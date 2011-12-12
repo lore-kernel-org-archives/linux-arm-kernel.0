@@ -1,106 +1,46 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 12 Dec 2011 15:39:47 +0100
-Subject: [PATCH] ARM: OMAP2+: Fix: Don't wait for the idle status if
- modulemode is not supported
-Message-ID: <1323700787-5934-1-git-send-email-b-cousson@ti.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 12 Dec 2011 14:40:30 +0000
+Subject: [PATCH 03/11] mm: mmzone: introduce zone_pfn_same_memmap()
+In-Reply-To: <op.v6dr4pj43l0zgt@mpn-glaptop>
+References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+ <1321634598-16859-4-git-send-email-m.szyprowski@samsung.com>
+ <20111212141953.GD3277@csn.ul.ie> <op.v6dr4pj43l0zgt@mpn-glaptop>
+Message-ID: <20111212144030.GF3277@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the module does not have any modulemode, the _disable_module function
-will do nothing. There is then no point waiting for a idle status change.
+On Mon, Dec 12, 2011 at 03:35:03PM +0100, Michal Nazarewicz wrote:
+> >On Fri, Nov 18, 2011 at 05:43:10PM +0100, Marek Szyprowski wrote:
+> >>From: Michal Nazarewicz <mina86@mina86.com>
+> >>diff --git a/mm/compaction.c b/mm/compaction.c
+> >>index 6afae0e..09c9702 100644
+> >>--- a/mm/compaction.c
+> >>+++ b/mm/compaction.c
+> >>@@ -111,7 +111,10 @@ skip:
+> >>
+> >> next:
+> >> 		pfn += isolated;
+> >>-		page += isolated;
+> >>+		if (zone_pfn_same_memmap(pfn - isolated, pfn))
+> >>+			page += isolated;
+> >>+		else
+> >>+			page = pfn_to_page(pfn);
+> >> 	}
+> 
+> On Mon, 12 Dec 2011 15:19:53 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
+> >Is this necessary?
+> >
+> >We are isolating pages, the largest of which is a MAX_ORDER_NR_PAGES
+> >page.  [...]
+> 
+> This is not true for CMA.
+> 
 
-It will remove the following warnings.
+To be clear, I'm referring to a single page being isolated here. It may
+or may not be a high-order page but it's still going to be less then
+MAX_ORDER_NR_PAGES so you should be able check when a new block is
+entered and pfn_to_page is necessary.
 
-[    0.331848] omap_hwmod: dmm: _wait_target_disable failed
-[    0.339935] omap_hwmod: emif_fw: _wait_target_disable failed
-[    0.348358] omap_hwmod: l3_main_1: _wait_target_disable failed
-[    0.356964] omap_hwmod: l3_main_2: _wait_target_disable failed
-[    0.365600] omap_hwmod: l4_abe: _wait_target_disable failed
-[    0.373931] omap_hwmod: l4_cfg: _wait_target_disable failed
-[    0.382263] omap_hwmod: l4_per: _wait_target_disable failed
-[    0.391113] omap_hwmod: l4_wkup: _wait_target_disable failed
-[    0.399536] omap_hwmod: dma_system: _wait_target_disable failed
-[    0.408325] omap_hwmod: dss_core: _wait_target_disable failed
-[    0.416839] omap_hwmod: dss_dispc: _wait_target_disable failed
-[    0.425445] omap_hwmod: dss_dsi1: _wait_target_disable failed
-[    0.433990] omap_hwmod: dss_dsi2: _wait_target_disable failed
-[    0.442504] omap_hwmod: dss_hdmi: _wait_target_disable failed
-[    0.451019] omap_hwmod: dss_rfbi: _wait_target_disable failed
-[    0.459564] omap_hwmod: dss_venc: _wait_target_disable failed
-[    0.489471] omap_hwmod: mailbox: _wait_target_disable failed
-[    0.505920] omap_hwmod: spinlock: _wait_target_disable failed
-
-Note: For such module, the state is managed automatically by HW according
-to clock domain transition. It is then not possible to wait for idle even
-later in the _idle function since the status will change at clock domain
-boundary.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   29 ++++++++++++++++++++---------
- 1 files changed, 20 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 207a2ff..dc9acac 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -710,16 +710,16 @@ static void _enable_module(struct omap_hwmod *oh)
-  * @oh: struct omap_hwmod *
-  *
-  * Disable the PRCM module mode related to the hwmod @oh.
-- * No return value.
-+ * Return EINVAL if the modulemode is not supported and 0 in case of success.
-  */
--static void _disable_module(struct omap_hwmod *oh)
-+int _disable_module(struct omap_hwmod *oh)
- {
- 	/* The module mode does not exist prior OMAP4 */
- 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
--		return;
-+		return -EINVAL;
- 
- 	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
--		return;
-+		return -EINVAL;
- 
- 	pr_debug("omap_hwmod: %s: _disable_module\n", oh->name);
- 
-@@ -727,6 +727,8 @@ static void _disable_module(struct omap_hwmod *oh)
- 				    oh->clkdm->cm_inst,
- 				    oh->clkdm->clkdm_offs,
- 				    oh->prcm.omap4.clkctrl_offs);
-+
-+	return 0;
- }
- 
- /**
-@@ -1537,11 +1539,20 @@ static int _idle(struct omap_hwmod *oh)
- 	if (oh->class->sysc)
- 		_idle_sysc(oh);
- 	_del_initiator_dep(oh, mpu_oh);
--	_disable_module(oh);
--	ret = _wait_target_disable(oh);
--	if (ret)
--		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
--			oh->name);
-+	ret = _disable_module(oh);
-+
-+	/*
-+	 * If the module does not have any modulemode, the previous
-+	 * function will do nothing. There is then no point waiting
-+	 * for a idle status change.
-+	 */
-+	if (!ret) {
-+		ret = _wait_target_disable(oh);
-+		if (ret)
-+			pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
-+				oh->name);
-+	}
-+
- 	/*
- 	 * The module must be in idle mode before disabling any parents
- 	 * clocks. Otherwise, the parent clock might be disabled before
 -- 
-1.7.0.4
+Mel Gorman
+SUSE Labs
