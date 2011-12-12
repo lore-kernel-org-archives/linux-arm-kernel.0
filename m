@@ -1,60 +1,36 @@
-From: rmorell@nvidia.com (Robert Morell)
-Date: Mon, 12 Dec 2011 14:44:09 -0800
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <4EE33EC2.6050508@redhat.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
- <201112051718.48324.arnd@arndb.de>
- <20111209225056.GL7969@morell.nvidia.com>
- <4EE33EC2.6050508@redhat.com>
-Message-ID: <20111212224408.GD4355@morell.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Dec 2011 14:46:49 -0800
+Subject: [GIT PULL] Two non-critical DMA fixes for v3.3 merge window
+Message-ID: <20111212224648.GI32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 10, 2011 at 03:13:06AM -0800, Mauro Carvalho Chehab wrote:
-> On 09-12-2011 20:50, Robert Morell wrote:
-> > On Mon, Dec 05, 2011 at 09:18:48AM -0800, Arnd Bergmann wrote:
-> >> On Friday 02 December 2011, Sumit Semwal wrote:
-> >>> This is the first step in defining a dma buffer sharing mechanism.
-> >>
-> > [...]
-> >>
-> >>> +	return dmabuf;
-> >>> +}
-> >>> +EXPORT_SYMBOL(dma_buf_export);
-> >>
-> >> I agree with Konrad, this should definitely be EXPORT_SYMBOL_GPL,
-> >> because it's really a low-level function that I would expect
-> >> to get used by in-kernel subsystems providing the feature to
-> >> users and having back-end drivers, but it's not the kind of thing
-> >> we want out-of-tree drivers to mess with.
-> >
-> > Is this really necessary?  If this is intended to be a
-> > lowest-common-denominator between many drivers to allow buffer sharing,
-> > it seems like it needs to be able to be usable by all drivers.
-> >
-> > If the interface is not accessible then I fear many drivers will be
-> > forced to continue to roll their own buffer sharing mechanisms (which is
-> > exactly what we're trying to avoid here, needless to say).
-> 
-> Doing a buffer sharing with something that is not GPL is not fun, as, if any
-> issue rises there, it would be impossible to discover if the problem is either
-> at the closed-source driver or at the open source one. At the time I was using
-> the Nvidia proprietary driver, it was very common to have unexplained issues
-> caused likely by bad code there at the buffer management code, causing X
-> applications and extensions (like xv) to break.
->
-> We should really make this EXPORT_SYMBOL_GPL(), in order to be able to latter
-> debug future share buffer issues, when needed.
+Hi Arnd & Olof,
 
-Sorry, I don't buy this argument.  Making these exports GPL-only is not
-likely to cause anybody to open-source their driver, but will rather
-just cause them to use yet more closed-source code that is even less
-debuggable than this would be, to those without access to the source.
+Please pull two non-critical DMA fixes from:
 
-Thanks,
-Robert
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical
 
-> Regards,
-> Mauro
+These are workarounds for corner cases. There's no rush
+to get them in during the -rc cycle, these are fixes for
+features that never worked before.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+  Linus Torvalds (1):
+        Linux 3.2-rc4
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical
+
+Peter Ujfalusi (2):
+      ARM: OMAP2+: DMA: Workaround for invalid source position
+      ARM: OMAP2+: DMA: Workaround for invalid destination position
+
+ arch/arm/plat-omap/dma.c |   22 +++++++++++++++++++++-
+ 1 files changed, 21 insertions(+), 1 deletions(-)
