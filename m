@@ -1,27 +1,27 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 12 Dec 2011 14:25:53 -0600
-Subject: [PATCH] ARM: remove header files included more than once
-In-Reply-To: <CAN1soZyaDO1dFTuG-5AgNGEHua6pi_W7VQ24yxyV1+dadK-vdQ@mail.gmail.com>
-References: <1323447943-23595-1-git-send-email-omar.ramirez@ti.com>
- <CAN1soZyaDO1dFTuG-5AgNGEHua6pi_W7VQ24yxyV1+dadK-vdQ@mail.gmail.com>
-Message-ID: <CAB-zwWg=7x2qLq52JC8LRzEu7HuzCHgqFZCB4ZBuVxAs_O0VWg@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 12 Dec 2011 22:58:19 +0200
+Subject: [PATCH 1/2] MTD: atmel_nand: Update Kconfig to support PMECC
+In-Reply-To: <1323327219-17895-1-git-send-email-hong.xu@atmel.com>
+References: <1323327219-17895-1-git-send-email-hong.xu@atmel.com>
+Message-ID: <1323723514.2297.8.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+On Thu, 2011-12-08 at 14:53 +0800, Hong Xu wrote:
+> +config MTD_NAND_ATMEL_PMECC_HW
+> +	bool "Programmable Hardware ECC (BCH code)"
+> +	depends on ARCH_AT91SAM9X5 || ARCH_AT91SAM9N12
+> +	help
+> +	  Use Programmable Hardware ECC (PMECC) controller.
+> +
+> +	  The PMECC Controller is a programmable binary BCH (Bose, Chaudhuri
+> +	  and Hocquenghem) encoder/decoder. This controller can be used to
+> +	  generate redundancy information for both SLC and MLC NAND Flash
+> +	  devices.
+> +
+> +	  NB : hardware and software ECC schemes are incompatible.
+> +	  If you switch from one to another, you'll have to erase your
+> +	  mtd partition.
 
-On Sun, Dec 11, 2011 at 7:10 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-...
-> Hi Omar,
->
-> Thanks for your patch. Could you help to split your patches into small
-> pieces? Since different people are handling for different files. For
-> example, I can help to handle files in arch-pxa. But I can't handle
-> other files.
-
-No problem, I'll split the patch to be included by independent trees.
-
-Thanks,
-
-Omar
+Does it have to be a config option, can we avoid adding config options
+uless we really have to?
