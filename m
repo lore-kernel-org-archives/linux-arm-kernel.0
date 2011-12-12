@@ -1,43 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Dec 2011 15:59:12 +0000
-Subject: [PATCH v3 2/2] ARM: SMP: Refactor Kconfig to be more maintainable
-In-Reply-To: <20111212150405.GB2296@linaro.org>
-References: <1323690426-6267-1-git-send-email-dave.martin@linaro.org>
- <1323690426-6267-3-git-send-email-dave.martin@linaro.org>
- <20111212141001.GZ14542@n2100.arm.linux.org.uk>
- <20111212150405.GB2296@linaro.org>
-Message-ID: <20111212155912.GB20178@n2100.arm.linux.org.uk>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 12 Dec 2011 21:32:10 +0530
+Subject: [RESEND][PATCH] ARM: Exynos: Add irq domain and device tree
+ support for interrupt combiner
+In-Reply-To: <4EE5781E.2060702@gmail.com>
+References: <1323586114-24486-1-git-send-email-thomas.abraham@linaro.org>
+ <4EE5781E.2060702@gmail.com>
+Message-ID: <CAJuYYwS=d92ra9-R0W0Q8nwv1aPfe192FcOb-5QM9ZnQAO_T3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 03:04:05PM +0000, Dave Martin wrote:
-> On Mon, Dec 12, 2011 at 02:10:01PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Dec 12, 2011 at 11:47:06AM +0000, Dave Martin wrote:
-> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > > index 4234937..4aa7f7e 100644
-> > > --- a/arch/arm/mach-imx/Kconfig
-> > > +++ b/arch/arm/mach-imx/Kconfig
-> > > @@ -611,6 +611,7 @@ config SOC_IMX6Q
-> > >  	select ARM_GIC
-> > >  	select CPU_V7
-> > >  	select HAVE_ARM_SCU
-> > > +	select HAVE_SMP
-> > >  	select HAVE_IMX_GPC
-> > >  	select HAVE_IMX_MMDC
-> > >  	select HAVE_IMX_SRC
-> > 
-> > NAK.  I'll let you work out why.  It has something to do with ABCDEFGH...
-> 
-> Duh.  Sorry about that -- will fix and repost.
-> 
-> 
-> Do you have a preference about where to insert new items where the list
-> is not already in alphabetical order?
+Hi Rob,
 
-What I've done in the past is roughly to ignore anything which isn't
-alphabetical from the top, and place it within that subset.  I
-simetimes change that (if there's a group of HAVE_xxx which is already
-sorted, I add it within that sub-group.)
+On 12 December 2011 09:12, Rob Herring <robherring2@gmail.com> wrote:
+>> +Example:
+>> +
+>> + ? ? combiner:interrupt-controller at 10440000 {
+>> + ? ? ? ? ? ? compatible = "samsung,exynos4120-combiner";
+>> + ? ? ? ? ? ? #interrupt-cells = <2>;
+>> + ? ? ? ? ? ? interrupt-controoler;
+>
+> s/controoler/controller/
 
-In other words, try to sensibly place it so the addition itself is
-alphabetically between two other options which are already so sorted.
+Ok. I will fix this.
+
+>
+>> + ? ? ? ? ? ? reg = <0x10440000 0x1000>;
+>> + ? ? };
+>
+> [snip]
+>
+>> +
+>> +int __init combiner_init_irq_domain(unsigned int irq_base, unsigned int nr_irq,
+>
+> Make irq_base signed.
+
+Ok.
+
+>
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device_node *np)
+>> +{
+>> + ? ? struct irq_domain *domain = &combiner_irq_domain;
+>> +
+>> + ? ? domain->irq_base = irq_alloc_descs(irq_base, irq_base, nr_irq, 0);
+>
+> This should be irq_alloc_descs(irq_base, 1,
+>
+> So that dynamic allocation can work when irq_base is -1.
+
+Ok. I will modify this.
+
+>
+>> + ? ? if (domain->irq_base < 0) {
+>> + ? ? ? ? ? ? pr_err("failed to alloc irq descs, combiner init failed\n");
+>> + ? ? ? ? ? ? return -EBUSY;
+>
+> On failure, just warn and do:
+>
+> domain->irq_base = irq_base
+>
+> instead of returning unless all platforms using this are completely
+> converted over to support dynamic Linux virq mapping.
+
+Ok.
+
+>
+> Also you should update your platforms' to set mdesc.nr_irq to
+> NR_IRQS_LEGACY. And test with SPARSE_IRQ turned on.
+
+Ok. I will test with NR_IRQS_LEGACY. Hope nothing breaks!
+
+Thank you Rob for you review and comments on this patch.
+
+Regards,
+Thomas.
+
+>
+> Rob
