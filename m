@@ -1,72 +1,98 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 11 Dec 2011 16:17:03 -0800
-Subject: [PATCH v6 04/10] arm/tegra: prepare early init for multiple
- tegra variants
-In-Reply-To: <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
+Date: Sun, 11 Dec 2011 16:26:16 -0800
+Subject: [PATCH v6 10/10] arm/tegra: add support for tegra30 based board
+ cardhu
+In-Reply-To: <4EE21B67.5040006@gmail.com>
 References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20111212001703.GA26598@quad.lixom.net>
+ <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
+ <4EE21B67.5040006@gmail.com>
+Message-ID: <20111212002616.GB26598@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 02:43:47PM +0200, Peter De Schrijver wrote:
-> This patch splits the early init code in a common and a tegra20 specific part.
-> L2 cache initialization is generalized and discovers the cache associativity
-> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
-> the system using the PMC reset feature rather then the CAR system reset.
+On Fri, Dec 09, 2011 at 08:29:59AM -0600, Rob Herring wrote:
+> On 12/08/2011 06:43 AM, Peter De Schrijver wrote:
+> > Add support for the tegra30 based cardhu development board. Cardhu is a tablet
+> > formfactor reference design for tegra30. The patch provides a device tree for
+> > the board, updates Makefile.boot to build the dtb, includes the platform in
+> > Kconfig and updates board-dt.c.
+> > 
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > ---
+> >  arch/arm/boot/dts/tegra-cardhu.dts |   36 ++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-tegra/Kconfig        |    7 +++++++
+> >  arch/arm/mach-tegra/Makefile.boot  |    1 +
+> >  arch/arm/mach-tegra/board-dt.c     |    1 +
+> >  4 files changed, 45 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/tegra-cardhu.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
+> > new file mode 100644
+> > index 0000000..70c41fc
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/tegra-cardhu.dts
+> > @@ -0,0 +1,36 @@
+> > +/dts-v1/;
+> > +
+> > +/include/ "tegra30.dtsi"
+> > +
+> > +/ {
+> > +	model = "NVIDIA Tegra30 Cardhu evaluation board";
+> > +	compatible = "nvidia,cardhu", "nvidia,tegra30";
+> > +
+> > +	memory {
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
->  arch/arm/mach-tegra/board-dt.c        |   10 +++++---
->  arch/arm/mach-tegra/board-harmony.c   |    2 +-
->  arch/arm/mach-tegra/board-paz00.c     |    2 +-
->  arch/arm/mach-tegra/board-seaboard.c  |    6 ++--
->  arch/arm/mach-tegra/board-trimslice.c |    2 +-
->  arch/arm/mach-tegra/board.h           |    2 +-
->  arch/arm/mach-tegra/clock.c           |    5 ----
->  arch/arm/mach-tegra/common.c          |   34 ++++++++++++++++++++------------
->  8 files changed, 34 insertions(+), 29 deletions(-)
+> memory at 80000000
+
+If there is only one memory node, then there is no need to specify the unit
+address after the name, it's just noise.
+
+> > diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> > index aad54ca..6bae1bb 100644
+> > --- a/arch/arm/mach-tegra/Kconfig
+> > +++ b/arch/arm/mach-tegra/Kconfig
+> > @@ -91,6 +91,13 @@ config MACH_VENTANA
+> >         help
+> >           Support for the nVidia Ventana development platform
+> >  
+> > +config MACH_CARDHU
+> > +       bool "Cardhu board"
+> > +       depends on ARCH_TEGRA_3x_SOC
+> > +       select MACH_TEGRA_DT
+> > +       help
+> > +         Support for the NVIDIA Cardhu development platform
+> > +
 > 
-> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-> index 6a460a2..ef9843c 100644
-> --- a/arch/arm/mach-tegra/board-dt.c
-> +++ b/arch/arm/mach-tegra/board-dt.c
-> @@ -133,7 +133,8 @@ static void __init tegra_dt_init(void)
->  		"Unknown platform! Pinmuxing not initialized\n");
->  }
->  
-> -static const char * tegra_dt_board_compat[] = {
-> +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-> +static const char *tegra20_dt_board_compat[] = {
->  	"compulab,trimslice",
->  	"nvidia,harmony",
->  	"compal,paz00",
-> @@ -142,13 +143,14 @@ static const char * tegra_dt_board_compat[] = {
->  	NULL
->  };
->  
-> -DT_MACHINE_START(TEGRA_DT, "nVidia Tegra (Flattened Device Tree)")
-> +DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
->  	.map_io		= tegra_map_common_io,
-> -	.init_early	= tegra_init_early,
-> +	.init_early	= tegra20_init_early,
->  	.init_irq	= tegra_dt_init_irq,
->  	.handle_irq	= gic_handle_irq,
->  	.timer		= &tegra_timer,
->  	.init_machine	= tegra_dt_init,
->  	.restart	= tegra_assert_system_reset,
-> -	.dt_compat	= tegra_dt_board_compat,
-> +	.dt_compat	= tegra20_dt_board_compat,
->  MACHINE_END
-> +#endif
+> You should not be adding kconfig entries for boards. They should
+> eventually go away with DT.
 
-As previously mentioned by Stephen, please split up in separate
-patches.
+Agreed. On Tegra2 we still want board configs since it allows us to leave out
+some of the kernel code that is still per-board (i.e. pinmux tables, etc). Once
+that has been moved to device tree we can remove all board kconfig options
+there. We might as well not start adding them on T30.
 
-But also, I would prefer to see one board-dt for tegra20 and one for
-tegra30 (board-dt-t20 and board-dt-t30, or whatnot). They wouldn't be
-sharing much code anyway, I would rather see a limited amount of code
-duplication than excessive ifdefs in one file.
+> >  choice
+> >          prompt "Low-level debug console UART"
+> >          default TEGRA_DEBUG_UART_NONE
+> > diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+> > index cf51a00..7c1110f 100644
+> > --- a/arch/arm/mach-tegra/Makefile.boot
+> > +++ b/arch/arm/mach-tegra/Makefile.boot
+> > @@ -7,3 +7,4 @@ dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
+> >  dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
+> >  dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
+> >  dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
+> > +dtb-$(CONFIG_MACH_CARDHU) += tegra-cardhu.dtb
+> 
+> Likewise, this should be more like:
+> dtb-$(CONFIG_MACH_TEGRA_DT) += tegra-seaboard.dtb tegra-trimslice.dtb
+> tegra-ventana.dtb ...
+
+Actually, the cardhu dts CONFIG_ARCH_TEGRA_3x_SOC, since there will only be DT
+boards for that platform.
+
+Moving the others to TEGRA_DT is a later change (see above comments about some
+C code still needed).
 
 
 -Olof
