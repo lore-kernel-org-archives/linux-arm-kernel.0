@@ -1,39 +1,36 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 12 Dec 2011 15:04:05 +0000
-Subject: [PATCH v3 2/2] ARM: SMP: Refactor Kconfig to be more maintainable
-In-Reply-To: <20111212141001.GZ14542@n2100.arm.linux.org.uk>
-References: <1323690426-6267-1-git-send-email-dave.martin@linaro.org>
- <1323690426-6267-3-git-send-email-dave.martin@linaro.org>
- <20111212141001.GZ14542@n2100.arm.linux.org.uk>
-Message-ID: <20111212150405.GB2296@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Dec 2011 23:15:55 +0800
+Subject: [PATCH v3 0/3] Add device tree support for mc13892 regulator driver
+Message-ID: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 02:10:01PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 12, 2011 at 11:47:06AM +0000, Dave Martin wrote:
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index 4234937..4aa7f7e 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -611,6 +611,7 @@ config SOC_IMX6Q
-> >  	select ARM_GIC
-> >  	select CPU_V7
-> >  	select HAVE_ARM_SCU
-> > +	select HAVE_SMP
-> >  	select HAVE_IMX_GPC
-> >  	select HAVE_IMX_MMDC
-> >  	select HAVE_IMX_SRC
-> 
-> NAK.  I'll let you work out why.  It has something to do with ABCDEFGH...
+Changes since v2:
+ * Drop '[PATCH v2 2/4] regulator: pass device_node to
+   of_get_regulator_init_data()' which has been picked up by Mark
+ * Add a note on how driver matches regulator device and the node in
+   binding document
 
-Duh.  Sorry about that -- will fix and repost.
+Changes since v1:
+ * Drop '[PATCH 2/5] regulator: fix label names used in device tree
+   bindings' which has been picked up
+ * Add binding document for mfd/mc13xxx-core device tree support
+ * Fix regulator/fixed.c breakage caused by interface change on
+   of_get_regulator_init_data()
+ * Reword the commit message of patch #2 a little bit to make the
+   reason for changing clear
+ * Retrieve the irq from gpio irq domain
 
+Shawn Guo (3):
+      mfd: mc13xxx: add device tree probe support
+      regulator: mc13892: add device tree probe support
+      arm/imx: add mc13892 support into imx51-babbage.dts
 
-Do you have a preference about where to insert new items where the list
-is not already in alphabetical order?
-
-Currently, I've just tried not to make things worse than they already
-are (except in this particular case...)
-
-Cheers
----Dave
+ Documentation/devicetree/bindings/mfd/mc13xxx.txt |   53 ++++++++++
+ arch/arm/boot/dts/imx51-babbage.dts               |  103 ++++++++++++++++++++-
+ drivers/mfd/mc13xxx-core.c                        |  106 +++++++++++++++------
+ drivers/regulator/mc13892-regulator.c             |   43 ++++++--
+ drivers/regulator/mc13xxx-regulator-core.c        |   57 +++++++++++
+ drivers/regulator/mc13xxx.h                       |   20 ++++
+ include/linux/mfd/mc13xxx.h                       |    1 +
+ 7 files changed, 339 insertions(+), 44 deletions(-)
