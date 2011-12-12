@@ -1,43 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 12 Dec 2011 09:56:10 +0900
-Subject: PL330: Merge PL330 drivers
-In-Reply-To: <1323306645-4003-1-git-send-email-boojin.kim@samsung.com>
-References: <1323306645-4003-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <000601ccb868$d711f690$8535e3b0$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 Dec 2011 09:20:43 +0800
+Subject: [PATCH v3] mfd: mc13xxx: add device tree probe support
+In-Reply-To: <1323183883-32161-1-git-send-email-shawn.guo@linaro.org>
+References: <1322731268-12158-2-git-send-email-shawn.guo@linaro.org>
+ <1323183883-32161-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111212012043.GB9572@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boojin Kim wrote:
+Hi Samuel,
+
+Ping?
+
+Regards,
+Shawn
+
+On Tue, Dec 06, 2011 at 11:04:43PM +0800, Shawn Guo wrote:
+> It adds device tree probe support for mc13xxx mfd driver.
 > 
-> In-Reply-To:
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> ---
+> Changes since v2:
 > 
-> PL330 driver is divided into 2 parts.
-> First is the PL330 API driver that located on driver/dma/.
-> Second is the low-level PL330 driver that is located on arch/arm/common/.
-> But, It's not needed anymore to divided PL330 driver into 2 parts
-> Low-level PL330 driver is only used for PL330 API driver on driver/dma
-> because samsung specific S3C-PL330 driver was gone.
-> So, This patch merges 'arch/arm/common/pl330' into 'driver/dma/pl330.c'.
+>  * Add some note on how driver matches regulator device and the node
+>    in binding document
 > 
-> [PATCH 1/2] DMA: PL330: Merge PL330 drivers
-> [PATCH 2/2] DMA: PL330: Remove an unused function
-
-Hi all,
-
-Since Boojin's git send-email has problem, this series re-submitted on
-Sunday like following :(
-Please kindly ignore this series.
-
-[PATCH 1/3] ARM: EXYNOS: Support DMA driver for Exynos4x12 series
-[PATCH 2/3] DMA: PL330: Merge PL330 drivers
-[PATCH 3/3] DMA: PL330: Remove an unused function
-
-Sorry for bothering.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Since it's a small change, I only resend this patch (as v3) instead
+> of the whole series.  Hope it's fine.
+> 
+> Regards,
+> Shawn
+> 
+>  Documentation/devicetree/bindings/mfd/mc13xxx.txt |   53 ++++++++++
+>  drivers/mfd/mc13xxx-core.c                        |  106 +++++++++++++++------
+>  2 files changed, 128 insertions(+), 31 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/mc13xxx.txt
