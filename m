@@ -1,41 +1,26 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 12 Dec 2011 13:56:01 +0800
-Subject: [PATCH 0/7] arm/imx6: add imx6q sabrelite board and imx6q
- cpufreq support
-In-Reply-To: <20111212054813.GE9572@S2100-06.ap.freescale.net>
-References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
- <20111212054813.GE9572@S2100-06.ap.freescale.net>
-Message-ID: <20111212055600.GC16350@b20223-02.ap.freescale.net>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Mon, 12 Dec 2011 15:46:53 +0900
+Subject: [PATCH] ARM: MM: Configure the number of banks
+In-Reply-To: <20111211102443.GT14542@n2100.arm.linux.org.uk>
+References: <1323048539-9573-1-git-send-email-boojin.kim@samsung.com>
+ <20111211100325.GR14542@n2100.arm.linux.org.uk>
+ <20111211102443.GT14542@n2100.arm.linux.org.uk>
+Message-ID: <006901ccb899$d5c33930$8149ab90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 01:48:14PM +0800, Shawn Guo wrote:
-> On Mon, Dec 12, 2011 at 11:42:25AM +0800, Richard Zhao wrote:
-> > - add imx6q sabrelite board support
-> > - add imx6q cpufreq support
-> > 
-> It seems that Rob Lee is also working on imx6q cpufreq.  We had some
-> talk about this.  I would suggest move the existing imx cpufreq driver
-> into drivers/cpufreq before we start adding imx6q support.  (Samsung
-> and Omap have already done that.)
-yes. There might be duplicate work here.
-I agree the migration. Please continue review other parts.
-
-Rob,
-
-Could you review this patch series too and check the fragment?
+Russell King wrote:
 
 
-Thanks
-Richard
-> 
-> -- 
-> Regards,
-> Shawn
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> >
+> >  source arch/arm/mm/Kconfig
+> >
+> > +config ARM_NR_BANKS
+> > +	int
+> > +	default 16 if ARCH_EP93XX
+>
+> I've now committed this patch - if you want to add exynos to this,
+> please send a patch to do just that.  Thanks.
+
+It's good to me.
+Thank you for review !
