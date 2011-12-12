@@ -1,51 +1,223 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 12 Dec 2011 11:03:31 +0000
-Subject: [PATCH v5 5/9] ARM: versatile: Map local timers using Device
- Tree when possible
-In-Reply-To: <4EE37A4D.8060204@ru.mvista.com>
-References: <1323457432-4800-1-git-send-email-pawel.moll@arm.com>
- <1323457432-4800-6-git-send-email-pawel.moll@arm.com>
- <4EE37A4D.8060204@ru.mvista.com>
-Message-ID: <1323687811.2391.3.camel@hornet.cambridge.arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 12 Dec 2011 13:10:38 +0200
+Subject: [PATCH] ARM: OMAP3LOGIC: Adding DSS support
+In-Reply-To: <1323345948-14533-1-git-send-email-alexg@meprolight.com>
+References: <1323345948-14533-1-git-send-email-alexg@meprolight.com>
+Message-ID: <1323688238.3852.18.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Morning,
+Hi,
 
-On Sat, 2011-12-10 at 15:27 +0000, Sergei Shtylyov wrote:
-> >   int __cpuinit local_timer_setup(struct clock_event_device *evt)
-> >   {
-> > +#if defined(CONFIG_OF)
-> > +	if (!twd_base) {
-> > +		struct device_node *np = of_find_compatible_node(NULL,
-> > +				NULL, "arm,smp-twd");
-> > +
-> > +		twd_base = of_iomap(np, 0);
-> > +		if (!twd_base)
-> > +			return -ENXIO;
+On Thu, 2011-12-08 at 14:05 +0200, Alex wrote:
+> This patch adds DSS2 support to the LogicPD OMAP 35x Torpedo boardfile. LCD and
+> TV-out are supported.
 > 
->     -ENOMEM.
+> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+> ---
+>  arch/arm/mach-omap2/board-omap3logic.c |  151 ++++++++++++++++++++++++++++++++
+>  1 files changed, 151 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+> index 7c0f193..86175fa 100644
+> --- a/arch/arm/mach-omap2/board-omap3logic.c
+> +++ b/arch/arm/mach-omap2/board-omap3logic.c
+> @@ -7,6 +7,9 @@
+>   * Copyright (C) 2010 Logic Product Development, Inc.
+>   * Peter Barada <peter.barada@logicpd.com>
+>   *
+> + * Copyright (C) 2011 Meprolight, Ltd.
+> + * Alex Gershgorin <alexg@meprolight.com>
+> + *
+>   * Modified from Beagle, EVM, and RX51
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+> @@ -44,6 +47,10 @@
+>  #include <plat/gpmc-smsc911x.h>
+>  #include <plat/gpmc.h>
+>  #include <plat/sdrc.h>
+> +#include <plat/vram.h>
+> +
+> +#include <video/omapdss.h>
+> +#include <video/omap-panel-generic-dpi.h>
+>  
+>  #define OMAP3LOGIC_SMSC911X_CS			1
+>  
+> @@ -58,6 +65,14 @@ static struct regulator_consumer_supply omap3logic_vmmc1_supply[] = {
+>  	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+>  };
+>  
+> +static struct regulator_consumer_supply omap3logic_vdds_supplies[] = {
+> +	REGULATOR_SUPPLY("vdds_sdi", "omapdss"),
+> +	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
+> +};
+> +
+> +static struct regulator_consumer_supply omap3logic_vdac_supply =
+> +	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc");
+> +
+>  /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
+>  static struct regulator_init_data omap3logic_vmmc1 = {
+>  	.constraints = {
+> @@ -74,6 +89,34 @@ static struct regulator_init_data omap3logic_vmmc1 = {
+>  	.consumer_supplies      = omap3logic_vmmc1_supply,
+>  };
+>  
+> +static struct regulator_init_data omap3logic_vpll2 = {
+> +	.constraints = {
+> +		.name			= "VDDS_DSI",
+> +		.min_uV			= 1800000,
+> +		.max_uV			= 1800000,
+> +		.apply_uV		= true,
+> +		.always_on		= true,
+> +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+> +					| REGULATOR_MODE_STANDBY,
+> +		.valid_ops_mask		= REGULATOR_CHANGE_MODE,
+> +	},
+> +	.num_consumer_supplies  = ARRAY_SIZE(omap3logic_vdds_supplies),
+> +	.consumer_supplies      = omap3logic_vdds_supplies,
+> +};
+> +
+> +static struct regulator_init_data omap3logic_vdac = {
+> +	.constraints = {
+> +		.min_uV			= 1800000,
+> +		.max_uV			= 1800000,
+> +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+> +					| REGULATOR_MODE_STANDBY,
+> +		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+> +					| REGULATOR_CHANGE_STATUS,
+> +	},
+> +	.num_consumer_supplies	= 1,
+> +	.consumer_supplies	= &omap3logic_vdac_supply,
+> +};
+> +
+>  static struct twl4030_gpio_platform_data omap3logic_gpio_data = {
+>  	.gpio_base	= OMAP_MAX_GPIO_LINES,
+>  	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+> @@ -91,6 +134,8 @@ static struct twl4030_platform_data omap3logic_twldata = {
+>  	/* platform_data for children goes here */
+>  	.gpio		= &omap3logic_gpio_data,
+>  	.vmmc1		= &omap3logic_vmmc1,
+> +	.vpll2		= &omap3logic_vpll2,
+> +	.vdac		= &omap3logic_vdac,
+>  };
 
-Hm. What I did simply mimics this ("arch/arm/include/asm/localtimer.h"):
+The regulators are already set up in twl-common.c, so there shouldn't be
+need for the code above.
 
-#ifdef CONFIG_LOCAL_TIMERS
-[...]
-#else
+>  
+>  static int __init omap3logic_i2c_init(void)
+> @@ -182,6 +227,110 @@ static inline void __init board_smsc911x_init(void)
+>  	gpmc_smsc911x_init(&board_smsc911x_data);
+>  }
+>  
+> +#if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
+> +
+> +#define OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO	154
+> +#define OMAP3_TORPEDO_LCD_ENABLE_GPIO		155
+> +#define OMAP3_TORPEDO_LCD_PWM_GPIO		56
 
-static inline int local_timer_setup(struct clock_event_device *evt)
-{
-        return -ENXIO;
-}
+The PWM gpio doesn't seem to be used. Is it needed for something?
 
-Now, I had a look at "include/asm-generic/errno-base.h":
+> +static struct gpio omap3logic_dss_gpios[] __initdata = {
+> +	{OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, GPIOF_OUT_INIT_LOW, "lcd_bl_pwr"},
+> +	{OMAP3_TORPEDO_LCD_PWM_GPIO, GPIOF_OUT_INIT_LOW, "lcd bl enable"},
+> +	{OMAP3_TORPEDO_LCD_ENABLE_GPIO, GPIOF_OUT_INIT_LOW, "lcd enable"},
+> +};
+> +
+> +static int omap3logic_enable_lcd(struct omap_dss_device *dssdev)
+> +{
+> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 1);
+> +	msleep(20);
+> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 1);
+> +
+> +	return 0;
+> +}
+> +
+> +static void omap3logic_disable_lcd(struct omap_dss_device *dssdev)
+> +{
+> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 0);
+> +	msleep(20);
+> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 0);
+> +}
 
-#define ENXIO            6      /* No such device or address */
-[...]
-#define ENOMEM          12      /* Out of memory */
+Is there a particular reason for msleep(20) in the enable and disable
+function?
 
-and to be honest, ENXIO makes more sense to me, but I really have no
-strong feelings either way... Do you?
+> +
+> +static struct panel_generic_dpi_data lcd_panel = {
+> +	.name			= "sharp_lq",
+> +	.platform_enable	= omap3logic_enable_lcd,
+> +	.platform_disable	= omap3logic_disable_lcd,
+> +};
+> +
+> +static struct omap_dss_device omap3logic_lcd_device = {
+> +	.name			= "lcd",
+> +	.driver_name		= "generic_dpi_panel",
+> +	.type			= OMAP_DISPLAY_TYPE_DPI,
+> +	.data			= &lcd_panel,
+> +	.phy.dpi.data_lines	= 16,
+> +};
+> +
+> +static struct omap_dss_device omap3logic_tv_device = {
+> +	.name			= "tv",
+> +	.driver_name		= "venc",
+> +	.type			= OMAP_DISPLAY_TYPE_VENC,
+> +	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
+> +};
+> +
+> +static struct omap_dss_device *omap3logic_dss_devices[] = {
+> +	&omap3logic_lcd_device,
+> +	&omap3logic_tv_device,
+> +};
+> +
+> +static struct omap_dss_board_info omap3logic_dss_data = {
+> +	.num_devices		= ARRAY_SIZE(omap3logic_dss_devices),
+> +	.devices		= omap3logic_dss_devices,
+> +	.default_device		= &omap3logic_lcd_device,
+> +};
+> +
+> +static void __init omap3logic_display_init(void)
+> +{
+> +	int r;
+> +
+> +	r = gpio_request_array(omap3logic_dss_gpios,
+> +			       ARRAY_SIZE(omap3logic_dss_gpios));
+> +	if (r) {
+> +		printk(KERN_ERR "failed to get lcd_panel_* gpios\n");
+> +		return;
+> +	}
+> +
+> +	gpio_export(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 0);
+> +	gpio_export(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 0);
+> +	gpio_export(OMAP3_TORPEDO_LCD_PWM_GPIO, 0);
+> +
+> +	r = omap_display_init(&omap3logic_dss_data);
+> +	if (r) {
+> +		pr_err("OMAP3LOGIC: failed to register DSS device\n");
+> +		gpio_free_array(omap3logic_dss_gpios,
+> +				ARRAY_SIZE(omap3logic_dss_gpios));
+> +	}
+> +}
+> +
+> +static void __init omap3logic_video_mem_init(void)
+> +{
+> +	/*
+> +	 * GFX 480x272x32bpp
+> +	 * VID1/2 480x272x32bpp double buffered
+> +	 */
+> +	omap_vram_set_sdram_vram(PAGE_ALIGN(480 * 272 * 4) +
+> +			2 * PAGE_ALIGN(480 * 272 * 4 * 2), 0);
+> +}
 
-Thanks for your time!
+You should normally let the bootloader or the user define the vram size
+via boot parameters, not in the board file like this.
 
-Pawe?
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111212/7402e7b0/attachment.sig>
