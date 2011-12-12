@@ -1,61 +1,79 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 12 Dec 2011 15:51:55 +0100
-Subject: [PATCH 03/11] mm: mmzone: introduce zone_pfn_same_memmap()
-In-Reply-To: <20111212144030.GF3277@csn.ul.ie>
-References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
- <1321634598-16859-4-git-send-email-m.szyprowski@samsung.com>
- <20111212141953.GD3277@csn.ul.ie> <op.v6dr4pj43l0zgt@mpn-glaptop>
- <20111212144030.GF3277@csn.ul.ie>
-Message-ID: <op.v6dswtfw3l0zgt@mpn-glaptop>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 12 Dec 2011 15:01:58 +0000
+Subject: [PATCH v3 1/2] ARM: pl2x0/pl310: Refactor Kconfig to be more
+ maintainable
+In-Reply-To: <20111212140836.GY14542@n2100.arm.linux.org.uk>
+References: <1323690426-6267-1-git-send-email-dave.martin@linaro.org>
+ <1323690426-6267-2-git-send-email-dave.martin@linaro.org>
+ <20111212140836.GY14542@n2100.arm.linux.org.uk>
+Message-ID: <20111212145738.GA2296@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Nov 18, 2011 at 05:43:10PM +0100, Marek Szyprowski wrote:
->> From: Michal Nazarewicz <mina86@mina86.com>
->> diff --git a/mm/compaction.c b/mm/compaction.c
->> index 6afae0e..09c9702 100644
->> --- a/mm/compaction.c
->> +++ b/mm/compaction.c
->> @@ -111,7 +111,10 @@ skip:
->>
->>  next:
->>  		pfn += isolated;
->> -		page += isolated;
->> +		if (zone_pfn_same_memmap(pfn - isolated, pfn))
->> +			page += isolated;
->> +		else
->> +			page = pfn_to_page(pfn);
->>  	}
+On Mon, Dec 12, 2011 at 02:08:37PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 12, 2011 at 11:47:05AM +0000, Dave Martin wrote:
+> > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> > index 724ec0f..c4c9acf 100644
+> > --- a/arch/arm/mach-exynos/Kconfig
+> > +++ b/arch/arm/mach-exynos/Kconfig
+> > @@ -17,6 +17,7 @@ choice
+> >  
+> >  config ARCH_EXYNOS4
+> >  	bool "SAMSUNG EXYNOS4"
+> > +	select CACHE_L2X0
+> 
+> Doesn't this need to select HAVE_L2X0_L2CC as well?
 
-On Mon, 12 Dec 2011 15:19:53 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> Is this necessary?
->
-> We are isolating pages, the largest of which is a MAX_ORDER_NR_PAGES
-> page.  [...]
+Probably not -- due to a moment of madness, it looks like I somehow
+mistranslated "highbank" as "exynos4".
 
-On Mon, 12 Dec 2011 15:40:30 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> To be clear, I'm referring to a single page being isolated here. It may
-> or may not be a high-order page but it's still going to be less then
-> MAX_ORDER_NR_PAGES so you should be able check when a new block is
-> entered and pfn_to_page is necessary.
+For highbank, Rob Herring thinks that direct selection of CACHE_L2X0 is
+needed [1].
 
-Do you mean something like:
+I will re-roll the patch to fix this.
 
-if (same pageblock)
-	just do arithmetic;
-else
-	use pfn_to_page;
 
-?
+This may apply to other platforms too; but if they are not already
+selecting CACHE_L2X0 directly, this series will make the situation no
+worse.
 
-I've discussed it with Dave and he suggested that approach as an
-optimisation since in some configurations zone_pfn_same_memmap()
-is always true thus compiler will strip the else part, whereas
-same pageblock test will be false on occasions regardless of kernel
-configuration.
+> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > index 5f7f9c2..4234937 100644
+> > --- a/arch/arm/mach-imx/Kconfig
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -609,12 +609,12 @@ comment "i.MX6 family:"
+> >  config SOC_IMX6Q
+> >  	bool "i.MX6 Quad support"
+> >  	select ARM_GIC
+> > -	select CACHE_L2X0
+> >  	select CPU_V7
+> >  	select HAVE_ARM_SCU
+> >  	select HAVE_IMX_GPC
+> >  	select HAVE_IMX_MMDC
+> >  	select HAVE_IMX_SRC
+> > +	select HAVE_L2X0_L2CC
+> 
+> Do you know enough about this to make L2 cache support optional on this SoC?
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+No.  But Shawn Guo suggested that this correct [2]
+ 
+> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> > index 5034147..0358159 100644
+> > --- a/arch/arm/mach-omap2/Kconfig
+> > +++ b/arch/arm/mach-omap2/Kconfig
+> > @@ -44,6 +44,7 @@ config ARCH_OMAP4
+> >  	select CPU_V7
+> >  	select ARM_GIC
+> >  	select LOCAL_TIMERS if SMP
+> > +	select CACHE_L2X0
+> 
+> HAVE_L2X0_L2CC ?
+
+Rob Herring thinks not [1]
+
+Cheers
+---Dave
+
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074495.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
