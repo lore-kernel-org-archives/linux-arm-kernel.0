@@ -1,17 +1,14 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 12 Dec 2011 12:29:50 +0800
-Subject: [PATCH 07/10] ASoC: OMAP: ams-delta: Drive modem/codec pins over
- GPIO API
-In-Reply-To: <1323634328-856-8-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <1323634328-856-8-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <20111212042949.GA2806@opensource.wolfsonmicro.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 12 Dec 2011 12:47:34 +0800
+Subject: [PATCH 3/7] ARM: imx: fix cpufreq build errors
+In-Reply-To: <1323661352-10291-4-git-send-email-richard.zhao@linaro.org>
+References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
+ <1323661352-10291-4-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111212044733.GA16350@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 11, 2011 at 09:12:05PM +0100, Janusz Krzysztofik wrote:
-> Don't use Amstrad Delta custom I/O functions any longer, replace them
-> with GPIO. Old pin definitions, no longer used by the modem bits either,
-> can be dropped.
+please ignore this one if it's already been merged.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Thanks
+Richard 
