@@ -1,108 +1,47 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Mon, 12 Dec 2011 11:15:17 +0200
-Subject: [PATCH] ARM: OMAP: McSPI: Remove unused flag from struct
- omap2_mcspi_device_config
-Message-ID: <1323681317-8447-1-git-send-email-jarkko.nikula@bitmer.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 Dec 2011 17:49:20 +0800
+Subject: [PATCH] irq: convert generic-chip to use irq_domain
+In-Reply-To: <4EE554BA.9040408@gmail.com>
+References: <1323470689-6200-1-git-send-email-robherring2@gmail.com>
+ <20111211160025.GA9572@S2100-06.ap.freescale.net>
+ <4EE554BA.9040408@gmail.com>
+Message-ID: <20111212094919.GH9572@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Flag single_channel in struct omap2_mcspi_device_config is not used
-by drivers/spi/spi-omap2-mcspi.c so we may remove it from include/plat/mcspi.h
-and affected board files.
+On Sun, Dec 11, 2011 at 07:11:22PM -0600, Rob Herring wrote:
+> Shawn,
+> 
+> On 12/11/2011 10:00 AM, Shawn Guo wrote:
+> > Hi Rob,
+> > 
+> > I installed the patch and played it a little bit, and I some feedback
+> > below.
+> 
+> Thanks!
+> 
+> > * It breaks some existing irq_chip_generic users like imx5, which
+> >   is currently numbering irq from 0.  For such users, irq_alloc_descs()
+> >   will fail because it's asked to search irq #0 starting from irq #1.
+> >   Yes, I know numbering irq from 0 is a bad idea and really needs to
+> >   get fixed.  But is it your intention to break such users and force
+> >   them get fixed with this patch?
+> 
+> I was trying not to break things and allow the existing irq base.
+> 
+> My problem is irq 0-15 are unallocated, 16-159 are the GIC. So when I
+> try to allocate 8 irqdescs for gpio, I don't really want irq_alloc_descs
+> to pick 0-15. Ideally we would just globally reserve 0-15 on ARM, but
+> this will cause problems. So starting at 1 was at least slightly better
+> than 0.
+> 
+> I think I'll just skip irq_alloc_descs call when the irq_base is >= 0.
+> 
+Yes, looks good.  But both parameter irq_base of irq_alloc_generic_chip
+and member irq_base of 'struct irq_domain' are unsigned int, which
+might be a little problem for irq_chip_generic users to pass -1 for
+asking irq_chip_generic to allocate Linux irq numbers for it.
 
-Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
----
- arch/arm/mach-omap2/board-cm-t35.c           |    1 -
- arch/arm/mach-omap2/board-n8x0.c             |    1 -
- arch/arm/mach-omap2/board-rx51-peripherals.c |    3 ---
- arch/arm/mach-omap2/board-zoom-display.c     |    1 -
- arch/arm/mach-omap2/common-board-devices.c   |    1 -
- arch/arm/plat-omap/include/plat/mcspi.h      |    3 ---
- 6 files changed, 0 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index b38cd7b..4cc2f04 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -280,7 +280,6 @@ static struct omap_dss_board_info cm_t35_dss_data = {
- 
- static struct omap2_mcspi_device_config tdo24m_mcspi_config = {
- 	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
- };
- 
- static struct tdo24m_platform_data tdo24m_config = {
-diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-index 05107d8..74065e6 100644
---- a/arch/arm/mach-omap2/board-n8x0.c
-+++ b/arch/arm/mach-omap2/board-n8x0.c
-@@ -140,7 +140,6 @@ static void __init n8x0_usb_init(void) {}
- 
- static struct omap2_mcspi_device_config p54spi_mcspi_config = {
- 	.turbo_mode	= 0,
--	.single_channel = 1,
- };
- 
- static struct spi_board_info n800_spi_board_info[] __initdata = {
-diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index e9eff00..c01c175 100644
---- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -138,17 +138,14 @@ static struct lp5523_platform_data rx51_lp5523_platform_data = {
- 
- static struct omap2_mcspi_device_config wl1251_mcspi_config = {
- 	.turbo_mode	= 0,
--	.single_channel	= 1,
- };
- 
- static struct omap2_mcspi_device_config mipid_mcspi_config = {
- 	.turbo_mode	= 0,
--	.single_channel	= 1,
- };
- 
- static struct omap2_mcspi_device_config tsc2005_mcspi_config = {
- 	.turbo_mode	= 0,
--	.single_channel	= 1,
- };
- 
- static struct spi_board_info rx51_peripherals_spi_board_info[] __initdata = {
-diff --git a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/board-zoom-display.c
-index d4683ba..2818290 100644
---- a/arch/arm/mach-omap2/board-zoom-display.c
-+++ b/arch/arm/mach-omap2/board-zoom-display.c
-@@ -117,7 +117,6 @@ static struct omap_dss_board_info zoom_dss_data = {
- 
- static struct omap2_mcspi_device_config dss_lcd_mcspi_config = {
- 	.turbo_mode		= 1,
--	.single_channel	= 1,  /* 0: slave, 1: master */
- };
- 
- static struct spi_board_info nec_8048_spi_board_info[] __initdata = {
-diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-index bcb0c58..2d1d775 100644
---- a/arch/arm/mach-omap2/common-board-devices.c
-+++ b/arch/arm/mach-omap2/common-board-devices.c
-@@ -33,7 +33,6 @@
- 	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
- static struct omap2_mcspi_device_config ads7846_mcspi_config = {
- 	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
- };
- 
- static struct ads7846_platform_data ads7846_config = {
-diff --git a/arch/arm/plat-omap/include/plat/mcspi.h b/arch/arm/plat-omap/include/plat/mcspi.h
-index 3d51b18..a357eb2 100644
---- a/arch/arm/plat-omap/include/plat/mcspi.h
-+++ b/arch/arm/plat-omap/include/plat/mcspi.h
-@@ -18,9 +18,6 @@ struct omap2_mcspi_dev_attr {
- 
- struct omap2_mcspi_device_config {
- 	unsigned turbo_mode:1;
--
--	/* Do we want one channel enabled at the same time? */
--	unsigned single_channel:1;
- };
- 
- #endif
 -- 
-1.7.7.3
+Regards,
+Shawn
