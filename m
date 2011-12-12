@@ -1,98 +1,87 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 11 Dec 2011 16:26:16 -0800
-Subject: [PATCH v6 10/10] arm/tegra: add support for tegra30 based board
- cardhu
-In-Reply-To: <4EE21B67.5040006@gmail.com>
-References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
- <4EE21B67.5040006@gmail.com>
-Message-ID: <20111212002616.GB26598@quad.lixom.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 11 Dec 2011 19:53:42 -0500 (EST)
+Subject: arm and patch phys offset
+In-Reply-To: <201112112255.32534.michael@walle.cc>
+References: <201112112255.32534.michael@walle.cc>
+Message-ID: <alpine.LFD.2.02.1112111935590.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 08:29:59AM -0600, Rob Herring wrote:
-> On 12/08/2011 06:43 AM, Peter De Schrijver wrote:
-> > Add support for the tegra30 based cardhu development board. Cardhu is a tablet
-> > formfactor reference design for tegra30. The patch provides a device tree for
-> > the board, updates Makefile.boot to build the dtb, includes the platform in
-> > Kconfig and updates board-dt.c.
-> > 
-> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > ---
-> >  arch/arm/boot/dts/tegra-cardhu.dts |   36 ++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-tegra/Kconfig        |    7 +++++++
-> >  arch/arm/mach-tegra/Makefile.boot  |    1 +
-> >  arch/arm/mach-tegra/board-dt.c     |    1 +
-> >  4 files changed, 45 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/tegra-cardhu.dts
-> > 
-> > diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
-> > new file mode 100644
-> > index 0000000..70c41fc
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/tegra-cardhu.dts
-> > @@ -0,0 +1,36 @@
-> > +/dts-v1/;
-> > +
-> > +/include/ "tegra30.dtsi"
-> > +
-> > +/ {
-> > +	model = "NVIDIA Tegra30 Cardhu evaluation board";
-> > +	compatible = "nvidia,cardhu", "nvidia,tegra30";
-> > +
-> > +	memory {
+On Sun, 11 Dec 2011, Michael Walle wrote:
+
 > 
-> memory at 80000000
+> [i don't know it this belongs to the arm kernel mailinglist]
 
-If there is only one memory node, then there is no need to specify the unit
-address after the name, it's just noise.
+It probably does, added.  When in doubt, it never hurt to CC the list.
 
-> > diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> > index aad54ca..6bae1bb 100644
-> > --- a/arch/arm/mach-tegra/Kconfig
-> > +++ b/arch/arm/mach-tegra/Kconfig
-> > @@ -91,6 +91,13 @@ config MACH_VENTANA
-> >         help
-> >           Support for the nVidia Ventana development platform
-> >  
-> > +config MACH_CARDHU
-> > +       bool "Cardhu board"
-> > +       depends on ARCH_TEGRA_3x_SOC
-> > +       select MACH_TEGRA_DT
-> > +       help
-> > +         Support for the NVIDIA Cardhu development platform
-> > +
+> Hi Nico,
 > 
-> You should not be adding kconfig entries for boards. They should
-> eventually go away with DT.
-
-Agreed. On Tegra2 we still want board configs since it allows us to leave out
-some of the kernel code that is still per-board (i.e. pinmux tables, etc). Once
-that has been moved to device tree we can remove all board kconfig options
-there. We might as well not start adding them on T30.
-
-> >  choice
-> >          prompt "Low-level debug console UART"
-> >          default TEGRA_DEBUG_UART_NONE
-> > diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
-> > index cf51a00..7c1110f 100644
-> > --- a/arch/arm/mach-tegra/Makefile.boot
-> > +++ b/arch/arm/mach-tegra/Makefile.boot
-> > @@ -7,3 +7,4 @@ dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
-> >  dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
-> >  dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
-> >  dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
-> > +dtb-$(CONFIG_MACH_CARDHU) += tegra-cardhu.dtb
+> i'm facing some weird problem with the PATCH_PHYS_OFFSET config option 
+> enabled.
 > 
-> Likewise, this should be more like:
-> dtb-$(CONFIG_MACH_TEGRA_DT) += tegra-seaboard.dtb tegra-trimslice.dtb
-> tegra-ventana.dtb ...
+> I have a marvell kirkwood based LS-CHLv2 board and running the latest HEAD of 
+> linus tree (with my dts patched for the kirkwood port, but hopefully this 
+> should be unrelated to this problem).
 
-Actually, the cardhu dts CONFIG_ARCH_TEGRA_3x_SOC, since there will only be DT
-boards for that platform.
+Did you try without those patches to be sure?
 
-Moving the others to TEGRA_DT is a later change (see above comments about some
-C code still needed).
+> There seems to be p2v and v2p calls which aren't patched. Unfortunately i 
+> don't have jtag access to the board. So, I use the following function to dump 
+> non-patched entries of the pvtable (called from setup_arch()):
+> 
+> extern unsigned long __pv_table_begin, __pv_table_end;
+> static void __init dump_pvtable(void)
+> {
+> 	unsigned char *b;
+> 	unsigned long *cur = &__pv_table_begin;
+> 	int i = 0;
+> 	early_print("__pvtable %08lx..%08lx\n",
+> 		&__pv_table_begin, &__pv_table_end);
+> 	while (*cur) {
+
+This is wrong.  You should have this instead:
+
+	while (cur < &__pv_table_end) {
+
+> 		b = (unsigned char *)(*cur);
+> 		if (*b == 0x81) {
+> 			early_print(" %d %08lx\n", i, *cur);
+> 			/* uncommenting the following make the kernel work */
+> 			/* *b = 0x40; */
+
+Conceptually, this would be lacking a data vs insn cache 
+resynchronization.
+
+> 		    //early_print("   %08lx\n", *((unsigned long*)*cur));
+> 		}
+> 		cur++;
+> 		i++;
+> 	}
+> 	early_print("total of %d entries\n", i);
+> }
+> 
+> Now i get the following output:
+> 
+> Uncompressing Linux... done, booting the kernel.
+> __pvtable c03f3e6c..c03f43c8
+>  7 c03d8508                 
+>  27 c03d9208
+>  29 c03d9360
+>  42 c03d9bfc
+>  59 c03dd174
+>  73 c03df094
+>  77 c03df1b8
+>  83 c03dfc54
+>  85 c03dfe6c
+>  127 c03e07d8
+>  129 c03e11ac
+> total of 343 entries
+> 
+> The weird thing is that this output changes if i insert or move some debug 
+> prints. I even accomplished to make the board boot completely sometimes.
+
+You must have some memory corrupting bug somewhere.  Please try calling 
+this code first thing in start_kernel() for comparison.
 
 
--Olof
+Nicolas
