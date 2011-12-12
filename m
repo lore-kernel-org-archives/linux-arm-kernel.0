@@ -1,37 +1,48 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 12 Dec 2011 10:56:22 +0100
-Subject: [PATCH 0/4] SMP TWD localtimer patches, broken apart
-Message-ID: <1323683782-23792-1-git-send-email-linus.walleij@stericsson.com>
+Date: Mon, 12 Dec 2011 10:56:45 +0100
+Subject: [PATCH 1/4] ARM: smp_twd: modernize clock event registration
+Message-ID: <1323683805-23830-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-In order to avoid stalling all of the code in Colin Cross' classic
-patch, I have taken the liberty to break it in four pieces, so we
-can (hopefully) proceed with atleast some pieces of the patch.
+This break-out from Colin Cross' cpufreq-aware TWD patch will
+just modernize the clock event registration code to use
+clockevents_config_and_register().
 
-I think patch 1 would be uncontroversial at least.
+Signed-off-by: Colin Cross <ccross@android.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[Broke out of larger SMP TWD patch]
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/kernel/smp_twd.c |    8 ++------
+ 1 files changed, 2 insertions(+), 6 deletions(-)
 
-I think ST-Ericsson, TI and nVidia are all using this patch or some
-variant of it in their recently shipped products, so if there is
-something seriously wrong about it, we'd better find out.
-
-Since the end result after all four patches are applied, is 100%
-identical to the original patch, I have kept the Acked-by:s from
-the big patch on each individual patch.
-
-I will replace the single patch in the patch tracker with these four
-patches soon-ish.
-
-Linus Walleij (4):
-  ARM: smp_twd: modernize clock event registration
-  ARM: smp_twd: create a percpu reference to the clockevent
-  ARM: smp_twd: get the rate from a clock
-  ARM: smp_twd: reconfigure clockevents after cpufreq change
-
- arch/arm/kernel/smp_twd.c |   89 ++++++++++++++++++++++++++++++++++++++++++---
- 1 files changed, 83 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index a8a6682..f057561 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -173,15 +173,11 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+-	clk->shift = 20;
+-	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
+-	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
+-	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
+ 
+ 	this_cpu_clk = __this_cpu_ptr(twd_evt);
+ 	*this_cpu_clk = clk;
+ 
+-	clockevents_register_device(clk);
+-
++	clockevents_config_and_register(clk, twd_timer_rate,
++					0xf, 0xffffffff);
+ 	enable_percpu_irq(clk->irq, 0);
+ }
 -- 
 1.7.3.2
