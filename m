@@ -1,44 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 Dec 2011 10:56:48 -0200
-Subject: [PATCH 1/1] net/fec: add KSZ9021RN phy fixup
-In-Reply-To: <1323684558-16796-1-git-send-email-richard.zhao@linaro.org>
-References: <1323684558-16796-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <CAOMZO5DNRrt7ULuBkh9y8bz2_fpCHOcSWxAbJOqTHA2Nrv1V_w@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 12 Dec 2011 11:24:02 -0200
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: Select SMSC911X driver by default.
+Message-ID: <1323696242-5902-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 8:09 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> For imx6q sabrelite board, set phy RGMII pad skew.
->
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
-> ?drivers/net/ethernet/freescale/fec.c | ? 19 +++++++++++++++++++
-> ?1 files changed, 19 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> index 112af9b..d3b4463 100644
-> --- a/drivers/net/ethernet/freescale/fec.c
-> +++ b/drivers/net/ethernet/freescale/fec.c
-> @@ -1513,6 +1513,21 @@ static inline void fec_reset_phy(struct platform_device *pdev)
-> ?}
-> ?#endif /* CONFIG_OF */
->
-> +/* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
-> +static int ksz9021rn_phy_fixup(struct phy_device *phydev)
-> +{
-> + ? ? ? /* min rx data delay */
-> + ? ? ? phy_write(phydev, 0x0b, 0x8105);
-> + ? ? ? phy_write(phydev, 0x0c, 0x0000);
-> +
-> + ? ? ? /* max rx/tx clock delay, min rx/tx control delay */
-> + ? ? ? phy_write(phydev, 0x0b, 0x8104);
-> + ? ? ? phy_write(phydev, 0x0c, 0xf0f0);
-> + ? ? ? phy_write(phydev, 0x0b, 0x104);
-> +
-> + ? ? ? return 0;
+Select SMSC911X driver by default.  
 
-This should go to drivers/net/phy/micrel.c.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 11a4192..a51e282 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -50,6 +50,7 @@ CONFIG_INET=y
+ CONFIG_IP_MULTICAST=y
+ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
++CONFIG_SMSC911X=y
+ # CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+ # CONFIG_INET_XFRM_MODE_TUNNEL is not set
+ # CONFIG_INET_XFRM_MODE_BEET is not set
+-- 
+1.7.1
