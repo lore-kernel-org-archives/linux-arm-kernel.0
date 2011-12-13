@@ -1,34 +1,20 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Dec 2011 16:27:41 -0800
-Subject: [PATCHv11 3/8] ARM: OMAP: prm: add support for chain interrupt
- handler
-In-Reply-To: <1323713733-13115-4-git-send-email-t-kristo@ti.com>
+Date: Mon, 12 Dec 2011 16:28:51 -0800
+Subject: [PATCHv11 2/8] ARM: OMAP2+: hwmod: Add API to check IO PAD
+ wakeup status
+In-Reply-To: <1323713733-13115-3-git-send-email-t-kristo@ti.com>
 References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
- <1323713733-13115-4-git-send-email-t-kristo@ti.com>
-Message-ID: <20111213002741.GP32251@atomide.com>
+ <1323713733-13115-3-git-send-email-t-kristo@ti.com>
+Message-ID: <20111213002851.GQ32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Tero Kristo <t-kristo@ti.com> [111212 09:44]:
-> Introduce a chained interrupt handler mechanism for the PRCM
-> interrupt, so that individual PRCM event can cleanly be handled by
-> handlers in separate drivers. We do this by introducing PRCM event
-> names, which are then matched to the particular PRCM interrupt bit
-> depending on the specific OMAP SoC being used.
+> From: R, Govindraj <govindraj.raja@ti.com>
 > 
-> PRCM interrupts have two priority levels, high or normal. High priority
-> is needed for IO event handling, so that we can be sure that IO events
-> are processed before other events. This reduces latency for IO event
-> customers and also prevents incorrect ack sequence on OMAP3.
+> Add API to determine IO-PAD wakeup event status for a given
+> hwmod dynamic_mux pad.
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Avinash.H.M <avinashhm@ti.com>
-> Cc: Cousson, Benoit <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Govindraj.R <govindraj.raja@ti.com>
-
-Assuming Paul will queue these:
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 
 Acked-by: Tony Lindgren <tony@atomide.com>
