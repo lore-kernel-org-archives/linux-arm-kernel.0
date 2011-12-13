@@ -1,70 +1,43 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 13 Dec 2011 16:18:38 -0500 (EST)
-Subject: Git pull request: update to the Marvell Orion SOC family
-Message-ID: <alpine.LFD.2.02.1112131611320.2907@xanadu.home>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Tue, 13 Dec 2011 23:21:13 +0200
+Subject: [PATCH v3 resend2] s3c/s3c24xx: arm: leds: Make s3c24xx LEDS
+ driver use gpiolib
+In-Reply-To: <1323810417.3837.25.camel@joe2Laptop>
+References: <4EE7B41C.5080006@solonet.org.ua>
+ <1323810417.3837.25.camel@joe2Laptop>
+Message-ID: <4EE7C1C9.8080000@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys, please pull the following:
+Hi Joe,
+Thank you for review.
 
-	git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git
+On 12/13/2011 11:06 PM, Joe Perches wrote:
+> On Tue, 2011-12-13 at 22:22 +0200, Denis Kuzmenko wrote:
+>> Make s3c24xx LEDS driver use gpiolib. Fix error disabling pull during probe.
+> []
+>> diff --git a/drivers/leds/leds-s3c24xx.c b/drivers/leds/leds-s3c24xx.c
+> []
+>> @@ -45,23 +45,35 @@ static void s3c24xx_led_set(struct led_classdev *led_cdev,
+>> +	/*
+>> +	 * ensure value is 0 or 1 to use it with bitwise XOR (^)
+>> +	 * (only 100% brightness is supported)
+>> +	 */
+>> +	value = value ? 1 : 0;
+> 
+> Maybe value = !!value;
 
-This contains minor fixes plus initial consolidation toward DT support.
+IMHO my variant is better readable.
 
-Andrew Lunn (4):
-      Consolidate the address map setup on Orion based platforms.
-      Move the *_mbus_dram_info structure into the orion platform and call it orion_mbus_dram_info everywhere.
-      Get address map from plat-orion instead of via platform_data.
-      Remove address map info from all platform data strucutures.
+>> +		/* no point in having a pull-up as we are always driving */
+>> +		s3c_gpio_setpull(pdata->gpio, S3C_GPIO_PULL_NONE);
+>> +		ret = gpio_direction_output(pdata->gpio,
+>> +				!!(pdata->flags & S3C24XX_LEDF_ACTLOW));
+> 
+> akin to this use.
 
-Arnaud Patard (1):
-      kirkwood: Add configuration for MPP12 as GPIO
+There is no so much space for implementation used before so I've used
+shorter notation, again, for better readability.
 
-Martin Michlmayr (1):
-      kirkwood: Recognize A1 revision of 6282 chip
-
- arch/arm/mach-dove/addr-map.c                  |  121 +++++--------
- arch/arm/mach-dove/common.c                    |   16 +-
- arch/arm/mach-dove/common.h                    |    1 -
- arch/arm/mach-dove/pcie.c                      |    4 +-
- arch/arm/mach-kirkwood/addr-map.c              |  137 ++++----------
- arch/arm/mach-kirkwood/common.c                |   19 +-
- arch/arm/mach-kirkwood/common.h                |    1 -
- arch/arm/mach-kirkwood/include/mach/kirkwood.h |    1 +
- arch/arm/mach-kirkwood/mpp.c                   |    1 -
- arch/arm/mach-kirkwood/mpp.h                   |    1 +
- arch/arm/mach-kirkwood/pcie.c                  |    4 +-
- arch/arm/mach-mv78xx0/addr-map.c               |  102 ++---------
- arch/arm/mach-mv78xx0/common.c                 |   22 +--
- arch/arm/mach-mv78xx0/common.h                 |    1 -
- arch/arm/mach-mv78xx0/mpp.c                    |    1 -
- arch/arm/mach-mv78xx0/pcie.c                   |    4 +-
- arch/arm/mach-orion5x/addr-map.c               |  146 +++++----------
- arch/arm/mach-orion5x/common.c                 |   23 +--
- arch/arm/mach-orion5x/common.h                 |    3 +-
- arch/arm/mach-orion5x/include/mach/orion5x.h   |    2 +-
- arch/arm/mach-orion5x/mpp.c                    |    1 -
- arch/arm/mach-orion5x/pci.c                    |    5 +-
- arch/arm/plat-orion/Makefile                   |    2 +-
- arch/arm/plat-orion/addr-map.c                 |  174 ++++++++++++++++++
- arch/arm/plat-orion/common.c                   |   43 +----
- arch/arm/plat-orion/include/plat/addr-map.h    |   53 ++++++
- arch/arm/plat-orion/include/plat/audio.h       |    3 -
- arch/arm/plat-orion/include/plat/common.h      |   17 +--
- arch/arm/plat-orion/include/plat/ehci-orion.h  |    1 -
- arch/arm/plat-orion/include/plat/mv_xor.h      |    6 -
- arch/arm/plat-orion/include/plat/mvsdio.h      |    1 -
- arch/arm/plat-orion/include/plat/pcie.h        |    3 +-
- arch/arm/plat-orion/pcie.c                     |    6 +-
- drivers/ata/sata_mv.c                          |   19 +-
- drivers/dma/mv_xor.c                           |   11 +-
- drivers/mmc/host/mvsdio.c                      |   13 +-
- drivers/net/ethernet/marvell/mv643xx_eth.c     |   10 +-
- drivers/usb/host/ehci-orion.c                  |   10 +-
- include/linux/ata_platform.h                   |    3 -
- include/linux/mbus.h                           |   13 ++-
- sound/soc/kirkwood/kirkwood-dma.c              |   15 +-
- 41 files changed, 497 insertions(+), 522 deletions(-)
-
-
-Nicolas
+-- 
+Best regards, Denis Kuzmenko.
