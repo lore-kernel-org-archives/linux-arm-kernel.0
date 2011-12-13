@@ -1,35 +1,140 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 13 Dec 2011 10:47:33 +0800
-Subject: [PATCH 1/1] net/fec: add KSZ9021RN phy fixup
-In-Reply-To: <CAB4PhKfSegpwrZbedN7KtJd+xFk1JAOCWuSFq2you5dWn9bqwA@mail.gmail.com>
-References: <1323684558-16796-1-git-send-email-richard.zhao@linaro.org>
- <CAOMZO5DNRrt7ULuBkh9y8bz2_fpCHOcSWxAbJOqTHA2Nrv1V_w@mail.gmail.com>
- <20111212135119.GE16835@b20223-02.ap.freescale.net>
- <4EE612BF.9050907@bluegiga.com>
- <20111213021008.GE28768@b20223-02.ap.freescale.net>
- <20111213023626.GA10866@S2100-06.ap.freescale.net>
- <CAB4PhKfSegpwrZbedN7KtJd+xFk1JAOCWuSFq2you5dWn9bqwA@mail.gmail.com>
-Message-ID: <20111213024733.GB10866@S2100-06.ap.freescale.net>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 13 Dec 2011 10:42:58 +0800
+Subject: [RFC PATCH v1 1/7] omap4: introduce fdif(face detect module) hwmod
+In-Reply-To: <1322817178-8931-2-git-send-email-ming.lei@canonical.com>
+References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+ <1322817178-8931-2-git-send-email-ming.lei@canonical.com>
+Message-ID: <CACVXFVM4gNwK90oiCx7c-rascT9n4zd-oCQLZvMXMbXT=37obg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 10:29:53AM +0800, Jason Liu wrote:
-> 2011/12/13 Shawn Guo <shawn.guo@freescale.com>:
-> > On Tue, Dec 13, 2011 at 10:10:08AM +0800, Richard Zhao wrote:
-> >> By converting to DT, machine code's becoming common too. I feel hard to
-> >> find a place. Put it in imx6q_init_machine?
-> >>
-> >> Sascha & Shawn, Could you give comments here?
-> >>
-> > I see no problem to do that by checking board compatible string and
-> > do the setup for particular board.
-> 
-> Then, you may end up having more and more fix up in the fec driver
-> when all the platforms converted to DT,
-> which will put the fec driver into mess.
-> 
-I meant we do this in imx6q_init_machine().
+Hi guys,
 
--- 
-Regards,
-Shawn
+Gentle ping on this patch, :-)
+
+thanks,
+--
+Ming Lei
+
+On Fri, Dec 2, 2011 at 5:12 PM, Ming Lei <ming.lei@canonical.com> wrote:
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+> ---
+> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? 81 ++++++++++++++++++++++++++++
+> ?1 files changed, 81 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index 6cf21ee..30db754 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -53,6 +53,7 @@ static struct omap_hwmod omap44xx_dmm_hwmod;
+> ?static struct omap_hwmod omap44xx_dsp_hwmod;
+> ?static struct omap_hwmod omap44xx_dss_hwmod;
+> ?static struct omap_hwmod omap44xx_emif_fw_hwmod;
+> +static struct omap_hwmod omap44xx_fdif_hwmod;
+> ?static struct omap_hwmod omap44xx_hsi_hwmod;
+> ?static struct omap_hwmod omap44xx_ipu_hwmod;
+> ?static struct omap_hwmod omap44xx_iss_hwmod;
+> @@ -354,6 +355,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
+> ? ? ? ?.user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
+> ?};
+>
+> +/* fdif -> l3_main_2 */
+> +static struct omap_hwmod_ocp_if omap44xx_fdif__l3_main_2 = {
+> + ? ? ? .master ? ? ? ? = &omap44xx_fdif_hwmod,
+> + ? ? ? .slave ? ? ? ? ?= &omap44xx_l3_main_2_hwmod,
+> + ? ? ? .clk ? ? ? ? ? ?= "l3_div_ck",
+> + ? ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> ?/* hsi -> l3_main_2 */
+> ?static struct omap_hwmod_ocp_if omap44xx_hsi__l3_main_2 = {
+> ? ? ? ?.master ? ? ? ? = &omap44xx_hsi_hwmod,
+> @@ -5444,6 +5453,75 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
+> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap44xx_wd_timer3_slaves),
+> ?};
+>
+> +/* 'fdif' class */
+> +static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
+> + ? ? ? .rev_offs ? ? ? = 0x0000,
+> + ? ? ? .sysc_offs ? ? ?= 0x0010,
+> + ? ? ? .sysc_flags ? ? = (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
+> + ? ? ? .idlemodes ? ? ?= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?MSTANDBY_FORCE | MSTANDBY_NO |
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?MSTANDBY_SMART),
+> + ? ? ? .sysc_fields ? ?= &omap_hwmod_sysc_type2,
+> +};
+> +
+> +static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
+> + ? ? ? .name ? = "fdif",
+> + ? ? ? .sysc ? = &omap44xx_fdif_sysc,
+> +};
+> +
+> +/*fdif*/
+> +static struct omap_hwmod_addr_space omap44xx_fdif_addrs[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x4a10a000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x4a10afff,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT
+> + ? ? ? },
+> + ? ? ? { }
+> +};
+> +
+> +/* l4_cfg -> fdif */
+> +static struct omap_hwmod_ocp_if omap44xx_l4_cfg__fdif = {
+> + ? ? ? .master ? ? ? ? = &omap44xx_l4_cfg_hwmod,
+> + ? ? ? .slave ? ? ? ? ?= &omap44xx_fdif_hwmod,
+> + ? ? ? .clk ? ? ? ? ? ?= "l4_div_ck",
+> + ? ? ? .addr ? ? ? ? ? = omap44xx_fdif_addrs,
+> + ? ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* fdif slave ports */
+> +static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
+> + ? ? ? &omap44xx_l4_cfg__fdif,
+> +};
+> +static struct omap_hwmod_irq_info omap44xx_fdif_irqs[] = {
+> + ? ? ? { .irq = 69 + OMAP44XX_IRQ_GIC_START },
+> + ? ? ? { .irq = -1 }
+> +};
+> +
+> +/* fdif master ports */
+> +static struct omap_hwmod_ocp_if *omap44xx_fdif_masters[] = {
+> + ? ? ? &omap44xx_fdif__l3_main_2,
+> +};
+> +
+> +static struct omap_hwmod omap44xx_fdif_hwmod = {
+> + ? ? ? .name ? ? ? ? ? = "fdif",
+> + ? ? ? .class ? ? ? ? ?= &omap44xx_fdif_hwmod_class,
+> + ? ? ? .clkdm_name ? ? = "iss_clkdm",
+> + ? ? ? .mpu_irqs ? ? ? = omap44xx_fdif_irqs,
+> + ? ? ? .main_clk ? ? ? = "fdif_fck",
+> + ? ? ? .prcm = {
+> + ? ? ? ? ? ? ? .omap4 = {
+> + ? ? ? ? ? ? ? ? ? ? ? .clkctrl_offs = OMAP4_CM_CAM_FDIF_CLKCTRL_OFFSET,
+> + ? ? ? ? ? ? ? ? ? ? ? .context_offs = OMAP4_RM_CAM_FDIF_CONTEXT_OFFSET,
+> + ? ? ? ? ? ? ? ? ? ? ? .modulemode ? = MODULEMODE_SWCTRL,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? },
+> + ? ? ? .slaves ? ? ? ? = omap44xx_fdif_slaves,
+> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_fdif_slaves),
+> + ? ? ? .masters ? ? ? ?= omap44xx_fdif_masters,
+> + ? ? ? .masters_cnt ? ?= ARRAY_SIZE(omap44xx_fdif_masters),
+> +};
+> +
+> ?static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+>
+> ? ? ? ?/* dmm class */
+> @@ -5593,6 +5671,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+> ? ? ? ?&omap44xx_wd_timer2_hwmod,
+> ? ? ? ?&omap44xx_wd_timer3_hwmod,
+>
+> + ? ? ? /* fdif class */
+> + ? ? ? &omap44xx_fdif_hwmod,
+> +
+> ? ? ? ?NULL,
+> ?};
+
+thanks,
+--
+Ming Lei
