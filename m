@@ -1,25 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 13 Dec 2011 21:36:52 +0100
-Subject: [PATCH] ARM: add device tree blobs to .gitignore
-Message-ID: <1323808612-14976-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 13 Dec 2011 13:51:31 -0700 (MST)
+Subject: [PATCHv11 1/8] ARM: OMAP2+: hwmod: Add API to enable IO ring
+ wakeup.
+In-Reply-To: <1323713733-13115-2-git-send-email-t-kristo@ti.com>
+References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
+ <1323713733-13115-2-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1112131350530.12046@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*.dtb files are a build result and so should be ignored.
+Hi Tero
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/.gitignore |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+On Mon, 12 Dec 2011, Tero Kristo wrote:
 
-diff --git a/arch/arm/boot/.gitignore b/arch/arm/boot/.gitignore
-index ce1c5ff..3c79f85 100644
---- a/arch/arm/boot/.gitignore
-+++ b/arch/arm/boot/.gitignore
-@@ -3,3 +3,4 @@ zImage
- xipImage
- bootpImage
- uImage
-+*.dtb
--- 
-1.7.7.3
+> From: R, Govindraj <govindraj.raja@ti.com>
+> 
+> Add API to enable IO pad wakeup capability based on mux dynamic pad and
+> wake_up enable flag available from hwmod_mux initialization.
+> 
+> Use the wakeup_enable flag and enable wakeup capability
+> for the given pads. Wakeup capability will be enabled/disabled
+> during hwmod idle transition based on whether wakeup_flag is
+> set or cleared.
+> 
+> Map the enable/disable pad wakeup API's to hwmod_wakeup_enable/disable.
+> 
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+
+Since you're in the submitter chain for these patches, I'll need your 
+Signed-off-by on this patch and the next one.  Okay to add it?
+
+
+- Paul
