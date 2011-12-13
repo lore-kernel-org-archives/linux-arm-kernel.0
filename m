@@ -1,89 +1,77 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Tue, 13 Dec 2011 19:53:29 +0530
-Subject: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain support via
- hwmod mux
-In-Reply-To: <f1252b7ed1e3731c8b0c18e385dcdc2b@mail.gmail.com>
-References: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com><87pqh3qvkt.fsf@ti.com><1e686270c099fa4a270b6b01e6ac585c@mail.gmail.com><a480ee86d60a9db484d3baa0faf2477f@mail.gmail.com>
- <87k46izb8b.fsf@ti.com> <3968ef2671e202d1cefdf4a7c5d32ec6@mail.gmail.com>
- <f1252b7ed1e3731c8b0c18e385dcdc2b@mail.gmail.com>
-Message-ID: <6f34d798db0dcb69747e6fc722cb0cf7@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Tue, 13 Dec 2011 15:24:06 +0100
+Subject: [PATCH v2] arm/imx6q: Rename Sabreauto to Armadillo2
+In-Reply-To: <1323328921-2226-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1323328921-2226-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <4EE76006.8010403@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+Shawn,
 
-> -----Original Message-----
-> From: Vishwanath Sripathy [mailto:vishwanath.bs at ti.com]
-> Sent: Friday, December 02, 2011 10:29 PM
-> To: Kevin Hilman
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain
-> support via hwmod mux
->
-> Kevin,
->
-> > -----Original Message-----
-> > From: Vishwanath Sripathy [mailto:vishwanath.bs at ti.com]
-> > Sent: Wednesday, November 30, 2011 2:58 PM
-> > To: Kevin Hilman
-> > Cc: linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> > Subject: RE: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain
-> > support via hwmod mux
-> >
-> > ---
-> > > >> > Can you refresh this against Tony's 'fixes' branch and re-
-> > test.
-> > > >> >
-> > > >> > I tested this on OMAP3430/n900 and noticed that it no
-> longer
-> > > hit
-> > > >> off
-> > > >> > mode from idle.
-> > > >> >
-> > > >> > IOW, If I enable UART timeouts and then enable off mode, I
-> > > don't
-> > > >> > actually ever hit off during idle.  However, if I do a
-> > > >> > suspend/resume I
-> > > >> > see it hits off mode, then subsequent attempts to hit off
-> > > during
-> > > >> > idle work.
-> > > >> >
-> > > >> > Can you investigate this?
-> > > >> OK. Let me check that.
-> > > > I rebased these patches against latest Tony's fixes branch and
-> > > tested it
-> > > > on OMAP3430 SDP. I see that Core enters off mode in idle path
-> > > after
-> > > > setting UART timeout w/o having to suspend the system.
-> > >
-> > > OK, sounds good.
-> > >
-> > > Do you have a branch that I can test as well?
-> > Sure. It's available at
-> > git://gitorious.org/omap-pm/linux.git for_3.3/io_daisy_chain
-> Did you get any chance to test it at your side?
-> Should I post the rebased patches?
-I have rebased these patch series against LO master commit id:
-deee6d5359969a0ce4e2760cfd7b9f379bd5698a and same is available here [1].
+On 08.12.2011 08:22, Dirk Behme wrote:
+> The Sabreauto board was renamed to Armadillo2 recently. To avoid
+> confusion, rename Sabreauto to Armadillo2/arm2.
+> 
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> Changes in v2: Rebase against the recent mainline
+> 
+>  Documentation/devicetree/bindings/arm/fsl.txt      |    4 ++--
+>  .../dts/{imx6q-sabreauto.dts => imx6q-arm2.dts}    |    4 ++--
+>  arch/arm/mach-imx/mach-imx6q.c                     |    2 +-
+>  3 files changed, 5 insertions(+), 5 deletions(-)
+>  rename arch/arm/boot/dts/{imx6q-sabreauto.dts => imx6q-arm2.dts} (91%)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> index c9848ad..1b81e99 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -21,6 +21,6 @@ i.MX53 Smart Mobile Reference Design Board
+>  Required root node properties:
+>      - compatible = "fsl,imx53-smd", "fsl,imx53";
+>  
+> -i.MX6 Quad SABRE Automotive Board
+> +i.MX6 Quad Armadillo2 Board
+>  Required root node properties:
+> -    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
+> +    - compatible = "fsl,imx6q-arm2", "fsl,imx6q";
+> diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+> similarity index 91%
+> rename from arch/arm/boot/dts/imx6q-sabreauto.dts
+> rename to arch/arm/boot/dts/imx6q-arm2.dts
+> index 072974e..b078b91 100644
+> --- a/arch/arm/boot/dts/imx6q-sabreauto.dts
+> +++ b/arch/arm/boot/dts/imx6q-arm2.dts
+> @@ -14,8 +14,8 @@
+>  /include/ "imx6q.dtsi"
+>  
+>  / {
+> -	model = "Freescale i.MX6 Quad SABRE Automotive Board";
+> -	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
+> +	model = "Freescale i.MX6 Quad Armadillo2 Board";
+> +	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
+>  
+>  	chosen {
+>  		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 9cd860a..a62e568 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -71,7 +71,7 @@ static struct sys_timer imx6q_timer = {
+>  };
+>  
+>  static const char *imx6q_dt_compat[] __initdata = {
+> -	"fsl,imx6q-sabreauto",
+> +	"fsl,imx6q-arm2",
+>  	NULL,
+>  };
+>  
 
-I have tested these patch series along with Tero's Chain Handler +
-Govind's UART Runtime series which is available at [2].
+Do you like to pick this through your tree? Or should I put it into 
+rmk's patch system?
 
-Regards
-Vishwa
+Thanks
 
-[1]:
-git://gitorious.org/omap-pm/linux.git for_3.3/io_daisy_chain_rebased
-
-[2]:
-git://gitorious.org/runtime_3-0/runtime_3-0.git
-for_3_3/tmp_rc4_uart_pm_intg
->
-> Regards
-> Vishwa
-> >
-> > Regards
-> > Vishwa
-> > >
-> > > Kevin
+Dirk
