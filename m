@@ -1,186 +1,329 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 14 Dec 2011 01:50:23 +0530
-Subject: [PATCH v9 21/31] gpio/omap: remove omap_gpio_save_context overhead
+Date: Wed, 14 Dec 2011 01:50:12 +0530
+Subject: [PATCH v9 10/31] gpio/omap: cleanup set_gpio_triggering function
 In-Reply-To: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
 References: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1323807633-23713-22-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1323807633-23713-11-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Context is now saved dynamically in respective functions whenever and
-whichever registers are modified. This avoid overhead of saving all
-registers context in the runtime suspend callback.
+Getting rid of ifdefs within the function by adding register offset intctrl
+and associating OMAPXXXX_GPIO_INT_CONTROL in respective SoC specific files.
+Also, use wkup_status register consistently instead of referring to wakeup
+clear and wakeup set register offsets. Get rid of cpu_is_xxxx checks in
+set_gpio_trigger() using irqctrl.
 
+Signed-off-by: Charulatha V <charu@ti.com>
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/gpio/gpio-omap.c |   56 +++++++++++++++++++++++-----------------------
- 1 files changed, 28 insertions(+), 28 deletions(-)
+ arch/arm/mach-omap1/gpio15xx.c         |    2 +
+ arch/arm/mach-omap1/gpio16xx.c         |    3 +
+ arch/arm/mach-omap1/gpio7xx.c          |    2 +
+ arch/arm/plat-omap/include/plat/gpio.h |    3 +
+ drivers/gpio/gpio-omap.c               |  157 +++++++++-----------------------
+ 5 files changed, 53 insertions(+), 114 deletions(-)
 
+diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+index f8c15ea..2adfece 100644
+--- a/arch/arm/mach-omap1/gpio15xx.c
++++ b/arch/arm/mach-omap1/gpio15xx.c
+@@ -42,6 +42,7 @@ static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
+ 	.irqstatus	= OMAP_MPUIO_GPIO_INT,
+ 	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
+ 	.irqenable_inv	= true,
++	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE,
+ };
+ 
+ static struct __initdata omap_gpio_platform_data omap15xx_mpu_gpio_config = {
+@@ -83,6 +84,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
+ 	.irqstatus	= OMAP1510_GPIO_INT_STATUS,
+ 	.irqenable	= OMAP1510_GPIO_INT_MASK,
+ 	.irqenable_inv	= true,
++	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
+ };
+ 
+ static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
+diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
+index 1eb47e2..46bb57a 100644
+--- a/arch/arm/mach-omap1/gpio16xx.c
++++ b/arch/arm/mach-omap1/gpio16xx.c
+@@ -45,6 +45,7 @@ static struct omap_gpio_reg_offs omap16xx_mpuio_regs = {
+ 	.irqstatus	= OMAP_MPUIO_GPIO_INT,
+ 	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
+ 	.irqenable_inv	= true,
++	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE,
+ };
+ 
+ static struct __initdata omap_gpio_platform_data omap16xx_mpu_gpio_config = {
+@@ -90,6 +91,8 @@ static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
+ 	.set_irqenable	= OMAP1610_GPIO_SET_IRQENABLE1,
+ 	.clr_irqenable	= OMAP1610_GPIO_CLEAR_IRQENABLE1,
+ 	.wkup_en	= OMAP1610_GPIO_WAKEUPENABLE,
++	.edgectrl1	= OMAP1610_GPIO_EDGE_CTRL1,
++	.edgectrl2	= OMAP1610_GPIO_EDGE_CTRL2,
+ };
+ 
+ static struct __initdata omap_gpio_platform_data omap16xx_gpio1_config = {
+diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+index 923eaa1..207a23c 100644
+--- a/arch/arm/mach-omap1/gpio7xx.c
++++ b/arch/arm/mach-omap1/gpio7xx.c
+@@ -47,6 +47,7 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
+ 	.irqstatus	= OMAP_MPUIO_GPIO_INT / 2,
+ 	.irqenable	= OMAP_MPUIO_GPIO_MASKIT / 2,
+ 	.irqenable_inv	= true,
++	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE >> 1,
+ };
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
+@@ -88,6 +89,7 @@ static struct omap_gpio_reg_offs omap7xx_gpio_regs = {
+ 	.irqstatus	= OMAP7XX_GPIO_INT_STATUS,
+ 	.irqenable	= OMAP7XX_GPIO_INT_MASK,
+ 	.irqenable_inv	= true,
++	.irqctrl	= OMAP7XX_GPIO_INT_CONTROL,
+ };
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_gpio1_config = {
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index 93f533f..d291e4d 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -195,6 +195,9 @@ struct omap_gpio_reg_offs {
+ 	u16 leveldetect1;
+ 	u16 risingdetect;
+ 	u16 fallingdetect;
++	u16 irqctrl;
++	u16 edgectrl1;
++	u16 edgectrl2;
+ 
+ 	bool irqenable_inv;
+ };
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 7f32391..8fba691 100644
+index 9c0ff4b..c5bb2e2 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -103,6 +103,7 @@ static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
- 	else
- 		l &= ~(1 << gpio);
- 	__raw_writel(l, reg);
-+	bank->context.oe = l;
+@@ -200,52 +200,32 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
+ 	__raw_writel(val, reg);
  }
  
- 
-@@ -133,6 +134,7 @@ static void _set_gpio_dataout_mask(struct gpio_bank *bank, int gpio, int enable)
- 	else
- 		l &= ~gpio_bit;
- 	__raw_writel(l, reg);
-+	bank->context.dataout = l;
- }
- 
- static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
-@@ -246,8 +248,20 @@ static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
- 	_gpio_rmw(base, bank->regs->fallingdetect, gpio_bit,
- 		  trigger & IRQ_TYPE_EDGE_FALLING);
- 
--	if (likely(!(bank->non_wakeup_gpios & gpio_bit)))
-+	bank->context.leveldetect0 =
-+			__raw_readl(bank->base + bank->regs->leveldetect0);
-+	bank->context.leveldetect1 =
-+			__raw_readl(bank->base + bank->regs->leveldetect1);
-+	bank->context.risingdetect =
-+			__raw_readl(bank->base + bank->regs->risingdetect);
-+	bank->context.fallingdetect =
-+			__raw_readl(bank->base + bank->regs->fallingdetect);
-+
-+	if (likely(!(bank->non_wakeup_gpios & gpio_bit))) {
- 		_gpio_rmw(base, bank->regs->wkup_en, gpio_bit, trigger != 0);
-+		bank->context.wake_en =
-+			__raw_readl(bank->base + bank->regs->wkup_en);
-+	}
- 
- 	/* This part needs to be executed always for OMAP{34xx, 44xx} */
- 	if (!bank->regs->irqctrl) {
-@@ -340,6 +354,8 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
- 
- 		/* Enable wake-up during idle for dynamic tick */
- 		_gpio_rmw(base, bank->regs->wkup_en, 1 << gpio, trigger);
-+		bank->context.wake_en =
-+			__raw_readl(bank->base + bank->regs->wkup_en);
- 		__raw_writel(l, reg);
- 	}
- 	return 0;
-@@ -432,6 +448,7 @@ static void _enable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
- 	}
- 
- 	__raw_writel(l, reg);
-+	bank->context.irqenable1 = l;
- }
- 
- static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
-@@ -452,6 +469,7 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
- 	}
- 
- 	__raw_writel(l, reg);
-+	bank->context.irqenable1 = l;
- }
- 
- static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int enable)
-@@ -543,6 +561,7 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
- 		/* Module is enabled, clocks are not gated */
- 		ctrl &= ~GPIO_MOD_CTRL_BIT;
- 		__raw_writel(ctrl, reg);
-+		bank->context.ctrl = ctrl;
- 	}
- 
- 	bank->mod_usage |= 1 << offset;
-@@ -560,9 +579,12 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&bank->lock, flags);
- 
--	if (bank->regs->wkup_en)
-+	if (bank->regs->wkup_en) {
- 		/* Disable wake-up during idle for dynamic tick */
- 		_gpio_rmw(base, bank->regs->wkup_en, 1 << offset, 0);
-+		bank->context.wake_en =
-+			__raw_readl(bank->base + bank->regs->wkup_en);
-+	}
- 
- 	bank->mod_usage &= ~(1 << offset);
- 
-@@ -574,6 +596,7 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
- 		/* Module is disabled, clocks are gated */
- 		ctrl |= GPIO_MOD_CTRL_BIT;
- 		__raw_writel(ctrl, reg);
-+		bank->context.ctrl = ctrl;
- 	}
- 
- 	_reset_gpio(bank, bank->chip.base + offset);
-@@ -1166,7 +1189,6 @@ static int omap_gpio_resume(struct device *dev)
- }
- 
- 
--static void omap_gpio_save_context(struct gpio_bank *bank);
- static void omap_gpio_restore_context(struct gpio_bank *bank);
- 
- static int omap_gpio_runtime_suspend(struct device *dev)
-@@ -1182,7 +1204,7 @@ static int omap_gpio_runtime_suspend(struct device *dev)
- 	spin_lock_irqsave(&bank->lock, flags);
- 	if (bank->power_mode != OFF_MODE) {
- 		bank->power_mode = 0;
--		goto save_gpio_context;
-+		goto update_gpio_context_count;
- 	}
- 	/*
- 	 * If going to OFF, remove triggering for all
-@@ -1190,7 +1212,7 @@ static int omap_gpio_runtime_suspend(struct device *dev)
- 	 * generated.  See OMAP2420 Errata item 1.101.
- 	 */
- 	if (!(bank->enabled_non_wakeup_gpios))
--		goto save_gpio_context;
-+		goto update_gpio_context_count;
- 
- 	bank->saved_datain = __raw_readl(bank->base +
- 						bank->regs->datain);
-@@ -1207,12 +1229,11 @@ static int omap_gpio_runtime_suspend(struct device *dev)
- 
- 	bank->need_context_restore = true;
- 
--save_gpio_context:
-+update_gpio_context_count:
- 	if (bank->get_context_loss_count)
- 		bank->context_loss_count =
- 				bank->get_context_loss_count(bank->dev);
- 
--	omap_gpio_save_context(bank);
- 	_gpio_dbck_disable(bank);
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
-@@ -1332,27 +1353,6 @@ void omap2_gpio_resume_after_idle(void)
- 	}
- }
- 
--static void omap_gpio_save_context(struct gpio_bank *bank)
--{
--	bank->context.irqenable1 =
--			__raw_readl(bank->base + bank->regs->irqenable);
--	bank->context.irqenable2 =
--			__raw_readl(bank->base + bank->regs->irqenable2);
--	bank->context.wake_en =
--			__raw_readl(bank->base + bank->regs->wkup_en);
--	bank->context.ctrl = __raw_readl(bank->base + bank->regs->ctrl);
--	bank->context.oe = __raw_readl(bank->base + bank->regs->direction);
--	bank->context.leveldetect0 =
--			__raw_readl(bank->base + bank->regs->leveldetect0);
--	bank->context.leveldetect1 =
--			__raw_readl(bank->base + bank->regs->leveldetect1);
--	bank->context.risingdetect =
--			__raw_readl(bank->base + bank->regs->risingdetect);
--	bank->context.fallingdetect =
--			__raw_readl(bank->base + bank->regs->fallingdetect);
--	bank->context.dataout = __raw_readl(bank->base + bank->regs->dataout);
--}
--
- static void omap_gpio_restore_context(struct gpio_bank *bank)
+-#ifdef CONFIG_ARCH_OMAP2PLUS
+-static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
++static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
+ 						int trigger)
  {
- 	__raw_writel(bank->context.irqenable1,
+ 	void __iomem *base = bank->base;
+ 	u32 gpio_bit = 1 << gpio;
+ 
+-	if (cpu_is_omap44xx()) {
+-		_gpio_rmw(base, OMAP4_GPIO_LEVELDETECT0, gpio_bit,
+-			  trigger & IRQ_TYPE_LEVEL_LOW);
+-		_gpio_rmw(base, OMAP4_GPIO_LEVELDETECT1, gpio_bit,
+-			  trigger & IRQ_TYPE_LEVEL_HIGH);
+-		_gpio_rmw(base, OMAP4_GPIO_RISINGDETECT, gpio_bit,
+-			  trigger & IRQ_TYPE_EDGE_RISING);
+-		_gpio_rmw(base, OMAP4_GPIO_FALLINGDETECT, gpio_bit,
+-			  trigger & IRQ_TYPE_EDGE_FALLING);
+-	} else {
+-		_gpio_rmw(base, OMAP24XX_GPIO_LEVELDETECT0, gpio_bit,
+-			  trigger & IRQ_TYPE_LEVEL_LOW);
+-		_gpio_rmw(base, OMAP24XX_GPIO_LEVELDETECT1, gpio_bit,
+-			  trigger & IRQ_TYPE_LEVEL_HIGH);
+-		_gpio_rmw(base, OMAP24XX_GPIO_RISINGDETECT, gpio_bit,
+-			  trigger & IRQ_TYPE_EDGE_RISING);
+-		_gpio_rmw(base, OMAP24XX_GPIO_FALLINGDETECT, gpio_bit,
+-			  trigger & IRQ_TYPE_EDGE_FALLING);
+-	}
+-	if (likely(!(bank->non_wakeup_gpios & gpio_bit))) {
+-		if (cpu_is_omap44xx()) {
+-			_gpio_rmw(base, OMAP4_GPIO_IRQWAKEN0, gpio_bit,
+-				  trigger != 0);
+-		} else {
+-			/*
+-			 * GPIO wakeup request can only be generated on edge
+-			 * transitions
+-			 */
+-			if (trigger & IRQ_TYPE_EDGE_BOTH)
+-				__raw_writel(1 << gpio, bank->base
+-					+ OMAP24XX_GPIO_SETWKUENA);
+-			else
+-				__raw_writel(1 << gpio, bank->base
+-					+ OMAP24XX_GPIO_CLEARWKUENA);
+-		}
+-	}
++	_gpio_rmw(base, bank->regs->leveldetect0, gpio_bit,
++		  trigger & IRQ_TYPE_LEVEL_LOW);
++	_gpio_rmw(base, bank->regs->leveldetect1, gpio_bit,
++		  trigger & IRQ_TYPE_LEVEL_HIGH);
++	_gpio_rmw(base, bank->regs->risingdetect, gpio_bit,
++		  trigger & IRQ_TYPE_EDGE_RISING);
++	_gpio_rmw(base, bank->regs->fallingdetect, gpio_bit,
++		  trigger & IRQ_TYPE_EDGE_FALLING);
++
++	if (likely(!(bank->non_wakeup_gpios & gpio_bit)))
++		_gpio_rmw(base, bank->regs->wkup_en, gpio_bit, trigger != 0);
++
+ 	/* This part needs to be executed always for OMAP{34xx, 44xx} */
+-	if (cpu_is_omap34xx() || cpu_is_omap44xx() ||
+-			(bank->non_wakeup_gpios & gpio_bit)) {
++	if (!bank->regs->irqctrl) {
++		/* On omap24xx proceed only when valid GPIO bit is set */
++		if (bank->non_wakeup_gpios) {
++			if (!(bank->non_wakeup_gpios & gpio_bit))
++				goto exit;
++		}
++
+ 		/*
+ 		 * Log the edge gpio and manually trigger the IRQ
+ 		 * after resume if the input level changes
+@@ -258,11 +238,11 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
+ 			bank->enabled_non_wakeup_gpios &= ~gpio_bit;
+ 	}
+ 
++exit:
+ 	bank->level_mask =
+ 		__raw_readl(bank->base + bank->regs->leveldetect0) |
+ 		__raw_readl(bank->base + bank->regs->leveldetect1);
+ }
+-#endif
+ 
+ #ifdef CONFIG_ARCH_OMAP1
+ /*
+@@ -274,23 +254,10 @@ static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio)
+ 	void __iomem *reg = bank->base;
+ 	u32 l = 0;
+ 
+-	switch (bank->method) {
+-	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_GPIO_INT_EDGE / bank->stride;
+-		break;
+-#ifdef CONFIG_ARCH_OMAP15XX
+-	case METHOD_GPIO_1510:
+-		reg += OMAP1510_GPIO_INT_CONTROL;
+-		break;
+-#endif
+-#if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+-	case METHOD_GPIO_7XX:
+-		reg += OMAP7XX_GPIO_INT_CONTROL;
+-		break;
+-#endif
+-	default:
++	if (!bank->regs->irqctrl)
+ 		return;
+-	}
++
++	reg += bank->regs->irqctrl;
+ 
+ 	l = __raw_readl(reg);
+ 	if ((l >> gpio) & 1)
+@@ -300,31 +267,21 @@ static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio)
+ 
+ 	__raw_writel(l, reg);
+ }
++#else
++static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio) {}
+ #endif
+ 
+ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
+ {
+ 	void __iomem *reg = bank->base;
++	void __iomem *base = bank->base;
+ 	u32 l = 0;
+ 
+-	switch (bank->method) {
+-#ifdef CONFIG_ARCH_OMAP1
+-	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_GPIO_INT_EDGE / bank->stride;
+-		l = __raw_readl(reg);
+-		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
+-			bank->toggle_mask |= 1 << gpio;
+-		if (trigger & IRQ_TYPE_EDGE_RISING)
+-			l |= 1 << gpio;
+-		else if (trigger & IRQ_TYPE_EDGE_FALLING)
+-			l &= ~(1 << gpio);
+-		else
+-			goto bad;
+-		break;
+-#endif
+-#ifdef CONFIG_ARCH_OMAP15XX
+-	case METHOD_GPIO_1510:
+-		reg += OMAP1510_GPIO_INT_CONTROL;
++	if (bank->regs->leveldetect0 && bank->regs->wkup_en) {
++		set_gpio_trigger(bank, gpio, trigger);
++	} else if (bank->regs->irqctrl) {
++		reg += bank->regs->irqctrl;
++
+ 		l = __raw_readl(reg);
+ 		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
+ 			bank->toggle_mask |= 1 << gpio;
+@@ -333,15 +290,15 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
+ 		else if (trigger & IRQ_TYPE_EDGE_FALLING)
+ 			l &= ~(1 << gpio);
+ 		else
+-			goto bad;
+-		break;
+-#endif
+-#ifdef CONFIG_ARCH_OMAP16XX
+-	case METHOD_GPIO_1610:
++			return -EINVAL;
++
++		__raw_writel(l, reg);
++	} else if (bank->regs->edgectrl1) {
+ 		if (gpio & 0x08)
+-			reg += OMAP1610_GPIO_EDGE_CTRL2;
++			reg += bank->regs->edgectrl2;
+ 		else
+-			reg += OMAP1610_GPIO_EDGE_CTRL1;
++			reg += bank->regs->edgectrl1;
++
+ 		gpio &= 0x07;
+ 		l = __raw_readl(reg);
+ 		l &= ~(3 << (gpio << 1));
+@@ -349,40 +306,12 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
+ 			l |= 2 << (gpio << 1);
+ 		if (trigger & IRQ_TYPE_EDGE_FALLING)
+ 			l |= 1 << (gpio << 1);
+-		if (trigger)
+-			/* Enable wake-up during idle for dynamic tick */
+-			__raw_writel(1 << gpio, bank->base + OMAP1610_GPIO_SET_WAKEUPENA);
+-		else
+-			__raw_writel(1 << gpio, bank->base + OMAP1610_GPIO_CLEAR_WAKEUPENA);
+-		break;
+-#endif
+-#if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+-	case METHOD_GPIO_7XX:
+-		reg += OMAP7XX_GPIO_INT_CONTROL;
+-		l = __raw_readl(reg);
+-		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
+-			bank->toggle_mask |= 1 << gpio;
+-		if (trigger & IRQ_TYPE_EDGE_RISING)
+-			l |= 1 << gpio;
+-		else if (trigger & IRQ_TYPE_EDGE_FALLING)
+-			l &= ~(1 << gpio);
+-		else
+-			goto bad;
+-		break;
+-#endif
+-#ifdef CONFIG_ARCH_OMAP2PLUS
+-	case METHOD_GPIO_24XX:
+-	case METHOD_GPIO_44XX:
+-		set_24xx_gpio_triggering(bank, gpio, trigger);
+-		return 0;
+-#endif
+-	default:
+-		goto bad;
++
++		/* Enable wake-up during idle for dynamic tick */
++		_gpio_rmw(base, bank->regs->wkup_en, 1 << gpio, trigger);
++		__raw_writel(l, reg);
+ 	}
+-	__raw_writel(l, reg);
+ 	return 0;
+-bad:
+-	return -EINVAL;
+ }
+ 
+ static int gpio_irq_type(struct irq_data *d, unsigned type)
 -- 
 1.7.0.4
