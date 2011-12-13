@@ -1,41 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Dec 2011 15:03:48 -0800
-Subject: [PULL] Calxeda Highbank for 3.3
-In-Reply-To: <4EE7D57F.7060702@gmail.com>
-References: <4EE57AC1.9000704@gmail.com>
-	<4EE7D57F.7060702@gmail.com>
-Message-ID: <CAOesGMh4NoFyd8V23evyZdmK+Fy-0CbjBsHXwzPjRy-C6PMP+Q@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 13 Dec 2011 15:07:08 -0800
+Subject: [PATCH V2 2/2] ARM: mmp: enable pinmux in platform driver
+In-Reply-To: <CACRpkdbqj0zyRP4skGm4EX0Hx1Axe5-wkC14Y6Ee_B9TFzy39g@mail.gmail.com>
+References: <1323769253-22580-1-git-send-email-haojian.zhuang@marvell.com>
+ <1323769253-22580-3-git-send-email-haojian.zhuang@marvell.com>
+ <CACRpkdbqj0zyRP4skGm4EX0Hx1Axe5-wkC14Y6Ee_B9TFzy39g@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1751860C3C@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Linus Walleij wrote at Tuesday, December 13, 2011 4:02 PM:
+> On Tue, Dec 13, 2011 at 10:40 AM, Haojian Zhuang wrote:
+...
+> > +static struct pinmux_map brownstone_pmx_map[] = {
+> > + ? ? ? {
+> > + ? ? ? ? ? ? ? .name = "dkin",
+> > + ? ? ? ? ? ? ? .ctrl_dev_name = "mmp2-pinmux",
+> > + ? ? ? ? ? ? ? .function = "dkin",
+> > + ? ? ? ? ? ? ? .group = "dkin-2-pin",
+> > + ? ? ? ? ? ? ? .hog_on_boot = true,
+> > + ? ? ? }, {
+...
+> 
+> Looks like we want to add
+> #define PINMUX_MAP_SYS_HOG_GROUP() or so with four
+> arguments, what do you say Stephen? Shall I try to patch  in
+> something like that (then this patch will look even better).
 
-On Tue, Dec 13, 2011 at 2:45 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 12/11/2011 09:53 PM, Rob Herring wrote:
->> Arnd,
->>
->> Please pull highbank changes for 3.3. Not much here this cycle.
->>
->> The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
->>
->> ? Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
->>
->> are available in the git repository at:
->> ? git://sources.calxeda.com/kernel/linux.git for-3.3
->>
->> Rob Herring (1):
->> ? ? ? ARM: highbank: add xgmac ethernet devices to dts
->>
->> ?arch/arm/boot/dts/highbank.dts | ? 12 ++++++++++++
->> ?1 files changed, 12 insertions(+), 0 deletions(-)
->>
->> Cheers,
->> Rob
->
-> Forgot to copy Olof.
+Yes, sounds like a good idea. I just realized that I ignored PINMUX_MAP_*
+in the stuff I'm working on and implemented exactly that macro as a custom
+macro right before the map array. So, having it in the pinctrl header
+would be good. 
 
-
-No worries. Applied to next/devel.
-
-
--Olof
+-- 
+nvpublic
