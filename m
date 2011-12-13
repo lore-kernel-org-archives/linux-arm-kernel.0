@@ -1,41 +1,33 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 13 Dec 2011 16:28:03 +0800
-Subject: [PATCH 1/1] net/fec: add KSZ9021RN phy fixup
-In-Reply-To: <20111213024733.GB10866@S2100-06.ap.freescale.net>
-References: <1323684558-16796-1-git-send-email-richard.zhao@linaro.org>
- <CAOMZO5DNRrt7ULuBkh9y8bz2_fpCHOcSWxAbJOqTHA2Nrv1V_w@mail.gmail.com>
- <20111212135119.GE16835@b20223-02.ap.freescale.net>
- <4EE612BF.9050907@bluegiga.com>
- <20111213021008.GE28768@b20223-02.ap.freescale.net>
- <20111213023626.GA10866@S2100-06.ap.freescale.net>
- <CAB4PhKfSegpwrZbedN7KtJd+xFk1JAOCWuSFq2you5dWn9bqwA@mail.gmail.com>
- <20111213024733.GB10866@S2100-06.ap.freescale.net>
-Message-ID: <20111213082802.GF28768@b20223-02.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 13 Dec 2011 14:16:13 +0530
+Subject: [PATCH 3/4] ARM: smp_twd: get the rate from a clock
+In-Reply-To: <20111213081723.GB14542@n2100.arm.linux.org.uk>
+References: <1323683847-23902-1-git-send-email-linus.walleij@stericsson.com>
+ <4EE6E17E.5040902@ti.com> <20111213081723.GB14542@n2100.arm.linux.org.uk>
+Message-ID: <CAMQu2gyauDsYE+MK56iKhrVBgvOU8Z3Hbtfxd-G_ZmQUBAW4LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 10:47:33AM +0800, Shawn Guo wrote:
-> On Tue, Dec 13, 2011 at 10:29:53AM +0800, Jason Liu wrote:
-> > 2011/12/13 Shawn Guo <shawn.guo@freescale.com>:
-> > > On Tue, Dec 13, 2011 at 10:10:08AM +0800, Richard Zhao wrote:
-> > >> By converting to DT, machine code's becoming common too. I feel hard to
-> > >> find a place. Put it in imx6q_init_machine?
-> > >>
-> > >> Sascha & Shawn, Could you give comments here?
-> > >>
-> > > I see no problem to do that by checking board compatible string and
-> > > do the setup for particular board.
-> > 
-> > Then, you may end up having more and more fix up in the fec driver
-> > when all the platforms converted to DT,
-> > which will put the fec driver into mess.
-> > 
-> I meant we do this in imx6q_init_machine().
-all right. moved to machine code.
+On Tue, Dec 13, 2011 at 1:47 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Dec 13, 2011 at 10:54:14AM +0530, Santosh Shilimkar wrote:
+>> > +static struct clk *twd_get_clock(void)
+>> > +{
+>> > + ? struct clk *clk;
+>> > + ? int err;
+>> > +
+>> > + ? clk = clk_get_sys("smp_twd", NULL);
+>>
+>> As noticed by Mike, would be better to use con_id instead
+>> of dev_id here. I mean,
+>> clk = clk_get_sys(NULL, "smp_twd");
+>
+> Why? ?It makes more sense for a device ID to be passed for this.
+Sorry. I assumed clk_get_sys() signature same as clk_get(). And then
+thought dev pointer and con_id is the right way to go about it.
+Since clk_get_sys() directly takes dev_id, it should be fine.
 
-Thanks
-Richard
-> 
-> -- 
-> Regards,
-> Shawn
+Will update OMAP clock-node patch accordingly.
+
+Regards
+Santosh
