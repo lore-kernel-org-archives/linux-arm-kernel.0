@@ -1,32 +1,58 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 12 Dec 2011 16:33:56 -0800
-Subject: [PATCHv11 0/8] OMAP3+: PRCM chain handler
-In-Reply-To: <1323713733-13115-1-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Mon, 12 Dec 2011 20:15:25 +0200")
-References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
-Message-ID: <87ty55z4wb.fsf@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Dec 2011 01:41:05 +0100
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <20111212143750.GA27267@pengutronix.de>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+ <4EE18403.30604@nvidia.com>
+ <20111209043220.GJ7913@S2100-06.ap.freescale.net>
+ <4EE192DC.3080209@nvidia.com>
+ <20111209051413.GK7913@S2100-06.ap.freescale.net>
+ <20111209110807.GG27267@pengutronix.de>
+ <CACRpkdYpq1phHTTLy875xSr-upiW5BmvKMPO_d-niG+-J14t9w@mail.gmail.com>
+ <20111212143750.GA27267@pengutronix.de>
+Message-ID: <CACRpkdZz=1xf19feiO8SkzGr=x6ntaNzSwiCjyYmOrz0Z33phA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
-
-
-> PRCM chain handler is adding a support to the omap3+ kernel that
-> allows different drivers to use PRCM interrupt events for their
-> own purposes, typically this means IO wakeups. This work was
-> attempted to integrate as its own driver at some point of
-> the evolution of this set, however this was now postponed as
-> the lacking support is basically blocking a few drivers.
+On Mon, Dec 12, 2011 at 3:37 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Sat, Dec 10, 2011 at 01:18:43AM +0100, Linus Walleij wrote:
+>> On Fri, Dec 9, 2011 at 12:08 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>>
+>> > Drivers should not be bothered with pin muxing *at all*.
+>>
+>> Not if they are simple. Like - set them up once and for all and
+>> then forget about it.
+>>
+>> It gets problematic when we get to sleep states and the system
+>> need to reconfigure all pins on say idle or deep sleep.
 >
-> This is the version 11 of this set, now posted to linux-arm-kernel also
-> as cc. Contains just a couple of minor changes compared to previous
-> version proposed by Kevin Hilman.
+> If you need to reconfigure your pins in deep sleep and you control
+> the pins in the driver this seems to suggest that your device won't
+> suspend properly if the driver is not loaded?
 
-Thanks Tero for the quick update.  
+In our case (ux500) it's more like all pins have a defined nice
+state for active, sleep and idle. (Pull-ups, downs, wakeups etc
+set in a certain way.)
 
-All of this series can go through Paul, so from my side
+Then there are some real agressive stuff PM people start to do.
+Some of them require you to shut down things in a certain
+sequence, like this device has to have its pins turned off first,
+the clock released, then regulator, etc. And others do it in the
+reverse order, or any order.
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
+If all your hardware was engineered the
+same way with this in mind it could probably be done
+centrally, like the nice stuff Magnus Damm has for managing
+clocks in drivers/base/power/clock_ops.c for all SHmobile
+clocks. Would be real nice if it worked for us, sadly not all
+hardware is designed in such a consistent way.
 
-Kevin
+For our hardware it's better to spread it out across the
+drivers and then consolidate once we have the entire
+picture, I'm afraid. For others it will be different, maybe
+your systems will never need it and you can keep all in
+central places.
+
+Linus Walleij
