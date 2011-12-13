@@ -1,34 +1,40 @@
-From: linux@solonet.org.ua (Denis Kuzmenko)
-Date: Wed, 14 Dec 2011 00:05:40 +0200
-Subject: [PATCH v3 resend2] s3c/s3c24xx: arm: leds: Make s3c24xx LEDS
- driver use gpiolib
-In-Reply-To: <1323812431.3837.31.camel@joe2Laptop>
-References: <4EE7B41C.5080006@solonet.org.ua>	
- <1323810417.3837.25.camel@joe2Laptop> <4EE7C1C9.8080000@solonet.org.ua>	
- <1323811732.3837.27.camel@joe2Laptop> <4EE7C4AD.8090805@solonet.org.ua>
- <1323812431.3837.31.camel@joe2Laptop>
-Message-ID: <4EE7CC34.8000209@solonet.org.ua>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 13 Dec 2011 15:16:26 -0700 (MST)
+Subject: [PATCHv11 2/8] ARM: OMAP2+: hwmod: Add API to check IO PAD wakeup
+ status
+In-Reply-To: <1323713733-13115-3-git-send-email-t-kristo@ti.com>
+References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
+ <1323713733-13115-3-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1112131505000.12046@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2011 11:40 PM, Joe Perches wrote:
-> On Tue, 2011-12-13 at 23:33 +0200, Denis Kuzmenko wrote:
->> On 12/13/2011 11:28 PM, Joe Perches wrote:
->>> The LEDF_ACTLOW use is dependent on it being #defined
->>> to 1 when using ^.  I think that's unintelligible.
->> Sorry, can't understand. Can you please clarify last two sentences?
-> 
-> 	s3c2410_gpio_setpin(pd->gpio, (value ? 1 : 0) ^
-> 			    (pd->flags & S3C24XX_LEDF_ACTLOW));
-> 
-> I think this should be:
-> 	s3c2410_gpio_setpin(pd->gpio,
-> 			    !!value ^ !!(pd->flags & S3C24XX_LEDF_ACTLOW));
-> 
+Hi
 
-So you've found a BUG. As I understand my code will behave wrong if
-S3C24XX_LEDF_ACTLOW value will be changed.
-Thank you, I'll make a new version.
+a question
 
--- 
-Best regards, Denis Kuzmenko.
+On Mon, 12 Dec 2011, Tero Kristo wrote:
+
+So the patch description says:
+
+> From: R, Govindraj <govindraj.raja@ti.com>
+> 
+> Add API to determine IO-PAD wakeup event status for a given
+> hwmod dynamic_mux pad.
+
+But the code does:
+
+> +	for (i = 0; i < hmux->nr_pads; i++) {
+> +		struct omap_device_pad *pad = &hmux->pads[i];
+
+which is going to check all of the pads, not just the dynamic ones.
+
+So it seems to me that we need to decide whether this code should be 
+testing all the pads, or just the dynamically remuxed ones.  The same 
+thing should be decided for the code in patch 1.
+
+Na?vely it seems to me that we want to test all of the pads in both 
+patches 1 and 2, not just the dynamically remuxable ones.  Comments?
+
+
+- Paul
