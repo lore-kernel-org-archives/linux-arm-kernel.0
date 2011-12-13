@@ -1,50 +1,166 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Dec 2011 18:58:05 +0000
-Subject: [PATCH v4] ARM: sched_clock: allow sched_clock to be selected
- at runtime
-In-Reply-To: <CAH9JG2X9dGJVdwzs2Wbqt9_8=Lg1bsrDP_A0n-JDxgN3bAOYKg@mail.gmail.com>
-References: <1323444833-10587-1-git-send-email-marc.zyngier@arm.com>
- <4EE57BC3.4080306@gmail.com>	<4EE63459.1030105@arm.com>
- <20111213004656.GR32251@atomide.com>	<20111213005018.GS32251@atomide.com>
- <CAH9JG2X9dGJVdwzs2Wbqt9_8=Lg1bsrDP_A0n-JDxgN3bAOYKg@mail.gmail.com>
-Message-ID: <4EE7A03D.7060208@arm.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Tue, 13 Dec 2011 13:04:23 -0600
+Subject: [PATCH V2 7/7] arm/imx6q: add cpufreq support
+In-Reply-To: <20111213103831.GG28768@b20223-02.ap.freescale.net>
+References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
+ <1323757530-19402-8-git-send-email-richard.zhao@linaro.org>
+ <20111213102315.GJ27267@pengutronix.de>
+ <20111213103831.GG28768@b20223-02.ap.freescale.net>
+Message-ID: <CAMXH7KHxRtWAZmUSo42gwcRps=CDY3PC-ZdqWQm7Ot9xYc+LgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/11 01:33, Kyungmin Park wrote:
-> Tested-by: Kyungmin Park <kyungmin,park@samsung.com>
-> 
-> On 12/13/11, Tony Lindgren <tony@atomide.com> wrote:
->> * Tony Lindgren <tony@atomide.com> [111212 16:46]:
->>> * Marc Zyngier <marc.zyngier@arm.com> [111212 08:33]:
->>>>
->>>> Queued as patch 7205/1.
->>>>
->>>> 	M.
->>>
->>> Great, seems to boot fine on all omaps I tried, will go ack it
->>> in the patch system.
+On 13 December 2011 04:38, Richard Zhao <richard.zhao@freescale.com> wrote:
+> On Tue, Dec 13, 2011 at 11:23:15AM +0100, Sascha Hauer wrote:
+>> On Tue, Dec 13, 2011 at 02:25:30PM +0800, Richard Zhao wrote:
+>> > use cpu0 node property clock-frequency to check max frequency.
+>> >
+>> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+>> > ---
+>> > ?arch/arm/mach-imx/Kconfig ? ? ? ?| ? ?1 +
+>> > ?arch/arm/mach-imx/Makefile ? ? ? | ? ?2 +-
+>> > ?arch/arm/mach-imx/cpu_op-imx6q.c | ? 69 ++++++++++++++++++++++++++++++++++++++
+>> > ?3 files changed, 71 insertions(+), 1 deletions(-)
+>> > ?create mode 100644 arch/arm/mach-imx/cpu_op-imx6q.c
+>> >
+>> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> > index fbd414b..21e472f 100644
+>> > --- a/arch/arm/mach-imx/Kconfig
+>> > +++ b/arch/arm/mach-imx/Kconfig
+>> > @@ -834,6 +834,7 @@ comment "i.MX6 family:"
+>> >
+>> > ?config SOC_IMX6Q
+>> > ? ? bool "i.MX6 Quad support"
+>> > + ? select ARCH_HAS_CPUFREQ
+>> > ? ? select ARM_GIC
+>> > ? ? select CACHE_L2X0
+>> > ? ? select CPU_V7
+>> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+>> > index 9cf630a..2dfe4a7 100644
+>> > --- a/arch/arm/mach-imx/Makefile
+>> > +++ b/arch/arm/mach-imx/Makefile
+>> > @@ -72,7 +72,7 @@ AFLAGS_head-v7.o :=-Wa,-march=armv7-a
+>> > ?obj-$(CONFIG_SMP) += platsmp.o
+>> > ?obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+>> > ?obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
+>> > -obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o pm-imx6q.o
+>> > +obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o pm-imx6q.o cpu_op-imx6q.o
+>> >
+>> > ?# i.MX5 based machines
+>> > ?obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
+>> > diff --git a/arch/arm/mach-imx/cpu_op-imx6q.c b/arch/arm/mach-imx/cpu_op-imx6q.c
+>> > new file mode 100644
+>> > index 0000000..d24e081
+>> > --- /dev/null
+>> > +++ b/arch/arm/mach-imx/cpu_op-imx6q.c
+>> > @@ -0,0 +1,69 @@
+>> > +/*
+>> > + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+>> > + */
+>> > +
+>> > +/*
+>> > + * The code contained herein is licensed under the GNU General Public
+>> > + * License. You may obtain a copy of the GNU General Public License
+>> > + * Version 2 or later at the following locations:
+>> > + *
+>> > + * http://www.opensource.org/licenses/gpl-license.html
+>> > + * http://www.gnu.org/copyleft/gpl.html
+>> > + */
+>> > +
+>> > +#include <linux/types.h>
+>> > +#include <linux/kernel.h>
+>> > +#include <linux/string.h>
+>> > +#include <linux/of.h>
+>> > +#include <mach/hardware.h>
+>> > +
+>> > +static int arm_max_freq_idx;
 >>
->> Hmm I guess you can't comment patches there, so:
+>> This is only used in mx6q_get_cpu_op()
+> I'll move to local var
 >>
->> Tested-by: Tony Lindgren <tony@atomide.com>
+>> Also shouldn't this be initialized with 1? From what you
+>> said 800MHz is safe for all boards whereas 1GHz is not.
+> I'll fix it in next version.
+>
 
-While I'm really glad to see platform maintainers testing and acking
-patches, may I kindly remind them to post their comments as early as
-possible?
+Richard, I communicated with Hui Liu a couple of weeks ago about the
+possibility of adding a "max_freq" kernel parameter to the i.MX6q
+community u-boot, similiar to what has been done for the BSP u-boot.
+If he is or has done this, it may be better to read and use this
+kernel parameter from u-boot so that the same kernel can be used
+between boards with and without the fix.  I'm not that familiar with
+device tree yet but perhaps it provides another way to handle this.
+Also keep in
 
-This patch has been around since August, and has reached version 4
-before platform maintainers started to comment on it. Many platform
-specific patches are left unanswered (and no, I'm not the only one
-complaining).
-
-So please, pretty please... When some platform-specific patch hit your
-mailbox, try to have a look at it in a timely manner. Specially if it is
-part of a much bigger series (by not answering, you're basically
-delaying the whole thing).
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Thanks
+> Richard
+>>
+>> Sascha
+>>
+>> > +
+>> > +/* operating point(op): 0 - 1GHz; 1 - 800MHz, 3 - 400MHz, 4 ?- 160MHz */
+>> > +static struct cpu_op mx6q_cpu_op[] = {
+>> > + ? {
+>> > + ? ? ? ? ? .cpu_rate = 996000000,
+>> > + ? ? ? ? ? .cpu_voltage = 1225000,
+>> > + ? },
+>> > + ? {
+>> > + ? ? ? ? ? .cpu_rate = 792000000,
+>> > + ? ? ? ? ? .cpu_voltage = 1100000,
+>> > + ? },
+>> > + ? {
+>> > + ? ? ? ? ? .cpu_rate = 396000000,
+>> > + ? ? ? ? ? .cpu_voltage = 950000,
+>> > + ? },
+>> > + ? {
+>> > + ? ? ? ? ? .cpu_rate = 198000000,
+>> > + ? ? ? ? ? .cpu_voltage = 850000,
+>> > + ? },
+>> > +};
+>> > +
+>> > +struct cpu_op *mx6q_get_cpu_op(int *op)
+>> > +{
+>> > + ? struct device_node *cpu0;
+>> > + ? u32 val;
+>> > + ? int i;
+>> > +
+>> > + ? cpu0 = of_find_node_by_path("/cpus/cpu at 0");
+>> > + ? if (cpu0 && !of_property_read_u32(cpu0, "clock-frequency", &val)) {
+>> > + ? ? ? ? ? for (i = 0; i < ARRAY_SIZE(mx6q_cpu_op); i++) {
+>> > + ? ? ? ? ? ? ? ? ? if (val >= mx6q_cpu_op[i].cpu_rate) {
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? arm_max_freq_idx = i;
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> > + ? ? ? ? ? ? ? ? ? }
+>> > + ? ? ? ? ? }
+>> > + ? }
+>> > + ? if (cpu0)
+>> > + ? ? ? ? ? of_node_put(cpu0);
+>> > + ? *op = ARRAY_SIZE(mx6q_cpu_op) - arm_max_freq_idx;
+>> > + ? return mx6q_cpu_op + arm_max_freq_idx;
+>> > +}
+>> > +
+>> > +static int __init mx6q_cpu_op_init(void)
+>> > +{
+>> > + ? get_cpu_op = mx6q_get_cpu_op;
+>> > + ? return 0;
+>> > +}
+>> > +
+>> > +core_initcall(mx6q_cpu_op_init);
+>> > --
+>> > 1.7.5.4
+>> >
+>> >
+>> >
+>>
+>> --
+>> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+>> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+>> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
