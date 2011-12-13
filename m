@@ -1,46 +1,50 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 13 Dec 2011 18:34:27 +0000
-Subject: [PATCH] arm,davinci: configure davinci aemif chipselects
- through OF
-In-Reply-To: <201112081548.08548.arnd@arndb.de>
-References: <1322991679-20947-1-git-send-email-hs@denx.de>
- <4EE07E27.8090602@denx.de>
- <DF0F476B391FA8409C78302C7BA518B6040CBB@DBDE01.ent.ti.com>
- <201112081548.08548.arnd@arndb.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B60471C1@DBDE01.ent.ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Dec 2011 18:58:05 +0000
+Subject: [PATCH v4] ARM: sched_clock: allow sched_clock to be selected
+ at runtime
+In-Reply-To: <CAH9JG2X9dGJVdwzs2Wbqt9_8=Lg1bsrDP_A0n-JDxgN3bAOYKg@mail.gmail.com>
+References: <1323444833-10587-1-git-send-email-marc.zyngier@arm.com>
+ <4EE57BC3.4080306@gmail.com>	<4EE63459.1030105@arm.com>
+ <20111213004656.GR32251@atomide.com>	<20111213005018.GS32251@atomide.com>
+ <CAH9JG2X9dGJVdwzs2Wbqt9_8=Lg1bsrDP_A0n-JDxgN3bAOYKg@mail.gmail.com>
+Message-ID: <4EE7A03D.7060208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Thu, Dec 08, 2011 at 21:18:08, Arnd Bergmann wrote:
-> On Thursday 08 December 2011, Nori, Sekhar wrote:
-> > DaVinci AEMIF is an async memory interface peripheral implemented
-> > in arch/arm/mach-davinci/aemif.c. It helps interface to NAND, NOR
-> > and other asynchronous memories. Currently it just provides an API
-> > for timing value configuration. The API is invoked by the MTD NAND
-> > driver.
-> > 
-> > Specification here: http://www.ti.com/lit/ug/sprue20c/sprue20c.pdf
-> > 
-> > We are looking at a place for this outside of architecture code.
+On 13/12/11 01:33, Kyungmin Park wrote:
+> Tested-by: Kyungmin Park <kyungmin,park@samsung.com>
 > 
-> I think the best place depends on how you plan to use the sram
-> interface. If all memory behind the aemif is handled by mtd, I would
-> put the entire driver somewhere in the mtd infrastructure.
+> On 12/13/11, Tony Lindgren <tony@atomide.com> wrote:
+>> * Tony Lindgren <tony@atomide.com> [111212 16:46]:
+>>> * Marc Zyngier <marc.zyngier@arm.com> [111212 08:33]:
+>>>>
+>>>> Queued as patch 7205/1.
+>>>>
+>>>> 	M.
+>>>
+>>> Great, seems to boot fine on all omaps I tried, will go ack it
+>>> in the patch system.
+>>
+>> Hmm I guess you can't comment patches there, so:
+>>
+>> Tested-by: Tony Lindgren <tony@atomide.com>
 
-All the boards and use cases I have come across for AEMIF so far
-(5-6 years) have either used NAND or NOR memory.
+While I'm really glad to see platform maintainers testing and acking
+patches, may I kindly remind them to post their comments as early as
+possible?
 
-> If you want it to provide endpoint devices that are handled by
-> distinct subsystems in Linux, I would make it an mfd multifunction
-> device and make the common code a driver that scans the connected
-> memories in order to register its child devices for each of the
-> subsystems.
+This patch has been around since August, and has reached version 4
+before platform maintainers started to comment on it. Many platform
+specific patches are left unanswered (and no, I'm not the only one
+complaining).
 
-Okay. Thanks for the explanation. Since the users of AEMIF at this
-point are mtd devices, I propose moving it to drivers/mtd/davinci-aemif.c
-(of course, mtd folks need to approve).
+So please, pretty please... When some platform-specific patch hit your
+mailbox, try to have a look at it in a timely manner. Specially if it is
+part of a much bigger series (by not answering, you're basically
+delaying the whole thing).
 
 Thanks,
-Sekhar
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
