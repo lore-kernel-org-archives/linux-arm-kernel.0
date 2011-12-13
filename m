@@ -1,46 +1,68 @@
-From: eric@eukrea.com (=?ISO-8859-15?Q?Eric_B=E9nard?=)
-Date: Tue, 13 Dec 2011 14:47:51 +0100
-Subject: [PATCH 09/19] clock-imx35: fix reboot in internal boot modeg
-In-Reply-To: <20111213100041.GG27267@pengutronix.de>
-References: <1323757911-25217-1-git-send-email-eric@eukrea.com>
- <1323757911-25217-9-git-send-email-eric@eukrea.com>
- <20111213100041.GG27267@pengutronix.de>
-Message-ID: <4EE75787.3020101@eukrea.com>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Tue, 13 Dec 2011 15:09:37 +0100
+Subject: [PATCH v2 01/19] mxc_udc: add workaround for ENGcm09152 for i.MX25
+In-Reply-To: <20111213101846.GC2619@pengutronix.de>
+References: <20111213101846.GC2619@pengutronix.de>
+Message-ID: <1323785377-22463-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/12/2011 11:00, Sascha Hauer a ?crit :
-> On Tue, Dec 13, 2011 at 07:31:41AM +0100, Eric B?nard wrote:
->> commit 8d75a2620dc3e33ce504044c375c443ed7ed4128 disable IIM
->> clock after reading silicon revision which will prevent
->> reboot in internal boot mode (see comment a few line before)
->
-> I'm a bit unsure. The fix you suggest is the least intrusive, but
-> a proper fix would be to move the mentioned block below the
-> imx_print_silicon_rev, like this:
->
-> 	clk_enable(&iim_clk);
-> 	imx_print_silicon_rev("i.MX35", mx35_revision());
-> 	clk_disable(&iim_clk);
->
-> 	/*
-> 	 * Check if we came up in internal boot mode. If yes, we need
-> 	 * some
-> 	 * extra clocks turned on, otherwise the MX35 boot ROM code will
-> 	 * hang after a watchdog reset.
-> 	 */
-> 	if (!(__raw_readl(CCM_BASE + CCM_RCSR)&  (3<<  10))) {
-> 		clk_enable(&iim_clk);
-> 		clk_enable(&uart1_clk);
-> 		clk_enable(&scc_clk);
-> 	}
->
-> This would also get the clk enable counters right.
->
-OK that's cleaner.
-While fixing the patch it seems comment & code are not synced as scc_clk is 
-0x3 << 2 and the code was setting 0x3 << 4 which corresponds to sdma_clk (and 
-in my configuration, reboot works without any of these clocks forced). I chose 
-to have code synced with comment for v2 of the patch.
+this patch gives the possibility to workaround bug ENGcm09152
+on i.MX25 when the hardware workaround is also implemented on
+the board.
+It covers the workaround described on page 42 of the following Errata,
+titled "USB: UTMI_USBPHY VBUS input impedance implementation error" :
+http://cache.freescale.com/files/dsp/doc/errata/IMX25CE.pdf
 
-Eric
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Greg Kroah-Hartman <gregkh@suse.de>
+Cc: Li Yang <leoli@freescale.com>
+---
+ drivers/usb/gadget/fsl_mxc_udc.c |   22 +++++++++++++---------
+ 1 files changed, 13 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+index dcbc0a2..4aff05d 100644
+--- a/drivers/usb/gadget/fsl_mxc_udc.c
++++ b/drivers/usb/gadget/fsl_mxc_udc.c
+@@ -23,7 +23,7 @@
+ static struct clk *mxc_ahb_clk;
+ static struct clk *mxc_usb_clk;
+ 
+-/* workaround ENGcm09152 for i.MX35 */
++/* workaround ENGcm09152 for i.MX25/35 */
+ #define USBPHYCTRL_OTGBASE_OFFSET	0x608
+ #define USBPHYCTRL_EVDO			(1 << 23)
+ 
+@@ -89,16 +89,20 @@ eenahb:
+ void fsl_udc_clk_finalize(struct platform_device *pdev)
+ {
+ 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+-	if (cpu_is_mx35()) {
++	if (cpu_is_mx25() || cpu_is_mx35()) {
+ 		unsigned int v;
+-
+-		/* workaround ENGcm09152 for i.MX35 */
++		void __iomem *otgbase;
++		if (cpu_is_mx25())
++			otgbase = MX25_IO_ADDRESS(MX25_USB_BASE_ADDR +
++					USBPHYCTRL_OTGBASE_OFFSET);
++		else if (cpu_is_mx35())
++			otgbase = MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
++					USBPHYCTRL_OTGBASE_OFFSET);
++
++		/* workaround ENGcm09152 for i.MX25/35 */
+ 		if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
+-			v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+-					USBPHYCTRL_OTGBASE_OFFSET));
+-			writel(v | USBPHYCTRL_EVDO,
+-				MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+-					USBPHYCTRL_OTGBASE_OFFSET));
++			v = readl(otgbase);
++			writel(v | USBPHYCTRL_EVDO, otgbase);
+ 		}
+ 	}
+ 
+-- 
+1.7.6.4
