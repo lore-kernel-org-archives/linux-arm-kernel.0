@@ -1,140 +1,99 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 13 Dec 2011 10:42:58 +0800
-Subject: [RFC PATCH v1 1/7] omap4: introduce fdif(face detect module) hwmod
-In-Reply-To: <1322817178-8931-2-git-send-email-ming.lei@canonical.com>
-References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
- <1322817178-8931-2-git-send-email-ming.lei@canonical.com>
-Message-ID: <CACVXFVM4gNwK90oiCx7c-rascT9n4zd-oCQLZvMXMbXT=37obg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 13 Dec 2011 11:17:42 +0800
+Subject: [PATCH v4] tty: serial: imx: Allow UART to be a source for wakeup
+In-Reply-To: <CAOMZO5DM_eDZqbxsNKYvwgP+qjr=yoLHrWHuZb-PQn9xWZpsrg@mail.gmail.com>
+References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
+ <1323456065-6240-1-git-send-email-festevam@gmail.com>
+ <20111211060133.GA9470@S2100-06.ap.freescale.net>
+ <CAOMZO5DM_eDZqbxsNKYvwgP+qjr=yoLHrWHuZb-PQn9xWZpsrg@mail.gmail.com>
+Message-ID: <20111213031741.GC10866@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On Mon, Dec 12, 2011 at 04:17:04PM -0200, Fabio Estevam wrote:
+> On Sun, Dec 11, 2011 at 4:01 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> 
+> >> + ? ? device_init_wakeup(&pdev->dev, 1);
+> >> + ? ? device_set_wakeup_enable(&pdev->dev, 0);
+> >> +
+> > Rather than calling these two functions, simply calling
+> >
+> > ? ? ? ?device_set_wakeup_capable(&pdev->dev, true);
+> >
+> > can just do what we want to do here.
+> 
+> Yes, this is correct.
+> 
+> After checking the code it seems to me that  neither of this calls are needed.
+> 
+> serial_core.c already calls:
+> 		device_init_wakeup(tty_dev, 1);
+> 		device_set_wakeup_enable(tty_dev, 0);
+> 
+> and we can see a wakeup entry at:
+> 
+> /sys/devices/platform/imx21-uart.0/tty/ttymxc0/power/wakeup
+> 
+> However, if I send "enabled" to this file the
+> "if (device_may_wakeup(&dev->dev)" statement is never true.
+> 
+That's because &pdev->dev and tty_dev above point to different
+'struct dev'.
 
-Gentle ping on this patch, :-)
+> I am not sure what would be the correct argument for device_may_wakeup
+> to "see" the original wakeup entry.
+> 
+It seems difficult to figure out the tty_dev in imx driver.  And I do
+not think we need to.  We can simply remove the device_may_wakeup
+check and rxirq enable/disable from serial_imx_suspend/resume, because
+both of these two things have been taken care of by serial_core.
 
-thanks,
---
-Ming Lei
+The following change works for me.
 
-On Fri, Dec 2, 2011 at 5:12 PM, Ming Lei <ming.lei@canonical.com> wrote:
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> ---
-> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? 81 ++++++++++++++++++++++++++++
-> ?1 files changed, 81 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 6cf21ee..30db754 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -53,6 +53,7 @@ static struct omap_hwmod omap44xx_dmm_hwmod;
-> ?static struct omap_hwmod omap44xx_dsp_hwmod;
-> ?static struct omap_hwmod omap44xx_dss_hwmod;
-> ?static struct omap_hwmod omap44xx_emif_fw_hwmod;
-> +static struct omap_hwmod omap44xx_fdif_hwmod;
-> ?static struct omap_hwmod omap44xx_hsi_hwmod;
-> ?static struct omap_hwmod omap44xx_ipu_hwmod;
-> ?static struct omap_hwmod omap44xx_iss_hwmod;
-> @@ -354,6 +355,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
-> ? ? ? ?.user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
-> ?};
->
-> +/* fdif -> l3_main_2 */
-> +static struct omap_hwmod_ocp_if omap44xx_fdif__l3_main_2 = {
-> + ? ? ? .master ? ? ? ? = &omap44xx_fdif_hwmod,
-> + ? ? ? .slave ? ? ? ? ?= &omap44xx_l3_main_2_hwmod,
-> + ? ? ? .clk ? ? ? ? ? ?= "l3_div_ck",
-> + ? ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> ?/* hsi -> l3_main_2 */
-> ?static struct omap_hwmod_ocp_if omap44xx_hsi__l3_main_2 = {
-> ? ? ? ?.master ? ? ? ? = &omap44xx_hsi_hwmod,
-> @@ -5444,6 +5453,75 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
-> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap44xx_wd_timer3_slaves),
-> ?};
->
-> +/* 'fdif' class */
-> +static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
-> + ? ? ? .rev_offs ? ? ? = 0x0000,
-> + ? ? ? .sysc_offs ? ? ?= 0x0010,
-> + ? ? ? .sysc_flags ? ? = (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ?SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-> + ? ? ? .idlemodes ? ? ?= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ?MSTANDBY_FORCE | MSTANDBY_NO |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ?MSTANDBY_SMART),
-> + ? ? ? .sysc_fields ? ?= &omap_hwmod_sysc_type2,
-> +};
-> +
-> +static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
-> + ? ? ? .name ? = "fdif",
-> + ? ? ? .sysc ? = &omap44xx_fdif_sysc,
-> +};
-> +
-> +/*fdif*/
-> +static struct omap_hwmod_addr_space omap44xx_fdif_addrs[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x4a10a000,
-> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x4a10afff,
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT
-> + ? ? ? },
-> + ? ? ? { }
-> +};
-> +
-> +/* l4_cfg -> fdif */
-> +static struct omap_hwmod_ocp_if omap44xx_l4_cfg__fdif = {
-> + ? ? ? .master ? ? ? ? = &omap44xx_l4_cfg_hwmod,
-> + ? ? ? .slave ? ? ? ? ?= &omap44xx_fdif_hwmod,
-> + ? ? ? .clk ? ? ? ? ? ?= "l4_div_ck",
-> + ? ? ? .addr ? ? ? ? ? = omap44xx_fdif_addrs,
-> + ? ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* fdif slave ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
-> + ? ? ? &omap44xx_l4_cfg__fdif,
-> +};
-> +static struct omap_hwmod_irq_info omap44xx_fdif_irqs[] = {
-> + ? ? ? { .irq = 69 + OMAP44XX_IRQ_GIC_START },
-> + ? ? ? { .irq = -1 }
-> +};
-> +
-> +/* fdif master ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_fdif_masters[] = {
-> + ? ? ? &omap44xx_fdif__l3_main_2,
-> +};
-> +
-> +static struct omap_hwmod omap44xx_fdif_hwmod = {
-> + ? ? ? .name ? ? ? ? ? = "fdif",
-> + ? ? ? .class ? ? ? ? ?= &omap44xx_fdif_hwmod_class,
-> + ? ? ? .clkdm_name ? ? = "iss_clkdm",
-> + ? ? ? .mpu_irqs ? ? ? = omap44xx_fdif_irqs,
-> + ? ? ? .main_clk ? ? ? = "fdif_fck",
-> + ? ? ? .prcm = {
-> + ? ? ? ? ? ? ? .omap4 = {
-> + ? ? ? ? ? ? ? ? ? ? ? .clkctrl_offs = OMAP4_CM_CAM_FDIF_CLKCTRL_OFFSET,
-> + ? ? ? ? ? ? ? ? ? ? ? .context_offs = OMAP4_RM_CAM_FDIF_CONTEXT_OFFSET,
-> + ? ? ? ? ? ? ? ? ? ? ? .modulemode ? = MODULEMODE_SWCTRL,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? },
-> + ? ? ? .slaves ? ? ? ? = omap44xx_fdif_slaves,
-> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_fdif_slaves),
-> + ? ? ? .masters ? ? ? ?= omap44xx_fdif_masters,
-> + ? ? ? .masters_cnt ? ?= ARRAY_SIZE(omap44xx_fdif_masters),
-> +};
-> +
-> ?static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->
-> ? ? ? ?/* dmm class */
-> @@ -5593,6 +5671,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
-> ? ? ? ?&omap44xx_wd_timer2_hwmod,
-> ? ? ? ?&omap44xx_wd_timer3_hwmod,
->
-> + ? ? ? /* fdif class */
-> + ? ? ? &omap44xx_fdif_hwmod,
-> +
-> ? ? ? ?NULL,
-> ?};
+8<----
 
-thanks,
---
-Ming Lei
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 163fc90..1722230 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -566,6 +566,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
+        if (sts & USR1_RTSD)
+                imx_rtsint(irq, dev_id);
+
++       if (sts & USR1_AWAKE)
++               writel(USR1_AWAKE, sport->port.membase + USR1);
++
+        return IRQ_HANDLED;
+ }
+
+@@ -1269,6 +1272,12 @@ static struct uart_driver imx_reg = {
+ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+ {
+        struct imx_port *sport = platform_get_drvdata(dev);
++       unsigned int val;
++
++       /* enable wakeup from i.MX UART */
++       val = readl(sport->port.membase + UCR3);
++       val |= UCR3_AWAKEN;
++       writel(val, sport->port.membase + UCR3);
+
+        if (sport)
+                uart_suspend_port(&imx_reg, &sport->port);
+@@ -1279,6 +1288,11 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+ static int serial_imx_resume(struct platform_device *dev)
+ {
+        struct imx_port *sport = platform_get_drvdata(dev);
++       unsigned int val;
++
++       val = readl(sport->port.membase + UCR3);
++       val &= ~UCR3_AWAKEN;
++       writel(val, sport->port.membase + UCR3);
+
+        if (sport)
+                uart_resume_port(&imx_reg, &sport->port);
+
+--->8
+
+-- 
+Regards,
+Shawn
