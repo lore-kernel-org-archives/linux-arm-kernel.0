@@ -1,365 +1,141 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 14 Dec 2011 01:50:20 +0530
-Subject: [PATCH v9 18/31] gpio/omap: cleanup prepare_for_idle and
- resume_after_idle
-In-Reply-To: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
-References: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1323807633-23713-19-git-send-email-tarun.kanti@ti.com>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Tue, 13 Dec 2011 22:22:52 +0200
+Subject: [PATCH v3 resend2] s3c/s3c24xx: arm: leds: Make s3c24xx LEDS driver
+ use gpiolib
+Message-ID: <4EE7B41C.5080006@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since *_prepare_for_idle() and *_resume_after_idle() are called
-with interrupts disabled they should be kept as simple as possible.
-So, moving most of the stuff to *_runtime_suspend/resume() callbacks.
+Make s3c24xx LEDS driver use gpiolib. Fix error disabling pull during probe.
 
-To avoid invalid context restore happening in *_runtime_resume()
-callback as a result of *_get_sync() call in *_gpio_probe(), update
-bank->context_loss_count. This would make context restore condition
-check false in the callback and skip restore until further
-initialization take place.
-
-Unlike most GPIO registers the OE has 0xffffffff as the default value.
-To make sure invalid context is not restored, updating the OE context
-with default value.
-
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Signed-off-by: Charulatha V <charu@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+Acked-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/gpio/gpio-omap.c |  249 +++++++++++++++++++++++++++-------------------
- 1 files changed, 147 insertions(+), 102 deletions(-)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 174aa06..175a364 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -29,6 +29,8 @@
- #include <asm/gpio.h>
- #include <asm/mach/irq.h>
+There is a comment "no point in having a pull-up if we are always driving"
+but code was actually enabled pull-resistor for that case probably because of
+function parameter misunderstanding (1 - disables, 0 - enables). So this was
+changed to another function which takes alphabetically defined constant as
+parameter.
+Tested on Mini2440 board which implements most complex case where both
+S3C24XX_LEDF_ACTLOW and S3C24XX_LEDF_TRISTATE are set.
+
+Changes v1->v2
+        Fix typo's and style problems.
+Changes v2->v3
+        Remove pull-resistor enabling code for case of S3C24XX_LEDF_TRISTATE
+flag is set
+
+See https://lkml.org/lkml/2011/11/22/42 for discussion and ack.
+
+diff --git a/drivers/leds/leds-s3c24xx.c b/drivers/leds/leds-s3c24xx.c
+index a77771d..a1dbf54 100644
+--- a/drivers/leds/leds-s3c24xx.c
++++ b/drivers/leds/leds-s3c24xx.c
+@@ -45,23 +45,35 @@ static void s3c24xx_led_set(struct led_classdev *led_cdev,
+ 	struct s3c24xx_gpio_led *led = to_gpio(led_cdev);
+ 	struct s3c24xx_led_platdata *pd = led->pdata;
  
-+#define OFF_MODE	1
+-	/* there will be a short delay between setting the output and
+-	 * going from output to input when using tristate. */
+-
+-	s3c2410_gpio_setpin(pd->gpio, (value ? 1 : 0) ^
+-			    (pd->flags & S3C24XX_LEDF_ACTLOW));
+-
+-	if (pd->flags & S3C24XX_LEDF_TRISTATE)
+-		s3c2410_gpio_cfgpin(pd->gpio,
+-			value ? S3C2410_GPIO_OUTPUT : S3C2410_GPIO_INPUT);
++	/*
++	 * ensure value is 0 or 1 to use it with bitwise XOR (^)
++	 * (only 100% brightness is supported)
++	 */
++	value = value ? 1 : 0;
 +
- static LIST_HEAD(omap_gpio_list);
- 
- struct gpio_regs {
-@@ -74,6 +76,7 @@ struct gpio_bank {
- 	u32 context_loss_count;
- 	bool need_context_restore;
- 	u16 id;
-+	int power_mode;
- 
- 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
- 	u32 (*get_context_loss_count)(struct device *dev);
-@@ -908,6 +911,8 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
- 	if (bank->regs->debounce_en)
- 		_gpio_rmw(base, bank->regs->debounce_en, 0, 1);
- 
-+	/* Save OE default value (0xffffffff) in the context */
-+	bank->context.oe = __raw_readl(bank->base + bank->regs->direction);
- 	 /* Initialize interface clk ungated, module enabled */
- 	if (bank->regs->ctrl)
- 		_gpio_rmw(base, bank->regs->ctrl, 0, 1);
-@@ -1059,6 +1064,13 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 
- 	pm_runtime_enable(bank->dev);
- 	pm_runtime_irq_safe(bank->dev);
-+	/*
-+	 * Avoid context restore happening in runtime callback
-+	 * because of pm_runtime_get_sync() by making context
-+	 * context restore condition check false. This is to make
-+	 * sure that we do not restore invalid context.
-+	 */
-+	bank->context_loss_count = bank->get_context_loss_count(bank->dev);
- 	pm_runtime_get_sync(bank->dev);
- 
- 	if (bank->is_mpuio)
-@@ -1132,141 +1144,170 @@ static int omap_gpio_resume(struct device *dev)
- static void omap_gpio_save_context(struct gpio_bank *bank);
- static void omap_gpio_restore_context(struct gpio_bank *bank);
- 
--void omap2_gpio_prepare_for_idle(int off_mode)
-+static int omap_gpio_runtime_suspend(struct device *dev)
- {
--	struct gpio_bank *bank;
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct gpio_bank *bank = platform_get_drvdata(pdev);
-+	u32 l1 = 0, l2 = 0;
-+	unsigned long flags;
- 
--	list_for_each_entry(bank, &omap_gpio_list, node) {
--		u32 l1 = 0, l2 = 0;
--		int j;
-+	if (!bank->loses_context)
-+		return 0;
- 
--		if (!bank->loses_context)
--			continue;
-+	spin_lock_irqsave(&bank->lock, flags);
-+	if (bank->power_mode != OFF_MODE) {
-+		bank->power_mode = 0;
-+		goto save_gpio_context;
-+	}
-+	/*
-+	 * If going to OFF, remove triggering for all
-+	 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
-+	 * generated.  See OMAP2420 Errata item 1.101.
-+	 */
-+	if (!(bank->enabled_non_wakeup_gpios))
-+		goto save_gpio_context;
- 
--		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
--			clk_disable(bank->dbck);
-+	bank->saved_datain = __raw_readl(bank->base +
-+						bank->regs->datain);
-+	l1 = __raw_readl(bank->base + bank->regs->fallingdetect);
-+	l2 = __raw_readl(bank->base + bank->regs->risingdetect);
- 
--		if (!off_mode)
--			continue;
-+	bank->saved_fallingdetect = l1;
-+	bank->saved_risingdetect = l2;
-+	l1 &= ~bank->enabled_non_wakeup_gpios;
-+	l2 &= ~bank->enabled_non_wakeup_gpios;
- 
--		/* If going to OFF, remove triggering for all
--		 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
--		 * generated.  See OMAP2420 Errata item 1.101. */
--		if (!(bank->enabled_non_wakeup_gpios))
--			goto save_gpio_context;
-+	__raw_writel(l1, bank->base + bank->regs->fallingdetect);
-+	__raw_writel(l2, bank->base + bank->regs->risingdetect);
- 
--		bank->saved_datain = __raw_readl(bank->base +
--							bank->regs->datain);
--		l1 = __raw_readl(bank->base + bank->regs->fallingdetect);
--		l2 = __raw_readl(bank->base + bank->regs->risingdetect);
-+	bank->need_context_restore = true;
- 
--		bank->saved_fallingdetect = l1;
--		bank->saved_risingdetect = l2;
--		l1 &= ~bank->enabled_non_wakeup_gpios;
--		l2 &= ~bank->enabled_non_wakeup_gpios;
-+save_gpio_context:
-+	if (bank->get_context_loss_count)
-+		bank->context_loss_count =
-+				bank->get_context_loss_count(bank->dev);
- 
--		__raw_writel(l1, bank->base + bank->regs->fallingdetect);
--		__raw_writel(l2, bank->base + bank->regs->risingdetect);
-+	omap_gpio_save_context(bank);
-+	spin_unlock_irqrestore(&bank->lock, flags);
- 
--		bank->need_context_restore = true;
-+	return 0;
-+}
- 
--save_gpio_context:
-+static int omap_gpio_runtime_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct gpio_bank *bank = platform_get_drvdata(pdev);
-+	u32 context_lost_cnt_after;
-+	u32 l = 0, gen, gen0, gen1;
-+	unsigned long flags;
- 
--		if (bank->get_context_loss_count)
--			bank->context_loss_count =
--				bank->get_context_loss_count(bank->dev);
-+	if (!bank->loses_context)
-+		return 0;
- 
--		omap_gpio_save_context(bank);
-+	spin_lock_irqsave(&bank->lock, flags);
-+	if (!bank->enabled_non_wakeup_gpios || !bank->need_context_restore) {
-+		spin_unlock_irqrestore(&bank->lock, flags);
-+		return 0;
-+	}
- 
--		if (!pm_runtime_suspended(bank->dev))
--			pm_runtime_put(bank->dev);
-+	if (bank->get_context_loss_count) {
-+		context_lost_cnt_after =
-+			bank->get_context_loss_count(bank->dev);
-+		if (context_lost_cnt_after != bank->context_loss_count) {
-+			omap_gpio_restore_context(bank);
++	if (pd->flags & S3C24XX_LEDF_TRISTATE) {
++		if (value) {
++			/* invert value if S3C24XX_LEDF_ACTLOW is set */
++			value = (pd->flags & S3C24XX_LEDF_ACTLOW) ^ value;
++			gpio_direction_output(pd->gpio, value);
 +		} else {
-+			spin_unlock_irqrestore(&bank->lock, flags);
-+			return 0;
++			gpio_direction_input(pd->gpio);
 +		}
- 	}
--}
- 
--void omap2_gpio_resume_after_idle(void)
--{
--	struct gpio_bank *bank;
-+	__raw_writel(bank->saved_fallingdetect,
-+			bank->base + bank->regs->fallingdetect);
-+	__raw_writel(bank->saved_risingdetect,
-+			bank->base + bank->regs->risingdetect);
-+	l = __raw_readl(bank->base + bank->regs->datain);
- 
--	list_for_each_entry(bank, &omap_gpio_list, node) {
--		u32 context_lost_cnt_after;
--		u32 l = 0, gen, gen0, gen1;
--		int j;
-+	/*
-+	 * Check if any of the non-wakeup interrupt GPIOs have changed
-+	 * state.  If so, generate an IRQ by software.  This is
-+	 * horribly racy, but it's the best we can do to work around
-+	 * this silicon bug.
-+	 */
-+	l ^= bank->saved_datain;
-+	l &= bank->enabled_non_wakeup_gpios;
- 
--		if (!bank->loses_context)
--			continue;
-+	/*
-+	 * No need to generate IRQs for the rising edge for gpio IRQs
-+	 * configured with falling edge only; and vice versa.
-+	 */
-+	gen0 = l & bank->saved_fallingdetect;
-+	gen0 &= bank->saved_datain;
-+	gen1 = l & bank->saved_risingdetect;
-+	gen1 &= ~(bank->saved_datain);
- 
--		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
--			clk_enable(bank->dbck);
-+	/* FIXME: Consider GPIO IRQs with level detections properly! */
-+	gen = l & (~(bank->saved_fallingdetect) & ~(bank->saved_risingdetect));
-+	/* Consider all GPIO IRQs needed to be updated */
-+	gen |= gen0 | gen1;
- 
--		if (!bank->need_context_restore)
--			continue;
-+	if (gen) {
-+		u32 old0, old1;
- 
--		bank->need_context_restore = false;
--		if (pm_runtime_suspended(bank->dev))
--			pm_runtime_get_sync(bank->dev);
-+		old0 = __raw_readl(bank->base + bank->regs->leveldetect0);
-+		old1 = __raw_readl(bank->base + bank->regs->leveldetect1);
- 
--		if (bank->get_context_loss_count) {
--			context_lost_cnt_after =
--				bank->get_context_loss_count(bank->dev);
--			if (context_lost_cnt_after != bank->context_loss_count
--				|| !context_lost_cnt_after)
--				omap_gpio_restore_context(bank);
-+		if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
-+			__raw_writel(old0 | gen, bank->base +
-+						bank->regs->leveldetect0);
-+			__raw_writel(old1 | gen, bank->base +
-+						bank->regs->leveldetect1);
- 		}
- 
--		if (!(bank->enabled_non_wakeup_gpios))
--			continue;
-+		if (cpu_is_omap44xx()) {
-+			__raw_writel(old0 | l, bank->base +
-+						bank->regs->leveldetect0);
-+			__raw_writel(old1 | l, bank->base +
-+						bank->regs->leveldetect1);
-+		}
-+		__raw_writel(old0, bank->base + bank->regs->leveldetect0);
-+		__raw_writel(old1, bank->base + bank->regs->leveldetect1);
++	} else {
++		/* invert value if S3C24XX_LEDF_ACTLOW is set */
++		value = (pd->flags & S3C24XX_LEDF_ACTLOW) ^ value;
++		gpio_set_value(pd->gpio, value);
 +	}
  
--		__raw_writel(bank->saved_fallingdetect,
--				bank->base + bank->regs->fallingdetect);
--		__raw_writel(bank->saved_risingdetect,
--				bank->base + bank->regs->risingdetect);
--		l = __raw_readl(bank->base + bank->regs->datain);
-+	bank->need_context_restore = false;
-+	spin_unlock_irqrestore(&bank->lock, flags);
- 
--		/* Check if any of the non-wakeup interrupt GPIOs have changed
--		 * state.  If so, generate an IRQ by software.  This is
--		 * horribly racy, but it's the best we can do to work around
--		 * this silicon bug. */
--		l ^= bank->saved_datain;
--		l &= bank->enabled_non_wakeup_gpios;
-+	return 0;
-+}
- 
--		/*
--		 * No need to generate IRQs for the rising edge for gpio IRQs
--		 * configured with falling edge only; and vice versa.
--		 */
--		gen0 = l & bank->saved_fallingdetect;
--		gen0 &= bank->saved_datain;
-+void omap2_gpio_prepare_for_idle(int power_mode)
-+{
-+	struct gpio_bank *bank;
- 
--		gen1 = l & bank->saved_risingdetect;
--		gen1 &= ~(bank->saved_datain);
-+	list_for_each_entry(bank, &omap_gpio_list, node) {
-+		int j;
- 
--		/* FIXME: Consider GPIO IRQs with level detections properly! */
--		gen = l & (~(bank->saved_fallingdetect) &
--				~(bank->saved_risingdetect));
--		/* Consider all GPIO IRQs needed to be updated */
--		gen |= gen0 | gen1;
-+		if (!bank->mod_usage)
-+			continue;
- 
--		if (gen) {
--			u32 old0, old1;
-+		bank->power_mode = power_mode;
- 
--			old0 = __raw_readl(bank->base +
--						bank->regs->leveldetect0);
--			old1 = __raw_readl(bank->base +
--						bank->regs->leveldetect1);
-+		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
-+			clk_disable(bank->dbck);
-+	}
-+}
-+
-+void omap2_gpio_resume_after_idle(void)
-+{
-+	struct gpio_bank *bank;
- 
--			if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
--				old0 |= gen;
--				old1 |= gen;
--			}
-+	list_for_each_entry(bank, &omap_gpio_list, node) {
-+		int j;
- 
--			if (cpu_is_omap44xx()) {
--				old0 |= l;
--				old1 |= l;
--			}
--			__raw_writel(old0, bank->base +
--						bank->regs->leveldetect0);
--			__raw_writel(old1, bank->base +
--						bank->regs->leveldetect1);
--		}
-+		if (!bank->mod_usage)
-+			continue;
-+
-+		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
-+			clk_enable(bank->dbck);
- 	}
  }
  
-@@ -1314,10 +1355,14 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- #else
- #define omap_gpio_suspend NULL
- #define omap_gpio_resume NULL
-+#define omap_gpio_runtime_suspend NULL
-+#define omap_gpio_runtime_resume NULL
- #endif
+ static int s3c24xx_led_remove(struct platform_device *dev)
+ {
++	struct s3c24xx_led_platdata *pdata = dev->dev.platform_data;
+ 	struct s3c24xx_gpio_led *led = pdev_to_gpio(dev);
  
- static const struct dev_pm_ops gpio_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(omap_gpio_suspend, omap_gpio_resume)
-+	SET_RUNTIME_PM_OPS(omap_gpio_runtime_suspend, omap_gpio_runtime_resume,
-+									NULL)
- };
+ 	led_classdev_unregister(&led->cdev);
++	gpio_free(pdata->gpio);
+ 	kfree(led);
  
- static struct platform_driver omap_gpio_driver = {
--- 
-1.7.0.4
+ 	return 0;
+@@ -76,7 +88,8 @@ static int s3c24xx_led_probe(struct platform_device *dev)
+ 	led = kzalloc(sizeof(struct s3c24xx_gpio_led), GFP_KERNEL);
+ 	if (led == NULL) {
+ 		dev_err(&dev->dev, "No memory for device\n");
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto err_kzalloc;
+ 	}
+ 
+ 	platform_set_drvdata(dev, led);
+@@ -88,15 +101,24 @@ static int s3c24xx_led_probe(struct platform_device *dev)
+ 
+ 	led->pdata = pdata;
+ 
+-	/* no point in having a pull-up if we are always driving */
++	ret = gpio_request(pdata->gpio, pdata->name);
++	if (ret < 0) {
++		dev_err(&dev->dev, "gpio_request failed\n");
++		goto err_gpio_request;
++	}
+ 
++	/* apply GPIO settings and initially turn off the LED */
+ 	if (pdata->flags & S3C24XX_LEDF_TRISTATE) {
+-		s3c2410_gpio_setpin(pdata->gpio, 0);
+-		s3c2410_gpio_cfgpin(pdata->gpio, S3C2410_GPIO_INPUT);
++		ret = gpio_direction_input(pdata->gpio);
+ 	} else {
+-		s3c2410_gpio_pullup(pdata->gpio, 0);
+-		s3c2410_gpio_setpin(pdata->gpio, 0);
+-		s3c2410_gpio_cfgpin(pdata->gpio, S3C2410_GPIO_OUTPUT);
++		/* no point in having a pull-up as we are always driving */
++		s3c_gpio_setpull(pdata->gpio, S3C_GPIO_PULL_NONE);
++		ret = gpio_direction_output(pdata->gpio,
++				!!(pdata->flags & S3C24XX_LEDF_ACTLOW));
++	}
++	if (ret < 0) {
++		dev_err(&dev->dev, "can't set gpio direction\n");
++		goto err_gpio_set_direction;
+ 	}
+ 
+ 	/* register our new led device */
+@@ -104,11 +126,18 @@ static int s3c24xx_led_probe(struct platform_device *dev)
+ 	ret = led_classdev_register(&dev->dev, &led->cdev);
+ 	if (ret < 0) {
+ 		dev_err(&dev->dev, "led_classdev_register failed\n");
+-		kfree(led);
+-		return ret;
++		goto err_led_classdev_register;
+ 	}
+ 
+ 	return 0;
++
++err_led_classdev_register:
++err_gpio_set_direction:
++		gpio_free(pdata->gpio);
++err_gpio_request:
++		kfree(led);
++err_kzalloc:
++		return ret;
+ }
+ 
+ static struct platform_driver s3c24xx_led_driver = {
