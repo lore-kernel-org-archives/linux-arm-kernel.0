@@ -1,141 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 13 Dec 2011 14:04:09 -0700 (MST)
-Subject: [PATCHv11 1/8] ARM: OMAP2+: hwmod: Add API to enable IO ring
- wakeup.
-In-Reply-To: <1323713733-13115-2-git-send-email-t-kristo@ti.com>
-References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
- <1323713733-13115-2-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1112131354380.12046@utopia.booyaka.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 13 Dec 2011 13:06:57 -0800
+Subject: [PATCH v3 resend2] s3c/s3c24xx: arm: leds: Make s3c24xx LEDS
+ driver use gpiolib
+In-Reply-To: <4EE7B41C.5080006@solonet.org.ua>
+References: <4EE7B41C.5080006@solonet.org.ua>
+Message-ID: <1323810417.3837.25.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, 2011-12-13 at 22:22 +0200, Denis Kuzmenko wrote:
+> Make s3c24xx LEDS driver use gpiolib. Fix error disabling pull during probe.
+[]
+> diff --git a/drivers/leds/leds-s3c24xx.c b/drivers/leds/leds-s3c24xx.c
+[]
+> @@ -45,23 +45,35 @@ static void s3c24xx_led_set(struct led_classdev *led_cdev,
+> +	/*
+> +	 * ensure value is 0 or 1 to use it with bitwise XOR (^)
+> +	 * (only 100% brightness is supported)
+> +	 */
+> +	value = value ? 1 : 0;
 
-On Mon, 12 Dec 2011, Tero Kristo wrote:
+Maybe value = !!value;
 
-> From: R, Govindraj <govindraj.raja@ti.com>
-> 
-> Add API to enable IO pad wakeup capability based on mux dynamic pad and
-> wake_up enable flag available from hwmod_mux initialization.
-> 
-> Use the wakeup_enable flag and enable wakeup capability
-> for the given pads. Wakeup capability will be enabled/disabled
-> during hwmod idle transition based on whether wakeup_flag is
-> set or cleared.
-> 
-> Map the enable/disable pad wakeup API's to hwmod_wakeup_enable/disable.
-> 
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> +		/* no point in having a pull-up as we are always driving */
+> +		s3c_gpio_setpull(pdata->gpio, S3C_GPIO_PULL_NONE);
+> +		ret = gpio_direction_output(pdata->gpio,
+> +				!!(pdata->flags & S3C24XX_LEDF_ACTLOW));
 
-A few changes have been made to this patch:
-
-- The documentation has been improved
-
-- omap_hwmod_{enable,disable}_ioring_wakeup() have been removed, since 
-  they are not called outside the omap_hwmod code and were missing 
-  function prototypes in omap_hwmod.h
-
-- The omap_hwmod_set_ioring_wakeup() function has been modified to
-  not return anything, and indentation depth has been reduced
-
-I still don't think this patch is 100% correct.  For example, if 
-omap_hwmod_enable_wakeup() or omap_hwmod_disable_wakeup() is called on an 
-idle hwmod, shouldn't the caller expect the SCM PADCONF registers to be 
-updated immediately?  The current code merely changes the dynamic mux 
-data.  If there is some rationale for not updating the hardware registers 
-at this point, I'd like to know what it is.
-
-Modified patch is below; please let me know if you have any comments.
-I may modify it again to synchronize the hardware with the in-memory 
-settings immediately.
-
-
-- Paul
-
-From: Govindraj R <govindraj.raja@ti.com>
-Date: Tue, 13 Dec 2011 13:50:23 -0700
-Subject: [PATCH] ARM: OMAP2+: hwmod: Add API to enable IO ring wakeup
-
-Add API to enable IO pad wakeup capability based on mux dynamic pad and
-wake_up enable flag available from hwmod_mux initialization.
-
-Use the wakeup_enable flag and enable wakeup capability
-for the given pads. Wakeup capability will be enabled/disabled
-during hwmod idle transition based on whether wakeup_flag is
-set or cleared.
-
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-XXX Tero's sign-off?
-[paul at pwsan.com: rearranged code to limit indentation, cleaned up
- documentation, removed unused non-static functions]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   39 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 39 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 207a2ff..ec19841 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -381,6 +381,43 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
- }
- 
- /**
-+ * _set_ioring_wakeup - enable/disable IO pad wakeup flag for dynamic muxing
-+ * @oh: struct omap_hwmod *
-+ * @set_wake: bool value indicating to set (true) or clear (false) wakeup enable
-+ *
-+ * Set or clear the I/O pad wakeup flag in the dynamic mux entries for
-+ * the hwmod @oh.  This function does not change anything in the
-+ * hardware.  Rather, the @oh->mux->pads_dynamic array is changed, and
-+ * these settings are later written to the SCM PADCTRL registers when
-+ * the hwmod is enabled or idled.  No return value.
-+ *
-+ * XXX Shouldn't the dynamic pad changes affect hwmod shutdown as
-+ * well?
-+ * XXX Shouldn't this function update the hardware SCM PADCONF registers if
-+ * anything has changed?
-+ */
-+static void _set_ioring_wakeup(struct omap_hwmod *oh, bool set_wake)
-+{
-+	struct omap_device_pad *pad;
-+	int j;
-+
-+	if (!oh->mux || !oh->mux->enabled)
-+		return;
-+
-+	for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
-+		pad = oh->mux->pads_dynamic[j];
-+
-+		if (!(pad->flags & OMAP_DEVICE_PAD_WAKEUP))
-+			continue;
-+
-+		if (set_wake)
-+			pad->idle |= OMAP_WAKEUP_EN;
-+		else
-+			pad->idle &= ~OMAP_WAKEUP_EN;
-+	}
-+}
-+
-+/**
-  * _enable_wakeup: set OCP_SYSCONFIG.ENAWAKEUP bit in the hardware
-  * @oh: struct omap_hwmod *
-  *
-@@ -2416,6 +2453,7 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- 	v = oh->_sysc_cache;
- 	_enable_wakeup(oh, &v);
- 	_write_sysconfig(v, oh);
-+	_set_ioring_wakeup(oh, true);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
- 	return 0;
-@@ -2446,6 +2484,7 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- 	v = oh->_sysc_cache;
- 	_disable_wakeup(oh, &v);
- 	_write_sysconfig(v, oh);
-+	_set_ioring_wakeup(oh, false);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
- 	return 0;
--- 
-1.7.7.3
+akin to this use.
