@@ -1,38 +1,34 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Tue, 13 Dec 2011 13:56:23 -0800
-Subject: [Kgdb-bugreport] Anyone used KDB single-stepping on ARM
-In-Reply-To: <4EE7AA4C.2050605@windriver.com>
-References: <4E95D13C.2090109@am.sony.com> <4EE7AA4C.2050605@windriver.com>
-Message-ID: <4EE7CA07.2050003@am.sony.com>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Wed, 14 Dec 2011 00:05:40 +0200
+Subject: [PATCH v3 resend2] s3c/s3c24xx: arm: leds: Make s3c24xx LEDS
+ driver use gpiolib
+In-Reply-To: <1323812431.3837.31.camel@joe2Laptop>
+References: <4EE7B41C.5080006@solonet.org.ua>	
+ <1323810417.3837.25.camel@joe2Laptop> <4EE7C1C9.8080000@solonet.org.ua>	
+ <1323811732.3837.27.camel@joe2Laptop> <4EE7C4AD.8090805@solonet.org.ua>
+ <1323812431.3837.31.camel@joe2Laptop>
+Message-ID: <4EE7CC34.8000209@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2011 11:41 AM, Jason Wessel wrote:
-> On 10/12/2011 12:41 PM, Tim Bird wrote:
->> I've tried to use single-stepping ('ss' command) on ARM
->> from KDB, without success.
->>
->> Has anyone done this - is it currently supported on ARM?
+On 12/13/2011 11:40 PM, Joe Perches wrote:
+> On Tue, 2011-12-13 at 23:33 +0200, Denis Kuzmenko wrote:
+>> On 12/13/2011 11:28 PM, Joe Perches wrote:
+>>> The LEDF_ACTLOW use is dependent on it being #defined
+>>> to 1 when using ^.  I think that's unintelligible.
+>> Sorry, can't understand. Can you please clarify last two sentences?
 > 
-> It is only supported via patches that are not in the mainline kernel the same is also true of the MIPS architecture.
+> 	s3c2410_gpio_setpin(pd->gpio, (value ? 1 : 0) ^
+> 			    (pd->flags & S3C24XX_LEDF_ACTLOW));
 > 
-> The last consideration I had taken a look at was to consider using the kprobes for single stepping, assuming kprobes work ok on ARM, vs using emulation of single stepping with breakpoints.
+> I think this should be:
+> 	s3c2410_gpio_setpin(pd->gpio,
+> 			    !!value ^ !!(pd->flags & S3C24XX_LEDF_ACTLOW));
 > 
-> The other possibility for newer arm hardward (v7 and up) is to use the hw_breakpoint API and plumb it into kdb/kgdb via the arch/arm/kernel/kgdb.c.  It is probably time to take another look at this now since it was merged to the mainline in the last year.
 
-OK.  Thanks very much for the response.  I started looking at it myself,
-and it looked too complicated for me to tackle without a lot
-more research.  My understanding is that older ARM hardware
-(pre-V7) doesn't have single-step support, which appears
-to match what you're saying above.
+So you've found a BUG. As I understand my code will behave wrong if
+S3C24XX_LEDF_ACTLOW value will be changed.
+Thank you, I'll make a new version.
 
-If you or someone else works on this, let me know.  I'd be a willing
-tester.  But I probably don't have enough cycles (or experience with kdb/kgdb)
-to actually implement this myself.
- -- Tim
-
-=============================
-Tim Bird
-Architecture Group Chair, CE Workgroup of the Linux Foundation
-Senior Staff Engineer, Sony Network Entertainment
-=============================
+-- 
+Best regards, Denis Kuzmenko.
