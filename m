@@ -1,52 +1,65 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 13 Dec 2011 09:33:19 +0800
-Subject: [PATCH 7/7] arm/imx6q: register arm_clk to clkdev
-In-Reply-To: <20111213013433.GC10437@S2100-06.ap.freescale.net>
-References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
- <1323661352-10291-8-git-send-email-richard.zhao@linaro.org>
- <20111213013433.GC10437@S2100-06.ap.freescale.net>
-Message-ID: <20111213013319.GD28768@b20223-02.ap.freescale.net>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 12 Dec 2011 19:49:05 -0600
+Subject: [PATCH 1/2] ARM: OMAP: dmtimer: fix sleeping function called from
+ invalid context
+In-Reply-To: <20111212230825.GJ32251@atomide.com>
+References: <1322194370-8073-1-git-send-email-omar.ramirez@ti.com>
+ <1322194370-8073-2-git-send-email-omar.ramirez@ti.com>
+ <20111209213447.GB31337@atomide.com>
+ <CAB-zwWjHPzTT5QYZt9DvDcM9ny5VML3mDw3-rQRuBr-fcxYMvQ@mail.gmail.com>
+ <20111212230825.GJ32251@atomide.com>
+Message-ID: <CAB-zwWg76+Si9BXsXQt6-ZL=VL7qJ5YPN5FSC-07y8J8GFX0ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 09:34:34AM +0800, Shawn Guo wrote:
-> On Mon, Dec 12, 2011 at 11:42:32AM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> 
-> It's always a good practice to add some commit message even for one
-> line patch.  When you try to do that, you can usually find something
-> to note in the message.  For this particular example, you may want to
-> note why 'cpu_clk' needs to be in clk_lookup table.
-right, I'll fix it in next version.
+On Mon, Dec 12, 2011 at 5:08 PM, Tony Lindgren <tony@atomide.com> wrote:
+...
+>> @@ -134,22 +134,13 @@ static void omap_dm_timer_reset(struct
+>> omap_dm_timer *timer)
+>> ?int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+>> ?{
+>> ...
+>> - ? ? ? ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+>> ...
+>>
+>> All clocks requested are set to 32 KHz first, even with the current
+>> approach, there exists another API to set a new source.
+>>
+>> To be honest I don't know why the clocks are set to 32 KHz first,
+>> maybe the default call path for users should be:
+>
+> You need a functional clock for the timer registers to work
+> I believe.
 
-Thanks
-Richard
-> 
-> Regards,
-> Shawn
-> 
-> > ---
-> >  arch/arm/mach-imx/clock-imx6q.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-> > index 039a7ab..2525380 100644
-> > --- a/arch/arm/mach-imx/clock-imx6q.c
-> > +++ b/arch/arm/mach-imx/clock-imx6q.c
-> > @@ -1911,6 +1911,7 @@ static struct clk_lookup lookups[] = {
-> >  	_REGISTER_CLOCK(NULL, "gpmi_io_clk", gpmi_io_clk),
-> >  	_REGISTER_CLOCK(NULL, "usboh3_clk", usboh3_clk),
-> >  	_REGISTER_CLOCK(NULL, "sata_clk", sata_clk),
-> > +	_REGISTER_CLOCK(NULL, "cpu_clk", arm_clk),
-> >  };
-> >  
-> >  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
-> > -- 
-> > 1.7.5.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Sounds logic :)
+
+>> omap_dm_timer_request
+>
+> Yes this would make sense. The omap_timer_list should be protected
+> by a mutex. There should not be a need for spinlock there as
+> omap_dm_timer_request should be only called during init. If that's
+> not the case, the the driver using it is broken.
+
+Ok, I made this patch thinking that 'request' could be called from any
+context, but if that is not the case mutex should be fine.
+
+>> omap_dm_timer_set_source (new explicit call)
+>> omap_dm_timer_start
+>
+> Once the timer has been requested, there should not be a need
+> for locking as there should be only one timer user using the
+> timer specific registers.
+>
+>> And remove setting the source to 32 KHz by default in omap_dm_timer_request.
+>
+> That you may need to be able to do anything with the timer :)
+
+Well the intention was for the user to call it explicitly so it didn't
+look as a hard coded setting, but I can keep it.
+
+IIUC, mutex should be held instead of spin lock, I can do the change
+instead of this patch and see how it goes.
+
+Thanks,
+
+Omar
