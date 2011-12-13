@@ -1,35 +1,86 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 13 Dec 2011 17:41:01 +0800
-Subject: [PATCH V2 1/7] dts/imx: rename gpio labels to consistent with hw
- spec
-In-Reply-To: <1323757530-19402-2-git-send-email-richard.zhao@linaro.org>
-References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
- <1323757530-19402-2-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111213094100.GD10866@S2100-06.ap.freescale.net>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Tue, 13 Dec 2011 09:38:01 +0000
+Subject: [PATCH v4 0/5] ARM: davinci: re-arrange definitions to have a
+ common	davinci header
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6043FD6@DBDE01.ent.ti.com>
+References: <1323352528-1207-1-git-send-email-manjunath.hadli@ti.com>
+ <DF0F476B391FA8409C78302C7BA518B6043FD6@DBDE01.ent.ti.com>
+Message-ID: <E99FAA59F8D8D34D8A118DD37F7C8F75015C04@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 02:25:24PM +0800, Richard Zhao wrote:
-> GPIO1/GPIO2/... is more readable than GPIO0/GPIO1/... .
-> Remove redundant gpio comments.
+Sekhar,
+ On Mon, Dec 12, 2011 at 16:55:11, Nori, Sekhar wrote:
+> Hi Manju,
 > 
-If we want to make this change, it's really more than just gpio, all
-phandle name numbering should be changed to keep consistency.  You may
-want to make the same change on uart as well.
+> On Thu, Dec 08, 2011 at 19:25:23, Hadli, Manjunath wrote:
+> > Re-arrange definitions and remove unnecessary code so that we can have 
+> > a common header for all davinci platforms. This will enable us to 
+> > share defines and enable common routines to be used without polluting 
+> > hardware.h.
+> >  This patch set forms the base for a later set of patches for having a 
+> > common system module base address (DAVINCI_SYSTEM_MODULE_BASE).
+> 
+> Its easy to dismiss this series as causing "needless churn" by moving around definitions from header to C files and consolidating definitions from multiple header files to one.
+> 
+> You need to do a better job of "selling" this series. The best way to do that would be to include future patches which benefit from this series into this series itself. This way, its clear to judge the relative benefit of the "churn". You gave some examples, but showing code helps.
+Ok. Will do. I will send the 11 patch set completely so it is better appreciated.
+> 
+> Also, one of the biggest gains from this series is reducing the pollution in include/mach as asked by Russell in his "pet peaves"
+> mail. That should find reference in the cover letter and in the commit text of patch 5/5.
+Ok.
+> 
+> Thanks,
+> Sekhar
 
--- 
-Regards,
-Shawn
+Thx,
+-Manju
 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts   |   11 +++++------
->  arch/arm/boot/dts/imx51.dtsi          |    8 ++++----
->  arch/arm/boot/dts/imx53-ard.dts       |   16 ++++++++--------
->  arch/arm/boot/dts/imx53-evk.dts       |   15 +++++++--------
->  arch/arm/boot/dts/imx53-qsb.dts       |   16 ++++++++--------
->  arch/arm/boot/dts/imx53-smd.dts       |   13 ++++++-------
->  arch/arm/boot/dts/imx53.dtsi          |   14 +++++++-------
->  arch/arm/boot/dts/imx6q-sabreauto.dts |    6 +++---
->  arch/arm/boot/dts/imx6q.dtsi          |   14 +++++++-------
->  9 files changed, 55 insertions(+), 58 deletions(-)
+> 
+> > 
+> > Changes from previous version:
+> > 1. Addressed Shekhar's comments for non-inclusion of mach headers from core.
+> > 2. Move the mach header from include to mach
+> > 
+> > Manjunath Hadli (5):
+> >   davinci: vpif: remove obsolete header file inclusion
+> >   ARM: davinci: dm644x: remove the macros from the header to move to c
+> >     file
+> >   ARM: davinci: dm365: remove the macros from the header to move to c
+> >     file
+> >   ARM: davinci: dm646x: remove the macros from the header to move to c
+> >     file
+> >   ARM: davinci: create new common platform header for davinci
+> > 
+> >  arch/arm/mach-davinci/board-dm355-evm.c     |    2 +-
+> >  arch/arm/mach-davinci/board-dm355-leopard.c |    2 +-
+> >  arch/arm/mach-davinci/board-dm365-evm.c     |    2 +-
+> >  arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
+> >  arch/arm/mach-davinci/board-dm646x-evm.c    |    2 +-
+> >  arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
+> >  arch/arm/mach-davinci/board-sffsdr.c        |    2 +-
+> >  arch/arm/mach-davinci/davinci.h             |   88 +++++++++++++++++++++++++++
+> >  arch/arm/mach-davinci/dm355.c               |    2 +-
+> >  arch/arm/mach-davinci/dm365.c               |   18 +++++-
+> >  arch/arm/mach-davinci/dm644x.c              |    9 +++-
+> >  arch/arm/mach-davinci/dm646x.c              |    9 +++-
+> >  arch/arm/mach-davinci/include/mach/dm355.h  |   32 ----------
+> >  arch/arm/mach-davinci/include/mach/dm365.h  |   52 ----------------
+> >  arch/arm/mach-davinci/include/mach/dm644x.h |   47 --------------
+> >  arch/arm/mach-davinci/include/mach/dm646x.h |   41 ------------
+> >  drivers/media/video/davinci/vpif.h          |    2 +-
+> >  drivers/media/video/davinci/vpif_display.c  |    2 -
+> >  18 files changed, 130 insertions(+), 186 deletions(-)  create mode 
+> > 100644 arch/arm/mach-davinci/davinci.h  delete mode 100644 
+> > arch/arm/mach-davinci/include/mach/dm355.h
+> >  delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
+> >  delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
+> >  delete mode 100644 arch/arm/mach-davinci/include/mach/dm646x.h
+> > 
+> > _______________________________________________
+> > Davinci-linux-open-source mailing list 
+> > Davinci-linux-open-source at linux.davincidsp.com
+> > http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> > 
+> 
+> 
