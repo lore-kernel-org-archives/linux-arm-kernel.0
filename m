@@ -1,33 +1,54 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 13 Dec 2011 15:49:32 +0530
-Subject: [PATCH v2 0/3] Device tree support for TWL regulators
-Message-ID: <1323771575-3550-1-git-send-email-rnayak@ti.com>
+Date: Tue, 13 Dec 2011 15:49:35 +0530
+Subject: [PATCH v2 3/3] omap4: panda: Pass regulator data from dt
+In-Reply-To: <1323771575-3550-1-git-send-email-rnayak@ti.com>
+References: <1323771575-3550-1-git-send-email-rnayak@ti.com>
+Message-ID: <1323771575-3550-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds DT support for TWL regulator driver and
-passes regulator data for two OMAP4 boards (OMAP4 panda and
-OMAP4 sdp) from device tree.
+Pass the adjustable voltage regulator information for
+omap4panda board from device tree.
 
-Patches are based on for-next of the regulator tree[1] with
-omap i2c/twl DT adaptation patches[2] from Benoit pulled in
-and are available here:
-git://gitorious.org/omap-pm/linux.git for-dt/regulator-twl
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/boot/dts/omap4-panda.dts |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
-regards,
-Rajendra
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
-[2] git://gitorious.org/omap-pm/linux.git for_3.3/3_omap_dt_i2c_twl
-
-Rajendra Nayak (3):
-  regulator: twl: adapt twl-regulator driver to dt
-  ARM: omap4-sdp: Pass regulator data from dt
-  omap4: panda: Pass regulator data from dt
-
- .../bindings/regulator/twl-regulator.txt           |   57 +++++++++
- arch/arm/boot/dts/omap4-panda.dts                  |   24 ++++
- arch/arm/boot/dts/omap4-sdp.dts                    |   36 ++++++
- drivers/regulator/twl-regulator.c                  |  128 +++++++++++++-------
- 4 files changed, 199 insertions(+), 46 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+index b66bcd6..f6cc48a 100644
+--- a/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
+@@ -40,6 +40,30 @@
+ 			compatible = "ti,twl4030-rtc";
+ 			interrupts = <11>;
+ 		};
++
++		vaux2: regulator at 0 {
++			compatible = "ti,twl6030-vaux2","ti,twl6030";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <2800000>;
++		};
++
++		vaux3: regulator at 1 {
++			compatible = "ti,twl6030-vaux3","ti,twl6030";
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <3000000>;
++		};
++
++		vmmc: regulator at 2 {
++			compatible = "ti,twl6030-vmmc","ti,twl6030";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3000000>;
++		};
++
++		vpp: regulator at 3 {
++			compatible = "ti,twl6030-vpp","ti,twl6030";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <2500000>;
++		};
+ 	};
+ };
+ 
+-- 
+1.7.1
