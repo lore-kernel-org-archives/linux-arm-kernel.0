@@ -1,58 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Dec 2011 01:41:05 +0100
-Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
-In-Reply-To: <20111212143750.GA27267@pengutronix.de>
-References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
- <20111209010147.GH7913@S2100-06.ap.freescale.net>
- <4EE18403.30604@nvidia.com>
- <20111209043220.GJ7913@S2100-06.ap.freescale.net>
- <4EE192DC.3080209@nvidia.com>
- <20111209051413.GK7913@S2100-06.ap.freescale.net>
- <20111209110807.GG27267@pengutronix.de>
- <CACRpkdYpq1phHTTLy875xSr-upiW5BmvKMPO_d-niG+-J14t9w@mail.gmail.com>
- <20111212143750.GA27267@pengutronix.de>
-Message-ID: <CACRpkdZz=1xf19feiO8SkzGr=x6ntaNzSwiCjyYmOrz0Z33phA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Dec 2011 16:46:56 -0800
+Subject: [PATCH v4] ARM: sched_clock: allow sched_clock to be selected
+ at runtime
+In-Reply-To: <4EE63459.1030105@arm.com>
+References: <1323444833-10587-1-git-send-email-marc.zyngier@arm.com>
+ <4EE57BC3.4080306@gmail.com> <4EE63459.1030105@arm.com>
+Message-ID: <20111213004656.GR32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 3:37 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Sat, Dec 10, 2011 at 01:18:43AM +0100, Linus Walleij wrote:
->> On Fri, Dec 9, 2011 at 12:08 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->>
->> > Drivers should not be bothered with pin muxing *at all*.
->>
->> Not if they are simple. Like - set them up once and for all and
->> then forget about it.
->>
->> It gets problematic when we get to sleep states and the system
->> need to reconfigure all pins on say idle or deep sleep.
->
-> If you need to reconfigure your pins in deep sleep and you control
-> the pins in the driver this seems to suggest that your device won't
-> suspend properly if the driver is not loaded?
+* Marc Zyngier <marc.zyngier@arm.com> [111212 08:33]:
+> On 12/12/11 03:57, Rob Herring wrote:
+> > On 12/09/2011 09:33 AM, Marc Zyngier wrote:
+> >> sched_clock() is yet another blocker on the road to the single
+> >> image. This patch implements an idea by Russell King:
+> >>
+> >> http://www.spinics.net/lists/linux-omap/msg49561.html
+> >>
+> >> Instead of asking the platform to implement both sched_clock()
+> >> itself and the rollover callback, simply register a read()
+> >> function, and let the ARM code care about sched_clock() itself,
+> >> the conversion to ns and the rollover. sched_clock() uses
+> >> this read() function as an indirection to the platform code.
+> >> If the platform doesn't provide a read(), the code falls back
+> >> to the jiffy counter (just like the default sched_clock).
+> >>
+> >> This allow some simplifications and possibly some footprint gain
+> >> when multiple platforms are compiled in. Among the drawbacks,
+> >> the removal of the *_fixed_sched_clock optimization which could
+> >> negatively impact some platforms (sa1100, tegra, versatile
+> >> and omap).
+> >>
+> >> Tested on 11MPCore, OMAP4 and Tegra.
+> >>
+> >> Cc: Imre Kaloz <kaloz@openwrt.org>
+> >> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> >> Cc: Tony Lindgren <tony@atomide.com>
+> >> Cc: Eric Miao <eric.y.miao@gmail.com>
+> >> Cc: Colin Cross <ccross@android.com>
+> >> Cc: Erik Gilling <konkers@android.com>
+> >> Cc: Olof Johansson <olof@lixom.net>
+> >> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> >> Cc: Sascha Hauer <kernel@pengutronix.de>
+> >> Cc: Alessandro Rubini <rubini@unipv.it>
+> >> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+> >> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> >> Cc: Nicolas Pitre <nico@fluxnic.net>
+> >> Cc: Ben Dooks <ben-linux@fluff.org>
+> >> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >> Cc: Jamie Iles <jamie@jamieiles.com>
+> >> Tested-by: Jamie Iles <jamie@jamieiles.com>
+> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >> I'm reposting this patch with the hope that it (or Russell's
+> >> alternative patch http://patchwork.ozlabs.org/patch/115961/)
+> >> will get merged in 3.3. It doesn't look intrusive enough to be
+> >> left on the side of the road for yet another cycle...
+> >>
+> > 
+> > Please! I've been holding off on (re)doing and submitting sched_clock
+> > support for highbank until this goes in.
+> 
+> Queued as patch 7205/1.
+> 
+> 	M.
 
-In our case (ux500) it's more like all pins have a defined nice
-state for active, sleep and idle. (Pull-ups, downs, wakeups etc
-set in a certain way.)
+Great, seems to boot fine on all omaps I tried, will go ack it
+in the patch system.
 
-Then there are some real agressive stuff PM people start to do.
-Some of them require you to shut down things in a certain
-sequence, like this device has to have its pins turned off first,
-the clock released, then regulator, etc. And others do it in the
-reverse order, or any order.
-
-If all your hardware was engineered the
-same way with this in mind it could probably be done
-centrally, like the nice stuff Magnus Damm has for managing
-clocks in drivers/base/power/clock_ops.c for all SHmobile
-clocks. Would be real nice if it worked for us, sadly not all
-hardware is designed in such a consistent way.
-
-For our hardware it's better to spread it out across the
-drivers and then consolidate once we have the entire
-picture, I'm afraid. For others it will be different, maybe
-your systems will never need it and you can keep all in
-central places.
-
-Linus Walleij
+Tony
