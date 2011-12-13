@@ -1,52 +1,81 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 13 Dec 2011 13:18:57 +0200
-Subject: [PATCH v6 04/10] arm/tegra: prepare early init for multiple
+Date: Tue, 13 Dec 2011 13:21:26 +0200
+Subject: [PATCH v6 03/10] arm/tegra: prepare clock code for multiple
  tegra variants
-In-Reply-To: <CAMbhsRR1HdG6QnNdrnD3y9DApnDR3RrUqFyTt5vZT0qR9n=ECg@mail.gmail.com>
+In-Reply-To: <20111209091319.GI27578@tbergstrom-lnx.Nvidia.com>
 References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1750B77A7E@HQMAIL01.nvidia.com>
- <CAMbhsRTD1rQBY7Sn2km=XsUYsHMdqQqZSKu4agc0GB6+QE79fA@mail.gmail.com>
- <20111209111925.GK27578@tbergstrom-lnx.Nvidia.com>
- <CAMbhsRR1HdG6QnNdrnD3y9DApnDR3RrUqFyTt5vZT0qR9n=ECg@mail.gmail.com>
-Message-ID: <20111213111857.GV27578@tbergstrom-lnx.Nvidia.com>
+ <1323348254-29072-4-git-send-email-pdeschrijver@nvidia.com>
+ <CAMbhsRT97Oq-=8f9++f6Jgg=YVaimKSz68xcDDNbDbvL+V5fJg@mail.gmail.com>
+ <20111209091319.GI27578@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20111213112126.GW27578@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 07:35:09PM +0100, Colin Cross wrote:
-> On Fri, Dec 9, 2011 at 3:19 AM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
-> > On Thu, Dec 08, 2011 at 07:29:43PM +0100, Colin Cross wrote:
-> >> On Thu, Dec 8, 2011 at 9:57 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> >> > Peter De Schrijver wrote at Thursday, December 08, 2011 5:44 AM:
-> >> >> This patch splits the early init code in a common and a tegra20 specific part.
-> >> >> L2 cache initialization is generalized and discovers the cache associativity
-> >> >> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
-> >> >> the system using the PMC reset feature rather then the CAR system reset.
-> >> >
-> >> > This one really should be at least 3 separate patches:
-> >> > * s/tegra_init_early/tegra20_init_early/ in machine descriptions
-> >> > * Switch reset mechanism from CAR to PMC
-> >> > * tegra_init_cache modifications
-> >> > * Not sure if all the ifdef additions go in the above, or if some should be
-> >> > ?separate?
-> >> >
-> >> > Still, I think it's probably OK to go in as it is even if it isn't optimal.
-> >>
-> >> Please at least split out the reset change. ?Does using the PMC reset
-> >> instead of the CAR reset still result in a warm reset, or does it
-> >> change to a cold reset?
-> >
-> > What do you consider a cold reset in the tegra world?
+On Fri, Dec 09, 2011 at 10:13:20AM +0100, Peter De Schrijver wrote:
+> On Thu, Dec 08, 2011 at 07:25:53PM +0100, Colin Cross wrote:
+> > On Thu, Dec 8, 2011 at 4:43 AM, Peter De Schrijver <pdeschrijver at nvidia.com<mailto:pdeschrijver@nvidia.com>> wrote:
+> > Rework the tegra20 clock code to support multiple tegra variants :
+> > 
+> >  * remove tegra2_periph_reset_assert/tegra2_periph_reset_deassert. This
+> >   functionality should be in clock.c.
+> >  * compile tegra_sdmmc_tap_delay only on tegra20 as this feature will not
+> >   be available in future variants.
+> >  * don't export clk_measure_input_freq as its functionality is also available
+> >   using clk_get_rate().
+> > 
+> > Signed-off-by: Peter De Schrijver <pdeschrijver at nvidia.com<mailto:pdeschrijver@nvidia.com>>
+> > ---
+> >  arch/arm/mach-tegra/clock.c         |   12 +++++++-----
+> >  arch/arm/mach-tegra/clock.h         |    8 ++++----
+> >  arch/arm/mach-tegra/tegra2_clocks.c |   14 +-------------
+> >  arch/arm/mach-tegra/timer.c         |   12 ++++++++----
+> >  4 files changed, 20 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+> > index f8d41ff..f27bdcc 100644
+> > --- a/arch/arm/mach-tegra/clock.c
+> > +++ b/arch/arm/mach-tegra/clock.c
+> > @@ -387,13 +387,15 @@ EXPORT_SYMBOL(tegra_clk_init_from_table);
+> > 
+> >  void tegra_periph_reset_deassert(struct clk *c)
+> >  {
+> > -       tegra2_periph_reset_deassert(c);
+> > +       BUG_ON(!c->ops->reset);
+> > +       c->ops->reset(c, false);
+> >  }
+> >  EXPORT_SYMBOL(tegra_periph_reset_deassert);
+> > 
+> >  void tegra_periph_reset_assert(struct clk *c)
+> >  {
+> > -       tegra2_periph_reset_assert(c);
+> > +       BUG_ON(!c->ops->reset);
+> > +       c->ops->reset(c, true);
+> >  }
+> >  EXPORT_SYMBOL(tegra_periph_reset_assert);
+> > 
+> > @@ -403,9 +405,9 @@ void __init tegra_init_clock(void)
+> >  }
+> > 
+> >  /*
+> > - * The SDMMC controllers have extra bits in the clock source register that
+> > - * adjust the delay between the clock and data to compenstate for delays
+> > - * on the PCB.
+> > + * The SDMMC controllers on tegra20 have extra bits in the clock source
+> > + * register that adjust the delay between the clock and data to compenstate
+> > + * for delays on the PCB.
+> >  */
+> >  void tegra_sdmmc_tap_delay(struct clk *c, int delay)
+> >  {
+> > 
+> > I created this wrapper around tegra2_sdmmc_tap_delay because I guessed the same requirement would be present in tegra3.  If you don't expect this to be required on anything but tegra2, you could drop the wrapper and just have callers use tegra2_sdmmc_tap_delay.
+> > 
 > 
-> Power rails turn off and on.  Some of our debugging tools rely on
-> memory contents surviving across a reset, and that is generally true
-> of a warm reset, but not a cold reset.
+> I will ask around if this is needed for tegra30.
+> 
 
-Neither of those methods result in a warm reset. In both cases the memory
-controller is reset so the SDRAM won't be refreshed until the memory
-controller is reintialized. So there is no guarantee the memory contents
-will survive the reset.
+This feature moved to the SDMMC block in tegra30, so we don't need any code
+in the clock framework anymore. So I think we should just use
+tegra2_sdmmc_tap_delay directly.
 
 Cheers,
 
