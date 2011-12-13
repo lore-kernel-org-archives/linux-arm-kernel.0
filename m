@@ -1,46 +1,33 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 13 Dec 2011 17:24:17 +0100
-Subject: [PATCH 0/5] mmc: mmci: Improvements and bugfixes for SDIO
-In-Reply-To: <1323704167-10247-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1323704167-10247-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <4EE77C31.4030205@stericsson.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 13 Dec 2011 12:16:19 -0500
+Subject: [PATCH] mmc: mmci: Fixup handling of MCI_STARTBITERR
+In-Reply-To: <CACRpkdazenok0RHQL0kXLKk2i3bcrWZ9aWDmoCGfjF6JpEoySA@mail.gmail.com>
+ (Linus Walleij's message of "Fri, 11 Nov 2011 16:17:17 +0100")
+References: <1320939199-30363-1-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdazenok0RHQL0kXLKk2i3bcrWZ9aWDmoCGfjF6JpEoySA@mail.gmail.com>
+Message-ID: <m2mxawl7do.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-I would just like to inform you that I just uploaded these patches into 
-your patchtracker tool. I will ask Linus to help out testing this on 
-RealView PB1176 board as well, since I unfortunately don't own such a 
-board myself.
+On Fri, Nov 11 2011, Linus Walleij wrote:
+>> The interrupt was previously enabled and then correctly cleared.
+>> Now we also handle it correctly.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> This should also go to -stable I think?
 
-These patches is also based on Linux 3.2-rc4 and on top of the other 
-mmci patch serie.
+Just to check:  should I be leaving MMCI patches for Russell to take
+care of?  I don't have hardware, so this suits me fine, but MAINTAINERS
+currently lists it as Orphan.
 
-Br
-Ulf Hansson
+Thanks,
 
-Ulf HANSSON wrote:
-> This patchserie is based upon the below stated patchserie:
-> mmc: mmci: Improved PM support, cleanup and bugfixes
-> 
-> These patches are all related to the SDIO support. Some patches will
-> anyway effect the code execution path for non-SDIO and more important
-> also the "hotpath" for all PIO read transfers. The intent is to try
-> to affect as little as possible.
-> 
-> Per Forlin (1):
->   mmc: mmci: Add constraints on alignment for SDIO
-> 
-> Stefan Nilsson XK (1):
->   mmc: mmci: Fix PIO read for small SDIO packets
-> 
-> Ulf Hansson (3):
->   mmc: mmci: Prepare for SDIO before setting up DMA job
->   mmc: mmci: Fix incorrect handling of HW flow control for SDIO
->   mmc: mmci: Support any block sizes for ux500v2 variant
-> 
->  drivers/mmc/host/mmci.c |  120 +++++++++++++++++++++++++++++++++++-----------
->  drivers/mmc/host/mmci.h |    7 +++
->  2 files changed, 98 insertions(+), 29 deletions(-)
-> 
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
