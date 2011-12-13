@@ -1,42 +1,95 @@
-From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
-Date: Wed, 14 Dec 2011 11:20:21 +0900
-Subject: [RESEND PATCH] ARM: SAMSUNG: Add s3c_setparent_clksrc in
- s3c_set_clksrc
-Message-ID: <1323829221-14171-1-git-send-email-jhbird.choi@samsung.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Tue, 13 Dec 2011 16:06:24 +0900
+Subject: [PATCH] DMA: PL330: Support MEMTOMEM transmit without barrier
+ operation.
+Message-ID: <1323759984-30644-1-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonghwan Choi <jhbird.choi@samsung.com>
+PL330 r1p0 version fixed the lockup error being on r0p0.
+This patch supports the DMA transmit without barrier operation
+if the revision is the next of r0p0.
 
-Currently we have to run clk_set_parent to change clock source.
-But if there are sources & parent defined, it means we will select a parent
-in multiple clock sources. So sources & parent are already defined,
-set the parent clock int s3c_set_clksrc.
-Then we can reduce many clk_set_parent function in driver or setup_clock function.
-
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
 ---
- arch/arm/plat-samsung/clock-clksrc.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/hardware/pl330.h |    5 +++++
+ drivers/dma/pl330.c                   |   26 +++++++++++++++++++++-----
+ 2 files changed, 26 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
-index ae8b850..61dfe0d 100644
---- a/arch/arm/plat-samsung/clock-clksrc.c
-+++ b/arch/arm/plat-samsung/clock-clksrc.c
-@@ -140,6 +140,14 @@ void __init_or_cpufreq s3c_set_clksrc(struct clksrc_clk *clk, bool announce)
- 		return;
+diff --git a/arch/arm/include/asm/hardware/pl330.h b/arch/arm/include/asm/hardware/pl330.h
+index ed38e32..1f4d7cb 100644
+--- a/arch/arm/include/asm/hardware/pl330.h
++++ b/arch/arm/include/asm/hardware/pl330.h
+@@ -144,6 +144,11 @@ enum pl330_reqtype {
+ #define CRD		0xe14
+ 
+ #define PERIPH_ID	0xfe0
++#define PERIPH_REV_SHIFT	20
++#define PERIPH_REV_MASK		0xf
++#define PERIPH_REV_R0P0		0
++#define PERIPH_REV_R1P0		1
++#define PERIPH_REV_R1P1		2
+ #define PCELL_ID	0xff0
+ 
+ #define CR0_PERIPH_REQ_SET	(1 << 0)
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 3214ced..d87d884 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -129,6 +129,7 @@ struct pl330_reqcfg {
+ 	enum pl330_dstcachectrl dcctl;
+ 	enum pl330_srccachectrl scctl;
+ 	enum pl330_byteswap swap;
++	struct pl330_config *pcfg;
+ };
+ 
+ /*
+@@ -438,6 +439,11 @@ static inline u32 get_id(struct pl330_info *pi, u32 off)
+ 	return id;
+ }
+ 
++static inline u32 get_revision(u32 periph_id)
++{
++	return (periph_id>>PERIPH_REV_SHIFT)&PERIPH_REV_MASK;
++}
++
+ static inline u32 _emit_ADDH(unsigned dry_run, u8 buf[],
+ 		enum pl330_dst da, u16 val)
+ {
+@@ -1026,12 +1032,21 @@ static inline int _ldst_memtomem(unsigned dry_run, u8 buf[],
+ 		const struct _xfer_spec *pxs, int cyc)
+ {
+ 	int off = 0;
++	struct pl330_config *pcfg = pxs->r->cfg->pcfg;
+ 
+-	while (cyc--) {
+-		off += _emit_LD(dry_run, &buf[off], ALWAYS);
+-		off += _emit_RMB(dry_run, &buf[off]);
+-		off += _emit_ST(dry_run, &buf[off], ALWAYS);
+-		off += _emit_WMB(dry_run, &buf[off]);
++	/* check lock-up free version */
++	if (get_revision(pcfg->periph_id)  >= PERIPH_REV_R1P0) {
++		while (cyc--) {
++			off += _emit_LD(dry_run, &buf[off], ALWAYS);
++			off += _emit_ST(dry_run, &buf[off], ALWAYS);
++		}
++	} else {
++		while (cyc--) {
++			off += _emit_LD(dry_run, &buf[off], ALWAYS);
++			off += _emit_RMB(dry_run, &buf[off]);
++			off += _emit_ST(dry_run, &buf[off], ALWAYS);
++			off += _emit_WMB(dry_run, &buf[off]);
++		}
  	}
  
-+	if (clk->sources && clk->clk.parent) {
-+		if (s3c_setparent_clksrc(&clk->clk, clk->clk.parent)) {
-+			printk(KERN_ERR "%s: bad source is %s\n",
-+					clk->clk.name, clk->clk.parent->name);
-+			return;
-+		}
-+	}
-+
- 	clksrc = __raw_readl(clk->reg_src.reg);
- 	clksrc &= mask;
- 	clksrc >>= clk->reg_src.shift;
+ 	return off;
+@@ -2398,6 +2413,7 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
+ 	async_tx_ack(&desc->txd);
+ 
+ 	desc->req.peri = peri_id ? pch->chan.chan_id : 0;
++	desc->rqcfg.pcfg = &pch->dmac->pif.pcfg;
+ 
+ 	dma_async_tx_descriptor_init(&desc->txd, &pch->chan);
+ 
 -- 
 1.7.1
