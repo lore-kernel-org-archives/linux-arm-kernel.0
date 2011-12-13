@@ -1,27 +1,46 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Tue, 13 Dec 2011 14:53:31 +0400
-Subject: [PATCH 08/19] dma: MX3_IPU fix depends
-In-Reply-To: <1323757911-25217-8-git-send-email-eric@eukrea.com>
-References: <1323757911-25217-1-git-send-email-eric@eukrea.com>
- <1323757911-25217-8-git-send-email-eric@eukrea.com>
-Message-ID: <4EE72EAB.4040308@ru.mvista.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 13 Dec 2011 16:25:56 +0530
+Subject: [PATCHv8 3/5] OMAP: I2C: Reset support
+In-Reply-To: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
+References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1323773758-6375-4-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Under some error conditions the i2c driver may do a reset.
+Adding a reset field and support in the device-specific code to aid
+error-recovery.
 
-On 13-12-2011 10:31, Eric B?nard wrote:
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ arch/arm/plat-omap/i2c.c |    2 ++
+ include/linux/i2c-omap.h |    1 +
+ 2 files changed, 3 insertions(+), 0 deletions(-)
 
-> ARCH_MX3 was removed in e760b5260d39113794da17c64cbd6e6311155b66
-
-    Please also specify that commit's summary in parens.
-
-> thus preventing to select MX3_IPU, thus preventing IPU and display
-> to work on i.MX3x SOC.
-
-> Signed-off-by: Eric B?nard<eric@eukrea.com>
-> Cc: Sascha Hauer<kernel@pengutronix.de>
-> Cc: Vinod Koul<vinod.koul@intel.com>
-> Cc: Dan Williams<dan.j.williams@intel.com>
-
-WBR, Sergei
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index db071bc..6cddde2 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -179,6 +179,8 @@ static inline int omap2_i2c_add_bus(int bus_id)
+ 	 */
+ 	if (cpu_is_omap34xx())
+ 		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
++
++	pdata->device_reset = omap_device_reset;
+ 	pdev = omap_device_build(name, bus_id, oh, pdata,
+ 			sizeof(struct omap_i2c_bus_platform_data),
+ 			NULL, 0, 0);
+diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+index 92a0dc7..fd38249 100644
+--- a/include/linux/i2c-omap.h
++++ b/include/linux/i2c-omap.h
+@@ -35,6 +35,7 @@ struct omap_i2c_bus_platform_data {
+ 	u32		rev;
+ 	u32		flags;
+ 	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
++	int		(*device_reset) (struct device *dev);
+ };
+ 
+ #endif
+-- 
+1.7.1
