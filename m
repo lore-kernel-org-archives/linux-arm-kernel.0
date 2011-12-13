@@ -1,54 +1,32 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 13 Dec 2011 23:01:09 +0800
-Subject: [PATCH V2 7/7] arm/imx6q: add cpufreq support
-In-Reply-To: <20111213142033.GW27267@pengutronix.de>
-References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
- <1323757530-19402-8-git-send-email-richard.zhao@linaro.org>
- <20111213121940.GC10022@S2101-09.ap.freescale.net>
- <20111213142033.GW27267@pengutronix.de>
-Message-ID: <20111213150107.GA1752@richard-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Dec 2011 15:10:02 +0000
+Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
+ sharing mechanism
+In-Reply-To: <20111212224408.GD4355@morell.nvidia.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <4EE33EC2.6050508@redhat.com> <20111212224408.GD4355@morell.nvidia.com>
+Message-ID: <201112131510.02785.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 03:20:33PM +0100, Sascha Hauer wrote:
-> On Tue, Dec 13, 2011 at 08:19:42PM +0800, Shawn Guo wrote:
-> > On Tue, Dec 13, 2011 at 02:25:30PM +0800, Richard Zhao wrote:
-> > > use cpu0 node property clock-frequency to check max frequency.
-> > > 
-> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > ---
-> > >  arch/arm/mach-imx/Kconfig        |    1 +
-> > >  arch/arm/mach-imx/Makefile       |    2 +-
-> > >  arch/arm/mach-imx/cpu_op-imx6q.c |   69 ++++++++++++++++++++++++++++++++++++++
-> > >  3 files changed, 71 insertions(+), 1 deletions(-)
-> > >  create mode 100644 arch/arm/mach-imx/cpu_op-imx6q.c
-> > > 
-> > NAK.
+On Monday 12 December 2011, Robert Morell wrote:
 > > 
-> > We really need to push people to help with cleanup and consolidation
-> > effort rather than accepting patches on top of something that needs
-> > to be cleaned up and consolidated, which will make the effort later
-> > more difficult.
+> > Doing a buffer sharing with something that is not GPL is not fun, as, if any
+> > issue rises there, it would be impossible to discover if the problem is either
+> > at the closed-source driver or at the open source one. At the time I was using
+> > the Nvidia proprietary driver, it was very common to have unexplained issues
+> > caused likely by bad code there at the buffer management code, causing X
+> > applications and extensions (like xv) to break.
+> >
+> > We should really make this EXPORT_SYMBOL_GPL(), in order to be able to latter
+> > debug future share buffer issues, when needed.
 > 
-> +1
-ok, let's make it clear.
-- move arch/arm/plat-mxc/cpufreq.c to drivers/cpufreq/
-- consider whether opp help imx, at least for imx cpufreq drive to pass
-operating table.
-- fall back ways, maybe define in dts /soc like:
-cpufreq {
-	compatible = "fsl,imx-cpufreq";
-	frequency = <100000000 800000000 500000000 200000000>;
-	volatage = <1500000 1400000 1300000 1200000>;
-};
+> Sorry, I don't buy this argument.  Making these exports GPL-only is not
+> likely to cause anybody to open-source their driver, but will rather
+> just cause them to use yet more closed-source code that is even less
+> debuggable than this would be, to those without access to the source.
 
-Thanks
-Richard
-> 
-> Sascha
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+But at least the broken module then won't be interacting with other modules
+because it cannot share any buffers.
+
+	Arnd
