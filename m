@@ -1,47 +1,50 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 13 Dec 2011 17:56:32 +0000
-Subject: [PATCH v4 4/5] highbank: Unconditionally require l2x0 L2 cache
- controller support
-In-Reply-To: <1323798993-8727-1-git-send-email-dave.martin@linaro.org>
-References: <1323798993-8727-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1323798993-8727-5-git-send-email-dave.martin@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 13 Dec 2011 11:02:27 -0700
+Subject: [PATCH] gpio: pl061: drop extra check for NULL platform_data
+In-Reply-To: <1323471368-7955-1-git-send-email-robherring2@gmail.com>
+References: <1323471368-7955-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20111213180227.GA4871@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If running in the Normal World on a TrustZone-enabled SoC, Linux
-does not have complete control over the L2 cache controller
-configuration.  The kernel cannot work reliably on such platforms
-without the l2x0 cache support code built in.
+On Fri, Dec 09, 2011 at 04:56:08PM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> In adding DT binding support, the check for NULL platform_data got added
+> back in inadvertently, so remove it.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-This patch unconditionally enables l2x0 support for the Highbank
-SoC.
+Applied, thanks.
 
-Thanks to Rob Herring for this suggestion. [1]
+g.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074495.html
----
- arch/arm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d33eb39..744296d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -340,12 +340,12 @@ config ARCH_HIGHBANK
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select ARM_TIMER_SP804
-+	select CACHE_L2X0
- 	select CLKDEV_LOOKUP
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU
- 	select HAVE_SMP
--	select MIGHT_HAVE_CACHE_L2X0
- 	select USE_OF
- 	help
- 	  Support for the Calxeda Highbank SoC based boards.
--- 
-1.7.4.1
+> ---
+> Linus or Grant, 
+> 
+> Can you apply this fix for 3.2-rc.
+> 
+> Thanks,
+> Rob
+> 
+>  drivers/gpio/gpio-pl061.c |    4 ----
+>  1 files changed, 0 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
+> index 093c90b..4102f63 100644
+> --- a/drivers/gpio/gpio-pl061.c
+> +++ b/drivers/gpio/gpio-pl061.c
+> @@ -238,10 +238,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  	int ret, irq, i;
+>  	static DECLARE_BITMAP(init_irq, NR_IRQS);
+>  
+> -	pdata = dev->dev.platform_data;
+> -	if (pdata == NULL)
+> -		return -ENODEV;
+> -
+>  	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+>  	if (chip == NULL)
+>  		return -ENOMEM;
+> -- 
+> 1.7.5.4
+> 
