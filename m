@@ -1,21 +1,49 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 13 Dec 2011 10:50:57 +0000
-Subject: [PATCH] ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
-In-Reply-To: <20111212154742.GA4585@pengutronix.de>
-References: <1322584345-19193-1-git-send-email-dave.martin@linaro.org>
- <20111212154742.GA4585@pengutronix.de>
-Message-ID: <20111213105057.GA2276@linaro.org>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Tue, 13 Dec 2011 14:52:07 +0400
+Subject: [PATCH 09/19] clock-imx35: fix reboot in internal boot mode
+In-Reply-To: <1323757911-25217-9-git-send-email-eric@eukrea.com>
+References: <1323757911-25217-1-git-send-email-eric@eukrea.com>
+ <1323757911-25217-9-git-send-email-eric@eukrea.com>
+Message-ID: <4EE72E57.6080400@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 04:47:42PM +0100, Uwe Kleine-K?nig wrote:
-> $Subject ~= s/pl2x0/l2x0/
-> 
-> Best regards
-> Uwe
+Hello.
 
-You're right -- in fact I'd already spotted that and changed it locally.
-It will appear in the next post.
+On 13-12-2011 10:31, Eric B?nard wrote:
 
-Thanks anyway
----Dave
+> commit 8d75a2620dc3e33ce504044c375c443ed7ed4128
+
+    Please also specify that commit's summary in parens.
+
+ > disable IIM
+
+    Disables?
+
+> clock after reading silicon revision which will prevent
+> reboot in internal boot mode (see comment a few line before)
+
+> Signed-off-by: Eric B?nard<eric@eukrea.com>
+> Cc: Jason Liu<jason.hui@linaro.org>
+> Cc: Sascha Hauer<kernel@pengutronix.de>
+> ---
+>   arch/arm/mach-imx/clock-imx35.c |    5 ++++-
+>   1 files changed, 4 insertions(+), 1 deletions(-)
+
+> diff --git a/arch/arm/mach-imx/clock-imx35.c b/arch/arm/mach-imx/clock-imx35.c
+> index 8116f11..b49a732 100644
+> --- a/arch/arm/mach-imx/clock-imx35.c
+> +++ b/arch/arm/mach-imx/clock-imx35.c
+> @@ -538,7 +538,10 @@ int __init mx35_clocks_init()
+>
+>   	clk_enable(&iim_clk);
+>   	imx_print_silicon_rev("i.MX35", mx35_revision());
+> -	clk_disable(&iim_clk);
+> +	/* Don't disable IIM clock if we came up in internal boot mode */
+> +	if (__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10)) {
+> +		clk_disable(&iim_clk);
+> +	}
+
+    {} not needed -- scripts/checkpatch.pl should have warned you.
+
+WBR, Sergei
