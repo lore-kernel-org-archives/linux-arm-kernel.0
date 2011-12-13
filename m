@@ -1,23 +1,31 @@
-From: eric@eukrea.com (=?ISO-8859-15?Q?Eric_B=E9nard?=)
-Date: Tue, 13 Dec 2011 11:13:18 +0100
-Subject: [PATCH 16/19] eukrea-cpuimx51: remove board
-In-Reply-To: <20111213100532.GH27267@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 13 Dec 2011 11:16:17 +0100
+Subject: [PATCH 03/19] cpuimx25sd: fix Kconfig
+In-Reply-To: <1323757911-25217-3-git-send-email-eric@eukrea.com>
 References: <1323757911-25217-1-git-send-email-eric@eukrea.com>
- <1323757911-25217-16-git-send-email-eric@eukrea.com>
- <20111213100532.GH27267@pengutronix.de>
-Message-ID: <4EE7253E.2030604@eukrea.com>
+ <1323757911-25217-3-git-send-email-eric@eukrea.com>
+Message-ID: <20111213101617.GB2619@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Tue, Dec 13, 2011 at 07:31:35AM +0100, Eric B?nard wrote:
+> in 0d6cfa3a75f5cde5b3ca0dde748fd22625b4f34c I fixed the mach-types
+> records. We also need to make the name consistent in Kconfig else
+> the machine_is_eukrea_cpuimx25sd macro fails, and thus audio codec
+> is not properly initalized.
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
 
-Le 13/12/2011 11:05, Sascha Hauer a ?crit :
-> On Tue, Dec 13, 2011 at 07:31:48AM +0100, Eric B?nard wrote:
->> this board is not maintained anymore and is replaced by cpuimx51sd
->
-> I'm happy to remove this code, but aren't there any users of this board?
->
-not any that would need a kernel upgrade considering the Freescale proprietary 
-drivers used on it :-(
-Thanks,
-Eric
+Nit: The subject line is a bit sparse.
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111213/6a71e43b/attachment.sig>
