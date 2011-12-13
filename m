@@ -1,66 +1,105 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 14 Dec 2011 01:50:22 +0530
-Subject: [PATCH v9 20/31] gpio/omap: fix incorrect access of debounce module
+Date: Wed, 14 Dec 2011 01:50:21 +0530
+Subject: [PATCH v9 19/31] gpio/omap: fix debounce clock handling
 In-Reply-To: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
 References: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1323807633-23713-21-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1323807633-23713-20-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable debounce clock before writing/reading debounce registers.
-Disable the clock at the end so that it is synchronized with the
-pm_runtime_get/put_sync calls.
-
-Enable debounce clock per module. This call is mandatory because
-in omap_gpio_request() when *_runtime_get_sync() is called,
-_gpio_dbck_enable() within runtime callbck fails to turn on dbck
- because dbck_enable_mask used within _gpio_dbck_enable() is still
-not initialized at that point. Therefore we have to enable dbck here.
+The dbck_enable_mask indicates which all GPIOs within a bank have debounce
+enabled and dbck is enabled/disabled based upon this. But there is no
+mechanism to track the dbck state. In order to manage the dbck state we need
+additional flag and logic so that turning off/on dbck is synchronized with
+pm_runtime_put/get_sync calls.
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-omap.c |   29 +++++++++++++++++++++--------
+ 1 files changed, 21 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 3a3e09a..7f32391 100644
+index 175a364..3a3e09a 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -205,22 +205,30 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
- 
- 	l = GPIO_BIT(bank, gpio);
- 
-+	clk_enable(bank->dbck);
- 	reg = bank->base + bank->regs->debounce;
- 	__raw_writel(debounce, reg);
- 
- 	reg = bank->base + bank->regs->debounce_en;
- 	val = __raw_readl(reg);
- 
--	if (debounce) {
-+	if (debounce)
- 		val |= l;
--		clk_enable(bank->dbck);
--	} else {
-+	else
- 		val &= ~l;
--		clk_disable(bank->dbck);
--	}
- 	bank->dbck_enable_mask = val;
- 
- 	__raw_writel(val, reg);
-+	clk_disable(bank->dbck);
-+	/*
-+	 * Enable debounce clock per module.
-+	 * This call is mandatory because in omap_gpio_request() when
-+	 * *_runtime_get_sync() is called,  _gpio_dbck_enable() within
-+	 * runtime callbck fails to turn on dbck because dbck_enable_mask
-+	 * used within _gpio_dbck_enable() is still not initialized at
-+	 * that point. Therefore we have to enable dbck here.
-+	 */
-+	_gpio_dbck_enable(bank);
+@@ -67,6 +67,7 @@ struct gpio_bank {
+ 	struct clk *dbck;
+ 	u32 mod_usage;
+ 	u32 dbck_enable_mask;
++	bool dbck_enabled;
+ 	struct device *dev;
+ 	bool is_mpuio;
+ 	bool dbck_flag;
+@@ -160,6 +161,22 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
+ 	__raw_writel(l, base + reg);
  }
  
- static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
++static inline void _gpio_dbck_enable(struct gpio_bank *bank)
++{
++	if (bank->dbck_enable_mask && !bank->dbck_enabled) {
++		clk_enable(bank->dbck);
++		bank->dbck_enabled = true;
++	}
++}
++
++static inline void _gpio_dbck_disable(struct gpio_bank *bank)
++{
++	if (bank->dbck_enable_mask && bank->dbck_enabled) {
++		clk_disable(bank->dbck);
++		bank->dbck_enabled = false;
++	}
++}
++
+ /**
+  * _set_gpio_debounce - low level gpio debounce time
+  * @bank: the gpio bank we're acting upon
+@@ -1188,6 +1205,7 @@ save_gpio_context:
+ 				bank->get_context_loss_count(bank->dev);
+ 
+ 	omap_gpio_save_context(bank);
++	_gpio_dbck_disable(bank);
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+ 	return 0;
+@@ -1205,6 +1223,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
+ 		return 0;
+ 
+ 	spin_lock_irqsave(&bank->lock, flags);
++	_gpio_dbck_enable(bank);
+ 	if (!bank->enabled_non_wakeup_gpios || !bank->need_context_restore) {
+ 		spin_unlock_irqrestore(&bank->lock, flags);
+ 		return 0;
+@@ -1284,15 +1303,12 @@ void omap2_gpio_prepare_for_idle(int power_mode)
+ 	struct gpio_bank *bank;
+ 
+ 	list_for_each_entry(bank, &omap_gpio_list, node) {
+-		int j;
+-
+ 		if (!bank->mod_usage)
+ 			continue;
+ 
+ 		bank->power_mode = power_mode;
+ 
+-		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
+-			clk_disable(bank->dbck);
++		pm_runtime_put_sync_suspend(bank->dev);
+ 	}
+ }
+ 
+@@ -1301,13 +1317,10 @@ void omap2_gpio_resume_after_idle(void)
+ 	struct gpio_bank *bank;
+ 
+ 	list_for_each_entry(bank, &omap_gpio_list, node) {
+-		int j;
+-
+ 		if (!bank->mod_usage)
+ 			continue;
+ 
+-		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
+-			clk_enable(bank->dbck);
++		pm_runtime_get_sync(bank->dev);
+ 	}
+ }
+ 
 -- 
 1.7.0.4
