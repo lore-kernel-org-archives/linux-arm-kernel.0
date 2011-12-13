@@ -1,43 +1,35 @@
-From: michael@walle.cc (Michael Walle)
-Date: Tue, 13 Dec 2011 01:08:25 +0100
-Subject: arm and patch phys offset
-In-Reply-To: <alpine.LFD.2.02.1112121746330.2907@xanadu.home>
-References: <201112112255.32534.michael@walle.cc>
- <20111212222157.GG20178@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1112121746330.2907@xanadu.home>
-Message-ID: <201112130108.25337.michael@walle.cc>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 13 Dec 2011 01:15:31 +0100
+Subject: [PATCH 01/10] GPIO: gpio-generic: Move initialization up to
+ postcore
+In-Reply-To: <20111212235544.GM32251@atomide.com>
+References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <201112130044.02007.jkrzyszt@tis.icnet.pl>
+ <20111212235544.GM32251@atomide.com>
+Message-ID: <201112130115.31927.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag 12 Dezember 2011, 23:56:38 schrieb Nicolas Pitre:
-> I just compiled vanilla v3.2-rc5 using kirkwood_defconfig and
-> successfully booted it on a SheevaPlug and a DB-88F6281-BP development
-> board.  And I do have CONFIG_ARM_PATCH_PHYS_VIRT=y.  Both platforms are
-> using u-Boot which booted the default uImage produced by the kernel
-> build system.
+On Tuesday 13 of December 2011 at 00:55:44, Tony Lindgren wrote:
+> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111212 15:13]:
+> > On Tuesday 13 of December 2011 at 00:15:20, Tony Lindgren wrote:
+> > > 
+> > > Might be worth checking if some board specific __initcall helps here
+> > > too?
+> > 
+> > If I only knew how I could insert a board specific __initcall between 
+> > two points from where the generic-gpio first, then the 8250 driver, are 
+> > called.
+> > 
+> > Any hints?
 > 
-> So at this point I wouldn't think the issue is Kirkwood related as I
-> can't reproduce it on two different Kirkwood targets.
+> Hmm, can't you do all that in the order you want in
+> ams_delta_modem_init()?  Or make that into a late_initcall so
+> you have generic-gpio available?
+> 
+> It seems that the pieces of code you're talking about don't need
+> to be initialized early, just needs to be done in the right
+> order to get things working.
 
-Seems like the l2 cache is enabled after uboot starts the linux kernel. I'll 
-dig deeper into that tomorrow.
-
-For now, i appended
-  l2_cache_disable();
-to uboots cleanup_before_linux() and all stubs seems to be patched correctly.
-
-void l2_cache_disable(void)
-{
-	struct kwcpu_registers *cpureg =
-		(struct kwcpu_registers *)KW_CPU_REG_BASE;
-	writel(readl(&cpureg->l2_cfg) & ~0x18, &cpureg->l2_cfg);
-}
-
-l2_cfg is 0xf1020128.
-
-But i don't know if that is correct way of disabling the cache.
-
-Nico, what uboot are you using for your SheeavaPlug? Vanilla uboot?
-
--- 
-michael
+I think I've got it, thanks!
+Janusz
