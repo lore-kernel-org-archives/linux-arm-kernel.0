@@ -1,48 +1,37 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 13 Dec 2011 15:38:17 -0700 (MST)
-Subject: [PATCHv11 2/8] ARM: OMAP2+: hwmod: Add API to check IO PAD wakeup
- status
-In-Reply-To: <20111213222804.GV32251@atomide.com>
-References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
- <1323713733-13115-3-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1112131505000.12046@utopia.booyaka.com>
- <20111213222804.GV32251@atomide.com>
-Message-ID: <alpine.DEB.2.00.1112131530100.12046@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Dec 2011 14:38:56 -0800
+Subject: [PATCH 1/3] ARM: OMAP2+: kconfig: Enable devicetree by default
+ for OMAP2+ systems
+In-Reply-To: <4EE75448.4010701@ti.com>
+References: <y> <1323190149-6492-2-git-send-email-b-cousson@ti.com>
+ <1323782836.1877.79.camel@deskari> <4EE75448.4010701@ti.com>
+Message-ID: <20111213223855.GW32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Dec 2011, Tony Lindgren wrote:
-
-> * Paul Walmsley <paul@pwsan.com> [111213 13:44]:
-> > 
-> > On Mon, 12 Dec 2011, Tero Kristo wrote:
-> > 
-> > So the patch description says:
-> > 
-> > > From: R, Govindraj <govindraj.raja@ti.com>
-> > > 
-> > > Add API to determine IO-PAD wakeup event status for a given
-> > > hwmod dynamic_mux pad.
-> > 
-> > But the code does:
-> > 
-> > > +	for (i = 0; i < hmux->nr_pads; i++) {
-> > > +		struct omap_device_pad *pad = &hmux->pads[i];
-> > 
-> > which is going to check all of the pads, not just the dynamic ones.
-> > 
-> > So it seems to me that we need to decide whether this code should be 
-> > testing all the pads, or just the dynamically remuxed ones.  The same 
-> > thing should be decided for the code in patch 1.
-> > 
-> > Na?vely it seems to me that we want to test all of the pads in both 
-> > patches 1 and 2, not just the dynamically remuxable ones.  Comments?
+* Cousson, Benoit <b-cousson@ti.com> [111213 05:02]:
+> On 12/13/2011 2:27 PM, Tomi Valkeinen wrote:
+> >Hi,
+> >
+> >On Tue, 2011-12-06 at 17:49 +0100, Benoit Cousson wrote:
+> >>devicetree will become the mandatory boot method for OMAP2+.
+> >>In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
+> >>select USE_OF by default for every OMAP2+ systems.
+> >>Select as well the APPENDED_DTB and ATAG_DTB_COMPAT to allow legacy
+> >>boot loader to keep working properly.
+> >
+> >APPENDED_DTB sounds a bit dangerous to be enabled by default according
+> >to the config help text.
 > 
-> You're right, it should be only the dynamic ones.
+> The help is indeed really scary :-)
 
-Hmm, looks to me like it should check all of them?  Can't a pad be marked 
-with OMAP_DEVICE_PAD_WAKEUP, but not be marked with OMAP_DEVICE_PAD_REMUX?  
-In that case it would not end up on the dynamic list, right?
+Heh, but it's also true.
+ 
+> Tony,
+> Do we want to keep it by default? Or should we fix the kconfig help?
 
+Let's just leave out those two from omap2plus_defconfig then.
 
-- Paul
+Regards,
+
+Tony
