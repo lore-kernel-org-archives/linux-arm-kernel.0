@@ -1,137 +1,47 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 14 Dec 2011 01:50:08 +0530
-Subject: [PATCH v9 06/31] gpio/omap: avoid cpu checks during module ena/disable
+Date: Wed, 14 Dec 2011 01:50:26 +0530
+Subject: [PATCH v9 24/31] gpio/omap: restore OE only after setting the output
+ level
 In-Reply-To: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
 References: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1323807633-23713-7-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1323807633-23713-25-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Charulatha V <charu@ti.com>
+From: Nishanth Menon <nm@ti.com>
 
-Remove cpu-is checks while enabling/disabling OMAP GPIO module during a gpio
-request/free.
+Setup the dataout register before restoring OE. This is to make
+sure that we have valid data in dataout register which would be
+made available in output pins as soon as OE is enabled. Else,
+there is risk of unknown data getting out into gpio pins.
 
-Signed-off-by: Charulatha V <charu@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/gpio.c             |    2 +
- arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio-omap.c               |   53 ++++++++++++++------------------
- 3 files changed, 26 insertions(+), 30 deletions(-)
+ drivers/gpio/gpio-omap.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 1d60fff..bc9271a 100644
---- a/arch/arm/mach-omap2/gpio.c
-+++ b/arch/arm/mach-omap2/gpio.c
-@@ -88,6 +88,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
- 		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
- 		pdata->regs->debounce_en = OMAP24XX_GPIO_DEBOUNCE_EN;
-+		pdata->regs->ctrl = OMAP24XX_GPIO_CTRL;
- 		break;
- 	case 2:
- 		pdata->bank_type = METHOD_GPIO_44XX;
-@@ -104,6 +105,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
- 		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
- 		pdata->regs->debounce_en = OMAP4_GPIO_DEBOUNCENABLE;
-+		pdata->regs->ctrl = OMAP4_GPIO_CTRL;
- 		break;
- 	default:
- 		WARN(1, "Invalid gpio bank_type\n");
-diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index 41459e2..649226e 100644
---- a/arch/arm/plat-omap/include/plat/gpio.h
-+++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -188,6 +188,7 @@ struct omap_gpio_reg_offs {
- 	u16 clr_irqenable;
- 	u16 debounce;
- 	u16 debounce_en;
-+	u16 ctrl;
- 
- 	bool irqenable_inv;
- };
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index a0bdd92..d46a805 100644
+index 7f7636b..bbc4fda 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -84,6 +84,7 @@ struct gpio_bank {
- 
- #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
- #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
-+#define GPIO_MOD_CTRL_BIT	BIT(0)
- 
- static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
- {
-@@ -578,22 +579,18 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
- 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
- 	}
- #endif
--	if (!cpu_class_is_omap1()) {
--		if (!bank->mod_usage) {
--			void __iomem *reg = bank->base;
--			u32 ctrl;
--
--			if (cpu_is_omap24xx() || cpu_is_omap34xx())
--				reg += OMAP24XX_GPIO_CTRL;
--			else if (cpu_is_omap44xx())
--				reg += OMAP4_GPIO_CTRL;
--			ctrl = __raw_readl(reg);
--			/* Module is enabled, clocks are not gated */
--			ctrl &= 0xFFFFFFFE;
--			__raw_writel(ctrl, reg);
--		}
--		bank->mod_usage |= 1 << offset;
-+	if (bank->regs->ctrl && !bank->mod_usage) {
-+		void __iomem *reg = bank->base + bank->regs->ctrl;
-+		u32 ctrl;
+@@ -1364,7 +1364,6 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+ 	__raw_writel(bank->context.wake_en,
+ 				bank->base + bank->regs->wkup_en);
+ 	__raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
+-	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
+ 	__raw_writel(bank->context.leveldetect0,
+ 				bank->base + bank->regs->leveldetect0);
+ 	__raw_writel(bank->context.leveldetect1,
+@@ -1374,6 +1373,8 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+ 	__raw_writel(bank->context.fallingdetect,
+ 				bank->base + bank->regs->fallingdetect);
+ 	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
++	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
 +
-+		ctrl = __raw_readl(reg);
-+		/* Module is enabled, clocks are not gated */
-+		ctrl &= ~GPIO_MOD_CTRL_BIT;
-+		__raw_writel(ctrl, reg);
- 	}
-+
-+	bank->mod_usage |= 1 << offset;
-+
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
- 	return 0;
-@@ -626,22 +623,18 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
- 		__raw_writel(1 << offset, reg);
- 	}
- #endif
--	if (!cpu_class_is_omap1()) {
--		bank->mod_usage &= ~(1 << offset);
--		if (!bank->mod_usage) {
--			void __iomem *reg = bank->base;
--			u32 ctrl;
--
--			if (cpu_is_omap24xx() || cpu_is_omap34xx())
--				reg += OMAP24XX_GPIO_CTRL;
--			else if (cpu_is_omap44xx())
--				reg += OMAP4_GPIO_CTRL;
--			ctrl = __raw_readl(reg);
--			/* Module is disabled, clocks are gated */
--			ctrl |= 1;
--			__raw_writel(ctrl, reg);
--		}
-+	bank->mod_usage &= ~(1 << offset);
-+
-+	if (bank->regs->ctrl && !bank->mod_usage) {
-+		void __iomem *reg = bank->base + bank->regs->ctrl;
-+		u32 ctrl;
-+
-+		ctrl = __raw_readl(reg);
-+		/* Module is disabled, clocks are gated */
-+		ctrl |= GPIO_MOD_CTRL_BIT;
-+		__raw_writel(ctrl, reg);
- 	}
-+
- 	_reset_gpio(bank, bank->chip.base + offset);
- 	spin_unlock_irqrestore(&bank->lock, flags);
- }
+ 	if (bank->dbck_enable_mask) {
+ 		__raw_writel(bank->context.debounce, bank->base +
+ 					bank->regs->debounce);
 -- 
 1.7.0.4
