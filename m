@@ -1,21 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Dec 2011 16:25:56 -0800
-Subject: [PATCHv11 8/8] ARM: OMAP: mux: add support for selecting
- mpu_irq for each wakeup pad
-In-Reply-To: <1323713733-13115-9-git-send-email-t-kristo@ti.com>
-References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
- <1323713733-13115-9-git-send-email-t-kristo@ti.com>
-Message-ID: <20111213002555.GO32251@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Dec 2011 01:27:05 +0100
+Subject: [RFC 1/3] pinctrl: add a driver for NVIDIA Tegra
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17518607C1@HQMAIL01.nvidia.com>
+References: <1323382390-14892-1-git-send-email-swarren@nvidia.com>
+ <1323382390-14892-2-git-send-email-swarren@nvidia.com>
+ <CACRpkdYDn0V7SeQuFiFDMxGkybvg6PGf7jxid8ECGB7Azkj3zw@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17518604D7@HQMAIL01.nvidia.com>
+ <CACRpkdahqb0qMVcKF9NBT5pwRgK4FOob5ABtb7ids9Bhh5XbZg@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17518607C1@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdYz4-HFf6oBZ1NNies6SqKCYrsTbFaMjh7Sr7M8wXFVPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [111212 09:44]:
-> By default all registered pads will trigger mpu_irqs[0]. Now there is
-> an API for selecting used mpu_irq on pad basis, which can be used to
-> trigger different irq handlers for different pads in the same hwmod.
-> Each pad that requires its interrupt to be re-routed this way must
-> have a separate call to omap_hwmod_pad_route_irq(hwmod, pad, irq).
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+On Mon, Dec 12, 2011 at 7:06 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Linus Walleij wrote at Friday, December 09, 2011 4:56 PM:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+>> For me there are two points:
+>>
+>> - Avoiding clash with kernel maintainers who hate firmware-like tables and
+>> ? binary data filling up the kernel. Some certain other guy bearing my
+>> ? name comes to mind.
+>
+> Well, one of the nice things here is that everything to conctrol the HW
+> is in the driver, unlike on other systems without all this data that
+> have to rely on opaque BIOS/ACPI/EFI/... hooks.
+
+Good point. I will have to play that card if the situation should arise.
+Kernel devs also tend to hate stuff they can't control.
+
+>> - Footprint: the majority of the stuff in your driver ends up in non-discardable
+>> ? memory, and will be kept around. Since we have this concept of a
+>> ? single zImage for a number of say ARMv7 systems, and since pin
+>> ? controllers can be pretty hard to load from modules, *all* of them
+>> ? may have to be compiled-in. If every driver for every board takes this
+>> ? approach I am afraid it will be end up with a measurable footprint.
+>
+> Perhaps what we need is a way to build all these drivers as modules, but
+> still link them into the kernel so they're statically available during
+> early boot, but allow them to be unloaded like modules after the system
+> has booted and determined they aren't needed.
+>
+> This would have the advantage of getting rid of the unused driver code
+> as well, whereas putting the data into DT only handles ensuring the data
+> for other SoCs isn't present in the kernel after boot.
+
+Hm that sounds pretty complicated. But also extremely useful if
+we forge ahead on single zImages.
+
+I'd never be able to pull it off thoug :-/
+
+Anyway, we'll deal with this when we run into the problem.
+
+Yours,
+Linus Walleij
