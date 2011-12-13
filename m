@@ -1,48 +1,21 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 13 Dec 2011 18:40:03 +0800
-Subject: [PATCH V2 1/7] dts/imx: rename gpio labels to consistent with hw
- spec
-In-Reply-To: <20111213094100.GD10866@S2100-06.ap.freescale.net>
-References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
- <1323757530-19402-2-git-send-email-richard.zhao@linaro.org>
- <20111213094100.GD10866@S2100-06.ap.freescale.net>
-Message-ID: <20111213104002.GH28768@b20223-02.ap.freescale.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 13 Dec 2011 10:50:57 +0000
+Subject: [PATCH] ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
+In-Reply-To: <20111212154742.GA4585@pengutronix.de>
+References: <1322584345-19193-1-git-send-email-dave.martin@linaro.org>
+ <20111212154742.GA4585@pengutronix.de>
+Message-ID: <20111213105057.GA2276@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 05:41:01PM +0800, Shawn Guo wrote:
-> On Tue, Dec 13, 2011 at 02:25:24PM +0800, Richard Zhao wrote:
-> > GPIO1/GPIO2/... is more readable than GPIO0/GPIO1/... .
-> > Remove redundant gpio comments.
-> > 
-> If we want to make this change, it's really more than just gpio, all
-> phandle name numbering should be changed to keep consistency.  You may
-> want to make the same change on uart as well.
-ok. I'll include uart renameing too in next version.
+On Mon, Dec 12, 2011 at 04:47:42PM +0100, Uwe Kleine-K?nig wrote:
+> $Subject ~= s/pl2x0/l2x0/
+> 
+> Best regards
+> Uwe
 
-Thanks
-Richard
-> 
-> -- 
-> Regards,
-> Shawn
-> 
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/imx51-babbage.dts   |   11 +++++------
-> >  arch/arm/boot/dts/imx51.dtsi          |    8 ++++----
-> >  arch/arm/boot/dts/imx53-ard.dts       |   16 ++++++++--------
-> >  arch/arm/boot/dts/imx53-evk.dts       |   15 +++++++--------
-> >  arch/arm/boot/dts/imx53-qsb.dts       |   16 ++++++++--------
-> >  arch/arm/boot/dts/imx53-smd.dts       |   13 ++++++-------
-> >  arch/arm/boot/dts/imx53.dtsi          |   14 +++++++-------
-> >  arch/arm/boot/dts/imx6q-sabreauto.dts |    6 +++---
-> >  arch/arm/boot/dts/imx6q.dtsi          |   14 +++++++-------
-> >  9 files changed, 55 insertions(+), 58 deletions(-)
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+You're right -- in fact I'd already spotted that and changed it locally.
+It will appear in the next post.
+
+Thanks anyway
+---Dave
