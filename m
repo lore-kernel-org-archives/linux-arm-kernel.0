@@ -1,29 +1,106 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Dec 2011 12:31:03 +0100
-Subject: [PATCH 2/4] ARM: smp_twd: create a percpu reference to the
- clockevent
-In-Reply-To: <20111212134904.GV14542@n2100.arm.linux.org.uk>
-References: <1323683830-23867-1-git-send-email-linus.walleij@stericsson.com>
- <20111212134904.GV14542@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYEitq9a7ZPMP-pHP7NtRPZTbmzJmayFDBA210rkwZaKQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 13 Dec 2011 12:44:41 +0100
+Subject: [PATCH 4/4 v2] ARM: smp_twd: reconfigure clockevents after cpufreq
+ change
+Message-ID: <1323776681-31303-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 2:49 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 12, 2011 at 10:57:10AM +0100, Linus Walleij wrote:
->> ?static unsigned long twd_timer_rate;
->> +static DEFINE_PER_CPU(struct clock_event_device *, twd_ce);
->>
->> ?static struct clock_event_device __percpu **twd_evt;
->
-> So, one pointer to the clock_event_device is not enough? ?Could we have
-> one or the other?
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Bah, just me being lame and not seeing that Marc already made
-these events per-cpu.
+This break-out from Colin Cross' cpufreq-aware TWD patch
+will handle the case when our localtimer's clock changes with
+the cpu clock. A cpufreq transtion notifier will be registered
+only if the platform has supplied a specified clock to the TWD.
 
-I'll update the CPUfreq patch and drop this crap.
+After a cpufreq transition, update the clockevent's frequency
+by fetching the new clock rate from the clock framework and
+reprogram the next clock event.
 
-Thanks,
-Linus Walleij
+The necessary changes in the clockevents framework was done by
+Thomas Gleixner in kernel v3.0.
+
+ChangeLog v1->v2:
+- Replace IS_ERR_OR_NULL() with IS_ERR() in twd_clk check.
+- Update code to use the already existing per-cpu array of TWD
+  clockevents instead of adding cruft.
+
+Signed-off-by: Colin Cross <ccross@android.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[Broke out, ifdef:ed CPUfreq stuff for non-cpufreq configs]
+[Rebased to newer TWD base with per-CPU clock array]
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/kernel/smp_twd.c |   47 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 47 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index a978394..c8e9385 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -11,6 +11,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
++#include <linux/cpufreq.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
+@@ -92,6 +93,52 @@ void twd_timer_stop(struct clock_event_device *clk)
+ 	disable_percpu_irq(clk->irq);
+ }
+ 
++#ifdef CONFIG_CPU_FREQ
++
++/*
++ * Updates clockevent frequency when the cpu frequency changes.
++ * Called on the cpu that is changing frequency with interrupts disabled.
++ */
++static void twd_update_frequency(void *data)
++{
++	twd_timer_rate = clk_get_rate(twd_clk);
++
++	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
++}
++
++static int twd_cpufreq_transition(struct notifier_block *nb,
++	unsigned long state, void *data)
++{
++	struct cpufreq_freqs *freqs = data;
++
++	/*
++	 * The twd clock events must be reprogrammed to account for the new
++	 * frequency.  The timer is local to a cpu, so cross-call to the
++	 * changing cpu.
++	 */
++	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
++		smp_call_function_single(freqs->cpu, twd_update_frequency,
++			NULL, 1);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block twd_cpufreq_nb = {
++	.notifier_call = twd_cpufreq_transition,
++};
++
++static int twd_cpufreq_init(void)
++{
++	if (!IS_ERR(twd_clk))
++		return cpufreq_register_notifier(&twd_cpufreq_nb,
++			CPUFREQ_TRANSITION_NOTIFIER);
++
++	return 0;
++}
++core_initcall(twd_cpufreq_init);
++
++#endif
++
+ static void __cpuinit twd_calibrate_rate(void)
+ {
+ 	unsigned long count;
+-- 
+1.7.3.2
