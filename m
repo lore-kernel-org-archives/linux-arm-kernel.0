@@ -1,43 +1,57 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 13 Dec 2011 09:35:56 -0800
-Subject: [PATCH v8 00/20] OMAP2+: UART: Runtime adaptation + cleanup
-In-Reply-To: <4EE75E1A.7080101@ti.com> (Rajendra Nayak's message of "Tue, 13
- Dec 2011 19:45:54 +0530")
-References: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
- <874nxd5j0f.fsf@ti.com> <4EE75E1A.7080101@ti.com>
-Message-ID: <87pqfsxtkz.fsf@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 13 Dec 2011 17:56:28 +0000
+Subject: [PATCH v4 0/5] Refactor common Kconfigs for easier maintenance
+Message-ID: <1323798993-8727-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+Common Kconfig options which depend on a long list of board- and
+SoC- specific Kconfigs can be cumbersome to maintain, leading to
+annoying merge conflicts (although rather trivial ones).
 
-> Hi Kevin,
->
-> On Wednesday 07 December 2011 05:51 AM, Kevin Hilman wrote:
->> "Govindraj.R"<govindraj.raja@ti.com>  writes:
->>
->>> Converting uart driver to adapt to pm runtime API's.
->>> Code re-org + cleanup.
->>> Moving some functionality from serial.c to omap-serial.c
->>
->> Alan, can you confirm your Ack's are still valid on the drivers/tty
->> parts of this series?  It has gone through quite a few changes since
->> your original ack.
->>
->> Greg, are you ok with this series merging via the OMAP tree since it is
->> changing arch/arm/mach-omap2/* code as well as the driver, and should go
->> together.  If so, with your ack (on the drivers/tty/* parts), I'll
->> handle this series through the OMAP tree.
->
-> I had a series to add DT support for omap-serial, which I did on top
-> of the runtime series from Govindraj. Its already acked by Rob Herring
-> for the DT parts. Would you be able to pick those up as well if its
-> fine with Greg?
+This series factors out the dependencies of CACHE_L2X0 and SMP so
+that the knowledge about when these can be enabled is moved to the
+relevant board/SoC Kconfig files instead.  New
+MIGHT_HAVE_CACHE_L2X0 and HAVE_SMP options are defined to mediate
+the dependencies.
 
-Yes, those should go on top of Govindraj's series.
+This series has been substantially reworked compared with the
+previous post, and is now in two parts:
 
-I'm OK with taking them, but I'd like to see them rebased on Govidraj's
-latest and see several Tested-by reports from various people since it is
-pretty late in the merge cycle.
+  * The first two patches simply refactor the way the Kconfig
+    options for CACHE_L2X0 and SMP are implemented, without
+    making any other changes.
 
-Kevin
+  * The final three patches apply functional changes suggested by
+    the contributors to this series, to make the config
+    dependencies more correct for some specific boards.
+
+
+Thanks to Rob Herring, Shawn Guo and Russell King for their
+contributions to this series.
+
+
+I have briefly build-tested on some of the affected boards, but any
+further reviews or Tested-Bys would be much appreciated.
+
+
+Dave Martin (5):
+  ARM: l2x0/pl310: Refactor Kconfig to be more maintainable
+  ARM: SMP: Refactor Kconfig to be more maintainable
+  omap4: Unconditionally require l2x0 L2 cache controller support
+  highbank: Unconditionally require l2x0 L2 cache controller support
+  imx6q: Remove unconditional dependency on l2x0 L2 cache support
+
+ arch/arm/Kconfig               |   23 +++++++++++++++++++----
+ arch/arm/mach-exynos/Kconfig   |    2 ++
+ arch/arm/mach-imx/Kconfig      |    3 ++-
+ arch/arm/mach-msm/Kconfig      |    1 +
+ arch/arm/mach-omap2/Kconfig    |    2 ++
+ arch/arm/mach-realview/Kconfig |    9 +++++++++
+ arch/arm/mach-vexpress/Kconfig |    2 ++
+ arch/arm/mm/Kconfig            |   15 ++++++++-------
+ arch/arm/plat-mxc/Kconfig      |    1 +
+ 9 files changed, 46 insertions(+), 12 deletions(-)
+
+-- 
+1.7.4.1
