@@ -1,39 +1,89 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 Dec 2011 15:20:33 +0100
-Subject: [PATCH V2 7/7] arm/imx6q: add cpufreq support
-In-Reply-To: <20111213121940.GC10022@S2101-09.ap.freescale.net>
-References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
- <1323757530-19402-8-git-send-email-richard.zhao@linaro.org>
- <20111213121940.GC10022@S2101-09.ap.freescale.net>
-Message-ID: <20111213142033.GW27267@pengutronix.de>
+From: vishwanath.bs@ti.com (Vishwanath Sripathy)
+Date: Tue, 13 Dec 2011 19:53:29 +0530
+Subject: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain support via
+ hwmod mux
+In-Reply-To: <f1252b7ed1e3731c8b0c18e385dcdc2b@mail.gmail.com>
+References: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com><87pqh3qvkt.fsf@ti.com><1e686270c099fa4a270b6b01e6ac585c@mail.gmail.com><a480ee86d60a9db484d3baa0faf2477f@mail.gmail.com>
+ <87k46izb8b.fsf@ti.com> <3968ef2671e202d1cefdf4a7c5d32ec6@mail.gmail.com>
+ <f1252b7ed1e3731c8b0c18e385dcdc2b@mail.gmail.com>
+Message-ID: <6f34d798db0dcb69747e6fc722cb0cf7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 08:19:42PM +0800, Shawn Guo wrote:
-> On Tue, Dec 13, 2011 at 02:25:30PM +0800, Richard Zhao wrote:
-> > use cpu0 node property clock-frequency to check max frequency.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Kevin,
+
+> -----Original Message-----
+> From: Vishwanath Sripathy [mailto:vishwanath.bs at ti.com]
+> Sent: Friday, December 02, 2011 10:29 PM
+> To: Kevin Hilman
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain
+> support via hwmod mux
+>
+> Kevin,
+>
+> > -----Original Message-----
+> > From: Vishwanath Sripathy [mailto:vishwanath.bs at ti.com]
+> > Sent: Wednesday, November 30, 2011 2:58 PM
+> > To: Kevin Hilman
+> > Cc: linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> > Subject: RE: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain
+> > support via hwmod mux
+> >
 > > ---
-> >  arch/arm/mach-imx/Kconfig        |    1 +
-> >  arch/arm/mach-imx/Makefile       |    2 +-
-> >  arch/arm/mach-imx/cpu_op-imx6q.c |   69 ++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 71 insertions(+), 1 deletions(-)
-> >  create mode 100644 arch/arm/mach-imx/cpu_op-imx6q.c
-> > 
-> NAK.
-> 
-> We really need to push people to help with cleanup and consolidation
-> effort rather than accepting patches on top of something that needs
-> to be cleaned up and consolidated, which will make the effort later
-> more difficult.
+> > > >> > Can you refresh this against Tony's 'fixes' branch and re-
+> > test.
+> > > >> >
+> > > >> > I tested this on OMAP3430/n900 and noticed that it no
+> longer
+> > > hit
+> > > >> off
+> > > >> > mode from idle.
+> > > >> >
+> > > >> > IOW, If I enable UART timeouts and then enable off mode, I
+> > > don't
+> > > >> > actually ever hit off during idle.  However, if I do a
+> > > >> > suspend/resume I
+> > > >> > see it hits off mode, then subsequent attempts to hit off
+> > > during
+> > > >> > idle work.
+> > > >> >
+> > > >> > Can you investigate this?
+> > > >> OK. Let me check that.
+> > > > I rebased these patches against latest Tony's fixes branch and
+> > > tested it
+> > > > on OMAP3430 SDP. I see that Core enters off mode in idle path
+> > > after
+> > > > setting UART timeout w/o having to suspend the system.
+> > >
+> > > OK, sounds good.
+> > >
+> > > Do you have a branch that I can test as well?
+> > Sure. It's available at
+> > git://gitorious.org/omap-pm/linux.git for_3.3/io_daisy_chain
+> Did you get any chance to test it at your side?
+> Should I post the rebased patches?
+I have rebased these patch series against LO master commit id:
+deee6d5359969a0ce4e2760cfd7b9f379bd5698a and same is available here [1].
 
-+1
+I have tested these patch series along with Tero's Chain Handler +
+Govind's UART Runtime series which is available at [2].
 
-Sascha
+Regards
+Vishwa
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+[1]:
+git://gitorious.org/omap-pm/linux.git for_3.3/io_daisy_chain_rebased
+
+[2]:
+git://gitorious.org/runtime_3-0/runtime_3-0.git
+for_3_3/tmp_rc4_uart_pm_intg
+>
+> Regards
+> Vishwa
+> >
+> > Regards
+> > Vishwa
+> > >
+> > > Kevin
