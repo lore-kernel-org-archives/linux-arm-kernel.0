@@ -1,166 +1,113 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Tue, 13 Dec 2011 13:04:23 -0600
-Subject: [PATCH V2 7/7] arm/imx6q: add cpufreq support
-In-Reply-To: <20111213103831.GG28768@b20223-02.ap.freescale.net>
-References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
- <1323757530-19402-8-git-send-email-richard.zhao@linaro.org>
- <20111213102315.GJ27267@pengutronix.de>
- <20111213103831.GG28768@b20223-02.ap.freescale.net>
-Message-ID: <CAMXH7KHxRtWAZmUSo42gwcRps=CDY3PC-ZdqWQm7Ot9xYc+LgQ@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 13 Dec 2011 11:26:40 -0800
+Subject: [PATCH v8 00/20] OMAP2+: UART: Runtime adaptation + cleanup
+In-Reply-To: <CAAL8m4wGN5ykm3-+xrGPe-WJUDBdterxAyZ=C3kH862+n1DprQ@mail.gmail.com>
+ (Govindraj's message of "Tue, 13 Dec 2011 18:31:13 +0530")
+References: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
+ <CAAL8m4wGN5ykm3-+xrGPe-WJUDBdterxAyZ=C3kH862+n1DprQ@mail.gmail.com>
+Message-ID: <87fwgow9vz.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2011 04:38, Richard Zhao <richard.zhao@freescale.com> wrote:
-> On Tue, Dec 13, 2011 at 11:23:15AM +0100, Sascha Hauer wrote:
->> On Tue, Dec 13, 2011 at 02:25:30PM +0800, Richard Zhao wrote:
->> > use cpu0 node property clock-frequency to check max frequency.
->> >
->> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
->> > ---
->> > ?arch/arm/mach-imx/Kconfig ? ? ? ?| ? ?1 +
->> > ?arch/arm/mach-imx/Makefile ? ? ? | ? ?2 +-
->> > ?arch/arm/mach-imx/cpu_op-imx6q.c | ? 69 ++++++++++++++++++++++++++++++++++++++
->> > ?3 files changed, 71 insertions(+), 1 deletions(-)
->> > ?create mode 100644 arch/arm/mach-imx/cpu_op-imx6q.c
->> >
->> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
->> > index fbd414b..21e472f 100644
->> > --- a/arch/arm/mach-imx/Kconfig
->> > +++ b/arch/arm/mach-imx/Kconfig
->> > @@ -834,6 +834,7 @@ comment "i.MX6 family:"
->> >
->> > ?config SOC_IMX6Q
->> > ? ? bool "i.MX6 Quad support"
->> > + ? select ARCH_HAS_CPUFREQ
->> > ? ? select ARM_GIC
->> > ? ? select CACHE_L2X0
->> > ? ? select CPU_V7
->> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
->> > index 9cf630a..2dfe4a7 100644
->> > --- a/arch/arm/mach-imx/Makefile
->> > +++ b/arch/arm/mach-imx/Makefile
->> > @@ -72,7 +72,7 @@ AFLAGS_head-v7.o :=-Wa,-march=armv7-a
->> > ?obj-$(CONFIG_SMP) += platsmp.o
->> > ?obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
->> > ?obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
->> > -obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o pm-imx6q.o
->> > +obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o pm-imx6q.o cpu_op-imx6q.o
->> >
->> > ?# i.MX5 based machines
->> > ?obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
->> > diff --git a/arch/arm/mach-imx/cpu_op-imx6q.c b/arch/arm/mach-imx/cpu_op-imx6q.c
->> > new file mode 100644
->> > index 0000000..d24e081
->> > --- /dev/null
->> > +++ b/arch/arm/mach-imx/cpu_op-imx6q.c
->> > @@ -0,0 +1,69 @@
->> > +/*
->> > + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
->> > + */
->> > +
->> > +/*
->> > + * The code contained herein is licensed under the GNU General Public
->> > + * License. You may obtain a copy of the GNU General Public License
->> > + * Version 2 or later at the following locations:
->> > + *
->> > + * http://www.opensource.org/licenses/gpl-license.html
->> > + * http://www.gnu.org/copyleft/gpl.html
->> > + */
->> > +
->> > +#include <linux/types.h>
->> > +#include <linux/kernel.h>
->> > +#include <linux/string.h>
->> > +#include <linux/of.h>
->> > +#include <mach/hardware.h>
->> > +
->> > +static int arm_max_freq_idx;
->>
->> This is only used in mx6q_get_cpu_op()
-> I'll move to local var
->>
->> Also shouldn't this be initialized with 1? From what you
->> said 800MHz is safe for all boards whereas 1GHz is not.
-> I'll fix it in next version.
->
+Govindraj <govindraj.ti@gmail.com> writes:
 
-Richard, I communicated with Hui Liu a couple of weeks ago about the
-possibility of adding a "max_freq" kernel parameter to the i.MX6q
-community u-boot, similiar to what has been done for the BSP u-boot.
-If he is or has done this, it may be better to read and use this
-kernel parameter from u-boot so that the same kernel can be used
-between boards with and without the fix.  I'm not that familiar with
-device tree yet but perhaps it provides another way to handle this.
-Also keep in
+[...]
 
-> Thanks
-> Richard
->>
->> Sascha
->>
->> > +
->> > +/* operating point(op): 0 - 1GHz; 1 - 800MHz, 3 - 400MHz, 4 ?- 160MHz */
->> > +static struct cpu_op mx6q_cpu_op[] = {
->> > + ? {
->> > + ? ? ? ? ? .cpu_rate = 996000000,
->> > + ? ? ? ? ? .cpu_voltage = 1225000,
->> > + ? },
->> > + ? {
->> > + ? ? ? ? ? .cpu_rate = 792000000,
->> > + ? ? ? ? ? .cpu_voltage = 1100000,
->> > + ? },
->> > + ? {
->> > + ? ? ? ? ? .cpu_rate = 396000000,
->> > + ? ? ? ? ? .cpu_voltage = 950000,
->> > + ? },
->> > + ? {
->> > + ? ? ? ? ? .cpu_rate = 198000000,
->> > + ? ? ? ? ? .cpu_voltage = 850000,
->> > + ? },
->> > +};
->> > +
->> > +struct cpu_op *mx6q_get_cpu_op(int *op)
->> > +{
->> > + ? struct device_node *cpu0;
->> > + ? u32 val;
->> > + ? int i;
->> > +
->> > + ? cpu0 = of_find_node_by_path("/cpus/cpu at 0");
->> > + ? if (cpu0 && !of_property_read_u32(cpu0, "clock-frequency", &val)) {
->> > + ? ? ? ? ? for (i = 0; i < ARRAY_SIZE(mx6q_cpu_op); i++) {
->> > + ? ? ? ? ? ? ? ? ? if (val >= mx6q_cpu_op[i].cpu_rate) {
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? arm_max_freq_idx = i;
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->> > + ? ? ? ? ? ? ? ? ? }
->> > + ? ? ? ? ? }
->> > + ? }
->> > + ? if (cpu0)
->> > + ? ? ? ? ? of_node_put(cpu0);
->> > + ? *op = ARRAY_SIZE(mx6q_cpu_op) - arm_max_freq_idx;
->> > + ? return mx6q_cpu_op + arm_max_freq_idx;
->> > +}
->> > +
->> > +static int __init mx6q_cpu_op_init(void)
->> > +{
->> > + ? get_cpu_op = mx6q_get_cpu_op;
->> > + ? return 0;
->> > +}
->> > +
->> > +core_initcall(mx6q_cpu_op_init);
->> > --
->> > 1.7.5.4
->> >
->> >
->> >
->>
->> --
->> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
->> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
->> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+> I have re-based this patch series against LO master
+> commit id: deee6d5359969a0ce4e2760cfd7b9f379bd5698a
 >
+> Same is available here [1]
+>
+> I have tested this patch series along with:
+>
+> 1.) Tero's V11 irq chaining series
+>      http://www.spinics.net/lists/linux-omap/msg61445.html
+>     (This patch series is used for uart wakeup handling using
+>       prcm_irq chaining)
+>
+> 2.) Rajendra's hwmod change
+>      http://www.spinics.net/lists/arm-kernel/msg148632.html
+>      (This patch handles init_no_idle flag setting
+>       without this patch there will be boot warning however
+>       all pm features will work after boot up.)
+>
+> 3.) Vishwa's io daisy chain changes.
+>      http://permalink.gmane.org/gmane.linux.ports.arm.omap/65500
+>      (tested with and without this patch series pm features works).
+>
+> Same combination of patches based on above commit id
+> used for testing is available here [2].
+
+Please have a closer look at your branch.
+
+The second commit[1] commits the .rej file from a failed patch apply,
+so obviously doesn't do what was intended.
+
+Kevin
+
+[1]
+>From ae5d13382a5784f35f5bfe05413fbec4632e58f0 Mon Sep 17 00:00:00 2001
+From: "Govindraj.R" <govindraj.raja@ti.com>
+Date: Tue, 13 Sep 2011 13:32:32 +0530
+Subject: [PATCH] OMAP2+: UART: cleanup 8250 console driver support
+
+We had been using traditional 8250 driver as uart console driver
+prior to omap-serial driver. Since we have omap-serial driver
+in mainline kernel for some time now it has been used as default
+uart console driver on omap2+ platforms. Remove 8250 support for
+omap-uarts.
+
+Serial_in and serial_out override for 8250 serial driver is also
+removed. Empty fifo read fix is already taken care with omap-serial
+driver with data ready bit check from LSR reg before reading RX fifo.
+Also waiting for THRE(transmit hold reg empty) is done with wait_for_xmitr
+in omap-serial driver.
+
+Serial_in/out overrides are not neceesary for omap-serial driver
+and things that are taken with omap-serial driver are removed here.
+
+Remove headers that were necessary to support 8250 support
+and remove all config bindings done to keep 8250 backward compatibility
+while adding omap-serial driver. Remove omap_uart_reset needed for
+8250 autoconf.
+
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/serial.c.rej |   26 ++++++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/serial.c.rej
+
+diff --git a/arch/arm/mach-omap2/serial.c.rej b/arch/arm/mach-omap2/serial.c.rej
+new file mode 100644
+index 0000000..2325897
+--- /dev/null
++++ b/arch/arm/mach-omap2/serial.c.rej
+@@ -0,0 +1,26 @@
++--- arch/arm/mach-omap2/serial.c
+++++ arch/arm/mach-omap2/serial.c
++@@ -19,23 +19,17 @@
++  */
++ #include <linux/kernel.h>
++ #include <linux/init.h>
++-#include <linux/serial_reg.h>
++ #include <linux/clk.h>
++ #include <linux/io.h>
++ #include <linux/delay.h>
++ #include <linux/platform_device.h>
++ #include <linux/slab.h>
++-#include <linux/serial_8250.h>
++ #include <linux/pm_runtime.h>
++ #include <linux/console.h>
++ 
++-#ifdef CONFIG_SERIAL_OMAP
++ #include <plat/omap-serial.h>
++-#endif
++-
++ #include <plat/common.h>
++ #include <plat/board.h>
++-#include <plat/clock.h>
++ #include <plat/dma.h>
++ #include <plat/omap_hwmod.h>
++ #include <plat/omap_device.h>
+-- 
+1.7.6
