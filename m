@@ -1,68 +1,49 @@
 From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Tue, 13 Dec 2011 15:09:37 +0100
-Subject: [PATCH v2 01/19] mxc_udc: add workaround for ENGcm09152 for i.MX25
-In-Reply-To: <20111213101846.GC2619@pengutronix.de>
-References: <20111213101846.GC2619@pengutronix.de>
-Message-ID: <1323785377-22463-1-git-send-email-eric@eukrea.com>
+Date: Tue, 13 Dec 2011 15:12:55 +0100
+Subject: [PATCH v2 08/19] dma: MX3_IPU fix depends
+In-Reply-To: <CAOMZO5AOpFtkJDmTSjPmvPVr0ra4d7jUcihGgncYE2VtfKCeSQ@mail.gmail.com>
+References: <CAOMZO5AOpFtkJDmTSjPmvPVr0ra4d7jUcihGgncYE2VtfKCeSQ@mail.gmail.com>
+Message-ID: <1323785575-22703-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch gives the possibility to workaround bug ENGcm09152
-on i.MX25 when the hardware workaround is also implemented on
-the board.
-It covers the workaround described on page 42 of the following Errata,
-titled "USB: UTMI_USBPHY VBUS input impedance implementation error" :
-http://cache.freescale.com/files/dsp/doc/errata/IMX25CE.pdf
+ARCH_MX3 was removed in commit a89cf59 :
+"arm/imx: merge i.MX3 and i.MX6"
+thus preventing to select MX3_IPU, thus preventing IPU and display
+to work on i.MX3x SOC.
+i.MX SDMA support is also affected.
 
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Cc: Li Yang <leoli@freescale.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
 ---
- drivers/usb/gadget/fsl_mxc_udc.c |   22 +++++++++++++---------
- 1 files changed, 13 insertions(+), 9 deletions(-)
+v2: improve comment based on Sergei's comments, and also handle SDMA
+case based on Fabio's comment
+ drivers/dma/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
-index dcbc0a2..4aff05d 100644
---- a/drivers/usb/gadget/fsl_mxc_udc.c
-+++ b/drivers/usb/gadget/fsl_mxc_udc.c
-@@ -23,7 +23,7 @@
- static struct clk *mxc_ahb_clk;
- static struct clk *mxc_usb_clk;
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index ab8f469..5a99bb3 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -124,7 +124,7 @@ config MV_XOR
  
--/* workaround ENGcm09152 for i.MX35 */
-+/* workaround ENGcm09152 for i.MX25/35 */
- #define USBPHYCTRL_OTGBASE_OFFSET	0x608
- #define USBPHYCTRL_EVDO			(1 << 23)
+ config MX3_IPU
+ 	bool "MX3x Image Processing Unit support"
+-	depends on ARCH_MX3
++	depends on SOC_IMX31 ||?SOC_IMX35
+ 	select DMA_ENGINE
+ 	default y
+ 	help
+@@ -216,7 +216,7 @@ config PCH_DMA
  
-@@ -89,16 +89,20 @@ eenahb:
- void fsl_udc_clk_finalize(struct platform_device *pdev)
- {
- 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
--	if (cpu_is_mx35()) {
-+	if (cpu_is_mx25() || cpu_is_mx35()) {
- 		unsigned int v;
--
--		/* workaround ENGcm09152 for i.MX35 */
-+		void __iomem *otgbase;
-+		if (cpu_is_mx25())
-+			otgbase = MX25_IO_ADDRESS(MX25_USB_BASE_ADDR +
-+					USBPHYCTRL_OTGBASE_OFFSET);
-+		else if (cpu_is_mx35())
-+			otgbase = MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
-+					USBPHYCTRL_OTGBASE_OFFSET);
-+
-+		/* workaround ENGcm09152 for i.MX25/35 */
- 		if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
--			v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
--					USBPHYCTRL_OTGBASE_OFFSET));
--			writel(v | USBPHYCTRL_EVDO,
--				MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
--					USBPHYCTRL_OTGBASE_OFFSET));
-+			v = readl(otgbase);
-+			writel(v | USBPHYCTRL_EVDO, otgbase);
- 		}
- 	}
- 
+ config IMX_SDMA
+ 	tristate "i.MX SDMA support"
+-	depends on ARCH_MX25 || ARCH_MX3 || ARCH_MX5
++	depends on ARCH_MX25 || SOC_IMX31 ||?SOC_IMX35 || ARCH_MX5
+ 	select DMA_ENGINE
+ 	help
+ 	  Support the i.MX SDMA engine. This engine is integrated into
 -- 
 1.7.6.4
