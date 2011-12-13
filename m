@@ -1,106 +1,113 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 13 Dec 2011 12:44:41 +0100
-Subject: [PATCH 4/4 v2] ARM: smp_twd: reconfigure clockevents after cpufreq
- change
-Message-ID: <1323776681-31303-1-git-send-email-linus.walleij@stericsson.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 13 Dec 2011 19:56:55 +0800
+Subject: [PATCH V2 2/7] arm/imx6: add imx6q sabrelite board support
+In-Reply-To: <1323757530-19402-3-git-send-email-richard.zhao@linaro.org>
+References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
+ <1323757530-19402-3-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111213115648.GA10022@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Dec 13, 2011 at 02:25:25PM +0800, Richard Zhao wrote:
+> - Add basic board dts file
+> - Add board compatible string to mach-imx6q.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6q-sabrelite.dts |   55 +++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/mach-imx6q.c        |    1 +
+>  2 files changed, 56 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx6q-sabrelite.dts
+> 
 
-This break-out from Colin Cross' cpufreq-aware TWD patch
-will handle the case when our localtimer's clock changes with
-the cpu clock. A cpufreq transtion notifier will be registered
-only if the platform has supplied a specified clock to the TWD.
+Documentation/devicetree/bindings/arm/fsl.txt needs to be updated to
+include compatible string for this sabrelite board.
 
-After a cpufreq transition, update the clockevent's frequency
-by fetching the new clock rate from the clock framework and
-reprogram the next clock event.
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> new file mode 100644
+> index 0000000..381f030
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -0,0 +1,55 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx6q.dtsi"
+> +
+> +/ {
+> +	model = "Freescale i.MX6 Quad SABRE Lite Board";
+> +	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			clock-frequency = <996000000>;
+> +		};
 
-The necessary changes in the clockevents framework was done by
-Thomas Gleixner in kernel v3.0.
+I do not follow why we need to have cpu frequency encoded in board
+level dts.  To me, what frequency the cpu is capable of running at
+is really soc specific thing.  So putting this data in
+imx6q-sabrelite.dts is kinda suggesting that imx6q soc on this
+sabrelite board can run at 996000000, while on other boards like
+sabreauto/arm2 can only run at other frequency.  This is seems different
+from what I heard from Freescale internal development team.
 
-ChangeLog v1->v2:
-- Replace IS_ERR_OR_NULL() with IS_ERR() in twd_clk check.
-- Update code to use the already existing per-cpu array of TWD
-  clockevents instead of adding cruft.
-
-Signed-off-by: Colin Cross <ccross@android.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[Broke out, ifdef:ed CPUfreq stuff for non-cpufreq configs]
-[Rebased to newer TWD base with per-CPU clock array]
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/kernel/smp_twd.c |   47 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 47 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index a978394..c8e9385 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -11,6 +11,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/clk.h>
-+#include <linux/cpufreq.h>
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -92,6 +93,52 @@ void twd_timer_stop(struct clock_event_device *clk)
- 	disable_percpu_irq(clk->irq);
- }
- 
-+#ifdef CONFIG_CPU_FREQ
-+
-+/*
-+ * Updates clockevent frequency when the cpu frequency changes.
-+ * Called on the cpu that is changing frequency with interrupts disabled.
-+ */
-+static void twd_update_frequency(void *data)
-+{
-+	twd_timer_rate = clk_get_rate(twd_clk);
-+
-+	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
-+}
-+
-+static int twd_cpufreq_transition(struct notifier_block *nb,
-+	unsigned long state, void *data)
-+{
-+	struct cpufreq_freqs *freqs = data;
-+
-+	/*
-+	 * The twd clock events must be reprogrammed to account for the new
-+	 * frequency.  The timer is local to a cpu, so cross-call to the
-+	 * changing cpu.
-+	 */
-+	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
-+		smp_call_function_single(freqs->cpu, twd_update_frequency,
-+			NULL, 1);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block twd_cpufreq_nb = {
-+	.notifier_call = twd_cpufreq_transition,
-+};
-+
-+static int twd_cpufreq_init(void)
-+{
-+	if (!IS_ERR(twd_clk))
-+		return cpufreq_register_notifier(&twd_cpufreq_nb,
-+			CPUFREQ_TRANSITION_NOTIFIER);
-+
-+	return 0;
-+}
-+core_initcall(twd_cpufreq_init);
-+
-+#endif
-+
- static void __cpuinit twd_calibrate_rate(void)
- {
- 	unsigned long count;
 -- 
-1.7.3.2
+Regards,
+Shawn
+
+> +	};
+> +
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +	soc {
+> +		aips-bus at 02100000 { /* AIPS2 */
+> +			enet at 02188000 {
+> +				phy-mode = "rgmii";
+> +				phy-reset-gpios = <&gpio3 23 0>;
+> +				status = "okay";
+> +			};
+> +
+> +			usdhc at 02198000 { /* uSDHC3 */
+> +				cd-gpios = <&gpio7 0 0>;
+> +				wp-gpios = <&gpio7 1 0>;
+> +				status = "okay";
+> +			};
+> +
+> +			usdhc at 0219c000 { /* uSDHC4 */
+> +				cd-gpios = <&gpio2 6 0>;
+> +				wp-gpios = <&gpio2 7 0>;
+> +				status = "okay";
+> +			};
+> +
+> +			uart1: uart at 021e8000 { /* UART2 */
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 8deb012..d24d6c4 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -73,6 +73,7 @@ static struct sys_timer imx6q_timer = {
+>  
+>  static const char *imx6q_dt_compat[] __initdata = {
+>  	"fsl,imx6q-sabreauto",
+> +	"fsl,imx6q-sabrelite",
+>  	NULL,
+>  };
+>  
+> -- 
+> 1.7.5.4
