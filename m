@@ -1,104 +1,88 @@
 From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Tue, 13 Dec 2011 07:31:47 +0100
-Subject: [PATCH 15/19] mx3_defconfig: update default configuration
+Date: Tue, 13 Dec 2011 07:31:50 +0100
+Subject: [PATCH 18/19] mbimx51sd: add audio codec support
 In-Reply-To: <1323757911-25217-1-git-send-email-eric@eukrea.com>
 References: <1323757911-25217-1-git-send-email-eric@eukrea.com>
-Message-ID: <1323757911-25217-15-git-send-email-eric@eukrea.com>
+Message-ID: <1323757911-25217-18-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-- add new machine VPR200
-- update CPUIMX35 -> CPUIMX35SD
-- add drivers :
-	- DNET & SMSC911X
-	- EVDEV & TOUCHSCREEN & TSC2007
-	- LCD & BACKLIGHT support
-	- SPI & SPIdev support
-	- LEDS support
-	- PCF8563 RTC support
 
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 ---
- arch/arm/configs/mx3_defconfig |   31 ++++++++++++++++++++++++-------
- 1 files changed, 24 insertions(+), 7 deletions(-)
+ arch/arm/mach-mx5/Kconfig                    |    1 +
+ arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |   28 ++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
-index cb0717f..afb6b04 100644
---- a/arch/arm/configs/mx3_defconfig
-+++ b/arch/arm/configs/mx3_defconfig
-@@ -23,7 +23,8 @@ CONFIG_MACH_ARMADILLO5X0=y
- CONFIG_MACH_KZM_ARM11_01=y
- CONFIG_MACH_PCM043=y
- CONFIG_MACH_MX35_3DS=y
--CONFIG_MACH_EUKREA_CPUIMX35=y
-+CONFIG_MACH_EUKREA_CPUIMX35SD=y
-+CONFIG_MACH_VPR200=y
- CONFIG_MXC_IRQ_PRIOR=y
- CONFIG_MXC_PWM=y
- CONFIG_ARM_ERRATA_411920=y
-@@ -63,18 +64,17 @@ CONFIG_MTD_UBI=y
- CONFIG_MISC_DEVICES=y
- CONFIG_EEPROM_AT24=y
- CONFIG_NETDEVICES=y
--CONFIG_SMSC_PHY=y
--CONFIG_NET_ETHERNET=y
--CONFIG_SMSC911X=y
- CONFIG_DNET=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
-+CONFIG_SMSC911X=y
-+CONFIG_SMSC_PHY=y
- # CONFIG_INPUT_MOUSEDEV is not set
-+CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_IMX=y
- # CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_TSC2007=y
- # CONFIG_SERIO is not set
--# CONFIG_VT is not set
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=m
- CONFIG_SERIAL_8250_EXTENDED=y
-@@ -86,6 +86,9 @@ CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_IMX=y
- CONFIG_SPI=y
-+CONFIG_SPI_IMX=y
-+CONFIG_SPI_SPIDEV=y
-+CONFIG_GPIO_SYSFS=y
- CONFIG_W1=y
- CONFIG_W1_MASTER_MXC=y
- CONFIG_W1_SLAVE_THERM=y
-@@ -109,6 +112,10 @@ CONFIG_SOC_CAMERA_OV772X=y
- CONFIG_VIDEO_MX3=y
- # CONFIG_RADIO_ADAPTERS is not set
- CONFIG_FB=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_LCD_PLATFORM=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- # CONFIG_SND_ARM is not set
-@@ -127,7 +134,17 @@ CONFIG_USB_G_SERIAL=m
- CONFIG_USB_ULPI=y
- CONFIG_MMC=y
- CONFIG_MMC_MXC=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_MXC=y
- CONFIG_DMADEVICES=y
- # CONFIG_DNOTIFY is not set
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index f318b67..ab700bb 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -115,6 +115,7 @@ choice
+ config MACH_EUKREA_MBIMXSD51_BASEBOARD
+ 	prompt "Eukrea MBIMXSD development board"
+ 	bool
++	select IMX_HAVE_PLATFORM_IMX_SSI
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	select LEDS_GPIO_REGISTER
+ 	help
+diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
+index d817fc8..19acca1 100644
+--- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
++++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
+@@ -67,6 +67,11 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
+ 	NEW_PAD_CTRL(MX51_PAD_GPIO1_0__SD1_CD, PAD_CTL_PUS_22K_UP |
+ 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
+ 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
++	/* SSI */
++	MX51_PAD_AUD3_BB_TXD__AUD3_TXD,
++	MX51_PAD_AUD3_BB_RXD__AUD3_RXD,
++	MX51_PAD_AUD3_BB_CK__AUD3_TXC,
++	MX51_PAD_AUD3_BB_FS__AUD3_TXFS,
+ };
+ 
+ #define GPIO_LED1	IMX_GPIO_NR(3, 30)
+@@ -113,6 +118,11 @@ static struct i2c_board_info eukrea_mbimxsd_i2c_devices[] = {
+ 	},
+ };
+ 
++static const
++struct imx_ssi_platform_data eukrea_mbimxsd_ssi_pdata __initconst = {
++	.flags = IMX_SSI_SYN | IMX_SSI_NET | IMX_SSI_USE_I2S_SLAVE,
++};
++
+ /*
+  * system init for baseboard usage. Will be called by cpuimx51sd init.
+  *
+@@ -125,11 +135,29 @@ void __init eukrea_mbimxsd51_baseboard_init(void)
+ 			ARRAY_SIZE(eukrea_mbimxsd_pads)))
+ 		printk(KERN_ERR "error setting mbimxsd pads !\n");
+ 
++#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
++	/* SSI unit master I2S codec connected to SSI_AUD3 */
++	mxc_audmux_v2_configure_port(0,
++			MXC_AUDMUX_V2_PTCR_SYN |
++			MXC_AUDMUX_V2_PTCR_TFSDIR |
++			MXC_AUDMUX_V2_PTCR_TFSEL(2) |
++			MXC_AUDMUX_V2_PTCR_TCLKDIR |
++			MXC_AUDMUX_V2_PTCR_TCSEL(2),
++			MXC_AUDMUX_V2_PDCR_RXDSEL(2)
++	);
++	mxc_audmux_v2_configure_port(2,
++			MXC_AUDMUX_V2_PTCR_SYN |
++			MXC_AUDMUX_V2_PTCR_TCSEL(0),
++			MXC_AUDMUX_V2_PDCR_RXDSEL(0)
++	);
++#endif
+ 	imx51_add_imx_uart(1, NULL);
+ 	imx51_add_imx_uart(2, &uart_pdata);
+ 
+ 	imx51_add_sdhci_esdhc_imx(0, NULL);
+ 
++	imx51_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
++
+ 	gpio_request(GPIO_LED1, "LED1");
+ 	gpio_direction_output(GPIO_LED1, 1);
+ 	gpio_free(GPIO_LED1);
 -- 
 1.7.6.4
