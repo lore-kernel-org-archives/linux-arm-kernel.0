@@ -1,5 +1,5 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Tue, 13 Dec 2011 21:00:57 +0100
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Tue, 13 Dec 2011 22:05:01 +0200
 Subject: [PATCH] omap: rx51: initialize isp1704 properly
 In-Reply-To: <20111212194445.GG32251@atomide.com>
 References: <20111207193141.GG31337@atomide.com>
@@ -7,44 +7,37 @@ References: <20111207193141.GG31337@atomide.com>
  <20111208144044.GA25415@xps8300>
  <CAMP44s2noD4TXBALOc0JkcbVroYFnp3BaSozrQYdUbsv50xuoQ@mail.gmail.com>
  <20111212194445.GG32251@atomide.com>
-Message-ID: <20111213200057.GA2965@earth.universe>
+Message-ID: <CAMP44s301iWcReReqScJw+N1pQ4=g8D8hZKOV3wEX-qN0_gRQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 11:44:45AM -0800, Tony Lindgren wrote:
+On Mon, Dec 12, 2011 at 9:44 PM, Tony Lindgren <tony@atomide.com> wrote:
 > * Felipe Contreras <felipe.contreras@gmail.com> [111208 11:52]:
-> > On Thu, Dec 8, 2011 at 4:40 PM, Heikki Krogerus <krohei@gmail.com> wrote:
-> > > On Wed, Dec 07, 2011 at 09:56:56PM +0200, Felipe Contreras wrote:
-> > >> From: Heikki Krogerus <krohei@gmail.com>
-> > >
-> > > I would prefer that you change this so this is from you, like it
-> > > actually is. You can mention me in the commit message if you like.
-> > 
-> > Well, you came with the fix, I just typed it down, but as you wish :)
-> > 
-> > >> Without this USB networking doesn't work as the link is never detected.
-> > >
-> > > What this changes is, it leaves the transceiver powered by default
-> > > instead of setting it into power off mode. So not only USB networking
-> > > is affected by this. If isp1704_charger is not enabled with RX51, USB
-> > > does not work at all. Please change the comment.
-> > 
-> > I've updated the patch.
-> 
+>> On Thu, Dec 8, 2011 at 4:40 PM, Heikki Krogerus <krohei@gmail.com> wrote:
+>> > On Wed, Dec 07, 2011 at 09:56:56PM +0200, Felipe Contreras wrote:
+>> >> From: Heikki Krogerus <krohei@gmail.com>
+>> >
+>> > I would prefer that you change this so this is from you, like it
+>> > actually is. You can mention me in the commit message if you like.
+>>
+>> Well, you came with the fix, I just typed it down, but as you wish :)
+>>
+>> >> Without this USB networking doesn't work as the link is never detected.
+>> >
+>> > What this changes is, it leaves the transceiver powered by default
+>> > instead of setting it into power off mode. So not only USB networking
+>> > is affected by this. If isp1704_charger is not enabled with RX51, USB
+>> > does not work at all. Please change the comment.
+>>
+>> I've updated the patch.
+>
 > Sorry what's the deal with this one? Is this the one to use or is there
 > some other patch?
 
-I can confirm, that USB on RX51 does not work with 3.1 mainline
-kernel and applying this patch (There's a v2 with fixed Author under
-[0]) results in working USB support.
+Yeap, there's v2 of this one:
+1323375780-13190-1-git-send-email-felipe.contreras at nokia.com
 
-[0] http://www.spinics.net/lists/linux-omap/msg61217.html
+Cheers.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111213/0eea6246/attachment-0001.sig>
+-- 
+Felipe Contreras
