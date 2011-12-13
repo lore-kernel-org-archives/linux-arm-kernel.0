@@ -1,48 +1,67 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 13 Dec 2011 13:28:52 -0800
-Subject: [PATCH v3 resend2] s3c/s3c24xx: arm: leds: Make s3c24xx LEDS
- driver use gpiolib
-In-Reply-To: <4EE7C1C9.8080000@solonet.org.ua>
-References: <4EE7B41C.5080006@solonet.org.ua>
- <1323810417.3837.25.camel@joe2Laptop> <4EE7C1C9.8080000@solonet.org.ua>
-Message-ID: <1323811732.3837.27.camel@joe2Laptop>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 13 Dec 2011 14:33:43 -0700 (MST)
+Subject: [PATCHv11 1/8] ARM: OMAP2+: hwmod: Add API to enable IO ring
+ wakeup.
+In-Reply-To: <alpine.DEB.2.00.1112131354380.12046@utopia.booyaka.com>
+References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
+ <1323713733-13115-2-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1112131354380.12046@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1112131431310.12046@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-12-13 at 23:21 +0200, Denis Kuzmenko wrote:
-> Hi Joe,
-> Thank you for review.
-> 
-> On 12/13/2011 11:06 PM, Joe Perches wrote:
-> > On Tue, 2011-12-13 at 22:22 +0200, Denis Kuzmenko wrote:
-> >> Make s3c24xx LEDS driver use gpiolib. Fix error disabling pull during probe.
-> > []
-> >> diff --git a/drivers/leds/leds-s3c24xx.c b/drivers/leds/leds-s3c24xx.c
-> > []
-> >> @@ -45,23 +45,35 @@ static void s3c24xx_led_set(struct led_classdev *led_cdev,
-> >> +	/*
-> >> +	 * ensure value is 0 or 1 to use it with bitwise XOR (^)
-> >> +	 * (only 100% brightness is supported)
-> >> +	 */
-> >> +	value = value ? 1 : 0;
-> > 
-> > Maybe value = !!value;
-> 
-> IMHO my variant is better readable.
-> 
-> >> +		/* no point in having a pull-up as we are always driving */
-> >> +		s3c_gpio_setpull(pdata->gpio, S3C_GPIO_PULL_NONE);
-> >> +		ret = gpio_direction_output(pdata->gpio,
-> >> +				!!(pdata->flags & S3C24XX_LEDF_ACTLOW));
-> > 
-> > akin to this use.
-> 
-> There is no so much space for implementation used before so I've used
-> shorter notation, again, for better readability.
+Hi Govindraj, Tero,
 
-Your choice, but I think consistency is better.
+another question about this patch:
 
-The LEDF_ACTLOW use is dependent on it being #defined
-to 1 when using ^.  I think that's unintelligible.
+On Tue, 13 Dec 2011, Paul Walmsley wrote:
 
-cheers, Joe
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 207a2ff..ec19841 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -381,6 +381,43 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
+>  }
+>  
+>  /**
+> + * _set_ioring_wakeup - enable/disable IO pad wakeup flag for dynamic muxing
+> + * @oh: struct omap_hwmod *
+> + * @set_wake: bool value indicating to set (true) or clear (false) wakeup enable
+> + *
+> + * Set or clear the I/O pad wakeup flag in the dynamic mux entries for
+> + * the hwmod @oh.  This function does not change anything in the
+> + * hardware.  Rather, the @oh->mux->pads_dynamic array is changed, and
+> + * these settings are later written to the SCM PADCTRL registers when
+> + * the hwmod is enabled or idled.  No return value.
+> + *
+> + * XXX Shouldn't the dynamic pad changes affect hwmod shutdown as
+> + * well?
+> + * XXX Shouldn't this function update the hardware SCM PADCONF registers if
+> + * anything has changed?
+> + */
+> +static void _set_ioring_wakeup(struct omap_hwmod *oh, bool set_wake)
+> +{
+> +	struct omap_device_pad *pad;
+> +	int j;
+> +
+> +	if (!oh->mux || !oh->mux->enabled)
+> +		return;
+> +
+> +	for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
+> +		pad = oh->mux->pads_dynamic[j];
+> +
+> +		if (!(pad->flags & OMAP_DEVICE_PAD_WAKEUP))
+> +			continue;
+> +
+> +		if (set_wake)
+> +			pad->idle |= OMAP_WAKEUP_EN;
+> +		else
+> +			pad->idle &= ~OMAP_WAKEUP_EN;
+> +	}
+> +}
+
+It appears that this loop only affects dynamic mux entries.  Should it 
+also affect static mux entries?
+
+
+- Paul
