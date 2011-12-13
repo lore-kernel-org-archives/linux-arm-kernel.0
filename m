@@ -1,23 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Dec 2011 14:39:43 -0800
-Subject: [GIT PULL] ux500 patches for 3.3
-In-Reply-To: <1323718962-4726-1-git-send-email-linus.walleij@linaro.org>
-References: <1323718962-4726-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAOesGMi5ZGPd5zcVo1V=ueJuRMT7cK8WWTOSnZrH4TgZb3H8wQ@mail.gmail.com>
+Date: Tue, 13 Dec 2011 14:40:04 -0800
+Subject: [GIT PULL] Two non-critical DMA fixes for v3.3 merge window
+In-Reply-To: <20111212224648.GI32251@atomide.com>
+References: <20111212224648.GI32251@atomide.com>
+Message-ID: <CAOesGMgzbPSSfGZnaaLt3utjxVG82WCb8hEfbTzkcwqr3SXhfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 11:42 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+Hi,
 
-> Hi Arnd,
+On Mon, Dec 12, 2011 at 2:46 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi Arnd & Olof,
 >
-> here is a set of three patches for ux500 I have queued for the
-> 3.3 merge window, can you please pull them into arm-soc? I expect
-> to come up with more patches but depends on what time permits.
+> Please pull two non-critical DMA fixes from:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical
+>
+> These are workarounds for corner cases. There's no rush
+> to get them in during the -rc cycle, these are fixes for
+> features that never worked before.
 
-
-Thanks, pulled into next/devel.
+Thanks, pulled into next/fixes-non-critical (to avoid confusion with
+the plain fixes branch for 3.2-rc).
 
 
 -Olof
