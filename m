@@ -1,65 +1,61 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 12 Dec 2011 19:49:05 -0600
-Subject: [PATCH 1/2] ARM: OMAP: dmtimer: fix sleeping function called from
- invalid context
-In-Reply-To: <20111212230825.GJ32251@atomide.com>
-References: <1322194370-8073-1-git-send-email-omar.ramirez@ti.com>
- <1322194370-8073-2-git-send-email-omar.ramirez@ti.com>
- <20111209213447.GB31337@atomide.com>
- <CAB-zwWjHPzTT5QYZt9DvDcM9ny5VML3mDw3-rQRuBr-fcxYMvQ@mail.gmail.com>
- <20111212230825.GJ32251@atomide.com>
-Message-ID: <CAB-zwWg76+Si9BXsXQt6-ZL=VL7qJ5YPN5FSC-07y8J8GFX0ew@mail.gmail.com>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Tue, 13 Dec 2011 09:58:56 +0800
+Subject: [PATCH 1/2] MTD: atmel_nand: Update Kconfig to support PMECC
+In-Reply-To: <4EE6A6DF.4@atmel.com>
+References: <1323327219-17895-1-git-send-email-hong.xu@atmel.com>
+ <1323723514.2297.8.camel@koala> <4EE6A6DF.4@atmel.com>
+Message-ID: <4EE6B160.3000201@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 5:08 PM, Tony Lindgren <tony@atomide.com> wrote:
-...
->> @@ -134,22 +134,13 @@ static void omap_dm_timer_reset(struct
->> omap_dm_timer *timer)
->> ?int omap_dm_timer_prepare(struct omap_dm_timer *timer)
->> ?{
->> ...
->> - ? ? ? ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
->> ...
->>
->> All clocks requested are set to 32 KHz first, even with the current
->> approach, there exists another API to set a new source.
->>
->> To be honest I don't know why the clocks are set to 32 KHz first,
->> maybe the default call path for users should be:
+Hi Artem,
+
+On 12/13/2011 09:14 AM, Hong Xu wrote:
+> Hi David,
+
+Sorry, this shall be Artem :-)
+
 >
-> You need a functional clock for the timer registers to work
-> I believe.
-
-Sounds logic :)
-
->> omap_dm_timer_request
+> On 12/13/2011 04:58 AM, Artem Bityutskiy wrote:
+>  > On Thu, 2011-12-08 at 14:53 +0800, Hong Xu wrote:
+>  > > +config MTD_NAND_ATMEL_PMECC_HW
+>  > > + bool "Programmable Hardware ECC (BCH code)"
+>  > > + depends on ARCH_AT91SAM9X5 || ARCH_AT91SAM9N12
+>  > > + help
+>  > > + Use Programmable Hardware ECC (PMECC) controller.
+>  > > +
+>  > > + The PMECC Controller is a programmable binary BCH (Bose, Chaudhuri
+>  > > + and Hocquenghem) encoder/decoder. This controller can be used to
+>  > > + generate redundancy information for both SLC and MLC NAND Flash
+>  > > + devices.
+>  > > +
+>  > > + NB : hardware and software ECC schemes are incompatible.
+>  > > + If you switch from one to another, you'll have to erase your
+>  > > + mtd partition.
+>  >
+>  > Does it have to be a config option, can we avoid adding config options
+>  > uless we really have to?
 >
-> Yes this would make sense. The omap_timer_list should be protected
-> by a mutex. There should not be a need for spinlock there as
-> omap_dm_timer_request should be only called during init. If that's
-> not the case, the the driver using it is broken.
+> Agree. The original MTD_NAND_ATMEL_ECC_HW can be reused. In driver, if
+> the SoC has PMECC, it'll be used.
 
-Ok, I made this patch thinking that 'request' could be called from any
-context, but if that is not the case mutex should be fine.
+PMECC is not compatible with the old HW ECC engine. It currently needs 
+around 700 lines of C code to make it work. If we do not have a way to 
+exclude the PMECC related code at compiling time, my quick testing shows 
+that the driver code size will be doubled if some old SoCs do not 
+support it. This sounds not good. What's your opinion?
 
->> omap_dm_timer_set_source (new explicit call)
->> omap_dm_timer_start
+Thanks.
+
+BR,
+Eric
+
+> Thanks.
 >
-> Once the timer has been requested, there should not be a need
-> for locking as there should be only one timer user using the
-> timer specific registers.
+> BR,
+> Eric
 >
->> And remove setting the source to 32 KHz by default in omap_dm_timer_request.
+> ______________________________________________________
+> Linux MTD discussion mailing list
+> http://lists.infradead.org/mailman/listinfo/linux-mtd/
 >
-> That you may need to be able to do anything with the timer :)
-
-Well the intention was for the user to call it explicitly so it didn't
-look as a hard coded setting, but I can keep it.
-
-IIUC, mutex should be held instead of spin lock, I can do the change
-instead of this patch and see how it goes.
-
-Thanks,
-
-Omar
