@@ -1,97 +1,53 @@
-From: linux@solonet.org.ua (Denis Kuzmenko)
-Date: Tue, 13 Dec 2011 23:06:39 +0200
-Subject: [PATCHv2 resend] Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-Message-ID: <4EE7BE5F.8020108@solonet.org.ua>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Dec 2011 21:16:41 +0000
+Subject: [PATCH v4] ARM: sched_clock: allow sched_clock to be selected
+ at runtime
+In-Reply-To: <4EE7A03D.7060208@arm.com>
+References: <1323444833-10587-1-git-send-email-marc.zyngier@arm.com>
+ <4EE57BC3.4080306@gmail.com> <4EE63459.1030105@arm.com>
+ <20111213004656.GR32251@atomide.com> <20111213005018.GS32251@atomide.com>
+ <CAH9JG2X9dGJVdwzs2Wbqt9_8=Lg1bsrDP_A0n-JDxgN3bAOYKg@mail.gmail.com>
+ <4EE7A03D.7060208@arm.com>
+Message-ID: <20111213211641.GC14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+On Tue, Dec 13, 2011 at 06:58:05PM +0000, Marc Zyngier wrote:
+> On 13/12/11 01:33, Kyungmin Park wrote:
+> > Tested-by: Kyungmin Park <kyungmin,park@samsung.com>
+> > 
+> > On 12/13/11, Tony Lindgren <tony@atomide.com> wrote:
+> >> * Tony Lindgren <tony@atomide.com> [111212 16:46]:
+> >>> * Marc Zyngier <marc.zyngier@arm.com> [111212 08:33]:
+> >>>>
+> >>>> Queued as patch 7205/1.
+> >>>>
+> >>>> 	M.
+> >>>
+> >>> Great, seems to boot fine on all omaps I tried, will go ack it
+> >>> in the patch system.
+> >>
+> >> Hmm I guess you can't comment patches there, so:
+> >>
+> >> Tested-by: Tony Lindgren <tony@atomide.com>
+> 
+> While I'm really glad to see platform maintainers testing and acking
+> patches, may I kindly remind them to post their comments as early as
+> possible?
+> 
+> This patch has been around since August, and has reached version 4
+> before platform maintainers started to comment on it. Many platform
+> specific patches are left unanswered (and no, I'm not the only one
+> complaining).
+> 
+> So please, pretty please... When some platform-specific patch hit your
+> mailbox, try to have a look at it in a timely manner. Specially if it is
+> part of a much bigger series (by not answering, you're basically
+> delaying the whole thing).
 
-Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
----
++1.
 
-Patch is against 3.2-rc4.
-CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of this the
-file s3c2410-iotiming.c is not ever compiled and enabling 
-CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to function 
-s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs defined
-as NULL for this case.
-
-Changelog:
-v1 -> v2
-New CONFIG_ symbols S3C241{0,2}_IOTIMING were removed as It was observed that 
-they already present but hidden from user.
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e084b7e..133d005 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2118,7 +2118,7 @@ config CPU_FREQ_S3C24XX_DEBUG
- 
- config CPU_FREQ_S3C24XX_IODEBUG
- 	bool "Debug CPUfreq Samsung driver IO timing"
--	depends on CPU_FREQ_S3C24XX
-+	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING || S3C2412_IOTIMING)
- 	help
- 	  Enable s3c_freq_iodbg for the Samsung S3C CPUfreq core
- 
-diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-index dac4760..c465252 100644
---- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-@@ -202,13 +202,23 @@ extern int s3c_plltab_register(struct cpufreq_frequency_table *plls,
- extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
- extern struct s3c_iotimings *s3c_cpufreq_getiotimings(void);
- 
--extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
--				     struct s3c_cpufreq_config *cfg,
--				     union s3c_iobank *iob);
--
--extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
--				     struct s3c_cpufreq_config *cfg,
--				     union s3c_iobank *iob);
-+#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
-+	#ifdef CONFIG_S3C2410_IOTIMING
-+	extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-+					     struct s3c_cpufreq_config *cfg,
-+					     union s3c_iobank *iob);
-+	#else
-+	#define s3c2410_iotiming_debugfs	NULL
-+	#endif
-+
-+	#ifdef CONFIG_S3C2412_IOTIMING
-+	extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-+					     struct s3c_cpufreq_config *cfg,
-+					     union s3c_iobank *iob);
-+	#else
-+	#define s3c2412_iotiming_debugfs	NULL
-+	#endif
-+#endif
- 
- #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
- #define s3c_cpufreq_debugfs_call(x) x
-@@ -241,10 +251,7 @@ extern void s3c2410_iotiming_set(struct s3c_cpufreq_config *cfg,
- #endif /* CONFIG_S3C2410_IOTIMING */
- 
- /* S3C2412 compatible routines */
--
--extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
--				struct s3c_iotimings *timings);
--
-+#ifdef CONFIG_S3C2412_IOTIMING
- extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
- 				struct s3c_iotimings *timings);
- 
-@@ -253,6 +260,11 @@ extern int s3c2412_iotiming_calc(struct s3c_cpufreq_config *cfg,
- 
- extern void s3c2412_iotiming_set(struct s3c_cpufreq_config *cfg,
- 				 struct s3c_iotimings *iot);
-+#else
-+#define s3c2412_iotiming_calc NULL
-+#define s3c2412_iotiming_get NULL
-+#define s3c2412_iotiming_set NULL
-+#endif
- 
- #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUG
- #define s3c_freq_dbg(x...) printk(KERN_INFO x)
+There's the matter that Samsung (and a few others) will be broken after
+the next merge window because no one is putting any effort into sorting
+it out for my restart changes.  This may be the last time I mention
+this breakage.
