@@ -1,65 +1,53 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 13 Dec 2011 16:25:58 +0530
-Subject: [PATCHv8 5/5] OMAP: I2C: Remove the SYSC register definition
-In-Reply-To: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
-References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1323773758-6375-6-git-send-email-shubhrajyoti@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 13 Dec 2011 13:18:57 +0200
+Subject: [PATCH v6 04/10] arm/tegra: prepare early init for multiple
+ tegra variants
+In-Reply-To: <CAMbhsRR1HdG6QnNdrnD3y9DApnDR3RrUqFyTt5vZT0qR9n=ECg@mail.gmail.com>
+References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
+ <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77A7E@HQMAIL01.nvidia.com>
+ <CAMbhsRTD1rQBY7Sn2km=XsUYsHMdqQqZSKu4agc0GB6+QE79fA@mail.gmail.com>
+ <20111209111925.GK27578@tbergstrom-lnx.Nvidia.com>
+ <CAMbhsRR1HdG6QnNdrnD3y9DApnDR3RrUqFyTt5vZT0qR9n=ECg@mail.gmail.com>
+Message-ID: <20111213111857.GV27578@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SYSC register should not accessed in the driver removing the
-define from the driver.
-Also clean up the syscstate from the omap_i2c_dev struct.
+On Fri, Dec 09, 2011 at 07:35:09PM +0100, Colin Cross wrote:
+> On Fri, Dec 9, 2011 at 3:19 AM, Peter De Schrijver
+> <pdeschrijver@nvidia.com> wrote:
+> > On Thu, Dec 08, 2011 at 07:29:43PM +0100, Colin Cross wrote:
+> >> On Thu, Dec 8, 2011 at 9:57 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> >> > Peter De Schrijver wrote at Thursday, December 08, 2011 5:44 AM:
+> >> >> This patch splits the early init code in a common and a tegra20 specific part.
+> >> >> L2 cache initialization is generalized and discovers the cache associativity
+> >> >> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
+> >> >> the system using the PMC reset feature rather then the CAR system reset.
+> >> >
+> >> > This one really should be at least 3 separate patches:
+> >> > * s/tegra_init_early/tegra20_init_early/ in machine descriptions
+> >> > * Switch reset mechanism from CAR to PMC
+> >> > * tegra_init_cache modifications
+> >> > * Not sure if all the ifdef additions go in the above, or if some should be
+> >> > ?separate?
+> >> >
+> >> > Still, I think it's probably OK to go in as it is even if it isn't optimal.
+> >>
+> >> Please at least split out the reset change. ?Does using the PMC reset
+> >> instead of the CAR reset still result in a warm reset, or does it
+> >> change to a cold reset?
+> >
+> > What do you consider a cold reset in the tegra world?
+> 
+> Power rails turn off and on.  Some of our debugging tools rely on
+> memory contents surviving across a reset, and that is generally true
+> of a warm reset, but not a cold reset.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+Neither of those methods result in a warm reset. In both cases the memory
+controller is reset so the SDRAM won't be refreshed until the memory
+controller is reintialized. So there is no guarantee the memory contents
+will survive the reset.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 70136a2..9dcd99b 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -63,7 +63,6 @@ enum {
- 	OMAP_I2C_BUF_REG,
- 	OMAP_I2C_CNT_REG,
- 	OMAP_I2C_DATA_REG,
--	OMAP_I2C_SYSC_REG,
- 	OMAP_I2C_CON_REG,
- 	OMAP_I2C_OA_REG,
- 	OMAP_I2C_SA_REG,
-@@ -187,7 +186,6 @@ struct omap_i2c_dev {
- 	u16			scllstate;
- 	u16			sclhstate;
- 	u16			bufstate;
--	u16			syscstate;
- 	u16			westate;
- 	u16			errata;
- };
-@@ -202,7 +200,6 @@ static const u8 reg_map_ip_v1[] = {
- 	[OMAP_I2C_BUF_REG] = 0x05,
- 	[OMAP_I2C_CNT_REG] = 0x06,
- 	[OMAP_I2C_DATA_REG] = 0x07,
--	[OMAP_I2C_SYSC_REG] = 0x08,
- 	[OMAP_I2C_CON_REG] = 0x09,
- 	[OMAP_I2C_OA_REG] = 0x0a,
- 	[OMAP_I2C_SA_REG] = 0x0b,
-@@ -223,7 +220,6 @@ static const u8 reg_map_ip_v2[] = {
- 	[OMAP_I2C_BUF_REG] = 0x94,
- 	[OMAP_I2C_CNT_REG] = 0x98,
- 	[OMAP_I2C_DATA_REG] = 0x9c,
--	[OMAP_I2C_SYSC_REG] = 0x10,
- 	[OMAP_I2C_CON_REG] = 0xa4,
- 	[OMAP_I2C_OA_REG] = 0xa8,
- 	[OMAP_I2C_SA_REG] = 0xac,
-@@ -264,7 +260,6 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- 		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, dev->syscstate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
- 	}
--- 
-1.7.1
+Cheers,
+
+Peter.
