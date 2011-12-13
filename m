@@ -1,31 +1,24 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 13 Dec 2011 14:34:00 +0100
-Subject: [PATCH 1/3] ARM: OMAP2+: kconfig: Enable devicetree by default
- for OMAP2+ systems
-In-Reply-To: <1323782836.1877.79.camel@deskari>
-References: <y> <1323190149-6492-2-git-send-email-b-cousson@ti.com>
- <1323782836.1877.79.camel@deskari>
-Message-ID: <4EE75448.4010701@ti.com>
+From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
+Date: Tue, 13 Dec 2011 14:41:10 +0100
+Subject: [PATCH 09/19] clock-imx35: fix reboot in internal boot mode
+In-Reply-To: <4EE72E57.6080400@ru.mvista.com>
+References: <1323757911-25217-1-git-send-email-eric@eukrea.com>
+ <1323757911-25217-9-git-send-email-eric@eukrea.com>
+ <4EE72E57.6080400@ru.mvista.com>
+Message-ID: <4EE755F6.1020905@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2011 2:27 PM, Tomi Valkeinen wrote:
-> Hi,
->
-> On Tue, 2011-12-06 at 17:49 +0100, Benoit Cousson wrote:
->> devicetree will become the mandatory boot method for OMAP2+.
->> In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
->> select USE_OF by default for every OMAP2+ systems.
->> Select as well the APPENDED_DTB and ATAG_DTB_COMPAT to allow legacy
->> boot loader to keep working properly.
->
-> APPENDED_DTB sounds a bit dangerous to be enabled by default according
-> to the config help text.
+Hi,
 
-The help is indeed really scary :-)
+Le 13/12/2011 11:52, Sergei Shtylyov a ?crit :
+ > {} not needed -- scripts/checkpatch.pl should have warned you.
+ >
+it failed to do so :
+$ ./scripts/checkpatch.pl 0009-clock-imx35-fix-reboot-in-internal-boot-mode.patch
+total: 0 errors, 0 warnings, 11 lines checked
 
-Tony,
-Do we want to keep it by default? Or should we fix the kconfig help?
+0009-clock-imx35-fix-reboot-in-internal-boot-mode.patch has no obvious style 
+problems and is ready for submission.
 
-Regards
-Benoit
+Eric
