@@ -1,53 +1,41 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 13 Dec 2011 18:50:52 -0500 (EST)
-Subject: Git pull request: update to the Marvell Orion SOC family
-In-Reply-To: <alpine.LFD.2.02.1112131746280.2907@xanadu.home>
-References: <alpine.LFD.2.02.1112131611320.2907@xanadu.home>
- <CAOesGMhMgj__0zLk=JrA3d6+x4gZFfBbN0eO7wnge7tLsLOsqg@mail.gmail.com>
- <alpine.LFD.2.02.1112131746280.2907@xanadu.home>
-Message-ID: <alpine.LFD.2.02.1112131848190.2907@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 13 Dec 2011 15:53:20 -0800
+Subject: [PATCH v5 0/6] PM QoS: implement the OMAP low level constraints
+ management code
+In-Reply-To: <1323706701-6627-1-git-send-email-j-pihet@ti.com> (jean pihet's
+ message of "Mon, 12 Dec 2011 17:18:15 +0100")
+References: <1323706701-6627-1-git-send-email-j-pihet@ti.com>
+Message-ID: <87zkewrpu7.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Dec 2011, Nicolas Pitre wrote:
+Hi Jean,
 
-> On Tue, 13 Dec 2011, Olof Johansson wrote:
-> 
-> > Hi Nico (and Andrew),
-> > 
-> > On Tue, Dec 13, 2011 at 1:18 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > 
-> > > This contains minor fixes plus initial consolidation toward DT support.
-> > >
-> > >
-> > > Andrew Lunn (4):
-> > > ? ? ?Consolidate the address map setup on Orion based platforms.
-> > > ? ? ?Move the *_mbus_dram_info structure into the orion platform and call it orion_mbus_dram_info everywhere.
-> > > ? ? ?Get address map from plat-orion instead of via platform_data.
-> > > ? ? ?Remove address map info from all platform data strucutures.
-> > 
-> > Andrew, in the future please prefix the patch subject with the
-> > subsystem/platform. One of them has a really long subject too.
-> > 
-> > Nico: The last two patches in the branch have your Acked-by but not a
-> > Signed-off-by, even though you were the committer. Would you mind
-> > fixing that and sending a new request, please?
-> 
-> OK, hold on I'll fix both issues.
+jean.pihet at newoldbits.com writes:
 
-Olof, please re-pull.  Here's the amended shortlog:
+> From: Jean Pihet <j-pihet@ti.com>
+>
+> . Implement the devices wake-up latency constraints using the global
+>   device PM QoS notification handler which applies the constraints to the
+>   underlying layer
+> . Implement the low level code which controls the power domains next power
+>   states, through the hwmod and pwrdm layers
+> . Add cpuidle and power domains wake-up latency figures for OMAP3, cf. 
+>   comments in the code and [1] for the details on where the numbers
+>   are magically coming from
+> . Implement the relation between the cpuidle and per-device PM QoS frameworks
+>   in the OMAP3 specific idle callbacks.
+>   The chosen C-state shall satisfy the following conditions:
+>    . the 'valid' field is enabled,
+>    . it satisfies the enable_off_mode flag,
+>    . the next state for MPU and CORE power domains is not lower than the
+>      state programmed by the per-device PM QoS.
 
-Andrew Lunn (4):
-      ARM: Orion: Consolidate the address map setup
-      ARM: Orion: mbus_dram_info consolidation
-      ARM: Orion: Get address map from plat-orion instead of via platform_data
-      ARM: Orion: Remove address map info from all platform data structures
+I had a couple minor comments on this version, but after that, feel free
+to add:
 
-Arnaud Patard (1):
-      ARM: Kirkwood: Add configuration for MPP12 as GPIO
+Reviewed-by: Kevin Hilman <khilman@ti.com>
 
-Martin Michlmayr (1):
-      ARM: Kirkwood: Recognize A1 revision of 6282 chip
+after that, this series will go upstream through Paul.
 
-
-Nicolas
+Kevin
