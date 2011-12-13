@@ -1,497 +1,196 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 13 Dec 2011 14:25:24 +0800
-Subject: [PATCH V2 1/7] dts/imx: rename gpio labels to consistent with hw spec
+Date: Tue, 13 Dec 2011 14:25:26 +0800
+Subject: [PATCH V2 3/7] arm/imx: cpufreq: add multi-core support
 In-Reply-To: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
 References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1323757530-19402-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1323757530-19402-4-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO1/GPIO2/... is more readable than GPIO0/GPIO1/... .
-Remove redundant gpio comments.
-
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/boot/dts/imx51-babbage.dts   |   11 +++++------
- arch/arm/boot/dts/imx51.dtsi          |    8 ++++----
- arch/arm/boot/dts/imx53-ard.dts       |   16 ++++++++--------
- arch/arm/boot/dts/imx53-evk.dts       |   15 +++++++--------
- arch/arm/boot/dts/imx53-qsb.dts       |   16 ++++++++--------
- arch/arm/boot/dts/imx53-smd.dts       |   13 ++++++-------
- arch/arm/boot/dts/imx53.dtsi          |   14 +++++++-------
- arch/arm/boot/dts/imx6q-sabreauto.dts |    6 +++---
- arch/arm/boot/dts/imx6q.dtsi          |   14 +++++++-------
- 9 files changed, 55 insertions(+), 58 deletions(-)
+ arch/arm/plat-mxc/cpufreq.c |   99 ++++++++++++++++++++++++++++--------------
+ 1 files changed, 66 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index f8766af..ed09dc1 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -35,8 +35,8 @@
- 				};
+diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+index adbff70..85d037f 100644
+--- a/arch/arm/plat-mxc/cpufreq.c
++++ b/arch/arm/plat-mxc/cpufreq.c
+@@ -22,6 +22,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
++#include <asm/cpu.h>
+ #include <mach/hardware.h>
+ #include <mach/clock.h>
  
- 				esdhc at 70008000 { /* ESDHC2 */
--					cd-gpios = <&gpio0 6 0>; /* GPIO1_6 */
--					wp-gpios = <&gpio0 5 0>; /* GPIO1_5 */
-+					cd-gpios = <&gpio1 6 0>;
-+					wp-gpios = <&gpio1 5 0>;
- 					status = "okay";
- 				};
+@@ -34,6 +35,7 @@ static int cpu_freq_khz_min;
+ static int cpu_freq_khz_max;
  
-@@ -47,8 +47,7 @@
+ static struct clk *cpu_clk;
++static DEFINE_MUTEX(cpu_lock);
+ static struct cpufreq_frequency_table *imx_freq_table;
  
- 				ecspi at 70010000 { /* ECSPI1 */
- 					fsl,spi-num-chipselects = <2>;
--					cs-gpios = <&gpio3 24 0>, /* GPIO4_24 */
--						   <&gpio3 25 0>; /* GPIO4_25 */
-+					cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
- 					status = "okay";
+ static int cpu_op_nr;
+@@ -59,17 +61,11 @@ static int set_cpu_freq(int freq)
  
- 					pmic: mc13892 at 0 {
-@@ -57,7 +56,7 @@
- 						compatible = "fsl,mc13892";
- 						spi-max-frequency = <6000000>;
- 						reg = <0>;
--						mc13xxx-irq-gpios = <&gpio0 8 0>; /* GPIO1_8 */
-+						mc13xxx-irq-gpios = <&gpio1 8 0>;
- 						fsl,mc13xxx-uses-regulator;
- 					};
+ static int mxc_verify_speed(struct cpufreq_policy *policy)
+ {
+-	if (policy->cpu != 0)
+-		return -EINVAL;
+-
+ 	return cpufreq_frequency_table_verify(policy, imx_freq_table);
+ }
  
-@@ -127,7 +126,7 @@
+ static unsigned int mxc_get_speed(unsigned int cpu)
+ {
+-	if (cpu)
+-		return 0;
+-
+ 	return clk_get_rate(cpu_clk) / 1000;
+ }
  
- 		power {
- 			label = "Power Button";
--			gpios = <&gpio1 21 0>;
-+			gpios = <&gpio2 21 0>;
- 			linux,code = <116>; /* KEY_POWER */
- 			gpio-key,wakeup;
- 		};
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 327ab8e..57a790d 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -117,7 +117,7 @@
- 				};
- 			};
+@@ -77,23 +73,49 @@ static int mxc_set_target(struct cpufreq_policy *policy,
+ 			  unsigned int target_freq, unsigned int relation)
+ {
+ 	struct cpufreq_freqs freqs;
+-	int freq_Hz;
++	int freq_Hz, cpu;
+ 	int ret = 0;
+ 	unsigned int index;
  
--			gpio0: gpio at 73f84000 { /* GPIO1 */
-+			gpio1: gpio at 73f84000 {
- 				compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
- 				reg = <0x73f84000 0x4000>;
- 				interrupts = <50 51>;
-@@ -127,7 +127,7 @@
- 				#interrupt-cells = <1>;
- 			};
++	mutex_lock(&cpu_lock);
++
+ 	cpufreq_frequency_table_target(policy, imx_freq_table,
+ 			target_freq, relation, &index);
+ 	freq_Hz = imx_freq_table[index].frequency * 1000;
  
--			gpio1: gpio at 73f88000 { /* GPIO2 */
-+			gpio2: gpio at 73f88000 {
- 				compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
- 				reg = <0x73f88000 0x4000>;
- 				interrupts = <52 53>;
-@@ -137,7 +137,7 @@
- 				#interrupt-cells = <1>;
- 			};
+ 	freqs.old = clk_get_rate(cpu_clk) / 1000;
+-	freqs.new = freq_Hz / 1000;
+-	freqs.cpu = 0;
++	freqs.new = clk_round_rate(cpu_clk, freq_Hz);
++	freqs.new = (freqs.new ? freqs.new : freq_Hz) / 1000;
+ 	freqs.flags = 0;
+-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++
++	if (freqs.old == freqs.new) {
++		mutex_unlock(&cpu_lock);
++		return 0;
++	}
++
++	for_each_possible_cpu(cpu) {
++		freqs.cpu = cpu;
++		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++	}
  
--			gpio2: gpio at 73f8c000 { /* GPIO3 */
-+			gpio3: gpio at 73f8c000 {
- 				compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
- 				reg = <0x73f8c000 0x4000>;
- 				interrupts = <54 55>;
-@@ -147,7 +147,7 @@
- 				#interrupt-cells = <1>;
- 			};
+ 	ret = set_cpu_freq(freq_Hz);
  
--			gpio3: gpio at 73f90000 { /* GPIO4 */
-+			gpio4: gpio at 73f90000 {
- 				compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
- 				reg = <0x73f90000 0x4000>;
- 				interrupts = <56 57>;
-diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
-index 2ab7f80..78c949e 100644
---- a/arch/arm/boot/dts/imx53-ard.dts
-+++ b/arch/arm/boot/dts/imx53-ard.dts
-@@ -29,8 +29,8 @@
- 		aips at 50000000 { /* AIPS1 */
- 			spba at 50000000 {
- 				esdhc at 50004000 { /* ESDHC1 */
--					cd-gpios = <&gpio0 1 0>; /* GPIO1_1 */
--					wp-gpios = <&gpio0 9 0>; /* GPIO1_9 */
-+					cd-gpios = <&gpio1 1 0>;
-+					wp-gpios = <&gpio1 9 0>;
- 					status = "okay";
- 				};
- 			};
-@@ -67,7 +67,7 @@
- 			compatible = "smsc,lan9220", "smsc,lan9115";
- 			reg = <0xf4000000 0x2000000>;
- 			phy-mode = "mii";
--			interrupt-parent = <&gpio1>;
-+			interrupt-parent = <&gpio2>;
- 			interrupts = <31>;
- 			reg-io-width = <4>;
- 			smsc,irq-push-pull;
-@@ -79,34 +79,34 @@
+-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++#ifdef CONFIG_SMP
++	/* loops_per_jiffy is not updated by the cpufreq core for SMP systems.
++	 * So update it for all CPUs.
++	 */
++	for_each_possible_cpu(cpu)
++		per_cpu(cpu_data, cpu).loops_per_jiffy =
++		cpufreq_scale(per_cpu(cpu_data, cpu).loops_per_jiffy,
++					freqs.old, freqs.new);
++#endif
++
++	for_each_possible_cpu(cpu) {
++		freqs.cpu = cpu;
++		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++	}
++
++	mutex_unlock(&cpu_lock);
  
- 		home {
- 			label = "Home";
--			gpios = <&gpio4 10 0>; /* GPIO5_10 */
-+			gpios = <&gpio5 10 0>;
- 			linux,code = <102>; /* KEY_HOME */
- 			gpio-key,wakeup;
- 		};
+ 	return ret;
+ }
+@@ -105,7 +127,7 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
  
- 		back {
- 			label = "Back";
--			gpios = <&gpio4 11 0>; /* GPIO5_11 */
-+			gpios = <&gpio5 11 0>;
- 			linux,code = <158>; /* KEY_BACK */
- 			gpio-key,wakeup;
- 		};
+ 	printk(KERN_INFO "i.MXC CPU frequency driver\n");
  
- 		program {
- 			label = "Program";
--			gpios = <&gpio4 12 0>; /* GPIO5_12 */
-+			gpios = <&gpio5 12 0>;
- 			linux,code = <362>; /* KEY_PROGRAM */
- 			gpio-key,wakeup;
- 		};
+-	if (policy->cpu != 0)
++	if (policy->cpu >= num_possible_cpus())
+ 		return -EINVAL;
  
- 		volume-up {
- 			label = "Volume Up";
--			gpios = <&gpio4 13 0>; /* GPIO5_13 */
-+			gpios = <&gpio5 13 0>;
- 			linux,code = <115>; /* KEY_VOLUMEUP */
- 		};
+ 	if (!get_cpu_op)
+@@ -117,37 +139,45 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
+ 		return PTR_ERR(cpu_clk);
+ 	}
  
- 		volume-down {
- 			label = "Volume Down";
--			gpios = <&gpio3 0 0>; /* GPIO4_0 */
-+			gpios = <&gpio4 0 0>;
- 			linux,code = <114>; /* KEY_VOLUMEDOWN */
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
-index 3f3a881..964743e 100644
---- a/arch/arm/boot/dts/imx53-evk.dts
-+++ b/arch/arm/boot/dts/imx53-evk.dts
-@@ -29,15 +29,14 @@
- 		aips at 50000000 { /* AIPS1 */
- 			spba at 50000000 {
- 				esdhc at 50004000 { /* ESDHC1 */
--					cd-gpios = <&gpio2 13 0>; /* GPIO3_13 */
--					wp-gpios = <&gpio2 14 0>; /* GPIO3_14 */
-+					cd-gpios = <&gpio3 13 0>;
-+					wp-gpios = <&gpio3 14 0>;
- 					status = "okay";
- 				};
+-	cpu_op_tbl = get_cpu_op(&cpu_op_nr);
++	mutex_lock(&cpu_lock);
++	if (!imx_freq_table) {
++		cpu_op_tbl = get_cpu_op(&cpu_op_nr);
  
- 				ecspi at 50010000 { /* ECSPI1 */
- 					fsl,spi-num-chipselects = <2>;
--					cs-gpios = <&gpio1 30 0>, /* GPIO2_30 */
--						   <&gpio2 19 0>; /* GPIO3_19 */
-+					cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
- 					status = "okay";
+-	cpu_freq_khz_min = cpu_op_tbl[0].cpu_rate / 1000;
+-	cpu_freq_khz_max = cpu_op_tbl[0].cpu_rate / 1000;
++		cpu_freq_khz_min = cpu_op_tbl[0].cpu_rate / 1000;
++		cpu_freq_khz_max = cpu_op_tbl[0].cpu_rate / 1000;
  
- 					flash: at45db321d at 1 {
-@@ -61,8 +60,8 @@
- 				};
+-	imx_freq_table = kmalloc(
+-		sizeof(struct cpufreq_frequency_table) * (cpu_op_nr + 1),
+-			GFP_KERNEL);
+-	if (!imx_freq_table) {
+-		ret = -ENOMEM;
+-		goto err1;
+-	}
++		imx_freq_table = kmalloc(sizeof(struct cpufreq_frequency_table)
++					* (cpu_op_nr + 1), GFP_KERNEL);
++		if (!imx_freq_table) {
++			ret = -ENOMEM;
++			mutex_unlock(&cpu_lock);
++			goto err1;
++		}
  
- 				esdhc at 50020000 { /* ESDHC3 */
--					cd-gpios = <&gpio2 11 0>; /* GPIO3_11 */
--					wp-gpios = <&gpio2 12 0>; /* GPIO3_12 */
-+					cd-gpios = <&gpio3 11 0>;
-+					wp-gpios = <&gpio3 12 0>;
- 					status = "okay";
- 				};
- 			};
-@@ -102,7 +101,7 @@
+-	for (i = 0; i < cpu_op_nr; i++) {
+-		imx_freq_table[i].index = i;
+-		imx_freq_table[i].frequency = cpu_op_tbl[i].cpu_rate / 1000;
++		for (i = 0; i < cpu_op_nr; i++) {
++			imx_freq_table[i].index = i;
++			imx_freq_table[i].frequency =
++					cpu_op_tbl[i].cpu_rate / 1000;
  
- 			fec at 63fec000 {
- 				phy-mode = "rmii";
--				phy-reset-gpios = <&gpio6 6 0>; /* GPIO7_6 */
-+				phy-reset-gpios = <&gpio7 6 0>;
- 				status = "okay";
- 			};
- 		};
-@@ -113,7 +112,7 @@
+-		if ((cpu_op_tbl[i].cpu_rate / 1000) < cpu_freq_khz_min)
+-			cpu_freq_khz_min = cpu_op_tbl[i].cpu_rate / 1000;
++			if ((cpu_op_tbl[i].cpu_rate / 1000) < cpu_freq_khz_min)
++				cpu_freq_khz_min =
++					cpu_op_tbl[i].cpu_rate / 1000;
  
- 		green {
- 			label = "Heartbeat";
--			gpios = <&gpio6 7 0>; /* GPIO7_7 */
-+			gpios = <&gpio7 7 0>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index ae6de6d..cc43bde 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -29,13 +29,13 @@
- 		aips at 50000000 { /* AIPS1 */
- 			spba at 50000000 {
- 				esdhc at 50004000 { /* ESDHC1 */
--					cd-gpios = <&gpio2 13 0>; /* GPIO3_13 */
-+					cd-gpios = <&gpio3 13 0>;
- 					status = "okay";
- 				};
+-		if ((cpu_op_tbl[i].cpu_rate / 1000) > cpu_freq_khz_max)
+-			cpu_freq_khz_max = cpu_op_tbl[i].cpu_rate / 1000;
+-	}
++			if ((cpu_op_tbl[i].cpu_rate / 1000) > cpu_freq_khz_max)
++				cpu_freq_khz_max =
++					cpu_op_tbl[i].cpu_rate / 1000;
++		}
  
- 				esdhc at 50020000 { /* ESDHC3 */
--					cd-gpios = <&gpio2 11 0>; /* GPIO3_11 */
--					wp-gpios = <&gpio2 12 0>; /* GPIO3_12 */
-+					cd-gpios = <&gpio3 11 0>;
-+					wp-gpios = <&gpio3 12 0>;
- 					status = "okay";
- 				};
- 			};
-@@ -84,7 +84,7 @@
+-	imx_freq_table[i].index = i;
+-	imx_freq_table[i].frequency = CPUFREQ_TABLE_END;
++		imx_freq_table[i].index = i;
++		imx_freq_table[i].frequency = CPUFREQ_TABLE_END;
++	}
++	mutex_unlock(&cpu_lock);
  
- 			fec at 63fec000 {
- 				phy-mode = "rmii";
--				phy-reset-gpios = <&gpio6 6 0>; /* GPIO7_6 */
-+				phy-reset-gpios = <&gpio7 6 0>;
- 				status = "okay";
- 			};
- 		};
-@@ -95,20 +95,20 @@
+ 	policy->cur = clk_get_rate(cpu_clk) / 1000;
+ 	policy->min = policy->cpuinfo.min_freq = cpu_freq_khz_min;
+ 	policy->max = policy->cpuinfo.max_freq = cpu_freq_khz_max;
+-
++	policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
++	cpumask_setall(policy->cpus);
+ 	/* Manual states, that PLL stabilizes in two CLK32 periods */
+ 	policy->cpuinfo.transition_latency = 2 * NANOSECOND / CLK32_FREQ;
  
- 		power {
- 			label = "Power Button";
--			gpios = <&gpio0 8 0>; /* GPIO1_8 */
-+			gpios = <&gpio1 8 0>;
- 			linux,code = <116>; /* KEY_POWER */
- 			gpio-key,wakeup;
- 		};
+@@ -174,7 +204,10 @@ static int mxc_cpufreq_exit(struct cpufreq_policy *policy)
  
- 		volume-up {
- 			label = "Volume Up";
--			gpios = <&gpio1 14 0>; /* GPIO2_14 */
-+			gpios = <&gpio2 14 0>;
- 			linux,code = <115>; /* KEY_VOLUMEUP */
- 		};
+ 	set_cpu_freq(cpu_freq_khz_max * 1000);
+ 	clk_put(cpu_clk);
++	mutex_lock(&cpu_lock);
+ 	kfree(imx_freq_table);
++	imx_freq_table = NULL;
++	mutex_unlock(&cpu_lock);
+ 	return 0;
+ }
  
- 		volume-down {
- 			label = "Volume Down";
--			gpios = <&gpio1 15 0>; /* GPIO2_15 */
-+			gpios = <&gpio2 15 0>;
- 			linux,code = <114>; /* KEY_VOLUMEDOWN */
- 		};
- 	};
-@@ -118,7 +118,7 @@
- 
- 		user {
- 			label = "Heartbeat";
--			gpios = <&gpio6 7 0>; /* GPIO7_7 */
-+			gpios = <&gpio7 7 0>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
-index b1c062e..9e51bc3 100644
---- a/arch/arm/boot/dts/imx53-smd.dts
-+++ b/arch/arm/boot/dts/imx53-smd.dts
-@@ -29,8 +29,8 @@
- 		aips at 50000000 { /* AIPS1 */
- 			spba at 50000000 {
- 				esdhc at 50004000 { /* ESDHC1 */
--					cd-gpios = <&gpio2 13 0>; /* GPIO3_13 */
--					wp-gpios = <&gpio3 11 0>; /* GPIO4_11 */
-+					cd-gpios = <&gpio3 13 0>;
-+					wp-gpios = <&gpio4 11 0>;
- 					status = "okay";
- 				};
- 
-@@ -46,8 +46,7 @@
- 
- 				ecspi at 50010000 { /* ECSPI1 */
- 					fsl,spi-num-chipselects = <2>;
--					cs-gpios = <&gpio1 30 0>, /* GPIO2_30 */
--						   <&gpio2 19 0>; /* GPIO3_19 */
-+					cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
- 					status = "okay";
- 
- 					zigbee: mc1323 at 0 {
-@@ -145,7 +144,7 @@
- 
- 			fec at 63fec000 {
- 				phy-mode = "rmii";
--				phy-reset-gpios = <&gpio6 6 0>; /* GPIO7_6 */
-+				phy-reset-gpios = <&gpio7 6 0>;
- 				status = "okay";
- 			};
- 		};
-@@ -156,13 +155,13 @@
- 
- 		volume-up {
- 			label = "Volume Up";
--			gpios = <&gpio1 14 0>; /* GPIO2_14 */
-+			gpios = <&gpio2 14 0>;
- 			linux,code = <115>; /* KEY_VOLUMEUP */
- 		};
- 
- 		volume-down {
- 			label = "Volume Down";
--			gpios = <&gpio1 15 0>; /* GPIO2_15 */
-+			gpios = <&gpio2 15 0>;
- 			linux,code = <114>; /* KEY_VOLUMEDOWN */
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 099cd84..3b15cdc 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -119,7 +119,7 @@
- 				};
- 			};
- 
--			gpio0: gpio at 53f84000 { /* GPIO1 */
-+			gpio1: gpio at 53f84000 {
- 				compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
- 				reg = <0x53f84000 0x4000>;
- 				interrupts = <50 51>;
-@@ -129,7 +129,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio1: gpio at 53f88000 { /* GPIO2 */
-+			gpio2: gpio at 53f88000 {
- 				compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
- 				reg = <0x53f88000 0x4000>;
- 				interrupts = <52 53>;
-@@ -139,7 +139,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio2: gpio at 53f8c000 { /* GPIO3 */
-+			gpio3: gpio at 53f8c000 {
- 				compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
- 				reg = <0x53f8c000 0x4000>;
- 				interrupts = <54 55>;
-@@ -149,7 +149,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio3: gpio at 53f90000 { /* GPIO4 */
-+			gpio4: gpio at 53f90000 {
- 				compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
- 				reg = <0x53f90000 0x4000>;
- 				interrupts = <56 57>;
-@@ -187,7 +187,7 @@
- 				status = "disabled";
- 			};
- 
--			gpio4: gpio at 53fdc000 { /* GPIO5 */
-+			gpio5: gpio at 53fdc000 {
- 				compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
- 				reg = <0x53fdc000 0x4000>;
- 				interrupts = <103 104>;
-@@ -197,7 +197,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio5: gpio at 53fe0000 { /* GPIO6 */
-+			gpio6: gpio at 53fe0000 {
- 				compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
- 				reg = <0x53fe0000 0x4000>;
- 				interrupts = <105 106>;
-@@ -207,7 +207,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio6: gpio at 53fe4000 { /* GPIO7 */
-+			gpio7: gpio at 53fe4000 {
- 				compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
- 				reg = <0x53fe4000 0x4000>;
- 				interrupts = <107 108>;
-diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-sabreauto.dts
-index 072974e..cd11ab0 100644
---- a/arch/arm/boot/dts/imx6q-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6q-sabreauto.dts
-@@ -34,8 +34,8 @@
- 			};
- 
- 			usdhc at 02198000 { /* uSDHC3 */
--				cd-gpios = <&gpio5 11 0>; /* GPIO6_11 */
--				wp-gpios = <&gpio5 14 0>; /* GPIO6_14 */
-+				cd-gpios = <&gpio6 11 0>;
-+				wp-gpios = <&gpio6 14 0>;
- 				status = "okay";
- 			};
- 
-@@ -55,7 +55,7 @@
- 
- 		debug-led {
- 			label = "Heartbeat";
--			gpios = <&gpio2 25 0>; /* GPIO3_25 */
-+			gpios = <&gpio3 25 0>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 7dda599..9d0bf4b 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -247,7 +247,7 @@
- 				interrupts = <0 55 0x04>;
- 			};
- 
--			gpio0: gpio at 0209c000 { /* GPIO1 */
-+			gpio1: gpio at 0209c000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx31-gpio";
- 				reg = <0x0209c000 0x4000>;
- 				interrupts = <0 66 0x04 0 67 0x04>;
-@@ -257,7 +257,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio1: gpio at 020a0000 { /* GPIO2 */
-+			gpio2: gpio at 020a0000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx31-gpio";
- 				reg = <0x020a0000 0x4000>;
- 				interrupts = <0 68 0x04 0 69 0x04>;
-@@ -267,7 +267,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio2: gpio at 020a4000 { /* GPIO3 */
-+			gpio3: gpio at 020a4000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx31-gpio";
- 				reg = <0x020a4000 0x4000>;
- 				interrupts = <0 70 0x04 0 71 0x04>;
-@@ -277,7 +277,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio3: gpio at 020a8000 { /* GPIO4 */
-+			gpio4: gpio at 020a8000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx31-gpio";
- 				reg = <0x020a8000 0x4000>;
- 				interrupts = <0 72 0x04 0 73 0x04>;
-@@ -287,7 +287,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio4: gpio at 020ac000 { /* GPIO5 */
-+			gpio5: gpio at 020ac000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx31-gpio";
- 				reg = <0x020ac000 0x4000>;
- 				interrupts = <0 74 0x04 0 75 0x04>;
-@@ -297,7 +297,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio5: gpio at 020b0000 { /* GPIO6 */
-+			gpio6: gpio at 020b0000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx31-gpio";
- 				reg = <0x020b0000 0x4000>;
- 				interrupts = <0 76 0x04 0 77 0x04>;
-@@ -307,7 +307,7 @@
- 				#interrupt-cells = <1>;
- 			};
- 
--			gpio6: gpio at 020b4000 { /* GPIO7 */
-+			gpio7: gpio at 020b4000 {
- 				compatible = "fsl,imx6q-gpio", "fsl,imx31-gpio";
- 				reg = <0x020b4000 0x4000>;
- 				interrupts = <0 78 0x04 0 79 0x04>;
 -- 
 1.7.5.4
