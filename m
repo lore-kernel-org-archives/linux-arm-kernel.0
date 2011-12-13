@@ -1,108 +1,35 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 13 Dec 2011 14:45:12 +0530
-Subject: [PATCH 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
- controller
-In-Reply-To: <1323291049-24964-3-git-send-email-b-cousson@ti.com>
-References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
- <1323291049-24964-3-git-send-email-b-cousson@ti.com>
-Message-ID: <4EE717A0.8020304@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 13 Dec 2011 17:41:01 +0800
+Subject: [PATCH V2 1/7] dts/imx: rename gpio labels to consistent with hw
+ spec
+In-Reply-To: <1323757530-19402-2-git-send-email-richard.zhao@linaro.org>
+References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
+ <1323757530-19402-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111213094100.GD10866@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Tue, Dec 13, 2011 at 02:25:24PM +0800, Richard Zhao wrote:
+> GPIO1/GPIO2/... is more readable than GPIO0/GPIO1/... .
+> Remove redundant gpio comments.
+> 
+If we want to make this change, it's really more than just gpio, all
+phandle name numbering should be changed to keep consistency.  You may
+want to make the same change on uart as well.
 
-> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-> index 012bac7..bcfccc2 100644
-> --- a/arch/arm/mach-omap2/common.h
-> +++ b/arch/arm/mach-omap2/common.h
-> @@ -156,6 +156,16 @@ void omap3_intc_resume_idle(void);
->   void omap2_intc_handle_irq(struct pt_regs *regs);
->   void omap3_intc_handle_irq(struct pt_regs *regs);
->
-> +struct device_node;
-> +#ifdef CONFIG_OF
-> +int __init intc_of_init(struct device_node *node, struct device_node *parent);
-> +#else
-> +int __init intc_of_init(struct device_node *node, struct device_node *parent)
-> +{
-> +	return 0;
-> +}
+-- 
+Regards,
+Shawn
 
-This seems to break !CONFIG_OF builds as common.h is included in
-multiple c files causing 'multiple definition' errors.
-
-regards,
-Rajendra
-
-> +#endif
-> +
->   /*
->    * wfi used in low power code. Directly opcode is used instead
->    * of instruction to avoid mulit-omap build break
-> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-> index 42b1d65..cafc663 100644
-> --- a/arch/arm/mach-omap2/irq.c
-> +++ b/arch/arm/mach-omap2/irq.c
-> @@ -17,6 +17,9 @@
->   #include<mach/hardware.h>
->   #include<asm/exception.h>
->   #include<asm/mach/irq.h>
-> +#include<linux/of.h>
-> +#include<linux/of_address.h>
-> +#include<linux/irqdomain.h>
->
->
->   /* selected INTC register offsets */
-> @@ -166,7 +169,7 @@ static void __init omap_init_irq(u32 base, int nr_irqs)
->   		/* Static mapping, never released */
->   		bank->base_reg = ioremap(base, SZ_4K);
->   		if (!bank->base_reg) {
-> -			printk(KERN_ERR "Could not ioremap irq bank%i\n", i);
-> +			pr_err("Could not ioremap irq bank%i\n", i);
->   			continue;
->   		}
->
-> @@ -179,8 +182,8 @@ static void __init omap_init_irq(u32 base, int nr_irqs)
->   		nr_banks++;
->   	}
->
-> -	printk(KERN_INFO "Total of %ld interrupts on %d active controller%s\n",
-> -	       nr_of_irqs, nr_banks, nr_banks>  1 ? "s" : "");
-> +	pr_info("Total of %ld interrupts on %d active controller%s\n",
-> +		nr_of_irqs, nr_banks, nr_banks>  1 ? "s" : "");
->   }
->
->   void __init omap2_init_irq(void)
-> @@ -236,6 +239,32 @@ asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs
->   	omap_intc_handle_irq(base_addr, regs);
->   }
->
-> +#ifdef CONFIG_OF
-> +int __init intc_of_init(struct device_node *node, struct device_node *parent)
-> +{
-> +	struct resource res;
-> +	u32 nr_irqs;
-> +
-> +	if (WARN_ON(!node))
-> +		return -ENODEV;
-> +
-> +	if (of_address_to_resource(node, 0,&res)) {
-> +		WARN(1, "unable to get intc registers\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (of_property_read_u32(node, "ti,intc-size",&nr_irqs)) {
-> +		WARN(1, "unable to get intc-size\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	omap_init_irq(res.start, nr_irqs);
-> +	irq_domain_add_simple(node, 0);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
->   #ifdef CONFIG_ARCH_OMAP3
->   static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
->
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx51-babbage.dts   |   11 +++++------
+>  arch/arm/boot/dts/imx51.dtsi          |    8 ++++----
+>  arch/arm/boot/dts/imx53-ard.dts       |   16 ++++++++--------
+>  arch/arm/boot/dts/imx53-evk.dts       |   15 +++++++--------
+>  arch/arm/boot/dts/imx53-qsb.dts       |   16 ++++++++--------
+>  arch/arm/boot/dts/imx53-smd.dts       |   13 ++++++-------
+>  arch/arm/boot/dts/imx53.dtsi          |   14 +++++++-------
+>  arch/arm/boot/dts/imx6q-sabreauto.dts |    6 +++---
+>  arch/arm/boot/dts/imx6q.dtsi          |   14 +++++++-------
+>  9 files changed, 55 insertions(+), 58 deletions(-)
