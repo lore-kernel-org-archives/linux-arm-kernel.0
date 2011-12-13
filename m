@@ -1,82 +1,44 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 13 Dec 2011 13:21:26 +0200
-Subject: [PATCH v6 03/10] arm/tegra: prepare clock code for multiple
- tegra variants
-In-Reply-To: <20111209091319.GI27578@tbergstrom-lnx.Nvidia.com>
-References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-4-git-send-email-pdeschrijver@nvidia.com>
- <CAMbhsRT97Oq-=8f9++f6Jgg=YVaimKSz68xcDDNbDbvL+V5fJg@mail.gmail.com>
- <20111209091319.GI27578@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20111213112126.GW27578@tbergstrom-lnx.Nvidia.com>
+From: manjunath.hadli@ti.com (Manjunath Hadli)
+Date: Tue, 13 Dec 2011 16:53:31 +0530
+Subject: [PATCH v5 07/11] davinci: dm644x: Replace register base value with a
+ defined macro
+In-Reply-To: <1323775415-24504-1-git-send-email-manjunath.hadli@ti.com>
+References: <1323775415-24504-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <1323775415-24504-8-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 10:13:20AM +0100, Peter De Schrijver wrote:
-> On Thu, Dec 08, 2011 at 07:25:53PM +0100, Colin Cross wrote:
-> > On Thu, Dec 8, 2011 at 4:43 AM, Peter De Schrijver <pdeschrijver at nvidia.com<mailto:pdeschrijver@nvidia.com>> wrote:
-> > Rework the tegra20 clock code to support multiple tegra variants :
-> > 
-> >  * remove tegra2_periph_reset_assert/tegra2_periph_reset_deassert. This
-> >   functionality should be in clock.c.
-> >  * compile tegra_sdmmc_tap_delay only on tegra20 as this feature will not
-> >   be available in future variants.
-> >  * don't export clk_measure_input_freq as its functionality is also available
-> >   using clk_get_rate().
-> > 
-> > Signed-off-by: Peter De Schrijver <pdeschrijver at nvidia.com<mailto:pdeschrijver@nvidia.com>>
-> > ---
-> >  arch/arm/mach-tegra/clock.c         |   12 +++++++-----
-> >  arch/arm/mach-tegra/clock.h         |    8 ++++----
-> >  arch/arm/mach-tegra/tegra2_clocks.c |   14 +-------------
-> >  arch/arm/mach-tegra/timer.c         |   12 ++++++++----
-> >  4 files changed, 20 insertions(+), 26 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-> > index f8d41ff..f27bdcc 100644
-> > --- a/arch/arm/mach-tegra/clock.c
-> > +++ b/arch/arm/mach-tegra/clock.c
-> > @@ -387,13 +387,15 @@ EXPORT_SYMBOL(tegra_clk_init_from_table);
-> > 
-> >  void tegra_periph_reset_deassert(struct clk *c)
-> >  {
-> > -       tegra2_periph_reset_deassert(c);
-> > +       BUG_ON(!c->ops->reset);
-> > +       c->ops->reset(c, false);
-> >  }
-> >  EXPORT_SYMBOL(tegra_periph_reset_deassert);
-> > 
-> >  void tegra_periph_reset_assert(struct clk *c)
-> >  {
-> > -       tegra2_periph_reset_assert(c);
-> > +       BUG_ON(!c->ops->reset);
-> > +       c->ops->reset(c, true);
-> >  }
-> >  EXPORT_SYMBOL(tegra_periph_reset_assert);
-> > 
-> > @@ -403,9 +405,9 @@ void __init tegra_init_clock(void)
-> >  }
-> > 
-> >  /*
-> > - * The SDMMC controllers have extra bits in the clock source register that
-> > - * adjust the delay between the clock and data to compenstate for delays
-> > - * on the PCB.
-> > + * The SDMMC controllers on tegra20 have extra bits in the clock source
-> > + * register that adjust the delay between the clock and data to compenstate
-> > + * for delays on the PCB.
-> >  */
-> >  void tegra_sdmmc_tap_delay(struct clk *c, int delay)
-> >  {
-> > 
-> > I created this wrapper around tegra2_sdmmc_tap_delay because I guessed the same requirement would be present in tegra3.  If you don't expect this to be required on anything but tegra2, you could drop the wrapper and just have callers use tegra2_sdmmc_tap_delay.
-> > 
-> 
-> I will ask around if this is needed for tegra30.
-> 
+Replace hard coded value of vpss register base to a define macro
+DM644X_VPSS_REG_BASE for proper readability
 
-This feature moved to the SDMMC block in tegra30, so we don't need any code
-in the clock framework anymore. So I think we should just use
-tegra2_sdmmc_tap_delay directly.
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/dm644x.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-Cheers,
-
-Peter.
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 6b1d473..3802b59 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -594,13 +594,15 @@ static struct platform_device dm644x_asp_device = {
+ 	.resource	= dm644x_asp_resources,
+ };
+ 
++#define DM644X_VPSS_REG_BASE	0x01c73400
++
+ static struct resource dm644x_vpss_resources[] = {
+ 	{
+ 		/* VPSS Base address */
+ 		.name		= "vpss",
+-		.start          = 0x01c73400,
+-		.end            = 0x01c73400 + 0xff,
+-		.flags          = IORESOURCE_MEM,
++		.start		= DM644X_VPSS_REG_BASE,
++		.end		= DM644X_VPSS_REG_BASE + 0xff,
++		.flags		= IORESOURCE_MEM,
+ 	},
+ };
+ 
+-- 
+1.6.2.4
