@@ -1,29 +1,33 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 13 Dec 2011 11:18:46 +0100
-Subject: [PATCH 01/19] mxc_udc: add workaround for ENGcm09152 for i.MX25
-In-Reply-To: <1323757911-25217-1-git-send-email-eric@eukrea.com>
-References: <1323757911-25217-1-git-send-email-eric@eukrea.com>
-Message-ID: <20111213101846.GC2619@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 13 Dec 2011 15:49:32 +0530
+Subject: [PATCH v2 0/3] Device tree support for TWL regulators
+Message-ID: <1323771575-3550-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 07:31:33AM +0100, Eric B?nard wrote:
-> this patch gives the possibility to workaround bug ENGcm09152
-> on i.MX25 when the hardware workaround is also implemented on
-> the board.
-> It covers the workaround described on page 42 of the following Errata :
-> http://cache.freescale.com/files/dsp/doc/errata/IMX25CE.pdf
+This series adds DT support for TWL regulator driver and
+passes regulator data for two OMAP4 boards (OMAP4 panda and
+OMAP4 sdp) from device tree.
 
-Nit: The title of the ENG would help reviewing, like it is preferred to
-cite patch titles when mentioning the commit-id.
+Patches are based on for-next of the regulator tree[1] with
+omap i2c/twl DT adaptation patches[2] from Benoit pulled in
+and are available here:
+git://gitorious.org/omap-pm/linux.git for-dt/regulator-twl
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111213/406be699/attachment.sig>
+regards,
+Rajendra
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
+[2] git://gitorious.org/omap-pm/linux.git for_3.3/3_omap_dt_i2c_twl
+
+Rajendra Nayak (3):
+  regulator: twl: adapt twl-regulator driver to dt
+  ARM: omap4-sdp: Pass regulator data from dt
+  omap4: panda: Pass regulator data from dt
+
+ .../bindings/regulator/twl-regulator.txt           |   57 +++++++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   24 ++++
+ arch/arm/boot/dts/omap4-sdp.dts                    |   36 ++++++
+ drivers/regulator/twl-regulator.c                  |  128 +++++++++++++-------
+ 4 files changed, 199 insertions(+), 46 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
