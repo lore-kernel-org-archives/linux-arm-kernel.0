@@ -1,86 +1,45 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 14 Dec 2011 11:36:55 +0000
-Subject: [PATCH v4 2/5] ARM: SMP: Refactor Kconfig to be more maintainable
-In-Reply-To: <20111213201137.GA31437@huya.qualcomm.com>
-References: <1323798993-8727-1-git-send-email-dave.martin@linaro.org>
- <1323798993-8727-3-git-send-email-dave.martin@linaro.org>
- <20111213201137.GA31437@huya.qualcomm.com>
-Message-ID: <20111214113655.GA2568@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 14 Dec 2011 12:37:28 +0100
+Subject: [PATCH 1/3] PWM: add pwm framework support
+In-Reply-To: <20111214100338.GA18348@avionic-0098.mockup.avionic-design.de>
+References: <201106301441.24493.arnd@arndb.de> <4E11994B.7070103@gmail.com>
+ <20110704124318.GI6069@pengutronix.de>
+ <201107041607.10265.arnd@arndb.de>
+ <20111207085339.GA7970@avionic-0098.mockup.avionic-design.de>
+ <20111207090734.GN27267@pengutronix.de>
+ <20111214100338.GA18348@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20111214113728.GG27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 12:11:37PM -0800, David Brown wrote:
-> On Tue, Dec 13, 2011 at 05:56:30PM +0000, Dave Martin wrote:
-> > Making SMP depend on (huge list of MACH_ and ARCH_ configs) is
-> > bothersome to maintain and likely to lead to merge conflicts.
+On Wed, Dec 14, 2011 at 11:03:38AM +0100, Thierry Reding wrote:
+> * Sascha Hauer wrote:
+> > I have a branch which adds a basic PWM framework. It doesn't change the
+> > pwm API at all, but only adds support for registering multiple PWM
+> > drivers. All in Kernel drivers are converted to this new framework, but
+> > except the i.MX driver all of them are untested. I'm quite confident
+> > that the drivers itself work, but there will probably be some Kconfig
+> > related issues which I wasn't able to sort out. The corresponding
+> > Maintainers should probably have a look over it. Feel free to post
+> > the patches if you are prepared to work on the comments you receive.
+> > Otherwise I'll see if I find some time maybe next week.
+> [...]
 > 
-> > diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> > index ebde97f..e6beaff 100644
-> > --- a/arch/arm/mach-msm/Kconfig
-> > +++ b/arch/arm/mach-msm/Kconfig
-> > @@ -67,6 +67,7 @@ config MSM_SOC_REV_A
-> >  	bool
-> >  config  ARCH_MSM_SCORPIONMP
-> >  	bool
-> > +	select HAVE_SMP
-> >  
-> >  config  ARCH_MSM_ARM11
-> >  	bool
-> 
-> The ARCH_MSM_SCORPIONMP config's only purpose was to enable SMP higher
-> up.  We might as well eliminate ARCH_MSM_SCORPIONMP entirely, and just
-> select HAVE_SMP in ARCH_MSM8X60 and ARCH_MSM8960.
+> I've looked at this in more detail and one thing that irritates me is that
+> the current driver API requires a driver to register a pwm_chip structure for
+> each PWM it can control. Wouldn't it be easier in such cases to just specify
+> how many PWMs a chip wants to register, much like gpiolib does it?
 
-First and foremost, I'm just refactoring with this series.  I've
-included other trivial changes suggested by other people where the
-effect is clear and straightforward.
+It may be more suitable for some devices like for example the mxs driver
+or the at91 driver which Bill has in his tree. However, the idea of this
+series was to move the drivers over with the least possible breakage.
+Once the drivers are consolidated in a single directory with a single
+framework it will be easier to modify.
 
+Sascha
 
-Removing ARCH_MSM_SCORPIONMP is not quite trivial, though:
-
-arch/arm/mach-msm/timer.c:
-#ifdef CONFIG_ARCH_MSM_SCORPIONMP
-	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
-#endif
-
-This suggests that ARCH_MSM_SCORPIONMP may mean more than just
-"HAVE_SMP".
-
-Also,
-
-arch/arm/Kconfig:config HAVE_SMP
-	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
-
-...and
-
-arch/arm/Kconfig:config LOCAL_TIMERS
-	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-
-
-Now, we could list the affected MSM boards longhand in those
-dependencies, but that's just reintroducing some of the exact kind of
-kconfig clunkiness I'm trying to remove: those lists are obviously
-liable to grow over time.
-
-Configs like this also look like they may be incompatible with the
-single kernel binary goal: if any of the boards supported by the kernel
-have the ARM SCU and/or TWD unit, surely we should be able to enable the
-support in the kernel?
-
-
-If you can see a nice way to resolve those issues though, feel free to
-propose a patch and I'll append it to the series.
-
-> 
-> Also, be sure to run ./scripts/get_maintainer.pl on your patch so that
-> the proper people get addressed by the message.  Otherwise, people
-> might miss patches.
-
-Argh, my metadata for that series was mangled -- I put together a long
-CC list based on but it never got used :(
-
-Thanks for highlighting that... I'll repost.  This probably explains why
-I didn't get much feedback.
-
-Cheers
----Dave
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
