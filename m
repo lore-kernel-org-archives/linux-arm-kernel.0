@@ -1,32 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Dec 2011 15:40:49 +0000
-Subject: [PATCH V2 1/2] pinctrl: enable pinmux for pxa series
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1751860B1F@HQMAIL01.nvidia.com>
-References: <1323769253-22580-1-git-send-email-haojian.zhuang@marvell.com>
- <1323769253-22580-2-git-send-email-haojian.zhuang@marvell.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1751860B1F@HQMAIL01.nvidia.com>
-Message-ID: <201112141540.49243.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Dec 2011 09:41:48 -0600
+Subject: [PATCH 0/9] irq domain for gen irq chip and pl061 DT irq support
+In-Reply-To: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
+References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4EE8C3BC.8080808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 December 2011, Stephen Warren wrote:
-> Haojian Zhuang wrote at Tuesday, December 13, 2011 2:41 AM:
+On 12/14/2011 09:28 AM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> > diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+> This series adds irq_domain support to generic irq chip, converts the
+> pl061 gpio driver to use generic irq chip, and finally adds DT irq binding
+> support for pl061. The pl061 driver is also fixed to use 0 for no irq
+> instead of -1 or NO_IRQ.
 > 
-> > +obj-$(CONFIG_PINMUX_PXA168)	+= pinmux-pxa168.o pinctrl-pxa3xx.o
-> > +obj-$(CONFIG_PINMUX_PXA300)	+= pinmux-pxa300.o pinctrl-pxa3xx.o
-> > +obj-$(CONFIG_PINMUX_PXA910)	+= pinmux-pxa910.o pinctrl-pxa3xx.o
+> The irq_domain support should be transparent to users of generic irq
+> chip. Shawn Guo has tested previous version with i.MX AVIC and his fixes
+> have been incorporated. Any testing by other users of generic irq chip
+> is appreciated.
 > 
-> That structure will cause problems if multiple of those Kconfig options
-> are enabled at once, as in a multi-SoC kernel. Instead, shouldn't this be:
+> This series is also dependent on:
 > 
-> obj-$(CONFIG_PINCTRL_PXA3XX)	+= pinctrl-pxa3xx.o
-> obj-$(CONFIG_PINMUX_PXA168)	+= pinmux-pxa168.o
-> obj-$(CONFIG_PINMUX_PXA300)	+= pinmux-pxa300.o
-> obj-$(CONFIG_PINMUX_PXA910)	+= pinmux-pxa910.o
+> irqdomain: export irq_domain_simple_ops for !CONFIG_OF
+> http://www.spinics.net/lists/arm-kernel/msg150290.html
+> 
+> gpio: pl061: drop extra check for NULL platform_data
+> http://www.spinics.net/lists/arm-kernel/msg151701.html
+> 
+> Tested on highbank and built all defconfigs.
+> 
+> Rob
 
-I'm pretty sure the first version is ok too, as long as none of the
-options can be built as modules.  Your version seems to be more common though.
+Forgot to mention this series is also available here:
 
-	Arnd
+git://sources.calxeda.com/kernel/linux.git pl061-domain
+
+Rob
