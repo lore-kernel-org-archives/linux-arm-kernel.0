@@ -1,58 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Dec 2011 19:12:05 +0000
-Subject: [linux-next] make  s5p64x0_defconfig build error
-In-Reply-To: <20111214123244.GE7122@mudshark.cambridge.arm.com>
-References: <1323838630.18517.1.camel@phoenix>
- <20111214123244.GE7122@mudshark.cambridge.arm.com>
-Message-ID: <20111214191205.GF14542@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Dec 2011 11:25:10 -0800
+Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART
+ from dt
+In-Reply-To: <1323863746-18145-5-git-send-email-rnayak@ti.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+ <1323863746-18145-5-git-send-email-rnayak@ti.com>
+Message-ID: <20111214192509.GH32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 12:32:44PM +0000, Will Deacon wrote:
-> On Wed, Dec 14, 2011 at 04:57:10AM +0000, Axel Lin wrote:
-> > I got below build error on linux-next 20111213.
-> > 
-> >   CC      arch/arm/kernel/process.o
-> > In file included from arch/arm/mach-s5p64x0/include/mach/system.h:16,
-> >                  from arch/arm/kernel/process.c:64:
-> > arch/arm/plat-samsung/include/plat/system-reset.h:19:2: error: #error Fix me up
-> > make[1]: *** [arch/arm/kernel/process.o] Error 1
-> > make: *** [arch/arm/kernel] Error 2
+* Rajendra Nayak <rnayak@ti.com> [111214 03:24]:
+> Pass minimal data needed for console boot, from dt, for
+> OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
+> static initialization from generic board file.
 > 
-> The clue is in the commit message:
-> 
-> commit d0f7e2beabe6a116152ccc31959b6654b6ef0071
-> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date:   Tue Dec 6 12:57:02 2011 +0000
-> 
->     ARM: restart: Temporary #error to persuade platform maintainers to take the restart changes seriously
-> 
->     Force builds to fail to ensure that platform maintainers take the
->     restart changes seriously, and sort out fixing their code before the
->     next merge window.
-> 
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-Indeed, and note the date, and how long its taken for just one of the
-platforms to be noticed.
+This we can't merge because this breaks serial console for
+omap2 because you're not adding the omap2 specific dtsi
+entries for omap2..
 
-It seems to me that no one really cares about whether six of the seven
-platforms which have the #error build or don't build, so I really think
-there's a simple solution to this at the next merge window - delete any
-platform which hasn't _at_ _least_ responded with a proposed patch to
-this.
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -69,7 +69,6 @@ static void __init omap_generic_init(void)
+>  	if (node)
+>  		irq_domain_add_simple(node, 0);
+>  
+> -	omap_serial_init();
+>  	omap_sdrc_init(NULL, NULL);
+>  
+>  	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 
-The platform maintainers have had _enough_ notice of this - by not
-responding, they're quite simply an obstacle to further consolidation,
-and we're not going to go through months of waiting for their response
-time and time again.
+..and you're removing the call for omap_serial_init.
 
-I've posted the patches to the mailing list, I've copied them asking
-for help, I've chased them several times, and now they have a #error
-to deal with.  If none of this gets their attention (it seems it
-doesn't), then frankly their platform is unmaintained, it will be
-broken at the next merge window, and therefore _should_ be deleted.
+Please just update this patch with the omap2 entries
+as well. Other than that looks good to me.
 
-So... unless things change, we can expect Gemini, almost all Samsung
-stuff, shmobile, vt8500, and Telechips TCC8k to be at least broken at
-the next merge window.
+Tony
