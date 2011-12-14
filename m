@@ -1,42 +1,63 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 14 Dec 2011 17:10:10 +0200
-Subject: serial tty name
-In-Reply-To: <20111214144344.GA2090@richard-laptop>
-References: <20111214144344.GA2090@richard-laptop>
-Message-ID: <4EE8BC52.5060905@compulab.co.il>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 14 Dec 2011 07:20:13 -0800
+Subject: [PATCH v3 0/4] OMAP serial device tree support
+In-Reply-To: <1323863746-18145-1-git-send-email-rnayak@ti.com> (Rajendra
+ Nayak's message of "Wed, 14 Dec 2011 17:25:42 +0530")
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+Message-ID: <87d3brnpsi.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Greg, Alan,
 
-On 12/14/11 16:43, Richard Zhao wrote:
-> How to map different uart port to ttymxc0 (take imx for example)?
-> 
-> In rootfs, it usually "getty ttymxc0"  to get
-> serial console. And the rootfs may be shared by different boards.
-> Traditionaly way is to set right platform device ID.
-> 
-> But with DT, UART2 always generate ttymxc1, UART3 for ttymxc2. You
-> always needs to modify the getty command when your change another board.
-> 
-> Is there a way to fix it?
+Rajendra Nayak <rnayak@ti.com> writes:
 
-As for fix in userspace, you can spawn getty on every ttymxc*,
-so you will get it always.
+> v3 is rebased on top of the latest serial runtime
+> patches[1] and boot tested with/without DT on OMAP4
+> SDP and OMAP4 Panda boards.
 
-Another (userspace) fix would be:
-Instead of getty, add a script (say getty.sh) which will do something like:
------------
-CONSOLE=`cat /proc/cmdline | tr " " "\n" | grep console= | tr "=" " " | tr "," " "`
-TTY=`echo $CONSOLE | cut -d' ' -f 2`
-SPEED=`echo $CONSOLE | cut -d' ' -f 3`
+With your ack on the drivers/tty/* stuff, I can queue this via the OMAP
+tree on top of the runtime PM conversion that it depends on.
 
-/sbin/getty -L $TTY $SPEED vt100
---------------
+Thanks,
 
-I use the above, because I have not just multiple boards,
-but multiple platforms each with its own tty name...
+Kevin
 
--- 
-Regards,
-Igor.
+> Patches can be found here..
+> git://gitorious.org/omap-pm/linux.git for-dt/serial
+>
+> I also had to pull in a fix[2] for DT testing (already in linux-omap
+> master) which was missing as the serial runtime branch[1]
+> was based on an older master commit.
+>
+> Changes in v3:
+> -1- Rebased on latest serial runtime patches
+> -2- Minor typr fixes
+>
+> Changes in v2:
+> -1- Got rid of binding to define which uart is console
+> -2- Added checks to default clock speed to 48Mhz
+> -3- Added compatible for each OMAP family
+> -4- Used of_alias_get_id to populate port.line
+>
+> [1] git://gitorious.org/runtime_3-0/runtime_3-0.git for_3_3/lo_rc4_uartruntime
+> [2] http://www.spinics.net/lists/arm-kernel/msg150751.html
+>
+> Rajendra Nayak (4):
+>   omap-serial: Get rid of all pdev->id usage
+>   omap-serial: Use default clock speed (48Mhz) if not specified
+>   omap-serial: Add minimal device tree support
+>   ARM: omap: pass minimal SoC/board data for UART from dt
+>
+>  .../devicetree/bindings/serial/omap_serial.txt     |   10 +++
+>  arch/arm/boot/dts/omap3.dtsi                       |   31 ++++++++
+>  arch/arm/boot/dts/omap4.dtsi                       |   28 +++++++
+>  arch/arm/mach-omap2/board-generic.c                |    1 -
+>  drivers/tty/serial/omap-serial.c                   |   80 +++++++++++++++----
+>  5 files changed, 132 insertions(+), 18 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/omap_serial.txt
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
