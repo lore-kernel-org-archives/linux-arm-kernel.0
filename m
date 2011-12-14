@@ -1,36 +1,59 @@
-From: alexg@meprolight.com (Alex)
-Date: Wed, 14 Dec 2011 14:50:28 +0200
-Subject: [PATCH] Linux OMAP: Add omap_reserve functionality
-Message-ID: <1323867028-8496-1-git-send-email-alexg@meprolight.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Wed, 14 Dec 2011 14:10:53 +0100
+Subject: [PATCH 01/10] GPIO: gpio-generic: Move initialization up to
+ postcore
+In-Reply-To: <20111212235544.GM32251@atomide.com>
+References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <201112130044.02007.jkrzyszt@tis.icnet.pl>
+ <20111212235544.GM32251@atomide.com>
+Message-ID: <201112141410.53522.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds omap_reserve functionality to board-omap3logic.c
+On Tuesday 13 of December 2011 at 00:55:44, Tony Lindgren wrote:
+> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111212 15:13]:
+> > On Tuesday 13 of December 2011 at 00:15:20, Tony Lindgren wrote:
+> > > 
+> > > Might be worth checking if some board specific __initcall helps here
+> > > too?
+> > 
+> > If I only knew how I could insert a board specific __initcall between 
+> > two points from where the generic-gpio first, then the 8250 driver, are 
+> > called.
+> > 
+> > Any hints?
+> 
+> Hmm, can't you do all that in the order you want in
+> ams_delta_modem_init()?  Or make that into a late_initcall so
+> you have generic-gpio available?
+> 
+> It seems that the pieces of code you're talking about don't need
+> to be initialized early, just needs to be done in the right
+> order to get things working.
 
-Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
----
- arch/arm/mach-omap2/board-omap3logic.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Hi,
+I'm almost done with moving registration of all latch dependent devices 
+down to a late_initcall hook, however while working on this, I've found 
+still another arrangement, yet better in my opinion:
+1) generic-gpio driver registration moved from device_initcall up to 
+   subsys_initcall,
+2) latch dependent device registration left at arch_initcall, as it is 
+   now,
+3) a temporary hack, removed with the last patch in the series, that 
+   requests GPIO pins on behalf of device drivers before those are 
+   updated, placed between subsys_initcall and device_initcall, i.e., at 
+   fs_initcall or rootfs_initcall; both look ugly, but this is only for 
+   a while, in order to keep things working while in the transition,
+4) the modem init hook, once updated with extra GPIO setup that must be 
+   done on behalf of the 8250 driver, which is not prepared for 
+   accepting any extra init hooks passed with the device platform data, 
+   moved down to late_initcall, as suggested,
+5) once all drivers are updated, the hack is removed, and an 
+   initialization of unused pins added to that late_initcall modem hook, 
+   perhaps renamed in order to not suggest it is still modem only 
+   related.
 
-diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-index b44c485..6230a96 100644
---- a/arch/arm/mach-omap2/board-omap3logic.c
-+++ b/arch/arm/mach-omap2/board-omap3logic.c
-@@ -301,6 +301,7 @@ static void __init omap3logic_init(void)
- 
- MACHINE_START(OMAP3_TORPEDO, "Logic OMAP3 Torpedo board")
- 	.atag_offset	= 0x100,
-+	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap35xx_init_early,
- 	.init_irq	= omap3_init_irq,
-@@ -310,6 +311,7 @@ MACHINE_END
- 
- MACHINE_START(OMAP3530_LV_SOM, "OMAP Logic 3530 LV SOM board")
- 	.atag_offset	= 0x100,
-+	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap35xx_init_early,
- 	.init_irq	= omap3_init_irq,
--- 
-1.7.0.4
+What do you think?
+
+Thanks,
+Janusz
