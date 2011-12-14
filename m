@@ -1,86 +1,80 @@
-From: martin@neutronstar.dyndns.org (martin at neutronstar.dyndns.org)
-Date: Wed, 14 Dec 2011 19:22:29 +0100
-Subject: [PATCH v3] arm: omap3evm: Add support for an MT9M032 based
- camera board.
-In-Reply-To: <201112141415.23885.laurent.pinchart@ideasonboard.com>
-References: <1323825934-13320-1-git-send-email-martin@neutronstar.dyndns.org>
- <4EE86CF7.1010002@compulab.co.il>
- <201112141415.23885.laurent.pinchart@ideasonboard.com>
-Message-ID: <1323886950.295978.31313@localhost>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 14 Dec 2011 18:30:31 +0000
+Subject: [PATCH v4 REPOST 3/5] omap4: Unconditionally require l2x0 L2
+ cache controller support
+In-Reply-To: <20111214181425.GB32251@atomide.com>
+References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
+ <1323862781-3465-4-git-send-email-dave.martin@linaro.org>
+ <20111214181425.GB32251@atomide.com>
+Message-ID: <20111214183030.GB9331@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 02:15:22PM +0100, Laurent Pinchart wrote:
-> Hi Igor,
+On Wed, Dec 14, 2011 at 10:14:25AM -0800, Tony Lindgren wrote:
+> * Dave Martin <dave.martin@linaro.org> [111214 03:08]:
+> > If running in the Normal World on a TrustZone-enabled SoC, Linux
+> > does not have complete control over the L2 cache controller
+> > configuration.  The kernel cannot work reliably on such platforms
+> > without the l2x0 cache support code built in.
 > 
-> On Wednesday 14 December 2011 10:31:35 Igor Grinberg wrote:
-> > On 12/14/11 03:25, Martin Hostettler wrote:
-> > > Adds board support for an MT9M032 based camera to omap3evm.
-> > > 
-> > > Signed-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
+> There are HS and GP omaps (High Security and General Purpose).
+> GP omaps do have full control of the L2. Also HS omaps most likely
+> provide control over enabling and disabling L2 depending how the
+> secure code is implemented.
 > 
-> [snip]
+> BTW, the real problem is that because the secure code is implemented
+> in various ways, we don't really have any handling for it in Linux.
 > 
-> > > diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c
-> > > b/arch/arm/mach-omap2/board-omap3evm-camera.c new file mode 100644
-> > > index 0000000..bffd5b8
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
-> > > @@ -0,0 +1,155 @@
+> The SMI instruction numbers don't seem to be standardized at all,
+> and can mean different things on different boards, even different
+> board versions :(
 > 
-> [snip]
+> Sounds like devicetree is the only safe way to deal with the L2
+> control options.
 > 
-> > > +#include <linux/i2c.h>
-> > > +#include <linux/init.h>
-> > > +#include <linux/platform_device.h>
-> > > +
-> > > +#include <linux/gpio.h>
-> > > +#include <plat/mux.h>
-> > > +#include "mux.h"
-> > > +
-> > > +#include "../../../drivers/media/video/omap3isp/isp.h"
-> > 
-> > Laurent,
-> > In one of the previous reviews, you stated:
-> > "I'll probably split it and move the part required by board files to
-> > include/media/omap3isp.h".
-> > Is there any progress on that?
-> 
-> Yes, it has been half-fixed in mainline. Half only because all the structures 
-> and macros that should be used by board code are now in <media/omap3isp.h>, 
-> but some boards need to access OMAP3 ISP internals from board code, which 
-> still requires drivers/media/video/omap3isp/isp.h. This will eventually be 
-> fixed, when the generic struct clk object will be available.
-> 
-> After a quick look at this patch it seems that <media/omap3isp.h> should be 
-> enough here.
-
-Almost. The code uses ISPCTRL_PAR_BRIDGE_DISABLE which is only available
-from drivers/media/video/omap3isp/ispreg.h.
-
-So i'd say it's better to keep that include than to duplicate this constant
-in the code.
-
-What do you think?
-
-By the way, it seems drivers/media/video/omap3isp/ispvideo.c is missing a 
-#include <linux/module.h> at the moment. I had to patch that line in to get
-omap3isp to compile as module.
-
-> 
-> > > +#include "media/mt9m032.h"
-> 
-> And this should be <media/mt9m032.h>
-
-I'll change this.
-
-Regards,
- - Martin Hostettler
-
-> 
-> > > +#include "devices.h"
-> 
-> -- 
 > Regards,
 > 
-> Laurent Pinchart
+> Tony
+> 
+>  
+> > This patch unconditionally enables l2x0 support for the OMAP4 SoCs.
+> > 
+> > Thanks to Rob Herring for this suggestion. [1]
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > 
+> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074495.html
+> > ---
+> >  arch/arm/mach-omap2/Kconfig |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> > index bb1b670..94e568a 100644
+> > --- a/arch/arm/mach-omap2/Kconfig
+> > +++ b/arch/arm/mach-omap2/Kconfig
+> > @@ -41,11 +41,11 @@ config ARCH_OMAP4
+> >  	bool "TI OMAP4"
+> >  	default y
+> >  	depends on ARCH_OMAP2PLUS
+> > +	select CACHE_L2X0
+> >  	select CPU_V7
+> >  	select ARM_GIC
+> >  	select HAVE_SMP
+> >  	select LOCAL_TIMERS if SMP
+> > -	select MIGHT_HAVE_CACHE_L2X0
+> >  	select PL310_ERRATA_588369
+> >  	select PL310_ERRATA_727915
+> >  	select ARM_ERRATA_720789
+> > -- 
+> > 1.7.4.1
+> > 
+
+To clarify, are you suggesting we retain this patch, or not?
+
+(If we only know what l2x0 support will be needed once the dts is
+parsed at runtime, there could be an argument for keeping the
+select CACHE_L2X0 here -- unless we have specific kconfigs for
+the different security variants of omap.)
+
+Cheers
+---Dave
