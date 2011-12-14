@@ -1,35 +1,88 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 14 Dec 2011 01:26:49 +0100 (CET)
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
- online/active
-In-Reply-To: <CAPz4a6BwzAmE=08pCfhK5of0vEV+uPaf8D-9U_MnW5_vAe6NFw@mail.gmail.com>
-References: <20110908215314.829452535@linutronix.de>
- <CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
- <20110913133258.GA6267@n2100.arm.linux.org.uk>
- <CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
- <20110913175312.GB6267@n2100.arm.linux.org.uk>
- <20110923084001.GP17169@n2100.arm.linux.org.uk>
- <01d501cc84d6$62720890$275619b0$%kim@samsung.com>
- <alpine.LFD.2.02.1110071354310.3240@ionos>
- <CAPz4a6CkOXp6LHX2hFYVBhXWT4rhCUzLyYTLbO7g8u_jYcHt7Q@mail.gmail.com>
- <CAPz4a6C7md+k8pCz6mJtB-v_1h-faGxQZkOqU9vHUtcG-jrYVQ@mail.gmail.com>
- <4EC2DF93.2050904@codeaurora.org> <alpine.LFD.2.02.1111152259430.4902@ionos>
- <CAPz4a6BwzAmE=08pCfhK5of0vEV+uPaf8D-9U_MnW5_vAe6NFw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1112140124480.3020@ionos>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 14 Dec 2011 08:44:06 +0800
+Subject: [PATCH v5] tty: serial: imx: Allow UART to be a source for wakeup
+In-Reply-To: <1323746628-25163-1-git-send-email-festevam@gmail.com>
+References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
+ <1323746628-25163-1-git-send-email-festevam@gmail.com>
+Message-ID: <20111214004405.GI28768@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Dec 2011, Dima Zavin wrote:
-
-> Thomas,
+On Tue, Dec 13, 2011 at 01:23:48AM -0200, Fabio Estevam wrote:
+> Allow UART to be a source for wakeup from low power mode.
 > 
-> Did you ever get a chance to look into this further?
-
-Yes, Peter and I are still debating the proper solution as this does
-not only affect ARM. It looks like most of arch/* implementations are
-hosed in one way or the other. Funny enough Peter and I put this on to
-the tomorrow todo list a few hours ago.
-
-Thanks,
-
-	tglx
+> Tested on a MX27PDK by doing:
+> 
+> echo enabled > /sys/devices/platform/imx21-uart.0/tty/ttymxc0/power/wakeup
+> 
+> echo mem > /sys/power/state
+> 
+> and then pressing a key in the console will wakeup the sytem.
+> 
+> Suggested-by: Shawn Guo <shawn.guo@freescale.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+For imx6q sabrelite,
+Tested-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+> Changes since v4:
+> - Let serial core handle device_init_wakeup/device_set_wakeup_enable.
+> Changes since v3:
+> - Remove IMXUART_CANWAKE flag. Let userspace write in /sys/ file
+> in order to enable UART wakeup source.
+> Changes since v2:
+> - Remove incorrect enable_irq_wake from serial_imx_resume
+> Changes since v1:
+> - Pass the can-wake property via DT correctly
+>  drivers/tty/serial/imx.c |   15 +++++++++++++++
+>  1 files changed, 15 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 163fc90..0022bbd 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -566,6 +566,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
+>  	if (sts & USR1_RTSD)
+>  		imx_rtsint(irq, dev_id);
+>  
+> +	if (sts & USR1_AWAKE)
+> +		writel(USR1_AWAKE, sport->port.membase + USR1);
+> +
+>  	return IRQ_HANDLED;
+>  }
+>  
+> @@ -1269,6 +1272,12 @@ static struct uart_driver imx_reg = {
+>  static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+>  {
+>  	struct imx_port *sport = platform_get_drvdata(dev);
+> +	unsigned int val;
+> +
+> +	/* enable wakeup from i.MX UART */
+> +	val = readl(sport->port.membase + UCR3);
+> +	val |= UCR3_AWAKEN;
+> +	writel(val, sport->port.membase + UCR3);
+>  
+>  	if (sport)
+>  		uart_suspend_port(&imx_reg, &sport->port);
+> @@ -1279,7 +1288,13 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+>  static int serial_imx_resume(struct platform_device *dev)
+>  {
+>  	struct imx_port *sport = platform_get_drvdata(dev);
+> +	unsigned int val;
+>  
+> +	/* disable wakeup from i.MX UART */
+> +	val = readl(sport->port.membase + UCR3);
+> +	val &= ~UCR3_AWAKEN;
+> +	writel(val, sport->port.membase + UCR3);
+> +
+>  	if (sport)
+>  		uart_resume_port(&imx_reg, &sport->port);
+>  
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
