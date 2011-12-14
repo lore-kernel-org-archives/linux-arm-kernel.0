@@ -1,64 +1,118 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 14 Dec 2011 15:01:19 +0000
-Subject: [PATCH v4 REPOST 5/5] imx6q: Remove unconditional dependency on
- l2x0 L2 cache support
-In-Reply-To: <20111214140500.GA1700@richard-laptop>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
- <1323862781-3465-6-git-send-email-dave.martin@linaro.org>
- <20111214132622.GA1520@S2100-06.ap.freescale.net>
- <20111214140500.GA1700@richard-laptop>
-Message-ID: <20111214150119.GD2568@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 14 Dec 2011 17:03:12 +0200
+Subject: [PATCH v7 00/14] Add support for tegra30 and cardhu
+Message-ID: <1323875032-18221-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 10:05:04PM +0800, Richard Zhao wrote:
-> On Wed, Dec 14, 2011 at 09:26:24PM +0800, Shawn Guo wrote:
-> > Hi Dave,
-> > 
-> > Sorry for that I did not look into previous post to point it out.
-> > 
-> > On Wed, Dec 14, 2011 at 11:39:41AM +0000, Dave Martin wrote:
-> > > The i.MX6 Quad SoC will work without the l2x0 L2 cache controller
-> > > support built into the kernel, so this patch removes the dependency
-> > > on CACHE_L2X0 and selects MIGHT_HAVE_CACHE_L2X0 instead.
-> > > 
-> > > This makes the l2x0 support optional, so that it can be turned off
-> > > when desired for debugging purposes etc.
-> > > 
-> > > Thanks to Shawn Guo for this suggestion. [1]
-> > > 
-> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > > 
-> > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
-> > > ---
-> > >  arch/arm/mach-imx/Kconfig |    2 +-
-> > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > > index 29a3d61..1fb93f2 100644
-> > > --- a/arch/arm/mach-imx/Kconfig
-> > > +++ b/arch/arm/mach-imx/Kconfig
-> > > @@ -609,13 +609,13 @@ comment "i.MX6 family:"
-> > >  config SOC_IMX6Q
-> > >  	bool "i.MX6 Quad support"
-> > >  	select ARM_GIC
-> > > -	select CACHE_L2X0
-> > >  	select CPU_V7
-> > >  	select HAVE_ARM_SCU
-> > >  	select HAVE_IMX_GPC
-> > >  	select HAVE_IMX_MMDC
-> > >  	select HAVE_IMX_SRC
-> > >  	select HAVE_SMP
-> > > +	select MIGHT_HAVE_CACHE_L2X0
-> > 
-> > The option SOC_IMX6Q is only available when ARCH_IMX_V6_V7 is selected.
-> > Since MIGHT_HAVE_CACHE_L2X0 has been selected by ARCH_IMX_V6_V7 in
-> > patch #1, this line seems redundant here.
-> Would it be better keep this one and remove patch #1 one? imx5 doesn't have
-> l2x0.
+This patchset adds support for the tegra30 SoC and the cardhu development
+board.
 
-Do you mean to remove MIGHT_HAVE_CACHE_L2X0 from ARCH_IMX_V6_V7, and select
-it only from SOC_IMX6Q?
+Patchset is on top of linux-next and
+http://www.spinics.net/lists/linux-tegra/msg03016.html.
 
-Cheers
----Dave
+Most important changes in v7:
+
+* split board-dt.c in board-dt-tegra20.c and board-dt-tegra30.c
+* split early init preparation into several patches
+* remove tegra_sdmmc_tap_delay. Drivers should use tegra2_sdmmc_tap_delay as
+  from tegra30 onwards this feature will no longer handled by the clock code
+  as it's implemented in the SDMMC block now.
+* remove CONFIG_CARDHU and the corresponding Kconfig entry
+
+Most important changes in v6:
+
+* Align with latest version of the ARM restart implementation
+* Address comments on tegra_sdmmc_tap_delay()
+
+Most important changes in v5:
+
+* use devicetree binding for GIC
+* define a seperate machine for tegra30
+* add documentation for tegra devicetree compatible definitions
+
+Most important changes in v4:
+
+* cleanup clock code to work on multiple tegra variants
+* added dependencies to avoid building tegra20 only code for tegra30
+
+Most important changes in v3:
+
+* align with ARM restart rework. might need a bit of rework to merge with the
+  latest version of this.
+* minor cleanups and reformats
+
+Most important changes in v2:
+
+* account for arch_reset cleanup
+* seperate patch for renaming pinmux-t2.h and pinmux-t2-tables.c
+* fixed bug in common cache initialization
+* fixed compatibility with non DT boards (boottested on harmony)
+* improved commit messages
+
+Peter De Schrijver (14):
+  arm/tegra: initial device tree for tegra30
+  arm/tegra: cleanup tegra20 support
+  arm/tegra: prepare clock code for multiple tegra variants
+  arm/tegra: don't export clk_measure_input_freq
+  arm/tegra: prepare early init for multiple tegra variants
+  arm/tegra: rename board-dt.c to board-dt-tegra20.c
+  arm/tegra: use PMC reset
+  arm/tegra: generalize L2 cache initialization
+  arm/tegra: rename tegra20 pinmux files
+  arm/tegra: prepare pinmux code for multiple tegra variants
+  arm/tegra: add new fields to struct tegra_pingroup_desc
+  arm/tegra: pinmux tables and definitions for tegra30
+  arm/tegra: implement support for tegra30
+  arm/tegra: add support for tegra30 based board cardhu
+
+ Documentation/devicetree/bindings/arm/tegra.txt   |   14 +
+ arch/arm/boot/dts/tegra-cardhu.dts                |   36 ++
+ arch/arm/boot/dts/tegra30.dtsi                    |  127 +++++++
+ arch/arm/mach-tegra/Kconfig                       |   30 ++-
+ arch/arm/mach-tegra/Makefile                      |    9 +-
+ arch/arm/mach-tegra/Makefile.boot                 |    1 +
+ arch/arm/mach-tegra/board-dt-tegra20.c            |  143 ++++++++
+ arch/arm/mach-tegra/board-dt-tegra30.c            |   63 ++++
+ arch/arm/mach-tegra/board-dt.c                    |  154 ---------
+ arch/arm/mach-tegra/board-harmony-pcie.c          |    1 +
+ arch/arm/mach-tegra/board-harmony-pinmux.c        |    1 +
+ arch/arm/mach-tegra/board-harmony.c               |    2 +-
+ arch/arm/mach-tegra/board-paz00-pinmux.c          |    1 +
+ arch/arm/mach-tegra/board-paz00.c                 |    2 +-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c       |    2 +-
+ arch/arm/mach-tegra/board-seaboard.c              |    6 +-
+ arch/arm/mach-tegra/board-trimslice-pinmux.c      |    1 +
+ arch/arm/mach-tegra/board-trimslice.c             |    2 +-
+ arch/arm/mach-tegra/board.h                       |    4 +-
+ arch/arm/mach-tegra/clock.c                       |   20 +-
+ arch/arm/mach-tegra/clock.h                       |    4 -
+ arch/arm/mach-tegra/common.c                      |   53 +++-
+ arch/arm/mach-tegra/include/mach/clk.h            |    2 +-
+ arch/arm/mach-tegra/include/mach/irqs.h           |    2 -
+ arch/arm/mach-tegra/include/mach/pinmux-t2.h      |  184 ----------
+ arch/arm/mach-tegra/include/mach/pinmux-tegra20.h |  184 ++++++++++
+ arch/arm/mach-tegra/include/mach/pinmux-tegra30.h |  320 ++++++++++++++++++
+ arch/arm/mach-tegra/include/mach/pinmux.h         |   88 ++++-
+ arch/arm/mach-tegra/pinmux-t2-tables.c            |  228 -------------
+ arch/arm/mach-tegra/pinmux-tegra20-tables.c       |  244 +++++++++++++
+ arch/arm/mach-tegra/pinmux-tegra30-tables.c       |  376 +++++++++++++++++++++
+ arch/arm/mach-tegra/pinmux.c                      |  153 ++++++---
+ arch/arm/mach-tegra/tegra2_clocks.c               |   19 +-
+ arch/arm/mach-tegra/timer.c                       |   12 +-
+ 34 files changed, 1789 insertions(+), 699 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra.txt
+ create mode 100644 arch/arm/boot/dts/tegra-cardhu.dts
+ create mode 100644 arch/arm/boot/dts/tegra30.dtsi
+ create mode 100644 arch/arm/mach-tegra/board-dt-tegra20.c
+ create mode 100644 arch/arm/mach-tegra/board-dt-tegra30.c
+ delete mode 100644 arch/arm/mach-tegra/board-dt.c
+ delete mode 100644 arch/arm/mach-tegra/include/mach/pinmux-t2.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/pinmux-tegra20.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/pinmux-tegra30.h
+ delete mode 100644 arch/arm/mach-tegra/pinmux-t2-tables.c
+ create mode 100644 arch/arm/mach-tegra/pinmux-tegra20-tables.c
+ create mode 100644 arch/arm/mach-tegra/pinmux-tegra30-tables.c
+
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
