@@ -1,75 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 14 Dec 2011 22:11:52 +0100
-Subject: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux subsystem
-In-Reply-To: <1323878622-26602-5-git-send-email-b29396@freescale.com>
-References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
- <1323878622-26602-5-git-send-email-b29396@freescale.com>
-Message-ID: <20111214211152.GM27267@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 14 Dec 2011 14:14:28 -0700
+Subject: [PATCH 3/9] irq: convert generic-chip to use irq_domain
+In-Reply-To: <1323876538-20406-4-git-send-email-robherring2@gmail.com>
+References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
+ <1323876538-20406-4-git-send-email-robherring2@gmail.com>
+Message-ID: <CACxGe6sqTx4h3vPgq+XrAoqLTiDMB-vcS5C9GgYssdsSYV_0qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 12:03:42AM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
+On Wed, Dec 14, 2011 at 8:28 AM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Add irq domain support to irq generic-chip. This enables users of
+> generic-chip to support dynamic irq assignment needed for DT interrupt
+> binding. Users must be converted to use irq_data.hwirq for determining
+> local interrupt numbers rather than using the Linux irq number.
+>
+> irq_base is kept for now as there are a few users of it. Once they
+> are converted to use the irq domain, it can be removed.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
 > ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   20 ++++++++++++++++++++
->  1 files changed, 20 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 4b976f0..4504136 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -24,6 +24,7 @@
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/of_gpio.h>
-> +#include <linux/pinctrl/pinmux.h>
->  #include <mach/esdhc.h>
->  #include "sdhci-pltfm.h"
->  #include "sdhci-esdhc.h"
-> @@ -68,6 +69,7 @@ struct pltfm_imx_data {
->  	int flags;
->  	u32 scratchpad;
->  	enum imx_esdhc_type devtype;
-> +	struct pinmux *pmx;
->  	struct esdhc_platform_data boarddata;
->  };
->  
-> @@ -439,6 +441,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  	struct clk *clk;
->  	int err;
->  	struct pltfm_imx_data *imx_data;
-> +	struct pinmux *pmx;
->  
->  	host = sdhci_pltfm_init(pdev, &sdhci_esdhc_imx_pdata);
->  	if (IS_ERR(host))
-> @@ -466,6 +469,16 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  	clk_enable(clk);
->  	pltfm_host->clk = clk;
->  
-> +	pmx = pinmux_get(&pdev->dev, NULL);
-> +	if (IS_ERR(pmx)) {
-> +		err = PTR_ERR(pmx);
-> +		goto err_pmx_get;
-> +	}
-> +	err = pinmux_enable(pmx);
-> +	if (err)
-> +		goto err_pmx_enable;
-> +	imx_data->pmx = pmx;
-> +
+> ?include/linux/irq.h ? ? ? | ? ?2 +-
+> ?kernel/irq/Kconfig ? ? ? ?| ? ?1 +
+> ?kernel/irq/generic-chip.c | ? 57 ++++++++++++++++++++++++++++----------------
+> ?3 files changed, 38 insertions(+), 22 deletions(-)
+>
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index bff29c5..9ba8a30 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -664,7 +664,7 @@ struct irq_chip_generic {
+> ? ? ? ?raw_spinlock_t ? ? ? ? ?lock;
+> ? ? ? ?void __iomem ? ? ? ? ? ?*reg_base;
+> ? ? ? ?unsigned int ? ? ? ? ? ?irq_base;
+> - ? ? ? unsigned int ? ? ? ? ? ?irq_cnt;
+> + ? ? ? struct irq_domain ? ? ? *domain;
 
-Won't this break every i.MX except i.MX6?
+Instead of making domain a pointer, why not embed the structure inside
+irq_chip_generic?  I don't see a reason for keeping it separate.
 
-Sascha
+After changing that you can add my Acked-by for this patch.
+
+g.
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
