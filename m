@@ -1,78 +1,46 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 14 Dec 2011 14:39:51 -0700
-Subject: [PATCH 9/9] ARM: highbank: add interrupt properties to gpio nodes
-In-Reply-To: <1323876538-20406-10-git-send-email-robherring2@gmail.com>
-References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
- <1323876538-20406-10-git-send-email-robherring2@gmail.com>
-Message-ID: <CACxGe6vDsk9W0Wnr02RhbfKaWWFXHG5vQD_+bKT5h0H88UAOgw@mail.gmail.com>
+Date: Wed, 14 Dec 2011 14:41:01 -0700
+Subject: [RFC PATCH v2 1/4] dt: add of_get_child_number helper function
+In-Reply-To: <4EE8E52C.1030506@gmail.com>
+References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+ <1323878622-26602-2-git-send-email-b29396@freescale.com>
+ <4EE8E52C.1030506@gmail.com>
+Message-ID: <CACxGe6tQO=5oGXjpZ_VD+Pzs+mPKgdciKBHiA6YBf4PHfe_Q7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 8:28 AM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Wed, Dec 14, 2011 at 11:04 AM, Rob Herring <robherring2@gmail.com> wrote:
+> Dong,
 >
-> Add interrupt-controller properties to pl061 gpio nodes so gpio lines can
-> function as interrupts.
+> On 12/14/2011 10:03 AM, Dong Aisheng wrote:
+>> From: Dong Aisheng <dong.aisheng@linaro.org>
+>>
+>> Currently most code to get child number in kernel are almost same,
+>> add a helper to implement this function for dt to use.
+>>
+>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>> ?include/linux/of.h | ? 17 +++++++++++++++++
+>> ?1 files changed, 17 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/include/linux/of.h b/include/linux/of.h
+>> index 4948552..09d53dc 100644
+>> --- a/include/linux/of.h
+>> +++ b/include/linux/of.h
+>> @@ -189,6 +189,18 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
+>> ? ? ? for (child = of_get_next_child(parent, NULL); child != NULL; \
+>> ? ? ? ? ? ?child = of_get_next_child(parent, child))
+>>
+>> +static inline int of_get_child_number(struct device_node *np)
 >
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> I would call this of_get_child_count instead.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+I agree.
 
-> ---
-> ?arch/arm/boot/dts/highbank.dts | ? ?9 ++++++++-
-> ?1 files changed, 8 insertions(+), 1 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-> index aeb1a75..dfe2b49 100644
-> --- a/arch/arm/boot/dts/highbank.dts
-> +++ b/arch/arm/boot/dts/highbank.dts
-> @@ -89,7 +89,6 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?#size-cells = <0>;
-> ? ? ? ? ? ? ? ? ? ? ? ?#address-cells = <1>;
-> ? ? ? ? ? ? ? ? ? ? ? ?interrupt-controller;
-> - ? ? ? ? ? ? ? ? ? ? ? interrupt-parent;
-> ? ? ? ? ? ? ? ? ? ? ? ?reg = <0xfff11000 0x1000>,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?<0xfff10100 0x100>;
-> ? ? ? ? ? ? ? ?};
-> @@ -129,6 +128,8 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
-> ? ? ? ? ? ? ? ? ? ? ? ?compatible = "arm,pl061", "arm,primecell";
-> ? ? ? ? ? ? ? ? ? ? ? ?gpio-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <2>;
-> ? ? ? ? ? ? ? ? ? ? ? ?reg = <0xfff30000 0x1000>;
-> ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <0 14 4>;
-> ? ? ? ? ? ? ? ?};
-> @@ -137,6 +138,8 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
-> ? ? ? ? ? ? ? ? ? ? ? ?compatible = "arm,pl061", "arm,primecell";
-> ? ? ? ? ? ? ? ? ? ? ? ?gpio-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <2>;
-> ? ? ? ? ? ? ? ? ? ? ? ?reg = <0xfff31000 0x1000>;
-> ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <0 15 4>;
-> ? ? ? ? ? ? ? ?};
-> @@ -145,6 +148,8 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
-> ? ? ? ? ? ? ? ? ? ? ? ?compatible = "arm,pl061", "arm,primecell";
-> ? ? ? ? ? ? ? ? ? ? ? ?gpio-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <2>;
-> ? ? ? ? ? ? ? ? ? ? ? ?reg = <0xfff32000 0x1000>;
-> ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <0 16 4>;
-> ? ? ? ? ? ? ? ?};
-> @@ -153,6 +158,8 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
-> ? ? ? ? ? ? ? ? ? ? ? ?compatible = "arm,pl061", "arm,primecell";
-> ? ? ? ? ? ? ? ? ? ? ? ?gpio-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <2>;
-> ? ? ? ? ? ? ? ? ? ? ? ?reg = <0xfff33000 0x1000>;
-> ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <0 17 4>;
-> ? ? ? ? ? ? ? ?};
-> --
-> 1.7.5.4
->
+> Rob
 
 
 
