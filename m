@@ -1,57 +1,48 @@
-From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Wed, 14 Dec 2011 09:35:25 -0500
-Subject: [PATCH] arm,
- davinci: configure davinci aemif chipselects through OF
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B60471C1@DBDE01.ent.ti.com>
-References: <1322991679-20947-1-git-send-email-hs@denx.de>
- <4EE07E27.8090602@denx.de>
- <DF0F476B391FA8409C78302C7BA518B6040CBB@DBDE01.ent.ti.com>
- <201112081548.08548.arnd@arndb.de>
- <DF0F476B391FA8409C78302C7BA518B60471C1@DBDE01.ent.ti.com>
-Message-ID: <CAPcSpELkWJpP9-3UoNHF_aWSdd_b0FHNooNm+zF7UTjHEBC_vg@mail.gmail.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Wed, 14 Dec 2011 20:11:55 +0530
+Subject: [PATCH v3 0/4] OMAP serial device tree support
+In-Reply-To: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+Message-ID: <CAAL8m4yA_pdaL6_reEtcvGSZBHw5XdrcVLevTNL2GON09174=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd and Sekhar,
+Hi Rajendra,
 
-On Tue, Dec 13, 2011 at 1:34 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
-> [...]
-> On Thu, Dec 08, 2011 at 21:18:08, Arnd Bergmann wrote:
->> [...]
->> If you want it to provide endpoint devices that are handled by
->> distinct subsystems in Linux, I would make it an mfd multifunction
->> device and make the common code a driver that scans the connected
->> memories in order to register its child devices for each of the
->> subsystems.
+On Wed, Dec 14, 2011 at 5:25 PM, Rajendra Nayak <rnayak@ti.com> wrote:
+> v3 is rebased on top of the latest serial runtime
+> patches[1] and boot tested with/without DT on OMAP4
+> SDP and OMAP4 Panda boards.
 >
-> Okay. Thanks for the explanation. Since the users of AEMIF at this
-> point are mtd devices, I propose moving it to drivers/mtd/davinci-aemif.c
-> (of course, mtd folks need to approve).
+> Patches can be found here..
+> git://gitorious.org/omap-pm/linux.git for-dt/serial
+>
+> I also had to pull in a fix[2] for DT testing (already in linux-omap
+> master) which was missing as the serial runtime branch[1]
+> was based on an older master commit.
+>
+> Changes in v3:
+> -1- Rebased on latest serial runtime patches
+> -2- Minor typr fixes
+>
+> Changes in v2:
+> -1- Got rid of binding to define which uart is console
+> -2- Added checks to default clock speed to 48Mhz
+> -3- Added compatible for each OMAP family
+> -4- Used of_alias_get_id to populate port.line
+>
+> [1] git://gitorious.org/runtime_3-0/runtime_3-0.git for_3_3/lo_rc4_uartruntime
+> [2] http://www.spinics.net/lists/arm-kernel/msg150751.html
+>
 
-We have a vested interest in the davinci AEMIF setup facilities
-in-kernel; I'm electing to pipe-up now rather than later. Sadly our
-board is not yet in mainline so my opinions may be redirected to the
-bit-bucket as you see fit. We are planning to post a patch series for
-our complete board support -- but we can't do it right now.
+I merged this patch series to a tmp_intg branch [1]
+having uart runtime changes and sanity tested on
+3430sdp/zoom3/panda seems fine.
 
-The AEMIF is useful for interfacing to other asynchronous devices too;
-our newest board uses it for accessing memory mapped FPGA functional
-blocks via UIO and for permanent storage to a compact flash using
-pata_platform. In both cases the timings and mode for the chip-select
-are manually configured before the devices are registered. In both
-cases the performance of the endpoints could be better preserved
-across CPU freq transitions if the hooks for cpufreq transitions
-recently proposed by Sudhakar [1] were part of an mfd device and hence
-applicable to devices other than mtd.
+--
+Thanks,
+Govindraj.R
 
-Again, I apologize for requesting features for boards that are not yet
-in mainline.
-
-Best Regards,
-Ben Gardiner
-
-[1] http://article.gmane.org/gmane.linux.drivers.mtd/36876/
-
----
-Nanometrics Inc.
-http://www.nanometrics.ca
+[1]:
+git://gitorious.org/runtime_3-0/runtime_3-0.git
+for_3_3/tmp_rc4_uart_pm_intg
