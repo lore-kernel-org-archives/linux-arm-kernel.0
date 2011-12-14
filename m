@@ -1,68 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Dec 2011 17:29:06 -0600
-Subject: [PATCH 3/9] irq: convert generic-chip to use irq_domain
-In-Reply-To: <CACxGe6uTp_=G4ODqzJdOTou2gzAM9LX8xHtKkeL8Safq0+B2rw@mail.gmail.com>
-References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
- <1323876538-20406-4-git-send-email-robherring2@gmail.com>
- <CACxGe6sqTx4h3vPgq+XrAoqLTiDMB-vcS5C9GgYssdsSYV_0qA@mail.gmail.com>
- <4EE913C7.1060901@gmail.com>
- <CACxGe6uTp_=G4ODqzJdOTou2gzAM9LX8xHtKkeL8Safq0+B2rw@mail.gmail.com>
-Message-ID: <4EE93142.9060904@gmail.com>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Thu, 15 Dec 2011 01:30:13 +0200
+Subject: [linux-next] make  s5p64x0_defconfig build error
+In-Reply-To: <20111214191205.GF14542@n2100.arm.linux.org.uk>
+References: <1323838630.18517.1.camel@phoenix>
+ <20111214123244.GE7122@mudshark.cambridge.arm.com>
+ <20111214191205.GF14542@n2100.arm.linux.org.uk>
+Message-ID: <4EE93185.9030502@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2011 03:26 PM, Grant Likely wrote:
-> On Wed, Dec 14, 2011 at 2:23 PM, Rob Herring <robherring2@gmail.com> wrote:
->>
->>
->> On 12/14/2011 03:14 PM, Grant Likely wrote:
->>> On Wed, Dec 14, 2011 at 8:28 AM, Rob Herring <robherring2@gmail.com> wrote:
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> Add irq domain support to irq generic-chip. This enables users of
->>>> generic-chip to support dynamic irq assignment needed for DT interrupt
->>>> binding. Users must be converted to use irq_data.hwirq for determining
->>>> local interrupt numbers rather than using the Linux irq number.
->>>>
->>>> irq_base is kept for now as there are a few users of it. Once they
->>>> are converted to use the irq domain, it can be removed.
->>>>
->>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>> ---
->>>>  include/linux/irq.h       |    2 +-
->>>>  kernel/irq/Kconfig        |    1 +
->>>>  kernel/irq/generic-chip.c |   57 ++++++++++++++++++++++++++++----------------
->>>>  3 files changed, 38 insertions(+), 22 deletions(-)
->>>>
->>>> diff --git a/include/linux/irq.h b/include/linux/irq.h
->>>> index bff29c5..9ba8a30 100644
->>>> --- a/include/linux/irq.h
->>>> +++ b/include/linux/irq.h
->>>> @@ -664,7 +664,7 @@ struct irq_chip_generic {
->>>>        raw_spinlock_t          lock;
->>>>        void __iomem            *reg_base;
->>>>        unsigned int            irq_base;
->>>> -       unsigned int            irq_cnt;
->>>> +       struct irq_domain       *domain;
->>>
->>> Instead of making domain a pointer, why not embed the structure inside
->>> irq_chip_generic?  I don't see a reason for keeping it separate.
->>>
->>
->> There is a circular header dependency between irq.h and irq_domain.h.
->> Maybe I just need to put the include of irq_domain.h just above here
->> rather than the top of the file.
-> 
-> Yes, try that.  I'd rather get the dependency problem sorted out.
-> Alternately, problematic bit of irq_domain.h can be moved to another
-> header.
-> 
-Things always start out so simple...
+On 12/14/2011 09:12 PM, Russell King - ARM Linux wrote:
+> On Wed, Dec 14, 2011 at 12:32:44PM +0000, Will Deacon wrote:
+>> On Wed, Dec 14, 2011 at 04:57:10AM +0000, Axel Lin wrote:
+> So... unless things change, we can expect Gemini, almost all Samsung
+> stuff, shmobile, vt8500, and Telechips TCC8k to be at least broken at
+> the next merge window.
 
-Removing irq.h from irqdomain.h fixes my original problem. However, that
-breaks on x86 since x86 has it's own struct irq_domain. Some ifdef'ing
-could fix it since x86 doesn't use irq_chip_generic. Didn't you have
-converting x86 in your original irq domain patches?
+Mini2440 march (s3c24xx platform) is not broken in v3.2-rc5. Does that
+mean that s3c24xx is untouched by this issue or this means that I should
+use linux-next?
+If this problem is related to s3c24xx I'm ready to do my best for saving
+that platform from being removed.
 
-Rob
+-- 
+Best regards, Denis Kuzmenko.
