@@ -1,162 +1,57 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 14 Dec 2011 16:26:23 +0200
-Subject: [PATCH v3] ARM: OMAP3LOGIC: Adding DSS support
-In-Reply-To: <1323865510-6273-1-git-send-email-alexg@meprolight.com>
-References: <1323865510-6273-1-git-send-email-alexg@meprolight.com>
-Message-ID: <4EE8B20F.5070907@compulab.co.il>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Wed, 14 Dec 2011 09:35:25 -0500
+Subject: [PATCH] arm,
+ davinci: configure davinci aemif chipselects through OF
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B60471C1@DBDE01.ent.ti.com>
+References: <1322991679-20947-1-git-send-email-hs@denx.de>
+ <4EE07E27.8090602@denx.de>
+ <DF0F476B391FA8409C78302C7BA518B6040CBB@DBDE01.ent.ti.com>
+ <201112081548.08548.arnd@arndb.de>
+ <DF0F476B391FA8409C78302C7BA518B60471C1@DBDE01.ent.ti.com>
+Message-ID: <CAPcSpELkWJpP9-3UoNHF_aWSdd_b0FHNooNm+zF7UTjHEBC_vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hello Arnd and Sekhar,
 
-On 12/14/11 14:25, Alex wrote:
-> This patch adds DSS2 support to the LogicPD OMAP 35x Torpedo boardfile. LCD and
-> TV-out are supported.
-> 
-> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
-> ---
->  arch/arm/mach-omap2/board-omap3logic.c |   96 ++++++++++++++++++++++++++++++++
->  1 files changed, 96 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-> index 7c0f193..b44c485 100644
-> --- a/arch/arm/mach-omap2/board-omap3logic.c
-> +++ b/arch/arm/mach-omap2/board-omap3logic.c
-> @@ -7,6 +7,9 @@
->   * Copyright (C) 2010 Logic Product Development, Inc.
->   * Peter Barada <peter.barada@logicpd.com>
->   *
-> + * Copyright (C) 2011 Meprolight, Ltd.
-> + * Alex Gershgorin <alexg@meprolight.com>
-> + *
->   * Modified from Beagle, EVM, and RX51
->   *
->   * This program is free software; you can redistribute it and/or modify
-> @@ -45,6 +48,9 @@
->  #include <plat/gpmc.h>
->  #include <plat/sdrc.h>
->  
-> +#include <video/omapdss.h>
-> +#include <video/omap-panel-generic-dpi.h>
-> +
->  #define OMAP3LOGIC_SMSC911X_CS			1
->  
->  #define OMAP3530_LV_SOM_MMC_GPIO_CD		110
-> @@ -95,6 +101,13 @@ static struct twl4030_platform_data omap3logic_twldata = {
->  
->  static int __init omap3logic_i2c_init(void)
->  {
-> +	omap3_pmic_get_config(&omap3logic_twldata, TWL_COMMON_PDATA_USB,
-> +			TWL_COMMON_REGULATOR_VDAC | TWL_COMMON_REGULATOR_VPLL2);
-> +
-> +	omap3logic_twldata.vdac->constraints.apply_uV = true;
-> +	omap3logic_twldata.vpll2->constraints.apply_uV = true;
-> +	omap3logic_twldata.vpll2->constraints.name = "VDSI";
-> +
->  	omap3_pmic_init("twl4030", &omap3logic_twldata);
->  	return 0;
->  }
-> @@ -182,6 +195,88 @@ static inline void __init board_smsc911x_init(void)
->  	gpmc_smsc911x_init(&board_smsc911x_data);
->  }
->  
-> +#if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
-> +
-> +#define OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO	154
-> +#define OMAP3_TORPEDO_LCD_ENABLE_GPIO		155
-> +#define OMAP3_TORPEDO_LCD_PWM_GPIO		56
-> +
-> +static struct gpio omap3logic_dss_gpios[] __initdata = {
-> +	{OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, GPIOF_OUT_INIT_LOW, "lcd_bl_pwr"},
-> +	{OMAP3_TORPEDO_LCD_PWM_GPIO, GPIOF_OUT_INIT_LOW, "lcd bl enable"},
-> +	{OMAP3_TORPEDO_LCD_ENABLE_GPIO, GPIOF_OUT_INIT_LOW, "lcd enable"},
-> +};
-> +
-> +static int omap3logic_enable_lcd(struct omap_dss_device *dssdev)
-> +{
-> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 1);
-> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 1);
-> +	gpio_set_value(OMAP3_TORPEDO_LCD_PWM_GPIO, 1);
-> +
-> +	return 0;
-> +}
-> +
-> +static void omap3logic_disable_lcd(struct omap_dss_device *dssdev)
-> +{
-> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 0);
-> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 0);
-> +	gpio_set_value(OMAP3_TORPEDO_LCD_PWM_GPIO, 0);
-> +}
-> +
-> +static struct panel_generic_dpi_data lcd_panel = {
-> +	.name			= "sharp_lq",
-> +	.platform_enable	= omap3logic_enable_lcd,
-> +	.platform_disable	= omap3logic_disable_lcd,
-> +};
-> +
-> +static struct omap_dss_device omap3logic_lcd_device = {
-> +	.name			= "lcd",
-> +	.driver_name		= "generic_dpi_panel",
-> +	.type			= OMAP_DISPLAY_TYPE_DPI,
-> +	.data			= &lcd_panel,
-> +	.phy.dpi.data_lines	= 16,
-> +};
-> +
-> +static struct omap_dss_device omap3logic_tv_device = {
-> +	.name			= "tv",
-> +	.driver_name		= "venc",
-> +	.type			= OMAP_DISPLAY_TYPE_VENC,
-> +	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
-> +};
-> +
-> +static struct omap_dss_device *omap3logic_dss_devices[] = {
-> +	&omap3logic_lcd_device,
-> +	&omap3logic_tv_device,
-> +};
-> +
-> +static struct omap_dss_board_info omap3logic_dss_data = {
-> +	.num_devices		= ARRAY_SIZE(omap3logic_dss_devices),
-> +	.devices		= omap3logic_dss_devices,
-> +	.default_device		= &omap3logic_lcd_device,
-> +};
-> +
-> +static void __init omap3logic_display_init(void)
-> +{
-> +	int r;
-> +
-> +	r = gpio_request_array(omap3logic_dss_gpios,
-> +			       ARRAY_SIZE(omap3logic_dss_gpios));
-> +	if (r) {
-> +		printk(KERN_ERR "failed to get lcd_panel_* gpios\n");
+On Tue, Dec 13, 2011 at 1:34 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> [...]
+> On Thu, Dec 08, 2011 at 21:18:08, Arnd Bergmann wrote:
+>> [...]
+>> If you want it to provide endpoint devices that are handled by
+>> distinct subsystems in Linux, I would make it an mfd multifunction
+>> device and make the common code a driver that scans the connected
+>> memories in order to register its child devices for each of the
+>> subsystems.
+>
+> Okay. Thanks for the explanation. Since the users of AEMIF at this
+> point are mtd devices, I propose moving it to drivers/mtd/davinci-aemif.c
+> (of course, mtd folks need to approve).
 
-You use pr_err() below, why not here?
+We have a vested interest in the davinci AEMIF setup facilities
+in-kernel; I'm electing to pipe-up now rather than later. Sadly our
+board is not yet in mainline so my opinions may be redirected to the
+bit-bucket as you see fit. We are planning to post a patch series for
+our complete board support -- but we can't do it right now.
 
-> +		return;
-> +	}
-> +
-> +	r = omap_display_init(&omap3logic_dss_data);
-> +	if (r) {
-> +		pr_err("OMAP3LOGIC: failed to register DSS device\n");
-> +		gpio_free_array(omap3logic_dss_gpios,
-> +				ARRAY_SIZE(omap3logic_dss_gpios));
-> +	}
-> +}
-> +#else
-> +static void __init omap3logic_display_init(void) { }
-> +#endif /* defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE) */
-> +
->  #ifdef CONFIG_OMAP_MUX
->  static struct omap_board_mux board_mux[] __initdata = {
->  	{ .reg_offset = OMAP_MUX_TERMINATOR },
-> @@ -197,6 +292,7 @@ static void __init omap3logic_init(void)
->  	omap_sdrc_init(NULL, NULL);
->  	board_mmc_init();
->  	board_smsc911x_init();
-> +	omap3logic_display_init();
->  
->  	/* Ensure SDRC pins are mux'd for self-refresh */
->  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+The AEMIF is useful for interfacing to other asynchronous devices too;
+our newest board uses it for accessing memory mapped FPGA functional
+blocks via UIO and for permanent storage to a compact flash using
+pata_platform. In both cases the timings and mode for the chip-select
+are manually configured before the devices are registered. In both
+cases the performance of the endpoints could be better preserved
+across CPU freq transitions if the hooks for cpufreq transitions
+recently proposed by Sudhakar [1] were part of an mfd device and hence
+applicable to devices other than mtd.
 
--- 
-Regards,
-Igor.
+Again, I apologize for requesting features for boards that are not yet
+in mainline.
+
+Best Regards,
+Ben Gardiner
+
+[1] http://article.gmane.org/gmane.linux.drivers.mtd/36876/
+
+---
+Nanometrics Inc.
+http://www.nanometrics.ca
