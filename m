@@ -1,196 +1,49 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Wed, 14 Dec 2011 15:51:44 +0100
-Subject: [PATCH 6/6] OMAP3: powerdomain data: add wake-up latency figures
-In-Reply-To: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
-References: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1323874304-5001-7-git-send-email-j-pihet@ti.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 14 Dec 2011 15:55:29 +0100
+Subject: [PATCH v5 0/6] PM QoS: implement the OMAP low level constraints
+ management code
+In-Reply-To: <87zkewrpu7.fsf@ti.com>
+References: <1323706701-6627-1-git-send-email-j-pihet@ti.com>
+ <87zkewrpu7.fsf@ti.com>
+Message-ID: <CAORVsuUYGTqsnnpN=rm+1pk8fLwNEA70HueF_cxqt34GirafUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+Hi Kevin,
 
-Figures are added to the power domains structs for RET and OFF modes.
+On Wed, Dec 14, 2011 at 12:53 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Jean,
+>
+> jean.pihet at newoldbits.com writes:
+>
+>> From: Jean Pihet <j-pihet@ti.com>
+>>
+>> . Implement the devices wake-up latency constraints using the global
+>> ? device PM QoS notification handler which applies the constraints to the
+>> ? underlying layer
+>> . Implement the low level code which controls the power domains next power
+>> ? states, through the hwmod and pwrdm layers
+>> . Add cpuidle and power domains wake-up latency figures for OMAP3, cf.
+>> ? comments in the code and [1] for the details on where the numbers
+>> ? are magically coming from
+>> . Implement the relation between the cpuidle and per-device PM QoS frameworks
+>> ? in the OMAP3 specific idle callbacks.
+>> ? The chosen C-state shall satisfy the following conditions:
+>> ? ?. the 'valid' field is enabled,
+>> ? ?. it satisfies the enable_off_mode flag,
+>> ? ?. the next state for MPU and CORE power domains is not lower than the
+>> ? ? ?state programmed by the per-device PM QoS.
+>
+> I had a couple minor comments on this version, but after that, feel free
+> to add:
+>
+> Reviewed-by: Kevin Hilman <khilman@ti.com>
+Thanks for reviewing!
+I fixed (most of) the minor remarks and re-submitted.
 
-Note: the latency figures for MPU, PER, CORE, NEON have been obtained
-from actual measurements.
-The latency figures for the other power domains are preliminary and
-shall be added.
+> after that, this series will go upstream through Paul.
+>
+> Kevin
 
-Cf. http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement
-for a detailed explanation on where are the numbers coming from.
-
-Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
-on MPU, CORE and PER.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/powerdomains3xxx_data.c |   83 +++++++++++++++++++++++++++
- 1 files changed, 83 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-index 8ef26da..63a3afd 100644
---- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-@@ -31,6 +31,19 @@
- 
- /*
-  * Powerdomains
-+ *
-+ * The wakeup_lat values are derived from HW and SW measurements on
-+ * the actual target. For more details cf.
-+ * http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement#Results_for_individual_power_domains
-+ *
-+ * Note: the latency figures for MPU, PER, CORE, NEON have been obtained
-+ * from actual measurements.
-+ * The latency figures for the other power domains are preliminary and
-+ * shall be added.
-+ *
-+ * Note: only the SW restore timing values are taken into account.
-+ * The HW impact of the sys_clkreq and sys_offmode signals is not taken
-+ * into account - TDB
-  */
- 
- static struct powerdomain iva2_pwrdm = {
-@@ -51,6 +64,13 @@ static struct powerdomain iva2_pwrdm = {
- 		[2] = PWRSTS_OFF_ON,
- 		[3] = PWRSTS_ON,
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 1100,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 350,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "mpu_iva" },
- };
- 
-@@ -67,6 +87,13 @@ static struct powerdomain mpu_3xxx_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_OFF_ON,
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 1830,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 121,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "mpu_iva" },
- };
- 
-@@ -94,6 +121,13 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
- 		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
- 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 3082,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 153,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "core" },
- };
- 
-@@ -116,6 +150,13 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
- 		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
- 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 3082,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 153,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "core" },
- };
- 
-@@ -131,6 +172,13 @@ static struct powerdomain dss_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 70,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 20,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "core" },
- };
- 
-@@ -152,6 +200,13 @@ static struct powerdomain sgx_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 1000,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "core" },
- };
- 
-@@ -167,6 +222,13 @@ static struct powerdomain cam_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 850,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 35,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "core" },
- };
- 
-@@ -182,6 +244,13 @@ static struct powerdomain per_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 671,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 31,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "core" },
- };
- 
-@@ -196,6 +265,13 @@ static struct powerdomain neon_pwrdm = {
- 	.prcm_offs	  = OMAP3430_NEON_MOD,
- 	.pwrsts		  = PWRSTS_OFF_RET_ON,
- 	.pwrsts_logic_ret = PWRSTS_RET,
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 0,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 0,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "mpu_iva" },
- };
- 
-@@ -218,6 +294,13 @@ static struct powerdomain usbhost_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.wakeup_lat = {
-+		[PWRDM_FUNC_PWRST_OFF] = 800,
-+		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_CSWR] = 150,
-+		[PWRDM_FUNC_PWRST_INACTIVE] = UNSUP_STATE,
-+		[PWRDM_FUNC_PWRST_ON] = 0,
-+	},
- 	.voltdm           = { .name = "core" },
- };
- 
--- 
-1.7.5.4
+Regards,
+Jean
