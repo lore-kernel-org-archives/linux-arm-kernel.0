@@ -1,58 +1,38 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed, 14 Dec 2011 11:27:20 +0100
-Subject: [PATCH 1/3] ARM: AT91: Add platform data for the ADCs
-In-Reply-To: <1323856877-18255-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1323856877-18255-1-git-send-email-maxime.ripard@free-electrons.com>
- <1323856877-18255-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <77881664.jmuBXsRUXo@ws-stein>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 14 Dec 2011 14:36:41 +0400
+Subject: [PATCH v5 07/11] davinci: dm644x: Replace register base value
+ with a defined macro
+In-Reply-To: <1323775415-24504-8-git-send-email-manjunath.hadli@ti.com>
+References: <1323775415-24504-1-git-send-email-manjunath.hadli@ti.com>
+ <1323775415-24504-8-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <4EE87C39.8010601@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 December 2011 11:01:15 Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Jonathan Cameron <jic23@cam.ac.uk>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Hello.
+
+On 13-12-2011 15:23, Manjunath Hadli wrote:
+
+> Replace hard coded value of vpss register base to a define macro
+> DM644X_VPSS_REG_BASE for proper readability
+
+> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
+> Acked-by: Sekhar Nori<nsekhar@ti.com>
 > ---
->  include/linux/platform_data/at91_adc.h |   23 +++++++++++++++++++++++
->  1 files changed, 23 insertions(+), 0 deletions(-)
->  create mode 100644 include/linux/platform_data/at91_adc.h
-> 
-> diff --git a/include/linux/platform_data/at91_adc.h
-> b/include/linux/platform_data/at91_adc.h new file mode 100644
-> index 0000000..bad80b7
-> --- /dev/null
-> +++ b/include/linux/platform_data/at91_adc.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + * Copyright (C) 2011 Free Electrons
-> + *
-> + * Licensed under the GPLv2 or later.
-> + *
-> + */
-> +
-> +#ifndef _AT91_ADC_H_
-> +#define _AT91_ADC_H_
-> +
-> +/**
-> + * struct at91_adc_data - platform data for ADC driver
-> + * @channels_use:	channels in use on the board as a bitmask
-> + * @vref:		Reference voltage for the ADC in millvolts
+>   arch/arm/mach-davinci/dm644x.c |    8 +++++---
+>   1 files changed, 5 insertions(+), 3 deletions(-)
 
-Nitpick, this should write millivolts, no?
-
-> + */
-> +struct at91_adc_data {
-> +	unsigned long	channels_used;
-> +	u16		vref;
-> +};
+> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+> index 6b1d473..3802b59 100644
+> --- a/arch/arm/mach-davinci/dm644x.c
+> +++ b/arch/arm/mach-davinci/dm644x.c
+> @@ -594,13 +594,15 @@ static struct platform_device dm644x_asp_device = {
+>   	.resource	= dm644x_asp_resources,
+>   };
+>
+> +#define DM644X_VPSS_REG_BASE	0x01c73400
 > +
-> +extern void __init at91_add_device_adc(struct at91_adc_data *data);
-> +
-> +#endif
 
-Regards,
-Alexander
+    Why not simply DM644X_VPSS_BASE, like all the other #define's?
+
+WBR, Sergei
