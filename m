@@ -1,81 +1,62 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Wed, 14 Dec 2011 22:05:04 +0800
-Subject: [PATCH v4 REPOST 5/5] imx6q: Remove unconditional dependency on
- l2x0 L2 cache support
-In-Reply-To: <20111214132622.GA1520@S2100-06.ap.freescale.net>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
- <1323862781-3465-6-git-send-email-dave.martin@linaro.org>
- <20111214132622.GA1520@S2100-06.ap.freescale.net>
-Message-ID: <20111214140500.GA1700@richard-laptop>
+Date: Wed, 14 Dec 2011 22:11:11 +0800
+Subject: [PATCH V2 2/7] arm/imx6: add imx6q sabrelite board support
+In-Reply-To: <20111214110558.GE27267@pengutronix.de>
+References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
+ <1323757530-19402-3-git-send-email-richard.zhao@linaro.org>
+ <20111213115648.GA10022@S2101-09.ap.freescale.net>
+ <20111213125353.GB1757@richard-laptop>
+ <20111213133348.GA14688@S2101-09.ap.freescale.net>
+ <20111214110558.GE27267@pengutronix.de>
+Message-ID: <20111214141109.GB1700@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 09:26:24PM +0800, Shawn Guo wrote:
-> Hi Dave,
+On Wed, Dec 14, 2011 at 12:05:58PM +0100, Sascha Hauer wrote:
+> On Tue, Dec 13, 2011 at 09:33:50PM +0800, Shawn Guo wrote:
+> > On Tue, Dec 13, 2011 at 08:54:01PM +0800, Richard Zhao wrote:
+> > > > > +	cpus {
+> > > > > +		cpu at 0 {
+> > > > > +			clock-frequency = <996000000>;
+> > > > > +		};
+> > > > 
+> > > > I do not follow why we need to have cpu frequency encoded in board
+> > > > level dts.  To me, what frequency the cpu is capable of running at
+> > > > is really soc specific thing.  So putting this data in
+> > > > imx6q-sabrelite.dts is kinda suggesting that imx6q soc on this
+> > > > sabrelite board can run at 996000000, while on other boards like
+> > > > sabreauto/arm2 can only run at other frequency.  This is seems different
+> > > > from what I heard from Freescale internal development team.
+> > > 1G operation needs a certain external voltage condition, though we have
+> > > internal regulater. Boards that don't meet the condition have to fall back
+> > > to lower frequency.
+> > > From software side view, I refer to Freescale software release. please see
+> > > http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/mach-mx6/cpu_op-mx6.c;h=30a4346282ea5c332b4c48bf6a2d644abd9f31db;hb=imx_2.6.38_11.11.01
+> > > 
+> > > and for imx53, there' also different max freq board:
+> > > http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/mach-mx5/mx53_wp.c;h=a63bae42fb661c161cab99d61f4a3108305b0f55;hb=refs/heads/imx_2.6.35_11.09.01
+> > > 
+> > > IMHO, even the board has limitations, we'd better give an option to support
+> > > it if it's possible.
+> > > 
+> > I understand all these things.  What I was suggesting is this option
+> > should not be provided by the dts at all.
 > 
-> Sorry for that I did not look into previous post to point it out.
-> 
-> On Wed, Dec 14, 2011 at 11:39:41AM +0000, Dave Martin wrote:
-> > The i.MX6 Quad SoC will work without the l2x0 L2 cache controller
-> > support built into the kernel, so this patch removes the dependency
-> > on CACHE_L2X0 and selects MIGHT_HAVE_CACHE_L2X0 instead.
-> > 
-> > This makes the l2x0 support optional, so that it can be turned off
-> > when desired for debugging purposes etc.
-> > 
-> > Thanks to Shawn Guo for this suggestion. [1]
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > 
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
-> > ---
-> >  arch/arm/mach-imx/Kconfig |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index 29a3d61..1fb93f2 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -609,13 +609,13 @@ comment "i.MX6 family:"
-> >  config SOC_IMX6Q
-> >  	bool "i.MX6 Quad support"
-> >  	select ARM_GIC
-> > -	select CACHE_L2X0
-> >  	select CPU_V7
-> >  	select HAVE_ARM_SCU
-> >  	select HAVE_IMX_GPC
-> >  	select HAVE_IMX_MMDC
-> >  	select HAVE_IMX_SRC
-> >  	select HAVE_SMP
-> > +	select MIGHT_HAVE_CACHE_L2X0
-> 
-> The option SOC_IMX6Q is only available when ARCH_IMX_V6_V7 is selected.
-> Since MIGHT_HAVE_CACHE_L2X0 has been selected by ARCH_IMX_V6_V7 in
-> patch #1, this line seems redundant here.
-Would it be better keep this one and remove patch #1 one? imx5 doesn't have
-l2x0.
+> Yes. If it's not provided the cpufreq layer should either assume 800MHz
+> is the highest value which is safe on all boards or it could read the
+> current frequency from the hardware. If this is 1GHz this value is
+> obviously safe.
+Actually, you'd better not depend on uboot to setting the highest cpu freq.
+At least current freescale internel uboot don't set 1G.
 
 Thanks
 Richard
 > 
-> Regards,
-> Shawn
-> 
-> >  	select USE_OF
-> >  
-> >  	help
-> > -- 
-> > 1.7.4.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+> Sascha
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
