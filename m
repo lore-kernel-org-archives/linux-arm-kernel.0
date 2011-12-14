@@ -1,39 +1,43 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 14 Dec 2011 13:48:31 +0200
-Subject: [PATCH 3/7] remoteproc: remove unused resource type
+Date: Wed, 14 Dec 2011 13:48:32 +0200
+Subject: [PATCH 4/7] remoteproc/omap: utilize module_platform_driver
 In-Reply-To: <1323863315-8159-1-git-send-email-ohad@wizery.com>
 References: <1323863315-8159-1-git-send-email-ohad@wizery.com>
-Message-ID: <1323863315-8159-4-git-send-email-ohad@wizery.com>
+Message-ID: <1323863315-8159-5-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RSC_VIRTIO_CFG isn't being used, so remove it.
+Ditch some boilerplate code by employing the module_platform_driver
+helper.
 
-Originally it was introduced to overcome a resource table limitation
-that prevented describing a virtio device in a single resource table
-entry.
-
-The plan though is to describe resource table entries in a TLV fashion,
-where each entry will consume the amount of space it requires,
-so the original limitation is anyway temporary.
-
-Reported-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- include/linux/remoteproc.h |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ drivers/remoteproc/omap_remoteproc.c |   13 +------------
+ 1 files changed, 1 insertions(+), 12 deletions(-)
 
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index 1edbfde..b52f784 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -122,7 +122,6 @@ enum fw_resource_type {
- 	RSC_TRACE	= 2,
- 	RSC_VRING	= 3,
- 	RSC_VIRTIO_DEV	= 4,
--	RSC_VIRTIO_CFG	= 5,
+diff --git a/drivers/remoteproc/omap_remoteproc.c b/drivers/remoteproc/omap_remoteproc.c
+index b49ecbb..aa3ce52 100644
+--- a/drivers/remoteproc/omap_remoteproc.c
++++ b/drivers/remoteproc/omap_remoteproc.c
+@@ -232,18 +232,7 @@ static struct platform_driver omap_rproc_driver = {
+ 	},
  };
  
- /**
+-/* most of the below will go when module_platform_driver is merged */
+-static int __init omap_rproc_init(void)
+-{
+-	return platform_driver_register(&omap_rproc_driver);
+-}
+-module_init(omap_rproc_init);
+-
+-static void __exit omap_rproc_exit(void)
+-{
+-	platform_driver_unregister(&omap_rproc_driver);
+-}
+-module_exit(omap_rproc_exit);
++module_platform_driver(omap_rproc_driver);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("OMAP Remote Processor control driver");
 -- 
 1.7.5.4
