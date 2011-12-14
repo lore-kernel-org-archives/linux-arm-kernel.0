@@ -1,93 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Dec 2011 10:39:53 -0800
-Subject: [PATCH v4 REPOST 3/5] omap4: Unconditionally require l2x0 L2
- cache controller support
-In-Reply-To: <20111214183030.GB9331@linaro.org>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
- <1323862781-3465-4-git-send-email-dave.martin@linaro.org>
- <20111214181425.GB32251@atomide.com>
- <20111214183030.GB9331@linaro.org>
-Message-ID: <20111214183952.GG32251@atomide.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 14 Dec 2011 10:56:21 -0800
+Subject: [PATCH v8 00/20] OMAP2+: UART: Runtime adaptation + cleanup
+In-Reply-To: <CAAL8m4x6ToG5uuKebqSvJaYg6YQjwFK017AiOFVm0-6BtmiCCA@mail.gmail.com>
+ (Govindraj's message of "Wed, 14 Dec 2011 21:50:08 +0530")
+References: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
+ <CAAL8m4wGN5ykm3-+xrGPe-WJUDBdterxAyZ=C3kH862+n1DprQ@mail.gmail.com>
+ <87fwgow9vz.fsf@ti.com>
+ <CAAL8m4wR-3WDYf_c56-h1ZtCg=Ob2T+FvOOaXLSKK1pyo9oh8Q@mail.gmail.com>
+ <877h1znpdo.fsf@ti.com>
+ <CAAL8m4x6ToG5uuKebqSvJaYg6YQjwFK017AiOFVm0-6BtmiCCA@mail.gmail.com>
+Message-ID: <87r507oucq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Martin <dave.martin@linaro.org> [111214 09:58]:
-> On Wed, Dec 14, 2011 at 10:14:25AM -0800, Tony Lindgren wrote:
-> > * Dave Martin <dave.martin@linaro.org> [111214 03:08]:
-> > > If running in the Normal World on a TrustZone-enabled SoC, Linux
-> > > does not have complete control over the L2 cache controller
-> > > configuration.  The kernel cannot work reliably on such platforms
-> > > without the l2x0 cache support code built in.
-> > 
-> > There are HS and GP omaps (High Security and General Purpose).
-> > GP omaps do have full control of the L2. Also HS omaps most likely
-> > provide control over enabling and disabling L2 depending how the
-> > secure code is implemented.
-> > 
-> > BTW, the real problem is that because the secure code is implemented
-> > in various ways, we don't really have any handling for it in Linux.
-> > 
-> > The SMI instruction numbers don't seem to be standardized at all,
-> > and can mean different things on different boards, even different
-> > board versions :(
-> > 
-> > Sounds like devicetree is the only safe way to deal with the L2
-> > control options.
-> > 
-> > Regards,
-> > 
-> > Tony
-> > 
-> >  
-> > > This patch unconditionally enables l2x0 support for the OMAP4 SoCs.
-> > > 
-> > > Thanks to Rob Herring for this suggestion. [1]
-> > > 
-> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > > 
-> > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074495.html
-> > > ---
-> > >  arch/arm/mach-omap2/Kconfig |    2 +-
-> > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> > > index bb1b670..94e568a 100644
-> > > --- a/arch/arm/mach-omap2/Kconfig
-> > > +++ b/arch/arm/mach-omap2/Kconfig
-> > > @@ -41,11 +41,11 @@ config ARCH_OMAP4
-> > >  	bool "TI OMAP4"
-> > >  	default y
-> > >  	depends on ARCH_OMAP2PLUS
-> > > +	select CACHE_L2X0
-> > >  	select CPU_V7
-> > >  	select ARM_GIC
-> > >  	select HAVE_SMP
-> > >  	select LOCAL_TIMERS if SMP
-> > > -	select MIGHT_HAVE_CACHE_L2X0
-> > >  	select PL310_ERRATA_588369
-> > >  	select PL310_ERRATA_727915
-> > >  	select ARM_ERRATA_720789
-> > > -- 
-> > > 1.7.4.1
-> > > 
-> 
-> To clarify, are you suggesting we retain this patch, or not?
+Govindraj <govindraj.ti@gmail.com> writes:
 
-I think we should keep L2 configurable for omaps until we have some
-way of getting the configuration dynamically or from device tree.
- 
-> (If we only know what l2x0 support will be needed once the dts is
-> parsed at runtime, there could be an argument for keeping the
-> select CACHE_L2X0 here -- unless we have specific kconfigs for
-> the different security variants of omap.)
+> On Wed, Dec 14, 2011 at 8:59 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> Govindraj <govindraj.ti@gmail.com> writes:
+>>
+>>> On Wed, Dec 14, 2011 at 12:56 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>>> Govindraj <govindraj.ti@gmail.com> writes:
+>>>>
+>>>> [...]
+>>>>
+>>>>> I have re-based this patch series against LO master
+>>>>> commit id: deee6d5359969a0ce4e2760cfd7b9f379bd5698a
+>>>>>
+>>>>> Same is available here [1]
+>>>>>
+>>>>> I have tested this patch series along with:
+>>>>>
+>>>>> 1.) Tero's V11 irq chaining series
+>>>>> ? ? ?http://www.spinics.net/lists/linux-omap/msg61445.html
+>>>>> ? ? (This patch series is used for uart wakeup handling using
+>>>>> ? ? ? prcm_irq chaining)
+>>>>>
+>>>>> 2.) Rajendra's hwmod change
+>>>>> ? ? ?http://www.spinics.net/lists/arm-kernel/msg148632.html
+>>>>> ? ? ?(This patch handles init_no_idle flag setting
+>>>>> ? ? ? without this patch there will be boot warning however
+>>>>> ? ? ? all pm features will work after boot up.)
+>>>>>
+>>>>> 3.) Vishwa's io daisy chain changes.
+>>>>> ? ? ?http://permalink.gmane.org/gmane.linux.ports.arm.omap/65500
+>>>>> ? ? ?(tested with and without this patch series pm features works).
+>>>>>
+>>>>> Same combination of patches based on above commit id
+>>>>> used for testing is available here [2].
+>>>>
+>>>> Please have a closer look at your branch.
+>>>>
+>>>> The second commit[1] commits the .rej file from a failed patch apply,
+>>>> so obviously doesn't do what was intended.
+>>>>
+>>>
+>>> Sorry my bad I have refreshed the uart runtime branch [1]
+>>> & test branch [2].
+>>
+>> Can you add another patch which fixes these compiler warnings:
+>>
+>> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c: In function 'serial_omap_irq':
+>> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:228:29: warning: 'ch' may be used uninitialized in this function [-Wuninitialized]
+>> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:176:16: note: 'ch' was declared here
+>> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:228:29: warning: 'ch' may be used uninitialized in this function [-Wuninitialized]
+>> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:176:16: note: 'ch' was declared here
+>>
+>
+> Here is the patch [1] and pushed to
+> git://gitorious.org/runtime_3-0/runtime_3-0.git for_3_3/lo_rc4_uartruntime
 
-Well we can detect if it's an HS omap, but we may not know what
-SMI it uses for enabling and disabling L2.. That can depend on
-the board version.
+Thanks!
 
-Is there some problem keeping MIGHT_HAVE_CACHE_L2X0? This is
-pretty important from debugging cache issues point of view.
-
-Regards,
-
-Tony
+Kevin
