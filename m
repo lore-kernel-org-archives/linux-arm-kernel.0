@@ -1,26 +1,65 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 14 Dec 2011 13:14:14 +0000
-Subject: [PATCH] ARM: davinci: add missing commas on last members of
- structure and arrays
-In-Reply-To: <1323335151-25398-1-git-send-email-akshay.s@ti.com>
-References: <1323335151-25398-1-git-send-email-akshay.s@ti.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B604811D@DBDE01.ent.ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 14 Dec 2011 14:15:22 +0100
+Subject: [PATCH v3] arm: omap3evm: Add support for an MT9M032 based camera
+ board.
+In-Reply-To: <4EE86CF7.1010002@compulab.co.il>
+References: <1323825934-13320-1-git-send-email-martin@neutronstar.dyndns.org>
+ <4EE86CF7.1010002@compulab.co.il>
+Message-ID: <201112141415.23885.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akshay,
+Hi Igor,
 
-On Thu, Dec 08, 2011 at 14:35:51, Shankarmurthy, Akshay wrote:
-> This patch adds missing commas on last members of structure and arrays.
-> This makes less harder to add additional initializer at the end of the
-> existing initializers and avoids the conflict of more line being
-> modified. This was pointed out by Russell King in his pet peeves mail at
-> http://www.spinics.net/lists/arm-kernel/msg147268.html.
+On Wednesday 14 December 2011 10:31:35 Igor Grinberg wrote:
+> On 12/14/11 03:25, Martin Hostettler wrote:
+> > Adds board support for an MT9M032 based camera to omap3evm.
+> > 
+> > Signed-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
 
-Tony has already provided link to his patches fixing this in the
-message you referenced. Is your patch catching any additional instances?
+[snip]
 
-Tony's patch adds comma after some sentinels, which should be dropped.
+> > diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c
+> > b/arch/arm/mach-omap2/board-omap3evm-camera.c new file mode 100644
+> > index 0000000..bffd5b8
+> > --- /dev/null
+> > +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
+> > @@ -0,0 +1,155 @@
 
-Thanks,
-Sekhar
+[snip]
+
+> > +#include <linux/i2c.h>
+> > +#include <linux/init.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +#include <linux/gpio.h>
+> > +#include <plat/mux.h>
+> > +#include "mux.h"
+> > +
+> > +#include "../../../drivers/media/video/omap3isp/isp.h"
+> 
+> Laurent,
+> In one of the previous reviews, you stated:
+> "I'll probably split it and move the part required by board files to
+> include/media/omap3isp.h".
+> Is there any progress on that?
+
+Yes, it has been half-fixed in mainline. Half only because all the structures 
+and macros that should be used by board code are now in <media/omap3isp.h>, 
+but some boards need to access OMAP3 ISP internals from board code, which 
+still requires drivers/media/video/omap3isp/isp.h. This will eventually be 
+fixed, when the generic struct clk object will be available.
+
+After a quick look at this patch it seems that <media/omap3isp.h> should be 
+enough here.
+
+> > +#include "media/mt9m032.h"
+
+And this should be <media/mt9m032.h>
+
+> > +#include "devices.h"
+
+-- 
+Regards,
+
+Laurent Pinchart
