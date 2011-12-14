@@ -1,67 +1,45 @@
 From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 14 Dec 2011 22:00:08 +0800
-Subject: [RFC PATCH v2 2/8] omap4: build fdif omap device from hwmod
+Date: Wed, 14 Dec 2011 22:00:09 +0800
+Subject: [RFC PATCH v2 3/8] media: videobuf2: move out of setting
+ pgprot_noncached from vb2_mmap_pfn_range
 In-Reply-To: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
 References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <1323871214-25435-3-git-send-email-ming.lei@canonical.com>
+Message-ID: <1323871214-25435-4-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+So that we can reuse vb2_mmap_pfn_range for the coming videobuf2_page
+memops.
+
 Signed-off-by: Ming Lei <ming.lei@canonical.com>
 ---
- arch/arm/mach-omap2/devices.c |   33 +++++++++++++++++++++++++++++++++
- 1 files changed, 33 insertions(+), 0 deletions(-)
+ drivers/media/video/videobuf2-dma-contig.c |    1 +
+ drivers/media/video/videobuf2-memops.c     |    1 -
+ 2 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 1166bdc..bd7f9b3 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -728,6 +728,38 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+diff --git a/drivers/media/video/videobuf2-dma-contig.c b/drivers/media/video/videobuf2-dma-contig.c
+index f17ad98..0ea8866 100644
+--- a/drivers/media/video/videobuf2-dma-contig.c
++++ b/drivers/media/video/videobuf2-dma-contig.c
+@@ -106,6 +106,7 @@ static int vb2_dma_contig_mmap(void *buf_priv, struct vm_area_struct *vma)
+ 		return -EINVAL;
+ 	}
  
- #endif
- 
-+static __init struct platform_device *omap4_init_fdif(void)
-+{
-+	struct platform_device *pd;
-+	struct omap_hwmod *oh;
-+	const char *dev_name = "omap-fdif";
-+
-+	oh = omap_hwmod_lookup("fdif");
-+	if (!oh) {
-+		pr_err("Could not look up fdif hwmod\n");
-+		return NULL;
-+	}
-+
-+	pd = omap_device_build(dev_name, -1, oh, NULL, 0, NULL, 0, 0);
-+	WARN(IS_ERR(pd), "Can't build omap_device for %s.\n",
-+				dev_name);
-+	return pd;
-+}
-+
-+static void __init omap_init_fdif(void)
-+{
-+	struct platform_device *pd;
-+
-+	if (!cpu_is_omap44xx())
-+		return;
-+
-+	pd = omap4_init_fdif();
-+	if (!pd)
-+		return;
-+
-+	pm_runtime_enable(&pd->dev);
-+}
-+
- /*-------------------------------------------------------------------------*/
- 
- #if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
-@@ -808,6 +840,7 @@ static int __init omap2_init_devices(void)
- 	omap_init_sham();
- 	omap_init_aes();
- 	omap_init_vout();
-+	omap_init_fdif();
- 
- 	return 0;
++	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+ 	return vb2_mmap_pfn_range(vma, buf->dma_addr, buf->size,
+ 				  &vb2_common_vm_ops, &buf->handler);
  }
+diff --git a/drivers/media/video/videobuf2-memops.c b/drivers/media/video/videobuf2-memops.c
+index 71a7a78..77e0def 100644
+--- a/drivers/media/video/videobuf2-memops.c
++++ b/drivers/media/video/videobuf2-memops.c
+@@ -162,7 +162,6 @@ int vb2_mmap_pfn_range(struct vm_area_struct *vma, unsigned long paddr,
+ 
+ 	size = min_t(unsigned long, vma->vm_end - vma->vm_start, size);
+ 
+-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+ 	ret = remap_pfn_range(vma, vma->vm_start, paddr >> PAGE_SHIFT,
+ 				size, vma->vm_page_prot);
+ 	if (ret) {
 -- 
 1.7.5.4
