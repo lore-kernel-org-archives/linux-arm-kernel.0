@@ -1,9 +1,9 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 14 Dec 2011 10:16:00 -0500
-Subject: [PATCH V3 3/6] ARM: S5PC100: Modified files for SPI consolidation work
+Date: Wed, 14 Dec 2011 10:16:01 -0500
+Subject: [PATCH V3 4/6] ARM: S5P64X0: Modified files for SPI consolidation work
 In-Reply-To: <1323875763-21197-1-git-send-email-padma.v@samsung.com>
 References: <1323875763-21197-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1323875763-21197-4-git-send-email-padma.v@samsung.com>
+Message-ID: <1323875763-21197-5-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,64 +14,82 @@ initialization.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/mach-s5pc100/Kconfig                    |    5 ++
- arch/arm/mach-s5pc100/Makefile                   |    1 +
- arch/arm/mach-s5pc100/include/mach/map.h         |    3 +
- arch/arm/mach-s5pc100/setup-spi.c                |   65 ++++++++++++++++++++++
- arch/arm/plat-samsung/devs.c                     |    3 +
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 +
- 6 files changed, 79 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pc100/setup-spi.c
+ arch/arm/mach-s5p64x0/Kconfig            |    7 +++-
+ arch/arm/mach-s5p64x0/Makefile           |    1 +
+ arch/arm/mach-s5p64x0/include/mach/map.h |    3 ++
+ arch/arm/mach-s5p64x0/setup-spi.c        |   55 ++++++++++++++++++++++++++++++
+ 4 files changed, 64 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-s5p64x0/setup-spi.c
 
-diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-index e538a4c..75a26ea 100644
---- a/arch/arm/mach-s5pc100/Kconfig
-+++ b/arch/arm/mach-s5pc100/Kconfig
-@@ -45,6 +45,11 @@ config S5PC100_SETUP_SDHCI_GPIO
+diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
+index 18690c5..dd8c85e 100644
+--- a/arch/arm/mach-s5p64x0/Kconfig
++++ b/arch/arm/mach-s5p64x0/Kconfig
+@@ -36,6 +36,11 @@ config S5P64X0_SETUP_I2C1
  	help
- 	  Common setup code for SDHCI gpio.
+ 	  Common setup code for i2c bus 1.
  
-+config S5PC100_SETUP_SPI
++config S5P64X0_SETUP_SPI
 +	bool
 +	help
-+	  Common setup code for SPI GPIO configurations.
++	  Common setup code for SPI GPIO configurations
 +
- config MACH_SMDKC100
- 	bool "SMDKC100"
- 	select CPU_S5PC100
-diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
-index 238a836..291e246 100644
---- a/arch/arm/mach-s5pc100/Makefile
-+++ b/arch/arm/mach-s5pc100/Makefile
-@@ -22,6 +22,7 @@ obj-$(CONFIG_S5PC100_SETUP_I2C1)	+= setup-i2c1.o
- obj-$(CONFIG_S5PC100_SETUP_IDE)		+= setup-ide.o
- obj-$(CONFIG_S5PC100_SETUP_KEYPAD)	+= setup-keypad.o
- obj-$(CONFIG_S5PC100_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-+obj-$(CONFIG_S5PC100_SETUP_SPI)	+= setup-spi.o
+ # machine support
  
- # device support
- obj-y				+= dev-audio.o
-diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
-index ccbe6b7..54bc4f8 100644
---- a/arch/arm/mach-s5pc100/include/mach/map.h
-+++ b/arch/arm/mach-s5pc100/include/mach/map.h
-@@ -100,6 +100,9 @@
- #define S3C_PA_USB_HSOTG		S5PC100_PA_USB_HSOTG
- #define S3C_PA_USB_HSPHY		S5PC100_PA_USB_HSPHY
- #define S3C_PA_WDT			S5PC100_PA_WATCHDOG
-+#define S3C_PA_SPI0			S5PC100_PA_SPI0
-+#define S3C_PA_SPI1			S5PC100_PA_SPI1
-+#define S3C_PA_SPI2			S5PC100_PA_SPI2
+ config MACH_SMDK6440
+@@ -45,7 +50,6 @@ config MACH_SMDK6440
+ 	select S3C_DEV_I2C1
+ 	select S3C_DEV_RTC
+ 	select S3C_DEV_WDT
+-	select S3C64XX_DEV_SPI
+ 	select SAMSUNG_DEV_ADC
+ 	select SAMSUNG_DEV_BACKLIGHT
+ 	select SAMSUNG_DEV_PWM
+@@ -62,7 +66,6 @@ config MACH_SMDK6450
+ 	select S3C_DEV_I2C1
+ 	select S3C_DEV_RTC
+ 	select S3C_DEV_WDT
+-	select S3C64XX_DEV_SPI
+ 	select SAMSUNG_DEV_ADC
+ 	select SAMSUNG_DEV_BACKLIGHT
+ 	select SAMSUNG_DEV_PWM
+diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
+index e24d316..a7d7a49 100644
+--- a/arch/arm/mach-s5p64x0/Makefile
++++ b/arch/arm/mach-s5p64x0/Makefile
+@@ -29,3 +29,4 @@ obj-y				+= dev-audio.o
  
- #define S5P_PA_CHIPID			S5PC100_PA_CHIPID
- #define S5P_PA_FIMC0			S5PC100_PA_FIMC0
-diff --git a/arch/arm/mach-s5pc100/setup-spi.c b/arch/arm/mach-s5pc100/setup-spi.c
+ obj-$(CONFIG_S5P64X0_SETUP_I2C1)	+= setup-i2c1.o
+ obj-$(CONFIG_S5P64X0_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
++obj-$(CONFIG_S5P64X0_SETUP_SPI)		+= setup-spi.o
+diff --git a/arch/arm/mach-s5p64x0/include/mach/map.h b/arch/arm/mach-s5p64x0/include/mach/map.h
+index 4d3ac8a..c6af0fc 100644
+--- a/arch/arm/mach-s5p64x0/include/mach/map.h
++++ b/arch/arm/mach-s5p64x0/include/mach/map.h
+@@ -67,6 +67,8 @@
+ #define S3C_PA_RTC		S5P64X0_PA_RTC
+ #define S3C_PA_WDT		S5P64X0_PA_WDT
+ #define S3C_PA_FB		S5P64X0_PA_FB
++#define S3C_PA_SPI0		S5P64X0_PA_SPI0
++#define S3C_PA_SPI1		S5P64X0_PA_SPI1
+ 
+ #define S5P_PA_CHIPID		S5P64X0_PA_CHIPID
+ #define S5P_PA_SROMC		S5P64X0_PA_SROMC
+@@ -75,6 +77,7 @@
+ 
+ #define SAMSUNG_PA_ADC		S5P64X0_PA_ADC
+ 
++
+ /* UART */
+ 
+ #define S5P6440_PA_UART(x)	(0xEC000000 + ((x) * S3C_UART_OFFSET))
+diff --git a/arch/arm/mach-s5p64x0/setup-spi.c b/arch/arm/mach-s5p64x0/setup-spi.c
 new file mode 100644
-index 0000000..431a6f7
+index 0000000..e9b8412
 --- /dev/null
-+++ b/arch/arm/mach-s5pc100/setup-spi.c
-@@ -0,0 +1,65 @@
-+/* linux/arch/arm/mach-s5pc100/setup-spi.c
++++ b/arch/arm/mach-s5p64x0/setup-spi.c
+@@ -0,0 +1,55 @@
++/* linux/arch/arm/mach-s5p64x0/setup-spi.c
 + *
 + * Copyright (C) 2011 Samsung Electronics Ltd.
 + *		http://www.samsung.com/
@@ -83,22 +101,27 @@ index 0000000..431a6f7
 +
 +#include <linux/gpio.h>
 +#include <linux/platform_device.h>
++#include <linux/io.h>
 +
 +#include <plat/gpio-cfg.h>
++#include <plat/cpu.h>
 +#include <plat/s3c64xx-spi.h>
 +
 +#ifdef CONFIG_S3C64XX_DEV_SPI0
 +struct s3c64xx_spi_info s3c64xx_spi0_pdata __initdata = {
-+	.fifo_lvl_mask	= 0x7f,
-+	.rx_lvl_offset	= 13,
-+	.high_speed	= 1,
-+	.tx_st_done	= 21,
++	.fifo_lvl_mask	= 0x1ff,
++	.rx_lvl_offset	= 15,
++	.tx_st_done	= 25,
 +};
 +
 +int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
 +{
-+	s3c_gpio_cfgall_range(S5PC100_GPB(0), 3,
-+				S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
++	if (soc_is_s5p6450())
++		s3c_gpio_cfgall_range(S5P6450_GPC(0), 3,
++					S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
++	else
++		s3c_gpio_cfgall_range(S5P6440_GPC(0), 3,
++					S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
 +	return 0;
 +}
 +#endif
@@ -106,63 +129,20 @@ index 0000000..431a6f7
 +#ifdef CONFIG_S3C64XX_DEV_SPI1
 +struct s3c64xx_spi_info s3c64xx_spi1_pdata __initdata = {
 +	.fifo_lvl_mask	= 0x7f,
-+	.rx_lvl_offset	= 13,
-+	.high_speed	= 1,
-+	.tx_st_done	= 21,
++	.rx_lvl_offset	= 15,
++	.tx_st_done	= 25,
 +};
 +
 +int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
 +{
-+	s3c_gpio_cfgall_range(S5PC100_GPB(4), 3,
-+				S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
++	if (soc_is_s5p6450())
++		s3c_gpio_cfgall_range(S5P6450_GPC(4), 3,
++					S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
++	else
++		s3c_gpio_cfgall_range(S5P6440_GPC(4), 3,
++					S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
 +	return 0;
 +}
 +#endif
-+
-+#ifdef CONFIG_S3C64XX_DEV_SPI2
-+struct s3c64xx_spi_info s3c64xx_spi2_pdata __initdata = {
-+	.fifo_lvl_mask	= 0x7f,
-+	.rx_lvl_offset	= 13,
-+	.high_speed	= 1,
-+	.tx_st_done	= 21,
-+};
-+
-+int s3c64xx_spi2_cfg_gpio(struct platform_device *dev)
-+{
-+	s3c_gpio_cfgpin(S5PC100_GPG3(0), S3C_GPIO_SFN(3));
-+	s3c_gpio_setpull(S5PC100_GPG3(0), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgall_range(S5PC100_GPB(2), 2,
-+				S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
-+	return 0;
-+}
-+#endif
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 2652dd9..7aa3bec 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -1582,6 +1582,9 @@ void __init s3c64xx_spi2_set_platdata(struct s3c64xx_spi_info *pd,
- 
- 	pd->num_cs = num_cs;
- 	pd->src_clk_nr = src_clk_nr;
-+	if (!pd->cfg_gpio)
-+		pd->cfg_gpio = s3c64xx_spi2_cfg_gpio;
-+
- 	s3c_set_platdata(pd, sizeof(*pd), &s3c64xx_device_spi2);
- }
- #endif /* CONFIG_S3C64XX_DEV_SPI2 */
-diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-index d3e2209..aea68b6 100644
---- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-@@ -75,7 +75,9 @@ extern void s3c64xx_spi2_set_platdata(struct s3c64xx_spi_info *pd,
- /* defined by architecture to configure gpio */
- extern int s3c64xx_spi0_cfg_gpio(struct platform_device *dev);
- extern int s3c64xx_spi1_cfg_gpio(struct platform_device *dev);
-+extern int s3c64xx_spi2_cfg_gpio(struct platform_device *dev);
- 
- extern struct s3c64xx_spi_info s3c64xx_spi0_pdata;
- extern struct s3c64xx_spi_info s3c64xx_spi1_pdata;
-+extern struct s3c64xx_spi_info s3c64xx_spi2_pdata;
- #endif /* __S3C64XX_PLAT_SPI_H */
 -- 
 1.7.0.4
