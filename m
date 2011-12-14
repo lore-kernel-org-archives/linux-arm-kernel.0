@@ -1,45 +1,58 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 14 Dec 2011 12:37:28 +0100
-Subject: [PATCH 1/3] PWM: add pwm framework support
-In-Reply-To: <20111214100338.GA18348@avionic-0098.mockup.avionic-design.de>
-References: <201106301441.24493.arnd@arndb.de> <4E11994B.7070103@gmail.com>
- <20110704124318.GI6069@pengutronix.de>
- <201107041607.10265.arnd@arndb.de>
- <20111207085339.GA7970@avionic-0098.mockup.avionic-design.de>
- <20111207090734.GN27267@pengutronix.de>
- <20111214100338.GA18348@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20111214113728.GG27267@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 14 Dec 2011 11:39:36 +0000
+Subject: [PATCH v4 REPOST 0/5] Refactor common Kconfigs for easier maintenance
+Message-ID: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 11:03:38AM +0100, Thierry Reding wrote:
-> * Sascha Hauer wrote:
-> > I have a branch which adds a basic PWM framework. It doesn't change the
-> > pwm API at all, but only adds support for registering multiple PWM
-> > drivers. All in Kernel drivers are converted to this new framework, but
-> > except the i.MX driver all of them are untested. I'm quite confident
-> > that the drivers itself work, but there will probably be some Kconfig
-> > related issues which I wasn't able to sort out. The corresponding
-> > Maintainers should probably have a look over it. Feel free to post
-> > the patches if you are prepared to work on the comments you receive.
-> > Otherwise I'll see if I find some time maybe next week.
-> [...]
-> 
-> I've looked at this in more detail and one thing that irritates me is that
-> the current driver API requires a driver to register a pwm_chip structure for
-> each PWM it can control. Wouldn't it be easier in such cases to just specify
-> how many PWMs a chip wants to register, much like gpiolib does it?
+Common Kconfig options which depend on a long list of board- and
+SoC- specific Kconfigs can be cumbersome to maintain, leading to
+annoying merge conflicts (although rather trivial ones).
 
-It may be more suitable for some devices like for example the mxs driver
-or the at91 driver which Bill has in his tree. However, the idea of this
-series was to move the drivers over with the least possible breakage.
-Once the drivers are consolidated in a single directory with a single
-framework it will be easier to modify.
+This series factors out the dependencies of CACHE_L2X0 and SMP so
+that the knowledge about when these can be enabled is moved to the
+relevant board/SoC Kconfig files instead.  New
+MIGHT_HAVE_CACHE_L2X0 and HAVE_SMP options are defined to mediate
+the dependencies.
 
-Sascha
+This series has been substantially reworked compared with the
+previous post, and is now in two parts:
+
+  * The first two patches simply refactor the way the Kconfig
+    options for CACHE_L2X0 and SMP are implemented, without
+    making any other changes.
+
+  * The final three patches apply functional changes suggested by
+    the contributors to this series, to make the config
+    dependencies more correct for some specific boards.
+
+
+Thanks to Rob Herring, Shawn Guo and Russell King for their
+contributions to this series.  Thanks also to David Brown for
+pointing out the lack of a comprehensive CC list.
+
+
+I have briefly build-tested on some of the affected boards, but any
+further reviews or Tested-Bys would be much appreciated.
+
+
+Dave Martin (5):
+  ARM: l2x0/pl310: Refactor Kconfig to be more maintainable
+  ARM: SMP: Refactor Kconfig to be more maintainable
+  omap4: Unconditionally require l2x0 L2 cache controller support
+  highbank: Unconditionally require l2x0 L2 cache controller support
+  imx6q: Remove unconditional dependency on l2x0 L2 cache support
+
+ arch/arm/Kconfig               |   23 +++++++++++++++++++----
+ arch/arm/mach-exynos/Kconfig   |    2 ++
+ arch/arm/mach-imx/Kconfig      |    3 ++-
+ arch/arm/mach-msm/Kconfig      |    1 +
+ arch/arm/mach-omap2/Kconfig    |    2 ++
+ arch/arm/mach-realview/Kconfig |    9 +++++++++
+ arch/arm/mach-vexpress/Kconfig |    2 ++
+ arch/arm/mm/Kconfig            |   15 ++++++++-------
+ arch/arm/plat-mxc/Kconfig      |    1 +
+ 9 files changed, 46 insertions(+), 12 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.4.1
