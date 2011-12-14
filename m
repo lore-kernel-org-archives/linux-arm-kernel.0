@@ -1,50 +1,33 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 14 Dec 2011 08:47:28 +0800
-Subject: [PATCH V2 4/7] arm/imx: fix cpufreq section mismatch
-In-Reply-To: <1323757530-19402-5-git-send-email-richard.zhao@linaro.org>
-References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
- <1323757530-19402-5-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111214004727.GJ28768@b20223-02.ap.freescale.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 13 Dec 2011 17:06:40 -0800
+Subject: [PATCH v2 02/10] i2c: OMAP: Add DT support for i2c controller
+In-Reply-To: <1323439361-1647-3-git-send-email-b-cousson@ti.com> (Benoit
+ Cousson's message of "Fri, 9 Dec 2011 15:02:33 +0100")
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-3-git-send-email-b-cousson@ti.com>
+Message-ID: <87hb14q7vj.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-can this fix go in?
+Benoit Cousson <b-cousson@ti.com> writes:
 
-Thanks
-Richard
-On Tue, Dec 13, 2011 at 02:25:27PM +0800, Richard Zhao wrote:
-> WARNING: arch/arm/plat-mxc/built-in.o(.data+0x488): Section mismatch in reference from the variable mxc_driver to the function .init.text:mxc_cpufreq_init()
-> The variable mxc_driver references
-> the function __init mxc_cpufreq_init()
-> If the reference is valid then annotate the
-> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  arch/arm/plat-mxc/cpufreq.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
-> index 85d037f..71e0d09 100644
-> --- a/arch/arm/plat-mxc/cpufreq.c
-> +++ b/arch/arm/plat-mxc/cpufreq.c
-> @@ -120,7 +120,7 @@ static int mxc_set_target(struct cpufreq_policy *policy,
->  	return ret;
->  }
->  
-> -static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
-> +static int mxc_cpufreq_init(struct cpufreq_policy *policy)
->  {
->  	int ret;
->  	int i;
-> -- 
-> 1.7.5.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Add initial DT support to retrieve the frequency using a
+> DT attribute instead of the pdata pointer if of_node exist.
+>
+> Add documentation for omap i2c controller binding.
+>
+> Based on original patches from Manju and Grant.
+>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+
+This seems indepenent from the rest of the series, and I can queue up
+for merge via the I2C tree.
+
+Benoit, please confirm that we shouldn't have any problems if this patch
+goes independently.
+
+Grant/Rob, with your ack on the bindings, I can queue this up for the
+I2C maintainers along with some other OMAP I2C changes for v3.3.
+
+Kevin
