@@ -1,35 +1,115 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 14 Dec 2011 09:29:59 +0800
-Subject: [PATCH V2 7/7] arm/imx6q: add cpufreq support
-In-Reply-To: <CAMXH7KHxRtWAZmUSo42gwcRps=CDY3PC-ZdqWQm7Ot9xYc+LgQ@mail.gmail.com>
-References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
- <1323757530-19402-8-git-send-email-richard.zhao@linaro.org>
- <20111213102315.GJ27267@pengutronix.de>
- <20111213103831.GG28768@b20223-02.ap.freescale.net>
- <CAMXH7KHxRtWAZmUSo42gwcRps=CDY3PC-ZdqWQm7Ot9xYc+LgQ@mail.gmail.com>
-Message-ID: <20111214012958.GK28768@b20223-02.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 14 Dec 2011 10:20:31 +0800
+Subject: [PATCH 4/4] mtd: gpmi-nand: move to dma_transfer_direction
+In-Reply-To: <1323791286-29574-5-git-send-email-shawn.guo@linaro.org>
+References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
+ <1323791286-29574-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4EE807EF.4090109@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> > +static int arm_max_freq_idx;
-> >>
-> >> This is only used in mx6q_get_cpu_op()
-> > I'll move to local var
-> >>
-> >> Also shouldn't this be initialized with 1? From what you
-> >> said 800MHz is safe for all boards whereas 1GHz is not.
-> > I'll fix it in next version.
-> >
-> 
-> Richard, I communicated with Hui Liu a couple of weeks ago about the
-> possibility of adding a "max_freq" kernel parameter to the i.MX6q
-> community u-boot, similiar to what has been done for the BSP u-boot.
-> If he is or has done this, it may be better to read and use this
-> kernel parameter from u-boot so that the same kernel can be used
-> between boards with and without the fix.  I'm not that familiar with
-> device tree yet but perhaps it provides another way to handle this.
-> Also keep in
-Using bootargs, it's what I did in V1 patch. I prefer that way too.
-
-Thanks
-Richard 
+? 2011?12?13? 23:48, Shawn Guo ??:
+> This patch fixes usage of dma direction to adopt dma_transfer_direction.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   22 ++++++++++++----------
+>  1 files changed, 12 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> index de4db76..c4c4d6d 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> @@ -827,7 +827,7 @@ int gpmi_send_command(struct gpmi_nand_data *this)
+>  	pio[1] = pio[2] = 0;
+>  	desc = channel->device->device_prep_slave_sg(channel,
+>  					(struct scatterlist *)pio,
+> -					ARRAY_SIZE(pio), DMA_NONE, 0);
+> +					ARRAY_SIZE(pio), DMA_TRANS_NONE, 0);
+>  	if (!desc) {
+>  		pr_err("step 1 error\n");
+>  		return -1;
+> @@ -839,7 +839,7 @@ int gpmi_send_command(struct gpmi_nand_data *this)
+>  	sg_init_one(sgl, this->cmd_buffer, this->command_length);
+>  	dma_map_sg(this->dev, sgl, 1, DMA_TO_DEVICE);
+>  	desc = channel->device->device_prep_slave_sg(channel,
+> -					sgl, 1, DMA_TO_DEVICE, 1);
+> +					sgl, 1, DMA_MEM_TO_DEV, 1);
+>  	if (!desc) {
+>  		pr_err("step 2 error\n");
+>  		return -1;
+> @@ -872,7 +872,7 @@ int gpmi_send_data(struct gpmi_nand_data *this)
+>  	pio[1] = 0;
+>  	desc = channel->device->device_prep_slave_sg(channel,
+>  					(struct scatterlist *)pio,
+> -					ARRAY_SIZE(pio), DMA_NONE, 0);
+> +					ARRAY_SIZE(pio), DMA_TRANS_NONE, 0);
+>  	if (!desc) {
+>  		pr_err("step 1 error\n");
+>  		return -1;
+> @@ -881,7 +881,7 @@ int gpmi_send_data(struct gpmi_nand_data *this)
+>  	/* [2] send DMA request */
+>  	prepare_data_dma(this, DMA_TO_DEVICE);
+>  	desc = channel->device->device_prep_slave_sg(channel, &this->data_sgl,
+> -						1, DMA_TO_DEVICE, 1);
+> +						1, DMA_MEM_TO_DEV, 1);
+>  	if (!desc) {
+>  		pr_err("step 2 error\n");
+>  		return -1;
+> @@ -908,7 +908,7 @@ int gpmi_read_data(struct gpmi_nand_data *this)
+>  	pio[1] = 0;
+>  	desc = channel->device->device_prep_slave_sg(channel,
+>  					(struct scatterlist *)pio,
+> -					ARRAY_SIZE(pio), DMA_NONE, 0);
+> +					ARRAY_SIZE(pio), DMA_TRANS_NONE, 0);
+>  	if (!desc) {
+>  		pr_err("step 1 error\n");
+>  		return -1;
+> @@ -917,7 +917,7 @@ int gpmi_read_data(struct gpmi_nand_data *this)
+>  	/* [2] : send DMA request */
+>  	prepare_data_dma(this, DMA_FROM_DEVICE);
+>  	desc = channel->device->device_prep_slave_sg(channel, &this->data_sgl,
+> -						1, DMA_FROM_DEVICE, 1);
+> +						1, DMA_DEV_TO_MEM, 1);
+>  	if (!desc) {
+>  		pr_err("step 2 error\n");
+>  		return -1;
+> @@ -964,7 +964,7 @@ int gpmi_send_page(struct gpmi_nand_data *this,
+>  
+>  	desc = channel->device->device_prep_slave_sg(channel,
+>  					(struct scatterlist *)pio,
+> -					ARRAY_SIZE(pio), DMA_NONE, 0);
+> +					ARRAY_SIZE(pio), DMA_TRANS_NONE, 0);
+>  	if (!desc) {
+>  		pr_err("step 2 error\n");
+>  		return -1;
+> @@ -998,7 +998,8 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+>  		| BF_GPMI_CTRL0_XFER_COUNT(0);
+>  	pio[1] = 0;
+>  	desc = channel->device->device_prep_slave_sg(channel,
+> -				(struct scatterlist *)pio, 2, DMA_NONE, 0);
+> +				(struct scatterlist *)pio, 2,
+> +				DMA_TRANS_NONE, 0);
+>  	if (!desc) {
+>  		pr_err("step 1 error\n");
+>  		return -1;
+> @@ -1027,7 +1028,7 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+>  	pio[5] = auxiliary;
+>  	desc = channel->device->device_prep_slave_sg(channel,
+>  					(struct scatterlist *)pio,
+> -					ARRAY_SIZE(pio), DMA_NONE, 1);
+> +					ARRAY_SIZE(pio), DMA_TRANS_NONE, 1);
+>  	if (!desc) {
+>  		pr_err("step 2 error\n");
+>  		return -1;
+> @@ -1045,7 +1046,8 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+>  		| BF_GPMI_CTRL0_XFER_COUNT(geo->page_size);
+>  	pio[1] = 0;
+>  	desc = channel->device->device_prep_slave_sg(channel,
+> -				(struct scatterlist *)pio, 2, DMA_NONE, 1);
+> +				(struct scatterlist *)pio, 2,
+> +				DMA_TRANS_NONE, 1);
+>  	if (!desc) {
+>  		pr_err("step 3 error\n");
+>  		return -1;
+It's ok to me.
