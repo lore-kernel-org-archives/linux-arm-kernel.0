@@ -1,28 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Dec 2011 18:31:58 +0100
-Subject: [PATCH v4 2/5] ARM: SMP: Refactor Kconfig to be more maintainable
-In-Reply-To: <1323798993-8727-3-git-send-email-dave.martin@linaro.org>
-References: <1323798993-8727-1-git-send-email-dave.martin@linaro.org>
- <1323798993-8727-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <CACRpkdb-trbiJHZEgGS427XTs8A_VnUFMAbnVvL3fp4qmBVX4w@mail.gmail.com>
+Date: Wed, 14 Dec 2011 18:40:51 +0100
+Subject: [RFC PATCH v2 0/4] pinctrl: imx: add pinnmux support
+In-Reply-To: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdbNOLBxsbAnnYSNiPaQ3EAj6eQ9=C8jJDb+jKP3GdjRcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 6:56 PM, Dave Martin <dave.martin@linaro.org> wrote:
+On Wed, Dec 14, 2011 at 5:03 PM, Dong Aisheng <b29396@freescale.com> wrote:
 
-> Making SMP depend on (huge list of MACH_ and ARCH_ configs) is
-> bothersome to maintain and likely to lead to merge conflicts.
->
-> This patch moves the knowledge of which platforms are SMP-capable
-> to the individual machines. ?To enable this, a new HAVE_SMP config
-> option is introduced to allow machines to indicate that they can
-> run in a SMP configuration.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> For DT support, there's still one issue that for pinmux_map,
+> since it's board specific, i wonder if it can be parsed by pinctrl
+> subsystem via dt rather than by each driver.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+That is definately how it should be done. Seems like a good
+idea to me.
 
-For "my" platforms...
+> but pinctrl still does not supported that, i still only called
+> it in mach-imx6q.c which seems not a correct place.
 
-Yours,
+Don't worry that pinctrl does not support it - patch pinctrl core!
+
+Just make a separate patch which patches drivers/pinctrl/pinmux.c
+to ass the device tree parsing you need from the core, and we'll
+review it.
+
+I am by far too incompetent in device tree mechanisms to do
+that myself, I have never worked much on device tree.
+
+Thanks,
 Linus Walleij
