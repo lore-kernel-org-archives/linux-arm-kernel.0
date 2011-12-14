@@ -1,48 +1,62 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 14 Dec 2011 18:20:04 +0000
-Subject: [PATCH v4 2/5] ARM: SMP: Refactor Kconfig to be more maintainable
-In-Reply-To: <20111214174618.GB22025@huya.qualcomm.com>
-References: <1323798993-8727-1-git-send-email-dave.martin@linaro.org>
- <1323798993-8727-3-git-send-email-dave.martin@linaro.org>
- <20111213201137.GA31437@huya.qualcomm.com>
- <20111214113655.GA2568@linaro.org>
- <20111214174618.GB22025@huya.qualcomm.com>
-Message-ID: <20111214182004.GA9331@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Dec 2011 10:21:49 -0800
+Subject: [PATCH 01/10] GPIO: gpio-generic: Move initialization up to
+ postcore
+In-Reply-To: <201112141410.53522.jkrzyszt@tis.icnet.pl>
+References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <201112130044.02007.jkrzyszt@tis.icnet.pl>
+ <20111212235544.GM32251@atomide.com>
+ <201112141410.53522.jkrzyszt@tis.icnet.pl>
+Message-ID: <20111214182149.GF32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 09:46:18AM -0800, David Brown wrote:
-> On Wed, Dec 14, 2011 at 11:36:55AM +0000, Dave Martin wrote:
-> > On Tue, Dec 13, 2011 at 12:11:37PM -0800, David Brown wrote:
-> > > On Tue, Dec 13, 2011 at 05:56:30PM +0000, Dave Martin wrote:
-> > > > Making SMP depend on (huge list of MACH_ and ARCH_ configs) is
-> > > > bothersome to maintain and likely to lead to merge conflicts.
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111214 04:40]:
+> On Tuesday 13 of December 2011 at 00:55:44, Tony Lindgren wrote:
+> > * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111212 15:13]:
+> > > On Tuesday 13 of December 2011 at 00:15:20, Tony Lindgren wrote:
+> > > > 
+> > > > Might be worth checking if some board specific __initcall helps here
+> > > > too?
 > > > 
-> > > > diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> > > > index ebde97f..e6beaff 100644
-> > > > --- a/arch/arm/mach-msm/Kconfig
-> > > > +++ b/arch/arm/mach-msm/Kconfig
-> > > > @@ -67,6 +67,7 @@ config MSM_SOC_REV_A
-> > > >  	bool
-> > > >  config  ARCH_MSM_SCORPIONMP
-> > > >  	bool
-> > > > +	select HAVE_SMP
-> > > >  
-> > > >  config  ARCH_MSM_ARM11
-> > > >  	bool
+> > > If I only knew how I could insert a board specific __initcall between 
+> > > two points from where the generic-gpio first, then the 8250 driver, are 
+> > > called.
 > > > 
-> > > The ARCH_MSM_SCORPIONMP config's only purpose was to enable SMP higher
-> > > up.  We might as well eliminate ARCH_MSM_SCORPIONMP entirely, and just
-> > > select HAVE_SMP in ARCH_MSM8X60 and ARCH_MSM8960.
+> > > Any hints?
 > > 
-> > First and foremost, I'm just refactoring with this series.  I've
-> > included other trivial changes suggested by other people where the
-> > effect is clear and straightforward.
+> > Hmm, can't you do all that in the order you want in
+> > ams_delta_modem_init()?  Or make that into a late_initcall so
+> > you have generic-gpio available?
+> > 
+> > It seems that the pieces of code you're talking about don't need
+> > to be initialized early, just needs to be done in the right
+> > order to get things working.
 > 
-> In that light, your patch is probably the right approach.  I can clean
-> our stuff up and sent out other patches later.
+> Hi,
+> I'm almost done with moving registration of all latch dependent devices 
+> down to a late_initcall hook, however while working on this, I've found 
+> still another arrangement, yet better in my opinion:
+> 1) generic-gpio driver registration moved from device_initcall up to 
+>    subsys_initcall,
+> 2) latch dependent device registration left at arch_initcall, as it is 
+>    now,
+> 3) a temporary hack, removed with the last patch in the series, that 
+>    requests GPIO pins on behalf of device drivers before those are 
+>    updated, placed between subsys_initcall and device_initcall, i.e., at 
+>    fs_initcall or rootfs_initcall; both look ugly, but this is only for 
+>    a while, in order to keep things working while in the transition,
+> 4) the modem init hook, once updated with extra GPIO setup that must be 
+>    done on behalf of the 8250 driver, which is not prepared for 
+>    accepting any extra init hooks passed with the device platform data, 
+>    moved down to late_initcall, as suggested,
+> 5) once all drivers are updated, the hack is removed, and an 
+>    initialization of unused pins added to that late_initcall modem hook, 
+>    perhaps renamed in order to not suggest it is still modem only 
+>    related.
+> 
+> What do you think?
 
-OK, thanks for confirming.
+Sounds better for sure than what we currently have :)
 
-Cheers
----Dave
+Tony
