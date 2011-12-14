@@ -1,63 +1,63 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 14 Dec 2011 07:20:13 -0800
-Subject: [PATCH v3 0/4] OMAP serial device tree support
-In-Reply-To: <1323863746-18145-1-git-send-email-rnayak@ti.com> (Rajendra
- Nayak's message of "Wed, 14 Dec 2011 17:25:42 +0530")
-References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
-Message-ID: <87d3brnpsi.fsf@ti.com>
+Date: Wed, 14 Dec 2011 07:29:07 -0800
+Subject: [PATCH v8 00/20] OMAP2+: UART: Runtime adaptation + cleanup
+In-Reply-To: <CAAL8m4wR-3WDYf_c56-h1ZtCg=Ob2T+FvOOaXLSKK1pyo9oh8Q@mail.gmail.com>
+ (Govindraj's message of "Wed, 14 Dec 2011 14:16:41 +0530")
+References: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
+ <CAAL8m4wGN5ykm3-+xrGPe-WJUDBdterxAyZ=C3kH862+n1DprQ@mail.gmail.com>
+ <87fwgow9vz.fsf@ti.com>
+ <CAAL8m4wR-3WDYf_c56-h1ZtCg=Ob2T+FvOOaXLSKK1pyo9oh8Q@mail.gmail.com>
+Message-ID: <877h1znpdo.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg, Alan,
+Govindraj <govindraj.ti@gmail.com> writes:
 
-Rajendra Nayak <rnayak@ti.com> writes:
+> On Wed, Dec 14, 2011 at 12:56 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Govindraj <govindraj.ti@gmail.com> writes:
+>>
+>> [...]
+>>
+>>> I have re-based this patch series against LO master
+>>> commit id: deee6d5359969a0ce4e2760cfd7b9f379bd5698a
+>>>
+>>> Same is available here [1]
+>>>
+>>> I have tested this patch series along with:
+>>>
+>>> 1.) Tero's V11 irq chaining series
+>>> ? ? ?http://www.spinics.net/lists/linux-omap/msg61445.html
+>>> ? ? (This patch series is used for uart wakeup handling using
+>>> ? ? ? prcm_irq chaining)
+>>>
+>>> 2.) Rajendra's hwmod change
+>>> ? ? ?http://www.spinics.net/lists/arm-kernel/msg148632.html
+>>> ? ? ?(This patch handles init_no_idle flag setting
+>>> ? ? ? without this patch there will be boot warning however
+>>> ? ? ? all pm features will work after boot up.)
+>>>
+>>> 3.) Vishwa's io daisy chain changes.
+>>> ? ? ?http://permalink.gmane.org/gmane.linux.ports.arm.omap/65500
+>>> ? ? ?(tested with and without this patch series pm features works).
+>>>
+>>> Same combination of patches based on above commit id
+>>> used for testing is available here [2].
+>>
+>> Please have a closer look at your branch.
+>>
+>> The second commit[1] commits the .rej file from a failed patch apply,
+>> so obviously doesn't do what was intended.
+>>
+>
+> Sorry my bad I have refreshed the uart runtime branch [1]
+> & test branch [2].
 
-> v3 is rebased on top of the latest serial runtime
-> patches[1] and boot tested with/without DT on OMAP4
-> SDP and OMAP4 Panda boards.
+Can you add another patch which fixes these compiler warnings:
 
-With your ack on the drivers/tty/* stuff, I can queue this via the OMAP
-tree on top of the runtime PM conversion that it depends on.
-
-Thanks,
+/work/kernel/omap/pm/drivers/tty/serial/omap-serial.c: In function 'serial_omap_irq':
+/work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:228:29: warning: 'ch' may be used uninitialized in this function [-Wuninitialized]
+/work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:176:16: note: 'ch' was declared here
+/work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:228:29: warning: 'ch' may be used uninitialized in this function [-Wuninitialized]
+/work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:176:16: note: 'ch' was declared here
 
 Kevin
-
-> Patches can be found here..
-> git://gitorious.org/omap-pm/linux.git for-dt/serial
->
-> I also had to pull in a fix[2] for DT testing (already in linux-omap
-> master) which was missing as the serial runtime branch[1]
-> was based on an older master commit.
->
-> Changes in v3:
-> -1- Rebased on latest serial runtime patches
-> -2- Minor typr fixes
->
-> Changes in v2:
-> -1- Got rid of binding to define which uart is console
-> -2- Added checks to default clock speed to 48Mhz
-> -3- Added compatible for each OMAP family
-> -4- Used of_alias_get_id to populate port.line
->
-> [1] git://gitorious.org/runtime_3-0/runtime_3-0.git for_3_3/lo_rc4_uartruntime
-> [2] http://www.spinics.net/lists/arm-kernel/msg150751.html
->
-> Rajendra Nayak (4):
->   omap-serial: Get rid of all pdev->id usage
->   omap-serial: Use default clock speed (48Mhz) if not specified
->   omap-serial: Add minimal device tree support
->   ARM: omap: pass minimal SoC/board data for UART from dt
->
->  .../devicetree/bindings/serial/omap_serial.txt     |   10 +++
->  arch/arm/boot/dts/omap3.dtsi                       |   31 ++++++++
->  arch/arm/boot/dts/omap4.dtsi                       |   28 +++++++
->  arch/arm/mach-omap2/board-generic.c                |    1 -
->  drivers/tty/serial/omap-serial.c                   |   80 +++++++++++++++----
->  5 files changed, 132 insertions(+), 18 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/serial/omap_serial.txt
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
