@@ -1,25 +1,32 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Wed, 14 Dec 2011 17:18:43 +0000
-Subject: [PATCH v3 0/4] OMAP serial device tree support
-In-Reply-To: <87d3brnpsi.fsf@ti.com>
-References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
- <87d3brnpsi.fsf@ti.com>
-Message-ID: <20111214171843.5f638874@bob.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Dec 2011 18:18:00 +0100
+Subject: [PATCH] ux500: remove overlapping iotable entries
+In-Reply-To: <alpine.LFD.2.02.1112141151490.2907@xanadu.home>
+References: <1323850933-3084-1-git-send-email-linus.walleij@stericsson.com>
+ <alpine.LFD.2.02.1112141151490.2907@xanadu.home>
+Message-ID: <CACRpkdadPTVrBLSWRftf_Hw2q1N2HFqKZyiJL7gS42THMA4=uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Dec 2011 07:20:13 -0800
-Kevin Hilman <khilman@ti.com> wrote:
+On Wed, Dec 14, 2011 at 5:53 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Wed, 14 Dec 2011, Linus Walleij wrote:
+>
+>> The overlapping iotable mapping entries for the ux500 Cortex
+>> A9 SCU, CPU control and TWD are no longer accepted by the
+>> kernel. Remove the overlaps so the machine boots again.
+>>
+>> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+>> Cc: Rabin Vincent <rabin.vincent@stericsson.com>
+>> Reported-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Reported-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+>
+> Please put this into RMK's patch system so he could merge it into his
+> devel-stable branch where the issue comes from.
 
-> Greg, Alan,
-> 
-> Rajendra Nayak <rnayak@ti.com> writes:
-> 
-> > v3 is rebased on top of the latest serial runtime
-> > patches[1] and boot tested with/without DT on OMAP4
-> > SDP and OMAP4 Panda boards.
-> 
-> With your ack on the drivers/tty/* stuff, I can queue this via the
-> OMAP tree on top of the runtime PM conversion that it depends on.
+OK it's 7233/1.
 
-Go for it
+Thanks,
+Linus Walleij
