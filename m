@@ -1,74 +1,147 @@
 From: vishwanath.bs@ti.com (Vishwanath BS)
-Date: Wed, 14 Dec 2011 21:31:13 +0530
-Subject: [PATCHV2 REPOST 3/7] ARM: OMAP4 PM: Add IO Daisychain support
+Date: Wed, 14 Dec 2011 21:31:12 +0530
+Subject: [PATCHV2 REPOST 2/7] ARM: OMAP3 PM: Move IO Daisychain function to
+ omap3 prm file
 In-Reply-To: <1323878477-21122-1-git-send-email-vishwanath.bs@ti.com>
 References: <1323878477-21122-1-git-send-email-vishwanath.bs@ti.com>
-Message-ID: <1323878477-21122-4-git-send-email-vishwanath.bs@ti.com>
+Message-ID: <1323878477-21122-3-git-send-email-vishwanath.bs@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+Since IO Daisychain modifies only PRM registers, it makes sense to move it to
+PRM File.
 
-patch adds IO Daisychain support for OMAP4 as per section 3.9.4 in OMAP4430
-Public TRM.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
 Tested-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/prm44xx.c |   30 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prm44xx.h |    1 +
- 2 files changed, 31 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c       |   30 +-----------------------------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c |   33 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |   14 ++++++++++++++
+ 3 files changed, 48 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 67d8d74..4dc58f7 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -142,3 +142,33 @@ static int __init omap4xxx_prcm_init(void)
- 		return omap_prcm_register_chain_handler(&omap4_prcm_irq_setup);
- 	return 0;
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 074688b..448e620 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -96,34 +96,6 @@ static inline void omap3_per_restore_context(void)
+ 	omap_gpio_restore_context();
  }
-+
+ 
+-static void omap3_enable_io_chain(void)
+-{
+-	int timeout = 0;
+-
+-	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
+-				   PM_WKEN);
+-	/* Do a readback to assure write has been done */
+-	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+-
+-	while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
+-		 OMAP3430_ST_IO_CHAIN_MASK)) {
+-		timeout++;
+-		if (timeout > 1000) {
+-			pr_err("Wake up daisy chain activation failed.\n");
+-			return;
+-		}
+-	}
+-	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
+-			PM_WKEN);
+-
+-}
+-
+-static void omap3_disable_io_chain(void)
+-{
+-	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
+-				     PM_WKEN);
+-}
+-
+ static void omap3_core_save_context(void)
+ {
+ 	omap3_ctrl_save_padconf();
+@@ -335,7 +307,7 @@ void omap_sram_idle(void)
+ 	     core_next_state < PWRDM_POWER_ON)) {
+ 		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
+ 		if (omap3_has_io_chain_ctrl())
+-			omap3_enable_io_chain();
++			omap3_trigger_wuclk_ctrl();
+ 	}
+ 
+ 	/* Block console output in case it is on one of the OMAP UARTs */
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index 2a4a678..6db5935 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -227,6 +227,39 @@ u32 omap3_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset)
+ 	return omap2_prm_rmw_mod_reg_bits(mask, bits, OMAP3430_GR_MOD, offset);
+ }
+ 
 +/**
 + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
 + * the I/O ring after asserting WUCLKIN high
 + */
 +#define MAX_IOPAD_LATCH_TIME 1000
 +
-+/* OMAP4 IO Daisychain trigger sequence */
-+void omap4_trigger_wuclk_ctrl(void)
++/* OMAP3 Daisychain trigger sequence */
++void omap3_trigger_wuclk_ctrl(void)
 +{
 +	int i = 0;
 +
-+	/* Enable GLOBAL_WUEN */
-+	if (!(omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET)
-+				& OMAP4430_GLOBAL_WUEN_MASK))
-+		omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
-+				OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_PRM_DEVICE_INST,
-+			OMAP4_PRM_IO_PMCTRL_OFFSET);
++	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
++			     PM_WKEN);
++	/* Do a readback to assure write has been done */
++	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
 +
-+	/* Trigger WUCLKIN enable */
-+	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, OMAP4430_WUCLK_CTRL_MASK,
-+			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
 +	omap_test_timeout(
-+		((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET)
-+		>> OMAP4430_WUCLK_STATUS_SHIFT) == 1), MAX_IOPAD_LATCH_TIME, i);
-+	/* Trigger WUCLKIN disable */
-+	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
-+			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
-+	return;
++	(((omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
++		 OMAP3430_ST_IO_CHAIN_MASK) == 1)),
++	MAX_IOPAD_LATCH_TIME, i);
++
++	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
++			     PM_WKEN);
 +}
-diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
-index 3d66ccd..a8678db 100644
---- a/arch/arm/mach-omap2/prm44xx.h
-+++ b/arch/arm/mach-omap2/prm44xx.h
-@@ -750,6 +750,7 @@
- extern u32 omap4_prm_read_inst_reg(s16 inst, u16 idx);
- extern void omap4_prm_write_inst_reg(u32 val, s16 inst, u16 idx);
- extern u32 omap4_prm_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
-+extern void omap4_trigger_wuclk_ctrl(void);
++
++/* OMAP3 Daisychain disable sequence */
++void omap3_disable_io_chain(void)
++{
++	if (omap_rev() >= OMAP3430_REV_ES3_1)
++		omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
++			PM_WKEN);
++}
++
+ static int __init omap3xxx_prcm_init(void)
+ {
+ 	if (cpu_is_omap34xx())
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index cef533d..e6f8206 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -289,6 +289,18 @@ static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift,
+ 		"not suppose to be used on omap4\n");
+ 	return 0;
+ }
++static inline void omap3_trigger_wuclk_ctrl(void)
++{
++	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
++static inline void omap3_disable_io_chain(void)
++{
++	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
+ #else
+ /* Power/reset management domain register get/set */
+ extern u32 omap2_prm_read_mod_reg(s16 module, u16 idx);
+@@ -302,6 +314,8 @@ extern u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask);
+ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
+ extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
+ extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
++extern void omap3_trigger_wuclk_ctrl(void);
++extern void omap3_disable_io_chain(void);
  
- /* OMAP4-specific VP functions */
- u32 omap4_prm_vp_check_txdone(u8 vp_id);
+ /* OMAP3-specific VP functions */
+ u32 omap3_prm_vp_check_txdone(u8 vp_id);
 -- 
 1.7.0.4
