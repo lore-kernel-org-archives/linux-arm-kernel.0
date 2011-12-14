@@ -1,61 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 13 Dec 2011 20:04:11 -0700 (MST)
-Subject: [PATCHv11 2/8] ARM: OMAP2+: hwmod: Add API to check IO PAD wakeup
- status
-In-Reply-To: <1323713733-13115-3-git-send-email-t-kristo@ti.com>
-References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
- <1323713733-13115-3-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1112132002070.12046@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Dec 2011 19:36:30 -0800
+Subject: Git pull request: update to the Marvell Orion SOC family
+In-Reply-To: <alpine.LFD.2.02.1112131848190.2907@xanadu.home>
+References: <alpine.LFD.2.02.1112131611320.2907@xanadu.home>
+ <CAOesGMhMgj__0zLk=JrA3d6+x4gZFfBbN0eO7wnge7tLsLOsqg@mail.gmail.com>
+ <alpine.LFD.2.02.1112131746280.2907@xanadu.home>
+ <alpine.LFD.2.02.1112131848190.2907@xanadu.home>
+Message-ID: <CAOesGMgQ6rjBhHKRryzk1Hwc-khT9-eE+z0E8hUxb8wa8337ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero
+On Tue, Dec 13, 2011 at 3:50 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Tue, 13 Dec 2011, Nicolas Pitre wrote:
+>
+>> On Tue, 13 Dec 2011, Olof Johansson wrote:
+>>
+>> > Hi Nico (and Andrew),
+>> >
+>> > On Tue, Dec 13, 2011 at 1:18 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> >
+>> > > This contains minor fixes plus initial consolidation toward DT support.
+>> > >
+>> > >
+>> > > Andrew Lunn (4):
+>> > > ? ? ?Consolidate the address map setup on Orion based platforms.
+>> > > ? ? ?Move the *_mbus_dram_info structure into the orion platform and call it orion_mbus_dram_info everywhere.
+>> > > ? ? ?Get address map from plat-orion instead of via platform_data.
+>> > > ? ? ?Remove address map info from all platform data strucutures.
+>> >
+>> > Andrew, in the future please prefix the patch subject with the
+>> > subsystem/platform. One of them has a really long subject too.
+>> >
+>> > Nico: The last two patches in the branch have your Acked-by but not a
+>> > Signed-off-by, even though you were the committer. Would you mind
+>> > fixing that and sending a new request, please?
+>>
+>> OK, hold on I'll fix both issues.
+>
+> Olof, please re-pull. ?Here's the amended shortlog:
 
-looking at this patch:
+Pulled into next/devel -- the diffstat still matches the original pull
+request as expected.
 
-On Mon, 12 Dec 2011, Tero Kristo wrote:
+Thanks!
 
-> From: R, Govindraj <govindraj.raja@ti.com>
-> 
-> Add API to determine IO-PAD wakeup event status for a given
-> hwmod dynamic_mux pad.
-> 
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-
-It seems that your last patch drops the following code that this patch 
-adds:
-
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 8d37d83..d7f4623 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -2721,3 +2721,10 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
->  
->  	return 0;
->  }
-> +
-> +int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh)
-> +{
-> +	if (oh && oh->mux)
-> +		return omap_hwmod_mux_get_wake_status(oh->mux);
-> +	return -EINVAL;
-> +}
-> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> index 8b372ed..1b81dfb 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> @@ -604,6 +604,7 @@ int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
->  
->  int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
->  
-> +int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh);
->  /*
->   * Chip variant-specific hwmod init routines - XXX should be converted
->   * to use initcalls once the initial boot ordering is straightened out
-
-It's best in these circumstances to modify this patch not to add the code 
-in the first place.  Otherwise this creates needless churn which plenty of 
-people are quite sensitized to.  So, dropping these from patch 2.
-
-
-- Paul
+-Olof
