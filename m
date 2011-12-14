@@ -1,58 +1,55 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 15 Dec 2011 00:03:39 +0800
-Subject: [RFC PATCH v2 1/4] dt: add of_get_child_number helper function
-In-Reply-To: <1323878622-26602-1-git-send-email-b29396@freescale.com>
-References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
-Message-ID: <1323878622-26602-2-git-send-email-b29396@freescale.com>
+Date: Thu, 15 Dec 2011 00:03:38 +0800
+Subject: [RFC PATCH v2 0/4] pinctrl: imx: add pinnmux support
+Message-ID: <1323878622-26602-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+The new patch series shows the basic idea of parsing data from device tree.
+The implementation bases on the assumption that board knows the function uses
+which pin group and it only passes one group per one function to ease the parsing
+effort. The core driver will construct the structure dynamically by parsing
+the data from dts file in probe.
 
-Currently most code to get child number in kernel are almost same,
-add a helper to implement this function for dt to use.
+For DT support, there's still one issue that for pinmux_map,
+since it's board specific, i wonder if it can be parsed by pinctrl
+subsystem via dt rather than by each driver.
+but pinctrl still does not supported that, i still only called
+it in mach-imx6q.c which seems not a correct place.
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
----
- include/linux/of.h |   17 +++++++++++++++++
- 1 files changed, 17 insertions(+), 0 deletions(-)
+The patch still has a few other work to do like add pinconf, gpio support and
+one know issue is that when add pinconf support, the trick that using pin->id
+to calculate the reg offset may not work since pin config registers are not
+layout regularly and we may find a better way to do that.
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 4948552..09d53dc 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -189,6 +189,18 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
- 	for (child = of_get_next_child(parent, NULL); child != NULL; \
- 	     child = of_get_next_child(parent, child))
- 
-+static inline int of_get_child_number(struct device_node *np)
-+
-+{
-+	struct device_node *child = NULL;
-+	int num = 0;
-+
-+	while((child = of_get_next_child(np, child)))
-+		num++;
-+
-+	return num;
-+}
-+
- extern struct device_node *of_find_node_with_property(
- 	struct device_node *from, const char *prop_name);
- #define for_each_node_with_property(dn, prop_name) \
-@@ -262,6 +274,11 @@ static inline bool of_have_populated_dt(void)
- #define for_each_child_of_node(parent, child) \
- 	while (0)
- 
-+static inline int of_get_child_number(struct device_node *np)
-+{
-+	return -ENOSYS;
-+}
-+
- static inline int of_device_is_compatible(const struct device_node *device,
- 					  const char *name)
- {
--- 
-1.7.0.4
+So it's mainly for discussion on the visiable issues.
+
+Changes since v1:
+ * add a cover letter
+ * remove the pin functon and group defines out of driver
+ * parsing data from device tree for imx6q support
+ * a few minor fixes suggested by Shawn
+
+Dong Aisheng (4):
+  dt: add of_get_child_number helper function
+  pinctrl: imx: add pinmux imx driver
+  ARM: imx6q: using pinmux subsystem
+  mmc: sdhci-esdhc-imx: using pinmux subsystem
+
+ arch/arm/boot/dts/imx6q-sabreauto.dts |   22 ++
+ arch/arm/boot/dts/imx6q.dtsi          |    1 +
+ arch/arm/mach-imx/Kconfig             |    1 +
+ arch/arm/mach-imx/mach-imx6q.c        |    8 +-
+ drivers/mmc/host/sdhci-esdhc-imx.c    |   20 ++
+ drivers/pinctrl/Kconfig               |   20 ++
+ drivers/pinctrl/Makefile              |    3 +
+ drivers/pinctrl/pinmux-imx-core.c     |  435 ++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinmux-imx-core.h     |   86 +++++++
+ drivers/pinctrl/pinmux-imx53.c        |  443 +++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinmux-imx6q.c        |  433 ++++++++++++++++++++++++++++++++
+ include/linux/of.h                    |   17 ++
+ 12 files changed, 1488 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/pinctrl/pinmux-imx-core.c
+ create mode 100644 drivers/pinctrl/pinmux-imx-core.h
+ create mode 100644 drivers/pinctrl/pinmux-imx53.c
+ create mode 100644 drivers/pinctrl/pinmux-imx6q.c
