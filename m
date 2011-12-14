@@ -1,40 +1,79 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Dec 2011 11:25:10 -0800
-Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART
- from dt
-In-Reply-To: <1323863746-18145-5-git-send-email-rnayak@ti.com>
-References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
- <1323863746-18145-5-git-send-email-rnayak@ti.com>
-Message-ID: <20111214192509.GH32251@atomide.com>
+Date: Wed, 14 Dec 2011 11:35:47 -0800
+Subject: [GIT PULL] SoC changes for omap4470, ti814x, am33xx for v3.3 merge
+ window
+Message-ID: <20111214193547.GI32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [111214 03:24]:
-> Pass minimal data needed for console boot, from dt, for
-> OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
-> static initialization from generic board file.
-> 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Hi Arnd & Olof,
 
-This we can't merge because this breaks serial console for
-omap2 because you're not adding the omap2 specific dtsi
-entries for omap2..
+Please pull support for new omap variants from:
 
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -69,7 +69,6 @@ static void __init omap_generic_init(void)
->  	if (node)
->  		irq_domain_add_simple(node, 0);
->  
-> -	omap_serial_init();
->  	omap_sdrc_init(NULL, NULL);
->  
->  	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap
 
-..and you're removing the call for omap_serial_init.
+This adds minimal support for omap4470, am33xx and ti814x.
+Note that these changes do not contain mux/clock/hwmod changes
+so only minimal boot support is added.
 
-Please just update this patch with the omap2 entries
-as well. Other than that looks good to me.
+Also, these do not have a dependency after all to the
+previously pulled omap4 branch unlike what I mentioned earlier
+
+The dependency is just Russell's devel-stable at commit
+deee6d5359969a0ce4e2760cfd7b9f379bd5698a as most omap
+patches have.
+
+Regards,
 
 Tony
+
+
+The following changes since commit deee6d5359969a0ce4e2760cfd7b9f379bd5698a:
+  Tony Lindgren (1):
+        ARM: 7194/1: OMAP: Fix build after a merge between v3.2-rc4 and ARM restart changes
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap soc
+
+Afzal Mohammed (2):
+      ARM: OMAP: am33xx: Update common omap platform files
+      ARM: OMAP: am33xx: Update common OMAP machine specific sources
+
+David Anders (1):
+      ARM: OMAP: id: add chip id recognition for omap4430 es2.3
+
+Hemant Pedanekar (2):
+      ARM: OMAP: TI81XX: Prepare for addition of TI814X support
+      ARM: OMAP: TI814X: Add cpu type macros and detection support
+
+Leonid Iziumtsev (1):
+      ARM: OMAP: ID: Chip detection for OMAP4470
+
+ arch/arm/mach-omap2/Kconfig                        |   11 +++-
+ arch/arm/mach-omap2/board-ti8168evm.c              |   11 +---
+ arch/arm/mach-omap2/clock.c                        |    2 +-
+ arch/arm/mach-omap2/clock.h                        |    2 +-
+ arch/arm/mach-omap2/clock3xxx_data.c               |    6 ++-
+ arch/arm/mach-omap2/common.c                       |   48 +++++++++++++----
+ arch/arm/mach-omap2/common.h                       |   23 ++++++--
+ arch/arm/mach-omap2/control.h                      |    8 ++--
+ arch/arm/mach-omap2/id.c                           |   52 ++++++++++++++++---
+ arch/arm/mach-omap2/include/mach/debug-macro.S     |   12 ++--
+ arch/arm/mach-omap2/io.c                           |   38 +++++++++++---
+ arch/arm/mach-omap2/irq.c                          |    2 +-
+ arch/arm/mach-omap2/opp2xxx.h                      |    2 +-
+ arch/arm/mach-omap2/serial.c                       |    6 +-
+ arch/arm/plat-omap/Makefile                        |    1 -
+ .../plat-omap/include/plat/{ti816x.h => am33xx.h}  |   20 +++----
+ arch/arm/plat-omap/include/plat/clock.h            |    4 +-
+ arch/arm/plat-omap/include/plat/cpu.h              |   56 ++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/hardware.h         |    3 +-
+ arch/arm/plat-omap/include/plat/io.h               |   12 ++++
+ arch/arm/plat-omap/include/plat/omap34xx.h         |    2 +
+ arch/arm/plat-omap/include/plat/serial.h           |   14 +++---
+ .../plat-omap/include/plat/{ti816x.h => ti81xx.h}  |   18 +++---
+ arch/arm/plat-omap/include/plat/uncompress.h       |    8 ++--
+ 24 files changed, 267 insertions(+), 94 deletions(-)
+ copy arch/arm/plat-omap/include/plat/{ti816x.h => am33xx.h} (53%)
+ rename arch/arm/plat-omap/include/plat/{ti816x.h => ti81xx.h} (60%)
