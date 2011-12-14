@@ -1,83 +1,143 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 14 Dec 2011 14:16:09 -0700
-Subject: [PATCH 5/9] gpio: pl061: convert to use 0 for no irq
-In-Reply-To: <1323876538-20406-6-git-send-email-robherring2@gmail.com>
+Date: Wed, 14 Dec 2011 14:16:29 -0700
+Subject: [PATCH 6/9] ARM: realview: convert pl061 no irq to 0 instead of -1
+In-Reply-To: <1323876538-20406-7-git-send-email-robherring2@gmail.com>
 References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
- <1323876538-20406-6-git-send-email-robherring2@gmail.com>
-Message-ID: <CACxGe6ujBaRLxo9JSW-vMHz1TZs+poKacHQbvC=aAjUsSq=m4g@mail.gmail.com>
+ <1323876538-20406-7-git-send-email-robherring2@gmail.com>
+Message-ID: <CACxGe6vbVkdRKm_fY6iXKAQHi4BGH7Cc+Hr1whPyFF1MdLXuWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Dec 14, 2011 at 8:28 AM, Rob Herring <robherring2@gmail.com> wrote:
 > From: Rob Herring <rob.herring@calxeda.com>
 >
-> We don't want drivers using NO_IRQ, so remove its use. For now, 0 or
-> -1 means no irq until platforms are converted to use 0.
+> Drivers should use 0 for no irq, so convert realview platforms pl061
+> platform_data over to use 0.
 >
 > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-> Cc: Linus Walleij <linus.ml.walleij@gmail.com>
+
 > ---
-> ?drivers/gpio/gpio-pl061.c ?| ? ?8 ++++----
-> ?include/linux/amba/pl061.h | ? ?2 +-
-> ?2 files changed, 5 insertions(+), 5 deletions(-)
+> ?arch/arm/mach-realview/realview_eb.c ? ? | ? ?3 ---
+> ?arch/arm/mach-realview/realview_pb1176.c | ? ?3 ---
+> ?arch/arm/mach-realview/realview_pb11mp.c | ? ?3 ---
+> ?arch/arm/mach-realview/realview_pba8.c ? | ? ?3 ---
+> ?arch/arm/mach-realview/realview_pbx.c ? ?| ? ?3 ---
+> ?5 files changed, 0 insertions(+), 15 deletions(-)
 >
-> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-> index 0f718f9..fe19dec 100644
-> --- a/drivers/gpio/gpio-pl061.c
-> +++ b/drivers/gpio/gpio-pl061.c
-> @@ -53,7 +53,7 @@ struct pl061_gpio {
-> ? ? ? ?spinlock_t ? ? ? ? ? ? ?irq_lock; ? ? ? /* IRQ registers */
+> diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+> index 026c66a..57f5bac 100644
+> --- a/arch/arm/mach-realview/realview_eb.c
+> +++ b/arch/arm/mach-realview/realview_eb.c
+> @@ -117,17 +117,14 @@ static void __init realview_eb_map_io(void)
 >
-> ? ? ? ?void __iomem ? ? ? ? ? ?*base;
-> - ? ? ? unsigned ? ? ? ? ? ? ? ?irq_base;
-> + ? ? ? int ? ? ? ? ? ? ? ? ? ? irq_base;
-> ? ? ? ?struct gpio_chip ? ? ? ?gc;
+> ?static struct pl061_platform_data gpio0_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 0,
+> - ? ? ? .irq_base ? ? ? = -1,
 > ?};
 >
-> @@ -119,7 +119,7 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
-> ?{
-> ? ? ? ?struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+> ?static struct pl061_platform_data gpio1_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 8,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
 >
-> - ? ? ? if (chip->irq_base == NO_IRQ)
-> + ? ? ? if (chip->irq_base <= 0)
-> ? ? ? ? ? ? ? ?return -EINVAL;
+> ?static struct pl061_platform_data gpio2_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 16,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
 >
-> ? ? ? ?return chip->irq_base + offset;
-> @@ -250,7 +250,7 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
-> ? ? ? ? ? ? ? ?chip->irq_base = pdata->irq_base;
-> ? ? ? ?} else if (dev->dev.of_node) {
-> ? ? ? ? ? ? ? ?chip->gc.base = -1;
-> - ? ? ? ? ? ? ? chip->irq_base = NO_IRQ;
-> + ? ? ? ? ? ? ? chip->irq_base = 0;
-> ? ? ? ?} else {
-> ? ? ? ? ? ? ? ?ret = -ENODEV;
-> ? ? ? ? ? ? ? ?goto free_mem;
-> @@ -290,7 +290,7 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
-> ? ? ? ? * irq_chip support
-> ? ? ? ? */
+> ?static struct pl022_ssp_controller ssp0_plat_data = {
+> diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+> index c057540..2267696 100644
+> --- a/arch/arm/mach-realview/realview_pb1176.c
+> +++ b/arch/arm/mach-realview/realview_pb1176.c
+> @@ -113,17 +113,14 @@ static void __init realview_pb1176_map_io(void)
 >
-> - ? ? ? if (chip->irq_base == NO_IRQ)
-> + ? ? ? if (chip->irq_base <= 0)
-> ? ? ? ? ? ? ? ?return 0;
+> ?static struct pl061_platform_data gpio0_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 0,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
 >
-> ? ? ? ?writeb(0, chip->base + GPIOIE); /* disable irqs */
-> diff --git a/include/linux/amba/pl061.h b/include/linux/amba/pl061.h
-> index 2412af9..fb83c04 100644
-> --- a/include/linux/amba/pl061.h
-> +++ b/include/linux/amba/pl061.h
-> @@ -7,7 +7,7 @@ struct pl061_platform_data {
-> ? ? ? ?unsigned ? ? ? ?gpio_base;
+> ?static struct pl061_platform_data gpio1_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 8,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
 >
-> ? ? ? ?/* number of the first IRQ.
-> - ? ? ? ?* If the IRQ functionality in not desired this must be set to NO_IRQ.
-> + ? ? ? ?* If the IRQ functionality in not desired this must be set to 0.
-> ? ? ? ? */
-> ? ? ? ?unsigned ? ? ? ?irq_base;
+> ?static struct pl061_platform_data gpio2_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 16,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
 >
+> ?static struct pl022_ssp_controller ssp0_plat_data = {
+> diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+> index 671ad6d..8622dbb 100644
+> --- a/arch/arm/mach-realview/realview_pb11mp.c
+> +++ b/arch/arm/mach-realview/realview_pb11mp.c
+> @@ -112,17 +112,14 @@ static void __init realview_pb11mp_map_io(void)
+>
+> ?static struct pl061_platform_data gpio0_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 0,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl061_platform_data gpio1_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 8,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl061_platform_data gpio2_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 16,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl022_ssp_controller ssp0_plat_data = {
+> diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+> index cbf22df..6f9511d 100644
+> --- a/arch/arm/mach-realview/realview_pba8.c
+> +++ b/arch/arm/mach-realview/realview_pba8.c
+> @@ -102,17 +102,14 @@ static void __init realview_pba8_map_io(void)
+>
+> ?static struct pl061_platform_data gpio0_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 0,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl061_platform_data gpio1_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 8,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl061_platform_data gpio2_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 16,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl022_ssp_controller ssp0_plat_data = {
+> diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+> index 63c4114..be3a01f 100644
+> --- a/arch/arm/mach-realview/realview_pbx.c
+> +++ b/arch/arm/mach-realview/realview_pbx.c
+> @@ -124,17 +124,14 @@ static void __init realview_pbx_map_io(void)
+>
+> ?static struct pl061_platform_data gpio0_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 0,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl061_platform_data gpio1_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 8,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl061_platform_data gpio2_plat_data = {
+> ? ? ? ?.gpio_base ? ? ?= 16,
+> - ? ? ? .irq_base ? ? ? = -1,
+> ?};
+>
+> ?static struct pl022_ssp_controller ssp0_plat_data = {
 > --
 > 1.7.5.4
 >
