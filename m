@@ -1,60 +1,102 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Wed, 14 Dec 2011 14:50:09 -0600
-Subject: [PATCH] ARM: OMAP: mcbsp: Fix possible memory corruption
-In-Reply-To: <20111212183300.GA32251@atomide.com>
-References: <1323678976-4119-1-git-send-email-jarkko.nikula@bitmer.com>
- <1323679106-4191-1-git-send-email-jarkko.nikula@bitmer.com>
- <4EE5D639.8080608@compulab.co.il> <4EE5E3F4.6060701@bitmer.com>
- <4EE5EC13.40901@compulab.co.il>
- <20111212183300.GA32251@atomide.com>
-Message-ID: <CAB-zwWgkme_SPDMOkT9Xuv2yYdpVAGoNGGRN95vNWh7hb91JSw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Dec 2011 15:01:41 -0600
+Subject: [PATCH v4 REPOST 3/5] omap4: Unconditionally require l2x0 L2
+ cache controller support
+In-Reply-To: <20111214183952.GG32251@atomide.com>
+References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
+ <1323862781-3465-4-git-send-email-dave.martin@linaro.org>
+ <20111214181425.GB32251@atomide.com> <20111214183030.GB9331@linaro.org>
+ <20111214183952.GG32251@atomide.com>
+Message-ID: <4EE90EB5.9070502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 12:33 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Applying into fixes.
 
-FWIW, I was bisecting this issue, the patch fixes the following slab
-corruptions on boot log:
+On 12/14/2011 12:39 PM, Tony Lindgren wrote:
+> * Dave Martin <dave.martin@linaro.org> [111214 09:58]:
+>> On Wed, Dec 14, 2011 at 10:14:25AM -0800, Tony Lindgren wrote:
+>>> * Dave Martin <dave.martin@linaro.org> [111214 03:08]:
+>>>> If running in the Normal World on a TrustZone-enabled SoC, Linux
+>>>> does not have complete control over the L2 cache controller
+>>>> configuration.  The kernel cannot work reliably on such platforms
+>>>> without the l2x0 cache support code built in.
+>>>
+>>> There are HS and GP omaps (High Security and General Purpose).
+>>> GP omaps do have full control of the L2. Also HS omaps most likely
+>>> provide control over enabling and disabling L2 depending how the
+>>> secure code is implemented.
+>>>
+>>> BTW, the real problem is that because the secure code is implemented
+>>> in various ways, we don't really have any handling for it in Linux.
+>>>
+>>> The SMI instruction numbers don't seem to be standardized at all,
+>>> and can mean different things on different boards, even different
+>>> board versions :(
+>>>
+>>> Sounds like devicetree is the only safe way to deal with the L2
+>>> control options.
+>>>
+>>> Regards,
+>>>
+>>> Tony
+>>>
+>>>  
+>>>> This patch unconditionally enables l2x0 support for the OMAP4 SoCs.
+>>>>
+>>>> Thanks to Rob Herring for this suggestion. [1]
+>>>>
+>>>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>>>>
+>>>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074495.html
+>>>> ---
+>>>>  arch/arm/mach-omap2/Kconfig |    2 +-
+>>>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>>>> index bb1b670..94e568a 100644
+>>>> --- a/arch/arm/mach-omap2/Kconfig
+>>>> +++ b/arch/arm/mach-omap2/Kconfig
+>>>> @@ -41,11 +41,11 @@ config ARCH_OMAP4
+>>>>  	bool "TI OMAP4"
+>>>>  	default y
+>>>>  	depends on ARCH_OMAP2PLUS
+>>>> +	select CACHE_L2X0
+>>>>  	select CPU_V7
+>>>>  	select ARM_GIC
+>>>>  	select HAVE_SMP
+>>>>  	select LOCAL_TIMERS if SMP
+>>>> -	select MIGHT_HAVE_CACHE_L2X0
+>>>>  	select PL310_ERRATA_588369
+>>>>  	select PL310_ERRATA_727915
+>>>>  	select ARM_ERRATA_720789
+>>>> -- 
+>>>> 1.7.4.1
+>>>>
+>>
+>> To clarify, are you suggesting we retain this patch, or not?
+> 
+> I think we should keep L2 configurable for omaps until we have some
+> way of getting the configuration dynamically or from device tree.
+>  
 
-...
-hw-breakpoint: found 5 (+1 reserved) breakpoint and 1 watchpoint registers.
-hw-breakpoint: maximum watchpoint size is 4 bytes.
-Slab corruption: size-32 start=eea66740, len=32
-010: d8 9d 02 c0 04 9d 02 c0 6b 6b 6b 6b 6b 6b 6b a5  ........kkkkkkk.
-Prev obj: start=eea66720, len=32
-000: 6f 6d 61 70 32 5f 6d 63 73 70 69 2e 31 00 5a 5a  omap2_mcspi.1.ZZ
-010: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a a5  ZZZZZZZZZZZZZZZ.
-Next obj: start=eea66760, len=32
-000: 70 6f 77 65 72 00 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a  power.ZZZZZZZZZZ
-010: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a a5  ZZZZZZZZZZZZZZZ.
-Slab corruption: size-32 start=eea66740, len=32
-010: d8 9d 02 c0 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b a5  ....kkkkkkkkkkk.
-Prev obj: start=eea66720, len=32
-000: 6f 6d 61 70 32 5f 6d 63 73 70 69 2e 31 00 5a 5a  omap2_mcspi.1.ZZ
-010: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a a5  ZZZZZZZZZZZZZZZ.
-Next obj: start=eea66760, len=32
-000: 70 6f 77 65 72 00 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a  power.ZZZZZZZZZZ
-010: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a a5  ZZZZZZZZZZZZZZZ.
-Slab corruption: size-32 start=eea66740, len=32
-010: d8 9d 02 c0 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b a5  ....kkkkkkkkkkk.
-Prev obj: start=eea66720, len=32
-000: 6f 6d 61 70 32 5f 6d 63 73 70 69 2e 31 00 5a 5a  omap2_mcspi.1.ZZ
-010: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a a5  ZZZZZZZZZZZZZZZ.
-Next obj: start=eea66760, len=32
-000: 70 6f 77 65 72 00 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a  power.ZZZZZZZZZZ
-010: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a a5  ZZZZZZZZZZZZZZZ.
-Slab corruption: size-32 start=eea66740, len=32
-010: d8 9d 02 c0 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b a5  ....kkkkkkkkkkk.
-Prev obj: start=eea66720, len=32
-000: 6f 6d 61 70 32 5f 6d 63 73 70 69 2e 31 00 5a 5a  omap2_mcspi.1.ZZ
-010: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a a5  ZZZZZZZZZZZZZZZ.
-Next obj: start=eea66760, len=32
-000: 70 6f 77 65 72 00 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a  power.ZZZZZZZZZZ
-010: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a a5  ZZZZZZZZZZZZZZZ.
-OMAP DMA hardware revision 0.0
-...
+This already exists with l2x0_of_init. OMAP just needs to start using
+it. It will initialize the l2 if present in the DT and skip it if not
+present.
 
-Regards,
+Rob
 
-Omar
+>> (If we only know what l2x0 support will be needed once the dts is
+>> parsed at runtime, there could be an argument for keeping the
+>> select CACHE_L2X0 here -- unless we have specific kconfigs for
+>> the different security variants of omap.)
+> 
+> Well we can detect if it's an HS omap, but we may not know what
+> SMI it uses for enabling and disabling L2.. That can depend on
+> the board version.
+> 
+> Is there some problem keeping MIGHT_HAVE_CACHE_L2X0? This is
+> pretty important from debugging cache issues point of view.
+> 
+> Regards,
+> 
+> Tony
