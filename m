@@ -1,84 +1,46 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 14 Dec 2011 08:44:06 +0800
-Subject: [PATCH v5] tty: serial: imx: Allow UART to be a source for wakeup
-In-Reply-To: <1323746628-25163-1-git-send-email-festevam@gmail.com>
-References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
- <1323746628-25163-1-git-send-email-festevam@gmail.com>
-Message-ID: <20111214004405.GI28768@b20223-02.ap.freescale.net>
+Date: Wed, 14 Dec 2011 08:47:28 +0800
+Subject: [PATCH V2 4/7] arm/imx: fix cpufreq section mismatch
+In-Reply-To: <1323757530-19402-5-git-send-email-richard.zhao@linaro.org>
+References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
+ <1323757530-19402-5-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111214004727.GJ28768@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 01:23:48AM -0200, Fabio Estevam wrote:
-> Allow UART to be a source for wakeup from low power mode.
+can this fix go in?
+
+Thanks
+Richard
+On Tue, Dec 13, 2011 at 02:25:27PM +0800, Richard Zhao wrote:
+> WARNING: arch/arm/plat-mxc/built-in.o(.data+0x488): Section mismatch in reference from the variable mxc_driver to the function .init.text:mxc_cpufreq_init()
+> The variable mxc_driver references
+> the function __init mxc_cpufreq_init()
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 > 
-> Tested on a MX27PDK by doing:
-> 
-> echo enabled > /sys/devices/platform/imx21-uart.0/tty/ttymxc0/power/wakeup
-> 
-> echo mem > /sys/power/state
-> 
-> and then pressing a key in the console will wakeup the sytem.
-> 
-> Suggested-by: Shawn Guo <shawn.guo@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-For imx6q sabrelite,
-Tested-by: Richard Zhao <richard.zhao@freescale.com>
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 > ---
-> Changes since v4:
-> - Let serial core handle device_init_wakeup/device_set_wakeup_enable.
-> Changes since v3:
-> - Remove IMXUART_CANWAKE flag. Let userspace write in /sys/ file
-> in order to enable UART wakeup source.
-> Changes since v2:
-> - Remove incorrect enable_irq_wake from serial_imx_resume
-> Changes since v1:
-> - Pass the can-wake property via DT correctly
->  drivers/tty/serial/imx.c |   15 +++++++++++++++
->  1 files changed, 15 insertions(+), 0 deletions(-)
+>  arch/arm/plat-mxc/cpufreq.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 163fc90..0022bbd 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -566,6 +566,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
->  	if (sts & USR1_RTSD)
->  		imx_rtsint(irq, dev_id);
->  
-> +	if (sts & USR1_AWAKE)
-> +		writel(USR1_AWAKE, sport->port.membase + USR1);
-> +
->  	return IRQ_HANDLED;
+> diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+> index 85d037f..71e0d09 100644
+> --- a/arch/arm/plat-mxc/cpufreq.c
+> +++ b/arch/arm/plat-mxc/cpufreq.c
+> @@ -120,7 +120,7 @@ static int mxc_set_target(struct cpufreq_policy *policy,
+>  	return ret;
 >  }
 >  
-> @@ -1269,6 +1272,12 @@ static struct uart_driver imx_reg = {
->  static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+> -static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
+> +static int mxc_cpufreq_init(struct cpufreq_policy *policy)
 >  {
->  	struct imx_port *sport = platform_get_drvdata(dev);
-> +	unsigned int val;
-> +
-> +	/* enable wakeup from i.MX UART */
-> +	val = readl(sport->port.membase + UCR3);
-> +	val |= UCR3_AWAKEN;
-> +	writel(val, sport->port.membase + UCR3);
->  
->  	if (sport)
->  		uart_suspend_port(&imx_reg, &sport->port);
-> @@ -1279,7 +1288,13 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
->  static int serial_imx_resume(struct platform_device *dev)
->  {
->  	struct imx_port *sport = platform_get_drvdata(dev);
-> +	unsigned int val;
->  
-> +	/* disable wakeup from i.MX UART */
-> +	val = readl(sport->port.membase + UCR3);
-> +	val &= ~UCR3_AWAKEN;
-> +	writel(val, sport->port.membase + UCR3);
-> +
->  	if (sport)
->  		uart_resume_port(&imx_reg, &sport->port);
->  
+>  	int ret;
+>  	int i;
 > -- 
-> 1.7.1
+> 1.7.5.4
+> 
 > 
 > 
 > _______________________________________________
