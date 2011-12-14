@@ -1,34 +1,40 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 14 Dec 2011 13:26:00 +0800
-Subject: [PATCH V3 0/4] add imx6q sabrelite board support
-In-Reply-To: <1323826007-17937-1-git-send-email-richard.zhao@linaro.org>
-References: <1323826007-17937-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111214052559.GL28768@b20223-02.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 13 Dec 2011 22:29:44 -0700 (MST)
+Subject: [PATCH 3/7] HACK: omap: convert 44xx data to common struct clk
+In-Reply-To: <CAJOA=zM8hP=1BxcpDu-XMvt0KefRPwhP3m-+yC7Uta+Aozz8Xw@mail.gmail.com>
+References: <1323835918-2371-1-git-send-email-mturquette@ti.com>
+ <1323835918-2371-4-git-send-email-mturquette@ti.com>
+ <alpine.DEB.2.00.1112132125200.12046@utopia.booyaka.com>
+ <CAJOA=zM8hP=1BxcpDu-XMvt0KefRPwhP3m-+yC7Uta+Aozz8Xw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1112132209590.12046@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since V2:
- - Add rename uart lables
- - drop cpufreq patches
+On Tue, 13 Dec 2011, Turquette, Mike wrote:
 
-> Changes since V1:
->  - rename gpio labels
->  - imx6q-sabrelite.dts: remove fec_mac and bootargs
->  - add clock_frequency in cpu0 node to check max cpu frequency
->  - add item in Kconfig in alpha order
+> On Tue, Dec 13, 2011 at 8:27 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Tue, 13 Dec 2011, Mike Turquette wrote:
+> >
+> >> omap_clk_get_by_name must die.
+> >
+> > You do realize that it exists for a reason? ?That hardware clock names
+> > don't have anything to do with the Linux device model?
 > 
-> 
-> [PATCH V3 1/4] dts/imx: rename gpio labels to consistent with hw
-> [PATCH V3 2/4] dts/imx: rename uart labels to consistent with hw
-> [PATCH V3 3/4] arm/imx6: add imx6q sabrelite board support
-> [PATCH V3 4/4] arm/imx6q-sabrelite: add enet phy ksz9021rn fixup
-> 
-> Thanks
-> Richard
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> We have a tree structure of clks in the new common clk code, and a
+> list of clks in clkdev (which admittedly is meant to be a subset, but
+> in reality we register every OMAP clk with it), and then the omap clk
+> list which is only really used by omap_get_clk_by_name for hwmod and
+> some initialization stuff.  What I'd really like to do is get rid of
+> the OMAP clk code keeping track of it's clks in a separate list, which
+> seems quite wasteful.
+
+Clock lookups that only involve a hardware clock name, with no device, 
+should be the province of the clock code itself, not clkdev.  The clkdev 
+code may handle this today in the OMAP code, but this is simply due to 
+legacy reasons.
+
+In general, on OMAP, we've got much faster ways now to implement 
+clk_get().
+
+
+- Paul
