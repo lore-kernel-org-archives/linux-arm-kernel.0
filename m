@@ -1,47 +1,31 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 14 Dec 2011 11:39:41 +0000
-Subject: [PATCH v4 REPOST 5/5] imx6q: Remove unconditional dependency on l2x0
- L2 cache support
-In-Reply-To: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1323862781-3465-6-git-send-email-dave.martin@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 14 Dec 2011 13:48:28 +0200
+Subject: [PATCH 0/7] remoteproc/rpmsg: a few trivial fixes
+Message-ID: <1323863315-8159-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 Quad SoC will work without the l2x0 L2 cache controller
-support built into the kernel, so this patch removes the dependency
-on CACHE_L2X0 and selects MIGHT_HAVE_CACHE_L2X0 instead.
+Two fixes from Mark (required for controlling non-IOMMU and non-Virtio
+remote processors via remoteproc), two fixes which were reported by
+Stephen Boyd, and three other trivial cleanups.
 
-This makes the l2x0 support optional, so that it can be turned off
-when desired for debugging purposes etc.
+Mark Grosen (2):
+  remoteproc: do not require an iommu
+  remoteproc: avoid registering a virtio device if not supported
 
-Thanks to Shawn Guo for this suggestion. [1]
+Ohad Ben-Cohen (5):
+  remoteproc: remove unused resource type
+  remoteproc/omap: utilize module_platform_driver
+  remoteproc: look for truncated firmware images
+  remoteproc: add Kconfig menu
+  rpmsg: add Kconfig menu
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
+ drivers/remoteproc/Kconfig           |    4 +++
+ drivers/remoteproc/omap_remoteproc.c |   13 +----------
+ drivers/remoteproc/remoteproc_core.c |   41 +++++++++++++++++++++++++++------
+ drivers/rpmsg/Kconfig                |    4 +++
+ include/linux/remoteproc.h           |    1 -
+ 5 files changed, 42 insertions(+), 21 deletions(-)
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
----
- arch/arm/mach-imx/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 29a3d61..1fb93f2 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -609,13 +609,13 @@ comment "i.MX6 family:"
- config SOC_IMX6Q
- 	bool "i.MX6 Quad support"
- 	select ARM_GIC
--	select CACHE_L2X0
- 	select CPU_V7
- 	select HAVE_ARM_SCU
- 	select HAVE_IMX_GPC
- 	select HAVE_IMX_MMDC
- 	select HAVE_IMX_SRC
- 	select HAVE_SMP
-+	select MIGHT_HAVE_CACHE_L2X0
- 	select USE_OF
- 
- 	help
 -- 
-1.7.4.1
+1.7.5.4
