@@ -1,54 +1,36 @@
 From: vishwanath.bs@ti.com (Vishwanath BS)
-Date: Wed, 14 Dec 2011 21:31:10 +0530
-Subject: [PATCHV2 REPOST 0/7] ARM: OMAP3PLUS PM: Add IO DaisyChain support via
- hwmod mux
-Message-ID: <1323878477-21122-1-git-send-email-vishwanath.bs@ti.com>
+Date: Wed, 14 Dec 2011 21:31:14 +0530
+Subject: [PATCHV2 REPOST 4/7] ARM: OMAP3 PM: Enable IO Wake up
+In-Reply-To: <1323878477-21122-1-git-send-email-vishwanath.bs@ti.com>
+References: <1323878477-21122-1-git-send-email-vishwanath.bs@ti.com>
+Message-ID: <1323878477-21122-5-git-send-email-vishwanath.bs@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch series provides IO Daisychain feature via omap hwmod mux framework.
-The patch series has been generated against Tero's V11 irq chaining series [1].
+Enable IO Wake up for OMAP3 as part of PM Init.
+Currently this has been managed in cpuidle path which is not the right place.
+Subsequent patch will remove IO Daisy chain handling in cpuidle path once daisy
+chain is handled as part of hwmod mux.
 
-Testing Performed:
-OMAP3:
-Tested for Retention and OFF mode in suspend/cpuidle path on OMAP3430 SDP and ZOOM3.
-Also tested against latest UART Runtime + Chain Handler patches[2] for Ret/OFF in
-cpuidle/suspend path.
+Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+Tested-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-OMAP4:
-Boot tested on OMAP4430 SDP. Also tested for Suspend/resume with CSWR using custom OMAP4
-kernel as Core PM is not yet supported in mainline.
-
-Thanks to Govind for testing the series with UART Runtime patches on various OMAP3 platforms.
-
-Patch series is available here[3].
-
-[1]: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git chain-prcm-v11
-
-[2]: git://gitorious.org/runtime_3-0/runtime_3-0.git
-for_3_3/tmp_rc4_uart_pm_intg
-
-[3]: git://gitorious.org/omap-pm/linux.git for_3.3/io_daisy_chain_rebased
-
-Mohan V (1):
-  ARM: OMAP3 PM: correct enable/disable of daisy io chain
-
-Rajendra Nayak (1):
-  ARM: OMAP4 PM: Add IO Daisychain support
-
-Vishwanath BS (5):
-  ARM: OMAP3 PM: Move IO Daisychain function to omap3 prm file
-  ARM: OMAP3 PM: Enable IO Wake up
-  ARM: OMAP3PLUS PM: Add IO Daisychain support via hwmod mux
-  ARM: OMAP3 PM: Remove IO Daisychain control from cpuidle
-  ARM: OMAP3 PM: Enable IO Daisychain for supported chips
-
- arch/arm/mach-omap2/omap_hwmod.c   |    9 +++++-
- arch/arm/mach-omap2/pm.c           |   11 ++++++++
- arch/arm/mach-omap2/pm.h           |    1 +
- arch/arm/mach-omap2/pm34xx.c       |   47 ++---------------------------------
- arch/arm/mach-omap2/prm2xxx_3xxx.c |   27 ++++++++++++++++++++
- arch/arm/mach-omap2/prm2xxx_3xxx.h |    7 +++++
- arch/arm/mach-omap2/prm44xx.c      |   30 +++++++++++++++++++++++
- arch/arm/mach-omap2/prm44xx.h      |    1 +
- 8 files changed, 87 insertions(+), 46 deletions(-)
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 448e620..258d871 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -836,6 +836,9 @@ static int __init omap3_pm_init(void)
+ 		goto err1;
+ 	}
+ 
++	if (omap3_has_io_wakeup())
++		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
++
+ 	ret = pwrdm_for_each(pwrdms_setup, NULL);
+ 	if (ret) {
+ 		printk(KERN_ERR "Failed to setup powerdomains\n");
+-- 
+1.7.0.4
