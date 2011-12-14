@@ -1,42 +1,52 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 14 Dec 2011 12:13:51 +0100
-Subject: [PATCH 01/10] GPIO: gpio-generic: Move initialization up to
- postcore
-In-Reply-To: <1323634328-856-2-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <1323634328-856-2-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <201112141213.51610.jkrzyszt@tis.icnet.pl>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Wed, 14 Dec 2011 20:28:42 +0900
+Subject: [PATCH v2 1/4] ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+In-Reply-To: <1323862125-10699-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1323862125-10699-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1323862125-10699-2-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 11 of December 2011 at 21:11:59, Janusz Krzysztofik wrote:
-> This will allow boards with custom memory mapped GPIO ports to set up
-> and use those port pins while initializing devices from arch init.
+- Add DMC1
+- Enlarge address space for DMC from 4k to 64k so that PPMU registers
+  may be accessed.
 
-Please ignore this patch, I'm going to submit a replacement, based on an 
-alternative approach suggested by Tony.
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/cpu.c              |    7 ++++++-
+ arch/arm/mach-exynos/include/mach/map.h |    1 +
+ 2 files changed, 7 insertions(+), 1 deletions(-)
 
-Thanks,
-Janusz
-
-> Created against linux-3.2-rc5.
-> 
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> ---
->  drivers/gpio/gpio-generic.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
-> index 4e24436..a6eaf38 100644
-> --- a/drivers/gpio/gpio-generic.c
-> +++ b/drivers/gpio/gpio-generic.c
-> @@ -528,7 +528,7 @@ static int __init bgpio_platform_init(void)
->  {
->  	return platform_driver_register(&bgpio_driver);
->  }
-> -module_init(bgpio_platform_init);
-> +postcore_initcall(bgpio_platform_init);
->  
->  static void __exit bgpio_platform_exit(void)
->  {
-> 
+diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
+index 90ec247..8bdcba9 100644
+--- a/arch/arm/mach-exynos/cpu.c
++++ b/arch/arm/mach-exynos/cpu.c
+@@ -108,7 +108,12 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	}, {
+ 		.virtual	= (unsigned long)S5P_VA_DMC0,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
+-		.length		= SZ_4K,
++		.length		= SZ_64K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_DMC1,
++		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC1),
++		.length		= SZ_64K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= (unsigned long)S5P_VA_SROMC,
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 058541d..870a980 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -57,6 +57,7 @@
+ #define EXYNOS4_PA_KEYPAD		0x100A0000
+ 
+ #define EXYNOS4_PA_DMC0			0x10400000
++#define EXYNOS4_PA_DMC1			0x10410000
+ 
+ #define EXYNOS4_PA_COMBINER		0x10440000
+ 
+-- 
+1.7.4.1
