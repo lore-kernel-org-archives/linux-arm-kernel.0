@@ -1,44 +1,128 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 14 Dec 2011 17:25:42 +0530
-Subject: [PATCH v3 0/4] OMAP serial device tree support
-Message-ID: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+Date: Wed, 14 Dec 2011 17:25:46 +0530
+Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART from dt
+In-Reply-To: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+Message-ID: <1323863746-18145-5-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v3 is rebased on top of the latest serial runtime
-patches[1] and boot tested with/without DT on OMAP4
-SDP and OMAP4 Panda boards.
+Pass minimal data needed for console boot, from dt, for
+OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
+static initialization from generic board file.
 
-Patches can be found here..
-git://gitorious.org/omap-pm/linux.git for-dt/serial
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/boot/dts/omap3.dtsi        |   31 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi        |   28 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/board-generic.c |    1 -
+ 3 files changed, 59 insertions(+), 1 deletions(-)
 
-I also had to pull in a fix[2] for DT testing (already in linux-omap
-master) which was missing as the serial runtime branch[1]
-was based on an older master commit.
-
-Changes in v3:
--1- Rebased on latest serial runtime patches
--2- Minor typr fixes
-
-Changes in v2:
--1- Got rid of binding to define which uart is console
--2- Added checks to default clock speed to 48Mhz
--3- Added compatible for each OMAP family
--4- Used of_alias_get_id to populate port.line
-
-[1] git://gitorious.org/runtime_3-0/runtime_3-0.git for_3_3/lo_rc4_uartruntime
-[2] http://www.spinics.net/lists/arm-kernel/msg150751.html
-
-Rajendra Nayak (4):
-  omap-serial: Get rid of all pdev->id usage
-  omap-serial: Use default clock speed (48Mhz) if not specified
-  omap-serial: Add minimal device tree support
-  ARM: omap: pass minimal SoC/board data for UART from dt
-
- .../devicetree/bindings/serial/omap_serial.txt     |   10 +++
- arch/arm/boot/dts/omap3.dtsi                       |   31 ++++++++
- arch/arm/boot/dts/omap4.dtsi                       |   28 +++++++
- arch/arm/mach-omap2/board-generic.c                |    1 -
- drivers/tty/serial/omap-serial.c                   |   80 +++++++++++++++----
- 5 files changed, 132 insertions(+), 18 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/serial/omap_serial.txt
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index d202bb5..216c331 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -13,6 +13,13 @@
+ / {
+ 	compatible = "ti,omap3430", "ti,omap3";
+ 
++	aliases {
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		serial3 = &uart4;
++	};
++
+ 	cpus {
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a8";
+@@ -59,5 +66,29 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <1>;
+ 		};
++
++		uart1: serial at 0x4806a000 {
++			compatible = "ti,omap3-uart";
++			ti,hwmods = "uart1";
++			clock-frequency = <48000000>;
++		};
++
++		uart2: serial at 0x4806c000 {
++			compatible = "ti,omap3-uart";
++			ti,hwmods = "uart2";
++			clock-frequency = <48000000>;
++		};
++
++		uart3: serial at 0x49020000 {
++			compatible = "ti,omap3-uart";
++			ti,hwmods = "uart3";
++			clock-frequency = <48000000>;
++		};
++
++		uart4: serial at 0x49042000 {
++			compatible = "ti,omap3-uart";
++			ti,hwmods = "uart4";
++			clock-frequency = <48000000>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 4c61c82..e8fe75f 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -21,6 +21,10 @@
+ 	interrupt-parent = <&gic>;
+ 
+ 	aliases {
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		serial3 = &uart4;
+ 	};
+ 
+ 	cpus {
+@@ -99,5 +103,29 @@
+ 			reg = <0x48241000 0x1000>,
+ 			      <0x48240100 0x0100>;
+ 		};
++
++		uart1: serial at 0x4806a000 {
++			compatible = "ti,omap4-uart";
++			ti,hwmods = "uart1";
++			clock-frequency = <48000000>;
++		};
++
++		uart2: serial at 0x4806c000 {
++			compatible = "ti,omap4-uart";
++			ti,hwmods = "uart2";
++			clock-frequency = <48000000>;
++		};
++
++		uart3: serial at 0x48020000 {
++			compatible = "ti,omap4-uart";
++			ti,hwmods = "uart3";
++			clock-frequency = <48000000>;
++		};
++
++		uart4: serial at 0x4806e000 {
++			compatible = "ti,omap4-uart";
++			ti,hwmods = "uart4";
++			clock-frequency = <48000000>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 63b5416..a508ed5 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -69,7 +69,6 @@ static void __init omap_generic_init(void)
+ 	if (node)
+ 		irq_domain_add_simple(node, 0);
+ 
+-	omap_serial_init();
+ 	omap_sdrc_init(NULL, NULL);
+ 
+ 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+-- 
+1.7.1
