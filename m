@@ -1,119 +1,129 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Wed, 14 Dec 2011 21:50:08 +0530
-Subject: [PATCH v8 00/20] OMAP2+: UART: Runtime adaptation + cleanup
-In-Reply-To: <877h1znpdo.fsf@ti.com>
-References: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
- <CAAL8m4wGN5ykm3-+xrGPe-WJUDBdterxAyZ=C3kH862+n1DprQ@mail.gmail.com>
- <87fwgow9vz.fsf@ti.com>
- <CAAL8m4wR-3WDYf_c56-h1ZtCg=Ob2T+FvOOaXLSKK1pyo9oh8Q@mail.gmail.com>
- <877h1znpdo.fsf@ti.com>
-Message-ID: <CAAL8m4x6ToG5uuKebqSvJaYg6YQjwFK017AiOFVm0-6BtmiCCA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 14 Dec 2011 17:50:33 +0100
+Subject: [PATCH v2 07/10] arm/dts: omap4-panda: Add twl6030 and i2c EEPROM
+In-Reply-To: <87obvbpws7.fsf@ti.com>
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-8-git-send-email-b-cousson@ti.com> <87obvbpws7.fsf@ti.com>
+Message-ID: <4EE8D3D9.5020403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 8:59 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Govindraj <govindraj.ti@gmail.com> writes:
+Hi Kevin,
+
+On 12/14/2011 6:06 AM, Kevin Hilman wrote:
+> Hi Benoit,
 >
->> On Wed, Dec 14, 2011 at 12:56 AM, Kevin Hilman <khilman@ti.com> wrote:
->>> Govindraj <govindraj.ti@gmail.com> writes:
->>>
->>> [...]
->>>
->>>> I have re-based this patch series against LO master
->>>> commit id: deee6d5359969a0ce4e2760cfd7b9f379bd5698a
->>>>
->>>> Same is available here [1]
->>>>
->>>> I have tested this patch series along with:
->>>>
->>>> 1.) Tero's V11 irq chaining series
->>>> ? ? ?http://www.spinics.net/lists/linux-omap/msg61445.html
->>>> ? ? (This patch series is used for uart wakeup handling using
->>>> ? ? ? prcm_irq chaining)
->>>>
->>>> 2.) Rajendra's hwmod change
->>>> ? ? ?http://www.spinics.net/lists/arm-kernel/msg148632.html
->>>> ? ? ?(This patch handles init_no_idle flag setting
->>>> ? ? ? without this patch there will be boot warning however
->>>> ? ? ? all pm features will work after boot up.)
->>>>
->>>> 3.) Vishwa's io daisy chain changes.
->>>> ? ? ?http://permalink.gmane.org/gmane.linux.ports.arm.omap/65500
->>>> ? ? ?(tested with and without this patch series pm features works).
->>>>
->>>> Same combination of patches based on above commit id
->>>> used for testing is available here [2].
->>>
->>> Please have a closer look at your branch.
->>>
->>> The second commit[1] commits the .rej file from a failed patch apply,
->>> so obviously doesn't do what was intended.
->>>
+> Benoit Cousson<b-cousson@ti.com>  writes:
+>
+>> Update pandaboard dts file with required clock frequencies
+>> for the i2c client devices existing on pandaboard.
 >>
->> Sorry my bad I have refreshed the uart runtime branch [1]
->> & test branch [2].
+>> Add the twl6030 node in i2c1 controller.
+>>
+>> This is the minimal support needed to boot OMAP4 boards
+>> without any crash.
+>> The support for all the features included in this MFD will be
+>> added later.
+>>
+>> Add a generic i2c EEPROM entry.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> ---
+>>   arch/arm/boot/dts/omap4-panda.dts |   45 +++++++++++++++++++++++++++++++++++++
+>>   1 files changed, 45 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+>> index 9755ad5..b66bcd6 100644
+>> --- a/arch/arm/boot/dts/omap4-panda.dts
+>> +++ b/arch/arm/boot/dts/omap4-panda.dts
+>> @@ -18,3 +18,48 @@
+>>   		reg =<0x80000000 0x40000000>; /* 1 GB */
+>>   	};
+>>   };
+>> +
+>> +&i2c1 {
+>> +	clock-frequency =<400000>;
+>> +
+>> +	/*
+>> +	 * Integrated Power Management Chip
+>> +	 * http://www.ti.com/lit/ds/symlink/twl6030.pdf
+>> +	 */
+>> +	twl at 48 {
+>> +		compatible = "ti,twl6030";
+>> +		reg =<0x48>;
+>> +		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+>> +		interrupts =<0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+>> +		interrupt-controller;
+>> +		#interrupt-cells =<1>;
+>> +		interrupt-parent =<&gic>;
+>> +
+>> +		/* twl is a MFD, so it will contain a bunch of sub-ips */
+>> +		rtc {
+>> +			compatible = "ti,twl4030-rtc";
+>> +			interrupts =<11>;
+>> +		};
 >
-> Can you add another patch which fixes these compiler warnings:
->
-> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c: In function 'serial_omap_irq':
-> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:228:29: warning: 'ch' may be used uninitialized in this function [-Wuninitialized]
-> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:176:16: note: 'ch' was declared here
-> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:228:29: warning: 'ch' may be used uninitialized in this function [-Wuninitialized]
-> /work/kernel/omap/pm/drivers/tty/serial/omap-serial.c:176:16: note: 'ch' was declared here
->
+> After seeing the mostly cut&  paste in Rajendra's regulator series, I'm
+> wondering if it wouldn't be better to just have a twl4030.dtsi here
+> which has the RTC and all the regulators with the default voltage ranges
+> from the TWL data sheet.
 
-Here is the patch [1] and pushed to
-git://gitorious.org/runtime_3-0/runtime_3-0.git for_3_3/lo_rc4_uartruntime
+Yes, indeed, it is still small here but will become much bigger with the 
+regulators.
+In fact twl6030 is a SoC like OMAP, so all the TWL specific internal 
+details can be located in a single file.
+The board will just have to provide the i2c address and the IRQ information.
 
---
+> Not knowing much about how includes work in DT, would it then be
+> possible for board files to override things like default voltage ranges
+> for regulators?
+
+To be honest, I was wondering as well how to do that with the /include/ 
+functionality :-)
+But I've just done a couple of DTC test, and this seems to be pretty 
+straightforward.
+
+The boards will contain that:
+&i2c1 {
+	clock-frequency = <400000>;
+
+	twl: twl at 48 {
+		reg = <0x48>;
+		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+		interrupt-controller;
+		interrupt-parent = <&gic>;
+	};
+};
+
+/include/ "twl6030.dtsi"
+
+...
+
+And the twl6030.dtsi will contain that for the moment:
+
+/*
+  * Integrated Power Management Chip
+  * http://www.ti.com/lit/ds/symlink/twl6030.pdf
+  */
+&twl {
+	compatible = "ti,twl6030";
+	#interrupt-cells = <1>;
+
+	/* twl is a MFD, so it will contain a bunch of sub-ips */
+	rtc {
+		compatible = "ti,twl4030-rtc";
+		interrupts = <11>;
+	};
+};
+
+And then all the regulators from Rajendra's series will be there as well.
+
+This will avoid the duplication between sdp and panda. Beagle will need 
+a twl4030.dtsi which is different than the twl6030.
+
+I'll update and repost the series soon.
+
 Thanks,
-Govindraj.R
-
-[1]:
-
->From 3a40f4e1a4c6db40d06cc6c5536ec06e9e5daf3d Mon Sep 17 00:00:00 2001
-From: "Govindraj.R" <govindraj.raja@ti.com>
-Date: Wed, 14 Dec 2011 21:24:11 +0530
-Subject: [PATCH] OMAP2+: UART: Fix compilation/sparse warnings
-
-Fixes below compilation warning.
-
-drivers/tty/serial/omap-serial.c: In function 'serial_omap_irq':
-drivers/tty/serial/omap-serial.c:228:29: warning: 'ch' may be used
-uninitialized in this function [-Wuninitialized]
-
-Fix below sparse warning.
-
-drivers/tty/serial/omap-serial.c:392:52: warning: incorrect type in
-argument 2 (different signedness)
-drivers/tty/serial/omap-serial.c:392:52:    expected int *status
-drivers/tty/serial/omap-serial.c:392:52:    got unsigned int *<noident>
-
-Reported-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- drivers/tty/serial/omap-serial.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index f3ff0ca..7b0303d 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -166,11 +166,12 @@ static void serial_omap_stop_rx(struct uart_port *port)
- 	pm_runtime_put_autosuspend(&up->pdev->dev);
- }
-
--static inline void receive_chars(struct uart_omap_port *up, int *status)
-+static inline void receive_chars(struct uart_omap_port *up,
-+		unsigned int *status)
- {
- 	struct tty_struct *tty = up->port.state->port.tty;
--	unsigned int flag;
--	unsigned char ch, lsr = *status;
-+	unsigned int flag, lsr = *status;
-+	unsigned char ch = 0;
- 	int max_count = 256;
-
- 	do {
--- 
-1.7.5.4
+Benoit
