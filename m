@@ -1,53 +1,51 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Dec 2011 07:37:32 -0600
-Subject: [PATCH v4 REPOST 4/5] highbank: Unconditionally require l2x0
- L2 cache controller support
-In-Reply-To: <1323862781-3465-5-git-send-email-dave.martin@linaro.org>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
- <1323862781-3465-5-git-send-email-dave.martin@linaro.org>
-Message-ID: <4EE8A69C.40304@gmail.com>
+Date: Wed, 14 Dec 2011 07:47:54 -0600
+Subject: [PATCH v3 0/4] OMAP serial device tree support
+In-Reply-To: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+Message-ID: <4EE8A90A.10206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/14/2011 05:55 AM, Rajendra Nayak wrote:
+> v3 is rebased on top of the latest serial runtime
+> patches[1] and boot tested with/without DT on OMAP4
+> SDP and OMAP4 Panda boards.
+> 
+> Patches can be found here..
+> git://gitorious.org/omap-pm/linux.git for-dt/serial
+> 
+> I also had to pull in a fix[2] for DT testing (already in linux-omap
+> master) which was missing as the serial runtime branch[1]
+> was based on an older master commit.
+> 
+> Changes in v3:
+> -1- Rebased on latest serial runtime patches
+> -2- Minor typr fixes
+> 
+> Changes in v2:
+> -1- Got rid of binding to define which uart is console
+> -2- Added checks to default clock speed to 48Mhz
+> -3- Added compatible for each OMAP family
+> -4- Used of_alias_get_id to populate port.line
+> 
+> [1] git://gitorious.org/runtime_3-0/runtime_3-0.git for_3_3/lo_rc4_uartruntime
+> [2] http://www.spinics.net/lists/arm-kernel/msg150751.html
+> 
+> Rajendra Nayak (4):
+>   omap-serial: Get rid of all pdev->id usage
+>   omap-serial: Use default clock speed (48Mhz) if not specified
+>   omap-serial: Add minimal device tree support
+>   ARM: omap: pass minimal SoC/board data for UART from dt
+> 
+>  .../devicetree/bindings/serial/omap_serial.txt     |   10 +++
+>  arch/arm/boot/dts/omap3.dtsi                       |   31 ++++++++
+>  arch/arm/boot/dts/omap4.dtsi                       |   28 +++++++
+>  arch/arm/mach-omap2/board-generic.c                |    1 -
+>  drivers/tty/serial/omap-serial.c                   |   80 +++++++++++++++----
+>  5 files changed, 132 insertions(+), 18 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/omap_serial.txt
 
-On 12/14/2011 05:39 AM, Dave Martin wrote:
-> If running in the Normal World on a TrustZone-enabled SoC, Linux
-> does not have complete control over the L2 cache controller
-> configuration.  The kernel cannot work reliably on such platforms
-> without the l2x0 cache support code built in.
-> 
-> This patch unconditionally enables l2x0 support for the Highbank
-> SoC.
-> 
-> Thanks to Rob Herring for this suggestion. [1]
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074495.html
+Looks good. For the series:
 
-Doesn't this need to be above the SOB? Otherwise:
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-> ---
->  arch/arm/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d33eb39..744296d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -340,12 +340,12 @@ config ARCH_HIGHBANK
->  	select ARM_AMBA
->  	select ARM_GIC
->  	select ARM_TIMER_SP804
-> +	select CACHE_L2X0
->  	select CLKDEV_LOOKUP
->  	select CPU_V7
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_ARM_SCU
->  	select HAVE_SMP
-> -	select MIGHT_HAVE_CACHE_L2X0
->  	select USE_OF
->  	help
->  	  Support for the Calxeda Highbank SoC based boards.
+Reviewed-by: Rob Herring <rob.herring@calxeda.com>
