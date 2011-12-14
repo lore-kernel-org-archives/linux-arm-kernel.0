@@ -1,40 +1,70 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Wed, 14 Dec 2011 18:06:19 +0800
-Subject: [RFC V2 0/8] imx5 clock port to Mike's clkv4
-In-Reply-To: <1323854638-3455-1-git-send-email-richard.zhao@linaro.org>
-References: <1323854638-3455-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <CAH8gqwXEsUfAtU=3qaA0TkwRQ-QPKDqsxR+CYZvdbwYxMGUK_Q@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 14 Dec 2011 12:13:09 +0200
+Subject: [PATCHv11 2/8] ARM: OMAP2+: hwmod: Add API to check IO PAD
+ wakeup status
+In-Reply-To: <alpine.DEB.2.00.1112132002070.12046@utopia.booyaka.com>
+References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
+ <1323713733-13115-3-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1112132002070.12046@utopia.booyaka.com>
+Message-ID: <1323857589.14920.6.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since all the 8 patches are blocked. Attach them.
-Sorry for the inconvenient.
+On Tue, 2011-12-13 at 20:04 -0700, Paul Walmsley wrote:
+> Hi Tero
+> 
+> looking at this patch:
+> 
+> On Mon, 12 Dec 2011, Tero Kristo wrote:
+> 
+> > From: R, Govindraj <govindraj.raja@ti.com>
+> > 
+> > Add API to determine IO-PAD wakeup event status for a given
+> > hwmod dynamic_mux pad.
+> > 
+> > Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> 
+> It seems that your last patch drops the following code that this patch 
+> adds:
 
-Richard
+Hmm yea true, it seems like the code in patch 2 does not exist anymore
+after patch 8, and well, the code in patch 2 was never used for anything
+anyway. Sorry for not spotting this myself, I added patch 8 in hurry to
+this set.
 
-On 14 December 2011 17:23, Richard Zhao <richard.zhao@linaro.org> wrote:
-> Changes in V2:
-> ?- port to Mike's clkv4 base.
-> ?- move clk-div and clk-mux define macro to common header file
-> ?- add driver/clk/imx to hold imx clock drivers and move imx common clock
-> ? and imx51/53 clock to the folder
->
-> [RFC V2 1/8] clk: pass parent rate if recalc_rate is NULL
-> [RFC V2 2/8] clk: Add support for simple dividers
-> [RFC V2 3/8] clk: Add support for a generic clock multiplexer
-> [RFC V2 4/8] ARM i.MX: Add generic support for pllv2
-> [RFC V2 5/8] ARM i.MX: clk: add generic support of gate2b
-> [RFC V2 6/8] ARM i.MX: prepare common clk support
-> [RFC V2 7/8] ARM i.MX51/53: reimplement clock support
-> [RFC V2 8/8] clk/imx: move imx51/imx53 clock to driver/clk/imx
->
-> Thanks
-> Richard
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: imx5_clk_patch.tar.gz
-Type: application/x-gzip
-Size: 33507 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111214/5693b623/attachment-0001.gz>
+> 
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> > index 8d37d83..d7f4623 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> > @@ -2721,3 +2721,10 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
+> >  
+> >  	return 0;
+> >  }
+> > +
+> > +int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh)
+> > +{
+> > +	if (oh && oh->mux)
+> > +		return omap_hwmod_mux_get_wake_status(oh->mux);
+> > +	return -EINVAL;
+> > +}
+> > diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > index 8b372ed..1b81dfb 100644
+> > --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > @@ -604,6 +604,7 @@ int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
+> >  
+> >  int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
+> >  
+> > +int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh);
+> >  /*
+> >   * Chip variant-specific hwmod init routines - XXX should be converted
+> >   * to use initcalls once the initial boot ordering is straightened out
+> 
+> It's best in these circumstances to modify this patch not to add the code 
+> in the first place.  Otherwise this creates needless churn which plenty of 
+> people are quite sensitized to.  So, dropping these from patch 2.
+
+Yeah, good call.
+
+-Tero
