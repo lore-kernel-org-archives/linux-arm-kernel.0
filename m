@@ -1,62 +1,162 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Wed, 14 Dec 2011 22:11:11 +0800
-Subject: [PATCH V2 2/7] arm/imx6: add imx6q sabrelite board support
-In-Reply-To: <20111214110558.GE27267@pengutronix.de>
-References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
- <1323757530-19402-3-git-send-email-richard.zhao@linaro.org>
- <20111213115648.GA10022@S2101-09.ap.freescale.net>
- <20111213125353.GB1757@richard-laptop>
- <20111213133348.GA14688@S2101-09.ap.freescale.net>
- <20111214110558.GE27267@pengutronix.de>
-Message-ID: <20111214141109.GB1700@richard-laptop>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 14 Dec 2011 16:26:23 +0200
+Subject: [PATCH v3] ARM: OMAP3LOGIC: Adding DSS support
+In-Reply-To: <1323865510-6273-1-git-send-email-alexg@meprolight.com>
+References: <1323865510-6273-1-git-send-email-alexg@meprolight.com>
+Message-ID: <4EE8B20F.5070907@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 12:05:58PM +0100, Sascha Hauer wrote:
-> On Tue, Dec 13, 2011 at 09:33:50PM +0800, Shawn Guo wrote:
-> > On Tue, Dec 13, 2011 at 08:54:01PM +0800, Richard Zhao wrote:
-> > > > > +	cpus {
-> > > > > +		cpu at 0 {
-> > > > > +			clock-frequency = <996000000>;
-> > > > > +		};
-> > > > 
-> > > > I do not follow why we need to have cpu frequency encoded in board
-> > > > level dts.  To me, what frequency the cpu is capable of running at
-> > > > is really soc specific thing.  So putting this data in
-> > > > imx6q-sabrelite.dts is kinda suggesting that imx6q soc on this
-> > > > sabrelite board can run at 996000000, while on other boards like
-> > > > sabreauto/arm2 can only run at other frequency.  This is seems different
-> > > > from what I heard from Freescale internal development team.
-> > > 1G operation needs a certain external voltage condition, though we have
-> > > internal regulater. Boards that don't meet the condition have to fall back
-> > > to lower frequency.
-> > > From software side view, I refer to Freescale software release. please see
-> > > http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/mach-mx6/cpu_op-mx6.c;h=30a4346282ea5c332b4c48bf6a2d644abd9f31db;hb=imx_2.6.38_11.11.01
-> > > 
-> > > and for imx53, there' also different max freq board:
-> > > http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/mach-mx5/mx53_wp.c;h=a63bae42fb661c161cab99d61f4a3108305b0f55;hb=refs/heads/imx_2.6.35_11.09.01
-> > > 
-> > > IMHO, even the board has limitations, we'd better give an option to support
-> > > it if it's possible.
-> > > 
-> > I understand all these things.  What I was suggesting is this option
-> > should not be provided by the dts at all.
-> 
-> Yes. If it's not provided the cpufreq layer should either assume 800MHz
-> is the highest value which is safe on all boards or it could read the
-> current frequency from the hardware. If this is 1GHz this value is
-> obviously safe.
-Actually, you'd better not depend on uboot to setting the highest cpu freq.
-At least current freescale internel uboot don't set 1G.
+Hi Alex,
 
-Thanks
-Richard
+On 12/14/11 14:25, Alex wrote:
+> This patch adds DSS2 support to the LogicPD OMAP 35x Torpedo boardfile. LCD and
+> TV-out are supported.
 > 
-> Sascha
+> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+> ---
+>  arch/arm/mach-omap2/board-omap3logic.c |   96 ++++++++++++++++++++++++++++++++
+>  1 files changed, 96 insertions(+), 0 deletions(-)
 > 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+> index 7c0f193..b44c485 100644
+> --- a/arch/arm/mach-omap2/board-omap3logic.c
+> +++ b/arch/arm/mach-omap2/board-omap3logic.c
+> @@ -7,6 +7,9 @@
+>   * Copyright (C) 2010 Logic Product Development, Inc.
+>   * Peter Barada <peter.barada@logicpd.com>
+>   *
+> + * Copyright (C) 2011 Meprolight, Ltd.
+> + * Alex Gershgorin <alexg@meprolight.com>
+> + *
+>   * Modified from Beagle, EVM, and RX51
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+> @@ -45,6 +48,9 @@
+>  #include <plat/gpmc.h>
+>  #include <plat/sdrc.h>
+>  
+> +#include <video/omapdss.h>
+> +#include <video/omap-panel-generic-dpi.h>
+> +
+>  #define OMAP3LOGIC_SMSC911X_CS			1
+>  
+>  #define OMAP3530_LV_SOM_MMC_GPIO_CD		110
+> @@ -95,6 +101,13 @@ static struct twl4030_platform_data omap3logic_twldata = {
+>  
+>  static int __init omap3logic_i2c_init(void)
+>  {
+> +	omap3_pmic_get_config(&omap3logic_twldata, TWL_COMMON_PDATA_USB,
+> +			TWL_COMMON_REGULATOR_VDAC | TWL_COMMON_REGULATOR_VPLL2);
+> +
+> +	omap3logic_twldata.vdac->constraints.apply_uV = true;
+> +	omap3logic_twldata.vpll2->constraints.apply_uV = true;
+> +	omap3logic_twldata.vpll2->constraints.name = "VDSI";
+> +
+>  	omap3_pmic_init("twl4030", &omap3logic_twldata);
+>  	return 0;
+>  }
+> @@ -182,6 +195,88 @@ static inline void __init board_smsc911x_init(void)
+>  	gpmc_smsc911x_init(&board_smsc911x_data);
+>  }
+>  
+> +#if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
+> +
+> +#define OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO	154
+> +#define OMAP3_TORPEDO_LCD_ENABLE_GPIO		155
+> +#define OMAP3_TORPEDO_LCD_PWM_GPIO		56
+> +
+> +static struct gpio omap3logic_dss_gpios[] __initdata = {
+> +	{OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, GPIOF_OUT_INIT_LOW, "lcd_bl_pwr"},
+> +	{OMAP3_TORPEDO_LCD_PWM_GPIO, GPIOF_OUT_INIT_LOW, "lcd bl enable"},
+> +	{OMAP3_TORPEDO_LCD_ENABLE_GPIO, GPIOF_OUT_INIT_LOW, "lcd enable"},
+> +};
+> +
+> +static int omap3logic_enable_lcd(struct omap_dss_device *dssdev)
+> +{
+> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 1);
+> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 1);
+> +	gpio_set_value(OMAP3_TORPEDO_LCD_PWM_GPIO, 1);
+> +
+> +	return 0;
+> +}
+> +
+> +static void omap3logic_disable_lcd(struct omap_dss_device *dssdev)
+> +{
+> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 0);
+> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 0);
+> +	gpio_set_value(OMAP3_TORPEDO_LCD_PWM_GPIO, 0);
+> +}
+> +
+> +static struct panel_generic_dpi_data lcd_panel = {
+> +	.name			= "sharp_lq",
+> +	.platform_enable	= omap3logic_enable_lcd,
+> +	.platform_disable	= omap3logic_disable_lcd,
+> +};
+> +
+> +static struct omap_dss_device omap3logic_lcd_device = {
+> +	.name			= "lcd",
+> +	.driver_name		= "generic_dpi_panel",
+> +	.type			= OMAP_DISPLAY_TYPE_DPI,
+> +	.data			= &lcd_panel,
+> +	.phy.dpi.data_lines	= 16,
+> +};
+> +
+> +static struct omap_dss_device omap3logic_tv_device = {
+> +	.name			= "tv",
+> +	.driver_name		= "venc",
+> +	.type			= OMAP_DISPLAY_TYPE_VENC,
+> +	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
+> +};
+> +
+> +static struct omap_dss_device *omap3logic_dss_devices[] = {
+> +	&omap3logic_lcd_device,
+> +	&omap3logic_tv_device,
+> +};
+> +
+> +static struct omap_dss_board_info omap3logic_dss_data = {
+> +	.num_devices		= ARRAY_SIZE(omap3logic_dss_devices),
+> +	.devices		= omap3logic_dss_devices,
+> +	.default_device		= &omap3logic_lcd_device,
+> +};
+> +
+> +static void __init omap3logic_display_init(void)
+> +{
+> +	int r;
+> +
+> +	r = gpio_request_array(omap3logic_dss_gpios,
+> +			       ARRAY_SIZE(omap3logic_dss_gpios));
+> +	if (r) {
+> +		printk(KERN_ERR "failed to get lcd_panel_* gpios\n");
+
+You use pr_err() below, why not here?
+
+> +		return;
+> +	}
+> +
+> +	r = omap_display_init(&omap3logic_dss_data);
+> +	if (r) {
+> +		pr_err("OMAP3LOGIC: failed to register DSS device\n");
+> +		gpio_free_array(omap3logic_dss_gpios,
+> +				ARRAY_SIZE(omap3logic_dss_gpios));
+> +	}
+> +}
+> +#else
+> +static void __init omap3logic_display_init(void) { }
+> +#endif /* defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE) */
+> +
+>  #ifdef CONFIG_OMAP_MUX
+>  static struct omap_board_mux board_mux[] __initdata = {
+>  	{ .reg_offset = OMAP_MUX_TERMINATOR },
+> @@ -197,6 +292,7 @@ static void __init omap3logic_init(void)
+>  	omap_sdrc_init(NULL, NULL);
+>  	board_mmc_init();
+>  	board_smsc911x_init();
+> +	omap3logic_display_init();
+>  
+>  	/* Ensure SDRC pins are mux'd for self-refresh */
+>  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+
+-- 
+Regards,
+Igor.
