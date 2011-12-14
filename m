@@ -1,50 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 14 Dec 2011 19:33:41 +0100
-Subject: serial tty name
-In-Reply-To: <4EE8BC52.5060905@compulab.co.il>
-References: <20111214144344.GA2090@richard-laptop>
- <4EE8BC52.5060905@compulab.co.il>
-Message-ID: <20111214183341.GK4585@pengutronix.de>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 14 Dec 2011 18:34:14 +0000
+Subject: [GIT PULL] DaVinci features for v3.3
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6048C5C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 05:10:10PM +0200, Igor Grinberg wrote:
-> Hi Richard,
-> 
-> On 12/14/11 16:43, Richard Zhao wrote:
-> > How to map different uart port to ttymxc0 (take imx for example)?
-> > 
-> > In rootfs, it usually "getty ttymxc0"  to get
-> > serial console. And the rootfs may be shared by different boards.
-> > Traditionaly way is to set right platform device ID.
-> > 
-> > But with DT, UART2 always generate ttymxc1, UART3 for ttymxc2. You
-> > always needs to modify the getty command when your change another board.
-> > 
-> > Is there a way to fix it?
-> 
-> As for fix in userspace, you can spawn getty on every ttymxc*,
-> so you will get it always.
-> 
-> Another (userspace) fix would be:
-> Instead of getty, add a script (say getty.sh) which will do something like:
-> -----------
-> CONSOLE=`cat /proc/cmdline | tr " " "\n" | grep console= | tr "=" " " | tr "," " "`
-> TTY=`echo $CONSOLE | cut -d' ' -f 2`
-> SPEED=`echo $CONSOLE | cut -d' ' -f 3`
-> 
-> /sbin/getty -L $TTY $SPEED vt100
-> --------------
+Arnd, Olof,
 
-what about:
+I have this lone feature queued for v3.3 so far. Can you please pull?
+The patch depends on v3.2-rc5 for build, but I have not rebased to
+preserve the commit date.
 
-	eval "$(sed 's/.*console=\([^,]*\),\([0-9]*\).*/tty=\1; speed=\2/'" /proc/cmdline)"
+Thanks,
+Sekhar
 
-this should prevent getting a "useless use of cat award".
+The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
+  Linus Torvalds (1):
+        Linux 3.2-rc3
 
-Best regards
-Uwe
+are available in the git repository at:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+  git://gitorious.org/linux-davinci/linux-davinci.git v3.3/features
+
+Murali Karicheri (1):
+      ARM: davinci: add support for multiple power domains
+
+ arch/arm/mach-davinci/clock.c  |   13 +++----------
+ arch/arm/mach-davinci/clock.h  |   10 +++++-----
+ arch/arm/mach-davinci/dm644x.c |    4 ++--
+ 3 files changed, 10 insertions(+), 17 deletions(-)
