@@ -1,57 +1,55 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 14 Dec 2011 14:48:40 +0400
-Subject: [PATCH v5 10/11] davinci: dm644x: add support for v4l2 video
- display
-In-Reply-To: <1323775415-24504-11-git-send-email-manjunath.hadli@ti.com>
-References: <1323775415-24504-1-git-send-email-manjunath.hadli@ti.com>
- <1323775415-24504-11-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4EE87F08.6080309@mvista.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 14 Dec 2011 12:05:58 +0100
+Subject: [PATCH V2 2/7] arm/imx6: add imx6q sabrelite board support
+In-Reply-To: <20111213133348.GA14688@S2101-09.ap.freescale.net>
+References: <1323757530-19402-1-git-send-email-richard.zhao@linaro.org>
+ <1323757530-19402-3-git-send-email-richard.zhao@linaro.org>
+ <20111213115648.GA10022@S2101-09.ap.freescale.net>
+ <20111213125353.GB1757@richard-laptop>
+ <20111213133348.GA14688@S2101-09.ap.freescale.net>
+Message-ID: <20111214110558.GE27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Dec 13, 2011 at 09:33:50PM +0800, Shawn Guo wrote:
+> On Tue, Dec 13, 2011 at 08:54:01PM +0800, Richard Zhao wrote:
+> > > > +	cpus {
+> > > > +		cpu at 0 {
+> > > > +			clock-frequency = <996000000>;
+> > > > +		};
+> > > 
+> > > I do not follow why we need to have cpu frequency encoded in board
+> > > level dts.  To me, what frequency the cpu is capable of running at
+> > > is really soc specific thing.  So putting this data in
+> > > imx6q-sabrelite.dts is kinda suggesting that imx6q soc on this
+> > > sabrelite board can run at 996000000, while on other boards like
+> > > sabreauto/arm2 can only run at other frequency.  This is seems different
+> > > from what I heard from Freescale internal development team.
+> > 1G operation needs a certain external voltage condition, though we have
+> > internal regulater. Boards that don't meet the condition have to fall back
+> > to lower frequency.
+> > From software side view, I refer to Freescale software release. please see
+> > http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/mach-mx6/cpu_op-mx6.c;h=30a4346282ea5c332b4c48bf6a2d644abd9f31db;hb=imx_2.6.38_11.11.01
+> > 
+> > and for imx53, there' also different max freq board:
+> > http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/mach-mx5/mx53_wp.c;h=a63bae42fb661c161cab99d61f4a3108305b0f55;hb=refs/heads/imx_2.6.35_11.09.01
+> > 
+> > IMHO, even the board has limitations, we'd better give an option to support
+> > it if it's possible.
+> > 
+> I understand all these things.  What I was suggesting is this option
+> should not be provided by the dts at all.
 
-On 13-12-2011 15:23, Manjunath Hadli wrote:
+Yes. If it's not provided the cpufreq layer should either assume 800MHz
+is the highest value which is safe on all boards or it could read the
+current frequency from the hardware. If this is 1GHz this value is
+obviously safe.
 
-> Create platform devices for various video modules like venc,osd,
-> vpbe and v4l2 driver for dm644x. Change the dm644x_init_video to
-> make room for display config, and register the vpfe or vpbe devices
-> based on the config pointer validity to make sure boards without vpfe
-> or vpbe can be built with minimal changes.
+Sascha
 
-> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-[...]
 
-> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-> index 6c034fd..2e408d8 100644
-> --- a/arch/arm/mach-davinci/dm644x.c
-> +++ b/arch/arm/mach-davinci/dm644x.c
-[...]
-> @@ -654,7 +654,127 @@ static struct platform_device dm644x_vpfe_dev = {
-[...]
-> +#define DM644X_OSD_REG_BASE		0x01c72600
-[...]
-> +#define DM644X_VENC_REG_BASE		0x01c72400
-
-    Why not without _REG, like all the other #define's?
-
-> +static int dm644x_venc_setup_clock(enum vpbe_enc_timings_type type,
-> +				   unsigned int mode)
-> +{
-> +	int ret = 0;
-> +	void __iomem *vpss_clkctl_reg;
-> +
-> +	vpss_clkctl_reg = DAVINCI_SYSMODULE_VIRT(0x44);
-
-    Why not in the initializer?
-
-> +	switch (type) {
-> +	case VPBE_ENC_STD:
-> +		writel(0x18, vpss_clkctl_reg);
-> +		break;
-> +	case VPBE_ENC_DV_PRESET:
-> +		switch ((unsigned int)mode) {
-
-    'mode' is already 'unsigned int'.
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
