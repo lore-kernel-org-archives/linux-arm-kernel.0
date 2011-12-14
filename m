@@ -1,69 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Dec 2011 09:28:58 -0600
-Subject: [PATCH 9/9] ARM: highbank: add interrupt properties to gpio nodes
-In-Reply-To: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
-References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1323876538-20406-10-git-send-email-robherring2@gmail.com>
+From: rob.herring@calxeda.com (Rob Herring)
+Date: Wed, 14 Dec 2011 09:31:59 -0600
+Subject: serial tty name
+In-Reply-To: <20111214144344.GA2090@richard-laptop>
+References: <20111214144344.GA2090@richard-laptop>
+Message-ID: <4EE8C16F.8060501@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Richard,
 
-Add interrupt-controller properties to pl061 gpio nodes so gpio lines can
-function as interrupts.
+On 12/14/2011 08:43 AM, Richard Zhao wrote:
+> How to map different uart port to ttymxc0 (take imx for example)?
+> 
+> In rootfs, it usually "getty ttymxc0"  to get
+> serial console. And the rootfs may be shared by different boards.
+> Traditionaly way is to set right platform device ID.
+> 
+> But with DT, UART2 always generate ttymxc1, UART3 for ttymxc2. You
+> always needs to modify the getty command when your change another board.
+> 
+> Is there a way to fix it?
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/boot/dts/highbank.dts |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+That's what the aliases are for.
 
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index aeb1a75..dfe2b49 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -89,7 +89,6 @@
- 			#size-cells = <0>;
- 			#address-cells = <1>;
- 			interrupt-controller;
--			interrupt-parent;
- 			reg = <0xfff11000 0x1000>,
- 			      <0xfff10100 0x100>;
- 		};
-@@ -129,6 +128,8 @@
- 			#gpio-cells = <2>;
- 			compatible = "arm,pl061", "arm,primecell";
- 			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			reg = <0xfff30000 0x1000>;
- 			interrupts = <0 14 4>;
- 		};
-@@ -137,6 +138,8 @@
- 			#gpio-cells = <2>;
- 			compatible = "arm,pl061", "arm,primecell";
- 			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			reg = <0xfff31000 0x1000>;
- 			interrupts = <0 15 4>;
- 		};
-@@ -145,6 +148,8 @@
- 			#gpio-cells = <2>;
- 			compatible = "arm,pl061", "arm,primecell";
- 			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			reg = <0xfff32000 0x1000>;
- 			interrupts = <0 16 4>;
- 		};
-@@ -153,6 +158,8 @@
- 			#gpio-cells = <2>;
- 			compatible = "arm,pl061", "arm,primecell";
- 			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			reg = <0xfff33000 0x1000>;
- 			interrupts = <0 17 4>;
- 		};
--- 
-1.7.5.4
+Rob
