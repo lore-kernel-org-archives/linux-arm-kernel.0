@@ -1,23 +1,66 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Dec 2011 10:16:25 -0800
-Subject: [PATCH v4 REPOST 2/5] ARM: SMP: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <1323862781-3465-3-git-send-email-dave.martin@linaro.org>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
- <1323862781-3465-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <20111214181624.GD32251@atomide.com>
+Date: Wed, 14 Dec 2011 10:18:22 -0800
+Subject: [PATCH 1/3] of/base: Take NULL string into account for
+ property with multiple strings
+In-Reply-To: <1323095036-3739-2-git-send-email-b-cousson@ti.com>
+References: <1323095036-3739-1-git-send-email-b-cousson@ti.com>
+ <1323095036-3739-2-git-send-email-b-cousson@ti.com>
+Message-ID: <20111214181822.GE32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Martin <dave.martin@linaro.org> [111214 03:08]:
-> Making SMP depend on (huge list of MACH_ and ARCH_ configs) is
-> bothersome to maintain and likely to lead to merge conflicts.
+* Benoit Cousson <b-cousson@ti.com> [111205 05:53]:
+> The current implementation just ignore any NULL string inserted in a
+> multiple strings property.
+> In some cases we can have a property with a fix number of strings but
+> not necessarily used, like for example in a list of valid pinmux modes.
 > 
-> This patch moves the knowledge of which platforms are SMP-capable
-> to the individual machines.  To enable this, a new HAVE_SMP config
-> option is introduced to allow machines to indicate that they can
-> run in a SMP configuration.
+>  prop = "uart_rx", "uart_tx", "", "", "safe_mode";
+> 
+> Do no skip NULL string and take them into account in
+> of_property_read_string_index and of_property_count_strings.
+> 
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
 
-For omap:
+This fix should be merged before people start doing workarounds
+in drivers for this:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
+
+> ---
+>  drivers/of/base.c |    8 +++-----
+>  1 files changed, 3 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 9b6588e..b707243 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -752,7 +752,7 @@ int of_property_read_string_index(struct device_node *np, const char *propname,
+>  
+>  	for (i = 0; total < prop->length; total += l, p += l) {
+>  		l = strlen(p) + 1;
+> -		if ((*p != 0) && (i++ == index)) {
+> +		if (i++ == index) {
+>  			*output = p;
+>  			return 0;
+>  		}
+> @@ -790,11 +790,9 @@ int of_property_count_strings(struct device_node *np, const char *propname)
+>  
+>  	p = prop->value;
+>  
+> -	for (i = 0; total < prop->length; total += l, p += l) {
+> +	for (i = 0; total < prop->length; total += l, p += l, i++)
+>  		l = strlen(p) + 1;
+> -		if (*p != 0)
+> -			i++;
+> -	}
+> +
+>  	return i;
+>  }
+>  EXPORT_SYMBOL_GPL(of_property_count_strings);
+> -- 
+> 1.7.0.4
+> 
