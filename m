@@ -1,40 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 13 Dec 2011 22:29:44 -0700 (MST)
-Subject: [PATCH 3/7] HACK: omap: convert 44xx data to common struct clk
-In-Reply-To: <CAJOA=zM8hP=1BxcpDu-XMvt0KefRPwhP3m-+yC7Uta+Aozz8Xw@mail.gmail.com>
-References: <1323835918-2371-1-git-send-email-mturquette@ti.com>
- <1323835918-2371-4-git-send-email-mturquette@ti.com>
- <alpine.DEB.2.00.1112132125200.12046@utopia.booyaka.com>
- <CAJOA=zM8hP=1BxcpDu-XMvt0KefRPwhP3m-+yC7Uta+Aozz8Xw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1112132209590.12046@utopia.booyaka.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 14 Dec 2011 14:23:33 +0800
+Subject: [PATCH V3 2/4] dts/imx: rename uart labels to consistent with hw
+ spec
+In-Reply-To: <1323826007-17937-3-git-send-email-richard.zhao@linaro.org>
+References: <1323826007-17937-1-git-send-email-richard.zhao@linaro.org>
+ <1323826007-17937-3-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111214062332.GB11874@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Dec 2011, Turquette, Mike wrote:
-
-> On Tue, Dec 13, 2011 at 8:27 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> > On Tue, 13 Dec 2011, Mike Turquette wrote:
-> >
-> >> omap_clk_get_by_name must die.
-> >
-> > You do realize that it exists for a reason? ?That hardware clock names
-> > don't have anything to do with the Linux device model?
+On Wed, Dec 14, 2011 at 09:26:45AM +0800, Richard Zhao wrote:
+> UART1/UART2/... is more readable than UART0/UART1/... .
+> Remove redundant UART comments.
 > 
-> We have a tree structure of clks in the new common clk code, and a
-> list of clks in clkdev (which admittedly is meant to be a subset, but
-> in reality we register every OMAP clk with it), and then the omap clk
-> list which is only really used by omap_get_clk_by_name for hwmod and
-> some initialization stuff.  What I'd really like to do is get rid of
-> the OMAP clk code keeping track of it's clks in a separate list, which
-> seems quite wasteful.
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx51-babbage.dts   |    6 +++---
+>  arch/arm/boot/dts/imx51.dtsi          |   12 ++++++------
+>  arch/arm/boot/dts/imx53-ard.dts       |    2 +-
+>  arch/arm/boot/dts/imx53-evk.dts       |    2 +-
+>  arch/arm/boot/dts/imx53-qsb.dts       |    2 +-
+>  arch/arm/boot/dts/imx53-smd.dts       |    6 +++---
+>  arch/arm/boot/dts/imx53.dtsi          |   18 +++++++++---------
+>  arch/arm/boot/dts/imx6q-sabreauto.dts |    2 +-
+>  arch/arm/boot/dts/imx6q.dtsi          |   20 ++++++++++----------
+>  9 files changed, 35 insertions(+), 35 deletions(-)
 
-Clock lookups that only involve a hardware clock name, with no device, 
-should be the province of the clock code itself, not clkdev.  The clkdev 
-code may handle this today in the OMAP code, but this is simply due to 
-legacy reasons.
+Applied, with the missing change below amended.
 
-In general, on OMAP, we've got much faster ways now to implement 
-clk_get().
+8<----
 
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index c10dc1f..5dd91b9 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -88,7 +88,7 @@
+                                        status = "disabled";
+                                };
 
-- Paul
+-                               uart2: uart at 5000c000 { /* UART3 */
++                               uart3: uart@5000c000 {
+                                        compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+                                        reg = <0x5000c000 0x4000>;
+                                        interrupts = <33>;
+
+----->8
+
+Otherwise, we see something like below.
+
+  DTC     arch/arm/boot/imx53-smd.dtb
+DTC: dts->dtb  on file "/home/r65073/repos/shawnguo/linux-2.6/arch/arm/boot/dts/imx53-smd.dts"
+ERROR (duplicate_label): Duplicate label 'uart2' on /soc/aips at 50000000/uart at 53fc0000 and /soc/aips at 50000000/spba at 50000000/uart at 5000c000
+ERROR: Input tree has errors, aborting (use -f to force output)
+make[2]: *** [arch/arm/boot/imx53-smd.dtb] Error 2
+make[1]: *** [imx53-smd.dtb] Error 2
+make: *** [sub-make] Error 2
+
+-- 
+Regards,
+Shawn
