@@ -1,33 +1,45 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 14 Dec 2011 13:48:35 +0200
-Subject: [PATCH 7/7] rpmsg: add Kconfig menu
-In-Reply-To: <1323863315-8159-1-git-send-email-ohad@wizery.com>
-References: <1323863315-8159-1-git-send-email-ohad@wizery.com>
-Message-ID: <1323863315-8159-8-git-send-email-ohad@wizery.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 14 Dec 2011 17:25:44 +0530
+Subject: [PATCH v3 2/4] omap-serial: Use default clock speed (48Mhz) if not
+ specified
+In-Reply-To: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+Message-ID: <1323863746-18145-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a dedicated Kconfig menu for the rpmsg drivers, so they
-don't show up in the main driver menu.
+Use a default clock speed of 48Mhz, instead of ending up with 0,
+if platforms fail to specify a valid clock speed.
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- drivers/rpmsg/Kconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/tty/serial/omap-serial.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/rpmsg/Kconfig b/drivers/rpmsg/Kconfig
-index 811fede..98aca55 100644
---- a/drivers/rpmsg/Kconfig
-+++ b/drivers/rpmsg/Kconfig
-@@ -1,5 +1,9 @@
-+menu "Rpmsg drivers"
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index a02cc9f..f14b9c5 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -43,6 +43,8 @@
+ #include <plat/dmtimer.h>
+ #include <plat/omap-serial.h>
+ 
++#define DEFAULT_CLK_SPEED 48000000 /* 48Mhz*/
 +
- # RPMSG always gets selected by whoever wants it
- config RPMSG
- 	tristate
- 	select VIRTIO
- 	select VIRTIO_RING
-+
-+endmenu
+ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+ 
+ /* Forward declaration of functions */
+@@ -1386,6 +1388,11 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 
+ 	up->port.flags = omap_up_info->flags;
+ 	up->port.uartclk = omap_up_info->uartclk;
++	if (!up->port.uartclk) {
++		up->port.uartclk = DEFAULT_CLK_SPEED;
++		dev_warn(&pdev->dev, "No clock speed specified: using default:"
++						"%d\n", DEFAULT_CLK_SPEED);
++	}
+ 	up->uart_dma.uart_base = mem->start;
+ 	up->errata = omap_up_info->errata;
+ 
 -- 
-1.7.5.4
+1.7.1
