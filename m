@@ -1,167 +1,140 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 14 Dec 2011 17:25:43 +0530
-Subject: [PATCH v3 1/4] omap-serial: Get rid of all pdev->id usage
+Date: Wed, 14 Dec 2011 17:25:45 +0530
+Subject: [PATCH v3 3/4] omap-serial: Add minimal device tree support
 In-Reply-To: <1323863746-18145-1-git-send-email-rnayak@ti.com>
 References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
-Message-ID: <1323863746-18145-2-git-send-email-rnayak@ti.com>
+Message-ID: <1323863746-18145-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With Device tree, pdev->id would no longer be Valid.
-Hence get rid of all instances of its usage in the
-driver. Device tree support for the driver is added
-in subsequent patches.
+Adapt the driver to device tree and pass minimal platform
+data from device tree needed for console boot.
+No power management features will be suppported for now
+since it requires more tweaks around OCP settings
+to toggle forceidle/noidle/smartidle bits and handling
+remote wakeup and dynamic muxing.
 
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- drivers/tty/serial/omap-serial.c |   30 +++++++++++++++---------------
- 1 files changed, 15 insertions(+), 15 deletions(-)
+ .../devicetree/bindings/serial/omap_serial.txt     |   10 ++++
+ drivers/tty/serial/omap-serial.c                   |   45 ++++++++++++++++++-
+ 2 files changed, 52 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/omap_serial.txt
 
+diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
+new file mode 100644
+index 0000000..342eedd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
+@@ -0,0 +1,10 @@
++OMAP UART controller
++
++Required properties:
++- compatible : should be "ti,omap2-uart" for OMAP2 controllers
++- compatible : should be "ti,omap3-uart" for OMAP3 controllers
++- compatible : should be "ti,omap4-uart" for OMAP4 controllers
++- ti,hwmods : Must be "uart<n>", n being the instance number (1-based)
++
++Optional properties:
++- clock-frequency : frequency of the clock input to the UART
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index f3ff0ca..a02cc9f 100644
+index f14b9c5..5aa524e 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -115,7 +115,7 @@ static void serial_omap_enable_ms(struct uart_port *port)
+@@ -38,6 +38,7 @@
+ #include <linux/serial_core.h>
+ #include <linux/irq.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
+ 
+ #include <plat/dma.h>
+ #include <plat/dmtimer.h>
+@@ -1324,6 +1325,19 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
+ 	return;
+ }
+ 
++static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
++{
++	struct omap_uart_port_info *omap_up_info;
++
++	omap_up_info = devm_kzalloc(dev, sizeof(*omap_up_info), GFP_KERNEL);
++	if (!omap_up_info)
++		return NULL; /* out of memory */
++
++	of_property_read_u32(dev->of_node, "clock-frequency",
++					 &omap_up_info->uartclk);
++	return omap_up_info;
++}
++
+ static int serial_omap_probe(struct platform_device *pdev)
  {
- 	struct uart_omap_port *up = (struct uart_omap_port *)port;
+ 	struct uart_omap_port	*up;
+@@ -1331,6 +1345,9 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 	struct omap_uart_port_info *omap_up_info = pdev->dev.platform_data;
+ 	int ret = -ENOSPC;
  
--	dev_dbg(up->port.dev, "serial_omap_enable_ms+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_enable_ms+%d\n", up->port.line);
- 
- 	pm_runtime_get_sync(&up->pdev->dev);
- 	up->ier |= UART_IER_MSI;
-@@ -418,7 +418,7 @@ static unsigned int serial_omap_tx_empty(struct uart_port *port)
- 	unsigned int ret = 0;
- 
- 	pm_runtime_get_sync(&up->pdev->dev);
--	dev_dbg(up->port.dev, "serial_omap_tx_empty+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_tx_empty+%d\n", up->port.line);
- 	spin_lock_irqsave(&up->port.lock, flags);
- 	ret = serial_in(up, UART_LSR) & UART_LSR_TEMT ? TIOCSER_TEMT : 0;
- 	spin_unlock_irqrestore(&up->port.lock, flags);
-@@ -436,7 +436,7 @@ static unsigned int serial_omap_get_mctrl(struct uart_port *port)
- 	status = check_modem_status(up);
- 	pm_runtime_put(&up->pdev->dev);
- 
--	dev_dbg(up->port.dev, "serial_omap_get_mctrl+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_get_mctrl+%d\n", up->port.line);
- 
- 	if (status & UART_MSR_DCD)
- 		ret |= TIOCM_CAR;
-@@ -454,7 +454,7 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
- 	struct uart_omap_port *up = (struct uart_omap_port *)port;
- 	unsigned char mcr = 0;
- 
--	dev_dbg(up->port.dev, "serial_omap_set_mctrl+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_set_mctrl+%d\n", up->port.line);
- 	if (mctrl & TIOCM_RTS)
- 		mcr |= UART_MCR_RTS;
- 	if (mctrl & TIOCM_DTR)
-@@ -478,7 +478,7 @@ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
- 	struct uart_omap_port *up = (struct uart_omap_port *)port;
- 	unsigned long flags = 0;
- 
--	dev_dbg(up->port.dev, "serial_omap_break_ctl+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_break_ctl+%d\n", up->port.line);
- 	pm_runtime_get_sync(&up->pdev->dev);
- 	spin_lock_irqsave(&up->port.lock, flags);
- 	if (break_state == -1)
-@@ -504,7 +504,7 @@ static int serial_omap_startup(struct uart_port *port)
- 	if (retval)
- 		return retval;
- 
--	dev_dbg(up->port.dev, "serial_omap_startup+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_startup+%d\n", up->port.line);
- 
- 	pm_runtime_get_sync(&up->pdev->dev);
- 	/*
-@@ -545,7 +545,7 @@ static int serial_omap_startup(struct uart_port *port)
- 			0);
- 		init_timer(&(up->uart_dma.rx_timer));
- 		up->uart_dma.rx_timer.function = serial_omap_rxdma_poll;
--		up->uart_dma.rx_timer.data = up->pdev->id;
-+		up->uart_dma.rx_timer.data = up->port.line;
- 		/* Currently the buffer size is 4KB. Can increase it */
- 		up->uart_dma.rx_buf = dma_alloc_coherent(NULL,
- 			up->uart_dma.rx_buf_size,
-@@ -573,7 +573,7 @@ static void serial_omap_shutdown(struct uart_port *port)
- 	struct uart_omap_port *up = (struct uart_omap_port *)port;
- 	unsigned long flags = 0;
- 
--	dev_dbg(up->port.dev, "serial_omap_shutdown+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_shutdown+%d\n", up->port.line);
- 
- 	pm_runtime_get_sync(&up->pdev->dev);
- 	/*
-@@ -883,7 +883,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	spin_unlock_irqrestore(&up->port.lock, flags);
- 	pm_runtime_put(&up->pdev->dev);
--	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->port.line);
- }
- 
- static void
-@@ -893,7 +893,7 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
- 	struct uart_omap_port *up = (struct uart_omap_port *)port;
- 	unsigned char efr;
- 
--	dev_dbg(up->port.dev, "serial_omap_pm+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_pm+%d\n", up->port.line);
- 
- 	pm_runtime_get_sync(&up->pdev->dev);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
-@@ -932,7 +932,7 @@ static void serial_omap_config_port(struct uart_port *port, int flags)
- 	struct uart_omap_port *up = (struct uart_omap_port *)port;
- 
- 	dev_dbg(up->port.dev, "serial_omap_config_port+%d\n",
--							up->pdev->id);
-+							up->port.line);
- 	up->port.type = PORT_OMAP;
- }
- 
-@@ -949,7 +949,7 @@ serial_omap_type(struct uart_port *port)
- {
- 	struct uart_omap_port *up = (struct uart_omap_port *)port;
- 
--	dev_dbg(up->port.dev, "serial_omap_type+%d\n", up->pdev->id);
-+	dev_dbg(up->port.dev, "serial_omap_type+%d\n", up->port.line);
- 	return up->name;
- }
- 
-@@ -1110,7 +1110,7 @@ static struct console serial_omap_console = {
- 
- static void serial_omap_add_console_port(struct uart_omap_port *up)
- {
--	serial_omap_console_ports[up->pdev->id] = up;
-+	serial_omap_console_ports[up->port.line] = up;
- }
- 
- #define OMAP_CONSOLE	(&serial_omap_console)
-@@ -1364,7 +1364,6 @@ static int serial_omap_probe(struct platform_device *pdev)
- 		ret = -ENOMEM;
- 		goto do_release_region;
- 	}
--	sprintf(up->name, "OMAP UART%d", pdev->id);
- 	up->pdev = pdev;
- 	up->port.dev = &pdev->dev;
- 	up->port.type = PORT_OMAP;
-@@ -1375,6 +1374,7 @@ static int serial_omap_probe(struct platform_device *pdev)
++	if (pdev->dev.of_node)
++		omap_up_info = of_get_uart_port_info(&pdev->dev);
++
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!mem) {
+ 		dev_err(&pdev->dev, "no mem resource?\n");
+@@ -1375,9 +1392,20 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 	up->port.regshift = 2;
  	up->port.fifosize = 64;
  	up->port.ops = &serial_omap_pops;
- 	up->port.line = pdev->id;
-+	sprintf(up->name, "OMAP UART%d", up->port.line);
+-	up->port.line = pdev->id;
+-	sprintf(up->name, "OMAP UART%d", up->port.line);
  
++	if (pdev->dev.of_node)
++		up->port.line = of_alias_get_id(pdev->dev.of_node, "serial");
++	else
++		up->port.line = pdev->id;
++
++	if (up->port.line < 0) {
++		dev_err(&pdev->dev, "failed to get alias/pdev id, errno %d\n",
++								up->port.line);
++		ret = -ENODEV;
++		goto err;
++	}
++
++	sprintf(up->name, "OMAP UART%d", up->port.line);
  	up->port.mapbase = mem->start;
  	up->port.membase = ioremap(mem->start, resource_size(mem));
-@@ -1417,7 +1417,7 @@ static int serial_omap_probe(struct platform_device *pdev)
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
+ 	if (!up->port.membase) {
+@@ -1530,7 +1558,7 @@ static int serial_omap_runtime_suspend(struct device *dev)
+ 	if (!up)
+ 		return -EINVAL;
  
--	ui[pdev->id] = up;
-+	ui[up->port.line] = up;
- 	serial_omap_add_console_port(up);
+-	if (!pdata->enable_wakeup)
++	if (!pdata || !pdata->enable_wakeup)
+ 		return 0;
  
- 	ret = uart_add_one_port(&serial_omap_reg, &up->port);
+ 	if (pdata->get_context_loss_count)
+@@ -1591,12 +1619,23 @@ static const struct dev_pm_ops serial_omap_dev_pm_ops = {
+ 				serial_omap_runtime_resume, NULL)
+ };
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id omap_serial_of_match[] = {
++	{ .compatible = "ti,omap2-uart" },
++	{ .compatible = "ti,omap3-uart" },
++	{ .compatible = "ti,omap4-uart" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, omap_serial_of_match);
++#endif
++
+ static struct platform_driver serial_omap_driver = {
+ 	.probe          = serial_omap_probe,
+ 	.remove         = serial_omap_remove,
+ 	.driver		= {
+ 		.name	= DRIVER_NAME,
+ 		.pm	= &serial_omap_dev_pm_ops,
++		.of_match_table = of_match_ptr(omap_serial_of_match),
+ 	},
+ };
+ 
 -- 
 1.7.1
