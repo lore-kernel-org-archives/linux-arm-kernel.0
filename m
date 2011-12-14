@@ -1,19 +1,74 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Wed, 14 Dec 2011 12:57:10 +0800
-Subject: [linux-next] make  s5p64x0_defconfig build error
-Message-ID: <1323838630.18517.1.camel@phoenix>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 13 Dec 2011 21:06:16 -0800
+Subject: [PATCH v2 07/10] arm/dts: omap4-panda: Add twl6030 and i2c EEPROM
+In-Reply-To: <1323439361-1647-8-git-send-email-b-cousson@ti.com> (Benoit
+ Cousson's message of "Fri, 9 Dec 2011 15:02:38 +0100")
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-8-git-send-email-b-cousson@ti.com>
+Message-ID: <87obvbpws7.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I got below build error on linux-next 20111213.
+Hi Benoit,
 
-  CC      arch/arm/kernel/process.o
-In file included from arch/arm/mach-s5p64x0/include/mach/system.h:16,
-                 from arch/arm/kernel/process.c:64:
-arch/arm/plat-samsung/include/plat/system-reset.h:19:2: error: #error Fix me up
-make[1]: *** [arch/arm/kernel/process.o] Error 1
-make: *** [arch/arm/kernel] Error 2
+Benoit Cousson <b-cousson@ti.com> writes:
 
-Regards,
-Axel
+> Update pandaboard dts file with required clock frequencies
+> for the i2c client devices existing on pandaboard.
+>
+> Add the twl6030 node in i2c1 controller.
+>
+> This is the minimal support needed to boot OMAP4 boards
+> without any crash.
+> The support for all the features included in this MFD will be
+> added later.
+>
+> Add a generic i2c EEPROM entry.
+>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  arch/arm/boot/dts/omap4-panda.dts |   45 +++++++++++++++++++++++++++++++++++++
+>  1 files changed, 45 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> index 9755ad5..b66bcd6 100644
+> --- a/arch/arm/boot/dts/omap4-panda.dts
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -18,3 +18,48 @@
+>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+>  	};
+>  };
+> +
+> +&i2c1 {
+> +	clock-frequency = <400000>;
+> +
+> +	/*
+> +	 * Integrated Power Management Chip
+> +	 * http://www.ti.com/lit/ds/symlink/twl6030.pdf
+> +	 */
+> +	twl at 48 {
+> +		compatible = "ti,twl6030";
+> +		reg = <0x48>;
+> +		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+> +		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		interrupt-parent = <&gic>;
+> +
+> +		/* twl is a MFD, so it will contain a bunch of sub-ips */
+> +		rtc {
+> +			compatible = "ti,twl4030-rtc";
+> +			interrupts = <11>;
+> +		};
+
+After seeing the mostly cut & paste in Rajendra's regulator series, I'm
+wondering if it wouldn't be better to just have a twl4030.dtsi here
+which has the RTC and all the regulators with the default voltage ranges
+from the TWL data sheet.   
+
+Not knowing much about how includes work in DT, would it then be
+possible for board files to override things like default voltage ranges
+for regulators?
+
+Kevin
