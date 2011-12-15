@@ -1,48 +1,44 @@
-From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Thu, 15 Dec 2011 17:41:50 +0530
-Subject: [PATCH v6 01/11] davinci: vpif: remove obsolete header file inclusion
-In-Reply-To: <1323951120-15876-1-git-send-email-manjunath.hadli@ti.com>
-References: <1323951120-15876-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <1323951120-15876-2-git-send-email-manjunath.hadli@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 15 Dec 2011 13:50:08 +0100
+Subject: [PATCH 1/5] ux500: support DB8520
+Message-ID: <1323953408-27013-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remove inclusion of header files from vpif.h and vpif_dispaly.c
-and add appropriate header file for building.
+From: Rabin Vincent <rabin.vincent@stericsson.com>
 
-Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
-Cc: LMML <linux-media@vger.kernel.org>
+Extend the ux500 ID table to cover the DB8520 variant.
+
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/media/video/davinci/vpif.h         |    2 +-
- drivers/media/video/davinci/vpif_display.c |    2 --
- 2 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/id.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
-index 25036cb..c96268a 100644
---- a/drivers/media/video/davinci/vpif.h
-+++ b/drivers/media/video/davinci/vpif.h
-@@ -19,7 +19,7 @@
- #include <linux/io.h>
- #include <linux/videodev2.h>
- #include <mach/hardware.h>
--#include <mach/dm646x.h>
-+#include <linux/i2c.h>
- #include <media/davinci/vpif_types.h>
+diff --git a/arch/arm/mach-ux500/id.c b/arch/arm/mach-ux500/id.c
+index d35122e..15a0f63 100644
+--- a/arch/arm/mach-ux500/id.c
++++ b/arch/arm/mach-ux500/id.c
+@@ -65,6 +65,7 @@ static unsigned int partnumber(unsigned int asicid)
+  * DB8500v1	0x411fc091	0x9001FFF4		0x008500A0
+  * DB8500v1.1	0x411fc091	0x9001FFF4		0x008500A1
+  * DB8500v2	0x412fc091	0x9001DBF4		0x008500B0
++ * DB8520v2.2	0x412fc091	0x9001DBF4		0x008500B2
+  * DB5500v1	0x412fc091	0x9001FFF4		0x005500A0
+  */
  
- /* Maximum channel allowed */
-diff --git a/drivers/media/video/davinci/vpif_display.c b/drivers/media/video/davinci/vpif_display.c
-index 286f029..7fa34b4 100644
---- a/drivers/media/video/davinci/vpif_display.c
-+++ b/drivers/media/video/davinci/vpif_display.c
-@@ -39,8 +39,6 @@
- #include <media/v4l2-ioctl.h>
- #include <media/v4l2-chip-ident.h>
+@@ -80,9 +81,10 @@ void __init ux500_map_io(void)
+ 		addr = 0x9001FFF4;
+ 		break;
  
--#include <mach/dm646x.h>
--
- #include "vpif_display.h"
- #include "vpif.h"
+-	case 0x412fc091: /* DB8500v2 / DB5500v1 */
++	case 0x412fc091: /* DB8520 / DB8500v2 / DB5500v1 */
+ 		asicid = ux500_read_asicid(0x9001DBF4);
+-		if (partnumber(asicid) == 0x8500)
++		if (partnumber(asicid) == 0x8500 ||
++		    partnumber(asicid) == 0x8520)
+ 			/* DB8500v2 */
+ 			break;
  
 -- 
-1.6.2.4
+1.7.3.2
