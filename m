@@ -1,30 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Dec 2011 20:29:11 +0000
-Subject: [RFC V1 1/4] cpufreq: add arm soc generic cpufreq driver
-In-Reply-To: <1323947798-25251-1-git-send-email-richard.zhao@linaro.org>
-References: <1323947798-25251-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111215202911.GL14542@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 15 Dec 2011 21:47:56 +0100
+Subject: [PATCH] ARM: unwinder: fix bisection to find origin in .idx section
+In-Reply-To: <20111215145109.GA4143@elliptictech.com>
+References: <20111215145109.GA4143@elliptictech.com>
+Message-ID: <1323982076-20068-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 07:16:35PM +0800, Richard Zhao wrote:
-> +#ifdef CONFIG_SMP
-> +	/* loops_per_jiffy is not updated by the cpufreq core for SMP systems.
-> +	 * So update it for all CPUs.
-> +	 */
-> +	for_each_possible_cpu(cpu)
-> +		per_cpu(cpu_data, cpu).loops_per_jiffy =
-> +		cpufreq_scale(per_cpu(cpu_data, cpu).loops_per_jiffy,
-> +					freqs.old, freqs.new);
+The bisection implemented in unwind_find_origin() stopped to early. If
+there is only a single entry left to check the original code just took
+the end point as origin which might be wrong.
 
-NAK.  If you think this is a good solution, you're very wrong.  If this
-is what's in the core cpufreq code, then it too is very broken.
+This was introduced in
 
-I've seen this exact method result in the loops_per_jiffy being totally
-buggered over time by the constant scaling up and down.  The only way
-to do this _sensibly_ is to record the _initial_ loops_per_jiffy and
-_inital_ frequency, and scale from that.
+	de66a97 (ARM: 7187/1: fix unwinding for XIP kernels)
 
-That way you get consistent results irrespective of the scalings you
-do over time, rather than something which continually deteriorates with
-every frequency change.
+Reported-by: Nick Bowler <nbowler@elliptictech.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello Linus,
+
+I suggested earlier to revert de66a97. I still think this is the safest
+bet for 3.2. Anyhow here comes the fix that made Nick happy. If you
+revert I'll fold it into my resubmission.
+
+Best regards
+Uwe
+
+ arch/arm/kernel/unwind.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index 3f03fe0..00df012 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -160,12 +160,12 @@ static const struct unwind_idx *unwind_find_origin(
+ 		const struct unwind_idx *start, const struct unwind_idx *stop)
+ {
+ 	pr_debug("%s(%p, %p)\n", __func__, start, stop);
+-	while (start < stop - 1) {
++	while (start < stop) {
+ 		const struct unwind_idx *mid = start + ((stop - start) >> 1);
+ 
+ 		if (mid->addr_offset >= 0x40000000)
+ 			/* negative offset */
+-			start = mid;
++			start = mid + 1;
+ 		else
+ 			/* positive offset */
+ 			stop = mid;
+-- 
+1.7.7.2
