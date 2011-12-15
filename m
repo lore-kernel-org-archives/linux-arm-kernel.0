@@ -1,52 +1,64 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 15 Dec 2011 15:53:54 +0000
-Subject: [PATCH v5 5/5] imx6q: Remove unconditional dependency on l2x0 L2
- cache support
-In-Reply-To: <1323964434-6764-1-git-send-email-dave.martin@linaro.org>
-References: <1323964434-6764-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1323964434-6764-6-git-send-email-dave.martin@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 15 Dec 2011 08:55:32 -0700
+Subject: [PATCH 3/9] irq: convert generic-chip to use irq_domain
+In-Reply-To: <4EE9FC99.6030905@gmail.com>
+References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
+ <1323876538-20406-4-git-send-email-robherring2@gmail.com>
+ <20111215052512.GB21815@S2101-09.ap.freescale.net>
+ <20111215055501.GC21815@S2101-09.ap.freescale.net>
+ <4EE9F899.7010402@gmail.com> <4EE9FC99.6030905@gmail.com>
+Message-ID: <CACxGe6t=ngbzNLkX+df8gP0aoMmgnsVqn2V2eRHpGi5FoFci_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 Quad SoC will work without the l2x0 L2 cache controller
-support built into the kernel, so this patch removes the dependency
-on CACHE_L2X0.
+On Thu, Dec 15, 2011 at 6:56 AM, Rob Herring <robherring2@gmail.com> wrote:
+> Shawn,
+>
+> On 12/15/2011 07:39 AM, Rob Herring wrote:
+>> On 12/14/2011 11:55 PM, Shawn Guo wrote:
+>>> On Thu, Dec 15, 2011 at 01:25:20PM +0800, Shawn Guo wrote:
+>>>> On Wed, Dec 14, 2011 at 09:28:52AM -0600, Rob Herring wrote:
+>>>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>>>
+>>>>> Add irq domain support to irq generic-chip. This enables users of
+>>>>> generic-chip to support dynamic irq assignment needed for DT interrupt
+>>>>> binding. Users must be converted to use irq_data.hwirq for determining
+>>>>> local interrupt numbers rather than using the Linux irq number.
+>>>>>
+>>>>> irq_base is kept for now as there are a few users of it. Once they
+>>>>> are converted to use the irq domain, it can be removed.
+>>>>>
+>>>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>>> ---
+>>>>
+>>>> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+>>>>
+>>> Sorry, I have to take that tag back after I correct my test setup.
+>>> It does not work for imx5 TZIC case, because the following change
+>>> I suggested before is missed.
+>>>
+>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>>> index eb763f7..2a2aac1 100644
+>>> --- a/kernel/irq/irqdomain.c
+>>> +++ b/kernel/irq/irqdomain.c
+>>> @@ -39,7 +39,7 @@ void irq_domain_add(struct irq_domain *domain)
+>>> ? ? ? ? ? ? ? ? ? ? ? ? return;
+>>> ? ? ? ? ? ? ? ? }
+>>> ? ? ? ? ? ? ? ? d->domain = domain;
+>>> - ? ? ? ? ? ? ? d->hwirq = hwirq;
+>>> + ? ? ? ? ? ? ? d->hwirq = hwirq - domain->hwirq_base;
+>>
+>> This is a problem. It entirely defeats the point of hwirq_base and it
+>> would break the GIC. We need to fix this in the generic irq chip.
+>>
+>
+> I think I found a fix. Can you try 's/d->hwirq/(d->hwirq % 32)/' in
+> generic-chip.c.
 
-This makes the l2x0 support optional, so that it can be turned off
-when desired for debugging purposes etc.
+Ugh, but that hard codes an assumption that a domain cannot have more
+that 32 irqs.
 
-Since SOC_IMX6Q already depends on ARCH_IMX_V6_V7 and
-ARCH_IMX_V6_V7 selects MIGHT_HAVE_CACHE_L2X0, there is no need to
-select that option explicitly from SOC_IMX6Q.
+/me goes to dig into irq_domain code...
 
-Thanks to Shawn Guo for this suggestion.  [1]
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-Changes:
-
-v5: Don't select MIGHT_HAVE_CACHE_L2X0 directly from SOC_IMX6Q, but
-    instead select implicitly via ARCH_IMX_V6_V7 (which we expect
-    to be selected by other relevant SoCs).  Thanks to Shawn for
-    this suggestion.
-
-
- arch/arm/mach-imx/Kconfig |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 29a3d61..1530678 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -609,7 +609,6 @@ comment "i.MX6 family:"
- config SOC_IMX6Q
- 	bool "i.MX6 Quad support"
- 	select ARM_GIC
--	select CACHE_L2X0
- 	select CPU_V7
- 	select HAVE_ARM_SCU
- 	select HAVE_IMX_GPC
--- 
-1.7.4.1
+g.
