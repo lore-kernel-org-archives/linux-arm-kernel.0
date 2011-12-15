@@ -1,120 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 15 Dec 2011 10:26:33 +0100
-Subject: Massive log spam loading modules on ARM after 3.2-rc5 (regression)
-In-Reply-To: <20111214215133.GA7780@elliptictech.com>
-References: <20111214215133.GA7780@elliptictech.com>
-Message-ID: <20111215092633.GD24496@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Dec 2011 10:32:18 +0100
+Subject: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux subsystem
+In-Reply-To: <7FE21149F4667147B645348EC60578850561FF@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+ <1323878622-26602-5-git-send-email-b29396@freescale.com>
+ <20111214211152.GM27267@pengutronix.de>
+ <CACRpkdYHtgx3Qgx4QRdgOahQXjvSWE_iogWCZjaYQ-VnyS62uQ@mail.gmail.com>
+ <7FE21149F4667147B645348EC60578850561FF@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <20111215093218.GN27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 04:51:33PM -0500, Nick Bowler wrote:
-> Hi folks,
+On Thu, Dec 15, 2011 at 07:23:42AM +0000, Dong Aisheng-B29396 wrote:
+> > -----Original Message-----
+> > From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> > Sent: Thursday, December 15, 2011 6:16 AM
+> > To: Sascha Hauer
+> > Cc: Dong Aisheng-B29396; linus.walleij at stericsson.com; linux-
+> > kernel at vger.kernel.org; rob.herring at calxeda.com;
+> > grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> > kernel at pengutronix.de; Guo Shawn-R65073
+> > Subject: Re: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux
+> > subsystem
+> > Importance: High
+> > 
+> > On Wed, Dec 14, 2011 at 10:11 PM, Sascha Hauer <s.hauer@pengutronix.de>
+> > wrote:
+> > > On Thu, Dec 15, 2011 at 12:03:42AM +0800, Dong Aisheng wrote:
+> > 
+> > >> + ? ? pmx = pinmux_get(&pdev->dev, NULL);
+> > >> + ? ? if (IS_ERR(pmx)) {
+> > >> + ? ? ? ? ? ? err = PTR_ERR(pmx);
+> > >> + ? ? ? ? ? ? goto err_pmx_get;
+> > >> + ? ? }
+> > >> + ? ? err = pinmux_enable(pmx);
+> > >> + ? ? if (err)
+> > >> + ? ? ? ? ? ? goto err_pmx_enable;
+> > >> + ? ? imx_data->pmx = pmx;
+> > >> +
+> > >
+> > > Won't this break every i.MX except i.MX6?
+> >
 > 
-> With latest Linus' master, I'm faced with massive log spam on our ARM
-> Versatile Express platform when using modules.  Here's an example:
+> If not select PINCTRL, pinmux_enable returns ok by default and pinmux_get
+> Returns NULL which also does not block.
+> So it will not break other i.MX currently since only mx6q are using PINCTRL.
+>  
+> > Not this patch on its own, first the machines have to select PINCTRL
+> > select PINMUX_FOO
+> > 
+> > *Then* it will break :-D
+> > 
 > 
->   # modprobe sp805-wdt
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   sp805-wdt mb:wdt: registration successful
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
->   unwind: Unknown symbol address 7f802009
->   unwind: Index not found 7f802009
-> 
-> The message only seem to get printed at module load time.  Other than
-> the noise, things _seem_ to be working.  Nevertheless, it's a regression
-> introduced after 3.2-rc5 by the following commit:
-> 
->   de66a979012dbc66b1ec0125795a3f79ee667b8a is the first bad commit
->   commit de66a979012dbc66b1ec0125795a3f79ee667b8a
->   Author: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->   Date:   Mon Dec 5 09:39:59 2011 +0100
-> 
->       ARM: 7187/1: fix unwinding for XIP kernels
-> 
->       The linker places the unwind tables in readonly sections. So when using
->       an XIP kernel these are located in ROM and cannot be modified.
->       For that reason the current approach to convert the relative offsets in
->       the unwind index to absolute addresses early in the boot process doesn't
->       work with XIP.
-> 
->       The offsets in the unwind index section are signed 31 bit numbers and
->       the structs are sorted by this offset. So it first has offsets between
->       0x40000000 and 0x7fffffff (i.e. the negative offsets) and then offsets
->       between 0x00000000 and 0x3fffffff. When seperating these two blocks the
->       numbers are sorted even when interpreting the offsets as unsigned longs.
-> 
->       So determine the first non-negative entry once and track that using the
->       new origin pointer. The actual bisection can then use a plain unsigned
->       long comparison. The only thing that makes the new bisection more
->       complicated is that the offsets are relative to their position in the
->       index section, so the key to search needs to be adapted accordingly in
->       each step.
-> 
->       Moreover several consts are added to catch future writes and rename the
->       member "addr" of struct unwind_idx to "addr_offset" to better match the
->       new semantic. (This has the additional benefit of breaking eventual
->       users at compile time to make them aware of the change.)
-> 
->       In my tests the new algorithm was a tad faster than the original and has
->       the additional upside of not needing the initial conversion and so saves
->       some boot time and it's possible to unwind even earlier.
-> 
->       Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->       Acked-by: Nicolas Pitre <nico@fluxnic.net>
->       Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->       Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
->   :040000 040000 9c4363228515808d71dac84a4a16e0aa0cf4ceaa 65b80d4e51fabf0a3142a880be795f4b38f4d9fe M	arch
-> 
-> I am *not* using XIP.  Reverting this commit resolves the issue.
-> 
-> Let me know if you need any more info,
-Can you provide me your .config please? I cannot reproduce your problems
-with modprobe on an i.MX28 based tx28 machine.
+> After we move to one single image for mx5 and mx6, it could be an issue
+> Since PINCTRL may be selected by default.
+> So mx5 pinmux driver is in my TODO list.
 
-Russell, maybe this makes you a bit less annoyed?
+Add i.MX3 which is compiled together with i.MX6 :)
 
-Best regards
-Uwe
+Sascha
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
