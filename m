@@ -1,68 +1,74 @@
-From: manjunath.hadli@ti.com (Hadli, Manjunath)
-Date: Thu, 15 Dec 2011 11:13:02 +0000
-Subject: [PATCH v5 10/11] davinci: dm644x: add support for v4l2 video
- display
-In-Reply-To: <4EE87F08.6080309@mvista.com>
-References: <1323775415-24504-1-git-send-email-manjunath.hadli@ti.com>
- <1323775415-24504-11-git-send-email-manjunath.hadli@ti.com>
- <4EE87F08.6080309@mvista.com>
-Message-ID: <E99FAA59F8D8D34D8A118DD37F7C8F750167B5@DBDE01.ent.ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 15 Dec 2011 19:21:45 +0800
+Subject: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux subsystem
+In-Reply-To: <20111215093319.GO27267@pengutronix.de>
+References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+ <1323878622-26602-5-git-send-email-b29396@freescale.com>
+ <20111214211152.GM27267@pengutronix.de>
+ <CACRpkdYHtgx3Qgx4QRdgOahQXjvSWE_iogWCZjaYQ-VnyS62uQ@mail.gmail.com>
+ <20111215070505.GA22541@S2101-09.ap.freescale.net>
+ <CACRpkdbN26q1_d4tPkJp4f4_KdvoEEk9uCCRyOfEU97DOWAnEw@mail.gmail.com>
+ <7FE21149F4667147B645348EC60578850564C5@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20111215093319.GO27267@pengutronix.de>
+Message-ID: <20111215112140.GA10522@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei,
-On Wed, Dec 14, 2011 at 16:18:40, Sergei Shtylyov wrote:
-> Hello.
+On Thu, Dec 15, 2011 at 10:33:19AM +0100, Sascha Hauer wrote:
+> On Thu, Dec 15, 2011 at 08:59:28AM +0000, Dong Aisheng-B29396 wrote:
+> > > -----Original Message-----
+> > > From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> > > Sent: Thursday, December 15, 2011 4:27 PM
+> > > To: Guo Shawn-R65073
+> > > Cc: Sascha Hauer; Dong Aisheng-B29396; linus.walleij at stericsson.com;
+> > > linux-kernel at vger.kernel.org; rob.herring at calxeda.com;
+> > > grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> > > kernel at pengutronix.de
+> > > Subject: Re: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux
+> > > subsystem
+> > > Importance: High
+> > > 
+> > > On Thu, Dec 15, 2011 at 8:05 AM, Shawn Guo <shawn.guo@freescale.com>
+> > > wrote:
+> > > >[Me]
+> > > >> So if you want to do this for i.MX you need something like selectable
+> > > >> dummy pinmuxes, i.e. pinmux_get() to return something that just say
+> > > >> "OK" to everything like the dummy regulators.
+> > > >>
+> > > >> Shall I try to create something like that?
+> > > >>
+> > > > Isn't the empty functions defined in include/linux/pinctrl/pinmux.h
+> > > > for this purpose?
+> > > 
+> > > No, these are for compiling it *out*, dummy pinmuxes would be if you
+> > > compile it *in*, but don't find an apropriate pinmux, you still get
+> > > something that does nothing and still works.
+> > > 
+> > > Dummy regulators work exactly this way.
+> > > 
+> > 
+> > I did not read the dummy regulator code too much.
+> > But does it mean that the dummy regulator or dummy pinmux will also hide the
+> > Real errors since it will always get a available one?
+
+What do you mean 'real error'?  When driver calls pimnux api on a
+platform with real pinmux support, the error is error.  When driver
+calls pinmux api on a platform support with dummy pinmux, it's totally
+error free, as the pinmux core will ensure all the pinmux_* calls
+always return success.
+
+> > How do we distinguish between the two case(real error and fake error)?
 > 
-> On 13-12-2011 15:23, Manjunath Hadli wrote:
+What do we need to distinguish between two cases?  The real success for
+real pinmux from the fake success for the dummy pinmux?  It does not
+really matter.
+
+> We don't :(
 > 
-> > Create platform devices for various video modules like venc,osd, vpbe 
-> > and v4l2 driver for dm644x. Change the dm644x_init_video to make room 
-> > for display config, and register the vpfe or vpbe devices based on the 
-> > config pointer validity to make sure boards without vpfe or vpbe can 
-> > be built with minimal changes.
+> That's the problem with the dummy regulator.
 > 
-> > Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-> [...]
-> 
-> > diff --git a/arch/arm/mach-davinci/dm644x.c 
-> > b/arch/arm/mach-davinci/dm644x.c index 6c034fd..2e408d8 100644
-> > --- a/arch/arm/mach-davinci/dm644x.c
-> > +++ b/arch/arm/mach-davinci/dm644x.c
-> [...]
-> > @@ -654,7 +654,127 @@ static struct platform_device dm644x_vpfe_dev = 
-> > {
-> [...]
-> > +#define DM644X_OSD_REG_BASE		0x01c72600
-> [...]
-> > +#define DM644X_VENC_REG_BASE		0x01c72400
-> 
->     Why not without _REG, like all the other #define's?
-Ok.
-> 
-> > +static int dm644x_venc_setup_clock(enum vpbe_enc_timings_type type,
-> > +				   unsigned int mode)
-> > +{
-> > +	int ret = 0;
-> > +	void __iomem *vpss_clkctl_reg;
-> > +
-> > +	vpss_clkctl_reg = DAVINCI_SYSMODULE_VIRT(0x44);
-> 
->     Why not in the initializer?
-Because it is used only for clock control. I think it is fine here.
-> 
-> > +	switch (type) {
-> > +	case VPBE_ENC_STD:
-> > +		writel(0x18, vpss_clkctl_reg);
-> > +		break;
-> > +	case VPBE_ENC_DV_PRESET:
-> > +		switch ((unsigned int)mode) {
-> 
->     'mode' is already 'unsigned int'.
-Ok.
-Thx,
--Manju
-> 
-> WBR, Sergei
-> 
-> 
+What is the problem exactly?  I do not quite understand.
+
+-- 
+Regards,
+Shawn
