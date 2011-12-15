@@ -1,46 +1,132 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 15 Dec 2011 11:06:15 +0100
-Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART
- from dt
-In-Reply-To: <4EE99923.4030902@ti.com>
-References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
- <1323863746-18145-5-git-send-email-rnayak@ti.com>
- <20111214192509.GH32251@atomide.com> <4EE99923.4030902@ti.com>
-Message-ID: <4EE9C697.4010604@ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 15 Dec 2011 12:18:07 +0200
+Subject: [PATCH v3] arm: omap3evm: Add support for an MT9M032 based camera
+ board.
+In-Reply-To: <1323886442.815408.21905@localhost>
+References: <1323825934-13320-1-git-send-email-martin@neutronstar.dyndns.org>
+ <4EE86CF7.1010002@compulab.co.il> <1323886442.815408.21905@localhost>
+Message-ID: <4EE9C95F.2090308@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 12/15/2011 7:52 AM, Rajendra Nayak wrote:
-> On Thursday 15 December 2011 12:55 AM, Tony Lindgren wrote:
->> * Rajendra Nayak<rnayak@ti.com> [111214 03:24]:
->>> Pass minimal data needed for console boot, from dt, for
->>> OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
->>> static initialization from generic board file.
->>>
->>> Acked-by: Rob Herring<rob.herring@calxeda.com>
->>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+On 12/14/11 20:14, martin at neutronstar.dyndns.org wrote:
+> On Wed, Dec 14, 2011 at 11:31:35AM +0200, Igor Grinberg wrote:
+>> Hi Martin,
 >>
->> This we can't merge because this breaks serial console for
->> omap2 because you're not adding the omap2 specific dtsi
->> entries for omap2..
->
-> But we never had omap2 working with DT, because we never added
-> a .dtsi file for omap2 or a .dts file for any omap2 board variants.
->
-> Until now the DT support on OMAP has been limited to OMAP3 and OMAP4
-> with boards limited to omap3beagle/omap4Panda and omap4sdp.
->
-> So when we do add base support for omap2, we could update those
-> with the serial entries.
+>> On 12/14/11 03:25, Martin Hostettler wrote:
+>>> Adds board support for an MT9M032 based camera to omap3evm.
+>>>
+>>> Signed-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
+>>> ---
+>>>  arch/arm/mach-omap2/Makefile                |    3 +-
+>>>  arch/arm/mach-omap2/board-omap3evm-camera.c |  155 +++++++++++++++++++++++++++
+>>>  arch/arm/mach-omap2/board-omap3evm.c        |    4 +
+>>>  3 files changed, 161 insertions(+), 1 deletions(-)
+>>>  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
+>>>
+>>> Changes in V3
+>>>  * Added missing copyright and attribution.
+>>>  * switched to gpio_request_array for gpio init.
+>>>  * removed device_initcall and added call to omap3_evm_camera_init into omap3_evm_init
+>>>
+>>> Changes in V2:
+>>>  * ported to current mainline
+>>>  * Style fixes
+>>>  * Fix error handling
+>>>
 
-I'm quite confused as well... Have you tried the current 3.2 kernel on 
-an OMAP2 board?
+[...]
 
-So far I've been taking care of keeping the OMAP2 support into the 
-board-generic.c file, but I've never added any omap2.dtsi or 
-omap2-board.dts file to support it.
+>>> +/**
+>>> + * omap3evm_set_mux - Sets mux to enable signal routing to
+>>> + *                           different peripherals present on new EVM board
+>>> + * @mux_id: enum, mux id to enable
+>>> + *
+>>> + * Returns 0 for success or a negative error code
+>>> + */
+>>> +static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
+>>> +{
+>>> +	/* Set GPIO6 = 1 */
+>>> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 6, 1);
+>>> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+>>> +
+>>> +	switch (mux_id) {
+>>> +	case MUX_TVP5146:
+>>> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+>>> +		gpio_set_value(nCAM_VD_SEL, 1);
+>>> +		break;
+>>> +
+>>> +	case MUX_CAMERA_SENSOR:
+>>> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+>>> +		gpio_set_value(nCAM_VD_SEL, 0);
+>>> +		break;
+>>> +
+>>> +	case MUX_EXP_CAMERA_SENSOR:
+>>> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 1);
+>>> +		break;
+>>> +
+>>> +	default:
+>>> +		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
+>>> +		return -EINVAL;
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>
+>> I don't really care about that, but I don't see any mux
+>> being set in the above function so the name and comments
+>> are misleading.
+> 
+> There's are video muxes on this board that's controlled by various
+> gpios. It's not a mux in the omap chip if you've expected to see that.
+> 
+> As this is an evaluation board it has a bunch of video connectors that 
+> the user can choose from for different input devices.
 
+I see... Probably a comment explaining that would not hurt here.
+
+[...]
+
+>>> +
+>>> +	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
+>>> +	ret = gpio_request_array(setup_gpios, ARRAY_SIZE(setup_gpios));
+>>> +	if (ret < 0) {
+>>> +		pr_err("omap3evm-camera: Failed to setup camera signal routing.\n");
+>>> +		return ret;
+>>> +	}
+>>
+>> It looks like both above calls (gpio_request and mux_init)
+>> can be moved to omap3evm_set_mux() function (or a renamed version of it),
+>> so all the GPIO stuff will be close to each other instead of requesting
+>> in one place and playing with values in another...
+> 
+> I'd like to keep the one time setup and the theoretically run time switchable
+> parts seperate. It doesn't complicate the code and if a brave soul wants to
+> connect different camera modules and switch between them it's a more reviewable
+> patch from here.
+
+Ok
+
+> 
+>>
+>>> +	omap3evm_set_mux(MUX_CAMERA_SENSOR);
+>>
+>> So the plan is to add support for the 3 types,
+>> but hard code to only one?
+>> Can't this be runtime detected somehow?
+> 
+> The mux code came from out of tree drivers. I did want to keep enough
+> information so someone extending this board code for other setups doesn't have a
+> hard time. I can't think of an reliable way to runtime detect what video source
+> a specific use case would want. Ideally someone who needs one of the other
+> video sources should add a more generic solution here. 
+
+I'm Ok with it, but usually, stuff that is never used stays out...
+I think the way it should be is to have a platform driver that uses
+a callback to switch between the "muxes" on the extension.
+
+[...]
+
+-- 
 Regards,
-Benoit
+Igor.
