@@ -1,64 +1,73 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 15 Dec 2011 08:55:32 -0700
-Subject: [PATCH 3/9] irq: convert generic-chip to use irq_domain
-In-Reply-To: <4EE9FC99.6030905@gmail.com>
-References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
- <1323876538-20406-4-git-send-email-robherring2@gmail.com>
- <20111215052512.GB21815@S2101-09.ap.freescale.net>
- <20111215055501.GC21815@S2101-09.ap.freescale.net>
- <4EE9F899.7010402@gmail.com> <4EE9FC99.6030905@gmail.com>
-Message-ID: <CACxGe6t=ngbzNLkX+df8gP0aoMmgnsVqn2V2eRHpGi5FoFci_w@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 15 Dec 2011 17:09:34 +0100
+Subject: [PATCH v2 02/10] i2c: OMAP: Add DT support for i2c controller
+In-Reply-To: <4EEA16CB.6040708@gmail.com>
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-3-git-send-email-b-cousson@ti.com>
+ <4EE8D5A1.2080100@gmail.com> <4EEA0CC5.4090602@ti.com>
+ <4EEA16CB.6040708@gmail.com>
+Message-ID: <4EEA1BBE.2090802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 6:56 AM, Rob Herring <robherring2@gmail.com> wrote:
-> Shawn,
+On 12/15/2011 4:48 PM, Rob Herring wrote:
+> On 12/15/2011 09:05 AM, Cousson, Benoit wrote:
+
+[...]
+
+>> Or using some omap3-i2c or omap4-i2c to determine the proper version and
+>> thus populate the right flags during probe.
+>>
 >
-> On 12/15/2011 07:39 AM, Rob Herring wrote:
->> On 12/14/2011 11:55 PM, Shawn Guo wrote:
->>> On Thu, Dec 15, 2011 at 01:25:20PM +0800, Shawn Guo wrote:
->>>> On Wed, Dec 14, 2011 at 09:28:52AM -0600, Rob Herring wrote:
->>>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>>
->>>>> Add irq domain support to irq generic-chip. This enables users of
->>>>> generic-chip to support dynamic irq assignment needed for DT interrupt
->>>>> binding. Users must be converted to use irq_data.hwirq for determining
->>>>> local interrupt numbers rather than using the Linux irq number.
->>>>>
->>>>> irq_base is kept for now as there are a few users of it. Once they
->>>>> are converted to use the irq domain, it can be removed.
->>>>>
->>>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>>> ---
+> If that's specific enough, then yes. I meant that if say only the
+> omap3578 (making up numbers here) has errata i207, then define a
+> compatible string "ti,omap3578-i2c" that implies that and possibly other
+> flags.
+>
+> To put it another way, there are only N valid combinations of flags and
+> N is probably fairly small as long as the flags are dictated by the i2c
+> h/w rev or how it was integrated into a particular SOC. So you should
+> have N compatible strings that reflect those valid combinations. The
+> driver can still use the flags internally.
+>
+> For any flags that are in fact board level configuration, they should be
+> broken out as individual properties. Most of these sound like they are
+> properties of the h/w and not user configuration of the h/w.
+
+Yes, indeed, I got the point. This is even much better for the 
+implementation standpoint. The whole stuff is located inside the driver 
+where it should belong.
+
+>> [...]
+>>
+>>>> @@ -965,6 +956,31 @@ static const struct i2c_algorithm omap_i2c_algo = {
+>>>>        .functionality    = omap_i2c_func,
+>>>>    };
 >>>>
->>>> Tested-by: Shawn Guo <shawn.guo@linaro.org>
->>>>
->>> Sorry, I have to take that tag back after I correct my test setup.
->>> It does not work for imx5 TZIC case, because the following change
->>> I suggested before is missed.
+>>>> +#ifdef CONFIG_OF
+>>>> +static struct omap_i2c_bus_platform_data omap3_pdata = {
+>>>> +    .rev = OMAP_I2C_IP_VERSION_1,
+>>>> +};
+>>>> +
+>>>> +static struct omap_i2c_bus_platform_data omap4_pdata = {
+>>>> +    .rev = OMAP_I2C_IP_VERSION_2,
+>>>> +};
 >>>
->>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->>> index eb763f7..2a2aac1 100644
->>> --- a/kernel/irq/irqdomain.c
->>> +++ b/kernel/irq/irqdomain.c
->>> @@ -39,7 +39,7 @@ void irq_domain_add(struct irq_domain *domain)
->>> ? ? ? ? ? ? ? ? ? ? ? ? return;
->>> ? ? ? ? ? ? ? ? }
->>> ? ? ? ? ? ? ? ? d->domain = domain;
->>> - ? ? ? ? ? ? ? d->hwirq = hwirq;
->>> + ? ? ? ? ? ? ? d->hwirq = hwirq - domain->hwirq_base;
+>>> This is redundant. The ip version can be determined from the compatible
+>>> string.
 >>
->> This is a problem. It entirely defeats the point of hwirq_base and it
->> would break the GIC. We need to fix this in the generic irq chip.
+>> I'm confused...
+>> I'm using the compatible string below to chose the proper value.
+>> This flag is then used later at runtime.
+>> I'm using a pseudo pdata because that driver is still used in old
+>> platform that does and will never not have DT support.
 >>
 >
-> I think I found a fix. Can you try 's/d->hwirq/(d->hwirq % 32)/' in
-> generic-chip.c.
+> After more thought, never mind. You'll probably need it for handling the
+> flags as I proposed above.
 
-Ugh, but that hard codes an assumption that a domain cannot have more
-that 32 irqs.
+Yes, I'm taking advantage of the existing pdata structure to provide the 
+proper flags.
 
-/me goes to dig into irq_domain code...
-
-g.
+Thanks for that feedback,
+Benoit
