@@ -1,41 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Dec 2011 09:28:56 +0100
-Subject: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux subsystem
-In-Reply-To: <7FE21149F4667147B645348EC60578850561FF@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
- <1323878622-26602-5-git-send-email-b29396@freescale.com>
- <20111214211152.GM27267@pengutronix.de>
- <CACRpkdYHtgx3Qgx4QRdgOahQXjvSWE_iogWCZjaYQ-VnyS62uQ@mail.gmail.com>
- <7FE21149F4667147B645348EC60578850561FF@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <CACRpkda-hzrgQ7YttN3Vi3E6jTv-LaQDyAqyJjdvqYDL+C50XA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Dec 2011 08:31:15 +0000
+Subject: Massive log spam loading modules on ARM after 3.2-rc5 (regression)
+In-Reply-To: <20111215080213.GC24496@pengutronix.de>
+References: <20111214215133.GA7780@elliptictech.com>
+ <20111215080213.GC24496@pengutronix.de>
+Message-ID: <20111215083115.GH14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 8:23 AM, Dong Aisheng-B29396
-<B29396@freescale.com> wrote:
-> [Me]
->> So if you want to do this for i.MX you need something like selectable
->> dummy pinmuxes, i.e. pinmux_get() to return something that just say "OK"
->> to everything like the dummy regulators.
->>
->> Shall I try to create something like that?
->
-> For those platforms do not select PINCTRL, current code does not block.
+On Thu, Dec 15, 2011 at 09:02:13AM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Dec 14, 2011 at 04:51:33PM -0500, Nick Bowler wrote:
+> > The message only seem to get printed at module load time.  Other than
+> > the noise, things _seem_ to be working.  Nevertheless, it's a regression
+> > introduced after 3.2-rc5 by the following commit:
+> > 
+> >   de66a979012dbc66b1ec0125795a3f79ee667b8a is the first bad commit
+> >   commit de66a979012dbc66b1ec0125795a3f79ee667b8a
+> >   Author: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >   Date:   Mon Dec 5 09:39:59 2011 +0100
+> > 
+> >       ARM: 7187/1: fix unwinding for XIP kernels
+> > 
+> >       The linker places the unwind tables in readonly sections. So when using
+> >       an XIP kernel these are located in ROM and cannot be modified.
+> >       For that reason the current approach to convert the relative offsets in
+> >       the unwind index to absolute addresses early in the boot process doesn't
+> >       work with XIP.
+> > 
+> >       The offsets in the unwind index section are signed 31 bit numbers and
+> >       the structs are sorted by this offset. So it first has offsets between
+> >       0x40000000 and 0x7fffffff (i.e. the negative offsets) and then offsets
+> >       between 0x00000000 and 0x3fffffff. When seperating these two blocks the
+> >       numbers are sorted even when interpreting the offsets as unsigned longs.
+> > 
+> >       So determine the first non-negative entry once and track that using the
+> >       new origin pointer. The actual bisection can then use a plain unsigned
+> >       long comparison. The only thing that makes the new bisection more
+> >       complicated is that the offsets are relative to their position in the
+> >       index section, so the key to search needs to be adapted accordingly in
+> >       each step.
+> > 
+> >       Moreover several consts are added to catch future writes and rename the
+> >       member "addr" of struct unwind_idx to "addr_offset" to better match the
+> >       new semantic. (This has the additional benefit of breaking eventual
+> >       users at compile time to make them aware of the change.)
+> > 
+> >       In my tests the new algorithm was a tad faster than the original and has
+> >       the additional upside of not needing the initial conversion and so saves
+> >       some boot time and it's possible to unwind even earlier.
+> > 
+> >       Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >       Acked-by: Nicolas Pitre <nico@fluxnic.net>
+> >       Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >       Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> >   :040000 040000 9c4363228515808d71dac84a4a16e0aa0cf4ceaa 65b80d4e51fabf0a3142a880be795f4b38f4d9fe M	arch
+> > 
+> > I am *not* using XIP.  Reverting this commit resolves the issue.
+> I'd say revert that change for now, I'll take a look. (IMHO this is
+> merge window material even though it has "fix" in the title. The
+> addressed problem is only relevant on XIP (which isn't used much AFAIK)
+> and is broken since 2.6.30-rc1~636^2~52^2~18 when unwinding was
+> introduced.)
 
-Yeah I know...
+For christ sake Uwe, stop being an idiot.  If that's the case then
+YOU NEED TO SAY which kernel you want the patch applied to, and not
+leave it up to chance.  Nothing in that says "this should not go
+into -rc".
 
-> For platforms do select PINCTRL but does not have pinmux driver ready,
-> for example, single image for both mx5&mx6,
-> IMHO it may be better to fix in driver to avoid introduce too much
-> complexity in pinctrl core.
+And wtf wasn't it tested with modules?
 
-If you mean that you fix the i.MX driver for all the combines i.MX variants
-then I agree.
-
-If you mean to do stuff like allow the code to continue even if the pinmux
-isn't found - no. That is not the way we proceed with clocks and
-regulators as Mark has taught me recently, so for consistency we
-need to error out if no pinmux is found.
-
-Thanks,
-Linus Walleij
+Congratulations, your incompetence will now have consequences.  I'm
+*not* going to apply any patch from you in future for -rc without
+there being _several_ tested-by's from various people.  So you're
+going to find it harder to get patches in.
