@@ -1,25 +1,51 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 15 Dec 2011 14:47:57 +0000
-Subject: [PATCH] ARM: add device tree blobs to .gitignore
-In-Reply-To: <1323808612-14976-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1323808612-14976-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20111215144757.GA2081@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 15 Dec 2011 08:53:28 -0600
+Subject: [PATCH v6 3/9] ARM: versatile: Map local timers using Device
+ Tree when possible
+In-Reply-To: <1323957761-13553-4-git-send-email-pawel.moll@arm.com>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-4-git-send-email-pawel.moll@arm.com>
+Message-ID: <4EEA09E8.3010807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 09:36:52PM +0100, Uwe Kleine-K??nig wrote:
-> *.dtb files are a build result and so should be ignored.
+On 12/15/2011 08:02 AM, Pawel Moll wrote:
+> Try to map TWD registers basing on a "arm,smp-twd" Device Tree
+> node (compatible value as used in Highbank's DT). This overrides
+> existing twd_base value.
 > 
-> Signed-off-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  arch/arm/plat-versatile/localtimer.c |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
+> index 0fb3961..8f0dc10 100644
+> --- a/arch/arm/plat-versatile/localtimer.c
+> +++ b/arch/arm/plat-versatile/localtimer.c
+> @@ -11,6 +11,8 @@
+>  #include <linux/init.h>
+>  #include <linux/smp.h>
+>  #include <linux/clockchips.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+>  
+>  #include <asm/smp_twd.h>
+>  #include <asm/localtimer.h>
+> @@ -21,6 +23,16 @@
+>   */
+>  int __cpuinit local_timer_setup(struct clock_event_device *evt)
+>  {
+> +#if defined(CONFIG_OF)
+> +	struct device_node *node = of_find_compatible_node(NULL,
+> +			NULL, "arm,smp-twd");
+> +
+> +	if (node)
+> +		twd_base = of_iomap(node, 0);
+> +#endif
 
-Should this actually be global?
+I think your previous version was more correct. This is going to find
+the node and do ioremap N times where N is the number of cores. It does
+work though because that is what I did initially too.
 
-It looks like at least powerpc, microblaze and openrisc may generate
-.dtbs and I don't see any local .gitignore entries for those.
-
-Since the dtc tool itself is global (i.e., in an arch-independent
-scripts dir instead of somewhere arch-specific), it could be argued that
-other related stuff should be global too.
-
-Cheers
----Dave
+Rob
