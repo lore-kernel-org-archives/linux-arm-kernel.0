@@ -1,60 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 15 Dec 2011 17:03:58 +0800
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Thu, 15 Dec 2011 08:55:54 +0000
 Subject: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux subsystem
-In-Reply-To: <CACRpkdbN26q1_d4tPkJp4f4_KdvoEEk9uCCRyOfEU97DOWAnEw@mail.gmail.com>
+In-Reply-To: <CACRpkda-hzrgQ7YttN3Vi3E6jTv-LaQDyAqyJjdvqYDL+C50XA@mail.gmail.com>
 References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
  <1323878622-26602-5-git-send-email-b29396@freescale.com>
  <20111214211152.GM27267@pengutronix.de>
  <CACRpkdYHtgx3Qgx4QRdgOahQXjvSWE_iogWCZjaYQ-VnyS62uQ@mail.gmail.com>
- <20111215070505.GA22541@S2101-09.ap.freescale.net>
- <CACRpkdbN26q1_d4tPkJp4f4_KdvoEEk9uCCRyOfEU97DOWAnEw@mail.gmail.com>
-Message-ID: <20111215090357.GA2267@S2100-06.ap.freescale.net>
+ <7FE21149F4667147B645348EC60578850561FF@039-SN2MPN1-013.039d.mgd.msft.net>
+ <CACRpkda-hzrgQ7YttN3Vi3E6jTv-LaQDyAqyJjdvqYDL+C50XA@mail.gmail.com>
+Message-ID: <7FE21149F4667147B645348EC6057885056487@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 09:26:40AM +0100, Linus Walleij wrote:
-> On Thu, Dec 15, 2011 at 8:05 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> >[Me]
-> >> So if you want to do this for i.MX you need something like
-> >> selectable dummy pinmuxes, i.e. pinmux_get() to return something
-> >> that just say "OK" to everything like the dummy regulators.
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: Thursday, December 15, 2011 4:29 PM
+> To: Dong Aisheng-B29396
+> Cc: Sascha Hauer; linus.walleij at stericsson.com; linux-
+> kernel at vger.kernel.org; rob.herring at calxeda.com;
+> grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> kernel at pengutronix.de; Guo Shawn-R65073
+> Subject: Re: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux
+> subsystem
+> Importance: High
+> 
+> On Thu, Dec 15, 2011 at 8:23 AM, Dong Aisheng-B29396
+> <B29396@freescale.com> wrote:
+> > [Me]
+> >> So if you want to do this for i.MX you need something like selectable
+> >> dummy pinmuxes, i.e. pinmux_get() to return something that just say
+> "OK"
+> >> to everything like the dummy regulators.
 > >>
 > >> Shall I try to create something like that?
-> >>
-> > Isn't the empty functions defined in include/linux/pinctrl/pinmux.h
-> > for this purpose?
+> >
+> > For those platforms do not select PINCTRL, current code does not block.
 > 
-> No, these are for compiling it *out*, dummy pinmuxes would
-> be if you compile it *in*, but don't find an apropriate pinmux,
-> you still get something that does nothing and still works.
+> Yeah I know...
 > 
-> Dummy regulators work exactly this way.
+> > For platforms do select PINCTRL but does not have pinmux driver ready,
+> > for example, single image for both mx5&mx6, IMHO it may be better to
+> > fix in driver to avoid introduce too much complexity in pinctrl core.
 > 
-> > It does not solve the problem with single image.
+> If you mean that you fix the i.MX driver for all the combines i.MX
+> variants then I agree.
 > 
-> I think it does.
-> 
-> > You might probably mean that we create a dummy_pinctrl_desc and register
-> > it to pinctrl core with pinctrl_register() if we detect that the kernel
-> > is running on a soc that has no pinctrl support?
-> 
-> No. You have a #ifdef CONFIG_PINMUX_DUMMY in pinmux_get()
-> that makes sure you return a working no-op pinmux handle even
-> though there is no real pinmux behind it.
-> 
-Ah, ok.  So the problem will be sorted out at pinctrl core level, and
-pinctrl driver will not be bothered at all.  Yes, please, we need this.
+Yes, I mean this one.
 
-> > This is not a problem to pinctrl migration only. ?We have the same
-> > problem with common clk migration. ?Unless we migrate imx3, imx5 and
-> > imx6 to common clk at the same time, single image build just does not
-> > cope with clk_* api.
+> If you mean to do stuff like allow the code to continue even if the
+> pinmux isn't found - no. That is not the way we proceed with clocks and
+> regulators as Mark has taught me recently, so for consistency we need to
+> error out if no pinmux is found.
 > 
-> And  you could have the same problem with regulator migration...
-> Luckily dummy regulators saves you in that case.
-> 
-Not sure what will save me in common clk case though.
 
--- 
-Regards,
-Shawn
+Regards
+Dong Aisheng
