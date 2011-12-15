@@ -1,72 +1,51 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 15 Dec 2011 14:02:33 +0000
-Subject: [PATCH v6 1/9] ARM: versatile: Add missing ENDPROC to headsmp.S
+Date: Thu, 15 Dec 2011 14:02:35 +0000
+Subject: [PATCH v6 3/9] ARM: versatile: Map local timers using Device Tree
+ when possible
 In-Reply-To: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
 References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1323957761-13553-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1323957761-13553-4-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once the ENDPROC is in place, BSYM() in not longer necessary
-to get correct pointer to versatile_secondary_startup().
+Try to map TWD registers basing on a "arm,smp-twd" Device Tree
+node (compatible value as used in Highbank's DT). This overrides
+existing twd_base value.
 
-Tested-by: Jon Medhurst <tixy@linaro.org>
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-realview/platsmp.c  |    3 +--
- arch/arm/mach-vexpress/platsmp.c  |    4 +---
- arch/arm/plat-versatile/headsmp.S |    1 +
- 3 files changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/plat-versatile/localtimer.c |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index e83c654..17c878d 100644
---- a/arch/arm/mach-realview/platsmp.c
-+++ b/arch/arm/mach-realview/platsmp.c
-@@ -17,7 +17,6 @@
- #include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <asm/smp_scu.h>
--#include <asm/unified.h>
- 
- #include <mach/board-eb.h>
- #include <mach/board-pb11mp.h>
-@@ -75,6 +74,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	__raw_writel(BSYM(virt_to_phys(versatile_secondary_startup)),
-+	__raw_writel(virt_to_phys(versatile_secondary_startup),
- 		     __io_address(REALVIEW_SYS_FLAGSSET));
- }
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 2b5f7ac..124ffb1 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -13,8 +13,6 @@
+diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
+index 0fb3961..8f0dc10 100644
+--- a/arch/arm/plat-versatile/localtimer.c
++++ b/arch/arm/plat-versatile/localtimer.c
+@@ -11,6 +11,8 @@
+ #include <linux/init.h>
  #include <linux/smp.h>
- #include <linux/io.h>
+ #include <linux/clockchips.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
  
--#include <asm/unified.h>
--
- #include <mach/motherboard.h>
- #define V2M_PA_CS7 0x10000000
- 
-@@ -46,6 +44,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * secondary CPU branches to this address.
- 	 */
- 	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
--	writel(BSYM(virt_to_phys(versatile_secondary_startup)),
-+	writel(virt_to_phys(versatile_secondary_startup),
- 		MMIO_P2V(V2M_SYS_FLAGSSET));
- }
-diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-index d397a1f..dd703ef 100644
---- a/arch/arm/plat-versatile/headsmp.S
-+++ b/arch/arm/plat-versatile/headsmp.S
-@@ -38,3 +38,4 @@ pen:	ldr	r7, [r6]
- 	.align
- 1:	.long	.
- 	.long	pen_release
-+ENDPROC(versatile_secondary_startup)
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
+@@ -21,6 +23,16 @@
+  */
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
++#if defined(CONFIG_OF)
++	struct device_node *node = of_find_compatible_node(NULL,
++			NULL, "arm,smp-twd");
++
++	if (node)
++		twd_base = of_iomap(node, 0);
++#endif
++	if (!twd_base)
++		return -ENXIO;
++
+ 	evt->irq = IRQ_LOCALTIMER;
+ 	twd_timer_setup(evt);
+ 	return 0;
 -- 
 1.7.5.4
