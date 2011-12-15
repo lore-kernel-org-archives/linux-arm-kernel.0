@@ -1,148 +1,449 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Thu, 15 Dec 2011 17:42:00 +0530
-Subject: [PATCH v6 11/11] davinci: dm644x EVM: add support for VPBE display
+Date: Thu, 15 Dec 2011 17:41:54 +0530
+Subject: [PATCH v6 05/11] ARM: davinci: create new common platform header for
+ davinci
 In-Reply-To: <1323951120-15876-1-git-send-email-manjunath.hadli@ti.com>
 References: <1323951120-15876-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <1323951120-15876-12-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <1323951120-15876-6-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for V4L2 video display to DM6446 EVM.
-Support for SD and ED modes is provided, along with Composite
-and Component outputs.Also added vpbe_config as a parameter for
-dm644x_init_video to allow for registration of vpbe platform devices.
+remove the code from individual platform header files for
+dm365, dm355, dm644x and dm646x and consolidate it into a
+single and common header file davinci.h.
+
+This reduces the pollution in the include/mach and is consistent
+with Russel's suggestions as part of his "pet peaves" mail.
+
+The further patches in the series take  advantage of this consolidation
+for easy implementation of IO_ADDRESS elimination.
 
 Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-Acked-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c |  108 +++++++++++++++++++++++++++++-
- 1 files changed, 107 insertions(+), 1 deletions(-)
+ arch/arm/mach-davinci/board-dm355-evm.c     |    2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c |    2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c     |    2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c    |    2 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
+ arch/arm/mach-davinci/board-sffsdr.c        |    2 +-
+ arch/arm/mach-davinci/davinci.h             |   87 +++++++++++++++++++++++++++
+ arch/arm/mach-davinci/dm355.c               |    2 +-
+ arch/arm/mach-davinci/dm365.c               |    2 +-
+ arch/arm/mach-davinci/dm644x.c              |    2 +-
+ arch/arm/mach-davinci/dm646x.c              |    2 +-
+ arch/arm/mach-davinci/include/mach/dm355.h  |   32 ----------
+ arch/arm/mach-davinci/include/mach/dm365.h  |   36 -----------
+ arch/arm/mach-davinci/include/mach/dm644x.h |   40 ------------
+ arch/arm/mach-davinci/include/mach/dm646x.h |   34 ----------
+ 16 files changed, 98 insertions(+), 153 deletions(-)
+ create mode 100644 arch/arm/mach-davinci/davinci.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/dm355.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/dm646x.h
 
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index 4e0e707..7ae0d15 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -26,7 +26,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+-#include <mach/dm355.h>
++#include "davinci.h"
+ #include <mach/i2c.h>
+ #include <mach/serial.h>
+ #include <mach/nand.h>
+diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+index ff2d241..56f88de 100644
+--- a/arch/arm/mach-davinci/board-dm355-leopard.c
++++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+@@ -23,7 +23,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+-#include <mach/dm355.h>
++#include "davinci.h"
+ #include <mach/i2c.h>
+ #include <mach/serial.h>
+ #include <mach/nand.h>
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 1918ae7..613ed00 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -32,7 +32,7 @@
+ #include <asm/mach/arch.h>
+ 
+ #include <mach/mux.h>
+-#include <mach/dm365.h>
++#include "davinci.h"
+ #include <mach/common.h>
+ #include <mach/i2c.h>
+ #include <mach/serial.h>
 diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index eb7daff..af81dbb 100644
+index 0cf8abf..00e8599 100644
 --- a/arch/arm/mach-davinci/board-dm644x-evm.c
 +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -612,6 +612,112 @@ static void __init evm_init_i2c(void)
- 	i2c_register_board_info(1, i2c_info, ARRAY_SIZE(i2c_info));
- }
+@@ -30,7 +30,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
  
-+#define VENC_STD_ALL	(V4L2_STD_NTSC | V4L2_STD_PAL)
-+
-+/* venc standard timings */
-+static struct vpbe_enc_mode_info dm644xevm_enc_std_timing[] = {
-+	{
-+		.name		= "ntsc",
-+		.timings_type	= VPBE_ENC_STD,
-+		.timings	= {V4L2_STD_525_60},
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {11, 10},
-+		.fps		= {30000, 1001},
-+		.left_margin	= 0x79,
-+		.upper_margin	= 0x10,
-+	},
-+	{
-+		.name		= "pal",
-+		.timings_type	= VPBE_ENC_STD,
-+		.timings	= {V4L2_STD_625_50},
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {54, 59},
-+		.fps		= {25, 1},
-+		.left_margin	= 0x7e,
-+		.upper_margin	= 0x16,
-+	},
-+};
-+
-+/* venc dv preset timings */
-+static struct vpbe_enc_mode_info dm644xevm_enc_preset_timing[] = {
-+	{
-+		.name		= "480p59_94",
-+		.timings_type	= VPBE_ENC_DV_PRESET,
-+		.timings	= {V4L2_DV_480P59_94},
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {1, 1},
-+		.fps		= {5994, 100},
-+		.left_margin	= 0x80,
-+		.upper_margin	= 0x20,
-+	},
-+	{
-+		.name		= "576p50",
-+		.timings_type	= VPBE_ENC_DV_PRESET,
-+		.timings	= {V4L2_DV_576P50},
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {1, 1},
-+		.fps		= {50, 1},
-+		.left_margin	= 0x7e,
-+		.upper_margin	= 0x30,
-+	},
-+};
-+
+-#include <mach/dm644x.h>
++#include "davinci.h"
+ #include <mach/common.h>
+ #include <mach/i2c.h>
+ #include <mach/serial.h>
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index e574d7f..c0f9ea2 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -36,7 +36,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+-#include <mach/dm646x.h>
++#include "davinci.h"
+ #include <mach/common.h>
+ #include <mach/serial.h>
+ #include <mach/i2c.h>
+diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+index e5f231a..edc6ff7 100644
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@ -30,7 +30,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+-#include <mach/dm644x.h>
++#include "davinci.h"
+ #include <mach/common.h>
+ #include <mach/i2c.h>
+ #include <mach/serial.h>
+diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+index 5dd4da9..122c7aa 100644
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@ -35,7 +35,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ 
+-#include <mach/dm644x.h>
++#include "davinci.h"
+ #include <mach/common.h>
+ #include <mach/i2c.h>
+ #include <mach/serial.h>
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+new file mode 100644
+index 0000000..3e6def4
+--- /dev/null
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -0,0 +1,87 @@
 +/*
-+ * The outputs available from VPBE + encoders. Keep the order same
-+ * as that of encoders. First those from venc followed by that from
-+ * encoders. Index in the output refers to index on a particular encoder.
-+ * Driver uses this index to pass it to encoder when it supports more than
-+ * one output. Application uses index of the array to set an output.
++ * This file contains the processor specific definitions
++ * of the TI DM644x, DM355, DM365, and DM646x.
++ *
++ * Copyright (C) 2011 Texas Instruments Incorporated
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+static struct vpbe_output dm644xevm_vpbe_outputs[] = {
-+	{
-+		.output		= {
-+			.index		= 0,
-+			.name		= "Composite",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.std		= VENC_STD_ALL,
-+			.capabilities	= V4L2_OUT_CAP_STD,
-+		},
-+		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "ntsc",
-+		.num_modes	= ARRAY_SIZE(dm644xevm_enc_std_timing),
-+		.modes		= dm644xevm_enc_std_timing,
-+	},
-+	{
-+		.output		= {
-+			.index		= 1,
-+			.name		= "Component",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities	= V4L2_OUT_CAP_PRESETS,
-+		},
-+		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "480p59_94",
-+		.num_modes	= ARRAY_SIZE(dm644xevm_enc_preset_timing),
-+		.modes		= dm644xevm_enc_preset_timing,
-+	},
-+};
++#ifndef __DAVINCI_H
++#define __DAVINCI_H
 +
-+static struct vpbe_config dm644xevm_display_cfg = {
-+	.module_name	= "dm644x-vpbe-display",
-+	.i2c_adapter_id	= 1,
-+	.osd		= {
-+		.module_name	= VPBE_OSD_SUBDEV_NAME,
-+	},
-+	.venc		= {
-+		.module_name	= VPBE_VENC_SUBDEV_NAME,
-+	},
-+	.num_outputs	= ARRAY_SIZE(dm644xevm_vpbe_outputs),
-+	.outputs	= dm644xevm_vpbe_outputs,
-+};
++#include <mach/asp.h>
++#include <linux/clk.h>
++#include <linux/i2c.h>
++#include <mach/keyscan.h>
++#include <linux/videodev2.h>
++#include <linux/davinci_emac.h>
++#include <linux/platform_device.h>
++#include <media/davinci/vpfe_capture.h>
++#include <media/davinci/vpif_types.h>
 +
- static struct platform_device *davinci_evm_devices[] __initdata = {
- 	&davinci_fb_device,
- 	&rtc_dev,
-@@ -695,7 +801,7 @@ static __init void davinci_evm_init(void)
- 	evm_init_i2c();
++/* DM355 base addresses */
++#define DM355_ASYNC_EMIF_CONTROL_BASE	0x01e10000
++#define DM355_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
++
++#define ASP1_TX_EVT_EN	1
++#define ASP1_RX_EVT_EN	2
++
++/* DM365 base addresses */
++#define DM365_ASYNC_EMIF_CONTROL_BASE	0x01d10000
++#define DM365_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
++#define DM365_ASYNC_EMIF_DATA_CE1_BASE	0x04000000
++
++/* DM644x base addresses */
++#define DM644X_ASYNC_EMIF_CONTROL_BASE	0x01e00000
++#define DM644X_ASYNC_EMIF_DATA_CE0_BASE 0x02000000
++#define DM644X_ASYNC_EMIF_DATA_CE1_BASE 0x04000000
++#define DM644X_ASYNC_EMIF_DATA_CE2_BASE 0x06000000
++#define DM644X_ASYNC_EMIF_DATA_CE3_BASE 0x08000000
++
++/* DM646x base addresses */
++#define DM646X_ASYNC_EMIF_CONTROL_BASE	0x20008000
++#define DM646X_ASYNC_EMIF_CS2_SPACE_BASE 0x42000000
++
++/* DM355 function declarations */
++struct spi_board_info;
++
++void __init dm355_init(void);
++void dm355_init_spi0(unsigned chipselect_mask,
++		struct spi_board_info *info, unsigned len);
++void __init dm355_init_asp1(u32 evt_enable, struct snd_platform_data *pdata);
++void dm355_set_vpfe_config(struct vpfe_config *cfg);
++
++/* DM365 function declarations */
++void __init dm365_init(void);
++void __init dm365_init_asp(struct snd_platform_data *pdata);
++void __init dm365_init_vc(struct snd_platform_data *pdata);
++void __init dm365_init_ks(struct davinci_ks_platform_data *pdata);
++void __init dm365_init_rtc(void);
++void dm365_init_spi0(unsigned chipselect_mask,
++			struct spi_board_info *info, unsigned len);
++
++void dm365_set_vpfe_config(struct vpfe_config *cfg);
++
++/* DM644x function declarations */
++void __init dm644x_init(void);
++void __init dm644x_init_asp(struct snd_platform_data *pdata);
++void dm644x_set_vpfe_config(struct vpfe_config *cfg);
++
++/* DM646x function declarations */
++void __init dm646x_init(void);
++void __init dm646x_init_mcasp0(struct snd_platform_data *pdata);
++void __init dm646x_init_mcasp1(struct snd_platform_data *pdata);
++int __init dm646x_init_edma(struct edma_rsv_info *rsv);
++
++void dm646x_video_init(void);
++
++void dm646x_setup_vpif(struct vpif_display_config *,
++		       struct vpif_capture_config *);
++#endif /*__DAVINCI_H */
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index fe520d4..36744ff 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -18,7 +18,7 @@
  
- 	davinci_setup_mmc(0, &dm6446evm_mmc_config);
--	dm644x_init_video(&dm644xevm_capture_cfg, NULL);
-+	dm644x_init_video(&dm644xevm_capture_cfg, &dm644xevm_display_cfg);
+ #include <asm/mach/map.h>
  
- 	davinci_serial_init(&uart_config);
- 	dm644x_init_asp(&dm644x_evm_snd_data);
+-#include <mach/dm355.h>
++#include "davinci.h"
+ #include <mach/cputype.h>
+ #include <mach/edma.h>
+ #include <mach/psc.h>
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 77edee8..3171cd1 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -21,7 +21,7 @@
+ 
+ #include <asm/mach/map.h>
+ 
+-#include <mach/dm365.h>
++#include "davinci.h"
+ #include <mach/cputype.h>
+ #include <mach/edma.h>
+ #include <mach/psc.h>
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 27d1371..b84b220 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -15,7 +15,7 @@
+ 
+ #include <asm/mach/map.h>
+ 
+-#include <mach/dm644x.h>
++#include "davinci.h"
+ #include <mach/cputype.h>
+ #include <mach/edma.h>
+ #include <mach/irqs.h>
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 0560e82..a6a9cde 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -16,7 +16,7 @@
+ 
+ #include <asm/mach/map.h>
+ 
+-#include <mach/dm646x.h>
++#include "davinci.h"
+ #include <mach/cputype.h>
+ #include <mach/edma.h>
+ #include <mach/irqs.h>
+diff --git a/arch/arm/mach-davinci/include/mach/dm355.h b/arch/arm/mach-davinci/include/mach/dm355.h
+deleted file mode 100644
+index 36dff4a..0000000
+--- a/arch/arm/mach-davinci/include/mach/dm355.h
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/*
+- * Chip specific defines for DM355 SoC
+- *
+- * Author: Kevin Hilman, Deep Root Systems, LLC
+- *
+- * 2007 (c) Deep Root Systems, LLC. This file is licensed under
+- * the terms of the GNU General Public License version 2. This program
+- * is licensed "as is" without any warranty of any kind, whether express
+- * or implied.
+- */
+-#ifndef __ASM_ARCH_DM355_H
+-#define __ASM_ARCH_DM355_H
+-
+-#include <mach/hardware.h>
+-#include <mach/asp.h>
+-#include <media/davinci/vpfe_capture.h>
+-
+-#define DM355_ASYNC_EMIF_CONTROL_BASE	0x01E10000
+-#define DM355_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
+-
+-#define ASP1_TX_EVT_EN	1
+-#define ASP1_RX_EVT_EN	2
+-
+-struct spi_board_info;
+-
+-void __init dm355_init(void);
+-void dm355_init_spi0(unsigned chipselect_mask,
+-		struct spi_board_info *info, unsigned len);
+-void __init dm355_init_asp1(u32 evt_enable, struct snd_platform_data *pdata);
+-void dm355_set_vpfe_config(struct vpfe_config *cfg);
+-
+-#endif /* __ASM_ARCH_DM355_H */
+diff --git a/arch/arm/mach-davinci/include/mach/dm365.h b/arch/arm/mach-davinci/include/mach/dm365.h
+deleted file mode 100644
+index 51924de..0000000
+--- a/arch/arm/mach-davinci/include/mach/dm365.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- * Copyright (C) 2009 Texas Instruments Incorporated
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License as
+- * published by the Free Software Foundation version 2.
+- *
+- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+- * kind, whether express or implied; without even the implied warranty
+- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#ifndef __ASM_ARCH_DM365_H
+-#define __ASM_ARCH_DM665_H
+-
+-#include <linux/platform_device.h>
+-#include <linux/davinci_emac.h>
+-#include <mach/hardware.h>
+-#include <mach/asp.h>
+-#include <mach/keyscan.h>
+-#include <media/davinci/vpfe_capture.h>
+-
+-#define DM365_ASYNC_EMIF_CONTROL_BASE	0x01D10000
+-#define DM365_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
+-#define DM365_ASYNC_EMIF_DATA_CE1_BASE	0x04000000
+-
+-void __init dm365_init(void);
+-void __init dm365_init_asp(struct snd_platform_data *pdata);
+-void __init dm365_init_vc(struct snd_platform_data *pdata);
+-void __init dm365_init_ks(struct davinci_ks_platform_data *pdata);
+-void __init dm365_init_rtc(void);
+-void dm365_init_spi0(unsigned chipselect_mask,
+-			struct spi_board_info *info, unsigned len);
+-
+-void dm365_set_vpfe_config(struct vpfe_config *cfg);
+-#endif /* __ASM_ARCH_DM365_H */
+diff --git a/arch/arm/mach-davinci/include/mach/dm644x.h b/arch/arm/mach-davinci/include/mach/dm644x.h
+deleted file mode 100644
+index 724377f..0000000
+--- a/arch/arm/mach-davinci/include/mach/dm644x.h
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/*
+- * This file contains the processor specific definitions
+- * of the TI DM644x.
+- *
+- * Copyright (C) 2008 Texas Instruments.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+- */
+-#ifndef __ASM_ARCH_DM644X_H
+-#define __ASM_ARCH_DM644X_H
+-
+-#include <linux/davinci_emac.h>
+-#include <mach/hardware.h>
+-#include <mach/asp.h>
+-#include <media/davinci/vpfe_capture.h>
+-
+-#define DM644X_ASYNC_EMIF_CONTROL_BASE	0x01E00000
+-#define DM644X_ASYNC_EMIF_DATA_CE0_BASE 0x02000000
+-#define DM644X_ASYNC_EMIF_DATA_CE1_BASE 0x04000000
+-#define DM644X_ASYNC_EMIF_DATA_CE2_BASE 0x06000000
+-#define DM644X_ASYNC_EMIF_DATA_CE3_BASE 0x08000000
+-
+-void __init dm644x_init(void);
+-void __init dm644x_init_asp(struct snd_platform_data *pdata);
+-void dm644x_set_vpfe_config(struct vpfe_config *cfg);
+-
+-#endif /* __ASM_ARCH_DM644X_H */
+diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
+deleted file mode 100644
+index eb95864..0000000
+--- a/arch/arm/mach-davinci/include/mach/dm646x.h
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/*
+- * Chip specific defines for DM646x SoC
+- *
+- * Author: Kevin Hilman, Deep Root Systems, LLC
+- *
+- * 2007 (c) Deep Root Systems, LLC. This file is licensed under
+- * the terms of the GNU General Public License version 2. This program
+- * is licensed "as is" without any warranty of any kind, whether express
+- * or implied.
+- */
+-#ifndef __ASM_ARCH_DM646X_H
+-#define __ASM_ARCH_DM646X_H
+-
+-#include <mach/hardware.h>
+-#include <mach/asp.h>
+-#include <linux/i2c.h>
+-#include <linux/videodev2.h>
+-#include <linux/davinci_emac.h>
+-#include <media/davinci/vpif_types.h>
+-
+-#define DM646X_ASYNC_EMIF_CONTROL_BASE	0x20008000
+-#define DM646X_ASYNC_EMIF_CS2_SPACE_BASE 0x42000000
+-
+-void __init dm646x_init(void);
+-void __init dm646x_init_mcasp0(struct snd_platform_data *pdata);
+-void __init dm646x_init_mcasp1(struct snd_platform_data *pdata);
+-int __init dm646x_init_edma(struct edma_rsv_info *rsv);
+-
+-void dm646x_video_init(void);
+-
+-void dm646x_setup_vpif(struct vpif_display_config *,
+-		       struct vpif_capture_config *);
+-
+-#endif /* __ASM_ARCH_DM646X_H */
 -- 
 1.6.2.4
