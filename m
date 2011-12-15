@@ -1,396 +1,203 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 15 Dec 2011 14:02:38 +0000
-Subject: [PATCH v6 6/9] ARM: vexpress: Motherboard RS1 memory map support
+Date: Thu, 15 Dec 2011 14:02:36 +0000
+Subject: [PATCH v6 4/9] ARM: vexpress: Use FDT data in platform SMP calls
 In-Reply-To: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
 References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1323957761-13553-7-git-send-email-pawel.moll@arm.com>
+Message-ID: <1323957761-13553-5-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for RS1 memory map based Versatile Express
-motherboard.
+If ct_desc is not set (so a board was booted with DT machine ID)
+try to look for "arm,cortex-a9-scu" node and initialize the SCU
+using base address in "reg" property.
 
-Tested-by: Jon Medhurst <tixy@linaro.org>
+Otherwise assume that there is no special SCU initialization
+required and initialize CPUs basing on numbers of "cpu" type
+devices in "cpus" node of the Device Tree.
+
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi           |  201 +++++++++++++++++++++
- arch/arm/mach-vexpress/include/mach/debug-macro.S |   37 ++++-
- arch/arm/mach-vexpress/include/mach/uncompress.h  |   13 ++-
- arch/arm/mach-vexpress/v2m.c                      |   64 +++++++-
- 4 files changed, 309 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+ arch/arm/mach-vexpress/platsmp.c |  148 +++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 146 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-new file mode 100644
-index 0000000..16076e2
---- /dev/null
-+++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-@@ -0,0 +1,201 @@
-+/*
-+ * ARM Ltd. Versatile Express
-+ *
-+ * Motherboard Express uATX
-+ * V2M-P1
-+ *
-+ * HBI-0190D
-+ *
-+ * RS1 memory map ("ARM Cortex-A Series memory map" in the board's
-+ * Technical Reference Manual)
-+ *
-+ * WARNING! The hardware described in this file is independent from the
-+ * original variant (vexpress-v2m.dtsi), but there is a strong
-+ * correspondence between the two configurations.
-+ *
-+ * TAKE CARE WHEN MAINTAINING THIS FILE TO PROPAGATE ANY RELEVANT
-+ * CHANGES TO vexpress-v2m.dtsi!
-+ */
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index a1ed6d6..d49e800d 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -12,6 +12,11 @@
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
++#include <linux/of_fdt.h>
 +
-+/ {
-+	aliases {
-+		arm,v2m_timer = &v2m_timer01;
-+	};
-+
-+	motherboard {
-+		compatible = "simple-bus";
-+		arm,v2m-memory-map = "rs1";
-+		#address-cells = <2>; /* SMB chipselect number and offset */
-+		#size-cells = <1>;
-+		#interrupt-cells = <1>;
-+
-+		flash at 0,00000000 {
-+			compatible = "arm,vexpress-flash", "cfi-flash";
-+			reg = <0 0x00000000 0x04000000>,
-+			      <4 0x00000000 0x04000000>;
-+			bank-width = <4>;
-+		};
-+
-+		psram at 1,00000000 {
-+			compatible = "arm,vexpress-psram", "mtd-ram";
-+			reg = <1 0x00000000 0x02000000>;
-+			bank-width = <4>;
-+		};
-+
-+		vram at 2,00000000 {
-+			compatible = "arm,vexpress-vram";
-+			reg = <2 0x00000000 0x00800000>;
-+		};
-+
-+		ethernet at 2,02000000 {
-+			compatible = "smsc,lan9118", "smsc,lan9115";
-+			reg = <2 0x02000000 0x10000>;
-+			interrupts = <15>;
-+			phy-mode = "mii";
-+			reg-io-width = <4>;
-+			smsc,irq-active-high;
-+			smsc,irq-push-pull;
-+		};
-+
-+		usb at 2,03000000 {
-+			compatible = "nxp,usb-isp1761";
-+			reg = <2 0x03000000 0x20000>;
-+			interrupts = <16>;
-+			port1-otg;
-+		};
-+
-+		iofpga at 3,00000000 {
-+			compatible = "arm,amba-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 3 0 0x200000>;
-+
-+			sysreg at 010000 {
-+				compatible = "arm,vexpress-sysreg";
-+				reg = <0x010000 0x1000>;
-+			};
-+
-+			sysctl at 020000 {
-+				compatible = "arm,sp810", "arm,primecell";
-+				reg = <0x020000 0x1000>;
-+			};
-+
-+			/* PCI-E I2C bus */
-+			v2m_i2c_pcie: i2c at 030000 {
-+				compatible = "arm,versatile-i2c";
-+				reg = <0x030000 0x1000>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				pcie-switch at 60 {
-+					compatible = "idt,89hpes32h8";
-+					reg = <0x60>;
-+				};
-+			};
-+
-+			aaci at 040000 {
-+				compatible = "arm,pl041", "arm,primecell";
-+				reg = <0x040000 0x1000>;
-+				interrupts = <11>;
-+			};
-+
-+			mmci at 050000 {
-+				compatible = "arm,pl180", "arm,primecell";
-+				reg = <0x050000 0x1000>;
-+				interrupts = <9 10>;
-+			};
-+
-+			kmi at 060000 {
-+				compatible = "arm,pl050", "arm,primecell";
-+				reg = <0x060000 0x1000>;
-+				interrupts = <12>;
-+			};
-+
-+			kmi at 070000 {
-+				compatible = "arm,pl050", "arm,primecell";
-+				reg = <0x070000 0x1000>;
-+				interrupts = <13>;
-+			};
-+
-+			v2m_serial0: uart at 090000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x090000 0x1000>;
-+				interrupts = <5>;
-+			};
-+
-+			v2m_serial1: uart at 0a0000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x0a0000 0x1000>;
-+				interrupts = <6>;
-+			};
-+
-+			v2m_serial2: uart at 0b0000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x0b0000 0x1000>;
-+				interrupts = <7>;
-+			};
-+
-+			v2m_serial3: uart at 0c0000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x0c0000 0x1000>;
-+				interrupts = <8>;
-+			};
-+
-+			wdt at 0f0000 {
-+				compatible = "arm,sp805", "arm,primecell";
-+				reg = <0x0f0000 0x1000>;
-+				interrupts = <0>;
-+			};
-+
-+			v2m_timer01: timer at 110000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x110000 0x1000>;
-+				interrupts = <2>;
-+			};
-+
-+			v2m_timer23: timer at 120000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x120000 0x1000>;
-+			};
-+
-+			/* DVI I2C bus */
-+			v2m_i2c_dvi: i2c at 160000 {
-+				compatible = "arm,versatile-i2c";
-+				reg = <0x160000 0x1000>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				dvi-transmitter at 39 {
-+					compatible = "sil,sii9022-tpi", "sil,sii9022";
-+					reg = <0x39>;
-+				};
-+
-+				dvi-transmitter at 60 {
-+					compatible = "sil,sii9022-cpi", "sil,sii9022";
-+					reg = <0x60>;
-+				};
-+			};
-+
-+			rtc at 170000 {
-+				compatible = "arm,pl031", "arm,primecell";
-+				reg = <0x170000 0x1000>;
-+				interrupts = <4>;
-+			};
-+
-+			compact-flash at 1a0000 {
-+				compatible = "arm,vexpress-cf", "ata-generic";
-+				reg = <0x1a0000 0x100
-+				       0x1a0100 0xf00>;
-+				reg-shift = <2>;
-+			};
-+
-+			clcd at 1f0000 {
-+				compatible = "arm,pl111", "arm,primecell";
-+				reg = <0x1f0000 0x1000>;
-+				interrupts = <14>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-index fd9e6c7..8010ff9 100644
---- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
-+++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-@@ -10,12 +10,41 @@
-  * published by the Free Software Foundation.
-  */
++#include <asm/smp_scu.h>
++#include <asm/hardware/gic.h>
++#include <asm/mach/map.h>
  
--#define DEBUG_LL_UART_OFFSET	0x00009000
-+#define DEBUG_LL_PHYS_BASE		0x10000000
-+#define DEBUG_LL_UART_OFFSET		0x00009000
-+
-+#define DEBUG_LL_PHYS_BASE_RS1		0x1c000000
-+#define DEBUG_LL_UART_OFFSET_RS1	0x00090000
-+
-+#define DEBUG_LL_VIRT_BASE		0xf8000000
+ #include <mach/motherboard.h>
  
- 		.macro	addruart,rp,rv,tmp
--		mov	\rp, #DEBUG_LL_UART_OFFSET
--		orr	\rv, \rp, #0xf8000000	@ virtual base
--		orr	\rp, \rp, #0x10000000	@ physical base
-+
-+		@ Check the MMU state
-+#if defined(CONFIG_MMU)
-+		mrc	p15, 0, \tmp, c1, c0	@ SCTRL
-+		tst	\tmp, #1		@ MMU enabled?
-+		moveq	\tmp, #DEBUG_LL_PHYS_BASE
-+		movne	\tmp, #DEBUG_LL_VIRT_BASE
-+#else
-+		mov	\tmp, #DEBUG_LL_PHYS_BASE
-+#endif
-+
-+		@ PL011 present in "original" place?
-+		orr	\tmp, \tmp, #DEBUG_LL_UART_OFFSET
-+		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
-+		teq	\tmp, #0x11		@ PL011
-+
-+		@ Original memory map
-+		moveq	\rp, #DEBUG_LL_UART_OFFSET
-+		orreq	\rv, \rp, #DEBUG_LL_VIRT_BASE
-+		orreq	\rp, \rp, #DEBUG_LL_PHYS_BASE
-+
-+		@ RS1 memory map
-+		movne	\rp, #DEBUG_LL_UART_OFFSET_RS1
-+		orrne	\rv, \rp, #DEBUG_LL_VIRT_BASE
-+		orrne	\rp, \rp, #DEBUG_LL_PHYS_BASE_RS1
-+
- 		.endm
+@@ -19,13 +24,149 @@
  
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-vexpress/include/mach/uncompress.h b/arch/arm/mach-vexpress/include/mach/uncompress.h
-index 7972c57..c491565 100644
---- a/arch/arm/mach-vexpress/include/mach/uncompress.h
-+++ b/arch/arm/mach-vexpress/include/mach/uncompress.h
-@@ -22,7 +22,18 @@
- #define AMBA_UART_CR(base)	(*(volatile unsigned char *)((base) + 0x30))
- #define AMBA_UART_FR(base)	(*(volatile unsigned char *)((base) + 0x18))
+ extern void versatile_secondary_startup(void);
  
--#define get_uart_base()	(0x10000000 + 0x00009000)
-+#define AMBA_PERIPH_ID0(base)	(*(volatile unsigned char *)((base) + 0xfe0))
++#if defined(CONFIG_OF)
 +
-+#define UART_BASE	0x10009000
-+#define UART_BASE_RS1	0x1c090000
++static enum {
++	UNKNOWN_SCU,
++	GENERIC_SCU,
++	CORTEX_A9_SCU,
++} vexpress_dt_scu = UNKNOWN_SCU;
 +
-+static unsigned long get_uart_base(void)
++static void __init vexpress_dt_init_cpu_map(int ncores)
 +{
-+	if (AMBA_PERIPH_ID0(UART_BASE) == 0x11)
-+		return UART_BASE;
-+	else
-+		return UART_BASE_RS1;
++	int i;
++
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++				ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
++	}
++
++	for (i = 0; i < ncores; ++i)
++		set_cpu_possible(i, true);
 +}
- 
- /*
-  * This does not append a newline
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 2544958..c5aff7b 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -484,9 +484,38 @@ MACHINE_END
- 
- #if defined(CONFIG_ARCH_VEXPRESS_DT)
- 
-+static struct map_desc v2m_rs1_io_desc[] __initdata = {
++
++static struct map_desc vexpress_dt_cortex_a9_scu_map[] __initdata = {
 +	{
-+		.virtual	= (unsigned long)V2M_PERIPH,
-+		.pfn		= __phys_to_pfn(0x1c000000),
-+		.length		= SZ_2M,
++		.virtual	= (unsigned long)V2T_PERIPH,
++		/* .pfn	set in vexpress_dt_init_cortex_a9_scu() */
++		.length		= SZ_128,
 +		.type		= MT_DEVICE,
 +	},
 +};
 +
-+static int __init v2m_dt_scan_memory_map(unsigned long node, const char *uname,
-+		int depth, void *data)
++static int __init vexpress_dt_find_scu(unsigned long node,
++		const char *uname, int depth, void *data)
 +{
-+	const char **map = data;
++	if (of_flat_dt_is_compatible(node, "arm,cortex-a9-scu")) {
++		__be32 *reg = of_get_flat_dt_prop(node, "reg", NULL);
 +
-+	if (strcmp(uname, "motherboard") != 0)
-+		return 0;
++		if (WARN_ON(!reg))
++			return -EINVAL;
 +
-+	*map = of_get_flat_dt_prop(node, "arm,v2m-memory-map", NULL);
++		vexpress_dt_cortex_a9_scu_map[0].pfn =
++				__phys_to_pfn(be32_to_cpup(reg));
++		iotable_init(vexpress_dt_cortex_a9_scu_map,
++				ARRAY_SIZE(vexpress_dt_cortex_a9_scu_map));
 +
-+	return 1;
++		vexpress_dt_init_cpu_map(scu_get_core_count(V2T_PERIPH));
++		set_smp_cross_call(gic_raise_softirq);
++
++		vexpress_dt_scu = CORTEX_A9_SCU;
++
++		return 1;
++	}
++
++	return 0;
 +}
 +
- void __init v2m_dt_map_io(void)
++static int __init vexpress_dt_nr_cpus(unsigned long node, const char *uname,
++		int depth, void *data)
++{
++	static int prev_depth = -1;
++	static int nr_cpus = -1;
++
++	if (prev_depth > depth && nr_cpus > 0)
++		return nr_cpus;
++
++	if (nr_cpus < 0 && strcmp(uname, "cpus") == 0)
++		nr_cpus = 0;
++
++	if (nr_cpus >= 0) {
++		const char *device_type = of_get_flat_dt_prop(node,
++				"device_type", NULL);
++
++		if (device_type && strcmp(device_type, "cpu") == 0)
++			nr_cpus++;
++	}
++
++	prev_depth = depth;
++
++	return 0;
++}
++
++static void __init vexpress_dt_smp_init_cpus(void)
++{
++	int res = of_scan_flat_dt(vexpress_dt_find_scu, NULL);
++
++	if (WARN_ON(res < 0))
++		return;
++
++	if (vexpress_dt_scu == UNKNOWN_SCU) {
++		int ncores = of_scan_flat_dt(vexpress_dt_nr_cpus, NULL);
++		if (ncores < 2)
++			return;
++
++		vexpress_dt_scu = GENERIC_SCU;
++
++		vexpress_dt_init_cpu_map(ncores);
++		set_smp_cross_call(gic_raise_softirq);
++	}
++}
++
++static void __init vexpress_dt_smp_prepare_cpus(unsigned int max_cpus)
++{
++	int i;
++
++	switch (vexpress_dt_scu) {
++	case GENERIC_SCU:
++		for (i = 0; i < max_cpus; i++)
++			set_cpu_present(i, true);
++		break;
++	case CORTEX_A9_SCU:
++		scu_enable(V2T_PERIPH);
++		break;
++	default:
++		WARN_ON(1);
++		break;
++	}
++}
++
++#else
++
++static void __init vexpress_dt_smp_init_cpus(void)
++{
++	WARN_ON(1);
++}
++
++void __init vexpress_dt_smp_prepare_cpus(unsigned int max_cpus)
++{
++	WARN_ON(1);
++}
++
++#endif
++
+ /*
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
+  */
+ void __init smp_init_cpus(void)
  {
--	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
-+	const char *map = NULL;
-+
-+	of_scan_flat_dt(v2m_dt_scan_memory_map, &map);
-+
-+	if (map && strcmp(map, "rs1") == 0)
-+		iotable_init(v2m_rs1_io_desc, ARRAY_SIZE(v2m_rs1_io_desc));
+-	ct_desc->init_cpu_map();
++	if (ct_desc)
++		ct_desc->init_cpu_map();
 +	else
-+		iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
++		vexpress_dt_smp_init_cpus();
++
  }
  
- static struct clk_lookup v2m_dt_lookups[] = {
-@@ -529,6 +558,35 @@ static struct clk_lookup v2m_dt_lookups[] = {
- 		.dev_id		= "1001f000.clcd",
- 		.clk		= &osc1_clk,
- 	},
-+	/* RS1 memory map */
-+	{	/* PL180 MMCI */
-+		.dev_id		= "mb:mmci", /* 1c050000.mmci */
-+		.clk		= &osc2_clk,
-+	}, {	/* PL050 KMI0 */
-+		.dev_id		= "1c060000.kmi",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL050 KMI1 */
-+		.dev_id		= "1c070000.kmi",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL011 UART0 */
-+		.dev_id		= "1c090000.uart",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL011 UART1 */
-+		.dev_id		= "1c0a0000.uart",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL011 UART2 */
-+		.dev_id		= "1c0b0000.uart",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL011 UART3 */
-+		.dev_id		= "1c0c0000.uart",
-+		.clk		= &osc2_clk,
-+	}, {	/* SP805 WDT */
-+		.dev_id		= "1c0f0000.wdt",
-+		.clk		= &v2m_ref_clk,
-+	}, {	/* PL111 CLCD */
-+		.dev_id		= "1c1f0000.clcd",
-+		.clk		= &osc1_clk,
-+	},
- };
+ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+@@ -34,7 +175,10 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	 * Initialise the present map, which describes the set of CPUs
+ 	 * actually populated at the present time.
+ 	 */
+-	ct_desc->smp_enable(max_cpus);
++	if (ct_desc)
++		ct_desc->smp_enable(max_cpus);
++	else
++		vexpress_dt_smp_prepare_cpus(max_cpus);
  
- void __init v2m_dt_init_early(void)
-@@ -597,6 +655,10 @@ static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
- 			&v2m_flash_data),
- 	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
-+	/* RS1 memory map */
-+	OF_DEV_AUXDATA("arm,vexpress-flash", 0x08000000, "physmap-flash",
-+			&v2m_flash_data),
-+	OF_DEV_AUXDATA("arm,primecell", 0x1c050000, "mb:mmci", &v2m_mmci_data),
- 	{}
- };
- 
+ 	/*
+ 	 * Write the address of secondary startup into the
 -- 
 1.7.5.4
