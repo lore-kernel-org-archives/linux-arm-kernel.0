@@ -1,128 +1,55 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 15 Dec 2011 16:05:41 +0100
-Subject: [PATCH v2 02/10] i2c: OMAP: Add DT support for i2c controller
-In-Reply-To: <4EE8D5A1.2080100@gmail.com>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-3-git-send-email-b-cousson@ti.com>
- <4EE8D5A1.2080100@gmail.com>
-Message-ID: <4EEA0CC5.4090602@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Dec 2011 16:10:46 +0100
+Subject: [GIT PULL] at91: drivers for 3.3
+Message-ID: <4EEA0DF6.3050408@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Arnd, Olof,
 
-On 12/14/2011 5:58 PM, Rob Herring wrote:
-> Benoit,
->
-> On 12/09/2011 08:02 AM, Benoit Cousson wrote:
->> Add initial DT support to retrieve the frequency using a
->> DT attribute instead of the pdata pointer if of_node exist.
->>
->> Add documentation for omap i2c controller binding.
->>
->> Based on original patches from Manju and Grant.
->>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Ben Dooks<ben-linux@fluff.org>
->> ---
->>   Documentation/devicetree/bindings/i2c/omap-i2c.txt |   42 ++++++++
->>   drivers/i2c/busses/i2c-omap.c                      |  100 +++++++++++++-------
->>   2 files changed, 107 insertions(+), 35 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/omap-i2c.txt b/Documentation/devicetree/bindings/i2c/omap-i2c.txt
->> new file mode 100644
->> index 0000000..d259a17
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/i2c/omap-i2c.txt
->> @@ -0,0 +1,42 @@
->> +I2C for OMAP platforms
->> +
->> +Required properties :
->> +- compatible : Must be "ti,omap3-i2c" or "ti,omap4-i2c"
->> +- ti,hwmods : Must be "i2c<n>", n being the instance number (1-based)
->> +- #address-cells =<1>;
->> +- #size-cells =<0>;
->> +
->> +Recommended properties :
->> +- clock-frequency : Desired I2C bus clock frequency in Hz. Otherwise
->> +  the default 100 kHz frequency will be used.
->> +
->> +Optional properties:
->> +- Child nodes conforming to i2c bus binding
->> +- ti,flags : u32: settings or errata relative to the i2c
->> +    0x1:   OMAP_I2C_FLAG_NO_FIFO
->> +    0x2:   OMAP_I2C_FLAG_SIMPLE_CLOCK
->> +    0x4:   OMAP_I2C_FLAG_16BIT_DATA_REG
->> +    0x8:   OMAP_I2C_FLAG_RESET_REGS_POSTIDLE
->> +    0x10:  OMAP_I2C_FLAG_APPLY_ERRATA_I207
->> +    0x20:  OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK
->> +    0x40:  OMAP_I2C_FLAG_FORCE_19200_INT_CLK
->> +  Valid for ti,omap3-i2c only:
->> +    0x80:  OMAP_I2C_FLAG_BUS_SHIFT_1: 8 bits registers
->> +    0x100: OMAP_I2C_FLAG_BUS_SHIFT_2: 16 bits registers
->
-> It's generally preferred to split these out to separate properties since
-> there is not yet define capability in dts.
+This is a first "drivers" part of our material for 3.3 merge window. It collects
+Ethernet drivers changes.
+One thing to note is that the macb.c driver is modified to support
+device tree. We agreed with David to drag those modifications into
+arm-soc git tree because they go on top of Jamie's work on macb-gem driver
+already in your drivers/macb-gem branch.
 
-Yeah, I was hoping that Stephen's DTC patches were accepted to avoid that.
+This pull request goes on top of Linus' 3.2-rc5 commit but with additional 
+dependencies with two of your branches:
+1/ fixes (which seems already included in 3.2-rc5)
+2/ drivers/macb-gem
 
-> Can some of these be removed
-> by having more specific compatible strings? That is the whole point in
-> having compatible strings not be generic. omap4-i2c and omap3-i2c is
-> still kind of generic.
+I had to resolve a conflict while merging the macb-gem branche with current 3.2-rc5. The 
+resolution is commited into this branch.
+Tell me if you need more precision.
 
-Do you mean creating some attributes like that:
 
-+    ti,16bits_shift;
-+    ti,reset_postidle;
-+    ti,errata_i207;
+The following changes since commit 6d69370e2b4a1e04e9ba0095d60aec7736fa1a99:
 
-Or using some omap3-i2c or omap4-i2c to determine the proper version and 
-thus populate the right flags during probe.
+  Merge remote-tracking branch 'armsoc/drivers/macb-gem' into for-3.3on32rc5-drivers (2011-12-15 15:55:59 +0100)
 
-[...]
+are available in the git repository at:
 
->> @@ -965,6 +956,31 @@ static const struct i2c_algorithm omap_i2c_algo = {
->>   	.functionality	= omap_i2c_func,
->>   };
->>
->> +#ifdef CONFIG_OF
->> +static struct omap_i2c_bus_platform_data omap3_pdata = {
->> +	.rev = OMAP_I2C_IP_VERSION_1,
->> +};
->> +
->> +static struct omap_i2c_bus_platform_data omap4_pdata = {
->> +	.rev = OMAP_I2C_IP_VERSION_2,
->> +};
->
-> This is redundant. The ip version can be determined from the compatible
-> string.
+  git://github.com/at91linux/linux-at91.git for-arnd-3.3-drivers
 
-I'm confused...
-I'm using the compatible string below to chose the proper value.
-This flag is then used later at runtime.
-I'm using a pseudo pdata because that driver is still used in old 
-platform that does and will never not have DT support.
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      net/macb: add DT support for Cadence macb/gem driver
 
->> +static const struct of_device_id omap_i2c_of_match[] = {
->> +	{
->> +		.compatible = "ti,omap4-i2c",
->> +		.data =&omap4_pdata,
->> +	},
->> +	{
->> +		.compatible = "ti,omap3-i2c",
->> +		.data =&omap3_pdata,
->> +	},
->> +	{ },
->> +};
->> +MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
->> +#else
->> +#define omap_i2c_of_match NULL
->
-> Use of_match_ptr instead of the #else.
+Nicolas Ferre (2):
+      ARM: at91/net: add macb ethernet controller in 9g45/9g20 DT
+      net/at91_ether: use gpio_is_valid for phy IRQ line
 
-OK, good point.
+ Documentation/devicetree/bindings/net/macb.txt |   25 ++++++++
+ arch/arm/boot/dts/at91sam9g20.dtsi             |    7 ++
+ arch/arm/boot/dts/at91sam9g45.dtsi             |    7 ++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts         |    5 ++
+ arch/arm/boot/dts/usb_a9g20.dts                |    5 ++
+ drivers/net/ethernet/cadence/at91_ether.c      |   23 ++++---
+ drivers/net/ethernet/cadence/macb.c            |   73 +++++++++++++++++++++---
+ drivers/net/ethernet/cadence/macb.h            |    2 +
+ 8 files changed, 129 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/macb.txt
 
-Thanks,
-Benoit
+Thanks, bye,
+-- 
+Nicolas Ferre
