@@ -1,40 +1,25 @@
-From: holger.brunck@keymile.com (Holger Brunck)
-Date: Thu, 15 Dec 2011 15:40:08 +0100
-Subject: label string for kirkwood gpiochip
-In-Reply-To: <alpine.LFD.2.02.1112150920430.2907@xanadu.home>
-References: <4EE9FC0D.10009@keymile.com>
- <alpine.LFD.2.02.1112150920430.2907@xanadu.home>
-Message-ID: <4EEA06C8.5010302@keymile.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 15 Dec 2011 14:47:57 +0000
+Subject: [PATCH] ARM: add device tree blobs to .gitignore
+In-Reply-To: <1323808612-14976-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1323808612-14976-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20111215144757.GA2081@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2011 03:22 PM, Nicolas Pitre wrote:
->>
->> The newer kernel version handles the gpiochip on kirkwood in a different way.
->> The orion_gpio_init function in arch/arm/mach-kirkwood/irq.c was called twice.
->> Once for first 32 gpios and a second time for the remaining 18 gpios. This
->> causes that the gpio framework shows two gpiochips in the sysfs with the same
->> label (orion_gpio).
->>
->> [@km_kirkwood /]# cat /sys/class/gpio/gpiochip0/label
->> orion_gpio
->> [@km_kirkwood /]# cat /sys/class/gpio/gpiochip32/label
->> orion_gpio
->>
->> So my question is simply, shouldn't be the string for a gpiochip unique in the
->> system and therefore this should be fixed or was this intended?
+On Tue, Dec 13, 2011 at 09:36:52PM +0100, Uwe Kleine-K??nig wrote:
+> *.dtb files are a build result and so should be ignored.
 > 
-> I don't think that was intended.
-> 
+> Signed-off-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
 
-Ok, how should this be done? We could add an additional  param chip_label to
+Should this actually be global?
 
-void __init orion_gpio_init(int gpio_base, int ngpio,
-                            u32 base, int mask_offset, int secondary_irq_base);
+It looks like at least powerpc, microblaze and openrisc may generate
+.dtbs and I don't see any local .gitignore entries for those.
 
-and fix the callers accordingly or we could add a simple static counter in
-orion_gpio_init and add a suffix _0, _1, _2 to the label to make it unique
-without touching the clients...
+Since the dtc tool itself is global (i.e., in an arch-independent
+scripts dir instead of somewhere arch-specific), it could be argued that
+other related stuff should be global too.
 
-Best regards
-Holger
+Cheers
+---Dave
