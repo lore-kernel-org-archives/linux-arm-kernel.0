@@ -1,103 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 15 Dec 2011 10:22:20 +0900
-Subject: [PATCH] DMA: PL330: Support MEMTOMEM transmit w/o RMB, WMB
-Message-ID: <028f01ccbac7$fdb83d70$f928b850$%kim@samsung.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Thu, 15 Dec 2011 02:28:34 +0100
+Subject: [PATCH] ARM: fix $(CROSS_COMPILE) prefix missing from size
+ invocation
+In-Reply-To: <20111214215815.GP32251@atomide.com>
+References: <1322186338-6020-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <201112140021.42598.jkrzyszt@tis.icnet.pl>
+ <20111214215815.GP32251@atomide.com>
+Message-ID: <201112150228.34815.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boojin Kim <boojin.kim@samsung.com>
+On Wednesday 14 of December 2011 at 22:58:15, Tony Lindgren wrote:
+> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111213 14:55]:
+> > On Friday 25 of November 2011 at 02:58:58, Janusz Krzysztofik wrote:
+> > > Otherwise, cross compilation may fail with error messages like:
+> > > 
+> > > ...
+> > > size: arch/arm/boot/compressed/../../../../vmlinux: File format is ambiguous
+> > > size: Matching formats: elf32-littlearm elf32-littlearm-symbian elf32-littlearm-vxworks
+> > >   LD      arch/arm/boot/compressed/vmlinux
+> > >   arm-angstrom-linux-uclibcgnueabi-ld:--defsym _kernel_bss_size=: syntax error
+> > > 
+> > > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> > 
+> > Trying to guess why this patch is still sitting in the Incoming queue in 
+> > the Russell's patch system (7184/1) while others have found their way to 
+> > the Applied queue meanwhile, I wonder if this is because I didn't 
+> > mention explicitly that it is a fix to a regression introduced into 
+> > 3.2-rc with the following commit:
+> 
+> It's because not all cross compiler in use have $(CROSS_COMPILE)size
+> available, so it would have to be symlinked to host size to keep things
+> compiling. So it's probably best to rather take the warning and keep
+> things compiling rather than fix the warning and break compile for
+> many people.
 
-The DMAC PL330 r1p0 version fixed the lockup error being on r0p0.
-This patch supports the DMA transmission without memory barrier
-operation when the revision of DMAC PL330 is the next of r0p0.
+First of all, thanks for someone finally commenting the patch. It's really hard for me to guess if a patch is OK or not if I hear nothing. Once I hear from someone what is wrong with my patch, I'm always willing to enhance it. But I feel more and more like an intruder on the linux-arm-kernel list.
 
-Cc: Jassi Brar <jassisinghbrar@gmail.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
-NOTE:
-- I'm not sure the position of pl330.h header is proper...
+Back to the merit: I would take that warning, as you suggest, if things were compiling for me, but it's not the case. Compilation fails, as I tried to state in the commit message. The patch was not about fixing the warning, but fixing the compilation broken. Since things worked for me before, I find it a regression. Sorry if I was not clear enough in the commit message.
 
- arch/arm/include/asm/hardware/pl330.h |    5 +++++
- drivers/dma/pl330.c                   |   26 +++++++++++++++++++++-----
- 2 files changed, 26 insertions(+), 5 deletions(-)
+I'll prepare v2 which will call $(CROSS_COMPILE)size if size fails, OK?
 
-diff --git a/arch/arm/include/asm/hardware/pl330.h b/arch/arm/include/asm/hardware/pl330.h
-index ed38e32..1f4d7cb 100644
---- a/arch/arm/include/asm/hardware/pl330.h
-+++ b/arch/arm/include/asm/hardware/pl330.h
-@@ -144,6 +144,11 @@ enum pl330_reqtype {
- #define CRD		0xe14
- 
- #define PERIPH_ID	0xfe0
-+#define PERIPH_REV_SHIFT	20
-+#define PERIPH_REV_MASK		0xf
-+#define PERIPH_REV_R0P0		0
-+#define PERIPH_REV_R1P0		1
-+#define PERIPH_REV_R1P1		2
- #define PCELL_ID	0xff0
- 
- #define CR0_PERIPH_REQ_SET	(1 << 0)
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 3214ced..d87d884 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -129,6 +129,7 @@ struct pl330_reqcfg {
- 	enum pl330_dstcachectrl dcctl;
- 	enum pl330_srccachectrl scctl;
- 	enum pl330_byteswap swap;
-+	struct pl330_config *pcfg;
- };
- 
- /*
-@@ -438,6 +439,11 @@ static inline u32 get_id(struct pl330_info *pi, u32 off)
- 	return id;
- }
- 
-+static inline u32 get_revision(u32 periph_id)
-+{
-+	return (periph_id >> PERIPH_REV_SHIFT) & PERIPH_REV_MASK;
-+}
-+
- static inline u32 _emit_ADDH(unsigned dry_run, u8 buf[],
- 		enum pl330_dst da, u16 val)
- {
-@@ -1026,12 +1032,21 @@ static inline int _ldst_memtomem(unsigned dry_run, u8 buf[],
- 		const struct _xfer_spec *pxs, int cyc)
- {
- 	int off = 0;
-+	struct pl330_config *pcfg = pxs->r->cfg->pcfg;
- 
--	while (cyc--) {
--		off += _emit_LD(dry_run, &buf[off], ALWAYS);
--		off += _emit_RMB(dry_run, &buf[off]);
--		off += _emit_ST(dry_run, &buf[off], ALWAYS);
--		off += _emit_WMB(dry_run, &buf[off]);
-+	/* check lock-up free version */
-+	if (get_revision(pcfg->periph_id) >= PERIPH_REV_R1P0) {
-+		while (cyc--) {
-+			off += _emit_LD(dry_run, &buf[off], ALWAYS);
-+			off += _emit_ST(dry_run, &buf[off], ALWAYS);
-+		}
-+	} else {
-+		while (cyc--) {
-+			off += _emit_LD(dry_run, &buf[off], ALWAYS);
-+			off += _emit_RMB(dry_run, &buf[off]);
-+			off += _emit_ST(dry_run, &buf[off], ALWAYS);
-+			off += _emit_WMB(dry_run, &buf[off]);
-+		}
- 	}
- 
- 	return off;
-@@ -2398,6 +2413,7 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
- 	async_tx_ack(&desc->txd);
- 
- 	desc->req.peri = peri_id ? pch->chan.chan_id : 0;
-+	desc->rqcfg.pcfg = &pch->dmac->pif.pcfg;
- 
- 	dma_async_tx_descriptor_init(&desc->txd, &pch->chan);
- 
--- 
-1.7.1
+Thanks,
+Janusz
