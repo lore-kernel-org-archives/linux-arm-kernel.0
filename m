@@ -1,23 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 15 Dec 2011 22:46:33 +0800
-Subject: [PATCH 3/9] irq: convert generic-chip to use irq_domain
-In-Reply-To: <4EE9FC99.6030905@gmail.com>
-References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
- <1323876538-20406-4-git-send-email-robherring2@gmail.com>
- <20111215052512.GB21815@S2101-09.ap.freescale.net>
- <20111215055501.GC21815@S2101-09.ap.freescale.net>
- <4EE9F899.7010402@gmail.com> <4EE9FC99.6030905@gmail.com>
-Message-ID: <20111215144632.GD2963@S2100-06.ap.freescale.net>
+From: holger.brunck@keymile.com (Holger Brunck)
+Date: Thu, 15 Dec 2011 15:40:08 +0100
+Subject: label string for kirkwood gpiochip
+In-Reply-To: <alpine.LFD.2.02.1112150920430.2907@xanadu.home>
+References: <4EE9FC0D.10009@keymile.com>
+ <alpine.LFD.2.02.1112150920430.2907@xanadu.home>
+Message-ID: <4EEA06C8.5010302@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 07:56:41AM -0600, Rob Herring wrote:
-[...]
-> I think I found a fix. Can you try 's/d->hwirq/(d->hwirq % 32)/' in
-> generic-chip.c.
+On 12/15/2011 03:22 PM, Nicolas Pitre wrote:
+>>
+>> The newer kernel version handles the gpiochip on kirkwood in a different way.
+>> The orion_gpio_init function in arch/arm/mach-kirkwood/irq.c was called twice.
+>> Once for first 32 gpios and a second time for the remaining 18 gpios. This
+>> causes that the gpio framework shows two gpiochips in the sysfs with the same
+>> label (orion_gpio).
+>>
+>> [@km_kirkwood /]# cat /sys/class/gpio/gpiochip0/label
+>> orion_gpio
+>> [@km_kirkwood /]# cat /sys/class/gpio/gpiochip32/label
+>> orion_gpio
+>>
+>> So my question is simply, shouldn't be the string for a gpiochip unique in the
+>> system and therefore this should be fixed or was this intended?
 > 
-Tried, it works.
+> I don't think that was intended.
+> 
 
--- 
-Regards,
-Shawn
+Ok, how should this be done? We could add an additional  param chip_label to
+
+void __init orion_gpio_init(int gpio_base, int ngpio,
+                            u32 base, int mask_offset, int secondary_irq_base);
+
+and fix the callers accordingly or we could add a simple static counter in
+orion_gpio_init and add a suffix _0, _1, _2 to the label to make it unique
+without touching the clients...
+
+Best regards
+Holger
