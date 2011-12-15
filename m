@@ -1,28 +1,63 @@
-From: holger.brunck@keymile.com (Holger Brunck)
-Date: Thu, 15 Dec 2011 14:54:21 +0100
-Subject: label string for kirkwood gpiochip
-Message-ID: <4EE9FC0D.10009@keymile.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 15 Dec 2011 22:08:28 +0800
+Subject: [PATCH 3/9] irq: convert generic-chip to use irq_domain
+In-Reply-To: <4EE9F899.7010402@gmail.com>
+References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
+ <1323876538-20406-4-git-send-email-robherring2@gmail.com>
+ <20111215052512.GB21815@S2101-09.ap.freescale.net>
+ <20111215055501.GC21815@S2101-09.ap.freescale.net>
+ <4EE9F899.7010402@gmail.com>
+Message-ID: <20111215140827.GB2963@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-we recently switched with our kirkwood based board to a newer kernel version.
-Our application code is written in that way if someone request an gpio in
-userspace that he do search the gpiochip via the gpio label.
+On Thu, Dec 15, 2011 at 07:39:37AM -0600, Rob Herring wrote:
+> On 12/14/2011 11:55 PM, Shawn Guo wrote:
+> > On Thu, Dec 15, 2011 at 01:25:20PM +0800, Shawn Guo wrote:
+> >> On Wed, Dec 14, 2011 at 09:28:52AM -0600, Rob Herring wrote:
+> >>> From: Rob Herring <rob.herring@calxeda.com>
+> >>>
+> >>> Add irq domain support to irq generic-chip. This enables users of
+> >>> generic-chip to support dynamic irq assignment needed for DT interrupt
+> >>> binding. Users must be converted to use irq_data.hwirq for determining
+> >>> local interrupt numbers rather than using the Linux irq number.
+> >>>
+> >>> irq_base is kept for now as there are a few users of it. Once they
+> >>> are converted to use the irq domain, it can be removed.
+> >>>
+> >>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >>> Cc: Thomas Gleixner <tglx@linutronix.de>
+> >>> ---
+> >>
+> >> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> >>
+> > Sorry, I have to take that tag back after I correct my test setup.
+> > It does not work for imx5 TZIC case, because the following change
+> > I suggested before is missed.
+> > 
+> > diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> > index eb763f7..2a2aac1 100644
+> > --- a/kernel/irq/irqdomain.c
+> > +++ b/kernel/irq/irqdomain.c
+> > @@ -39,7 +39,7 @@ void irq_domain_add(struct irq_domain *domain)
+> >                         return;
+> >                 }
+> >                 d->domain = domain;
+> > -               d->hwirq = hwirq;
+> > +               d->hwirq = hwirq - domain->hwirq_base;
+> 
+> This is a problem. It entirely defeats the point of hwirq_base and it
+> would break the GIC. We need to fix this in the generic irq chip.
+> 
+Actually I do not quite understand why we need to make the following
+change all over generic-chip.c.
 
-The newer kernel version handles the gpiochip on kirkwood in a different way.
-The orion_gpio_init function in arch/arm/mach-kirkwood/irq.c was called twice.
-Once for first 32 gpios and a second time for the remaining 18 gpios. This
-causes that the gpio framework shows two gpiochips in the sysfs with the same
-label (orion_gpio).
+-       u32 mask = 1 << (d->irq - gc->irq_base);
++       u32 mask = 1 << d->hwirq;
 
-[@km_kirkwood /]# cat /sys/class/gpio/gpiochip0/label
-orion_gpio
-[@km_kirkwood /]# cat /sys/class/gpio/gpiochip32/label
-orion_gpio
+Though d->irq is the Linux irq number, "d->irq - gc->irq_base" is
+really just what we need here.
 
-So my question is simply, shouldn't be the string for a gpiochip unique in the
-system and therefore this should be fixed or was this intended?
-
-Best regards
-Holger Brunck
+-- 
+Regards,
+Shawn
