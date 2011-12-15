@@ -1,67 +1,147 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 15 Dec 2011 09:16:34 +0100
-Subject: [PATCH] serial/imx: let probing fail for the dt case without a valid
- alias
-In-Reply-To: <20111215021046.GD3259@S2101-09.ap.freescale.net>
-References: <20111215021046.GD3259@S2101-09.ap.freescale.net>
-Message-ID: <1323936994-2250-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Thu, 15 Dec 2011 08:16:57 +0000
+Subject: [RFC PATCH v2 2/4] pinctrl: imx: add pinmux imx driver
+In-Reply-To: <20111215081825.GB22541@S2101-09.ap.freescale.net>
+References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+ <1323878622-26602-3-git-send-email-b29396@freescale.com>
+ <20111215081825.GB22541@S2101-09.ap.freescale.net>
+Message-ID: <7FE21149F4667147B645348EC60578850563AA@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the uart device is instantiated by dt but dt doesn't provide an
-alias then better let probing fail instead of falling back to an
-unrelated device id used for the line number and no platform data.
+> -----Original Message-----
+> From: Guo Shawn-R65073
+> Sent: Thursday, December 15, 2011 4:18 PM
+> To: Dong Aisheng-B29396
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linus.walleij at stericsson.com; s.hauer at pengutronix.de;
+> kernel at pengutronix.de; grant.likely at secretlab.ca; rob.herring at calxeda.com
+> Subject: Re: [RFC PATCH v2 2/4] pinctrl: imx: add pinmux imx driver
+> Importance: High
+> 
+> On Thu, Dec 15, 2011 at 12:03:40AM +0800, Dong Aisheng wrote:
+> > The driver contains the initial support for imx53 and imx6q.
+> >
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Shawn Guo <shanw.guo@freescale.com>
+> > ---
+> >  drivers/pinctrl/Kconfig           |   20 ++
+> >  drivers/pinctrl/Makefile          |    3 +
+> >  drivers/pinctrl/pinmux-imx-core.c |  435
+> ++++++++++++++++++++++++++++++++++++
+> >  drivers/pinctrl/pinmux-imx-core.h |   86 +++++++
+> >  drivers/pinctrl/pinmux-imx53.c    |  443
+> +++++++++++++++++++++++++++++++++++++
+> >  drivers/pinctrl/pinmux-imx6q.c    |  433
+> ++++++++++++++++++++++++++++++++++++
+> >  6 files changed, 1420 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig index
+> > e17e2f8..268c212 100644
+> > --- a/drivers/pinctrl/Kconfig
+> > +++ b/drivers/pinctrl/Kconfig
+> > @@ -20,6 +20,26 @@ config DEBUG_PINCTRL
+> >  	help
+> >  	  Say Y here to add some extra checks and diagnostics to PINCTRL
+> calls.
+> >
+> > +config PINMUX_IMX
+> > +	bool "Freescale IMX core pinmux driver"
+> > +	depends on ARCH_MXC
+> > +
+> > +config PINMUX_IMX53
+> > +	bool "IMX53 pinmux driver"
+> > +	depends on ARCH_MX5
+> > +	select PINMUX
+> > +	select PINMUX_IMX
+> > +	help
+> > +	  Say Y here to enable the imx6q pinmux driver
+> 
+> s/imx6q/imx53
+> 
+Acked.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/tty/serial/imx.c |   13 ++++++++++---
- 1 files changed, 10 insertions(+), 3 deletions(-)
+> > +
+> > +config PINMUX_IMX6Q
+> > +	bool "IMX6Q pinmux driver"
+> > +	depends on SOC_IMX6Q
+> > +	select PINMUX
+> > +	select PINMUX_IMX
+> > +	help
+> > +	  Say Y here to enable the imx6q pinmux driver
+> > +
+> 
+> [...]
+> 
+> > +#ifdef CONFIG_OF
+> > +static int __devinit imx_pmx_parse_functions(struct device_node *np,
+> > +			struct imx_pinctrl_info *info, u32 num) {
+> > +	struct imx_pmx_func *function;
+> > +	struct imx_pin_group *group;
+> > +	int ret, len;
+> > +
+> > +	dev_dbg(info->dev, "parse function %d\n", num);
+> > +
+> > +	group = &info->groups[num];
+> > +	function = &info->functions[num];
+> > +
+> > +	/* Initialise group */
+> > +	ret = of_property_read_string(np, "grp_name", &group->name);
+> > +	if (ret) {
+> > +		dev_err(info->dev, "failed to get grp_name\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = of_property_read_u32(np, "num_pins", &group->num_pins);
+> > +	if (ret) {
+> > +		dev_err(info->dev, "failed to get num_pins\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = of_property_read_u32(np, "num_mux", &group->num_mux);
+> > +	if (ret) {
+> > +		dev_err(info->dev, "failed to get num_mux\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	if (group->num_pins != group->num_mux)
+> > +		return -EINVAL;
+> > +
+> > +	group->pins = devm_kzalloc(info->dev, group->num_pins *
+> sizeof(unsigned int),
+> > +				GFP_KERNEL);
+> > +	group->mux_mode = devm_kzalloc(info->dev, group->num_mux *
+> sizeof(unsigned int),
+> > +				GFP_KERNEL);
+> > +	if (!group->pins || !group->mux_mode)
+> > +		return -ENOMEM;
+> > +
+> > +	/* sanity check */
+> > +	if (of_get_property(np, "grp_pins", &len) &&
+> > +		len != group->num_pins * sizeof(unsigned int)) {
+> 
+> Since we can figure out the 'num_pins' here, why do we bother to encode
+> it in dts?
+> 
+Since the pin group is easily to define wrongly by mistake when pins are many,
+I would add num_pins in dts to double check in driver to improve the code
+Stability.
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 75c159a..1c94218 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1287,6 +1287,10 @@ static int serial_imx_resume(struct platform_device *dev)
- }
- 
- #ifdef CONFIG_OF
-+/*
-+ * This function returns 1 iff pdev isn't a device instatiated by dt, 0 iff it
-+ * could successfully get all information from dt or a negative errno.
-+ */
- static int serial_imx_probe_dt(struct imx_port *sport,
- 		struct platform_device *pdev)
- {
-@@ -1296,7 +1300,8 @@ static int serial_imx_probe_dt(struct imx_port *sport,
- 	int ret;
- 
- 	if (!np)
--		return -ENODEV;
-+		/* no device tree device */
-+		return 1;
- 
- 	ret = of_alias_get_id(np, "serial");
- 	if (ret < 0) {
-@@ -1319,7 +1324,7 @@ static int serial_imx_probe_dt(struct imx_port *sport,
- static inline int serial_imx_probe_dt(struct imx_port *sport,
- 		struct platform_device *pdev)
- {
--	return -ENODEV;
-+	return 1;
- }
- #endif
- 
-@@ -1354,8 +1359,10 @@ static int serial_imx_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	ret = serial_imx_probe_dt(sport, pdev);
--	if (ret == -ENODEV)
-+	if (ret > 0)
- 		serial_imx_probe_pdata(sport, pdev);
-+	else if (ret < 0)
-+		goto free;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
--- 
-1.7.7.3
+> > +		dev_err(info->dev, "wrong pins number?\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	if (of_get_property(np, "grp_mux", &len) &&
+> > +		len != group->num_mux * sizeof(unsigned int)) {
+> 
+> ditto
+> 
+> > +		dev_err(info->dev, "wrong pin mux number?\n");
+> > +		return -EINVAL;
+> > +	}
+> 
+> --
+> Regards,
+> Shawn
