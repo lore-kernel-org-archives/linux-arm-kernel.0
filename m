@@ -1,53 +1,115 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 15 Dec 2011 21:47:56 +0100
-Subject: [PATCH] ARM: unwinder: fix bisection to find origin in .idx section
-In-Reply-To: <20111215145109.GA4143@elliptictech.com>
-References: <20111215145109.GA4143@elliptictech.com>
-Message-ID: <1323982076-20068-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 15 Dec 2011 14:52:02 -0600
+Subject: [PATCH 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
+ controller
+In-Reply-To: <4EEA333E.9030502@ti.com>
+References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
+ <1323291049-24964-3-git-send-email-b-cousson@ti.com>
+ <4EDFD88B.8060008@gmail.com> <4EE0D0E6.3060202@ti.com>
+ <4EE20B38.8050006@gmail.com> <4EE2209E.2040209@ti.com>
+ <4EE227A4.2030209@gmail.com> <4EE2320D.2030309@ti.com>
+ <4EE2335C.7050902@gmail.com> <4EEA333E.9030502@ti.com>
+Message-ID: <4EEA5DF2.6000903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bisection implemented in unwind_find_origin() stopped to early. If
-there is only a single entry left to check the original code just took
-the end point as origin which might be wrong.
+On 12/15/2011 11:49 AM, Cousson, Benoit wrote:
+> On 12/9/2011 5:12 PM, Rob Herring wrote:
+>> On 12/09/2011 10:06 AM, Cousson, Benoit wrote:
+> 
+> [...]
+> 
+>>> My point is that even in the DT case I do have some devices that are
+>>> initialized without DT for the moment and thus cannot get access to the
+>>> interrupt-controller node and then cannot retrieve the domain information.
+>>>
+>>> How can I ensure the proper hwirq ->  irq translation then for such devices?
+>>> Only the one created by DT will have the correct irq number.
+>>
+>> Okay, I missed that aspect of it. So I guess 0 base is fine for now.
+>>
+>> Rob
+> 
+> Following that discussion, I made a patch (included below) last week to add domain support just before this one for DT migration.
+> I'm now wondering if it makes sense to do it like that considering your recent patch: irq: convert generic-chip to use irq_domain.
+> 
+> What do you think?
 
-This was introduced in
+Using my patch should definitely simplify yours. You'll definitely need
+the fix I discussed with Shawn. Also, I do have to sort out that it
+breaks on x86 with Grant's suggested change, but that's not too complicated.
 
-	de66a97 (ARM: 7187/1: fix unwinding for XIP kernels)
+Rob
 
-Reported-by: Nick Bowler <nbowler@elliptictech.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello Linus,
-
-I suggested earlier to revert de66a97. I still think this is the safest
-bet for 3.2. Anyhow here comes the fix that made Nick happy. If you
-revert I'll fold it into my resubmission.
-
-Best regards
-Uwe
-
- arch/arm/kernel/unwind.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 3f03fe0..00df012 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -160,12 +160,12 @@ static const struct unwind_idx *unwind_find_origin(
- 		const struct unwind_idx *start, const struct unwind_idx *stop)
- {
- 	pr_debug("%s(%p, %p)\n", __func__, start, stop);
--	while (start < stop - 1) {
-+	while (start < stop) {
- 		const struct unwind_idx *mid = start + ((stop - start) >> 1);
- 
- 		if (mid->addr_offset >= 0x40000000)
- 			/* negative offset */
--			start = mid;
-+			start = mid + 1;
- 		else
- 			/* positive offset */
- 			stop = mid;
--- 
-1.7.7.2
+> 
+> Thanks,
+> Benoit
+> 
+> ---
+> From 3083589f48604aab3d801179810c2af8339525ae Mon Sep 17 00:00:00 2001
+> From: Benoit Cousson <b-cousson@ti.com>
+> Date: Thu, 8 Dec 2011 22:16:51 +0100
+> Subject: [PATCH] ARM: OMAP2/3: intc: Add irqdomain support
+> 
+> Introduce the usage of the irqdomain to prepare the DT support.
+> The irq_base is still hard coded to 0 to allow non-DT drivers
+> to work with the previous assumption that was hwirq = irq.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/mach-omap2/irq.c |   18 +++++++++++++++++-
+>  1 files changed, 17 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+> index 42b1d65..2f65dfd 100644
+> --- a/arch/arm/mach-omap2/irq.c
+> +++ b/arch/arm/mach-omap2/irq.c
+> @@ -17,6 +17,7 @@
+>  #include <mach/hardware.h>
+>  #include <asm/exception.h>
+>  #include <asm/mach/irq.h>
+> +#include <linux/irqdomain.h>
+>  
+>  
+>  /* selected INTC register offsets */
+> @@ -57,6 +58,8 @@ static struct omap_irq_bank {
+>  	},
+>  };
+>  
+> +static struct irq_domain domain;
+> +
+>  /* Structure to save interrupt controller context */
+>  struct omap3_intc_regs {
+>  	u32 sysconfig;
+> @@ -158,6 +161,17 @@ static void __init omap_init_irq(u32 base, int nr_irqs)
+>  	if (WARN_ON(!omap_irq_base))
+>  		return;
+>  
+> +	/*
+> +	 * XXX: Use a 0 irq_base for the moment since the legacy devices
+> +	 * created statically are expected a hwirq = irq mapping.
+> +	 * A proper offset will be added later, when IRQ resource creation
+> +	 * will be handled by DT.
+> +	 */
+> +	domain.irq_base = 0;
+> +	domain.nr_irq = nr_irqs;
+> +	domain.ops = &irq_domain_simple_ops;
+> +	irq_domain_add(&domain);
+> +
+>  	for (i = 0; i < ARRAY_SIZE(irq_banks); i++) {
+>  		struct omap_irq_bank *bank = irq_banks + i;
+>  
+> @@ -225,8 +239,10 @@ out:
+>  		irqnr = readl_relaxed(base_addr + INTCPS_SIR_IRQ_OFFSET);
+>  		irqnr &= ACTIVEIRQ_MASK;
+>  
+> -		if (irqnr)
+> +		if (irqnr) {
+> +			irqnr = irq_domain_to_irq(&domain, irqnr);
+>  			handle_IRQ(irqnr, regs);
+> +		}
+>  	} while (irqnr);
+>  }
+>  
