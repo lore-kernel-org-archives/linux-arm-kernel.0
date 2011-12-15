@@ -1,87 +1,46 @@
-From: Josh.wu@atmel.com (Wu, Josh)
-Date: Thu, 15 Dec 2011 18:00:41 +0800
-Subject: [PATCH v3 2/2] [media] V4L: atmel-isi: add
- clk_prepare()/clk_unprepare() functions
-In-Reply-To: <1323339530-26117-2-git-send-email-josh.wu@atmel.com>
-References: <1323339530-26117-1-git-send-email-josh.wu@atmel.com>
- <1323339530-26117-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <4C79549CB6F772498162A641D92D532803B5255C@penmb01.corp.atmel.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 15 Dec 2011 11:06:15 +0100
+Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART
+ from dt
+In-Reply-To: <4EE99923.4030902@ti.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+ <1323863746-18145-5-git-send-email-rnayak@ti.com>
+ <20111214192509.GH32251@atomide.com> <4EE99923.4030902@ti.com>
+Message-ID: <4EE9C697.4010604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Guennadi
+Hi Tony,
 
-Would you acknowledge these two v3 patches and queue them for 3.3 merge
-window? Thanks.
+On 12/15/2011 7:52 AM, Rajendra Nayak wrote:
+> On Thursday 15 December 2011 12:55 AM, Tony Lindgren wrote:
+>> * Rajendra Nayak<rnayak@ti.com> [111214 03:24]:
+>>> Pass minimal data needed for console boot, from dt, for
+>>> OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
+>>> static initialization from generic board file.
+>>>
+>>> Acked-by: Rob Herring<rob.herring@calxeda.com>
+>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>
+>> This we can't merge because this breaks serial console for
+>> omap2 because you're not adding the omap2 specific dtsi
+>> entries for omap2..
+>
+> But we never had omap2 working with DT, because we never added
+> a .dtsi file for omap2 or a .dts file for any omap2 board variants.
+>
+> Until now the DT support on OMAP has been limited to OMAP3 and OMAP4
+> with boards limited to omap3beagle/omap4Panda and omap4sdp.
+>
+> So when we do add base support for omap2, we could update those
+> with the serial entries.
 
-Best Regards,
-Josh Wu
+I'm quite confused as well... Have you tried the current 3.2 kernel on 
+an OMAP2 board?
 
-On Thursday, December 08, 2011 6:19 PM, Josh Wu wrote:
+So far I've been taking care of keeping the OMAP2 support into the 
+board-generic.c file, but I've never added any omap2.dtsi or 
+omap2-board.dts file to support it.
 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> in v2 version, made the label name to be consistent
-
-> drivers/media/video/atmel-isi.c |   15 +++++++++++++++
-> 1 files changed, 15 insertions(+), 0 deletions(-)
-
-> diff --git a/drivers/media/video/atmel-isi.c
-b/drivers/media/video/atmel-isi.c
-> index ea4eef4..91ebcfb 100644
-> --- a/drivers/media/video/atmel-isi.c
-> +++ b/drivers/media/video/atmel-isi.c
-> @@ -922,7 +922,9 @@ static int __devexit atmel_isi_remove(struct
-platform_device *pdev)
-> 			isi->fb_descriptors_phys);
- 
-> 	iounmap(isi->regs);
-> +	clk_unprepare(isi->mck);
-> 	clk_put(isi->mck);
-> +	clk_unprepare(isi->pclk);
-> 	clk_put(isi->pclk);
-> 	kfree(isi);
- 
-> @@ -955,6 +957,12 @@ static int __devinit atmel_isi_probe(struct
-platform_device *pdev)
->  	if (IS_ERR(pclk))
-> 		return PTR_ERR(pclk);
- 
-> +	ret = clk_prepare(pclk);
-> +	if (ret) {
-> +		clk_put(pclk);
-> +		return ret;
-> +	}
-> +
-> 	isi = kzalloc(sizeof(struct atmel_isi), GFP_KERNEL);
-> 	if (!isi) {
-> 		ret = -ENOMEM;
-> @@ -978,6 +986,10 @@ static int __devinit atmel_isi_probe(struct
-platform_device *pdev)
-> 		goto err_clk_get;
-> 	}
-> 
-> +	ret = clk_prepare(isi->mck);
-> +	if (ret)
-> +		goto err_clk_prepare_mck;
-> +
-> 	/* Set ISI_MCK's frequency, it should be faster than pixel clock
-*/
-> 	ret = clk_set_rate(isi->mck, pdata->mck_hz);
-> 	if (ret < 0)
-> @@ -1059,10 +1071,13 @@ err_alloc_ctx:
-> 			isi->fb_descriptors_phys);
-> err_alloc_descriptors:
-> err_set_mck_rate:
-> +	clk_unprepare(isi->mck);
-> +err_clk_prepare_mck:
-> 	clk_put(isi->mck);
-> err_clk_get:
-> 	kfree(isi);
-> err_alloc_isi:
-> +	clk_unprepare(pclk);
-> 	clk_put(pclk);
-> 
-> 	return ret;
-> -- 
-> 1.6.3.3
+Regards,
+Benoit
