@@ -1,59 +1,44 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 15 Dec 2011 17:10:57 +0000
-Subject: [PATCH] arm,davinci: configure davinci aemif chipselects
- through OF
-In-Reply-To: <CAPcSpELkWJpP9-3UoNHF_aWSdd_b0FHNooNm+zF7UTjHEBC_vg@mail.gmail.com>
-References: <1322991679-20947-1-git-send-email-hs@denx.de>
- <4EE07E27.8090602@denx.de>
- <DF0F476B391FA8409C78302C7BA518B6040CBB@DBDE01.ent.ti.com>
- <201112081548.08548.arnd@arndb.de>
- <DF0F476B391FA8409C78302C7BA518B60471C1@DBDE01.ent.ti.com>
- <CAPcSpELkWJpP9-3UoNHF_aWSdd_b0FHNooNm+zF7UTjHEBC_vg@mail.gmail.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B604A17B@DBDE01.ent.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Dec 2011 20:16:02 +0100
+Subject: [PATCH 0/6] ARM: at91: irqdomain and device tree for AIC and GPIO
+Message-ID: <1323976568-20244-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Hi,
 
-On Wed, Dec 14, 2011 at 20:05:25, Ben Gardiner wrote:
-> Hello Arnd and Sekhar,
-> 
-> On Tue, Dec 13, 2011 at 1:34 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
-> > [...]
-> > On Thu, Dec 08, 2011 at 21:18:08, Arnd Bergmann wrote:
-> >> [...]
-> >> If you want it to provide endpoint devices that are handled by
-> >> distinct subsystems in Linux, I would make it an mfd multifunction
-> >> device and make the common code a driver that scans the connected
-> >> memories in order to register its child devices for each of the
-> >> subsystems.
-> >
-> > Okay. Thanks for the explanation. Since the users of AEMIF at this
-> > point are mtd devices, I propose moving it to drivers/mtd/davinci-aemif.c
-> > (of course, mtd folks need to approve).
-> 
-> We have a vested interest in the davinci AEMIF setup facilities
-> in-kernel; I'm electing to pipe-up now rather than later. Sadly our
-> board is not yet in mainline so my opinions may be redirected to the
-> bit-bucket as you see fit. We are planning to post a patch series for
-> our complete board support -- but we can't do it right now.
-> 
-> The AEMIF is useful for interfacing to other asynchronous devices too;
-> our newest board uses it for accessing memory mapped FPGA functional
-> blocks via UIO and for permanent storage to a compact flash using
-> pata_platform. In both cases the timings and mode for the chip-select
-> are manually configured before the devices are registered. In both
-> cases the performance of the endpoints could be better preserved
-> across CPU freq transitions if the hooks for cpufreq transitions
-> recently proposed by Sudhakar [1] were part of an mfd device and hence
-> applicable to devices other than mtd.
-> 
-> Again, I apologize for requesting features for boards that are not yet
-> in mainline.
+This series adds irqdomain and device tree support for both the
+interrupt and GPIO controllers of AT91 SoC.
 
-No problem. Thanks for showing a use case I didn't know existed.
-Now we just need to find someone to work on moving aemif to mfd
-multifunction device :)
+The AIC part has already been sent some time ago but has been
+reworked to address Rob's comments. This reworked patch is marked
+with a "v4" tag.
 
-Thanks,
-Sekhar
+The series can go on top of Jamie's patch
+"irqdomain: export irq_domain_simple_ops for !CONFIG_OF"
+and has been tested on top of 'v3.2-rc5' + 'arm-soc/at91/ioremap'
+and 'arm-soc/at91/gpio'
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      ARM: at91/gpio: add DT support
+
+Nicolas Ferre (5):
+      ARM: at91/aic: add irq domain and device tree support
+      ARM: at91/gpio: add irqdomain to gpio interrupts
+      ARM: at91/gpio: add .to_irq gpio_chip handler and rework irq_to_gpio
+      ARM: at91/gpio: remove the static specification of gpio_chip.base
+      ARM: at91/board-dt: remove AIC irq domain from board file
+
+ .../devicetree/bindings/arm/atmel-aic.txt          |   38 ++++
+ .../devicetree/bindings/gpio/gpio_at91.txt         |   20 ++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/at91sam9g20.dtsi                 |   44 ++++-
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   59 +++++-
+ arch/arm/mach-at91/board-dt.c                      |   15 +--
+ arch/arm/mach-at91/gpio.c                          |  197 ++++++++++++++++----
+ arch/arm/mach-at91/include/mach/gpio.h             |   12 --
+ arch/arm/mach-at91/include/mach/irqs.h             |    3 +-
+ arch/arm/mach-at91/irq.c                           |   91 +++++++--
+ 10 files changed, 383 insertions(+), 97 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio_at91.txt
