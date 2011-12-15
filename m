@@ -1,50 +1,36 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 15 Dec 2011 13:55:04 +0800
-Subject: [PATCH 3/9] irq: convert generic-chip to use irq_domain
-In-Reply-To: <20111215052512.GB21815@S2101-09.ap.freescale.net>
-References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
- <1323876538-20406-4-git-send-email-robherring2@gmail.com>
- <20111215052512.GB21815@S2101-09.ap.freescale.net>
-Message-ID: <20111215055501.GC21815@S2101-09.ap.freescale.net>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Thu, 15 Dec 2011 05:48:38 +0000
+Subject: [RFC PATCH v2 2/4] pinctrl: imx: add pinmux imx driver
+In-Reply-To: <CAOMZO5DVsk_iNCrMaBbK4kuehhL1C71fKqC65isybJDknzWrRQ@mail.gmail.com>
+References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+ <1323878622-26602-3-git-send-email-b29396@freescale.com>
+ <CAOMZO5DVsk_iNCrMaBbK4kuehhL1C71fKqC65isybJDknzWrRQ@mail.gmail.com>
+Message-ID: <7FE21149F4667147B645348EC6057885052C1B@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 01:25:20PM +0800, Shawn Guo wrote:
-> On Wed, Dec 14, 2011 at 09:28:52AM -0600, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > Add irq domain support to irq generic-chip. This enables users of
-> > generic-chip to support dynamic irq assignment needed for DT interrupt
-> > binding. Users must be converted to use irq_data.hwirq for determining
-> > local interrupt numbers rather than using the Linux irq number.
-> > 
-> > irq_base is kept for now as there are a few users of it. Once they
-> > are converted to use the irq domain, it can be removed.
-> > 
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > ---
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Thursday, December 15, 2011 12:01 AM
+> To: Dong Aisheng-B29396
+> Cc: linux-kernel at vger.kernel.org; linus.walleij at stericsson.com;
+> s.hauer at pengutronix.de; rob.herring at calxeda.com;
+> grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> kernel at pengutronix.de; Guo Shawn-R65073
+> Subject: Re: [RFC PATCH v2 2/4] pinctrl: imx: add pinmux imx driver
+> Importance: High
 > 
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> On Wed, Dec 14, 2011 at 2:03 PM, Dong Aisheng <b29396@freescale.com>
+> wrote:
 > 
-Sorry, I have to take that tag back after I correct my test setup.
-It does not work for imx5 TZIC case, because the following change
-I suggested before is missed.
+> > +config PINMUX_IMX53
+> > + ? ? ? bool "IMX53 pinmux driver"
+> > + ? ? ? depends on ARCH_MX5
+> 
+> Shouldn't this be SOC_IMX53 instead?
+> 
+Yes, it should be SOC_IMX53.
+Thanks.
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index eb763f7..2a2aac1 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -39,7 +39,7 @@ void irq_domain_add(struct irq_domain *domain)
-                        return;
-                }
-                d->domain = domain;
--               d->hwirq = hwirq;
-+               d->hwirq = hwirq - domain->hwirq_base;
-        }
-
-        mutex_lock(&irq_domain_mutex);
-
--- 
-Regards,
-Shawn
+Regards
+Dong Aisheng
