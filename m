@@ -1,25 +1,90 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 15 Dec 2011 11:37:37 +0200
-Subject: [PATCH 0/2] OMAP4: McBSP: Fix clock reparenting
-Message-ID: <1323941859-7946-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 15 Dec 2011 11:37:38 +0200
+Subject: [PATCH 1/2] OMAP2+: mcbsp: Restructure clk reparenting code
+In-Reply-To: <1323941859-7946-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1323941859-7946-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1323941859-7946-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In OMAP4 we have different clk names compared to OMAP2/3.
+To be able to support OMAP4 clock reparenting the set_clk_src
+function need to be separated into two function.
+One for selecting the platform's clock names, the other
+will do the reparenting.
 
-OMAP4 has different clock names compared to OMAP2/3.
-Restructure the clock reparenting code for omap2plus in order to be able to
-suport OMAP4 clock source selection without breaking upper layer API.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (2):
-  OMAP2+: mcbsp: Restructure clk reparenting code
-  OMAP4: mcbsp: Clock reparenting support
+ arch/arm/mach-omap2/mcbsp.c |   37 ++++++++++++++++++++++---------------
+ 1 files changed, 22 insertions(+), 15 deletions(-)
 
- arch/arm/mach-omap2/mcbsp.c |   66 +++++++++++++++++++++++++++++++-----------
- 1 files changed, 48 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+index 857860b..9129003 100644
+--- a/arch/arm/mach-omap2/mcbsp.c
++++ b/arch/arm/mach-omap2/mcbsp.c
+@@ -65,25 +65,16 @@ static int omap2_mcbsp1_mux_rx_clk(struct device *dev, const char *signal,
+ 	return 0;
+ }
+ 
+-/* McBSP CLKS source switching function */
+-static int omap2_mcbsp_set_clk_src(struct device *dev, struct clk *clk,
+-				   const char *src)
++static int omap2_mcbsp_reparent_clk(struct device *dev, struct clk *clk,
++				    char *fck_src_name)
+ {
+ 	struct clk *fck_src;
+-	char *fck_src_name;
+ 	int r;
+ 
+-	if (!strcmp(src, "clks_ext"))
+-		fck_src_name = "pad_fck";
+-	else if (!strcmp(src, "clks_fclk"))
+-		fck_src_name = "prcm_fck";
+-	else
+-		return -EINVAL;
+-
+ 	fck_src = clk_get(dev, fck_src_name);
+ 	if (IS_ERR_OR_NULL(fck_src)) {
+-		pr_err("omap-mcbsp: %s: could not clk_get() %s\n", "clks",
+-		       fck_src_name);
++		dev_err(dev, "clk reparent: could not clk_get() %s\n",
++			fck_src_name);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -91,8 +82,8 @@ static int omap2_mcbsp_set_clk_src(struct device *dev, struct clk *clk,
+ 
+ 	r = clk_set_parent(clk, fck_src);
+ 	if (IS_ERR_VALUE(r)) {
+-		pr_err("omap-mcbsp: %s: could not clk_set_parent() to %s\n",
+-		       "clks", fck_src_name);
++		dev_err(dev, "clk reparent: could not clk_set_parent() to %s\n",
++			fck_src_name);
+ 		clk_put(fck_src);
+ 		return -EINVAL;
+ 	}
+@@ -104,6 +95,22 @@ static int omap2_mcbsp_set_clk_src(struct device *dev, struct clk *clk,
+ 	return 0;
+ }
+ 
++/* McBSP CLKS source switching for OMAP2/3 */
++static int omap2_mcbsp_set_clk_src(struct device *dev, struct clk *clk,
++				   const char *src)
++{
++	char *fck_src_name;
++
++	if (!strcmp(src, "clks_ext"))
++		fck_src_name = "pad_fck";
++	else if (!strcmp(src, "clks_fclk"))
++		fck_src_name = "prcm_fck";
++	else
++		return -EINVAL;
++
++	return omap2_mcbsp_reparent_clk(dev, clk, fck_src_name);
++}
++
+ static int omap3_enable_st_clock(unsigned int id, bool enable)
+ {
+ 	unsigned int w;
 -- 
 1.7.8
