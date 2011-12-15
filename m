@@ -1,89 +1,105 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 15 Dec 2011 09:54:15 +0800
-Subject: [PATCH v4 REPOST 5/5] imx6q: Remove unconditional dependency on
- l2x0 L2 cache support
-In-Reply-To: <20111215014619.GB3259@S2101-09.ap.freescale.net>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
- <1323862781-3465-6-git-send-email-dave.martin@linaro.org>
- <20111214132622.GA1520@S2100-06.ap.freescale.net>
- <20111214140500.GA1700@richard-laptop>
- <20111214150119.GD2568@linaro.org>
- <20111215010219.GP28768@b20223-02.ap.freescale.net>
- <20111215014619.GB3259@S2101-09.ap.freescale.net>
-Message-ID: <20111215015414.GQ28768@b20223-02.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 15 Dec 2011 10:56:07 +0900
+Subject: [PATCH v4] ARM: sched_clock: allow sched_clock to be selected at
+ runtime
+In-Reply-To: <1323444833-10587-1-git-send-email-marc.zyngier@arm.com>
+References: <1323444833-10587-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <029b01ccbacc$b5fdb6e0$21f924a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 09:46:20AM +0800, Shawn Guo wrote:
-> On Thu, Dec 15, 2011 at 09:02:20AM +0800, Richard Zhao wrote:
-> > On Wed, Dec 14, 2011 at 03:01:19PM +0000, Dave Martin wrote:
-> > > On Wed, Dec 14, 2011 at 10:05:04PM +0800, Richard Zhao wrote:
-> > > > On Wed, Dec 14, 2011 at 09:26:24PM +0800, Shawn Guo wrote:
-> > > > > Hi Dave,
-> > > > > 
-> > > > > Sorry for that I did not look into previous post to point it out.
-> > > > > 
-> > > > > On Wed, Dec 14, 2011 at 11:39:41AM +0000, Dave Martin wrote:
-> > > > > > The i.MX6 Quad SoC will work without the l2x0 L2 cache controller
-> > > > > > support built into the kernel, so this patch removes the dependency
-> > > > > > on CACHE_L2X0 and selects MIGHT_HAVE_CACHE_L2X0 instead.
-> > > > > > 
-> > > > > > This makes the l2x0 support optional, so that it can be turned off
-> > > > > > when desired for debugging purposes etc.
-> > > > > > 
-> > > > > > Thanks to Shawn Guo for this suggestion. [1]
-> > > > > > 
-> > > > > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > > > > > 
-> > > > > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
-> > > > > > ---
-> > > > > >  arch/arm/mach-imx/Kconfig |    2 +-
-> > > > > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > > > > 
-> > > > > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > > > > > index 29a3d61..1fb93f2 100644
-> > > > > > --- a/arch/arm/mach-imx/Kconfig
-> > > > > > +++ b/arch/arm/mach-imx/Kconfig
-> > > > > > @@ -609,13 +609,13 @@ comment "i.MX6 family:"
-> > > > > >  config SOC_IMX6Q
-> > > > > >  	bool "i.MX6 Quad support"
-> > > > > >  	select ARM_GIC
-> > > > > > -	select CACHE_L2X0
-> > > > > >  	select CPU_V7
-> > > > > >  	select HAVE_ARM_SCU
-> > > > > >  	select HAVE_IMX_GPC
-> > > > > >  	select HAVE_IMX_MMDC
-> > > > > >  	select HAVE_IMX_SRC
-> > > > > >  	select HAVE_SMP
-> > > > > > +	select MIGHT_HAVE_CACHE_L2X0
-> > > > > 
-> > > > > The option SOC_IMX6Q is only available when ARCH_IMX_V6_V7 is selected.
-> > > > > Since MIGHT_HAVE_CACHE_L2X0 has been selected by ARCH_IMX_V6_V7 in
-> > > > > patch #1, this line seems redundant here.
-> > > > Would it be better keep this one and remove patch #1 one? imx5 doesn't have
-> > > > l2x0.
-> > > 
-> > > Do you mean to remove MIGHT_HAVE_CACHE_L2X0 from ARCH_IMX_V6_V7, and select
-> > > it only from SOC_IMX6Q?
-> > Yes, I think it's more precise. Shawn?
-> > 
-> No.
+Marc Zyngier wrote:
 > 
-> * imx5 hardware does have L2, and it's just not set up in the kernel
->   (I do not know why).
-> * Currently, ARCH_IMX_V6_V7 only covers imx3 and imx6, and both are
->   calling l2x0 init function to set L2 up.
-> * When we merge mach-mx5 into mach-imx to have ARCH_IMX_V6_V7 cover
->   imx3, imx5 and imx6, there is no reason for us to not set L2 up for
->   imx5 too.
+> sched_clock() is yet another blocker on the road to the single
+> image. This patch implements an idea by Russell King:
 > 
-> So MIGHT_HAVE_CACHE_L2X0 really should be selected by ARCH_IMX_V6_V7.
-mx5/cortex-a8 don't use L2X0. But that's ok. MIGHT_HAVE_CACHE_L2X0 is just a hint.
-Please Shawn's suggestion.
+> http://www.spinics.net/lists/linux-omap/msg49561.html
+> 
+> Instead of asking the platform to implement both sched_clock()
+> itself and the rollover callback, simply register a read()
+> function, and let the ARM code care about sched_clock() itself,
+> the conversion to ns and the rollover. sched_clock() uses
+> this read() function as an indirection to the platform code.
+> If the platform doesn't provide a read(), the code falls back
+> to the jiffy counter (just like the default sched_clock).
+> 
+> This allow some simplifications and possibly some footprint gain
+> when multiple platforms are compiled in. Among the drawbacks,
+> the removal of the *_fixed_sched_clock optimization which could
+> negatively impact some platforms (sa1100, tegra, versatile
+> and omap).
+> 
+> Tested on 11MPCore, OMAP4 and Tegra.
+> 
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Erik Gilling <konkers@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-Thanks
-Richard
+Hi Marc,
+
+There is a complaining with checkpatch.
+
+ERROR: trailing whitespace
+#376: FILE: arch/arm/kernel/sched_clock.c:163:
++^I^Isetup_sched_clock(jiffy_sched_clock_read, 32, HZ);^I$
+
+And build warning:
+
+arch/arm/plat-s5p/s5p-time.c: In function 's5p_read_sched_clock':
+arch/arm/plat-s5p/s5p-time.c:328: warning: 'return' with no value, in
+function returning non-void
+
+I'm not sure what is proper return value in this case...
+
+Anyway, others, looks ok to me and tested on Samsung S5P boards.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Thanks and sorry for late response.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Tested-by: Jamie Iles <jamie@jamieiles.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> I'm reposting this patch with the hope that it (or Russell's
+> alternative patch http://patchwork.ozlabs.org/patch/115961/)
+> will get merged in 3.3. It doesn't look intrusive enough to be
+> left on the side of the road for yet another cycle...
 > 
-> -- 
-> Regards,
-> Shawn
+> Based on RMK's devel-stable as of Dec 9th.
+> 
+> >From v3:
+> - Converted picoxcell
+> - Some minor cleanup
+> 
+> >From v2:
+> - Removed the read_sched_clock test from sched_clock() and move
+>   the jiffies code to its own function, as suggested by Nicolas Pitre.
+>   WARN_ON are added to ensure that setup_sched_clock() is not called
+>   in an unsafe context and that we only override the default once.
+> 
+> >From v1:
+> - Added 'notrace' to all _read_sched_lock() functions, fixing
+>   the ftrace problem reported by Jamie Iles
+> - Removed useless #include <linux/sched.h> from touched files
+> - Made omap_32k_read_sched_clock() static
+
+(snip)
