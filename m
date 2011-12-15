@@ -1,94 +1,66 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 15 Dec 2011 13:51:08 +0100
-Subject: [PATCH 3/5] ux500: register DB5500 PMU dynamically
-Message-ID: <1323953468-27121-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 15 Dec 2011 13:51:17 +0100
+Subject: [PATCH 4/5] ux500: update register files
+Message-ID: <1323953477-27156-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin.vincent@stericsson.com>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Use platform_device_register_simple() rather than a static
-struct, so we create and register the PMU device on-the-fly.
+A few new addresses for newly supported peripherals and SRAM base
+offsets.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db5500.c |   41 ++++++++++++++++++-------------------
- 1 files changed, 20 insertions(+), 21 deletions(-)
+ arch/arm/mach-ux500/include/mach/db5500-regs.h |    4 ++++
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db5500.c b/arch/arm/mach-ux500/cpu-db5500.c
-index 5323286..18aa5c0 100644
---- a/arch/arm/mach-ux500/cpu-db5500.c
-+++ b/arch/arm/mach-ux500/cpu-db5500.c
-@@ -46,26 +46,6 @@ static struct map_desc u5500_io_desc[] __initdata = {
- 	__IO_DEV_DESC(U5500_PRCMU_TCDM_BASE, SZ_4K),
- };
+diff --git a/arch/arm/mach-ux500/include/mach/db5500-regs.h b/arch/arm/mach-ux500/include/mach/db5500-regs.h
+index 994b5fe..8e714bc 100644
+--- a/arch/arm/mach-ux500/include/mach/db5500-regs.h
++++ b/arch/arm/mach-ux500/include/mach/db5500-regs.h
+@@ -65,8 +65,11 @@
+ #define U5500_PRCMU_TIMER_4_BASE (U5500_PER4_BASE + 0x07450)
+ #define U5500_MSP1_BASE		(U5500_PER4_BASE + 0x9000)
+ #define U5500_GPIO2_BASE	(U5500_PER4_BASE + 0xA000)
++#define U5500_MTIMER_BASE	(U5500_PER4_BASE + 0xC000)
+ #define U5500_CDETECT_BASE	(U5500_PER4_BASE + 0xF000)
+ #define U5500_PRCMU_TCDM_BASE	(U5500_PER4_BASE + 0x18000)
++#define U5500_PRCMU_TCPM_BASE	(U5500_PER4_BASE + 0x10000)
++#define U5500_TPIU_BASE		(U5500_PER4_BASE + 0x50000)
  
--static struct resource db5500_pmu_resources[] = {
--	[0] = {
--		.start		= IRQ_DB5500_PMU0,
--		.end		= IRQ_DB5500_PMU0,
--		.flags		= IORESOURCE_IRQ,
--	},
--	[1] = {
--		.start		= IRQ_DB5500_PMU1,
--		.end		= IRQ_DB5500_PMU1,
--		.flags		= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device db5500_pmu_device = {
--	.name			= "arm-pmu",
--	.id			= ARM_PMU_DEVICE_CPU,
--	.num_resources		= ARRAY_SIZE(db5500_pmu_resources),
--	.resource		= db5500_pmu_resources,
--};
--
- static struct resource mbox0_resources[] = {
- 	{
- 		.name = "mbox_peer",
-@@ -151,7 +131,6 @@ static struct platform_device mbox2_device = {
- };
+ #define U5500_SPI0_BASE		(U5500_PER5_BASE + 0x0000)
+ #define U5500_SPI1_BASE		(U5500_PER5_BASE + 0x1000)
+@@ -125,6 +128,7 @@
+ #define U5500_ACCCON_BASE		(0xBFFF1000)
+ #define U5500_ACCCON_CPUVEC_RESET_ADDR_OFFSET (0x00000020)
+ #define U5500_ACCCON_ACC_CPU_CTRL_OFFSET (0x000000BC)
++#define U5500_INTCON_MBOX1_INT_RESET_ADDR	(0xBFFD31A4)
  
- static struct platform_device *db5500_platform_devs[] __initdata = {
--	&db5500_pmu_device,
- 	&mbox0_device,
- 	&mbox1_device,
- 	&mbox2_device,
-@@ -192,6 +171,25 @@ void __init u5500_map_io(void)
- 	_PRCMU_BASE = __io_address(U5500_PRCMU_BASE);
- }
+ #define U5500_ESRAM_BASE	        0x40000000
+ #define U5500_ESRAM_DMA_LCPA_OFFSET	0x10000
+diff --git a/arch/arm/mach-ux500/include/mach/db8500-regs.h b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+index 751b0e6..8decf18 100644
+--- a/arch/arm/mach-ux500/include/mach/db8500-regs.h
++++ b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+@@ -24,6 +24,9 @@
+ #define U8500_DMA_LCPA_BASE    (U8500_ESRAM_BANK0 + U8500_ESRAM_DMA_LCPA_OFFSET)
+ #define U8500_DMA_LCPA_BASE_ED	(U8500_ESRAM_BANK4 + 0x4000)
  
-+static void __init db5500_pmu_init(void)
-+{
-+	struct resource res[] = {
-+		[0] = {
-+			.start		= IRQ_DB5500_PMU0,
-+			.end		= IRQ_DB5500_PMU0,
-+			.flags		= IORESOURCE_IRQ,
-+		},
-+		[1] = {
-+			.start		= IRQ_DB5500_PMU1,
-+			.end		= IRQ_DB5500_PMU1,
-+			.flags		= IORESOURCE_IRQ,
-+		},
-+	};
++/* This address fulfills the 256k alignment requirement of the lcla base */
++#define U8500_DMA_LCLA_BASE	U8500_ESRAM_BANK4
 +
-+	platform_device_register_simple("arm-pmu", ARM_PMU_DEVICE_CPU,
-+					res, ARRAY_SIZE(res));
-+}
-+
- static int usb_db5500_rx_dma_cfg[] = {
- 	DB5500_DMA_DEV4_USB_OTG_IEP_1_9,
- 	DB5500_DMA_DEV5_USB_OTG_IEP_2_10,
-@@ -217,6 +215,7 @@ static int usb_db5500_tx_dma_cfg[] = {
- void __init u5500_init_devices(void)
- {
- 	db5500_add_gpios();
-+	db5500_pmu_init();
- 	db5500_dma_init();
- 	db5500_add_rtc();
- 	db5500_add_usb(usb_db5500_rx_dma_cfg, usb_db5500_tx_dma_cfg);
+ #define U8500_PER3_BASE		0x80000000
+ #define U8500_STM_BASE		0x80100000
+ #define U8500_STM_REG_BASE	(U8500_STM_BASE + 0xF000)
+@@ -40,6 +43,7 @@
+ #define U8500_ASIC_ID_BASE	0x9001D000
+ 
+ #define U8500_PER6_BASE		0xa03c0000
++#define U8500_PER7_BASE		0xa03d0000
+ #define U8500_PER5_BASE		0xa03e0000
+ #define U8500_PER7_BASE_ED	0xa03d0000
+ 
 -- 
 1.7.3.2
