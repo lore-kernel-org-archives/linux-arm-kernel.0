@@ -1,16 +1,50 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 15 Dec 2011 14:06:56 -0800
-Subject: [PATCH v7 00/14] Add support for tegra30 and cardhu
-In-Reply-To: <1323875032-18221-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1323875032-18221-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAMbhsRTtrVsfXXpW9WeSc72kqfJ3qQwDZ_TRWp4M1H-zYY=YRA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Dec 2011 14:14:06 -0800
+Subject: [PATCH] ARM: fix $(CROSS_COMPILE) prefix missing from size
+ invocation
+In-Reply-To: <201112150228.34815.jkrzyszt@tis.icnet.pl>
+References: <1322186338-6020-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <201112140021.42598.jkrzyszt@tis.icnet.pl>
+ <20111214215815.GP32251@atomide.com>
+ <201112150228.34815.jkrzyszt@tis.icnet.pl>
+Message-ID: <20111215221406.GY32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 7:03 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> This patchset adds support for the tegra30 SoC and the cardhu development
-> board.
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111214 16:59]:
+> On Wednesday 14 of December 2011 at 22:58:15, Tony Lindgren wrote:
+> > * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111213 14:55]:
+> > > On Friday 25 of November 2011 at 02:58:58, Janusz Krzysztofik wrote:
+> > > > Otherwise, cross compilation may fail with error messages like:
+> > > > 
+> > > > ...
+> > > > size: arch/arm/boot/compressed/../../../../vmlinux: File format is ambiguous
+> > > > size: Matching formats: elf32-littlearm elf32-littlearm-symbian elf32-littlearm-vxworks
+> > > >   LD      arch/arm/boot/compressed/vmlinux
+> > > >   arm-angstrom-linux-uclibcgnueabi-ld:--defsym _kernel_bss_size=: syntax error
+> > > > 
+> > > > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> > > 
+> > > Trying to guess why this patch is still sitting in the Incoming queue in 
+> > > the Russell's patch system (7184/1) while others have found their way to 
+> > > the Applied queue meanwhile, I wonder if this is because I didn't 
+> > > mention explicitly that it is a fix to a regression introduced into 
+> > > 3.2-rc with the following commit:
+> > 
+> > It's because not all cross compiler in use have $(CROSS_COMPILE)size
+> > available, so it would have to be symlinked to host size to keep things
+> > compiling. So it's probably best to rather take the warning and keep
+> > things compiling rather than fix the warning and break compile for
+> > many people.
+> 
+> First of all, thanks for someone finally commenting the patch. It's really hard for me to guess if a patch is OK or not if I hear nothing. Once I hear from someone what is wrong with my patch, I'm always willing to enhance it. But I feel more and more like an intruder on the linux-arm-kernel list.
 
-Whole series,
-Acked-by: Colin Cross <ccross@android.com>
+I thought this was already discussed a while back on the LAKML list?
+ 
+> Back to the merit: I would take that warning, as you suggest, if things were compiling for me, but it's not the case. Compilation fails, as I tried to state in the commit message. The patch was not about fixing the warning, but fixing the compilation broken. Since things worked for me before, I find it a regression. Sorry if I was not clear enough in the commit message.
+> 
+> I'll prepare v2 which will call $(CROSS_COMPILE)size if size fails, OK?
+
+Sounds good :)
+
+Tony
