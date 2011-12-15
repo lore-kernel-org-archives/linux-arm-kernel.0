@@ -1,203 +1,197 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 15 Dec 2011 14:02:36 +0000
-Subject: [PATCH v6 4/9] ARM: vexpress: Use FDT data in platform SMP calls
+Date: Thu, 15 Dec 2011 14:02:39 +0000
+Subject: [PATCH v6 7/9] ARM: vexpress: Add Device Tree for V2P-CA5s core tile
 In-Reply-To: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
 References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1323957761-13553-5-git-send-email-pawel.moll@arm.com>
+Message-ID: <1323957761-13553-8-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If ct_desc is not set (so a board was booted with DT machine ID)
-try to look for "arm,cortex-a9-scu" node and initialize the SCU
-using base address in "reg" property.
+This patch adds Device Tree file for the CoreTile Express A5x2 (V2P-CA5s).
 
-Otherwise assume that there is no special SCU initialization
-required and initialize CPUs basing on numbers of "cpu" type
-devices in "cpus" node of the Device Tree.
-
+Tested-by: Jon Medhurst <tixy@linaro.org>
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-vexpress/platsmp.c |  148 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 146 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts |  160 +++++++++++++++++++++++++++++++
+ arch/arm/mach-vexpress/Makefile.boot    |    2 +
+ 2 files changed, 162 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca5s.dts
 
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index a1ed6d6..d49e800d 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -12,6 +12,11 @@
- #include <linux/errno.h>
- #include <linux/smp.h>
- #include <linux/io.h>
-+#include <linux/of_fdt.h>
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+new file mode 100644
+index 0000000..da26a13
+--- /dev/null
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -0,0 +1,160 @@
++/*
++ * ARM Ltd. Versatile Express
++ *
++ * CoreTile Express A5x2
++ * Cortex-A5 MPCore (V2P-CA5s)
++ *
++ * HBI-0225B
++ */
 +
-+#include <asm/smp_scu.h>
-+#include <asm/hardware/gic.h>
-+#include <asm/mach/map.h>
- 
- #include <mach/motherboard.h>
- 
-@@ -19,13 +24,149 @@
- 
- extern void versatile_secondary_startup(void);
- 
-+#if defined(CONFIG_OF)
++/dts-v1/;
 +
-+static enum {
-+	UNKNOWN_SCU,
-+	GENERIC_SCU,
-+	CORTEX_A9_SCU,
-+} vexpress_dt_scu = UNKNOWN_SCU;
++/include/ "skeleton.dtsi"
 +
-+static void __init vexpress_dt_init_cpu_map(int ncores)
-+{
-+	int i;
++/ {
++	model = "V2P-CA5s";
++	arm,hbi = <0x225>;
++	compatible = "arm,vexpress,v2p-ca5s", "arm,vexpress";
++	interrupt-parent = <&gic>;
 +
-+	if (ncores > nr_cpu_ids) {
-+		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
-+				ncores, nr_cpu_ids);
-+		ncores = nr_cpu_ids;
-+	}
++	aliases {
++		serial0 = &v2m_serial0;
++		serial1 = &v2m_serial1;
++		serial2 = &v2m_serial2;
++		serial3 = &v2m_serial3;
++		i2c0 = &v2m_i2c_dvi;
++		i2c1 = &v2m_i2c_pcie;
++	};
 +
-+	for (i = 0; i < ncores; ++i)
-+		set_cpu_possible(i, true);
-+}
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+static struct map_desc vexpress_dt_cortex_a9_scu_map[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)V2T_PERIPH,
-+		/* .pfn	set in vexpress_dt_init_cortex_a9_scu() */
-+		.length		= SZ_128,
-+		.type		= MT_DEVICE,
-+	},
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a5";
++			reg = <0>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a5";
++			reg = <1>;
++			next-level-cache = <&L2>;
++		};
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x80000000 0x40000000>;
++	};
++
++	hdlcd at 2a110000 {
++		compatible = "arm,hdlcd";
++		reg = <0x2a110000 0x1000>;
++		interrupts = <0 85 4>;
++	};
++
++	memory-controller at 2a150000 {
++		compatible = "arm,pl341", "arm,primecell";
++		reg = <0x2a150000 0x1000>;
++	};
++
++	memory-controller at 2a190000 {
++		compatible = "arm,pl354", "arm,primecell";
++		reg = <0x2a190000 0x1000>;
++		interrupts = <0 86 4>,
++			     <0 87 4>;
++	};
++
++	scu at 2c000000 {
++		compatible = "arm,cortex-a9-scu";
++		reg = <0x2c000000 0x58>;
++	};
++
++	timer at 2c000600 {
++		compatible = "arm,smp-twd";
++		reg = <0x2c000600 0x38>;
++		interrupts = <1 2 0x304>,
++			     <1 3 0x304>;
++	};
++
++	gic: interrupt-controller at 2c001000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0x2c001000 0x1000>,
++		      <0x2c000100 0x100>;
++	};
++
++	L2: cache-controller at 2c0f0000 {
++		compatible = "arm,pl310-cache";
++		reg = <0x2c0f0000 0x1000>;
++		interrupts = <0 84 4>;
++		cache-level = <2>;
++	};
++
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupts = <0 68 4>,
++			     <0 69 4>;
++	};
++
++	motherboard {
++		ranges = <0 0 0x08000000 0x04000000>,
++			 <1 0 0x14000000 0x04000000>,
++			 <2 0 0x18000000 0x04000000>,
++			 <3 0 0x1c000000 0x04000000>,
++			 <4 0 0x0c000000 0x04000000>,
++			 <5 0 0x10000000 0x04000000>;
++
++		interrupt-map-mask = <0 0 63>;
++		interrupt-map = <0 0  0 &gic 0  0 4>,
++				<0 0  1 &gic 0  1 4>,
++				<0 0  2 &gic 0  2 4>,
++				<0 0  3 &gic 0  3 4>,
++				<0 0  4 &gic 0  4 4>,
++				<0 0  5 &gic 0  5 4>,
++				<0 0  6 &gic 0  6 4>,
++				<0 0  7 &gic 0  7 4>,
++				<0 0  8 &gic 0  8 4>,
++				<0 0  9 &gic 0  9 4>,
++				<0 0 10 &gic 0 10 4>,
++				<0 0 11 &gic 0 11 4>,
++				<0 0 12 &gic 0 12 4>,
++				<0 0 13 &gic 0 13 4>,
++				<0 0 14 &gic 0 14 4>,
++				<0 0 15 &gic 0 15 4>,
++				<0 0 16 &gic 0 16 4>,
++				<0 0 17 &gic 0 17 4>,
++				<0 0 18 &gic 0 18 4>,
++				<0 0 19 &gic 0 19 4>,
++				<0 0 20 &gic 0 20 4>,
++				<0 0 21 &gic 0 21 4>,
++				<0 0 22 &gic 0 22 4>,
++				<0 0 23 &gic 0 23 4>,
++				<0 0 24 &gic 0 24 4>,
++				<0 0 25 &gic 0 25 4>,
++				<0 0 26 &gic 0 26 4>,
++				<0 0 27 &gic 0 27 4>,
++				<0 0 28 &gic 0 28 4>,
++				<0 0 29 &gic 0 29 4>,
++				<0 0 30 &gic 0 30 4>,
++				<0 0 31 &gic 0 31 4>,
++				<0 0 32 &gic 0 32 4>,
++				<0 0 33 &gic 0 33 4>,
++				<0 0 34 &gic 0 34 4>,
++				<0 0 35 &gic 0 35 4>,
++				<0 0 36 &gic 0 36 4>,
++				<0 0 37 &gic 0 37 4>,
++				<0 0 38 &gic 0 38 4>,
++				<0 0 39 &gic 0 39 4>,
++				<0 0 40 &gic 0 40 4>,
++				<0 0 41 &gic 0 41 4>,
++				<0 0 42 &gic 0 42 4>;
++	};
 +};
 +
-+static int __init vexpress_dt_find_scu(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	if (of_flat_dt_is_compatible(node, "arm,cortex-a9-scu")) {
-+		__be32 *reg = of_get_flat_dt_prop(node, "reg", NULL);
++/include/ "vexpress-v2m-rs1.dtsi"
+diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
+index c6dd891..5e2177e 100644
+--- a/arch/arm/mach-vexpress/Makefile.boot
++++ b/arch/arm/mach-vexpress/Makefile.boot
+@@ -3,3 +3,5 @@
+    zreladdr-y	+= 0x60008000
+ params_phys-y	:= 0x60000100
+ initrd_phys-y	:= 0x60800000
 +
-+		if (WARN_ON(!reg))
-+			return -EINVAL;
-+
-+		vexpress_dt_cortex_a9_scu_map[0].pfn =
-+				__phys_to_pfn(be32_to_cpup(reg));
-+		iotable_init(vexpress_dt_cortex_a9_scu_map,
-+				ARRAY_SIZE(vexpress_dt_cortex_a9_scu_map));
-+
-+		vexpress_dt_init_cpu_map(scu_get_core_count(V2T_PERIPH));
-+		set_smp_cross_call(gic_raise_softirq);
-+
-+		vexpress_dt_scu = CORTEX_A9_SCU;
-+
-+		return 1;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init vexpress_dt_nr_cpus(unsigned long node, const char *uname,
-+		int depth, void *data)
-+{
-+	static int prev_depth = -1;
-+	static int nr_cpus = -1;
-+
-+	if (prev_depth > depth && nr_cpus > 0)
-+		return nr_cpus;
-+
-+	if (nr_cpus < 0 && strcmp(uname, "cpus") == 0)
-+		nr_cpus = 0;
-+
-+	if (nr_cpus >= 0) {
-+		const char *device_type = of_get_flat_dt_prop(node,
-+				"device_type", NULL);
-+
-+		if (device_type && strcmp(device_type, "cpu") == 0)
-+			nr_cpus++;
-+	}
-+
-+	prev_depth = depth;
-+
-+	return 0;
-+}
-+
-+static void __init vexpress_dt_smp_init_cpus(void)
-+{
-+	int res = of_scan_flat_dt(vexpress_dt_find_scu, NULL);
-+
-+	if (WARN_ON(res < 0))
-+		return;
-+
-+	if (vexpress_dt_scu == UNKNOWN_SCU) {
-+		int ncores = of_scan_flat_dt(vexpress_dt_nr_cpus, NULL);
-+		if (ncores < 2)
-+			return;
-+
-+		vexpress_dt_scu = GENERIC_SCU;
-+
-+		vexpress_dt_init_cpu_map(ncores);
-+		set_smp_cross_call(gic_raise_softirq);
-+	}
-+}
-+
-+static void __init vexpress_dt_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	int i;
-+
-+	switch (vexpress_dt_scu) {
-+	case GENERIC_SCU:
-+		for (i = 0; i < max_cpus; i++)
-+			set_cpu_present(i, true);
-+		break;
-+	case CORTEX_A9_SCU:
-+		scu_enable(V2T_PERIPH);
-+		break;
-+	default:
-+		WARN_ON(1);
-+		break;
-+	}
-+}
-+
-+#else
-+
-+static void __init vexpress_dt_smp_init_cpus(void)
-+{
-+	WARN_ON(1);
-+}
-+
-+void __init vexpress_dt_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	WARN_ON(1);
-+}
-+
-+#endif
-+
- /*
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
-  */
- void __init smp_init_cpus(void)
- {
--	ct_desc->init_cpu_map();
-+	if (ct_desc)
-+		ct_desc->init_cpu_map();
-+	else
-+		vexpress_dt_smp_init_cpus();
-+
- }
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-@@ -34,7 +175,10 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * Initialise the present map, which describes the set of CPUs
- 	 * actually populated at the present time.
- 	 */
--	ct_desc->smp_enable(max_cpus);
-+	if (ct_desc)
-+		ct_desc->smp_enable(max_cpus);
-+	else
-+		vexpress_dt_smp_prepare_cpus(max_cpus);
- 
- 	/*
- 	 * Write the address of secondary startup into the
++dtb-$(CONFIG_ARCH_VEXPRESS_DT)	+= vexpress-v2p-ca5s.dtb
 -- 
 1.7.5.4
