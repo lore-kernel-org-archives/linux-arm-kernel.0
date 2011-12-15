@@ -1,59 +1,57 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Dec 2011 20:16:08 +0100
-Subject: [PATCH 6/6] ARM: at91/board-dt: remove AIC irq domain from board file
+Date: Thu, 15 Dec 2011 20:16:07 +0100
+Subject: [PATCH 5/6] ARM: at91/gpio: remove the static specification of
+ gpio_chip.base
 In-Reply-To: <1323976568-20244-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1323976568-20244-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <9fea5224b3a6544bd07c6e877d12870de9403b98.1323975517.git.nicolas.ferre@atmel.com>
+Message-ID: <62da3cffc145e2ada7ecbf4939a6029eb482d116.1323975517.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding of irqdomain in AIC code make the specification
-of the irq domain in board file useless.
+This value is determined at runtime using device tree or platform data
+information.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/board-dt.c |   15 +--------------
- 1 files changed, 1 insertions(+), 14 deletions(-)
+ arch/arm/mach-at91/gpio.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-index bb6b434..119eda6 100644
---- a/arch/arm/mach-at91/board-dt.c
-+++ b/arch/arm/mach-at91/board-dt.c
-@@ -15,8 +15,6 @@
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/gpio.h>
--#include <linux/irqdomain.h>
--#include <linux/of_irq.h>
- #include <linux/of_platform.h>
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index c390f71..8ed0bc9 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -49,7 +49,7 @@ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+ 					unsigned offset);
+ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
  
- #include <mach/hardware.h>
-@@ -88,17 +86,6 @@ static void __init ek_add_device_nand(void)
- 	at91_add_device_nand(&ek_nand_data);
- }
+-#define AT91_GPIO_CHIP(name, base_gpio, nr_gpio)			\
++#define AT91_GPIO_CHIP(name, nr_gpio)					\
+ 	{								\
+ 		.chip = {						\
+ 			.label		  = name,			\
+@@ -58,18 +58,17 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 			.get		  = at91_gpiolib_get,		\
+ 			.set		  = at91_gpiolib_set,		\
+ 			.dbg_show	  = at91_gpiolib_dbg_show,	\
+-			.base		  = base_gpio,			\
+ 			.to_irq		  = at91_gpiolib_to_irq,	\
+ 			.ngpio		  = nr_gpio,			\
+ 		},							\
+ 	}
  
--static const struct of_device_id aic_of_match[] __initconst = {
--	{ .compatible = "atmel,at91rm9200-aic", },
--	{},
--};
--
--static void __init at91_dt_init_irq(void)
--{
--	irq_domain_generate_simple(aic_of_match, 0xfffff000, 0);
--	at91_init_irq_default();
--}
--
- static void __init at91_dt_device_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-@@ -118,7 +105,7 @@ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
- 	.init_early	= ek_init_early,
--	.init_irq	= at91_dt_init_irq,
-+	.init_irq	= at91_init_irq_default,
- 	.init_machine	= at91_dt_device_init,
- 	.dt_compat	= at91_dt_board_compat,
- MACHINE_END
+ static struct at91_gpio_chip gpio_chip[] = {
+-	AT91_GPIO_CHIP("pioA", 0x00, 32),
+-	AT91_GPIO_CHIP("pioB", 0x20, 32),
+-	AT91_GPIO_CHIP("pioC", 0x40, 32),
+-	AT91_GPIO_CHIP("pioD", 0x60, 32),
+-	AT91_GPIO_CHIP("pioE", 0x80, 32),
++	AT91_GPIO_CHIP("pioA", 32),
++	AT91_GPIO_CHIP("pioB", 32),
++	AT91_GPIO_CHIP("pioC", 32),
++	AT91_GPIO_CHIP("pioD", 32),
++	AT91_GPIO_CHIP("pioE", 32),
+ };
+ 
+ static int gpio_banks;
 -- 
 1.7.5.4
