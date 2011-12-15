@@ -1,36 +1,41 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Thu, 15 Dec 2011 12:52:03 -0600
-Subject: [RFC V1 2/4] dts/imx6q: add cpufreq property
-In-Reply-To: <1323947798-25251-2-git-send-email-richard.zhao@linaro.org>
-References: <1323947798-25251-1-git-send-email-richard.zhao@linaro.org>
- <1323947798-25251-2-git-send-email-richard.zhao@linaro.org>
-Message-ID: <4EEA41D3.9010600@calxeda.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 15 Dec 2011 11:00:41 -0800
+Subject: [RFC PATCH] ARM: vmlinux.lds.S: do not hardcode cacheline size
+ as 32 bytes
+In-Reply-To: <1323799572-5641-1-git-send-email-will.deacon@arm.com>
+References: <1323799572-5641-1-git-send-email-will.deacon@arm.com>
+Message-ID: <4EEA43D9.9040700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2011 05:16 AM, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao<richard.zhao@linaro.org>
+On 12/13/11 10:06, Will Deacon wrote:
+> The linker script assumes a cacheline size of 32 bytes when aligning
+> the .data..cacheline_aligned and .data..percpu sections.
+>
+> This patch updates the script to use L1_CACHE_BYTES, which should be set
+> to 64 on platforms that require it.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->   arch/arm/boot/dts/imx6q.dtsi |    2 ++
->   1 files changed, 2 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 263e8f3..9e9943b 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -29,6 +29,8 @@
->   			compatible = "arm,cortex-a9";
->   			reg =<0>;
->   			next-level-cache =<&L2>;
-> +			cpu_freqs =<996000000 792000000 396000000 198000000>;
-> +			cpu_volts =<1225000 1100000 950000 850000>;
-+			trans_latency =<3000>;
->   		};
->
->   		cpu at 1 {
+> I'm posting this as an RFC because, whilst this fixes a bug, it looks
+> like many platforms don't select ARM_L1_CACHE_SHIFT_6 when they should
+> (all Cortex-A8 platforms should select this, for example).
 
-The trans_latency value definitely needs to be defined to avoid
-strange behavior in the driver.
+What are the implications of not having cache aligned data? Is it a
+performance impact or something more?
 
---Mark Langsdorf
-Calxeda, Inc.
+> @@ -205,7 +206,7 @@ SECTIONS
+>  #endif
+>  
+>  		NOSAVE_DATA
+> -		CACHELINE_ALIGNED_DATA(32)
+> +		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
+>  		READ_MOSTLY_DATA(32)
+
+Does READ_MOSTLY_DATA also need to be cache aligned? At least powerpc is
+doing that.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
