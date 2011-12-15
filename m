@@ -1,106 +1,275 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 15 Dec 2011 17:25:17 +0000
-Subject: [PATCH v6 3/9] ARM: versatile: Map local timers using Device
- Tree when possible
-In-Reply-To: <1323962751.18989.4.camel@hornet.cambridge.arm.com>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
- <1323957761-13553-4-git-send-email-pawel.moll@arm.com>
- <4EEA09E8.3010807@gmail.com>
- <1323962751.18989.4.camel@hornet.cambridge.arm.com>
-Message-ID: <1323969917.18989.8.camel@hornet.cambridge.arm.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Thu, 15 Dec 2011 17:48:48 +0000
+Subject: [PATCH] ARM: PL330: Fix driver freeze
+In-Reply-To: <1323631637-9610-1-git-send-email-javi.merino@arm.com>
+References: <4EE4EB91.6020508@arm.com>
+ <1323631637-9610-1-git-send-email-javi.merino@arm.com>
+Message-ID: <4EEA3300.9000402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-12-15 at 15:25 +0000, Pawel Moll wrote:
-> > I think your previous version was more correct. This is going to find
-> > the node and do ioremap N times where N is the number of cores. It does
-> > work though because that is what I did initially too.
+On 11/12/11 19:27, Javi Merino wrote:
+> Add a req_running field to the pl330_thread to track which request (if
+> any) has been submitted to the DMA.  This mechanism replaces the old
+> one in which we tried to guess the same by looking at the PC of the
+> DMA, which could prevent the driver from sending more requests if it
+> didn't guess correctly.
 > 
-> Right, how about that, then:
+> Signed-off-by: Javi Merino <javi.merino@arm.com>
+> Cc: Jassi Brar <jaswinder.singh@linaro.org>
+> ---
+>  arch/arm/common/pl330.c |  116 ++++++++++++++++++++---------------------------
+>  1 files changed, 49 insertions(+), 67 deletions(-)
 > 
-> @@ -21,6 +23,22 @@
+> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+> index f407a6b..8d8df74 100644
+> --- a/arch/arm/common/pl330.c
+> +++ b/arch/arm/common/pl330.c
+> @@ -221,17 +221,6 @@
 >   */
->  int __cpuinit local_timer_setup(struct clock_event_device *evt)
+>  #define MCODE_BUFF_PER_REQ	256
+>  
+> -/*
+> - * Mark a _pl330_req as free.
+> - * We do it by writing DMAEND as the first instruction
+> - * because no valid request is going to have DMAEND as
+> - * its first instruction to execute.
+> - */
+> -#define MARK_FREE(req)	do { \
+> -				_emit_END(0, (req)->mc_cpu); \
+> -				(req)->mc_len = 0; \
+> -			} while (0)
+> -
+>  /* If the _pl330_req is available to the client */
+>  #define IS_FREE(req)	(*((u8 *)((req)->mc_cpu)) == CMD_DMAEND)
+>  
+> @@ -301,8 +290,10 @@ struct pl330_thread {
+>  	struct pl330_dmac *dmac;
+>  	/* Only two at a time */
+>  	struct _pl330_req req[2];
+> -	/* Index of the last submitted request */
+> +	/* Index of the last enqueued request */
+>  	unsigned lstenq;
+> +	/* Index of the last submitted request or -1 if the DMA is stopped */
+> +	int req_running;
+>  };
+>  
+>  enum pl330_dmac_state {
+> @@ -778,6 +769,22 @@ static inline void _execute_DBGINSN(struct pl330_thread *thrd,
+>  	writel(0, regs + DBGCMD);
+>  }
+>  
+> +/*
+> + * Mark a _pl330_req as free.
+> + * We do it by writing DMAEND as the first instruction
+> + * because no valid request is going to have DMAEND as
+> + * its first instruction to execute.
+> + */
+> +static void mark_free(struct pl330_thread *thrd, int idx)
+> +{
+> +	struct _pl330_req *req = &thrd->req[idx];
+> +
+> +	_emit_END(0, req->mc_cpu);
+> +	req->mc_len = 0;
+> +
+> +	thrd->req_running = -1;
+> +}
+> +
+>  static inline u32 _state(struct pl330_thread *thrd)
 >  {
-> +#if defined(CONFIG_OF)
-> +       static int dt_node_probed;
+>  	void __iomem *regs = thrd->dmac->pinfo->base;
+> @@ -836,31 +843,6 @@ static inline u32 _state(struct pl330_thread *thrd)
+>  	}
+>  }
+>  
+> -/* If the request 'req' of thread 'thrd' is currently active */
+> -static inline bool _req_active(struct pl330_thread *thrd,
+> -		struct _pl330_req *req)
+> -{
+> -	void __iomem *regs = thrd->dmac->pinfo->base;
+> -	u32 buf = req->mc_bus, pc = readl(regs + CPC(thrd->id));
+> -
+> -	if (IS_FREE(req))
+> -		return false;
+> -
+> -	return (pc >= buf && pc <= buf + req->mc_len) ? true : false;
+> -}
+> -
+> -/* Returns 0 if the thread is inactive, ID of active req + 1 otherwise */
+> -static inline unsigned _thrd_active(struct pl330_thread *thrd)
+> -{
+> -	if (_req_active(thrd, &thrd->req[0]))
+> -		return 1; /* First req active */
+> -
+> -	if (_req_active(thrd, &thrd->req[1]))
+> -		return 2; /* Second req active */
+> -
+> -	return 0;
+> -}
+> -
+>  static void _stop(struct pl330_thread *thrd)
+>  {
+>  	void __iomem *regs = thrd->dmac->pinfo->base;
+> @@ -892,17 +874,22 @@ static bool _trigger(struct pl330_thread *thrd)
+>  	struct _arg_GO go;
+>  	unsigned ns;
+>  	u8 insn[6] = {0, 0, 0, 0, 0, 0};
+> +	int idx;
+>  
+>  	/* Return if already ACTIVE */
+>  	if (_state(thrd) != PL330_STATE_STOPPED)
+>  		return true;
+>  
+> -	if (!IS_FREE(&thrd->req[1 - thrd->lstenq]))
+> -		req = &thrd->req[1 - thrd->lstenq];
+> -	else if (!IS_FREE(&thrd->req[thrd->lstenq]))
+> -		req = &thrd->req[thrd->lstenq];
+> -	else
+> -		req = NULL;
+> +	idx = 1 - thrd->lstenq;
+> +	if (!IS_FREE(&thrd->req[idx]))
+> +		req = &thrd->req[idx];
+> +	else {
+> +		idx = thrd->lstenq;
+> +		if (!IS_FREE(&thrd->req[idx]))
+> +			req = &thrd->req[idx];
+> +		else
+> +			req = NULL;
+> +	}
+>  
+>  	/* Return if no request */
+>  	if (!req || !req->r)
+> @@ -933,6 +920,8 @@ static bool _trigger(struct pl330_thread *thrd)
+>  	/* Only manager can execute GO */
+>  	_execute_DBGINSN(thrd, insn, true);
+>  
+> +	thrd->req_running = idx;
 > +
-> +       if (!dt_node_probed) {
-> +               struct device_node *node = of_find_compatible_node(NULL,
-> +                               NULL, "arm,smp-twd");
-> +
-> +               if (node)
-> +                       twd_base = of_iomap(node, 0);
-> +
-> +               dt_node_probed = 1;
-> +       }
-> +#endif
-> +       if (!twd_base)
-> +               return -ENXIO;
-> +
->         evt->irq = IRQ_LOCALTIMER;
->         twd_timer_setup(evt);
->         return 0;
+>  	return true;
+>  }
+>  
+> @@ -1382,8 +1371,8 @@ static void pl330_dotask(unsigned long data)
+>  
+>  			thrd->req[0].r = NULL;
+>  			thrd->req[1].r = NULL;
+> -			MARK_FREE(&thrd->req[0]);
+> -			MARK_FREE(&thrd->req[1]);
+> +			mark_free(thrd, 0);
+> +			mark_free(thrd, 1);
+>  
+>  			/* Clear the reset flag */
+>  			pl330->dmac_tbd.reset_chan &= ~(1 << i);
+> @@ -1461,14 +1450,12 @@ int pl330_update(const struct pl330_info *pi)
+>  
+>  			thrd = &pl330->channels[id];
+>  
+> -			active = _thrd_active(thrd);
+> -			if (!active) /* Aborted */
+> +			active = thrd->req_running;
+> +			if (active == -1) /* Aborted */
+>  				continue;
+>  
+> -			active -= 1;
+> -
+>  			rqdone = &thrd->req[active];
+> -			MARK_FREE(rqdone);
+> +			mark_free(thrd, active);
+>  
+>  			/* Get going again ASAP */
+>  			_start(thrd);
+> @@ -1509,7 +1496,7 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+>  	struct pl330_thread *thrd = ch_id;
+>  	struct pl330_dmac *pl330;
+>  	unsigned long flags;
+> -	int ret = 0, active;
+> +	int ret = 0, active = thrd->req_running;
+>  
+>  	if (!thrd || thrd->free || thrd->dmac->state == DYING)
+>  		return -EINVAL;
+> @@ -1525,28 +1512,24 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+>  
+>  		thrd->req[0].r = NULL;
+>  		thrd->req[1].r = NULL;
+> -		MARK_FREE(&thrd->req[0]);
+> -		MARK_FREE(&thrd->req[1]);
+> +		mark_free(thrd, 0);
+> +		mark_free(thrd, 1);
+>  		break;
+>  
+>  	case PL330_OP_ABORT:
+> -		active = _thrd_active(thrd);
+> -
+>  		/* Make sure the channel is stopped */
+>  		_stop(thrd);
+>  
+>  		/* ABORT is only for the active req */
+> -		if (!active)
+> +		if (active == -1)
+>  			break;
+>  
+> -		active--;
+> -
+>  		thrd->req[active].r = NULL;
+> -		MARK_FREE(&thrd->req[active]);
+> +		mark_free(thrd, active);
+>  
+>  		/* Start the next */
+>  	case PL330_OP_START:
+> -		if (!_thrd_active(thrd) && !_start(thrd))
+> +		if ((active == -1) && !_start(thrd))
+>  			ret = -EIO;
+>  		break;
+>  
+> @@ -1587,14 +1570,13 @@ int pl330_chan_status(void *ch_id, struct pl330_chanstatus *pstatus)
+>  	else
+>  		pstatus->faulting = false;
+>  
+> -	active = _thrd_active(thrd);
+> +	active = thrd->req_running;
+>  
+> -	if (!active) {
+> +	if (active == -1) {
+>  		/* Indicate that the thread is not running */
+>  		pstatus->top_req = NULL;
+>  		pstatus->wait_req = NULL;
+>  	} else {
+> -		active--;
+>  		pstatus->top_req = thrd->req[active].r;
+>  		pstatus->wait_req = !IS_FREE(&thrd->req[1 - active])
+>  					? thrd->req[1 - active].r : NULL;
+> @@ -1659,9 +1641,9 @@ void *pl330_request_channel(const struct pl330_info *pi)
+>  				thrd->free = false;
+>  				thrd->lstenq = 1;
+>  				thrd->req[0].r = NULL;
+> -				MARK_FREE(&thrd->req[0]);
+> +				mark_free(thrd, 0);
+>  				thrd->req[1].r = NULL;
+> -				MARK_FREE(&thrd->req[1]);
+> +				mark_free(thrd, 1);
+>  				break;
+>  			}
+>  		}
+> @@ -1767,14 +1749,14 @@ static inline void _reset_thread(struct pl330_thread *thrd)
+>  	thrd->req[0].mc_bus = pl330->mcode_bus
+>  				+ (thrd->id * pi->mcbufsz);
+>  	thrd->req[0].r = NULL;
+> -	MARK_FREE(&thrd->req[0]);
+> +	mark_free(thrd, 0);
+>  
+>  	thrd->req[1].mc_cpu = thrd->req[0].mc_cpu
+>  				+ pi->mcbufsz / 2;
+>  	thrd->req[1].mc_bus = thrd->req[0].mc_bus
+>  				+ pi->mcbufsz / 2;
+>  	thrd->req[1].r = NULL;
+> -	MARK_FREE(&thrd->req[1]);
+> +	mark_free(thrd, 1);
+>  }
+>  
+>  static int dmac_alloc_threads(struct pl330_dmac *pl330)
 
-Ok, so I have updated the both vexpress-dt and
-vexpress-dt-rmk-devel-stable branches like that.
+I've done some testing and I haven't been able to break it.  Can
+somebody please test this patch with the workload that failed (audio in
+exynos I believe)?
 
-Arnd, Russell, the new pull request below.
-
-I'll see you all next year!
-
-Cheers!
-
-Pawe?
-
-8<-------------------------------------------------------------------
-
-The following changes since commit 55b02d2f4445ad625213817a1736bf2884d32547:
-
-  Merge branch 'drm-fixes' of git://people.freedesktop.org/~airlied/linux (2011-12-14 19:45:40 -0800)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress-dt
-
-Pawel Moll (9):
-      ARM: versatile: Add missing ENDPROC to headsmp.S
-      ARM: vexpress: Get rid of MMIO_P2V
-      ARM: versatile: Map local timers using Device Tree when possible
-      ARM: vexpress: Use FDT data in platform SMP calls
-      ARM: vexpress: Add Device Tree support
-      ARM: vexpress: Motherboard RS1 memory map support
-      ARM: vexpress: Add Device Tree for V2P-CA5s core tile
-      ARM: vexpress: Add Device Tree for V2P-CA9 core tile
-      ARM: vexpress: Add Device Tree for V2P-CA15 core tile (TC1 variant)
-
- Documentation/devicetree/bindings/arm/vexpress.txt |  144 ++++++++++
- arch/arm/Kconfig                                   |    2 +-
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  201 ++++++++++++++
- arch/arm/boot/dts/vexpress-v2m.dtsi                |  200 ++++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  155 +++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |  160 +++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  190 +++++++++++++
- arch/arm/include/asm/hardware/arm_timer.h          |    5 +
- arch/arm/mach-realview/platsmp.c                   |    3 +-
- arch/arm/mach-vexpress/Kconfig                     |   45 +++-
- arch/arm/mach-vexpress/Makefile.boot               |    6 +
- arch/arm/mach-vexpress/core.h                      |    9 +-
- arch/arm/mach-vexpress/ct-ca9x4.c                  |   48 +---
- arch/arm/mach-vexpress/include/mach/ct-ca9x4.h     |   13 +-
- arch/arm/mach-vexpress/include/mach/debug-macro.S  |   37 +++-
- arch/arm/mach-vexpress/include/mach/irqs.h         |    2 +-
- arch/arm/mach-vexpress/include/mach/motherboard.h  |   58 +++--
- arch/arm/mach-vexpress/include/mach/uncompress.h   |   13 +-
- arch/arm/mach-vexpress/platsmp.c                   |  153 ++++++++++-
- arch/arm/mach-vexpress/v2m.c                       |  282 ++++++++++++++++++--
- arch/arm/mm/Kconfig                                |    2 +-
- arch/arm/plat-versatile/headsmp.S                  |    1 +
- arch/arm/plat-versatile/localtimer.c               |   19 ++
- 23 files changed, 1628 insertions(+), 120 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/vexpress.txt
- create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
- create mode 100644 arch/arm/boot/dts/vexpress-v2m.dtsi
- create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
- create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca5s.dts
- create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca9.dts
+Thanks,
+Javi
