@@ -1,20 +1,72 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 15 Dec 2011 17:08:05 +0800
-Subject: [PATCH] serial/imx: let probing fail for the dt case without a
- valid alias
-In-Reply-To: <1323936994-2250-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20111215021046.GD3259@S2101-09.ap.freescale.net>
- <1323936994-2250-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20111215090804.GC22541@S2101-09.ap.freescale.net>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Thu, 15 Dec 2011 08:59:28 +0000
+Subject: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux subsystem
+In-Reply-To: <CACRpkdbN26q1_d4tPkJp4f4_KdvoEEk9uCCRyOfEU97DOWAnEw@mail.gmail.com>
+References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+ <1323878622-26602-5-git-send-email-b29396@freescale.com>
+ <20111214211152.GM27267@pengutronix.de>
+ <CACRpkdYHtgx3Qgx4QRdgOahQXjvSWE_iogWCZjaYQ-VnyS62uQ@mail.gmail.com>
+ <20111215070505.GA22541@S2101-09.ap.freescale.net>
+ <CACRpkdbN26q1_d4tPkJp4f4_KdvoEEk9uCCRyOfEU97DOWAnEw@mail.gmail.com>
+Message-ID: <7FE21149F4667147B645348EC60578850564C5@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 09:16:34AM +0100, Uwe Kleine-K?nig wrote:
-> When the uart device is instantiated by dt but dt doesn't provide an
-> alias then better let probing fail instead of falling back to an
-> unrelated device id used for the line number and no platform data.
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: Thursday, December 15, 2011 4:27 PM
+> To: Guo Shawn-R65073
+> Cc: Sascha Hauer; Dong Aisheng-B29396; linus.walleij at stericsson.com;
+> linux-kernel at vger.kernel.org; rob.herring at calxeda.com;
+> grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> kernel at pengutronix.de
+> Subject: Re: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux
+> subsystem
+> Importance: High
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
+> On Thu, Dec 15, 2011 at 8:05 AM, Shawn Guo <shawn.guo@freescale.com>
+> wrote:
+> >[Me]
+> >> So if you want to do this for i.MX you need something like selectable
+> >> dummy pinmuxes, i.e. pinmux_get() to return something that just say
+> >> "OK" to everything like the dummy regulators.
+> >>
+> >> Shall I try to create something like that?
+> >>
+> > Isn't the empty functions defined in include/linux/pinctrl/pinmux.h
+> > for this purpose?
+> 
+> No, these are for compiling it *out*, dummy pinmuxes would be if you
+> compile it *in*, but don't find an apropriate pinmux, you still get
+> something that does nothing and still works.
+> 
+> Dummy regulators work exactly this way.
+> 
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+I did not read the dummy regulator code too much.
+But does it mean that the dummy regulator or dummy pinmux will also hide the
+Real errors since it will always get a available one?
+How do we distinguish between the two case(real error and fake error)?
+
+> > It does not solve the problem with single image.
+> 
+> I think it does.
+> 
+> > You might probably mean that we create a dummy_pinctrl_desc and
+> > register it to pinctrl core with pinctrl_register() if we detect that
+> > the kernel is running on a soc that has no pinctrl support?
+> 
+> No. You have a #ifdef CONFIG_PINMUX_DUMMY in pinmux_get() that makes sure
+> you return a working no-op pinmux handle even though there is no real
+> pinmux behind it.
+> 
+> > This is not a problem to pinctrl migration only. ?We have the same
+> > problem with common clk migration. ?Unless we migrate imx3, imx5 and
+> > imx6 to common clk at the same time, single image build just does not
+> > cope with clk_* api.
+> 
+> And  you could have the same problem with regulator migration...
+> Luckily dummy regulators saves you in that case.
+> 
+> Thanks,
+> Linus Walleij
