@@ -1,69 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 15 Dec 2011 10:17:44 -0600
-Subject: [PATCH 3/9] irq: convert generic-chip to use irq_domain
-In-Reply-To: <CACxGe6t=ngbzNLkX+df8gP0aoMmgnsVqn2V2eRHpGi5FoFci_w@mail.gmail.com>
-References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
- <1323876538-20406-4-git-send-email-robherring2@gmail.com>
- <20111215052512.GB21815@S2101-09.ap.freescale.net>
- <20111215055501.GC21815@S2101-09.ap.freescale.net>
- <4EE9F899.7010402@gmail.com> <4EE9FC99.6030905@gmail.com>
- <CACxGe6t=ngbzNLkX+df8gP0aoMmgnsVqn2V2eRHpGi5FoFci_w@mail.gmail.com>
-Message-ID: <4EEA1DA8.6040705@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 15 Dec 2011 17:28:49 +0100
+Subject: [PATCH 1/3] ARM: OMAP2+: kconfig: Enable devicetree by default
+ for OMAP2+ systems
+In-Reply-To: <20111213223855.GW32251@atomide.com>
+References: <y> <1323190149-6492-2-git-send-email-b-cousson@ti.com>
+ <1323782836.1877.79.camel@deskari> <4EE75448.4010701@ti.com>
+ <20111213223855.GW32251@atomide.com>
+Message-ID: <4EEA2041.6070304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2011 09:55 AM, Grant Likely wrote:
-> On Thu, Dec 15, 2011 at 6:56 AM, Rob Herring <robherring2@gmail.com> wrote:
->> Shawn,
->>
->> On 12/15/2011 07:39 AM, Rob Herring wrote:
->>> On 12/14/2011 11:55 PM, Shawn Guo wrote:
->>>> On Thu, Dec 15, 2011 at 01:25:20PM +0800, Shawn Guo wrote:
->>>>> On Wed, Dec 14, 2011 at 09:28:52AM -0600, Rob Herring wrote:
->>>>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>>>
->>>>>> Add irq domain support to irq generic-chip. This enables users of
->>>>>> generic-chip to support dynamic irq assignment needed for DT interrupt
->>>>>> binding. Users must be converted to use irq_data.hwirq for determining
->>>>>> local interrupt numbers rather than using the Linux irq number.
->>>>>>
->>>>>> irq_base is kept for now as there are a few users of it. Once they
->>>>>> are converted to use the irq domain, it can be removed.
->>>>>>
->>>>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->>>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>>>> ---
->>>>>
->>>>> Tested-by: Shawn Guo <shawn.guo@linaro.org>
->>>>>
->>>> Sorry, I have to take that tag back after I correct my test setup.
->>>> It does not work for imx5 TZIC case, because the following change
->>>> I suggested before is missed.
->>>>
->>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->>>> index eb763f7..2a2aac1 100644
->>>> --- a/kernel/irq/irqdomain.c
->>>> +++ b/kernel/irq/irqdomain.c
->>>> @@ -39,7 +39,7 @@ void irq_domain_add(struct irq_domain *domain)
->>>>                         return;
->>>>                 }
->>>>                 d->domain = domain;
->>>> -               d->hwirq = hwirq;
->>>> +               d->hwirq = hwirq - domain->hwirq_base;
+On 12/13/2011 11:38 PM, Tony Lindgren wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [111213 05:02]:
+>> On 12/13/2011 2:27 PM, Tomi Valkeinen wrote:
+>>> Hi,
 >>>
->>> This is a problem. It entirely defeats the point of hwirq_base and it
->>> would break the GIC. We need to fix this in the generic irq chip.
+>>> On Tue, 2011-12-06 at 17:49 +0100, Benoit Cousson wrote:
+>>>> devicetree will become the mandatory boot method for OMAP2+.
+>>>> In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
+>>>> select USE_OF by default for every OMAP2+ systems.
+>>>> Select as well the APPENDED_DTB and ATAG_DTB_COMPAT to allow legacy
+>>>> boot loader to keep working properly.
 >>>
+>>> APPENDED_DTB sounds a bit dangerous to be enabled by default according
+>>> to the config help text.
 >>
->> I think I found a fix. Can you try 's/d->hwirq/(d->hwirq % 32)/' in
->> generic-chip.c.
-> 
-> Ugh, but that hard codes an assumption that a domain cannot have more
-> that 32 irqs.
-> 
-> /me goes to dig into irq_domain code...
+>> The help is indeed really scary :-)
+>
+> Heh, but it's also true.
+>
+>> Tony,
+>> Do we want to keep it by default? Or should we fix the kconfig help?
+>
+> Let's just leave out those two from omap2plus_defconfig then.
 
-No, it hard codes that generic irq chip is 32 interrupts at most which
-is already the case. That's why the TZIC uses 5 generic irq chip instances.
+OK. I'll do that.
 
-Rob
+Benoit
