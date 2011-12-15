@@ -1,30 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Dec 2011 15:15:45 +0100
-Subject: [GIT PULL] at91 defconfigs for 3.3
-Message-ID: <4EEA0111.2000907@atmel.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 15 Dec 2011 09:22:11 -0500 (EST)
+Subject: label string for kirkwood gpiochip
+In-Reply-To: <4EE9FC0D.10009@keymile.com>
+References: <4EE9FC0D.10009@keymile.com>
+Message-ID: <alpine.LFD.2.02.1112150920430.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Thu, 15 Dec 2011, Holger Brunck wrote:
 
-Here is a single patch that removes a defconfig for AT91. 
-It is not needed anymore as we tend to group defconfigs by
-SoC and build all boards into it.
+> Hi,
+> we recently switched with our kirkwood based board to a newer kernel version.
+> Our application code is written in that way if someone request an gpio in
+> userspace that he do search the gpiochip via the gpio label.
+> 
+> The newer kernel version handles the gpiochip on kirkwood in a different way.
+> The orion_gpio_init function in arch/arm/mach-kirkwood/irq.c was called twice.
+> Once for first 32 gpios and a second time for the remaining 18 gpios. This
+> causes that the gpio framework shows two gpiochips in the sysfs with the same
+> label (orion_gpio).
+> 
+> [@km_kirkwood /]# cat /sys/class/gpio/gpiochip0/label
+> orion_gpio
+> [@km_kirkwood /]# cat /sys/class/gpio/gpiochip32/label
+> orion_gpio
+> 
+> So my question is simply, shouldn't be the string for a gpiochip unique in the
+> system and therefore this should be fixed or was this intended?
 
-The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+I don't think that was intended.
 
-  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
 
-are available in the git repository at:
-  git://github.com/at91linux/linux-at91.git for-arnd-3.3-defconfig
-
-Paul Gortmaker (1):
-      ARM: at91: delete the pcontrol_g20_defconfig
-
- arch/arm/configs/pcontrol_g20_defconfig |  175 -------------------------------
- 1 files changed, 0 insertions(+), 175 deletions(-)
- delete mode 100644 arch/arm/configs/pcontrol_g20_defconfig
-
-Thanks, best regards,
--- 
-Nicolas Ferre
+Nicolas
