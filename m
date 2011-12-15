@@ -1,39 +1,28 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 15 Dec 2011 17:28:49 +0100
-Subject: [PATCH 1/3] ARM: OMAP2+: kconfig: Enable devicetree by default
- for OMAP2+ systems
-In-Reply-To: <20111213223855.GW32251@atomide.com>
-References: <y> <1323190149-6492-2-git-send-email-b-cousson@ti.com>
- <1323782836.1877.79.camel@deskari> <4EE75448.4010701@ti.com>
- <20111213223855.GW32251@atomide.com>
-Message-ID: <4EEA2041.6070304@ti.com>
+From: linux_arm@lakedaemon.net (Jason)
+Date: Thu, 15 Dec 2011 11:10:05 -0500
+Subject: [PATCH 0/4] [orion] move *_mbus_dram_info out of platform_data
+In-Reply-To: <1321599572-705-1-git-send-email-andrew@lunn.ch>
+References: <1321599572-705-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20111215161005.GP23844@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2011 11:38 PM, Tony Lindgren wrote:
-> * Cousson, Benoit<b-cousson@ti.com>  [111213 05:02]:
->> On 12/13/2011 2:27 PM, Tomi Valkeinen wrote:
->>> Hi,
->>>
->>> On Tue, 2011-12-06 at 17:49 +0100, Benoit Cousson wrote:
->>>> devicetree will become the mandatory boot method for OMAP2+.
->>>> In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
->>>> select USE_OF by default for every OMAP2+ systems.
->>>> Select as well the APPENDED_DTB and ATAG_DTB_COMPAT to allow legacy
->>>> boot loader to keep working properly.
->>>
->>> APPENDED_DTB sounds a bit dangerous to be enabled by default according
->>> to the config help text.
->>
->> The help is indeed really scary :-)
->
-> Heh, but it's also true.
->
->> Tony,
->> Do we want to keep it by default? Or should we fix the kconfig help?
->
-> Let's just leave out those two from omap2plus_defconfig then.
+Andrew,
 
-OK. I'll do that.
+On Fri, Nov 18, 2011 at 07:59:28AM +0100, Andrew Lunn wrote:
+> Boot tested on kirkwood, compile tested on other orion based systems.
+> 
+> Andrew Lunn (4):
+>   [orion] Consolidate the address map setup on Orion based platforms.
+>   [orion] Move the *_mbus_dram_info structure into the orion platform  
+>       and call it orion_mbus_dram_info everywhere.
+>   [orion] Get address map from plat-orion instead of via platform_data.
+>   [orion] Remove address map info from all platform data strucutures.
 
-Benoit
+Do you have a public git tree I could pull from?  I'd like to assist
+with testing / contributing towards this.  If you've started on a
+kirkwood.dtsi I could base off of, that would be great.
+
+thx,
+
+Jason.
