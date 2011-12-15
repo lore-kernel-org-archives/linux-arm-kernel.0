@@ -1,35 +1,26 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 15 Dec 2011 10:25:54 +0800
-Subject: [PATCH] ARM: add device tree blobs to .gitignore
-In-Reply-To: <1323808612-14976-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1323808612-14976-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20111215022553.GE3259@S2101-09.ap.freescale.net>
+From: Jon.Povey@racelogic.co.uk (Jon Povey)
+Date: Thu, 15 Dec 2011 02:45:32 +0000
+Subject: OT: ARM Linux job in Buckingham, UK
+Message-ID: <70E876B0EA86DD4BAF101844BC814DFE0BF3F7C869@Cloud.RL.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 09:36:52PM +0100, Uwe Kleine-K?nig wrote:
-> *.dtb files are a build result and so should be ignored.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
+Hello folks,
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+My company Racelogic is looking for another ARM Linux dev to work in Buckingham, UK with me and the rest of our dev team, job ad here:
 
--- 
-Regards,
-Shawn
+http://www.racelogic.co.uk/index.php/en/careersjobs
 
->  arch/arm/boot/.gitignore |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/.gitignore b/arch/arm/boot/.gitignore
-> index ce1c5ff..3c79f85 100644
-> --- a/arch/arm/boot/.gitignore
-> +++ b/arch/arm/boot/.gitignore
-> @@ -3,3 +3,4 @@ zImage
->  xipImage
->  bootpImage
->  uImage
-> +*.dtb
-> -- 
-> 1.7.7.3
+Sorry if this is considered off-topic, I don't mean to be spammy.
+Suggestions for more appropriate ways to find people like this are welcome and appreciated.
+
+Thanks,
+
+--
+Jon Povey
+jon.povey at racelogic.co.uk
+
+Racelogic is a limited company registered in England. Registered number 2743719 .
+Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
+
+The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
