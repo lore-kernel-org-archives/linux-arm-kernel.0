@@ -1,53 +1,82 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 15 Dec 2011 14:36:13 -0700
-Subject: [PATCH 1/9] ARM: OMAP2+: mux: add wakeup-capable hwmod mux entries to
- dynamic list
-In-Reply-To: <20111215213358.26632.44165.stgit@dusk>
-References: <20111215213358.26632.44165.stgit@dusk>
-Message-ID: <20111215213609.26632.43406.stgit@dusk>
+Date: Thu, 15 Dec 2011 14:36:09 -0700
+Subject: [PATCHv12 0/9] OMAP3+: PRCM chain handler
+Message-ID: <20111215213358.26632.44165.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_hwmod_mux() currently only iterates through the dynamic pad list.
-This list currently only consists of pads with the
-OMAP_DEVICE_MUX_REMUX flag set.
+Hi,
 
-Subsequent patches in this series will cause hwmod mux entries with
-the OMAP_DEVICE_MUX_WAKEUP flag set to be changed dynamically, to
-control hwmod I/O ring wakeup.  For this to work correctly, hwmod mux
-entries with the OMAP_DEVICE_MUX_WAKEUP flag set must also be added to
-the dynamic pad list.  So this patch modifies omap_hwmod_mux_init() to
-do so.
+This is a repost of Tero's PRCM chain handler patch set with a few changes:
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Govindraj R <govindraj.raja@ti.com>
+- A new mux patch has been added to place hwmod mux entries with
+  OMAP_DEVICE_PAD_WAKEUP set into the dynamic list
+
+- Several OCP barriers have been added to PRM writes to try to protect
+  against races between PRM register writes and the MPU
+
+- Kerneldoc documentation has been added
+
+- The pending IRQ test functions have been split into per-SoC versions
+
+- Some patches have been rearranged and merged to avoid churn
+
+- The PRM IRQ handler is now installed on OMAP4
+
+This updated series has been tested on OMAP3530 BeagleBoard in dynamic idle
+with off-mode enabled, although the functions that do dynamic IRQ mapping
+have not been tested.
+
+I've preserved Signed-off-by:s and other tags, even though the patches
+have been rearranged.  Any further testing would be appreciated, and if any
+Signed-off-by: or other tag does not belong, please advise and I'll remove it.
+I'd like to send Tony a pull request for this tomorrow.
+
+Original series description follows:
+
+From: Tero Kristo <t-kristo@ti.com>
+
+PRCM chain handler is adding a support to the omap3+ kernel that
+allows different drivers to use PRCM interrupt events for their
+own purposes, typically this means IO wakeups. This work was
+attempted to integrate as its own driver at some point of
+the evolution of this set, however this was now postponed as
+the lacking support is basically blocking a few drivers.
+
 ---
- arch/arm/mach-omap2/mux.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 655e948..a474c81 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -306,7 +306,8 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads)
- 		pad->idle = bpad->idle;
- 		pad->off = bpad->off;
- 
--		if (pad->flags & OMAP_DEVICE_PAD_REMUX)
-+		if (pad->flags &
-+		    (OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP))
- 			nr_pads_dynamic++;
- 
- 		pr_debug("%s: Initialized %s\n", __func__, pad->name);
-@@ -331,7 +332,8 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads)
- 	for (i = 0; i < hmux->nr_pads; i++) {
- 		struct omap_device_pad *pad = &hmux->pads[i];
- 
--		if (pad->flags & OMAP_DEVICE_PAD_REMUX) {
-+		if (pad->flags &
-+		    (OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP)) {
- 			pr_debug("%s: pad %s tagged dynamic\n",
- 					__func__, pad->name);
- 			hmux->pads_dynamic[nr_pads_dynamic] = pad;
+tk_prm_chain_handler_devel_3.3
+   text	   data	    bss	    dec	    hex	filename
+6476701	 671380	5588224	12736305	 c25731	vmlinux.omap2plus_defconfig.orig
+6483705	 671468	5588224	12743397	 c272e5	vmlinux.omap2plus_defconfig.patched
+
+
+Govindraj R (1):
+      ARM: OMAP2+: hwmod: Add API to enable IO ring wakeup
+
+Paul Walmsley (2):
+      ARM: OMAP2+: mux: add wakeup-capable hwmod mux entries to dynamic list
+      ARM: OMAP3/4: PRM: add functions to read pending IRQs, PRM barrier
+
+Tero Kristo (6):
+      ARM: OMAP: PRCM: add support for chain interrupt handler
+      ARM: OMAP: PRCM: add suspend prepare / finish support
+      ARM: OMAP2+: mux: add support for PAD wakeup interrupts
+      ARM: OMAP: hwmod: add support for selecting mpu_irq for each wakeup pad
+      ARM: OMAP3: pm: use prcm chain handler
+      ARM: OMAP4: PRM: use PRCM interrupt handler
+
+
+ arch/arm/mach-omap2/Makefile                 |    5 
+ arch/arm/mach-omap2/mux.c                    |   89 +++++++
+ arch/arm/mach-omap2/omap_hwmod.c             |  102 ++++++++
+ arch/arm/mach-omap2/pm34xx.c                 |  115 ++++-----
+ arch/arm/mach-omap2/prcm-common.h            |   75 ++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.c           |   97 ++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h           |    9 +
+ arch/arm/mach-omap2/prm44xx.c                |  116 +++++++++
+ arch/arm/mach-omap2/prm44xx.h                |    8 +
+ arch/arm/mach-omap2/prm_common.c             |  320 ++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 
+ 11 files changed, 860 insertions(+), 79 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/prm_common.c
