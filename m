@@ -1,60 +1,79 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 15 Dec 2011 08:44:48 +0800
-Subject: serial tty name
-In-Reply-To: <20111214183341.GK4585@pengutronix.de>
-References: <20111214144344.GA2090@richard-laptop>
- <4EE8BC52.5060905@compulab.co.il>
- <20111214183341.GK4585@pengutronix.de>
-Message-ID: <20111215004447.GO28768@b20223-02.ap.freescale.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 14 Dec 2011 16:53:50 -0800
+Subject: [GIT PULL] OMAP: UART cleanup and runtime PM conversion for v3.3
+Message-ID: <878vmeodsx.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 07:33:41PM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Dec 14, 2011 at 05:10:10PM +0200, Igor Grinberg wrote:
-> > Hi Richard,
-> > 
-> > On 12/14/11 16:43, Richard Zhao wrote:
-> > > How to map different uart port to ttymxc0 (take imx for example)?
-> > > 
-> > > In rootfs, it usually "getty ttymxc0"  to get
-> > > serial console. And the rootfs may be shared by different boards.
-> > > Traditionaly way is to set right platform device ID.
-> > > 
-> > > But with DT, UART2 always generate ttymxc1, UART3 for ttymxc2. You
-> > > always needs to modify the getty command when your change another board.
-> > > 
-> > > Is there a way to fix it?
-> > 
-> > As for fix in userspace, you can spawn getty on every ttymxc*,
-> > so you will get it always.
-> > 
-> > Another (userspace) fix would be:
-> > Instead of getty, add a script (say getty.sh) which will do something like:
-> > -----------
-> > CONSOLE=`cat /proc/cmdline | tr " " "\n" | grep console= | tr "=" " " | tr "," " "`
-> > TTY=`echo $CONSOLE | cut -d' ' -f 2`
-> > SPEED=`echo $CONSOLE | cut -d' ' -f 3`
-> > 
-> > /sbin/getty -L $TTY $SPEED vt100
-> > --------------
-> 
-> what about:
-> 
-> 	eval "$(sed 's/.*console=\([^,]*\),\([0-9]*\).*/tty=\1; speed=\2/'" /proc/cmdline)"
-> 
-> this should prevent getting a "useless use of cat award".
-Thanks.
-Richard
-> 
-> Best regards
-> Uwe
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Tony,
+
+Please pull the OMAP UART cleanup and conversion to runtime PM.  I had
+to rebase it onto your soc branch due to the serial.c changes there.
+
+This includes changes to drivers/tty/serial/omap-serial.c and those
+changes have Acks from Greg KH and Alan Cox and I got the OK from them
+to merge this all together via the OMAP tree.
+
+Thanks to Govindraj for his persistence with this series.
+
+Boot tested on 2420/n810, 4430/Blaze, 4430/Panda
+Additional PM testing on 3430/n900, 3530/Overo, 3630/Zoom3.
+
+NOTE: while normal UART behavior works fine with this series, including
+      suspend/resume, in order for wakeups from runtime PM to work, this
+      series depends on the PRCM IRQ chaining series from Tero and the
+      the new hwmod init state from Rajendra[1].  However, since runtime
+      PM is disabled by default for the UARTs, they will behave normally
+      even without those dependencies.
+
+Kevin
+
+[1] http://marc.info/?l=linux-omap&m=132187766930901&w=2
+
+
+The following changes since commit 4390f5b2cb1f568c1d4b3e5bbf57158f6809627a:
+
+  ARM: OMAP: TI814X: Add cpu type macros and detection support (2011-12-13 10:46:45 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/uart/runtime-pm
+
+Deepak K (1):
+      ARM: OMAP2+: UART: Allow UART parameters to be configured from board file.
+
+Govindraj.R (19):
+      ARM: OMAP2+: UART: cleanup + remove uart pm specific API
+      ARM: OMAP2+: UART: cleanup 8250 console driver support
+      ARM: OMAP2+: UART: Cleanup part of clock gating mechanism for uart
+      ARM: OMAP2+: UART: Add default mux for all uarts.
+      ARM: OMAP2+: UART: Remove mapbase/membase fields from pdata.
+      ARM: OMAP2+: UART: Add runtime pm support for omap-serial driver
+      ARM: OMAP2+: UART: Remove context_save and move context restore to driver
+      ARM: OMAP2+: UART: Ensure all reg values configured are available from port structure
+      ARM: OMAP2+: UART: Remove uart reset function.
+      ARM: OMAP2+: UART: Get context loss count to context restore
+      ARM: OMAP2+: UART: Move errata handling from serial.c to omap-serial
+      ARM: OMAP2+: UART: Add wakeup mechanism for omap-uarts
+      ARM: OMAP2+: UART: Remove old and unused clocks handling funcs
+      ARM: OMAP2+: UART: remove temporary variable used to count uart instance
+      ARM: OMAP2+: UART: Avoid console uart idling during bootup
+      ARM: OMAP2+: UART: Avoid uart idling on suspend for no_console_suspend usecase
+      ARM: OMAP2+: UART: Do not gate uart clocks if used for debug_prints
+      ARM: OMAP2+: UART: Remove omap_uart_can_sleep and add pm_qos
+      ARM: OMAP2+: UART: Fix compilation/sparse warnings
+
+Jon Hunter (1):
+      ARM: OMAP2+: UART: Make the RX_TIMEOUT for DMA configurable for each UART
+
+ arch/arm/mach-omap2/board-3430sdp.c           |  100 +---
+ arch/arm/mach-omap2/board-4430sdp.c           |   68 +--
+ arch/arm/mach-omap2/board-n8x0.c              |    6 +-
+ arch/arm/mach-omap2/board-omap4panda.c        |   68 +--
+ arch/arm/mach-omap2/cpuidle34xx.c             |    6 -
+ arch/arm/mach-omap2/pm24xx.c                  |   20 -
+ arch/arm/mach-omap2/pm34xx.c                  |   43 --
+ arch/arm/mach-omap2/serial.c                  |  907 +++++++------------------
+ arch/arm/plat-omap/include/plat/omap-serial.h |   37 +-
+ arch/arm/plat-omap/include/plat/serial.h      |   10 +-
+ drivers/tty/serial/omap-serial.c              |  350 +++++++++--
+ 11 files changed, 588 insertions(+), 1027 deletions(-)
