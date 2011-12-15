@@ -1,55 +1,90 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Dec 2011 16:10:46 +0100
-Subject: [GIT PULL] at91: drivers for 3.3
-Message-ID: <4EEA0DF6.3050408@atmel.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 15 Dec 2011 15:14:28 +0000
+Subject: [PATCH v4 REPOST 5/5] imx6q: Remove unconditional dependency on
+ l2x0 L2 cache support
+In-Reply-To: <20111215015414.GQ28768@b20223-02.ap.freescale.net>
+References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
+ <1323862781-3465-6-git-send-email-dave.martin@linaro.org>
+ <20111214132622.GA1520@S2100-06.ap.freescale.net>
+ <20111214140500.GA1700@richard-laptop>
+ <20111214150119.GD2568@linaro.org>
+ <20111215010219.GP28768@b20223-02.ap.freescale.net>
+ <20111215014619.GB3259@S2101-09.ap.freescale.net>
+ <20111215015414.GQ28768@b20223-02.ap.freescale.net>
+Message-ID: <20111215151427.GB2081@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Thu, Dec 15, 2011 at 09:54:15AM +0800, Richard Zhao wrote:
+> On Thu, Dec 15, 2011 at 09:46:20AM +0800, Shawn Guo wrote:
+> > On Thu, Dec 15, 2011 at 09:02:20AM +0800, Richard Zhao wrote:
+> > > On Wed, Dec 14, 2011 at 03:01:19PM +0000, Dave Martin wrote:
+> > > > On Wed, Dec 14, 2011 at 10:05:04PM +0800, Richard Zhao wrote:
+> > > > > On Wed, Dec 14, 2011 at 09:26:24PM +0800, Shawn Guo wrote:
+> > > > > > Hi Dave,
+> > > > > > 
+> > > > > > Sorry for that I did not look into previous post to point it out.
+> > > > > > 
+> > > > > > On Wed, Dec 14, 2011 at 11:39:41AM +0000, Dave Martin wrote:
+> > > > > > > The i.MX6 Quad SoC will work without the l2x0 L2 cache controller
+> > > > > > > support built into the kernel, so this patch removes the dependency
+> > > > > > > on CACHE_L2X0 and selects MIGHT_HAVE_CACHE_L2X0 instead.
+> > > > > > > 
+> > > > > > > This makes the l2x0 support optional, so that it can be turned off
+> > > > > > > when desired for debugging purposes etc.
+> > > > > > > 
+> > > > > > > Thanks to Shawn Guo for this suggestion. [1]
+> > > > > > > 
+> > > > > > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > > > > > > 
+> > > > > > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
+> > > > > > > ---
+> > > > > > >  arch/arm/mach-imx/Kconfig |    2 +-
+> > > > > > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > > > > > 
+> > > > > > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > > > > > > index 29a3d61..1fb93f2 100644
+> > > > > > > --- a/arch/arm/mach-imx/Kconfig
+> > > > > > > +++ b/arch/arm/mach-imx/Kconfig
+> > > > > > > @@ -609,13 +609,13 @@ comment "i.MX6 family:"
+> > > > > > >  config SOC_IMX6Q
+> > > > > > >  	bool "i.MX6 Quad support"
+> > > > > > >  	select ARM_GIC
+> > > > > > > -	select CACHE_L2X0
+> > > > > > >  	select CPU_V7
+> > > > > > >  	select HAVE_ARM_SCU
+> > > > > > >  	select HAVE_IMX_GPC
+> > > > > > >  	select HAVE_IMX_MMDC
+> > > > > > >  	select HAVE_IMX_SRC
+> > > > > > >  	select HAVE_SMP
+> > > > > > > +	select MIGHT_HAVE_CACHE_L2X0
+> > > > > > 
+> > > > > > The option SOC_IMX6Q is only available when ARCH_IMX_V6_V7 is selected.
+> > > > > > Since MIGHT_HAVE_CACHE_L2X0 has been selected by ARCH_IMX_V6_V7 in
+> > > > > > patch #1, this line seems redundant here.
+> > > > > Would it be better keep this one and remove patch #1 one? imx5 doesn't have
+> > > > > l2x0.
+> > > > 
+> > > > Do you mean to remove MIGHT_HAVE_CACHE_L2X0 from ARCH_IMX_V6_V7, and select
+> > > > it only from SOC_IMX6Q?
+> > > Yes, I think it's more precise. Shawn?
+> > > 
+> > No.
+> > 
+> > * imx5 hardware does have L2, and it's just not set up in the kernel
+> >   (I do not know why).
+> > * Currently, ARCH_IMX_V6_V7 only covers imx3 and imx6, and both are
+> >   calling l2x0 init function to set L2 up.
+> > * When we merge mach-mx5 into mach-imx to have ARCH_IMX_V6_V7 cover
+> >   imx3, imx5 and imx6, there is no reason for us to not set L2 up for
+> >   imx5 too.
+> > 
+> > So MIGHT_HAVE_CACHE_L2X0 really should be selected by ARCH_IMX_V6_V7.
+> mx5/cortex-a8 don't use L2X0. But that's ok. MIGHT_HAVE_CACHE_L2X0 is just a hint.
+> Please Shawn's suggestion.
 
-This is a first "drivers" part of our material for 3.3 merge window. It collects
-Ethernet drivers changes.
-One thing to note is that the macb.c driver is modified to support
-device tree. We agreed with David to drag those modifications into
-arm-soc git tree because they go on top of Jamie's work on macb-gem driver
-already in your drivers/macb-gem branch.
+OK, my local series has what I believe to be the correct change;
+I will repost based on that.
 
-This pull request goes on top of Linus' 3.2-rc5 commit but with additional 
-dependencies with two of your branches:
-1/ fixes (which seems already included in 3.2-rc5)
-2/ drivers/macb-gem
-
-I had to resolve a conflict while merging the macb-gem branche with current 3.2-rc5. The 
-resolution is commited into this branch.
-Tell me if you need more precision.
-
-
-The following changes since commit 6d69370e2b4a1e04e9ba0095d60aec7736fa1a99:
-
-  Merge remote-tracking branch 'armsoc/drivers/macb-gem' into for-3.3on32rc5-drivers (2011-12-15 15:55:59 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git for-arnd-3.3-drivers
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      net/macb: add DT support for Cadence macb/gem driver
-
-Nicolas Ferre (2):
-      ARM: at91/net: add macb ethernet controller in 9g45/9g20 DT
-      net/at91_ether: use gpio_is_valid for phy IRQ line
-
- Documentation/devicetree/bindings/net/macb.txt |   25 ++++++++
- arch/arm/boot/dts/at91sam9g20.dtsi             |    7 ++
- arch/arm/boot/dts/at91sam9g45.dtsi             |    7 ++
- arch/arm/boot/dts/at91sam9m10g45ek.dts         |    5 ++
- arch/arm/boot/dts/usb_a9g20.dts                |    5 ++
- drivers/net/ethernet/cadence/at91_ether.c      |   23 ++++---
- drivers/net/ethernet/cadence/macb.c            |   73 +++++++++++++++++++++---
- drivers/net/ethernet/cadence/macb.h            |    2 +
- 8 files changed, 129 insertions(+), 18 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/macb.txt
-
-Thanks, bye,
--- 
-Nicolas Ferre
+Cheers
+---Dave
