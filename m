@@ -1,105 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Dec 2011 12:54:28 +0100
-Subject: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux subsystem
-In-Reply-To: <20111215115300.GB10522@S2101-09.ap.freescale.net>
-References: <1323878622-26602-5-git-send-email-b29396@freescale.com>
- <20111214211152.GM27267@pengutronix.de>
- <CACRpkdYHtgx3Qgx4QRdgOahQXjvSWE_iogWCZjaYQ-VnyS62uQ@mail.gmail.com>
- <20111215070505.GA22541@S2101-09.ap.freescale.net>
- <CACRpkdbN26q1_d4tPkJp4f4_KdvoEEk9uCCRyOfEU97DOWAnEw@mail.gmail.com>
- <7FE21149F4667147B645348EC60578850564C5@039-SN2MPN1-013.039d.mgd.msft.net>
- <20111215093319.GO27267@pengutronix.de>
- <20111215112140.GA10522@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC60578850567C3@039-SN2MPN1-013.039d.mgd.msft.net>
- <20111215115300.GB10522@S2101-09.ap.freescale.net>
-Message-ID: <20111215115428.GQ27267@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 15 Dec 2011 13:02:17 +0100
+Subject: [PATCH v3] arm: omap3evm: Add support for an MT9M032 based camera
+ board.
+In-Reply-To: <1323886950.295978.31313@localhost>
+References: <1323825934-13320-1-git-send-email-martin@neutronstar.dyndns.org>
+ <201112141415.23885.laurent.pinchart@ideasonboard.com>
+ <1323886950.295978.31313@localhost>
+Message-ID: <201112151302.18508.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 07:53:05PM +0800, Shawn Guo wrote:
-> On Thu, Dec 15, 2011 at 07:28:18PM +0800, Dong Aisheng-B29396 wrote:
-> > > -----Original Message-----
-> > > From: Guo Shawn-R65073
-> > > Sent: Thursday, December 15, 2011 7:22 PM
-> > > To: Sascha Hauer
-> > > Cc: Dong Aisheng-B29396; Linus Walleij; Guo Shawn-R65073;
-> > > linus.walleij at stericsson.com; linux-kernel at vger.kernel.org;
-> > > rob.herring at calxeda.com; grant.likely at secretlab.ca; linux-arm-
-> > > kernel at lists.infradead.org; kernel at pengutronix.de
-> > > Subject: Re: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux
-> > > subsystem
-> > > Importance: High
-> > > 
-> > > On Thu, Dec 15, 2011 at 10:33:19AM +0100, Sascha Hauer wrote:
-> > > > On Thu, Dec 15, 2011 at 08:59:28AM +0000, Dong Aisheng-B29396 wrote:
-> > > > > > -----Original Message-----
-> > > > > > From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> > > > > > Sent: Thursday, December 15, 2011 4:27 PM
-> > > > > > To: Guo Shawn-R65073
-> > > > > > Cc: Sascha Hauer; Dong Aisheng-B29396;
-> > > > > > linus.walleij at stericsson.com; linux-kernel at vger.kernel.org;
-> > > > > > rob.herring at calxeda.com; grant.likely at secretlab.ca;
-> > > > > > linux-arm-kernel at lists.infradead.org;
-> > > > > > kernel at pengutronix.de
-> > > > > > Subject: Re: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux
-> > > > > > subsystem
-> > > > > > Importance: High
-> > > > > >
-> > > > > > On Thu, Dec 15, 2011 at 8:05 AM, Shawn Guo
-> > > > > > <shawn.guo@freescale.com>
-> > > > > > wrote:
-> > > > > > >[Me]
-> > > > > > >> So if you want to do this for i.MX you need something like
-> > > > > > >> selectable dummy pinmuxes, i.e. pinmux_get() to return
-> > > > > > >> something that just say "OK" to everything like the dummy
-> > > regulators.
-> > > > > > >>
-> > > > > > >> Shall I try to create something like that?
-> > > > > > >>
-> > > > > > > Isn't the empty functions defined in
-> > > > > > > include/linux/pinctrl/pinmux.h for this purpose?
-> > > > > >
-> > > > > > No, these are for compiling it *out*, dummy pinmuxes would be if
-> > > > > > you compile it *in*, but don't find an apropriate pinmux, you
-> > > > > > still get something that does nothing and still works.
-> > > > > >
-> > > > > > Dummy regulators work exactly this way.
-> > > > > >
-> > > > >
-> > > > > I did not read the dummy regulator code too much.
-> > > > > But does it mean that the dummy regulator or dummy pinmux will also
-> > > > > hide the Real errors since it will always get a available one?
-> > > 
-> > > What do you mean 'real error'?  When driver calls pimnux api on a
-> > > platform with real pinmux support, the error is error.  When driver calls
-> > > pinmux api on a platform support with dummy pinmux, it's totally error
-> > > free, as the pinmux core will ensure all the pinmux_* calls always return
-> > > success.
-> > > 
-> > My understanding is that pinmux_get will return an error if no proper pinmux
-> > Found without dummy pinmux. That's a real error.
-> > But with dummy pinmux, if no proper pinmux found, the pinctrl core may check
-> > If dummy pinmux is supported, if supported, it will fakely success with returning
-> > a dummy pinmux. Then real error is hiden.
-> > This is due to for supporting one single image, the dummy pinmux may also be enabled
-> > For platforms like mx6q with real pinmux.
+Hi Martin,
+
+On Wednesday 14 December 2011 19:22:29 martin at neutronstar.dyndns.org wrote:
+> On Wed, Dec 14, 2011 at 02:15:22PM +0100, Laurent Pinchart wrote:
+> > On Wednesday 14 December 2011 10:31:35 Igor Grinberg wrote:
+> > > On 12/14/11 03:25, Martin Hostettler wrote:
+> > > > Adds board support for an MT9M032 based camera to omap3evm.
+> > > > 
+> > > > Signed-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
 > > 
-> Got your point.  So your concern is about the fake success when dummy
-> pinmux comes to play rather than 'fake error'.  I'm not concerned about
-> that case much, since we will know the failure with a simple debug/info
-> message in the pinmux core, saying 'I do not find any available pinmux,
-> and I'm falling into the dummy pinmux'.  When you see this message
-> imx6q, you know something goes wrong.
+> > [snip]
+> > 
+> > > > diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c
+> > > > b/arch/arm/mach-omap2/board-omap3evm-camera.c new file mode 100644
+> > > > index 0000000..bffd5b8
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
+> > > > @@ -0,0 +1,155 @@
+> > 
+> > [snip]
+> > 
+> > > > +#include <linux/i2c.h>
+> > > > +#include <linux/init.h>
+> > > > +#include <linux/platform_device.h>
+> > > > +
+> > > > +#include <linux/gpio.h>
+> > > > +#include <plat/mux.h>
+> > > > +#include "mux.h"
+> > > > +
+> > > > +#include "../../../drivers/media/video/omap3isp/isp.h"
+> > > 
+> > > Laurent,
+> > > In one of the previous reviews, you stated:
+> > > "I'll probably split it and move the part required by board files to
+> > > include/media/omap3isp.h".
+> > > Is there any progress on that?
+> > 
+> > Yes, it has been half-fixed in mainline. Half only because all the
+> > structures and macros that should be used by board code are now in
+> > <media/omap3isp.h>, but some boards need to access OMAP3 ISP internals
+> > from board code, which still requires
+> > drivers/media/video/omap3isp/isp.h. This will eventually be fixed, when
+> > the generic struct clk object will be available.
+> > 
+> > After a quick look at this patch it seems that <media/omap3isp.h> should
+> > be enough here.
+> 
+> Almost. The code uses ISPCTRL_PAR_BRIDGE_DISABLE which is only available
+> from drivers/media/video/omap3isp/ispreg.h.
+>
+> So i'd say it's better to keep that include than to duplicate this constant
+> in the code.
+> 
+> What do you think?
 
-So i.MX3/5 people must know that it's safe to ignore this message
-whereas i.MX6 people must know there's something wrong Adding messages
-saying "there might or might not be something wrong" is not good.
-People will frequently ask on the mailing list about these messages.
+You should use ISP_BRIDGE_DISABLE instead. That one is defined in 
+<media/omap3isp.h>
+ 
+> By the way, it seems drivers/media/video/omap3isp/ispvideo.c is missing a
+> #include <linux/module.h> at the moment. I had to patch that line in to get
+> omap3isp to compile as module.
 
-Sascha
+http://patchwork.linuxtv.org/patch/8510/
+
+The fix should get in v3.2.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Laurent Pinchart
