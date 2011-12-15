@@ -1,73 +1,161 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 15 Dec 2011 17:09:34 +0100
-Subject: [PATCH v2 02/10] i2c: OMAP: Add DT support for i2c controller
-In-Reply-To: <4EEA16CB.6040708@gmail.com>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-3-git-send-email-b-cousson@ti.com>
- <4EE8D5A1.2080100@gmail.com> <4EEA0CC5.4090602@ti.com>
- <4EEA16CB.6040708@gmail.com>
-Message-ID: <4EEA1BBE.2090802@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 15 Dec 2011 17:09:22 +0100
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+ online/active
+In-Reply-To: <alpine.LFD.2.02.1112140124480.3020@ionos>
+References: <20110908215314.829452535@linutronix.de>
+ <CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+ <20110913133258.GA6267@n2100.arm.linux.org.uk>
+ <CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+ <20110913175312.GB6267@n2100.arm.linux.org.uk>
+ <20110923084001.GP17169@n2100.arm.linux.org.uk>
+ <01d501cc84d6$62720890$275619b0$%kim@samsung.com>
+ <alpine.LFD.2.02.1110071354310.3240@ionos>
+ <CAPz4a6CkOXp6LHX2hFYVBhXWT4rhCUzLyYTLbO7g8u_jYcHt7Q@mail.gmail.com>
+ <CAPz4a6C7md+k8pCz6mJtB-v_1h-faGxQZkOqU9vHUtcG-jrYVQ@mail.gmail.com>
+ <4EC2DF93.2050904@codeaurora.org>
+ <alpine.LFD.2.02.1111152259430.4902@ionos>
+ <CAPz4a6BwzAmE=08pCfhK5of0vEV+uPaf8D-9U_MnW5_vAe6NFw@mail.gmail.com>
+ <alpine.LFD.2.02.1112140124480.3020@ionos>
+Message-ID: <1323965362.18942.71.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2011 4:48 PM, Rob Herring wrote:
-> On 12/15/2011 09:05 AM, Cousson, Benoit wrote:
 
-[...]
+With the note that we really should clean up the cpu hotplug code,
+there's far too much code duplication in the arch/ implementations. The
+below patch looks like it might actually work.
 
->> Or using some omap3-i2c or omap4-i2c to determine the proper version and
->> thus populate the right flags during probe.
->>
->
-> If that's specific enough, then yes. I meant that if say only the
-> omap3578 (making up numbers here) has errata i207, then define a
-> compatible string "ti,omap3578-i2c" that implies that and possibly other
-> flags.
->
-> To put it another way, there are only N valid combinations of flags and
-> N is probably fairly small as long as the flags are dictated by the i2c
-> h/w rev or how it was integrated into a particular SOC. So you should
-> have N compatible strings that reflect those valid combinations. The
-> driver can still use the flags internally.
->
-> For any flags that are in fact board level configuration, they should be
-> broken out as individual properties. Most of these sound like they are
-> properties of the h/w and not user configuration of the h/w.
+Thomas, others, please have a very close look because I might have
+thought too hard and missed the obvious :-)
 
-Yes, indeed, I got the point. This is even much better for the 
-implementation standpoint. The whole stuff is located inside the driver 
-where it should belong.
+---
+Subject: hotplug, sched: cpu_active vs __cpu_up
 
->> [...]
->>
->>>> @@ -965,6 +956,31 @@ static const struct i2c_algorithm omap_i2c_algo = {
->>>>        .functionality    = omap_i2c_func,
->>>>    };
->>>>
->>>> +#ifdef CONFIG_OF
->>>> +static struct omap_i2c_bus_platform_data omap3_pdata = {
->>>> +    .rev = OMAP_I2C_IP_VERSION_1,
->>>> +};
->>>> +
->>>> +static struct omap_i2c_bus_platform_data omap4_pdata = {
->>>> +    .rev = OMAP_I2C_IP_VERSION_2,
->>>> +};
->>>
->>> This is redundant. The ip version can be determined from the compatible
->>> string.
->>
->> I'm confused...
->> I'm using the compatible string below to chose the proper value.
->> This flag is then used later at runtime.
->> I'm using a pseudo pdata because that driver is still used in old
->> platform that does and will never not have DT support.
->>
->
-> After more thought, never mind. You'll probably need it for handling the
-> flags as I proposed above.
+Stepan found:
 
-Yes, I'm taking advantage of the existing pdata structure to provide the 
-proper flags.
+CPU0		CPUn
 
-Thanks for that feedback,
-Benoit
+_cpu_up()
+  __cpu_up()
+
+		boostrap()
+		  notify_cpu_starting()
+		  set_cpu_online()
+		  while (!cpu_active())
+		    cpu_relax()
+
+
+<PREEMPT-out>
+
+smp_call_function(.wait=1)
+  /* we find cpu_online() is true */
+  arch_send_call_function_ipi_mask()
+
+  /* wait-forever-more */
+
+<PREEMPT-in>
+		  local_irq_enable()
+
+  cpu_notify(CPU_ONLINE)
+    sched_cpu_active()
+      set_cpu_active()
+
+Now the purpose of cpu_active is mostly with bringing down a cpu, where
+we mark it !active to avoid the load-balancer from moving tasks to it
+while we tear down the cpu. This is required because we only update the
+sched_domain tree after we brought the cpu-down. And this is needed so
+that some tasks can still run while we bring it down, we just don't want
+new tasks to appear.
+
+On cpu-up however the sched_domain tree doesn't yet include the new cpu,
+so its invisible to the load-balancer, regardless of the active state.
+So instead of setting the active state after we boot the new cpu (and
+consequently having to wait for it before enabling interrupts) set the
+cpu active before we set it online and avoid the whole mess.
+
+Reported-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+Signed-off-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+---
+ arch/arm/kernel/smp.c     |    7 -------
+ arch/hexagon/kernel/smp.c |    2 --
+ arch/s390/kernel/smp.c    |    6 ------
+ arch/x86/kernel/smpboot.c |   13 -------------
+ kernel/sched/core.c       |    2 +-
+ 5 files changed, 1 insertion(+), 29 deletions(-)
+
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -337,13 +337,6 @@ asmlinkage void __cpuinit secondary_star
+ 	 */
+ 	percpu_timer_setup();
+ 
+-	while (!cpu_active(cpu))
+-		cpu_relax();
+-
+-	/*
+-	 * cpu_active bit is set, so it's safe to enalbe interrupts
+-	 * now.
+-	 */
+ 	local_irq_enable();
+ 	local_fiq_enable();
+ 
+--- a/arch/hexagon/kernel/smp.c
++++ b/arch/hexagon/kernel/smp.c
+@@ -179,8 +179,6 @@ void __cpuinit start_secondary(void)
+ 	printk(KERN_INFO "%s cpu %d\n", __func__, current_thread_info()->cpu);
+ 
+ 	set_cpu_online(cpu, true);
+-	while (!cpumask_test_cpu(cpu, cpu_active_mask))
+-		cpu_relax();
+ 	local_irq_enable();
+ 
+ 	cpu_idle();
+--- a/arch/s390/kernel/smp.c
++++ b/arch/s390/kernel/smp.c
+@@ -518,12 +518,6 @@ int __cpuinit start_secondary(void *cpuv
+ 	S390_lowcore.restart_psw.addr =
+ 		PSW_ADDR_AMODE | (unsigned long) psw_restart_int_handler;
+ 	__ctl_set_bit(0, 28); /* Enable lowcore protection */
+-	/*
+-	 * Wait until the cpu which brought this one up marked it
+-	 * active before enabling interrupts.
+-	 */
+-	while (!cpumask_test_cpu(smp_processor_id(), cpu_active_mask))
+-		cpu_relax();
+ 	local_irq_enable();
+ 	/* cpu_idle will call schedule for us */
+ 	cpu_idle();
+--- a/arch/x86/kernel/smpboot.c
++++ b/arch/x86/kernel/smpboot.c
+@@ -291,19 +291,6 @@ notrace static void __cpuinit start_seco
+ 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
+ 	x86_platform.nmi_init();
+ 
+-	/*
+-	 * Wait until the cpu which brought this one up marked it
+-	 * online before enabling interrupts. If we don't do that then
+-	 * we can end up waking up the softirq thread before this cpu
+-	 * reached the active state, which makes the scheduler unhappy
+-	 * and schedule the softirq thread on the wrong cpu. This is
+-	 * only observable with forced threaded interrupts, but in
+-	 * theory it could also happen w/o them. It's just way harder
+-	 * to achieve.
+-	 */
+-	while (!cpumask_test_cpu(smp_processor_id(), cpu_active_mask))
+-		cpu_relax();
+-
+ 	/* enable local interrupts */
+ 	local_irq_enable();
+ 
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5390,7 +5390,7 @@ static int __cpuinit sched_cpu_active(st
+ 				      unsigned long action, void *hcpu)
+ {
+ 	switch (action & ~CPU_TASKS_FROZEN) {
+-	case CPU_ONLINE:
++	case CPU_STARTING:
+ 	case CPU_DOWN_FAILED:
+ 		set_cpu_active((long)hcpu, true);
+ 		return NOTIFY_OK;
