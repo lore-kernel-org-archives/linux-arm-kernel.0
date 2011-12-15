@@ -1,45 +1,82 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Thu, 15 Dec 2011 02:28:34 +0100
-Subject: [PATCH] ARM: fix $(CROSS_COMPILE) prefix missing from size
- invocation
-In-Reply-To: <20111214215815.GP32251@atomide.com>
-References: <1322186338-6020-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <201112140021.42598.jkrzyszt@tis.icnet.pl>
- <20111214215815.GP32251@atomide.com>
-Message-ID: <201112150228.34815.jkrzyszt@tis.icnet.pl>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 15 Dec 2011 09:46:20 +0800
+Subject: [PATCH v4 REPOST 5/5] imx6q: Remove unconditional dependency on
+ l2x0 L2 cache support
+In-Reply-To: <20111215010219.GP28768@b20223-02.ap.freescale.net>
+References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
+ <1323862781-3465-6-git-send-email-dave.martin@linaro.org>
+ <20111214132622.GA1520@S2100-06.ap.freescale.net>
+ <20111214140500.GA1700@richard-laptop>
+ <20111214150119.GD2568@linaro.org>
+ <20111215010219.GP28768@b20223-02.ap.freescale.net>
+Message-ID: <20111215014619.GB3259@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 of December 2011 at 22:58:15, Tony Lindgren wrote:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111213 14:55]:
-> > On Friday 25 of November 2011 at 02:58:58, Janusz Krzysztofik wrote:
-> > > Otherwise, cross compilation may fail with error messages like:
-> > > 
-> > > ...
-> > > size: arch/arm/boot/compressed/../../../../vmlinux: File format is ambiguous
-> > > size: Matching formats: elf32-littlearm elf32-littlearm-symbian elf32-littlearm-vxworks
-> > >   LD      arch/arm/boot/compressed/vmlinux
-> > >   arm-angstrom-linux-uclibcgnueabi-ld:--defsym _kernel_bss_size=: syntax error
-> > > 
-> > > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+On Thu, Dec 15, 2011 at 09:02:20AM +0800, Richard Zhao wrote:
+> On Wed, Dec 14, 2011 at 03:01:19PM +0000, Dave Martin wrote:
+> > On Wed, Dec 14, 2011 at 10:05:04PM +0800, Richard Zhao wrote:
+> > > On Wed, Dec 14, 2011 at 09:26:24PM +0800, Shawn Guo wrote:
+> > > > Hi Dave,
+> > > > 
+> > > > Sorry for that I did not look into previous post to point it out.
+> > > > 
+> > > > On Wed, Dec 14, 2011 at 11:39:41AM +0000, Dave Martin wrote:
+> > > > > The i.MX6 Quad SoC will work without the l2x0 L2 cache controller
+> > > > > support built into the kernel, so this patch removes the dependency
+> > > > > on CACHE_L2X0 and selects MIGHT_HAVE_CACHE_L2X0 instead.
+> > > > > 
+> > > > > This makes the l2x0 support optional, so that it can be turned off
+> > > > > when desired for debugging purposes etc.
+> > > > > 
+> > > > > Thanks to Shawn Guo for this suggestion. [1]
+> > > > > 
+> > > > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > > > > 
+> > > > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
+> > > > > ---
+> > > > >  arch/arm/mach-imx/Kconfig |    2 +-
+> > > > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > > > > index 29a3d61..1fb93f2 100644
+> > > > > --- a/arch/arm/mach-imx/Kconfig
+> > > > > +++ b/arch/arm/mach-imx/Kconfig
+> > > > > @@ -609,13 +609,13 @@ comment "i.MX6 family:"
+> > > > >  config SOC_IMX6Q
+> > > > >  	bool "i.MX6 Quad support"
+> > > > >  	select ARM_GIC
+> > > > > -	select CACHE_L2X0
+> > > > >  	select CPU_V7
+> > > > >  	select HAVE_ARM_SCU
+> > > > >  	select HAVE_IMX_GPC
+> > > > >  	select HAVE_IMX_MMDC
+> > > > >  	select HAVE_IMX_SRC
+> > > > >  	select HAVE_SMP
+> > > > > +	select MIGHT_HAVE_CACHE_L2X0
+> > > > 
+> > > > The option SOC_IMX6Q is only available when ARCH_IMX_V6_V7 is selected.
+> > > > Since MIGHT_HAVE_CACHE_L2X0 has been selected by ARCH_IMX_V6_V7 in
+> > > > patch #1, this line seems redundant here.
+> > > Would it be better keep this one and remove patch #1 one? imx5 doesn't have
+> > > l2x0.
 > > 
-> > Trying to guess why this patch is still sitting in the Incoming queue in 
-> > the Russell's patch system (7184/1) while others have found their way to 
-> > the Applied queue meanwhile, I wonder if this is because I didn't 
-> > mention explicitly that it is a fix to a regression introduced into 
-> > 3.2-rc with the following commit:
+> > Do you mean to remove MIGHT_HAVE_CACHE_L2X0 from ARCH_IMX_V6_V7, and select
+> > it only from SOC_IMX6Q?
+> Yes, I think it's more precise. Shawn?
 > 
-> It's because not all cross compiler in use have $(CROSS_COMPILE)size
-> available, so it would have to be symlinked to host size to keep things
-> compiling. So it's probably best to rather take the warning and keep
-> things compiling rather than fix the warning and break compile for
-> many people.
+No.
 
-First of all, thanks for someone finally commenting the patch. It's really hard for me to guess if a patch is OK or not if I hear nothing. Once I hear from someone what is wrong with my patch, I'm always willing to enhance it. But I feel more and more like an intruder on the linux-arm-kernel list.
+* imx5 hardware does have L2, and it's just not set up in the kernel
+  (I do not know why).
+* Currently, ARCH_IMX_V6_V7 only covers imx3 and imx6, and both are
+  calling l2x0 init function to set L2 up.
+* When we merge mach-mx5 into mach-imx to have ARCH_IMX_V6_V7 cover
+  imx3, imx5 and imx6, there is no reason for us to not set L2 up for
+  imx5 too.
 
-Back to the merit: I would take that warning, as you suggest, if things were compiling for me, but it's not the case. Compilation fails, as I tried to state in the commit message. The patch was not about fixing the warning, but fixing the compilation broken. Since things worked for me before, I find it a regression. Sorry if I was not clear enough in the commit message.
+So MIGHT_HAVE_CACHE_L2X0 really should be selected by ARCH_IMX_V6_V7.
 
-I'll prepare v2 which will call $(CROSS_COMPILE)size if size fails, OK?
-
-Thanks,
-Janusz
+-- 
+Regards,
+Shawn
