@@ -1,132 +1,80 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 15 Dec 2011 12:18:07 +0200
-Subject: [PATCH v3] arm: omap3evm: Add support for an MT9M032 based camera
- board.
-In-Reply-To: <1323886442.815408.21905@localhost>
-References: <1323825934-13320-1-git-send-email-martin@neutronstar.dyndns.org>
- <4EE86CF7.1010002@compulab.co.il> <1323886442.815408.21905@localhost>
-Message-ID: <4EE9C95F.2090308@compulab.co.il>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Thu, 15 Dec 2011 10:40:44 +0000
+Subject: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux subsystem
+In-Reply-To: <20111215093218.GN27267@pengutronix.de>
+References: <1323878622-26602-1-git-send-email-b29396@freescale.com>
+ <1323878622-26602-5-git-send-email-b29396@freescale.com>
+ <20111214211152.GM27267@pengutronix.de>
+ <CACRpkdYHtgx3Qgx4QRdgOahQXjvSWE_iogWCZjaYQ-VnyS62uQ@mail.gmail.com>
+ <7FE21149F4667147B645348EC60578850561FF@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20111215093218.GN27267@pengutronix.de>
+Message-ID: <7FE21149F4667147B645348EC6057885056723@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/11 20:14, martin at neutronstar.dyndns.org wrote:
-> On Wed, Dec 14, 2011 at 11:31:35AM +0200, Igor Grinberg wrote:
->> Hi Martin,
->>
->> On 12/14/11 03:25, Martin Hostettler wrote:
->>> Adds board support for an MT9M032 based camera to omap3evm.
->>>
->>> Signed-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
->>> ---
->>>  arch/arm/mach-omap2/Makefile                |    3 +-
->>>  arch/arm/mach-omap2/board-omap3evm-camera.c |  155 +++++++++++++++++++++++++++
->>>  arch/arm/mach-omap2/board-omap3evm.c        |    4 +
->>>  3 files changed, 161 insertions(+), 1 deletions(-)
->>>  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
->>>
->>> Changes in V3
->>>  * Added missing copyright and attribution.
->>>  * switched to gpio_request_array for gpio init.
->>>  * removed device_initcall and added call to omap3_evm_camera_init into omap3_evm_init
->>>
->>> Changes in V2:
->>>  * ported to current mainline
->>>  * Style fixes
->>>  * Fix error handling
->>>
-
-[...]
-
->>> +/**
->>> + * omap3evm_set_mux - Sets mux to enable signal routing to
->>> + *                           different peripherals present on new EVM board
->>> + * @mux_id: enum, mux id to enable
->>> + *
->>> + * Returns 0 for success or a negative error code
->>> + */
->>> +static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
->>> +{
->>> +	/* Set GPIO6 = 1 */
->>> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 6, 1);
->>> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
->>> +
->>> +	switch (mux_id) {
->>> +	case MUX_TVP5146:
->>> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
->>> +		gpio_set_value(nCAM_VD_SEL, 1);
->>> +		break;
->>> +
->>> +	case MUX_CAMERA_SENSOR:
->>> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
->>> +		gpio_set_value(nCAM_VD_SEL, 0);
->>> +		break;
->>> +
->>> +	case MUX_EXP_CAMERA_SENSOR:
->>> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 1);
->>> +		break;
->>> +
->>> +	default:
->>> +		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>
->> I don't really care about that, but I don't see any mux
->> being set in the above function so the name and comments
->> are misleading.
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Thursday, December 15, 2011 5:32 PM
+> To: Dong Aisheng-B29396
+> Cc: Linus Walleij; linus.walleij at stericsson.com; linux-
+> kernel at vger.kernel.org; rob.herring at calxeda.com;
+> grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> kernel at pengutronix.de; Guo Shawn-R65073
+> Subject: Re: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux
+> subsystem
+> Importance: High
 > 
-> There's are video muxes on this board that's controlled by various
-> gpios. It's not a mux in the omap chip if you've expected to see that.
+> On Thu, Dec 15, 2011 at 07:23:42AM +0000, Dong Aisheng-B29396 wrote:
+> > > -----Original Message-----
+> > > From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> > > Sent: Thursday, December 15, 2011 6:16 AM
+> > > To: Sascha Hauer
+> > > Cc: Dong Aisheng-B29396; linus.walleij at stericsson.com; linux-
+> > > kernel at vger.kernel.org; rob.herring at calxeda.com;
+> > > grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> > > kernel at pengutronix.de; Guo Shawn-R65073
+> > > Subject: Re: [RFC PATCH v2 4/4] mmc: sdhci-esdhc-imx: using pinmux
+> > > subsystem
+> > > Importance: High
+> > >
+> > > On Wed, Dec 14, 2011 at 10:11 PM, Sascha Hauer
+> > > <s.hauer@pengutronix.de>
+> > > wrote:
+> > > > On Thu, Dec 15, 2011 at 12:03:42AM +0800, Dong Aisheng wrote:
+> > >
+> > > >> + ? ? pmx = pinmux_get(&pdev->dev, NULL);
+> > > >> + ? ? if (IS_ERR(pmx)) {
+> > > >> + ? ? ? ? ? ? err = PTR_ERR(pmx);
+> > > >> + ? ? ? ? ? ? goto err_pmx_get;
+> > > >> + ? ? }
+> > > >> + ? ? err = pinmux_enable(pmx);
+> > > >> + ? ? if (err)
+> > > >> + ? ? ? ? ? ? goto err_pmx_enable;
+> > > >> + ? ? imx_data->pmx = pmx;
+> > > >> +
+> > > >
+> > > > Won't this break every i.MX except i.MX6?
+> > >
+> >
+> > If not select PINCTRL, pinmux_enable returns ok by default and
+> > pinmux_get Returns NULL which also does not block.
+> > So it will not break other i.MX currently since only mx6q are using
+> PINCTRL.
+> >
+> > > Not this patch on its own, first the machines have to select PINCTRL
+> > > select PINMUX_FOO
+> > >
+> > > *Then* it will break :-D
+> > >
+> >
+> > After we move to one single image for mx5 and mx6, it could be an
+> > issue Since PINCTRL may be selected by default.
+> > So mx5 pinmux driver is in my TODO list.
 > 
-> As this is an evaluation board it has a bunch of video connectors that 
-> the user can choose from for different input devices.
-
-I see... Probably a comment explaining that would not hurt here.
-
-[...]
-
->>> +
->>> +	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
->>> +	ret = gpio_request_array(setup_gpios, ARRAY_SIZE(setup_gpios));
->>> +	if (ret < 0) {
->>> +		pr_err("omap3evm-camera: Failed to setup camera signal routing.\n");
->>> +		return ret;
->>> +	}
->>
->> It looks like both above calls (gpio_request and mux_init)
->> can be moved to omap3evm_set_mux() function (or a renamed version of it),
->> so all the GPIO stuff will be close to each other instead of requesting
->> in one place and playing with values in another...
+> Add i.MX3 which is compiled together with i.MX6 :)
 > 
-> I'd like to keep the one time setup and the theoretically run time switchable
-> parts seperate. It doesn't complicate the code and if a brave soul wants to
-> connect different camera modules and switch between them it's a more reviewable
-> patch from here.
+Sure, would like to do it.
+Thanks
 
-Ok
-
-> 
->>
->>> +	omap3evm_set_mux(MUX_CAMERA_SENSOR);
->>
->> So the plan is to add support for the 3 types,
->> but hard code to only one?
->> Can't this be runtime detected somehow?
-> 
-> The mux code came from out of tree drivers. I did want to keep enough
-> information so someone extending this board code for other setups doesn't have a
-> hard time. I can't think of an reliable way to runtime detect what video source
-> a specific use case would want. Ideally someone who needs one of the other
-> video sources should add a more generic solution here. 
-
-I'm Ok with it, but usually, stuff that is never used stays out...
-I think the way it should be is to have a platform driver that uses
-a callback to switch between the "muxes" on the extension.
-
-[...]
-
--- 
-Regards,
-Igor.
+Regards
+Dong Aisheng
