@@ -1,90 +1,59 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 15 Dec 2011 15:14:28 +0000
-Subject: [PATCH v4 REPOST 5/5] imx6q: Remove unconditional dependency on
- l2x0 L2 cache support
-In-Reply-To: <20111215015414.GQ28768@b20223-02.ap.freescale.net>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
- <1323862781-3465-6-git-send-email-dave.martin@linaro.org>
- <20111214132622.GA1520@S2100-06.ap.freescale.net>
- <20111214140500.GA1700@richard-laptop>
- <20111214150119.GD2568@linaro.org>
- <20111215010219.GP28768@b20223-02.ap.freescale.net>
- <20111215014619.GB3259@S2101-09.ap.freescale.net>
- <20111215015414.GQ28768@b20223-02.ap.freescale.net>
-Message-ID: <20111215151427.GB2081@linaro.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 15 Dec 2011 15:25:51 +0000
+Subject: [PATCH v6 3/9] ARM: versatile: Map local timers using Device
+ Tree when possible
+In-Reply-To: <4EEA09E8.3010807@gmail.com>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-4-git-send-email-pawel.moll@arm.com>
+ <4EEA09E8.3010807@gmail.com>
+Message-ID: <1323962751.18989.4.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 09:54:15AM +0800, Richard Zhao wrote:
-> On Thu, Dec 15, 2011 at 09:46:20AM +0800, Shawn Guo wrote:
-> > On Thu, Dec 15, 2011 at 09:02:20AM +0800, Richard Zhao wrote:
-> > > On Wed, Dec 14, 2011 at 03:01:19PM +0000, Dave Martin wrote:
-> > > > On Wed, Dec 14, 2011 at 10:05:04PM +0800, Richard Zhao wrote:
-> > > > > On Wed, Dec 14, 2011 at 09:26:24PM +0800, Shawn Guo wrote:
-> > > > > > Hi Dave,
-> > > > > > 
-> > > > > > Sorry for that I did not look into previous post to point it out.
-> > > > > > 
-> > > > > > On Wed, Dec 14, 2011 at 11:39:41AM +0000, Dave Martin wrote:
-> > > > > > > The i.MX6 Quad SoC will work without the l2x0 L2 cache controller
-> > > > > > > support built into the kernel, so this patch removes the dependency
-> > > > > > > on CACHE_L2X0 and selects MIGHT_HAVE_CACHE_L2X0 instead.
-> > > > > > > 
-> > > > > > > This makes the l2x0 support optional, so that it can be turned off
-> > > > > > > when desired for debugging purposes etc.
-> > > > > > > 
-> > > > > > > Thanks to Shawn Guo for this suggestion. [1]
-> > > > > > > 
-> > > > > > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > > > > > > 
-> > > > > > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
-> > > > > > > ---
-> > > > > > >  arch/arm/mach-imx/Kconfig |    2 +-
-> > > > > > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > > > > > 
-> > > > > > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > > > > > > index 29a3d61..1fb93f2 100644
-> > > > > > > --- a/arch/arm/mach-imx/Kconfig
-> > > > > > > +++ b/arch/arm/mach-imx/Kconfig
-> > > > > > > @@ -609,13 +609,13 @@ comment "i.MX6 family:"
-> > > > > > >  config SOC_IMX6Q
-> > > > > > >  	bool "i.MX6 Quad support"
-> > > > > > >  	select ARM_GIC
-> > > > > > > -	select CACHE_L2X0
-> > > > > > >  	select CPU_V7
-> > > > > > >  	select HAVE_ARM_SCU
-> > > > > > >  	select HAVE_IMX_GPC
-> > > > > > >  	select HAVE_IMX_MMDC
-> > > > > > >  	select HAVE_IMX_SRC
-> > > > > > >  	select HAVE_SMP
-> > > > > > > +	select MIGHT_HAVE_CACHE_L2X0
-> > > > > > 
-> > > > > > The option SOC_IMX6Q is only available when ARCH_IMX_V6_V7 is selected.
-> > > > > > Since MIGHT_HAVE_CACHE_L2X0 has been selected by ARCH_IMX_V6_V7 in
-> > > > > > patch #1, this line seems redundant here.
-> > > > > Would it be better keep this one and remove patch #1 one? imx5 doesn't have
-> > > > > l2x0.
-> > > > 
-> > > > Do you mean to remove MIGHT_HAVE_CACHE_L2X0 from ARCH_IMX_V6_V7, and select
-> > > > it only from SOC_IMX6Q?
-> > > Yes, I think it's more precise. Shawn?
-> > > 
-> > No.
-> > 
-> > * imx5 hardware does have L2, and it's just not set up in the kernel
-> >   (I do not know why).
-> > * Currently, ARCH_IMX_V6_V7 only covers imx3 and imx6, and both are
-> >   calling l2x0 init function to set L2 up.
-> > * When we merge mach-mx5 into mach-imx to have ARCH_IMX_V6_V7 cover
-> >   imx3, imx5 and imx6, there is no reason for us to not set L2 up for
-> >   imx5 too.
-> > 
-> > So MIGHT_HAVE_CACHE_L2X0 really should be selected by ARCH_IMX_V6_V7.
-> mx5/cortex-a8 don't use L2X0. But that's ok. MIGHT_HAVE_CACHE_L2X0 is just a hint.
-> Please Shawn's suggestion.
+On Thu, 2011-12-15 at 14:53 +0000, Rob Herring wrote:
+> > @@ -21,6 +23,16 @@
+> >   */
+> >  int __cpuinit local_timer_setup(struct clock_event_device *evt)
+> >  {
+> > +#if defined(CONFIG_OF)
+> > +	struct device_node *node = of_find_compatible_node(NULL,
+> > +			NULL, "arm,smp-twd");
+> > +
+> > +	if (node)
+> > +		twd_base = of_iomap(node, 0);
+> > +#endif
+> 
+> I think your previous version was more correct. This is going to find
+> the node and do ioremap N times where N is the number of cores. It does
+> work though because that is what I did initially too.
 
-OK, my local series has what I believe to be the correct change;
-I will repost based on that.
+Right, how about that, then:
 
-Cheers
----Dave
+@@ -21,6 +23,22 @@
+  */
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
++#if defined(CONFIG_OF)
++       static int dt_node_probed;
++
++       if (!dt_node_probed) {
++               struct device_node *node = of_find_compatible_node(NULL,
++                               NULL, "arm,smp-twd");
++
++               if (node)
++                       twd_base = of_iomap(node, 0);
++
++               dt_node_probed = 1;
++       }
++#endif
++       if (!twd_base)
++               return -ENXIO;
++
+        evt->irq = IRQ_LOCALTIMER;
+        twd_timer_setup(evt);
+        return 0;
+
+
+Cheers!
+
+Pawe?
