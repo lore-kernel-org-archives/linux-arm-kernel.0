@@ -1,109 +1,29 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 15 Dec 2011 18:49:50 +0100
-Subject: [PATCH 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
- controller
-In-Reply-To: <4EE2335C.7050902@gmail.com>
-References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
- <1323291049-24964-3-git-send-email-b-cousson@ti.com>
- <4EDFD88B.8060008@gmail.com> <4EE0D0E6.3060202@ti.com>
- <4EE20B38.8050006@gmail.com> <4EE2209E.2040209@ti.com>
- <4EE227A4.2030209@gmail.com> <4EE2320D.2030309@ti.com>
- <4EE2335C.7050902@gmail.com>
-Message-ID: <4EEA333E.9030502@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 15 Dec 2011 10:14:50 -0800
+Subject: [PATCH v4 REPOST 2/5] ARM: SMP: Refactor Kconfig to be more
+ maintainable
+In-Reply-To: <1323862781-3465-3-git-send-email-dave.martin@linaro.org>
+References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
+ <1323862781-3465-3-git-send-email-dave.martin@linaro.org>
+Message-ID: <20111215181450.GA22330@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/9/2011 5:12 PM, Rob Herring wrote:
-> On 12/09/2011 10:06 AM, Cousson, Benoit wrote:
-
-[...]
-
->> My point is that even in the DT case I do have some devices that are
->> initialized without DT for the moment and thus cannot get access to the
->> interrupt-controller node and then cannot retrieve the domain information.
->>
->> How can I ensure the proper hwirq ->  irq translation then for such devices?
->> Only the one created by DT will have the correct irq number.
+On Wed, Dec 14, 2011 at 11:39:38AM +0000, Dave Martin wrote:
+> Making SMP depend on (huge list of MACH_ and ARCH_ configs) is
+> bothersome to maintain and likely to lead to merge conflicts.
 > 
-> Okay, I missed that aspect of it. So I guess 0 base is fine for now.
-> 
-> Rob
+> This patch moves the knowledge of which platforms are SMP-capable
+> to the individual machines.  To enable this, a new HAVE_SMP config
+> option is introduced to allow machines to indicate that they can
+> run in a SMP configuration.
 
-Following that discussion, I made a patch (included below) last week to add domain support just before this one for DT migration.
-I'm now wondering if it makes sense to do it like that considering your recent patch: irq: convert generic-chip to use irq_domain.
+There still seem to be several people and lists from the
+get_maintainer.pl output that are missing.  Russell should be
+included, as well as the MSM maintainers and that list.
 
-What do you think?
+David
 
-Thanks,
-Benoit
-
----
->From 3083589f48604aab3d801179810c2af8339525ae Mon Sep 17 00:00:00 2001
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Thu, 8 Dec 2011 22:16:51 +0100
-Subject: [PATCH] ARM: OMAP2/3: intc: Add irqdomain support
-
-Introduce the usage of the irqdomain to prepare the DT support.
-The irq_base is still hard coded to 0 to allow non-DT drivers
-to work with the previous assumption that was hwirq = irq.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-omap2/irq.c |   18 +++++++++++++++++-
- 1 files changed, 17 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 42b1d65..2f65dfd 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -17,6 +17,7 @@
- #include <mach/hardware.h>
- #include <asm/exception.h>
- #include <asm/mach/irq.h>
-+#include <linux/irqdomain.h>
- 
- 
- /* selected INTC register offsets */
-@@ -57,6 +58,8 @@ static struct omap_irq_bank {
- 	},
- };
- 
-+static struct irq_domain domain;
-+
- /* Structure to save interrupt controller context */
- struct omap3_intc_regs {
- 	u32 sysconfig;
-@@ -158,6 +161,17 @@ static void __init omap_init_irq(u32 base, int nr_irqs)
- 	if (WARN_ON(!omap_irq_base))
- 		return;
- 
-+	/*
-+	 * XXX: Use a 0 irq_base for the moment since the legacy devices
-+	 * created statically are expected a hwirq = irq mapping.
-+	 * A proper offset will be added later, when IRQ resource creation
-+	 * will be handled by DT.
-+	 */
-+	domain.irq_base = 0;
-+	domain.nr_irq = nr_irqs;
-+	domain.ops = &irq_domain_simple_ops;
-+	irq_domain_add(&domain);
-+
- 	for (i = 0; i < ARRAY_SIZE(irq_banks); i++) {
- 		struct omap_irq_bank *bank = irq_banks + i;
- 
-@@ -225,8 +239,10 @@ out:
- 		irqnr = readl_relaxed(base_addr + INTCPS_SIR_IRQ_OFFSET);
- 		irqnr &= ACTIVEIRQ_MASK;
- 
--		if (irqnr)
-+		if (irqnr) {
-+			irqnr = irq_domain_to_irq(&domain, irqnr);
- 			handle_IRQ(irqnr, regs);
-+		}
- 	} while (irqnr);
- }
- 
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
