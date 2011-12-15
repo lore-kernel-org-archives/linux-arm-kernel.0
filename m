@@ -1,41 +1,70 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Dec 2011 11:00:41 -0800
-Subject: [RFC PATCH] ARM: vmlinux.lds.S: do not hardcode cacheline size
- as 32 bytes
-In-Reply-To: <1323799572-5641-1-git-send-email-will.deacon@arm.com>
-References: <1323799572-5641-1-git-send-email-will.deacon@arm.com>
-Message-ID: <4EEA43D9.9040700@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 Dec 2011 20:37:04 +0100
+Subject: [PATCH 1/3] ARM: AT91: Add platform data for the ADCs
+In-Reply-To: <77881664.jmuBXsRUXo@ws-stein>
+References: <1323856877-18255-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1323856877-18255-2-git-send-email-maxime.ripard@free-electrons.com>
+ <77881664.jmuBXsRUXo@ws-stein>
+Message-ID: <4EEA4C60.4060409@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/11 10:06, Will Deacon wrote:
-> The linker script assumes a cacheline size of 32 bytes when aligning
-> the .data..cacheline_aligned and .data..percpu sections.
->
-> This patch updates the script to use L1_CACHE_BYTES, which should be set
-> to 64 on platforms that require it.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->
-> I'm posting this as an RFC because, whilst this fixes a bug, it looks
-> like many platforms don't select ARM_L1_CACHE_SHIFT_6 when they should
-> (all Cortex-A8 platforms should select this, for example).
+On 14/12/2011 11:27, Alexander Stein wrote:
+> On Wednesday 14 December 2011 11:01:15 Maxime Ripard wrote:
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Acked-by: Jonathan Cameron <jic23@cam.ac.uk>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>
+>> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> ---
+>>  include/linux/platform_data/at91_adc.h |   23 +++++++++++++++++++++++
+>>  1 files changed, 23 insertions(+), 0 deletions(-)
+>>  create mode 100644 include/linux/platform_data/at91_adc.h
+>>
+>> diff --git a/include/linux/platform_data/at91_adc.h
+>> b/include/linux/platform_data/at91_adc.h new file mode 100644
+>> index 0000000..bad80b7
+>> --- /dev/null
+>> +++ b/include/linux/platform_data/at91_adc.h
+>> @@ -0,0 +1,23 @@
+>> +/*
+>> + * Copyright (C) 2011 Free Electrons
+>> + *
+>> + * Licensed under the GPLv2 or later.
+>> + *
+>> + */
+>> +
+>> +#ifndef _AT91_ADC_H_
+>> +#define _AT91_ADC_H_
+>> +
+>> +/**
+>> + * struct at91_adc_data - platform data for ADC driver
+>> + * @channels_use:	channels in use on the board as a bitmask
+>> + * @vref:		Reference voltage for the ADC in millvolts
+> 
+> Nitpick, this should write millivolts, no?
 
-What are the implications of not having cache aligned data? Is it a
-performance impact or something more?
+Yes, of course :)
 
-> @@ -205,7 +206,7 @@ SECTIONS
->  #endif
->  
->  		NOSAVE_DATA
-> -		CACHELINE_ALIGNED_DATA(32)
-> +		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
->  		READ_MOSTLY_DATA(32)
+> 
+>> + */
+>> +struct at91_adc_data {
+>> +	unsigned long	channels_used;
+>> +	u16		vref;
+>> +};
+>> +
+>> +extern void __init at91_add_device_adc(struct at91_adc_data *data);
+>> +
+>> +#endif
+> 
+> Regards,
+> Alexander
 
-Does READ_MOSTLY_DATA also need to be cache aligned? At least powerpc is
-doing that.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
