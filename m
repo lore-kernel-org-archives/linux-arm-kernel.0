@@ -1,29 +1,35 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 15 Dec 2011 10:14:50 -0800
-Subject: [PATCH v4 REPOST 2/5] ARM: SMP: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <1323862781-3465-3-git-send-email-dave.martin@linaro.org>
-References: <1323862781-3465-1-git-send-email-dave.martin@linaro.org>
- <1323862781-3465-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <20111215181450.GA22330@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 15 Dec 2011 10:16:46 -0800
+Subject: [PATCH v7 00/14] Add support for tegra30 and cardhu
+In-Reply-To: <1323875032-18221-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1323875032-18221-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20111215181646.GA10631@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 11:39:38AM +0000, Dave Martin wrote:
-> Making SMP depend on (huge list of MACH_ and ARCH_ configs) is
-> bothersome to maintain and likely to lead to merge conflicts.
+On Wed, Dec 14, 2011 at 05:03:12PM +0200, Peter De Schrijver wrote:
+> This patchset adds support for the tegra30 SoC and the cardhu development
+> board.
 > 
-> This patch moves the knowledge of which platforms are SMP-capable
-> to the individual machines.  To enable this, a new HAVE_SMP config
-> option is introduced to allow machines to indicate that they can
-> run in a SMP configuration.
+> Patchset is on top of linux-next and
+> http://www.spinics.net/lists/linux-tegra/msg03016.html.
+> 
+> Most important changes in v7:
+> 
+> * split board-dt.c in board-dt-tegra20.c and board-dt-tegra30.c
+> * split early init preparation into several patches
+> * remove tegra_sdmmc_tap_delay. Drivers should use tegra2_sdmmc_tap_delay as
+>   from tegra30 onwards this feature will no longer handled by the clock code
+>   as it's implemented in the SDMMC block now.
+> * remove CONFIG_CARDHU and the corresponding Kconfig entry
 
-There still seem to be several people and lists from the
-get_maintainer.pl output that are missing.  Russell should be
-included, as well as the MSM maintainers and that list.
+Thanks, this is looking pretty good by now, and remaining rough edges
+(if any), can be fixed up over time as well.
 
-David
+I'm ok with it going in but lets have it sit for another day or two until
+Stephen is back and has a chance to look it through as well. Colin had
+some questions that I want to make sure he's happy with the answers to
+as well.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+-Olof
