@@ -1,77 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Dec 2011 11:04:20 +0000
-Subject: [PATCH v4] ARM: sched_clock: allow sched_clock to be selected
- at runtime
-In-Reply-To: <029b01ccbacc$b5fdb6e0$21f924a0$%kim@samsung.com>
-References: <1323444833-10587-1-git-send-email-marc.zyngier@arm.com>
- <029b01ccbacc$b5fdb6e0$21f924a0$%kim@samsung.com>
-Message-ID: <4EE9D434.2010900@arm.com>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Thu, 15 Dec 2011 11:11:58 +0000
+Subject: [PATCH v5 07/11] davinci: dm644x: Replace register base value
+ with a defined macro
+In-Reply-To: <4EE87C39.8010601@mvista.com>
+References: <1323775415-24504-1-git-send-email-manjunath.hadli@ti.com>
+ <1323775415-24504-8-git-send-email-manjunath.hadli@ti.com>
+ <4EE87C39.8010601@mvista.com>
+Message-ID: <E99FAA59F8D8D34D8A118DD37F7C8F750167AD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/11 01:56, Kukjin Kim wrote:
-> Marc Zyngier wrote:
->>
->> sched_clock() is yet another blocker on the road to the single
->> image. This patch implements an idea by Russell King:
->>
->> http://www.spinics.net/lists/linux-omap/msg49561.html
->>
->> Instead of asking the platform to implement both sched_clock()
->> itself and the rollover callback, simply register a read()
->> function, and let the ARM code care about sched_clock() itself,
->> the conversion to ns and the rollover. sched_clock() uses
->> this read() function as an indirection to the platform code.
->> If the platform doesn't provide a read(), the code falls back
->> to the jiffy counter (just like the default sched_clock).
->>
->> This allow some simplifications and possibly some footprint gain
->> when multiple platforms are compiled in. Among the drawbacks,
->> the removal of the *_fixed_sched_clock optimization which could
->> negatively impact some platforms (sa1100, tegra, versatile
->> and omap).
->>
->> Tested on 11MPCore, OMAP4 and Tegra.
->>
->> Cc: Imre Kaloz <kaloz@openwrt.org>
->> Cc: Krzysztof Halasa <khc@pm.waw.pl>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Eric Miao <eric.y.miao@gmail.com>
->> Cc: Colin Cross <ccross@android.com>
->> Cc: Erik Gilling <konkers@android.com>
->> Cc: Olof Johansson <olof@lixom.net>
->> Cc: Linus Walleij <linus.walleij@stericsson.com>
->> Cc: Sascha Hauer <kernel@pengutronix.de>
->> Cc: Alessandro Rubini <rubini@unipv.it>
->> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
->> Cc: Lennert Buytenhek <kernel@wantstofly.org>
->> Cc: Nicolas Pitre <nico@fluxnic.net>
->> Cc: Ben Dooks <ben-linux@fluff.org>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
+Sergei,
+On Wed, Dec 14, 2011 at 16:06:41, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Hi Marc,
+> On 13-12-2011 15:23, Manjunath Hadli wrote:
 > 
-> There is a complaining with checkpatch.
+> > Replace hard coded value of vpss register base to a define macro 
+> > DM644X_VPSS_REG_BASE for proper readability
 > 
-> ERROR: trailing whitespace
-> #376: FILE: arch/arm/kernel/sched_clock.c:163:
-> +^I^Isetup_sched_clock(jiffy_sched_clock_read, 32, HZ);^I$
+> > Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
+> > Acked-by: Sekhar Nori<nsekhar@ti.com>
+> > ---
+> >   arch/arm/mach-davinci/dm644x.c |    8 +++++---
+> >   1 files changed, 5 insertions(+), 3 deletions(-)
 > 
-> And build warning:
+> > diff --git a/arch/arm/mach-davinci/dm644x.c 
+> > b/arch/arm/mach-davinci/dm644x.c index 6b1d473..3802b59 100644
+> > --- a/arch/arm/mach-davinci/dm644x.c
+> > +++ b/arch/arm/mach-davinci/dm644x.c
+> > @@ -594,13 +594,15 @@ static struct platform_device dm644x_asp_device = {
+> >   	.resource	= dm644x_asp_resources,
+> >   };
+> >
+> > +#define DM644X_VPSS_REG_BASE	0x01c73400
+> > +
 > 
-> arch/arm/plat-s5p/s5p-time.c: In function 's5p_read_sched_clock':
-> arch/arm/plat-s5p/s5p-time.c:328: warning: 'return' with no value, in
-> function returning non-void
-> 
-> I'm not sure what is proper return value in this case...
+>     Why not simply DM644X_VPSS_BASE, like all the other #define's?
+There are #defines with _REG also like DAVINCI_DM646X_MCASP0_REG_BASE. But in the spirit of keeping it same for this file, I will change it.
 
-Good catch. The return value should be 0, and I'll update the patch now.
+> 
+> WBR, Sergei
+> 
 
-> Anyway, others, looks ok to me and tested on Samsung S5P boards.
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thx,
+-Manju
