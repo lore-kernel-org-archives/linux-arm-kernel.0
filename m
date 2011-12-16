@@ -1,84 +1,68 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Fri, 16 Dec 2011 16:39:04 +0100
-Subject: [PATCH v2 2/2] [RFC] ARM: IOMMU: Tegra30: iommu_ops for SMMU
- driver
-In-Reply-To: <1323954690-7000-3-git-send-email-hdoyu@nvidia.com>
-References: <1323954690-7000-1-git-send-email-hdoyu@nvidia.com>
- <1323954690-7000-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20111216153904.GC29877@amd.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Dec 2011 15:41:18 +0000
+Subject: [GIT PULL] arm-soc fixes for 3.2, part 4
+Message-ID: <201112161541.18525.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 03:11:30PM +0200, Hiroshi DOYU wrote:
-> +static int smmu_iommu_attach_dev(struct iommu_domain *domain,
-> +				 struct device *dev)
-> +{
-> +	struct smmu_as *as = domain->priv;
-> +	struct smmu_client *client, *c;
-> +	u32 map;
-> +	int err;
-> +
-> +	client = kmalloc(sizeof(*c), GFP_KERNEL);
-> +	if (!client)
-> +		return -ENOMEM;
-> +	client->dev = dev;
-> +	client->as = as;
-> +	map = (unsigned long)dev->platform_data;
-> +	if (!map)
-> +		return -EINVAL;
-> +
-> +	err = smmu_client_enable_hwgrp(client, map);
-> +	if (err)
-> +		goto err_hwgrp;
-> +
-> +	spin_lock(&as->client_lock);
-> +	list_for_each_entry(c, &as->client, list) {
-> +		if (c->dev == dev) {
-> +			pr_err("%s is already attached\n", dev_name(dev));
-> +			err = -EINVAL;
-> +			goto err_client;
-> +		}
-> +	}
-> +	list_add(&client->list, &as->client);
-> +	spin_unlock(&as->client_lock);
-> +
-> +	/*
-> +	 * Reserve "page zero" for AVP vectors using a common dummy
-> +	 * page.
-> +	 */
-> +	if (map & HWG_AVPC) {
-> +		struct page *page;
-> +
-> +		page = as->smmu->avp_vector_page;
-> +		__smmu_iommu_map_pfn(as, 0, page_to_pfn(page));
-> +
-> +		pr_info("Reserve \"page zero\" for AVP vectors using a common dummy\n");
-> +	}
-> +
-> +	pr_debug("Attached %s\n", dev_name(dev));
-> +	return 0;
-> +err_client:
-> +	smmu_client_disable_hwgrp(client);
-> +	spin_unlock(&as->client_lock);
-> +err_hwgrp:
-> +	kfree(client);
-> +	return err;
-> +}
+Hi Linus,
 
-Hmm, I have a question about that. Reading the code it looks like your
-SMMU exists per pheripheral device and the SMMU hardware supports
-multiple address spaces per device, right? The domains are implemented
-for one address-space. So is it right that a device can have multiple
-address-spaces? If so, what kind of devices do you bind to the domains
-then. I doesn't make sense to bind whole peripheral devices in this
-case.
+Here is the current set of fixes for v3.2. The majority of these are
+i.mx platform fixes that came slightly too late for the previous round.
 
+	Arnd
+---
+The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
 
-	Joerg
+  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
 
--- 
-AMD Operating System Research Center
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Amit Daniel Kachhap (1):
+      ARM: EXYNOS: Fix for stall in case of cpu hotplug or sleep
+
+Arnd Bergmann (1):
+      Merge branch 'imx-fixes-for-arnd' of git://git.pengutronix.de/git/imx/linux-2.6 into fixes
+
+Dong Aisheng (1):
+      ARM: mx5: add __initconst for fec pdata
+
+Felipe Contreras (1):
+      ARM: OMAP: rx51: fix USB
+
+Jarkko Nikula (1):
+      ARM: OMAP: mcbsp: Fix possible memory corruption
+
+Jason Chen (1):
+      MXC PWM: should active during DOZE/WAIT/DBG mode
+
+Jingoo Han (2):
+      ARM: SAMSUNG: remove duplicated header include
+      ARM: S5PV210: Set 1000ns as PWM backlight period on SMDKV210
+
+Kukjin Kim (1):
+      ARM: EXYNOS: Fix build error without CONFIG_LOCAL_TIMERS
+
+Olof Johansson (2):
+      Merge branch 'fixes' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge branch 'samsung-fixes-3' of git://git.kernel.org/.../kgene/linux-samsung into fixes
+
+Richard Zhao (1):
+      ARM: imx: fix cpufreq build errors
+
+Shawn Guo (1):
+      arm/imx: fix power button on imx51 babbage board
+
+ arch/arm/mach-exynos/mct.c                   |   13 ++++++++++---
+ arch/arm/mach-mx5/board-mx51_babbage.c       |    2 +-
+ arch/arm/mach-mx5/board-mx53_evk.c           |    2 +-
+ arch/arm/mach-mx5/board-mx53_loco.c          |    2 +-
+ arch/arm/mach-mx5/board-mx53_smd.c           |    2 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+ arch/arm/mach-omap2/mcbsp.c                  |    6 +++---
+ arch/arm/mach-s5pv210/mach-smdkv210.c        |    1 +
+ arch/arm/plat-mxc/cpufreq.c                  |    1 +
+ arch/arm/plat-mxc/pwm.c                      |    7 ++++++-
+ arch/arm/plat-samsung/dev-backlight.c        |    1 -
+ 11 files changed, 26 insertions(+), 13 deletions(-)
