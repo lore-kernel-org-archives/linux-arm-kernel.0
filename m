@@ -1,71 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Dec 2011 14:09:47 -0800
-Subject: [PATCH v3 0/4] OMAP serial device tree support
-In-Reply-To: <4EEBBFDD.1010509@gmail.com>
-References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
- <4EE8A90A.10206@gmail.com> <20111216215731.GQ32251@atomide.com>
- <4EEBBFDD.1010509@gmail.com>
-Message-ID: <20111216220947.GR32251@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 16 Dec 2011 15:12:24 -0700
+Subject: [PATCH 1/9] arm/tegra: Split Seaboard GPIO table to allow for Ventana
+In-Reply-To: <1324073552-15542-1-git-send-email-swarren@nvidia.com>
+References: <1324073552-15542-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1324073552-15542-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [111216 13:30]:
-> Tony,
-> 
-> On 12/16/2011 03:57 PM, Tony Lindgren wrote:
-> > Rob,
-> > 
-> > * Rob Herring <robherring2@gmail.com> [111214 05:16]:
-> >> On 12/14/2011 05:55 AM, Rajendra Nayak wrote:
-> >>> v3 is rebased on top of the latest serial runtime
-> >>> patches[1] and boot tested with/without DT on OMAP4
-> >>> SDP and OMAP4 Panda boards.
-> >>>
-> >>> Patches can be found here..
-> >>> git://gitorious.org/omap-pm/linux.git for-dt/serial
-> >>>
-> >>> I also had to pull in a fix[2] for DT testing (already in linux-omap
-> >>> master) which was missing as the serial runtime branch[1]
-> >>> was based on an older master commit.
-> >>>
-> >>> Changes in v3:
-> >>> -1- Rebased on latest serial runtime patches
-> >>> -2- Minor typr fixes
-> >>>
-> >>> Changes in v2:
-> >>> -1- Got rid of binding to define which uart is console
-> >>> -2- Added checks to default clock speed to 48Mhz
-> >>> -3- Added compatible for each OMAP family
-> >>> -4- Used of_alias_get_id to populate port.line
-> >>>
-> >>> [1] git://gitorious.org/runtime_3-0/runtime_3-0.git for_3_3/lo_rc4_uartruntime
-> >>> [2] http://www.spinics.net/lists/arm-kernel/msg150751.html
-> >>>
-> >>> Rajendra Nayak (4):
-> >>>   omap-serial: Get rid of all pdev->id usage
-> >>>   omap-serial: Use default clock speed (48Mhz) if not specified
-> >>>   omap-serial: Add minimal device tree support
-> >>>   ARM: omap: pass minimal SoC/board data for UART from dt
-> >>>
-> >>>  .../devicetree/bindings/serial/omap_serial.txt     |   10 +++
-> >>>  arch/arm/boot/dts/omap3.dtsi                       |   31 ++++++++
-> >>>  arch/arm/boot/dts/omap4.dtsi                       |   28 +++++++
-> >>>  arch/arm/mach-omap2/board-generic.c                |    1 -
-> >>>  drivers/tty/serial/omap-serial.c                   |   80 +++++++++++++++----
-> >>>  5 files changed, 132 insertions(+), 18 deletions(-)
-> >>>  create mode 100644 Documentation/devicetree/bindings/serial/omap_serial.txt
-> >>
-> >> Looks good. For the series:
-> >>
-> >> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > Care to check if your Reviewed-by can also be applied
-> > to the additional patch "[PATCH] arm/dts: Add minimal device
-> > tree support for omap2420 and omap2430" that's needed
-> > to keep serial port working for omap2 with this series?
-> 
-> It looks fine.
+Seaboard and Ventana share some GPIOs, but others are different. Split the
+GPIO table into common, seaboard-specific, and ventana-specific tables, so
+that only the correct ones are enabled for each board. Add a few missing
+audio-related GPIOs for Ventana.
 
-OK thanks.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
 
-Tony
+diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+index b1c2972..cb5b2e9 100644
+--- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
++++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+@@ -190,14 +190,26 @@ static struct tegra_gpio_table common_gpio_table[] = {
+ 	{ .gpio = TEGRA_GPIO_SD2_CD,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_SD2_WP,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_SD2_POWER,		.enable = true },
++	{ .gpio = TEGRA_GPIO_CDC_IRQ,		.enable = true },
++};
++
++static struct tegra_gpio_table seaboard_gpio_table[] = {
+ 	{ .gpio = TEGRA_GPIO_LIDSWITCH,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_POWERKEY,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_HP_DET,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_ISL29018_IRQ,	.enable = true },
+-	{ .gpio = TEGRA_GPIO_CDC_IRQ,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_USB1,		.enable = true },
+ };
+ 
++static struct tegra_gpio_table ventana_gpio_table[] = {
++	/* hp_det */
++	{ .gpio = TEGRA_GPIO_PW2,		.enable = true },
++	/* int_mic_en */
++	{ .gpio = TEGRA_GPIO_PX0,		.enable = true },
++	/* ext_mic_en */
++	{ .gpio = TEGRA_GPIO_PX1,		.enable = true },
++};
++
+ static void __init update_pinmux(struct tegra_pingroup_config *newtbl, int size)
+ {
+ 	int i, j;
+@@ -235,11 +247,13 @@ void __init seaboard_common_pinmux_init(void)
+ void __init seaboard_pinmux_init(void)
+ {
+ 	seaboard_common_pinmux_init();
++	tegra_gpio_config(seaboard_gpio_table, ARRAY_SIZE(seaboard_gpio_table));
+ }
+ 
+ void __init ventana_pinmux_init(void)
+ {
+ 	update_pinmux(ventana_pinmux, ARRAY_SIZE(ventana_pinmux));
+ 	seaboard_common_pinmux_init();
++	tegra_gpio_config(ventana_gpio_table, ARRAY_SIZE(ventana_gpio_table));
+ }
+ 
+-- 
+1.7.0.4
