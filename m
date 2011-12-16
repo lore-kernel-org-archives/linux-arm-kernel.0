@@ -1,148 +1,55 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 15 Dec 2011 22:53:11 -0700 (MST)
-Subject: [RFC PATCH v2 1/8] omap4: introduce fdif(face detect module) hwmod
-In-Reply-To: <1323871214-25435-2-git-send-email-ming.lei@canonical.com>
-References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
- <1323871214-25435-2-git-send-email-ming.lei@canonical.com>
-Message-ID: <alpine.DEB.2.00.1112152252260.12660@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 15 Dec 2011 21:53:12 -0800
+Subject: [GIT PULL] at91: drivers for 3.3
+In-Reply-To: <4EEA0DF6.3050408@atmel.com>
+References: <4EEA0DF6.3050408@atmel.com>
+Message-ID: <CAOesGMjurPDXVR1FLmLXa5NDNjpTzGpshQQ0piqHis5wsYM=Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Beno?t
+Hi,
 
-On Wed, 14 Dec 2011, Ming Lei wrote:
+On Thu, Dec 15, 2011 at 7:10 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Arnd, Olof,
+>
+> This is a first "drivers" part of our material for 3.3 merge window. It collects
+> Ethernet drivers changes.
+> One thing to note is that the macb.c driver is modified to support
+> device tree. We agreed with David to drag those modifications into
+> arm-soc git tree because they go on top of Jamie's work on macb-gem driver
+> already in your drivers/macb-gem branch.
+>
+> This pull request goes on top of Linus' 3.2-rc5 commit but with additional
+> dependencies with two of your branches:
+> 1/ fixes (which seems already included in 3.2-rc5)
+> 2/ drivers/macb-gem
+>
+> I had to resolve a conflict while merging the macb-gem branche with current 3.2-rc5. The
+> resolution is commited into this branch.
+> Tell me if you need more precision.
 
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   81 ++++++++++++++++++++++++++++
->  1 files changed, 81 insertions(+), 0 deletions(-)
+The history of this branch due to the double dependencies gets a bit
+awkward. Also, it seems like you in one of your merges kept the
+'default y' in NET_CADENCE that should have been removed.
 
-any comments on this patch?  I'd like to queue it if it looks good to you.
+Would you mind trying this instead?
 
-- Paul
+* Base this new branch on the previous macb-gem branch
+* Cherry-pick the fixes from 'fixes' into the new branch if truly
+needed -- I tested here and all of the patches applied cleanly.
+* Then apply these patches
+* For build testing before sending, merge into for-next to aggregate
+with the rest of the 'fixes' changes -- it's OK that we have to do a
+fixup here.
 
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 6cf21ee..30db754 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -53,6 +53,7 @@ static struct omap_hwmod omap44xx_dmm_hwmod;
->  static struct omap_hwmod omap44xx_dsp_hwmod;
->  static struct omap_hwmod omap44xx_dss_hwmod;
->  static struct omap_hwmod omap44xx_emif_fw_hwmod;
-> +static struct omap_hwmod omap44xx_fdif_hwmod;
->  static struct omap_hwmod omap44xx_hsi_hwmod;
->  static struct omap_hwmod omap44xx_ipu_hwmod;
->  static struct omap_hwmod omap44xx_iss_hwmod;
-> @@ -354,6 +355,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +/* fdif -> l3_main_2 */
-> +static struct omap_hwmod_ocp_if omap44xx_fdif__l3_main_2 = {
-> +	.master		= &omap44xx_fdif_hwmod,
-> +	.slave		= &omap44xx_l3_main_2_hwmod,
-> +	.clk		= "l3_div_ck",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
->  /* hsi -> l3_main_2 */
->  static struct omap_hwmod_ocp_if omap44xx_hsi__l3_main_2 = {
->  	.master		= &omap44xx_hsi_hwmod,
-> @@ -5444,6 +5453,75 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
->  	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_slaves),
->  };
->  
-> +/* 'fdif' class */
-> +static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
-> +	.rev_offs	= 0x0000,
-> +	.sysc_offs	= 0x0010,
-> +	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
-> +			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> +			   MSTANDBY_FORCE | MSTANDBY_NO |
-> +			   MSTANDBY_SMART),
-> +	.sysc_fields	= &omap_hwmod_sysc_type2,
-> +};
-> +
-> +static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
-> +	.name	= "fdif",
-> +	.sysc	= &omap44xx_fdif_sysc,
-> +};
-> +
-> +/*fdif*/
-> +static struct omap_hwmod_addr_space omap44xx_fdif_addrs[] = {
-> +	{
-> +		.pa_start	= 0x4a10a000,
-> +		.pa_end		= 0x4a10afff,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
-> +	{ }
-> +};
-> +
-> +/* l4_cfg -> fdif */
-> +static struct omap_hwmod_ocp_if omap44xx_l4_cfg__fdif = {
-> +	.master		= &omap44xx_l4_cfg_hwmod,
-> +	.slave		= &omap44xx_fdif_hwmod,
-> +	.clk		= "l4_div_ck",
-> +	.addr		= omap44xx_fdif_addrs,
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* fdif slave ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
-> +	&omap44xx_l4_cfg__fdif,
-> +};
-> +static struct omap_hwmod_irq_info omap44xx_fdif_irqs[] = {
-> +	{ .irq = 69 + OMAP44XX_IRQ_GIC_START },
-> +	{ .irq = -1 }
-> +};
-> +
-> +/* fdif master ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_fdif_masters[] = {
-> +	&omap44xx_fdif__l3_main_2,
-> +};
-> +
-> +static struct omap_hwmod omap44xx_fdif_hwmod = {
-> +	.name		= "fdif",
-> +	.class		= &omap44xx_fdif_hwmod_class,
-> +	.clkdm_name	= "iss_clkdm",
-> +	.mpu_irqs	= omap44xx_fdif_irqs,
-> +	.main_clk	= "fdif_fck",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_offs = OMAP4_CM_CAM_FDIF_CLKCTRL_OFFSET,
-> +			.context_offs = OMAP4_RM_CAM_FDIF_CONTEXT_OFFSET,
-> +			.modulemode   = MODULEMODE_SWCTRL,
-> +		},
-> +	},
-> +	.slaves		= omap44xx_fdif_slaves,
-> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_fdif_slaves),
-> +	.masters	= omap44xx_fdif_masters,
-> +	.masters_cnt	= ARRAY_SIZE(omap44xx_fdif_masters),
-> +};
-> +
->  static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->  
->  	/* dmm class */
-> @@ -5593,6 +5671,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->  	&omap44xx_wd_timer2_hwmod,
->  	&omap44xx_wd_timer3_hwmod,
->  
-> +	/* fdif class */
-> +	&omap44xx_fdif_hwmod,
-> +
->  	NULL,
->  };
->  
-> -- 
-> 1.7.5.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+That should give a clean branch with neat history for just these
+changes. About 'fixes': Since they are in for-next, and will be in
+3.2, that dependency will be taken care of that way.
+
+Then send a fresh pull request for that new branch, please.
 
 
-- Paul
+Thanks!
+
+
+-Olof
