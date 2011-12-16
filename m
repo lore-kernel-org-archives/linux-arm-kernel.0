@@ -1,26 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Dec 2011 11:48:14 -0800
-Subject: [GIT PULL] ARM: OMAP3/4: hwmod data changes for 3.3
-In-Reply-To: <alpine.DEB.2.00.1112160423360.12660@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1112160423360.12660@utopia.booyaka.com>
-Message-ID: <20111216194813.GI32251@atomide.com>
+Date: Fri, 16 Dec 2011 11:48:27 -0800
+Subject: [GIT PULL] ARM: OMAP: EHCI/OHCI: convert to runtime PM
+In-Reply-To: <alpine.DEB.2.00.1112160447440.12660@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1112160447440.12660@utopia.booyaka.com>
+Message-ID: <20111216194827.GJ32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [111216 02:53]:
-> Hi Tony
+* Paul Walmsley <paul@pwsan.com> [111216 03:20]:
+> Hi Tony,
 > 
-> Here are some hwmod data changes for the 3.3 merge window.  Note that they 
-> have a dependency on the 3.2-rc hwmod data fixes.  Once those are merged, 
-> I'd be happy to update this pull request on a stable commit.
+> This series converts the USB EHCI/OHCI code to use runtime PM.  It has 
+> multiple hwmods for its omap_device, but Keshava & Partha have promised to 
+> post patches to solve that problem for the 3.4 merge window.
 > 
-> The following changes since commit 91a36bdb3ada99ebf3a613a0dab2d741445ffd7f:
-> 
->   ARM: OMAP: hwmod data: fix the panic on Nokia RM-680 during boot (2011-12-15 22:38:37 -0700)
+> This series has a dependency on the "hwmod_data_devel_3.3" branch, which 
+> in turn depends on the "hwmod_data_fixes_3.2rc" branch.
 
-Thanks pulling into hwmod branch on top of fixes-non-critical-part2.
-No need to rebase since I have your commit above pulled already in
-fixes-non-critical-part2.
+Thanks pulling into ehci branch on top of hwmod branch which is based
+on fixes-non-critical-part2.
 
 Regards,
 
