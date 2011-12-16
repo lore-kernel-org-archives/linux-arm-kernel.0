@@ -1,33 +1,60 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 16 Dec 2011 20:43:22 +0530
-Subject: [QUESTION] How to set static/dynamic dependency between clock
- domains
-In-Reply-To: <CACVXFVNOpfWxod_pN-kiQPoQ7n=XSFeV6WK6sf+8hYSiZ2rDBA@mail.gmail.com>
-References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
- <CACVXFVNOpfWxod_pN-kiQPoQ7n=XSFeV6WK6sf+8hYSiZ2rDBA@mail.gmail.com>
-Message-ID: <CAMQu2gxNvrMXYs0gPYTS3wUL=toL=ccRxso25esXwmx9j4O5fg@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 16 Dec 2011 16:21:43 +0100
+Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART
+ from dt
+In-Reply-To: <1323863746-18145-5-git-send-email-rnayak@ti.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+ <1323863746-18145-5-git-send-email-rnayak@ti.com>
+Message-ID: <4EEB6207.9090200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2011 at 7:20 PM, Ming Lei <tom.leiming@gmail.com> wrote:
-> Hi,
->
-> On Fri, Dec 16, 2011 at 9:24 PM, Ming Lei <tom.leiming@gmail.com> wrote:
->
->> [1], add static dependency
->
-> Sorry for the mess, see attachment for the change.
->
-Your patch is setting static dependency between ISS and l3_2.
-It's not dynamic dep. Dynamic dep is managed through hardware and they
-are not configurable. But with static dep. you can over-ride that behavior
-as you have done.
+Hi Rajendra,
 
-This will impact power since l3_2 can't idle as long as iss clock
-domain is active.
+Just one minor comment if you plan to repost.
 
-I need to check internal code-base but I don't remember this
-issue observed so far.
+On 12/14/2011 12:55 PM, Rajendra Nayak wrote:
+> Pass minimal data needed for console boot, from dt, for
+> OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
+> static initialization from generic board file.
+>
+> Acked-by: Rob Herring<rob.herring@calxeda.com>
+> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
 
-Regards
-Santosh
+Tested-by: Benoit Cousson <b-cousson@ti.com>
+
+>   arch/arm/boot/dts/omap3.dtsi        |   31 +++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/omap4.dtsi        |   28 ++++++++++++++++++++++++++++
+>   arch/arm/mach-omap2/board-generic.c |    1 -
+>   3 files changed, 59 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index d202bb5..216c331 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -13,6 +13,13 @@
+>   / {
+>   	compatible = "ti,omap3430", "ti,omap3";
+>
+> +	aliases {
+> +		serial0 =&uart1;
+> +		serial1 =&uart2;
+> +		serial2 =&uart3;
+> +		serial3 =&uart4;
+> +	};
+> +
+>   	cpus {
+>   		cpu at 0 {
+>   			compatible = "arm,cortex-a8";
+> @@ -59,5 +66,29 @@
+>   			interrupt-controller;
+>   			#interrupt-cells =<1>;
+>   		};
+> +
+> +		uart1: serial at 0x4806a000 {
+
+Could you get rid of the 0x prefix for consistency?
+This is applicable for the omap4.dtsi as well.
+
+Thanks,
+Benoit
