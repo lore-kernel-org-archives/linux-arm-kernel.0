@@ -1,30 +1,30 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 16 Dec 2011 18:31:00 +0800
-Subject: [PATCH V2 2/4] dts/imx6q: add cpufreq property
+Date: Fri, 16 Dec 2011 18:31:01 +0800
+Subject: [PATCH V2 3/4] arm/imx6q: register arm_clk as cpu to clkdev
 In-Reply-To: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
 References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1324031462-24961-3-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1324031462-24961-4-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+cpufreq needs cpu clock to change frequency.
+
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/boot/dts/imx6q.dtsi |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-imx/clock-imx6q.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 263e8f3..f2e3eaf 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -29,6 +29,9 @@
- 			compatible = "arm,cortex-a9";
- 			reg = <0>;
- 			next-level-cache = <&L2>;
-+			cpu-freqs = <996000000 792000000 396000000 198000000>;
-+			cpu-volts = <1225000 1100000 950000 850000>;
-+			trans-latency = <61036>; /* two CLK32 periods */
- 		};
+diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+index 039a7ab..72acbc2 100644
+--- a/arch/arm/mach-imx/clock-imx6q.c
++++ b/arch/arm/mach-imx/clock-imx6q.c
+@@ -1911,6 +1911,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK(NULL, "gpmi_io_clk", gpmi_io_clk),
+ 	_REGISTER_CLOCK(NULL, "usboh3_clk", usboh3_clk),
+ 	_REGISTER_CLOCK(NULL, "sata_clk", sata_clk),
++	_REGISTER_CLOCK(NULL, "cpu", arm_clk),
+ };
  
- 		cpu at 1 {
+ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
 -- 
 1.7.5.4
