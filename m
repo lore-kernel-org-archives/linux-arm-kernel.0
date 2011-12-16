@@ -1,28 +1,21 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Fri, 16 Dec 2011 21:50:46 +0800
-Subject: [QUESTION] How to set static/dynamic dependency between clock
- domains
-In-Reply-To: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
-References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
-Message-ID: <CACVXFVNOpfWxod_pN-kiQPoQ7n=XSFeV6WK6sf+8hYSiZ2rDBA@mail.gmail.com>
+From: joro@8bytes.org ('Joerg Roedel')
+Date: Fri, 16 Dec 2011 15:15:07 +0100
+Subject: [PATCH] iommu: Initialize domain->handler in iommu_domain_alloc()
+In-Reply-To: <000401ccbbef$9b0389e0$d10a9da0$%cho@samsung.com>
+References: <1323760466-30333-1-git-send-email-pullip.cho@samsung.com>
+ <20111215081056.GC4475@8bytes.org>
+ <000401ccbbef$9b0389e0$d10a9da0$%cho@samsung.com>
+Message-ID: <20111216141507.GB28302@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 16, 2011 at 09:38:25PM +0900, KyongHo Cho wrote:
+> Subject: [PATCH] iommu: Initialize domain->handler in iommu_domain_alloc()
+> 
+> Since it is not guaranteed that an iommu driver initializes in its
+> domain_init() function, it must be initialized with NULL to prevent
+> calling a function in an arbitrary location when iommu fault occurred.
+> 
+> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
 
-On Fri, Dec 16, 2011 at 9:24 PM, Ming Lei <tom.leiming@gmail.com> wrote:
-
-> [1], add static dependency
-
-Sorry for the mess, see attachment for the change.
-
-thanks,
--- 
-Ming Lei
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: dyndep.patch
-Type: text/x-patch
-Size: 1309 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111216/7dc305eb/attachment.bin>
+Applied to iommu/fixes, thanks a lot.
