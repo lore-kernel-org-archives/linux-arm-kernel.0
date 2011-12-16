@@ -1,42 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Dec 2011 04:25:12 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP3/4: hwmod data changes for 3.3
-Message-ID: <alpine.DEB.2.00.1112160423360.12660@utopia.booyaka.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Fri, 16 Dec 2011 12:26:03 +0100
+Subject: [PATCH V2 1/4] cpufreq: add arm soc generic cpufreq driver
+In-Reply-To: <1324031462-24961-2-git-send-email-richard.zhao@linaro.org>
+References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
+ <1324031462-24961-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <201112161226.04092.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+Am Freitag, 16. Dezember 2011, 11:30:59 schrieb Richard Zhao:
+> It support single core and multi-core ARM SoCs. But it assume
+> all cores share the same frequency and voltage.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm   |    8 ++
+>  drivers/cpufreq/Makefile      |    1 +
+>  drivers/cpufreq/arm-cpufreq.c |  269
+> +++++++++++++++++++++++++++++++++++++++++ 3 files changed, 278
+> insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/cpufreq/arm-cpufreq.c
 
-Here are some hwmod data changes for the 3.3 merge window.  Note that they 
-have a dependency on the 3.2-rc hwmod data fixes.  Once those are merged, 
-I'd be happy to update this pull request on a stable commit.
+looks quite cool, but should also provide a description of the devicetree 
+bindings (i.e. like the rest in Documentation/devicetree/bindings/...) for 
+future reference.
 
-The following changes since commit 91a36bdb3ada99ebf3a613a0dab2d741445ffd7f:
-
-  ARM: OMAP: hwmod data: fix the panic on Nokia RM-680 during boot (2011-12-15 22:38:37 -0700)
-
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 hwmod_data_devel_3.3
-
-Benoit Cousson (1):
-      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP4
-
-Keshava Munegowda (1):
-      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP3
-
-Kyle Manna (1):
-      ARM: OMAP: hwmod data: Add support for AM35xx UART4/ttyO3
-
-Paul Walmsley (1):
-      ARM: OMAP3: hwmod data: disable multiblock reads on MMC1/2 on OMAP34xx/35xx <= ES2.1
-
-Shubhrajyoti D (1):
-      ARM: OMAP3+: hwmod data: Add the default clockactivity for I2C
-
- arch/arm/mach-omap2/clock3xxx_data.c       |   11 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  374 +++++++++++++++++++++++++++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  217 ++++++++++++++++-
- arch/arm/mach-omap2/prcm-common.h          |    2 +
- arch/arm/plat-omap/include/plat/irqs.h     |    2 +-
- arch/arm/plat-omap/include/plat/serial.h   |    1 +
- 6 files changed, 594 insertions(+), 13 deletions(-)
+Heiko
