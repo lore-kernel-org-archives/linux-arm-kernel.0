@@ -1,44 +1,67 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Dec 2011 06:22:17 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP2+: PRCM: add chained PRCM interrupt handler
-Message-ID: <alpine.DEB.2.00.1112160621080.12660@utopia.booyaka.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 16 Dec 2011 21:24:25 +0800
+Subject: [QUESTION] How to set static/dynamic dependency between clock domains
+Message-ID: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+Hi,
 
-The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+I found that face detection module(fdif) can't be enabled successfully
+without the
+change in [1].
 
-  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+Looks like it is not a good way to do it because the dynamic dependency of
+CD_CAM on l3_2 is disabled at default, not like other ones, so I guess that
+it may work if the dynamic dependency is enabled by setting bit L3_2_DYNDEP
+to CM_CAM_DYNAMICDEP.  After greping over arch/arm/mach-omap2 and
+arch/arm/plat-omap, I did not find any operations on CM_*_DYNAMICDEP
+register, so I am wondering if dynamic dependency is not used on omap4 at all
+now.
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 tk_prm_chain_handler_devel_3.3
+Also I have tried to add 'l3_2_clkdm' into dependency table of iss_clkdm in [2],
+and it doesn't work.
 
-Govindraj R (1):
-      ARM: OMAP2+: hwmod: Add API to enable IO ring wakeup
+How could I cope with the clock domain dependency so that fdif can be
+enabled successfully?
 
-Paul Walmsley (2):
-      ARM: OMAP2+: mux: add wakeup-capable hwmod mux entries to dynamic list
-      ARM: OMAP3/4: PRM: add functions to read pending IRQs, PRM barrier
 
-Tero Kristo (6):
-      ARM: OMAP: PRCM: add support for chain interrupt handler
-      ARM: OMAP: PRCM: add suspend prepare / finish support
-      ARM: OMAP2+: mux: add support for PAD wakeup interrupts
-      ARM: OMAP: hwmod: add support for selecting mpu_irq for each wakeup pad
-      ARM: OMAP3: pm: use prcm chain handler
-      ARM: OMAP4: PRM: use PRCM interrupt handler
+thanks,--?Ming Lei
+[1], add static dependency
+diff --git a/arch/arm/mach-omap2/pm44xx.c
+b/arch/arm/mach-omap2/pm44xx.cindex c264ef7..23e1f8c 100644---
+a/arch/arm/mach-omap2/pm44xx.c+++ b/arch/arm/mach-omap2/pm44xx.c@@
+-198,6 +198,7 @@ static int __init omap4_pm_init(void)?	int ret;
+	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm;?	struct
+clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;+	struct
+clockdomain *iss_clkdm;??	if (!cpu_is_omap44xx())?		return -ENODEV;@@
+-227,8 +228,10 @@ static int __init omap4_pm_init(void)?	l3_2_clkdm =
+clkdm_lookup("l3_2_clkdm");?	l4_per_clkdm =
+clkdm_lookup("l4_per_clkdm");?	ducati_clkdm =
+clkdm_lookup("ducati_clkdm");+	iss_clkdm = clkdm_lookup("iss_clkdm");
+	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm)
+||-		(!l3_2_clkdm) || (!ducati_clkdm) ||
+(!l4_per_clkdm))+		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm)
+||+		(!iss_clkdm))?		goto err2;??	ret = clkdm_add_wkdep(mpuss_clkdm,
+emif_clkdm);@@ -237,6 +240,7 @@ static int __init omap4_pm_init(void)
+	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);?	ret |=
+clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);?	ret |=
+clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);+	ret |=
+clkdm_add_wkdep(iss_clkdm, l3_2_clkdm);?	if (ret) {?		pr_err("Failed
+to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 "?				"wakeup
+dependency\n");
+[2],
 
- arch/arm/mach-omap2/Makefile                 |    5 +-
- arch/arm/mach-omap2/mux.c                    |   89 +++++++-
- arch/arm/mach-omap2/omap_hwmod.c             |  102 ++++++++
- arch/arm/mach-omap2/pm34xx.c                 |  115 ++++------
- arch/arm/mach-omap2/prcm-common.h            |   75 ++++++-
- arch/arm/mach-omap2/prm2xxx_3xxx.c           |   97 ++++++++-
- arch/arm/mach-omap2/prm2xxx_3xxx.h           |    9 +-
- arch/arm/mach-omap2/prm44xx.c                |  116 ++++++++++
- arch/arm/mach-omap2/prm44xx.h                |    8 +-
- arch/arm/mach-omap2/prm_common.c             |  320 ++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 +
- 11 files changed, 860 insertions(+), 79 deletions(-)
- create mode 100644 arch/arm/mach-omap2/prm_common.c
+diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c
+b/arch/arm/mach-omap2/clockdomains44xx_data.c
+index 9299ac2..3f8f6a9 100644
+--- a/arch/arm/mach-omap2/clockdomains44xx_data.c
++++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+@@ -65,6 +65,7 @@ static struct clkdm_dep ducati_wkup_sleep_deps[] = {
+ static struct clkdm_dep iss_wkup_sleep_deps[] = {
+        { .clkdm_name = "ivahd_clkdm" },
+        { .clkdm_name = "l3_1_clkdm" },
++       { .clkdm_name = "l3_2_clkdm" },
+        { .clkdm_name = "l3_emif_clkdm" },
+        { NULL },
+ };
