@@ -1,48 +1,45 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 16 Dec 2011 16:35:31 +0000
-Subject: [PATCH v5 REPOST 4/5] highbank: Unconditionally require l2x0 L2 cache
- controller support
-In-Reply-To: <1324053332-6431-1-git-send-email-dave.martin@linaro.org>
-References: <1324053332-6431-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1324053332-6431-5-git-send-email-dave.martin@linaro.org>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Fri, 16 Dec 2011 11:35:39 -0500
+Subject: [PATCH V2 3/4] arm/imx6q: register arm_clk as cpu to clkdev
+In-Reply-To: <1324031462-24961-4-git-send-email-richard.zhao@linaro.org>
+References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>,
+ <1324031462-24961-4-git-send-email-richard.zhao@linaro.org>
+Message-ID: <21672683C5A3814BB4DB938EBE482DE40A1AE8EF74@IAD2MBX09.mex02.mlsrvr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If running in the Normal World on a TrustZone-enabled SoC, Linux
-does not have complete control over the L2 cache controller
-configuration.  The kernel cannot work reliably on such platforms
-without the l2x0 cache support code built in.
+Is there a portable/generic approach for other drivers that may
+want to use arm-cpufreq.c? arm_clk is not normally defined for
+my SoC and I don't see an easy way to pull it in.
 
-This patch unconditionally enables l2x0 support for the Highbank
-SoC.
+--Mark Langsdorf
+Calxeda, Inc.
 
-Thanks to Rob Herring for this suggestion.  [1]
+________________________________________
+From: Richard Zhao [richard.zhao at linaro.org]
+Sent: Friday, December 16, 2011 4:31 AM
+To: linux-arm-kernel at lists.infradead.org; cpufreq at vger.kernel.org; devicetree-discuss at lists.ozlabs.org
+Cc: linux at arm.linux.org.uk; davej at redhat.com; kernel at pengutronix.de; shawn.guo at linaro.org; eric.miao at linaro.org; Mark Langsdorf; linaro-dev at lists.linaro.org; patches at linaro.org; Richard Zhao
+Subject: [PATCH V2 3/4] arm/imx6q: register arm_clk as cpu to clkdev
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074495.html
+cpufreq needs cpu clock to change frequency.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-imx/clock-imx6q.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index eca82f9..1792146 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -340,12 +340,12 @@ config ARCH_HIGHBANK
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select ARM_TIMER_SP804
-+	select CACHE_L2X0
- 	select CLKDEV_LOOKUP
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU
- 	select HAVE_SMP
--	select MIGHT_HAVE_CACHE_L2X0
- 	select USE_OF
- 	help
- 	  Support for the Calxeda Highbank SoC based boards.
--- 
-1.7.4.1
+diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+index 039a7ab..72acbc2 100644
+--- a/arch/arm/mach-imx/clock-imx6q.c
++++ b/arch/arm/mach-imx/clock-imx6q.c
+@@ -1911,6 +1911,7 @@ static struct clk_lookup lookups[] = {
+        _REGISTER_CLOCK(NULL, "gpmi_io_clk", gpmi_io_clk),
+        _REGISTER_CLOCK(NULL, "usboh3_clk", usboh3_clk),
+        _REGISTER_CLOCK(NULL, "sata_clk", sata_clk),
++       _REGISTER_CLOCK(NULL, "cpu", arm_clk),
+ };
+
+ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+--
+1.7.5.4
