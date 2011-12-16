@@ -1,25 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Dec 2011 02:55:54 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP: I2C: prepare to use hwmod reset in driver
-Message-ID: <alpine.DEB.2.00.1112160254320.12660@utopia.booyaka.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 16 Dec 2011 11:01:10 +0100
+Subject: [PATCH v2] [RESEND] Handle instruction cache maintenance fault
+ properly
+In-Reply-To: <20111216022205.GA28787@shutemov.name>
+References: <AANLkTilVp0xvAJNns3TEe4SzEUpN8hMC9DdwmwW7i9yX@mail.gmail.com>
+ <20111215215649.GJ24496@pengutronix.de>
+ <20111216022205.GA28787@shutemov.name>
+Message-ID: <20111216100110.GK24496@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+Hallo,
 
-The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+On Fri, Dec 16, 2011 at 04:22:05AM +0200, Kirill A. Shutemov wrote:
+> On Thu, Dec 15, 2011 at 10:56:49PM +0100, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Tue, May 11, 2010 at 01:33:14PM +0300, Kirill A. Shutemov wrote:
+> > > Between "clean D line..." and "invalidate I line" operations in
+> > > v7_coherent_user_range(), the memory page may get swapped out.
+> > > And the fault on "invalidate I line" could not be properly handled
+> > > causing the oops.
+> > > 
+> > > In ARMv6 "external abort on linefetch" replaced by "instruction cache
+> > > maintenance fault". Let's handle it as translation fault. It fixes the
+> > > issue.
+> > > 
+> > > I'm not sure if it's reasonable to check arch version in run-time.
+> > > Let's do it in compile time for now.
+> > > 
+> > > Signed-off-by: Siarhei Siamashka <siarhei.siamashka@nokia.com>
+> > > Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+> > I found this patch in Catalin's stack that I picked up to get support
+> > for Cortex-M3. Is this still relevant?
+> 
+> It's in upstream. See 8c0b742.
+Ah, I missed that because it applies again on top of 3.2-rc because of
 
-  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+	993bf4e (ARM: 6256/1: Check arch version and modify fsr_info[] depends on it at runtime)
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 i2c_reset_devel_3.3
+Thanks and sorry for the noise,
+Uwe
 
-Shubhrajyoti D (2):
-      ARM: OMAP: omap_device: add omap_device_reset to reset all the hwmods in the device
-      ARM: OMAP: I2C: Reset support
-
- arch/arm/plat-omap/i2c.c                      |    2 ++
- arch/arm/plat-omap/include/plat/omap_device.h |    1 +
- arch/arm/plat-omap/omap_device.c              |   22 ++++++++++++++++++++++
- include/linux/i2c-omap.h                      |    1 +
- 4 files changed, 26 insertions(+), 0 deletions(-)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
