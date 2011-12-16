@@ -1,124 +1,148 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 16 Dec 2011 14:34:44 +0900
-Subject: [PATCH 23/23] ARM: move VMALLOC_END down temporarily for shmobile
-In-Reply-To: <1321422521-1138-24-git-send-email-nico@fluxnic.net>
-References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
- <1321422521-1138-24-git-send-email-nico@fluxnic.net>
-Message-ID: <CANqRtoQZqZykFCFU9t_Oh55oXEUZhe8O6VPvwdJG2i6Yhr_EDg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 15 Dec 2011 22:53:11 -0700 (MST)
+Subject: [RFC PATCH v2 1/8] omap4: introduce fdif(face detect module) hwmod
+In-Reply-To: <1323871214-25435-2-git-send-email-ming.lei@canonical.com>
+References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
+ <1323871214-25435-2-git-send-email-ming.lei@canonical.com>
+Message-ID: <alpine.DEB.2.00.1112152252260.12660@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 2:48 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
->
-> THIS IS A TEMPORARY HACK. ?The purpose of this is _only_ to avoid a
-> regression on an existing machine while a better fix is implemented.
->
-> On shmobile the consistent DMA memory area was set to 158MB in commit
-> 28f0721a79 with no explanation. ?The documented size for this area should
-> vary between 2MB and 14MB, and none of the other ARM targets exceed that.
->
-> The included #warning is therefore meant to be noisy on purpose to get
-> shmobile maintainers attention and this commit reverted once this
-> consistent DMA size conflict is resolved.
->
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Magnus Damm <damm@opensource.se>
-> Cc: Paul Mundt <lethal@linux-sh.org>
+Hi Beno?t
+
+On Wed, 14 Dec 2011, Ming Lei wrote:
+
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
 > ---
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   81 ++++++++++++++++++++++++++++
+>  1 files changed, 81 insertions(+), 0 deletions(-)
 
-Hi Nicolas,
+any comments on this patch?  I'd like to queue it if it looks good to you.
 
-Thanks for your work on this! Please excuse the slow progress. I have
-now gotten around to remove the special mach-shmobile behavior.
+- Paul
 
-The change is included in the unfortunately mangled patch below. Where
-would you like me to submit the patch?
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index 6cf21ee..30db754 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -53,6 +53,7 @@ static struct omap_hwmod omap44xx_dmm_hwmod;
+>  static struct omap_hwmod omap44xx_dsp_hwmod;
+>  static struct omap_hwmod omap44xx_dss_hwmod;
+>  static struct omap_hwmod omap44xx_emif_fw_hwmod;
+> +static struct omap_hwmod omap44xx_fdif_hwmod;
+>  static struct omap_hwmod omap44xx_hsi_hwmod;
+>  static struct omap_hwmod omap44xx_ipu_hwmod;
+>  static struct omap_hwmod omap44xx_iss_hwmod;
+> @@ -354,6 +355,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +/* fdif -> l3_main_2 */
+> +static struct omap_hwmod_ocp_if omap44xx_fdif__l3_main_2 = {
+> +	.master		= &omap44xx_fdif_hwmod,
+> +	.slave		= &omap44xx_l3_main_2_hwmod,
+> +	.clk		= "l3_div_ck",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  /* hsi -> l3_main_2 */
+>  static struct omap_hwmod_ocp_if omap44xx_hsi__l3_main_2 = {
+>  	.master		= &omap44xx_hsi_hwmod,
+> @@ -5444,6 +5453,75 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
+>  	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_slaves),
+>  };
+>  
+> +/* 'fdif' class */
+> +static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
+> +	.rev_offs	= 0x0000,
+> +	.sysc_offs	= 0x0010,
+> +	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
+> +			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+> +			   MSTANDBY_FORCE | MSTANDBY_NO |
+> +			   MSTANDBY_SMART),
+> +	.sysc_fields	= &omap_hwmod_sysc_type2,
+> +};
+> +
+> +static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
+> +	.name	= "fdif",
+> +	.sysc	= &omap44xx_fdif_sysc,
+> +};
+> +
+> +/*fdif*/
+> +static struct omap_hwmod_addr_space omap44xx_fdif_addrs[] = {
+> +	{
+> +		.pa_start	= 0x4a10a000,
+> +		.pa_end		= 0x4a10afff,
+> +		.flags		= ADDR_TYPE_RT
+> +	},
+> +	{ }
+> +};
+> +
+> +/* l4_cfg -> fdif */
+> +static struct omap_hwmod_ocp_if omap44xx_l4_cfg__fdif = {
+> +	.master		= &omap44xx_l4_cfg_hwmod,
+> +	.slave		= &omap44xx_fdif_hwmod,
+> +	.clk		= "l4_div_ck",
+> +	.addr		= omap44xx_fdif_addrs,
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* fdif slave ports */
+> +static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
+> +	&omap44xx_l4_cfg__fdif,
+> +};
+> +static struct omap_hwmod_irq_info omap44xx_fdif_irqs[] = {
+> +	{ .irq = 69 + OMAP44XX_IRQ_GIC_START },
+> +	{ .irq = -1 }
+> +};
+> +
+> +/* fdif master ports */
+> +static struct omap_hwmod_ocp_if *omap44xx_fdif_masters[] = {
+> +	&omap44xx_fdif__l3_main_2,
+> +};
+> +
+> +static struct omap_hwmod omap44xx_fdif_hwmod = {
+> +	.name		= "fdif",
+> +	.class		= &omap44xx_fdif_hwmod_class,
+> +	.clkdm_name	= "iss_clkdm",
+> +	.mpu_irqs	= omap44xx_fdif_irqs,
+> +	.main_clk	= "fdif_fck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = OMAP4_CM_CAM_FDIF_CLKCTRL_OFFSET,
+> +			.context_offs = OMAP4_RM_CAM_FDIF_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +	.slaves		= omap44xx_fdif_slaves,
+> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_fdif_slaves),
+> +	.masters	= omap44xx_fdif_masters,
+> +	.masters_cnt	= ARRAY_SIZE(omap44xx_fdif_masters),
+> +};
+> +
+>  static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+>  
+>  	/* dmm class */
+> @@ -5593,6 +5671,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+>  	&omap44xx_wd_timer2_hwmod,
+>  	&omap44xx_wd_timer3_hwmod,
+>  
+> +	/* fdif class */
+> +	&omap44xx_fdif_hwmod,
+> +
+>  	NULL,
+>  };
+>  
+> -- 
+> 1.7.5.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-Thanks,
 
-/ magnus
-
-From: Magnus Damm <damm@opensource.se>
-
-Update mach-shmobile code to use standard 2MiB
-coherent DMA memory size instead of 158MiB.
-
-The 158MiB memory area was used to support HD
-resolution multimedia workloads using the same
-legacy memory allocating solution as on SH.
-
-There are no in-tree kernel dependencies on the
-158MiB setting, and future development should
-reserve and allocate memory using some other
-method like for instance CMA.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
- arch/arm/mach-shmobile/board-ag5evm.c   |    2 --
- arch/arm/mach-shmobile/board-ap4evb.c   |    2 --
- arch/arm/mach-shmobile/board-g3evm.c    |    2 --
- arch/arm/mach-shmobile/board-g4evm.c    |    2 --
- arch/arm/mach-shmobile/board-mackerel.c |    2 --
- 5 files changed, 10 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/board-ag5evm.c
-+++ work/arch/arm/mach-shmobile/board-ag5evm.c  2011-12-16
-14:04:50.000000000 +0900
-@@ -500,8 +500,6 @@ static struct map_desc ag5evm_io_desc[]
- static void __init ag5evm_map_io(void)
- {
-        iotable_init(ag5evm_io_desc, ARRAY_SIZE(ag5evm_io_desc));
--       /* DMA memory at 0xf6000000 - 0xffdfffff */
--       init_consistent_dma_size(158 << 20);
-
-        /* setup early devices and console here as well */
-        sh73a0_add_early_devices();
---- 0001/arch/arm/mach-shmobile/board-ap4evb.c
-+++ work/arch/arm/mach-shmobile/board-ap4evb.c  2011-12-16
-14:04:12.000000000 +0900
-@@ -1213,8 +1213,6 @@ static struct map_desc ap4evb_io_desc[]
- static void __init ap4evb_map_io(void)
- {
-        iotable_init(ap4evb_io_desc, ARRAY_SIZE(ap4evb_io_desc));
--       /* DMA memory at 0xf6000000 - 0xffdfffff */
--       init_consistent_dma_size(158 << 20);
-
-        /* setup early devices and console here as well */
-        sh7372_add_early_devices();
---- 0001/arch/arm/mach-shmobile/board-g3evm.c
-+++ work/arch/arm/mach-shmobile/board-g3evm.c   2011-12-16
-14:05:32.000000000 +0900
-@@ -261,8 +261,6 @@ static struct map_desc g3evm_io_desc[] _
- static void __init g3evm_map_io(void)
- {
-        iotable_init(g3evm_io_desc, ARRAY_SIZE(g3evm_io_desc));
--       /* DMA memory at 0xf6000000 - 0xffdfffff */
--       init_consistent_dma_size(158 << 20);
-
-        /* setup early devices and console here as well */
-        sh7367_add_early_devices();
---- 0001/arch/arm/mach-shmobile/board-g4evm.c
-+++ work/arch/arm/mach-shmobile/board-g4evm.c   2011-12-16
-14:05:05.000000000 +0900
-@@ -275,8 +275,6 @@ static struct map_desc g4evm_io_desc[] _
- static void __init g4evm_map_io(void)
- {
-        iotable_init(g4evm_io_desc, ARRAY_SIZE(g4evm_io_desc));
--       /* DMA memory at 0xf6000000 - 0xffdfffff */
--       init_consistent_dma_size(158 << 20);
-
-        /* setup early devices and console here as well */
-        sh7377_add_early_devices();
---- 0001/arch/arm/mach-shmobile/board-mackerel.c
-+++ work/arch/arm/mach-shmobile/board-mackerel.c        2011-12-16
-14:04:04.000000000 +0900
-@@ -1402,8 +1402,6 @@ static struct map_desc mackerel_io_desc[
- static void __init mackerel_map_io(void)
- {
-        iotable_init(mackerel_io_desc, ARRAY_SIZE(mackerel_io_desc));
--       /* DMA memory@0xf6000000 - 0xffdfffff */
--       init_consistent_dma_size(158 << 20);
-
-        /* setup early devices and console here as well */
-        sh7372_add_early_devices();
+- Paul
