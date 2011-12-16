@@ -1,41 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 16 Dec 2011 13:03:01 -0800
-Subject: [GIT PULL] at91: devices and boards files update for 3.3
-In-Reply-To: <4EEB73DD.3070505@atmel.com>
-References: <4EEA034C.9020800@atmel.com>
- <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
- <4EEB73DD.3070505@atmel.com>
-Message-ID: <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 16 Dec 2011 13:21:18 -0800
+Subject: [RFC V2 1/8] clk: pass parent rate if recalc_rate is NULL
+In-Reply-To: <1323854638-3455-2-git-send-email-richard.zhao@linaro.org>
+References: <1323854638-3455-1-git-send-email-richard.zhao@linaro.org>
+ <1323854638-3455-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <CAPtuhTjbL6zPv1WGA_tV5dfXbdsqLk+gazG5ZSnwDELkRn5RaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Wed, Dec 14, 2011 at 1:23 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+> ?drivers/clk/clk.c | ? ?4 ++++
+> ?1 files changed, 4 insertions(+), 0 deletions(-)
 
-On Fri, Dec 16, 2011 at 8:37 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+Last time this patch came up I pointed out that Saravana objected to
+it at Linaro Connect but there was no response, so I'll try again.
 
-> Yes, this ISI driver addition is also dependent on an update of the ISI
-> driver itself that will certainly be included in 3.3 by Guennadi using
-> v4L2 path.
+Saravana, do you still dislike this change for your platform?
+Otherwise it seems like a sane default and I'll take it in for the
+next series.
+
+Regards,
+Mike
+
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index a6ddbb1..30ba22e 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -470,6 +470,8 @@ static void __clk_recalc_rates(struct clk *clk, unsigned long msg)
 >
-> So, do we have to wait for its inclusion in linux-next or maybe we can
-> manage this little out-of-sync situation during the 3.3 life cycle...
+> ? ? ? ?if (clk->ops->recalc_rate)
+> ? ? ? ? ? ? ? ?clk->rate = clk->ops->recalc_rate(clk);
+> + ? ? ? else if (clk->parent)
+> + ? ? ? ? ? ? ? clk->rate = clk->parent->rate;
 >
-> ISI is a "several times reworked" and "long-awaited" driver and I really
-> would like to see it included in mainline soon...
-
-I don't see why code that is known to be broken should be added to the kernel.
-
-The way these things are normally handled is that once Guennadi has
-the patch on a stable branch, we can add that branch as a dependency
-that your code requires. So we pull that in as a dependency and apply
-your code on top of it (or, if it is just one or two patches, that
-they are are cherry-picked into your branch in the same way).
-
-But that requires that he picks up the v4l patches and keeps it in a
-stable, small, branch and that said branch gets merged in the 3.3
-merge window before the branch containing these at91 changes do.
-
-Guennadi, sound reasonable to you?
-
-
--Olof
+> ? ? ? ?/* ignore return value for POST_RATE_CHANGE & ABORT_RATE_CHANGE */
+> ? ? ? ?if (clk->notifier_count)
+> @@ -864,6 +866,8 @@ void clk_init(struct device *dev, struct clk *clk)
+>
+> ? ? ? ?if (clk->ops->recalc_rate)
+> ? ? ? ? ? ? ? ?clk->rate = clk->ops->recalc_rate(clk);
+> + ? ? ? else if (clk->parent)
+> + ? ? ? ? ? ? ? clk->rate = clk->parent->rate;
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?clk->rate = 0;
+>
+> --
+> 1.7.5.4
+>
+>
