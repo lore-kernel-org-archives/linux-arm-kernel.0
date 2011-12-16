@@ -1,36 +1,41 @@
-From: bryanh@codeaurora.org (Bryan Huntsman)
-Date: Fri, 16 Dec 2011 11:59:02 -0800
-Subject: [PATCH V2 1/4] cpufreq: add arm soc generic cpufreq driver
-In-Reply-To: <20111216105229.GB3230@totoro>
-References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
- <1324031462-24961-2-git-send-email-richard.zhao@linaro.org>
- <20111216105229.GB3230@totoro>
-Message-ID: <4EEBA306.3060309@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 16 Dec 2011 13:17:28 -0700 (MST)
+Subject: [GIT PULL] ARM: OMAP: I2C: prepare to use hwmod reset in
+ driver
+In-Reply-To: <20111216195002.GL32251@atomide.com>
+References: <alpine.DEB.2.00.1112160254320.12660@utopia.booyaka.com>
+ <20111216195002.GL32251@atomide.com>
+Message-ID: <alpine.DEB.2.00.1112161314180.12660@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2011 02:52 AM, Jamie Iles wrote:
->
->> +static DEFINE_PER_CPU(unsigned long, l_p_j_ref);
->> +static unsigned long l_p_j_ref_freq;
->> +
->> +static struct clk *cpu_clk;
+Hi
+
+On Fri, 16 Dec 2011, Tony Lindgren wrote:
+
+> * Paul Walmsley <paul@pwsan.com> [111216 01:24]:
+> > The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+> > 
+> >   Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+> > 
+> > are available in the git repository at:
+> >   git://git.pwsan.com/linux-2.6 i2c_reset_devel_3.3
+> > 
+> > Shubhrajyoti D (2):
+> >       ARM: OMAP: omap_device: add omap_device_reset to reset all the hwmods in the device
+> >       ARM: OMAP: I2C: Reset support
+> > 
+> >  arch/arm/plat-omap/i2c.c                      |    2 ++
+> >  arch/arm/plat-omap/include/plat/omap_device.h |    1 +
+> >  arch/arm/plat-omap/omap_device.c              |   22 ++++++++++++++++++++++
+> >  include/linux/i2c-omap.h                      |    1 +
+> >  4 files changed, 26 insertions(+), 0 deletions(-)
 > 
-> This assumes that all CPU's share the same clk and run at the same rate.  
-> Is that a fair/safe assumption?  I honestly don't know the answer to 
-> this so it's just a question!!!
+> Can you please update shi to leave out the extra callback
+> function int (*device_reset) (struct device *dev) as I'd
+> rather see that happen with pm_runtime calls?
 
-On MSM, cpus independently scale both frequency and voltage.  Our clock
-driver isn't upstream yet.  David Brown has a preliminary version here:
+What PM runtime call is used to reset a device?
 
-https://www.codeaurora.org/gitweb/quic/kernel/?p=davidb/linux-msm.git;a=shortlog;h=refs/heads/msm-clock-rfc
 
-Once we get our driver upstream, MSM will be an exception and not select
-ARM_GENERIC_CPUFREQ.  We'll probably have a separate msm-cpufreq.c
-driver under drivers/cpufreq/.
-
-- Bryan
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+- Paul
