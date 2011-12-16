@@ -1,41 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Dec 2011 13:17:28 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP: I2C: prepare to use hwmod reset in
- driver
-In-Reply-To: <20111216195002.GL32251@atomide.com>
-References: <alpine.DEB.2.00.1112160254320.12660@utopia.booyaka.com>
- <20111216195002.GL32251@atomide.com>
-Message-ID: <alpine.DEB.2.00.1112161314180.12660@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Dec 2011 20:20:40 +0000
+Subject: Bad page state BUG triggered by init process (kernel 3.1.2)
+In-Reply-To: <CAN_pD_DS93wxpkf1p-=iN7ciUbKHjV79DMO4O-6Dy2mPsUa5NA@mail.gmail.com>
+References: <CAN_pD_CfXh=savgYk21vo8+5E8ScfSgVsu7m4VjBLVwdPop+SA@mail.gmail.com>
+ <CAN_pD_BA8g=G3nvdiu0bNp0gqJU=LF4N4POGh9E5qfN_ubbfdg@mail.gmail.com>
+ <CAN_pD_DS93wxpkf1p-=iN7ciUbKHjV79DMO4O-6Dy2mPsUa5NA@mail.gmail.com>
+Message-ID: <20111216202040.GN14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Fri, 16 Dec 2011, Tony Lindgren wrote:
-
-> * Paul Walmsley <paul@pwsan.com> [111216 01:24]:
-> > The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
-> > 
-> >   Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
-> > 
-> > are available in the git repository at:
-> >   git://git.pwsan.com/linux-2.6 i2c_reset_devel_3.3
-> > 
-> > Shubhrajyoti D (2):
-> >       ARM: OMAP: omap_device: add omap_device_reset to reset all the hwmods in the device
-> >       ARM: OMAP: I2C: Reset support
-> > 
-> >  arch/arm/plat-omap/i2c.c                      |    2 ++
-> >  arch/arm/plat-omap/include/plat/omap_device.h |    1 +
-> >  arch/arm/plat-omap/omap_device.c              |   22 ++++++++++++++++++++++
-> >  include/linux/i2c-omap.h                      |    1 +
-> >  4 files changed, 26 insertions(+), 0 deletions(-)
+On Fri, Dec 16, 2011 at 04:19:05PM +0000, Bruce Stenning wrote:
+> On Tue, Dec 13, 2011 at 12:22 PM, Bruce Stenning <b.a.stenning@gmail.com> wrote:
+> >> BUG: Bad page state in process busybox ?pfn:00000
+> >> page:c0291000 count:0 mapcount:0 mapping: ?(null) index:0x0
+> >> page flags: 0x200(arch_1)
+> >
+> > After some experimentation, the diagnostics provided by CONFIG_DMA_API_DEBUG
+> > have shown up problems in the IOP ADMA self-tests (inconsistencies between
+> > map and unmap of DMA pages) and disabling these self-tests removes the
+> > DMA API use warnings and prevents the bad page state bug from triggering
+> > when init runs.
 > 
-> Can you please update shi to leave out the extra callback
-> function int (*device_reset) (struct device *dev) as I'd
-> rather see that happen with pm_runtime calls?
+> These problems (including the kernel memory corruption issues we have also been
+> experiencing) have been tracked to the following issue:
+> 
+> http://article.gmane.org/gmane.linux.raid/33553
 
-What PM runtime call is used to reset a device?
-
-
-- Paul
+I think you need to cc Dan in that case.
