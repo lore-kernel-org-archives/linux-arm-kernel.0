@@ -1,28 +1,42 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Dec 2011 04:23:23 -0700 (MST)
-Subject: [PATCH 3/3] ARM: OMAP: hwmod: Look for hwmod/module level context
- lost count if supported
-In-Reply-To: <alpine.DEB.2.00.1112160414530.12660@utopia.booyaka.com>
-References: <1320317665-6381-1-git-send-email-rnayak@ti.com>
- <1320317665-6381-4-git-send-email-rnayak@ti.com> <4ED52007.8010804@ti.com>
- <4ED85835.7080108@ti.com>
- <alpine.DEB.2.00.1112160414530.12660@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1112160422150.12660@utopia.booyaka.com>
+Date: Fri, 16 Dec 2011 04:25:12 -0700 (MST)
+Subject: [GIT PULL] ARM: OMAP3/4: hwmod data changes for 3.3
+Message-ID: <alpine.DEB.2.00.1112160423360.12660@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Tony
 
-On Fri, 16 Dec 2011, Paul Walmsley wrote:
+Here are some hwmod data changes for the 3.3 merge window.  Note that they 
+have a dependency on the 3.2-rc hwmod data fixes.  Once those are merged, 
+I'd be happy to update this pull request on a stable commit.
 
-> + * XXX Will not work correctly if the RM_*_CONTEXT register
-> + * offset is 0 -- probably a flag should be used to avoid this
-> + * situation, rather than testing @oh->prcm.omap4.context_offs.  No
-> + * return value.
+The following changes since commit 91a36bdb3ada99ebf3a613a0dab2d741445ffd7f:
 
-By the way, I'm also worried about this case.  Am wondering if we should 
-add a flag here just to be sure, rather than testing the offset.  
-Thoughts?
+  ARM: OMAP: hwmod data: fix the panic on Nokia RM-680 during boot (2011-12-15 22:38:37 -0700)
 
+are available in the git repository at:
+  git://git.pwsan.com/linux-2.6 hwmod_data_devel_3.3
 
-- Paul
+Benoit Cousson (1):
+      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP4
+
+Keshava Munegowda (1):
+      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP3
+
+Kyle Manna (1):
+      ARM: OMAP: hwmod data: Add support for AM35xx UART4/ttyO3
+
+Paul Walmsley (1):
+      ARM: OMAP3: hwmod data: disable multiblock reads on MMC1/2 on OMAP34xx/35xx <= ES2.1
+
+Shubhrajyoti D (1):
+      ARM: OMAP3+: hwmod data: Add the default clockactivity for I2C
+
+ arch/arm/mach-omap2/clock3xxx_data.c       |   11 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  374 +++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  217 ++++++++++++++++-
+ arch/arm/mach-omap2/prcm-common.h          |    2 +
+ arch/arm/plat-omap/include/plat/irqs.h     |    2 +-
+ arch/arm/plat-omap/include/plat/serial.h   |    1 +
+ 6 files changed, 594 insertions(+), 13 deletions(-)
