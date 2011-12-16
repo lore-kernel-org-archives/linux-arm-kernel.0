@@ -1,68 +1,34 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Fri, 16 Dec 2011 21:38:25 +0900
-Subject: [PATCH] iommu: Initialize domain->handler in	iommu_domain_alloc()
-In-Reply-To: <20111215081056.GC4475@8bytes.org>
-References: <1323760466-30333-1-git-send-email-pullip.cho@samsung.com>
- <20111215081056.GC4475@8bytes.org>
-Message-ID: <000401ccbbef$9b0389e0$d10a9da0$%cho@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 16 Dec 2011 05:38:51 -0700 (MST)
+Subject: [PATCH 3/3] ARM: OMAP: hwmod: Look for hwmod/module level context
+ lost count if supported
+In-Reply-To: <4EEB36E5.8020504@ti.com>
+References: <1320317665-6381-1-git-send-email-rnayak@ti.com>
+ <1320317665-6381-4-git-send-email-rnayak@ti.com> <4ED52007.8010804@ti.com>
+ <4ED85835.7080108@ti.com>
+ <alpine.DEB.2.00.1112160414530.12660@utopia.booyaka.com>
+ <4EEB36E5.8020504@ti.com>
+Message-ID: <alpine.DEB.2.00.1112160538200.12660@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 05:11:26PM +0100, Joerg Roedel wrote:
-> On Tue, Dec 13, 2011 at 04:14:20PM +0900, KyongHo Cho wrote:
-> > Since it is not guaranteed that an iommu driver initializes in its
-> > domain_init() function, it must be initialized with NULL to prevent
-> > calling a function in an arbitrary location when iommu fault occurred.
-> >
-> > Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
-> > ---
-> >  drivers/iommu/iommu.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> > index 7cc3c65..1afb896 100644
-> > --- a/drivers/iommu/iommu.c
-> > +++ b/drivers/iommu/iommu.c
-> > @@ -148,6 +148,7 @@ struct iommu_domain *iommu_domain_alloc(struct
-> bus_type *bus)
-> >  		return NULL;
-> >
-> >  	domain->ops = bus->iommu_ops;
-> > +	domain->handler = NULL;
+On Fri, 16 Dec 2011, Rajendra Nayak wrote:
+
+> On Friday 16 December 2011 04:46 PM, Paul Walmsley wrote:
+> > 
+> > Hi Rajendra,
+> > 
+> > I've combined your patches down to one patch and changed the logic a
+> > little bit.  It looks to me that the update and clear context registers
+> > can be done in one step, since an IP block shouldn't lose context when
+> > it's enabled.  But maybe I'm missing something?
 > 
-> Good catch. But it is better to change the kmalloc in the function to
-> kzalloc. This will implicitly initialize all future members correctly.
-Hi.
+> Thanks for the patch. The changes look fine and I also did a quick
+> test on an internal tree which supports core OSWR and it seems to
+> work fine too.
 
-Here is the patch that change kmalloc -> kzalloc
-according to your advice.
+Great, thanks.  Will wait on this one until you have a chance to tinker 
+with it during the 3.4 time frame.
 
->From 821141fcf00a64fe4fbacc78b2bbe90e15da9fca Mon Sep 17 00:00:00 2001
-From: KyongHo Cho <pullip.cho@samsung.com>
-Date: Tue, 13 Dec 2011 16:08:51 +0900
-Subject: [PATCH] iommu: Initialize domain->handler in iommu_domain_alloc()
 
-Since it is not guaranteed that an iommu driver initializes in its
-domain_init() function, it must be initialized with NULL to prevent
-calling a function in an arbitrary location when iommu fault occurred.
-
-Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
----
- drivers/iommu/iommu.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 7cc3c65..2198b2d 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -143,7 +143,7 @@ struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
- 	if (bus == NULL || bus->iommu_ops == NULL)
- 		return NULL;
- 
--	domain = kmalloc(sizeof(*domain), GFP_KERNEL);
-+	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
- 	if (!domain)
- 		return NULL;
- 
--- 
-1.7.1
+- Paul
