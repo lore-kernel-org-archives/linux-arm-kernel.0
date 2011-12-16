@@ -1,124 +1,162 @@
-From: trenn@suse.de (Thomas Renninger)
-Date: Fri, 16 Dec 2011 15:35:51 +0100
-Subject: [PATCH 1/4] cpupower: Add cpupower-idle-info manpage
-In-Reply-To: <1324046154-64824-1-git-send-email-trenn@suse.de>
-References: <1324046154-64824-1-git-send-email-trenn@suse.de>
-Message-ID: <1324046154-64824-2-git-send-email-trenn@suse.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 16 Dec 2011 15:54:52 +0100
+Subject: [RFC PATCH v2 1/8] omap4: introduce fdif(face detect module) hwmod
+In-Reply-To: <alpine.DEB.2.00.1112152252260.12660@utopia.booyaka.com>
+References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
+ <1323871214-25435-2-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1112152252260.12660@utopia.booyaka.com>
+Message-ID: <4EEB5BBC.7050807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last missing manpage for cpupower tools.
+Hi Paul,
 
-More info about other architecture's sleep state specialities would be great.
+On 12/16/2011 6:53 AM, Paul Walmsley wrote:
+> Hi Beno?t
+>
+> On Wed, 14 Dec 2011, Ming Lei wrote:
+>
+>> Signed-off-by: Ming Lei<ming.lei@canonical.com>
 
-Signed-off-by: Thomas Renninger <trenn@suse.de>
-CC: linux-arm-kernel at lists.infradead.org
-CC: jean.pihet at newoldbits.com
-CC: linux-omap at vger.kernel.org
-CC: linux-pm at lists.linux-foundation.org
-CC: linux-acpi at vger.kernel.org
-CC: cpufreq at vger.kernel.org
-CC: linux at dominikbrodowski.net
----
- tools/power/cpupower/man/cpupower-idle-info.1 |   90 +++++++++++++++++++++++++
- 1 files changed, 90 insertions(+), 0 deletions(-)
- create mode 100644 tools/power/cpupower/man/cpupower-idle-info.1
+Acked-by: Benoit Cousson <b-cousson@ti.com>
 
-diff --git a/tools/power/cpupower/man/cpupower-idle-info.1 b/tools/power/cpupower/man/cpupower-idle-info.1
-new file mode 100644
-index 0000000..4178eff
---- /dev/null
-+++ b/tools/power/cpupower/man/cpupower-idle-info.1
-@@ -0,0 +1,90 @@
-+.TH "CPUPOWER-IDLE-INFO" "1" "0.1" "" "cpupower Manual"
-+.SH "NAME"
-+.LP
-+cpupower idle\-info \- Utility to retrieve cpu idle kernel information
-+.SH "SYNTAX"
-+.LP
-+cpupower [ \-c cpulist ] idle\-info [\fIoptions\fP]
-+.SH "DESCRIPTION"
-+.LP
-+A tool which prints out per cpu idle information helpful to developers and interested users.
-+.SH "OPTIONS"
-+.LP
-+.TP
-+\fB\-f\fR \fB\-\-silent\fR
-+Only print a summary of all available C-states in the system.
-+.TP
-+\fB\-e\fR \fB\-\-proc\fR
-+deprecated.
-+Prints out idle information in old /proc/acpi/processor/*/power format. This
-+interface has been removed from the kernel for quite some time, do not let
-+further code depend on this option, best do not use it.
-+
-+.SH IDLE\-INFO DESCRIPTIONS
-+CPU sleep state statistics and descriptions are retrieved from sysfs files,
-+exported by the cpuidle kernel subsystem. The kernel only updates these
-+statistics when it enters or leaves an idle state, therefore on a very idle or
-+a very busy system, these statistics may not be accurate. They still provide a
-+good overview about the usage and availability of processor sleep states on
-+the platform.
-+
-+Be aware that the sleep states as exported by the hardware or BIOS and used by
-+the Linux kernel may not exactly reflect the capabilities of the
-+processor. This often is the case on the X86 architecture when the acpi_idle
-+driver is used. It is also possible that the hardware overrules the kernel
-+requests, due to internal activity monitors or other reasons.
-+On recent X86 platforms it is often possible to read out hardware registers
-+which monitor the duration of sleep states the processor resided in. The
-+cpupower monitor tool (cpupower\-monitor(1)) can be used to show real sleep
-+state residencies. Please refer to the architecture specific description
-+section below.
-+
-+.SH IDLE\-INFO ARCHITECTURE SPECIFIC DESCRIPTIONS
-+.SS "X86"
-+POLL idle state
-+
-+If cpuidle is active, X86 platforms have one special idle state.
-+The POLL idle state is not a real idle state, it does not save any
-+power. Instead, a busy\-loop is executed doing nothing for a short period of
-+time. This state is used if the kernel knows that work has to be processed
-+very soon and entering any real hardware idle state may result in a slight
-+performance penalty.
-+
-+There exist two different cpuidle drivers on the X86 architecture platform:
-+
-+"acpi_idle" cpuidle driver
-+
-+The acpi_idle cpuidle driver retrieves available sleep states (C\-states) from
-+the ACPI BIOS tables (from the _CST ACPI function on recent platforms or from
-+the FADT BIOS table on older ones).
-+The C1 state is not retrieved from ACPI tables. If the C1 state is entered,
-+the kernel will call the hlt instruction (or mwait on Intel).
-+
-+"intel_idle" cpuidle driver
-+
-+In kernel 2.6.36 the intel_idle driver was introduced.
-+It only serves recent Intel CPUs (Nehalem, Westmere, Sandybridge, Atoms or
-+newer). On older Intel CPUs the acpi_idle driver is still used (if the BIOS
-+provides C\-state ACPI tables).
-+The intel_idle driver knows the sleep state capabilities of the processor and
-+ignores ACPI BIOS exported processor sleep states tables.
-+
-+.SH "REMARKS"
-+.LP
-+By default only values of core zero are displayed. How to display settings of
-+other cores is described in the cpupower(1) manpage in the \-\-cpu option
-+section.
-+.SH REFERENCES
-+http://www.acpi.info/spec.htm
-+.SH "FILES"
-+.nf
-+\fI/sys/devices/system/cpu/cpu*/cpuidle/state*\fP
-+\fI/sys/devices/system/cpu/cpuidle/*\fP
-+.fi
-+.SH "AUTHORS"
-+.nf
-+Thomas Renninger <trenn@suse.de>
-+.fi
-+.SH "SEE ALSO"
-+.LP
-+cpupower(1), cpupower\-monitor(1), cpupower\-info(1), cpupower\-set(1)
--- 
-1.7.6.1
+>> ---
+>>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   81 ++++++++++++++++++++++++++++
+>>   1 files changed, 81 insertions(+), 0 deletions(-)
+>
+> any comments on this patch?  I'd like to queue it if it looks good to you.
+
+It looks good to me. The only minor comment is about fdif location in 
+the list that should be sorted and thus cannot be after wd_timer2.
+
+Regards,
+Benoit
+
+>
+> - Paul
+>
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> index 6cf21ee..30db754 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> @@ -53,6 +53,7 @@ static struct omap_hwmod omap44xx_dmm_hwmod;
+>>   static struct omap_hwmod omap44xx_dsp_hwmod;
+>>   static struct omap_hwmod omap44xx_dss_hwmod;
+>>   static struct omap_hwmod omap44xx_emif_fw_hwmod;
+>> +static struct omap_hwmod omap44xx_fdif_hwmod;
+>>   static struct omap_hwmod omap44xx_hsi_hwmod;
+>>   static struct omap_hwmod omap44xx_ipu_hwmod;
+>>   static struct omap_hwmod omap44xx_iss_hwmod;
+>> @@ -354,6 +355,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
+>>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>   };
+>>
+>> +/* fdif ->  l3_main_2 */
+>> +static struct omap_hwmod_ocp_if omap44xx_fdif__l3_main_2 = {
+>> +	.master		=&omap44xx_fdif_hwmod,
+>> +	.slave		=&omap44xx_l3_main_2_hwmod,
+>> +	.clk		= "l3_div_ck",
+>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>>   /* hsi ->  l3_main_2 */
+>>   static struct omap_hwmod_ocp_if omap44xx_hsi__l3_main_2 = {
+>>   	.master		=&omap44xx_hsi_hwmod,
+>> @@ -5444,6 +5453,75 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
+>>   	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_slaves),
+>>   };
+>>
+>> +/* 'fdif' class */
+>> +static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
+>> +	.rev_offs	= 0x0000,
+>> +	.sysc_offs	= 0x0010,
+>> +	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
+>> +			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
+>> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+>> +			   MSTANDBY_FORCE | MSTANDBY_NO |
+>> +			   MSTANDBY_SMART),
+>> +	.sysc_fields	=&omap_hwmod_sysc_type2,
+>> +};
+>> +
+>> +static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
+>> +	.name	= "fdif",
+>> +	.sysc	=&omap44xx_fdif_sysc,
+>> +};
+>> +
+>> +/*fdif*/
+>> +static struct omap_hwmod_addr_space omap44xx_fdif_addrs[] = {
+>> +	{
+>> +		.pa_start	= 0x4a10a000,
+>> +		.pa_end		= 0x4a10afff,
+>> +		.flags		= ADDR_TYPE_RT
+>> +	},
+>> +	{ }
+>> +};
+>> +
+>> +/* l4_cfg ->  fdif */
+>> +static struct omap_hwmod_ocp_if omap44xx_l4_cfg__fdif = {
+>> +	.master		=&omap44xx_l4_cfg_hwmod,
+>> +	.slave		=&omap44xx_fdif_hwmod,
+>> +	.clk		= "l4_div_ck",
+>> +	.addr		= omap44xx_fdif_addrs,
+>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>> +/* fdif slave ports */
+>> +static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
+>> +	&omap44xx_l4_cfg__fdif,
+>> +};
+>> +static struct omap_hwmod_irq_info omap44xx_fdif_irqs[] = {
+>> +	{ .irq = 69 + OMAP44XX_IRQ_GIC_START },
+>> +	{ .irq = -1 }
+>> +};
+>> +
+>> +/* fdif master ports */
+>> +static struct omap_hwmod_ocp_if *omap44xx_fdif_masters[] = {
+>> +	&omap44xx_fdif__l3_main_2,
+>> +};
+>> +
+>> +static struct omap_hwmod omap44xx_fdif_hwmod = {
+>> +	.name		= "fdif",
+>> +	.class		=&omap44xx_fdif_hwmod_class,
+>> +	.clkdm_name	= "iss_clkdm",
+>> +	.mpu_irqs	= omap44xx_fdif_irqs,
+>> +	.main_clk	= "fdif_fck",
+>> +	.prcm = {
+>> +		.omap4 = {
+>> +			.clkctrl_offs = OMAP4_CM_CAM_FDIF_CLKCTRL_OFFSET,
+>> +			.context_offs = OMAP4_RM_CAM_FDIF_CONTEXT_OFFSET,
+>> +			.modulemode   = MODULEMODE_SWCTRL,
+>> +		},
+>> +	},
+>> +	.slaves		= omap44xx_fdif_slaves,
+>> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_fdif_slaves),
+>> +	.masters	= omap44xx_fdif_masters,
+>> +	.masters_cnt	= ARRAY_SIZE(omap44xx_fdif_masters),
+>> +};
+>> +
+>>   static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+>>
+>>   	/* dmm class */
+>> @@ -5593,6 +5671,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+>>   	&omap44xx_wd_timer2_hwmod,
+>>   	&omap44xx_wd_timer3_hwmod,
+>>
+>> +	/* fdif class */
+>> +	&omap44xx_fdif_hwmod,
+>> +
+>>   	NULL,
+>>   };
+>>
+>> --
+>> 1.7.5.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
+>
+> - Paul
