@@ -1,142 +1,68 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Dec 2011 03:37:42 -0700 (MST)
-Subject: [PATCH v3] ARM: OMAP2+: hwmod: Add a new state to handle hwmods
- left enabled at init
-In-Reply-To: <1321877570-4333-1-git-send-email-rnayak@ti.com>
-References: <1321877570-4333-1-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.00.1112160334100.12660@utopia.booyaka.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Dec 2011 10:38:30 +0000
+Subject: [RFC PATCH] ARM: Fix the bug in dcache flush all API.
+In-Reply-To: <1324026157-32628-1-git-send-email-r.sricharan@ti.com>
+References: <1324026157-32628-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <20111216103830.GA30477@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hello,
 
-On Mon, 21 Nov 2011, Rajendra Nayak wrote:
-
-> An hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
-> enabled state by the hwmod framework post the initial setup.
-> Once a real user of the device (a driver) tries to enable it
-> at a later point, the hwmod framework throws a WARN() about
-> the device being already in enabled state.
+On Fri, Dec 16, 2011 at 09:02:37AM +0000, sricharan wrote:
+> Currently the v7_flush_dcache_all api uses the loc bit field
+> in clidr register to find out the last level of cache that has to be
+> flushed to achieve the data coherency. The loc bit field is present in
+> the register from bits[24:26], but the algorithm uses bits[23:25] as
+> the loc bit field. Bit[23] which corresponds to the cache type bit of
+> level 8 is zero in most of the architectures. As a example, for a
+> level 3 coherency the loc bit field is actually 2, since the bits[23:25]
+> are used, the loc becomes 4 (multipled by 2) and algorithm compares this
+> with current cace level * 2, which makes it work. But this wont work starting
+> from cases where the loc bit field becomes 4, since bits[23:25] will be zeroes.
 > 
-> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
-> to identify such devices/hwmods. When the device/hwmod
-> is requested to be enabled (the first time) by its driver/user,
-> nothing except the mux-enable and a state change to '_HWMOD_STATE_ENABLED'
-> is needed. The mux data is board specific and is unavailable during
-> initial enable() of the device, done by the framework as part of
-> setup().
+> So correcting this in the algorithm by using 24 as the right shift value
+> and compare the loc bit field with the current cache level.
 > 
-> A good example of a such a device is an UART used as debug console.
-> The UART module needs to be kept enabled through the boot, until the
-> UART driver takes control of it, for debug prints to appear on
-> the console.
+> Signed-off-by: sricharan <r.sricharan@ti.com>
+> Reviewed-by: Santosh Shilimkar  <santosh.shilimkar@ti.com>
+> ---
+> Boot tested this on omap4430sdp.
 > 
-> Acked-by: Kevin Hilman <khilman@ti.com>
-> Acked-by: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>  arch/arm/mm/cache-v7.S |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index 07c4bc8..868aa1f 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -45,7 +45,7 @@ ENTRY(v7_flush_dcache_all)
+>  	dmb					@ ensure ordering with previous memory accesses
+>  	mrc	p15, 1, r0, c0, c0, 1		@ read clidr
+>  	ands	r3, r0, #0x7000000		@ extract loc from clidr
+> -	mov	r3, r3, lsr #23			@ left align loc bit field
+> +	mov	r3, r3, lsr #24			@ left align loc bit field
+>  	beq	finished			@ if loc is 0, then no need to clean
+>  	mov	r10, #0				@ start clean at cache level 0
+>  loop1:
+> @@ -80,7 +80,7 @@ loop3:
+>  	bge	loop2
+>  skip:
+>  	add	r10, r10, #2			@ increment cache number
+> -	cmp	r3, r10
+> +	cmp	r3, r10, lsr #1
+>  	bgt	loop1
+>  finished:
+>  	mov	r10, #0				@ swith back to cache level 0
 
-I've tweaked this patch a little bit, mostly to avoid adding a new state, 
-which increases the complexity of the rest of the code that handles the 
-hwmod state machine.  The modified patch below just uses an internal flag.  
-Please let me know if you have any comments.
+I don't think this is fixing the problem fully and actually, I've just
+spotted another bug where the line size is calculated incorrectly.
 
+When we work out the shift to extract the cache type bits it will go wrong
+once we hit the 4th iteration (r10 == 6) because we'll calculate a shift of
+10 instead of 9.
 
-- Paul
+I'll try and come up with some patches to fix this function properly since
+it seems to broken in a few different ways.
 
-
-From: Rajendra Nayak <rnayak@ti.com>
-Date: Mon, 21 Nov 2011 17:42:50 +0530
-Subject: [PATCH] ARM: OMAP2+: hwmod: Add a new flag to handle hwmods left
- enabled at init
-
-An hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
-enabled state by the hwmod framework post the initial setup.
-Once a real user of the device (a driver) tries to enable it
-at a later point, the hwmod framework throws a WARN() about
-the device being already in enabled state.
-
-Fix this by introducing a new internal '_HWMOD_SKIP_ENABLE' to
-identify such devices/hwmods. When the device/hwmod is requested to be
-enabled (the first time) by its driver/user, nothing except the
-mux-enable is needed. The mux data is board specific and is
-unavailable during initial enable() of the device, done by the
-framework as part of setup().
-
-A good example of a such a device is an UART used as debug console.
-The UART module needs to be kept enabled through the boot, until the
-UART driver takes control of it, for debug prints to appear on
-the console.
-
-Acked-by: Kevin Hilman <khilman@ti.com>
-Acked-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[paul at pwsan.com: use a flag rather than a state; updated commit message;
- edited some documentation]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod.c             |   23 ++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 +++
- 2 files changed, 25 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index ebace0f..0a89335 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1449,6 +1449,25 @@ static int _enable(struct omap_hwmod *oh)
- 
- 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
- 
-+	/*
-+	 * hwmods with HWMOD_INIT_NO_IDLE flag set are left
-+	 * in enabled state at init.
-+	 * Now that someone is really trying to enable them,
-+	 * just ensure that the hwmod mux is set.
-+	 */
-+	if (oh->_int_flags & _HWMOD_SKIP_ENABLE) {
-+		/*
-+		 * If the caller has mux data populated, do the mux'ing
-+		 * which wouldn't have been done as part of the _enable()
-+		 * done during setup.
-+		 */
-+		if (oh->mux)
-+			omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
-+
-+		oh->_int_flags &= ~_HWMOD_SKIP_ENABLE;
-+		return 0;
-+	}
-+
- 	if (oh->_state != _HWMOD_STATE_INITIALIZED &&
- 	    oh->_state != _HWMOD_STATE_IDLE &&
- 	    oh->_state != _HWMOD_STATE_DISABLED) {
-@@ -1744,8 +1763,10 @@ static int _setup(struct omap_hwmod *oh, void *data)
- 	 * it should be set by the core code as a runtime flag during startup
- 	 */
- 	if ((oh->flags & HWMOD_INIT_NO_IDLE) &&
--	    (postsetup_state == _HWMOD_STATE_IDLE))
-+	    (postsetup_state == _HWMOD_STATE_IDLE)) {
-+		oh->_int_flags |= _HWMOD_SKIP_ENABLE;
- 		postsetup_state = _HWMOD_STATE_ENABLED;
-+	}
- 
- 	if (postsetup_state == _HWMOD_STATE_IDLE)
- 		_idle(oh);
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 8b372ed..1a13c02 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -416,10 +416,13 @@ struct omap_hwmod_omap4_prcm {
-  * _HWMOD_NO_MPU_PORT: no path exists for the MPU to write to this module
-  * _HWMOD_WAKEUP_ENABLED: set when the omap_hwmod code has enabled ENAWAKEUP
-  * _HWMOD_SYSCONFIG_LOADED: set when the OCP_SYSCONFIG value has been cached
-+ * _HWMOD_SKIP_ENABLE: set if hwmod enabled during init (HWMOD_INIT_NO_IDLE) -
-+ *     causes the first call to _enable() to only update the pinmux
-  */
- #define _HWMOD_NO_MPU_PORT			(1 << 0)
- #define _HWMOD_WAKEUP_ENABLED			(1 << 1)
- #define _HWMOD_SYSCONFIG_LOADED			(1 << 2)
-+#define _HWMOD_SKIP_ENABLE			(1 << 3)
- 
- /*
-  * omap_hwmod._state definitions
--- 
-1.7.7.3
+Will
