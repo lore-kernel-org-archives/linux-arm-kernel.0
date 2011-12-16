@@ -1,46 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 15 Dec 2011 23:06:47 -0800
-Subject: [GIT PULL] at91: devices and boards files update for 3.3
-In-Reply-To: <4EEA034C.9020800@atmel.com>
-References: <4EEA034C.9020800@atmel.com>
-Message-ID: <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
+Date: Thu, 15 Dec 2011 23:24:11 -0800
+Subject: [GIT PULL] DaVinci features for v3.3
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6048C5C@DBDE01.ent.ti.com>
+References: <DF0F476B391FA8409C78302C7BA518B6048C5C@DBDE01.ent.ti.com>
+Message-ID: <CAOesGMhT-UORf5LkooM2VXpAwVZq9Ji11=C-6Z4_SjjuoM0utQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Dec 15, 2011 at 6:25 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On Wed, Dec 14, 2011 at 10:34 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
 > Arnd, Olof,
 >
-> This pull request adds the ISI to the sam9m10g45 board. As ISI has
-> been waited for a long time on AT91, I think it is not possible to wait
-> for the DT support. Moreover, DT support for this camera sensor + ISI
-> soc interface seems not so trivial and will certainly need a handful of
-> kernel releases before being stabilized.
-> Other changes are quite simple and self-explanatory...
+> I have this lone feature queued for v3.3 so far. Can you please pull?
+> The patch depends on v3.2-rc5 for build, but I have not rebased to
+> preserve the commit date.
 >
-> The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+> Thanks,
+> Sekhar
 >
-> ?Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+> The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
+> ?Linus Torvalds (1):
+> ? ? ? ?Linux 3.2-rc3
 >
 > are available in the git repository at:
-> ?git://github.com/at91linux/linux-at91.git for-arnd-3.3-device_board
+>
+> ?git://gitorious.org/linux-davinci/linux-davinci.git v3.3/features
 
-Sure, since you removed a defconfig I'm OK with a small amount of
-board addition for ISI.
+Thanks, pulled into next/devel.
 
-However, I noticed that it doesn't build with at91sam9g45_defconfig:
-
-arch/arm/mach-at91/board-sam9m10g45ek.c:195: error: unknown field
-'full_mode' specified in initializer
-arch/arm/mach-at91/board-sam9m10g45ek.c:195: warning: excess elements
-in struct initializer
-arch/arm/mach-at91/board-sam9m10g45ek.c:195: warning: (near
-initialization for 'isi_data')
-arch/arm/mach-at91/board-sam9m10g45ek.c:198: error: unknown field
-'mck_hz' specified in initializer
-
-
-Please fixup and send fresh request.
 
 -Olof
