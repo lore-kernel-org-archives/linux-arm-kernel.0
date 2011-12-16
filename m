@@ -1,68 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Dec 2011 15:41:18 +0000
-Subject: [GIT PULL] arm-soc fixes for 3.2, part 4
-Message-ID: <201112161541.18525.arnd@arndb.de>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 16 Dec 2011 15:43:57 +0000
+Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt
+ extensions
+In-Reply-To: <CAHkRjk48jHO19H04rf8252+v04hk9qSdKBrfYCqJsZyamVhMEw@mail.gmail.com>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>	<201111292129.20444.arnd@arndb.de>	<alpine.DEB.2.00.1111301053300.31179@kaball-desktop>
+ <CAHkRjk48jHO19H04rf8252+v04hk9qSdKBrfYCqJsZyamVhMEw@mail.gmail.com>
+Message-ID: <4EEB673D.3040608@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 30/11/11 14:11, Catalin Marinas wrote:
+> On 30 November 2011 11:39, Stefano Stabellini
+> <stefano.stabellini@eu.citrix.com> wrote:
+>> A git branch is available here (not ready for submission):
+>>
+>> git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git arm
+>>
+>> the branch above is based on git://linux-arm.org/linux-2.6.git arm-lpae,
+>> even though guests don't really need lpae support to run on Xen.
+> 
+> Indeed, you don't really need LPAE. What you may need though is
+> generic timers support for A15, it would allow less Hypervisor traps.
+> For up-to-date architecture patches (well, development tree, not
+> guaranteed to be stable), I would recommend this (they get into
+> mainline at some point):
+> 
+> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
+> 
+> Either use master or just cherry-pick the branches that you are interested in.
 
-Here is the current set of fixes for v3.2. The majority of these are
-i.mx platform fixes that came slightly too late for the previous round.
+Hi Catalin,
 
-	Arnd
----
-The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+Which branches are required for the Versatile Express with the
+Cortex-A15? I merged linux-arm-arch/arm-arch/vexpress in but I get a
+instruction fault immediately after branching to __mmap_switched.
 
-  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+Is it not setting up the MMU correctly?
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
-
-Amit Daniel Kachhap (1):
-      ARM: EXYNOS: Fix for stall in case of cpu hotplug or sleep
-
-Arnd Bergmann (1):
-      Merge branch 'imx-fixes-for-arnd' of git://git.pengutronix.de/git/imx/linux-2.6 into fixes
-
-Dong Aisheng (1):
-      ARM: mx5: add __initconst for fec pdata
-
-Felipe Contreras (1):
-      ARM: OMAP: rx51: fix USB
-
-Jarkko Nikula (1):
-      ARM: OMAP: mcbsp: Fix possible memory corruption
-
-Jason Chen (1):
-      MXC PWM: should active during DOZE/WAIT/DBG mode
-
-Jingoo Han (2):
-      ARM: SAMSUNG: remove duplicated header include
-      ARM: S5PV210: Set 1000ns as PWM backlight period on SMDKV210
-
-Kukjin Kim (1):
-      ARM: EXYNOS: Fix build error without CONFIG_LOCAL_TIMERS
-
-Olof Johansson (2):
-      Merge branch 'fixes' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge branch 'samsung-fixes-3' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-
-Richard Zhao (1):
-      ARM: imx: fix cpufreq build errors
-
-Shawn Guo (1):
-      arm/imx: fix power button on imx51 babbage board
-
- arch/arm/mach-exynos/mct.c                   |   13 ++++++++++---
- arch/arm/mach-mx5/board-mx51_babbage.c       |    2 +-
- arch/arm/mach-mx5/board-mx53_evk.c           |    2 +-
- arch/arm/mach-mx5/board-mx53_loco.c          |    2 +-
- arch/arm/mach-mx5/board-mx53_smd.c           |    2 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
- arch/arm/mach-omap2/mcbsp.c                  |    6 +++---
- arch/arm/mach-s5pv210/mach-smdkv210.c        |    1 +
- arch/arm/plat-mxc/cpufreq.c                  |    1 +
- arch/arm/plat-mxc/pwm.c                      |    7 ++++++-
- arch/arm/plat-samsung/dev-backlight.c        |    1 -
- 11 files changed, 26 insertions(+), 13 deletions(-)
+David
