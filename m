@@ -1,29 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 15 Dec 2011 23:25:46 -0800
-Subject: [GIT PULL] at91 defconfigs for 3.3
-In-Reply-To: <4EEA0111.2000907@atmel.com>
-References: <4EEA0111.2000907@atmel.com>
-Message-ID: <CAOesGMhHtDG91BaeJzC-PcPVeZqb4vhcSN0-GbdyV0+Wgtw_0w@mail.gmail.com>
+Date: Thu, 15 Dec 2011 23:25:58 -0800
+Subject: [GIT PULL] two omap fixes for v3.2-rc5
+In-Reply-To: <20111214215305.GN32251@atomide.com>
+References: <20111214215305.GN32251@atomide.com>
+Message-ID: <CAOesGMgG0SLC52xV0vV8x7QHAP9=29xsLYGKWEo1Hpu8t5Ckqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Dec 15, 2011 at 6:15 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Arnd, Olof,
+On Wed, Dec 14, 2011 at 1:53 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi Arnd & Olof,
 >
-> Here is a single patch that removes a defconfig for AT91.
-> It is not needed anymore as we tend to group defconfigs by
-> SoC and build all boards into it.
+> Please pull two regression fixes for the -rc series from:
 >
-> The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
->
-> ?Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
->
-> are available in the git repository at:
-> ?git://github.com/at91linux/linux-at91.git for-arnd-3.3-defconfig
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
 
-Thanks, pulled into next/cleanup.
+Thanks, pulled into fixes.
 
 
 -Olof
