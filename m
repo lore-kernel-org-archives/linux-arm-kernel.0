@@ -1,22 +1,81 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 15 Dec 2011 23:25:58 -0800
-Subject: [GIT PULL] two omap fixes for v3.2-rc5
-In-Reply-To: <20111214215305.GN32251@atomide.com>
-References: <20111214215305.GN32251@atomide.com>
-Message-ID: <CAOesGMgG0SLC52xV0vV8x7QHAP9=29xsLYGKWEo1Hpu8t5Ckqw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 16 Dec 2011 12:58:31 +0530
+Subject: [PATCH v9 00/31] gpio/omap: driver cleanup and fixes
+In-Reply-To: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
+References: <1323807633-23713-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <CAMQu2gyZtuW3HLbWH5wH-YjB4SpLD9tz5kpVdRHi2j9RsXLA2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Tarun,
 
-On Wed, Dec 14, 2011 at 1:53 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Arnd & Olof,
+On Wed, Dec 14, 2011 at 1:50 AM, Tarun Kanti DebBarma
+<tarun.kanti@ti.com> wrote:
+> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+> The cleanup include getting rid of cpu_is_* checks wherever possible,
+> use of gpio_bank list instead of static array, use of unique platform
+> specific value associated data member to OMAP platforms to avoid
+> cpu_is_* checks. The series also include PM runtime support.
 >
-> Please pull two regression fixes for the -rc series from:
+> Baseline: git://github.com/khilman/linux-omap-pm.git
+> Branch: for_3.3/gpio-base
 >
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
+> Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+> Branch: master
+> Commit: b835c0f
+>
+> Power Tests
+> a) OMAP3430SDP
+> - Modify board-3430sdp.c file to have multiple GPIO modules active
+> ?with debounce timeout enabled.
+> - Enable CPU-Idle
+> - Enable UART timeouts
+> - Enable offmode
+> - echo mem > /sys/power/state
+> - Verify retention and offmode count increment
+>
+> b) ZOOM3
+> - Enable CPU-Idle
+> - Enable UART timeout
+> - echo mem > /sys/power/state
+> - Wakeup system using serial keyboard
+> - Verify retention count increment
+>
+> Functional Tests
+> - Done on OMAP2430, OMAP3430SDP, ZOOM3, OMAP4430
+>
+> Bootup Test
+> - Done on OMAP1710
+>
+> v9:
+> - Summary of Comments/Issues fixed
+> ?* GPIO wakeup does not work
+> ?* Call debounce clock enable/disable functions from PM runtime callbacks.
+> ? ?This will avoid calling the functions from multiple places.
+> ?* Modify description of following patch to match latest changes.
+> ? ?gpio/omap: save and restore debounce registers
+> ?* Use (bank->regs->set_dataout && bank->regs->clr_dataout) together instead
+> ? ?of using only one of them.
+> ?* Remove cpu_is_omapxxxx() checks from set_gpio_trigger().
+> ?* _gpio_dbck_enable() in runtime callback triggered from omap_gpio_request
+> ? ?does not enable dbck because dbck_enable_mask is not set at this point.
+> ?* Workaround associated with an errata got missed in v8. This has been
+> ? ? ?included.
+>
+As reported by Kevin ( off-the list), only 25 patches out of 31
+reached to the list.
+The rest 8, for some reason didn't reached to the list.
 
-Thanks, pulled into fixes.
+Also since you have added few additional bug fixes in this series on top of
+the v8, the v9 becomes slightly different.
 
+So here is what I suggest.
+1. Repost your v9 only with those 25 reworked patches.
+2. Create a separate series for additional bug fixes which will apply on top
+of 1)
 
--Olof
+That way it's easier to line up the patches since the 25 ones have gone though
+few review cycles where as the new 8 has only gone through the internal review.
+
+Regards
+Santosh
