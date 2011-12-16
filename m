@@ -1,46 +1,46 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 16 Dec 2011 12:35:53 +0530
-Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
-Message-ID: <1324019153-13316-1-git-send-email-hvaibhav@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 15 Dec 2011 23:06:47 -0800
+Subject: [GIT PULL] at91: devices and boards files update for 3.3
+In-Reply-To: <4EEA034C.9020800@atmel.com>
+References: <4EEA034C.9020800@atmel.com>
+Message-ID: <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OMAP3 EVM (OMAP3530, AM/DM37x) DTS file to use the omap3.dtsi SoC file,
-along with memory node information.
+Hi,
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
----
-Boot tested it on AM/DM37x EVM, kernel parses the info correctly.
+On Thu, Dec 15, 2011 at 6:25 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Arnd, Olof,
+>
+> This pull request adds the ISI to the sam9m10g45 board. As ISI has
+> been waited for a long time on AT91, I think it is not possible to wait
+> for the DT support. Moreover, DT support for this camera sensor + ISI
+> soc interface seems not so trivial and will certainly need a handful of
+> kernel releases before being stabilized.
+> Other changes are quite simple and self-explanatory...
+>
+> The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+>
+> ?Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+>
+> are available in the git repository at:
+> ?git://github.com/at91linux/linux-at91.git for-arnd-3.3-device_board
 
- arch/arm/boot/dts/omap3-evm.dts |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-evm.dts
+Sure, since you removed a defconfig I'm OK with a small amount of
+board addition for ISI.
 
-diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
-new file mode 100644
-index 0000000..2eee16e
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-evm.dts
-@@ -0,0 +1,20 @@
-+/*
-+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+/include/ "omap3.dtsi"
-+
-+/ {
-+	model = "TI OMAP3 EVM (OMAP3530, AM/DM37x)";
-+	compatible = "ti,omap3-evm", "ti,omap3";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+};
---
-1.7.0.4
+However, I noticed that it doesn't build with at91sam9g45_defconfig:
+
+arch/arm/mach-at91/board-sam9m10g45ek.c:195: error: unknown field
+'full_mode' specified in initializer
+arch/arm/mach-at91/board-sam9m10g45ek.c:195: warning: excess elements
+in struct initializer
+arch/arm/mach-at91/board-sam9m10g45ek.c:195: warning: (near
+initialization for 'isi_data')
+arch/arm/mach-at91/board-sam9m10g45ek.c:198: error: unknown field
+'mck_hz' specified in initializer
+
+
+Please fixup and send fresh request.
+
+-Olof
