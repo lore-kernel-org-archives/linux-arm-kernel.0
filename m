@@ -1,71 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Dec 2011 17:29:29 +0100
-Subject: [PATCH 0/6] ARM: at91: irqdomain and device tree for AIC and GPIO
-In-Reply-To: <4EEAA4A7.3040902@gmail.com>
-References: <1323976568-20244-1-git-send-email-nicolas.ferre@atmel.com>
- <4EEAA4A7.3040902@gmail.com>
-Message-ID: <4EEB71E9.3050609@atmel.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sat, 17 Dec 2011 00:33:23 +0800
+Subject: [QUESTION] How to set static/dynamic dependency between clock
+ domains
+In-Reply-To: <CAMQu2gwDth6OVTk3PkRCo05QF6WeQvMTJ-d5s33cT35GSVwT=w@mail.gmail.com>
+References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
+ <CACVXFVPOaw7OG7owJw0h7DAe3pRH6nROsy13UeAWPWgLedKY1g@mail.gmail.com>
+ <CAMQu2gwDth6OVTk3PkRCo05QF6WeQvMTJ-d5s33cT35GSVwT=w@mail.gmail.com>
+Message-ID: <CACVXFVNtaaxB-MRXKBgAZFEkf72nsgcOSHOFsYjspoL0Fv6VWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2011 02:53 AM, Rob Herring :
-> Nicolas,
-> 
-> On 12/15/2011 01:16 PM, Nicolas Ferre wrote:
->> Hi,
->>
->> This series adds irqdomain and device tree support for both the
->> interrupt and GPIO controllers of AT91 SoC.
->>
->> The AIC part has already been sent some time ago but has been
->> reworked to address Rob's comments. This reworked patch is marked
->> with a "v4" tag.
->>
->> The series can go on top of Jamie's patch
->> "irqdomain: export irq_domain_simple_ops for !CONFIG_OF"
->> and has been tested on top of 'v3.2-rc5' + 'arm-soc/at91/ioremap'
->> and 'arm-soc/at91/gpio'
->>
->> Jean-Christophe PLAGNIOL-VILLARD (1):
->>       ARM: at91/gpio: add DT support
->>
->> Nicolas Ferre (5):
->>       ARM: at91/aic: add irq domain and device tree support
->>       ARM: at91/gpio: add irqdomain to gpio interrupts
->>       ARM: at91/gpio: add .to_irq gpio_chip handler and rework irq_to_gpio
->>       ARM: at91/gpio: remove the static specification of gpio_chip.base
->>       ARM: at91/board-dt: remove AIC irq domain from board file
->>
->>  .../devicetree/bindings/arm/atmel-aic.txt          |   38 ++++
->>  .../devicetree/bindings/gpio/gpio_at91.txt         |   20 ++
->>  arch/arm/Kconfig                                   |    1 +
->>  arch/arm/boot/dts/at91sam9g20.dtsi                 |   44 ++++-
->>  arch/arm/boot/dts/at91sam9g45.dtsi                 |   59 +++++-
->>  arch/arm/mach-at91/board-dt.c                      |   15 +--
->>  arch/arm/mach-at91/gpio.c                          |  197 ++++++++++++++++----
->>  arch/arm/mach-at91/include/mach/gpio.h             |   12 --
->>  arch/arm/mach-at91/include/mach/irqs.h             |    3 +-
->>  arch/arm/mach-at91/irq.c                           |   91 +++++++--
->>  10 files changed, 383 insertions(+), 97 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
->>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_at91.txt
-> 
-> What about using generic irq chip as I previously mentioned? It looks to
-> me like both the AIC and gpio controller could use it. I've added irq
-> domain support to generic irq chip, so it should simplify your changes.
-> The latest branch is here:
-> 
-> git://sources.calxeda.com/kernel/linux.git pl061-domain-v2
+On Sat, Dec 17, 2011 at 12:09 AM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+> No. The table reflects the actual possible combination on hardware. You can't
+> add anything there arbitrary if that combination is not supported.
+>
+> But that makes me wonder how the patch worked. I will look at this in detail
+> next week.
 
-Rob,
+Thanks, I use the below hwmod data patch[1] and omap device patch[2]
+to bring up fdif module, and Benoit has ACKed on patch [1].
 
-Yes, that definitively makes sense but I fear that this rework will
-delay again the introduction of a couple of products and the work we
-have to do to enable DT for other drivers.
-The AIC and GPIO will definitively need a rework but I cannot start this
-now and as I have a nearly working solution, I would prefer to start
-this task later...
 
-Best regards,
+[1], http://marc.info/?l=linux-kernel&m=132387140703874&w=2
+[2], http://marc.info/?l=linux-kernel&m=132387155403929&w=2
+
+thanks,
 -- 
-Nicolas Ferre
+Ming Lei
