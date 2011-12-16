@@ -1,52 +1,51 @@
-From: sakoman@gmail.com (Steve Sakoman)
-Date: Fri, 16 Dec 2011 08:52:16 -0800
-Subject: [PATCH v2] ARM: OMAP3: hwmod data: disable multiblock reads on
- MMC1/2 on OMAP34xx/35xx <= ES2.1
-In-Reply-To: <alpine.DEB.2.00.1112152346080.12660@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1110061453540.4611@utopia.booyaka.com>
- <alpine.DEB.2.00.1112152346080.12660@utopia.booyaka.com>
-Message-ID: <CAGDS+nnWz5hW_13hHf51s-MhK8B-C_cMVLLmEpUA1pTCBJ3hbg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Dec 2011 16:54:20 +0000
+Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with
+ virt extensions
+In-Reply-To: <4EEB673D.3040608@citrix.com>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111292129.20444.arnd@arndb.de>
+ <alpine.DEB.2.00.1111301053300.31179@kaball-desktop>
+ <CAHkRjk48jHO19H04rf8252+v04hk9qSdKBrfYCqJsZyamVhMEw@mail.gmail.com>
+ <4EEB673D.3040608@citrix.com>
+Message-ID: <20111216165420.GE6342@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2011 at 12:04 AM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> The HSMMC1/HSMMC2 host controllers on OMAP34xx and
-> OMAP3503/3515/3525/3530 chips at ES levels prior to 3.0 can't do multiple
-> block reads[1]. ?Mark the hwmod data appropriately.
->
-> Reported by Dave Hylands <dhylands@gmail.com> and Steve Sakoman
-> <sakoman@gmail.com>. ?Thanks to Steve Sakoman for further help
-> testing this patch.
->
-> 1. See for example Advisory 2.1.1.128 "MMC: Multiple Block Read
-> ? Operation Issue" in _OMAP3530/3525/3515/3503 Silicon Errata_
-> ? Revision F (October 2010) (SPRZ278F), available from
-> ? http://focus.ti.com/lit/er/sprz278f/sprz278f.pdf
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Dave Hylands <dhylands@gmail.com>
-> Cc: Steve Sakoman <sakoman@gmail.com>
-> ---
->
-> The first version of this patch caused MMC hwmods to not be registered on
-> 36xx/37xx chips. ?Thanks to Steve Sakoman for noting this. ?This version
-> fixes it - tested on 37xx BeagleBoard.
+On Fri, Dec 16, 2011 at 03:43:57PM +0000, David Vrabel wrote:
+> On 30/11/11 14:11, Catalin Marinas wrote:
+> > On 30 November 2011 11:39, Stefano Stabellini
+> > <stefano.stabellini@eu.citrix.com> wrote:
+> >> A git branch is available here (not ready for submission):
+> >>
+> >> git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git arm
+> >>
+> >> the branch above is based on git://linux-arm.org/linux-2.6.git arm-lpae,
+> >> even though guests don't really need lpae support to run on Xen.
+> > 
+> > Indeed, you don't really need LPAE. What you may need though is
+> > generic timers support for A15, it would allow less Hypervisor traps.
+> > For up-to-date architecture patches (well, development tree, not
+> > guaranteed to be stable), I would recommend this (they get into
+> > mainline at some point):
+> > 
+> > http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
+> > 
+> > Either use master or just cherry-pick the branches that you are interested in.
+> 
+> Which branches are required for the Versatile Express with the
+> Cortex-A15? I merged linux-arm-arch/arm-arch/vexpress in
 
-I tested this on multiple different processor versions:
+That's the branch if you only need VE and A15 support
 
-OMAP3503-GP ES2.1
-OMAP3503-GP ES3.1
-OMAP3530-GP ES3.1
-OMAP3730-GP ES1.0
-OMAP3730-GP ES1.2
+> but I get a
+> instruction fault immediately after branching to __mmap_switched.
+> 
+> Is it not setting up the MMU correctly?
 
-All worked as expected, multi-block reads were enabled for all except
-OMAP3503-GP ES2.1, which displayed:
+Do you run this on a software model? What config options do you use? You
+would need to enable VEXPRESS_EXTENDED_MEMORY_MAP and
+ARCH_VEXPRESS_CA15X4.
 
-omap_hsmmc omap_hsmmc.0: multiblock reads disabled due to 35xx erratum
-2.1.1.128; MMC read performance may suffer
-
-Thanks, Paul!
-
-Tested-by: Steve Sakoman <steve@sakoman.com>
+-- 
+Catalin
