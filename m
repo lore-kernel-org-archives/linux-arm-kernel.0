@@ -1,31 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Dec 2011 10:57:08 +0000
-Subject: [RFC PATCH] ARM: Fix the bug in dcache flush all API.
-In-Reply-To: <CAJ7qFScn07xH2t_PSH2jSPG+4NLed7sptWy=UV8Whv=hKgdLRA@mail.gmail.com>
-References: <1324026157-32628-1-git-send-email-r.sricharan@ti.com>
- <20111216103830.GA30477@mudshark.cambridge.arm.com>
- <CAJ7qFScn07xH2t_PSH2jSPG+4NLed7sptWy=UV8Whv=hKgdLRA@mail.gmail.com>
-Message-ID: <20111216105707.GC30477@mudshark.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 16 Dec 2011 16:33:08 +0530
+Subject: [PATCH v3] ARM: OMAP2+: hwmod: Add a new state to handle hwmods
+ left enabled at init
+In-Reply-To: <alpine.DEB.2.00.1112160334100.12660@utopia.booyaka.com>
+References: <1321877570-4333-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1112160334100.12660@utopia.booyaka.com>
+Message-ID: <4EEB256C.6030306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2011 at 10:52:48AM +0000, R, Sricharan wrote:
->     When we work out the shift to extract the cache type bits it will go wrong
->     once we hit the 4th iteration (r10 == 6) because we'll calculate a shift of
->     10 instead of 9.
-> 
-> 
->         add     r2, r10, r10, lsr #1            @ work out 3x current cache
-> level
->         mov     r1, r0, lsr r2                  @ extract cache type bits from
-> clidr
->        
->          Here when r10=6, then r2 will be 9 , which is correct shift ?
+Hi Paul,
 
-Yes, of course, I'm on my second coffee now. I still think the line size
-calculation is plain wrong though (should be 1 << (ls + 2) instead of (ls +
-4)).
+On Friday 16 December 2011 04:07 PM, Paul Walmsley wrote:
+> On Mon, 21 Nov 2011, Rajendra Nayak wrote:
+>
+>> >  An hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
+>> >  enabled state by the hwmod framework post the initial setup.
+>> >  Once a real user of the device (a driver) tries to enable it
+>> >  at a later point, the hwmod framework throws a WARN() about
+>> >  the device being already in enabled state.
+>> >
+>> >  Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
+>> >  to identify such devices/hwmods. When the device/hwmod
+>> >  is requested to be enabled (the first time) by its driver/user,
+>> >  nothing except the mux-enable and a state change to '_HWMOD_STATE_ENABLED'
+>> >  is needed. The mux data is board specific and is unavailable during
+>> >  initial enable() of the device, done by the framework as part of
+>> >  setup().
+>> >
+>> >  A good example of a such a device is an UART used as debug console.
+>> >  The UART module needs to be kept enabled through the boot, until the
+>> >  UART driver takes control of it, for debug prints to appear on
+>> >  the console.
+>> >
+>> >  Acked-by: Kevin Hilman<khilman@ti.com>
+>> >  Acked-by: Benoit Cousson<b-cousson@ti.com>
+>> >  Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+> I've tweaked this patch a little bit, mostly to avoid adding a new state,
+> which increases the complexity of the rest of the code that handles the
+> hwmod state machine.  The modified patch below just uses an internal flag.
+> Please let me know if you have any comments.
 
-I'll take another look@your patch.
+Looks good to me.
 
-Will
+thanks,
+Rajendra
