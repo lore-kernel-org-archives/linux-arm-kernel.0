@@ -1,54 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Dec 2011 15:22:42 +0000
-Subject: [GIT PULL] Samsung devel-1 for v3.3
-In-Reply-To: <014a01ccbbc6$7b036300$710a2900$%kim@samsung.com>
-References: <014a01ccbbc6$7b036300$710a2900$%kim@samsung.com>
-Message-ID: <201112161522.42721.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 16 Dec 2011 16:25:40 +0100
+Subject: [PATCH 1/3] ARM: OMAP2+: kconfig: Enable devicetree by default
+ for OMAP2+ systems
+In-Reply-To: <20111213223855.GW32251@atomide.com>
+References: <y> <1323190149-6492-2-git-send-email-b-cousson@ti.com>
+ <1323782836.1877.79.camel@deskari> <4EE75448.4010701@ti.com>
+ <20111213223855.GW32251@atomide.com>
+Message-ID: <4EEB62F4.2010202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 December 2011, Kukjin Kim wrote:
-> Please pull next-samsung-devel for v3.3.
-> It includes DT support for EXYNOS, update Cragganmore board and SPI clkdev
-> support. As a note, out of arch/arm/samsung stuff got the ack from regarding
-> maintainers and actually, it has been included in linux-next for long time
-> so I think, it has no problem for v3.3.
+Hi Tony,
+
+On 12/13/2011 11:38 PM, Tony Lindgren wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [111213 05:02]:
+>> On 12/13/2011 2:27 PM, Tomi Valkeinen wrote:
+>>> Hi,
+>>>
+>>> On Tue, 2011-12-06 at 17:49 +0100, Benoit Cousson wrote:
+>>>> devicetree will become the mandatory boot method for OMAP2+.
+>>>> In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
+>>>> select USE_OF by default for every OMAP2+ systems.
+>>>> Select as well the APPENDED_DTB and ATAG_DTB_COMPAT to allow legacy
+>>>> boot loader to keep working properly.
+>>>
+>>> APPENDED_DTB sounds a bit dangerous to be enabled by default according
+>>> to the config help text.
+>>
+>> The help is indeed really scary :-)
 > 
-> One more, I need to follow up Russell and some arm consolidation work and
-> one plat-samsung directory and apply some patches in my mail-box ;) It will
-> be sent to you soon.
+> Heh, but it's also true.
 > 
-> If any problems, please let me know.
+>> Tony,
+>> Do we want to keep it by default? Or should we fix the kconfig help?
+> 
+> Let's just leave out those two from omap2plus_defconfig then.
 
-The patches look really good for the most part, but I'd rather not take
-them like this because you have put so many different things into a single
-branch. Your branch is much larger than any of the others that are currently
-queued in arm-soc.
+Here is the updated version.
+Just let me know if you'd like to get the full series re-posted.
 
-Can you split it up into separate branches for dt, board and clkdev and
-driver changes or something along those lines?
-A number of changes in here also seem to qualify as cleanups,
-so they might better be held in a branch for that.
+Thanks,
+Benoit
 
-I also found one commit that I think should not be there: 25767e69 "ARM:
-EXYNOS: Add ioremap interceptor for statically remapped regions" from
-Thomas Abraham. As far as I know, the work that Nico did on the vmalloc_end
-elimination will conflict with this patch and solve the problem in a better
-way.
+---
+>From b33d4be0213ab0c630b87bd3df77035cbb109cd0 Mon Sep 17 00:00:00 2001
+From: Benoit Cousson <b-cousson@ti.com>
+Date: Thu, 1 Dec 2011 10:21:16 +0100
+Subject: [PATCH] ARM: OMAP2+: kconfig: Enable devicetree by default for OMAP2+ systems
 
-I have now pulled in everything up to 39cb263ecc "ARM: S3C64XX: Hook up
-VDDINT on Cragganmore" into a samsung/board branch and merged that into
-the next/board branch, because that was easy to do without rebasing.
+devicetree will become the mandatory boot method for OMAP2+.
+In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
+select USE_OF by default for every OMAP2+ systems.
 
-The rest should be fairly easy to split up into the branches I mentioned
-if you don't mind rebasing them (best leaving them on v3.2-rc1 though).
-Without rebasing, it would get a bit trickier but we could easily make
-39ae3685 "ARM: dts: Add intial dts file for EXYNOS4210 SoC, SMDKV310 and
-ORIGEN" the samsung/dt branch and revert the ioremap interceptor on top
-of that. The samsung/clkdev branch probably should depend on the samsung/dt
-branch anyway, so it can remain on top without getting rebased.
+Enable PROC_DEVICETREE as well.
 
-I can probably fix this all up (this time) in the way I want it, or let you
-take care of it and send me new pull requests, whichever you prefer.
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/Kconfig |    1 -
+ arch/arm/plat-omap/Kconfig  |    2 ++
+ 2 files changed, 2 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index b662513..bdd5b68 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -111,7 +111,6 @@ comment "OMAP Board Type"
+ config MACH_OMAP_GENERIC
+ 	bool "Generic OMAP2+ board"
+ 	depends on ARCH_OMAP2PLUS
+-	select USE_OF
+ 	default y
+ 	help
+ 	  Support for generic TI OMAP2+ boards using Flattened Device Tree.
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index aa59f42..734009a 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -24,6 +24,8 @@ config ARCH_OMAP2PLUS
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_IRQ_CHIP
+ 	select OMAP_DM_TIMER
++	select USE_OF
++	select PROC_DEVICETREE
+ 	help
+ 	  "Systems based on OMAP2, OMAP3 or OMAP4"
+ 
+-- 
+1.7.0.4
