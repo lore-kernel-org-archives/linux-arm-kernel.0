@@ -1,45 +1,61 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Fri, 16 Dec 2011 11:35:39 -0500
-Subject: [PATCH V2 3/4] arm/imx6q: register arm_clk as cpu to clkdev
-In-Reply-To: <1324031462-24961-4-git-send-email-richard.zhao@linaro.org>
-References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>,
- <1324031462-24961-4-git-send-email-richard.zhao@linaro.org>
-Message-ID: <21672683C5A3814BB4DB938EBE482DE40A1AE8EF74@IAD2MBX09.mex02.mlsrvr.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Dec 2011 17:37:49 +0100
+Subject: [GIT PULL] at91: devices and boards files update for 3.3
+In-Reply-To: <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
+References: <4EEA034C.9020800@atmel.com>
+ <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
+Message-ID: <4EEB73DD.3070505@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is there a portable/generic approach for other drivers that may
-want to use arm-cpufreq.c? arm_clk is not normally defined for
-my SoC and I don't see an easy way to pull it in.
+On 12/16/2011 08:06 AM, Olof Johansson :
+> Hi,
+> 
+> On Thu, Dec 15, 2011 at 6:25 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> Arnd, Olof,
+>>
+>> This pull request adds the ISI to the sam9m10g45 board. As ISI has
+>> been waited for a long time on AT91, I think it is not possible to wait
+>> for the DT support. Moreover, DT support for this camera sensor + ISI
+>> soc interface seems not so trivial and will certainly need a handful of
+>> kernel releases before being stabilized.
+>> Other changes are quite simple and self-explanatory...
+>>
+>> The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+>>
+>>  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+>>
+>> are available in the git repository at:
+>>  git://github.com/at91linux/linux-at91.git for-arnd-3.3-device_board
+> 
+> Sure, since you removed a defconfig I'm OK with a small amount of
+> board addition for ISI.
+> 
+> However, I noticed that it doesn't build with at91sam9g45_defconfig:
+> 
+> arch/arm/mach-at91/board-sam9m10g45ek.c:195: error: unknown field
+> 'full_mode' specified in initializer
+> arch/arm/mach-at91/board-sam9m10g45ek.c:195: warning: excess elements
+> in struct initializer
+> arch/arm/mach-at91/board-sam9m10g45ek.c:195: warning: (near
+> initialization for 'isi_data')
+> arch/arm/mach-at91/board-sam9m10g45ek.c:198: error: unknown field
+> 'mck_hz' specified in initializer
+>
+> Please fixup and send fresh request.
 
---Mark Langsdorf
-Calxeda, Inc.
+Olof,
 
-________________________________________
-From: Richard Zhao [richard.zhao at linaro.org]
-Sent: Friday, December 16, 2011 4:31 AM
-To: linux-arm-kernel at lists.infradead.org; cpufreq at vger.kernel.org; devicetree-discuss at lists.ozlabs.org
-Cc: linux at arm.linux.org.uk; davej at redhat.com; kernel at pengutronix.de; shawn.guo at linaro.org; eric.miao at linaro.org; Mark Langsdorf; linaro-dev at lists.linaro.org; patches at linaro.org; Richard Zhao
-Subject: [PATCH V2 3/4] arm/imx6q: register arm_clk as cpu to clkdev
+Yes, this ISI driver addition is also dependent on an update of the ISI
+driver itself that will certainly be included in 3.3 by Guennadi using
+v4L2 path.
 
-cpufreq needs cpu clock to change frequency.
+So, do we have to wait for its inclusion in linux-next or maybe we can
+manage this little out-of-sync situation during the 3.3 life cycle...
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- arch/arm/mach-imx/clock-imx6q.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ISI is a "several times reworked" and "long-awaited" driver and I really
+would like to see it included in mainline soon...
 
-diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-index 039a7ab..72acbc2 100644
---- a/arch/arm/mach-imx/clock-imx6q.c
-+++ b/arch/arm/mach-imx/clock-imx6q.c
-@@ -1911,6 +1911,7 @@ static struct clk_lookup lookups[] = {
-        _REGISTER_CLOCK(NULL, "gpmi_io_clk", gpmi_io_clk),
-        _REGISTER_CLOCK(NULL, "usboh3_clk", usboh3_clk),
-        _REGISTER_CLOCK(NULL, "sata_clk", sata_clk),
-+       _REGISTER_CLOCK(NULL, "cpu", arm_clk),
- };
-
- int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
---
-1.7.5.4
+Best regards,
+-- 
+Nicolas Ferre
