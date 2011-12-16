@@ -1,37 +1,27 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 16 Dec 2011 17:18:37 +0100
-Subject: [PATCH 1/4] cpupower: Add cpupower-idle-info manpage
-In-Reply-To: <1324046154-64824-2-git-send-email-trenn@suse.de>
-References: <1324046154-64824-1-git-send-email-trenn@suse.de>
- <1324046154-64824-2-git-send-email-trenn@suse.de>
-Message-ID: <CAORVsuVrm+dWGgs-taatnUMZsYvYg_tdx1=7ekWp0qM+25DorQ@mail.gmail.com>
+From: b.a.stenning@gmail.com (Bruce Stenning)
+Date: Fri, 16 Dec 2011 16:19:05 +0000
+Subject: Bad page state BUG triggered by init process (kernel 3.1.2)
+In-Reply-To: <CAN_pD_BA8g=G3nvdiu0bNp0gqJU=LF4N4POGh9E5qfN_ubbfdg@mail.gmail.com>
+References: <CAN_pD_CfXh=savgYk21vo8+5E8ScfSgVsu7m4VjBLVwdPop+SA@mail.gmail.com>
+ <CAN_pD_BA8g=G3nvdiu0bNp0gqJU=LF4N4POGh9E5qfN_ubbfdg@mail.gmail.com>
+Message-ID: <CAN_pD_DS93wxpkf1p-=iN7ciUbKHjV79DMO4O-6Dy2mPsUa5NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Fri, Dec 16, 2011 at 3:35 PM, Thomas Renninger <trenn@suse.de> wrote:
-> The last missing manpage for cpupower tools.
-Great!
-
-> More info about other architecture's sleep state specialities would be great.
-I wonder if it is the right place for some arch specific information
-about the sleep states.
-
-I propose to document this in a more generic doc file (e.g.
-Documentation/arm/OMAP/omap_pm) and link it from the manpage.
-
-What do you think?
-
+On Tue, Dec 13, 2011 at 12:22 PM, Bruce Stenning <b.a.stenning@gmail.com> wrote:
+>> BUG: Bad page state in process busybox ?pfn:00000
+>> page:c0291000 count:0 mapcount:0 mapping: ?(null) index:0x0
+>> page flags: 0x200(arch_1)
 >
-> Signed-off-by: Thomas Renninger <trenn@suse.de>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: jean.pihet at newoldbits.com
-> CC: linux-omap at vger.kernel.org
-> CC: linux-pm at lists.linux-foundation.org
-> CC: linux-acpi at vger.kernel.org
-> CC: cpufreq at vger.kernel.org
-> CC: linux at dominikbrodowski.net
+> After some experimentation, the diagnostics provided by CONFIG_DMA_API_DEBUG
+> have shown up problems in the IOP ADMA self-tests (inconsistencies between
+> map and unmap of DMA pages) and disabling these self-tests removes the
+> DMA API use warnings and prevents the bad page state bug from triggering
+> when init runs.
 
-Regards,
-Jean
+These problems (including the kernel memory corruption issues we have also been
+experiencing) have been tracked to the following issue:
+
+http://article.gmane.org/gmane.linux.raid/33553
+
+Bruce.
