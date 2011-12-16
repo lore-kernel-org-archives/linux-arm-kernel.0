@@ -1,40 +1,55 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 16 Dec 2011 15:43:57 +0000
-Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt
- extensions
-In-Reply-To: <CAHkRjk48jHO19H04rf8252+v04hk9qSdKBrfYCqJsZyamVhMEw@mail.gmail.com>
-References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>	<201111292129.20444.arnd@arndb.de>	<alpine.DEB.2.00.1111301053300.31179@kaball-desktop>
- <CAHkRjk48jHO19H04rf8252+v04hk9qSdKBrfYCqJsZyamVhMEw@mail.gmail.com>
-Message-ID: <4EEB673D.3040608@citrix.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 16 Dec 2011 23:46:20 +0800
+Subject: [QUESTION] How to set static/dynamic dependency between clock
+ domains
+In-Reply-To: <CAMQu2gxNvrMXYs0gPYTS3wUL=toL=ccRxso25esXwmx9j4O5fg@mail.gmail.com>
+References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
+ <CACVXFVNOpfWxod_pN-kiQPoQ7n=XSFeV6WK6sf+8hYSiZ2rDBA@mail.gmail.com>
+ <CAMQu2gxNvrMXYs0gPYTS3wUL=toL=ccRxso25esXwmx9j4O5fg@mail.gmail.com>
+Message-ID: <CACVXFVNw1ni63Pk-SxaykTjMS4Qm0_9wtt8=DXypoKwfUiA2ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/11 14:11, Catalin Marinas wrote:
-> On 30 November 2011 11:39, Stefano Stabellini
-> <stefano.stabellini@eu.citrix.com> wrote:
->> A git branch is available here (not ready for submission):
+On Fri, Dec 16, 2011 at 11:13 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+> On Fri, Dec 16, 2011 at 7:20 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+>> Hi,
 >>
->> git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git arm
+>> On Fri, Dec 16, 2011 at 9:24 PM, Ming Lei <tom.leiming@gmail.com> wrote:
 >>
->> the branch above is based on git://linux-arm.org/linux-2.6.git arm-lpae,
->> even though guests don't really need lpae support to run on Xen.
-> 
-> Indeed, you don't really need LPAE. What you may need though is
-> generic timers support for A15, it would allow less Hypervisor traps.
-> For up-to-date architecture patches (well, development tree, not
-> guaranteed to be stable), I would recommend this (they get into
-> mainline at some point):
-> 
-> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
-> 
-> Either use master or just cherry-pick the branches that you are interested in.
+>>> [1], add static dependency
+>>
+>> Sorry for the mess, see attachment for the change.
+>>
+> Your patch is setting static dependency between ISS and l3_2.
+> It's not dynamic dep. Dynamic dep is managed through hardware and they
 
-Hi Catalin,
+Yes, I see now,  L3_2_DYNDEP of CM_CAM_DYNAMICDEP is read only.
 
-Which branches are required for the Versatile Express with the
-Cortex-A15? I merged linux-arm-arch/arm-arch/vexpress in but I get a
-instruction fault immediately after branching to __mmap_switched.
+> are not configurable. But with static dep. you can over-ride that behavior
+> as you have done.
+>
+> This will impact power since l3_2 can't idle as long as iss clock
+> domain is active.
+>
+> I need to check internal code-base but I don't remember this
+> issue observed so far.
 
-Is it not setting up the MMU correctly?
+In fact, I saw the issue on 3.2.0-rc5-next-20111216, and even
+no such issue on 3.2.0-rc5.  After some bisecting, I found below
+is the first commit on which the issue can be observed:
 
-David
+commit 3c50729b3fa1cd8ca1f347e6caf1081204cf1a7c
+Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date:   Wed Jan 5 22:03:17 2011 +0530
+
+    ARM: OMAP4: PM: Initialise all the clockdomains to supported states
+
+    Initialise hardware supervised mode for all clockdomains if it's
+    supported. Initiate sleep transition for other clockdomains,
+    if they are not being used.
+
+
+thanks,
+-- 
+Ming Lei
