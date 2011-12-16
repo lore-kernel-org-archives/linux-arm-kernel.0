@@ -1,162 +1,33 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 16 Dec 2011 15:54:52 +0100
-Subject: [RFC PATCH v2 1/8] omap4: introduce fdif(face detect module) hwmod
-In-Reply-To: <alpine.DEB.2.00.1112152252260.12660@utopia.booyaka.com>
-References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
- <1323871214-25435-2-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1112152252260.12660@utopia.booyaka.com>
-Message-ID: <4EEB5BBC.7050807@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 16 Dec 2011 20:43:22 +0530
+Subject: [QUESTION] How to set static/dynamic dependency between clock
+ domains
+In-Reply-To: <CACVXFVNOpfWxod_pN-kiQPoQ7n=XSFeV6WK6sf+8hYSiZ2rDBA@mail.gmail.com>
+References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
+ <CACVXFVNOpfWxod_pN-kiQPoQ7n=XSFeV6WK6sf+8hYSiZ2rDBA@mail.gmail.com>
+Message-ID: <CAMQu2gxNvrMXYs0gPYTS3wUL=toL=ccRxso25esXwmx9j4O5fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Fri, Dec 16, 2011 at 7:20 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+> Hi,
+>
+> On Fri, Dec 16, 2011 at 9:24 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+>
+>> [1], add static dependency
+>
+> Sorry for the mess, see attachment for the change.
+>
+Your patch is setting static dependency between ISS and l3_2.
+It's not dynamic dep. Dynamic dep is managed through hardware and they
+are not configurable. But with static dep. you can over-ride that behavior
+as you have done.
 
-On 12/16/2011 6:53 AM, Paul Walmsley wrote:
-> Hi Beno?t
->
-> On Wed, 14 Dec 2011, Ming Lei wrote:
->
->> Signed-off-by: Ming Lei<ming.lei@canonical.com>
+This will impact power since l3_2 can't idle as long as iss clock
+domain is active.
 
-Acked-by: Benoit Cousson <b-cousson@ti.com>
+I need to check internal code-base but I don't remember this
+issue observed so far.
 
->> ---
->>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   81 ++++++++++++++++++++++++++++
->>   1 files changed, 81 insertions(+), 0 deletions(-)
->
-> any comments on this patch?  I'd like to queue it if it looks good to you.
-
-It looks good to me. The only minor comment is about fdif location in 
-the list that should be sorted and thus cannot be after wd_timer2.
-
-Regards,
-Benoit
-
->
-> - Paul
->
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> index 6cf21ee..30db754 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> @@ -53,6 +53,7 @@ static struct omap_hwmod omap44xx_dmm_hwmod;
->>   static struct omap_hwmod omap44xx_dsp_hwmod;
->>   static struct omap_hwmod omap44xx_dss_hwmod;
->>   static struct omap_hwmod omap44xx_emif_fw_hwmod;
->> +static struct omap_hwmod omap44xx_fdif_hwmod;
->>   static struct omap_hwmod omap44xx_hsi_hwmod;
->>   static struct omap_hwmod omap44xx_ipu_hwmod;
->>   static struct omap_hwmod omap44xx_iss_hwmod;
->> @@ -354,6 +355,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
->>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->>   };
->>
->> +/* fdif ->  l3_main_2 */
->> +static struct omap_hwmod_ocp_if omap44xx_fdif__l3_main_2 = {
->> +	.master		=&omap44xx_fdif_hwmod,
->> +	.slave		=&omap44xx_l3_main_2_hwmod,
->> +	.clk		= "l3_div_ck",
->> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->> +};
->> +
->>   /* hsi ->  l3_main_2 */
->>   static struct omap_hwmod_ocp_if omap44xx_hsi__l3_main_2 = {
->>   	.master		=&omap44xx_hsi_hwmod,
->> @@ -5444,6 +5453,75 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
->>   	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_slaves),
->>   };
->>
->> +/* 'fdif' class */
->> +static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
->> +	.rev_offs	= 0x0000,
->> +	.sysc_offs	= 0x0010,
->> +	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
->> +			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
->> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
->> +			   MSTANDBY_FORCE | MSTANDBY_NO |
->> +			   MSTANDBY_SMART),
->> +	.sysc_fields	=&omap_hwmod_sysc_type2,
->> +};
->> +
->> +static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
->> +	.name	= "fdif",
->> +	.sysc	=&omap44xx_fdif_sysc,
->> +};
->> +
->> +/*fdif*/
->> +static struct omap_hwmod_addr_space omap44xx_fdif_addrs[] = {
->> +	{
->> +		.pa_start	= 0x4a10a000,
->> +		.pa_end		= 0x4a10afff,
->> +		.flags		= ADDR_TYPE_RT
->> +	},
->> +	{ }
->> +};
->> +
->> +/* l4_cfg ->  fdif */
->> +static struct omap_hwmod_ocp_if omap44xx_l4_cfg__fdif = {
->> +	.master		=&omap44xx_l4_cfg_hwmod,
->> +	.slave		=&omap44xx_fdif_hwmod,
->> +	.clk		= "l4_div_ck",
->> +	.addr		= omap44xx_fdif_addrs,
->> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->> +};
->> +
->> +/* fdif slave ports */
->> +static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
->> +	&omap44xx_l4_cfg__fdif,
->> +};
->> +static struct omap_hwmod_irq_info omap44xx_fdif_irqs[] = {
->> +	{ .irq = 69 + OMAP44XX_IRQ_GIC_START },
->> +	{ .irq = -1 }
->> +};
->> +
->> +/* fdif master ports */
->> +static struct omap_hwmod_ocp_if *omap44xx_fdif_masters[] = {
->> +	&omap44xx_fdif__l3_main_2,
->> +};
->> +
->> +static struct omap_hwmod omap44xx_fdif_hwmod = {
->> +	.name		= "fdif",
->> +	.class		=&omap44xx_fdif_hwmod_class,
->> +	.clkdm_name	= "iss_clkdm",
->> +	.mpu_irqs	= omap44xx_fdif_irqs,
->> +	.main_clk	= "fdif_fck",
->> +	.prcm = {
->> +		.omap4 = {
->> +			.clkctrl_offs = OMAP4_CM_CAM_FDIF_CLKCTRL_OFFSET,
->> +			.context_offs = OMAP4_RM_CAM_FDIF_CONTEXT_OFFSET,
->> +			.modulemode   = MODULEMODE_SWCTRL,
->> +		},
->> +	},
->> +	.slaves		= omap44xx_fdif_slaves,
->> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_fdif_slaves),
->> +	.masters	= omap44xx_fdif_masters,
->> +	.masters_cnt	= ARRAY_SIZE(omap44xx_fdif_masters),
->> +};
->> +
->>   static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->>
->>   	/* dmm class */
->> @@ -5593,6 +5671,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->>   	&omap44xx_wd_timer2_hwmod,
->>   	&omap44xx_wd_timer3_hwmod,
->>
->> +	/* fdif class */
->> +	&omap44xx_fdif_hwmod,
->> +
->>   	NULL,
->>   };
->>
->> --
->> 1.7.5.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->
->
-> - Paul
+Regards
+Santosh
