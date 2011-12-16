@@ -1,55 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 15 Dec 2011 21:53:12 -0800
-Subject: [GIT PULL] at91: drivers for 3.3
-In-Reply-To: <4EEA0DF6.3050408@atmel.com>
-References: <4EEA0DF6.3050408@atmel.com>
-Message-ID: <CAOesGMjurPDXVR1FLmLXa5NDNjpTzGpshQQ0piqHis5wsYM=Tg@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 16 Dec 2011 11:36:00 +0530
+Subject: [PATCH] arm/dts: Add support for OMAP3 Mistral EVM board
+Message-ID: <1324015560-26735-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add OMAP3 Mistral EVM DTS file to use the omap3.dtsi SoC file,
+along with memory node information.
 
-On Thu, Dec 15, 2011 at 7:10 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Arnd, Olof,
->
-> This is a first "drivers" part of our material for 3.3 merge window. It collects
-> Ethernet drivers changes.
-> One thing to note is that the macb.c driver is modified to support
-> device tree. We agreed with David to drag those modifications into
-> arm-soc git tree because they go on top of Jamie's work on macb-gem driver
-> already in your drivers/macb-gem branch.
->
-> This pull request goes on top of Linus' 3.2-rc5 commit but with additional
-> dependencies with two of your branches:
-> 1/ fixes (which seems already included in 3.2-rc5)
-> 2/ drivers/macb-gem
->
-> I had to resolve a conflict while merging the macb-gem branche with current 3.2-rc5. The
-> resolution is commited into this branch.
-> Tell me if you need more precision.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+---
+Boot tested it on DM37x Mistral EVM, kernel parses the info correctly.
 
-The history of this branch due to the double dependencies gets a bit
-awkward. Also, it seems like you in one of your merges kept the
-'default y' in NET_CADENCE that should have been removed.
+ arch/arm/boot/dts/omap3-evm.dts |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-evm.dts
 
-Would you mind trying this instead?
-
-* Base this new branch on the previous macb-gem branch
-* Cherry-pick the fixes from 'fixes' into the new branch if truly
-needed -- I tested here and all of the patches applied cleanly.
-* Then apply these patches
-* For build testing before sending, merge into for-next to aggregate
-with the rest of the 'fixes' changes -- it's OK that we have to do a
-fixup here.
-
-That should give a clean branch with neat history for just these
-changes. About 'fixes': Since they are in for-next, and will be in
-3.2, that dependency will be taken care of that way.
-
-Then send a fresh pull request for that new branch, please.
-
-
-Thanks!
-
-
--Olof
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+new file mode 100644
+index 0000000..59b2de0
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++/include/ "omap3.dtsi"
++
++/ {
++	model = "TI OMAP3 Mistral EVM";
++	compatible = "ti,omap3-evm", "ti,omap3";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256 MB */
++	};
++};
+-- 
+1.7.0.4
