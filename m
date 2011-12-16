@@ -1,90 +1,84 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 16 Dec 2011 16:25:40 +0100
-Subject: [PATCH 1/3] ARM: OMAP2+: kconfig: Enable devicetree by default
- for OMAP2+ systems
-In-Reply-To: <20111213223855.GW32251@atomide.com>
-References: <y> <1323190149-6492-2-git-send-email-b-cousson@ti.com>
- <1323782836.1877.79.camel@deskari> <4EE75448.4010701@ti.com>
- <20111213223855.GW32251@atomide.com>
-Message-ID: <4EEB62F4.2010202@ti.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Fri, 16 Dec 2011 16:39:04 +0100
+Subject: [PATCH v2 2/2] [RFC] ARM: IOMMU: Tegra30: iommu_ops for SMMU
+ driver
+In-Reply-To: <1323954690-7000-3-git-send-email-hdoyu@nvidia.com>
+References: <1323954690-7000-1-git-send-email-hdoyu@nvidia.com>
+ <1323954690-7000-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20111216153904.GC29877@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, Dec 15, 2011 at 03:11:30PM +0200, Hiroshi DOYU wrote:
+> +static int smmu_iommu_attach_dev(struct iommu_domain *domain,
+> +				 struct device *dev)
+> +{
+> +	struct smmu_as *as = domain->priv;
+> +	struct smmu_client *client, *c;
+> +	u32 map;
+> +	int err;
+> +
+> +	client = kmalloc(sizeof(*c), GFP_KERNEL);
+> +	if (!client)
+> +		return -ENOMEM;
+> +	client->dev = dev;
+> +	client->as = as;
+> +	map = (unsigned long)dev->platform_data;
+> +	if (!map)
+> +		return -EINVAL;
+> +
+> +	err = smmu_client_enable_hwgrp(client, map);
+> +	if (err)
+> +		goto err_hwgrp;
+> +
+> +	spin_lock(&as->client_lock);
+> +	list_for_each_entry(c, &as->client, list) {
+> +		if (c->dev == dev) {
+> +			pr_err("%s is already attached\n", dev_name(dev));
+> +			err = -EINVAL;
+> +			goto err_client;
+> +		}
+> +	}
+> +	list_add(&client->list, &as->client);
+> +	spin_unlock(&as->client_lock);
+> +
+> +	/*
+> +	 * Reserve "page zero" for AVP vectors using a common dummy
+> +	 * page.
+> +	 */
+> +	if (map & HWG_AVPC) {
+> +		struct page *page;
+> +
+> +		page = as->smmu->avp_vector_page;
+> +		__smmu_iommu_map_pfn(as, 0, page_to_pfn(page));
+> +
+> +		pr_info("Reserve \"page zero\" for AVP vectors using a common dummy\n");
+> +	}
+> +
+> +	pr_debug("Attached %s\n", dev_name(dev));
+> +	return 0;
+> +err_client:
+> +	smmu_client_disable_hwgrp(client);
+> +	spin_unlock(&as->client_lock);
+> +err_hwgrp:
+> +	kfree(client);
+> +	return err;
+> +}
 
-On 12/13/2011 11:38 PM, Tony Lindgren wrote:
-> * Cousson, Benoit<b-cousson@ti.com>  [111213 05:02]:
->> On 12/13/2011 2:27 PM, Tomi Valkeinen wrote:
->>> Hi,
->>>
->>> On Tue, 2011-12-06 at 17:49 +0100, Benoit Cousson wrote:
->>>> devicetree will become the mandatory boot method for OMAP2+.
->>>> In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
->>>> select USE_OF by default for every OMAP2+ systems.
->>>> Select as well the APPENDED_DTB and ATAG_DTB_COMPAT to allow legacy
->>>> boot loader to keep working properly.
->>>
->>> APPENDED_DTB sounds a bit dangerous to be enabled by default according
->>> to the config help text.
->>
->> The help is indeed really scary :-)
-> 
-> Heh, but it's also true.
-> 
->> Tony,
->> Do we want to keep it by default? Or should we fix the kconfig help?
-> 
-> Let's just leave out those two from omap2plus_defconfig then.
+Hmm, I have a question about that. Reading the code it looks like your
+SMMU exists per pheripheral device and the SMMU hardware supports
+multiple address spaces per device, right? The domains are implemented
+for one address-space. So is it right that a device can have multiple
+address-spaces? If so, what kind of devices do you bind to the domains
+then. I doesn't make sense to bind whole peripheral devices in this
+case.
 
-Here is the updated version.
-Just let me know if you'd like to get the full series re-posted.
 
-Thanks,
-Benoit
+	Joerg
 
----
->From b33d4be0213ab0c630b87bd3df77035cbb109cd0 Mon Sep 17 00:00:00 2001
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Thu, 1 Dec 2011 10:21:16 +0100
-Subject: [PATCH] ARM: OMAP2+: kconfig: Enable devicetree by default for OMAP2+ systems
-
-devicetree will become the mandatory boot method for OMAP2+.
-In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
-select USE_OF by default for every OMAP2+ systems.
-
-Enable PROC_DEVICETREE as well.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/Kconfig |    1 -
- arch/arm/plat-omap/Kconfig  |    2 ++
- 2 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index b662513..bdd5b68 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -111,7 +111,6 @@ comment "OMAP Board Type"
- config MACH_OMAP_GENERIC
- 	bool "Generic OMAP2+ board"
- 	depends on ARCH_OMAP2PLUS
--	select USE_OF
- 	default y
- 	help
- 	  Support for generic TI OMAP2+ boards using Flattened Device Tree.
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index aa59f42..734009a 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -24,6 +24,8 @@ config ARCH_OMAP2PLUS
- 	select CLKDEV_LOOKUP
- 	select GENERIC_IRQ_CHIP
- 	select OMAP_DM_TIMER
-+	select USE_OF
-+	select PROC_DEVICETREE
- 	help
- 	  "Systems based on OMAP2, OMAP3 or OMAP4"
- 
 -- 
-1.7.0.4
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
