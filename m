@@ -1,44 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Dec 2011 10:16:26 -0800
-Subject: [PATCH v4] ARM: OMAP2+: hwmod: Add a new flag to handle hwmods
- left enabled at init
-In-Reply-To: <alpine.DEB.2.00.1112160544470.12660@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1112160544470.12660@utopia.booyaka.com>
-Message-ID: <20111216181626.GC32251@atomide.com>
+Date: Fri, 16 Dec 2011 10:24:16 -0800
+Subject: [GIT PULL] OMAP: UART cleanup and runtime PM conversion for v3.3
+In-Reply-To: <878vmeodsx.fsf@ti.com>
+References: <878vmeodsx.fsf@ti.com>
+Message-ID: <20111216182416.GD32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [111216 04:18]:
+* Kevin Hilman <khilman@ti.com> [111214 16:22]:
+> Tony,
 > 
-> From: Rajendra Nayak <rnayak@ti.com>
+> Please pull the OMAP UART cleanup and conversion to runtime PM.  I had
+> to rebase it onto your soc branch due to the serial.c changes there.
 > 
-> An hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
-> enabled state by the hwmod framework post the initial setup.
-> Once a real user of the device (a driver) tries to enable it
-> at a later point, the hwmod framework throws a WARN() about
-> the device being already in enabled state.
+> This includes changes to drivers/tty/serial/omap-serial.c and those
+> changes have Acks from Greg KH and Alan Cox and I got the OK from them
+> to merge this all together via the OMAP tree.
 > 
-> Fix this by introducing a new internal flag '_HWMOD_SKIP_ENABLE' to
-> identify such devices/hwmods. When the device/hwmod is requested to be
-> enabled (the first time) by its driver/user, nothing except the
-> mux-enable is needed. The mux data is board specific and is
-> unavailable during initial enable() of the device, done by the
-> framework as part of setup().
+> Thanks to Govindraj for his persistence with this series.
 > 
-> A good example of a such a device is an UART used as debug console.
-> The UART module needs to be kept enabled through the boot, until the
-> UART driver takes control of it, for debug prints to appear on
-> the console.
+> Boot tested on 2420/n810, 4430/Blaze, 4430/Panda
+> Additional PM testing on 3430/n900, 3530/Overo, 3630/Zoom3.
 > 
-> Acked-by: Kevin Hilman <khilman@ti.com>
-> Acked-by: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> [paul at pwsan.com: use a flag rather than a state; updated commit message;
->  edited some documentation]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> NOTE: while normal UART behavior works fine with this series, including
+>       suspend/resume, in order for wakeups from runtime PM to work, this
+>       series depends on the PRCM IRQ chaining series from Tero and the
+>       the new hwmod init state from Rajendra[1].  However, since runtime
+>       PM is disabled by default for the UARTs, they will behave normally
+>       even without those dependencies.
+> 
+> Kevin
+> 
+> [1] http://marc.info/?l=linux-omap&m=132187766930901&w=2
 
-Thanks I'll apply this into uart branch so I can pull Kevin's
-changes on top of it.
+Thanks pulling this into uart branch.
 
 Regards,
 
