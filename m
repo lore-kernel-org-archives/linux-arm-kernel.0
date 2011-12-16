@@ -1,27 +1,71 @@
-From: b.a.stenning@gmail.com (Bruce Stenning)
-Date: Fri, 16 Dec 2011 16:19:05 +0000
-Subject: Bad page state BUG triggered by init process (kernel 3.1.2)
-In-Reply-To: <CAN_pD_BA8g=G3nvdiu0bNp0gqJU=LF4N4POGh9E5qfN_ubbfdg@mail.gmail.com>
-References: <CAN_pD_CfXh=savgYk21vo8+5E8ScfSgVsu7m4VjBLVwdPop+SA@mail.gmail.com>
- <CAN_pD_BA8g=G3nvdiu0bNp0gqJU=LF4N4POGh9E5qfN_ubbfdg@mail.gmail.com>
-Message-ID: <CAN_pD_DS93wxpkf1p-=iN7ciUbKHjV79DMO4O-6Dy2mPsUa5NA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Dec 2011 17:29:29 +0100
+Subject: [PATCH 0/6] ARM: at91: irqdomain and device tree for AIC and GPIO
+In-Reply-To: <4EEAA4A7.3040902@gmail.com>
+References: <1323976568-20244-1-git-send-email-nicolas.ferre@atmel.com>
+ <4EEAA4A7.3040902@gmail.com>
+Message-ID: <4EEB71E9.3050609@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 12:22 PM, Bruce Stenning <b.a.stenning@gmail.com> wrote:
->> BUG: Bad page state in process busybox ?pfn:00000
->> page:c0291000 count:0 mapcount:0 mapping: ?(null) index:0x0
->> page flags: 0x200(arch_1)
->
-> After some experimentation, the diagnostics provided by CONFIG_DMA_API_DEBUG
-> have shown up problems in the IOP ADMA self-tests (inconsistencies between
-> map and unmap of DMA pages) and disabling these self-tests removes the
-> DMA API use warnings and prevents the bad page state bug from triggering
-> when init runs.
+On 12/16/2011 02:53 AM, Rob Herring :
+> Nicolas,
+> 
+> On 12/15/2011 01:16 PM, Nicolas Ferre wrote:
+>> Hi,
+>>
+>> This series adds irqdomain and device tree support for both the
+>> interrupt and GPIO controllers of AT91 SoC.
+>>
+>> The AIC part has already been sent some time ago but has been
+>> reworked to address Rob's comments. This reworked patch is marked
+>> with a "v4" tag.
+>>
+>> The series can go on top of Jamie's patch
+>> "irqdomain: export irq_domain_simple_ops for !CONFIG_OF"
+>> and has been tested on top of 'v3.2-rc5' + 'arm-soc/at91/ioremap'
+>> and 'arm-soc/at91/gpio'
+>>
+>> Jean-Christophe PLAGNIOL-VILLARD (1):
+>>       ARM: at91/gpio: add DT support
+>>
+>> Nicolas Ferre (5):
+>>       ARM: at91/aic: add irq domain and device tree support
+>>       ARM: at91/gpio: add irqdomain to gpio interrupts
+>>       ARM: at91/gpio: add .to_irq gpio_chip handler and rework irq_to_gpio
+>>       ARM: at91/gpio: remove the static specification of gpio_chip.base
+>>       ARM: at91/board-dt: remove AIC irq domain from board file
+>>
+>>  .../devicetree/bindings/arm/atmel-aic.txt          |   38 ++++
+>>  .../devicetree/bindings/gpio/gpio_at91.txt         |   20 ++
+>>  arch/arm/Kconfig                                   |    1 +
+>>  arch/arm/boot/dts/at91sam9g20.dtsi                 |   44 ++++-
+>>  arch/arm/boot/dts/at91sam9g45.dtsi                 |   59 +++++-
+>>  arch/arm/mach-at91/board-dt.c                      |   15 +--
+>>  arch/arm/mach-at91/gpio.c                          |  197 ++++++++++++++++----
+>>  arch/arm/mach-at91/include/mach/gpio.h             |   12 --
+>>  arch/arm/mach-at91/include/mach/irqs.h             |    3 +-
+>>  arch/arm/mach-at91/irq.c                           |   91 +++++++--
+>>  10 files changed, 383 insertions(+), 97 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
+>>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_at91.txt
+> 
+> What about using generic irq chip as I previously mentioned? It looks to
+> me like both the AIC and gpio controller could use it. I've added irq
+> domain support to generic irq chip, so it should simplify your changes.
+> The latest branch is here:
+> 
+> git://sources.calxeda.com/kernel/linux.git pl061-domain-v2
 
-These problems (including the kernel memory corruption issues we have also been
-experiencing) have been tracked to the following issue:
+Rob,
 
-http://article.gmane.org/gmane.linux.raid/33553
+Yes, that definitively makes sense but I fear that this rework will
+delay again the introduction of a couple of products and the work we
+have to do to enable DT for other drivers.
+The AIC and GPIO will definitively need a rework but I cannot start this
+now and as I have a nearly working solution, I would prefer to start
+this task later...
 
-Bruce.
+Best regards,
+-- 
+Nicolas Ferre
