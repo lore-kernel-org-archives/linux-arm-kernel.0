@@ -1,42 +1,93 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 15 Dec 2011 21:18:01 -0600
-Subject: [PATCH v4 4/4] OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <CAMP44s3Jb9DZLUyDVU_HmQbaJKp=2qym7Z6uauNchJh0fPL4hQ@mail.gmail.com>
-References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
- <1323922709-6986-5-git-send-email-omar.ramirez@ti.com>
- <CAMP44s3Jb9DZLUyDVU_HmQbaJKp=2qym7Z6uauNchJh0fPL4hQ@mail.gmail.com>
-Message-ID: <CAB-zwWhpmwRP2mNu-CdX-RVgmTRjw0UsYckAVsM+qztmVdvc7A@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 16 Dec 2011 09:31:05 +0530
+Subject: [PATCH] arm/dts: Add minimal device tree support for omap2420
+ and omap2430
+In-Reply-To: <20111215213940.GW32251@atomide.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+ <1323863746-18145-5-git-send-email-rnayak@ti.com>
+ <20111214192509.GH32251@atomide.com> <4EE99923.4030902@ti.com>
+ <4EE9C697.4010604@ti.com> <20111215211320.GU32251@atomide.com>
+ <4EEA6686.3010504@ti.com> <20111215213722.GV32251@atomide.com>
+ <20111215213940.GW32251@atomide.com>
+Message-ID: <4EEAC281.7010705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 6:53 PM, Felipe Contreras
-<felipe.contreras@gmail.com> wrote:
-> On Thu, Dec 15, 2011 at 6:18 AM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
->> Use runtime PM functionality interfaced with hwmod enable/idle
->> functions, to replace direct clock operations, reset and sysconfig
->> handling.
->>
->> Removed clk handling during interrupt, given that in order to receive one,
->> the device should be powered on in advance. Now doing pm_runtime_get/put
->> on iommu_enable/disable so it doesn't rely on others to keep the clocks on.
->>
->> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
->> ---
->> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ? | ? 17 -----------
->> ?arch/arm/mach-omap2/omap-iommu.c ? ? ? ? | ? ?1 -
->> ?arch/arm/plat-omap/include/plat/iommu.h ?| ? ?2 -
->> ?arch/arm/plat-omap/include/plat/iommu2.h | ? ?2 -
->> ?drivers/iommu/omap-iommu.c ? ? ? ? ? ? ? | ? 44 ++++++++++++-----------------
->> ?5 files changed, 18 insertions(+), 48 deletions(-)
+On Friday 16 December 2011 03:09 AM, Tony Lindgren wrote:
+> Add minimal device tree support for omap2420 and omap2430
+
+Looks good to me.
+
 >
-> Shouldn't pm_runtime_enable() be called in omap_iommu_init(), and
-> omap_iommu_probe() call pm_runtime_get_sync()/put() on the sections
-> where the device should be active?
-
-omap_iommu_init is called on module init however omap_iommu_probe is
-called by driver instance (isp, iva), on probe pm_runtime_enable
-activates runtime for both isp and iva devices, one at a time.
-
-Regards,
-
-Omar
+> Signed-off-by: Tony Lindgren<tony@atomide.com>
+>
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap2.dtsi
+> @@ -0,0 +1,67 @@
+> +/*
+> + * Device Tree Source for OMAP2 SoC
+> + *
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "ti,omap2430", "ti,omap2420", "ti,omap2";
+> +
+> +	aliases {
+> +		serial0 =&uart1;
+> +		serial1 =&uart2;
+> +		serial2 =&uart3;
+> +	};
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,arm1136jf-s";
+> +		};
+> +	};
+> +
+> +	soc {
+> +		compatible = "ti,omap-infra";
+> +		mpu {
+> +			compatible = "ti,omap2-mpu";
+> +			ti,hwmods = "mpu";
+> +		};
+> +	};
+> +
+> +	ocp {
+> +		compatible = "simple-bus";
+> +		#address-cells =<1>;
+> +		#size-cells =<1>;
+> +		ranges;
+> +		ti,hwmods = "l3_main";
+> +
+> +		intc: interrupt-controller at 1 {
+> +			compatible = "ti,omap2-intc";
+> +			interrupt-controller;
+> +			#interrupt-cells =<1>;
+> +		};
+> +
+> +		uart1: serial at 4806a000 {
+> +			compatible = "ti,omap2-uart";
+> +			ti,hwmods = "uart1";
+> +			clock-frequency =<48000000>;
+> +		};
+> +
+> +		uart2: serial at 4806c000 {
+> +			compatible = "ti,omap2-uart";
+> +			ti,hwmods = "uart2";
+> +			clock-frequency =<48000000>;
+> +		};
+> +
+> +		uart3: serial at 4806e000 {
+> +			compatible = "ti,omap2-uart";
+> +			ti,hwmods = "uart3";
+> +			clock-frequency =<48000000>;
+> +		};
+> +	};
+> +};
