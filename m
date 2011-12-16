@@ -1,46 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Dec 2011 13:59:41 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP: I2C: prepare to use hwmod reset in
- driver
-In-Reply-To: <20111216204123.GM32251@atomide.com>
-References: <alpine.DEB.2.00.1112160254320.12660@utopia.booyaka.com>
- <20111216195002.GL32251@atomide.com>
- <alpine.DEB.2.00.1112161314180.12660@utopia.booyaka.com>
- <20111216204123.GM32251@atomide.com>
-Message-ID: <alpine.DEB.2.00.1112161357250.12660@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 16 Dec 2011 13:03:01 -0800
+Subject: [GIT PULL] at91: devices and boards files update for 3.3
+In-Reply-To: <4EEB73DD.3070505@atmel.com>
+References: <4EEA034C.9020800@atmel.com>
+ <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
+ <4EEB73DD.3070505@atmel.com>
+Message-ID: <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Nicolas,
 
-On Fri, 16 Dec 2011, Tony Lindgren wrote:
+On Fri, Dec 16, 2011 at 8:37 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-> * Paul Walmsley <paul@pwsan.com> [111216 11:45]:
-> > On Fri, 16 Dec 2011, Tony Lindgren wrote:
-> > 
-> > > * Paul Walmsley <paul@pwsan.com> [111216 01:24]:
-> > >
-> > > > Shubhrajyoti D (2):
-> > > >       ARM: OMAP: omap_device: add omap_device_reset to reset all the hwmods in the device
-> > > >       ARM: OMAP: I2C: Reset support
-> > > > 
-> > > Can you please update shi to leave out the extra callback
-> > > function int (*device_reset) (struct device *dev) as I'd
-> > > rather see that happen with pm_runtime calls?
-> > 
-> > What PM runtime call is used to reset a device?
-> 
-> Hmm how about pm_runtime_disable? Or do we need a new
-> call for reset?
+> Yes, this ISI driver addition is also dependent on an update of the ISI
+> driver itself that will certainly be included in 3.3 by Guennadi using
+> v4L2 path.
+>
+> So, do we have to wait for its inclusion in linux-next or maybe we can
+> manage this little out-of-sync situation during the 3.3 life cycle...
+>
+> ISI is a "several times reworked" and "long-awaited" driver and I really
+> would like to see it included in mainline soon...
 
-Looking at the last few hunks of:
+I don't see why code that is known to be broken should be added to the kernel.
 
-http://marc.info/?l=linux-omap&m=132377389204328&w=2
+The way these things are normally handled is that once Guennadi has
+the patch on a stable branch, we can add that branch as a dependency
+that your code requires. So we pull that in as a dependency and apply
+your code on top of it (or, if it is just one or two patches, that
+they are are cherry-picked into your branch in the same way).
 
-it appears to me that the driver needs to reset the device while it's 
-still active & powered on, etc.
+But that requires that he picks up the v4l patches and keeps it in a
+stable, small, branch and that said branch gets merged in the 3.3
+merge window before the branch containing these at91 changes do.
 
-Shubhrajyoti, care to comment further?
+Guennadi, sound reasonable to you?
 
 
-- Paul
+-Olof
