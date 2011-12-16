@@ -1,30 +1,63 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sat, 17 Dec 2011 00:33:23 +0800
-Subject: [QUESTION] How to set static/dynamic dependency between clock
- domains
-In-Reply-To: <CAMQu2gwDth6OVTk3PkRCo05QF6WeQvMTJ-d5s33cT35GSVwT=w@mail.gmail.com>
-References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
- <CACVXFVPOaw7OG7owJw0h7DAe3pRH6nROsy13UeAWPWgLedKY1g@mail.gmail.com>
- <CAMQu2gwDth6OVTk3PkRCo05QF6WeQvMTJ-d5s33cT35GSVwT=w@mail.gmail.com>
-Message-ID: <CACVXFVNtaaxB-MRXKBgAZFEkf72nsgcOSHOFsYjspoL0Fv6VWA@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 16 Dec 2011 16:35:27 +0000
+Subject: [PATCH v5 REPOST 0/5] Refactor common Kconfigs for easier maintenance
+Message-ID: <1324053332-6431-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 17, 2011 at 12:09 AM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> No. The table reflects the actual possible combination on hardware. You can't
-> add anything there arbitrary if that combination is not supported.
->
-> But that makes me wonder how the patch worked. I will look at this in detail
-> next week.
+[Expanding the CC list again so that affected people get a final
+chance to comment -- David Brown pointed out that a few people/
+ists were still missing.  This is otherwise a repost of v5 with
+no changes.  Apologies to anyone who has already read this series.]
 
-Thanks, I use the below hwmod data patch[1] and omap device patch[2]
-to bring up fdif module, and Benoit has ACKed on patch [1].
+Common Kconfig options which depend on a long list of board- and
+SoC- specific Kconfigs can be cumbersome to maintain, leading to
+annoying merge conflicts (although rather trivial ones).
+
+This series factors out the dependencies of CACHE_L2X0 and SMP so
+that the knowledge about when these can be enabled is moved to the
+relevant board/SoC Kconfig files instead.  New
+MIGHT_HAVE_CACHE_L2X0 and HAVE_SMP options are defined to mediate
+the dependencies.
+
+This series has been substantially reworked compared with the
+previous post, and is now in two parts:
+
+  * The first two patches simply refactor the way the Kconfig
+    options for CACHE_L2X0 and SMP are implemented, without
+    making any other changes.
+
+  * The final three patches apply functional changes suggested by
+    the contributors to this series, to make the config
+    dependencies more correct for some specific boards.
 
 
-[1], http://marc.info/?l=linux-kernel&m=132387140703874&w=2
-[2], http://marc.info/?l=linux-kernel&m=132387155403929&w=2
+Thanks to Rob Herring, Shawn Guo and Russell King for their
+contributions to this series.  Thanks also to David Brown for
+pointing out the lack of a comprehensive CC list.
 
-thanks,
+
+I have briefly build-tested on some of the affected boards, but any
+further reviews or Tested-Bys would be much appreciated.
+
+
+Dave Martin (5):
+  ARM: l2x0/pl310: Refactor Kconfig to be more maintainable
+  ARM: SMP: Refactor Kconfig to be more maintainable
+  omap4: Unconditionally require l2x0 L2 cache controller support
+  highbank: Unconditionally require l2x0 L2 cache controller support
+  imx6q: Remove unconditional dependency on l2x0 L2 cache support
+
+ arch/arm/Kconfig               |   26 ++++++++++++++++++++++----
+ arch/arm/mach-exynos/Kconfig   |    2 ++
+ arch/arm/mach-imx/Kconfig      |    2 +-
+ arch/arm/mach-msm/Kconfig      |    1 +
+ arch/arm/mach-omap2/Kconfig    |    2 ++
+ arch/arm/mach-realview/Kconfig |    9 +++++++++
+ arch/arm/mach-vexpress/Kconfig |    2 ++
+ arch/arm/mm/Kconfig            |   23 ++++++++++++++++-------
+ arch/arm/plat-mxc/Kconfig      |    1 +
+ 9 files changed, 56 insertions(+), 12 deletions(-)
+
 -- 
-Ming Lei
+1.7.4.1
