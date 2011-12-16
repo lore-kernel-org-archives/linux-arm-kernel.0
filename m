@@ -1,43 +1,42 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 16 Dec 2011 11:13:26 +0800
-Subject: [RFC V1 1/4] cpufreq: add arm soc generic cpufreq driver
-In-Reply-To: <20111215202911.GL14542@n2100.arm.linux.org.uk>
-References: <1323947798-25251-1-git-send-email-richard.zhao@linaro.org>
- <20111215202911.GL14542@n2100.arm.linux.org.uk>
-Message-ID: <20111216031325.GU28768@b20223-02.ap.freescale.net>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Thu, 15 Dec 2011 21:18:01 -0600
+Subject: [PATCH v4 4/4] OMAP3/4: iommu: adapt to runtime pm
+In-Reply-To: <CAMP44s3Jb9DZLUyDVU_HmQbaJKp=2qym7Z6uauNchJh0fPL4hQ@mail.gmail.com>
+References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
+ <1323922709-6986-5-git-send-email-omar.ramirez@ti.com>
+ <CAMP44s3Jb9DZLUyDVU_HmQbaJKp=2qym7Z6uauNchJh0fPL4hQ@mail.gmail.com>
+Message-ID: <CAB-zwWhpmwRP2mNu-CdX-RVgmTRjw0UsYckAVsM+qztmVdvc7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 08:29:11PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 15, 2011 at 07:16:35PM +0800, Richard Zhao wrote:
-> > +#ifdef CONFIG_SMP
-> > +	/* loops_per_jiffy is not updated by the cpufreq core for SMP systems.
-> > +	 * So update it for all CPUs.
-> > +	 */
-> > +	for_each_possible_cpu(cpu)
-> > +		per_cpu(cpu_data, cpu).loops_per_jiffy =
-> > +		cpufreq_scale(per_cpu(cpu_data, cpu).loops_per_jiffy,
-> > +					freqs.old, freqs.new);
-> 
-> NAK.  If you think this is a good solution, you're very wrong.  If this
-> is what's in the core cpufreq code, then it too is very broken.
-> 
-> I've seen this exact method result in the loops_per_jiffy being totally
-> buggered over time by the constant scaling up and down.  The only way
-> to do this _sensibly_ is to record the _initial_ loops_per_jiffy and
-> _inital_ frequency, and scale from that.
-> 
-> That way you get consistent results irrespective of the scalings you
-> do over time, rather than something which continually deteriorates with
-> every frequency change.
-Thanks for your comments. I'll recalculate loops_per_jiffy always based on boot
-up values.
+On Thu, Dec 15, 2011 at 6:53 PM, Felipe Contreras
+<felipe.contreras@gmail.com> wrote:
+> On Thu, Dec 15, 2011 at 6:18 AM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
+>> Use runtime PM functionality interfaced with hwmod enable/idle
+>> functions, to replace direct clock operations, reset and sysconfig
+>> handling.
+>>
+>> Removed clk handling during interrupt, given that in order to receive one,
+>> the device should be powered on in advance. Now doing pm_runtime_get/put
+>> on iommu_enable/disable so it doesn't rely on others to keep the clocks on.
+>>
+>> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ? | ? 17 -----------
+>> ?arch/arm/mach-omap2/omap-iommu.c ? ? ? ? | ? ?1 -
+>> ?arch/arm/plat-omap/include/plat/iommu.h ?| ? ?2 -
+>> ?arch/arm/plat-omap/include/plat/iommu2.h | ? ?2 -
+>> ?drivers/iommu/omap-iommu.c ? ? ? ? ? ? ? | ? 44 ++++++++++++-----------------
+>> ?5 files changed, 18 insertions(+), 48 deletions(-)
+>
+> Shouldn't pm_runtime_enable() be called in omap_iommu_init(), and
+> omap_iommu_probe() call pm_runtime_get_sync()/put() on the sections
+> where the device should be active?
 
-Thanks
-Richard
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+omap_iommu_init is called on module init however omap_iommu_probe is
+called by driver instance (isp, iva), on probe pm_runtime_enable
+activates runtime for both isp and iva devices, one at a time.
+
+Regards,
+
+Omar
