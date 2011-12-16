@@ -1,60 +1,24 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 16 Dec 2011 21:20:39 +0530
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 16 Dec 2011 23:57:17 +0800
 Subject: [QUESTION] How to set static/dynamic dependency between clock
  domains
-In-Reply-To: <CACVXFVNw1ni63Pk-SxaykTjMS4Qm0_9wtt8=DXypoKwfUiA2ig@mail.gmail.com>
+In-Reply-To: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
 References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
- <CACVXFVNOpfWxod_pN-kiQPoQ7n=XSFeV6WK6sf+8hYSiZ2rDBA@mail.gmail.com>
- <CAMQu2gxNvrMXYs0gPYTS3wUL=toL=ccRxso25esXwmx9j4O5fg@mail.gmail.com>
- <CACVXFVNw1ni63Pk-SxaykTjMS4Qm0_9wtt8=DXypoKwfUiA2ig@mail.gmail.com>
-Message-ID: <CAMQu2gzZ4EBpPWej+TQ3GShDjxZimCZVdVUoE-iPhOWBDS9Wfg@mail.gmail.com>
+Message-ID: <CACVXFVPOaw7OG7owJw0h7DAe3pRH6nROsy13UeAWPWgLedKY1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2011 at 9:16 PM, Ming Lei <tom.leiming@gmail.com> wrote:
-> On Fri, Dec 16, 2011 at 11:13 PM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
->> On Fri, Dec 16, 2011 at 7:20 PM, Ming Lei <tom.leiming@gmail.com> wrote:
->>> Hi,
->>>
->>> On Fri, Dec 16, 2011 at 9:24 PM, Ming Lei <tom.leiming@gmail.com> wrote:
->>>
->>>> [1], add static dependency
->>>
->>> Sorry for the mess, see attachment for the change.
->>>
->> Your patch is setting static dependency between ISS and l3_2.
->> It's not dynamic dep. Dynamic dep is managed through hardware and they
->
-> Yes, I see now, ?L3_2_DYNDEP of CM_CAM_DYNAMICDEP is read only.
->
->> are not configurable. But with static dep. you can over-ride that behavior
->> as you have done.
->>
->> This will impact power since l3_2 can't idle as long as iss clock
->> domain is active.
->>
->> I need to check internal code-base but I don't remember this
->> issue observed so far.
->
-> In fact, I saw the issue on 3.2.0-rc5-next-20111216, and even
-> no such issue on 3.2.0-rc5. ?After some bisecting, I found below
-> is the first commit on which the issue can be observed:
->
-> commit 3c50729b3fa1cd8ca1f347e6caf1081204cf1a7c
-> Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: ? Wed Jan 5 22:03:17 2011 +0530
->
-> ? ?ARM: OMAP4: PM: Initialise all the clockdomains to supported states
->
-> ? ?Initialise hardware supervised mode for all clockdomains if it's
-> ? ?supported. Initiate sleep transition for other clockdomains,
-> ? ?if they are not being used.
->
-Before this patch all clock-domains were  put into SW forcewakeup
-and hence the clock domains were not idling. With this patch now, hw
-will take control of the clock-domain idle based on the domain
-activities.
+Hi,
 
-Regards
-Santosh
+On Fri, Dec 16, 2011 at 9:24 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+
+> Also I have tried to add 'l3_2_clkdm' into dependency table of iss_clkdm in [2],
+> and it doesn't work.
+
+Also, I still have the question why the static dependency isn't generated from
+the table .wkdep_srcs of struct clockdomain? Seems the static dep info has been
+put inside the tables.
+
+thanks,
+-- 
+Ming Lei
