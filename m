@@ -1,250 +1,65 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Dec 2011 03:21:14 -0700 (MST)
-Subject: [PATCH] ARM: OMAP2+: Fix: Don't wait for the idle status if
- modulemode is not supported
-In-Reply-To: <1323700787-5934-1-git-send-email-b-cousson@ti.com>
-References: <1323700787-5934-1-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1112160319000.12660@utopia.booyaka.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Dec 2011 11:21:30 +0100
+Subject: [GIT PULL] at91: drivers for 3.3
+In-Reply-To: <CAOesGMjurPDXVR1FLmLXa5NDNjpTzGpshQQ0piqHis5wsYM=Tg@mail.gmail.com>
+References: <4EEA0DF6.3050408@atmel.com>
+ <CAOesGMjurPDXVR1FLmLXa5NDNjpTzGpshQQ0piqHis5wsYM=Tg@mail.gmail.com>
+Message-ID: <4EEB1BAA.9050705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, 12 Dec 2011, Benoit Cousson wrote:
-
-> If the module does not have any modulemode, the _disable_module function
-> will do nothing. There is then no point waiting for a idle status change.
+On 12/16/2011 06:53 AM, Olof Johansson :
+> Hi,
 > 
-> It will remove the following warnings.
+> On Thu, Dec 15, 2011 at 7:10 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> Arnd, Olof,
+>>
+>> This is a first "drivers" part of our material for 3.3 merge window. It collects
+>> Ethernet drivers changes.
+>> One thing to note is that the macb.c driver is modified to support
+>> device tree. We agreed with David to drag those modifications into
+>> arm-soc git tree because they go on top of Jamie's work on macb-gem driver
+>> already in your drivers/macb-gem branch.
+>>
+>> This pull request goes on top of Linus' 3.2-rc5 commit but with additional
+>> dependencies with two of your branches:
+>> 1/ fixes (which seems already included in 3.2-rc5)
+>> 2/ drivers/macb-gem
+>>
+>> I had to resolve a conflict while merging the macb-gem branche with current 3.2-rc5. The
+>> resolution is commited into this branch.
+>> Tell me if you need more precision.
 > 
-> [    0.331848] omap_hwmod: dmm: _wait_target_disable failed
-> [    0.339935] omap_hwmod: emif_fw: _wait_target_disable failed
-> [    0.348358] omap_hwmod: l3_main_1: _wait_target_disable failed
-> [    0.356964] omap_hwmod: l3_main_2: _wait_target_disable failed
-> [    0.365600] omap_hwmod: l4_abe: _wait_target_disable failed
-> [    0.373931] omap_hwmod: l4_cfg: _wait_target_disable failed
-> [    0.382263] omap_hwmod: l4_per: _wait_target_disable failed
-> [    0.391113] omap_hwmod: l4_wkup: _wait_target_disable failed
-> [    0.399536] omap_hwmod: dma_system: _wait_target_disable failed
-> [    0.408325] omap_hwmod: dss_core: _wait_target_disable failed
-> [    0.416839] omap_hwmod: dss_dispc: _wait_target_disable failed
-> [    0.425445] omap_hwmod: dss_dsi1: _wait_target_disable failed
-> [    0.433990] omap_hwmod: dss_dsi2: _wait_target_disable failed
-> [    0.442504] omap_hwmod: dss_hdmi: _wait_target_disable failed
-> [    0.451019] omap_hwmod: dss_rfbi: _wait_target_disable failed
-> [    0.459564] omap_hwmod: dss_venc: _wait_target_disable failed
-> [    0.489471] omap_hwmod: mailbox: _wait_target_disable failed
-> [    0.505920] omap_hwmod: spinlock: _wait_target_disable failed
+> The history of this branch due to the double dependencies gets a bit
+> awkward. Also, it seems like you in one of your merges kept the
+> 'default y' in NET_CADENCE that should have been removed.
+
+Well, no, this line has been added into "eccab1ec" and is in mainline
+since 3.2-rc3.
+
+This line have to be kept and the merge conflict is triggered during the
+merge of macb-gem on top of Linus' tree. BTW, this merge is already
+performed properly in linux-next.
+
+> Would you mind trying this instead?
 > 
-> Note: For such module, the state is managed automatically by HW according
-> to clock domain transition. It is then not possible to wait for idle even
-> later in the _idle function since the status will change at clock domain
-> boundary.
+> * Base this new branch on the previous macb-gem branch
+> * Cherry-pick the fixes from 'fixes' into the new branch if truly
+> needed -- I tested here and all of the patches applied cleanly.
+> * Then apply these patches
+> * For build testing before sending, merge into for-next to aggregate
+> with the rest of the 'fixes' changes -- it's OK that we have to do a
+> fixup here.
 > 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
+> That should give a clean branch with neat history for just these
+> changes. About 'fixes': Since they are in for-next, and will be in
+> 3.2, that dependency will be taken care of that way.
+> 
+> Then send a fresh pull request for that new branch, please.
 
-Thanks.  I've modified this patch somewhat - please let me know if you 
-have any comments.
+Ok, I will base my "drivers" branch on top of macb-gem one and send you
+another pull request.
 
-
-- Paul
-
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Mon, 12 Dec 2011 15:39:47 +0100
-Subject: [PATCH] ARM: OMAP4: hwmod: Don't wait for the idle status if
- modulemode is not supported
-
-If the module does not have any modulemode, the _disable_module function
-will do nothing. There is then no point waiting for a idle status change.
-
-It will remove the following warnings.
-
-[    0.331848] omap_hwmod: dmm: _wait_target_disable failed
-[    0.339935] omap_hwmod: emif_fw: _wait_target_disable failed
-[    0.348358] omap_hwmod: l3_main_1: _wait_target_disable failed
-[    0.356964] omap_hwmod: l3_main_2: _wait_target_disable failed
-[    0.365600] omap_hwmod: l4_abe: _wait_target_disable failed
-[    0.373931] omap_hwmod: l4_cfg: _wait_target_disable failed
-[    0.382263] omap_hwmod: l4_per: _wait_target_disable failed
-[    0.391113] omap_hwmod: l4_wkup: _wait_target_disable failed
-[    0.399536] omap_hwmod: dma_system: _wait_target_disable failed
-[    0.408325] omap_hwmod: dss_core: _wait_target_disable failed
-[    0.416839] omap_hwmod: dss_dispc: _wait_target_disable failed
-[    0.425445] omap_hwmod: dss_dsi1: _wait_target_disable failed
-[    0.433990] omap_hwmod: dss_dsi2: _wait_target_disable failed
-[    0.442504] omap_hwmod: dss_hdmi: _wait_target_disable failed
-[    0.451019] omap_hwmod: dss_rfbi: _wait_target_disable failed
-[    0.459564] omap_hwmod: dss_venc: _wait_target_disable failed
-[    0.489471] omap_hwmod: mailbox: _wait_target_disable failed
-[    0.505920] omap_hwmod: spinlock: _wait_target_disable failed
-
-Note: For such module, the state is managed automatically by HW according
-to clock domain transition. It is then not possible to wait for idle even
-later in the _idle function since the status will change at clock domain
-boundary.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-[paul at pwsan.com: renamed fns to indicate that they are OMAP4-only; moved
- _wait_target_disable() into _disable_module(), removing duplicate code]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   98 +++++++++++++++++++-------------------
- 1 files changed, 49 insertions(+), 49 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 207a2ff..ebace0f 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -706,27 +706,65 @@ static void _enable_module(struct omap_hwmod *oh)
- }
- 
- /**
-- * _disable_module - enable CLKCTRL modulemode on OMAP4
-+ * _omap4_wait_target_disable - wait for a module to be disabled on OMAP4
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Wait for a module @oh to enter slave idle.  Returns 0 if the module
-+ * does not have an IDLEST bit or if the module successfully enters
-+ * slave idle; otherwise, pass along the return value of the
-+ * appropriate *_cm*_wait_module_idle() function.
-+ */
-+static int _omap4_wait_target_disable(struct omap_hwmod *oh)
-+{
-+	if (!cpu_is_omap44xx())
-+		return 0;
-+
-+	if (!oh)
-+		return -EINVAL;
-+
-+	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
-+		return 0;
-+
-+	if (oh->flags & HWMOD_NO_IDLEST)
-+		return 0;
-+
-+	return omap4_cminst_wait_module_idle(oh->clkdm->prcm_partition,
-+					     oh->clkdm->cm_inst,
-+					     oh->clkdm->clkdm_offs,
-+					     oh->prcm.omap4.clkctrl_offs);
-+}
-+
-+/**
-+ * _omap4_disable_module - enable CLKCTRL modulemode on OMAP4
-  * @oh: struct omap_hwmod *
-  *
-  * Disable the PRCM module mode related to the hwmod @oh.
-- * No return value.
-+ * Return EINVAL if the modulemode is not supported and 0 in case of success.
-  */
--static void _disable_module(struct omap_hwmod *oh)
-+static int _omap4_disable_module(struct omap_hwmod *oh)
- {
-+	int v;
-+
- 	/* The module mode does not exist prior OMAP4 */
--	if (cpu_is_omap24xx() || cpu_is_omap34xx())
--		return;
-+	if (!cpu_is_omap44xx())
-+		return -EINVAL;
- 
- 	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
--		return;
-+		return -EINVAL;
- 
--	pr_debug("omap_hwmod: %s: _disable_module\n", oh->name);
-+	pr_debug("omap_hwmod: %s: %s\n", oh->name, __func__);
- 
- 	omap4_cminst_module_disable(oh->clkdm->prcm_partition,
- 				    oh->clkdm->cm_inst,
- 				    oh->clkdm->clkdm_offs,
- 				    oh->prcm.omap4.clkctrl_offs);
-+
-+	v = _omap4_wait_target_disable(oh);
-+	if (v)
-+		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
-+			oh->name);
-+
-+	return 0;
- }
- 
- /**
-@@ -1153,36 +1191,6 @@ static int _wait_target_ready(struct omap_hwmod *oh)
- }
- 
- /**
-- * _wait_target_disable - wait for a module to be disabled
-- * @oh: struct omap_hwmod *
-- *
-- * Wait for a module @oh to enter slave idle.  Returns 0 if the module
-- * does not have an IDLEST bit or if the module successfully enters
-- * slave idle; otherwise, pass along the return value of the
-- * appropriate *_cm*_wait_module_idle() function.
-- */
--static int _wait_target_disable(struct omap_hwmod *oh)
--{
--	/* TODO: For now just handle OMAP4+ */
--	if (cpu_is_omap24xx() || cpu_is_omap34xx())
--		return 0;
--
--	if (!oh)
--		return -EINVAL;
--
--	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
--		return 0;
--
--	if (oh->flags & HWMOD_NO_IDLEST)
--		return 0;
--
--	return omap4_cminst_wait_module_idle(oh->clkdm->prcm_partition,
--					     oh->clkdm->cm_inst,
--					     oh->clkdm->clkdm_offs,
--					     oh->prcm.omap4.clkctrl_offs);
--}
--
--/**
-  * _lookup_hardreset - fill register bit info for this hwmod/reset line
-  * @oh: struct omap_hwmod *
-  * @name: name of the reset line in the context of this hwmod
-@@ -1524,8 +1532,6 @@ static int _enable(struct omap_hwmod *oh)
-  */
- static int _idle(struct omap_hwmod *oh)
- {
--	int ret;
--
- 	pr_debug("omap_hwmod: %s: idling\n", oh->name);
- 
- 	if (oh->_state != _HWMOD_STATE_ENABLED) {
-@@ -1537,11 +1543,9 @@ static int _idle(struct omap_hwmod *oh)
- 	if (oh->class->sysc)
- 		_idle_sysc(oh);
- 	_del_initiator_dep(oh, mpu_oh);
--	_disable_module(oh);
--	ret = _wait_target_disable(oh);
--	if (ret)
--		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
--			oh->name);
-+
-+	_omap4_disable_module(oh);
-+
- 	/*
- 	 * The module must be in idle mode before disabling any parents
- 	 * clocks. Otherwise, the parent clock might be disabled before
-@@ -1642,11 +1646,7 @@ static int _shutdown(struct omap_hwmod *oh)
- 	if (oh->_state == _HWMOD_STATE_ENABLED) {
- 		_del_initiator_dep(oh, mpu_oh);
- 		/* XXX what about the other system initiators here? dma, dsp */
--		_disable_module(oh);
--		ret = _wait_target_disable(oh);
--		if (ret)
--			pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
--				oh->name);
-+		_omap4_disable_module(oh);
- 		_disable_clocks(oh);
- 		if (oh->clkdm)
- 			clkdm_hwmod_disable(oh->clkdm, oh);
+Thanks, bye,
 -- 
-1.7.7.3
+Nicolas Ferre
