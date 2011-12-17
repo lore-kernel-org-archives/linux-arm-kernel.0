@@ -1,24 +1,17 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Dec 2011 17:39:39 -0800
-Subject: [PATCH v4 4/4] OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <1323922709-6986-5-git-send-email-omar.ramirez@ti.com>
-References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
- <1323922709-6986-5-git-send-email-omar.ramirez@ti.com>
-Message-ID: <20111217013939.GG6464@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 16 Dec 2011 22:24:55 -0500 (EST)
+Subject: buggy usage of pm_idle by omap1 code
+Message-ID: <alpine.LFD.2.02.1112162208390.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Omar Ramirez Luna <omar.ramirez@ti.com> [111214 19:47]:
-> Use runtime PM functionality interfaced with hwmod enable/idle
-> functions, to replace direct clock operations, reset and sysconfig
-> handling.
-> 
-> Removed clk handling during interrupt, given that in order to receive one,
-> the device should be powered on in advance. Now doing pm_runtime_get/put
-> on iommu_enable/disable so it doesn't rely on others to keep the clocks on.
-> 
-> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
 
-The omap parts look OK to me for Ohad to queue:
+I just noticed in mach-omap1/cpu.c:omap_pm_prepare() that the function 
+pointer pm_idle is explicitly set to NULL for some vague reason.  
+However this pointer is unconditionally dereferenced in 
+kernel/process.c:cpu_idle().  This is just a oops waiting to happen.  
+And if it doesn't happen in practice, then the code in omap_pm_prepare() 
+must be useless in addition to being wrong.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+
+Nicolas
