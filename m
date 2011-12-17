@@ -1,47 +1,51 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Sat, 17 Dec 2011 16:39:54 +0800
-Subject: [PATCH V2 1/4] cpufreq: add arm soc generic cpufreq driver
-In-Reply-To: <4EEBA306.3060309@codeaurora.org>
-References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
- <1324031462-24961-2-git-send-email-richard.zhao@linaro.org>
- <20111216105229.GB3230@totoro> <4EEBA306.3060309@codeaurora.org>
-Message-ID: <20111217083952.GE2010@richard-laptop>
+From: trenn@suse.de (Thomas Renninger)
+Date: Sat, 17 Dec 2011 10:21:57 +0100
+Subject: [PATCH 1/4] cpupower: Add cpupower-idle-info manpage
+In-Reply-To: <CAORVsuVrm+dWGgs-taatnUMZsYvYg_tdx1=7ekWp0qM+25DorQ@mail.gmail.com>
+References: <1324046154-64824-1-git-send-email-trenn@suse.de>
+ <1324046154-64824-2-git-send-email-trenn@suse.de>
+ <CAORVsuVrm+dWGgs-taatnUMZsYvYg_tdx1=7ekWp0qM+25DorQ@mail.gmail.com>
+Message-ID: <201112171021.58492.trenn@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2011 at 11:59:02AM -0800, Bryan Huntsman wrote:
-> On 12/16/2011 02:52 AM, Jamie Iles wrote:
-> >
-> >> +static DEFINE_PER_CPU(unsigned long, l_p_j_ref);
-> >> +static unsigned long l_p_j_ref_freq;
-> >> +
-> >> +static struct clk *cpu_clk;
-> > 
-> > This assumes that all CPU's share the same clk and run at the same rate.  
-> > Is that a fair/safe assumption?  I honestly don't know the answer to 
-> > this so it's just a question!!!
+On Friday 16 December 2011 17:18:37 Jean Pihet wrote:
+> Hi Thomas,
 > 
-> On MSM, cpus independently scale both frequency and voltage.  Our clock
-> driver isn't upstream yet.  David Brown has a preliminary version here:
-If
- - cpu_clk are per_cpu, and get from cpu0 clk, cpu1 clk, etc.
-   The same to regulators.
- - set CPUFREQ_SHARED_TYPE_NONE
- - don't set affect cpus.
+> On Fri, Dec 16, 2011 at 3:35 PM, Thomas Renninger <trenn@suse.de> wrote:
+> > The last missing manpage for cpupower tools.
+> Great!
+> 
+> > More info about other architecture's sleep state specialities would be great.
+> I wonder if it is the right place for some arch specific information
+> about the sleep states.
+> 
+> I propose to document this in a more generic doc file (e.g.
+> Documentation/arm/OMAP/omap_pm) and link it from the manpage.
+Duplicating info at different places increases needed maintenance.
+Mabye above should be more about the kernel implementation details
+and the manpage should more include the bits a typical user
+wants to know?
 
-Does that help you?
+> What do you think?
+The POLL state is a bit confusing on X86 cpupower idle-info output.
+Also on X86 the CPU may decide to use other states than the kernel
+requested and the cpupower monitor tool should get used to see them.
+This directly affects the output/usage of the tool and to understand it,
+it should be documented in the manpage.
 
-Thanks
-Richard
-> 
-> https://www.codeaurora.org/gitweb/quic/kernel/?p=davidb/linux-msm.git;a=shortlog;h=refs/heads/msm-clock-rfc
-> 
-> Once we get our driver upstream, MSM will be an exception and not select
-> ARM_GENERIC_CPUFREQ.  We'll probably have a separate msm-cpufreq.c
-> driver under drivers/cpufreq/.
-> 
-> - Bryan
-> 
-> -- 
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+IMO it's not bad to have a somewhat bigger manpage here.
+Especially on ARM, also the "ordinary" user wants to know
+about how/whether the cpu power functionalities work as expected
+without the need of looking at the kernel sources.
+
+For now I could only try out cpupower on an ARM platform
+with cpufreq support.
+Would be great if someone could give cpupower idle-info
+a try on such a machine.
+Think of a typical user, not a kernel hacker and what he needs to
+know to interpret and understand the output.
+Maybe it's self-explanatory already, maybe the one or other arch
+specific bit should get explained?
+
+   Thomas
