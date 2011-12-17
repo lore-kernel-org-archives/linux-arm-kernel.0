@@ -1,70 +1,29 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Sat, 17 Dec 2011 16:00:03 +0800
+Date: Sat, 17 Dec 2011 16:29:23 +0800
 Subject: [PATCH V2 1/4] cpufreq: add arm soc generic cpufreq driver
-In-Reply-To: <4EEB5683.7000409@gmail.com>
+In-Reply-To: <20111216105229.GB3230@totoro>
 References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
  <1324031462-24961-2-git-send-email-richard.zhao@linaro.org>
- <4EEB5683.7000409@gmail.com>
-Message-ID: <20111217080001.GC2010@richard-laptop>
+ <20111216105229.GB3230@totoro>
+Message-ID: <20111217082920.GD2010@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2011 at 08:32:35AM -0600, Rob Herring wrote:
-> On 12/16/2011 04:30 AM, Richard Zhao wrote:
+On Fri, Dec 16, 2011 at 10:52:29AM +0000, Jamie Iles wrote:
+> Hi Richard,
+> 
+> A couple of questions inline, but otherwise looks nice!
+Thanks for your review.
+> 
+> Jamie
+> 
+> On Fri, Dec 16, 2011 at 06:30:59PM +0800, Richard Zhao wrote:
 > > It support single core and multi-core ARM SoCs. But it assume
 > > all cores share the same frequency and voltage.
 > > 
 > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 > > ---
-> >  drivers/cpufreq/Kconfig.arm   |    8 ++
-> >  drivers/cpufreq/Makefile      |    1 +
-> >  drivers/cpufreq/arm-cpufreq.c |  269 +++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 278 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/cpufreq/arm-cpufreq.c
-> > 
-> 
-> What makes this specific to ARM and not a generic DT + clk api +
-> regulator api driver?
-smp loops_per_jiffy update needs arm header <asm/cpu.h>.
-> 
-> Also, you need documentation of the DT bindings.
-Yes, Thanks.
-
-Richard
-> 
-> Rob
-> 
-> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> > index 72a0044..a0f7d35 100644
-> > --- a/drivers/cpufreq/Kconfig.arm
-> > +++ b/drivers/cpufreq/Kconfig.arm
-> > @@ -2,6 +2,14 @@
-> >  # ARM CPU Frequency scaling drivers
-> >  #
-> >  
-> > +config ARM_GENERIC_CPUFREQ
-> > +	bool "ARM generic"
-> > +	help
-> > +	  This adds ARM generic CPUFreq driver. It assumes all
-> > +	  cores of the SoC share the same clock and voltage.
-> > +
-> > +	  If in doubt, say N.
-> > +
-> >  config ARM_S3C64XX_CPUFREQ
-> >  	bool "Samsung S3C64XX"
-> >  	depends on CPU_S3C6410
-> > diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> > index ce75fcb..6ccf02d 100644
-> > --- a/drivers/cpufreq/Makefile
-> > +++ b/drivers/cpufreq/Makefile
-> > @@ -39,6 +39,7 @@ obj-$(CONFIG_X86_CPUFREQ_NFORCE2)	+= cpufreq-nforce2.o
-> >  
-> >  ##################################################################################
-> >  # ARM SoC drivers
-> > +obj-$(CONFIG_ARM_GENERIC_CPUFREQ)	+= arm-cpufreq.o
-> >  obj-$(CONFIG_UX500_SOC_DB8500)		+= db8500-cpufreq.o
-> >  obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
-> >  obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
+> [...]
 > > diff --git a/drivers/cpufreq/arm-cpufreq.c b/drivers/cpufreq/arm-cpufreq.c
 > > new file mode 100644
 > > index 0000000..e4d20da
@@ -102,6 +61,17 @@ Richard
 > > +static unsigned long l_p_j_ref_freq;
 > > +
 > > +static struct clk *cpu_clk;
+> 
+> This assumes that all CPU's share the same clk and run at the same rate.  
+> Is that a fair/safe assumption?  I honestly don't know the answer to 
+> this so it's just a question!!!
+As I know, most share the same clk/volt. From the code:
+IMX6: yes
+Tegra: Yes, but strange it sets CPUFREQ_SHARED_TYPE_ALL.
+
+MSM is an exception. I can support the case, but I have to make sure it's
+handy to use.
+> 
 > > +static struct regulator *cpu_reg;
 > > +static struct cpufreq_frequency_table *arm_freq_table;
 > > +
@@ -116,6 +86,10 @@ Richard
 > > +	ret = clk_set_rate(cpu_clk, freq);
 > > +	if (ret != 0) {
 > > +		printk(KERN_DEBUG "cannot set CPU clock rate\n");
+> 
+> Perhaps use pr_debug() and friends throughout this driver?
+ok. Thanks.
+> 
 > > +		return ret;
 > > +	}
 > > +
@@ -151,7 +125,11 @@ Richard
 > > +	freq_Hz = freq_Hz ? freq_Hz : cpu_freqs[index];
 > > +	freqs.old = clk_get_rate(cpu_clk) / 1000;
 > > +	freqs.new = clk_round_rate(cpu_clk, cpu_freqs[index]);
+I forgot to delete this line.
 > > +	freqs.new = freq_Hz / 1000;
+> 
+> Why round the rate then overwrite it?  Should this be freqs.new /= 1000?
+> 
 > > +	freqs.flags = 0;
 > > +
 > > +	if (freqs.old == freqs.new)
@@ -221,6 +199,12 @@ Richard
 > > +	.init = arm_cpufreq_init,
 > > +	.exit = arm_cpufreq_exit,
 > > +	.name = "arm",
+> 
+> Is this really just for ARM or can it be a generic-clk driver?  I can't 
+> see any ARM specifics here.
+If we make recalculating smp loops_per_jiffy portable, this driver will
+be portable too.
+> 
 > > +};
 > > +
 > > +static int __devinit arm_cpufreq_driver_init(void)
@@ -286,6 +270,15 @@ Richard
 > > +		ret = PTR_ERR(cpu_clk);
 > > +		goto free_freq_table;
 > > +	}
+> 
+> Should there be a clk_prepare() + clk_enable() pair here?  I can't see 
+> it would really be needed but maybe for completeness?  Again, just a 
+> question!
+The cpu clock should already be prepared/enabled. The same to the regulator.
+IMHO, cpufreq is not used to handle cpu clk/power gating. The gating should be
+handled by cpu hotplug, idle and suspend/resume.
+Please correct me if I'm wrong.
+> 
 > > +
 > > +	if (cpu_volts) {
 > > +		cpu_reg = regulator_get(NULL, "cpu");
@@ -336,8 +329,26 @@ Richard
 > > +
 > > +module_init(arm_cpufreq_driver_init);
 > > +module_exit(arm_cpufreq_driver_exit);
+> 
+> Are there any ARM platforms that wouldn't be able to use this driver?  
+> If there are then should platforms "opt-in" by calling a register 
+> function rather than having it auto registering as when we have multiple 
+> platforms in a single zImage the probe errors might not be too nice.
+Good point. But would it be better to check cpu node compatible property?
+
+Thanks
+Richard
+> 
 > > +
 > > +MODULE_AUTHOR("Freescale Semiconductor Inc. Richard Zhao <richard.zhao@freescale.com>");
 > > +MODULE_DESCRIPTION("ARM SoC generic CPUFreq driver");
 > > +MODULE_LICENSE("GPL");
-> 
+> > -- 
+> > 1.7.5.4
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
