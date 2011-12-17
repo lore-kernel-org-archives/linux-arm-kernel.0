@@ -1,92 +1,144 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 16 Dec 2011 16:57:52 -0800
-Subject: [PATCH v4 5/6] clk: basic gateable and fixed-rate clks
-In-Reply-To: <4EE830D5.5070305@gmail.com>
-References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
- <1323834838-2206-6-git-send-email-mturquette@linaro.org>
- <4EE830D5.5070305@gmail.com>
-Message-ID: <CAJOA=zMcRzZ8LAzFzf_=1L2ZCrFHHjx_PTsxkb6US4HpWp8BOA@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Sat, 17 Dec 2011 02:03:15 +0100
+Subject: [PATCH v2 2/2] [RFC] ARM: IOMMU: Tegra30: iommu_ops for SMMU
+ driver
+In-Reply-To: <20111216153904.GC29877@amd.com>
+References: <1323954690-7000-1-git-send-email-hdoyu@nvidia.com><1323954690-7000-3-git-send-email-hdoyu@nvidia.com><20111216153904.GC29877@amd.com>
+Message-ID: <20111217.030315.2218721757650628823.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 9:15 PM, Ryan Mallon <rmallon@gmail.com> wrote:
-> On 14/12/11 14:53, Mike Turquette wrote:
->
->> Many platforms support simple gateable clks and fixed-rate clks that
->> should not be re-implemented by every platform.
->>
->> This patch introduces a gateable clk with a common programming model of
->> gate control via a write of 1 bit to a register. ?Both set-to-enable and
->> clear-to-enable are supported.
->>
->> Also introduced is a fixed-rate clk which has no reprogrammable aspects.
->>
->> The purpose of both types of clks is documented in drivers/clk/basic.c.
->>
->> TODO: add support for a simple divider, simple mux and a dummy clk for
->> stubbing out platform support.
->>
->> Based on original patch by Jeremy Kerr and contribution by Jamie Iles.
->>
->> Signed-off-by: Mike Turquette <mturquette@linaro.org>
->> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
->> Cc: Jamie Iles <jamie@jamieiles.com>
->
-> <snip>
->
->> +int clk_register_gate(struct device *dev, const char *name, unsigned long flags,
->> + ? ? ? ? ? ? struct clk *fixed_parent, void __iomem *reg, u8 bit_idx,
->> + ? ? ? ? ? ? int set_to_enable)
->> +{
->> + ? ? struct clk_hw_gate *gclk;
->> + ? ? struct clk *clk;
->> +
->> + ? ? gclk = kmalloc(sizeof(struct clk_hw_gate), GFP_KERNEL);
->> +
->> + ? ? if (!gclk) {
->> + ? ? ? ? ? ? pr_err("%s: could not allocate gated clk\n", __func__);
->> + ? ? ? ? ? ? return -ENOMEM;
->> + ? ? }
->> +
->> + ? ? clk = &gclk->clk;
->> +
->> + ? ? /* struct clk_hw_gate assignments */
->> + ? ? gclk->fixed_parent = fixed_parent;
->> + ? ? gclk->reg = reg;
->> + ? ? gclk->bit_idx = bit_idx;
->> +
->> + ? ? /* struct clk assignments */
->> + ? ? clk->name = name;
->> + ? ? clk->flags = flags;
->> +
->> + ? ? if (set_to_enable)
->> + ? ? ? ? ? ? clk->ops = &clk_hw_gate_set_enable_ops;
->> + ? ? else
->> + ? ? ? ? ? ? clk->ops = &clk_hw_gate_set_disable_ops;
->
->
-> You could avoid having two sets of operations if you stored the
-> set_to_enable value in struct clk_hw_gate. It might be useful to store
-> additional information in struct clk_hw_gate if you also want to extend
-> to supporting non-32bit registers (readb, etc), clocks with write only
-> registers, or support clocks which require more than one bit to be set
-> or cleared to enable them, etc. See the basic mmio gpio driver for a
-> similar case.
+Hi Joerg, Thank you for your quick review.
 
-I haven't given the basic clks enough attention, mostly because I
-haven't started using them yet in my own platform's conversion to
-common struct clk :-/
+From: Joerg Roedel <joerg.roedel@amd.com>
+Subject: Re: [PATCH v2 2/2] [RFC] ARM: IOMMU: Tegra30: iommu_ops for SMMU driver
+Date: Fri, 16 Dec 2011 16:39:04 +0100
+Message-ID: <20111216153904.GC29877@amd.com>
 
-I think the original reason for the extra operations is to avoid the
-conditional in the enable/disable path, but if we're going to end up
-adding other conditionals anyways (such as the register locking in the
-iMX platform implementation) then we should probably forget about that
-approach and just deal with the complexity in one set of common
-enable/disable functions.
+> On Thu, Dec 15, 2011 at 03:11:30PM +0200, Hiroshi DOYU wrote:
+> > +static int smmu_iommu_attach_dev(struct iommu_domain *domain,
+> > +				 struct device *dev)
+> > +{
+> > +	struct smmu_as *as = domain->priv;
+> > +	struct smmu_client *client, *c;
+> > +	u32 map;
+> > +	int err;
+> > +
+> > +	client = kmalloc(sizeof(*c), GFP_KERNEL);
+> > +	if (!client)
+> > +		return -ENOMEM;
+> > +	client->dev = dev;
+> > +	client->as = as;
+> > +	map = (unsigned long)dev->platform_data;
+> > +	if (!map)
+> > +		return -EINVAL;
+> > +
+> > +	err = smmu_client_enable_hwgrp(client, map);
+> > +	if (err)
+> > +		goto err_hwgrp;
+> > +
+> > +	spin_lock(&as->client_lock);
+> > +	list_for_each_entry(c, &as->client, list) {
+> > +		if (c->dev == dev) {
+> > +			pr_err("%s is already attached\n", dev_name(dev));
+> > +			err = -EINVAL;
+> > +			goto err_client;
+> > +		}
+> > +	}
+> > +	list_add(&client->list, &as->client);
+> > +	spin_unlock(&as->client_lock);
+> > +
+> > +	/*
+> > +	 * Reserve "page zero" for AVP vectors using a common dummy
+> > +	 * page.
+> > +	 */
+> > +	if (map & HWG_AVPC) {
+> > +		struct page *page;
+> > +
+> > +		page = as->smmu->avp_vector_page;
+> > +		__smmu_iommu_map_pfn(as, 0, page_to_pfn(page));
+> > +
+> > +		pr_info("Reserve \"page zero\" for AVP vectors using a common dummy\n");
+> > +	}
+> > +
+> > +	pr_debug("Attached %s\n", dev_name(dev));
+> > +	return 0;
+> > +err_client:
+> > +	smmu_client_disable_hwgrp(client);
+> > +	spin_unlock(&as->client_lock);
+> > +err_hwgrp:
+> > +	kfree(client);
+> > +	return err;
+> > +}
+> 
+> Hmm, I have a question about that. Reading the code it looks like your
+> SMMU exists per pheripheral device
 
-Thanks for the review,
-Mike
+A single SMMU is shared with multiple peripheral devices, a single
+SMMU has multiple ASIDs. ASID is used per group of peripheral
+devices. These peripheral groups can be configured by the above
+"hwgrp"/"map" passed via platform_data. The above "struct device"
+represents a groupd of peripheral devices, a kind of virtual device.
 
->
-> ~Ryan
->
+The above "struct device" ~= a group of peripheral devices.
+
+> and the SMMU hardware supports multiple address spaces per device,
+> right?
+
+Yes, where "device" is a gropud of peripheral devices.
+
+> The domains are implemented for one address-space.
+
+Yes.
+
+> So is it right that a device can have multiple
+> address-spaces?
+
+No, at least, the following code prevents if a peripheral is already
+assigned ASID.
+
+smmu_client_enable_hwgrp():
+....
++	for_each_set_bit(i, &map, BITS_PER_LONG) {
++		offs = HWGRP_ASID_REG(i);
++		val = smmu_read(smmu, offs);
++		if (on) {
++			if (WARN_ON(val & mask))
++				goto err_hw_busy;
+
+
+> If so, what kind of devices do you bind to the domains
+> then. I doesn't make sense to bind whole peripheral devices in this
+> case.
+
+Here, the above "struct device" ~= a group of any peripheral
+devices. Those groups are configurable.
+
+
+In my simple DMA API test(not posted), the above hwgrp/map is configured as below:
+
+   146  static int __init dmaapi_test_init(void)
+   147  {
+   148          int i;
+   149          struct dma_iommu_mapping *map;
+   150  
+   151          map = arm_iommu_create_mapping(IOVA_START, IOVA_SIZE, 0);
+   152          BUG_ON(!map);
+   153          pr_debug("Allocate IOVA: %08x-%08x\n", map->base, map->base + IOVA_SIZE);
+   154  
+   155          for (i = 0; i < ARRAY_SIZE(dmaapi_dummy_device); i++) {
+   156                  int err;
+   157                  struct platform_device *pdev = &dmaapi_dummy_device[i];
+   158  
+   159                  pdev->dev.platform_data = (void *)dummy_hwgrp_map[i];
+   160                  err = platform_device_register(pdev);
+   161                  BUG_ON(err);
+   162  
+   163                  err = arm_iommu_attach_device(&pdev->dev, map);
+   164                  BUG_ON(err);
+   165                  pr_debug("IOMMU API: Attached to %s\n", dev_name(&pdev->dev));
+   166          }
+
+So peripheral devices can be divided into multiple groups, and each
+each group represents struct device with hwgrp/map info in
+platform_data.
