@@ -1,89 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Dec 2011 16:30:05 -0800
-Subject: [PATCH] ARM: Fix cross compilation broken by failing size command
-In-Reply-To: <1324032146-723-1-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <20111214215815.GP32251@atomide.com>
- <1324032146-723-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <20111217003005.GC6464@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 16 Dec 2011 17:37:04 -0700 (MST)
+Subject: [PATCH 2/2] OMAP4: mcbsp: Clock reparenting support
+In-Reply-To: <1323941859-7946-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1323941859-7946-1-git-send-email-peter.ujfalusi@ti.com>
+ <1323941859-7946-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <alpine.DEB.2.00.1112161730080.12660@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111216 02:12]:
-> Since commit 5ffb04f6690d71fab241b3562ebf52b893ac4ff1, "ARM: zImage:
-> make sure appended DTB doesn't get overwritten by kernel .bss", the
-> native 'size' command, which is now always used for calculation of the
-> kernel bss size, may break in selected cross compilation environments
-> with error messages like:
-> 
-> size: arch/arm/boot/compressed/../../../../vmlinux: File format is ambiguous
-> size: Matching formats: elf32-littlearm elf32-littlearm-symbian elf32-littlearm-vxworks
-> 
-> As a consequence, the KBSS_SZ variable extracted from the size output is
-> empty, and the the final linker command, provided with incorrectly
-> formatted arguments, also fails:
-> 
->   LD      arch/arm/boot/compressed/vmlinux
->   arm-angstrom-linux-uclibcgnueabi-ld:--defsym _kernel_bss_size=: syntax error
-> 
-> Don't append the '_kernel_bss_size=$(KBSS_SZ)' argument to the linker
-> command line if that variable is empty because of the failing size
-> command. Moreover, use $(CROSS_COMPILE)size if available instead of
-> native size.
-> 
-> Created and tested against linux-3.2-rc5.
-> 
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Hi P?ter
 
-This seems like a good solution to me:
+On Thu, 15 Dec 2011, Peter Ujfalusi wrote:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
-
+> With OMAP4 the clock names are different compared to OMAP2/3. The 
+> internal fclk name depends on the McBSP instance number. In case of 
+> MCBSP_TYPE4 (OMAP4) we should use different clock selection method 
+> compared to OMAP2/3.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
-> This patch supersedes my previously submitted "ARM: fix $(CROSS_COMPILE) 
-> prefix missing from size invocation". Thanks to Tony Lindgren for his
-> comments on $(CROSS_COMPILE)size limited availability.
+>  arch/arm/mach-omap2/mcbsp.c |   29 ++++++++++++++++++++++++++---
+>  1 files changed, 26 insertions(+), 3 deletions(-)
 > 
-> Unfortunately, I've already pushed that old version to the patch system
-> at http://www.arm.linux.org.uk/developer/patches/, which I know is not
-> a review system. Apparently, I was not patient enough, not waiting more
-> than a week with that regression fix for a single reply to my initial
-> submission to Russell King, the ARM PORT maintainer, Cc: Nicolas Pitre,
-> the regression introducing commit author, and the linux-arm-kernel list.
-> Sorry for that, please drop the old version from the Incoming queue, and
-> I'll not be pushing anything to that patch system without prior positive
-> review response any more.
-
-Heh :) The patch system is pretty arcane.. You can move the
-patch there to superseded yourself btw.
-
-Tony
-
- 
-> Thanks,
-> Janusz
-> 
->  arch/arm/boot/compressed/Makefile |    5 ++++-
->  1 files changed, 4 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 21f56ff..17972e9 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -126,8 +126,11 @@ ccflags-y := -fpic -fno-builtin -I$(obj)
->  asflags-y := -Wa,-march=all
+> diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+> index 9129003..829f4c7 100644
+> --- a/arch/arm/mach-omap2/mcbsp.c
+> +++ b/arch/arm/mach-omap2/mcbsp.c
+> @@ -111,6 +111,23 @@ static int omap2_mcbsp_set_clk_src(struct device *dev, struct clk *clk,
+>  	return omap2_mcbsp_reparent_clk(dev, clk, fck_src_name);
+>  }
 >  
->  # Supply kernel BSS size to the decompressor via a linker symbol.
-> -KBSS_SZ = $(shell size $(obj)/../../../../vmlinux | awk 'END{print $$3}')
-> +KBSS_SZ = $(shell if $(CROSS_COMPILE)size $(obj)/../../../../vmlinux; then :; \
-> +		else size $(obj)/../../../../vmlinux; fi | awk 'END{print $$3}')
-> +ifneq ($(KBSS_SZ),)
->  LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)
-> +endif
->  # Supply ZRELADDR to the decompressor via a linker symbol.
->  ifneq ($(CONFIG_AUTO_ZRELADDR),y)
->  LDFLAGS_vmlinux += --defsym zreladdr=$(ZRELADDR)
-> -- 
-> 1.7.3.4
-> 
+> +/* McBSP CLKS source switching for OMAP4 */
+> +static int omap4_mcbsp_set_clk_src(struct device *dev, struct clk *clk,
+> +				   const char *src)
+> +{
+> +	struct omap_mcbsp *mcbsp = dev_get_drvdata(dev);
+> +	char fck_src_name[30];
+> +
+> +	if (!strcmp(src, "clks_ext"))
+> +		strcpy(fck_src_name, "pad_clks_ck");
+> +	else if (!strcmp(src, "clks_fclk"))
+> +		sprintf(fck_src_name, "mcbsp%d_sync_mux_ck", mcbsp->id);
+> +	else
+> +		return -EINVAL;
+> +
+> +	return omap2_mcbsp_reparent_clk(dev, clk, fck_src_name);
+> +}
+
+What do you think about using clkdev alias lines and hwmod optional clks 
+for this instead?  With these mechanisms, you can give clocks a consistent 
+"role name" for a given device, even if the underlying clock changes on 
+different platforms.
+
+So in the mach-omap2/clock*_data.c files, you'd do something like
+
+	CLK("omap-mcbsp.1",	"pad_fck",	&mcbsp_clks,  CK_3XXX),
+
+for OMAP3, and 
+
+	CLK("omap-mcbsp.1",	"pad_fck",	&pad_clks_clk,  CK_44XX),
+
+for OMAP4.
+
+Then in the hwmod data files, you'd add them as optional clocks - 
+something like:
+
+static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
+	{ .role = "pad_fck", .clk = "mcbsp_clks" },
+};
+
+for OMAP3, and
+
+static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
+	{ .role = "pad_fck", .clk = "pad_clks_clk" },
+};
+
+for OMAP4.
+
+I think this might work for your needs?
+
+
+- Paul
