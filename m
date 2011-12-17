@@ -1,56 +1,47 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 16 Dec 2011 15:34:14 -0800
-Subject: [RFC V2 6/8] ARM i.MX: prepare common clk support
-In-Reply-To: <1323854638-3455-7-git-send-email-richard.zhao@linaro.org>
-References: <1323854638-3455-1-git-send-email-richard.zhao@linaro.org>
- <1323854638-3455-7-git-send-email-richard.zhao@linaro.org>
-Message-ID: <CAPtuhTim42ZjqPA5i+O0eHqEmfmO2Z5nJnBAA+TWS753gH8m5w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Dec 2011 16:20:42 -0800
+Subject: [PATCH 1/3] ARM: OMAP2+: kconfig: Enable devicetree by default
+ for OMAP2+ systems
+In-Reply-To: <4EEB62F4.2010202@ti.com>
+References: <y> <1323190149-6492-2-git-send-email-b-cousson@ti.com>
+ <1323782836.1877.79.camel@deskari> <4EE75448.4010701@ti.com>
+ <20111213223855.GW32251@atomide.com> <4EEB62F4.2010202@ti.com>
+Message-ID: <20111217002042.GA6464@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 1:23 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
->
-> Add static clock help macros, clock register spinlock.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
-> ?arch/arm/plat-mxc/clock.c ? ? ? ? ? ? ?| ? ?8 ++++++
-> ?arch/arm/plat-mxc/include/mach/clock.h | ? 42 +++++++++++++++++++++++++++++--
-> ?2 files changed, 47 insertions(+), 3 deletions(-)
->
-...
->
-> +extern spinlock_t imx_ccm_lock;
-> +
-> +#define DEFINE_CLK_GATE2B(_name, _parent, _reg, _shift) \
-> + ? ? ? struct clk_gate2b _name = { \
-> + ? ? ? ? ? ? ? .clk = { \
-> + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
-> + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_gate2b_ops, \
-> + ? ? ? ? ? ? ? ? ? ? ? .parent = _parent, \
-> + ? ? ? ? ? ? ? }, \
-> + ? ? ? ? ? ? ? .reg = (_reg), \
-> + ? ? ? ? ? ? ? .shift = (_shift) * 2, \
-> + ? ? ? ? ? ? ? .val_en = 0x3, \
-> + ? ? ? ? ? ? ? .val_dis = 0x0, \
-> + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
-> + ? ? ? }
-> +
-> +#define IMX_DEFINE_CLK_DIVIDER(_name, _parent, _flags, _reg, _shift, _width) \
-> + ? ? ? DEFINE_CLK_DIVIDER(_name, _parent, _flags, _reg, _shift, _width, \
-> + ? ? ? ? ? ? ? ? ? ? ? &imx_ccm_lock)
-> +
-> +#define IMX_DEFINE_CLK_MUX(_name, _reg, _shift, _width, _clks) \
-> + ? ? ? DEFINE_CLK_MUX(_name, _reg, _shift, _width, _clks, &imx_ccm_lock)
+* Cousson, Benoit <b-cousson@ti.com> [111216 06:53]:
+> Hi Tony,
+> 
+> On 12/13/2011 11:38 PM, Tony Lindgren wrote:
+> > * Cousson, Benoit<b-cousson@ti.com>  [111213 05:02]:
+> >> On 12/13/2011 2:27 PM, Tomi Valkeinen wrote:
+> >>> Hi,
+> >>>
+> >>> On Tue, 2011-12-06 at 17:49 +0100, Benoit Cousson wrote:
+> >>>> devicetree will become the mandatory boot method for OMAP2+.
+> >>>> In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
+> >>>> select USE_OF by default for every OMAP2+ systems.
+> >>>> Select as well the APPENDED_DTB and ATAG_DTB_COMPAT to allow legacy
+> >>>> boot loader to keep working properly.
+> >>>
+> >>> APPENDED_DTB sounds a bit dangerous to be enabled by default according
+> >>> to the config help text.
+> >>
+> >> The help is indeed really scary :-)
+> > 
+> > Heh, but it's also true.
+> > 
+> >> Tony,
+> >> Do we want to keep it by default? Or should we fix the kconfig help?
+> > 
+> > Let's just leave out those two from omap2plus_defconfig then.
+> 
+> Here is the updated version.
+> Just let me know if you'd like to get the full series re-posted.
 
-gate2b, basic div and basic mux clks all use the imx_ccm_lock.  How
-many registers are we talking about here?  If the number is very high
-then maybe per-register locking makes sense for you?
-
-Also, do you need locking added to the basic gated clk type, or any of
-the others?  I'll probably add it anyways but just curious...
+Thanks applying into dt branch. No need to repost this series.
 
 Regards,
-Mike
+
+Tony
