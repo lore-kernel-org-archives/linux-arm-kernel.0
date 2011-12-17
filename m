@@ -1,53 +1,32 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Sat, 17 Dec 2011 15:56:15 +0800
-Subject: [PATCH V2 3/4] arm/imx6q: register arm_clk as cpu to clkdev
-In-Reply-To: <21672683C5A3814BB4DB938EBE482DE40A1AE8EF74@IAD2MBX09.mex02.mlsrvr.com>
+Date: Sat, 17 Dec 2011 15:57:34 +0800
+Subject: [PATCH V2 1/4] cpufreq: add arm soc generic cpufreq driver
+In-Reply-To: <201112161226.04092.heiko@sntech.de>
 References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
- <1324031462-24961-4-git-send-email-richard.zhao@linaro.org>
- <21672683C5A3814BB4DB938EBE482DE40A1AE8EF74@IAD2MBX09.mex02.mlsrvr.com>
-Message-ID: <20111217075612.GA2010@richard-laptop>
+ <1324031462-24961-2-git-send-email-richard.zhao@linaro.org>
+ <201112161226.04092.heiko@sntech.de>
+Message-ID: <20111217075732.GB2010@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2011 at 11:35:39AM -0500, Mark Langsdorf wrote:
-> Is there a portable/generic approach for other drivers that may
-> want to use arm-cpufreq.c? arm_clk is not normally defined for
-> my SoC and I don't see an easy way to pull it in.
-Could you tell me the details? Is your board arch/arm/mach-highbank/ Rob
-maintained?
-clk API is the most generic way for arm as far as I find out.
-
-Thanks
-Richard
+On Fri, Dec 16, 2011 at 12:26:03PM +0100, Heiko St?bner wrote:
+> Am Freitag, 16. Dezember 2011, 11:30:59 schrieb Richard Zhao:
+> > It support single core and multi-core ARM SoCs. But it assume
+> > all cores share the same frequency and voltage.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm   |    8 ++
+> >  drivers/cpufreq/Makefile      |    1 +
+> >  drivers/cpufreq/arm-cpufreq.c |  269
+> > +++++++++++++++++++++++++++++++++++++++++ 3 files changed, 278
+> > insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/cpufreq/arm-cpufreq.c
 > 
-> --Mark Langsdorf
-> Calxeda, Inc.
+> looks quite cool, but should also provide a description of the devicetree 
+> bindings (i.e. like the rest in Documentation/devicetree/bindings/...) for 
+> future reference.
+Yes, Thanks for your remind.
 > 
-> ________________________________________
-> From: Richard Zhao [richard.zhao at linaro.org]
-> Sent: Friday, December 16, 2011 4:31 AM
-> To: linux-arm-kernel at lists.infradead.org; cpufreq at vger.kernel.org; devicetree-discuss at lists.ozlabs.org
-> Cc: linux at arm.linux.org.uk; davej at redhat.com; kernel at pengutronix.de; shawn.guo at linaro.org; eric.miao at linaro.org; Mark Langsdorf; linaro-dev at lists.linaro.org; patches at linaro.org; Richard Zhao
-> Subject: [PATCH V2 3/4] arm/imx6q: register arm_clk as cpu to clkdev
+> Heiko
 > 
-> cpufreq needs cpu clock to change frequency.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  arch/arm/mach-imx/clock-imx6q.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-> index 039a7ab..72acbc2 100644
-> --- a/arch/arm/mach-imx/clock-imx6q.c
-> +++ b/arch/arm/mach-imx/clock-imx6q.c
-> @@ -1911,6 +1911,7 @@ static struct clk_lookup lookups[] = {
->         _REGISTER_CLOCK(NULL, "gpmi_io_clk", gpmi_io_clk),
->         _REGISTER_CLOCK(NULL, "usboh3_clk", usboh3_clk),
->         _REGISTER_CLOCK(NULL, "sata_clk", sata_clk),
-> +       _REGISTER_CLOCK(NULL, "cpu", arm_clk),
->  };
-> 
->  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
-> --
-> 1.7.5.4
