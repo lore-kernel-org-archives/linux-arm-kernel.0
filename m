@@ -1,68 +1,96 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sat, 17 Dec 2011 19:34:45 +0100 (CET)
-Subject: [GIT PULL] at91: devices and boards files update for 3.3
-In-Reply-To: <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
-References: <4EEA034C.9020800@atmel.com>
- <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
- <4EEB73DD.3070505@atmel.com>
- <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1112171928380.13817@axis700.grange>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sat, 17 Dec 2011 19:57:38 +0100
+Subject: [PATCH] ARM: Fix cross compilation broken by failing size command
+In-Reply-To: <alpine.LFD.2.02.1112171109210.2907@xanadu.home>
+References: <20111214215815.GP32251@atomide.com>
+ <201112171401.30635.jkrzyszt@tis.icnet.pl>
+ <alpine.LFD.2.02.1112171109210.2907@xanadu.home>
+Message-ID: <201112171957.38681.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof
-
-On Fri, 16 Dec 2011, Olof Johansson wrote:
-
-> Hi Nicolas,
+On Saturday 17 of December 2011 at 17:38:34, Nicolas Pitre wrote:
+> On Sat, 17 Dec 2011, Janusz Krzysztofik wrote:
 > 
-> On Fri, Dec 16, 2011 at 8:37 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> > On Saturday 17 of December 2011 at 11:57:37, Russell King - ARM Linux wrote:
+> > > On Fri, Dec 16, 2011 at 11:42:26AM +0100, Janusz Krzysztofik wrote:
+> > > > Unfortunately, I've already pushed that old version to the patch system
+> > > > at http://www.arm.linux.org.uk/developer/patches/, which I know is not
+> > > > a review system. Apparently, I was not patient enough, not waiting more
+> > > > than a week with that regression fix for a single reply to my initial
+> > > 
+> > > I'll disagree with you there: this is not a regression fix.  A regression
+> > > fix implies that it was something that worked before, a change happened
+> > > to the kernel, and now it's broken.
+> > > 
+> > > That is not the case: a change happened to binutils
+> > 
+> > Not to mine, I'm still using the same version as before.
+> > 
+> > > which meant 'size'
+> > > no longer parses foreign ELF formats. 
+> > 
+> > But 'size' was not there before v3.2-rc1! The problem has arised because 
+> > arch/arm/boot/compress/Makefile, which belongs to the kernel sources, 
+> > not to binutils you're trying to blame, was changed. The 'size' call was 
+> > introduced into that Makefile, i.e. the file that belongs to the kernel 
+> > sources, whithout taking care of what can happen if that command fails. 
+> > And I was just lucky enough to find out it may fail in certains build 
+> > environments, like mine.
 > 
-> > Yes, this ISI driver addition is also dependent on an update of the ISI
-> > driver itself that will certainly be included in 3.3 by Guennadi using
-> > v4L2 path.
-> >
-> > So, do we have to wait for its inclusion in linux-next or maybe we can
-> > manage this little out-of-sync situation during the 3.3 life cycle...
-> >
-> > ISI is a "several times reworked" and "long-awaited" driver and I really
-> > would like to see it included in mainline soon...
+> OK let's stop arguing in circles please.
 > 
-> I don't see why code that is known to be broken should be added to the kernel.
+> I introduced the call to 'size' so by definition I'm the one who broke 
+> the build for you.
+
+I don't care who broke it, this might happen to anyone, including me.
+
+Now I see my fault was not examining the linux-arm-kernel archives a few 
+months deep before submitting my patch, which was apparently a 
+(independently developed) duplicate for the one already submitted by 
+Thomas Weber 6 weeks earlier.
+
+> However I don't have any problem using the native 'size' command with a 
+> foreign architecture binary.  My binutils version is 2.21.51.0.6 on 
+> X86-64.  And clearly I'm not alone in that situation otherwise we would 
+> have been overwhelmed by complaints from a much bigger crowd by now.  So 
+> your installation must be "special".
+
+2.20.1.20100303 on X86-64 here, built with --enable-targets=all for a 
+reason I'm not able to recall now.
+
+> OTOH all cross-compiler installations I've seen had $(CROSS_COMPILE)size 
+> available.  It is therefore well possible that Russell's cross compiler 
+> installation is also "special".
 > 
-> The way these things are normally handled is that once Guennadi has
-> the patch on a stable branch, we can add that branch as a dependency
-> that your code requires. So we pull that in as a dependency and apply
-> your code on top of it (or, if it is just one or two patches, that
-> they are are cherry-picked into your branch in the same way).
+> Given that the build works for the vast majority of people now, there is 
+> a risk that applying your first patch might break the build for more 
+> people (currently only one known) than the number of people for whom 
+> this is an improvement (currently only one known).
+
+Tony already told me the same, and I came out with v2 as a solution.
+
+> I suggested a simple fix for Russell's installation already:
 > 
-> But that requires that he picks up the v4l patches and keeps it in a
-> stable, small, branch and that said branch gets merged in the 3.3
-> merge window before the branch containing these at91 changes do.
+> 	ln -s size arm-linux-size
 > 
-> Guennadi, sound reasonable to you?
+> I don't know what is special about yours though, and maybe it is worth 
+> investigating given that, as I said, you appear to be alone so far 
+> having problems with the current Makefile which is rather intriguing.  
+> If it is clear with references to facts (binutils release notes, etc.) 
+> that the problem is something that will persist in the future then we 
+> have a more solid basis for choosing either of your solutions.  
+> Otherwise we can't call it a "regression" just yet.
 
-I'm not sure what you call a "stable" branch. If you mean a branch in some 
-tree somewhere (like my tree on linuxtv.org) then I wouldn't yet use that. 
-I think, there are two ways to handle this:
+After Tony's comments I changed my approach in that the core regression 
+here was not calling the native 'size', but passing an additional 
+argument to the linker without checking for its correctness first. The 
+core problem was not a broken 'size', but a broken linker command after 
+all. Broken 'size' consequences should be limited to at most making the 
+change your patch was about ineffective, but not the whole compilation 
+broken. That's what my v2 was about in the first place.
 
-1. Safe from the dependency and synchronisation PoV, but might cause 
-problems during merge. One of the patches gets an ack from the respective 
-maintainer but gets merged together with the other patch via the "wrong" 
-tree. E.g., someone from at91 could ack this patch and I could apply it to 
-V4L together with the actual ISI patch.
+YMMV.
 
-2. Each patch goes via its own tree, but we make sure, that at91 tree is 
-pushed to Linus after the V4L tree. This is more "correct" - each patch is 
-merged via its respective tree, but if the V4L tree is merged near the end 
-of the merge interval, it might be difficult for at91 to hit the remaining 
-window.
-
-I'm ok with either of the above.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Thanks,
+Janusz
