@@ -1,29 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Dec 2011 21:18:25 +0100
-Subject: [PATCHv2 0/5] Misc picoxcell updates for 3.3
-In-Reply-To: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
-References: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <18144957.3Nv7HuJyz7@wuerfel>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 17 Dec 2011 15:42:58 -0800
+Subject: [GIT PULL] at91: devices and boards files update for 3.3
+In-Reply-To: <Pine.LNX.4.64.1112171928380.13817@axis700.grange>
+References: <4EEA034C.9020800@atmel.com>
+ <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
+ <4EEB73DD.3070505@atmel.com>
+ <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
+ <Pine.LNX.4.64.1112171928380.13817@axis700.grange>
+Message-ID: <CAOesGMi6-iPPBSP_TgKHf_agGSOrQeoB1CU=xhj8wuM2dQvf0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 December 2011 13:42:32 Jamie Iles wrote:
-> Here's v2 of a small series of feature updates for picoxcell in 3.3.
-> 
-> Jamie
-> 
-> Jamie Iles (5):
->   ARM: picoxcell: remove mach/memory.h
->   ARM: picoxcell: don't reserve irq_descs
->   ARM: picoxcell: move io mappings to common.c
->   MAINTAINERS: add maintainer entry for Picochip picoxcell
->   ARM: picoxcell: implement watchdog restart
+Hi,
 
-Hi Jamie,
+On Sat, Dec 17, 2011 at 10:34 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Hi Olof
+>
+> On Fri, 16 Dec 2011, Olof Johansson wrote:
+>
+>> Hi Nicolas,
+>>
+>> On Fri, Dec 16, 2011 at 8:37 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>
+>> > Yes, this ISI driver addition is also dependent on an update of the ISI
+>> > driver itself that will certainly be included in 3.3 by Guennadi using
+>> > v4L2 path.
+>> >
+>> > So, do we have to wait for its inclusion in linux-next or maybe we can
+>> > manage this little out-of-sync situation during the 3.3 life cycle...
+>> >
+>> > ISI is a "several times reworked" and "long-awaited" driver and I really
+>> > would like to see it included in mainline soon...
+>>
+>> I don't see why code that is known to be broken should be added to the kernel.
+>>
+>> The way these things are normally handled is that once Guennadi has
+>> the patch on a stable branch, we can add that branch as a dependency
+>> that your code requires. So we pull that in as a dependency and apply
+>> your code on top of it (or, if it is just one or two patches, that
+>> they are are cherry-picked into your branch in the same way).
+>>
+>> But that requires that he picks up the v4l patches and keeps it in a
+>> stable, small, branch and that said branch gets merged in the 3.3
+>> merge window before the branch containing these at91 changes do.
+>>
+>> Guennadi, sound reasonable to you?
+>
+> I'm not sure what you call a "stable" branch. If you mean a branch in some
+> tree somewhere (like my tree on linuxtv.org) then I wouldn't yet use that.
+> I think, there are two ways to handle this:
 
-The series looks good to me, aside from the trivial comments I've given
-on patch 5. When you submit these for inclusion in arm-soc, please split
-the series so that the first four patches can go into the next/cleanup
-branch, while the last patch goes into the devel branch.
+When I say "stable" branch, I mean a topic branch that is staged for
+3.3, pulled into a for-next branch that is picked up by linux-next and
+that *will not be rebased* before the merge window. In other words,
+patches that have been staged and won't be touched before they go in.
+It would them match case (2) below, but it would also allow us to
+merge in either a branch pull of said stable staging branch as a base
+for the at91 patch -- if the V4L code is merged before the at91 branch
+then git will handle it nicely.
 
-	Arnd
+> 1. Safe from the dependency and synchronisation PoV, but might cause
+> problems during merge. One of the patches gets an ack from the respective
+> maintainer but gets merged together with the other patch via the "wrong"
+> tree. E.g., someone from at91 could ack this patch and I could apply it to
+> V4L together with the actual ISI patch.
+>
+> 2. Each patch goes via its own tree, but we make sure, that at91 tree is
+> pushed to Linus after the V4L tree. This is more "correct" - each patch is
+> merged via its respective tree, but if the V4L tree is merged near the end
+> of the merge interval, it might be difficult for at91 to hit the remaining
+> window.
+>
+> I'm ok with either of the above.
+
+Since we're trying to keep the amount of board code addition to a
+minimum on ARM right now, I would prefer if all changes to said code
+goes through arm-soc mostly to keep an eye on just what goes in, which
+means (2). Do you normally get the v4l tree merged very late during
+the merge window?
+
+We can keep one late-merge branch in arm-soc that contain patches with
+external and possibly late dependencies and submit that branch last,
+but it would be good if we had a bit of margin to get it in. :)
+
+
+-Olof
