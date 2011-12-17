@@ -1,96 +1,54 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sat, 17 Dec 2011 19:57:38 +0100
-Subject: [PATCH] ARM: Fix cross compilation broken by failing size command
-In-Reply-To: <alpine.LFD.2.02.1112171109210.2907@xanadu.home>
-References: <20111214215815.GP32251@atomide.com>
- <201112171401.30635.jkrzyszt@tis.icnet.pl>
- <alpine.LFD.2.02.1112171109210.2907@xanadu.home>
-Message-ID: <201112171957.38681.jkrzyszt@tis.icnet.pl>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sat, 17 Dec 2011 20:23:04 +0100
+Subject: [PATCH v2 0/7] s3c-hsudc: regulator handling and a lot of fixes
+Message-ID: <201112172023.05519.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 of December 2011 at 17:38:34, Nicolas Pitre wrote:
-> On Sat, 17 Dec 2011, Janusz Krzysztofik wrote:
-> 
-> > On Saturday 17 of December 2011 at 11:57:37, Russell King - ARM Linux wrote:
-> > > On Fri, Dec 16, 2011 at 11:42:26AM +0100, Janusz Krzysztofik wrote:
-> > > > Unfortunately, I've already pushed that old version to the patch system
-> > > > at http://www.arm.linux.org.uk/developer/patches/, which I know is not
-> > > > a review system. Apparently, I was not patient enough, not waiting more
-> > > > than a week with that regression fix for a single reply to my initial
-> > > 
-> > > I'll disagree with you there: this is not a regression fix.  A regression
-> > > fix implies that it was something that worked before, a change happened
-> > > to the kernel, and now it's broken.
-> > > 
-> > > That is not the case: a change happened to binutils
-> > 
-> > Not to mine, I'm still using the same version as before.
-> > 
-> > > which meant 'size'
-> > > no longer parses foreign ELF formats. 
-> > 
-> > But 'size' was not there before v3.2-rc1! The problem has arised because 
-> > arch/arm/boot/compress/Makefile, which belongs to the kernel sources, 
-> > not to binutils you're trying to blame, was changed. The 'size' call was 
-> > introduced into that Makefile, i.e. the file that belongs to the kernel 
-> > sources, whithout taking care of what can happen if that command fails. 
-> > And I was just lucky enough to find out it may fail in certains build 
-> > environments, like mine.
-> 
-> OK let's stop arguing in circles please.
-> 
-> I introduced the call to 'size' so by definition I'm the one who broke 
-> the build for you.
+In his response to the first submission Felipe Balbi asked to also move
+the driver to the new udc_start and udc_stop functions and to make an
+effort to reduce dependencies on archictecture code.
 
-I don't care who broke it, this might happen to anyone, including me.
+The first patch reduces the number of arch dependencies by one by moving
+the platform data struct to a header unter include/linux/usb.
 
-Now I see my fault was not examining the linux-arm-kernel archives a few 
-months deep before submitting my patch, which was apparently a 
-(independently developed) duplicate for the one already submitted by 
-Thomas Weber 6 weeks earlier.
+The third patch adds a remove function, that was missing until now.
 
-> However I don't have any problem using the native 'size' command with a 
-> foreign architecture binary.  My binutils version is 2.21.51.0.6 on 
-> X86-64.  And clearly I'm not alone in that situation otherwise we would 
-> have been overwhelmed by complaints from a much bigger crowd by now.  So 
-> your installation must be "special".
+The fifth and sixt patches implement the move to udc_start / udc_stop
 
-2.20.1.20100303 on X86-64 here, built with --enable-targets=all for a 
-reason I'm not able to recall now.
+And the last patch finally allows the s3c-hsudc driver to control its
+supplying regulators as intended in the first place.
 
-> OTOH all cross-compiler installations I've seen had $(CROSS_COMPILE)size 
-> available.  It is therefore well possible that Russell's cross compiler 
-> installation is also "special".
-> 
-> Given that the build works for the vast majority of people now, there is 
-> a risk that applying your first patch might break the build for more 
-> people (currently only one known) than the number of people for whom 
-> this is an improvement (currently only one known).
+The regulator calls can use the regulators unconditionally and let
+necessary "stubbing and mapping" happen through the regulator framework,
+according to for example
+http://marc.info/?l=linux-netdev&m=131914562120725&w=2
+meaning there is no need to gracefully fail if a regulator is not present.
 
-Tony already told me the same, and I came out with v2 as a solution.
 
-> I suggested a simple fix for Russell's installation already:
-> 
-> 	ln -s size arm-linux-size
-> 
-> I don't know what is special about yours though, and maybe it is worth 
-> investigating given that, as I said, you appear to be alone so far 
-> having problems with the current Makefile which is rather intriguing.  
-> If it is clear with references to facts (binutils release notes, etc.) 
-> that the problem is something that will persist in the future then we 
-> have a more solid basis for choosing either of your solutions.  
-> Otherwise we can't call it a "regression" just yet.
+Each patch was compile-tested individually, the series applies cleanly
+against linux-next from 2011-12-16.
 
-After Tony's comments I changed my approach in that the core regression 
-here was not calling the native 'size', but passing an additional 
-argument to the linker without checking for its correctness first. The 
-core problem was not a broken 'size', but a broken linker command after 
-all. Broken 'size' consequences should be limited to at most making the 
-change your patch was about ineffective, but not the whole compilation 
-broken. That's what my v2 was about in the first place.
+Real-life testing happened on S3C2416 hardware including adding and
+removing of gadgets and unloading and later on reloading the s3c_hsudc
+module.
 
-YMMV.
+Heiko Stuebner (7):
+  s3c-hsudc: move platform_data struct to global header
+  s3c-hsudc: add __devinit to probe function
+  s3c-hsudc: add a remove function
+  s3c-hsudc: add missing otg_put_transceiver in probe
+  s3c-hsudc: move device registration to probe and remove
+  s3c-hsudc: use udc_start and udc_stop functions
+  s3c-hsudc: Add regulator handling
 
-Thanks,
-Janusz
+ arch/arm/mach-s3c2416/mach-smdk2416.c    |    1 +
+ arch/arm/plat-samsung/devs.c             |    1 +
+ arch/arm/plat-samsung/include/plat/udc.h |   15 +---
+ drivers/usb/gadget/s3c-hsudc.c           |  142 +++++++++++++++++++++---------
+ include/linux/usb/s3c-hsudc.h            |   34 +++++++
+ 5 files changed, 136 insertions(+), 57 deletions(-)
+ create mode 100644 include/linux/usb/s3c-hsudc.h
+
+-- 
+1.7.2.3
