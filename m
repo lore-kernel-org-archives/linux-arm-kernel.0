@@ -1,32 +1,27 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Sat, 17 Dec 2011 13:42:32 +0000
-Subject: [PATCHv2 0/5] Misc picoxcell updates for 3.3
-Message-ID: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
+Date: Sat, 17 Dec 2011 13:42:33 +0000
+Subject: [PATCHv2 1/5] ARM: picoxcell: remove mach/memory.h
+In-Reply-To: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
+References: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <1324129357-16030-2-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's v2 of a small series of feature updates for picoxcell in 3.3.
+mach/memory.h is no longer required for simple platforms so remove it
+for picoxcell.
 
-Jamie
-
-Jamie Iles (5):
-  ARM: picoxcell: remove mach/memory.h
-  ARM: picoxcell: don't reserve irq_descs
-  ARM: picoxcell: move io mappings to common.c
-  MAINTAINERS: add maintainer entry for Picochip picoxcell
-  ARM: picoxcell: implement watchdog restart
-
- MAINTAINERS                                   |    9 +++++
- arch/arm/Kconfig                              |    1 +
- arch/arm/mach-picoxcell/Makefile              |    1 -
- arch/arm/mach-picoxcell/common.c              |   47 ++++++++++++++++++++++++-
- arch/arm/mach-picoxcell/common.h              |    1 -
- arch/arm/mach-picoxcell/include/mach/irqs.h   |    9 +----
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
  arch/arm/mach-picoxcell/include/mach/memory.h |    1 -
- arch/arm/mach-picoxcell/io.c                  |   32 -----------------
- 8 files changed, 58 insertions(+), 43 deletions(-)
+ 1 files changed, 0 insertions(+), 1 deletions(-)
  delete mode 100644 arch/arm/mach-picoxcell/include/mach/memory.h
- delete mode 100644 arch/arm/mach-picoxcell/io.c
 
+diff --git a/arch/arm/mach-picoxcell/include/mach/memory.h b/arch/arm/mach-picoxcell/include/mach/memory.h
+deleted file mode 100644
+index 40a8c17..0000000
+--- a/arch/arm/mach-picoxcell/include/mach/memory.h
++++ /dev/null
+@@ -1 +0,0 @@
+-/* empty */
 -- 
 1.7.5.4
