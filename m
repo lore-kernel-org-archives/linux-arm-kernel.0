@@ -1,75 +1,111 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Sat, 17 Dec 2011 13:42:34 +0000
-Subject: [PATCHv2 2/5] ARM: picoxcell: don't reserve irq_descs
+Date: Sat, 17 Dec 2011 13:42:35 +0000
+Subject: [PATCHv2 3/5] ARM: picoxcell: move io mappings to common.c
 In-Reply-To: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
 References: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1324129357-16030-3-git-send-email-jamie@jamieiles.com>
+Message-ID: <1324129357-16030-4-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All irq_desc's are now dynamically allocated so we don't need to
-statically reserve them.
-
-v2:	- select SPARSE_IRQ and set .nr_irqs to NR_IRQS_LEGACY to skip
-	ISA and IRQ 0.
+Now that we have lost our machine specific ioremap() we just have one
+mapping that covers all peripherals.  Move this to common.c to simplify
+things a little.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/Kconfig                            |    1 +
- arch/arm/mach-picoxcell/common.c            |    2 +-
- arch/arm/mach-picoxcell/include/mach/irqs.h |    9 ++-------
- 3 files changed, 4 insertions(+), 8 deletions(-)
+ arch/arm/mach-picoxcell/Makefile |    1 -
+ arch/arm/mach-picoxcell/common.c |   13 +++++++++++++
+ arch/arm/mach-picoxcell/common.h |    1 -
+ arch/arm/mach-picoxcell/io.c     |   32 --------------------------------
+ 4 files changed, 13 insertions(+), 34 deletions(-)
+ delete mode 100644 arch/arm/mach-picoxcell/io.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44789ef..0831d48 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -650,6 +650,7 @@ config ARCH_PICOXCELL
- 	select HAVE_SCHED_CLOCK
- 	select HAVE_TCM
- 	select NO_IOPORT
-+	select SPARSE_IRQ
- 	select USE_OF
- 	help
- 	  This enables support for systems based on the Picochip picoXcell
+diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
+index c550b63..e5ec4a8 100644
+--- a/arch/arm/mach-picoxcell/Makefile
++++ b/arch/arm/mach-picoxcell/Makefile
+@@ -1,3 +1,2 @@
+ obj-y	:= common.o
+ obj-y	+= time.o
+-obj-y	+= io.o
 diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
-index ad871bd..d34b333 100644
+index d34b333..febee47 100644
 --- a/arch/arm/mach-picoxcell/common.c
 +++ b/arch/arm/mach-picoxcell/common.c
-@@ -45,7 +45,7 @@ static void __init picoxcell_init_irq(void)
+@@ -16,12 +16,25 @@
  
- DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
- 	.map_io		= picoxcell_map_io,
--	.nr_irqs	= ARCH_NR_IRQS,
-+	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= picoxcell_init_irq,
- 	.handle_irq	= vic_handle_irq,
- 	.timer		= &picoxcell_timer,
-diff --git a/arch/arm/mach-picoxcell/include/mach/irqs.h b/arch/arm/mach-picoxcell/include/mach/irqs.h
-index 4d13ed9..59eac1e 100644
---- a/arch/arm/mach-picoxcell/include/mach/irqs.h
-+++ b/arch/arm/mach-picoxcell/include/mach/irqs.h
-@@ -1,8 +1,6 @@
- /*
-  * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-  *
-- * This file contains the hardware definitions of the picoXcell SoC devices.
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/vic.h>
++#include <asm/mach/map.h>
+ 
+ #include <mach/map.h>
+ #include <mach/picoxcell_soc.h>
+ 
+ #include "common.h"
+ 
++static struct map_desc io_map __initdata = {
++	.virtual	= PHYS_TO_IO(PICOXCELL_PERIPH_BASE),
++	.pfn		= __phys_to_pfn(PICOXCELL_PERIPH_BASE),
++	.length		= PICOXCELL_PERIPH_LENGTH,
++	.type		= MT_DEVICE,
++};
++
++static void __init picoxcell_map_io(void)
++{
++	iotable_init(&io_map, 1);
++}
++
+ static void __init picoxcell_init_machine(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+diff --git a/arch/arm/mach-picoxcell/common.h b/arch/arm/mach-picoxcell/common.h
+index 5263f0f..83d55ab 100644
+--- a/arch/arm/mach-picoxcell/common.h
++++ b/arch/arm/mach-picoxcell/common.h
+@@ -13,6 +13,5 @@
+ #include <asm/mach/time.h>
+ 
+ extern struct sys_timer picoxcell_timer;
+-extern void picoxcell_map_io(void);
+ 
+ #endif /* __PICOXCELL_COMMON_H__ */
+diff --git a/arch/arm/mach-picoxcell/io.c b/arch/arm/mach-picoxcell/io.c
+deleted file mode 100644
+index 39e9b9e..0000000
+--- a/arch/arm/mach-picoxcell/io.c
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/*
+- * Copyright (c) 2011 Picochip Ltd., Jamie Iles
 - *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-  * the Free Software Foundation; either version 2 of the License, or
-@@ -16,10 +14,7 @@
- #ifndef __MACH_IRQS_H
- #define __MACH_IRQS_H
- 
--#define ARCH_NR_IRQS			64
--#define NR_IRQS				(128 + ARCH_NR_IRQS)
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * All enquiries to support at picochip.com
+- */
+-#include <linux/io.h>
+-#include <linux/mm.h>
+-#include <linux/module.h>
+-#include <linux/of.h>
 -
--#define IRQ_VIC0_BASE			0
--#define IRQ_VIC1_BASE			32
-+/* We dynamically allocate our irq_desc's. */
-+#define NR_IRQS				0
- 
- #endif /* __MACH_IRQS_H */
+-#include <asm/mach/map.h>
+-
+-#include <mach/map.h>
+-#include <mach/picoxcell_soc.h>
+-
+-#include "common.h"
+-
+-void __init picoxcell_map_io(void)
+-{
+-	struct map_desc io_map = {
+-		.virtual	= PHYS_TO_IO(PICOXCELL_PERIPH_BASE),
+-		.pfn		= __phys_to_pfn(PICOXCELL_PERIPH_BASE),
+-		.length		= PICOXCELL_PERIPH_LENGTH,
+-		.type		= MT_DEVICE,
+-	};
+-
+-	iotable_init(&io_map, 1);
+-}
 -- 
 1.7.5.4
