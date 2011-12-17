@@ -1,46 +1,47 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 17 Dec 2011 11:41:47 -0500 (EST)
-Subject: [PATCH 23/23] ARM: move VMALLOC_END down temporarily for shmobile
-In-Reply-To: <CANqRtoQZqZykFCFU9t_Oh55oXEUZhe8O6VPvwdJG2i6Yhr_EDg@mail.gmail.com>
-References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
- <1321422521-1138-24-git-send-email-nico@fluxnic.net>
- <CANqRtoQZqZykFCFU9t_Oh55oXEUZhe8O6VPvwdJG2i6Yhr_EDg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1112171139390.2907@xanadu.home>
+Date: Sat, 17 Dec 2011 11:44:39 -0500 (EST)
+Subject: label string for kirkwood gpiochip
+In-Reply-To: <4EEA06C8.5010302@keymile.com>
+References: <4EE9FC0D.10009@keymile.com>
+ <alpine.LFD.2.02.1112150920430.2907@xanadu.home>
+ <4EEA06C8.5010302@keymile.com>
+Message-ID: <alpine.LFD.2.02.1112171142320.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Dec 2011, Magnus Damm wrote:
+On Thu, 15 Dec 2011, Holger Brunck wrote:
 
-> On Wed, Nov 16, 2011 at 2:48 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> >
-> > THIS IS A TEMPORARY HACK. ?The purpose of this is _only_ to avoid a
-> > regression on an existing machine while a better fix is implemented.
-> >
-> > On shmobile the consistent DMA memory area was set to 158MB in commit
-> > 28f0721a79 with no explanation. ?The documented size for this area should
-> > vary between 2MB and 14MB, and none of the other ARM targets exceed that.
-> >
-> > The included #warning is therefore meant to be noisy on purpose to get
-> > shmobile maintainers attention and this commit reverted once this
-> > consistent DMA size conflict is resolved.
-> >
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Cc: Magnus Damm <damm@opensource.se>
-> > Cc: Paul Mundt <lethal@linux-sh.org>
-> > ---
+> On 12/15/2011 03:22 PM, Nicolas Pitre wrote:
+> >>
+> >> The newer kernel version handles the gpiochip on kirkwood in a different way.
+> >> The orion_gpio_init function in arch/arm/mach-kirkwood/irq.c was called twice.
+> >> Once for first 32 gpios and a second time for the remaining 18 gpios. This
+> >> causes that the gpio framework shows two gpiochips in the sysfs with the same
+> >> label (orion_gpio).
+> >>
+> >> [@km_kirkwood /]# cat /sys/class/gpio/gpiochip0/label
+> >> orion_gpio
+> >> [@km_kirkwood /]# cat /sys/class/gpio/gpiochip32/label
+> >> orion_gpio
+> >>
+> >> So my question is simply, shouldn't be the string for a gpiochip unique in the
+> >> system and therefore this should be fixed or was this intended?
+> > 
+> > I don't think that was intended.
+> > 
 > 
-> Hi Nicolas,
+> Ok, how should this be done? We could add an additional  param chip_label to
 > 
-> Thanks for your work on this! Please excuse the slow progress. I have
-> now gotten around to remove the special mach-shmobile behavior.
+> void __init orion_gpio_init(int gpio_base, int ngpio,
+>                             u32 base, int mask_offset, int secondary_irq_base);
 > 
-> The change is included in the unfortunately mangled patch below. Where
-> would you like me to submit the patch?
+> and fix the callers accordingly or we could add a simple static counter in
+> orion_gpio_init and add a suffix _0, _1, _2 to the label to make it unique
+> without touching the clients...
 
-Just send it to me non mangled and I'll take care of it.
+The later would be less intrusive at this point.
 
-Thanks!
+Eventually this should be hooked into the pinctrl subsystem.
 
 
 Nicolas
