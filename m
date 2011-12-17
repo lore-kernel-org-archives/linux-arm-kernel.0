@@ -1,69 +1,236 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Dec 2011 10:29:29 +0100
-Subject: [PATCH V2 1/4] cpufreq: add arm soc generic cpufreq driver
-In-Reply-To: <20111217080001.GC2010@richard-laptop>
-References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
- <4EEB5683.7000409@gmail.com> <20111217080001.GC2010@richard-laptop>
-Message-ID: <1771359.4jv0xX1vFp@wuerfel>
+From: martin@neutronstar.dyndns.org (Martin Hostettler)
+Date: Sat, 17 Dec 2011 11:05:20 +0100
+Subject: [PATCH v4] arm: omap3evm: Add support for an MT9M032 based camera
+ board.
+Message-ID: <1324116320-13007-1-git-send-email-martin@neutronstar.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 December 2011 16:00:03 Richard Zhao wrote:
-> On Fri, Dec 16, 2011 at 08:32:35AM -0600, Rob Herring wrote:
-> > On 12/16/2011 04:30 AM, Richard Zhao wrote:
-> > > It support single core and multi-core ARM SoCs. But it assume
-> > > all cores share the same frequency and voltage.
-> > > 
-> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > ---
-> > >  drivers/cpufreq/Kconfig.arm   |    8 ++
-> > >  drivers/cpufreq/Makefile      |    1 +
-> > >  drivers/cpufreq/arm-cpufreq.c |  269 +++++++++++++++++++++++++++++++++++++++++
-> > >  3 files changed, 278 insertions(+), 0 deletions(-)
-> > >  create mode 100644 drivers/cpufreq/arm-cpufreq.c
-> > > 
-> > 
-> > What makes this specific to ARM and not a generic DT + clk api +
-> > regulator api driver?
->
-> smp loops_per_jiffy update needs arm header <asm/cpu.h>.
+Adds board support for an MT9M032 based camera to omap3evm.
 
-I would suggest to instead change the definition of adjust_jiffies in the
-core so it can be overridden by the architecture, like this
+Signed-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
+---
+ arch/arm/mach-omap2/Makefile                |    3 +-
+ arch/arm/mach-omap2/board-omap3evm-camera.c |  159 +++++++++++++++++++++++++++
+ arch/arm/mach-omap2/board-omap3evm.c        |    4 +
+ 3 files changed, 165 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index 987a165..174584d 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -189,6 +189,7 @@ EXPORT_SYMBOL_GPL(cpufreq_cpu_put);
-  * systems as each CPU might be scaled differently. So, use the arch
-  * per-CPU loops_per_jiffy value wherever possible.
-  */
-+#ifndef adjust_jiffies
- #ifndef CONFIG_SMP
- static unsigned long l_p_j_ref;
- static unsigned int  l_p_j_ref_freq;
-@@ -218,7 +219,8 @@ static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
+Changes in V4
+ * Fix includes
+ * Add comment to clearify that the mux is a seperate gpio controlled chip.
+ * remove useless variable initialisation.
+
+Changes in V3
+ * Added missing copyright and attribution.
+ * switched to gpio_request_array for gpio init.
+ * removed device_initcall and added call to omap3_evm_camera_init into omap3_evm_init
+
+Changes in V2:
+ * ported to current mainline
+ * Style fixes
+ * Fix error handling
+
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index b009f17..6045789 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -196,7 +196,8 @@ obj-$(CONFIG_MACH_OMAP3530_LV_SOM)      += board-omap3logic.o
+ obj-$(CONFIG_MACH_OMAP3_TORPEDO)        += board-omap3logic.o
+ obj-$(CONFIG_MACH_ENCORE)		+= board-omap3encore.o
+ obj-$(CONFIG_MACH_OVERO)		+= board-overo.o
+-obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o
++obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
++					   board-omap3evm-camera.o
+ obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o
+ obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o
+ obj-$(CONFIG_MACH_NOKIA_N8X0)		+= board-n8x0.o
+diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c b/arch/arm/mach-omap2/board-omap3evm-camera.c
+new file mode 100644
+index 0000000..82a4ec2
+--- /dev/null
++++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
+@@ -0,0 +1,159 @@
++/*
++ * Copyright (C) 2011 Texas Instruments Inc
++ * Copyright (C) 2010-2011 Lund Engineering
++ * Contact: Gil Lund <gwlund@lundeng.com>
++ * Authors:
++ *    Vaibhav Hiremath <hvaibhav@ti.com>
++ *    Martin Hostettler <martin@neutronstar.dyndns.org>
++ *
++ * Board intregration for a MT9M032 camera connected to IMAGE_CONN and I2C Bus 2
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ */
++
++#include <linux/i2c.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++
++#include <linux/gpio.h>
++#include <plat/mux.h>
++#include "mux.h"
++
++#include <media/omap3isp.h>
++#include <media/mt9m032.h>
++
++#include "devices.h"
++
++#define EVM_TWL_GPIO_BASE OMAP_MAX_GPIO_LINES
++#define GPIO98_VID_DEC_RES	98
++#define nCAM_VD_SEL		157
++
++#define MT9M032_I2C_BUS_NUM	2
++
++
++enum omap3evmdc_mux {
++	MUX_TVP5146,
++	MUX_CAMERA_SENSOR,
++	MUX_EXP_CAMERA_SENSOR,
++};
++
++/**
++ * omap3evm_set_mux - Sets mux to enable signal routing to
++ *                           different peripherals present on new EVM board
++ * @mux_id: enum, mux id to enable
++ *
++ * Returns 0 for success or a negative error code
++ */
++static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
++{
++	/*
++	 * The video mux on the EVM board is controlled by various
++	 * GPIO pins.
++         */
++	/* Set GPIO6 = 1 */
++	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 6, 1);
++	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
++
++	switch (mux_id) {
++	case MUX_TVP5146:
++		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
++		gpio_set_value(nCAM_VD_SEL, 1);
++		break;
++
++	case MUX_CAMERA_SENSOR:
++		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
++		gpio_set_value(nCAM_VD_SEL, 0);
++		break;
++
++	case MUX_EXP_CAMERA_SENSOR:
++		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 1);
++		break;
++
++	default:
++		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static struct mt9m032_platform_data mt9m032_platform_data = {
++	.ext_clock = 13500000,
++	.pll_pre_div = 6,
++	.pll_mul = 120,
++	.pll_out_div = 5,
++	.invert_pixclock = 1,
++};
++
++static struct i2c_board_info camera_i2c_devices[] = {
++	{
++		I2C_BOARD_INFO(MT9M032_NAME, MT9M032_I2C_ADDR),
++		.platform_data = &mt9m032_platform_data,
++	},
++};
++
++static struct isp_subdev_i2c_board_info camera_i2c_subdevs[] = {
++	{
++		.board_info = &camera_i2c_devices[0],
++		.i2c_adapter_id = MT9M032_I2C_BUS_NUM,
++	},
++	{},
++};
++
++static struct isp_v4l2_subdevs_group camera_subdevs[] = {
++	{
++		.subdevs = camera_i2c_subdevs,
++		.interface = ISP_INTERFACE_PARALLEL,
++		.bus = {
++			.parallel = {
++				.data_lane_shift = 1,
++				.clk_pol = 0,
++				.bridge = ISP_BRIDGE_DISABLE,
++			}
++		},
++	},
++	{},
++};
++
++static struct isp_platform_data isp_platform_data = {
++	.subdevs = camera_subdevs,
++};
++
++
++static struct gpio setup_gpios[] = {
++	{ nCAM_VD_SEL,           GPIOF_OUT_INIT_HIGH, "nCAM_VD_SEL" },
++	{ EVM_TWL_GPIO_BASE + 2, GPIOF_OUT_INIT_LOW,  "T2_GPIO2" },
++	{ EVM_TWL_GPIO_BASE + 8, GPIOF_OUT_INIT_LOW, "nCAM_VD_EN" },
++};
++
++
++int __init omap3_evm_camera_init(void)
++{
++	int ret;
++
++	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
++	ret = gpio_request_array(setup_gpios, ARRAY_SIZE(setup_gpios));
++	if (ret < 0) {
++		pr_err("omap3evm-camera: Failed to setup camera signal routing.\n");
++		return ret;
++	}
++	omap3evm_set_mux(MUX_CAMERA_SENSOR);
++	ret = omap3_init_camera(&isp_platform_data);
++	if (ret < 0) {
++		gpio_free_array(setup_gpios, ARRAY_SIZE(setup_gpios));
++		return ret;
++	}
++	return 0;
++}
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index ec00b2e..1b50539 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -617,6 +617,8 @@ static struct gpio omap3_evm_ehci_gpios[] __initdata = {
+ 	{ OMAP3_EVM_EHCI_SELECT, GPIOF_OUT_INIT_LOW,   "select EHCI port" },
+ };
+ 
++int omap3_evm_camera_init(void);
++
+ static void __init omap3_evm_init(void)
  {
-        return;
+ 	omap3_evm_get_revision();
+@@ -672,6 +674,8 @@ static void __init omap3_evm_init(void)
+ 		pr_err("error setting wl12xx data\n");
+ 	platform_device_register(&omap3evm_wlan_regulator);
+ #endif
++
++	omap3_evm_camera_init();
  }
--#endif
-+#endif /* CONFIG_SMP */
-+#endif /* adjust_jiffies */
  
- 
- /**
-
-
-Then ARM (and any others that want the driver) can provide their own
-implementation and set 
-
-#define adjust_jiffies(val, ci) adjust_jiffies((val), (ci))
-
-to let the core use that instead of the generic UP version.
-
-
-While we're there, we should probably try to fix drivers that use loops_per_jiffy,
-because that is not what they think it is on SMP.
-
-	Arnd
+ MACHINE_START(OMAP3EVM, "OMAP3 EVM")
+-- 
+1.7.2.5
