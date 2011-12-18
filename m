@@ -1,43 +1,27 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Dec 2011 00:57:47 +0900
-Subject: [PATCH v5 REPOST 2/5] ARM: SMP: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <1324053332-6431-3-git-send-email-dave.martin@linaro.org>
-References: <1324053332-6431-1-git-send-email-dave.martin@linaro.org>
- <1324053332-6431-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <4EEE0D7B.5080805@samsung.com>
+Date: Mon, 19 Dec 2011 00:58:15 +0900
+Subject: [PATCH 1/4] ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+In-Reply-To: <CAH9JG2VS3_dBar-wMAA=9wn_+hT0FgFHDsnBsOWTDGJE_v_qKA@mail.gmail.com>
+References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>	<1322730317-8171-2-git-send-email-myungjoo.ham@samsung.com>
+ <CAH9JG2VS3_dBar-wMAA=9wn_+hT0FgFHDsnBsOWTDGJE_v_qKA@mail.gmail.com>
+Message-ID: <4EEE0D97.9060001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/11 01:35, Dave Martin wrote:
-> Making SMP depend on (huge list of MACH_ and ARCH_ configs) is
-> bothersome to maintain and likely to lead to merge conflicts.
+On 12/16/11 17:24, Kyungmin Park wrote:
+> Hi Mr. Kim,
 >
-> This patch moves the knowledge of which platforms are SMP-capable
-> to the individual machines.  To enable this, a new HAVE_SMP config
-> option is introduced to allow machines to indicate that they can
-> run in a SMP configuration.
+> It's maybe missing for v3.3 merge at samsung soc.
+> Please give your opinion, how to handle it?
+
+Looks ok to me at the moment, and as a note, I'm sorting it out now.
+
 >
-> Signed-off-by: Dave Martin<dave.martin@linaro.org>
-> Acked-by: Linus Walleij<linus.walleij@linaro.org>
->          (for nomadik, ux500)
-> Acked-by: Tony Lindgren<tony@atomide.com>
->          (for omap)
+> If you don't mind it, it can merge it by devfreq.
 
-for exynos:
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-> ---
->   arch/arm/Kconfig               |   18 ++++++++++++++----
->   arch/arm/mach-exynos/Kconfig   |    1 +
->   arch/arm/mach-imx/Kconfig      |    1 +
->   arch/arm/mach-msm/Kconfig      |    1 +
->   arch/arm/mach-omap2/Kconfig    |    1 +
->   arch/arm/mach-realview/Kconfig |    4 ++++
->   arch/arm/mach-vexpress/Kconfig |    1 +
->   7 files changed, 23 insertions(+), 4 deletions(-)
-
-(snip)
+Hmm, I think, it should be handled in samsung tree to avoid useless 
+conflicts with others. And if you need this in the devfreq tree now, 
+please let me know so that I can create topic branch for it.
 
 Thanks.
 
@@ -46,3 +30,49 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> On 12/1/11, MyungJoo Ham<myungjoo.ham@samsung.com>  wrote:
+>> - Add DMC1
+>> - Enlarge address space for DMC from 4k to 64k so that PPMU registers
+>>    may be accessed.
+>>
+>> Signed-off-by: MyungJoo Ham<myungjoo.ham@samsung.com>
+>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/cpu.c              |    7 ++++++-
+>>   arch/arm/mach-exynos/include/mach/map.h |    1 +
+>>   2 files changed, 7 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
+>> index 90ec247..8bdcba9 100644
+>> --- a/arch/arm/mach-exynos/cpu.c
+>> +++ b/arch/arm/mach-exynos/cpu.c
+>> @@ -108,7 +108,12 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+>>   	}, {
+>>   		.virtual	= (unsigned long)S5P_VA_DMC0,
+>>   		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
+>> -		.length		= SZ_4K,
+>> +		.length		= SZ_64K,
+>> +		.type		= MT_DEVICE,
+>> +	}, {
+>> +		.virtual	= (unsigned long)S5P_VA_DMC1,
+>> +		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC1),
+>> +		.length		= SZ_64K,
+>>   		.type		= MT_DEVICE,
+>>   	}, {
+>>   		.virtual	= (unsigned long)S5P_VA_SROMC,
+>> diff --git a/arch/arm/mach-exynos/include/mach/map.h
+>> b/arch/arm/mach-exynos/include/mach/map.h
+>> index 058541d..870a980 100644
+>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>> @@ -57,6 +57,7 @@
+>>   #define EXYNOS4_PA_KEYPAD		0x100A0000
+>>
+>>   #define EXYNOS4_PA_DMC0			0x10400000
+>> +#define EXYNOS4_PA_DMC1			0x10410000
+>>
+>>   #define EXYNOS4_PA_COMBINER		0x10440000
+>>
+>> --
+>> 1.7.4.1
