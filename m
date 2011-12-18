@@ -1,36 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 17 Dec 2011 20:48:31 -0800
-Subject: [PATCH v7 00/14] Add support for tegra30 and cardhu
-In-Reply-To: <1323875032-18221-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1323875032-18221-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20111218044831.GB4336@quad.lixom.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Sat, 17 Dec 2011 22:18:23 -0700
+Subject: [PATCH] arm/tegra: Seaboard: Add GPIO key device tree nodes
+Message-ID: <1324185503-23413-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 05:03:12PM +0200, Peter De Schrijver wrote:
-> This patchset adds support for the tegra30 SoC and the cardhu development
-> board.
+This brings all the GPIO key definitions from board-seaboard.c into
+tegra-seaboard.dtsi.
 
-Thanks, applied to for-3.3/dt (first patch) and for-3.3/soc (the rest).
-I didn't want to split up too much between the branches and make
-cross-dependencies since that defeats most of the idea behind topic branches,
-so I left it at that.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-seaboard.dts |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
-I rebased for-3.3/soc (which only had one patch on it before) to be on top of
-rmk's devel-stable and for-3.3/dt, and will tell Arnd about those dependencies
-when sending up the branches -- other SoCs have similar dependencies already so
-it's not a problem.
-
-I had to do some minor touchups, including redoing the move of board-dt.c due
-to other changes to the file. Please check final contents of the branch and let
-me know if there's a problem.
-
-Also, the defconfig needs to be updated to enable t30 support as well as move
-over to the new config option for t20. I'll post a patch in a few minutes.
-
-Please let me know how the branch looks as soon as practical, since the
-clock is ticking on getting the branches into arm-soc in the next few
-days for the upcoming merge window.
-
-
--Olof
+diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+index f552bcc..3cfbd04 100644
+--- a/arch/arm/boot/dts/tegra-seaboard.dts
++++ b/arch/arm/boot/dts/tegra-seaboard.dts
+@@ -68,4 +68,24 @@
+ 	usb at c5000000 {
+ 		nvidia,vbus-gpio = <&gpio 24 0>; /* PD0 */
+ 	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		power {
++			label = "Power";
++			gpios = <&gpio 170 1>; /* gpio PV2, active low */
++			linux,code = <116>; /* KEY_POWER */
++			gpio-key,wakeup;
++		};
++
++		lid {
++			label = "Lid";
++			gpios = <&gpio 23 0>; /* gpio PC7 */
++			linux,input-type = <5>; /* EV_SW */
++			linux,code = <0>; /* SW_LID */
++			debounce-interval = <1>;
++			gpio-key,wakeup;
++		};
++	};
+ };
+-- 
+1.7.5.4
