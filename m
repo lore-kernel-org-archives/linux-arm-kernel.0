@@ -1,33 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 18 Dec 2011 08:13:27 +0000
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Sun, 18 Dec 2011 09:41:13 +0000
 Subject: [PATCHv2 5/5] ARM: picoxcell: implement watchdog restart
-In-Reply-To: <1771411.xn5pEUbjJo@wuerfel>
+In-Reply-To: <20111218081327.GT14542@n2100.arm.linux.org.uk>
 References: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
  <1324129357-16030-6-git-send-email-jamie@jamieiles.com>
  <1771411.xn5pEUbjJo@wuerfel>
-Message-ID: <20111218081327.GT14542@n2100.arm.linux.org.uk>
+ <20111218081327.GT14542@n2100.arm.linux.org.uk>
+Message-ID: <20111218094112.GB2376@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 17, 2011 at 09:17:00PM +0100, Arnd Bergmann wrote:
-> > +static void picoxcell_wdt_restart(char mode, const char *cmd)
-> > +{
-> > +	/*
-> > +	 * Configure the watchdog to reset with the shortest possible timeout
-> > +	 * and give it chance to do the reset.
-> > +	 */
-> > +	if (wdt_regs) {
-> > +		__raw_writel(WDT_CTRL_REG_EN_MASK, wdt_regs + WDT_CTRL_REG_OFFS);
-> > +		__raw_writel(0, wdt_regs + WDT_TIMEOUT_REG_OFFS);
-> > +		mdelay(500);
-> > +	}
-> > +}
+On Sun, Dec 18, 2011 at 08:13:27AM +0000, Russell King - ARM Linux wrote:
+> On Sat, Dec 17, 2011 at 09:17:00PM +0100, Arnd Bergmann wrote:
+> > > +static void picoxcell_wdt_restart(char mode, const char *cmd)
+> > > +{
+> > > +	/*
+> > > +	 * Configure the watchdog to reset with the shortest possible timeout
+> > > +	 * and give it chance to do the reset.
+> > > +	 */
+> > > +	if (wdt_regs) {
+> > > +		__raw_writel(WDT_CTRL_REG_EN_MASK, wdt_regs + WDT_CTRL_REG_OFFS);
+> > > +		__raw_writel(0, wdt_regs + WDT_TIMEOUT_REG_OFFS);
+> > > +		mdelay(500);
+> > > +	}
+> > > +}
+> > 
+> > Does this work if the real watchdog is still running, on a preemtible kernel?
+> > 
+> > Also, please always use writel_relaxed instead of __raw_writel, and try to use
+> > msleep instead of mdelay by default. If msleep doesn't work here because it
+> > actually causes the system not to be reset, just add a comment.
 > 
-> Does this work if the real watchdog is still running, on a preemtible kernel?
-> 
-> Also, please always use writel_relaxed instead of __raw_writel, and try to use
-> msleep instead of mdelay by default. If msleep doesn't work here because it
-> actually causes the system not to be reset, just add a comment.
+> Restarting can be called from atomic contexts, so any function which may
+> sleep must not be used.  That include sioremap.
 
-Restarting can be called from atomic contexts, so any function which may
-sleep must not be used.  That include sioremap.
+Thanks for clarifying Russell.  I'll add a comment or two to that effect 
+and change the __raw_writel's to writel_relaxed().
+
+Thanks,
+
+Jamie
