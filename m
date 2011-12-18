@@ -1,83 +1,113 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 18 Dec 2011 10:42:15 +0100
-Subject: [PATCH 3/7] s3c-hsudc: add a remove function
-In-Reply-To: <20111218081048.GS14542@n2100.arm.linux.org.uk>
-References: <201112172023.05519.heiko@sntech.de>
- <201112172026.34215.heiko@sntech.de>
- <20111218081048.GS14542@n2100.arm.linux.org.uk>
-Message-ID: <201112181042.15550.heiko@sntech.de>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Sun, 18 Dec 2011 10:13:49 +0000
+Subject: [PATCH 2/2] ARM: picoxcell: use new Synopsys Designware GPIO binding
+In-Reply-To: <1324203229-15571-1-git-send-email-jamie@jamieiles.com>
+References: <1324203229-15571-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <1324203229-15571-2-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag 18 Dezember 2011, 09:10:48 schrieb Russell King - ARM Linux:
-> On Sat, Dec 17, 2011 at 08:26:33PM +0100, Heiko St?bner wrote:
-> > As the driver is also buildable as a module it should need
-> > a cleanup function for the removal of the module.
-> 
-> My guess is that this wasn't implemented because of the embedded struct
-> device lifetime rules for the gadget - to prevent the unbinding of the
-> driver.
-> 
-> Until the struct device lifetime gets fixed, you must not allow the module
-> nor the data structure containing the struct device to be freed.
-so essentially, this patch and the release stuff in 5/7 must go.
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ arch/arm/boot/dts/picoxcell-pc3x2.dtsi |   19 ++++++++-----------
+ arch/arm/boot/dts/picoxcell-pc3x3.dtsi |   28 +++++++++++-----------------
+ 2 files changed, 19 insertions(+), 28 deletions(-)
 
-Thanks for pointing out this problem.
-
-
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  drivers/usb/gadget/s3c-hsudc.c |   25 +++++++++++++++++++++++++
-> >  1 files changed, 25 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/usb/gadget/s3c-hsudc.c
-> > b/drivers/usb/gadget/s3c-hsudc.c index 3e5673d..7cb0850 100644
-> > --- a/drivers/usb/gadget/s3c-hsudc.c
-> > +++ b/drivers/usb/gadget/s3c-hsudc.c
-> > 
-> > @@ -1370,12 +1370,37 @@ err_res:
-> >  	return ret;
-> >  
-> >  }
-> > 
-> > +static int __devexit s3c_hsudc_remove(struct platform_device *pdev)
-> > +{
-> > +	struct s3c_hsudc *hsudc = the_controller;
-> > +
-> > +	usb_del_gadget_udc(&hsudc->gadget);
-> > +
-> > +	clk_disable(hsudc->uclk);
-> > +	clk_put(hsudc->uclk);
-> > +
-> > +	free_irq(hsudc->irq, hsudc);
-> > +
-> > +	iounmap(hsudc->regs);
-> > +
-> > +	release_resource(hsudc->mem_rsrc);
-> > +	kfree(hsudc->mem_rsrc);
-> > +
-> > +	if (hsudc->transceiver)
-> > +		otg_put_transceiver(hsudc->transceiver);
-> > +
-> > +	the_controller = NULL;
-> > +	kfree(hsudc);
-> > +	return 0;
-> > +}
-> > +
-> > 
-> >  static struct platform_driver s3c_hsudc_driver = {
-> >  
-> >  	.driver		= {
-> >  	
-> >  		.owner	= THIS_MODULE,
-> >  		.name	= "s3c-hsudc",
-> >  	
-> >  	},
-> >  	.probe		= s3c_hsudc_probe,
-> > 
-> > +	.remove		= __devexit_p(s3c_hsudc_remove),
-> > 
-> >  };
-> >  
-> >  module_platform_driver(s3c_hsudc_driver);
+diff --git a/arch/arm/boot/dts/picoxcell-pc3x2.dtsi b/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
+index f0a8c20..887b331c 100644
+--- a/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
++++ b/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
+@@ -169,28 +169,25 @@
+ 				reg = <0x20000 0x1000>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				reg-io-width = <4>;
+ 
+ 				banka: gpio-controller at 0 {
+ 					compatible = "snps,dw-apb-gpio-bank";
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+-					gpio-generic,nr-gpio = <8>;
+-
+-					regoffset-dat = <0x50>;
+-					regoffset-set = <0x00>;
+-					regoffset-dirout = <0x04>;
++					nr-gpio = <8>;
++					snps,gpio-bank = <0>
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					interrupt-parent = <&vic1>;
++					interrupts = <0 1 2 3 4 5 6 7>;
+ 				};
+ 
+ 				bankb: gpio-controller at 1 {
+ 					compatible = "snps,dw-apb-gpio-bank";
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+-					gpio-generic,nr-gpio = <8>;
+-
+-					regoffset-dat = <0x54>;
+-					regoffset-set = <0x0c>;
+-					regoffset-dirout = <0x10>;
++					nr-gpio = <8>;
++					snps,gpio-bank = <1>
+ 				};
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/picoxcell-pc3x3.dtsi b/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
+index daa962d..dea5981 100644
+--- a/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
++++ b/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
+@@ -252,39 +252,33 @@
+ 				reg = <0x20000 0x1000>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				reg-io-width = <4>;
+ 
+ 				banka: gpio-controller at 0 {
+ 					compatible = "snps,dw-apb-gpio-bank";
+ 					gpio-controller;
++					snps,gpio-bank = <0>;
+ 					#gpio-cells = <2>;
+-					gpio-generic,nr-gpio = <8>;
+-
+-					regoffset-dat = <0x50>;
+-					regoffset-set = <0x00>;
+-					regoffset-dirout = <0x04>;
++					nr-gpio = <8>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					interrupt-parent = <&vic1>;
++					interrupts = <0 1 2 3 4 5 6 7>;
+ 				};
+ 
+ 				bankb: gpio-controller at 1 {
+ 					compatible = "snps,dw-apb-gpio-bank";
+ 					gpio-controller;
++					snps,gpio-bank = <1>;
+ 					#gpio-cells = <2>;
+-					gpio-generic,nr-gpio = <16>;
+-
+-					regoffset-dat = <0x54>;
+-					regoffset-set = <0x0c>;
+-					regoffset-dirout = <0x10>;
++					nr-gpio = <16>;
+ 				};
+ 
+-				bankd: gpio-controller at 2 {
++				bankd: gpio-controller at 3 {
+ 					compatible = "snps,dw-apb-gpio-bank";
+ 					gpio-controller;
++					snps,gpio-bank = <3>;
+ 					#gpio-cells = <2>;
+-					gpio-generic,nr-gpio = <30>;
+-
+-					regoffset-dat = <0x5c>;
+-					regoffset-set = <0x24>;
+-					regoffset-dirout = <0x28>;
++					nr-gpio = <30>;
+ 				};
+ 			};
+ 
+-- 
+1.7.5.4
