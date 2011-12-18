@@ -1,42 +1,83 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Sun, 18 Dec 2011 09:41:13 +0000
-Subject: [PATCHv2 5/5] ARM: picoxcell: implement watchdog restart
-In-Reply-To: <20111218081327.GT14542@n2100.arm.linux.org.uk>
-References: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
- <1324129357-16030-6-git-send-email-jamie@jamieiles.com>
- <1771411.xn5pEUbjJo@wuerfel>
- <20111218081327.GT14542@n2100.arm.linux.org.uk>
-Message-ID: <20111218094112.GB2376@gallagher>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 18 Dec 2011 10:42:15 +0100
+Subject: [PATCH 3/7] s3c-hsudc: add a remove function
+In-Reply-To: <20111218081048.GS14542@n2100.arm.linux.org.uk>
+References: <201112172023.05519.heiko@sntech.de>
+ <201112172026.34215.heiko@sntech.de>
+ <20111218081048.GS14542@n2100.arm.linux.org.uk>
+Message-ID: <201112181042.15550.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 18, 2011 at 08:13:27AM +0000, Russell King - ARM Linux wrote:
-> On Sat, Dec 17, 2011 at 09:17:00PM +0100, Arnd Bergmann wrote:
-> > > +static void picoxcell_wdt_restart(char mode, const char *cmd)
-> > > +{
-> > > +	/*
-> > > +	 * Configure the watchdog to reset with the shortest possible timeout
-> > > +	 * and give it chance to do the reset.
-> > > +	 */
-> > > +	if (wdt_regs) {
-> > > +		__raw_writel(WDT_CTRL_REG_EN_MASK, wdt_regs + WDT_CTRL_REG_OFFS);
-> > > +		__raw_writel(0, wdt_regs + WDT_TIMEOUT_REG_OFFS);
-> > > +		mdelay(500);
-> > > +	}
-> > > +}
-> > 
-> > Does this work if the real watchdog is still running, on a preemtible kernel?
-> > 
-> > Also, please always use writel_relaxed instead of __raw_writel, and try to use
-> > msleep instead of mdelay by default. If msleep doesn't work here because it
-> > actually causes the system not to be reset, just add a comment.
+Am Sonntag 18 Dezember 2011, 09:10:48 schrieb Russell King - ARM Linux:
+> On Sat, Dec 17, 2011 at 08:26:33PM +0100, Heiko St?bner wrote:
+> > As the driver is also buildable as a module it should need
+> > a cleanup function for the removal of the module.
 > 
-> Restarting can be called from atomic contexts, so any function which may
-> sleep must not be used.  That include sioremap.
+> My guess is that this wasn't implemented because of the embedded struct
+> device lifetime rules for the gadget - to prevent the unbinding of the
+> driver.
+> 
+> Until the struct device lifetime gets fixed, you must not allow the module
+> nor the data structure containing the struct device to be freed.
+so essentially, this patch and the release stuff in 5/7 must go.
 
-Thanks for clarifying Russell.  I'll add a comment or two to that effect 
-and change the __raw_writel's to writel_relaxed().
+Thanks for pointing out this problem.
 
-Thanks,
 
-Jamie
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  drivers/usb/gadget/s3c-hsudc.c |   25 +++++++++++++++++++++++++
+> >  1 files changed, 25 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/usb/gadget/s3c-hsudc.c
+> > b/drivers/usb/gadget/s3c-hsudc.c index 3e5673d..7cb0850 100644
+> > --- a/drivers/usb/gadget/s3c-hsudc.c
+> > +++ b/drivers/usb/gadget/s3c-hsudc.c
+> > 
+> > @@ -1370,12 +1370,37 @@ err_res:
+> >  	return ret;
+> >  
+> >  }
+> > 
+> > +static int __devexit s3c_hsudc_remove(struct platform_device *pdev)
+> > +{
+> > +	struct s3c_hsudc *hsudc = the_controller;
+> > +
+> > +	usb_del_gadget_udc(&hsudc->gadget);
+> > +
+> > +	clk_disable(hsudc->uclk);
+> > +	clk_put(hsudc->uclk);
+> > +
+> > +	free_irq(hsudc->irq, hsudc);
+> > +
+> > +	iounmap(hsudc->regs);
+> > +
+> > +	release_resource(hsudc->mem_rsrc);
+> > +	kfree(hsudc->mem_rsrc);
+> > +
+> > +	if (hsudc->transceiver)
+> > +		otg_put_transceiver(hsudc->transceiver);
+> > +
+> > +	the_controller = NULL;
+> > +	kfree(hsudc);
+> > +	return 0;
+> > +}
+> > +
+> > 
+> >  static struct platform_driver s3c_hsudc_driver = {
+> >  
+> >  	.driver		= {
+> >  	
+> >  		.owner	= THIS_MODULE,
+> >  		.name	= "s3c-hsudc",
+> >  	
+> >  	},
+> >  	.probe		= s3c_hsudc_probe,
+> > 
+> > +	.remove		= __devexit_p(s3c_hsudc_remove),
+> > 
+> >  };
+> >  
+> >  module_platform_driver(s3c_hsudc_driver);
