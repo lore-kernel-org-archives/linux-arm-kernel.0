@@ -1,57 +1,58 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Sun, 18 Dec 2011 02:35:47 +0200
-Subject: [PATCH] ARM: OMAP: fix erroneous mmc2 clock change on mmc3 setup
-Message-ID: <1324168547-26569-1-git-send-email-notasas@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 17 Dec 2011 16:57:02 -0800
+Subject: [PATCH 0/9] arm/tegra: Various pinmux-related cleanups
+In-Reply-To: <1324073552-15542-1-git-send-email-swarren@nvidia.com>
+References: <1324073552-15542-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20111218005702.GA4336@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hsmmc23_before_set_reg() can set MMCSDIO2ADPCLKISEL bit, which
-enables internal clock for MMC2. Currently this function is also called
-by code handling MMC3, and if .internal_clock is set in platform data
-(by default it currently is), it will set MMCSDIO2ADPCLKISEL for MMC2
-instead of MMC3 (MMC3 doesn't have such bit so nothing actually needs to
-be done). This breaks 2nd SD slot on pandora.
+On Fri, Dec 16, 2011 at 03:12:23PM -0700, Stephen Warren wrote:
+> While working on switching Tegra to a new pinctrl-based pin mux driver,
+> I made a bunch of small pinmux-related fixes; this patch series.
+>
+> This patch series will have a few small context conflicts with Peter
+> De Schrijver's Tegra30 support. Peter's patch series should have
+> priority over this one (i.e. be the one merged if it's difficult to
+> merge both).
 
-Fix this by changing hsmmc23_before_set_reg() to only handle MMC2.
-Note that this removes .remux() call for MMC3, but no board currently
-needs it and it's also not called for MMC4 and MMC5.
+Contents of the series as a whole looks good to me, but I did notice a
+bunch of section mismatches. Instead of commenting on the specific
+ones, just compile with CONFIG_DEBUG_SECTION_MISMATCH=y and fix up the
+new ones and repost, please. :)
 
-Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
----
-applies both on mainline and hsmmc branch.
+> In particular:
+> * My patch 3 "arm/tegra: Harmony PCIe: Don't touch pinmux" and Peter's
+>   patch "arm/tegra: prepare pinmux code for multiple tegra variants"
+>   will have context conflicts; I've described the best way to resolve
+>   this in my patch's commit description.
+> * This series edits board-dt.c whereas Peter's series renames that to
+>   board-dt-tegra20.c. I assume git will handle this without any issue.
+> * There may be other obvious context conflicts that should be trivial
+>   to resolve.
 
- arch/arm/mach-omap2/hsmmc.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
+The fixups were indeed trivial and no big deal, thanks for providing the
+preferred resolutions and heads-up though.
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index f4a1020..d90ac08 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -171,7 +171,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 	}
- }
- 
--static void hsmmc23_before_set_reg(struct device *dev, int slot,
-+static void hsmmc2_before_set_reg(struct device *dev, int slot,
- 				   int power_on, int vdd)
- {
- 	struct omap_mmc_platform_data *mmc = dev->platform_data;
-@@ -378,14 +378,13 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 			c->caps &= ~MMC_CAP_8_BIT_DATA;
- 			c->caps |= MMC_CAP_4_BIT_DATA;
- 		}
--		/* FALLTHROUGH */
--	case 3:
- 		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
- 			/* off-chip level shifting, or none */
--			mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
-+			mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
- 			mmc->slots[0].after_set_reg = NULL;
- 		}
- 		break;
-+	case 3:
- 	case 4:
- 	case 5:
- 		mmc->slots[0].before_set_reg = NULL;
--- 
-1.7.0.4
+> Following this series, I have 3 patches in my local tree:
+>   arm/tegra: Select PINMUX Kconfig variables
+>   arm/tegra: Switch to new pinctrl driver
+>   arm/tegra: Remove pre-pinctrl pinmux driver
+> 
+> (all work in DT and non-DT on all supported Tegra20 boards)
+> 
+> I need to rebase those on top of Peter's patches (the first patch needs
+> updates for Tegra30 support, the last patch needs to delete the new
+> Tegra30 pinmux driver that Peter's series adds). It will also depend on
+> the pinctrl subsystem, which is being merged for the first time in 3.3,
+> and probably also patches to pinctrl that may only show up in 3.4. So,
+> I'll probably hold off posting those patches for merge until after 3.3
+> is out, but will probably send them out as a preview before that.
+
+It's no problem to add a topic branch that has dependencies and make
+sure it gets merged upstream with said dependencies resolved, as long as
+they are on stable branches by then (i.e. that they won't be rebased). So
+either way works, it's up to you.
+
+
+-Olof
