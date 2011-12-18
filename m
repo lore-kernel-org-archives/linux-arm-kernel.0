@@ -1,36 +1,57 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 17 Dec 2011 20:23:56 -0800
-Subject: [PATCH v5 1/5] ARM: l2x0/pl310: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <1323964434-6764-2-git-send-email-dave.martin@linaro.org>
-References: <1323964434-6764-1-git-send-email-dave.martin@linaro.org>
- <1323964434-6764-2-git-send-email-dave.martin@linaro.org>
-Message-ID: <CAOesGMibYSA-hJUzpeqFAR0NwewvqHYgujU7SW6-Ua7vxC=-3w@mail.gmail.com>
+Date: Sat, 17 Dec 2011 20:48:04 -0800
+Subject: [PATCH] arm/tegra: refresh defconfig for tegra30
+Message-ID: <1324183684-19606-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 7:53 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> Making CACHE_L2X0 depend on (huge list of MACH_ and ARCH_ configs)
-> is bothersome to maintain and likely to lead to merge conflicts.
->
-> This patch moves the knowledge of which platforms have a L2x0 or
-> PL310 cache controller to the individual machines. ?To enable this,
-> a new MIGHT_HAVE_CACHE_L2X0 config option is introduced to allow
-> machines to indicate that they may have such a cache controller
-> independently of each other.
->
-> Boards/SoCs which cannot reliably operate without the L2 cache
-> controller support will need to select CACHE_L2X0 directly from
-> their own Kconfigs instead. ?This applies to some TrustZone-enabled
-> boards where Linux runs in the Normal World, for example.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
-> ? ? ? ?(for cns3xxx)
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> ? ? ? ?(for omap)
+Update the defconfig for tegra due to the addition of tegra30 and rename
+of t20/t30 options.
 
-Acked-by: Olof Johansson <olof@lixom.net> (for tegra)
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/configs/tegra_defconfig |    9 ++++-----
+ 1 files changed, 4 insertions(+), 5 deletions(-)
 
-
--Olof
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 1957297..fd5d304 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -9,9 +9,8 @@ CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_RT_GROUP_SCHED=y
+ CONFIG_BLK_DEV_INITRD=y
+-CONFIG_EMBEDDED=y
+-# CONFIG_SYSCTL_SYSCALL is not set
+ # CONFIG_ELF_CORE is not set
++CONFIG_EMBEDDED=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+@@ -20,6 +19,8 @@ CONFIG_MODULE_FORCE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_TEGRA=y
++CONFIG_ARCH_TEGRA_2x_SOC=y
++CONFIG_ARCH_TEGRA_3x_SOC=y
+ CONFIG_MACH_HARMONY=y
+ CONFIG_MACH_KAEN=y
+ CONFIG_MACH_PAZ00=y
+@@ -78,14 +79,12 @@ CONFIG_BLK_DEV_SD=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_NETDEVICES=y
+ CONFIG_DUMMY=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_R8169=y
+-# CONFIG_NETDEV_10000 is not set
+-# CONFIG_WLAN is not set
+ CONFIG_USB_PEGASUS=y
+ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_SMSC75XX=y
+ CONFIG_USB_NET_SMSC95XX=y
++# CONFIG_WLAN is not set
+ # CONFIG_INPUT is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT is not set
+-- 
+1.7.5.4
