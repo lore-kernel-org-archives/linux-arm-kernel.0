@@ -1,88 +1,77 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 17 Dec 2011 15:42:58 -0800
-Subject: [GIT PULL] at91: devices and boards files update for 3.3
-In-Reply-To: <Pine.LNX.4.64.1112171928380.13817@axis700.grange>
-References: <4EEA034C.9020800@atmel.com>
- <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
- <4EEB73DD.3070505@atmel.com>
- <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
- <Pine.LNX.4.64.1112171928380.13817@axis700.grange>
-Message-ID: <CAOesGMi6-iPPBSP_TgKHf_agGSOrQeoB1CU=xhj8wuM2dQvf0A@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Sun, 18 Dec 2011 00:05:23 +0000
+Subject: [PATCHv2 5/5] ARM: picoxcell: implement watchdog restart
+In-Reply-To: <1771411.xn5pEUbjJo@wuerfel>
+References: <1324129357-16030-1-git-send-email-jamie@jamieiles.com>
+ <1324129357-16030-6-git-send-email-jamie@jamieiles.com>
+ <1771411.xn5pEUbjJo@wuerfel>
+Message-ID: <20111218000523.GA2376@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On Sat, Dec 17, 2011 at 10:34 AM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> Hi Olof
->
-> On Fri, 16 Dec 2011, Olof Johansson wrote:
->
->> Hi Nicolas,
->>
->> On Fri, Dec 16, 2011 at 8:37 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->>
->> > Yes, this ISI driver addition is also dependent on an update of the ISI
->> > driver itself that will certainly be included in 3.3 by Guennadi using
->> > v4L2 path.
->> >
->> > So, do we have to wait for its inclusion in linux-next or maybe we can
->> > manage this little out-of-sync situation during the 3.3 life cycle...
->> >
->> > ISI is a "several times reworked" and "long-awaited" driver and I really
->> > would like to see it included in mainline soon...
->>
->> I don't see why code that is known to be broken should be added to the kernel.
->>
->> The way these things are normally handled is that once Guennadi has
->> the patch on a stable branch, we can add that branch as a dependency
->> that your code requires. So we pull that in as a dependency and apply
->> your code on top of it (or, if it is just one or two patches, that
->> they are are cherry-picked into your branch in the same way).
->>
->> But that requires that he picks up the v4l patches and keeps it in a
->> stable, small, branch and that said branch gets merged in the 3.3
->> merge window before the branch containing these at91 changes do.
->>
->> Guennadi, sound reasonable to you?
->
-> I'm not sure what you call a "stable" branch. If you mean a branch in some
-> tree somewhere (like my tree on linuxtv.org) then I wouldn't yet use that.
-> I think, there are two ways to handle this:
+On Sat, Dec 17, 2011 at 09:17:00PM +0100, Arnd Bergmann wrote:
+> On Saturday 17 December 2011 13:42:37 Jamie Iles wrote:
+> > Allow the platform to be restarted by triggering the watchdog to expire
+> > with the shortest possible expiry.  This should reset the CPU core and
+> > all on-chip peripherals.
+> > 
+> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> 
+> Hi Jamie,
+> 
+> > @@ -23,6 +24,22 @@
+> >  
+> >  #include "common.h"
+> >  
+> > +#define WDT_CTRL_REG_EN_MASK	(1 << 0)
+> > +#define WDT_CTRL_REG_OFFS	(0x00)
+> > +#define WDT_TIMEOUT_REG_OFFS	(0x04)
+> > +static void __iomem *wdt_regs;
+> > +
+> > +static void picoxcell_setup_restart(void)
+> > +{
+> > +	struct device_node *np = of_find_compatible_node(NULL, NULL,
+> > +							 "snps,dw-apb-wdg");
+> > +	if (WARN(!np, "unable to setup watchdog restart"))
+> > +		return;
+> > +
+> > +	wdt_regs = of_iomap(np, 0);
+> > +	WARN(!wdt_regs, "failed to remap watchdog regs");
+> > +}
+> 
+> Can you do this at restart time? I think it would be nicer to
+> avoid the global variable and init function and instead have
+> everything in a single function call for restart
+> 
+> > +static void picoxcell_wdt_restart(char mode, const char *cmd)
+> > +{
+> > +	/*
+> > +	 * Configure the watchdog to reset with the shortest possible timeout
+> > +	 * and give it chance to do the reset.
+> > +	 */
+> > +	if (wdt_regs) {
+> > +		__raw_writel(WDT_CTRL_REG_EN_MASK, wdt_regs + WDT_CTRL_REG_OFFS);
+> > +		__raw_writel(0, wdt_regs + WDT_TIMEOUT_REG_OFFS);
+> > +		mdelay(500);
+> > +	}
+> > +}
+> 
+> Does this work if the real watchdog is still running, on a preemtible kernel?
 
-When I say "stable" branch, I mean a topic branch that is staged for
-3.3, pulled into a for-next branch that is picked up by linux-next and
-that *will not be rebased* before the merge window. In other words,
-patches that have been staged and won't be touched before they go in.
-It would them match case (2) below, but it would also allow us to
-merge in either a branch pull of said stable staging branch as a base
-for the at91 patch -- if the V4L code is merged before the at91 branch
-then git will handle it nicely.
+Yes, this sets the timeout period to about 3us on this platform so 
+there's no way the driver should be pinging it that fast even if it was 
+still active.
 
-> 1. Safe from the dependency and synchronisation PoV, but might cause
-> problems during merge. One of the patches gets an ack from the respective
-> maintainer but gets merged together with the other patch via the "wrong"
-> tree. E.g., someone from at91 could ack this patch and I could apply it to
-> V4L together with the actual ISI patch.
->
-> 2. Each patch goes via its own tree, but we make sure, that at91 tree is
-> pushed to Linus after the V4L tree. This is more "correct" - each patch is
-> merged via its respective tree, but if the V4L tree is merged near the end
-> of the merge interval, it might be difficult for at91 to hit the remaining
-> window.
->
-> I'm ok with either of the above.
+> Also, please always use writel_relaxed instead of __raw_writel, and try to use
+> msleep instead of mdelay by default. If msleep doesn't work here because it
+> actually causes the system not to be reset, just add a comment.
 
-Since we're trying to keep the amount of board code addition to a
-minimum on ARM right now, I would prefer if all changes to said code
-goes through arm-soc mostly to keep an eye on just what goes in, which
-means (2). Do you normally get the v4l tree merged very late during
-the merge window?
+OK fair point.  I was a bit wary of doing too much in the actual reboot 
+time as it wasn't clear what services are available at that time, but 
+all of your changes work so I'll go ahead and implement them.
 
-We can keep one late-merge branch in arm-soc that contain patches with
-external and possibly late dependencies and submit that branch last,
-but it would be good if we had a bit of margin to get it in. :)
+Thanks,
 
-
--Olof
+Jamie
