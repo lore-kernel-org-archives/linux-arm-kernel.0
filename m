@@ -1,50 +1,40 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Sat, 17 Dec 2011 23:29:31 -0700
-Subject: [PATCH V2 3/4] arm/dt: tegra: Use new compatible value for DVC I2C
- controller
-In-Reply-To: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
-References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1324189772-26914-3-git-send-email-swarren@nvidia.com>
+Date: Sat, 17 Dec 2011 23:29:29 -0700
+Subject: [PATCH V2 1/4] i2c: tegra: Add __devinit/exit to probe/remove
+Message-ID: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the device tree to indicate which I2C controller is the DVC
-controller. AUXDATA needs to be updated too, since the compatible
-value changed.
+This fixes some section mismatch build warnings.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-v2: No change
+v2: New patch.
 
- arch/arm/boot/dts/tegra20.dtsi |    2 +-
- arch/arm/mach-tegra/board-dt.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-tegra.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 660c8ad..3da7afd 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -39,7 +39,7 @@
- 	i2c at 7000d000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "nvidia,tegra20-i2c";
-+		compatible = "nvidia,tegra20-i2c-dvc";
- 		reg = <0x7000D000 0x200>;
- 		interrupts = < 0 53 0x04 >;
- 	};
-diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index b44633b..9abc89d 100644
---- a/arch/arm/mach-tegra/board-dt.c
-+++ b/arch/arm/mach-tegra/board-dt.c
-@@ -74,7 +74,7 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_I2C_BASE, "tegra-i2c.0", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_I2C2_BASE, "tegra-i2c.1", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_I2C3_BASE, "tegra-i2c.2", NULL),
--	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_DVC_BASE, "tegra-i2c.3", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-i2c-dvc", TEGRA_DVC_BASE, "tegra-i2c.3", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.0", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S2_BASE, "tegra-i2s.1", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-das", TEGRA_APB_MISC_DAS_BASE, "tegra-das", NULL),
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 46b6500..e8560ed 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -558,7 +558,7 @@ static const struct i2c_algorithm tegra_i2c_algo = {
+ 	.functionality	= tegra_i2c_func,
+ };
+ 
+-static int tegra_i2c_probe(struct platform_device *pdev)
++static int __devinit tegra_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct tegra_i2c_dev *i2c_dev;
+ 	struct tegra_i2c_platform_data *pdata = pdev->dev.platform_data;
+@@ -690,7 +690,7 @@ err_iounmap:
+ 	return ret;
+ }
+ 
+-static int tegra_i2c_remove(struct platform_device *pdev)
++static int __devexit tegra_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
+ 	i2c_del_adapter(&i2c_dev->adapter);
 -- 
 1.7.5.4
