@@ -1,39 +1,97 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Sat, 17 Dec 2011 22:28:21 -0700
-Subject: [PATCH 3/3] arm/dt: Add ADT7461 to Seaboard
-In-Reply-To: <1324186101-23695-1-git-send-email-swarren@nvidia.com>
-References: <1324186101-23695-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1324186101-23695-3-git-send-email-swarren@nvidia.com>
+Date: Sat, 17 Dec 2011 22:28:19 -0700
+Subject: [PATCH 1/3] i2c: tegra: Support DVC controller in device tree
+Message-ID: <1324186101-23695-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ADT7461 is a temperature monitoring IC. One is present on the DVC
-I2C bus on Seaboard.
+One of the Tegra I2C blocks is inside the DVC (Digital Voltage Controller)
+block. This block is identical to the rest of the I2C blocks, except that
+it only supports master mode, it has registers moved around, and it needs
+some extra init to get it into I2C mode.  The register moves are handled
+by i2c_readl and i2c_writel
+
+This patch adds a new compatible value for controllers of this "DVC"
+type; I figured that this approach was reasonable, as opposed to adding
+an is-dvc property under the existing compatible value, since the HW
+truly is different.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-For this to be useful, the previous two patches are required. Without
-them, all the I2C transactions to this device will time out and spew
-errors, but other device shouldn't be affected.
+Ben, it'd probably be simplest if you could ack this patch, and we
+could take it through the Tegra tree.
 
- arch/arm/boot/dts/tegra-seaboard.dts |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-tegra.c |   37 +++++++++++++++++++++++++------------
+ 1 files changed, 25 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index 3cfbd04..b55a02e 100644
---- a/arch/arm/boot/dts/tegra-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -25,6 +25,11 @@
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 46b6500..c264e8c 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -26,6 +26,7 @@
+ #include <linux/delay.h>
+ #include <linux/slab.h>
+ #include <linux/i2c-tegra.h>
++#include <linux/of_device.h>
+ #include <linux/of_i2c.h>
+ #include <linux/module.h>
  
- 	i2c at 7000d000 {
- 		clock-frequency = <400000>;
+@@ -558,6 +559,18 @@ static const struct i2c_algorithm tegra_i2c_algo = {
+ 	.functionality	= tegra_i2c_func,
+ };
+ 
++#if defined(CONFIG_OF)
++/* Match table for of_platform binding */
++static const struct of_device_id tegra_i2c_of_match[] __devinitconst = {
++	{ .compatible = "nvidia,tegra20-i2c",     .data = (void *)0},
++	{ .compatible = "nvidia,tegra20-i2c-dvc", .data = (void *)1},
++	{},
++};
++MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
++#else
++#define tegra_i2c_of_match NULL
++#endif
 +
-+		adt7461 at 4c {
-+			compatible = "adt7461";
-+			reg = <0x4c>;
-+		};
- 	};
+ static int tegra_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct tegra_i2c_dev *i2c_dev;
+@@ -636,7 +649,18 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+ 			i2c_dev->bus_clk_rate = be32_to_cpup(prop);
+ 	}
  
- 	serial at 70006000 {
+-	if (pdev->id == 3)
++#if defined(CONFIG_OF)
++	if (pdev->dev.of_node) {
++		const struct of_device_id *match;
++
++		match = of_match_device(tegra_i2c_of_match, &pdev->dev);
++		if (!match)
++			return -EINVAL;
++
++		i2c_dev->is_dvc = match->data;
++	}
++#endif
++	else if (pdev->id == 3)
+ 		i2c_dev->is_dvc = 1;
+ 	init_completion(&i2c_dev->msg_complete);
+ 
+@@ -738,17 +762,6 @@ static int tegra_i2c_resume(struct platform_device *pdev)
+ }
+ #endif
+ 
+-#if defined(CONFIG_OF)
+-/* Match table for of_platform binding */
+-static const struct of_device_id tegra_i2c_of_match[] __devinitconst = {
+-	{ .compatible = "nvidia,tegra20-i2c", },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
+-#else
+-#define tegra_i2c_of_match NULL
+-#endif
+-
+ static struct platform_driver tegra_i2c_driver = {
+ 	.probe   = tegra_i2c_probe,
+ 	.remove  = tegra_i2c_remove,
 -- 
 1.7.5.4
