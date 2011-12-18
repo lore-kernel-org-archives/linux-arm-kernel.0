@@ -1,37 +1,50 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Sat, 17 Dec 2011 23:29:32 -0700
-Subject: [PATCH V2 4/4] arm/dt: Add ADT7461 to Seaboard
+Date: Sat, 17 Dec 2011 23:29:31 -0700
+Subject: [PATCH V2 3/4] arm/dt: tegra: Use new compatible value for DVC I2C
+ controller
 In-Reply-To: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
 References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1324189772-26914-4-git-send-email-swarren@nvidia.com>
+Message-ID: <1324189772-26914-3-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ADT7461 is a temperature monitoring IC. One is present on the DVC
-I2C bus on Seaboard.
+Update the device tree to indicate which I2C controller is the DVC
+controller. AUXDATA needs to be updated too, since the compatible
+value changed.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
 v2: No change
 
- arch/arm/boot/dts/tegra-seaboard.dts |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra20.dtsi |    2 +-
+ arch/arm/mach-tegra/board-dt.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index 3cfbd04..b55a02e 100644
---- a/arch/arm/boot/dts/tegra-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -25,6 +25,11 @@
- 
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 660c8ad..3da7afd 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -39,7 +39,7 @@
  	i2c at 7000d000 {
- 		clock-frequency = <400000>;
-+
-+		adt7461 at 4c {
-+			compatible = "adt7461";
-+			reg = <0x4c>;
-+		};
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "nvidia,tegra20-i2c";
++		compatible = "nvidia,tegra20-i2c-dvc";
+ 		reg = <0x7000D000 0x200>;
+ 		interrupts = < 0 53 0x04 >;
  	};
- 
- 	serial at 70006000 {
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index b44633b..9abc89d 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -74,7 +74,7 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_I2C_BASE, "tegra-i2c.0", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_I2C2_BASE, "tegra-i2c.1", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_I2C3_BASE, "tegra-i2c.2", NULL),
+-	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_DVC_BASE, "tegra-i2c.3", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-i2c-dvc", TEGRA_DVC_BASE, "tegra-i2c.3", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.0", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S2_BASE, "tegra-i2s.1", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-das", TEGRA_APB_MISC_DAS_BASE, "tegra-das", NULL),
 -- 
 1.7.5.4
