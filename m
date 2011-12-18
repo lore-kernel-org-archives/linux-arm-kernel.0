@@ -1,29 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Dec 2011 00:17:01 +0100
-Subject: [PATCH] GPIO: sa1100: implement proper gpiolib gpio_to_irq
- conversion
-In-Reply-To: <20111218182457.GV14542@n2100.arm.linux.org.uk>
-References: <20111218182457.GV14542@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZ-W_JHYj2SHZb7wSVHKmnv7UiCgHE84DDcJfX0d_oTSA@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 19 Dec 2011 00:31:15 +0100
+Subject: [PATCH] ux500: fix the smp_twd clock calculation
+Message-ID: <1324251075-3248-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 18, 2011 at 7:24 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
->
-> The existing gpio_to_irq() implementation on sa1100 only translates
-> validly for internal GPIOs. ?Since this sub-arch enables GPIOLIB
-> support, this results in buggy translations for non-internal GPIOs.
->
-> Get rid of the private gpio_to_irq() implementation, replacing it
-> with the .to_irq method in the sa1100 gpio chip instead.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+The clock for the smp_twd block is not equal to the CPU
+frequency, actually it is divided by two, so fix this,
+and set the initial frequency to half of 1GHz which is
+the most common case.
 
-Thanks Russell!
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Reported-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/clock.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
+index 2ebf998..7379075 100644
+--- a/arch/arm/mach-ux500/clock.c
++++ b/arch/arm/mach-ux500/clock.c
+@@ -651,7 +651,7 @@ err_out:
+ late_initcall(clk_debugfs_init);
+ #endif /* defined(CONFIG_DEBUG_FS) */
+ 
+-unsigned long clk_smp_twd_rate = 400000000;
++unsigned long clk_smp_twd_rate = 500000000;
+ 
+ unsigned long clk_smp_twd_get_rate(struct clk *clk)
+ {
+@@ -677,7 +677,7 @@ static int clk_twd_cpufreq_transition(struct notifier_block *nb,
+ 
+ 	if (state == CPUFREQ_PRECHANGE) {
+ 		/* Save frequency in simple Hz */
+-		clk_smp_twd_rate = f->new * 1000;
++		clk_smp_twd_rate = (f->new * 1000) / 2;
+ 	}
+ 
+ 	return NOTIFY_OK;
+-- 
+1.7.8
