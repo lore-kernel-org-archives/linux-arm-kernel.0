@@ -1,80 +1,103 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Sun, 18 Dec 2011 20:34:17 +0800
-Subject: [PATCH V2 1/4] cpufreq: add arm soc generic cpufreq driver
-In-Reply-To: <1771359.4jv0xX1vFp@wuerfel>
-References: <1324031462-24961-1-git-send-email-richard.zhao@linaro.org>
- <4EEB5683.7000409@gmail.com> <20111217080001.GC2010@richard-laptop>
- <1771359.4jv0xX1vFp@wuerfel>
-Message-ID: <20111218123414.GA2741@richard-laptop>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 18 Dec 2011 14:44:39 +0100
+Subject: [PATCH 3/7] s3c-hsudc: add a remove function
+In-Reply-To: <20111218081048.GS14542@n2100.arm.linux.org.uk>
+References: <201112172023.05519.heiko@sntech.de>
+ <201112172026.34215.heiko@sntech.de>
+ <20111218081048.GS14542@n2100.arm.linux.org.uk>
+Message-ID: <201112181444.39812.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 17, 2011 at 10:29:29AM +0100, Arnd Bergmann wrote:
-> On Saturday 17 December 2011 16:00:03 Richard Zhao wrote:
-> > On Fri, Dec 16, 2011 at 08:32:35AM -0600, Rob Herring wrote:
-> > > On 12/16/2011 04:30 AM, Richard Zhao wrote:
-> > > > It support single core and multi-core ARM SoCs. But it assume
-> > > > all cores share the same frequency and voltage.
-> > > > 
-> > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > > ---
-> > > >  drivers/cpufreq/Kconfig.arm   |    8 ++
-> > > >  drivers/cpufreq/Makefile      |    1 +
-> > > >  drivers/cpufreq/arm-cpufreq.c |  269 +++++++++++++++++++++++++++++++++++++++++
-> > > >  3 files changed, 278 insertions(+), 0 deletions(-)
-> > > >  create mode 100644 drivers/cpufreq/arm-cpufreq.c
-> > > > 
-> > > 
-> > > What makes this specific to ARM and not a generic DT + clk api +
-> > > regulator api driver?
-> >
-> > smp loops_per_jiffy update needs arm header <asm/cpu.h>.
+Am Sonntag 18 Dezember 2011, 09:10:48 schrieb Russell King - ARM Linux:
+> On Sat, Dec 17, 2011 at 08:26:33PM +0100, Heiko St?bner wrote:
+> > As the driver is also buildable as a module it should need
+> > a cleanup function for the removal of the module.
 > 
-> I would suggest to instead change the definition of adjust_jiffies in the
-> core so it can be overridden by the architecture, like this
+> My guess is that this wasn't implemented because of the embedded struct
+> device lifetime rules for the gadget - to prevent the unbinding of the
+> driver.
 > 
-> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> index 987a165..174584d 100644
-> --- a/drivers/cpufreq/cpufreq.c
-> +++ b/drivers/cpufreq/cpufreq.c
-> @@ -189,6 +189,7 @@ EXPORT_SYMBOL_GPL(cpufreq_cpu_put);
->   * systems as each CPU might be scaled differently. So, use the arch
->   * per-CPU loops_per_jiffy value wherever possible.
->   */
-> +#ifndef adjust_jiffies
->  #ifndef CONFIG_SMP
->  static unsigned long l_p_j_ref;
->  static unsigned int  l_p_j_ref_freq;
-> @@ -218,7 +219,8 @@ static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
->  {
->         return;
->  }
-> -#endif
-> +#endif /* CONFIG_SMP */
-> +#endif /* adjust_jiffies */
->  
->  
->  /**
-> 
-> 
-> Then ARM (and any others that want the driver) can provide their own
-> implementation and set 
-> 
-> #define adjust_jiffies(val, ci) adjust_jiffies((val), (ci))
-> 
-> to let the core use that instead of the generic UP version.
-> 
-> 
-> While we're there, we should probably try to fix drivers that use loops_per_jiffy,
-> because that is not what they think it is on SMP.
-Or let different arch register its different CPUFREQ_TRANSITION_NOTIFIER ?
+> Until the struct device lifetime gets fixed, you must not allow the module
+> nor the data structure containing the struct device to be freed.
 
-Thanks
-Richard
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I understand where this problem comes from (the release method is potentially 
+gone with the module before it is called) but after more reading, I have a 
+hard time believing that a lot of the other gadget drivers would be wrong as 
+well. Some of them since 2009 or possibly earlier.
+
+Gadgets with embedded release methods: langwell_udc, goku_udc, fsl_qe_udc (and 
+fsl_udc_core), amd5536udc, net2280, pch_udc, cil13xxx_udc, dummy_hcd, 
+omap_udc, net2272, mc_udc_core
+
+Gadgets which use the release method from its pdev->dev but also free the 
+struct with the gadget in their remove method: r8a66597-udc, m66592-udc, 
+fusb300_udc. (possibly before the release function is called)
+
+On the other hand, the gets and puts of the udc->gadget.dev should be paired 
+correctly and it's only an intermediate device between the udc and the gadget 
+driver, so that the call to device_unregister in the remove method should put 
+the refcount to 0 and thus init the cleanup (including the call to release) 
+before the module is removed.
+
+So, I am very confused :-).
+
+Heiko
+
+
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  drivers/usb/gadget/s3c-hsudc.c |   25 +++++++++++++++++++++++++
+> >  1 files changed, 25 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/usb/gadget/s3c-hsudc.c
+> > b/drivers/usb/gadget/s3c-hsudc.c index 3e5673d..7cb0850 100644
+> > --- a/drivers/usb/gadget/s3c-hsudc.c
+> > +++ b/drivers/usb/gadget/s3c-hsudc.c
+> > 
+> > @@ -1370,12 +1370,37 @@ err_res:
+> >  	return ret;
+> >  
+> >  }
+> > 
+> > +static int __devexit s3c_hsudc_remove(struct platform_device *pdev)
+> > +{
+> > +	struct s3c_hsudc *hsudc = the_controller;
+> > +
+> > +	usb_del_gadget_udc(&hsudc->gadget);
+> > +
+> > +	clk_disable(hsudc->uclk);
+> > +	clk_put(hsudc->uclk);
+> > +
+> > +	free_irq(hsudc->irq, hsudc);
+> > +
+> > +	iounmap(hsudc->regs);
+> > +
+> > +	release_resource(hsudc->mem_rsrc);
+> > +	kfree(hsudc->mem_rsrc);
+> > +
+> > +	if (hsudc->transceiver)
+> > +		otg_put_transceiver(hsudc->transceiver);
+> > +
+> > +	the_controller = NULL;
+> > +	kfree(hsudc);
+> > +	return 0;
+> > +}
+> > +
+> > 
+> >  static struct platform_driver s3c_hsudc_driver = {
+> >  
+> >  	.driver		= {
+> >  	
+> >  		.owner	= THIS_MODULE,
+> >  		.name	= "s3c-hsudc",
+> >  	
+> >  	},
+> >  	.probe		= s3c_hsudc_probe,
+> > 
+> > +	.remove		= __devexit_p(s3c_hsudc_remove),
+> > 
+> >  };
+> >  
+> >  module_platform_driver(s3c_hsudc_driver);
