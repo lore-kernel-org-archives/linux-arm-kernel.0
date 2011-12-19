@@ -1,190 +1,102 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Tue, 20 Dec 2011 00:08:57 +0100
-Subject: [PATCH v2 7/7] input: serio: ams-delta: toggle keyboard power over
- GPIO
-In-Reply-To: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <378bcda9c6cb6a1ddeeb54817078bc7ec68c5987.1324331816.git.jkrzyszt@tis.icnet.pl>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Dec 2011 15:20:49 -0800
+Subject: buggy usage of pm_idle by omap1 code
+In-Reply-To: <20111219213445.GL14542@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1112162208390.2907@xanadu.home>
+ <20111219173518.GH6464@atomide.com>
+ <20111219213445.GL14542@n2100.arm.linux.org.uk>
+Message-ID: <20111219232049.GU6464@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't use Amstrad Delta custom I/O functions once GPIO interface is
-available for the underlying hardware.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [111219 13:02]:
+> On Mon, Dec 19, 2011 at 09:35:19AM -0800, Tony Lindgren wrote:
+> > Good catch. Here's a patch to deal with that issue, want to take this
+> > into your idle series? I'll try out your idle series today at some
+> > point.
+> 
+> Two points:
+> 
+> 1. It's good practice to call cpu_idle_wait() after modifying pm_idle,
+> even on UP - it allows static checking of this.
 
-While requesting and initializing GPIO pins used, also take care of one
-extra pin KEYBRD_DATAOUT which, even if not used by the driver, belongs
-to the device and affects its functioning.
-
-Once done, move the driver initialization back to the device_initcall
-level, reverting the temporary chane introduced with patch 1/7 "ARM:
-OMAP1: ams-delta: register latch dependent devices from late_initcall".
-That change is no longer required once the driver takes care of
-registering used GPIO pins, and it's better to initialize the device
-before others using the latch2 based GPIO pins, otherwise a garbage is
-reported on boot, perhaps due to random data already captured by the FIQ
-handler while the keyboard related latch bits are written with random
-values during initialization of those other latch2 dependent devices.
-
-Depends on patch 2/7 "ARM: OMAP1: ams-delta: convert latches to
-basic_mmio_gpio"
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
-Changes against initial version:
-* was 9/10,
-* rebased on top of v2 of patch 2/7, just in case,
-* moved AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT pin handling from the board
-  code to the driver,
-* reverted a temporary change to the driver initcall level, introduced
-  by the new solution provided with patch 1/7.
-
-
- arch/arm/mach-omap1/board-ams-delta.c             |   10 ----
- arch/arm/plat-omap/include/plat/board-ams-delta.h |    2 -
- drivers/input/serio/ams_delta_serio.c             |   55 ++++++++++++---------
- 3 files changed, 31 insertions(+), 36 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 3aba8f9..673cf21 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -227,16 +227,6 @@ static struct gpio latch_gpios[] __initconst = {
- 		.label	= "dockit2",
- 	},
- 	{
--		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
--		.flags	= GPIOF_OUT_INIT_LOW,
--		.label	= "keybrd_pwr",
--	},
--	{
--		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
--		.flags	= GPIOF_OUT_INIT_LOW,
--		.label	= "keybrd_dataout",
--	},
--	{
- 		.gpio	= AMS_DELTA_GPIO_PIN_SCARD_RSTIN,
- 		.flags	= GPIOF_OUT_INIT_LOW,
- 		.label	= "scard_rstin",
-diff --git a/arch/arm/plat-omap/include/plat/board-ams-delta.h b/arch/arm/plat-omap/include/plat/board-ams-delta.h
-index e9ad673..027e79e 100644
---- a/arch/arm/plat-omap/include/plat/board-ams-delta.h
-+++ b/arch/arm/plat-omap/include/plat/board-ams-delta.h
-@@ -28,8 +28,6 @@
+Hmm, looks like we're not using that anywhere right now. Should
+we have a function or macro set_arm_idle() that does that
+automatically?
  
- #if defined (CONFIG_MACH_AMS_DELTA)
+> > From: Tony Lindgren <tony@atomide.com>
+> > Date: Mon, 19 Dec 2011 09:11:11 -0800
+> > Subject: [PATCH] ARM: OMAP1: Fix pm_idle during suspend
+> > 
+> > Commit 9ccdac3662dbf3c75e8f8851a214bdf7d365a4bd ([ARM] idle:
+> > clean up pm_idle calling, obey hlt_counter) removed a check
+> > for NULL pm_idle.
+> > 
+> > On omap1 the system hits an equivalent of suspend during idle.
+> > If we are suspending, we need to make sure so we don't call
+> > omap1_pm_idle during the suspend process.
+> > 
+> > Fix this by setting the pm_idle function to a an empty
+> > function while suspending.
+> 
+> 2. what's wrong with calling disable_hlt() to prevent the pm_idle function
+> being called?  Why solve it this complicated way of changing the pm_idle
+> pointer when there's some infrastructure which can fix it for you already?
+
+Thanks that allows removal of few lines of code. Updated
+patch below.
+
+Regards,
+
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 19 Dec 2011 09:11:11 -0800
+Subject: [PATCH] Subject: [PATCH] ARM: OMAP1: Fix pm_idle during suspend
+
+Commit 9ccdac3662dbf3c75e8f8851a214bdf7d365a4bd ([ARM] idle:
+clean up pm_idle calling, obey hlt_counter) removed a check
+for NULL pm_idle.
+
+On omap1 the system hits an equivalent of suspend during idle.
+If we are suspending, we need to make sure so we don't call
+omap1_pm_idle during the suspend process.
+
+Fix this by using disable_hlt and enable_hlt for the suspend
+as pointed out by Russell King <linux@arm.linux.org.uk>. This
+allows us to remove the saved_idle.
+
+Reported-by: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap1/pm.c
++++ b/arch/arm/mach-omap1/pm.c
+@@ -583,8 +583,6 @@ static void omap_pm_init_proc(void)
  
--#define AMD_DELTA_LATCH2_KEYBRD_PWR	0x0100
--#define AMD_DELTA_LATCH2_KEYBRD_DATA	0x0200
- #define AMD_DELTA_LATCH2_SCARD_RSTIN	0x0400
- #define AMD_DELTA_LATCH2_SCARD_CMDVCC	0x0800
- #define AMS_DELTA_LATCH2_MODEM_NRESET	0x1000
-diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
-index 56ffd7c..ef1ec40 100644
---- a/drivers/input/serio/ams_delta_serio.c
-+++ b/drivers/input/serio/ams_delta_serio.c
-@@ -92,8 +92,7 @@ static irqreturn_t ams_delta_serio_interrupt(int irq, void *dev_id)
- static int ams_delta_serio_open(struct serio *serio)
- {
- 	/* enable keyboard */
--	ams_delta_latch2_write(AMD_DELTA_LATCH2_KEYBRD_PWR,
--			AMD_DELTA_LATCH2_KEYBRD_PWR);
-+	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 1);
+ #endif /* DEBUG && CONFIG_PROC_FS */
  
- 	return 0;
- }
-@@ -101,9 +100,32 @@ static int ams_delta_serio_open(struct serio *serio)
- static void ams_delta_serio_close(struct serio *serio)
- {
- 	/* disable keyboard */
--	ams_delta_latch2_write(AMD_DELTA_LATCH2_KEYBRD_PWR, 0);
-+	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 0);
- }
- 
-+static struct gpio _gpios[] __initconst_or_module = {
-+	{
-+		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATA,
-+		.flags	= GPIOF_DIR_IN,
-+		.label	= "serio-data",
-+	},
-+	{
-+		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_CLK,
-+		.flags	= GPIOF_DIR_IN,
-+		.label	= "serio-clock",
-+	},
-+	{
-+		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
-+		.flags	= GPIOF_OUT_INIT_LOW,
-+		.label	= "serio-power",
-+	},
-+	{
-+		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
-+		.flags	= GPIOF_OUT_INIT_LOW,
-+		.label	= "serio-dataout",
-+	},
-+};
-+
- static int __init ams_delta_serio_init(void)
- {
- 	int err;
-@@ -123,19 +145,11 @@ static int __init ams_delta_serio_init(void)
- 	strlcpy(ams_delta_serio->phys, "GPIO/serio0",
- 			sizeof(ams_delta_serio->phys));
- 
--	err = gpio_request(AMS_DELTA_GPIO_PIN_KEYBRD_DATA, "serio-data");
-+	err = gpio_request_array(_gpios, ARRAY_SIZE(_gpios));
- 	if (err) {
--		pr_err("ams_delta_serio: Couldn't request gpio pin for data\n");
-+		pr_err("ams_delta_serio: Couldn't request gpio pins\n");
- 		goto serio;
- 	}
--	gpio_direction_input(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
+-static void (*saved_idle)(void) = NULL;
 -
--	err = gpio_request(AMS_DELTA_GPIO_PIN_KEYBRD_CLK, "serio-clock");
--	if (err) {
--		pr_err("ams_delta_serio: couldn't request gpio pin for clock\n");
--		goto gpio_data;
--	}
--	gpio_direction_input(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
- 
- 	err = request_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
- 			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
-@@ -143,7 +157,7 @@ static int __init ams_delta_serio_init(void)
- 	if (err < 0) {
- 		pr_err("ams_delta_serio: couldn't request gpio interrupt %d\n",
- 				gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK));
--		goto gpio_clk;
-+		goto gpio;
- 	}
- 	/*
- 	 * Since GPIO register handling for keyboard clock pin is performed
-@@ -157,25 +171,18 @@ static int __init ams_delta_serio_init(void)
- 	dev_info(&ams_delta_serio->dev, "%s\n", ams_delta_serio->name);
+ /*
+  *	omap_pm_prepare - Do preliminary suspend work.
+  *
+@@ -592,8 +590,7 @@ static void (*saved_idle)(void) = NULL;
+ static int omap_pm_prepare(void)
+ {
+ 	/* We cannot sleep in idle until we have resumed */
+-	saved_idle = pm_idle;
+-	pm_idle = NULL;
++	disable_hlt();
  
  	return 0;
--gpio_clk:
--	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
--gpio_data:
--	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
-+gpio:
-+	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
- serio:
- 	kfree(ams_delta_serio);
- 	return err;
  }
--#ifndef MODULE
--late_initcall(ams_delta_serio_init);
--#else
- module_init(ams_delta_serio_init);
+@@ -630,7 +627,7 @@ static int omap_pm_enter(suspend_state_t state)
  
- static void __exit ams_delta_serio_exit(void)
+ static void omap_pm_finish(void)
  {
- 	serio_unregister_port(ams_delta_serio);
- 	free_irq(OMAP_GPIO_IRQ(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), 0);
--	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
--	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
-+	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
+-	pm_idle = saved_idle;
++	enable_hlt();
  }
- module_exit(ams_delta_serio_exit);
--#endif
--- 
-1.7.3.4
+ 
+ 
