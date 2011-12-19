@@ -1,60 +1,50 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 19 Dec 2011 08:12:08 +0000
-Subject: [GIT PULL] DaVinci cleanup for v3.3
-In-Reply-To: <201112161428.03412.arnd@arndb.de>
-References: <DF0F476B391FA8409C78302C7BA518B6048974@DBDE01.ent.ti.com>
- <201112161428.03412.arnd@arndb.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B604DA0B@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Dec 2011 08:22:25 +0000
+Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
+In-Reply-To: <201112190503.46668.marek.vasut@gmail.com>
+References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
+ <20111219032712.GB4962@S2100-06.ap.freescale.net>
+ <201112190503.46668.marek.vasut@gmail.com>
+Message-ID: <20111219082225.GC14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Arnd,
-
-On Fri, Dec 16, 2011 at 19:58:03, Arnd Bergmann wrote:
-> On Wednesday 14 December 2011, Nori, Sekhar wrote:
-> > I have this lone patch queued for DaVinci clean-up so far.
-> > Can you please pull this?
+On Mon, Dec 19, 2011 at 05:03:45AM +0100, Marek Vasut wrote:
+> > On Sun, Dec 18, 2011 at 03:06:13PM +0100, Marek Vasut wrote:
+> > > The mutexes can't be safely used under certain circumstances. I noticed
+> > > this
 > > 
-> > The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
-> >   Linus Torvalds (1):
-> >         Linux 3.2-rc3
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://gitorious.org/linux-davinci/linux-davinci.git v3.3/cleanup
-> > 
+> > > issue during some network instability at home:
+> > Yes, this is a known issue.  And there was some discussion[1] about
+> > why mutex is needed.
 > 
-> Pulled into next/cleanups, but not happy about the patch.
+> Thanks for pointing this out, I was unaware of it.
 > 
-> While the patch is a move in the right direction, it is not sufficient for
-> what you intend with it:
+> > But I really have not thought about why we can
+> > not use spinlock only, since using mutex only leads to the issue we
+> > are seeing here, and using spinlock in enable/disable and mutex in
+> > rate/parent will not work, because the mxs clocks have enable/disable
+> > and rate/parent functions access the same register.  I know it's not
+> > good to hold spinlock in rate/parent functions for a long time, but
+> > do we have a way around rather than using spinlock for both sets of
+> > functions?
 > 
-> Author: Manjunath Hadli <manjunath.hadli@ti.com>
-> Date:   Sat Nov 12 20:36:02 2011 +0530
-> 
->     ARM: davinci: vpif: move code to driver core header from platform
->     
->     Move vpif related definitions for capture and display drivers
->     from dm646x platform header file to vpif_types.h inside
->     the driver as these definitions are related to driver code
->     rather than the platform or board.
->     
->     This enables reusing this IP across platforms.
-> 
-> If you really want to use the same IP on future platforms, the correct
-> approach would be to get rid of the requirement for having platform-
-> specific callbacks and setup data, and replace it all with device tree
-> based probing. I can understand that you consider mach-davinci legacy
-> code and don't want to rework it in significant ways, but if a driver
-> that is used in there is not legacy code, it should be updated to the
-> modern ways of doing this.
+> Yea, spinlock is not good either. On the other hand, is it really held for so 
+> long ?
 
-Yes, agreed. In this case the other platform is not an OMAP
-but an existing DaVinci platform - da850. There are no plans
-of using VPIF on any new OMAP platforms AFAIK.
+There is another solution to this, which I've pointed out before when
+this has come up:
 
-Thanks for pulling the patch.
+1. Convert all your drivers to _also_ use clk_prepare()/clk_unprepare().
+   You need to do this anyway as it will become mandatory for the common
+   clk stuff.
 
-Regards,
-Sekhar
+2. Rename your existing clk_enable()/clk_disable() implementation to
+   clk_prepare()/clk_unprepare().  Ensure CONFIG_HAVE_CLK_PREPARE is
+   selected.
+
+3. Provide a new no-op clk_enable()/clk_disable() functions.
+
+This fixes the issue because clk_prepare()/clk_unprepare() must only be
+called from process contexts, whereas clk_enable()/clk_disable() may be
+called from atomic contexts as well.
