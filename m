@@ -1,48 +1,38 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Mon, 19 Dec 2011 19:14:01 +0200
-Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
-In-Reply-To: <20111219155252.GG2031@linaro.org>
-References: <1324284030-25540-1-git-send-email-mgherzan@gmail.com>
- <20111219125021.GA2031@linaro.org>
- <20111219151958.GU24496@pengutronix.de>
- <20111219152418.GF2031@linaro.org>
- <20111219153338.GV24496@pengutronix.de>
- <20111219155252.GG2031@linaro.org>
-Message-ID: <20111219171401.GA1732@swarm.cs.pub.ro>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 19 Dec 2011 09:20:34 -0800
+Subject: [GIT PULL] imx: gpio interrupt cleanup
+In-Reply-To: <20111208143204.GA8139@S2100-06.ap.freescale.net>
+References: <20111208143204.GA8139@S2100-06.ap.freescale.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF176BE92A13@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Dec 19, 2011 at 03:52:52PM +0000, Dave Martin wrote:
-> On Mon, Dec 19, 2011 at 04:33:38PM +0100, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Mon, Dec 19, 2011 at 03:24:18PM +0000, Dave Martin wrote:
-> > > On Mon, Dec 19, 2011 at 04:19:58PM +0100, Uwe Kleine-K?nig wrote:
-> > > > On Mon, Dec 19, 2011 at 12:50:21PM +0000, Dave Martin wrote:
-> > > > > On Mon, Dec 19, 2011 at 09:40:30AM +0100, Mircea Gherzan wrote:
-> > > > > > Based of Matt Evans's PPC64 implementation.
-> > > > > Note that it's fine to have the JIT generating ARM code, even if the rest
-> > > > > if the kernel is Thumb-2.  This would only start to cause problems if we
-> > > > > want to do things like set kprobes in the JITted code, or unwind out of
-> > > > > the JITted code.
-> > > > or use a CPU that doesn't speak ARM (e.g. v7M)
-> > > 
-> > > Indeed... I was assuming though that that would be out of scope for the
-> > > first iteration of this code.
-> > Right, depending on !THUMB2 is fine. Only generating ARM code with
-> > THUMB2=y is not.
+Behalf Of Shawn Guo wrote at Thursday, December 08, 2011 7:32 AM:
+> Hi Arnd and  Olof,
 > 
-> The kernel doesn't support v7-M upstream though.  CONFIG_THUMB2_KERNEL=y
-> doesn't mean that there is no ARM code present -- there _is_ ARM code in
-> the kernel image even with this option (though not very much).
+> Please consider to pull the series below.  I really should have
+> Thomas' ack on Jamie's patch 'irqdomain: export irq_domain_simple_ops
+> for !CONFIG_OF', and Grant's ack on patch 'gpio/mxc: adopt irq_domain
+> in gpio driver'.  So this pull request is also asking comments for the
+> path of these patches.
+> 
+> Thomas, Grant,
+> 
+> Please speak up if you do not want "your" patches to go through arm-soc
+> tree.  Thanks.
 
-What about relying at runtime on bits[3:0] of ID_PFR0? And this only for
-ARMv7.
+Thomas,
 
-Are there any other ARM cores of interest that do _not_ support the ARM
-instruction set?
+I'm waiting on the following patch, since I need it to complete a patch
+I'm working on:
 
-Thanks,
-Mircea
+> Jamie Iles (1):
+>       irqdomain: export irq_domain_simple_ops for !CONFIG_OF
+
+Can you ack it for inclusion in the arm-soc tree, or apply it, so I know
+it's OK to rely on this patch in my work?
+
+Thanks.
+
+-- 
+nvpublic
