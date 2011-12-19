@@ -1,28 +1,39 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Mon, 19 Dec 2011 11:21:43 +0800
-Subject: [PATCH V3 7/7] arm/imx6q: select ARCH_HAS_CPUFREQ
-In-Reply-To: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
-References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1324264903-15395-8-git-send-email-richard.zhao@linaro.org>
+From: jason.chen@linaro.org (Jason Chen)
+Date: Mon, 19 Dec 2011 11:23:28 +0800
+Subject: [PATCH] ARM:imx:fix pwm period value
+Message-ID: <1324265008-22866-1-git-send-email-jason.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- arch/arm/mach-imx/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+According to imx pwm RM, the real period value should be
+PERIOD value in PWMPR plus 2.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index c44aa97..39cf00a 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -595,6 +595,7 @@ comment "i.MX6 family:"
+PWMO (Hz) = PCLK(Hz) / (period +2)
+
+Signed-off-by: Jason Chen <jason.chen@linaro.org>
+---
+ arch/arm/plat-mxc/pwm.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
+index 6b78490..0b112d2 100644
+--- a/arch/arm/plat-mxc/pwm.c
++++ b/arch/arm/plat-mxc/pwm.c
+@@ -78,6 +78,15 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 		do_div(c, period_ns);
+ 		duty_cycles = c;
  
- config SOC_IMX6Q
- 	bool "i.MX6 Quad support"
-+	select ARCH_HAS_CPUFREQ
- 	select ARM_GIC
- 	select CACHE_L2X0
- 	select CPU_V7
++		/*
++		 * according to imx pwm RM, the real period value should be
++		 * PERIOD value in PWMPR plus 2.
++		 */
++		if (period_cycles > 2)
++			period_cycles -= 2;
++		else
++			period_cycles = 0;
++
+ 		writel(duty_cycles, pwm->mmio_base + MX3_PWMSAR);
+ 		writel(period_cycles, pwm->mmio_base + MX3_PWMPR);
+ 
 -- 
-1.7.5.4
+1.7.4.1
