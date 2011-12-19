@@ -1,31 +1,33 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 19 Dec 2011 08:59:44 -0800
-Subject: [PATCH V2 1/4] i2c: tegra: Add __devinit/exit to probe/remove
-In-Reply-To: <CAM=Q2csGoQR8PZhQO_oeVZt9CqEq377Ut8swY5g12M_=71on9g@mail.gmail.com>
-References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
- <CAM=Q2csGoQR8PZhQO_oeVZt9CqEq377Ut8swY5g12M_=71on9g@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF176BE929ED@HQMAIL01.nvidia.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 19 Dec 2011 12:03:32 -0500 (EST)
+Subject: [PATCH v4] ARM: Add generic instruction opcode manipulation
+ helpers
+In-Reply-To: <1324305365-22514-1-git-send-email-dave.martin@linaro.org>
+References: <1324305365-22514-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.02.1112191201360.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti Datta wrote at Sunday, December 18, 2011 11:54 PM:
-> On Sun, Dec 18, 2011 at 11:59 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> > This fixes some section mismatch build warnings.
->
-> What was the error was a devinit function called from these?
+On Mon, 19 Dec 2011, Dave Martin wrote:
 
-As I Understand It, probe/remove are devinit/exit functions, and hence
-should be marked as such.
+> This patch adds some endianness-agnostic helpers to convert machine
+> instructions between canonical integer form and in-memory
+> representation.
+> 
+> A canonical integer form for representing instructions is also
+> formalised here.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> ---
+> Changes since v1:
+> 
+> v4: Rebase on top of Leif's patch which created <asm/opcodes.h>
+>     ARM: 7206/1: Add generic ARM instruction set condition code checks.
 
-The errors were from building with CONFIG_DEBUG_SECTION_MISMATCH=y.
+In that case you might be able to put your patch in the patch system, 
+and then go back to add a note for Russell mentioning 7206/1 is a 
+prerequisite.
 
-I guess the section mismatch errors won't actually show up in the code
-that's in the kernel right now; they only showed up because I had a local
-patch that modified probe() to reference tegra_i2c_of_match[] which is
-__devinitconst. I since reworked that patch so that it doesn't introduce
-that reference, for other reasons. Still, I think this is a good cleanup
-change even if nothing is actually causing these mismatch errors to fire
-right now.
 
--- 
-nvpublic
+Nicolas
