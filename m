@@ -1,28 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Dec 2011 21:20:02 +0900
-Subject: [PATCH] ARM: restart: S3C64XX: use new restart hook
-In-Reply-To: <201112191312.34546.heiko@sntech.de>
-References: <03dc01ccbe45$80633d30$8129b790$%kim@samsung.com>
- <201112191312.34546.heiko@sntech.de>
-Message-ID: <03dd01ccbe48$88ed7d50$9ac877f0$%kim@samsung.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 19 Dec 2011 14:21:29 +0200
+Subject: [PATCH v7 00/14] Add support for tegra30 and cardhu
+In-Reply-To: <20111218044831.GB4336@quad.lixom.net>
+References: <1323875032-18221-1-git-send-email-pdeschrijver@nvidia.com>
+ <20111218044831.GB4336@quad.lixom.net>
+Message-ID: <20111219122129.GA2840@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+On Sun, Dec 18, 2011 at 05:48:31AM +0100, Olof Johansson wrote:
+> On Wed, Dec 14, 2011 at 05:03:12PM +0200, Peter De Schrijver wrote:
+> > This patchset adds support for the tegra30 SoC and the cardhu development
+> > board.
 > 
-> Hi Kgene,
+> Thanks, applied to for-3.3/dt (first patch) and for-3.3/soc (the rest).
+> I didn't want to split up too much between the branches and make
+> cross-dependencies since that defeats most of the idea behind topic branches,
+> so I left it at that.
 > 
-> will you also do s3c24xx?
+> I rebased for-3.3/soc (which only had one patch on it before) to be on top of
+> rmk's devel-stable and for-3.3/dt, and will tell Arnd about those dependencies
+> when sending up the branches -- other SoCs have similar dependencies already so
+> it's not a problem.
 > 
-> I'm asking, as I'm currently also looking at this for the 24xx arches and
-> would like to prevent double work on both our sides.
+> I had to do some minor touchups, including redoing the move of board-dt.c due
+> to other changes to the file. Please check final contents of the branch and let
+> me know if there's a problem.
 > 
-Sure, I'm sorting out all of Samsung stuff and it will be done tomorrow :)
+> Also, the defconfig needs to be updated to enable t30 support as well as move
+> over to the new config option for t20. I'll post a patch in a few minutes.
+> 
+> Please let me know how the branch looks as soon as practical, since the
+> clock is ticking on getting the branches into arm-soc in the next few
+> days for the upcoming merge window.
+> 
 
-Thanks.
+Branch boots fine on my cardhu board.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Cheers,
+
+Peter.
