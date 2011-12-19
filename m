@@ -1,59 +1,63 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 19 Dec 2011 13:45:23 +0000
-Subject: Fw: [GIT PULL] Refactor common Kconfigs for easier maintenance
-Message-ID: <20111219134523.GA2029@linaro.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 19 Dec 2011 14:50:49 +0100
+Subject: [PATCH 0/3] of: Add support for named irq and reg
+In-Reply-To: <1323095036-3739-1-git-send-email-b-cousson@ti.com>
+References: <1323095036-3739-1-git-send-email-b-cousson@ti.com>
+Message-ID: <4EEF4139.3050609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Forwarding to alkml, which I missed off the original recipient list.
-If you already received this mail, please ignore]
+Hi Grant and Rob,
 
------ Forwarded message from Dave Martin <dave.martin@linaro.org> -----
+Gentle ping: Do you have some comment on that series?
 
-Date: Mon, 19 Dec 2011 13:42:07 +0000
-From: Dave Martin <dave.martin@linaro.org>
-To: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: patches at linaro.org, Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>, Anton Vorontsov <cbouatmailru@gmail.com>, Barry Song <baohua.song@csr.com>, Bryan Huntsman <bryanh@codeaurora.org>, Catalin Marinas <catalin.marinas@arm.com>,
-	Colin Cross <ccross@google.com>, Daniel Walker <dwalker@fifo99.com>, David Brown <davidb@codeaurora.org>, Fabio Estevam <fabio.estevam@freescale.com>, Haojian Zhuang <haojian.zhuang@marvell.com>, John Linn
-	<john.linn@xilinx.com>, Kukjin Kim <kgene.kim@samsung.com>, Linus Walleij <linus.walleij@linaro.org>, Magnus Damm <magnus.damm@gmail.com>, Paul Mundt <lethal@linux-sh.org>, Pawel Moll <pawel.moll@arm.com>, Rob Herring
-	<rob.herring@calxeda.com>, Sascha Hauer <kernel@pengutronix.de>, Sascha Hauer <s.hauer@pengutronix.de>, Shawn Guo <shawn.guo@linaro.org>, Tony Lindgren <tony@atomide.com>, Will Deacon <will.deacon@arm.com>,
-	linux-arm-msm at vger.kernel.org, linux-omap at vger.kernel.org, linux-samsung-soc at vger.kernel.org, linux-sh at vger.kernel.org, linux-tegra at vger.kernel.org
-Subject: [GIT PULL] Refactor common Kconfigs for easier maintenance
-X-Mailer: git-send-email 1.7.4.1
+Thanks,
+Benoit
 
-Hi Russell,
-
-This series now has acks on the generic patches from a reasonable
-cross-section of maintainers, and acks from relevant people on the
-board-specifc patches, so if you're happy with it, could you pull
-it into your tree?
-
-If you have any concerns, let me know.
-
-Thanks
----Dave
-
-The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
-
-  Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
-
-are available in the git repository at:
-  git://git.linaro.org/people/dmart/linux-2.6-arm.git arm/common-kconfig-refactor+for-rmk
-
-Dave Martin (5):
-      ARM: l2x0/pl310: Refactor Kconfig to be more maintainable
-      ARM: SMP: Refactor Kconfig to be more maintainable
-      omap4: Unconditionally require l2x0 L2 cache controller support
-      highbank: Unconditionally require l2x0 L2 cache controller support
-      imx6q: Remove unconditional dependency on l2x0 L2 cache support
-
- arch/arm/Kconfig               |   26 ++++++++++++++++++++++----
- arch/arm/mach-exynos/Kconfig   |    2 ++
- arch/arm/mach-imx/Kconfig      |    2 +-
- arch/arm/mach-msm/Kconfig      |    1 +
- arch/arm/mach-omap2/Kconfig    |    2 ++
- arch/arm/mach-realview/Kconfig |    9 +++++++++
- arch/arm/mach-vexpress/Kconfig |    2 ++
- arch/arm/mm/Kconfig            |   23 ++++++++++++++++-------
- arch/arm/plat-mxc/Kconfig      |    1 +
- 9 files changed, 56 insertions(+), 12 deletions(-)
+On 12/5/2011 3:23 PM, Benoit Cousson wrote:
+> Hi Grant&  Rob,
+>
+> Following the previous patch submission [1], here is an updated series
+> that adds the support for both reg and irq names.
+> A small improvement is done as well on the property with multiple strings
+> helper function.
+>
+> Please note that I've just realized that Russell's concern with the
+> /proc/iomem readability might not even be valid in the DT case.
+> I might be wrong, but it looks like devices created by of_device_alloc
+> does not seems to call the insert_resource. It means that the /proc/iomem
+> is mostly empty when the devices are created from device tree blob.
+> I'm not sure it was done on purpose, but even if this is not the case,
+> the fact is that this /proc/iomem entry does not seems to be used
+> extensively.
+> That does not mean it cannot be improved, but it should change the urgency
+> to fix that with regards to that series.
+>
+> This series is based on 3.2-rc4 and is available here:
+> git://gitorious.org/omap-pm/linux.git for_3.3/resource-names
+>
+> Comments are welcome.
+>
+> Auto comment: I'm not super happy with these new properties name because it
+> is not really consistent. If you have any better idea, do not hesitate.
+>
+> Thanks,
+> Benoit
+>
+>
+> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg57881.html
+>
+>
+> Benoit Cousson (3):
+>    of/base: Take NULL string into account for property with multiple strings
+>    of/address: Add reg-names property to name an iomem resource
+>    of/irq: Add interrupts-names property to name an irq resource
+>
+>   .../devicetree/bindings/interrupts-names.txt       |   50 ++++++++++++++++++++
+>   Documentation/devicetree/bindings/reg-names.txt    |   48 +++++++++++++++++++
+>   drivers/of/address.c                               |   16 ++++--
+>   drivers/of/base.c                                  |    8 +--
+>   drivers/of/irq.c                                   |   11 ++++-
+>   5 files changed, 122 insertions(+), 11 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/interrupts-names.txt
+>   create mode 100644 Documentation/devicetree/bindings/reg-names.txt
