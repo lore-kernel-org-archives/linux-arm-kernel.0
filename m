@@ -1,22 +1,32 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 19 Dec 2011 11:01:56 -0700
-Subject: [PATCH 0/2] arm/tegra: Fix section mismatch errors in pinmux
-Message-ID: <1324317718-24464-1-git-send-email-swarren@nvidia.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 19 Dec 2011 13:07:29 -0500 (EST)
+Subject: [PATCH 12/20] ARM: mach-msm: hook special idle handlers to
+ arm_pm_idle
+In-Reply-To: <20111219175636.GJ6464@atomide.com>
+References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
+ <1324288069-21940-13-git-send-email-nico@fluxnic.net>
+ <20111219175636.GJ6464@atomide.com>
+Message-ID: <alpine.LFD.2.02.1112191305370.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patches in Tegra's for-3.3/soc branch introduce some section mismatch
-errors when building with CONFIG_DEBUG_SECTION_MISMATCH=y. This series
-fixes them. I patched each file separately in case you want to squash
-these into the original patches.
+On Mon, 19 Dec 2011, Tony Lindgren wrote:
 
-tegra20: 6996e08 arm/tegra: prepare pinmux code for multiple tegra variants
-tegra30: 241682c arm/tegra: pinmux tables and definitions for tegra30
+> * Nicolas Pitre <nico@fluxnic.net> [111219 01:42]:
+> > --- /dev/null
+> > +++ b/arch/arm/mach-msm/idle.c
+> > @@ -0,0 +1,49 @@
+> > +/* arch/arm/mach-msm/idle.c
+> > + *
+> > + * Idle processing for MSM7K - work around bugs with SWFI.
+> > + *
+> > + * Copyright (c) 2007 QUALCOMM Incorporated.
+> > + * Copyright (C) 2007 Google, Inc. 
+> 
+> Trailing whitespace here too "<stdin>:62: trailing whitespace.".
 
-Stephen Warren (2):
-  arm/tegra: Fix section mismatch errors in tegra20 pinmux
-  arm/tegra: Fix section mismatch errors in tegra30 pinmux
+I just did "git rebase --whitespace=fix" on my branch.  They should all 
+be gone now.
 
- arch/arm/mach-tegra/pinmux-tegra20-tables.c |    2 +-
- arch/arm/mach-tegra/pinmux-tegra30-tables.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+
+Nicolas
