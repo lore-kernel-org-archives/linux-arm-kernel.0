@@ -1,68 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 19 Dec 2011 15:32:05 +0200
-Subject: [PATCH 5/7] s3c-hsudc: use udc_start and udc_stop functions
-In-Reply-To: <201112191426.20365.heiko@sntech.de>
-References: <201112191423.21461.heiko@sntech.de>
- <201112191426.20365.heiko@sntech.de>
-Message-ID: <20111219133203.GG3146@legolas.emea.dhcp.ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 19 Dec 2011 13:45:23 +0000
+Subject: Fw: [GIT PULL] Refactor common Kconfigs for easier maintenance
+Message-ID: <20111219134523.GA2029@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 02:26:20PM +0100, Heiko St?bner wrote:
-> udc_start and udc_stop reduce code duplication in comparison to
-> start and stop generalising calls done by all drivers
-> (i.e. bind and unbind) and moving these calls to common code.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/usb/gadget/s3c-hsudc.c |   44 ++++++++++++---------------------------
->  1 files changed, 14 insertions(+), 30 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/s3c-hsudc.c b/drivers/usb/gadget/s3c-hsudc.c
-> index 42bcd97..daaccec 100644
-> --- a/drivers/usb/gadget/s3c-hsudc.c
-> +++ b/drivers/usb/gadget/s3c-hsudc.c
-> @@ -282,8 +282,7 @@ static void s3c_hsudc_nuke_ep(struct s3c_hsudc_ep *hsep, int status)
->   * All the endpoints are stopped and any pending transfer requests if any on
->   * the endpoint are terminated.
->   */
-> -static void s3c_hsudc_stop_activity(struct s3c_hsudc *hsudc,
-> -			  struct usb_gadget_driver *driver)
-> +static void s3c_hsudc_stop_activity(struct s3c_hsudc *hsudc)
->  {
->  	struct s3c_hsudc_ep *hsep;
->  	int epnum;
-> @@ -295,10 +294,6 @@ static void s3c_hsudc_stop_activity(struct s3c_hsudc *hsudc,
->  		hsep->stopped = 1;
->  		s3c_hsudc_nuke_ep(hsep, -ESHUTDOWN);
->  	}
-> -
-> -	spin_unlock(&hsudc->lock);
-> -	driver->disconnect(&hsudc->gadget);
-> -	spin_lock(&hsudc->lock);
->  }
->  
->  /**
-> @@ -1135,16 +1130,15 @@ static irqreturn_t s3c_hsudc_irq(int irq, void *_dev)
->  	return IRQ_HANDLED;
->  }
->  
-> -static int s3c_hsudc_start(struct usb_gadget_driver *driver,
-> -		int (*bind)(struct usb_gadget *))
-> +static int s3c_hsudc_start(struct usb_gadget *g,
-> +		struct usb_gadget_driver *driver)
->  {
->  	struct s3c_hsudc *hsudc = the_controller;
+[Forwarding to alkml, which I missed off the original recipient list.
+If you already received this mail, please ignore]
 
-while at that, you can drop this "the_controller" global. You could use
-a container_of() to reach your s3c_hsudc pointer.
+----- Forwarded message from Dave Martin <dave.martin@linaro.org> -----
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111219/5b5914cd/attachment.sig>
+Date: Mon, 19 Dec 2011 13:42:07 +0000
+From: Dave Martin <dave.martin@linaro.org>
+To: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: patches at linaro.org, Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>, Anton Vorontsov <cbouatmailru@gmail.com>, Barry Song <baohua.song@csr.com>, Bryan Huntsman <bryanh@codeaurora.org>, Catalin Marinas <catalin.marinas@arm.com>,
+	Colin Cross <ccross@google.com>, Daniel Walker <dwalker@fifo99.com>, David Brown <davidb@codeaurora.org>, Fabio Estevam <fabio.estevam@freescale.com>, Haojian Zhuang <haojian.zhuang@marvell.com>, John Linn
+	<john.linn@xilinx.com>, Kukjin Kim <kgene.kim@samsung.com>, Linus Walleij <linus.walleij@linaro.org>, Magnus Damm <magnus.damm@gmail.com>, Paul Mundt <lethal@linux-sh.org>, Pawel Moll <pawel.moll@arm.com>, Rob Herring
+	<rob.herring@calxeda.com>, Sascha Hauer <kernel@pengutronix.de>, Sascha Hauer <s.hauer@pengutronix.de>, Shawn Guo <shawn.guo@linaro.org>, Tony Lindgren <tony@atomide.com>, Will Deacon <will.deacon@arm.com>,
+	linux-arm-msm at vger.kernel.org, linux-omap at vger.kernel.org, linux-samsung-soc at vger.kernel.org, linux-sh at vger.kernel.org, linux-tegra at vger.kernel.org
+Subject: [GIT PULL] Refactor common Kconfigs for easier maintenance
+X-Mailer: git-send-email 1.7.4.1
+
+Hi Russell,
+
+This series now has acks on the generic patches from a reasonable
+cross-section of maintainers, and acks from relevant people on the
+board-specifc patches, so if you're happy with it, could you pull
+it into your tree?
+
+If you have any concerns, let me know.
+
+Thanks
+---Dave
+
+The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
+
+  Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
+
+are available in the git repository at:
+  git://git.linaro.org/people/dmart/linux-2.6-arm.git arm/common-kconfig-refactor+for-rmk
+
+Dave Martin (5):
+      ARM: l2x0/pl310: Refactor Kconfig to be more maintainable
+      ARM: SMP: Refactor Kconfig to be more maintainable
+      omap4: Unconditionally require l2x0 L2 cache controller support
+      highbank: Unconditionally require l2x0 L2 cache controller support
+      imx6q: Remove unconditional dependency on l2x0 L2 cache support
+
+ arch/arm/Kconfig               |   26 ++++++++++++++++++++++----
+ arch/arm/mach-exynos/Kconfig   |    2 ++
+ arch/arm/mach-imx/Kconfig      |    2 +-
+ arch/arm/mach-msm/Kconfig      |    1 +
+ arch/arm/mach-omap2/Kconfig    |    2 ++
+ arch/arm/mach-realview/Kconfig |    9 +++++++++
+ arch/arm/mach-vexpress/Kconfig |    2 ++
+ arch/arm/mm/Kconfig            |   23 ++++++++++++++++-------
+ arch/arm/plat-mxc/Kconfig      |    1 +
+ 9 files changed, 56 insertions(+), 12 deletions(-)
