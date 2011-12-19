@@ -1,28 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 19 Dec 2011 14:57:19 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP3/4: miscellaneous hwmod data updates
-Message-ID: <alpine.DEB.2.00.1112191456030.12660@utopia.booyaka.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 19 Dec 2011 23:21:41 +0100
+Subject: [PATCH V3 10/14] ARM: mxs: add clk_prepare/clk_unprepare
+In-Reply-To: <1321008637-19999-11-git-send-email-richard.zhao@linaro.org>
+References: <1321008637-19999-1-git-send-email-richard.zhao@linaro.org>
+ <1321008637-19999-11-git-send-email-richard.zhao@linaro.org>
+Message-ID: <201112192321.41560.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/mach-mxs/system.c |    2 +-
+>  arch/arm/mach-mxs/timer.c  |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
+> index 20ec3bd..9760a12 100644
+> --- a/arch/arm/mach-mxs/system.c
+> +++ b/arch/arm/mach-mxs/system.c
+> @@ -66,7 +66,7 @@ static int __init mxs_arch_reset_init(void)
+> 
+>  	clk = clk_get_sys("rtc", NULL);
+>  	if (!IS_ERR(clk))
+> -		clk_enable(clk);
+> +		clk_prepare_enable(clk);
+> 
+>  	return 0;
+>  }
+> diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+> index cace0d2..564a632 100644
+> --- a/arch/arm/mach-mxs/timer.c
+> +++ b/arch/arm/mach-mxs/timer.c
+> @@ -245,7 +245,7 @@ static int __init mxs_clocksource_init(struct clk
+> *timer_clk)
+> 
+>  void __init mxs_timer_init(struct clk *timer_clk, int irq)
+>  {
+> -	clk_enable(timer_clk);
+> +	clk_prepare_enable(timer_clk);
+> 
+>  	/*
+>  	 * Initialize timers to a known state
 
-The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+Hi Richard,
 
-  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+I just came across this, will this also help solve the mxs problem with mutex 
+lock begin done in atomic context in clk_enable/disable()?
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 hwmod_data_b_devel_3.3
-
-Ming Lei (1):
-      ARM: OMAP4: hwmod data: introduce fdif(face detect module) hwmod
-
-Peter Ujfalusi (1):
-      ARM: OMAP4: hwmod data: Add names for DMIC memory address space
-
-Shubhrajyoti D (1):
-      ARM: OMAP3+: hwmod data: Add the default clockactivity for I2C
-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    7 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   96 ++++++++++++++++++++++++++-
- 2 files changed, 96 insertions(+), 7 deletions(-)
+M
