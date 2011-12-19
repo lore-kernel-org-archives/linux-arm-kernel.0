@@ -1,30 +1,40 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 19 Dec 2011 13:30:42 +0800
-Subject: [PATCH v3 2/4] ARM: pxa168: Add SDHCI support
-In-Reply-To: <8B50F2A0-3991-4127-B3D9-5D69C70F87EF@marvell.com>
-References: <87r51fwxgt.fsf@laptop.org>
- <1321849572-2944-1-git-send-email-tanmay.upadhyay@einfochips.com>
- <874nxkmaky.fsf@laptop.org> <m2sjklfmuf.fsf@bob.laptop.org>
- <CAN1soZxmKct+qGUE2_W+FZufR+gcYZu6Dsj+TkJ06PaO8rV-TQ@mail.gmail.com>
- <4EEEC3BF.6010708@einfochips.com>
- <CAN1soZxnSsZ8SDp=ueu0iMaz59pq7p09DoYD27qCridrrAkmuw@mail.gmail.com>
- <8B50F2A0-3991-4127-B3D9-5D69C70F87EF@marvell.com>
-Message-ID: <CAN1soZzDR-iH8mkiDaugZ1bo+=fj6MDYxUEh92Pu52XaMDepPw@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 19 Dec 2011 13:40:13 +0800
+Subject: serial tty name
+In-Reply-To: <20111219035636.GE4962@S2100-06.ap.freescale.net>
+References: <20111214144344.GA2090@richard-laptop>
+ <20111219035636.GE4962@S2100-06.ap.freescale.net>
+Message-ID: <20111219054012.GA15863@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 1:24 PM, Philip Rakity <prakity@marvell.com> wrote:
->
-> Haojian,
->
-> Should the APMU definitions be moved to a separate include for pxa168 and say given the name pxa168_apmu.h ?
->
-> Same comment applies to all the register set since they are not really common.
->
-> Philip
-
-I think it's unnecessary to create a new apmu.h. We can distinguish
-them by name in macro, as PXA168/MMP2.
+On Mon, Dec 19, 2011 at 11:56:37AM +0800, Shawn Guo wrote:
+> On Wed, Dec 14, 2011 at 10:43:47PM +0800, Richard Zhao wrote:
+> > How to map different uart port to ttymxc0 (take imx for example)?
+> > 
+> > In rootfs, it usually "getty ttymxc0"  to get
+> > serial console. And the rootfs may be shared by different boards.
+> > Traditionaly way is to set right platform device ID.
+> > 
+> > But with DT, UART2 always generate ttymxc1, UART3 for ttymxc2. You
+> > always needs to modify the getty command when your change another board.
+> > 
+> > Is there a way to fix it?
+> > 
+> I'm using Linaro rootfs and do not see this problem at all.  So as
+> people have suggested, you need to fix it in your user space.
+Why not past your linaro rootfs solution?
 
 Thanks
-Haojian
+Richard
+> 
+> -- 
+> Regards,
+> Shawn
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
