@@ -1,37 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Dec 2011 21:04:38 +0000
-Subject: Status of the following patch (clocksource sched_clock) ?
-In-Reply-To: <3E54258959B69E4282D79E01AB1F32B724934E@DFLE34.ent.ti.com>
-References: <3E54258959B69E4282D79E01AB1F32B7249324@DFLE34.ent.ti.com>
- <20111219172557.GH14542@n2100.arm.linux.org.uk>
- <3E54258959B69E4282D79E01AB1F32B724934E@DFLE34.ent.ti.com>
-Message-ID: <20111219210438.GJ14542@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 19 Dec 2011 22:05:25 +0100
+Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
+In-Reply-To: <20111219210317.GI14542@n2100.arm.linux.org.uk>
+References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
+ <201112192154.25310.marek.vasut@gmail.com>
+ <20111219210317.GI14542@n2100.arm.linux.org.uk>
+Message-ID: <201112192205.25806.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 05:29:49PM +0000, Karicheri, Muralidharan wrote:
-> Russell,
+> On Mon, Dec 19, 2011 at 09:54:25PM +0100, Marek Vasut wrote:
+> > > So, in summary, you have everything you require to fix it outside the
+> > > driver.  You just have to decide which of the two options you want to
+> > > proceed with, and actually (and finally) do it instead of endlessly
+> > > procrastinating and waiting for more and more bug reports (which is
+> > > exactly what has happened so far.)
+> > 
+> > What the hell, I just recently found this bug and I submitted a patch
+> > right away! What are you complaining about?!
 > 
-> Thanks for responding.
-> 
-> >> 
-> >> > Could someone tell me what is the status of this patch? I want to try
-> >> > it on my target platform which is a davinci variant.
-> >> 
-> >> Dead.
-> >> 
-> >> Just make sure you use the sched_clock infrastructure already provided
-> >> on ARM and provided you give it the correct information - and set it up
-> >> early enough (in init_early) you will not have any sched_clock() wraps.
-> >> This is because a timer will be set to automatically update things
-> >> before any wrap occurs.
-> 
-> Good to know that there is already support available to avoid
-> clocksource wraparound. Could you point me to the code in kernel
-> tree where this infrastructure is located and some sample code
-> that implements it?
+> If you want to take that attitude to my attempt to help you understand
+> the problem and see solutions, I'll ignore you permanently for being an
+> absolute twit.
 
-Let's get one thing straight - are you talking about clocksource
-wrap-around or sched_clock wrap-around?
+Go ahead, but you accused me of procrastinating and waiting even if the first 
+thing I did when I saw the bug was start solving it. That's just insane!
 
-I interpreted you as referring to sched_clock wrap-around.
+> I'm not going to spend time giving a detailed explaination
+> about the background and options over something to only then have it
+> immediately shoved back in my face with such a response.
+
+I consider my response to the last part of your email appropriate.
+
+M
