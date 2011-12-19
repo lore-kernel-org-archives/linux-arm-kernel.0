@@ -1,186 +1,163 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Dec 2011 14:52:07 -0600
-Subject: [PATCH v2] gpio: pl061: convert to use generic irq chip
-In-Reply-To: <1323876538-20406-8-git-send-email-robherring2@gmail.com>
-References: <1323876538-20406-8-git-send-email-robherring2@gmail.com>
-Message-ID: <1324327927-6886-1-git-send-email-robherring2@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 19 Dec 2011 21:54:25 +0100
+Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
+In-Reply-To: <20111219121559.GF14542@n2100.arm.linux.org.uk>
+References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
+ <201112191257.06145.marek.vasut@gmail.com>
+ <20111219121559.GF14542@n2100.arm.linux.org.uk>
+Message-ID: <201112192154.25310.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+> On Mon, Dec 19, 2011 at 12:57:05PM +0100, Marek Vasut wrote:
+> > > There is another solution to this, which I've pointed out before when
+> > > this has come up:
+> > > 
+> > > 1. Convert all your drivers to _also_ use
+> > > clk_prepare()/clk_unprepare().
+> > > 
+> > >    You need to do this anyway as it will become mandatory for the
+> > >    common clk stuff.
+> > > 
+> > > 2. Rename your existing clk_enable()/clk_disable() implementation to
+> > > 
+> > >    clk_prepare()/clk_unprepare().  Ensure CONFIG_HAVE_CLK_PREPARE is
+> > >    selected.
+> > > 
+> > > 3. Provide a new no-op clk_enable()/clk_disable() functions.
+> > 
+> > Well, I'm still unsure how'd you then enable/disable the clock ?
+> > clk_prepare/clk_unprepare is good, but how would that help in avoiding
+> > the mutex/spinlock?
+> 
+> Then, quite simply, you don't understand clk_prepare/clk_unprepare.
+> 
+> Lets go back to the original discussion.  We have two classes of
+> implementations of the clk API:
+> 
+> 1. We have those where clk_enable() and clk_disable() can be called from
+>    any context.
+> 
+> 2. We have those where clk_enable() and clk_disable() can only be called
+>    from process context.
 
-Convert the pl061 irq_chip code to use the generic irq chip code.
+Yes, that's the MXS clock case and that's where it gets broken.
+> 
+> Then we have drivers - some of which call clk_enable() and clk_disable()
+> from atomic contexts.
 
-This has the side effect of using 32-bit accesses rather than 8-bit
-accesses to interrupt registers. The h/w TRM and testing seem to indicate
-this is fine.
+OK
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-Cc: Linus Walleij <linus.ml.walleij@gmail.com>
----
-v2:
-- put struct irq_chip_generic pointer into struct pl061_gpio instead of domain
-ptr.
+> 
+> Obviously, this situation can't be unified as is, because the different
+> requirements of the implementations and drivers are such that it's
+> impossible to have a single implementation which works across the board.
+> 
+> So, to allow a single implementation to proceed, it was decided that we'd
+> split clk_enable() and clk_disable() into two parts - an atomic part and
+> a non-atomic part.
+> 
+> The atomic part keeps the clk_enable() and clk_disable() name.  The
+> non-atomic part gets the new clk_prepare() and clk_unprepare() name.
 
- drivers/gpio/Kconfig      |    1 +
- drivers/gpio/gpio-pl061.c |   74 ++++++++++++++++-----------------------------
- 2 files changed, 27 insertions(+), 48 deletions(-)
+Ok, understood so far.
+> 
+> Drivers must respect the following sequence throughout their code:
+> 
+> 	clk = clk_get();
+> 	clk_prepare(clk);
+> 	clk_enable(clk);
+> 
+> 	clk_disable(clk);
+> 	clk_unprepare(clk);
+> 	clk_put(clk);
+> 
+> In other words, it is _illegal_ for any driver to enable a clock which
+> they have not _themselves_ prepared - in the same way that it is illegal
+> to call clk_enable() on a clk that they have already put.
+> 
+> Drivers which only enable/disable their clocks from process context would
+> pair the clk_prepare()+clk_enable() calls together, and the clk_disable()+
+> clk_unprepare() calls.
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 8482a23..4d433e2 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -138,6 +138,7 @@ config GPIO_MXS
- config GPIO_PL061
- 	bool "PrimeCell PL061 GPIO support"
- 	depends on ARM_AMBA
-+	select GENERIC_IRQ_CHIP
- 	help
- 	  Say yes here to support the PrimeCell PL061 GPIO device
- 
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index fe19dec..96ff6b2 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -50,10 +50,10 @@ struct pl061_gpio {
- 	 * the IRQ code simpler.
- 	 */
- 	spinlock_t		lock;		/* GPIO registers */
--	spinlock_t		irq_lock;	/* IRQ registers */
- 
- 	void __iomem		*base;
- 	int			irq_base;
-+	struct irq_chip_generic	*irq_gc;
- 	struct gpio_chip	gc;
- };
- 
-@@ -125,40 +125,10 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
- 	return chip->irq_base + offset;
- }
- 
--/*
-- * PL061 GPIO IRQ
-- */
--static void pl061_irq_disable(struct irq_data *d)
--{
--	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
--	int offset = d->irq - chip->irq_base;
--	unsigned long flags;
--	u8 gpioie;
--
--	spin_lock_irqsave(&chip->irq_lock, flags);
--	gpioie = readb(chip->base + GPIOIE);
--	gpioie &= ~(1 << offset);
--	writeb(gpioie, chip->base + GPIOIE);
--	spin_unlock_irqrestore(&chip->irq_lock, flags);
--}
--
--static void pl061_irq_enable(struct irq_data *d)
--{
--	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
--	int offset = d->irq - chip->irq_base;
--	unsigned long flags;
--	u8 gpioie;
--
--	spin_lock_irqsave(&chip->irq_lock, flags);
--	gpioie = readb(chip->base + GPIOIE);
--	gpioie |= 1 << offset;
--	writeb(gpioie, chip->base + GPIOIE);
--	spin_unlock_irqrestore(&chip->irq_lock, flags);
--}
--
- static int pl061_irq_type(struct irq_data *d, unsigned trigger)
- {
--	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct pl061_gpio *chip = gc->private;
- 	int offset = d->irq - chip->irq_base;
- 	unsigned long flags;
- 	u8 gpiois, gpioibe, gpioiev;
-@@ -166,7 +136,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
- 	if (offset < 0 || offset >= PL061_GPIO_NR)
- 		return -EINVAL;
- 
--	spin_lock_irqsave(&chip->irq_lock, flags);
-+	raw_spin_lock_irqsave(&gc->lock, flags);
- 
- 	gpioiev = readb(chip->base + GPIOIEV);
- 
-@@ -195,18 +165,11 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
- 
- 	writeb(gpioiev, chip->base + GPIOIEV);
- 
--	spin_unlock_irqrestore(&chip->irq_lock, flags);
-+	raw_spin_unlock_irqrestore(&gc->lock, flags);
- 
- 	return 0;
- }
- 
--static struct irq_chip pl061_irqchip = {
--	.name		= "GPIO",
--	.irq_enable	= pl061_irq_enable,
--	.irq_disable	= pl061_irq_disable,
--	.irq_set_type	= pl061_irq_type,
--};
--
- static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
- {
- 	struct list_head *chip_list = irq_get_handler_data(irq);
-@@ -232,6 +195,25 @@ static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
- 	chained_irq_exit(irqchip, desc);
- }
- 
-+static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
-+{
-+	struct irq_chip_type *ct;
-+
-+	chip->irq_gc = irq_alloc_generic_chip("gpio-pl061", 1, irq_base,
-+					      chip->base, handle_simple_irq);
-+	chip->irq_gc->private = chip;
-+
-+	ct = chip->irq_gc->chip_types;
-+	ct->chip.irq_mask = irq_gc_mask_clr_bit;
-+	ct->chip.irq_unmask = irq_gc_mask_set_bit;
-+	ct->chip.irq_set_type = pl061_irq_type;
-+	ct->chip.irq_set_wake = irq_gc_set_wake;
-+	ct->regs.mask = GPIOIE;
-+
-+	irq_setup_generic_chip(chip->irq_gc, IRQ_MSK(PL061_GPIO_NR),
-+			       IRQ_GC_INIT_NESTED_LOCK, IRQ_NOREQUEST, 0);
-+}
-+
- static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct pl061_platform_data *pdata;
-@@ -269,7 +251,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
- 	}
- 
- 	spin_lock_init(&chip->lock);
--	spin_lock_init(&chip->irq_lock);
- 	INIT_LIST_HEAD(&chip->list);
- 
- 	chip->gc.direction_input = pl061_direction_input;
-@@ -293,6 +274,8 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (chip->irq_base <= 0)
- 		return 0;
- 
-+	pl061_init_gc(chip, chip->irq_base);
-+
- 	writeb(0, chip->base + GPIOIE); /* disable irqs */
- 	irq = dev->irq[0];
- 	if (irq < 0) {
-@@ -321,11 +304,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
- 			else
- 				pl061_direction_input(&chip->gc, i);
- 		}
--
--		irq_set_chip_and_handler(i + chip->irq_base, &pl061_irqchip,
--					 handle_simple_irq);
--		set_irq_flags(i+chip->irq_base, IRQF_VALID);
--		irq_set_chip_data(i + chip->irq_base, chip);
- 	}
- 
- 	return 0;
--- 
-1.7.5.4
+I see ... so basically, the locking will happen in clk_prepare() call.
+> 
+> Drivers which enable/disable their clocks from atomic contexts must ensure
+> that a clk is already prepared in some process context prior to calling
+> clk_enable() - as it is not permitted to call clk_prepare() from atomic
+> contexts.
+> 
+> For the PL011 UART, this means that:
+> 
+> 1. Clocks are prepared when the port is opened _or_ when the console is
+>    configured.
+
+Ok, so here I either lock or lock-configure-unlock ... which one is it ?
+> 
+> 2. Clocks are enabled when the port is opened _or_ when there is a message
+>    to output through the console.
+
+But to enable the clock, I need to lock again. Or I can lock in prepare() call, 
+but then the locking is meaningless because the lock'd be held all this time and 
+noone else would be able to operate with the MXS clock.
+> 
+> 3. Clocks are disabled when the port is closed _or_ when the console output
+>    has finished.
+> 
+> 4. Clocks are unprepared when the port is closed.
+> 
+> This means that if you are capable of _only _process-context based clock
+> handing, and you use this driver, your clock will be enabled for the
+> console port at boot time and _never_ turned off.  That's the penalty
+> you _have_ to pay to satisfy the conditions imposed by your implementation.
+
+My implementation ... of what? Clock framework or the driver? Why would the 
+spinlock be bad for this case -- only because it'd be held for too long ?
+
+The implementation of clk_enable/clk_disable for mxs is -- from my understanding 
+-- really fast:
+
+spinlock_lock()
+increase usecount
+enable/disable clock by doing RMW of one bit on one register
+spinlock_unlock()
+
+And this can be made even faster via MXS hardware specifics (like bitwise-set 
+registers, avoiding the RMW).
+
+> 
+> So, there are two solutions:
+> 
+> 1. Fix your clk API implementation such that clk_enable/clk_disable() are
+>    callable from atomic contexts.
+
+Yea ... the spinlock is IMO reasonable, I see no problem with that, the code 
+path is really fast. It can be made even faster I think.
+> 
+> 2. Fix your clk API to rename the non-atomic clk_enable/clk_disable() to
+>    clk_prepare/clk_unprepare() and provide dummy clk_enable/clk_disable().
+
+I don't see a point in this, this'd add way more overhead and overcomplicate the 
+whole stuff.
+> 
+> 'Fixing' the driver is not an option - and would be just a case of moving
+> the existing clk_enable/clk_disable calls to where the clk_prepare/
+> clk_unprepare calls currently are - crippling those implementations which
+> are good citizens.
+
+Indeed.
+> 
+> So, in summary, you have everything you require to fix it outside the
+> driver.  You just have to decide which of the two options you want to
+> proceed with, and actually (and finally) do it instead of endlessly
+> procrastinating and waiting for more and more bug reports (which is
+> exactly what has happened so far.)
+
+What the hell, I just recently found this bug and I submitted a patch right 
+away! What are you complaining about?!
+
+Grumble!
+
+But thanks for the explanation!
+
+M
