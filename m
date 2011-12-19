@@ -1,111 +1,55 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 19 Dec 2011 14:43:01 -0500 (EST)
-Subject: [PATCH 01/20] ARM: clean up idle handlers
-In-Reply-To: <20111219190736.GK6464@atomide.com>
-References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
- <1324288069-21940-2-git-send-email-nico@fluxnic.net>
- <20111219190736.GK6464@atomide.com>
-Message-ID: <alpine.LFD.2.02.1112191437350.2907@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Dec 2011 11:48:18 -0800
+Subject: [GIT PULL] omap hwmod changes for v3.3 merge window
+Message-ID: <20111219194818.GQ6464@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Dec 2011, Tony Lindgren wrote:
+Hi Arnd & Olof,
 
-> * Nicolas Pitre <nico@fluxnic.net> [111219 01:20]:
-> > Let's factor out the need_resched() check instead of having it duplicated
-> > in every pm_idle implementations to avoid inconsistencies (omap2_pm_idle
-> > was missing it already).
-> > 
-> > The forceful re-enablement of IRQs after pm_idle has returned can go.
-> > The warning certainly doesn't trigger for existing users.  Similar for
-> > the redundant local_irq_disable() call in the OMAP implementations.
-> > 
-> > To get rid of the pm_idle calling convention oddity, let's introduce
-> > arm_pm_idle() allowing for the local_irq_enable() to be factored out
-> > from SOC specific implementations. The default pm_idle function becomes
-> > a wrapper for arm_pm_idle and it takes care of enabling IRQs closer to
-> > where they are initially disabled.
-> > 
-> > And finally move the comment explaining the reason for that turning off
-> > of IRQs to a more proper location.
-> > 
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> For omaps:
-> 
-> Tested-by: Tony Lindgren <tony@atomide.com>
+Please pull omap hwmod changes from:
 
-Thanks.
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap hwmod
 
-> For pm44xx.c the following merge will be needed for omap/omap4 branch
-> in arm-soc tree:
+These changes are mostly needed for the USB *HCI support to
+behave. These depend on the fixes-non-critical-part2 posted
+earlier.
 
-Great.  I'm CC'ing Arnd and Olof so they are aware.
+Regards,
 
-> 
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm44xx.c
-> @@@ -16,10 -17,10 +17,12 @@@
->   #include <linux/err.h>
->   #include <linux/slab.h>
->   
->  +#include <asm/system.h>
->  +
->   #include "common.h"
-> + #include "clockdomain.h"
->   #include "powerdomain.h"
-> + #include "pm.h"
->   
->   struct power_state {
->   	struct powerdomain *pwrdm;
-> @@@ -85,11 -161,30 +163,24 @@@ static int __init pwrdms_setup(struct p
->   	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
->   	if (!pwrst)
->   		return -ENOMEM;
-> + 
->   	pwrst->pwrdm = pwrdm;
-> - 	pwrst->next_state = PWRDM_POWER_ON;
-> + 	pwrst->next_state = PWRDM_POWER_RET;
->   	list_add(&pwrst->node, &pwrst_list);
->   
-> - 	return pwrdm_set_next_pwrst(pwrst->pwrdm, pwrst->next_state);
-> + 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-> + }
-> + 
-> + /**
-> +  * omap_default_idle - OMAP4 default ilde routine.'
-> +  *
-> +  * Implements OMAP4 memory, IO ordering requirements which can't be addressed
-> +  * with default arch_idle() hook. Used by all CPUs with !CONFIG_CPUIDLE and
-> +  * by secondary CPU with CONFIG_CPUIDLE.
-> +  */
-> + static void omap_default_idle(void)
-> + {
->  -	local_irq_disable();
->  -	local_fiq_disable();
->  -
-> + 	omap_do_wfi();
->  -
->  -	local_fiq_enable();
->  -	local_irq_enable();
->   }
->   
->   /**
-> @@@ -117,6 -255,11 +251,11 @@@ static int __init omap4_pm_init(void
->   	suspend_set_ops(&omap_pm_ops);
->   #endif /* CONFIG_SUSPEND */
->   
-> + 	/* Overwrite the default arch_idle() */
->  -	pm_idle = omap_default_idle;
-> ++	arm_pm_idle = omap_default_idle;
-> + 
-> + 	omap4_idle_init();
-> + 
->   err2:
->   	return ret;
->   }
-> 
-> Regards,
-> 
-> Tony
-> 
+Tony
+
+
+The following changes since commit 30c95692f62a40170833e87f3cd50fcbfe87c1a2:
+  Santosh Shilimkar (1):
+        ARM: OMAP4: clock: Add CPU local timer clock node
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap hwmod
+
+Benoit Cousson (1):
+      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP4
+
+Keshava Munegowda (1):
+      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP3
+
+Kyle Manna (1):
+      ARM: OMAP: hwmod data: Add support for AM35xx UART4/ttyO3
+
+Paul Walmsley (1):
+      ARM: OMAP3: hwmod data: disable multiblock reads on MMC1/2 on OMAP34xx/35xx <= ES2.1
+
+Shubhrajyoti D (1):
+      ARM: OMAP3+: hwmod data: Add the default clockactivity for I2C
+
+Tony Lindgren (1):
+      Merge branch 'hwmod_data_devel_3.3' of git://git.pwsan.com/linux-2.6 into hwmod
+
+ arch/arm/mach-omap2/clock3xxx_data.c       |   11 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  374 +++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  217 ++++++++++++++++-
+ arch/arm/mach-omap2/prcm-common.h          |    2 +
+ arch/arm/plat-omap/include/plat/irqs.h     |    2 +-
+ arch/arm/plat-omap/include/plat/serial.h   |    1 +
+ 6 files changed, 594 insertions(+), 13 deletions(-)
