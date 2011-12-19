@@ -1,69 +1,82 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 19 Dec 2011 16:21:15 +0100
-Subject: [PATCH 2/9] irq: check domain hwirq range for DT translate
-In-Reply-To: <4EEF48EE.1070800@gmail.com>
-References: <1323876538-20406-1-git-send-email-robherring2@gmail.com>
- <1323876538-20406-3-git-send-email-robherring2@gmail.com>
- <4EEF3110.30203@ti.com> <4EEF48EE.1070800@gmail.com>
-Message-ID: <4EEF566B.6080703@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 19 Dec 2011 15:24:18 +0000
+Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
+In-Reply-To: <20111219151958.GU24496@pengutronix.de>
+References: <1324284030-25540-1-git-send-email-mgherzan@gmail.com>
+ <20111219125021.GA2031@linaro.org>
+ <20111219151958.GU24496@pengutronix.de>
+Message-ID: <20111219152418.GF2031@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2011 3:23 PM, Rob Herring wrote:
-> Benoit,
->
-> On 12/19/2011 06:41 AM, Cousson, Benoit wrote:
->> Hi Rob,
->>
->> While trying your series to take advantage of the generic-irq domain
->> support for OMAP3 INTC, I realized that the following patch is breaking
->> drivers that are using irq_domain_add_simple.
->>
->> The point is that irq_domain_add_simple does not populate hwirq_base or
->> nr_irq, so that test will always fail if the domain is created by the
->> irq_domain_add_simple API.
->>
->> Adding an extra parameter to provide the nr_irq should fix that.
->>
->> The long term fix should be to use the generic-irq for such driver, but
->> this is not the same effort, so it might worth fixing that API for the
->> moment.
->>
->> Regards,
->> Benoit
->>
->> On 12/14/2011 4:28 PM, Rob Herring wrote:
->>> From: Rob Herring<rob.herring@calxeda.com>
->>>
->>> A DT node may have more than 1 domain associated with it, so make sure
->>> the hwirq number is within range when doing DT translation.
->>>
->>> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
->>> Cc: Thomas Gleixner<tglx@linutronix.de>
->>> ---
->>>    kernel/irq/irqdomain.c |    3 +++
->>>    1 files changed, 3 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->>> index 200ce83..ae6441e 100644
->>> --- a/kernel/irq/irqdomain.c
->>> +++ b/kernel/irq/irqdomain.c
->>> @@ -135,6 +135,9 @@ int irq_domain_simple_dt_translate(struct
->>> irq_domain *d,
->>>            return -EINVAL;
->>>        if (intsize<   1)
->>>            return -EINVAL;
->>> +    if ((intspec[0]<   d->hwirq_base) ||
->>> +        (intspec[0]>= d->hwirq_base + d->nr_irq))
->
-> I think this should work:
->
-> if (d->nr_irq&&  ((intspec[0]<  d->hwirq_base) ||
->      (intspec[0]>= d->hwirq_base + d->nr_irq)))
+On Mon, Dec 19, 2011 at 04:19:58PM +0100, Uwe Kleine-K?nig wrote:
+> On Mon, Dec 19, 2011 at 12:50:21PM +0000, Dave Martin wrote:
+> > On Mon, Dec 19, 2011 at 09:40:30AM +0100, Mircea Gherzan wrote:
+> > > Based of Matt Evans's PPC64 implementation.
+> > > 
+> > > Supports only ARM mode with EABI.
+> > > 
+> > > Supports both little and big endian. Depends on the support for
+> > > unaligned loads on ARMv7. Does not support all the BPF opcodes
+> > > that deal with ancillary data. The scratch memory of the filter
+> > > lives on the stack.
+> > > 
+> > > Enabled in the same way as for x86-64 and PPC64:
+> > > 
+> > > 	echo 1 > /proc/sys/net/core/bpf_jit_enable
+> > > 
+> > > A value greater than 1 enables opcode output.
+> > > 
+> > > Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+> > > ---
+> > 
+> > Interesting patch... I haven't reviewed in detail, but I have a few
+> > quick comments.
+> > 
+> > > 
+> > > Changes in v2:
+> > >  * enable the compiler ony for ARMv5+ because of the BLX instruction
+> > >  * use the same comparison for the ARM version checks
+> > >  * use misaligned accesses on ARMv6
+> > 
+> > You probably want to change the commit message now to reflect this.
+> > 
+> > >  * fix the SEEN_MEM
+> > >  * fix the mem_words_used()
+> > > 
+> > >  arch/arm/Kconfig          |    1 +
+> > >  arch/arm/Makefile         |    1 +
+> > >  arch/arm/net/Makefile     |    3 +
+> > >  arch/arm/net/bpf_jit_32.c |  838 +++++++++++++++++++++++++++++++++++++++++++++
+> > >  arch/arm/net/bpf_jit_32.h |  174 ++++++++++
+> > >  5 files changed, 1017 insertions(+), 0 deletions(-)
+> > >  create mode 100644 arch/arm/net/Makefile
+> > >  create mode 100644 arch/arm/net/bpf_jit_32.c
+> > >  create mode 100644 arch/arm/net/bpf_jit_32.h
+> > > 
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index abba5b8..ea65c41 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -30,6 +30,7 @@ config ARM
+> > >  	select HAVE_SPARSE_IRQ
+> > >  	select GENERIC_IRQ_SHOW
+> > >  	select CPU_PM if (SUSPEND || CPU_IDLE)
+> > > +	select HAVE_BPF_JIT if (!THUMB2_KERNEL && AEABI)
+> > 
+> > Have to tried your code with a Thumb-2 kernel?
+> > 
+> > Quickly skimming though your patch, I don't see an obvious reason why we
+> > can't have that working, though I haven't tried it yet.
+> > 
+> > Note that it's fine to have the JIT generating ARM code, even if the rest
+> > if the kernel is Thumb-2.  This would only start to cause problems if we
+> > want to do things like set kprobes in the JITted code, or unwind out of
+> > the JITted code.
+> or use a CPU that doesn't speak ARM (e.g. v7M)
 
-Yes, indeed. It is even simpler that fixing the API.
+Indeed... I was assuming though that that would be out of scope for the
+first iteration of this code.
 
-I can now repost the OMAP3/4 series based on this series.
-
-Thanks,
-Benoit
+Cheers
+---Dave
