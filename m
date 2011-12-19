@@ -1,67 +1,127 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Dec 2011 21:42:24 +0900
-Subject: [PATCH] ARM: restart: move SWRST based S3C platforms to
- machine_desc hook
-In-Reply-To: <201112191325.56090.heiko@sntech.de>
-References: <03dc01ccbe45$80633d30$8129b790$%kim@samsung.com>
- <201112191312.34546.heiko@sntech.de>
- <03dd01ccbe48$88ed7d50$9ac877f0$%kim@samsung.com>
- <201112191325.56090.heiko@sntech.de>
-Message-ID: <03de01ccbe4b$a8a5bb00$f9f13100$%kim@samsung.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 19 Dec 2011 12:50:21 +0000
+Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
+In-Reply-To: <1324284030-25540-1-git-send-email-mgherzan@gmail.com>
+References: <1324284030-25540-1-git-send-email-mgherzan@gmail.com>
+Message-ID: <20111219125021.GA2031@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-
+On Mon, Dec 19, 2011 at 09:40:30AM +0100, Mircea Gherzan wrote:
+> Based of Matt Evans's PPC64 implementation.
 > 
-> S3C2412/S3C2416/S3C2443 use a special register to signal the reset to
-> the processor and used therefore the s3c24xx_reset_hook mechanism in the
-> s3c24xx-specific arch reset.
+> Supports only ARM mode with EABI.
 > 
-> This patch introduces restart functions for these architectures,
-> moves the board files to them and removes the s3c24xx_reset_hook
-> infrastructure, as all users are gone.
+> Supports both little and big endian. Depends on the support for
+> unaligned loads on ARMv7. Does not support all the BPF opcodes
+> that deal with ancillary data. The scratch memory of the filter
+> lives on the stack.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Enabled in the same way as for x86-64 and PPC64:
+> 
+> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
+> 
+> A value greater than 1 enables opcode output.
+> 
+> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
 > ---
-> @Kgene: This is my first cleanup step, done before your s3c64xx mail
-> arrived,
-> which transforms the 2412,2416 and 2443 arches which use the special SWRST
-> register to do the reset. Just if it helps :-)
+
+Interesting patch... I haven't reviewed in detail, but I have a few
+quick comments.
+
 > 
-Heiko, thanks.
+> Changes in v2:
+>  * enable the compiler ony for ARMv5+ because of the BLX instruction
+>  * use the same comparison for the ARM version checks
+>  * use misaligned accesses on ARMv6
 
-I'm looking at S5P SoCs now and of course this helps. And if possible, let
-me do it with this.
+You probably want to change the commit message now to reflect this.
 
-As a note, we need to implement local header file before using new restart
-hook and I'm thinking which one is better to us between all s3c24xx SoCs'
-common or each mach-s3c24xx's one.
+>  * fix the SEEN_MEM
+>  * fix the mem_words_used()
+> 
+>  arch/arm/Kconfig          |    1 +
+>  arch/arm/Makefile         |    1 +
+>  arch/arm/net/Makefile     |    3 +
+>  arch/arm/net/bpf_jit_32.c |  838 +++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/net/bpf_jit_32.h |  174 ++++++++++
+>  5 files changed, 1017 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/net/Makefile
+>  create mode 100644 arch/arm/net/bpf_jit_32.c
+>  create mode 100644 arch/arm/net/bpf_jit_32.h
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index abba5b8..ea65c41 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -30,6 +30,7 @@ config ARM
+>  	select HAVE_SPARSE_IRQ
+>  	select GENERIC_IRQ_SHOW
+>  	select CPU_PM if (SUSPEND || CPU_IDLE)
+> +	select HAVE_BPF_JIT if (!THUMB2_KERNEL && AEABI)
 
-Thanks.
+Have to tried your code with a Thumb-2 kernel?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Quickly skimming though your patch, I don't see an obvious reason why we
+can't have that working, though I haven't tried it yet.
 
+Note that it's fine to have the JIT generating ARM code, even if the rest
+if the kernel is Thumb-2.  This would only start to cause problems if we
+want to do things like set kprobes in the JITted code, or unwind out of
+the JITted code.
 
->  arch/arm/mach-s3c2410/include/mach/reset.h        |   22
--------------------
-> --
->  arch/arm/mach-s3c2410/include/mach/system-reset.h |    5 ----
->  arch/arm/mach-s3c2410/include/mach/system.h       |    2 -
->  arch/arm/mach-s3c2412/mach-jive.c                 |    2 +
->  arch/arm/mach-s3c2412/mach-smdk2413.c             |    3 ++
->  arch/arm/mach-s3c2412/mach-vstms.c                |    1 +
->  arch/arm/mach-s3c2412/s3c2412.c                   |   10 +++-----
->  arch/arm/mach-s3c2416/mach-smdk2416.c             |    1 +
->  arch/arm/mach-s3c2416/s3c2416.c                   |    7 +++--
->  arch/arm/mach-s3c2443/mach-smdk2443.c             |    1 +
->  arch/arm/mach-s3c2443/s3c2443.c                   |    8 +++---
->  arch/arm/plat-samsung/include/plat/s3c2412.h      |    3 ++
->  arch/arm/plat-samsung/include/plat/s3c2416.h      |    2 +
->  arch/arm/plat-samsung/include/plat/s3c2443.h      |    2 +
->  14 files changed, 27 insertions(+), 42 deletions(-)
->  delete mode 100644 arch/arm/mach-s3c2410/include/mach/reset.h
+It's just necessary to make sure that calls/returns into/out of the
+JITted code are handled correctly.  You don't seem to do any scary
+arithmetic or mov to or from pc or lr, and it doesn't look like you ever
+call back into the kernel from JITted code, so the implementation is
+probably safe for ARM/Thumb interworking already (if I've understood
+correctly).
+
+It doesn't look hard to port the JIT to generate Thumb-2 code directly
+either -- but I suggest not to worry about that initially.  So long as
+the ARM-based JIT works in a Thumb-2 kernel, it will be useful.
+
+[...]
+
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> new file mode 100644
+> index 0000000..d2b86fa
+> --- /dev/null
+> +++ b/arch/arm/net/bpf_jit_32.c
+
+[...]
+
+> +static int build_body(struct jit_ctx *ctx)
+> +{
+
+[...]
+
+> +		case BPF_S_ALU_DIV_K:
+> +			/* K is not zero, it was previously checked */
+> +			emit_mov_i(ARM_R1, k, ctx);
+> +			goto div;
+> +		case BPF_S_ALU_DIV_X:
+> +			ctx->seen |= SEEN_X;
+> +			emit(ARM_CMP_I(r_X, 0), ctx);
+> +			emit_err_ret(ARM_COND_EQ, ctx);
+> +			emit(ARM_MOV_R(ARM_R1, r_X), ctx);
+> +div:
+> +			ctx->seen |= SEEN_CALL;
+> +
+> +			emit(ARM_MOV_R(ARM_R0, r_A), ctx);
+> +			emit_mov_i(r_scratch, (u32)__aeabi_uidiv, ctx);
+> +			emit(ARM_BLX_R(r_scratch), ctx);
+> +			emit(ARM_MOV_R(r_A, ARM_R0), ctx);
+> +			break;
+
+I don't know how much division is used by the packet filter JIT.  If
+it gets used a significant amount, you might want to support hardware
+divide for CPUs that have it:
+
+Cortex-A15 and later processors may have hardware integer divide
+support.  You can check for its availability at runtime using by testing
+the HWCAP_IDIVA (for ARM) or HWCAP_IDIVT (for Thumb) bits in elf_hwcap
+(see arch/arm/include/asm/hwcap.h).
+
+Cheers
+---Dave
