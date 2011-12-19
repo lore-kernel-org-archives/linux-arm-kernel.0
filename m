@@ -1,49 +1,111 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Dec 2011 11:42:49 -0800
-Subject: [GIT PULL] Borderline fixes for v3.2-rc6
-Message-ID: <20111219194249.GO6464@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 19 Dec 2011 14:43:01 -0500 (EST)
+Subject: [PATCH 01/20] ARM: clean up idle handlers
+In-Reply-To: <20111219190736.GK6464@atomide.com>
+References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
+ <1324288069-21940-2-git-send-email-nico@fluxnic.net>
+ <20111219190736.GK6464@atomide.com>
+Message-ID: <alpine.LFD.2.02.1112191437350.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On Mon, 19 Dec 2011, Tony Lindgren wrote:
 
-Here are two fixes that could potentially go into v3.2 -rc cycle.
+> * Nicolas Pitre <nico@fluxnic.net> [111219 01:20]:
+> > Let's factor out the need_resched() check instead of having it duplicated
+> > in every pm_idle implementations to avoid inconsistencies (omap2_pm_idle
+> > was missing it already).
+> > 
+> > The forceful re-enablement of IRQs after pm_idle has returned can go.
+> > The warning certainly doesn't trigger for existing users.  Similar for
+> > the redundant local_irq_disable() call in the OMAP implementations.
+> > 
+> > To get rid of the pm_idle calling convention oddity, let's introduce
+> > arm_pm_idle() allowing for the local_irq_enable() to be factored out
+> > from SOC specific implementations. The default pm_idle function becomes
+> > a wrapper for arm_pm_idle and it takes care of enabling IRQs closer to
+> > where they are initially disabled.
+> > 
+> > And finally move the comment explaining the reason for that turning off
+> > of IRQs to a more proper location.
+> > 
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> For omaps:
+> 
+> Tested-by: Tony Lindgren <tony@atomide.com>
 
-One fixes a harmless but annoying warning that happens on omap 34xx
-processors during boot. The other one fixes booting on pretty rare
-secure mode development board, but that's fixed in "features that
-never worked earlier either" style.
+Thanks.
 
-We can surely wait on these fixes, but if you have something going
-upstream anyways, then these might be worth considering too.
+> For pm44xx.c the following merge will be needed for omap/omap4 branch
+> in arm-soc tree:
 
-I'll post a following pull request for fixes-non-critical-part2
-that is based on this one, so no need to pull in this one in case
-you're not sending any more fixes for the -rc cycle:
+Great.  I'm CC'ing Arnd and Olof so they are aware.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-hwmod
-
-Regards,
-
-Tony
-
-
-The following changes since commit e5fe29c7198a1f6616286dfc8602a69da165cb3f:
-  Felipe Contreras (1):
-        ARM: OMAP: rx51: fix USB
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-hwmod
-
-Aaro Koskinen (1):
-      ARM: OMAP: hwmod data: fix the panic on Nokia RM-680 during boot
-
-Felipe Contreras (1):
-      ARM: OMAP: hwmod data: fix iva and mailbox hwmods for OMAP 3
-
-Tony Lindgren (1):
-      Merge branch 'hwmod_data_fixes_3.2rc' of git://git.pwsan.com/linux-2.6 into fixes-hwmod
-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+> 
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@@ -16,10 -17,10 +17,12 @@@
+>   #include <linux/err.h>
+>   #include <linux/slab.h>
+>   
+>  +#include <asm/system.h>
+>  +
+>   #include "common.h"
+> + #include "clockdomain.h"
+>   #include "powerdomain.h"
+> + #include "pm.h"
+>   
+>   struct power_state {
+>   	struct powerdomain *pwrdm;
+> @@@ -85,11 -161,30 +163,24 @@@ static int __init pwrdms_setup(struct p
+>   	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
+>   	if (!pwrst)
+>   		return -ENOMEM;
+> + 
+>   	pwrst->pwrdm = pwrdm;
+> - 	pwrst->next_state = PWRDM_POWER_ON;
+> + 	pwrst->next_state = PWRDM_POWER_RET;
+>   	list_add(&pwrst->node, &pwrst_list);
+>   
+> - 	return pwrdm_set_next_pwrst(pwrst->pwrdm, pwrst->next_state);
+> + 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+> + }
+> + 
+> + /**
+> +  * omap_default_idle - OMAP4 default ilde routine.'
+> +  *
+> +  * Implements OMAP4 memory, IO ordering requirements which can't be addressed
+> +  * with default arch_idle() hook. Used by all CPUs with !CONFIG_CPUIDLE and
+> +  * by secondary CPU with CONFIG_CPUIDLE.
+> +  */
+> + static void omap_default_idle(void)
+> + {
+>  -	local_irq_disable();
+>  -	local_fiq_disable();
+>  -
+> + 	omap_do_wfi();
+>  -
+>  -	local_fiq_enable();
+>  -	local_irq_enable();
+>   }
+>   
+>   /**
+> @@@ -117,6 -255,11 +251,11 @@@ static int __init omap4_pm_init(void
+>   	suspend_set_ops(&omap_pm_ops);
+>   #endif /* CONFIG_SUSPEND */
+>   
+> + 	/* Overwrite the default arch_idle() */
+>  -	pm_idle = omap_default_idle;
+> ++	arm_pm_idle = omap_default_idle;
+> + 
+> + 	omap4_idle_init();
+> + 
+>   err2:
+>   	return ret;
+>   }
+> 
+> Regards,
+> 
+> Tony
+> 
