@@ -1,73 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Dec 2011 12:00:46 -0800
-Subject: [GIT PULL] omap prcm changes for v3.3 merge window
-Message-ID: <20111219200046.GS6464@atomide.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 19 Dec 2011 20:02:29 +0000
+Subject: [PATCH v6 01/11] davinci: vpif: remove obsolete header file
+ inclusion
+In-Reply-To: <1323951120-15876-2-git-send-email-manjunath.hadli@ti.com>
+References: <1323951120-15876-1-git-send-email-manjunath.hadli@ti.com>
+ <1323951120-15876-2-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B604F83C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+Hi Manju,
 
-Please pull omap prcm changes from:
+In the subject line, calling mach/dm646x.h obsolete
+is not right since as of this patch mach/dm646x.h
+still exists.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap prcm
+On Thu, Dec 15, 2011 at 17:41:50, Hadli, Manjunath wrote:
+> remove inclusion of header files from vpif.h and vpif_dispaly.c
+> and add appropriate header file for building.
 
-These changes adds support for PRCM (Power, Reset, Clock, Module)
-chained interrupt handling. This will eventually allow us to start
-making PM parts into driver modules and move them out of arch/arm.
+The main purpose of the patch is to remove machine specific
+includes from driver files since that (among other things)
+comes in the way of platform code consolidation. This needs
+to come out in the description. Right now the description is
+just describing the change without answering the question - why?
 
-These are also needed for the serial port runtime PM patches that
-I'll post a pull request for after this.
+> 
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+> Cc: LMML <linux-media@vger.kernel.org>
+> ---
+>  drivers/media/video/davinci/vpif.h         |    2 +-
+>  drivers/media/video/davinci/vpif_display.c |    2 --
+>  2 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
+> index 25036cb..c96268a 100644
+> --- a/drivers/media/video/davinci/vpif.h
+> +++ b/drivers/media/video/davinci/vpif.h
+> @@ -19,7 +19,7 @@
+>  #include <linux/io.h>
+>  #include <linux/videodev2.h>
+>  #include <mach/hardware.h>
 
-Note that these have a slight dependency to the previously merged
-omap4 branch so it would produce a minor merge conflict if based
-on something earlier. However, the following uart branch has a
-dependency to both omap4 branch and this branch, so I've based
-this on omap4 branch also.
+It appears mach/hardware.h can be removed as well. Can you please
+check?
 
-Regards,
+> -#include <mach/dm646x.h>
+> +#include <linux/i2c.h>
 
-Tony
+I2C is actually needed by include/media/davinci/vpif_types.h so it
+should go there.
 
-
-The following changes since commit 4c89aad9f4803875f7065e825badc9ba61922091:
-  Tony Lindgren (1):
-        Merge branch 'for_3.3/pm/omap4-mpuss' of git://git.kernel.org/.../khilman/linux-omap-pm into omap4
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap prcm
-
-Govindraj R (1):
-      ARM: OMAP2+: hwmod: Add API to enable IO ring wakeup
-
-Paul Walmsley (2):
-      ARM: OMAP2+: mux: add wakeup-capable hwmod mux entries to dynamic list
-      ARM: OMAP3/4: PRM: add functions to read pending IRQs, PRM barrier
-
-Rajendra Nayak (1):
-      ARM: OMAP2+: hwmod: Add a new flag to handle hwmods left enabled at init
-
-Tero Kristo (6):
-      ARM: OMAP: PRCM: add support for chain interrupt handler
-      ARM: OMAP: PRCM: add suspend prepare / finish support
-      ARM: OMAP2+: mux: add support for PAD wakeup interrupts
-      ARM: OMAP: hwmod: add support for selecting mpu_irq for each wakeup pad
-      ARM: OMAP3: pm: use prcm chain handler
-      ARM: OMAP4: PRM: use PRCM interrupt handler
-
-Tony Lindgren (1):
-      Merge branch 'tk_prm_chain_handler_devel_3.3' of git://git.pwsan.com/linux-2.6 into prcm
-
- arch/arm/mach-omap2/Makefile                 |    3 +-
- arch/arm/mach-omap2/mux.c                    |   89 +++++++-
- arch/arm/mach-omap2/omap_hwmod.c             |  125 ++++++++++-
- arch/arm/mach-omap2/pm34xx.c                 |  115 ++++------
- arch/arm/mach-omap2/prcm-common.h            |   75 ++++++-
- arch/arm/mach-omap2/prm2xxx_3xxx.c           |   97 ++++++++-
- arch/arm/mach-omap2/prm2xxx_3xxx.h           |    9 +-
- arch/arm/mach-omap2/prm44xx.c                |  116 ++++++++++
- arch/arm/mach-omap2/prm44xx.h                |    8 +-
- arch/arm/mach-omap2/prm_common.c             |  320 ++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 +
- 11 files changed, 884 insertions(+), 79 deletions(-)
- create mode 100644 arch/arm/mach-omap2/prm_common.c
+Thanks,
+Sekhar
