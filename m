@@ -1,30 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Dec 2011 21:39:42 +0000
-Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
- AMBA drivers
-In-Reply-To: <20111219132409.GB2031@linaro.org>
-References: <20111206151541.GA13774@linaro.org>
- <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
- <20111206155911.GA11902@mail.gnudd.com> <20111206161815.GD13769@linaro.org>
- <20111219132409.GB2031@linaro.org>
-Message-ID: <20111219213942.GM14542@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 19 Dec 2011 22:43:49 +0100
+Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
+In-Reply-To: <201112192237.42034.marek.vasut@gmail.com>
+References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
+ <20111219212847.GK14542@n2100.arm.linux.org.uk>
+ <201112192237.42034.marek.vasut@gmail.com>
+Message-ID: <201112192243.49355.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 01:24:09PM +0000, Dave Martin wrote:
-> Hi Russell,
+> > On Mon, Dec 19, 2011 at 10:05:25PM +0100, Marek Vasut wrote:
+> > > > On Mon, Dec 19, 2011 at 09:54:25PM +0100, Marek Vasut wrote:
+> > > > > > So, in summary, you have everything you require to fix it outside
+> > > > > > the driver.  You just have to decide which of the two options you
+> > > > > > want to proceed with, and actually (and finally) do it instead of
+> > > > > > endlessly procrastinating and waiting for more and more bug
+> > > > > > reports (which is exactly what has happened so far.)
+> > > > > 
+> > > > > What the hell, I just recently found this bug and I submitted a
+> > > > > patch right away! What are you complaining about?!
+> > > > 
+> > > > If you want to take that attitude to my attempt to help you
+> > > > understand the problem and see solutions, I'll ignore you
+> > > > permanently for being an absolute twit.
+> > > 
+> > > Go ahead, but you accused me of procrastinating and waiting even if the
+> > > first thing I did when I saw the bug was start solving it. That's just
+> > > insane!
+> > > 
+> > > > I'm not going to spend time giving a detailed explaination
+> > > > about the background and options over something to only then have it
+> > > > immediately shoved back in my face with such a response.
+> > > 
+> > > I consider my response to the last part of your email appropriate.
+> > 
+> > Sorry, it wasn't directed personally at you, but to the entire MXS
 > 
-> This one isn't urgent, but I'm not seeing the amba modalias patches
-> anywhere yet.  Did you have any outstanding concerns which need to be
-> resolved?
+> > community.  The facts over this are:
+> Ah! I'm sorry I was so direct and rude too. I was unaware it was discussed
+> before, I started this effort on my own just recently.
 > 
-> If you can suggest when/if these are likely to merge that would be great.
+> > 1. This problem has been known about since October.
 > 
-> Since Alessandro is now expecting to have to rebase on top of the amba
-> additions anyway, we shouldn't need to worry about conflicting with his
-> patches.
+> I was really away from the kernel community for a while so I didn't know.
 > 
-> Of course, if you've already merged these somewhere, then there's no
-> problem.
+> > 2. It's been discussed several times - every time along the same lines.
+> > 3. There is zero apparant progress on the issue.
+> > 
+> > Here's two of the discussions over it, where I've said exactly the same
+> > thing:
+> > 
+> > http://lists.arm.linux.org.uk/lurker/thread/20111018.173744.46c4bd76.en.h
+> > tm l
+> > http://lists.arm.linux.org.uk/lurker/thread/20111123.183640.222b05cf.en.h
+> > t ml
+> > 
+> > So now, tell me - is this _finally_ going to get fixed in the MXS code,
+> > or is the previous discussion about converting stuff to spinlocks etc
+> > just going to be repeated yet again?
+> 
+> Spinlocks are OK as far as the code within them is fast, right ? But hm ...
+> actually, we might be able to toggle the clock in one instruction by using
+> the bitwise set/clear registers. That way, we won't need the locks at all,
+> but we'd loose the usecount ... which is useless anyway).
+> 
+> M
 
-I have pulled it, I just haven't merged it in anywhere yet.
+I see ... clk_set_rate() can be slow. OK, looking further into it.
