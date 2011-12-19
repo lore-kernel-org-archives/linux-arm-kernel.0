@@ -1,76 +1,253 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 19 Dec 2011 17:52:26 +0100
-Subject: [PATCH v2 04/10] rtc: rtc-twl: Add DT support for RTC inside
- twl4030/twl6030
-In-Reply-To: <1323439361-1647-5-git-send-email-b-cousson@ti.com>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-5-git-send-email-b-cousson@ti.com>
-Message-ID: <4EEF6BCA.908@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 19 Dec 2011 08:52:55 -0800
+Subject: [RFC v2 PATCH 1/3] dt: device tree bindings for DDR memories
+In-Reply-To: <1324303533-17458-2-git-send-email-aneesh@ti.com>
+References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
+ <1324303533-17458-2-git-send-email-aneesh@ti.com>
+Message-ID: <CAOesGMjOybCbu1Bgxe0Te=XANVOqOPcaDOL_6c4=pVCxzu9ZnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alessandro,
+Hi,
 
-Gentle ping on this patch.
+Some comments below, but also a more general question: How much of
+this generic data makes sense to encode in the device tree? Final
+hardware configuration usually has to take into consideration board
+layout/signal delays, etc, and that's not part of this binding.
 
-Thanks,
-Benoit
 
-On 12/9/2011 3:02 PM, Benoit Cousson wrote:
-> Add the DT support for the TI rtc-twl present in the twl4030
-> and twl6030 devices.
->
-> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> Cc: Alessandro Zummo<a.zummo@towertech.it>
-> ---
->   Documentation/devicetree/bindings/rtc/twl-rtc.txt |   12 ++++++++++++
->   drivers/rtc/rtc-twl.c                             |   10 ++++++++--
->   2 files changed, 20 insertions(+), 2 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/rtc/twl-rtc.txt
->
-> diff --git a/Documentation/devicetree/bindings/rtc/twl-rtc.txt b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
+On Mon, Dec 19, 2011 at 6:05 AM, Aneesh V <aneesh@ti.com> wrote:
+
+> diff --git a/Documentation/devicetree/bindings/ddr/ddr.txt b/Documentation/devicetree/bindings/ddr/ddr.txt
 > new file mode 100644
-> index 0000000..596e0c9
+> index 0000000..f15c4dd
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
-> @@ -0,0 +1,12 @@
-> +* TI twl RTC
-> +
-> +The TWL family (twl4030/6030) contains a RTC.
+> +++ b/Documentation/devicetree/bindings/ddr/ddr.txt
+> @@ -0,0 +1,114 @@
+> +* DDR SDRAM memories compliant to JEDEC specifications JESD209-2(LPDDR2)
+> + ?or JESD79-3(DDR3).
 > +
 > +Required properties:
-> +- compatible : Should be twl4030-rtc
+> +- compatible : Should be one of - "jedec,ddr3", "jedec,lpddr2-nvm",
+> + ?"jedec,lpddr2-s2", "jedec,lpddr2-s4"
 > +
-> +Examples:
+> + ?"ti,jedec-ddr3" should be listed if the memory part is DDR3 type
 > +
-> +rtc at 0 {
-> +    compatible = "ti,twl4030-rtc";
+> + ?"ti,jedec-lpddr2-s2" should be listed if the memory part is LPDDR2-S2 type
+> +
+> + ?"ti,jedec-lpddr2-s4" should be listed if the memory part is LPDDR2-S4 type
+> +
+> + ?"ti,jedec-lpddr2-nvm" should be listed if the memory part is LPDDR2-NVM type
+> +
+> +- density ?: string representing the density of the device in terms of
+> + ?Mb (mega bits). Following are the allowed values: "64Mb", "128Mb",
+> + ?"256Mb", "512Mb", "1Gb", "2Gb", "4Gb", "8Gb", "16Gb", or "32Gb"
+
+No, please encode as a two-cell integer instead.
+
+> +- io-width : string representing the io width: "x8", "x16" or "x32".
+
+No, encode as an integer.
+
+> +
+> +Optional properties:
+> +
+> +The following optional properties represent the minimum value of some AC
+> +timing parameters of the DDR device in terms of number of clock cycles.
+> +These values shall be obtained from the device data-sheet.
+> +
+> +The suffix nCK indicates that the unit for these parameters is number
+> +of DDR clock cycles. Note: In LPDDR2 spec and data-sheets tCK is used
+> +inter-changeably for nCK. Both are equivalent in this context.
+
+Please use only lower characters in property names unless absolutely
+necessary, which this doesn't qualify as, in my opinion.
+
+Also, can't these strings be shortened a bit? All of them have '-min'
+in common, and none of them seem to be very devicetree-like in their
+naming.
+
+Finally, the "lpddr2" and "ddr3" properties could just be prefixed
+with "lpddr2,<propertyname>" instead.
+
+> +
+> +- tRRD-min-nCK
+> +- tWTR-min-nCK
+> +- tXP-min-nCK
+> +- tRTP-min-nCK
+> +- tCKE-min-nCK
+> +- tRPab-min-nCK ? ? ? ? ? ? ? ?/* LPDDR2 only */
+> +- tRCD-min-nCK ? ? ? ? /* LPDDR2 only */
+> +- tWR-min-nCK ? ? ? ? ?/* LPDDR2 only */
+> +- tRASmin-min-nCK ? ? ?/* LPDDR2 only */
+> +- tCKESR-min-nCK ? ? ? /* LPDDR2 only */
+> +- tFAW-min-nCK ? ? ? ? /* LPDDR2 only */
+> +- tZQCS-min-nCK ? ? ? ? ? ? ? ?/* DDR3 only */
+> +- tZQoper-min-nCK ? ? ?/* DDR3 only */
+> +- tZQinit-min-nCK ? ? ?/* DDR3 only */
+> +- tXS-min-nCK ? ? ? ? ?/* DDR3 only */
+> +
+> +Child nodes:
+> +- The ddr node may have one or more child nodes of type "ddr-timings".
+> + ?"ddr-timings" provides AC timing parameters of the device for
+> + ?a given speed-bin. The user may provide the timings for as many
+> + ?speed-bins as is required. Please see Documentation/devicetree/
+> + ?bindings/ddr/ddr-timings.txt for more information on "ddr-timings"
+> +
+> +Example:
+> +
+> +elpida_ECB240ABACN : ddr {
+> + ? ? ? compatible ? ? ?= "Elpida,ECB240ABACN","jedec,lpddr2-s4";
+> + ? ? ? density ? ? ? ? = "2Gb";
+> + ? ? ? io-width ? ? ? ?= "x32";
+> +
+> + ? ? ? tRPab-min-nCK ? = <3>;
+> + ? ? ? tRCD-min-nCK ? ?= <3>;
+> + ? ? ? tWR-min-nCK ? ? = <3>;
+> + ? ? ? tRASmin-min-nCK = <3>;
+> + ? ? ? tRRD-min-nCK ? ?= <2>;
+> + ? ? ? tWTR-min-nCK ? ?= <2>;
+> + ? ? ? tXP-min-nCK ? ? = <2>;
+> + ? ? ? tRTP-min-nCK ? ?= <2>;
+> + ? ? ? tCKE-min-nCK ? ?= <3>;
+> + ? ? ? tCKESR-min-nCK ?= <3>;
+> + ? ? ? tFAW-min-nCK ? ?= <8>;
+> +
+> + ? ? ? timings_elpida_ECB240ABACN_400mhz: ddr-timings {
+
+You will need a unit address here.
+
+> + ? ? ? ? ? ? ? min-freq ? ? ? ?= <10000000>;
+> + ? ? ? ? ? ? ? max-freq ? ? ? ?= <400000000>;
+> + ? ? ? ? ? ? ? tRP-ps ? ? ? ? ?= <21000>;
+> + ? ? ? ? ? ? ? tRCD-ps ? ? ? ? = <18000>;
+> + ? ? ? ? ? ? ? tWR-ps ? ? ? ? ?= <15000>;
+> + ? ? ? ? ? ? ? tRAS-min-ps ? ? = <42000:;
+> + ? ? ? ? ? ? ? tRRD-ps ? ? ? ? = <10000>;
+> + ? ? ? ? ? ? ? tWTR-ps ? ? ? ? = <7500>;
+> + ? ? ? ? ? ? ? tXP-ps ? ? ? ? ?= <7500>;
+> + ? ? ? ? ? ? ? tRTP-ps ? ? ? ? = <7500>;
+> + ? ? ? ? ? ? ? tCKESR-ps ? ? ? = <15000>;
+> + ? ? ? ? ? ? ? tDQSCK-max-ps ? = <5500>;
+> + ? ? ? ? ? ? ? tFAW-ps ? ? ? ? = <50000>;
+> + ? ? ? ? ? ? ? tZQCS-ps ? ? ? ?= <90000>;
+> + ? ? ? ? ? ? ? tZQoper-ps ? ? ?= <360000>;
+> + ? ? ? ? ? ? ? tZQinit-ps ? ? ?= <1000000>;
+> + ? ? ? ? ? ? ? tRAS-max-ns ? ? = <70000>;
+> + ? ? ? };
+> +
+> + ? ? ? timings_elpida_ECB240ABACN_200mhz: ddr-timings {
+
+Same here, since you have more than one table. See previous
+discussions about emc tables on tegra (I'll repost that series this
+week).
+
+> + ? ? ? ? ? ? ? min-freq ? ? ? ?= <10000000>;
+> + ? ? ? ? ? ? ? max-freq ? ? ? ?= <200000000>;
+> + ? ? ? ? ? ? ? tRP-ps ? ? ? ? ?= <21000>;
+> + ? ? ? ? ? ? ? tRCD-ps ? ? ? ? = <18000>;
+> + ? ? ? ? ? ? ? tWR-ps ? ? ? ? ?= <15000>;
+> + ? ? ? ? ? ? ? tRAS-min-ps ? ? = <42000:;
+
+Typo
+
+> + ? ? ? ? ? ? ? tRRD-ps ? ? ? ? = <10000>;
+> + ? ? ? ? ? ? ? tWTR-ps ? ? ? ? = <10000>;
+> + ? ? ? ? ? ? ? tXP-ps ? ? ? ? ?= <7500>;
+> + ? ? ? ? ? ? ? tRTP-ps ? ? ? ? = <7500>;
+> + ? ? ? ? ? ? ? tCKESR-ps ? ? ? = <15000>;
+> + ? ? ? ? ? ? ? tDQSCK-max-ps ? = <5500>;
+> + ? ? ? ? ? ? ? tFAW-ps ? ? ? ? = <50000>;
+> + ? ? ? ? ? ? ? tZQCS-ps ? ? ? ?= <90000>;
+> + ? ? ? ? ? ? ? tZQoper-ps ? ? ?= <360000>;
+> + ? ? ? ? ? ? ? tZQinit-ps ? ? ?= <1000000>;
+> + ? ? ? ? ? ? ? tRAS-max-ns ? ? = <70000>;
+> + ? ? ? };
+> +
+> +}
+> diff --git a/Documentation/devicetree/bindings/ddr/ddr_timings.txt b/Documentation/devicetree/bindings/ddr/ddr_timings.txt
+> new file mode 100644
+> index 0000000..38fcdec
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ddr/ddr_timings.txt
+> @@ -0,0 +1,62 @@
+> +* AC timing parameters of DDR memories for a given speed-bin
+> + ?At the moment properties for only LPDDR2 and DDR3 have been added
+> +
+> +Required properties:
+> +- min-freq : minimum DDR clock frequency for the speed-bin
+> +- max-freq : maximum DDR clock frequency for the speed-bin
+
+There should be a compatible field here too, especially if the binding
+ever has to be revised.
+
+> +
+> +Optional properties:
+> +
+> +The following properties represent AC timing parameters from the memory
+> +data-sheet of the device for a given speed-bin. All these properties are
+> +of type <u32> and "-ps", "-ns", "-nCK" etc in the name indicates the
+> +unit of the corresponding parameter:
+> + ?ps - pico seconds
+> + ?ns - nano seconds
+> + ?nCK - number of DDR clock cycles. Please note that in LPDDR2 spec and
+> + ?data-sheets tCK is used inter-changeably for nCK. Both are equivalent
+> + ?in this context.
+
+Seems noisy to include the units on every single property instead of
+just in the bindings.
+
+> +
+> +- tRCD-ps
+> +- tWR-ps
+> +- tRAS-min-ps
+> +- tRRD-ps
+> +- tWTR-ps
+> +- tXP-ps
+> +- tRTP-ps
+> +- tDQSCK-max-ps
+> +- tFAW-ps
+> +- tZQCS-ps
+> +- tZQinit-ps
+> +- tRP-ps ? ? ? /* DDR3 only */
+> +- tRC-ps ? ? ? /* DDR3 only */
+> +- tXSDLL-nCK ? /* DDR3 only */
+> +- tCKE-ps ? ? ?/* DDR3 only */
+> +- tZQoper-ps ? /* DDR3 only */
+> +- tRPab-ps ? ? /* LPDDR2 only */
+> +- tZQCL-ps ? ? /* LPDDR2 only */
+> +- tCKESR-ps ? ?/* LPDDR2 only */
+> +- tRAS-max-ns ?/* LPDDR2 only */
+
+Same above about type-specific properties.
+
+> +
+> +Example:
+> +
+> +timings_elpida_ECB240ABACN_400mhz: ddr-timings {
+> + ? ? ? min-freq ? ? ? ?= <10000000>;
+> + ? ? ? max-freq ? ? ? ?= <400000000>;
+> + ? ? ? tRPab-ps ? ? ? ?= <21000>;
+> + ? ? ? tRCD-ps ? ? ? ? = <18000>;
+> + ? ? ? tWR-ps ? ? ? ? ?= <15000>;
+> + ? ? ? tRAS-min-ps ? ? = <42000:;
+> + ? ? ? tRRD-ps ? ? ? ? = <10000>;
+> + ? ? ? tWTR-ps ? ? ? ? = <7500>;
+> + ? ? ? tXP-ps ? ? ? ? ?= <7500>;
+> + ? ? ? tRTP-ps ? ? ? ? = <7500>;
+> + ? ? ? tCKESR-ps ? ? ? = <15000>;
+> + ? ? ? tDQSCK-max-ps ? = <5500>;
+> + ? ? ? tFAW-ps ? ? ? ? = <50000>;
+> + ? ? ? tZQCS-ps ? ? ? ?= <90000>;
+> + ? ? ? tZQCL-ps ? ? ? ?= <360000>;
+> + ? ? ? tZQinit-ps ? ? ?= <1000000>;
+> + ? ? ? tRAS-max-ns ? ? = <70000>;
 > +};
-> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-> index 20687d5..d43b4f6 100644
-> --- a/drivers/rtc/rtc-twl.c
-> +++ b/drivers/rtc/rtc-twl.c
-> @@ -550,6 +550,11 @@ static int twl_rtc_resume(struct platform_device *pdev)
->   #define twl_rtc_resume  NULL
->   #endif
+> +
+> --
+> 1.7.1
 >
-> +static const struct of_device_id twl_rtc_of_match[] = {
-> +	{.compatible = "ti,twl4030-rtc", },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, twl_rtc_of_match);
->   MODULE_ALIAS("platform:twl_rtc");
->
->   static struct platform_driver twl4030rtc_driver = {
-> @@ -559,8 +564,9 @@ static struct platform_driver twl4030rtc_driver = {
->   	.suspend	= twl_rtc_suspend,
->   	.resume		= twl_rtc_resume,
->   	.driver		= {
-> -		.owner	= THIS_MODULE,
-> -		.name	= "twl_rtc",
-> +		.owner		= THIS_MODULE,
-> +		.name		= "twl_rtc",
-> +		.of_match_table = twl_rtc_of_match,
->   	},
->   };
->
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
