@@ -1,52 +1,71 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Dec 2011 21:28:47 +0000
-Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
-In-Reply-To: <201112192205.25806.marek.vasut@gmail.com>
-References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
- <201112192154.25310.marek.vasut@gmail.com>
- <20111219210317.GI14542@n2100.arm.linux.org.uk>
- <201112192205.25806.marek.vasut@gmail.com>
-Message-ID: <20111219212847.GK14542@n2100.arm.linux.org.uk>
+Date: Mon, 19 Dec 2011 21:34:45 +0000
+Subject: buggy usage of pm_idle by omap1 code
+In-Reply-To: <20111219173518.GH6464@atomide.com>
+References: <alpine.LFD.2.02.1112162208390.2907@xanadu.home>
+ <20111219173518.GH6464@atomide.com>
+Message-ID: <20111219213445.GL14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 10:05:25PM +0100, Marek Vasut wrote:
-> > On Mon, Dec 19, 2011 at 09:54:25PM +0100, Marek Vasut wrote:
-> > > > So, in summary, you have everything you require to fix it outside the
-> > > > driver.  You just have to decide which of the two options you want to
-> > > > proceed with, and actually (and finally) do it instead of endlessly
-> > > > procrastinating and waiting for more and more bug reports (which is
-> > > > exactly what has happened so far.)
-> > > 
-> > > What the hell, I just recently found this bug and I submitted a patch
-> > > right away! What are you complaining about?!
-> > 
-> > If you want to take that attitude to my attempt to help you understand
-> > the problem and see solutions, I'll ignore you permanently for being an
-> > absolute twit.
+On Mon, Dec 19, 2011 at 09:35:19AM -0800, Tony Lindgren wrote:
+> Good catch. Here's a patch to deal with that issue, want to take this
+> into your idle series? I'll try out your idle series today at some
+> point.
+
+Two points:
+
+1. It's good practice to call cpu_idle_wait() after modifying pm_idle,
+even on UP - it allows static checking of this.
+
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Mon, 19 Dec 2011 09:11:11 -0800
+> Subject: [PATCH] ARM: OMAP1: Fix pm_idle during suspend
 > 
-> Go ahead, but you accused me of procrastinating and waiting even if the first 
-> thing I did when I saw the bug was start solving it. That's just insane!
+> Commit 9ccdac3662dbf3c75e8f8851a214bdf7d365a4bd ([ARM] idle:
+> clean up pm_idle calling, obey hlt_counter) removed a check
+> for NULL pm_idle.
 > 
-> > I'm not going to spend time giving a detailed explaination
-> > about the background and options over something to only then have it
-> > immediately shoved back in my face with such a response.
+> On omap1 the system hits an equivalent of suspend during idle.
+> If we are suspending, we need to make sure so we don't call
+> omap1_pm_idle during the suspend process.
 > 
-> I consider my response to the last part of your email appropriate.
+> Fix this by setting the pm_idle function to a an empty
+> function while suspending.
 
-Sorry, it wasn't directed personally at you, but to the entire MXS
-community.  The facts over this are:
+2. what's wrong with calling disable_hlt() to prevent the pm_idle function
+being called?  Why solve it this complicated way of changing the pm_idle
+pointer when there's some infrastructure which can fix it for you already?
 
-1. This problem has been known about since October.
-2. It's been discussed several times - every time along the same lines.
-3. There is zero apparant progress on the issue.
-
-Here's two of the discussions over it, where I've said exactly the same
-thing:
-
-http://lists.arm.linux.org.uk/lurker/thread/20111018.173744.46c4bd76.en.html
-http://lists.arm.linux.org.uk/lurker/thread/20111123.183640.222b05cf.en.html
-
-So now, tell me - is this _finally_ going to get fixed in the MXS code,
-or is the previous discussion about converting stuff to spinlocks etc
-just going to be repeated yet again?
+> 
+> Reported-by: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
+> index 89ea20c..b551a62 100644
+> --- a/arch/arm/mach-omap1/pm.c
+> +++ b/arch/arm/mach-omap1/pm.c
+> @@ -584,6 +584,9 @@ static void omap_pm_init_proc(void)
+>  #endif /* DEBUG && CONFIG_PROC_FS */
+>  
+>  static void (*saved_idle)(void) = NULL;
+> +static void omap1_dummy_idle(void)
+> +{
+> +}
+>  
+>  /*
+>   *	omap_pm_prepare - Do preliminary suspend work.
+> @@ -593,7 +596,7 @@ static int omap_pm_prepare(void)
+>  {
+>  	/* We cannot sleep in idle until we have resumed */
+>  	saved_idle = pm_idle;
+> -	pm_idle = NULL;
+> +	pm_idle = omap1_dummy_idle;
+>  
+>  	return 0;
+>  }
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
