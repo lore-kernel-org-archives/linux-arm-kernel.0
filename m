@@ -1,53 +1,30 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 19 Dec 2011 14:23:21 +0100
-Subject: [PATCH v3 0/7] s3c-hsudc: regulator handling and a lot of fixes
-Message-ID: <201112191423.21461.heiko@sntech.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 19 Dec 2011 13:24:09 +0000
+Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
+ AMBA drivers
+In-Reply-To: <20111206161815.GD13769@linaro.org>
+References: <20111206151541.GA13774@linaro.org>
+ <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
+ <20111206155911.GA11902@mail.gnudd.com>
+ <20111206161815.GD13769@linaro.org>
+Message-ID: <20111219132409.GB2031@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In his response to the first submission Felipe Balbi asked to also move
-the driver to the new udc_start and udc_stop functions and to make an
-effort to reduce dependencies on archictecture code.
+Hi Russell,
 
-v3 of the series does not try to provide a remove function, due to the
-possible lifetime problem of gadget.dev found by Russel King.
+This one isn't urgent, but I'm not seeing the amba modalias patches
+anywhere yet.  Did you have any outstanding concerns which need to be
+resolved?
 
-The first patch reduces the number of arch dependencies by one by moving
-the platform data struct to a header unter include/linux/usb.
+If you can suggest when/if these are likely to merge that would be great.
 
-The fourth and fifth patches implement the move to udc_start / udc_stop
+Since Alessandro is now expecting to have to rebase on top of the amba
+additions anyway, we shouldn't need to worry about conflicting with his
+patches.
 
-And the sixt patch finally allows the s3c-hsudc driver to control its
-supplying regulators as intended in the first place.
+Of course, if you've already merged these somewhere, then there's no
+problem.
 
-The regulator calls can use the regulators unconditionally and let
-necessary "stubbing and mapping" happen through the regulator framework,
-according to for example
-http://marc.info/?l=linux-netdev&m=131914562120725&w=2
-meaning there is no need to gracefully fail if a regulator is not present.
-
-
-Each patch was compile-tested individually, the series applies cleanly
-against linux-next from 2011-12-16.
-
-Real-life testing happened on S3C2416 hardware.
-
-Heiko Stuebner (7):
-  s3c-hsudc: move platform_data struct to global header
-  s3c-hsudc: add __devinit to probe function
-  s3c-hsudc: add missing otg_put_transceiver in probe
-  s3c-hsudc: move device registration to probe
-  s3c-hsudc: use udc_start and udc_stop functions
-  s3c-hsudc: Add regulator handling
-  s3c-hsudc: use release_mem_region instead of release_resource
-
- arch/arm/mach-s3c2416/mach-smdk2416.c    |    1 +
- arch/arm/plat-samsung/devs.c             |    1 +
- arch/arm/plat-samsung/include/plat/udc.h |   15 +----
- drivers/usb/gadget/s3c-hsudc.c           |  109 +++++++++++++++++-------------
- include/linux/usb/s3c-hsudc.h            |   34 +++++++++
- 5 files changed, 100 insertions(+), 60 deletions(-)
- create mode 100644 include/linux/usb/s3c-hsudc.h
-
--- 
-1.7.5.4
+Cheers
+---Dave
