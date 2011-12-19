@@ -1,75 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 19 Dec 2011 14:02:00 -0700 (MST)
-Subject: [PATCH v6 0/6] PM QoS: implement the OMAP low level constraints
- management code
-In-Reply-To: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
-References: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
-Message-ID: <alpine.DEB.2.00.1112191337420.12660@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Dec 2011 21:03:17 +0000
+Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
+In-Reply-To: <201112192154.25310.marek.vasut@gmail.com>
+References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
+ <201112191257.06145.marek.vasut@gmail.com>
+ <20111219121559.GF14542@n2100.arm.linux.org.uk>
+ <201112192154.25310.marek.vasut@gmail.com>
+Message-ID: <20111219210317.GI14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean
-
-I'm really sorry it's taken me so long to do detailed review of these 
-patches for merging... anyway -
-
-On Wed, 14 Dec 2011, jean.pihet at newoldbits.com wrote:
-
-> From: Jean Pihet <j-pihet@ti.com>
+On Mon, Dec 19, 2011 at 09:54:25PM +0100, Marek Vasut wrote:
+> > So, in summary, you have everything you require to fix it outside the
+> > driver.  You just have to decide which of the two options you want to
+> > proceed with, and actually (and finally) do it instead of endlessly
+> > procrastinating and waiting for more and more bug reports (which is
+> > exactly what has happened so far.)
 > 
-> . Implement the devices wake-up latency constraints using the global
->   device PM QoS notification handler which applies the constraints to the
->   underlying layer
-> . Implement the low level code which controls the power domains next power
->   states, through the hwmod and pwrdm layers
-> . Add cpuidle and power domains wake-up latency figures for OMAP3, cf. 
->   comments in the code and [1] for the details on where the numbers
->   are magically coming from
-> . Implement the relation between the cpuidle and per-device PM QoS frameworks
->   in the OMAP3 specific idle callbacks.
->   The chosen C-state shall satisfy the following conditions:
->    . the 'valid' field is enabled,
->    . it satisfies the enable_off_mode flag,
->    . the next state for MPU and CORE power domains is not lower than the
->      state programmed by the per-device PM QoS.
+> What the hell, I just recently found this bug and I submitted a patch right 
+> away! What are you complaining about?!
 
-I've been reviewing these closely.  It looks to me that are some issues 
-that need to be resolved before all of them are mergeable.
-
-One issue that I noticed in this series is that there are some locking 
-issues in patch 1.  It looks to me that calls to 
-_pwrdm_wakeuplat_update_pwrst() can race with each other, since it's 
-called outside the lock?
-
-Another issue is with the latency data, which we've discussed previously. 
-Before we merge the latency data in mainline, we need to ensure that we've 
-minimized the dependency of that data on other register settings, such as 
-the AUTOEXTCLKMODE bits or the external high-frequency oscillator 
-stabilization time.  Otherwise any board vendor that ships devices based 
-on that data will need to redo it, which we'd like to avoid.  I'll comment 
-more on this in replies to those data patches.
-
-But there is a more fundamental issue that we need to deal with before we 
-should merge the low-level powerdomain portion of your patches -- an issue 
-that isn't directly related to your code.  We should first switch over to 
-use functional powerstates throughout our PM code.  Right now, we have 
-some code that tweaks powerdomain bits directly, and some code that calls 
-omap_set_pwrdm_state().  We should get rid of the former, I think, so that 
-there is one single code path that directly changes the low-level 
-powerdomain bits.  Otherwise I think we run the risk of having one of our 
-code paths lose track of what the powerdomain settings are -- and that way 
-lies madness...
-
-Anyway, I've got some experimental code to do this, but since it touches a 
-lot of our existing PM code, I'd like to have Kevin's review, testing, and 
-approval of it.  (And yours too, ideally ;-)  So what I'd like to do is to 
-repost your series with some changes, and with the functional powerstate 
-portion sorted out first.  Would you be able to help test those for 3.4?
-
-In the meantime, it looks to me like two of your patches are good to go in 
-the short term, with some tweaks - the omap_hwmod changes and the 
-dev_pm_qos callback changes.  I'll repost those shortly and queue them up 
-for whenever Tony wants to pull them.
-
-
-- Paul
+If you want to take that attitude to my attempt to help you understand
+the problem and see solutions, I'll ignore you permanently for being an
+absolute twit.  I'm not going to spend time giving a detailed explaination
+about the background and options over something to only then have it
+immediately shoved back in my face with such a response.
