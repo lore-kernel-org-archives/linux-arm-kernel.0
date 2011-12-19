@@ -1,50 +1,27 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Mon, 19 Dec 2011 12:23:40 +0530
-Subject: [PATCH V2 1/4] i2c: tegra: Add __devinit/exit to probe/remove
-In-Reply-To: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
-References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
-Message-ID: <CAM=Q2csGoQR8PZhQO_oeVZt9CqEq377Ut8swY5g12M_=71on9g@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 19 Dec 2011 15:13:51 +0800
+Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
+ Development Kit
+In-Reply-To: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
+References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
+Message-ID: <20111219071350.GH4962@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 18, 2011 at 11:59 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> This fixes some section mismatch build warnings.
-What was the error was a devinit function called from these?
+On Tue, Dec 13, 2011 at 11:02:46AM +0200, Lauri Hintsala wrote:
+> Added initial support for APX4 Development Kit with RTC, LED, Ethernet,
+> Audio, SDIO, I2C, DUART and AUART support.
+> 
+> cc: shawn.guo at linaro.org
+> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
 
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> v2: New patch.
->
-> ?drivers/i2c/busses/i2c-tegra.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-> index 46b6500..e8560ed 100644
-> --- a/drivers/i2c/busses/i2c-tegra.c
-> +++ b/drivers/i2c/busses/i2c-tegra.c
-> @@ -558,7 +558,7 @@ static const struct i2c_algorithm tegra_i2c_algo = {
-> ? ? ? ?.functionality ?= tegra_i2c_func,
-> ?};
->
-> -static int tegra_i2c_probe(struct platform_device *pdev)
-> +static int __devinit tegra_i2c_probe(struct platform_device *pdev)
-> ?{
-> ? ? ? ?struct tegra_i2c_dev *i2c_dev;
-> ? ? ? ?struct tegra_i2c_platform_data *pdata = pdev->dev.platform_data;
-> @@ -690,7 +690,7 @@ err_iounmap:
-> ? ? ? ?return ret;
-> ?}
->
-> -static int tegra_i2c_remove(struct platform_device *pdev)
-> +static int __devexit tegra_i2c_remove(struct platform_device *pdev)
-> ?{
-> ? ? ? ?struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
-> ? ? ? ?i2c_del_adapter(&i2c_dev->adapter);
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+The patch looks good.  The only problem I have is I do not see
+MACH_TYPE_APX4DEVKIT defined in arch/arm/tools/mach-types on either
+Linus' tree or linux-next tree.  I'm afraid that we will experience
+the same problem we have experienced with m28evk patch, which broke
+the whole mxs build for a couple of early -rc of v3.2.
+
+-- 
+Regards,
+Shawn
