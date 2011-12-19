@@ -1,56 +1,52 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Mon, 19 Dec 2011 17:37:44 +0000
-Subject: Status of the following patch (clocksource sched_clock) ?
-In-Reply-To: <3E54258959B69E4282D79E01AB1F32B724934E@DFLE34.ent.ti.com>
-References: <3E54258959B69E4282D79E01AB1F32B7249324@DFLE34.ent.ti.com>
- <20111219172557.GH14542@n2100.arm.linux.org.uk>
- <3E54258959B69E4282D79E01AB1F32B724934E@DFLE34.ent.ti.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B7249373@DFLE34.ent.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Dec 2011 17:39:51 +0000
+Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
+In-Reply-To: <20111219155252.GG2031@linaro.org>
+References: <1324284030-25540-1-git-send-email-mgherzan@gmail.com>
+ <20111219125021.GA2031@linaro.org> <20111219151958.GU24496@pengutronix.de>
+ <20111219152418.GF2031@linaro.org> <20111219153338.GV24496@pengutronix.de>
+ <20111219155252.GG2031@linaro.org>
+Message-ID: <CAHkRjk5ABYmwfxbvFgh2yWP_D69Sap6Pud+yMG7fBCTzRwmNzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 19 December 2011 15:52, Dave Martin <dave.martin@linaro.org> wrote:
+> On Mon, Dec 19, 2011 at 04:33:38PM +0100, Uwe Kleine-K?nig wrote:
+>> On Mon, Dec 19, 2011 at 03:24:18PM +0000, Dave Martin wrote:
+>> > On Mon, Dec 19, 2011 at 04:19:58PM +0100, Uwe Kleine-K?nig wrote:
+>> > > On Mon, Dec 19, 2011 at 12:50:21PM +0000, Dave Martin wrote:
+>> > > > On Mon, Dec 19, 2011 at 09:40:30AM +0100, Mircea Gherzan wrote:
+>> > > > > Based of Matt Evans's PPC64 implementation.
+>> > > > Note that it's fine to have the JIT generating ARM code, even if the rest
+>> > > > if the kernel is Thumb-2. ?This would only start to cause problems if we
+>> > > > want to do things like set kprobes in the JITted code, or unwind out of
+>> > > > the JITted code.
+>> > > or use a CPU that doesn't speak ARM (e.g. v7M)
+>> >
+>> > Indeed... I was assuming though that that would be out of scope for the
+>> > first iteration of this code.
+>> Right, depending on !THUMB2 is fine. Only generating ARM code with
+>> THUMB2=y is not.
+>
+> The kernel doesn't support v7-M upstream though. ?CONFIG_THUMB2_KERNEL=y
+> doesn't mean that there is no ARM code present -- there _is_ ARM code in
+> the kernel image even with this option (though not very much).
+>
+> IMHO, CONFIG_THUMB2_KERNEL should be viewed as similiar to an optimisation
+> option or other code gen options -- it's a hint to use the Thumb-2
+> instruction set in preference to ARM, but doesn't make a 100% guarantee.
+> Some parts of the kernel do contain ARM code even in this configuration.
+>
+>
+> The real problem we have here is that we do not distinguish between v7-A
+> and v7-M in Kconfig (this is not the same thing as CONFIG_MMU, since
+> there's no special reason why it should be impossible to build a ucLinux
+> kernel for v7-A -- in which case the ARM instruction is available)
 
-Is it init_sched_clock(),update_sched_clock() APIs that you are referring to?
+If we ever take the time to push ARMv7-M into mainline, my patches
+actually introduce CONFIG_CPU_V7M:
 
-Murali Karicheri
-Software Design Engineer
-email: m-karicheri2 at ti.com
+http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=53a9ca6eccb3e14c7d9045870464cbfb37b0bb3b
 
-
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Karicheri, Muralidharan
->> Sent: Monday, December 19, 2011 12:30 PM
->> To: Russell King - ARM Linux
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: RE: Status of the following patch (clocksource sched_clock) ?
->> 
->> Russell,
->> 
->> Thanks for responding.
->> 
->> >>
->> >> > Could someone tell me what is the status of this patch? I want to try
->> >> > it on my target platform which is a davinci variant.
->> >>
->> >> Dead.
->> >>
->> >> Just make sure you use the sched_clock infrastructure already provided
->> >> on ARM and provided you give it the correct information - and set it up
->> >> early enough (in init_early) you will not have any sched_clock() wraps.
->> >> This is because a timer will be set to automatically update things
->> >> before any wrap occurs.
->> 
->> Good to know that there is already support available to avoid clocksource
->> wraparound. Could you point me to the code in kernel tree where this
->> infrastructure is located and some sample code that implements it?
->> 
->> Thanks
->> 
->> Murali
->> 
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Catalin
