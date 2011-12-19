@@ -1,37 +1,89 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Mon, 19 Dec 2011 11:21:36 +0800
-Subject: [PATCH V3 0/7] add a generic cpufreq driver 
-Message-ID: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+Date: Mon, 19 Dec 2011 11:21:37 +0800
+Subject: [PATCH V3 1/7] ARM: add cpufreq transiton notifier to adjust
+ loops_per_jiffy for smp
+In-Reply-To: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1324264903-15395-2-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver support single core and multi core ARM SoCs. For multi core,
-it assume all cores share the same clock and voltage.
+If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
+arch has different per-cpu loops_per_jiffy definition.
 
-TODO:
- - Add each core seperate freq/volt support (MSM).
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+---
+ arch/arm/kernel/smp.c |   54 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 54 insertions(+), 0 deletions(-)
 
-Changes in v3:
- - move adjusting smp loops_per_jiffy to arm common code,
-   and also adjust global loops_per_jiffy.
- - remove adjusting loops_per_jiffy in imx and omap cpufreq drivers.
- - check compatible "generic-cpufreq" when module_init
- - change printk to pr_xxx
- - add generic-cpufreq DT binding doc
-
-Changes in v2:
- - add volatage change support
- - change '_' in property name to '-'
- - use initial value to calculate loops_per_jiffy
- - fix reading cpu_volts property bug 
- - let cpufreq_frequency_table_cpuinfo routines handle cpu_freq_khz_max/min
- - don't change freq in arm_cpufreq_exit, because every core share the same freq.
- - use unsigned long describe frequency as much as possible. Because clk use
-   unsigned long, but cpufreq use unsigned int.
-[PATCH V3 1/7] ARM: add cpufreq transiton notifier to adjust
-[PATCH V3 2/7] arm/imx: cpufreq: remove loops_per_jiffy recalculate
-[PATCH V3 3/7] cpufreq: OMAP: remove loops_per_jiffy recalculate for
-[PATCH V3 4/7] cpufreq: add generic cpufreq driver
-[PATCH V3 5/7] dts/imx6q: add cpufreq property
-[PATCH V3 6/7] arm/imx6q: register arm_clk as cpu to clkdev
-[PATCH V3 7/7] arm/imx6q: select ARCH_HAS_CPUFREQ
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ef5640b..ac9cadc 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -25,6 +25,7 @@
+ #include <linux/percpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/completion.h>
++#include <linux/cpufreq.h>
+ 
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -631,3 +632,56 @@ int setup_profiling_timer(unsigned int multiplier)
+ {
+ 	return -EINVAL;
+ }
++
++#ifdef CONFIG_CPU_FREQ
++
++static DEFINE_PER_CPU(unsigned long, l_p_j_ref);
++static DEFINE_PER_CPU(unsigned long, l_p_j_ref_freq);
++static unsigned long global_l_p_j_ref;
++static unsigned long global_l_p_j_ref_freq;
++
++static int cpufreq_callback(struct notifier_block *nb,
++					unsigned long val, void *data)
++{
++	struct cpufreq_freqs *freq = data;
++	int cpu = freq->cpu;
++
++	if (freq->flags & CPUFREQ_CONST_LOOPS)
++		return NOTIFY_OK;
++
++	if (!per_cpu(l_p_j_ref, cpu)) {
++		per_cpu(l_p_j_ref, cpu) =
++			per_cpu(cpu_data, cpu).loops_per_jiffy;
++		per_cpu(l_p_j_ref_freq, cpu) = freq->old;
++		if (!global_l_p_j_ref) {
++			global_l_p_j_ref = loops_per_jiffy;
++			global_l_p_j_ref_freq = freq->old;
++		}
++	}
++
++	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
++	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new) ||
++	    (val == CPUFREQ_RESUMECHANGE || val == CPUFREQ_SUSPENDCHANGE)) {
++		loops_per_jiffy = cpufreq_scale(global_l_p_j_ref,
++						global_l_p_j_ref_freq,
++						freq->new);
++		per_cpu(cpu_data, cpu).loops_per_jiffy =
++			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
++					per_cpu(l_p_j_ref_freq, cpu),
++					freq->new);
++	}
++	return NOTIFY_OK;
++}
++
++static struct notifier_block cpufreq_notifier = {
++	.notifier_call  = cpufreq_callback,
++};
++
++static int __init register_cpufreq_notifier(void)
++{
++	return cpufreq_register_notifier(&cpufreq_notifier,
++						CPUFREQ_TRANSITION_NOTIFIER);
++}
++core_initcall(register_cpufreq_notifier);
++
++#endif
+-- 
+1.7.5.4
