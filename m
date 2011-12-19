@@ -1,100 +1,39 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 19 Dec 2011 12:06:10 +0800
-Subject: [PATCH] mioa701: add newly available DoC G3 chip
-In-Reply-To: <1324122591-1756-1-git-send-email-robert.jarzmik@free.fr>
-References: <1324122591-1756-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CAN1soZyS-qO-N7bbKBvhm1UzvpUJU9py20_uabEPCQxbsp7_Tg@mail.gmail.com>
+Date: Mon, 19 Dec 2011 12:45:09 +0800
+Subject: [PATCH v3 2/4] ARM: pxa168: Add SDHCI support
+In-Reply-To: <m2sjklfmuf.fsf@bob.laptop.org>
+References: <87r51fwxgt.fsf@laptop.org>
+ <1321849572-2944-1-git-send-email-tanmay.upadhyay@einfochips.com>
+ <874nxkmaky.fsf@laptop.org> <m2sjklfmuf.fsf@bob.laptop.org>
+Message-ID: <CAN1soZxmKct+qGUE2_W+FZufR+gcYZu6Dsj+TkJ06PaO8rV-TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 17, 2011 at 7:49 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> From: Robert Jarzmik <robert.jarzmik@atosorigin.com>
+On Fri, Dec 16, 2011 at 7:15 AM, Chris Ball <cjb@laptop.org> wrote:
+> Hi Eric and Jason,
 >
-> As the mioa701 board has a M-Systems DiskOnChip G3 chip, add
-> it to the platform resources of the board.
+> On Thu, Dec 01 2011, Chris Ball wrote:
+>> Hi Eric, Jason,
+>>
+>> Please could you ACK this patch if you agree with it, and I'll take it
+>> and the rest of the series via the MMC tree? ?Thanks.
 >
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@atosorigin.com>
-> ---
-> ?arch/arm/mach-pxa/mioa701.c | ? 29 +++++++++++++++++------------
-> ?1 files changed, 17 insertions(+), 12 deletions(-)
+> Ping?
 >
-> diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-> index b938fc2..dba02b7 100644
-> --- a/arch/arm/mach-pxa/mioa701.c
-> +++ b/arch/arm/mach-pxa/mioa701.c
-> @@ -53,6 +53,7 @@
-> ?#include <mach/pxa27x-udc.h>
-> ?#include <mach/camera.h>
-> ?#include <mach/audio.h>
-> +#include <mach/smemc.h>
-> ?#include <media/soc_camera.h>
+> Thanks,
 >
-> ?#include <mach/mioa701.h>
-> @@ -390,24 +391,19 @@ static struct pxamci_platform_data mioa701_mci_info = {
-> ?};
+> - Chris.
 >
-> ?/* FlashRAM */
-> -static struct resource strataflash_resource = {
-> +static struct resource docg3_resource = {
-> ? ? ? ?.start = PXA_CS0_PHYS,
-> - ? ? ? .end ? = PXA_CS0_PHYS + SZ_64M - 1,
-> + ? ? ? .end ? = PXA_CS0_PHYS + SZ_8K - 1,
-> ? ? ? ?.flags = IORESOURCE_MEM,
-> ?};
+NACK.
 
-You resized the flash from 64MB to 8KB. It surprised me that the flash
-size is only 8KB. Could you help to check this?
+>>> +/* Offset defined in arch/arm/mach-mmp/include/mach/regs-apmu.h are for MMP2
+>>> + * PXA168 has different offset */
+>>> +#undef APMU_SDH2
+>>> +#undef APMU_SDH3
+>>> +
+>>> +#define APMU_SDH2   APMU_REG(0xe0)
+>>> +#define APMU_SDH3   APMU_REG(0xe4)
+>>> +
 
->
-> -static struct physmap_flash_data strataflash_data = {
-> - ? ? ? .width = 2,
-> - ? ? ? /* .set_vpp = mioa701_set_vpp, */
-> -};
-> -
-> -static struct platform_device strataflash = {
-> - ? ? ? .name ? ? ? ? ?= "physmap-flash",
-> +static struct platform_device docg3 = {
-> + ? ? ? .name ? ? ? ? ?= "docg3",
-> ? ? ? ?.id ? ? ? ? ? ?= -1,
-> - ? ? ? .resource ? ? ?= &strataflash_resource,
-> + ? ? ? .resource ? ? ?= &docg3_resource,
-> ? ? ? ?.num_resources = 1,
-> ? ? ? ?.dev = {
-> - ? ? ? ? ? ? ? .platform_data = &strataflash_data,
-> + ? ? ? ? ? ? ? .platform_data = NULL,
-> ? ? ? ?},
-> ?};
->
-> @@ -685,7 +681,7 @@ static struct platform_device *devices[] __initdata = {
-> ? ? ? ?&pxa2xx_pcm,
-> ? ? ? ?&mioa701_sound,
-> ? ? ? ?&power_dev,
-> - ? ? ? &strataflash,
-> + ? ? ? &docg3,
-> ? ? ? ?&gpio_vbus,
-> ? ? ? ?&mioa701_camera,
-> ? ? ? ?&mioa701_board,
-> @@ -720,6 +716,15 @@ static void __init mioa701_machine_init(void)
-> ? ? ? ?RTTR = 32768 - 1; /* Reset crazy WinCE value */
-> ? ? ? ?UP2OCR = UP2OCR_HXOE;
->
-> + ? ? ? /*
-> + ? ? ? ?* Set up the flash memory : DiskOnChip G3 on first static memory bank
-> + ? ? ? ?*/
-> + ? ? ? __raw_writel(0x7ff02dd8, MSC0);
-> + ? ? ? __raw_writel(0x0001c391, MCMEM0);
-> + ? ? ? __raw_writel(0x0001c391, MCATT0);
-> + ? ? ? __raw_writel(0x0001c391, MCIO0);
-> +
-> +
-> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(mioa701_pin_config));
-> ? ? ? ?pxa_set_ffuart_info(NULL);
-> ? ? ? ?pxa_set_btuart_info(NULL);
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Please don't use #undef at here. If the register setting is different,
+I prefer to use two different clk operations.
