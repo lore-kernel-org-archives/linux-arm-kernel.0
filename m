@@ -1,41 +1,52 @@
-From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
-Date: Mon, 19 Dec 2011 13:18:12 +0200
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20111219094428.GA5257@S2100-06.ap.freescale.net>
-References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
- <20111219091506.GA16097@n2100.arm.linux.org.uk>
- <20111219094428.GA5257@S2100-06.ap.freescale.net>
-Message-ID: <4EEF1D74.8090009@bluegiga.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 19 Dec 2011 12:29:15 +0100
+Subject: [GIT PULL]
+Message-ID: <20111219112915.GN27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2011 11:44 AM, Shawn Guo wrote:
-> On Mon, Dec 19, 2011 at 09:15:06AM +0000, Russell King - ARM Linux wrote:
->> On Mon, Dec 19, 2011 at 09:13:22AM +0000, Russell King - ARM Linux wrote:
->>> Someone needs to tell me what the correct entry is supposed to look like.
->>
-> I guess it becomes MACH_TYPE_APX4DEVKIT now, but Lauri should be the
-> 'someone' :)
+Hi Arnd, Olof,
 
-I sent an email directly to Russell about the issue on 20.10.2011 but 
-maybe it was wrong approach. It seems to be corrected now in the 
-database. Thanks!
+Please pull the following for -rc. Most stuff is regressions since
+the last merge window, so only "ARM:imx:fix pwm period value" has
+Cc stable.
 
->> Also, whether Veli-Pekka Peltola is should still be the current owner
->> or whether there's someone more appropriate to be looking after this
->> entry (eg, the active platform maintainer) ?
->>
-> Veli-Pekka Peltola still has SOB on the patch and he is on Cc, so he
-> or Lauri may want to confirm.
+Sascha
 
-It is ok to keep me as the owner. Some parts of machine support file is 
-made by me and I have reviewed everything that has been sent to ML 
-before Lauri sent those.
+The following changes since commit 384703b8e6cd4c8ef08512e596024e028c91c339:
 
---
-Veli-Pekka Peltola
+  Linux 3.2-rc6 (2011-12-16 18:36:26 -0800)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git fixes-for-arnd
+
+Eric B?nard (7):
+      cpuimx25sd: fix Kconfig
+      imx_v4_v5_defconfig: update default configuration
+      dma: MX3_IPU fix depends
+      clock-imx35: fix reboot in internal boot mode
+      cpuimx35sd: fix Kconfig
+      cpuimx35: fix touchscreen support
+      enable uncompress log on cpuimx35sd
+
+Jason Chen (1):
+      ARM:imx:fix pwm period value
+
+Richard Zhao (1):
+      arm/imx: fix cpufreq section mismatch
+
+ arch/arm/configs/imx_v4_v5_defconfig        |   12 +++++++-----
+ arch/arm/mach-imx/Kconfig                   |    8 ++++----
+ arch/arm/mach-imx/Makefile                  |    4 ++--
+ arch/arm/mach-imx/clock-imx35.c             |   20 ++++++++++----------
+ arch/arm/mach-imx/mach-cpuimx35.c           |    8 +++++++-
+ arch/arm/plat-mxc/cpufreq.c                 |    2 +-
+ arch/arm/plat-mxc/include/mach/uncompress.h |    1 +
+ arch/arm/plat-mxc/pwm.c                     |    9 +++++++++
+ drivers/dma/Kconfig                         |    4 ++--
+ 9 files changed, 43 insertions(+), 25 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
