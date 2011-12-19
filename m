@@ -1,37 +1,44 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 19 Dec 2011 09:09:57 +0100
-Subject: [PATCH] mioa701: add newly available DoC G3 chip
-In-Reply-To: <CAN1soZyS-qO-N7bbKBvhm1UzvpUJU9py20_uabEPCQxbsp7_Tg@mail.gmail.com>
- (Haojian Zhuang's message of "Mon, 19 Dec 2011 12:06:10 +0800")
-References: <1324122591-1756-1-git-send-email-robert.jarzmik@free.fr>
- <CAN1soZyS-qO-N7bbKBvhm1UzvpUJU9py20_uabEPCQxbsp7_Tg@mail.gmail.com>
-Message-ID: <87hb0xf0dm.fsf@free.fr>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 19 Dec 2011 10:10:11 +0200
+Subject: [PATCH] ARM: OMAP: avoid NULL pointer dereference when no PMIC
+ is configured
+In-Reply-To: <1324235628-26439-1-git-send-email-zonque@gmail.com>
+References: <1324235628-26439-1-git-send-email-zonque@gmail.com>
+Message-ID: <4EEEF163.7030608@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+Hi Daniel,
 
->> -static struct resource strataflash_resource = {
->> +static struct resource docg3_resource = {
->> ? ? ? ?.start = PXA_CS0_PHYS,
->> - ? ? ? .end ? = PXA_CS0_PHYS + SZ_64M - 1,
->> + ? ? ? .end ? = PXA_CS0_PHYS + SZ_8K - 1,
->> ? ? ? ?.flags = IORESOURCE_MEM,
->> ?};
->
-> You resized the flash from 64MB to 8KB. It surprised me that the flash
-> size is only 8KB. Could you help to check this?
-Checked and confirmed, it's 8K.
-The docg3 has a mapped IO space, where :
- - 0x0 - 0x7ff     : boot memory (NOR like)
- - 0x800 - 0xfff   : data area
- - 0x1000 - 0x17ff : registers area
- - 0x1800 - 0x1fff : boot memory (the same one as before)
+On 12/18/11 21:13, Daniel Mack wrote:
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/vp.c |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
+> index 66bd700..5407173 100644
+> --- a/arch/arm/mach-omap2/vp.c
+> +++ b/arch/arm/mach-omap2/vp.c
+> @@ -41,6 +41,11 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
+>  	u32 val, sys_clk_rate, timeout, waittime;
+>  	u32 vddmin, vddmax, vstepmin, vstepmax;
+>  
+> +	if (!voltdm->pmic) {
+> +		pr_err("%s: No PMIC configured.\n", __func__, voltdm->name);
 
-And the previous "64MB" was because I didn't know which kind of memory was
-there, and a static bank can be as big as 64MB.
+You are passing two parameters to pr_err(), but use only one...
+Also, I don't know if this is the right thing to do here,
+so Cc'ed Paul and Kevin.
 
-Cheers.
+> +		return;
+> +	}
+> +
+>  	if (!voltdm->read || !voltdm->write) {
+>  		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
+>  			__func__, voltdm->name);
 
---
-Robert
+-- 
+Regards,
+Igor.
