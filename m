@@ -1,39 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Dec 2011 10:25:20 +0000
-Subject: Fwd: Re: [03: PATCH 0/5] The remaining stuff
-In-Reply-To: <20111128104554.GA2165@local>
-References: <20111124204447.GW9581@n2100.arm.linux.org.uk>
- <20111128104554.GA2165@local>
-Message-ID: <20111219102520.GE14542@n2100.arm.linux.org.uk>
+From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
+Date: Mon, 19 Dec 2011 13:18:12 +0200
+Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
+ Development Kit
+In-Reply-To: <20111219094428.GA5257@S2100-06.ap.freescale.net>
+References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <20111219071350.GH4962@S2100-06.ap.freescale.net>
+ <4EEEE40C.3000200@bluegiga.com>
+ <20111219091916.GJ4962@S2100-06.ap.freescale.net>
+ <20111219091322.GD14542@n2100.arm.linux.org.uk>
+ <20111219091506.GA16097@n2100.arm.linux.org.uk>
+ <20111219094428.GA5257@S2100-06.ap.freescale.net>
+Message-ID: <4EEF1D74.8090009@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 11:45:55AM +0100, Hans J. Koch wrote:
-> On Thu, Nov 24, 2011 at 08:44:47PM +0000, Russell King - ARM Linux wrote:
-> > As I've already implied, I'm quite prepared to break these platforms at
-> > the next merge window for the greater good if there's no sign of
-> > maintainers willing to help sort them out - which will then ultimately
-> > result in them being deleted from mainline.
-> 
-> For the past 12 months, nobody was interested in Telechips (plat-tcc).
-> No community, no customers, no support from Telechips. Under these
-> circumstances, I am not willing to maintain this forever.
-> 
-> However, Harry Sievers, European distributor of Telechips, told me
-> that there are persons at Telechips who are interested in having
-> their stuff in mainline. He will tell them it is threatened with
-> being deleted from mainline, and ask for support.
-> 
-> I am willing to wait until christmas for any news from Harry, and
-> will then send a patch. Either one that fixes the arch as requested in
-> the mail above, or one that removes the whole platform from mainline.
-> My feeling is that the latter is more likely.
-> 
-> Russell, if that is too late for you, please let us know.
+On 12/19/2011 11:44 AM, Shawn Guo wrote:
+> On Mon, Dec 19, 2011 at 09:15:06AM +0000, Russell King - ARM Linux wrote:
+>> On Mon, Dec 19, 2011 at 09:13:22AM +0000, Russell King - ARM Linux wrote:
+>>> Someone needs to tell me what the correct entry is supposed to look like.
+>>
+> I guess it becomes MACH_TYPE_APX4DEVKIT now, but Lauri should be the
+> 'someone' :)
 
-We're now less than a week away from Christmas - any news on this?
-If it's going to be deleted, could I have a patch to do so please?
-(You probably know better than me whether anything has been touched
-outside of arch/arm for it.)
+I sent an email directly to Russell about the issue on 20.10.2011 but 
+maybe it was wrong approach. It seems to be corrected now in the 
+database. Thanks!
 
-Thanks.
+>> Also, whether Veli-Pekka Peltola is should still be the current owner
+>> or whether there's someone more appropriate to be looking after this
+>> entry (eg, the active platform maintainer) ?
+>>
+> Veli-Pekka Peltola still has SOB on the patch and he is on Cc, so he
+> or Lauri may want to confirm.
+
+It is ok to keep me as the owner. Some parts of machine support file is 
+made by me and I have reviewed everything that has been sent to ML 
+before Lauri sent those.
+
+--
+Veli-Pekka Peltola
