@@ -1,46 +1,76 @@
-From: holger.brunck@keymile.com (Holger Brunck)
-Date: Mon, 19 Dec 2011 17:49:48 +0100
-Subject: [PATCH] arm/plat-orion: make gpiochip label unique
-Message-ID: <1324313388-16703-1-git-send-email-holger.brunck@keymile.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 19 Dec 2011 17:52:26 +0100
+Subject: [PATCH v2 04/10] rtc: rtc-twl: Add DT support for RTC inside
+ twl4030/twl6030
+In-Reply-To: <1323439361-1647-5-git-send-email-b-cousson@ti.com>
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-5-git-send-email-b-cousson@ti.com>
+Message-ID: <4EEF6BCA.908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The former implementation adds a fix gpiochip label string
-to the framework. This is confusing because orion_gpio_init
-is called more than once and this ends up in different gpiochips
-with the same label.
+Hi Alessandro,
 
-This patch adds the already present orion_gpio_chip_count to the
-label string to make it unique in the system.
+Gentle ping on this patch.
 
-Signed-off-by: Holger Brunck <holger.brunck@keymile.com>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Nicolas Pitre <nico@fluxnic.net>
----
- arch/arm/plat-orion/gpio.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+Thanks,
+Benoit
 
-diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
-index 41ab97e..10d1608 100644
---- a/arch/arm/plat-orion/gpio.c
-+++ b/arch/arm/plat-orion/gpio.c
-@@ -384,12 +384,16 @@ void __init orion_gpio_init(int gpio_base, int ngpio,
- 	struct orion_gpio_chip *ochip;
- 	struct irq_chip_generic *gc;
- 	struct irq_chip_type *ct;
-+	char gc_label[16];
- 
- 	if (orion_gpio_chip_count == ARRAY_SIZE(orion_gpio_chips))
- 		return;
- 
-+	snprintf(gc_label, sizeof(gc_label), "orion_gpio%d",
-+		orion_gpio_chip_count);
-+
- 	ochip = orion_gpio_chips + orion_gpio_chip_count;
--	ochip->chip.label = "orion_gpio";
-+	ochip->chip.label = kstrdup(gc_label, GFP_KERNEL);
- 	ochip->chip.request = orion_gpio_request;
- 	ochip->chip.direction_input = orion_gpio_direction_input;
- 	ochip->chip.get = orion_gpio_get;
--- 
-1.7.1
+On 12/9/2011 3:02 PM, Benoit Cousson wrote:
+> Add the DT support for the TI rtc-twl present in the twl4030
+> and twl6030 devices.
+>
+> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> Cc: Alessandro Zummo<a.zummo@towertech.it>
+> ---
+>   Documentation/devicetree/bindings/rtc/twl-rtc.txt |   12 ++++++++++++
+>   drivers/rtc/rtc-twl.c                             |   10 ++++++++--
+>   2 files changed, 20 insertions(+), 2 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/rtc/twl-rtc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/rtc/twl-rtc.txt b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
+> new file mode 100644
+> index 0000000..596e0c9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
+> @@ -0,0 +1,12 @@
+> +* TI twl RTC
+> +
+> +The TWL family (twl4030/6030) contains a RTC.
+> +
+> +Required properties:
+> +- compatible : Should be twl4030-rtc
+> +
+> +Examples:
+> +
+> +rtc at 0 {
+> +    compatible = "ti,twl4030-rtc";
+> +};
+> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+> index 20687d5..d43b4f6 100644
+> --- a/drivers/rtc/rtc-twl.c
+> +++ b/drivers/rtc/rtc-twl.c
+> @@ -550,6 +550,11 @@ static int twl_rtc_resume(struct platform_device *pdev)
+>   #define twl_rtc_resume  NULL
+>   #endif
+>
+> +static const struct of_device_id twl_rtc_of_match[] = {
+> +	{.compatible = "ti,twl4030-rtc", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, twl_rtc_of_match);
+>   MODULE_ALIAS("platform:twl_rtc");
+>
+>   static struct platform_driver twl4030rtc_driver = {
+> @@ -559,8 +564,9 @@ static struct platform_driver twl4030rtc_driver = {
+>   	.suspend	= twl_rtc_suspend,
+>   	.resume		= twl_rtc_resume,
+>   	.driver		= {
+> -		.owner	= THIS_MODULE,
+> -		.name	= "twl_rtc",
+> +		.owner		= THIS_MODULE,
+> +		.name		= "twl_rtc",
+> +		.of_match_table = twl_rtc_of_match,
+>   	},
+>   };
+>
