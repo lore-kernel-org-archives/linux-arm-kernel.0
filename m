@@ -1,39 +1,48 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 19 Dec 2011 12:45:09 +0800
-Subject: [PATCH v3 2/4] ARM: pxa168: Add SDHCI support
-In-Reply-To: <m2sjklfmuf.fsf@bob.laptop.org>
-References: <87r51fwxgt.fsf@laptop.org>
- <1321849572-2944-1-git-send-email-tanmay.upadhyay@einfochips.com>
- <874nxkmaky.fsf@laptop.org> <m2sjklfmuf.fsf@bob.laptop.org>
-Message-ID: <CAN1soZxmKct+qGUE2_W+FZufR+gcYZu6Dsj+TkJ06PaO8rV-TQ@mail.gmail.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Mon, 19 Dec 2011 12:49:11 +0800
+Subject: serial tty name
+In-Reply-To: <20111219040804.GF4962@S2100-06.ap.freescale.net>
+References: <20111214144344.GA2090@richard-laptop>
+ <4EE8C16F.8060501@calxeda.com>
+ <20111219040804.GF4962@S2100-06.ap.freescale.net>
+Message-ID: <CAB4PhKd6bURP1SgvEeJ5+=iGO5reC7jaBcd1JGz07HiN-pwXZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2011 at 7:15 AM, Chris Ball <cjb@laptop.org> wrote:
-> Hi Eric and Jason,
->
-> On Thu, Dec 01 2011, Chris Ball wrote:
->> Hi Eric, Jason,
+2011/12/19 Shawn Guo <shawn.guo@freescale.com>:
+> On Wed, Dec 14, 2011 at 09:31:59AM -0600, Rob Herring wrote:
+>> Richard,
 >>
->> Please could you ACK this patch if you agree with it, and I'll take it
->> and the rest of the series via the MMC tree? ?Thanks.
->
-> Ping?
->
-> Thanks,
->
-> - Chris.
->
-NACK.
+>> On 12/14/2011 08:43 AM, Richard Zhao wrote:
+>> > How to map different uart port to ttymxc0 (take imx for example)?
+>> >
+>> > In rootfs, it usually "getty ttymxc0" ?to get
+>> > serial console. And the rootfs may be shared by different boards.
+>> > Traditionaly way is to set right platform device ID.
+>> >
+>> > But with DT, UART2 always generate ttymxc1, UART3 for ttymxc2. You
+>> > always needs to modify the getty command when your change another board.
+>> >
+>> > Is there a way to fix it?
+>>
+>> That's what the aliases are for.
+>>
+> I understand it differently. ?The aliases was introduced to help
+> tty/serial driver identify the correct hardware port for given serial
+> node from device tree. ?(Ab)using it to fool 'console' setting may
+> eventually confuse users, saying they will think the uart port on his
+> board is UART0.
 
->>> +/* Offset defined in arch/arm/mach-mmp/include/mach/regs-apmu.h are for MMP2
->>> + * PXA168 has different offset */
->>> +#undef APMU_SDH2
->>> +#undef APMU_SDH3
->>> +
->>> +#define APMU_SDH2   APMU_REG(0xe0)
->>> +#define APMU_SDH3   APMU_REG(0xe4)
->>> +
+We absolutely need document this in detail to avoid confusion. Otherwise,
+the ARM DT support will also mess up in the end.
 
-Please don't use #undef at here. If the register setting is different,
-I prefer to use two different clk operations.
+>
+> --
+> Regards,
+> Shawn
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
