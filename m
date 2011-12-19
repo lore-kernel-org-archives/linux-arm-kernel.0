@@ -1,42 +1,41 @@
-From: sumit.semwal@ti.com (Semwal, Sumit)
-Date: Mon, 19 Dec 2011 11:46:40 +0530
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <201112121648.52126.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <20111209142405.6f371be6@pyramind.ukuu.org.uk>
- <CAKMK7uH+4uSYYjBLcvfhVC+iwGUZ09Z4p64fNBzh196aG+hqgg@mail.gmail.com>
- <201112121648.52126.arnd@arndb.de>
-Message-ID: <CAB2ybb_dU7BzJmPo6vA92pe1YCNerCLc+bv7Qi_EfkfGaik6bQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 19 Dec 2011 11:47:18 +0530
+Subject: [QUESTION] How to set static/dynamic dependency between clock
+ domains
+In-Reply-To: <CACVXFVNtaaxB-MRXKBgAZFEkf72nsgcOSHOFsYjspoL0Fv6VWA@mail.gmail.com>
+References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
+ <CACVXFVPOaw7OG7owJw0h7DAe3pRH6nROsy13UeAWPWgLedKY1g@mail.gmail.com>
+ <CAMQu2gwDth6OVTk3PkRCo05QF6WeQvMTJ-d5s33cT35GSVwT=w@mail.gmail.com>
+ <CACVXFVNtaaxB-MRXKBgAZFEkf72nsgcOSHOFsYjspoL0Fv6VWA@mail.gmail.com>
+Message-ID: <CAMQu2gzs6op9C8jDJ5xEGs7A7ok_GXeD5OxnHiDoeHaKghCJ5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Daniel,
+On Fri, Dec 16, 2011 at 10:03 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+> On Sat, Dec 17, 2011 at 12:09 AM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+>> No. The table reflects the actual possible combination on hardware. You can't
+>> add anything there arbitrary if that combination is not supported.
+>>
+>> But that makes me wonder how the patch worked. I will look at this in detail
+>> next week.
+>
+> Thanks, I use the below hwmod data patch[1] and omap device patch[2]
+> to bring up fdif module, and Benoit has ACKed on patch [1].
+>
+>
+> [1], http://marc.info/?l=linux-kernel&m=132387140703874&w=2
+> [2], http://marc.info/?l=linux-kernel&m=132387155403929&w=2
+>
+The patches are fine but I am surprised that 'dyndep.patch' is helping you.
+L3_2 dependency is always enabled with ISS or Camera and it
+should have worked.
+clkdm_add_wkdep(iss_clkdm, l3_2_clkdm), shoudn't do anything since
+the bit is read-only.
 
-On Mon, Dec 12, 2011 at 10:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 10 December 2011, Daniel Vetter wrote:
->> If userspace (through some driver calls)
->> tries to do stupid things, it'll just get garbage. See
->> Message-ID: <CAKMK7uHeXYn-v_8cmpLNWsFY14KtmuRZy8YRKR5Xst2-2WdFSQ@mail.gmail.com>
->> for my reasons why it think this is the right way to go forward. So in
->> essence I'm really interested in the reasons why you want the kernel
->> to enforce this (or I'm completely missing what's the contentious
->> issue here).
->
-> This has nothing to do with user space mappings. Whatever user space does,
-> you get garbage if you don't invalidate cache lines that were introduced
-> through speculative prefetching before you access cache lines that were
-> DMA'd from a device.
-I didn't see a consensus on whether dma_buf should enforce some form
-of serialization within the API - so atleast for v1 of dma-buf, I
-propose to 'not' impose a restriction, and we can tackle it (add new
-ops or enforce as design?) whenever we see the first need of it - will
-that be ok? [I am bending towards the thought that it is a problem to
-solve at a bigger platform than dma_buf.]
->
-> ? ? ? ?Arnd
+Can you check value of CM_CAM_STATICDEP [ 0x4A009004],
+after your patch. I am suspecting that for some reason l3_1 dep.
+is getting enabled which might be helping your case.
 
-Best regards,
-~Sumit.
->
-> --
+Regards
+Santosh
