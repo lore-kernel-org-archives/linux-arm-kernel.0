@@ -1,140 +1,75 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Dec 2011 14:54:38 -0600
-Subject: [PATCH v2] gpio: pl061: enable interrupts with DT style binding
-In-Reply-To: <1323876538-20406-9-git-send-email-robherring2@gmail.com>
-References: <1323876538-20406-9-git-send-email-robherring2@gmail.com>
-Message-ID: <1324328078-7310-1-git-send-email-robherring2@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 19 Dec 2011 14:02:00 -0700 (MST)
+Subject: [PATCH v6 0/6] PM QoS: implement the OMAP low level constraints
+ management code
+In-Reply-To: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
+References: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
+Message-ID: <alpine.DEB.2.00.1112191337420.12660@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hi Jean
 
-Enable DT interrupt binding support for pl061 gpio lines. If the gpio
-node has an interrupt-controller property, then it will be setup to
-handle interrupts on gpio lines.
+I'm really sorry it's taken me so long to do detailed review of these 
+patches for merging... anyway -
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Linus Walleij <linus.ml.walleij@gmail.com>
----
-v2:
-- use domain ptr from struct irq_chip_generic
-- Add comment on irq_base values.
+On Wed, 14 Dec 2011, jean.pihet at newoldbits.com wrote:
 
- .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 +++++++++
- drivers/gpio/gpio-pl061.c                          |   31 +++++++++++---------
- 2 files changed, 32 insertions(+), 14 deletions(-)
+> From: Jean Pihet <j-pihet@ti.com>
+> 
+> . Implement the devices wake-up latency constraints using the global
+>   device PM QoS notification handler which applies the constraints to the
+>   underlying layer
+> . Implement the low level code which controls the power domains next power
+>   states, through the hwmod and pwrdm layers
+> . Add cpuidle and power domains wake-up latency figures for OMAP3, cf. 
+>   comments in the code and [1] for the details on where the numbers
+>   are magically coming from
+> . Implement the relation between the cpuidle and per-device PM QoS frameworks
+>   in the OMAP3 specific idle callbacks.
+>   The chosen C-state shall satisfy the following conditions:
+>    . the 'valid' field is enabled,
+>    . it satisfies the enable_off_mode flag,
+>    . the next state for MPU and CORE power domains is not lower than the
+>      state programmed by the per-device PM QoS.
 
-diff --git a/Documentation/devicetree/bindings/gpio/pl061-gpio.txt b/Documentation/devicetree/bindings/gpio/pl061-gpio.txt
-index a2c416b..9671d4e 100644
---- a/Documentation/devicetree/bindings/gpio/pl061-gpio.txt
-+++ b/Documentation/devicetree/bindings/gpio/pl061-gpio.txt
-@@ -8,3 +8,18 @@ Required properties:
- - gpio-controller : Marks the device node as a GPIO controller.
- - interrupts : Interrupt mapping for GPIO IRQ.
- 
-+Optional properties:
-+- interrupt-controller : Identifies the node as an interrupt controller. Must
-+  be present if using gpios lines for interrupts.
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source.  The type shall be a <u32> and the value shall be 2.
-+
-+  The 1st cell contains the interrupt number 0-7 corresponding to the gpio
-+  line.
-+
-+  The 2nd cell is the flags, encoding trigger type and level flags.
-+	1 = low-to-high edge triggered
-+	2 = high-to-low edge triggered
-+	4 = active high level-sensitive
-+	8 = active low level-sensitive
-+
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index 96ff6b2..ea799c7 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -16,6 +16,8 @@
- #include <linux/io.h>
- #include <linux/ioport.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of.h>
- #include <linux/bitops.h>
- #include <linux/workqueue.h>
- #include <linux/gpio.h>
-@@ -52,7 +54,6 @@ struct pl061_gpio {
- 	spinlock_t		lock;		/* GPIO registers */
- 
- 	void __iomem		*base;
--	int			irq_base;
- 	struct irq_chip_generic	*irq_gc;
- 	struct gpio_chip	gc;
- };
-@@ -118,18 +119,16 @@ static void pl061_set_value(struct gpio_chip *gc, unsigned offset, int value)
- static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
- {
- 	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
--
--	if (chip->irq_base <= 0)
--		return -EINVAL;
--
--	return chip->irq_base + offset;
-+	if (!chip->irq_gc)
-+		return -ENXIO;
-+	return irq_domain_to_irq(&chip->irq_gc->domain, offset);
- }
- 
- static int pl061_irq_type(struct irq_data *d, unsigned trigger)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct pl061_gpio *chip = gc->private;
--	int offset = d->irq - chip->irq_base;
-+	int offset = d->hwirq;
- 	unsigned long flags;
- 	u8 gpiois, gpioibe, gpioiev;
- 
-@@ -219,7 +218,7 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
- 	struct pl061_platform_data *pdata;
- 	struct pl061_gpio *chip;
- 	struct list_head *chip_list;
--	int ret, irq, i;
-+	int ret, irq, i, irq_base;
- 	static DECLARE_BITMAP(init_irq, NR_IRQS);
- 
- 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
-@@ -229,10 +228,13 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
- 	pdata = dev->dev.platform_data;
- 	if (pdata) {
- 		chip->gc.base = pdata->gpio_base;
--		chip->irq_base = pdata->irq_base;
-+		irq_base = pdata->irq_base;
- 	} else if (dev->dev.of_node) {
- 		chip->gc.base = -1;
--		chip->irq_base = 0;
-+		if (of_get_property(dev->dev.of_node, "interrupt-controller", NULL))
-+			irq_base = -1;
-+		else
-+			irq_base = 0;
- 	} else {
- 		ret = -ENODEV;
- 		goto free_mem;
-@@ -268,13 +270,14 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
- 		goto iounmap;
- 
- 	/*
--	 * irq_chip support
-+	 * irq_chip support. If irq_base is 0, then we don't support interrupts
-+	 * on gpio lines and just return now. Otherwise setup the interrupts.
- 	 */
--
--	if (chip->irq_base <= 0)
-+	if (!irq_base)
- 		return 0;
- 
--	pl061_init_gc(chip, chip->irq_base);
-+	pl061_init_gc(chip, irq_base);
-+	chip->irq_gc->domain.of_node = of_node_get(dev->dev.of_node);
- 
- 	writeb(0, chip->base + GPIOIE); /* disable irqs */
- 	irq = dev->irq[0];
--- 
-1.7.5.4
+I've been reviewing these closely.  It looks to me that are some issues 
+that need to be resolved before all of them are mergeable.
+
+One issue that I noticed in this series is that there are some locking 
+issues in patch 1.  It looks to me that calls to 
+_pwrdm_wakeuplat_update_pwrst() can race with each other, since it's 
+called outside the lock?
+
+Another issue is with the latency data, which we've discussed previously. 
+Before we merge the latency data in mainline, we need to ensure that we've 
+minimized the dependency of that data on other register settings, such as 
+the AUTOEXTCLKMODE bits or the external high-frequency oscillator 
+stabilization time.  Otherwise any board vendor that ships devices based 
+on that data will need to redo it, which we'd like to avoid.  I'll comment 
+more on this in replies to those data patches.
+
+But there is a more fundamental issue that we need to deal with before we 
+should merge the low-level powerdomain portion of your patches -- an issue 
+that isn't directly related to your code.  We should first switch over to 
+use functional powerstates throughout our PM code.  Right now, we have 
+some code that tweaks powerdomain bits directly, and some code that calls 
+omap_set_pwrdm_state().  We should get rid of the former, I think, so that 
+there is one single code path that directly changes the low-level 
+powerdomain bits.  Otherwise I think we run the risk of having one of our 
+code paths lose track of what the powerdomain settings are -- and that way 
+lies madness...
+
+Anyway, I've got some experimental code to do this, but since it touches a 
+lot of our existing PM code, I'd like to have Kevin's review, testing, and 
+approval of it.  (And yours too, ideally ;-)  So what I'd like to do is to 
+repost your series with some changes, and with the functional powerstate 
+portion sorted out first.  Would you be able to help test those for 3.4?
+
+In the meantime, it looks to me like two of your patches are good to go in 
+the short term, with some tweaks - the omap_hwmod changes and the 
+dev_pm_qos callback changes.  I'll repost those shortly and queue them up 
+for whenever Tony wants to pull them.
+
+
+- Paul
