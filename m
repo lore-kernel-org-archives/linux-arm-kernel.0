@@ -1,52 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Dec 2011 17:39:51 +0000
-Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
-In-Reply-To: <20111219155252.GG2031@linaro.org>
-References: <1324284030-25540-1-git-send-email-mgherzan@gmail.com>
- <20111219125021.GA2031@linaro.org> <20111219151958.GU24496@pengutronix.de>
- <20111219152418.GF2031@linaro.org> <20111219153338.GV24496@pengutronix.de>
- <20111219155252.GG2031@linaro.org>
-Message-ID: <CAHkRjk5ABYmwfxbvFgh2yWP_D69Sap6Pud+yMG7fBCTzRwmNzg@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 19 Dec 2011 09:40:41 -0800
+Subject: [GIT PULL] imx: gpio interrupt cleanup
+In-Reply-To: <20111219172903.GK2351@totoro>
+References: <20111208143204.GA8139@S2100-06.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176BE92A13@HQMAIL01.nvidia.com>
+ <20111219172903.GK2351@totoro>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF176BE92A37@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 December 2011 15:52, Dave Martin <dave.martin@linaro.org> wrote:
-> On Mon, Dec 19, 2011 at 04:33:38PM +0100, Uwe Kleine-K?nig wrote:
->> On Mon, Dec 19, 2011 at 03:24:18PM +0000, Dave Martin wrote:
->> > On Mon, Dec 19, 2011 at 04:19:58PM +0100, Uwe Kleine-K?nig wrote:
->> > > On Mon, Dec 19, 2011 at 12:50:21PM +0000, Dave Martin wrote:
->> > > > On Mon, Dec 19, 2011 at 09:40:30AM +0100, Mircea Gherzan wrote:
->> > > > > Based of Matt Evans's PPC64 implementation.
->> > > > Note that it's fine to have the JIT generating ARM code, even if the rest
->> > > > if the kernel is Thumb-2. ?This would only start to cause problems if we
->> > > > want to do things like set kprobes in the JITted code, or unwind out of
->> > > > the JITted code.
->> > > or use a CPU that doesn't speak ARM (e.g. v7M)
->> >
->> > Indeed... I was assuming though that that would be out of scope for the
->> > first iteration of this code.
->> Right, depending on !THUMB2 is fine. Only generating ARM code with
->> THUMB2=y is not.
->
-> The kernel doesn't support v7-M upstream though. ?CONFIG_THUMB2_KERNEL=y
-> doesn't mean that there is no ARM code present -- there _is_ ARM code in
-> the kernel image even with this option (though not very much).
->
-> IMHO, CONFIG_THUMB2_KERNEL should be viewed as similiar to an optimisation
-> option or other code gen options -- it's a hint to use the Thumb-2
-> instruction set in preference to ARM, but doesn't make a 100% guarantee.
-> Some parts of the kernel do contain ARM code even in this configuration.
->
->
-> The real problem we have here is that we do not distinguish between v7-A
-> and v7-M in Kconfig (this is not the same thing as CONFIG_MMU, since
-> there's no special reason why it should be impossible to build a ucLinux
-> kernel for v7-A -- in which case the ARM instruction is available)
+Jamie Iles wrote at Monday, December 19, 2011 10:29 AM:
+> On Mon, Dec 19, 2011 at 09:20:34AM -0800, Stephen Warren wrote:
+> > Behalf Of Shawn Guo wrote at Thursday, December 08, 2011 7:32 AM:
+> > > Hi Arnd and  Olof,
+> > >
+> > > Please consider to pull the series below.  I really should have
+> > > Thomas' ack on Jamie's patch 'irqdomain: export irq_domain_simple_ops
+> > > for !CONFIG_OF', and Grant's ack on patch 'gpio/mxc: adopt irq_domain
+> > > in gpio driver'.  So this pull request is also asking comments for the
+> > > path of these patches.
+> > >
+> > > Thomas, Grant,
+> > >
+> > > Please speak up if you do not want "your" patches to go through arm-soc
+> > > tree.  Thanks.
+> >
+> > Thomas,
+> >
+> > I'm waiting on the following patch, since I need it to complete a patch
+> > I'm working on:
+> >
+> > > Jamie Iles (1):
+> > >       irqdomain: export irq_domain_simple_ops for !CONFIG_OF
+> >
+> > Can you ack it for inclusion in the arm-soc tree, or apply it, so I know
+> > it's OK to rely on this patch in my work?
+> 
+> Thomas has acked this and it's in Russell's tracker as 7235/1 as I have
+> a VIC patch that uses it too.
 
-If we ever take the time to push ARMv7-M into mainline, my patches
-actually introduce CONFIG_CPU_V7M:
+Ah, I missed that.
 
-http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=53a9ca6eccb3e14c7d9045870464cbfb37b0bb3b
+Is it in a stable git tree anywhere, so that it can be used as a
+dependency for my patch in the arm-soc tree? It certainly hasn't shown
+up in today's next.
+
+Thanks.
 
 -- 
-Catalin
+nvpublic
