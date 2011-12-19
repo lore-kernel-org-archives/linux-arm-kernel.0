@@ -1,28 +1,58 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 20 Dec 2011 00:35:52 +0100
-Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
-In-Reply-To: <20111219232325.GA5683@S2100-06.ap.freescale.net>
-References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
- <201112192154.25310.marek.vasut@gmail.com>
- <20111219232325.GA5683@S2100-06.ap.freescale.net>
-Message-ID: <201112200035.52802.marek.vasut@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Dec 2011 15:35:59 -0800
+Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
+ and DDR
+In-Reply-To: <4EEFC23A.30201@gmail.com>
+References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
+ <4EEFC23A.30201@gmail.com>
+Message-ID: <20111219233559.GW6464@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, Dec 19, 2011 at 09:54:25PM +0100, Marek Vasut wrote:
-> > > So, in summary, you have everything you require to fix it outside the
-> > > driver.  You just have to decide which of the two options you want to
-> > > proceed with, and actually (and finally) do it instead of endlessly
-> > > procrastinating and waiting for more and more bug reports (which is
-> > > exactly what has happened so far.)
+* Rob Herring <robherring2@gmail.com> [111219 14:29]:
+> On 12/19/2011 08:05 AM, Aneesh V wrote:
+> > This is an RFC to add new device tree bindings for DDR memories and
+> > EMIF - TI's DDR SDRAM controller. 
+> > 
+> > The first patch adds bindings for DDR memories. Currently,
+> > we have added properties for only DDR3 and LPDDR2 memories.
+> > However, the binding can be easily extended to describe
+> > other types such as DDR2 in the future.
+> > 
+> > The second patch provides the bindings for the EMIF controller.
+> > 
+> > The final patch provides DT data for EMIF controller instances
+> > in OMAP4 and LPDDR2 memories attached to them on various boards.
+> > 
+> > Thanks to Rajendra for answering my numerous queries on device tree.
+> > 
+> > This is a re-post of the RFC that was posted to devicetree-discuss ml,
+> > now sent to a larger audience and looping out an internal list.
+> > Please ignore the previous version.
 > 
-> Marek, the 'you' here really means me rather than you.
+> There's already a standard way (i.e. JEDEC standard) to define DDR chip
+> configuration that's called SPD. Why invent something new? While this is
+> normally an i2c eeprom on a DIMM, there's no reason you couldn't get it
+> from somewhere else including perhaps the DT. There's already code in
+> u-boot that can parse SPD data.
 
-Sure, I figured as much after Russells reply.
-> 
-> Russell, sorry for leaving the issue here for long time, and I'm working
-> on the patches you suggested right now.
+I agree generic JEDEC standard would be good for the DT.
+ 
+> In general, is it really feasible to parse the DTB before DDR is
+> initialized?
 
-I see ... shall I back off from this issue then? Can I somehow help you on this?
+Changing timings is still needed for DVFS during runtime.
 
-M
+But we can boot to userspace with bootloader set timings, so I'm
+thinking that maybe these timings should be just set by loadable
+modules. Just the configuration of which timings to select should
+be passed via DT. Something in compatible like:
+
+	.compatible = "ti,omap3630", "sdram-micron-mt46h32m32lf-6";
+
+And that should allow the SDRC driver to only accept timings for
+"sdram-micron-mt46h32m32lf-6".
+
+Regards,
+
+Tony
