@@ -1,35 +1,82 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Mon, 19 Dec 2011 09:13:16 +0200
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20111219071350.GH4962@S2100-06.ap.freescale.net>
-References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20111219071350.GH4962@S2100-06.ap.freescale.net>
-Message-ID: <4EEEE40C.3000200@bluegiga.com>
+From: akong@redhat.com (Amos Kong)
+Date: Mon, 19 Dec 2011 15:21:35 +0800
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <1324262474.30454.12.camel@pasglop>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <1322867384.11728.20.camel@pasglop> <87hb1iqls3.fsf@rustcorp.com.au>
+ <20111211122544.GC11504@redhat.com> <1323642447.19891.8.camel@pasglop>
+ <4EE56FCD.9030609@redhat.com> <87wra2tlue.fsf@rustcorp.com.au>
+ <4EEE9F16.8000501@redhat.com> <1324262474.30454.12.camel@pasglop>
+Message-ID: <4EEEE5FF.9050502@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2011 09:13 AM, Shawn Guo wrote:
-> The patch looks good.
+On 19/12/11 10:41, Benjamin Herrenschmidt wrote:
+> On Mon, 2011-12-19 at 10:19 +0800, Amos Kong wrote:
+>
+>> I tested with the same environment and scenarios.
+>> tested one scenarios for three times and compute the average for more
+>> precision.
+>>
+>> Thanks, Amos
+>>
+>> --------- compare results -----------
+>> Mon Dec 19 09:51:09 2011
+>>
+>> 1 - avg-old.netperf.exhost_guest.txt
+>> 2 - avg-fixed.netperf.exhost_guest.txt
+>
+> The output is word wrapped and generally unreadable. Any chance you can
+> provide us with a summary of the outcome ?
+>
+> Cheers,
+> Ben.
 
-Thank you for your time.
+Hi Ben,
+
+The change of TCP_RR Throughput is very small.
+external host -> guest: Some of throughput of TCP_STREAM and TCP_MAERTS 
+reduced a little.
+local host -> guest: Some of throughput of TCP_STREAM and TCP_MAERTS 
+increased a little.
 
 
-> The only problem I have is I do not see MACH_TYPE_APX4DEVKIT defined
-> in arch/arm/tools/mach-types on either Linus' tree or linux-next
-> tree.  I'm afraid that we will experience the same problem we have
-> experienced with m28evk patch, which broke the whole mxs build for a
-> couple of early -rc of v3.2.
+About compare result format:
+---------------------------
+>> 1 - avg-old.netperf.exhost_guest.txt
 
-I see the problem. What is your suggestion? Should we create patch to 
-add APX4DEVKIT to mach-types file as you did last time?
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/140425
+average result (tested 3 times) file of test 1
+>> 2 - avg-fixed.netperf.exhost_guest.txt
 
-We have register apx4devkit to ARM machine database. Machine id of 
-apx4devkit is 3712. For some reason "Kconfig macro" and "type 
-identifier" are out of sync in db. DEVKIT string is missing from those.
-http://www.arm.linux.org.uk/developer/machines/list.php?id=3712
+average result file of test 2
+>>
+>> ======
+>> TCP_STREAM
+
+^^^ protocol
+
+>>       sessions| size|throughput|   cpu| normalize|  #tx-pkts| #rx-pkts| #tx-byts|  #rx-byts| #re-trans| #tx-intr|  #rx-intr|  #io_exit|  #irq_inj|#tpkt/#exit| #rpkt/#irq
+>> 1            1|   64|   1073.54| 10.50|       102|  ....
+
+^^^ average result of old kernel, start netserver in guest, start 
+netperf client(s) in external host
+
+>> 2            1|   64|   1079.44| 10.29|       104|  ....
+
+^^^ average result of fixed kernel
+
+>> %             |  0.0|      +0.5|  -2.0|      +2.0|  ....
+
+^^^ augment rate between test1 and test2
+
+--------
+sessions: netperf clients number
+size: request/response sizes
+#rx-pkts: received packets number
+#rx-byts: received bytes number
+#rx-intr: interrupt number for receive
+#io_exit: io exit number
+#irq_inj: injected irq number
 
 
-BR,
-Lauri
+Thanks, Amos.
