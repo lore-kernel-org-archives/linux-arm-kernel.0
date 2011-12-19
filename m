@@ -1,83 +1,171 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Dec 2011 15:22:51 -0800
-Subject: buggy usage of pm_idle by omap1 code
-In-Reply-To: <alpine.LFD.2.02.1112191758520.2907@xanadu.home>
-References: <alpine.LFD.2.02.1112162208390.2907@xanadu.home>
- <20111219173518.GH6464@atomide.com>
- <20111219213445.GL14542@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1112191758520.2907@xanadu.home>
-Message-ID: <20111219232251.GV6464@atomide.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 20 Dec 2011 00:28:32 +0100
+Subject: [PATCH v2 1/7][RESEND] ARM: OMAP1: ams-delta: register latch
+ dependent devices later
+In-Reply-To: <83e934adfc691b347534edb7788a67ab2e6bd7e1.1324331816.git.jkrzyszt@tis.icnet.pl>
+References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <83e934adfc691b347534edb7788a67ab2e6bd7e1.1324331816.git.jkrzyszt@tis.icnet.pl>
+Message-ID: <201112200028.32947.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [111219 14:32]:
-> On Mon, 19 Dec 2011, Russell King - ARM Linux wrote:
-> 
-> > On Mon, Dec 19, 2011 at 09:35:19AM -0800, Tony Lindgren wrote:
-> > > Commit 9ccdac3662dbf3c75e8f8851a214bdf7d365a4bd ([ARM] idle:
-> > > clean up pm_idle calling, obey hlt_counter) removed a check
-> > > for NULL pm_idle.
-> > > 
-> > > On omap1 the system hits an equivalent of suspend during idle.
-> > > If we are suspending, we need to make sure so we don't call
-> > > omap1_pm_idle during the suspend process.
-> > > 
-> > > Fix this by setting the pm_idle function to a an empty
-> > > function while suspending.
-> > 
-> > 2. what's wrong with calling disable_hlt() to prevent the pm_idle function
-> > being called?  Why solve it this complicated way of changing the pm_idle
-> > pointer when there's some infrastructure which can fix it for you already?
-> 
-> Absolutely.  I must have been stairing at the whole thing for too long, 
-> as I obviously did exactly that already elsewhere.
-> 
-> So I propose this alternative:
-> 
->     ARM: OMAP1: Fix pm_idle during suspend
->     
->     Commit 9ccdac3662dbf3c75e8f8851a214bdf7d365a4bd ([ARM] idle:
->     clean up pm_idle calling, obey hlt_counter) removed a check
->     for NULL pm_idle.
->     
->     Replace the NULL assignment in the OMAP1 code with disable_hlt()
->     to be in sync with the core code and provide the intended behavior.
->     
->     Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Resending because of a typo in the Cc: list, sorry.
 
-Yeh this is better. Looks like you beat me to it by few minutes:
+8<--------------------------
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+In preparation to converting Amstrad Delta on-board latches to
+basic_mmio_gpio devices, registration of platform devices which depend
+on latches and will require initialization of their GPIO pins first,
+should be moved out of .machine_init down to late_initcall level, as the
+gpio-generic driver is not available until device_initcall time.  The
+latch reset operation, which will be replaced with GPIO initialization,
+must also be moved to late_initcall for the same reason.
+
+Since there was already another, separate arch_initcall function for
+setting up one of those latch dependent devices, the on-board modem
+device, reuse that function, i.e., rename it to a name that matches the
+new purpose, extend with other device setup relocated from
+.machine_init, and move down to the late_initcall level.
+
+While being at it, add missing gpio_free() in case the modem platform
+device registration fails.
+
+In addition, defer registration of the Amstrad Delta ASoC and serio
+devices, done from their device driver files, until late_initcall time,
+as those drivers will depend on their GPIO pins already requested from
+the board late_init() function until updated to register their GPIO pins
+themselves.
+
+Thanks to Tony Lindgren <tony@atomide.com> who suggested this approach
+instead of shifting up the gpio-generic driver initialization.
+
+Created and tested against linux-3.2-rc6.
+
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+This patch was not present in the initial submission, it replaces the
+old patch 1/10, providing an alternative solution not touching the
+gpio-generic driver.
+
+Thanks,
+Janusz
+
+
+ arch/arm/mach-omap1/board-ams-delta.c |   28 ++++++++++++++++++++--------
+ drivers/input/serio/ams_delta_serio.c |    4 ++++
+ sound/soc/omap/ams-delta.c            |    4 ++++
+ 3 files changed, 28 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index b0f15d2..50987c9 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -275,11 +275,14 @@ static struct omap1_cam_platform_data ams_delta_camera_platform_data = {
+ };
  
-> diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
-> index 89ea20ca0c..6c6a2dc554 100644
-> --- a/arch/arm/mach-omap1/pm.c
-> +++ b/arch/arm/mach-omap1/pm.c
-> @@ -583,8 +583,6 @@ static void omap_pm_init_proc(void)
->  
->  #endif /* DEBUG && CONFIG_PROC_FS */
->  
-> -static void (*saved_idle)(void) = NULL;
-> -
->  /*
->   *	omap_pm_prepare - Do preliminary suspend work.
->   *
-> @@ -592,8 +590,7 @@ static void (*saved_idle)(void) = NULL;
->  static int omap_pm_prepare(void)
->  {
->  	/* We cannot sleep in idle until we have resumed */
-> -	saved_idle = pm_idle;
-> -	pm_idle = NULL;
-> +	disable_hlt();
->  
->  	return 0;
->  }
-> @@ -630,7 +627,7 @@ static int omap_pm_enter(suspend_state_t state)
->  
->  static void omap_pm_finish(void)
->  {
-> -	pm_idle = saved_idle;
-> +	enable_hlt();
->  }
->  
->  
+ static struct platform_device *ams_delta_devices[] __initdata = {
+-	&ams_delta_nand_device,
+ 	&ams_delta_kp_device,
++	&ams_delta_camera_device,
++};
++
++static struct platform_device *late_devices[] __initdata = {
++	&ams_delta_nand_device,
+ 	&ams_delta_lcd_device,
+ 	&ams_delta_led_device,
+-	&ams_delta_camera_device,
+ };
+ 
+ static void __init ams_delta_init(void)
+@@ -307,9 +310,6 @@ static void __init ams_delta_init(void)
+ 	omap_serial_init();
+ 	omap_register_i2c_bus(1, 100, NULL, 0);
+ 
+-	/* Clear latch2 (NAND, LCD, modem enable) */
+-	ams_delta_latch2_write(~0, 0);
+-
+ 	omap1_usb_init(&ams_delta_usb_config);
+ 	omap1_set_camera_info(&ams_delta_camera_platform_data);
+ #ifdef CONFIG_LEDS_TRIGGERS
+@@ -345,13 +345,18 @@ static struct platform_device ams_delta_modem_device = {
+ 	},
+ };
+ 
+-static int __init ams_delta_modem_init(void)
++static int __init late_init(void)
+ {
+ 	int err;
+ 
+ 	if (!machine_is_ams_delta())
+ 		return -ENODEV;
+ 
++	/* Clear latch2 (NAND, LCD, modem enable) */
++	ams_delta_latch2_write(~0, 0);
++
++	platform_add_devices(late_devices, ARRAY_SIZE(late_devices));
++
+ 	omap_cfg_reg(M14_1510_GPIO2);
+ 	ams_delta_modem_ports[0].irq =
+ 			gpio_to_irq(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
+@@ -367,9 +372,16 @@ static int __init ams_delta_modem_init(void)
+ 		AMS_DELTA_LATCH2_MODEM_NRESET | AMS_DELTA_LATCH2_MODEM_CODEC,
+ 		AMS_DELTA_LATCH2_MODEM_NRESET | AMS_DELTA_LATCH2_MODEM_CODEC);
+ 
+-	return platform_device_register(&ams_delta_modem_device);
++	err = platform_device_register(&ams_delta_modem_device);
++	if (err)
++		goto gpio_free;
++	return 0;
++
++gpio_free:
++	gpio_free(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
++	return err;
+ }
+-arch_initcall(ams_delta_modem_init);
++late_initcall(late_init);
+ 
+ static void __init ams_delta_map_io(void)
+ {
+diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
+index d4d08bd..56ffd7c 100644
+--- a/drivers/input/serio/ams_delta_serio.c
++++ b/drivers/input/serio/ams_delta_serio.c
+@@ -165,6 +165,9 @@ serio:
+ 	kfree(ams_delta_serio);
+ 	return err;
+ }
++#ifndef MODULE
++late_initcall(ams_delta_serio_init);
++#else
+ module_init(ams_delta_serio_init);
+ 
+ static void __exit ams_delta_serio_exit(void)
+@@ -175,3 +178,4 @@ static void __exit ams_delta_serio_exit(void)
+ 	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
+ }
+ module_exit(ams_delta_serio_exit);
++#endif
+diff --git a/sound/soc/omap/ams-delta.c b/sound/soc/omap/ams-delta.c
+index ccb8a6a..1764a3b 100644
+--- a/sound/soc/omap/ams-delta.c
++++ b/sound/soc/omap/ams-delta.c
+@@ -636,6 +636,9 @@ err:
+ 	platform_device_put(ams_delta_audio_platform_device);
+ 	return ret;
+ }
++#ifndef MODULE
++late_initcall(ams_delta_module_init);
++#else
+ module_init(ams_delta_module_init);
+ 
+ static void __exit ams_delta_module_exit(void)
+@@ -657,6 +660,7 @@ static void __exit ams_delta_module_exit(void)
+ 	platform_device_unregister(ams_delta_audio_platform_device);
+ }
+ module_exit(ams_delta_module_exit);
++#endif
+ 
+ MODULE_AUTHOR("Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>");
+ MODULE_DESCRIPTION("ALSA SoC driver for Amstrad E3 (Delta) videophone");
+-- 
+1.7.3.4
