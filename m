@@ -1,40 +1,77 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Dec 2011 17:01:14 -0600
-Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
- and DDR
-In-Reply-To: <1324303533-17458-1-git-send-email-aneesh@ti.com>
-References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
-Message-ID: <4EEFC23A.30201@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 19 Dec 2011 18:04:46 -0500 (EST)
+Subject: buggy usage of pm_idle by omap1 code
+In-Reply-To: <20111219213445.GL14542@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1112162208390.2907@xanadu.home>
+ <20111219173518.GH6464@atomide.com>
+ <20111219213445.GL14542@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1112191758520.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2011 08:05 AM, Aneesh V wrote:
-> This is an RFC to add new device tree bindings for DDR memories and
-> EMIF - TI's DDR SDRAM controller. 
-> 
-> The first patch adds bindings for DDR memories. Currently,
-> we have added properties for only DDR3 and LPDDR2 memories.
-> However, the binding can be easily extended to describe
-> other types such as DDR2 in the future.
-> 
-> The second patch provides the bindings for the EMIF controller.
-> 
-> The final patch provides DT data for EMIF controller instances
-> in OMAP4 and LPDDR2 memories attached to them on various boards.
-> 
-> Thanks to Rajendra for answering my numerous queries on device tree.
-> 
-> This is a re-post of the RFC that was posted to devicetree-discuss ml,
-> now sent to a larger audience and looping out an internal list.
-> Please ignore the previous version.
+On Mon, 19 Dec 2011, Russell King - ARM Linux wrote:
 
-There's already a standard way (i.e. JEDEC standard) to define DDR chip
-configuration that's called SPD. Why invent something new? While this is
-normally an i2c eeprom on a DIMM, there's no reason you couldn't get it
-from somewhere else including perhaps the DT. There's already code in
-u-boot that can parse SPD data.
+> On Mon, Dec 19, 2011 at 09:35:19AM -0800, Tony Lindgren wrote:
+> > Commit 9ccdac3662dbf3c75e8f8851a214bdf7d365a4bd ([ARM] idle:
+> > clean up pm_idle calling, obey hlt_counter) removed a check
+> > for NULL pm_idle.
+> > 
+> > On omap1 the system hits an equivalent of suspend during idle.
+> > If we are suspending, we need to make sure so we don't call
+> > omap1_pm_idle during the suspend process.
+> > 
+> > Fix this by setting the pm_idle function to a an empty
+> > function while suspending.
+> 
+> 2. what's wrong with calling disable_hlt() to prevent the pm_idle function
+> being called?  Why solve it this complicated way of changing the pm_idle
+> pointer when there's some infrastructure which can fix it for you already?
 
-In general, is it really feasible to parse the DTB before DDR is
-initialized?
+Absolutely.  I must have been stairing at the whole thing for too long, 
+as I obviously did exactly that already elsewhere.
 
-Rob
+So I propose this alternative:
+
+    ARM: OMAP1: Fix pm_idle during suspend
+    
+    Commit 9ccdac3662dbf3c75e8f8851a214bdf7d365a4bd ([ARM] idle:
+    clean up pm_idle calling, obey hlt_counter) removed a check
+    for NULL pm_idle.
+    
+    Replace the NULL assignment in the OMAP1 code with disable_hlt()
+    to be in sync with the core code and provide the intended behavior.
+    
+    Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
+index 89ea20ca0c..6c6a2dc554 100644
+--- a/arch/arm/mach-omap1/pm.c
++++ b/arch/arm/mach-omap1/pm.c
+@@ -583,8 +583,6 @@ static void omap_pm_init_proc(void)
+ 
+ #endif /* DEBUG && CONFIG_PROC_FS */
+ 
+-static void (*saved_idle)(void) = NULL;
+-
+ /*
+  *	omap_pm_prepare - Do preliminary suspend work.
+  *
+@@ -592,8 +590,7 @@ static void (*saved_idle)(void) = NULL;
+ static int omap_pm_prepare(void)
+ {
+ 	/* We cannot sleep in idle until we have resumed */
+-	saved_idle = pm_idle;
+-	pm_idle = NULL;
++	disable_hlt();
+ 
+ 	return 0;
+ }
+@@ -630,7 +627,7 @@ static int omap_pm_enter(suspend_state_t state)
+ 
+ static void omap_pm_finish(void)
+ {
+-	pm_idle = saved_idle;
++	enable_hlt();
+ }
+ 
+ 
