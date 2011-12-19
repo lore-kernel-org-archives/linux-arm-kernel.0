@@ -1,82 +1,37 @@
-From: akong@redhat.com (Amos Kong)
-Date: Mon, 19 Dec 2011 15:21:35 +0800
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <1324262474.30454.12.camel@pasglop>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <1322867384.11728.20.camel@pasglop> <87hb1iqls3.fsf@rustcorp.com.au>
- <20111211122544.GC11504@redhat.com> <1323642447.19891.8.camel@pasglop>
- <4EE56FCD.9030609@redhat.com> <87wra2tlue.fsf@rustcorp.com.au>
- <4EEE9F16.8000501@redhat.com> <1324262474.30454.12.camel@pasglop>
-Message-ID: <4EEEE5FF.9050502@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 19 Dec 2011 09:09:57 +0100
+Subject: [PATCH] mioa701: add newly available DoC G3 chip
+In-Reply-To: <CAN1soZyS-qO-N7bbKBvhm1UzvpUJU9py20_uabEPCQxbsp7_Tg@mail.gmail.com>
+ (Haojian Zhuang's message of "Mon, 19 Dec 2011 12:06:10 +0800")
+References: <1324122591-1756-1-git-send-email-robert.jarzmik@free.fr>
+ <CAN1soZyS-qO-N7bbKBvhm1UzvpUJU9py20_uabEPCQxbsp7_Tg@mail.gmail.com>
+Message-ID: <87hb0xf0dm.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/12/11 10:41, Benjamin Herrenschmidt wrote:
-> On Mon, 2011-12-19 at 10:19 +0800, Amos Kong wrote:
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+
+>> -static struct resource strataflash_resource = {
+>> +static struct resource docg3_resource = {
+>> ? ? ? ?.start = PXA_CS0_PHYS,
+>> - ? ? ? .end ? = PXA_CS0_PHYS + SZ_64M - 1,
+>> + ? ? ? .end ? = PXA_CS0_PHYS + SZ_8K - 1,
+>> ? ? ? ?.flags = IORESOURCE_MEM,
+>> ?};
 >
->> I tested with the same environment and scenarios.
->> tested one scenarios for three times and compute the average for more
->> precision.
->>
->> Thanks, Amos
->>
->> --------- compare results -----------
->> Mon Dec 19 09:51:09 2011
->>
->> 1 - avg-old.netperf.exhost_guest.txt
->> 2 - avg-fixed.netperf.exhost_guest.txt
->
-> The output is word wrapped and generally unreadable. Any chance you can
-> provide us with a summary of the outcome ?
->
-> Cheers,
-> Ben.
+> You resized the flash from 64MB to 8KB. It surprised me that the flash
+> size is only 8KB. Could you help to check this?
+Checked and confirmed, it's 8K.
+The docg3 has a mapped IO space, where :
+ - 0x0 - 0x7ff     : boot memory (NOR like)
+ - 0x800 - 0xfff   : data area
+ - 0x1000 - 0x17ff : registers area
+ - 0x1800 - 0x1fff : boot memory (the same one as before)
 
-Hi Ben,
+And the previous "64MB" was because I didn't know which kind of memory was
+there, and a static bank can be as big as 64MB.
 
-The change of TCP_RR Throughput is very small.
-external host -> guest: Some of throughput of TCP_STREAM and TCP_MAERTS 
-reduced a little.
-local host -> guest: Some of throughput of TCP_STREAM and TCP_MAERTS 
-increased a little.
+Cheers.
 
-
-About compare result format:
----------------------------
->> 1 - avg-old.netperf.exhost_guest.txt
-
-average result (tested 3 times) file of test 1
->> 2 - avg-fixed.netperf.exhost_guest.txt
-
-average result file of test 2
->>
->> ======
->> TCP_STREAM
-
-^^^ protocol
-
->>       sessions| size|throughput|   cpu| normalize|  #tx-pkts| #rx-pkts| #tx-byts|  #rx-byts| #re-trans| #tx-intr|  #rx-intr|  #io_exit|  #irq_inj|#tpkt/#exit| #rpkt/#irq
->> 1            1|   64|   1073.54| 10.50|       102|  ....
-
-^^^ average result of old kernel, start netserver in guest, start 
-netperf client(s) in external host
-
->> 2            1|   64|   1079.44| 10.29|       104|  ....
-
-^^^ average result of fixed kernel
-
->> %             |  0.0|      +0.5|  -2.0|      +2.0|  ....
-
-^^^ augment rate between test1 and test2
-
---------
-sessions: netperf clients number
-size: request/response sizes
-#rx-pkts: received packets number
-#rx-byts: received bytes number
-#rx-intr: interrupt number for receive
-#io_exit: io exit number
-#irq_inj: injected irq number
-
-
-Thanks, Amos.
+--
+Robert
