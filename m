@@ -1,76 +1,50 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Mon, 19 Dec 2011 07:49:56 +0100
-Subject: [PATCH 1/2] imx: Add save/restore functions for UART control regs
-In-Reply-To: <20111219034902.GC4962@S2100-06.ap.freescale.net>
-References: <1324229655-5538-1-git-send-email-dirk.behme@gmail.com>
- <20111219034902.GC4962@S2100-06.ap.freescale.net>
-Message-ID: <4EEEDE94.3080804@googlemail.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Mon, 19 Dec 2011 12:23:40 +0530
+Subject: [PATCH V2 1/4] i2c: tegra: Add __devinit/exit to probe/remove
+In-Reply-To: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
+References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
+Message-ID: <CAM=Q2csGoQR8PZhQO_oeVZt9CqEq377Ut8swY5g12M_=71on9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.12.2011 04:49, Shawn Guo wrote:
-> On Sun, Dec 18, 2011 at 06:34:14PM +0100, Dirk Behme wrote:
->> Factor out the uart save/restore functionality instead of
->> having the same code several times in the driver.
->>
->> Signed-off-by: Dirk Behme<dirk.behme@gmail.com>
->> CC: Saleem Abdulrasool<compnerd@compnerd.org>
->> CC: Sascha Hauer<s.hauer@pengutronix.de>
->> CC: Fabio Estevam<festevam@gmail.com>
->> CC: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
->> CC: linux-serial at vger.kernel.org
->> ---
->>   drivers/tty/serial/imx.c |   38 +++++++++++++++++++++++++++++++-------
->>   1 files changed, 31 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
->> index 163fc90..6a01c2a 100644
->> --- a/drivers/tty/serial/imx.c
->> +++ b/drivers/tty/serial/imx.c
->> @@ -260,6 +260,31 @@ static inline int is_imx21_uart(struct imx_port *sport)
->>   }
->>
->>   /*
->> + * Save and restore functions for UCR1, UCR2 and UCR3 registers
->> + */
->> +static void imx_console_mode(struct uart_port *port,
+On Sun, Dec 18, 2011 at 11:59 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> This fixes some section mismatch build warnings.
+What was the error was a devinit function called from these?
+
 >
-> Function name imx_console_mode seems not like a couple with
-> imx_console_restore.  And I guess something like
-> imx_port_ucrs_save[restore] would be better?
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> v2: New patch.
 >
->> +			     unsigned int *ucr1,
->> +			     unsigned int *ucr2,
->> +			     unsigned int *ucr3)
+> ?drivers/i2c/busses/i2c-tegra.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
 >
-> Can we define something like 'struct imx_port_ucrs' to contains these?
-
-Yes, we could have different function names above and use a struct.
-
-I implemented what Sascha asked for in
-
-http://www.spinics.net/lists/arm-kernel/msg144960.html
-
-though:
-
--- Sascha wrote: --
-I'm thinking about:
-
-imx_console_mode(struct uart_port *port, u32 *ucr1, u32 *ucr2, u32 *ucr2);
-imx_console_restore(struct uart_port *port, u32 ucr1, u32 ucr2, u32 ucr3);
--- Sascha end --
-
-It seems Shawn proposes
-
-imx_port_ucrs_save(struct uart_port *port, struct *imx_port_ucrs);
-imx_port_ucrs_restore(struct uart_port *port, struct *imx_port_ucrs);
-
-(?)
-
-Sascha, Shawn: Could you agree on what we should use?
-
-Once you agreed, I will send an update of both two patches.
-
-Many thanks and best regards
-
-Dirk
+> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+> index 46b6500..e8560ed 100644
+> --- a/drivers/i2c/busses/i2c-tegra.c
+> +++ b/drivers/i2c/busses/i2c-tegra.c
+> @@ -558,7 +558,7 @@ static const struct i2c_algorithm tegra_i2c_algo = {
+> ? ? ? ?.functionality ?= tegra_i2c_func,
+> ?};
+>
+> -static int tegra_i2c_probe(struct platform_device *pdev)
+> +static int __devinit tegra_i2c_probe(struct platform_device *pdev)
+> ?{
+> ? ? ? ?struct tegra_i2c_dev *i2c_dev;
+> ? ? ? ?struct tegra_i2c_platform_data *pdata = pdev->dev.platform_data;
+> @@ -690,7 +690,7 @@ err_iounmap:
+> ? ? ? ?return ret;
+> ?}
+>
+> -static int tegra_i2c_remove(struct platform_device *pdev)
+> +static int __devexit tegra_i2c_remove(struct platform_device *pdev)
+> ?{
+> ? ? ? ?struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
+> ? ? ? ?i2c_del_adapter(&i2c_dev->adapter);
+> --
+> 1.7.5.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
