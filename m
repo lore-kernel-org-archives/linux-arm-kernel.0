@@ -1,62 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Dec 2011 08:02:41 -0600
-Subject: [PATCH 1/3] of/base: Take NULL string into account for property
- with multiple strings
-In-Reply-To: <1323095036-3739-2-git-send-email-b-cousson@ti.com>
-References: <1323095036-3739-1-git-send-email-b-cousson@ti.com>
- <1323095036-3739-2-git-send-email-b-cousson@ti.com>
-Message-ID: <4EEF4401.1060303@gmail.com>
+From: aneesh@ti.com (Aneesh V)
+Date: Mon, 19 Dec 2011 19:35:30 +0530
+Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF and DDR
+Message-ID: <1324303533-17458-1-git-send-email-aneesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2011 08:23 AM, Benoit Cousson wrote:
-> The current implementation just ignore any NULL string inserted in a
-> multiple strings property.
-> In some cases we can have a property with a fix number of strings but
-> not necessarily used, like for example in a list of valid pinmux modes.
-> 
->  prop = "uart_rx", "uart_tx", "", "", "safe_mode";
-> 
-> Do no skip NULL string and take them into account in
-> of_property_read_string_index and of_property_count_strings.
-> 
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
+This is an RFC to add new device tree bindings for DDR memories and
+EMIF - TI's DDR SDRAM controller. 
 
-Applied. The others need Grant's agreement.
+The first patch adds bindings for DDR memories. Currently,
+we have added properties for only DDR3 and LPDDR2 memories.
+However, the binding can be easily extended to describe
+other types such as DDR2 in the future.
 
-Rob
+The second patch provides the bindings for the EMIF controller.
 
-> ---
->  drivers/of/base.c |    8 +++-----
->  1 files changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 9b6588e..b707243 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -752,7 +752,7 @@ int of_property_read_string_index(struct device_node *np, const char *propname,
->  
->  	for (i = 0; total < prop->length; total += l, p += l) {
->  		l = strlen(p) + 1;
-> -		if ((*p != 0) && (i++ == index)) {
-> +		if (i++ == index) {
->  			*output = p;
->  			return 0;
->  		}
-> @@ -790,11 +790,9 @@ int of_property_count_strings(struct device_node *np, const char *propname)
->  
->  	p = prop->value;
->  
-> -	for (i = 0; total < prop->length; total += l, p += l) {
-> +	for (i = 0; total < prop->length; total += l, p += l, i++)
->  		l = strlen(p) + 1;
-> -		if (*p != 0)
-> -			i++;
-> -	}
-> +
->  	return i;
->  }
->  EXPORT_SYMBOL_GPL(of_property_count_strings);
+The final patch provides DT data for EMIF controller instances
+in OMAP4 and LPDDR2 memories attached to them on various boards.
+
+Thanks to Rajendra for answering my numerous queries on device tree.
+
+This is a re-post of the RFC that was posted to devicetree-discuss ml,
+now sent to a larger audience and looping out an internal list.
+Please ignore the previous version.
+
+Aneesh V (3):
+  dt: device tree bindings for DDR memories
+  dt: device tree bindings for TI's EMIF sdram controller
+  arm/dts: EMIF and lpddr2 device tree data for OMAP4 boards
+
+ Documentation/devicetree/bindings/ddr/ddr.txt      |  114 ++++++++++++++++++++
+ .../devicetree/bindings/ddr/ddr_timings.txt        |   62 +++++++++++
+ .../bindings/memory-controllers/ti/emif.txt        |   64 +++++++++++
+ arch/arm/boot/dts/omap-common-devices.dtsi         |   63 +++++++++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   13 +++
+ arch/arm/boot/dts/omap4-sdp.dts                    |   13 +++
+ arch/arm/boot/dts/omap4.dtsi                       |   19 ++++
+ 7 files changed, 348 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ddr/ddr.txt
+ create mode 100644 Documentation/devicetree/bindings/ddr/ddr_timings.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+ create mode 100644 arch/arm/boot/dts/omap-common-devices.dtsi
