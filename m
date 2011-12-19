@@ -1,50 +1,40 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 19 Dec 2011 23:21:41 +0100
-Subject: [PATCH V3 10/14] ARM: mxs: add clk_prepare/clk_unprepare
-In-Reply-To: <1321008637-19999-11-git-send-email-richard.zhao@linaro.org>
-References: <1321008637-19999-1-git-send-email-richard.zhao@linaro.org>
- <1321008637-19999-11-git-send-email-richard.zhao@linaro.org>
-Message-ID: <201112192321.41560.marek.vasut@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 19 Dec 2011 17:01:14 -0600
+Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
+ and DDR
+In-Reply-To: <1324303533-17458-1-git-send-email-aneesh@ti.com>
+References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
+Message-ID: <4EEFC23A.30201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  arch/arm/mach-mxs/system.c |    2 +-
->  arch/arm/mach-mxs/timer.c  |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+On 12/19/2011 08:05 AM, Aneesh V wrote:
+> This is an RFC to add new device tree bindings for DDR memories and
+> EMIF - TI's DDR SDRAM controller. 
 > 
-> diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
-> index 20ec3bd..9760a12 100644
-> --- a/arch/arm/mach-mxs/system.c
-> +++ b/arch/arm/mach-mxs/system.c
-> @@ -66,7 +66,7 @@ static int __init mxs_arch_reset_init(void)
+> The first patch adds bindings for DDR memories. Currently,
+> we have added properties for only DDR3 and LPDDR2 memories.
+> However, the binding can be easily extended to describe
+> other types such as DDR2 in the future.
 > 
->  	clk = clk_get_sys("rtc", NULL);
->  	if (!IS_ERR(clk))
-> -		clk_enable(clk);
-> +		clk_prepare_enable(clk);
+> The second patch provides the bindings for the EMIF controller.
 > 
->  	return 0;
->  }
-> diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-> index cace0d2..564a632 100644
-> --- a/arch/arm/mach-mxs/timer.c
-> +++ b/arch/arm/mach-mxs/timer.c
-> @@ -245,7 +245,7 @@ static int __init mxs_clocksource_init(struct clk
-> *timer_clk)
+> The final patch provides DT data for EMIF controller instances
+> in OMAP4 and LPDDR2 memories attached to them on various boards.
 > 
->  void __init mxs_timer_init(struct clk *timer_clk, int irq)
->  {
-> -	clk_enable(timer_clk);
-> +	clk_prepare_enable(timer_clk);
+> Thanks to Rajendra for answering my numerous queries on device tree.
 > 
->  	/*
->  	 * Initialize timers to a known state
+> This is a re-post of the RFC that was posted to devicetree-discuss ml,
+> now sent to a larger audience and looping out an internal list.
+> Please ignore the previous version.
 
-Hi Richard,
+There's already a standard way (i.e. JEDEC standard) to define DDR chip
+configuration that's called SPD. Why invent something new? While this is
+normally an i2c eeprom on a DIMM, there's no reason you couldn't get it
+from somewhere else including perhaps the DT. There's already code in
+u-boot that can parse SPD data.
 
-I just came across this, will this also help solve the mxs problem with mutex 
-lock begin done in atomic context in clk_enable/disable()?
+In general, is it really feasible to parse the DTB before DDR is
+initialized?
 
-M
+Rob
