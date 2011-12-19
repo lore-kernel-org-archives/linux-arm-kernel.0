@@ -1,176 +1,67 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 19 Dec 2011 14:48:38 -0700 (MST)
-Subject: [RFC PATCH v2 1/8] omap4: introduce fdif(face detect module) hwmod
-In-Reply-To: <4EEB5BBC.7050807@ti.com>
-References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
- <1323871214-25435-2-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1112152252260.12660@utopia.booyaka.com>
- <4EEB5BBC.7050807@ti.com>
-Message-ID: <alpine.DEB.2.00.1112191447270.12660@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Dec 2011 21:52:22 +0000
+Subject: Status of the following patch (clocksource sched_clock) ?
+In-Reply-To: <3E54258959B69E4282D79E01AB1F32B724963A@DFLE34.ent.ti.com>
+References: <3E54258959B69E4282D79E01AB1F32B7249324@DFLE34.ent.ti.com>
+ <20111219172557.GH14542@n2100.arm.linux.org.uk>
+ <3E54258959B69E4282D79E01AB1F32B724934E@DFLE34.ent.ti.com>
+ <20111219210438.GJ14542@n2100.arm.linux.org.uk>
+ <3E54258959B69E4282D79E01AB1F32B724963A@DFLE34.ent.ti.com>
+Message-ID: <20111219215222.GN14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Beno?t,
-
-On Fri, 16 Dec 2011, Cousson, Benoit wrote:
-
-> On 12/16/2011 6:53 AM, Paul Walmsley wrote:
-> > Hi Beno?t
-> > 
-> > On Wed, 14 Dec 2011, Ming Lei wrote:
-> > 
-> > > Signed-off-by: Ming Lei<ming.lei@canonical.com>
+On Mon, Dec 19, 2011 at 09:39:16PM +0000, Karicheri, Muralidharan wrote:
+> I am relatively new to this. Here is more explanation of the issue.
 > 
-> Acked-by: Benoit Cousson <b-cousson@ti.com>
+> We have clocksource timer implemented using a 32bit hw timer which at
+> 166.84MHz of the clock rate wraps around at approximately 25secs. Our
+> platform uses the arch/arm/mach-davinci/time.c at
+> http://git.kernel.org/?p=linux/kernel/git/stable/linux-stable.git;a=blob;f=arch/arm/mach-davinci/time.c;h=e1969ce904dc5b4de9ff8f0d44442175c7c2497f;hb=1ea6b8f48918282bdca0b32a34095504ee65bab5
 > 
-> > > ---
-> > >   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   81
-> > > ++++++++++++++++++++++++++++
-> > >   1 files changed, 81 insertions(+), 0 deletions(-)
-> > 
-> > any comments on this patch?  I'd like to queue it if it looks good to you.
+> In this file, sched_clock() is implemented to override the weak
+> sched_clock() as 
 > 
-> It looks good to me. The only minor comment is about fdif location in the list
-> that should be sorted and thus cannot be after wd_timer2.
+> unsigned long long notrace sched_clock(void) { 
+>       const cycle_t cyc = clocksource_davinci.read(&clocksource_davinci); 
+>       return clocksource_cyc2ns(cyc, clocksource_davinci.mult,
+>                                 clocksource_davinci.shift);
+> } 
 
-Thanks, patch updated to match the script output and queued.  Modified 
-patch follows.
+Ah.  That implementation (and any other similar implementation) of
+sched_clock() is indeed buggy, and _will_ lead to sched_clock wraps.
 
+That's not because the clocksource wraps - the time keeping subsystem
+internally deals with clocksource wrapping.  However, the calculation
+method used above is such that the returned nanoseconds _will_ always
+wrap each time the clocksource cycle counter itself wraps.
 
-- Paul
+I implemented replacement sched_clock() across the ARM architecture,
+replacing at the time every single ARM sched_clock() implementation in
+the tree with it.  This implements necessary infrastructure to allow
+for a _fast_ sched_clock() function, yet solving completely the wrap
+problem.
 
-From: Ming Lei <ming.lei@canonical.com>
-Date: Mon, 19 Dec 2011 14:34:06 -0700
-Subject: [PATCH] ARM: OMAP4: hwmod data: introduce fdif(face detect module)
- hwmod
+> Based on your previous response, I did some research and found
+> arch/arm/kernel/sched_clock.c that seems to solve clocksource
+> wraparound. So I have enabled HAVE_SCHED_CLOCK to pick this
+> implementation in my build. Also I have modified
+> arch/arm/mach-davinci/time.c to call init_sched_clock(), but I got
+> a kernel crash when Linux booted up (given below). Looks like this
+> has to happen early in the initialization (postcoreinit() ??) so
+> that sched_init() can use this. In the above time.c, the timer gets
+> initialized late in the boot up stage. Is my understanding correct?
 
-Add hwmod data for the OMAP4 FDIF IP block.
+The kernel expects sched_clock() to be available really early in the
+system boot - platforms should do their best to ensure that sched_clock
+is indeed up and running.
 
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
-Acked-by: Beno?t Cousson <b-cousson@ti.com>
-[paul at pwsan.com: rearranged to match script output; fixed FDIF end address to
- match script data; wrote trivial changelog]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   85 ++++++++++++++++++++++++++++
- 1 files changed, 85 insertions(+), 0 deletions(-)
+This generally means before clocksource initialisation - and means
+typically at init_early time.  However, while I converted some platforms,
+I wasn't prepared to reorganize their code to achieve this, so I just
+made the reading of the timer register conditional on the clocksource
+having been enabled.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index daaf165..3ac4bf6 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -53,6 +53,7 @@ static struct omap_hwmod omap44xx_dmm_hwmod;
- static struct omap_hwmod omap44xx_dsp_hwmod;
- static struct omap_hwmod omap44xx_dss_hwmod;
- static struct omap_hwmod omap44xx_emif_fw_hwmod;
-+static struct omap_hwmod omap44xx_fdif_hwmod;
- static struct omap_hwmod omap44xx_hsi_hwmod;
- static struct omap_hwmod omap44xx_ipu_hwmod;
- static struct omap_hwmod omap44xx_iss_hwmod;
-@@ -346,6 +347,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* fdif -> l3_main_2 */
-+static struct omap_hwmod_ocp_if omap44xx_fdif__l3_main_2 = {
-+	.master		= &omap44xx_fdif_hwmod,
-+	.slave		= &omap44xx_l3_main_2_hwmod,
-+	.clk		= "l3_div_ck",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* hsi -> l3_main_2 */
- static struct omap_hwmod_ocp_if omap44xx_hsi__l3_main_2 = {
- 	.master		= &omap44xx_hsi_hwmod,
-@@ -1797,6 +1806,79 @@ static struct omap_hwmod omap44xx_dss_venc_hwmod = {
- };
- 
- /*
-+ * 'fdif' class
-+ * face detection hw accelerator module
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
-+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
-+
-+static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
-+	.name	= "fdif",
-+	.sysc	= &omap44xx_fdif_sysc,
-+};
-+
-+/* fdif */
-+static struct omap_hwmod_irq_info omap44xx_fdif_irqs[] = {
-+	{ .irq = 69 + OMAP44XX_IRQ_GIC_START },
-+	{ .irq = -1 }
-+};
-+
-+/* fdif master ports */
-+static struct omap_hwmod_ocp_if *omap44xx_fdif_masters[] = {
-+	&omap44xx_fdif__l3_main_2,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_fdif_addrs[] = {
-+	{
-+		.pa_start	= 0x4a10a000,
-+		.pa_end		= 0x4a10a1ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+	{ }
-+};
-+
-+/* l4_cfg -> fdif */
-+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__fdif = {
-+	.master		= &omap44xx_l4_cfg_hwmod,
-+	.slave		= &omap44xx_fdif_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_fdif_addrs,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* fdif slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
-+	&omap44xx_l4_cfg__fdif,
-+};
-+
-+static struct omap_hwmod omap44xx_fdif_hwmod = {
-+	.name		= "fdif",
-+	.class		= &omap44xx_fdif_hwmod_class,
-+	.clkdm_name	= "iss_clkdm",
-+	.mpu_irqs	= omap44xx_fdif_irqs,
-+	.main_clk	= "fdif_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP4_CM_CAM_FDIF_CLKCTRL_OFFSET,
-+			.context_offs = OMAP4_RM_CAM_FDIF_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_fdif_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_fdif_slaves),
-+	.masters	= omap44xx_fdif_masters,
-+	.masters_cnt	= ARRAY_SIZE(omap44xx_fdif_masters),
-+};
-+
-+/*
-  * 'gpio' class
-  * general purpose io module
-  */
-@@ -5327,6 +5409,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	&omap44xx_dss_rfbi_hwmod,
- 	&omap44xx_dss_venc_hwmod,
- 
-+	/* fdif class */
-+	&omap44xx_fdif_hwmod,
-+
- 	/* gpio class */
- 	&omap44xx_gpio1_hwmod,
- 	&omap44xx_gpio2_hwmod,
--- 
-1.7.7.3
+It would be preferable for new implementations to get this right -
+ensure that sched_clock() is operable at the init_early machine
+callback.
