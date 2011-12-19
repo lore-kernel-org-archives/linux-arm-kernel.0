@@ -1,68 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Dec 2011 09:35:19 -0800
-Subject: buggy usage of pm_idle by omap1 code
-In-Reply-To: <alpine.LFD.2.02.1112162208390.2907@xanadu.home>
-References: <alpine.LFD.2.02.1112162208390.2907@xanadu.home>
-Message-ID: <20111219173518.GH6464@atomide.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Mon, 19 Dec 2011 23:07:40 +0530
+Subject: [GIT PULL] ARM: OMAP: I2C: prepare to use hwmod reset in driver
+In-Reply-To: <4EEF6714.2040208@ti.com>
+References: <alpine.DEB.2.00.1112160254320.12660@utopia.booyaka.com>
+ <20111216195002.GL32251@atomide.com>
+ <alpine.DEB.2.00.1112161314180.12660@utopia.booyaka.com>
+ <20111216204123.GM32251@atomide.com>
+ <alpine.DEB.2.00.1112161357250.12660@utopia.booyaka.com>
+ <20111217002409.GB6464@atomide.com> <4EED9DD4.3020506@ti.com>
+ <4EEF6714.2040208@ti.com>
+Message-ID: <4EEF7664.3000203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [111216 18:53]:
-> 
-> I just noticed in mach-omap1/cpu.c:omap_pm_prepare() that the function 
-> pointer pm_idle is explicitly set to NULL for some vague reason.  
-> However this pointer is unconditionally dereferenced in 
-> kernel/process.c:cpu_idle().  This is just a oops waiting to happen.  
-> And if it doesn't happen in practice, then the code in omap_pm_prepare() 
-> must be useless in addition to being wrong.
+On Monday 19 December 2011 10:02 PM, Cousson, Benoit wrote:
+> Hi Shubhro,
+>
+> On 12/18/2011 9:01 AM, Shubhrajyoti wrote:
+>
+> [...]
+>
+>> The driver does a reset in the error path.
+>> Since we are not supposed to access the sysc reg the function is needed.
+>
+> I'm just wondering what will happen to the driver if this callback is
+> not provided during the device creation? This is what will happen
+> during DT boot for example?
+>
+> Is it a mandatory function?
+This is used in the recovery mechanism in case of errors like some one
+holding the bus and not releasing it etc.
 
-Good catch. Here's a patch to deal with that issue, want to take this
-into your idle series? I'll try out your idle series today at some
-point.
-
-Regards,
-
-Tony
-
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 19 Dec 2011 09:11:11 -0800
-Subject: [PATCH] ARM: OMAP1: Fix pm_idle during suspend
-
-Commit 9ccdac3662dbf3c75e8f8851a214bdf7d365a4bd ([ARM] idle:
-clean up pm_idle calling, obey hlt_counter) removed a check
-for NULL pm_idle.
-
-On omap1 the system hits an equivalent of suspend during idle.
-If we are suspending, we need to make sure so we don't call
-omap1_pm_idle during the suspend process.
-
-Fix this by setting the pm_idle function to a an empty
-function while suspending.
-
-Reported-by: Nicolas Pitre <nico@fluxnic.net>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
-index 89ea20c..b551a62 100644
---- a/arch/arm/mach-omap1/pm.c
-+++ b/arch/arm/mach-omap1/pm.c
-@@ -584,6 +584,9 @@ static void omap_pm_init_proc(void)
- #endif /* DEBUG && CONFIG_PROC_FS */
- 
- static void (*saved_idle)(void) = NULL;
-+static void omap1_dummy_idle(void)
-+{
-+}
- 
- /*
-  *	omap_pm_prepare - Do preliminary suspend work.
-@@ -593,7 +596,7 @@ static int omap_pm_prepare(void)
- {
- 	/* We cannot sleep in idle until we have resumed */
- 	saved_idle = pm_idle;
--	pm_idle = NULL;
-+	pm_idle = omap1_dummy_idle;
- 
- 	return 0;
- }
+>
+> Thanks,
+> Benoit
