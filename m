@@ -1,50 +1,49 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 19 Dec 2011 14:25:25 -0500 (EST)
-Subject: [PATCH 00/20] arch_idle() cleanup and mach/system.h removal
-In-Reply-To: <20111219185706.GG2376@gallagher>
-References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
- <20111219185706.GG2376@gallagher>
-Message-ID: <alpine.LFD.2.02.1112191424390.2907@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Dec 2011 11:42:49 -0800
+Subject: [GIT PULL] Borderline fixes for v3.2-rc6
+Message-ID: <20111219194249.GO6464@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Dec 2011, Jamie Iles wrote:
+Hi Arnd & Olof,
 
-> Hi Nicolas,
-> 
-> On Mon, Dec 19, 2011 at 04:47:29AM -0500, Nicolas Pitre wrote:
-> > This is the logical continuation of the arch_reset() work that Russell did
-> > and therefore this must be applied on top of Russell's "reset" branch.
-> > 
-> > Most arch_idle() implementations are simply a call to cpu_do_idle() and
-> > can be eliminated in favor of a common call.  However, some platforms
-> > require special idle handling and the arm_pm_idle hook is made available
-> > for those cases.
-> > 
-> > Why "arm_pm_idle"?  Because there is already a generic "pm_idle", but its
-> > calling convention is rather awkward with regard to interrupts, so the
-> > default "pm_idle" handler will call arm_pm_idle if it is non null, or
-> > cpu_do_idle otherwise.  The generic pm_idle hook still can be overriden
-> > as before.
-> > 
-> > This series is therefore meant to be functionally a big no-op i.e.
-> > everything should just behave as before, despite having more than 1000
-> > lines of code and 55 files removed in the end.
-> 
-> Tested on picoxcell, works great.
-> 
-> Acked-and-tested-by: Jamie Iles <jamie@jamieiles.com>
+Here are two fixes that could potentially go into v3.2 -rc cycle.
 
-Great!
+One fixes a harmless but annoying warning that happens on omap 34xx
+processors during boot. The other one fixes booting on pretty rare
+secure mode development board, but that's fixed in "features that
+never worked earlier either" style.
 
-> btw,
-> 
-> > [PATCH 20/20] ARM: big removal of now unused arch_reset()
-> 
-> I guess this should be "ARM: big removal of now unused mach/system.h" or 
-> similar?
+We can surely wait on these fixes, but if you have something going
+upstream anyways, then these might be worth considering too.
 
-Indeed!
+I'll post a following pull request for fixes-non-critical-part2
+that is based on this one, so no need to pull in this one in case
+you're not sending any more fixes for the -rc cycle:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-hwmod
+
+Regards,
+
+Tony
 
 
-Nicolas
+The following changes since commit e5fe29c7198a1f6616286dfc8602a69da165cb3f:
+  Felipe Contreras (1):
+        ARM: OMAP: rx51: fix USB
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-hwmod
+
+Aaro Koskinen (1):
+      ARM: OMAP: hwmod data: fix the panic on Nokia RM-680 during boot
+
+Felipe Contreras (1):
+      ARM: OMAP: hwmod data: fix iva and mailbox hwmods for OMAP 3
+
+Tony Lindgren (1):
+      Merge branch 'hwmod_data_fixes_3.2rc' of git://git.pwsan.com/linux-2.6 into fixes-hwmod
+
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   18 +++++++++++++-----
+ 1 files changed, 13 insertions(+), 5 deletions(-)
