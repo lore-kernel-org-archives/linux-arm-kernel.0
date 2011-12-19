@@ -1,32 +1,22 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 19 Dec 2011 11:01:58 -0700
-Subject: [PATCH 2/2] arm/tegra: Fix section mismatch errors in tegra30 pinmux
-In-Reply-To: <1324317718-24464-1-git-send-email-swarren@nvidia.com>
-References: <1324317718-24464-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1324317718-24464-3-git-send-email-swarren@nvidia.com>
+Date: Mon, 19 Dec 2011 11:01:56 -0700
+Subject: [PATCH 0/2] arm/tegra: Fix section mismatch errors in pinmux
+Message-ID: <1324317718-24464-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tegra30_pinmux_init() is called from the pinmux's probe() function, and
-hence should be __devinit not __init.
+Patches in Tegra's for-3.3/soc branch introduce some section mismatch
+errors when building with CONFIG_DEBUG_SECTION_MISMATCH=y. This series
+fixes them. I patched each file separately in case you want to squash
+these into the original patches.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
+tegra20: 6996e08 arm/tegra: prepare pinmux code for multiple tegra variants
+tegra30: 241682c arm/tegra: pinmux tables and definitions for tegra30
+
+Stephen Warren (2):
+  arm/tegra: Fix section mismatch errors in tegra20 pinmux
+  arm/tegra: Fix section mismatch errors in tegra30 pinmux
+
+ arch/arm/mach-tegra/pinmux-tegra20-tables.c |    2 +-
  arch/arm/mach-tegra/pinmux-tegra30-tables.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/pinmux-tegra30-tables.c b/arch/arm/mach-tegra/pinmux-tegra30-tables.c
-index 8b6db9a..14fc0e4 100644
---- a/arch/arm/mach-tegra/pinmux-tegra30-tables.c
-+++ b/arch/arm/mach-tegra/pinmux-tegra30-tables.c
-@@ -364,7 +364,7 @@ static const struct tegra_pingroup_desc tegra_soc_pingroups[TEGRA_MAX_PINGROUP]
- 	PINGROUP(HDMI_CEC,	  SYS,      CEC,	RSVD1,	    RSVD2,	RSVD3,	    RSVD,	INPUT,	0x33e0),
- };
- 
--void __init tegra30_pinmux_init(const struct tegra_pingroup_desc **pg,
-+void __devinit tegra30_pinmux_init(const struct tegra_pingroup_desc **pg,
- 		int *pg_max, const struct tegra_drive_pingroup_desc **pgdrive,
- 		int *pgdrive_max)
- {
--- 
-1.7.0.4
+ 2 files changed, 2 insertions(+), 2 deletions(-)
