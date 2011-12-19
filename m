@@ -1,39 +1,105 @@
-From: jason.chen@linaro.org (Jason Chen)
-Date: Mon, 19 Dec 2011 11:23:28 +0800
-Subject: [PATCH] ARM:imx:fix pwm period value
-Message-ID: <1324265008-22866-1-git-send-email-jason.chen@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 19 Dec 2011 11:49:03 +0800
+Subject: [PATCH 1/2] imx: Add save/restore functions for UART control regs
+In-Reply-To: <1324229655-5538-1-git-send-email-dirk.behme@gmail.com>
+References: <1324229655-5538-1-git-send-email-dirk.behme@gmail.com>
+Message-ID: <20111219034902.GC4962@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to imx pwm RM, the real period value should be
-PERIOD value in PWMPR plus 2.
+On Sun, Dec 18, 2011 at 06:34:14PM +0100, Dirk Behme wrote:
+> Factor out the uart save/restore functionality instead of
+> having the same code several times in the driver.
+> 
+> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+> CC: Saleem Abdulrasool <compnerd@compnerd.org>
+> CC: Sascha Hauer <s.hauer@pengutronix.de>
+> CC: Fabio Estevam <festevam@gmail.com>
+> CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> CC: linux-serial at vger.kernel.org
+> ---
+>  drivers/tty/serial/imx.c |   38 +++++++++++++++++++++++++++++++-------
+>  1 files changed, 31 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 163fc90..6a01c2a 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -260,6 +260,31 @@ static inline int is_imx21_uart(struct imx_port *sport)
+>  }
+>  
+>  /*
+> + * Save and restore functions for UCR1, UCR2 and UCR3 registers
+> + */
+> +static void imx_console_mode(struct uart_port *port,
 
-PWMO (Hz) = PCLK(Hz) / (period +2)
+Function name imx_console_mode seems not like a couple with
+imx_console_restore.  And I guess something like
+imx_port_ucrs_save[restore] would be better?
 
-Signed-off-by: Jason Chen <jason.chen@linaro.org>
----
- arch/arm/plat-mxc/pwm.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+> +			     unsigned int *ucr1,
+> +			     unsigned int *ucr2,
+> +			     unsigned int *ucr3)
 
-diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-index 6b78490..0b112d2 100644
---- a/arch/arm/plat-mxc/pwm.c
-+++ b/arch/arm/plat-mxc/pwm.c
-@@ -78,6 +78,15 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 		do_div(c, period_ns);
- 		duty_cycles = c;
- 
-+		/*
-+		 * according to imx pwm RM, the real period value should be
-+		 * PERIOD value in PWMPR plus 2.
-+		 */
-+		if (period_cycles > 2)
-+			period_cycles -= 2;
-+		else
-+			period_cycles = 0;
-+
- 		writel(duty_cycles, pwm->mmio_base + MX3_PWMSAR);
- 		writel(period_cycles, pwm->mmio_base + MX3_PWMPR);
- 
--- 
-1.7.4.1
+Can we define something like 'struct imx_port_ucrs' to contains these?
+
+Regards,
+Shawn
+
+> +{
+> +	/* save control registers */
+> +	*ucr1 = readl(port->membase + UCR1);
+> +	*ucr2 = readl(port->membase + UCR2);
+> +	*ucr3 = readl(port->membase + UCR3);
+> +}
+> +
+> +static void imx_console_restore(struct uart_port *port,
+> +				unsigned int ucr1,
+> +				unsigned int ucr2,
+> +				unsigned int ucr3)
+> +{
+> +	/* restore control registers */
+> +	writel(ucr1, port->membase + UCR1);
+> +	writel(ucr2, port->membase + UCR2);
+> +	writel(ucr3, port->membase + UCR3);
+> +}
+> +
+> +/*
+>   * Handle any change of modem status signal since we were last called.
+>   */
+>  static void imx_mctrl_check(struct imx_port *sport)
+> @@ -1118,13 +1143,13 @@ static void
+>  imx_console_write(struct console *co, const char *s, unsigned int count)
+>  {
+>  	struct imx_port *sport = imx_ports[co->index];
+> -	unsigned int old_ucr1, old_ucr2, ucr1;
+> +	unsigned int old_ucr1, old_ucr2, old_ucr3, ucr1;
+>  
+>  	/*
+> -	 *	First, save UCR1/2 and then disable interrupts
+> +	 *	First, save UCR1/2/3 and then disable interrupts
+>  	 */
+> -	ucr1 = old_ucr1 = readl(sport->port.membase + UCR1);
+> -	old_ucr2 = readl(sport->port.membase + UCR2);
+> +	imx_console_mode(&sport->port, &old_ucr1, &old_ucr2, &old_ucr3);
+> +	ucr1 = old_ucr1;
+>  
+>  	if (is_imx1_uart(sport))
+>  		ucr1 |= IMX1_UCR1_UARTCLKEN;
+> @@ -1139,12 +1164,11 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+>  
+>  	/*
+>  	 *	Finally, wait for transmitter to become empty
+> -	 *	and restore UCR1/2
+> +	 *	and restore UCR1/2/3
+>  	 */
+>  	while (!(readl(sport->port.membase + USR2) & USR2_TXDC));
+>  
+> -	writel(old_ucr1, sport->port.membase + UCR1);
+> -	writel(old_ucr2, sport->port.membase + UCR2);
+> +	imx_console_restore(&sport->port, old_ucr1, old_ucr2, old_ucr3);
+>  }
+>  
+>  /*
+> -- 
+> 1.7.7.4
