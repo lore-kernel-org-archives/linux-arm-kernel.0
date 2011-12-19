@@ -1,171 +1,52 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 19 Dec 2011 14:12:20 -0700 (MST)
-Subject: [PATCH 3/6] OMAP: PM: register to the per-device PM QoS framework
-In-Reply-To: <1323874304-5001-4-git-send-email-j-pihet@ti.com>
-References: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
- <1323874304-5001-4-git-send-email-j-pihet@ti.com>
-Message-ID: <alpine.DEB.2.00.1112191405310.12660@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Dec 2011 21:28:47 +0000
+Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
+In-Reply-To: <201112192205.25806.marek.vasut@gmail.com>
+References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
+ <201112192154.25310.marek.vasut@gmail.com>
+ <20111219210317.GI14542@n2100.arm.linux.org.uk>
+ <201112192205.25806.marek.vasut@gmail.com>
+Message-ID: <20111219212847.GK14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Wed, 14 Dec 2011, jean.pihet at newoldbits.com wrote:
-
-> From: Jean Pihet <j-pihet@ti.com>
+On Mon, Dec 19, 2011 at 10:05:25PM +0100, Marek Vasut wrote:
+> > On Mon, Dec 19, 2011 at 09:54:25PM +0100, Marek Vasut wrote:
+> > > > So, in summary, you have everything you require to fix it outside the
+> > > > driver.  You just have to decide which of the two options you want to
+> > > > proceed with, and actually (and finally) do it instead of endlessly
+> > > > procrastinating and waiting for more and more bug reports (which is
+> > > > exactly what has happened so far.)
+> > > 
+> > > What the hell, I just recently found this bug and I submitted a patch
+> > > right away! What are you complaining about?!
+> > 
+> > If you want to take that attitude to my attempt to help you understand
+> > the problem and see solutions, I'll ignore you permanently for being an
+> > absolute twit.
 > 
-> Implement the devices wake-up latency constraints using the global
-> device PM QoS notification handler which applies the constraints to the
-> underlying layer by calling the corresponding function at hwmod level.
+> Go ahead, but you accused me of procrastinating and waiting even if the first 
+> thing I did when I saw the bug was start solving it. That's just insane!
 > 
-> Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using wake-up
-> latency constraints on MPU, CORE and PER.
+> > I'm not going to spend time giving a detailed explaination
+> > about the background and options over something to only then have it
+> > immediately shoved back in my face with such a response.
 > 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
+> I consider my response to the last part of your email appropriate.
 
-I've modified this patch to work with omap_devices that contain multiple 
-hwmods, and to move the code to the mach-omap2/omap_device.c code, which 
-seems to make more sense.  Since the hwmod set-constraint and 
-remove-constraint functions are now split, this code also must determine 
-which one to call.
+Sorry, it wasn't directed personally at you, but to the entire MXS
+community.  The facts over this are:
 
-- Paul
+1. This problem has been known about since October.
+2. It's been discussed several times - every time along the same lines.
+3. There is zero apparant progress on the issue.
 
-From: Jean Pihet <j-pihet@ti.com>
-Date: Sun, 18 Dec 2011 16:42:07 -0700
-Subject: [PATCH] ARM: OMAP: omap_device: register to the per-device PM QoS
- framework
+Here's two of the discussions over it, where I've said exactly the same
+thing:
 
-Implement the devices wake-up latency constraints using the global
-device PM QoS notification handler which applies the constraints to the
-underlying layer by calling the corresponding function at hwmod level.
+http://lists.arm.linux.org.uk/lurker/thread/20111018.173744.46c4bd76.en.html
+http://lists.arm.linux.org.uk/lurker/thread/20111123.183640.222b05cf.en.html
 
-Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using wake-up
-latency constraints on MPU, CORE and PER.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-[paul at pwsan.com: modified to work with omap_devices with large numbers of
- hwmods; moved code to mach-omap2/omap_device.c; added documentation; use
- notifier return codes]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/plat-omap/omap_device.c |   74 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 74 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index e8d9869..b2c18b7 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -2,6 +2,7 @@
-  * omap_device implementation
-  *
-  * Copyright (C) 2009-2010 Nokia Corporation
-+ * Copyright (C) 2011 Texas Instruments, Inc.
-  * Paul Walmsley, Kevin Hilman
-  *
-  * Developed in collaboration with (alphabetical order): Benoit
-@@ -88,6 +89,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/notifier.h>
-+#include <linux/pm_qos.h>
- 
- #include <plat/omap_device.h>
- #include <plat/omap_hwmod.h>
-@@ -409,6 +411,67 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
- 	return NOTIFY_DONE;
- }
- 
-+/**
-+ * _omap_device_pm_qos_handler - interface to the per-device PM QoS framework
-+ * @nb: pointer to omap_device_pm_qos_nb (not used)
-+ * @new_value: new maximum wakeup latency constraint for @req->dev (in ?s)
-+ * @req: struct dev_pm_qos_request * passed by the Linux PM QoS code
-+ *
-+ * Called by the Linux core device PM QoS code to alter the maximum
-+ * wakeup latency constraint on a device.  If the underlying device is
-+ * an omap_device, then this code will pass the constraint on to the
-+ * underlying hwmods.  Returns -EINVAL if this code can't handle the
-+ * constraint for some reason, or passes along the return code from the
-+ * hwmod wakeup latency constraint functions.
-+ */
-+static int _omap_device_pm_qos_handler(struct notifier_block *nb,
-+				       unsigned long new_value,
-+				       void *req)
-+{
-+	struct omap_device *od;
-+	struct omap_hwmod *oh;
-+	struct platform_device *pdev;
-+	struct dev_pm_qos_request *dev_pm_qos_req = req;
-+	int ret = NOTIFY_OK;
-+	int r, i;
-+
-+	pr_debug("OMAP PM constraints: req at 0x%p, new_value=%lu\n",
-+		 req, new_value);
-+
-+	/* Look for the platform device for the constraint target device */
-+	pdev = to_platform_device(dev_pm_qos_req->dev);
-+
-+	/* Try to catch non platform devices */
-+	if (pdev->name == NULL) {
-+		pr_err("%s: Error: platform device for device %s not valid\n",
-+		       __func__, dev_name(dev_pm_qos_req->dev));
-+		return NOTIFY_DONE;
-+	}
-+
-+	/* Find the associated omap_device for dev */
-+	od = to_omap_device(pdev);
-+	if (od == NULL) {
-+		pr_err("%s: Error: no omap_device for device %s\n",
-+		       __func__, dev_name(dev_pm_qos_req->dev));
-+		return NOTIFY_DONE;
-+	}
-+
-+	pr_debug("OMAP PM constraints: req at 0x%p, dev=0x%p, new_value=%lu\n",
-+		 req, dev_pm_qos_req->dev, new_value);
-+
-+	for (i = 0; i < od->hwmods_cnt; i++) {
-+		oh = od->hwmods[i];
-+		if (new_value == PM_QOS_DEV_LAT_DEFAULT_VALUE)
-+			r = omap_hwmod_remove_wakeuplat_constraint(oh, dev_pm_qos_req);
-+		else
-+			r = omap_hwmod_set_wakeuplat_constraint(oh, dev_pm_qos_req, new_value);
-+
-+		if (!r)
-+			ret = NOTIFY_BAD;
-+	}
-+
-+	return ret;
-+}
- 
- /* Public functions for use by core code */
- 
-@@ -1135,13 +1198,24 @@ struct device omap_device_parent = {
- 	.parent         = &platform_bus,
- };
- 
-+static struct notifier_block omap_device_pm_qos_nb = {
-+	.notifier_call	= _omap_device_pm_qos_handler,
-+};
-+
- static struct notifier_block platform_nb = {
- 	.notifier_call = _omap_device_notifier_call,
- };
- 
- static int __init omap_device_init(void)
- {
-+	int ret;
-+
- 	bus_register_notifier(&platform_bus_type, &platform_nb);
-+
-+	ret = dev_pm_qos_add_global_notifier(&omap_device_pm_qos_nb);
-+	if (!ret)
-+		pr_err("omap_device: cannot add global notifier for dev PM QoS\n");
-+
- 	return device_register(&omap_device_parent);
- }
- core_initcall(omap_device_init);
--- 
-1.7.7.3
+So now, tell me - is this _finally_ going to get fixed in the MXS code,
+or is the previous discussion about converting stuff to spinlocks etc
+just going to be repeated yet again?
