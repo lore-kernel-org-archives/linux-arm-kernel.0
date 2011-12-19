@@ -1,36 +1,33 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 19 Dec 2011 12:08:05 +0800
-Subject: serial tty name
-In-Reply-To: <4EE8C16F.8060501@calxeda.com>
-References: <20111214144344.GA2090@richard-laptop>
- <4EE8C16F.8060501@calxeda.com>
-Message-ID: <20111219040804.GF4962@S2100-06.ap.freescale.net>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 19 Dec 2011 05:03:45 +0100
+Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
+In-Reply-To: <20111219032712.GB4962@S2100-06.ap.freescale.net>
+References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
+ <20111219032712.GB4962@S2100-06.ap.freescale.net>
+Message-ID: <201112190503.46668.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 09:31:59AM -0600, Rob Herring wrote:
-> Richard,
+> On Sun, Dec 18, 2011 at 03:06:13PM +0100, Marek Vasut wrote:
+> > The mutexes can't be safely used under certain circumstances. I noticed
+> > this
 > 
-> On 12/14/2011 08:43 AM, Richard Zhao wrote:
-> > How to map different uart port to ttymxc0 (take imx for example)?
-> > 
-> > In rootfs, it usually "getty ttymxc0"  to get
-> > serial console. And the rootfs may be shared by different boards.
-> > Traditionaly way is to set right platform device ID.
-> > 
-> > But with DT, UART2 always generate ttymxc1, UART3 for ttymxc2. You
-> > always needs to modify the getty command when your change another board.
-> > 
-> > Is there a way to fix it?
-> 
-> That's what the aliases are for.
-> 
-I understand it differently.  The aliases was introduced to help
-tty/serial driver identify the correct hardware port for given serial
-node from device tree.  (Ab)using it to fool 'console' setting may
-eventually confuse users, saying they will think the uart port on his
-board is UART0.
+> > issue during some network instability at home:
+> Yes, this is a known issue.  And there was some discussion[1] about
+> why mutex is needed.
 
--- 
-Regards,
-Shawn
+Thanks for pointing this out, I was unaware of it.
+
+> But I really have not thought about why we can
+> not use spinlock only, since using mutex only leads to the issue we
+> are seeing here, and using spinlock in enable/disable and mutex in
+> rate/parent will not work, because the mxs clocks have enable/disable
+> and rate/parent functions access the same register.  I know it's not
+> good to hold spinlock in rate/parent functions for a long time, but
+> do we have a way around rather than using spinlock for both sets of
+> functions?
+
+Yea, spinlock is not good either. On the other hand, is it really held for so 
+long ?
+
+M
