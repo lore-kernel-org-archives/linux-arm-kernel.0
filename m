@@ -1,102 +1,70 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 19 Dec 2011 10:55:48 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20111219105548.d30839e148800b38bc93d001@canb.auug.org.au>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 19 Dec 2011 00:44:31 +0000
+Subject: [PATCH 1/2] gpio: add a driver for the Synopsys DesignWare APB
+ GPIO block
+In-Reply-To: <CACRpkdYu7HCBdAzqNr1pwZMgvZFyBYpcJXYo-RUx5R-U3CJ1BA@mail.gmail.com>
+References: <1324203229-15571-1-git-send-email-jamie@jamieiles.com>
+ <CACRpkdYu7HCBdAzqNr1pwZMgvZFyBYpcJXYo-RUx5R-U3CJ1BA@mail.gmail.com>
+Message-ID: <20111219004431.GE2376@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Linus,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-imx/mach-imx6q.c between commit 1237f0f6ecf6 ("ARM: 7198/1:
-arm/imx6: add restart support for imx6q") from the arm tree and commit
-477fce49aef4 ("arm/imx6q-sabrelite: add enet phy ksz9021rn fixup") from
-the arm-soc tree.
+On Sun, Dec 18, 2011 at 11:01:38PM +0100, Linus Walleij wrote:
+> On Sun, Dec 18, 2011 at 11:13 AM, Jamie Iles <jamie@jamieiles.com> wrote:
+> 
+> > The Synopsys DesignWare block is used in some ARM devices (picoxcell)
+> > and can be configured to provide multiple banks of GPIO pins. ?The first
+> > bank (A) can also provide IRQ capabilities.
+> 
+> Overall this is looking good.
+> 
+> Here is a problem (I think):
+> 
+> > +static int dwapb_irq_set_type(struct irq_data *d, u32 type)
+> > +{
+> > + ? ? ? struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> > + ? ? ? struct dwapb_gpio *gpio = gc->private;
+> > + ? ? ? int bit = d->hwirq;
+> > + ? ? ? unsigned long level, polarity;
+> > +
+> > + ? ? ? if (type & ~(IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING |
+> > + ? ? ? ? ? ? ? ? ? ?IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW))
+> > + ? ? ? ? ? ? ? return -EINVAL;
+> > +
+> > + ? ? ? level = readl(gpio->regs + INT_TYPE_REG_OFFS);
+> > + ? ? ? polarity = readl(gpio->regs + INT_POLARITY_REG_OFFS);
+> > +
+> > + ? ? ? if (type & IRQ_TYPE_EDGE_RISING) {
+> > + ? ? ? ? ? ? ? level |= (1 << bit);
+> > + ? ? ? ? ? ? ? polarity |= (1 << bit);
+> > + ? ? ? } else if (type & IRQ_TYPE_EDGE_FALLING) {
+> > + ? ? ? ? ? ? ? level |= (1 << bit);
+> > + ? ? ? ? ? ? ? polarity &= ~(1 << bit);
+> 
+> So what if you get request for *both* falling and rising edges?
+> 
+> This is not uncommon at all, for example a GPIO which detecs
+> MMC card insertions and removals like drivers/host/mmc/mmci.c
+> will want interrupts on both edges since we want to change state
+> whenever the card is inserted *or* removed.
+> 
+> If you check drivers/gpio/gpio-u300.c you can see how I handled
+> this on another hardware where triggering on falling and rising
+> edges was a binary choice and thus mutually exclusive: I toggle
+> for each interrupt.
+> 
+> See u300_toggle_trigger(), u300_gpio_irq_type().
+> 
+> So either you do something like that, or you detect both set
+> and return an error, else the poor caller will just get falling
+> edges in this driver...
 
-Just context changes.  I fixed it up (see below) and can carry the fix as
-necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Hmm, I hadn't thought of that.  I've had a quick once-over your u300 
+gpio driver and that looks pretty neat.  I'll give that a go over the 
+next day or two and repost.
 
-diff --cc arch/arm/mach-imx/mach-imx6q.c
-index 05b49bb,bee6334..0000000
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@@ -16,9 -14,10 +16,11 @@@
-  #include <linux/irq.h>
-  #include <linux/irqdomain.h>
-  #include <linux/of.h>
- +#include <linux/of_address.h>
-  #include <linux/of_irq.h>
-  #include <linux/of_platform.h>
-+ #include <linux/phy.h>
-+ #include <linux/micrel_phy.h>
-  #include <asm/hardware/cache-l2x0.h>
-  #include <asm/hardware/gic.h>
-  #include <asm/mach/arch.h>
-@@@ -26,38 -25,27 +28,57 @@@
-  #include <mach/common.h>
-  #include <mach/hardware.h>
-  
- +void imx6q_restart(char mode, const char *cmd)
- +{
- +	struct device_node *np;
- +	void __iomem *wdog_base;
- +
- +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
- +	wdog_base = of_iomap(np, 0);
- +	if (!wdog_base)
- +		goto soft;
- +
- +	imx_src_prepare_restart();
- +
- +	/* enable wdog */
- +	writew_relaxed(1 << 2, wdog_base);
- +	/* write twice to ensure the request will not get ignored */
- +	writew_relaxed(1 << 2, wdog_base);
- +
- +	/* wait for reset to assert ... */
- +	mdelay(500);
- +
- +	pr_err("Watchdog reset failed to assert reset\n");
- +
- +	/* delay to allow the serial port to show the message */
- +	mdelay(50);
- +
- +soft:
- +	/* we'll take a jump through zero as a poor second */
- +	soft_restart(0);
- +}
- +
-+ /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
-+ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
-+ {
-+ 	/* min rx data delay */
-+ 	phy_write(phydev, 0x0b, 0x8105);
-+ 	phy_write(phydev, 0x0c, 0x0000);
-+ 
-+ 	/* max rx/tx clock delay, min rx/tx control delay */
-+ 	phy_write(phydev, 0x0b, 0x8104);
-+ 	phy_write(phydev, 0x0c, 0xf0f0);
-+ 	phy_write(phydev, 0x0b, 0x104);
-+ 
-+ 	return 0;
-+ }
-+ 
-  static void __init imx6q_init_machine(void)
-  {
-+ 	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
-+ 		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
-+ 					   ksz9021rn_phy_fixup);
-+ 
-  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-  
-  	imx6q_pm_init();
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111219/6871fb42/attachment.sig>
+Thanks for the pointer!
+
+Jamie
