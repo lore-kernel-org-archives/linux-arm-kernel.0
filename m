@@ -1,42 +1,102 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 19 Dec 2011 18:57:06 +0000
-Subject: [PATCH 00/20] arch_idle() cleanup and mach/system.h removal
-In-Reply-To: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Dec 2011 11:07:37 -0800
+Subject: [PATCH 01/20] ARM: clean up idle handlers
+In-Reply-To: <1324288069-21940-2-git-send-email-nico@fluxnic.net>
 References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
-Message-ID: <20111219185706.GG2376@gallagher>
+ <1324288069-21940-2-git-send-email-nico@fluxnic.net>
+Message-ID: <20111219190736.GK6464@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On Mon, Dec 19, 2011 at 04:47:29AM -0500, Nicolas Pitre wrote:
-> This is the logical continuation of the arch_reset() work that Russell did
-> and therefore this must be applied on top of Russell's "reset" branch.
+* Nicolas Pitre <nico@fluxnic.net> [111219 01:20]:
+> Let's factor out the need_resched() check instead of having it duplicated
+> in every pm_idle implementations to avoid inconsistencies (omap2_pm_idle
+> was missing it already).
 > 
-> Most arch_idle() implementations are simply a call to cpu_do_idle() and
-> can be eliminated in favor of a common call.  However, some platforms
-> require special idle handling and the arm_pm_idle hook is made available
-> for those cases.
+> The forceful re-enablement of IRQs after pm_idle has returned can go.
+> The warning certainly doesn't trigger for existing users.  Similar for
+> the redundant local_irq_disable() call in the OMAP implementations.
 > 
-> Why "arm_pm_idle"?  Because there is already a generic "pm_idle", but its
-> calling convention is rather awkward with regard to interrupts, so the
-> default "pm_idle" handler will call arm_pm_idle if it is non null, or
-> cpu_do_idle otherwise.  The generic pm_idle hook still can be overriden
-> as before.
+> To get rid of the pm_idle calling convention oddity, let's introduce
+> arm_pm_idle() allowing for the local_irq_enable() to be factored out
+> from SOC specific implementations. The default pm_idle function becomes
+> a wrapper for arm_pm_idle and it takes care of enabling IRQs closer to
+> where they are initially disabled.
 > 
-> This series is therefore meant to be functionally a big no-op i.e.
-> everything should just behave as before, despite having more than 1000
-> lines of code and 55 files removed in the end.
+> And finally move the comment explaining the reason for that turning off
+> of IRQs to a more proper location.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Tested on picoxcell, works great.
+For omaps:
 
-Acked-and-tested-by: Jamie Iles <jamie@jamieiles.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
 
-btw,
+For pm44xx.c the following merge will be needed for omap/omap4 branch
+in arm-soc tree:
 
-> [PATCH 20/20] ARM: big removal of now unused arch_reset()
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@@ -16,10 -17,10 +17,12 @@@
+  #include <linux/err.h>
+  #include <linux/slab.h>
+  
+ +#include <asm/system.h>
+ +
+  #include "common.h"
++ #include "clockdomain.h"
+  #include "powerdomain.h"
++ #include "pm.h"
+  
+  struct power_state {
+  	struct powerdomain *pwrdm;
+@@@ -85,11 -161,30 +163,24 @@@ static int __init pwrdms_setup(struct p
+  	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
+  	if (!pwrst)
+  		return -ENOMEM;
++ 
+  	pwrst->pwrdm = pwrdm;
+- 	pwrst->next_state = PWRDM_POWER_ON;
++ 	pwrst->next_state = PWRDM_POWER_RET;
+  	list_add(&pwrst->node, &pwrst_list);
+  
+- 	return pwrdm_set_next_pwrst(pwrst->pwrdm, pwrst->next_state);
++ 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
++ }
++ 
++ /**
++  * omap_default_idle - OMAP4 default ilde routine.'
++  *
++  * Implements OMAP4 memory, IO ordering requirements which can't be addressed
++  * with default arch_idle() hook. Used by all CPUs with !CONFIG_CPUIDLE and
++  * by secondary CPU with CONFIG_CPUIDLE.
++  */
++ static void omap_default_idle(void)
++ {
+ -	local_irq_disable();
+ -	local_fiq_disable();
+ -
++ 	omap_do_wfi();
+ -
+ -	local_fiq_enable();
+ -	local_irq_enable();
+  }
+  
+  /**
+@@@ -117,6 -255,11 +251,11 @@@ static int __init omap4_pm_init(void
+  	suspend_set_ops(&omap_pm_ops);
+  #endif /* CONFIG_SUSPEND */
+  
++ 	/* Overwrite the default arch_idle() */
+ -	pm_idle = omap_default_idle;
+++	arm_pm_idle = omap_default_idle;
++ 
++ 	omap4_idle_init();
++ 
+  err2:
+  	return ret;
+  }
 
-I guess this should be "ARM: big removal of now unused mach/system.h" or 
-similar?
+Regards,
 
-Jamie
+Tony
