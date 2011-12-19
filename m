@@ -1,50 +1,41 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 19 Dec 2011 04:47:47 -0500
-Subject: [PATCH 18/20] ARM: mach-tegra: properly disable CPU idle call
+Date: Mon, 19 Dec 2011 04:47:48 -0500
+Subject: [PATCH 19/20] ARM: substitute arch_idle()
 In-Reply-To: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
 References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1324288069-21940-19-git-send-email-nico@fluxnic.net>
+Message-ID: <1324288069-21940-20-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/mach-tegra/common.c              |    3 ++-
- arch/arm/mach-tegra/include/mach/system.h |    1 +
- 2 files changed, 3 insertions(+), 1 deletions(-)
+Now that all implementations of arch_idle() are equivalent to cpu_do_idle()
+we can just use the later directly and stop including mach/system.h.
 
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 20f396d740..ca0a297b72 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -25,7 +25,6 @@
- #include <asm/hardware/cache-l2x0.h>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/kernel/process.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index bf904624c5..4a04b2d661 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -61,8 +61,6 @@ extern void setup_mm_for_reboot(void);
  
- #include <mach/iomap.h>
+ static volatile int hlt_counter;
+ 
 -#include <mach/system.h>
- 
- #include "board.h"
- #include "clock.h"
-@@ -74,6 +73,8 @@ static void __init tegra_init_cache(void)
- 
- void __init tegra_init_early(void)
+-
+ void disable_hlt(void)
  {
-+	disable_hlt();  /* idle WFI usage needs to be confirmed */
-+
- 	tegra_init_fuse();
- 	tegra_init_clock();
- 	tegra_clk_init_from_table(common_clk_init_table);
-diff --git a/arch/arm/mach-tegra/include/mach/system.h b/arch/arm/mach-tegra/include/mach/system.h
-index a312988bf6..968ea2b052 100644
---- a/arch/arm/mach-tegra/include/mach/system.h
-+++ b/arch/arm/mach-tegra/include/mach/system.h
-@@ -23,6 +23,7 @@
- 
- static inline void arch_idle(void)
- {
-+	cpu_do_idle();
+ 	hlt_counter++;
+@@ -161,7 +159,7 @@ static void default_idle(void)
+ 	if (arm_pm_idle)
+ 		arm_pm_idle();
+ 	else
+-		arch_idle();
++		cpu_do_idle();
+ 	local_irq_enable();
  }
  
- #endif
 -- 
 1.7.7.1.431.g10b2a
