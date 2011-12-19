@@ -1,317 +1,148 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 19 Dec 2011 04:47:30 -0500
-Subject: [PATCH 01/20] ARM: clean up idle handlers
-In-Reply-To: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
-References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1324288069-21940-2-git-send-email-nico@fluxnic.net>
+Date: Mon, 19 Dec 2011 04:47:29 -0500
+Subject: [PATCH 00/20] arch_idle() cleanup and mach/system.h removal
+Message-ID: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's factor out the need_resched() check instead of having it duplicated
-in every pm_idle implementations to avoid inconsistencies (omap2_pm_idle
-was missing it already).
+This is the logical continuation of the arch_reset() work that Russell did
+and therefore this must be applied on top of Russell's "reset" branch.
 
-The forceful re-enablement of IRQs after pm_idle has returned can go.
-The warning certainly doesn't trigger for existing users.  Similar for
-the redundant local_irq_disable() call in the OMAP implementations.
+Most arch_idle() implementations are simply a call to cpu_do_idle() and
+can be eliminated in favor of a common call.  However, some platforms
+require special idle handling and the arm_pm_idle hook is made available
+for those cases.
 
-To get rid of the pm_idle calling convention oddity, let's introduce
-arm_pm_idle() allowing for the local_irq_enable() to be factored out
-from SOC specific implementations. The default pm_idle function becomes
-a wrapper for arm_pm_idle and it takes care of enabling IRQs closer to
-where they are initially disabled.
+Why "arm_pm_idle"?  Because there is already a generic "pm_idle", but its
+calling convention is rather awkward with regard to interrupts, so the
+default "pm_idle" handler will call arm_pm_idle if it is non null, or
+cpu_do_idle otherwise.  The generic pm_idle hook still can be overriden
+as before.
 
-And finally move the comment explaining the reason for that turning off
-of IRQs to a more proper location.
+This series is therefore meant to be functionally a big no-op i.e.
+everything should just behave as before, despite having more than 1000
+lines of code and 55 files removed in the end.
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/include/asm/system.h |    1 +
- arch/arm/kernel/process.c     |   23 +++++++++++++++--------
- arch/arm/mach-omap1/pm.c      |   19 ++++++-------------
- arch/arm/mach-omap2/pm24xx.c  |    5 ++---
- arch/arm/mach-omap2/pm34xx.c  |    7 +++----
- arch/arm/mach-omap2/pm44xx.c  |    2 ++
- arch/arm/mach-s5p64x0/cpu.c   |   16 +++++++---------
- 7 files changed, 36 insertions(+), 37 deletions(-)
+[PATCH 01/20] ARM: clean up idle handlers
+[PATCH 02/20] ARM: mach-s5pv210: use standard arch_idle()
+[PATCH 03/20] ARM: mach-s5pc100: use standard arch_idle()
+[PATCH 04/20] ARM: mach-exynos: use standard arch_idle()
+[PATCH 05/20] ARM: mach-at91: move special idle code out of line
+[PATCH 06/20] ARM: mach-clps711x: move special idle code out of line
+[PATCH 07/20] ARM: mach-ebsa110: move special idle code out of line
+[PATCH 08/20] ARM: mach-gemini: move special idle code out of line
+[PATCH 09/20] ARM: mach-h720x: move special idle code out of line
+[PATCH 10/20] ARM: s3c24xx: move special idle code to out of line
+[PATCH 11/20] ARM: plat-mxc: hook special idle handlers to
+[PATCH 12/20] ARM: mach-msm: hook special idle handlers to
+[PATCH 13/20] ARM: mach-ixp23xx: properly disable CPU idle call
+[PATCH 14/20] ARM: mach-ixp4xx: properly disable CPU idle call
+[PATCH 15/20] ARM: mach-shark: properly disable CPU idle call
+[PATCH 16/20] ARM: mach-w90x900: properly disable CPU idle call
+[PATCH 17/20] ARM: mach-s3c64xx: properly disable CPU idle call
+[PATCH 18/20] ARM: mach-tegra: properly disable CPU idle call
+[PATCH 19/20] ARM: substitute arch_idle()
+[PATCH 20/20] ARM: big removal of now unused arch_reset()
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 03775b14be..8f1adbbbed 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -102,6 +102,7 @@ extern void cpu_init(void);
- 
- void soft_restart(unsigned long);
- extern void (*arm_pm_restart)(char str, const char *cmd);
-+extern void (*arm_pm_idle)(void);
- 
- #define UDBG_UNDEFINED	(1 << 0)
- #define UDBG_SYSCALL	(1 << 1)
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index a92ca50f6f..bf904624c5 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -151,12 +151,16 @@ void cpu_idle_wait(void)
- EXPORT_SYMBOL_GPL(cpu_idle_wait);
- 
- /*
-- * This is our default idle handler.  We need to disable
-- * interrupts here to ensure we don't miss a wakeup call.
-+ * This is our default idle handler.
-  */
-+
-+void (*arm_pm_idle)(void);
-+
- static void default_idle(void)
- {
--	if (!need_resched())
-+	if (arm_pm_idle)
-+		arm_pm_idle();
-+	else
- 		arch_idle();
- 	local_irq_enable();
- }
-@@ -184,23 +188,26 @@ void cpu_idle(void)
- 				cpu_die();
- #endif
- 
-+			/*
-+			 * We need to disable interrupts here
-+			 * to ensure we don't miss a wakeup call.
-+			 */
- 			local_irq_disable();
- 			if (hlt_counter) {
- 				local_irq_enable();
- 				cpu_relax();
--			} else {
-+			} else if (!need_resched()) {
- 				stop_critical_timings();
- 				if (cpuidle_idle_call())
- 					pm_idle();
- 				start_critical_timings();
- 				/*
--				 * This will eventually be removed - pm_idle
--				 * functions should always return with IRQs
--				 * enabled.
-+				 * pm_idle functions should always
-+				 * return with IRQs enabled.
- 				 */
- 				WARN_ON(irqs_disabled());
-+			} else
- 				local_irq_enable();
--			}
- 		}
- 		leds_event(led_idle_end);
- 		tick_nohz_restart_sched_tick();
-diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
-index 89ea20ca0c..575950ef81 100644
---- a/arch/arm/mach-omap1/pm.c
-+++ b/arch/arm/mach-omap1/pm.c
-@@ -42,9 +42,10 @@
- #include <linux/sysfs.h>
- #include <linux/module.h>
- #include <linux/io.h>
-+#include <linux/atomic.h>
- 
-+#include <asm/system.h>
- #include <asm/irq.h>
--#include <linux/atomic.h>
- #include <asm/mach/time.h>
- #include <asm/mach/irq.h>
- 
-@@ -108,13 +109,7 @@ void omap1_pm_idle(void)
- 	__u32 use_idlect1 = arm_idlect1_mask;
- 	int do_sleep = 0;
- 
--	local_irq_disable();
- 	local_fiq_disable();
--	if (need_resched()) {
--		local_fiq_enable();
--		local_irq_enable();
--		return;
--	}
- 
- #if defined(CONFIG_OMAP_MPU_TIMER) && !defined(CONFIG_OMAP_DM_TIMER)
- #warning Enable 32kHz OS timer in order to allow sleep states in idle
-@@ -157,14 +152,12 @@ void omap1_pm_idle(void)
- 		omap_writel(saved_idlect1, ARM_IDLECT1);
- 
- 		local_fiq_enable();
--		local_irq_enable();
- 		return;
- 	}
- 	omap_sram_suspend(omap_readl(ARM_IDLECT1),
- 			  omap_readl(ARM_IDLECT2));
- 
- 	local_fiq_enable();
--	local_irq_enable();
- }
- 
- /*
-@@ -592,8 +585,8 @@ static void (*saved_idle)(void) = NULL;
- static int omap_pm_prepare(void)
- {
- 	/* We cannot sleep in idle until we have resumed */
--	saved_idle = pm_idle;
--	pm_idle = NULL;
-+	saved_idle = arm_pm_idle;
-+	arm_pm_idle = NULL;
- 
- 	return 0;
- }
-@@ -630,7 +623,7 @@ static int omap_pm_enter(suspend_state_t state)
- 
- static void omap_pm_finish(void)
- {
--	pm_idle = saved_idle;
-+	arm_pm_idle = saved_idle;
- }
- 
- 
-@@ -687,7 +680,7 @@ static int __init omap_pm_init(void)
- 		return -ENODEV;
- 	}
- 
--	pm_idle = omap1_pm_idle;
-+	arm_pm_idle = omap1_pm_idle;
- 
- 	if (cpu_is_omap7xx())
- 		setup_irq(INT_7XX_WAKE_UP_REQ, &omap_wakeup_irq);
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index ef8595c802..7903087182 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -34,6 +34,7 @@
- 
- #include <asm/mach/time.h>
- #include <asm/mach/irq.h>
-+#include <asm/system.h>
- #include <asm/mach-types.h>
- 
- #include <mach/irqs.h>
-@@ -251,7 +252,6 @@ static int omap2_can_sleep(void)
- 
- static void omap2_pm_idle(void)
- {
--	local_irq_disable();
- 	local_fiq_disable();
- 
- 	if (!omap2_can_sleep()) {
-@@ -268,7 +268,6 @@ static void omap2_pm_idle(void)
- 
- out:
- 	local_fiq_enable();
--	local_irq_enable();
- }
- 
- #ifdef CONFIG_SUSPEND
-@@ -488,7 +487,7 @@ static int __init omap2_pm_init(void)
- 	}
- 
- 	suspend_set_ops(&omap_pm_ops);
--	pm_idle = omap2_pm_idle;
-+	arm_pm_idle = omap2_pm_idle;
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index fa637dfdda..c4b3d7291b 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -32,6 +32,7 @@
- #include <trace/events/power.h>
- 
- #include <asm/suspend.h>
-+#include <asm/system.h>
- 
- #include <plat/sram.h>
- #include "clockdomain.h"
-@@ -494,13 +495,12 @@ int omap3_can_sleep(void)
- 
- static void omap3_pm_idle(void)
- {
--	local_irq_disable();
- 	local_fiq_disable();
- 
- 	if (!omap3_can_sleep())
- 		goto out;
- 
--	if (omap_irq_pending() || need_resched())
-+	if (omap_irq_pending())
- 		goto out;
- 
- 	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
-@@ -513,7 +513,6 @@ static void omap3_pm_idle(void)
- 
- out:
- 	local_fiq_enable();
--	local_irq_enable();
- }
- 
- #ifdef CONFIG_SUSPEND
-@@ -918,7 +917,7 @@ static int __init omap3_pm_init(void)
- 	suspend_set_ops(&omap_pm_ops);
- #endif /* CONFIG_SUSPEND */
- 
--	pm_idle = omap3_pm_idle;
-+	arm_pm_idle = omap3_pm_idle;
- 	omap3_idle_init();
- 
- 	/*
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 8edb015f56..b02124ce14 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -16,6 +16,8 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- 
-+#include <asm/system.h>
-+
- #include "common.h"
- #include "powerdomain.h"
- 
-diff --git a/arch/arm/mach-s5p64x0/cpu.c b/arch/arm/mach-s5p64x0/cpu.c
-index ecab40cf19..b776c2b167 100644
---- a/arch/arm/mach-s5p64x0/cpu.c
-+++ b/arch/arm/mach-s5p64x0/cpu.c
-@@ -27,6 +27,7 @@
- #include <asm/mach/irq.h>
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-+#include <asm/system.h>
- 
- #include <mach/hardware.h>
- #include <mach/map.h>
-@@ -89,15 +90,12 @@ static void s5p64x0_idle(void)
- {
- 	unsigned long val;
- 
--	if (!need_resched()) {
--		val = __raw_readl(S5P64X0_PWR_CFG);
--		val &= ~(0x3 << 5);
--		val |= (0x1 << 5);
--		__raw_writel(val, S5P64X0_PWR_CFG);
-+	val = __raw_readl(S5P64X0_PWR_CFG);
-+	val &= ~(0x3 << 5);
-+	val |= (0x1 << 5);
-+	__raw_writel(val, S5P64X0_PWR_CFG);
- 
--		cpu_do_idle();
--	}
--	local_irq_enable();
-+	cpu_do_idle();
- }
- 
- /*
-@@ -209,7 +207,7 @@ int __init s5p64x0_init(void)
- 	printk(KERN_INFO "S5P64X0(S5P6440/S5P6450): Initializing architecture\n");
- 
- 	/* set idle function */
--	pm_idle = s5p64x0_idle;
-+	arm_pm_idle = s5p64x0_idle;
- 
- 	return sysdev_register(&s5p64x0_sysdev);
- }
--- 
-1.7.7.1.431.g10b2a
+ arch/arm/include/asm/system.h                  |    1 +
+ arch/arm/kernel/process.c                      |   27 ++++++----
+ arch/arm/mach-at91/at91cap9.c                  |    8 +++
+ arch/arm/mach-at91/at91rm9200.c                |   10 ++++
+ arch/arm/mach-at91/at91sam9260.c               |    8 +++
+ arch/arm/mach-at91/at91sam9261.c               |    8 +++
+ arch/arm/mach-at91/at91sam9263.c               |    8 +++
+ arch/arm/mach-at91/at91sam9g45.c               |    7 +++
+ arch/arm/mach-at91/at91sam9rl.c                |    8 +++
+ arch/arm/mach-at91/at91x40.c                   |   12 ++++
+ arch/arm/mach-at91/include/mach/system.h       |   50 ------------------
+ arch/arm/mach-bcmring/include/mach/system.h    |   28 ----------
+ arch/arm/mach-clps711x/common.c                |   16 ++++++
+ arch/arm/mach-clps711x/include/mach/system.h   |   35 ------------
+ arch/arm/mach-cns3xxx/include/mach/system.h    |   25 ---------
+ arch/arm/mach-davinci/include/mach/system.h    |   21 -------
+ arch/arm/mach-dove/include/mach/system.h       |   17 ------
+ arch/arm/mach-ebsa110/core.c                   |   25 +++++++++
+ arch/arm/mach-ebsa110/include/mach/system.h    |   37 -------------
+ arch/arm/mach-ep93xx/include/mach/system.h     |    7 ---
+ arch/arm/mach-exynos/cpu.c                     |   12 ----
+ arch/arm/mach-exynos/include/mach/system.h     |   22 --------
+ arch/arm/mach-footbridge/include/mach/system.h |   13 -----
+ arch/arm/mach-gemini/Makefile                  |    2 +-
+ arch/arm/mach-gemini/idle.c                    |   29 ++++++++++
+ arch/arm/mach-gemini/include/mach/system.h     |   31 -----------
+ arch/arm/mach-gemini/irq.c                     |    4 +-
+ arch/arm/mach-h720x/common.c                   |   18 ++++++
+ arch/arm/mach-h720x/include/mach/system.h      |   27 ----------
+ arch/arm/mach-highbank/include/mach/system.h   |   24 --------
+ arch/arm/mach-imx/mm-imx3.c                    |    4 +-
+ arch/arm/mach-imx/pm-imx27.c                   |    3 +-
+ arch/arm/mach-integrator/include/mach/system.h |   33 ------------
+ arch/arm/mach-iop13xx/include/mach/system.h    |   13 -----
+ arch/arm/mach-iop32x/include/mach/system.h     |   13 -----
+ arch/arm/mach-iop33x/include/mach/system.h     |   13 -----
+ arch/arm/mach-ixp2000/include/mach/system.h    |   14 -----
+ arch/arm/mach-ixp23xx/core.c                   |    3 +
+ arch/arm/mach-ixp23xx/include/mach/system.h    |   16 ------
+ arch/arm/mach-ixp4xx/common.c                  |    6 ++
+ arch/arm/mach-ixp4xx/include/mach/system.h     |   19 -------
+ arch/arm/mach-kirkwood/include/mach/system.h   |   17 ------
+ arch/arm/mach-ks8695/include/mach/system.h     |   27 ----------
+ arch/arm/mach-lpc32xx/include/mach/system.h    |   27 ----------
+ arch/arm/mach-mmp/include/mach/system.h        |   16 ------
+ arch/arm/mach-msm/idle.S                       |   36 -------------
+ arch/arm/mach-msm/idle.c                       |   49 +++++++++++++++++
+ arch/arm/mach-msm/include/mach/system.h        |    1 -
+ arch/arm/mach-mv78xx0/include/mach/system.h    |   17 ------
+ arch/arm/mach-mx5/mm.c                         |    2 +-
+ arch/arm/mach-mxs/include/mach/system.h        |   25 ---------
+ arch/arm/mach-mxs/pm.c                         |    3 +-
+ arch/arm/mach-netx/include/mach/system.h       |   28 ----------
+ arch/arm/mach-nomadik/include/mach/system.h    |   32 -----------
+ arch/arm/mach-omap1/include/mach/system.h      |    5 --
+ arch/arm/mach-omap1/pm.c                       |   19 ++-----
+ arch/arm/mach-omap2/include/mach/system.h      |    5 --
+ arch/arm/mach-omap2/pm24xx.c                   |    5 +-
+ arch/arm/mach-omap2/pm34xx.c                   |    7 +--
+ arch/arm/mach-omap2/pm44xx.c                   |    2 +
+ arch/arm/mach-orion5x/include/mach/system.h    |   19 -------
+ arch/arm/mach-picoxcell/include/mach/system.h  |   26 ---------
+ arch/arm/mach-pnx4008/include/mach/system.h    |   29 ----------
+ arch/arm/mach-prima2/include/mach/system.h     |   17 ------
+ arch/arm/mach-pxa/include/mach/system.h        |   15 -----
+ arch/arm/mach-realview/include/mach/system.h   |   33 ------------
+ arch/arm/mach-rpc/include/mach/system.h        |   13 -----
+ arch/arm/mach-s3c2410/include/mach/system.h    |   37 -------------
+ arch/arm/mach-s3c2412/s3c2412.c                |    3 +-
+ arch/arm/mach-s3c2416/s3c2416.c                |    2 -
+ arch/arm/mach-s3c64xx/cpu.c                    |    2 +
+ arch/arm/mach-s3c64xx/include/mach/system.h    |    5 --
+ arch/arm/mach-s5p64x0/cpu.c                    |   16 +++---
+ arch/arm/mach-s5p64x0/include/mach/system.h    |   23 --------
+ arch/arm/mach-s5pc100/cpu.c                    |   12 ----
+ arch/arm/mach-s5pc100/include/mach/system.h    |   21 -------
+ arch/arm/mach-s5pv210/cpu.c                    |   12 ----
+ arch/arm/mach-s5pv210/include/mach/system.h    |   23 --------
+ arch/arm/mach-sa1100/include/mach/system.h     |    9 ---
+ arch/arm/mach-shark/core.c                     |    6 ++
+ arch/arm/mach-shark/include/mach/system.h      |   13 -----
+ arch/arm/mach-shmobile/include/mach/system.h   |    5 --
+ arch/arm/mach-spear3xx/include/mach/system.h   |   19 -------
+ arch/arm/mach-spear6xx/include/mach/system.h   |   19 -------
+ arch/arm/mach-tegra/common.c                   |    3 +-
+ arch/arm/mach-tegra/include/mach/system.h      |   28 ----------
+ arch/arm/mach-u300/include/mach/system.h       |   14 -----
+ arch/arm/mach-ux500/include/mach/system.h      |   20 -------
+ arch/arm/mach-versatile/include/mach/system.h  |   33 ------------
+ arch/arm/mach-vexpress/include/mach/system.h   |   33 ------------
+ arch/arm/mach-vt8500/include/mach/system.h     |    5 --
+ arch/arm/mach-w90x900/dev.c                    |    1 +
+ arch/arm/mach-w90x900/include/mach/system.h    |   19 -------
+ arch/arm/mach-zynq/include/mach/system.h       |   23 --------
+ arch/arm/plat-mxc/include/mach/common.h        |    1 -
+ arch/arm/plat-mxc/include/mach/system.h        |   30 -----------
+ arch/arm/plat-mxc/system.c                     |    1 -
+ arch/arm/plat-omap/include/plat/system.h       |   15 -----
+ arch/arm/plat-s3c24xx/cpu.c                    |   27 ++++++++++
+ arch/arm/plat-spear/include/plat/system.h      |   26 ---------
+ arch/arm/plat-tcc/include/mach/system.h        |   31 -----------
+ 101 files changed, 299 insertions(+), 1390 deletions(-)
