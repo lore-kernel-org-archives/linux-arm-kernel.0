@@ -1,60 +1,56 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 20 Dec 2011 18:14:37 +0100
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <CAF6AEGtOjO6Z6yfHz-ZGz3+NuEMH2M-8=20U6+-xt-gv9XtzaQ@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <201112121648.52126.arnd@arndb.de>
- <CAB2ybb_dU7BzJmPo6vA92pe1YCNerCLc+bv7Qi_EfkfGaik6bQ@mail.gmail.com>
- <201112201541.17904.arnd@arndb.de>
- <CAF6AEGtOjO6Z6yfHz-ZGz3+NuEMH2M-8=20U6+-xt-gv9XtzaQ@mail.gmail.com>
-Message-ID: <20111220171437.GC3883@phenom.ffwll.local>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 21 Dec 2011 01:40:35 +0800
+Subject: [RFC PATCH v3 0/5] pinctrl: imx: add pinnmux support
+Message-ID: <1324402840-32451-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 10:41:45AM -0600, Rob Clark wrote:
-> On Tue, Dec 20, 2011 at 9:41 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 19 December 2011, Semwal, Sumit wrote:
-> >> I didn't see a consensus on whether dma_buf should enforce some form
-> >> of serialization within the API - so atleast for v1 of dma-buf, I
-> >> propose to 'not' impose a restriction, and we can tackle it (add new
-> >> ops or enforce as design?) whenever we see the first need of it - will
-> >> that be ok? [I am bending towards the thought that it is a problem to
-> >> solve at a bigger platform than dma_buf.]
-> >
-> > The problem is generally understood for streaming mappings with a
-> > single device using it: if you have a long-running mapping, you have
-> > to use dma_sync_*. This obviously falls apart if you have multiple
-> > devices and no serialization between the accesses.
-> >
-> > If you don't want serialization, that implies that we cannot have
-> > use the ?dma_sync_* API on the buffer, which in turn implies that
-> > we cannot have streaming mappings. I think that's ok, but then
-> > you have to bring back the mmap API on the buffer if you want to
-> > allow any driver to provide an mmap function for a shared buffer.
-> 
-> I'm thinking for a first version, we can get enough mileage out of it by saying:
-> 1) only exporter can mmap to userspace
-> 2) only importers that do not need CPU access to buffer..
-> 
-> This way we can get dmabuf into the kernel, maybe even for 3.3.  I
-> know there are a lot of interesting potential uses where this stripped
-> down version is good enough.  It probably isn't the final version,
-> maybe more features are added over time to deal with importers that
-> need CPU access to buffer, sync object, etc.  But we have to start
-> somewhere.
+The main changes of this new patch series are add dt binding
+support in pinctrl core for pinmux mappings and shows an example
+on using the standard API provided by pinctrl core to register
+pinmux mappings from dts file.
+Then we can remove the old board specifc pinmux mappings from
+generic soc specific code (e.g. mach-imx6q.c).
 
-I agree with Rob here - I think especially for the coherency discussion
-some actual users of dma_buf on a bunch of insane platforms (i915
-qualifies here too, because we do some cacheline flushing behind everyones
-back) would massively help in clarifying things.
+Change v2->v3:
+- change the name from of_get_child_number to of_get_child_count
+- pinctrl: add dt binding support for pinmux mappings
+- Add phandle for pinmux mappings for imx6q
+- binding pinmux mappings via pinctrl core API
+- follow the dt convention to use dash '-' for property name
 
-It also sounds like that at least for proper userspace mmap support we'd
-need some dma api extensions on at least arm, and that might take a while
-...
+Changes v1->v2:
+- add a cover letter
+- remove the pin functon and group defines out of driver
+- parsing data from device tree for imx6q support
+- a few minor fixes suggested by Shawn
 
-Cheers, Daniel
--- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+Dong Aisheng (5):
+  dt: add of_get_child_count helper function
+  pinctrl: add dt binding support for pinmux mappings
+  pinctrl: imx: add pinctrl imx driver
+  ARM: imx6q: using pinmux subsystem
+  mmc: sdhci-esdhc-imx: using pinmux subsystem
+
+ .../devicetree/bindings/pinctrl/pinctrl-imx.txt    |   59 +++
+ .../devicetree/bindings/pinctrl/pinctrl.txt        |   33 ++
+ arch/arm/boot/dts/imx6q-sabreauto.dts              |   32 ++
+ arch/arm/boot/dts/imx6q.dtsi                       |    1 +
+ arch/arm/mach-imx/Kconfig                          |    1 +
+ drivers/mmc/host/sdhci-esdhc-imx.c                 |   20 +
+ drivers/pinctrl/Kconfig                            |   20 +
+ drivers/pinctrl/Makefile                           |    3 +
+ drivers/pinctrl/pinctrl-imx-core.c                 |  450 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-imx-core.h                 |   86 ++++
+ drivers/pinctrl/pinctrl-imx53.c                    |  443 +++++++++++++++++++
+ drivers/pinctrl/pinctrl-imx6q.c                    |  433 +++++++++++++++++++
+ drivers/pinctrl/pinmux.c                           |  101 +++++
+ include/linux/of.h                                 |   16 +
+ include/linux/pinctrl/machine.h                    |    6 +
+ 15 files changed, 1704 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-imx.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-imx-core.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx-core.h
+ create mode 100644 drivers/pinctrl/pinctrl-imx53.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx6q.c
