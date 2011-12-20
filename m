@@ -1,67 +1,93 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 20 Dec 2011 17:27:19 +0100
-Subject: [PATCH v3 06/11] arm/dts: twl6030: Add DTS file for twl6030 PMIC
+Date: Tue, 20 Dec 2011 17:27:22 +0100
+Subject: [PATCH v3 09/11] arm/dts: omap4-sdp: Add twl6030,
+ i2c3 and i2c4 devices
 In-Reply-To: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
 References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1324398444-23296-7-git-send-email-b-cousson@ti.com>
+Message-ID: <1324398444-23296-10-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a dedicated DTS file for the twl6030 Power IC.
-This chip is a big SoC that will be reused in a lot of various
-OMAP4+ boards.
+Update DTS file with required clock frequencies
+for the i2c client devices existing on sdp4430.
 
-Note: This file is supposed to be included in a board DTS that will
-create the twl node in order to allow the &twl reference to work.
+Add the twl6030 node inside the i2c1 controller node.
+This is the minimal support needed to boot OMAP4 boards
+without any crash.
+The support for all the features included in this MFD will be
+added later.
 
-Exmaple:
-...
-&i2c1 {
-    twl: twl at 48 {
-        reg = <0x48>;
-        interrupts = <0 7 4>;
-        interrupt-controller;
-        interrupt-parent = <&gic>;
-    };
-};
+Add the RTC submodule inside the twl node.
 
-/include/ "twl6030.dtsi"
-...
+Add tmp105 temperature sensor in i2c3
+Add bh1780 Ambient Light Sensor in i2c3
+Add hmc5843 3-Axis Digital Compass in i2c4
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/boot/dts/twl6030.dtsi |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/twl6030.dtsi
+ arch/arm/boot/dts/omap4-sdp.dts |   53 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 53 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-new file mode 100644
-index 0000000..b7b4e5e
---- /dev/null
-+++ b/arch/arm/boot/dts/twl6030.dtsi
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index 63c6b2b..17e829a 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -18,3 +18,56 @@
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
+ };
 +
-+/*
-+ * Integrated Power Management Chip
-+ * http://www.ti.com/lit/ds/symlink/twl6030.pdf
-+ */
-+&twl {
-+	compatible = "ti,twl6030";
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
++&i2c1 {
++	clock-frequency = <400000>;
 +
-+	rtc {
-+		compatible = "ti,twl4030-rtc";
-+		interrupts = <11>;
++	twl: twl at 48 {
++		reg = <0x48>;
++		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
++		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
++		interrupt-parent = <&gic>;
++	};
++};
++
++/include/ "twl6030.dtsi"
++
++&i2c2 {
++	clock-frequency = <400000>;
++	reg = <0x48072000 0x100>, <0x48072100 0x100>, <0x48072200 0x100>;
++};
++
++&i2c3 {
++	clock-frequency = <400000>;
++
++	/*
++	 * Temperature Sensor
++	 * http://www.ti.com/lit/ds/symlink/tmp105.pdf
++	 */
++	tmp105 at 48 {
++		compatible = "ti,tmp105";
++		reg = <0x48>;
++	};
++
++	/*
++	 * Ambient Light Sensor
++	 * http://www.rohm.com/products/databook/sensor/pdf/bh1780gli-e.pdf
++	 */
++	bh1780 at 29 {
++		compatible = "rohm,bh1780";
++		reg = <0x29>;
++	};
++};
++
++&i2c4 {
++	clock-frequency = <400000>;
++
++	/*
++	 * 3-Axis Digital Compass
++	 * http://www.sparkfun.com/datasheets/Sensors/Magneto/HMC5843.pdf
++	 */
++	hmc5843 at 1e {
++		compatible = "honeywell,hmc5843";
++		reg = <0x1e>;
 +	};
 +};
 -- 
