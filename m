@@ -1,72 +1,57 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Tue, 20 Dec 2011 16:14:43 +0530
-Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
- and DDR
-In-Reply-To: <20111219233559.GW6464@atomide.com>
-References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
- <4EEFC23A.30201@gmail.com> <20111219233559.GW6464@atomide.com>
-Message-ID: <4EF0671B.7090508@ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 20 Dec 2011 15:07:16 +0400
+Subject: [PATCH] davinci: DA850 EVM: OHCI platform code
+In-Reply-To: <1324363005-11320-1-git-send-email-prakash.pm@ti.com>
+References: <1324363005-11320-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <4EF06C64.8000708@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 December 2011 05:05 AM, Tony Lindgren wrote:
-> * Rob Herring<robherring2@gmail.com>  [111219 14:29]:
->> On 12/19/2011 08:05 AM, Aneesh V wrote:
->>> This is an RFC to add new device tree bindings for DDR memories and
->>> EMIF - TI's DDR SDRAM controller.
->>>
->>> The first patch adds bindings for DDR memories. Currently,
->>> we have added properties for only DDR3 and LPDDR2 memories.
->>> However, the binding can be easily extended to describe
->>> other types such as DDR2 in the future.
->>>
->>> The second patch provides the bindings for the EMIF controller.
->>>
->>> The final patch provides DT data for EMIF controller instances
->>> in OMAP4 and LPDDR2 memories attached to them on various boards.
->>>
->>> Thanks to Rajendra for answering my numerous queries on device tree.
->>>
->>> This is a re-post of the RFC that was posted to devicetree-discuss ml,
->>> now sent to a larger audience and looping out an internal list.
->>> Please ignore the previous version.
->>
->> There's already a standard way (i.e. JEDEC standard) to define DDR chip
->> configuration that's called SPD. Why invent something new? While this is
->> normally an i2c eeprom on a DIMM, there's no reason you couldn't get it
->> from somewhere else including perhaps the DT. There's already code in
->> u-boot that can parse SPD data.
->
-> I agree generic JEDEC standard would be good for the DT.
+Hello.
 
-Please see my comments in reply to Rob's mail. SPD doesn't seems to
-have a standard for LPDDR2. What JEDEC has now is not suitable for our
-needs.
+On 20.12.2011 10:36, Manjunathappa, Prakash wrote:
 
->
->> In general, is it really feasible to parse the DTB before DDR is
->> initialized?
->
-> Changing timings is still needed for DVFS during runtime.
->
-> But we can boot to userspace with bootloader set timings, so I'm
+> From: Ajay Kumar Gupta <ajay.gupta@ti.com>
 
-As far as I understand, in the current out-of-tree DVFS implementation
-for OMAP, DVFS can start even before user-space.
+    It's a good practice to CC the original author of the patch -- which I'm 
+doing now...
 
-> thinking that maybe these timings should be just set by loadable
-> modules. Just the configuration of which timings to select should
-> be passed via DT. Something in compatible like:
+> On this board the OHCI port's power control and over-current signals from
+> TPS2065 power switch are connected via GPIO1[15] and GPIO2[1] respectively,
+
+    Ajay, your description seems to be copied unchganged from the analogous 
+DA830 EVM patch, and thus doesn't match your patch: GPIO2[4] and GPIO6[13] are 
+used apparently. Be more attentive to detail next time please.
+
+> so we can implement the DA8xx OHCI glue layer's hooks for overriding the
+> root hub port's power and over-current status bits.
+
+> We also have to properly set up the clocking mode in the CFGCHIP2 register,
+> so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
+> its output is used to clock the USB 1.1 (OHCI) PHY...
+
+> Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> ---
+>   arch/arm/mach-davinci/board-da850-evm.c |  126 +++++++++++++++++++++++++++++++
+>   1 files changed, 126 insertions(+), 0 deletions(-)
 >
-> 	.compatible = "ti,omap3630", "sdram-micron-mt46h32m32lf-6";
->
-> And that should allow the SDRC driver to only accept timings for
-> "sdram-micron-mt46h32m32lf-6".
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 6659a90..df74ba5 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+[...]
+> @@ -734,6 +736,127 @@ static struct davinci_i2c_platform_data da850_evm_i2c_0_pdata = {
+[...]
+> +static int da850_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
+> +{
+> +	int irq		= gpio_to_irq(ON_BD_USB_OVC);
+> +	int error	= 0;
+> +
+> +	if (handler != NULL) {
+> +		da850_evm_usb_ocic_handler = handler;
+> +
+> +		error = request_irq(irq, da850_evm_usb_ocic_irq, IRQF_DISABLED |
 
-Do you mean one module per memory device and have all timing data in
-the respective module? Wouldn't this clutter the kernel proper with all
-these tables. By having the timing data in DT, it can be eventually
-moved out of kernel eventually, right?
+    IRQF_DISABLED is a nop now -- just remove it.
 
-br,
-Aneesh
+WBR, Sergei
