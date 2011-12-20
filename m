@@ -1,147 +1,77 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 Dec 2011 09:13:22 -0600
-Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
-In-Reply-To: <20111220015934.GD15863@b20223-02.ap.freescale.net>
-References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
- <1324264903-15395-5-git-send-email-richard.zhao@linaro.org>
- <20111219100512.GC2459@totoro> <20111219141925.GA1789@richard-laptop>
- <20111219143913.GI2351@totoro> <4EEF519C.4090808@gmail.com>
- <20111220015934.GD15863@b20223-02.ap.freescale.net>
-Message-ID: <4EF0A612.2060400@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 20 Dec 2011 16:13:41 +0100
+Subject: [PATCH v2 04/10] rtc: rtc-twl: Add DT support for RTC inside
+ twl4030/twl6030
+In-Reply-To: <1323439361-1647-5-git-send-email-b-cousson@ti.com>
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-5-git-send-email-b-cousson@ti.com>
+Message-ID: <4EF0A625.4050008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2011 07:59 PM, Richard Zhao wrote:
-> On Mon, Dec 19, 2011 at 09:00:44AM -0600, Rob Herring wrote:
->> On 12/19/2011 08:39 AM, Jamie Iles wrote:
->>> On Mon, Dec 19, 2011 at 10:19:29PM +0800, Richard Zhao wrote:
->>>> On Mon, Dec 19, 2011 at 10:05:12AM +0000, Jamie Iles wrote:
->>>>> Hi Richard,
->>>>>
->>>>> On Mon, Dec 19, 2011 at 11:21:40AM +0800, Richard Zhao wrote:
->>>>>> It support single core and multi-core ARM SoCs. But currently it assume
->>>>>> all cores share the same frequency and voltage.
->>>>>>
->>>>>> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
->>>>>> ---
->>>>>>  .../devicetree/bindings/cpufreq/generic-cpufreq    |    7 +
->>>>>>  drivers/cpufreq/Kconfig                            |    8 +
->>>>>>  drivers/cpufreq/Makefile                           |    2 +
->>>>>>  drivers/cpufreq/generic-cpufreq.c                  |  251 ++++++++++++++++++++
->>>>>>  4 files changed, 268 insertions(+), 0 deletions(-)
->>>>>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/generic-cpufreq
->>>>>>  create mode 100644 drivers/cpufreq/generic-cpufreq.c
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/cpufreq/generic-cpufreq b/Documentation/devicetree/bindings/cpufreq/generic-cpufreq
->>>>>> new file mode 100644
->>>>>> index 0000000..15dd780
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/cpufreq/generic-cpufreq
->>>>>> @@ -0,0 +1,7 @@
->>>>>> +Generic cpufreq driver
->>>>>> +
->>>>>> +Required properties in /cpus/cpu at 0:
->>>>>> +- compatible : "generic-cpufreq"
->>>>>
->>>>> I'm not convinced this is the best way to do this.  By requiring a 
->>>>> generic-cpufreq compatible string we're encoding Linux driver 
->>>>> information into the hardware description.  The only way I can see to 
->>>>> avoid this is to provide a generic_clk_cpufreq_init() function that 
->>>>> platforms can call in their machine init code to use the driver.
->>
->> Agreed on the compatible string.
-> Assume you reject to use compatible string.
->> It's putting Linux specifics into DT.
->>
->> You could flip this around and have the module make a call into the
->> kernel to determine whether to initialize or not. Then platforms could
->> set a flag to indicate this.
-> Could you make it more clear? kernel global variable, macro, or function?
+Hi Andrew,
 
-Any of those. Of course, direct access to variables across modules is
-discouraged, so it would probably be a function that checks a variable.
+I've never got any feedback on this patch from Alessandro and it seems
+that you took care of some rtc stuff recently.
 
-> - Following your idea, I think, we can add in driver/cpufreq/cpufreq.c:
-> int (*clk_reg_cpufreq_get_op_table) (struct op_table *tbl, int *size);
-> SoC code set the callback. If it's NULL, driver will exit. We can get rid
-> of DT. It'll make cpufreq core dirty, but it's the only file built-in.
+Thanks in advance,
+Benoit
 
-But aren't you getting the operating points from the DT? Then you don't
-want to put this code into each platform.
-
-> 
-> - Drop module support. SoC call generic_clk_cpufreq_init as Jamie said.
-> 
->>
->>>> It'll prevent the driver from being a kernel module.
->>>
->>> Hmm, that's not very nice either!  I guess you _could_ add an 
->>> of_machine_is_compatible() check against a list of compatible machines 
->>> in the driver but that feels a little gross.  Hopefully Rob or Grant 
->>> have a good alternative!
->>>
->>
->> What does cpufreq core do if multiple drivers are registered?
-> current cpufreq core only support one cpufreq_driver. Others will fail
-> except the first time.
-
-Then whoever gets there first wins. Make your driver register late and
-if someone doesn't want to use it they can register a custom driver earlier.
-
-Rob
-
->> Perhaps a
->> ranking is needed and this would only get enabled if there are no other
->> drivers and other conditions like having the clock "cpu" present are met.
-> We'd better keep cpufreq core simple. For this driver, register cpufreq_driver
-> is the last thing after checking all conditions.
-> 
->>
->> Rob
->>
->>>> Hi Grant & Rob,
->>>>
->>>> Could you comment?
->>>>
->>>>>
->>>>>> +- cpu-freqs : cpu frequency points it support
->>>>>> +- cpu-volts : cpu voltages required by the frequency point at the same index
->>>>>> +- trans-latency :  transition_latency
->>>>>> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
->>>>>> index e24a2a1..216eecd 100644
->>>>>> --- a/drivers/cpufreq/Kconfig
->>>>>> +++ b/drivers/cpufreq/Kconfig
->>>>>> @@ -179,6 +179,14 @@ config CPU_FREQ_GOV_CONSERVATIVE
->>>>>>  
->>>>>>  	  If in doubt, say N.
->>>>>>  
->>>>>> +config GENERIC_CPUFREQ_DRIVER
->>>>>> +	bool "Generic cpufreq driver using clock/regulator/devicetree"
->>>>>> +	help
->>>>>> +	  This adds generic CPUFreq driver. It assumes all
->>>>>> +	  cores of the CPU share the same clock and voltage.
->>>>>> +
->>>>>> +	  If in doubt, say N.
->>>>>
->>>>> I think this needs dependencies on HAVE_CLK, OF and REGULATOR.
->>>> right, Thanks. I can not check clk before generic clock framework
->>>> come in.
->>>> Added:
->>>> 	depends on OF && REGULATOR
->>>> 	select CPU_FREQ_TABLE
->>>
->>> You can still use HAVE_CLK.  That symbol has been around for ages and 
->>> any platform implementing the clk API should select it so it's fine to 
->>> depend on it even before there is a generic struct clk.
-> You are right. Thanks.
-> 
-> Richard
->>>
->>> Jamie
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
+On 12/9/2011 3:02 PM, Benoit Cousson wrote:
+> Add the DT support for the TI rtc-twl present in the twl4030
+> and twl6030 devices.
+>
+> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> Cc: Alessandro Zummo<a.zummo@towertech.it>
+> ---
+>   Documentation/devicetree/bindings/rtc/twl-rtc.txt |   12 ++++++++++++
+>   drivers/rtc/rtc-twl.c                             |   10 ++++++++--
+>   2 files changed, 20 insertions(+), 2 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/rtc/twl-rtc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/rtc/twl-rtc.txt b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
+> new file mode 100644
+> index 0000000..596e0c9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
+> @@ -0,0 +1,12 @@
+> +* TI twl RTC
+> +
+> +The TWL family (twl4030/6030) contains a RTC.
+> +
+> +Required properties:
+> +- compatible : Should be twl4030-rtc
+> +
+> +Examples:
+> +
+> +rtc at 0 {
+> +    compatible = "ti,twl4030-rtc";
+> +};
+> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+> index 20687d5..d43b4f6 100644
+> --- a/drivers/rtc/rtc-twl.c
+> +++ b/drivers/rtc/rtc-twl.c
+> @@ -550,6 +550,11 @@ static int twl_rtc_resume(struct platform_device *pdev)
+>   #define twl_rtc_resume  NULL
+>   #endif
+>
+> +static const struct of_device_id twl_rtc_of_match[] = {
+> +	{.compatible = "ti,twl4030-rtc", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, twl_rtc_of_match);
+>   MODULE_ALIAS("platform:twl_rtc");
+>
+>   static struct platform_driver twl4030rtc_driver = {
+> @@ -559,8 +564,9 @@ static struct platform_driver twl4030rtc_driver = {
+>   	.suspend	= twl_rtc_suspend,
+>   	.resume		= twl_rtc_resume,
+>   	.driver		= {
+> -		.owner	= THIS_MODULE,
+> -		.name	= "twl_rtc",
+> +		.owner		= THIS_MODULE,
+> +		.name		= "twl_rtc",
+> +		.of_match_table = twl_rtc_of_match,
+>   	},
+>   };
+>
