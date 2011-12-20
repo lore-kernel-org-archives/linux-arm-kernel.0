@@ -1,108 +1,81 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 20 Dec 2011 14:39:58 +0100
-Subject: [PATCH v2 5/5] ARM: OMAP2+: board-generic: Use of_irq_init API
-In-Reply-To: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1324388398-2683-6-git-send-email-b-cousson@ti.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 20 Dec 2011 14:43:02 +0100
+Subject: [PATCH 0/12] Add clk_prepare/clk_unprepare for mxs clock api
+In-Reply-To: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201112201443.03202.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the of_irq_init API introduced in 3.2 to handle
-interrupt-controller with DT.
-Update the irq_match table to map the proper XXX_of_init
-functions for INTC and GIC drivers.
+> The mutex locking problem on mxs platform has been reported on mailing
+> list for a few time.  The cause is that a mutex is being held in mxs
+> clock api clk_enable/clk_disable which are being called by some mxs
+> clock client drivers like amba-pl011 and mxs-saif in atomic context.
+> 
+> This series takes Russell's suggestion to:
+> 
+>  * Convert all mxs clock client drivers to clk_prepare/clk_unprepare.
+>    (I hope the series has covered all the drivers, but appreciate any
+>    reminding on any missing ones.)
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-omap2/board-generic.c |   30 ++++++++++++++++--------------
- 1 files changed, 16 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index e493877..2529017 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -12,6 +12,7 @@
-  * published by the Free Software Foundation.
-  */
- #include <linux/io.h>
-+#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
- #include <linux/i2c/twl.h>
-@@ -24,6 +25,17 @@
- #include "common.h"
- #include "common-board-devices.h"
- 
-+static struct of_device_id irq_match[] __initdata = {
-+	{ .compatible = "ti,omap2-intc", .data = intc_of_init, },
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{ }
-+};
-+
-+static void __init omap_init_irq(void)
-+{
-+	of_irq_init(irq_match);
-+}
-+
- /*
-  * XXX: Still needed to boot until the i2c & twl driver is adapted to
-  * device-tree
-@@ -58,18 +70,8 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ }
- };
- 
--static struct of_device_id intc_match[] __initdata = {
--	{ .compatible = "ti,omap3-intc", },
--	{ .compatible = "arm,cortex-a9-gic", },
--	{ }
--};
--
- static void __init omap_generic_init(void)
- {
--	struct device_node *node = of_find_matching_node(NULL, intc_match);
--	if (node)
--		irq_domain_add_simple(node, 0);
--
- 	omap_serial_init();
- 	omap_sdrc_init(NULL, NULL);
- 
-@@ -103,7 +105,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
--	.init_irq	= omap2_init_irq,
-+	.init_irq	= omap_init_irq,
- 	.handle_irq	= omap2_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap2_timer,
-@@ -122,7 +124,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap243x_map_io,
- 	.init_early	= omap2430_init_early,
--	.init_irq	= omap2_init_irq,
-+	.init_irq	= omap_init_irq,
- 	.handle_irq	= omap2_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap2_timer,
-@@ -141,7 +143,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3430_init_early,
--	.init_irq	= omap3_init_irq,
-+	.init_irq	= omap_init_irq,
- 	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap3_init,
- 	.timer		= &omap3_timer,
-@@ -160,7 +162,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
--	.init_irq	= gic_init_irq,
-+	.init_irq	= omap_init_irq,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= omap4_init,
- 	.timer		= &omap4_timer,
--- 
-1.7.0.4
+serial/amba-pl011.c isn't converted, that's where I originally observed the 
+issue.
+> 
+>  * Add clk_prepare/clk_unprepare for mxs clock api to contain the
+>    non-atomic portion of existing clk_enable/clk_disable implemention.
+>    (As the whole existing clk_enable/clk_disable are non-atomic,
+>    clk_prepare/clk_unprepare become a renaming of the existing
+>    clk_enable/clk_disable, and the new clk_enable/clk_disable become
+>    a pair of dummy functions.)
+> 
+> Thus, we can ensure that no mutex will be held for atomic context, and
+> the problem people keep reporting gets fixed with one step move toward
+> common clk framework while not ncessarily waiting for it.
+> 
+> If driver maintainers have no objection, after the review process, I
+> would like to send the series through arm-soc tree to ease the merge
+> process.
+> 
+> Those two patches from Richard Zhao are included here for completeness,
+> and they have been picked up by Sascha on imx tree.  But since imx and
+> mxs will both go through arm-soc, it should easy to sort out how we
+> should merge them.
+> 
+> Regards,
+> Shawn
+> 
+> Richard Zhao (2):
+>       clk: add helper functions clk_prepare_enable and
+> clk_disable_unprepare net: fec: add clk_prepare/clk_unprepare
+> 
+> Shawn Guo (10):
+>       arm/mxs: convert platform code to clk_prepare/clk_unprepare
+>       dma: mxs-dma: convert to clk_prepare/clk_unprepare
+>       mmc: mxs-mmc: convert to clk_prepare/clk_unprepare
+>       mtd: gpmi-lib: convert to clk_prepare/clk_unprepare
+>       net: flexcan: convert to clk_prepare/clk_unprepare
+>       serial: mxs-auart: convert to clk_prepare/clk_unprepare
+>       video: mxsfb: convert to clk_prepare/clk_unprepare
+>       ASoC: mxs-saif: convert to clk_prepare/clk_unprepare
+>       clk: add config option HAVE_CLK_PREPARE into Kconfig
+>       arm/mxs: select HAVE_CLK_PREPARE for clock
+> 
+>  arch/arm/Kconfig                      |    1 +
+>  arch/arm/mach-mxs/clock-mx23.c        |   10 +++++-----
+>  arch/arm/mach-mxs/clock-mx28.c        |   10 +++++-----
+>  arch/arm/mach-mxs/clock.c             |   33
+> +++++++++++++++++++++++---------- arch/arm/mach-mxs/mach-mx28evk.c      | 
+>   2 +-
+>  arch/arm/mach-mxs/system.c            |    2 +-
+>  arch/arm/mach-mxs/timer.c             |    2 +-
+>  drivers/clk/Kconfig                   |    3 +++
+>  drivers/dma/mxs-dma.c                 |    8 ++++----
+>  drivers/mmc/host/mxs-mmc.c            |   10 +++++-----
+>  drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   12 ++++++------
+>  drivers/net/can/flexcan.c             |   10 +++++-----
+>  drivers/net/ethernet/freescale/fec.c  |   10 +++++-----
+>  drivers/tty/serial/mxs-auart.c        |    8 ++++----
+>  drivers/video/mxsfb.c                 |    8 ++++----
+>  include/linux/clk.h                   |   22 ++++++++++++++++++++++
+>  sound/soc/mxs/mxs-saif.c              |    4 ++--
+>  17 files changed, 97 insertions(+), 58 deletions(-)
