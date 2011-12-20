@@ -1,66 +1,73 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 20 Dec 2011 14:48:10 +0100
-Subject: [PATCH 01/12] clk: add helper functions clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <1324382443-4439-2-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 20 Dec 2011 14:48:48 +0100
+Subject: [PATCH 07/12] net: flexcan: convert to clk_prepare/clk_unprepare
+In-Reply-To: <1324382443-4439-8-git-send-email-shawn.guo@linaro.org>
 References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
- <1324382443-4439-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201112201448.10577.marek.vasut@gmail.com>
+ <1324382443-4439-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201112201448.48712.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Richard Zhao <richard.zhao@linaro.org>
+> The patch converts flexcan driver to clk_prepare/clk_unprepare by
+> using helper functions clk_prepare_enable/clk_disable_unprepare.
 > 
-> It's for migrating to generic clk framework API.
-> 
-> The helper functions  help cases clk_enable/clk_disable is used
-> in non-atomic context.
-> For example, Call clk_enable in probe and clk_disable in remove.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> Cc: David S. Miller <davem@davemloft.net>
 > ---
->  include/linux/clk.h |   22 ++++++++++++++++++++++
->  1 files changed, 22 insertions(+), 0 deletions(-)
+>  drivers/net/can/flexcan.c |   10 +++++-----
+>  1 files changed, 5 insertions(+), 5 deletions(-)
 > 
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 7213b52..b9d46fa 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -107,6 +107,28 @@ static inline void clk_unprepare(struct clk *clk)
+> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+> index e023379..fdd0f3f 100644
+> --- a/drivers/net/can/flexcan.c
+> +++ b/drivers/net/can/flexcan.c
+> @@ -802,7 +802,7 @@ static int flexcan_open(struct net_device *dev)
+>  	struct flexcan_priv *priv = netdev_priv(dev);
+>  	int err;
+> 
+> -	clk_enable(priv->clk);
+> +	clk_prepare_enable(priv->clk);
+> 
+>  	err = open_candev(dev);
+>  	if (err)
+> @@ -824,7 +824,7 @@ static int flexcan_open(struct net_device *dev)
+>   out_close:
+>  	close_candev(dev);
+>   out:
+> -	clk_disable(priv->clk);
+> +	clk_disable_unprepare(priv->clk);
+> 
+>  	return err;
 >  }
->  #endif
+> @@ -838,7 +838,7 @@ static int flexcan_close(struct net_device *dev)
+>  	flexcan_chip_stop(dev);
 > 
-> +/* clk_prepare_enable helps cases using clk_enable in non-atomic context.
-> */ +static inline int clk_prepare_enable(struct clk *clk)
-> +{
-> +	int ret;
-> +
-> +	ret = clk_prepare(clk);
-> +	if (ret)
-> +		return ret;
-> +	ret = clk_enable(clk);
-> +	if (ret)
-> +		clk_unprepare(clk);
-> +
-> +	return ret;
-> +}
-> +
-> +/* clk_disable_unprepare helps cases using clk_disable in non-atomic
-> context. */ +static inline void clk_disable_unprepare(struct clk *clk)
-> +{
-> +	clk_disable(clk);
-> +	clk_unprepare(clk);
-> +}
-> +
->  /**
->   * clk_get_rate - obtain the current clock rate (in Hz) for a clock
-> source. *		  This is only valid once the clock source has been 
-enabled.
+>  	free_irq(dev->irq, dev);
+> -	clk_disable(priv->clk);
+> +	clk_disable_unprepare(priv->clk);
+> 
+>  	close_candev(dev);
+> 
+> @@ -877,7 +877,7 @@ static int __devinit register_flexcandev(struct
+> net_device *dev) struct flexcan_regs __iomem *regs = priv->base;
+>  	u32 reg, err;
+> 
+> -	clk_enable(priv->clk);
+> +	clk_prepare_enable(priv->clk);
+> 
+>  	/* select "bus clock", chip must be disabled */
+>  	flexcan_chip_disable(priv);
+> @@ -911,7 +911,7 @@ static int __devinit register_flexcandev(struct
+> net_device *dev) out:
+>  	/* disable core and turn off clocks */
+>  	flexcan_chip_disable(priv);
+> -	clk_disable(priv->clk);
+> +	clk_disable_unprepare(priv->clk);
+> 
+>  	return err;
+>  }
 
-Just be sure clk_prepare() is always available (which I suspect is checked in 
-the implementation, so ok). Other than that, 
+Are you sure close()/open() ops are not called from atomic?
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
+M
