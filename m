@@ -1,70 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Dec 2011 09:33:38 -0800
-Subject: [PATCH] arm/tegra: remove __initdata annotation from pinmux tables
-Message-ID: <1324402418-20279-1-git-send-email-olof@lixom.net>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 21 Dec 2011 01:51:58 +0800
+Subject: [PATCH 1/1] dt: reform for_each_property to
+ for_each_property_of_node_of_node
+Message-ID: <1324403518-3462-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of reshuffling what functions in the pinmux paths should be
-__init and thus could keep references to __initdata, let's just remove
-the annotations for now -- the tables are moving to device tree in the
-next version anyway and the whole subsystem is being wired up. We will
-go back and re-annotate where appropriate once things settle down.
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Make this micro more easy to use(do not need to pass properties, a node is
+enough), also change to a more sensible name as for_each_child_of_node.
+
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-tegra/board-seaboard-pinmux.c  |    8 ++++----
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    2 +-
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/of/base.c  |    2 +-
+ include/linux/of.h |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-index af28fd3..a448f29 100644
---- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
-+++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-@@ -37,11 +37,11 @@
- 		.slew_falling = TEGRA_SLEW_SLOWEST,		\
- 	}
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 9b6588e..f6f6fe8 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -1159,7 +1159,7 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
+ 	if (!of_aliases)
+ 		return;
  
--static __initdata struct tegra_drive_pingroup_config seaboard_drive_pinmux[] = {
-+static struct tegra_drive_pingroup_config seaboard_drive_pinmux[] = {
- 	DEFAULT_DRIVE(SDIO1),
- };
+-	for_each_property(pp, of_aliases->properties) {
++	for_each_property_of_node(of_aliases, pp) {
+ 		const char *start = pp->name;
+ 		const char *end = start + strlen(start);
+ 		struct device_node *np;
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 4948552..f1a490c 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -219,8 +219,8 @@ extern int of_device_is_available(const struct device_node *device);
+ extern const void *of_get_property(const struct device_node *node,
+ 				const char *name,
+ 				int *lenp);
+-#define for_each_property(pp, properties) \
+-	for (pp = properties; pp != NULL; pp = pp->next)
++#define for_each_property_of_node(dn, pp) \
++	for (pp = dn->properties; pp != NULL; pp = pp->next)
  
--static __initdata struct tegra_pingroup_config common_pinmux[] = {
-+static struct tegra_pingroup_config common_pinmux[] = {
- 	{TEGRA_PINGROUP_ATA,   TEGRA_MUX_IDE,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_ATB,   TEGRA_MUX_SDIO4,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_ATC,   TEGRA_MUX_NAND,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
-@@ -147,7 +147,7 @@ static __initdata struct tegra_pingroup_config common_pinmux[] = {
- 	{TEGRA_PINGROUP_XM2D,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- };
- 
--static __initdata struct tegra_pingroup_config seaboard_pinmux[] = {
-+static struct tegra_pingroup_config seaboard_pinmux[] = {
- 	{TEGRA_PINGROUP_DDC,   TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_GMD,   TEGRA_MUX_SFLASH,        TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_LPW0,  TEGRA_MUX_HDMI,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
-@@ -163,7 +163,7 @@ static __initdata struct tegra_pingroup_config seaboard_pinmux[] = {
- 	{TEGRA_PINGROUP_SPIG,  TEGRA_MUX_SPI2_ALT,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
- };
- 
--static __initdata struct tegra_pingroup_config ventana_pinmux[] = {
-+static struct tegra_pingroup_config ventana_pinmux[] = {
- 	{TEGRA_PINGROUP_DDC,  TEGRA_MUX_RSVD2,    TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_GMD,  TEGRA_MUX_SFLASH,   TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_LPW0, TEGRA_MUX_RSVD4,    TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
-diff --git a/arch/arm/mach-tegra/board-trimslice-pinmux.c b/arch/arm/mach-tegra/board-trimslice-pinmux.c
-index be2f3e8..1b3ccec 100644
---- a/arch/arm/mach-tegra/board-trimslice-pinmux.c
-+++ b/arch/arm/mach-tegra/board-trimslice-pinmux.c
-@@ -24,7 +24,7 @@
- #include "board-pinmux.h"
- #include "board-trimslice.h"
- 
--static __initdata struct tegra_pingroup_config trimslice_pinmux[] = {
-+static struct tegra_pingroup_config trimslice_pinmux[] = {
- 	{TEGRA_PINGROUP_ATA,   TEGRA_MUX_IDE,           TEGRA_PUPD_NORMAL,	TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_ATB,   TEGRA_MUX_SDIO4,         TEGRA_PUPD_NORMAL,	TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_ATC,   TEGRA_MUX_NAND,          TEGRA_PUPD_NORMAL,	TEGRA_TRI_TRISTATE},
+ extern int of_n_addr_cells(struct device_node *np);
+ extern int of_n_size_cells(struct device_node *np);
 -- 
-1.7.5.4
+1.7.0.4
