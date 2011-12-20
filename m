@@ -1,23 +1,22 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Dec 2011 00:51:01 +0000
-Subject: [PATCH 5/5] ASoC: mxs: correct 'direction' of
- device_prep_dma_cyclic
-In-Reply-To: <1323848866-19768-1-git-send-email-shawn.guo@linaro.org>
-References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
- <1323848866-19768-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111220005100.GJ2860@opensource.wolfsonmicro.com>
+Date: Tue, 20 Dec 2011 00:54:15 +0000
+Subject: [PATCH v3 2/3] regulator: mc13892: add device tree probe support
+In-Reply-To: <20111219140730.GB5257@S2100-06.ap.freescale.net>
+References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
+ <1323702958-4831-3-git-send-email-shawn.guo@linaro.org>
+ <20111219140730.GB5257@S2100-06.ap.freescale.net>
+Message-ID: <20111220005414.GL2860@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 03:47:46PM +0800, Shawn Guo wrote:
-> The commit 49920bc (dmaengine: add new enum dma_transfer_direction)
-> changes the type of parameter 'direction' of device_prep_dma_cyclic
-> from dma_data_direction to dma_transfer_direction.
+On Mon, Dec 19, 2011 at 10:07:31PM +0800, Shawn Guo wrote:
+> On Mon, Dec 12, 2011 at 11:15:57PM +0800, Shawn Guo wrote:
+> > It adds device tree probe support for mc13892-regulator driver.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > Cc: Liam Girdwood <lrg@ti.com>
+> 
+> Ping?
 
-Applied, thanks.
-
-With patches like this you really need to supply more context - knowing
-which release the commit you're talking about appears in is useful for
-exammple, as is having some hint as to what the rest of the series is
-(does this patch depend on any of the earlier patches, and if not why is
-it part of a series).
+I can't really do anything with this without the MFD portion being OK.
