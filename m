@@ -1,58 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Dec 2011 09:10:41 -0800
-Subject: [GIT PULL] Borderline fixes for v3.2-rc6
-In-Reply-To: <CAOesGMj-OyDu9pcOZ20o6G0W3-kkxyHF7o5DqDRaQkkUDf98CA@mail.gmail.com>
-References: <20111219194249.GO6464@atomide.com>
- <CAOesGMj-OyDu9pcOZ20o6G0W3-kkxyHF7o5DqDRaQkkUDf98CA@mail.gmail.com>
-Message-ID: <20111220171041.GA24444@atomide.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 20 Dec 2011 18:14:37 +0100
+Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
+ sharing mechanism
+In-Reply-To: <CAF6AEGtOjO6Z6yfHz-ZGz3+NuEMH2M-8=20U6+-xt-gv9XtzaQ@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <201112121648.52126.arnd@arndb.de>
+ <CAB2ybb_dU7BzJmPo6vA92pe1YCNerCLc+bv7Qi_EfkfGaik6bQ@mail.gmail.com>
+ <201112201541.17904.arnd@arndb.de>
+ <CAF6AEGtOjO6Z6yfHz-ZGz3+NuEMH2M-8=20U6+-xt-gv9XtzaQ@mail.gmail.com>
+Message-ID: <20111220171437.GC3883@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [111219 20:20]:
-> Hi Tony,
+On Tue, Dec 20, 2011 at 10:41:45AM -0600, Rob Clark wrote:
+> On Tue, Dec 20, 2011 at 9:41 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 19 December 2011, Semwal, Sumit wrote:
+> >> I didn't see a consensus on whether dma_buf should enforce some form
+> >> of serialization within the API - so atleast for v1 of dma-buf, I
+> >> propose to 'not' impose a restriction, and we can tackle it (add new
+> >> ops or enforce as design?) whenever we see the first need of it - will
+> >> that be ok? [I am bending towards the thought that it is a problem to
+> >> solve at a bigger platform than dma_buf.]
+> >
+> > The problem is generally understood for streaming mappings with a
+> > single device using it: if you have a long-running mapping, you have
+> > to use dma_sync_*. This obviously falls apart if you have multiple
+> > devices and no serialization between the accesses.
+> >
+> > If you don't want serialization, that implies that we cannot have
+> > use the ?dma_sync_* API on the buffer, which in turn implies that
+> > we cannot have streaming mappings. I think that's ok, but then
+> > you have to bring back the mmap API on the buffer if you want to
+> > allow any driver to provide an mmap function for a shared buffer.
 > 
-> On Mon, Dec 19, 2011 at 11:42 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > Hi Arnd & Olof,
-> >
-> > Here are two fixes that could potentially go into v3.2 -rc cycle.
-> >
-> > One fixes a harmless but annoying warning that happens on omap 34xx
-> > processors during boot. The other one fixes booting on pretty rare
-> > secure mode development board, but that's fixed in "features that
-> > never worked earlier either" style.
-> >
-> > We can surely wait on these fixes, but if you have something going
-> > upstream anyways, then these might be worth considering too.
+> I'm thinking for a first version, we can get enough mileage out of it by saying:
+> 1) only exporter can mmap to userspace
+> 2) only importers that do not need CPU access to buffer..
 > 
-> The hwmod patch is a regression so that one I'll take, the other one
-> is a little less obvious that it should go in now. Also, shouldn't it
-> be cc:d stable in that case?
+> This way we can get dmabuf into the kernel, maybe even for 3.3.  I
+> know there are a lot of interesting potential uses where this stripped
+> down version is good enough.  It probably isn't the final version,
+> maybe more features are added over time to deal with importers that
+> need CPU access to buffer, sync object, etc.  But we have to start
+> somewhere.
 
-Yes let's not worry about the second one, it adds new functionality and
-it's for a currently rare case.
+I agree with Rob here - I think especially for the coherency discussion
+some actual users of dma_buf on a bunch of insane platforms (i915
+qualifies here too, because we do some cacheline flushing behind everyones
+back) would massively help in clarifying things.
 
-> Let me know what you prefer (rebase with a cc: stable) or take out the
-> secure mode patch. I'm collecting a small series of fixes so I'll pull
-> it in tomorrow for that.
+It also sounds like that at least for proper userspace mmap support we'd
+need some dma api extensions on at least arm, and that might take a while
+...
 
-I've branched it out into fixes-hwmod-regression with just that
-same commit in it. The second patch in this series will be pulled in
-with fixes-non-critical-part2. Updated pull request below.
-
-Regards,
-
-Tony
-
-The following changes since commit e5fe29c7198a1f6616286dfc8602a69da165cb3f:
-  Felipe Contreras (1):
-        ARM: OMAP: rx51: fix USB
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-hwmod-regression
-
-Felipe Contreras (1):
-      ARM: OMAP: hwmod data: fix iva and mailbox hwmods for OMAP 3
-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
+Cheers, Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
