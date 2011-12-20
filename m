@@ -1,42 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Dec 2011 13:24:07 -0800
-Subject: [PATCH v3 02/11] i2c: OMAP: Add DT support for i2c controller
-In-Reply-To: <1324398444-23296-3-git-send-email-b-cousson@ti.com>
-References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
- <1324398444-23296-3-git-send-email-b-cousson@ti.com>
-Message-ID: <CAOesGMiwg9gVDDwCjuCcAPX6hc2E6OgH-c_nAqhCHmj7y5oCeQ@mail.gmail.com>
+Date: Tue, 20 Dec 2011 13:20:29 -0800
+Subject: [PATCH] net: macb: fix build break with !CONFIG_OF
+Message-ID: <1324416029-28198-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This fixes the build of the macb driver that was broken by the DT changes:
 
-On Tue, Dec 20, 2011 at 8:27 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+drivers/net/ethernet/cadence/macb.c:1503: error: implicit declaration of function 'of_match_ptr'
+drivers/net/ethernet/cadence/macb.c:1503: error: 'macb_dt_ids' undeclared here (not in a function)
+drivers/net/ethernet/cadence/macb.c:1503: error: initializer element is not constant
+drivers/net/ethernet/cadence/macb.c:1503: error: (near initialization for 'macb_driver.driver.of_match_table')
 
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index a43d002..dcbc1ec 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -37,6 +37,8 @@
-> ?#include <linux/platform_device.h>
-> ?#include <linux/clk.h>
-> ?#include <linux/io.h>
-> +#include <linux/of_i2c.h>
-> +#include <linux/of_device.h>
-> ?#include <linux/slab.h>
-> ?#include <linux/i2c-omap.h>
-> ?#include <linux/pm_runtime.h>
-[...]
-> @@ -1165,6 +1195,7 @@ static struct platform_driver omap_i2c_driver = {
-> ? ? ? ? ? ? ? ?.name ? = "omap_i2c",
-> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
-> ? ? ? ? ? ? ? ?.pm ? ? = OMAP_I2C_PM_OPS,
-> + ? ? ? ? ? ? ? .of_match_table = of_match_ptr(omap_i2c_of_match),
-> ? ? ? ?},
-> ?};
+Nicolas, care to ack this so I can apply it on top of the macb DT branch in arm-soc?
 
-of_match_ptr() comes from <linux/of.h>, so you need to include that to
-not break !CONFIG_OF builds.
+ drivers/net/ethernet/cadence/macb.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-
--Olof
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index baf1a0d..f3d5c65 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -23,6 +23,7 @@
+ #include <linux/platform_data/macb.h>
+ #include <linux/platform_device.h>
+ #include <linux/phy.h>
++#include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_net.h>
+ 
+-- 
+1.7.5.4
