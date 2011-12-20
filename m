@@ -1,48 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Dec 2011 15:01:11 +0100
-Subject: [GIT PULL] U300 updates for 3.3
-Message-ID: <1324389671-17507-1-git-send-email-linus.walleij@linaro.org>
+From: aneesh@ti.com (Aneesh V)
+Date: Tue, 20 Dec 2011 19:38:09 +0530
+Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
+ and DDR
+In-Reply-To: <4EF0824A.9060208@ti.com>
+References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
+ <4EEFC23A.30201@gmail.com> <20111219233559.GW6464@atomide.com>
+ <4EF0671B.7090508@ti.com> <4EF0824A.9060208@ti.com>
+Message-ID: <4EF096C9.1070808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Benoit
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Tuesday 20 December 2011 06:10 PM, Cousson, Benoit wrote:
+> Hi Aneesh,
+>
 
-Hi ARM-SoC Arnd, Olof,
+<snip>
 
-This is the one v3.3 accumulated patch for U300, removing the
-memory.h file, which is nice. Please pull it in, thanks!
+>>>> In general, is it really feasible to parse the DTB before DDR is
+>>>> initialized?
+>>>
+>>> Changing timings is still needed for DVFS during runtime.
+>>>
+>>> But we can boot to userspace with bootloader set timings, so I'm
+>>
+>> As far as I understand, in the current out-of-tree DVFS implementation
+>> for OMAP, DVFS can start even before user-space.
+>
+> Maybe it is the case, but that does not mean it should.
+> We can potentially delay the DVFS init until the user-space is started.
+> This should not be considered as a big constraint.
+>
+>>> thinking that maybe these timings should be just set by loadable
+>>> modules. Just the configuration of which timings to select should
+>>> be passed via DT. Something in compatible like:
+>>>
+>>> .compatible = "ti,omap3630", "sdram-micron-mt46h32m32lf-6";
+>>>
+>>> And that should allow the SDRC driver to only accept timings for
+>>> "sdram-micron-mt46h32m32lf-6".
+>>
+>> Do you mean one module per memory device and have all timing data in
+>> the respective module? Wouldn't this clutter the kernel proper with all
+>> these tables. By having the timing data in DT, it can be eventually
+>> moved out of kernel eventually, right?
+>
+> Yes, that's the theory, but referring to Olof's point, this is not
+> necessarily the goal of DT to store all the information that are not
+> board dependent.
+> In this case, each DDR will have it sets of well known AC timings data
+> that will never depend of the board config. In this case, storing that
+> inside DT might not be the best solution.
+>
+> In fact we always had the same kind of discussion for the pinmux data
+> and for the clock data...
+>
+> The conclusion being that most of the static data does not have to be in
+> the DTS.
+> But since Linus was complaining about the huge amount of data inside the
+> kernel, it is not obvious what the best solution is:-)
 
-The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+Hmm.. I get the point now. Linus' complaint is what I had in mind too.
+My humble opinion is to have such data in DTS but re-use it as much as
+possible. That is, we could have something like a "sdram-micron-
+mt46h32m32lf-6.dtsi"(as you suggested before) that can be included by
+board level DTS files. I think the fact that dts files are organized at
+arch level today is limiting such re-use. Please correct me if I am
+wrong.
 
-  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git u300-for-arm-soc
-
-Linus Walleij (1):
-      ARM: u300: delete memory.h
-
- arch/arm/Kconfig                         |    1 -
- arch/arm/mach-u300/include/mach/memory.h |   19 -------------------
- arch/arm/mach-u300/u300.c                |    2 +-
- 3 files changed, 1 insertions(+), 21 deletions(-)
- delete mode 100644 arch/arm/mach-u300/include/mach/memory.h
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-
-iQIcBAEBAgAGBQJO8JQQAAoJEEEQszewGV1zpNYQAMmNygTGmgSfaqJbRfqDRyAM
-DUT/GquVCCUhk8aXifguo65RuGW6Qe3+RovJcXMrMmWnkkRavnw9jNYZv+84JUg4
-riH9v+alfagJz8ipzXugc4tvZKV8Qy9nO1ueJcsQjKk4YbClBtmxnR+dF3kocWmT
-VBusY7BNEU+7FBAfxuR7S0+SEvwZYo58cMSswLCJkIxqbhMaYOOBA1bNReBPgLWP
-lyVEdFLFsFNj1Ei9iIwpLOqRsB9bp2KYuIXMEfYBFFyTn/n+oaAaaKEwUdMc6qX1
-KPWlt5+J7RS6ozNNfyRDaHQb04FlAXOHMnbIbjYAGpeuu2N8JMAMtydHWcdhAnIo
-sXyf49TVQlZDwOXKf0OLCudYil6f15hYwUL155bsgtLuZVVD+WJsSOjS6IzAem5C
-fL4Gm64Uy7HZPrIbvA3Sjfh4fOh17jQK/szkYN81bC47zQBFiRRNTnw6puboosRx
-vd6plDoXbppj+JMxYS309xaMiKxrmKwBaddEhBMwoH+ftWFPgnvbetKEVb9p32kV
-bn6eZ4DYJwjtiCdreiBjHVue+wysyBO2xiAqbp1Jxe5Q9kAPxhFRNDEqWlgcHJn9
-v7s9mva8tJqoAq9/EjY1+RppJCuqAq0zdSHaekiT6UT4FgGrUma/F1LnjRWm7FXF
-7K0eCKTS+XAX5pV41wtr
-=8wtX
------END PGP SIGNATURE-----
+br,
+Aneesh
