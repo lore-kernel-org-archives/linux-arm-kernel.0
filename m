@@ -1,56 +1,54 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 Dec 2011 10:42:43 -0600
-Subject: [PATCH v3 02/11] i2c: OMAP: Add DT support for i2c controller
-In-Reply-To: <1324398444-23296-3-git-send-email-b-cousson@ti.com>
+Date: Tue, 20 Dec 2011 10:47:16 -0600
+Subject: [PATCH v3 07/11] arm/dts: twl4030: Add DTS file for twl4030 PM
+ + Audio IC
+In-Reply-To: <1324398444-23296-8-git-send-email-b-cousson@ti.com>
 References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
- <1324398444-23296-3-git-send-email-b-cousson@ti.com>
-Message-ID: <4EF0BB03.6040906@gmail.com>
+ <1324398444-23296-8-git-send-email-b-cousson@ti.com>
+Message-ID: <4EF0BC14.7080205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/20/2011 10:27 AM, Benoit Cousson wrote:
-> Add initial DT support to retrieve the frequency using a
-> DT attribute instead of the pdata pointer if of_node exist.
-> 
-> Add documentation for omap i2c controller binding.
-> 
-> Based on original patches from Manju and Grant.
+> Add a dedicated DTS file for the twl4030/5030 Power + Audio IC.
+> This chip is a big SoC that will be reused in a lot of various
+> OMAP3 boards.
 > 
 > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kevin Hilman <khilman@ti.com>
-
-One issue below, otherwise:
-
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-
-
-> @@ -1001,15 +1019,24 @@ omap_i2c_probe(struct platform_device *pdev)
->  		goto err_release_region;
->  	}
->  
-> -	if (pdata != NULL) {
-> -		speed = pdata->clkrate;
-> +	match = of_match_device(omap_i2c_of_match, &pdev->dev);
-> +	if (match) {
-> +		u32 freq = 100000; /* default to 100000 Hz */
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/boot/dts/twl4030.dtsi |   21 +++++++++++++++++++++
+>  1 files changed, 21 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/twl4030.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+> new file mode 100644
+> index 0000000..8be5223
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/twl4030.dtsi
+> @@ -0,0 +1,21 @@
+> +/*
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> +		pdata = match->data;
-> +		dev->dtrev = pdata->rev;
-> +		dev->flags = pdata->flags;
+> +/*
+> + * Integrated Power Management Chip
+> + */
+> +&twl {
+> +	compatible = "ti,twl4030";
+> +	interrupt-controller;
+> +	#interrupt-cells = <1>;
 > +
-> +		of_property_read_u32(node, "clock-frequency", &freq);
-> +		/* convert DT freq value in Hz into kHz for speed */
-> +		dev->speed = freq / 1000;
-> +	} else if (pdata != NULL) {
-> +		dev->speed = pdata->clkrate;
-> +		dev->flags = pdata->flags;
->  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
-> -	} else {
-> -		speed = 100;	/* Default speed */
-> -		dev->set_mpu_wkup_lat = NULL;
-> +		dev->dtrev = pdata->rev;
+> +	rtc {
+> +		compatible = "ti,twl4030-rtc";
+> +		interrupts = <11>;
 
-If you get here, pdata is NULL.
+Can't this vary? Not only the irq#, but the parent controller's number
+of cells can vary.
 
 Rob
