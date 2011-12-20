@@ -1,79 +1,36 @@
-From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
-Date: Tue, 20 Dec 2011 13:51:10 +0000
-Subject: [PATCH] davinci: DA850 EVM: OHCI platform code
-In-Reply-To: <4EF06C64.8000708@mvista.com>
-References: <1324363005-11320-1-git-send-email-prakash.pm@ti.com>
- <4EF06C64.8000708@mvista.com>
-Message-ID: <47CEF8C4B26E8C44B22B028A650E0EA90659DC@DBDE01.ent.ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Dec 2011 22:05:03 +0800
+Subject: [PATCH 0/12] Add clk_prepare/clk_unprepare for mxs clock api
+In-Reply-To: <201112201443.03202.marek.vasut@gmail.com>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+ <201112201443.03202.marek.vasut@gmail.com>
+Message-ID: <20111220140502.GC5129@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-> Hello.
+On Tue, Dec 20, 2011 at 02:43:02PM +0100, Marek Vasut wrote:
+> > The mutex locking problem on mxs platform has been reported on mailing
+> > list for a few time.  The cause is that a mutex is being held in mxs
+> > clock api clk_enable/clk_disable which are being called by some mxs
+> > clock client drivers like amba-pl011 and mxs-saif in atomic context.
+> > 
+> > This series takes Russell's suggestion to:
+> > 
+> >  * Convert all mxs clock client drivers to clk_prepare/clk_unprepare.
+> >    (I hope the series has covered all the drivers, but appreciate any
+> >    reminding on any missing ones.)
 > 
-> On 20.12.2011 10:36, Manjunathappa, Prakash wrote:
-> 
-> > From: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> 
->     It's a good practice to CC the original author of the patch -- which
-> I'm
-> doing now...
-> 
-> > On this board the OHCI port's power control and over-current signals
-> from
-> > TPS2065 power switch are connected via GPIO1[15] and GPIO2[1]
-> respectively,
-> 
->     Ajay, your description seems to be copied unchganged from the
-> analogous
-> DA830 EVM patch, and thus doesn't match your patch: GPIO2[4] and
-> GPIO6[13] are
-> used apparently. Be more attentive to detail next time please.
+> serial/amba-pl011.c isn't converted, that's where I originally observed the 
+> issue.
 
-Well, this patch was created long back for internal release work and
-couldn't review this before it is sent out.
+The amba-pl011 on mainline had already been converted by Russell.  The
+reason we are still seeing the problem is that clk_prepare/clk_unprepare
+is dummy while clk_enable/clk_disable holds mutex on mxs clock api.
+And this series is trying to swap the their position to have the problem
+fixed.
 
-Prakash, Please correct the patch description as suggested.
+You can try this series out to see if your problem goes away :)
 
+-- 
 Regards,
-Ajay
-> .
-> > so we can implement the DA8xx OHCI glue layer's hooks for overriding
-> the
-> > root hub port's power and over-current status bits.
-> 
-> > We also have to properly set up the clocking mode in the CFGCHIP2
-> register,
-> > so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB)
-> PHY and
-> > its output is used to clock the USB 1.1 (OHCI) PHY...
-> 
-> > Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> > ---
-> >   arch/arm/mach-davinci/board-da850-evm.c |  126
-> +++++++++++++++++++++++++++++++
-> >   1 files changed, 126 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-
-> davinci/board-da850-evm.c
-> > index 6659a90..df74ba5 100644
-> > --- a/arch/arm/mach-davinci/board-da850-evm.c
-> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> [...]
-> > @@ -734,6 +736,127 @@ static struct davinci_i2c_platform_data
-> da850_evm_i2c_0_pdata = {
-> [...]
-> > +static int da850_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
-> > +{
-> > +	int irq		= gpio_to_irq(ON_BD_USB_OVC);
-> > +	int error	= 0;
-> > +
-> > +	if (handler != NULL) {
-> > +		da850_evm_usb_ocic_handler = handler;
-> > +
-> > +		error = request_irq(irq, da850_evm_usb_ocic_irq,
-> IRQF_DISABLED |
-> 
->     IRQF_DISABLED is a nop now -- just remove it.
-> 
-> WBR, Sergei
+Shawn
