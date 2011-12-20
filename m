@@ -1,50 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Dec 2011 23:25:27 +0000
-Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
-In-Reply-To: <20111220153101.GD5348@S2101-09.ap.freescale.net>
-References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
- <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
- <20111220005708.GM2860@opensource.wolfsonmicro.com>
- <20111220020101.GD5683@S2100-06.ap.freescale.net>
- <20111220015931.GX2860@opensource.wolfsonmicro.com>
- <20111220030347.GB2995@S2101-09.ap.freescale.net>
- <20111220112510.GL2866@opensource.wolfsonmicro.com>
- <20111220135251.GB5129@S2101-09.ap.freescale.net>
- <20111220143558.GT2866@opensource.wolfsonmicro.com>
- <20111220153101.GD5348@S2101-09.ap.freescale.net>
-Message-ID: <20111220232526.GA6551@opensource.wolfsonmicro.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Wed, 21 Dec 2011 07:27:03 +0800
+Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
+In-Reply-To: <20111220145904.GD29727@sirena.org.uk>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+ <1324264903-15395-5-git-send-email-richard.zhao@linaro.org>
+ <20111220145904.GD29727@sirena.org.uk>
+Message-ID: <20111220232701.GA1698@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 11:31:03PM +0800, Shawn Guo wrote:
-> On Tue, Dec 20, 2011 at 02:35:58PM +0000, Mark Brown wrote:
+On Tue, Dec 20, 2011 at 02:59:04PM +0000, Mark Brown wrote:
+> On Mon, Dec 19, 2011 at 11:21:40AM +0800, Richard Zhao wrote:
+> > It support single core and multi-core ARM SoCs. But currently it assume
+> > all cores share the same frequency and voltage.
+> 
+> My comments on the previous version of the patch still apply:
+> 
+>  - The voltage ranges being set need to be specified as ranges.
+cpu normally need strict voltages. and only proved operating opints
+are allowed to set in dts. If the voltage changes slightly especially
+for high frequency, it's easy to cause unstable.
+>  - Frequencies that can't be supported due to limitations of the
+>    available supplies shouldn't be exposed to users.
+As I said, only proved operation points are allowed.
+>  - The driver needs to handle errors.
+Yes.
+> 
+> > +Required properties in /cpus/cpu at 0:
+> > +- compatible : "generic-cpufreq"
+> > +- cpu-freqs : cpu frequency points it support
+> > +- cpu-volts : cpu voltages required by the frequency point at the same index
+> > +- trans-latency :  transition_latency
+> 
+> You need to define units for all of these, and for the transition
+> latency you need to be clear about what's being measured (it looks like
+> the CPU time only, not any voltage ramping).
+right.
+> 
+> You also need to define how the core supplies get looked up.
+It's pure software. platform uses this driver have to define "cpu" consumer.
+> 
+> > +	/* Manual states, that PLL stabilizes in two CLK32 periods */
+> > +	policy->cpuinfo.transition_latency = trans_latency;
+> 
+> I guess this comment is a cut'n'paste error.
+right, thanks.
+> 
+> > +
+> > +	ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
+> > +
+> > +	if (ret < 0) {
+> > +		pr_err("%s: invalid frequency table for cpu %d\n",
+> > +		       __func__, policy->cpu);
+> 
+> You should define pr_fmt to always include __func__ in the messages
+> rather than open coding - ensures consistency and is less noisy in the
+> code.
+I'll check it.
+> 
+> > +	pr_info("Generic CPU frequency driver\n");
+> 
+> This seems noisy...
+Why? Do you think only errors and warnings can print out?
 
-> > I don't know that that helps, register numbers and shifts aren't going
-> > to do anything for legibility.
-
-> I think it helps.  It's not about legibility but identification.  For
-> mc13892 driver to work, it has to match the register number and enable
-> bit shift given by mc13892 reference manual.  So register number +
-> enable bit shift is stable and unique to identify a mc13892 regulator.
-
-It's unique but I feel the disadvantages in terms of legibility of the
-resulting device trees are substantial - we want humans to be able to
-read and write device trees, preferrably without having to dig out the
-datasheet for the part.  So long as the names are reasonably sensible
-and can be understood in the case of any lack of clarity we should be
-OK.
-
-> > The problem with the names was that the
-> > names chosen were poorly defined (why call DCDCn chipname__dcdcn?) and
-> > not documented in the binding, not that they were names.
-
-> The problem with name is it's name.  The mc13892 driver can still work
-> with naming regulator differently from mc13892 reference manual.  So
-> using name to bind a regulator means we are binding with Linux mc13892
-> driver.  In that case, DT probe works if and only if the name in dts
-> matches the name used in mc13892 driver, and it does not work as long
-> as the name dts does not match the name used in mc13892 driver.
-
-This is the whole reason why I'm saying that you need to define the
-names used in the binding - if the names are a defined part of the
-binding then there's nothing driver specific about them.
+Thanks
+Richard
