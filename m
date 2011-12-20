@@ -1,64 +1,73 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 20 Dec 2011 15:17:22 +0400
-Subject: [PATCH] davinci: DA850 EVM: OHCI platform code
-In-Reply-To: <1324363005-11320-1-git-send-email-prakash.pm@ti.com>
-References: <1324363005-11320-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <4EF06EC2.3070907@mvista.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 20 Dec 2011 13:23:19 +0200
+Subject: [PATCH 5/8] s3c-hsudc: use udc_start and udc_stop functions
+In-Reply-To: <201112191941.45881.heiko@sntech.de>
+References: <201112191938.22254.heiko@sntech.de>
+ <201112191941.45881.heiko@sntech.de>
+Message-ID: <20111220112317.GF31842@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 20-12-2011 10:36, Manjunathappa, Prakash wrote:
-
-> From: Ajay Kumar Gupta<ajay.gupta@ti.com>
-
-> On this board the OHCI port's power control and over-current signals from
-> TPS2065 power switch are connected via GPIO1[15] and GPIO2[1] respectively,
-> so we can implement the DA8xx OHCI glue layer's hooks for overriding the
-> root hub port's power and over-current status bits.
-
-> We also have to properly set up the clocking mode in the CFGCHIP2 register,
-> so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
-> its output is used to clock the USB 1.1 (OHCI) PHY...
-
-> Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
-
-    BTW, Prakash, as you'r on the patch's disrtibution path, shouldn't you add 
-your signoff as well?
-
+On Mon, Dec 19, 2011 at 07:41:45PM +0100, Heiko St?bner wrote:
+> udc_start and udc_stop reduce code duplication in comparison to
+> start and stop generalising calls done by all drivers
+> (i.e. bind and unbind) and moving these calls to common code.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->   arch/arm/mach-davinci/board-da850-evm.c |  126 +++++++++++++++++++++++++++++++
->   1 files changed, 126 insertions(+), 0 deletions(-)
+>  drivers/usb/gadget/s3c-hsudc.c |   44 ++++++++++++---------------------------
+>  1 files changed, 14 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/s3c-hsudc.c b/drivers/usb/gadget/s3c-hsudc.c
+> index 8792830..d17cbcf 100644
+> --- a/drivers/usb/gadget/s3c-hsudc.c
+> +++ b/drivers/usb/gadget/s3c-hsudc.c
+> @@ -282,8 +282,7 @@ static void s3c_hsudc_nuke_ep(struct s3c_hsudc_ep *hsep, int status)
+>   * All the endpoints are stopped and any pending transfer requests if any on
+>   * the endpoint are terminated.
+>   */
+> -static void s3c_hsudc_stop_activity(struct s3c_hsudc *hsudc,
+> -			  struct usb_gadget_driver *driver)
+> +static void s3c_hsudc_stop_activity(struct s3c_hsudc *hsudc)
+>  {
+>  	struct s3c_hsudc_ep *hsep;
+>  	int epnum;
+> @@ -295,10 +294,6 @@ static void s3c_hsudc_stop_activity(struct s3c_hsudc *hsudc,
+>  		hsep->stopped = 1;
+>  		s3c_hsudc_nuke_ep(hsep, -ESHUTDOWN);
+>  	}
+> -
+> -	spin_unlock(&hsudc->lock);
+> -	driver->disconnect(&hsudc->gadget);
+> -	spin_lock(&hsudc->lock);
+>  }
+>  
+>  /**
+> @@ -1135,16 +1130,15 @@ static irqreturn_t s3c_hsudc_irq(int irq, void *_dev)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static int s3c_hsudc_start(struct usb_gadget_driver *driver,
+> -		int (*bind)(struct usb_gadget *))
+> +static int s3c_hsudc_start(struct usb_gadget *gadget,
+> +		struct usb_gadget_driver *driver)
+>  {
+>  	struct s3c_hsudc *hsudc = the_controller;
 
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 6659a90..df74ba5 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-[...]
-> +static __init void da850_evm_usb_init(void)
-> +{
-[...]
-> +	ret = gpio_request(ON_BD_USB_DRV, "ON_BD_USB_DRV");
-> +	if (ret) {
-> +		printk(KERN_ERR "%s: failed to request GPIO for USB 1.1 port "
-> +		       "power control: %d\n", __func__, ret);
-> +		return;
-> +	}
-> +	gpio_direction_output(ON_BD_USB_DRV, 0);
+I remember commenting that this 'the_controller' global could be
+dropped. I will add a patch to this series myself this time otherwise we
+will not have time to get this in during 3.3 merge window, but next time
+please make sure you fix all comments (or give reasons not to do so)
+before sending another version.
 
-    You should also use gpio_request_one() instead 
-gpio_request()/gpio_direction_output() pair.
-
-> +
-> +	ret = gpio_request(ON_BD_USB_OVC, "ON_BD_USB_OVC");
-> +	if (ret) {
-> +		printk(KERN_ERR "%s: failed to request GPIO for USB 1.1 port "
-> +		       "over-current indicator: %d\n", __func__, ret);
-> +		return;
-> +	}
-> +	gpio_direction_input(ON_BD_USB_OVC);
-
-    Same here.
-
-WBR, Sergei
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111220/3d738792/attachment-0001.sig>
