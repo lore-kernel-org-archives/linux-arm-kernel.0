@@ -1,45 +1,40 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Tue, 20 Dec 2011 12:49:29 +0530
-Subject: [RFC v2 PATCH 2/3] dt: device tree bindings for TI's EMIF sdram
- controller
-In-Reply-To: <CAOesGMidr_orQ60wWrDkSPXZziZ6wuThTixmQj-idkkDjrMG0A@mail.gmail.com>
-References: <1324303533-17458-1-git-send-email-aneesh@ti.com>	<1324303533-17458-3-git-send-email-aneesh@ti.com>
- <CAOesGMidr_orQ60wWrDkSPXZziZ6wuThTixmQj-idkkDjrMG0A@mail.gmail.com>
-Message-ID: <4EF03701.9090809@ti.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 20 Dec 2011 12:55:59 +0530
+Subject: [PATCH] OMAP: I2C: add devexit to the remove code
+Message-ID: <1324365959-4143-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 December 2011 10:29 PM, Olof Johansson wrote:
-> Oh wait, when I saw 3/3 I realized the following too:
->
-> On Mon, Dec 19, 2011 at 6:05 AM, Aneesh V<aneesh@ti.com>  wrote:
->
->> +- phy-type     : string indicating the phy type. Should be one of the
->> +  following:
->> +
->> +  "phy-type-omap4"  : PHY used in OMAP4 family of SoCs
->> +
->> +  "phy-type-dm81xx" : PHY used in DM81XX family of SoCs
->
-> No, again please don't define new string properties when a simple
-> binary property will do just fine. Just use "phy-type-omap4" or
-> "phy-type-dm81xx" as an empty property to indicate what phy is used.
-> Or encode as an integer and list the valid values here.
+The omap_i2c_remove function may not be needed after
+device exit so the memory could be freed.
 
-Ok. I just got carried away by readability. Somebody told me that
-something like #define will come to device-tree soon. Probably, I can
-use that then.
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-Is binary property suitable in situations like this where "one and only
-one" phy-type should be specified by the user?
-
->
-> Every time you add a string to the device tree, the data structure
-> grows, not to mention the fact that it adds a lot of string
-> comparisons during setup. Please keep that in mind when defining
-> bindings.
-
-Understand.
-
-Thanks,
-Aneesh
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index fa23faa..2efdc6b 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1111,8 +1111,7 @@ err_release_region:
+ 	return r;
+ }
+ 
+-static int
+-omap_i2c_remove(struct platform_device *pdev)
++static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+ 	struct resource		*mem;
+@@ -1161,7 +1160,7 @@ static struct dev_pm_ops omap_i2c_pm_ops = {
+ 
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
+-	.remove		= omap_i2c_remove,
++	.remove		= __devexit_p(omap_i2c_remove),
+ 	.driver		= {
+ 		.name	= "omap_i2c",
+ 		.owner	= THIS_MODULE,
+-- 
+1.7.1
