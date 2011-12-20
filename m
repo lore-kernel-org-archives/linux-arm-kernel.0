@@ -1,45 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 20 Dec 2011 14:15:02 +0000
-Subject: [PATCH] ARM: errata: Update the workaround for the 742231
- Cortex-A9 erratum
-In-Reply-To: <4EF04956.90006@renesas.com>
-References: <4EF04923.50203@renesas.com>
- <4EF04956.90006@renesas.com>
-Message-ID: <20111220141501.GB22161@arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Dec 2011 22:27:40 +0800
+Subject: [PATCH 08/12] serial: mxs-auart: convert to
+ clk_prepare/clk_unprepare
+In-Reply-To: <201112201449.13420.marek.vasut@gmail.com>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+ <1324382443-4439-9-git-send-email-shawn.guo@linaro.org>
+ <201112201449.13420.marek.vasut@gmail.com>
+Message-ID: <20111220142739.GC5348@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 08:37:42AM +0000, Shinya Kuribayashi wrote:
-> Workaround for the 742231 erratum has been updated, which explains
-> that bit #22 is required only for Cortex-A9 MPcore configuration with
-> 1 single processor and the ACP present.
+On Tue, Dec 20, 2011 at 02:49:13PM +0100, Marek Vasut wrote:
+> > The patch converts mxs-auart driver to clk_prepare/clk_unprepare by
+> > using helper functions clk_prepare_enable/clk_disable_unprepare.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Alan Cox <alan@linux.intel.com>
+> > ---
+> >  drivers/tty/serial/mxs-auart.c |    8 ++++----
+> >  1 files changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/mxs-auart.c
+> > b/drivers/tty/serial/mxs-auart.c index 7e02c9c..c33500a 100644
+> > --- a/drivers/tty/serial/mxs-auart.c
+> > +++ b/drivers/tty/serial/mxs-auart.c
+> > @@ -424,7 +424,7 @@ static int mxs_auart_startup(struct uart_port *u)
+> >  {
+> >  	struct mxs_auart_port *s = to_auart_port(u);
+> > 
+> > -	clk_enable(s->clk);
+> > +	clk_prepare_enable(s->clk);
+> > 
+> >  	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+> > 
+> > @@ -453,7 +453,7 @@ static void mxs_auart_shutdown(struct uart_port *u)
+> >  	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
+> >  			u->membase + AUART_INTR_CLR);
+> > 
+> > -	clk_disable(s->clk);
+> > +	clk_disable_unprepare(s->clk);
+> >  }
+> > 
+> >  static unsigned int mxs_auart_tx_empty(struct uart_port *u)
+> > @@ -634,7 +634,7 @@ auart_console_setup(struct console *co, char *options)
+> >  	if (!s)
+> >  		return -ENODEV;
+> > 
+> > -	clk_enable(s->clk);
+> > +	clk_prepare_enable(s->clk);
+> > 
+> >  	if (options)
+> >  		uart_parse_options(options, &baud, &parity, &bits, &flow);
+> > @@ -643,7 +643,7 @@ auart_console_setup(struct console *co, char *options)
+> > 
+> >  	ret = uart_set_options(&s->port, co, baud, parity, bits, flow);
+> > 
+> > -	clk_disable(s->clk);
+> > +	clk_disable_unprepare(s->clk);
+> > 
+> >  	return ret;
+> >  }
 > 
-> That means, it's not needed for the SMP kernel.
+> DTTO here, are you sure all of them are not called from atomic ctx?
 > 
-> Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
-> ---
-> 
->  Since #742231 is associated with SMP, it's safe to remove bit #22
->  for now, but I'm concerned that 'MPcore + 1 processor + ACP' case
->  still remains as untreated.  Do we need to support the case?
-> 
->  arch/arm/mm/proc-v7.S |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 2c559ac..8f8fced 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -352,7 +352,6 @@ __v7_setup:
->  	teqne	r6, #0x22			@ present in r2p2
->  	mrceq	p15, 0, r10, c15, c0, 1		@ read diagnostic register
->  	orreq	r10, r10, #1 << 12		@ set bit #12
-> -	orreq	r10, r10, #1 << 22		@ set bit #22
->  	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
-
-Most A9 configurations I'm aware of are indeed SMP. But maybe you could
-add a !CONFIG_SMP around bit 22 setting, just in case there are
-platforms using this together with an ACP.
+Yes.  My understanding is that only the clk_enable/clk_disable in
+auart_console_write() will be called in atomic context.
 
 -- 
-Catalin
+Regards,
+Shawn
