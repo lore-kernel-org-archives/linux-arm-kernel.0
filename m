@@ -1,87 +1,47 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 20 Dec 2011 17:51:59 +0800
-Subject: [PATCH 1/1] pinctrl: some typo fixes
-Message-ID: <1324374719-5654-1-git-send-email-b29396@freescale.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 20 Dec 2011 11:00:31 +0100
+Subject: [PATCH] ARM: OMAP: avoid NULL pointer dereference when no PMIC
+ is configured
+In-Reply-To: <4EEEF163.7030608@compulab.co.il>
+References: <1324235628-26439-1-git-send-email-zonque@gmail.com>
+ <4EEEF163.7030608@compulab.co.il>
+Message-ID: <4EF05CBF.4010007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+Hi Igor,
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
- Documentation/pinctrl.txt |   10 +++++-----
- drivers/pinctrl/pinmux.c  |    4 ++--
- 2 files changed, 7 insertions(+), 7 deletions(-)
+On 12/19/2011 09:10 AM, Igor Grinberg wrote:
+> On 12/18/11 21:13, Daniel Mack wrote:
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> ---
+>>  arch/arm/mach-omap2/vp.c |    5 +++++
+>>  1 files changed, 5 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
+>> index 66bd700..5407173 100644
+>> --- a/arch/arm/mach-omap2/vp.c
+>> +++ b/arch/arm/mach-omap2/vp.c
+>> @@ -41,6 +41,11 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
+>>  	u32 val, sys_clk_rate, timeout, waittime;
+>>  	u32 vddmin, vddmax, vstepmin, vstepmax;
+>>  
+>> +	if (!voltdm->pmic) {
+>> +		pr_err("%s: No PMIC configured.\n", __func__, voltdm->name);
+> 
+> You are passing two parameters to pr_err(), but use only one...
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index f080643..1021be9 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -217,7 +217,7 @@ changing pin configuration in the pin controller ops like this:
- #include <linux/pinctrl/pinconf.h>
- #include "platform_x_pindefs.h"
- 
--int foo_pin_config_get(struct pinctrl_dev *pctldev,
-+static int foo_pin_config_get(struct pinctrl_dev *pctldev,
- 		    unsigned offset,
- 		    unsigned long *config)
- {
-@@ -228,7 +228,7 @@ int foo_pin_config_get(struct pinctrl_dev *pctldev,
- 	*config = (unsigned long) conf;
- }
- 
--int foo_pin_config_set(struct pinctrl_dev *pctldev,
-+static int foo_pin_config_set(struct pinctrl_dev *pctldev,
- 		    unsigned offset,
- 		    unsigned long config)
- {
-@@ -241,14 +241,14 @@ int foo_pin_config_set(struct pinctrl_dev *pctldev,
- 	}
- }
- 
--int foo_pin_config_group_get (struct pinctrl_dev *pctldev,
-+static int foo_pin_config_group_get (struct pinctrl_dev *pctldev,
- 		    unsigned selector,
- 		    unsigned long *config)
- {
- 	...
- }
- 
--int foo_pin_config_group_set (struct pinctrl_dev *pctldev,
-+static int foo_pin_config_group_set (struct pinctrl_dev *pctldev,
- 		    unsigned selector,
- 		    unsigned long config)
- {
-@@ -819,7 +819,7 @@ it even more compact which assumes you want to use pinctrl-foo and position
- 0 for mapping, for example:
- 
- static struct pinmux_map __initdata pmx_mapping[] = {
--       PINMUX_MAP_PRIMARY("I2CMAP", "i2c0", "foo-i2c.0"),
-+       PINMUX_MAP("I2CMAP", "pinctrl-foo", "i2c0", "foo-i2c.0"),
- };
- 
- 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 432feb6..0916222 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -342,7 +342,7 @@ EXPORT_SYMBOL_GPL(pinmux_gpio_direction_output);
-  * Only call this once during initialization of your machine, the function is
-  * tagged as __init and won't be callable after init has completed. The map
-  * passed into this function will be owned by the pinmux core and cannot be
-- * free:d.
-+ * freed.
-  */
- int __init pinmux_register_mappings(struct pinmux_map const *maps,
- 				    unsigned num_maps)
-@@ -1006,7 +1006,7 @@ int pinmux_hog_maps(struct pinctrl_dev *pctldev)
- }
- 
- /**
-- * pinmux_hog_maps() - unhog specific map entries on controller device
-+ * pinmux_unhog_maps() - unhog specific map entries on controller device
-  * @pctldev: the pin control device to unhog entries on
-  */
- void pinmux_unhog_maps(struct pinctrl_dev *pctldev)
--- 
-1.7.0.4
+Of course not. I wonder why the compiler didn't yell at me about that.
+
+> Also, I don't know if this is the right thing to do here,
+> so Cc'ed Paul and Kevin.
+
+That is the other question ideed. In the case I was facing on a custom
+board, I was running into this without any configured PMIC. Clearly,
+derferencing a NULL pointer here is no good thing to do.
+
+
+
+Thanks,
+Daniel
