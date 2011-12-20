@@ -1,63 +1,55 @@
-From: rmorell@nvidia.com (Robert Morell)
-Date: Mon, 19 Dec 2011 18:05:49 -0800
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <201112131510.02785.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <4EE33EC2.6050508@redhat.com>
- <20111212224408.GD4355@morell.nvidia.com>
- <201112131510.02785.arnd@arndb.de>
-Message-ID: <20111220020549.GQ6559@morell.nvidia.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Dec 2011 10:15:33 +0800
+Subject: [PATCH V3 10/14] ARM: mxs: add clk_prepare/clk_unprepare
+In-Reply-To: <1321008637-19999-11-git-send-email-richard.zhao@linaro.org>
+References: <1321008637-19999-1-git-send-email-richard.zhao@linaro.org>
+ <1321008637-19999-11-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111220021532.GA2995@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 07:10:02AM -0800, Arnd Bergmann wrote:
-> On Monday 12 December 2011, Robert Morell wrote:
-> > > 
-> > > Doing a buffer sharing with something that is not GPL is not fun, as, if any
-> > > issue rises there, it would be impossible to discover if the problem is either
-> > > at the closed-source driver or at the open source one. At the time I was using
-> > > the Nvidia proprietary driver, it was very common to have unexplained issues
-> > > caused likely by bad code there at the buffer management code, causing X
-> > > applications and extensions (like xv) to break.
-> > >
-> > > We should really make this EXPORT_SYMBOL_GPL(), in order to be able to latter
-> > > debug future share buffer issues, when needed.
-> > 
-> > Sorry, I don't buy this argument.  Making these exports GPL-only is not
-> > likely to cause anybody to open-source their driver, but will rather
-> > just cause them to use yet more closed-source code that is even less
-> > debuggable than this would be, to those without access to the source.
+Hi Sascha,
+
+Can you drop this patch from your tree?  This patch is not complete
+even for mxs platform/arch code, and will conflict with my mxs
+clk-prepare series.
+
+-- 
+Regards,
+Shawn
+
+On Fri, Nov 11, 2011 at 06:50:33PM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/mach-mxs/system.c |    2 +-
+>  arch/arm/mach-mxs/timer.c  |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> But at least the broken module then won't be interacting with other modules
-> because it cannot share any buffers.
-
-One of the goals of this project is to unify the fragmented space of the
-ARM SoC memory managers so that each vendor doesn't implement their own,
-and they can all be closer to mainline.
-
-I fear that restricting the use of this buffer sharing mechanism to GPL
-drivers only will prevent that goal from being achieved, if an SoC
-driver has to interact with modules that use a non-GPL license.
-
-As a hypothetical example, consider laptops that have multiple GPUs.
-Today, these ship with onboard graphics (integrated to the CPU or
-chipset) along with a discrete GPU, where in many cases only the onboard
-graphics can actually display to the screen.  In order for anything
-rendered by the discrete GPU to be displayed, it has to be copied to
-memory available for the smaller onboard graphics to texture from or
-display directly.  Obviously, that's best done by sharing dma buffers
-rather than bouncing them through the GPU.  It's not much of a stretch
-to imagine that we'll see such systems with a Tegra CPU/GPU plus a
-discrete GPU in the future; in that case, we'd want to be able to share
-memory between the discrete GPU and the Tegra system.  In that scenario,
-if this interface is GPL-only, we'd be unable to adopt the dma_buffer
-sharing mechanism for Tegra.
-
-(This isn't too pie-in-the-sky, either; people are already combining
-Tegra with discrete GPUs:
-http://blogs.nvidia.com/2011/11/world%e2%80%99s-first-arm-based-supercomputer-to-launch-in-barcelona/
-)
-
-Thanks,
-Robert
+> diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
+> index 20ec3bd..9760a12 100644
+> --- a/arch/arm/mach-mxs/system.c
+> +++ b/arch/arm/mach-mxs/system.c
+> @@ -66,7 +66,7 @@ static int __init mxs_arch_reset_init(void)
+>  
+>  	clk = clk_get_sys("rtc", NULL);
+>  	if (!IS_ERR(clk))
+> -		clk_enable(clk);
+> +		clk_prepare_enable(clk);
+>  
+>  	return 0;
+>  }
+> diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+> index cace0d2..564a632 100644
+> --- a/arch/arm/mach-mxs/timer.c
+> +++ b/arch/arm/mach-mxs/timer.c
+> @@ -245,7 +245,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
+>  
+>  void __init mxs_timer_init(struct clk *timer_clk, int irq)
+>  {
+> -	clk_enable(timer_clk);
+> +	clk_prepare_enable(timer_clk);
+>  
+>  	/*
+>  	 * Initialize timers to a known state
+> -- 
+> 1.7.5.4
