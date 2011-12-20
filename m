@@ -1,66 +1,215 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 20 Dec 2011 20:47:10 +0100
-Subject: [RFC PATCH v3 1/5] dt: add of_get_child_count helper function
-In-Reply-To: <1324402840-32451-2-git-send-email-b29396@freescale.com>
+Date: Tue, 20 Dec 2011 20:48:38 +0100
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <1324402840-32451-3-git-send-email-b29396@freescale.com>
 References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-2-git-send-email-b29396@freescale.com>
-Message-ID: <201112202047.10308.marek.vasut@gmail.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+Message-ID: <201112202048.39012.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> Currently most code to get child count in kernel are almost same,
-> add a helper to implement this function for dt to use.
-> 
-> ---
-> Changes v1->v2:
->  * change the name from of_get_child_number to of_get_child_count
+> This patch provies a common API for driver to use to register pinmux
+> mappings from dts file. It is needed for dt support.
 > 
 > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 > Cc: Grant Likely <grant.likely@secretlab.ca>
 > Cc: Rob Herring <rob.herring@calxeda.com>
 > ---
->  include/linux/of.h |   16 ++++++++++++++++
->  1 files changed, 16 insertions(+), 0 deletions(-)
+>  .../devicetree/bindings/pinctrl/pinctrl.txt        |   33 +++++++
+>  drivers/pinctrl/pinmux.c                           |  101
+> ++++++++++++++++++++ include/linux/pinctrl/machine.h                    | 
+>   6 +
+>  3 files changed, 140 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl.txt
 > 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 4948552..d0d91a1 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -189,6 +189,17 @@ extern struct device_node *of_get_next_child(const
-> struct device_node *node, for (child = of_get_next_child(parent, NULL);
-> child != NULL; \
->  	     child = of_get_next_child(parent, child))
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl.txt
+> b/Documentation/devicetree/bindings/pinctrl/pinctrl.txt new file mode
+> 100644
+> index 0000000..a27a7ce
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl.txt
+> @@ -0,0 +1,33 @@
+> +The pin control subsystem
+> +
+> +The pin control subsystem provides a common API to support parsing pinmux
+> +mappings data from device tree. Each board dts file should provide a
+> device +node of which all the child nodes are the corresponding pinmux
+> mappings. +
+> +The required properties for pinmux mapping are:
+> +- map-name: the name of this specific map entry
+> +- clk-dev-name: the name of the device controlling this specific mapping
+> +- funcion: a function in the driver to use for this mapping
+> +
+> +Optional properties:
+> +- group: a certain specific pin group to activate for the function
+> +- dev-name: the name of the device using this specific mapping
+> +- hog-on-boot: indicate wether hog the mappings(do not need to specify
+> value) +
+> +Examples:
+> +
+> +pinmux: imx6q-sabreauto-map {
+> +	map-sd4 {
+> +		map-name = "usdhc4";
+> +		ctrl-dev-name = "20e0000.iomuxc";
+> +		function = "sd4";
+> +		dev-name = "219c000.usdhc";
+> +	};
+> +	...
+> +};
+> +
+> +Then calling pinmux_of_register_mappings() with the device node of
+> +imx6q-sabreauto-map as parameter to register pinmux mappings from dts.
+> +
+> +Usually user can get this device node via a phandle in driver then call
+> +the function to register maps. Please refer to pinctrl-imx.txt for
+> example. diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+> index 432feb6..3ac3098 100644
+> --- a/drivers/pinctrl/pinmux.c
+> +++ b/drivers/pinctrl/pinmux.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/err.h>
+>  #include <linux/list.h>
+>  #include <linux/mutex.h>
+> +#include <linux/of_device.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/string.h>
+>  #include <linux/sysfs.h>
+> @@ -410,6 +411,106 @@ int __init pinmux_register_mappings(struct pinmux_map
+> const *maps, return 0;
+>  }
 > 
-> +static inline int of_get_child_count(const struct device_node *np)
+> +static int __devinit pinmux_of_parse_mapping(struct device_node *np,
+> +					struct pinmux_map *maps, unsigned id)
 > +{
+> +	struct pinmux_map *map = &maps[id];
+> +	int ret = 0;
+> +
+> +	pr_debug("parse pinmux map %d\n", id + 1);
+> +
+> +	if (of_find_property(np, "map-name", NULL)) {
+> +		ret = of_property_read_string(np, "map-name", &map->name);
+> +		if (ret) {
+> +			pr_err("failed to get map-name");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (of_find_property(np, "ctrl-dev-name", NULL)) {
+> +		ret = of_property_read_string(np, "ctrl-dev-name",
+> +						&map->ctrl_dev_name);
+> +		if (ret) {
+> +			pr_err("failed to get ctrl-dev-name");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (of_find_property(np, "function", NULL)) {
+> +		ret = of_property_read_string(np, "function", &map->function);
+> +		if (ret) {
+> +			pr_err("failed to get function");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (of_find_property(np, "group", NULL)) {
+> +		ret = of_property_read_string(np, "group", &map->group);
+> +		if (ret) {
+> +			pr_err("failed to get group");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (of_find_property(np, "dev-name", NULL)) {
+> +		ret = of_property_read_string(np, "dev-name", &map->dev_name);
+> +		if (ret) {
+> +			pr_err("failed to get dev-name");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (of_find_property(np, "hog-on-boot", NULL))
+> +		map->hog_on_boot = true;
+> +
+> +	pr_debug("map-name: %s ctrl-dev-name: %s function: %s group: %s dev-
+name:
+> %s hog-on-boot: %d\n", +			map->name, map->ctrl_dev_name, 
+map->function,
+> +			map->group, map->dev_name, map->hog_on_boot);
+
+Line too long maybe?
+
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * pinmux_of_register_mappings() - parse and register pinmux mappings from
+> dt + * &np: a device node containing pinmux map properties
+> + *
+> + * Like pinmux_register_mappings(), the memory of pinmux maps are owned by
+> + * pinctrl core and can not be freed.
+> + */
+> +int __devinit pinmux_of_register_mappings(struct device_node *np)
+> +{
+> +	struct pinmux_map *maps;
 > +	struct device_node *child = NULL;
-> +	int num = 0;
+> +	int count, i;
+> +	int ret;
 > +
-> +	while ((child = of_get_next_child(np, child)))
-
-The assignment in this condition really looks eerie, maybe just rewrite it to do  
-{ } while () ? Also, aren't the parenthesis unnecessary?
-
-M
-> +		num++;
+> +	pr_debug("parse pinmux maps from device node %s\n", np->name);
 > +
-> +	return num;
+> +	if (!np)
+> +		return -EINVAL;
+> +
+> +	count = of_get_child_count(np);
+> +	if (!count) {
+> +		pr_err("no available pinmux maps found\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	maps = kzalloc(count * sizeof(struct pinmux_map), GFP_KERNEL);
+> +	if (!maps)
+> +		return -ENOMEM;
+> +
+> +	i = 0;
+> +	for_each_child_of_node(np, child) {
+> +		ret = pinmux_of_parse_mapping(child, maps, i++);
+> +		if (ret) {
+> +			pr_err("failed to parse pinmux map\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	return pinmux_register_mappings(maps, count);
 > +}
 > +
->  extern struct device_node *of_find_node_with_property(
->  	struct device_node *from, const char *prop_name);
->  #define for_each_node_with_property(dn, prop_name) \
-> @@ -262,6 +273,11 @@ static inline bool of_have_populated_dt(void)
->  #define for_each_child_of_node(parent, child) \
->  	while (0)
+>  /**
+>   * acquire_pins() - acquire all the pins for a certain funcion on a pinmux
+>   * @pctldev: the device to take the pins on
+> diff --git a/include/linux/pinctrl/machine.h
+> b/include/linux/pinctrl/machine.h index ad430e0..74a695d 100644
+> --- a/include/linux/pinctrl/machine.h
+> +++ b/include/linux/pinctrl/machine.h
+> @@ -78,6 +78,7 @@ struct pinmux_map {
+>  extern int pinmux_register_mappings(struct pinmux_map const *map,
+>  				unsigned num_maps);
 > 
-> +static inline int of_get_child_count(const struct device_node *np)
+> +extern int pinmux_of_register_mappings(struct device_node *np);
+>  #else
+> 
+>  static inline int pinmux_register_mappings(struct pinmux_map const *map,
+> @@ -86,5 +87,10 @@ static inline int pinmux_register_mappings(struct
+> pinmux_map const *map, return 0;
+>  }
+> 
+> +static inline int pinmux_of_register_mappings(struct device_node *np)
 > +{
-> +	return -ENOSYS;
+> +	return 0;
 > +}
 > +
->  static inline int of_device_is_compatible(const struct device_node
-> *device, const char *name)
->  {
+>  #endif /* !CONFIG_PINMUX */
+>  #endif
