@@ -1,37 +1,37 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 Dec 2011 11:07:13 +0800
-Subject: [alsa-devel] [PATCH 5/5] ASoC: mxs: correct 'direction' of
- device_prep_dma_cyclic
-In-Reply-To: <20111220005100.GJ2860@opensource.wolfsonmicro.com>
-References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
- <1323848866-19768-1-git-send-email-shawn.guo@linaro.org>
- <20111220005100.GJ2860@opensource.wolfsonmicro.com>
-Message-ID: <20111220030712.GC2995@S2101-09.ap.freescale.net>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 20 Dec 2011 04:09:03 +0100
+Subject: [PATCH] MXS: Convert mutexes in clock.c to spinlocks
+In-Reply-To: <20111220001946.GB5683@S2100-06.ap.freescale.net>
+References: <1324217174-6574-1-git-send-email-marek.vasut@gmail.com>
+ <201112200035.52802.marek.vasut@gmail.com>
+ <20111220001946.GB5683@S2100-06.ap.freescale.net>
+Message-ID: <201112200409.04529.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 12:51:01AM +0000, Mark Brown wrote:
-> On Wed, Dec 14, 2011 at 03:47:46PM +0800, Shawn Guo wrote:
-> > The commit 49920bc (dmaengine: add new enum dma_transfer_direction)
-> > changes the type of parameter 'direction' of device_prep_dma_cyclic
-> > from dma_data_direction to dma_transfer_direction.
+> On Tue, Dec 20, 2011 at 12:35:52AM +0100, Marek Vasut wrote:
+> > > On Mon, Dec 19, 2011 at 09:54:25PM +0100, Marek Vasut wrote:
+> > > > > So, in summary, you have everything you require to fix it outside
+> > > > > the driver.  You just have to decide which of the two options you
+> > > > > want to proceed with, and actually (and finally) do it instead of
+> > > > > endlessly procrastinating and waiting for more and more bug
+> > > > > reports (which is exactly what has happened so far.)
+> > > 
+> > > Marek, the 'you' here really means me rather than you.
+> > 
+> > Sure, I figured as much after Russells reply.
+> > 
+> > > Russell, sorry for leaving the issue here for long time, and I'm
+> > > working on the patches you suggested right now.
+> > 
+> > I see ... shall I back off from this issue then? Can I somehow help you
+> > on this?
 > 
-> Applied, thanks.
-> 
-> With patches like this you really need to supply more context - knowing
-> which release the commit you're talking about appears in is useful for
-> exammple,
+> I will try to work out the series soon, and you can help to see if it
+> solves your problem.
 
-This patch only applies to -next, as the offending patch only sits on
--next.
+All right, I'll be glad to review. Make sure to Cc me :)
 
-> as is having some hint as to what the rest of the series is
-> (does this patch depend on any of the earlier patches, and if not why is
-> it part of a series).
+Cheers!
 
-The reason it's in the series is that they are addressing the same
-problem.
-
--- 
-Regards,
-Shawn
+M
