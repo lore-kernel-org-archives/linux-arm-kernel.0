@@ -1,236 +1,82 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 20 Dec 2011 21:25:52 +0800
-Subject: [PATCH v4 2/4] ARM: pxa168: Add SDHCI support
-In-Reply-To: <1324386781-25271-1-git-send-email-tanmay.upadhyay@einfochips.com>
-References: <CAN1soZxZjdzivfttUhDDvjUDiyiAC5SSKtB0rXR1D=3=q6O0wQ@mail.gmail.com>
- <1324386781-25271-1-git-send-email-tanmay.upadhyay@einfochips.com>
-Message-ID: <CAN1soZzzu56SiUa4z2NY0HdqieYTZvM0q-nq1QsnCBLkeD70mg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 Dec 2011 22:34:58 +0900
+Subject: [PATCH 12/12] ARM: restart: S3C24XX: use new restart hook
+In-Reply-To: <201112201418.07935.heiko@sntech.de>
+References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
+ <1324385316-6052-13-git-send-email-kgene.kim@samsung.com>
+ <201112201418.07935.heiko@sntech.de>
+Message-ID: <4EF08F02.9010604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 9:13 PM, Tanmay Upadhyay
-<tanmay.upadhyay@einfochips.com> wrote:
-> v2 - clock register for SDHCI are not common across all MMP SoCs.
-> ? ? So, move PXA168 implementation to pxa168.c
+On 12/20/11 22:18, Heiko St?bner wrote:
+> Am Dienstag, 20. Dezember 2011, 13:48:36 schrieb Kukjin Kim:
+>> Hook these platforms restart code into the new restart hook rather
+>> than using arch_reset().
+>> And adds local header file, common.h in arch/arm/mach-s3c2410/ and
+>> arch/arm/mach-s3c2440/ directories.
+>>
+>> Cc: Ben Dooks<ben-linux@fluff.org>
+>> Cc: Russell King<rmk+kernel@arm.linux.org.uk>
+>> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+> just for my understanding would it not also be possible to move the function
+> prototype to plat-samsung/include/plat/s3c2410.h and s3c244x.h?
 >
-> v3 - sdhci-pxav1 driver code is merged with sdhci-pxav2. So, change
-> ? ? the device name accordingly
-> ? - start sdhci device numbering from 1 as other PXA168 devices
-> ? ? does that
->
-> v4 - Use different names for SD clock registers for PXA168 instead
-> ? ? of redefining them in pxa168.c. Suggested by Haojian Zhuang
->
-> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
-> Reviewed-by: Philip Rakity <prakity@marvell.com>
-> ---
-> ?arch/arm/mach-mmp/include/mach/pxa168.h ? ?| ? 20 ++++++++++++++
-> ?arch/arm/mach-mmp/include/mach/regs-apmu.h | ? 40 ++++++++++++++-------------
-> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ? ? | ? 39 +++++++++++++++++++++++++++
-> ?3 files changed, 80 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
-> index 7fb568d..a181608 100644
-> --- a/arch/arm/mach-mmp/include/mach/pxa168.h
-> +++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-> @@ -15,6 +15,7 @@ extern void pxa168_clear_keypad_wakeup(void);
-> ?#include <plat/pxa27x_keypad.h>
-> ?#include <mach/cputype.h>
-> ?#include <linux/pxa168_eth.h>
-> +#include <linux/platform_data/pxa_sdhci.h>
->
-> ?extern struct pxa_device_desc pxa168_device_uart1;
-> ?extern struct pxa_device_desc pxa168_device_uart2;
-> @@ -34,6 +35,10 @@ extern struct pxa_device_desc pxa168_device_nand;
-> ?extern struct pxa_device_desc pxa168_device_fb;
-> ?extern struct pxa_device_desc pxa168_device_keypad;
-> ?extern struct pxa_device_desc pxa168_device_eth;
-> +extern struct pxa_device_desc pxa168_device_sdh1;
-> +extern struct pxa_device_desc pxa168_device_sdh2;
-> +extern struct pxa_device_desc pxa168_device_sdh3;
-> +extern struct pxa_device_desc pxa168_device_sdh4;
->
-> ?struct pxa168_usb_pdata {
-> ? ? ? ?/* If NULL, default phy init routine for PXA168 would be called */
-> @@ -132,4 +137,19 @@ static inline int pxa168_add_eth(struct pxa168_eth_platform_data *data)
-> ?{
-> ? ? ? ?return pxa_register_device(&pxa168_device_eth, data, sizeof(*data));
-> ?}
-> +
-> +static inline int pxa168_add_sdh(int id, struct sdhci_pxa_platdata *data)
-> +{
-> + ? ? ? struct pxa_device_desc *d = NULL;
-> +
-> + ? ? ? switch (id) {
-> + ? ? ? case 1: d = &pxa168_device_sdh1; break;
-> + ? ? ? case 2: d = &pxa168_device_sdh2; break;
-> + ? ? ? case 3: d = &pxa168_device_sdh3; break;
-> + ? ? ? case 4: d = &pxa168_device_sdh4; break;
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> + ? ? ? return pxa_register_device(d, data, sizeof(*data));
-> +}
-> ?#endif /* __ASM_MACH_PXA168_H */
-> diff --git a/arch/arm/mach-mmp/include/mach/regs-apmu.h b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-> index 8447ac6..a84de77 100644
-> --- a/arch/arm/mach-mmp/include/mach/regs-apmu.h
-> +++ b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-> @@ -17,27 +17,29 @@
-> ?#define APMU_REG(x) ? ?(APMU_VIRT_BASE + (x))
->
-> ?/* Clock Reset Control */
-> -#define APMU_IRE ? ? ? APMU_REG(0x048)
-> -#define APMU_LCD ? ? ? APMU_REG(0x04c)
-> -#define APMU_CCIC ? ? ?APMU_REG(0x050)
-> -#define APMU_SDH0 ? ? ?APMU_REG(0x054)
-> -#define APMU_SDH1 ? ? ?APMU_REG(0x058)
-> -#define APMU_USB ? ? ? APMU_REG(0x05c)
-> -#define APMU_NAND ? ? ?APMU_REG(0x060)
-> -#define APMU_DMA ? ? ? APMU_REG(0x064)
-> -#define APMU_GEU ? ? ? APMU_REG(0x068)
-> -#define APMU_BUS ? ? ? APMU_REG(0x06c)
-> -#define APMU_SDH2 ? ? ?APMU_REG(0x0e8)
-> -#define APMU_SDH3 ? ? ?APMU_REG(0x0ec)
-> -#define APMU_ETH ? ? ? APMU_REG(0x0fc)
-> -
-> -#define APMU_FNCLK_EN ?(1 << 4)
-> -#define APMU_AXICLK_EN (1 << 3)
-> -#define APMU_FNRST_DIS (1 << 1)
-> -#define APMU_AXIRST_DIS ? ? ? ?(1 << 0)
-> +#define APMU_IRE ? ? ? ? ? ? ? APMU_REG(0x048)
-> +#define APMU_LCD ? ? ? ? ? ? ? APMU_REG(0x04c)
-> +#define APMU_CCIC ? ? ? ? ? ? ?APMU_REG(0x050)
-> +#define APMU_SDH0 ? ? ? ? ? ? ?APMU_REG(0x054)
-> +#define APMU_SDH1 ? ? ? ? ? ? ?APMU_REG(0x058)
-> +#define APMU_USB ? ? ? ? ? ? ? APMU_REG(0x05c)
-> +#define APMU_NAND ? ? ? ? ? ? ?APMU_REG(0x060)
-> +#define APMU_DMA ? ? ? ? ? ? ? APMU_REG(0x064)
-> +#define APMU_GEU ? ? ? ? ? ? ? APMU_REG(0x068)
-> +#define APMU_BUS ? ? ? ? ? ? ? APMU_REG(0x06c)
-> +#define APMU_PXA168_SDH2 ? ? ? APMU_REG(0x0e0)
-> +#define APMU_PXA168_SDH3 ? ? ? APMU_REG(0x0e4)
-> +#define APMU_SDH2 ? ? ? ? ? ? ?APMU_REG(0x0e8)
-> +#define APMU_SDH3 ? ? ? ? ? ? ?APMU_REG(0x0ec)
-> +#define APMU_ETH ? ? ? ? ? ? ? APMU_REG(0x0fc)
-> +
-> +#define APMU_FNCLK_EN ? ? ? ? ?(1 << 4)
-> +#define APMU_AXICLK_EN ? ? ? ? (1 << 3)
-> +#define APMU_FNRST_DIS ? ? ? ? (1 << 1)
-> +#define APMU_AXIRST_DIS ? ? ? ? ? ? ? ?(1 << 0)
->
-> ?/* Wake Clear Register */
-> -#define APMU_WAKE_CLR ?APMU_REG(0x07c)
-> +#define APMU_WAKE_CLR ? ? ? ? ?APMU_REG(0x07c)
->
-> ?#define APMU_PXA168_KP_WAKE_CLR ? ? ? ? ? ? ? ?(1 << 7)
-> ?#define APMU_PXA168_CFI_WAKE_CLR ? ? ? (1 << 6)
-> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-> index 76ca15c..023659b 100644
-> --- a/arch/arm/mach-mmp/pxa168.c
-> +++ b/arch/arm/mach-mmp/pxa168.c
-> @@ -65,6 +65,32 @@ void __init pxa168_init_irq(void)
-> ? ? ? ?pxa168_init_gpio();
-> ?}
->
-> +static void sdh_clk_enable(struct clk *clk)
-> +{
-> + ? ? ? void __iomem *reg_offset = clk->clk_rst;
-> +
-> + ? ? ? /* Can't see any clean way to do this: Bits 3 & 0 in registers
-> + ? ? ? ?* for host 0 & 2 should be set for host 1 & 3 also */
-> + ? ? ? if (reg_offset == APMU_SDH0 || reg_offset == APMU_SDH1)
-> + ? ? ? ? ? ? ? __raw_writel(__raw_readl(APMU_SDH0) | 0x9, APMU_SDH0);
-> + ? ? ? if (reg_offset == APMU_PXA168_SDH2 || reg_offset == APMU_PXA168_SDH3)
-> + ? ? ? ? ? ? ? __raw_writel(__raw_readl(APMU_PXA168_SDH2) | 0x9,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? APMU_PXA168_SDH2);
-> +
-> + ? ? ? __raw_writel(__raw_readl(clk->clk_rst) | clk->enable_val, clk->clk_rst);
-> +}
-> +
-How about use the below code instead? I think we can avoid to check
-register offset.
+Hi Heiko,
 
-static void sdh0_clk_enable(struct clk *clk)
-{
-       void __iomem *reg_offset = clk->clk_rst;
+Yeah, we have many choices about that and I will sort out the 
+mach-s3c24.. directories to mach-s3c24xx or just mach-s3c...
 
-       __raw_writel(__raw_readl(APMU_SDH0) | 0x9, APMU_SDH0);
-       __raw_writel(__raw_readl(clk->clk_rst) | clk->enable_val, clk->clk_rst);
-}
-
-static void sdh2_clk_enable(struct clk *clk)
-{
-       void __iomem *reg_offset = clk->clk_rst;
-               __raw_writel(__raw_readl(APMU_PXA168_SDH2) | 0x9,
-                               APMU_PXA168_SDH2);
-       __raw_writel(__raw_readl(clk->clk_rst) | clk->enable_val, clk->clk_rst);
-
-}
-
-struct clkops sdh0_clk_ops = {
-      .enable         = sdh0_clk_enable,
-      .disable        = sdh_clk_disable,
-};
-
-struct clkops sdh2_clk_ops = {
-      .enable         = sdh2_clk_enable,
-      .disable        = sdh_clk_disable,
-};
-
-static APMU_CLK_OPS(sdh1, SDH0, 0x12, 48000000, &sdh0_clk_ops);
-static APMU_CLK_OPS(sdh2, SDH1, 0x12, 48000000, &sdh0_clk_ops);
-static APMU_CLK_OPS(sdh3, PXA168_SDH2, 0x12, 48000000, &sdh2_clk_ops);
-static APMU_CLK_OPS(sdh4, PXA168_SDH3, 0x12, 48000000, &sdh2_clk_ops);
-
-> +static void sdh_clk_disable(struct clk *clk)
-> +{
-> + ? ? ? __raw_writel(__raw_readl(clk->clk_rst) & ~(clk->enable_val),
-> + ? ? ? ? ? ? ? ? ? ? ? clk->clk_rst);
-> +}
-> +
-> +struct clkops sdh_clk_ops = {
-> + ? ? ? .enable ? ? ? ? = sdh_clk_enable,
-> + ? ? ? .disable ? ? ? ?= sdh_clk_disable,
-> +};
-> +
-> ?/* APB peripheral clocks */
-> ?static APBC_CLK(uart1, PXA168_UART1, 1, 14745600);
-> ?static APBC_CLK(uart2, PXA168_UART2, 1, 14745600);
-> @@ -87,6 +113,11 @@ static APMU_CLK(lcd, LCD, 0x7f, 312000000);
-> ?static APMU_CLK(eth, ETH, 0x09, 0);
-> ?static APMU_CLK(usb, USB, 0x12, 0);
+> Or should these files vanish in the long run?
 >
-> +static APMU_CLK_OPS(sdh1, SDH0, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh2, SDH1, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh3, PXA168_SDH2, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh4, PXA168_SDH3, 0x12, 48000000, &sdh_clk_ops);
-> +
-> ?/* device and clock bindings */
-> ?static struct clk_lookup pxa168_clkregs[] = {
-> ? ? ? ?INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
-> @@ -108,6 +139,10 @@ static struct clk_lookup pxa168_clkregs[] = {
-> ? ? ? ?INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_eth, "pxa168-eth", "MFUCLK"),
-> ? ? ? ?INIT_CLKREG(&clk_usb, "pxa168-ehci", "PXA168-USBCLK"),
-> + ? ? ? INIT_CLKREG(&clk_sdh1, NULL, "PXA-SDHCLK"),
-> + ? ? ? INIT_CLKREG(&clk_sdh2, NULL, "PXA-SDHCLK"),
-> + ? ? ? INIT_CLKREG(&clk_sdh3, NULL, "PXA-SDHCLK"),
-> + ? ? ? INIT_CLKREG(&clk_sdh4, NULL, "PXA-SDHCLK"),
-> ?};
+Yes, as per Russell's suggestion, I think we don't need that and as a 
+note, I'm working on removing plat-s3c24xx and plat-s5p, just keeping 
+one plat-samsung.
+
 >
-> ?static int __init pxa168_init(void)
-> @@ -173,6 +208,10 @@ PXA168_DEVICE(ssp5, "pxa168-ssp", 4, SSP5, 0xd4021000, 0x40, 60, 61);
-> ?PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000, 0x1c8);
-> ?PXA168_DEVICE(keypad, "pxa27x-keypad", -1, KEYPAD, 0xd4012000, 0x4c);
-> ?PXA168_DEVICE(eth, "pxa168-eth", -1, MFU, 0xc0800000, 0x0fff);
-> +PXA168_DEVICE(sdh1, "sdhci-pxav2", 0, SDH1, 0xd4280000, 0x100);
-> +PXA168_DEVICE(sdh2, "sdhci-pxav2", 1, SDH1, 0xd4281000, 0x100);
-> +PXA168_DEVICE(sdh3, "sdhci-pxav2", 2, SDH2, 0xd427e000, 0x100);
-> +PXA168_DEVICE(sdh4, "sdhci-pxav2", 3, SDH2, 0xd427f000, 0x100);
+> Also, if you have a minute could you take a look at the
+> [PATCH 1/8] s3c-hsudc: move platform_data struct to global header
+> from yesterday, as Felipe Balbi would like an Ack on it.
 >
-> ?struct resource pxa168_usb_host_resources[] = {
-> ? ? ? ?/* USB Host conroller register base */
-> --
-> 1.7.0.4
+Sure, let me look at that tomorrow with others.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
 >
+>> ---
+>>   arch/arm/mach-s3c2410/common.h                    |   17 +++++++++++++
+>>   arch/arm/mach-s3c2410/include/mach/system-reset.h |   27
+>> --------------------- arch/arm/mach-s3c2410/include/mach/system.h       |
+>>    2 -
+>>   arch/arm/mach-s3c2410/mach-amlm5900.c             |    3 ++
+>>   arch/arm/mach-s3c2410/mach-bast.c                 |    2 +
+>>   arch/arm/mach-s3c2410/mach-h1940.c                |    3 ++
+>>   arch/arm/mach-s3c2410/mach-n30.c                  |    4 +++
+>>   arch/arm/mach-s3c2410/mach-otom.c                 |    3 ++
+>>   arch/arm/mach-s3c2410/mach-qt2410.c               |    5 ++-
+>>   arch/arm/mach-s3c2410/mach-smdk2410.c             |    5 ++-
+>>   arch/arm/mach-s3c2410/mach-tct_hammer.c           |    3 ++
+>>   arch/arm/mach-s3c2410/mach-vr1000.c               |    2 +
+>>   arch/arm/mach-s3c2410/s3c2410.c                   |    9 +++++++
+>>   arch/arm/mach-s3c2440/common.h                    |   17 +++++++++++++
+>>   arch/arm/mach-s3c2440/mach-anubis.c               |    3 ++
+>>   arch/arm/mach-s3c2440/mach-at2440evb.c            |    3 ++
+>>   arch/arm/mach-s3c2440/mach-gta02.c                |    2 +
+>>   arch/arm/mach-s3c2440/mach-mini2440.c             |    3 ++
+>>   arch/arm/mach-s3c2440/mach-nexcoder.c             |    3 ++
+>>   arch/arm/mach-s3c2440/mach-osiris.c               |    3 ++
+>>   arch/arm/mach-s3c2440/mach-rx1950.c               |    3 ++
+>>   arch/arm/mach-s3c2440/mach-rx3715.c               |    3 ++
+>>   arch/arm/mach-s3c2440/mach-smdk2440.c             |    3 ++
+>>   arch/arm/mach-s3c2440/s3c2440.c                   |    9 +++++++
+>>   arch/arm/plat-s3c24xx/cpu.c                       |    2 -
+>>   25 files changed, 104 insertions(+), 35 deletions(-)
+>>   create mode 100644 arch/arm/mach-s3c2410/common.h
+>>   delete mode 100644 arch/arm/mach-s3c2410/include/mach/system-reset.h
+>>   create mode 100644 arch/arm/mach-s3c2440/common.h
