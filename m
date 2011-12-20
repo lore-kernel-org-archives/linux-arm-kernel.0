@@ -1,338 +1,551 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 Dec 2011 21:48:35 +0900
-Subject: [PATCH 11/12] ARM: restart: S3C24XX: move SWRST based S3C platforms
- to machine_desc hook
+Date: Tue, 20 Dec 2011 21:48:36 +0900
+Subject: [PATCH 12/12] ARM: restart: S3C24XX: use new restart hook
 In-Reply-To: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
 References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1324385316-6052-12-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1324385316-6052-13-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Heiko Stuebner <heiko@sntech.de>
+Hook these platforms restart code into the new restart hook rather
+than using arch_reset().
+And adds local header file, common.h in arch/arm/mach-s3c2410/ and
+arch/arm/mach-s3c2440/ directories.
 
-S3C2412/S3C2416/S3C2443 use a special register to signal the reset to
-the processor and used therefore the s3c24xx_reset_hook mechanism in the
-s3c24xx-specific arch reset.
-
-This patch introduces restart functions for these architectures,
-moves the board files to them and removes the s3c24xx_reset_hook
-infrastructure, as all users are gone.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c2410/include/mach/reset.h        |   22 ---------------------
- arch/arm/mach-s3c2410/include/mach/system-reset.h |    5 ----
+ arch/arm/mach-s3c2410/common.h                    |   17 +++++++++++++
+ arch/arm/mach-s3c2410/include/mach/system-reset.h |   27 ---------------------
  arch/arm/mach-s3c2410/include/mach/system.h       |    2 -
- arch/arm/mach-s3c2412/mach-jive.c                 |    2 +
- arch/arm/mach-s3c2412/mach-smdk2413.c             |    3 ++
- arch/arm/mach-s3c2412/mach-vstms.c                |    1 +
- arch/arm/mach-s3c2412/s3c2412.c                   |   10 +++-----
- arch/arm/mach-s3c2416/mach-smdk2416.c             |    1 +
- arch/arm/mach-s3c2416/s3c2416.c                   |    7 +++--
- arch/arm/mach-s3c2443/mach-smdk2443.c             |    1 +
- arch/arm/mach-s3c2443/s3c2443.c                   |    8 +++---
- arch/arm/plat-samsung/include/plat/s3c2412.h      |    3 ++
- arch/arm/plat-samsung/include/plat/s3c2416.h      |    2 +
- arch/arm/plat-samsung/include/plat/s3c2443.h      |    2 +
- 14 files changed, 27 insertions(+), 42 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/include/mach/reset.h
+ arch/arm/mach-s3c2410/mach-amlm5900.c             |    3 ++
+ arch/arm/mach-s3c2410/mach-bast.c                 |    2 +
+ arch/arm/mach-s3c2410/mach-h1940.c                |    3 ++
+ arch/arm/mach-s3c2410/mach-n30.c                  |    4 +++
+ arch/arm/mach-s3c2410/mach-otom.c                 |    3 ++
+ arch/arm/mach-s3c2410/mach-qt2410.c               |    5 ++-
+ arch/arm/mach-s3c2410/mach-smdk2410.c             |    5 ++-
+ arch/arm/mach-s3c2410/mach-tct_hammer.c           |    3 ++
+ arch/arm/mach-s3c2410/mach-vr1000.c               |    2 +
+ arch/arm/mach-s3c2410/s3c2410.c                   |    9 +++++++
+ arch/arm/mach-s3c2440/common.h                    |   17 +++++++++++++
+ arch/arm/mach-s3c2440/mach-anubis.c               |    3 ++
+ arch/arm/mach-s3c2440/mach-at2440evb.c            |    3 ++
+ arch/arm/mach-s3c2440/mach-gta02.c                |    2 +
+ arch/arm/mach-s3c2440/mach-mini2440.c             |    3 ++
+ arch/arm/mach-s3c2440/mach-nexcoder.c             |    3 ++
+ arch/arm/mach-s3c2440/mach-osiris.c               |    3 ++
+ arch/arm/mach-s3c2440/mach-rx1950.c               |    3 ++
+ arch/arm/mach-s3c2440/mach-rx3715.c               |    3 ++
+ arch/arm/mach-s3c2440/mach-smdk2440.c             |    3 ++
+ arch/arm/mach-s3c2440/s3c2440.c                   |    9 +++++++
+ arch/arm/plat-s3c24xx/cpu.c                       |    2 -
+ 25 files changed, 104 insertions(+), 35 deletions(-)
+ create mode 100644 arch/arm/mach-s3c2410/common.h
+ delete mode 100644 arch/arm/mach-s3c2410/include/mach/system-reset.h
+ create mode 100644 arch/arm/mach-s3c2440/common.h
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/reset.h b/arch/arm/mach-s3c2410/include/mach/reset.h
+diff --git a/arch/arm/mach-s3c2410/common.h b/arch/arm/mach-s3c2410/common.h
+new file mode 100644
+index 0000000..f65dc80
+--- /dev/null
++++ b/arch/arm/mach-s3c2410/common.h
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Common Header for S3C2410 machines
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ARCH_ARM_MACH_S3C2410_COMMON_H
++#define __ARCH_ARM_MACH_S3C2410_COMMON_H
++
++void s3c2410_restart(char mode, const char *cmd);
++
++#endif /* __ARCH_ARM_MACH_S3C2410_COMMON_H */
+diff --git a/arch/arm/mach-s3c2410/include/mach/system-reset.h b/arch/arm/mach-s3c2410/include/mach/system-reset.h
 deleted file mode 100644
-index f8c9387..0000000
---- a/arch/arm/mach-s3c2410/include/mach/reset.h
+index 1e495f3..0000000
+--- a/arch/arm/mach-s3c2410/include/mach/system-reset.h
 +++ /dev/null
-@@ -1,22 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/reset.h
+@@ -1,27 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/system-reset.h
 - *
-- * Copyright (c) 2007 Simtec Electronics
+- * Copyright (c) 2008 Simtec Electronics
 - *	Ben Dooks <ben@simtec.co.uk>
-- *	http://armlinux.simtec.co.uk/
+- *
+- * S3C2410 - System define for arch_reset() function
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
-- *
-- * S3C2410 CPU reset controls
 -*/
 -
--#ifndef __ASM_ARCH_RESET_H
--#define __ASM_ARCH_RESET_H __FILE__
+-#include <mach/hardware.h>
+-#include <plat/watchdog-reset.h>
 -
--/* This allows the over-ride of the default reset code
--*/
+-static void
+-arch_reset(char mode, const char *cmd)
+-{
+-	if (mode == 's') {
+-		soft_restart(0);
+-	}
 -
--extern void (*s3c24xx_reset_hook)(void);
+-	arch_wdt_reset();
 -
--#endif /* __ASM_ARCH_RESET_H */
-diff --git a/arch/arm/mach-s3c2410/include/mach/system-reset.h b/arch/arm/mach-s3c2410/include/mach/system-reset.h
-index 913893d..1e495f3 100644
---- a/arch/arm/mach-s3c2410/include/mach/system-reset.h
-+++ b/arch/arm/mach-s3c2410/include/mach/system-reset.h
-@@ -13,8 +13,6 @@
- #include <mach/hardware.h>
- #include <plat/watchdog-reset.h>
- 
--extern void (*s3c24xx_reset_hook)(void);
--
- static void
- arch_reset(char mode, const char *cmd)
- {
-@@ -22,9 +20,6 @@ arch_reset(char mode, const char *cmd)
- 		soft_restart(0);
- 	}
- 
--	if (s3c24xx_reset_hook)
--		s3c24xx_reset_hook();
--
- 	arch_wdt_reset();
- 
- 	/* we'll take a jump through zero as a poor second */
+-	/* we'll take a jump through zero as a poor second */
+-	soft_restart(0);
+-}
 diff --git a/arch/arm/mach-s3c2410/include/mach/system.h b/arch/arm/mach-s3c2410/include/mach/system.h
-index a8cbca6..eef8f24 100644
+index eef8f24..5e215c1 100644
 --- a/arch/arm/mach-s3c2410/include/mach/system.h
 +++ b/arch/arm/mach-s3c2410/include/mach/system.h
-@@ -15,12 +15,10 @@
- 
- #include <mach/map.h>
- #include <mach/idle.h>
--#include <mach/reset.h>
- 
- #include <mach/regs-clock.h>
- 
- void (*s3c24xx_idle)(void);
--void (*s3c24xx_reset_hook)(void);
- 
- void s3c24xx_default_idle(void)
- {
-diff --git a/arch/arm/mach-s3c2412/mach-jive.c b/arch/arm/mach-s3c2412/mach-jive.c
-index 286ef17..ae73ba3 100644
---- a/arch/arm/mach-s3c2412/mach-jive.c
-+++ b/arch/arm/mach-s3c2412/mach-jive.c
-@@ -48,6 +48,7 @@
- #include <linux/mtd/nand_ecc.h>
- #include <linux/mtd/partitions.h>
- 
-+#include <plat/s3c2412.h>
- #include <plat/gpio-cfg.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
-@@ -661,4 +662,5 @@ MACHINE_START(JIVE, "JIVE")
- 	.map_io		= jive_map_io,
- 	.init_machine	= jive_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.restart	= s3c2412_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c2412/mach-smdk2413.c b/arch/arm/mach-s3c2412/mach-smdk2413.c
-index f1eec1b..b11451b 100644
---- a/arch/arm/mach-s3c2412/mach-smdk2413.c
-+++ b/arch/arm/mach-s3c2412/mach-smdk2413.c
-@@ -134,6 +134,7 @@ MACHINE_START(S3C2413, "S3C2413")
- 	.map_io		= smdk2413_map_io,
- 	.init_machine	= smdk2413_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.restart	= s3c2412_restart,
- MACHINE_END
- 
- MACHINE_START(SMDK2412, "SMDK2412")
-@@ -145,6 +146,7 @@ MACHINE_START(SMDK2412, "SMDK2412")
- 	.map_io		= smdk2413_map_io,
- 	.init_machine	= smdk2413_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.restart	= s3c2412_restart,
- MACHINE_END
- 
- MACHINE_START(SMDK2413, "SMDK2413")
-@@ -156,4 +158,5 @@ MACHINE_START(SMDK2413, "SMDK2413")
- 	.map_io		= smdk2413_map_io,
- 	.init_machine	= smdk2413_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.restart	= s3c2412_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c2412/mach-vstms.c b/arch/arm/mach-s3c2412/mach-vstms.c
-index 1bbb1ef..94bfaa1 100644
---- a/arch/arm/mach-s3c2412/mach-vstms.c
-+++ b/arch/arm/mach-s3c2412/mach-vstms.c
-@@ -162,4 +162,5 @@ MACHINE_START(VSTMS, "VSTMS")
- 	.init_machine	= vstms_init,
- 	.map_io		= vstms_map_io,
- 	.timer		= &s3c24xx_timer,
-+	.restart	= s3c2412_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c2412/s3c2412.c b/arch/arm/mach-s3c2412/s3c2412.c
-index 57a1e01..867ce2e 100644
---- a/arch/arm/mach-s3c2412/s3c2412.c
-+++ b/arch/arm/mach-s3c2412/s3c2412.c
-@@ -32,7 +32,6 @@
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
- 
--#include <mach/reset.h>
- #include <mach/idle.h>
- 
- #include <plat/cpu-freq.h>
-@@ -131,8 +130,11 @@ static void s3c2412_idle(void)
- 	cpu_do_idle();
+@@ -52,5 +52,3 @@ static void arch_idle(void)
+ 	else
+ 		s3c24xx_default_idle();
  }
+-
+-#include <mach/system-reset.h>
+diff --git a/arch/arm/mach-s3c2410/mach-amlm5900.c b/arch/arm/mach-s3c2410/mach-amlm5900.c
+index 7983894..4220cc6 100644
+--- a/arch/arm/mach-s3c2410/mach-amlm5900.c
++++ b/arch/arm/mach-s3c2410/mach-amlm5900.c
+@@ -63,6 +63,8 @@
+ #include <linux/mtd/map.h>
+ #include <linux/mtd/physmap.h>
  
--static void s3c2412_hard_reset(void)
-+void s3c2412_restart(char mode, const char *cmd)
- {
-+	if (mode == 's')
-+		soft_restart(0);
++#include "common.h"
 +
- 	/* errata "Watch-dog/Software Reset Problem" specifies that
- 	 * this reset must be done with the SYSCLK sourced from
- 	 * EXTCLK instead of FOUT to avoid a glitch in the reset
-@@ -164,10 +166,6 @@ void __init s3c2412_map_io(void)
- 
- 	s3c24xx_idle = s3c2412_idle;
- 
--	/* set custom reset hook */
--
--	s3c24xx_reset_hook = s3c2412_hard_reset;
--
- 	/* register our io-tables */
- 
- 	iotable_init(s3c2412_iodesc, ARRAY_SIZE(s3c2412_iodesc));
-diff --git a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c2416/mach-smdk2416.c
-index a9eee53..66b7173 100644
---- a/arch/arm/mach-s3c2416/mach-smdk2416.c
-+++ b/arch/arm/mach-s3c2416/mach-smdk2416.c
-@@ -251,4 +251,5 @@ MACHINE_START(SMDK2416, "SMDK2416")
- 	.map_io		= smdk2416_map_io,
- 	.init_machine	= smdk2416_machine_init,
+ static struct resource amlm5900_nor_resource = {
+ 		.start = 0x00000000,
+ 		.end   = 0x01000000 - 1,
+@@ -241,4 +243,5 @@ MACHINE_START(AML_M5900, "AML_M5900")
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.init_machine	= amlm5900_init,
  	.timer		= &s3c24xx_timer,
-+	.restart	= s3c2416_restart,
++	.restart	= s3c2410_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
-index ee214bc..4606223 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -44,7 +44,6 @@
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
+diff --git a/arch/arm/mach-s3c2410/mach-bast.c b/arch/arm/mach-s3c2410/mach-bast.c
+index a20ae1a..c6133c6 100644
+--- a/arch/arm/mach-s3c2410/mach-bast.c
++++ b/arch/arm/mach-s3c2410/mach-bast.c
+@@ -66,6 +66,7 @@
  
--#include <mach/reset.h>
- #include <mach/idle.h>
- #include <mach/regs-s3c2443-clock.h>
+ #include "usb-simtec.h"
+ #include "nor-simtec.h"
++#include "common.h"
  
-@@ -76,8 +75,11 @@ static struct sys_device s3c2416_sysdev = {
- 	.cls		= &s3c2416_sysclass,
+ #define COPYRIGHT ", Copyright 2004-2008 Simtec Electronics"
+ 
+@@ -662,4 +663,5 @@ MACHINE_START(BAST, "Simtec-BAST")
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.init_machine	= bast_init,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2410_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
+index 05a7d16..ad9d865 100644
+--- a/arch/arm/mach-s3c2410/mach-h1940.c
++++ b/arch/arm/mach-s3c2410/mach-h1940.c
+@@ -70,6 +70,8 @@
+ 
+ #include <sound/uda1380.h>
+ 
++#include "common.h"
++
+ #define H1940_LATCH		((void __force __iomem *)0xF8000000)
+ 
+ #define H1940_PA_LATCH		S3C2410_CS2
+@@ -751,4 +753,5 @@ MACHINE_START(H1940, "IPAQ-H1940")
+ 	.init_irq	= h1940_init_irq,
+ 	.init_machine	= h1940_init,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2410_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
+index 1dc3e32..383d00c 100644
+--- a/arch/arm/mach-s3c2410/mach-n30.c
++++ b/arch/arm/mach-s3c2410/mach-n30.c
+@@ -51,6 +51,8 @@
+ #include <plat/s3c2410.h>
+ #include <plat/udc.h>
+ 
++#include "common.h"
++
+ static struct map_desc n30_iodesc[] __initdata = {
+ 	/* nothing here yet */
  };
- 
--static void s3c2416_hard_reset(void)
-+void s3c2416_restart(char mode, const char *cmd)
- {
-+	if (mode == 's')
-+		soft_restart(0);
-+
- 	__raw_writel(S3C2443_SWRST_RESET, S3C2443_SWRST);
- }
- 
-@@ -85,7 +87,6 @@ int __init s3c2416_init(void)
- {
- 	printk(KERN_INFO "S3C2416: Initializing architecture\n");
- 
--	s3c24xx_reset_hook = s3c2416_hard_reset;
- 	/* s3c24xx_idle = s3c2416_idle;	*/
- 
- 	/* change WDT IRQ number */
-diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c2443/mach-smdk2443.c
-index bec107e..2092369 100644
---- a/arch/arm/mach-s3c2443/mach-smdk2443.c
-+++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
-@@ -145,4 +145,5 @@ MACHINE_START(SMDK2443, "SMDK2443")
- 	.map_io		= smdk2443_map_io,
- 	.init_machine	= smdk2443_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.restart	= s3c2443_restart,
+@@ -591,6 +593,7 @@ MACHINE_START(N30, "Acer-N30")
+ 	.init_machine	= n30_init,
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.map_io		= n30_map_io,
++	.restart	= s3c2410_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-s3c2443/s3c2443.c b/arch/arm/mach-s3c2443/s3c2443.c
-index a22b771..4568ded 100644
---- a/arch/arm/mach-s3c2443/s3c2443.c
-+++ b/arch/arm/mach-s3c2443/s3c2443.c
-@@ -31,7 +31,6 @@
- #include <asm/irq.h>
  
- #include <mach/regs-s3c2443-clock.h>
--#include <mach/reset.h>
+ MACHINE_START(N35, "Acer-N35")
+@@ -601,4 +604,5 @@ MACHINE_START(N35, "Acer-N35")
+ 	.init_machine	= n30_init,
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.map_io		= n30_map_io,
++	.restart	= s3c2410_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2410/mach-otom.c b/arch/arm/mach-s3c2410/mach-otom.c
+index f03f3fd..5f1e0ee 100644
+--- a/arch/arm/mach-s3c2410/mach-otom.c
++++ b/arch/arm/mach-s3c2410/mach-otom.c
+@@ -38,6 +38,8 @@
+ #include <plat/iic.h>
+ #include <plat/cpu.h>
+ 
++#include "common.h"
++
+ static struct map_desc otom11_iodesc[] __initdata = {
+   /* Device area */
+ 	{ (u32)OTOM_VA_CS8900A_BASE, OTOM_PA_CS8900A_BASE, SZ_16M, MT_DEVICE },
+@@ -121,4 +123,5 @@ MACHINE_START(OTOM, "Nex Vision - Otom 1.1")
+ 	.init_machine	= otom11_init,
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2410_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2410/mach-qt2410.c b/arch/arm/mach-s3c2410/mach-qt2410.c
+index 4518521..58f2c17 100644
+--- a/arch/arm/mach-s3c2410/mach-qt2410.c
++++ b/arch/arm/mach-s3c2410/mach-qt2410.c
+@@ -62,6 +62,8 @@
+ #include <plat/cpu.h>
+ #include <plat/pm.h>
+ 
++#include "common.h"
++
+ static struct map_desc qt2410_iodesc[] __initdata = {
+ 	{ 0xe0000000, __phys_to_pfn(S3C2410_CS3+0x01000000), SZ_1M, MT_DEVICE }
+ };
+@@ -350,6 +352,5 @@ MACHINE_START(QT2410, "QT2410")
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.init_machine	= qt2410_machine_init,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2410_restart,
+ MACHINE_END
+-
+-
+diff --git a/arch/arm/mach-s3c2410/mach-smdk2410.c b/arch/arm/mach-s3c2410/mach-smdk2410.c
+index 99c9dfd..bdc27e7 100644
+--- a/arch/arm/mach-s3c2410/mach-smdk2410.c
++++ b/arch/arm/mach-s3c2410/mach-smdk2410.c
+@@ -54,6 +54,8 @@
+ 
+ #include <plat/common-smdk.h>
+ 
++#include "common.h"
++
+ static struct map_desc smdk2410_iodesc[] __initdata = {
+   /* nothing here yet */
+ };
+@@ -116,6 +118,5 @@ MACHINE_START(SMDK2410, "SMDK2410") /* @TODO: request a new identifier and switc
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.init_machine	= smdk2410_init,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2410_restart,
+ MACHINE_END
+-
+-
+diff --git a/arch/arm/mach-s3c2410/mach-tct_hammer.c b/arch/arm/mach-s3c2410/mach-tct_hammer.c
+index e0d0b6f..1114666 100644
+--- a/arch/arm/mach-s3c2410/mach-tct_hammer.c
++++ b/arch/arm/mach-s3c2410/mach-tct_hammer.c
+@@ -54,6 +54,8 @@
+ #include <linux/mtd/map.h>
+ #include <linux/mtd/physmap.h>
+ 
++#include "common.h"
++
+ static struct resource tct_hammer_nor_resource = {
+ 		.start = 0x00000000,
+ 		.end   = 0x01000000 - 1,
+@@ -151,4 +153,5 @@ MACHINE_START(TCT_HAMMER, "TCT_HAMMER")
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.init_machine	= tct_hammer_init,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2410_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2410/mach-vr1000.c b/arch/arm/mach-s3c2410/mach-vr1000.c
+index df47e8e..cc7032b 100644
+--- a/arch/arm/mach-s3c2410/mach-vr1000.c
++++ b/arch/arm/mach-s3c2410/mach-vr1000.c
+@@ -53,6 +53,7 @@
+ 
+ #include "usb-simtec.h"
+ #include "nor-simtec.h"
++#include "common.h"
+ 
+ /* macros for virtual address mods for the io space entries */
+ #define VA_C5(item) ((unsigned long)(item) + BAST_VAM_CS5)
+@@ -405,4 +406,5 @@ MACHINE_START(VR1000, "Thorcom-VR1000")
+ 	.init_machine	= vr1000_init,
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2410_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2410/s3c2410.c b/arch/arm/mach-s3c2410/s3c2410.c
+index 3d7ebc5..c3044cd 100644
+--- a/arch/arm/mach-s3c2410/s3c2410.c
++++ b/arch/arm/mach-s3c2410/s3c2410.c
+@@ -42,6 +42,7 @@
+ #include <plat/clock.h>
+ #include <plat/pll.h>
+ #include <plat/pm.h>
++#include <plat/watchdog-reset.h>
  
  #include <plat/gpio-core.h>
  #include <plat/gpio-cfg.h>
-@@ -57,8 +56,11 @@ static struct sys_device s3c2443_sysdev = {
- 	.cls		= &s3c2443_sysclass,
- };
- 
--static void s3c2443_hard_reset(void)
-+void s3c2443_restart(char mode, const char *cmd)
- {
-+	if (mode == 's')
-+		soft_restart(0);
-+
- 	__raw_writel(S3C2443_SWRST_RESET, S3C2443_SWRST);
+@@ -183,3 +184,11 @@ int __init s3c2410a_init(void)
+ 	s3c2410_sysdev.cls = &s3c2410a_sysclass;
+ 	return s3c2410_init();
  }
- 
-@@ -66,8 +68,6 @@ int __init s3c2443_init(void)
- {
- 	printk("S3C2443: Initialising architecture\n");
- 
--	s3c24xx_reset_hook = s3c2443_hard_reset;
--
- 	s3c_nand_setname("s3c2412-nand");
- 	s3c_fb_setname("s3c2443-fb");
- 
-diff --git a/arch/arm/plat-samsung/include/plat/s3c2412.h b/arch/arm/plat-samsung/include/plat/s3c2412.h
-index 5bcfd14..cbae50d 100644
---- a/arch/arm/plat-samsung/include/plat/s3c2412.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c2412.h
-@@ -21,9 +21,12 @@ extern void s3c2412_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- extern void s3c2412_init_clocks(int xtal);
- 
- extern  int s3c2412_baseclk_add(void);
 +
-+extern void s3c2412_restart(char mode, const char *cmd);
- #else
- #define s3c2412_init_clocks NULL
- #define s3c2412_init_uarts NULL
- #define s3c2412_map_io NULL
- #define s3c2412_init NULL
-+#define s3c2412_restart NULL
- #endif
-diff --git a/arch/arm/plat-samsung/include/plat/s3c2416.h b/arch/arm/plat-samsung/include/plat/s3c2416.h
-index a764f85..de2b5bd 100644
---- a/arch/arm/plat-samsung/include/plat/s3c2416.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c2416.h
-@@ -23,9 +23,11 @@ extern void s3c2416_init_clocks(int xtal);
++void s3c2410_restart(char mode, const char *cmd)
++{
++	if (mode != 's')
++		arch_wdt_reset();
++
++	soft_restart(0);
++}
+diff --git a/arch/arm/mach-s3c2440/common.h b/arch/arm/mach-s3c2440/common.h
+new file mode 100644
+index 0000000..db8a98a
+--- /dev/null
++++ b/arch/arm/mach-s3c2440/common.h
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Common Header for S3C2440 machines
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ARCH_ARM_MACH_S3C2440_COMMON_H
++#define __ARCH_ARM_MACH_S3C2440_COMMON_H
++
++void s3c2440_restart(char mode, const char *cmd);
++
++#endif /* __ARCH_ARM_MACH_S3C2440_COMMON_H */
+diff --git a/arch/arm/mach-s3c2440/mach-anubis.c b/arch/arm/mach-s3c2440/mach-anubis.c
+index 74f92fc..121ff8d 100644
+--- a/arch/arm/mach-s3c2440/mach-anubis.c
++++ b/arch/arm/mach-s3c2440/mach-anubis.c
+@@ -55,6 +55,8 @@
+ #include <plat/cpu.h>
+ #include <plat/audio-simtec.h>
  
- extern  int s3c2416_baseclk_add(void);
++#include "common.h"
++
+ #define COPYRIGHT ", Copyright 2005-2009 Simtec Electronics"
  
-+extern void s3c2416_restart(char mode, const char *cmd);
- #else
- #define s3c2416_init_clocks NULL
- #define s3c2416_init_uarts NULL
- #define s3c2416_map_io NULL
- #define s3c2416_init NULL
-+#define s3c2416_restart NULL
- #endif
-diff --git a/arch/arm/plat-samsung/include/plat/s3c2443.h b/arch/arm/plat-samsung/include/plat/s3c2443.h
-index 7fae1a0..dce05b4 100644
---- a/arch/arm/plat-samsung/include/plat/s3c2443.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c2443.h
-@@ -24,11 +24,13 @@ extern void s3c2443_init_clocks(int xtal);
+ static struct map_desc anubis_iodesc[] __initdata = {
+@@ -503,4 +505,5 @@ MACHINE_START(ANUBIS, "Simtec-Anubis")
+ 	.init_machine	= anubis_init,
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/mach-at2440evb.c b/arch/arm/mach-s3c2440/mach-at2440evb.c
+index 38887ee..b7e334f 100644
+--- a/arch/arm/mach-s3c2440/mach-at2440evb.c
++++ b/arch/arm/mach-s3c2440/mach-at2440evb.c
+@@ -49,6 +49,8 @@
+ #include <plat/cpu.h>
+ #include <plat/mci.h>
  
- extern  int s3c2443_baseclk_add(void);
++#include "common.h"
++
+ static struct map_desc at2440evb_iodesc[] __initdata = {
+ 	/* Nothing here */
+ };
+@@ -238,4 +240,5 @@ MACHINE_START(AT2440EVB, "AT2440EVB")
+ 	.init_machine	= at2440evb_init,
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
+index de1e0ff..5859e60 100644
+--- a/arch/arm/mach-s3c2440/mach-gta02.c
++++ b/arch/arm/mach-s3c2440/mach-gta02.c
+@@ -90,6 +90,7 @@
+ #include <plat/iic.h>
+ #include <plat/ts.h>
  
-+extern void s3c2443_restart(char mode, const char *cmd);
- #else
- #define s3c2443_init_clocks NULL
- #define s3c2443_init_uarts NULL
- #define s3c2443_map_io NULL
- #define s3c2443_init NULL
-+#define s3c2443_restart NULL
- #endif
++#include "common.h"
  
- /* common code used by s3c2443 and others.
+ static struct pcf50633 *gta02_pcf;
+ 
+@@ -600,4 +601,5 @@ MACHINE_START(NEO1973_GTA02, "GTA02")
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.init_machine	= gta02_machine_init,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index 91fe0b4..437322f 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -60,6 +60,8 @@
+ 
+ #include <sound/s3c24xx_uda134x.h>
+ 
++#include "common.h"
++
+ #define MACH_MINI2440_DM9K_BASE (S3C2410_CS4 + 0x300)
+ 
+ static struct map_desc mini2440_iodesc[] __initdata = {
+@@ -681,4 +683,5 @@ MACHINE_START(MINI2440, "MINI2440")
+ 	.init_machine	= mini2440_init,
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/mach-nexcoder.c b/arch/arm/mach-s3c2440/mach-nexcoder.c
+index 61c0bf1..40eaf84 100644
+--- a/arch/arm/mach-s3c2440/mach-nexcoder.c
++++ b/arch/arm/mach-s3c2440/mach-nexcoder.c
+@@ -47,6 +47,8 @@
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ 
++#include "common.h"
++
+ static struct map_desc nexcoder_iodesc[] __initdata = {
+ 	/* nothing here yet */
+ };
+@@ -156,4 +158,5 @@ MACHINE_START(NEXCODER_2440, "NexVision - Nexcoder 2440")
+ 	.init_machine	= nexcoder_init,
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/mach-osiris.c b/arch/arm/mach-s3c2440/mach-osiris.c
+index dc142eb..e795715 100644
+--- a/arch/arm/mach-s3c2440/mach-osiris.c
++++ b/arch/arm/mach-s3c2440/mach-osiris.c
+@@ -54,6 +54,8 @@
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ 
++#include "common.h"
++
+ /* onboard perihperal map */
+ 
+ static struct map_desc osiris_iodesc[] __initdata = {
+@@ -452,4 +454,5 @@ MACHINE_START(OSIRIS, "Simtec-OSIRIS")
+ 	.init_irq	= s3c24xx_init_irq,
+ 	.init_machine	= osiris_init,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
+index 0d3453b..1c50d3e 100644
+--- a/arch/arm/mach-s3c2440/mach-rx1950.c
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c
+@@ -62,6 +62,8 @@
+ 
+ #include <sound/uda1380.h>
+ 
++#include "common.h"
++
+ #define LCD_PWM_PERIOD 192960
+ #define LCD_PWM_DUTY 127353
+ 
+@@ -832,4 +834,5 @@ MACHINE_START(RX1950, "HP iPAQ RX1950")
+ 	.init_irq = s3c24xx_init_irq,
+ 	.init_machine = rx1950_init_machine,
+ 	.timer = &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/mach-rx3715.c b/arch/arm/mach-s3c2440/mach-rx3715.c
+index e19499c..4d20a01 100644
+--- a/arch/arm/mach-s3c2440/mach-rx3715.c
++++ b/arch/arm/mach-s3c2440/mach-rx3715.c
+@@ -51,6 +51,8 @@
+ #include <plat/cpu.h>
+ #include <plat/pm.h>
+ 
++#include "common.h"
++
+ static struct map_desc rx3715_iodesc[] __initdata = {
+ 	/* dump ISA space somewhere unused */
+ 
+@@ -224,4 +226,5 @@ MACHINE_START(RX3715, "IPAQ-RX3715")
+ 	.init_irq	= rx3715_init_irq,
+ 	.init_machine	= rx3715_init_machine,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/mach-smdk2440.c b/arch/arm/mach-s3c2440/mach-smdk2440.c
+index 36eeb41..1deb60d 100644
+--- a/arch/arm/mach-s3c2440/mach-smdk2440.c
++++ b/arch/arm/mach-s3c2440/mach-smdk2440.c
+@@ -47,6 +47,8 @@
+ 
+ #include <plat/common-smdk.h>
+ 
++#include "common.h"
++
+ static struct map_desc smdk2440_iodesc[] __initdata = {
+ 	/* ISA IO Space map (memory space selected by A24) */
+ 
+@@ -181,4 +183,5 @@ MACHINE_START(S3C2440, "SMDK2440")
+ 	.map_io		= smdk2440_map_io,
+ 	.init_machine	= smdk2440_machine_init,
+ 	.timer		= &s3c24xx_timer,
++	.restart	= s3c2440_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c2440/s3c2440.c b/arch/arm/mach-s3c2440/s3c2440.c
+index 37f8cc6..01a8dc8 100644
+--- a/arch/arm/mach-s3c2440/s3c2440.c
++++ b/arch/arm/mach-s3c2440/s3c2440.c
+@@ -35,6 +35,7 @@
+ #include <plat/cpu.h>
+ #include <plat/s3c244x.h>
+ #include <plat/pm.h>
++#include <plat/watchdog-reset.h>
+ 
+ #include <plat/gpio-core.h>
+ #include <plat/gpio-cfg.h>
+@@ -73,3 +74,11 @@ void __init s3c2440_map_io(void)
+ 	s3c24xx_gpiocfg_default.set_pull = s3c24xx_gpio_setpull_1up;
+ 	s3c24xx_gpiocfg_default.get_pull = s3c24xx_gpio_getpull_1up;
+ }
++
++void s3c2440_restart(char mode, const char *cmd)
++{
++	if (mode != 's')
++		arch_wdt_reset();
++
++	soft_restart(0);
++}
+diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+index 3c63353..48fb8d8 100644
+--- a/arch/arm/plat-s3c24xx/cpu.c
++++ b/arch/arm/plat-s3c24xx/cpu.c
+@@ -38,8 +38,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
+-#include <mach/system-reset.h>
+-
+ #include <mach/regs-gpio.h>
+ #include <plat/regs-serial.h>
+ 
 -- 
 1.7.4.4
