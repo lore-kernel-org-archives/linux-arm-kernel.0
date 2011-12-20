@@ -1,61 +1,95 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 20 Dec 2011 12:15:01 +0000
-Subject: [PATCH-V4 0/3] Introducing TI's New SoC/board AM335XEVM
-In-Reply-To: <87aa7akhe9.fsf@ti.com>
-References: <1320946837-32507-1-git-send-email-hvaibhav@ti.com>
- <878vmxxjrv.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A80474FD@DBDE01.ent.ti.com>
- <878vmws4z8.fsf@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A902847B@DBDE01.ent.ti.com>
- <87aa7akhe9.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8062CD4@DBDE01.ent.ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 20 Dec 2011 13:40:42 +0100
+Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
+ and DDR
+In-Reply-To: <4EF0671B.7090508@ti.com>
+References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
+ <4EEFC23A.30201@gmail.com> <20111219233559.GW6464@atomide.com>
+ <4EF0671B.7090508@ti.com>
+Message-ID: <4EF0824A.9060208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Aneesh,
 
-> -----Original Message-----
-> From: Hilman, Kevin
-> Sent: Friday, December 02, 2011 11:04 PM
-> To: Mohammed, Afzal
-> Cc: Hiremath, Vaibhav; Russell King; linux-omap at vger.kernel.org;
-> tony at atomide.com; linux-arm-kernel at lists.infradead.org; paul at pwsan.com
-> Subject: Re: [PATCH-V4 0/3] Introducing TI's New SoC/board AM335XEVM
-> 
-> "Mohammed, Afzal" <afzal@ti.com> writes:
-> 
-> > Hi Kevin,
-> >
-> > On Thu, Dec 01, 2011 at 20:40:03, Hilman, Kevin wrote:
-> >> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-> > :
-> >> > We can detect the board using on-board EEPROM, so same mach-id
-> >> > should work for both EVM and Beagle.
-> >>
-> >> > And also going forward with device tree approach we may
-> >> > not need different id's, right?
-> >>
-> >> Right, which is why I'm wondering why are there sevral new AM33x
-> >> mach-types when only one of them is being used:
-> >>
-> >> 3684    TI AM335X IA EVM        am335xiaevm     Afzal Mohammed
-> >> 3589    TI AM335X EVM           am335xevm       Vaibhav Bedia
-> >> 3808    Beaglebone Board        beaglebone      Steven Kipisz
-> >>
-> >> Russell has been trying to cleanup athe mach-types, so if these others
-> >> are not going to be used, I suggest they be deleted.
-> >
-> > "3684-TI AM335X IA EVM" is required as IA EVM uses a different UART,
-> > because of which early prints can't be captured, problem mentioned
-> > in http://marc.info/?l=linux-omap&m=131286938723617&w=2
-> 
-> This problem will be solved by using the device tree.
-> 
+On 12/20/2011 11:44 AM, Aneesh V wrote:
+> On Tuesday 20 December 2011 05:05 AM, Tony Lindgren wrote:
+>> * Rob Herring<robherring2@gmail.com> [111219 14:29]:
+>>> On 12/19/2011 08:05 AM, Aneesh V wrote:
+>>>> This is an RFC to add new device tree bindings for DDR memories and
+>>>> EMIF - TI's DDR SDRAM controller.
+>>>>
+>>>> The first patch adds bindings for DDR memories. Currently,
+>>>> we have added properties for only DDR3 and LPDDR2 memories.
+>>>> However, the binding can be easily extended to describe
+>>>> other types such as DDR2 in the future.
+>>>>
+>>>> The second patch provides the bindings for the EMIF controller.
+>>>>
+>>>> The final patch provides DT data for EMIF controller instances
+>>>> in OMAP4 and LPDDR2 memories attached to them on various boards.
+>>>>
+>>>> Thanks to Rajendra for answering my numerous queries on device tree.
+>>>>
+>>>> This is a re-post of the RFC that was posted to devicetree-discuss ml,
+>>>> now sent to a larger audience and looping out an internal list.
+>>>> Please ignore the previous version.
+>>>
+>>> There's already a standard way (i.e. JEDEC standard) to define DDR chip
+>>> configuration that's called SPD. Why invent something new? While this is
+>>> normally an i2c eeprom on a DIMM, there's no reason you couldn't get it
+>>> from somewhere else including perhaps the DT. There's already code in
+>>> u-boot that can parse SPD data.
+>>
+>> I agree generic JEDEC standard would be good for the DT.
+>
+> Please see my comments in reply to Rob's mail. SPD doesn't seems to
+> have a standard for LPDDR2. What JEDEC has now is not suitable for our
+> needs.
+>
+>>
+>>> In general, is it really feasible to parse the DTB before DDR is
+>>> initialized?
+>>
+>> Changing timings is still needed for DVFS during runtime.
+>>
+>> But we can boot to userspace with bootloader set timings, so I'm
+>
+> As far as I understand, in the current out-of-tree DVFS implementation
+> for OMAP, DVFS can start even before user-space.
 
-Kevin,
+Maybe it is the case, but that does not mean it should.
+We can potentially delay the DVFS init until the user-space is started.
+This should not be considered as a big constraint.
 
-Will this solve earlyprintk as well?
+>> thinking that maybe these timings should be just set by loadable
+>> modules. Just the configuration of which timings to select should
+>> be passed via DT. Something in compatible like:
+>>
+>> .compatible = "ti,omap3630", "sdram-micron-mt46h32m32lf-6";
+>>
+>> And that should allow the SDRC driver to only accept timings for
+>> "sdram-micron-mt46h32m32lf-6".
+>
+> Do you mean one module per memory device and have all timing data in
+> the respective module? Wouldn't this clutter the kernel proper with all
+> these tables. By having the timing data in DT, it can be eventually
+> moved out of kernel eventually, right?
 
-Thanks,
-Vaibhav
+Yes, that's the theory, but referring to Olof's point, this is not 
+necessarily the goal of DT to store all the information that are not 
+board dependent.
+In this case, each DDR will have it sets of well known AC timings data 
+that will never depend of the board config. In this case, storing that 
+inside DT might not be the best solution.
 
-> Kevin
+In fact we always had the same kind of discussion for the pinmux data 
+and for the clock data...
+
+The conclusion being that most of the static data does not have to be in 
+the DTS.
+But since Linus was complaining about the huge amount of data inside the 
+kernel, it is not obvious what the best solution is:-)
+
+Regards,
+Benoit
