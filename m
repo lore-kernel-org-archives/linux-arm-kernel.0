@@ -1,72 +1,60 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Dec 2011 20:00:34 +0800
-Subject: [PATCH 03/12] net: fec: add clk_prepare/clk_unprepare
+Date: Tue, 20 Dec 2011 20:00:35 +0800
+Subject: [PATCH 04/12] dma: mxs-dma: convert to clk_prepare/clk_unprepare
 In-Reply-To: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
 References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1324382443-4439-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1324382443-4439-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Zhao <richard.zhao@linaro.org>
+The patch converts mxs-dma driver to clk_prepare/clk_unprepare by
+using helper functions clk_prepare_enable/clk_disable_unprepare.
 
-It's for migrating to generic clk framework API.
-
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: David S. Miller <davem@davemloft.net>
+Cc: Vinod Koul <vinod.koul@intel.com>
 ---
- drivers/net/ethernet/freescale/fec.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/dma/mxs-dma.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index c136230..112af9b 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1591,7 +1591,7 @@ fec_probe(struct platform_device *pdev)
- 		ret = PTR_ERR(fep->clk);
- 		goto failed_clk;
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index b4588bd..fc903c0 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -334,7 +334,7 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+ 			goto err_irq;
  	}
--	clk_enable(fep->clk);
-+	clk_prepare_enable(fep->clk);
  
- 	ret = fec_enet_init(ndev);
+-	ret = clk_enable(mxs_dma->clk);
++	ret = clk_prepare_enable(mxs_dma->clk);
  	if (ret)
-@@ -1614,7 +1614,7 @@ failed_register:
- 	fec_enet_mii_remove(fep);
- failed_mii_init:
- failed_init:
--	clk_disable(fep->clk);
-+	clk_disable_unprepare(fep->clk);
- 	clk_put(fep->clk);
- failed_clk:
- 	for (i = 0; i < FEC_IRQ_NUM; i++) {
-@@ -1641,7 +1641,7 @@ fec_drv_remove(struct platform_device *pdev)
+ 		goto err_clk;
  
- 	fec_stop(ndev);
- 	fec_enet_mii_remove(fep);
--	clk_disable(fep->clk);
-+	clk_disable_unprepare(fep->clk);
- 	clk_put(fep->clk);
- 	iounmap(fep->hwp);
- 	unregister_netdev(ndev);
-@@ -1667,7 +1667,7 @@ fec_suspend(struct device *dev)
- 		fec_stop(ndev);
- 		netif_device_detach(ndev);
- 	}
--	clk_disable(fep->clk);
-+	clk_disable_unprepare(fep->clk);
+@@ -372,7 +372,7 @@ static void mxs_dma_free_chan_resources(struct dma_chan *chan)
+ 	dma_free_coherent(mxs_dma->dma_device.dev, PAGE_SIZE,
+ 			mxs_chan->ccw, mxs_chan->ccw_phys);
+ 
+-	clk_disable(mxs_dma->clk);
++	clk_disable_unprepare(mxs_dma->clk);
+ }
+ 
+ static struct dma_async_tx_descriptor *mxs_dma_prep_slave_sg(
+@@ -578,7 +578,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
+ {
+ 	int ret;
+ 
+-	ret = clk_enable(mxs_dma->clk);
++	ret = clk_prepare_enable(mxs_dma->clk);
+ 	if (ret)
+ 		goto err_out;
+ 
+@@ -604,7 +604,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
+ 	writel(MXS_DMA_CHANNELS_MASK << MXS_DMA_CHANNELS,
+ 		mxs_dma->base + HW_APBHX_CTRL1 + MXS_SET_ADDR);
+ 
+-	clk_disable(mxs_dma->clk);
++	clk_disable_unprepare(mxs_dma->clk);
  
  	return 0;
- }
-@@ -1678,7 +1678,7 @@ fec_resume(struct device *dev)
- 	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct fec_enet_private *fep = netdev_priv(ndev);
  
--	clk_enable(fep->clk);
-+	clk_prepare_enable(fep->clk);
- 	if (netif_running(ndev)) {
- 		fec_restart(ndev, fep->full_duplex);
- 		netif_device_attach(ndev);
 -- 
 1.7.4.1
