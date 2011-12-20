@@ -1,72 +1,54 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 Dec 2011 22:27:40 +0800
-Subject: [PATCH 08/12] serial: mxs-auart: convert to
- clk_prepare/clk_unprepare
-In-Reply-To: <201112201449.13420.marek.vasut@gmail.com>
-References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
- <1324382443-4439-9-git-send-email-shawn.guo@linaro.org>
- <201112201449.13420.marek.vasut@gmail.com>
-Message-ID: <20111220142739.GC5348@S2101-09.ap.freescale.net>
+From: anca.emanuel@gmail.com (Anca Emanuel)
+Date: Tue, 20 Dec 2011 16:29:42 +0200
+Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
+ sharing mechanism
+In-Reply-To: <20111220020549.GQ6559@morell.nvidia.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <4EE33EC2.6050508@redhat.com>
+ <20111212224408.GD4355@morell.nvidia.com>
+ <201112131510.02785.arnd@arndb.de>
+ <20111220020549.GQ6559@morell.nvidia.com>
+Message-ID: <CAJL_dMvYYWyx8xD4B75wXdKg+bD959i1LTWXD8b+yrW6HuxnTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 02:49:13PM +0100, Marek Vasut wrote:
-> > The patch converts mxs-auart driver to clk_prepare/clk_unprepare by
-> > using helper functions clk_prepare_enable/clk_disable_unprepare.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Alan Cox <alan@linux.intel.com>
-> > ---
-> >  drivers/tty/serial/mxs-auart.c |    8 ++++----
-> >  1 files changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/tty/serial/mxs-auart.c
-> > b/drivers/tty/serial/mxs-auart.c index 7e02c9c..c33500a 100644
-> > --- a/drivers/tty/serial/mxs-auart.c
-> > +++ b/drivers/tty/serial/mxs-auart.c
-> > @@ -424,7 +424,7 @@ static int mxs_auart_startup(struct uart_port *u)
-> >  {
-> >  	struct mxs_auart_port *s = to_auart_port(u);
-> > 
-> > -	clk_enable(s->clk);
-> > +	clk_prepare_enable(s->clk);
-> > 
-> >  	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-> > 
-> > @@ -453,7 +453,7 @@ static void mxs_auart_shutdown(struct uart_port *u)
-> >  	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
-> >  			u->membase + AUART_INTR_CLR);
-> > 
-> > -	clk_disable(s->clk);
-> > +	clk_disable_unprepare(s->clk);
-> >  }
-> > 
-> >  static unsigned int mxs_auart_tx_empty(struct uart_port *u)
-> > @@ -634,7 +634,7 @@ auart_console_setup(struct console *co, char *options)
-> >  	if (!s)
-> >  		return -ENODEV;
-> > 
-> > -	clk_enable(s->clk);
-> > +	clk_prepare_enable(s->clk);
-> > 
-> >  	if (options)
-> >  		uart_parse_options(options, &baud, &parity, &bits, &flow);
-> > @@ -643,7 +643,7 @@ auart_console_setup(struct console *co, char *options)
-> > 
-> >  	ret = uart_set_options(&s->port, co, baud, parity, bits, flow);
-> > 
-> > -	clk_disable(s->clk);
-> > +	clk_disable_unprepare(s->clk);
-> > 
-> >  	return ret;
-> >  }
-> 
-> DTTO here, are you sure all of them are not called from atomic ctx?
-> 
-Yes.  My understanding is that only the clk_enable/clk_disable in
-auart_console_write() will be called in atomic context.
+On Tue, Dec 20, 2011 at 4:05 AM, Robert Morell <rmorell@nvidia.com> wrote:
+>
+> One of the goals of this project is to unify the fragmented space of the
+> ARM SoC memory managers so that each vendor doesn't implement their own,
+> and they can all be closer to mainline.
 
--- 
-Regards,
-Shawn
+That is a very good objective.
+
+> I fear that restricting the use of this buffer sharing mechanism to GPL
+> drivers only will prevent that goal from being achieved, if an SoC
+> driver has to interact with modules that use a non-GPL license.
+
+If nobody from nvidia have any experience with this kind of work...
+Look at Intel. Why are you afraid of ?
+
+> As a hypothetical example, consider laptops that have multiple GPUs.
+> Today, these ship with onboard graphics (integrated to the CPU or
+> chipset) along with a discrete GPU, where in many cases only the onboard
+> graphics can actually display to the screen. ?In order for anything
+> rendered by the discrete GPU to be displayed, it has to be copied to
+> memory available for the smaller onboard graphics to texture from or
+> display directly. ?Obviously, that's best done by sharing dma buffers
+> rather than bouncing them through the GPU. ?It's not much of a stretch
+> to imagine that we'll see such systems with a Tegra CPU/GPU plus a
+> discrete GPU in the future; in that case, we'd want to be able to share
+> memory between the discrete GPU and the Tegra system. ?In that scenario,
+> if this interface is GPL-only, we'd be unable to adopt the dma_buffer
+> sharing mechanism for Tegra.
+>
+> (This isn't too pie-in-the-sky, either; people are already combining
+> Tegra with discrete GPUs:
+> http://blogs.nvidia.com/2011/11/world%e2%80%99s-first-arm-based-supercomputer-to-launch-in-barcelona/
+> )
+>
+> Thanks,
+> Robert
+
+There are other problems ? Some secret agreements with Microsoft ?
+
+I hope to see something open sourced. You can do it nVidia.
