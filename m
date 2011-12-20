@@ -1,61 +1,120 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Dec 2011 20:00:32 +0800
-Subject: [PATCH 01/12] clk: add helper functions clk_prepare_enable and
- clk_disable_unprepare
+Date: Tue, 20 Dec 2011 20:00:33 +0800
+Subject: [PATCH 02/12] arm/mxs: convert platform code to
+ clk_prepare/clk_unprepare
 In-Reply-To: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
 References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1324382443-4439-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1324382443-4439-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Zhao <richard.zhao@linaro.org>
-
-It's for migrating to generic clk framework API.
-
-The helper functions  help cases clk_enable/clk_disable is used
-in non-atomic context.
-For example, Call clk_enable in probe and clk_disable in remove.
+The patch converts mxs platform code to clk_prepare/clk_unprepare
+by using helper functions clk_prepare_enable/clk_disable_unprepare.
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
 ---
- include/linux/clk.h |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/clock-mx23.c   |   10 +++++-----
+ arch/arm/mach-mxs/clock-mx28.c   |   10 +++++-----
+ arch/arm/mach-mxs/clock.c        |    2 +-
+ arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
+ arch/arm/mach-mxs/system.c       |    2 +-
+ arch/arm/mach-mxs/timer.c        |    2 +-
+ 6 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 7213b52..b9d46fa 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -107,6 +107,28 @@ static inline void clk_unprepare(struct clk *clk)
- }
- #endif
+diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+index 0163b6d..e12e112 100644
+--- a/arch/arm/mach-mxs/clock-mx23.c
++++ b/arch/arm/mach-mxs/clock-mx23.c
+@@ -545,11 +545,11 @@ int __init mx23_clocks_init(void)
+ 	 */
+ 	clk_set_parent(&ssp_clk, &ref_io_clk);
  
-+/* clk_prepare_enable helps cases using clk_enable in non-atomic context. */
-+static inline int clk_prepare_enable(struct clk *clk)
-+{
-+	int ret;
-+
-+	ret = clk_prepare(clk);
-+	if (ret)
-+		return ret;
-+	ret = clk_enable(clk);
-+	if (ret)
-+		clk_unprepare(clk);
-+
-+	return ret;
-+}
-+
-+/* clk_disable_unprepare helps cases using clk_disable in non-atomic context. */
-+static inline void clk_disable_unprepare(struct clk *clk)
-+{
-+	clk_disable(clk);
-+	clk_unprepare(clk);
-+}
-+
- /**
-  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-  *		  This is only valid once the clock source has been enabled.
+-	clk_enable(&cpu_clk);
+-	clk_enable(&hbus_clk);
+-	clk_enable(&xbus_clk);
+-	clk_enable(&emi_clk);
+-	clk_enable(&uart_clk);
++	clk_prepare_enable(&cpu_clk);
++	clk_prepare_enable(&hbus_clk);
++	clk_prepare_enable(&xbus_clk);
++	clk_prepare_enable(&emi_clk);
++	clk_prepare_enable(&uart_clk);
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index da6e4aa..f85f1f5 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -775,11 +775,11 @@ int __init mx28_clocks_init(void)
+ 	clk_set_parent(&ssp0_clk, &ref_io0_clk);
+ 	clk_set_parent(&ssp1_clk, &ref_io0_clk);
+ 
+-	clk_enable(&cpu_clk);
+-	clk_enable(&hbus_clk);
+-	clk_enable(&xbus_clk);
+-	clk_enable(&emi_clk);
+-	clk_enable(&uart_clk);
++	clk_prepare_enable(&cpu_clk);
++	clk_prepare_enable(&hbus_clk);
++	clk_prepare_enable(&xbus_clk);
++	clk_prepare_enable(&emi_clk);
++	clk_prepare_enable(&uart_clk);
+ 
+ 	clk_set_parent(&lcdif_clk, &ref_pix_clk);
+ 	clk_set_parent(&saif0_clk, &pll0_clk);
+diff --git a/arch/arm/mach-mxs/clock.c b/arch/arm/mach-mxs/clock.c
+index a7093c8..755eec0 100644
+--- a/arch/arm/mach-mxs/clock.c
++++ b/arch/arm/mach-mxs/clock.c
+@@ -166,7 +166,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 		return ret;
+ 
+ 	if (clk->usecount)
+-		clk_enable(parent);
++		clk_prepare_enable(parent);
+ 
+ 	mutex_lock(&clocks_mutex);
+ 	ret = clk->set_parent(clk, parent);
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index 064ec5a..6b9e83e 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -228,7 +228,7 @@ static void __init mx28evk_fec_reset(void)
+ 	/* Enable fec phy clock */
+ 	clk = clk_get_sys("pll2", NULL);
+ 	if (!IS_ERR(clk))
+-		clk_enable(clk);
++		clk_prepare_enable(clk);
+ 
+ 	/* Power up fec phy */
+ 	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
+diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
+index 20ec3bd..9760a12 100644
+--- a/arch/arm/mach-mxs/system.c
++++ b/arch/arm/mach-mxs/system.c
+@@ -66,7 +66,7 @@ static int __init mxs_arch_reset_init(void)
+ 
+ 	clk = clk_get_sys("rtc", NULL);
+ 	if (!IS_ERR(clk))
+-		clk_enable(clk);
++		clk_prepare_enable(clk);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+index cace0d2..564a632 100644
+--- a/arch/arm/mach-mxs/timer.c
++++ b/arch/arm/mach-mxs/timer.c
+@@ -245,7 +245,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
+ 
+ void __init mxs_timer_init(struct clk *timer_clk, int irq)
+ {
+-	clk_enable(timer_clk);
++	clk_prepare_enable(timer_clk);
+ 
+ 	/*
+ 	 * Initialize timers to a known state
 -- 
 1.7.4.1
