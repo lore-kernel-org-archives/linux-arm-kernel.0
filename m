@@ -1,44 +1,79 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 20 Dec 2011 14:49:37 +0100
-Subject: [PATCH 10/12] ASoC: mxs-saif: convert to clk_prepare/clk_unprepare
-In-Reply-To: <1324382443-4439-11-git-send-email-shawn.guo@linaro.org>
-References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
- <1324382443-4439-11-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201112201449.37879.marek.vasut@gmail.com>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Tue, 20 Dec 2011 13:51:10 +0000
+Subject: [PATCH] davinci: DA850 EVM: OHCI platform code
+In-Reply-To: <4EF06C64.8000708@mvista.com>
+References: <1324363005-11320-1-git-send-email-prakash.pm@ti.com>
+ <4EF06C64.8000708@mvista.com>
+Message-ID: <47CEF8C4B26E8C44B22B028A650E0EA90659DC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The patch converts mxs-saif driver to clk_prepare/clk_unprepare by
-> using helper functions clk_prepare_enable/clk_disable_unprepare.
+Hi
+> Hello.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Dong Aisheng <b29396@freescale.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  sound/soc/mxs/mxs-saif.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> On 20.12.2011 10:36, Manjunathappa, Prakash wrote:
 > 
-> diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-> index 76dc74d..ef1abb5 100644
-> --- a/sound/soc/mxs/mxs-saif.c
-> +++ b/sound/soc/mxs/mxs-saif.c
-> @@ -210,7 +210,7 @@ int mxs_saif_put_mclk(unsigned int saif_id)
->  		return -EBUSY;
->  	}
+> > From: Ajay Kumar Gupta <ajay.gupta@ti.com>
 > 
-> -	clk_disable(saif->clk);
-> +	clk_disable_unprepare(saif->clk);
+>     It's a good practice to CC the original author of the patch -- which
+> I'm
+> doing now...
 > 
->  	/* disable MCLK output */
->  	__raw_writel(BM_SAIF_CTRL_CLKGATE,
-> @@ -264,7 +264,7 @@ int mxs_saif_get_mclk(unsigned int saif_id, unsigned
-> int mclk, if (ret)
->  		return ret;
+> > On this board the OHCI port's power control and over-current signals
+> from
+> > TPS2065 power switch are connected via GPIO1[15] and GPIO2[1]
+> respectively,
 > 
-> -	ret = clk_enable(saif->clk);
-> +	ret = clk_prepare_enable(saif->clk);
->  	if (ret)
->  		return ret;
+>     Ajay, your description seems to be copied unchganged from the
+> analogous
+> DA830 EVM patch, and thus doesn't match your patch: GPIO2[4] and
+> GPIO6[13] are
+> used apparently. Be more attentive to detail next time please.
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
+Well, this patch was created long back for internal release work and
+couldn't review this before it is sent out.
+
+Prakash, Please correct the patch description as suggested.
+
+Regards,
+Ajay
+> .
+> > so we can implement the DA8xx OHCI glue layer's hooks for overriding
+> the
+> > root hub port's power and over-current status bits.
+> 
+> > We also have to properly set up the clocking mode in the CFGCHIP2
+> register,
+> > so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB)
+> PHY and
+> > its output is used to clock the USB 1.1 (OHCI) PHY...
+> 
+> > Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> > ---
+> >   arch/arm/mach-davinci/board-da850-evm.c |  126
+> +++++++++++++++++++++++++++++++
+> >   1 files changed, 126 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-
+> davinci/board-da850-evm.c
+> > index 6659a90..df74ba5 100644
+> > --- a/arch/arm/mach-davinci/board-da850-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> [...]
+> > @@ -734,6 +736,127 @@ static struct davinci_i2c_platform_data
+> da850_evm_i2c_0_pdata = {
+> [...]
+> > +static int da850_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
+> > +{
+> > +	int irq		= gpio_to_irq(ON_BD_USB_OVC);
+> > +	int error	= 0;
+> > +
+> > +	if (handler != NULL) {
+> > +		da850_evm_usb_ocic_handler = handler;
+> > +
+> > +		error = request_irq(irq, da850_evm_usb_ocic_irq,
+> IRQF_DISABLED |
+> 
+>     IRQF_DISABLED is a nop now -- just remove it.
+> 
+> WBR, Sergei
