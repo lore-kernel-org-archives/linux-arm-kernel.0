@@ -1,42 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Dec 2011 09:06:41 -0800
-Subject: [PATCH] arm/tegra: boards: more __init/__initdata annotations
-In-Reply-To: <20111220082641.GQ14542@n2100.arm.linux.org.uk>
-References: <1324353802-31774-1-git-send-email-olof@lixom.net>
- <20111220082641.GQ14542@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMjh2DmzgjvoYZyDygADDcMwf-m7E3Np0f=h8xRWZZ6-4Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Dec 2011 09:10:41 -0800
+Subject: [GIT PULL] Borderline fixes for v3.2-rc6
+In-Reply-To: <CAOesGMj-OyDu9pcOZ20o6G0W3-kkxyHF7o5DqDRaQkkUDf98CA@mail.gmail.com>
+References: <20111219194249.GO6464@atomide.com>
+ <CAOesGMj-OyDu9pcOZ20o6G0W3-kkxyHF7o5DqDRaQkkUDf98CA@mail.gmail.com>
+Message-ID: <20111220171041.GA24444@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 12:26 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 19, 2011 at 08:03:22PM -0800, Olof Johansson wrote:
->> Silence a bunch of section warnings, and mark some of the init functions as
->> __init.
->>
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->> ---
->> ?arch/arm/mach-tegra/board-harmony-pinmux.c ? | ? ?8 ++++----
->> ?arch/arm/mach-tegra/board-paz00-pinmux.c ? ? | ? ?8 ++++----
->> ?arch/arm/mach-tegra/board-seaboard-pinmux.c ?| ? 16 ++++++++--------
->> ?arch/arm/mach-tegra/board-trimslice-pinmux.c | ? ?4 ++--
->> ?4 files changed, 18 insertions(+), 18 deletions(-)
->>
->> diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
->> index 465808c..84cfbef 100644
->> --- a/arch/arm/mach-tegra/board-harmony-pinmux.c
->> +++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
->> @@ -25,7 +25,7 @@
->> ?#include "board-harmony.h"
->> ?#include "board-pinmux.h"
->>
->> -static struct tegra_pingroup_config harmony_pinmux[] = {
->> +static __initdata struct tegra_pingroup_config harmony_pinmux[] = {
->
-> __initdata goes at the end of the declaration - just before the '='.
+* Olof Johansson <olof@lixom.net> [111219 20:20]:
+> Hi Tony,
+> 
+> On Mon, Dec 19, 2011 at 11:42 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > Hi Arnd & Olof,
+> >
+> > Here are two fixes that could potentially go into v3.2 -rc cycle.
+> >
+> > One fixes a harmless but annoying warning that happens on omap 34xx
+> > processors during boot. The other one fixes booting on pretty rare
+> > secure mode development board, but that's fixed in "features that
+> > never worked earlier either" style.
+> >
+> > We can surely wait on these fixes, but if you have something going
+> > upstream anyways, then these might be worth considering too.
+> 
+> The hwmod patch is a regression so that one I'll take, the other one
+> is a little less obvious that it should go in now. Also, shouldn't it
+> be cc:d stable in that case?
 
-Thanks for pointing it out -- looks like a couple of other instances
-use the wrong location as well (probably added by me in the past).
-I'll respin the patch, and fix up those cases as well.
+Yes let's not worry about the second one, it adds new functionality and
+it's for a currently rare case.
 
--Olof
+> Let me know what you prefer (rebase with a cc: stable) or take out the
+> secure mode patch. I'm collecting a small series of fixes so I'll pull
+> it in tomorrow for that.
+
+I've branched it out into fixes-hwmod-regression with just that
+same commit in it. The second patch in this series will be pulled in
+with fixes-non-critical-part2. Updated pull request below.
+
+Regards,
+
+Tony
+
+The following changes since commit e5fe29c7198a1f6616286dfc8602a69da165cb3f:
+  Felipe Contreras (1):
+        ARM: OMAP: rx51: fix USB
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-hwmod-regression
+
+Felipe Contreras (1):
+      ARM: OMAP: hwmod data: fix iva and mailbox hwmods for OMAP 3
+
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
