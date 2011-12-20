@@ -1,198 +1,102 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Tue, 20 Dec 2011 23:10:34 +0100
-Subject: [PATCH] input: serio: ams-delta: toggle keyboard power over GPIO
-In-Reply-To: <378bcda9c6cb6a1ddeeb54817078bc7ec68c5987.1324331816.git.jkrzyszt@tis.icnet.pl>
-References: <378bcda9c6cb6a1ddeeb54817078bc7ec68c5987.1324331816.git.jkrzyszt@tis.icnet.pl>
-Message-ID: <1324419034-31024-1-git-send-email-jkrzyszt@tis.icnet.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Dec 2011 22:24:42 +0000
+Subject: [PATCH 08/12] serial: mxs-auart: convert to
+ clk_prepare/clk_unprepare
+In-Reply-To: <201112202228.27468.marek.vasut@gmail.com>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+ <20111220140750.GZ24496@pengutronix.de>
+ <20111220211519.GF2577@n2100.arm.linux.org.uk>
+ <201112202228.27468.marek.vasut@gmail.com>
+Message-ID: <20111220222442.GH2577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't use Amstrad Delta custom I/O functions once GPIO interface is
-available for the underlying hardware.
+On Tue, Dec 20, 2011 at 10:28:26PM +0100, Marek Vasut wrote:
+> > On Tue, Dec 20, 2011 at 03:07:50PM +0100, Uwe Kleine-K?nig wrote:
+> > > Hello,
+> > > 
+> > > On Tue, Dec 20, 2011 at 02:49:13PM +0100, Marek Vasut wrote:
+> > > > > The patch converts mxs-auart driver to clk_prepare/clk_unprepare by
+> > > > > using helper functions clk_prepare_enable/clk_disable_unprepare.
+> > > > > 
+> > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > > Cc: Alan Cox <alan@linux.intel.com>
+> > > > > ---
+> > > > > 
+> > > > >  drivers/tty/serial/mxs-auart.c |    8 ++++----
+> > > > >  1 files changed, 4 insertions(+), 4 deletions(-)
+> > > > > 
+> > > > > diff --git a/drivers/tty/serial/mxs-auart.c
+> > > > > b/drivers/tty/serial/mxs-auart.c index 7e02c9c..c33500a 100644
+> > > > > --- a/drivers/tty/serial/mxs-auart.c
+> > > > > +++ b/drivers/tty/serial/mxs-auart.c
+> > > > > @@ -424,7 +424,7 @@ static int mxs_auart_startup(struct uart_port *u)
+> > > > > 
+> > > > >  {
+> > > > >  
+> > > > >  	struct mxs_auart_port *s = to_auart_port(u);
+> > > > > 
+> > > > > -	clk_enable(s->clk);
+> > > > > +	clk_prepare_enable(s->clk);
+> > > > > 
+> > > > >  	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+> > > > > 
+> > > > > @@ -453,7 +453,7 @@ static void mxs_auart_shutdown(struct uart_port
+> > > > > *u)
+> > > > > 
+> > > > >  	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
+> > > > >  	
+> > > > >  			u->membase + AUART_INTR_CLR);
+> > > > > 
+> > > > > -	clk_disable(s->clk);
+> > > > > +	clk_disable_unprepare(s->clk);
+> > > > > 
+> > > > >  }
+> > > > >  
+> > > > >  static unsigned int mxs_auart_tx_empty(struct uart_port *u)
+> > > > > 
+> > > > > @@ -634,7 +634,7 @@ auart_console_setup(struct console *co, char
+> > > > > *options)
+> > > > > 
+> > > > >  	if (!s)
+> > > > >  	
+> > > > >  		return -ENODEV;
+> > > > > 
+> > > > > -	clk_enable(s->clk);
+> > > > > +	clk_prepare_enable(s->clk);
+> > > > > 
+> > > > >  	if (options)
+> > > > >  	
+> > > > >  		uart_parse_options(options, &baud, &parity, &bits, 
+> &flow);
+> > > > > 
+> > > > > @@ -643,7 +643,7 @@ auart_console_setup(struct console *co, char
+> > > > > *options)
+> > > > > 
+> > > > >  	ret = uart_set_options(&s->port, co, baud, parity, bits, flow);
+> > > > > 
+> > > > > -	clk_disable(s->clk);
+> > > > > +	clk_disable_unprepare(s->clk);
+> > > > > 
+> > > > >  	return ret;
+> > > > >  
+> > > > >  }
+> > > > 
+> > > > DTTO here, are you sure all of them are not called from atomic ctx?
+> > > 
+> > > the startup callback is called with irqs off.
+> > 
+> > It shouldn't be, as it has to do things like request_irq() which can
+> > sleep.  The documentation in Documentation/serial/driver is now out
+> > of date, and can't be relied upon.
+> 
+> auart_rx/tx_empty() shouldn't be called from atomic context? It
+> doesn't really look that way. The name is probably misleading though.
 
-While requesting and initializing GPIO pins used, also take care of one
-extra pin KEYBRD_DATAOUT which, even if not used by the driver, belongs
-to the device and affects its functioning.
+I can't find an auart_rx nor auart_rx_empty() function.
 
-Once done, move the driver initialization back to the device_initcall
-level, reverting the temporary chane introduced with patch 1/7 "ARM:
-OMAP1: ams-delta: register latch dependent devices later".  That change
-is no longer required once the driver takes care of registering used
-GPIO pins, and it's better to initialize the device before others using
-the latch2 based GPIO pins, otherwise a garbage is reported on boot,
-perhaps due to random data already captured by the FIQ handler while the
-keyboard related latch bits are written with random values during
-initialization of those other latch2 dependent devices.
-
-Depends on patch 2/7 "ARM: OMAP1: ams-delta: convert latches to
-basic_mmio_gpio"
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
-Hi,
-I'm submitting only this one refreshed on top of updated 1/7. All others
-(2/7-6/7) don't require any refresh, can be rebased smoothly.
-
-Thanks,
-Janusz
-
-
-Changes against version 2:
-* refreshed on top of updated patch 1/7 v2,
-* changelog: corrected patch 1/7 summary (was inaccurate).
-
-Changes against initial version:
-* was 9/10,
-* rebased on top of v2 of patch 2/7, just in case,
-* moved AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT pin handling from the board
-  code to the driver,
-* reverted a temporary change to the driver initcall level, introduced
-  by the new solution provided with patch 1/7.
-
-
- arch/arm/mach-omap1/board-ams-delta.c             |   10 ----
- arch/arm/plat-omap/include/plat/board-ams-delta.h |    2 -
- drivers/input/serio/ams_delta_serio.c             |   53 ++++++++++++--------
-:x 3 files changed, 32 insertions(+), 33 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 3aba8f9..673cf21 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -227,16 +227,6 @@ static struct gpio latch_gpios[] __initconst = {
- 		.label	= "dockit2",
- 	},
- 	{
--		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
--		.flags	= GPIOF_OUT_INIT_LOW,
--		.label	= "keybrd_pwr",
--	},
--	{
--		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
--		.flags	= GPIOF_OUT_INIT_LOW,
--		.label	= "keybrd_dataout",
--	},
--	{
- 		.gpio	= AMS_DELTA_GPIO_PIN_SCARD_RSTIN,
- 		.flags	= GPIOF_OUT_INIT_LOW,
- 		.label	= "scard_rstin",
-diff --git a/arch/arm/plat-omap/include/plat/board-ams-delta.h b/arch/arm/plat-omap/include/plat/board-ams-delta.h
-index e9ad673..027e79e 100644
---- a/arch/arm/plat-omap/include/plat/board-ams-delta.h
-+++ b/arch/arm/plat-omap/include/plat/board-ams-delta.h
-@@ -28,8 +28,6 @@
- 
- #if defined (CONFIG_MACH_AMS_DELTA)
- 
--#define AMD_DELTA_LATCH2_KEYBRD_PWR	0x0100
--#define AMD_DELTA_LATCH2_KEYBRD_DATA	0x0200
- #define AMD_DELTA_LATCH2_SCARD_RSTIN	0x0400
- #define AMD_DELTA_LATCH2_SCARD_CMDVCC	0x0800
- #define AMS_DELTA_LATCH2_MODEM_NRESET	0x1000
-diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
-index 835d37a..ef1ec40 100644
---- a/drivers/input/serio/ams_delta_serio.c
-+++ b/drivers/input/serio/ams_delta_serio.c
-@@ -92,8 +92,7 @@ static irqreturn_t ams_delta_serio_interrupt(int irq, void *dev_id)
- static int ams_delta_serio_open(struct serio *serio)
- {
- 	/* enable keyboard */
--	ams_delta_latch2_write(AMD_DELTA_LATCH2_KEYBRD_PWR,
--			AMD_DELTA_LATCH2_KEYBRD_PWR);
-+	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 1);
- 
- 	return 0;
- }
-@@ -101,9 +100,32 @@ static int ams_delta_serio_open(struct serio *serio)
- static void ams_delta_serio_close(struct serio *serio)
- {
- 	/* disable keyboard */
--	ams_delta_latch2_write(AMD_DELTA_LATCH2_KEYBRD_PWR, 0);
-+	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 0);
- }
- 
-+static struct gpio _gpios[] __initconst_or_module = {
-+	{
-+		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATA,
-+		.flags	= GPIOF_DIR_IN,
-+		.label	= "serio-data",
-+	},
-+	{
-+		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_CLK,
-+		.flags	= GPIOF_DIR_IN,
-+		.label	= "serio-clock",
-+	},
-+	{
-+		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
-+		.flags	= GPIOF_OUT_INIT_LOW,
-+		.label	= "serio-power",
-+	},
-+	{
-+		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
-+		.flags	= GPIOF_OUT_INIT_LOW,
-+		.label	= "serio-dataout",
-+	},
-+};
-+
- static int __init ams_delta_serio_init(void)
- {
- 	int err;
-@@ -123,19 +145,11 @@ static int __init ams_delta_serio_init(void)
- 	strlcpy(ams_delta_serio->phys, "GPIO/serio0",
- 			sizeof(ams_delta_serio->phys));
- 
--	err = gpio_request(AMS_DELTA_GPIO_PIN_KEYBRD_DATA, "serio-data");
-+	err = gpio_request_array(_gpios, ARRAY_SIZE(_gpios));
- 	if (err) {
--		pr_err("ams_delta_serio: Couldn't request gpio pin for data\n");
-+		pr_err("ams_delta_serio: Couldn't request gpio pins\n");
- 		goto serio;
- 	}
--	gpio_direction_input(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
--
--	err = gpio_request(AMS_DELTA_GPIO_PIN_KEYBRD_CLK, "serio-clock");
--	if (err) {
--		pr_err("ams_delta_serio: couldn't request gpio pin for clock\n");
--		goto gpio_data;
--	}
--	gpio_direction_input(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
- 
- 	err = request_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
- 			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
-@@ -143,7 +157,7 @@ static int __init ams_delta_serio_init(void)
- 	if (err < 0) {
- 		pr_err("ams_delta_serio: couldn't request gpio interrupt %d\n",
- 				gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK));
--		goto gpio_clk;
-+		goto gpio;
- 	}
- 	/*
- 	 * Since GPIO register handling for keyboard clock pin is performed
-@@ -157,21 +171,18 @@ static int __init ams_delta_serio_init(void)
- 	dev_info(&ams_delta_serio->dev, "%s\n", ams_delta_serio->name);
- 
- 	return 0;
--gpio_clk:
--	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
--gpio_data:
--	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
-+gpio:
-+	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
- serio:
- 	kfree(ams_delta_serio);
- 	return err;
- }
--late_initcall(ams_delta_serio_init);
-+module_init(ams_delta_serio_init);
- 
- static void __exit ams_delta_serio_exit(void)
- {
- 	serio_unregister_port(ams_delta_serio);
- 	free_irq(OMAP_GPIO_IRQ(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), 0);
--	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
--	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
-+	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
- }
- module_exit(ams_delta_serio_exit);
--- 
-1.7.3.4
+The tx_empty function should only be called while the port is started-up,
+and in any case is only called from process context.  (Functions calling
+this also call put_user(), msleep() or other functions which can cause
+schedule events.)
