@@ -1,68 +1,24 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 20 Dec 2011 08:56:34 +0800
-Subject: [PATCH V3 10/14] ARM: mxs: add clk_prepare/clk_unprepare
-In-Reply-To: <201112192321.41560.marek.vasut@gmail.com>
-References: <1321008637-19999-1-git-send-email-richard.zhao@linaro.org>
- <1321008637-19999-11-git-send-email-richard.zhao@linaro.org>
- <201112192321.41560.marek.vasut@gmail.com>
-Message-ID: <20111220005633.GC15863@b20223-02.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 20 Dec 2011 00:57:09 +0000
+Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
+In-Reply-To: <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
+References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
+ <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111220005708.GM2860@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 11:21:41PM +0100, Marek Vasut wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  arch/arm/mach-mxs/system.c |    2 +-
-> >  arch/arm/mach-mxs/timer.c  |    2 +-
-> >  2 files changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
-> > index 20ec3bd..9760a12 100644
-> > --- a/arch/arm/mach-mxs/system.c
-> > +++ b/arch/arm/mach-mxs/system.c
-> > @@ -66,7 +66,7 @@ static int __init mxs_arch_reset_init(void)
-> > 
-> >  	clk = clk_get_sys("rtc", NULL);
-> >  	if (!IS_ERR(clk))
-> > -		clk_enable(clk);
-> > +		clk_prepare_enable(clk);
-> > 
-> >  	return 0;
-> >  }
-> > diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-> > index cace0d2..564a632 100644
-> > --- a/arch/arm/mach-mxs/timer.c
-> > +++ b/arch/arm/mach-mxs/timer.c
-> > @@ -245,7 +245,7 @@ static int __init mxs_clocksource_init(struct clk
-> > *timer_clk)
-> > 
-> >  void __init mxs_timer_init(struct clk *timer_clk, int irq)
-> >  {
-> > -	clk_enable(timer_clk);
-> > +	clk_prepare_enable(timer_clk);
-> > 
-> >  	/*
-> >  	 * Initialize timers to a known state
-> 
-> Hi Richard,
-> 
-> I just came across this, will this also help solve the mxs problem with mutex 
-> lock begin done in atomic context in clk_enable/disable()?
-No, It's for converting to generic clock framwork.
-You can look at Mike's generic clock patches. clk_hw_ops.enable/disable
-definitely can not sleep.
-On register side, there' two way to protect register:
- - use a global spin lock
- - only use spin lock wherever gate register share the same one with
-   other non-gate register.
+On Mon, Dec 12, 2011 at 11:15:56PM +0800, Shawn Guo wrote:
 
-Thanks
-Richard
-> 
-> M
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> +Sub-nodes:
+> +- regulators : Contain the regulator nodes.  The name of regulator node
+> +  is being used by mc13xxx regulator driver to find the correct relator
+> +  device.
+
+Reading this I'm not clear what the name of the node is, or what the
+valid node names are.
+
+> +			sw1_reg: mc13892__sw1 {
+
+The examples don't really elucidate this either (and the __ is rather
+odd).
