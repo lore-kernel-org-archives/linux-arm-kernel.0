@@ -1,39 +1,32 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Tue, 20 Dec 2011 02:18:02 +0100
-Subject: [PATCH v2 2/7] ARM: OMAP1: ams-delta: convert latches to
- basic_mmio_gpio
-In-Reply-To: <20111220010446.GA6464@atomide.com>
-References: <cover.1324331816.git.jkrzyszt@tis.icnet.pl>
- <201112200159.36558.jkrzyszt@tis.icnet.pl>
- <20111220010446.GA6464@atomide.com>
-Message-ID: <201112200218.03283.jkrzyszt@tis.icnet.pl>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Dec 2011 09:37:12 +0800
+Subject: [PATCH v3 2/3] regulator: mc13892: add device tree probe support
+In-Reply-To: <20111220005414.GL2860@opensource.wolfsonmicro.com>
+References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
+ <1323702958-4831-3-git-send-email-shawn.guo@linaro.org>
+ <20111219140730.GB5257@S2100-06.ap.freescale.net>
+ <20111220005414.GL2860@opensource.wolfsonmicro.com>
+Message-ID: <20111220013711.GC5683@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 of December 2011 at 02:04:46, Tony Lindgren wrote:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111219 16:28]:
-> > On Tuesday 20 of December 2011 at 01:06:00, Tony Lindgren wrote:
+On Tue, Dec 20, 2011 at 12:54:15AM +0000, Mark Brown wrote:
+> On Mon, Dec 19, 2011 at 10:07:31PM +0800, Shawn Guo wrote:
+> > On Mon, Dec 12, 2011 at 11:15:57PM +0800, Shawn Guo wrote:
+> > > It adds device tree probe support for mc13892-regulator driver.
 > > > 
-> > > This part especially looks like it really should be just a regular
-> > > device driver under drivers/ somewhere. 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > > Cc: Liam Girdwood <lrg@ti.com>
 > > 
-> > I really don't understand what kind of a driver you might mean here.
-> > 
-> > The latch_gpios[] table is initially filled with all latch1 and latch2 
-> > GPIO pins in order to register and initialize them from the board file 
-> > until they are handled by respective existing device drivers (leds, 
-> > nand, lcd, serio, serial8250, asoc) instead of those drivers accessing 
-> > the latches with those old ams_delta_latch[12]_write() functions. That 
-> > table will get almost empty after the transision process is completed, 
-> > holding only pins not used by any drivers / connected to unsued devices, 
-> > in order to initialize them from the board file for power saving 
-> > purposes. A separate driver for the purpose of initializing a few GPIO 
-> > pins seems an overkill.
+> > Ping?
 > 
-> OK maybe update the comments a bit to describe how that table will
-> mostly disappear? It's not obvious from glancing over this patch
-> series :)
+> I can't really do anything with this without the MFD portion being OK.
+> 
+It seems that Samuel has applied it.
 
-To be sure, do you mean in-line comments? Or the changelog message?
+http://article.gmane.org/gmane.linux.drivers.devicetree/10441
 
-Janusz
+-- 
+Regards,
+Shawn
