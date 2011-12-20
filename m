@@ -1,33 +1,64 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Dec 2011 08:26:41 +0000
-Subject: [PATCH] arm/tegra: boards: more __init/__initdata annotations
-In-Reply-To: <1324353802-31774-1-git-send-email-olof@lixom.net>
-References: <1324353802-31774-1-git-send-email-olof@lixom.net>
-Message-ID: <20111220082641.GQ14542@n2100.arm.linux.org.uk>
+Date: Tue, 20 Dec 2011 08:28:02 +0000
+Subject: [PATCH v3] video: support MIPI-DSI controller driver
+In-Reply-To: <4EF00557.2000201@samsung.com>
+References: <4EF00557.2000201@samsung.com>
+Message-ID: <20111220082802.GR14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 08:03:22PM -0800, Olof Johansson wrote:
-> Silence a bunch of section warnings, and mark some of the init functions as
-> __init.
+On Tue, Dec 20, 2011 at 12:47:35PM +0900, Donghwa Lee wrote:
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Samsung S5PC210 and EXYNOS SoC platform has MIPI-DSI controller and MIPI-DSI
+> based LCD Panel could be used with it. This patch supports MIPI-DSI driver
+> based Samsung SoC chip.
+> 
+> LCD panel driver based MIPI-DSI should be registered to MIPI-DSI driver at
+> machine code and LCD panel driver specific function registered to mipi_dsim_ddi
+> structure at lcd panel init function called system init.
+> In the MIPI-DSI driver, find lcd panel driver by using registered
+> lcd panel name, and then initialize lcd panel driver.
+> 
+> Changes since v2:
+> 	- support regulators control in the driver.
+> 	- avoid type casting and use array to read easily in data write
+> 	  function.
+> 	- etc.
+> 
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-tegra/board-harmony-pinmux.c   |    8 ++++----
->  arch/arm/mach-tegra/board-paz00-pinmux.c     |    8 ++++----
->  arch/arm/mach-tegra/board-seaboard-pinmux.c  |   16 ++++++++--------
->  arch/arm/mach-tegra/board-trimslice-pinmux.c |    4 ++--
->  4 files changed, 18 insertions(+), 18 deletions(-)
+>  drivers/video/Kconfig                 |    7 +
+>  drivers/video/Makefile                |    2 +
+>  drivers/video/s5p_mipi_dsi.c          |  619 ++++++++++++++++++++++
+>  drivers/video/s5p_mipi_dsi_common.c   |  902 +++++++++++++++++++++++++++++++++
+>  drivers/video/s5p_mipi_dsi_common.h   |   46 ++
+>  drivers/video/s5p_mipi_dsi_lowlevel.c |  627 +++++++++++++++++++++++
+>  drivers/video/s5p_mipi_dsi_lowlevel.h |  112 ++++
+>  drivers/video/s5p_mipi_dsi_regs.h     |  156 ++++++
+>  include/linux/mipi_dsim.h             |  361 +++++++++++++
+>  9 files changed, 2832 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/video/s5p_mipi_dsi.c
+>  create mode 100644 drivers/video/s5p_mipi_dsi_common.c
+>  create mode 100644 drivers/video/s5p_mipi_dsi_common.h
+>  create mode 100644 drivers/video/s5p_mipi_dsi_lowlevel.c
+>  create mode 100644 drivers/video/s5p_mipi_dsi_lowlevel.h
+>  create mode 100644 drivers/video/s5p_mipi_dsi_regs.h
+>  create mode 100644 include/linux/mipi_dsim.h
 > 
-> diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
-> index 465808c..84cfbef 100644
-> --- a/arch/arm/mach-tegra/board-harmony-pinmux.c
-> +++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
-> @@ -25,7 +25,7 @@
->  #include "board-harmony.h"
->  #include "board-pinmux.h"
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index d83e967..879177b 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -2082,6 +2082,13 @@ config FB_S3C2410_DEBUG
+>  	  Turn on debugging messages. Note that you can set/unset at run time
+>  	  through sysfs
 >  
-> -static struct tegra_pingroup_config harmony_pinmux[] = {
-> +static __initdata struct tegra_pingroup_config harmony_pinmux[] = {
+> +config S5P_MIPI_DSI
+> +	tristate "Samsung SoC MIPI-DSI support."
+> +	depends on FB_S3C && (ARCH_S5PV210 || ARCH_S5PV310 || ARCH_EXYNOS)
+> +	default n
 
-__initdata goes at the end of the declaration - just before the '='.
+default n is the default default, so there's no point explicltly
+specifying the default default default.
