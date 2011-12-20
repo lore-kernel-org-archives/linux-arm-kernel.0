@@ -1,46 +1,45 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Tue, 20 Dec 2011 08:13:32 +0100
-Subject: [PATCH] arm: device.h: Add dma_mask to pdev_archdata structure
-In-Reply-To: <1321415178-12179-1-git-send-email-festevam@gmail.com>
-References: <1321415178-12179-1-git-send-email-festevam@gmail.com>
-Message-ID: <4EF0359C.1090703@googlemail.com>
+From: aneesh@ti.com (Aneesh V)
+Date: Tue, 20 Dec 2011 12:49:29 +0530
+Subject: [RFC v2 PATCH 2/3] dt: device tree bindings for TI's EMIF sdram
+ controller
+In-Reply-To: <CAOesGMidr_orQ60wWrDkSPXZziZ6wuThTixmQj-idkkDjrMG0A@mail.gmail.com>
+References: <1324303533-17458-1-git-send-email-aneesh@ti.com>	<1324303533-17458-3-git-send-email-aneesh@ti.com>
+ <CAOesGMidr_orQ60wWrDkSPXZziZ6wuThTixmQj-idkkDjrMG0A@mail.gmail.com>
+Message-ID: <4EF03701.9090809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.11.2011 04:46, Fabio Estevam wrote:
-> Fix the following build error when doing a 'make mx3_defconfig'
+On Monday 19 December 2011 10:29 PM, Olof Johansson wrote:
+> Oh wait, when I saw 3/3 I realized the following too:
 >
-> CC [M]  drivers/usb/host/fsl-mph-dr-of.o
-> drivers/usb/host/fsl-mph-dr-of.c: In function 'fsl_usb2_device_register':
-> drivers/usb/host/fsl-mph-dr-of.c:97: error: 'struct pdev_archdata' has no member named 'dma_mask'
-> make[3]: *** [drivers/usb/host/fsl-mph-dr-of.o] Error 1
-> make[2]: *** [drivers/usb/host] Error 2
-> make[1]: *** [drivers/usb] Error 2
-> make: *** [drivers] Error 2
+> On Mon, Dec 19, 2011 at 6:05 AM, Aneesh V<aneesh@ti.com>  wrote:
 >
-> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
-> ---
->   arch/arm/include/asm/device.h |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
+>> +- phy-type     : string indicating the phy type. Should be one of the
+>> +  following:
+>> +
+>> +  "phy-type-omap4"  : PHY used in OMAP4 family of SoCs
+>> +
+>> +  "phy-type-dm81xx" : PHY used in DM81XX family of SoCs
 >
-> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-> index 7aa3680..6ec60f6 100644
-> --- a/arch/arm/include/asm/device.h
-> +++ b/arch/arm/include/asm/device.h
-> @@ -21,6 +21,7 @@ struct pdev_archdata {
->   #ifdef CONFIG_ARCH_OMAP
->   	struct omap_device *od;
->   #endif
-> +	u64 dma_mask;
->   };
+> No, again please don't define new string properties when a simple
+> binary property will do just fine. Just use "phy-type-omap4" or
+> "phy-type-dm81xx" as an empty property to indicate what phy is used.
+> Or encode as an integer and list the valid values here.
+
+Ok. I just got carried away by readability. Somebody told me that
+something like #define will come to device-tree soon. Probably, I can
+use that then.
+
+Is binary property suitable in situations like this where "one and only
+one" phy-type should be specified by the user?
+
 >
->   #endif
+> Every time you add a string to the device tree, the data structure
+> grows, not to mention the fact that it adds a lot of string
+> comparisons during setup. Please keep that in mind when defining
+> bindings.
 
-Will there  be a v2 of this patch fixing the review comments?
+Understand.
 
-It seems the number of people hit by the issue this patch deals with 
-increases ...
-
-Many thanks
-
-Dirk
+Thanks,
+Aneesh
