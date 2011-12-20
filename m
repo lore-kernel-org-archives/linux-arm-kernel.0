@@ -1,36 +1,95 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Dec 2011 13:20:29 -0800
-Subject: [PATCH] net: macb: fix build break with !CONFIG_OF
-Message-ID: <1324416029-28198-1-git-send-email-olof@lixom.net>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 20 Dec 2011 22:28:26 +0100
+Subject: [PATCH 08/12] serial: mxs-auart: convert to
+ clk_prepare/clk_unprepare
+In-Reply-To: <20111220211519.GF2577@n2100.arm.linux.org.uk>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+ <20111220140750.GZ24496@pengutronix.de>
+ <20111220211519.GF2577@n2100.arm.linux.org.uk>
+Message-ID: <201112202228.27468.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the build of the macb driver that was broken by the DT changes:
+> On Tue, Dec 20, 2011 at 03:07:50PM +0100, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Tue, Dec 20, 2011 at 02:49:13PM +0100, Marek Vasut wrote:
+> > > > The patch converts mxs-auart driver to clk_prepare/clk_unprepare by
+> > > > using helper functions clk_prepare_enable/clk_disable_unprepare.
+> > > > 
+> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > Cc: Alan Cox <alan@linux.intel.com>
+> > > > ---
+> > > > 
+> > > >  drivers/tty/serial/mxs-auart.c |    8 ++++----
+> > > >  1 files changed, 4 insertions(+), 4 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/tty/serial/mxs-auart.c
+> > > > b/drivers/tty/serial/mxs-auart.c index 7e02c9c..c33500a 100644
+> > > > --- a/drivers/tty/serial/mxs-auart.c
+> > > > +++ b/drivers/tty/serial/mxs-auart.c
+> > > > @@ -424,7 +424,7 @@ static int mxs_auart_startup(struct uart_port *u)
+> > > > 
+> > > >  {
+> > > >  
+> > > >  	struct mxs_auart_port *s = to_auart_port(u);
+> > > > 
+> > > > -	clk_enable(s->clk);
+> > > > +	clk_prepare_enable(s->clk);
+> > > > 
+> > > >  	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+> > > > 
+> > > > @@ -453,7 +453,7 @@ static void mxs_auart_shutdown(struct uart_port
+> > > > *u)
+> > > > 
+> > > >  	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
+> > > >  	
+> > > >  			u->membase + AUART_INTR_CLR);
+> > > > 
+> > > > -	clk_disable(s->clk);
+> > > > +	clk_disable_unprepare(s->clk);
+> > > > 
+> > > >  }
+> > > >  
+> > > >  static unsigned int mxs_auart_tx_empty(struct uart_port *u)
+> > > > 
+> > > > @@ -634,7 +634,7 @@ auart_console_setup(struct console *co, char
+> > > > *options)
+> > > > 
+> > > >  	if (!s)
+> > > >  	
+> > > >  		return -ENODEV;
+> > > > 
+> > > > -	clk_enable(s->clk);
+> > > > +	clk_prepare_enable(s->clk);
+> > > > 
+> > > >  	if (options)
+> > > >  	
+> > > >  		uart_parse_options(options, &baud, &parity, &bits, 
+&flow);
+> > > > 
+> > > > @@ -643,7 +643,7 @@ auart_console_setup(struct console *co, char
+> > > > *options)
+> > > > 
+> > > >  	ret = uart_set_options(&s->port, co, baud, parity, bits, flow);
+> > > > 
+> > > > -	clk_disable(s->clk);
+> > > > +	clk_disable_unprepare(s->clk);
+> > > > 
+> > > >  	return ret;
+> > > >  
+> > > >  }
+> > > 
+> > > DTTO here, are you sure all of them are not called from atomic ctx?
+> > 
+> > the startup callback is called with irqs off.
+> 
+> It shouldn't be, as it has to do things like request_irq() which can
+> sleep.  The documentation in Documentation/serial/driver is now out
+> of date, and can't be relied upon.
 
-drivers/net/ethernet/cadence/macb.c:1503: error: implicit declaration of function 'of_match_ptr'
-drivers/net/ethernet/cadence/macb.c:1503: error: 'macb_dt_ids' undeclared here (not in a function)
-drivers/net/ethernet/cadence/macb.c:1503: error: initializer element is not constant
-drivers/net/ethernet/cadence/macb.c:1503: error: (near initialization for 'macb_driver.driver.of_match_table')
+auart_rx/tx_empty() shouldn't be called from atomic context? It doesn't really 
+look that way. The name is probably misleading though.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
-
-Nicolas, care to ack this so I can apply it on top of the macb DT branch in arm-soc?
-
- drivers/net/ethernet/cadence/macb.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index baf1a0d..f3d5c65 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_data/macb.h>
- #include <linux/platform_device.h>
- #include <linux/phy.h>
-+#include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_net.h>
- 
--- 
-1.7.5.4
+M
