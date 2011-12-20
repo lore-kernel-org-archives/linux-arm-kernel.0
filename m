@@ -1,73 +1,76 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Tue, 20 Dec 2011 19:38:09 +0530
-Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
- and DDR
-In-Reply-To: <4EF0824A.9060208@ti.com>
-References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
- <4EEFC23A.30201@gmail.com> <20111219233559.GW6464@atomide.com>
- <4EF0671B.7090508@ti.com> <4EF0824A.9060208@ti.com>
-Message-ID: <4EF096C9.1070808@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 20 Dec 2011 15:07:50 +0100
+Subject: [PATCH 08/12] serial: mxs-auart: convert to
+ clk_prepare/clk_unprepare
+In-Reply-To: <201112201449.13420.marek.vasut@gmail.com>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+ <1324382443-4439-9-git-send-email-shawn.guo@linaro.org>
+ <201112201449.13420.marek.vasut@gmail.com>
+Message-ID: <20111220140750.GZ24496@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit
+Hello,
 
-On Tuesday 20 December 2011 06:10 PM, Cousson, Benoit wrote:
-> Hi Aneesh,
->
+On Tue, Dec 20, 2011 at 02:49:13PM +0100, Marek Vasut wrote:
+> > The patch converts mxs-auart driver to clk_prepare/clk_unprepare by
+> > using helper functions clk_prepare_enable/clk_disable_unprepare.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Alan Cox <alan@linux.intel.com>
+> > ---
+> >  drivers/tty/serial/mxs-auart.c |    8 ++++----
+> >  1 files changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/mxs-auart.c
+> > b/drivers/tty/serial/mxs-auart.c index 7e02c9c..c33500a 100644
+> > --- a/drivers/tty/serial/mxs-auart.c
+> > +++ b/drivers/tty/serial/mxs-auart.c
+> > @@ -424,7 +424,7 @@ static int mxs_auart_startup(struct uart_port *u)
+> >  {
+> >  	struct mxs_auart_port *s = to_auart_port(u);
+> > 
+> > -	clk_enable(s->clk);
+> > +	clk_prepare_enable(s->clk);
+> > 
+> >  	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+> > 
+> > @@ -453,7 +453,7 @@ static void mxs_auart_shutdown(struct uart_port *u)
+> >  	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
+> >  			u->membase + AUART_INTR_CLR);
+> > 
+> > -	clk_disable(s->clk);
+> > +	clk_disable_unprepare(s->clk);
+> >  }
+> > 
+> >  static unsigned int mxs_auart_tx_empty(struct uart_port *u)
+> > @@ -634,7 +634,7 @@ auart_console_setup(struct console *co, char *options)
+> >  	if (!s)
+> >  		return -ENODEV;
+> > 
+> > -	clk_enable(s->clk);
+> > +	clk_prepare_enable(s->clk);
+> > 
+> >  	if (options)
+> >  		uart_parse_options(options, &baud, &parity, &bits, &flow);
+> > @@ -643,7 +643,7 @@ auart_console_setup(struct console *co, char *options)
+> > 
+> >  	ret = uart_set_options(&s->port, co, baud, parity, bits, flow);
+> > 
+> > -	clk_disable(s->clk);
+> > +	clk_disable_unprepare(s->clk);
+> > 
+> >  	return ret;
+> >  }
+> 
+> DTTO here, are you sure all of them are not called from atomic ctx?
+the startup callback is called with irqs off. AFAIK clk_prepare should
+be called in request_port and console_setup.
 
-<snip>
+Best regards
+Uwe
 
->>>> In general, is it really feasible to parse the DTB before DDR is
->>>> initialized?
->>>
->>> Changing timings is still needed for DVFS during runtime.
->>>
->>> But we can boot to userspace with bootloader set timings, so I'm
->>
->> As far as I understand, in the current out-of-tree DVFS implementation
->> for OMAP, DVFS can start even before user-space.
->
-> Maybe it is the case, but that does not mean it should.
-> We can potentially delay the DVFS init until the user-space is started.
-> This should not be considered as a big constraint.
->
->>> thinking that maybe these timings should be just set by loadable
->>> modules. Just the configuration of which timings to select should
->>> be passed via DT. Something in compatible like:
->>>
->>> .compatible = "ti,omap3630", "sdram-micron-mt46h32m32lf-6";
->>>
->>> And that should allow the SDRC driver to only accept timings for
->>> "sdram-micron-mt46h32m32lf-6".
->>
->> Do you mean one module per memory device and have all timing data in
->> the respective module? Wouldn't this clutter the kernel proper with all
->> these tables. By having the timing data in DT, it can be eventually
->> moved out of kernel eventually, right?
->
-> Yes, that's the theory, but referring to Olof's point, this is not
-> necessarily the goal of DT to store all the information that are not
-> board dependent.
-> In this case, each DDR will have it sets of well known AC timings data
-> that will never depend of the board config. In this case, storing that
-> inside DT might not be the best solution.
->
-> In fact we always had the same kind of discussion for the pinmux data
-> and for the clock data...
->
-> The conclusion being that most of the static data does not have to be in
-> the DTS.
-> But since Linus was complaining about the huge amount of data inside the
-> kernel, it is not obvious what the best solution is:-)
-
-Hmm.. I get the point now. Linus' complaint is what I had in mind too.
-My humble opinion is to have such data in DTS but re-use it as much as
-possible. That is, we could have something like a "sdram-micron-
-mt46h32m32lf-6.dtsi"(as you suggested before) that can be included by
-board level DTS files. I think the fact that dts files are organized at
-arch level today is limiting such re-use. Please correct me if I am
-wrong.
-
-br,
-Aneesh
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
