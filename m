@@ -1,38 +1,155 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 20 Dec 2011 13:47:29 -0800
-Subject: [PATCH V2 1/4] i2c: tegra: Add __devinit/exit to probe/remove
-In-Reply-To: <CAM=Q2cs8K4vraWPNqervcmxEqUGiAbng+44+L9OhD3ijPw9tAA@mail.gmail.com>
-References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
- <20111220015634.GA27789@quad.lixom.net>
- <CAM=Q2cs8K4vraWPNqervcmxEqUGiAbng+44+L9OhD3ijPw9tAA@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF176BE92E21@HQMAIL01.nvidia.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 20 Dec 2011 22:54:18 +0100
+Subject: [PATCH v2 1/7 v2] ARM: OMAP1: ams-delta: register latch dependent
+ devices later
+In-Reply-To: <201112200028.32947.jkrzyszt@tis.icnet.pl>
+References: <201112200028.32947.jkrzyszt@tis.icnet.pl>
+Message-ID: <1324418058-30905-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti Datta wrote at Monday, December 19, 2011 11:15 PM:
-...
-> Hi Stephen ,
-> could you check this one also
-> thanks.
-> 
-> From: Shubhrajyoti D <shubhrajyoti@ti.com>
-> Date: Tue, 20 Dec 2011 11:40:51 +0530
-> Subject: [PATCH] I2C : tegra : devexit in remove
-> 
-> Adding I2C __devexxit in remove
-> 
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+In preparation to converting Amstrad Delta on-board latches to
+basic_mmio_gpio devices, registration of platform devices which depend
+on latches and will require initialization of their GPIO pins first,
+should be moved out of .machine_init down to late_initcall level, as the
+gpio-generic driver is not available until device_initcall time.  The
+latch reset operation, which will be replaced with GPIO initialization,
+must also be moved to late_initcall for the same reason.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Since there was already another, separate arch_initcall function for
+setting up one of those latch dependent devices, the on-board modem
+device, reuse that function, i.e., rename it to a name that matches the
+new purpose, extend with other device setup relocated from
+.machine_init, and move down to the late_initcall level.
 
-Ben or Olof,
+While being at it, add missing gpio_free() in case the modem platform
+device registration fails.
 
-> -       .remove  = tegra_i2c_remove,
-> +       .remove  =__devexit_p(tegra_i2c_remove),
+Thanks to Tony Lindgren <tony@atomide.com> who suggested this approach
+instead of shifting up the gpio-generic driver initialization.
 
-When you apply this, can you fix it up to add a space after the = in
-the modified line? If you want, I can post an updated version to do that.
+In addition, defer registration of the Amstrad Delta ASoC and serio
+devices, done from their device driver files, until late_initcall time,
+as those drivers will depend on their GPIO pins already requested from
+the board late_init() function until updated to register their GPIO pins
+themselves.
 
+Created and tested against linux-3.2-rc6.
+
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+Changes since the initial version of this patch:
+* use late_initcall() unconditionally in modules, requested by Russell
+  King (thanks!); an updated patch 7/7 will follow,
+* in the changelog message, move credits to Tony up a bit, since the
+  person responsible for other changes (he might not necessarily like)
+  is me, not him ;).
+
+Comments copied from this patch initial submission:
+This patch was not present in the initial submission, it replaces the
+old patch 1/10, providing an alternative solution not touching the
+gpio-generic driver.
+
+ arch/arm/mach-omap1/board-ams-delta.c |   28 ++++++++++++++++++++--------
+ drivers/input/serio/ams_delta_serio.c |    2 +-
+ sound/soc/omap/ams-delta.c            |    2 +-
+ 3 files changed, 22 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index b0f15d2..50987c9 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -275,11 +275,14 @@ static struct omap1_cam_platform_data ams_delta_camera_platform_data = {
+ };
+ 
+ static struct platform_device *ams_delta_devices[] __initdata = {
+-	&ams_delta_nand_device,
+ 	&ams_delta_kp_device,
++	&ams_delta_camera_device,
++};
++
++static struct platform_device *late_devices[] __initdata = {
++	&ams_delta_nand_device,
+ 	&ams_delta_lcd_device,
+ 	&ams_delta_led_device,
+-	&ams_delta_camera_device,
+ };
+ 
+ static void __init ams_delta_init(void)
+@@ -307,9 +310,6 @@ static void __init ams_delta_init(void)
+ 	omap_serial_init();
+ 	omap_register_i2c_bus(1, 100, NULL, 0);
+ 
+-	/* Clear latch2 (NAND, LCD, modem enable) */
+-	ams_delta_latch2_write(~0, 0);
+-
+ 	omap1_usb_init(&ams_delta_usb_config);
+ 	omap1_set_camera_info(&ams_delta_camera_platform_data);
+ #ifdef CONFIG_LEDS_TRIGGERS
+@@ -345,13 +345,18 @@ static struct platform_device ams_delta_modem_device = {
+ 	},
+ };
+ 
+-static int __init ams_delta_modem_init(void)
++static int __init late_init(void)
+ {
+ 	int err;
+ 
+ 	if (!machine_is_ams_delta())
+ 		return -ENODEV;
+ 
++	/* Clear latch2 (NAND, LCD, modem enable) */
++	ams_delta_latch2_write(~0, 0);
++
++	platform_add_devices(late_devices, ARRAY_SIZE(late_devices));
++
+ 	omap_cfg_reg(M14_1510_GPIO2);
+ 	ams_delta_modem_ports[0].irq =
+ 			gpio_to_irq(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
+@@ -367,9 +372,16 @@ static int __init ams_delta_modem_init(void)
+ 		AMS_DELTA_LATCH2_MODEM_NRESET | AMS_DELTA_LATCH2_MODEM_CODEC,
+ 		AMS_DELTA_LATCH2_MODEM_NRESET | AMS_DELTA_LATCH2_MODEM_CODEC);
+ 
+-	return platform_device_register(&ams_delta_modem_device);
++	err = platform_device_register(&ams_delta_modem_device);
++	if (err)
++		goto gpio_free;
++	return 0;
++
++gpio_free:
++	gpio_free(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
++	return err;
+ }
+-arch_initcall(ams_delta_modem_init);
++late_initcall(late_init);
+ 
+ static void __init ams_delta_map_io(void)
+ {
+diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
+index d4d08bd..835d37a 100644
+--- a/drivers/input/serio/ams_delta_serio.c
++++ b/drivers/input/serio/ams_delta_serio.c
+@@ -165,7 +165,7 @@ serio:
+ 	kfree(ams_delta_serio);
+ 	return err;
+ }
+-module_init(ams_delta_serio_init);
++late_initcall(ams_delta_serio_init);
+ 
+ static void __exit ams_delta_serio_exit(void)
+ {
+diff --git a/sound/soc/omap/ams-delta.c b/sound/soc/omap/ams-delta.c
+index ccb8a6a..be81bc7 100644
+--- a/sound/soc/omap/ams-delta.c
++++ b/sound/soc/omap/ams-delta.c
+@@ -636,7 +636,7 @@ err:
+ 	platform_device_put(ams_delta_audio_platform_device);
+ 	return ret;
+ }
+-module_init(ams_delta_module_init);
++late_initcall(ams_delta_module_init);
+ 
+ static void __exit ams_delta_module_exit(void)
+ {
 -- 
-nvpublic
+1.7.3.4
