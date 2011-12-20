@@ -1,208 +1,31 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 21 Dec 2011 01:40:37 +0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux mappings
-In-Reply-To: <1324402840-32451-1-git-send-email-b29396@freescale.com>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
-Message-ID: <1324402840-32451-3-git-send-email-b29396@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 Dec 2011 09:32:39 -0800
+Subject: [PATCH] arm/tegra: boards: more __init/__initdata annotations
+In-Reply-To: <CAOesGMjh2DmzgjvoYZyDygADDcMwf-m7E3Np0f=h8xRWZZ6-4Q@mail.gmail.com>
+References: <1324353802-31774-1-git-send-email-olof@lixom.net>
+ <20111220082641.GQ14542@n2100.arm.linux.org.uk>
+ <CAOesGMjh2DmzgjvoYZyDygADDcMwf-m7E3Np0f=h8xRWZZ6-4Q@mail.gmail.com>
+Message-ID: <CAOesGMj73O79=hwFfLFpepTy1WDXCztppZQmZ_5b4tYRhjQFjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+On Tue, Dec 20, 2011 at 9:06 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Dec 20, 2011 at 12:26 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Dec 19, 2011 at 08:03:22PM -0800, Olof Johansson wrote:
+>>> Silence a bunch of section warnings, and mark some of the init functions as
+>>> __init.
+[...]
+> Thanks for pointing it out -- looks like a couple of other instances
+> use the wrong location as well (probably added by me in the past).
+> I'll respin the patch, and fix up those cases as well.
 
-This patch provies a common API for driver to use to register pinmux
-mappings from dts file. It is needed for dt support.
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
----
- .../devicetree/bindings/pinctrl/pinctrl.txt        |   33 +++++++
- drivers/pinctrl/pinmux.c                           |  101 ++++++++++++++++++++
- include/linux/pinctrl/machine.h                    |    6 +
- 3 files changed, 140 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl.txt
+Actually, after some brief discussion on IRC, I'll go the other way
+instead: These tables are all moving to devicetree in the next release
+or so, and it's uncertain what functions should (long-term) be __init
+and not. For now, I'll just remove __initdata from the seaboard pinmux
+tables. Sending separate patch for that.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl.txt
-new file mode 100644
-index 0000000..a27a7ce
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl.txt
-@@ -0,0 +1,33 @@
-+The pin control subsystem
-+
-+The pin control subsystem provides a common API to support parsing pinmux
-+mappings data from device tree. Each board dts file should provide a device
-+node of which all the child nodes are the corresponding pinmux mappings.
-+
-+The required properties for pinmux mapping are:
-+- map-name: the name of this specific map entry
-+- clk-dev-name: the name of the device controlling this specific mapping
-+- funcion: a function in the driver to use for this mapping
-+
-+Optional properties:
-+- group: a certain specific pin group to activate for the function
-+- dev-name: the name of the device using this specific mapping
-+- hog-on-boot: indicate wether hog the mappings(do not need to specify value)
-+
-+Examples:
-+
-+pinmux: imx6q-sabreauto-map {
-+	map-sd4 {
-+		map-name = "usdhc4";
-+		ctrl-dev-name = "20e0000.iomuxc";
-+		function = "sd4";
-+		dev-name = "219c000.usdhc";
-+	};
-+	...
-+};
-+
-+Then calling pinmux_of_register_mappings() with the device node of
-+imx6q-sabreauto-map as parameter to register pinmux mappings from dts.
-+
-+Usually user can get this device node via a phandle in driver then call
-+the function to register maps. Please refer to pinctrl-imx.txt for example.
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 432feb6..3ac3098 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -20,6 +20,7 @@
- #include <linux/err.h>
- #include <linux/list.h>
- #include <linux/mutex.h>
-+#include <linux/of_device.h>
- #include <linux/spinlock.h>
- #include <linux/string.h>
- #include <linux/sysfs.h>
-@@ -410,6 +411,106 @@ int __init pinmux_register_mappings(struct pinmux_map const *maps,
- 	return 0;
- }
- 
-+static int __devinit pinmux_of_parse_mapping(struct device_node *np,
-+					struct pinmux_map *maps, unsigned id)
-+{
-+	struct pinmux_map *map = &maps[id];
-+	int ret = 0;
-+
-+	pr_debug("parse pinmux map %d\n", id + 1);
-+
-+	if (of_find_property(np, "map-name", NULL)) {
-+		ret = of_property_read_string(np, "map-name", &map->name);
-+		if (ret) {
-+			pr_err("failed to get map-name");
-+			return ret;
-+		}
-+	}
-+
-+	if (of_find_property(np, "ctrl-dev-name", NULL)) {
-+		ret = of_property_read_string(np, "ctrl-dev-name",
-+						&map->ctrl_dev_name);
-+		if (ret) {
-+			pr_err("failed to get ctrl-dev-name");
-+			return ret;
-+		}
-+	}
-+
-+	if (of_find_property(np, "function", NULL)) {
-+		ret = of_property_read_string(np, "function", &map->function);
-+		if (ret) {
-+			pr_err("failed to get function");
-+			return ret;
-+		}
-+	}
-+
-+	if (of_find_property(np, "group", NULL)) {
-+		ret = of_property_read_string(np, "group", &map->group);
-+		if (ret) {
-+			pr_err("failed to get group");
-+			return ret;
-+		}
-+	}
-+
-+	if (of_find_property(np, "dev-name", NULL)) {
-+		ret = of_property_read_string(np, "dev-name", &map->dev_name);
-+		if (ret) {
-+			pr_err("failed to get dev-name");
-+			return ret;
-+		}
-+	}
-+
-+	if (of_find_property(np, "hog-on-boot", NULL))
-+		map->hog_on_boot = true;
-+
-+	pr_debug("map-name: %s ctrl-dev-name: %s function: %s group: %s dev-name: %s hog-on-boot: %d\n",
-+			map->name, map->ctrl_dev_name, map->function,
-+			map->group, map->dev_name, map->hog_on_boot);
-+
-+	return 0;
-+}
-+
-+/**
-+ * pinmux_of_register_mappings() - parse and register pinmux mappings from dt
-+ * &np: a device node containing pinmux map properties
-+ *
-+ * Like pinmux_register_mappings(), the memory of pinmux maps are owned by
-+ * pinctrl core and can not be freed.
-+ */
-+int __devinit pinmux_of_register_mappings(struct device_node *np)
-+{
-+	struct pinmux_map *maps;
-+	struct device_node *child = NULL;
-+	int count, i;
-+	int ret;
-+
-+	pr_debug("parse pinmux maps from device node %s\n", np->name);
-+
-+	if (!np)
-+		return -EINVAL;
-+
-+	count = of_get_child_count(np);
-+	if (!count) {
-+		pr_err("no available pinmux maps found\n");
-+		return -EINVAL;
-+	}
-+
-+	maps = kzalloc(count * sizeof(struct pinmux_map), GFP_KERNEL);
-+	if (!maps)
-+		return -ENOMEM;
-+
-+	i = 0;
-+	for_each_child_of_node(np, child) {
-+		ret = pinmux_of_parse_mapping(child, maps, i++);
-+		if (ret) {
-+			pr_err("failed to parse pinmux map\n");
-+			return ret;
-+		}
-+	}
-+
-+	return pinmux_register_mappings(maps, count);
-+}
-+
- /**
-  * acquire_pins() - acquire all the pins for a certain funcion on a pinmux
-  * @pctldev: the device to take the pins on
-diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
-index ad430e0..74a695d 100644
---- a/include/linux/pinctrl/machine.h
-+++ b/include/linux/pinctrl/machine.h
-@@ -78,6 +78,7 @@ struct pinmux_map {
- extern int pinmux_register_mappings(struct pinmux_map const *map,
- 				unsigned num_maps);
- 
-+extern int pinmux_of_register_mappings(struct device_node *np);
- #else
- 
- static inline int pinmux_register_mappings(struct pinmux_map const *map,
-@@ -86,5 +87,10 @@ static inline int pinmux_register_mappings(struct pinmux_map const *map,
- 	return 0;
- }
- 
-+static inline int pinmux_of_register_mappings(struct device_node *np)
-+{
-+	return 0;
-+}
-+
- #endif /* !CONFIG_PINMUX */
- #endif
--- 
-1.7.0.4
+
+-Olof
