@@ -1,33 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Dec 2011 21:29:26 -0800
-Subject: [GIT PULL v2] at91: drivers for 3.3
-In-Reply-To: <4EEB388A.1040906@atmel.com>
-References: <4EEA0DF6.3050408@atmel.com>
-	<4EEB388A.1040906@atmel.com>
-Message-ID: <CAOesGMgQVRRCURQ_Lxx21igq9RecMHo3Kz4Jx286Spp3500FPQ@mail.gmail.com>
+Date: Mon, 19 Dec 2011 21:33:06 -0800
+Subject: [GIT PULL] picoxcell features for 3.3
+In-Reply-To: <20111218110018.GD2376@gallagher>
+References: <20111218110018.GD2376@gallagher>
+Message-ID: <CAOesGMjnisHU=GiZfXkk075XQj8bs5_CX0obxHSBFMCJTpu1fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas, Jean-Christophe,
+Hi,
 
-On Fri, Dec 16, 2011 at 4:24 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On Sun, Dec 18, 2011 at 3:00 AM, Jamie Iles <jamie@jamieiles.com> wrote:
+> Hi Arnd, Olof,
+>
+> Please pull this single feature change for picoxcell for 3.3 which is
+> based on the previous cleanup branch.
+>
+> Thanks,
+>
+> Jamie
+>
+> The following changes since commit a53bfa07369b7c3448a60d29f0fc2e81751ed0b7:
+>
+> ?MAINTAINERS: add maintainer entry for Picochip picoxcell (2011-12-18 10:48:20 +0000)
+>
+> are available in the git repository at:
+> ?git://github.com/jamieiles/linux-2.6-ji.git picoxcell-devel
 
-> Jean-Christophe PLAGNIOL-VILLARD (1):
-> ? ? ?net/macb: add DT support for Cadence macb/gem driver
-
-
-This patch breaks build for non-OF configs. I hit this at least with
-afeb9260_defconfig, at91cap9_defconfig and at91sam9263_defconfig.
-Still building other defconfigs:
-
-drivers/net/ethernet/cadence/macb.c:1503: error: implicit declaration
-of function 'of_match_ptr'
-drivers/net/ethernet/cadence/macb.c:1503: error: 'macb_dt_ids'
-undeclared here (not in a function)
-drivers/net/ethernet/cadence/macb.c:1503: error: initializer element
-is not constant
-drivers/net/ethernet/cadence/macb.c:1503: error: (near initialization
-for 'macb_driver.driver.of_match_table')
+Thanks, pulled into next/devel.
 
 
 -Olof
