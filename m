@@ -1,42 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Dec 2011 01:42:36 +0100
-Subject: [PATCH 2/2] ARM: integrator: explicitly select the serial drivers
-Message-ID: <1324341756-20814-1-git-send-email-linus.walleij@linaro.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 19 Dec 2011 16:41:31 -0800
+Subject: [PATCH 01/20] ARM: clean up idle handlers
+In-Reply-To: <1324288069-21940-2-git-send-email-nico@fluxnic.net>
+References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
+ <1324288069-21940-2-git-send-email-nico@fluxnic.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF176BE92C29@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The defconfig for the Integrator only include the serial drivers
-for the PL010 as found in the Integrator/AP, to make sure we
-don't loose the serial console we simply select both PL010 and
-PL011 drivers from the Integrator Kconfig entries so they are
-always included when applicable.
+Nicolas Pitre wrote at Monday, December 19, 2011 2:48 AM:
+> Let's factor out the need_resched() check instead of having it duplicated
+> in every pm_idle implementations to avoid inconsistencies (omap2_pm_idle
+> was missing it already).
+> 
+> The forceful re-enablement of IRQs after pm_idle has returned can go.
+> The warning certainly doesn't trigger for existing users.  Similar for
+> the redundant local_irq_disable() call in the OMAP implementations.
+> 
+> To get rid of the pm_idle calling convention oddity, let's introduce
+> arm_pm_idle() allowing for the local_irq_enable() to be factored out
+> from SOC specific implementations. The default pm_idle function becomes
+> a wrapper for arm_pm_idle and it takes care of enabling IRQs closer to
+> where they are initially disabled.
+> 
+> And finally move the comment explaining the reason for that turning off
+> of IRQs to a more proper location.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-integrator/Kconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+The parts which affect Tegra,
 
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index dfd18f3..350e266 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -6,6 +6,8 @@ config ARCH_INTEGRATOR_AP
- 	bool "Support Integrator/AP and Integrator/PP2 platforms"
- 	select CLKSRC_MMIO
- 	select MIGHT_HAVE_PCI
-+	select SERIAL_AMBA_PL010
-+	select SERIAL_AMBA_PL010_CONSOLE
- 	help
- 	  Include support for the ARM(R) Integrator/AP and
- 	  Integrator/PP2 platforms.
-@@ -15,6 +17,8 @@ config ARCH_INTEGRATOR_CP
- 	select ARCH_CINTEGRATOR
- 	select ARM_TIMER_SP804
- 	select PLAT_VERSATILE_CLCD
-+	select SERIAL_AMBA_PL011
-+	select SERIAL_AMBA_PL011_CONSOLE
- 	help
- 	  Include support for the ARM(R) Integrator CP platform.
- 
+Acked-by: Stephen Warren <swarren@nvidia.com>
+
+Also,
+
+Tested-by: Stephen Warren <swarren@nvidia.com>
+
+(which IIUC for Tegra means booting with these patches applied, and
+running nothing much so that the CPU is idle, since we don't yet support
+any power management)
+
 -- 
-1.7.6.4
+nvpublic
