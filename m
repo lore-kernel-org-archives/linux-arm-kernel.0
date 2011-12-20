@@ -1,35 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Dec 2011 14:35:58 +0000
-Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
-In-Reply-To: <20111220135251.GB5129@S2101-09.ap.freescale.net>
-References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
- <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
- <20111220005708.GM2860@opensource.wolfsonmicro.com>
- <20111220020101.GD5683@S2100-06.ap.freescale.net>
- <20111220015931.GX2860@opensource.wolfsonmicro.com>
- <20111220030347.GB2995@S2101-09.ap.freescale.net>
- <20111220112510.GL2866@opensource.wolfsonmicro.com>
- <20111220135251.GB5129@S2101-09.ap.freescale.net>
-Message-ID: <20111220143558.GT2866@opensource.wolfsonmicro.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 20 Dec 2011 14:37:08 +0000
+Subject: [PATCH] ARM: drop unused parameter from flush_cache_user_range
+In-Reply-To: <1323985698-6371-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1323985698-6371-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAHkRjk5XOPjRSDaX2P0YxV7Vv_ddZSpVLnGVMOOGSJ8rzOeEAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 09:52:52PM +0800, Shawn Guo wrote:
-> On Tue, Dec 20, 2011 at 11:25:11AM +0000, Mark Brown wrote:
+2011/12/15 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> vma isn't used and flush_cache_user_range isn't a standard macro that
+> is used on several archs with the same prototype. In fact only unicore32
+> has a macro with the same name (with an identical implementation and no
+> in-tree users).
+>
+> This is a part of a patch proposed by Dima Zavin (with Message-id:
+> 1272439931-12795-1-git-send-email-dima at android.com) that didn't get
+> accepted.
+>
+> Cc: Dima Zavin <dima@android.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-> > Well, removing the random extra _s would be a big start (though I'd just
-> > drop the chip name entirely from the name of the regulators since by the
-> > time we're looking at the regulator we've already identified the chip)
-> > and as I keep saying you need to document what the names mean - what are
-> > the possible names and how do they map onto the hardware?
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-> I just came up with an idea which can totally avoid matching name.  It
-> seems that we can identify a regulator using register plus enable bit,
-> which is basically 'reg' and 'enable_bit' in 'mc13xxx_regulator'.  As
-> these data must be coming from hardware manual, they should be stable
-> enough for binding a regulator.  What do you think?
+I had this change as part of Dima's other patch to solve the user
+cache maintenance race (but Russell didn't like it -
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/139111)
 
-I don't know that that helps, register numbers and shifts aren't going
-to do anything for legibility.  The problem with the names was that the
-names chosen were poorly defined (why call DCDCn chipname__dcdcn?) and
-not documented in the binding, not that they were names.
+-- 
+Catalin
