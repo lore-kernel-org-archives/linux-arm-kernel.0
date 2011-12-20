@@ -1,32 +1,21 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 20 Dec 2011 23:09:48 +0200
-Subject: [PATCH 7/8] s3c-hsudc: use release_mem_region instead of
- release_resource
-In-Reply-To: <20111220201049.GB2577@n2100.arm.linux.org.uk>
-References: <201112191938.22254.heiko@sntech.de>
- <201112191942.52629.heiko@sntech.de>
- <20111220201049.GB2577@n2100.arm.linux.org.uk>
-Message-ID: <20111220210947.GA7352@legolas.emea.dhcp.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Dec 2011 21:11:00 +0000
+Subject: [PATCH 02/12] arm/mxs: convert platform code to
+ clk_prepare/clk_unprepare
+In-Reply-To: <201112201444.40509.marek.vasut@gmail.com>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+ <1324382443-4439-3-git-send-email-shawn.guo@linaro.org>
+ <201112201444.40509.marek.vasut@gmail.com>
+Message-ID: <20111220211100.GE2577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 08:10:49PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 19, 2011 at 07:42:52PM +0100, Heiko St?bner wrote:
-> > As the memory region is requested through request_mem_region
-> > use the correct paired method to release it in the error path
-> > and don't go "beneath the API" as pointed out by Russel King.
-> 
-> Please correct the spelling, thanks.
+On Tue, Dec 20, 2011 at 02:44:40PM +0100, Marek Vasut wrote:
+> I still wonder how to handle the DUART -- amba-pl011 -- maybe we should
+> toggle the clock here too ?
 
-Just did, do you prefer that I add a Reported-by: Russell instead of
-that mention ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111220/ea81203d/attachment.sig>
+amba-pl011, along with all the other Primecells and a few other devices,
+have already been converted to use clk_prepare() in the appropriate
+places.  See the bunch of commits from
+7ff6bcf048e6a9849ea0b44269fa4c1c72869db2 to (and including)
+40d3e0f4942ec12c4521fe1b2a2b774164cd2c80.
