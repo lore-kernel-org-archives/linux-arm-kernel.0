@@ -1,46 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 20 Dec 2011 09:23:52 +0100
-Subject: [PATCH] arm/tegra: boards: more __init/__initdata annotations
-In-Reply-To: <1324353802-31774-1-git-send-email-olof@lixom.net>
-References: <1324353802-31774-1-git-send-email-olof@lixom.net>
-Message-ID: <20111220082352.GW24496@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Dec 2011 08:24:12 +0000
+Subject: [PATCH] arm: device.h: Add dma_mask to pdev_archdata structure
+In-Reply-To: <4EF0359C.1090703@googlemail.com>
+References: <1321415178-12179-1-git-send-email-festevam@gmail.com>
+ <4EF0359C.1090703@googlemail.com>
+Message-ID: <20111220082412.GP14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 08:03:22PM -0800, Olof Johansson wrote:
-> Silence a bunch of section warnings, and mark some of the init functions as
-> __init.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm/mach-tegra/board-harmony-pinmux.c   |    8 ++++----
->  arch/arm/mach-tegra/board-paz00-pinmux.c     |    8 ++++----
->  arch/arm/mach-tegra/board-seaboard-pinmux.c  |   16 ++++++++--------
->  arch/arm/mach-tegra/board-trimslice-pinmux.c |    4 ++--
->  4 files changed, 18 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
-> index 465808c..84cfbef 100644
-> --- a/arch/arm/mach-tegra/board-harmony-pinmux.c
-> +++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
-> @@ -25,7 +25,7 @@
->  #include "board-harmony.h"
->  #include "board-pinmux.h"
->  
-> -static struct tegra_pingroup_config harmony_pinmux[] = {
-> +static __initdata struct tegra_pingroup_config harmony_pinmux[] = {
-The correct syntax is:
+On Tue, Dec 20, 2011 at 08:13:32AM +0100, Dirk Behme wrote:
+> On 16.11.2011 04:46, Fabio Estevam wrote:
+>> Fix the following build error when doing a 'make mx3_defconfig'
+>>
+>> CC [M]  drivers/usb/host/fsl-mph-dr-of.o
+>> drivers/usb/host/fsl-mph-dr-of.c: In function 'fsl_usb2_device_register':
+>> drivers/usb/host/fsl-mph-dr-of.c:97: error: 'struct pdev_archdata' has no member named 'dma_mask'
+>> make[3]: *** [drivers/usb/host/fsl-mph-dr-of.o] Error 1
+>> make[2]: *** [drivers/usb/host] Error 2
+>> make[1]: *** [drivers/usb] Error 2
+>> make: *** [drivers] Error 2
+>>
+>> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
+>> ---
+>>   arch/arm/include/asm/device.h |    1 +
+>>   1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+>> index 7aa3680..6ec60f6 100644
+>> --- a/arch/arm/include/asm/device.h
+>> +++ b/arch/arm/include/asm/device.h
+>> @@ -21,6 +21,7 @@ struct pdev_archdata {
+>>   #ifdef CONFIG_ARCH_OMAP
+>>   	struct omap_device *od;
+>>   #endif
+>> +	u64 dma_mask;
+>>   };
+>>
+>>   #endif
+>
+> Will there  be a v2 of this patch fixing the review comments?
+>
+> It seems the number of people hit by the issue this patch deals with  
+> increases ...
 
-	static struct tegra_pingroup_config harmony_pinmux[] __initdata = {
-
-that is, __initdata has to be at the end.
-
-I havn't looked, but it might be possible to mark these as const, too
-(and then use __initconst instead of __initdata).
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+How about fixing the driver?  Or how about fixing this problem properly
+and sorting it out in the standard platform device model, rather than
+asking every arch to add this to their platform device archdata?
