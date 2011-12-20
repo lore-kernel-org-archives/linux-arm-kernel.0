@@ -1,27 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Dec 2011 21:33:17 -0800
-Subject: [GIT PULL] picoxcell cleanups for 3.3
-In-Reply-To: <20111218105922.GC2376@gallagher>
-References: <20111218105922.GC2376@gallagher>
-Message-ID: <CAOesGMivZ0hOqXaF5+wh5J3JAjaUnsCadi=QXzH--M09-kLU3g@mail.gmail.com>
+Date: Mon, 19 Dec 2011 21:33:38 -0800
+Subject: [GIT PULL]
+In-Reply-To: <20111219112915.GN27267@pengutronix.de>
+References: <20111219112915.GN27267@pengutronix.de>
+Message-ID: <CAOesGMgKyarxTmuxsmpciarLDhV1rz5sVWV1aErpK9Om_hkMBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 18, 2011 at 2:59 AM, Jamie Iles <jamie@jamieiles.com> wrote:
-> Hi Arnd, Olof
+On Mon, Dec 19, 2011 at 3:29 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Arnd, Olof,
 >
-> Please pull these cleanups for picoxcell for the 3.3 merge window. ?I've
-> based this on Russell's devel-stable branch as they are dependent on the
-> VIC changes.
+> Please pull the following for -rc. Most stuff is regressions since
+> the last merge window, so only "ARM:imx:fix pwm period value" has
+> Cc stable.
 >
-> The following changes since commit 3bdc3484e8f2b1b219ad0397d81ce4601fbaf76d:
+> Sascha
 >
-> ?ARM: kexec: use soft_restart for branching to the reboot buffer (2011-12-12 16:07:36 +0000)
+> The following changes since commit 384703b8e6cd4c8ef08512e596024e028c91c339:
+>
+> ?Linux 3.2-rc6 (2011-12-16 18:36:26 -0800)
 >
 > are available in the git repository at:
-> ?git://github.com/jamieiles/linux-2.6-ji.git picoxcell-cleanup
+> ?git://git.pengutronix.de/git/imx/linux-2.6.git fixes-for-arnd
 
-Thanks, pulled into next/cleanup.
+Thanks, pulled.
+
+For the next release cycle, please try to get these kind of fixes in
+sooner if you can -- it's getting quite close to release.
 
 
 -Olof
