@@ -1,108 +1,61 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 19 Dec 2011 22:08:05 -0800
-Subject: [PATCH 3/7] s3c-hsudc: add a remove function
-In-Reply-To: <20111218213704.GZ14542@n2100.arm.linux.org.uk>
-References: <201112172023.05519.heiko@sntech.de>
- <201112182124.13313.heiko@sntech.de>
- <20111218203953.GY14542@n2100.arm.linux.org.uk>
- <201112182146.09090.heiko@sntech.de>
- <20111218213704.GZ14542@n2100.arm.linux.org.uk>
-Message-ID: <20111220060805.GD25439@kroah.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Tue, 20 Dec 2011 11:45:08 +0530
+Subject: [PATCH V2 1/4] i2c: tegra: Add __devinit/exit to probe/remove
+In-Reply-To: <20111220015634.GA27789@quad.lixom.net>
+References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
+ <20111220015634.GA27789@quad.lixom.net>
+Message-ID: <CAM=Q2cs8K4vraWPNqervcmxEqUGiAbng+44+L9OhD3ijPw9tAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 18, 2011 at 09:37:04PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Dec 18, 2011 at 09:46:08PM +0100, Heiko St?bner wrote:
-> > > > kobject: 'holders' (c7addc80): kobject_cleanup
-> > > > Unable to handle kernel paging request at virtual address bf055504
-> > > > pgd = c0004000
-> > > > [bf055504] *pgd=371f9811, *pte=00000000, *ppte=00000000
-> > > > Internal error: Oops: 7 [#1]
-> > > 
-> > > Please post the entire first oops dump for the above run - it may contain
-> > > useful information to properly track this down.
-> > 
-> > kobject: 'holders' (c7addc80): kobject_cleanup
-> > Unable to handle kernel paging request at virtual address bf055504
-> > pgd = c0004000
-> > [bf055504] *pgd=371f9811, *pte=00000000, *ppte=00000000
-> > Internal error: Oops: 7 [#1]
-> > Modules linked in: ohci_hcd usbcore leds_s3c24xx i2c_s3c2410 i2c_core
-> > CPU: 0    Not tainted  (3.2.0-rc5-next-20111216+ #33)
-> > PC is at kobject_put+0x18/0x7c
-> > LR is at kobject_del+0x64/0x70
-> > pc : [<c0114624>]    lr : [<c011470c>]    psr: a0000013
-> > sp : c70bdef8  ip : c70bdf18  fp : c70bdf14
-> > r10: 00000000  r9 : c0114718  r8 : c7803a00
-> > r7 : c7abd360  r6 : c02e1de0  r5 : c7addca0  r4 : bf0554a0
-> > r3 : 00000001  r2 : 00000000  r1 : 00000000  r0 : bf0554a0
-> > Backtrace: 
-> > [<c011460c>] (kobject_put+0x0/0x7c) from [<c011470c>] (kobject_del+0x64/0x70)
-> >  r4:c7addc80
-> > [<c01146a8>] (kobject_del+0x0/0x70) from [<c01147ec>] (kobject_delayed_cleanup+0xd4/0x174)
-> >  r4:c7addc80
-> > [<c0114718>] (kobject_delayed_cleanup+0x0/0x174) from [<c00318fc>] (process_one_work+0x24c/0x3a8)
-> 
-> Right, here's what I think is happening.
-> 
-> You're right that 0xc7addc80 is being cleaned up.  So, we enter
-> kobject_cleanup() with kobj = 0xc7addc80.  We get to this:
-> 
->         /* remove from sysfs if the caller did not do it */
->         if (kobj->state_in_sysfs) {
->                 pr_debug("kobject: '%s' (%p): auto cleanup kobject_del\n",
->                          kobject_name(kobj), kobj);
->                 kobject_del(kobj);
->         }
-> 
-> So, we call kobject_del() on c7addc80 (which we can see in r4 in the
-> backtrace):
-> 
-> void kobject_del(struct kobject *kobj)
-> {
->         if (!kobj)
->                 return;
-> 
->         sysfs_remove_dir(kobj);
->         kobj->state_in_sysfs = 0;
->         kobj_kset_leave(kobj);
->         kobject_put(kobj->parent);
-> 
-> And so we get to kobject_put(), and we call that with a pointer of
-> 0xbf0554a0.  This is a pointer into struct module.  And this is where
-> the problem lies...
-> 
-> The struct module is free'd as part of the core of the module
-> (mod->module_core) here:
-> 
-> static void module_deallocate(struct module *mod, struct load_info *info)
-> {
->         kfree(info->strmap);
->         percpu_modfree(mod);
->         module_free(mod, mod->module_init);
->         module_free(mod, mod->module_core);
-> }
-> 
-> A struct module contains:
-> 
-> struct module
-> {
-> 	...
->         /* Sysfs stuff. */
->         struct module_kobject mkobj;
-> 
-> which in turn is defined as:
-> 
-> struct module_kobject {
->         struct kobject kobj;
-> 	...
-> }
-> 
-> So, we have a struct kobject contained within a data structure which is
-> independently allocated and freed - and this is highly illegal.  I'm
-> sure GregKH will want to discuss this with Rusty...
+On Tue, Dec 20, 2011 at 7:26 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Dec 17, 2011 at 11:29:29PM -0700, Stephen Warren wrote:
+>> This fixes some section mismatch build warnings.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>
+> Ben, since the patch is trivial, I've picked it up in tegra
+> for-3.3/drivers and will merge that way. Let me know if you disagree.
+>
+>
+Hi Stephen ,
+could you check this one also
+thanks.
 
-Ugh, that sucks, yes I'll work on this when I get back from vacation the
-first week in January.
+From: Shubhrajyoti D <shubhrajyoti@ti.com>
+Date: Tue, 20 Dec 2011 11:40:51 +0530
+Subject: [PATCH] I2C : tegra : devexit in remove
 
-greg k-h
+Adding I2C __devexxit in remove
+
+Cc: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+Untested
+
+ drivers/i2c/busses/i2c-tegra.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 46b6500..b25f78b 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -751,7 +751,7 @@ MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
+
+ static struct platform_driver tegra_i2c_driver = {
+        .probe   = tegra_i2c_probe,
+-       .remove  = tegra_i2c_remove,
++       .remove  =__devexit_p(tegra_i2c_remove),
+ #ifdef CONFIG_PM
+        .suspend = tegra_i2c_suspend,
+        .resume  = tegra_i2c_resume,
+-- 
+1.7.1
+
+> Thanks,
+>
+> -Olof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
