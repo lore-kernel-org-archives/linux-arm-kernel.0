@@ -1,52 +1,56 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 20 Dec 2011 10:41:45 -0600
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <201112201541.17904.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <201112121648.52126.arnd@arndb.de>
- <CAB2ybb_dU7BzJmPo6vA92pe1YCNerCLc+bv7Qi_EfkfGaik6bQ@mail.gmail.com>
- <201112201541.17904.arnd@arndb.de>
-Message-ID: <CAF6AEGtOjO6Z6yfHz-ZGz3+NuEMH2M-8=20U6+-xt-gv9XtzaQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 20 Dec 2011 10:42:43 -0600
+Subject: [PATCH v3 02/11] i2c: OMAP: Add DT support for i2c controller
+In-Reply-To: <1324398444-23296-3-git-send-email-b-cousson@ti.com>
+References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
+ <1324398444-23296-3-git-send-email-b-cousson@ti.com>
+Message-ID: <4EF0BB03.6040906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 9:41 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 19 December 2011, Semwal, Sumit wrote:
->> I didn't see a consensus on whether dma_buf should enforce some form
->> of serialization within the API - so atleast for v1 of dma-buf, I
->> propose to 'not' impose a restriction, and we can tackle it (add new
->> ops or enforce as design?) whenever we see the first need of it - will
->> that be ok? [I am bending towards the thought that it is a problem to
->> solve at a bigger platform than dma_buf.]
->
-> The problem is generally understood for streaming mappings with a
-> single device using it: if you have a long-running mapping, you have
-> to use dma_sync_*. This obviously falls apart if you have multiple
-> devices and no serialization between the accesses.
->
-> If you don't want serialization, that implies that we cannot have
-> use the ?dma_sync_* API on the buffer, which in turn implies that
-> we cannot have streaming mappings. I think that's ok, but then
-> you have to bring back the mmap API on the buffer if you want to
-> allow any driver to provide an mmap function for a shared buffer.
+On 12/20/2011 10:27 AM, Benoit Cousson wrote:
+> Add initial DT support to retrieve the frequency using a
+> DT attribute instead of the pdata pointer if of_node exist.
+> 
+> Add documentation for omap i2c controller binding.
+> 
+> Based on original patches from Manju and Grant.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-I'm thinking for a first version, we can get enough mileage out of it by saying:
-1) only exporter can mmap to userspace
-2) only importers that do not need CPU access to buffer..
+One issue below, otherwise:
 
-This way we can get dmabuf into the kernel, maybe even for 3.3.  I
-know there are a lot of interesting potential uses where this stripped
-down version is good enough.  It probably isn't the final version,
-maybe more features are added over time to deal with importers that
-need CPU access to buffer, sync object, etc.  But we have to start
-somewhere.
+Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 
-BR,
--R
 
-> ? ? ? ?Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> @@ -1001,15 +1019,24 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		goto err_release_region;
+>  	}
+>  
+> -	if (pdata != NULL) {
+> -		speed = pdata->clkrate;
+> +	match = of_match_device(omap_i2c_of_match, &pdev->dev);
+> +	if (match) {
+> +		u32 freq = 100000; /* default to 100000 Hz */
+> +
+> +		pdata = match->data;
+> +		dev->dtrev = pdata->rev;
+> +		dev->flags = pdata->flags;
+> +
+> +		of_property_read_u32(node, "clock-frequency", &freq);
+> +		/* convert DT freq value in Hz into kHz for speed */
+> +		dev->speed = freq / 1000;
+> +	} else if (pdata != NULL) {
+> +		dev->speed = pdata->clkrate;
+> +		dev->flags = pdata->flags;
+>  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+> -	} else {
+> -		speed = 100;	/* Default speed */
+> -		dev->set_mpu_wkup_lat = NULL;
+> +		dev->dtrev = pdata->rev;
+
+If you get here, pdata is NULL.
+
+Rob
