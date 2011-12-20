@@ -1,67 +1,25 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Wed, 21 Dec 2011 07:27:03 +0800
-Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
-In-Reply-To: <20111220145904.GD29727@sirena.org.uk>
-References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
- <1324264903-15395-5-git-send-email-richard.zhao@linaro.org>
- <20111220145904.GD29727@sirena.org.uk>
-Message-ID: <20111220232701.GA1698@richard-laptop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 20 Dec 2011 23:36:21 +0000
+Subject: [PATCH 17/20] ARM: mach-s3c64xx: properly disable CPU idle call
+In-Reply-To: <alpine.LFD.2.02.1112201348430.2907@xanadu.home>
+References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
+ <1324288069-21940-18-git-send-email-nico@fluxnic.net>
+ <20111220150302.GE29727@sirena.org.uk>
+ <alpine.LFD.2.02.1112201348430.2907@xanadu.home>
+Message-ID: <20111220233621.GB6551@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 02:59:04PM +0000, Mark Brown wrote:
-> On Mon, Dec 19, 2011 at 11:21:40AM +0800, Richard Zhao wrote:
-> > It support single core and multi-core ARM SoCs. But currently it assume
-> > all cores share the same frequency and voltage.
-> 
-> My comments on the previous version of the patch still apply:
-> 
->  - The voltage ranges being set need to be specified as ranges.
-cpu normally need strict voltages. and only proved operating opints
-are allowed to set in dts. If the voltage changes slightly especially
-for high frequency, it's easy to cause unstable.
->  - Frequencies that can't be supported due to limitations of the
->    available supplies shouldn't be exposed to users.
-As I said, only proved operation points are allowed.
->  - The driver needs to handle errors.
-Yes.
-> 
-> > +Required properties in /cpus/cpu at 0:
-> > +- compatible : "generic-cpufreq"
-> > +- cpu-freqs : cpu frequency points it support
-> > +- cpu-volts : cpu voltages required by the frequency point at the same index
-> > +- trans-latency :  transition_latency
-> 
-> You need to define units for all of these, and for the transition
-> latency you need to be clear about what's being measured (it looks like
-> the CPU time only, not any voltage ramping).
-right.
-> 
-> You also need to define how the core supplies get looked up.
-It's pure software. platform uses this driver have to define "cpu" consumer.
-> 
-> > +	/* Manual states, that PLL stabilizes in two CLK32 periods */
-> > +	policy->cpuinfo.transition_latency = trans_latency;
-> 
-> I guess this comment is a cut'n'paste error.
-right, thanks.
-> 
-> > +
-> > +	ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-> > +
-> > +	if (ret < 0) {
-> > +		pr_err("%s: invalid frequency table for cpu %d\n",
-> > +		       __func__, policy->cpu);
-> 
-> You should define pr_fmt to always include __func__ in the messages
-> rather than open coding - ensures consistency and is less noisy in the
-> code.
-I'll check it.
-> 
-> > +	pr_info("Generic CPU frequency driver\n");
-> 
-> This seems noisy...
-Why? Do you think only errors and warnings can print out?
+On Tue, Dec 20, 2011 at 01:54:00PM -0500, Nicolas Pitre wrote:
 
-Thanks
-Richard
+> So if you can confirm the kernel works fine with that disable_hlt() 
+> commented out (while still including the rest of the patch) then I can 
+> change the patch.  And if you can measure a difference in power 
+> consumption when the system is idle then that would be even better.
+
+Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+
+with and without the disable_hlt() call.  I don't have equipment with me
+to measure power but I don't expect much effect without additional code
+to enable power saving in WFI as for some reason the default behaviour
+isn't to save power.
