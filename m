@@ -1,42 +1,58 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 20 Dec 2011 17:27:14 +0100
-Subject: [PATCH v3 01/11] ARM: OMAP2+: pm: Do not init statically the SR and
- voltage layer with DT
+Date: Tue, 20 Dec 2011 17:27:17 +0100
+Subject: [PATCH v3 04/11] arm/dts: OMAP4: Add i2c controller nodes
 In-Reply-To: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
 References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1324398444-23296-2-git-send-email-b-cousson@ti.com>
+Message-ID: <1324398444-23296-5-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case of DT, the PMIC and SR initialization will be done using
-a completely different mechanism.
-
-Disable this part if a DT blob is available.
+Add i2c controllers nodes into the main ocp bus.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Acked-by: Kevin Hilman <khilman@ti.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-omap2/pm.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap4.dtsi |   28 ++++++++++++++++++++++++++++
+ 1 files changed, 28 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 1881fe9..ad4f693 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -227,6 +227,14 @@ postcore_initcall(omap2_common_pm_init);
- 
- static int __init omap2_common_pm_late_init(void)
- {
-+	/*
-+	 * In the case of DT, the PMIC and SR initialization will be done using
-+	 * a completely different mechanism.
-+	 * Disable this part if a DT blob is available.
-+	 */
-+	if (of_have_populated_dt())
-+		return 0;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index bede009..9872283 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -100,5 +100,33 @@
+ 			reg = <0x48241000 0x1000>,
+ 			      <0x48240100 0x0100>;
+ 		};
 +
- 	/* Init the voltage layer */
- 	omap_pmic_late_init();
- 	omap_voltage_late_init();
++		i2c1: i2c at 1 {
++			compatible = "ti,omap4-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "i2c1";
++		};
++
++		i2c2: i2c at 2 {
++			compatible = "ti,omap4-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "i2c2";
++		};
++
++		i2c3: i2c at 3 {
++			compatible = "ti,omap4-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "i2c3";
++		};
++
++		i2c4: i2c at 4 {
++			compatible = "ti,omap4-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "i2c4";
++		};
+ 	};
+ };
 -- 
 1.7.0.4
