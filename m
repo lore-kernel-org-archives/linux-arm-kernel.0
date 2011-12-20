@@ -1,75 +1,23 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 20 Dec 2011 11:03:06 +0200
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <201112091413.03736.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <201112071340.35267.arnd@arndb.de>
- <CAKMK7uFQiiUbkU-7c3Os0d0FJNyLbqS2HLPRLy3LGnOoCXV5Pw@mail.gmail.com>
- <201112091413.03736.arnd@arndb.de>
-Message-ID: <20111220090306.GO3677@valkosipuli.localdomain>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 20 Dec 2011 14:54:04 +0530
+Subject: [PATCH 0/4] Fix the left DMA_NONE from dma_transfer_direction
+ migration
+In-Reply-To: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
+References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1324373044.1641.10096.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Fri, Dec 09, 2011 at 02:13:03PM +0000, Arnd Bergmann wrote:
-> On Thursday 08 December 2011, Daniel Vetter wrote:
-> > > c) only allowing streaming mappings, even if those are non-coherent
-> > > (requiring strict serialization between CPU (in-kernel) and dma users of
-> > > the buffer)
-> > 
-> > I think only allowing streaming access makes the most sense:
-> > - I don't see much (if any need) for the kernel to access a dma_buf -
-> > in all current usecases it just contains pixel data and no hw-specific
-> > things (like sg tables, command buffers, ..). At most I see the need
-> > for the kernel to access the buffer for dma bounce buffers, but that
-> > is internal to the dma subsystem (and hence does not need to be
-> > exposed).
-> > - Userspace can still access the contents through the exporting
-> > subsystem (e.g. use some gem mmap support). For efficiency reason gpu
-> > drivers are already messing around with cache coherency in a platform
-> > specific way (and hence violated the dma api a bit), so we could stuff
-> > the mmap coherency in there, too. When we later on extend dma_buf
-> > support so that other drivers than the gpu can export dma_bufs, we can
-> > then extend the official dma api with already a few drivers with
-> > use-patterns around.
-> > 
-> > But I still think that the kernel must not be required to enforce
-> > correct access ordering for the reasons outlined in my other mail.
+On Tue, 2011-12-13 at 23:48 +0800, Shawn Guo wrote:
+> I have been working on -rc recently, and have not noticed the failure
+> until I ran next tree today.  The mxs-mmc driver is broken on next
+> tree because the DMA_NONE was left over from the dma_transfer_direction
+> migration for mxs-dma and its client drivers.
 > 
-> I still don't think that's possible. Please explain how you expect
-> to change the semantics of the streaming mapping API to allow multiple
-> mappers without having explicit serialization points that are visible
-> to all users. For simplicity, let's assume a cache coherent system
-> with bounce buffers where map() copies the buffer to a dma area
-> and unmap() copies it back to regular kernel memory. How does a driver
-> know if it can touch the buffer in memory or from DMA at any given
-> point in time? Note that this problem is the same as the cache coherency
-> problem but may be easier to grasp.
+For DMA transfer, the NONE direction makes no sense?
 
-(I'm jumping into the discussion in the middle, and might miss something
-that has already been talked about. I still hope what I'm about to say is
-relevant. :-))
+In your conetext, what are you trying to achieve?
 
-In subsystems such as V4L2 where drivers deal with such large buffers, the
-buffers stay mapped all the time. The user explicitly gives the control of
-the buffers to the driver and eventually gets them back. This is already
-part of those APIs, whether they're using dma_buf or not. The user could
-have, and often has, the same buffers mapped elsewhere.
-
-When it comes to passing these buffers between different hardware devices,
-either V4L2 or not, the user might not want to perform extra cache flush
-when the buffer memory itself is not being touched by the CPU in the process
-at all. I'd consider it impossible for the driver to know how the user space
-intends to user the buffer.
-
-Flushing the cache is quite expensive: typically it's the best to flush the
-whole data cache when one needs to flush buffers. The V4L2 DQBUF and QBUF
-IOCTLs already have flags to suggest special cache handling for buffers.
-
-Kind regards,
 
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	jabber/XMPP/Gmail: sailus at retiisi.org.uk
+~Vinod
