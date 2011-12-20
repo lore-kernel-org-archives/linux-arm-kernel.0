@@ -1,77 +1,51 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 20 Dec 2011 16:13:41 +0100
-Subject: [PATCH v2 04/10] rtc: rtc-twl: Add DT support for RTC inside
- twl4030/twl6030
-In-Reply-To: <1323439361-1647-5-git-send-email-b-cousson@ti.com>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-5-git-send-email-b-cousson@ti.com>
-Message-ID: <4EF0A625.4050008@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Dec 2011 15:21:37 +0000
+Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
+In-Reply-To: <20111220015934.GD15863@b20223-02.ap.freescale.net>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+ <4EEF519C.4090808@gmail.com>
+ <20111220015934.GD15863@b20223-02.ap.freescale.net>
+Message-ID: <201112201521.37747.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Tuesday 20 December 2011, Richard Zhao wrote:
+> > >>>> +Generic cpufreq driver
+> > >>>> +
+> > >>>> +Required properties in /cpus/cpu at 0:
+> > >>>> +- compatible : "generic-cpufreq"
+> > >>>
+> > >>> I'm not convinced this is the best way to do this.  By requiring a 
+> > >>> generic-cpufreq compatible string we're encoding Linux driver 
+> > >>> information into the hardware description.  The only way I can see to 
+> > >>> avoid this is to provide a generic_clk_cpufreq_init() function that 
+> > >>> platforms can call in their machine init code to use the driver.
+> > 
+> > Agreed on the compatible string.
+> Assume you reject to use compatible string.
+> > It's putting Linux specifics into DT.
+> > 
+> > You could flip this around and have the module make a call into the
+> > kernel to determine whether to initialize or not. Then platforms could
+> > set a flag to indicate this.
+> Could you make it more clear? kernel global variable, macro, or function?
+> 
+> - Following your idea, I think, we can add in driver/cpufreq/cpufreq.c:
+> int (*clk_reg_cpufreq_get_op_table) (struct op_table *tbl, int *size);
+> SoC code set the callback. If it's NULL, driver will exit. We can get rid
+> of DT. It'll make cpufreq core dirty, but it's the only file built-in.
+> 
+> - Drop module support. SoC call generic_clk_cpufreq_init as Jamie said.
 
-I've never got any feedback on this patch from Alessandro and it seems
-that you took care of some rtc stuff recently.
+I think you don't actually need a "compatible" property here, as long as we
+ensure that the "cpu-freqs", "cpu-volts" and "trans-latency" properties are
+present in the cpu node if and only if the machine works with this driver
+(why else would you put them there?).
 
-Thanks in advance,
-Benoit
+CPUs are special in the device trees in a number of ways, so I think we
+can treat this as a logical extension. This way, you can still make the
+generic cpufreq driver a loadable module. You don't get module autoloading
+with this structure, but that is already the case because the cpu nodes
+in the device tree are not translated into linux devices.
 
-On 12/9/2011 3:02 PM, Benoit Cousson wrote:
-> Add the DT support for the TI rtc-twl present in the twl4030
-> and twl6030 devices.
->
-> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> Cc: Alessandro Zummo<a.zummo@towertech.it>
-> ---
->   Documentation/devicetree/bindings/rtc/twl-rtc.txt |   12 ++++++++++++
->   drivers/rtc/rtc-twl.c                             |   10 ++++++++--
->   2 files changed, 20 insertions(+), 2 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/rtc/twl-rtc.txt
->
-> diff --git a/Documentation/devicetree/bindings/rtc/twl-rtc.txt b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
-> new file mode 100644
-> index 0000000..596e0c9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
-> @@ -0,0 +1,12 @@
-> +* TI twl RTC
-> +
-> +The TWL family (twl4030/6030) contains a RTC.
-> +
-> +Required properties:
-> +- compatible : Should be twl4030-rtc
-> +
-> +Examples:
-> +
-> +rtc at 0 {
-> +    compatible = "ti,twl4030-rtc";
-> +};
-> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-> index 20687d5..d43b4f6 100644
-> --- a/drivers/rtc/rtc-twl.c
-> +++ b/drivers/rtc/rtc-twl.c
-> @@ -550,6 +550,11 @@ static int twl_rtc_resume(struct platform_device *pdev)
->   #define twl_rtc_resume  NULL
->   #endif
->
-> +static const struct of_device_id twl_rtc_of_match[] = {
-> +	{.compatible = "ti,twl4030-rtc", },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, twl_rtc_of_match);
->   MODULE_ALIAS("platform:twl_rtc");
->
->   static struct platform_driver twl4030rtc_driver = {
-> @@ -559,8 +564,9 @@ static struct platform_driver twl4030rtc_driver = {
->   	.suspend	= twl_rtc_suspend,
->   	.resume		= twl_rtc_resume,
->   	.driver		= {
-> -		.owner	= THIS_MODULE,
-> -		.name	= "twl_rtc",
-> +		.owner		= THIS_MODULE,
-> +		.name		= "twl_rtc",
-> +		.of_match_table = twl_rtc_of_match,
->   	},
->   };
->
+	Arnd
