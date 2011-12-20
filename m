@@ -1,27 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Dec 2011 21:19:08 +0000
-Subject: [PATCH 7/8] s3c-hsudc: use release_mem_region instead of
- release_resource
-In-Reply-To: <20111220210947.GA7352@legolas.emea.dhcp.ti.com>
-References: <201112191938.22254.heiko@sntech.de>
- <201112191942.52629.heiko@sntech.de>
- <20111220201049.GB2577@n2100.arm.linux.org.uk>
- <20111220210947.GA7352@legolas.emea.dhcp.ti.com>
-Message-ID: <20111220211908.GG2577@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 Dec 2011 13:24:07 -0800
+Subject: [PATCH v3 02/11] i2c: OMAP: Add DT support for i2c controller
+In-Reply-To: <1324398444-23296-3-git-send-email-b-cousson@ti.com>
+References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
+ <1324398444-23296-3-git-send-email-b-cousson@ti.com>
+Message-ID: <CAOesGMiwg9gVDDwCjuCcAPX6hc2E6OgH-c_nAqhCHmj7y5oCeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 11:09:48PM +0200, Felipe Balbi wrote:
-> On Tue, Dec 20, 2011 at 08:10:49PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Dec 19, 2011 at 07:42:52PM +0100, Heiko St?bner wrote:
-> > > As the memory region is requested through request_mem_region
-> > > use the correct paired method to release it in the error path
-> > > and don't go "beneath the API" as pointed out by Russel King.
-> > 
-> > Please correct the spelling, thanks.
-> 
-> Just did, do you prefer that I add a Reported-by: Russell instead of
-> that mention ?
+Hi,
 
-If you wish - I don't mind.  If you do, please use an email address
-of rmk+kernel at arm.linux.org.uk in the attributations.  Thanks.
+On Tue, Dec 20, 2011 at 8:27 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+
+
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index a43d002..dcbc1ec 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -37,6 +37,8 @@
+> ?#include <linux/platform_device.h>
+> ?#include <linux/clk.h>
+> ?#include <linux/io.h>
+> +#include <linux/of_i2c.h>
+> +#include <linux/of_device.h>
+> ?#include <linux/slab.h>
+> ?#include <linux/i2c-omap.h>
+> ?#include <linux/pm_runtime.h>
+[...]
+> @@ -1165,6 +1195,7 @@ static struct platform_driver omap_i2c_driver = {
+> ? ? ? ? ? ? ? ?.name ? = "omap_i2c",
+> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
+> ? ? ? ? ? ? ? ?.pm ? ? = OMAP_I2C_PM_OPS,
+> + ? ? ? ? ? ? ? .of_match_table = of_match_ptr(omap_i2c_of_match),
+> ? ? ? ?},
+> ?};
+
+of_match_ptr() comes from <linux/of.h>, so you need to include that to
+not break !CONFIG_OF builds.
+
+
+-Olof
