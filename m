@@ -1,94 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Dec 2011 10:06:11 -0800
-Subject: [PATCH v2 1/7][RESEND] ARM: OMAP1: ams-delta: register latch
- dependent devices later
-In-Reply-To: <201112200028.32947.jkrzyszt@tis.icnet.pl>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <83e934adfc691b347534edb7788a67ab2e6bd7e1.1324331816.git.jkrzyszt@tis.icnet.pl>
- <201112200028.32947.jkrzyszt@tis.icnet.pl>
-Message-ID: <20111220180610.GB24444@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 Dec 2011 10:10:08 -0800
+Subject: [GIT PULL] Ux500 patches for 3.3, take two
+In-Reply-To: <1324390384-17732-1-git-send-email-linus.walleij@linaro.org>
+References: <1324390384-17732-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAOesGMi-1ueEjL+gjH3DBQOzYpN07rrMo-4TDyxJNQqC_P=0Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111219 14:57]:
-> Resending because of a typo in the Cc: list, sorry.
-> 
-> 8<--------------------------
-> 
-> In preparation to converting Amstrad Delta on-board latches to
-> basic_mmio_gpio devices, registration of platform devices which depend
-> on latches and will require initialization of their GPIO pins first,
-> should be moved out of .machine_init down to late_initcall level, as the
-> gpio-generic driver is not available until device_initcall time.  The
-> latch reset operation, which will be replaced with GPIO initialization,
-> must also be moved to late_initcall for the same reason.
-> 
-> Since there was already another, separate arch_initcall function for
-> setting up one of those latch dependent devices, the on-board modem
-> device, reuse that function, i.e., rename it to a name that matches the
-> new purpose, extend with other device setup relocated from
-> .machine_init, and move down to the late_initcall level.
-> 
-> While being at it, add missing gpio_free() in case the modem platform
-> device registration fails.
-> 
-> In addition, defer registration of the Amstrad Delta ASoC and serio
-> devices, done from their device driver files, until late_initcall time,
-> as those drivers will depend on their GPIO pins already requested from
-> the board late_init() function until updated to register their GPIO pins
-> themselves.
-> 
-> Thanks to Tony Lindgren <tony@atomide.com> who suggested this approach
-> instead of shifting up the gpio-generic driver initialization.
-...
- 
-> --- a/drivers/input/serio/ams_delta_serio.c
-> +++ b/drivers/input/serio/ams_delta_serio.c
-> @@ -165,6 +165,9 @@ serio:
->  	kfree(ams_delta_serio);
->  	return err;
->  }
-> +#ifndef MODULE
-> +late_initcall(ams_delta_serio_init);
-> +#else
->  module_init(ams_delta_serio_init);
->  
->  static void __exit ams_delta_serio_exit(void)
-> @@ -175,3 +178,4 @@ static void __exit ams_delta_serio_exit(void)
->  	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
->  }
->  module_exit(ams_delta_serio_exit);
-> +#endif
-> diff --git a/sound/soc/omap/ams-delta.c b/sound/soc/omap/ams-delta.c
-> index ccb8a6a..1764a3b 100644
-> --- a/sound/soc/omap/ams-delta.c
-> +++ b/sound/soc/omap/ams-delta.c
-> @@ -636,6 +636,9 @@ err:
->  	platform_device_put(ams_delta_audio_platform_device);
->  	return ret;
->  }
-> +#ifndef MODULE
-> +late_initcall(ams_delta_module_init);
-> +#else
->  module_init(ams_delta_module_init);
->  
->  static void __exit ams_delta_module_exit(void)
-> @@ -657,6 +660,7 @@ static void __exit ams_delta_module_exit(void)
->  	platform_device_unregister(ams_delta_audio_platform_device);
->  }
->  module_exit(ams_delta_module_exit);
-> +#endif
->  
->  MODULE_AUTHOR("Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>");
->  MODULE_DESCRIPTION("ALSA SoC driver for Amstrad E3 (Delta) videophone");
+On Tue, Dec 20, 2011 at 6:13 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+>
+> Hi ARM-SoC, Arnd, Olof,
+>
+> These are more ux500 patches for the 3.3 merge window, mainly removing
+> prototype silicon support and cleaning up stuff. They are closely
+> related to the three earlier patches sent for this merge window,
+> and done on the same branch, so it is based on top of the previous
+> pull request. (The series as a whole is available on the same branch,
+> based off v3.2-rc4.)
+>
+> Please pull it in, yours
+> Linus Walleij
+>
+> The following changes since commit 017beaa63bd8034b6c6c0f964a57f54973f59f17:
+>
+> ?ARM: ux500: update the MOP500 GPIO assignments (2011-12-12 09:48:31 +0100)
+>
+> are available in the git repository at:
+> ? git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-for-arm-soc
 
-This looks a bit odd.. I think these drivers should be converted to
-a proper platform_driver so you can get rid of the machine_is_ams_delta
-check in the init. Then you can rely on the probe to match the
-device. To deal with the init order issues, you can pass a set_power
-function pointer in platform_data that the driver can use. Or
-set up a fixed regulator for it.
 
-Regards,
+Thanks, I pulled this into the same ux500/devel branch as the previous
+pull request (which then went into next/devel).
 
-Tony
+
+-Olof
