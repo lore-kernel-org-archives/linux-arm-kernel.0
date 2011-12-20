@@ -1,51 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Dec 2011 15:21:37 +0000
-Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
-In-Reply-To: <20111220015934.GD15863@b20223-02.ap.freescale.net>
-References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
- <4EEF519C.4090808@gmail.com>
- <20111220015934.GD15863@b20223-02.ap.freescale.net>
-Message-ID: <201112201521.37747.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Dec 2011 23:31:03 +0800
+Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
+In-Reply-To: <20111220143558.GT2866@opensource.wolfsonmicro.com>
+References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
+ <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
+ <20111220005708.GM2860@opensource.wolfsonmicro.com>
+ <20111220020101.GD5683@S2100-06.ap.freescale.net>
+ <20111220015931.GX2860@opensource.wolfsonmicro.com>
+ <20111220030347.GB2995@S2101-09.ap.freescale.net>
+ <20111220112510.GL2866@opensource.wolfsonmicro.com>
+ <20111220135251.GB5129@S2101-09.ap.freescale.net>
+ <20111220143558.GT2866@opensource.wolfsonmicro.com>
+Message-ID: <20111220153101.GD5348@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 December 2011, Richard Zhao wrote:
-> > >>>> +Generic cpufreq driver
-> > >>>> +
-> > >>>> +Required properties in /cpus/cpu at 0:
-> > >>>> +- compatible : "generic-cpufreq"
-> > >>>
-> > >>> I'm not convinced this is the best way to do this.  By requiring a 
-> > >>> generic-cpufreq compatible string we're encoding Linux driver 
-> > >>> information into the hardware description.  The only way I can see to 
-> > >>> avoid this is to provide a generic_clk_cpufreq_init() function that 
-> > >>> platforms can call in their machine init code to use the driver.
-> > 
-> > Agreed on the compatible string.
-> Assume you reject to use compatible string.
-> > It's putting Linux specifics into DT.
-> > 
-> > You could flip this around and have the module make a call into the
-> > kernel to determine whether to initialize or not. Then platforms could
-> > set a flag to indicate this.
-> Could you make it more clear? kernel global variable, macro, or function?
+On Tue, Dec 20, 2011 at 02:35:58PM +0000, Mark Brown wrote:
+> On Tue, Dec 20, 2011 at 09:52:52PM +0800, Shawn Guo wrote:
+> > On Tue, Dec 20, 2011 at 11:25:11AM +0000, Mark Brown wrote:
 > 
-> - Following your idea, I think, we can add in driver/cpufreq/cpufreq.c:
-> int (*clk_reg_cpufreq_get_op_table) (struct op_table *tbl, int *size);
-> SoC code set the callback. If it's NULL, driver will exit. We can get rid
-> of DT. It'll make cpufreq core dirty, but it's the only file built-in.
+> > > Well, removing the random extra _s would be a big start (though I'd just
+> > > drop the chip name entirely from the name of the regulators since by the
+> > > time we're looking at the regulator we've already identified the chip)
+> > > and as I keep saying you need to document what the names mean - what are
+> > > the possible names and how do they map onto the hardware?
 > 
-> - Drop module support. SoC call generic_clk_cpufreq_init as Jamie said.
+> > I just came up with an idea which can totally avoid matching name.  It
+> > seems that we can identify a regulator using register plus enable bit,
+> > which is basically 'reg' and 'enable_bit' in 'mc13xxx_regulator'.  As
+> > these data must be coming from hardware manual, they should be stable
+> > enough for binding a regulator.  What do you think?
+> 
+> I don't know that that helps, register numbers and shifts aren't going
+> to do anything for legibility.
 
-I think you don't actually need a "compatible" property here, as long as we
-ensure that the "cpu-freqs", "cpu-volts" and "trans-latency" properties are
-present in the cpu node if and only if the machine works with this driver
-(why else would you put them there?).
+I think it helps.  It's not about legibility but identification.  For
+mc13892 driver to work, it has to match the register number and enable
+bit shift given by mc13892 reference manual.  So register number +
+enable bit shift is stable and unique to identify a mc13892 regulator.
 
-CPUs are special in the device trees in a number of ways, so I think we
-can treat this as a logical extension. This way, you can still make the
-generic cpufreq driver a loadable module. You don't get module autoloading
-with this structure, but that is already the case because the cpu nodes
-in the device tree are not translated into linux devices.
+> The problem with the names was that the
+> names chosen were poorly defined (why call DCDCn chipname__dcdcn?) and
+> not documented in the binding, not that they were names.
+> 
+The problem with name is it's name.  The mc13892 driver can still work
+with naming regulator differently from mc13892 reference manual.  So
+using name to bind a regulator means we are binding with Linux mc13892
+driver.  In that case, DT probe works if and only if the name in dts
+matches the name used in mc13892 driver, and it does not work as long
+as the name dts does not match the name used in mc13892 driver.
 
-	Arnd
+Yes, I flipped and now think using name to bind is a bad idea, no
+matter how we document it.
+
+-- 
+Regards,
+Shawn
