@@ -1,60 +1,69 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Dec 2011 20:00:35 +0800
-Subject: [PATCH 04/12] dma: mxs-dma: convert to clk_prepare/clk_unprepare
+Date: Tue, 20 Dec 2011 20:00:36 +0800
+Subject: [PATCH 05/12] mmc: mxs-mmc: convert to clk_prepare/clk_unprepare
 In-Reply-To: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
 References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1324382443-4439-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1324382443-4439-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch converts mxs-dma driver to clk_prepare/clk_unprepare by
+The patch converts mxs-mmc driver to clk_prepare/clk_unprepare by
 using helper functions clk_prepare_enable/clk_disable_unprepare.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Chris Ball <cjb@laptop.org>
 ---
- drivers/dma/mxs-dma.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/mmc/host/mxs-mmc.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index b4588bd..fc903c0 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -334,7 +334,7 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
- 			goto err_irq;
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index 99b449d..973011f 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -713,7 +713,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(host->clk);
+ 		goto out_iounmap;
  	}
+-	clk_enable(host->clk);
++	clk_prepare_enable(host->clk);
  
--	ret = clk_enable(mxs_dma->clk);
-+	ret = clk_prepare_enable(mxs_dma->clk);
- 	if (ret)
- 		goto err_clk;
+ 	mxs_mmc_reset(host);
  
-@@ -372,7 +372,7 @@ static void mxs_dma_free_chan_resources(struct dma_chan *chan)
- 	dma_free_coherent(mxs_dma->dma_device.dev, PAGE_SIZE,
- 			mxs_chan->ccw, mxs_chan->ccw_phys);
+@@ -772,7 +772,7 @@ out_free_dma:
+ 	if (host->dmach)
+ 		dma_release_channel(host->dmach);
+ out_clk_put:
+-	clk_disable(host->clk);
++	clk_disable_unprepare(host->clk);
+ 	clk_put(host->clk);
+ out_iounmap:
+ 	iounmap(host->base);
+@@ -798,7 +798,7 @@ static int mxs_mmc_remove(struct platform_device *pdev)
+ 	if (host->dmach)
+ 		dma_release_channel(host->dmach);
  
--	clk_disable(mxs_dma->clk);
-+	clk_disable_unprepare(mxs_dma->clk);
+-	clk_disable(host->clk);
++	clk_disable_unprepare(host->clk);
+ 	clk_put(host->clk);
+ 
+ 	iounmap(host->base);
+@@ -819,7 +819,7 @@ static int mxs_mmc_suspend(struct device *dev)
+ 
+ 	ret = mmc_suspend_host(mmc);
+ 
+-	clk_disable(host->clk);
++	clk_disable_unprepare(host->clk);
+ 
+ 	return ret;
  }
+@@ -830,7 +830,7 @@ static int mxs_mmc_resume(struct device *dev)
+ 	struct mxs_mmc_host *host = mmc_priv(mmc);
+ 	int ret = 0;
  
- static struct dma_async_tx_descriptor *mxs_dma_prep_slave_sg(
-@@ -578,7 +578,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
- {
- 	int ret;
+-	clk_enable(host->clk);
++	clk_prepare_enable(host->clk);
  
--	ret = clk_enable(mxs_dma->clk);
-+	ret = clk_prepare_enable(mxs_dma->clk);
- 	if (ret)
- 		goto err_out;
- 
-@@ -604,7 +604,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
- 	writel(MXS_DMA_CHANNELS_MASK << MXS_DMA_CHANNELS,
- 		mxs_dma->base + HW_APBHX_CTRL1 + MXS_SET_ADDR);
- 
--	clk_disable(mxs_dma->clk);
-+	clk_disable_unprepare(mxs_dma->clk);
- 
- 	return 0;
+ 	ret = mmc_resume_host(mmc);
  
 -- 
 1.7.4.1
