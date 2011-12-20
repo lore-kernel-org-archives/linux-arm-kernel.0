@@ -1,23 +1,87 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 20 Dec 2011 14:54:04 +0530
-Subject: [PATCH 0/4] Fix the left DMA_NONE from dma_transfer_direction
- migration
-In-Reply-To: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
-References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1324373044.1641.10096.camel@vkoul-udesk3>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 20 Dec 2011 17:51:59 +0800
+Subject: [PATCH 1/1] pinctrl: some typo fixes
+Message-ID: <1324374719-5654-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-12-13 at 23:48 +0800, Shawn Guo wrote:
-> I have been working on -rc recently, and have not noticed the failure
-> until I ran next tree today.  The mxs-mmc driver is broken on next
-> tree because the DMA_NONE was left over from the dma_transfer_direction
-> migration for mxs-dma and its client drivers.
-> 
-For DMA transfer, the NONE direction makes no sense?
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-In your conetext, what are you trying to achieve?
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ Documentation/pinctrl.txt |   10 +++++-----
+ drivers/pinctrl/pinmux.c  |    4 ++--
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-
+diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+index f080643..1021be9 100644
+--- a/Documentation/pinctrl.txt
++++ b/Documentation/pinctrl.txt
+@@ -217,7 +217,7 @@ changing pin configuration in the pin controller ops like this:
+ #include <linux/pinctrl/pinconf.h>
+ #include "platform_x_pindefs.h"
+ 
+-int foo_pin_config_get(struct pinctrl_dev *pctldev,
++static int foo_pin_config_get(struct pinctrl_dev *pctldev,
+ 		    unsigned offset,
+ 		    unsigned long *config)
+ {
+@@ -228,7 +228,7 @@ int foo_pin_config_get(struct pinctrl_dev *pctldev,
+ 	*config = (unsigned long) conf;
+ }
+ 
+-int foo_pin_config_set(struct pinctrl_dev *pctldev,
++static int foo_pin_config_set(struct pinctrl_dev *pctldev,
+ 		    unsigned offset,
+ 		    unsigned long config)
+ {
+@@ -241,14 +241,14 @@ int foo_pin_config_set(struct pinctrl_dev *pctldev,
+ 	}
+ }
+ 
+-int foo_pin_config_group_get (struct pinctrl_dev *pctldev,
++static int foo_pin_config_group_get (struct pinctrl_dev *pctldev,
+ 		    unsigned selector,
+ 		    unsigned long *config)
+ {
+ 	...
+ }
+ 
+-int foo_pin_config_group_set (struct pinctrl_dev *pctldev,
++static int foo_pin_config_group_set (struct pinctrl_dev *pctldev,
+ 		    unsigned selector,
+ 		    unsigned long config)
+ {
+@@ -819,7 +819,7 @@ it even more compact which assumes you want to use pinctrl-foo and position
+ 0 for mapping, for example:
+ 
+ static struct pinmux_map __initdata pmx_mapping[] = {
+-       PINMUX_MAP_PRIMARY("I2CMAP", "i2c0", "foo-i2c.0"),
++       PINMUX_MAP("I2CMAP", "pinctrl-foo", "i2c0", "foo-i2c.0"),
+ };
+ 
+ 
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index 432feb6..0916222 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -342,7 +342,7 @@ EXPORT_SYMBOL_GPL(pinmux_gpio_direction_output);
+  * Only call this once during initialization of your machine, the function is
+  * tagged as __init and won't be callable after init has completed. The map
+  * passed into this function will be owned by the pinmux core and cannot be
+- * free:d.
++ * freed.
+  */
+ int __init pinmux_register_mappings(struct pinmux_map const *maps,
+ 				    unsigned num_maps)
+@@ -1006,7 +1006,7 @@ int pinmux_hog_maps(struct pinctrl_dev *pctldev)
+ }
+ 
+ /**
+- * pinmux_hog_maps() - unhog specific map entries on controller device
++ * pinmux_unhog_maps() - unhog specific map entries on controller device
+  * @pctldev: the pin control device to unhog entries on
+  */
+ void pinmux_unhog_maps(struct pinctrl_dev *pctldev)
 -- 
-~Vinod
+1.7.0.4
