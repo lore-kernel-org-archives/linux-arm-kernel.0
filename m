@@ -1,35 +1,67 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Tue, 20 Dec 2011 02:42:20 +0200
-Subject: [PATCH 03/10] arm: omap2: fix omap3 touchbook kconfig warning
+Date: Tue, 20 Dec 2011 02:42:21 +0200
+Subject: [PATCH 04/10] arm: omap2: fix regulator warnings
 In-Reply-To: <1324341747-5922-1-git-send-email-felipe.contreras@gmail.com>
 References: <1324341747-5922-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1324341747-5922-4-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1324341747-5922-5-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-warning: (MACH_OMAP3_TOUCHBOOK && DRM_RADEON_KMS && DRM_I915 && STUB_POULSBO && FB_BACKLIGHT && USB_APPLEDISPLAY && FB_OLPC_DCON && ASUS_LAPTOP && SONY_LAPTOP && THINKPAD_ACPI && EEEPC_LAPTOP && ACPI_ASUS && ACPI_CMPC && SAMSUNG_Q10) selects BACKLIGHT_CLASS_DEVICE which has unmet direct dependencies (HAS_IOMEM && BACKLIGHT_LCD_SUPPORT)
-
-A lot of boards need BACKLIGHT_CLASS_DEVICE for the framebuffers to
-work, but it's not *needed* for the device itself. It might be nice to
-enable it by default somewhoe if graphics stuff is enabled, but that's
-another story.
+warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3 && MACH_OMAP_4430SDP && MACH_OMAP4_PANDA && TPS6105X) selects REGULATOR_FIXED_VOLTAGE which has unmet direct dependencies (REGULATOR)
 
 Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 ---
- arch/arm/mach-omap2/Kconfig |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/Kconfig |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index eb7c3ac..dbecb9a 100644
+index dbecb9a..04734b5 100644
 --- a/arch/arm/mach-omap2/Kconfig
 +++ b/arch/arm/mach-omap2/Kconfig
-@@ -211,7 +211,6 @@ config MACH_OMAP3_TOUCHBOOK
- 	bool "OMAP3 Touch Book"
+@@ -205,7 +205,7 @@ config MACH_OMAP3_PANDORA
  	depends on ARCH_OMAP3
  	default y
--	select BACKLIGHT_CLASS_DEVICE
+ 	select OMAP_PACKAGE_CBB
+-	select REGULATOR_FIXED_VOLTAGE
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
  
- config MACH_OMAP_3430SDP
- 	bool "OMAP 3430 SDP board"
+ config MACH_OMAP3_TOUCHBOOK
+ 	bool "OMAP3 Touch Book"
+@@ -256,7 +256,7 @@ config MACH_OMAP_ZOOM2
+ 	select SERIAL_8250
+ 	select SERIAL_CORE_CONSOLE
+ 	select SERIAL_8250_CONSOLE
+-	select REGULATOR_FIXED_VOLTAGE
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 
+ config MACH_OMAP_ZOOM3
+ 	bool "OMAP3630 Zoom3 board"
+@@ -266,7 +266,7 @@ config MACH_OMAP_ZOOM3
+ 	select SERIAL_8250
+ 	select SERIAL_CORE_CONSOLE
+ 	select SERIAL_8250_CONSOLE
+-	select REGULATOR_FIXED_VOLTAGE
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 
+ config MACH_CM_T35
+ 	bool "CompuLab CM-T35/CM-T3730 modules"
+@@ -320,7 +320,7 @@ config MACH_OMAP_4430SDP
+ 	depends on ARCH_OMAP4
+ 	select OMAP_PACKAGE_CBL
+ 	select OMAP_PACKAGE_CBS
+-	select REGULATOR_FIXED_VOLTAGE
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 
+ config MACH_OMAP4_PANDA
+ 	bool "OMAP4 Panda Board"
+@@ -328,7 +328,7 @@ config MACH_OMAP4_PANDA
+ 	depends on ARCH_OMAP4
+ 	select OMAP_PACKAGE_CBL
+ 	select OMAP_PACKAGE_CBS
+-	select REGULATOR_FIXED_VOLTAGE
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 
+ config OMAP3_EMU
+ 	bool "OMAP3 debugging peripherals"
 -- 
 1.7.8.rc1.14.g248db
