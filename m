@@ -1,84 +1,198 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Tue, 20 Dec 2011 22:03:52 +0000
-Subject: Status of the following patch (clocksource sched_clock) ?
-In-Reply-To: <20111219215222.GN14542@n2100.arm.linux.org.uk>
-References: <3E54258959B69E4282D79E01AB1F32B7249324@DFLE34.ent.ti.com>
- <20111219172557.GH14542@n2100.arm.linux.org.uk>
- <3E54258959B69E4282D79E01AB1F32B724934E@DFLE34.ent.ti.com>
- <20111219210438.GJ14542@n2100.arm.linux.org.uk>
- <3E54258959B69E4282D79E01AB1F32B724963A@DFLE34.ent.ti.com>
- <20111219215222.GN14542@n2100.arm.linux.org.uk>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B724A1DC@DFLE34.ent.ti.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 20 Dec 2011 23:10:34 +0100
+Subject: [PATCH] input: serio: ams-delta: toggle keyboard power over GPIO
+In-Reply-To: <378bcda9c6cb6a1ddeeb54817078bc7ec68c5987.1324331816.git.jkrzyszt@tis.icnet.pl>
+References: <378bcda9c6cb6a1ddeeb54817078bc7ec68c5987.1324331816.git.jkrzyszt@tis.icnet.pl>
+Message-ID: <1324419034-31024-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Don't use Amstrad Delta custom I/O functions once GPIO interface is
+available for the underlying hardware.
 
->> -----Original Message-----
->> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
->> Sent: Monday, December 19, 2011 4:52 PM
->> To: Karicheri, Muralidharan
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: Re: Status of the following patch (clocksource sched_clock) ?
->> 
->> On Mon, Dec 19, 2011 at 09:39:16PM +0000, Karicheri, Muralidharan wrote:
->> > I am relatively new to this. Here is more explanation of the issue.
->> >
->> > We have clocksource timer implemented using a 32bit hw timer which at
->> > 166.84MHz of the clock rate wraps around at approximately 25secs. Our
->> > platform uses the arch/arm/mach-davinci/time.c at
->> > http://git.kernel.org/?p=linux/kernel/git/stable/linux-
->> stable.git;a=blob;f=arch/arm/mach-
->> davinci/time.c;h=e1969ce904dc5b4de9ff8f0d44442175c7c2497f;hb=1ea6b8f48918282bd
->> ca0b32a34095504ee65bab5
->> >
->> > In this file, sched_clock() is implemented to override the weak
->> > sched_clock() as
->> >
->> > unsigned long long notrace sched_clock(void) {
->> >       const cycle_t cyc = clocksource_davinci.read(&clocksource_davinci);
->> >       return clocksource_cyc2ns(cyc, clocksource_davinci.mult,
->> >                                 clocksource_davinci.shift);
->> > }
->> 
->> Ah.  That implementation (and any other similar implementation) of
->> sched_clock() is indeed buggy, and _will_ lead to sched_clock wraps.
->> 
->> That's not because the clocksource wraps - the time keeping subsystem
->> internally deals with clocksource wrapping.  However, the calculation
->> method used above is such that the returned nanoseconds _will_ always
->> wrap each time the clocksource cycle counter itself wraps.
->> 
->> I implemented replacement sched_clock() across the ARM architecture,
->> replacing at the time every single ARM sched_clock() implementation in
->> the tree with it.  This implements necessary infrastructure to allow
->> for a _fast_ sched_clock() function, yet solving completely the wrap
->> problem.
->> 
->> > Based on your previous response, I did some research and found
->> > arch/arm/kernel/sched_clock.c that seems to solve clocksource
->> > wraparound. So I have enabled HAVE_SCHED_CLOCK to pick this
->> > implementation in my build. Also I have modified
->> > arch/arm/mach-davinci/time.c to call init_sched_clock(), but I got
->> > a kernel crash when Linux booted up (given below). Looks like this
->> > has to happen early in the initialization (postcoreinit() ??) so
->> > that sched_init() can use this. In the above time.c, the timer gets
->> > initialized late in the boot up stage. Is my understanding correct?
->> 
->> The kernel expects sched_clock() to be available really early in the
->> system boot - platforms should do their best to ensure that sched_clock
->> is indeed up and running.
->> 
->> This generally means before clocksource initialisation - and means
->> typically at init_early time.  However, while I converted some platforms,
->> I wasn't prepared to reorganize their code to achieve this, so I just
->> made the reading of the timer register conditional on the clocksource
->> having been enabled.
->> 
->> It would be preferable for new implementations to get this right -
->> ensure that sched_clock() is operable at the init_early machine
->> callback.
+While requesting and initializing GPIO pins used, also take care of one
+extra pin KEYBRD_DATAOUT which, even if not used by the driver, belongs
+to the device and affects its functioning.
 
-Thanks for your immediate attention and all inputs. These really put me in the right
-path to work on the fix.
+Once done, move the driver initialization back to the device_initcall
+level, reverting the temporary chane introduced with patch 1/7 "ARM:
+OMAP1: ams-delta: register latch dependent devices later".  That change
+is no longer required once the driver takes care of registering used
+GPIO pins, and it's better to initialize the device before others using
+the latch2 based GPIO pins, otherwise a garbage is reported on boot,
+perhaps due to random data already captured by the FIQ handler while the
+keyboard related latch bits are written with random values during
+initialization of those other latch2 dependent devices.
 
-Murali
+Depends on patch 2/7 "ARM: OMAP1: ams-delta: convert latches to
+basic_mmio_gpio"
+
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+Hi,
+I'm submitting only this one refreshed on top of updated 1/7. All others
+(2/7-6/7) don't require any refresh, can be rebased smoothly.
+
+Thanks,
+Janusz
+
+
+Changes against version 2:
+* refreshed on top of updated patch 1/7 v2,
+* changelog: corrected patch 1/7 summary (was inaccurate).
+
+Changes against initial version:
+* was 9/10,
+* rebased on top of v2 of patch 2/7, just in case,
+* moved AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT pin handling from the board
+  code to the driver,
+* reverted a temporary change to the driver initcall level, introduced
+  by the new solution provided with patch 1/7.
+
+
+ arch/arm/mach-omap1/board-ams-delta.c             |   10 ----
+ arch/arm/plat-omap/include/plat/board-ams-delta.h |    2 -
+ drivers/input/serio/ams_delta_serio.c             |   53 ++++++++++++--------
+:x 3 files changed, 32 insertions(+), 33 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 3aba8f9..673cf21 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -227,16 +227,6 @@ static struct gpio latch_gpios[] __initconst = {
+ 		.label	= "dockit2",
+ 	},
+ 	{
+-		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
+-		.flags	= GPIOF_OUT_INIT_LOW,
+-		.label	= "keybrd_pwr",
+-	},
+-	{
+-		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
+-		.flags	= GPIOF_OUT_INIT_LOW,
+-		.label	= "keybrd_dataout",
+-	},
+-	{
+ 		.gpio	= AMS_DELTA_GPIO_PIN_SCARD_RSTIN,
+ 		.flags	= GPIOF_OUT_INIT_LOW,
+ 		.label	= "scard_rstin",
+diff --git a/arch/arm/plat-omap/include/plat/board-ams-delta.h b/arch/arm/plat-omap/include/plat/board-ams-delta.h
+index e9ad673..027e79e 100644
+--- a/arch/arm/plat-omap/include/plat/board-ams-delta.h
++++ b/arch/arm/plat-omap/include/plat/board-ams-delta.h
+@@ -28,8 +28,6 @@
+ 
+ #if defined (CONFIG_MACH_AMS_DELTA)
+ 
+-#define AMD_DELTA_LATCH2_KEYBRD_PWR	0x0100
+-#define AMD_DELTA_LATCH2_KEYBRD_DATA	0x0200
+ #define AMD_DELTA_LATCH2_SCARD_RSTIN	0x0400
+ #define AMD_DELTA_LATCH2_SCARD_CMDVCC	0x0800
+ #define AMS_DELTA_LATCH2_MODEM_NRESET	0x1000
+diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
+index 835d37a..ef1ec40 100644
+--- a/drivers/input/serio/ams_delta_serio.c
++++ b/drivers/input/serio/ams_delta_serio.c
+@@ -92,8 +92,7 @@ static irqreturn_t ams_delta_serio_interrupt(int irq, void *dev_id)
+ static int ams_delta_serio_open(struct serio *serio)
+ {
+ 	/* enable keyboard */
+-	ams_delta_latch2_write(AMD_DELTA_LATCH2_KEYBRD_PWR,
+-			AMD_DELTA_LATCH2_KEYBRD_PWR);
++	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 1);
+ 
+ 	return 0;
+ }
+@@ -101,9 +100,32 @@ static int ams_delta_serio_open(struct serio *serio)
+ static void ams_delta_serio_close(struct serio *serio)
+ {
+ 	/* disable keyboard */
+-	ams_delta_latch2_write(AMD_DELTA_LATCH2_KEYBRD_PWR, 0);
++	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 0);
+ }
+ 
++static struct gpio _gpios[] __initconst_or_module = {
++	{
++		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATA,
++		.flags	= GPIOF_DIR_IN,
++		.label	= "serio-data",
++	},
++	{
++		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_CLK,
++		.flags	= GPIOF_DIR_IN,
++		.label	= "serio-clock",
++	},
++	{
++		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
++		.flags	= GPIOF_OUT_INIT_LOW,
++		.label	= "serio-power",
++	},
++	{
++		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
++		.flags	= GPIOF_OUT_INIT_LOW,
++		.label	= "serio-dataout",
++	},
++};
++
+ static int __init ams_delta_serio_init(void)
+ {
+ 	int err;
+@@ -123,19 +145,11 @@ static int __init ams_delta_serio_init(void)
+ 	strlcpy(ams_delta_serio->phys, "GPIO/serio0",
+ 			sizeof(ams_delta_serio->phys));
+ 
+-	err = gpio_request(AMS_DELTA_GPIO_PIN_KEYBRD_DATA, "serio-data");
++	err = gpio_request_array(_gpios, ARRAY_SIZE(_gpios));
+ 	if (err) {
+-		pr_err("ams_delta_serio: Couldn't request gpio pin for data\n");
++		pr_err("ams_delta_serio: Couldn't request gpio pins\n");
+ 		goto serio;
+ 	}
+-	gpio_direction_input(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
+-
+-	err = gpio_request(AMS_DELTA_GPIO_PIN_KEYBRD_CLK, "serio-clock");
+-	if (err) {
+-		pr_err("ams_delta_serio: couldn't request gpio pin for clock\n");
+-		goto gpio_data;
+-	}
+-	gpio_direction_input(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
+ 
+ 	err = request_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
+ 			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
+@@ -143,7 +157,7 @@ static int __init ams_delta_serio_init(void)
+ 	if (err < 0) {
+ 		pr_err("ams_delta_serio: couldn't request gpio interrupt %d\n",
+ 				gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK));
+-		goto gpio_clk;
++		goto gpio;
+ 	}
+ 	/*
+ 	 * Since GPIO register handling for keyboard clock pin is performed
+@@ -157,21 +171,18 @@ static int __init ams_delta_serio_init(void)
+ 	dev_info(&ams_delta_serio->dev, "%s\n", ams_delta_serio->name);
+ 
+ 	return 0;
+-gpio_clk:
+-	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
+-gpio_data:
+-	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
++gpio:
++	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
+ serio:
+ 	kfree(ams_delta_serio);
+ 	return err;
+ }
+-late_initcall(ams_delta_serio_init);
++module_init(ams_delta_serio_init);
+ 
+ static void __exit ams_delta_serio_exit(void)
+ {
+ 	serio_unregister_port(ams_delta_serio);
+ 	free_irq(OMAP_GPIO_IRQ(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), 0);
+-	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
+-	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
++	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
+ }
+ module_exit(ams_delta_serio_exit);
+-- 
+1.7.3.4
