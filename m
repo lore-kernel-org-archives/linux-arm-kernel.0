@@ -1,69 +1,51 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 20 Dec 2011 17:27:16 +0100
-Subject: [PATCH v3 03/11] rtc: rtc-twl: Add DT support for RTC inside
- twl4030/twl6030
+Date: Tue, 20 Dec 2011 17:27:20 +0100
+Subject: [PATCH v3 07/11] arm/dts: twl4030: Add DTS file for twl4030 PM +
+ Audio IC
 In-Reply-To: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
 References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1324398444-23296-4-git-send-email-b-cousson@ti.com>
+Message-ID: <1324398444-23296-8-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DT support for the TI rtc-twl present in the twl4030
-and twl6030 devices.
+Add a dedicated DTS file for the twl4030/5030 Power + Audio IC.
+This chip is a big SoC that will be reused in a lot of various
+OMAP3 boards.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
 ---
- Documentation/devicetree/bindings/rtc/twl-rtc.txt |   12 ++++++++++++
- drivers/rtc/rtc-twl.c                             |   10 ++++++++--
- 2 files changed, 20 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/twl-rtc.txt
+ arch/arm/boot/dts/twl4030.dtsi |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/twl4030.dtsi
 
-diff --git a/Documentation/devicetree/bindings/rtc/twl-rtc.txt b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
+diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
 new file mode 100644
-index 0000000..596e0c9
+index 0000000..8be5223
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/twl-rtc.txt
-@@ -0,0 +1,12 @@
-+* TI twl RTC
++++ b/arch/arm/boot/dts/twl4030.dtsi
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+The TWL family (twl4030/6030) contains a RTC.
++/*
++ * Integrated Power Management Chip
++ */
++&twl {
++	compatible = "ti,twl4030";
++	interrupt-controller;
++	#interrupt-cells = <1>;
 +
-+Required properties:
-+- compatible : Should be twl4030-rtc
-+
-+Examples:
-+
-+rtc at 0 {
-+    compatible = "ti,twl4030-rtc";
++	rtc {
++		compatible = "ti,twl4030-rtc";
++		interrupts = <11>;
++	};
 +};
-diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-index 20687d5..d43b4f6 100644
---- a/drivers/rtc/rtc-twl.c
-+++ b/drivers/rtc/rtc-twl.c
-@@ -550,6 +550,11 @@ static int twl_rtc_resume(struct platform_device *pdev)
- #define twl_rtc_resume  NULL
- #endif
- 
-+static const struct of_device_id twl_rtc_of_match[] = {
-+	{.compatible = "ti,twl4030-rtc", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, twl_rtc_of_match);
- MODULE_ALIAS("platform:twl_rtc");
- 
- static struct platform_driver twl4030rtc_driver = {
-@@ -559,8 +564,9 @@ static struct platform_driver twl4030rtc_driver = {
- 	.suspend	= twl_rtc_suspend,
- 	.resume		= twl_rtc_resume,
- 	.driver		= {
--		.owner	= THIS_MODULE,
--		.name	= "twl_rtc",
-+		.owner		= THIS_MODULE,
-+		.name		= "twl_rtc",
-+		.of_match_table = twl_rtc_of_match,
- 	},
- };
- 
 -- 
 1.7.0.4
