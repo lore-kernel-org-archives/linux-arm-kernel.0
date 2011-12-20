@@ -1,113 +1,55 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 20 Dec 2011 01:43:51 +0000
-Subject: [PATCHv2 2/2] ARM: picoxcell: use new Synopsys Designware GPIO binding
-In-Reply-To: <1324345431-12251-1-git-send-email-jamie@jamieiles.com>
-References: <1324345431-12251-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1324345431-12251-2-git-send-email-jamie@jamieiles.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Dec 2011 10:01:02 +0800
+Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
+In-Reply-To: <20111220005708.GM2860@opensource.wolfsonmicro.com>
+References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
+ <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
+ <20111220005708.GM2860@opensource.wolfsonmicro.com>
+Message-ID: <20111220020101.GD5683@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/boot/dts/picoxcell-pc3x2.dtsi |   19 ++++++++-----------
- arch/arm/boot/dts/picoxcell-pc3x3.dtsi |   28 +++++++++++-----------------
- 2 files changed, 19 insertions(+), 28 deletions(-)
+On Tue, Dec 20, 2011 at 12:57:09AM +0000, Mark Brown wrote:
+> On Mon, Dec 12, 2011 at 11:15:56PM +0800, Shawn Guo wrote:
+> 
+> > +Sub-nodes:
+> > +- regulators : Contain the regulator nodes.  The name of regulator node
+> > +  is being used by mc13xxx regulator driver to find the correct relator
+> > +  device.
+> 
+> Reading this I'm not clear what the name of the node is, or what the
+> valid node names are.
+> 
+In the example below, the name would be 'mc13892__sw1'.
 
-diff --git a/arch/arm/boot/dts/picoxcell-pc3x2.dtsi b/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-index f0a8c20..a247812 100644
---- a/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-+++ b/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-@@ -169,28 +169,25 @@
- 				reg = <0x20000 0x1000>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				reg-io-width = <4>;
- 
- 				banka: gpio-controller at 0 {
- 					compatible = "snps,dw-apb-gpio-bank";
- 					gpio-controller;
- 					#gpio-cells = <2>;
--					gpio-generic,nr-gpio = <8>;
--
--					regoffset-dat = <0x50>;
--					regoffset-set = <0x00>;
--					regoffset-dirout = <0x04>;
-+					nr-gpio = <8>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupt-parent = <&vic1>;
-+					interrupts = <0 1 2 3 4 5 6 7>;
- 				};
- 
- 				bankb: gpio-controller at 1 {
- 					compatible = "snps,dw-apb-gpio-bank";
- 					gpio-controller;
- 					#gpio-cells = <2>;
--					gpio-generic,nr-gpio = <8>;
--
--					regoffset-dat = <0x54>;
--					regoffset-set = <0x0c>;
--					regoffset-dirout = <0x10>;
-+					nr-gpio = <8>;
-+					reg = <1>;
- 				};
- 			};
- 
-diff --git a/arch/arm/boot/dts/picoxcell-pc3x3.dtsi b/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-index daa962d..96f049f 100644
---- a/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-+++ b/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-@@ -252,39 +252,33 @@
- 				reg = <0x20000 0x1000>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				reg-io-width = <4>;
- 
- 				banka: gpio-controller at 0 {
- 					compatible = "snps,dw-apb-gpio-bank";
- 					gpio-controller;
-+					reg = <0>;
- 					#gpio-cells = <2>;
--					gpio-generic,nr-gpio = <8>;
--
--					regoffset-dat = <0x50>;
--					regoffset-set = <0x00>;
--					regoffset-dirout = <0x04>;
-+					nr-gpio = <8>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupt-parent = <&vic1>;
-+					interrupts = <0 1 2 3 4 5 6 7>;
- 				};
- 
- 				bankb: gpio-controller at 1 {
- 					compatible = "snps,dw-apb-gpio-bank";
- 					gpio-controller;
-+					reg = <1>;
- 					#gpio-cells = <2>;
--					gpio-generic,nr-gpio = <16>;
--
--					regoffset-dat = <0x54>;
--					regoffset-set = <0x0c>;
--					regoffset-dirout = <0x10>;
-+					nr-gpio = <16>;
- 				};
- 
--				bankd: gpio-controller at 2 {
-+				bankd: gpio-controller at 3 {
- 					compatible = "snps,dw-apb-gpio-bank";
- 					gpio-controller;
-+					reg = <3>;
- 					#gpio-cells = <2>;
--					gpio-generic,nr-gpio = <30>;
--
--					regoffset-dat = <0x5c>;
--					regoffset-set = <0x24>;
--					regoffset-dirout = <0x28>;
-+					nr-gpio = <30>;
- 				};
- 			};
- 
+> > +			sw1_reg: mc13892__sw1 {
+> 
+> The examples don't really elucidate this either (and the __ is rather
+> odd).
+
+Yes, that's because the name defined by mc13892 regulator driver is odd.
+
+There is a '_' in 'MC13892_' when using MC13xxx_DEFINE below.
+
+#define MC13892_SW_DEFINE(name, reg, vsel_reg, voltages)        \
+        MC13xxx_DEFINE(MC13892_, name, reg, vsel_reg, voltages, \
+                        mc13892_sw_regulator_ops)
+
+And the second one comes from the definition of .name below.
+
+#define MC13xxx_DEFINE(prefix, _name, _reg, _vsel_reg, _voltages, _ops) \
+        [prefix ## _name] = {                           \
+                .desc = {                                               \
+                        .name = #prefix "_" #_name,                     \
+
+Using the regulator name to find the correct device is the approach I
+can see that brings the least churn to the existing driver.  You may
+think the regulator name is Linux mc13892 regulator driver specific.
+But I think it should be something from hardware manual and should be
+used in driver and device tree consistently.  Unfortunately, the driver
+created an odd name first, and we have to use that name in device tree
+to minimize the diff stat.
+
 -- 
-1.7.5.4
+Regards,
+Shawn
