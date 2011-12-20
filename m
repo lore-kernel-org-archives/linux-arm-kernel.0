@@ -1,25 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Dec 2011 18:07:38 -0800
-Subject: [PATCH 1/3] arm/tegra: Delete tegra_init_clock()
-In-Reply-To: <1324322645-30653-1-git-send-email-swarren@nvidia.com>
-References: <1324322645-30653-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20111220020738.GH27789@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Dec 2011 18:13:31 -0800
+Subject: [PATCH v2 2/7] ARM: OMAP1: ams-delta: convert latches to
+ basic_mmio_gpio
+In-Reply-To: <201112200218.03283.jkrzyszt@tis.icnet.pl>
+References: <cover.1324331816.git.jkrzyszt@tis.icnet.pl>
+ <201112200159.36558.jkrzyszt@tis.icnet.pl>
+ <20111220010446.GA6464@atomide.com>
+ <201112200218.03283.jkrzyszt@tis.icnet.pl>
+Message-ID: <20111220021331.GB6464@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 12:24:03PM -0700, Stephen Warren wrote:
-> tegra_init_clock() is written to call tegra2_init_clocks(), which only
-> exists if Tegra20 support is enabled. This breaks the build of a
-> Tegra30-only kernel.
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111219 16:46]:
+> On Tuesday 20 of December 2011 at 02:04:46, Tony Lindgren wrote:
+> > * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111219 16:28]:
+> > > On Tuesday 20 of December 2011 at 01:06:00, Tony Lindgren wrote:
+> > > > 
+> > > > This part especially looks like it really should be just a regular
+> > > > device driver under drivers/ somewhere. 
+> > > 
+> > > I really don't understand what kind of a driver you might mean here.
+> > > 
+> > > The latch_gpios[] table is initially filled with all latch1 and latch2 
+> > > GPIO pins in order to register and initialize them from the board file 
+> > > until they are handled by respective existing device drivers (leds, 
+> > > nand, lcd, serio, serial8250, asoc) instead of those drivers accessing 
+> > > the latches with those old ams_delta_latch[12]_write() functions. That 
+> > > table will get almost empty after the transision process is completed, 
+> > > holding only pins not used by any drivers / connected to unsued devices, 
+> > > in order to initialize them from the board file for power saving 
+> > > purposes. A separate driver for the purpose of initializing a few GPIO 
+> > > pins seems an overkill.
+> > 
+> > OK maybe update the comments a bit to describe how that table will
+> > mostly disappear? It's not obvious from glancing over this patch
+> > series :)
 > 
-> tegra_init_clock() isn't actually used any more; tegra20_init_early()
-> calls tegra2_init_clocks() directly. So, just delete this function.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> These 3 patches are all cleanup for Tegra's for-3.3/soc branch.
+> To be sure, do you mean in-line comments? Or the changelog message?
 
-Thanks, applied 1-3 to for-3.3/soc.
+Just the changelog.
 
-
--Olof
+Tony
