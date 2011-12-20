@@ -1,95 +1,36 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 20 Dec 2011 13:40:42 +0100
-Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
- and DDR
-In-Reply-To: <4EF0671B.7090508@ti.com>
-References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
- <4EEFC23A.30201@gmail.com> <20111219233559.GW6464@atomide.com>
- <4EF0671B.7090508@ti.com>
-Message-ID: <4EF0824A.9060208@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Dec 2011 20:54:02 +0800
+Subject: [PATCH 0/4] Fix the left DMA_NONE from dma_transfer_direction
+ migration
+In-Reply-To: <1324373044.1641.10096.camel@vkoul-udesk3>
+References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
+ <1324373044.1641.10096.camel@vkoul-udesk3>
+Message-ID: <20111220125401.GA5129@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aneesh,
+On Tue, Dec 20, 2011 at 02:54:04PM +0530, Vinod Koul wrote:
+> On Tue, 2011-12-13 at 23:48 +0800, Shawn Guo wrote:
+> > I have been working on -rc recently, and have not noticed the failure
+> > until I ran next tree today.  The mxs-mmc driver is broken on next
+> > tree because the DMA_NONE was left over from the dma_transfer_direction
+> > migration for mxs-dma and its client drivers.
+> > 
+> For DMA transfer, the NONE direction makes no sense?
+> 
+> In your conetext, what are you trying to achieve?
+> 
+The mxs-dma controller has a feature to program peripheral registers
+with given values (mxs-dma PIO mode).  This is designed to pipeline
+the operations.  For example, we can put mxs-mmc controller register
+values into scatter list as one element together with actual data.
+Triggering the mxs-dma, the dma will program the values into mxs-mmc
+controller register to set up and enable mxs-mmc, and then dma
+continue transfer data from/to mxs-mmc.  All these get done in one
+dmaengine_submit().
 
-On 12/20/2011 11:44 AM, Aneesh V wrote:
-> On Tuesday 20 December 2011 05:05 AM, Tony Lindgren wrote:
->> * Rob Herring<robherring2@gmail.com> [111219 14:29]:
->>> On 12/19/2011 08:05 AM, Aneesh V wrote:
->>>> This is an RFC to add new device tree bindings for DDR memories and
->>>> EMIF - TI's DDR SDRAM controller.
->>>>
->>>> The first patch adds bindings for DDR memories. Currently,
->>>> we have added properties for only DDR3 and LPDDR2 memories.
->>>> However, the binding can be easily extended to describe
->>>> other types such as DDR2 in the future.
->>>>
->>>> The second patch provides the bindings for the EMIF controller.
->>>>
->>>> The final patch provides DT data for EMIF controller instances
->>>> in OMAP4 and LPDDR2 memories attached to them on various boards.
->>>>
->>>> Thanks to Rajendra for answering my numerous queries on device tree.
->>>>
->>>> This is a re-post of the RFC that was posted to devicetree-discuss ml,
->>>> now sent to a larger audience and looping out an internal list.
->>>> Please ignore the previous version.
->>>
->>> There's already a standard way (i.e. JEDEC standard) to define DDR chip
->>> configuration that's called SPD. Why invent something new? While this is
->>> normally an i2c eeprom on a DIMM, there's no reason you couldn't get it
->>> from somewhere else including perhaps the DT. There's already code in
->>> u-boot that can parse SPD data.
->>
->> I agree generic JEDEC standard would be good for the DT.
->
-> Please see my comments in reply to Rob's mail. SPD doesn't seems to
-> have a standard for LPDDR2. What JEDEC has now is not suitable for our
-> needs.
->
->>
->>> In general, is it really feasible to parse the DTB before DDR is
->>> initialized?
->>
->> Changing timings is still needed for DVFS during runtime.
->>
->> But we can boot to userspace with bootloader set timings, so I'm
->
-> As far as I understand, in the current out-of-tree DVFS implementation
-> for OMAP, DVFS can start even before user-space.
+And DMA_NONE was used to let mxs-dma know this is a PIO operation.
 
-Maybe it is the case, but that does not mean it should.
-We can potentially delay the DVFS init until the user-space is started.
-This should not be considered as a big constraint.
-
->> thinking that maybe these timings should be just set by loadable
->> modules. Just the configuration of which timings to select should
->> be passed via DT. Something in compatible like:
->>
->> .compatible = "ti,omap3630", "sdram-micron-mt46h32m32lf-6";
->>
->> And that should allow the SDRC driver to only accept timings for
->> "sdram-micron-mt46h32m32lf-6".
->
-> Do you mean one module per memory device and have all timing data in
-> the respective module? Wouldn't this clutter the kernel proper with all
-> these tables. By having the timing data in DT, it can be eventually
-> moved out of kernel eventually, right?
-
-Yes, that's the theory, but referring to Olof's point, this is not 
-necessarily the goal of DT to store all the information that are not 
-board dependent.
-In this case, each DDR will have it sets of well known AC timings data 
-that will never depend of the board config. In this case, storing that 
-inside DT might not be the best solution.
-
-In fact we always had the same kind of discussion for the pinmux data 
-and for the clock data...
-
-The conclusion being that most of the static data does not have to be in 
-the DTS.
-But since Linus was complaining about the huge amount of data inside the 
-kernel, it is not obvious what the best solution is:-)
-
+-- 
 Regards,
-Benoit
+Shawn
