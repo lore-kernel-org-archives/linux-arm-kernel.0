@@ -1,31 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Dec 2011 12:57:06 -0800
-Subject: [PATCH v2 1/7][RESEND] ARM: OMAP1: ams-delta: register latch
- dependent devices later
-In-Reply-To: <201112202134.36802.jkrzyszt@tis.icnet.pl>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <201112200028.32947.jkrzyszt@tis.icnet.pl>
- <20111220180610.GB24444@atomide.com>
- <201112202134.36802.jkrzyszt@tis.icnet.pl>
-Message-ID: <20111220205706.GH17267@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Dec 2011 21:00:22 +0000
+Subject: [PATCH 00/12] ARM: restart: SAMSUNG: use new restart hook
+In-Reply-To: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
+References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20111220210022.GC2577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111220 12:03]:
-> On Tuesday 20 of December 2011 at 19:06:11, Tony Lindgren wrote:
+On Tue, Dec 20, 2011 at 09:48:24PM +0900, Kukjin Kim wrote:
+> This patch introduces common.[ch] in each SAMSUNG mach- directories
+> and implements using new restart hook for Samsung stuff.
 > 
-> > To deal with the init order issues, you can pass a set_power
-> > function pointer in platform_data that the driver can use. Or
-> > set up a fixed regulator for it.
+> This is against on rmk/devel-stable branch.
 > 
-> I'm already working on the follow up patch series mentioned in the cover 
-> letter, and yes, I'm using the fixed regulator. Be patient, please, as 
-> my resources are somehow limited.
+> [PATCH 01/12] ARM: S3C64XX: introduce arch/arm/mach-s3c64xx/common.[ch]
+> [PATCH 02/12] ARM: restart: S3C64XX: use new restart hook
+> [PATCH 03/12] ARM: S5P64X0: introduce arch/arm/mach-s5p64x0/common.[ch]
+> [PATCH 04/12] ARM: restart: S5P64X0: use new restart hook
+> [PATCH 05/12] ARM: S5PC100: introduce arch/arm/mach-s5pc100/common.[ch]
+> [PATCH 06/12] ARM: restart: S5PC100: use new restart hook
+> [PATCH 07/12] ARM: S5PV210: introduce arch/arm/mach-s5pv210/common.[ch]
+> [PATCH 08/12] ARM: restart: S5PV210: use new restart hook
+> [PATCH 09/12] ARM: EXYNOS: introduce arch/arm/mach-exynos/common.[ch]
+> [PATCH 10/12] ARM: restart: EXYNOS: use new restart hook
+> [PATCH 11/12] ARM: restart: S3C24XX: move SWRST based S3C platforms
+> [PATCH 12/12] ARM: restart: S3C24XX: use new restart hook
 
-Yes, I understand. For this patch I'm fine with the late_initcall
-changes Russell suggested, then the rest can be done in separate
-patches later on.
+I think this series looks fine - I'd like the cleanups to be ordered before
+any of the other changes (so that the cleanups can be applied to the
+restart-cleanup branch and queued into devel-stable independently of the
+rest of the restart changes.)
 
-Regards,
+Please submit them to the patch system in a couple of days time (to give
+some time for anyone to ack them.)
 
-Tony
+Thanks.
