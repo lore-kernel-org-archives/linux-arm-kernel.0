@@ -1,338 +1,635 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 20 Dec 2011 17:27:15 +0100
-Subject: [PATCH v3 02/11] i2c: OMAP: Add DT support for i2c controller
-In-Reply-To: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
-References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1324398444-23296-3-git-send-email-b-cousson@ti.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 20 Dec 2011 11:36:50 -0500
+Subject: [RFC v3 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <1324283611-18344-3-git-send-email-sumit.semwal@ti.com>
+References: <1324283611-18344-1-git-send-email-sumit.semwal@ti.com>
+ <1324283611-18344-3-git-send-email-sumit.semwal@ti.com>
+Message-ID: <20111220163650.GB3964@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial DT support to retrieve the frequency using a
-DT attribute instead of the pdata pointer if of_node exist.
+On Mon, Dec 19, 2011 at 02:03:30PM +0530, Sumit Semwal wrote:
+> This is the first step in defining a dma buffer sharing mechanism.
+> 
+> A new buffer object dma_buf is added, with operations and API to allow easy
+> sharing of this buffer object across devices.
+> 
+> The framework allows:
+> - different devices to 'attach' themselves to this buffer, to facilitate
+>   backing storage negotiation, using dma_buf_attach() API.
 
-Add documentation for omap i2c controller binding.
+Any thoughts of adding facility to track them? So you can see who is using what?
 
-Based on original patches from Manju and Grant.
+> - association of a file pointer with each user-buffer and associated
+>    allocator-defined operations on that buffer. This operation is called the
+>    'export' operation.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kevin Hilman <khilman@ti.com>
----
- Documentation/devicetree/bindings/i2c/omap-i2c.txt |   30 ++++++
- drivers/i2c/busses/i2c-omap.c                      |  101 +++++++++++++-------
- 2 files changed, 96 insertions(+), 35 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
+ 'create'? or 'alloc' ?
 
-diff --git a/Documentation/devicetree/bindings/i2c/omap-i2c.txt b/Documentation/devicetree/bindings/i2c/omap-i2c.txt
-new file mode 100644
-index 0000000..56564aa
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/omap-i2c.txt
-@@ -0,0 +1,30 @@
-+I2C for OMAP platforms
-+
-+Required properties :
-+- compatible : Must be "ti,omap3-i2c" or "ti,omap4-i2c"
-+- ti,hwmods : Must be "i2c<n>", n being the instance number (1-based)
-+- #address-cells = <1>;
-+- #size-cells = <0>;
-+
-+Recommended properties :
-+- clock-frequency : Desired I2C bus clock frequency in Hz. Otherwise
-+  the default 100 kHz frequency will be used.
-+
-+Optional properties:
-+- Child nodes conforming to i2c bus binding
-+
-+Note: Current implementation will fetch base address, irq and dma
-+from omap hwmod data base during device registration.
-+Future plan is to migrate hwmod data base contents into device tree
-+blob so that, all the required data will be used from device tree dts
-+file.
-+
-+Examples :
-+
-+i2c1: i2c at 0 {
-+    compatible = "ti,omap3-i2c";
-+    #address-cells = <1>;
-+    #size-cells = <0>;
-+    ti,hwmods = "i2c1";
-+    clock-frequency = <400000>;
-+};
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index a43d002..dcbc1ec 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -37,6 +37,8 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/of_i2c.h>
-+#include <linux/of_device.h>
- #include <linux/slab.h>
- #include <linux/i2c-omap.h>
- #include <linux/pm_runtime.h>
-@@ -182,7 +184,9 @@ struct omap_i2c_dev {
- 	u32			latency;	/* maximum mpu wkup latency */
- 	void			(*set_mpu_wkup_lat)(struct device *dev,
- 						    long latency);
--	u32			speed;		/* Speed of bus in Khz */
-+	u32			speed;		/* Speed of bus in kHz */
-+	u32			dtrev;		/* extra revision from DT */
-+	u32			flags;
- 	u16			cmd_err;
- 	u8			*buf;
- 	u8			*regs;
-@@ -266,11 +270,7 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- 
- static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- {
--	struct omap_i2c_bus_platform_data *pdata;
--
--	pdata = dev->dev->platform_data;
--
--	if (pdata->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
-+	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
- 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
-@@ -291,13 +291,10 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- 
- static void omap_i2c_idle(struct omap_i2c_dev *dev)
- {
--	struct omap_i2c_bus_platform_data *pdata;
- 	u16 iv;
- 
--	pdata = dev->dev->platform_data;
--
- 	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
--	if (pdata->rev == OMAP_I2C_IP_VERSION_2)
-+	if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
- 		omap_i2c_write_reg(dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
- 	else
- 		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, 0);
-@@ -320,9 +317,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 	unsigned long timeout;
- 	unsigned long internal_clk = 0;
- 	struct clk *fclk;
--	struct omap_i2c_bus_platform_data *pdata;
--
--	pdata = dev->dev->platform_data;
- 
- 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
- 		/* Disable I2C controller before soft reset */
-@@ -373,7 +367,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 	}
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 
--	if (pdata->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
-+	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
- 		/*
- 		 * The I2C functional clock is the armxor_ck, so there's
- 		 * no need to get "armxor_ck" separately.  Now, if OMAP2420
-@@ -397,7 +391,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 			psc = fclk_rate / 12000000;
- 	}
- 
--	if (!(pdata->flags & OMAP_I2C_FLAG_SIMPLE_CLOCK)) {
-+	if (!(dev->flags & OMAP_I2C_FLAG_SIMPLE_CLOCK)) {
- 
- 		/*
- 		 * HSI2C controller internal clk rate should be 19.2 Mhz for
-@@ -406,7 +400,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 		 * The filter is iclk (fclk for HS) period.
- 		 */
- 		if (dev->speed > 400 ||
--			       pdata->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
-+			       dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
- 			internal_clk = 19200;
- 		else if (dev->speed > 100)
- 			internal_clk = 9600;
-@@ -475,7 +469,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 
- 	dev->errata = 0;
- 
--	if (pdata->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
-+	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
- 		dev->errata |= I2C_OMAP_ERRATA_I207;
- 
- 	/* Enable interrupts */
-@@ -484,7 +478,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 			OMAP_I2C_IE_AL)  | ((dev->fifo_size) ?
- 				(OMAP_I2C_IE_RDR | OMAP_I2C_IE_XDR) : 0);
- 	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
--	if (pdata->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
-+	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
- 		dev->pscstate = psc;
- 		dev->scllstate = scll;
- 		dev->sclhstate = sclh;
-@@ -804,9 +798,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 	u16 bits;
- 	u16 stat, w;
- 	int err, count = 0;
--	struct omap_i2c_bus_platform_data *pdata;
--
--	pdata = dev->dev->platform_data;
- 
- 	if (pm_runtime_suspended(dev->dev))
- 		return IRQ_NONE;
-@@ -875,7 +866,7 @@ complete:
- 					 * Data reg in 2430, omap3 and
- 					 * omap4 is 8 bit wide
- 					 */
--					if (pdata->flags &
-+					if (dev->flags &
- 						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
- 						if (dev->buf_len) {
- 							*dev->buf++ = w >> 8;
-@@ -918,7 +909,7 @@ complete:
- 					 * Data reg in 2430, omap3 and
- 					 * omap4 is 8 bit wide
- 					 */
--					if (pdata->flags &
-+					if (dev->flags &
- 						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
- 						if (dev->buf_len) {
- 							w |= *dev->buf++ << 8;
-@@ -965,6 +956,32 @@ static const struct i2c_algorithm omap_i2c_algo = {
- 	.functionality	= omap_i2c_func,
- };
- 
-+#ifdef CONFIG_OF
-+static struct omap_i2c_bus_platform_data omap3_pdata = {
-+	.rev = OMAP_I2C_IP_VERSION_1,
-+	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
-+		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
-+		 OMAP_I2C_FLAG_BUS_SHIFT_2,
-+};
-+
-+static struct omap_i2c_bus_platform_data omap4_pdata = {
-+	.rev = OMAP_I2C_IP_VERSION_2,
-+};
-+
-+static const struct of_device_id omap_i2c_of_match[] = {
-+	{
-+		.compatible = "ti,omap4-i2c",
-+		.data = &omap4_pdata,
-+	},
-+	{
-+		.compatible = "ti,omap3-i2c",
-+		.data = &omap3_pdata,
-+	},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
-+#endif
-+
- static int __devinit
- omap_i2c_probe(struct platform_device *pdev)
- {
-@@ -972,9 +989,10 @@ omap_i2c_probe(struct platform_device *pdev)
- 	struct i2c_adapter	*adap;
- 	struct resource		*mem, *irq, *ioarea;
- 	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
-+	struct device_node	*node = pdev->dev.of_node;
-+	const struct of_device_id *match;
- 	irq_handler_t isr;
- 	int r;
--	u32 speed = 0;
- 
- 	/* NOTE: driver uses the static register mapping */
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -1001,15 +1019,24 @@ omap_i2c_probe(struct platform_device *pdev)
- 		goto err_release_region;
- 	}
- 
--	if (pdata != NULL) {
--		speed = pdata->clkrate;
-+	match = of_match_device(omap_i2c_of_match, &pdev->dev);
-+	if (match) {
-+		u32 freq = 100000; /* default to 100000 Hz */
-+
-+		pdata = match->data;
-+		dev->dtrev = pdata->rev;
-+		dev->flags = pdata->flags;
-+
-+		of_property_read_u32(node, "clock-frequency", &freq);
-+		/* convert DT freq value in Hz into kHz for speed */
-+		dev->speed = freq / 1000;
-+	} else if (pdata != NULL) {
-+		dev->speed = pdata->clkrate;
-+		dev->flags = pdata->flags;
- 		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
--	} else {
--		speed = 100;	/* Default speed */
--		dev->set_mpu_wkup_lat = NULL;
-+		dev->dtrev = pdata->rev;
- 	}
- 
--	dev->speed = speed;
- 	dev->dev = &pdev->dev;
- 	dev->irq = irq->start;
- 	dev->base = ioremap(mem->start, resource_size(mem));
-@@ -1020,9 +1047,9 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, dev);
- 
--	dev->reg_shift = (pdata->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
-+	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
- 
--	if (pdata->rev == OMAP_I2C_IP_VERSION_2)
-+	if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
- 		dev->regs = (u8 *)reg_map_ip_v2;
- 	else
- 		dev->regs = (u8 *)reg_map_ip_v1;
-@@ -1035,7 +1062,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 	if (dev->rev <= OMAP_I2C_REV_ON_3430)
- 		dev->errata |= I2C_OMAP3_1P153;
- 
--	if (!(pdata->flags & OMAP_I2C_FLAG_NO_FIFO)) {
-+	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
- 		u16 s;
- 
- 		/* Set up the fifo size - Get total size */
-@@ -1057,7 +1084,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 		/* calculate wakeup latency constraint for MPU */
- 		if (dev->set_mpu_wkup_lat != NULL)
- 			dev->latency = (1000000 * dev->fifo_size) /
--				       (1000 * speed / 8);
-+				       (1000 * dev->speed / 8);
- 	}
- 
- 	/* reset ASAP, clearing any IRQs */
-@@ -1073,7 +1100,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 	}
- 
- 	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
--		 pdata->rev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
-+		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
- 
- 	pm_runtime_put(dev->dev);
- 
-@@ -1084,6 +1111,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 	strlcpy(adap->name, "OMAP I2C adapter", sizeof(adap->name));
- 	adap->algo = &omap_i2c_algo;
- 	adap->dev.parent = &pdev->dev;
-+	adap->dev.of_node = pdev->dev.of_node;
- 
- 	/* i2c device drivers may be active on return from add_adapter() */
- 	adap->nr = pdev->id;
-@@ -1093,6 +1121,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 		goto err_free_irq;
- 	}
- 
-+	of_i2c_register_devices(adap);
-+
- 	return 0;
- 
- err_free_irq:
-@@ -1165,6 +1195,7 @@ static struct platform_driver omap_i2c_driver = {
- 		.name	= "omap_i2c",
- 		.owner	= THIS_MODULE,
- 		.pm	= OMAP_I2C_PM_OPS,
-+		.of_match_table = of_match_ptr(omap_i2c_of_match),
- 	},
- };
- 
--- 
-1.7.0.4
+export implies an import somwhere and I don't think that is the case here.
+
+> - this exported buffer-object to be shared with the other entity by asking for
+>    its 'file-descriptor (fd)', and sharing the fd across.
+> - a received fd to get the buffer object back, where it can be accessed using
+>    the associated exporter-defined operations.
+> - the exporter and user to share the scatterlist using map_dma_buf and
+>    unmap_dma_buf operations.
+> 
+> Atleast one 'attach()' call is required to be made prior to calling the
+> map_dma_buf() operation.
+
+for the whole memory region or just for the device itself?
+
+> 
+> Couple of building blocks in map_dma_buf() are added to ease introduction
+> of sync'ing across exporter and users, and late allocation by the exporter.
+> 
+> More details are there in the documentation patch.
+> 
+> This is based on design suggestions from many people at the mini-summits[1],
+> most notably from Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
+> Daniel Vetter <daniel@ffwll.ch>.
+> 
+> The implementation is inspired from proof-of-concept patch-set from
+> Tomasz Stanislawski <t.stanislaws@samsung.com>, who demonstrated buffer sharing
+> between two v4l2 devices. [2]
+> 
+> [1]: https://wiki.linaro.org/OfficeofCTO/MemoryManagement
+> [2]: http://lwn.net/Articles/454389
+> 
+> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+> Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
+> ---
+>  drivers/base/Kconfig    |   10 ++
+>  drivers/base/Makefile   |    1 +
+>  drivers/base/dma-buf.c  |  289 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/dma-buf.h |  172 ++++++++++++++++++++++++++++
+>  4 files changed, 472 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/base/dma-buf.c
+>  create mode 100644 include/linux/dma-buf.h
+> 
+> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+> index 21cf46f..8a0e87f 100644
+> --- a/drivers/base/Kconfig
+> +++ b/drivers/base/Kconfig
+> @@ -174,4 +174,14 @@ config SYS_HYPERVISOR
+>  
+>  source "drivers/base/regmap/Kconfig"
+>  
+> +config DMA_SHARED_BUFFER
+> +	bool "Buffer framework to be shared between drivers"
+> +	default n
+> +	select ANON_INODES
+> +	help
+> +	  This option enables the framework for buffer-sharing between
+> +	  multiple drivers. A buffer is associated with a file using driver
+> +	  APIs extension; the file's descriptor can then be passed on to other
+> +	  driver.
+> +
+>  endmenu
+> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+> index 99a375a..d0df046 100644
+> --- a/drivers/base/Makefile
+> +++ b/drivers/base/Makefile
+> @@ -8,6 +8,7 @@ obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
+>  obj-y			+= power/
+>  obj-$(CONFIG_HAS_DMA)	+= dma-mapping.o
+>  obj-$(CONFIG_HAVE_GENERIC_DMA_COHERENT) += dma-coherent.o
+> +obj-$(CONFIG_DMA_SHARED_BUFFER) += dma-buf.o
+>  obj-$(CONFIG_ISA)	+= isa.o
+>  obj-$(CONFIG_FW_LOADER)	+= firmware_class.o
+>  obj-$(CONFIG_NUMA)	+= node.o
+> diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
+> new file mode 100644
+> index 0000000..e920709
+> --- /dev/null
+> +++ b/drivers/base/dma-buf.c
+> @@ -0,0 +1,289 @@
+> +/*
+> + * Framework for buffer objects that can be shared across devices/subsystems.
+> + *
+> + * Copyright(C) 2011 Linaro Limited. All rights reserved.
+> + * Author: Sumit Semwal <sumit.semwal@ti.com>
+> + *
+> + * Many thanks to linaro-mm-sig list, and specially
+> + * Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
+> + * Daniel Vetter <daniel@ffwll.ch> for their support in creation and
+> + * refining of this idea.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/fs.h>
+> +#include <linux/slab.h>
+> +#include <linux/dma-buf.h>
+> +#include <linux/anon_inodes.h>
+> +#include <linux/export.h>
+> +
+> +static inline int is_dma_buf_file(struct file *);
+> +
+> +static int dma_buf_release(struct inode *inode, struct file *file)
+> +{
+> +	struct dma_buf *dmabuf;
+> +
+> +	if (!is_dma_buf_file(file))
+> +		return -EINVAL;
+> +
+> +	dmabuf = file->private_data;
+> +
+> +	dmabuf->ops->release(dmabuf);
+> +	kfree(dmabuf);
+> +	return 0;
+> +}
+> +
+> +static const struct file_operations dma_buf_fops = {
+> +	.release	= dma_buf_release,
+> +};
+> +
+> +/*
+> + * is_dma_buf_file - Check if struct file* is associated with dma_buf
+> + */
+> +static inline int is_dma_buf_file(struct file *file)
+> +{
+> +	return file->f_op == &dma_buf_fops;
+> +}
+> +
+> +/**
+
+Wrong kerneldoc.
+
+> + * dma_buf_export - Creates a new dma_buf, and associates an anon file
+> + * with this buffer, so it can be exported.
+> + * Also connect the allocator specific data and ops to the buffer.
+> + *
+> + * @priv:	[in]	Attach private data of allocator to this buffer
+> + * @ops:	[in]	Attach allocator-defined dma buf ops to the new buffer.
+> + * @size:	[in]	Size of the buffer
+> + * @flags:	[in]	mode flags for the file.
+> + *
+> + * Returns, on success, a newly created dma_buf object, which wraps the
+> + * supplied private data and operations for dma_buf_ops. On either missing
+> + * ops, or error in allocating struct dma_buf, will return negative error.
+> + *
+> + */
+> +struct dma_buf *dma_buf_export(void *priv, struct dma_buf_ops *ops,
+> +				size_t size, int flags)
+> +{
+> +	struct dma_buf *dmabuf;
+> +	struct file *file;
+> +
+> +	if (WARN_ON(!priv || !ops
+> +			  || !ops->map_dma_buf
+> +			  || !ops->unmap_dma_buf
+> +			  || !ops->release)) {
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	dmabuf = kzalloc(sizeof(struct dma_buf), GFP_KERNEL);
+> +	if (dmabuf == NULL)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	dmabuf->priv = priv;
+> +	dmabuf->ops = ops;
+> +	dmabuf->size = size;
+> +
+> +	file = anon_inode_getfile("dmabuf", &dma_buf_fops, dmabuf, flags);
+> +
+> +	dmabuf->file = file;
+> +
+> +	mutex_init(&dmabuf->lock);
+> +	INIT_LIST_HEAD(&dmabuf->attachments);
+> +
+> +	return dmabuf;
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_export);
+> +
+> +
+> +/**
+> + * dma_buf_fd - returns a file descriptor for the given dma_buf
+> + * @dmabuf:	[in]	pointer to dma_buf for which fd is required.
+> + *
+> + * On success, returns an associated 'fd'. Else, returns error.
+> + */
+> +int dma_buf_fd(struct dma_buf *dmabuf)
+> +{
+> +	int error, fd;
+> +
+> +	if (!dmabuf || !dmabuf->file)
+> +		return -EINVAL;
+> +
+> +	error = get_unused_fd();
+> +	if (error < 0)
+> +		return error;
+> +	fd = error;
+> +
+> +	fd_install(fd, dmabuf->file);
+> +
+> +	return fd;
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_fd);
+> +
+> +/**
+> + * dma_buf_get - returns the dma_buf structure related to an fd
+> + * @fd:	[in]	fd associated with the dma_buf to be returned
+> + *
+> + * On success, returns the dma_buf structure associated with an fd; uses
+> + * file's refcounting done by fget to increase refcount. returns ERR_PTR
+> + * otherwise.
+> + */
+> +struct dma_buf *dma_buf_get(int fd)
+> +{
+> +	struct file *file;
+> +
+> +	file = fget(fd);
+> +
+> +	if (!file)
+> +		return ERR_PTR(-EBADF);
+> +
+> +	if (!is_dma_buf_file(file)) {
+> +		fput(file);
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	return file->private_data;
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_get);
+> +
+> +/**
+> + * dma_buf_put - decreases refcount of the buffer
+> + * @dmabuf:	[in]	buffer to reduce refcount of
+> + *
+> + * Uses file's refcounting done implicitly by fput()
+> + */
+> +void dma_buf_put(struct dma_buf *dmabuf)
+> +{
+> +	if (WARN_ON(!dmabuf || !dmabuf->file))
+> +		return;
+> +
+> +	fput(dmabuf->file);
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_put);
+> +
+> +/**
+> + * dma_buf_attach - Add the device to dma_buf's attachments list; optionally,
+> + * calls attach() of dma_buf_ops to allow device-specific attach functionality
+> + * @dmabuf:	[in]	buffer to attach device to.
+> + * @dev:	[in]	device to be attached.
+> + *
+> + * Returns struct dma_buf_attachment * for this attachment; may return negative
+> + * error codes.
+> + *
+> + */
+> +struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+> +					  struct device *dev)
+> +{
+> +	struct dma_buf_attachment *attach;
+> +	int ret;
+> +
+> +	if (WARN_ON(!dmabuf || !dev || !dmabuf->ops))
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	attach = kzalloc(sizeof(struct dma_buf_attachment), GFP_KERNEL);
+> +	if (attach == NULL)
+> +		goto err_alloc;
+> +
+> +	mutex_lock(&dmabuf->lock);
+> +
+> +	attach->dev = dev;
+> +	attach->dmabuf = dmabuf;
+> +	if (dmabuf->ops->attach) {
+> +		ret = dmabuf->ops->attach(dmabuf, dev, attach);
+> +		if (ret)
+> +			goto err_attach;
+> +	}
+> +	list_add(&attach->node, &dmabuf->attachments);
+> +
+> +	mutex_unlock(&dmabuf->lock);
+> +	return attach;
+> +
+> +err_alloc:
+> +	return ERR_PTR(-ENOMEM);
+> +err_attach:
+> +	kfree(attach);
+> +	mutex_unlock(&dmabuf->lock);
+> +	return ERR_PTR(ret);
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_attach);
+> +
+> +/**
+> + * dma_buf_detach - Remove the given attachment from dmabuf's attachments list;
+> + * optionally calls detach() of dma_buf_ops for device-specific detach
+> + * @dmabuf:	[in]	buffer to detach from.
+> + * @attach:	[in]	attachment to be detached; is free'd after this call.
+> + *
+> + */
+> +void dma_buf_detach(struct dma_buf *dmabuf, struct dma_buf_attachment *attach)
+> +{
+> +	if (WARN_ON(!dmabuf || !attach || !dmabuf->ops))
+> +		return;
+> +
+> +	mutex_lock(&dmabuf->lock);
+> +	list_del(&attach->node);
+> +	if (dmabuf->ops->detach)
+> +		dmabuf->ops->detach(dmabuf, attach);
+> +
+> +	mutex_unlock(&dmabuf->lock);
+> +	kfree(attach);
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_detach);
+> +
+> +/**
+> + * dma_buf_map_attachment - Returns the scatterlist table of the attachment;
+> + * mapped into _device_ address space. Is a wrapper for map_dma_buf() of the
+> + * dma_buf_ops.
+> + * @attach:	[in]	attachment whose scatterlist is to be returned
+> + * @direction:	[in]	direction of DMA transfer
+> + *
+> + * Returns sg_table containing the scatterlist to be returned; may return NULL
+> + * or ERR_PTR.
+> + *
+> + */
+> +struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
+> +					enum dma_data_direction direction)
+> +{
+> +	struct sg_table *sg_table = ERR_PTR(-EINVAL);
+> +
+> +	if (WARN_ON(!attach || !attach->dmabuf || !attach->dmabuf->ops))
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	mutex_lock(&attach->dmabuf->lock);
+> +	if (attach->dmabuf->ops->map_dma_buf)
+> +		sg_table = attach->dmabuf->ops->map_dma_buf(attach, direction);
+> +	mutex_unlock(&attach->dmabuf->lock);
+> +
+> +	return sg_table;
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_map_attachment);
+> +
+> +/**
+> + * dma_buf_unmap_attachment - unmaps and decreases usecount of the buffer;might
+> + * deallocate the scatterlist associated. Is a wrapper for unmap_dma_buf() of
+> + * dma_buf_ops.
+> + * @attach:	[in]	attachment to unmap buffer from
+> + * @sg_table:	[in]	scatterlist info of the buffer to unmap
+> + *
+> + */
+> +void dma_buf_unmap_attachment(struct dma_buf_attachment *attach,
+> +				struct sg_table *sg_table)
+> +{
+> +	if (WARN_ON(!attach || !attach->dmabuf || !sg_table
+> +			    || !attach->dmabuf->ops))
+> +		return;
+> +
+> +	mutex_lock(&attach->dmabuf->lock);
+> +	if (attach->dmabuf->ops->unmap_dma_buf)
+> +		attach->dmabuf->ops->unmap_dma_buf(attach, sg_table);
+> +	mutex_unlock(&attach->dmabuf->lock);
+> +
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_unmap_attachment);
+> diff --git a/include/linux/dma-buf.h b/include/linux/dma-buf.h
+> new file mode 100644
+> index 0000000..3e3ecf3
+> --- /dev/null
+> +++ b/include/linux/dma-buf.h
+> @@ -0,0 +1,172 @@
+> +/*
+> + * Header file for dma buffer sharing framework.
+> + *
+> + * Copyright(C) 2011 Linaro Limited. All rights reserved.
+> + * Author: Sumit Semwal <sumit.semwal@ti.com>
+> + *
+> + * Many thanks to linaro-mm-sig list, and specially
+> + * Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
+> + * Daniel Vetter <daniel@ffwll.ch> for their support in creation and
+> + * refining of this idea.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __DMA_BUF_H__
+> +#define __DMA_BUF_H__
+> +
+> +#include <linux/file.h>
+> +#include <linux/err.h>
+> +#include <linux/device.h>
+> +#include <linux/scatterlist.h>
+> +#include <linux/list.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +struct dma_buf;
+> +
+> +/**
+> + * struct dma_buf_attachment - holds device-buffer attachment data
+
+OK, but what is the purpose of it?
+
+> + * @dmabuf: buffer for this attachment.
+> + * @dev: device attached to the buffer.
+                                ^^^ this
+> + * @node: list_head to allow manipulation of list of dma_buf_attachment.
+
+Just say: "list of dma_buf_attachment"'
+
+> + * @priv: exporter-specific attachment data.
+
+That "exporter-specific.." brings to my mind custom decleration forms. But maybe that is me.
+
+> + */
+> +struct dma_buf_attachment {
+> +	struct dma_buf *dmabuf;
+> +	struct device *dev;
+> +	struct list_head node;
+> +	void *priv;
+> +};
+
+Why don't you move the decleration of this below 'struct dma_buf'?
+It would easier than to read this structure..
+
+> +
+> +/**
+> + * struct dma_buf_ops - operations possible on struct dma_buf
+> + * @attach: allows different devices to 'attach' themselves to the given
+
+register?
+> + *	    buffer. It might return -EBUSY to signal that backing storage
+> + *	    is already allocated and incompatible with the requirements
+
+Wait.. allocated or attached?
+
+> + *	    of requesting device. [optional]
+
+What is optional? The return value? Or the 'attach' call? If the later , say
+that in the first paragraph.
+
+
+> + * @detach: detach a given device from this buffer. [optional]
+> + * @map_dma_buf: returns list of scatter pages allocated, increases usecount
+> + *		 of the buffer. Requires atleast one attach to be called
+> + *		 before. Returned sg list should already be mapped into
+> + *		 _device_ address space. This call may sleep. May also return
+
+Ok, there is some __might_sleep macro you should put on the function.
+
+> + *		 -EINTR.
+
+Ok. What is the return code if attach has _not_ been called?
+
+> + * @unmap_dma_buf: decreases usecount of buffer, might deallocate scatter
+> + *		   pages.
+> + * @release: release this buffer; to be called after the last dma_buf_put.
+> + * @sync_sg_for_cpu: sync the sg list for cpu.
+> + * @sync_sg_for_device: synch the sg list for device.
+
+Not seeing those two.
+> + */
+> +struct dma_buf_ops {
+> +	int (*attach)(struct dma_buf *, struct device *,
+> +			struct dma_buf_attachment *);
+> +
+> +	void (*detach)(struct dma_buf *, struct dma_buf_attachment *);
+> +
+> +	/* For {map,unmap}_dma_buf below, any specific buffer attributes
+> +	 * required should get added to device_dma_parameters accessible
+> +	 * via dev->dma_params.
+> +	 */
+> +	struct sg_table * (*map_dma_buf)(struct dma_buf_attachment *,
+> +						enum dma_data_direction);
+> +	void (*unmap_dma_buf)(struct dma_buf_attachment *,
+> +						struct sg_table *);
+> +	/* TODO: Add try_map_dma_buf version, to return immed with -EBUSY
+
+Ewww. Why? Why not just just the 'map_dma_buf' and return that?
+
+> +	 * if the call would block.
+> +	 */
+> +
+> +	/* after final dma_buf_put() */
+> +	void (*release)(struct dma_buf *);
+> +
+> +};
+> +
+> +/**
+> + * struct dma_buf - shared buffer object
+
+Missing the 'size'.
+
+> + * @file: file pointer used for sharing buffers across, and for refcounting.
+> + * @attachments: list of dma_buf_attachment that denotes all devices attached.
+> + * @ops: dma_buf_ops associated with this buffer object
+> + * @priv: user specific private data
+
+
+Can you elaborate on this? Is this the "exporter" using this? Or is
+it for the "user" using it? If so, why provide it? Wouldn't the 
+user of this have something like this:
+
+struct my_dma_bufs {
+	struct dma_buf[20];
+	void *priv;
+}
+
+Anyhow?
+
+> + */
+> +struct dma_buf {
+> +	size_t size;
+> +	struct file *file;
+> +	struct list_head attachments;
+> +	const struct dma_buf_ops *ops;
+> +	/* mutex to serialize list manipulation and other ops */
+> +	struct mutex lock;
+> +	void *priv;
+> +};
+> +
+> +#ifdef CONFIG_DMA_SHARED_BUFFER
+> +struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+> +							struct device *dev);
+> +void dma_buf_detach(struct dma_buf *dmabuf,
+> +				struct dma_buf_attachment *dmabuf_attach);
+> +struct dma_buf *dma_buf_export(void *priv, struct dma_buf_ops *ops,
+> +			size_t size, int flags);
+> +int dma_buf_fd(struct dma_buf *dmabuf);
+> +struct dma_buf *dma_buf_get(int fd);
+> +void dma_buf_put(struct dma_buf *dmabuf);
+> +
+> +struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *,
+> +					enum dma_data_direction);
+> +void dma_buf_unmap_attachment(struct dma_buf_attachment *, struct sg_table *);
+> +#else
+> +
+> +static inline struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+> +							struct device *dev)
+> +{
+> +	return ERR_PTR(-ENODEV);
+> +}
+> +
+> +static inline void dma_buf_detach(struct dma_buf *dmabuf,
+> +				  struct dma_buf_attachment *dmabuf_attach)
+> +{
+> +	return;
+> +}
+> +
+> +static inline struct dma_buf *dma_buf_export(void *priv,
+> +						struct dma_buf_ops *ops,
+> +						size_t size, int flags)
+> +{
+> +	return ERR_PTR(-ENODEV);
+> +}
+> +
+> +static inline int dma_buf_fd(struct dma_buf *dmabuf)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +static inline struct dma_buf *dma_buf_get(int fd)
+> +{
+> +	return ERR_PTR(-ENODEV);
+> +}
+> +
+> +static inline void dma_buf_put(struct dma_buf *dmabuf)
+> +{
+> +	return;
+> +}
+> +
+> +static inline struct sg_table *dma_buf_map_attachment(
+> +	struct dma_buf_attachment *attach, enum dma_data_direction write)
+> +{
+> +	return ERR_PTR(-ENODEV);
+> +}
+> +
+> +static inline void dma_buf_unmap_attachment(struct dma_buf_attachment *attach,
+> +						struct sg_table *sg)
+> +{
+> +	return;
+> +}
+> +
+> +#endif /* CONFIG_DMA_SHARED_BUFFER */
+> +
+> +#endif /* __DMA_BUF_H__ */
+> -- 
+> 1.7.4.1
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
