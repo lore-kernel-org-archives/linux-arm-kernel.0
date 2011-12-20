@@ -1,75 +1,61 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Dec 2011 20:00:31 +0800
-Subject: [PATCH 0/12] Add clk_prepare/clk_unprepare for mxs clock api
-Message-ID: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 20 Dec 2011 20:00:32 +0800
+Subject: [PATCH 01/12] clk: add helper functions clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1324382443-4439-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mutex locking problem on mxs platform has been reported on mailing
-list for a few time.  The cause is that a mutex is being held in mxs
-clock api clk_enable/clk_disable which are being called by some mxs
-clock client drivers like amba-pl011 and mxs-saif in atomic context.
+From: Richard Zhao <richard.zhao@linaro.org>
 
-This series takes Russell's suggestion to:
+It's for migrating to generic clk framework API.
 
- * Convert all mxs clock client drivers to clk_prepare/clk_unprepare.
-   (I hope the series has covered all the drivers, but appreciate any
-   reminding on any missing ones.)
+The helper functions  help cases clk_enable/clk_disable is used
+in non-atomic context.
+For example, Call clk_enable in probe and clk_disable in remove.
 
- * Add clk_prepare/clk_unprepare for mxs clock api to contain the
-   non-atomic portion of existing clk_enable/clk_disable implemention.
-   (As the whole existing clk_enable/clk_disable are non-atomic,
-   clk_prepare/clk_unprepare become a renaming of the existing
-   clk_enable/clk_disable, and the new clk_enable/clk_disable become
-   a pair of dummy functions.)
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ include/linux/clk.h |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-Thus, we can ensure that no mutex will be held for atomic context, and
-the problem people keep reporting gets fixed with one step move toward
-common clk framework while not ncessarily waiting for it.
-
-If driver maintainers have no objection, after the review process, I
-would like to send the series through arm-soc tree to ease the merge
-process.
-
-Those two patches from Richard Zhao are included here for completeness,
-and they have been picked up by Sascha on imx tree.  But since imx and
-mxs will both go through arm-soc, it should easy to sort out how we
-should merge them.
-
-Regards,
-Shawn
-
-Richard Zhao (2):
-      clk: add helper functions clk_prepare_enable and clk_disable_unprepare
-      net: fec: add clk_prepare/clk_unprepare
-
-Shawn Guo (10):
-      arm/mxs: convert platform code to clk_prepare/clk_unprepare
-      dma: mxs-dma: convert to clk_prepare/clk_unprepare
-      mmc: mxs-mmc: convert to clk_prepare/clk_unprepare
-      mtd: gpmi-lib: convert to clk_prepare/clk_unprepare
-      net: flexcan: convert to clk_prepare/clk_unprepare
-      serial: mxs-auart: convert to clk_prepare/clk_unprepare
-      video: mxsfb: convert to clk_prepare/clk_unprepare
-      ASoC: mxs-saif: convert to clk_prepare/clk_unprepare
-      clk: add config option HAVE_CLK_PREPARE into Kconfig
-      arm/mxs: select HAVE_CLK_PREPARE for clock
-
- arch/arm/Kconfig                      |    1 +
- arch/arm/mach-mxs/clock-mx23.c        |   10 +++++-----
- arch/arm/mach-mxs/clock-mx28.c        |   10 +++++-----
- arch/arm/mach-mxs/clock.c             |   33 +++++++++++++++++++++++----------
- arch/arm/mach-mxs/mach-mx28evk.c      |    2 +-
- arch/arm/mach-mxs/system.c            |    2 +-
- arch/arm/mach-mxs/timer.c             |    2 +-
- drivers/clk/Kconfig                   |    3 +++
- drivers/dma/mxs-dma.c                 |    8 ++++----
- drivers/mmc/host/mxs-mmc.c            |   10 +++++-----
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   12 ++++++------
- drivers/net/can/flexcan.c             |   10 +++++-----
- drivers/net/ethernet/freescale/fec.c  |   10 +++++-----
- drivers/tty/serial/mxs-auart.c        |    8 ++++----
- drivers/video/mxsfb.c                 |    8 ++++----
- include/linux/clk.h                   |   22 ++++++++++++++++++++++
- sound/soc/mxs/mxs-saif.c              |    4 ++--
- 17 files changed, 97 insertions(+), 58 deletions(-)
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 7213b52..b9d46fa 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -107,6 +107,28 @@ static inline void clk_unprepare(struct clk *clk)
+ }
+ #endif
+ 
++/* clk_prepare_enable helps cases using clk_enable in non-atomic context. */
++static inline int clk_prepare_enable(struct clk *clk)
++{
++	int ret;
++
++	ret = clk_prepare(clk);
++	if (ret)
++		return ret;
++	ret = clk_enable(clk);
++	if (ret)
++		clk_unprepare(clk);
++
++	return ret;
++}
++
++/* clk_disable_unprepare helps cases using clk_disable in non-atomic context. */
++static inline void clk_disable_unprepare(struct clk *clk)
++{
++	clk_disable(clk);
++	clk_unprepare(clk);
++}
++
+ /**
+  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+  *		  This is only valid once the clock source has been enabled.
+-- 
+1.7.4.1
