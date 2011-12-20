@@ -1,183 +1,283 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 20 Dec 2011 12:06:45 +0530
-Subject: [PATCH] davinci: DA850 EVM: OHCI platform code
-Message-ID: <1324363005-11320-1-git-send-email-prakash.pm@ti.com>
+From: aneesh@ti.com (Aneesh V)
+Date: Tue, 20 Dec 2011 12:39:52 +0530
+Subject: [RFC v2 PATCH 1/3] dt: device tree bindings for DDR memories
+In-Reply-To: <CAOesGMjOybCbu1Bgxe0Te=XANVOqOPcaDOL_6c4=pVCxzu9ZnA@mail.gmail.com>
+References: <1324303533-17458-1-git-send-email-aneesh@ti.com>	<1324303533-17458-2-git-send-email-aneesh@ti.com>
+ <CAOesGMjOybCbu1Bgxe0Te=XANVOqOPcaDOL_6c4=pVCxzu9ZnA@mail.gmail.com>
+Message-ID: <4EF034C0.9070401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+Hi Olof,
 
-On this board the OHCI port's power control and over-current signals from
-TPS2065 power switch are connected via GPIO1[15] and GPIO2[1] respectively,
-so we can implement the DA8xx OHCI glue layer's hooks for overriding the
-root hub port's power and over-current status bits.
+On Monday 19 December 2011 10:22 PM, Olof Johansson wrote:
+> Hi,
+>
+> Some comments below, but also a more general question: How much of
+> this generic data makes sense to encode in the device tree? Final
+> hardware configuration usually has to take into consideration board
+> layout/signal delays, etc, and that's not part of this binding.
 
-We also have to properly set up the clocking mode in the CFGCHIP2 register,
-so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
-its output is used to clock the USB 1.1 (OHCI) PHY...
+The JEDEC specifies base values for all timing parameters. But Vendors
+can improve on these timings and provide better values. Using device
+specific timing values therefore provides scope for optimization.
 
-Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
----
- arch/arm/mach-davinci/board-da850-evm.c |  126 +++++++++++++++++++++++++++++++
- 1 files changed, 126 insertions(+), 0 deletions(-)
+Everything that I have encoded here is needed by our driver to
+re-configure our SDRAM controller during DVFS. In fact, I have not
+listed all AC timing parameters in the spec in this binding, leaving
+the rest for future users to add if they need them.
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 6659a90..df74ba5 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -22,6 +22,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/platform_device.h>
-+#include <linux/interrupt.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-@@ -42,6 +43,7 @@
- #include <mach/nand.h>
- #include <mach/mux.h>
- #include <mach/aemif.h>
-+#include <mach/usb.h>
- #include <mach/spi.h>
- 
- #define DA850_EVM_PHY_ID		"0:00"
-@@ -734,6 +736,127 @@ static struct davinci_i2c_platform_data da850_evm_i2c_0_pdata = {
- 	.bus_delay	= 0,	/* usec */
- };
- 
-+/*
-+ * USB1 VBUS is controlled by GPIO2[4], over-current is reported on GPIO6[13].
-+ */
-+#define ON_BD_USB_DRV	GPIO_TO_PIN(2, 4)
-+#define ON_BD_USB_OVC	GPIO_TO_PIN(6, 13)
-+
-+static const short da850_evm_usb11_pins[] = {
-+	DA850_GPIO2_4, DA850_GPIO6_13,
-+	-1
-+};
-+
-+static da8xx_ocic_handler_t da850_evm_usb_ocic_handler;
-+
-+static int da850_evm_usb_set_power(unsigned port, int on)
-+{
-+	gpio_set_value(ON_BD_USB_DRV, on);
-+	return 0;
-+}
-+
-+static int da850_evm_usb_get_power(unsigned port)
-+{
-+	return gpio_get_value(ON_BD_USB_DRV);
-+}
-+
-+static int da850_evm_usb_get_oci(unsigned port)
-+{
-+	return !gpio_get_value(ON_BD_USB_OVC);
-+}
-+
-+static irqreturn_t da850_evm_usb_ocic_irq(int, void *);
-+
-+static int da850_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
-+{
-+	int irq		= gpio_to_irq(ON_BD_USB_OVC);
-+	int error	= 0;
-+
-+	if (handler != NULL) {
-+		da850_evm_usb_ocic_handler = handler;
-+
-+		error = request_irq(irq, da850_evm_usb_ocic_irq, IRQF_DISABLED |
-+				    IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-+				    "OHCI over-current indicator", NULL);
-+		if (error)
-+			printk(KERN_ERR "%s: could not request IRQ to watch "
-+			       "over-current indicator changes\n", __func__);
-+	} else
-+		free_irq(irq, NULL);
-+
-+	return error;
-+}
-+
-+static struct da8xx_ohci_root_hub da850_evm_usb11_pdata = {
-+	.set_power	= da850_evm_usb_set_power,
-+	.get_power	= da850_evm_usb_get_power,
-+	.get_oci	= da850_evm_usb_get_oci,
-+	.ocic_notify	= da850_evm_usb_ocic_notify,
-+
-+	/* TPS2065 switch @ 5V */
-+	.potpgt		= (3 + 1) / 2,	/* 3 ms max */
-+};
-+
-+static irqreturn_t da850_evm_usb_ocic_irq(int irq, void *dev_id)
-+{
-+	da850_evm_usb_ocic_handler(&da850_evm_usb11_pdata, 1);
-+	return IRQ_HANDLED;
-+}
-+
-+static __init void da850_evm_usb_init(void)
-+{
-+	u32 cfgchip2;
-+	int ret;
-+
-+	/*
-+	 * Set up USB clock/mode in the CFGCHIP2 register.
-+	 * FYI:  CFGCHIP2 is 0x0000ef00 initially.
-+	 */
-+	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
-+
-+	/* USB2.0 PHY reference clock is 24 MHz */
-+	cfgchip2 &= ~CFGCHIP2_REFFREQ;
-+	cfgchip2 |=  CFGCHIP2_REFFREQ_24MHZ;
-+
-+	/*
-+	 * Select internal reference clock for USB 2.0 PHY
-+	 * and use it as a clock source for USB 1.1 PHY
-+	 * (this is the default setting anyway).
-+	 */
-+	cfgchip2 &= ~CFGCHIP2_USB1PHYCLKMUX;
-+	cfgchip2 |=  CFGCHIP2_USB2PHYCLKMUX;
-+
-+	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
-+
-+	ret = davinci_cfg_reg_list(da850_evm_usb11_pins);
-+	if (ret) {
-+		pr_warning("%s: USB 1.1 PinMux setup failed: %d\n",
-+			   __func__, ret);
-+		return;
-+	}
-+
-+	ret = gpio_request(ON_BD_USB_DRV, "ON_BD_USB_DRV");
-+	if (ret) {
-+		printk(KERN_ERR "%s: failed to request GPIO for USB 1.1 port "
-+		       "power control: %d\n", __func__, ret);
-+		return;
-+	}
-+	gpio_direction_output(ON_BD_USB_DRV, 0);
-+
-+	ret = gpio_request(ON_BD_USB_OVC, "ON_BD_USB_OVC");
-+	if (ret) {
-+		printk(KERN_ERR "%s: failed to request GPIO for USB 1.1 port "
-+		       "over-current indicator: %d\n", __func__, ret);
-+		return;
-+	}
-+	gpio_direction_input(ON_BD_USB_OVC);
-+
-+	ret = da8xx_register_usb11(&da850_evm_usb11_pdata);
-+	if (ret)
-+		pr_warning("%s: USB 1.1 registration failed: %d\n",
-+			   __func__, ret);
-+}
-+
- static struct davinci_uart_config da850_evm_uart_config __initdata = {
- 	.enabled_uarts = 0x7,
- };
-@@ -1386,6 +1509,9 @@ static __init void da850_evm_init(void)
- 				ret);
- 
- 	da850_evm_setup_mac_addr();
-+
-+	/* initilaize usb module */
-+	da850_evm_usb_init();
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
--- 
-1.7.1
+>
+>
+> On Mon, Dec 19, 2011 at 6:05 AM, Aneesh V<aneesh@ti.com>  wrote:
+>
+>> diff --git a/Documentation/devicetree/bindings/ddr/ddr.txt b/Documentation/devicetree/bindings/ddr/ddr.txt
+>> new file mode 100644
+>> index 0000000..f15c4dd
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/ddr/ddr.txt
+>> @@ -0,0 +1,114 @@
+>> +* DDR SDRAM memories compliant to JEDEC specifications JESD209-2(LPDDR2)
+>> +  or JESD79-3(DDR3).
+>> +
+>> +Required properties:
+>> +- compatible : Should be one of - "jedec,ddr3", "jedec,lpddr2-nvm",
+>> +  "jedec,lpddr2-s2", "jedec,lpddr2-s4"
+>> +
+>> +  "ti,jedec-ddr3" should be listed if the memory part is DDR3 type
+>> +
+>> +  "ti,jedec-lpddr2-s2" should be listed if the memory part is LPDDR2-S2 type
+>> +
+>> +  "ti,jedec-lpddr2-s4" should be listed if the memory part is LPDDR2-S4 type
+>> +
+>> +  "ti,jedec-lpddr2-nvm" should be listed if the memory part is LPDDR2-NVM type
+>> +
+>> +- density  : string representing the density of the device in terms of
+>> +  Mb (mega bits). Following are the allowed values: "64Mb", "128Mb",
+>> +  "256Mb", "512Mb", "1Gb", "2Gb", "4Gb", "8Gb", "16Gb", or "32Gb"
+>
+> No, please encode as a two-cell integer instead.
+
+That is what I thought of doing initially. But I felt that "32Gb" is
+more readable than 34359738368 or 33554432(if the unit is Mb).
+
+>
+>> +- io-width : string representing the io width: "x8", "x16" or "x32".
+>
+> No, encode as an integer.
+
+Ok.
+
+>
+>> +
+>> +Optional properties:
+>> +
+>> +The following optional properties represent the minimum value of some AC
+>> +timing parameters of the DDR device in terms of number of clock cycles.
+>> +These values shall be obtained from the device data-sheet.
+>> +
+>> +The suffix nCK indicates that the unit for these parameters is number
+>> +of DDR clock cycles. Note: In LPDDR2 spec and data-sheets tCK is used
+>> +inter-changeably for nCK. Both are equivalent in this context.
+>
+> Please use only lower characters in property names unless absolutely
+> necessary, which this doesn't qualify as, in my opinion.
+
+I have used the names "as is" from the spec. Thought that might be
+useful when users extract data from the data-sheets in the future to
+create dts for new devices.
+
+>
+> Also, can't these strings be shortened a bit? All of them have '-min'
+> in common, and none of them seem to be very devicetree-like in their
+> naming.
+
+Most of these have a counter part in the timings node. That is we have
+both "tCKESR-min-nCK" and "tCKESR-ps" albeit in different nodes.
+
+>
+> Finally, the "lpddr2" and "ddr3" properties could just be prefixed
+> with "lpddr2,<propertyname>" instead.
+
+Makes sense. But a given node will have data for only either of them,
+
+not both and the compatible property will clearly mention what the data
+is for. Would you still like to have the above scheme?
+
+>
+>> +
+>> +- tRRD-min-nCK
+>> +- tWTR-min-nCK
+>> +- tXP-min-nCK
+>> +- tRTP-min-nCK
+>> +- tCKE-min-nCK
+>> +- tRPab-min-nCK                /* LPDDR2 only */
+>> +- tRCD-min-nCK         /* LPDDR2 only */
+>> +- tWR-min-nCK          /* LPDDR2 only */
+>> +- tRASmin-min-nCK      /* LPDDR2 only */
+>> +- tCKESR-min-nCK       /* LPDDR2 only */
+>> +- tFAW-min-nCK         /* LPDDR2 only */
+>> +- tZQCS-min-nCK                /* DDR3 only */
+>> +- tZQoper-min-nCK      /* DDR3 only */
+>> +- tZQinit-min-nCK      /* DDR3 only */
+>> +- tXS-min-nCK          /* DDR3 only */
+>> +
+>> +Child nodes:
+>> +- The ddr node may have one or more child nodes of type "ddr-timings".
+>> +  "ddr-timings" provides AC timing parameters of the device for
+>> +  a given speed-bin. The user may provide the timings for as many
+>> +  speed-bins as is required. Please see Documentation/devicetree/
+>> +  bindings/ddr/ddr-timings.txt for more information on "ddr-timings"
+>> +
+>> +Example:
+>> +
+>> +elpida_ECB240ABACN : ddr {
+>> +       compatible      = "Elpida,ECB240ABACN","jedec,lpddr2-s4";
+>> +       density         = "2Gb";
+>> +       io-width        = "x32";
+>> +
+>> +       tRPab-min-nCK   =<3>;
+>> +       tRCD-min-nCK    =<3>;
+>> +       tWR-min-nCK     =<3>;
+>> +       tRASmin-min-nCK =<3>;
+>> +       tRRD-min-nCK    =<2>;
+>> +       tWTR-min-nCK    =<2>;
+>> +       tXP-min-nCK     =<2>;
+>> +       tRTP-min-nCK    =<2>;
+>> +       tCKE-min-nCK    =<3>;
+>> +       tCKESR-min-nCK  =<3>;
+>> +       tFAW-min-nCK    =<8>;
+>> +
+>> +       timings_elpida_ECB240ABACN_400mhz: ddr-timings {
+>
+> You will need a unit address here.
+
+Ok. ddr-timing at 0, ddr-timings at 1 etc, right?
+
+>
+>> +               min-freq        =<10000000>;
+>> +               max-freq        =<400000000>;
+>> +               tRP-ps          =<21000>;
+>> +               tRCD-ps         =<18000>;
+>> +               tWR-ps          =<15000>;
+>> +               tRAS-min-ps     =<42000:;
+>> +               tRRD-ps         =<10000>;
+>> +               tWTR-ps         =<7500>;
+>> +               tXP-ps          =<7500>;
+>> +               tRTP-ps         =<7500>;
+>> +               tCKESR-ps       =<15000>;
+>> +               tDQSCK-max-ps   =<5500>;
+>> +               tFAW-ps         =<50000>;
+>> +               tZQCS-ps        =<90000>;
+>> +               tZQoper-ps      =<360000>;
+>> +               tZQinit-ps      =<1000000>;
+>> +               tRAS-max-ns     =<70000>;
+>> +       };
+>> +
+>> +       timings_elpida_ECB240ABACN_200mhz: ddr-timings {
+>
+> Same here, since you have more than one table. See previous
+> discussions about emc tables on tegra (I'll repost that series this
+> week).
+
+Ok.
+
+>
+>> +               min-freq        =<10000000>;
+>> +               max-freq        =<200000000>;
+>> +               tRP-ps          =<21000>;
+>> +               tRCD-ps         =<18000>;
+>> +               tWR-ps          =<15000>;
+>> +               tRAS-min-ps     =<42000:;
+>
+> Typo
+
+Will fix.
+
+>
+>> +               tRRD-ps         =<10000>;
+>> +               tWTR-ps         =<10000>;
+>> +               tXP-ps          =<7500>;
+>> +               tRTP-ps         =<7500>;
+>> +               tCKESR-ps       =<15000>;
+>> +               tDQSCK-max-ps   =<5500>;
+>> +               tFAW-ps         =<50000>;
+>> +               tZQCS-ps        =<90000>;
+>> +               tZQoper-ps      =<360000>;
+>> +               tZQinit-ps      =<1000000>;
+>> +               tRAS-max-ns     =<70000>;
+>> +       };
+>> +
+>> +}
+>> diff --git a/Documentation/devicetree/bindings/ddr/ddr_timings.txt b/Documentation/devicetree/bindings/ddr/ddr_timings.txt
+>> new file mode 100644
+>> index 0000000..38fcdec
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/ddr/ddr_timings.txt
+>> @@ -0,0 +1,62 @@
+>> +* AC timing parameters of DDR memories for a given speed-bin
+>> +  At the moment properties for only LPDDR2 and DDR3 have been added
+>> +
+>> +Required properties:
+>> +- min-freq : minimum DDR clock frequency for the speed-bin
+>> +- max-freq : maximum DDR clock frequency for the speed-bin
+>
+> There should be a compatible field here too, especially if the binding
+> ever has to be revised.
+
+Ok. Bindings may have to be extended while adapting for other
+controllers.
+
+>
+>> +
+>> +Optional properties:
+>> +
+>> +The following properties represent AC timing parameters from the memory
+>> +data-sheet of the device for a given speed-bin. All these properties are
+>> +of type<u32>  and "-ps", "-ns", "-nCK" etc in the name indicates the
+>> +unit of the corresponding parameter:
+>> +  ps - pico seconds
+>> +  ns - nano seconds
+>> +  nCK - number of DDR clock cycles. Please note that in LPDDR2 spec and
+>> +  data-sheets tCK is used inter-changeably for nCK. Both are equivalent
+>> +  in this context.
+>
+> Seems noisy to include the units on every single property instead of
+> just in the bindings.
+
+Hmm.. How about having them only for the exceptions below, that is,
+"nCK" and "ns" so that people don't make avoidable mistakes while
+entering the data.
+
+>
+>> +
+>> +- tRCD-ps
+>> +- tWR-ps
+>> +- tRAS-min-ps
+>> +- tRRD-ps
+>> +- tWTR-ps
+>> +- tXP-ps
+>> +- tRTP-ps
+>> +- tDQSCK-max-ps
+>> +- tFAW-ps
+>> +- tZQCS-ps
+>> +- tZQinit-ps
+>> +- tRP-ps       /* DDR3 only */
+>> +- tRC-ps       /* DDR3 only */
+>> +- tXSDLL-nCK   /* DDR3 only */
+>> +- tCKE-ps      /* DDR3 only */
+>> +- tZQoper-ps   /* DDR3 only */
+>> +- tRPab-ps     /* LPDDR2 only */
+>> +- tZQCL-ps     /* LPDDR2 only */
+>> +- tCKESR-ps    /* LPDDR2 only */
+>> +- tRAS-max-ns  /* LPDDR2 only */
+>
+> Same above about type-specific properties.
+
+Explained above.
+
+
+Thanks for the review.
+
+best regards,
+Aneesh
