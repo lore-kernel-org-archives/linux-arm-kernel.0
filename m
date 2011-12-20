@@ -1,47 +1,36 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 Dec 2011 11:03:48 +0800
-Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
-In-Reply-To: <20111220015931.GX2860@opensource.wolfsonmicro.com>
-References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
- <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
- <20111220005708.GM2860@opensource.wolfsonmicro.com>
- <20111220020101.GD5683@S2100-06.ap.freescale.net>
- <20111220015931.GX2860@opensource.wolfsonmicro.com>
-Message-ID: <20111220030347.GB2995@S2101-09.ap.freescale.net>
+Date: Tue, 20 Dec 2011 11:07:13 +0800
+Subject: [alsa-devel] [PATCH 5/5] ASoC: mxs: correct 'direction' of
+ device_prep_dma_cyclic
+In-Reply-To: <20111220005100.GJ2860@opensource.wolfsonmicro.com>
+References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
+ <1323848866-19768-1-git-send-email-shawn.guo@linaro.org>
+ <20111220005100.GJ2860@opensource.wolfsonmicro.com>
+Message-ID: <20111220030712.GC2995@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 01:59:32AM +0000, Mark Brown wrote:
-> On Tue, Dec 20, 2011 at 10:01:02AM +0800, Shawn Guo wrote:
-> > On Tue, Dec 20, 2011 at 12:57:09AM +0000, Mark Brown wrote:
-> > > On Mon, Dec 12, 2011 at 11:15:56PM +0800, Shawn Guo wrote:
+On Tue, Dec 20, 2011 at 12:51:01AM +0000, Mark Brown wrote:
+> On Wed, Dec 14, 2011 at 03:47:46PM +0800, Shawn Guo wrote:
+> > The commit 49920bc (dmaengine: add new enum dma_transfer_direction)
+> > changes the type of parameter 'direction' of device_prep_dma_cyclic
+> > from dma_data_direction to dma_transfer_direction.
 > 
-> > > > +Sub-nodes:
-> > > > +- regulators : Contain the regulator nodes.  The name of regulator node
-> > > > +  is being used by mc13xxx regulator driver to find the correct relator
-> > > > +  device.
+> Applied, thanks.
 > 
-> > > Reading this I'm not clear what the name of the node is, or what the
-> > > valid node names are.
-> 
-> > In the example below, the name would be 'mc13892__sw1'.
-> 
-> You're missing the point - someone reading the documentation needs to be
-> able to figure out what strings they need to use for all the different
-> regulators on the chip are without groveling through the driver code.
-> 
-> > > > +			sw1_reg: mc13892__sw1 {
-> 
-> > > The examples don't really elucidate this either (and the __ is rather
-> > > odd).
-> 
-> > Yes, that's because the name defined by mc13892 regulator driver is odd.
-> 
-> That's *not* something that we should be exposing in the device tree
-> bindings.  This is an implementation detail of the Linux driver which
-> might well change in future.
-> 
-Any suggestion on a better binding for mc13892 regulator device?
+> With patches like this you really need to supply more context - knowing
+> which release the commit you're talking about appears in is useful for
+> exammple,
+
+This patch only applies to -next, as the offending patch only sits on
+-next.
+
+> as is having some hint as to what the rest of the series is
+> (does this patch depend on any of the earlier patches, and if not why is
+> it part of a series).
+
+The reason it's in the series is that they are addressing the same
+problem.
 
 -- 
 Regards,
