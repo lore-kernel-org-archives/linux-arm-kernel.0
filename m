@@ -1,81 +1,46 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 20 Dec 2011 14:43:02 +0100
-Subject: [PATCH 0/12] Add clk_prepare/clk_unprepare for mxs clock api
-In-Reply-To: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
-References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201112201443.03202.marek.vasut@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Dec 2011 21:52:52 +0800
+Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
+In-Reply-To: <20111220112510.GL2866@opensource.wolfsonmicro.com>
+References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
+ <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
+ <20111220005708.GM2860@opensource.wolfsonmicro.com>
+ <20111220020101.GD5683@S2100-06.ap.freescale.net>
+ <20111220015931.GX2860@opensource.wolfsonmicro.com>
+ <20111220030347.GB2995@S2101-09.ap.freescale.net>
+ <20111220112510.GL2866@opensource.wolfsonmicro.com>
+Message-ID: <20111220135251.GB5129@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The mutex locking problem on mxs platform has been reported on mailing
-> list for a few time.  The cause is that a mutex is being held in mxs
-> clock api clk_enable/clk_disable which are being called by some mxs
-> clock client drivers like amba-pl011 and mxs-saif in atomic context.
+On Tue, Dec 20, 2011 at 11:25:11AM +0000, Mark Brown wrote:
+> On Tue, Dec 20, 2011 at 11:03:48AM +0800, Shawn Guo wrote:
+> > On Tue, Dec 20, 2011 at 01:59:32AM +0000, Mark Brown wrote:
 > 
-> This series takes Russell's suggestion to:
+> > > You're missing the point - someone reading the documentation needs to be
+> > > able to figure out what strings they need to use for all the different
+> > > regulators on the chip are without groveling through the driver code.
 > 
->  * Convert all mxs clock client drivers to clk_prepare/clk_unprepare.
->    (I hope the series has covered all the drivers, but appreciate any
->    reminding on any missing ones.)
+> ...
+> 
+> > > That's *not* something that we should be exposing in the device tree
+> > > bindings.  This is an implementation detail of the Linux driver which
+> > > might well change in future.
+> 
+> > Any suggestion on a better binding for mc13892 regulator device?
+> 
+> Well, removing the random extra _s would be a big start (though I'd just
+> drop the chip name entirely from the name of the regulators since by the
+> time we're looking at the regulator we've already identified the chip)
+> and as I keep saying you need to document what the names mean - what are
+> the possible names and how do they map onto the hardware?
+> 
+I just came up with an idea which can totally avoid matching name.  It
+seems that we can identify a regulator using register plus enable bit,
+which is basically 'reg' and 'enable_bit' in 'mc13xxx_regulator'.  As
+these data must be coming from hardware manual, they should be stable
+enough for binding a regulator.  What do you think?
 
-serial/amba-pl011.c isn't converted, that's where I originally observed the 
-issue.
-> 
->  * Add clk_prepare/clk_unprepare for mxs clock api to contain the
->    non-atomic portion of existing clk_enable/clk_disable implemention.
->    (As the whole existing clk_enable/clk_disable are non-atomic,
->    clk_prepare/clk_unprepare become a renaming of the existing
->    clk_enable/clk_disable, and the new clk_enable/clk_disable become
->    a pair of dummy functions.)
-> 
-> Thus, we can ensure that no mutex will be held for atomic context, and
-> the problem people keep reporting gets fixed with one step move toward
-> common clk framework while not ncessarily waiting for it.
-> 
-> If driver maintainers have no objection, after the review process, I
-> would like to send the series through arm-soc tree to ease the merge
-> process.
-> 
-> Those two patches from Richard Zhao are included here for completeness,
-> and they have been picked up by Sascha on imx tree.  But since imx and
-> mxs will both go through arm-soc, it should easy to sort out how we
-> should merge them.
-> 
-> Regards,
-> Shawn
-> 
-> Richard Zhao (2):
->       clk: add helper functions clk_prepare_enable and
-> clk_disable_unprepare net: fec: add clk_prepare/clk_unprepare
-> 
-> Shawn Guo (10):
->       arm/mxs: convert platform code to clk_prepare/clk_unprepare
->       dma: mxs-dma: convert to clk_prepare/clk_unprepare
->       mmc: mxs-mmc: convert to clk_prepare/clk_unprepare
->       mtd: gpmi-lib: convert to clk_prepare/clk_unprepare
->       net: flexcan: convert to clk_prepare/clk_unprepare
->       serial: mxs-auart: convert to clk_prepare/clk_unprepare
->       video: mxsfb: convert to clk_prepare/clk_unprepare
->       ASoC: mxs-saif: convert to clk_prepare/clk_unprepare
->       clk: add config option HAVE_CLK_PREPARE into Kconfig
->       arm/mxs: select HAVE_CLK_PREPARE for clock
-> 
->  arch/arm/Kconfig                      |    1 +
->  arch/arm/mach-mxs/clock-mx23.c        |   10 +++++-----
->  arch/arm/mach-mxs/clock-mx28.c        |   10 +++++-----
->  arch/arm/mach-mxs/clock.c             |   33
-> +++++++++++++++++++++++---------- arch/arm/mach-mxs/mach-mx28evk.c      | 
->   2 +-
->  arch/arm/mach-mxs/system.c            |    2 +-
->  arch/arm/mach-mxs/timer.c             |    2 +-
->  drivers/clk/Kconfig                   |    3 +++
->  drivers/dma/mxs-dma.c                 |    8 ++++----
->  drivers/mmc/host/mxs-mmc.c            |   10 +++++-----
->  drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   12 ++++++------
->  drivers/net/can/flexcan.c             |   10 +++++-----
->  drivers/net/ethernet/freescale/fec.c  |   10 +++++-----
->  drivers/tty/serial/mxs-auart.c        |    8 ++++----
->  drivers/video/mxsfb.c                 |    8 ++++----
->  include/linux/clk.h                   |   22 ++++++++++++++++++++++
->  sound/soc/mxs/mxs-saif.c              |    4 ++--
->  17 files changed, 97 insertions(+), 58 deletions(-)
+-- 
+Regards,
+Shawn
