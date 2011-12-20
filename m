@@ -1,25 +1,60 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Dec 2011 23:36:21 +0000
-Subject: [PATCH 17/20] ARM: mach-s3c64xx: properly disable CPU idle call
-In-Reply-To: <alpine.LFD.2.02.1112201348430.2907@xanadu.home>
-References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
- <1324288069-21940-18-git-send-email-nico@fluxnic.net>
- <20111220150302.GE29727@sirena.org.uk>
- <alpine.LFD.2.02.1112201348430.2907@xanadu.home>
-Message-ID: <20111220233621.GB6551@opensource.wolfsonmicro.com>
+Date: Tue, 20 Dec 2011 23:48:45 +0000
+Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
+In-Reply-To: <20111220232701.GA1698@richard-laptop>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+ <1324264903-15395-5-git-send-email-richard.zhao@linaro.org>
+ <20111220145904.GD29727@sirena.org.uk>
+ <20111220232701.GA1698@richard-laptop>
+Message-ID: <20111220234844.GC6551@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 01:54:00PM -0500, Nicolas Pitre wrote:
+On Wed, Dec 21, 2011 at 07:27:03AM +0800, Richard Zhao wrote:
+> On Tue, Dec 20, 2011 at 02:59:04PM +0000, Mark Brown wrote:
 
-> So if you can confirm the kernel works fine with that disable_hlt() 
-> commented out (while still including the rest of the patch) then I can 
-> change the patch.  And if you can measure a difference in power 
-> consumption when the system is idle then that would be even better.
+> > My comments on the previous version of the patch still apply:
 
-Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> >  - The voltage ranges being set need to be specified as ranges.
 
-with and without the disable_hlt() call.  I don't have equipment with me
-to measure power but I don't expect much effect without additional code
-to enable power saving in WFI as for some reason the default behaviour
-isn't to save power.
+> cpu normally need strict voltages. and only proved operating opints
+> are allowed to set in dts. If the voltage changes slightly especially
+> for high frequency, it's easy to cause unstable.
+
+Clearly there will be limits which get more and more restrictive as the
+frequencies get higher but there will always be at least some play in
+the numbers as one must at a minimum specify tolerance ranges, and at
+lower frequencies the ranges specified will typically get compartively
+large.
+
+Note also that not all hardware specifies things in terms of a fixed set
+of operating points, sometimes only the minimum voltage specification is
+varied with frequency or sometimes you see maximum and minimum stepping
+independently.
+
+Further note that if all hardware really does have as tight a set of
+requirements as you suggest then the regulator support in the driver
+needs to be non-optional otherwise a board without software regulator
+control might drop the frequency without also dropping the voltage.
+
+> >  - Frequencies that can't be supported due to limitations of the
+> >    available supplies shouldn't be exposed to users.
+
+> As I said, only proved operation points are allowed.
+
+This statement appears to be unrelated to the comment you're replying
+to.
+
+> > You also need to define how the core supplies get looked up.
+
+> It's pure software. platform uses this driver have to define "cpu" consumer.
+
+You still need to define this in the binding.
+
+> > > +	pr_info("Generic CPU frequency driver\n");
+
+> > This seems noisy...
+
+> Why? Do you think only errors and warnings can print out?
+
+Yes.
