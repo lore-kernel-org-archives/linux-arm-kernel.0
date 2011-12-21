@@ -1,89 +1,40 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 21 Dec 2011 10:57:35 -0800
-Subject: [PATCH 0/3] Support Samsung S5P OHCI device and driver
-In-Reply-To: <062501ccbf9a$601f3af0$205db0d0$%kim@samsung.com>
-References: <33510089.42761321876635907.JavaMail.weblogic@epv6ml08>
- <20111121172344.GA4483@kroah.com>
- <046f01ccb011$6d111370$47333a50$%kim@samsung.com>
- <20111209235807.GC6680@kroah.com>
- <062501ccbf9a$601f3af0$205db0d0$%kim@samsung.com>
-Message-ID: <20111221185735.GA6609@kroah.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 21 Dec 2011 20:04:33 +0100
+Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
+ sharing mechanism
+In-Reply-To: <201112211727.17104.arnd@arndb.de>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <CAF6AEGtOjO6Z6yfHz-ZGz3+NuEMH2M-8=20U6+-xt-gv9XtzaQ@mail.gmail.com>
+ <20111220171437.GC3883@phenom.ffwll.local>
+ <201112211727.17104.arnd@arndb.de>
+Message-ID: <20111221190433.GE3827@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 01:38:24PM +0900, Kukjin Kim wrote:
+On Wed, Dec 21, 2011 at 05:27:16PM +0000, Arnd Bergmann wrote:
+> On Tuesday 20 December 2011, Daniel Vetter wrote:
+> > It also sounds like that at least for proper userspace mmap support we'd
+> > need some dma api extensions on at least arm, and that might take a while
+> > ...
 > 
-> 
-> > -----Original Message-----
-> > From: Greg KH [mailto:greg at kroah.com]
-> > Sent: Saturday, December 10, 2011 8:58 AM
-> > To: Kukjin Kim
-> > Cc: 'Jingoo Han'; linux-arm-kernel at lists.infradead.org; linux-
-> > usb at vger.kernel.org; linux-samsung-soc at vger.kernel.org; gregkh at suse.de;
-> > stern at rowland.harvard.edu; 'Yulgon Kim'; 'Shim Joonyoung'
-> > Subject: Re: Re: [PATCH 0/3] Support Samsung S5P OHCI device and driver
-> > 
-> > On Thu, Dec 01, 2011 at 07:10:17PM +0900, Kukjin Kim wrote:
-> > > Greg KH wrote:
-> > > >
-> > > > On Mon, Nov 21, 2011 at 11:57:16AM +0000, Jingoo Han wrote:
-> > > > > > -----Original Message-----
-> > > > > > From: Greg KH [mailto:greg at kroah.com]
-> > > > > > Sent: Friday, November 18, 2011 4:12 AM
-> > > > > > To: Jingoo Han
-> > > > > > Cc: linux-arm-kernel at lists.infradead.org; linux-
-> > usb at vger.kernel.org;
-> > > > > > linux-samsung-soc at vger.kernel.org; gregkh at suse.de;
-> > > > > > stern at rowland.harvard.edu; kgene.kim at samsung.com;
-> > > > yulgon.kim at samsung.com;
-> > > > > > jy0922.shim at samsung.com
-> > > > > > Subject: Re: [PATCH 0/3] Support Samsung S5P OHCI device and
-> > driver
-> > > > > >
-> > > > > > On Tue, Nov 15, 2011 at 06:49:58AM +0000, Jingoo Han wrote:
-> > > > > > > Hello.
-> > > > > > >
-> > > > > > > This patch series adds USB OHCI device and initial driver for
-> > > > Samsung
-> > > > > > > S5P SoCs and is based from Linux 3.2-rc1. I have tested on
-> > SMDKV310
-> > > > > > board
-> > > > > > > using EXYNOS4.
-> > > > > >
-> > > > > > This is to be sent through some arm tree, not the usb tree, right?
-> > > > > Right, 1st and 2nd patch are sent throught arm tree.
-> > > > > However, 3rd patch is sent through the usb tree.
-> > > > > Thanks.
-> > > > > [PATCH 1/3] ARM: SAMSUNG: Add USB OHCI device
-> > > > > [PATCH 2/3]  ARM: EXYNOS: Add USB OHCI support to SMDKV310 board
-> > > > > [PATCH 3/3] USB: Add S5P OHCI diver
-> > > >
-> > > Hi Greg,
-> > >
-> > > Sorry for late response. I came back today from family vacation...
-> > >
-> > > Anyway,
-> > >
-> > > > So the third patch does not depend on the first two?  If it does, that
-> > > > means I will get build errors in the USB tree when I apply that patch,
-> > > > right?
-> > > >
-> > > > If so, then all three should go through a single tree.
-> > > >
-> > > Yes, right. This series would be handled in same tree so that we can
-> > avoid
-> > > useless conflicts.
-> > >
-> > > I commented small thing on 3rd patch. So I think, if you're ok on his
-> > > updated patch, it can be sent to upstream via Samsung tree. Or your tree
-> > > with my ack?
-> > 
-> > The samsung tree is fine to take these, thanks.
-> > 
-> Hi Greg,
-> 
-> OK, let me pick this up in my tree...so, when I apply, may I can have a ack
-> from you on 3rd patch?
+> I think it's actually the opposite -- you'd need dma api extensions on
+> everything else other than arm, which already has dma_mmap_coherent()
+> and dma_mmap_writecombine() for this purpose.
 
-Yes, feel free to add:
-	Acked-by: Greg Kroah-Hartman <gregkh@suse.de>
+Yeah, that's actually what I wanted to say, but failed at ... Another
+thing is that at least for i915, _writecombine isn't what we want actually
+because:
+- It won't work anyway cause i915 maps stuff cached and does the flushing
+  itself and x86 PAT doesn't support mixed mappings (kinda like arm).
+- It isn't actually enough, there's another hidden buffer between the
+  memory controller interface and the gpu that i915 manually flushes
+  (because even a readback on a wc mapping doesn't flush things in there).
+
+So I assume we'll have plenty of funny beating out a good api for cpu
+access ;-)
+
+Cheers, Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
