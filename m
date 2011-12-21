@@ -1,49 +1,45 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 21 Dec 2011 16:24:49 +0400
-Subject: [PATCH v2] davinci: DA850 EVM: OHCI platform code
-In-Reply-To: <4EF1CB8A.10309@mvista.com>
-References: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
- <DF0F476B391FA8409C78302C7BA518B6051CB9@DBDE01.ent.ti.com>
- <4EF1CB8A.10309@mvista.com>
-Message-ID: <4EF1D011.8060103@mvista.com>
+From: kay.sievers@vrfy.org (Kay Sievers)
+Date: Wed, 21 Dec 2011 13:49:07 +0100
+Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
+In-Reply-To: <20111221121246.GB15309@opensource.wolfsonmicro.com>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+ <20111221012046.GE15863@b20223-02.ap.freescale.net>
+ <20111221092739.GI15863@b20223-02.ap.freescale.net>
+ <201112210943.34310.arnd@arndb.de>
+ <CAPXgP10FCrqdTg++46m4+xxM9tw1ZrKc8wz=JkKjCHJ0hQPtng@mail.gmail.com>
+ <20111221121246.GB15309@opensource.wolfsonmicro.com>
+Message-ID: <CAPXgP10CGxfEJ4jK2MkKt0-nAWgiawDERyA1N4wHvMCJfE3oDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Dec 21, 2011 at 13:12, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Dec 21, 2011 at 12:44:57PM +0100, Kay Sievers wrote:
+>
+>> We will convert all classes to buses over time time, and have a single
+>> type of device and a single type of subsystem.
+>
+> Are there any conversions that have been done already that I can look at
+> for reference?
 
-On 21-12-2011 16:05, I wrote:
+The first step is the conversion from 'sys_device' to 'device', which is here:
+  http://git.kernel.org/?p=linux/kernel/git/kay/patches.git;a=tree
 
->> On Wed, Dec 21, 2011 at 12:50:02, Manjunathappa, Prakash wrote:
->>> From: Ajay Kumar Gupta<ajay.gupta@ti.com>
+That should hit the tree soon, if all works according to plan. All
+sys_devices and sysdev classes will be gone for forever.
 
->>> On this board the OHCI port's power control and over-current signals from
->>> TPS2065 power switch are connected via GPIO2[4] and GPIO6[13] respectively,
->>> so we can implement the DA8xx OHCI glue layer's hooks for overriding the
->>> root hub port's power and over-current status bits.
+The 'class' to 'bus' work is simpler, because the logic in both of
+them is very similar and both use the same 'struct device' already.
 
->>> We also have to properly set up the clocking mode in the CFGCHIP2 register,
->>> so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
->>> its output is used to clock the USB 1.1 (OHCI) PHY...
+We'll need to add some convenience APIs to bus, and add code to make
+sure the converted stuff has compat symlinks in /sys/class when
+needed. Then we can convert-over one 'struct class' to 'struct
+bus_type' after the other until 'struct class' can be deleted.
 
->>> Signed-off-by: Ajay Kumar Gupta<ajay.gupta@ti.com>
->>> Signed-off-by: Manjunathappa, Prakash<prakash.pm@ti.com>
+This work has not yet started, because we are busy with the sys_device
+stuff at the moment.
 
->> This is the third copy of OHCI platform setup code which is almost
->> the same except for the GPIO numbers.
+No new stuff should use 'struct class' or 'struct sys_device', they
+should all start right away with 'struct bus_type'.
 
-> Well, in my counting, it's only second, DA830 EVM being the first one.
-> What's the third?
-
-    Ah, I missed Hawkboard... :-)
-
- >    I designed the hub interface to be as abstract as I could, and now you're
- > proposing to add GPIO to it? No, I have no clear idea how to keeep it
- > abstract and add GPIO support at the same time. I would have been grateful to
- > TI if I didn't have to invent this at all and they stop saving on OHCI pins.
-
-    Well, I have one idea. We can create a separate module in 
-arch/arm/mach-davinci/, named say ohci.c, put the shared code there and pass 
-to it the GPIOs actually used via a function call. Or maybe use existing 
-arch/arm/mach-davinci/usb.c.
-
-WBR, Sergei
+Kay
