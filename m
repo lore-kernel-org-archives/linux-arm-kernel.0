@@ -1,44 +1,36 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 21 Dec 2011 01:55:13 -0800
-Subject: [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <4EF1AA8A.8060304@linux.intel.com>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <4EF1A0B4.5080307@linux.intel.com>
- <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
- <4EF1AA8A.8060304@linux.intel.com>
-Message-ID: <CAMbhsRSNTUvou9Gf6T4Ggq=jfxsWUcn7M2yNsKQz6aNrt6gLDg@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 21 Dec 2011 09:56:55 +0000
+Subject: [PATCH v2] davinci: DA850 EVM: OHCI platform code
+In-Reply-To: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
+References: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6051CB9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 1:44 AM, Arjan van de Ven <arjan@linux.intel.com> wrote:
-> On 12/21/2011 10:40 AM, Colin Cross wrote:
->
->>> this smells fundamentally racey to me; you can get an interrupt one
->>> cycle after you think you're done, but before the last guy enters WFI...
->>>
->>> how do you solve that issue ?
->>
->> All the cpus have interrupts off when they increment the counter, so
->> they cannot receive an interrupt. ?If an interrupt is pending on one
->> of those cpus, it will be handled later when WFI aborts due to the
->> pending interrupt.
->
-> ... but this leads to cases where you're aborting before other cpus are
-> entering..... so your "last guy in" doesn't really work, since while cpu
-> 0 thinks it's the last guy, cpu 1 is already on the way out/out
-> already... ?(heck it might already be going back to sleep if your idle
-> code can run fast, like in the size of a cache miss)
+Hi Prakash,
 
-Once a cpu has incremented the counter, it has no way out unless either
-1: another cpu (that hasn't incremented the counter yet) receives an
-interrupt, aborts idle, and clears its idle flag
-or
-2: all cpus enter the ready counter, and call the cpuidle driver's
-enter function.
+On Wed, Dec 21, 2011 at 12:50:02, Manjunathappa, Prakash wrote:
+> From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> 
+> On this board the OHCI port's power control and over-current signals from
+> TPS2065 power switch are connected via GPIO2[4] and GPIO6[13] respectively,
+> so we can implement the DA8xx OHCI glue layer's hooks for overriding the
+> root hub port's power and over-current status bits.
+> 
+> We also have to properly set up the clocking mode in the CFGCHIP2 register,
+> so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
+> its output is used to clock the USB 1.1 (OHCI) PHY...
+> 
+> Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
 
-In your example, cpu 1 has incremented the counter, so it cannot be on
-the way out unless cpu 0 aborts (in which case it will not increment
-the counter, and the counter will never be equal to the number of
-cpus), or unless cpu 0 turns off its interrupts and incrementes the
-counter (in which case neither cpu can return until after the cpuidle
-driver's enter function has been called on all cpus).
+This is the third copy of OHCI platform setup code which is almost
+the same except for the GPIO numbers. Can we attempt to consolidate
+the GPIO case under drivers/usb/host/ohci-da8xx.c glue layer itself?
+Of course, here should be a provision for non-GPIO based implementation
+as well.
+
+Sergei, any thoughts, comments?
+
+Thanks,
+Sekhar
