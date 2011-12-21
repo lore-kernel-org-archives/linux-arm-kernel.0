@@ -1,127 +1,53 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Dec 2011 16:19:53 +0900
-Subject: [PATCH 1/4] ARM: SAMSUNG: cleanup of rtc register definitions
-In-Reply-To: <201112121545.15211.heiko@sntech.de>
+Date: Wed, 21 Dec 2011 16:25:53 +0900
+Subject: [PATCH v2 0/4] Implement RTC support for S3C2443/S3C2416/S3C2450
+In-Reply-To: <201112121543.42299.heiko@sntech.de>
 References: <201112121543.42299.heiko@sntech.de>
- <201112121545.15211.heiko@sntech.de>
-Message-ID: <064701ccbfb0$ef40ea60$cdc2bf20$%kim@samsung.com>
+Message-ID: <064801ccbfb1$c5d48e60$517dab20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Heiko St?bner wrote:
 > 
-> regs-rtc.h uses a mixture of tabs and spaces and also (x<<y)
-> to format bits. So, before adding new stuff clean up the formatting
-> and also add spaces to the bit definitions (i.e. (x << y) )
+> Similar to the ADC the RTC of S3C2443 and S3C2416/2450 has some slight
+> variances when compared to the existing types.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> This series adds support for those SoCs.
+> 
+> As with the ADC patches, these changes where tested on S3C2416 hardware.
+> The S3C2443 quirks are a subset of those and are done according to the
+> datasheet, but not tested on real hardware (as I do not own a S3C2443
+> device).
+> 
+> changes since v1:
+> address comments from Thomas Abraham, reducing number of ifdefs and
+> duplicate code
+> 
+> 
+> Heiko Stuebner (4):
+>   ARM: SAMSUNG: cleanup of rtc register definitions
+>   rtc-s3c: make room for more variants in devicetree block
+>   rtc-s3c: add variants for S3C2443 and S3C2416
+>   ARM: S3C2443/S3C2416: add s3c_rtc_setname and rename rtc devices
+> 
+>  arch/arm/mach-s3c2416/s3c2416.c               |    2 +
+>  arch/arm/mach-s3c2443/s3c2443.c               |    2 +
+>  arch/arm/plat-samsung/include/plat/regs-rtc.h |   92
++++++++++++++++------
 > ---
->  arch/arm/plat-samsung/include/plat/regs-rtc.h |   66
-++++++++++++---------
-> ----
->  1 files changed, 32 insertions(+), 34 deletions(-)
+>  arch/arm/plat-samsung/include/plat/rtc-core.h |   27 +++++++
+>  drivers/rtc/rtc-s3c.c                         |   74 ++++++++++++++++----
+>  5 files changed, 149 insertions(+), 48 deletions(-)
+>  create mode 100644 arch/arm/plat-samsung/include/plat/rtc-core.h
 > 
-> diff --git a/arch/arm/plat-samsung/include/plat/regs-rtc.h
-> b/arch/arm/plat-samsung/include/plat/regs-rtc.h
-> index 30b7cc1..d9d9bdc 100644
-> --- a/arch/arm/plat-samsung/include/plat/regs-rtc.h
-> +++ b/arch/arm/plat-samsung/include/plat/regs-rtc.h
-> @@ -18,51 +18,49 @@
->  #define S3C2410_INTP_ALM	(1 << 1)
->  #define S3C2410_INTP_TIC	(1 << 0)
-> 
-> -#define S3C2410_RTCCON	      S3C2410_RTCREG(0x40)
-> -#define S3C2410_RTCCON_RTCEN  (1<<0)
-> -#define S3C2410_RTCCON_CLKSEL (1<<1)
-> -#define S3C2410_RTCCON_CNTSEL (1<<2)
-> -#define S3C2410_RTCCON_CLKRST (1<<3)
-> -#define S3C64XX_RTCCON_TICEN  (1<<8)
-> +#define S3C2410_RTCCON		S3C2410_RTCREG(0x40)
-> +#define S3C2410_RTCCON_RTCEN	(1 << 0)
-> +#define S3C2410_RTCCON_CLKSEL	(1 << 1)
-> +#define S3C2410_RTCCON_CNTSEL	(1 << 2)
-> +#define S3C2410_RTCCON_CLKRST	(1 << 3)
-> +#define S3C64XX_RTCCON_TICEN	(1 << 8)
-> 
-> -#define S3C64XX_RTCCON_TICMSK (0xF<<7)
-> -#define S3C64XX_RTCCON_TICSHT (7)
-> +#define S3C64XX_RTCCON_TICMSK	(0xF << 7)
-> +#define S3C64XX_RTCCON_TICSHT	(7)
-> 
-> -#define S3C2410_TICNT	      S3C2410_RTCREG(0x44)
-> -#define S3C2410_TICNT_ENABLE  (1<<7)
-> +#define S3C2410_TICNT		S3C2410_RTCREG(0x44)
-> +#define S3C2410_TICNT_ENABLE	(1 << 7)
-> 
-> -#define S3C2410_RTCALM	      S3C2410_RTCREG(0x50)
-> -#define S3C2410_RTCALM_ALMEN  (1<<6)
-> -#define S3C2410_RTCALM_YEAREN (1<<5)
-> -#define S3C2410_RTCALM_MONEN  (1<<4)
-> -#define S3C2410_RTCALM_DAYEN  (1<<3)
-> -#define S3C2410_RTCALM_HOUREN (1<<2)
-> -#define S3C2410_RTCALM_MINEN  (1<<1)
-> -#define S3C2410_RTCALM_SECEN  (1<<0)
-> +#define S3C2410_RTCALM		S3C2410_RTCREG(0x50)
-> +#define S3C2410_RTCALM_ALMEN	(1 << 6)
-> +#define S3C2410_RTCALM_YEAREN	(1 << 5)
-> +#define S3C2410_RTCALM_MONEN	(1 << 4)
-> +#define S3C2410_RTCALM_DAYEN	(1 << 3)
-> +#define S3C2410_RTCALM_HOUREN	(1 << 2)
-> +#define S3C2410_RTCALM_MINEN	(1 << 1)
-> +#define S3C2410_RTCALM_SECEN	(1 << 0)
-> 
->  #define S3C2410_RTCALM_ALL \
->    S3C2410_RTCALM_ALMEN | S3C2410_RTCALM_YEAREN | S3C2410_RTCALM_MONEN |\
->    S3C2410_RTCALM_DAYEN | S3C2410_RTCALM_HOUREN | S3C2410_RTCALM_MINEN |\
->    S3C2410_RTCALM_SECEN
-> 
-> +#define S3C2410_ALMSEC		S3C2410_RTCREG(0x54)
-> +#define S3C2410_ALMMIN		S3C2410_RTCREG(0x58)
-> +#define S3C2410_ALMHOUR		S3C2410_RTCREG(0x5c)
-> 
-> -#define S3C2410_ALMSEC	      S3C2410_RTCREG(0x54)
-> -#define S3C2410_ALMMIN	      S3C2410_RTCREG(0x58)
-> -#define S3C2410_ALMHOUR	      S3C2410_RTCREG(0x5c)
-> +#define S3C2410_ALMDATE		S3C2410_RTCREG(0x60)
-> +#define S3C2410_ALMMON		S3C2410_RTCREG(0x64)
-> +#define S3C2410_ALMYEAR		S3C2410_RTCREG(0x68)
-> 
-> -#define S3C2410_ALMDATE	      S3C2410_RTCREG(0x60)
-> -#define S3C2410_ALMMON	      S3C2410_RTCREG(0x64)
-> -#define S3C2410_ALMYEAR	      S3C2410_RTCREG(0x68)
-> -
-> -#define S3C2410_RTCRST	      S3C2410_RTCREG(0x6c)
-> -
-> -#define S3C2410_RTCSEC	      S3C2410_RTCREG(0x70)
-> -#define S3C2410_RTCMIN	      S3C2410_RTCREG(0x74)
-> -#define S3C2410_RTCHOUR	      S3C2410_RTCREG(0x78)
-> -#define S3C2410_RTCDATE	      S3C2410_RTCREG(0x7c)
-> -#define S3C2410_RTCDAY	      S3C2410_RTCREG(0x80)
-> -#define S3C2410_RTCMON	      S3C2410_RTCREG(0x84)
-> -#define S3C2410_RTCYEAR	      S3C2410_RTCREG(0x88)
-> +#define S3C2410_RTCRST		S3C2410_RTCREG(0x6c)
-> 
-> +#define S3C2410_RTCSEC		S3C2410_RTCREG(0x70)
-> +#define S3C2410_RTCMIN		S3C2410_RTCREG(0x74)
-> +#define S3C2410_RTCHOUR		S3C2410_RTCREG(0x78)
-> +#define S3C2410_RTCDATE		S3C2410_RTCREG(0x7c)
-> +#define S3C2410_RTCDAY		S3C2410_RTCREG(0x80)
-> +#define S3C2410_RTCMON		S3C2410_RTCREG(0x84)
-> +#define S3C2410_RTCYEAR		S3C2410_RTCREG(0x88)
-> 
->  #endif /* __ASM_ARCH_REGS_RTC_H */
 > --
 > 1.7.5.4
 
-Looks good to me, but how about cleanup useless definitions together like
-following?
+Hi Heiko,
 
-Actually, S3C2410_RTCCON_CLKSEL, S3C64XX_RTCCON_TICMSK,
-S3C64XX_RTCCON_TICSHT, S3C2410_RTCALM_ALL, S3C2410_RTCRST and S3C2410_RTCDAY
-are not used.
-
-And I'm not sure we really need to define the S3C2410_RTCREG(x), but this
-can be sorted out next time with similar others.
+There were small comments on 1st patch and others looks ok to me.
+If you're ok on my comments, please re-send it so that I can request to pull
+this series to Alessandro or Andrew with my ack.
 
 Thanks.
 
