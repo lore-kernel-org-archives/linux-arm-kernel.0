@@ -1,65 +1,118 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Wed, 21 Dec 2011 19:13:33 +0530
-Subject: [PATCH v7 0/8] ARM: davinci:add support for dm644x vpbe display driver
-Message-ID: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
+Date: Wed, 21 Dec 2011 19:13:39 +0530
+Subject: [PATCH v7 6/8] davinci: dm644x: move vpfe init from soc to board
+ specific files
+In-Reply-To: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
+References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <1324475021-32509-7-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-arrange definitions and remove unnecessary code so that we can
-have a common header for all davinci platforms. This will enable
-us to share defines and enable common routines to be used without
-polluting hardware.h.
+Move all vpfe platform device registrations to the board specific
+file like the rest of the devices, and have all of them together.
 
-This is consistent with Russel's pet peaves notes regarding
-non-pollution of include/mach.
+This would remove the  restriction of inclusion and registration of
+vpfe platform devices for non-vpfe boards.
 
-Having this as the base, have a common system module
-base address (DAVINCI_SYSTEM_MODULE_BASE) and removing IO_ADDRESS
-macro,add support for dm644x VPBE display driver.
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+---
+ arch/arm/mach-davinci/board-dm644x-evm.c |    3 +--
+ arch/arm/mach-davinci/davinci.h          |    2 +-
+ arch/arm/mach-davinci/dm644x.c           |   29 +++++++++++++++++------------
+ 3 files changed, 19 insertions(+), 15 deletions(-)
 
-Changes from last version:
-1. patches 2,3 and 4 from last set pulled by Sekhar
-2. Some description changes.
-3. Header inclusion sequence changes.
-4. Deletion of a platform file which was missed out.
-
-
-Manjunath Hadli (8):
-  davinci: vpif: remove machine specific inclusion from driver
-  ARM: davinci: create new common platform header for davinci
-  davinci: eliminate use of IO_ADDRESS() on sysmod
-  davinci: dm644x: Replace register base value with a defined macro
-  davinci: dm644x: change vpfe capture structure variables for
-    consistency
-  davinci: dm644x: move vpfe init from soc to board specific files
-  davinci: dm644x: add support for v4l2 video display
-  davinci: dm644x EVM: add support for VPBE display
-
- arch/arm/mach-davinci/board-dm355-evm.c       |    3 +-
- arch/arm/mach-davinci/board-dm355-leopard.c   |    3 +-
- arch/arm/mach-davinci/board-dm365-evm.c       |    3 +-
- arch/arm/mach-davinci/board-dm644x-evm.c      |  134 +++++++++++++++++--
- arch/arm/mach-davinci/board-dm646x-evm.c      |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c     |    3 +-
- arch/arm/mach-davinci/board-sffsdr.c          |    3 +-
- arch/arm/mach-davinci/davinci.h               |   99 ++++++++++++++
- arch/arm/mach-davinci/devices.c               |   25 +++--
- arch/arm/mach-davinci/dm355.c                 |    3 +-
- arch/arm/mach-davinci/dm365.c                 |    3 +-
- arch/arm/mach-davinci/dm644x.c                |  179 ++++++++++++++++++++++---
- arch/arm/mach-davinci/dm646x.c                |    3 +-
- arch/arm/mach-davinci/include/mach/dm355.h    |   32 -----
- arch/arm/mach-davinci/include/mach/dm365.h    |   36 -----
- arch/arm/mach-davinci/include/mach/dm644x.h   |   40 ------
- arch/arm/mach-davinci/include/mach/dm646x.h   |   34 -----
- arch/arm/mach-davinci/include/mach/hardware.h |    2 -
- drivers/media/video/davinci/vpif.h            |    2 -
- drivers/media/video/davinci/vpif_display.c    |    2 -
- include/media/davinci/vpif_types.h            |    2 +
- sound/soc/codecs/cq93vc.c                     |    2 -
- 22 files changed, 413 insertions(+), 202 deletions(-)
- create mode 100644 arch/arm/mach-davinci/davinci.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm355.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm646x.h
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 7d940f5..71aae93 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -625,8 +625,6 @@ static struct davinci_uart_config uart_config __initdata = {
+ static void __init
+ davinci_evm_map_io(void)
+ {
+-	/* setup input configuration for VPFE input devices */
+-	dm644x_set_vpfe_config(&dm644xevm_capture_cfg);
+ 	dm644x_init();
+ }
+ 
+@@ -698,6 +696,7 @@ static __init void davinci_evm_init(void)
+ 	evm_init_i2c();
+ 
+ 	davinci_setup_mmc(0, &dm6446evm_mmc_config);
++	dm644x_init_video(&dm644xevm_capture_cfg);
+ 
+ 	davinci_serial_init(&uart_config);
+ 	dm644x_init_asp(&dm644x_evm_snd_data);
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index 065b3a0..680446f 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -81,7 +81,7 @@ void dm365_set_vpfe_config(struct vpfe_config *cfg);
+ /* DM644x function declarations */
+ void __init dm644x_init(void);
+ void __init dm644x_init_asp(struct snd_platform_data *pdata);
+-void dm644x_set_vpfe_config(struct vpfe_config *cfg);
++int __init dm644x_init_video(struct vpfe_config *);
+ 
+ /* DM646x function declarations */
+ void __init dm646x_init(void);
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index acd9ee2..27bf9ca 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -659,11 +659,6 @@ static struct platform_device dm644x_vpfe_dev = {
+ 	},
+ };
+ 
+-void dm644x_set_vpfe_config(struct vpfe_config *cfg)
+-{
+-	dm644x_vpfe_dev.dev.platform_data = cfg;
+-}
+-
+ /*----------------------------------------------------------------------*/
+ 
+ static struct map_desc dm644x_io_desc[] = {
+@@ -792,14 +787,28 @@ void __init dm644x_init(void)
+ 	davinci_map_sysmod();
+ }
+ 
++static struct platform_device *dm644x_video_devices[] __initdata = {
++	&dm644x_vpss_device,
++	&dm644x_ccdc_dev,
++	&dm644x_vpfe_dev,
++};
++
++int __init dm644x_init_video(struct vpfe_config *vpfe_cfg)
++{
++	dm644x_vpfe_dev.dev.platform_data = vpfe_cfg;
++	/* Add ccdc clock aliases */
++	clk_add_alias("master", dm644x_ccdc_dev.name, "vpss_master", NULL);
++	clk_add_alias("slave", dm644x_ccdc_dev.name, "vpss_slave", NULL);
++	platform_add_devices(dm644x_video_devices,
++				ARRAY_SIZE(dm644x_video_devices));
++	return 0;
++}
++
+ static int __init dm644x_init_devices(void)
+ {
+ 	if (!cpu_is_davinci_dm644x())
+ 		return 0;
+ 
+-	/* Add ccdc clock aliases */
+-	clk_add_alias("master", dm644x_ccdc_dev.name, "vpss_master", NULL);
+-	clk_add_alias("slave", dm644x_ccdc_dev.name, "vpss_slave", NULL);
+ 	platform_device_register(&dm644x_edma_device);
+ 
+ 	platform_device_register(&dm644x_mdio_device);
+@@ -807,10 +816,6 @@ static int __init dm644x_init_devices(void)
+ 	clk_add_alias(NULL, dev_name(&dm644x_mdio_device.dev),
+ 		      NULL, &dm644x_emac_device.dev);
+ 
+-	platform_device_register(&dm644x_vpss_device);
+-	platform_device_register(&dm644x_ccdc_dev);
+-	platform_device_register(&dm644x_vpfe_dev);
+-
+ 	return 0;
+ }
+ postcore_initcall(dm644x_init_devices);
+-- 
+1.6.2.4
