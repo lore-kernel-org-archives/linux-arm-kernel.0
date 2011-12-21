@@ -1,40 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 21 Dec 2011 10:12:47 +0800
-Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
-In-Reply-To: <20111221013702.GB15398@opensource.wolfsonmicro.com>
-References: <20111220020101.GD5683@S2100-06.ap.freescale.net>
- <20111220015931.GX2860@opensource.wolfsonmicro.com>
- <20111220030347.GB2995@S2101-09.ap.freescale.net>
- <20111220112510.GL2866@opensource.wolfsonmicro.com>
- <20111220135251.GB5129@S2101-09.ap.freescale.net>
- <20111220143558.GT2866@opensource.wolfsonmicro.com>
- <20111220153101.GD5348@S2101-09.ap.freescale.net>
- <20111220232526.GA6551@opensource.wolfsonmicro.com>
- <20111221012519.GA5983@S2101-09.ap.freescale.net>
- <20111221013702.GB15398@opensource.wolfsonmicro.com>
-Message-ID: <20111221021246.GB5983@S2101-09.ap.freescale.net>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Wed, 21 Dec 2011 02:11:36 +0000
+Subject: [PATCH 09/12] video: mxsfb: convert to clk_prepare/clk_unprepare
+In-Reply-To: <1324382443-4439-10-git-send-email-shawn.guo@linaro.org>
+References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
+ <1324382443-4439-10-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4EF14058.9030205@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 01:37:03AM +0000, Mark Brown wrote:
-> On Wed, Dec 21, 2011 at 09:25:21AM +0800, Shawn Guo wrote:
-> > The problem is even if we have the name defined that way, it has to be
-> > matched to the name used in mc13892 driver somehow, if we want to use
-> > name as the key to find the regulator defined in mc13892 driver as
-> > array mc13892_regulators[].
+On 12/20/2011 12:00 PM, Shawn Guo wrote:
+> The patch converts mxsfb driver to clk_prepare/clk_unprepare by
+> using helper functions clk_prepare_enable/clk_disable_unprepare.
 > 
-> This doesn't seem like a problem - the most obvious thing would just be
-> to adjust the strings in the code to correspond to what the device tree
-> binding says.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+
+Acked-by: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+
+> ---
+>  drivers/video/mxsfb.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
 > 
-Okay, that's it.  Something obvious to you is not obvious to me :)
-As I'm migrating an existing driver to be DT aware, I'm trying to avoid
-changing any non-dt code.  Your suggestion would be obvious to me if I'm
-writing a new driver that only supports DT.
-
-Anyway, I got your point, and will follow that since you seems fine
-with changing non-dt code to adopt dt support.
-
--- 
-Regards,
-Shawn
+> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+> index d837d63..eb3c5ee 100644
+> --- a/drivers/video/mxsfb.c
+> +++ b/drivers/video/mxsfb.c
+> @@ -328,7 +328,7 @@ static void mxsfb_enable_controller(struct fb_info *fb_info)
+>  
+>  	dev_dbg(&host->pdev->dev, "%s\n", __func__);
+>  
+> -	clk_enable(host->clk);
+> +	clk_prepare_enable(host->clk);
+>  	clk_set_rate(host->clk, PICOS2KHZ(fb_info->var.pixclock) * 1000U);
+>  
+>  	/* if it was disabled, re-enable the mode again */
+> @@ -368,7 +368,7 @@ static void mxsfb_disable_controller(struct fb_info *fb_info)
+>  
+>  	writel(VDCTRL4_SYNC_SIGNALS_ON, host->base + LCDC_VDCTRL4 + REG_CLR);
+>  
+> -	clk_disable(host->clk);
+> +	clk_disable_unprepare(host->clk);
+>  
+>  	host->enabled = 0;
+>  }
+> @@ -668,7 +668,7 @@ static int __devinit mxsfb_restore_mode(struct mxsfb_info *host)
+>  	line_count = fb_info->fix.smem_len / fb_info->fix.line_length;
+>  	fb_info->fix.ypanstep = 1;
+>  
+> -	clk_enable(host->clk);
+> +	clk_prepare_enable(host->clk);
+>  	host->enabled = 1;
+>  
+>  	return 0;
+> @@ -841,7 +841,7 @@ static int __devinit mxsfb_probe(struct platform_device *pdev)
+>  
+>  error_register:
+>  	if (host->enabled)
+> -		clk_disable(host->clk);
+> +		clk_disable_unprepare(host->clk);
+>  	fb_destroy_modelist(&fb_info->modelist);
+>  error_init_fb:
+>  	kfree(fb_info->pseudo_palette);
