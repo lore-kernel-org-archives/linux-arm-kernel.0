@@ -1,35 +1,43 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Wed, 21 Dec 2011 16:43:47 +0200
-Subject: [PATCH] ARM: net: JIT compiler for packet filters
-In-Reply-To: <alpine.LFD.2.02.1112191231520.2907@xanadu.home>
-References: <1324252185-15894-1-git-send-email-mgherzan@gmail.com>
- <alpine.LFD.2.02.1112191231520.2907@xanadu.home>
-Message-ID: <20111221144346.GB3229@swarm.cs.pub.ro>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 21 Dec 2011 23:00:43 +0800
+Subject: [PATCH v4 0/4] Add device tree support for mc13892 regulator driver
+Message-ID: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 12:42:49PM -0500, Nicolas Pitre wrote:
-> On Mon, 19 Dec 2011, Mircea Gherzan wrote:
-> 
-> > +static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
-> > +{
-> > +	if (ctx->target != NULL)
-> > +		ctx->target[ctx->idx] = inst | (cond << 28);
-> > +
-> > +	ctx->idx++;
-> > +}
-> 
-> You might consider the patch titled "ARM: Add generic instruction opcode 
-> manipulation helpers" that Dave Martin just posted and rely on it to 
-> make your code compatible with BE8 mode as well.
+Changes since v3:
+ * The mfd patch in v3 was applied, and it's replaced by a incremental
+   patch to improve the binding document in the new series.
+ * Add a patch to remove the unnecessary prefix 'MC13892__' from
+   regulator name.
+ * Adopt the binding and regulator name changes in dts.
 
-That patch is not in devel-stable and I don't want to introduce further
-dependencies for the time being. Once both patches are in mainline, I
-will take a look.
+Changes since v2:
+ * Drop '[PATCH v2 2/4] regulator: pass device_node to
+   of_get_regulator_init_data()' which has been picked up by Mark
+ * Add a note on how driver matches regulator device and the node in
+   binding document
 
-> Also it seems that you are making the distinction between pre-ARMv7 and 
-> ARMv7+ while in most cases it should be pre-ARMv6 and ARMv6+
+Changes since v1:
+ * Drop '[PATCH 2/5] regulator: fix label names used in device tree
+   bindings' which has been picked up
+ * Add binding document for mfd/mc13xxx-core device tree support
+ * Fix regulator/fixed.c breakage caused by interface change on
+   of_get_regulator_init_data()
+ * Reword the commit message of patch #2 a little bit to make the
+   reason for changing clear
+ * Retrieve the irq from gpio irq domain
 
-Has been fixed in v2 of the patch.
+Shawn Guo (4):
+      mfd: improve mc13xxx dt binding document
+      regulator: mc13892: remove the unnecessary prefix from regulator name
+      regulator: mc13892: add device tree probe support
+      arm/imx: add mc13892 support into imx51-babbage.dts
 
-Mircea
+ Documentation/devicetree/bindings/mfd/mc13xxx.txt |   31 ++++++-
+ arch/arm/boot/dts/imx51-babbage.dts               |   93 ++++++++++++++++++++-
+ drivers/regulator/mc13892-regulator.c             |   43 +++++++---
+ drivers/regulator/mc13xxx-regulator-core.c        |   57 +++++++++++++
+ drivers/regulator/mc13xxx.h                       |   26 +++++-
+ include/linux/mfd/mc13xxx.h                       |    1 +
+ 6 files changed, 232 insertions(+), 19 deletions(-)
