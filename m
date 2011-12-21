@@ -1,35 +1,127 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Dec 2011 16:04:40 +0900
-Subject: [PATCHv2 resend] Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-In-Reply-To: <4EE7BE5F.8020108@solonet.org.ua>
-References: <4EE7BE5F.8020108@solonet.org.ua>
-Message-ID: <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
+Date: Wed, 21 Dec 2011 16:19:53 +0900
+Subject: [PATCH 1/4] ARM: SAMSUNG: cleanup of rtc register definitions
+In-Reply-To: <201112121545.15211.heiko@sntech.de>
+References: <201112121543.42299.heiko@sntech.de>
+ <201112121545.15211.heiko@sntech.de>
+Message-ID: <064701ccbfb0$ef40ea60$cdc2bf20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Denis Kuzmenko wrote:
+Heiko St?bner wrote:
 > 
-> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+> regs-rtc.h uses a mixture of tabs and spaces and also (x<<y)
+> to format bits. So, before adding new stuff clean up the formatting
+> and also add spaces to the bit definitions (i.e. (x << y) )
 > 
-> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
+>  arch/arm/plat-samsung/include/plat/regs-rtc.h |   66
+++++++++++++---------
+> ----
+>  1 files changed, 32 insertions(+), 34 deletions(-)
 > 
-> Patch is against 3.2-rc4.
-> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of this
-> the
-> file s3c2410-iotiming.c is not ever compiled and enabling
-> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
-> function
-> s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs
-> defined
-> as NULL for this case.
+> diff --git a/arch/arm/plat-samsung/include/plat/regs-rtc.h
+> b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+> index 30b7cc1..d9d9bdc 100644
+> --- a/arch/arm/plat-samsung/include/plat/regs-rtc.h
+> +++ b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+> @@ -18,51 +18,49 @@
+>  #define S3C2410_INTP_ALM	(1 << 1)
+>  #define S3C2410_INTP_TIC	(1 << 0)
 > 
-Hi Denis,
+> -#define S3C2410_RTCCON	      S3C2410_RTCREG(0x40)
+> -#define S3C2410_RTCCON_RTCEN  (1<<0)
+> -#define S3C2410_RTCCON_CLKSEL (1<<1)
+> -#define S3C2410_RTCCON_CNTSEL (1<<2)
+> -#define S3C2410_RTCCON_CLKRST (1<<3)
+> -#define S3C64XX_RTCCON_TICEN  (1<<8)
+> +#define S3C2410_RTCCON		S3C2410_RTCREG(0x40)
+> +#define S3C2410_RTCCON_RTCEN	(1 << 0)
+> +#define S3C2410_RTCCON_CLKSEL	(1 << 1)
+> +#define S3C2410_RTCCON_CNTSEL	(1 << 2)
+> +#define S3C2410_RTCCON_CLKRST	(1 << 3)
+> +#define S3C64XX_RTCCON_TICEN	(1 << 8)
+> 
+> -#define S3C64XX_RTCCON_TICMSK (0xF<<7)
+> -#define S3C64XX_RTCCON_TICSHT (7)
+> +#define S3C64XX_RTCCON_TICMSK	(0xF << 7)
+> +#define S3C64XX_RTCCON_TICSHT	(7)
+> 
+> -#define S3C2410_TICNT	      S3C2410_RTCREG(0x44)
+> -#define S3C2410_TICNT_ENABLE  (1<<7)
+> +#define S3C2410_TICNT		S3C2410_RTCREG(0x44)
+> +#define S3C2410_TICNT_ENABLE	(1 << 7)
+> 
+> -#define S3C2410_RTCALM	      S3C2410_RTCREG(0x50)
+> -#define S3C2410_RTCALM_ALMEN  (1<<6)
+> -#define S3C2410_RTCALM_YEAREN (1<<5)
+> -#define S3C2410_RTCALM_MONEN  (1<<4)
+> -#define S3C2410_RTCALM_DAYEN  (1<<3)
+> -#define S3C2410_RTCALM_HOUREN (1<<2)
+> -#define S3C2410_RTCALM_MINEN  (1<<1)
+> -#define S3C2410_RTCALM_SECEN  (1<<0)
+> +#define S3C2410_RTCALM		S3C2410_RTCREG(0x50)
+> +#define S3C2410_RTCALM_ALMEN	(1 << 6)
+> +#define S3C2410_RTCALM_YEAREN	(1 << 5)
+> +#define S3C2410_RTCALM_MONEN	(1 << 4)
+> +#define S3C2410_RTCALM_DAYEN	(1 << 3)
+> +#define S3C2410_RTCALM_HOUREN	(1 << 2)
+> +#define S3C2410_RTCALM_MINEN	(1 << 1)
+> +#define S3C2410_RTCALM_SECEN	(1 << 0)
+> 
+>  #define S3C2410_RTCALM_ALL \
+>    S3C2410_RTCALM_ALMEN | S3C2410_RTCALM_YEAREN | S3C2410_RTCALM_MONEN |\
+>    S3C2410_RTCALM_DAYEN | S3C2410_RTCALM_HOUREN | S3C2410_RTCALM_MINEN |\
+>    S3C2410_RTCALM_SECEN
+> 
+> +#define S3C2410_ALMSEC		S3C2410_RTCREG(0x54)
+> +#define S3C2410_ALMMIN		S3C2410_RTCREG(0x58)
+> +#define S3C2410_ALMHOUR		S3C2410_RTCREG(0x5c)
+> 
+> -#define S3C2410_ALMSEC	      S3C2410_RTCREG(0x54)
+> -#define S3C2410_ALMMIN	      S3C2410_RTCREG(0x58)
+> -#define S3C2410_ALMHOUR	      S3C2410_RTCREG(0x5c)
+> +#define S3C2410_ALMDATE		S3C2410_RTCREG(0x60)
+> +#define S3C2410_ALMMON		S3C2410_RTCREG(0x64)
+> +#define S3C2410_ALMYEAR		S3C2410_RTCREG(0x68)
+> 
+> -#define S3C2410_ALMDATE	      S3C2410_RTCREG(0x60)
+> -#define S3C2410_ALMMON	      S3C2410_RTCREG(0x64)
+> -#define S3C2410_ALMYEAR	      S3C2410_RTCREG(0x68)
+> -
+> -#define S3C2410_RTCRST	      S3C2410_RTCREG(0x6c)
+> -
+> -#define S3C2410_RTCSEC	      S3C2410_RTCREG(0x70)
+> -#define S3C2410_RTCMIN	      S3C2410_RTCREG(0x74)
+> -#define S3C2410_RTCHOUR	      S3C2410_RTCREG(0x78)
+> -#define S3C2410_RTCDATE	      S3C2410_RTCREG(0x7c)
+> -#define S3C2410_RTCDAY	      S3C2410_RTCREG(0x80)
+> -#define S3C2410_RTCMON	      S3C2410_RTCREG(0x84)
+> -#define S3C2410_RTCYEAR	      S3C2410_RTCREG(0x88)
+> +#define S3C2410_RTCRST		S3C2410_RTCREG(0x6c)
+> 
+> +#define S3C2410_RTCSEC		S3C2410_RTCREG(0x70)
+> +#define S3C2410_RTCMIN		S3C2410_RTCREG(0x74)
+> +#define S3C2410_RTCHOUR		S3C2410_RTCREG(0x78)
+> +#define S3C2410_RTCDATE		S3C2410_RTCREG(0x7c)
+> +#define S3C2410_RTCDAY		S3C2410_RTCREG(0x80)
+> +#define S3C2410_RTCMON		S3C2410_RTCREG(0x84)
+> +#define S3C2410_RTCYEAR		S3C2410_RTCREG(0x88)
+> 
+>  #endif /* __ASM_ARCH_REGS_RTC_H */
+> --
+> 1.7.5.4
 
-Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected in my
-case and s3c2410-iotiming.c is built...when is it happened? I just selected
-every regarding configuration in kernel menuconfig...
+Looks good to me, but how about cleanup useless definitions together like
+following?
+
+Actually, S3C2410_RTCCON_CLKSEL, S3C64XX_RTCCON_TICMSK,
+S3C64XX_RTCCON_TICSHT, S3C2410_RTCALM_ALL, S3C2410_RTCRST and S3C2410_RTCDAY
+are not used.
+
+And I'm not sure we really need to define the S3C2410_RTCREG(x), but this
+can be sorted out next time with similar others.
 
 Thanks.
 
@@ -38,88 +130,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-> Changelog:
-> v1 -> v2
-> New CONFIG_ symbols S3C241{0,2}_IOTIMING were removed as It was observed
-> that
-> they already present but hidden from user.
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e084b7e..133d005 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2118,7 +2118,7 @@ config CPU_FREQ_S3C24XX_DEBUG
-> 
->  config CPU_FREQ_S3C24XX_IODEBUG
->  	bool "Debug CPUfreq Samsung driver IO timing"
-> -	depends on CPU_FREQ_S3C24XX
-> +	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING ||
-> S3C2412_IOTIMING)
->  	help
->  	  Enable s3c_freq_iodbg for the Samsung S3C CPUfreq core
-> 
-> diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> index dac4760..c465252 100644
-> --- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> +++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> @@ -202,13 +202,23 @@ extern int s3c_plltab_register(struct
-> cpufreq_frequency_table *plls,
->  extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
->  extern struct s3c_iotimings *s3c_cpufreq_getiotimings(void);
-> 
-> -extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-> -				     struct s3c_cpufreq_config *cfg,
-> -				     union s3c_iobank *iob);
-> -
-> -extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-> -				     struct s3c_cpufreq_config *cfg,
-> -				     union s3c_iobank *iob);
-> +#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
-> +	#ifdef CONFIG_S3C2410_IOTIMING
-> +	extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-> +					     struct s3c_cpufreq_config *cfg,
-> +					     union s3c_iobank *iob);
-> +	#else
-> +	#define s3c2410_iotiming_debugfs	NULL
-> +	#endif
-> +
-> +	#ifdef CONFIG_S3C2412_IOTIMING
-> +	extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-> +					     struct s3c_cpufreq_config *cfg,
-> +					     union s3c_iobank *iob);
-> +	#else
-> +	#define s3c2412_iotiming_debugfs	NULL
-> +	#endif
-> +#endif
-> 
->  #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
->  #define s3c_cpufreq_debugfs_call(x) x
-> @@ -241,10 +251,7 @@ extern void s3c2410_iotiming_set(struct
-> s3c_cpufreq_config *cfg,
->  #endif /* CONFIG_S3C2410_IOTIMING */
-> 
->  /* S3C2412 compatible routines */
-> -
-> -extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
-> -				struct s3c_iotimings *timings);
-> -
-> +#ifdef CONFIG_S3C2412_IOTIMING
->  extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
->  				struct s3c_iotimings *timings);
-> 
-> @@ -253,6 +260,11 @@ extern int s3c2412_iotiming_calc(struct
-> s3c_cpufreq_config *cfg,
-> 
->  extern void s3c2412_iotiming_set(struct s3c_cpufreq_config *cfg,
->  				 struct s3c_iotimings *iot);
-> +#else
-> +#define s3c2412_iotiming_calc NULL
-> +#define s3c2412_iotiming_get NULL
-> +#define s3c2412_iotiming_set NULL
-> +#endif
-> 
->  #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUG
->  #define s3c_freq_dbg(x...) printk(KERN_INFO x)
