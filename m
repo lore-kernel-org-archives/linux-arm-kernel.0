@@ -1,52 +1,80 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 21 Dec 2011 23:19:02 +0400
-Subject: [PATCH] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
-In-Reply-To: <CA+gwMcc3tbGXmFHQt=y7mwprXumh7sgMSE_e7B0L2LbQ-Hk2fg@mail.gmail.com>
-References: <1323728465.801.YahooMailClassic@web29018.mail.ird.yahoo.com>
- <CA+gwMcc3tbGXmFHQt=y7mwprXumh7sgMSE_e7B0L2LbQ-Hk2fg@mail.gmail.com>
-Message-ID: <20111221191901.GA18261@rainbow>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Dec 2011 11:19:15 -0800
+Subject: [PATCH 3/3] ARM: OMAP2+: board-generic: Replace #if defined by
+ #ifdef for consistency
+In-Reply-To: <4EF08B8B.2040400@ti.com>
+References: <y> <1323190149-6492-4-git-send-email-b-cousson@ti.com>
+ <4EF08B8B.2040400@ti.com>
+Message-ID: <20111221191915.GF24444@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:12 Wed 21 Dec     , Philipp Zabel wrote:
-> Hello Paul,
+* Cousson, Benoit <b-cousson@ti.com> [111220 04:48]:
+> Hi Tony,
 > 
-> On Mon, Dec 12, 2011 at 11:21 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> > linux-2.6.32 changed the values of PXA_GPIO_IRQ_BASE and PXA_GPIO_IRQ_NUM from
-> > 64/128 to 96/192. This has broken the hx4700 platform, for example its PCMCIA/CF
-> > driver. The 9 EGPIO GPIOs have become numbered 256..264, and consequently fail
-> > the gpio_is_valid() test in gpiolib.c (which limits GPIOs to the range 0..255).
-> > This patch reverts the values of PXA_GPIO_IRQ_BASE and PXA_GPIO_IRQ_NUM to their
-> > previous linux-2.6.31 values for the hx4700 platform only.
+> What about that patch?
+> 
+> This is the only one that is missing in lo.
+> I know it is not a big deal, but it will make things a little bit cleaner.
+
+I think we should wait on this one and combine it later on into
+some other clean-up patch.
+
+Regards,
+
+Tony
+ 
+> Thanks,
+> Benoit
+> 
+> On 12/6/2011 5:49 PM, Benoit Cousson wrote:
+> >The file contains a mix of #ifdef and #if defined().
+> >Replace the #if... by #ifdef.
 > >
-> > Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> > ---
-
-[...]
-
-> > +#ifdef CONFIG_MACH_H4700
-> > +#define PXA_GPIO_IRQ_BASE ? ? ?PXA_IRQ(64)
-> > +#define PXA_GPIO_IRQ_NUM ? ? ? (128)
-> > +#else
-> > ?#define PXA_GPIO_IRQ_BASE ? ? ?PXA_IRQ(96)
-> > ?#define PXA_GPIO_IRQ_NUM ? ? ? (192)
-> > +#endif
+> >Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> >Cc: Tony Lindgren<tony@atomide.com>
+> >---
+> >  arch/arm/mach-omap2/board-generic.c |    8 ++++----
+> >  1 files changed, 4 insertions(+), 4 deletions(-)
+> >
+> >diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> >index fb55fa3..09f44e0 100644
+> >--- a/arch/arm/mach-omap2/board-generic.c
+> >+++ b/arch/arm/mach-omap2/board-generic.c
+> >@@ -92,7 +92,7 @@ static void __init omap3_init(void)
+> >  }
+> >  #endif
+> >
+> >-#if defined(CONFIG_SOC_OMAP2420)
+> >+#ifdef CONFIG_SOC_OMAP2420
+> >  static const char *omap242x_boards_compat[] __initdata = {
+> >  	"ti,omap2420",
+> >  	NULL,
+> >@@ -110,7 +110,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
+> >  MACHINE_END
+> >  #endif
+> >
+> >-#if defined(CONFIG_SOC_OMAP2430)
+> >+#ifdef CONFIG_SOC_OMAP2430
+> >  static const char *omap243x_boards_compat[] __initdata = {
+> >  	"ti,omap2430",
+> >  	NULL,
+> >@@ -128,7 +128,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
+> >  MACHINE_END
+> >  #endif
+> >
+> >-#if defined(CONFIG_ARCH_OMAP3)
+> >+#ifdef CONFIG_ARCH_OMAP3
+> >  static const char *omap3_boards_compat[] __initdata = {
+> >  	"ti,omap3",
+> >  	NULL,
+> >@@ -146,7 +146,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+> >  MACHINE_END
+> >  #endif
+> >
+> >-#if defined(CONFIG_ARCH_OMAP4)
+> >+#ifdef CONFIG_ARCH_OMAP4
+> >  static const char *omap4_boards_compat[] __initdata = {
+> >  	"ti,omap4",
+> >  	NULL,
 > 
-> machine specific definitions were removed from mach/irqs.h in commits
-> 0dc726bb264ca5ecfdfab94a6937e0e9b9b26f64 ([ARM] pxa: move board board
-> IRQ definitions out of irqs.h) and
-> 6ac6b817f3f4c23c5febd960d8deb343e13af5f3 (ARM: pxa: encode IRQ number
-> into .nr_irqs).
-> I'd propose to increase ARCH_NR_GPIOs to 264 in mach/gpio.h or
-> plat/gpio.h instead.
-
-Yes, I also think increasing ARCH_NR_GPIO is the way to go.
-BTW, there's a patchset floating around which moves such custom
-settings of ARCH_NR_GPIO from mach/gpio.h into Kconfig variable:
-http://lkml.indiana.edu/hypermail/linux/kernel/1111.0/01433.html
-
-I'm not sure though if it's going to be merged into 3.3
-
--- 
-Best regards,
-Dmitry "MAD" Artamonow
