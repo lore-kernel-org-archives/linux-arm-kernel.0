@@ -1,62 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 21 Dec 2011 23:00:44 +0800
-Subject: [PATCH 1/4] mfd: improve mc13xxx dt binding document
-In-Reply-To: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
-References: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1324479647-4580-2-git-send-email-shawn.guo@linaro.org>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 21 Dec 2011 15:52:02 +0100
+Subject: [PATCH] ARM: imx6q: build pm code only when CONFIG_PM selected
+In-Reply-To: <1324478303-3899-1-git-send-email-eric.miao@linaro.org>
+References: <1324478303-3899-1-git-send-email-eric.miao@linaro.org>
+Message-ID: <20209.62098.146087.510816@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It improves mc13xxx dt binding document on how the regulator name
-is being used for binding a mc13892 regulator device.
+Hi,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
----
- Documentation/devicetree/bindings/mfd/mc13xxx.txt |   31 +++++++++++++++++++--
- 1 files changed, 28 insertions(+), 3 deletions(-)
+Eric Miao writes:
+[...]
+> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
+> index 6229efb..a59cae7 100644
+> --- a/arch/arm/mach-imx/head-v7.S
+> +++ b/arch/arm/mach-imx/head-v7.S
+> @@ -71,6 +71,7 @@ ENTRY(v7_secondary_startup)
+>  ENDPROC(v7_secondary_startup)
+>  #endif
+>  
+> +#ifdef CONFIG_PM
+>  /*
+>   * The following code is located into the .data section.  This is to
+>   * allow phys_l2x0_saved_regs to be accessed with a relative load
+> @@ -97,3 +98,4 @@ ENDPROC(v7_cpu_resume)
+>  	.globl	phys_l2x0_saved_regs
+>  phys_l2x0_saved_regs:
+>          .long   0
+> +#endif
+>
+While you are changing mach-imx/head-v7.S you could also fix a build
+error with 'CONFIG_CACHE_L2x0' disabled.
+I just found this, but sending a patch now would conflict with your
+patch:
 
-diff --git a/Documentation/devicetree/bindings/mfd/mc13xxx.txt b/Documentation/devicetree/bindings/mfd/mc13xxx.txt
-index 4ed46a61..19f6af4 100644
---- a/Documentation/devicetree/bindings/mfd/mc13xxx.txt
-+++ b/Documentation/devicetree/bindings/mfd/mc13xxx.txt
-@@ -10,9 +10,34 @@ Optional properties:
- - fsl,mc13xxx-uses-touch : Indicate the touchscreen controller is being used
+diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
+index 6229efb..830b5c8 100644
+--- a/arch/arm/mach-imx/head-v7.S
++++ b/arch/arm/mach-imx/head-v7.S
+@@ -80,12 +80,14 @@ ENDPROC(v7_secondary_startup)
+ 	.align
  
- Sub-nodes:
--- regulators : Contain the regulator nodes.  The name of regulator node
--  is being used by mc13xxx regulator driver to find the correct relator
--  device.
-+- regulators : Contain the regulator nodes.  The MC13892 regulators are
-+  bound using their names as listed below with their registers and bits
-+  for enabling.
-+
-+    vcoincell : regulator VCOINCELL (register 13, bit 23)
-+    sw1       : regulator SW1	    (register 24, bit 0)
-+    sw2       : regulator SW2	    (register 25, bit 0)
-+    sw3       : regulator SW3	    (register 26, bit 0)
-+    sw4       : regulator SW4	    (register 27, bit 0)
-+    swbst     : regulator SWBST	    (register 29, bit 20)
-+    vgen1     : regulator VGEN1	    (register 32, bit 0)
-+    viohi     : regulator VIOHI	    (register 32, bit 3)
-+    vdig      : regulator VDIG	    (register 32, bit 9)
-+    vgen2     : regulator VGEN2	    (register 32, bit 12)
-+    vpll      : regulator VPLL	    (register 32, bit 15)
-+    vusb2     : regulator VUSB2	    (register 32, bit 18)
-+    vgen3     : regulator VGEN3	    (register 33, bit 0)
-+    vcam      : regulator VCAM	    (register 33, bit 6)
-+    vvideo    : regulator VVIDEO    (register 33, bit 12)
-+    vaudio    : regulator VAUDIO    (register 33, bit 15)
-+    vsd       : regulator VSD	    (register 33, bit 18)
-+    gpo1      : regulator GPO1	    (register 34, bit 6)
-+    gpo2      : regulator GPO2	    (register 34, bit 8)
-+    gpo3      : regulator GPO3	    (register 34, bit 10)
-+    gpo4      : regulator GPO4	    (register 34, bit 12)
-+    pwgt1spi  : regulator PWGT1SPI  (register 34, bit 15)
-+    pwgt2spi  : regulator PWGT2SPI  (register 34, bit 16)
-+    vusb      : regulator VUSB	    (register 50, bit 3)
+ 	.macro	pl310_resume
++#ifdef CONFIG_CACHE_L2X0
+ 	ldr	r2, phys_l2x0_saved_regs
+ 	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
+ 	ldr	r1, [r2, #L2X0_R_AUX_CTRL]	@ get aux_ctrl value
+ 	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
+ 	mov	r1, #0x1
+ 	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
++#endif
+ 	.endm
  
-   The bindings details of individual regulator device can be found in:
-   Documentation/devicetree/bindings/regulator/regulator.txt
+ ENTRY(v7_cpu_resume)
+@@ -94,6 +96,8 @@ ENTRY(v7_cpu_resume)
+ 	b	cpu_resume
+ ENDPROC(v7_cpu_resume)
+ 
++#ifdef CONFIG_CACHE_L2X0
+ 	.globl	phys_l2x0_saved_regs
+ phys_l2x0_saved_regs:
+         .long   0
++#endif
+
+
+Lothar Wa?mann
 -- 
-1.7.4.1
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
