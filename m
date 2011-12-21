@@ -1,62 +1,84 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 21 Dec 2011 10:51:23 +0800
-Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
-In-Reply-To: <20111221023336.GE13529@sirena.org.uk>
-References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
- <1324264903-15395-5-git-send-email-richard.zhao@linaro.org>
- <20111220145904.GD29727@sirena.org.uk>
- <20111220232701.GA1698@richard-laptop>
- <20111220234844.GC6551@opensource.wolfsonmicro.com>
- <20111221012046.GE15863@b20223-02.ap.freescale.net>
- <20111221013220.GA15398@opensource.wolfsonmicro.com>
- <20111221022452.GF15863@b20223-02.ap.freescale.net>
- <20111221023336.GE13529@sirena.org.uk>
-Message-ID: <20111221025123.GG15863@b20223-02.ap.freescale.net>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 21 Dec 2011 02:56:26 +0000
+Subject: [RFC PATCH v3 1/5] dt: add of_get_child_count helper function
+In-Reply-To: <4EF0D556.3030701@gmail.com>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-2-git-send-email-b29396@freescale.com>
+ <4EF0D556.3030701@gmail.com>
+Message-ID: <7FE21149F4667147B645348EC605788505C474@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 02:33:36AM +0000, Mark Brown wrote:
-> On Wed, Dec 21, 2011 at 10:24:53AM +0800, Richard Zhao wrote:
-> > On Wed, Dec 21, 2011 at 01:32:21AM +0000, Mark Brown wrote:
+> -----Original Message-----
+> From: Rob Herring [mailto:robherring2 at gmail.com]
+> Sent: Wednesday, December 21, 2011 2:35 AM
+> To: Dong Aisheng-B29396
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linus.walleij at stericsson.com; s.hauer at pengutronix.de; Guo Shawn-R65073;
+> kernel at pengutronix.de; grant.likely at secretlab.ca; devicetree-
+> discuss at lists.ozlabs.org; cjb at laptop.org; w.sang at pengutronix.de
+> Subject: Re: [RFC PATCH v3 1/5] dt: add of_get_child_count helper function
+> Importance: High
 > 
-> > > That's not the point - the point is that you may do something like
-> > > specify a defined set of frequencies and just drop the minimum supported
-> > > voltage without altering the maximum supported voltage as the frequency
-> > > gets lower.
+> On 12/20/2011 11:40 AM, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> >
+> > Currently most code to get child count in kernel are almost same, add
+> > a helper to implement this function for dt to use.
+> >
+> > ---
+> > Changes v1->v2:
+> >  * change the name from of_get_child_number to of_get_child_count
+> >
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
 > 
-> > What do you mean by "drop"?
+> I assume you want this to go in with the rest of the series? If not, let me know.
 > 
-> Drop is a synonym for lower in this context.
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 > 
-> > cpu-volts = <
-> > 	/* min  max */
-> > 	1100000 1200000 /* 1G HZ */
-> > 	1000000 1200000 /* 800M HZ */
-> > 	900000  1200000 /* 600M HZ */
-> > 	>;
-> > The above sample dts could meet your point?
-> 
-> Yes.
-> 
-> > > While this is important the driver should also be enumerating the
-> > > supported voltages at probe time and eliminating unsupportable settings
-> > > so that governors aren't constantly trying to set things that can never
-> > > be supported.  The s3c64xx cpufreq driver provides an implementation of
-> > > this.
-> 
-> > I'll use regulator_is_supported_voltage pre-check the cpu-volts.
-> > For clock, conditions ((clk_round_rate(cpu-freq)/1000) * 1000 == cpu-freq)
-> > seems too strict. Because cpu clock is SoC dependent, I'll not add the check.
-> 
-> The issue that was there for is that there are multiple runtime
-> detectable variant clocking configurations which couldn't be switched
-> between so the driver needs to select only the rates that can be reached
-> from the current configuration.  I'd imagine that might be an issue
-> elsewhere.
-one case is that, cpu freq is 800M, clock may only reach 799M. I'd rather let
-clock code to decide how to handle 800M request. That's why I said
-the condition check is too strict.
+> Rob
+>
+Yes, since other patches in this series depend on this patch.
+Thanks for the review.
 
-Thanks
-Richard
-> 
+Regards
+Dong Aisheng 
+> > ---
+> >  include/linux/of.h |   16 ++++++++++++++++
+> >  1 files changed, 16 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/include/linux/of.h b/include/linux/of.h index
+> > 4948552..d0d91a1 100644
+> > --- a/include/linux/of.h
+> > +++ b/include/linux/of.h
+> > @@ -189,6 +189,17 @@ extern struct device_node *of_get_next_child(const struct
+> device_node *node,
+> >  	for (child = of_get_next_child(parent, NULL); child != NULL; \
+> >  	     child = of_get_next_child(parent, child))
+> >
+> > +static inline int of_get_child_count(const struct device_node *np) {
+> > +	struct device_node *child = NULL;
+> > +	int num = 0;
+> > +
+> > +	while ((child = of_get_next_child(np, child)))
+> > +		num++;
+> > +
+> > +	return num;
+> > +}
+> > +
+> >  extern struct device_node *of_find_node_with_property(
+> >  	struct device_node *from, const char *prop_name);  #define
+> > for_each_node_with_property(dn, prop_name) \ @@ -262,6 +273,11 @@
+> > static inline bool of_have_populated_dt(void)  #define
+> > for_each_child_of_node(parent, child) \
+> >  	while (0)
+> >
+> > +static inline int of_get_child_count(const struct device_node *np) {
+> > +	return -ENOSYS;
+> > +}
+> > +
+> >  static inline int of_device_is_compatible(const struct device_node *device,
+> >  					  const char *name)
+> >  {
