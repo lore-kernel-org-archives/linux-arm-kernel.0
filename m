@@ -1,109 +1,75 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 21 Dec 2011 02:06:40 +0100
-Subject: [PATCH 08/12] serial: mxs-auart: convert to
- clk_prepare/clk_unprepare
-In-Reply-To: <20111220222442.GH2577@n2100.arm.linux.org.uk>
-References: <1324382443-4439-1-git-send-email-shawn.guo@linaro.org>
- <201112202228.27468.marek.vasut@gmail.com>
- <20111220222442.GH2577@n2100.arm.linux.org.uk>
-Message-ID: <201112210206.40859.marek.vasut@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 21 Dec 2011 09:25:21 +0800
+Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
+In-Reply-To: <20111220232526.GA6551@opensource.wolfsonmicro.com>
+References: <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
+ <20111220005708.GM2860@opensource.wolfsonmicro.com>
+ <20111220020101.GD5683@S2100-06.ap.freescale.net>
+ <20111220015931.GX2860@opensource.wolfsonmicro.com>
+ <20111220030347.GB2995@S2101-09.ap.freescale.net>
+ <20111220112510.GL2866@opensource.wolfsonmicro.com>
+ <20111220135251.GB5129@S2101-09.ap.freescale.net>
+ <20111220143558.GT2866@opensource.wolfsonmicro.com>
+ <20111220153101.GD5348@S2101-09.ap.freescale.net>
+ <20111220232526.GA6551@opensource.wolfsonmicro.com>
+Message-ID: <20111221012519.GA5983@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, Dec 20, 2011 at 10:28:26PM +0100, Marek Vasut wrote:
-> > > On Tue, Dec 20, 2011 at 03:07:50PM +0100, Uwe Kleine-K?nig wrote:
-> > > > Hello,
-> > > > 
-> > > > On Tue, Dec 20, 2011 at 02:49:13PM +0100, Marek Vasut wrote:
-> > > > > > The patch converts mxs-auart driver to clk_prepare/clk_unprepare
-> > > > > > by using helper functions
-> > > > > > clk_prepare_enable/clk_disable_unprepare.
-> > > > > > 
-> > > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > > > Cc: Alan Cox <alan@linux.intel.com>
-> > > > > > ---
-> > > > > > 
-> > > > > >  drivers/tty/serial/mxs-auart.c |    8 ++++----
-> > > > > >  1 files changed, 4 insertions(+), 4 deletions(-)
-> > > > > > 
-> > > > > > diff --git a/drivers/tty/serial/mxs-auart.c
-> > > > > > b/drivers/tty/serial/mxs-auart.c index 7e02c9c..c33500a 100644
-> > > > > > --- a/drivers/tty/serial/mxs-auart.c
-> > > > > > +++ b/drivers/tty/serial/mxs-auart.c
-> > > > > > @@ -424,7 +424,7 @@ static int mxs_auart_startup(struct uart_port
-> > > > > > *u)
-> > > > > > 
-> > > > > >  {
-> > > > > >  
-> > > > > >  	struct mxs_auart_port *s = to_auart_port(u);
-> > > > > > 
-> > > > > > -	clk_enable(s->clk);
-> > > > > > +	clk_prepare_enable(s->clk);
-> > > > > > 
-> > > > > >  	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-> > > > > > 
-> > > > > > @@ -453,7 +453,7 @@ static void mxs_auart_shutdown(struct
-> > > > > > uart_port *u)
-> > > > > > 
-> > > > > >  	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN |
-> > > > > >  	AUART_INTR_CTSMIEN,
-> > > > > >  	
-> > > > > >  			u->membase + AUART_INTR_CLR);
-> > > > > > 
-> > > > > > -	clk_disable(s->clk);
-> > > > > > +	clk_disable_unprepare(s->clk);
-> > > > > > 
-> > > > > >  }
-> > > > > >  
-> > > > > >  static unsigned int mxs_auart_tx_empty(struct uart_port *u)
-> > > > > > 
-> > > > > > @@ -634,7 +634,7 @@ auart_console_setup(struct console *co, char
-> > > > > > *options)
-> > > > > > 
-> > > > > >  	if (!s)
-> > > > > >  	
-> > > > > >  		return -ENODEV;
-> > > > > > 
-> > > > > > -	clk_enable(s->clk);
-> > > > > > +	clk_prepare_enable(s->clk);
-> > > > > > 
-> > > > > >  	if (options)
-> > > > > >  	
-> > > > > >  		uart_parse_options(options, &baud, &parity, &bits,
-> > 
-> > &flow);
-> > 
-> > > > > > @@ -643,7 +643,7 @@ auart_console_setup(struct console *co, char
-> > > > > > *options)
-> > > > > > 
-> > > > > >  	ret = uart_set_options(&s->port, co, baud, parity, bits, flow);
-> > > > > > 
-> > > > > > -	clk_disable(s->clk);
-> > > > > > +	clk_disable_unprepare(s->clk);
-> > > > > > 
-> > > > > >  	return ret;
-> > > > > >  
-> > > > > >  }
-> > > > > 
-> > > > > DTTO here, are you sure all of them are not called from atomic ctx?
-> > > > 
-> > > > the startup callback is called with irqs off.
-> > > 
-> > > It shouldn't be, as it has to do things like request_irq() which can
-> > > sleep.  The documentation in Documentation/serial/driver is now out
-> > > of date, and can't be relied upon.
-> > 
-> > auart_rx/tx_empty() shouldn't be called from atomic context? It
-> > doesn't really look that way. The name is probably misleading though.
+On Tue, Dec 20, 2011 at 11:25:27PM +0000, Mark Brown wrote:
+> On Tue, Dec 20, 2011 at 11:31:03PM +0800, Shawn Guo wrote:
+> > On Tue, Dec 20, 2011 at 02:35:58PM +0000, Mark Brown wrote:
 > 
-> I can't find an auart_rx nor auart_rx_empty() function.
+> > > I don't know that that helps, register numbers and shifts aren't going
+> > > to do anything for legibility.
 > 
-> The tx_empty function should only be called while the port is started-up,
-> and in any case is only called from process context.  (Functions calling
-> this also call put_user(), msleep() or other functions which can cause
-> schedule events.)
+> > I think it helps.  It's not about legibility but identification.  For
+> > mc13892 driver to work, it has to match the register number and enable
+> > bit shift given by mc13892 reference manual.  So register number +
+> > enable bit shift is stable and unique to identify a mc13892 regulator.
+> 
+> It's unique but I feel the disadvantages in terms of legibility of the
+> resulting device trees are substantial - we want humans to be able to
+> read and write device trees, preferrably without having to dig out the
+> datasheet for the part.
 
-Well then this is cleared up :)
+Eh, device tree is all about describing hardware.  I do not understand
+what is wrong with looking at hardware manual when writing dts.
 
-M
+> So long as the names are reasonably sensible
+> and can be understood in the case of any lack of clarity we should be
+> OK.
+> 
+The problem is even if we have the name defined that way, it has to be
+matched to the name used in mc13892 driver somehow, if we want to use
+name as the key to find the regulator defined in mc13892 driver as
+array mc13892_regulators[].
+
+> > > The problem with the names was that the
+> > > names chosen were poorly defined (why call DCDCn chipname__dcdcn?) and
+> > > not documented in the binding, not that they were names.
+> 
+> > The problem with name is it's name.  The mc13892 driver can still work
+> > with naming regulator differently from mc13892 reference manual.  So
+> > using name to bind a regulator means we are binding with Linux mc13892
+> > driver.  In that case, DT probe works if and only if the name in dts
+> > matches the name used in mc13892 driver, and it does not work as long
+> > as the name dts does not match the name used in mc13892 driver.
+> 
+> This is the whole reason why I'm saying that you need to define the
+> names used in the binding - if the names are a defined part of the
+> binding then there's nothing driver specific about them.
+> 
+Can you please help me understand how this can be achieved with an
+example?  Taking 'mc13892__sw1' as the example, if I read your comment
+before correctly, 'sw1' is the name that you are suggesting.  How this
+name can be nothing driver specific?  After all, we need to find
+regulator MC13892_SW1 defined in mc13892_regulators[] by matching name
+'sw1' defined by binding and name 'MC13892_SW1' defined by driver
+somehow, if we want to use name to bind the regulator.
+
+I feel I might miss your point again.  So please help clarify.
+
+-- 
+Regards,
+Shawn
