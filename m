@@ -1,16 +1,16 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 21 Dec 2011 20:09:33 +0000
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 21 Dec 2011 15:36:49 -0500 (EST)
 Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
  Cortex-M3 SoCs
 In-Reply-To: <20111221195602.GK2577@n2100.arm.linux.org.uk>
 References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20111221154838.GA23102@page>
- <20111221195602.GK2577@n2100.arm.linux.org.uk>
-Message-ID: <20111221200933.GA3117@page>
+ <20111221154838.GA23102@page> <20111221195602.GK2577@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1112211535010.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 07:56:02PM +0000, Russell King - ARM Linux wrote:
+On Wed, 21 Dec 2011, Russell King - ARM Linux wrote:
+
 > On Wed, Dec 21, 2011 at 03:48:50PM +0000, Jamie Iles wrote:
 > > > +#define __io(a)			__typesafe_io(a)
 > > 
@@ -21,9 +21,8 @@ On Wed, Dec 21, 2011 at 07:56:02PM +0000, Russell King - ARM Linux wrote:
 > make drivers which use PCI IO stuff fail at build time.  Don't try to
 > frig it into doing a NULL pointer deref.
 
-Fair point.  I said that because I remember that the 8250 driver uses 
-ioport accessors even for !HAVE_IOPORT and that some patches to remove 
-that were nacked, but I don't remember the details.  But yes, not 
-defining __io would be much better!
+... especially since this is a !MMU platform and therefore NULL pointer 
+derefs won't work as intended.
 
-Jamie
+
+Nicolas
