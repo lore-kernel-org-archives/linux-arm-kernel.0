@@ -1,172 +1,43 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 21 Dec 2011 20:51:12 +0100
-Subject: [PATCH v2 1/7 v2] ARM: OMAP1: ams-delta: register latch dependent
- devices later
-In-Reply-To: <20111221190815.GC24444@atomide.com>
-References: <201112200028.32947.jkrzyszt@tis.icnet.pl>
- <1324418058-30905-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <20111221190815.GC24444@atomide.com>
-Message-ID: <201112212051.13113.jkrzyszt@tis.icnet.pl>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Wed, 21 Dec 2011 21:49:38 +0200
+Subject: [PATCHv2 resend] Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+In-Reply-To: <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
+References: <4EE7BE5F.8020108@solonet.org.ua>
+ <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
+Message-ID: <4EF23852.1050304@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 of December 2011 at 20:08:15, Tony Lindgren wrote:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111220 13:23]:
-> > In preparation to converting Amstrad Delta on-board latches to
-> > basic_mmio_gpio devices, registration of platform devices which depend
-> > on latches and will require initialization of their GPIO pins first,
-> > should be moved out of .machine_init down to late_initcall level, as the
-> > gpio-generic driver is not available until device_initcall time.  The
-> > latch reset operation, which will be replaced with GPIO initialization,
-> > must also be moved to late_initcall for the same reason.
-> > 
-> > Since there was already another, separate arch_initcall function for
-> > setting up one of those latch dependent devices, the on-board modem
-> > device, reuse that function, i.e., rename it to a name that matches the
-> > new purpose, extend with other device setup relocated from
-> > .machine_init, and move down to the late_initcall level.
-> > 
-> > While being at it, add missing gpio_free() in case the modem platform
-> > device registration fails.
-> > 
-> > Thanks to Tony Lindgren <tony@atomide.com> who suggested this approach
-> > instead of shifting up the gpio-generic driver initialization.
-> > 
-> > In addition, defer registration of the Amstrad Delta ASoC and serio
-> > devices, done from their device driver files, until late_initcall time,
-> > as those drivers will depend on their GPIO pins already requested from
-> > the board late_init() function until updated to register their GPIO pins
-> > themselves.
-> > 
-> > Created and tested against linux-3.2-rc6.
-> > 
-> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+On 12/21/2011 09:04 AM, Kukjin Kim wrote:
+> Denis Kuzmenko wrote:
+>>
+>> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+>>
+>> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+>> ---
+>>
+>> Patch is against 3.2-rc4.
+>> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of this
+>> the
+>> file s3c2410-iotiming.c is not ever compiled and enabling
+>> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
+>> function
+>> s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs
+>> defined
+>> as NULL for this case.
+>>
+> Hi Denis,
 > 
-> Planning to apply this series. Dmitry, care to ack the drivers/input/serio/
-> related change?
+> Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected in my
+> case and s3c2410-iotiming.c is built...when is it happened? I just selected
+> every regarding configuration in kernel menuconfig...
 
-Don't we need Jarkko's or Mark's or Liam's ack as well for the change to 
-the sound/soc/omap/ams-delta.c file?
+Please, try attached config (it's still failing in v3.2-rc6).
 
-Thanks,
-Janusz
-
-> Regards,
-> 
-> Tony
-> 
-> > ---
-> > Changes since the initial version of this patch:
-> > * use late_initcall() unconditionally in modules, requested by Russell
-> >   King (thanks!); an updated patch 7/7 will follow,
-> > * in the changelog message, move credits to Tony up a bit, since the
-> >   person responsible for other changes (he might not necessarily like)
-> >   is me, not him ;).
-> > 
-> > Comments copied from this patch initial submission:
-> > This patch was not present in the initial submission, it replaces the
-> > old patch 1/10, providing an alternative solution not touching the
-> > gpio-generic driver.
-> > 
-> >  arch/arm/mach-omap1/board-ams-delta.c |   28 ++++++++++++++++++++--------
-> >  drivers/input/serio/ams_delta_serio.c |    2 +-
-> >  sound/soc/omap/ams-delta.c            |    2 +-
-> >  3 files changed, 22 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-> > index b0f15d2..50987c9 100644
-> > --- a/arch/arm/mach-omap1/board-ams-delta.c
-> > +++ b/arch/arm/mach-omap1/board-ams-delta.c
-> > @@ -275,11 +275,14 @@ static struct omap1_cam_platform_data ams_delta_camera_platform_data = {
-> >  };
-> >  
-> >  static struct platform_device *ams_delta_devices[] __initdata = {
-> > -	&ams_delta_nand_device,
-> >  	&ams_delta_kp_device,
-> > +	&ams_delta_camera_device,
-> > +};
-> > +
-> > +static struct platform_device *late_devices[] __initdata = {
-> > +	&ams_delta_nand_device,
-> >  	&ams_delta_lcd_device,
-> >  	&ams_delta_led_device,
-> > -	&ams_delta_camera_device,
-> >  };
-> >  
-> >  static void __init ams_delta_init(void)
-> > @@ -307,9 +310,6 @@ static void __init ams_delta_init(void)
-> >  	omap_serial_init();
-> >  	omap_register_i2c_bus(1, 100, NULL, 0);
-> >  
-> > -	/* Clear latch2 (NAND, LCD, modem enable) */
-> > -	ams_delta_latch2_write(~0, 0);
-> > -
-> >  	omap1_usb_init(&ams_delta_usb_config);
-> >  	omap1_set_camera_info(&ams_delta_camera_platform_data);
-> >  #ifdef CONFIG_LEDS_TRIGGERS
-> > @@ -345,13 +345,18 @@ static struct platform_device ams_delta_modem_device = {
-> >  	},
-> >  };
-> >  
-> > -static int __init ams_delta_modem_init(void)
-> > +static int __init late_init(void)
-> >  {
-> >  	int err;
-> >  
-> >  	if (!machine_is_ams_delta())
-> >  		return -ENODEV;
-> >  
-> > +	/* Clear latch2 (NAND, LCD, modem enable) */
-> > +	ams_delta_latch2_write(~0, 0);
-> > +
-> > +	platform_add_devices(late_devices, ARRAY_SIZE(late_devices));
-> > +
-> >  	omap_cfg_reg(M14_1510_GPIO2);
-> >  	ams_delta_modem_ports[0].irq =
-> >  			gpio_to_irq(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
-> > @@ -367,9 +372,16 @@ static int __init ams_delta_modem_init(void)
-> >  		AMS_DELTA_LATCH2_MODEM_NRESET | AMS_DELTA_LATCH2_MODEM_CODEC,
-> >  		AMS_DELTA_LATCH2_MODEM_NRESET | AMS_DELTA_LATCH2_MODEM_CODEC);
-> >  
-> > -	return platform_device_register(&ams_delta_modem_device);
-> > +	err = platform_device_register(&ams_delta_modem_device);
-> > +	if (err)
-> > +		goto gpio_free;
-> > +	return 0;
-> > +
-> > +gpio_free:
-> > +	gpio_free(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
-> > +	return err;
-> >  }
-> > -arch_initcall(ams_delta_modem_init);
-> > +late_initcall(late_init);
-> >  
-> >  static void __init ams_delta_map_io(void)
-> >  {
-> > diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
-> > index d4d08bd..835d37a 100644
-> > --- a/drivers/input/serio/ams_delta_serio.c
-> > +++ b/drivers/input/serio/ams_delta_serio.c
-> > @@ -165,7 +165,7 @@ serio:
-> >  	kfree(ams_delta_serio);
-> >  	return err;
-> >  }
-> > -module_init(ams_delta_serio_init);
-> > +late_initcall(ams_delta_serio_init);
-> >  
-> >  static void __exit ams_delta_serio_exit(void)
-> >  {
-> > diff --git a/sound/soc/omap/ams-delta.c b/sound/soc/omap/ams-delta.c
-> > index ccb8a6a..be81bc7 100644
-> > --- a/sound/soc/omap/ams-delta.c
-> > +++ b/sound/soc/omap/ams-delta.c
-> > @@ -636,7 +636,7 @@ err:
-> >  	platform_device_put(ams_delta_audio_platform_device);
-> >  	return ret;
-> >  }
-> > -module_init(ams_delta_module_init);
-> > +late_initcall(ams_delta_module_init);
-> >  
-> >  static void __exit ams_delta_module_exit(void)
-> >  {
-> 
+-- 
+Best regards, Denis Kuzmenko.
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: .config
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111221/e70a99b9/attachment-0001.ksh>
