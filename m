@@ -1,19 +1,31 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 21 Dec 2011 19:31:56 +0200
-Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
+Date: Wed, 21 Dec 2011 19:35:07 +0200
+Subject: Adding remoteproc/rpmsg to linux-next
+In-Reply-To: <20111212103301.5ff6a582dca82394ace40e8d@canb.auug.org.au>
+References: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
+ <20111212103301.5ff6a582dca82394ace40e8d@canb.auug.org.au>
+Message-ID: <CAK=WgbZm9txdvZ1VW-iUn5306yMz1Y=DT_Uygwi6zPZNyWx7gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Arnd,
 
-2011/12/21 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> If you're interested in the details I can publish my tree I think.
+On Mon, Dec 12, 2011 at 1:33 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> On Fri, 9 Dec 2011 16:55:27 +0200 Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>>
+>> Can you please add the following remoteproc tree to linux-next ?
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
+>
+> I have added that from today.
 
-Definitely interested - it could be very nice if you can publish that tree.
+Would you like rpmsg/remoteproc to go through arm-soc or do you prefer
+me to send a pull request directly to Linus ?
+
+If you prefer the former (IIRC you told me you might consider it in a
+random ELCE hallway conversation :) then I'll send you a pull request.
+
+I'm happy either way.
 
 Thanks!
 Ohad.
