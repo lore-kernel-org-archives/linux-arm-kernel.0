@@ -1,23 +1,43 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 21 Dec 2011 12:41:52 +0100
-Subject: [PATCH] dmaengine: Add support for MEMCPY for imx-dma.
-In-Reply-To: <1324051191-19507-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1324051191-19507-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <CACKLOr1eUahSQ4vJiuqsXMyJ1Rezq+yGSoSULQ4R==8mK6QrfQ@mail.gmail.com>
+From: kay.sievers@vrfy.org (Kay Sievers)
+Date: Wed, 21 Dec 2011 12:44:57 +0100
+Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
+In-Reply-To: <201112210943.34310.arnd@arndb.de>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+ <20111221012046.GE15863@b20223-02.ap.freescale.net>
+ <20111221092739.GI15863@b20223-02.ap.freescale.net>
+ <201112210943.34310.arnd@arndb.de>
+Message-ID: <CAPXgP10FCrqdTg++46m4+xxM9tw1ZrKc8wz=JkKjCHJ0hQPtng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments on this patch?
-I don't know exactly which tree this belongs to. Sascha have you
-applied it to your tree?
+On Wed, Dec 21, 2011 at 10:43, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 21 December 2011, Richard Zhao wrote:
+>> On Wed, Dec 21, 2011 at 09:20:46AM +0800, Richard Zhao wrote:
+>
+>> > > > > You also need to define how the core supplies get looked up.
+>> > >
+>> > > > It's pure software. platform uses this driver have to define "cpu" consumer.
+>> > >
+>> > > You still need to define this in the binding.
+>> > You mean regulator DT binding? already in ? I'll check it.
+>> Mark, cpu node is not a struct device, sys_device instead. I can not find
+>> regulator via device/dt node. Can I still use the string to get regulator
+>> after converting to DT?
+>
+> I believe Kay and Greg have the plan to unify "class" and "bus" in sysfs, which
+> implies turning sys_device into a derived class of device instead of kobject.
+> If that understanding is correct, we might as well do that now so we can
+> attach a device_node to a sys_device.
+>
+> Kay, does this make sense?
 
-Thank you.
+Yes, it's all converted already:
+  http://git.kernel.org/?p=linux/kernel/git/kay/patches.git;a=tree
 
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+The sysdev stuff will entirely go away, the devices are just 'struct
+device' and the sysdev classes are all converted to buses.
+
+We will convert all classes to buses over time time, and have a single
+type of device and a single type of subsystem.
+
+Kay
