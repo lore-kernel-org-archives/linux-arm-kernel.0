@@ -1,48 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Dec 2011 22:34:55 +0100
-Subject: [PATCH] net: macb: fix build break with !CONFIG_OF
-In-Reply-To: <1324416029-28198-1-git-send-email-olof@lixom.net>
-References: <1324416029-28198-1-git-send-email-olof@lixom.net>
-Message-ID: <4EF250FF.7090302@atmel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 22 Dec 2011 07:04:28 +0900
+Subject: [PATCHv2 resend] Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+In-Reply-To: <4EF23852.1050304@solonet.org.ua>
+References: <4EE7BE5F.8020108@solonet.org.ua>
+ <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
+ <4EF23852.1050304@solonet.org.ua>
+Message-ID: <06fa01ccc02c$828b6810$87a23830$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2011 10:20 PM, Olof Johansson :
-> This fixes the build of the macb driver that was broken by the DT changes:
+Denis Kuzmenko wrote:
 > 
-> drivers/net/ethernet/cadence/macb.c:1503: error: implicit declaration of function 'of_match_ptr'
-> drivers/net/ethernet/cadence/macb.c:1503: error: 'macb_dt_ids' undeclared here (not in a function)
-> drivers/net/ethernet/cadence/macb.c:1503: error: initializer element is not constant
-> drivers/net/ethernet/cadence/macb.c:1503: error: (near initialization for 'macb_driver.driver.of_match_table')
+> On 12/21/2011 09:04 AM, Kukjin Kim wrote:
+> > Denis Kuzmenko wrote:
+> >>
+> >> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+> >>
+> >> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+> >> ---
+> >>
+> >> Patch is against 3.2-rc4.
+> >> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of
+> this
+> >> the
+> >> file s3c2410-iotiming.c is not ever compiled and enabling
+> >> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
+> >> function
+> >> s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs
+> >> defined
+> >> as NULL for this case.
+> >>
+> > Hi Denis,
+> >
+> > Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected in
+> my
+> > case and s3c2410-iotiming.c is built...when is it happened? I just
+> selected
+> > every regarding configuration in kernel menuconfig...
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Please, try attached config (it's still failing in v3.2-rc6).
+> 
+Hi Denis,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Olof, thanks for this patch.
+Yes, when s3c2410 stuff is not selected, it happened.
+Look at me soon and thanks.
 
 Best regards,
-
-> ---
-> 
-> Nicolas, care to ack this so I can apply it on top of the macb DT branch in arm-soc?
-> 
->  drivers/net/ethernet/cadence/macb.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index baf1a0d..f3d5c65 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -23,6 +23,7 @@
->  #include <linux/platform_data/macb.h>
->  #include <linux/platform_device.h>
->  #include <linux/phy.h>
-> +#include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/of_net.h>
->  
-
-
--- 
-Nicolas Ferre
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
