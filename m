@@ -1,28 +1,43 @@
-From: arjan@linux.intel.com (Arjan van de Ven)
-Date: Wed, 21 Dec 2011 10:44:42 +0100
-Subject: [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <4EF1A0B4.5080307@linux.intel.com>
- <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
-Message-ID: <4EF1AA8A.8060304@linux.intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Dec 2011 09:46:24 +0000
+Subject: Is Pandaboard cpuhotplug working stably?
+In-Reply-To: <CAGsJ_4ydbMaS0DD6+j1m9tdCTCzw3TGELcY=KotupvvMMK1YOA@mail.gmail.com>
+References: <CAGsJ_4ydbMaS0DD6+j1m9tdCTCzw3TGELcY=KotupvvMMK1YOA@mail.gmail.com>
+Message-ID: <20111221094624.GB3354@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2011 10:40 AM, Colin Cross wrote:
-
->> this smells fundamentally racey to me; you can get an interrupt one
->> cycle after you think you're done, but before the last guy enters WFI...
->>
->> how do you solve that issue ?
+On Wed, Dec 21, 2011 at 05:23:48PM +0800, Barry Song wrote:
+> Hi guys,
+> i tried cpuhotplug on pandaboard for both
+> Pandroid_Froyo_L27.8.2_release_pkg and Linaro 11.11. It has failed to
+> work stably.
+> On Pandroid_Froyo_L27.8.2_release_pkg, unplugging cpu1 works well:
+> # echo 0 > /sys/devices/system/cpu/cpu1/online
+> CPU1: shutdown
 > 
-> All the cpus have interrupts off when they increment the counter, so
-> they cannot receive an interrupt.  If an interrupt is pending on one
-> of those cpus, it will be handled later when WFI aborts due to the
-> pending interrupt.
+> if i enable the cpu1 again by "echo 1 >
+> /sys/devices/system/cpu/cpu1/online", the system will restore to 3
+> random status: hang, normal, panic.
+> 
+> Using  Linaro 11.11 release, "echo 0 >
+> /sys/devices/system/cpu/cpu1/online" will make system hang and the
+> whole system will not be able to reset by pressing reset key, the only
+> way to reset system is pulling out AV power.
+> 
+> i am sorry i can't get more time to debug and find more clues. just
+> want to ask people whether this is a version the cpuhotplug works
+> normal on?
 
-... but this leads to cases where you're aborting before other cpus are
-entering..... so your "last guy in" doesn't really work, since while cpu
-0 thinks it's the last guy, cpu 1 is already on the way out/out
-already...  (heck it might already be going back to sleep if your idle
-code can run fast, like in the size of a cache miss)
+cpu hotplug is basically totally buggered - the preconditions placed
+upon the bringup code path are basically impossible to satisfy in any
+shape or form at the moment.
+
+There's the requirement that the secondary CPU is marked online and
+active before interrupts are enabled for the thread migration stuff
+to behave correctly.  However, this is incompatible with smp_call_function()
+which will wait for online CPUs to respond to an IPI - which this one
+won't because interrupts are disabled.
+
+I think there was some discussion about how to fix this but I don't
+recall the details.
