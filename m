@@ -1,41 +1,57 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Dec 2011 13:06:14 +0900
-Subject: [PATCH 1/8] s3c-hsudc: move platform_data struct to global header
-In-Reply-To: <201112201236.37581.heiko@sntech.de>
-References: <201112191938.22254.heiko@sntech.de>
- <201112191939.16542.heiko@sntech.de>
- <20111220112458.GG31842@legolas.emea.dhcp.ti.com>
- <201112201236.37581.heiko@sntech.de>
-Message-ID: <061801ccbf95$e1df4580$a59dd080$%kim@samsung.com>
+Date: Wed, 21 Dec 2011 13:07:01 +0900
+Subject: [RESEND PATCH] ARM: SAMSUNG: Add s3c_setparent_clksrc in
+ s3c_set_clksrc
+In-Reply-To: <1323829221-14171-1-git-send-email-jhbird.choi@samsung.com>
+References: <1323829221-14171-1-git-send-email-jhbird.choi@samsung.com>
+Message-ID: <061a01ccbf95$fe1e6960$fa5b3c20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+jhbird.choi at samsung.com wrote:
 > 
-> Am Dienstag, 20. Dezember 2011, 12:25:00 schrieb Felipe Balbi:
-> > Hi,
-> >
-> > On Mon, Dec 19, 2011 at 07:39:15PM +0100, Heiko St?bner wrote:
-> > > Gadget drivers should be compilable on all architectures.
-> > > This patch removes one dependency on architecture-specific code.
-> > >
-> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > ---
-> > >
-> > >  arch/arm/mach-s3c2416/mach-smdk2416.c    |    1 +
-> > >  arch/arm/plat-samsung/devs.c             |    1 +
-> > >  arch/arm/plat-samsung/include/plat/udc.h |   15 +------------
-> >
-> > I would like to have ack from Ben and/or Kukjin before applying this
-> > one. Ben are you ok with this patch ?
-> I think Kukjin does more acking if this stuff currently, so hopefully he will
-> see this mail.
+> From: Jonghwan Choi <jhbird.choi@samsung.com>
 > 
+> Currently we have to run clk_set_parent to change clock source.
+> But if there are sources & parent defined, it means we will select a
+> parent
+> in multiple clock sources. So sources & parent are already defined,
+> set the parent clock int s3c_set_clksrc.
+> Then we can reduce many clk_set_parent function in driver or setup_clock
+> function.
+> 
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> ---
+>  arch/arm/plat-samsung/clock-clksrc.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-
+> samsung/clock-clksrc.c
+> index ae8b850..61dfe0d 100644
+> --- a/arch/arm/plat-samsung/clock-clksrc.c
+> +++ b/arch/arm/plat-samsung/clock-clksrc.c
+> @@ -140,6 +140,14 @@ void __init_or_cpufreq s3c_set_clksrc(struct
+> clksrc_clk *clk, bool announce)
+>  		return;
+>  	}
+> 
+> +	if (clk->sources && clk->clk.parent) {
+> +		if (s3c_setparent_clksrc(&clk->clk, clk->clk.parent)) {
+> +			printk(KERN_ERR "%s: bad source is %s\n",
+> +					clk->clk.name, clk->clk.parent->name);
+> +			return;
+> +		}
+> +	}
+> +
+>  	clksrc = __raw_readl(clk->reg_src.reg);
+>  	clksrc &= mask;
+>  	clksrc >>= clk->reg_src.shift;
+> --
+> 1.7.1
 
-Hi Felipe,
-
-Looks ok to me, you can go ahead with my ack.
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Hmm, I think, this  is not good. If there is a mux which includes clock sources, as you know, its parent clock can be selected
+according to the value of reg_src and it should be changed by calling clk_set_parent() even though this can help in some kind of
+view. And the clksrc_clk depends on SoC not board so the clk.parent cannot be fixed at the clock.c file.
 
 Thanks.
 
