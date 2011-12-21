@@ -1,32 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Dec 2011 09:43:34 +0000
-Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
-In-Reply-To: <20111221092739.GI15863@b20223-02.ap.freescale.net>
-References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
- <20111221012046.GE15863@b20223-02.ap.freescale.net>
- <20111221092739.GI15863@b20223-02.ap.freescale.net>
-Message-ID: <201112210943.34310.arnd@arndb.de>
+From: arjan@linux.intel.com (Arjan van de Ven)
+Date: Wed, 21 Dec 2011 10:44:42 +0100
+Subject: [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <4EF1A0B4.5080307@linux.intel.com>
+ <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
+Message-ID: <4EF1AA8A.8060304@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 December 2011, Richard Zhao wrote:
-> On Wed, Dec 21, 2011 at 09:20:46AM +0800, Richard Zhao wrote:
+On 12/21/2011 10:40 AM, Colin Cross wrote:
 
-> > > > > You also need to define how the core supplies get looked up.
-> > > 
-> > > > It's pure software. platform uses this driver have to define "cpu" consumer.
-> > > 
-> > > You still need to define this in the binding.
-> > You mean regulator DT binding? already in ? I'll check it.
-> Mark, cpu node is not a struct device, sys_device instead. I can not find
-> regulator via device/dt node. Can I still use the string to get regulator
-> after converting to DT?
+>> this smells fundamentally racey to me; you can get an interrupt one
+>> cycle after you think you're done, but before the last guy enters WFI...
+>>
+>> how do you solve that issue ?
+> 
+> All the cpus have interrupts off when they increment the counter, so
+> they cannot receive an interrupt.  If an interrupt is pending on one
+> of those cpus, it will be handled later when WFI aborts due to the
+> pending interrupt.
 
-I believe Kay and Greg have the plan to unify "class" and "bus" in sysfs, which
-implies turning sys_device into a derived class of device instead of kobject.
-If that understanding is correct, we might as well do that now so we can
-attach a device_node to a sys_device.
-
-Kay, does this make sense?
-
-	Arnd
+... but this leads to cases where you're aborting before other cpus are
+entering..... so your "last guy in" doesn't really work, since while cpu
+0 thinks it's the last guy, cpu 1 is already on the way out/out
+already...  (heck it might already be going back to sleep if your idle
+code can run fast, like in the size of a cache miss)
