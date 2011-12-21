@@ -1,77 +1,56 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 21 Dec 2011 15:52:02 +0100
-Subject: [PATCH] ARM: imx6q: build pm code only when CONFIG_PM selected
-In-Reply-To: <1324478303-3899-1-git-send-email-eric.miao@linaro.org>
-References: <1324478303-3899-1-git-send-email-eric.miao@linaro.org>
-Message-ID: <20209.62098.146087.510816@ipc1.ka-ro>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 21 Dec 2011 23:00:45 +0800
+Subject: [PATCH 2/4] regulator: mc13892: remove the unnecessary prefix from
+ regulator name
+In-Reply-To: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
+References: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1324479647-4580-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It's not really necessary to add a prefix 'MC13892__' for each mc13892
+regulator name, since the chip must have been identified as mc13892
+when we look at the regulator name.
 
-Eric Miao writes:
-[...]
-> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
-> index 6229efb..a59cae7 100644
-> --- a/arch/arm/mach-imx/head-v7.S
-> +++ b/arch/arm/mach-imx/head-v7.S
-> @@ -71,6 +71,7 @@ ENTRY(v7_secondary_startup)
->  ENDPROC(v7_secondary_startup)
->  #endif
->  
-> +#ifdef CONFIG_PM
->  /*
->   * The following code is located into the .data section.  This is to
->   * allow phys_l2x0_saved_regs to be accessed with a relative load
-> @@ -97,3 +98,4 @@ ENDPROC(v7_cpu_resume)
->  	.globl	phys_l2x0_saved_regs
->  phys_l2x0_saved_regs:
->          .long   0
-> +#endif
->
-While you are changing mach-imx/head-v7.S you could also fix a build
-error with 'CONFIG_CACHE_L2x0' disabled.
-I just found this, but sending a patch now would conflict with your
-patch:
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@ti.com>
 
-diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
-index 6229efb..830b5c8 100644
---- a/arch/arm/mach-imx/head-v7.S
-+++ b/arch/arm/mach-imx/head-v7.S
-@@ -80,12 +80,14 @@ ENDPROC(v7_secondary_startup)
- 	.align
- 
- 	.macro	pl310_resume
-+#ifdef CONFIG_CACHE_L2X0
- 	ldr	r2, phys_l2x0_saved_regs
- 	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
- 	ldr	r1, [r2, #L2X0_R_AUX_CTRL]	@ get aux_ctrl value
- 	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
- 	mov	r1, #0x1
- 	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
-+#endif
- 	.endm
- 
- ENTRY(v7_cpu_resume)
-@@ -94,6 +96,8 @@ ENTRY(v7_cpu_resume)
- 	b	cpu_resume
- ENDPROC(v7_cpu_resume)
- 
-+#ifdef CONFIG_CACHE_L2X0
- 	.globl	phys_l2x0_saved_regs
- phys_l2x0_saved_regs:
-         .long   0
-+#endif
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/regulator/mc13xxx.h |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-
-Lothar Wa?mann
+diff --git a/drivers/regulator/mc13xxx.h b/drivers/regulator/mc13xxx.h
+index 2775826..75e3832 100644
+--- a/drivers/regulator/mc13xxx.h
++++ b/drivers/regulator/mc13xxx.h
+@@ -48,7 +48,7 @@ extern struct regulator_ops mc13xxx_fixed_regulator_ops;
+ #define MC13xxx_DEFINE(prefix, _name, _reg, _vsel_reg, _voltages, _ops)	\
+ 	[prefix ## _name] = {				\
+ 		.desc = {						\
+-			.name = #prefix "_" #_name,			\
++			.name = #_name,					\
+ 			.n_voltages = ARRAY_SIZE(_voltages),		\
+ 			.ops = &_ops,			\
+ 			.type = REGULATOR_VOLTAGE,			\
+@@ -66,7 +66,7 @@ extern struct regulator_ops mc13xxx_fixed_regulator_ops;
+ #define MC13xxx_FIXED_DEFINE(prefix, _name, _reg, _voltages, _ops)	\
+ 	[prefix ## _name] = {				\
+ 		.desc = {						\
+-			.name = #prefix "_" #_name,			\
++			.name = #_name,					\
+ 			.n_voltages = ARRAY_SIZE(_voltages),		\
+ 			.ops = &_ops,		\
+ 			.type = REGULATOR_VOLTAGE,			\
+@@ -81,7 +81,7 @@ extern struct regulator_ops mc13xxx_fixed_regulator_ops;
+ #define MC13xxx_GPO_DEFINE(prefix, _name, _reg,  _voltages, _ops)	\
+ 	[prefix ## _name] = {				\
+ 		.desc = {						\
+-			.name = #prefix "_" #_name,			\
++			.name = #_name,					\
+ 			.n_voltages = ARRAY_SIZE(_voltages),		\
+ 			.ops = &_ops,		\
+ 			.type = REGULATOR_VOLTAGE,			\
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.4.1
