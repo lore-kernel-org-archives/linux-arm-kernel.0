@@ -1,47 +1,40 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 21 Dec 2011 09:48:24 +0800
-Subject: [PATCH v4 2/4] ARM: pxa168: Add SDHCI support
-In-Reply-To: <20111220210324.GD2577@n2100.arm.linux.org.uk>
-References: <CAN1soZxZjdzivfttUhDDvjUDiyiAC5SSKtB0rXR1D=3=q6O0wQ@mail.gmail.com>
- <1324386781-25271-1-git-send-email-tanmay.upadhyay@einfochips.com>
- <20111220210324.GD2577@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZwwPe1Xdh=EO-wdynihaBQ8DvWV=imjokJvDZVC+qqdSg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 21 Dec 2011 10:12:47 +0800
+Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
+In-Reply-To: <20111221013702.GB15398@opensource.wolfsonmicro.com>
+References: <20111220020101.GD5683@S2100-06.ap.freescale.net>
+ <20111220015931.GX2860@opensource.wolfsonmicro.com>
+ <20111220030347.GB2995@S2101-09.ap.freescale.net>
+ <20111220112510.GL2866@opensource.wolfsonmicro.com>
+ <20111220135251.GB5129@S2101-09.ap.freescale.net>
+ <20111220143558.GT2866@opensource.wolfsonmicro.com>
+ <20111220153101.GD5348@S2101-09.ap.freescale.net>
+ <20111220232526.GA6551@opensource.wolfsonmicro.com>
+ <20111221012519.GA5983@S2101-09.ap.freescale.net>
+ <20111221013702.GB15398@opensource.wolfsonmicro.com>
+Message-ID: <20111221021246.GB5983@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 5:03 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Just two minor style issues in this patch.
->
-> On Tue, Dec 20, 2011 at 06:43:01PM +0530, Tanmay Upadhyay wrote:
->> +static inline int pxa168_add_sdh(int id, struct sdhci_pxa_platdata *data)
->> +{
->> + ? ? struct pxa_device_desc *d = NULL;
->> +
->> + ? ? switch (id) {
->> + ? ? case 1: d = &pxa168_device_sdh1; break;
->> + ? ? case 2: d = &pxa168_device_sdh2; break;
->> + ? ? case 3: d = &pxa168_device_sdh3; break;
->> + ? ? case 4: d = &pxa168_device_sdh4; break;
->
-> Style.
-> ? ? ? ?case X:
-> ? ? ? ? ? ? ? ?d = &y;
-> ? ? ? ? ? ? ? ?break;
->
->> +static void sdh_clk_disable(struct clk *clk)
->> +{
->> + ? ? __raw_writel(__raw_readl(clk->clk_rst) & ~(clk->enable_val),
->
-> Parens around clk->enable_val not required.
->
->> + ? ? INIT_CLKREG(&clk_sdh1, NULL, "PXA-SDHCLK"),
->> + ? ? INIT_CLKREG(&clk_sdh2, NULL, "PXA-SDHCLK"),
->> + ? ? INIT_CLKREG(&clk_sdh3, NULL, "PXA-SDHCLK"),
->> + ? ? INIT_CLKREG(&clk_sdh4, NULL, "PXA-SDHCLK"),
->
-> So these clocks are registered with the same name? ?How are they
-> distinguished by clk_get()?
->
+On Wed, Dec 21, 2011 at 01:37:03AM +0000, Mark Brown wrote:
+> On Wed, Dec 21, 2011 at 09:25:21AM +0800, Shawn Guo wrote:
+> > The problem is even if we have the name defined that way, it has to be
+> > matched to the name used in mc13892 driver somehow, if we want to use
+> > name as the key to find the regulator defined in mc13892 driver as
+> > array mc13892_regulators[].
+> 
+> This doesn't seem like a problem - the most obvious thing would just be
+> to adjust the strings in the code to correspond to what the device tree
+> binding says.
+> 
+Okay, that's it.  Something obvious to you is not obvious to me :)
+As I'm migrating an existing driver to be DT aware, I'm trying to avoid
+changing any non-dt code.  Your suggestion would be obvious to me if I'm
+writing a new driver that only supports DT.
 
-Yes, it's better to use devname.
+Anyway, I got your point, and will follow that since you seems fine
+with changing non-dt code to adopt dt support.
+
+-- 
+Regards,
+Shawn
