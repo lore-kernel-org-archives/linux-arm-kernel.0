@@ -1,31 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Dec 2011 10:07:06 +0000
-Subject: Is Pandaboard cpuhotplug working stably?
-In-Reply-To: <CAGsJ_4w0iVXC6qmDzmkuOb=ZN=Q0bF7EAFkxeYR_d7-vo+8bqQ@mail.gmail.com>
-References: <CAGsJ_4ydbMaS0DD6+j1m9tdCTCzw3TGELcY=KotupvvMMK1YOA@mail.gmail.com>
- <20111221094624.GB3354@n2100.arm.linux.org.uk>
- <CAGsJ_4w0iVXC6qmDzmkuOb=ZN=Q0bF7EAFkxeYR_d7-vo+8bqQ@mail.gmail.com>
-Message-ID: <20111221100706.GC3354@n2100.arm.linux.org.uk>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 21 Dec 2011 11:22:34 +0100
+Subject: [RFC 1/8] gpio/microblaze: Eliminate duplication of
+ of_get_named_gpio_flags()
+In-Reply-To: <1320801583-12774-2-git-send-email-grant.likely@secretlab.ca>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-2-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <4EF1B36A.8050304@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 05:59:07PM +0800, Barry Song wrote:
-> 2011/12/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > cpu hotplug is basically totally buggered - the preconditions placed
-> > upon the bringup code path are basically impossible to satisfy in any
-> > shape or form at the moment.
-> >
-> > There's the requirement that the secondary CPU is marked online and
-> > active before interrupts are enabled for the thread migration stuff
-> > to behave correctly. ?However, this is incompatible with smp_call_function()
-> > which will wait for online CPUs to respond to an IPI - which this one
-> > won't because interrupts are disabled.
-> >
-> > I think there was some discussion about how to fix this but I don't
-> > recall the details.
+Grant Likely wrote:
+> of_reset_gpio_handle() is largely a cut-and-paste copy of
+> of_get_named_gpio_flags(). There really isn't any reason for the
+> split, so this patch deletes the duplicate function
 > 
-> thanks, Russell. then could i think this is an ARM-kernel-specific bug
-> which exists on all ARM SMP chips for the moment?
-> and that bug doesn't happen on x86:
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Michal Simek <monstr@monstr.eu>
+> ---
+>  arch/microblaze/kernel/reset.c |   43 +--------------------------------------
+>  1 files changed, 2 insertions(+), 41 deletions(-)
 
-I don't think so.  There's nothing ARM specific about it.
+Sorry for taking to long.
+
+Tested and applied to microblaze tree.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
