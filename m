@@ -1,31 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Dec 2011 11:14:47 -0800
-Subject: [GIT PULL 0/5] Tegra updates for 3.3
-Message-ID: <CAOesGMhxGdPOXhVd0LSbmkOJxHK75iuWek7ET4uB6gbct-cNfw@mail.gmail.com>
+Date: Wed, 21 Dec 2011 11:14:52 -0800
+Subject: [GIT PULL 1/5] Tegra cleanups for 3.3
+Message-ID: <CAOesGMja7+nA-VSF9bEmUJRbpLbVwZ+ngC1+qJ4Sz8L3Bx0m5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-I have a series of 5 pull request for 3.3 merge window:
-
-* Cleanups
-* Device tree
-* SoC
-* Board
-* Drivers
-
-I have been merging them into for-next in the above order (with the
-exception of DT that I accidentally merged out-of-order in the last
-for-next merge).
-
-They will have some merge conflicts with devel-stable and between each
-other, all of them should be trivial and you can compare your
-resolutions with those in:
-
-http://git.kernel.org/?p=linux/kernel/git/olof/tegra.git;a=shortlog;h=refs/heads/for-next
+Please pull the following cleanups for tegra. Thanks!
 
 
-Thanks!
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
 
--Olof
+  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/cleanup
+
+Olof Johansson (1):
+      arm/tegra: fix variable formatting in makefile
+
+Stephen Warren (1):
+      arm/tegra: Remove code that's ifndef CONFIG_ARM_GIC
+
+pdeschrijver at nvidia.com (1):
+      arm/tegra: remove unused defines
+
+ arch/arm/mach-tegra/Makefile                   |   26 ++++++++++++------------
+ arch/arm/mach-tegra/include/mach/entry-macro.S |   23 ---------------------
+ arch/arm/mach-tegra/irq.c                      |    4 ---
+ 3 files changed, 13 insertions(+), 40 deletions(-)
