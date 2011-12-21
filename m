@@ -1,186 +1,117 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 21 Dec 2011 12:50:02 +0530
-Subject: [PATCH v2] davinci: DA850 EVM: OHCI platform code
-Message-ID: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Wed, 21 Dec 2011 07:29:31 +0000
+Subject: [PATCH v6 05/11] ARM: davinci: create new common platform
+ header for davinci
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6051001@DBDE01.ent.ti.com>
+References: <1323951120-15876-1-git-send-email-manjunath.hadli@ti.com>
+ <1323951120-15876-6-git-send-email-manjunath.hadli@ti.com>
+ <DF0F476B391FA8409C78302C7BA518B6051001@DBDE01.ent.ti.com>
+Message-ID: <E99FAA59F8D8D34D8A118DD37F7C8F750187E6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+Sekhar,
+On Wed, Dec 21, 2011 at 00:45:47, Nori, Sekhar wrote:
+> Hi Manju,
+> 
+> On Thu, Dec 15, 2011 at 17:41:54, Hadli, Manjunath wrote:
+> > remove the code from individual platform header files for
+> 
+> Not just the code, the files themselves are being removed.
+> 
+> > dm365, dm355, dm644x and dm646x and consolidate it into a single and 
+> > common header file davinci.h.
+> 
+> .. placed in arch/arm/mach-davinci/
+> 
+> > 
+> > This reduces the pollution in the include/mach and is consistent with 
+> > Russel's suggestions as part of his "pet peaves" mail.
+> > 
+> > The further patches in the series take  advantage of this 
+> > consolidation for easy implementation of IO_ADDRESS elimination.
+> > 
+> > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> > ---
+> 
+> [...]
+> 
+> > diff --git a/arch/arm/mach-davinci/board-dm355-evm.c 
+> > b/arch/arm/mach-davinci/board-dm355-evm.c
+> > index 4e0e707..7ae0d15 100644
+> > --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> > +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> > @@ -26,7 +26,7 @@
+> >  #include <asm/mach-types.h>
+> >  #include <asm/mach/arch.h>
+> >  
+> > -#include <mach/dm355.h>
+> > +#include "davinci.h"
+> >  #include <mach/i2c.h>
+> 
+> Local headers should typically be the last ones included. Can you please revisit the header file inclusion order throughout this patch? The headers in linux/ need to be added first followed by asm/ mach/ and then the private headers.
+> 
+> Also, like headers need to be grouped together using empty lines. You can look at arch/arm/mach-davinci/board-dm644x-evm.c
+> as an example of how existing code looks.
+> 
+> [...]
+> 
+> > diff --git a/arch/arm/mach-davinci/davinci.h 
+> > b/arch/arm/mach-davinci/davinci.h
+> 
+> > +/* DM355 function declarations */
+> > +struct spi_board_info;
+> > +
+> > +void __init dm355_init(void);
+> > +void dm355_init_spi0(unsigned chipselect_mask,
+> > +		struct spi_board_info *info, unsigned len); void __init 
+> > +dm355_init_asp1(u32 evt_enable, struct snd_platform_data *pdata); 
+> > +void dm355_set_vpfe_config(struct vpfe_config *cfg);
+> > +
+> > +/* DM365 function declarations */
+> > +void __init dm365_init(void);
+> > +void __init dm365_init_asp(struct snd_platform_data *pdata); void 
+> > +__init dm365_init_vc(struct snd_platform_data *pdata); void __init 
+> > +dm365_init_ks(struct davinci_ks_platform_data *pdata); void __init 
+> > +dm365_init_rtc(void); void dm365_init_spi0(unsigned chipselect_mask,
+> > +			struct spi_board_info *info, unsigned len);
+> > +
+> 
+> You can drop the empty line here...
+> 
+> > +void dm365_set_vpfe_config(struct vpfe_config *cfg);
+> > +
+> > +/* DM644x function declarations */
+> > +void __init dm644x_init(void);
+> > +void __init dm644x_init_asp(struct snd_platform_data *pdata); void 
+> > +dm644x_set_vpfe_config(struct vpfe_config *cfg);
+> > +
+> > +/* DM646x function declarations */
+> > +void __init dm646x_init(void);
+> > +void __init dm646x_init_mcasp0(struct snd_platform_data *pdata); void 
+> > +__init dm646x_init_mcasp1(struct snd_platform_data *pdata); int 
+> > +__init dm646x_init_edma(struct edma_rsv_info *rsv);
+> > +
+> > +void dm646x_video_init(void);
+> > +
+> > +void dm646x_setup_vpif(struct vpif_display_config *,
+> > +		       struct vpif_capture_config *);
+> 
+> .. and these two as well.
+> 
+> I have merged 2/11, 3/11 and 4/11 of this series into my master branch. Can you please respin 1/11 and 5/11 of this series based on my new master and with my comments fixed?
+I will. Can you send me the link for your new master?
 
-On this board the OHCI port's power control and over-current signals from
-TPS2065 power switch are connected via GPIO2[4] and GPIO6[13] respectively,
-so we can implement the DA8xx OHCI glue layer's hooks for overriding the
-root hub port's power and over-current status bits.
+> 
+> Based on your patch 1/11, I guess you have grepped the driver sources to make sure none of them are including any of the files you are deleting. Want to double check.
+There was another file-sound codec with the inclusion of the header which
+was not needed. I have deleted the inclusion from that file. Will send 
+across that patch also.
 
-We also have to properly set up the clocking mode in the CFGCHIP2 register,
-so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
-its output is used to clock the USB 1.1 (OHCI) PHY...
-
-Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
----
-Since v1:
-Fixed Sergei's review comments.
-
- arch/arm/mach-davinci/board-da850-evm.c |  125 +++++++++++++++++++++++++++++++
- 1 files changed, 125 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 6659a90..c505992 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -22,6 +22,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/platform_device.h>
-+#include <linux/interrupt.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-@@ -42,6 +43,7 @@
- #include <mach/nand.h>
- #include <mach/mux.h>
- #include <mach/aemif.h>
-+#include <mach/usb.h>
- #include <mach/spi.h>
- 
- #define DA850_EVM_PHY_ID		"0:00"
-@@ -734,6 +736,126 @@ static struct davinci_i2c_platform_data da850_evm_i2c_0_pdata = {
- 	.bus_delay	= 0,	/* usec */
- };
- 
-+/*
-+ * USB1 VBUS is controlled by GPIO2[4], over-current is reported on GPIO6[13].
-+ */
-+#define ON_BD_USB_DRV	GPIO_TO_PIN(2, 4)
-+#define ON_BD_USB_OVC	GPIO_TO_PIN(6, 13)
-+
-+static const short da850_evm_usb11_pins[] = {
-+	DA850_GPIO2_4, DA850_GPIO6_13,
-+	-1
-+};
-+
-+static da8xx_ocic_handler_t da850_evm_usb_ocic_handler;
-+
-+static int da850_evm_usb_set_power(unsigned port, int on)
-+{
-+	gpio_set_value(ON_BD_USB_DRV, on);
-+	return 0;
-+}
-+
-+static int da850_evm_usb_get_power(unsigned port)
-+{
-+	return gpio_get_value(ON_BD_USB_DRV);
-+}
-+
-+static int da850_evm_usb_get_oci(unsigned port)
-+{
-+	return !gpio_get_value(ON_BD_USB_OVC);
-+}
-+
-+static irqreturn_t da850_evm_usb_ocic_irq(int, void *);
-+
-+static int da850_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
-+{
-+	int irq		= gpio_to_irq(ON_BD_USB_OVC);
-+	int error	= 0;
-+
-+	if (handler != NULL) {
-+		da850_evm_usb_ocic_handler = handler;
-+
-+		error = request_irq(irq, da850_evm_usb_ocic_irq,
-+				    IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-+				    "OHCI over-current indicator", NULL);
-+		if (error)
-+			printk(KERN_ERR "%s: could not request IRQ to watch "
-+			       "over-current indicator changes\n", __func__);
-+	} else
-+		free_irq(irq, NULL);
-+
-+	return error;
-+}
-+
-+static struct da8xx_ohci_root_hub da850_evm_usb11_pdata = {
-+	.set_power	= da850_evm_usb_set_power,
-+	.get_power	= da850_evm_usb_get_power,
-+	.get_oci	= da850_evm_usb_get_oci,
-+	.ocic_notify	= da850_evm_usb_ocic_notify,
-+
-+	/* TPS2065 switch @ 5V */
-+	.potpgt		= (3 + 1) / 2,	/* 3 ms max */
-+};
-+
-+static irqreturn_t da850_evm_usb_ocic_irq(int irq, void *dev_id)
-+{
-+	da850_evm_usb_ocic_handler(&da850_evm_usb11_pdata, 1);
-+	return IRQ_HANDLED;
-+}
-+
-+static __init void da850_evm_usb_init(void)
-+{
-+	u32 cfgchip2;
-+	int ret;
-+
-+	/*
-+	 * Set up USB clock/mode in the CFGCHIP2 register.
-+	 * FYI:  CFGCHIP2 is 0x0000ef00 initially.
-+	 */
-+	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
-+
-+	/* USB2.0 PHY reference clock is 24 MHz */
-+	cfgchip2 &= ~CFGCHIP2_REFFREQ;
-+	cfgchip2 |=  CFGCHIP2_REFFREQ_24MHZ;
-+
-+	/*
-+	 * Select internal reference clock for USB 2.0 PHY
-+	 * and use it as a clock source for USB 1.1 PHY
-+	 * (this is the default setting anyway).
-+	 */
-+	cfgchip2 &= ~CFGCHIP2_USB1PHYCLKMUX;
-+	cfgchip2 |=  CFGCHIP2_USB2PHYCLKMUX;
-+
-+	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
-+
-+	ret = davinci_cfg_reg_list(da850_evm_usb11_pins);
-+	if (ret) {
-+		pr_warning("%s: USB 1.1 PinMux setup failed: %d\n",
-+			   __func__, ret);
-+		return;
-+	}
-+
-+	ret = gpio_request_one(ON_BD_USB_DRV, GPIOF_OUT_INIT_LOW,
-+			"ON_BD_USB_DRV");
-+	if (ret) {
-+		pr_err("%s: failed to request GPIO for USB 1.1 port "
-+		       "power control: %d\n", __func__, ret);
-+		return;
-+	}
-+
-+	ret = gpio_request_one(ON_BD_USB_OVC, GPIOF_IN, "ON_BD_USB_OVC");
-+	if (ret) {
-+		pr_err("%s: failed to request GPIO for USB 1.1 port "
-+		       "over-current indicator: %d\n", __func__, ret);
-+		return;
-+	}
-+
-+	ret = da8xx_register_usb11(&da850_evm_usb11_pdata);
-+	if (ret)
-+		pr_warning("%s: USB 1.1 registration failed: %d\n",
-+			   __func__, ret);
-+}
-+
- static struct davinci_uart_config da850_evm_uart_config __initdata = {
- 	.enabled_uarts = 0x7,
- };
-@@ -1386,6 +1508,9 @@ static __init void da850_evm_init(void)
- 				ret);
- 
- 	da850_evm_setup_mac_addr();
-+
-+	/* initilaize usb module */
-+	da850_evm_usb_init();
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
--- 
-1.7.1
+> 
+> Thanks,
+> Sekhar
+> 
+> 
+Thx,
+-Manju
