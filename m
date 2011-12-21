@@ -1,51 +1,62 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Wed, 21 Dec 2011 16:45:22 +0900
-Subject: Pull Requeset: Exynos4 Register Address Update for Devfreq Drivers.
-Message-ID: <CAJ0PZbQ1=+BTs0Emi78kfOWD5d90+ND5Jc_SJ9T4BcGMXyny9A@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 21 Dec 2011 09:22:11 +0100
+Subject: [PATCH v2 0/4] Implement RTC support for S3C2443/S3C2416/S3C2450
+In-Reply-To: <064801ccbfb1$c5d48e60$517dab20$%kim@samsung.com>
+References: <201112121543.42299.heiko@sntech.de>
+ <064801ccbfb1$c5d48e60$517dab20$%kim@samsung.com>
+Message-ID: <201112210922.12300.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Am Mittwoch, 21. Dezember 2011, 08:25:53 schrieb Kukjin Kim:
+> Heiko St?bner wrote:
+> > Similar to the ADC the RTC of S3C2443 and S3C2416/2450 has some slight
+> > variances when compared to the existing types.
+> > 
+> > This series adds support for those SoCs.
+> > 
+> > As with the ADC patches, these changes where tested on S3C2416 hardware.
+> > The S3C2443 quirks are a subset of those and are done according to the
+> > datasheet, but not tested on real hardware (as I do not own a S3C2443
+> > device).
+> > 
+> > changes since v1:
+> > address comments from Thomas Abraham, reducing number of ifdefs and
+> > duplicate code
+> > 
+> > Heiko Stuebner (4):
+> >   ARM: SAMSUNG: cleanup of rtc register definitions
+> >   rtc-s3c: make room for more variants in devicetree block
+> >   rtc-s3c: add variants for S3C2443 and S3C2416
+> >   ARM: S3C2443/S3C2416: add s3c_rtc_setname and rename rtc devices
+> >  
+> >  arch/arm/mach-s3c2416/s3c2416.c               |    2 +
+> >  arch/arm/mach-s3c2443/s3c2443.c               |    2 +
+> >  arch/arm/plat-samsung/include/plat/regs-rtc.h |   92
+> 
+> +++++++++++++++------
+> 
+> > ---
+> > 
+> >  arch/arm/plat-samsung/include/plat/rtc-core.h |   27 +++++++
+> >  drivers/rtc/rtc-s3c.c                         |   74
+> >  ++++++++++++++++---- 5 files changed, 149 insertions(+), 48
+> >  deletions(-)
+> >  create mode 100644 arch/arm/plat-samsung/include/plat/rtc-core.h
+> > 
+> > --
+> > 1.7.5.4
+> 
+> Hi Heiko,
+> 
+> There were small comments on 1st patch and others looks ok to me.
+> If you're ok on my comments, please re-send it so that I can request to
+> pull this series to Alessandro or Andrew with my ack.
 
-Please pull the patches for Exynos4 SoCs that support devfreq device
-drivers for Exynos4210/4212/4412.
+I'm on it now. 
 
-The patches are:
-ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
-ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus devfreq driver
-ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
+Who is Andrew and should I include him in the recipients? I only found 
+Alessandro Zummo in the MAINTAINERS file for rtc stuff and am lacking any 
+comment from the rtc-side until now.
 
-Gitweb: http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/devfreq-for-samsung
-Git Repository: git://git.infradead.org/users/kmpark/linux-samsung
-Branch: devfreq-for-samsung
-
-The following changes since commit 390f998509bf049019df0b078c0a6606e0d57fb4:
-
-Merge: e34d6b4 6f6c2aa
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Sun Dec 18 14:28:31 2011 -0800
-
-  Merge git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi-rc-fixes-2.6
-(2011-12-18 14:28:31 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/kmpark/linux-samsung.git devfreq-for-samsung
-
-MyungJoo Ham (3):
-      ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
-      ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus
-devfreq driver
-      ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
-
- arch/arm/mach-exynos/cpu.c                     |    7 +++-
- arch/arm/mach-exynos/include/mach/map.h        |    1 +
- arch/arm/mach-exynos/include/mach/regs-clock.h |   42 ++++++++++++++++++++++++
- arch/arm/mach-exynos/mach-nuri.c               |   11 ++++--
- 4 files changed, 57 insertions(+), 4 deletions(-)
-
-
-
--- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab, DMC Business, Samsung Electronics
+Heiko
