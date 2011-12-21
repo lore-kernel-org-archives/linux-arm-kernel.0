@@ -1,242 +1,106 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Wed, 21 Dec 2011 15:51:37 +1030
-Subject: [PATCH] virtio: harsher barriers for virtio-mmio.
-Message-ID: <87k45qjy8u.fsf@rustcorp.com.au>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Wed, 21 Dec 2011 05:52:13 +0000
+Subject: [PATCH] davinci: DA850 EVM: OHCI platform code
+In-Reply-To: <4EF06C64.8000708@mvista.com>
+References: <1324363005-11320-1-git-send-email-prakash.pm@ti.com>
+ <4EF06C64.8000708@mvista.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC026173@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were cheating with our barriers; using the smp ones rather than the
-real device ones.  That was fine, until virtio-mmio came along, which
-could be talking to a real device (a non-SMP CPU).
+Hi Sergei,
 
-Unfortunately, just putting back the real barriers (reverting
-d57ed95d) causes a performance regression on virtio-pci.  In
-particular, Amos reports netbench's TCP_RR over virtio_net CPU
-utilization increased up to 35% while throughput went down by up to
-14%.
+On Tue, Dec 20, 2011 at 16:37:16, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 20.12.2011 10:36, Manjunathappa, Prakash wrote:
+> 
+> > From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> 
+>     It's a good practice to CC the original author of the patch -- which I'm 
+> doing now...
+> 
 
-By comparison, this branch is in the noise.
+I did put author and maintainers in CC, my git send-email log shows it up as below. But I don't know why it doesnot appear when mails reach my inbox. Can you please let me know if I am missing any configuration?:
 
-Reference: https://lkml.org/lkml/2011/12/11/22
+prakash at linux-psp-server:~/project/linux/linux_torvalds$ git send-email --smtp-server=192.168.247.13 --cc=nsekhar at ti.com --cc=linux-kernel at vger.kernel.org --cc=linux-arm-kernel at lists.infradead.org --cc=linux at arm.linux.org.uk 0001-davinci-DA850-EVM-OHCI-platform-code.patch
+0001-davinci-DA850-EVM-OHCI-platform-code.patch
+Who should the emails appear to be from? [Manjunathappa, Prakash <prakash.pm@ti.com>]
+Emails will be sent from: Manjunathappa, Prakash <prakash.pm@ti.com>
+Who should the emails be sent to? davinci-linux-open-source at linux.davincidsp.com
+Message-ID to be used as In-Reply-To for the first email?
+(mbox) Adding cc: Ajay Kumar Gupta <ajay.gupta@ti.com> from line 'From: Ajay Kumar Gupta <ajay.gupta@ti.com>'
+(body) Adding cc: Ajay Kumar Gupta <ajay.gupta@ti.com> from line 'Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>'
 
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
----
- drivers/lguest/lguest_device.c |   10 ++++++----
- drivers/s390/kvm/kvm_virtio.c  |    2 +-
- drivers/virtio/virtio_mmio.c   |    7 ++++---
- drivers/virtio/virtio_pci.c    |    4 ++--
- drivers/virtio/virtio_ring.c   |   34 +++++++++++++++++++++-------------
- include/linux/virtio_ring.h    |    1 +
- tools/virtio/linux/virtio.h    |    1 +
- tools/virtio/virtio_test.c     |    3 ++-
- 8 files changed, 38 insertions(+), 24 deletions(-)
+From: "Manjunathappa, Prakash" <prakash.pm@ti.com>
+To: davinci-linux-open-source at linux.davincidsp.com
+Cc: nsekhar at ti.com,
+        linux-kernel at vger.kernel.org,
+        linux-arm-kernel at lists.infradead.org,
+        linux at arm.linux.org.uk,
+        Ajay Kumar Gupta <ajay.gupta@ti.com>
+Subject: [PATCH] davinci: DA850 EVM: OHCI platform code
+Date: Wed, 21 Dec 2011 11:05:38 +0530
+Message-Id: <1324445738-7203-1-git-send-email-prakash.pm@ti.com>
+X-Mailer: git-send-email 1.7.1
 
-diff --git a/drivers/lguest/lguest_device.c b/drivers/lguest/lguest_device.c
---- a/drivers/lguest/lguest_device.c
-+++ b/drivers/lguest/lguest_device.c
-@@ -291,11 +291,13 @@ static struct virtqueue *lg_find_vq(stru
- 	}
- 
- 	/*
--	 * OK, tell virtio_ring.c to set up a virtqueue now we know its size
--	 * and we've got a pointer to its pages.
-+	 * OK, tell virtio_ring.c to set up a virtqueue now we know its size
-+	 * and we've got a pointer to its pages.  Note that we set weak_barriers
-+	 * to 'true': the host just a(nother) SMP CPU, so we only need inter-cpu
-+	 * barriers.
- 	 */
--	vq = vring_new_virtqueue(lvq->config.num, LGUEST_VRING_ALIGN,
--				 vdev, lvq->pages, lg_notify, callback, name);
-+	vq = vring_new_virtqueue(lvq->config.num, LGUEST_VRING_ALIGN, vdev,
-+				 true, lvq->pages, lg_notify, callback, name);
- 	if (!vq) {
- 		err = -ENOMEM;
- 		goto unmap;
-diff --git a/drivers/s390/kvm/kvm_virtio.c b/drivers/s390/kvm/kvm_virtio.c
---- a/drivers/s390/kvm/kvm_virtio.c
-+++ b/drivers/s390/kvm/kvm_virtio.c
-@@ -198,7 +198,7 @@ static struct virtqueue *kvm_find_vq(str
- 		goto out;
- 
- 	vq = vring_new_virtqueue(config->num, KVM_S390_VIRTIO_RING_ALIGN,
--				 vdev, (void *) config->address,
-+				 vdev, true, (void *) config->address,
- 				 kvm_notify, callback, name);
- 	if (!vq) {
- 		err = -ENOMEM;
-diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
---- a/drivers/virtio/virtio_mmio.c
-+++ b/drivers/virtio/virtio_mmio.c
-@@ -309,9 +309,10 @@ static struct virtqueue *vm_setup_vq(str
- 	writel(virt_to_phys(info->queue) >> PAGE_SHIFT,
- 			vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
- 
--	/* Create the vring */
--	vq = vring_new_virtqueue(info->num, VIRTIO_MMIO_VRING_ALIGN,
--				 vdev, info->queue, vm_notify, callback, name);
-+	/* Create the vring: no weak barriers, the other side is could
-+	 * be an independent "device". */
-+	vq = vring_new_virtqueue(info->num, VIRTIO_MMIO_VRING_ALIGN, vdev,
-+				 false, info->queue, vm_notify, callback, name);
- 	if (!vq) {
- 		err = -ENOMEM;
- 		goto error_new_virtqueue;
-diff --git a/drivers/virtio/virtio_pci.c b/drivers/virtio/virtio_pci.c
---- a/drivers/virtio/virtio_pci.c
-+++ b/drivers/virtio/virtio_pci.c
-@@ -414,8 +414,8 @@ static struct virtqueue *setup_vq(struct
- 		  vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
- 
- 	/* create the vring */
--	vq = vring_new_virtqueue(info->num, VIRTIO_PCI_VRING_ALIGN,
--				 vdev, info->queue, vp_notify, callback, name);
-+	vq = vring_new_virtqueue(info->num, VIRTIO_PCI_VRING_ALIGN, vdev,
-+				 true, info->queue, vp_notify, callback, name);
- 	if (!vq) {
- 		err = -ENOMEM;
- 		goto out_activate_queue;
-diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
---- a/drivers/virtio/virtio_ring.c
-+++ b/drivers/virtio/virtio_ring.c
-@@ -28,17 +28,20 @@
- #ifdef CONFIG_SMP
- /* Where possible, use SMP barriers which are more lightweight than mandatory
-  * barriers, because mandatory barriers control MMIO effects on accesses
-- * through relaxed memory I/O windows (which virtio does not use). */
--#define virtio_mb() smp_mb()
--#define virtio_rmb() smp_rmb()
--#define virtio_wmb() smp_wmb()
-+ * through relaxed memory I/O windows (which virtio-pci does not use). */
-+#define virtio_mb(vq) \
-+	do { if ((vq)->weak_barriers) smp_mb(); else mb(); } while(0)
-+#define virtio_rmb(vq) \
-+	do { if ((vq)->weak_barriers) smp_rmb(); else rmb(); } while(0)
-+#define virtio_wmb(vq) \
-+	do { if ((vq)->weak_barriers) smp_rmb(); else rmb(); } while(0)
- #else
- /* We must force memory ordering even if guest is UP since host could be
-  * running on another CPU, but SMP barriers are defined to barrier() in that
-  * configuration. So fall back to mandatory barriers instead. */
--#define virtio_mb() mb()
--#define virtio_rmb() rmb()
--#define virtio_wmb() wmb()
-+#define virtio_mb(vq) mb()
-+#define virtio_rmb(vq) rmb()
-+#define virtio_wmb(vq) wmb()
- #endif
- 
- #ifdef DEBUG
-@@ -77,6 +80,9 @@ struct vring_virtqueue
- 	/* Actual memory layout for this queue */
- 	struct vring vring;
- 
-+	/* Can we use weak barriers? */
-+	bool weak_barriers;
-+
- 	/* Other side has made a mess, don't try any more. */
- 	bool broken;
- 
-@@ -245,14 +251,14 @@ void virtqueue_kick(struct virtqueue *_v
- 	START_USE(vq);
- 	/* Descriptors and available array need to be set before we expose the
- 	 * new available array entries. */
--	virtio_wmb();
-+	virtio_wmb(vq);
- 
- 	old = vq->vring.avail->idx;
- 	new = vq->vring.avail->idx = old + vq->num_added;
- 	vq->num_added = 0;
- 
- 	/* Need to update avail index before checking if we should notify */
--	virtio_mb();
-+	virtio_mb(vq);
- 
- 	if (vq->event ?
- 	    vring_need_event(vring_avail_event(&vq->vring), new, old) :
-@@ -314,7 +320,7 @@ void *virtqueue_get_buf(struct virtqueue
- 	}
- 
- 	/* Only get used array entries after they have been exposed by host. */
--	virtio_rmb();
-+	virtio_rmb(vq);
- 
- 	i = vq->vring.used->ring[vq->last_used_idx%vq->vring.num].id;
- 	*len = vq->vring.used->ring[vq->last_used_idx%vq->vring.num].len;
-@@ -337,7 +343,7 @@ void *virtqueue_get_buf(struct virtqueue
- 	 * the read in the next get_buf call. */
- 	if (!(vq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT)) {
- 		vring_used_event(&vq->vring) = vq->last_used_idx;
--		virtio_mb();
-+		virtio_mb(vq);
- 	}
- 
- 	END_USE(vq);
-@@ -366,7 +372,7 @@ bool virtqueue_enable_cb(struct virtqueu
- 	 * entry. Always do both to keep code simple. */
- 	vq->vring.avail->flags &= ~VRING_AVAIL_F_NO_INTERRUPT;
- 	vring_used_event(&vq->vring) = vq->last_used_idx;
--	virtio_mb();
-+	virtio_mb(vq);
- 	if (unlikely(more_used(vq))) {
- 		END_USE(vq);
- 		return false;
-@@ -393,7 +399,7 @@ bool virtqueue_enable_cb_delayed(struct 
- 	/* TODO: tune this threshold */
- 	bufs = (u16)(vq->vring.avail->idx - vq->last_used_idx) * 3 / 4;
- 	vring_used_event(&vq->vring) = vq->last_used_idx + bufs;
--	virtio_mb();
-+	virtio_mb(vq);
- 	if (unlikely((u16)(vq->vring.used->idx - vq->last_used_idx) > bufs)) {
- 		END_USE(vq);
- 		return false;
-@@ -453,6 +459,7 @@ EXPORT_SYMBOL_GPL(vring_interrupt);
- struct virtqueue *vring_new_virtqueue(unsigned int num,
- 				      unsigned int vring_align,
- 				      struct virtio_device *vdev,
-+				      bool weak_barriers,
- 				      void *pages,
- 				      void (*notify)(struct virtqueue *),
- 				      void (*callback)(struct virtqueue *),
-@@ -476,6 +483,7 @@ struct virtqueue *vring_new_virtqueue(un
- 	vq->vq.vdev = vdev;
- 	vq->vq.name = name;
- 	vq->notify = notify;
-+	vq->weak_barriers = weak_barriers;
- 	vq->broken = false;
- 	vq->last_used_idx = 0;
- 	vq->num_added = 0;
-diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
---- a/include/linux/virtio_ring.h
-+++ b/include/linux/virtio_ring.h
-@@ -168,6 +168,7 @@ struct virtqueue;
- struct virtqueue *vring_new_virtqueue(unsigned int num,
- 				      unsigned int vring_align,
- 				      struct virtio_device *vdev,
-+				      bool weak_barriers,
- 				      void *pages,
- 				      void (*notify)(struct virtqueue *vq),
- 				      void (*callback)(struct virtqueue *vq),
-diff --git a/tools/virtio/linux/virtio.h b/tools/virtio/linux/virtio.h
---- a/tools/virtio/linux/virtio.h
-+++ b/tools/virtio/linux/virtio.h
-@@ -214,6 +214,7 @@ void *virtqueue_detach_unused_buf(struct
- struct virtqueue *vring_new_virtqueue(unsigned int num,
- 				      unsigned int vring_align,
- 				      struct virtio_device *vdev,
-+				      bool weak_barriers,
- 				      void *pages,
- 				      void (*notify)(struct virtqueue *vq),
- 				      void (*callback)(struct virtqueue *vq),
-diff --git a/tools/virtio/virtio_test.c b/tools/virtio/virtio_test.c
---- a/tools/virtio/virtio_test.c
-+++ b/tools/virtio/virtio_test.c
-@@ -92,7 +92,8 @@ static void vq_info_add(struct vdev_info
- 	assert(r >= 0);
- 	memset(info->ring, 0, vring_size(num, 4096));
- 	vring_init(&info->vring, num, info->ring, 4096);
--	info->vq = vring_new_virtqueue(info->vring.num, 4096, &dev->vdev, info->ring,
-+	info->vq = vring_new_virtqueue(info->vring.num, 4096, &dev->vdev,
-+				       true, info->ring,
- 				       vq_notify, vq_callback, "test");
- 	assert(info->vq);
- 	info->vq->priv = info;
+    The Cc list above has been expanded by additional
+    addresses found in the patch commit message. By default
+    send-email prompts before sending whenever this occurs.
+    This behavior is controlled by the sendemail.confirm
+    configuration setting.
+
+    For additional information, run 'git send-email --help'.
+    To retain the current behavior, but squelch this message,
+    run 'git config --global sendemail.confirm auto'.
+
+Send this email? ([y]es|[n]o|[q]uit|[a]ll):
+
+> > On this board the OHCI port's power control and over-current signals from
+> > TPS2065 power switch are connected via GPIO1[15] and GPIO2[1] respectively,
+> 
+>     Ajay, your description seems to be copied unchganged from the analogous 
+> DA830 EVM patch, and thus doesn't match your patch: GPIO2[4] and GPIO6[13] are 
+> used apparently. Be more attentive to detail next time please.
+> 
+
+I will fix this.
+
+> > so we can implement the DA8xx OHCI glue layer's hooks for overriding the
+> > root hub port's power and over-current status bits.
+> 
+> > We also have to properly set up the clocking mode in the CFGCHIP2 register,
+> > so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
+> > its output is used to clock the USB 1.1 (OHCI) PHY...
+> 
+> > Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> > ---
+> >   arch/arm/mach-davinci/board-da850-evm.c |  126 +++++++++++++++++++++++++++++++
+> >   1 files changed, 126 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> > index 6659a90..df74ba5 100644
+> > --- a/arch/arm/mach-davinci/board-da850-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> [...]
+> > @@ -734,6 +736,127 @@ static struct davinci_i2c_platform_data da850_evm_i2c_0_pdata = {
+> [...]
+> > +static int da850_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
+> > +{
+> > +	int irq		= gpio_to_irq(ON_BD_USB_OVC);
+> > +	int error	= 0;
+> > +
+> > +	if (handler != NULL) {
+> > +		da850_evm_usb_ocic_handler = handler;
+> > +
+> > +		error = request_irq(irq, da850_evm_usb_ocic_irq, IRQF_DISABLED |
+> 
+>     IRQF_DISABLED is a nop now -- just remove it.
+> 
+
+Agreed, I will remove it.
+
+Thanks,
+Prakash
+> WBR, Sergei
+> 
