@@ -1,43 +1,61 @@
-From: linux@solonet.org.ua (Denis Kuzmenko)
-Date: Wed, 21 Dec 2011 21:49:38 +0200
-Subject: [PATCHv2 resend] Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-In-Reply-To: <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
-References: <4EE7BE5F.8020108@solonet.org.ua>
- <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
-Message-ID: <4EF23852.1050304@solonet.org.ua>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Dec 2011 19:54:21 +0000
+Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
+ Cortex-M3 SoCs
+In-Reply-To: <201112211634.15954.arnd@arndb.de>
+References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201112211634.15954.arnd@arndb.de>
+Message-ID: <20111221195421.GJ2577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2011 09:04 AM, Kukjin Kim wrote:
-> Denis Kuzmenko wrote:
->>
->> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
->>
->> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
->> ---
->>
->> Patch is against 3.2-rc4.
->> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of this
->> the
->> file s3c2410-iotiming.c is not ever compiled and enabling
->> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
->> function
->> s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs
->> defined
->> as NULL for this case.
->>
-> Hi Denis,
+On Wed, Dec 21, 2011 at 04:34:15PM +0000, Arnd Bergmann wrote:
+> > diff --git a/arch/arm/mach-efm32/include/mach/io.h b/arch/arm/mach-efm32/include/mach/io.h
+> > new file mode 100644
+> > index 0000000..00b6af6
+> > --- /dev/null
+> > +++ b/arch/arm/mach-efm32/include/mach/io.h
+> > @@ -0,0 +1,7 @@
+> > +#ifndef __MACH_IO_H__
+> > +#define __MACH_IO_H__
+> > +
+> > +#define __io(a)			__typesafe_io(a)
+> > +#define __mem_pci(a)		(a)
+> > +
+> > +#endif /* __MACH_IO_H__ */
 > 
-> Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected in my
-> case and s3c2410-iotiming.c is built...when is it happened? I just selected
-> every regarding configuration in kernel menuconfig...
+> Can you already build with __io not defined? That should catch any drivers
+> that try to access the PC-style I/O ports.
 
-Please, try attached config (it's still failing in v3.2-rc6).
+And don't forget to select NO_IOPORT in the configuration as well.
 
--- 
-Best regards, Denis Kuzmenko.
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: .config
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111221/e70a99b9/attachment-0001.ksh>
+> > --- a/arch/arm/mm/Kconfig
+> > +++ b/arch/arm/mm/Kconfig
+> > @@ -432,7 +432,7 @@ config CPU_V7
+> >  # ARMv7
+> >  config CPU_V7M
+> >  	bool "Support ARMv7-M processors"
+> > -	depends on MACH_REALVIEW_EB && EXPERIMENTAL
+> > +	depends on (MACH_REALVIEW_EB && EXPERIMENTAL) || ARCH_EFM32
+> >  	select THUMB2_KERNEL
+> >  	select ARM_THUMB
+> >  	select CPU_32v7M
+> 
+> Hmm, since you *have* to enable this option for a successful build,
+> wouldn't it make more sense to 'select' this from ARCH_EFM32.
+
+It'd help if Catalin conformed to the well established way in the rest
+of the CPU specific configuration.  Rather than making this depend on
+realview etc, make the presentation of the prompt conditional on
+realview etc.  Then ARCH_EFM32 can simply select CPU_V7M without
+generating any warnings.
+
+In other words:
+
+config CPU_whatever
+	bool "whatever" if <symbols-which-may-have-this-cpu>
+
+and elsewhere:
+
+config PLATFORM_which_always_has_CPU_whatever
+	select CPU_whatever
