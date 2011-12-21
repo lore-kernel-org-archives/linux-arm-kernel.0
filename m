@@ -1,45 +1,46 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 21 Dec 2011 11:47:54 +0800
-Subject: [PATCH v4] I2C: add CSR SiRFprimaII on-chip I2C controllers driver
-In-Reply-To: <20111221033444.GH15863@b20223-02.ap.freescale.net>
-References: <1323852927-13521-1-git-send-email-Barry.Song@csr.com>
- <20111220200750.GA2577@n2100.arm.linux.org.uk>
- <CAGsJ_4y8vwrK=UD8a10gf2aN=O3hs_R_jYBKeFYf0v+gk0hiuQ@mail.gmail.com>
- <20111221033444.GH15863@b20223-02.ap.freescale.net>
-Message-ID: <20111221034753.GC5983@S2101-09.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Dec 2011 13:06:14 +0900
+Subject: [PATCH 1/8] s3c-hsudc: move platform_data struct to global header
+In-Reply-To: <201112201236.37581.heiko@sntech.de>
+References: <201112191938.22254.heiko@sntech.de>
+ <201112191939.16542.heiko@sntech.de>
+ <20111220112458.GG31842@legolas.emea.dhcp.ti.com>
+ <201112201236.37581.heiko@sntech.de>
+Message-ID: <061801ccbf95$e1df4580$a59dd080$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 11:34:45AM +0800, Richard Zhao wrote:
-> On Wed, Dec 21, 2011 at 11:29:29AM +0800, Barry Song wrote:
-> > 2011/12/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > > On Wed, Dec 14, 2011 at 04:55:27PM +0800, Barry Song wrote:
-> > >> +static int __devinit i2c_sirfsoc_probe(struct platform_device *pdev)
-> > >> +{
-> > >> + ? ? struct clk *clk;
-> > >> +
-> > >> + ? ? clk = clk_get(&pdev->dev, NULL);
-> > >> + ? ? err = clk_prepare(clk);
-> > >> + ? ? err = clk_enable(clk);
-> > > ...
-> > >> + ? ? clk_disable(clk);
-> > >> +
-> > >> + ? ? dev_info(&pdev->dev, " I2C adapter ready to operate\n");
-> > >> +
-> > >> + ? ? return 0;
-> > >> +}
-> > >> +
-> > >> +static int __devexit i2c_sirfsoc_remove(struct platform_device *pdev)
-> > >> +{
-> > >> + ? ? clk_disable(siic->clk);
-> > >> + ? ? clk_unprepare(siic->clk);
-> > >> + ? ? clk_put(siic->clk);
-> > >
-> There's a handy clk_disable_unprepare function in the patch I ever sent
-> out. It's in Sascha or Shawn's tree.
+Heiko St?bner wrote:
 > 
-We cannot really ask people to use that before it hits Linus' tree.
+> Am Dienstag, 20. Dezember 2011, 12:25:00 schrieb Felipe Balbi:
+> > Hi,
+> >
+> > On Mon, Dec 19, 2011 at 07:39:15PM +0100, Heiko St?bner wrote:
+> > > Gadget drivers should be compilable on all architectures.
+> > > This patch removes one dependency on architecture-specific code.
+> > >
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > >
+> > >  arch/arm/mach-s3c2416/mach-smdk2416.c    |    1 +
+> > >  arch/arm/plat-samsung/devs.c             |    1 +
+> > >  arch/arm/plat-samsung/include/plat/udc.h |   15 +------------
+> >
+> > I would like to have ack from Ben and/or Kukjin before applying this
+> > one. Ben are you ok with this patch ?
+> I think Kukjin does more acking if this stuff currently, so hopefully he will
+> see this mail.
+> 
 
--- 
-Regards,
-Shawn
+Hi Felipe,
+
+Looks ok to me, you can go ahead with my ack.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
