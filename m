@@ -1,27 +1,55 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 21 Dec 2011 22:56:50 +0200
-Subject: [PATCH v2 5/7] MTD: NAND: ams-delta: use GPIO instead of custom
- I/O
-In-Reply-To: <ebab42f6ddd313afb38b71880ac7865e4e0ceab4.1324331816.git.jkrzyszt@tis.icnet.pl>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <ebab42f6ddd313afb38b71880ac7865e4e0ceab4.1324331816.git.jkrzyszt@tis.icnet.pl>
-Message-ID: <1324501012.2110.2.camel@koala>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Dec 2011 22:23:58 +0100
+Subject: [PATCH] arm/at91: fix build of stamp9g20
+In-Reply-To: <1324416782-29035-1-git-send-email-olof@lixom.net>
+References: <1324416782-29035-1-git-send-email-olof@lixom.net>
+Message-ID: <4EF24E6E.2050309@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-12-20 at 00:08 +0100, Janusz Krzysztofik wrote:
-> Don't use Amstrad Delta custom I/O functions for controlling the device,
-> use GPIO API instead.
+On 12/20/2011 10:33 PM, Olof Johansson :
+> Fixes build:
 > 
-> While being at it, add missing gpio_free(AMS_DELTA_GPIO_PIN_NAND_RB).
+> arch/arm/mach-at91/board-stamp9g20.c:126: error: expected '}' before ';' token
 > 
-> Depends on patch 2/7 "ARM: OMAP1: ams-delta: convert latches to
-> basic_mmio_gpio"
-> 
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-Looks good, thanks!
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Reviewed-by: Artem Bityutskiy <Artem.Bityutskiy@linux.intel.com>
+Thanks a lot Olof for this correction. Sorry for not having noticed the
+first one...
+
+Best regards,
+
+> ---
+> 
+> Nicolas, I haven't seen any replies from neither you nor Jean-Christoph
+> on the email I sent over a week ago about this. Can you ack this patch
+> and I'll apply it to the branch in arm-soc?
+> 
+> Thanks,
+> 
+> -Olof
+> 
+>  arch/arm/mach-at91/board-stamp9g20.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
+> index e8d3d5b..72eb3b4 100644
+> --- a/arch/arm/mach-at91/board-stamp9g20.c
+> +++ b/arch/arm/mach-at91/board-stamp9g20.c
+> @@ -123,8 +123,8 @@ static void __init add_device_nand(void)
+>  static struct mci_platform_data __initdata mmc_data = {
+>  	.slot[0] = {
+>  		.bus_width	= 4,
+> -		.detect_pin	= -1;
+> -		.wp_pin		= -1;
+> +		.detect_pin	= -1,
+> +		.wp_pin		= -1,
+>  	},
+>  };
+>  #else
+
+
+-- 
+Nicolas Ferre
