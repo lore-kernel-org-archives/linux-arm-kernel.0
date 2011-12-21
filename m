@@ -1,33 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Dec 2011 11:16:37 -0800
-Subject: [GIT PULL 5/5] Tegra driver updates for 3.3
-In-Reply-To: <CAOesGMgFCiMqGMA4mVFxKT7tQ_OK+XbAgwXrnvWKp=N2LAouKQ@mail.gmail.com>
-References: <CAOesGMgFCiMqGMA4mVFxKT7tQ_OK+XbAgwXrnvWKp=N2LAouKQ@mail.gmail.com>
-Message-ID: <CAOesGMj7aOwtVbvW=ror_BZLHZciFge+_=Gdou5i1Ltk+hBBfA@mail.gmail.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Wed, 21 Dec 2011 23:19:02 +0400
+Subject: [PATCH] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
+In-Reply-To: <CA+gwMcc3tbGXmFHQt=y7mwprXumh7sgMSE_e7B0L2LbQ-Hk2fg@mail.gmail.com>
+References: <1323728465.801.YahooMailClassic@web29018.mail.ird.yahoo.com>
+ <CA+gwMcc3tbGXmFHQt=y7mwprXumh7sgMSE_e7B0L2LbQ-Hk2fg@mail.gmail.com>
+Message-ID: <20111221191901.GA18261@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 11:15 AM, Olof Johansson <olof@lixom.net> wrote:
-> Arnd,
->
-> Please pull the below driver updates for tegra for 3.3. They are two
-> device-tree-enablement related patches for i2c, I haven't seen acks
-> from Ben on them but they are trivial and tegra-specific patches so I
-> picked them up anyway.
+On 15:12 Wed 21 Dec     , Philipp Zabel wrote:
+> Hello Paul,
+> 
+> On Mon, Dec 12, 2011 at 11:21 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> > linux-2.6.32 changed the values of PXA_GPIO_IRQ_BASE and PXA_GPIO_IRQ_NUM from
+> > 64/128 to 96/192. This has broken the hx4700 platform, for example its PCMCIA/CF
+> > driver. The 9 EGPIO GPIOs have become numbered 256..264, and consequently fail
+> > the gpio_is_valid() test in gpiolib.c (which limits GPIOs to the range 0..255).
+> > This patch reverts the values of PXA_GPIO_IRQ_BASE and PXA_GPIO_IRQ_NUM to their
+> > previous linux-2.6.31 values for the hx4700 platform only.
+> >
+> > Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> > ---
 
-Pasted in the wrong git request-pull output. Here is the correct one:
+[...]
 
+> > +#ifdef CONFIG_MACH_H4700
+> > +#define PXA_GPIO_IRQ_BASE ? ? ?PXA_IRQ(64)
+> > +#define PXA_GPIO_IRQ_NUM ? ? ? (128)
+> > +#else
+> > ?#define PXA_GPIO_IRQ_BASE ? ? ?PXA_IRQ(96)
+> > ?#define PXA_GPIO_IRQ_NUM ? ? ? (192)
+> > +#endif
+> 
+> machine specific definitions were removed from mach/irqs.h in commits
+> 0dc726bb264ca5ecfdfab94a6937e0e9b9b26f64 ([ARM] pxa: move board board
+> IRQ definitions out of irqs.h) and
+> 6ac6b817f3f4c23c5febd960d8deb343e13af5f3 (ARM: pxa: encode IRQ number
+> into .nr_irqs).
+> I'd propose to increase ARCH_NR_GPIOs to 264 in mach/gpio.h or
+> plat/gpio.h instead.
 
-The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+Yes, I also think increasing ARCH_NR_GPIO is the way to go.
+BTW, there's a patchset floating around which moves such custom
+settings of ARCH_NR_GPIO from mach/gpio.h into Kconfig variable:
+http://lkml.indiana.edu/hypermail/linux/kernel/1111.0/01433.html
 
-  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
+I'm not sure though if it's going to be merged into 3.3
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/drivers
-
-Stephen Warren (2):
-      i2c: tegra: Add __devinit/exit to probe/remove
-      i2c: tegra: Support DVC controller in device tree
-
- drivers/i2c/busses/i2c-tegra.c |   10 +++++++---
- 1 files changed, 7 insertions(+), 3 deletions(-)
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
