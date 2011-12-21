@@ -1,34 +1,59 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 21 Dec 2011 11:22:34 +0100
-Subject: [RFC 1/8] gpio/microblaze: Eliminate duplication of
- of_get_named_gpio_flags()
-In-Reply-To: <1320801583-12774-2-git-send-email-grant.likely@secretlab.ca>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-2-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <4EF1B36A.8050304@monstr.eu>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 21 Dec 2011 13:21:12 +0200
+Subject: [PATCH 1/2] remoteproc: depend on EXPERIMENTAL
+Message-ID: <1324466473-5128-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote:
-> of_reset_gpio_handle() is largely a cut-and-paste copy of
-> of_get_named_gpio_flags(). There really isn't any reason for the
-> split, so this patch deletes the duplicate function
-> 
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Michal Simek <monstr@monstr.eu>
-> ---
->  arch/microblaze/kernel/reset.c |   43 +--------------------------------------
->  1 files changed, 2 insertions(+), 41 deletions(-)
+Remoteproc is still under development and as it gets traction we
+definitely expect to have some changes in the binary format (most probably
+only in the resource table, e.g. the upcoming move to TLV-based entries).
 
-Sorry for taking to long.
+Active testing and use of remoteproc is most welcome, but we don't want
+users to expect backward binary compatibility with the preliminary
+images we have today.
 
-Tested and applied to microblaze tree.
+Therefore mark remoteproc as EXPERIMENTAL, and explicitly inform the user
+about this when a new remote processor is registered.
 
-Thanks,
-Michal
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Rob Clark <rob@ti.com>
+Cc: Mark Grosen <mgrosen@ti.com>
+Cc: Ludovic BARRE <ludovic.barre@stericsson.com>
+---
+ drivers/remoteproc/Kconfig           |    3 ++-
+ drivers/remoteproc/remoteproc_core.c |    3 +++
+ 2 files changed, 5 insertions(+), 1 deletions(-)
 
+diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+index 00fb72f..25fc4cc 100644
+--- a/drivers/remoteproc/Kconfig
++++ b/drivers/remoteproc/Kconfig
+@@ -1,8 +1,9 @@
+-menu "Remoteproc drivers"
++menu "Remoteproc drivers (EXPERIMENTAL)"
+ 
+ # REMOTEPROC gets selected by whoever wants it
+ config REMOTEPROC
+ 	tristate
++	depends on EXPERIMENTAL
+ 
+ config OMAP_REMOTEPROC
+ 	tristate "OMAP remoteproc support"
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index f2354ce..6212b82 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -1275,6 +1275,9 @@ int rproc_register(struct rproc *rproc)
+ 
+ 	dev_info(rproc->dev, "%s is available\n", rproc->name);
+ 
++	dev_info(dev, "Note: remoteproc is still under development and considered experimental.\n");
++	dev_info(dev, "THE BINARY FORMAT IS NOT YET FINALIZED, and backward compatibility isn't yet guaranteed.\n");
++
+ 	/* create debugfs entries */
+ 	rproc_create_debug_dir(rproc);
+ 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+1.7.5.4
