@@ -1,80 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Dec 2011 11:19:15 -0800
-Subject: [PATCH 3/3] ARM: OMAP2+: board-generic: Replace #if defined by
- #ifdef for consistency
-In-Reply-To: <4EF08B8B.2040400@ti.com>
-References: <y> <1323190149-6492-4-git-send-email-b-cousson@ti.com>
- <4EF08B8B.2040400@ti.com>
-Message-ID: <20111221191915.GF24444@atomide.com>
+From: arjan@linux.intel.com (Arjan van de Ven)
+Date: Wed, 21 Dec 2011 20:36:12 +0100
+Subject: [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <CAMbhsRRnKoR3YPWrZzVynVe+dcuU5v0siYvmp2vbBcS1hquC7Q@mail.gmail.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <4EF1A0B4.5080307@linux.intel.com>
+ <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
+ <4EF1AA8A.8060304@linux.intel.com>
+ <CAMbhsRSNTUvou9Gf6T4Ggq=jfxsWUcn7M2yNsKQz6aNrt6gLDg@mail.gmail.com>
+ <4EF1CD49.9020800@linux.intel.com>
+ <CAMbhsRRnKoR3YPWrZzVynVe+dcuU5v0siYvmp2vbBcS1hquC7Q@mail.gmail.com>
+Message-ID: <4EF2352C.3060102@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cousson, Benoit <b-cousson@ti.com> [111220 04:48]:
-> Hi Tony,
+>>
+>> .. or it enters WFI, and a physical device sends it an interrupt,
+>> at which point it exits.
 > 
-> What about that patch?
-> 
-> This is the only one that is missing in lo.
-> I know it is not a big deal, but it will make things a little bit cleaner.
+> None of the cpus will return to the idle loop until all cpus have
+> decremented the ready counter back to 0, so they can't wrap around
+> again.
 
-I think we should wait on this one and combine it later on into
-some other clean-up patch.
 
-Regards,
-
-Tony
- 
-> Thanks,
-> Benoit
-> 
-> On 12/6/2011 5:49 PM, Benoit Cousson wrote:
-> >The file contains a mix of #ifdef and #if defined().
-> >Replace the #if... by #ifdef.
-> >
-> >Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> >Cc: Tony Lindgren<tony@atomide.com>
-> >---
-> >  arch/arm/mach-omap2/board-generic.c |    8 ++++----
-> >  1 files changed, 4 insertions(+), 4 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> >index fb55fa3..09f44e0 100644
-> >--- a/arch/arm/mach-omap2/board-generic.c
-> >+++ b/arch/arm/mach-omap2/board-generic.c
-> >@@ -92,7 +92,7 @@ static void __init omap3_init(void)
-> >  }
-> >  #endif
-> >
-> >-#if defined(CONFIG_SOC_OMAP2420)
-> >+#ifdef CONFIG_SOC_OMAP2420
-> >  static const char *omap242x_boards_compat[] __initdata = {
-> >  	"ti,omap2420",
-> >  	NULL,
-> >@@ -110,7 +110,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
-> >  MACHINE_END
-> >  #endif
-> >
-> >-#if defined(CONFIG_SOC_OMAP2430)
-> >+#ifdef CONFIG_SOC_OMAP2430
-> >  static const char *omap243x_boards_compat[] __initdata = {
-> >  	"ti,omap2430",
-> >  	NULL,
-> >@@ -128,7 +128,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
-> >  MACHINE_END
-> >  #endif
-> >
-> >-#if defined(CONFIG_ARCH_OMAP3)
-> >+#ifdef CONFIG_ARCH_OMAP3
-> >  static const char *omap3_boards_compat[] __initdata = {
-> >  	"ti,omap3",
-> >  	NULL,
-> >@@ -146,7 +146,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
-> >  MACHINE_END
-> >  #endif
-> >
-> >-#if defined(CONFIG_ARCH_OMAP4)
-> >+#ifdef CONFIG_ARCH_OMAP4
-> >  static const char *omap4_boards_compat[] __initdata = {
-> >  	"ti,omap4",
-> >  	NULL,
-> 
+yikes, so you IPI all the cpus on the first exit.
+that must burn power ;-(
