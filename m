@@ -1,51 +1,28 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 21 Dec 2011 16:05:30 +0400
-Subject: [PATCH v2] davinci: DA850 EVM: OHCI platform code
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6051CB9@DBDE01.ent.ti.com>
-References: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
- <DF0F476B391FA8409C78302C7BA518B6051CB9@DBDE01.ent.ti.com>
-Message-ID: <4EF1CB8A.10309@mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 21 Dec 2011 12:11:10 +0000
+Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
+In-Reply-To: <201112210943.34310.arnd@arndb.de>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+ <20111221012046.GE15863@b20223-02.ap.freescale.net>
+ <20111221092739.GI15863@b20223-02.ap.freescale.net>
+ <201112210943.34310.arnd@arndb.de>
+Message-ID: <20111221121108.GA15309@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Dec 21, 2011 at 09:43:34AM +0000, Arnd Bergmann wrote:
+> On Wednesday 21 December 2011, Richard Zhao wrote:
 
-On 21-12-2011 13:56, Nori, Sekhar wrote:
+> > Mark, cpu node is not a struct device, sys_device instead. I can not find
+> > regulator via device/dt node. Can I still use the string to get regulator
+> > after converting to DT?
 
-> On Wed, Dec 21, 2011 at 12:50:02, Manjunathappa, Prakash wrote:
->> From: Ajay Kumar Gupta<ajay.gupta@ti.com>
+> I believe Kay and Greg have the plan to unify "class" and "bus" in sysfs, which
+> implies turning sys_device into a derived class of device instead of kobject.
+> If that understanding is correct, we might as well do that now so we can
+> attach a device_node to a sys_device.
 
->> On this board the OHCI port's power control and over-current signals from
->> TPS2065 power switch are connected via GPIO2[4] and GPIO6[13] respectively,
->> so we can implement the DA8xx OHCI glue layer's hooks for overriding the
->> root hub port's power and over-current status bits.
+> Kay, does this make sense?
 
->> We also have to properly set up the clocking mode in the CFGCHIP2 register,
->> so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
->> its output is used to clock the USB 1.1 (OHCI) PHY...
-
->> Signed-off-by: Ajay Kumar Gupta<ajay.gupta@ti.com>
->> Signed-off-by: Manjunathappa, Prakash<prakash.pm@ti.com>
-
-> This is the third copy of OHCI platform setup code which is almost
-> the same except for the GPIO numbers.
-
-    Well, in my counting, it's only second, DA830 EVM being the first one.
-What's the third?
-
-> Can we attempt to consolidate
-> the GPIO case under drivers/usb/host/ohci-da8xx.c glue layer itself?
-> Of course, here should be a provision for non-GPIO based implementation
-> as well.
-
-> Sergei, any thoughts, comments?
-
-    I designed the hub interface to be as abstract as I could, and now you're 
-proposing to add GPIO to it? No, I have no clear idea how to keeep it abstract 
-and add GPIO support at the same time. I would have been grateful to
-TI if I didn't have to invent this at all and they stop saving on OHCI pins.
-
-> Thanks,
-> Sekhar
-
-WBR, Sergei
+I'm noy Kay but I think even if it's not what we end uo doing internally
+it's a sensible design for the device tree representation.
