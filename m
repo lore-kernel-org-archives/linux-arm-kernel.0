@@ -1,31 +1,28 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 21 Dec 2011 19:35:07 +0200
-Subject: Adding remoteproc/rpmsg to linux-next
-In-Reply-To: <20111212103301.5ff6a582dca82394ace40e8d@canb.auug.org.au>
-References: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
- <20111212103301.5ff6a582dca82394ace40e8d@canb.auug.org.au>
-Message-ID: <CAK=WgbZm9txdvZ1VW-iUn5306yMz1Y=DT_Uygwi6zPZNyWx7gA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 21 Dec 2011 15:59:26 -0200
+Subject: [PATCH] arm: device.h: Add dma_mask to pdev_archdata structure
+In-Reply-To: <4EF0359C.1090703@googlemail.com>
+References: <1321415178-12179-1-git-send-email-festevam@gmail.com>
+ <4EF0359C.1090703@googlemail.com>
+Message-ID: <CAOMZO5BOYRKz9uVrhe43q9SxGdyELPGktWVNks=vcXb2MZnYAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Dirk,
 
-On Mon, Dec 12, 2011 at 1:33 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> On Fri, 9 Dec 2011 16:55:27 +0200 Ohad Ben-Cohen <ohad@wizery.com> wrote:
->>
->> Can you please add the following remoteproc tree to linux-next ?
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
+On Tue, Dec 20, 2011 at 5:13 AM, Dirk Behme <dirk.behme@googlemail.com> wrote:
+
+> Will there ?be a v2 of this patch fixing the review comments?
 >
-> I have added that from today.
+> It seems the number of people hit by the issue this patch deals with
+> increases ...
 
-Would you like rpmsg/remoteproc to go through arm-soc or do you prefer
-me to send a pull request directly to Linus ?
+I no longer see this issue on a recent kernel.
 
-If you prefer the former (IIRC you told me you might consider it in a
-random ELCE hallway conversation :) then I'll send you a pull request.
+drivers/usb/host/fsl-mph-dr-of.c is not built for i.MX now.
 
-I'm happy either way.
+If you still see this issue, let me know how to reproduce it.
 
-Thanks!
-Ohad.
+Regards,
+
+Fabio Estevam
