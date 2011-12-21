@@ -1,31 +1,47 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 20 Dec 2011 15:58:43 -0800
-Subject: [RFC PATCH v3 1/5] dt: add of_get_child_count helper function
-In-Reply-To: <1324402840-32451-2-git-send-email-b29396@freescale.com>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-2-git-send-email-b29396@freescale.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF176BE92EE2@HQMAIL01.nvidia.com>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 20 Dec 2011 16:09:06 -0800
+Subject: [PATCH 2/3] cpuidle: fix error handling in __cpuidle_register_device
+In-Reply-To: <1324426147-16735-1-git-send-email-ccross@android.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+Message-ID: <1324426147-16735-3-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dong Aisheng wrote at Tuesday, December 20, 2011 10:41 AM:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Currently most code to get child count in kernel are almost same,
-> add a helper to implement this function for dt to use.
+Fix the error handling in __cpuidle_register_device to include
+the missing list_del.  Move it to a label, which will simplify
+the error handling when coupled states are added.
 
-> diff --git a/include/linux/of.h b/include/linux/of.h
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ drivers/cpuidle/cpuidle.c |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
 
-> +static inline int of_get_child_count(const struct device_node *np)
-> +{
-> +	return -ENOSYS;
-> +}
-
-Wouldn't it be better to return 0 here? -ENOSYS would be fine if the
-function returned an error code, but it's really returning a count, and
-other "dummy" functions that return data return 0/NULL already. This
-would also allow you to just use the value directly in all cases rather
-than having to check for a < 0 error case.
-
+diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+index 1486b3c..ea00a16 100644
+--- a/drivers/cpuidle/cpuidle.c
++++ b/drivers/cpuidle/cpuidle.c
+@@ -318,13 +318,18 @@ static int __cpuidle_register_device(struct cpuidle_device *dev)
+ 
+ 	per_cpu(cpuidle_devices, dev->cpu) = dev;
+ 	list_add(&dev->device_list, &cpuidle_detected_devices);
+-	if ((ret = cpuidle_add_sysfs(sys_dev))) {
+-		module_put(cpuidle_driver->owner);
+-		return ret;
+-	}
++	ret = cpuidle_add_sysfs(sys_dev);
++	if (ret)
++		goto err_sysfs;
+ 
+ 	dev->registered = 1;
+ 	return 0;
++
++err_sysfs:
++	module_put(cpuidle_driver->owner);
++	list_del(&dev->device_list);
++	per_cpu(cpuidle_devices, dev->cpu) = NULL;
++	return ret;
+ }
+ 
+ /**
 -- 
-nvpublic
+1.7.4.1
