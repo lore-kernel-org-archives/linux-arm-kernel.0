@@ -1,23 +1,35 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Dec 2011 15:46:37 +0900
-Subject: [PATCH v4] s3c/s3c24xx: arm: leds: Make s3c24xx LEDS driver use
- gpiolib. Fix error disabling pull during probe.
-In-Reply-To: <4EE7E0E7.1020802@solonet.org.ua>
-References: <4EE7E0E7.1020802@solonet.org.ua>
-Message-ID: <063a01ccbfac$498513c0$dc8f3b40$%kim@samsung.com>
+Date: Wed, 21 Dec 2011 16:04:40 +0900
+Subject: [PATCHv2 resend] Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+In-Reply-To: <4EE7BE5F.8020108@solonet.org.ua>
+References: <4EE7BE5F.8020108@solonet.org.ua>
+Message-ID: <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Denis Kuzmenko wrote:
 > 
-> Make s3c24xx LEDS driver use gpiolib. Fix error disabling pull during
-> probe.
+> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
 > 
 > Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+> ---
+> 
+> Patch is against 3.2-rc4.
+> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of this
+> the
+> file s3c2410-iotiming.c is not ever compiled and enabling
+> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
+> function
+> s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs
+> defined
+> as NULL for this case.
+> 
+Hi Denis,
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Richard, I think, this should be handled in your tree.
+Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected in my
+case and s3c2410-iotiming.c is built...when is it happened? I just selected
+every regarding configuration in kernel menuconfig...
 
 Thanks.
 
@@ -27,140 +39,87 @@ Kgene.
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-> ---
+
+> Changelog:
+> v1 -> v2
+> New CONFIG_ symbols S3C241{0,2}_IOTIMING were removed as It was observed
+> that
+> they already present but hidden from user.
 > 
-> There is a comment "no point in having a pull-up if we are always driving"
-> but code was actually enabled pull-resistor for that case probably because
-> of
-> function parameter misunderstanding (1 - disables, 0 - enables). So this
-> was
-> changed to another function which takes alphabetically defined constant as
-> parameter.
-> Tested on Mini2440 board which implements most complex case where both
-> S3C24XX_LEDF_ACTLOW and S3C24XX_LEDF_TRISTATE are set.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index e084b7e..133d005 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2118,7 +2118,7 @@ config CPU_FREQ_S3C24XX_DEBUG
 > 
-> Changes v1->v2
->         Fix typo's and style problems.
-> Changes v2->v3
->         Remove pull-resistor enabling code for case of
-S3C24XX_LEDF_TRISTATE
-> flag is set
-> Changes v3->v4
-> 	!! approach for XOR operation with (pd->flags & S3C24XX_LEDF_ACTLOW)
-> (otherwise code will became buggy when S3C24XX_LEDF_ACTLOW valu will be
-> changed)
+>  config CPU_FREQ_S3C24XX_IODEBUG
+>  	bool "Debug CPUfreq Samsung driver IO timing"
+> -	depends on CPU_FREQ_S3C24XX
+> +	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING ||
+> S3C2412_IOTIMING)
+>  	help
+>  	  Enable s3c_freq_iodbg for the Samsung S3C CPUfreq core
 > 
-> See https://lkml.org/lkml/2011/11/22/42 and
-> https://lkml.org/lkml/2011/12/13/338
-> previous for discussions.
+> diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+> b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+> index dac4760..c465252 100644
+> --- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+> +++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+> @@ -202,13 +202,23 @@ extern int s3c_plltab_register(struct
+> cpufreq_frequency_table *plls,
+>  extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
+>  extern struct s3c_iotimings *s3c_cpufreq_getiotimings(void);
 > 
-> diff --git a/drivers/leds/leds-s3c24xx.c b/drivers/leds/leds-s3c24xx.c
-> index 29f8b0f..8062664 100644
-> --- a/drivers/leds/leds-s3c24xx.c
-> +++ b/drivers/leds/leds-s3c24xx.c
-> @@ -46,23 +46,29 @@ static void s3c24xx_led_set(struct led_classdev
-> *led_cdev,
->  	struct s3c24xx_gpio_led *led = to_gpio(led_cdev);
->  	struct s3c24xx_led_platdata *pd = led->pdata;
-> 
-> -	/* there will be a short delay between setting the output and
-> -	 * going from output to input when using tristate. */
+> -extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
+> -				     struct s3c_cpufreq_config *cfg,
+> -				     union s3c_iobank *iob);
 > -
-> -	s3c2410_gpio_setpin(pd->gpio, (value ? 1 : 0) ^
-> -			    (pd->flags & S3C24XX_LEDF_ACTLOW));
-> -
-> -	if (pd->flags & S3C24XX_LEDF_TRISTATE)
-> -		s3c2410_gpio_cfgpin(pd->gpio,
-> -			value ? S3C2410_GPIO_OUTPUT : S3C2410_GPIO_INPUT);
-> +	if (pd->flags & S3C24XX_LEDF_TRISTATE) {
-> +		if (value) {
-> +			/* invert value if S3C24XX_LEDF_ACTLOW is set */
-> +			gpio_direction_output(pd->gpio,
-> +				!!value ^ !!(pd->flags &
-S3C24XX_LEDF_ACTLOW));
-> +		} else {
-> +			gpio_direction_input(pd->gpio);
-> +		}
-> +	} else {
-> +		/* invert value if S3C24XX_LEDF_ACTLOW is set */
-> +		gpio_direction_output(pd->gpio,
-> +			!!value ^ !!(pd->flags & S3C24XX_LEDF_ACTLOW));
-> +	}
-> 
->  }
-> 
->  static int s3c24xx_led_remove(struct platform_device *dev)
->  {
-> +	struct s3c24xx_led_platdata *pdata = dev->dev.platform_data;
->  	struct s3c24xx_gpio_led *led = pdev_to_gpio(dev);
-> 
->  	led_classdev_unregister(&led->cdev);
-> +	gpio_free(pdata->gpio);
->  	kfree(led);
-> 
->  	return 0;
-> @@ -77,7 +83,8 @@ static int s3c24xx_led_probe(struct platform_device
-*dev)
->  	led = kzalloc(sizeof(struct s3c24xx_gpio_led), GFP_KERNEL);
->  	if (led == NULL) {
->  		dev_err(&dev->dev, "No memory for device\n");
-> -		return -ENOMEM;
-> +		ret = -ENOMEM;
-> +		goto err_kzalloc;
->  	}
-> 
->  	platform_set_drvdata(dev, led);
-> @@ -89,15 +96,24 @@ static int s3c24xx_led_probe(struct platform_device
-> *dev)
-> 
->  	led->pdata = pdata;
-> 
-> -	/* no point in having a pull-up if we are always driving */
-> +	ret = gpio_request(pdata->gpio, pdata->name);
-> +	if (ret < 0) {
-> +		dev_err(&dev->dev, "gpio_request failed\n");
-> +		goto err_gpio_request;
-> +	}
-> 
-> +	/* apply GPIO settings and initially turn off the LED */
->  	if (pdata->flags & S3C24XX_LEDF_TRISTATE) {
-> -		s3c2410_gpio_setpin(pdata->gpio, 0);
-> -		s3c2410_gpio_cfgpin(pdata->gpio, S3C2410_GPIO_INPUT);
-> +		ret = gpio_direction_input(pdata->gpio);
->  	} else {
-> -		s3c2410_gpio_pullup(pdata->gpio, 0);
-> -		s3c2410_gpio_setpin(pdata->gpio, 0);
-> -		s3c2410_gpio_cfgpin(pdata->gpio, S3C2410_GPIO_OUTPUT);
-> +		/* no point in having a pull-up as we are always driving */
-> +		s3c_gpio_setpull(pdata->gpio, S3C_GPIO_PULL_NONE);
-> +		ret = gpio_direction_output(pdata->gpio,
-> +				!!(pdata->flags & S3C24XX_LEDF_ACTLOW));
-> +	}
-> +	if (ret < 0) {
-> +		dev_err(&dev->dev, "can't set gpio direction\n");
-> +		goto err_gpio_set_direction;
->  	}
-> 
->  	/* register our new led device */
-> @@ -105,11 +121,18 @@ static int s3c24xx_led_probe(struct platform_device
-> *dev)
->  	ret = led_classdev_register(&dev->dev, &led->cdev);
->  	if (ret < 0) {
->  		dev_err(&dev->dev, "led_classdev_register failed\n");
-> -		kfree(led);
-> -		return ret;
-> +		goto err_led_classdev_register;
->  	}
-> 
->  	return 0;
+> -extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
+> -				     struct s3c_cpufreq_config *cfg,
+> -				     union s3c_iobank *iob);
+> +#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
+> +	#ifdef CONFIG_S3C2410_IOTIMING
+> +	extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
+> +					     struct s3c_cpufreq_config *cfg,
+> +					     union s3c_iobank *iob);
+> +	#else
+> +	#define s3c2410_iotiming_debugfs	NULL
+> +	#endif
 > +
-> +err_led_classdev_register:
-> +err_gpio_set_direction:
-> +		gpio_free(pdata->gpio);
-> +err_gpio_request:
-> +		kfree(led);
-> +err_kzalloc:
-> +		return ret;
->  }
+> +	#ifdef CONFIG_S3C2412_IOTIMING
+> +	extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
+> +					     struct s3c_cpufreq_config *cfg,
+> +					     union s3c_iobank *iob);
+> +	#else
+> +	#define s3c2412_iotiming_debugfs	NULL
+> +	#endif
+> +#endif
 > 
->  static struct platform_driver s3c24xx_led_driver = {
+>  #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
+>  #define s3c_cpufreq_debugfs_call(x) x
+> @@ -241,10 +251,7 @@ extern void s3c2410_iotiming_set(struct
+> s3c_cpufreq_config *cfg,
+>  #endif /* CONFIG_S3C2410_IOTIMING */
+> 
+>  /* S3C2412 compatible routines */
+> -
+> -extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
+> -				struct s3c_iotimings *timings);
+> -
+> +#ifdef CONFIG_S3C2412_IOTIMING
+>  extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
+>  				struct s3c_iotimings *timings);
+> 
+> @@ -253,6 +260,11 @@ extern int s3c2412_iotiming_calc(struct
+> s3c_cpufreq_config *cfg,
+> 
+>  extern void s3c2412_iotiming_set(struct s3c_cpufreq_config *cfg,
+>  				 struct s3c_iotimings *iot);
+> +#else
+> +#define s3c2412_iotiming_calc NULL
+> +#define s3c2412_iotiming_get NULL
+> +#define s3c2412_iotiming_set NULL
+> +#endif
+> 
+>  #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUG
+>  #define s3c_freq_dbg(x...) printk(KERN_INFO x)
