@@ -1,56 +1,32 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 21 Dec 2011 01:40:54 -0800
-Subject: [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <4EF1A0B4.5080307@linux.intel.com>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <4EF1A0B4.5080307@linux.intel.com>
-Message-ID: <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Dec 2011 09:43:34 +0000
+Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
+In-Reply-To: <20111221092739.GI15863@b20223-02.ap.freescale.net>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+ <20111221012046.GE15863@b20223-02.ap.freescale.net>
+ <20111221092739.GI15863@b20223-02.ap.freescale.net>
+Message-ID: <201112210943.34310.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 1:02 AM, Arjan van de Ven <arjan@linux.intel.com> wrote:
-> On 12/21/2011 1:09 AM, Colin Cross wrote:
->> On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
->> cpus cannot be independently powered down, either due to
->> sequencing restrictions (on Tegra 2, cpu 0 must be the last to
->> power down), or due to HW bugs (on OMAP4460, a cpu powering up
->> will corrupt the gic state unless the other cpu runs a work
->> around). ?Each cpu has a power state that it can enter without
->> coordinating with the other cpu (usually Wait For Interrupt, or
->> WFI), and one or more "coupled" power states that affect blocks
->> shared between the cpus (L2 cache, interrupt controller, and
->> sometimes the whole SoC). ?Entering a coupled power state must
->> be tightly controlled on both cpus.
->>
->> The easiest solution to implementing coupled cpu power states is
->> to hotplug all but one cpu whenever possible, usually using a
->> cpufreq governor that looks at cpu load to determine when to
->> enable the secondary cpus. ?This causes problems, as hotplug is an
->> expensive operation, so the number of hotplug transitions must be
->> minimized, leading to very slow response to loads, often on the
->> order of seconds.
->>
->> This patch series implements an alternative solution, where each
->> cpu will wait in the WFI state until all cpus are ready to enter
->> a coupled state, at which point the coupled state function will
->> be called on all cpus at approximately the same time.
->>
->> Once all cpus are ready to enter idle, they are woken by an smp
->> cross call. ?At this point, there is a chance that one of the
->> cpus will find work to do, and choose not to enter suspend. ?A
->> final pass is needed to guarantee that all cpus will call the
->> power state enter function at the same time. ?During this pass,
->> each cpu will increment the ready counter, and continue once the
->> ready counter matches the number of online coupled cpus. ?If any
->> cpu exits idle, the other cpus will decrement their counter and
->> retry.
->
-> this smells fundamentally racey to me; you can get an interrupt one
-> cycle after you think you're done, but before the last guy enters WFI...
->
-> how do you solve that issue ?
+On Wednesday 21 December 2011, Richard Zhao wrote:
+> On Wed, Dec 21, 2011 at 09:20:46AM +0800, Richard Zhao wrote:
 
-All the cpus have interrupts off when they increment the counter, so
-they cannot receive an interrupt.  If an interrupt is pending on one
-of those cpus, it will be handled later when WFI aborts due to the
-pending interrupt.
+> > > > > You also need to define how the core supplies get looked up.
+> > > 
+> > > > It's pure software. platform uses this driver have to define "cpu" consumer.
+> > > 
+> > > You still need to define this in the binding.
+> > You mean regulator DT binding? already in ? I'll check it.
+> Mark, cpu node is not a struct device, sys_device instead. I can not find
+> regulator via device/dt node. Can I still use the string to get regulator
+> after converting to DT?
+
+I believe Kay and Greg have the plan to unify "class" and "bus" in sysfs, which
+implies turning sys_device into a derived class of device instead of kobject.
+If that understanding is correct, we might as well do that now so we can
+attach a device_node to a sys_device.
+
+Kay, does this make sense?
+
+	Arnd
