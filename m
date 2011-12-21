@@ -1,136 +1,166 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 21 Dec 2011 23:00:47 +0800
-Subject: [PATCH 4/4] arm/imx: add mc13892 support into imx51-babbage.dts
-In-Reply-To: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
-References: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1324479647-4580-5-git-send-email-shawn.guo@linaro.org>
+From: m-karicheri2@ti.com (Karicheri, Muralidharan)
+Date: Wed, 21 Dec 2011 14:55:23 +0000
+Subject: [PATCH v7 5/8] davinci: dm644x: change vpfe capture structure
+ variables for consistency
+In-Reply-To: <1324475021-32509-6-git-send-email-manjunath.hadli@ti.com>
+References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
+ <1324475021-32509-6-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <3E54258959B69E4282D79E01AB1F32B724A949@DFLE34.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds mc13892 support into imx51-babbage device tree source.
+original Message-----
+>> From: davinci-linux-open-source-bounces+m-
+>> karicheri2=ti.com at linux.davincidsp.com [mailto:davinci-linux-open-source-
+>> bounces+m-karicheri2=ti.com at linux.davincidsp.com] On Behalf Of Hadli,
+>> Manjunath
+>> Sent: Wednesday, December 21, 2011 8:44 AM
+>> To: dlos; LAK
+>> Subject: [PATCH v7 5/8] davinci: dm644x: change vpfe capture structure
+>> variables for consistency
+>> 
+>> Add SoC and board prefixes to variable names so that it is
+>> consistent with the rest of the file.
+>> 
+>> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+>> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>> ---
+>>  arch/arm/mach-davinci/board-dm644x-evm.c |   24 ++++++++++++------------
+>>  arch/arm/mach-davinci/dm644x.c           |   12 ++++++------
+>>  2 files changed, 18 insertions(+), 18 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-
+>> davinci/board-dm644x-evm.c
+>> index 6d76d7c..7d940f5 100644
+>> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+>> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+>> @@ -190,7 +190,7 @@ static struct platform_device davinci_fb_device = {
+>>  	.num_resources = 0,
+>>  };
+>> 
+>> -static struct tvp514x_platform_data tvp5146_pdata = {
+>> +static struct tvp514x_platform_data dm644xevm_tvp5146_pdata = {
+>>  	.clk_polarity = 0,
+>>  	.hs_polarity = 1,
+>>  	.vs_polarity = 1
+>> @@ -198,7 +198,7 @@ static struct tvp514x_platform_data tvp5146_pdata = {
+>> 
+>>  #define TVP514X_STD_ALL	(V4L2_STD_NTSC | V4L2_STD_PAL)
+>>  /* Inputs available at the TVP5146 */
+>> -static struct v4l2_input tvp5146_inputs[] = {
+>> +static struct v4l2_input dm644xevm_tvp5146_inputs[] = {
+>>  	{
+>>  		.index = 0,
+>>  		.name = "Composite",
+>> @@ -218,7 +218,7 @@ static struct v4l2_input tvp5146_inputs[] = {
+>>   * ouput that goes to vpfe. There is a one to one correspondence
+>>   * with tvp5146_inputs
+>>   */
+>> -static struct vpfe_route tvp5146_routes[] = {
+>> +static struct vpfe_route dm644xevm_tvp5146_routes[] = {
+>>  	{
+>>  		.input = INPUT_CVBS_VI2B,
+>>  		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
+>> @@ -229,13 +229,13 @@ static struct vpfe_route tvp5146_routes[] = {
+>>  	},
+>>  };
+>> 
+>> -static struct vpfe_subdev_info vpfe_sub_devs[] = {
+>> +static struct vpfe_subdev_info dm644xevm_vpfe_sub_devs[] = {
+>>  	{
+>>  		.name = "tvp5146",
+>>  		.grp_id = 0,
+>> -		.num_inputs = ARRAY_SIZE(tvp5146_inputs),
+>> -		.inputs = tvp5146_inputs,
+>> -		.routes = tvp5146_routes,
+>> +		.num_inputs = ARRAY_SIZE(dm644xevm_tvp5146_inputs),
+>> +		.inputs = dm644xevm_tvp5146_inputs,
+>> +		.routes = dm644xevm_tvp5146_routes,
+>>  		.can_route = 1,
+>>  		.ccdc_if_params = {
+>>  			.if_type = VPFE_BT656,
+>> @@ -244,15 +244,15 @@ static struct vpfe_subdev_info vpfe_sub_devs[] = {
+>>  		},
+>>  		.board_info = {
+>>  			I2C_BOARD_INFO("tvp5146", 0x5d),
+>> -			.platform_data = &tvp5146_pdata,
+>> +			.platform_data = &dm644xevm_tvp5146_pdata,
+>>  		},
+>>  	},
+>>  };
+>> 
+>> -static struct vpfe_config vpfe_cfg = {
+>> -	.num_subdevs = ARRAY_SIZE(vpfe_sub_devs),
+>> +static struct vpfe_config dm644xevm_capture_cfg = {
+>> +	.num_subdevs = ARRAY_SIZE(dm644xevm_vpfe_sub_devs),
+>>  	.i2c_adapter_id = 1,
+>> -	.sub_devs = vpfe_sub_devs,
+>> +	.sub_devs = dm644xevm_vpfe_sub_devs,
+>>  	.card_name = "DM6446 EVM",
+>>  	.ccdc = "DM6446 CCDC",
+>>  };
+>> @@ -626,7 +626,7 @@ static void __init
+>>  davinci_evm_map_io(void)
+>>  {
+>>  	/* setup input configuration for VPFE input devices */
+>> -	dm644x_set_vpfe_config(&vpfe_cfg);
+>> +	dm644x_set_vpfe_config(&dm644xevm_capture_cfg);
+>>  	dm644x_init();
+>>  }
+>> 
+>> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+>> index 97aecf2..acd9ee2 100644
+>> --- a/arch/arm/mach-davinci/dm644x.c
+>> +++ b/arch/arm/mach-davinci/dm644x.c
+>> @@ -614,7 +614,7 @@ static struct platform_device dm644x_vpss_device = {
+>>  	.resource		= dm644x_vpss_resources,
+>>  };
+>> 
+>> -static struct resource vpfe_resources[] = {
+>> +static struct resource dm644x_vpfe_resources[] = {
+>>  	{
+>>  		.start          = IRQ_VDINT0,
+>>  		.end            = IRQ_VDINT0,
+>> @@ -648,11 +648,11 @@ static struct platform_device dm644x_ccdc_dev = {
+>>  	},
+>>  };
+>> 
+>> -static struct platform_device vpfe_capture_dev = {
+>> +static struct platform_device dm644x_vpfe_dev = {
+>>  	.name		= CAPTURE_DRV_NAME,
+>>  	.id		= -1,
+>> -	.num_resources	= ARRAY_SIZE(vpfe_resources),
+>> -	.resource	= vpfe_resources,
+>> +	.num_resources	= ARRAY_SIZE(dm644x_vpfe_resources),
+>> +	.resource	= dm644x_vpfe_resources,
+>>  	.dev = {
+>>  		.dma_mask		= &vpfe_capture_dma_mask,
+>>  		.coherent_dma_mask	= DMA_BIT_MASK(32),
+>> @@ -661,7 +661,7 @@ static struct platform_device vpfe_capture_dev = {
+>> 
+>>  void dm644x_set_vpfe_config(struct vpfe_config *cfg)
+>>  {
+>> -	vpfe_capture_dev.dev.platform_data = cfg;
+>> +	dm644x_vpfe_dev.dev.platform_data = cfg;
+>>  }
+>> 
+>>  /*----------------------------------------------------------------------*/
+>> @@ -809,7 +809,7 @@ static int __init dm644x_init_devices(void)
+>> 
+>>  	platform_device_register(&dm644x_vpss_device);
+>>  	platform_device_register(&dm644x_ccdc_dev);
+>> -	platform_device_register(&vpfe_capture_dev);
+>> +	platform_device_register(&dm644x_vpfe_dev);
+>> 
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx51-babbage.dts |   93 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 91 insertions(+), 2 deletions(-)
+Just a suggestion. Why don't we change these with platform_add_devices() API call and register all of the video devices in once call instead of separate calls to platform_device_register?
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 564cb8c..728c9e8 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -31,12 +31,14 @@
- 				esdhc at 70004000 { /* ESDHC1 */
- 					fsl,cd-internal;
- 					fsl,wp-internal;
-+					vmmc-supply = <&vsd_reg>;
- 					status = "okay";
- 				};
- 
- 				esdhc at 70008000 { /* ESDHC2 */
- 					cd-gpios = <&gpio1 6 0>;
- 					wp-gpios = <&gpio1 5 0>;
-+					vmmc-supply = <&vsd_reg>;
- 					status = "okay";
- 				};
- 
-@@ -56,8 +58,95 @@
- 						compatible = "fsl,mc13892";
- 						spi-max-frequency = <6000000>;
- 						reg = <0>;
--						mc13xxx-irq-gpios = <&gpio1 8 0>;
--						fsl,mc13xxx-uses-regulator;
-+						interrupt-parent = <&gpio1>;
-+						interrupts = <8>;
-+
-+						regulators {
-+							sw1_reg: sw1 {
-+								regulator-min-microvolt = <600000>;
-+								regulator-max-microvolt = <1375000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw2_reg: sw2 {
-+								regulator-min-microvolt = <900000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw3_reg: sw3 {
-+								regulator-min-microvolt = <1100000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw4_reg: sw4 {
-+								regulator-min-microvolt = <1100000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vpll_reg: vpll {
-+								regulator-min-microvolt = <1050000>;
-+								regulator-max-microvolt = <1800000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vdig_reg: vdig {
-+								regulator-min-microvolt = <1650000>;
-+								regulator-max-microvolt = <1650000>;
-+								regulator-boot-on;
-+							};
-+
-+							vsd_reg: vsd {
-+								regulator-min-microvolt = <1800000>;
-+								regulator-max-microvolt = <3150000>;
-+							};
-+
-+							vusb2_reg: vusb2 {
-+								regulator-min-microvolt = <2400000>;
-+								regulator-max-microvolt = <2775000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vvideo_reg: vvideo {
-+								regulator-min-microvolt = <2775000>;
-+								regulator-max-microvolt = <2775000>;
-+							};
-+
-+							vaudio_reg: vaudio {
-+								regulator-min-microvolt = <2300000>;
-+								regulator-max-microvolt = <3000000>;
-+							};
-+
-+							vcam_reg: vcam {
-+								regulator-min-microvolt = <2500000>;
-+								regulator-max-microvolt = <3000000>;
-+							};
-+
-+							vgen1_reg: vgen1 {
-+								regulator-min-microvolt = <1200000>;
-+								regulator-max-microvolt = <1200000>;
-+							};
-+
-+							vgen2_reg: vgen2 {
-+								regulator-min-microvolt = <1200000>;
-+								regulator-max-microvolt = <3150000>;
-+								regulator-always-on;
-+							};
-+
-+							vgen3_reg: vgen3 {
-+								regulator-min-microvolt = <1800000>;
-+								regulator-max-microvolt = <2900000>;
-+								regulator-always-on;
-+							};
-+						};
- 					};
- 
- 					flash: at45db321d at 1 {
--- 
-1.7.4.1
+>>  	return 0;
+>>  }
+>> --
+>> 1.6.2.4
+>> 
+>> _______________________________________________
+>> Davinci-linux-open-source mailing list
+>> Davinci-linux-open-source at linux.davincidsp.com
+>> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
