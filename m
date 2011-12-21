@@ -1,166 +1,86 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Wed, 21 Dec 2011 14:55:23 +0000
-Subject: [PATCH v7 5/8] davinci: dm644x: change vpfe capture structure
- variables for consistency
-In-Reply-To: <1324475021-32509-6-git-send-email-manjunath.hadli@ti.com>
-References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
- <1324475021-32509-6-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B724A949@DFLE34.ent.ti.com>
+From: mgherzan@gmail.com (Mircea Gherzan)
+Date: Wed, 21 Dec 2011 16:59:13 +0200
+Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
+In-Reply-To: <20111219182908.GA2027@linaro.org>
+References: <1324284030-25540-1-git-send-email-mgherzan@gmail.com>
+ <20111219125021.GA2031@linaro.org>
+ <20111219164513.GA25105@swarm.cs.pub.ro>
+ <20111219181839.GH2031@linaro.org>
+ <20111219182908.GA2027@linaro.org>
+Message-ID: <20111221145913.GC3229@swarm.cs.pub.ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-original Message-----
->> From: davinci-linux-open-source-bounces+m-
->> karicheri2=ti.com at linux.davincidsp.com [mailto:davinci-linux-open-source-
->> bounces+m-karicheri2=ti.com at linux.davincidsp.com] On Behalf Of Hadli,
->> Manjunath
->> Sent: Wednesday, December 21, 2011 8:44 AM
->> To: dlos; LAK
->> Subject: [PATCH v7 5/8] davinci: dm644x: change vpfe capture structure
->> variables for consistency
->> 
->> Add SoC and board prefixes to variable names so that it is
->> consistent with the rest of the file.
->> 
->> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
->> Acked-by: Sekhar Nori <nsekhar@ti.com>
->> ---
->>  arch/arm/mach-davinci/board-dm644x-evm.c |   24 ++++++++++++------------
->>  arch/arm/mach-davinci/dm644x.c           |   12 ++++++------
->>  2 files changed, 18 insertions(+), 18 deletions(-)
->> 
->> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-
->> davinci/board-dm644x-evm.c
->> index 6d76d7c..7d940f5 100644
->> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
->> @@ -190,7 +190,7 @@ static struct platform_device davinci_fb_device = {
->>  	.num_resources = 0,
->>  };
->> 
->> -static struct tvp514x_platform_data tvp5146_pdata = {
->> +static struct tvp514x_platform_data dm644xevm_tvp5146_pdata = {
->>  	.clk_polarity = 0,
->>  	.hs_polarity = 1,
->>  	.vs_polarity = 1
->> @@ -198,7 +198,7 @@ static struct tvp514x_platform_data tvp5146_pdata = {
->> 
->>  #define TVP514X_STD_ALL	(V4L2_STD_NTSC | V4L2_STD_PAL)
->>  /* Inputs available at the TVP5146 */
->> -static struct v4l2_input tvp5146_inputs[] = {
->> +static struct v4l2_input dm644xevm_tvp5146_inputs[] = {
->>  	{
->>  		.index = 0,
->>  		.name = "Composite",
->> @@ -218,7 +218,7 @@ static struct v4l2_input tvp5146_inputs[] = {
->>   * ouput that goes to vpfe. There is a one to one correspondence
->>   * with tvp5146_inputs
->>   */
->> -static struct vpfe_route tvp5146_routes[] = {
->> +static struct vpfe_route dm644xevm_tvp5146_routes[] = {
->>  	{
->>  		.input = INPUT_CVBS_VI2B,
->>  		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
->> @@ -229,13 +229,13 @@ static struct vpfe_route tvp5146_routes[] = {
->>  	},
->>  };
->> 
->> -static struct vpfe_subdev_info vpfe_sub_devs[] = {
->> +static struct vpfe_subdev_info dm644xevm_vpfe_sub_devs[] = {
->>  	{
->>  		.name = "tvp5146",
->>  		.grp_id = 0,
->> -		.num_inputs = ARRAY_SIZE(tvp5146_inputs),
->> -		.inputs = tvp5146_inputs,
->> -		.routes = tvp5146_routes,
->> +		.num_inputs = ARRAY_SIZE(dm644xevm_tvp5146_inputs),
->> +		.inputs = dm644xevm_tvp5146_inputs,
->> +		.routes = dm644xevm_tvp5146_routes,
->>  		.can_route = 1,
->>  		.ccdc_if_params = {
->>  			.if_type = VPFE_BT656,
->> @@ -244,15 +244,15 @@ static struct vpfe_subdev_info vpfe_sub_devs[] = {
->>  		},
->>  		.board_info = {
->>  			I2C_BOARD_INFO("tvp5146", 0x5d),
->> -			.platform_data = &tvp5146_pdata,
->> +			.platform_data = &dm644xevm_tvp5146_pdata,
->>  		},
->>  	},
->>  };
->> 
->> -static struct vpfe_config vpfe_cfg = {
->> -	.num_subdevs = ARRAY_SIZE(vpfe_sub_devs),
->> +static struct vpfe_config dm644xevm_capture_cfg = {
->> +	.num_subdevs = ARRAY_SIZE(dm644xevm_vpfe_sub_devs),
->>  	.i2c_adapter_id = 1,
->> -	.sub_devs = vpfe_sub_devs,
->> +	.sub_devs = dm644xevm_vpfe_sub_devs,
->>  	.card_name = "DM6446 EVM",
->>  	.ccdc = "DM6446 CCDC",
->>  };
->> @@ -626,7 +626,7 @@ static void __init
->>  davinci_evm_map_io(void)
->>  {
->>  	/* setup input configuration for VPFE input devices */
->> -	dm644x_set_vpfe_config(&vpfe_cfg);
->> +	dm644x_set_vpfe_config(&dm644xevm_capture_cfg);
->>  	dm644x_init();
->>  }
->> 
->> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
->> index 97aecf2..acd9ee2 100644
->> --- a/arch/arm/mach-davinci/dm644x.c
->> +++ b/arch/arm/mach-davinci/dm644x.c
->> @@ -614,7 +614,7 @@ static struct platform_device dm644x_vpss_device = {
->>  	.resource		= dm644x_vpss_resources,
->>  };
->> 
->> -static struct resource vpfe_resources[] = {
->> +static struct resource dm644x_vpfe_resources[] = {
->>  	{
->>  		.start          = IRQ_VDINT0,
->>  		.end            = IRQ_VDINT0,
->> @@ -648,11 +648,11 @@ static struct platform_device dm644x_ccdc_dev = {
->>  	},
->>  };
->> 
->> -static struct platform_device vpfe_capture_dev = {
->> +static struct platform_device dm644x_vpfe_dev = {
->>  	.name		= CAPTURE_DRV_NAME,
->>  	.id		= -1,
->> -	.num_resources	= ARRAY_SIZE(vpfe_resources),
->> -	.resource	= vpfe_resources,
->> +	.num_resources	= ARRAY_SIZE(dm644x_vpfe_resources),
->> +	.resource	= dm644x_vpfe_resources,
->>  	.dev = {
->>  		.dma_mask		= &vpfe_capture_dma_mask,
->>  		.coherent_dma_mask	= DMA_BIT_MASK(32),
->> @@ -661,7 +661,7 @@ static struct platform_device vpfe_capture_dev = {
->> 
->>  void dm644x_set_vpfe_config(struct vpfe_config *cfg)
->>  {
->> -	vpfe_capture_dev.dev.platform_data = cfg;
->> +	dm644x_vpfe_dev.dev.platform_data = cfg;
->>  }
->> 
->>  /*----------------------------------------------------------------------*/
->> @@ -809,7 +809,7 @@ static int __init dm644x_init_devices(void)
->> 
->>  	platform_device_register(&dm644x_vpss_device);
->>  	platform_device_register(&dm644x_ccdc_dev);
->> -	platform_device_register(&vpfe_capture_dev);
->> +	platform_device_register(&dm644x_vpfe_dev);
->> 
+On Mon, Dec 19, 2011 at 06:29:08PM +0000, Dave Martin wrote:
+> On Mon, Dec 19, 2011 at 06:18:39PM +0000, Dave Martin wrote:
+> > On Mon, Dec 19, 2011 at 06:45:13PM +0200, Mircea Gherzan wrote:
+> 
+> [...]
+> 
+> > > The JITed code calls back to the kernel for the load helpers. So setting
+> > > bit 0 is required.
+> > 
+> > When you take the address of a link-time external function symbol,
+> > bit[0] in the address will automatically be set appropriately by the
+> > linker to indicate the target instruction set -- you already use BX/BLX
+> > to jump to such symbols, so you should switch correctly when calling
+> > _to_ the kernel.
+> > 
+> > Returns should also work, except for old-style "mov pc,lr" returns made
+> > in Thumb code (from ARM code, this magically works for >= v7).  Such returns
+> > only happen in hand-written assembler: for C code, the compiler always
+> > generates proper AEABI-compliant return sequences.
+> > 
+> > So, for calling load_func[], jit_get_skb_b etc. (which are C functions),
+> > there should be no problem.
+> > 
+> > I think the only code which you call from the JIT output but which does
+> > not return compliantly is __aeabi_uidiv() in arch/arm/lib/lib1funcs.S.
+> > 
+> > 
+> > I have a quick hacked-up patch (below) which attempts to fix this;
+> > I'd be interested if this works for you  -- but finalising your ARM-only
+> > version of the patch should still be the priority.
+> > 
+> > If this fix does work, I'll turn it into a proper patch, as we can maybe
+> > use it more widely.
+> 
+> Oops, I forgot to paste in my patch ... here it is.
+> 
+> Cheers
+> ---Dave
+> 
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index b6e65de..013bfaf 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -313,4 +313,39 @@
+>  	.size \name , . - \name
+>  	.endm
+>  
+> +/*
+> + * Helper macro to abstract a function return, where the return address is
+> + * held in a register:
+> + */
+> +.macro __def_bret cc
+> +	.macro bret\cc Rm:req
+> +#if __LINUX_ARM_ARCH__ < 7
+> +		mov\cc	pc, \Rm
+> +#else
+> +		bx\cc	\Rm
+> +#endif
 
-Just a suggestion. Why don't we change these with platform_add_devices() API call and register all of the video devices in once call instead of separate calls to platform_device_register?
+This patch worked for me, because I'm using ARMv7 exclusively. But I'm
+inclined to think that your patch will fail on ARMv6T (for example) with
+a Thumb2 kernel, because the "mov pc, Rm" is a simple branch on pre-v7
+cores.
 
->>  	return 0;
->>  }
->> --
->> 1.6.2.4
->> 
->> _______________________________________________
->> Davinci-linux-open-source mailing list
->> Davinci-linux-open-source at linux.davincidsp.com
->> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+Note however that v3 of my patch no longer requires any changes to the
+assembly code: the C trampoline/wrapper for integer division ensures a
+proper return. And this one is used only for the DIV_X BPF opcode, which
+appears also quite rarely.
+
+[...]
+
+Cheers,
+Mircea
