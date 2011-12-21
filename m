@@ -1,26 +1,38 @@
-From: lrg@ti.com (Liam Girdwood)
-Date: Wed, 21 Dec 2011 18:33:44 +0000
-Subject: [PATCH 07/10] ASoC: OMAP: ams-delta: Drive modem/codec pins
- over GPIO API
-In-Reply-To: <1323634328-856-8-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <1323634328-856-8-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <1324492424.8478.5.camel@odin>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 21 Dec 2011 16:37:20 -0200
+Subject: [PATCH] usb: gadget: Fix build error due to selection of
+ USB_FSL_MPH_DR_OF by ARCH_MXC
+Message-ID: <1324492640-25481-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2011-12-11 at 21:12 +0100, Janusz Krzysztofik wrote:
-> Don't use Amstrad Delta custom I/O functions any longer, replace them
-> with GPIO. Old pin definitions, no longer used by the modem bits either,
-> can be dropped.
-> 
-> Depends on patch 2/10 "ARM: OMAP1: Convert Amstrad E3 latches to
-> basic_mmio_gpio".
-> 
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+USB_FSL_MPH_DR_OF is a PowerPC driver and should not be selected by ARCH_MXC.
 
-Applied.
+Doing a 'make mx3_defconfig' and selecting i.MX6 we get:
 
-Thanks
+CC [M]  drivers/usb/host/fsl-mph-dr-of.o
+drivers/usb/host/fsl-mph-dr-of.c: In function 'fsl_usb2_device_register':
+drivers/usb/host/fsl-mph-dr-of.c:97: error: 'struct pdev_archdata' has no member named 'dma_mask'
 
-Liam
+Fix this error by not allowing USB_FSL_MPH_DR_OF to be selected by ARCH_MXC.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ drivers/usb/gadget/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 23a4473..0148676 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -159,7 +159,7 @@ config USB_FSL_USB2
+ 	tristate "Freescale Highspeed USB DR Peripheral Controller"
+ 	depends on FSL_SOC || ARCH_MXC
+ 	select USB_GADGET_DUALSPEED
+-	select USB_FSL_MPH_DR_OF if OF
++	select USB_FSL_MPH_DR_OF if OF && !ARCH_MXC
+ 	help
+ 	   Some of Freescale PowerPC processors have a High Speed
+ 	   Dual-Role(DR) USB controller, which supports device mode.
+-- 
+1.7.1
