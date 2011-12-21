@@ -1,36 +1,59 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 21 Dec 2011 09:56:55 +0000
-Subject: [PATCH v2] davinci: DA850 EVM: OHCI platform code
-In-Reply-To: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
-References: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6051CB9@DBDE01.ent.ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 21 Dec 2011 17:59:07 +0800
+Subject: Is Pandaboard cpuhotplug working stably?
+In-Reply-To: <20111221094624.GB3354@n2100.arm.linux.org.uk>
+References: <CAGsJ_4ydbMaS0DD6+j1m9tdCTCzw3TGELcY=KotupvvMMK1YOA@mail.gmail.com>
+ <20111221094624.GB3354@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4w0iVXC6qmDzmkuOb=ZN=Q0bF7EAFkxeYR_d7-vo+8bqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prakash,
+2011/12/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Wed, Dec 21, 2011 at 05:23:48PM +0800, Barry Song wrote:
+>> Hi guys,
+>> i tried cpuhotplug on pandaboard for both
+>> Pandroid_Froyo_L27.8.2_release_pkg and Linaro 11.11. It has failed to
+>> work stably.
+>> On Pandroid_Froyo_L27.8.2_release_pkg, unplugging cpu1 works well:
+>> # echo 0 > /sys/devices/system/cpu/cpu1/online
+>> CPU1: shutdown
+>>
+>> if i enable the cpu1 again by "echo 1 >
+>> /sys/devices/system/cpu/cpu1/online", the system will restore to 3
+>> random status: hang, normal, panic.
+>>
+>> Using ?Linaro 11.11 release, "echo 0 >
+>> /sys/devices/system/cpu/cpu1/online" will make system hang and the
+>> whole system will not be able to reset by pressing reset key, the only
+>> way to reset system is pulling out AV power.
+>>
+>> i am sorry i can't get more time to debug and find more clues. just
+>> want to ask people whether this is a version the cpuhotplug works
+>> normal on?
+>
+> cpu hotplug is basically totally buggered - the preconditions placed
+> upon the bringup code path are basically impossible to satisfy in any
+> shape or form at the moment.
+>
+> There's the requirement that the secondary CPU is marked online and
+> active before interrupts are enabled for the thread migration stuff
+> to behave correctly. ?However, this is incompatible with smp_call_function()
+> which will wait for online CPUs to respond to an IPI - which this one
+> won't because interrupts are disabled.
+>
+> I think there was some discussion about how to fix this but I don't
+> recall the details.
 
-On Wed, Dec 21, 2011 at 12:50:02, Manjunathappa, Prakash wrote:
-> From: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> 
-> On this board the OHCI port's power control and over-current signals from
-> TPS2065 power switch are connected via GPIO2[4] and GPIO6[13] respectively,
-> so we can implement the DA8xx OHCI glue layer's hooks for overriding the
-> root hub port's power and over-current status bits.
-> 
-> We also have to properly set up the clocking mode in the CFGCHIP2 register,
-> so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
-> its output is used to clock the USB 1.1 (OHCI) PHY...
-> 
-> Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+thanks, Russell. then could i think this is an ARM-kernel-specific bug
+which exists on all ARM SMP chips for the moment?
+and that bug doesn't happen on x86:
+root at ubuntu:~/simple-rootfs/initrd/bin# echo 0 >
+/sys/devices/system/cpu/cpu3/online
+root at ubuntu:~/simple-rootfs/initrd/bin# echo 1 >
+/sys/devices/system/cpu/cpu3/online
+root at ubuntu:~/simple-rootfs/initrd/bin# echo 0 >
+/sys/devices/system/cpu/cpu2/online
+root at ubuntu:~/simple-rootfs/initrd/bin# echo 1 >
+/sys/devices/system/cpu/cpu2/online
 
-This is the third copy of OHCI platform setup code which is almost
-the same except for the GPIO numbers. Can we attempt to consolidate
-the GPIO case under drivers/usb/host/ohci-da8xx.c glue layer itself?
-Of course, here should be a provision for non-GPIO based implementation
-as well.
-
-Sergei, any thoughts, comments?
-
-Thanks,
-Sekhar
+-barry
