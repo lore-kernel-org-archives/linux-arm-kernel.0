@@ -1,258 +1,79 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Wed, 21 Dec 2011 19:13:40 +0530
-Subject: [PATCH v7 7/8] davinci: dm644x: add support for v4l2 video display
+Date: Wed, 21 Dec 2011 19:13:34 +0530
+Subject: [PATCH v7 1/8] davinci: vpif: remove machine specific inclusion from
+ driver
 In-Reply-To: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
 References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <1324475021-32509-8-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <1324475021-32509-2-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create platform devices for various video modules like venc,osd,
-vpbe and v4l2 driver for dm644x. Change the dm644x_init_video to
-make room for display config, and register the vpfe or vpbe devices
-based on the config pointer validity to make sure boards without vpfe
-or vpbe can be built with minimal changes.
+remove machine specific inclusion from the driver which
+comes in the way of platform code consolidation.
+currently was seen that these header inclusions were
+not necessary.
 
 Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+Cc: LMML <linux-media@vger.kernel.org>
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c |    2 +-
- arch/arm/mach-davinci/davinci.h          |    7 +-
- arch/arm/mach-davinci/dm644x.c           |  163 +++++++++++++++++++++++++++---
- 3 files changed, 154 insertions(+), 18 deletions(-)
+ drivers/media/video/davinci/vpif.h         |    2 --
+ drivers/media/video/davinci/vpif_display.c |    2 --
+ include/media/davinci/vpif_types.h         |    2 ++
+ sound/soc/codecs/cq93vc.c                  |    2 --
+ 4 files changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 71aae93..8d6e4f6 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -696,7 +696,7 @@ static __init void davinci_evm_init(void)
- 	evm_init_i2c();
+diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
+index 25036cb..8bcac65 100644
+--- a/drivers/media/video/davinci/vpif.h
++++ b/drivers/media/video/davinci/vpif.h
+@@ -18,8 +18,6 @@
  
- 	davinci_setup_mmc(0, &dm6446evm_mmc_config);
--	dm644x_init_video(&dm644xevm_capture_cfg);
-+	dm644x_init_video(&dm644xevm_capture_cfg, NULL);
- 
- 	davinci_serial_init(&uart_config);
- 	dm644x_init_asp(&dm644x_evm_snd_data);
-diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-index 680446f..fcfe2f8 100644
---- a/arch/arm/mach-davinci/davinci.h
-+++ b/arch/arm/mach-davinci/davinci.h
-@@ -27,6 +27,11 @@
- 
- #include <media/davinci/vpfe_capture.h>
+ #include <linux/io.h>
+ #include <linux/videodev2.h>
+-#include <mach/hardware.h>
+-#include <mach/dm646x.h>
  #include <media/davinci/vpif_types.h>
-+#include <media/davinci/vpss.h>
-+#include <media/davinci/vpbe_types.h>
-+#include <media/davinci/vpbe_venc.h>
-+#include <media/davinci/vpbe.h>
-+#include <media/davinci/vpbe_osd.h>
  
- #define DAVINCI_SYSTEM_MODULE_BASE        0x01c40000
+ /* Maximum channel allowed */
+diff --git a/drivers/media/video/davinci/vpif_display.c b/drivers/media/video/davinci/vpif_display.c
+index 286f029..7fa34b4 100644
+--- a/drivers/media/video/davinci/vpif_display.c
++++ b/drivers/media/video/davinci/vpif_display.c
+@@ -39,8 +39,6 @@
+ #include <media/v4l2-ioctl.h>
+ #include <media/v4l2-chip-ident.h>
  
-@@ -81,7 +86,7 @@ void dm365_set_vpfe_config(struct vpfe_config *cfg);
- /* DM644x function declarations */
- void __init dm644x_init(void);
- void __init dm644x_init_asp(struct snd_platform_data *pdata);
--int __init dm644x_init_video(struct vpfe_config *);
-+int __init dm644x_init_video(struct vpfe_config *, struct vpbe_config *);
- 
- /* DM646x function declarations */
- void __init dm646x_init(void);
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 27bf9ca..6809bea 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -627,7 +627,7 @@ static struct resource dm644x_vpfe_resources[] = {
- 	},
- };
- 
--static u64 vpfe_capture_dma_mask = DMA_BIT_MASK(32);
-+static u64 dm644x_video_dma_mask = DMA_BIT_MASK(32);
- static struct resource dm644x_ccdc_resource[] = {
- 	/* CCDC Base address */
- 	{
-@@ -643,7 +643,7 @@ static struct platform_device dm644x_ccdc_dev = {
- 	.num_resources  = ARRAY_SIZE(dm644x_ccdc_resource),
- 	.resource       = dm644x_ccdc_resource,
- 	.dev = {
--		.dma_mask               = &vpfe_capture_dma_mask,
-+		.dma_mask               = &dm644x_video_dma_mask,
- 		.coherent_dma_mask      = DMA_BIT_MASK(32),
- 	},
- };
-@@ -654,7 +654,127 @@ static struct platform_device dm644x_vpfe_dev = {
- 	.num_resources	= ARRAY_SIZE(dm644x_vpfe_resources),
- 	.resource	= dm644x_vpfe_resources,
- 	.dev = {
--		.dma_mask		= &vpfe_capture_dma_mask,
-+		.dma_mask		= &dm644x_video_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+};
-+
-+#define DM644X_OSD_BASE		0x01c72600
-+
-+static struct resource dm644x_osd_resources[] = {
-+	{
-+		.start	= DM644X_OSD_BASE,
-+		.end	= DM644X_OSD_BASE + 0x1ff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct osd_platform_data dm644x_osd_data = {
-+	.vpbe_type     = VPBE_VERSION_1,
-+};
-+
-+static struct platform_device dm644x_osd_dev = {
-+	.name		= VPBE_OSD_SUBDEV_NAME,
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(dm644x_osd_resources),
-+	.resource	= dm644x_osd_resources,
-+	.dev		= {
-+		.dma_mask		= &dm644x_video_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+		.platform_data		= &dm644x_osd_data,
-+	},
-+};
-+
-+#define DM644X_VENC_BASE		0x01c72400
-+
-+static struct resource dm644x_venc_resources[] = {
-+	{
-+		.start	= DM644X_VENC_BASE,
-+		.end	= DM644X_VENC_BASE + 0x17f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static int dm644x_venc_setup_clock(enum vpbe_enc_timings_type type,
-+				   unsigned int mode)
-+{
-+	int ret = 0;
-+	void __iomem *vpss_clkctl_reg;
-+
-+	vpss_clkctl_reg = DAVINCI_SYSMODULE_VIRT(0x44);
-+
-+	switch (type) {
-+	case VPBE_ENC_STD:
-+		writel(0x18, vpss_clkctl_reg);
-+		break;
-+	case VPBE_ENC_DV_PRESET:
-+		switch (mode) {
-+		case V4L2_DV_480P59_94:
-+		case V4L2_DV_576P50:
-+			writel(0x19, vpss_clkctl_reg);
-+			break;
-+		case V4L2_DV_720P60:
-+		case V4L2_DV_1080I60:
-+		case V4L2_DV_1080P30:
-+			/*
-+			 * For HD, use external clock source since
-+			 * HD requires higher clock rate
-+			 */
-+			writel(0xa, vpss_clkctl_reg);
-+			break;
-+		default:
-+			ret = -EINVAL;
-+			break;
-+		}
-+		break;
-+	default:
-+		ret  = -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+static struct resource dm644x_v4l2_disp_resources[] = {
-+	{
-+		.start	= IRQ_VENCINT,
-+		.end	= IRQ_VENCINT,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device dm644x_vpbe_display = {
-+	.name		= "vpbe-v4l2",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(dm644x_v4l2_disp_resources),
-+	.resource	= dm644x_v4l2_disp_resources,
-+	.dev		= {
-+		.dma_mask		= &dm644x_video_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+};
-+
-+static struct venc_platform_data dm644x_venc_pdata = {
-+	.venc_type	= VPBE_VERSION_1,
-+	.setup_clock	= dm644x_venc_setup_clock,
-+};
-+
-+static struct platform_device dm644x_venc_dev = {
-+	.name		= VPBE_VENC_SUBDEV_NAME,
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(dm644x_venc_resources),
-+	.resource	= dm644x_venc_resources,
-+	.dev		= {
-+		.dma_mask		= &dm644x_video_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+		.platform_data		= &dm644x_venc_pdata,
-+	},
-+};
-+
-+static struct platform_device dm644x_vpbe_dev = {
-+	.name		= "vpbe_controller",
-+	.id		= -1,
-+	.dev		= {
-+		.dma_mask		= &dm644x_video_dma_mask,
- 		.coherent_dma_mask	= DMA_BIT_MASK(32),
- 	},
- };
-@@ -787,20 +907,31 @@ void __init dm644x_init(void)
- 	davinci_map_sysmod();
- }
- 
--static struct platform_device *dm644x_video_devices[] __initdata = {
--	&dm644x_vpss_device,
--	&dm644x_ccdc_dev,
--	&dm644x_vpfe_dev,
--};
+-#include <mach/dm646x.h>
 -
--int __init dm644x_init_video(struct vpfe_config *vpfe_cfg)
-+int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
-+				struct vpbe_config *vpbe_cfg)
- {
--	dm644x_vpfe_dev.dev.platform_data = vpfe_cfg;
--	/* Add ccdc clock aliases */
--	clk_add_alias("master", dm644x_ccdc_dev.name, "vpss_master", NULL);
--	clk_add_alias("slave", dm644x_ccdc_dev.name, "vpss_slave", NULL);
--	platform_add_devices(dm644x_video_devices,
--				ARRAY_SIZE(dm644x_video_devices));
-+	if (vpfe_cfg || vpbe_cfg)
-+		platform_device_register(&dm644x_vpss_device);
-+
-+	if (vpfe_cfg) {
-+		dm644x_vpfe_dev.dev.platform_data = vpfe_cfg;
-+		platform_device_register(&dm644x_ccdc_dev);
-+		platform_device_register(&dm644x_vpfe_dev);
-+		/* Add ccdc clock aliases */
-+		clk_add_alias("master", dm644x_ccdc_dev.name,
-+			      "vpss_master", NULL);
-+		clk_add_alias("slave", dm644x_ccdc_dev.name,
-+			      "vpss_slave", NULL);
-+	}
-+
-+	if (vpbe_cfg) {
-+		dm644x_vpbe_dev.dev.platform_data = vpbe_cfg;
-+		platform_device_register(&dm644x_osd_dev);
-+		platform_device_register(&dm644x_venc_dev);
-+		platform_device_register(&dm644x_vpbe_dev);
-+		platform_device_register(&dm644x_vpbe_display);
-+	}
-+
- 	return 0;
- }
+ #include "vpif_display.h"
+ #include "vpif.h"
  
+diff --git a/include/media/davinci/vpif_types.h b/include/media/davinci/vpif_types.h
+index 9929b05..bd8217c 100644
+--- a/include/media/davinci/vpif_types.h
++++ b/include/media/davinci/vpif_types.h
+@@ -17,6 +17,8 @@
+ #ifndef _VPIF_TYPES_H
+ #define _VPIF_TYPES_H
+ 
++#include <linux/i2c.h>
++
+ #define VPIF_CAPTURE_MAX_CHANNELS	2
+ 
+ enum vpif_if_type {
+diff --git a/sound/soc/codecs/cq93vc.c b/sound/soc/codecs/cq93vc.c
+index 46dbfd0..ff4eb7a 100644
+--- a/sound/soc/codecs/cq93vc.c
++++ b/sound/soc/codecs/cq93vc.c
+@@ -38,8 +38,6 @@
+ #include <sound/soc.h>
+ #include <sound/initval.h>
+ 
+-#include <mach/dm365.h>
+-
+ static inline unsigned int cq93vc_read(struct snd_soc_codec *codec,
+ 						unsigned int reg)
+ {
 -- 
 1.6.2.4
