@@ -1,151 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Dec 2011 16:29:57 +0900
-Subject: [PATCH] ARM: S3C64XX: Add basic cpuidle driver
-In-Reply-To: <1323117169-9817-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1323117169-9817-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <064901ccbfb2$57a86780$06f93680$%kim@samsung.com>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Wed, 21 Dec 2011 16:45:22 +0900
+Subject: Pull Requeset: Exynos4 Register Address Update for Devfreq Drivers.
+Message-ID: <CAJ0PZbQ1=+BTs0Emi78kfOWD5d90+ND5Jc_SJ9T4BcGMXyny9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> Add a very basic cpuidle driver for S3C64xx which merely drives the CPU
-> into IDLE mode. We could do this with pm_idle but the more modern idiom
-> is to use cpuidle and the intention is to go further and support STOP
-> and DEEP-STOP states in conjunction with the pm_domain framework.
-> 
-> The actual state entry code was lifted from Tomasz Figa's work on spica.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/Makefile  |    1 +
->  arch/arm/mach-s3c64xx/cpuidle.c |   91
-> +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 92 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s3c64xx/cpuidle.c
-> 
-> diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-
-> s3c64xx/Makefile
-> index e32093c..8f5574b 100644
-> --- a/arch/arm/mach-s3c64xx/Makefile
-> +++ b/arch/arm/mach-s3c64xx/Makefile
-> @@ -40,6 +40,7 @@ obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) += setup-sdhci-
-> gpio.o
->  obj-$(CONFIG_PM)		+= pm.o
->  obj-$(CONFIG_PM)		+= sleep.o
->  obj-$(CONFIG_PM)		+= irq-pm.o
-> +obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-> 
->  # Machine support
-> 
-> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-
-> s3c64xx/cpuidle.c
-> new file mode 100644
-> index 0000000..625d2c7
-> --- /dev/null
-> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
-> @@ -0,0 +1,91 @@
-> +/* linux/arch/arm/mach-s3c64xx/cpuidle.c
-> + *
-> + * Copyright (c) 2011 Wolfson Microelectronics, plc
-> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/io.h>
-> +#include <linux/export.h>
-> +#include <linux/time.h>
-> +
-> +#include <asm/proc-fns.h>
-> +
-> +#include <mach/map.h>
-> +
-> +#include <mach/regs-sys.h>
-> +#include <mach/regs-syscon-power.h>
-> +
-> +static int s3c64xx_enter_idle(struct cpuidle_device *dev,
-> +			      struct cpuidle_driver *drv,
-> +			      int index)
-> +{
-> +	struct timeval before, after;
-> +	unsigned long tmp;
-> +	int idle_time;
-> +
-> +	local_irq_disable();
-> +	do_gettimeofday(&before);
-> +
-> +	/* Setup PWRCFG to enter idle mode */
-> +	tmp = __raw_readl(S3C64XX_PWR_CFG);
-> +	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
-> +	tmp |= S3C64XX_PWRCFG_CFG_WFI_IDLE;
-> +	__raw_writel(tmp, S3C64XX_PWR_CFG);
-> +
-> +	cpu_do_idle();
-> +
-> +	do_gettimeofday(&after);
-> +	local_irq_enable();
-> +	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> +		    (after.tv_usec - before.tv_usec);
-> +
-> +	dev->last_residency = idle_time;
-> +	return index;
-> +}
-> +
-> +static struct cpuidle_state s3c64xx_cpuidle_set[] = {
-> +	[0] = {
-> +		.enter			= s3c64xx_enter_idle,
-> +		.exit_latency		= 1,
-> +		.target_residency	= 100000,
-> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
-> +		.name			= "IDLE",
-> +		.desc			= "System active, ARM gated",
-> +	},
-> +};
-> +
-> +static struct cpuidle_driver s3c64xx_cpuidle_driver = {
-> +	.name		= "s3c64xx_cpuidle",
-> +	.owner		= THIS_MODULE,
-> +	.state_count	= ARRAY_SIZE(s3c64xx_cpuidle_set),
-> +};
-> +
-> +static struct cpuidle_device s3c64xx_cpuidle_device = {
-> +	.state_count	= ARRAY_SIZE(s3c64xx_cpuidle_set),
-> +};
-> +
-> +static int __init s3c64xx_init_cpuidle(void)
-> +{
-> +	int ret;
-> +
-> +	memcpy(s3c64xx_cpuidle_driver.states, s3c64xx_cpuidle_set,
-> +	       sizeof(s3c64xx_cpuidle_set));
-> +	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
-> +
-> +	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
-> +	if (ret) {
-> +		pr_err("Failed to register cpuidle device: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +device_initcall(s3c64xx_init_cpuidle);
-> --
-> 1.7.7.3
+Hello,
 
-Hi Mark,
+Please pull the patches for Exynos4 SoCs that support devfreq device
+drivers for Exynos4210/4212/4412.
 
-Looks ok to me, will apply.
-Thanks.
+The patches are:
+ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus devfreq driver
+ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Gitweb: http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/devfreq-for-samsung
+Git Repository: git://git.infradead.org/users/kmpark/linux-samsung
+Branch: devfreq-for-samsung
+
+The following changes since commit 390f998509bf049019df0b078c0a6606e0d57fb4:
+
+Merge: e34d6b4 6f6c2aa
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sun Dec 18 14:28:31 2011 -0800
+
+  Merge git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi-rc-fixes-2.6
+(2011-12-18 14:28:31 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/kmpark/linux-samsung.git devfreq-for-samsung
+
+MyungJoo Ham (3):
+      ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+      ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus
+devfreq driver
+      ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
+
+ arch/arm/mach-exynos/cpu.c                     |    7 +++-
+ arch/arm/mach-exynos/include/mach/map.h        |    1 +
+ arch/arm/mach-exynos/include/mach/regs-clock.h |   42 ++++++++++++++++++++++++
+ arch/arm/mach-exynos/mach-nuri.c               |   11 ++++--
+ 4 files changed, 57 insertions(+), 4 deletions(-)
+
+
+
+-- 
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab, DMC Business, Samsung Electronics
