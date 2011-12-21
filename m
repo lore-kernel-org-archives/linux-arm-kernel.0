@@ -1,40 +1,48 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 21 Dec 2011 20:04:33 +0100
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <201112211727.17104.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <CAF6AEGtOjO6Z6yfHz-ZGz3+NuEMH2M-8=20U6+-xt-gv9XtzaQ@mail.gmail.com>
- <20111220171437.GC3883@phenom.ffwll.local>
- <201112211727.17104.arnd@arndb.de>
-Message-ID: <20111221190433.GE3827@phenom.ffwll.local>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 21 Dec 2011 11:05:41 -0800
+Subject: [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <4EF1CD49.9020800@linux.intel.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <4EF1A0B4.5080307@linux.intel.com>
+ <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
+ <4EF1AA8A.8060304@linux.intel.com>
+ <CAMbhsRSNTUvou9Gf6T4Ggq=jfxsWUcn7M2yNsKQz6aNrt6gLDg@mail.gmail.com>
+ <4EF1CD49.9020800@linux.intel.com>
+Message-ID: <CAMbhsRRnKoR3YPWrZzVynVe+dcuU5v0siYvmp2vbBcS1hquC7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 05:27:16PM +0000, Arnd Bergmann wrote:
-> On Tuesday 20 December 2011, Daniel Vetter wrote:
-> > It also sounds like that at least for proper userspace mmap support we'd
-> > need some dma api extensions on at least arm, and that might take a while
-> > ...
-> 
-> I think it's actually the opposite -- you'd need dma api extensions on
-> everything else other than arm, which already has dma_mmap_coherent()
-> and dma_mmap_writecombine() for this purpose.
+On Wed, Dec 21, 2011 at 4:12 AM, Arjan van de Ven <arjan@linux.intel.com> wrote:
+> On 12/21/2011 10:55 AM, Colin Cross wrote:
+>> On Wed, Dec 21, 2011 at 1:44 AM, Arjan van de Ven <arjan@linux.intel.com> wrote:
+>>> On 12/21/2011 10:40 AM, Colin Cross wrote:
+>>>
+>>>>> this smells fundamentally racey to me; you can get an interrupt one
+>>>>> cycle after you think you're done, but before the last guy enters WFI...
+>>>>>
+>>>>> how do you solve that issue ?
+>>>>
+>>>> All the cpus have interrupts off when they increment the counter, so
+>>>> they cannot receive an interrupt. ?If an interrupt is pending on one
+>>>> of those cpus, it will be handled later when WFI aborts due to the
+>>>> pending interrupt.
+>>>
+>>> ... but this leads to cases where you're aborting before other cpus are
+>>> entering..... so your "last guy in" doesn't really work, since while cpu
+>>> 0 thinks it's the last guy, cpu 1 is already on the way out/out
+>>> already... ?(heck it might already be going back to sleep if your idle
+>>> code can run fast, like in the size of a cache miss)
+>>
+>> Once a cpu has incremented the counter, it has no way out unless either
+>> 1: another cpu (that hasn't incremented the counter yet) receives an
+>> interrupt, aborts idle, and clears its idle flag
+>> or
+>> 2: all cpus enter the ready counter, and call the cpuidle driver's
+>> enter function.
+>
+> .. or it enters WFI, and a physical device sends it an interrupt,
+> at which point it exits.
 
-Yeah, that's actually what I wanted to say, but failed at ... Another
-thing is that at least for i915, _writecombine isn't what we want actually
-because:
-- It won't work anyway cause i915 maps stuff cached and does the flushing
-  itself and x86 PAT doesn't support mixed mappings (kinda like arm).
-- It isn't actually enough, there's another hidden buffer between the
-  memory controller interface and the gpu that i915 manually flushes
-  (because even a readback on a wc mapping doesn't flush things in there).
-
-So I assume we'll have plenty of funny beating out a good api for cpu
-access ;-)
-
-Cheers, Daniel
--- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+None of the cpus will return to the idle loop until all cpus have
+decremented the ready counter back to 0, so they can't wrap around
+again.
