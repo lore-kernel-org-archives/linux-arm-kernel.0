@@ -1,28 +1,27 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 21 Dec 2011 15:36:49 -0500 (EST)
-Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <20111221195602.GK2577@n2100.arm.linux.org.uk>
-References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20111221154838.GA23102@page> <20111221195602.GK2577@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1112211535010.2907@xanadu.home>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 21 Dec 2011 22:56:50 +0200
+Subject: [PATCH v2 5/7] MTD: NAND: ams-delta: use GPIO instead of custom
+ I/O
+In-Reply-To: <ebab42f6ddd313afb38b71880ac7865e4e0ceab4.1324331816.git.jkrzyszt@tis.icnet.pl>
+References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <ebab42f6ddd313afb38b71880ac7865e4e0ceab4.1324331816.git.jkrzyszt@tis.icnet.pl>
+Message-ID: <1324501012.2110.2.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Dec 2011, Russell King - ARM Linux wrote:
-
-> On Wed, Dec 21, 2011 at 03:48:50PM +0000, Jamie Iles wrote:
-> > > +#define __io(a)			__typesafe_io(a)
-> > 
-> > Do you support io ports on this platform?  If not then perhaps select 
-> > NO_IPORT and define __io(a) to 0?
+On Tue, 2011-12-20 at 00:08 +0100, Janusz Krzysztofik wrote:
+> Don't use Amstrad Delta custom I/O functions for controlling the device,
+> use GPIO API instead.
 > 
-> Do not do that.  Define NO_IOPORT and *do* *not* define __io() at all to
-> make drivers which use PCI IO stuff fail at build time.  Don't try to
-> frig it into doing a NULL pointer deref.
+> While being at it, add missing gpio_free(AMS_DELTA_GPIO_PIN_NAND_RB).
+> 
+> Depends on patch 2/7 "ARM: OMAP1: ams-delta: convert latches to
+> basic_mmio_gpio"
+> 
+> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-... especially since this is a !MMU platform and therefore NULL pointer 
-derefs won't work as intended.
+Looks good, thanks!
 
-
-Nicolas
+Reviewed-by: Artem Bityutskiy <Artem.Bityutskiy@linux.intel.com>
