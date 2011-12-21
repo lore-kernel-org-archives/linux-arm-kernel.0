@@ -1,44 +1,72 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 21 Dec 2011 09:37:04 +0530
-Subject: [PATCH 0/4] Fix the left DMA_NONE from dma_transfer_direction
- migration
-In-Reply-To: <20111220125401.GA5129@S2101-09.ap.freescale.net>
-References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
- <1324373044.1641.10096.camel@vkoul-udesk3>
- <20111220125401.GA5129@S2101-09.ap.freescale.net>
-Message-ID: <1324440424.1641.10104.camel@vkoul-udesk3>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Dec 2011 13:10:23 +0900
+Subject: [PATCH] ARM: remove header files included more than once
+In-Reply-To: <1323447943-23595-1-git-send-email-omar.ramirez@ti.com>
+References: <1323447943-23595-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <061b01ccbf96$763f95e0$62bec1a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-12-20 at 20:54 +0800, Shawn Guo wrote:
-> On Tue, Dec 20, 2011 at 02:54:04PM +0530, Vinod Koul wrote:
-> > On Tue, 2011-12-13 at 23:48 +0800, Shawn Guo wrote:
-> > > I have been working on -rc recently, and have not noticed the failure
-> > > until I ran next tree today.  The mxs-mmc driver is broken on next
-> > > tree because the DMA_NONE was left over from the dma_transfer_direction
-> > > migration for mxs-dma and its client drivers.
-> > > 
-> > For DMA transfer, the NONE direction makes no sense?
-> > 
-> > In your conetext, what are you trying to achieve?
-> > 
-> The mxs-dma controller has a feature to program peripheral registers
-> with given values (mxs-dma PIO mode).  This is designed to pipeline
-> the operations.  For example, we can put mxs-mmc controller register
-> values into scatter list as one element together with actual data.
-> Triggering the mxs-dma, the dma will program the values into mxs-mmc
-> controller register to set up and enable mxs-mmc, and then dma
-> continue transfer data from/to mxs-mmc.  All these get done in one
-> dmaengine_submit().
+Omar Ramirez Luna wrote:
 > 
-> And DMA_NONE was used to let mxs-dma know this is a PIO operation.
-Sorry am little lost here. Why would DMA driver bother with a PIO mode,
-that is something only peripheral driver would know about, mmc in your
-case.
+> checkincludes.pl complains about these:
+> 	linux/debugfs.h
+> 	linux/dma-mapping.h
+> 	linux/gpio.h
+> 	linux/sched.h
+> 	linux/slab.h
+> 	plat/common.h
+> 	plat/i2c.h
+> 
+> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+> ---
+>  arch/arm/mach-bcmring/dma.c                 |    1 -
+>  arch/arm/mach-ks8695/leds.c                 |    1 -
+>  arch/arm/mach-mmp/aspenite.c                |    1 -
+>  arch/arm/mach-mmp/tavorevb.c                |    1 -
+>  arch/arm/mach-msm/board-msm7x30.c           |    1 -
+>  arch/arm/mach-msm/board-qsd8x50.c           |    1 -
+>  arch/arm/mach-omap2/board-ldp.c             |    1 -
+>  arch/arm/mach-omap2/io.c                    |    1 -
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c  |    1 -
+>  arch/arm/mach-pxa/pxa25x.c                  |    1 -
+>  arch/arm/mach-pxa/pxa27x.c                  |    1 -
+>  arch/arm/mach-pxa/saarb.c                   |    1 -
+>  arch/arm/mach-shmobile/board-ag5evm.c       |    1 -
+>  arch/arm/mach-ux500/board-mop500-u8500uib.c |    1 -
+>  arch/arm/plat-omap/clock.c                  |    1 -
+>  arch/arm/plat-samsung/dev-backlight.c       |    1 -
+>  16 files changed, 0 insertions(+), 16 deletions(-)
+> 
 
-So what you are saying is the your dma has the capability to program the
-peripheral registers in case of PIO mode, but why wouldn't the
-peripheral driver do that instead? 
+(snip)
 
--- 
-~Vinod
+> diff --git a/arch/arm/plat-samsung/dev-backlight.c
+b/arch/arm/plat-samsung/dev-backlight.c
+> index e657305..a976c02 100644
+> --- a/arch/arm/plat-samsung/dev-backlight.c
+> +++ b/arch/arm/plat-samsung/dev-backlight.c
+> @@ -15,7 +15,6 @@
+>  #include <linux/slab.h>
+>  #include <linux/io.h>
+>  #include <linux/pwm_backlight.h>
+> -#include <linux/slab.h>
+> 
+>  #include <plat/devs.h>
+>  #include <plat/gpio-cfg.h>
+> --
+> 1.7.4.1
+
+Hi,
+
+Above has been already fixed in mainline.
+:commit d7a4c45ec24b6c6773ff302c3c9cb5ed46c8e211 ("ARM: SAMSUNG: remove
+duplicated header include").
+
+Anyway, thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
