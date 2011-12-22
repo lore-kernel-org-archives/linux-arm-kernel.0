@@ -1,56 +1,39 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 22 Dec 2011 18:23:53 +0200
-Subject: [PATCH 2/2] OMAP4: mcbsp: Clock reparenting support
-In-Reply-To: <alpine.DEB.2.00.1112161730080.12660@utopia.booyaka.com>
-References: <1323941859-7946-1-git-send-email-peter.ujfalusi@ti.com>
- <1323941859-7946-3-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.00.1112161730080.12660@utopia.booyaka.com>
-Message-ID: <4EF35999.5040607@ti.com>
+From: sposelenov@emcraft.com (Sergei Poselenov)
+Date: Thu, 22 Dec 2011 20:35:31 +0400
+Subject: insmod problem on ARM with more than 16MB of RAM?
+Message-ID: <20111222203531.0c4f80f1@emcraft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi all,
 
-On 12/17/2011 02:37 AM, Paul Walmsley wrote:
-> What do you think about using clkdev alias lines and hwmod optional clks 
-> for this instead?  With these mechanisms, you can give clocks a consistent 
-> "role name" for a given device, even if the underlying clock changes on 
-> different platforms.
+I'm working with an ARM Cortex-M3 port of Linux 2.6.33. Everything is
+fine except the target board has 32MB memory and this breaks the
+loadable modules support:
+...
+~ # insmod sample.ko 
+sample: relocation out of range, section 2 reloc 0 sym 'printk'
+insmod: can't insert 'sample.ko': invalid module format
+~ # 
+..
 
-I need to look into the clock framework, but sounds promising.
-I can see quite big difference between the clock3xxx_data, and
-clock44xx_data regarding to McBSPs.
-Need to understand why, and what need to be changed to achieve what I want.
+The reason for this error is that the module_alloc() for non-MMU
+ARM target is just kmalloc(size), which obviously returns the memory
+area too far for allowed range of the thumb2 branch instructions.
 
-> So in the mach-omap2/clock*_data.c files, you'd do something like
-> 
-> 	CLK("omap-mcbsp.1",	"pad_fck",	&mcbsp_clks,  CK_3XXX),
-> 
-> for OMAP3, and 
-> 
-> 	CLK("omap-mcbsp.1",	"pad_fck",	&pad_clks_clk,  CK_44XX),
-> 
-> for OMAP4.
-> 
-> Then in the hwmod data files, you'd add them as optional clocks - 
-> something like:
-> 
-> static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
-> 	{ .role = "pad_fck", .clk = "mcbsp_clks" },
-> };
-> 
-> for OMAP3, and
-> 
-> static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
-> 	{ .role = "pad_fck", .clk = "pad_clks_clk" },
-> };
-> 
-> for OMAP4.
-> 
-> I think this might work for your needs?
+Currently, I worked around this by restricting kernel memory usage with
+"mem=16M".
 
-Is it OK if I do this as an incremental patch as soon as I figured out
-the way to do it nicely?
+Is anybody solved this problem in 2.6 no-MMU ARM kernels?
 
-Thank you,
-P?ter
+In the lists I only found this thread
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/037837.html
+, but it discussed different problem.
+
+I looked at the recent 3.x kernels and didn't see support for loadable
+modules at all for the non-mmu ARM. Any plans to add it there?
+
+Merry Christmas!
+
+Regards,
+Sergei
