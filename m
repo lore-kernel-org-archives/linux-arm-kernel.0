@@ -1,63 +1,54 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 22 Dec 2011 16:39:27 +0800
-Subject: [GIT PULL for v3.3 1/2] pxa for-next branch
-Message-ID: <CAN1soZx47ds1eNV5UamUDSXDgbJAGjirQPbNy_K=PP03Y_Rm_Q@mail.gmail.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Thu, 22 Dec 2011 16:51:32 +0800
+Subject: [PATCH] regulator: max8925: fix enabled/disabled judgement mistake
+Message-ID: <1324543892-32540-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Kevin Liu <kliu5@marvell.com>
 
-Please pull the for-next branch of pxa tree.
+The judgement should depend on the power up/down sequence select.
+With flexible power sequence, regulator is always enabled after boot up.
+With i2c enabled, regulator enable/disable according to output enable bit.
 
-The following changes since commit dc47ce90c3a822cd7c9e9339fe4d5f61dcb26b50:
+Signed-off-by: Kevin Liu <kliu5@marvell.com>
+---
+ drivers/regulator/max8925-regulator.c |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
 
-  Linux 3.2-rc5 (2011-12-09 15:09:32 -0800)
-
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git for-next
-
-Axel Lin (3):
-      pcmcia: pxa: replace IRQ_GPIO() with gpio_to_irq()
-      Input: zylonite-wm97xx - replace IRQ_GPIO() with gpio_to_irq()
-      ARM: pxa: Include linux/export.h in balloon3.c
-
-Haojian Zhuang (3):
-      ARM: pxa: fix build error for GPIO_bit()
-      ARM: pxa: fix the build error because of missing gpio-pxa.h
-      MAINTAINERS: update pxa and mmp
-
-Jett.Zhou (5):
-      RTC: sa1100: Clean out ost register
-      RTC: sa1100: remove redundant code of setting alarm
-      RTC: sa1100: support sa1100, pxa and mmp soc families
-      ARM: pxa: add dummy clock for sa1100-rtc
-      ARM: sa1100: clean up of the clock support
-
-Robert Jarzmik (1):
-      mioa701: add newly available DoC G3 chip
-
- MAINTAINERS                                 |   22 +--
- arch/arm/Kconfig                            |    2 +-
- arch/arm/mach-pxa/balloon3.c                |    1 +
- arch/arm/mach-pxa/corgi_pm.c                |    1 +
- arch/arm/mach-pxa/devices.c                 |   20 ++
- arch/arm/mach-pxa/mioa701.c                 |   29 ++-
- arch/arm/mach-pxa/pxa25x.c                  |    2 +
- arch/arm/mach-pxa/pxa27x.c                  |    2 +
- arch/arm/mach-pxa/pxa300.c                  |    1 +
- arch/arm/mach-pxa/pxa320.c                  |    1 +
- arch/arm/mach-pxa/pxa3xx.c                  |    1 +
- arch/arm/mach-pxa/pxa95x.c                  |    1 +
- arch/arm/mach-pxa/spitz_pm.c                |    1 +
- arch/arm/mach-sa1100/clock.c                |   91 ++++++---
- arch/arm/mach-sa1100/generic.c              |   20 ++
- drivers/input/touchscreen/zylonite-wm97xx.c |    5 +-
- drivers/pcmcia/pxa2xx_e740.c                |   11 +-
- drivers/pcmcia/pxa2xx_palmld.c              |    2 +-
- drivers/pcmcia/pxa2xx_palmtc.c              |    2 +-
- drivers/pcmcia/pxa2xx_stargate2.c           |    6 +-
- drivers/pcmcia/pxa2xx_trizeps4.c            |    5 +-
- drivers/pcmcia/pxa2xx_vpac270.c             |    4 +-
- drivers/rtc/Kconfig                         |    2 +-
- drivers/rtc/rtc-sa1100.c                    |  300 ++++++++++++++++-----------
- 24 files changed, 347 insertions(+), 185 deletions(-)
+diff --git a/drivers/regulator/max8925-regulator.c b/drivers/regulator/max8925-regulator.c
+index cc9ec0e..9e99420 100644
+--- a/drivers/regulator/max8925-regulator.c
++++ b/drivers/regulator/max8925-regulator.c
+@@ -27,6 +27,9 @@
+ /* bit definitions in SD & LDO control registers */
+ #define OUT_ENABLE   		0x1f		/* Power U/D sequence as I2C */
+ #define OUT_DISABLE		0x1e		/* Power U/D sequence as I2C */
++#define LDO_SEQ_MASK		0x7		/* Power U/D sequence mask */
++#define LDO_SEQ_SHIFT		2		/* Power U/D sequence offset */
++#define LDO_SEQ_I2C_EN		0x7		/* Power U/D sequence as I2C_EN */
+ 
+ struct max8925_regulator_info {
+ 	struct regulator_desc	desc;
+@@ -114,13 +117,16 @@ static int max8925_disable(struct regulator_dev *rdev)
+ static int max8925_is_enabled(struct regulator_dev *rdev)
+ {
+ 	struct max8925_regulator_info *info = rdev_get_drvdata(rdev);
+-	int ret;
++	int ldo_seq, ret;
+ 
+ 	ret = max8925_reg_read(info->i2c, info->enable_reg);
+ 	if (ret < 0)
+ 		return ret;
+-
+-	return ret & (1 << info->enable_bit);
++	ldo_seq = (ret >> LDO_SEQ_SHIFT) & LDO_SEQ_MASK;
++	if (ldo_seq != LDO_SEQ_I2C_EN)
++		return 1 << info->enable_bit;
++	else
++		return ret & (1 << info->enable_bit);
+ }
+ 
+ static int max8925_set_dvm_voltage(struct regulator_dev *rdev, int uV)
+-- 
+1.7.0.4
