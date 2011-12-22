@@ -1,43 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Dec 2011 14:49:37 +0000
-Subject: Oops in guest after ioremap() on ARMv7
-In-Reply-To: <4EF31DA7.9030407@citrix.com>
-References: <4EF31DA7.9030407@citrix.com>
-Message-ID: <20111222144937.GE20635@arm.com>
+From: vladimir.zapolskiy@nokia.com (Vladimir Zapolskiy)
+Date: Thu, 22 Dec 2011 16:52:32 +0200
+Subject: [PATCH] arm: oprofile: fix linkage issue
+In-Reply-To: <20111222142140.GP16765@erda.amd.com>
+References: <1324561016-19389-1-git-send-email-vladimir.zapolskiy@nokia.com>
+ <20111222142140.GP16765@erda.amd.com>
+Message-ID: <4EF34430.6030700@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 12:08:07PM +0000, David Vrabel wrote:
-> When running the linux kernel on the ARMv7 envelope model as a guest
-> under the Xen hypervisor there is a oops (see below for an example of
-> the page translation fault) when trying to access ioremap()'d memory.
-> 
-> The same kernel works fine when not running under the hypervisor.
-> 
-> It's a 3.2.0-rc5+ kernel with the two additional linux-arch-arm
-> branches: arm-arch/vexpress and arm-arch/arm-lpae.
-> 
-> Calling flush_cache_all() in flush_cache_vmap() makes it work.  What
-> isn't being correctly flushed?  I see that flush_pmd_entry() and
-> cpu_v7_set_pte_ext() already flush the L1 and L2 translation table
-> entries and I can't think of anything else that would need to be flushed
-> (unless the mapped virtual addresses need to be flushed as well?)
-> 
-> The "Barrier Litmus Tests and Cookbook" says that a TLB flush and a
-> branch predictor flush are required after a translation table entry
-> update.  This seems not to be done but adding this didn't seem to help
-> (and using local_flush_tlb_all()) in flush_cache_vmap() didn't help either).
-> 
-> I don't see anything in the hypervisor that could be causing this as the
-> fault is occurring at stage 1 and not stage 2 translation.
+On 12/22/2011 04:21 PM, ext Robert Richter wrote:
+> On 22.12.11 15:36:56, Vladimir Zapolskiy wrote:
+>> This change fixes a linking problem, which happens if oprofile is selected to
+>> be compiled as built-in:
+>>
+>>    `oprofile_arch_exit' referenced in section `.init.text' of
+>>    arch/arm/oprofile/built-in.o: defined in discarded section
+>>    `.exit.text' of arch/arm/oprofile/built-in.o
+>>
+>> The problem is appeared after commit 87121ca504, which introduced
+>> oprofile_arch_exit() calls from __init function. Note that the aforementioned
+>> commit has been backported to stable branches, and the problem is known to be
+>> reproduced at least with 3.0.13 and 3.1.5 kernels.
+>
+> I will fix it upstream, afterwards this goes into stable due to the
+> stable tag.
+>
+What's the expected difference with this change?
 
-Interesting error, I don't have an immediate idea of what might be
-wrong, just some questions.
+> Right, commit 87121ca504 went into stable kernels 3.0 and 3.1, need to
+> fix them too:
+>
+> CC: stable at kernel.org # 3.0+
+>
+> Please fix also arch/sh with this patch:
+>
+>   $ git grep exit.*oprofile_arch_exit arch/*/oprofile drivers/oprofile/
+>   arch/arm/oprofile/common.c:void __exit oprofile_arch_exit(void)
+>   arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void)
+>   arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void) {}
 
-What's the value of the VTCR register for this guest? Are the
-translation table walks marked as cacheable? Also, are the page table
-attributes Normal Cacheable in the stage 2 translation? The processor
-chooses the more restrictive attribute between stage 1 and stage 2.
+I checked the linkage of arch/sh/oprofile/built-in.o on 3.0.13 under the 
+same conditions, and there the original issue is not reproduced, 
+probably because of not tightly optimized vmlinux ld script, so for sh 
+architecture the problem is not so hot as it is for arm.
 
--- 
-Catalin
+With best wishes,
+Vladimir
+
+> Thanks,
+>
+> -Robert
+>
+>>
+>> Signed-off-by: Vladimir Zapolskiy<vladimir.zapolskiy@nokia.com>
+>> Cc: Will Deacon<will.deacon@arm.com>
+>> Cc: Robert Richter<robert.richter@amd.com>
+>> Cc: stable at kernel.org
+>> ---
+>>   arch/arm/oprofile/common.c |    2 +-
+>>   1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+>> index c074e66..4e0a371 100644
+>> --- a/arch/arm/oprofile/common.c
+>> +++ b/arch/arm/oprofile/common.c
+>> @@ -116,7 +116,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+>>   	return oprofile_perf_init(ops);
+>>   }
+>>
+>> -void __exit oprofile_arch_exit(void)
+>> +void oprofile_arch_exit(void)
+>>   {
+>>   	oprofile_perf_exit();
+>>   }
+>> --
+>> 1.7.2.3
+>>
+>>
+>
