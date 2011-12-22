@@ -1,38 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Dec 2011 14:31:27 +0000
-Subject: [PATCH] ARM: smp_twd: make sure timer is stopped before registering it
-Message-ID: <1324564287-1742-1-git-send-email-marc.zyngier@arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 22 Dec 2011 14:38:03 +0000
+Subject: [PATCH] regulator: max8925: fix enabled/disabled judgement mistake
+In-Reply-To: <CAN1soZwBX3x5fiLrLwcC_xTSPMuXw4=u5Rj_CF_R_V3attNzYA@mail.gmail.com>
+References: <1324543892-32540-1-git-send-email-haojian.zhuang@marvell.com>
+ <20111222105357.GC4546@opensource.wolfsonmicro.com>
+ <CAN1soZy+hgW2iaQad9gbis7bHLCnfQhMKx-JTJc1j2++eRrJyw@mail.gmail.com>
+ <20111222134415.GU4546@opensource.wolfsonmicro.com>
+ <CAN1soZwBX3x5fiLrLwcC_xTSPMuXw4=u5Rj_CF_R_V3attNzYA@mail.gmail.com>
+Message-ID: <20111222143803.GB4546@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On secondary CPUs, the Timer Control Register is not reset
-to a sane value before the timer is registered, and the TRM
-doesn't seem to indicate any reset value either. In some cases,
-the kernel will take an interrupt too early, depending on what
-junk was present in the registers at reset time.
+On Thu, Dec 22, 2011 at 10:22:17PM +0800, Haojian Zhuang wrote:
 
-The fix is to set the Timer Control Register to 0 before
-registering the clock_event_device and enabling the interrupt.
+> While we enable/disable the LDO in software, we'll force LDO into I2C mode
+> and enable/disable the control bit. So there's no risk in the
+> enable/disable function.
 
-Problem seen on VE (Cortex A5) and Tegra.
+Oh, dear.  That code really is obscure - it's got a shift called
+enable_bit but actually it's mostly working with bitfields not just a
+single bit.  Reading the enable() and disable() functions it looks like
+they're setting a single bit but that's not the case.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/smp_twd.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Please send a patch fixing this.
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index a8a6682..2442bbb 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -167,6 +167,8 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 
- 	twd_calibrate_rate();
- 
-+	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);		
-+
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
- 			CLOCK_EVT_FEAT_C3STOP;
--- 
-1.7.7.1
+> There's only potential issue of checking whether LDO is enabled. If
+> sequence matches
+> the power sequence (not I2C mode), LDO will be enabled even the
+> control bit is OFF.
+> So this patch is necessary.
+
+I'm not saying the patch isn't required, I'm saying it's very hard to
+work out what the patch is supposed to do and why it's only an issue in
+the is_enabled() function.
+
+Please resend with an improved changelog.
