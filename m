@@ -1,45 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Dec 2011 20:38:28 +0000
-Subject: [PATCH v2 01/15] ARM: local timers: allow smp_twd to be used
- standalone
-In-Reply-To: <1324574865-5367-2-git-send-email-marc.zyngier@arm.com>
-References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
- <1324574865-5367-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20111222203828.GP2577@n2100.arm.linux.org.uk>
+Date: Thu, 22 Dec 2011 20:45:15 +0000
+Subject: insmod problem on ARM with more than 16MB of RAM?
+In-Reply-To: <CAHkRjk7105PLe=98mMKmSKkWDmyFjWpBkZ5_iy-U-ZiNKHFNLw@mail.gmail.com>
+References: <20111222203531.0c4f80f1@emcraft.com>
+ <CAHkRjk7105PLe=98mMKmSKkWDmyFjWpBkZ5_iy-U-ZiNKHFNLw@mail.gmail.com>
+Message-ID: <20111222204515.GQ2577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 05:27:31PM +0000, Marc Zyngier wrote:
-> +	twd_clock_event	= alloc_percpu(struct clock_event_device);
-> +	if (!twd_base || !twd_clock_event) {
-> +		iounmap(twd_base);
-> +		twd_base = NULL;
-> +		free_percpu(twd_clock_event);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	/* Immediately configure the timer on the boot CPU */
-> +	clk = per_cpu_ptr(twd_clock_event, smp_processor_id());
-> +	twd_setup(clk);
+On Thu, Dec 22, 2011 at 04:49:13PM +0000, Catalin Marinas wrote:
+> A completely generic solution would be to modify the module loader to
+> cope with longer relocations by setting up some trampoline code.
 
-This is insufficient.  A proper local timer has this:
+That was discussed when the module format changed, and decided it was
+not possible because of circular dependencies to do it right.
 
-	evt->cpumask = cpumask_of(cpu);
-	evt->broadcast = smp_timer_broadcast;
+The reason is you can't modify the size of the allocation after the
+module has been loaded to add trampolines, and you can't parse the
+object file until memory has been allocated to load it into.  So you
+either have to allocate a trampoline for every function symbol in the
+kernel which the module _might_ use (which wastes lots of memory) or
+you just arrange for stuff to be placed within range of the kernel.
 
-as well as all the rest of the normal clock event stuff.  The broadcast
-callback is used when the timer core wants to broadcast the timer tick
-to other CPUs - see tick_do_broadcast() in kernel/time/tick-broadcast.c.
-The selection of which clock event device to use is rather 'optimized'
-for current conditions, and registering local timers without this is
-likely to oops the kernel at some point.
-
-I don't think you can register separate clock event devices for use as
-the broadcast device vs the local timer device.
-
-So, either you _have_ to use the SMP supplied version, or we make the
-broadcast function public and have everyone conditionally set that up,
-or something else... either way this is getting exceedingly messy.
-
-That's why I believe it's far simpler to just say no to using twd as a
-global timer, and just keep it for SMP local timer purposes.
+So for MMU platforms, we just ensure that modules are always placed
+within reach of the kernel text.  For nommu platforms, modules are
+a bitch - and TBH given the virtually non-existent activity/interest
+from the nommu sector, it's something I'm willing to spend the grand
+total of zero time to solve this _really_ _hard_ problem.
