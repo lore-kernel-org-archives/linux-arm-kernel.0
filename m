@@ -1,220 +1,224 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Dec 2011 17:27:42 +0000
-Subject: [PATCH v2 12/15] ARM: smp_twd: remove support for non-standalone
- version
+Date: Thu, 22 Dec 2011 17:27:43 +0000
+Subject: [PATCH v2 13/15] ARM: local timers: make MCT timer standalone
 In-Reply-To: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
 References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1324574865-5367-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1324574865-5367-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no in-tree platform using both CONFIG_LOCAL_TIMERS and
-CONFIG_HAVE_ARM_TWD. As such, some code can be removed and some
-exported functions of smp_twd.c can be made static.
+Following the same pattern used for smp_twd, allow the MCT timers
+to be built in standalone, without relying on the CONFIG_LOCAL_TIMER
+infrastructure and use a CPU notifier block to stop or start
+the timer on the right CPU.
 
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/Kconfig                  |    1 -
- arch/arm/include/asm/localtimer.h |   10 ------
- arch/arm/include/asm/smp_twd.h    |    5 ---
- arch/arm/kernel/smp_twd.c         |   65 ++++++++++--------------------------
- 4 files changed, 18 insertions(+), 63 deletions(-)
+ arch/arm/Kconfig           |    2 +-
+ arch/arm/mach-exynos/mct.c |   85 ++++++++++++++++++++++++++++++-------------
+ 2 files changed, 60 insertions(+), 27 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c37410a..c3732bb 100644
+index c3732bb..f5563c5 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1566,7 +1566,6 @@ config LOCAL_TIMERS
+@@ -1564,7 +1564,7 @@ config HOTPLUG_CPU
+ 
+ config LOCAL_TIMERS
  	bool "Use local timer interrupts"
- 	depends on SMP && !ARM_SMP_TWD
+-	depends on SMP && !ARM_SMP_TWD
++	depends on SMP && !ARM_SMP_TWD && !EXYNOS4_MCT
  	default y
--	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
  	help
  	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index c6a1842..5f21c37 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -22,21 +22,11 @@ void percpu_timer_setup(void);
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index 85b5527..2f1ab9f 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -19,6 +19,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/percpu.h>
++#include <linux/cpu.h>
  
- #ifdef CONFIG_LOCAL_TIMERS
+ #include <asm/hardware/gic.h>
  
--#ifdef CONFIG_HAVE_ARM_TWD
--
--#include "smp_twd.h"
--
--#define local_timer_stop(c)	twd_timer_stop((c))
--
--#else
--
- /*
-  * Stop the local timer
-  */
- void local_timer_stop(struct clock_event_device *);
+@@ -39,7 +40,7 @@ static unsigned long clk_rate;
+ static unsigned int mct_int_type;
  
--#endif
+ struct mct_clock_event_device {
+-	struct clock_event_device *evt;
++	struct clock_event_device evt;
+ 	void __iomem *base;
+ 	char name[10];
+ };
+@@ -261,9 +262,7 @@ static void exynos4_clockevent_init(void)
+ 	setup_irq(IRQ_MCT_G0, &mct_comp_event_irq);
+ }
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
 -
- /*
-  * Setup a local timer interrupt for a CPU.
-  */
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 09c3b71..1479a6f 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -18,14 +18,9 @@
- #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
- #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
+-static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
++static struct mct_clock_event_device __percpu *mct_tick;
  
--struct clock_event_device;
- struct resource;
- struct of_device_id;
- 
--extern void __iomem *twd_base;
--
--void twd_timer_setup(struct clock_event_device *);
--void twd_timer_stop(struct clock_event_device *);
- #ifdef CONFIG_HAVE_ARM_TWD
- int twd_timer_register(struct resource *res, int res_nr);
- int twd_timer_of_init(const struct of_device_id *twd_of_match);
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 98a6a59..aec1bc1 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -18,21 +18,18 @@
- #include <linux/clockchips.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/interrupt.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- 
- #include <asm/smp_plat.h>
- #include <asm/smp_twd.h>
--#include <asm/localtimer.h>
--#include <asm/hardware/gic.h>
--
--/* set up by the platform code */
--void __iomem *twd_base;
- 
-+static void __iomem *twd_base;
-+static struct clock_event_device __percpu *twd_clock_event;
-+static int twd_ppi;
- static unsigned long twd_timer_rate;
- 
--static struct clock_event_device __percpu **twd_evt;
--
- static void twd_set_mode(enum clock_event_mode mode,
- 			struct clock_event_device *clk)
+ /* Clock event handling */
+ static void exynos4_mct_tick_stop(struct mct_clock_event_device *mevt)
+@@ -303,8 +302,9 @@ static void exynos4_mct_tick_start(unsigned long cycles,
+ static int exynos4_tick_set_next_event(unsigned long cycles,
+ 				       struct clock_event_device *evt)
  {
-@@ -87,7 +84,7 @@ int twd_timer_ack(void)
+-	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
++	struct mct_clock_event_device *mevt;
+ 
++	mevt = container_of(evt, struct mct_clock_event_device, evt);
+ 	exynos4_mct_tick_start(cycles, mevt);
+ 
  	return 0;
+@@ -313,8 +313,9 @@ static int exynos4_tick_set_next_event(unsigned long cycles,
+ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+ 					 struct clock_event_device *evt)
+ {
+-	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
++	struct mct_clock_event_device *mevt;
+ 
++	mevt = container_of(evt, struct mct_clock_event_device, evt);
+ 	exynos4_mct_tick_stop(mevt);
+ 
+ 	switch (mode) {
+@@ -332,7 +333,7 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+ 
+ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ {
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
+ 
+ 	/*
+ 	 * This is for supporting oneshot mode.
+@@ -354,7 +355,7 @@ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+ {
+ 	struct mct_clock_event_device *mevt = dev_id;
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
+ 
+ 	exynos4_mct_tick_clear(mevt);
+ 
+@@ -375,14 +376,11 @@ static struct irqaction mct_tick1_event_irq = {
+ 	.handler	= exynos4_mct_tick_isr,
+ };
+ 
+-static void exynos4_mct_tick_init(struct clock_event_device *evt)
++static void __cpuinit exynos4_mct_tick_init(struct mct_clock_event_device *mevt)
+ {
+-	struct mct_clock_event_device *mevt;
++	struct clock_event_device *evt = &mevt->evt;
+ 	unsigned int cpu = smp_processor_id();
+ 
+-	mevt = this_cpu_ptr(&percpu_mct_tick);
+-	mevt->evt = evt;
+-
+ 	mevt->base = EXYNOS4_MCT_L_BASE(cpu);
+ 	sprintf(mevt->name, "mct_tick%d", cpu);
+ 
+@@ -419,17 +417,12 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
+ 	}
  }
  
--void twd_timer_stop(struct clock_event_device *clk)
-+static void twd_timer_stop(struct clock_event_device *clk)
- {
- 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
- 	disable_percpu_irq(clk->irq);
-@@ -134,7 +131,7 @@ static void __cpuinit twd_calibrate_rate(void)
- 
- static irqreturn_t twd_handler(int irq, void *dev_id)
- {
--	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
-+	struct clock_event_device *evt = dev_id;
- 
- 	if (twd_timer_ack()) {
- 		evt->event_handler(evt);
-@@ -147,28 +144,8 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
- /*
-  * Setup the local clock events for a CPU.
-  */
--void __cpuinit twd_timer_setup(struct clock_event_device *clk)
-+static void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
--	struct clock_event_device **this_cpu_clk;
--
--	if (!twd_evt) {
--		int err;
--
--		twd_evt = alloc_percpu(struct clock_event_device *);
--		if (!twd_evt) {
--			pr_err("twd: can't allocate memory\n");
--			return;
--		}
--
--		err = request_percpu_irq(clk->irq, twd_handler,
--					 "twd", twd_evt);
--		if (err) {
--			pr_err("twd: can't register interrupt %d (%d)\n",
--			       clk->irq, err);
--			return;
--		}
--	}
--
- 	twd_calibrate_rate();
- 
- 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);		
-@@ -183,26 +160,14 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
- 	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
- 	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
--
--	this_cpu_clk = __this_cpu_ptr(twd_evt);
--	*this_cpu_clk = clk;
-+	clk->cpumask = cpumask_of(smp_processor_id());
-+	clk->irq = twd_ppi;
- 
- 	clockevents_register_device(clk);
- 
- 	enable_percpu_irq(clk->irq, 0);
- }
- 
--#ifdef CONFIG_ARM_SMP_TWD
--static struct clock_event_device __percpu *twd_clock_event;
--static int twd_ppi;
--
--static void __cpuinit twd_setup(struct clock_event_device *clk)
+-/* Setup the local clock events for a CPU */
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
 -{
--	clk->cpumask = cpumask_of(smp_processor_id());
--	clk->irq = twd_ppi;
--	twd_timer_setup(clk);
+-	exynos4_mct_tick_init(evt);
+-
+-	return 0;
 -}
 -
- static void __cpuinit twd_teardown(void *data)
+-void local_timer_stop(struct clock_event_device *evt)
++void exynos4_mct_tick_halt(void *data)
  {
- 	struct clock_event_device *clk = data;
-@@ -218,7 +183,7 @@ static int __cpuinit twd_cpu_notify(struct notifier_block *self,
- 	switch (action) {
- 	case CPU_STARTING:
- 	case CPU_STARTING_FROZEN:
--		twd_setup(clk);
-+		twd_timer_setup(clk);
- 		break;
- 
- 	case CPU_DOWN_PREPARE:
-@@ -250,9 +215,16 @@ static int __init twd_timer_common_init(void)
- 		goto out_free;
- 	}
- 
-+	err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_clock_event);
-+	if (err) {
-+		pr_err("twd: can't register interrupt %d (%d)\n",
-+		       twd_ppi, err);
-+		goto out_free;
++	struct mct_clock_event_device *mevt = data;
++	struct clock_event_device *evt = &mevt->evt;
+ 	unsigned int cpu = smp_processor_id();
++
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+ 	if (mct_int_type == MCT_INT_SPI)
+ 		if (cpu == 0)
+@@ -439,7 +432,48 @@ void local_timer_stop(struct clock_event_device *evt)
+ 	else
+ 		disable_percpu_irq(IRQ_MCT_LOCALTIMER);
+ }
+-#endif /* CONFIG_LOCAL_TIMERS */
++
++static int __cpuinit exynos4_mct_cpu_notify(struct notifier_block *self,
++					    unsigned long action, void *data)
++{
++	int cpu = (int)data;
++	struct mct_clock_event_device *mevt = per_cpu_ptr(mct_tick, cpu);
++
++	switch (action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		exynos4_mct_tick_init(mevt);
++		break;
++
++	case CPU_DOWN_PREPARE:
++	case CPU_DOWN_PREPARE_FROZEN:
++		smp_call_function_single(cpu, exynos4_mct_tick_halt, mevt, 1);
++		break;
 +	}
 +
- 	/* Immediately configure the timer on the boot CPU */
- 	clk = per_cpu_ptr(twd_clock_event, smp_processor_id());
--	twd_setup(clk);
-+	twd_timer_setup(clk);
++	return NOTIFY_OK;
++}
++
++static struct notifier_block __cpuinitdata exynos4_mct_cpu_nb = {
++	.notifier_call = exynos4_mct_cpu_notify,
++};
++
++static void __init exynos4_mct_init(void)
++{
++	struct mct_clock_event_device *mevt;
++
++	mct_tick = alloc_percpu(struct mct_clock_event_device);
++	if (!mct_tick) {
++		pr_err("exynos4_mct_init: can't allocate memory\n");
++		return;
++	}
++
++	/* Immediately configure the timer on the boot CPU */
++	mevt = per_cpu_ptr(mct_tick, smp_processor_id());
++	exynos4_mct_tick_init(mevt);
++
++	register_cpu_notifier(&exynos4_mct_cpu_nb);
++}
  
- 	register_cpu_notifier(&twd_cpu_nb);
+ static void __init exynos4_timer_resources(void)
+ {
+@@ -448,17 +482,15 @@ static void __init exynos4_timer_resources(void)
  
-@@ -302,4 +274,3 @@ int __init twd_timer_of_init(const struct of_device_id *twd_of_match)
- 	return twd_timer_common_init();
+ 	clk_rate = clk_get_rate(mct_clk);
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+ 	if (mct_int_type == MCT_INT_PPI) {
+ 		int err;
+ 
+ 		err = request_percpu_irq(IRQ_MCT_LOCALTIMER,
+ 					 exynos4_mct_tick_isr, "MCT",
+-					 &percpu_mct_tick);
++					 mct_tick);
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     IRQ_MCT_LOCALTIMER, err);
+ 	}
+-#endif /* CONFIG_LOCAL_TIMERS */
  }
- #endif
--#endif
+ 
+ static void __init exynos4_timer_init(void)
+@@ -471,6 +503,7 @@ static void __init exynos4_timer_init(void)
+ 	exynos4_timer_resources();
+ 	exynos4_clocksource_init();
+ 	exynos4_clockevent_init();
++	exynos4_mct_init();
+ }
+ 
+ struct sys_timer exynos4_timer = {
 -- 
 1.7.7.1
