@@ -1,28 +1,56 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 22 Dec 2011 18:15:11 +0200
-Subject: [PATCH 02/10] arm: vexpress: fix kconfig warning
-In-Reply-To: <20111222113916.GA2625@localhost>
-References: <1324341747-5922-1-git-send-email-felipe.contreras@gmail.com>
- <1324341747-5922-3-git-send-email-felipe.contreras@gmail.com>
- <20111222113916.GA2625@localhost>
-Message-ID: <CAMP44s3qhLNRv6e7GJY-pGigv-fqeFZw1zfqOqHThL0nV5tegg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 22 Dec 2011 18:23:53 +0200
+Subject: [PATCH 2/2] OMAP4: mcbsp: Clock reparenting support
+In-Reply-To: <alpine.DEB.2.00.1112161730080.12660@utopia.booyaka.com>
+References: <1323941859-7946-1-git-send-email-peter.ujfalusi@ti.com>
+ <1323941859-7946-3-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.00.1112161730080.12660@utopia.booyaka.com>
+Message-ID: <4EF35999.5040607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 1:39 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> NAK -- I hit this problem too, but in fact the errata configs should not
-> really be dependent on SMP; these are fixed in a couple of patches
-> currently queued in Russell's patch system:
->
-> 7196/1 - errata: remove SMP dependency for erratum 720789
-> 7197/1 - errata: remove SMP dependency for erratum 751472
->
-> ...so we should avoid duplicating knowledge about exactly what these
-> errata workarounds do, where it can be avoided.
->
-> In the meantime, the warning is harmless.
+Hi Paul,
 
-All right.
+On 12/17/2011 02:37 AM, Paul Walmsley wrote:
+> What do you think about using clkdev alias lines and hwmod optional clks 
+> for this instead?  With these mechanisms, you can give clocks a consistent 
+> "role name" for a given device, even if the underlying clock changes on 
+> different platforms.
 
--- 
-Felipe Contreras
+I need to look into the clock framework, but sounds promising.
+I can see quite big difference between the clock3xxx_data, and
+clock44xx_data regarding to McBSPs.
+Need to understand why, and what need to be changed to achieve what I want.
+
+> So in the mach-omap2/clock*_data.c files, you'd do something like
+> 
+> 	CLK("omap-mcbsp.1",	"pad_fck",	&mcbsp_clks,  CK_3XXX),
+> 
+> for OMAP3, and 
+> 
+> 	CLK("omap-mcbsp.1",	"pad_fck",	&pad_clks_clk,  CK_44XX),
+> 
+> for OMAP4.
+> 
+> Then in the hwmod data files, you'd add them as optional clocks - 
+> something like:
+> 
+> static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
+> 	{ .role = "pad_fck", .clk = "mcbsp_clks" },
+> };
+> 
+> for OMAP3, and
+> 
+> static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
+> 	{ .role = "pad_fck", .clk = "pad_clks_clk" },
+> };
+> 
+> for OMAP4.
+> 
+> I think this might work for your needs?
+
+Is it OK if I do this as an incremental patch as soon as I figured out
+the way to do it nicely?
+
+Thank you,
+P?ter
