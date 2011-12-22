@@ -1,224 +1,210 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Dec 2011 17:27:43 +0000
-Subject: [PATCH v2 13/15] ARM: local timers: make MCT timer standalone
+Date: Thu, 22 Dec 2011 17:27:44 +0000
+Subject: [PATCH v2 14/15] ARM: local timers: make MSM timers standalone
 In-Reply-To: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
 References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1324574865-5367-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1324574865-5367-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the same pattern used for smp_twd, allow the MCT timers
+Following the same pattern used for smp_twd, allow the MSM timers
 to be built in standalone, without relying on the CONFIG_LOCAL_TIMER
 infrastructure and use a CPU notifier block to stop or start
-the timer on the right CPU.
+the timer on the secondary CPU.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/Kconfig           |    2 +-
- arch/arm/mach-exynos/mct.c |   85 ++++++++++++++++++++++++++++++-------------
- 2 files changed, 60 insertions(+), 27 deletions(-)
+ arch/arm/Kconfig          |    2 +-
+ arch/arm/mach-msm/timer.c |   92 +++++++++++++++++++++++++++++++++-----------
+ 2 files changed, 70 insertions(+), 24 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c3732bb..f5563c5 100644
+index f5563c5..cea5e72 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
 @@ -1564,7 +1564,7 @@ config HOTPLUG_CPU
  
  config LOCAL_TIMERS
  	bool "Use local timer interrupts"
--	depends on SMP && !ARM_SMP_TWD
-+	depends on SMP && !ARM_SMP_TWD && !EXYNOS4_MCT
+-	depends on SMP && !ARM_SMP_TWD && !EXYNOS4_MCT
++	depends on SMP && !ARM_SMP_TWD && !EXYNOS4_MCT && !MSM
  	default y
  	help
  	  Enable support for local timers on SMP platforms, rather then the
-diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-index 85b5527..2f1ab9f 100644
---- a/arch/arm/mach-exynos/mct.c
-+++ b/arch/arm/mach-exynos/mct.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/percpu.h>
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 11d0d8f..ac055c9 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -20,10 +20,11 @@
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
 +#include <linux/cpu.h>
++#include <linux/slab.h>
  
+ #include <asm/mach/time.h>
  #include <asm/hardware/gic.h>
+-#include <asm/localtimer.h>
  
-@@ -39,7 +40,7 @@ static unsigned long clk_rate;
- static unsigned int mct_int_type;
+ #include <mach/msm_iomap.h>
+ #include <mach/cpu.h>
+@@ -46,7 +47,7 @@ static void __iomem *event_base;
  
- struct mct_clock_event_device {
--	struct clock_event_device *evt;
-+	struct clock_event_device evt;
- 	void __iomem *base;
- 	char name[10];
+ static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
+ {
+-	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
++	struct clock_event_device *evt = dev_id;
+ 	/* Stop the timer tick */
+ 	if (evt->mode == CLOCK_EVT_MODE_ONESHOT) {
+ 		u32 ctrl = readl_relaxed(event_base + TIMER_ENABLE);
+@@ -100,7 +101,7 @@ static struct clock_event_device msm_clockevent = {
+ 
+ static union {
+ 	struct clock_event_device *evt;
+-	struct clock_event_device __percpu **percpu_evt;
++	struct clock_event_device __percpu *percpu_evt;
+ } msm_evt;
+ 
+ static void __iomem *source_base;
+@@ -127,7 +128,7 @@ static struct clocksource msm_clocksource = {
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
  };
-@@ -261,9 +262,7 @@ static void exynos4_clockevent_init(void)
- 	setup_irq(IRQ_MCT_G0, &mct_comp_event_irq);
+ 
+-static void __init msm_timer_init(void)
++static void __init msm_timer_primary_setup(void)
+ {
+ 	struct clock_event_device *ce = &msm_clockevent;
+ 	struct clocksource *cs = &msm_clocksource;
+@@ -154,6 +155,13 @@ static void __init msm_timer_init(void)
+ 		source_base = MSM_TMR0_BASE + 0x24;
+ 		dgt_hz = 27000000 / 4;
+ 		writel_relaxed(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
++		msm_evt.percpu_evt = alloc_percpu(struct clock_event_device);
++		if (!msm_evt.percpu_evt) {
++			pr_err("memory allocation failed for %s\n", ce->name);
++			goto err;
++		}
++		ce = __this_cpu_ptr(msm_evt.percpu_evt);
++		*ce = msm_clockevent; /* Use msm_clockevent as a template */
+ 	} else
+ 		BUG();
+ 
+@@ -165,12 +173,8 @@ static void __init msm_timer_init(void)
+ 	ce->irq = INT_GP_TIMER_EXP;
+ 	clockevents_config_and_register(ce, GPT_HZ, 4, 0xffffffff);
+ 	if (cpu_is_msm8x60() || cpu_is_msm8960()) {
+-		msm_evt.percpu_evt = alloc_percpu(struct clock_event_device *);
+-		if (!msm_evt.percpu_evt) {
+-			pr_err("memory allocation failed for %s\n", ce->name);
+-			goto err;
+-		}
+-		*__this_cpu_ptr(msm_evt.percpu_evt) = ce;
++		msm_clockevent.irq = ce->irq;
++		msm_clockevent.shift = ce->shift;
+ 		res = request_percpu_irq(ce->irq, msm_timer_interrupt,
+ 					 ce->name, msm_evt.percpu_evt);
+ 		if (!res)
+@@ -179,7 +183,7 @@ static void __init msm_timer_init(void)
+ 		msm_evt.evt = ce;
+ 		res = request_irq(ce->irq, msm_timer_interrupt,
+ 				  IRQF_TIMER | IRQF_NOBALANCING |
+-				  IRQF_TRIGGER_RISING, ce->name, &msm_evt.evt);
++				  IRQF_TRIGGER_RISING, ce->name, msm_evt.evt);
+ 	}
+ 
+ 	if (res)
+@@ -191,16 +195,18 @@ err:
+ 		pr_err("clocksource_register failed\n");
  }
  
 -#ifdef CONFIG_LOCAL_TIMERS
--
--static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
-+static struct mct_clock_event_device __percpu *mct_tick;
- 
- /* Clock event handling */
- static void exynos4_mct_tick_stop(struct mct_clock_event_device *mevt)
-@@ -303,8 +302,9 @@ static void exynos4_mct_tick_start(unsigned long cycles,
- static int exynos4_tick_set_next_event(unsigned long cycles,
- 				       struct clock_event_device *evt)
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
++#ifdef CONFIG_SMP
++static void __cpuinit msm_timer_secondary_setup(struct clock_event_device *evt)
  {
--	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
-+	struct mct_clock_event_device *mevt;
+-	/* Use existing clock_event for cpu 0 */
+-	if (!smp_processor_id())
+-		return 0;
++	static bool local_timer_inited;
++
++	if (!local_timer_inited) {
++		writel_relaxed(0, event_base + TIMER_ENABLE);
++		writel_relaxed(0, event_base + TIMER_CLEAR);
++		writel_relaxed(~0, event_base + TIMER_MATCH_VAL);
++		local_timer_inited = true;
++	}
  
-+	mevt = container_of(evt, struct mct_clock_event_device, evt);
- 	exynos4_mct_tick_start(cycles, mevt);
+-	writel_relaxed(0, event_base + TIMER_ENABLE);
+-	writel_relaxed(0, event_base + TIMER_CLEAR);
+-	writel_relaxed(~0, event_base + TIMER_MATCH_VAL);
+ 	evt->irq = msm_clockevent.irq;
+ 	evt->name = "local_timer";
+ 	evt->features = msm_clockevent.features;
+@@ -211,19 +217,59 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ 	evt->mult = div_sc(GPT_HZ, NSEC_PER_SEC, evt->shift);
+ 	evt->max_delta_ns = clockevent_delta2ns(0xf0000000, evt);
+ 	evt->min_delta_ns = clockevent_delta2ns(4, evt);
++	evt->cpumask = cpumask_of(smp_processor_id());
  
- 	return 0;
-@@ -313,8 +313,9 @@ static int exynos4_tick_set_next_event(unsigned long cycles,
- static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
- 					 struct clock_event_device *evt)
- {
--	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
-+	struct mct_clock_event_device *mevt;
- 
-+	mevt = container_of(evt, struct mct_clock_event_device, evt);
- 	exynos4_mct_tick_stop(mevt);
- 
- 	switch (mode) {
-@@ -332,7 +333,7 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
- 
- static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
- {
--	struct clock_event_device *evt = mevt->evt;
-+	struct clock_event_device *evt = &mevt->evt;
- 
- 	/*
- 	 * This is for supporting oneshot mode.
-@@ -354,7 +355,7 @@ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
- static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
- {
- 	struct mct_clock_event_device *mevt = dev_id;
--	struct clock_event_device *evt = mevt->evt;
-+	struct clock_event_device *evt = &mevt->evt;
- 
- 	exynos4_mct_tick_clear(mevt);
- 
-@@ -375,14 +376,11 @@ static struct irqaction mct_tick1_event_irq = {
- 	.handler	= exynos4_mct_tick_isr,
- };
- 
--static void exynos4_mct_tick_init(struct clock_event_device *evt)
-+static void __cpuinit exynos4_mct_tick_init(struct mct_clock_event_device *mevt)
- {
--	struct mct_clock_event_device *mevt;
-+	struct clock_event_device *evt = &mevt->evt;
- 	unsigned int cpu = smp_processor_id();
- 
--	mevt = this_cpu_ptr(&percpu_mct_tick);
--	mevt->evt = evt;
--
- 	mevt->base = EXYNOS4_MCT_L_BASE(cpu);
- 	sprintf(mevt->name, "mct_tick%d", cpu);
- 
-@@ -419,17 +417,12 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
- 	}
+-	*__this_cpu_ptr(msm_evt.percpu_evt) = evt;
+ 	clockevents_register_device(evt);
++
+ 	enable_percpu_irq(evt->irq, 0);
+-	return 0;
  }
  
--/* Setup the local clock events for a CPU */
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	exynos4_mct_tick_init(evt);
--
--	return 0;
--}
--
 -void local_timer_stop(struct clock_event_device *evt)
-+void exynos4_mct_tick_halt(void *data)
++void msm_timer_secondary_teardown(void *data)
  {
-+	struct mct_clock_event_device *mevt = data;
-+	struct clock_event_device *evt = &mevt->evt;
- 	unsigned int cpu = smp_processor_id();
-+
++	struct clock_event_device *evt = data;
  	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
- 	if (mct_int_type == MCT_INT_SPI)
- 		if (cpu == 0)
-@@ -439,7 +432,48 @@ void local_timer_stop(struct clock_event_device *evt)
- 	else
- 		disable_percpu_irq(IRQ_MCT_LOCALTIMER);
+ 	disable_percpu_irq(evt->irq);
  }
 -#endif /* CONFIG_LOCAL_TIMERS */
 +
-+static int __cpuinit exynos4_mct_cpu_notify(struct notifier_block *self,
-+					    unsigned long action, void *data)
++static int __cpuinit msm_timer_cpu_notify(struct notifier_block *self,
++					  unsigned long action, void *data)
 +{
 +	int cpu = (int)data;
-+	struct mct_clock_event_device *mevt = per_cpu_ptr(mct_tick, cpu);
++	struct clock_event_device *clk;
++
++	clk = per_cpu_ptr(msm_evt.percpu_evt, cpu);
 +
 +	switch (action) {
 +	case CPU_STARTING:
 +	case CPU_STARTING_FROZEN:
-+		exynos4_mct_tick_init(mevt);
++		msm_timer_secondary_setup(clk);
 +		break;
 +
 +	case CPU_DOWN_PREPARE:
 +	case CPU_DOWN_PREPARE_FROZEN:
-+		smp_call_function_single(cpu, exynos4_mct_tick_halt, mevt, 1);
++		smp_call_function_single(cpu, msm_timer_secondary_teardown,
++					 clk, 1);
 +		break;
 +	}
 +
 +	return NOTIFY_OK;
 +}
 +
-+static struct notifier_block __cpuinitdata exynos4_mct_cpu_nb = {
-+	.notifier_call = exynos4_mct_cpu_notify,
++static struct notifier_block __cpuinitdata msm_timer_cpu_nb = {
++	.notifier_call = msm_timer_cpu_notify,
 +};
++#endif
 +
-+static void __init exynos4_mct_init(void)
++static void __init msm_timer_init(void)
 +{
-+	struct mct_clock_event_device *mevt;
-+
-+	mct_tick = alloc_percpu(struct mct_clock_event_device);
-+	if (!mct_tick) {
-+		pr_err("exynos4_mct_init: can't allocate memory\n");
-+		return;
-+	}
-+
 +	/* Immediately configure the timer on the boot CPU */
-+	mevt = per_cpu_ptr(mct_tick, smp_processor_id());
-+	exynos4_mct_tick_init(mevt);
++	msm_timer_primary_setup();
 +
-+	register_cpu_notifier(&exynos4_mct_cpu_nb);
++#ifdef CONFIG_SMP
++	if (cpu_is_msm8x60() || cpu_is_msm8960())
++		register_cpu_notifier(&msm_timer_cpu_nb);
++#endif
 +}
  
- static void __init exynos4_timer_resources(void)
- {
-@@ -448,17 +482,15 @@ static void __init exynos4_timer_resources(void)
- 
- 	clk_rate = clk_get_rate(mct_clk);
- 
--#ifdef CONFIG_LOCAL_TIMERS
- 	if (mct_int_type == MCT_INT_PPI) {
- 		int err;
- 
- 		err = request_percpu_irq(IRQ_MCT_LOCALTIMER,
- 					 exynos4_mct_tick_isr, "MCT",
--					 &percpu_mct_tick);
-+					 mct_tick);
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     IRQ_MCT_LOCALTIMER, err);
- 	}
--#endif /* CONFIG_LOCAL_TIMERS */
- }
- 
- static void __init exynos4_timer_init(void)
-@@ -471,6 +503,7 @@ static void __init exynos4_timer_init(void)
- 	exynos4_timer_resources();
- 	exynos4_clocksource_init();
- 	exynos4_clockevent_init();
-+	exynos4_mct_init();
- }
- 
- struct sys_timer exynos4_timer = {
+ struct sys_timer msm_timer = {
+ 	.init = msm_timer_init
 -- 
 1.7.7.1
