@@ -1,56 +1,25 @@
-From: linux@solonet.org.ua (Denis Kuzmenko)
-Date: Thu, 22 Dec 2011 02:40:22 +0200
-Subject: [PATCHv2 resend] Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-In-Reply-To: <06fa01ccc02c$828b6810$87a23830$%kim@samsung.com>
-References: <4EE7BE5F.8020108@solonet.org.ua>
- <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
- <4EF23852.1050304@solonet.org.ua>
- <06fa01ccc02c$828b6810$87a23830$%kim@samsung.com>
-Message-ID: <4EF27C76.3020805@solonet.org.ua>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 22 Dec 2011 00:50:51 +0000
+Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
+In-Reply-To: <20111221141907.GA1777@richard-laptop>
+References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
+ <20111221012046.GE15863@b20223-02.ap.freescale.net>
+ <20111221092739.GI15863@b20223-02.ap.freescale.net>
+ <201112210943.34310.arnd@arndb.de>
+ <CAPXgP10FCrqdTg++46m4+xxM9tw1ZrKc8wz=JkKjCHJ0hQPtng@mail.gmail.com>
+ <20111221121246.GB15309@opensource.wolfsonmicro.com>
+ <CAPXgP10CGxfEJ4jK2MkKt0-nAWgiawDERyA1N4wHvMCJfE3oDg@mail.gmail.com>
+ <20111221141907.GA1777@richard-laptop>
+Message-ID: <20111222005048.GA27144@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2011 12:04 AM, Kukjin Kim wrote:
-> Denis Kuzmenko wrote:
->>
->> On 12/21/2011 09:04 AM, Kukjin Kim wrote:
->>> Denis Kuzmenko wrote:
->>>>
->>>> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
->>>>
->>>> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
->>>> ---
->>>>
->>>> Patch is against 3.2-rc4.
->>>> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of
->> this
->>>> the
->>>> file s3c2410-iotiming.c is not ever compiled and enabling
->>>> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
->>>> function
->>>> s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs
->>>> defined
->>>> as NULL for this case.
->>>>
->>> Hi Denis,
->>>
->>> Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected in
->> my
->>> case and s3c2410-iotiming.c is built...when is it happened? I just
->> selected
->>> every regarding configuration in kernel menuconfig...
->>
->> Please, try attached config (it's still failing in v3.2-rc6).
->>
-> Hi Denis,
-> 
-> Yes, when s3c2410 stuff is not selected, it happened.
-> Look at me soon and thanks.
-Hi, Kukjin,
+On Wed, Dec 21, 2011 at 10:19:11PM +0800, Richard Zhao wrote:
 
-Sorry, can you please explain as I can't understand. Especially second
-sentence.
+> Even cpu node is device, I still need to find a way to get it.  I think it's
+> better have another patch to fix the regulator dt binding in cpu node. I'll
+> not include it in this patch series.
 
--- 
-Best regards, Denis Kuzmenko.
+I'd expect this to be easy if we can find any device tree data for the
+CPU at all?  It's just another piece of data no different to the clock
+rates or whatever.
