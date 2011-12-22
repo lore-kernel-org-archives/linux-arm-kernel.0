@@ -1,71 +1,65 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Thu, 22 Dec 2011 15:21:40 +0100
-Subject: [PATCH] arm: oprofile: fix linkage issue
-In-Reply-To: <1324561016-19389-1-git-send-email-vladimir.zapolskiy@nokia.com>
-References: <1324561016-19389-1-git-send-email-vladimir.zapolskiy@nokia.com>
-Message-ID: <20111222142140.GP16765@erda.amd.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 22 Dec 2011 22:22:17 +0800
+Subject: [PATCH] regulator: max8925: fix enabled/disabled judgement mistake
+In-Reply-To: <20111222134415.GU4546@opensource.wolfsonmicro.com>
+References: <1324543892-32540-1-git-send-email-haojian.zhuang@marvell.com>
+ <20111222105357.GC4546@opensource.wolfsonmicro.com>
+ <CAN1soZy+hgW2iaQad9gbis7bHLCnfQhMKx-JTJc1j2++eRrJyw@mail.gmail.com>
+ <20111222134415.GU4546@opensource.wolfsonmicro.com>
+Message-ID: <CAN1soZwBX3x5fiLrLwcC_xTSPMuXw4=u5Rj_CF_R_V3attNzYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.12.11 15:36:56, Vladimir Zapolskiy wrote:
-> This change fixes a linking problem, which happens if oprofile is selected to
-> be compiled as built-in:
-> 
->   `oprofile_arch_exit' referenced in section `.init.text' of
->   arch/arm/oprofile/built-in.o: defined in discarded section
->   `.exit.text' of arch/arm/oprofile/built-in.o
-> 
-> The problem is appeared after commit 87121ca504, which introduced
-> oprofile_arch_exit() calls from __init function. Note that the aforementioned
-> commit has been backported to stable branches, and the problem is known to be
-> reproduced at least with 3.0.13 and 3.1.5 kernels.
+On Thu, Dec 22, 2011 at 9:44 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Dec 22, 2011 at 09:31:22PM +0800, Haojian Zhuang wrote:
+>> On Thu, Dec 22, 2011 at 6:53 PM, Mark Brown
+>
+>> > Does this mean that the register for enabling and disabling the register
+>> > doesn't always work? ?If it does then doesn't that mean that the enable
+>> > and disable functions need to be updated as well to either put the
+>> > regulator into I2C mode or return an error when it isn't in I2C mode?
+>
+>> According to the logic in above, we need check both registers to figure out
+>> whether LDO is on or off.
+>> Return error if it isn't in I2C mode doesn't make sense. If sequence is in one
+>> of power-on sequence, the LDO is already ON by default.
+>
+> I don't understand how your reply follows on from my comment here? ?If
+> the enable register doesn't control if the regulator is enabled and
+> disabled and it's always on then it seems fairly clear that the enable
+> and disable functions ought to know about this.
 
-I will fix it upstream, afterwards this goes into stable due to the
-stable tag.
+Mark,
 
-Right, commit 87121ca504 went into stable kernels 3.0 and 3.1, need to
-fix them too:
+The logic I mentioned is pasted by me. In order to make it clear, let
+me copy the logic again.
 
-CC: stable at kernel.org # 3.0+
+> If power-sequence is power-on sequence:
+>     enable LDO
+> else if power-sequence is i2c mode:
+>     if enable bit of control register is on:
+>            enable LDO
+>     else:
+>            disable LDO
+> else:
+>      disable LDO
+>
+> If the LDO default state is OFF, software needs to set sequence
+> to I2C mode first. Then software can enable LDO via control register.
 
-Please fix also arch/sh with this patch:
+I'm sorry that there's an error in the comments. There's only one enable
+register. Power sequence is bit[4:2], and enable bit is bit[0].
 
- $ git grep exit.*oprofile_arch_exit arch/*/oprofile drivers/oprofile/ 
- arch/arm/oprofile/common.c:void __exit oprofile_arch_exit(void)
- arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void)
- arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void) {}
+While we enable/disable the LDO in software, we'll force LDO into I2C mode
+and enable/disable the control bit. So there's no risk in the
+enable/disable function.
 
-Thanks,
+There's only potential issue of checking whether LDO is enabled. If
+sequence matches
+the power sequence (not I2C mode), LDO will be enabled even the
+control bit is OFF.
+So this patch is necessary.
 
--Robert
-
-> 
-> Signed-off-by: Vladimir Zapolskiy <vladimir.zapolskiy@nokia.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robert Richter <robert.richter@amd.com>
-> Cc: stable at kernel.org
-> ---
->  arch/arm/oprofile/common.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> index c074e66..4e0a371 100644
-> --- a/arch/arm/oprofile/common.c
-> +++ b/arch/arm/oprofile/common.c
-> @@ -116,7 +116,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
->  	return oprofile_perf_init(ops);
->  }
->  
-> -void __exit oprofile_arch_exit(void)
-> +void oprofile_arch_exit(void)
->  {
->  	oprofile_perf_exit();
->  }
-> -- 
-> 1.7.2.3
-> 
-> 
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Best Regards
+Haojian
