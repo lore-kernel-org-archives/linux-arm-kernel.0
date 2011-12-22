@@ -1,60 +1,58 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Thu, 22 Dec 2011 18:38:31 +0530
-Subject: [PATCH 0/1] Add Qualcomm MSM ADM DMAEngine driver 
-Message-ID: <1324559312-23684-1-git-send-email-kumarrav@codeaurora.org>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 22 Dec 2011 13:10:01 +0000
+Subject: [PATCH v7 1/8] davinci: vpif: remove machine specific inclusion
+ from driver
+In-Reply-To: <1324475021-32509-2-git-send-email-manjunath.hadli@ti.com>
+References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
+ <1324475021-32509-2-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6053133@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Qualcomm Application Datamover(ADM) supports simple, scatter gather
-and box mode dma transfers.
+Hi Manju,
 
-This driver implements the scatter gather and box mode transfer.
+On Wed, Dec 21, 2011 at 19:13:34, Hadli, Manjunath wrote:
+> remove machine specific inclusion from the driver which
+> comes in the way of platform code consolidation.
 
-Our ADM hardware needs these following fields for a transfer.
--------------------
-Scatter gather mode
--------------------
-32-bit command configuration.
-32-bit source address
-32 bit destination address
-16-bit length
+I think it would be more readable to use the term "header file"
+here and in the headline. Just "machine specific inclusion"
+begs the question - "inclusion of what?"
 
----------
-Box Mode
----------
-32-bit command configuration
-32-bit source address
-32-bit destination address
-16-bit source row length
-16-bit destination row length
-16-bit source row numbers
-16-bit destination row numbers
-16-bit source row offset
-16-bit destination row offset
+> currently was seen that these header inclusions were
+> not necessary.
 
-As of now there is no support to pass private data like "command"
-configuration in standard DMAEngine API.
+Sorry about nit-picking, but it is not good to talk in
+past tense in commit text. Past tense is natural for you
+to use since you write the text after making the changes,
+but for the reviewer it is not natural since he is seeing
+the commit text and the patch both at once. Also, usage
+of "currently" in above line is not necessary. It is assumed
+that commit text talks about current state of affairs.
 
-We are using "device_prep_dma_sg" API to do the SG and box mode transfer,
-but since the current APIs doesn't support a way to pass the "command configuration",
-"source and destination row numbers" we are using "length"  and "offset" field of the
-existing scatterlist to achieve it. Let us know if there is a better way
-to do it or new API needs to be created. 
+I would have made these changes myself after Mauro's ack,
+but..
 
-Here we are using same length field as above for command configuration,
-16 MSB bits offset field of scatterlist for passing row numbers
-and remaining of 16 LSB bits for offset.
+> 
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+> Cc: LMML <linux-media@vger.kernel.org>
+> ---
+>  drivers/media/video/davinci/vpif.h         |    2 --
+>  drivers/media/video/davinci/vpif_display.c |    2 --
+>  include/media/davinci/vpif_types.h         |    2 ++
+>  sound/soc/codecs/cq93vc.c                  |    2 --
 
-Ravi Kumar V (1):
-  msm: DMAEngine: Add DMAEngine driver based on old MSM DMA APIs
+.. you clubbed this unrelated sound/soc/ change in this patch.
+First, the change is not related to VPIF in any way so it
+has no business being in this patch. Second, there is no way
+the sound/soc folks will have a look at this patch, so basically
+the change will end up bypassing the right maintainers if other
+reviewers fail to catch it.
 
- arch/arm/mach-msm/include/mach/dma.h |   53 +++
- drivers/dma/Kconfig                  |   12 +
- drivers/dma/Makefile                 |    1 +
- drivers/dma/msm-dma.c                |  719 ++++++++++++++++++++++++++++++++++
- 4 files changed, 785 insertions(+), 0 deletions(-)
- create mode 100644 drivers/dma/msm-dma.c
+Please separate the change into another patch. You can just
+post the two patches alone copying the right maintainers
+in each instead of posting the entire series again.
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+Sekhar
