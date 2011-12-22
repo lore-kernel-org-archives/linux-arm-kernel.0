@@ -1,81 +1,50 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 22 Dec 2011 19:31:46 +0200
-Subject: [PATCH 5/5] OMAP4: mcbsp: Callback function for McBSP4 CLKR/FSR mux
- selection
-In-Reply-To: <1324575106-17172-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1324575106-17172-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1324575106-17172-6-git-send-email-peter.ujfalusi@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Dec 2011 09:32:16 -0800
+Subject: [PATCH v2 8/9] OMAP4: omap4panda: Enable audio support
+In-Reply-To: <1324571902-16918-9-git-send-email-peter.ujfalusi@ti.com>
+References: <1324571902-16918-1-git-send-email-peter.ujfalusi@ti.com>
+ <1324571902-16918-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20111222173216.GJ24444@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4 McBSP4 has 6 pin mode. The configuration of the CLKR/FSR
-source can be done via the CONTROL_MCBSPLP register which only
-has two valid bits (30: CLKR mux, 31: FSR mux).
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/mcbsp.c |   42 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+> @@ -548,6 +588,19 @@ void omap4_panda_display_init(void)
+>  	omap_display_init(&omap4_panda_dss_data);
+>  }
+>  
+> +static void omap4_panda_audio_init(void)
+> +{
+> +	if (cpu_is_omap4430()) {
+> +		/* PandaBoard 4430 */
+> +		panda_abe_audio_data.card_name = "PandaBoard";
+> +		/* Audio in is connected to HSMIC */
+> +		panda_abe_audio_data.has_hsmic = 1;
+> +	} else {
+> +		/* PandaBoard ES */
+> +		panda_abe_audio_data.card_name = "PandaBoardES";
+> +	}
+> +}
+> +
 
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index 269765c..d5fbe9a 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -70,6 +70,46 @@ static int omap2_mcbsp1_mux_rx_clk(struct device *dev, const char *signal,
- 	return 0;
- }
- 
-+#define OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_FSX	(1 << 31)
-+#define OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_CLKX	(1 << 30)
-+static int omap4_mcbsp4_mux_rx_clk(struct device *dev, const char *signal,
-+				   const char *src)
-+{
-+	struct omap_mcbsp *mcbsp = dev_get_drvdata(dev);
-+	u32 v;
-+
-+	/* Only McBSP4 have 6 pin configuration (CLKR/FSR source selectable) */
-+	if (mcbsp->id != 3)
-+		return -EINVAL;
-+
-+	/*
-+	 * In CONTROL_MCBSPLP register only bit 30 (CLKR mux), and bit 31 (FSR
-+	 * mux) is used */
-+	v = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MCBSPLP);
-+
-+	if (!strcmp(signal, "clkr")) {
-+		if (!strcmp(src, "clkr"))
-+			v &= ~OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_CLKX;
-+		else if (!strcmp(src, "clkx"))
-+			v |= OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_CLKX;
-+		else
-+			return -EINVAL;
-+	} else if (!strcmp(signal, "fsr")) {
-+		if (!strcmp(src, "fsr"))
-+			v &= ~OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_FSX;
-+		else if (!strcmp(src, "fsx"))
-+			v |= OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_FSX;
-+		else
-+			return -EINVAL;
-+	} else {
-+		return -EINVAL;
-+	}
-+
-+	omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MCBSPLP);
-+
-+	return 0;
-+}
-+
- static int omap2_mcbsp_reparent_clk(struct device *dev, struct clk *clk,
- 				    char *fck_src_name)
- {
-@@ -209,6 +249,8 @@ static int omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 
- 	if (oh->class->rev == MCBSP_CONFIG_TYPE4)
- 		pdata->set_clk_src = omap4_mcbsp_set_clk_src;
-+		if (id == 4)
-+			pdata->mux_signal = omap4_mcbsp4_mux_rx_clk;
- 	else {
- 		pdata->set_clk_src = omap2_mcbsp_set_clk_src;
- 		if (id == 1)
--- 
-1.7.8.1
+Please move the cpu_is_omap4430() check from audio_init to..
+
+>  static void __init omap4_panda_init(void)
+>  {
+>  	int package = OMAP_PACKAGE_CBS;
+> @@ -560,6 +613,7 @@ static void __init omap4_panda_init(void)
+>  		pr_err("error setting wl12xx data\n");
+>  
+>  	omap4_panda_i2c_init();
+> +	omap4_panda_audio_init();
+>  	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
+>  	platform_device_register(&omap_vwlan_device);
+>  	board_serial_init();
+
+..omap4_panda_init() instead and set some flag that other
+devices can use too so we don't have cpu_is_omap tests
+for each init function. I'd assume that will be needed for
+other devices too, but that's just a guess of course :)
+
+Tony
