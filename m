@@ -1,45 +1,37 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Fri, 23 Dec 2011 05:39:27 +0800
-Subject: [PATCH] tty: serial: imx: move del_timer_sync() to avoid potential
- deadlock
-Message-ID: <1324589967-25365-1-git-send-email-eric.miao@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Dec 2011 22:41:51 +0000
+Subject: Oops in guest after ioremap() on ARMv7
+In-Reply-To: <20111222192923.GN2577@n2100.arm.linux.org.uk>
+References: <4EF31DA7.9030407@citrix.com> <20111222144937.GE20635@arm.com>
+ <4EF35CFF.3050200@citrix.com> <20111222181356.GI20635@arm.com>
+ <20111222192923.GN2577@n2100.arm.linux.org.uk>
+Message-ID: <CAHkRjk49U52XaD841JE2HRxmAeFNQ7sT+7VbHFXWqJTR6=+uBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-del_timer_sync() acquires its own lock and doesn't have to be nested
-within the spinlock of sport->port.lock in imx_set_termios(),  which
-will cause potential deadlock.  Fix this by moving it outside.
+On 22 December 2011 19:29, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 22, 2011 at 06:13:56PM +0000, Catalin Marinas wrote:
+>> It could as well be a model bug but people are on holiday at the moment
+>> (and I'm off shortly as well, until 3rd of January). Could you try to
+>> disable the cacheability of the page table walks for both stage 1 (TTBRx
+>> with classic page tables or TTBCR with LPAE) and stage 2 (VTCR)? Since
+>> Linux does the correct cache flushing and I assume the hypervisor as
+>> well, this may work around possible model bug.
+>
+> Note that Linux, through and through, expects that page table entries are
+> not negatively cached. ?Non-present page table entries are expected to be
+> refetched without requiring any kind of TLB flushing at any point.
 
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Signed-off-by: Eric Miao <eric.miao@linaro.org>
----
- drivers/tty/serial/imx.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+The TLB on ARM does not do any negative caching. Full translations are
+only stored if the page table walk succeeds. You may get some partial
+caching (like level 1) if there is a valid entry in the page table but
+that's not negative caching. For this scenario we have the
+(pmd|pte)_free_tlb() implementation.
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 39bbce4..0f4ba21 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -904,6 +904,8 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
- 			ucr2 |= UCR2_PROE;
- 	}
- 
-+	del_timer_sync(&sport->timer);
-+
- 	/*
- 	 * Ask the core to calculate the divisor for us.
- 	 */
-@@ -934,8 +936,6 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
- 			sport->port.ignore_status_mask |= URXD_OVRRUN;
- 	}
- 
--	del_timer_sync(&sport->timer);
--
- 	/*
- 	 * Update the per-port timeout.
- 	 */
+What caching attributes in TTBR/TTBCR/VTCR mean is looking up the page
+table in the L1 cache so that we don't need to do extra cache
+flushing.
+
 -- 
-1.7.5.4
+Catalin
