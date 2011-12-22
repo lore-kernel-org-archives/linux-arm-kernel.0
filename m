@@ -1,7 +1,7 @@
 From: jason.chen@linaro.org (Jason Chen)
-Date: Thu, 22 Dec 2011 20:21:21 +0800
-Subject: [PATCH 1/7] arm/imx6q: add clock debugfs support
-Message-ID: <1324556481-28106-1-git-send-email-jason.chen@linaro.org>
+Date: Thu, 22 Dec 2011 20:23:45 +0800
+Subject: [PATCH] arm/imx6q: add clock debugfs support
+Message-ID: <1324556625-28192-1-git-send-email-jason.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,7 +11,7 @@ Signed-off-by: Jason Chen <jason.chen@linaro.org>
  1 files changed, 23 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-index 3225ab2..83bc38d 100644
+index 9273c2a..840ab8d 100644
 --- a/arch/arm/mach-imx/clock-imx6q.c
 +++ b/arch/arm/mach-imx/clock-imx6q.c
 @@ -335,6 +335,12 @@
@@ -117,7 +117,7 @@ index 3225ab2..83bc38d 100644
  		.enable_reg	= er,			\
  		.enable_shift	= es,			\
  		.enable		= _clk_enable,		\
-@@ -1826,6 +1844,7 @@ static void pcie_clk_disable(struct clk *clk)
+@@ -1825,6 +1843,7 @@ static void pcie_clk_disable(struct clk *clk)
  }
  
  static struct clk pcie_clk = {
@@ -125,7 +125,7 @@ index 3225ab2..83bc38d 100644
  	.enable_reg = CCGR4,
  	.enable_shift = CG0,
  	.enable = pcie_clk_enable,
-@@ -1858,6 +1877,7 @@ static void sata_clk_disable(struct clk *clk)
+@@ -1857,6 +1876,7 @@ static void sata_clk_disable(struct clk *clk)
  }
  
  static struct clk sata_clk = {
@@ -133,7 +133,7 @@ index 3225ab2..83bc38d 100644
  	.enable_reg = CCGR5,
  	.enable_shift = CG2,
  	.enable = sata_clk_enable,
-@@ -1989,8 +2009,10 @@ int __init mx6q_clocks_init(void)
+@@ -1976,8 +1996,10 @@ int __init mx6q_clocks_init(void)
  			oscillator_reference = rate;
  	}
  
