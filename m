@@ -1,47 +1,31 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 22 Dec 2011 15:56:41 +0100
-Subject: [PATCH v4 07/12] arm/dts: twl6030: Add DTS file for twl6030 PMIC
+Date: Thu, 22 Dec 2011 15:56:42 +0100
+Subject: [PATCH v4 08/12] arm/dts: twl4030: Add DTS file for twl4030 PM +
+ Audio IC
 In-Reply-To: <1324565806-31142-1-git-send-email-b-cousson@ti.com>
 References: <1324565806-31142-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1324565806-31142-8-git-send-email-b-cousson@ti.com>
+Message-ID: <1324565806-31142-9-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a dedicated DTS file for the twl6030 Power IC.
+Add a dedicated DTS file for the twl4030/5030 Power + Audio IC.
 This chip is a big SoC that will be reused in a lot of various
-OMAP4+ boards.
-
-Note: This file is supposed to be included in a board DTS that will
-create the twl node in order to allow the &twl reference to work.
-
-Exmaple:
-...
-&i2c1 {
-    twl: twl at 48 {
-        reg = <0x48>;
-        interrupts = <0 7 4>;
-        interrupt-controller;
-        interrupt-parent = <&gic>;
-    };
-};
-
-/include/ "twl6030.dtsi"
-...
+OMAP3 boards.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/boot/dts/twl6030.dtsi |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/twl6030.dtsi
+ arch/arm/boot/dts/twl4030.dtsi |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/twl4030.dtsi
 
-diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
+diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
 new file mode 100644
-index 0000000..b7b4e5e
+index 0000000..8be5223
 --- /dev/null
-+++ b/arch/arm/boot/dts/twl6030.dtsi
-@@ -0,0 +1,22 @@
++++ b/arch/arm/boot/dts/twl4030.dtsi
+@@ -0,0 +1,21 @@
 +/*
 + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
 + *
@@ -52,10 +36,9 @@ index 0000000..b7b4e5e
 +
 +/*
 + * Integrated Power Management Chip
-+ * http://www.ti.com/lit/ds/symlink/twl6030.pdf
 + */
 +&twl {
-+	compatible = "ti,twl6030";
++	compatible = "ti,twl4030";
 +	interrupt-controller;
 +	#interrupt-cells = <1>;
 +
