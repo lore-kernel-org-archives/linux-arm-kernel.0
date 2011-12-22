@@ -1,29 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Dec 2011 20:45:15 +0000
-Subject: insmod problem on ARM with more than 16MB of RAM?
-In-Reply-To: <CAHkRjk7105PLe=98mMKmSKkWDmyFjWpBkZ5_iy-U-ZiNKHFNLw@mail.gmail.com>
-References: <20111222203531.0c4f80f1@emcraft.com>
- <CAHkRjk7105PLe=98mMKmSKkWDmyFjWpBkZ5_iy-U-ZiNKHFNLw@mail.gmail.com>
-Message-ID: <20111222204515.GQ2577@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Dec 2011 12:45:45 -0800
+Subject: [PATCH 01/10] arm: omap4: fix kconfig warning
+In-Reply-To: <CAMP44s2MfdS-woETebYsTHEPZsBuBpP2dfmfBibC+JWZZ2iLKQ@mail.gmail.com>
+References: <1324341747-5922-1-git-send-email-felipe.contreras@gmail.com>
+ <1324341747-5922-2-git-send-email-felipe.contreras@gmail.com>
+ <20111222182240.GN24444@atomide.com>
+ <CAMP44s2MfdS-woETebYsTHEPZsBuBpP2dfmfBibC+JWZZ2iLKQ@mail.gmail.com>
+Message-ID: <20111222204545.GT24444@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 04:49:13PM +0000, Catalin Marinas wrote:
-> A completely generic solution would be to modify the module loader to
-> cope with longer relocations by setting up some trampoline code.
+* Felipe Contreras <felipe.contreras@gmail.com> [111222 11:37]:
+> On Thu, Dec 22, 2011 at 8:22 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Felipe Contreras <felipe.contreras@gmail.com> [111219 16:11]:
+> >> warning: (ARCH_OMAP4 && ARCH_VEXPRESS_CA9X4) selects ARM_ERRATA_720789 which has unmet direct dependencies (CPU_V7 && SMP)
+> >
+> > Thanks applying into fixes-non-critical-part3.
+> 
+> Actually, please disregard this one, it should be handled by this:
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/141942
 
-That was discussed when the module format changed, and decided it was
-not possible because of circular dependencies to do it right.
+OK dropping.
 
-The reason is you can't modify the size of the allocation after the
-module has been loaded to add trampolines, and you can't parse the
-object file until memory has been allocated to load it into.  So you
-either have to allocate a trampoline for every function symbol in the
-kernel which the module _might_ use (which wastes lots of memory) or
-you just arrange for stuff to be placed within range of the kernel.
-
-So for MMU platforms, we just ensure that modules are always placed
-within reach of the kernel text.  For nommu platforms, modules are
-a bitch - and TBH given the virtually non-existent activity/interest
-from the nommu sector, it's something I'm willing to spend the grand
-total of zero time to solve this _really_ _hard_ problem.
+Tony
