@@ -1,47 +1,55 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 22 Dec 2011 11:39:16 +0000
-Subject: [PATCH 02/10] arm: vexpress: fix kconfig warning
-In-Reply-To: <1324341747-5922-3-git-send-email-felipe.contreras@gmail.com>
-References: <1324341747-5922-1-git-send-email-felipe.contreras@gmail.com>
- <1324341747-5922-3-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <20111222113916.GA2625@localhost>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 22 Dec 2011 20:19:24 +0800
+Subject: [PATCH v2 1/1] dt: reform for_each_property to
+ for_each_property_of_node
+Message-ID: <1324556364-26188-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 02:42:19AM +0200, Felipe Contreras wrote:
-> warning: (ARCH_OMAP4 && ARCH_VEXPRESS_CA9X4) selects ARM_ERRATA_720789 which has unmet direct dependencies (CPU_V7 && SMP)
-> warning: (ARCH_VEXPRESS_CA9X4) selects ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 && SMP)
-> 
-> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
-> ---
->  arch/arm/mach-vexpress/Kconfig |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index 9311484..3fbcb8c 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -5,8 +5,8 @@ config ARCH_VEXPRESS_CA9X4
->  	bool "Versatile Express Cortex-A9x4 tile"
->  	select CPU_V7
->  	select ARM_GIC
-> -	select ARM_ERRATA_720789
-> -	select ARM_ERRATA_751472
-> +	select ARM_ERRATA_720789 if SMP
-> +	select ARM_ERRATA_751472 if SMP
->  	select ARM_ERRATA_753970
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-NAK -- I hit this problem too, but in fact the errata configs should not
-really be dependent on SMP; these are fixed in a couple of patches
-currently queued in Russell's patch system:
+Make this macro easier to use(do not need to pass properties, a node is
+enough), also change to a more sensible name as for_each_child_of_node.
 
-7196/1 - errata: remove SMP dependency for erratum 720789
-7197/1 - errata: remove SMP dependency for erratum 751472
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+---
+Changes v1->v2:
+- Fix a typo error (micro->macro)
 
-...so we should avoid duplicating knowledge about exactly what these
-errata workarounds do, where it can be avoided.
+---
+ drivers/of/base.c  |    2 +-
+ include/linux/of.h |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-In the meantime, the warning is harmless.
-
-Cheers
----Dave
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 9b6588e..f6f6fe8 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -1159,7 +1159,7 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
+ 	if (!of_aliases)
+ 		return;
+ 
+-	for_each_property(pp, of_aliases->properties) {
++	for_each_property_of_node(of_aliases, pp) {
+ 		const char *start = pp->name;
+ 		const char *end = start + strlen(start);
+ 		struct device_node *np;
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 4948552..f1a490c 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -219,8 +219,8 @@ extern int of_device_is_available(const struct device_node *device);
+ extern const void *of_get_property(const struct device_node *node,
+ 				const char *name,
+ 				int *lenp);
+-#define for_each_property(pp, properties) \
+-	for (pp = properties; pp != NULL; pp = pp->next)
++#define for_each_property_of_node(dn, pp) \
++	for (pp = dn->properties; pp != NULL; pp = pp->next)
+ 
+ extern int of_n_addr_cells(struct device_node *np);
+ extern int of_n_size_cells(struct device_node *np);
+-- 
+1.7.0.4
