@@ -1,66 +1,21 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 22 Dec 2011 14:01:59 -0700
-Subject: [PATCH] arm/tegra: Support Tegra30 in decompressor UART setup
-Message-ID: <1324587719-32731-1-git-send-email-swarren@nvidia.com>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Thu, 22 Dec 2011 22:19:48 +0100
+Subject: [PATCH 0/4] arm: Remove Telechips subarchitecture
+Message-ID: <20111222211948.GA1201@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tegra20, the UART clock runs at 216MHz, whereas on Tegra30 it runs at
-408MHz. Modify arch_decomp_setup() to detect Tegra20-vs-Tegra30 at run-
-time, and program the correct divisor.
+Unfortunately, nobody is interested in having support for Telechips' SoCs in
+mainline. With neither feedback nor support from anywhere, I am not willing
+to maintain this any longer.
 
-This makes uncompressor messages work correctly on Tegra30. This also
-fixes early printk, assuming zImage is used and this setup code runs.
+Russell requires subarchs to be up-to-date and maintainers to do their work
+to prevent their subarchs from bit-rotting. That is completely the right
+thing to do.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/include/mach/uncompress.h |   20 ++++++++++++++++++--
- 1 files changed, 18 insertions(+), 2 deletions(-)
+For me, the only possible course of action is to completely remove the
+whole Telechips subarchitecture. I'll reply to this mail with a series of
+four patches that does this.
 
-diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
-index 4e83237..61d6e08 100644
---- a/arch/arm/mach-tegra/include/mach/uncompress.h
-+++ b/arch/arm/mach-tegra/include/mach/uncompress.h
-@@ -24,6 +24,8 @@
- #include <linux/types.h>
- #include <linux/serial_reg.h>
- 
-+#include <asm/hardware/gic.h>
-+
- #include <mach/iomap.h>
- 
- static void putc(int c)
-@@ -45,15 +47,29 @@ static inline void flush(void)
- 
- static inline void arch_decomp_setup(void)
- {
-+	u8 *distctr = (u8 *)(TEGRA_ARM_INT_DIST_BASE +
-+			     GIC_DIST_CTR);
-+	u32 ctlrs, div;
- 	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
- 	int shift = 2;
- 
- 	if (uart == NULL)
- 		return;
- 
-+	/*
-+	 * Tegra20 has 4 interrupt controllers
-+	 * Tegra30 has 5 interrupt controllers
-+	 * Future SoCs may need additional means of identification
-+	 */
-+	ctlrs = (*distctr) & 0x1f;
-+	if (ctlrs == 4)
-+		div = 0x0075;
-+	else
-+		div = 0x00dd;
-+
- 	uart[UART_LCR << shift] |= UART_LCR_DLAB;
--	uart[UART_DLL << shift] = 0x75;
--	uart[UART_DLM << shift] = 0x0;
-+	uart[UART_DLL << shift] = div & 0xff;
-+	uart[UART_DLM << shift] = div >> 8;
- 	uart[UART_LCR << shift] = 3;
- }
- 
--- 
-1.7.0.4
+Thanks,
+Hans
