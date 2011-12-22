@@ -1,489 +1,350 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Thu, 22 Dec 2011 08:18:13 +0000
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-3-git-send-email-b29396@freescale.com>
- <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
-Message-ID: <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Thu, 22 Dec 2011 13:52:04 +0530
+Subject: [PATCH v2 02/10] i2c: OMAP: Add DT support for i2c controller
+In-Reply-To: <1323439361-1647-3-git-send-email-b-cousson@ti.com>
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-3-git-send-email-b-cousson@ti.com>
+Message-ID: <4EF2E8AC.40300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-> -----Original Message-----
-> From: Stephen Warren [mailto:swarren at nvidia.com]
-> Sent: Wednesday, December 21, 2011 8:39 AM
-> To: Dong Aisheng-B29396; linux-kernel at vger.kernel.org
-> Cc: linus.walleij at stericsson.com; s.hauer at pengutronix.de;
-> rob.herring at calxeda.com; linux-arm-kernel at lists.infradead.org;
-> kernel at pengutronix.de; cjb at laptop.org; devicetree-discuss at lists.ozlabs.org
-> Subject: RE: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
-> mappings
-> Importance: High
-> 
-> Dong Aisheng wrote at Tuesday, December 20, 2011 10:41 AM:
-> > This patch provies a common API for driver to use to register pinmux
-> > mappings from dts file. It is needed for dt support.
-> 
-> Dong,
-> 
-> Thanks for providing a concrete binding to get discussion started. I had
-> intended to do this myself, but got side-tracked on other things.
-> 
-> I'll comment exclusively on the documentation in this patch, since any changes
-> there will require the code to be changed.
-> 
-First, thanks for such a long and detailed comments.
-I spent some time to read and understood.
-
-> > diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl.txt
-> > +The pin control subsystem
-> > +
-> > +The pin control subsystem provides a common API to support parsing
-> > +pinmux mappings data from device tree. Each board dts file should
-> > +provide a device node of which all the child nodes are the corresponding
-> pinmux mappings.
-> 
-> So, the binding you propose seems very reasonable from the point-of-view of the
-> Linux pinctrl subsystem. However, it violates basic device tree philosophy in a
-> few ways. Some background:
-> 
-> Device tree is supposed to be a pure representation of hardware, not the
-> software that runs on it. This means a couple of things: (a) the nodes in the DT
-> generally match 1:1 with specific HW on the board (b) the design of the bindings
-> should be justifiable given HW datasheets without any reference to specific
-> operating systems or software driver design
-> (c) the DT should be useful to all operating systems that run on the HW; there
-> should be no "DT for Linux", "DT for FreeBSD", "DT for Windows".
+Since it touches the driver file
++linux-i2c
+On Friday 09 December 2011 07:32 PM, Benoit Cousson wrote:
+> Add initial DT support to retrieve the frequency using a
+> DT attribute instead of the pdata pointer if of_node exist.
 >
-I'm not DT expert, but it looks reasonable and correct.
-
-> Hence, I see a few problems with this binding:
-> 
-> a) The binding is documented as being for the pinctrl subsystem, rather than for
-> pinmux hardware.
+> Add documentation for omap i2c controller binding.
 >
-Seems yes.
-
-> b) The top-level node ("imx6q-sabreauto-map" below) is not tied to any
-> particular piece of hardware (no compatible flag, not reg property etc.)
+> Based on original patches from Manju and Grant.
 >
-My original purpose was that it was not a hw device node, it was just created for
-containing pin map information and referenced by a phandle in iomuxc deivce node
-like:
-iomuxc at 020e0000 {
-        compatible = "fsl,imx6q-iomuxc";
-        reg = <0x020e0000 0x4000>;
-        fsl,pinmux-map = <&pinmux>;
-	  ...
-}
-I could also make it as a sub node of iomuxc, but original design is that sub nodes of
-Ioxmuc are already representing each pinmux functions.
-To avoid conflict, I put the imx6q-sabreauto-map node out of iomuxc since a phandle
-(fsl,pinmux-map ) does the same work well.
-
-For it's not a real hw device node, I was not aware of that DT has such restriction
-Before. So I may use it wrongly.
-But I have question that I did some research that it seemed not all the nodes in
-dts file are pure hw device node
-Like:
-Sound in arch/arm/boot/dts/tegra-harmony.dts.
-        sound {
-                compatible = "nvidia,harmony-sound", "nvidia,tegra-wm8903";
-
-                spkr-en-gpios = <&codec 2 0>;
-                hp-det-gpios = <&gpio 178 0>;
-                int-mic-en-gpios = <&gpio 184 0>;
-                ext-mic-en-gpios = <&gpio 185 0>;
-        };
-I did not know how asoc to handle differenct devices binding like soc dai, pcm and machines,
-But machine device seems not a real hw device.
-
-Or even the chosen node:
-chosen {
-       bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk0p2 rw rootwait";
-};
-And I guess chosen is also Linux specific, right?
-
-I don't know how DT define such restrictions or if there's an exception?
-
-> c) The design of the binding is very much derived from the design of the pinctrl
-> subsystem's internal data structures. This isn't necessarily bad, since in
-> general SW data structures might be very closely related to how HW is put
-> together. In this case though, the binding seems very SW oriented.
-> 
-I have the same doubt that some properties of a device node are not pure hw properties
-and they're a little depending on the driver design.
-Like atmel,use-dma-rx in arch/arm/boot/dts/at91sam9g20.dtsi
-                        usart0: serial at fffb0000 {
-                                compatible = "atmel,at91sam9260-usart";
-                                reg = <0xfffb0000 0x200>;
-                                interrupts = <6>;
-                                atmel,use-dma-rx;
-                                atmel,use-dma-tx;
-                                status = "disabled";
-                        };
-And flash for partitions binding in arch/powerpc/boot/dts/mpc8378_mds.dts,
-                flash at 0,0 {
-                        #address-cells = <1>;
-                        #size-cells = <1>;
-                        compatible = "cfi-flash";
-                        reg = <0 0x0 0x2000000>;
-                        bank-width = <2>;
-                        device-width = <1>;
-
-                        u-boot at 0 {
-                                reg = <0x0 0x100000>;
-                                read-only;
-                        };
-
-                        fs at 100000 {
-                                reg = <0x100000 0x800000>;
-                        };
-
-                        kernel at 1d00000 {
-                                reg = <0x1d00000 0x200000>;
-                        };
-
-                        dtb at 1f00000 {
-                                reg = <0x1f00000 0x100000>;
-                        };
-                };
-It depends on driver to implement it.
-
-It loos like a historical issue since we have platform data in old way
-to tell the driver what features to be enabled or not like pio or dma.
-And the platform data is easily to be driver specific.
-
-> > +The required properties for pinmux mapping are:
-> > +- map-name: the name of this specific map entry
-> > +- clk-dev-name: the name of the device controlling this specific
-> > +mapping
-> > +- funcion: a function in the driver to use for this mapping
-> > +
-> > +Optional properties:
-> > +- group: a certain specific pin group to activate for the function
-> > +- dev-name: the name of the device using this specific mapping
-> > +- hog-on-boot: indicate wether hog the mappings(do not need to
-> > +specify value)
-> > +
-> > +Examples:
-> > +
-> > +pinmux: imx6q-sabreauto-map {
-> 
-> Here we have an all-encompassing standalone "pinctrl mapping table" node.
-> If we continue to have such an all-encompassing table, it should really be part
-> of (a child of) the pinmux HW's node in order to tie it directly to the HW,
-> rather than standing out as a HW concept. So, perhaps something more like:
-> 
-> iomuxc at 020e0000 {
->     compatible = "fsl,imx6-pinmux";
->     usage { // I can't think of a good name for the table right now
->         sd4 {
->         };
->         sd3 {
->         };
->         ...
->     };
-> };
-> 
-I already define pinmux functions like this:
-iomuxc at 020e0000 {
-        fsl,pinmux-map = <&pinmux>;
-        pinmux-uart4 {
-                func-name = "uart4";
-                grp-name = "uart4grp";
-                grp-pins = <107 108>;
-                num-pins = <2>;
-                grp-mux = <4 4>;
-                num-mux = <2>;
-        };
-
-        pinmux-sd4 {
-                func-name = "sd4";
-                grp-name = "sd4grp";
-                grp-pins = <170 171 180 181 182 183 184 185 186 187>;
-                num-pins = <10>;
-                grp-mux = <0 0 1 1 1 1 1 1 1 1>;
-                num-mux = <10>;
-        };
-};
-So I move the pinmux mapping node out as I said above.
-
-> Others have suggested that having this all-encompassing table isn't the correct
-> approach, and instead, it should be split into chunks that are co-located with
-> the devices that use the pinmux:
-> 
-> sdhci at 1000 {
->     compatible = "...";
->     regs = <...>;
->     pinmux = <&pmx>;
->     pinmux-usage = {
->         // Some representation of the pins/groups/functions used
->         // by just this HW block.
->     };
-> };
-> sdhci at 2000 {
->     compatible = "...";
->     regs = <...>;
->     pinmux = <&pmx>;
->     pinmux-usage = {
->         // Some representation of the pins/groups/functions used
->         // by just this HW block.
->     };
-> };
-> 
-> The latter probably is a little more idiomatic, although I haven't seen or
-> thought through any details on what goes inside such a "pinmux-usage"
-> node yet.
-> 
-> > +	map-sd4 {
-> > +		map-name = "usdhc4";
-> 
-> I don't think that field is needed; I'd suggest just using the name of the DT
-> node containing the entry (which could be renamed to your desired
-> names)
-> 
-Yes, I agree, could remove it.
-
-> > +		ctrl-dev-name = "20e0000.iomuxc";
-> ...
-> > +		dev-name = "219c000.usdhc";
-> 
-> That name is Linux-specific. Instead of using device names, we should use
-> phandle references, e.g. see the "dev" property below:
-> 
-Yes, I agree, will consider to change it.
-
-> sdhci1: sdhci at 1000 {
-> ...
-> };
-> sdhci2: sdhci at 1000 {
-> ...
-> };
-> iomuxc at 020e0000 {
->     compatible = "fsl,imx6-pinmux";
->     usage {
->         sd4 {
->             dev = <&sdhci1>;
->         };
->         sd3 {
->             dev = <&sdhci2>;
->         };
->         ...
->     };
-> };
-> 
-> (in the above, your ctrl-dev-name would be implied to be iomuxc at 020e0000 since
-> the table is part of that pinctrl device's node)
-> 
-> > +		function = "sd4";
-> 
-> Here it would be nice to use an integer instead. However, putting lots of opaque
-The question is that pinctrl is using string to address the functions.
-struct pinmux_map {
-        const char *name;
-        struct device *ctrl_dev;
-        const char *ctrl_dev_name;
-        const char *function;
-        const char *group;
-        struct device *dev;
-        const char *dev_name;
-        bool hog_on_boot;
-};
-I wonder if using integer, we may still need to convert it to string to construct
-a pinmux map.
-
-> integers in the device tree is going to be ripe for mistakes.
-> It's a real pity that dtc doesn't have a way of doing named integer constants,
-> so this could be re-written as e.g.:
-> 
-> SoC .dtsi file:
-> 
-> /define/ TEGRA_MUX_FUNC_SD4 234
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  Documentation/devicetree/bindings/i2c/omap-i2c.txt |   42 ++++++++
+>  drivers/i2c/busses/i2c-omap.c                      |  100 +++++++++++++-------
+>  2 files changed, 107 insertions(+), 35 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
 >
-Actually I was also thinking if we could use macro in dts file, that could make
-life much Easier.
- 
-> Board .dts file:
-> 
-> function = <TEGRA_MUX_FUNC_SD4>;
-> 
-> Without that feature, using strings here seems the only reasonable thing to do.
-> 
-
-Up to here I understand that your propose is co-locate pinmux Resource within device
-Node definitions and define pinmux maps in the iomuxc device node.
-(If I understand wrongly, please let me know)
-It's just like:
-Sdhci1: sdhci at 1000 {
-    compatible = "...";
-    regs = <...>;
-    pinmux = <&pmx>;
-    pinmux-usage = {
-        // Some representation of the pins/groups/functions used
-        // by just this HW block.
-    };
-};
-
-iomuxc at 020e0000 {
-    compatible = "fsl,imx6-pinmux";
-    usage {
-        sd4 {
-            dev = <&sdhci1>;
-        };
-        sd3 {
-            dev = <&sdhci2>;
-        };
-        ...
-    };
-};
-My concern is that would pass the effort to each driver to handle pinmux-usage.
-
-Take mx6q as an example, it may be:
-Usdhc4: usdhc at 0219c000 { /* uSDHC4 */
-        compatible = "fsl,imx6q-usdhc";
-        reg = <0x0219c000 0x4000>;
-        interrupts = <0 25 0x04>;
-        status = "disabled";
-        pinmux-sd4 : sd4{
-                func-name = "sd4";
-                grp-name = "sd4grp";
-                grp-pins = <170 171 180 181 182 183 184 185 186 187>;
-                num-pins = <10>;
-                grp-mux = <0 0 1 1 1 1 1 1 1 1>;
-                num-mux = <10>;
-        };
-
-};
-
-iomuxc at 020e0000 {
-    compatible = "fsl,imx6-pinmux";
-    usage {
-        sd4 {
-            dev = <&usdhc4>;
-	     function = <&pinmux-sd4>;
-        };
-        sd3 {
-            dev = <&usdhc3>;
-        };
-        ...
-    };
-};
-And I don't think it follows original design purpose: tell me how you are
-and I will handle you everything.
-The same question applies to clock and regulator: does each device need
-Define its clock and regulator properties?
-
-> We also need to consider compatibility and extensibility. A DT binding is an ABI
-> between the kernel and whatever is providing it, and so we need to be able to
-> maintain and extend it in a compatible fashion, just like the user-space syscall
-> ABI. Now it's true that the .dts files are currently part of the kernel source
-> tree and can be rev'd in sync with kernel changes, but that may not always be
-> the case moving forward.
-> 
-Great, i agree and it's an idea state.
-
-> In other words, taking a board with an old device tree embedded into Flash and
-> running a new kernel using that device tree should work just like running the
-> original kernel did.
-> 
-> There are a couple of current active areas of change in the pinctrl subsystem
-> that impact this:
-> 
-> * Pin configuration is being added. We probably need to add the data to
-> configure pin config into the mapping table in the kernel, or some parallel
-> table.
-> 
-> * Support for pins being in multiple states (active, suspend, unused,
-> ...) is being added to pinctrl. We need to be able to represent this in DT too.
-> 
-> (and yes I know I wrote that from a Linux pinctrl SW perspective, but the
-> concepts apply to HW!)
-> 
-> To support this, we may just be able to add more fields to any mapping table
-> entries e.g. to describe pin config setup alongside mux setup.
-> It'd probably be a good idea to add some kind of "type" field to the table
-> entries though, so that we can transparently add new types in the future, much
-> like compatible does for HW nodes.
-> 
-> iomuxc at 020e0000 {
->     compatible = "fsl,imx6-pinmux";
->     usage {
->         sd4 {
->             type = <0>; // 0 == mux setting
->             dev = <&sdhci1>;
->         };
->         sd3 {
->             type = <0>; // 0 == mux setting
->             dev = <&sdhci2>;
->         };
->         foo {
->             type = <1>; // 1 == pin config?
->             dev = <&sdhci2>;
->             pull-up;
->             tri-state;
->             ...
->         };
->         ...
->     };
-> };
-> 
-Basically this is a good idea, it's very easy to understand and to use.
-The key problem is where we define the pin groups its related functions
-I only see pin mappings and configs here.
-Since we need to pass these data to pinctrl subsystem, i don't think
-it would be good to let the device driver to handle that things.
-
-As well as pinmux, for pin config, I would also split it into two parts,
-whether it shoud be handled by each pinctrl driver or pinctrl core.
-If it should be handled by pinctrl driver, then ok, let it handled by
-Driver and it's driver owner's responsibility to define those properties
-in dt since each soc iomux controller may have different properties and
-pinctrl core does not need to be aware of such dt things.
-
-If it should be handled by pinctrl core, we may need to define some common
-Properties as it needs to be parsed by pinctrl core like pin mappings.
-
-Based on your idea, for pinconfig, one simple approach I could think is that
-for pinctrl driver to handle it.
-The properties could be:
-iomuxc at 020e0000 {
-        fsl,pinmux-map = <&pinmux>;
-        pinmux-uart4 {
-                func-name = "uart4";
-                grp-name = "uart4grp";
-                grp-pins = <107 108>;
-                num-pins = <2>;
-                grp-mux = <4 4>;
-                num-mux = <2>;
-            	   pull-up; /* for group setting */
-                tri-state; /* for group setting */
-        };
-
-        pinmux-sd4 {
-                func-name = "sd4";
-                grp-name = "sd4grp";
-                grp-pins = <170 171 180 181 182 183 184 185 186 187>;
-                num-pins = <10>;
-                grp-mux = <0 0 1 1 1 1 1 1 1 1>;
-                num-mux = <10>;
-		   /* individual setting for each pin; 0: pull-up 1: tri-state */
-		   conf = <0, 1, 2 ...>;
-        };
-};
-
-Maybe finally remove the name properties would be better, like:
-        pinmux-uart4 {
-                grp-pins = <107 108>;
-                num-pins = <2>;
-                grp-mux = <4 4>;
-                num-mux = <2>;
-            	   pull-up; /* for group setting */
-                tri-state; /* for group setting */
-        };
-
-Regards
-Dong Aisheng
+> diff --git a/Documentation/devicetree/bindings/i2c/omap-i2c.txt b/Documentation/devicetree/bindings/i2c/omap-i2c.txt
+> new file mode 100644
+> index 0000000..d259a17
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/omap-i2c.txt
+> @@ -0,0 +1,42 @@
+> +I2C for OMAP platforms
+> +
+> +Required properties :
+> +- compatible : Must be "ti,omap3-i2c" or "ti,omap4-i2c"
+> +- ti,hwmods : Must be "i2c<n>", n being the instance number (1-based)
+> +- #address-cells = <1>;
+> +- #size-cells = <0>;
+> +
+> +Recommended properties :
+> +- clock-frequency : Desired I2C bus clock frequency in Hz. Otherwise
+> +  the default 100 kHz frequency will be used.
+> +
+> +Optional properties:
+> +- Child nodes conforming to i2c bus binding
+> +- ti,flags : u32: settings or errata relative to the i2c
+> +    0x1:   OMAP_I2C_FLAG_NO_FIFO
+> +    0x2:   OMAP_I2C_FLAG_SIMPLE_CLOCK
+> +    0x4:   OMAP_I2C_FLAG_16BIT_DATA_REG
+> +    0x8:   OMAP_I2C_FLAG_RESET_REGS_POSTIDLE
+> +    0x10:  OMAP_I2C_FLAG_APPLY_ERRATA_I207
+> +    0x20:  OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK
+> +    0x40:  OMAP_I2C_FLAG_FORCE_19200_INT_CLK
+> +  Valid for ti,omap3-i2c only:
+> +    0x80:  OMAP_I2C_FLAG_BUS_SHIFT_1: 8 bits registers
+> +    0x100: OMAP_I2C_FLAG_BUS_SHIFT_2: 16 bits registers
+> +
+> +Note: Current implementation will fetch base address, irq and dma
+> +from omap hwmod data base during device registration.
+> +Future plan is to migrate hwmod data base contents into device tree
+> +blob so that, all the required data will be used from device tree dts
+> +file.
+> +
+> +Examples :
+> +
+> +i2c1: i2c at 0 {
+> +    compatible = "ti,omap3-i2c";
+> +    #address-cells = <1>;
+> +    #size-cells = <0>;
+> +    ti,hwmods = "i2c1";
+> +    clock-frequency = <400000>;
+> +    ti,flags = <0x118>;
+> +};
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index a43d002..b4a8eee 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -37,6 +37,8 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+> +#include <linux/of_i2c.h>
+> +#include <linux/of_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/i2c-omap.h>
+>  #include <linux/pm_runtime.h>
+> @@ -182,7 +184,9 @@ struct omap_i2c_dev {
+>  	u32			latency;	/* maximum mpu wkup latency */
+>  	void			(*set_mpu_wkup_lat)(struct device *dev,
+>  						    long latency);
+> -	u32			speed;		/* Speed of bus in Khz */
+> +	u32			speed;		/* Speed of bus in kHz */
+> +	u32			dtrev;		/* extra revision from DT */
+> +	u32			flags;
+>  	u16			cmd_err;
+>  	u8			*buf;
+>  	u8			*regs;
+> @@ -266,11 +270,7 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+>  
+>  static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+>  {
+> -	struct omap_i2c_bus_platform_data *pdata;
+> -
+> -	pdata = dev->dev->platform_data;
+> -
+> -	if (pdata->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+> +	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+>  		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>  		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
+>  		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
+> @@ -291,13 +291,10 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+>  
+>  static void omap_i2c_idle(struct omap_i2c_dev *dev)
+>  {
+> -	struct omap_i2c_bus_platform_data *pdata;
+>  	u16 iv;
+>  
+> -	pdata = dev->dev->platform_data;
+> -
+>  	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+> -	if (pdata->rev == OMAP_I2C_IP_VERSION_2)
+> +	if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
+>  		omap_i2c_write_reg(dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
+>  	else
+>  		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, 0);
+> @@ -320,9 +317,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  	unsigned long timeout;
+>  	unsigned long internal_clk = 0;
+>  	struct clk *fclk;
+> -	struct omap_i2c_bus_platform_data *pdata;
+> -
+> -	pdata = dev->dev->platform_data;
+>  
+>  	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
+>  		/* Disable I2C controller before soft reset */
+> @@ -373,7 +367,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  	}
+>  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>  
+> -	if (pdata->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+> +	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+>  		/*
+>  		 * The I2C functional clock is the armxor_ck, so there's
+>  		 * no need to get "armxor_ck" separately.  Now, if OMAP2420
+> @@ -397,7 +391,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  			psc = fclk_rate / 12000000;
+>  	}
+>  
+> -	if (!(pdata->flags & OMAP_I2C_FLAG_SIMPLE_CLOCK)) {
+> +	if (!(dev->flags & OMAP_I2C_FLAG_SIMPLE_CLOCK)) {
+>  
+>  		/*
+>  		 * HSI2C controller internal clk rate should be 19.2 Mhz for
+> @@ -406,7 +400,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  		 * The filter is iclk (fclk for HS) period.
+>  		 */
+>  		if (dev->speed > 400 ||
+> -			       pdata->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
+> +			       dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
+>  			internal_clk = 19200;
+>  		else if (dev->speed > 100)
+>  			internal_clk = 9600;
+> @@ -475,7 +469,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  
+>  	dev->errata = 0;
+>  
+> -	if (pdata->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+> +	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+>  		dev->errata |= I2C_OMAP_ERRATA_I207;
+>  
+>  	/* Enable interrupts */
+> @@ -484,7 +478,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  			OMAP_I2C_IE_AL)  | ((dev->fifo_size) ?
+>  				(OMAP_I2C_IE_RDR | OMAP_I2C_IE_XDR) : 0);
+>  	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+> -	if (pdata->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+> +	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+>  		dev->pscstate = psc;
+>  		dev->scllstate = scll;
+>  		dev->sclhstate = sclh;
+> @@ -804,9 +798,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
+>  	u16 bits;
+>  	u16 stat, w;
+>  	int err, count = 0;
+> -	struct omap_i2c_bus_platform_data *pdata;
+> -
+> -	pdata = dev->dev->platform_data;
+>  
+>  	if (pm_runtime_suspended(dev->dev))
+>  		return IRQ_NONE;
+> @@ -875,7 +866,7 @@ complete:
+>  					 * Data reg in 2430, omap3 and
+>  					 * omap4 is 8 bit wide
+>  					 */
+> -					if (pdata->flags &
+> +					if (dev->flags &
+>  						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
+>  						if (dev->buf_len) {
+>  							*dev->buf++ = w >> 8;
+> @@ -918,7 +909,7 @@ complete:
+>  					 * Data reg in 2430, omap3 and
+>  					 * omap4 is 8 bit wide
+>  					 */
+> -					if (pdata->flags &
+> +					if (dev->flags &
+>  						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
+>  						if (dev->buf_len) {
+>  							w |= *dev->buf++ << 8;
+> @@ -965,6 +956,31 @@ static const struct i2c_algorithm omap_i2c_algo = {
+>  	.functionality	= omap_i2c_func,
+>  };
+>  
+> +#ifdef CONFIG_OF
+> +static struct omap_i2c_bus_platform_data omap3_pdata = {
+> +	.rev = OMAP_I2C_IP_VERSION_1,
+> +};
+> +
+> +static struct omap_i2c_bus_platform_data omap4_pdata = {
+> +	.rev = OMAP_I2C_IP_VERSION_2,
+> +};
+> +
+> +static const struct of_device_id omap_i2c_of_match[] = {
+> +	{
+> +		.compatible = "ti,omap4-i2c",
+> +		.data = &omap4_pdata,
+> +	},
+> +	{
+> +		.compatible = "ti,omap3-i2c",
+> +		.data = &omap3_pdata,
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
+> +#else
+> +#define omap_i2c_of_match NULL
+> +#endif
+> +
+>  static int __devinit
+>  omap_i2c_probe(struct platform_device *pdev)
+>  {
+> @@ -972,9 +988,10 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	struct i2c_adapter	*adap;
+>  	struct resource		*mem, *irq, *ioarea;
+>  	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+> +	struct device_node	*node = pdev->dev.of_node;
+> +	const struct of_device_id *match;
+>  	irq_handler_t isr;
+>  	int r;
+> -	u32 speed = 0;
+>  
+>  	/* NOTE: driver uses the static register mapping */
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -1001,15 +1018,24 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		goto err_release_region;
+>  	}
+>  
+> -	if (pdata != NULL) {
+> -		speed = pdata->clkrate;
+> +	match = of_match_device(omap_i2c_of_match, &pdev->dev);
+> +	if (match) {
+> +		u32 freq = 100000; /* default to 100000 Hz */
+> +		pdata = match->data;
+> +
+> +		of_property_read_u32(node, "clock-frequency", &freq);
+> +		/* convert DT freq value in Hz into kHz for speed */
+> +		dev->speed = freq / 1000;
+> +		of_property_read_u32(node, "ti,flags", &dev->flags);
+> +		dev->dtrev = pdata->rev;
+> +
+> +	} else if (pdata != NULL) {
+> +		dev->speed = pdata->clkrate;
+> +		dev->flags = pdata->flags;
+>  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+> -	} else {
+> -		speed = 100;	/* Default speed */
+> -		dev->set_mpu_wkup_lat = NULL;
+> +		dev->dtrev = pdata->rev;
+>  	}
+>  
+> -	dev->speed = speed;
+>  	dev->dev = &pdev->dev;
+>  	dev->irq = irq->start;
+>  	dev->base = ioremap(mem->start, resource_size(mem));
+> @@ -1020,9 +1046,9 @@ omap_i2c_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, dev);
+>  
+> -	dev->reg_shift = (pdata->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
+> +	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
+>  
+> -	if (pdata->rev == OMAP_I2C_IP_VERSION_2)
+> +	if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
+>  		dev->regs = (u8 *)reg_map_ip_v2;
+>  	else
+>  		dev->regs = (u8 *)reg_map_ip_v1;
+> @@ -1035,7 +1061,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	if (dev->rev <= OMAP_I2C_REV_ON_3430)
+>  		dev->errata |= I2C_OMAP3_1P153;
+>  
+> -	if (!(pdata->flags & OMAP_I2C_FLAG_NO_FIFO)) {
+> +	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
+>  		u16 s;
+>  
+>  		/* Set up the fifo size - Get total size */
+> @@ -1057,7 +1083,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		/* calculate wakeup latency constraint for MPU */
+>  		if (dev->set_mpu_wkup_lat != NULL)
+>  			dev->latency = (1000000 * dev->fifo_size) /
+> -				       (1000 * speed / 8);
+> +				       (1000 * dev->speed / 8);
+>  	}
+>  
+>  	/* reset ASAP, clearing any IRQs */
+> @@ -1073,7 +1099,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
+> -		 pdata->rev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+> +		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+>  
+>  	pm_runtime_put(dev->dev);
+>  
+> @@ -1084,6 +1110,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	strlcpy(adap->name, "OMAP I2C adapter", sizeof(adap->name));
+>  	adap->algo = &omap_i2c_algo;
+>  	adap->dev.parent = &pdev->dev;
+> +	adap->dev.of_node = pdev->dev.of_node;
+>  
+>  	/* i2c device drivers may be active on return from add_adapter() */
+>  	adap->nr = pdev->id;
+> @@ -1093,6 +1120,8 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		goto err_free_irq;
+>  	}
+>  
+> +	of_i2c_register_devices(adap);
+> +
+>  	return 0;
+>  
+>  err_free_irq:
+> @@ -1165,6 +1194,7 @@ static struct platform_driver omap_i2c_driver = {
+>  		.name	= "omap_i2c",
+>  		.owner	= THIS_MODULE,
+>  		.pm	= OMAP_I2C_PM_OPS,
+> +		.of_match_table = omap_i2c_of_match,
+>  	},
+>  };
+>  
