@@ -1,56 +1,56 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 22 Dec 2011 12:13:05 +0200
-Subject: [PATCH] OMAP3: hwmod_data: add HWMOD_INIT_NO_RESET flag for
- dss_dispc
-In-Reply-To: <1324515653-17287-1-git-send-email-yanok@emcraft.com>
-References: <1324515653-17287-1-git-send-email-yanok@emcraft.com>
-Message-ID: <1324548785.13282.10.camel@deskari>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Dec 2011 10:24:54 +0000
+Subject: Is Pandaboard cpuhotplug working stably?
+In-Reply-To: <CAMQu2gy8mwJ-aKit0b4d7=4FkxeFakfnL-phy0eMOK81Oe=PCw@mail.gmail.com>
+References: <CAGsJ_4ydbMaS0DD6+j1m9tdCTCzw3TGELcY=KotupvvMMK1YOA@mail.gmail.com>
+ <20111221094624.GB3354@n2100.arm.linux.org.uk>
+ <CAGsJ_4w0iVXC6qmDzmkuOb=ZN=Q0bF7EAFkxeYR_d7-vo+8bqQ@mail.gmail.com>
+ <20111221100706.GC3354@n2100.arm.linux.org.uk>
+ <CAMQu2gy8mwJ-aKit0b4d7=4FkxeFakfnL-phy0eMOK81Oe=PCw@mail.gmail.com>
+Message-ID: <20111222102454.GD3354@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-12-22 at 02:00 +0100, Ilya Yanok wrote:
-> Resetting DISPC when a DISPC output is enabled causes the DSS to go into
-> an inconsistent state.
+On Thu, Dec 22, 2011 at 02:19:23PM +0530, Shilimkar, Santosh wrote:
+> + Peter Z
 > 
-> commit b923d40dd4211c4ef7d4efa2bd81b7ca1d8744c1
-> Author: Archit Taneja <archit@ti.com>
-> Date:   Thu Oct 6 18:04:08 2011 -0600
+> On Wed, Dec 21, 2011 at 3:37 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Dec 21, 2011 at 05:59:07PM +0800, Barry Song wrote:
+> >> 2011/12/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> >> > cpu hotplug is basically totally buggered - the preconditions placed
+> >> > upon the bringup code path are basically impossible to satisfy in any
+> >> > shape or form at the moment.
+> >> >
+> >> > There's the requirement that the secondary CPU is marked online and
+> >> > active before interrupts are enabled for the thread migration stuff
+> >> > to behave correctly. ?However, this is incompatible with smp_call_function()
+> >> > which will wait for online CPUs to respond to an IPI - which this one
+> >> > won't because interrupts are disabled.
+> >> >
+> >> > I think there was some discussion about how to fix this but I don't
+> >> > recall the details.
+> >>
+> >> thanks, Russell. then could i think this is an ARM-kernel-specific bug
+> >> which exists on all ARM SMP chips for the moment?
+> >> and that bug doesn't happen on x86:
+> >
+> > I don't think so. ?There's nothing ARM specific about it.
 > 
->     ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is
-> enabled in bootloader
+> There are few patches floating around for this issue. I posted one version
+> long back [1] and then there was one more form Thomas G.
+> The most recent is from one is from Peter Z [2] which is moving the
+> fix for the cup online race to core code.
 > 
-> tries to deal with this problem by checking if display is enabled and
-> disabling it before doing reset.
+> Can you try Peter's patch with your test-case ?
 > 
-> But in my setup dss_dispc is resetted from omap_hwmod_setup_all function
-> _before_ calling omap_dss_reset. So when dispc_disable_outputs is
-> executed dispc is already reset and nothing happens.
+> Regards,
+> Santosh
+> 
+> [1] https://lkml.org/lkml/2011/6/20/79
+> [2] https://lkml.org/lkml/2011/12/15/255
 
-Hmm, why is that? You don't have the dss hwmod before dispc in the list
-of hwmods? The code presumes that dss hwmod is handled first.
-
-> This patch and HWMOD_INIT_NO_RESET flags to dss_dispc hwmod thus leaving
-> DISPC untouched so that omap_dss_reset can take care of it.
-
-omap_dss_reset() doesn't reset dispc, so this will leave dispc
-un-reseted.
-
-The idea of the current code is to do the reset similarly on all OMAPs.
-The sequence should be:
-
-- omap_dss_reset(), which disables dispc outputs and manually resets dss
-registers.
-- then the rest of the dss modules reset themselves normally, using the
-softreset bit.
-
-Your patch would break that.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111222/f0e484eb/attachment.sig>
+[1] is already fixed - and is not the latest "problem" with this code.
+Fixing the problem in [1] actually itself created the latest problem
+with smp_call_function() which wasn't there before this change.  Patch
+[2] refers to this problem and proposes a fix for it.
