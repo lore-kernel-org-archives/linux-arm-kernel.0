@@ -1,42 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 22 Dec 2011 18:38:22 +0200
-Subject: [PATCH v2 9/9] ASoC: Kconfig: OMAP4: Enable support for PandaBoards
-In-Reply-To: <1324571902-16918-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1324571902-16918-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1324571902-16918-10-git-send-email-peter.ujfalusi@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Dec 2011 16:49:13 +0000
+Subject: insmod problem on ARM with more than 16MB of RAM?
+In-Reply-To: <20111222203531.0c4f80f1@emcraft.com>
+References: <20111222203531.0c4f80f1@emcraft.com>
+Message-ID: <CAHkRjk7105PLe=98mMKmSKkWDmyFjWpBkZ5_iy-U-ZiNKHFNLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the ASoC audio support for PandaBoard family via
-teh omap-abe-twl6040 machine driver.
+On 22 December 2011 16:35, Sergei Poselenov <sposelenov@emcraft.com> wrote:
+> I'm working with an ARM Cortex-M3 port of Linux 2.6.33. Everything is
+> fine except the target board has 32MB memory and this breaks the
+> loadable modules support:
+> ...
+> ~ # insmod sample.ko
+> sample: relocation out of range, section 2 reloc 0 sym 'printk'
+> insmod: can't insert 'sample.ko': invalid module format
+> ~ #
+> ..
+>
+> The reason for this error is that the module_alloc() for non-MMU
+> ARM target is just kmalloc(size), which obviously returns the memory
+> area too far for allowed range of the thumb2 branch instructions.
+>
+> Currently, I worked around this by restricting kernel memory usage with
+> "mem=16M".
+>
+> Is anybody solved this problem in 2.6 no-MMU ARM kernels?
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- sound/soc/omap/Kconfig |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+You could change the testofs-y in arch/arm/Makefile to something like
+16MB and it could be reachable from all 32MB of RAM.
 
-diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
-index 98410b8..2d19119 100644
---- a/sound/soc/omap/Kconfig
-+++ b/sound/soc/omap/Kconfig
-@@ -99,7 +99,8 @@ config SND_OMAP_SOC_SDP3430
- 
- config SND_OMAP_SOC_OMAP_ABE_TWL6040
- 	tristate "SoC Audio support for OMAP boards using ABE and twl6040 codec"
--	depends on TWL4030_CORE && SND_OMAP_SOC && MACH_OMAP_4430SDP
-+	depends on TWL4030_CORE && SND_OMAP_SOC
-+	depends on MACH_OMAP_4430SDP || MACH_OMAP4_PANDA
- 	select SND_OMAP_SOC_DMIC
- 	select SND_OMAP_SOC_MCPDM
- 	select SND_SOC_TWL6040
-@@ -108,6 +109,8 @@ config SND_OMAP_SOC_OMAP_ABE_TWL6040
- 	  Say Y if you want to add support for SoC audio on OMAP boards using
- 	  ABE and twl6040 codec. This driver currently supports:
- 	  - SDP4430/Blaze boards
-+	  - PandaBoard (4430)
-+	  - PandaBoardES (4460)
- 
- config SND_OMAP_SOC_OMAP4_HDMI
- 	tristate "SoC Audio support for Texas Instruments OMAP4 HDMI"
+A more general solution may be to move the kernel in the top 16MB of
+RAM (in case you have more than 32MB), enable ZONE_DMA and make all
+the memory up to the kernel part of the DMA zone. The top 16MB would
+be ZONE_NORMAL and modules would in general be allocated from there
+(but there is no guarantee).
+
+A completely generic solution would be to modify the module loader to
+cope with longer relocations by setting up some trampoline code.
+
 -- 
-1.7.8.1
+Catalin
