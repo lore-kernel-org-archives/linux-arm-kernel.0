@@ -1,75 +1,65 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Thu, 22 Dec 2011 15:54:12 +0100
-Subject: [PATCH] arm: oprofile: fix linkage issue
-In-Reply-To: <20111222142140.GP16765@erda.amd.com>
-References: <1324561016-19389-1-git-send-email-vladimir.zapolskiy@nokia.com>
- <20111222142140.GP16765@erda.amd.com>
-Message-ID: <20111222145412.GV16765@erda.amd.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 22 Dec 2011 15:56:34 +0100
+Subject: [PATCH v4 00/12] OMAP4: Add DT support for i2c and twl6030
+Message-ID: <1324565806-31142-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.12.11 15:21:40, Robert Richter wrote:
-> On 22.12.11 15:36:56, Vladimir Zapolskiy wrote:
-> > This change fixes a linking problem, which happens if oprofile is selected to
-> > be compiled as built-in:
-> > 
-> >   `oprofile_arch_exit' referenced in section `.init.text' of
-> >   arch/arm/oprofile/built-in.o: defined in discarded section
-> >   `.exit.text' of arch/arm/oprofile/built-in.o
-> > 
-> > The problem is appeared after commit 87121ca504, which introduced
-> > oprofile_arch_exit() calls from __init function. Note that the aforementioned
-> > commit has been backported to stable branches, and the problem is known to be
-> > reproduced at least with 3.0.13 and 3.1.5 kernels.
-> 
-> I will fix it upstream, afterwards this goes into stable due to the
-> stable tag.
-> 
-> Right, commit 87121ca504 went into stable kernels 3.0 and 3.1, need to
-> fix them too:
-> 
-> CC: stable at kernel.org # 3.0+
-> 
-> Please fix also arch/sh with this patch:
-> 
->  $ git grep exit.*oprofile_arch_exit arch/*/oprofile drivers/oprofile/ 
->  arch/arm/oprofile/common.c:void __exit oprofile_arch_exit(void)
->  arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void)
->  arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void) {}
-> 
-> Thanks,
+Hi Tony and Rob,
 
-To make things easier: if you aggree I will apply your patch with the
-changes below in addition. No need to respin a new patch version.
+Here is the updated version of the i2c + twl DT adaptation series.
 
-Thanks,
+This update, compared to v3 [1], is fixing the twl-core build for non-OMAP
+platform.
+Per Olof's suggestion, adding the of.h include in the i2c driver to avoid
+problem in case on non-DT build.
 
--Robert
+Patches are based on for_3.3/2_dt_irq, to get the latest GIC binding,
+and are available here:
+git://gitorious.org/omap-pm/linux.git for_3.3/3_omap_dt_i2c_twl
 
+Tested on Beagle and sdp4430. Build tested for x86.
 
+Comments are welcome.
 
-diff --git a/arch/sh/oprofile/common.c b/arch/sh/oprofile/common.c
-index b4c2d2b..e4dd5d5 100644
---- a/arch/sh/oprofile/common.c
-+++ b/arch/sh/oprofile/common.c
-@@ -49,7 +49,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-        return oprofile_perf_init(ops);
- }
- 
--void __exit oprofile_arch_exit(void)
-+void oprofile_arch_exit(void)
- {
-        oprofile_perf_exit();
-        kfree(sh_pmu_op_name);
-@@ -60,5 +60,5 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-        ops->backtrace = sh_backtrace;
-        return -ENODEV;
- }
--void __exit oprofile_arch_exit(void) {}
-+void oprofile_arch_exit(void) {}
- #endif /* CONFIG_HW_PERF_EVENTS */
+Regards,
+Benoit
 
+[1] http://www.spinics.net/lists/linux-omap/msg62127.html
 
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Benoit Cousson (12):
+  ARM: OMAP2+: pm: Do not init statically the SR and voltage layer with DT
+  i2c: OMAP: Add DT support for i2c controller
+  mfd: twl-core: Add initial DT support for twl4030/twl6030
+  rtc: rtc-twl: Add DT support for RTC inside twl4030/twl6030
+  arm/dts: OMAP4: Add i2c controller nodes
+  arm/dts: OMAP3: Add i2c controller nodes
+  arm/dts: twl6030: Add DTS file for twl6030 PMIC
+  arm/dts: twl4030: Add DTS file for twl4030 PM + Audio IC
+  arm/dts: omap4-panda: Add twl6030 and i2c EEPROM
+  arm/dts: omap4-sdp: Add twl6030, i2c3 and i2c4 devices
+  arm/dts: omap3-beagle: Add twl4030 and i2c EEPROM
+  ARM: OMAP2+: board-generic: Remove i2c static init
+
+ Documentation/devicetree/bindings/i2c/omap-i2c.txt |   30 ++++++
+ .../devicetree/bindings/mfd/twl-familly.txt        |   47 +++++++++
+ Documentation/devicetree/bindings/rtc/twl-rtc.txt  |   12 +++
+ arch/arm/boot/dts/omap3-beagle.dts                 |   29 ++++++
+ arch/arm/boot/dts/omap3.dtsi                       |   21 ++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   34 +++++++
+ arch/arm/boot/dts/omap4-sdp.dts                    |   53 ++++++++++
+ arch/arm/boot/dts/omap4.dtsi                       |   28 ++++++
+ arch/arm/boot/dts/twl4030.dtsi                     |   21 ++++
+ arch/arm/boot/dts/twl6030.dtsi                     |   22 ++++
+ arch/arm/mach-omap2/board-generic.c                |   48 +---------
+ arch/arm/mach-omap2/pm.c                           |    8 ++
+ drivers/i2c/busses/i2c-omap.c                      |  102 +++++++++++++-------
+ drivers/mfd/Kconfig                                |    1 +
+ drivers/mfd/twl-core.c                             |   51 ++++++++++-
+ drivers/rtc/rtc-twl.c                              |   10 ++-
+ 16 files changed, 433 insertions(+), 84 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/twl-familly.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/twl-rtc.txt
+ create mode 100644 arch/arm/boot/dts/twl4030.dtsi
+ create mode 100644 arch/arm/boot/dts/twl6030.dtsi
