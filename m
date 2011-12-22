@@ -1,68 +1,73 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Dec 2011 17:27:36 +0000
-Subject: [PATCH v2 06/15] ARM: local timers: switch tegra to standalone smp_twd
+Date: Thu, 22 Dec 2011 17:27:37 +0000
+Subject: [PATCH v2 07/15] ARM: local timers: switch omap4 to standalone smp_twd
 In-Reply-To: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
 References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1324574865-5367-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1324574865-5367-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the Tegra-2 platforms to the standalone version
+Convert the OMAP4 platforms to the standalone version
 of smp_twd.c. Since the timer calibration code requires another
 timer to be up and running, the actual initialisation is left
 to the late_timer_init hook.
 
-Tested on Harmony.
+Tested on a Pandaboard.
 
-Cc: Colin Cross <ccross@android.com>
-Cc: Erik Gilling <konkers@android.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-tegra/Kconfig      |    1 +
- arch/arm/mach-tegra/Makefile     |    2 +-
- arch/arm/mach-tegra/localtimer.c |   26 --------------------------
- arch/arm/mach-tegra/timer.c      |   34 +++++++++++++++++++++++++++++-----
- 4 files changed, 31 insertions(+), 32 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/localtimer.c
+ arch/arm/mach-omap2/Kconfig     |    2 +-
+ arch/arm/mach-omap2/Makefile    |    1 -
+ arch/arm/mach-omap2/timer-mpu.c |   39 ---------------------------------------
+ arch/arm/mach-omap2/timer.c     |   38 +++++++++++++++++++++++++++++++++-----
+ 4 files changed, 34 insertions(+), 46 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 373652d..f93aa6aa 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -6,6 +6,7 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Enable support for Tegra20 family"
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index cb760ac..ab0c972 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -45,7 +45,7 @@ config ARCH_OMAP4
+ 	depends on ARCH_OMAP2PLUS
  	select CPU_V7
  	select ARM_GIC
+-	select LOCAL_TIMERS if SMP
 +	select ARM_SMP_TWD
- 	select ARCH_REQUIRE_GPIOLIB
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index e120ff5..f7d0443 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -13,7 +13,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-tegra20-tables.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= pinmux-tegra30-tables.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
--obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
-+obj-$(CONFIG_SMP)                       += platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
- obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
- obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
-diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
+ 	select PL310_ERRATA_588369
+ 	select PL310_ERRATA_727915
+ 	select ARM_ERRATA_720789
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index fc9b238..27ea7c2 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -23,7 +23,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+ 
+ # SMP support ONLY available for OMAP4
+ obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o \
+ 					   sleep44xx.o
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
 deleted file mode 100644
-index e91d681..0000000
---- a/arch/arm/mach-tegra/localtimer.c
+index 31c0ac4..0000000
+--- a/arch/arm/mach-omap2/timer-mpu.c
 +++ /dev/null
-@@ -1,26 +0,0 @@
+@@ -1,39 +0,0 @@
 -/*
-- *  arch/arm/mach-tegra/localtimer.c
+- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
+- * own timer in it's MPU domain. These timers will be driving the
+- * linux kernel SMP tick framework when active. These timers are not
+- * part of the wake up domain.
 - *
-- *  Copyright (C) 2002 ARM Ltd.
-- *  All Rights Reserved
+- * Copyright (C) 2009 Texas Instruments, Inc.
+- *
+- * Author:
+- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
+- *
+- * This file is based on arm realview smp platform file.
+- * Copyright (C) 2002 ARM Ltd.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
@@ -80,77 +85,75 @@ index e91d681..0000000
 - */
 -int __cpuinit local_timer_setup(struct clock_event_device *evt)
 -{
--	evt->irq = IRQ_LOCALTIMER;
+-	/* Local timers are not supprted on OMAP4430 ES1.0 */
+-	if (omap_rev() == OMAP4430_REV_ES1_0)
+-		return -ENXIO;
+-
+-	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
 -	twd_timer_setup(evt);
 -	return 0;
 -}
-diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
-index 6366654..0c537b9 100644
---- a/arch/arm/mach-tegra/timer.c
-+++ b/arch/arm/mach-tegra/timer.c
-@@ -27,9 +27,10 @@
- #include <linux/clocksource.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/ioport.h>
+-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 9edcd52..a69e686 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -39,7 +39,7 @@
  
  #include <asm/mach/time.h>
+ #include <plat/dmtimer.h>
 -#include <asm/localtimer.h>
 +#include <asm/smp_twd.h>
  #include <asm/sched_clock.h>
- 
- #include <mach/iomap.h>
-@@ -179,6 +180,31 @@ static struct irqaction tegra_timer_irq = {
- 	.irq		= INT_TMR3,
- };
+ #include "common.h"
+ #include <plat/omap_hwmod.h>
+@@ -335,15 +335,43 @@ OMAP_SYS_TIMER_INIT(3_secure, OMAP3_SECURE_TIMER, OMAP3_CLKEV_SOURCE,
+ OMAP_SYS_TIMER(3_secure)
+ #endif
  
 +#ifdef CONFIG_ARM_SMP_TWD
-+static struct resource tegra_twd_resources[] __initdata = {
++static struct resource omap4_twd_resources[] __initdata = {
 +	{
-+		.start	= TEGRA_ARM_PERIF_BASE + 0x600,
-+		.end	= TEGRA_ARM_PERIF_BASE + 0x610,
++		.start	= OMAP44XX_LOCAL_TWD_BASE,
++		.end	= OMAP44XX_LOCAL_TWD_BASE + 0x10,
 +		.flags	= IORESOURCE_MEM,
 +	},
 +	{
-+		.start	= IRQ_LOCALTIMER,
-+		.end	= IRQ_LOCALTIMER,
++		.start	= OMAP44XX_IRQ_LOCALTIMER,
++		.end	= OMAP44XX_IRQ_LOCALTIMER,
 +		.flags	= IORESOURCE_IRQ,
 +	},
 +};
 +
-+static void __init tegra_twd_init(void)
++static void __init omap4_twd_init(void)
 +{
-+	int err = twd_timer_register(tegra_twd_resources,
-+				     ARRAY_SIZE(tegra_twd_resources));
++	int err;
++
++	/* Local timers are not supprted on OMAP4430 ES1.0 */
++	if (omap_rev() == OMAP4430_REV_ES1_0)
++		return;
++
++	err = twd_timer_register(omap4_twd_resources,
++				 ARRAY_SIZE(omap4_twd_resources));
 +	if (err)
 +		pr_err("twd_timer_register failed %d\n", err);
 +}
 +#else
-+#define tegra_twd_init	NULL
++#define omap4_twd_init	NULL
 +#endif
 +
- static void __init tegra_init_timer(void)
+ #ifdef CONFIG_ARCH_OMAP4
+ static void __init omap4_timer_init(void)
  {
- 	struct clk *clk;
-@@ -205,10 +231,6 @@ static void __init tegra_init_timer(void)
- 	else
- 		clk_enable(clk);
- 
--#ifdef CONFIG_HAVE_ARM_TWD
--	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
+-#ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
+-	BUG_ON(!twd_base);
 -#endif
--
- 	switch (rate) {
- 	case 12000000:
- 		timer_writel(0x000b, TIMERUS_USEC_CFG);
-@@ -249,6 +271,8 @@ static void __init tegra_init_timer(void)
- 	tegra_clockevent.cpumask = cpu_all_mask;
- 	tegra_clockevent.irq = tegra_timer_irq.irq;
- 	clockevents_register_device(&tegra_clockevent);
-+
-+	late_time_init = tegra_twd_init;
+ 	omap2_gp_clockevent_init(1, OMAP4_CLKEV_SOURCE);
+ 	omap2_gp_clocksource_init(2, OMAP4_MPU_SOURCE);
++	late_time_init = omap4_twd_init;
  }
- 
- struct sys_timer tegra_timer = {
+ OMAP_SYS_TIMER(4)
+ #endif
 -- 
 1.7.7.1
