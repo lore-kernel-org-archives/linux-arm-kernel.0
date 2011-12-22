@@ -1,77 +1,25 @@
-From: kishorek.kadiyala@gmail.com (Kishore Kadiyala)
-Date: Fri, 23 Dec 2011 01:07:55 +0530
-Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
-In-Reply-To: <1323868927-3738-1-git-send-email-zonque@gmail.com>
-References: <1323868927-3738-1-git-send-email-zonque@gmail.com>
-Message-ID: <CAF=Qhp3UjugPL8eDzbJ9=-Yw0gxxpCFw7p13GS5LQEWrzHxLfQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Dec 2011 11:38:29 -0800
+Subject: [PATCH v3 8/9] OMAP4: omap4panda: Enable audio support
+In-Reply-To: <1324582474-18181-9-git-send-email-peter.ujfalusi@ti.com>
+References: <1324582474-18181-1-git-send-email-peter.ujfalusi@ti.com>
+ <1324582474-18181-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20111222193829.GS24444@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 6:52 PM, Daniel Mack <zonque@gmail.com> wrote:
-> External circuitry like level shifters may limit the maximum operation
-> speed of the hsmmc controller. Add a field to struct omap2_hsmmc_info
-> so boards can adjust the setting on demand.
->
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
-> ?arch/arm/mach-omap2/hsmmc.c ? | ? ?1 +
-> ?arch/arm/mach-omap2/hsmmc.h ? | ? ?2 ++
-> ?drivers/mmc/host/omap_hsmmc.c | ? ?8 ++++++--
-> ?3 files changed, 9 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-> index f4a1020..4c7bc36 100644
-> --- a/arch/arm/mach-omap2/hsmmc.c
-> +++ b/arch/arm/mach-omap2/hsmmc.c
-> @@ -298,6 +298,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
-> ? ? ? ?mmc->slots[0].caps = c->caps;
-> ? ? ? ?mmc->slots[0].internal_clock = !c->ext_clock;
-> ? ? ? ?mmc->dma_mask = 0xffffffff;
-> + ? ? ? mmc->max_freq = c->max_freq;
-> ? ? ? ?if (cpu_is_omap44xx())
-> ? ? ? ? ? ? ? ?mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
-> ? ? ? ?else
-> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-> index f757e78..65a8c12 100644
-> --- a/arch/arm/mach-omap2/hsmmc.h
-> +++ b/arch/arm/mach-omap2/hsmmc.h
-> @@ -25,6 +25,8 @@ struct omap2_hsmmc_info {
-> ? ? ? ?char ? ?*name; ? ? ? ? ?/* or NULL for default */
-> ? ? ? ?struct device *dev; ? ? /* returned: pointer to mmc adapter */
-> ? ? ? ?int ? ? ocr_mask; ? ? ? /* temporary HACK */
-> + ? ? ? int ? ? max_freq; ? ? ? /* maximum clock, if constrained by external
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* circuitry, or 0 for default */
-> ? ? ? ?/* Remux (pad configuration) when powering on/off */
-> ? ? ? ?void (*remux)(struct device *dev, int slot, int power_on);
-> ? ? ? ?/* init some special card */
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 101cd31..8215ef9 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
-> ? ? ? ?if (mmc_slot(host).vcc_aux_disable_is_sleep)
-> ? ? ? ? ? ? ? ?mmc_slot(host).no_off = 1;
->
-> - ? ? ? mmc->f_min ? ? ?= OMAP_MMC_MIN_CLOCK;
-> - ? ? ? mmc->f_max ? ? ?= OMAP_MMC_MAX_CLOCK;
-> + ? ? ? mmc->f_min = OMAP_MMC_MIN_CLOCK;
-> +
-> + ? ? ? if (pdata->max_freq > 0)
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [111222 11:03]:
+> PandaBoard has twl6040 codec for audio.
+> Register the omap4-abe-twl6040 platform device.
+> Add platform data to enable the twl6040 codec.
+> Since there is a difference in audio between  PandaBoard 4430
+> and PandaBoard ES (4460):
+> Use different name for the sound card:
+> "OMAP4-Panda" for PandaBoard 4430
+> "OMAP4-PandaES" for PandaBoard ES
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> CC: David Anders <x0132446@ti.com>
 
-What about having check as below:
-if (pdata->max_freq > 0 && pdata->max_freq < OMAP_MMC_MAX_CLOCK)
-
-> + ? ? ? ? ? ? ? mmc->f_max = pdata->max_freq;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? mmc->f_max = OMAP_MMC_MAX_CLOCK;
->
-> ? ? ? ?spin_lock_init(&host->irq_lock);
->
-> --
-> 1.7.7.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+Acked-by: Tony Lindgren <tony@atomide.com>
