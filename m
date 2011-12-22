@@ -1,105 +1,35 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 22 Dec 2011 17:00:07 +0000
-Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
-In-Reply-To: <20111221145913.GC3229@swarm.cs.pub.ro>
-References: <1324284030-25540-1-git-send-email-mgherzan@gmail.com>
- <20111219125021.GA2031@linaro.org>
- <20111219164513.GA25105@swarm.cs.pub.ro>
- <20111219181839.GH2031@linaro.org>
- <20111219182908.GA2027@linaro.org>
- <20111221145913.GC3229@swarm.cs.pub.ro>
-Message-ID: <20111222170006.GA2321@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Dec 2011 09:11:12 -0800
+Subject: [GIT PULL] Borderline fixes for v3.2-rc6
+In-Reply-To: <CAOesGMhXnSB8-eW=NxjFqv_9Br5pD5XOi==wAL_j+bDoj_+gCw@mail.gmail.com>
+References: <20111219194249.GO6464@atomide.com>
+ <CAOesGMj-OyDu9pcOZ20o6G0W3-kkxyHF7o5DqDRaQkkUDf98CA@mail.gmail.com>
+ <20111220171041.GA24444@atomide.com>
+ <CAOesGMhXnSB8-eW=NxjFqv_9Br5pD5XOi==wAL_j+bDoj_+gCw@mail.gmail.com>
+Message-ID: <20111222171112.GH24444@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 04:59:13PM +0200, Mircea Gherzan wrote:
-> On Mon, Dec 19, 2011 at 06:29:08PM +0000, Dave Martin wrote:
-> > On Mon, Dec 19, 2011 at 06:18:39PM +0000, Dave Martin wrote:
-> > > On Mon, Dec 19, 2011 at 06:45:13PM +0200, Mircea Gherzan wrote:
-> > 
-> > [...]
-> > 
-> > > > The JITed code calls back to the kernel for the load helpers. So setting
-> > > > bit 0 is required.
-> > > 
-> > > When you take the address of a link-time external function symbol,
-> > > bit[0] in the address will automatically be set appropriately by the
-> > > linker to indicate the target instruction set -- you already use BX/BLX
-> > > to jump to such symbols, so you should switch correctly when calling
-> > > _to_ the kernel.
-> > > 
-> > > Returns should also work, except for old-style "mov pc,lr" returns made
-> > > in Thumb code (from ARM code, this magically works for >= v7).  Such returns
-> > > only happen in hand-written assembler: for C code, the compiler always
-> > > generates proper AEABI-compliant return sequences.
-> > > 
-> > > So, for calling load_func[], jit_get_skb_b etc. (which are C functions),
-> > > there should be no problem.
-> > > 
-> > > I think the only code which you call from the JIT output but which does
-> > > not return compliantly is __aeabi_uidiv() in arch/arm/lib/lib1funcs.S.
-> > > 
-> > > 
-> > > I have a quick hacked-up patch (below) which attempts to fix this;
-> > > I'd be interested if this works for you  -- but finalising your ARM-only
-> > > version of the patch should still be the priority.
-> > > 
-> > > If this fix does work, I'll turn it into a proper patch, as we can maybe
-> > > use it more widely.
-> > 
-> > Oops, I forgot to paste in my patch ... here it is.
-> > 
-> > Cheers
-> > ---Dave
-> > 
-> > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> > index b6e65de..013bfaf 100644
-> > --- a/arch/arm/include/asm/assembler.h
-> > +++ b/arch/arm/include/asm/assembler.h
-> > @@ -313,4 +313,39 @@
-> >  	.size \name , . - \name
-> >  	.endm
-> >  
-> > +/*
-> > + * Helper macro to abstract a function return, where the return address is
-> > + * held in a register:
-> > + */
-> > +.macro __def_bret cc
-> > +	.macro bret\cc Rm:req
-> > +#if __LINUX_ARM_ARCH__ < 7
-> > +		mov\cc	pc, \Rm
-> > +#else
-> > +		bx\cc	\Rm
-> > +#endif
+Hi Olof,
+
+* Olof Johansson <olof@lixom.net> [111220 09:29]:
+> On Tue, Dec 20, 2011 at 9:10 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > I've branched it out into fixes-hwmod-regression with just that
+> > same commit in it. The second patch in this series will be pulled in
+> > with fixes-non-critical-part2. Updated pull request below.
 > 
-> This patch worked for me, because I'm using ARMv7 exclusively. But I'm
-> inclined to think that your patch will fail on ARMv6T (for example) with
-> a Thumb2 kernel, because the "mov pc, Rm" is a simple branch on pre-v7
-> cores.
+> Thanks, I pulled fixes-hwmod-regression into fixes and fixes-hwmod
+> into next/fixes-non-critical.
 
-Thumb-2 kernels are not currently supported on ARMv6T2, and that's
-probably not going to change for the foreseeable future.  There are
-not many v6T2 CPUs out there.
+Just checking.. Looks like you pulled fixes-hwmod into a new branch
+named fixes-non-critical-part2, but did not pull the same name branch
+fixes-non-critical-part2 that I posted?
 
-In principle, the condition could be __LINUX_ARM_ARCH__ < 5, since the
-bx instruction is guaranteed to be available on all ARMv5 CPUs and
-later (ARMv5T is not required).
+That's this pull request:
 
-For this sketch of the patch though, I just went for the principle of
-least impact, and changed the behaviour only for CPUs where it's
-definitely needed (i.e., v7+).
+http://www.spinics.net/lists/linux-omap/msg62050.html
 
-Thanks for trying it out, though.
+Regards,
 
-> Note however that v3 of my patch no longer requires any changes to the
-> assembly code: the C trampoline/wrapper for integer division ensures a
-> proper return. And this one is used only for the DIV_X BPF opcode, which
-> appears also quite rarely.
-
-I may try to push my patch independently -- this way we might make
-a lot of the existing assembler files properly EABI compliant at low
-effort; as and when that happens, your C helper wouldn't be needed
-any more, but it makes sense for you to keep if for now.
-
-Cheers
----Dave
+Tony
