@@ -1,49 +1,27 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 22 Dec 2011 14:19:23 +0530
-Subject: Is Pandaboard cpuhotplug working stably?
-In-Reply-To: <20111221100706.GC3354@n2100.arm.linux.org.uk>
-References: <CAGsJ_4ydbMaS0DD6+j1m9tdCTCzw3TGELcY=KotupvvMMK1YOA@mail.gmail.com>
- <20111221094624.GB3354@n2100.arm.linux.org.uk>
- <CAGsJ_4w0iVXC6qmDzmkuOb=ZN=Q0bF7EAFkxeYR_d7-vo+8bqQ@mail.gmail.com>
- <20111221100706.GC3354@n2100.arm.linux.org.uk>
-Message-ID: <CAMQu2gy8mwJ-aKit0b4d7=4FkxeFakfnL-phy0eMOK81Oe=PCw@mail.gmail.com>
+From: arjan@linux.intel.com (Arjan van de Ven)
+Date: Thu, 22 Dec 2011 09:53:50 +0100
+Subject: [linux-pm] [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <CAMQu2gxws83BUdj_eMbF0xpA1Mo_OA_MswE7KUm5pvbn3YbMuQ@mail.gmail.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <4EF1A0B4.5080307@linux.intel.com>
+ <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
+ <4EF1AA8A.8060304@linux.intel.com>
+ <CAMbhsRSNTUvou9Gf6T4Ggq=jfxsWUcn7M2yNsKQz6aNrt6gLDg@mail.gmail.com>
+ <4EF1CD49.9020800@linux.intel.com>
+ <CAMbhsRRnKoR3YPWrZzVynVe+dcuU5v0siYvmp2vbBcS1hquC7Q@mail.gmail.com>
+ <4EF2352C.3060102@linux.intel.com>
+ <CAMbhsRSPCo9MSGp57Fv0sRdYUFcdwx8jEz1-CfX8LdKf8X4MVg@mail.gmail.com>
+ <CAMQu2gxws83BUdj_eMbF0xpA1Mo_OA_MswE7KUm5pvbn3YbMuQ@mail.gmail.com>
+Message-ID: <4EF2F01E.8060307@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Peter Z
+On 12/22/2011 9:35 AM, Shilimkar, Santosh wrote:
 
-On Wed, Dec 21, 2011 at 3:37 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Dec 21, 2011 at 05:59:07PM +0800, Barry Song wrote:
->> 2011/12/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > cpu hotplug is basically totally buggered - the preconditions placed
->> > upon the bringup code path are basically impossible to satisfy in any
->> > shape or form at the moment.
->> >
->> > There's the requirement that the secondary CPU is marked online and
->> > active before interrupts are enabled for the thread migration stuff
->> > to behave correctly. ?However, this is incompatible with smp_call_function()
->> > which will wait for online CPUs to respond to an IPI - which this one
->> > won't because interrupts are disabled.
->> >
->> > I think there was some discussion about how to fix this but I don't
->> > recall the details.
->>
->> thanks, Russell. then could i think this is an ARM-kernel-specific bug
->> which exists on all ARM SMP chips for the moment?
->> and that bug doesn't happen on x86:
->
-> I don't think so. ?There's nothing ARM specific about it.
+> Indeed. The SOCs, Arch's which does support low power
+> state independently and doesn't need any co-ordination between CPU's
+> will continue to work same way as before with this series.
 
-There are few patches floating around for this issue. I posted one version
-long back [1] and then there was one more form Thomas G.
-The most recent is from one is from Peter Z [2] which is moving the
-fix for the cup online race to core code.
-
-Can you try Peter's patch with your test-case ?
-
-Regards,
-Santosh
-
-[1] https://lkml.org/lkml/2011/6/20/79
-[2] https://lkml.org/lkml/2011/12/15/255
+btw I think you misunderstand; I don't object to a need for something
+like this, I am just very concerned that this may not be possible to be
+done in a race-free way.
