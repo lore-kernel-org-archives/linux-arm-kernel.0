@@ -1,16 +1,17 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 22 Dec 2011 17:33:22 +0000
-Subject: [PATCH 3/5] ASoC: omap-mcbsp: Use the new interface for
- configuring CLKR/FSR mux
-In-Reply-To: <1324575106-17172-4-git-send-email-peter.ujfalusi@ti.com>
-References: <1324575106-17172-1-git-send-email-peter.ujfalusi@ti.com>
- <1324575106-17172-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20111222173321.GC29622@opensource.wolfsonmicro.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Thu, 22 Dec 2011 17:34:27 -0000
+Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
+In-Reply-To: <20111222170006.GA2321@localhost>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6D8AF25@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 07:31:44PM +0200, Peter Ujfalusi wrote:
-> Switch using the new API to configure the 6 pin port's CLKR/FSR mux
-> configuration.
+> In principle, the condition could be __LINUX_ARM_ARCH__ < 5, since the
+> bx instruction is guaranteed to be available on all ARMv5 CPUs and
+> later (ARMv5T is not required).
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Can't this code look at the actual cpu being used, and
+generate the relevant 'return' instruction?
+(Instead of trying to use some compile-time value.)
+
+	David
