@@ -1,43 +1,37 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 22 Dec 2011 11:21:25 +0000
-Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
- AMBA drivers
-In-Reply-To: <20111219213942.GM14542@n2100.arm.linux.org.uk>
-References: <20111206151541.GA13774@linaro.org>
- <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
- <20111206155911.GA11902@mail.gnudd.com>
- <20111206161815.GD13769@linaro.org>
- <20111219132409.GB2031@linaro.org>
- <20111219213942.GM14542@n2100.arm.linux.org.uk>
-Message-ID: <20111222112125.GA2573@localhost>
+Date: Thu, 22 Dec 2011 11:27:51 +0000
+Subject: [PATCH v4] ARM: Add generic instruction opcode manipulation
+ helpers
+In-Reply-To: <alpine.LFD.2.02.1112191201360.2907@xanadu.home>
+References: <1324305365-22514-1-git-send-email-dave.martin@linaro.org>
+ <alpine.LFD.2.02.1112191201360.2907@xanadu.home>
+Message-ID: <20111222112751.GB2573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 09:39:42PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 19, 2011 at 01:24:09PM +0000, Dave Martin wrote:
-> > Hi Russell,
-> > 
-> > This one isn't urgent, but I'm not seeing the amba modalias patches
-> > anywhere yet.  Did you have any outstanding concerns which need to be
-> > resolved?
-> > 
-> > If you can suggest when/if these are likely to merge that would be great.
-> > 
-> > Since Alessandro is now expecting to have to rebase on top of the amba
-> > additions anyway, we shouldn't need to worry about conflicting with his
-> > patches.
-> > 
-> > Of course, if you've already merged these somewhere, then there's no
-> > problem.
+On Mon, Dec 19, 2011 at 12:03:32PM -0500, Nicolas Pitre wrote:
+> On Mon, 19 Dec 2011, Dave Martin wrote:
 > 
-> I have pulled it, I just haven't merged it in anywhere yet.
+> > This patch adds some endianness-agnostic helpers to convert machine
+> > instructions between canonical integer form and in-memory
+> > representation.
+> > 
+> > A canonical integer form for representing instructions is also
+> > formalised here.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> > Changes since v1:
+> > 
+> > v4: Rebase on top of Leif's patch which created <asm/opcodes.h>
+> >     ARM: 7206/1: Add generic ARM instruction set condition code checks.
+> 
+> In that case you might be able to put your patch in the patch system, 
+> and then go back to add a note for Russell mentioning 7206/1 is a 
+> prerequisite.
 
-OK, great -- thanks.
-
-I wasn't too familiar with the procedure, so I just wanted
-to be sure that I hadn't done things wrong.
-
-Have a good Christmas in the meantime!
+OK, I'll try and do that.
 
 Cheers
 ---Dave
