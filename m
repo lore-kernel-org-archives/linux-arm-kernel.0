@@ -1,58 +1,56 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 22 Dec 2011 15:00:34 +0530
-Subject: [linux-pm] [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <4EF2F01E.8060307@linux.intel.com>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <4EF1A0B4.5080307@linux.intel.com>
- <CAMbhsRRP7s9xsHqxhb=iMfHAJFcqAea-6CDORZS34RCPNo+UWw@mail.gmail.com>
- <4EF1AA8A.8060304@linux.intel.com>
- <CAMbhsRSNTUvou9Gf6T4Ggq=jfxsWUcn7M2yNsKQz6aNrt6gLDg@mail.gmail.com>
- <4EF1CD49.9020800@linux.intel.com>
- <CAMbhsRRnKoR3YPWrZzVynVe+dcuU5v0siYvmp2vbBcS1hquC7Q@mail.gmail.com>
- <4EF2352C.3060102@linux.intel.com>
- <CAMbhsRSPCo9MSGp57Fv0sRdYUFcdwx8jEz1-CfX8LdKf8X4MVg@mail.gmail.com>
- <CAMQu2gxws83BUdj_eMbF0xpA1Mo_OA_MswE7KUm5pvbn3YbMuQ@mail.gmail.com>
- <4EF2F01E.8060307@linux.intel.com>
-Message-ID: <CAMQu2gxq26=pNA3L8aXUbLR4ZAT5RqyNawtm2qsPVc5cJCdOLg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 22 Dec 2011 12:13:05 +0200
+Subject: [PATCH] OMAP3: hwmod_data: add HWMOD_INIT_NO_RESET flag for
+ dss_dispc
+In-Reply-To: <1324515653-17287-1-git-send-email-yanok@emcraft.com>
+References: <1324515653-17287-1-git-send-email-yanok@emcraft.com>
+Message-ID: <1324548785.13282.10.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 2:23 PM, Arjan van de Ven <arjan@linux.intel.com> wrote:
-> On 12/22/2011 9:35 AM, Shilimkar, Santosh wrote:
->
->> Indeed. The SOCs, Arch's which does support low power
->> state independently and doesn't need any co-ordination between CPU's
->> will continue to work same way as before with this series.
->
-> btw I think you misunderstand; I don't object to a need for something
-> like this,
-I did. Thanks for clarification.
+On Thu, 2011-12-22 at 02:00 +0100, Ilya Yanok wrote:
+> Resetting DISPC when a DISPC output is enabled causes the DSS to go into
+> an inconsistent state.
+> 
+> commit b923d40dd4211c4ef7d4efa2bd81b7ca1d8744c1
+> Author: Archit Taneja <archit@ti.com>
+> Date:   Thu Oct 6 18:04:08 2011 -0600
+> 
+>     ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is
+> enabled in bootloader
+> 
+> tries to deal with this problem by checking if display is enabled and
+> disabling it before doing reset.
+> 
+> But in my setup dss_dispc is resetted from omap_hwmod_setup_all function
+> _before_ calling omap_dss_reset. So when dispc_disable_outputs is
+> executed dispc is already reset and nothing happens.
 
-> I am just very concerned that this may not be possible to be
-> done in a race-free way.
->
-I agree to those races but may be they are harmless.
-Also the safe state need not be just WFI and can be bit deeper
-where the co-ordination between isn't necessary. So that should
-still not burn the power that much.
+Hmm, why is that? You don't have the dss hwmod before dispc in the list
+of hwmods? The code presumes that dss hwmod is handled first.
 
-For simplicity let's assume a two CPU scenario.
-Ideal scenario:
-CPU 1 has entered idle and incremented counter for the
-co-ordinated C state. CPU0 also enter and increments the
-counter and now the subsystem and interconnect can go
-down along with CPU cluster.
+> This patch and HWMOD_INIT_NO_RESET flags to dss_dispc hwmod thus leaving
+> DISPC untouched so that omap_dss_reset can take care of it.
 
-Few of the race conditions will possibly lead to void
-the above conditions  and in that case the counter would
-reflect that and such a C-state won't be attempted and
-a safe C-state would be attempted. That should still work
-fine.
+omap_dss_reset() doesn't reset dispc, so this will leave dispc
+un-reseted.
 
-Some how this hardware/security restriction is bit stupid
-and likely going against the existing CPUIDLE design
-which expect that a CPUIDLE thread are per CPU and it should
-be independent and local to that CPU.
+The idea of the current code is to do the reset similarly on all OMAPs.
+The sequence should be:
 
-Regards
-Santosh
+- omap_dss_reset(), which disables dispc outputs and manually resets dss
+registers.
+- then the rest of the dss modules reset themselves normally, using the
+softreset bit.
+
+Your patch would break that.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111222/f0e484eb/attachment.sig>
