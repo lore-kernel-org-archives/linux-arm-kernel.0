@@ -1,54 +1,49 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Thu, 22 Dec 2011 16:51:32 +0800
-Subject: [PATCH] regulator: max8925: fix enabled/disabled judgement mistake
-Message-ID: <1324543892-32540-1-git-send-email-haojian.zhuang@marvell.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 22 Dec 2011 14:19:23 +0530
+Subject: Is Pandaboard cpuhotplug working stably?
+In-Reply-To: <20111221100706.GC3354@n2100.arm.linux.org.uk>
+References: <CAGsJ_4ydbMaS0DD6+j1m9tdCTCzw3TGELcY=KotupvvMMK1YOA@mail.gmail.com>
+ <20111221094624.GB3354@n2100.arm.linux.org.uk>
+ <CAGsJ_4w0iVXC6qmDzmkuOb=ZN=Q0bF7EAFkxeYR_d7-vo+8bqQ@mail.gmail.com>
+ <20111221100706.GC3354@n2100.arm.linux.org.uk>
+Message-ID: <CAMQu2gy8mwJ-aKit0b4d7=4FkxeFakfnL-phy0eMOK81Oe=PCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Liu <kliu5@marvell.com>
++ Peter Z
 
-The judgement should depend on the power up/down sequence select.
-With flexible power sequence, regulator is always enabled after boot up.
-With i2c enabled, regulator enable/disable according to output enable bit.
+On Wed, Dec 21, 2011 at 3:37 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Dec 21, 2011 at 05:59:07PM +0800, Barry Song wrote:
+>> 2011/12/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> > cpu hotplug is basically totally buggered - the preconditions placed
+>> > upon the bringup code path are basically impossible to satisfy in any
+>> > shape or form at the moment.
+>> >
+>> > There's the requirement that the secondary CPU is marked online and
+>> > active before interrupts are enabled for the thread migration stuff
+>> > to behave correctly. ?However, this is incompatible with smp_call_function()
+>> > which will wait for online CPUs to respond to an IPI - which this one
+>> > won't because interrupts are disabled.
+>> >
+>> > I think there was some discussion about how to fix this but I don't
+>> > recall the details.
+>>
+>> thanks, Russell. then could i think this is an ARM-kernel-specific bug
+>> which exists on all ARM SMP chips for the moment?
+>> and that bug doesn't happen on x86:
+>
+> I don't think so. ?There's nothing ARM specific about it.
 
-Signed-off-by: Kevin Liu <kliu5@marvell.com>
----
- drivers/regulator/max8925-regulator.c |   12 +++++++++---
- 1 files changed, 9 insertions(+), 3 deletions(-)
+There are few patches floating around for this issue. I posted one version
+long back [1] and then there was one more form Thomas G.
+The most recent is from one is from Peter Z [2] which is moving the
+fix for the cup online race to core code.
 
-diff --git a/drivers/regulator/max8925-regulator.c b/drivers/regulator/max8925-regulator.c
-index cc9ec0e..9e99420 100644
---- a/drivers/regulator/max8925-regulator.c
-+++ b/drivers/regulator/max8925-regulator.c
-@@ -27,6 +27,9 @@
- /* bit definitions in SD & LDO control registers */
- #define OUT_ENABLE   		0x1f		/* Power U/D sequence as I2C */
- #define OUT_DISABLE		0x1e		/* Power U/D sequence as I2C */
-+#define LDO_SEQ_MASK		0x7		/* Power U/D sequence mask */
-+#define LDO_SEQ_SHIFT		2		/* Power U/D sequence offset */
-+#define LDO_SEQ_I2C_EN		0x7		/* Power U/D sequence as I2C_EN */
- 
- struct max8925_regulator_info {
- 	struct regulator_desc	desc;
-@@ -114,13 +117,16 @@ static int max8925_disable(struct regulator_dev *rdev)
- static int max8925_is_enabled(struct regulator_dev *rdev)
- {
- 	struct max8925_regulator_info *info = rdev_get_drvdata(rdev);
--	int ret;
-+	int ldo_seq, ret;
- 
- 	ret = max8925_reg_read(info->i2c, info->enable_reg);
- 	if (ret < 0)
- 		return ret;
--
--	return ret & (1 << info->enable_bit);
-+	ldo_seq = (ret >> LDO_SEQ_SHIFT) & LDO_SEQ_MASK;
-+	if (ldo_seq != LDO_SEQ_I2C_EN)
-+		return 1 << info->enable_bit;
-+	else
-+		return ret & (1 << info->enable_bit);
- }
- 
- static int max8925_set_dvm_voltage(struct regulator_dev *rdev, int uV)
--- 
-1.7.0.4
+Can you try Peter's patch with your test-case ?
+
+Regards,
+Santosh
+
+[1] https://lkml.org/lkml/2011/6/20/79
+[2] https://lkml.org/lkml/2011/12/15/255
