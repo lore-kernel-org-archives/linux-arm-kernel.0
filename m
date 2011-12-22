@@ -1,1345 +1,1551 @@
 From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Thu, 22 Dec 2011 22:26:16 +0100
-Subject: [PATCH 3/4] arm: Remove mach-tcc8k directory
+Date: Thu, 22 Dec 2011 22:28:19 +0100
+Subject: [PATCH 4/4] arm: Remove plat-tcc directory
 In-Reply-To: <20111222211948.GA1201@local>
 References: <20111222211948.GA1201@local>
-Message-ID: <20111222212615.GD1201@local>
+Message-ID: <20111222212818.GE1201@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Telechips ARM architecture is being removed. This patch
-deletes the arch/arm/mach-tcc8k/ folder.
+deletes the arch/arm/plat-tcc/ folder.
 
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Harry Sievers <hsievers@csselectronic.com>
 Signed-off-by: Hans J. Koch <hjk@hansjkoch.de>
 ---
- arch/arm/mach-tcc8k/Kconfig             |   11 -
- arch/arm/mach-tcc8k/Makefile            |    9 -
- arch/arm/mach-tcc8k/Makefile.boot       |    3 -
- arch/arm/mach-tcc8k/board-tcc8000-sdk.c |   81 -----
- arch/arm/mach-tcc8k/clock.c             |  580 -------------------------------
- arch/arm/mach-tcc8k/common.h            |   15 -
- arch/arm/mach-tcc8k/devices.c           |  239 -------------
- arch/arm/mach-tcc8k/io.c                |   62 ----
- arch/arm/mach-tcc8k/irq.c               |  111 ------
- arch/arm/mach-tcc8k/time.c              |  134 -------
- 10 files changed, 0 insertions(+), 1245 deletions(-)
- delete mode 100644 arch/arm/mach-tcc8k/Kconfig
- delete mode 100644 arch/arm/mach-tcc8k/Makefile
- delete mode 100644 arch/arm/mach-tcc8k/Makefile.boot
- delete mode 100644 arch/arm/mach-tcc8k/board-tcc8000-sdk.c
- delete mode 100644 arch/arm/mach-tcc8k/clock.c
- delete mode 100644 arch/arm/mach-tcc8k/common.h
- delete mode 100644 arch/arm/mach-tcc8k/devices.c
- delete mode 100644 arch/arm/mach-tcc8k/io.c
- delete mode 100644 arch/arm/mach-tcc8k/irq.c
- delete mode 100644 arch/arm/mach-tcc8k/time.c
+ arch/arm/plat-tcc/Kconfig                    |   20 -
+ arch/arm/plat-tcc/Makefile                   |    3 -
+ arch/arm/plat-tcc/clock.c                    |  179 ------
+ arch/arm/plat-tcc/include/mach/clock.h       |   48 --
+ arch/arm/plat-tcc/include/mach/debug-macro.S |   32 -
+ arch/arm/plat-tcc/include/mach/entry-macro.S |   68 ---
+ arch/arm/plat-tcc/include/mach/hardware.h    |   43 --
+ arch/arm/plat-tcc/include/mach/io.h          |   23 -
+ arch/arm/plat-tcc/include/mach/irqs.h        |   83 ---
+ arch/arm/plat-tcc/include/mach/system.h      |   31 -
+ arch/arm/plat-tcc/include/mach/tcc8k-regs.h  |  807 --------------------------
+ arch/arm/plat-tcc/include/mach/timex.h       |    5 -
+ arch/arm/plat-tcc/include/mach/uncompress.h  |   34 --
+ arch/arm/plat-tcc/include/mach/vmalloc.h     |   10 -
+ arch/arm/plat-tcc/system.c                   |   25 -
+ 15 files changed, 0 insertions(+), 1411 deletions(-)
+ delete mode 100644 arch/arm/plat-tcc/Kconfig
+ delete mode 100644 arch/arm/plat-tcc/Makefile
+ delete mode 100644 arch/arm/plat-tcc/clock.c
+ delete mode 100644 arch/arm/plat-tcc/include/mach/clock.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/plat-tcc/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/plat-tcc/include/mach/hardware.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/io.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/irqs.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/system.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/tcc8k-regs.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/timex.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/uncompress.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/plat-tcc/system.c
 
-diff --git a/arch/arm/mach-tcc8k/Kconfig b/arch/arm/mach-tcc8k/Kconfig
+diff --git a/arch/arm/plat-tcc/Kconfig b/arch/arm/plat-tcc/Kconfig
 deleted file mode 100644
-index ad86415..0000000
---- a/arch/arm/mach-tcc8k/Kconfig
+index 1bf4995..0000000
+--- a/arch/arm/plat-tcc/Kconfig
 +++ /dev/null
-@@ -1,11 +0,0 @@
--if ARCH_TCC8K
+@@ -1,20 +0,0 @@
+-if ARCH_TCC_926
 -
--comment "TCC8000 systems:"
+-menu "Telechips ARM926-based CPUs"
 -
--config MACH_TCC8000_SDK
--	bool "Telechips TCC8000-SDK development kit"
--	default y
+-choice
+-	prompt "Telechips CPU type:"
+-	default ARCH_TCC8K
+-
+-config ARCH_TCC8K
+-	bool TCC8000
+-	select USB_ARCH_HAS_OHCI
 -	help
--	  Support for the Telechips TCC8000-SDK board.
+-	  Support for Telechips TCC8000 systems
 -
+-endchoice
+-
+-source "arch/arm/mach-tcc8k/Kconfig"
+-
+-endmenu
 -endif
-diff --git a/arch/arm/mach-tcc8k/Makefile b/arch/arm/mach-tcc8k/Makefile
+diff --git a/arch/arm/plat-tcc/Makefile b/arch/arm/plat-tcc/Makefile
 deleted file mode 100644
-index 9bacf31..0000000
---- a/arch/arm/mach-tcc8k/Makefile
-+++ /dev/null
-@@ -1,9 +0,0 @@
--#
--# Makefile for TCC8K boards and common files.
--#
--
--# Common support
--obj-y += clock.o irq.o time.o io.o devices.o
--
--# Board specific support
--obj-$(CONFIG_MACH_TCC8000_SDK) += board-tcc8000-sdk.o
-diff --git a/arch/arm/mach-tcc8k/Makefile.boot b/arch/arm/mach-tcc8k/Makefile.boot
-deleted file mode 100644
-index 5e02d41..0000000
---- a/arch/arm/mach-tcc8k/Makefile.boot
+index eceabc8..0000000
+--- a/arch/arm/plat-tcc/Makefile
 +++ /dev/null
 @@ -1,3 +0,0 @@
--   zreladdr-y		+= 0x20008000
--params_phys-y		:= 0x20000100
--initrd_phys-y		:= 0x20800000
-diff --git a/arch/arm/mach-tcc8k/board-tcc8000-sdk.c b/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
+-# "Telechips Platform Common Modules"
+-
+-obj-y := clock.o system.o
+diff --git a/arch/arm/plat-tcc/clock.c b/arch/arm/plat-tcc/clock.c
 deleted file mode 100644
-index 777a5bb..0000000
---- a/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
+index f3ced10..0000000
+--- a/arch/arm/plat-tcc/clock.c
 +++ /dev/null
-@@ -1,81 +0,0 @@
+@@ -1,179 +0,0 @@
 -/*
+- * Clock framework for Telechips SoCs
+- * Based on arch/arm/plat-mxc/clock.c
+- *
+- * Copyright (C) 2004 - 2005 Nokia corporation
+- * Written by Tuukka Tikkanen <tuukka.tikkanen@elektrobit.com>
+- * Modified for omap shared clock framework by Tony Lindgren <tony@atomide.com>
+- * Copyright 2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
+- * Copyright 2010 Hans J. Koch, hjk at linutronix.de
+- *
+- * Licensed under the terms of the GPL v2.
+- */
+-
+-#include <linux/clk.h>
+-#include <linux/err.h>
+-#include <linux/errno.h>
+-#include <linux/module.h>
+-#include <linux/mutex.h>
+-#include <linux/string.h>
+-
+-#include <mach/clock.h>
+-#include <mach/hardware.h>
+-
+-static DEFINE_MUTEX(clocks_mutex);
+-
+-/*-------------------------------------------------------------------------
+- * Standard clock functions defined in include/linux/clk.h
+- *-------------------------------------------------------------------------*/
+-
+-static void __clk_disable(struct clk *clk)
+-{
+-	BUG_ON(clk->refcount == 0);
+-
+-	if (!(--clk->refcount) && clk->disable) {
+-		/* Unconditionally disable the clock in hardware */
+-		clk->disable(clk);
+-		/* recursively disable parents */
+-		if (clk->parent)
+-			__clk_disable(clk->parent);
+-	}
+-}
+-
+-static int __clk_enable(struct clk *clk)
+-{
+-	int ret = 0;
+-
+-	if (clk->refcount++ == 0 && clk->enable) {
+-		if (clk->parent)
+-			ret = __clk_enable(clk->parent);
+-		if (ret)
+-			return ret;
+-		else
+-			return clk->enable(clk);
+-	}
+-
+-	return 0;
+-}
+-
+-/* This function increments the reference count on the clock and enables the
+- * clock if not already enabled. The parent clock tree is recursively enabled
+- */
+-int clk_enable(struct clk *clk)
+-{
+-	int ret = 0;
+-
+-	if (!clk)
+-		return -EINVAL;
+-
+-	mutex_lock(&clocks_mutex);
+-	ret = __clk_enable(clk);
+-	mutex_unlock(&clocks_mutex);
+-
+-	return ret;
+-}
+-EXPORT_SYMBOL_GPL(clk_enable);
+-
+-/* This function decrements the reference count on the clock and disables
+- * the clock when reference count is 0. The parent clock tree is
+- * recursively disabled
+- */
+-void clk_disable(struct clk *clk)
+-{
+-	if (!clk)
+-		return;
+-
+-	mutex_lock(&clocks_mutex);
+-	__clk_disable(clk);
+-	mutex_unlock(&clocks_mutex);
+-}
+-EXPORT_SYMBOL_GPL(clk_disable);
+-
+-/* Retrieve the *current* clock rate. If the clock itself
+- * does not provide a special calculation routine, ask
+- * its parent and so on, until one is able to return
+- * a valid clock rate
+- */
+-unsigned long clk_get_rate(struct clk *clk)
+-{
+-	if (!clk)
+-		return 0UL;
+-
+-	if (clk->get_rate)
+-		return clk->get_rate(clk);
+-
+-	return clk_get_rate(clk->parent);
+-}
+-EXPORT_SYMBOL_GPL(clk_get_rate);
+-
+-/* Round the requested clock rate to the nearest supported
+- * rate that is less than or equal to the requested rate.
+- * This is dependent on the clock's current parent.
+- */
+-long clk_round_rate(struct clk *clk, unsigned long rate)
+-{
+-	if (!clk)
+-		return 0;
+-	if (!clk->round_rate)
+-		return 0;
+-
+-	return clk->round_rate(clk, rate);
+-}
+-EXPORT_SYMBOL_GPL(clk_round_rate);
+-
+-/* Set the clock to the requested clock rate. The rate must
+- * match a supported rate exactly based on what clk_round_rate returns
+- */
+-int clk_set_rate(struct clk *clk, unsigned long rate)
+-{
+-	int ret = -EINVAL;
+-
+-	if (!clk)
+-		return ret;
+-	if (!clk->set_rate || !rate)
+-		return ret;
+-
+-	mutex_lock(&clocks_mutex);
+-	ret = clk->set_rate(clk, rate);
+-	mutex_unlock(&clocks_mutex);
+-
+-	return ret;
+-}
+-EXPORT_SYMBOL_GPL(clk_set_rate);
+-
+-/* Set the clock's parent to another clock source */
+-int clk_set_parent(struct clk *clk, struct clk *parent)
+-{
+-	struct clk *old;
+-	int ret = -EINVAL;
+-
+-	if (!clk)
+-		return ret;
+-	if (!clk->set_parent || !parent)
+-		return ret;
+-
+-	mutex_lock(&clocks_mutex);
+-	old = clk->parent;
+-	if (clk->refcount)
+-		__clk_enable(parent);
+-	ret = clk->set_parent(clk, parent);
+-	if (ret)
+-		old = parent;
+-	if (clk->refcount)
+-		__clk_disable(old);
+-	mutex_unlock(&clocks_mutex);
+-
+-	return ret;
+-}
+-EXPORT_SYMBOL_GPL(clk_set_parent);
+-
+-/* Retrieve the clock's parent clock source */
+-struct clk *clk_get_parent(struct clk *clk)
+-{
+-	if (!clk)
+-		return NULL;
+-
+-	return clk->parent;
+-}
+-EXPORT_SYMBOL_GPL(clk_get_parent);
+diff --git a/arch/arm/plat-tcc/include/mach/clock.h b/arch/arm/plat-tcc/include/mach/clock.h
+deleted file mode 100644
+index a12f58a..0000000
+--- a/arch/arm/plat-tcc/include/mach/clock.h
++++ /dev/null
+@@ -1,48 +0,0 @@
+-/*
+- * Low level clock header file for Telechips TCC architecture
+- * (C) 2010 Hans J. Koch <hjk@linutronix.de>
+- *
+- * Licensed under the GPL v2.
+- */
+-
+-#ifndef __ASM_ARCH_TCC_CLOCK_H__
+-#define __ASM_ARCH_TCC_CLOCK_H__
+-
+-#ifndef __ASSEMBLY__
+-
+-struct clk {
+-	struct clk *parent;
+-	/* id number of a root clock, 0 for normal clocks */
+-	int root_id;
+-	/* Reference count of clock enable/disable */
+-	int refcount;
+-	/* Address of associated BCLKCTRx register. Must be set. */
+-	void __iomem *bclkctr;
+-	/* Bit position for BCLKCTRx. Must be set. */
+-	int bclk_shift;
+-	/* Address of ACLKxxx register, if any. */
+-	void __iomem *aclkreg;
+-	/* get the current clock rate (always a fresh value) */
+-	unsigned long (*get_rate) (struct clk *);
+-	/* Function ptr to set the clock to a new rate. The rate must match a
+-	   supported rate returned from round_rate. Leave blank if clock is not
+-	   programmable */
+-	int (*set_rate) (struct clk *, unsigned long);
+-	/* Function ptr to round the requested clock rate to the nearest
+-	   supported rate that is less than or equal to the requested rate. */
+-	unsigned long (*round_rate) (struct clk *, unsigned long);
+-	/* Function ptr to enable the clock. Leave blank if clock can not
+-	   be gated. */
+-	int (*enable) (struct clk *);
+-	/* Function ptr to disable the clock. Leave blank if clock can not
+-	   be gated. */
+-	void (*disable) (struct clk *);
+-	/* Function ptr to set the parent clock of the clock. */
+-	int (*set_parent) (struct clk *, struct clk *);
+-};
+-
+-int clk_register(struct clk *clk);
+-void clk_unregister(struct clk *clk);
+-
+-#endif /* __ASSEMBLY__ */
+-#endif /* __ASM_ARCH_MXC_CLOCK_H__ */
+diff --git a/arch/arm/plat-tcc/include/mach/debug-macro.S b/arch/arm/plat-tcc/include/mach/debug-macro.S
+deleted file mode 100644
+index cf17d04..0000000
+--- a/arch/arm/plat-tcc/include/mach/debug-macro.S
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/*
+- * Copyright (C) 1994-1999 Russell King
+- * Copyright (C) 2008-2009 Telechips
 - * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
+- *
 - */
 -
--#include <linux/delay.h>
--#include <linux/init.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
+-		.macro	addruart, rp, rv, tmp
+-		moveq	\rp, #0x90000000	@ physical base address
+-		movne	\rv, #0xF1000000	@ virtual base
+-		orr	\rp, \rp, #0x00007000	@ UART0
+-		orr	\rv, \rv, #0x00007000	@ UART0
+-		.endm
+-
+-		.macro	senduart,rd,rx
+-		strb	\rd, [\rx, #0x44]
+-		.endm
+-
+-		.macro	waituart,rd,rx
+-		.endm
+-
+-		.macro	busyuart,rd,rx
+-1001:
+-		ldr \rd, [\rx, #0x14]
+-		tst \rd, #0x20
+-
+-		beq 1001b
+-		.endm
+diff --git a/arch/arm/plat-tcc/include/mach/entry-macro.S b/arch/arm/plat-tcc/include/mach/entry-macro.S
+deleted file mode 100644
+index 748f401..0000000
+--- a/arch/arm/plat-tcc/include/mach/entry-macro.S
++++ /dev/null
+@@ -1,68 +0,0 @@
+-/*
+- * include/asm-arm/arch-tcc83x/entry-macro.S
+- *
+- * Author : <linux@telechips.com>
+- * Created: June 10, 2008
+- * Description: Low-level IRQ helper macros for Telechips-based platforms
+- *
+- * Copyright (C) 2008-2009 Telechips
+- *
+- * This file is licensed under  the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <mach/hardware.h>
+-#include <mach/irqs.h>
+-
+-	.macro	disable_fiq
+-	.endm
+-
+-	.macro  get_irqnr_preamble, base, tmp
+-	.endm
+-
+-	.macro  arch_ret_to_user, tmp1, tmp2
+-	.endm
+-
+-	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-
+-		ldr	\base, =0xF2003000 @ base address of PIC registers
+-
+-		@@ read MREQ register of PIC0
+-
+-		mov	\irqnr, #0
+-		ldr	\irqstat, [\base, #0x00000014 ]	@ lower 32 interrupts
+-		cmp	\irqstat, #0
+-		bne	1001f
+-
+-		@@ read MREQ register of PIC1
+-
+-		ldr	\irqstat, [\base, #0x00000094]	@ upper 32 interrupts
+-		cmp	\irqstat, #0
+-		beq	1002f
+-		mov	\irqnr, #0x20
+-
+-1001:
+-		movs	\tmp, \irqstat, lsl #16
+-		movne	\irqstat, \tmp
+-		addeq	\irqnr, \irqnr, #16
+-
+-		movs	\tmp, \irqstat, lsl #8
+-		movne	\irqstat, \tmp
+-		addeq	\irqnr, \irqnr, #8
+-
+-		movs	\tmp, \irqstat, lsl #4
+-		movne	\irqstat, \tmp
+-		addeq	\irqnr, \irqnr, #4
+-
+-		movs	\tmp, \irqstat, lsl #2
+-		movne	\irqstat, \tmp
+-		addeq	\irqnr, \irqnr, #2
+-
+-		movs	\tmp, \irqstat, lsl #1
+-		addeq	\irqnr, \irqnr, #1
+-		orrs	\base, \base, #1
+-1002:
+-		@@ exit here, Z flag unset if IRQ
+-
+-	.endm
+diff --git a/arch/arm/plat-tcc/include/mach/hardware.h b/arch/arm/plat-tcc/include/mach/hardware.h
+deleted file mode 100644
+index e70d126..0000000
+--- a/arch/arm/plat-tcc/include/mach/hardware.h
++++ /dev/null
+@@ -1,43 +0,0 @@
+-/*
+- * Author: RidgeRun, Inc. Greg Lonnon <glonnon@ridgerun.com>
+- * Reorganized for Linux-2.6 by Tony Lindgren <tony@atomide.com>
+- *                          and Dirk Behme <dirk.behme@de.bosch.com>
+- * Rewritten by:    <linux@telechips.com>
+- * Description: Hardware definitions for TCC8300 processors and boards
+- *
+- * Copyright (C) 2001 RidgeRun, Inc.
+- * Copyright (C) 2008-2009 Telechips
+- *
+- * Modifications for mainline (C) 2009 Hans J. Koch <hjk@linutronix.de>
+- *
+- * Licensed under the terms of the GNU Pulic License version 2.
+- */
+-
+-#ifndef __ASM_ARCH_TCC_HARDWARE_H
+-#define __ASM_ARCH_TCC_HARDWARE_H
+-
+-#include <asm/sizes.h>
+-#ifndef __ASSEMBLER__
+-#include <asm/types.h>
+-#endif
+-#include <mach/io.h>
+-
+-/*
+- * ----------------------------------------------------------------------------
+- * Clocks
+- * ----------------------------------------------------------------------------
+- */
+-#define CLKGEN_REG_BASE		0xfffece00
+-#define ARM_CKCTL		(CLKGEN_REG_BASE + 0x0)
+-#define ARM_IDLECT1		(CLKGEN_REG_BASE + 0x4)
+-#define ARM_IDLECT2		(CLKGEN_REG_BASE + 0x8)
+-#define ARM_EWUPCT		(CLKGEN_REG_BASE + 0xC)
+-#define ARM_RSTCT1		(CLKGEN_REG_BASE + 0x10)
+-#define ARM_RSTCT2		(CLKGEN_REG_BASE + 0x14)
+-#define ARM_SYSST		(CLKGEN_REG_BASE + 0x18)
+-#define ARM_IDLECT3		(CLKGEN_REG_BASE + 0x24)
+-
+-/* DPLL control registers */
+-#define DPLL_CTL		0xfffecf00
+-
+-#endif	/* __ASM_ARCH_TCC_HARDWARE_H */
+diff --git a/arch/arm/plat-tcc/include/mach/io.h b/arch/arm/plat-tcc/include/mach/io.h
+deleted file mode 100644
+index 3e911d3..0000000
+--- a/arch/arm/plat-tcc/include/mach/io.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * IO definitions for TCC8000 processors and boards
+- *
+- * Copyright (C) 1997-1999 Russell King
+- * Copyright (C) 2008-2009 Telechips
+- * Copyright (C) 2010 Hans J. Koch <hjk@linutronix.de>
+- *
+- * Licensed under the terms of the GNU Public License version 2.
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/*
+- * We don't actually have real ISA nor PCI buses, but there is so many
+- * drivers out there that might just work if we fake them...
+- */
+-#define __io(a)			__typesafe_io(a)
+-#define __mem_pci(a)		(a)
+-
+-#endif
+diff --git a/arch/arm/plat-tcc/include/mach/irqs.h b/arch/arm/plat-tcc/include/mach/irqs.h
+deleted file mode 100644
+index da86389..0000000
+--- a/arch/arm/plat-tcc/include/mach/irqs.h
++++ /dev/null
+@@ -1,83 +0,0 @@
+-/*
+- * IRQ definitions for TCC8xxx
+- *
+- * Copyright (C) 2008-2009 Telechips
+- * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
+- *
+- * Licensed under the terms of the GPL v2.
+- *
+- */
+-
+-#ifndef __ASM_ARCH_TCC_IRQS_H
+-#define __ASM_ARCH_TCC_IRQS_H
+-
+-#define NR_IRQS 64
+-
+-/* PIC0 interrupts */
+-#define INT_ADMA1	0
+-#define INT_BDMA	1
+-#define INT_ADMA0	2
+-#define INT_GDMA1	3
+-#define INT_I2S0RX	4
+-#define INT_I2S0TX	5
+-#define INT_TC		6
+-#define INT_UART0	7
+-#define INT_USBD	8
+-#define INT_SPI0TX	9
+-#define INT_UDMA	10
+-#define INT_LIRQ	11
+-#define INT_GDMA2	12
+-#define INT_GDMA0	13
+-#define INT_TC32	14
+-#define INT_LCD		15
+-#define INT_ADC		16
+-#define INT_I2C		17
+-#define INT_RTCP	18
+-#define INT_RTCA	19
+-#define INT_NFC		20
+-#define INT_SD0		21
+-#define INT_GSB0	22
+-#define INT_PK		23
+-#define INT_USBH0	24
+-#define INT_USBH1	25
+-#define INT_G2D		26
+-#define INT_ECC		27
+-#define INT_SPI0RX	28
+-#define INT_UART1	29
+-#define INT_MSCL	30
+-#define INT_GSB1	31
+-/* PIC1 interrupts */
+-#define INT_E0		32
+-#define INT_E1		33
+-#define INT_E2		34
+-#define INT_E3		35
+-#define INT_E4		36
+-#define INT_E5		37
+-#define INT_E6		38
+-#define INT_E7		39
+-#define INT_UART2	40
+-#define INT_UART3	41
+-#define INT_SPI1TX	42
+-#define INT_SPI1RX	43
+-#define INT_GSB2	44
+-#define INT_SPDIF	45
+-#define INT_CDIF	46
+-#define INT_VBON	47
+-#define INT_VBOFF	48
+-#define INT_SD1		49
+-#define INT_UART4	50
+-#define INT_GDMA3	51
+-#define INT_I2S1RX	52
+-#define INT_I2S1TX	53
+-#define INT_CAN0	54
+-#define INT_CAN1	55
+-#define INT_GSB3	56
+-#define INT_KRST	57
+-#define INT_UNUSED	58
+-#define INT_SD0D3	59
+-#define INT_SD1D3	60
+-#define INT_GPS0	61
+-#define INT_GPS1	62
+-#define INT_GPS2	63
+-
+-#endif  /* ASM_ARCH_TCC_IRQS_H */
+diff --git a/arch/arm/plat-tcc/include/mach/system.h b/arch/arm/plat-tcc/include/mach/system.h
+deleted file mode 100644
+index 909e603..0000000
+--- a/arch/arm/plat-tcc/include/mach/system.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- * Author: <linux@telechips.com>
+- * Created: June 10, 2008
+- * Description: LINUX SYSTEM FUNCTIONS for TCC83x
+- *
+- * Copyright (C) 2008-2009 Telechips
+- *
+- * Licensed under the terms of the GPL v2.
+- *
+- */
+-
+-#ifndef __ASM_ARCH_SYSTEM_H
+-#define __ASM_ARCH_SYSTEM_H
+-#include <linux/clk.h>
 -
 -#include <asm/mach-types.h>
+-#include <mach/hardware.h>
 -
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <asm/mach/time.h>
+-extern void plat_tcc_reboot(void);
 -
--#include <mach/clock.h>
--#include <mach/tcc-nand.h>
--#include <mach/tcc8k-regs.h>
+-static inline void arch_idle(void)
+-{
+-	cpu_do_idle();
+-}
 -
--#include "common.h"
+-static inline void arch_reset(char mode, const char *cmd)
+-{
+-	plat_tcc_reboot();
+-}
 -
--#define XI_FREQUENCY	12000000
--#define XTI_FREQUENCY	32768
--
--#ifdef CONFIG_MTD_NAND_TCC
--/* NAND */
--static struct tcc_nand_platform_data tcc8k_sdk_nand_data = {
--	.width = 1,
--	.hw_ecc = 0,
--};
 -#endif
--
--static void __init tcc8k_init(void)
--{
--#ifdef CONFIG_MTD_NAND_TCC
--	tcc_nand_device.dev.platform_data = &tcc8k_sdk_nand_data;
--	platform_device_register(&tcc_nand_device);
--#endif
--}
--
--static void __init tcc8k_init_timer(void)
--{
--	tcc_clocks_init(XI_FREQUENCY, XTI_FREQUENCY);
--}
--
--static struct sys_timer tcc8k_timer = {
--	.init	= tcc8k_init_timer,
--};
--
--static void __init tcc8k_map_io(void)
--{
--	tcc8k_map_common_io();
--
--	/* set PLL0 clock to 96MHz, adapt UART0 divisor */
--	__raw_writel(0x00026003, CKC_BASE + PLL0CFG_OFFS);
--	__raw_writel(0x10000001, CKC_BASE + ACLKUART0_OFFS);
--
--	/* set PLL1 clock to 192MHz */
--	__raw_writel(0x00016003, CKC_BASE + PLL1CFG_OFFS);
--
--	/* set PLL2 clock to 48MHz */
--	__raw_writel(0x00036003, CKC_BASE + PLL2CFG_OFFS);
--
--	/* with CPU freq higher than 150 MHz, need extra DTCM wait */
--	__raw_writel(0x00000001, SCFG_BASE + DTCMWAIT_OFFS);
--
--	/* PLL locking time as specified */
--	udelay(300);
--}
--
--MACHINE_START(TCC8000_SDK, "Telechips TCC8000-SDK Demo Board")
--	.atag_offset	= 0x100,
--	.map_io		= tcc8k_map_io,
--	.init_irq	= tcc8k_init_irq,
--	.init_machine	= tcc8k_init,
--	.timer		= &tcc8k_timer,
--MACHINE_END
-diff --git a/arch/arm/mach-tcc8k/clock.c b/arch/arm/mach-tcc8k/clock.c
+diff --git a/arch/arm/plat-tcc/include/mach/tcc8k-regs.h b/arch/arm/plat-tcc/include/mach/tcc8k-regs.h
 deleted file mode 100644
-index e7cdae5..0000000
---- a/arch/arm/mach-tcc8k/clock.c
+index 1d94282..0000000
+--- a/arch/arm/plat-tcc/include/mach/tcc8k-regs.h
 +++ /dev/null
-@@ -1,580 +0,0 @@
+@@ -1,807 +0,0 @@
 -/*
-- * Lowlevel clock handling for Telechips TCC8xxx SoCs
+- * Telechips TCC8000 register definitions
 - *
-- * Copyright (C) 2010 by Hans J. Koch <hjk@linutronix.de>
+- * (C) 2009 Hans J. Koch <hjk@linutronix.de>
 - *
-- * Licensed under the terms of the GPL v2
+- * Licensed under the terms of the GPLv2.
 - */
 -
--#include <linux/clk.h>
--#include <linux/delay.h>
--#include <linux/err.h>
--#include <linux/io.h>
--#include <linux/module.h>
--#include <linux/spinlock.h>
--#include <linux/clkdev.h>
--
--#include <mach/clock.h>
--#include <mach/irqs.h>
--#include <mach/tcc8k-regs.h>
--
--#include "common.h"
--
--#define BCLKCTR0	(CKC_BASE + BCLKCTR0_OFFS)
--#define BCLKCTR1	(CKC_BASE + BCLKCTR1_OFFS)
--
--#define ACLKREF		(CKC_BASE + ACLKREF_OFFS)
--#define ACLKUART0	(CKC_BASE + ACLKUART0_OFFS)
--#define ACLKUART1	(CKC_BASE + ACLKUART1_OFFS)
--#define ACLKUART2	(CKC_BASE + ACLKUART2_OFFS)
--#define ACLKUART3	(CKC_BASE + ACLKUART3_OFFS)
--#define ACLKUART4	(CKC_BASE + ACLKUART4_OFFS)
--#define ACLKI2C		(CKC_BASE + ACLKI2C_OFFS)
--#define ACLKADC		(CKC_BASE + ACLKADC_OFFS)
--#define ACLKUSBH	(CKC_BASE + ACLKUSBH_OFFS)
--#define ACLKLCD		(CKC_BASE + ACLKLCD_OFFS)
--#define ACLKSDH0	(CKC_BASE + ACLKSDH0_OFFS)
--#define ACLKSDH1	(CKC_BASE + ACLKSDH1_OFFS)
--#define ACLKSPI0	(CKC_BASE + ACLKSPI0_OFFS)
--#define ACLKSPI1	(CKC_BASE + ACLKSPI1_OFFS)
--#define ACLKSPDIF	(CKC_BASE + ACLKSPDIF_OFFS)
--#define ACLKC3DEC	(CKC_BASE + ACLKC3DEC_OFFS)
--#define ACLKCAN0	(CKC_BASE + ACLKCAN0_OFFS)
--#define ACLKCAN1	(CKC_BASE + ACLKCAN1_OFFS)
--#define ACLKGSB0	(CKC_BASE + ACLKGSB0_OFFS)
--#define ACLKGSB1	(CKC_BASE + ACLKGSB1_OFFS)
--#define ACLKGSB2	(CKC_BASE + ACLKGSB2_OFFS)
--#define ACLKGSB3	(CKC_BASE + ACLKGSB3_OFFS)
--#define ACLKTCT		(CKC_BASE + ACLKTCT_OFFS)
--#define ACLKTCX		(CKC_BASE + ACLKTCX_OFFS)
--#define ACLKTCZ		(CKC_BASE + ACLKTCZ_OFFS)
--
--#define ACLK_MAX_DIV	(0xfff + 1)
--
--/* Crystal frequencies */
--static unsigned long xi_rate, xti_rate;
--
--static void __iomem *pll_cfg_addr(int pll)
--{
--	switch (pll) {
--	case 0: return (CKC_BASE + PLL0CFG_OFFS);
--	case 1: return (CKC_BASE + PLL1CFG_OFFS);
--	case 2: return (CKC_BASE + PLL2CFG_OFFS);
--	default:
--		BUG();
--	}
--}
--
--static int pll_enable(int pll, int enable)
--{
--	u32 reg;
--	void __iomem *addr = pll_cfg_addr(pll);
--
--	reg = __raw_readl(addr);
--	if (enable)
--		reg &= ~PLLxCFG_PD;
--	else
--		reg |= PLLxCFG_PD;
--
--	__raw_writel(reg, addr);
--	return 0;
--}
--
--static int xi_enable(int enable)
--{
--	u32 reg;
--
--	reg = __raw_readl(CKC_BASE + CLKCTRL_OFFS);
--	if (enable)
--		reg |= CLKCTRL_XE;
--	else
--		reg &= ~CLKCTRL_XE;
--
--	__raw_writel(reg, CKC_BASE + CLKCTRL_OFFS);
--	return 0;
--}
--
--static int root_clk_enable(enum root_clks src)
--{
--	switch (src) {
--	case CLK_SRC_PLL0: return pll_enable(0, 1);
--	case CLK_SRC_PLL1: return pll_enable(1, 1);
--	case CLK_SRC_PLL2: return pll_enable(2, 1);
--	case CLK_SRC_XI: return xi_enable(1);
--	default:
--		BUG();
--	}
--	return 0;
--}
--
--static int root_clk_disable(enum root_clks src)
--{
--	switch (src) {
--	case CLK_SRC_PLL0: return pll_enable(0, 0);
--	case CLK_SRC_PLL1: return pll_enable(1, 0);
--	case CLK_SRC_PLL2: return pll_enable(2, 0);
--	case CLK_SRC_XI: return xi_enable(0);
--	default:
--		BUG();
--	}
--	return 0;
--}
--
--static int enable_clk(struct clk *clk)
--{
--	u32 reg;
--
--	if (clk->root_id != CLK_SRC_NOROOT)
--		return root_clk_enable(clk->root_id);
--
--	if (clk->aclkreg) {
--		reg = __raw_readl(clk->aclkreg);
--		reg |= ACLK_EN;
--		__raw_writel(reg, clk->aclkreg);
--	}
--	if (clk->bclkctr) {
--		reg = __raw_readl(clk->bclkctr);
--		reg |= 1 << clk->bclk_shift;
--		__raw_writel(reg, clk->bclkctr);
--	}
--	return 0;
--}
--
--static void disable_clk(struct clk *clk)
--{
--	u32 reg;
--
--	if (clk->root_id != CLK_SRC_NOROOT) {
--		root_clk_disable(clk->root_id);
--		return;
--	}
--
--	if (clk->bclkctr) {
--		reg = __raw_readl(clk->bclkctr);
--		reg &= ~(1 << clk->bclk_shift);
--		__raw_writel(reg, clk->bclkctr);
--	}
--	if (clk->aclkreg) {
--		reg = __raw_readl(clk->aclkreg);
--		reg &= ~ACLK_EN;
--		__raw_writel(reg, clk->aclkreg);
--	}
--}
--
--static unsigned long get_rate_pll(int pll)
--{
--	u32 reg;
--	unsigned long s, m, p;
--	void __iomem *addr = pll_cfg_addr(pll);
--
--	reg = __raw_readl(addr);
--	s = (reg >> 16) & 0x07;
--	m = (reg >> 8) & 0xff;
--	p = reg & 0x3f;
--
--	return (m * xi_rate) / (p * (1 << s));
--}
--
--static unsigned long get_rate_pll_div(int pll)
--{
--	u32 reg;
--	unsigned long div = 0;
--	void __iomem *addr;
--
--	switch (pll) {
--	case 0:
--		addr = CKC_BASE + CLKDIVC0_OFFS;
--		reg = __raw_readl(addr);
--		if (reg & CLKDIVC0_P0E)
--			div = (reg >> 24) & 0x3f;
--		break;
--	case 1:
--		addr = CKC_BASE + CLKDIVC0_OFFS;
--		reg = __raw_readl(addr);
--		if (reg & CLKDIVC0_P1E)
--			div = (reg >> 16) & 0x3f;
--		break;
--	case 2:
--		addr = CKC_BASE + CLKDIVC1_OFFS;
--		reg = __raw_readl(addr);
--		if (reg & CLKDIVC1_P2E)
--			div = reg & 0x3f;
--		break;
--	}
--	return get_rate_pll(pll) / (div + 1);
--}
--
--static unsigned long get_rate_xi_div(void)
--{
--	unsigned long div = 0;
--	u32 reg = __raw_readl(CKC_BASE + CLKDIVC0_OFFS);
--
--	if (reg & CLKDIVC0_XE)
--		div = (reg >> 8) & 0x3f;
--
--	return xi_rate / (div + 1);
--}
--
--static unsigned long get_rate_xti_div(void)
--{
--	unsigned long div = 0;
--	u32 reg = __raw_readl(CKC_BASE + CLKDIVC0_OFFS);
--
--	if (reg & CLKDIVC0_XTE)
--		div = reg & 0x3f;
--
--	return xti_rate / (div + 1);
--}
--
--static unsigned long root_clk_get_rate(enum root_clks src)
--{
--	switch (src) {
--	case CLK_SRC_PLL0: return get_rate_pll(0);
--	case CLK_SRC_PLL1: return get_rate_pll(1);
--	case CLK_SRC_PLL2: return get_rate_pll(2);
--	case CLK_SRC_PLL0DIV: return get_rate_pll_div(0);
--	case CLK_SRC_PLL1DIV: return get_rate_pll_div(1);
--	case CLK_SRC_PLL2DIV: return get_rate_pll_div(2);
--	case CLK_SRC_XI: return xi_rate;
--	case CLK_SRC_XTI: return xti_rate;
--	case CLK_SRC_XIDIV: return get_rate_xi_div();
--	case CLK_SRC_XTIDIV: return get_rate_xti_div();
--	default: return 0;
--	}
--}
--
--static unsigned long aclk_get_rate(struct clk *clk)
--{
--	u32 reg;
--	unsigned long div;
--	unsigned int src;
--
--	reg = __raw_readl(clk->aclkreg);
--	div = reg & 0x0fff;
--	src = (reg >> ACLK_SEL_SHIFT) & CLK_SRC_MASK;
--	return root_clk_get_rate(src) / (div + 1);
--}
--
--static unsigned long aclk_best_div(struct clk *clk, unsigned long rate)
--{
--	unsigned long div, src, freq, r1, r2;
--
--	if (!rate)
--		return ACLK_MAX_DIV;
--
--	src = __raw_readl(clk->aclkreg) >> ACLK_SEL_SHIFT;
--	src &= CLK_SRC_MASK;
--	freq = root_clk_get_rate(src);
--	div = freq / rate;
--	if (!div)
--		return 1;
--	if (div >= ACLK_MAX_DIV)
--		return ACLK_MAX_DIV;
--	r1 = freq / div;
--	r2 = freq / (div + 1);
--	if ((rate - r2) < (r1 - rate))
--		return div + 1;
--
--	return div;
--}
--
--static unsigned long aclk_round_rate(struct clk *clk, unsigned long rate)
--{
--	unsigned int src;
--
--	src = __raw_readl(clk->aclkreg) >> ACLK_SEL_SHIFT;
--	src &= CLK_SRC_MASK;
--
--	return root_clk_get_rate(src) / aclk_best_div(clk, rate);
--}
--
--static int aclk_set_rate(struct clk *clk, unsigned long rate)
--{
--	u32 reg;
--
--	reg = __raw_readl(clk->aclkreg) & ~ACLK_DIV_MASK;
--	reg |= aclk_best_div(clk, rate) - 1;
--	__raw_writel(reg, clk->aclkreg);
--	return 0;
--}
--
--static unsigned long get_rate_sys(struct clk *clk)
--{
--	unsigned int src;
--
--	src = __raw_readl(CKC_BASE + CLKCTRL_OFFS) & CLK_SRC_MASK;
--	return root_clk_get_rate(src);
--}
--
--static unsigned long get_rate_bus(struct clk *clk)
--{
--	unsigned int reg, sdiv, bdiv, rate;
--
--	reg = __raw_readl(CKC_BASE + CLKCTRL_OFFS);
--	rate = get_rate_sys(clk);
--	sdiv = (reg >> 20) & 3;
--	if (sdiv)
--		rate /= sdiv + 1;
--	bdiv = (reg >> 4) & 0xff;
--	if (bdiv)
--		rate /= bdiv + 1;
--	return rate;
--}
--
--static unsigned long get_rate_cpu(struct clk *clk)
--{
--	unsigned int reg, div, fsys, fbus;
--
--	fbus = get_rate_bus(clk);
--	reg = __raw_readl(CKC_BASE + CLKCTRL_OFFS);
--	if (reg & (1 << 29))
--		return fbus;
--	fsys = get_rate_sys(clk);
--	div = (reg >> 16) & 0x0f;
--	return fbus + ((fsys - fbus) * (div + 1)) / 16;
--}
--
--static unsigned long get_rate_root(struct clk *clk)
--{
--	return root_clk_get_rate(clk->root_id);
--}
--
--static int aclk_set_parent(struct clk *clock, struct clk *parent)
--{
--	u32 reg;
--
--	if (clock->parent == parent)
--		return 0;
--
--	clock->parent = parent;
--
--	if (!parent)
--		return 0;
--
--	if (parent->root_id == CLK_SRC_NOROOT)
--		return 0;
--	reg = __raw_readl(clock->aclkreg);
--	reg &= ~ACLK_SEL_MASK;
--	reg |= (parent->root_id << ACLK_SEL_SHIFT) & ACLK_SEL_MASK;
--	__raw_writel(reg, clock->aclkreg);
--
--	return 0;
--}
--
--#define DEFINE_ROOT_CLOCK(name, ri, p)	\
--	static struct clk name = {		\
--		.root_id = ri,			\
--		.get_rate = get_rate_root,			\
--		.enable = enable_clk,		\
--		.disable = disable_clk,		\
--		.parent = p,			\
--	};
--
--#define DEFINE_SPECIAL_CLOCK(name, gr, p)	\
--	static struct clk name = {		\
--		.root_id = CLK_SRC_NOROOT,	\
--		.get_rate = gr,			\
--		.parent = p,			\
--	};
--
--#define DEFINE_ACLOCK(name, bc, bs, ar)		\
--	static struct clk name = {		\
--		.root_id = CLK_SRC_NOROOT,	\
--		.bclkctr = bc,			\
--		.bclk_shift = bs,		\
--		.aclkreg = ar,			\
--		.get_rate = aclk_get_rate,	\
--		.set_rate = aclk_set_rate,	\
--		.round_rate = aclk_round_rate,	\
--		.enable = enable_clk,		\
--		.disable = disable_clk,		\
--		.set_parent = aclk_set_parent,	\
--	};
--
--#define DEFINE_BCLOCK(name, bc, bs, gr, p)	\
--	static struct clk name = {		\
--		.root_id = CLK_SRC_NOROOT,	\
--		.bclkctr = bc,			\
--		.bclk_shift = bs,		\
--		.get_rate = gr,			\
--		.enable = enable_clk,		\
--		.disable = disable_clk,		\
--		.parent = p,			\
--	};
--
--DEFINE_ROOT_CLOCK(xi, CLK_SRC_XI, NULL)
--DEFINE_ROOT_CLOCK(xti, CLK_SRC_XTI, NULL)
--DEFINE_ROOT_CLOCK(xidiv, CLK_SRC_XIDIV, &xi)
--DEFINE_ROOT_CLOCK(xtidiv, CLK_SRC_XTIDIV, &xti)
--DEFINE_ROOT_CLOCK(pll0, CLK_SRC_PLL0, &xi)
--DEFINE_ROOT_CLOCK(pll1, CLK_SRC_PLL1, &xi)
--DEFINE_ROOT_CLOCK(pll2, CLK_SRC_PLL2, &xi)
--DEFINE_ROOT_CLOCK(pll0div, CLK_SRC_PLL0DIV, &pll0)
--DEFINE_ROOT_CLOCK(pll1div, CLK_SRC_PLL1DIV, &pll1)
--DEFINE_ROOT_CLOCK(pll2div, CLK_SRC_PLL2DIV, &pll2)
--
--/* The following 3 clocks are special and are initialized explicitly later */
--DEFINE_SPECIAL_CLOCK(sys, get_rate_sys, NULL)
--DEFINE_SPECIAL_CLOCK(bus, get_rate_bus, &sys)
--DEFINE_SPECIAL_CLOCK(cpu, get_rate_cpu, &sys)
--
--DEFINE_ACLOCK(tct, NULL, 0, ACLKTCT)
--DEFINE_ACLOCK(tcx, NULL, 0, ACLKTCX)
--DEFINE_ACLOCK(tcz, NULL, 0, ACLKTCZ)
--DEFINE_ACLOCK(ref, NULL, 0, ACLKREF)
--DEFINE_ACLOCK(uart0, BCLKCTR0, 5, ACLKUART0)
--DEFINE_ACLOCK(uart1, BCLKCTR0, 23, ACLKUART1)
--DEFINE_ACLOCK(uart2, BCLKCTR0, 6, ACLKUART2)
--DEFINE_ACLOCK(uart3, BCLKCTR0, 8, ACLKUART3)
--DEFINE_ACLOCK(uart4, BCLKCTR1, 6, ACLKUART4)
--DEFINE_ACLOCK(i2c, BCLKCTR0, 7, ACLKI2C)
--DEFINE_ACLOCK(adc, BCLKCTR0, 10, ACLKADC)
--DEFINE_ACLOCK(usbh0, BCLKCTR0, 11, ACLKUSBH)
--DEFINE_ACLOCK(lcd, BCLKCTR0, 13, ACLKLCD)
--DEFINE_ACLOCK(sd0, BCLKCTR0, 17, ACLKSDH0)
--DEFINE_ACLOCK(sd1, BCLKCTR1, 5, ACLKSDH1)
--DEFINE_ACLOCK(spi0, BCLKCTR0, 24, ACLKSPI0)
--DEFINE_ACLOCK(spi1, BCLKCTR0, 30, ACLKSPI1)
--DEFINE_ACLOCK(spdif, BCLKCTR1, 2, ACLKSPDIF)
--DEFINE_ACLOCK(c3dec, BCLKCTR1, 9, ACLKC3DEC)
--DEFINE_ACLOCK(can0, BCLKCTR1, 10, ACLKCAN0)
--DEFINE_ACLOCK(can1, BCLKCTR1, 11, ACLKCAN1)
--DEFINE_ACLOCK(gsb0, BCLKCTR1, 13, ACLKGSB0)
--DEFINE_ACLOCK(gsb1, BCLKCTR1, 14, ACLKGSB1)
--DEFINE_ACLOCK(gsb2, BCLKCTR1, 15, ACLKGSB2)
--DEFINE_ACLOCK(gsb3, BCLKCTR1, 16, ACLKGSB3)
--DEFINE_ACLOCK(usbh1, BCLKCTR1, 20, ACLKUSBH)
--
--DEFINE_BCLOCK(dai0, BCLKCTR0, 0, NULL, NULL)
--DEFINE_BCLOCK(pic, BCLKCTR0, 1, NULL, NULL)
--DEFINE_BCLOCK(tc, BCLKCTR0, 2, NULL, NULL)
--DEFINE_BCLOCK(gpio, BCLKCTR0, 3, NULL, NULL)
--DEFINE_BCLOCK(usbd, BCLKCTR0, 4, NULL, NULL)
--DEFINE_BCLOCK(ecc, BCLKCTR0, 9, NULL, NULL)
--DEFINE_BCLOCK(gdma0, BCLKCTR0, 12, NULL, NULL)
--DEFINE_BCLOCK(rtc, BCLKCTR0, 15, NULL, NULL)
--DEFINE_BCLOCK(nfc, BCLKCTR0, 16, NULL, NULL)
--DEFINE_BCLOCK(g2d, BCLKCTR0, 18, NULL, NULL)
--DEFINE_BCLOCK(gdma1, BCLKCTR0, 22, NULL, NULL)
--DEFINE_BCLOCK(mscl, BCLKCTR0, 25, NULL, NULL)
--DEFINE_BCLOCK(bdma, BCLKCTR1, 0, NULL, NULL)
--DEFINE_BCLOCK(adma0, BCLKCTR1, 1, NULL, NULL)
--DEFINE_BCLOCK(scfg, BCLKCTR1, 3, NULL, NULL)
--DEFINE_BCLOCK(cid, BCLKCTR1, 4, NULL, NULL)
--DEFINE_BCLOCK(dai1, BCLKCTR1, 7, NULL, NULL)
--DEFINE_BCLOCK(adma1, BCLKCTR1, 8, NULL, NULL)
--DEFINE_BCLOCK(gps, BCLKCTR1, 12, NULL, NULL)
--DEFINE_BCLOCK(gdma2, BCLKCTR1, 17, NULL, NULL)
--DEFINE_BCLOCK(gdma3, BCLKCTR1, 18, NULL, NULL)
--DEFINE_BCLOCK(ddrc, BCLKCTR1, 19, NULL, NULL)
--
--#define _REGISTER_CLOCK(d, n, c) \
--	{ \
--		.dev_id = d, \
--		.con_id = n, \
--		.clk = &c, \
--	},
--
--static struct clk_lookup lookups[] = {
--	_REGISTER_CLOCK(NULL, "bus", bus)
--	_REGISTER_CLOCK(NULL, "cpu", cpu)
--	_REGISTER_CLOCK(NULL, "tct", tct)
--	_REGISTER_CLOCK(NULL, "tcx", tcx)
--	_REGISTER_CLOCK(NULL, "tcz", tcz)
--	_REGISTER_CLOCK(NULL, "ref", ref)
--	_REGISTER_CLOCK(NULL, "dai0", dai0)
--	_REGISTER_CLOCK(NULL, "pic", pic)
--	_REGISTER_CLOCK(NULL, "tc", tc)
--	_REGISTER_CLOCK(NULL, "gpio", gpio)
--	_REGISTER_CLOCK(NULL, "usbd", usbd)
--	_REGISTER_CLOCK("tcc-uart.0", NULL, uart0)
--	_REGISTER_CLOCK("tcc-uart.2", NULL, uart2)
--	_REGISTER_CLOCK("tcc-i2c", NULL, i2c)
--	_REGISTER_CLOCK("tcc-uart.3", NULL, uart3)
--	_REGISTER_CLOCK(NULL, "ecc", ecc)
--	_REGISTER_CLOCK(NULL, "adc", adc)
--	_REGISTER_CLOCK("tcc-usbh.0", "usb", usbh0)
--	_REGISTER_CLOCK(NULL, "gdma0", gdma0)
--	_REGISTER_CLOCK(NULL, "lcd", lcd)
--	_REGISTER_CLOCK(NULL, "rtc", rtc)
--	_REGISTER_CLOCK(NULL, "nfc", nfc)
--	_REGISTER_CLOCK("tcc-mmc.0", NULL, sd0)
--	_REGISTER_CLOCK(NULL, "g2d", g2d)
--	_REGISTER_CLOCK(NULL, "gdma1", gdma1)
--	_REGISTER_CLOCK("tcc-uart.1", NULL, uart1)
--	_REGISTER_CLOCK("tcc-spi.0", NULL, spi0)
--	_REGISTER_CLOCK(NULL, "mscl", mscl)
--	_REGISTER_CLOCK("tcc-spi.1", NULL, spi1)
--	_REGISTER_CLOCK(NULL, "bdma", bdma)
--	_REGISTER_CLOCK(NULL, "adma0", adma0)
--	_REGISTER_CLOCK(NULL, "spdif", spdif)
--	_REGISTER_CLOCK(NULL, "scfg", scfg)
--	_REGISTER_CLOCK(NULL, "cid", cid)
--	_REGISTER_CLOCK("tcc-mmc.1", NULL, sd1)
--	_REGISTER_CLOCK("tcc-uart.4", NULL, uart4)
--	_REGISTER_CLOCK(NULL, "dai1", dai1)
--	_REGISTER_CLOCK(NULL, "adma1", adma1)
--	_REGISTER_CLOCK(NULL, "c3dec", c3dec)
--	_REGISTER_CLOCK("tcc-can.0", NULL, can0)
--	_REGISTER_CLOCK("tcc-can.1", NULL, can1)
--	_REGISTER_CLOCK(NULL, "gps", gps)
--	_REGISTER_CLOCK("tcc-gsb.0", NULL, gsb0)
--	_REGISTER_CLOCK("tcc-gsb.1", NULL, gsb1)
--	_REGISTER_CLOCK("tcc-gsb.2", NULL, gsb2)
--	_REGISTER_CLOCK("tcc-gsb.3", NULL, gsb3)
--	_REGISTER_CLOCK(NULL, "gdma2", gdma2)
--	_REGISTER_CLOCK(NULL, "gdma3", gdma3)
--	_REGISTER_CLOCK(NULL, "ddrc", ddrc)
--	_REGISTER_CLOCK("tcc-usbh.1", "usb", usbh1)
+-#ifndef TCC8K_REGS_H
+-#define TCC8K_REGS_H
+-
+-#include <linux/types.h>
+-
+-#define EXT_SDRAM_BASE		0x20000000
+-#define INT_SRAM_BASE		0x30000000
+-#define INT_SRAM_SIZE		SZ_32K
+-#define CS0_BASE		0x40000000
+-#define CS1_BASE		0x50000000
+-#define CS1_SIZE		SZ_64K
+-#define CS2_BASE		0x60000000
+-#define CS3_BASE		0x70000000
+-#define AHB_PERI_BASE		0x80000000
+-#define AHB_PERI_SIZE		SZ_64K
+-#define APB0_PERI_BASE		0x90000000
+-#define APB0_PERI_SIZE		SZ_128K
+-#define APB1_PERI_BASE		0x98000000
+-#define APB1_PERI_SIZE		SZ_128K
+-#define DATA_TCM_BASE		0xa0000000
+-#define DATA_TCM_SIZE		SZ_8K
+-#define EXT_MEM_CTRL_BASE	0xf0000000
+-#define EXT_MEM_CTRL_SIZE	SZ_4K
+-
+-#define CS1_BASE_VIRT		(void __iomem *)0xf7000000
+-#define AHB_PERI_BASE_VIRT	(void __iomem *)0xf4000000
+-#define APB0_PERI_BASE_VIRT	(void __iomem *)0xf1000000
+-#define APB1_PERI_BASE_VIRT	(void __iomem *)0xf2000000
+-#define EXT_MEM_CTRL_BASE_VIRT	(void __iomem *)0xf3000000
+-#define INT_SRAM_BASE_VIRT	(void __iomem *)0xf5000000
+-#define DATA_TCM_BASE_VIRT	(void __iomem *)0xf6000000
+-
+-#define __REG(x)     (*((volatile u32 *)(x)))
+-
+-/* USB Device Controller Registers */
+-#define UDC_BASE	(AHB_PERI_BASE_VIRT + 0x8000)
+-#define UDC_BASE_PHYS	(AHB_PERI_BASE + 0x8000)
+-
+-#define UDC_IR_OFFS		0x00
+-#define UDC_EIR_OFFS		0x04
+-#define UDC_EIER_OFFS		0x08
+-#define UDC_FAR_OFFS		0x0c
+-#define UDC_FNR_OFFS		0x10
+-#define UDC_EDR_OFFS		0x14
+-#define UDC_RT_OFFS		0x18
+-#define UDC_SSR_OFFS		0x1c
+-#define UDC_SCR_OFFS		0x20
+-#define UDC_EP0SR_OFFS		0x24
+-#define UDC_EP0CR_OFFS		0x28
+-
+-#define UDC_ESR_OFFS		0x2c
+-#define UDC_ECR_OFFS		0x30
+-#define UDC_BRCR_OFFS		0x34
+-#define UDC_BWCR_OFFS		0x38
+-#define UDC_MPR_OFFS		0x3c
+-#define UDC_DCR_OFFS		0x40
+-#define UDC_DTCR_OFFS		0x44
+-#define UDC_DFCR_OFFS		0x48
+-#define UDC_DTTCR1_OFFS		0x4c
+-#define UDC_DTTCR2_OFFS		0x50
+-#define UDC_ESR2_OFFS		0x54
+-
+-#define UDC_SCR2_OFFS		0x58
+-#define UDC_EP0BUF_OFFS		0x60
+-#define UDC_EP1BUF_OFFS		0x64
+-#define UDC_EP2BUF_OFFS		0x68
+-#define UDC_EP3BUF_OFFS		0x6c
+-#define UDC_PLICR_OFFS		0xa0
+-#define UDC_PCR_OFFS		0xa4
+-
+-#define UDC_UPCR0_OFFS		0xc8
+-#define UDC_UPCR1_OFFS		0xcc
+-#define UDC_UPCR2_OFFS		0xd0
+-#define UDC_UPCR3_OFFS		0xd4
+-
+-/* Bits in UDC_EIR */
+-#define UDC_EIR_EP0I		(1 << 0)
+-#define UDC_EIR_EP1I		(1 << 1)
+-#define UDC_EIR_EP2I		(1 << 2)
+-#define UDC_EIR_EP3I		(1 << 3)
+-#define UDC_EIR_EPI_MASK	0x0f
+-
+-/* Bits in UDC_EIER */
+-#define UDC_EIER_EP0IE		(1 << 0)
+-#define UDC_EIER_EP1IE		(1 << 1)
+-#define UDC_EIER_EP2IE		(1 << 2)
+-#define UDC_EIER_EP3IE		(1 << 3)
+-
+-/* Bits in UDC_FNR */
+-#define UDC_FNR_FN_MASK		0x7ff
+-#define UDC_FNR_SM		(1 << 13)
+-#define UDC_FNR_FTL		(1 << 14)
+-
+-/* Bits in UDC_SSR */
+-#define UDC_SSR_HFRES		(1 << 0)
+-#define UDC_SSR_HFSUSP		(1 << 1)
+-#define UDC_SSR_HFRM		(1 << 2)
+-#define UDC_SSR_SDE		(1 << 3)
+-#define UDC_SSR_HSP		(1 << 4)
+-#define UDC_SSR_DM		(1 << 5)
+-#define UDC_SSR_DP		(1 << 6)
+-#define UDC_SSR_TBM		(1 << 7)
+-#define UDC_SSR_VBON		(1 << 8)
+-#define UDC_SSR_VBOFF		(1 << 9)
+-#define UDC_SSR_EOERR		(1 << 10)
+-#define UDC_SSR_DCERR		(1 << 11)
+-#define UDC_SSR_TCERR		(1 << 12)
+-#define UDC_SSR_BSERR		(1 << 13)
+-#define UDC_SSR_TMERR		(1 << 14)
+-#define UDC_SSR_BAERR		(1 << 15)
+-
+-/* Bits in UDC_SCR */
+-#define UDC_SCR_HRESE		(1 << 0)
+-#define UDC_SCR_HSSPE		(1 << 1)
+-#define UDC_SCR_RRDE		(1 << 5)
+-#define UDC_SCR_SPDEN		(1 << 6)
+-#define UDC_SCR_DIEN		(1 << 12)
+-
+-/* Bits in UDC_EP0SR */
+-#define UDC_EP0SR_RSR		(1 << 0)
+-#define UDC_EP0SR_TST		(1 << 1)
+-#define UDC_EP0SR_SHT		(1 << 4)
+-#define UDC_EP0SR_LWO		(1 << 6)
+-
+-/* Bits in UDC_EP0CR */
+-#define UDC_EP0CR_ESS		(1 << 1)
+-
+-/* Bits in UDC_ESR */
+-#define UDC_ESR_RPS		(1 << 0)
+-#define UDC_ESR_TPS		(1 << 1)
+-#define UDC_ESR_LWO		(1 << 4)
+-#define UDC_ESR_FFS		(1 << 6)
+-
+-/* Bits in UDC_ECR */
+-#define UDC_ECR_ESS		(1 << 1)
+-#define UDC_ECR_CDP		(1 << 2)
+-
+-#define UDC_ECR_FLUSH		(1 << 6)
+-#define UDC_ECR_DUEN		(1 << 7)
+-
+-/* Bits in UDC_UPCR0 */
+-#define UDC_UPCR0_VBD		(1 << 1)
+-#define UDC_UPCR0_VBDS		(1 << 6)
+-#define UDC_UPCR0_RCD_12	(0x0 << 9)
+-#define UDC_UPCR0_RCD_24	(0x1 << 9)
+-#define UDC_UPCR0_RCD_48	(0x2 << 9)
+-#define UDC_UPCR0_RCS_EXT	(0x1 << 11)
+-#define UDC_UPCR0_RCS_XTAL	(0x0 << 11)
+-
+-/* Bits in UDC_UPCR1 */
+-#define UDC_UPCR1_CDT(x)	((x) << 0)
+-#define UDC_UPCR1_OTGT(x)	((x) << 3)
+-#define UDC_UPCR1_SQRXT(x)	((x) << 8)
+-#define UDC_UPCR1_TXFSLST(x)	((x) << 12)
+-
+-/* Bits in UDC_UPCR2 */
+-#define UDC_UPCR2_TP		(1 << 0)
+-#define UDC_UPCR2_TXRT(x)	((x) << 2)
+-#define UDC_UPCR2_TXVRT(x)	((x) << 5)
+-#define UDC_UPCR2_OPMODE(x)	((x) << 9)
+-#define UDC_UPCR2_XCVRSEL(x)	((x) << 12)
+-#define UDC_UPCR2_TM		(1 << 14)
+-
+-/* USB Host Controller registers */
+-#define USBH0_BASE	(AHB_PERI_BASE_VIRT + 0xb000)
+-#define USBH1_BASE	(AHB_PERI_BASE_VIRT + 0xb800)
+-
+-#define OHCI_INT_ENABLE_OFFS	0x10
+-
+-#define RH_DESCRIPTOR_A_OFFS	0x48
+-#define RH_DESCRIPTOR_B_OFFS	0x4c
+-
+-#define USBHTCFG0_OFFS		0x100
+-#define USBHHCFG0_OFFS		0x104
+-#define USBHHCFG1_OFFS		0x104
+-
+-/* DMA controller registers */
+-#define DMAC0_BASE	(AHB_PERI_BASE + 0x4000)
+-#define DMAC1_BASE	(AHB_PERI_BASE + 0xa000)
+-#define DMAC2_BASE	(AHB_PERI_BASE + 0x4800)
+-#define DMAC3_BASE	(AHB_PERI_BASE + 0xa800)
+-
+-#define DMAC_CH_OFFSET(ch)	(ch * 0x30)
+-
+-#define ST_SADR_OFFS		0x00
+-#define SPARAM_OFFS		0x04
+-#define C_SADR_OFFS		0x0c
+-#define ST_DADR_OFFS		0x10
+-#define DPARAM_OFFS		0x14
+-#define C_DADR_OFFS		0x1c
+-#define HCOUNT_OFFS		0x20
+-#define CHCTRL_OFFS		0x24
+-#define RPTCTRL_OFFS		0x28
+-#define EXTREQ_A_OFFS		0x2c
+-
+-/* Bits in CHCTRL register */
+-#define CHCTRL_EN		(1 << 0)
+-
+-#define CHCTRL_IEN		(1 << 2)
+-#define CHCTRL_FLAG		(1 << 3)
+-#define CHCTRL_WSIZE8		(0 << 4)
+-#define CHCTRL_WSIZE16		(1 << 4)
+-#define CHCTRL_WSIZE32		(2 << 4)
+-
+-#define CHCTRL_BSIZE1		(0 << 6)
+-#define CHCTRL_BSIZE2		(1 << 6)
+-#define CHCTRL_BSIZE4		(2 << 6)
+-#define CHCTRL_BSIZE8		(3 << 6)
+-
+-#define CHCTRL_TYPE_SINGLE_E	(0 << 8)
+-#define CHCTRL_TYPE_HW		(1 << 8)
+-#define CHCTRL_TYPE_SW		(2 << 8)
+-#define CHCTRL_TYPE_SINGLE_L	(3 << 8)
+-
+-#define CHCTRL_BST		(1 << 10)
+-
+-/* Use DMA controller 0, channel 2 for USB */
+-#define USB_DMA_BASE		(DMAC0_BASE + DMAC_CH_OFFSET(2))
+-
+-/* NAND flash controller registers */
+-#define NFC_BASE	(AHB_PERI_BASE_VIRT + 0xd000)
+-#define NFC_BASE_PHYS	(AHB_PERI_BASE + 0xd000)
+-
+-#define NFC_CMD_OFFS		0x00
+-#define NFC_LADDR_OFFS		0x04
+-#define NFC_BADDR_OFFS		0x08
+-#define NFC_SADDR_OFFS		0x0c
+-#define NFC_WDATA_OFFS		0x10
+-#define NFC_LDATA_OFFS		0x20
+-#define NFC_SDATA_OFFS		0x40
+-#define NFC_CTRL_OFFS		0x50
+-#define NFC_PSTART_OFFS		0x54
+-#define NFC_RSTART_OFFS		0x58
+-#define NFC_DSIZE_OFFS		0x5c
+-#define NFC_IREQ_OFFS		0x60
+-#define NFC_RST_OFFS		0x64
+-#define NFC_CTRL1_OFFS		0x68
+-#define NFC_MDATA_OFFS		0x70
+-
+-#define NFC_WDATA_PHYS_ADDR	(NFC_BASE_PHYS + NFC_WDATA_OFFS)
+-
+-/* Bits in NFC_CTRL */
+-#define NFC_CTRL_BHLD_MASK	(0xf << 0)
+-#define NFC_CTRL_BPW_MASK	(0xf << 4)
+-#define NFC_CTRL_BSTP_MASK	(0xf << 8)
+-#define NFC_CTRL_CADDR_MASK	(0x7 << 12)
+-#define NFC_CTRL_CADDR_1	(0x0 << 12)
+-#define NFC_CTRL_CADDR_2	(0x1 << 12)
+-#define NFC_CTRL_CADDR_3	(0x2 << 12)
+-#define NFC_CTRL_CADDR_4	(0x3 << 12)
+-#define NFC_CTRL_CADDR_5	(0x4 << 12)
+-#define NFC_CTRL_MSK		(1 << 15)
+-#define NFC_CTRL_PSIZE256	(0 << 16)
+-#define NFC_CTRL_PSIZE512	(1 << 16)
+-#define NFC_CTRL_PSIZE1024	(2 << 16)
+-#define NFC_CTRL_PSIZE2048	(3 << 16)
+-#define NFC_CTRL_PSIZE4096	(4 << 16)
+-#define NFC_CTRL_PSIZE_MASK	(7 << 16)
+-#define NFC_CTRL_BSIZE1		(0 << 19)
+-#define NFC_CTRL_BSIZE2		(1 << 19)
+-#define NFC_CTRL_BSIZE4		(2 << 19)
+-#define NFC_CTRL_BSIZE8		(3 << 19)
+-#define NFC_CTRL_BSIZE_MASK	(3 << 19)
+-#define NFC_CTRL_RDY		(1 << 21)
+-#define NFC_CTRL_CS0SEL		(1 << 22)
+-#define NFC_CTRL_CS1SEL		(1 << 23)
+-#define NFC_CTRL_CS2SEL		(1 << 24)
+-#define NFC_CTRL_CS3SEL		(1 << 25)
+-#define NFC_CTRL_CSMASK		(0xf << 22)
+-#define NFC_CTRL_BW		(1 << 26)
+-#define NFC_CTRL_FS		(1 << 27)
+-#define NFC_CTRL_DEN		(1 << 28)
+-#define NFC_CTRL_READ_IEN	(1 << 29)
+-#define NFC_CTRL_PROG_IEN	(1 << 30)
+-#define NFC_CTRL_RDY_IEN	(1 << 31)
+-
+-/* Bits in NFC_IREQ */
+-#define NFC_IREQ_IRQ0		(1 << 0)
+-#define NFC_IREQ_IRQ1		(1 << 1)
+-#define NFC_IREQ_IRQ2		(1 << 2)
+-
+-#define NFC_IREQ_FLAG0		(1 << 4)
+-#define NFC_IREQ_FLAG1		(1 << 5)
+-#define NFC_IREQ_FLAG2		(1 << 6)
+-
+-/* MMC controller registers */
+-#define MMC0_BASE	(AHB_PERI_BASE_VIRT + 0xe000)
+-#define MMC1_BASE	(AHB_PERI_BASE_VIRT + 0xe800)
+-
+-/* UART base addresses */
+-
+-#define UART0_BASE	(APB0_PERI_BASE_VIRT + 0x07000)
+-#define UART0_BASE_PHYS	(APB0_PERI_BASE + 0x07000)
+-#define UART1_BASE	(APB0_PERI_BASE_VIRT + 0x08000)
+-#define UART1_BASE_PHYS	(APB0_PERI_BASE + 0x08000)
+-#define UART2_BASE	(APB0_PERI_BASE_VIRT + 0x09000)
+-#define UART2_BASE_PHYS	(APB0_PERI_BASE + 0x09000)
+-#define UART3_BASE	(APB0_PERI_BASE_VIRT + 0x0a000)
+-#define UART3_BASE_PHYS	(APB0_PERI_BASE + 0x0a000)
+-#define UART4_BASE	(APB0_PERI_BASE_VIRT + 0x15000)
+-#define UART4_BASE_PHYS	(APB0_PERI_BASE + 0x15000)
+-
+-#define UART_BASE	UART0_BASE
+-#define UART_BASE_PHYS	UART0_BASE_PHYS
+-
+-/* ECC controller */
+-#define ECC_CTR_BASE	(APB0_PERI_BASE_VIRT + 0xd000)
+-
+-#define ECC_CTRL_OFFS		0x00
+-#define ECC_BASE_OFFS		0x04
+-#define ECC_MASK_OFFS		0x08
+-#define ECC_CLEAR_OFFS		0x0c
+-#define ECC4_0_OFFS		0x10
+-#define ECC4_1_OFFS		0x14
+-
+-#define ECC_EADDR0_OFFS		0x50
+-
+-#define ECC_ERRNUM_OFFS		0x90
+-#define ECC_IREQ_OFFS		0x94
+-
+-/* Bits in ECC_CTRL */
+-#define ECC_CTRL_ECC4_DIEN	(1 << 28)
+-#define ECC_CTRL_ECC8_DIEN	(1 << 29)
+-#define ECC_CTRL_ECC12_DIEN	(1 << 30)
+-#define ECC_CTRL_ECC_DISABLE	0x0
+-#define ECC_CTRL_ECC_SLC_ENC	0x8
+-#define ECC_CTRL_ECC_SLC_DEC	0x9
+-#define ECC_CTRL_ECC4_ENC	0xa
+-#define ECC_CTRL_ECC4_DEC	0xb
+-#define ECC_CTRL_ECC8_ENC	0xc
+-#define ECC_CTRL_ECC8_DEC	0xd
+-#define ECC_CTRL_ECC12_ENC	0xe
+-#define ECC_CTRL_ECC12_DEC	0xf
+-
+-/* Bits in ECC_IREQ */
+-#define ECC_IREQ_E4DI		(1 << 4)
+-
+-#define ECC_IREQ_E4DF		(1 << 20)
+-#define ECC_IREQ_E4EF		(1 << 21)
+-
+-/* Interrupt controller */
+-
+-#define PIC0_BASE	(APB1_PERI_BASE_VIRT + 0x3000)
+-#define PIC0_BASE_PHYS	(APB1_PERI_BASE + 0x3000)
+-
+-#define PIC0_IEN_OFFS		0x00
+-#define PIC0_CREQ_OFFS		0x04
+-#define PIC0_IREQ_OFFS		0x08
+-#define PIC0_IRQSEL_OFFS	0x0c
+-#define PIC0_SRC_OFFS		0x10
+-#define PIC0_MREQ_OFFS		0x14
+-#define PIC0_TSTREQ_OFFS	0x18
+-#define PIC0_POL_OFFS		0x1c
+-#define PIC0_IRQ_OFFS		0x20
+-#define PIC0_FIQ_OFFS		0x24
+-#define PIC0_MIRQ_OFFS		0x28
+-#define PIC0_MFIQ_OFFS		0x2c
+-#define PIC0_TMODE_OFFS		0x30
+-#define PIC0_SYNC_OFFS		0x34
+-#define PIC0_WKUP_OFFS		0x38
+-#define PIC0_TMODEA_OFFS	0x3c
+-#define PIC0_INTOEN_OFFS	0x40
+-#define PIC0_MEN0_OFFS		0x44
+-#define PIC0_MEN_OFFS		0x48
+-
+-#define PIC0_IEN		__REG(PIC0_BASE + PIC0_IEN_OFFS)
+-#define PIC0_IEN_PHYS		__REG(PIC0_BASE_PHYS + PIC0_IEN_OFFS)
+-#define PIC0_CREQ		__REG(PIC0_BASE + PIC0_CREQ_OFFS)
+-#define PIC0_CREQ_PHYS		__REG(PIC0_BASE_PHYS + PIC0_CREQ_OFFS)
+-#define PIC0_IREQ		__REG(PIC0_BASE + PIC0_IREQ_OFFS)
+-#define PIC0_IRQSEL		__REG(PIC0_BASE + PIC0_IRQSEL_OFFS)
+-#define PIC0_IRQSEL_PHYS	__REG(PIC0_BASE_PHYS + PIC0_IRQSEL_OFFS)
+-#define PIC0_SRC		__REG(PIC0_BASE + PIC0_SRC_OFFS)
+-#define PIC0_MREQ		__REG(PIC0_BASE + PIC0_MREQ_OFFS)
+-#define PIC0_TSTREQ		__REG(PIC0_BASE + PIC0_TSTREQ_OFFS)
+-#define PIC0_POL		__REG(PIC0_BASE + PIC0_POL_OFFS)
+-#define PIC0_IRQ		__REG(PIC0_BASE + PIC0_IRQ_OFFS)
+-#define PIC0_FIQ		__REG(PIC0_BASE + PIC0_FIQ_OFFS)
+-#define PIC0_MIRQ		__REG(PIC0_BASE + PIC0_MIRQ_OFFS)
+-#define PIC0_MFIQ		__REG(PIC0_BASE + PIC0_MFIQ_OFFS)
+-#define PIC0_TMODE		__REG(PIC0_BASE + PIC0_TMODE_OFFS)
+-#define PIC0_TMODE_PHYS		__REG(PIC0_BASE_PHYS + PIC0_TMODE_OFFS)
+-#define PIC0_SYNC		__REG(PIC0_BASE + PIC0_SYNC_OFFS)
+-#define PIC0_WKUP		__REG(PIC0_BASE + PIC0_WKUP_OFFS)
+-#define PIC0_TMODEA		__REG(PIC0_BASE + PIC0_TMODEA_OFFS)
+-#define PIC0_INTOEN		__REG(PIC0_BASE + PIC0_INTOEN_OFFS)
+-#define PIC0_MEN0		__REG(PIC0_BASE + PIC0_MEN0_OFFS)
+-#define PIC0_MEN		__REG(PIC0_BASE + PIC0_MEN_OFFS)
+-
+-#define PIC1_BASE	(APB1_PERI_BASE_VIRT + 0x3080)
+-
+-#define PIC1_IEN_OFFS		0x00
+-#define PIC1_CREQ_OFFS		0x04
+-#define PIC1_IREQ_OFFS		0x08
+-#define PIC1_IRQSEL_OFFS	0x0c
+-#define PIC1_SRC_OFFS		0x10
+-#define PIC1_MREQ_OFFS		0x14
+-#define PIC1_TSTREQ_OFFS	0x18
+-#define PIC1_POL_OFFS		0x1c
+-#define PIC1_IRQ_OFFS		0x20
+-#define PIC1_FIQ_OFFS		0x24
+-#define PIC1_MIRQ_OFFS		0x28
+-#define PIC1_MFIQ_OFFS		0x2c
+-#define PIC1_TMODE_OFFS		0x30
+-#define PIC1_SYNC_OFFS		0x34
+-#define PIC1_WKUP_OFFS		0x38
+-#define PIC1_TMODEA_OFFS	0x3c
+-#define PIC1_INTOEN_OFFS	0x40
+-#define PIC1_MEN1_OFFS		0x44
+-#define PIC1_MEN_OFFS		0x48
+-
+-#define PIC1_IEN	__REG(PIC1_BASE + PIC1_IEN_OFFS)
+-#define PIC1_CREQ	__REG(PIC1_BASE + PIC1_CREQ_OFFS)
+-#define PIC1_IREQ	__REG(PIC1_BASE + PIC1_IREQ_OFFS)
+-#define PIC1_IRQSEL	__REG(PIC1_BASE + PIC1_IRQSEL_OFFS)
+-#define PIC1_SRC	__REG(PIC1_BASE + PIC1_SRC_OFFS)
+-#define PIC1_MREQ	__REG(PIC1_BASE + PIC1_MREQ_OFFS)
+-#define PIC1_TSTREQ	__REG(PIC1_BASE + PIC1_TSTREQ_OFFS)
+-#define PIC1_POL	__REG(PIC1_BASE + PIC1_POL_OFFS)
+-#define PIC1_IRQ	__REG(PIC1_BASE + PIC1_IRQ_OFFS)
+-#define PIC1_FIQ	__REG(PIC1_BASE + PIC1_FIQ_OFFS)
+-#define PIC1_MIRQ	__REG(PIC1_BASE + PIC1_MIRQ_OFFS)
+-#define PIC1_MFIQ	__REG(PIC1_BASE + PIC1_MFIQ_OFFS)
+-#define PIC1_TMODE	__REG(PIC1_BASE + PIC1_TMODE_OFFS)
+-#define PIC1_SYNC	__REG(PIC1_BASE + PIC1_SYNC_OFFS)
+-#define PIC1_WKUP	__REG(PIC1_BASE + PIC1_WKUP_OFFS)
+-#define PIC1_TMODEA	__REG(PIC1_BASE + PIC1_TMODEA_OFFS)
+-#define PIC1_INTOEN	__REG(PIC1_BASE + PIC1_INTOEN_OFFS)
+-#define PIC1_MEN1	__REG(PIC1_BASE + PIC1_MEN1_OFFS)
+-#define PIC1_MEN	__REG(PIC1_BASE + PIC1_MEN_OFFS)
+-
+-/* Timer registers */
+-#define TIMER_BASE		(APB1_PERI_BASE_VIRT + 0x4000)
+-#define TIMER_BASE_PHYS		(APB1_PERI_BASE + 0x4000)
+-
+-#define TWDCFG_OFFS		0x70
+-
+-#define TC32EN_OFFS		0x80
+-#define TC32LDV_OFFS		0x84
+-#define TC32CMP0_OFFS		0x88
+-#define TC32CMP1_OFFS		0x8c
+-#define TC32PCNT_OFFS		0x90
+-#define TC32MCNT_OFFS		0x94
+-#define TC32IRQ_OFFS		0x98
+-
+-/* Bits in TC32EN */
+-#define TC32EN_PRESCALE_MASK	0x00ffffff
+-#define TC32EN_ENABLE		(1 << 24)
+-#define TC32EN_LOADZERO		(1 << 25)
+-#define TC32EN_STOPMODE		(1 << 26)
+-#define TC32EN_LDM0		(1 << 28)
+-#define TC32EN_LDM1		(1 << 29)
+-
+-/* Bits in TC32IRQ */
+-#define TC32IRQ_MSTAT_MASK	0x0000001f
+-#define TC32IRQ_RSTAT_MASK	(0x1f << 8)
+-#define TC32IRQ_IRQEN0		(1 << 16)
+-#define TC32IRQ_IRQEN1		(1 << 17)
+-#define TC32IRQ_IRQEN2		(1 << 18)
+-#define TC32IRQ_IRQEN3		(1 << 19)
+-#define TC32IRQ_IRQEN4		(1 << 20)
+-#define TC32IRQ_RSYNC		(1 << 30)
+-#define TC32IRQ_IRQCLR		(1 << 31)
+-
+-/* GPIO registers */
+-#define GPIOPD_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOPD_DAT_OFFS		0x00
+-#define GPIOPD_DOE_OFFS		0x04
+-#define GPIOPD_FS0_OFFS		0x08
+-#define GPIOPD_FS1_OFFS		0x0c
+-#define GPIOPD_FS2_OFFS		0x10
+-#define GPIOPD_RPU_OFFS		0x30
+-#define GPIOPD_RPD_OFFS		0x34
+-#define GPIOPD_DV0_OFFS		0x38
+-#define GPIOPD_DV1_OFFS		0x3c
+-
+-#define GPIOPS_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOPS_DAT_OFFS		0x40
+-#define GPIOPS_DOE_OFFS		0x44
+-#define GPIOPS_FS0_OFFS		0x48
+-#define GPIOPS_FS1_OFFS		0x4c
+-#define GPIOPS_FS2_OFFS		0x50
+-#define GPIOPS_FS3_OFFS		0x54
+-#define GPIOPS_RPU_OFFS		0x70
+-#define GPIOPS_RPD_OFFS		0x74
+-#define GPIOPS_DV0_OFFS		0x78
+-#define GPIOPS_DV1_OFFS		0x7c
+-
+-#define GPIOPS_FS1_SDH0_BITS	0x000000ff
+-#define GPIOPS_FS1_SDH1_BITS	0x0000ff00
+-
+-#define GPIOPU_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOPU_DAT_OFFS		0x80
+-#define GPIOPU_DOE_OFFS		0x84
+-#define GPIOPU_FS0_OFFS		0x88
+-#define GPIOPU_FS1_OFFS		0x8c
+-#define GPIOPU_FS2_OFFS		0x90
+-#define GPIOPU_RPU_OFFS		0xb0
+-#define GPIOPU_RPD_OFFS		0xb4
+-#define GPIOPU_DV0_OFFS		0xb8
+-#define GPIOPU_DV1_OFFS		0xbc
+-
+-#define GPIOPU_FS0_TXD0		(1 << 0)
+-#define GPIOPU_FS0_RXD0		(1 << 1)
+-#define GPIOPU_FS0_CTS0		(1 << 2)
+-#define GPIOPU_FS0_RTS0		(1 << 3)
+-#define GPIOPU_FS0_TXD1		(1 << 4)
+-#define GPIOPU_FS0_RXD1		(1 << 5)
+-#define GPIOPU_FS0_CTS1		(1 << 6)
+-#define GPIOPU_FS0_RTS1		(1 << 7)
+-#define GPIOPU_FS0_TXD2		(1 << 8)
+-#define GPIOPU_FS0_RXD2		(1 << 9)
+-#define GPIOPU_FS0_CTS2		(1 << 10)
+-#define GPIOPU_FS0_RTS2		(1 << 11)
+-#define GPIOPU_FS0_TXD3		(1 << 12)
+-#define GPIOPU_FS0_RXD3		(1 << 13)
+-#define GPIOPU_FS0_CTS3		(1 << 14)
+-#define GPIOPU_FS0_RTS3		(1 << 15)
+-#define GPIOPU_FS0_TXD4		(1 << 16)
+-#define GPIOPU_FS0_RXD4		(1 << 17)
+-#define GPIOPU_FS0_CTS4		(1 << 18)
+-#define GPIOPU_FS0_RTS4		(1 << 19)
+-
+-#define GPIOFC_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOFC_DAT_OFFS		0xc0
+-#define GPIOFC_DOE_OFFS		0xc4
+-#define GPIOFC_FS0_OFFS		0xc8
+-#define GPIOFC_FS1_OFFS		0xcc
+-#define GPIOFC_FS2_OFFS		0xd0
+-#define GPIOFC_FS3_OFFS		0xd4
+-#define GPIOFC_RPU_OFFS		0xf0
+-#define GPIOFC_RPD_OFFS		0xf4
+-#define GPIOFC_DV0_OFFS		0xf8
+-#define GPIOFC_DV1_OFFS		0xfc
+-
+-#define GPIOFD_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOFD_DAT_OFFS		0x100
+-#define GPIOFD_DOE_OFFS		0x104
+-#define GPIOFD_FS0_OFFS		0x108
+-#define GPIOFD_FS1_OFFS		0x10c
+-#define GPIOFD_FS2_OFFS		0x110
+-#define GPIOFD_RPU_OFFS		0x130
+-#define GPIOFD_RPD_OFFS		0x134
+-#define GPIOFD_DV0_OFFS		0x138
+-#define GPIOFD_DV1_OFFS		0x13c
+-
+-#define GPIOLC_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOLC_DAT_OFFS		0x140
+-#define GPIOLC_DOE_OFFS		0x144
+-#define GPIOLC_FS0_OFFS		0x148
+-#define GPIOLC_FS1_OFFS		0x14c
+-#define GPIOLC_RPU_OFFS		0x170
+-#define GPIOLC_RPD_OFFS		0x174
+-#define GPIOLC_DV0_OFFS		0x178
+-#define GPIOLC_DV1_OFFS		0x17c
+-
+-#define GPIOLD_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOLD_DAT_OFFS		0x180
+-#define GPIOLD_DOE_OFFS		0x184
+-#define GPIOLD_FS0_OFFS		0x188
+-#define GPIOLD_FS1_OFFS		0x18c
+-#define GPIOLD_FS2_OFFS		0x190
+-#define GPIOLD_RPU_OFFS		0x1b0
+-#define GPIOLD_RPD_OFFS		0x1b4
+-#define GPIOLD_DV0_OFFS		0x1b8
+-#define GPIOLD_DV1_OFFS		0x1bc
+-
+-#define GPIOAD_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOAD_DAT_OFFS		0x1c0
+-#define GPIOAD_DOE_OFFS		0x1c4
+-#define GPIOAD_FS0_OFFS		0x1c8
+-#define GPIOAD_RPU_OFFS		0x1f0
+-#define GPIOAD_RPD_OFFS		0x1f4
+-#define GPIOAD_DV0_OFFS		0x1f8
+-#define GPIOAD_DV1_OFFS		0x1fc
+-
+-#define GPIOXC_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOXC_DAT_OFFS		0x200
+-#define GPIOXC_DOE_OFFS		0x204
+-#define GPIOXC_FS0_OFFS		0x208
+-#define GPIOXC_RPU_OFFS		0x230
+-#define GPIOXC_RPD_OFFS		0x234
+-#define GPIOXC_DV0_OFFS		0x238
+-#define GPIOXC_DV1_OFFS		0x23c
+-
+-#define GPIOXC_FS0		__REG(GPIOXC_BASE + GPIOXC_FS0_OFFS)
+-
+-#define GPIOXC_FS0_CS0		(1 << 26)
+-#define GPIOXC_FS0_CS1		(1 << 27)
+-
+-#define GPIOXD_BASE		(APB1_PERI_BASE_VIRT + 0x5000)
+-
+-#define GPIOXD_DAT_OFFS		0x240
+-#define GPIOXD_FS0_OFFS		0x248
+-#define GPIOXD_RPU_OFFS		0x270
+-#define GPIOXD_RPD_OFFS		0x274
+-#define GPIOXD_DV0_OFFS		0x278
+-#define GPIOXD_DV1_OFFS		0x27c
+-
+-#define GPIOPK_BASE		(APB1_PERI_BASE_VIRT + 0x1c000)
+-
+-#define GPIOPK_RST_OFFS		0x008
+-#define GPIOPK_DAT_OFFS		0x100
+-#define GPIOPK_DOE_OFFS		0x104
+-#define GPIOPK_FS0_OFFS		0x108
+-#define GPIOPK_FS1_OFFS		0x10c
+-#define GPIOPK_FS2_OFFS		0x110
+-#define GPIOPK_IRQST_OFFS	0x210
+-#define GPIOPK_IRQEN_OFFS	0x214
+-#define GPIOPK_IRQPOL_OFFS	0x218
+-#define GPIOPK_IRQTM0_OFFS	0x21c
+-#define GPIOPK_IRQTM1_OFFS	0x220
+-#define GPIOPK_CTL_OFFS		0x22c
+-
+-#define PMGPIO_BASE		(APB1_PERI_BASE_VIRT + 0x10000)
+-#define BACKUP_RAM_BASE		PMGPIO_BASE
+-
+-#define PMGPIO_DAT_OFFS		0x800
+-#define PMGPIO_DOE_OFFS		0x804
+-#define PMGPIO_FS0_OFFS		0x808
+-#define PMGPIO_RPU_OFFS		0x810
+-#define PMGPIO_RPD_OFFS		0x814
+-#define PMGPIO_DV0_OFFS		0x818
+-#define PMGPIO_DV1_OFFS		0x81c
+-#define PMGPIO_EE0_OFFS		0x820
+-#define PMGPIO_EE1_OFFS		0x824
+-#define PMGPIO_CTL_OFFS		0x828
+-#define PMGPIO_DI_OFFS		0x82c
+-#define PMGPIO_STR_OFFS		0x830
+-#define PMGPIO_STF_OFFS		0x834
+-#define PMGPIO_POL_OFFS		0x838
+-#define PMGPIO_APB_OFFS		0x800
+-
+-/* Clock controller registers */
+-#define CKC_BASE	((void __iomem *)(APB1_PERI_BASE_VIRT + 0x6000))
+-
+-#define CLKCTRL_OFFS		0x00
+-#define PLL0CFG_OFFS		0x04
+-#define PLL1CFG_OFFS		0x08
+-#define CLKDIVC0_OFFS		0x0c
+-
+-#define BCLKCTR0_OFFS		0x14
+-#define SWRESET0_OFFS		0x18
+-
+-#define BCLKCTR1_OFFS		0x60
+-#define SWRESET1_OFFS		0x64
+-#define PWDCTL_OFFS		0x68
+-#define PLL2CFG_OFFS		0x6c
+-#define CLKDIVC1_OFFS		0x70
+-
+-#define ACLKREF_OFFS		0x80
+-#define ACLKI2C_OFFS		0x84
+-#define ACLKSPI0_OFFS		0x88
+-#define ACLKSPI1_OFFS		0x8c
+-#define ACLKUART0_OFFS		0x90
+-#define ACLKUART1_OFFS		0x94
+-#define ACLKUART2_OFFS		0x98
+-#define ACLKUART3_OFFS		0x9c
+-#define ACLKUART4_OFFS		0xa0
+-#define ACLKTCT_OFFS		0xa4
+-#define ACLKTCX_OFFS		0xa8
+-#define ACLKTCZ_OFFS		0xac
+-#define ACLKADC_OFFS		0xb0
+-#define ACLKDAI0_OFFS		0xb4
+-#define ACLKDAI1_OFFS		0xb8
+-#define ACLKLCD_OFFS		0xbc
+-#define ACLKSPDIF_OFFS		0xc0
+-#define ACLKUSBH_OFFS		0xc4
+-#define ACLKSDH0_OFFS		0xc8
+-#define ACLKSDH1_OFFS		0xcc
+-#define ACLKC3DEC_OFFS		0xd0
+-#define ACLKEXT_OFFS		0xd4
+-#define ACLKCAN0_OFFS		0xd8
+-#define ACLKCAN1_OFFS		0xdc
+-#define ACLKGSB0_OFFS		0xe0
+-#define ACLKGSB1_OFFS		0xe4
+-#define ACLKGSB2_OFFS		0xe8
+-#define ACLKGSB3_OFFS		0xec
+-
+-#define PLLxCFG_PD		(1 << 31)
+-
+-/* CLKCTRL bits */
+-#define CLKCTRL_XE		(1 << 31)
+-
+-/* CLKDIVCx bits */
+-#define CLKDIVC0_XTE		(1 << 7)
+-#define CLKDIVC0_XE		(1 << 15)
+-#define CLKDIVC0_P1E		(1 << 23)
+-#define CLKDIVC0_P0E		(1 << 31)
+-
+-#define CLKDIVC1_P2E		(1 << 7)
+-
+-/* BCLKCTR0 clock bits */
+-#define BCLKCTR0_USBD		(1 << 4)
+-#define BCLKCTR0_ECC		(1 << 9)
+-#define BCLKCTR0_USBH0		(1 << 11)
+-#define BCLKCTR0_NFC		(1 << 16)
+-
+-/* BCLKCTR1 clock bits */
+-#define BCLKCTR1_USBH1		(1 << 20)
+-
+-/* SWRESET0 bits */
+-#define SWRESET0_USBD		(1 << 4)
+-#define SWRESET0_USBH0		(1 << 11)
+-
+-/* SWRESET1 bits */
+-#define SWRESET1_USBH1		(1 << 20)
+-
+-/* System clock sources.
+- * Note: These are the clock sources that serve as parents for
+- * all other clocks. They have no parents themselves.
+- *
+- * These values are used for struct clk->root_id. All clocks
+- * that are not system clock sources have this value set to
+- * CLK_SRC_NOROOT.
+- * The values for system clocks start with CLK_SRC_PLL0 == 0
+- * because this gives us exactly the values needed for the lower
+- * 4 bits of ACLK_* registers. Therefore, CLK_SRC_NOROOT is
+- * defined as -1 to not disturb the order.
+- */
+-enum root_clks {
+-	CLK_SRC_NOROOT = -1,
+-	CLK_SRC_PLL0 = 0,
+-	CLK_SRC_PLL1,
+-	CLK_SRC_PLL0DIV,
+-	CLK_SRC_PLL1DIV,
+-	CLK_SRC_XI,
+-	CLK_SRC_XIDIV,
+-	CLK_SRC_XTI,
+-	CLK_SRC_XTIDIV,
+-	CLK_SRC_PLL2,
+-	CLK_SRC_PLL2DIV,
+-	CLK_SRC_PK0,
+-	CLK_SRC_PK1,
+-	CLK_SRC_PK2,
+-	CLK_SRC_PK3,
+-	CLK_SRC_PK4,
+-	CLK_SRC_48MHZ
 -};
 -
--static struct clk *root_clk_by_index(enum root_clks src)
--{
--	switch (src) {
--	case CLK_SRC_PLL0: return &pll0;
--	case CLK_SRC_PLL1: return &pll1;
--	case CLK_SRC_PLL2: return &pll2;
--	case CLK_SRC_PLL0DIV: return &pll0div;
--	case CLK_SRC_PLL1DIV: return &pll1div;
--	case CLK_SRC_PLL2DIV: return &pll2div;
--	case CLK_SRC_XI: return &xi;
--	case CLK_SRC_XTI: return &xti;
--	case CLK_SRC_XIDIV: return &xidiv;
--	case CLK_SRC_XTIDIV: return &xtidiv;
--	default: return NULL;
--	}
--}
+-#define CLK_SRC_MASK		0xf
 -
--static void find_aclk_parent(struct clk *clk)
--{
--	unsigned int src;
--	struct clk *clock;
+-/* Bits in ACLK* registers */
+-#define ACLK_EN		(1 << 28)
+-#define ACLK_SEL_SHIFT		24
+-#define ACLK_SEL_MASK		0x0f000000
+-#define ACLK_DIV_MASK		0x00000fff
 -
--	if (!clk->aclkreg)
--		return;
+-/* System configuration registers */
 -
--	src = __raw_readl(clk->aclkreg) >> ACLK_SEL_SHIFT;
--	src &= CLK_SRC_MASK;
+-#define SCFG_BASE		(APB1_PERI_BASE_VIRT + 0x13000)
 -
--	clock = root_clk_by_index(src);
--	if (!clock)
--		return;
+-#define	BMI_OFFS		0x00
+-#define AHBCON0_OFFS		0x04
+-#define APBPWE_OFFS		0x08
+-#define DTCMWAIT_OFFS		0x0c
+-#define ECCSEL_OFFS		0x10
+-#define AHBCON1_OFFS		0x14
+-#define SDHCFG_OFFS		0x18
+-#define REMAP_OFFS		0x20
+-#define LCDSIAE_OFFS		0x24
+-#define XMCCFG_OFFS		0xe0
+-#define IMCCFG_OFFS		0xe4
 -
--	clk->parent = clock;
--	clk->set_parent = aclk_set_parent;
--}
+-/* Values for ECCSEL */
+-#define ECCSEL_EXTMEM		0x0
+-#define ECCSEL_DTCM		0x1
+-#define ECCSEL_INT_SRAM		0x2
+-#define ECCSEL_AHB		0x3
 -
--void __init tcc_clocks_init(unsigned long xi_freq, unsigned long xti_freq)
--{
--	int i;
+-/* Bits in XMCCFG */
+-#define XMCCFG_NFCE		(1 << 1)
+-#define XMCCFG_FDXD		(1 << 2)
 -
--	xi_rate = xi_freq;
--	xti_rate = xti_freq;
+-/* External memory controller registers */
 -
--	/* fixup parents and add the clock */
--	for (i = 0; i < ARRAY_SIZE(lookups); i++) {
--		find_aclk_parent(lookups[i].clk);
--		clkdev_add(&lookups[i]);
--	}
--	tcc8k_timer_init(&tcz, (void __iomem *)TIMER_BASE, INT_TC32);
--}
-diff --git a/arch/arm/mach-tcc8k/common.h b/arch/arm/mach-tcc8k/common.h
+-#define EMC_BASE		EXT_MEM_CTRL_BASE
+-
+-#define SDCFG_OFFS		0x00
+-#define SDFSM_OFFS		0x04
+-#define MCFG_OFFS		0x08
+-
+-#define CSCFG0_OFFS		0x10
+-#define CSCFG1_OFFS		0x14
+-#define CSCFG2_OFFS		0x18
+-#define CSCFG3_OFFS		0x1c
+-
+-#define MCFG_SDEN		(1 << 4)
+-
+-#endif /* TCC8K_REGS_H */
+diff --git a/arch/arm/plat-tcc/include/mach/timex.h b/arch/arm/plat-tcc/include/mach/timex.h
 deleted file mode 100644
-index 705690a..0000000
---- a/arch/arm/mach-tcc8k/common.h
+index 057acbe..0000000
+--- a/arch/arm/plat-tcc/include/mach/timex.h
 +++ /dev/null
-@@ -1,15 +0,0 @@
--#ifndef MACH_TCC8K_COMMON_H
--#define MACH_TCC8K_COMMON_H
--
--#include <linux/platform_device.h>
--
--extern struct platform_device tcc_nand_device;
--
--struct clk;
--
--extern void tcc_clocks_init(unsigned long xi_freq, unsigned long xti_freq);
--extern void tcc8k_timer_init(struct clk *clock, void __iomem *base, int irq);
--extern void tcc8k_init_irq(void);
--extern void tcc8k_map_common_io(void);
--
--#endif
-diff --git a/arch/arm/mach-tcc8k/devices.c b/arch/arm/mach-tcc8k/devices.c
-deleted file mode 100644
-index 6722ad7..0000000
---- a/arch/arm/mach-tcc8k/devices.c
-+++ /dev/null
-@@ -1,239 +0,0 @@
+@@ -1,5 +0,0 @@
 -/*
-- * linux/arch/arm/mach-tcc8k/devices.c
+- * A definition needed by arch core code.
 - *
-- * Copyright (C) Telechips, Inc.
+- */
+-#define CLOCK_TICK_RATE		(HZ * 100000UL)
+diff --git a/arch/arm/plat-tcc/include/mach/uncompress.h b/arch/arm/plat-tcc/include/mach/uncompress.h
+deleted file mode 100644
+index 7a3e33a..0000000
+--- a/arch/arm/plat-tcc/include/mach/uncompress.h
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/*
 - * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
 - *
-- * Licensed under the terms of GPL v2.
-- *
+- * This file is licensed under the terms of the GPL version 2.
 - */
 -
--#include <linux/dma-mapping.h>
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/kernel.h>
--#include <linux/module.h>
--
--#include <asm/mach/map.h>
+-#include <linux/serial_reg.h>
+-#include <linux/types.h>
 -
 -#include <mach/tcc8k-regs.h>
--#include <mach/irqs.h>
 -
--#include "common.h"
+-unsigned int system_rev;
 -
--static u64 tcc8k_dmamask = DMA_BIT_MASK(32);
+-#define ID_MASK			0x7fff
 -
--#ifdef CONFIG_MTD_NAND_TCC
--/* NAND controller */
--static struct resource tcc_nand_resources[] = {
--	{
--		.start	= (resource_size_t)NFC_BASE,
--		.end	= (resource_size_t)NFC_BASE + 0x7f,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= INT_NFC,
--		.end	= INT_NFC,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--struct platform_device tcc_nand_device = {
--	.name = "tcc_nand",
--	.id = 0,
--	.num_resources = ARRAY_SIZE(tcc_nand_resources),
--	.resource = tcc_nand_resources,
--};
--#endif
--
--#ifdef CONFIG_MMC_TCC8K
--/* MMC controller */
--static struct resource tcc8k_mmc0_resource[] = {
--	{
--		.start = INT_SD0,
--		.end   = INT_SD0,
--		.flags = IORESOURCE_IRQ,
--	},
--};
--
--static struct resource tcc8k_mmc1_resource[] = {
--	{
--		.start = INT_SD1,
--		.end   = INT_SD1,
--		.flags = IORESOURCE_IRQ,
--	},
--};
--
--struct platform_device tcc8k_mmc0_device = {
--	.name		= "tcc-mmc",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(tcc8k_mmc0_resource),
--	.resource	= tcc8k_mmc0_resource,
--	.dev		= {
--		.dma_mask		= &tcc8k_dmamask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	}
--};
--
--struct platform_device tcc8k_mmc1_device = {
--	.name		= "tcc-mmc",
--	.id		= 1,
--	.num_resources	= ARRAY_SIZE(tcc8k_mmc1_resource),
--	.resource	= tcc8k_mmc1_resource,
--	.dev		= {
--		.dma_mask		= &tcc8k_dmamask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	}
--};
--
--static inline void tcc8k_init_mmc(void)
+-static void putc(int c)
 -{
--	u32 reg = __raw_readl(GPIOPS_BASE + GPIOPS_FS1_OFFS);
+-	u32 *uart_lsr = (u32 *)(UART_BASE_PHYS + (UART_LSR << 2));
+-	u32 *uart_tx = (u32 *)(UART_BASE_PHYS + (UART_TX << 2));
 -
--	reg |= GPIOPS_FS1_SDH0_BITS | GPIOPS_FS1_SDH1_BITS;
--	__raw_writel(reg, GPIOPS_BASE + GPIOPS_FS1_OFFS);
--
--	platform_device_register(&tcc8k_mmc0_device);
--	platform_device_register(&tcc8k_mmc1_device);
--}
--#else
--static inline void tcc8k_init_mmc(void) { }
--#endif
--
--#ifdef CONFIG_USB_OHCI_HCD
--static int tcc8k_ohci_init(struct device *dev)
--{
--	u32 reg;
--
--	/* Use GPIO PK19 as VBUS control output */
--	reg = __raw_readl(GPIOPK_BASE + GPIOPK_FS0_OFFS);
--	reg &= ~(1 << 19);
--	__raw_writel(reg, GPIOPK_BASE + GPIOPK_FS0_OFFS);
--	reg = __raw_readl(GPIOPK_BASE + GPIOPK_FS1_OFFS);
--	reg &= ~(1 << 19);
--	__raw_writel(reg, GPIOPK_BASE + GPIOPK_FS1_OFFS);
--
--	reg = __raw_readl(GPIOPK_BASE + GPIOPK_DOE_OFFS);
--	reg |= (1 << 19);
--	__raw_writel(reg, GPIOPK_BASE + GPIOPK_DOE_OFFS);
--	/* Turn on VBUS */
--	reg = __raw_readl(GPIOPK_BASE + GPIOPK_DAT_OFFS);
--	reg |= (1 << 19);
--	__raw_writel(reg, GPIOPK_BASE + GPIOPK_DAT_OFFS);
--
--	return 0;
+-	while (!(*uart_lsr & UART_LSR_THRE))
+-		barrier();
+-	*uart_tx = c;
 -}
 -
--static struct resource tcc8k_ohci0_resources[] = {
--	[0] = {
--		.start = (resource_size_t)USBH0_BASE,
--		.end   = (resource_size_t)USBH0_BASE + 0x5c,
--		.flags = IORESOURCE_MEM,
--	},
--	[1] = {
--		.start = INT_USBH0,
--		.end   = INT_USBH0,
--		.flags = IORESOURCE_IRQ,
--	}
--};
--
--static struct resource tcc8k_ohci1_resources[] = {
--	[0] = {
--		.start = (resource_size_t)USBH1_BASE,
--		.end   = (resource_size_t)USBH1_BASE + 0x5c,
--		.flags = IORESOURCE_MEM,
--	},
--	[1] = {
--		.start = INT_USBH1,
--		.end   = INT_USBH1,
--		.flags = IORESOURCE_IRQ,
--	}
--};
--
--static struct tccohci_platform_data tcc8k_ohci0_platform_data = {
--	.controller	= 0,
--	.port_mode	= PMM_PERPORT_MODE,
--	.init		= tcc8k_ohci_init,
--};
--
--static struct tccohci_platform_data tcc8k_ohci1_platform_data = {
--	.controller	= 1,
--	.port_mode	= PMM_PERPORT_MODE,
--	.init		= tcc8k_ohci_init,
--};
--
--static struct platform_device ohci0_device = {
--	.name = "tcc-ohci",
--	.id = 0,
--	.dev = {
--		.dma_mask = &tcc8k_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--		.platform_data = &tcc8k_ohci0_platform_data,
--	},
--	.num_resources  = ARRAY_SIZE(tcc8k_ohci0_resources),
--	.resource       = tcc8k_ohci0_resources,
--};
--
--static struct platform_device ohci1_device = {
--	.name = "tcc-ohci",
--	.id = 1,
--	.dev = {
--		.dma_mask = &tcc8k_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--		.platform_data = &tcc8k_ohci1_platform_data,
--	},
--	.num_resources  = ARRAY_SIZE(tcc8k_ohci1_resources),
--	.resource       = tcc8k_ohci1_resources,
--};
--
--static void __init tcc8k_init_usbhost(void)
+-static inline void flush(void)
 -{
--	platform_device_register(&ohci0_device);
--	platform_device_register(&ohci1_device);
--}
--#else
--static void __init tcc8k_init_usbhost(void) { }
--#endif
--
--/* USB device controller*/
--#ifdef CONFIG_USB_GADGET_TCC8K
--static struct resource udc_resources[] = {
--	[0] = {
--		.start = INT_USBD,
--		.end   = INT_USBD,
--		.flags = IORESOURCE_IRQ,
--	},
--	[1] = {
--		.start = INT_UDMA,
--		.end   = INT_UDMA,
--		.flags = IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device tcc8k_udc_device = {
--	.name = "tcc-udc",
--	.id = 0,
--	.resource = udc_resources,
--	.num_resources = ARRAY_SIZE(udc_resources),
--	.dev = {
--		 .dma_mask = &tcc8k_dmamask,
--		 .coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--};
--
--static void __init tcc8k_init_usb_gadget(void)
--{
--	platform_device_register(&tcc8k_udc_device);
--}
--#else
--static void __init tcc8k_init_usb_gadget(void) { }
--#endif	/* CONFIG_USB_GADGET_TCC83X */
--
--static int __init tcc8k_init_devices(void)
--{
--	tcc8k_init_mmc();
--	tcc8k_init_usbhost();
--	tcc8k_init_usb_gadget();
--	return 0;
 -}
 -
--arch_initcall(tcc8k_init_devices);
-diff --git a/arch/arm/mach-tcc8k/io.c b/arch/arm/mach-tcc8k/io.c
+-/*
+- * nothing to do
+- */
+-#define arch_decomp_setup()
+-#define arch_decomp_wdog()
+diff --git a/arch/arm/plat-tcc/include/mach/vmalloc.h b/arch/arm/plat-tcc/include/mach/vmalloc.h
 deleted file mode 100644
-index 9b39d7f..0000000
---- a/arch/arm/mach-tcc8k/io.c
+index 99414d9..0000000
+--- a/arch/arm/plat-tcc/include/mach/vmalloc.h
 +++ /dev/null
-@@ -1,62 +0,0 @@
+@@ -1,10 +0,0 @@
 -/*
-- * linux/arch/arm/mach-tcc8k/io.c
+- * Author: <linux@telechips.com>
+- * Created: June 10, 2008
 - *
-- * (C) 2009 Hans J. Koch <hjk@linutronix.de>
+- * Copyright (C) 2000 Russell King.
+- * Copyright (C) 2008-2009 Telechips
 - *
-- * derived from TCC83xx io.c
-- * Copyright (C) Telechips, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
+- * Licensed under the terms of the GPL v2.
 - */
--
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/kernel.h>
--
--#include <asm/mach/map.h>
--
--#include <mach/tcc8k-regs.h>
--
--/*
-- * The machine specific code may provide the extra mapping besides the
-- * default mapping provided here.
-- */
--static struct map_desc tcc8k_io_desc[] __initdata = {
--	{
--		.virtual	= (unsigned long)CS1_BASE_VIRT,
--		.pfn		= __phys_to_pfn(CS1_BASE),
--		.length		= CS1_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)AHB_PERI_BASE_VIRT,
--		.pfn		= __phys_to_pfn(AHB_PERI_BASE),
--		.length		= AHB_PERI_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)APB0_PERI_BASE_VIRT,
--		.pfn		= __phys_to_pfn(APB0_PERI_BASE),
--		.length		= APB0_PERI_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)APB1_PERI_BASE_VIRT,
--		.pfn		= __phys_to_pfn(APB1_PERI_BASE),
--		.length		= APB1_PERI_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)EXT_MEM_CTRL_BASE_VIRT,
--		.pfn		= __phys_to_pfn(EXT_MEM_CTRL_BASE),
--		.length		= EXT_MEM_CTRL_SIZE,
--		.type		= MT_DEVICE,
--	},
--};
--
--/*
-- * Maps common IO regions for tcc8k.
-- *
-- */
--void __init tcc8k_map_common_io(void)
--{
--	iotable_init(tcc8k_io_desc, ARRAY_SIZE(tcc8k_io_desc));
--}
-diff --git a/arch/arm/mach-tcc8k/irq.c b/arch/arm/mach-tcc8k/irq.c
+-#define VMALLOC_END	0xf0000000UL
+diff --git a/arch/arm/plat-tcc/system.c b/arch/arm/plat-tcc/system.c
 deleted file mode 100644
-index 209fa5c..0000000
---- a/arch/arm/mach-tcc8k/irq.c
+index cc208fa..0000000
+--- a/arch/arm/plat-tcc/system.c
 +++ /dev/null
-@@ -1,111 +0,0 @@
+@@ -1,25 +0,0 @@
 -/*
-- * Copyright (C) Telechips, Inc.
-- * Copyright (C) 2009-2010 Hans J. Koch <hjk@linutronix.de>
+- * System functions for Telechips TCCxxxx SoCs
 - *
-- * Licensed under the terms of the GNU GPL version 2.
-- */
--
--#include <linux/init.h>
--#include <linux/interrupt.h>
--#include <linux/io.h>
--
--#include <asm/irq.h>
--#include <asm/mach/irq.h>
--
--#include <mach/tcc8k-regs.h>
--#include <mach/irqs.h>
--
--#include "common.h"
--
--/* Disable IRQ */
--static void tcc8000_mask_ack_irq0(struct irq_data *d)
--{
--	PIC0_IEN &= ~(1 << d->irq);
--	PIC0_CREQ |=  (1 << d->irq);
--}
--
--static void tcc8000_mask_ack_irq1(struct irq_data *d)
--{
--	PIC1_IEN &= ~(1 << (d->irq - 32));
--	PIC1_CREQ |= (1 << (d->irq - 32));
--}
--
--static void tcc8000_mask_irq0(struct irq_data *d)
--{
--	PIC0_IEN &= ~(1 << d->irq);
--}
--
--static void tcc8000_mask_irq1(struct irq_data *d)
--{
--	PIC1_IEN &= ~(1 << (d->irq - 32));
--}
--
--static void tcc8000_ack_irq0(struct irq_data *d)
--{
--	PIC0_CREQ |=  (1 << d->irq);
--}
--
--static void tcc8000_ack_irq1(struct irq_data *d)
--{
--	PIC1_CREQ |= (1 << (d->irq - 32));
--}
--
--/* Enable IRQ */
--static void tcc8000_unmask_irq0(struct irq_data *d)
--{
--	PIC0_IEN |= (1 << d->irq);
--	PIC0_INTOEN |= (1 << d->irq);
--}
--
--static void tcc8000_unmask_irq1(struct irq_data *d)
--{
--	PIC1_IEN |= (1 << (d->irq - 32));
--	PIC1_INTOEN |= (1 << (d->irq - 32));
--}
--
--static struct irq_chip tcc8000_irq_chip0 = {
--	.name		= "tcc_irq0",
--	.irq_mask	= tcc8000_mask_irq0,
--	.irq_ack	= tcc8000_ack_irq0,
--	.irq_mask_ack	= tcc8000_mask_ack_irq0,
--	.irq_unmask	= tcc8000_unmask_irq0,
--};
--
--static struct irq_chip tcc8000_irq_chip1 = {
--	.name		= "tcc_irq1",
--	.irq_mask	= tcc8000_mask_irq1,
--	.irq_ack	= tcc8000_ack_irq1,
--	.irq_mask_ack	= tcc8000_mask_ack_irq1,
--	.irq_unmask	= tcc8000_unmask_irq1,
--};
--
--void __init tcc8k_init_irq(void)
--{
--	int irqno;
--
--	/* Mask and clear all interrupts */
--	PIC0_IEN = 0x00000000;
--	PIC0_CREQ = 0xffffffff;
--	PIC1_IEN = 0x00000000;
--	PIC1_CREQ = 0xffffffff;
--
--	PIC0_MEN0 = 0x00000003;
--	PIC1_MEN1 = 0x00000003;
--	PIC1_MEN = 0x00000003;
--
--	/* let all IRQs be level triggered */
--	PIC0_TMODE = 0xffffffff;
--	PIC1_TMODE = 0xffffffff;
--	/* all IRQs are IRQs (not FIQs) */
--	PIC0_IRQSEL = 0xffffffff;
--	PIC1_IRQSEL = 0xffffffff;
--
--	for (irqno = 0; irqno < NR_IRQS; irqno++) {
--		if (irqno < 32)
--			irq_set_chip(irqno, &tcc8000_irq_chip0);
--		else
--			irq_set_chip(irqno, &tcc8000_irq_chip1);
--		irq_set_handler(irqno, handle_level_irq);
--		set_irq_flags(irqno, IRQF_VALID);
--	}
--}
-diff --git a/arch/arm/mach-tcc8k/time.c b/arch/arm/mach-tcc8k/time.c
-deleted file mode 100644
-index a96babe..0000000
---- a/arch/arm/mach-tcc8k/time.c
-+++ /dev/null
-@@ -1,134 +0,0 @@
--/*
-- * TCC8000 system timer setup
+- * Copyright (C) Hans J. Koch <hjk@linutronix.de>
 - *
-- * (C) 2009 Hans J. Koch <hjk@linutronix.de>
-- *
-- * Licensed under the terms of the GPL version 2.
+- * Licensed under the terms of the GPL v2.
 - *
 - */
 -
--#include <linux/clk.h>
--#include <linux/clockchips.h>
--#include <linux/init.h>
--#include <linux/interrupt.h>
 -#include <linux/io.h>
--#include <linux/irq.h>
--#include <linux/kernel.h>
--#include <linux/spinlock.h>
--
--#include <asm/mach/time.h>
 -
 -#include <mach/tcc8k-regs.h>
--#include <mach/irqs.h>
 -
--#include "common.h"
--
--static void __iomem *timer_base;
--
--static int tcc_set_next_event(unsigned long evt,
--			      struct clock_event_device *unused)
+-/* System reboot */
+-void plat_tcc_reboot(void)
 -{
--	unsigned long reg = __raw_readl(timer_base + TC32MCNT_OFFS);
+-	/* Make sure clocks are on */
+-	__raw_writel(0xffffffff, CKC_BASE + BCLKCTR0_OFFS);
 -
--	__raw_writel(reg + evt, timer_base + TC32CMP0_OFFS);
--	return 0;
--}
--
--static void tcc_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *evt)
--{
--	unsigned long tc32irq;
--
--	switch (mode) {
--	case CLOCK_EVT_MODE_ONESHOT:
--		tc32irq = __raw_readl(timer_base + TC32IRQ_OFFS);
--		tc32irq |= TC32IRQ_IRQEN0;
--		__raw_writel(tc32irq, timer_base + TC32IRQ_OFFS);
--		break;
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_UNUSED:
--		tc32irq = __raw_readl(timer_base + TC32IRQ_OFFS);
--		tc32irq &= ~TC32IRQ_IRQEN0;
--		__raw_writel(tc32irq, timer_base + TC32IRQ_OFFS);
--		break;
--	case CLOCK_EVT_MODE_PERIODIC:
--	case CLOCK_EVT_MODE_RESUME:
--		break;
--	}
--}
--
--static irqreturn_t tcc8k_timer_interrupt(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = dev_id;
--
--	/* Acknowledge TC32 interrupt by reading TC32IRQ */
--	__raw_readl(timer_base + TC32IRQ_OFFS);
--
--	evt->event_handler(evt);
--
--	return IRQ_HANDLED;
--}
--
--static struct clock_event_device clockevent_tcc = {
--	.name		= "tcc_timer1",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.shift		= 32,
--	.set_mode	= tcc_set_mode,
--	.set_next_event	= tcc_set_next_event,
--	.rating		= 200,
--};
--
--static struct irqaction tcc8k_timer_irq = {
--	.name		= "TC32_timer",
--	.flags		= IRQF_DISABLED | IRQF_TIMER,
--	.handler	= tcc8k_timer_interrupt,
--	.dev_id		= &clockevent_tcc,
--};
--
--static int __init tcc_clockevent_init(struct clk *clock)
--{
--	unsigned int c = clk_get_rate(clock);
--
--	clocksource_mmio_init(timer_base + TC32MCNT_OFFS, "tcc_tc32", c,
--		200, 32, clocksource_mmio_readl_up);
--
--	clockevent_tcc.mult = div_sc(c, NSEC_PER_SEC,
--					clockevent_tcc.shift);
--	clockevent_tcc.max_delta_ns =
--			clockevent_delta2ns(0xfffffffe, &clockevent_tcc);
--	clockevent_tcc.min_delta_ns =
--			clockevent_delta2ns(0xff, &clockevent_tcc);
--
--	clockevent_tcc.cpumask = cpumask_of(0);
--
--	clockevents_register_device(&clockevent_tcc);
--
--	return 0;
--}
--
--void __init tcc8k_timer_init(struct clk *clock, void __iomem *base, int irq)
--{
--	u32 reg;
--
--	timer_base = base;
--	tcc8k_timer_irq.irq = irq;
--
--	/* Enable clocks */
--	clk_enable(clock);
--
--	/* Initialize 32-bit timer */
--	reg = __raw_readl(timer_base + TC32EN_OFFS);
--	reg &= ~TC32EN_ENABLE; /* Disable timer */
--	__raw_writel(reg, timer_base + TC32EN_OFFS);
--	/* Free running timer, counting from 0 to 0xffffffff */
--	__raw_writel(0, timer_base + TC32EN_OFFS);
--	__raw_writel(0, timer_base + TC32LDV_OFFS);
--	reg = __raw_readl(timer_base + TC32IRQ_OFFS);
--	reg |= TC32IRQ_IRQEN0; /* irq at match with CMP0 */
--	__raw_writel(reg, timer_base + TC32IRQ_OFFS);
--
--	__raw_writel(TC32EN_ENABLE, timer_base + TC32EN_OFFS);
--
--	tcc_clockevent_init(clock);
--	setup_irq(irq, &tcc8k_timer_irq);
+-	/* Enable watchdog reset */
+-	__raw_writel(0x49, TIMER_BASE + TWDCFG_OFFS);
+-	/* Wait for reset */
+-	while(1)
+-		;
 -}
 -- 
 1.7.6.3
