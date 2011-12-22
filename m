@@ -1,178 +1,59 @@
-From: B02280@freescale.com (Chen Jie-B02280)
-Date: Thu, 22 Dec 2011 12:41:35 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIXSBhcm0vaW14NnE6IGFkZCBjbG9jayBkZWJ1Z2ZzIHN1?=
- =?gb2312?Q?pport?=
-In-Reply-To: <1324556625-28192-1-git-send-email-jason.chen@linaro.org>
-References: <1324556625-28192-1-git-send-email-jason.chen@linaro.org>
-Message-ID: <76DA9649941BC14A850EA090E8B0465E03A476@039-SN2MPN1-012.039d.mgd.msft.net>
+From: yanok@emcraft.com (Ilya Yanok)
+Date: Thu, 22 Dec 2011 16:42:32 +0400
+Subject: [PATCH] OMAP3: hwmod_data: add HWMOD_INIT_NO_RESET flag for
+ dss_dispc
+In-Reply-To: <1324548785.13282.10.camel@deskari>
+References: <1324515653-17287-1-git-send-email-yanok@emcraft.com>
+ <1324548785.13282.10.camel@deskari>
+Message-ID: <4EF325B8.2090206@emcraft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sorry, pls ignore this mail which miss some commit, I will resend whole patch again.
+Hi Tomi,
 
-Jason Chen
+On 22.12.2011 14:13, Tomi Valkeinen wrote:
+> On Thu, 2011-12-22 at 02:00 +0100, Ilya Yanok wrote:
+>> Resetting DISPC when a DISPC output is enabled causes the DSS to go into
+>> an inconsistent state.
+>>
+>> commit b923d40dd4211c4ef7d4efa2bd81b7ca1d8744c1
+>> Author: Archit Taneja <archit@ti.com>
+>> Date:   Thu Oct 6 18:04:08 2011 -0600
+>>
+>>     ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is
+>> enabled in bootloader
+>>
+>> tries to deal with this problem by checking if display is enabled and
+>> disabling it before doing reset.
+>>
+>> But in my setup dss_dispc is resetted from omap_hwmod_setup_all function
+>> _before_ calling omap_dss_reset. So when dispc_disable_outputs is
+>> executed dispc is already reset and nothing happens.
+> 
+> Hmm, why is that? You don't have the dss hwmod before dispc in the list
+> of hwmods? The code presumes that dss hwmod is handled first.
 
-Tel: +86 21 28937178
+Looking at the arch/arm/mach-omap2/omap_hwmod_3xxx_data.c I can see that
+dss_dispc is in the list of generic hwmods which is registered first
+while dss_core hwmod is in revision-specific lists which are registered
+later. I think this is the real root of the problem, thanks for pointing
+this out!
 
-Freescale Semiconductor (China) Limited
-Shanghai Branch Office
+> 
+>> This patch and HWMOD_INIT_NO_RESET flags to dss_dispc hwmod thus leaving
+>> DISPC untouched so that omap_dss_reset can take care of it.
+> 
+> omap_dss_reset() doesn't reset dispc, so this will leave dispc
+> un-reseted.
+> 
+> The idea of the current code is to do the reset similarly on all OMAPs.
+> The sequence should be:
+> 
+> - omap_dss_reset(), which disables dispc outputs and manually resets dss
+> registers.
+> - then the rest of the dss modules reset themselves normally, using the
+> softreset bit.
 
-No.192 Liangjing Rd.,
-Pudong New Area, Shanghai, 201203
+But currently omap_dss_reset() is called the last.
 
-________________________________________
-???: linux-arm-kernel-bounces at lists.infradead.org [linux-arm-kernel-bounces at lists.infradead.org] ?? Jason Chen [jason.chen at linaro.org]
-????: 2011?12?22? 20:23
-?: linux-arm-kernel at lists.infradead.org
-Cc: s.hauer at pengutronix.de; shawn.guo at linaro.org; eric.miao at linaro.org
-??: [PATCH] arm/imx6q: add clock debugfs support
-
-Signed-off-by: Jason Chen <jason.chen@linaro.org>
----
- arch/arm/mach-imx/clock-imx6q.c |   24 +++++++++++++++++++++++-
- 1 files changed, 23 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-index 9273c2a..840ab8d 100644
---- a/arch/arm/mach-imx/clock-imx6q.c
-+++ b/arch/arm/mach-imx/clock-imx6q.c
-@@ -335,6 +335,12 @@
- #define FREQ_650M      650000000
- #define FREQ_1300M     1300000000
-
-+#ifdef CONFIG_CLK_DEBUG
-+#define __INIT_CLK_DEBUG(n)    .name = #n,
-+#else
-+#define __INIT_CLK_DEBUG(n)
-+#endif
-+
- static struct clk pll1_sys;
- static struct clk pll2_bus;
- static struct clk pll3_usb_otg;
-@@ -415,14 +421,17 @@ static unsigned long get_low_reference_clock_rate(struct clk *clk)
- }
-
- static struct clk ckil_clk = {
-+       __INIT_CLK_DEBUG(ckil_clk)
-        .get_rate = get_low_reference_clock_rate,
- };
-
- static struct clk ckih_clk = {
-+       __INIT_CLK_DEBUG(ckih_clk)
-        .get_rate = get_high_reference_clock_rate,
- };
-
- static struct clk osc_clk = {
-+       __INIT_CLK_DEBUG(osc_clk)
-        .get_rate = get_oscillator_reference_clock_rate,
- };
-
-@@ -677,6 +686,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
-
- #define DEF_PLL(name)                                  \
-        static struct clk name = {                      \
-+               __INIT_CLK_DEBUG(name)                  \
-                .enable         = pll_enable,           \
-                .disable        = pll_disable,          \
-                .get_rate       = name##_get_rate,      \
-@@ -796,6 +806,7 @@ static void pfd_disable(struct clk *clk)
-
- #define DEF_PFD(name, er, es, p)                       \
-        static struct clk name = {                      \
-+               __INIT_CLK_DEBUG(name)                  \
-                .enable_reg     = er,                   \
-                .enable_shift   = es,                   \
-                .enable         = pfd_enable,           \
-@@ -820,6 +831,7 @@ static unsigned long pll2_200m_get_rate(struct clk *clk)
- }
-
- static struct clk pll2_200m = {
-+       __INIT_CLK_DEBUG(pll2_200m)
-        .parent = &pll2_pfd_400m,
-        .get_rate = pll2_200m_get_rate,
- };
-@@ -830,6 +842,7 @@ static unsigned long pll3_120m_get_rate(struct clk *clk)
- }
-
- static struct clk pll3_120m = {
-+       __INIT_CLK_DEBUG(pll3_120m)
-        .parent = &pll3_usb_otg,
-        .get_rate = pll3_120m_get_rate,
- };
-@@ -840,6 +853,7 @@ static unsigned long pll3_80m_get_rate(struct clk *clk)
- }
-
- static struct clk pll3_80m = {
-+       __INIT_CLK_DEBUG(pll3_80m)
-        .parent = &pll3_usb_otg,
-        .get_rate = pll3_80m_get_rate,
- };
-@@ -850,6 +864,7 @@ static unsigned long pll3_60m_get_rate(struct clk *clk)
- }
-
- static struct clk pll3_60m = {
-+       __INIT_CLK_DEBUG(pll3_60m)
-        .parent = &pll3_usb_otg,
-        .get_rate = pll3_60m_get_rate,
- };
-@@ -877,6 +892,7 @@ static int pll1_sw_clk_set_parent(struct clk *clk, struct clk *parent)
- }
-
- static struct clk pll1_sw_clk = {
-+       __INIT_CLK_DEBUG(pll1_sw_clk)
-        .parent = &pll1_sys,
-        .set_parent = pll1_sw_clk_set_parent,
- };
-@@ -1696,6 +1712,7 @@ static int _clk_set_parent(struct clk *clk, struct clk *parent)
-
- #define DEF_NG_CLK(name, p)                            \
-        static struct clk name = {                      \
-+               __INIT_CLK_DEBUG(name)                  \
-                .get_rate       = _clk_get_rate,        \
-                .set_rate       = _clk_set_rate,        \
-                .round_rate     = _clk_round_rate,      \
-@@ -1723,6 +1740,7 @@ DEF_NG_CLK(asrc_serial_clk,       &pll3_usb_otg);
-
- #define DEF_CLK(name, er, es, p, s)                    \
-        static struct clk name = {                      \
-+               __INIT_CLK_DEBUG(name)                  \
-                .enable_reg     = er,                   \
-                .enable_shift   = es,                   \
-                .enable         = _clk_enable,          \
-@@ -1825,6 +1843,7 @@ static void pcie_clk_disable(struct clk *clk)
- }
-
- static struct clk pcie_clk = {
-+       __INIT_CLK_DEBUG(pcie_clk)
-        .enable_reg = CCGR4,
-        .enable_shift = CG0,
-        .enable = pcie_clk_enable,
-@@ -1857,6 +1876,7 @@ static void sata_clk_disable(struct clk *clk)
- }
-
- static struct clk sata_clk = {
-+       __INIT_CLK_DEBUG(sata_clk)
-        .enable_reg = CCGR5,
-        .enable_shift = CG2,
-        .enable = sata_clk_enable,
-@@ -1976,8 +1996,10 @@ int __init mx6q_clocks_init(void)
-                        oscillator_reference = rate;
-        }
-
--       for (i = 0; i < ARRAY_SIZE(lookups); i++)
-+       for (i = 0; i < ARRAY_SIZE(lookups); i++) {
-                clkdev_add(&lookups[i]);
-+               clk_debug_register(lookups[i].clk);
-+       }
-
-        /* only keep necessary clocks on */
-        writel_relaxed(0x3 << CG0  | 0x3 << CG1  | 0x3 << CG2,  CCGR0);
---
-1.7.4.1
-
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards, Ilya.
