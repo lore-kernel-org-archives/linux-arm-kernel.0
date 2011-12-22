@@ -1,109 +1,75 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 22 Dec 2011 15:56:46 +0100
-Subject: [PATCH v4 12/12] ARM: OMAP2+: board-generic: Remove i2c static init
-In-Reply-To: <1324565806-31142-1-git-send-email-b-cousson@ti.com>
-References: <1324565806-31142-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1324565806-31142-13-git-send-email-b-cousson@ti.com>
+From: vladimir.zapolskiy@nokia.com (Vladimir Zapolskiy)
+Date: Thu, 22 Dec 2011 17:05:29 +0200
+Subject: [PATCH] arm: oprofile: fix linkage issue
+In-Reply-To: <20111222145412.GV16765@erda.amd.com>
+References: <1324561016-19389-1-git-send-email-vladimir.zapolskiy@nokia.com>
+ <20111222142140.GP16765@erda.amd.com> <20111222145412.GV16765@erda.amd.com>
+Message-ID: <4EF34739.1070704@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mainly reverts the commit that was adding the i2c static init.
+On 12/22/2011 04:54 PM, ext Robert Richter wrote:
+> On 22.12.11 15:21:40, Robert Richter wrote:
+>> On 22.12.11 15:36:56, Vladimir Zapolskiy wrote:
+>>> This change fixes a linking problem, which happens if oprofile is selected to
+>>> be compiled as built-in:
+>>>
+>>>    `oprofile_arch_exit' referenced in section `.init.text' of
+>>>    arch/arm/oprofile/built-in.o: defined in discarded section
+>>>    `.exit.text' of arch/arm/oprofile/built-in.o
+>>>
+>>> The problem is appeared after commit 87121ca504, which introduced
+>>> oprofile_arch_exit() calls from __init function. Note that the aforementioned
+>>> commit has been backported to stable branches, and the problem is known to be
+>>> reproduced at least with 3.0.13 and 3.1.5 kernels.
+>>
+>> I will fix it upstream, afterwards this goes into stable due to the
+>> stable tag.
+>>
+>> Right, commit 87121ca504 went into stable kernels 3.0 and 3.1, need to
+>> fix them too:
+>>
+>> CC: stable at kernel.org # 3.0+
+>>
+>> Please fix also arch/sh with this patch:
+>>
+>>   $ git grep exit.*oprofile_arch_exit arch/*/oprofile drivers/oprofile/
+>>   arch/arm/oprofile/common.c:void __exit oprofile_arch_exit(void)
+>>   arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void)
+>>   arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void) {}
+>>
+>> Thanks,
+>
+> To make things easier: if you aggree I will apply your patch with the
+> changes below in addition. No need to respin a new patch version.
+>
 
-Since the i2c and twl nodes are now present, there is no need
-for the static initialization anymore.
+Certainly, thanks.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-generic.c |   48 +---------------------------------
- 1 files changed, 2 insertions(+), 46 deletions(-)
+With best wishes,
+Vladimir
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 2529017..38f105d 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -15,7 +15,6 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
--#include <linux/i2c/twl.h>
- 
- #include <mach/hardware.h>
- #include <asm/hardware/gic.h>
-@@ -36,34 +35,6 @@ static void __init omap_init_irq(void)
- 	of_irq_init(irq_match);
- }
- 
--/*
-- * XXX: Still needed to boot until the i2c & twl driver is adapted to
-- * device-tree
-- */
--#ifdef CONFIG_ARCH_OMAP4
--static struct twl4030_platform_data sdp4430_twldata = {
--	.irq_base	= TWL6030_IRQ_BASE,
--	.irq_end	= TWL6030_IRQ_END,
--};
--
--static void __init omap4_i2c_init(void)
--{
--	omap4_pmic_init("twl6030", &sdp4430_twldata);
--}
--#endif
--
--#ifdef CONFIG_ARCH_OMAP3
--static struct twl4030_platform_data beagle_twldata = {
--	.irq_base	= TWL4030_IRQ_BASE,
--	.irq_end	= TWL4030_IRQ_END,
--};
--
--static void __init omap3_i2c_init(void)
--{
--	omap3_pmic_init("twl4030", &beagle_twldata);
--}
--#endif
--
- static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ .compatible = "simple-bus", },
- 	{ .compatible = "ti,omap-infra", },
-@@ -78,21 +49,6 @@ static void __init omap_generic_init(void)
- 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
- }
- 
--#ifdef CONFIG_ARCH_OMAP4
--static void __init omap4_init(void)
--{
--	omap4_i2c_init();
--	omap_generic_init();
--}
--#endif
--
--#ifdef CONFIG_ARCH_OMAP3
--static void __init omap3_init(void)
--{
--	omap3_i2c_init();
--	omap_generic_init();
--}
--#endif
- 
- #if defined(CONFIG_SOC_OMAP2420)
- static const char *omap242x_boards_compat[] __initdata = {
-@@ -145,7 +101,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.init_early	= omap3430_init_early,
- 	.init_irq	= omap_init_irq,
- 	.handle_irq	= omap3_intc_handle_irq,
--	.init_machine	= omap3_init,
-+	.init_machine	= omap_generic_init,
- 	.timer		= &omap3_timer,
- 	.dt_compat	= omap3_boards_compat,
- MACHINE_END
-@@ -164,7 +120,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.init_early	= omap4430_init_early,
- 	.init_irq	= omap_init_irq,
- 	.handle_irq	= gic_handle_irq,
--	.init_machine	= omap4_init,
-+	.init_machine	= omap_generic_init,
- 	.timer		= &omap4_timer,
- 	.dt_compat	= omap4_boards_compat,
- MACHINE_END
--- 
-1.7.0.4
+>
+>
+> diff --git a/arch/sh/oprofile/common.c b/arch/sh/oprofile/common.c
+> index b4c2d2b..e4dd5d5 100644
+> --- a/arch/sh/oprofile/common.c
+> +++ b/arch/sh/oprofile/common.c
+> @@ -49,7 +49,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+>          return oprofile_perf_init(ops);
+>   }
+>
+> -void __exit oprofile_arch_exit(void)
+> +void oprofile_arch_exit(void)
+>   {
+>          oprofile_perf_exit();
+>          kfree(sh_pmu_op_name);
+> @@ -60,5 +60,5 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+>          ops->backtrace = sh_backtrace;
+>          return -ENODEV;
+>   }
+> -void __exit oprofile_arch_exit(void) {}
+> +void oprofile_arch_exit(void) {}
+>   #endif /* CONFIG_HW_PERF_EVENTS */
+>
+>
