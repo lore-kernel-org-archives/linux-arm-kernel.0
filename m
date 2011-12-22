@@ -1,62 +1,42 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Thu, 22 Dec 2011 16:17:35 +0800
-Subject: [PATCH v3 3/3] gpio: pxa: request pinmux function for gpio
-In-Reply-To: <1324541855-19911-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1324541855-19911-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1324541855-19911-4-git-send-email-haojian.zhuang@marvell.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Dec 2011 08:14:47 +0000
+Subject: Fwd: Re: [03: PATCH 0/5] The remaining stuff
+In-Reply-To: <20111219102520.GE14542@n2100.arm.linux.org.uk>
+References: <20111124204447.GW9581@n2100.arm.linux.org.uk>
+ <20111128104554.GA2165@local> <20111219102520.GE14542@n2100.arm.linux.org.uk>
+Message-ID: <20111222081447.GA19725@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While gpio is requested for pxa, gpio driver will request function ready
-on pin.
+On Mon, Dec 19, 2011 at 10:25:20AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 28, 2011 at 11:45:55AM +0100, Hans J. Koch wrote:
+> > On Thu, Nov 24, 2011 at 08:44:47PM +0000, Russell King - ARM Linux wrote:
+> > > As I've already implied, I'm quite prepared to break these platforms at
+> > > the next merge window for the greater good if there's no sign of
+> > > maintainers willing to help sort them out - which will then ultimately
+> > > result in them being deleted from mainline.
+> > 
+> > For the past 12 months, nobody was interested in Telechips (plat-tcc).
+> > No community, no customers, no support from Telechips. Under these
+> > circumstances, I am not willing to maintain this forever.
+> > 
+> > However, Harry Sievers, European distributor of Telechips, told me
+> > that there are persons at Telechips who are interested in having
+> > their stuff in mainline. He will tell them it is threatened with
+> > being deleted from mainline, and ask for support.
+> > 
+> > I am willing to wait until christmas for any news from Harry, and
+> > will then send a patch. Either one that fixes the arch as requested in
+> > the mail above, or one that removes the whole platform from mainline.
+> > My feeling is that the latter is more likely.
+> > 
+> > Russell, if that is too late for you, please let us know.
+> 
+> We're now less than a week away from Christmas - any news on this?
+> If it's going to be deleted, could I have a patch to do so please?
+> (You probably know better than me whether anything has been touched
+> outside of arch/arm for it.)
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- drivers/gpio/gpio-pxa.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+Ping.
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index b2d3ee1..4f33ba2 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -19,6 +19,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-+#include <linux/pinctrl/pinmux.h>
- #include <linux/syscore_ops.h>
- #include <linux/slab.h>
- 
-@@ -267,6 +268,21 @@ static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 				(value ? GPSR_OFFSET : GPCR_OFFSET));
- }
- 
-+#ifdef CONFIG_PINMUX
-+static int pxa_gpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	return pinmux_request_gpio(chip->base + offset);
-+}
-+
-+static void pxa_gpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	pinmux_free_gpio(chip->base + offset);
-+}
-+#else
-+static int pxa_gpio_request(struct gpio_chip *chip, unsigned offset) {return 0;}
-+static void pxa_gpio_free(struct gpio_chip *chip, unsigned offset) {}
-+#endif
-+
- static int __devinit pxa_init_gpio_chip(int gpio_end)
- {
- 	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
-@@ -292,6 +308,8 @@ static int __devinit pxa_init_gpio_chip(int gpio_end)
- 		c->get = pxa_gpio_get;
- 		c->set = pxa_gpio_set;
- 		c->to_irq = pxa_gpio_to_irq;
-+		c->request = pxa_gpio_request;
-+		c->free = pxa_gpio_free;
- 
- 		/* number of GPIOs on last bank may be less than 32 */
- 		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
--- 
-1.7.0.4
+I'll delete it on Friday (tomorrow) unless I hear any news.
