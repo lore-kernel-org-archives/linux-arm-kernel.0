@@ -1,66 +1,34 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 22 Dec 2011 20:08:31 +0200
-Subject: [PATCH v2 8/9] OMAP4: omap4panda: Enable audio support
-In-Reply-To: <20111222173216.GJ24444@atomide.com>
-References: <1324571902-16918-1-git-send-email-peter.ujfalusi@ti.com>
- <1324571902-16918-9-git-send-email-peter.ujfalusi@ti.com>
- <20111222173216.GJ24444@atomide.com>
-Message-ID: <4EF3721F.8080908@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 22 Dec 2011 18:09:23 +0000
+Subject: [RFC PATCH v2 1/2] cpuidle: Add common init interface and idle
+ functionality
+In-Reply-To: <1323846126-7516-2-git-send-email-rob.lee@linaro.org>
+References: <1323846126-7516-1-git-send-email-rob.lee@linaro.org>
+ <1323846126-7516-2-git-send-email-rob.lee@linaro.org>
+Message-ID: <20111222180923.GH29622@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 12/22/2011 07:32 PM, Tony Lindgren wrote:
-> Hi,
+On Wed, Dec 14, 2011 at 01:02:05AM -0600, Robert Lee wrote:
+> The patch adds some cpuidle initialization functionality commonly
+> duplicated by many platforms.  The duplicate cpuidle init code of
+> various platfroms has been consolidated to use this common code
+> and successfully rebuilt.
 > 
->> @@ -548,6 +588,19 @@ void omap4_panda_display_init(void)
->>  	omap_display_init(&omap4_panda_dss_data);
->>  }
->>  
->> +static void omap4_panda_audio_init(void)
->> +{
->> +	if (cpu_is_omap4430()) {
->> +		/* PandaBoard 4430 */
->> +		panda_abe_audio_data.card_name = "PandaBoard";
->> +		/* Audio in is connected to HSMIC */
->> +		panda_abe_audio_data.has_hsmic = 1;
->> +	} else {
->> +		/* PandaBoard ES */
->> +		panda_abe_audio_data.card_name = "PandaBoardES";
->> +	}
->> +}
->> +
-> 
-> Please move the cpu_is_omap4430() check from audio_init to..
-> 
->>  static void __init omap4_panda_init(void)
->>  {
->>  	int package = OMAP_PACKAGE_CBS;
->> @@ -560,6 +613,7 @@ static void __init omap4_panda_init(void)
->>  		pr_err("error setting wl12xx data\n");
->>  
->>  	omap4_panda_i2c_init();
->> +	omap4_panda_audio_init();
->>  	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
->>  	platform_device_register(&omap_vwlan_device);
->>  	board_serial_init();
-> 
-> ..omap4_panda_init() instead and set some flag that other
-> devices can use too so we don't have cpu_is_omap tests
-> for each init function. I'd assume that will be needed for
-> other devices too, but that's just a guess of course :)
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
 
-I was planning to have omap4_panda_init_rev(), which would be called
-just before the i2c_init().
-If other drivers need to differentiate between Panda and PandaES they
-can add their code there.
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-We can use GPIOs to get the board ID, I'm looking at those for a
-followup patch.
-The only issue is that the ID1 GPIO number is different between 4430,
-and 4460 based Panda.
-We can have similar revision handling as we have for Beagle at the end.
+This looks good to me with one small comment:
 
--- 
-P?ter
+> +int cpuidle_def_idle(struct cpuidle_device *dev,
+> +			       struct cpuidle_driver *drv, int index) {
+> +	cpu_do_idle();
+> +	return index;
+> +}
+
+Odd indentation here.
+
+I'll move my s3c64xx cpuidle code over to this, though I think it'll end
+up being an incremental patch as Kukjin just said he'd apply it and it'd
+be nice to get the support into 3.3 if we can.
