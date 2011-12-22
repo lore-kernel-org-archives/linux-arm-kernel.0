@@ -1,34 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 22 Dec 2011 19:43:20 +0800
-Subject: [PATCH 2/4] regulator: mc13892: remove the unnecessary prefix
- from regulator name
-In-Reply-To: <20111222110830.GI4546@opensource.wolfsonmicro.com>
-References: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
- <1324479647-4580-3-git-send-email-shawn.guo@linaro.org>
- <20111222110830.GI4546@opensource.wolfsonmicro.com>
-Message-ID: <20111222114319.GA6806@S2100-06.ap.freescale.net>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 22 Dec 2011 09:33:22 -0200
+Subject: [PATCH v2] usb: gadget: Fix build error due to selection of
+ USB_FSL_MPH_DR_OF by ARCH_MXC
+In-Reply-To: <1324492640-25481-1-git-send-email-fabio.estevam@freescale.com>
+References: <1324492640-25481-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1324553602-3411-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 11:08:30AM +0000, Mark Brown wrote:
-> On Wed, Dec 21, 2011 at 11:00:45PM +0800, Shawn Guo wrote:
-> > It's not really necessary to add a prefix 'MC13892__' for each mc13892
-> > regulator name, since the chip must have been identified as mc13892
-> > when we look at the regulator name.
-> 
-> Applied, thanks.
-> 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > Cc: Liam Girdwood <lrg@ti.com>
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Think something went wrong with your scripts here...  might be worth
-> checking.
+USB_FSL_MPH_DR_OF is a PowerPC driver and should not be selected by ARCH_MXC.
 
-Yes, something did go wrong there.  Thanks for noticing.
+Doing a 'make mx3_defconfig' and selecting i.MX6 we get:
 
+CC [M]  drivers/usb/host/fsl-mph-dr-of.o
+drivers/usb/host/fsl-mph-dr-of.c: In function 'fsl_usb2_device_register':
+drivers/usb/host/fsl-mph-dr-of.c:97: error: 'struct pdev_archdata' has no member named 'dma_mask'
+
+Fix this error by not allowing USB_FSL_MPH_DR_OF to be selected by ARCH_MXC.
+
+Cc: stable at kernel.org
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Changed the selection logic to depend on FSL_SOC
+- Cc stable at kernel.org
+
+ drivers/usb/gadget/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 23a4473..0148676 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -159,7 +159,7 @@ config USB_FSL_USB2
+ 	tristate "Freescale Highspeed USB DR Peripheral Controller"
+ 	depends on FSL_SOC || ARCH_MXC
+ 	select USB_GADGET_DUALSPEED
+-	select USB_FSL_MPH_DR_OF if OF
++	select USB_FSL_MPH_DR_OF if OF && FSL_SOC
+ 	help
+ 	   Some of Freescale PowerPC processors have a High Speed
+ 	   Dual-Role(DR) USB controller, which supports device mode.
 -- 
-Regards,
-Shawn
+1.7.1
