@@ -1,149 +1,57 @@
-From: jason.chen@linaro.org (Jason Chen)
-Date: Thu, 22 Dec 2011 20:23:45 +0800
-Subject: [PATCH] arm/imx6q: add clock debugfs support
-Message-ID: <1324556625-28192-1-git-send-email-jason.chen@linaro.org>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 22 Dec 2011 12:27:16 +0000
+Subject: [PATCH v2] davinci: DA850 EVM: OHCI platform code
+In-Reply-To: <4EF1D011.8060103@mvista.com>
+References: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
+ <DF0F476B391FA8409C78302C7BA518B6051CB9@DBDE01.ent.ti.com>
+ <4EF1CB8A.10309@mvista.com> <4EF1D011.8060103@mvista.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6053054@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jason Chen <jason.chen@linaro.org>
----
- arch/arm/mach-imx/clock-imx6q.c |   24 +++++++++++++++++++++++-
- 1 files changed, 23 insertions(+), 1 deletions(-)
+On Wed, Dec 21, 2011 at 17:54:49, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 21-12-2011 16:05, I wrote:
+> 
+> >> On Wed, Dec 21, 2011 at 12:50:02, Manjunathappa, Prakash wrote:
+> >>> From: Ajay Kumar Gupta<ajay.gupta@ti.com>
+> 
+> >>> On this board the OHCI port's power control and over-current signals from
+> >>> TPS2065 power switch are connected via GPIO2[4] and GPIO6[13] respectively,
+> >>> so we can implement the DA8xx OHCI glue layer's hooks for overriding the
+> >>> root hub port's power and over-current status bits.
+> 
+> >>> We also have to properly set up the clocking mode in the CFGCHIP2 register,
+> >>> so that internal 24 MHz reference clock is fed to the USB 2.0 (MUSB) PHY and
+> >>> its output is used to clock the USB 1.1 (OHCI) PHY...
+> 
+> >>> Signed-off-by: Ajay Kumar Gupta<ajay.gupta@ti.com>
+> >>> Signed-off-by: Manjunathappa, Prakash<prakash.pm@ti.com>
+> 
+> >> This is the third copy of OHCI platform setup code which is almost
+> >> the same except for the GPIO numbers.
+> 
+> > Well, in my counting, it's only second, DA830 EVM being the first one.
+> > What's the third?
+> 
+>     Ah, I missed Hawkboard... :-)
+> 
+>  >    I designed the hub interface to be as abstract as I could, and now you're
+>  > proposing to add GPIO to it? No, I have no clear idea how to keeep it
+>  > abstract and add GPIO support at the same time. I would have been grateful to
+>  > TI if I didn't have to invent this at all and they stop saving on OHCI pins.
+> 
+>     Well, I have one idea. We can create a separate module in 
+> arch/arm/mach-davinci/, named say ohci.c, put the shared code there and pass 
+> to it the GPIOs actually used via a function call. Or maybe use existing 
+> arch/arm/mach-davinci/usb.c.
 
-diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-index 9273c2a..840ab8d 100644
---- a/arch/arm/mach-imx/clock-imx6q.c
-+++ b/arch/arm/mach-imx/clock-imx6q.c
-@@ -335,6 +335,12 @@
- #define FREQ_650M	650000000
- #define FREQ_1300M	1300000000
- 
-+#ifdef CONFIG_CLK_DEBUG
-+#define __INIT_CLK_DEBUG(n)	.name = #n,
-+#else
-+#define __INIT_CLK_DEBUG(n)
-+#endif
-+
- static struct clk pll1_sys;
- static struct clk pll2_bus;
- static struct clk pll3_usb_otg;
-@@ -415,14 +421,17 @@ static unsigned long get_low_reference_clock_rate(struct clk *clk)
- }
- 
- static struct clk ckil_clk = {
-+	__INIT_CLK_DEBUG(ckil_clk)
- 	.get_rate = get_low_reference_clock_rate,
- };
- 
- static struct clk ckih_clk = {
-+	__INIT_CLK_DEBUG(ckih_clk)
- 	.get_rate = get_high_reference_clock_rate,
- };
- 
- static struct clk osc_clk = {
-+	__INIT_CLK_DEBUG(osc_clk)
- 	.get_rate = get_oscillator_reference_clock_rate,
- };
- 
-@@ -677,6 +686,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
- 
- #define DEF_PLL(name)					\
- 	static struct clk name = {			\
-+		__INIT_CLK_DEBUG(name)			\
- 		.enable		= pll_enable,		\
- 		.disable	= pll_disable,		\
- 		.get_rate	= name##_get_rate,	\
-@@ -796,6 +806,7 @@ static void pfd_disable(struct clk *clk)
- 
- #define DEF_PFD(name, er, es, p)			\
- 	static struct clk name = {			\
-+		__INIT_CLK_DEBUG(name)			\
- 		.enable_reg	= er,			\
- 		.enable_shift	= es,			\
- 		.enable		= pfd_enable,		\
-@@ -820,6 +831,7 @@ static unsigned long pll2_200m_get_rate(struct clk *clk)
- }
- 
- static struct clk pll2_200m = {
-+	__INIT_CLK_DEBUG(pll2_200m)
- 	.parent = &pll2_pfd_400m,
- 	.get_rate = pll2_200m_get_rate,
- };
-@@ -830,6 +842,7 @@ static unsigned long pll3_120m_get_rate(struct clk *clk)
- }
- 
- static struct clk pll3_120m = {
-+	__INIT_CLK_DEBUG(pll3_120m)
- 	.parent = &pll3_usb_otg,
- 	.get_rate = pll3_120m_get_rate,
- };
-@@ -840,6 +853,7 @@ static unsigned long pll3_80m_get_rate(struct clk *clk)
- }
- 
- static struct clk pll3_80m = {
-+	__INIT_CLK_DEBUG(pll3_80m)
- 	.parent = &pll3_usb_otg,
- 	.get_rate = pll3_80m_get_rate,
- };
-@@ -850,6 +864,7 @@ static unsigned long pll3_60m_get_rate(struct clk *clk)
- }
- 
- static struct clk pll3_60m = {
-+	__INIT_CLK_DEBUG(pll3_60m)
- 	.parent = &pll3_usb_otg,
- 	.get_rate = pll3_60m_get_rate,
- };
-@@ -877,6 +892,7 @@ static int pll1_sw_clk_set_parent(struct clk *clk, struct clk *parent)
- }
- 
- static struct clk pll1_sw_clk = {
-+	__INIT_CLK_DEBUG(pll1_sw_clk)
- 	.parent = &pll1_sys,
- 	.set_parent = pll1_sw_clk_set_parent,
- };
-@@ -1696,6 +1712,7 @@ static int _clk_set_parent(struct clk *clk, struct clk *parent)
- 
- #define DEF_NG_CLK(name, p)				\
- 	static struct clk name = {			\
-+		__INIT_CLK_DEBUG(name)			\
- 		.get_rate	= _clk_get_rate,	\
- 		.set_rate	= _clk_set_rate,	\
- 		.round_rate	= _clk_round_rate,	\
-@@ -1723,6 +1740,7 @@ DEF_NG_CLK(asrc_serial_clk,	&pll3_usb_otg);
- 
- #define DEF_CLK(name, er, es, p, s)			\
- 	static struct clk name = {			\
-+		__INIT_CLK_DEBUG(name)			\
- 		.enable_reg	= er,			\
- 		.enable_shift	= es,			\
- 		.enable		= _clk_enable,		\
-@@ -1825,6 +1843,7 @@ static void pcie_clk_disable(struct clk *clk)
- }
- 
- static struct clk pcie_clk = {
-+	__INIT_CLK_DEBUG(pcie_clk)
- 	.enable_reg = CCGR4,
- 	.enable_shift = CG0,
- 	.enable = pcie_clk_enable,
-@@ -1857,6 +1876,7 @@ static void sata_clk_disable(struct clk *clk)
- }
- 
- static struct clk sata_clk = {
-+	__INIT_CLK_DEBUG(sata_clk)
- 	.enable_reg = CCGR5,
- 	.enable_shift = CG2,
- 	.enable = sata_clk_enable,
-@@ -1976,8 +1996,10 @@ int __init mx6q_clocks_init(void)
- 			oscillator_reference = rate;
- 	}
- 
--	for (i = 0; i < ARRAY_SIZE(lookups); i++)
-+	for (i = 0; i < ARRAY_SIZE(lookups); i++) {
- 		clkdev_add(&lookups[i]);
-+		clk_debug_register(lookups[i].clk);
-+	}
- 
- 	/* only keep necessary clocks on */
- 	writel_relaxed(0x3 << CG0  | 0x3 << CG1  | 0x3 << CG2,	CCGR0);
--- 
-1.7.4.1
+Thanks Sergei. I think using the existing usb.c would be a better idea.
+
+Prakash,
+
+Can you please go ahead with this approach and post updated patches.
+
+Thanks,
+Sekhar
