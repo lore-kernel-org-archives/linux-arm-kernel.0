@@ -1,41 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Dec 2011 09:21:43 -0800
-Subject: [GIT PULL] Borderline fixes for v3.2-rc6
-In-Reply-To: <CAOesGMihx_1Ay6qEfynXw8Xqmu9xzgLeEj0UjkfY8g7e9jUaDw@mail.gmail.com>
-References: <20111219194249.GO6464@atomide.com>
- <CAOesGMj-OyDu9pcOZ20o6G0W3-kkxyHF7o5DqDRaQkkUDf98CA@mail.gmail.com>
- <20111220171041.GA24444@atomide.com>
- <CAOesGMhXnSB8-eW=NxjFqv_9Br5pD5XOi==wAL_j+bDoj_+gCw@mail.gmail.com>
- <20111222171112.GH24444@atomide.com>
- <CAOesGMihx_1Ay6qEfynXw8Xqmu9xzgLeEj0UjkfY8g7e9jUaDw@mail.gmail.com>
-Message-ID: <20111222172143.GI24444@atomide.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 22 Dec 2011 18:31:06 +0100
+Subject: [PATCH v4 03/12] mfd: twl-core: Add initial DT support for
+ twl4030/twl6030
+In-Reply-To: <1324565806-31142-4-git-send-email-b-cousson@ti.com>
+References: <1324565806-31142-1-git-send-email-b-cousson@ti.com>
+ <1324565806-31142-4-git-send-email-b-cousson@ti.com>
+Message-ID: <20111222173106.GJ5183@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [111222 08:42]:
-> On Thu, Dec 22, 2011 at 9:11 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > Hi Olof,
-> >
-> > * Olof Johansson <olof@lixom.net> [111220 09:29]:
-> >> On Tue, Dec 20, 2011 at 9:10 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> >
-> >> > I've branched it out into fixes-hwmod-regression with just that
-> >> > same commit in it. The second patch in this series will be pulled in
-> >> > with fixes-non-critical-part2. Updated pull request below.
-> >>
-> >> Thanks, I pulled fixes-hwmod-regression into fixes and fixes-hwmod
-> >> into next/fixes-non-critical.
-> >
-> > Just checking.. Looks like you pulled fixes-hwmod into a new branch
-> > named fixes-non-critical-part2, but did not pull the same name branch
-> > fixes-non-critical-part2 that I posted?
-> >
-> > That's this pull request:
-> >
-> > http://www.spinics.net/lists/linux-omap/msg62050.html
+Hi Benoit,
+
+On Thu, Dec 22, 2011 at 03:56:37PM +0100, Benoit Cousson wrote:
+> Add initial device-tree support for twl familly chips.
+> The current version is missing the regulator entries due
+> to the lack of DT regulator bindings for the moment.
+> Only the simple sub-modules that do not depend on
+> platform_data information can be initialized properly.
 > 
-> Grmbl, thanks for catching that. I'll sort it out at this end.
+> Add irqdomain support.
+> 
+> Add documentation for the Texas Instruments TWL Integrated Chip.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Balaji T K <balajitk@ti.com>
+> Cc: Graeme Gregory <gg@slimlogic.co.uk>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> ---
+>  .../devicetree/bindings/mfd/twl-familly.txt        |   47 ++++++++++++++++++
+>  drivers/mfd/Kconfig                                |    1 +
+>  drivers/mfd/twl-core.c                             |   51 +++++++++++++++++++-
+>  3 files changed, 98 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/twl-familly.txt
+Patch applied instead of the previous one, thanks for the quick fix.
 
-OK thanks!
+Cheers,
+Samuel.
 
-Tony
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
