@@ -1,68 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 22 Dec 2011 10:44:04 +0900
-Subject: [PATCHv2 resend] Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-In-Reply-To: <4EF27C76.3020805@solonet.org.ua>
-References: <4EE7BE5F.8020108@solonet.org.ua>
- <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
- <4EF23852.1050304@solonet.org.ua>
- <06fa01ccc02c$828b6810$87a23830$%kim@samsung.com>
- <4EF27C76.3020805@solonet.org.ua>
-Message-ID: <073601ccc04b$2fcff5e0$8f6fe1a0$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 22 Dec 2011 11:04:01 +0800
+Subject: [PATCH] ARM: mx3_defconfig: Allow all the targets to be built by
+ default
+In-Reply-To: <1324496261-30844-1-git-send-email-fabio.estevam@freescale.com>
+References: <1324496261-30844-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20111222030400.GD6470@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Denis Kuzmenko wrote:
+On Wed, Dec 21, 2011 at 05:37:41PM -0200, Fabio Estevam wrote:
+> In order to get better build coverage, include the two missing platforms to be build
+> by default on mx3_defconfig.
 > 
-> On 12/22/2011 12:04 AM, Kukjin Kim wrote:
-> > Denis Kuzmenko wrote:
-> >>
-> >> On 12/21/2011 09:04 AM, Kukjin Kim wrote:
-> >>> Denis Kuzmenko wrote:
-> >>>>
-> >>>> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-> >>>>
-> >>>> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
-> >>>> ---
-> >>>>
-> >>>> Patch is against 3.2-rc4.
-> >>>> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of
-> >> this
-> >>>> the
-> >>>> file s3c2410-iotiming.c is not ever compiled and enabling
-> >>>> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
-> >>>> function
-> >>>> s3c2410_iotiming_debugfs defined in that file.
-> s3c2410_iotiming_debugfs
-> >>>> defined
-> >>>> as NULL for this case.
-> >>>>
-> >>> Hi Denis,
-> >>>
-> >>> Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected
-> in
-> >> my
-> >>> case and s3c2410-iotiming.c is built...when is it happened? I just
-> >> selected
-> >>> every regarding configuration in kernel menuconfig...
-> >>
-> >> Please, try attached config (it's still failing in v3.2-rc6).
-> >>
-> > Hi Denis,
-> >
-> > Yes, when s3c2410 stuff is not selected, it happened.
-> > Look at me soon and thanks.
-> Hi, Kukjin,
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/configs/mx3_defconfig |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> Sorry, can you please explain as I can't understand. Especially second
-> sentence.
-> 
-Oops, mis-typing. Let me look at that with your patch :)
+> diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
+> index cb0717f..a2550fa 100644
+> --- a/arch/arm/configs/mx3_defconfig
+> +++ b/arch/arm/configs/mx3_defconfig
+> @@ -24,6 +24,8 @@ CONFIG_MACH_KZM_ARM11_01=y
+>  CONFIG_MACH_PCM043=y
+>  CONFIG_MACH_MX35_3DS=y
+>  CONFIG_MACH_EUKREA_CPUIMX35=y
+> +CONFIG_MACH_VPR200=y
+> +CONFIG_SOC_IMX6Q=y
+>  CONFIG_MXC_IRQ_PRIOR=y
+>  CONFIG_MXC_PWM=y
+>  CONFIG_ARM_ERRATA_411920=y
+> -- 
+> 1.7.1
 
-Thanks.
+We do not bother, since imx_v6_v7_defconfig which enables imx3, imx5
+and imx6 will come to play in the coming merge window.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Regards,
+Shawn
