@@ -1,37 +1,34 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 22 Dec 2011 11:27:51 +0000
-Subject: [PATCH v4] ARM: Add generic instruction opcode manipulation
- helpers
-In-Reply-To: <alpine.LFD.2.02.1112191201360.2907@xanadu.home>
-References: <1324305365-22514-1-git-send-email-dave.martin@linaro.org>
- <alpine.LFD.2.02.1112191201360.2907@xanadu.home>
-Message-ID: <20111222112751.GB2573@localhost>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 22 Dec 2011 19:43:20 +0800
+Subject: [PATCH 2/4] regulator: mc13892: remove the unnecessary prefix
+ from regulator name
+In-Reply-To: <20111222110830.GI4546@opensource.wolfsonmicro.com>
+References: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
+ <1324479647-4580-3-git-send-email-shawn.guo@linaro.org>
+ <20111222110830.GI4546@opensource.wolfsonmicro.com>
+Message-ID: <20111222114319.GA6806@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 12:03:32PM -0500, Nicolas Pitre wrote:
-> On Mon, 19 Dec 2011, Dave Martin wrote:
+On Thu, Dec 22, 2011 at 11:08:30AM +0000, Mark Brown wrote:
+> On Wed, Dec 21, 2011 at 11:00:45PM +0800, Shawn Guo wrote:
+> > It's not really necessary to add a prefix 'MC13892__' for each mc13892
+> > regulator name, since the chip must have been identified as mc13892
+> > when we look at the regulator name.
 > 
-> > This patch adds some endianness-agnostic helpers to convert machine
-> > instructions between canonical integer form and in-memory
-> > representation.
-> > 
-> > A canonical integer form for representing instructions is also
-> > formalised here.
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> > Changes since v1:
-> > 
-> > v4: Rebase on top of Leif's patch which created <asm/opcodes.h>
-> >     ARM: 7206/1: Add generic ARM instruction set condition code checks.
+> Applied, thanks.
 > 
-> In that case you might be able to put your patch in the patch system, 
-> and then go back to add a note for Russell mentioning 7206/1 is a 
-> prerequisite.
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > Cc: Liam Girdwood <lrg@ti.com>
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Think something went wrong with your scripts here...  might be worth
+> checking.
 
-OK, I'll try and do that.
+Yes, something did go wrong there.  Thanks for noticing.
 
-Cheers
----Dave
+-- 
+Regards,
+Shawn
