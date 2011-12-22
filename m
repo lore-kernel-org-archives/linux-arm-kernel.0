@@ -1,42 +1,42 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 22 Dec 2011 18:31:06 +0100
-Subject: [PATCH v4 03/12] mfd: twl-core: Add initial DT support for
- twl4030/twl6030
-In-Reply-To: <1324565806-31142-4-git-send-email-b-cousson@ti.com>
-References: <1324565806-31142-1-git-send-email-b-cousson@ti.com>
- <1324565806-31142-4-git-send-email-b-cousson@ti.com>
-Message-ID: <20111222173106.GJ5183@sortiz-mobl>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 22 Dec 2011 09:27:01 -0800
+Subject: [GIT PULL] Non critical fixes for v3.3 merge window, part2
+In-Reply-To: <20111219202354.GA17267@atomide.com>
+References: <20111219194546.GP6464@atomide.com>
+ <20111219202354.GA17267@atomide.com>
+Message-ID: <CAOesGMgWjyOoj22Yqz0hx0wbOnd=uTdh5SkkC9SgZBZRKxwpDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Mon, Dec 19, 2011 at 12:23 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Resending with mailing lists in Cc.
+>
+> * Tony Lindgren <tony@atomide.com> [111219 11:45]:
+>> Hi Arnd & Olof,
+>>
+>> Please pull few non-critical fixes for v3.3 merge window from:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical-part2
+>>
+>> These will be needed for some omap hwmod and ehci changes I'll
+>> post pull requests for after this. Note that this is based on
+>> the earlier pull request for fixes, so those two fixes will also
+>> get pulled in if they don't make it to the -rc cycle.
+>>
+>> Regards,
+>>
+>> Tony
+>>
+>>
+>> The following changes since commit 4a4de1d9b47156525ceb46c7faf6ae4042d90aa7:
+>> ? Tony Lindgren (1):
+>> ? ? ? ? Merge branch 'hwmod_data_fixes_3.2rc' of git://git.pwsan.com/linux-2.6 into fixes-hwmod
+>>
+>> are available in the git repository at:
+>>
+>> ? git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical-part2
 
-On Thu, Dec 22, 2011 at 03:56:37PM +0100, Benoit Cousson wrote:
-> Add initial device-tree support for twl familly chips.
-> The current version is missing the regulator entries due
-> to the lack of DT regulator bindings for the moment.
-> Only the simple sub-modules that do not depend on
-> platform_data information can be initialized properly.
-> 
-> Add irqdomain support.
-> 
-> Add documentation for the Texas Instruments TWL Integrated Chip.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Balaji T K <balajitk@ti.com>
-> Cc: Graeme Gregory <gg@slimlogic.co.uk>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> ---
->  .../devicetree/bindings/mfd/twl-familly.txt        |   47 ++++++++++++++++++
->  drivers/mfd/Kconfig                                |    1 +
->  drivers/mfd/twl-core.c                             |   51 +++++++++++++++++++-
->  3 files changed, 98 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/twl-familly.txt
-Patch applied instead of the previous one, thanks for the quick fix.
+Pulled into next/fixes-non-critical. Thanks!
 
-Cheers,
-Samuel.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+-Olof
