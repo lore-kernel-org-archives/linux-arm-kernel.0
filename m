@@ -1,75 +1,77 @@
-From: vladimir.zapolskiy@nokia.com (Vladimir Zapolskiy)
-Date: Thu, 22 Dec 2011 17:05:29 +0200
-Subject: [PATCH] arm: oprofile: fix linkage issue
-In-Reply-To: <20111222145412.GV16765@erda.amd.com>
-References: <1324561016-19389-1-git-send-email-vladimir.zapolskiy@nokia.com>
- <20111222142140.GP16765@erda.amd.com> <20111222145412.GV16765@erda.amd.com>
-Message-ID: <4EF34739.1070704@nokia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 22 Dec 2011 09:07:49 -0600
+Subject: [PATCH v3 00/11] OMAP4: Add DT support for i2c and twl6030
+In-Reply-To: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
+References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
+Message-ID: <4EF347C5.5020401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2011 04:54 PM, ext Robert Richter wrote:
-> On 22.12.11 15:21:40, Robert Richter wrote:
->> On 22.12.11 15:36:56, Vladimir Zapolskiy wrote:
->>> This change fixes a linking problem, which happens if oprofile is selected to
->>> be compiled as built-in:
->>>
->>>    `oprofile_arch_exit' referenced in section `.init.text' of
->>>    arch/arm/oprofile/built-in.o: defined in discarded section
->>>    `.exit.text' of arch/arm/oprofile/built-in.o
->>>
->>> The problem is appeared after commit 87121ca504, which introduced
->>> oprofile_arch_exit() calls from __init function. Note that the aforementioned
->>> commit has been backported to stable branches, and the problem is known to be
->>> reproduced at least with 3.0.13 and 3.1.5 kernels.
->>
->> I will fix it upstream, afterwards this goes into stable due to the
->> stable tag.
->>
->> Right, commit 87121ca504 went into stable kernels 3.0 and 3.1, need to
->> fix them too:
->>
->> CC: stable at kernel.org # 3.0+
->>
->> Please fix also arch/sh with this patch:
->>
->>   $ git grep exit.*oprofile_arch_exit arch/*/oprofile drivers/oprofile/
->>   arch/arm/oprofile/common.c:void __exit oprofile_arch_exit(void)
->>   arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void)
->>   arch/sh/oprofile/common.c:void __exit oprofile_arch_exit(void) {}
->>
->> Thanks,
->
-> To make things easier: if you aggree I will apply your patch with the
-> changes below in addition. No need to respin a new patch version.
->
+On 12/20/2011 10:27 AM, Benoit Cousson wrote:
+> Hi Tony and Rob,
+> 
+> Here is the updated version of the i2c + twl DT adaptation series.
+> 
+> This update, compared to v2 [1], is adding some dedicated dtsi files for
+> the twl PMIC and audio IC. These devices will contain a huge amount of
+> regulator nodes and thus deserve a dedicated file to avoid every boards
+> to redefine the same data.
+> The twl patch is now included in Samuel's for-next branch and thus dropped
+> from this update.
+> The i2c binding was cleaned as suggested by Rob to avoid all the ugly
+> hexa flags inside the DTS.
+> 
+> The pm.c was updated to prevent the SR / VP initialization in the DT
+> context since none of them is DT aware for the moment.
+> 
+> A couple of basic i2c devices are added for panda, beagle and sdp board.
+> 
+> Patches are based on for_3.3/2_dt_irq, to get the latest GIC binding,
+> and are available here:
+> git://gitorious.org/omap-pm/linux.git for_3.3/3_omap_dt_i2c_twl
+> 
+> Tested on Beagle and sdp4430.
+> 
+> Comments are welcome.
+> 
+> Regards,
+> Benoit
+> 
+> [1] http://www.spinics.net/lists/linux-omap/msg61260.html
+> 
+> 
+> Benoit Cousson (11):
+>   ARM: OMAP2+: pm: Do not init statically the SR and voltage layer with DT
+>   i2c: OMAP: Add DT support for i2c controller
+>   rtc: rtc-twl: Add DT support for RTC inside twl4030/twl6030
+>   arm/dts: OMAP4: Add i2c controller nodes
+>   arm/dts: OMAP3: Add i2c controller nodes
+>   arm/dts: twl6030: Add DTS file for twl6030 PMIC
+>   arm/dts: twl4030: Add DTS file for twl4030 PM + Audio IC
+>   arm/dts: omap4-panda: Add twl6030 and i2c EEPROM
+>   arm/dts: omap4-sdp: Add twl6030, i2c3 and i2c4 devices
+>   arm/dts: omap3-beagle: Add twl4030 and i2c EEPROM
+>   ARM: OMAP2+: board-generic: Remove i2c static init
+> 
+>  Documentation/devicetree/bindings/i2c/omap-i2c.txt |   30 ++++++
+>  Documentation/devicetree/bindings/rtc/twl-rtc.txt  |   12 +++
+>  arch/arm/boot/dts/omap3-beagle.dts                 |   29 ++++++
+>  arch/arm/boot/dts/omap3.dtsi                       |   21 ++++
+>  arch/arm/boot/dts/omap4-panda.dts                  |   34 +++++++
+>  arch/arm/boot/dts/omap4-sdp.dts                    |   53 ++++++++++
+>  arch/arm/boot/dts/omap4.dtsi                       |   28 ++++++
+>  arch/arm/boot/dts/twl4030.dtsi                     |   21 ++++
+>  arch/arm/boot/dts/twl6030.dtsi                     |   22 ++++
+>  arch/arm/mach-omap2/board-generic.c                |   48 +---------
+>  arch/arm/mach-omap2/pm.c                           |    8 ++
+>  drivers/i2c/busses/i2c-omap.c                      |  101 +++++++++++++-------
+>  drivers/rtc/rtc-twl.c                              |   10 ++-
+>  13 files changed, 334 insertions(+), 83 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
+>  create mode 100644 Documentation/devicetree/bindings/rtc/twl-rtc.txt
+>  create mode 100644 arch/arm/boot/dts/twl4030.dtsi
+>  create mode 100644 arch/arm/boot/dts/twl6030.dtsi
 
-Certainly, thanks.
+For the series:
 
-With best wishes,
-Vladimir
-
->
->
-> diff --git a/arch/sh/oprofile/common.c b/arch/sh/oprofile/common.c
-> index b4c2d2b..e4dd5d5 100644
-> --- a/arch/sh/oprofile/common.c
-> +++ b/arch/sh/oprofile/common.c
-> @@ -49,7 +49,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
->          return oprofile_perf_init(ops);
->   }
->
-> -void __exit oprofile_arch_exit(void)
-> +void oprofile_arch_exit(void)
->   {
->          oprofile_perf_exit();
->          kfree(sh_pmu_op_name);
-> @@ -60,5 +60,5 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
->          ops->backtrace = sh_backtrace;
->          return -ENODEV;
->   }
-> -void __exit oprofile_arch_exit(void) {}
-> +void oprofile_arch_exit(void) {}
->   #endif /* CONFIG_HW_PERF_EVENTS */
->
->
+Acked-by: Rob Herring <rob.herring@calxeda.com>
