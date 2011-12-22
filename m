@@ -1,46 +1,56 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 21 Dec 2011 23:14:39 +0100
-Subject: [PATCH 07/10] ASoC: OMAP: ams-delta: Drive modem/codec pins over
- GPIO API
-In-Reply-To: <1324492424.8478.5.camel@odin>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <1323634328-856-8-git-send-email-jkrzyszt@tis.icnet.pl>
- <1324492424.8478.5.camel@odin>
-Message-ID: <201112212314.39844.jkrzyszt@tis.icnet.pl>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Thu, 22 Dec 2011 02:40:22 +0200
+Subject: [PATCHv2 resend] Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+In-Reply-To: <06fa01ccc02c$828b6810$87a23830$%kim@samsung.com>
+References: <4EE7BE5F.8020108@solonet.org.ua>
+ <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
+ <4EF23852.1050304@solonet.org.ua>
+ <06fa01ccc02c$828b6810$87a23830$%kim@samsung.com>
+Message-ID: <4EF27C76.3020805@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 of December 2011 at 19:33:44, Liam Girdwood wrote:
-> On Sun, 2011-12-11 at 21:12 +0100, Janusz Krzysztofik wrote:
-> > Don't use Amstrad Delta custom I/O functions any longer, replace them
-> > with GPIO. Old pin definitions, no longer used by the modem bits either,
-> > can be dropped.
-> > 
-> > Depends on patch 2/10 "ARM: OMAP1: Convert Amstrad E3 latches to
-> > basic_mmio_gpio".
-> > 
-> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+On 12/22/2011 12:04 AM, Kukjin Kim wrote:
+> Denis Kuzmenko wrote:
+>>
+>> On 12/21/2011 09:04 AM, Kukjin Kim wrote:
+>>> Denis Kuzmenko wrote:
+>>>>
+>>>> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+>>>>
+>>>> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+>>>> ---
+>>>>
+>>>> Patch is against 3.2-rc4.
+>>>> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of
+>> this
+>>>> the
+>>>> file s3c2410-iotiming.c is not ever compiled and enabling
+>>>> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
+>>>> function
+>>>> s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs
+>>>> defined
+>>>> as NULL for this case.
+>>>>
+>>> Hi Denis,
+>>>
+>>> Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected in
+>> my
+>>> case and s3c2410-iotiming.c is built...when is it happened? I just
+>> selected
+>>> every regarding configuration in kernel menuconfig...
+>>
+>> Please, try attached config (it's still failing in v3.2-rc6).
+>>
+> Hi Denis,
 > 
-> Applied.
+> Yes, when s3c2410 stuff is not selected, it happened.
+> Look at me soon and thanks.
+Hi, Kukjin,
 
-Hi,
-I'm sorry, but I've probably missed to infrom you explicitly, i.e. other 
-than in a cover letter to v2 of this series, that this particular patch 
-has been dropped from the series. I've already started working on an 
-alternative solution, which I intend to submit as a separate set. It 
-will be free of potentail problems with two devices, a modem and the 
-sound card, accessing the same GPIO pins concurrently. For the 
-MODEM_NRESET pin I've already set up a virtual regulator on top of it, 
-and for the MODEM_CODEC pin I'll probably choose a virtual clock (pinmux 
-would match the hardware more closely here, but it looks too complicated 
-to me). Moreover, I've already started to move all those GPIO pin 
-related functions, i.e. bias control, digital mute and line discipline 
-interaction, from the board file to the codec driver, where all those 
-seem to belong.
+Sorry, can you please explain as I can't understand. Especially second
+sentence.
 
-Having this patch applied will conflict with the regultor and the clock 
-solutions, taking control over those two GPIO pins. Please revert this 
-patch, or reset it if still possible.
-
-Thanks,
-Janusz
+-- 
+Best regards, Denis Kuzmenko.
