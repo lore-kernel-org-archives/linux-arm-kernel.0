@@ -1,30 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 22 Dec 2011 11:10:33 +0000
-Subject: [PATCH v2 1/7 v2] ARM: OMAP1: ams-delta: register latch
- dependent devices later
-In-Reply-To: <4EF30F9C.7030708@bitmer.com>
-References: <201112200028.32947.jkrzyszt@tis.icnet.pl>
- <201112212051.13113.jkrzyszt@tis.icnet.pl>
- <20111221200728.GG24444@atomide.com>
- <201112221139.16317.jkrzyszt@tis.icnet.pl>
- <4EF30F9C.7030708@bitmer.com>
-Message-ID: <20111222111032.GK4546@opensource.wolfsonmicro.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 22 Dec 2011 11:21:25 +0000
+Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
+ AMBA drivers
+In-Reply-To: <20111219213942.GM14542@n2100.arm.linux.org.uk>
+References: <20111206151541.GA13774@linaro.org>
+ <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
+ <20111206155911.GA11902@mail.gnudd.com>
+ <20111206161815.GD13769@linaro.org>
+ <20111219132409.GB2031@linaro.org>
+ <20111219213942.GM14542@n2100.arm.linux.org.uk>
+Message-ID: <20111222112125.GA2573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 01:08:12PM +0200, Jarkko Nikula wrote:
-> On 12/22/2011 12:39 PM, Janusz Krzysztofik wrote:
+On Mon, Dec 19, 2011 at 09:39:42PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 19, 2011 at 01:24:09PM +0000, Dave Martin wrote:
+> > Hi Russell,
+> > 
+> > This one isn't urgent, but I'm not seeing the amba modalias patches
+> > anywhere yet.  Did you have any outstanding concerns which need to be
+> > resolved?
+> > 
+> > If you can suggest when/if these are likely to merge that would be great.
+> > 
+> > Since Alessandro is now expecting to have to rebase on top of the amba
+> > additions anyway, we shouldn't need to worry about conflicting with his
+> > patches.
+> > 
+> > Of course, if you've already merged these somewhere, then there's no
+> > problem.
+> 
+> I have pulled it, I just haven't merged it in anywhere yet.
 
-Guys *please* delete irrelevant context from mails.  I wasn't reading
-any of the rest of it since nothing about the subject line says anything
-about anything relevant and there was no content anywhere near the start
-of the actual mails.  I only saw this because Jarkko did trim the
-context.
+OK, great -- thanks.
 
-> >Jarkko, Mark or Liam, care to ack this change, moving the Amstrad Delta
-> >sound card registration to late_initcall?
+I wasn't too familiar with the procedure, so I just wanted
+to be sure that I hadn't done things wrong.
 
-> Unfortunately I haven't had time to look at the series but I'm fine
-> with sound/soc/omap/ams-delta.c change.
+Have a good Christmas in the meantime!
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cheers
+---Dave
