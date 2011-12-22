@@ -1,78 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Dec 2011 11:37:36 -0800
-Subject: [PATCH v3 2/9] OMAP4: 4430sdp: Register platform device for
- OMAP4 audio
-In-Reply-To: <1324582474-18181-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1324582474-18181-1-git-send-email-peter.ujfalusi@ti.com>
- <1324582474-18181-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20111222193736.GR24444@atomide.com>
+From: kishorek.kadiyala@gmail.com (Kishore Kadiyala)
+Date: Fri, 23 Dec 2011 01:07:55 +0530
+Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
+In-Reply-To: <1323868927-3738-1-git-send-email-zonque@gmail.com>
+References: <1323868927-3738-1-git-send-email-zonque@gmail.com>
+Message-ID: <CAF=Qhp3UjugPL8eDzbJ9=-Yw0gxxpCFw7p13GS5LQEWrzHxLfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [111222 11:03]:
-> To avoid breakage in audio support with the coming change
-> in ASoC machine driver (conversion to platfrom device).
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
+On Wed, Dec 14, 2011 at 6:52 PM, Daniel Mack <zonque@gmail.com> wrote:
+> External circuitry like level shifters may limit the maximum operation
+> speed of the hsmmc controller. Add a field to struct omap2_hsmmc_info
+> so boards can adjust the setting on demand.
+>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 > ---
->  arch/arm/mach-omap2/board-4430sdp.c |   27 +++++++++++++++++++++++++++
->  1 files changed, 27 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index 21b62bd..394cbab 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -41,6 +41,7 @@
->  #include <video/omap-panel-nokia-dsi.h>
->  #include <video/omap-panel-picodlp.h>
->  #include <linux/wl12xx.h>
-> +#include <linux/platform_data/omap-abe-twl6040.h>
->  
->  #include "mux.h"
->  #include "hsmmc.h"
-> @@ -377,12 +378,38 @@ static struct platform_device sdp4430_dmic_codec = {
->  	.id	= -1,
->  };
->  
-> +static struct omap_abe_twl6040_data sdp4430_abe_audio_data = {
-> +	.card_name = "SDP4430",
-> +	.has_hs		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
-> +	.has_hf		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
-> +	.has_ep		= 1,
-> +	.has_aux	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
-> +	.has_vibra	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
+> ?arch/arm/mach-omap2/hsmmc.c ? | ? ?1 +
+> ?arch/arm/mach-omap2/hsmmc.h ? | ? ?2 ++
+> ?drivers/mmc/host/omap_hsmmc.c | ? ?8 ++++++--
+> ?3 files changed, 9 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index f4a1020..4c7bc36 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -298,6 +298,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+> ? ? ? ?mmc->slots[0].caps = c->caps;
+> ? ? ? ?mmc->slots[0].internal_clock = !c->ext_clock;
+> ? ? ? ?mmc->dma_mask = 0xffffffff;
+> + ? ? ? mmc->max_freq = c->max_freq;
+> ? ? ? ?if (cpu_is_omap44xx())
+> ? ? ? ? ? ? ? ?mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
+> ? ? ? ?else
+> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+> index f757e78..65a8c12 100644
+> --- a/arch/arm/mach-omap2/hsmmc.h
+> +++ b/arch/arm/mach-omap2/hsmmc.h
+> @@ -25,6 +25,8 @@ struct omap2_hsmmc_info {
+> ? ? ? ?char ? ?*name; ? ? ? ? ?/* or NULL for default */
+> ? ? ? ?struct device *dev; ? ? /* returned: pointer to mmc adapter */
+> ? ? ? ?int ? ? ocr_mask; ? ? ? /* temporary HACK */
+> + ? ? ? int ? ? max_freq; ? ? ? /* maximum clock, if constrained by external
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* circuitry, or 0 for default */
+> ? ? ? ?/* Remux (pad configuration) when powering on/off */
+> ? ? ? ?void (*remux)(struct device *dev, int slot, int power_on);
+> ? ? ? ?/* init some special card */
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 101cd31..8215ef9 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+> ? ? ? ?if (mmc_slot(host).vcc_aux_disable_is_sleep)
+> ? ? ? ? ? ? ? ?mmc_slot(host).no_off = 1;
+>
+> - ? ? ? mmc->f_min ? ? ?= OMAP_MMC_MIN_CLOCK;
+> - ? ? ? mmc->f_max ? ? ?= OMAP_MMC_MAX_CLOCK;
+> + ? ? ? mmc->f_min = OMAP_MMC_MIN_CLOCK;
 > +
-> +	.has_dmic	= 1,
-> +	.has_hsmic	= 1,
-> +	.has_mainmic	= 1,
-> +	.has_submic	= 1,
-> +	.has_afm	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
-> +
-> +	.jack_detection = 1,
-> +};
-> +
-> +static struct platform_device sdp4430_abe_audio = {
-> +	.name		= "omap-abe-twl6040",
-> +	.id		= -1,
-> +	.dev = {
-> +		.platform_data = &sdp4430_abe_audio_data,
-> +	},
-> +};
-> +
->  static struct platform_device *sdp4430_devices[] __initdata = {
->  	&sdp4430_gpio_keys_device,
->  	&sdp4430_leds_gpio,
->  	&sdp4430_leds_pwm,
->  	&sdp4430_vbat,
->  	&sdp4430_dmic_codec,
-> +	&sdp4430_abe_audio,
->  };
->  
->  static struct omap_musb_board_data musb_board_data = {
-> -- 
-> 1.7.8.1
-> 
+> + ? ? ? if (pdata->max_freq > 0)
+
+What about having check as below:
+if (pdata->max_freq > 0 && pdata->max_freq < OMAP_MMC_MAX_CLOCK)
+
+> + ? ? ? ? ? ? ? mmc->f_max = pdata->max_freq;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? mmc->f_max = OMAP_MMC_MAX_CLOCK;
+>
+> ? ? ? ?spin_lock_init(&host->irq_lock);
+>
+> --
+> 1.7.7.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
