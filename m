@@ -1,100 +1,180 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Dec 2011 17:27:30 +0000
-Subject: [PATCH v2 00/15] Make SMP timers standalone
-Message-ID: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 22 Dec 2011 17:27:31 +0000
+Subject: [PATCH v2 01/15] ARM: local timers: allow smp_twd to be used
+ standalone
+In-Reply-To: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
+References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1324574865-5367-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LOCAL_TIMERS infrastructure has a few limitations:
-- It only allows one implementation to be compiled in, hence
-  preventing a single kernel image to be booted on hardware with
-  different requirements (Tegra and MSM, for example).
-- It is only supported on SMP, which is a problem on platforms where
-  the local timer can be used on UP platforms (Cortex A15 being one).
+Allow smp_twd to be built in a "standalone" version,
+without relying on the CONFIG_LOCAL_TIMER infrastructure.
+It mainly relies on a CPU notifier block to stop or start
+the timer on the right CPU.
 
-The proposal is to convert local timer drivers to be "standalone" (not
-relying on the local timer infrastructure) and to use a CPU notifier
-to have the timer brought up or down on non-boot CPUs.
+The CONFIG_ARM_SMP_TWD option selects the new behaviour.
 
-The SMP support code can then be simplified to only manage the
-boadcast timer, which is always installed, and leave the generic
-kernel code to pick the highest priority timer. CONFIG_LOCAL_TIMERS
-disappears in the process.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/Kconfig               |    6 +++-
+ arch/arm/include/asm/smp_twd.h |    9 +++++
+ arch/arm/kernel/smp_twd.c      |   79 +++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 92 insertions(+), 2 deletions(-)
 
-Tested on EB11MP, OMAP4 and Tegra. Based on next-20111222.
-
->From v1:
-- Various bug fixes
-- DT support for smp_twd
-- Added support for highbank and imx6q
-
-Marc Zyngier (15):
-  ARM: local timers: allow smp_twd to be used standalone
-  ARM: smp_twd: add device tree support
-  ARM: local timers: switch realview to standalone smp_twd
-  ARM: local timers: switch vexpress to standalone smp_twd
-  ARM: local timers: remove localtimer.c from plat-versatile
-  ARM: local timers: switch tegra to standalone smp_twd
-  ARM: local timers: switch omap4 to standalone smp_twd
-  ARM: local timers: switch shmobile to standalone smp_twd
-  ARM: local timers: switch ux500 to standalone smp_twd
-  ARM: local timers: switch highbank to standalone smp_twd
-  ARM: local timers: switch imx6q to standalone smp_twd
-  ARM: smp_twd: remove support for non-standalone version
-  ARM: local timers: make MCT timer standalone
-  ARM: local timers: make MSM timers standalone
-  ARM: local timers: Remove CONFIG_LOCAL_TIMERS support
-
- Documentation/devicetree/bindings/arm/twd.txt |   29 +++++
- arch/arm/Kconfig                              |   15 +--
- arch/arm/include/asm/localtimer.h             |   57 ---------
- arch/arm/include/asm/smp_twd.h                |   19 +++-
- arch/arm/kernel/smp.c                         |   54 ++-------
- arch/arm/kernel/smp_twd.c                     |  155 +++++++++++++++++++------
- arch/arm/mach-exynos/mct.c                    |   85 ++++++++++----
- arch/arm/mach-highbank/Makefile               |    1 -
- arch/arm/mach-highbank/highbank.c             |   13 ++
- arch/arm/mach-highbank/localtimer.c           |   40 -------
- arch/arm/mach-imx/Makefile                    |    1 -
- arch/arm/mach-imx/localtimer.c                |   35 ------
- arch/arm/mach-imx/mach-imx6q.c                |   12 ++
- arch/arm/mach-msm/timer.c                     |   92 +++++++++++----
- arch/arm/mach-omap2/Kconfig                   |    2 +-
- arch/arm/mach-omap2/Makefile                  |    1 -
- arch/arm/mach-omap2/timer-mpu.c               |   39 ------
- arch/arm/mach-omap2/timer.c                   |   38 +++++-
- arch/arm/mach-realview/Kconfig                |    3 +
- arch/arm/mach-realview/realview_eb.c          |   33 +++++-
- arch/arm/mach-realview/realview_pb11mp.c      |   31 +++++-
- arch/arm/mach-realview/realview_pbx.c         |   30 +++++-
- arch/arm/mach-shmobile/Kconfig                |    1 +
- arch/arm/mach-shmobile/Makefile               |    1 -
- arch/arm/mach-shmobile/include/mach/common.h  |    3 +
- arch/arm/mach-shmobile/localtimer.c           |   26 ----
- arch/arm/mach-shmobile/smp-sh73a0.c           |   32 +++++-
- arch/arm/mach-shmobile/timer.c                |   10 ++
- arch/arm/mach-tegra/Kconfig                   |    1 +
- arch/arm/mach-tegra/Makefile                  |    2 +-
- arch/arm/mach-tegra/localtimer.c              |   26 ----
- arch/arm/mach-tegra/timer.c                   |   34 +++++-
- arch/arm/mach-ux500/Kconfig                   |    1 +
- arch/arm/mach-ux500/Makefile                  |    1 -
- arch/arm/mach-ux500/localtimer.c              |   29 -----
- arch/arm/mach-ux500/timer.c                   |   41 ++++++-
- arch/arm/mach-vexpress/Kconfig                |    1 +
- arch/arm/mach-vexpress/ct-ca9x4.c             |   29 ++++-
- arch/arm/plat-versatile/Makefile              |    1 -
- arch/arm/plat-versatile/localtimer.c          |   27 -----
- 40 files changed, 591 insertions(+), 460 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
- delete mode 100644 arch/arm/include/asm/localtimer.h
- delete mode 100644 arch/arm/mach-highbank/localtimer.c
- delete mode 100644 arch/arm/mach-imx/localtimer.c
- delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
- delete mode 100644 arch/arm/mach-shmobile/localtimer.c
- delete mode 100644 arch/arm/mach-tegra/localtimer.c
- delete mode 100644 arch/arm/mach-ux500/localtimer.c
- delete mode 100644 arch/arm/plat-versatile/localtimer.c
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 6f3e186..c37410a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1522,6 +1522,10 @@ config HAVE_ARM_TWD
+ 	help
+ 	  This options enables support for the ARM timer and watchdog unit
+ 
++config ARM_SMP_TWD
++	bool
++	select HAVE_ARM_TWD if SMP
++
+ choice
+ 	prompt "Memory split"
+ 	default VMSPLIT_3G
+@@ -1560,7 +1564,7 @@ config HOTPLUG_CPU
+ 
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+-	depends on SMP
++	depends on SMP && !ARM_SMP_TWD
+ 	default y
+ 	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+ 	help
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index ef9ffba9..934f1bc 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -19,10 +19,19 @@
+ #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
+ 
+ struct clock_event_device;
++struct resource;
+ 
+ extern void __iomem *twd_base;
+ 
+ void twd_timer_setup(struct clock_event_device *);
+ void twd_timer_stop(struct clock_event_device *);
++#ifdef CONFIG_HAVE_ARM_TWD
++int twd_timer_register(struct resource *res, int res_nr);
++#else
++static inline int twd_timer_register(struct resource *res, int res_nr)
++{
++	return 0;
++}
++#endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 2442bbb..dedbdb4 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -13,11 +13,13 @@
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/smp.h>
++#include <linux/cpu.h>
+ #include <linux/jiffies.h>
+ #include <linux/clockchips.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
+ 
++#include <asm/smp_plat.h>
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
+ #include <asm/hardware/gic.h>
+@@ -172,7 +174,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+ 			CLOCK_EVT_FEAT_C3STOP;
+-	clk->rating = 350;
++	clk->rating = 450;	/* Make sure this is higher than broadcast */
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+ 	clk->shift = 20;
+@@ -187,3 +189,78 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 
+ 	enable_percpu_irq(clk->irq, 0);
+ }
++
++#ifdef CONFIG_ARM_SMP_TWD
++static struct clock_event_device __percpu *twd_clock_event;
++static int twd_ppi;
++
++static void __cpuinit twd_setup(struct clock_event_device *clk)
++{
++	clk->cpumask = cpumask_of(smp_processor_id());
++	clk->irq = twd_ppi;
++	twd_timer_setup(clk);
++}
++
++static void __cpuinit twd_teardown(void *data)
++{
++	struct clock_event_device *clk = data;
++	twd_timer_stop(clk);
++}
++
++static int __cpuinit twd_cpu_notify(struct notifier_block *self,
++				    unsigned long action, void *data)
++{
++	int cpu = (int)data;
++	struct clock_event_device *clk = per_cpu_ptr(twd_clock_event, cpu);
++
++	switch (action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		twd_setup(clk);
++		break;
++
++	case CPU_DOWN_PREPARE:
++	case CPU_DOWN_PREPARE_FROZEN:
++		smp_call_function_single(cpu, twd_teardown, clk, 1);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block __cpuinitdata twd_cpu_nb = {
++	.notifier_call = twd_cpu_notify,
++};
++
++int __init twd_timer_register(struct resource *res, int res_nr)
++{
++	struct clock_event_device *clk;
++
++	if (!is_smp())
++		return -ENODEV;
++
++	if (res_nr != 2 || res[1].start < 0)
++		return -EINVAL;
++
++	if (twd_base)
++		return -EBUSY;
++
++	twd_ppi		= res[1].start;
++	twd_base	= ioremap(res[0].start, resource_size(&res[0]));
++	twd_clock_event	= alloc_percpu(struct clock_event_device);
++	if (!twd_base || !twd_clock_event) {
++		iounmap(twd_base);
++		twd_base = NULL;
++		free_percpu(twd_clock_event);
++		return -ENOMEM;
++	}
++
++	/* Immediately configure the timer on the boot CPU */
++	clk = per_cpu_ptr(twd_clock_event, smp_processor_id());
++	twd_setup(clk);
++
++	register_cpu_notifier(&twd_cpu_nb);
++
++	return 0;
++}
++#endif
 -- 
 1.7.7.1
