@@ -1,30 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 22 Dec 2011 10:53:58 +0000
-Subject: [PATCH] regulator: max8925: fix enabled/disabled judgement mistake
-In-Reply-To: <1324543892-32540-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1324543892-32540-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20111222105357.GC4546@opensource.wolfsonmicro.com>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Thu, 22 Dec 2011 12:05:37 +0100
+Subject: Fwd: Re: [03: PATCH 0/5] The remaining stuff
+In-Reply-To: <20111222081447.GA19725@n2100.arm.linux.org.uk>
+References: <20111124204447.GW9581@n2100.arm.linux.org.uk>
+ <20111128104554.GA2165@local>
+ <20111219102520.GE14542@n2100.arm.linux.org.uk>
+ <20111222081447.GA19725@n2100.arm.linux.org.uk>
+Message-ID: <20111222110537.GB30589@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 04:51:32PM +0800, Haojian Zhuang wrote:
-> From: Kevin Liu <kliu5@marvell.com>
+On Thu, Dec 22, 2011 at 08:14:47AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 19, 2011 at 10:25:20AM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Nov 28, 2011 at 11:45:55AM +0100, Hans J. Koch wrote:
+> > > On Thu, Nov 24, 2011 at 08:44:47PM +0000, Russell King - ARM Linux wrote:
+> > > > As I've already implied, I'm quite prepared to break these platforms at
+> > > > the next merge window for the greater good if there's no sign of
+> > > > maintainers willing to help sort them out - which will then ultimately
+> > > > result in them being deleted from mainline.
+> > > 
+> > > For the past 12 months, nobody was interested in Telechips (plat-tcc).
+> > > No community, no customers, no support from Telechips. Under these
+> > > circumstances, I am not willing to maintain this forever.
+> > > 
+> > > However, Harry Sievers, European distributor of Telechips, told me
+> > > that there are persons at Telechips who are interested in having
+> > > their stuff in mainline. He will tell them it is threatened with
+> > > being deleted from mainline, and ask for support.
+> > > 
+> > > I am willing to wait until christmas for any news from Harry, and
+> > > will then send a patch. Either one that fixes the arch as requested in
+> > > the mail above, or one that removes the whole platform from mainline.
+> > > My feeling is that the latter is more likely.
+> > > 
+> > > Russell, if that is too late for you, please let us know.
+> > 
+> > We're now less than a week away from Christmas - any news on this?
+> > If it's going to be deleted, could I have a patch to do so please?
+> > (You probably know better than me whether anything has been touched
+> > outside of arch/arm for it.)
 > 
-> The judgement should depend on the power up/down sequence select.
-> With flexible power sequence, regulator is always enabled after boot up.
-> With i2c enabled, regulator enable/disable according to output enable bit.
+> Ping.
+> 
+> I'll delete it on Friday (tomorrow) unless I hear any news.
 
-I'm sorry but I'm having a hard time understanding what this changelog
-means, please clarify.
+I'll send patches tonight.
 
-> -	return ret & (1 << info->enable_bit);
-> +	ldo_seq = (ret >> LDO_SEQ_SHIFT) & LDO_SEQ_MASK;
-> +	if (ldo_seq != LDO_SEQ_I2C_EN)
-> +		return 1 << info->enable_bit;
-> +	else
-> +		return ret & (1 << info->enable_bit);
-
-Does this mean that the register for enabling and disabling the register
-doesn't always work?  If it does then doesn't that mean that the enable
-and disable functions need to be updated as well to either put the
-regulator into I2C mode or return an error when it isn't in I2C mode?
+Thanks,
+Hans
