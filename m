@@ -1,187 +1,219 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Dec 2011 17:27:32 +0000
-Subject: [PATCH v2 02/15] ARM: smp_twd: add device tree support
+Date: Thu, 22 Dec 2011 17:27:33 +0000
+Subject: [PATCH v2 03/15] ARM: local timers: switch realview to standalone
+ smp_twd
 In-Reply-To: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
 References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1324574865-5367-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1324574865-5367-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings to support DT discovery of the ARM Timer Watchdog
-(aka TWD). Only the timer side is converted by this patch.
+Convert the SMP RealView platforms to the standalone version
+of smp_twd.c. Since the timer calibration code requires another
+timer to be up and running, the actual initialisation is left
+to the late_timer_init hook.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
+Tested on EB-11MP.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/devicetree/bindings/arm/twd.txt |   29 +++++++++++
- arch/arm/include/asm/smp_twd.h                |    7 +++
- arch/arm/kernel/smp_twd.c                     |   67 +++++++++++++++++++-----
- 3 files changed, 89 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
+ arch/arm/mach-realview/Kconfig           |    3 ++
+ arch/arm/mach-realview/realview_eb.c     |   33 ++++++++++++++++++++++++++---
+ arch/arm/mach-realview/realview_pb11mp.c |   31 ++++++++++++++++++++++++---
+ arch/arm/mach-realview/realview_pbx.c    |   30 ++++++++++++++++++++++++--
+ 4 files changed, 86 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
-new file mode 100644
-index 0000000..a9d5587
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/twd.txt
-@@ -0,0 +1,29 @@
-+* ARM Timer Watchdog
-+
-+ARM 11MP, Cortex-A5 and Cortex-A9 are often associated with a per-core
-+Timer-Watchdog (aka TWD), which provides both a per-cpu local timer
-+and watchdog.
-+
-+The TWD is usually attached to a GIC to deliver its two per-processor
-+interrupts.
-+
-+Main node required properties:
-+
-+- compatible : Should be one of:
-+	"arm,cortex-a9-twd"
-+	"arm,cortex-a5-twd"
-+	"arm,arm11mp-twd"
-+	"arm,smp-twd"
-+
-+- interrupts : Two interrupts to each core, the first one for the
-+  timer, the second one for the watchdog.
-+
-+- reg : Specify the base address and the size of the TWD.
-+
-+Example:
-+
-+	twd at 2c000600 {
-+		compatible = "arm,arm11mp-twd", "arm,smp-twd";
-+		reg = <0x2c000600 0x100>;
-+		interrupts = <1 13 0xf01 1 14 0xf01>;
-+	};
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 934f1bc..09c3b71 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -20,6 +20,7 @@
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index dba6d0c..135a7ea 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -4,6 +4,7 @@ menu "RealView platform type"
+ config MACH_REALVIEW_EB
+ 	bool "Support RealView(R) Emulation Baseboard"
+ 	select ARM_GIC
++	select ARM_SMP_TWD if SMP
+ 	help
+ 	  Include support for the ARM(R) RealView(R) Emulation Baseboard
+ 	  platform.
+@@ -40,6 +41,7 @@ config MACH_REALVIEW_PB11MP
+ 	select ARM_GIC
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_HAS_BARRIERS if SMP
++	select ARM_SMP_TWD if SMP
+ 	help
+ 	  Include support for the ARM(R) RealView(R) Platform Baseboard for
+ 	  the ARM11MPCore.  This platform has an on-board ARM11MPCore and has
+@@ -80,6 +82,7 @@ config MACH_REALVIEW_PBX
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
+ 	select ZONE_DMA if SPARSEMEM
++	select ARM_SMP_TWD if SMP
+ 	help
+ 	  Include support for the ARM(R) RealView(R) Platform Baseboard
+ 	  Explore.
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index f92a920..75cd6ef 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -36,7 +36,7 @@
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+-#include <asm/localtimer.h>
++#include <asm/smp_twd.h>
  
- struct clock_event_device;
- struct resource;
-+struct of_device_id;
- 
- extern void __iomem *twd_base;
- 
-@@ -27,11 +28,17 @@ void twd_timer_setup(struct clock_event_device *);
- void twd_timer_stop(struct clock_event_device *);
- #ifdef CONFIG_HAVE_ARM_TWD
- int twd_timer_register(struct resource *res, int res_nr);
-+int twd_timer_of_init(const struct of_device_id *twd_of_match);
- #else
- static inline int twd_timer_register(struct resource *res, int res_nr)
- {
- 	return 0;
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -391,6 +391,33 @@ static void realview_eb11mp_fixup(void)
+ 	realview_eb_isp1761_resources[1].end	= IRQ_EB11MP_USB;
  }
+ 
++#ifdef CONFIG_ARM_SMP_TWD
++static struct resource twd_resources[] __initdata = {
++	{
++		.start	= REALVIEW_EB11MP_TWD_BASE,
++		.end	= REALVIEW_EB11MP_TWD_BASE + 0xff,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IRQ_LOCALTIMER,
++		.end	= IRQ_LOCALTIMER,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
 +
-+static inline int twd_timer_of_init(const struct of_device_id *twd_of_match)
++static void __init realview_eb_twd_init(void)
 +{
-+	return 0;
-+}
- #endif
- 
- #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index dedbdb4..98a6a59 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -18,6 +18,8 @@
- #include <linux/clockchips.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
- 
- #include <asm/smp_plat.h>
- #include <asm/smp_twd.h>
-@@ -232,13 +234,40 @@ static struct notifier_block __cpuinitdata twd_cpu_nb = {
- 	.notifier_call = twd_cpu_notify,
- };
- 
--int __init twd_timer_register(struct resource *res, int res_nr)
-+static int __init twd_timer_common_init(void)
- {
- 	struct clock_event_device *clk;
-+	int err;
- 
--	if (!is_smp())
--		return -ENODEV;
-+	if (!is_smp()) {
-+		err = -ENODEV;
-+		goto out_free;
++	if (core_tile_eb11mp() || core_tile_a9mp()) {
++		int err = twd_timer_register(twd_resources,
++					     ARRAY_SIZE(twd_resources));
++		if (err)
++			pr_err("twd_timer_register failed %d\n", err);
 +	}
-+
-+	twd_clock_event	= alloc_percpu(struct clock_event_device);
-+	if (!twd_clock_event) {
-+		err = -ENOMEM;
-+		goto out_free;
-+	}
-+
-+	/* Immediately configure the timer on the boot CPU */
-+	clk = per_cpu_ptr(twd_clock_event, smp_processor_id());
-+	twd_setup(clk);
-+
-+	register_cpu_notifier(&twd_cpu_nb);
-+
-+	return 0;
- 
-+out_free:
-+	iounmap(twd_base);
-+	twd_base = NULL;
-+	free_percpu(twd_clock_event);
-+
-+	return err;
 +}
-+
-+int __init twd_timer_register(struct resource *res, int res_nr)
-+{
- 	if (res_nr != 2 || res[1].start < 0)
- 		return -EINVAL;
- 
-@@ -247,20 +276,30 @@ int __init twd_timer_register(struct resource *res, int res_nr)
- 
- 	twd_ppi		= res[1].start;
- 	twd_base	= ioremap(res[0].start, resource_size(&res[0]));
--	twd_clock_event	= alloc_percpu(struct clock_event_device);
--	if (!twd_base || !twd_clock_event) {
--		iounmap(twd_base);
--		twd_base = NULL;
--		free_percpu(twd_clock_event);
-+	if (!twd_base)
- 		return -ENOMEM;
--	}
- 
--	/* Immediately configure the timer on the boot CPU */
--	clk = per_cpu_ptr(twd_clock_event, smp_processor_id());
--	twd_setup(clk);
-+	return twd_timer_common_init();
-+}
- 
--	register_cpu_notifier(&twd_cpu_nb);
-+#ifdef CONFIG_OF
-+int __init twd_timer_of_init(const struct of_device_id *twd_of_match)
-+{
-+	struct device_node *np;
- 
--	return 0;
-+	np = of_find_matching_node(NULL, twd_of_match);
-+	if (!np)
-+		return -ENODEV;
-+
-+	twd_ppi = irq_of_parse_and_map(np, 0);
-+	if (!twd_ppi)
-+		return -EINVAL;
-+
-+	twd_base = of_iomap(np, 0);
-+	if (!twd_base)
-+		return -ENOMEM;
-+
-+	return twd_timer_common_init();
- }
- #endif
++#else
++#define realview_eb_twd_init	NULL
 +#endif
++
+ static void __init realview_eb_timer_init(void)
+ {
+ 	unsigned int timer_irq;
+@@ -401,9 +428,7 @@ static void __init realview_eb_timer_init(void)
+ 	timer3_va_base = __io_address(REALVIEW_EB_TIMER2_3_BASE) + 0x20;
+ 
+ 	if (core_tile_eb11mp() || core_tile_a9mp()) {
+-#ifdef CONFIG_LOCAL_TIMERS
+-		twd_base = __io_address(REALVIEW_EB11MP_TWD_BASE);
+-#endif
++		late_time_init = realview_eb_twd_init;
+ 		timer_irq = IRQ_EB11MP_TIMER0_1;
+ 	} else
+ 		timer_irq = IRQ_EB_TIMER0_1;
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index f035fda..b164772 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -36,7 +36,7 @@
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+-#include <asm/localtimer.h>
++#include <asm/smp_twd.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+@@ -298,6 +298,31 @@ static void __init gic_init_irq(void)
+ 	gic_cascade_irq(1, IRQ_TC11MP_PB_IRQ1);
+ }
+ 
++#ifdef CONFIG_ARM_SMP_TWD
++static struct resource realview_pb11mp_twd_resources[] __initdata = {
++	{
++		.start	= REALVIEW_TC11MP_TWD_BASE,
++		.end	= REALVIEW_TC11MP_TWD_BASE + 0x10,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IRQ_LOCALTIMER,
++		.end	= IRQ_LOCALTIMER,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static void __init realview_pb11mp_twd_init(void)
++{
++	int err = twd_timer_register(realview_pb11mp_twd_resources,
++				     ARRAY_SIZE(realview_pb11mp_twd_resources));
++	if (err)
++		pr_err("twd_timer_register failed %d\n", err);
++}
++#else
++#define realview_pb11mp_twd_init	NULL
++#endif
++
+ static void __init realview_pb11mp_timer_init(void)
+ {
+ 	timer0_va_base = __io_address(REALVIEW_PB11MP_TIMER0_1_BASE);
+@@ -305,10 +330,8 @@ static void __init realview_pb11mp_timer_init(void)
+ 	timer2_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE);
+ 	timer3_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE) + 0x20;
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = __io_address(REALVIEW_TC11MP_TWD_BASE);
+-#endif
+ 	realview_timer_init(IRQ_TC11MP_TIMER0_1);
++	late_time_init = realview_pb11mp_twd_init;
+ }
+ 
+ static struct sys_timer realview_pb11mp_timer = {
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 0194b3e..d833935 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -301,6 +301,31 @@ static void __init gic_init_irq(void)
+ 	}
+ }
+ 
++#ifdef CONFIG_ARM_SMP_TWD
++static struct resource realview_pbx_twd_resources[] __initdata = {
++	{
++		.start	= REALVIEW_PBX_TILE_TWD_BASE,
++		.end	= REALVIEW_PBX_TILE_TWD_BASE + 0x10,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IRQ_LOCALTIMER,
++		.end	= IRQ_LOCALTIMER,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static void __init realview_pbx_twd_init(void)
++{
++	int err = twd_timer_register(realview_pbx_twd_resources,
++				     ARRAY_SIZE(realview_pbx_twd_resources));
++	if (err)
++		pr_err("twd_timer_register failed %d\n", err);
++}
++#else
++#define realview_pbx_twd_init	NULL
++#endif
++
+ static void __init realview_pbx_timer_init(void)
+ {
+ 	timer0_va_base = __io_address(REALVIEW_PBX_TIMER0_1_BASE);
+@@ -308,10 +333,9 @@ static void __init realview_pbx_timer_init(void)
+ 	timer2_va_base = __io_address(REALVIEW_PBX_TIMER2_3_BASE);
+ 	timer3_va_base = __io_address(REALVIEW_PBX_TIMER2_3_BASE) + 0x20;
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+ 	if (core_tile_pbx11mp() || core_tile_pbxa9mp())
+-		twd_base = __io_address(REALVIEW_PBX_TILE_TWD_BASE);
+-#endif
++		late_time_init = realview_pbx_twd_init;
++
+ 	realview_timer_init(IRQ_PBX_TIMER0_1);
+ }
+ 
 -- 
 1.7.7.1
