@@ -1,50 +1,18 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Thu, 22 Dec 2011 12:05:37 +0100
-Subject: Fwd: Re: [03: PATCH 0/5] The remaining stuff
-In-Reply-To: <20111222081447.GA19725@n2100.arm.linux.org.uk>
-References: <20111124204447.GW9581@n2100.arm.linux.org.uk>
- <20111128104554.GA2165@local>
- <20111219102520.GE14542@n2100.arm.linux.org.uk>
- <20111222081447.GA19725@n2100.arm.linux.org.uk>
-Message-ID: <20111222110537.GB30589@local>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 22 Dec 2011 11:05:52 +0000
+Subject: [PATCH 1/4] mfd: improve mc13xxx dt binding document
+In-Reply-To: <1324479647-4580-2-git-send-email-shawn.guo@linaro.org>
+References: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
+ <1324479647-4580-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111222110552.GH4546@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 08:14:47AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 19, 2011 at 10:25:20AM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Nov 28, 2011 at 11:45:55AM +0100, Hans J. Koch wrote:
-> > > On Thu, Nov 24, 2011 at 08:44:47PM +0000, Russell King - ARM Linux wrote:
-> > > > As I've already implied, I'm quite prepared to break these platforms at
-> > > > the next merge window for the greater good if there's no sign of
-> > > > maintainers willing to help sort them out - which will then ultimately
-> > > > result in them being deleted from mainline.
-> > > 
-> > > For the past 12 months, nobody was interested in Telechips (plat-tcc).
-> > > No community, no customers, no support from Telechips. Under these
-> > > circumstances, I am not willing to maintain this forever.
-> > > 
-> > > However, Harry Sievers, European distributor of Telechips, told me
-> > > that there are persons at Telechips who are interested in having
-> > > their stuff in mainline. He will tell them it is threatened with
-> > > being deleted from mainline, and ask for support.
-> > > 
-> > > I am willing to wait until christmas for any news from Harry, and
-> > > will then send a patch. Either one that fixes the arch as requested in
-> > > the mail above, or one that removes the whole platform from mainline.
-> > > My feeling is that the latter is more likely.
-> > > 
-> > > Russell, if that is too late for you, please let us know.
-> > 
-> > We're now less than a week away from Christmas - any news on this?
-> > If it's going to be deleted, could I have a patch to do so please?
-> > (You probably know better than me whether anything has been touched
-> > outside of arch/arm for it.)
-> 
-> Ping.
-> 
-> I'll delete it on Friday (tomorrow) unless I hear any news.
+On Wed, Dec 21, 2011 at 11:00:44PM +0800, Shawn Guo wrote:
+> It improves mc13xxx dt binding document on how the regulator name
+> is being used for binding a mc13892 regulator device.
 
-I'll send patches tonight.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
 
-Thanks,
-Hans
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
