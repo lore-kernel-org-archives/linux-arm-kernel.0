@@ -1,24 +1,45 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 22 Dec 2011 22:09:27 +0200
-Subject: [PATCH 01/10] arm: omap4: fix kconfig warning
-In-Reply-To: <20111222182240.GN24444@atomide.com>
-References: <1324341747-5922-1-git-send-email-felipe.contreras@gmail.com>
- <1324341747-5922-2-git-send-email-felipe.contreras@gmail.com>
- <20111222182240.GN24444@atomide.com>
-Message-ID: <CAMP44s2MfdS-woETebYsTHEPZsBuBpP2dfmfBibC+JWZZ2iLKQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Dec 2011 20:38:28 +0000
+Subject: [PATCH v2 01/15] ARM: local timers: allow smp_twd to be used
+ standalone
+In-Reply-To: <1324574865-5367-2-git-send-email-marc.zyngier@arm.com>
+References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
+ <1324574865-5367-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20111222203828.GP2577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 8:22 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Felipe Contreras <felipe.contreras@gmail.com> [111219 16:11]:
->> warning: (ARCH_OMAP4 && ARCH_VEXPRESS_CA9X4) selects ARM_ERRATA_720789 which has unmet direct dependencies (CPU_V7 && SMP)
->
-> Thanks applying into fixes-non-critical-part3.
+On Thu, Dec 22, 2011 at 05:27:31PM +0000, Marc Zyngier wrote:
+> +	twd_clock_event	= alloc_percpu(struct clock_event_device);
+> +	if (!twd_base || !twd_clock_event) {
+> +		iounmap(twd_base);
+> +		twd_base = NULL;
+> +		free_percpu(twd_clock_event);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/* Immediately configure the timer on the boot CPU */
+> +	clk = per_cpu_ptr(twd_clock_event, smp_processor_id());
+> +	twd_setup(clk);
 
-Actually, please disregard this one, it should be handled by this:
-http://article.gmane.org/gmane.linux.ports.arm.kernel/141942
+This is insufficient.  A proper local timer has this:
 
-Cheers.
+	evt->cpumask = cpumask_of(cpu);
+	evt->broadcast = smp_timer_broadcast;
 
--- 
-Felipe Contreras
+as well as all the rest of the normal clock event stuff.  The broadcast
+callback is used when the timer core wants to broadcast the timer tick
+to other CPUs - see tick_do_broadcast() in kernel/time/tick-broadcast.c.
+The selection of which clock event device to use is rather 'optimized'
+for current conditions, and registering local timers without this is
+likely to oops the kernel at some point.
+
+I don't think you can register separate clock event devices for use as
+the broadcast device vs the local timer device.
+
+So, either you _have_ to use the SMP supplied version, or we make the
+broadcast function public and have everyone conditionally set that up,
+or something else... either way this is getting exceedingly messy.
+
+That's why I believe it's far simpler to just say no to using twd as a
+global timer, and just keep it for SMP local timer purposes.
