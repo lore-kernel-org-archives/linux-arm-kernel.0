@@ -1,83 +1,55 @@
-From: gaowanlong@cn.fujitsu.com (Wanlong Gao)
-Date: Thu, 22 Dec 2011 17:08:04 +0800
-Subject: [PATCH] misc: max8925_onkey: add function to work as wakeup source
-In-Reply-To: <1324544151-2040-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1324544151-2040-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <4EF2F374.1010606@cn.fujitsu.com>
+From: lrg@ti.com (Girdwood, Liam)
+Date: Thu, 22 Dec 2011 09:25:26 +0000
+Subject: [PATCH 07/10] ASoC: OMAP: ams-delta: Drive modem/codec pins over
+ GPIO API
+In-Reply-To: <201112212314.39844.jkrzyszt@tis.icnet.pl>
+References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1323634328-856-8-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1324492424.8478.5.camel@odin>
+ <201112212314.39844.jkrzyszt@tis.icnet.pl>
+Message-ID: <CABS+qY1Ng0JQMan++sG+T0jcCFOdDH61hzQ=AXyAD-BPDTpDFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2011 04:55 PM, Haojian Zhuang wrote:
+On 21 December 2011 22:14, Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> wrote:
+> On Wednesday 21 of December 2011 at 19:33:44, Liam Girdwood wrote:
+>> On Sun, 2011-12-11 at 21:12 +0100, Janusz Krzysztofik wrote:
+>> > Don't use Amstrad Delta custom I/O functions any longer, replace them
+>> > with GPIO. Old pin definitions, no longer used by the modem bits either,
+>> > can be dropped.
+>> >
+>> > Depends on patch 2/10 "ARM: OMAP1: Convert Amstrad E3 latches to
+>> > basic_mmio_gpio".
+>> >
+>> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+>>
+>> Applied.
+>
+> Hi,
+> I'm sorry, but I've probably missed to infrom you explicitly, i.e. other
+> than in a cover letter to v2 of this series, that this particular patch
+> has been dropped from the series. I've already started working on an
+> alternative solution, which I intend to submit as a separate set. It
+> will be free of potentail problems with two devices, a modem and the
+> sound card, accessing the same GPIO pins concurrently. For the
+> MODEM_NRESET pin I've already set up a virtual regulator on top of it,
+> and for the MODEM_CODEC pin I'll probably choose a virtual clock (pinmux
+> would match the hardware more closely here, but it looks too complicated
+> to me). Moreover, I've already started to move all those GPIO pin
+> related functions, i.e. bias control, digital mute and line discipline
+> interaction, from the board file to the codec driver, where all those
+> seem to belong.
+>
+> Having this patch applied will conflict with the regultor and the clock
+> solutions, taking control over those two GPIO pins. Please revert this
+> patch, or reset it if still possible.
+>
+> Thanks,
+> Janusz
 
-> From: Kevin Liu <kliu5@marvell.com>
-> 
-> Signed-off-by: Kevin Liu <kliu5@marvell.com>
-> ---
->  drivers/input/misc/max8925_onkey.c |   35 +++++++++++++++++++++++++++++++++++
->  1 files changed, 35 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/input/misc/max8925_onkey.c b/drivers/input/misc/max8925_onkey.c
-> index 7de0ded..ce07ae2 100644
-> --- a/drivers/input/misc/max8925_onkey.c
-> +++ b/drivers/input/misc/max8925_onkey.c
-> @@ -122,6 +122,7 @@ static int __devinit max8925_onkey_probe(struct platform_device *pdev)
->  	info->idev->evbit[0] = BIT_MASK(EV_KEY);
->  	info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
->  
-> +	device_init_wakeup(&pdev->dev, 1);
->  
->  	error = input_register_device(info->idev);
->  	if (error) {
-> @@ -158,10 +159,44 @@ static int __devexit max8925_onkey_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int max8925_onkey_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct max8925_chip *chip = dev_get_drvdata(pdev->dev.parent);
-> +
-> +	if (device_may_wakeup(dev)) {
-> +		chip->wakeup_flag |= 1 << (onkey_irq[0] - chip->irq_base);
-> +		chip->wakeup_flag |= 1 << (onkey_irq[1] - chip->irq_base);
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int max8925_onkey_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct max8925_chip *chip = dev_get_drvdata(pdev->dev.parent);
-> +
-> +	if (device_may_wakeup(dev)) {
-> +		chip->wakeup_flag &= ~(1 << (onkey_irq[0] - chip->irq_base));
-> +		chip->wakeup_flag &= ~(1 << (onkey_irq[1] - chip->irq_base));
-> +	}
-> +	return 0;
-> +}
-> +
-> +static struct dev_pm_ops max8925_onkey_pm_ops = {
-> +	.suspend        = max8925_onkey_suspend,
-> +	.resume         = max8925_onkey_resume,
-> +}
-
-
-You can use SIMPLE_DEV_PM_OPS here.
-
+Will do, I never pushed last night as it was late. So I'll only will
+have to make a local change.
 
 Thanks
--Wanlong Gao
 
-> +#endif
-> +
->  static struct platform_driver max8925_onkey_driver = {
->  	.driver		= {
->  		.name	= "max8925-onkey",
->  		.owner	= THIS_MODULE,
-> +#ifdef CONFIG_PM
-> +		.pm	= &max8925_onkey_pm_ops,
-> +#endif
->  	},
->  	.probe		= max8925_onkey_probe,
->  	.remove		= __devexit_p(max8925_onkey_remove),
+Liam
