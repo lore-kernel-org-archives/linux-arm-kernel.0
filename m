@@ -1,25 +1,51 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 22 Dec 2011 00:50:51 +0000
-Subject: [PATCH V3 4/7] cpufreq: add generic cpufreq driver
-In-Reply-To: <20111221141907.GA1777@richard-laptop>
-References: <1324264903-15395-1-git-send-email-richard.zhao@linaro.org>
- <20111221012046.GE15863@b20223-02.ap.freescale.net>
- <20111221092739.GI15863@b20223-02.ap.freescale.net>
- <201112210943.34310.arnd@arndb.de>
- <CAPXgP10FCrqdTg++46m4+xxM9tw1ZrKc8wz=JkKjCHJ0hQPtng@mail.gmail.com>
- <20111221121246.GB15309@opensource.wolfsonmicro.com>
- <CAPXgP10CGxfEJ4jK2MkKt0-nAWgiawDERyA1N4wHvMCJfE3oDg@mail.gmail.com>
- <20111221141907.GA1777@richard-laptop>
-Message-ID: <20111222005048.GA27144@opensource.wolfsonmicro.com>
+From: yanok@emcraft.com (Ilya Yanok)
+Date: Thu, 22 Dec 2011 02:00:53 +0100
+Subject: [PATCH] OMAP3: hwmod_data: add HWMOD_INIT_NO_RESET flag for dss_dispc
+Message-ID: <1324515653-17287-1-git-send-email-yanok@emcraft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 10:19:11PM +0800, Richard Zhao wrote:
+Resetting DISPC when a DISPC output is enabled causes the DSS to go into
+an inconsistent state.
 
-> Even cpu node is device, I still need to find a way to get it.  I think it's
-> better have another patch to fix the regulator dt binding in cpu node. I'll
-> not include it in this patch series.
+commit b923d40dd4211c4ef7d4efa2bd81b7ca1d8744c1
+Author: Archit Taneja <archit@ti.com>
+Date:   Thu Oct 6 18:04:08 2011 -0600
 
-I'd expect this to be easy if we can find any device tree data for the
-CPU at all?  It's just another piece of data no different to the clock
-rates or whatever.
+    ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is
+enabled in bootloader
+
+tries to deal with this problem by checking if display is enabled and
+disabling it before doing reset.
+
+But in my setup dss_dispc is resetted from omap_hwmod_setup_all function
+_before_ calling omap_dss_reset. So when dispc_disable_outputs is
+executed dispc is already reset and nothing happens.
+
+This patch and HWMOD_INIT_NO_RESET flags to dss_dispc hwmod thus leaving
+DISPC untouched so that omap_dss_reset can take care of it.
+
+This solves the l3_app_irq BUG problem on my AM3517 based board.
+
+CC: Archit Taneja <archit@ti.com>
+CC: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Ilya Yanok <yanok@emcraft.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 5324e8d..226b365 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1515,7 +1515,7 @@ static struct omap_hwmod omap3xxx_dss_dispc_hwmod = {
+ 	},
+ 	.slaves		= omap3xxx_dss_dispc_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_dss_dispc_slaves),
+-	.flags		= HWMOD_NO_IDLEST,
++	.flags		= HWMOD_NO_IDLEST | HWMOD_INIT_NO_RESET,
+ 	.dev_attr	= &omap2_3_dss_dispc_dev_attr
+ };
+ 
+-- 
+1.7.6.4
