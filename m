@@ -1,47 +1,70 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 22 Dec 2011 15:01:40 +0100
-Subject: [PATCH v3 02/11] i2c: OMAP: Add DT support for i2c controller
-In-Reply-To: <CAOesGMiwg9gVDDwCjuCcAPX6hc2E6OgH-c_nAqhCHmj7y5oCeQ@mail.gmail.com>
-References: <1324398444-23296-1-git-send-email-b-cousson@ti.com>
- <1324398444-23296-3-git-send-email-b-cousson@ti.com>
- <CAOesGMiwg9gVDDwCjuCcAPX6hc2E6OgH-c_nAqhCHmj7y5oCeQ@mail.gmail.com>
-Message-ID: <4EF33844.5080105@ti.com>
+From: yanok@emcraft.com (Ilya Yanok)
+Date: Thu, 22 Dec 2011 15:02:43 +0100
+Subject: [PATCH] OMAP3: hwmod_data: register dss hwmods after dss_core
+Message-ID: <1324562563-27119-1-git-send-email-yanok@emcraft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+dss_core has to be initialized before any other DSS hwmod. Currently
+this is broken as dss_core is listed in chip/revision specific hwmod
+lists while other DSS hwmods are listed in common list which is
+registered first.
 
-On 12/20/2011 10:24 PM, Olof Johansson wrote:
-> Hi,
->
-> On Tue, Dec 20, 2011 at 8:27 AM, Benoit Cousson<b-cousson@ti.com>  wrote:
->
->> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
->> index a43d002..dcbc1ec 100644
->> --- a/drivers/i2c/busses/i2c-omap.c
->> +++ b/drivers/i2c/busses/i2c-omap.c
->> @@ -37,6 +37,8 @@
->>   #include<linux/platform_device.h>
->>   #include<linux/clk.h>
->>   #include<linux/io.h>
->> +#include<linux/of_i2c.h>
->> +#include<linux/of_device.h>
->>   #include<linux/slab.h>
->>   #include<linux/i2c-omap.h>
->>   #include<linux/pm_runtime.h>
-> [...]
->> @@ -1165,6 +1195,7 @@ static struct platform_driver omap_i2c_driver = {
->>                 .name   = "omap_i2c",
->>                 .owner  = THIS_MODULE,
->>                 .pm     = OMAP_I2C_PM_OPS,
->> +               .of_match_table = of_match_ptr(omap_i2c_of_match),
->>         },
->>   };
->
-> of_match_ptr() comes from<linux/of.h>, so you need to include that to
-> not break !CONFIG_OF builds.
+This patch moves DSS hwmods (except for dss_core) to the separate list
+which is registered last to ensure that dss_core is already registered.
 
-Good point, I'll fix that.
+CC: Tomi Valkeinen <tomi.valkeinen@ti.com>
+CC: Archit Taneja <archit@ti.com>
+CC: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Ilya Yanok <yanok@emcraft.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   20 ++++++++++++++------
+ 1 files changed, 14 insertions(+), 6 deletions(-)
 
-Thanks,
-Benoit
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 5324e8d..85536ff 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3523,12 +3523,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+ 	&omap3xxx_uart2_hwmod,
+ 	&omap3xxx_uart3_hwmod,
+ 
+-	/* dss class */
+-	&omap3xxx_dss_dispc_hwmod,
+-	&omap3xxx_dss_dsi1_hwmod,
+-	&omap3xxx_dss_rfbi_hwmod,
+-	&omap3xxx_dss_venc_hwmod,
+-
+ 	/* i2c class */
+ 	&omap3xxx_i2c1_hwmod,
+ 	&omap3xxx_i2c2_hwmod,
+@@ -3635,6 +3629,15 @@ static __initdata struct omap_hwmod *am35xx_hwmods[] = {
+ 	NULL
+ };
+ 
++static __initdata struct omap_hwmod *omap3xxx_dss_hwmods[] = {
++	/* dss class */
++	&omap3xxx_dss_dispc_hwmod,
++	&omap3xxx_dss_dsi1_hwmod,
++	&omap3xxx_dss_rfbi_hwmod,
++	&omap3xxx_dss_venc_hwmod,
++	NULL
++};
++
+ int __init omap3xxx_hwmod_init(void)
+ {
+ 	int r;
+@@ -3708,6 +3711,11 @@ int __init omap3xxx_hwmod_init(void)
+ 
+ 	if (h)
+ 		r = omap_hwmod_register(h);
++	if (r < 0)
++		return r;
++
++	/* Register common DSS hwmods later than dss_core */
++	r = omap_hwmod_register(omap3xxx_dss_hwmods);
+ 
+ 	return r;
+ }
+-- 
+1.7.6.4
