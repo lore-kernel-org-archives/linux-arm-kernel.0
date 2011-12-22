@@ -1,65 +1,54 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 22 Dec 2011 12:08:07 +0000
-Subject: Oops in guest after ioremap() on ARMv7
-Message-ID: <4EF31DA7.9030407@citrix.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 22 Dec 2011 20:08:34 +0800
+Subject: [PATCH v4] I2C: add CSR SiRFprimaII on-chip I2C controllers driver
+In-Reply-To: <20111221034753.GC5983@S2101-09.ap.freescale.net>
+References: <1323852927-13521-1-git-send-email-Barry.Song@csr.com>
+ <20111220200750.GA2577@n2100.arm.linux.org.uk>
+ <CAGsJ_4y8vwrK=UD8a10gf2aN=O3hs_R_jYBKeFYf0v+gk0hiuQ@mail.gmail.com>
+ <20111221033444.GH15863@b20223-02.ap.freescale.net>
+ <20111221034753.GC5983@S2101-09.ap.freescale.net>
+Message-ID: <CAGsJ_4wS1Otr3Od3y+pBg+YssDbwhU2xKsKzJk_UcVowxwzVOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running the linux kernel on the ARMv7 envelope model as a guest
-under the Xen hypervisor there is a oops (see below for an example of
-the page translation fault) when trying to access ioremap()'d memory.
+2011/12/21 Shawn Guo <shawn.guo@freescale.com>:
+> On Wed, Dec 21, 2011 at 11:34:45AM +0800, Richard Zhao wrote:
+>> On Wed, Dec 21, 2011 at 11:29:29AM +0800, Barry Song wrote:
+>> > 2011/12/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> > > On Wed, Dec 14, 2011 at 04:55:27PM +0800, Barry Song wrote:
+>> > >> +static int __devinit i2c_sirfsoc_probe(struct platform_device *pdev)
+>> > >> +{
+>> > >> + ? ? struct clk *clk;
+>> > >> +
+>> > >> + ? ? clk = clk_get(&pdev->dev, NULL);
+>> > >> + ? ? err = clk_prepare(clk);
+>> > >> + ? ? err = clk_enable(clk);
+>> > > ...
+>> > >> + ? ? clk_disable(clk);
+>> > >> +
+>> > >> + ? ? dev_info(&pdev->dev, " I2C adapter ready to operate\n");
+>> > >> +
+>> > >> + ? ? return 0;
+>> > >> +}
+>> > >> +
+>> > >> +static int __devexit i2c_sirfsoc_remove(struct platform_device *pdev)
+>> > >> +{
+>> > >> + ? ? clk_disable(siic->clk);
+>> > >> + ? ? clk_unprepare(siic->clk);
+>> > >> + ? ? clk_put(siic->clk);
+>> > >
+>> There's a handy clk_disable_unprepare function in the patch I ever sent
+>> out. It's in Sascha or Shawn's tree.
+>>
+> We cannot really ask people to use that before it hits Linus' tree.
 
-The same kernel works fine when not running under the hypervisor.
+Thanks. Shawn/Richard.
+The problem is that Ben seems to have been scheduled to TASK_UNINTERRUPTIBLE.
 
-It's a 3.2.0-rc5+ kernel with the two additional linux-arch-arm
-branches: arm-arch/vexpress and arm-arch/arm-lpae.
+>
+> --
+> Regards,
+> Shawn
+>
 
-Calling flush_cache_all() in flush_cache_vmap() makes it work.  What
-isn't being correctly flushed?  I see that flush_pmd_entry() and
-cpu_v7_set_pte_ext() already flush the L1 and L2 translation table
-entries and I can't think of anything else that would need to be flushed
-(unless the mapped virtual addresses need to be flushed as well?)
-
-The "Barrier Litmus Tests and Cookbook" says that a TLB flush and a
-branch predictor flush are required after a translation table entry
-update.  This seems not to be done but adding this didn't seem to help
-(and using local_flush_tlb_all()) in flush_cache_vmap() didn't help either).
-
-I don't see anything in the hypervisor that could be causing this as the
-fault is occurring at stage 1 and not stage 2 translation.
-
-David
-
-[    0.200952] Unable to handle kernel paging request at virtual address
-c8804050
-[    0.203234] pgd = c0004000
-[    0.204147] [c8804050] *pgd=8781a811, *pte=1a000653, *ppte=1a000453
-[    0.206120] Internal error: Oops: 7 [#1]
-[    0.207381] CPU: 0    Tainted: G        W     (3.2.0-rc5.dv #123)
-[    0.209338] PC is at v2m_init+0x44/0x100
-[    0.210616] LR is at ioremap_page_range+0x100/0x164
-[    0.212197] pc : [<c0325130>]    lr : [<c013e278>]    psr: a0000013
-[    0.212235] sp : c781dfa0  ip : 00000001  fp : 00000000
-[    0.215880] r10: 00000000  r9 : 00000000  r8 : 00000000
-[    0.217570] r7 : 00000013  r6 : 00000000  r5 : c0321f1c  r4 : c033d184
-[    0.219680] r3 : c8804000  r2 : c0325128  r1 : 1a000613  r0 : c8804000
-[    0.221756] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
-Segment kernel
-[    0.224159] Control: 10c53c7d  Table: 80004059  DAC: 00000015
-[    0.225990] Process swapper (pid: 1, stack limit = 0xc781c268)
-[    0.227858] Stack: (0xc781dfa0 to 0xc781e000)
-[    0.229325] dfa0: c03250ec c033d184 c0321f1c c0321f38 c781c000
-c031f7c0 c033d430 33369eb8
-[    0.231955] dfc0: 00000000 00000000 00000080 c033d184 c033d430
-c0009eb8 00000013 00000000
-[    0.234652] dfe0: 00000000 c031f908 00000000 00000000 c031f890
-c0009eb8 dfdfdfcf cfdfdfdf
-[    0.237304] [<c0325130>] (v2m_init+0x44/0x100) from [<c0321f38>]
-(customize_machine+0x1c/0x28)
-[    0.240099] [<c0321f38>] (customize_machine+0x1c/0x28) from
-[<c031f7c0>] (do_one_initcall+0x90/0x160)
-[    0.243080] [<c031f7c0>] (do_one_initcall+0x90/0x160) from
-[<c031f908>] (kernel_init+0x78/0x114)
-[    0.245958] [<c031f908>] (kernel_init+0x78/0x114) from [<c0009eb8>]
-(kernel_thread_exit+0x0/0x8)
-[    0.248823] Code: e3a02000 ebf3a9b7 e2503000 0a00000a (e5933050)
+-barry
