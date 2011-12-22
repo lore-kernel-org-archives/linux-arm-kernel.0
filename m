@@ -1,99 +1,81 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 22 Dec 2011 19:31:43 +0200
-Subject: [PATCH 2/5] OMAP: mcbsp: Signle function for CLKR/FSR source mux
- configuration
+Date: Thu, 22 Dec 2011 19:31:45 +0200
+Subject: [PATCH 4/5] OMAP: mcbsp: Remove old CLKR/FSR mux functions
 In-Reply-To: <1324575106-17172-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1324575106-17172-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1324575106-17172-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1324575106-17172-5-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use single function to configure the CLKR/FSR mux configuration.
-OMAP2/3 has 6 pin configuration on McBSP1 instance, while on OMAP4
-McBSP4 instance have the 6 pin configuration.
+New, single function has replaced the old mux configuration API for
+CLKR/FSR configuration.
+Remove the unused code.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/plat-omap/include/plat/mcbsp.h |   13 +++++------
- arch/arm/plat-omap/mcbsp.c              |   35 +++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+), 7 deletions(-)
+ arch/arm/plat-omap/include/plat/mcbsp.h |    2 -
+ arch/arm/plat-omap/mcbsp.c              |   36 -------------------------------
+ 2 files changed, 0 insertions(+), 38 deletions(-)
 
 diff --git a/arch/arm/plat-omap/include/plat/mcbsp.h b/arch/arm/plat-omap/include/plat/mcbsp.h
-index 8fa74e2..7f9a745 100644
+index 7f9a745..89aa33b 100644
 --- a/arch/arm/plat-omap/include/plat/mcbsp.h
 +++ b/arch/arm/plat-omap/include/plat/mcbsp.h
-@@ -242,13 +242,11 @@ enum {
- #define RFSREN			0x0002
- #define RSYNCERREN		0x0001
+@@ -377,8 +377,6 @@ void omap_mcbsp_stop(unsigned int id, int tx, int rx);
+ extern int omap2_mcbsp_set_clks_src(u8 id, u8 fck_src_id);
  
--/* CLKR signal muxing options */
--#define CLKR_SRC_CLKR		0
--#define CLKR_SRC_CLKX		1
--
--/* FSR signal muxing options */
--#define FSR_SRC_FSR		0
--#define FSR_SRC_FSX		1
-+/* Clock signal muxing options */
-+#define CLKR_SRC_CLKR		0 /* CLKR signal is from the CLKR pin */
-+#define CLKR_SRC_CLKX		1 /* CLKR signal is from the CLKX pin */
-+#define FSR_SRC_FSR		2 /* FSR signal is from the FSR pin */
-+#define FSR_SRC_FSX		3 /* FSR signal is from the FSX pin */
- 
- /* McBSP functional clock sources */
- #define MCBSP_CLKS_PRCM_SRC	0
-@@ -381,6 +379,7 @@ extern int omap2_mcbsp_set_clks_src(u8 id, u8 fck_src_id);
  /* McBSP signal muxing API */
- void omap2_mcbsp1_mux_clkr_src(u8 mux);
- void omap2_mcbsp1_mux_fsr_src(u8 mux);
-+int omap_mcbsp_6pin_src_mux(unsigned int id, u8 mux);
+-void omap2_mcbsp1_mux_clkr_src(u8 mux);
+-void omap2_mcbsp1_mux_fsr_src(u8 mux);
+ int omap_mcbsp_6pin_src_mux(unsigned int id, u8 mux);
  
  int omap_mcbsp_dma_ch_params(unsigned int id, unsigned int stream);
- int omap_mcbsp_dma_reg_params(unsigned int id, unsigned int stream);
 diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-index f2eb1bb..501c6d1 100644
+index 501c6d1..c48d974 100644
 --- a/arch/arm/plat-omap/mcbsp.c
 +++ b/arch/arm/plat-omap/mcbsp.c
-@@ -957,6 +957,41 @@ void omap2_mcbsp1_mux_fsr_src(u8 mux)
+@@ -921,42 +921,6 @@ int omap2_mcbsp_set_clks_src(u8 id, u8 fck_src_id)
  }
- EXPORT_SYMBOL(omap2_mcbsp1_mux_fsr_src);
+ EXPORT_SYMBOL(omap2_mcbsp_set_clks_src);
  
-+int omap_mcbsp_6pin_src_mux(unsigned int id, u8 mux)
-+{
-+	struct omap_mcbsp *mcbsp;
-+	const char *signal, *src;
-+	int ret = 0;
-+
-+	if (!omap_mcbsp_check_valid_id(id)) {
-+		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
-+		return -EINVAL;
-+	}
-+
-+	mcbsp = id_to_mcbsp_ptr(id);
-+
-+	if (mux == CLKR_SRC_CLKR) {
-+		signal = "clkr";
-+		src = "clkr";
-+	} else if (mux == CLKR_SRC_CLKX) {
-+		signal = "clkr";
-+		src = "clkx";
-+	} else if (mux == FSR_SRC_FSR) {
-+		signal = "fsr";
-+		src = "fsr";
-+	} else if (mux == FSR_SRC_FSX) {
-+		signal = "fsr";
-+		src = "fsx";
-+	} else
-+		return -EINVAL;
-+
-+	if (mcbsp->pdata->mux_signal)
-+		ret = mcbsp->pdata->mux_signal(mcbsp->dev, signal, src);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(omap_mcbsp_6pin_src_mux);
-+
- #define max_thres(m)			(mcbsp->pdata->buffer_size)
- #define valid_threshold(m, val)		((val) <= max_thres(m))
- #define THRESHOLD_PROP_BUILDER(prop)					\
+-void omap2_mcbsp1_mux_clkr_src(u8 mux)
+-{
+-	struct omap_mcbsp *mcbsp;
+-	const char *src;
+-
+-	if (mux == CLKR_SRC_CLKR)
+-		src = "clkr";
+-	else if (mux == CLKR_SRC_CLKX)
+-		src = "clkx";
+-	else
+-		return;
+-
+-	mcbsp = id_to_mcbsp_ptr(0);
+-	if (mcbsp->pdata->mux_signal)
+-		mcbsp->pdata->mux_signal(mcbsp->dev, "clkr", src);
+-}
+-EXPORT_SYMBOL(omap2_mcbsp1_mux_clkr_src);
+-
+-void omap2_mcbsp1_mux_fsr_src(u8 mux)
+-{
+-	struct omap_mcbsp *mcbsp;
+-	const char *src;
+-
+-	if (mux == FSR_SRC_FSR)
+-		src = "fsr";
+-	else if (mux == FSR_SRC_FSX)
+-		src = "fsx";
+-	else
+-		return;
+-
+-	mcbsp = id_to_mcbsp_ptr(0);
+-	if (mcbsp->pdata->mux_signal)
+-		mcbsp->pdata->mux_signal(mcbsp->dev, "fsr", src);
+-}
+-EXPORT_SYMBOL(omap2_mcbsp1_mux_fsr_src);
+-
+ int omap_mcbsp_6pin_src_mux(unsigned int id, u8 mux)
+ {
+ 	struct omap_mcbsp *mcbsp;
 -- 
 1.7.8.1
