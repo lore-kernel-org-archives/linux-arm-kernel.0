@@ -1,51 +1,68 @@
-From: yanok@emcraft.com (Ilya Yanok)
-Date: Thu, 22 Dec 2011 02:00:53 +0100
-Subject: [PATCH] OMAP3: hwmod_data: add HWMOD_INIT_NO_RESET flag for dss_dispc
-Message-ID: <1324515653-17287-1-git-send-email-yanok@emcraft.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 22 Dec 2011 10:44:04 +0900
+Subject: [PATCHv2 resend] Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+In-Reply-To: <4EF27C76.3020805@solonet.org.ua>
+References: <4EE7BE5F.8020108@solonet.org.ua>
+ <064501ccbfae$cf1e5cb0$6d5b1610$%kim@samsung.com>
+ <4EF23852.1050304@solonet.org.ua>
+ <06fa01ccc02c$828b6810$87a23830$%kim@samsung.com>
+ <4EF27C76.3020805@solonet.org.ua>
+Message-ID: <073601ccc04b$2fcff5e0$8f6fe1a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resetting DISPC when a DISPC output is enabled causes the DSS to go into
-an inconsistent state.
+Denis Kuzmenko wrote:
+> 
+> On 12/22/2011 12:04 AM, Kukjin Kim wrote:
+> > Denis Kuzmenko wrote:
+> >>
+> >> On 12/21/2011 09:04 AM, Kukjin Kim wrote:
+> >>> Denis Kuzmenko wrote:
+> >>>>
+> >>>> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+> >>>>
+> >>>> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+> >>>> ---
+> >>>>
+> >>>> Patch is against 3.2-rc4.
+> >>>> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of
+> >> this
+> >>>> the
+> >>>> file s3c2410-iotiming.c is not ever compiled and enabling
+> >>>> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
+> >>>> function
+> >>>> s3c2410_iotiming_debugfs defined in that file.
+> s3c2410_iotiming_debugfs
+> >>>> defined
+> >>>> as NULL for this case.
+> >>>>
+> >>> Hi Denis,
+> >>>
+> >>> Well, there is no error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected
+> in
+> >> my
+> >>> case and s3c2410-iotiming.c is built...when is it happened? I just
+> >> selected
+> >>> every regarding configuration in kernel menuconfig...
+> >>
+> >> Please, try attached config (it's still failing in v3.2-rc6).
+> >>
+> > Hi Denis,
+> >
+> > Yes, when s3c2410 stuff is not selected, it happened.
+> > Look at me soon and thanks.
+> Hi, Kukjin,
+> 
+> Sorry, can you please explain as I can't understand. Especially second
+> sentence.
+> 
+Oops, mis-typing. Let me look at that with your patch :)
 
-commit b923d40dd4211c4ef7d4efa2bd81b7ca1d8744c1
-Author: Archit Taneja <archit@ti.com>
-Date:   Thu Oct 6 18:04:08 2011 -0600
+Thanks.
 
-    ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is
-enabled in bootloader
-
-tries to deal with this problem by checking if display is enabled and
-disabling it before doing reset.
-
-But in my setup dss_dispc is resetted from omap_hwmod_setup_all function
-_before_ calling omap_dss_reset. So when dispc_disable_outputs is
-executed dispc is already reset and nothing happens.
-
-This patch and HWMOD_INIT_NO_RESET flags to dss_dispc hwmod thus leaving
-DISPC untouched so that omap_dss_reset can take care of it.
-
-This solves the l3_app_irq BUG problem on my AM3517 based board.
-
-CC: Archit Taneja <archit@ti.com>
-CC: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Ilya Yanok <yanok@emcraft.com>
----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 5324e8d..226b365 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1515,7 +1515,7 @@ static struct omap_hwmod omap3xxx_dss_dispc_hwmod = {
- 	},
- 	.slaves		= omap3xxx_dss_dispc_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_dss_dispc_slaves),
--	.flags		= HWMOD_NO_IDLEST,
-+	.flags		= HWMOD_NO_IDLEST | HWMOD_INIT_NO_RESET,
- 	.dev_attr	= &omap2_3_dss_dispc_dev_attr
- };
- 
--- 
-1.7.6.4
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
