@@ -1,53 +1,18 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 22 Dec 2011 09:45:38 -0800
-Subject: [PATCH] input: serio: ams-delta: toggle keyboard power over GPIO
-In-Reply-To: <201112212055.10343.jkrzyszt@tis.icnet.pl>
-References: <378bcda9c6cb6a1ddeeb54817078bc7ec68c5987.1324331816.git.jkrzyszt@tis.icnet.pl>
- <1324419034-31024-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <20111221190945.GD24444@atomide.com>
- <201112212055.10343.jkrzyszt@tis.icnet.pl>
-Message-ID: <20111222174537.GB21103@core.coreip.homeip.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 22 Dec 2011 17:50:28 +0000
+Subject: [RFC PATCH v2 2/2] ARM: imx: Add mx5 cpuidle implmentation
+In-Reply-To: <1323846126-7516-3-git-send-email-rob.lee@linaro.org>
+References: <1323846126-7516-1-git-send-email-rob.lee@linaro.org>
+ <1323846126-7516-3-git-send-email-rob.lee@linaro.org>
+Message-ID: <20111222175027.GG29622@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 08:55:09PM +0100, Janusz Krzysztofik wrote:
-> On Wednesday 21 of December 2011 at 20:09:45, Tony Lindgren wrote:
-> > * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111220 13:39]:
-> > > Don't use Amstrad Delta custom I/O functions once GPIO interface is
-> > > available for the underlying hardware.
-> > > 
-> > > While requesting and initializing GPIO pins used, also take care of one
-> > > extra pin KEYBRD_DATAOUT which, even if not used by the driver, belongs
-> > > to the device and affects its functioning.
-> > > 
-> > > Once done, move the driver initialization back to the device_initcall
-> > > level, reverting the temporary chane introduced with patch 1/7 "ARM:
-> > > OMAP1: ams-delta: register latch dependent devices later".  That change
-> > > is no longer required once the driver takes care of registering used
-> > > GPIO pins, and it's better to initialize the device before others using
-> > > the latch2 based GPIO pins, otherwise a garbage is reported on boot,
-> > > perhaps due to random data already captured by the FIQ handler while the
-> > > keyboard related latch bits are written with random values during
-> > > initialization of those other latch2 dependent devices.
-> > > 
-> > > Depends on patch 2/7 "ARM: OMAP1: ams-delta: convert latches to
-> > > basic_mmio_gpio"
-> > > 
-> > > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> > 
-> > I'm assuming Dmitry's ack for an earlier version of this patch also
-> > covers this one when applying.
-> 
-> Hi Dmitry,
-> Can we assume your ack still valid for this version?
-> 
+On Wed, Dec 14, 2011 at 01:02:06AM -0600, Robert Lee wrote:
 
-Yes, please merge with your other changes.
+> +	clk_enable(&gpc_dvfs_clk);
 
-BTW, if you could rename :static struct gpio _gpios" to "ams_delta_gpios"
-that would be even better.
-
-Thanks!
-
--- 
-Dmitry
+Should these enables be in the cpuidle code?  The device appears to have
+been working fine without them thus far...  Alternatively, if they
+should be on anyway does this need to be split out and sent as a bug
+fix?
