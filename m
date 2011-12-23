@@ -1,34 +1,26 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Fri, 23 Dec 2011 13:15:28 +0000
-Subject: [PATCH v2] davinci: DA850 EVM: OHCI platform code
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6053054@DBDE01.ent.ti.com>
-References: <1324452002-8388-1-git-send-email-prakash.pm@ti.com>
- <DF0F476B391FA8409C78302C7BA518B6051CB9@DBDE01.ent.ti.com>
- <4EF1CB8A.10309@mvista.com> <4EF1D011.8060103@mvista.com>
- <DF0F476B391FA8409C78302C7BA518B6053054@DBDE01.ent.ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC027573@DBDE01.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 23 Dec 2011 13:18:51 +0000
+Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
+References: <1324537753-30590-1-git-send-email-richard.zhao@linaro.org>
+ <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111223131851.GB13175@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 17:57:16, Nori, Sekhar wrote:
-[...]
-> > 
-> >     Well, I have one idea. We can create a separate module in 
-> > arch/arm/mach-davinci/, named say ohci.c, put the shared code there and pass 
-> > to it the GPIOs actually used via a function call. Or maybe use existing 
-> > arch/arm/mach-davinci/usb.c.
-> 
-> Thanks Sergei. I think using the existing usb.c would be a better idea.
-> 
-> Prakash,
-> 
-> Can you please go ahead with this approach and post updated patches.
-> 
-> Thanks,
-> Sekhar
-> 
+On Thu, Dec 22, 2011 at 03:09:10PM +0800, Richard Zhao wrote:
+> The driver get cpu operation point table from device tree cpu0 node,
+> and adjusts operating points using clk and regulator APIs.
 
-Ok I will create abstract function and post the new set of patches.
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Thanks,
-Prakash
+but one nit:
+
+> +Required properties in /cpus/cpu at 0:
+> +- cpu-freqs : cpu frequency points it support, in unit of Hz.
+> +- cpu-volts : cpu voltages required by the frequency point at the same index,
+> +	      in unit of uV.
+> +- trans-latency :  transition_latency, in unit of ns.
+
+trans-latency should really say what latency is being measured (the CPU
+core only or the whole operation).
