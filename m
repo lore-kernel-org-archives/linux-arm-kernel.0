@@ -1,45 +1,103 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 23 Dec 2011 11:54:09 +0000
-Subject: init_kprobes() takes too much time during boot up
-In-Reply-To: <alpine.LFD.2.02.1112222212140.2907@xanadu.home>
-References: <CAMPhdO8T5wwPBYp_n15A88o8YxkXv2t8WOumRyni6WDhJinS3A@mail.gmail.com>
- <alpine.LFD.2.02.1112222212140.2907@xanadu.home>
-Message-ID: <1324641249.2215.25.camel@linaro1>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Fri, 23 Dec 2011 12:00:25 +0000
+Subject: Oops in guest after ioremap() on ARMv7
+In-Reply-To: <4EF37802.30300@citrix.com>
+References: <4EF31DA7.9030407@citrix.com> <20111222144937.GE20635@arm.com>
+ <4EF35CFF.3050200@citrix.com> <20111222181356.GI20635@arm.com>
+ <4EF37802.30300@citrix.com>
+Message-ID: <1324641625.7877.161.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-12-22 at 22:20 -0500, Nicolas Pitre wrote:
-> On Fri, 23 Dec 2011, Eric Miao wrote:
-> 
-> > I was trying to improve the kernel boot performance of the boards at
-> > my hands, while simply turning on initcall_debug, and found that
-> > init_kprobes() won the crown of being the most hungry time gobbler.
+On Thu, 2011-12-22 at 18:33 +0000, David Vrabel wrote:
+> On 22/12/11 18:13, Catalin Marinas wrote:
+> > On Thu, Dec 22, 2011 at 04:38:23PM +0000, David Vrabel wrote:
+> >> On 22/12/11 14:49, Catalin Marinas wrote:
+> >>> On Thu, Dec 22, 2011 at 12:08:07PM +0000, David Vrabel wrote:
+> >>>> When running the linux kernel on the ARMv7 envelope model as a guest
+> >>>> under the Xen hypervisor there is a oops (see below for an example of
+> >>>> the page translation fault) when trying to access ioremap()'d memory.
+> >>
+> >> The translation tables for userspace seem to be also affected.  The
+> >> program repeatedly faults with a translation fault on the same address.
+> >>  Putting a cache_flush_all() after the call to handle_mm_fault() in
+> >> __do_page_fault() makes userspace work as well.
 > > 
-> > Before I take my time to look into why it's taking so much time, I'd
-> > post the question to the list to seek help first.
+> > With the classic page tables, on A15 we need this patch:
+> > 
+> > http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux.git;a=commitdiff_plain;h=27cbbe6b1e17fa0b954edd37e26d601bdd7766a6
+> > 
+> > But that's to do with TLBs rather than cache and it only shows on real
+> > hardware rather than model.
+> > 
+> >>>> The same kernel works fine when not running under the hypervisor.
+> >>>>
+> >>>> It's a 3.2.0-rc5+ kernel with the two additional linux-arch-arm
+> >>>> branches: arm-arch/vexpress and arm-arch/arm-lpae.
+> >>>>
+> >>>> Calling flush_cache_all() in flush_cache_vmap() makes it work.  What
+> >>>> isn't being correctly flushed?  I see that flush_pmd_entry() and
+> >>>> cpu_v7_set_pte_ext() already flush the L1 and L2 translation table
+> >>>> entries and I can't think of anything else that would need to be flushed
+> >>>> (unless the mapped virtual addresses need to be flushed as well?)
+> >>>>
+> >>>> The "Barrier Litmus Tests and Cookbook" says that a TLB flush and a
+> >>>> branch predictor flush are required after a translation table entry
+> >>>> update.  This seems not to be done but adding this didn't seem to help
+> >>>> (and using local_flush_tlb_all()) in flush_cache_vmap() didn't help either).
+> >>>>
+> >>>> I don't see anything in the hypervisor that could be causing this as the
+> >>>> fault is occurring at stage 1 and not stage 2 translation.
+> >>>
+> >>> Interesting error, I don't have an immediate idea of what might be
+> >>> wrong, just some questions.
+> >>>
+> >>> What's the value of the VTCR register for this guest? Are the
+> >>> translation table walks marked as cacheable? Also, are the page table
+> >>> attributes Normal Cacheable in the stage 2 translation? The processor
+> >>> chooses the more restrictive attribute between stage 1 and stage 2.
+> >>
+> >> VTCR = 0x80002558 which is: Outer Shareable; Normal memory, outer
+> >> write-back write-allocate cacheable; Normal memory, inner write-back,
+> >> write-allocate cacheable.
+> >>
+> >> L3 TT entries for stage 2 have the following attributes:
+> >> Outer-Shareable; Normal, inner write-back cachable; Normal, outer
+> >> write-back cacheable.
+> >>
+> >> These look sensible to me.
+> > 
+> > They look fine (UP system). BTW, I assume that the hypervisor also
+> > flushes the caches and TLBs for the stage 2 translation tables.
 > 
-> From a quick glance, the "Lookup and populate the kprobe_blacklist" 
-> loops certainly have the potential to be costly.
+> I think so. Cc'ing Ian Campbell who knows the hypervisor side better
+> than me.
+
+At the moment we build the entire p2m before we ever load the VTTBR or
+enable stage-2 translations in the HCR. Is that sufficient or do we also
+need to flush something?
+
+Obviously we will need to make sure we do appropriate flushes when we
+start needing to change the p2m of a running guest etc. Currently our
+write_pte does a flush with DCCMVAC and in general our global flushes
+are at the more aggressive end of the scale (correctness before
+optimisation ;-)).
+
+BTW the Xen code is all at
+http://xenbits.xen.org/gitweb/?p=people/ianc/xen-unstable.git;a=tree;h=refs/heads/devel/arm;hb=devel/arm
+interesting code from this PoV is likely to be
+xen/arch/arm/{p2m,domain_build}.c and xen/include/asm-arm/page.h
+
+Ian.
+
 > 
-> There is nothing with notable complexity in the ARM specific part.
-
-Linaro's kernels have CONFIG_KPROBES_SANITY_TEST enabled and I suspect
-the slowness is due to these sanity tests.  The reason I think this is
-that I recently noticed that my kprobes test code is 1000 times slower
-on a Versatile Express than on a BeagleBoard. I suspect (without much
-evidence) that on SMP systems, the use of stop_machine() to set and
-clear breakpoints is causing this massive delay.
-
-I was speculating that the slowness could be due to process scheduling
-not happening until the next 'tick', or buggy code waking other CPUs
-from sleep.
-
-Does Linux have some general IPI interface we could use to synchronize
-CPU rather than stop_machine? All we need to do is interrupt other cores
-and make them wait until we write a new instruction to memory and do a
-cache flush and relevant barrier instructions. That would propagate the
-work case interrupt latency across all cores and add a little to that
-value to boot though.
-
--- 
-Tixy
+> > It could as well be a model bug but people are on holiday at the moment
+> > (and I'm off shortly as well, until 3rd of January). Could you try to
+> > disable the cacheability of the page table walks for both stage 1 (TTBRx
+> > with classic page tables or TTBCR with LPAE) and stage 2 (VTCR)? Since
+> > Linux does the correct cache flushing and I assume the hypervisor as
+> > well, this may work around possible model bug.
+> 
+> I can try this but probably not until the new year.
+> 
+> David
