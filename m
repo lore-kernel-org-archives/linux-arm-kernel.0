@@ -1,26 +1,74 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 22 Dec 2011 21:26:47 -0500 (EST)
-Subject: [PATCH v2] ARM: net: JIT compiler for packet filters
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6D8AF25@saturn3.aculab.com>
-References: <AE90C24D6B3A694183C094C60CF0A2F6D8AF25@saturn3.aculab.com>
-Message-ID: <alpine.LFD.2.02.1112222122100.2907@xanadu.home>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 22 Dec 2011 18:33:13 -0800
+Subject: [PATCH] dt/tegra: seaboard: add i2c devices
+Message-ID: <1324607593-2378-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Dec 2011, David Laight wrote:
+Add the known i2c devices on seaboard to the i2c table.
 
-> > In principle, the condition could be __LINUX_ARM_ARCH__ < 5, since the
-> > bx instruction is guaranteed to be available on all ARMv5 CPUs and
-> > later (ARMv5T is not required).
-> 
-> Can't this code look at the actual cpu being used, and
-> generate the relevant 'return' instruction?
-> (Instead of trying to use some compile-time value.)
-
-There is really no point doing so.  We intend to ultimately have a 
-kernel that may support ARMv5 and lower, and another kernel to support 
-ARMv6 and ARMv7.  So in a given context, either bx is always available 
-(ARMv6+) or never required (ARMv5-).
+Also rename the temperature sensor device node, and mark it as a nct1008 instead
+of an adt7461 (which it is -- the chips are compatible though).
 
 
-Nicolas
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/boot/dts/tegra-seaboard.dts |   29 +++++++++++++++++++++++++++--
+ 1 files changed, 27 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+index b55a02e..b64e0bd 100644
+--- a/arch/arm/boot/dts/tegra-seaboard.dts
++++ b/arch/arm/boot/dts/tegra-seaboard.dts
+@@ -13,6 +13,18 @@
+ 
+ 	i2c at 7000c000 {
+ 		clock-frequency = <400000>;
++
++		light-sensor at 44 {
++			compatible = "isil,isl29018";
++			reg = <0x44>;
++			interrupts = < 0 202 0x04 >; /* gpio PZ2 */
++		};
++
++		gyrometer at 68 {
++			compatible = "invn,mpu3050";
++			reg = <0x68>;
++			interrupts = < 0 204 0x04 >; /* gpio PZ4 */
++		};
+ 	};
+ 
+ 	i2c at 7000c400 {
+@@ -21,15 +33,28 @@
+ 
+ 	i2c at 7000c500 {
+ 		clock-frequency = <400000>;
++
++		smart-battery at b {
++			compatible = "ti,bq20z75", "smart-battery-1.1";
++			ti,i2c-retry-count = < 2 >;
++			ti,poll-retry-count = < 10 >;
++			reg = <0xb>;
++		};
+ 	};
+ 
+ 	i2c at 7000d000 {
+ 		clock-frequency = <400000>;
+ 
+-		adt7461 at 4c {
+-			compatible = "adt7461";
++		temperature-sensor at 4c {
++			compatible = "nct1008";
+ 			reg = <0x4c>;
+ 		};
++
++		magnetometer at c {
++			compatible = "ak8975";
++			reg = <0xc>;
++			interrupts = < 0 109 0x04 >; /* gpio PN5 */
++		};
+ 	};
+ 
+ 	serial at 70006000 {
+-- 
+1.7.8.GIT
