@@ -1,48 +1,30 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 23 Dec 2011 13:45:19 +0200
-Subject: Adding remoteproc/rpmsg to linux-next
-In-Reply-To: <201112221522.21146.arnd@arndb.de>
-References: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
- <20111212103301.5ff6a582dca82394ace40e8d@canb.auug.org.au>
- <CAK=WgbZm9txdvZ1VW-iUn5306yMz1Y=DT_Uygwi6zPZNyWx7gA@mail.gmail.com>
- <201112221522.21146.arnd@arndb.de>
-Message-ID: <CAK=WgbYanX_q8JDO6MF3zLWMkRiJ6uynmu+s7eBNrX4qL0N8ug@mail.gmail.com>
+From: e.voevodin@samsung.com (Evgeny Voevodin)
+Date: Fri, 23 Dec 2011 15:48:47 +0400
+Subject: [PATCH] exynos4: Frame buffer clock source changed to "lcd".
+Message-ID: <1324640927-16139-1-git-send-email-e.voevodin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Either way works for me, too. Right now, I would tend to let you send it
-> to Linus directly because I haven't looked at the latest versions of the
-> code for some time.
+With "fimd" kernel couldn't find the clock during boot-up:
+"s3c-fb exynos4-fb.0: failed to get bus clock"
 
-Directly to Linus it is then.
+Signed-off-by: Evgeny Voevodin <e.voevodin@samsung.com>
+---
+ arch/arm/mach-exynos/clock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> While I generally trust you to do the right thing
-> there, I'm not 100% comfortable to vouch for it in the way that an Ack
-> or pull would imply without doing a more detailed review of the latest
-> code.
-
-Sure, I fully understand.
-
-> I know that I promised you that review, but haven't gotten to it, sorry.
-> I've done a 5 minute review now and it absolutely looks good to go in
-> as far as I can tell, so I certainly don't object to you sending it
-> to Linus for 3.3.
-
-Thanks.
-
-> If you think you need more Acks or if there are other
-> reasons to have it go through arm-soc, please tell me and I'll try harder
-> to find the time for a proper review.
-
-I do have explicit Acks on the changes to other sub-systems, though
-ideally I'd be happy to have some explicit Acks on the generic code
-too.
-
-But I hope this should be fine. Let's try to proceed this way and see
-how it goes (maybe I should just tell Linus that despite the lack of
-explicit Acks to some of the patches, people do think this is
-good-to-go).
-
-Thanks!
-Ohad.
+diff --git a/arch/arm/mach-exynos/clock.c b/arch/arm/mach-exynos/clock.c
+index 2894f0a..8e52be5 100644
+--- a/arch/arm/mach-exynos/clock.c
++++ b/arch/arm/mach-exynos/clock.c
+@@ -489,7 +489,7 @@ static struct clk init_clocks_off[] = {
+ 		.enable		= exynos4_clk_ip_cam_ctrl,
+ 		.ctrlbit	= (1 << 3),
+ 	}, {
+-		.name		= "fimd",
++		.name		= "lcd",
+ 		.devname	= "exynos4-fb.0",
+ 		.enable		= exynos4_clk_ip_lcd0_ctrl,
+ 		.ctrlbit	= (1 << 0),
+-- 
+1.7.4.1
