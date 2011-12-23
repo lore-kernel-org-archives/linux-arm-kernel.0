@@ -1,52 +1,58 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 23 Dec 2011 15:07:13 +0530
-Subject: [QUESTION] How to set static/dynamic dependency between clock
- domains
-In-Reply-To: <4EF44363.4050008@ti.com>
-References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
- <CACVXFVPOaw7OG7owJw0h7DAe3pRH6nROsy13UeAWPWgLedKY1g@mail.gmail.com>
- <CAMQu2gwDth6OVTk3PkRCo05QF6WeQvMTJ-d5s33cT35GSVwT=w@mail.gmail.com>
- <CACVXFVNtaaxB-MRXKBgAZFEkf72nsgcOSHOFsYjspoL0Fv6VWA@mail.gmail.com>
- <CAMQu2gzs6op9C8jDJ5xEGs7A7ok_GXeD5OxnHiDoeHaKghCJ5g@mail.gmail.com>
- <CACVXFVOOQVe8u5TFZDYrNqvga-=RJ1mueaaqkBNB-s4BwkhiOw@mail.gmail.com>
- <CAMQu2gwKgpH_dOBQovgxBR_yTGAiXu=2yPhwgoERv+YD+pO_Sg@mail.gmail.com>
- <4EF44363.4050008@ti.com>
-Message-ID: <CAMQu2gwhyZasccr8wU6srhb8Y+T02yawy+RQQMzUGZjy1bvtJA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 23 Dec 2011 10:46:39 +0100
+Subject: [PATCH v2 0/5] ARM: OMAP2+: Interrupt controllers adaptation to DT
+In-Reply-To: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
+References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
+Message-ID: <4EF44DFF.4090300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2011 at 2:31 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> Hi Santosh,
->
->
-> On 12/23/2011 9:45 AM, Shilimkar, Santosh wrote:
->>
->> On Fri, Dec 23, 2011 at 2:00 PM, Ming Lei<tom.leiming@gmail.com> ?wrote:
->
->
-> [...]
->
->
->>> The only change on iss(CAM) clock domain setting in your commit[1] is to
->>> configure CLKTRCTRL as HW_AUTO, instead of previous ?SW_WKUP.
->>> Once I change flags of iss to CLKDM_CAN_SWSUP [2], the issue can be
->>> fixed, so I am wondering if something is wrong about HW_AUTO mode
->>> of CAM clock domain.
->>>
->> Now I recollect the issue and also track a patch in the internal product
->> tree.
->> Same is attached and also in the end of the email.
->>
->> I am lopping Miguel who wrote the patch and Benoit who acked it.
->> This should sort out your issue as you have already verified it works.
->
->
-> Ooops, that remains me that I forgot to push it upstream:-(
->
-> Since this is a bug fix, if this is too late for 3.3, we can try to push it
-> during rc phases.
->
-Cool. Thanks for picking it up
+Hi Rob,
 
-Regards
-Santosh
+Are you OK with that update?
+
+Thanks,
+Benoit
+
+On 12/20/2011 2:39 PM, Benoit Cousson wrote:
+> Hi Tony and Rob,
+>
+> Here is the series to take advantage of the new DT interrupt init mechanism.
+> Thanks to Marc's CONFIG_MULTI_IRQ_HANDLER series, OMAP4 just has to use the
+> default GIC binding and does not need some OMAP specific hacks anymore.
+> OMAP2 and 3 are using a simple interrupt controller that can thus expose
+> a simpler binding.
+>
+> This update, compared to v1 [1], is introducing the IRQ domain for the
+> OMAP2&3 INTC by default for both DT and none-DT build.
+> Please note that in the near future that code can even be simplier with the
+> introduction of the domain support inside generic irq chip.
+>
+> This series is based on lo/dt branch to get the needed cleanup and fixes for
+> OMAP.
+>
+> The series is available here for reference:
+> git://gitorious.org/omap-pm/linux.git for_3.3/2_dt_irq
+>
+> Regards,
+> Benoit
+>
+> [1] http://www.spinics.net/lists/linux-omap/msg61152.html
+>
+>
+> Benoit Cousson (5):
+>    arm/dts: OMAP4: Update DTS file with new GIC bindings
+>    ARM: OMAP2/3: intc: Add irqdomain support
+>    ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
+>    arm/dts: OMAP3: Add interrupt-controller bindings for INTC
+>    ARM: OMAP2+: board-generic: Use of_irq_init API
+>
+>   .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++++
+>   arch/arm/boot/dts/omap3.dtsi                       |    6 ++-
+>   arch/arm/boot/dts/omap4.dtsi                       |    3 +-
+>   arch/arm/mach-omap2/board-generic.c                |   30 +++++++------
+>   arch/arm/mach-omap2/common.h                       |   10 ++++
+>   arch/arm/mach-omap2/irq.c                          |   48 ++++++++++++++++++--
+>   6 files changed, 103 insertions(+), 21 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
+>
