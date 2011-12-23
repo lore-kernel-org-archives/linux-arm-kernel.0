@@ -1,55 +1,27 @@
-From: sumit.semwal@ti.com (Semwal, Sumit)
-Date: Fri, 23 Dec 2011 15:38:03 +0530
-Subject: [Linaro-mm-sig] [RFC v3 0/2] Introduce DMA buffer sharing
- mechanism
-In-Reply-To: <CAPM=9tzi5MyCBMJhWBM_ouL=QOaxX3K6KZ8K+t7dUYJLQrF+yA@mail.gmail.com>
-References: <1324283611-18344-1-git-send-email-sumit.semwal@ti.com>
- <20111220193117.GD3883@phenom.ffwll.local>
- <CAPM=9tzi5MyCBMJhWBM_ouL=QOaxX3K6KZ8K+t7dUYJLQrF+yA@mail.gmail.com>
-Message-ID: <CAB2ybb-+VTR=V1hwhF1GKxgkhTrssZ1JVOwcP6spO5O3AXqivA@mail.gmail.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Fri, 23 Dec 2011 12:34:43 +0200
+Subject: [PATCH 0/5] OMAP4: Fix CLKR/FSR mux for port with 6 pin mode
+In-Reply-To: <1324575106-17172-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1324575106-17172-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <4EF45943.3020302@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 1:50 AM, Dave Airlie <airlied@gmail.com> wrote:
-<snip>
->>
->> I think this is a really good v1 version of dma_buf. It contains all the
->> required bits (with well-specified semantics in the doc patch) to
->> implement some basic use-cases and start fleshing out the integration with
->> various subsystem (like drm and v4l). All the things still under
->> discussion like
->> - userspace mmap support
->> - more advanced (and more strictly specified) coherency models
->> - and shared infrastructure for implementing exporters
->> are imo much clearer once we have a few example drivers at hand and a
->> better understanding of some of the insane corner cases we need to be able
->> to handle.
->>
->> And I think any risk that the resulting clarifications will break a basic
->> use-case is really minimal, so I think it'd be great if this could go into
->> 3.3 (maybe as some kind of staging/experimental infrastructure).
->>
->> Hence for both patches:
->> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+On 12/22/2011 07:31 PM, Peter Ujfalusi wrote:
+> Hello,
 >
-> Yeah I'm with Daniel, I like this one, I can definitely build the drm
-> buffer sharing layer on top of this.
+> This series will fix the CLKR/FSR signal mux configuration for OMAP4 devices.
+> McBSP4 has 6 pin configuration on McBSP4 port while OMAP2/3 has the same
+> capability on McBSP1 port.
+> The API for mux control will be simplified for the mcbsp users (ASoC).
 >
-> How do we see this getting merged? I'm quite happy to push it to Linus
-> if we don't have an identified path, though it could go via a Linaro
-> tree as well.
+> The series depends on earlier series sent for mcbsp:
+> OMAP4: McBSP: Fix clock reparenting
 >
-> so feel free to add:
-> Reviewed-by: Dave Airlie <airlied@redhat.com>
-Thanks Daniel and Dave!
+> I think the ASoC patch can go via linux-omap, since we do not have other changes
+> for McBSP coming via sound tree.
+>
+Looks ok to me and you can have my ack if you plan to resend this after 
+clock reparenting fix set. (Note small typo in 2/5 subject)
 
-I guess we can start with staging for 3.3, and see how it shapes up. I
-will post the latest patch version pretty soon.
-
-Arnd, Dave: do you have any preference on the path it takes to get
-merged? In my mind, Linaro tree might make more sense, but I would
-leave it upto you gentlemen.
->
-> Dave.
-Best regards,
-~Sumit.
+Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
