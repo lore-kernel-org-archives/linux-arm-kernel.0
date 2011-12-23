@@ -1,53 +1,118 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 23 Dec 2011 21:15:27 +0530
-Subject: [PATCH v2 08/19] dma: MX3_IPU fix depends
-In-Reply-To: <1323785575-22703-1-git-send-email-eric@eukrea.com>
-References: <CAOMZO5AOpFtkJDmTSjPmvPVr0ra4d7jUcihGgncYE2VtfKCeSQ@mail.gmail.com>
- <1323785575-22703-1-git-send-email-eric@eukrea.com>
-Message-ID: <1324655127.1633.4.camel@vkoul-udesk3>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Fri, 23 Dec 2011 09:53:58 -0600
+Subject: [PATCH v4 1/4] OMAP3: hwmod data: add mmu data for iva and isp
+In-Reply-To: <CAMP44s2H7v6dRPXO6eBBNrYAnym_ZLdmKcAQPmYyCC6Wo5qOmw@mail.gmail.com>
+References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
+ <1323922709-6986-2-git-send-email-omar.ramirez@ti.com>
+ <CAMP44s2WFghH4qPKuwSQJFaoLEmfAtcHB3DRZwNYe4zXTQexfQ@mail.gmail.com>
+ <CAB-zwWiTHD38s6Mz_xfxhxBqYph1ctTmhU5dntnp4zHsUwJtHA@mail.gmail.com>
+ <CAMP44s2H7v6dRPXO6eBBNrYAnym_ZLdmKcAQPmYyCC6Wo5qOmw@mail.gmail.com>
+Message-ID: <CAB-zwWhNNW1GEYr019xecuZTYhR55HpNGrhGjJdE1CEAfFSriQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-12-13 at 15:12 +0100, Eric B?nard wrote:
-> ARCH_MX3 was removed in commit a89cf59 :
-> "arm/imx: merge i.MX3 and i.MX6"
-> thus preventing to select MX3_IPU, thus preventing IPU and display
-> to work on i.MX3x SOC.
-> i.MX SDMA support is also affected.
-> 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> ---
-> v2: improve comment based on Sergei's comments, and also handle SDMA
-> case based on Fabio's comment
->  drivers/dma/Kconfig |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index ab8f469..5a99bb3 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -124,7 +124,7 @@ config MV_XOR
->  
->  config MX3_IPU
->  	bool "MX3x Image Processing Unit support"
-> -	depends on ARCH_MX3
-> +	depends on SOC_IMX31 || SOC_IMX35
->  	select DMA_ENGINE
->  	default y
->  	help
-> @@ -216,7 +216,7 @@ config PCH_DMA
->  
->  config IMX_SDMA
->  	tristate "i.MX SDMA support"
-> -	depends on ARCH_MX25 || ARCH_MX3 || ARCH_MX5
-> +	depends on ARCH_MX25 || SOC_IMX31 || SOC_IMX35 || ARCH_MX5
->  	select DMA_ENGINE
->  	help
->  	  Support the i.MX SDMA engine. This engine is integrated into
-Which tree is this targeted to?
+On Mon, Dec 19, 2011 at 10:11 AM, Felipe Contreras
+<felipe.contreras@gmail.com> wrote:
+> On Fri, Dec 16, 2011 at 4:01 AM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
+>> On Thu, Dec 15, 2011 at 6:39 PM, Felipe Contreras
+>> <felipe.contreras@gmail.com> wrote:
+>>> Are you sure you are not missing something like:
+>>>
+>>> ?.clk = "cam_ick",
+>>
+>> I believe in this case cam_ick is used as the main clock as it
+>> supplies both functional and interface.
+>
+> Are you sure?
 
--- 
-~Vinod
+As sure as 4.7.4.1.7 CAM Power Domain ;), if someone else could
+clarify would be great to avoid the "are you sure" discussion.
+
+>>>> +/* isp mmu slave ports */
+>>>> +static struct omap_hwmod_ocp_if *omap3xxx_isp_mmu_slaves[] = {
+>>>> + ? ? ? &omap3xxx_l4_core__isp_mmu,
+>>>> +};
+>>>> +
+>>>> +static struct omap_hwmod omap3xxx_isp_mmu_hwmod = {
+>>>> + ? ? ? .name ? ? ? ? ? = "isp_mmu",
+>>>> + ? ? ? .class ? ? ? ? ?= &omap3xxx_mmu_hwmod_class,
+>>>> + ? ? ? .mpu_irqs ? ? ? = omap3xxx_isp_mmu_irqs,
+>>>> + ? ? ? .main_clk ? ? ? = "cam_ick",
+>>>
+>>> It's not "cam_fck"?
+>>
+>> AFAIK cam_fck doesn't exist in the code, and CAM_L3_ICK is used as
+>> both ick/fck according to TRM.
+>
+> Then maybe the code is wrong.
+>
+> Look at the OMAP34xx documentation, it says that:
+>
+> CAM_L3_ICLK -> CAM_FCLK
+> CAM_L4_ICLK -> CAM_ICLK
+> CAM_MCLK -> CAM_MCLK
+> CSI2_96M_FCLK -> CSI2_96M_FCLK
+>
+> CAM_FCLK
+> Functional clock (L3 interconnect clock domain)
+> Functional clock domain.
+>
+> CAM_ICLK
+> Interface clock (L4 interconnect clock domain)
+> Interface clock domain.
+
+"The camera subsystem interface is clocked with the L3 and L4 clocks
+(CAM_L3_ICLK and CAM_L4_ICLK, respectively). CAM_L3_ICLK is also used
+as the main functional clock. The functional clock (CAM_MCLK) is
+provided by DPLL4 to supply the external sensor."
+
+Either CAM subsystem section or PRCM - CAM PWRDM is ambiguous or wrong.
+
+...
+>
+> Looks like the driver is manually calling clk_get() and clk_put() for
+> the "i3_ick", where I guess the clock framework is supposed to do
+> that... It's almost as if somebody forgot a dependency somewhere.
+
+Would be good to clarify the intentions to keep the code as it is.
+
+>>>> + ? ? ? .dev_attr ? ? ? = &isp_mmu_dev_attr,
+>>>> + ? ? ? .slaves ? ? ? ? = omap3xxx_isp_mmu_slaves,
+>>>> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3xxx_isp_mmu_slaves),
+>>>> + ? ? ? .flags ? ? ? ? ?= HWMOD_NO_IDLEST,
+>>>> +};
+>>>
+>>> Most of the stuff I see the hwmods is .main_lock = "foo_fck", slave
+>>> .clk = "foo_ick". Maybe that explains the irq issues you get.
+>>
+>> I see irq issues with iva hwmod because tidspbridge doesn't use iommu
+>> API yet, so if you enable both the mmu hwmod and tidspbridge own mmu
+>> implementation there will be some conflicts.
+>>
+>> I didn't see isp issues though, but I didn't went more than
+>> booting/enabling with isp mmu.
+>
+> This is what you said:
+> Removed clk handling during interrupt, given that in order to receive one,
+> the device should be powered on in advance.
+
+Yes, you should receive an interrupt if the clock is enabled and the
+iommu is being used, hence the part inside in the ISR to enable the
+clocks was removed.
+
+> I'm not sure how this clock stuff works, but I'm guessing the device
+> is supposed to go to sleep at some points in time, and with your patch
+> "OMAP3/4: iommu: adapt to runtime pm" it won't, as long as the module
+> is loaded, unless I'm missing something.
+
+The device should be able to be put to sleep at anytime when it is NOT
+being used. AFAIK there is no mechanism for the main processor (the
+one running the kernel) to know when the other iommus are not being
+used, given that they are in independent processors/subsystems, at
+least for the ones in the DSP or M3 processors. Once the user releases
+its iommu resource it means it is no longer using it, at that point
+the device can be put to sleep.
+
+Regards,
+
+Omar
