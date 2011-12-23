@@ -1,83 +1,60 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 23 Dec 2011 23:27:20 +0530
-Subject: [PATCH 2/2] ARM: davinci: convert sched_clock() to use common
- infrastructure
-In-Reply-To: <1324663040-2859-1-git-send-email-nsekhar@ti.com>
-References: <1324663040-2859-1-git-send-email-nsekhar@ti.com>
-Message-ID: <1324663040-2859-2-git-send-email-nsekhar@ti.com>
+From: julia@diku.dk (Julia Lawall)
+Date: Fri, 23 Dec 2011 18:39:31 +0100
+Subject: [PATCH 6/9] arch/arm/mach-omap2/devices.c: introduce missing kfree
+Message-ID: <1324661974-17281-6-git-send-email-julia@diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert davinci to use the common sched_clock() infrastructure
-for extending 32bit counters to full 64-bit nanoseconds.
+pdata needs to be freed before leaving the function in an error case.
 
-Eventually clocksource timer should be initialized from init_early
-so there would be no need to use a dummy clocksource read at start.
+A simplified version of the semantic match that finds the problem is as
+follows: (http://coccinelle.lip6.fr)
 
-Tested-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+// <smpl>
+@r exists@
+local idexpression x;
+statement S;
+identifier f1;
+position p1,p2;
+expression *ptr != NULL;
+@@
+
+x at p1 = \(kmalloc\|kzalloc\|kcalloc\)(...);
+...
+if (x == NULL) S
+<... when != x
+     when != if (...) { <+...x...+> }
+x->f1
+...>
+(
+ return \(0\|<+...x...+>\|ptr\);
+|
+ return at p2 ...;
+)
+
+@script:python@
+p1 << r.p1;
+p2 << r.p2;
+@@
+
+print "* file: %s kmalloc %s return %s" % (p1[0].file,p1[0].line,p2[0].line)
+// </smpl>
+
+Signed-off-by: Julia Lawall <julia@diku.dk>
+
 ---
- arch/arm/Kconfig             |    1 +
- arch/arm/mach-davinci/time.c |   15 ++++++++++++---
- 2 files changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/devices.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 776d76b..3304316 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -925,6 +925,7 @@ config ARCH_DAVINCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ZONE_DMA
- 	select HAVE_IDE
-+	select HAVE_SCHED_CLOCK
- 	select CLKDEV_LOOKUP
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_IRQ_CHIP
-diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-index f2afb2d..e7d8b52 100644
---- a/arch/arm/mach-davinci/time.c
-+++ b/arch/arm/mach-davinci/time.c
-@@ -19,6 +19,7 @@
- #include <linux/err.h>
- #include <linux/platform_device.h>
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 46dfd1a..3334a47 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -393,6 +393,7 @@ static int omap_mcspi_init(struct omap_hwmod *oh, void *unused)
+ 			break;
+ 	default:
+ 			pr_err("Invalid McSPI Revision value\n");
++			kfree(pdata);
+ 			return -EINVAL;
+ 	}
  
-+#include <asm/sched_clock.h>
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- 
-@@ -291,15 +292,21 @@ static struct clocksource clocksource_davinci = {
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-+static DEFINE_CLOCK_DATA(cd);
-+
- /*
-  * Overwrite weak default sched_clock with something more precise
-  */
- unsigned long long notrace sched_clock(void)
- {
--	const cycle_t cyc = clocksource_davinci.read(&clocksource_davinci);
-+	u32 cyc = clocksource_davinci.read(&clocksource_davinci);
-+	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
-+}
- 
--	return clocksource_cyc2ns(cyc, clocksource_davinci.mult,
--				clocksource_davinci.shift);
-+static void notrace davinci_update_sched_clock(void)
-+{
-+	u32 cyc = timer32_read(&timers[TID_CLOCKSOURCE]);
-+	update_sched_clock(&cd, cyc, (u32)~0);
- }
- 
- /*
-@@ -401,6 +408,8 @@ static void __init davinci_timer_init(void)
- 	/* setup clocksource */
- 	clocksource_davinci.read = read_cycles;
- 	clocksource_davinci.name = id_to_name[clocksource_id];
-+	init_sched_clock(&cd, davinci_update_sched_clock, 32,
-+			 davinci_clock_tick_rate);
- 	if (clocksource_register_hz(&clocksource_davinci,
- 				    davinci_clock_tick_rate))
- 		printk(err, clocksource_davinci.name);
--- 
-1.6.2.4
