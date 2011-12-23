@@ -1,64 +1,39 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 23 Dec 2011 19:04:43 +0200
-Subject: [PATCH v4 4/4] OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <CAB-zwWio5iMTyofv3Hx5Q7G7rYY5cRU4kXNQzMF0NRprEd8=5g@mail.gmail.com>
-References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
- <1323922709-6986-5-git-send-email-omar.ramirez@ti.com>
- <CAMP44s3Jb9DZLUyDVU_HmQbaJKp=2qym7Z6uauNchJh0fPL4hQ@mail.gmail.com>
- <CAB-zwWhpmwRP2mNu-CdX-RVgmTRjw0UsYckAVsM+qztmVdvc7A@mail.gmail.com>
- <CAMP44s0hYWiZ8OnjQ6Jy_W7MCveP+WyHG18Tt2jRGzxSwoQP3w@mail.gmail.com>
- <CAB-zwWio5iMTyofv3Hx5Q7G7rYY5cRU4kXNQzMF0NRprEd8=5g@mail.gmail.com>
-Message-ID: <CAMP44s2JWRN4XVCVrbVUJwZK9zkT6p2dPnK2SPuZXJPj71c4Yg@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Fri, 23 Dec 2011 11:10:07 -0600
+Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
+ sharing mechanism
+In-Reply-To: <CAB2ybb_XcwLd8fx+vvditt+MUq2L2+WmsUpxH-gBKsbrVk7jGA@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <CAF6AEGtOjO6Z6yfHz-ZGz3+NuEMH2M-8=20U6+-xt-gv9XtzaQ@mail.gmail.com>
+ <20111220171437.GC3883@phenom.ffwll.local>
+ <201112211727.17104.arnd@arndb.de>
+ <CAB2ybb_XcwLd8fx+vvditt+MUq2L2+WmsUpxH-gBKsbrVk7jGA@mail.gmail.com>
+Message-ID: <CAF6AEGtGR0-vtfrP4i++kBxb2wGgGzv2MDu-K3CjmhEBXQyDnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2011 at 6:30 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
-> On Mon, Dec 19, 2011 at 10:27 AM, Felipe Contreras
-> <felipe.contreras@gmail.com> wrote:
->> On Fri, Dec 16, 2011 at 5:18 AM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
->>> On Thu, Dec 15, 2011 at 6:53 PM, Felipe Contreras
->>> <felipe.contreras@gmail.com> wrote:
->>>> On Thu, Dec 15, 2011 at 6:18 AM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
->>>>> Use runtime PM functionality interfaced with hwmod enable/idle
->>>>> functions, to replace direct clock operations, reset and sysconfig
->>>>> handling.
->>>>>
->>>>> Removed clk handling during interrupt, given that in order to receive one,
->>>>> the device should be powered on in advance. Now doing pm_runtime_get/put
->>>>> on iommu_enable/disable so it doesn't rely on others to keep the clocks on.
->>>>>
->>>>> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
->>>>> ---
->>>>> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ? | ? 17 -----------
->>>>> ?arch/arm/mach-omap2/omap-iommu.c ? ? ? ? | ? ?1 -
->>>>> ?arch/arm/plat-omap/include/plat/iommu.h ?| ? ?2 -
->>>>> ?arch/arm/plat-omap/include/plat/iommu2.h | ? ?2 -
->>>>> ?drivers/iommu/omap-iommu.c ? ? ? ? ? ? ? | ? 44 ++++++++++++-----------------
->>>>> ?5 files changed, 18 insertions(+), 48 deletions(-)
->>>>
->>>> Shouldn't pm_runtime_enable() be called in omap_iommu_init(), and
->>>> omap_iommu_probe() call pm_runtime_get_sync()/put() on the sections
->>>> where the device should be active?
->>>
->>> omap_iommu_init is called on module init however omap_iommu_probe is
->>> called by driver instance (isp, iva), on probe pm_runtime_enable
->>> activates runtime for both isp and iva devices, one at a time.
+On Fri, Dec 23, 2011 at 4:00 AM, Semwal, Sumit <sumit.semwal@ti.com> wrote:
+> On Wed, Dec 21, 2011 at 10:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 20 December 2011, Daniel Vetter wrote:
+>>> > I'm thinking for a first version, we can get enough mileage out of it by saying:
+>>> > 1) only exporter can mmap to userspace
+>>> > 2) only importers that do not need CPU access to buffer..
+>
+> Thanks Rob - and the exporter can do the mmap outside of dma-buf
+> usage, right?
+
+Yes
+
+> I mean, we don't need to provide an mmap to dma_buf()
+> and restrict it to exporter, when the exporter has more 'control' of
+> the buffer anyways.
+
+No, if it is only for the exporter, it really doesn't need to be in
+dmabuf (ie. the exporter already knows how he is)
+
+BR,
+-R
+
 >>
->> Yes, but omap_iommu_init() will *always* be called at boot time and
->> will register the data for all the devices.
->
-> There are 2 omap_iommu_init :/ Thought you were talking about the one
-> in drivers/iommu/omap-iommu.c.
->
->> If the 'iommu' module is
->> never loaded, then the devices will remain active the whole time.
->
-> oma-iommu is meant to be built-in as part of the kernel, there is no
-> option for module anymore.
-
-Which omap-iommu? The platform driver, or the device stuff? The device
-stuff is always built-in, but not the platform driver
-(drivers/iommu/omap-iommu.c), that can be a module.
-
--- 
-Felipe Contreras
+> BR,
+> ~Sumit.
