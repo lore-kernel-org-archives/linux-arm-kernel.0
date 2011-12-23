@@ -1,27 +1,52 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 22 Dec 2011 22:20:45 -0500 (EST)
-Subject: init_kprobes() takes too much time during boot up
-In-Reply-To: <CAMPhdO8T5wwPBYp_n15A88o8YxkXv2t8WOumRyni6WDhJinS3A@mail.gmail.com>
-References: <CAMPhdO8T5wwPBYp_n15A88o8YxkXv2t8WOumRyni6WDhJinS3A@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1112222212140.2907@xanadu.home>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Fri, 23 Dec 2011 05:44:17 +0100
+Subject: [PATCH v5] ARM: net: JIT compiler for packet filters
+In-Reply-To: <1324601625-20351-1-git-send-email-mgherzan@gmail.com>
+References: <1324601625-20351-1-git-send-email-mgherzan@gmail.com>
+Message-ID: <1324615457.2674.6.camel@edumazet-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Dec 2011, Eric Miao wrote:
-
-> I was trying to improve the kernel boot performance of the boards at
-> my hands, while simply turning on initcall_debug, and found that
-> init_kprobes() won the crown of being the most hungry time gobbler.
+Le vendredi 23 d?cembre 2011 ? 01:53 +0100, Mircea Gherzan a ?crit :
+> Based of Matt Evans's PPC64 implementation.
 > 
-> Before I take my time to look into why it's taking so much time, I'd
-> post the question to the list to seek help first.
+> The compiler generates ARM instructions but interworking is
+> supported for Thumb2 kernels.
+> 
+> Supports both little and big endian. Unaligned loads are emitted
+> for ARMv6+. Not all the BPF opcodes that deal with ancillary data
+> are supported. The scratch memory of the filter lives on the stack.
+> Hardware integer division is used if it is available.
+> 
+> Enabled in the same way as for x86-64 and PPC64:
+> 
+> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
+> 
+> A value greater than 1 enables opcode output.
+> 
+> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+> ---
+> 
+> Changes in v5:
+>  * replace SEEN_LEN with SEEN_SKB
+>  * set ctx->seen when handling some ancillary data opcodes
 
->From a quick glance, the "Lookup and populate the kprobe_blacklist" 
-loops certainly have the potential to be costly.
+> +		case BPF_S_ANC_CPU:
+> +			/* A = current_thread_info()->cpu */
+> +			emit_mov_i(r_scratch, (~(THREAD_SIZE - 1)), ctx);
+> +			emit(ARM_ADD_R(r_scratch, ARM_SP, r_scratch), ctx);
 
-There is nothing with notable complexity in the ARM specific part.
+This cant be right ;)
 
-CC'ing Tixy in case he has a better idea.
+> +
+> +			BUILD_BUG_ON(FIELD_SIZEOF(struct thread_info, cpu) != 4);
+> +			off = offsetof(struct thread_info, cpu);
+> +			emit(ARM_LDR_I(r_A, r_scratch, off), ctx);
+> +			break;
 
+code for r_A = raw_smp_processor_id(); should be something like :
 
-Nicolas
+mov r0, sp
+bic r0, r0, #8128   ; 0x1fc0
+bic r0, r0, #63 ; 0x3f
+ldr r4, [r0, #20] 
