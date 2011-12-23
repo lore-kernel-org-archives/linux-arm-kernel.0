@@ -1,30 +1,24 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 22 Dec 2011 16:09:22 -0800
-Subject: [PATCH] arm/tegra: dma: fix buildbreak for
- !CONFIG_TEGRA_SYSTEM_DMA
-In-Reply-To: <1324598592-9855-1-git-send-email-olof@lixom.net>
-References: <1324598592-9855-1-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF176CC74343@HQMAIL01.nvidia.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 22 Dec 2011 17:15:07 -0700
+Subject: fix implicit use of page.h
+Message-ID: <CAErSpo4=qnWvhhgQRDZVRPrsYppR9q1UW2WHBu9kbcdAKAFyBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Thursday, December 22, 2011 5:03 PM:
-> There's no need to keep the DMA_REQ_SEL defines inside the ifdef.
-> 
-> Fixes the following build break with CONFIG_TEGRA_SYSTEM_DMA=n:
-> 
-> arch/arm/mach-tegra/devices.c:645: error: 'TEGRA_DMA_REQ_SEL_I2S_1' undeclared here (not in a
-> function)
-> arch/arm/mach-tegra/devices.c:663: error: 'TEGRA_DMA_REQ_SEL_I2S2_1' undeclared here (not in a
-> function)
-> arch/arm/mach-tegra/devices.c:663: error: initializer element is not constant
-> arch/arm/mach-tegra/devices.c:663: error: (near initialization for 'i2s_resource2[1].start')
-> arch/arm/mach-tegra/devices.c:664: error: initializer element is not constant
-> arch/arm/mach-tegra/devices.c:664: error: (near initialization for 'i2s_resource2[1].end')
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+Here's a fix for a nanoengine build failure I found with the attached config.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
-
--- 
-nvpublic
+Bjorn
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: patch.arm-nanoengine
+Type: application/octet-stream
+Size: 794 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111222/6e3a3ae7/attachment-0002.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: arm-nanoengine
+Type: application/octet-stream
+Size: 40970 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111222/6e3a3ae7/attachment-0003.obj>
