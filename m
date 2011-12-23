@@ -1,56 +1,69 @@
-From: heinold@inf.fu-berlin.de (Henning Heinold)
-Date: Fri, 23 Dec 2011 11:47:51 +0100
-Subject: [PATCH 4/9] arm/tegra: fuse: add functions to access chip revision
-In-Reply-To: <1324599468-12845-5-git-send-email-olof@lixom.net>
-References: <1324599468-12845-1-git-send-email-olof@lixom.net>
- <1324599468-12845-5-git-send-email-olof@lixom.net>
-Message-ID: <20111223104751.GA22157@rhein.zuhause.netz>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 23 Dec 2011 13:35:26 +0200
+Subject: [RESENDx2] [PULL] virtio: fix barriers for virtio-mmio
+In-Reply-To: <CA+55aFzKU0GWqpQo2AzAawoVm=qPaJiwKTcifeYApyZP_Hj3nQ@mail.gmail.com>
+References: <8739cbkgv2.fsf@rustcorp.com.au>
+ <CA+55aFyvMkAtXPRxiFR+UpZKGHMhp8Vd9aYg1dkaoKMwD5MLcw@mail.gmail.com>
+ <CA+55aFzKU0GWqpQo2AzAawoVm=qPaJiwKTcifeYApyZP_Hj3nQ@mail.gmail.com>
+Message-ID: <CAK=WgbacH1tXHJiHNKLNNsFA7-vnFT_J6vYOANh0wzGyUj8Zpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 04:17:43PM -0800, Olof Johansson wrote:
-> Add function to get chip revision, and print it out at boot time.
-> 
-> Restructure the fuse access to just use cached variables instead
-> of always reading the fuses, and export those variables directly
-> instead of using accessor functions.
-> 
-> Add a SKU ID table of currently known values.
-> 
-> Based on code originally by Colin Cross <ccross@android.com>.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm/mach-tegra/fuse.c          |   80 +++++++++++++++++++++++------------
->  arch/arm/mach-tegra/fuse.h          |   31 +++++++++++--
->  arch/arm/mach-tegra/tegra2_clocks.c |    2 +-
->  3 files changed, 80 insertions(+), 33 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-> index daf3f57..2ddede9 100644
-> --- a/arch/arm/mach-tegra/fuse.c
-> +++ b/arch/arm/mach-tegra/fuse.c
-> @@ -30,20 +30,70 @@
->  #define FUSE_SKU_INFO		0x110
->  #define FUSE_SPARE_BIT		0x200
->  
-> +int tegra_sku_id;
-> +int tegra_cpu_process_id;
-> +int tegra_core_process_id;
-> +enum tegra_revision tegra_revision;
-> +
-> +static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
-> +	[TEGRA_REVISION_UNKNOWN] = "unknown",
-> +	[TEGRA_REVISION_A02]     = "A02",
-> +	[TEGRA_REVISION_A03]     = "A03",
-> +	[TEGRA_REVISION_A03p]    = "A03 prime",
-> +	[TEGRA_REVISION_A04]     = "A04",
-> +};
-> +
+On Fri, Dec 23, 2011 at 11:35 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On x86, there really is never any reason to use the heavy memory
+> barriers unless you are talking to a real device. And last I saw,
+> "virtio" was still about virtual IO.
 
-Hi Olof,
+I reported this originally, so maybe I should describe our use case a
+bit here (it's not virtio-mmio). It's a bit long, so apologizes in
+advance.
 
-can you please add here [TEGRA_REVISION_A01] = "A01", too. It is used in the nvidia git tree and affects the new beta xorg
-driver.
+Almost every SoC today have several additional cores (DSP or whatnot)
+which usually employ some hardware multimedia accelerators and are
+used to offload cpu-intensive tasks from the main application
+processor. These other cores are used in an asymmetric multiprocessing
+configurations, i.e. they run their own instance of operating system
+(which can be some flavor of RTOS, or Linux, or whatnot. anything
+goes).
 
-Bye Henning
+Virtually every SoC vendor have this (lots of ARM vendors, but it's
+definitely not limited to ARM), and they all have their own way of
+controlling, and communicating with, those remote cores. And it's
+usually rather big (tens of thousands loc), out-of-tree and very
+vendor-specific code.
+
+So we're trying to fix this by introducing some generic code that'd
+control those remote cores and let drivers talk to them, which all
+vendors could then use. I'll be sending you a 3.3 pull request for
+this, but you can already take a look in linux-next at drivers/rpmsg
+(inter-processor communication bus) and drivers/remoteproc (framework
+for booting a remote core).
+
+And rpmsg is using virtio to avoid implementing another shared memory
+"wire" protocol. And of course to be able to reuse all the existing
+virtio drivers (e.g. net, block, console) with a remote core backend.
+
+Which leads me to the specific issue we have. On OMAP4, the virtio
+kick is implemented using a memory-mapped mailbox device. After
+updating a vring (which is mapped using ARM's Normal memory) and
+before kicking the remote core (using the mailbox device which is
+mapped using ARM's Device memory) we must use a "heavy" memory barrier
+(i.e. ARM's DSB). Otherwise, if only an smp memory barrier is used
+(i.e. DMB on ARM), the kick might jump ahead before the remote core
+has observed the updates to the vrings. And then bad things happen.
+
+We didn't want to inflict the performance degradation on the
+virtualization use cases (which can run concurrently with the remote
+core scenarios), hence the dynamic "IO or SMP barrier" thingy.
+
+(Btw we don't have enough information about other
+setups/configurations as other vendors just begin using virtio for
+these kind of scenarios, but we guess this is probably isn't limited
+to OMAP. Fixing it at the transport layer sounds reasonable, although
+there are other ways to do this too).
+
+Hope this makes sense,
+
+Thanks,
+Ohad.
