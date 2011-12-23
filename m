@@ -1,21 +1,81 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 23 Dec 2011 10:37:44 +0000
-Subject: [PATCH v3 1/9] include: platform_data: Platform data header for
- OMAP4 ASoC audio
-In-Reply-To: <1324582474-18181-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1324582474-18181-1-git-send-email-peter.ujfalusi@ti.com>
- <1324582474-18181-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20111223103744.GC2834@opensource.wolfsonmicro.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 23 Dec 2011 11:38:34 +0100
+Subject: [RFC PATCH v2 4/8] media: videobuf2: introduce VIDEOBUF2_PAGE
+ memops
+In-Reply-To: <CACVXFVNdczv=tu7VG24766myCnGDRWAjkthbdfMwTGzTwFCoBA@mail.gmail.com>
+References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
+ <1323871214-25435-5-git-send-email-ming.lei@canonical.com>
+ <010501ccc08c$1c7b7870$55726950$%szyprowski@samsung.com>
+ <CACVXFVOqMmakPW-aAdp005RDLuV5oc6-JfjQHr-2bFRzZi2zDQ@mail.gmail.com>
+ <015201ccc156$033f73a0$09be5ae0$%szyprowski@samsung.com>
+ <CACVXFVNdczv=tu7VG24766myCnGDRWAjkthbdfMwTGzTwFCoBA@mail.gmail.com>
+Message-ID: <015301ccc15f$053e61d0$0fbb2570$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 09:34:26PM +0200, Peter Ujfalusi wrote:
+Hello,
 
->  include/linux/platform_data/omap-abe-twl6040.h |   48 ++++++++++++++++++++++++
+On Friday, December 23, 2011 10:51 AM Ming Lei wrote:
 
-I have to say I'm still really unhappy with the name - it's not like we
-should ever be seeing an omap-twl6040 driver but the naming suggests
-that there should be.  Bypassing the ABE ought to be a runtime decision
-as it's policy and might change with use case.  But anyway:
+> On Fri, Dec 23, 2011 at 5:34 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> 
+> >> For example, on ARM, there is very limited kernel virtual address space reserved
+> >> for DMA coherent buffer mapping, the default size is about 2M if I
+> >> don't remember mistakenly.
+> >
+> > It can be easily increased for particular boards, there is no problem with this.
+> 
+> It is not easily to increase it because there is very limited space reserved for
+> this purpose, see Documentation/arm/memory.txt. Also looks like it is
+> not configurable.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+It is really not a big issue to increase it by a few MBytes.
+ 
+> >> > I understand that there might be some speed issues with coherent (uncached)
+> >> > userspace mappings, but I would solve it in completely different way. The interface
+> >>
+> >> Also there is poor performance inside kernel space, see [1]
+> >
+> > Your driver doesn't access video data inside kernel space, so this is also not an issue.
+> 
+> Why not introduce it so that other drivers(include face detection) can
+> benefit with it? :-)
+
+We can get back into this once a driver which really benefits from comes.
+ 
+> >> >
+> >> > Your current implementation also abuses the design and api of videobuf2 memory
+> >> > allocators. If the allocator needs to return a custom structure to the driver
+> >>
+> >> I think returning vaddr is enough.
+> >>
+> >> > you should use cookie method. vaddr is intended to provide only a pointer to
+> >> > kernel virtual mapping, but you pass a struct page * there.
+> >>
+> >> No, __get_free_pages returns virtual address instead of 'struct page *'.
+> >
+> > Then you MUST use cookie for it. vaddr method should return kernel virtual address
+> > to the buffer video data. Some parts of videobuf2 relies on this - it is used by file
+> > io emulator (read(), write() calls) and mmap equivalent for non-mmu systems.
+> >
+> > Manual casting in the driver is also a bad idea, that's why there are helper functions
+> 
+> I don't see any casts are needed. The dma address can be got from vaddr with
+> dma_map_* easily in drivers, see the usage on patch 8/8(media: video: introduce
+> omap4 face detection module driver).
+
+Sorry, but I won't accept such driver/allocator which abuses the defined API. I've already
+pointed what vaddr method is used for.
+
+> > defined for both dma_contig and dma_sg allocators: vb2_dma_contig_plane_dma_addr() and
+> > vb2_dma_sg_plane_desc().
+> 
+> These two helpers are not needed and won't be provided by VIDEOBUF2_PAGE memops.
+
+I gave the example. Your allocator should have something similar.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
