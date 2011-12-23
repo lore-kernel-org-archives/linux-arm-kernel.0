@@ -1,31 +1,19 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 23 Dec 2011 16:23:34 +0000
-Subject: [PATCH 2/2] ARM: SAMSUNG: dma-ops.h needs mach/dma.h
-In-Reply-To: <1324657414-27991-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1324657414-27991-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1324657414-27991-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Fri, 23 Dec 2011 16:28:27 +0000
+Subject: [PATCH 5/5] ASoC: mxs: correct 'direction' of
+ device_prep_dma_cyclic
+In-Reply-To: <1324656420.1633.15.camel@vkoul-udesk3>
+References: <1323791286-29574-1-git-send-email-shawn.guo@linaro.org>
+ <1323848866-19768-1-git-send-email-shawn.guo@linaro.org>
+ <1324656420.1633.15.camel@vkoul-udesk3>
+Message-ID: <20111223162826.GA28036@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma-ops.h uses samsung_dma_is_dmadev so it needs to have mach/dma.h
-included.
+On Fri, Dec 23, 2011 at 09:37:00PM +0530, Vinod Koul wrote:
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/plat-samsung/include/plat/dma-ops.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> Has this been applied in soc tree? I don't see it in linux-next or do
+> you want this to go thru slave-dma?
 
-diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
-index 70b6325..71a6827 100644
---- a/arch/arm/plat-samsung/include/plat/dma-ops.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
-@@ -14,6 +14,7 @@
- #define __SAMSUNG_DMA_OPS_H_ __FILE__
- 
- #include <linux/dmaengine.h>
-+#include <mach/dma.h>
- 
- struct samsung_dma_prep_info {
- 	enum dma_transaction_type cap;
--- 
-1.7.7.3
+I reverted it, it needs to go with the commit that introduces the new
+API otherwise it breaks bisection.
