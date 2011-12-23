@@ -1,42 +1,61 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 23 Dec 2011 22:42:35 +0800
-Subject: [PATCH] regulator: max8925: fix enabled/disabled judgement mistake
-In-Reply-To: <20111222143803.GB4546@opensource.wolfsonmicro.com>
-References: <1324543892-32540-1-git-send-email-haojian.zhuang@marvell.com>
- <20111222105357.GC4546@opensource.wolfsonmicro.com>
- <CAN1soZy+hgW2iaQad9gbis7bHLCnfQhMKx-JTJc1j2++eRrJyw@mail.gmail.com>
- <20111222134415.GU4546@opensource.wolfsonmicro.com>
- <CAN1soZwBX3x5fiLrLwcC_xTSPMuXw4=u5Rj_CF_R_V3attNzYA@mail.gmail.com>
- <20111222143803.GB4546@opensource.wolfsonmicro.com>
-Message-ID: <CAN1soZz=LH2d5-A_y+1kw9mGY0sG2aBj5n=h-dtGU2aGPvDK3Q@mail.gmail.com>
+Date: Fri, 23 Dec 2011 22:43:48 +0800
+Subject: [PATCH] misc: max8925_onkey: add function to work as wakeup source
+In-Reply-To: <20111222174338.GA21103@core.coreip.homeip.net>
+References: <1324544151-2040-1-git-send-email-haojian.zhuang@marvell.com>
+ <20111222174338.GA21103@core.coreip.homeip.net>
+Message-ID: <CAN1soZyigBwJyhKjaVfVZdZLDC4MJO6kwuP=PEnb61m7xAC5FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 10:38 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Dec 22, 2011 at 10:22:17PM +0800, Haojian Zhuang wrote:
+On Fri, Dec 23, 2011 at 1:43 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> Hi Haojian,
 >
->> While we enable/disable the LDO in software, we'll force LDO into I2C mode
->> and enable/disable the control bit. So there's no risk in the
->> enable/disable function.
+> On Thu, Dec 22, 2011 at 04:55:51PM +0800, Haojian Zhuang wrote:
+>> From: Kevin Liu <kliu5@marvell.com>
+>>
+>> Signed-off-by: Kevin Liu <kliu5@marvell.com>
 >
-> Oh, dear. ?That code really is obscure - it's got a shift called
-> enable_bit but actually it's mostly working with bitfields not just a
-> single bit. ?Reading the enable() and disable() functions it looks like
-> they're setting a single bit but that's not the case.
+> Since I am getting the patch from you you need to add your own
+> "Signed-off-by: ..." as well.
 >
-> Please send a patch fixing this.
+>> ---
+>> ?drivers/input/misc/max8925_onkey.c | ? 35 +++++++++++++++++++++++++++++++++++
+>> ?1 files changed, 35 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/input/misc/max8925_onkey.c b/drivers/input/misc/max8925_onkey.c
+>> index 7de0ded..ce07ae2 100644
+>> --- a/drivers/input/misc/max8925_onkey.c
+>> +++ b/drivers/input/misc/max8925_onkey.c
+>> @@ -122,6 +122,7 @@ static int __devinit max8925_onkey_probe(struct platform_device *pdev)
+>> ? ? ? info->idev->evbit[0] = BIT_MASK(EV_KEY);
+>> ? ? ? info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
+>>
+>> + ? ? device_init_wakeup(&pdev->dev, 1);
+>>
+>> ? ? ? error = input_register_device(info->idev);
+>> ? ? ? if (error) {
+>> @@ -158,10 +159,44 @@ static int __devexit max8925_onkey_remove(struct platform_device *pdev)
+>> ? ? ? return 0;
+>> ?}
+>>
+>> +#ifdef CONFIG_PM
 >
->> There's only potential issue of checking whether LDO is enabled. If
->> sequence matches
->> the power sequence (not I2C mode), LDO will be enabled even the
->> control bit is OFF.
->> So this patch is necessary.
+> #ifdef CONFIG_PM_SLEEP is better choice here.
 >
-> I'm not saying the patch isn't required, I'm saying it's very hard to
-> work out what the patch is supposed to do and why it's only an issue in
-> the is_enabled() function.
+>> +static int max8925_onkey_suspend(struct device *dev)
+>> +{
+>> + ? ? struct platform_device *pdev = to_platform_device(dev);
+>> + ? ? struct max8925_chip *chip = dev_get_drvdata(pdev->dev.parent);
+>> +
+>> + ? ? if (device_may_wakeup(dev)) {
+>> + ? ? ? ? ? ? chip->wakeup_flag |= 1 << (onkey_irq[0] - chip->irq_base);
+>> + ? ? ? ? ? ? chip->wakeup_flag |= 1 << (onkey_irq[1] - chip->irq_base);
 >
-> Please resend with an improved changelog.
+> You don't need to actually communicate this to the device?
+>
+Excuse me that I missed another patch in this series. So I'll send it again.
 
-Sure. We'll format a new version.
+Best Regards
+Haojian
