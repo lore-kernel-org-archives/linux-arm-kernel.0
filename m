@@ -1,58 +1,69 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 23 Dec 2011 10:46:39 +0100
-Subject: [PATCH v2 0/5] ARM: OMAP2+: Interrupt controllers adaptation to DT
-In-Reply-To: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
-Message-ID: <4EF44DFF.4090300@ti.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 23 Dec 2011 17:51:11 +0800
+Subject: [RFC PATCH v2 4/8] media: videobuf2: introduce VIDEOBUF2_PAGE
+ memops
+In-Reply-To: <015201ccc156$033f73a0$09be5ae0$%szyprowski@samsung.com>
+References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
+ <1323871214-25435-5-git-send-email-ming.lei@canonical.com>
+ <010501ccc08c$1c7b7870$55726950$%szyprowski@samsung.com>
+ <CACVXFVOqMmakPW-aAdp005RDLuV5oc6-JfjQHr-2bFRzZi2zDQ@mail.gmail.com>
+ <015201ccc156$033f73a0$09be5ae0$%szyprowski@samsung.com>
+Message-ID: <CACVXFVNdczv=tu7VG24766myCnGDRWAjkthbdfMwTGzTwFCoBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-Are you OK with that update?
+On Fri, Dec 23, 2011 at 5:34 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
-Thanks,
-Benoit
+>> For example, on ARM, there is very limited kernel virtual address space reserved
+>> for DMA coherent buffer mapping, the default size is about 2M if I
+>> don't remember mistakenly.
+>
+> It can be easily increased for particular boards, there is no problem with this.
 
-On 12/20/2011 2:39 PM, Benoit Cousson wrote:
-> Hi Tony and Rob,
+It is not easily to increase it because there is very limited space reserved for
+this purpose, see Documentation/arm/memory.txt. Also looks like it is
+not configurable.
+
 >
-> Here is the series to take advantage of the new DT interrupt init mechanism.
-> Thanks to Marc's CONFIG_MULTI_IRQ_HANDLER series, OMAP4 just has to use the
-> default GIC binding and does not need some OMAP specific hacks anymore.
-> OMAP2 and 3 are using a simple interrupt controller that can thus expose
-> a simpler binding.
+>> > I understand that there might be some speed issues with coherent (uncached)
+>> > userspace mappings, but I would solve it in completely different way. The interface
+>>
+>> Also there is poor performance inside kernel space, see [1]
 >
-> This update, compared to v1 [1], is introducing the IRQ domain for the
-> OMAP2&3 INTC by default for both DT and none-DT build.
-> Please note that in the near future that code can even be simplier with the
-> introduction of the domain support inside generic irq chip.
+> Your driver doesn't access video data inside kernel space, so this is also not an issue.
+
+Why not introduce it so that other drivers(include face detection) can
+benefit with it? :-)
+
+>> >
+>> > Your current implementation also abuses the design and api of videobuf2 memory
+>> > allocators. If the allocator needs to return a custom structure to the driver
+>>
+>> I think returning vaddr is enough.
+>>
+>> > you should use cookie method. vaddr is intended to provide only a pointer to
+>> > kernel virtual mapping, but you pass a struct page * there.
+>>
+>> No, __get_free_pages returns virtual address instead of 'struct page *'.
 >
-> This series is based on lo/dt branch to get the needed cleanup and fixes for
-> OMAP.
+> Then you MUST use cookie for it. vaddr method should return kernel virtual address
+> to the buffer video data. Some parts of videobuf2 relies on this - it is used by file
+> io emulator (read(), write() calls) and mmap equivalent for non-mmu systems.
 >
-> The series is available here for reference:
-> git://gitorious.org/omap-pm/linux.git for_3.3/2_dt_irq
->
-> Regards,
-> Benoit
->
-> [1] http://www.spinics.net/lists/linux-omap/msg61152.html
->
->
-> Benoit Cousson (5):
->    arm/dts: OMAP4: Update DTS file with new GIC bindings
->    ARM: OMAP2/3: intc: Add irqdomain support
->    ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
->    arm/dts: OMAP3: Add interrupt-controller bindings for INTC
->    ARM: OMAP2+: board-generic: Use of_irq_init API
->
->   .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++++
->   arch/arm/boot/dts/omap3.dtsi                       |    6 ++-
->   arch/arm/boot/dts/omap4.dtsi                       |    3 +-
->   arch/arm/mach-omap2/board-generic.c                |   30 +++++++------
->   arch/arm/mach-omap2/common.h                       |   10 ++++
->   arch/arm/mach-omap2/irq.c                          |   48 ++++++++++++++++++--
->   6 files changed, 103 insertions(+), 21 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
->
+> Manual casting in the driver is also a bad idea, that's why there are helper functions
+
+I don't see any casts are needed. The dma address can be got from vaddr with
+dma_map_* easily in drivers, see the usage on patch 8/8(media: video: introduce
+omap4 face detection module driver).
+
+> defined for both dma_contig and dma_sg allocators: vb2_dma_contig_plane_dma_addr() and
+> vb2_dma_sg_plane_desc().
+
+These two helpers are not needed and won't be provided by VIDEOBUF2_PAGE memops.
+
+thanks,
+--
+Ming Lei
