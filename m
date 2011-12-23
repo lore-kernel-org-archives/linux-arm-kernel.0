@@ -1,26 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 23 Dec 2011 13:18:51 +0000
-Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
-In-Reply-To: <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
-References: <1324537753-30590-1-git-send-email-richard.zhao@linaro.org>
- <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111223131851.GB13175@sirena.org.uk>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 23 Dec 2011 22:42:35 +0800
+Subject: [PATCH] regulator: max8925: fix enabled/disabled judgement mistake
+In-Reply-To: <20111222143803.GB4546@opensource.wolfsonmicro.com>
+References: <1324543892-32540-1-git-send-email-haojian.zhuang@marvell.com>
+ <20111222105357.GC4546@opensource.wolfsonmicro.com>
+ <CAN1soZy+hgW2iaQad9gbis7bHLCnfQhMKx-JTJc1j2++eRrJyw@mail.gmail.com>
+ <20111222134415.GU4546@opensource.wolfsonmicro.com>
+ <CAN1soZwBX3x5fiLrLwcC_xTSPMuXw4=u5Rj_CF_R_V3attNzYA@mail.gmail.com>
+ <20111222143803.GB4546@opensource.wolfsonmicro.com>
+Message-ID: <CAN1soZz=LH2d5-A_y+1kw9mGY0sG2aBj5n=h-dtGU2aGPvDK3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 03:09:10PM +0800, Richard Zhao wrote:
-> The driver get cpu operation point table from device tree cpu0 node,
-> and adjusts operating points using clk and regulator APIs.
+On Thu, Dec 22, 2011 at 10:38 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Dec 22, 2011 at 10:22:17PM +0800, Haojian Zhuang wrote:
+>
+>> While we enable/disable the LDO in software, we'll force LDO into I2C mode
+>> and enable/disable the control bit. So there's no risk in the
+>> enable/disable function.
+>
+> Oh, dear. ?That code really is obscure - it's got a shift called
+> enable_bit but actually it's mostly working with bitfields not just a
+> single bit. ?Reading the enable() and disable() functions it looks like
+> they're setting a single bit but that's not the case.
+>
+> Please send a patch fixing this.
+>
+>> There's only potential issue of checking whether LDO is enabled. If
+>> sequence matches
+>> the power sequence (not I2C mode), LDO will be enabled even the
+>> control bit is OFF.
+>> So this patch is necessary.
+>
+> I'm not saying the patch isn't required, I'm saying it's very hard to
+> work out what the patch is supposed to do and why it's only an issue in
+> the is_enabled() function.
+>
+> Please resend with an improved changelog.
 
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-but one nit:
-
-> +Required properties in /cpus/cpu at 0:
-> +- cpu-freqs : cpu frequency points it support, in unit of Hz.
-> +- cpu-volts : cpu voltages required by the frequency point at the same index,
-> +	      in unit of uV.
-> +- trans-latency :  transition_latency, in unit of ns.
-
-trans-latency should really say what latency is being measured (the CPU
-core only or the whole operation).
+Sure. We'll format a new version.
