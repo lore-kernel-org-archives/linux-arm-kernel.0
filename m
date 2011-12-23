@@ -1,88 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Dec 2011 19:19:35 +0000
-Subject: [PATCH 09/12] ARM: EXYNOS: introduce
- arch/arm/mach-exynos/common.[ch]
-In-Reply-To: <1324385316-6052-10-git-send-email-kgene.kim@samsung.com>
-References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
- <1324385316-6052-10-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20111223191935.GS2577@n2100.arm.linux.org.uk>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sat, 24 Dec 2011 00:12:20 +0100
+Subject: [PATCH 0/4] Amstrad Delta: access MODEM_RESET GPIO pin over a
+ regulator
+Message-ID: <1324681944-19067-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 09:48:33PM +0900, Kukjin Kim wrote:
-> This patch introduces common.[ch] which are used only in the
-> arch/arm/mach-exynos/ directory. The common.c file merges
-> the cpu.c, init.c, irq-combiner.c and irq-eint.c files which
-> are used commonly on EXYNOS SoCs and the common.h file replaces
-> with plat/exynos4.h file.
-> 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+The Amstrad Delta on-board latch2 bit named MODEM_NRESET, now available
+as a GPIO pin AMS_DELTA_GPIO_PIN_NMODEM_RESET, is used to power up/down
+(bring into/out of a reset state) two distinct on-board devices
+simultaneously: the modem, and the voice codec. As a consequence, that
+bit is, or can be, manipulated concurrently by two drivers, or their
+platform provided hooks.
 
-It looks like there's some changes made to exynos stuff between -rc1
-(which my immutable restart-cleanup branch is based upon) and the base
-for this patch which makes it hard to apply:
+Instead of updating those drivers to use the gpiolib API as a new method
+of controlling the MODEM_NRESET pin state, like it was done to other
+drivers accessing latch2 pins, and still being vulnerable to potential
+concurrency conflicts, or trying to solve that sharing issue with a
+custom piece of code, set up a fixed regulator device on top of that
+GPIO pin and update both drivers to manipulate that regulator, not the
+GPIO pin directly.
 
-Patching 7249/1...
-git apply --whitespace=fix -p1 --index --check > /tmp/pdb.2292 2>&1 exited with
-non-zero status: 256
-error: patch failed: arch/arm/mach-exynos/cpu.c:1
-error: arch/arm/mach-exynos/cpu.c: patch does not apply
+Janusz Krzysztofik (4):
+  ARM: OMAP1: ams-delta: set up regulator over modem reset GPIO pin
+  ASoC: cx20442: add bias control over a platform provided regulator
+  ARM: OMAP1: ams-delta: update the modem to use regulator API
+  ASoC: OMAP: ams-delta: drop .set_bias_level callback
 
-Trying with GNU patch gives:
+ arch/arm/mach-omap1/Kconfig                       |    2 +
+ arch/arm/mach-omap1/board-ams-delta.c             |  116 +++++++++++++++++++--
+ arch/arm/plat-omap/include/plat/board-ams-delta.h |    1 -
+ sound/soc/codecs/cx20442.c                        |   58 ++++++++++-
+ sound/soc/omap/ams-delta.c                        |   34 ------
+ 5 files changed, 165 insertions(+), 46 deletions(-)
 
-Patching 7249/1...
-patch -p1 -f -EF0 -N --dry-run > /tmp/pdb.2298 2>&1 exited with non-zero status: 256
-patching file arch/arm/mach-exynos/Makefile
-patching file arch/arm/mach-exynos/clock-exynos4210.c
-patching file arch/arm/mach-exynos/clock-exynos4212.c
-patching file arch/arm/mach-exynos/clock.c
-patching file arch/arm/mach-exynos/common.c
-patching file arch/arm/mach-exynos/common.h
-patching file arch/arm/mach-exynos/cpu.c
-Hunk #1 FAILED at 1.
-File arch/arm/mach-exynos/cpu.c is not empty after patch, as expected
-1 out of 1 hunk FAILED -- saving rejects to file arch/arm/mach-exynos/cpu.c.rej
-patching file arch/arm/mach-exynos/include/mach/map.h
-patching file arch/arm/mach-exynos/init.c
-patching file arch/arm/mach-exynos/irq-combiner.c
-patching file arch/arm/mach-exynos/irq-eint.c
-patching file arch/arm/mach-exynos/mach-armlex4210.c
-Hunk #1 succeeded at 20 (offset -1 lines).
-Hunk #2 succeeded at 27 (offset -1 lines).
-Hunk #3 succeeded at 188 (offset -1 lines).
-patching file arch/arm/mach-exynos/mach-nuri.c
-Hunk #1 succeeded at 37 (offset -1 lines).
-Hunk #2 succeeded at 53 (offset -1 lines).
-Hunk #3 succeeded at 1284 (offset -1 lines).
-patching file arch/arm/mach-exynos/mach-origen.c
-Hunk #1 succeeded at 28 (offset -1 lines).
-Hunk #2 succeeded at 42 (offset -1 lines).
-Hunk #3 succeeded at 639 (offset -1 lines).
-patching file arch/arm/mach-exynos/mach-smdk4x12.c
-Hunk #1 succeeded at 27 (offset -1 lines).
-Hunk #2 succeeded at 35 (offset -1 lines).
-Hunk #3 succeeded at 250 (offset -1 lines).
-patching file arch/arm/mach-exynos/mach-smdkv310.c
-Hunk #1 succeeded at 27 (offset -1 lines).
-Hunk #2 succeeded at 42 (offset -1 lines).
-Hunk #3 succeeded at 333 (offset -1 lines).
-patching file arch/arm/mach-exynos/mach-universal_c210.c
-Hunk #1 succeeded at 27 (offset -1 lines).
-Hunk #2 succeeded at 46 (offset -1 lines).
-Hunk #3 succeeded at 993 (offset -1 lines).
-patching file arch/arm/plat-s5p/Makefile
-patching file arch/arm/plat-s5p/cpu.c
-patching file arch/arm/plat-samsung/include/plat/cpu.h
-patching file arch/arm/plat-samsung/include/plat/exynos4.h
-
-So I can't apply this, and this in turn means I can't provide Nicolas with
-a tree this evening for his arch_idle changes.
-
-Given the proximity to Christmas, and I'm _not_ planning to work from this
-evening until after the new year, things will now have to just sit and wait
-until after the festive period.
-
-I'll push out what I have been able to merge later this evening, but it
-will not include the exynos patches.
+-- 
+1.7.3.4
