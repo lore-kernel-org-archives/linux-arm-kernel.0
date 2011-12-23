@@ -1,276 +1,146 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 22 Dec 2011 16:17:45 -0800
-Subject: [PATCH 6/9] arm/tegra: emc: convert tegra2_emc to a platform driver
+Date: Thu, 22 Dec 2011 16:17:46 -0800
+Subject: [PATCH 7/9] arm/tegra: emc: device tree bindings
 In-Reply-To: <1324599468-12845-1-git-send-email-olof@lixom.net>
 References: <1324599468-12845-1-git-send-email-olof@lixom.net>
-Message-ID: <1324599468-12845-7-git-send-email-olof@lixom.net>
+Message-ID: <1324599468-12845-8-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the first step in making it device-tree aware and get rid of the
-in-kernel EMC tables (of which there are none in mainline, thankfully).
+Device tree bindings for the EMC tables on tegra.
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: devicetree-discuss at lists.ozlabs.org
 ---
- arch/arm/mach-tegra/tegra2_emc.c        |  110 ++++++++++++++++++++++++-------
- arch/arm/mach-tegra/tegra2_emc.h        |   11 +--
- include/linux/platform_data/tegra_emc.h |   34 ++++++++++
- 3 files changed, 125 insertions(+), 30 deletions(-)
- create mode 100644 include/linux/platform_data/tegra_emc.h
+ .../devicetree/bindings/arm/tegra/emc.txt          |  100 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra20.dtsi                     |    7 ++
+ 2 files changed, 107 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra/emc.txt
 
-diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
-index 0f7ae6e..9ef61e8 100644
---- a/arch/arm/mach-tegra/tegra2_emc.c
-+++ b/arch/arm/mach-tegra/tegra2_emc.c
-@@ -20,6 +20,8 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/platform_data/tegra_emc.h>
- 
- #include <mach/iomap.h>
- 
-@@ -32,18 +34,17 @@ static bool emc_enable;
- #endif
- module_param(emc_enable, bool, 0644);
- 
--static void __iomem *emc = IO_ADDRESS(TEGRA_EMC_BASE);
--static const struct tegra_emc_table *tegra_emc_table;
--static int tegra_emc_table_size;
-+static struct platform_device *emc_pdev;
-+static void __iomem *emc_regbase;
- 
- static inline void emc_writel(u32 val, unsigned long addr)
- {
--	writel(val, emc + addr);
-+	writel(val, emc_regbase + addr);
- }
- 
- static inline u32 emc_readl(unsigned long addr)
- {
--	return readl(emc + addr);
-+	return readl(emc_regbase + addr);
- }
- 
- static const unsigned long emc_reg_addr[TEGRA_EMC_NUM_REGS] = {
-@@ -98,15 +99,15 @@ static const unsigned long emc_reg_addr[TEGRA_EMC_NUM_REGS] = {
- /* Select the closest EMC rate that is higher than the requested rate */
- long tegra_emc_round_rate(unsigned long rate)
- {
-+	struct tegra_emc_pdata *pdata;
- 	int i;
- 	int best = -1;
- 	unsigned long distance = ULONG_MAX;
- 
--	if (!tegra_emc_table)
-+	if (!emc_pdev)
- 		return -EINVAL;
- 
--	if (!emc_enable)
--		return -EINVAL;
-+	pdata = emc_pdev->dev.platform_data;
- 
- 	pr_debug("%s: %lu\n", __func__, rate);
- 
-@@ -116,10 +117,10 @@ long tegra_emc_round_rate(unsigned long rate)
- 	 */
- 	rate = rate / 2 / 1000;
- 
--	for (i = 0; i < tegra_emc_table_size; i++) {
--		if (tegra_emc_table[i].rate >= rate &&
--		    (tegra_emc_table[i].rate - rate) < distance) {
--			distance = tegra_emc_table[i].rate - rate;
-+	for (i = 0; i < pdata->num_tables; i++) {
-+		if (pdata->tables[i].rate >= rate &&
-+		    (pdata->tables[i].rate - rate) < distance) {
-+			distance = pdata->tables[i].rate - rate;
- 			best = i;
- 		}
- 	}
-@@ -127,9 +128,9 @@ long tegra_emc_round_rate(unsigned long rate)
- 	if (best < 0)
- 		return -EINVAL;
- 
--	pr_debug("%s: using %lu\n", __func__, tegra_emc_table[best].rate);
-+	pr_debug("%s: using %lu\n", __func__, pdata->tables[best].rate);
- 
--	return tegra_emc_table[best].rate * 2 * 1000;
-+	return pdata->tables[best].rate * 2 * 1000;
- }
- 
- /*
-@@ -142,37 +143,100 @@ long tegra_emc_round_rate(unsigned long rate)
-  */
- int tegra_emc_set_rate(unsigned long rate)
- {
-+	struct tegra_emc_pdata *pdata;
- 	int i;
- 	int j;
- 
--	if (!tegra_emc_table)
-+	if (!emc_pdev)
- 		return -EINVAL;
- 
-+	pdata = emc_pdev->dev.platform_data;
-+
- 	/*
- 	 * The EMC clock rate is twice the bus rate, and the bus rate is
- 	 * measured in kHz
- 	 */
- 	rate = rate / 2 / 1000;
- 
--	for (i = 0; i < tegra_emc_table_size; i++)
--		if (tegra_emc_table[i].rate == rate)
-+	for (i = 0; i < pdata->num_tables; i++)
-+		if (pdata->tables[i].rate == rate)
- 			break;
- 
--	if (i >= tegra_emc_table_size)
-+	if (i >= pdata->num_tables)
- 		return -EINVAL;
- 
- 	pr_debug("%s: setting to %lu\n", __func__, rate);
- 
- 	for (j = 0; j < TEGRA_EMC_NUM_REGS; j++)
--		emc_writel(tegra_emc_table[i].regs[j], emc_reg_addr[j]);
-+		emc_writel(pdata->tables[i].regs[j], emc_reg_addr[j]);
- 
--	emc_readl(tegra_emc_table[i].regs[TEGRA_EMC_NUM_REGS - 1]);
-+	emc_readl(pdata->tables[i].regs[TEGRA_EMC_NUM_REGS - 1]);
- 
- 	return 0;
- }
- 
--void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
-+static int __devinit tegra_emc_probe(struct platform_device *pdev)
-+{
-+	struct tegra_emc_pdata *pdata;
-+	struct clk *c = clk_get_sys("emc", NULL);
-+	struct clk *user;
-+	struct resource *res;
-+	unsigned long max = 0;
-+	int i;
-+
-+	if (!emc_enable) {
-+		dev_err(&pdev->dev, "disabled per module parameter\n");
-+		return -ENODEV;
-+	}
-+
-+	pdata = pdev->dev.platform_data;
-+
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "missing platform data\n");
-+		return -ENXIO;
-+	}
-+
-+        res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+        if (!res) {
-+		dev_err(&pdev->dev, "missing register base\n");
-+                return -ENOMEM;
-+        }
-+
-+	if (!request_mem_region(res->start, resource_size(res), "tegra_emc")) {
-+		dev_err(&pdev->dev, "failed to request register region\n");
-+		return -EBUSY;
-+	}
-+
-+	emc_regbase = ioremap(res->start, resource_size(res));
-+
-+	/* Since default max_rate on emc clock is the same as firmware set
-+	 * it to before booting, raise it up here based on known timings.
-+	 */
-+
-+	for (i = 0; i < pdata->num_tables; i++)
-+		if (pdata->tables[i].rate > max)
-+			max = pdata->tables[i].rate;
-+
-+	c->max_rate = max * 2 * 1000;
-+
-+	list_for_each_entry(user, &c->shared_bus_list, u.shared_bus_user.node)
-+		user->max_rate = c->max_rate;
-+
-+	emc_pdev = pdev;
-+
-+	return 0;
-+}
-+
-+static struct platform_driver tegra_emc_driver = {
-+	.driver         = {
-+		.name   = "tegra-emc",
-+		.owner  = THIS_MODULE,
-+	},
-+	.probe          = tegra_emc_probe,
-+};
-+
-+static int __init tegra_emc_init(void)
- {
--	tegra_emc_table = table;
--	tegra_emc_table_size = table_size;
-+	return platform_driver_register(&tegra_emc_driver);
- }
-+device_initcall(tegra_emc_init);
-diff --git a/arch/arm/mach-tegra/tegra2_emc.h b/arch/arm/mach-tegra/tegra2_emc.h
-index 19f08cb..f61409b 100644
---- a/arch/arm/mach-tegra/tegra2_emc.h
-+++ b/arch/arm/mach-tegra/tegra2_emc.h
-@@ -15,13 +15,10 @@
-  *
-  */
- 
--#define TEGRA_EMC_NUM_REGS 46
--
--struct tegra_emc_table {
--	unsigned long rate;
--	u32 regs[TEGRA_EMC_NUM_REGS];
--};
-+#ifndef __MACH_TEGRA_TEGRA2_EMC_H_
-+#define __MACH_TEGRA_TEGRA2_EMC_H
- 
- int tegra_emc_set_rate(unsigned long rate);
- long tegra_emc_round_rate(unsigned long rate);
--void tegra_init_emc(const struct tegra_emc_table *table, int table_size);
-+
-+#endif
-diff --git a/include/linux/platform_data/tegra_emc.h b/include/linux/platform_data/tegra_emc.h
+diff --git a/Documentation/devicetree/bindings/arm/tegra/emc.txt b/Documentation/devicetree/bindings/arm/tegra/emc.txt
 new file mode 100644
-index 0000000..df67505
+index 0000000..09335f8
 --- /dev/null
-+++ b/include/linux/platform_data/tegra_emc.h
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright (C) 2011 Google, Inc.
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@android.com>
-+ *	Olof Johansson <olof@lixom.net>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
++++ b/Documentation/devicetree/bindings/arm/tegra/emc.txt
+@@ -0,0 +1,100 @@
++Embedded Memory Controller
 +
-+#ifndef __TEGRA_EMC_H_
-+#define __TEGRA_EMC_H_
++Properties:
++- name : Should be emc
++- #address-cells : Should be 1
++- #size-cells : Should be 0
++- compatible : Should contain "nvidia,tegra20-emc".
++- reg : Offset and length of the register set for the device
++- nvidia,use-ram-code : If present, the sub-nodes will be addressed
++  and chosen using the ramcode board selector. If omitted, only one
++  set of tables can be present and said tables will be used
++  irrespective of ram-code configuration.
 +
-+#define TEGRA_EMC_NUM_REGS 46
++Child device nodes describe the memory settings for different configurations and clock rates.
 +
-+struct tegra_emc_table {
-+	unsigned long rate;
-+	u32 regs[TEGRA_EMC_NUM_REGS];
-+};
++Example:
 +
-+struct tegra_emc_pdata {
-+	int num_tables;
-+	struct tegra_emc_table *tables;
-+};
++	emc at 7000f400 {
++		#address-cells = < 1 >;
++		#size-cells = < 0 >;
++		compatible = "nvidia,tegra20-emc";
++		reg = <0x7000f4000 0x200>;
++	}
 +
-+#endif
++
++Embedded Memory Controller ram-code table
++
++If the emc node has the nvidia,use-ram-code property present, then the
++next level of nodes below the emc table are used to specify which settings
++apply for which ram-code settings.
++
++If the emc node lacks the nvidia,use-ram-code property, this level is omitted
++and the tables are stored directly under the emc node (see below).
++
++Properties:
++
++- name : Should be emc-tables
++- nvidia,ram-code : the binary representation of the ram-code board strappings
++  for which this node (and children) are valid.
++
++
++
++Embedded Memory Controller configuration table
++
++This is a table containing the EMC register settings for the various
++operating speeds of the memory controller. They are always located as
++subnodes of the emc controller node.
++
++There are two ways of specifying which tables to use:
++
++* The simplest is if there is just one set of tables in the device tree,
++  and they will always be used (based on which frequency is used).
++  This is the preferred method, especially when firmware can fill in
++  this information based on the specific system information and just
++  pass it on to the kernel.
++
++* The slightly more complex one is when more than one memory configuration
++  might exist on the system.  The Tegra20 platform handles this during
++  early boot by selecting one out of possible 4 memory settings based
++  on a 2-pin "ram code" bootstrap setting on the board. The values of
++  these strappings can be read through a register in the SoC, and thus
++  used to select which tables to use.
++
++Properties:
++- name : Should be emc-table
++- compatible : Should contain "nvidia,tegra20-emc-table".
++- reg : either an opaque enumerator to tell different tables apart, or
++  the valid frequency for which the table should be used (in kHz).
++- clock-frequency : the clock frequency for the EMC at which this
++  table should be used (in kHz).
++- nvidia,emc-registers : a 46 word array of EMC registers to be programmed
++  for operation at the 'clock-frequency' setting.
++  The order and contents of the registers are:
++    RC, RFC, RAS, RP, R2W, W2R, R2P, W2P, RD_RCD, WR_RCD, RRD, REXT,
++    WDV, QUSE, QRST, QSAFE, RDV, REFRESH, BURST_REFRESH_NUM, PDEX2WR,
++    PDEX2RD, PCHG2PDEN, ACT2PDEN, AR2PDEN, RW2PDEN, TXSR, TCKE, TFAW,
++    TRPAB, TCLKSTABLE, TCLKSTOP, TREFBW, QUSE_EXTRA, FBIO_CFG6, ODT_WRITE,
++    ODT_READ, FBIO_CFG5, CFG_DIG_DLL, DLL_XFORM_DQS, DLL_XFORM_QUSE,
++    ZCAL_REF_CNT, ZCAL_WAIT_CNT, AUTO_CAL_INTERVAL, CFG_CLKTRIM_0,
++    CFG_CLKTRIM_1, CFG_CLKTRIM_2
++
++		emc-table at 166000 {
++			reg = <166000>;
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = < 166000 >;
++			nvidia,emc-registers = < 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 >;
++		};
++
++		emc-table at 333000 {
++			reg = <333000>;
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = < 333000 >;
++			nvidia,emc-registers = < 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 >;
++		};
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 3da7afd..c162241 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -120,6 +120,13 @@
+ 		interrupts = < 0 91 0x04 >;
+ 	};
+ 
++	emc at 7000f400 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "nvidia,tegra20-emc";
++		reg = <0x7000f400 0x200>;
++	};
++
+ 	sdhci at c8000000 {
+ 		compatible = "nvidia,tegra20-sdhci";
+ 		reg = <0xc8000000 0x200>;
 -- 
 1.7.8.GIT
