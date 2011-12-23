@@ -1,60 +1,52 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Fri, 23 Dec 2011 18:39:31 +0100
-Subject: [PATCH 6/9] arch/arm/mach-omap2/devices.c: introduce missing kfree
-Message-ID: <1324661974-17281-6-git-send-email-julia@diku.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Dec 2011 19:14:48 +0000
+Subject: [PATCH 07/12] ARM: S5PV210: introduce
+ arch/arm/mach-s5pv210/common.[ch]
+In-Reply-To: <1324385316-6052-8-git-send-email-kgene.kim@samsung.com>
+References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
+ <1324385316-6052-8-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20111223191448.GR2577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pdata needs to be freed before leaving the function in an error case.
+On Tue, Dec 20, 2011 at 09:48:31PM +0900, Kukjin Kim wrote:
+> This patch introduces common.[ch] which are used only in the
+> arch/arm/mach-s5pv210/ directory. The common.c file merges
+> the cpu.c and init.c which are used commonly on S5PCV210/S5PC100
+> SoC and the common.h local header file replaces with plat/s5pv210.h
+> file.
 
-A simplified version of the semantic match that finds the problem is as
-follows: (http://coccinelle.lip6.fr)
+Note that the patch system does _not_ deal in any way with replacing
+patch comments.  Comments added against a patch already submitted
+to the patch system containing an attributation get _added_ to the
+initial comment.
 
-// <smpl>
-@r exists@
-local idexpression x;
-statement S;
-identifier f1;
-position p1,p2;
-expression *ptr != NULL;
-@@
+So, it ends up looking like this:
 
-x at p1 = \(kmalloc\|kzalloc\|kcalloc\)(...);
-...
-if (x == NULL) S
-<... when != x
-     when != if (...) { <+...x...+> }
-x->f1
-...>
-(
- return \(0\|<+...x...+>\|ptr\);
-|
- return at p2 ...;
-)
+ARM: 7248/1: S5PV210: introduce arch/arm/mach-s5pv210/common.[ch
 
-@script:python@
-p1 << r.p1;
-p2 << r.p2;
-@@
+This patch introduces common.[ch] which are used only in the
+arch/arm/mach-s5pv210/ directory. The common.c file merges
+the cpu.c and init.c which are used commonly on S5PCV210/S5PC100
+SoC and the common.h local header file replaces with plat/s5pv210.h
+file.
 
-print "* file: %s kmalloc %s return %s" % (p1[0].file,p1[0].line,p2[0].line)
-// </smpl>
+Comments from Kukjin Kim:
 
-Signed-off-by: Julia Lawall <julia@diku.dk>
+ Subject: [PATCH 04/12] ARM: S5PV210: introduce arch/arm/mach-s5pv210/common.[ch]
 
----
- arch/arm/mach-omap2/devices.c |    1 +
- 1 file changed, 1 insertion(+)
+ This patch introduces common.[ch] which are used only in the
+ arch/arm/mach-s5pv210/ directory. The common.c file merges
+ the cpu.c and init.c which are used commonly on S5PCV210/S5PC100
+ SoC and the common.h local header file replaces with plat/s5pv210.h
+ file.
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 46dfd1a..3334a47 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -393,6 +393,7 @@ static int omap_mcspi_init(struct omap_hwmod *oh, void *unused)
- 			break;
- 	default:
- 			pr_err("Invalid McSPI Revision value\n");
-+			kfree(pdata);
- 			return -EINVAL;
- 	}
- 
+ ---
+ Changes: fixed missing ']' at the end of the subject
+
+Cc: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+which I think you can agree is not good.  If you want to _change_ the
+initial comments, please resubmit the patch entirely.
