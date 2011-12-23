@@ -1,25 +1,37 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 23 Dec 2011 21:44:13 +0530
-Subject: [PATCH v2 08/19] dma: MX3_IPU fix depends
-In-Reply-To: <4EF4A696.9010509@eukrea.com>
-References: <CAOMZO5AOpFtkJDmTSjPmvPVr0ra4d7jUcihGgncYE2VtfKCeSQ@mail.gmail.com>
- <1323785575-22703-1-git-send-email-eric@eukrea.com>
- <1324655127.1633.4.camel@vkoul-udesk3>  <4EF4A696.9010509@eukrea.com>
-Message-ID: <1324656853.1633.17.camel@vkoul-udesk3>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 23 Dec 2011 16:23:33 +0000
+Subject: [PATCH 1/2] ARM: SAMSUNG: Guard against multiple inclusion of
+ plat/dma.h
+Message-ID: <1324657414-27991-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-12-23 at 17:04 +0100, Eric B?nard wrote:
-> if I followed everything (see Stephen Rothwell mail titled
-> "linux-next: manual 
-> merge of the slave-dma tree with the arm-soc tree"), this patch was
-> not 
-> applieed because the problem was already fixed in commit 8e2d41f8c856
-> ("dma 
-> i.MX: remove individual SOC dependency") from the slave-dma tree
-> 
-Okay thanks,
-I will check the merge conflict
+Otherwise it'll generate errors if included twice.
 
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/plat-samsung/include/plat/dma.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
+index b906112..baa05ed 100644
+--- a/arch/arm/plat-samsung/include/plat/dma.h
++++ b/arch/arm/plat-samsung/include/plat/dma.h
+@@ -10,6 +10,9 @@
+  * published by the Free Software Foundation.
+ */
+ 
++#ifndef __PLAT_DMA_H
++#define __PLAT_DMA_H
++
+ #include <linux/dma-mapping.h>
+ 
+ enum s3c2410_dma_buffresult {
+@@ -124,3 +127,5 @@ extern int s3c2410_dma_set_buffdone_fn(enum dma_ch, s3c2410_dma_cbfn_t rtn);
+ 
+ 
+ #include <plat/dma-ops.h>
++
++#endif
 -- 
-~Vinod
+1.7.7.3
