@@ -1,104 +1,45 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 23 Dec 2011 20:20:43 +0800
-Subject: [RFC PATCH v2 4/8] media: videobuf2: introduce VIDEOBUF2_PAGE
- memops
-In-Reply-To: <015301ccc15f$053e61d0$0fbb2570$%szyprowski@samsung.com>
-References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
- <1323871214-25435-5-git-send-email-ming.lei@canonical.com>
- <010501ccc08c$1c7b7870$55726950$%szyprowski@samsung.com>
- <CACVXFVOqMmakPW-aAdp005RDLuV5oc6-JfjQHr-2bFRzZi2zDQ@mail.gmail.com>
- <015201ccc156$033f73a0$09be5ae0$%szyprowski@samsung.com>
- <CACVXFVNdczv=tu7VG24766myCnGDRWAjkthbdfMwTGzTwFCoBA@mail.gmail.com>
- <015301ccc15f$053e61d0$0fbb2570$%szyprowski@samsung.com>
-Message-ID: <CACVXFVMrRTS7TUtj7bqCWeF4zx11yT6mOq4syOkZv=Ejoo0LMw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 23 Dec 2011 13:27:20 +0100
+Subject: [PATCH 01/14] common: dma-mapping: introduce alloc_attrs and
+ free_attrs methods
+In-Reply-To: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
+References: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1324643253-3024-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Introduce new generic alloc and free methods with attributes argument.
 
-On Fri, Dec 23, 2011 at 6:38 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> On Friday, December 23, 2011 10:51 AM Ming Lei wrote:
->
->> On Fri, Dec 23, 2011 at 5:34 PM, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->>
->> >> For example, on ARM, there is very limited kernel virtual address space reserved
->> >> for DMA coherent buffer mapping, the default size is about 2M if I
->> >> don't remember mistakenly.
->> >
->> > It can be easily increased for particular boards, there is no problem with this.
->>
->> It is not easily to increase it because there is very limited space reserved for
->> this purpose, see Documentation/arm/memory.txt. Also looks like it is
->> not configurable.
->
-> It is really not a big issue to increase it by a few MBytes.
+Existing alloc_coherent and free_coherent can be implemented on top of the
+new calls with NULL attributes argument. Later also dma_alloc_non_coherent
+can be implemented using DMA_ATTR_NONCOHERENT attribute as well as
+dma_alloc_writecombine with separate DMA_ATTR_WRITECOMBINE attribute.
 
-IMO, the extra few MBytes are not helpful for the issue at all, considered the
-kernel virtual memory address fragmentation problem, you know there is only
-several MBytes DMA coherent virtual address space on ARM.
+This way the drivers will get more generic, platform independent way of
+allocating dma buffers with specific parameters.
 
->
->> >> > I understand that there might be some speed issues with coherent (uncached)
->> >> > userspace mappings, but I would solve it in completely different way. The interface
->> >>
->> >> Also there is poor performance inside kernel space, see [1]
->> >
->> > Your driver doesn't access video data inside kernel space, so this is also not an issue.
->>
->> Why not introduce it so that other drivers(include face detection) can
->> benefit with it? :-)
->
-> We can get back into this once a driver which really benefits from comes.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ include/linux/dma-mapping.h |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-In fact, streaming DMA is more widespread used than coherent DMA in
-kernel, so why can't videobuf2 support streaming dma? :-)
-
-You know under some situation, coherent DMA buffer is very slower than
-other buffer to be accessed by CPU.
-
->
->> >> >
->> >> > Your current implementation also abuses the design and api of videobuf2 memory
->> >> > allocators. If the allocator needs to return a custom structure to the driver
->> >>
->> >> I think returning vaddr is enough.
->> >>
->> >> > you should use cookie method. vaddr is intended to provide only a pointer to
->> >> > kernel virtual mapping, but you pass a struct page * there.
->> >>
->> >> No, __get_free_pages returns virtual address instead of 'struct page *'.
->> >
->> > Then you MUST use cookie for it. vaddr method should return kernel virtual address
->> > to the buffer video data. Some parts of videobuf2 relies on this - it is used by file
->> > io emulator (read(), write() calls) and mmap equivalent for non-mmu systems.
->> >
->> > Manual casting in the driver is also a bad idea, that's why there are helper functions
->>
->> I don't see any casts are needed. The dma address can be got from vaddr with
->> dma_map_* easily in drivers, see the usage on patch 8/8(media: video: introduce
->> omap4 face detection module driver).
->
-> Sorry, but I won't accept such driver/allocator which abuses the defined API. I've already
-> pointed what vaddr method is used for.
-
-Sorry, could you describe the abuse problem in a bit detail?
-
->
->> > defined for both dma_contig and dma_sg allocators: vb2_dma_contig_plane_dma_addr() and
->> > vb2_dma_sg_plane_desc().
->>
->> These two helpers are not needed and won't be provided by VIDEOBUF2_PAGE memops.
->
-> I gave the example. Your allocator should have something similar.
-
-I don't think the two helper are required for the VIDEOBUF2_PAGE memops, why
-can't driver handle DMA mapping directly?
-
-
-thanks,
---
-Ming Lei
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index e13117c..8cc7f95 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -13,6 +13,12 @@ struct dma_map_ops {
+ 				dma_addr_t *dma_handle, gfp_t gfp);
+ 	void (*free_coherent)(struct device *dev, size_t size,
+ 			      void *vaddr, dma_addr_t dma_handle);
++	void* (*alloc)(struct device *dev, size_t size,
++				dma_addr_t *dma_handle, gfp_t gfp,
++				struct dma_attrs *attrs);
++	void (*free)(struct device *dev, size_t size,
++			      void *vaddr, dma_addr_t dma_handle,
++			      struct dma_attrs *attrs);
+ 	dma_addr_t (*map_page)(struct device *dev, struct page *page,
+ 			       unsigned long offset, size_t size,
+ 			       enum dma_data_direction dir,
+-- 
+1.7.1.569.g6f426
