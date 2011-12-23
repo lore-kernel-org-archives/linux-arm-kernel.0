@@ -1,61 +1,23 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 23 Dec 2011 22:43:48 +0800
-Subject: [PATCH] misc: max8925_onkey: add function to work as wakeup source
-In-Reply-To: <20111222174338.GA21103@core.coreip.homeip.net>
-References: <1324544151-2040-1-git-send-email-haojian.zhuang@marvell.com>
- <20111222174338.GA21103@core.coreip.homeip.net>
-Message-ID: <CAN1soZyigBwJyhKjaVfVZdZLDC4MJO6kwuP=PEnb61m7xAC5FA@mail.gmail.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Fri, 23 Dec 2011 21:10:26 +0530
+Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
+In-Reply-To: <1323868927-3738-1-git-send-email-zonque@gmail.com>
+References: <1323868927-3738-1-git-send-email-zonque@gmail.com>
+Message-ID: <CANrkHUY3Zf4a2K5769Z=7Wng339zB6+z_Tgd4mOPChZ1RvZ=Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2011 at 1:43 AM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> Hi Haojian,
+On Wed, Dec 14, 2011 at 6:52 PM, Daniel Mack <zonque@gmail.com> wrote:
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 101cd31..8215ef9 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+> ? ? ? ?if (mmc_slot(host).vcc_aux_disable_is_sleep)
+> ? ? ? ? ? ? ? ?mmc_slot(host).no_off = 1;
 >
-> On Thu, Dec 22, 2011 at 04:55:51PM +0800, Haojian Zhuang wrote:
->> From: Kevin Liu <kliu5@marvell.com>
->>
->> Signed-off-by: Kevin Liu <kliu5@marvell.com>
->
-> Since I am getting the patch from you you need to add your own
-> "Signed-off-by: ..." as well.
->
->> ---
->> ?drivers/input/misc/max8925_onkey.c | ? 35 +++++++++++++++++++++++++++++++++++
->> ?1 files changed, 35 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/input/misc/max8925_onkey.c b/drivers/input/misc/max8925_onkey.c
->> index 7de0ded..ce07ae2 100644
->> --- a/drivers/input/misc/max8925_onkey.c
->> +++ b/drivers/input/misc/max8925_onkey.c
->> @@ -122,6 +122,7 @@ static int __devinit max8925_onkey_probe(struct platform_device *pdev)
->> ? ? ? info->idev->evbit[0] = BIT_MASK(EV_KEY);
->> ? ? ? info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
->>
->> + ? ? device_init_wakeup(&pdev->dev, 1);
->>
->> ? ? ? error = input_register_device(info->idev);
->> ? ? ? if (error) {
->> @@ -158,10 +159,44 @@ static int __devexit max8925_onkey_remove(struct platform_device *pdev)
->> ? ? ? return 0;
->> ?}
->>
->> +#ifdef CONFIG_PM
->
-> #ifdef CONFIG_PM_SLEEP is better choice here.
->
->> +static int max8925_onkey_suspend(struct device *dev)
->> +{
->> + ? ? struct platform_device *pdev = to_platform_device(dev);
->> + ? ? struct max8925_chip *chip = dev_get_drvdata(pdev->dev.parent);
->> +
->> + ? ? if (device_may_wakeup(dev)) {
->> + ? ? ? ? ? ? chip->wakeup_flag |= 1 << (onkey_irq[0] - chip->irq_base);
->> + ? ? ? ? ? ? chip->wakeup_flag |= 1 << (onkey_irq[1] - chip->irq_base);
->
-> You don't need to actually communicate this to the device?
->
-Excuse me that I missed another patch in this series. So I'll send it again.
+> - ? ? ? mmc->f_min ? ? ?= OMAP_MMC_MIN_CLOCK;
+> - ? ? ? mmc->f_max ? ? ?= OMAP_MMC_MAX_CLOCK;
+> + ? ? ? mmc->f_min = OMAP_MMC_MIN_CLOCK;
 
-Best Regards
-Haojian
+Stray change for f_min ?
