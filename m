@@ -1,23 +1,26 @@
-From: balajitk@ti.com (T Krishnamoorthy, Balaji)
-Date: Fri, 23 Dec 2011 21:10:26 +0530
-Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
-In-Reply-To: <1323868927-3738-1-git-send-email-zonque@gmail.com>
-References: <1323868927-3738-1-git-send-email-zonque@gmail.com>
-Message-ID: <CANrkHUY3Zf4a2K5769Z=7Wng339zB6+z_Tgd4mOPChZ1RvZ=Kw@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 23 Dec 2011 21:11:03 +0530
+Subject: DMA: PL330: Merge PL330 drivers
+In-Reply-To: <1323306645-4003-1-git-send-email-boojin.kim@samsung.com>
+References: <1323306645-4003-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1324654863.1633.3.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2011 at 6:52 PM, Daniel Mack <zonque@gmail.com> wrote:
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 101cd31..8215ef9 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
-> ? ? ? ?if (mmc_slot(host).vcc_aux_disable_is_sleep)
-> ? ? ? ? ? ? ? ?mmc_slot(host).no_off = 1;
->
-> - ? ? ? mmc->f_min ? ? ?= OMAP_MMC_MIN_CLOCK;
-> - ? ? ? mmc->f_max ? ? ?= OMAP_MMC_MAX_CLOCK;
-> + ? ? ? mmc->f_min = OMAP_MMC_MIN_CLOCK;
+On Thu, 2011-12-08 at 10:10 +0900, Boojin Kim wrote:
+> In-Reply-To: 
+> 
+> PL330 driver is divided into 2 parts.
+> First is the PL330 API driver that located on driver/dma/.
+> Second is the low-level PL330 driver that is located on arch/arm/common/.
+> But, It's not needed anymore to divided PL330 driver into 2 parts
+> Low-level PL330 driver is only used for PL330 API driver on driver/dma
+> because samsung specific S3C-PL330 driver was gone.
+> So, This patch merges 'arch/arm/common/pl330' into 'driver/dma/pl330.c'.
+> 
+> [PATCH 1/2] DMA: PL330: Merge PL330 drivers
+> [PATCH 2/2] DMA: PL330: Remove an unused function
+You should try git --cover-letter for this :)
 
-Stray change for f_min ?
+-- 
+~Vinod
