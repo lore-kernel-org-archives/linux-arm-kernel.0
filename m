@@ -1,81 +1,53 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Dec 2011 11:38:34 +0100
-Subject: [RFC PATCH v2 4/8] media: videobuf2: introduce VIDEOBUF2_PAGE
- memops
-In-Reply-To: <CACVXFVNdczv=tu7VG24766myCnGDRWAjkthbdfMwTGzTwFCoBA@mail.gmail.com>
-References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
- <1323871214-25435-5-git-send-email-ming.lei@canonical.com>
- <010501ccc08c$1c7b7870$55726950$%szyprowski@samsung.com>
- <CACVXFVOqMmakPW-aAdp005RDLuV5oc6-JfjQHr-2bFRzZi2zDQ@mail.gmail.com>
- <015201ccc156$033f73a0$09be5ae0$%szyprowski@samsung.com>
- <CACVXFVNdczv=tu7VG24766myCnGDRWAjkthbdfMwTGzTwFCoBA@mail.gmail.com>
-Message-ID: <015301ccc15f$053e61d0$0fbb2570$%szyprowski@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Dec 2011 10:39:18 +0000
+Subject: [PATCH] ARM: smp_twd: make sure timer is stopped before
+ registering it
+In-Reply-To: <CAMQu2gwePYXQZ5Z1pfoEWqbmJH1SabpbLXfmCnNBe=mQnoQiXQ@mail.gmail.com>
+References: <1324564287-1742-1-git-send-email-marc.zyngier@arm.com>
+ <CAMQu2gwePYXQZ5Z1pfoEWqbmJH1SabpbLXfmCnNBe=mQnoQiXQ@mail.gmail.com>
+Message-ID: <4EF45A56.6070506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 23/12/11 06:41, Shilimkar, Santosh wrote:
+> On Thu, Dec 22, 2011 at 8:01 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On secondary CPUs, the Timer Control Register is not reset
+>> to a sane value before the timer is registered, and the TRM
+>> doesn't seem to indicate any reset value either. In some cases,
+>> the kernel will take an interrupt too early, depending on what
+>> junk was present in the registers at reset time.
+>>
+>> The fix is to set the Timer Control Register to 0 before
+>> registering the clock_event_device and enabling the interrupt.
+>>
+>> Problem seen on VE (Cortex A5) and Tegra.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kernel/smp_twd.c |    2 ++
+>>  1 files changed, 2 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+>> index a8a6682..2442bbb 100644
+>> --- a/arch/arm/kernel/smp_twd.c
+>> +++ b/arch/arm/kernel/smp_twd.c
+>> @@ -167,6 +167,8 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+>>
+>>        twd_calibrate_rate();
+>>
+>> +       __raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+>> +
+> Is it because of junk value in register or something programmed as part of the
+> calibrate function. I suspect it might be because of what's getting programmed
+> as part of calibrate function.
 
-On Friday, December 23, 2011 10:51 AM Ming Lei wrote:
+The calibration only affects the boot CPU, and is what puts it in a
+known state (the timer is counting, but interrupts are disabled at the
+timer level, making it safe to enable interrupts at the GIC level).
 
-> On Fri, Dec 23, 2011 at 5:34 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> 
-> >> For example, on ARM, there is very limited kernel virtual address space reserved
-> >> for DMA coherent buffer mapping, the default size is about 2M if I
-> >> don't remember mistakenly.
-> >
-> > It can be easily increased for particular boards, there is no problem with this.
-> 
-> It is not easily to increase it because there is very limited space reserved for
-> this purpose, see Documentation/arm/memory.txt. Also looks like it is
-> not configurable.
+This problem only affects the secondary CPUs, which are in an unknown
+state when we enable the interrupt.
 
-It is really not a big issue to increase it by a few MBytes.
- 
-> >> > I understand that there might be some speed issues with coherent (uncached)
-> >> > userspace mappings, but I would solve it in completely different way. The interface
-> >>
-> >> Also there is poor performance inside kernel space, see [1]
-> >
-> > Your driver doesn't access video data inside kernel space, so this is also not an issue.
-> 
-> Why not introduce it so that other drivers(include face detection) can
-> benefit with it? :-)
-
-We can get back into this once a driver which really benefits from comes.
- 
-> >> >
-> >> > Your current implementation also abuses the design and api of videobuf2 memory
-> >> > allocators. If the allocator needs to return a custom structure to the driver
-> >>
-> >> I think returning vaddr is enough.
-> >>
-> >> > you should use cookie method. vaddr is intended to provide only a pointer to
-> >> > kernel virtual mapping, but you pass a struct page * there.
-> >>
-> >> No, __get_free_pages returns virtual address instead of 'struct page *'.
-> >
-> > Then you MUST use cookie for it. vaddr method should return kernel virtual address
-> > to the buffer video data. Some parts of videobuf2 relies on this - it is used by file
-> > io emulator (read(), write() calls) and mmap equivalent for non-mmu systems.
-> >
-> > Manual casting in the driver is also a bad idea, that's why there are helper functions
-> 
-> I don't see any casts are needed. The dma address can be got from vaddr with
-> dma_map_* easily in drivers, see the usage on patch 8/8(media: video: introduce
-> omap4 face detection module driver).
-
-Sorry, but I won't accept such driver/allocator which abuses the defined API. I've already
-pointed what vaddr method is used for.
-
-> > defined for both dma_contig and dma_sg allocators: vb2_dma_contig_plane_dma_addr() and
-> > vb2_dma_sg_plane_desc().
-> 
-> These two helpers are not needed and won't be provided by VIDEOBUF2_PAGE memops.
-
-I gave the example. Your allocator should have something similar.
-
-Best regards
+	M.
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Jazz is not dead. It just smells funny...
