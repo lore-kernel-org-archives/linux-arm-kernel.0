@@ -1,52 +1,66 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Fri, 23 Dec 2011 05:44:17 +0100
-Subject: [PATCH v5] ARM: net: JIT compiler for packet filters
-In-Reply-To: <1324601625-20351-1-git-send-email-mgherzan@gmail.com>
-References: <1324601625-20351-1-git-send-email-mgherzan@gmail.com>
-Message-ID: <1324615457.2674.6.camel@edumazet-laptop>
+From: sumit.semwal@ti.com (Semwal, Sumit)
+Date: Fri, 23 Dec 2011 11:14:34 +0530
+Subject: [Linaro-mm-sig] [RFC v3 0/2] Introduce DMA buffer sharing
+ mechanism
+In-Reply-To: <CAF6AEGt9Ae_zVmhBmmtfyKrqC4EyBgAAO1RWdK_UhY-1RLfOSQ@mail.gmail.com>
+References: <1324283611-18344-1-git-send-email-sumit.semwal@ti.com>
+ <20111220193117.GD3883@phenom.ffwll.local>
+ <CAPM=9tzi5MyCBMJhWBM_ouL=QOaxX3K6KZ8K+t7dUYJLQrF+yA@mail.gmail.com>
+ <CAF6AEGt9Ae_zVmhBmmtfyKrqC4EyBgAAO1RWdK_UhY-1RLfOSQ@mail.gmail.com>
+Message-ID: <CAB2ybb-CN9-APAqGBjm7tzHDfpuih0vN2Wry1_RqxujxVOy=OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le vendredi 23 d?cembre 2011 ? 01:53 +0100, Mircea Gherzan a ?crit :
-> Based of Matt Evans's PPC64 implementation.
-> 
-> The compiler generates ARM instructions but interworking is
-> supported for Thumb2 kernels.
-> 
-> Supports both little and big endian. Unaligned loads are emitted
-> for ARMv6+. Not all the BPF opcodes that deal with ancillary data
-> are supported. The scratch memory of the filter lives on the stack.
-> Hardware integer division is used if it is available.
-> 
-> Enabled in the same way as for x86-64 and PPC64:
-> 
-> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
-> 
-> A value greater than 1 enables opcode output.
-> 
-> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
-> ---
-> 
-> Changes in v5:
->  * replace SEEN_LEN with SEEN_SKB
->  * set ctx->seen when handling some ancillary data opcodes
-
-> +		case BPF_S_ANC_CPU:
-> +			/* A = current_thread_info()->cpu */
-> +			emit_mov_i(r_scratch, (~(THREAD_SIZE - 1)), ctx);
-> +			emit(ARM_ADD_R(r_scratch, ARM_SP, r_scratch), ctx);
-
-This cant be right ;)
-
-> +
-> +			BUILD_BUG_ON(FIELD_SIZEOF(struct thread_info, cpu) != 4);
-> +			off = offsetof(struct thread_info, cpu);
-> +			emit(ARM_LDR_I(r_A, r_scratch, off), ctx);
-> +			break;
-
-code for r_A = raw_smp_processor_id(); should be something like :
-
-mov r0, sp
-bic r0, r0, #8128   ; 0x1fc0
-bic r0, r0, #63 ; 0x3f
-ldr r4, [r0, #20] 
+On Wed, Dec 21, 2011 at 3:56 AM, Rob Clark <rob@ti.com> wrote:
+> On Tue, Dec 20, 2011 at 2:20 PM, Dave Airlie <airlied@gmail.com> wrote:
+>>>>
+<snip>
+>>>
+>>> I think this is a really good v1 version of dma_buf. It contains all the
+>>> required bits (with well-specified semantics in the doc patch) to
+>>> implement some basic use-cases and start fleshing out the integration with
+>>> various subsystem (like drm and v4l). All the things still under
+>>> discussion like
+>>> - userspace mmap support
+>>> - more advanced (and more strictly specified) coherency models
+>>> - and shared infrastructure for implementing exporters
+>>> are imo much clearer once we have a few example drivers at hand and a
+>>> better understanding of some of the insane corner cases we need to be able
+>>> to handle.
+>>>
+>>> And I think any risk that the resulting clarifications will break a basic
+>>> use-case is really minimal, so I think it'd be great if this could go into
+>>> 3.3 (maybe as some kind of staging/experimental infrastructure).
+>>>
+>>> Hence for both patches:
+>>> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+>>
+>> Yeah I'm with Daniel, I like this one, I can definitely build the drm
+>> buffer sharing layer on top of this.
+>>
+>> How do we see this getting merged? I'm quite happy to push it to Linus
+>> if we don't have an identified path, though it could go via a Linaro
+>> tree as well.
+>>
+>> so feel free to add:
+>> Reviewed-by: Dave Airlie <airlied@redhat.com>
+>
+> fwiw, patches to share buffers between drm and v4l2 are here:
+>
+> https://github.com/robclark/kernel-omap4/commits/drmplane-dmabuf
+>
+> (need a bit of cleanup before the vb2 patches are submitted.. but that
+> is unrelated to the dmabuf patches)
+>
+> so,
+>
+> Reviewed-and-Tested-by: Rob Clark <rob.clark@linaro.org>
+Thanks Daniel, Dave, and Rob!
+BR,
+Sumit.
+>
+>> Dave.
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
