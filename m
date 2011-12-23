@@ -1,37 +1,31 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 23 Dec 2011 16:23:33 +0000
-Subject: [PATCH 1/2] ARM: SAMSUNG: Guard against multiple inclusion of
- plat/dma.h
-Message-ID: <1324657414-27991-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Fri, 23 Dec 2011 16:23:34 +0000
+Subject: [PATCH 2/2] ARM: SAMSUNG: dma-ops.h needs mach/dma.h
+In-Reply-To: <1324657414-27991-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1324657414-27991-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1324657414-27991-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise it'll generate errors if included twice.
+dma-ops.h uses samsung_dma_is_dmadev so it needs to have mach/dma.h
+included.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/plat-samsung/include/plat/dma.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/plat-samsung/include/plat/dma-ops.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
-index b906112..baa05ed 100644
---- a/arch/arm/plat-samsung/include/plat/dma.h
-+++ b/arch/arm/plat-samsung/include/plat/dma.h
-@@ -10,6 +10,9 @@
-  * published by the Free Software Foundation.
- */
+diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
+index 70b6325..71a6827 100644
+--- a/arch/arm/plat-samsung/include/plat/dma-ops.h
++++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
+@@ -14,6 +14,7 @@
+ #define __SAMSUNG_DMA_OPS_H_ __FILE__
  
-+#ifndef __PLAT_DMA_H
-+#define __PLAT_DMA_H
-+
- #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
++#include <mach/dma.h>
  
- enum s3c2410_dma_buffresult {
-@@ -124,3 +127,5 @@ extern int s3c2410_dma_set_buffdone_fn(enum dma_ch, s3c2410_dma_cbfn_t rtn);
- 
- 
- #include <plat/dma-ops.h>
-+
-+#endif
+ struct samsung_dma_prep_info {
+ 	enum dma_transaction_type cap;
 -- 
 1.7.7.3
