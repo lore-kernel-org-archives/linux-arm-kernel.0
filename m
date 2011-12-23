@@ -1,46 +1,64 @@
-From: matthew@wil.cx (Matthew Wilcox)
-Date: Fri, 23 Dec 2011 09:35:16 -0700
-Subject: [PATCH 00/14] DMA-mapping framework redesign preparation
-In-Reply-To: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
-References: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20111223163516.GO20129@parisc-linux.org>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Fri, 23 Dec 2011 19:04:43 +0200
+Subject: [PATCH v4 4/4] OMAP3/4: iommu: adapt to runtime pm
+In-Reply-To: <CAB-zwWio5iMTyofv3Hx5Q7G7rYY5cRU4kXNQzMF0NRprEd8=5g@mail.gmail.com>
+References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
+ <1323922709-6986-5-git-send-email-omar.ramirez@ti.com>
+ <CAMP44s3Jb9DZLUyDVU_HmQbaJKp=2qym7Z6uauNchJh0fPL4hQ@mail.gmail.com>
+ <CAB-zwWhpmwRP2mNu-CdX-RVgmTRjw0UsYckAVsM+qztmVdvc7A@mail.gmail.com>
+ <CAMP44s0hYWiZ8OnjQ6Jy_W7MCveP+WyHG18Tt2jRGzxSwoQP3w@mail.gmail.com>
+ <CAB-zwWio5iMTyofv3Hx5Q7G7rYY5cRU4kXNQzMF0NRprEd8=5g@mail.gmail.com>
+Message-ID: <CAMP44s2JWRN4XVCVrbVUJwZK9zkT6p2dPnK2SPuZXJPj71c4Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2011 at 01:27:19PM +0100, Marek Szyprowski wrote:
-> The first issue we identified is the fact that on some platform (again,
-> mainly ARM) there are several functions for allocating DMA buffers:
-> dma_alloc_coherent, dma_alloc_writecombine and dma_alloc_noncoherent
+On Fri, Dec 23, 2011 at 6:30 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
+> On Mon, Dec 19, 2011 at 10:27 AM, Felipe Contreras
+> <felipe.contreras@gmail.com> wrote:
+>> On Fri, Dec 16, 2011 at 5:18 AM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
+>>> On Thu, Dec 15, 2011 at 6:53 PM, Felipe Contreras
+>>> <felipe.contreras@gmail.com> wrote:
+>>>> On Thu, Dec 15, 2011 at 6:18 AM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
+>>>>> Use runtime PM functionality interfaced with hwmod enable/idle
+>>>>> functions, to replace direct clock operations, reset and sysconfig
+>>>>> handling.
+>>>>>
+>>>>> Removed clk handling during interrupt, given that in order to receive one,
+>>>>> the device should be powered on in advance. Now doing pm_runtime_get/put
+>>>>> on iommu_enable/disable so it doesn't rely on others to keep the clocks on.
+>>>>>
+>>>>> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+>>>>> ---
+>>>>> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ? | ? 17 -----------
+>>>>> ?arch/arm/mach-omap2/omap-iommu.c ? ? ? ? | ? ?1 -
+>>>>> ?arch/arm/plat-omap/include/plat/iommu.h ?| ? ?2 -
+>>>>> ?arch/arm/plat-omap/include/plat/iommu2.h | ? ?2 -
+>>>>> ?drivers/iommu/omap-iommu.c ? ? ? ? ? ? ? | ? 44 ++++++++++++-----------------
+>>>>> ?5 files changed, 18 insertions(+), 48 deletions(-)
+>>>>
+>>>> Shouldn't pm_runtime_enable() be called in omap_iommu_init(), and
+>>>> omap_iommu_probe() call pm_runtime_get_sync()/put() on the sections
+>>>> where the device should be active?
+>>>
+>>> omap_iommu_init is called on module init however omap_iommu_probe is
+>>> called by driver instance (isp, iva), on probe pm_runtime_enable
+>>> activates runtime for both isp and iva devices, one at a time.
+>>
+>> Yes, but omap_iommu_init() will *always* be called at boot time and
+>> will register the data for all the devices.
+>
+> There are 2 omap_iommu_init :/ Thought you were talking about the one
+> in drivers/iommu/omap-iommu.c.
+>
+>> If the 'iommu' module is
+>> never loaded, then the devices will remain active the whole time.
+>
+> oma-iommu is meant to be built-in as part of the kernel, there is no
+> option for module anymore.
 
-Is this write-combining from the point of view of the device (ie iommu),
-or from the point of view of the CPU, or both?
-
-> The next step in dma mapping framework update is the introduction of
-> dma_mmap/dma_mmap_attrs() function. There are a number of drivers
-> (mainly V4L2 and ALSA) that only exports the DMA buffers to user space.
-> Creating a userspace mapping with correct page attributes is not an easy
-> task for the driver. Also the DMA-mapping framework is the only place
-> where the complete information about the allocated pages is available,
-> especially if the implementation uses IOMMU controller to provide a
-> contiguous buffer in DMA address space which is scattered in physical
-> memory space.
-
-Surely we only need a helper which drivrs can call from their mmap routine to solve this?
-
-> Usually these drivers don't touch the buffer data at all, so the mapping
-> in kernel virtual address space is not needed. We can introduce
-> DMA_ATTRIB_NO_KERNEL_MAPPING attribute which lets kernel to skip/ignore
-> creation of kernel virtual mapping. This way we can save previous
-> vmalloc area and simply some mapping operation on a few architectures.
-
-I really think this wants to be a separate function.  dma_alloc_coherent
-is for allocating memory to be shared between the kernel and a driver;
-we already have dma_map_sg for mapping userspace I/O as an alternative
-interface.  This feels like it's something different again rather than
-an option to dma_alloc_coherent.
+Which omap-iommu? The platform driver, or the device stuff? The device
+stuff is always built-in, but not the platform driver
+(drivers/iommu/omap-iommu.c), that can be a module.
 
 -- 
-Matthew Wilcox				Intel Open Source Technology Centre
-"Bill, look, we understand that you're interested in selling us this
-operating system, but compare it to ours.  We can't possibly take such
-a retrograde step."
+Felipe Contreras
