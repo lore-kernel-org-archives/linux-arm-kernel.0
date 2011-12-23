@@ -1,118 +1,194 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Fri, 23 Dec 2011 09:53:58 -0600
-Subject: [PATCH v4 1/4] OMAP3: hwmod data: add mmu data for iva and isp
-In-Reply-To: <CAMP44s2H7v6dRPXO6eBBNrYAnym_ZLdmKcAQPmYyCC6Wo5qOmw@mail.gmail.com>
-References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
- <1323922709-6986-2-git-send-email-omar.ramirez@ti.com>
- <CAMP44s2WFghH4qPKuwSQJFaoLEmfAtcHB3DRZwNYe4zXTQexfQ@mail.gmail.com>
- <CAB-zwWiTHD38s6Mz_xfxhxBqYph1ctTmhU5dntnp4zHsUwJtHA@mail.gmail.com>
- <CAMP44s2H7v6dRPXO6eBBNrYAnym_ZLdmKcAQPmYyCC6Wo5qOmw@mail.gmail.com>
-Message-ID: <CAB-zwWhNNW1GEYr019xecuZTYhR55HpNGrhGjJdE1CEAfFSriQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 23 Dec 2011 21:28:18 +0530
+Subject: [PATCH] dmaengine/dw_dmac: Add support for device_prep_dma_sg
+In-Reply-To: <1323766064-13425-1-git-send-email-pratyush.anand@st.com>
+References: <1323766064-13425-1-git-send-email-pratyush.anand@st.com>
+Message-ID: <1324655898.1633.11.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 10:11 AM, Felipe Contreras
-<felipe.contreras@gmail.com> wrote:
-> On Fri, Dec 16, 2011 at 4:01 AM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
->> On Thu, Dec 15, 2011 at 6:39 PM, Felipe Contreras
->> <felipe.contreras@gmail.com> wrote:
->>> Are you sure you are not missing something like:
->>>
->>> ?.clk = "cam_ick",
->>
->> I believe in this case cam_ick is used as the main clock as it
->> supplies both functional and interface.
->
-> Are you sure?
+On Tue, 2011-12-13 at 14:17 +0530, Pratyush Anand wrote:
+> Memory to memory copy with scatter gather option has been implemented in
+> this patch. Driver can manage even if number of nodes in src and dst
+> list is different.
+The logic looks okay, but it would be great if we could split this
+prepare here.
+Possibly later when we have multiple such cases we can create templates
+for parsing the non linear sg list and create linear lists from it.
 
-As sure as 4.7.4.1.7 CAM Power Domain ;), if someone else could
-clarify would be great to avoid the "are you sure" discussion.
+> 
+> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+> ---
+>  drivers/dma/dw_dmac.c |  135 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 135 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+> index 96b2750..c1c78c1 100644
+> --- a/drivers/dma/dw_dmac.c
+> +++ b/drivers/dma/dw_dmac.c
+> @@ -729,6 +729,140 @@ err_desc_get:
+>  }
+>  
+>  static struct dma_async_tx_descriptor *
+> +dwc_prep_dma_sg(struct dma_chan *chan,
+> +	    struct scatterlist *dsgl, unsigned int dst_nents,
+> +	    struct scatterlist *ssgl, unsigned int src_nents,
+> +	    unsigned long flags)
+> +{
+> +	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+> +	struct dw_desc *desc;
+> +	struct dw_desc *first;
+> +	struct dw_desc *prev;
+> +	size_t xfer_count;
+> +	size_t offset;
+> +	unsigned int src_width;
+> +	unsigned int dst_width;
+> +	u32 ctllo;
+> +	struct scatterlist *dsg, *ssg;
+> +	dma_addr_t src = 0, dst = 0;
+> +	unsigned int slen = 0, dlen = 0, total_len = 0;
+> +	unsigned int i, nents, len = 0, incs, si = 0, di = 0;
+> +
+> +	if (unlikely(!src_nents))
+> +		return NULL;
+> +
+> +	if (unlikely(!dst_nents))
+> +		return NULL;
+> +
+> +	prev = first = NULL;
+> +
+> +	dsg = dsgl;
+> +	ssg = ssgl;
+> +	nents = max(src_nents, dst_nents);
+shouldn't you validate if total src sg length and dstn sg lengths are
+same here?
+> +
+> +	if (nents == src_nents)
+> +		incs = true;
+> +	else
+> +		incs = false;
+> +
+> +	for (i = 0; i < nents;) {
+> +		if (!slen) {
+> +			src = sg_dma_address(ssg);
+> +			slen = sg_dma_len(ssg);
+> +			ssg = sg_next(ssg);
+> +			if (!ssg && si < src_nents - 1)
+> +				goto err_sg_len;
+> +			si++;
+> +		} else
+> +			src += len;
+> +
+> +		if (!dlen) {
+> +			dst = sg_dma_address(dsg);
+> +			dlen = sg_dma_len(dsg);
+> +			dsg = sg_next(dsg);
+> +			if (!dsg && di < dst_nents - 1)
+> +				goto err_sg_len;
+this could be made better lokking by using helpers
 
->>>> +/* isp mmu slave ports */
->>>> +static struct omap_hwmod_ocp_if *omap3xxx_isp_mmu_slaves[] = {
->>>> + ? ? ? &omap3xxx_l4_core__isp_mmu,
->>>> +};
->>>> +
->>>> +static struct omap_hwmod omap3xxx_isp_mmu_hwmod = {
->>>> + ? ? ? .name ? ? ? ? ? = "isp_mmu",
->>>> + ? ? ? .class ? ? ? ? ?= &omap3xxx_mmu_hwmod_class,
->>>> + ? ? ? .mpu_irqs ? ? ? = omap3xxx_isp_mmu_irqs,
->>>> + ? ? ? .main_clk ? ? ? = "cam_ick",
->>>
->>> It's not "cam_fck"?
->>
->> AFAIK cam_fck doesn't exist in the code, and CAM_L3_ICK is used as
->> both ick/fck according to TRM.
->
-> Then maybe the code is wrong.
->
-> Look at the OMAP34xx documentation, it says that:
->
-> CAM_L3_ICLK -> CAM_FCLK
-> CAM_L4_ICLK -> CAM_ICLK
-> CAM_MCLK -> CAM_MCLK
-> CSI2_96M_FCLK -> CSI2_96M_FCLK
->
-> CAM_FCLK
-> Functional clock (L3 interconnect clock domain)
-> Functional clock domain.
->
-> CAM_ICLK
-> Interface clock (L4 interconnect clock domain)
-> Interface clock domain.
+> +			di++;
+> +		} else
+> +			dst += len;
+> +
+> +		if (incs)
+> +			i = si;
+> +		else
+> +			i = di;
+> +		len = min(slen, dlen);
+> +		slen -= len;
+> +		dlen -= len;
+> +
+> +		if (!((src | dst | len) & 7))
+> +			src_width = dst_width = 3;
+> +		else if (!((src | dst | len) & 3))
+> +			src_width = dst_width = 2;
+> +		else if (!((src | dst | len) & 1))
+> +			src_width = dst_width = 1;
+> +		else
+> +			src_width = dst_width = 0;
+how about putting this is get_me_the_length()
+> +
+> +		ctllo = DWC_DEFAULT_CTLLO(chan->private)
+> +			| DWC_CTLL_DST_WIDTH(dst_width)
+> +			| DWC_CTLL_SRC_WIDTH(src_width)
+> +			| DWC_CTLL_DST_INC
+> +			| DWC_CTLL_SRC_INC
+> +			| DWC_CTLL_FC_M2M;
+> +
+> +		offset = 0;
+> +		while ((len - offset) > 0) {
+> +
+> +			xfer_count = min_t(size_t, (len - offset) >> dst_width,
+> +					DWC_MAX_COUNT);
+> +
+> +			desc = dwc_desc_get(dwc);
+> +			if (!desc)
+> +				goto err_desc_get;
+> +
+> +			desc->lli.sar = src + offset;
+> +			desc->lli.dar = dst + offset;
+> +			desc->lli.ctllo = ctllo;
+> +			desc->lli.ctlhi = xfer_count;
+> +
+> +			if (!first) {
+> +				first = desc;
+> +			} else {
+> +				prev->lli.llp = desc->txd.phys;
+> +				dma_sync_single_for_device(chan2parent(chan),
+> +						prev->txd.phys,
+> +						sizeof(prev->lli),
+> +						DMA_TO_DEVICE);
+> +				list_add_tail(&desc->desc_node,
+> +						&first->tx_list);
+> +			}
+> +			prev = desc;
+> +			offset += xfer_count << dst_width;
+> +		}
+> +		total_len += len;
+> +	}
+> +
+> +	if (flags & DMA_PREP_INTERRUPT)
+> +		/* Trigger interrupt after last block */
+> +		prev->lli.ctllo |= DWC_CTLL_INT_EN;
+> +
+> +	prev->lli.llp = 0;
+> +	dma_sync_single_for_device(chan2parent(chan),
+> +			prev->txd.phys, sizeof(prev->lli),
+> +			DMA_TO_DEVICE);
+> +
+> +	first->txd.flags = flags;
+> +	first->len = total_len;
+> +
+> +	return &first->txd;
+> +
+> +err_sg_len:
+> +err_desc_get:
+> +	dwc_desc_put(dwc, first);
+> +	return NULL;
+> +}
+> +
+> +static struct dma_async_tx_descriptor *
+>  dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+>  		unsigned int sg_len, enum dma_transfer_direction direction,
+>  		unsigned long flags)
+> @@ -1471,6 +1605,7 @@ static int __init dw_probe(struct platform_device *pdev)
+>  	dw->dma.device_free_chan_resources = dwc_free_chan_resources;
+>  
+>  	dw->dma.device_prep_dma_memcpy = dwc_prep_dma_memcpy;
+> +	dw->dma.device_prep_dma_sg = dwc_prep_dma_sg;
+>  
+>  	dw->dma.device_prep_slave_sg = dwc_prep_slave_sg;
+>  	dw->dma.device_control = dwc_control;
+> -- 
+> 1.7.2.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-"The camera subsystem interface is clocked with the L3 and L4 clocks
-(CAM_L3_ICLK and CAM_L4_ICLK, respectively). CAM_L3_ICLK is also used
-as the main functional clock. The functional clock (CAM_MCLK) is
-provided by DPLL4 to supply the external sensor."
 
-Either CAM subsystem section or PRCM - CAM PWRDM is ambiguous or wrong.
-
-...
->
-> Looks like the driver is manually calling clk_get() and clk_put() for
-> the "i3_ick", where I guess the clock framework is supposed to do
-> that... It's almost as if somebody forgot a dependency somewhere.
-
-Would be good to clarify the intentions to keep the code as it is.
-
->>>> + ? ? ? .dev_attr ? ? ? = &isp_mmu_dev_attr,
->>>> + ? ? ? .slaves ? ? ? ? = omap3xxx_isp_mmu_slaves,
->>>> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3xxx_isp_mmu_slaves),
->>>> + ? ? ? .flags ? ? ? ? ?= HWMOD_NO_IDLEST,
->>>> +};
->>>
->>> Most of the stuff I see the hwmods is .main_lock = "foo_fck", slave
->>> .clk = "foo_ick". Maybe that explains the irq issues you get.
->>
->> I see irq issues with iva hwmod because tidspbridge doesn't use iommu
->> API yet, so if you enable both the mmu hwmod and tidspbridge own mmu
->> implementation there will be some conflicts.
->>
->> I didn't see isp issues though, but I didn't went more than
->> booting/enabling with isp mmu.
->
-> This is what you said:
-> Removed clk handling during interrupt, given that in order to receive one,
-> the device should be powered on in advance.
-
-Yes, you should receive an interrupt if the clock is enabled and the
-iommu is being used, hence the part inside in the ISR to enable the
-clocks was removed.
-
-> I'm not sure how this clock stuff works, but I'm guessing the device
-> is supposed to go to sleep at some points in time, and with your patch
-> "OMAP3/4: iommu: adapt to runtime pm" it won't, as long as the module
-> is loaded, unless I'm missing something.
-
-The device should be able to be put to sleep at anytime when it is NOT
-being used. AFAIK there is no mechanism for the main processor (the
-one running the kernel) to know when the other iommus are not being
-used, given that they are in independent processors/subsystems, at
-least for the ones in the DSP or M3 processors. Once the user releases
-its iommu resource it means it is no longer using it, at that point
-the device can be put to sleep.
-
-Regards,
-
-Omar
+-- 
+~Vinod
