@@ -1,83 +1,193 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 22 Dec 2011 16:17:42 -0800
-Subject: [PATCH 3/9] arm/tegra: fuse: use apbio dma for register access
+Date: Thu, 22 Dec 2011 16:17:43 -0800
+Subject: [PATCH 4/9] arm/tegra: fuse: add functions to access chip revision
 In-Reply-To: <1324599468-12845-1-git-send-email-olof@lixom.net>
 References: <1324599468-12845-1-git-send-email-olof@lixom.net>
-Message-ID: <1324599468-12845-4-git-send-email-olof@lixom.net>
+Message-ID: <1324599468-12845-5-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the apbio dma functions for accessing the fuse registers.
+Add function to get chip revision, and print it out at boot time.
+
+Restructure the fuse access to just use cached variables instead
+of always reading the fuses, and export those variables directly
+instead of using accessor functions.
+
+Add a SKU ID table of currently known values.
+
+Based on code originally by Colin Cross <ccross@android.com>.
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mach-tegra/fuse.c |   20 ++++++++------------
- 1 files changed, 8 insertions(+), 12 deletions(-)
+ arch/arm/mach-tegra/fuse.c          |   80 +++++++++++++++++++++++------------
+ arch/arm/mach-tegra/fuse.h          |   31 +++++++++++--
+ arch/arm/mach-tegra/tegra2_clocks.c |    2 +-
+ 3 files changed, 80 insertions(+), 33 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-index 1fa26d9..daf3f57 100644
+index daf3f57..2ddede9 100644
 --- a/arch/arm/mach-tegra/fuse.c
 +++ b/arch/arm/mach-tegra/fuse.c
-@@ -23,20 +23,16 @@
- #include <mach/iomap.h>
- 
- #include "fuse.h"
-+#include "apbio.h"
- 
- #define FUSE_UID_LOW		0x108
- #define FUSE_UID_HIGH		0x10c
+@@ -30,20 +30,70 @@
  #define FUSE_SKU_INFO		0x110
  #define FUSE_SPARE_BIT		0x200
  
--static inline u32 fuse_readl(unsigned long offset)
-+static inline u32 tegra_fuse_readl(unsigned long offset)
++int tegra_sku_id;
++int tegra_cpu_process_id;
++int tegra_core_process_id;
++enum tegra_revision tegra_revision;
++
++static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
++	[TEGRA_REVISION_UNKNOWN] = "unknown",
++	[TEGRA_REVISION_A02]     = "A02",
++	[TEGRA_REVISION_A03]     = "A03",
++	[TEGRA_REVISION_A03p]    = "A03 prime",
++	[TEGRA_REVISION_A04]     = "A04",
++};
++
+ static inline u32 tegra_fuse_readl(unsigned long offset)
  {
--	return readl(IO_TO_VIRT(TEGRA_FUSE_BASE + offset));
--}
--
--static inline void fuse_writel(u32 value, unsigned long offset)
--{
--	writel(value, IO_TO_VIRT(TEGRA_FUSE_BASE + offset));
-+	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
+ 	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
  }
  
++static inline bool get_spare_fuse(int bit)
++{
++	return tegra_fuse_readl(FUSE_SPARE_BIT + bit * 4);
++}
++
++static enum tegra_revision tegra_get_revision(void)
++{
++	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
++	u32 id = readl(chip_id);
++
++	switch ((id >> 16) & 0xf) {
++	case 2:
++		return TEGRA_REVISION_A02;
++	case 3:
++		if (get_spare_fuse(18) || get_spare_fuse(19))
++			return TEGRA_REVISION_A03p;
++		else
++			return TEGRA_REVISION_A03;
++	case 4:
++		return TEGRA_REVISION_A04;
++	default:
++		return TEGRA_REVISION_UNKNOWN;
++	}
++}
++
  void tegra_init_fuse(void)
-@@ -54,15 +50,15 @@ unsigned long long tegra_chip_uid(void)
  {
- 	unsigned long long lo, hi;
+ 	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
+ 	reg |= 1 << 28;
+ 	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
  
--	lo = fuse_readl(FUSE_UID_LOW);
--	hi = fuse_readl(FUSE_UID_HIGH);
-+	lo = tegra_fuse_readl(FUSE_UID_LOW);
-+	hi = tegra_fuse_readl(FUSE_UID_HIGH);
+-	pr_info("Tegra SKU: %d CPU Process: %d Core Process: %d\n",
+-		tegra_sku_id(), tegra_cpu_process_id(),
+-		tegra_core_process_id());
++	reg = tegra_fuse_readl(FUSE_SKU_INFO);
++	tegra_sku_id = reg & 0xFF;
++
++	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
++	tegra_cpu_process_id = (reg >> 6) & 3;
++
++	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
++	tegra_core_process_id = (reg >> 12) & 3;
++
++	tegra_revision = tegra_get_revision();
++
++	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
++		tegra_revision_name[tegra_get_revision()],
++		tegra_sku_id, tegra_cpu_process_id,
++		tegra_core_process_id);
+ }
+ 
+ unsigned long long tegra_chip_uid(void)
+@@ -54,27 +104,3 @@ unsigned long long tegra_chip_uid(void)
+ 	hi = tegra_fuse_readl(FUSE_UID_HIGH);
  	return (hi << 32ull) | lo;
  }
+-
+-int tegra_sku_id(void)
+-{
+-	int sku_id;
+-	u32 reg = tegra_fuse_readl(FUSE_SKU_INFO);
+-	sku_id = reg & 0xFF;
+-	return sku_id;
+-}
+-
+-int tegra_cpu_process_id(void)
+-{
+-	int cpu_process_id;
+-	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
+-	cpu_process_id = (reg >> 6) & 3;
+-	return cpu_process_id;
+-}
+-
+-int tegra_core_process_id(void)
+-{
+-	int core_process_id;
+-	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
+-	core_process_id = (reg >> 12) & 3;
+-	return core_process_id;
+-}
+diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
+index 584b2e2..e418d40 100644
+--- a/arch/arm/mach-tegra/fuse.h
++++ b/arch/arm/mach-tegra/fuse.h
+@@ -1,6 +1,4 @@
+ /*
+- * arch/arm/mach-tegra/fuse.c
+- *
+  * Copyright (C) 2010 Google, Inc.
+  *
+  * Author:
+@@ -17,8 +15,31 @@
+  *
+  */
  
- int tegra_sku_id(void)
++#ifndef __MACH_TEGRA_FUSE_H
++#define __MACH_TEGRA_FUSE_H
++
++enum tegra_revision {
++	TEGRA_REVISION_UNKNOWN = 0,
++	TEGRA_REVISION_A02,
++	TEGRA_REVISION_A03,
++	TEGRA_REVISION_A03p,
++	TEGRA_REVISION_A04,
++	TEGRA_REVISION_MAX,
++};
++
++#define SKU_ID_T20	8
++#define SKU_ID_T25SE	20
++#define SKU_ID_AP25	23
++#define SKU_ID_T25	24
++#define SKU_ID_AP25E	27
++#define SKU_ID_T25E	28
++
++extern int tegra_sku_id;
++extern int tegra_cpu_process_id;
++extern int tegra_core_process_id;
++extern enum tegra_revision tegra_revision;
++
+ unsigned long long tegra_chip_uid(void);
+-int tegra_sku_id(void);
+-int tegra_cpu_process_id(void);
+-int tegra_core_process_id(void);
+ void tegra_init_fuse(void);
++
++#endif
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index ff9e6b6..74d314fd 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -720,7 +720,7 @@ static void tegra2_pllx_clk_init(struct clk *c)
  {
- 	int sku_id;
--	u32 reg = fuse_readl(FUSE_SKU_INFO);
-+	u32 reg = tegra_fuse_readl(FUSE_SKU_INFO);
- 	sku_id = reg & 0xFF;
- 	return sku_id;
+ 	tegra2_pll_clk_init(c);
+ 
+-	if (tegra_sku_id() == 7)
++	if (tegra_sku_id == 7)
+ 		c->max_rate = 750000000;
  }
-@@ -70,7 +66,7 @@ int tegra_sku_id(void)
- int tegra_cpu_process_id(void)
- {
- 	int cpu_process_id;
--	u32 reg = fuse_readl(FUSE_SPARE_BIT);
-+	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
- 	cpu_process_id = (reg >> 6) & 3;
- 	return cpu_process_id;
- }
-@@ -78,7 +74,7 @@ int tegra_cpu_process_id(void)
- int tegra_core_process_id(void)
- {
- 	int core_process_id;
--	u32 reg = fuse_readl(FUSE_SPARE_BIT);
-+	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
- 	core_process_id = (reg >> 12) & 3;
- 	return core_process_id;
- }
+ 
 -- 
 1.7.8.GIT
