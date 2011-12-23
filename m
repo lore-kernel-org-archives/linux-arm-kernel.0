@@ -1,70 +1,53 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Dec 2011 00:02:39 +0100
-Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
-In-Reply-To: <CAF=Qhp3UjugPL8eDzbJ9=-Yw0gxxpCFw7p13GS5LQEWrzHxLfQ@mail.gmail.com>
-References: <1323868927-3738-1-git-send-email-zonque@gmail.com>
- <CAF=Qhp3UjugPL8eDzbJ9=-Yw0gxxpCFw7p13GS5LQEWrzHxLfQ@mail.gmail.com>
-Message-ID: <4EF3B70F.5080604@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 22 Dec 2011 16:03:12 -0800
+Subject: [PATCH] arm/tegra: dma: fix buildbreak for !CONFIG_TEGRA_SYSTEM_DMA
+Message-ID: <1324598592-9855-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2011 08:37 PM, Kishore Kadiyala wrote:
-> On Wed, Dec 14, 2011 at 6:52 PM, Daniel Mack <zonque@gmail.com> wrote:
->> External circuitry like level shifters may limit the maximum operation
->> speed of the hsmmc controller. Add a field to struct omap2_hsmmc_info
->> so boards can adjust the setting on demand.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> ---
->>  arch/arm/mach-omap2/hsmmc.c   |    1 +
->>  arch/arm/mach-omap2/hsmmc.h   |    2 ++
->>  drivers/mmc/host/omap_hsmmc.c |    8 ++++++--
->>  3 files changed, 9 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
->> index f4a1020..4c7bc36 100644
->> --- a/arch/arm/mach-omap2/hsmmc.c
->> +++ b/arch/arm/mach-omap2/hsmmc.c
->> @@ -298,6 +298,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
->>        mmc->slots[0].caps = c->caps;
->>        mmc->slots[0].internal_clock = !c->ext_clock;
->>        mmc->dma_mask = 0xffffffff;
->> +       mmc->max_freq = c->max_freq;
->>        if (cpu_is_omap44xx())
->>                mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
->>        else
->> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
->> index f757e78..65a8c12 100644
->> --- a/arch/arm/mach-omap2/hsmmc.h
->> +++ b/arch/arm/mach-omap2/hsmmc.h
->> @@ -25,6 +25,8 @@ struct omap2_hsmmc_info {
->>        char    *name;          /* or NULL for default */
->>        struct device *dev;     /* returned: pointer to mmc adapter */
->>        int     ocr_mask;       /* temporary HACK */
->> +       int     max_freq;       /* maximum clock, if constrained by external
->> +                                * circuitry, or 0 for default */
->>        /* Remux (pad configuration) when powering on/off */
->>        void (*remux)(struct device *dev, int slot, int power_on);
->>        /* init some special card */
->> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
->> index 101cd31..8215ef9 100644
->> --- a/drivers/mmc/host/omap_hsmmc.c
->> +++ b/drivers/mmc/host/omap_hsmmc.c
->> @@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
->>        if (mmc_slot(host).vcc_aux_disable_is_sleep)
->>                mmc_slot(host).no_off = 1;
->>
->> -       mmc->f_min      = OMAP_MMC_MIN_CLOCK;
->> -       mmc->f_max      = OMAP_MMC_MAX_CLOCK;
->> +       mmc->f_min = OMAP_MMC_MIN_CLOCK;
->> +
->> +       if (pdata->max_freq > 0)
-> 
-> What about having check as below:
-> if (pdata->max_freq > 0 && pdata->max_freq < OMAP_MMC_MAX_CLOCK)
+There's no need to keep the DMA_REQ_SEL defines inside the ifdef.
 
-I can quickly do that if Tony agrees on it. Any opinions?
+Fixes the following build break with CONFIG_TEGRA_SYSTEM_DMA=n:
 
-Thanks,
-Daniel
+arch/arm/mach-tegra/devices.c:645: error: 'TEGRA_DMA_REQ_SEL_I2S_1' undeclared here (not in a function)
+arch/arm/mach-tegra/devices.c:663: error: 'TEGRA_DMA_REQ_SEL_I2S2_1' undeclared here (not in a function)
+arch/arm/mach-tegra/devices.c:663: error: initializer element is not constant
+arch/arm/mach-tegra/devices.c:663: error: (near initialization for 'i2s_resource2[1].start')
+arch/arm/mach-tegra/devices.c:664: error: initializer element is not constant
+arch/arm/mach-tegra/devices.c:664: error: (near initialization for 'i2s_resource2[1].end')
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-tegra/include/mach/dma.h |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/include/mach/dma.h b/arch/arm/mach-tegra/include/mach/dma.h
+index d0132e8..3c9339058 100644
+--- a/arch/arm/mach-tegra/include/mach/dma.h
++++ b/arch/arm/mach-tegra/include/mach/dma.h
+@@ -23,11 +23,6 @@
+ 
+ #include <linux/list.h>
+ 
+-#if defined(CONFIG_TEGRA_SYSTEM_DMA)
+-
+-struct tegra_dma_req;
+-struct tegra_dma_channel;
+-
+ #define TEGRA_DMA_REQ_SEL_CNTR			0
+ #define TEGRA_DMA_REQ_SEL_I2S_2			1
+ #define TEGRA_DMA_REQ_SEL_I2S_1			2
+@@ -56,6 +51,11 @@ struct tegra_dma_channel;
+ #define TEGRA_DMA_REQ_SEL_OWR			25
+ #define TEGRA_DMA_REQ_SEL_INVALID		31
+ 
++#if defined(CONFIG_TEGRA_SYSTEM_DMA)
++
++struct tegra_dma_req;
++struct tegra_dma_channel;
++
+ enum tegra_dma_mode {
+ 	TEGRA_DMA_SHARED = 1,
+ 	TEGRA_DMA_MODE_CONTINOUS = 2,
+-- 
+1.7.8.GIT
