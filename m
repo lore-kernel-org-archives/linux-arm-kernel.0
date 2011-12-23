@@ -1,124 +1,91 @@
 From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sat, 24 Dec 2011 00:12:21 +0100
-Subject: [PATCH 1/4] ARM: OMAP1: ams-delta: set up regulator over modem reset
- GPIO pin
+Date: Sat, 24 Dec 2011 00:12:24 +0100
+Subject: [PATCH 4/4] ASoC: OMAP: ams-delta: drop .set_bias_level callback
 In-Reply-To: <1324681944-19067-1-git-send-email-jkrzyszt@tis.icnet.pl>
 References: <1324681944-19067-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <1324681944-19067-2-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <1324681944-19067-5-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amstrad Delta on-board latch2 bit named MODEM_NRESET, now available
-as a GPIO pin AMS_DELTA_GPIO_PIN_NMODEM_RESET, is used to power up/down
-(bring into/out of a reset state) two distinct on-board devices
-simultaneously: the modem, and the voice codec. As a consequence, that
-bit is, or can be, manipulated concurrently by two drivers, or their
-platform provided hooks.
+This functionality has just been implemented in the cx20442 codec
+driver, no need to keep it here duplicated.
 
-Instead of updating those drivers to use the gpiolib API as a new method
-of controlling the MODEM_NRESET pin state, like it was done to other
-drivers accessing latch2 pins, and still being vulnerable to potential
-concurrency conflicts, or trying to solve that sharing issue with a
-custom piece of code, set up a fixed regulator device on top of that
-GPIO pin, with the intention of updating both drivers to manipulate that
-regulator, not the GPIO pin directly.
+Once done, remove the no longer needed AMS_DELTA_LATCH2_MODEM_NRESET
+symbol from the Amstrad Delta header file, and a call to the
+regulator_toggle() helper function from the old API wrapper found in the
+board file.  While being at it, move that function definition, together
+with the regulator consumer related data structure, down to the modem
+related section for better readability.
 
-Before the ASoC driver is updated to use that regulator, and the modem
-platform data expanded with a power management callback for switching
-its power, the ams_delta_latch_write() function, which still provides
-the old API for accessing latch2 functionality from not updated drivers,
-is modified to toggle the regulator instead of the MODEM_NRESET GPIO
-pin.  A helper function provided for balancing the regulator
-enable/disable operations, together with the regulator consumer data
-needed for maintaining its state, will be reused by the above mentioned
-modem power management callback once implemented.
-
-Depends on patch series "ARM: OMAP1: ams-delta: replace custom I/O with
-GPIO".
+Depends on patch 3/4 "ARM: OMAP1: ams-delta: update the modem to use
+regulator API"
 
 Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 ---
- arch/arm/mach-omap1/Kconfig           |    2 +
- arch/arm/mach-omap1/board-ams-delta.c |  103 +++++++++++++++++++++++++++++++--
- 2 files changed, 99 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap1/board-ams-delta.c             |   75 ++++++++++-----------
+ arch/arm/plat-omap/include/plat/board-ams-delta.h |    1 -
+ sound/soc/omap/ams-delta.c                        |   34 ---------
+ 3 files changed, 36 insertions(+), 74 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
-index 5b1edba..4b6a774 100644
---- a/arch/arm/mach-omap1/Kconfig
-+++ b/arch/arm/mach-omap1/Kconfig
-@@ -157,6 +157,8 @@ config MACH_AMS_DELTA
- 	select FIQ
- 	select GPIO_GENERIC_PLATFORM
- 	select LEDS_GPIO_REGISTER
-+	select REGULATOR
-+	select REGULATOR_FIXED_VOLTAGE
- 	help
- 	  Support for the Amstrad E3 (codename Delta) videophone. Say Y here
- 	  if you have such a device.
 diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 673cf21..b5a1a3b 100644
+index 9b52aeb..945c4db 100644
 --- a/arch/arm/mach-omap1/board-ams-delta.c
 +++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -18,7 +18,11 @@
- #include <linux/input.h>
- #include <linux/interrupt.h>
- #include <linux/leds.h>
-+#include <linux/mutex.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/regulator/fixed.h>
-+#include <linux/regulator/machine.h>
- #include <linux/serial_8250.h>
- #include <linux/export.h>
- 
-@@ -237,11 +241,6 @@ static struct gpio latch_gpios[] __initconst = {
- 		.label	= "scard_cmdvcc",
- 	},
- 	{
--		.gpio	= AMS_DELTA_GPIO_PIN_MODEM_NRESET,
--		.flags	= GPIOF_OUT_INIT_LOW,
--		.label	= "modem_nreset",
--	},
--	{
- 		.gpio	= AMS_DELTA_GPIO_PIN_MODEM_CODEC,
- 		.flags	= GPIOF_OUT_INIT_LOW,
- 		.label	= "modem_codec",
-@@ -258,6 +257,73 @@ static struct gpio latch_gpios[] __initconst = {
+@@ -289,41 +289,6 @@ static struct platform_device modem_nreset_device = {
  	},
  };
  
-+static struct regulator_consumer_supply modem_nreset_consumers[] __initconst = {
-+	REGULATOR_SUPPLY("RESET#", "serial8250.1"),
-+	REGULATOR_SUPPLY("POR", "cx20442-codec"),
-+};
-+
-+static struct regulator_init_data modem_nreset_data __initconst = {
-+	.constraints		= {
-+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-+		.boot_on		= 1,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(modem_nreset_consumers),
-+	.consumer_supplies	= modem_nreset_consumers,
-+};
-+
-+static struct fixed_voltage_config modem_nreset_config __initconst = {
-+	.supply_name		= "modem_nreset",
-+	.microvolts		= 3300000,
-+	.gpio			= AMS_DELTA_GPIO_PIN_MODEM_NRESET,
-+	.startup_delay		= 25000,
-+	.enable_high		= 1,
-+	.enabled_at_boot	= 1,
-+	.init_data		= &modem_nreset_data,
-+};
-+
-+static struct platform_device modem_nreset_device = {
-+	.name	= "reg-fixed-voltage",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &modem_nreset_config,
-+	},
-+};
-+
+-struct regulator_consumer_data {
+-	struct mutex lock;
+-	struct regulator *regulator;
+-	bool enabled;
+-};
+-
+-static int regulator_toggle(struct regulator_consumer_data *consumer,
+-		bool enable)
+-{
+-	int err = 0;
+-
+-	if (!consumer->regulator)
+-		return -ENODEV;
+-
+-	mutex_lock(&consumer->lock);
+-	if (IS_ERR(consumer->regulator)) {
+-		err = PTR_ERR(consumer->regulator);
+-	} else if (enable) {
+-		if (!consumer->enabled) {
+-			err = regulator_enable(consumer->regulator);
+-			consumer->enabled = true;
+-		}
+-	} else {
+-		if (consumer->enabled) {
+-			err = regulator_disable(consumer->regulator);
+-			consumer->enabled = false;
+-		}
+-	}
+-	mutex_unlock(&consumer->lock);
+-
+-	return err;
+-}
+-
+-static struct regulator_consumer_data modem_nreset;
+-
+ void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value)
+ {
+ 	int bit = 0;
+@@ -333,7 +298,7 @@ void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value)
+ 		if (!(mask & bitpos))
+ 			continue;
+ 		if (base + bit == AMS_DELTA_GPIO_PIN_MODEM_NRESET)
+-			regulator_toggle(&modem_nreset, (value & bitpos) != 0);
++			continue;
+ 		else
+ 			gpio_set_value(base + bit, (value & bitpos) != 0);
+ 	}
+@@ -528,6 +493,39 @@ static void __init ams_delta_init(void)
+ 	omap_writew(omap_readw(ARM_RSTCT1) | 0x0004, ARM_RSTCT1);
+ }
+ 
 +struct regulator_consumer_data {
 +	struct mutex lock;
 +	struct regulator *regulator;
@@ -152,60 +119,105 @@ index 673cf21..b5a1a3b 100644
 +	return err;
 +}
 +
+ static void modem_pm(struct uart_port *port, unsigned int state, unsigned old)
+ {
+ 	struct regulator_consumer_data *consumer = port->private_data;
+@@ -536,6 +534,8 @@ static void modem_pm(struct uart_port *port, unsigned int state, unsigned old)
+ 		regulator_toggle(consumer, state == 0);
+ }
+ 
 +static struct regulator_consumer_data modem_nreset;
 +
- void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value)
- {
- 	int bit = 0;
-@@ -266,7 +332,10 @@ void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value)
- 	for (; bit < ngpio; bit++, bitpos = bitpos << 1) {
- 		if (!(mask & bitpos))
- 			continue;
--		gpio_set_value(base + bit, (value & bitpos) != 0);
-+		if (base + bit == AMS_DELTA_GPIO_PIN_MODEM_NRESET)
-+			regulator_toggle(&modem_nreset, (value & bitpos) != 0);
-+		else
-+			gpio_set_value(base + bit, (value & bitpos) != 0);
+ static struct plat_serial8250_port ams_delta_modem_ports[] = {
+ 	{
+ 		.membase	= IOMEM(MODEM_VIRT),
+@@ -602,9 +602,6 @@ static int __init late_init(void)
+ 	/*
+ 	 * Once the modem device is registered, the modem_nreset
+ 	 * regulator can be requested on behalf of that device.
+-	 * In addition to the modem .pm callback, that regulator
+-	 * is still used via the ams_delta_latch_write() wrapper
+-	 * by the ASoC driver until updated.
+ 	 */
+ 	mutex_init(&modem_nreset.lock);
+ 	modem_nreset.regulator = regulator_get(&ams_delta_modem_device.dev,
+diff --git a/arch/arm/plat-omap/include/plat/board-ams-delta.h b/arch/arm/plat-omap/include/plat/board-ams-delta.h
+index 027e79e..ad6f865 100644
+--- a/arch/arm/plat-omap/include/plat/board-ams-delta.h
++++ b/arch/arm/plat-omap/include/plat/board-ams-delta.h
+@@ -30,7 +30,6 @@
+ 
+ #define AMD_DELTA_LATCH2_SCARD_RSTIN	0x0400
+ #define AMD_DELTA_LATCH2_SCARD_CMDVCC	0x0800
+-#define AMS_DELTA_LATCH2_MODEM_NRESET	0x1000
+ #define AMS_DELTA_LATCH2_MODEM_CODEC	0x2000
+ 
+ #define AMS_DELTA_GPIO_PIN_KEYBRD_DATA	0
+diff --git a/sound/soc/omap/ams-delta.c b/sound/soc/omap/ams-delta.c
+index be81bc7..d213d04 100644
+--- a/sound/soc/omap/ams-delta.c
++++ b/sound/soc/omap/ams-delta.c
+@@ -426,31 +426,6 @@ static struct snd_soc_ops ams_delta_ops = {
+ };
+ 
+ 
+-/* Board specific codec bias level control */
+-static int ams_delta_set_bias_level(struct snd_soc_card *card,
+-				    struct snd_soc_dapm_context *dapm,
+-				    enum snd_soc_bias_level level)
+-{
+-	struct snd_soc_codec *codec = card->rtd->codec;
+-
+-	switch (level) {
+-	case SND_SOC_BIAS_ON:
+-	case SND_SOC_BIAS_PREPARE:
+-	case SND_SOC_BIAS_STANDBY:
+-		if (codec->dapm.bias_level == SND_SOC_BIAS_OFF)
+-			ams_delta_latch2_write(AMS_DELTA_LATCH2_MODEM_NRESET,
+-						AMS_DELTA_LATCH2_MODEM_NRESET);
+-		break;
+-	case SND_SOC_BIAS_OFF:
+-		if (codec->dapm.bias_level != SND_SOC_BIAS_OFF)
+-			ams_delta_latch2_write(AMS_DELTA_LATCH2_MODEM_NRESET,
+-						0);
+-	}
+-	codec->dapm.bias_level = level;
+-
+-	return 0;
+-}
+-
+ /* Digital mute implemented using modem/CPU multiplexer.
+  * Shares hardware with codec config pulse generation */
+ static bool ams_delta_muted = 1;
+@@ -514,9 +489,6 @@ static int ams_delta_cx20442_init(struct snd_soc_pcm_runtime *rtd)
+ 		ams_delta_ops.shutdown = ams_delta_shutdown;
  	}
+ 
+-	/* Set codec bias level */
+-	ams_delta_set_bias_level(card, dapm, SND_SOC_BIAS_STANDBY);
+-
+ 	/* Add hook switch - can be used to control the codec from userspace
+ 	 * even if line discipline fails */
+ 	ret = snd_soc_jack_new(rtd->codec, "hook_switch",
+@@ -599,7 +571,6 @@ static struct snd_soc_card ams_delta_audio_card = {
+ 	.name = "AMS_DELTA",
+ 	.dai_link = &ams_delta_dai_link,
+ 	.num_links = 1,
+-	.set_bias_level = ams_delta_set_bias_level,
+ };
+ 
+ /* Module init/exit */
+@@ -648,11 +619,6 @@ static void __exit ams_delta_module_exit(void)
+ 			ARRAY_SIZE(ams_delta_hook_switch_gpios),
+ 			ams_delta_hook_switch_gpios);
+ 
+-	/* Keep modem power on */
+-	ams_delta_set_bias_level(&ams_delta_audio_card,
+-				 &ams_delta_audio_card.rtd[0].codec->dapm,
+-				 SND_SOC_BIAS_STANDBY);
+-
+ 	platform_device_unregister(cx20442_platform_device);
+ 	platform_device_unregister(ams_delta_audio_platform_device);
  }
- EXPORT_SYMBOL(ams_delta_latch_write);
-@@ -496,6 +565,12 @@ static int __init late_init(void)
- 
- 	platform_add_devices(late_devices, ARRAY_SIZE(late_devices));
- 
-+	err = platform_device_register(&modem_nreset_device);
-+	if (err) {
-+		pr_err("Couldn't register the modem regulator device\n");
-+		return err;
-+	}
-+
- 	omap_cfg_reg(M14_1510_GPIO2);
- 	ams_delta_modem_ports[0].irq =
- 			gpio_to_irq(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
-@@ -514,8 +589,24 @@ static int __init late_init(void)
- 	err = platform_device_register(&ams_delta_modem_device);
- 	if (err)
- 		goto gpio_free;
-+
-+	/*
-+	 * Once the modem device is registered, the modem_nreset
-+	 * regulator can be requested on behalf of that device.
-+	 * The regulator is used via ams_delta_latch_write()
-+	 * by the modem and ASoC drivers until updated.
-+	 */
-+	mutex_init(&modem_nreset.lock);
-+	modem_nreset.regulator = regulator_get(&ams_delta_modem_device.dev,
-+			"RESET#");
-+	if (IS_ERR(modem_nreset.regulator)) {
-+		err = PTR_ERR(modem_nreset.regulator);
-+		goto unregister;
-+	}
- 	return 0;
- 
-+unregister:
-+	platform_device_unregister(&ams_delta_modem_device);
- gpio_free:
- 	gpio_free(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
- 	return err;
 -- 
 1.7.3.4
