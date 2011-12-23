@@ -1,75 +1,52 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Dec 2011 10:34:04 +0100
-Subject: [RFC PATCH v2 4/8] media: videobuf2: introduce VIDEOBUF2_PAGE
- memops
-In-Reply-To: <CACVXFVOqMmakPW-aAdp005RDLuV5oc6-JfjQHr-2bFRzZi2zDQ@mail.gmail.com>
-References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
- <1323871214-25435-5-git-send-email-ming.lei@canonical.com>
- <010501ccc08c$1c7b7870$55726950$%szyprowski@samsung.com>
- <CACVXFVOqMmakPW-aAdp005RDLuV5oc6-JfjQHr-2bFRzZi2zDQ@mail.gmail.com>
-Message-ID: <015201ccc156$033f73a0$09be5ae0$%szyprowski@samsung.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 23 Dec 2011 15:07:13 +0530
+Subject: [QUESTION] How to set static/dynamic dependency between clock
+ domains
+In-Reply-To: <4EF44363.4050008@ti.com>
+References: <CACVXFVMe7T2WJiDwc9DFz9ifUPQG4pcYzFtx6O=gs7pFgrkNJg@mail.gmail.com>
+ <CACVXFVPOaw7OG7owJw0h7DAe3pRH6nROsy13UeAWPWgLedKY1g@mail.gmail.com>
+ <CAMQu2gwDth6OVTk3PkRCo05QF6WeQvMTJ-d5s33cT35GSVwT=w@mail.gmail.com>
+ <CACVXFVNtaaxB-MRXKBgAZFEkf72nsgcOSHOFsYjspoL0Fv6VWA@mail.gmail.com>
+ <CAMQu2gzs6op9C8jDJ5xEGs7A7ok_GXeD5OxnHiDoeHaKghCJ5g@mail.gmail.com>
+ <CACVXFVOOQVe8u5TFZDYrNqvga-=RJ1mueaaqkBNB-s4BwkhiOw@mail.gmail.com>
+ <CAMQu2gwKgpH_dOBQovgxBR_yTGAiXu=2yPhwgoERv+YD+pO_Sg@mail.gmail.com>
+ <4EF44363.4050008@ti.com>
+Message-ID: <CAMQu2gwhyZasccr8wU6srhb8Y+T02yawy+RQQMzUGZjy1bvtJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Dec 23, 2011 at 2:31 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Santosh,
+>
+>
+> On 12/23/2011 9:45 AM, Shilimkar, Santosh wrote:
+>>
+>> On Fri, Dec 23, 2011 at 2:00 PM, Ming Lei<tom.leiming@gmail.com> ?wrote:
+>
+>
+> [...]
+>
+>
+>>> The only change on iss(CAM) clock domain setting in your commit[1] is to
+>>> configure CLKTRCTRL as HW_AUTO, instead of previous ?SW_WKUP.
+>>> Once I change flags of iss to CLKDM_CAN_SWSUP [2], the issue can be
+>>> fixed, so I am wondering if something is wrong about HW_AUTO mode
+>>> of CAM clock domain.
+>>>
+>> Now I recollect the issue and also track a patch in the internal product
+>> tree.
+>> Same is attached and also in the end of the email.
+>>
+>> I am lopping Miguel who wrote the patch and Benoit who acked it.
+>> This should sort out your issue as you have already verified it works.
+>
+>
+> Ooops, that remains me that I forgot to push it upstream:-(
+>
+> Since this is a bug fix, if this is too late for 3.3, we can try to push it
+> during rc phases.
+>
+Cool. Thanks for picking it up
 
-On Friday, December 23, 2011 10:22 AM Ming Lei wrote:
-
-> On Thu, Dec 22, 2011 at 5:28 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> >> DMA contig memory resource is very limited and precious, also
-> >> accessing to it from CPU is very slow on some platform.
-> >>
-> >> For some cases(such as the comming face detection driver), DMA Streaming
-> >> buffer is enough, so introduce VIDEOBUF2_PAGE to allocate continuous
-> >> physical memory but letting video device driver to handle DMA buffer mapping
-> >> and unmapping things.
-> >>
-> >> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> >
-> > Could you elaborate a bit why do you think that DMA contig memory resource
-> > is so limited? If dma_alloc_coherent fails because of the memory fragmentation,
-> > the alloc_pages() call with order > 0 will also fail.
-> 
-> For example, on ARM, there is very limited kernel virtual address space reserved
-> for DMA coherent buffer mapping, the default size is about 2M if I
-> don't remember mistakenly.
-
-It can be easily increased for particular boards, there is no problem with this.
-
-> > I understand that there might be some speed issues with coherent (uncached)
-> > userspace mappings, but I would solve it in completely different way. The interface
-> 
-> Also there is poor performance inside kernel space, see [1]
-
-Your driver doesn't access video data inside kernel space, so this is also not an issue.
- 
-> > for both coherent/uncached and non-coherent/cached contig allocator should be the
-> > same, so exchanging them is easy and will not require changes in the driver.
-> > I'm planning to introduce some design changes in memory allocator api and introduce
-> > prepare and finish callbacks in allocator ops. I hope to post the rfc after
-> > Christmas. For your face detection driver using standard dma-contig allocator
-> > shouldn't be a big issue.
-> >
-> > Your current implementation also abuses the design and api of videobuf2 memory
-> > allocators. If the allocator needs to return a custom structure to the driver
-> 
-> I think returning vaddr is enough.
-> 
-> > you should use cookie method. vaddr is intended to provide only a pointer to
-> > kernel virtual mapping, but you pass a struct page * there.
-> 
-> No, __get_free_pages returns virtual address instead of 'struct page *'.
-
-Then you MUST use cookie for it. vaddr method should return kernel virtual address 
-to the buffer video data. Some parts of videobuf2 relies on this - it is used by file
-io emulator (read(), write() calls) and mmap equivalent for non-mmu systems.
-
-Manual casting in the driver is also a bad idea, that's why there are helper functions
-defined for both dma_contig and dma_sg allocators: vb2_dma_contig_plane_dma_addr() and
-vb2_dma_sg_plane_desc().
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Regards
+Santosh
