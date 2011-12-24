@@ -1,40 +1,70 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 24 Dec 2011 10:41:38 +0900
-Subject: [PATCH 2/2] ARM: SAMSUNG: dma-ops.h needs mach/dma.h
-In-Reply-To: <1324657414-27991-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1324657414-27991-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1324657414-27991-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <088801ccc1dd$2df5d300$89e17900$%kim@samsung.com>
+Date: Sat, 24 Dec 2011 10:58:58 +0900
+Subject: Pull Requeset: Exynos4 Register Address Update for Devfreq
+ Drivers.
+In-Reply-To: <CAJ0PZbQ1=+BTs0Emi78kfOWD5d90+ND5Jc_SJ9T4BcGMXyny9A@mail.gmail.com>
+References: <CAJ0PZbQ1=+BTs0Emi78kfOWD5d90+ND5Jc_SJ9T4BcGMXyny9A@mail.gmail.com>
+Message-ID: <088b01ccc1df$994d0090$cbe701b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+MyungJoo Ham wrote:
 > 
-> dma-ops.h uses samsung_dma_is_dmadev so it needs to have mach/dma.h
-> included.
+> Hello,
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/plat-samsung/include/plat/dma-ops.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-
-> samsung/include/plat/dma-ops.h
-> index 70b6325..71a6827 100644
-> --- a/arch/arm/plat-samsung/include/plat/dma-ops.h
-> +++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
-> @@ -14,6 +14,7 @@
->  #define __SAMSUNG_DMA_OPS_H_ __FILE__
-> 
->  #include <linux/dmaengine.h>
-> +#include <mach/dma.h>
-> 
->  struct samsung_dma_prep_info {
->  	enum dma_transaction_type cap;
-> --
-> 1.7.7.3
+Hi,
 
-OK, will apply.
+> Please pull the patches for Exynos4 SoCs that support devfreq device
+> drivers for Exynos4210/4212/4412.
+> 
+> The patches are:
+> ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+> ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus devfreq
+> driver
+> ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
+> 
+> Gitweb: http://git.infradead.org/users/kmpark/linux-
+> samsung/shortlog/refs/heads/devfreq-for-samsung
+> Git Repository: git://git.infradead.org/users/kmpark/linux-samsung
+> Branch: devfreq-for-samsung
+> 
+> The following changes since commit
+> 390f998509bf049019df0b078c0a6606e0d57fb4:
+> 
+> Merge: e34d6b4 6f6c2aa
+> Author: Linus Torvalds <torvalds@linux-foundation.org>
+> Date:   Sun Dec 18 14:28:31 2011 -0800
+> 
+>   Merge git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi-rc-fixes-
+> 2.6
+> (2011-12-18 14:28:31 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/kmpark/linux-samsung.git devfreq-for-
+> samsung
+> 
+> MyungJoo Ham (3):
+>       ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+>       ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus
+> devfreq driver
+>       ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
+> 
+>  arch/arm/mach-exynos/cpu.c                     |    7 +++-
+>  arch/arm/mach-exynos/include/mach/map.h        |    1 +
+>  arch/arm/mach-exynos/include/mach/regs-clock.h |   42
+> ++++++++++++++++++++++++
+>  arch/arm/mach-exynos/mach-nuri.c               |   11 ++++--
+>  4 files changed, 57 insertions(+), 4 deletions(-)
+> 
+> 
+As I commented, looks ok to me and will apply patches not pull and since I
+didn't get your answer to ask 'topic branch is required for this', I didn't
+yet.
+
+As a note, if there is no reason to create based on not -rc, just use -rc.
+
+Merry Christmas.
 Thanks.
 
 Best regards,
