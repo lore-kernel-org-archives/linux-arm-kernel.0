@@ -1,29 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 25 Dec 2011 00:22:00 +0100
-Subject: [PATCH 20/20] ARM: big removal of now unused arch_reset()
-In-Reply-To: <1324288069-21940-21-git-send-email-nico@fluxnic.net>
-References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
- <1324288069-21940-21-git-send-email-nico@fluxnic.net>
-Message-ID: <CACRpkdYMPEs8B5AaJMW0KA4t+Ky50zgB+RbrvofitUyUNskX2w@mail.gmail.com>
+Date: Sun, 25 Dec 2011 00:26:09 +0100
+Subject: [PATCH v2] gpio: pl061: convert to use generic irq chip
+In-Reply-To: <1324327927-6886-1-git-send-email-robherring2@gmail.com>
+References: <1323876538-20406-8-git-send-email-robherring2@gmail.com>
+ <1324327927-6886-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CACRpkdY3=4b4P7N-oK1UyHbY-FEzm=nvaGzuD_28Mbof1msY2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 10:47 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+On Mon, Dec 19, 2011 at 9:52 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-> When this is the only content remaining in mach/system.h then the
-> whole file is removed.
-
-Merry christmas!
-
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> From: Rob Herring <rob.herring@calxeda.com>
 >
-> ?arch/arm/mach-integrator/include/mach/system.h | ? 33 ------------------------
-> ?arch/arm/mach-nomadik/include/mach/system.h ? ?| ? 32 -----------------------
-> ?arch/arm/mach-u300/include/mach/system.h ? ? ? | ? 14 ----------
-> ?arch/arm/mach-ux500/include/mach/system.h ? ? ?| ? 20 --------------
+> Convert the pl061 irq_chip code to use the generic irq chip code.
+>
+> This has the side effect of using 32-bit accesses rather than 8-bit
+> accesses to interrupt registers. The h/w TRM and testing seem to indicate
+> this is fine.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.ml.walleij@gmail.com>
+> ---
+> v2:
+> - put struct irq_chip_generic pointer into struct pl061_gpio instead of domain
+> ptr.
 
-Acked-by:
-Linus Walleij <linus.walleij@linaro.org>
+Looks good to me.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yours,
+Thanks,
 Linus Walleij
