@@ -1,74 +1,27 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 24 Dec 2011 10:58:58 +0900
-Subject: Pull Requeset: Exynos4 Register Address Update for Devfreq
- Drivers.
-In-Reply-To: <CAJ0PZbQ1=+BTs0Emi78kfOWD5d90+ND5Jc_SJ9T4BcGMXyny9A@mail.gmail.com>
-References: <CAJ0PZbQ1=+BTs0Emi78kfOWD5d90+ND5Jc_SJ9T4BcGMXyny9A@mail.gmail.com>
-Message-ID: <088b01ccc1df$994d0090$cbe701b0$%kim@samsung.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Sat, 24 Dec 2011 13:31:14 +1030
+Subject: [RESENDx2] [PULL] virtio: fix barriers for virtio-mmio
+In-Reply-To: <CAK=WgbacH1tXHJiHNKLNNsFA7-vnFT_J6vYOANh0wzGyUj8Zpg@mail.gmail.com>
+References: <8739cbkgv2.fsf@rustcorp.com.au>
+ <CA+55aFyvMkAtXPRxiFR+UpZKGHMhp8Vd9aYg1dkaoKMwD5MLcw@mail.gmail.com>
+ <CA+55aFzKU0GWqpQo2AzAawoVm=qPaJiwKTcifeYApyZP_Hj3nQ@mail.gmail.com>
+ <CAK=WgbacH1tXHJiHNKLNNsFA7-vnFT_J6vYOANh0wzGyUj8Zpg@mail.gmail.com>
+Message-ID: <87pqfeisg5.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> Hello,
-> 
-Hi,
+On Fri, 23 Dec 2011 13:35:26 +0200, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Fri, Dec 23, 2011 at 11:35 AM, Linus Torvalds
+> <torvalds@linux-foundation.org> wrote:
+> > On x86, there really is never any reason to use the heavy memory
+> > barriers unless you are talking to a real device. And last I saw,
+> > "virtio" was still about virtual IO.
 
-> Please pull the patches for Exynos4 SoCs that support devfreq device
-> drivers for Exynos4210/4212/4412.
-> 
-> The patches are:
-> ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
-> ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus devfreq
-> driver
-> ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
-> 
-> Gitweb: http://git.infradead.org/users/kmpark/linux-
-> samsung/shortlog/refs/heads/devfreq-for-samsung
-> Git Repository: git://git.infradead.org/users/kmpark/linux-samsung
-> Branch: devfreq-for-samsung
-> 
-> The following changes since commit
-> 390f998509bf049019df0b078c0a6606e0d57fb4:
-> 
-> Merge: e34d6b4 6f6c2aa
-> Author: Linus Torvalds <torvalds@linux-foundation.org>
-> Date:   Sun Dec 18 14:28:31 2011 -0800
-> 
->   Merge git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi-rc-fixes-
-> 2.6
-> (2011-12-18 14:28:31 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/kmpark/linux-samsung.git devfreq-for-
-> samsung
-> 
-> MyungJoo Ham (3):
->       ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
->       ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus
-> devfreq driver
->       ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
-> 
->  arch/arm/mach-exynos/cpu.c                     |    7 +++-
->  arch/arm/mach-exynos/include/mach/map.h        |    1 +
->  arch/arm/mach-exynos/include/mach/regs-clock.h |   42
-> ++++++++++++++++++++++++
->  arch/arm/mach-exynos/mach-nuri.c               |   11 ++++--
->  4 files changed, 57 insertions(+), 4 deletions(-)
-> 
-> 
-As I commented, looks ok to me and will apply patches not pull and since I
-didn't get your answer to ask 'topic branch is required for this', I didn't
-yet.
+Not any more, as the commit message describes.
 
-As a note, if there is no reason to create based on not -rc, just use -rc.
+But I missed that they're using rpmsg, which isn't merged yet.
 
-Merry Christmas.
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Sorry for the noise,
+Rusty.
+PS. Switching barriers by bus type is too crude anyway, let's come up
+    with something better...
