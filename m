@@ -1,34 +1,34 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 24 Dec 2011 18:00:14 +1100
-Subject: [PATCH 00/14] DMA-mapping framework redesign preparation
-In-Reply-To: <20111223163516.GO20129@parisc-linux.org>
-References: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
- <20111223163516.GO20129@parisc-linux.org>
-Message-ID: <1324710014.6632.23.camel@pasglop>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Sat, 24 Dec 2011 16:55:42 +0800
+Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <20111223131851.GB13175@sirena.org.uk>
+References: <1324537753-30590-1-git-send-email-richard.zhao@linaro.org>
+ <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
+ <20111223131851.GB13175@sirena.org.uk>
+Message-ID: <20111224085539.GA1892@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-12-23 at 09:35 -0700, Matthew Wilcox wrote:
-> I really think this wants to be a separate function.
-> dma_alloc_coherent
-> is for allocating memory to be shared between the kernel and a driver;
-> we already have dma_map_sg for mapping userspace I/O as an alternative
-> interface.  This feels like it's something different again rather than
-> an option to dma_alloc_coherent. 
+On Fri, Dec 23, 2011 at 01:18:51PM +0000, Mark Brown wrote:
+> On Thu, Dec 22, 2011 at 03:09:10PM +0800, Richard Zhao wrote:
+> > The driver get cpu operation point table from device tree cpu0 node,
+> > and adjusts operating points using clk and regulator APIs.
+> 
+> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> 
+Thanks.
+> but one nit:
+> 
+> > +Required properties in /cpus/cpu at 0:
+> > +- cpu-freqs : cpu frequency points it support, in unit of Hz.
+> > +- cpu-volts : cpu voltages required by the frequency point at the same index,
+> > +	      in unit of uV.
+> > +- trans-latency :  transition_latency, in unit of ns.
+> 
+> trans-latency should really say what latency is being measured (the CPU
+> core only or the whole operation).
+dts only descibe hw info. so the transition latency is for hw.
+- trans-latency :  transition latency of HW, in unit of ns.
 
-Depends. There can be some interesting issues with some of the ARM stuff
-out there (and to a lesser extent older ppc embedded stuff).
-
-For example, some devices really want a physically contiguous chunk, and
-are not cache coherent. In that case, you can't keep the linear mapping
-around. But you also don't waste your precious kernel virtual space
-creating a separate non-cachable mapping for those.
-
-In general, dma mapping attributes as a generic feature make sense,
-whether this specific attribute does or not though. And we probably want
-space for platform specific attributes, for example, FSL embedded
-iommu's have "interesting" features for directing data toward a specific
-core cache etc... that we might want to expose using such attributes.
-
-Cheers,
-Ben.
+Thanks
+Richard
