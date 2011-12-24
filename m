@@ -1,16 +1,118 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 24 Dec 2011 10:00:52 +0900
-Subject: [GIT PULL] Samsung cleanup-spi for v3.3
-Message-ID: <088001ccc1d7$7c0da460$7428ed20$%kim@samsung.com>
+Date: Sat, 24 Dec 2011 10:10:26 +0900
+Subject: [PATCH 09/12] ARM: EXYNOS: introduce
+ arch/arm/mach-exynos/common.[ch]
+In-Reply-To: <20111223191935.GS2577@n2100.arm.linux.org.uk>
+References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
+ <1324385316-6052-10-git-send-email-kgene.kim@samsung.com>
+ <20111223191935.GS2577@n2100.arm.linux.org.uk>
+Message-ID: <088101ccc1d8$d2023b00$7606b100$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Russell King - ARM Linux wrote:
+> 
+> On Tue, Dec 20, 2011 at 09:48:33PM +0900, Kukjin Kim wrote:
+> > This patch introduces common.[ch] which are used only in the
+> > arch/arm/mach-exynos/ directory. The common.c file merges
+> > the cpu.c, init.c, irq-combiner.c and irq-eint.c files which
+> > are used commonly on EXYNOS SoCs and the common.h file replaces
+> > with plat/exynos4.h file.
+> >
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+Hi Russell,
 
-Please pull the samsung-cleanup-spi for v3.3.
-It depends on samsung-devel-spi3 branch...
+Sorry for my late following up the restart work :(
 
-If any problems, please let me know.
+> It looks like there's some changes made to exynos stuff between -rc1
+
+Yes, some bug has been fixed after -rc1...
+
+> (which my immutable restart-cleanup branch is based upon) and the base
+> for this patch which makes it hard to apply:
+> 
+Oops, I created this based on your devel-stable as per your suggestion and I
+couldn't look at 'restart-cleanup' and 'restart' branches in your git,
+'http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git'
+.
+
+> Patching 7249/1...
+> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.2292 2>&1 exited
+> with
+> non-zero status: 256
+> error: patch failed: arch/arm/mach-exynos/cpu.c:1
+> error: arch/arm/mach-exynos/cpu.c: patch does not apply
+> 
+> Trying with GNU patch gives:
+> 
+> Patching 7249/1...
+> patch -p1 -f -EF0 -N --dry-run > /tmp/pdb.2298 2>&1 exited with non-zero
+> status: 256
+> patching file arch/arm/mach-exynos/Makefile
+> patching file arch/arm/mach-exynos/clock-exynos4210.c
+> patching file arch/arm/mach-exynos/clock-exynos4212.c
+> patching file arch/arm/mach-exynos/clock.c
+> patching file arch/arm/mach-exynos/common.c
+> patching file arch/arm/mach-exynos/common.h
+> patching file arch/arm/mach-exynos/cpu.c
+> Hunk #1 FAILED at 1.
+> File arch/arm/mach-exynos/cpu.c is not empty after patch, as expected
+> 1 out of 1 hunk FAILED -- saving rejects to file arch/arm/mach-
+> exynos/cpu.c.rej
+> patching file arch/arm/mach-exynos/include/mach/map.h
+> patching file arch/arm/mach-exynos/init.c
+> patching file arch/arm/mach-exynos/irq-combiner.c
+> patching file arch/arm/mach-exynos/irq-eint.c
+> patching file arch/arm/mach-exynos/mach-armlex4210.c
+> Hunk #1 succeeded at 20 (offset -1 lines).
+> Hunk #2 succeeded at 27 (offset -1 lines).
+> Hunk #3 succeeded at 188 (offset -1 lines).
+> patching file arch/arm/mach-exynos/mach-nuri.c
+> Hunk #1 succeeded at 37 (offset -1 lines).
+> Hunk #2 succeeded at 53 (offset -1 lines).
+> Hunk #3 succeeded at 1284 (offset -1 lines).
+> patching file arch/arm/mach-exynos/mach-origen.c
+> Hunk #1 succeeded at 28 (offset -1 lines).
+> Hunk #2 succeeded at 42 (offset -1 lines).
+> Hunk #3 succeeded at 639 (offset -1 lines).
+> patching file arch/arm/mach-exynos/mach-smdk4x12.c
+> Hunk #1 succeeded at 27 (offset -1 lines).
+> Hunk #2 succeeded at 35 (offset -1 lines).
+> Hunk #3 succeeded at 250 (offset -1 lines).
+> patching file arch/arm/mach-exynos/mach-smdkv310.c
+> Hunk #1 succeeded at 27 (offset -1 lines).
+> Hunk #2 succeeded at 42 (offset -1 lines).
+> Hunk #3 succeeded at 333 (offset -1 lines).
+> patching file arch/arm/mach-exynos/mach-universal_c210.c
+> Hunk #1 succeeded at 27 (offset -1 lines).
+> Hunk #2 succeeded at 46 (offset -1 lines).
+> Hunk #3 succeeded at 993 (offset -1 lines).
+> patching file arch/arm/plat-s5p/Makefile
+> patching file arch/arm/plat-s5p/cpu.c
+> patching file arch/arm/plat-samsung/include/plat/cpu.h
+> patching file arch/arm/plat-samsung/include/plat/exynos4.h
+> 
+> So I can't apply this, and this in turn means I can't provide Nicolas with
+> a tree this evening for his arch_idle changes.
+> 
+So, isn't there any required my effort for it?
+
+> Given the proximity to Christmas, and I'm _not_ planning to work from this
+> evening until after the new year, things will now have to just sit and
+> wait
+> until after the festive period.
+
+Hmm...yeah...
+Anyway, Russell, Merry Christmas to you and your family ;)
+
+> 
+> I'll push out what I have been able to merge later this evening, but it
+> will not include the exynos patches.
+
+How should I do for including exynos-restart? Please kindly let me know.
 
 Thanks.
 
@@ -19,56 +121,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit a153e31abb01484d0088ac28425dc98204848ad4:
-
-  ARM: SAMSUNG: Remove SPI bus clocks from platform data (2011-12-23
-10:10:46 +0900)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next-samsung-cleanup-spi4
-
-Padmavathi Venna (6):
-      ARM: SAMSUNG: Consolidation of SPI platform devices to plat-samsung
-      ARM: S3C64XX: Modified files for SPI consolidation work
-      ARM: S5PC100: Modified files for SPI consolidation work
-      ARM: S5P64X0: Modified files for SPI consolidation work
-      ARM: S5PV210: Modified files for SPI consolidation work
-      ARM: S3C64XX: Modified according to SPI consolidation work
-
- arch/arm/mach-s3c64xx/Kconfig                    |    8 +-
- arch/arm/mach-s3c64xx/Makefile                   |    2 +-
- arch/arm/mach-s3c64xx/dev-spi.c                  |  173 -----------------
- arch/arm/mach-s3c64xx/include/mach/map.h         |    2 +
- arch/arm/mach-s3c64xx/setup-spi.c                |   45 +++++
- arch/arm/mach-s5p64x0/Kconfig                    |    7 +-
- arch/arm/mach-s5p64x0/Makefile                   |    2 +-
- arch/arm/mach-s5p64x0/dev-spi.c                  |  218
----------------------
- arch/arm/mach-s5p64x0/include/mach/map.h         |    2 +
- arch/arm/mach-s5p64x0/setup-spi.c                |   55 ++++++
- arch/arm/mach-s5pc100/Kconfig                    |    5 +
- arch/arm/mach-s5pc100/Makefile                   |    2 +-
- arch/arm/mach-s5pc100/dev-spi.c                  |  220
-----------------------
- arch/arm/mach-s5pc100/include/mach/map.h         |    3 +
- arch/arm/mach-s5pc100/setup-spi.c                |   65 +++++++
- arch/arm/mach-s5pv210/Kconfig                    |    5 +
- arch/arm/mach-s5pv210/Makefile                   |    2 +-
- arch/arm/mach-s5pv210/dev-spi.c                  |  169 -----------------
- arch/arm/mach-s5pv210/include/mach/map.h         |    2 +
- arch/arm/mach-s5pv210/setup-spi.c                |   51 +++++
- arch/arm/plat-samsung/Kconfig                    |   16 ++-
- arch/arm/plat-samsung/devs.c                     |  127 +++++++++++++
- arch/arm/plat-samsung/include/plat/devs.h        |    8 +-
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |   22 ++-
- 24 files changed, 409 insertions(+), 802 deletions(-)
- delete mode 100644 arch/arm/mach-s3c64xx/dev-spi.c
- create mode 100644 arch/arm/mach-s3c64xx/setup-spi.c
- delete mode 100644 arch/arm/mach-s5p64x0/dev-spi.c
- create mode 100644 arch/arm/mach-s5p64x0/setup-spi.c
- delete mode 100644 arch/arm/mach-s5pc100/dev-spi.c
- create mode 100644 arch/arm/mach-s5pc100/setup-spi.c
- delete mode 100644 arch/arm/mach-s5pv210/dev-spi.c
- create mode 100644 arch/arm/mach-s5pv210/setup-spi.c
