@@ -1,48 +1,39 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 25 Dec 2011 09:48:43 +0800
-Subject: [PATCH 01/20] ARM: clean up idle handlers
-In-Reply-To: <20111225014227.GA8240@S2100-06.ap.freescale.net>
+Date: Sun, 25 Dec 2011 09:53:23 +0800
+Subject: [PATCH 11/20] ARM: plat-mxc: hook special idle handlers to
+ arm_pm_idle
+In-Reply-To: <1324288069-21940-12-git-send-email-nico@fluxnic.net>
 References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
- <1324288069-21940-2-git-send-email-nico@fluxnic.net>
- <20111225014227.GA8240@S2100-06.ap.freescale.net>
-Message-ID: <20111225014842.GB8240@S2100-06.ap.freescale.net>
+ <1324288069-21940-12-git-send-email-nico@fluxnic.net>
+Message-ID: <20111225015322.GC8240@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 25, 2011 at 09:42:28AM +0800, Shawn Guo wrote:
-> On Mon, Dec 19, 2011 at 04:47:30AM -0500, Nicolas Pitre wrote:
-> > Let's factor out the need_resched() check instead of having it duplicated
-> > in every pm_idle implementations to avoid inconsistencies (omap2_pm_idle
-> > was missing it already).
-> > 
-> > The forceful re-enablement of IRQs after pm_idle has returned can go.
-> > The warning certainly doesn't trigger for existing users.  Similar for
-> > the redundant local_irq_disable() call in the OMAP implementations.
-> > 
-> > To get rid of the pm_idle calling convention oddity, let's introduce
-> > arm_pm_idle() allowing for the local_irq_enable() to be factored out
-> > from SOC specific implementations. The default pm_idle function becomes
-> > a wrapper for arm_pm_idle and it takes care of enabling IRQs closer to
-> > where they are initially disabled.
-> > 
-> > And finally move the comment explaining the reason for that turning off
-> > of IRQs to a more proper location.
-> > 
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > ---
-> >  arch/arm/include/asm/system.h |    1 +
-> >  arch/arm/kernel/process.c     |   23 +++++++++++++++--------
-> >  arch/arm/mach-omap1/pm.c      |   19 ++++++-------------
-> >  arch/arm/mach-omap2/pm24xx.c  |    5 ++---
-> >  arch/arm/mach-omap2/pm34xx.c  |    7 +++----
-> >  arch/arm/mach-omap2/pm44xx.c  |    2 ++
-> >  arch/arm/mach-s5p64x0/cpu.c   |   16 +++++++---------
-> >  7 files changed, 36 insertions(+), 37 deletions(-)
-> > 
-> There is one more since v3.2-rc4, imx5_idle() in arch/arm/mach-mx5/mm.c
+Hi Nico,
+
+On Mon, Dec 19, 2011 at 04:47:40AM -0500, Nicolas Pitre wrote:
+> ... and remove redundant include of <mach/system.h>.
 > 
-And imx3_idle() in arch/arm/mach-imx/mm-imx3.c
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  arch/arm/mach-imx/mm-imx3.c             |    4 ++--
+>  arch/arm/mach-imx/pm-imx27.c            |    3 +--
+>  arch/arm/mach-mx5/mm.c                  |    2 +-
+
+The hook imx_idle has been removed since v3.2-rc4 as suggested by rmk,
+so the context is changed here.
+
+>  arch/arm/mach-mxs/pm.c                  |    3 +--
+
+The mxs is a different sub-architecture/platform than imx/mxc, so it
+might be better to split it out.
 
 -- 
 Regards,
 Shawn
+
+>  arch/arm/plat-mxc/include/mach/common.h |    1 -
+>  arch/arm/plat-mxc/include/mach/system.h |    7 +------
+>  arch/arm/plat-mxc/system.c              |    1 -
+>  7 files changed, 6 insertions(+), 15 deletions(-)
+> 
