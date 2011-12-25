@@ -1,38 +1,136 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 25 Dec 2011 21:40:32 +0800
-Subject: [PATCH v2 11/15] ARM: local timers: switch imx6q to standalone
- smp_twd
-In-Reply-To: <1324574865-5367-12-git-send-email-marc.zyngier@arm.com>
-References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
- <1324574865-5367-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20111225134031.GE8240@S2100-06.ap.freescale.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 25 Dec 2011 22:08:19 +0100
+Subject: [PATCH v4 1/4] OMAP3: hwmod data: add mmu data for iva and isp
+In-Reply-To: <CAB-zwWhNNW1GEYr019xecuZTYhR55HpNGrhGjJdE1CEAfFSriQ@mail.gmail.com>
+References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
+ <CAMP44s2H7v6dRPXO6eBBNrYAnym_ZLdmKcAQPmYyCC6Wo5qOmw@mail.gmail.com>
+ <CAB-zwWhNNW1GEYr019xecuZTYhR55HpNGrhGjJdE1CEAfFSriQ@mail.gmail.com>
+Message-ID: <201112252208.20148.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Omar,
 
-On Thu, Dec 22, 2011 at 05:27:41PM +0000, Marc Zyngier wrote:
-> Convert the imx6q platforms to the standalone version of smp_twd.c.
-> Since the timer calibration code requires another timer to be up
-> and running, the actual initialisation is left to the late_timer_init
-> hook.
+On Friday 23 December 2011 16:53:58 Ramirez Luna, Omar wrote:
+> On Mon, Dec 19, 2011 at 10:11 AM, Felipe Contreras wrote:
+> > On Fri, Dec 16, 2011 at 4:01 AM, Ramirez Luna, Omar wrote:
+> >> On Thu, Dec 15, 2011 at 6:39 PM, Felipe Contreras wrote:
+> >>> Are you sure you are not missing something like:
+> >>> 
+> >>>  .clk = "cam_ick",
+> >> 
+> >> I believe in this case cam_ick is used as the main clock as it
+> >> supplies both functional and interface.
+> > 
+> > Are you sure?
 > 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-imx/Makefile     |    1 -
->  arch/arm/mach-imx/localtimer.c |   35 -----------------------------------
->  arch/arm/mach-imx/mach-imx6q.c |   12 ++++++++++++
->  3 files changed, 12 insertions(+), 36 deletions(-)
->  delete mode 100644 arch/arm/mach-imx/localtimer.c
+> As sure as 4.7.4.1.7 CAM Power Domain ;), if someone else could
+> clarify would be great to avoid the "are you sure" discussion.
+
+I don't know where the ISP IOMMU fonctional and interface clocks come from, 
+sorry. Shouldn't it be possible to find someone inside TI who can provide that 
+information ? :-)
+
+> >>>> +/* isp mmu slave ports */
+> >>>> +static struct omap_hwmod_ocp_if *omap3xxx_isp_mmu_slaves[] = {
+> >>>> +       &omap3xxx_l4_core__isp_mmu,
+> >>>> +};
+> >>>> +
+> >>>> +static struct omap_hwmod omap3xxx_isp_mmu_hwmod = {
+> >>>> +       .name           = "isp_mmu",
+> >>>> +       .class          = &omap3xxx_mmu_hwmod_class,
+> >>>> +       .mpu_irqs       = omap3xxx_isp_mmu_irqs,
+> >>>> +       .main_clk       = "cam_ick",
+> >>> 
+> >>> It's not "cam_fck"?
+> >> 
+> >> AFAIK cam_fck doesn't exist in the code, and CAM_L3_ICK is used as
+> >> both ick/fck according to TRM.
+> > 
+> > Then maybe the code is wrong.
+> > 
+> > Look at the OMAP34xx documentation, it says that:
+> > 
+> > CAM_L3_ICLK -> CAM_FCLK
+> > CAM_L4_ICLK -> CAM_ICLK
+> > CAM_MCLK -> CAM_MCLK
+> > CSI2_96M_FCLK -> CSI2_96M_FCLK
+> > 
+> > CAM_FCLK
+> > Functional clock (L3 interconnect clock domain)
+> > Functional clock domain.
+> > 
+> > CAM_ICLK
+> > Interface clock (L4 interconnect clock domain)
+> > Interface clock domain.
 > 
-Are we missing 'select ARM_SMP_TWD' for 'config SOC_IMX6Q' in
-arch/arm/mach-imx/Kconfig?
+> "The camera subsystem interface is clocked with the L3 and L4 clocks
+> (CAM_L3_ICLK and CAM_L4_ICLK, respectively). CAM_L3_ICLK is also used
+> as the main functional clock. The functional clock (CAM_MCLK) is
+> provided by DPLL4 to supply the external sensor."
+> 
+> Either CAM subsystem section or PRCM - CAM PWRDM is ambiguous or wrong.
 
-With that added,
+I haven't checked how the clocks are used in details (I started working on the 
+OMAP3 ISP driver after the clock handling code was in place), but I can at 
+least confirm that CAM_L3_ICLK is the main functional clock. I would be a bit 
+surprised if CAM_L3_ICLK was used as the interface clock as well.
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Once again, you should be able to find clarification on this subject inside 
+TI.
+
+> ...
+> 
+> > Looks like the driver is manually calling clk_get() and clk_put() for
+> > the "i3_ick", where I guess the clock framework is supposed to do
+> > that... It's almost as if somebody forgot a dependency somewhere.
+> 
+> Would be good to clarify the intentions to keep the code as it is.
+
+Once proper clock dependencies will be in place I'll be glad to remove the 
+direct l3_ick if needed.
+
+> >>>> +       .dev_attr       = &isp_mmu_dev_attr,
+> >>>> +       .slaves         = omap3xxx_isp_mmu_slaves,
+> >>>> +       .slaves_cnt     = ARRAY_SIZE(omap3xxx_isp_mmu_slaves),
+> >>>> +       .flags          = HWMOD_NO_IDLEST,
+> >>>> +};
+> >>> 
+> >>> Most of the stuff I see the hwmods is .main_lock = "foo_fck", slave
+> >>> .clk = "foo_ick". Maybe that explains the irq issues you get.
+> >> 
+> >> I see irq issues with iva hwmod because tidspbridge doesn't use iommu
+> >> API yet, so if you enable both the mmu hwmod and tidspbridge own mmu
+> >> implementation there will be some conflicts.
+> >> 
+> >> I didn't see isp issues though, but I didn't went more than
+> >> booting/enabling with isp mmu.
+> > 
+> > This is what you said:
+> > Removed clk handling during interrupt, given that in order to receive
+> > one, the device should be powered on in advance.
+> 
+> Yes, you should receive an interrupt if the clock is enabled and the
+> iommu is being used, hence the part inside in the ISR to enable the
+> clocks was removed.
+> 
+> > I'm not sure how this clock stuff works, but I'm guessing the device
+> > is supposed to go to sleep at some points in time, and with your patch
+> > "OMAP3/4: iommu: adapt to runtime pm" it won't, as long as the module
+> > is loaded, unless I'm missing something.
+> 
+> The device should be able to be put to sleep at anytime when it is NOT
+> being used. AFAIK there is no mechanism for the main processor (the
+> one running the kernel) to know when the other iommus are not being
+> used, given that they are in independent processors/subsystems, at
+> least for the ones in the DSP or M3 processors. Once the user releases
+> its iommu resource it means it is no longer using it, at that point
+> the device can be put to sleep.
+
+How should the OMAP3 ISP driver proceed to make sure that its IOMMU is clocked 
+off when it doesn't need it ?
 
 -- 
 Regards,
-Shawn
+
+Laurent Pinchart
