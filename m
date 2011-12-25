@@ -1,28 +1,44 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Sat, 24 Dec 2011 18:03:24 -0600
-Subject: [PATCH v4 4/4] OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <CAMP44s2JWRN4XVCVrbVUJwZK9zkT6p2dPnK2SPuZXJPj71c4Yg@mail.gmail.com>
-References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
- <1323922709-6986-5-git-send-email-omar.ramirez@ti.com>
- <CAMP44s3Jb9DZLUyDVU_HmQbaJKp=2qym7Z6uauNchJh0fPL4hQ@mail.gmail.com>
- <CAB-zwWhpmwRP2mNu-CdX-RVgmTRjw0UsYckAVsM+qztmVdvc7A@mail.gmail.com>
- <CAMP44s0hYWiZ8OnjQ6Jy_W7MCveP+WyHG18Tt2jRGzxSwoQP3w@mail.gmail.com>
- <CAB-zwWio5iMTyofv3Hx5Q7G7rYY5cRU4kXNQzMF0NRprEd8=5g@mail.gmail.com>
- <CAMP44s2JWRN4XVCVrbVUJwZK9zkT6p2dPnK2SPuZXJPj71c4Yg@mail.gmail.com>
-Message-ID: <CAB-zwWicBq8sUZCiRLP_6QX3jL7gsTvF0-NP1r+AvDWP+aWsMg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 25 Dec 2011 09:42:28 +0800
+Subject: [PATCH 01/20] ARM: clean up idle handlers
+In-Reply-To: <1324288069-21940-2-git-send-email-nico@fluxnic.net>
+References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
+ <1324288069-21940-2-git-send-email-nico@fluxnic.net>
+Message-ID: <20111225014227.GA8240@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2011 at 11:04 AM, Felipe Contreras
-<felipe.contreras@gmail.com> wrote:
-> Which omap-iommu? The platform driver, or the device stuff? The device
-> stuff is always built-in, but not the platform driver
-> (drivers/iommu/omap-iommu.c), that can be a module.
+On Mon, Dec 19, 2011 at 04:47:30AM -0500, Nicolas Pitre wrote:
+> Let's factor out the need_resched() check instead of having it duplicated
+> in every pm_idle implementations to avoid inconsistencies (omap2_pm_idle
+> was missing it already).
+> 
+> The forceful re-enablement of IRQs after pm_idle has returned can go.
+> The warning certainly doesn't trigger for existing users.  Similar for
+> the redundant local_irq_disable() call in the OMAP implementations.
+> 
+> To get rid of the pm_idle calling convention oddity, let's introduce
+> arm_pm_idle() allowing for the local_irq_enable() to be factored out
+> from SOC specific implementations. The default pm_idle function becomes
+> a wrapper for arm_pm_idle and it takes care of enabling IRQs closer to
+> where they are initially disabled.
+> 
+> And finally move the comment explaining the reason for that turning off
+> of IRQs to a more proper location.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  arch/arm/include/asm/system.h |    1 +
+>  arch/arm/kernel/process.c     |   23 +++++++++++++++--------
+>  arch/arm/mach-omap1/pm.c      |   19 ++++++-------------
+>  arch/arm/mach-omap2/pm24xx.c  |    5 ++---
+>  arch/arm/mach-omap2/pm34xx.c  |    7 +++----
+>  arch/arm/mach-omap2/pm44xx.c  |    2 ++
+>  arch/arm/mach-s5p64x0/cpu.c   |   16 +++++++---------
+>  7 files changed, 36 insertions(+), 37 deletions(-)
+> 
+There is one more since v3.2-rc4, imx5_idle() in arch/arm/mach-mx5/mm.c
 
-Both, I can't recall exactly when it changed (prior to being moved to
-drivers/iommu it could be built as a module), but now
-CONFIG_OMAP_IOMMU is boolean type.
-
+-- 
 Regards,
-
-Omar
+Shawn
