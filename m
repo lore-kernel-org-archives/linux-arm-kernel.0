@@ -1,38 +1,35 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 26 Dec 2011 21:44:41 +0100
-Subject: [PATCH 1/2] PM / Domains: Add OF support
-In-Reply-To: <20111226192424.GN8722@opensource.wolfsonmicro.com>
-References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
- <201112262013.19995.rjw@sisk.pl>
- <20111226192424.GN8722@opensource.wolfsonmicro.com>
-Message-ID: <201112262144.42211.rjw@sisk.pl>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon, 26 Dec 2011 21:43:23 +0100
+Subject: [PATCH 4/4] ASoC: OMAP: ams-delta: drop .set_bias_level callback
+In-Reply-To: <20111226172349.GK8722@opensource.wolfsonmicro.com>
+References: <201112261330.22783.jkrzyszt@tis.icnet.pl>
+ <20111226172349.GK8722@opensource.wolfsonmicro.com>
+Message-ID: <201112262143.23704.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 26, 2011, Mark Brown wrote:
-> On Mon, Dec 26, 2011 at 08:13:19PM +0100, Rafael J. Wysocki wrote:
-> > On Monday, December 12, 2011, Thomas Abraham wrote:
+On Monday 26 of December 2011 at 18:23:50, Mark Brown wrote:
+> On Mon, Dec 26, 2011 at 01:30:22PM +0100, Janusz Krzysztofik wrote:
 > 
-> > > A device node pointer is added to generic pm domain structure to associate
-> > > the domain with a node in the device tree.
+> > > Why's this code not been dropped and what is it for?
 > 
-> > That sounds fine except for one thing: PM domains are not devices, so adding
-> > "device node" pointers to them is kind of confusing.  Perhaps there should be
-> > something like struct dt_node, representing a more general device tree node?
+> > It is, and will be, used by another regulator consumer, the modem. The 
+> > device is controlled by the generic serial8250 driver, extended with a 
+> > custom .pm hook which enables/disables the regulator. The above code, 
+> > temporarily shared with the ASoC device before updated, is now just 
+> > moved down the board file where the modem related bits are located (see 
+> > patch 3/4).
 > 
-> There's struct of_node which is exactly that, though practically
-> speaking you need a device if you're going to bind automatically to
-> something from the device tree in a sensible fashion and there is actual
-> hardware under there so a device does make some sense.
+> > Any hints like that for the codec driver?
 > 
-> This is in part compatibility with the existing Exynos code which uses
-> devices to probe the domains for non-DT systems.
+> The main thing that looks bad here is that you're keeping track of the
+> state of the regulator by hand.  It may be that the upper layers aren't
+> reference counting in which case you might need this but it certainly
+> looks very suspicious as-is.
 
-Well, that's not a general case, though.
-
-It doesn't feel approporiate to use a "device node" pointer for something
-that's not based on struct device, at least not a generic level, so I wonder
-if there's a different way.
+OK, I can try to examine how the serial8250 driver tracks the device 
+power state when calling the .pm hook and if it looks safe to drop that 
+regulator state manual tracking.
 
 Thanks,
-Rafael
+Janusz
