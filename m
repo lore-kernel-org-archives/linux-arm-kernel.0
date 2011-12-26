@@ -1,25 +1,36 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 26 Dec 2011 10:00:18 +0800
-Subject: [PATCH] tty: serial: imx: move del_timer_sync() to avoid
- potential deadlock
-In-Reply-To: <1324589967-25365-1-git-send-email-eric.miao@linaro.org>
-References: <1324589967-25365-1-git-send-email-eric.miao@linaro.org>
-Message-ID: <20111226020017.GK8240@S2100-06.ap.freescale.net>
+Date: Mon, 26 Dec 2011 10:09:37 +0800
+Subject: [PATCH] ARM: mx5: use generic irq chip pm interface for pm
+ functions on
+In-Reply-To: <1323053069-26329-1-git-send-email-shawn.guo@linaro.org>
+References: <1323053069-26329-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111226020936.GL8240@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2011 at 05:39:27AM +0800, Eric Miao wrote:
-> del_timer_sync() acquires its own lock and doesn't have to be nested
-> within the spinlock of sport->port.lock in imx_set_termios(),  which
-> will cause potential deadlock.  Fix this by moving it outside.
+On Mon, Dec 05, 2011 at 10:44:29AM +0800, Shawn Guo wrote:
+> From: Hui Wang <jason77.wang@gmail.com>
 > 
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Greg Kroah-Hartman <gregkh@suse.de>
-> Signed-off-by: Eric Miao <eric.miao@linaro.org>
+> Two problems exist in the current i.MX5 pm suspend/resume and idle
+> functions. The first is the current i.MX5 suspend routine will call
+> tzic_enable_wake(1) to set wake source, this will set all enabled
+> irq as wake source rather than those wake capable. The second
+> is i.MX5 idle will call mx5_cpu_lp_set() to prepare enter low power
+> mode, but it forgets to call wfi instruction to enter this mode.
+> 
+> To fix these two problems, using generic irq chip pm interface and
+> modify function imx5_idle().
+> 
+> [Tested by Shawn Guo on imx51 babbage board.
+>  Tested by Hui Wang on imx51 pdk board.]
+> 
+> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-I queued this for 3.3, and will send a pull-request to Greg.
+Hi Sascha,
+
+I have another two imx/pm related patches queued for 3.3.  Since I
+have not seen this patch on any your branch, I queued it together here.
 
 -- 
 Regards,
