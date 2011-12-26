@@ -1,31 +1,44 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 26 Dec 2011 10:58:46 +0000
-Subject: [PATCH] ARM: S3C64XX: Reduce residency requirement for cpuidle WFI
- mode
-Message-ID: <1324897126-8889-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Mon, 26 Dec 2011 11:02:01 +0000
+Subject: [PATCH 2/4] ASoC: cx20442: add bias control over a platform
+ provided regulator
+In-Reply-To: <1324681944-19067-3-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <1324681944-19067-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1324681944-19067-3-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111226110201.GA8722@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Entering and leaving WFI is really cheap so there's no reason to have much
-of a residency requirement for the state. Lower it to 1ms.
+On Sat, Dec 24, 2011 at 12:12:22AM +0100, Janusz Krzysztofik wrote:
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/cpuidle.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> +	case SND_SOC_BIAS_ON:
+> +	case SND_SOC_BIAS_PREPARE:
+> +		if (IS_ERR(cx20442->por.regulator)) {
+> +			err = PTR_ERR(cx20442->por.regulator);
+> +		} else if (!cx20442->por.enabled) {
+> +			err = regulator_enable(cx20442->por.regulator);
+> +			if (!err)
+> +				cx20442->por.enabled = true;
+> +		}
+> +		break;
+> +	case SND_SOC_BIAS_STANDBY:
+> +	case SND_SOC_BIAS_OFF:
+> +		if (IS_ERR(cx20442->por.regulator)) {
+> +			err = PTR_ERR(cx20442->por.regulator);
+> +		} else if (cx20442->por.enabled) {
+> +			err = regulator_disable(cx20442->por.regulator);
+> +			if (!err)
+> +				cx20442->por.enabled = false;
+> +		}
+> +	}
+> +	mutex_unlock(&cx20442->por.lock);
 
-diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
-index 625d2c7..179460f 100644
---- a/arch/arm/mach-s3c64xx/cpuidle.c
-+++ b/arch/arm/mach-s3c64xx/cpuidle.c
-@@ -55,7 +55,7 @@ static struct cpuidle_state s3c64xx_cpuidle_set[] = {
- 	[0] = {
- 		.enter			= s3c64xx_enter_idle,
- 		.exit_latency		= 1,
--		.target_residency	= 100000,
-+		.target_residency	= 1,
- 		.flags			= CPUIDLE_FLAG_TIME_VALID,
- 		.name			= "IDLE",
- 		.desc			= "System active, ARM gated",
--- 
-1.7.7.3
+You can avoid the mutex and simplify the code by relying on the fact
+that the only possible transitions are:
+
+   OFF <-> STANDBY <-> PREPARE <-> ON
+
+which would look a lot more natural - you shouldn't need to remember if
+the regulator is enabled, you should just turn it on in the STANDBY to
+PREPARE transition and turn it off in the ON to PREPARE or PREPARE to
+STANDBY transitions.
