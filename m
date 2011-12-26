@@ -1,20 +1,24 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 26 Dec 2011 09:56:35 +0800
-Subject: [PATCH] serial/imx: let probing fail for the dt case without a
- valid alias
-In-Reply-To: <1323936994-2250-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20111215021046.GD3259@S2101-09.ap.freescale.net>
- <1323936994-2250-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20111226015634.GH8240@S2100-06.ap.freescale.net>
+Date: Mon, 26 Dec 2011 09:58:30 +0800
+Subject: [PATCH 1/2 v2] imx: Add save/restore functions for UART control
+ regs
+In-Reply-To: <1324544273-9820-1-git-send-email-dirk.behme@gmail.com>
+References: <1324544273-9820-1-git-send-email-dirk.behme@gmail.com>
+Message-ID: <20111226015829.GI8240@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 09:16:34AM +0100, Uwe Kleine-K?nig wrote:
-> When the uart device is instantiated by dt but dt doesn't provide an
-> alias then better let probing fail instead of falling back to an
-> unrelated device id used for the line number and no platform data.
+On Thu, Dec 22, 2011 at 09:57:52AM +0100, Dirk Behme wrote:
+> Factor out the uart save/restore functionality instead of
+> having the same code several times in the driver.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+> CC: Saleem Abdulrasool <compnerd@compnerd.org>
+> CC: Sascha Hauer <s.hauer@pengutronix.de>
+> CC: Fabio Estevam <festevam@gmail.com>
+> CC: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+> CC: linux-serial at vger.kernel.org
+> CC: Alan Cox <alan@linux.intel.com>
 
 I queued this for 3.3, and will send a pull-request to Greg.
 
