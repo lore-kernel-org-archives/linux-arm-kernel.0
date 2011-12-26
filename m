@@ -1,44 +1,47 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 26 Dec 2011 11:02:01 +0000
-Subject: [PATCH 2/4] ASoC: cx20442: add bias control over a platform
- provided regulator
-In-Reply-To: <1324681944-19067-3-git-send-email-jkrzyszt@tis.icnet.pl>
+Date: Mon, 26 Dec 2011 11:03:49 +0000
+Subject: [PATCH 4/4] ASoC: OMAP: ams-delta: drop .set_bias_level callback
+In-Reply-To: <1324681944-19067-5-git-send-email-jkrzyszt@tis.icnet.pl>
 References: <1324681944-19067-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <1324681944-19067-3-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <20111226110201.GA8722@opensource.wolfsonmicro.com>
+ <1324681944-19067-5-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111226110348.GB8722@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 24, 2011 at 12:12:22AM +0100, Janusz Krzysztofik wrote:
+On Sat, Dec 24, 2011 at 12:12:24AM +0100, Janusz Krzysztofik wrote:
 
-> +	case SND_SOC_BIAS_ON:
-> +	case SND_SOC_BIAS_PREPARE:
-> +		if (IS_ERR(cx20442->por.regulator)) {
-> +			err = PTR_ERR(cx20442->por.regulator);
-> +		} else if (!cx20442->por.enabled) {
-> +			err = regulator_enable(cx20442->por.regulator);
-> +			if (!err)
-> +				cx20442->por.enabled = true;
+> +struct regulator_consumer_data {
+> +	struct mutex lock;
+> +	struct regulator *regulator;
+> +	bool enabled;
+> +};
+> +
+> +static int regulator_toggle(struct regulator_consumer_data *consumer,
+> +		bool enable)
+> +{
+> +	int err = 0;
+> +
+> +	if (!consumer->regulator)
+> +		return -ENODEV;
+> +
+> +	mutex_lock(&consumer->lock);
+> +	if (IS_ERR(consumer->regulator)) {
+> +		err = PTR_ERR(consumer->regulator);
+> +	} else if (enable) {
+> +		if (!consumer->enabled) {
+> +			err = regulator_enable(consumer->regulator);
+> +			consumer->enabled = true;
 > +		}
-> +		break;
-> +	case SND_SOC_BIAS_STANDBY:
-> +	case SND_SOC_BIAS_OFF:
-> +		if (IS_ERR(cx20442->por.regulator)) {
-> +			err = PTR_ERR(cx20442->por.regulator);
-> +		} else if (cx20442->por.enabled) {
-> +			err = regulator_disable(cx20442->por.regulator);
-> +			if (!err)
-> +				cx20442->por.enabled = false;
+> +	} else {
+> +		if (consumer->enabled) {
+> +			err = regulator_disable(consumer->regulator);
+> +			consumer->enabled = false;
 > +		}
 > +	}
-> +	mutex_unlock(&cx20442->por.lock);
+> +	mutex_unlock(&consumer->lock);
+> +
+> +	return err;
+> +}
+> +
 
-You can avoid the mutex and simplify the code by relying on the fact
-that the only possible transitions are:
-
-   OFF <-> STANDBY <-> PREPARE <-> ON
-
-which would look a lot more natural - you shouldn't need to remember if
-the regulator is enabled, you should just turn it on in the STANDBY to
-PREPARE transition and turn it off in the ON to PREPARE or PREPARE to
-STANDBY transitions.
+Why's this code not been dropped and what is it for?
