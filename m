@@ -1,33 +1,30 @@
-From: a.zummo@towertech.it (Alessandro Zummo)
-Date: Mon, 26 Dec 2011 02:18:35 +0100
-Subject: [PATCH v2 04/10] rtc: rtc-twl: Add DT support for RTC inside
- twl4030/twl6030
-In-Reply-To: <4EEF6BCA.908@ti.com>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-5-git-send-email-b-cousson@ti.com>
- <4EEF6BCA.908@ti.com>
-Message-ID: <20111226021835.08c8205b@linux.lan.towertech.it>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 26 Dec 2011 09:53:23 +0800
+Subject: [PATCH v5] tty: serial: imx: Allow UART to be a source for wakeup
+In-Reply-To: <1323746628-25163-1-git-send-email-festevam@gmail.com>
+References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
+ <1323746628-25163-1-git-send-email-festevam@gmail.com>
+Message-ID: <20111226015322.GF8240@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Dec 2011 17:52:26 +0100
-"Cousson, Benoit" <b-cousson@ti.com> wrote:
-
-> Hi Alessandro,
+On Tue, Dec 13, 2011 at 01:23:48AM -0200, Fabio Estevam wrote:
+> Allow UART to be a source for wakeup from low power mode.
 > 
-> Gentle ping on this patch.
+> Tested on a MX27PDK by doing:
+> 
+> echo enabled > /sys/devices/platform/imx21-uart.0/tty/ttymxc0/power/wakeup
+> 
+> echo mem > /sys/power/state
+> 
+> and then pressing a key in the console will wakeup the sytem.
+> 
+> Suggested-by: Shawn Guo <shawn.guo@freescale.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
 
- Hi, 
-
- Acked-by: Alessandro Zummo <a.zummo@towertech.it>
-
- Andrew will probably pick it up. ty.
+I queued this for 3.3, and will send a pull-request to Greg.
 
 -- 
-
- Best regards,
-
- Alessandro Zummo,
-  Tower Technologies - Torino, Italy
-
-  http://www.towertech.it
+Regards,
+Shawn
