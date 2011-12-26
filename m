@@ -1,45 +1,26 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 26 Dec 2011 14:22:34 +0000
-Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
-In-Reply-To: <20111226134449.GA4259@richard-laptop>
-References: <1324537753-30590-1-git-send-email-richard.zhao@linaro.org>
- <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
- <20111223131851.GB13175@sirena.org.uk>
- <20111224085539.GA1892@richard-laptop>
- <20111224122411.GA13778@sirena.org.uk>
- <20111224132831.GB1803@richard-laptop>
- <20111224134227.GA20908@opensource.wolfsonmicro.com>
- <20111224155227.GC1803@richard-laptop>
- <20111226111030.GC8722@opensource.wolfsonmicro.com>
- <20111226134449.GA4259@richard-laptop>
-Message-ID: <20111226142234.GH8722@opensource.wolfsonmicro.com>
+Date: Mon, 26 Dec 2011 17:23:50 +0000
+Subject: [PATCH 4/4] ASoC: OMAP: ams-delta: drop .set_bias_level callback
+In-Reply-To: <201112261330.22783.jkrzyszt@tis.icnet.pl>
+References: <201112261330.22783.jkrzyszt@tis.icnet.pl>
+Message-ID: <20111226172349.GK8722@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 26, 2011 at 09:44:52PM +0800, Richard Zhao wrote:
-> On Mon, Dec 26, 2011 at 11:10:30AM +0000, Mark Brown wrote:
+On Mon, Dec 26, 2011 at 01:30:22PM +0100, Janusz Krzysztofik wrote:
 
-Fix your mailer to word wrap properly please.
+> > Why's this code not been dropped and what is it for?
 
-> > The *call* is there in the regulator subsystem, it's just that none of
-> > the drivers back it up with an actual implementation yet.  Which turns
-> > out to be a good thing as cpufreq can't currently understand variable
-> > latencies and the governors don't deal well with non-trivial latencies
-> > anyway.
+> It is, and will be, used by another regulator consumer, the modem. The 
+> device is controlled by the generic serial8250 driver, extended with a 
+> custom .pm hook which enables/disables the regulator. The above code, 
+> temporarily shared with the ASoC device before updated, is now just 
+> moved down the board file where the modem related bits are located (see 
+> patch 3/4).
 
-> but clk API don't have such calls. and many SoCs only adjust clk
-> frequencies, using one single voltage.
+> Any hints like that for the codec driver?
 
-I've not suggested doing this in the clock API, only for the regulator.
-For the clocks it's less clear that it's useful as you don't have the
-bulk operations and it's much rarer to need them.
-
-> > The problem with device tree is that once you've defined a binding
-> > you're stuck with it, it's very hard to change - witness all the magic
-> > number based stuff with the interrupt bindings for example
-
-> So what's your suggestion? We can not set transition_latency to set
-> random number.
-
-As I've repeatedly said I think you should define it to be the latency
-for the SoC only, not for the regulators.
+The main thing that looks bad here is that you're keeping track of the
+state of the regulator by hand.  It may be that the upper layers aren't
+reference counting in which case you might need this but it certainly
+looks very suspicious as-is.
