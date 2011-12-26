@@ -1,41 +1,55 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Mon, 26 Dec 2011 13:16:41 +0900
-Subject: Pull Requeset: Exynos4 Register Address Update for Devfreq
- Drivers.
-In-Reply-To: <088b01ccc1df$994d0090$cbe701b0$%kim@samsung.com>
-References: <CAJ0PZbQ1=+BTs0Emi78kfOWD5d90+ND5Jc_SJ9T4BcGMXyny9A@mail.gmail.com>
- <088b01ccc1df$994d0090$cbe701b0$%kim@samsung.com>
-Message-ID: <CAJ0PZbSozVrr70c4s6-F-_dNETo7Of37RxGwQnrjt2mva9B_sA@mail.gmail.com>
+From: sumit.semwal@ti.com (Semwal, Sumit)
+Date: Mon, 26 Dec 2011 12:21:45 +0530
+Subject: [Linaro-mm-sig] [RFC v3 0/2] Introduce DMA buffer sharing
+ mechanism
+In-Reply-To: <CAF6AEGs-Xgi_kmz5oag76=4v20RP5PfAM2-pyt_PyvWizgdW8Q@mail.gmail.com>
+References: <1324283611-18344-1-git-send-email-sumit.semwal@ti.com>
+ <20111220193117.GD3883@phenom.ffwll.local>
+ <CAPM=9tzi5MyCBMJhWBM_ouL=QOaxX3K6KZ8K+t7dUYJLQrF+yA@mail.gmail.com>
+ <CAB2ybb-+VTR=V1hwhF1GKxgkhTrssZ1JVOwcP6spO5O3AXqivA@mail.gmail.com>
+ <CAF6AEGs-Xgi_kmz5oag76=4v20RP5PfAM2-pyt_PyvWizgdW8Q@mail.gmail.com>
+Message-ID: <CAB2ybb-iAN_GPoUkPaEgUyhZmm9mZfoC9cf6oeaPehhCnHGu4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 24, 2011 at 10:58 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> As I commented, looks ok to me and will apply patches not pull and since I
-> didn't get your answer to ask 'topic branch is required for this', I didn't
-> yet.
+On Fri, Dec 23, 2011 at 10:50 PM, Rob Clark <rob@ti.com> wrote:
+> On Fri, Dec 23, 2011 at 4:08 AM, Semwal, Sumit <sumit.semwal@ti.com> wrote:
+>> On Wed, Dec 21, 2011 at 1:50 AM, Dave Airlie <airlied@gmail.com> wrote:
+>> <snip>
+>>>>
+>>>> Hence for both patches:
+>>>> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+>>>
+>>> Yeah I'm with Daniel, I like this one, I can definitely build the drm
+>>> buffer sharing layer on top of this.
+>>>
+>>> How do we see this getting merged? I'm quite happy to push it to Linus
+>>> if we don't have an identified path, though it could go via a Linaro
+>>> tree as well.
+>>>
+>>> so feel free to add:
+>>> Reviewed-by: Dave Airlie <airlied@redhat.com>
+>> Thanks Daniel and Dave!
+>>
+>> I guess we can start with staging for 3.3, and see how it shapes up. I
+>> will post the latest patch version pretty soon.
 >
-> As a note, if there is no reason to create based on not -rc, just use -rc.
+> not sure about staging, but could make sense to mark as experimental.
+Thanks, I will mark it experimental for the first version; we can
+remove that once it is more widely used and tested.
 >
-> Merry Christmas.
-> Thanks.
+>> Arnd, Dave: do you have any preference on the path it takes to get
+>> merged? In my mind, Linaro tree might make more sense, but I would
+>> leave it upto you gentlemen.
 >
-
-
-Hello,
-
-Having a topic branch for devfreq is fine and I don't care whether
-there is one or not as long as the required registers are supported.
-
-Because the registers added in the patches do not seem to be devfreq
-specific, I don't think we should have another branch for this. Thus,
-having the patches in your Exynos' branch is also fine.
-
-I'll let future pull-requested branches be rebased on rcX anyway. Thanks.
-
-
-Cheers! Happy new year!
-- MyungJoo
-
--- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab, DMC Business, Samsung Electronics
+> Looks like Dave is making some progress on drm usage of buffer sharing
+> between gpu's.. if that is ready to go in at the same time, it might
+> be a bit logistically simpler for him to put dmabuf in the same pull
+> req. ?I don't have strong preference one way or another, so do what is
+> collectively simpler ;-)
+:) Right - I am quite happy for it to get merged in either ways :)
+>
+> BR,
+> -R
+Best regards,
+~Sumit.
