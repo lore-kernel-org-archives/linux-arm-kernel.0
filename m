@@ -1,35 +1,55 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 26 Dec 2011 21:43:23 +0100
-Subject: [PATCH 4/4] ASoC: OMAP: ams-delta: drop .set_bias_level callback
-In-Reply-To: <20111226172349.GK8722@opensource.wolfsonmicro.com>
-References: <201112261330.22783.jkrzyszt@tis.icnet.pl>
- <20111226172349.GK8722@opensource.wolfsonmicro.com>
-Message-ID: <201112262143.23704.jkrzyszt@tis.icnet.pl>
+From: yanok@emcraft.com (Ilya Yanok)
+Date: Tue, 27 Dec 2011 00:08:31 +0100
+Subject: [PATCH 1/2] mt_ventoux: very basic support for TeeJet Mt.Ventoux board
+In-Reply-To: <1324940912-18164-1-git-send-email-yanok@emcraft.com>
+References: <1324940912-18164-1-git-send-email-yanok@emcraft.com>
+Message-ID: <1324940912-18164-2-git-send-email-yanok@emcraft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 of December 2011 at 18:23:50, Mark Brown wrote:
-> On Mon, Dec 26, 2011 at 01:30:22PM +0100, Janusz Krzysztofik wrote:
-> 
-> > > Why's this code not been dropped and what is it for?
-> 
-> > It is, and will be, used by another regulator consumer, the modem. The 
-> > device is controlled by the generic serial8250 driver, extended with a 
-> > custom .pm hook which enables/disables the regulator. The above code, 
-> > temporarily shared with the ASoC device before updated, is now just 
-> > moved down the board file where the modem related bits are located (see 
-> > patch 3/4).
-> 
-> > Any hints like that for the codec driver?
-> 
-> The main thing that looks bad here is that you're keeping track of the
-> state of the regulator by hand.  It may be that the upper layers aren't
-> reference counting in which case you might need this but it certainly
-> looks very suspicious as-is.
+Very basic support for TeeJet Mt.Ventoux board. Able to boot via
+board-generic and ramdisk/initramfs, however most of peripherals are
+not supported. Produces tons of twl4030 related errors as this board
+doesn't have twl4030 installed.
 
-OK, I can try to examine how the serial8250 driver tracks the device 
-power state when calling the .pm hook and if it looks safe to drop that 
-regulator state manual tracking.
+Signed-off-by: Ilya Yanok <yanok@emcraft.com>
+---
+ arch/arm/boot/dts/am3517_mt_ventoux.dts |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am3517_mt_ventoux.dts
 
-Thanks,
-Janusz
+diff --git a/arch/arm/boot/dts/am3517_mt_ventoux.dts b/arch/arm/boot/dts/am3517_mt_ventoux.dts
+new file mode 100644
+index 0000000..5eb26d7
+--- /dev/null
++++ b/arch/arm/boot/dts/am3517_mt_ventoux.dts
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2011 Ilya Yanok, EmCraft Systems
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++/include/ "omap3.dtsi"
++
++/ {
++	model = "TeeJet Mt.Ventoux";
++	compatible = "teejet,mt_ventoux", "ti,omap3";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256 MB */
++	};
++
++	/* AM35xx doesn't have IVA */
++	soc {
++		iva {
++			status = "disabled";
++		};
++	};
++};
+-- 
+1.7.6.4
