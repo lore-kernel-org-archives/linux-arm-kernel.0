@@ -1,38 +1,46 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Mon, 26 Dec 2011 15:08:08 +0400
-Subject: [PATCH] arm: oprofile: fix linkage issue
-In-Reply-To: <1324561016-19389-1-git-send-email-vladimir.zapolskiy@nokia.com>
-References: <1324561016-19389-1-git-send-email-vladimir.zapolskiy@nokia.com>
-Message-ID: <4EF85598.30705@ru.mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 26 Dec 2011 11:10:30 +0000
+Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <20111224155227.GC1803@richard-laptop>
+References: <1324537753-30590-1-git-send-email-richard.zhao@linaro.org>
+ <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
+ <20111223131851.GB13175@sirena.org.uk>
+ <20111224085539.GA1892@richard-laptop>
+ <20111224122411.GA13778@sirena.org.uk>
+ <20111224132831.GB1803@richard-laptop>
+ <20111224134227.GA20908@opensource.wolfsonmicro.com>
+ <20111224155227.GC1803@richard-laptop>
+Message-ID: <20111226111030.GC8722@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Sat, Dec 24, 2011 at 11:52:29PM +0800, Richard Zhao wrote:
+> On Sat, Dec 24, 2011 at 01:42:29PM +0000, Mark Brown wrote:
+> > On Sat, Dec 24, 2011 at 09:28:33PM +0800, Richard Zhao wrote:
 
-On 22-12-2011 17:36, Vladimir Zapolskiy wrote:
+> > > If you think regulator thansition latency is board specific, then the board
+> > > dts can overrite it.
 
-> This change fixes a linking problem, which happens if oprofile is selected to
-> be compiled as built-in:
+> > We should just query this information from the regulator subsystem
+> > (there's hooks but currently nothing implements them).  The regulators
+> > can define their own bindings if they need to read it from device tree,
+> > most of them should be able to do this as a function of knowing about
+> > the device.  None of this is specific to cpufreq so cpufreq shouldn't
+> > have to define its own support for this.
 
->    `oprofile_arch_exit' referenced in section `.init.text' of
->    arch/arm/oprofile/built-in.o: defined in discarded section
->    `.exit.text' of arch/arm/oprofile/built-in.o
+> I'd like to query the latency by call clk and regulator APIs. but as you said
+> both of them have not implemented it yet. I think, for now, we can use the
 
-> The problem is
+The *call* is there in the regulator subsystem, it's just that none of
+the drivers back it up with an actual implementation yet.  Which turns
+out to be a good thing as cpufreq can't currently understand variable
+latencies and the governors don't deal well with non-trivial latencies
+anyway.
 
-    s/is/has/
+> property to get the total latency. Once I can get it at runtime, I'll remove
+> it. So the definition of trans-latency is just the same as cpufreq transition_latency,
+> people get less confused. What do you think?
 
-> appeared after commit 87121ca504, which introduced
-
-    Please also specify that commit's summary in parens.
-
-> oprofile_arch_exit() calls from __init function. Note that the aforementioned
-> commit has been backported to stable branches, and the problem is known to be
-> reproduced at least with 3.0.13 and 3.1.5 kernels.
-
-> Signed-off-by: Vladimir Zapolskiy<vladimir.zapolskiy@nokia.com>
-> Cc: Will Deacon<will.deacon@arm.com>
-> Cc: Robert Richter<robert.richter@amd.com>
-> Cc: stable at kernel.org
-
-WBR, Sergei
+The problem with device tree is that once you've defined a binding
+you're stuck with it, it's very hard to change - witness all the magic
+number based stuff with the interrupt bindings for example
