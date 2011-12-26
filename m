@@ -1,53 +1,31 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Mon, 26 Dec 2011 14:51:27 +0400
-Subject: [PATCH] arm/tegra: Support Tegra30 in decompressor UART setup
-In-Reply-To: <1324587719-32731-1-git-send-email-swarren@nvidia.com>
-References: <1324587719-32731-1-git-send-email-swarren@nvidia.com>
-Message-ID: <4EF851AF.60203@ru.mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 26 Dec 2011 10:58:46 +0000
+Subject: [PATCH] ARM: S3C64XX: Reduce residency requirement for cpuidle WFI
+ mode
+Message-ID: <1324897126-8889-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Entering and leaving WFI is really cheap so there's no reason to have much
+of a residency requirement for the state. Lower it to 1ms.
 
-On 23-12-2011 1:01, Stephen Warren wrote:
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/cpuidle.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> On Tegra20, the UART clock runs at 216MHz, whereas on Tegra30 it runs at
-> 408MHz. Modify arch_decomp_setup() to detect Tegra20-vs-Tegra30 at run-
-> time, and program the correct divisor.
-
-> This makes uncompressor messages work correctly on Tegra30. This also
-> fixes early printk, assuming zImage is used and this setup code runs.
-
-> Signed-off-by: Stephen Warren<swarren@nvidia.com>
-> ---
->   arch/arm/mach-tegra/include/mach/uncompress.h |   20 ++++++++++++++++++--
->   1 files changed, 18 insertions(+), 2 deletions(-)
-
-> diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
-> index 4e83237..61d6e08 100644
-> --- a/arch/arm/mach-tegra/include/mach/uncompress.h
-> +++ b/arch/arm/mach-tegra/include/mach/uncompress.h
-[...]
-> @@ -45,15 +47,29 @@ static inline void flush(void)
->
->   static inline void arch_decomp_setup(void)
->   {
-> +	u8 *distctr = (u8 *)(TEGRA_ARM_INT_DIST_BASE +
-> +			     GIC_DIST_CTR);
-> +	u32 ctlrs, div;
->   	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
->   	int shift = 2;
->
->   	if (uart == NULL)
->   		return;
->
-> +	/*
-> +	 * Tegra20 has 4 interrupt controllers
-> +	 * Tegra30 has 5 interrupt controllers
-> +	 * Future SoCs may need additional means of identification
-> +	 */
-> +	ctlrs = (*distctr) & 0x1f;
-
-    () not necessary.
-
-WBR, Sergei
+diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
+index 625d2c7..179460f 100644
+--- a/arch/arm/mach-s3c64xx/cpuidle.c
++++ b/arch/arm/mach-s3c64xx/cpuidle.c
+@@ -55,7 +55,7 @@ static struct cpuidle_state s3c64xx_cpuidle_set[] = {
+ 	[0] = {
+ 		.enter			= s3c64xx_enter_idle,
+ 		.exit_latency		= 1,
+-		.target_residency	= 100000,
++		.target_residency	= 1,
+ 		.flags			= CPUIDLE_FLAG_TIME_VALID,
+ 		.name			= "IDLE",
+ 		.desc			= "System active, ARM gated",
+-- 
+1.7.7.3
