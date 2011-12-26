@@ -1,84 +1,468 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 26 Dec 2011 10:17:28 +0800
-Subject: [PATCH] ARM: imx6q: resume PL310 only when CACHE_L2X0 defined
-In-Reply-To: <1324526101-7140-1-git-send-email-eric.miao@linaro.org>
-References: <1324526101-7140-1-git-send-email-eric.miao@linaro.org>
-Message-ID: <20111226021727.GN8240@S2100-06.ap.freescale.net>
+From: riverful.kim@samsung.com (HeungJun, Kim)
+Date: Mon, 26 Dec 2011 12:49:21 +0900
+Subject: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
+In-Reply-To: <CAH9JG2WEcA1BwWq+uovrax5bWvuXaYsGky8D9txymXta7GY8TQ@mail.gmail.com>
+References: <1324624169-16102-1-git-send-email-riverful.kim@samsung.com>
+ <088901ccc1dd$deea1e00$9cbe5a00$%kim@samsung.com>
+ <CAH9JG2WEcA1BwWq+uovrax5bWvuXaYsGky8D9txymXta7GY8TQ@mail.gmail.com>
+Message-ID: <000d01ccc381$59fbe660$0df3b320$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 11:55:01AM +0800, Eric Miao wrote:
-> Original patch from Lothar Wa?mann, this patch fixes a building error
-> when CONFIG_CACHE_L2X0 is not defined.
+Hi Kukjun Kim, 
+
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Kyungmin Park
+> Sent: Monday, December 26, 2011 8:56 AM
+> To: Kukjin Kim
+> Cc: HeungJun, Kim; linux-samsung-soc at vger.kernel.org; arm-linux
+> Subject: Re: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
 > 
-> Cc: Lothar Wa?mann <lw@karo-electronics.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Eric Miao <eric.miao@linaro.org>
-> ---
->  arch/arm/mach-imx/head-v7.S |   13 +++++++++----
->  1 files changed, 9 insertions(+), 4 deletions(-)
+> On 12/24/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > HeungJun, Kim wrote:
+> >>
+> >> This patch adds Samsung Mobile TRATS board support.
+> >>
+> >> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
+> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >> ---
+> >>  arch/arm/mach-exynos/Kconfig       |   11 ++
+> >>  arch/arm/mach-exynos/Makefile      |    1 +
+> >>  arch/arm/mach-exynos/board-trats.c |  340
+> >> ++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 352 insertions(+), 0 deletions(-)
+> >>  create mode 100644 arch/arm/mach-exynos/board-trats.c
+> >>
+> >
+> > If this is for v3.3, unfortunately, it's a little late to add board file and
+> > since many things have changed I don't want to cause the conflicts with
+> > others now.
+> >
+> > BTW, why is the name board-xxx not mach-xxx like others?
 > 
-> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
-> index a59cae7..cec23a8 100644
-> --- a/arch/arm/mach-imx/head-v7.S
-> +++ b/arch/arm/mach-imx/head-v7.S
-> @@ -80,6 +80,7 @@ ENDPROC(v7_secondary_startup)
->  	.data
->  	.align
->  
-> +#ifdef CONFIG_CACHE_L2X0
->  	.macro	pl310_resume
->  	ldr	r2, phys_l2x0_saved_regs
->  	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
-> @@ -89,13 +90,17 @@ ENDPROC(v7_secondary_startup)
->  	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
->  	.endm
->  
-> +	.globl	phys_l2x0_saved_regs
-> +phys_l2x0_saved_regs:
-> +        .long   0
-> +#else
-> +	.macro	pl310_resume
-> +	.endm
-> +#endif
-> +
->  ENTRY(v7_cpu_resume)
->  	bl	v7_invalidate_l1
->  	pl310_resume
->  	b	cpu_resume
->  ENDPROC(v7_cpu_resume)
-> -
-> -	.globl	phys_l2x0_saved_regs
-> -phys_l2x0_saved_regs:
-> -        .long   0
->  #endif
-> -- 
-> 1.7.5.4
+> It's mentioned several times,
+> How do you talk with other when talk about the smdk?
+> "I'm using the smdk machine and it's based on smdk machine?"
+> As board is more proper word and it's easy to know when find the board
+> at source code.
+> So hope to use the board if it's not big deal.
+If you don't mind, I want to let you know additional information.
+
+I also agree with Mr.Park.
+
+Generally in the robot field, the term "machine" means the total things
+including the machinery part and even the brain "board", and the machine
+is more bigger concept.
+Probably, in the other field, this confusion will be occurred
+when they see the linux kernel source first.
+So, I think these terms might be necessary to distinguish.
+
+Thanks and Regards,
+Heungjun Kim
+
 > 
-The following change on pm-imx6q.c needs to amended, otherwise we will see
-
-  LD      .tmp_vmlinux1
-arch/arm/mach-imx/built-in.o: In function `imx6q_pm_init':
-arch/arm/mach-imx/pm-imx6q.c:70: undefined reference to `phys_l2x0_saved_regs'
-arch/arm/mach-imx/pm-imx6q.c:70: undefined reference to `l2x0_saved_regs'
-
-I fixed it up and queued for 3.3.  Thanks.
-
-Regards,
-Shawn
-
-8<----
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index f20f191..f7b0c2b 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -64,7 +64,9 @@ void __init imx6q_pm_init(void)
-         * address of the data structure used by l2x0 core to save registers,
-         * and later restore the necessary ones in imx6q resume entry.
-         */
-+#ifdef CONFIG_CACHE_L2X0
-        phys_l2x0_saved_regs = __pa(&l2x0_saved_regs);
-+#endif
-
-        suspend_set_ops(&imx6q_pm_ops);
- }
+> BR,
+> Kyungmin Park
+> >
+> >> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> >> index 0afcc3b..3bbbef8 100644
+> >> --- a/arch/arm/mach-exynos/Kconfig
+> >> +++ b/arch/arm/mach-exynos/Kconfig
+> >> @@ -304,6 +304,17 @@ config MACH_ORIGEN
+> >>  	help
+> >>  	  Machine support for ORIGEN based on Samsung EXYNOS4210
+> >>
+> >> +config MACH_TRATS
+> >> +	bool "Mobile TRATS Board"
+> >> +	select CPU_EXYNOS4210
+> >> +	select S3C_DEV_WDT
+> >> +	select S3C_DEV_HSMMC
+> >> +	select S3C_DEV_I2C5
+> >> +	select EXYNOS4_SETUP_I2C5
+> >> +	select EXYNOS4_SETUP_SDHCI
+> >> +	help
+> >> +	  Machine support for Samsung Mobile TRATS Board.
+> >> +
+> >>  comment "EXYNOS4212 Boards"
+> >>
+> >>  config MACH_SMDK4212
+> >> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+> >> index 57e5296..f3bdda9 100644
+> >> --- a/arch/arm/mach-exynos/Makefile
+> >> +++ b/arch/arm/mach-exynos/Makefile
+> >> @@ -33,6 +33,7 @@ obj-$(CONFIG_MACH_ARMLEX4210)		+= mach-
+> >> armlex4210.o
+> >>  obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
+> >>  obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
+> >>  obj-$(CONFIG_MACH_ORIGEN)		+= mach-origen.o
+> >> +obj-$(CONFIG_MACH_TRATS)		+= board-trats.o
+> >>
+> >>  obj-$(CONFIG_MACH_SMDK4212)		+= mach-smdk4x12.o
+> >>  obj-$(CONFIG_MACH_SMDK4412)		+= mach-smdk4x12.o
+> >> diff --git a/arch/arm/mach-exynos/board-trats.c b/arch/arm/mach-
+> >> exynos/board-trats.c
+> >> new file mode 100644
+> >> index 0000000..4c13dfc
+> >> --- /dev/null
+> >> +++ b/arch/arm/mach-exynos/board-trats.c
+> >> @@ -0,0 +1,340 @@
+> >> +/*
+> >> + * linux/arch/arm/mach-exynos4/board-trats.c
+> >> + *
+> >> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> + */
+> >> +
+> >> +#include <linux/platform_device.h>
+> >> +#include <linux/serial_core.h>
+> >> +#include <linux/i2c.h>
+> >> +#include <linux/gpio.h>
+> >> +#include <linux/regulator/machine.h>
+> >> +#include <linux/regulator/fixed.h>
+> >> +#include <linux/mfd/max8997.h>
+> >> +#include <linux/mfd/max8997-private.h>
+> >> +#include <linux/mmc/host.h>
+> >> +
+> >> +#include <asm/mach/arch.h>
+> >> +#include <asm/mach-types.h>
+> >> +
+> >> +#include <plat/regs-serial.h>
+> >> +#include <plat/exynos4.h>
+> >> +#include <plat/cpu.h>
+> >> +#include <plat/devs.h>
+> >> +#include <plat/sdhci.h>
+> >> +#include <plat/clock.h>
+> >> +#include <plat/gpio-cfg.h>
+> >> +#include <plat/iic.h>
+> >> +
+> >> +#include <mach/map.h>
+> >> +
+> >> +/* Following are default values for UCON, ULCON and UFCON UART registers
+> >> */
+> >> +#define TRATS_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+> >> +				 S3C2410_UCON_RXILEVEL |	\
+> >> +				 S3C2410_UCON_TXIRQMODE |	\
+> >> +				 S3C2410_UCON_RXIRQMODE |	\
+> >> +				 S3C2410_UCON_RXFIFO_TOI |	\
+> >> +				 S3C2443_UCON_RXERR_IRQEN)
+> >> +
+> >> +#define TRATS_ULCON_DEFAULT	S3C2410_LCON_CS8
+> >> +
+> >> +#define TRATS_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
+> >> +				 S5PV210_UFCON_TXTRIG256 |	\
+> >> +				 S5PV210_UFCON_RXTRIG256)
+> >> +
+> >> +enum fixed_regulator_id {
+> >> +	FIXED_REG_ID_MMC = 0,
+> >> +};
+> >> +
+> >> +static struct s3c2410_uartcfg trats_uartcfgs[] __initdata = {
+> >> +	{
+> >> +		.hwport		= 0,
+> >> +		.ucon		= TRATS_UCON_DEFAULT,
+> >> +		.ulcon		= TRATS_ULCON_DEFAULT,
+> >> +		.ufcon		= TRATS_UFCON_DEFAULT,
+> >> +	},
+> >> +	{
+> >> +		.hwport		= 1,
+> >> +		.ucon		= TRATS_UCON_DEFAULT,
+> >> +		.ulcon		= TRATS_ULCON_DEFAULT,
+> >> +		.ufcon		= TRATS_UFCON_DEFAULT,
+> >> +	},
+> >> +	{
+> >> +		.hwport		= 2,
+> >> +		.ucon		= TRATS_UCON_DEFAULT,
+> >> +		.ulcon		= TRATS_ULCON_DEFAULT,
+> >> +		.ufcon		= TRATS_UFCON_DEFAULT,
+> >> +	},
+> >> +	{
+> >> +		.hwport		= 3,
+> >> +		.ucon		= TRATS_UCON_DEFAULT,
+> >> +		.ulcon		= TRATS_ULCON_DEFAULT,
+> >> +		.ufcon		= TRATS_UFCON_DEFAULT,
+> >> +	},
+> >> +};
+> >> +
+> >> +/* eMMC */
+> >> +static struct s3c_sdhci_platdata trats_hsmmc0_data __initdata = {
+> >> +	.max_width		= 8,
+> >> +	.host_caps		= (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
+> >> +				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED
+> > |
+> >> +				MMC_CAP_DISABLE | MMC_CAP_ERASE),
+> >> +	.cd_type		= S3C_SDHCI_CD_PERMANENT,
+> >> +	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+> >> +};
+> >> +
+> >> +static struct regulator_consumer_supply emmc_supplies[] = {
+> >> +	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+> >> +};
+> >> +
+> >> +static struct regulator_init_data emmc_fixed_voltage_init_data = {
+> >> +	.constraints		= {
+> >> +		.name		= "VMEM_VDD_2.8V",
+> >> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+> >> +	},
+> >> +	.num_consumer_supplies	= ARRAY_SIZE(emmc_supplies),
+> >> +	.consumer_supplies	= emmc_supplies,
+> >> +};
+> >> +
+> >> +static struct fixed_voltage_config emmc_fixed_voltage_config = {
+> >> +	.supply_name		= "MASSMEMORY_EN (inverted)",
+> >> +	.microvolts		= 2800000,
+> >> +	.gpio			= EXYNOS4_GPK0(2),
+> >> +	.enable_high		= true,
+> >> +	.init_data		= &emmc_fixed_voltage_init_data,
+> >> +};
+> >> +
+> >> +static struct platform_device emmc_fixed_voltage = {
+> >> +	.name			= "reg-fixed-voltage",
+> >> +	.id			= FIXED_REG_ID_MMC,
+> >> +	.dev			= {
+> >> +		.platform_data	= &emmc_fixed_voltage_config,
+> >> +	},
+> >> +};
+> >> +
+> >> +static void __init trats_sdhci_init(void)
+> >> +{
+> >> +	s3c_sdhci0_set_platdata(&trats_hsmmc0_data);
+> >> +}
+> >> +
+> >> +static struct regulator_consumer_supply __initdata max8997_buck1_[] = {
+> >> +	REGULATOR_SUPPLY("vdd_arm", NULL), /* CPUFREQ */
+> >> +};
+> >> +static struct regulator_consumer_supply __initdata max8997_buck2_[] = {
+> >> +	REGULATOR_SUPPLY("vdd_int", NULL), /* CPUFREQ */
+> >> +};
+> >> +
+> >> +static struct regulator_init_data __initdata max8997_ldo2_data = {
+> >> +	.constraints	= {
+> >> +		.name		= "VALIVE_1.1V_C210",
+> >> +		.min_uV		= 1100000,
+> >> +		.max_uV		= 1100000,
+> >> +		.apply_uV	= 1,
+> >> +		.always_on	= 1,
+> >> +		.state_mem	= {
+> >> +			.enabled	= 1,
+> >> +		},
+> >> +	},
+> >> +};
+> >> +
+> >> +static struct regulator_init_data __initdata max8997_ldo6_data = {
+> >> +	.constraints	= {
+> >> +		.name		= "VCC_1.8V_PDA",
+> >> +		.min_uV		= 1800000,
+> >> +		.max_uV		= 1800000,
+> >> +		.apply_uV	= 1,
+> >> +		.always_on	= 1,
+> >> +		.state_mem	= {
+> >> +			.enabled	= 1,
+> >> +		},
+> >> +	},
+> >> +};
+> >> +
+> >> +static struct regulator_init_data __initdata max8997_ldo9_data = {
+> >> +	.constraints	= {
+> >> +		.name		= "VCC_2.8V_PDA",
+> >> +		.min_uV		= 2800000,
+> >> +		.max_uV		= 2800000,
+> >> +		.apply_uV	= 1,
+> >> +		.always_on	= 1,
+> >> +		.state_mem	= {
+> >> +			.enabled	= 1,
+> >> +		},
+> >> +	},
+> >> +};
+> >> +
+> >> +static struct regulator_init_data __initdata max8997_ldo10_data = {
+> >> +	.constraints	= {
+> >> +		.name		= "VPLL_1.1V_C210",
+> >> +		.min_uV		= 1100000,
+> >> +		.max_uV		= 1100000,
+> >> +		.apply_uV	= 1,
+> >> +		.always_on	= 1,
+> >> +		.state_mem	= {
+> >> +			.disabled	= 1,
+> >> +		},
+> >> +	},
+> >> +};
+> >> +
+> >> +static struct regulator_init_data __initdata max8997_buck1_data = {
+> >> +	.constraints	= {
+> >> +		.name		= "VARM_1.2V_C210",
+> >> +		.min_uV		= 900000,
+> >> +		.max_uV		= 1350000,
+> >> +		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
+> >> +		.always_on	= 1,
+> >> +		.state_mem	= {
+> >> +			.disabled	= 1,
+> >> +		},
+> >> +	},
+> >> +	.num_consumer_supplies = ARRAY_SIZE(max8997_buck1_),
+> >> +	.consumer_supplies = max8997_buck1_,
+> >> +};
+> >> +
+> >> +static struct regulator_init_data __initdata max8997_buck2_data = {
+> >> +	.constraints	= {
+> >> +		.name		= "VINT_1.1V_C210",
+> >> +		.min_uV		= 900000,
+> >> +		.max_uV		= 1100000,
+> >> +		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
+> >> +		.always_on	= 1,
+> >> +		.state_mem	= {
+> >> +			.disabled	= 1,
+> >> +		},
+> >> +	},
+> >> +	.num_consumer_supplies = ARRAY_SIZE(max8997_buck2_),
+> >> +	.consumer_supplies = max8997_buck2_,
+> >> +};
+> >> +
+> >> +static struct regulator_init_data __initdata max8997_buck5_data = {
+> >> +	.constraints	= {
+> >> +		.name		= "VMEM_1.2V_C210",
+> >> +		.min_uV		= 1200000,
+> >> +		.max_uV		= 1200000,
+> >> +		.apply_uV	= 1,
+> >> +		.always_on	= 1,
+> >> +		.state_mem	= {
+> >> +			.enabled	= 1,
+> >> +		},
+> >> +	},
+> >> +};
+> >> +
+> >> +static struct regulator_init_data __initdata max8997_buck6_data = {
+> >> +	.constraints	= {
+> >> +		.name		= "V_BAT",
+> >> +		.min_uV		= 2800000,
+> >> +		.max_uV		= 2800000,
+> >> +		.always_on	= 1,
+> >> +		.state_mem	= {
+> >> +			.enabled	= 1,
+> >> +		},
+> >> +	},
+> >> +};
+> >> +
+> >> +static struct max8997_regulator_data __initdata
+> > trats_max8997_regulators[]
+> >> = {
+> >> +	{ MAX8997_LDO2, &max8997_ldo2_data },
+> >> +	{ MAX8997_LDO6, &max8997_ldo6_data },
+> >> +	{ MAX8997_LDO9, &max8997_ldo9_data },
+> >> +	{ MAX8997_LDO10, &max8997_ldo10_data },
+> >> +
+> >> +	{ MAX8997_BUCK1, &max8997_buck1_data },
+> >> +	{ MAX8997_BUCK2, &max8997_buck2_data },
+> >> +	{ MAX8997_BUCK5, &max8997_buck5_data },
+> >> +	{ MAX8997_BUCK6, &max8997_buck6_data },
+> >> +};
+> >> +
+> >> +static struct max8997_platform_data __initdata trats_max8997_pdata = {
+> >> +	.wakeup			= 1,
+> >> +
+> >> +	.num_regulators		= ARRAY_SIZE(trats_max8997_regulators),
+> >> +	.regulators		= trats_max8997_regulators,
+> >> +
+> >> +	.buck125_gpios = { EXYNOS4_GPX0(5), EXYNOS4_GPX0(6),
+> >> EXYNOS4_GPL0(0) },
+> >> +
+> >> +	.buck1_voltage[0] = 1350000, /* 1.35V */
+> >> +	.buck1_voltage[1] = 1300000, /* 1.3V */
+> >> +	.buck1_voltage[2] = 1250000, /* 1.25V */
+> >> +	.buck1_voltage[3] = 1200000, /* 1.2V */
+> >> +	.buck1_voltage[4] = 1150000, /* 1.15V */
+> >> +	.buck1_voltage[5] = 1100000, /* 1.1V */
+> >> +	.buck1_voltage[6] = 1000000, /* 1.0V */
+> >> +	.buck1_voltage[7] = 950000, /* 0.95V */
+> >> +
+> >> +	.buck2_voltage[0] = 1100000, /* 1.1V */
+> >> +	.buck2_voltage[1] = 1000000, /* 1.0V */
+> >> +	.buck2_voltage[2] = 950000, /* 0.95V */
+> >> +	.buck2_voltage[3] = 900000, /* 0.9V */
+> >> +	.buck2_voltage[4] = 1100000, /* 1.1V */
+> >> +	.buck2_voltage[5] = 1000000, /* 1.0V */
+> >> +	.buck2_voltage[6] = 950000, /* 0.95V */
+> >> +	.buck2_voltage[7] = 900000, /* 0.9V */
+> >> +
+> >> +	.buck5_voltage[0] = 1200000, /* 1.2V */
+> >> +	.buck5_voltage[1] = 1200000, /* 1.2V */
+> >> +	.buck5_voltage[2] = 1200000, /* 1.2V */
+> >> +	.buck5_voltage[3] = 1200000, /* 1.2V */
+> >> +	.buck5_voltage[4] = 1200000, /* 1.2V */
+> >> +	.buck5_voltage[5] = 1200000, /* 1.2V */
+> >> +	.buck5_voltage[6] = 1200000, /* 1.2V */
+> >> +	.buck5_voltage[7] = 1200000, /* 1.2V */
+> >> +};
+> >> +
+> >> +/* I2C 5 (PMIC) */
+> >> +enum { I2C5_MAX8997 };
+> >> +static struct i2c_board_info i2c5_devs[] __initdata = {
+> >> +	[I2C5_MAX8997] = {
+> >> +		I2C_BOARD_INFO("max8997", 0xCC >> 1),
+> >> +		.platform_data	= &trats_max8997_pdata,
+> >> +	},
+> >> +};
+> >> +
+> >> +static void __init trats_power_init(void)
+> >> +{
+> >> +	int gpio;
+> >> +
+> >> +	gpio = EXYNOS4_GPX0(7);
+> >> +	gpio_request(gpio, "AP_PMIC_IRQ");
+> >> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+> >> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> >> +}
+> >> +
+> >> +static struct platform_device *trats_devices[] __initdata = {
+> >> +	/* Samsung Platform Devices */
+> >> +	&s3c_device_i2c5, /* PMIC should initialize first */
+> >> +	&emmc_fixed_voltage,
+> >> +	&s3c_device_hsmmc0,
+> >> +	&s3c_device_wdt,
+> >> +};
+> >> +
+> >> +static void __init trats_map_io(void)
+> >> +{
+> >> +	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> >> +	s3c24xx_init_clocks(24000000);
+> >> +	s3c24xx_init_uarts(trats_uartcfgs, ARRAY_SIZE(trats_uartcfgs));
+> >> +}
+> >> +
+> >> +static void __init trats_machine_init(void)
+> >> +{
+> >> +	trats_sdhci_init();
+> >> +	trats_power_init();
+> >> +
+> >> +	s3c_i2c5_set_platdata(NULL);
+> >> +	i2c5_devs[I2C5_MAX8997].irq = gpio_to_irq(EXYNOS4_GPX0(7));
+> >> +	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
+> >> +
+> >> +	/* Last */
+> >> +	platform_add_devices(trats_devices, ARRAY_SIZE(trats_devices));
+> >> +}
+> >> +
+> >> +MACHINE_START(TRATS, "TRATS")
+> >> +	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+> >> +	.atag_offset	= 0x100,
+> >> +	.init_irq	= exynos4_init_irq,
+> >> +	.map_io		= trats_map_io,
+> >> +	.init_machine	= trats_machine_init,
+> >> +	.timer		= &exynos4_timer,
+> >> +MACHINE_END
+> >> --
+> >> 1.7.4.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> > in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
