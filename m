@@ -1,27 +1,24 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 26 Dec 2011 09:53:23 +0800
-Subject: [PATCH v5] tty: serial: imx: Allow UART to be a source for wakeup
-In-Reply-To: <1323746628-25163-1-git-send-email-festevam@gmail.com>
-References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
- <1323746628-25163-1-git-send-email-festevam@gmail.com>
-Message-ID: <20111226015322.GF8240@S2100-06.ap.freescale.net>
+Date: Mon, 26 Dec 2011 09:55:44 +0800
+Subject: [PATCH] serial/imx: propagate error from of_alias_get_id instead
+ of using -ENODEV
+In-Reply-To: <1323894411-12294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1323894411-12294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20111226015543.GG8240@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2011 at 01:23:48AM -0200, Fabio Estevam wrote:
-> Allow UART to be a source for wakeup from low power mode.
+On Wed, Dec 14, 2011 at 09:26:51PM +0100, Uwe Kleine-K?nig wrote:
+> A quick look at of_alias_get_id shows that in the error case it returns
+> -ENODEV, too, but still it's better style to propagate the value as is.
 > 
-> Tested on a MX27PDK by doing:
-> 
-> echo enabled > /sys/devices/platform/imx21-uart.0/tty/ttymxc0/power/wakeup
-> 
-> echo mem > /sys/power/state
-> 
-> and then pressing a key in the console will wakeup the sytem.
-> 
-> Suggested-by: Shawn Guo <shawn.guo@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Alan Cox <alan@linux.intel.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Cc: Jason Liu <jason.hui@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
 I queued this for 3.3, and will send a pull-request to Greg.
 
