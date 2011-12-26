@@ -1,61 +1,118 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 26 Dec 2011 13:30:22 +0100
-Subject: [PATCH 4/4] ASoC: OMAP: ams-delta: drop .set_bias_level callback
-In-Reply-To: <20111226110348.GB8722@opensource.wolfsonmicro.com>
-References: <1324681944-19067-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <1324681944-19067-5-git-send-email-jkrzyszt@tis.icnet.pl>
- <20111226110348.GB8722@opensource.wolfsonmicro.com>
-Message-ID: <201112261330.22783.jkrzyszt@tis.icnet.pl>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 26 Dec 2011 21:41:30 +0800
+Subject: [PATCH] ARM: imx6q: add support for IRAM
+In-Reply-To: <1324898123-13973-1-git-send-email-jason.chen@linaro.org>
+References: <1324898123-13973-1-git-send-email-jason.chen@linaro.org>
+Message-ID: <20111226134129.GA9014@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 of December 2011 at 12:03:49, Mark Brown wrote:
-> On Sat, Dec 24, 2011 at 12:12:24AM +0100, Janusz Krzysztofik wrote:
+On Mon, Dec 26, 2011 at 07:15:23PM +0800, Jason Chen wrote:
+> Signed-off-by: Jason Chen <jason.chen@linaro.org>
+> Signed-off-by: Eric Miao <eric.miao@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi    |    7 +++++++
+>  arch/arm/mach-imx/Kconfig       |    1 +
+>  arch/arm/mach-imx/clock-imx6q.c |    3 ++-
+>  arch/arm/mach-imx/mach-imx6q.c  |   17 +++++++++++++++++
+>  4 files changed, 27 insertions(+), 1 deletions(-)
 > 
-> > +struct regulator_consumer_data {
-> > +	struct mutex lock;
-> > +	struct regulator *regulator;
-> > +	bool enabled;
-> > +};
-> > +
-> > +static int regulator_toggle(struct regulator_consumer_data *consumer,
-> > +		bool enable)
-> > +{
-> > +	int err = 0;
-> > +
-> > +	if (!consumer->regulator)
-> > +		return -ENODEV;
-> > +
-> > +	mutex_lock(&consumer->lock);
-> > +	if (IS_ERR(consumer->regulator)) {
-> > +		err = PTR_ERR(consumer->regulator);
-> > +	} else if (enable) {
-> > +		if (!consumer->enabled) {
-> > +			err = regulator_enable(consumer->regulator);
-> > +			consumer->enabled = true;
-> > +		}
-> > +	} else {
-> > +		if (consumer->enabled) {
-> > +			err = regulator_disable(consumer->regulator);
-> > +			consumer->enabled = false;
-> > +		}
-> > +	}
-> > +	mutex_unlock(&consumer->lock);
-> > +
-> > +	return err;
-> > +}
-> > +
-> 
-> Why's this code not been dropped and what is it for?
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 263e8f3..01646b8 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -80,6 +80,13 @@
+>  		};
+>  	};
+>  
+> +	ocram at 00900000 {
+> +		compatible = "fsl,imx6q-iram";
 
-It is, and will be, used by another regulator consumer, the modem. The 
-device is controlled by the generic serial8250 driver, extended with a 
-custom .pm hook which enables/disables the regulator. The above code, 
-temporarily shared with the ASoC device before updated, is now just 
-moved down the board file where the modem related bits are located (see 
-patch 3/4).
+It should have nothing specific to imx6q, and could be "fsl,iram".
+Then we can have some common code across different SoCs to match it.
 
-Any hints like that for the codec driver?
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x00900000 0x40000>;
+> +	};
+> +
 
-Thanks,
-Janusz
+Would it be better to put this node inside node 'soc', since it's
+the part of SoC?  The bonus point would be that we can save
+#address-cells and #size-cells for iram node.
+
+>  	soc {
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index fa5c10c..88eaef6 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -841,6 +841,7 @@ config SOC_IMX6Q
+>  	select HAVE_IMX_GPC
+>  	select HAVE_IMX_MMDC
+>  	select HAVE_IMX_SRC
+> +	select IRAM_ALLOC
+>  	select USE_OF
+>  
+>  	help
+> diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+> index 9273c2a..285fd06 100644
+> --- a/arch/arm/mach-imx/clock-imx6q.c
+> +++ b/arch/arm/mach-imx/clock-imx6q.c
+> @@ -1777,6 +1777,7 @@ DEF_CLK(mmdc_ch0_axi_clk, CCGR3, CG10, &periph_clk,	  &mmdc_ch0_ipg_clk);
+>  DEF_CLK(mmdc_ch1_ipg_clk, CCGR3, CG13, &ipg_clk,	  NULL);
+>  DEF_CLK(mmdc_ch1_axi_clk, CCGR3, CG11, &periph2_clk,	  &mmdc_ch1_ipg_clk);
+>  DEF_CLK(openvg_axi_clk,   CCGR3, CG13, &axi_clk,	  NULL);
+> +DEF_CLK(ocram_clk,   	  CCGR3, CG14, &ahb_clk,	  NULL);
+>  DEF_CLK(pwm1_clk,	  CCGR4, CG8,  &ipg_perclk,	  NULL);
+>  DEF_CLK(pwm2_clk,	  CCGR4, CG9,  &ipg_perclk,	  NULL);
+>  DEF_CLK(pwm3_clk,	  CCGR4, CG10, &ipg_perclk,	  NULL);
+> @@ -1982,7 +1983,7 @@ int __init mx6q_clocks_init(void)
+>  	/* only keep necessary clocks on */
+>  	writel_relaxed(0x3 << CG0  | 0x3 << CG1  | 0x3 << CG2,	CCGR0);
+>  	writel_relaxed(0x3 << CG8  | 0x3 << CG9  | 0x3 << CG10,	CCGR2);
+> -	writel_relaxed(0x3 << CG10 | 0x3 << CG12,		CCGR3);
+> +	writel_relaxed(0x3 << CG10 | 0x3 << CG12 | 0x1 << CG14,	CCGR3);
+>  	writel_relaxed(0x3 << CG4  | 0x3 << CG6  | 0x3 << CG7,	CCGR4);
+>  	writel_relaxed(0x3 << CG0,				CCGR5);
+>  	writel_relaxed(0,					CCGR6);
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index c257281..7612ef5 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -27,6 +27,7 @@
+>  #include <asm/mach/time.h>
+>  #include <mach/common.h>
+>  #include <mach/hardware.h>
+> +#include <mach/iram.h>
+>  
+>  void imx6q_restart(char mode, const char *cmd)
+>  {
+> @@ -73,6 +74,21 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+>  	return 0;
+>  }
+>  
+> +static int imx6q_init_iram(void)
+> +{
+> +	struct device_node *np;
+> +	struct resource res;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-iram");
+> +	if (np) {
+> +		if (!of_address_to_resource(np, 0, &res))
+> +			return iram_init(res.start, res.end - res.start + 1);
+> +		else
+> +			return 0;
+> +	} else
+> +		return 0;
+> +}
+> +
+This piece of code should not be imx6q specific.  Instead, it could
+become the function iram_of_init() in iram_alloc.c, so that the future
+soc like imx6dl or whatever that has iram integrated can just can call
+iram_of_init() to have iram allocator set up.
+
+-- 
+Regards,
+Shawn
