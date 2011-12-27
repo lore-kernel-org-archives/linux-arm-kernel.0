@@ -1,47 +1,44 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 27 Dec 2011 21:39:35 +0530
-Subject: [PATCH v9 REPOST 24/25] gpio/omap: restore OE only after setting the
- output level
+Date: Tue, 27 Dec 2011 21:39:36 +0530
+Subject: [PATCH v9 REPOST 25/25] gpio/omap: handle set_dataout reg capable IP
+ on restore
 In-Reply-To: <1325002176-25626-1-git-send-email-tarun.kanti@ti.com>
 References: <1325002176-25626-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1325002176-25626-25-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1325002176-25626-26-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-Setup the dataout register before restoring OE. This is to make
-sure that we have valid data in dataout register which would be
-made available in output pins as soon as OE is enabled. Else,
-there is risk of unknown data getting out into gpio pins.
+GPIO IP revisions such as those used in OMAP4 have a set_dataout
+while the previous revisions used a single dataout register.
+Depending on what is available restore the dataout settings
+to the right register.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/gpio/gpio-omap.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 36aaea7..81fdbcf 100644
+index 81fdbcf..4273401 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -1351,7 +1351,6 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- 	__raw_writel(bank->context.wake_en,
- 				bank->base + bank->regs->wkup_en);
- 	__raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
--	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
- 	__raw_writel(bank->context.leveldetect0,
- 				bank->base + bank->regs->leveldetect0);
- 	__raw_writel(bank->context.leveldetect1,
-@@ -1361,6 +1360,8 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+@@ -1359,7 +1359,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+ 				bank->base + bank->regs->risingdetect);
  	__raw_writel(bank->context.fallingdetect,
  				bank->base + bank->regs->fallingdetect);
- 	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
-+	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
-+
+-	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
++	if (bank->regs->set_dataout && bank->regs->clr_dataout)
++		__raw_writel(bank->context.dataout,
++				bank->base + bank->regs->set_dataout);
++	else
++		__raw_writel(bank->context.dataout,
++				bank->base + bank->regs->dataout);
+ 	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
+ 
  	if (bank->dbck_enable_mask) {
- 		__raw_writel(bank->context.debounce, bank->base +
- 					bank->regs->debounce);
 -- 
 1.7.0.4
