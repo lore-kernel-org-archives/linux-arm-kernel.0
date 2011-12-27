@@ -1,57 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 Dec 2011 15:23:31 -0800
-Subject: [GIT PULL 4/5] Tegra board updates for 3.3
-In-Reply-To: <201112272309.11498.arnd@arndb.de>
-References: <CAOesGMh7P6-=LbgUbYe1o7iO_-yALjce3H9ujXHW8hhikeTOsQ@mail.gmail.com>
- <201112272309.11498.arnd@arndb.de>
-Message-ID: <CAOesGMjMKZ+8e+MtEuBftODbCuCC-2UiiR+VgUq7HEZw-Z2O6Q@mail.gmail.com>
+Date: Tue, 27 Dec 2011 15:25:04 -0800
+Subject: [GIT PULL 2/5] Tegra devicetree updates for 3.3
+In-Reply-To: <201112272243.39791.arnd@arndb.de>
+References: <CAOesGMhSEbpcKXv87_cv+1b-wB7g8zmtFR2wMygByuTBv_bmvA@mail.gmail.com>
+ <201112272243.39791.arnd@arndb.de>
+Message-ID: <CAOesGMi5gEc-KAsEGDc7yw4UowEEAhkFFwKa6LoMvBf5=3WK9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2011 at 3:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi,
+
+On Tue, Dec 27, 2011 at 2:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > On Wednesday 21 December 2011, Olof Johansson wrote:
->> Please pull the below board updates for tegra for the 3.3 merge window.
+>> Hi Arnd,
 >>
->> Some of the board changes went into the soc branch due to close
->> dependencies, most of these are pinmux cleanup and prep for pinctrl
->> integration.
+>> Please pull the following device tree-related updates for tegra for 3.3. Thanks!
 >>
 >>
->> They are based on the for-3.3/soc branch.
+>> The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+>>
+>> ? Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+>>
+>> are available in the git repository at:
+>> ? git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/dt
+>>
 >
-> Ok, pulled into the next/boards branch.
+> Pulled into a new next/dt branch, thanks!
 
 Thanks!
 
->> The following changes since commit 6cc04a4420391c3f034afe8ea6e28d75912a70a3:
->>
->> ? arm/tegra: Compile tegra_dt_init_irq only when CONFIG_OF (2011-12-19
->> 18:07:22 -0800)
->>
->> are available in the git repository at:
->> ? git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/boards
->>
->> Leon Romanovsky (1):
->> ? ? ? ARM: tegra: paz00: Fix board pinmux table.
->>
->> Marc Dietrich (1):
->> ? ? ? ARM: tegra: paz00: add support for wakeup gpio key
->>
->> Olof Johansson (1):
->> ? ? ? arm/tegra: remove __initdata annotation from pinmux tables
->>
->> Stephen Warren (9):
->> ? ? ? arm/tegra: Split Seaboard GPIO table to allow for Ventana
+> There is a bogus conflict in arch/arm/mach-tegra/Makefile from merging
+> two different versions of "arm/tegra: fix variable formatting in makefile".
+> The patches are identical, but 317d5330 made it into tegra/dt and
+> 584634e3 into tegra/cleanup.
 >
-> I only just noticed that you are inconsistent with the formatting of the
-> patch subjects. We had a discussion about this a few months back and decided
-> to standardize on "ARM: tegra:" instead of "arm/tegra".
->
-> Please move to that style in future patches.
+> Trivial to fix, but something to watch out for in the future.
 
-Ack, I had moved away from ARM: platform: myself, since it seemed like
-everybody else was. :) I'll move back -- I had missed the discussion.
-
+Thanks, I just realized how that must have happened -- I had to rebase
+to a newer -rc a while back, and must have rebased each branch from
+scratch instead of rebasing dt on top of the new rebased cleanup.
 
 
 -Olof
