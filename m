@@ -1,52 +1,27 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 27 Dec 2011 21:39:34 +0530
-Subject: [PATCH v9 REPOST 23/25] gpio/omap: enable irq at the end of all
- configuration in restore
-In-Reply-To: <1325002176-25626-1-git-send-email-tarun.kanti@ti.com>
-References: <1325002176-25626-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1325002176-25626-24-git-send-email-tarun.kanti@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 27 Dec 2011 17:26:00 +0000
+Subject: [alsa-devel] [PATCH 2/4] ASoC: cx20442: add bias control over a
+ platform provided regulator
+In-Reply-To: <201112271516.09114.jkrzyszt@tis.icnet.pl>
+References: <1324681944-19067-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1324681944-19067-3-git-send-email-jkrzyszt@tis.icnet.pl>
+ <20111226110201.GA8722@opensource.wolfsonmicro.com>
+ <201112271516.09114.jkrzyszt@tis.icnet.pl>
+Message-ID: <20111227172559.GB22970@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+On Tue, Dec 27, 2011 at 03:16:08PM +0100, Janusz Krzysztofik wrote:
+> On Monday 26 of December 2011 at 12:02:01, Mark Brown wrote:
 
-Setup the interrupt enable registers only after we have configured the
-required edge and required configurations, not before, to prevent
-spurious events as part of restore routine.
+> > which would look a lot more natural - you shouldn't need to remember if
+> > the regulator is enabled, you should just turn it on in the STANDBY to
+> > PREPARE transition and turn it off in the ON to PREPARE or PREPARE to
+> > STANDBY transitions.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/gpio/gpio-omap.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+> Can I assume STANDBY or OFF at the time the codec .remove method is 
+> called? If not, is there a helper function available which can be called 
+> in order to perform all those ON -> PREPARE -> STANDBY [-> OFF] transitions before calling regulator_put()?
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 560567d..36aaea7 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1348,10 +1348,6 @@ void omap2_gpio_resume_after_idle(void)
- 
- static void omap_gpio_restore_context(struct gpio_bank *bank)
- {
--	__raw_writel(bank->context.irqenable1,
--				bank->base + bank->regs->irqenable);
--	__raw_writel(bank->context.irqenable2,
--				bank->base + bank->regs->irqenable2);
- 	__raw_writel(bank->context.wake_en,
- 				bank->base + bank->regs->wkup_en);
- 	__raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
-@@ -1371,6 +1367,11 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- 		__raw_writel(bank->context.debounce_en,
- 					bank->base + bank->regs->debounce_en);
- 	}
-+
-+	__raw_writel(bank->context.irqenable1,
-+				bank->base + bank->regs->irqenable);
-+	__raw_writel(bank->context.irqenable2,
-+				bank->base + bank->regs->irqenable2);
- }
- #else
- #define omap_gpio_suspend NULL
--- 
-1.7.0.4
+It'll be in STANDBY or OFF depending on if the device sets
+idle_bias_off.
