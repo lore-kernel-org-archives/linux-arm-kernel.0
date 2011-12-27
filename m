@@ -1,36 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Dec 2011 22:43:39 +0000
-Subject: [GIT PULL 2/5] Tegra devicetree updates for 3.3
-In-Reply-To: <CAOesGMhSEbpcKXv87_cv+1b-wB7g8zmtFR2wMygByuTBv_bmvA@mail.gmail.com>
-References: <CAOesGMhSEbpcKXv87_cv+1b-wB7g8zmtFR2wMygByuTBv_bmvA@mail.gmail.com>
-Message-ID: <201112272243.39791.arnd@arndb.de>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Tue, 27 Dec 2011 23:49:57 +0100
+Subject: [rtc-linux] Re: [PATCH v2 0/4] Implement RTC support for
+ S3C2443/S3C2416/S3C2450
+In-Reply-To: <08e301ccc430$beb4dc60$3c1e9520$%kim@samsung.com>
+References: <201112121543.42299.heiko@sntech.de>
+ <064801ccbfb1$c5d48e60$517dab20$%kim@samsung.com>
+ <201112210922.12300.heiko@sntech.de>
+ <20111223114300.GA13175@sirena.org.uk>
+ <20111226020119.2c57a26e@linux.lan.towertech.it>
+ <08e301ccc430$beb4dc60$3c1e9520$%kim@samsung.com>
+Message-ID: <20111227234957.3bc1d3c3@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 December 2011, Olof Johansson wrote:
-> Hi Arnd,
-> 
-> Please pull the following device tree-related updates for tegra for 3.3. Thanks!
-> 
-> 
-> The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
-> 
->   Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
-> 
-> are available in the git repository at:
->   git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/dt
-> 
+On Tue, 27 Dec 2011 09:44:52 +0900
+Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-Pulled into a new next/dt branch, thanks!
+> Please check next-samsung-devel-rtc branch in my tree,
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> 
+> And if you're ok to send to upstream via samsung tree, please let me know so
+> that I can add your ack on rtc patches. Of course, if any problems, let me
+> revert them and they should be re-worked.
 
-There is a bogus conflict in arch/arm/mach-tegra/Makefile from merging
-two different versions of "arm/tegra: fix variable formatting in makefile".
-The patches are identical, but 317d5330 made it into tegra/dt and
-584634e3 into tegra/cleanup.
+ Checked. Please send it via samsung tree. I can only visually check the 
+ code but don't really know if it works and I guess you are in a better
+ position to know ;)
 
-Trivial to fix, but something to watch out for in the future.
+ Acked-by: Alessandro Zummo <a.zummo@towertech.it>
 
-Another conflict in arch/arm/mach-tegra/board-dt.c with the "ARM:
-tegra2: convert to CONFIG_MULTI_IRQ_HANDLER", also trivial.
+-- 
 
-	Arnd
+ Best regards,
+
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
