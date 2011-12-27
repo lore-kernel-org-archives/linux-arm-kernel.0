@@ -1,44 +1,50 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Wed, 28 Dec 2011 00:08:56 +0100
-Subject: [PATCH 3/3 v3] ARM: EXYNOS4: Delete the power domain code depend
- on samsung SoC
-In-Reply-To: <013401cc99cd$92218f00$b664ad00$%kim@samsung.com>
-References: <4EA690F4.6040608@samsung.com>
- <013401cc99cd$92218f00$b664ad00$%kim@samsung.com>
-Message-ID: <4EFA5008.9070006@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Dec 2011 23:09:11 +0000
+Subject: [GIT PULL 4/5] Tegra board updates for 3.3
+In-Reply-To: <CAOesGMh7P6-=LbgUbYe1o7iO_-yALjce3H9ujXHW8hhikeTOsQ@mail.gmail.com>
+References: <CAOesGMh7P6-=LbgUbYe1o7iO_-yALjce3H9ujXHW8hhikeTOsQ@mail.gmail.com>
+Message-ID: <201112272309.11498.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2011 03:09 AM, Kukjin Kim wrote:
-> Chanwoo Choi wrote:
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/mach-exynos4/Kconfig           |    5 -
->>  arch/arm/mach-exynos4/Makefile          |    1 -
->>  arch/arm/mach-exynos4/dev-pd.c          |  139 -------------------------------
->>  arch/arm/plat-samsung/Kconfig           |    8 --
->>  arch/arm/plat-samsung/Makefile          |    4 -
->>  arch/arm/plat-samsung/include/plat/pd.h |   30 -------
->>  arch/arm/plat-samsung/pd.c              |   95 ---------------------
->>  7 files changed, 0 insertions(+), 282 deletions(-)
->>  delete mode 100644 arch/arm/mach-exynos4/dev-pd.c
->>  delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
->>  delete mode 100644 arch/arm/plat-samsung/pd.c
-...
-> Well, I can't agree on this because you removed power domain codes which
-> can be used for all of Samsung stuff for only EXYNOS4's generic power 
-> domain even though it was used for only EXYNOS4.
+On Wednesday 21 December 2011, Olof Johansson wrote:
+> Please pull the below board updates for tegra for the 3.3 merge window.
+> 
+> Some of the board changes went into the soc branch due to close
+> dependencies, most of these are pinmux cleanup and prep for pinctrl
+> integration.
+> 
+> 
+> They are based on the for-3.3/soc branch.
 
-In the same way the generic power domains can be used for "all Samsung stuff",
-and there is no effort of converting something that doesn't even exist in
-the mainline kernel.
-More than that, any incoming power domain support seem to be already based on
-the generic power domains...
+Ok, pulled into the next/boards branch.
 
+> The following changes since commit 6cc04a4420391c3f034afe8ea6e28d75912a70a3:
+> 
+>   arm/tegra: Compile tegra_dt_init_irq only when CONFIG_OF (2011-12-19
+> 18:07:22 -0800)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/boards
+> 
+> Leon Romanovsky (1):
+>       ARM: tegra: paz00: Fix board pinmux table.
+> 
+> Marc Dietrich (1):
+>       ARM: tegra: paz00: add support for wakeup gpio key
+> 
+> Olof Johansson (1):
+>       arm/tegra: remove __initdata annotation from pinmux tables
+>
+> Stephen Warren (9):
+>       arm/tegra: Split Seaboard GPIO table to allow for Ventana
 
---
+I only just noticed that you are inconsistent with the formatting of the
+patch subjects. We had a discussion about this a few months back and decided
+to standardize on "ARM: tegra:" instead of "arm/tegra".
+
+Please move to that style in future patches.
 
 Thanks,
-Sylwester
+
+	Arnd
