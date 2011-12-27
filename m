@@ -1,87 +1,71 @@
-From: jason.chen@linaro.org (Jason Chen)
-Date: Tue, 27 Dec 2011 09:33:59 +0800
-Subject: [PATCH 2/2] ARM: imx6q: add support for IRAM
-Message-ID: <1324949639-27246-1-git-send-email-jason.chen@linaro.org>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Tue, 27 Dec 2011 10:35:09 +0900
+Subject: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
+In-Reply-To: <08e401ccc434$841e6630$8c5b3290$%kim@samsung.com>
+References: <1324624169-16102-1-git-send-email-riverful.kim@samsung.com>
+ <088901ccc1dd$deea1e00$9cbe5a00$%kim@samsung.com>
+ <CAH9JG2WEcA1BwWq+uovrax5bWvuXaYsGky8D9txymXta7GY8TQ@mail.gmail.com>
+ <08e101ccc42f$c3a10b00$4ae32100$%kim@samsung.com>
+ <CAH9JG2VnchqHbhmDyqhqm_oT+oL5zkbbDonT1a7-5+9z+3wVXw@mail.gmail.com>
+ <08e401ccc434$841e6630$8c5b3290$%kim@samsung.com>
+Message-ID: <CAH9JG2VgU3Uuq48F-BQ4vtfkC2bn8FrF54gRq51cE8Ay1+11LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jason Chen <jason.chen@linaro.org>
-Signed-off-by: Eric Miao <eric.miao@linaro.org>
----
- arch/arm/boot/dts/imx6q.dtsi    |    5 +++++
- arch/arm/mach-imx/Kconfig       |    1 +
- arch/arm/mach-imx/clock-imx6q.c |    3 ++-
- arch/arm/mach-imx/mach-imx6q.c  |    2 ++
- 4 files changed, 10 insertions(+), 1 deletions(-)
+On 12/27/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kyungmin Park wrote:
+>>
+>> On 12/27/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > Kyungmin Park wrote:
+>> >>
+>> >> On 12/24/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> >> > HeungJun, Kim wrote:
+>> >> >>
+>> >> >> This patch adds Samsung Mobile TRATS board support.
+>> >> >>
+>> >> >> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
+>> >> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> >> >> ---
+>> >> >>  arch/arm/mach-exynos/Kconfig       |   11 ++
+>> >> >>  arch/arm/mach-exynos/Makefile      |    1 +
+>> >> >>  arch/arm/mach-exynos/board-trats.c |  340
+>> >> >> ++++++++++++++++++++++++++++++++++++
+>> >> >>  3 files changed, 352 insertions(+), 0 deletions(-)
+>> >> >>  create mode 100644 arch/arm/mach-exynos/board-trats.c
+>> >> >>
+>> >> >
+>> >> > If this is for v3.3, unfortunately, it's a little late to add board
+>> file
+>> >> and
+>> >> > since many things have changed I don't want to cause the conflicts
+>> with
+>> >> > others now.
+>> >> >
+>> >> > BTW, why is the name board-xxx not mach-xxx like others?
+>> >>
+>> >> It's mentioned several times,
+>> >> How do you talk with other when talk about the smdk?
+>> >> "I'm using the smdk machine and it's based on smdk machine?"
+>> >> As board is more proper word and it's easy to know when find the board
+>> >> at source code.
+>> >> So hope to use the board if it's not big deal.
+>> >>
+>> > Yes, we say 'SMDK board blah blah' so it can be no big deal, but I don't
+>> > want to make a confusion between CONFIG_MACH_XXX and mach-xxx.c yet even
+>> > though there is a similar situation of arch/arm/mach-xxx/ directory and
+>> > CONFIG_ARCH_XXX. In addition, the machine_is_xxx() is used to
+>> distinguish
+>> > board in the kernel.
+>> >
+>> > Anyway, I think, if to use board-xxx.c is required, we can change it all
+>> at
+>> > once and let me think again.
+>>
+>> Don't think, use the current way.
+>
+> You seem not to have the common courtesy to discuss something here.
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 263e8f3..72b78bb 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -87,6 +87,11 @@
- 		interrupt-parent = <&intc>;
- 		ranges;
- 
-+		ocram at 00900000 {
-+			compatible = "fsl,imx-iram";
-+			reg = <0x00900000 0x40000>;
-+		};
-+
- 		timer at 00a00600 {
- 			compatible = "arm,smp-twd";
- 			reg = <0x00a00600 0x100>;
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index fa5c10c..88eaef6 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -841,6 +841,7 @@ config SOC_IMX6Q
- 	select HAVE_IMX_GPC
- 	select HAVE_IMX_MMDC
- 	select HAVE_IMX_SRC
-+	select IRAM_ALLOC
- 	select USE_OF
- 
- 	help
-diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-index 9273c2a..285fd06 100644
---- a/arch/arm/mach-imx/clock-imx6q.c
-+++ b/arch/arm/mach-imx/clock-imx6q.c
-@@ -1777,6 +1777,7 @@ DEF_CLK(mmdc_ch0_axi_clk, CCGR3, CG10, &periph_clk,	  &mmdc_ch0_ipg_clk);
- DEF_CLK(mmdc_ch1_ipg_clk, CCGR3, CG13, &ipg_clk,	  NULL);
- DEF_CLK(mmdc_ch1_axi_clk, CCGR3, CG11, &periph2_clk,	  &mmdc_ch1_ipg_clk);
- DEF_CLK(openvg_axi_clk,   CCGR3, CG13, &axi_clk,	  NULL);
-+DEF_CLK(ocram_clk,   	  CCGR3, CG14, &ahb_clk,	  NULL);
- DEF_CLK(pwm1_clk,	  CCGR4, CG8,  &ipg_perclk,	  NULL);
- DEF_CLK(pwm2_clk,	  CCGR4, CG9,  &ipg_perclk,	  NULL);
- DEF_CLK(pwm3_clk,	  CCGR4, CG10, &ipg_perclk,	  NULL);
-@@ -1982,7 +1983,7 @@ int __init mx6q_clocks_init(void)
- 	/* only keep necessary clocks on */
- 	writel_relaxed(0x3 << CG0  | 0x3 << CG1  | 0x3 << CG2,	CCGR0);
- 	writel_relaxed(0x3 << CG8  | 0x3 << CG9  | 0x3 << CG10,	CCGR2);
--	writel_relaxed(0x3 << CG10 | 0x3 << CG12,		CCGR3);
-+	writel_relaxed(0x3 << CG10 | 0x3 << CG12 | 0x1 << CG14,	CCGR3);
- 	writel_relaxed(0x3 << CG4  | 0x3 << CG6  | 0x3 << CG7,	CCGR4);
- 	writel_relaxed(0x3 << CG0,				CCGR5);
- 	writel_relaxed(0,					CCGR6);
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index c257281..9bfbcfc 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -27,6 +27,7 @@
- #include <asm/mach/time.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
-+#include <mach/iram.h>
- 
- void imx6q_restart(char mode, const char *cmd)
- {
-@@ -81,6 +82,7 @@ static void __init imx6q_init_machine(void)
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
-+	of_iram_init();
- 	imx6q_pm_init();
- }
- 
--- 
-1.7.4.1
+I also have same opinion on you. Discussion(?) with you is meaningless
+and don't see any progress.
+
+BR
