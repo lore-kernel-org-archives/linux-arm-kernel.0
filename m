@@ -1,161 +1,89 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 27 Dec 2011 09:56:49 +0200
-Subject: [PATCH 2/2] mt_ventoux: support for TeeJet Mt.Ventoux board
-In-Reply-To: <1324940912-18164-3-git-send-email-yanok@emcraft.com>
-References: <1324940912-18164-1-git-send-email-yanok@emcraft.com>
- <1324940912-18164-3-git-send-email-yanok@emcraft.com>
-Message-ID: <4EF97A41.7050605@compulab.co.il>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Tue, 27 Dec 2011 16:24:16 +0800
+Subject: [PATCH V5 1/7] ARM: add cpufreq transiton notifier to adjust
+ loops_per_jiffy for smp
+In-Reply-To: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
+References: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1324974262-30963-2-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ilya,
+If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
+arch has different per-cpu loops_per_jiffy definition.
 
-On 12/27/11 01:08, Ilya Yanok wrote:
-> This patch adds support for TeeJet Mt.Ventoux board based on TAM3517
-> SOM. Supported devices:
->  - Serial
->  - Ethernet
->  - NAND
->  - USB host
->  - LCD
->  - Touchscreen
->  - CAN controller
->  - ADC128S converter
-> 
-> Signed-off-by: Ilya Yanok <yanok@emcraft.com>
-> ---
-> Requires updated machine-type file, recently posted AM35xx-EMAC patch
-> and "Disable PM init on AM35{05,17} patch.
-> 
->  arch/arm/mach-omap2/Kconfig                   |    6 +
->  arch/arm/mach-omap2/Makefile                  |    1 +
->  arch/arm/mach-omap2/board-am3517_mt_ventoux.c |  708 +++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/uncompress.h  |    1 +
->  4 files changed, 716 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/board-am3517_mt_ventoux.c
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+---
+ arch/arm/kernel/smp.c |   54 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 54 insertions(+), 0 deletions(-)
 
-[...]
-
-> diff --git a/arch/arm/mach-omap2/board-am3517_mt_ventoux.c b/arch/arm/mach-omap2/board-am3517_mt_ventoux.c
-> new file mode 100644
-> index 0000000..d4501d9
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/board-am3517_mt_ventoux.c
-
-[...]
-
-> +/*
-> + * use fake regulator for vdds_dsi as we can't find this pin inside
-> + * AM3517 datasheet.
-> + */
-> +static struct regulator_consumer_supply mt_ventoux_vdds_dsi_supply[] = {
-> +	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-> +	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
-> +};
-
-Although the TRM states that there is a vdds_dsi signal,
-it looks, from the datasheet, that VDDSHV is used to power the DSS.
-Either way, it can't be switched off, I think...
-Therefore, depending on your board wiring, you can leave it as fixed
-regulator or bind to a supply on TPS65023.
-
-[...]
-
-> +static struct i2c_board_info __initdata mt_ventoux_i2c1_devices[] = {
-> +	{
-> +		I2C_BOARD_INFO("tps65023", 0x48),
-> +		.flags = I2C_CLIENT_WAKE,
-> +		.platform_data = &mt_ventoux_regulator_data[0],
-> +	},
-> +        {
-> +                I2C_BOARD_INFO("24c02", 0x50),
-> +        },
-> +};
-
-Here (and may be in some other places) you have spaces for
-indentation. Can it be tabs instead for uniformity (and file size)?
-
-> +
-> +static struct i2c_board_info __initdata mt_ventoux_i2c2_devices[] = {
-> +        {
-> +                I2C_BOARD_INFO("24c02", 0x50),
-> +        },
-> +};
-
-also here...
-
-[...]
-
-> +#if defined(CONFIG_TOUCHSCREEN_ADS7846)
-
-Can't the ADS7846 be module?
-
-> +static struct ads7846_platform_data tsc2046_config __initdata = {
-> +	.x_max			= 0x0fff,
-> +	.y_max			= 0x0fff,
-> +	.x_plate_ohms		= 180,
-> +	.pressure_max		= 255,
-> +	.debounce_max		= 30,
-> +	.debounce_tol		= 10,
-> +	.debounce_rep		= 1,
-> +	.keep_vref_on		= 1,
-> +	.settle_delay_usecs	= 100,
-> +};
-> +#endif
-
-[...]
-
-> +static void __init mt_ventoux_init(void)
-> +{
-> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-> +	mt_ventoux_i2c_init();
-> +	platform_add_devices(mt_ventoux_devices, ARRAY_SIZE(mt_ventoux_devices));
-> +	mt_ventoux_serial_init();
-> +	omap_sdrc_init(NULL, NULL);
-> +
-> +	mt_ventoux_display_init();
-> +
-> +	/* Configure EHCI ports */
-> +	omap_mux_init_gpio(USB_PHY1_RESET, OMAP_PIN_OUTPUT);
-> +	usbhs_init(&usbhs_bdata);
-> +
-> +	/* NAND */
-> +	omap_nand_flash_init(NAND_BUSWIDTH_16, mt_ventoux_nand_partitions,
-> +			     ARRAY_SIZE(mt_ventoux_nand_partitions));
-> +
-> +	/* touchscreen */
-> +	omap_mux_init_gpio(TS_IRQ_PIN, OMAP_PIN_INPUT);
-> +	omap_ads7846_init(1, TS_IRQ_PIN, 310, &tsc2046_config);
-
-Here you call omap_ads7846_init() irregardless to
-CONFIG_TOUCHSCREEN_ADS7846, but the tsc2046_config is defined only
-if it is enabled...
-I think, either remove the #ifdef CONFIG_TOUCHSCREEN_ADS7846
-or move the above to a separate function like
-mt_ventoux_touch_init() and provide a static inline version of it
-in case the CONFIG_TOUCHSCREEN_ADS7846 is not enabled (just like you
-did for adc128s_init()).
-Otherwise, various rand_configs will fail...
-
-> +
-> +	/* Ethernet */
-> +	am35xx_ethernet_init(MCX_MDIO_FREQUENCY, 1);
-> +
-> +	/* MMC init */
-> +	omap_mux_init_gpio(SD_CARD_CD, OMAP_PIN_INPUT);
-> +	omap2_hsmmc_init(mmc);
-> +
-> +	/* ADC128S022 init */
-> +	adc128s_init();
-
-I think you are missing the __init annotation in the adc128s_init()
-function definition (just noticed after snipping).
-
-> +}
-
-[...]
-
-
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ef5640b..ac9cadc 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -25,6 +25,7 @@
+ #include <linux/percpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/completion.h>
++#include <linux/cpufreq.h>
+ 
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -631,3 +632,56 @@ int setup_profiling_timer(unsigned int multiplier)
+ {
+ 	return -EINVAL;
+ }
++
++#ifdef CONFIG_CPU_FREQ
++
++static DEFINE_PER_CPU(unsigned long, l_p_j_ref);
++static DEFINE_PER_CPU(unsigned long, l_p_j_ref_freq);
++static unsigned long global_l_p_j_ref;
++static unsigned long global_l_p_j_ref_freq;
++
++static int cpufreq_callback(struct notifier_block *nb,
++					unsigned long val, void *data)
++{
++	struct cpufreq_freqs *freq = data;
++	int cpu = freq->cpu;
++
++	if (freq->flags & CPUFREQ_CONST_LOOPS)
++		return NOTIFY_OK;
++
++	if (!per_cpu(l_p_j_ref, cpu)) {
++		per_cpu(l_p_j_ref, cpu) =
++			per_cpu(cpu_data, cpu).loops_per_jiffy;
++		per_cpu(l_p_j_ref_freq, cpu) = freq->old;
++		if (!global_l_p_j_ref) {
++			global_l_p_j_ref = loops_per_jiffy;
++			global_l_p_j_ref_freq = freq->old;
++		}
++	}
++
++	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
++	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new) ||
++	    (val == CPUFREQ_RESUMECHANGE || val == CPUFREQ_SUSPENDCHANGE)) {
++		loops_per_jiffy = cpufreq_scale(global_l_p_j_ref,
++						global_l_p_j_ref_freq,
++						freq->new);
++		per_cpu(cpu_data, cpu).loops_per_jiffy =
++			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
++					per_cpu(l_p_j_ref_freq, cpu),
++					freq->new);
++	}
++	return NOTIFY_OK;
++}
++
++static struct notifier_block cpufreq_notifier = {
++	.notifier_call  = cpufreq_callback,
++};
++
++static int __init register_cpufreq_notifier(void)
++{
++	return cpufreq_register_notifier(&cpufreq_notifier,
++						CPUFREQ_TRANSITION_NOTIFIER);
++}
++core_initcall(register_cpufreq_notifier);
++
++#endif
 -- 
-Regards,
-Igor.
+1.7.5.4
