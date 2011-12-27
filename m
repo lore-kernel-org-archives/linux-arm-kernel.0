@@ -1,32 +1,37 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Tue, 27 Dec 2011 23:16:12 +0100
-Subject: [PATCH 2/2] ARM: Exynos: Hook up power domains to generic power
- domain infrastructure
-In-Reply-To: <20111226190616.GL8722@opensource.wolfsonmicro.com>
-References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
- <1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>
- <1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>
- <20111226190616.GL8722@opensource.wolfsonmicro.com>
-Message-ID: <4EFA43AC.8030900@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Dec 2011 22:19:38 +0000
+Subject: [GIT PULL 1/5] Tegra cleanups for 3.3
+In-Reply-To: <CAOesGMja7+nA-VSF9bEmUJRbpLbVwZ+ngC1+qJ4Sz8L3Bx0m5A@mail.gmail.com>
+References: <CAOesGMja7+nA-VSF9bEmUJRbpLbVwZ+ngC1+qJ4Sz8L3Bx0m5A@mail.gmail.com>
+Message-ID: <201112272219.38986.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/26/2011 08:06 PM, Mark Brown wrote:
-> On Mon, Dec 12, 2011 at 09:16:29PM +0530, Thomas Abraham wrote:
+On Wednesday 21 December 2011, Olof Johansson wrote:
+> Hi Arnd,
 > 
->> +	/* Wait max 1ms */
->> +	timeout = 10;
->> +	while ((__raw_readl(base + 0x4) & S5P_INT_LOCAL_PWR_EN)
->> +					!= S5P_INT_LOCAL_PWR_EN) {
->> +		if (!timeout) {
->> +			pr_err("Power domain %s enable failed\n", domain->name);
->> +			return -ETIMEDOUT;
->> +		}
->> +		timeout--;
->> +		udelay(100);
->> +	}
+> Please pull the following cleanups for tegra. Thanks!
 > 
-> Might be worth putting a cpu_relax() in there just to be a bit nicer?
+> 
+> The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+> 
+>   Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/cleanup
 
-There is a quite significant delay within the loop, thus it might make more
-sense to replace udelay() with usleep_range() instead.
+Pulled and resolved a conflict with Marc's "ARM: tegra2: convert to
+CONFIG_MULTI_IRQ_HANDLER" patch, which leaves entry-macro.S
+almost empty with these contents:
+
+        .macro  disable_fiq
+        .endm
+
+        .macro  arch_ret_to_user, tmp1, tmp2
+        .endm
+
+Please confirm if this is the correct resolution.
+
+Thanks,
+
+	Arnd
