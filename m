@@ -1,39 +1,20 @@
-From: a.zummo@towertech.it (Alessandro Zummo)
-Date: Tue, 27 Dec 2011 23:49:57 +0100
-Subject: [rtc-linux] Re: [PATCH v2 0/4] Implement RTC support for
- S3C2443/S3C2416/S3C2450
-In-Reply-To: <08e301ccc430$beb4dc60$3c1e9520$%kim@samsung.com>
-References: <201112121543.42299.heiko@sntech.de>
- <064801ccbfb1$c5d48e60$517dab20$%kim@samsung.com>
- <201112210922.12300.heiko@sntech.de>
- <20111223114300.GA13175@sirena.org.uk>
- <20111226020119.2c57a26e@linux.lan.towertech.it>
- <08e301ccc430$beb4dc60$3c1e9520$%kim@samsung.com>
-Message-ID: <20111227234957.3bc1d3c3@linux.lan.towertech.it>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Dec 2011 22:59:52 +0000
+Subject: [GIT PULL 3/5] Tegra SoC updates for 3.3
+In-Reply-To: <CAOesGMgo+isLeNhi1_ruzYdJCSesZrQKpYeq5Yd9O2r2sJWbaA@mail.gmail.com>
+References: <CAOesGMgo+isLeNhi1_ruzYdJCSesZrQKpYeq5Yd9O2r2sJWbaA@mail.gmail.com>
+Message-ID: <201112272259.53209.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Dec 2011 09:44:52 +0900
-Kukjin Kim <kgene.kim@samsung.com> wrote:
-
-> Please check next-samsung-devel-rtc branch in my tree,
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+On Wednesday 21 December 2011, Olof Johansson wrote:
+> Hi Arnd,
 > 
-> And if you're ok to send to upstream via samsung tree, please let me know so
-> that I can add your ack on rtc patches. Of course, if any problems, let me
-> revert them and they should be re-worked.
+> Please pull the following SoC updates for Tegra for 3.3. The major
+> part of them is the support for Tegra3.
+> 
+> They are based on the for-3.3/dt branch, plus Russell's devel-stable branch.
 
- Checked. Please send it via samsung tree. I can only visually check the 
- code but don't really know if it works and I guess you are in a better
- position to know ;)
+Pulled into next/soc, thanks!
 
- Acked-by: Alessandro Zummo <a.zummo@towertech.it>
-
--- 
-
- Best regards,
-
- Alessandro Zummo,
-  Tower Technologies - Torino, Italy
-
-  http://www.towertech.it
+	Arnd
