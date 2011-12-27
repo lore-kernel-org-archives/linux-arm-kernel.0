@@ -1,83 +1,43 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Dec 2011 09:37:55 +0900
-Subject: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
-In-Reply-To: <000d01ccc381$59fbe660$0df3b320$%kim@samsung.com>
-References: <1324624169-16102-1-git-send-email-riverful.kim@samsung.com>
- <088901ccc1dd$deea1e00$9cbe5a00$%kim@samsung.com>
- <CAH9JG2WEcA1BwWq+uovrax5bWvuXaYsGky8D9txymXta7GY8TQ@mail.gmail.com>
- <000d01ccc381$59fbe660$0df3b320$%kim@samsung.com>
-Message-ID: <08e201ccc42f$c67e3a50$537aaef0$%kim@samsung.com>
+Date: Tue, 27 Dec 2011 09:44:52 +0900
+Subject: [rtc-linux] Re: [PATCH v2 0/4] Implement RTC support for
+ S3C2443/S3C2416/S3C2450
+In-Reply-To: <20111226020119.2c57a26e@linux.lan.towertech.it>
+References: <201112121543.42299.heiko@sntech.de>
+ <064801ccbfb1$c5d48e60$517dab20$%kim@samsung.com>
+ <201112210922.12300.heiko@sntech.de> <20111223114300.GA13175@sirena.org.uk>
+ <20111226020119.2c57a26e@linux.lan.towertech.it>
+Message-ID: <08e301ccc430$beb4dc60$3c1e9520$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HeungJun, Kim wrote:
+Alessandro Zummo wrote:
 > 
-> Hi Kukjun Kim,
+> On Fri, 23 Dec 2011 11:43:00 +0000
+> Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 > 
-> > -----Original Message-----
-> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-
-> > bounces at lists.infradead.org] On Behalf Of Kyungmin Park
-> > Sent: Monday, December 26, 2011 8:56 AM
-> > To: Kukjin Kim
-> > Cc: HeungJun, Kim; linux-samsung-soc at vger.kernel.org; arm-linux
-> > Subject: Re: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
+> > > Who is Andrew and should I include him in the recipients? I only found
+> > > Alessandro Zummo in the MAINTAINERS file for rtc stuff and am lacking
+> any
+> > > comment from the rtc-side until now.
 > >
-> > On 12/24/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > > HeungJun, Kim wrote:
-> > >>
-> > >> This patch adds Samsung Mobile TRATS board support.
-> > >>
-> > >> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
-> > >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > >> ---
-> > >>  arch/arm/mach-exynos/Kconfig       |   11 ++
-> > >>  arch/arm/mach-exynos/Makefile      |    1 +
-> > >>  arch/arm/mach-exynos/board-trats.c |  340
-> > >> ++++++++++++++++++++++++++++++++++++
-> > >>  3 files changed, 352 insertions(+), 0 deletions(-)
-> > >>  create mode 100644 arch/arm/mach-exynos/board-trats.c
-> > >>
-> > >
-> > > If this is for v3.3, unfortunately, it's a little late to add board
-> file and
-> > > since many things have changed I don't want to cause the conflicts
-> with
-> > > others now.
-> > >
-> > > BTW, why is the name board-xxx not mach-xxx like others?
-> >
-> > It's mentioned several times,
-> > How do you talk with other when talk about the smdk?
-> > "I'm using the smdk machine and it's based on smdk machine?"
-> > As board is more proper word and it's easy to know when find the board
-> > at source code.
-> > So hope to use the board if it's not big deal.
-> If you don't mind, I want to let you know additional information.
+> > Andrew Morton.  Alessandro hasn't been terribly active for a while now.
 > 
-> I also agree with Mr.Park.
+>  But I'm still keeping an eye on the patches ;)
 > 
-> Generally in the robot field, the term "machine" means the total things
-> including the machinery part and even the brain "board", and the machine
-> is more bigger concept.
-> Probably, in the other field, this confusion will be occurred
-> when they see the linux kernel source first.
-> So, I think these terms might be necessary to distinguish.
-> 
+Hi Alessandro,
 
-Well, I don't think so. I'd like to ask why you _do_ think the meaning of
-machine is bigger than board. General robot field?...Nobody knows machine
-does not mean board in the arch/arm/ kernel.
+Good to see you again :)
 
-If we use the meaning what you said the contrary is rather to be supposed.
-The confusion can be caused.
-And how about machine_is_xxx() and CONFIG_MACH_XXX for board?
+Please check next-samsung-devel-rtc branch in my tree,
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 
-...
+And if you're ok to send to upstream via samsung tree, please let me know so
+that I can add your ack on rtc patches. Of course, if any problems, let me
+revert them and they should be re-worked.
 
-Anyway, the board-xxx.c file can be used for it later but as I said, if
-required, we need to change it all at once in samsung stuff not just for
-TRATS board.
+As a note, it depends on next-samsung-devel-dt1 which includes support
+device tree for Samsung stuff, so I rebased on it.
 
 Thanks.
 
