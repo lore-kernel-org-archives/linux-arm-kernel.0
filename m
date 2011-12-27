@@ -1,38 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 27 Dec 2011 10:53:46 +0000
-Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
-In-Reply-To: <20111227015109.GJ15863@b20223-02.ap.freescale.net>
-References: <20111223131851.GB13175@sirena.org.uk>
- <20111224085539.GA1892@richard-laptop>
- <20111224122411.GA13778@sirena.org.uk>
- <20111224132831.GB1803@richard-laptop>
- <20111224134227.GA20908@opensource.wolfsonmicro.com>
- <20111224155227.GC1803@richard-laptop>
- <20111226111030.GC8722@opensource.wolfsonmicro.com>
- <20111226134449.GA4259@richard-laptop>
- <20111226142234.GH8722@opensource.wolfsonmicro.com>
- <20111227015109.GJ15863@b20223-02.ap.freescale.net>
-Message-ID: <20111227105345.GF2870@opensource.wolfsonmicro.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 27 Dec 2011 20:40:31 +0800
+Subject: [PATCH v5 REPOST 1/5] ARM: l2x0/pl310: Refactor Kconfig to be
+ more maintainable
+In-Reply-To: <1324053332-6431-2-git-send-email-dave.martin@linaro.org>
+References: <1324053332-6431-1-git-send-email-dave.martin@linaro.org>
+ <1324053332-6431-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <CAGsJ_4wFZHrnKv-aYkm11iHjgmjgHZQ3UJ2yofC2fPYa+RMidg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2011 at 09:51:10AM +0800, Richard Zhao wrote:
-> On Mon, Dec 26, 2011 at 02:22:34PM +0000, Mark Brown wrote:
+2011/12/17 Dave Martin <dave.martin@linaro.org>:
+> Making CACHE_L2X0 depend on (huge list of MACH_ and ARCH_ configs)
+> is bothersome to maintain and likely to lead to merge conflicts.
+>
+> This patch moves the knowledge of which platforms have a L2x0 or
+> PL310 cache controller to the individual machines. ?To enable this,
+> a new MIGHT_HAVE_CACHE_L2X0 config option is introduced to allow
+> machines to indicate that they may have such a cache controller
+> independently of each other.
+>
+> Boards/SoCs which cannot reliably operate without the L2 cache
+> controller support will need to select CACHE_L2X0 directly from
+> their own Kconfigs instead. ?This applies to some TrustZone-enabled
+> boards where Linux runs in the Normal World, for example.
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
+> ? ? ? ?(for cns3xxx)
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> ? ? ? ?(for omap)
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> ? ? ? ?(for imx)
 
-> > Fix your mailer to word wrap properly please.
-
-> If you mean last mail I sent, I didn't see anything wrong. I use
-> mutt.
-
-It's wrapping at a bit more than 80 columns a lot of the time.
-
-> > > So what's your suggestion? We can not set transition_latency to set
-> > > random number.
-
-> > As I've repeatedly said I think you should define it to be the latency
-> > for the SoC only, not for the regulators.
-
-> Sometimes, regulators are in SoC too. To avoid confusion, I'll use below:
-> clk-trans-latency = <61036>;
-
-Makes sense.
+Acked-by: Barry Song <baohua.song@csr.com>
+        (for prima2)
+> ---
+> ?arch/arm/Kconfig ? ? ? ? ? ? ? | ? ?8 ++++++++
+> ?arch/arm/mach-exynos/Kconfig ? | ? ?1 +
+> ?arch/arm/mach-omap2/Kconfig ? ?| ? ?1 +
+> ?arch/arm/mach-realview/Kconfig | ? ?5 +++++
+> ?arch/arm/mach-vexpress/Kconfig | ? ?1 +
+> ?arch/arm/mm/Kconfig ? ? ? ? ? ?| ? 23 ++++++++++++++++-------
+> ?arch/arm/plat-mxc/Kconfig ? ? ?| ? ?1 +
+> ?7 files changed, 33 insertions(+), 7 deletions(-)
+>
