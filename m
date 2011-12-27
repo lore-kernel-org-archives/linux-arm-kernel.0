@@ -1,53 +1,89 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Tue, 27 Dec 2011 17:53:13 +0000
-Subject: [PATCH 00/14] DMA-mapping framework redesign preparation
-In-Reply-To: <000901ccc471$15db8bc0$4192a340$%szyprowski@samsung.com>
-References: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
- <20111223163516.GO20129@parisc-linux.org>
- <000901ccc471$15db8bc0$4192a340$%szyprowski@samsung.com>
-Message-ID: <1325008393.14252.5.camel@dabdike>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 27 Dec 2011 15:39:23 -0600
+Subject: [PATCH] ARM/of: allow *machine_desc.dt_compat to be const
+In-Reply-To: <1324418205-30355-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1324418205-30355-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <4EFA3B0B.8020808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-12-27 at 09:25 +0100, Marek Szyprowski wrote:
-[...]
-> > > Usually these drivers don't touch the buffer data at all, so the mapping
-> > > in kernel virtual address space is not needed. We can introduce
-> > > DMA_ATTRIB_NO_KERNEL_MAPPING attribute which lets kernel to skip/ignore
-> > > creation of kernel virtual mapping. This way we can save previous
-> > > vmalloc area and simply some mapping operation on a few architectures.
-> > 
-> > I really think this wants to be a separate function.  dma_alloc_coherent
-> > is for allocating memory to be shared between the kernel and a driver;
-> > we already have dma_map_sg for mapping userspace I/O as an alternative
-> > interface.  This feels like it's something different again rather than
-> > an option to dma_alloc_coherent.
+On 12/20/2011 03:56 PM, Uwe Kleine-K?nig wrote:
+> This allows dt_compat to point to a constant list of compatible strings.
 > 
-> That is just a starting point for the discussion. 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
 > 
-> I thought about this API a bit and came to conclusion that there is no much
-> difference between a dma_alloc_coherent which creates a mapping in kernel
-> virtual space and the one that does not. It is just a hint from the driver
-> that it will not use that mapping at all. Of course this attribute makes sense
-> only together with adding a dma_mmap_attrs() call, because otherwise drivers
-> won't be able to get access to the buffer data.
+> does this need to be split into an of and an ARM part?
 
-This depends.  On Virtually indexed systems like PA-RISC, there are two
-ways of making a DMA range coherent.  One is to make the range uncached.
-This is incredibly slow and not what we do by default, but it can be
-used to make multiple mappings coherent.  The other is to load the
-virtual address up as a coherence index into the IOMMU.  This makes it a
-full peer in the coherence process, but means we can only designate a
-single virtual range to be coherent (not multiple mappings unless they
-happen to be congruent).  Perhaps it doesn't matter that much, since I
-don't see a use for this on PA, but if any other architecture works the
-same, you'd have to designate a single mapping as the coherent one and
-essentially promise not to use the other mapping if we followed our
-normal coherence protocols.
+No, I don't think so. I've applied it.
 
-Obviously, the usual range we currently make coherent is the kernel
-mapping (that's actually the only virtual address we have by the time
-we're deep in the iommu code), so designating a different virtual
-address would need some surgery to the guts of the iommu code.
+Thanks,
+Rob
 
-James
+> 
+> Best regards
+> Uwe
+> 
+>  arch/arm/include/asm/mach/arch.h |    2 +-
+>  drivers/of/fdt.c                 |    4 ++--
+>  include/linux/of_fdt.h           |    4 ++--
+>  3 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 2b0efc3..02a718a 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -19,7 +19,7 @@ struct machine_desc {
+>  	unsigned int		nr;		/* architecture number	*/
+>  	const char		*name;		/* architecture name	*/
+>  	unsigned long		atag_offset;	/* tagged list (relative) */
+> -	const char		**dt_compat;	/* array of device tree
+> +	const char *const 	*dt_compat;	/* array of device tree
+>  						 * 'compatible' strings	*/
+>  
+>  	unsigned int		nr_irqs;	/* number of IRQs */
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index fd85fa2..7dc8e6d 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -107,7 +107,7 @@ int of_fdt_is_compatible(struct boot_param_header *blob,
+>   * of_fdt_match - Return true if node matches a list of compatible values
+>   */
+>  int of_fdt_match(struct boot_param_header *blob, unsigned long node,
+> -                 const char **compat)
+> +                 const char *const *compat)
+>  {
+>  	unsigned int tmp, score = 0;
+>  
+> @@ -541,7 +541,7 @@ int __init of_flat_dt_is_compatible(unsigned long node, const char *compat)
+>  /**
+>   * of_flat_dt_match - Return true if node matches a list of compatible values
+>   */
+> -int __init of_flat_dt_match(unsigned long node, const char **compat)
+> +int __init of_flat_dt_match(unsigned long node, const char *const *compat)
+>  {
+>  	return of_fdt_match(initial_boot_params, node, compat);
+>  }
+> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> index c84d900..ed136ad 100644
+> --- a/include/linux/of_fdt.h
+> +++ b/include/linux/of_fdt.h
+> @@ -71,7 +71,7 @@ extern int of_fdt_is_compatible(struct boot_param_header *blob,
+>  				unsigned long node,
+>  				const char *compat);
+>  extern int of_fdt_match(struct boot_param_header *blob, unsigned long node,
+> -			const char **compat);
+> +			const char *const *compat);
+>  extern void of_fdt_unflatten_tree(unsigned long *blob,
+>  			       struct device_node **mynodes);
+>  
+> @@ -88,7 +88,7 @@ extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
+>  extern void *of_get_flat_dt_prop(unsigned long node, const char *name,
+>  				 unsigned long *size);
+>  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
+> -extern int of_flat_dt_match(unsigned long node, const char **matches);
+> +extern int of_flat_dt_match(unsigned long node, const char *const *matches);
+>  extern unsigned long of_get_flat_dt_root(void);
+>  
+>  extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
