@@ -1,49 +1,161 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Dec 2011 16:31:52 +0900
-Subject: [PATCH 09/12] ARM: EXYNOS: introduce
- arch/arm/mach-exynos/common.[ch]
-In-Reply-To: <088101ccc1d8$d2023b00$7606b100$%kim@samsung.com>
-References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
- <1324385316-6052-10-git-send-email-kgene.kim@samsung.com>
- <20111223191935.GS2577@n2100.arm.linux.org.uk>
- <088101ccc1d8$d2023b00$7606b100$%kim@samsung.com>
-Message-ID: <08f401ccc469$9a93a800$cfbaf800$%kim@samsung.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 27 Dec 2011 09:56:49 +0200
+Subject: [PATCH 2/2] mt_ventoux: support for TeeJet Mt.Ventoux board
+In-Reply-To: <1324940912-18164-3-git-send-email-yanok@emcraft.com>
+References: <1324940912-18164-1-git-send-email-yanok@emcraft.com>
+ <1324940912-18164-3-git-send-email-yanok@emcraft.com>
+Message-ID: <4EF97A41.7050605@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Hi Ilya,
+
+On 12/27/11 01:08, Ilya Yanok wrote:
+> This patch adds support for TeeJet Mt.Ventoux board based on TAM3517
+> SOM. Supported devices:
+>  - Serial
+>  - Ethernet
+>  - NAND
+>  - USB host
+>  - LCD
+>  - Touchscreen
+>  - CAN controller
+>  - ADC128S converter
 > 
-> Russell King - ARM Linux wrote:
-> >
-
-> > It looks like there's some changes made to exynos stuff between -rc1
+> Signed-off-by: Ilya Yanok <yanok@emcraft.com>
+> ---
+> Requires updated machine-type file, recently posted AM35xx-EMAC patch
+> and "Disable PM init on AM35{05,17} patch.
 > 
-> Yes, some bug has been fixed after -rc1...
-> 
+>  arch/arm/mach-omap2/Kconfig                   |    6 +
+>  arch/arm/mach-omap2/Makefile                  |    1 +
+>  arch/arm/mach-omap2/board-am3517_mt_ventoux.c |  708 +++++++++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/uncompress.h  |    1 +
+>  4 files changed, 716 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/board-am3517_mt_ventoux.c
 
-Hi Russell,
+[...]
 
-It is not a bug fix after -rc1 in mainline and the changes are from Marc's
-commit db0d4db2 ("ARM: gic: allow GIC to support non-banked setups") and
-Axel's bug fixes on Marc's patch which are in your devel-stable branch.
+> diff --git a/arch/arm/mach-omap2/board-am3517_mt_ventoux.c b/arch/arm/mach-omap2/board-am3517_mt_ventoux.c
+> new file mode 100644
+> index 0000000..d4501d9
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/board-am3517_mt_ventoux.c
 
-If this patch is not on top of Marc's patch, you can meet conflicts when you
-merge the reset branch. Nevertheless, I'm sending the cleaned patch(7257/1
-and 7258/1) which can be applied based on your restart-cleanup so that you
-can apply this easily anyway and in addition, you can apply other
-patches(7254/1, 7255/1 and 7256/1) as well.
+[...]
 
-I think, expected conflicts when you merge your branches can be fixed and if
-any problems, please let me know.
+> +/*
+> + * use fake regulator for vdds_dsi as we can't find this pin inside
+> + * AM3517 datasheet.
+> + */
+> +static struct regulator_consumer_supply mt_ventoux_vdds_dsi_supply[] = {
+> +	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
+> +	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+> +};
 
-As a note, since local common.[ch] which are not based on current samsung
-tree have been introduced, we will meet conflicts between this series and my
-tree and of course, I will fix then.
+Although the TRM states that there is a vdds_dsi signal,
+it looks, from the datasheet, that VDDSHV is used to power the DSS.
+Either way, it can't be switched off, I think...
+Therefore, depending on your board wiring, you can leave it as fixed
+regulator or bind to a supply on TPS65023.
 
-Thanks.
+[...]
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> +static struct i2c_board_info __initdata mt_ventoux_i2c1_devices[] = {
+> +	{
+> +		I2C_BOARD_INFO("tps65023", 0x48),
+> +		.flags = I2C_CLIENT_WAKE,
+> +		.platform_data = &mt_ventoux_regulator_data[0],
+> +	},
+> +        {
+> +                I2C_BOARD_INFO("24c02", 0x50),
+> +        },
+> +};
+
+Here (and may be in some other places) you have spaces for
+indentation. Can it be tabs instead for uniformity (and file size)?
+
+> +
+> +static struct i2c_board_info __initdata mt_ventoux_i2c2_devices[] = {
+> +        {
+> +                I2C_BOARD_INFO("24c02", 0x50),
+> +        },
+> +};
+
+also here...
+
+[...]
+
+> +#if defined(CONFIG_TOUCHSCREEN_ADS7846)
+
+Can't the ADS7846 be module?
+
+> +static struct ads7846_platform_data tsc2046_config __initdata = {
+> +	.x_max			= 0x0fff,
+> +	.y_max			= 0x0fff,
+> +	.x_plate_ohms		= 180,
+> +	.pressure_max		= 255,
+> +	.debounce_max		= 30,
+> +	.debounce_tol		= 10,
+> +	.debounce_rep		= 1,
+> +	.keep_vref_on		= 1,
+> +	.settle_delay_usecs	= 100,
+> +};
+> +#endif
+
+[...]
+
+> +static void __init mt_ventoux_init(void)
+> +{
+> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+> +	mt_ventoux_i2c_init();
+> +	platform_add_devices(mt_ventoux_devices, ARRAY_SIZE(mt_ventoux_devices));
+> +	mt_ventoux_serial_init();
+> +	omap_sdrc_init(NULL, NULL);
+> +
+> +	mt_ventoux_display_init();
+> +
+> +	/* Configure EHCI ports */
+> +	omap_mux_init_gpio(USB_PHY1_RESET, OMAP_PIN_OUTPUT);
+> +	usbhs_init(&usbhs_bdata);
+> +
+> +	/* NAND */
+> +	omap_nand_flash_init(NAND_BUSWIDTH_16, mt_ventoux_nand_partitions,
+> +			     ARRAY_SIZE(mt_ventoux_nand_partitions));
+> +
+> +	/* touchscreen */
+> +	omap_mux_init_gpio(TS_IRQ_PIN, OMAP_PIN_INPUT);
+> +	omap_ads7846_init(1, TS_IRQ_PIN, 310, &tsc2046_config);
+
+Here you call omap_ads7846_init() irregardless to
+CONFIG_TOUCHSCREEN_ADS7846, but the tsc2046_config is defined only
+if it is enabled...
+I think, either remove the #ifdef CONFIG_TOUCHSCREEN_ADS7846
+or move the above to a separate function like
+mt_ventoux_touch_init() and provide a static inline version of it
+in case the CONFIG_TOUCHSCREEN_ADS7846 is not enabled (just like you
+did for adc128s_init()).
+Otherwise, various rand_configs will fail...
+
+> +
+> +	/* Ethernet */
+> +	am35xx_ethernet_init(MCX_MDIO_FREQUENCY, 1);
+> +
+> +	/* MMC init */
+> +	omap_mux_init_gpio(SD_CARD_CD, OMAP_PIN_INPUT);
+> +	omap2_hsmmc_init(mmc);
+> +
+> +	/* ADC128S022 init */
+> +	adc128s_init();
+
+I think you are missing the __init annotation in the adc128s_init()
+function definition (just noticed after snipping).
+
+> +}
+
+[...]
+
+
+-- 
+Regards,
+Igor.
