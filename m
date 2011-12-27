@@ -1,73 +1,59 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 27 Dec 2011 16:24:18 +0800
-Subject: [PATCH V5 3/7] cpufreq: OMAP: remove loops_per_jiffy recalculate for
- smp
-In-Reply-To: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
-References: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1324974262-30963-4-git-send-email-richard.zhao@linaro.org>
+Date: Tue, 27 Dec 2011 16:24:15 +0800
+Subject: [PATCH V5 0/7] add a generic cpufreq driver
+Message-ID: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm registered cpufreq transition notifier to recalculate it.
+The driver is based on clock and regulator APIs and  support single core
+and multi core ARM SoCs. For multi core, it assume all cores share the
+same clock and voltage.
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- drivers/cpufreq/omap-cpufreq.c |   36 ------------------------------------
- 1 files changed, 0 insertions(+), 36 deletions(-)
+Thanks Arnd, Mark, Jamie, Rob, for your review.
 
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 5d04c57..17da4c4 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -37,16 +37,6 @@
- 
- #include <mach/hardware.h>
- 
--#ifdef CONFIG_SMP
--struct lpj_info {
--	unsigned long	ref;
--	unsigned int	freq;
--};
--
--static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
--static struct lpj_info global_lpj_ref;
--#endif
--
- static struct cpufreq_frequency_table *freq_table;
- static atomic_t freq_table_users = ATOMIC_INIT(0);
- static struct clk *mpu_clk;
-@@ -118,32 +108,6 @@ static int omap_target(struct cpufreq_policy *policy,
- 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
- 	freqs.new = omap_getspeed(policy->cpu);
- 
--#ifdef CONFIG_SMP
--	/*
--	 * Note that loops_per_jiffy is not updated on SMP systems in
--	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
--	 * on frequency transition. We need to update all dependent CPUs.
--	 */
--	for_each_cpu(i, policy->cpus) {
--		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
--		if (!lpj->freq) {
--			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
--			lpj->freq = freqs.old;
--		}
--
--		per_cpu(cpu_data, i).loops_per_jiffy =
--			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
--	}
--
--	/* And don't forget to adjust the global one */
--	if (!global_lpj_ref.freq) {
--		global_lpj_ref.ref = loops_per_jiffy;
--		global_lpj_ref.freq = freqs.old;
--	}
--	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
--					freqs.new);
--#endif
--
- 	/* notifiers */
- 	for_each_cpu(i, policy->cpus) {
- 		freqs.cpu = i;
--- 
-1.7.5.4
+Changes in V5:
+ - add more comments
+ - rename trans-latency to clk-trans-latency, and it only describe clk
+   latency. Regulator latency is got from regulator_set_voltage_time.
+
+Changes in v4:
+ - add depends on HAVE_CLK && OF && REGULATOR
+ - add set_cpu_freq fail check
+ - regulator_put wehn module exit
+ - add pr_fmt and convert all printk to pr_xxx
+ - use voltage range
+ - comment and doc fix
+ - add cpu_volts value pre-check in module init
+ - add helpfull module parameter max_freq
+ - remove compatible string check on Arnd's comment.
+ - remove generic-cpufreq to clk-reg-cpufreq
+
+Changes in v3:
+ - move adjusting smp loops_per_jiffy to arm common code,
+   and also adjust global loops_per_jiffy.
+ - remove adjusting loops_per_jiffy in imx and omap cpufreq drivers.
+ - check compatible "generic-cpufreq" when module_init
+ - change printk to pr_xxx
+ - add generic-cpufreq DT binding doc
+
+Changes in v2:
+ - add volatage change support
+ - change '_' in property name to '-'
+ - use initial value to calculate loops_per_jiffy
+ - fix reading cpu_volts property bug 
+ - let cpufreq_frequency_table_cpuinfo routines handle cpu_freq_khz_max/min
+ - don't change freq in arm_cpufreq_exit, because every core share the same freq.
+ - use unsigned long describe frequency as much as possible. Because clk use
+   unsigned long, but cpufreq use unsigned int.
+
+
+[PATCH V5 1/7] ARM: add cpufreq transiton notifier to adjust
+[PATCH V5 2/7] arm/imx: cpufreq: remove loops_per_jiffy recalculate
+[PATCH V5 3/7] cpufreq: OMAP: remove loops_per_jiffy recalculate for
+[PATCH V5 4/7] cpufreq: add clk-reg cpufreq driver
+[PATCH V5 5/7] dts/imx6q: add cpufreq property
+[PATCH V5 6/7] arm/imx6q: register arm_clk as cpu to clkdev
+[PATCH V5 7/7] arm/imx6q: select ARCH_HAS_CPUFREQ
+
+Thanks
+Richard
