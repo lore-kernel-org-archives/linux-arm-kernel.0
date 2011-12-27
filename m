@@ -1,46 +1,53 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 27 Dec 2011 20:40:31 +0800
-Subject: [PATCH v5 REPOST 1/5] ARM: l2x0/pl310: Refactor Kconfig to be
- more maintainable
-In-Reply-To: <1324053332-6431-2-git-send-email-dave.martin@linaro.org>
-References: <1324053332-6431-1-git-send-email-dave.martin@linaro.org>
- <1324053332-6431-2-git-send-email-dave.martin@linaro.org>
-Message-ID: <CAGsJ_4wFZHrnKv-aYkm11iHjgmjgHZQ3UJ2yofC2fPYa+RMidg@mail.gmail.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 27 Dec 2011 15:16:08 +0100
+Subject: [alsa-devel] [PATCH 2/4] ASoC: cx20442: add bias control over a
+ platform provided regulator
+In-Reply-To: <20111226110201.GA8722@opensource.wolfsonmicro.com>
+References: <1324681944-19067-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1324681944-19067-3-git-send-email-jkrzyszt@tis.icnet.pl>
+ <20111226110201.GA8722@opensource.wolfsonmicro.com>
+Message-ID: <201112271516.09114.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/12/17 Dave Martin <dave.martin@linaro.org>:
-> Making CACHE_L2X0 depend on (huge list of MACH_ and ARCH_ configs)
-> is bothersome to maintain and likely to lead to merge conflicts.
->
-> This patch moves the knowledge of which platforms have a L2x0 or
-> PL310 cache controller to the individual machines. ?To enable this,
-> a new MIGHT_HAVE_CACHE_L2X0 config option is introduced to allow
-> machines to indicate that they may have such a cache controller
-> independently of each other.
->
-> Boards/SoCs which cannot reliably operate without the L2 cache
-> controller support will need to select CACHE_L2X0 directly from
-> their own Kconfigs instead. ?This applies to some TrustZone-enabled
-> boards where Linux runs in the Normal World, for example.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
-> ? ? ? ?(for cns3xxx)
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> ? ? ? ?(for omap)
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> ? ? ? ?(for imx)
+On Monday 26 of December 2011 at 12:02:01, Mark Brown wrote:
+> On Sat, Dec 24, 2011 at 12:12:22AM +0100, Janusz Krzysztofik wrote:
+> 
+> > +	case SND_SOC_BIAS_ON:
+> > +	case SND_SOC_BIAS_PREPARE:
+> > +		if (IS_ERR(cx20442->por.regulator)) {
+> > +			err = PTR_ERR(cx20442->por.regulator);
+> > +		} else if (!cx20442->por.enabled) {
+> > +			err = regulator_enable(cx20442->por.regulator);
+> > +			if (!err)
+> > +				cx20442->por.enabled = true;
+> > +		}
+> > +		break;
+> > +	case SND_SOC_BIAS_STANDBY:
+> > +	case SND_SOC_BIAS_OFF:
+> > +		if (IS_ERR(cx20442->por.regulator)) {
+> > +			err = PTR_ERR(cx20442->por.regulator);
+> > +		} else if (cx20442->por.enabled) {
+> > +			err = regulator_disable(cx20442->por.regulator);
+> > +			if (!err)
+> > +				cx20442->por.enabled = false;
+> > +		}
+> > +	}
+> > +	mutex_unlock(&cx20442->por.lock);
+> 
+> You can avoid the mutex and simplify the code by relying on the fact
+> that the only possible transitions are:
+> 
+>    OFF <-> STANDBY <-> PREPARE <-> ON
+> 
+> which would look a lot more natural - you shouldn't need to remember if
+> the regulator is enabled, you should just turn it on in the STANDBY to
+> PREPARE transition and turn it off in the ON to PREPARE or PREPARE to
+> STANDBY transitions.
 
-Acked-by: Barry Song <baohua.song@csr.com>
-        (for prima2)
-> ---
-> ?arch/arm/Kconfig ? ? ? ? ? ? ? | ? ?8 ++++++++
-> ?arch/arm/mach-exynos/Kconfig ? | ? ?1 +
-> ?arch/arm/mach-omap2/Kconfig ? ?| ? ?1 +
-> ?arch/arm/mach-realview/Kconfig | ? ?5 +++++
-> ?arch/arm/mach-vexpress/Kconfig | ? ?1 +
-> ?arch/arm/mm/Kconfig ? ? ? ? ? ?| ? 23 ++++++++++++++++-------
-> ?arch/arm/plat-mxc/Kconfig ? ? ?| ? ?1 +
-> ?7 files changed, 33 insertions(+), 7 deletions(-)
->
+Can I assume STANDBY or OFF at the time the codec .remove method is 
+called? If not, is there a helper function available which can be called 
+in order to perform all those ON -> PREPARE -> STANDBY [-> OFF] transitions before calling regulator_put()?
+
+Thanks,
+Janusz
