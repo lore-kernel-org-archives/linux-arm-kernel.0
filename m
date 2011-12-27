@@ -1,89 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 27 Dec 2011 15:39:23 -0600
-Subject: [PATCH] ARM/of: allow *machine_desc.dt_compat to be const
-In-Reply-To: <1324418205-30355-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1324418205-30355-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4EFA3B0B.8020808@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Dec 2011 21:52:50 +0000
+Subject: [GIT PULL] omap hwmod changes for v3.3 merge window
+In-Reply-To: <20111219194818.GQ6464@atomide.com>
+References: <20111219194818.GQ6464@atomide.com>
+Message-ID: <201112272152.50502.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2011 03:56 PM, Uwe Kleine-K?nig wrote:
-> This allows dt_compat to point to a constant list of compatible strings.
+On Monday 19 December 2011, Tony Lindgren wrote:
+> Hi Arnd & Olof,
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
+> Please pull omap hwmod changes from:
 > 
-> does this need to be split into an of and an ARM part?
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap hwmod
+> 
+> These changes are mostly needed for the USB *HCI support to
+> behave. These depend on the fixes-non-critical-part2 posted
+> earlier.
+> 
 
-No, I don't think so. I've applied it.
+Pulled into next/devel, and written down the dependency.
+I wasn't sure about whether this should be next/pm or next/devel,
+decided for next/devel in the end.
 
-Thanks,
-Rob
-
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/include/asm/mach/arch.h |    2 +-
->  drivers/of/fdt.c                 |    4 ++--
->  include/linux/of_fdt.h           |    4 ++--
->  3 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index 2b0efc3..02a718a 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -19,7 +19,7 @@ struct machine_desc {
->  	unsigned int		nr;		/* architecture number	*/
->  	const char		*name;		/* architecture name	*/
->  	unsigned long		atag_offset;	/* tagged list (relative) */
-> -	const char		**dt_compat;	/* array of device tree
-> +	const char *const 	*dt_compat;	/* array of device tree
->  						 * 'compatible' strings	*/
->  
->  	unsigned int		nr_irqs;	/* number of IRQs */
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index fd85fa2..7dc8e6d 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -107,7 +107,7 @@ int of_fdt_is_compatible(struct boot_param_header *blob,
->   * of_fdt_match - Return true if node matches a list of compatible values
->   */
->  int of_fdt_match(struct boot_param_header *blob, unsigned long node,
-> -                 const char **compat)
-> +                 const char *const *compat)
->  {
->  	unsigned int tmp, score = 0;
->  
-> @@ -541,7 +541,7 @@ int __init of_flat_dt_is_compatible(unsigned long node, const char *compat)
->  /**
->   * of_flat_dt_match - Return true if node matches a list of compatible values
->   */
-> -int __init of_flat_dt_match(unsigned long node, const char **compat)
-> +int __init of_flat_dt_match(unsigned long node, const char *const *compat)
->  {
->  	return of_fdt_match(initial_boot_params, node, compat);
->  }
-> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> index c84d900..ed136ad 100644
-> --- a/include/linux/of_fdt.h
-> +++ b/include/linux/of_fdt.h
-> @@ -71,7 +71,7 @@ extern int of_fdt_is_compatible(struct boot_param_header *blob,
->  				unsigned long node,
->  				const char *compat);
->  extern int of_fdt_match(struct boot_param_header *blob, unsigned long node,
-> -			const char **compat);
-> +			const char *const *compat);
->  extern void of_fdt_unflatten_tree(unsigned long *blob,
->  			       struct device_node **mynodes);
->  
-> @@ -88,7 +88,7 @@ extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
->  extern void *of_get_flat_dt_prop(unsigned long node, const char *name,
->  				 unsigned long *size);
->  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
-> -extern int of_flat_dt_match(unsigned long node, const char **matches);
-> +extern int of_flat_dt_match(unsigned long node, const char *const *matches);
->  extern unsigned long of_get_flat_dt_root(void);
->  
->  extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+	Arnd
