@@ -1,32 +1,60 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Tue, 27 Dec 2011 11:41:29 +0200
-Subject: [PATCH v4 4/4] OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <CAB-zwWicBq8sUZCiRLP_6QX3jL7gsTvF0-NP1r+AvDWP+aWsMg@mail.gmail.com>
-References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
- <1323922709-6986-5-git-send-email-omar.ramirez@ti.com>
- <CAMP44s3Jb9DZLUyDVU_HmQbaJKp=2qym7Z6uauNchJh0fPL4hQ@mail.gmail.com>
- <CAB-zwWhpmwRP2mNu-CdX-RVgmTRjw0UsYckAVsM+qztmVdvc7A@mail.gmail.com>
- <CAMP44s0hYWiZ8OnjQ6Jy_W7MCveP+WyHG18Tt2jRGzxSwoQP3w@mail.gmail.com>
- <CAB-zwWio5iMTyofv3Hx5Q7G7rYY5cRU4kXNQzMF0NRprEd8=5g@mail.gmail.com>
- <CAMP44s2JWRN4XVCVrbVUJwZK9zkT6p2dPnK2SPuZXJPj71c4Yg@mail.gmail.com>
- <CAB-zwWicBq8sUZCiRLP_6QX3jL7gsTvF0-NP1r+AvDWP+aWsMg@mail.gmail.com>
-Message-ID: <CAMP44s2zKVRd3+uJUAo+WaaV=n9LvM-5q_cFivEtE=iTzFbfeg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 27 Dec 2011 18:42:14 +0900
+Subject: [GIT PULL] Samsung devel-mmc-spi for v3.3
+Message-ID: <000801ccc47b$d474fd00$7d5ef700$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 25, 2011 at 2:03 AM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
-> On Fri, Dec 23, 2011 at 11:04 AM, Felipe Contreras
-> <felipe.contreras@gmail.com> wrote:
->> Which omap-iommu? The platform driver, or the device stuff? The device
->> stuff is always built-in, but not the platform driver
->> (drivers/iommu/omap-iommu.c), that can be a module.
->
-> Both, I can't recall exactly when it changed (prior to being moved to
-> drivers/iommu it could be built as a module), but now
-> CONFIG_OMAP_IOMMU is boolean type.
+Hi Arnd and Olof,
 
-I see. Still, it looks like the proper way to use the API is to call
-_enable() on the platform driver.
+Please pull the Samsung-devel-mmc-spi for v3.3.
+It depends on Samsung-cleanup-spi4 branch as well.
 
--- 
-Felipe Contreras
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 7d38af51d587ad953eef786a6922bcd1482cae5c:
+
+  ARM: S3C64XX: Modified according to SPI consolidation work (2011-12-23
+10:50:03 +0900)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+next-samsung-devel-mmc-spi5
+
+Padmavathi Venna (1):
+      ARM: EXYNOS: Modified files for SPI consolidation work
+
+Rajeshwari Shinde (3):
+      ARM: S5P64X0: Add HSMMC setup for host Controller
+      ARM: S5P64X0: Add lookup of sdhci-s3c clocks using generic names
+      ARM: S5P64X0: Enable SDHCI support
+
+ arch/arm/mach-exynos/Kconfig                   |    5 +
+ arch/arm/mach-exynos/Makefile                  |    1 +
+ arch/arm/mach-exynos/clock.c                   |   73 ++++++++++-------
+ arch/arm/mach-exynos/include/mach/irqs.h       |    3 +
+ arch/arm/mach-exynos/include/mach/map.h        |    7 ++
+ arch/arm/mach-exynos/include/mach/spi-clocks.h |   16 ++++
+ arch/arm/mach-exynos/setup-spi.c               |   72 ++++++++++++++++
+ arch/arm/mach-s5p64x0/Kconfig                  |   24 ++++++
+ arch/arm/mach-s5p64x0/Makefile                 |    1 +
+ arch/arm/mach-s5p64x0/clock-s5p6440.c          |   72 ++++++++++-------
+ arch/arm/mach-s5p64x0/clock-s5p6450.c          |   72 ++++++++++-------
+ arch/arm/mach-s5p64x0/cpu.c                    |    9 ++
+ arch/arm/mach-s5p64x0/mach-smdk6440.c          |   25 ++++++
+ arch/arm/mach-s5p64x0/mach-smdk6450.c          |   26 ++++++-
+ arch/arm/mach-s5p64x0/setup-sdhci-gpio.c       |  104
+++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/sdhci.h     |   44 ++++++++++
+ 16 files changed, 463 insertions(+), 91 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/include/mach/spi-clocks.h
+ create mode 100644 arch/arm/mach-exynos/setup-spi.c
+ create mode 100644 arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
