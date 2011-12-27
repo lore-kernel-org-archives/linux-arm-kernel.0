@@ -1,89 +1,40 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 27 Dec 2011 16:24:16 +0800
-Subject: [PATCH V5 1/7] ARM: add cpufreq transiton notifier to adjust
- loops_per_jiffy for smp
+Date: Tue, 27 Dec 2011 16:24:17 +0800
+Subject: [PATCH V5 2/7] arm/imx: cpufreq: remove loops_per_jiffy recalculate
+ for smp
 In-Reply-To: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
 References: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1324974262-30963-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1324974262-30963-3-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
-arch has different per-cpu loops_per_jiffy definition.
+arm registered cpufreq transition notifier to recalculate it.
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/kernel/smp.c |   54 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 54 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/cpufreq.c |   10 ----------
+ 1 files changed, 0 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index ef5640b..ac9cadc 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -25,6 +25,7 @@
- #include <linux/percpu.h>
- #include <linux/clockchips.h>
- #include <linux/completion.h>
-+#include <linux/cpufreq.h>
+diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+index c937e75..364793a 100644
+--- a/arch/arm/plat-mxc/cpufreq.c
++++ b/arch/arm/plat-mxc/cpufreq.c
+@@ -99,16 +99,6 @@ static int mxc_set_target(struct cpufreq_policy *policy,
  
- #include <linux/atomic.h>
- #include <asm/cacheflush.h>
-@@ -631,3 +632,56 @@ int setup_profiling_timer(unsigned int multiplier)
- {
- 	return -EINVAL;
- }
-+
-+#ifdef CONFIG_CPU_FREQ
-+
-+static DEFINE_PER_CPU(unsigned long, l_p_j_ref);
-+static DEFINE_PER_CPU(unsigned long, l_p_j_ref_freq);
-+static unsigned long global_l_p_j_ref;
-+static unsigned long global_l_p_j_ref_freq;
-+
-+static int cpufreq_callback(struct notifier_block *nb,
-+					unsigned long val, void *data)
-+{
-+	struct cpufreq_freqs *freq = data;
-+	int cpu = freq->cpu;
-+
-+	if (freq->flags & CPUFREQ_CONST_LOOPS)
-+		return NOTIFY_OK;
-+
-+	if (!per_cpu(l_p_j_ref, cpu)) {
-+		per_cpu(l_p_j_ref, cpu) =
-+			per_cpu(cpu_data, cpu).loops_per_jiffy;
-+		per_cpu(l_p_j_ref_freq, cpu) = freq->old;
-+		if (!global_l_p_j_ref) {
-+			global_l_p_j_ref = loops_per_jiffy;
-+			global_l_p_j_ref_freq = freq->old;
-+		}
-+	}
-+
-+	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
-+	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new) ||
-+	    (val == CPUFREQ_RESUMECHANGE || val == CPUFREQ_SUSPENDCHANGE)) {
-+		loops_per_jiffy = cpufreq_scale(global_l_p_j_ref,
-+						global_l_p_j_ref_freq,
-+						freq->new);
-+		per_cpu(cpu_data, cpu).loops_per_jiffy =
-+			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
-+					per_cpu(l_p_j_ref_freq, cpu),
-+					freq->new);
-+	}
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block cpufreq_notifier = {
-+	.notifier_call  = cpufreq_callback,
-+};
-+
-+static int __init register_cpufreq_notifier(void)
-+{
-+	return cpufreq_register_notifier(&cpufreq_notifier,
-+						CPUFREQ_TRANSITION_NOTIFIER);
-+}
-+core_initcall(register_cpufreq_notifier);
-+
-+#endif
+ 	ret = set_cpu_freq(freq_Hz);
+ 
+-#ifdef CONFIG_SMP
+-	/* loops_per_jiffy is not updated by the cpufreq core for SMP systems.
+-	 * So update it for all CPUs.
+-	 */
+-	for_each_possible_cpu(cpu)
+-		per_cpu(cpu_data, cpu).loops_per_jiffy =
+-		cpufreq_scale(per_cpu(cpu_data, cpu).loops_per_jiffy,
+-					freqs.old, freqs.new);
+-#endif
+-
+ 	for_each_possible_cpu(cpu) {
+ 		freqs.cpu = cpu;
+ 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 -- 
 1.7.5.4
