@@ -1,107 +1,54 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 27 Dec 2011 23:05:41 +0800
-Subject: [PATCH V5 4/7] cpufreq: add clk-reg cpufreq driver
-In-Reply-To: <1324974262-30963-5-git-send-email-richard.zhao@linaro.org>
-References: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
- <1324974262-30963-5-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111227150539.GA15132@S2101-09.ap.freescale.net>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 27 Dec 2011 16:24:33 +0100
+Subject: [PATCH RESEND] ARM: pxa: fix error handling in
+ pxa2xx_drv_pcmcia_probe
+In-Reply-To: <1324974344.2351.5.camel@phoenix>
+References: <1324974344.2351.5.camel@phoenix>
+Message-ID: <201112271624.33760.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
-
-On Tue, Dec 27, 2011 at 04:24:19PM +0800, Richard Zhao wrote:
-> The driver get cpu operation point table from device tree cpu0 node,
-> and adjusts operating points using clk and regulator APIs.
+> If pxa2xx_drv_pcmcia_add_one fails, it will go to err1 error path.
+> Add a missing clk_put in the error path.
 > 
-> It support single core and multi-core ARM SoCs. But currently it assume
-> all cores share the same frequency and voltage.
+> Checking the ret value after the for loop is redundant, it is always false.
+> Thus remove the redundant checking.
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 > ---
->  .../devicetree/bindings/cpufreq/clk-reg-cpufreq    |   21 ++
->  drivers/cpufreq/Kconfig                            |   10 +
->  drivers/cpufreq/Makefile                           |    2 +
->  drivers/cpufreq/clk-reg-cpufreq.c                  |  302 ++++++++++++++++++++
->  4 files changed, 335 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/clk-reg-cpufreq
->  create mode 100644 drivers/cpufreq/clk-reg-cpufreq.c
+>  drivers/pcmcia/pxa2xx_base.c |   12 +++---------
+>  1 files changed, 3 insertions(+), 9 deletions(-)
 > 
+> diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+> index a87e272..64d433e 100644
+> --- a/drivers/pcmcia/pxa2xx_base.c
+> +++ b/drivers/pcmcia/pxa2xx_base.c
+> @@ -328,21 +328,15 @@ static int pxa2xx_drv_pcmcia_probe(struct
+> platform_device *dev) goto err1;
+>  	}
+> 
+> -	if (ret) {
+> -		while (--i >= 0)
+> -			soc_pcmcia_remove_one(&sinfo->skt[i]);
+> -		kfree(sinfo);
+> -		clk_put(clk);
+> -	} else {
+> -		pxa2xx_configure_sockets(&dev->dev);
+> -		dev_set_drvdata(&dev->dev, sinfo);
+> -	}
+> +	pxa2xx_configure_sockets(&dev->dev);
+> +	dev_set_drvdata(&dev->dev, sinfo);
+> 
+>  	return 0;
+> 
+>  err1:
+>  	while (--i >= 0)
+>  		soc_pcmcia_remove_one(&sinfo->skt[i]);
+> +	clk_put(clk);
+>  	kfree(sinfo);
+>  err0:
+>  	return ret;
 
-[...]
+Makes sense
 
-> +static struct cpufreq_driver clk_reg_cpufreq_driver = {
-> +	.flags = CPUFREQ_STICKY,
-> +	.verify = clk_reg_verify_speed,
-> +	.target = clk_reg_set_target,
-> +	.get = clk_reg_get_speed,
-> +	.init = clk_reg_cpufreq_init,
-> +	.exit = clk_reg_cpufreq_exit,
-> +	.name = "clk-reg",
-> +};
-> +
-> +static u32 max_freq = UINT_MAX / 1000; /* kHz */
-> +module_param(max_freq, uint, 0);
-> +MODULE_PARM_DESC(max_freq, "max cpu frequency in unit of kHz");
-> +
-
-Have you tried to pass this param from kernel cmdline?  What's the
-syntax if we want to pass a 800 MHz max_freq?
-
-And I played this driver on imx6q with pm-qa [1] cpufreq test suit from
-Linaro PMWG.
-
-### cpufreq_01:
-### test the cpufreq framework is available for frequency
-### https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/QA/Scripts#cpufreq_01
-###
-cpufreq_01.0/cpu0: checking 'scaling_available_frequencies' exists...       fail
-cpufreq_01.0/cpu1: checking 'scaling_available_frequencies' exists...       fail
-cpufreq_01.0/cpu2: checking 'scaling_available_frequencies' exists...       fail
-cpufreq_01.0/cpu3: checking 'scaling_available_frequencies' exists...       fail
-
-### cpufreq_05:
-### test 'ondemand' and 'conservative' trigger correctly the configuration directory
-### https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/QA/Scripts#cpufreq_05
-###
-cpufreq_05.0: checking 'ondemand' directory exists...                       pass
-cpufreq_05.1: checking 'conservative' directory exists...                   pass
-cpufreq_05.2: checking 'ondemand' directory is not there...                 pass
-cpufreq_05.3: checking 'conservative' directory is not there...             pass
-cpufreq_05.4: checking 'ondemand' directory exists...                       fail
-cpufreq_05.5: checking 'conservative' directory exists...                   pass
-
-The cpufreq_01 can be easily fixed with the following change.
-
-8<-----
-@@ -146,6 +150,11 @@ static int clk_reg_cpufreq_exit(struct cpufreq_policy *policy)
-        return 0;
- }
-
-+static struct freq_attr *clk_reg_cpufreq_attr[] = {
-+       &cpufreq_freq_attr_scaling_available_freqs,
-+       NULL,
-+};
-+
- static struct cpufreq_driver clk_reg_cpufreq_driver = {
-        .flags = CPUFREQ_STICKY,
-        .verify = clk_reg_verify_speed,
-@@ -153,10 +162,15 @@ static struct cpufreq_driver clk_reg_cpufreq_driver = {
-        .get = clk_reg_get_speed,
-        .init = clk_reg_cpufreq_init,
-        .exit = clk_reg_cpufreq_exit,
-+       .attr = clk_reg_cpufreq_attr,
-        .name = "clk-reg",
- };
------>8
-
-And I have not looked into the second one deeply, but maybe you
-want to :)
-
--- 
-Regards,
-Shawn
-
-[1] git://git.linaro.org/people/dlezcano/pm-qa.git
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
