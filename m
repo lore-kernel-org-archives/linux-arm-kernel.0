@@ -1,103 +1,61 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Wed, 28 Dec 2011 19:58:11 +0100
-Subject: [PATCH 2/2] ARM: Exynos: Hook up power domains to generic power
- domain infrastructure
-In-Reply-To: <1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>
-References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
- <1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>
- <1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4EFB66C3.4040504@gmail.com>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Wed, 28 Dec 2011 23:02:22 +0200
+Subject: [PATCHv2 resend] Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+In-Reply-To: <01e501ccc536$a6e58fb0$f4b0af10$%kim@samsung.com>
+References: <4EE7BE5F.8020108@solonet.org.ua>
+ <01e501ccc536$a6e58fb0$f4b0af10$%kim@samsung.com>
+Message-ID: <4EFB83DE.7080404@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Kukjin,
 
-On 12/12/2011 04:46 PM, Thomas Abraham wrote:
-> The generic power domain infrastructure is used to control the power domains
-> available on Exynos4. For non-dt platforms, the power domains are statically
-> instantiated. For dt platforms, the power domain nodes found in the device
-> tree are instantiated.
+Your patch applies (note that it looks like your email-client have
+wrapped long lines thus broke the path) and works OK. Looks good to me.
+See some additional comments below.
+
+On 12/28/2011 09:59 AM, Kukjin Kim wrote:
+> Denis Kuzmenko wrote:
+(snip)
+>> +	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING ||
+>> S3C2412_IOTIMING)
 > 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> This patch is mainly derived from Mark Brown's work on generic power domain
-> support for s3c64xx platforms. The existing exynos4 power domain implementation
-> is not removed in this patch. The devices are not yet registered with the power
-> domains for non-dt platforms.
+> As you know, CONFIG_CPU_FREQ_S3C24XX_IODEBUG is for enabling of
+> s3c_freq_iodbg() and there is no problem when CONFIG_S3C241{0,2}_IOTIMING is
+> not selected, even though s3c_freq_iodbg() is used only at
+> s3c2410-iotiming.c now. So this is not necessary to fix the problem you
+> said.
+
+I'm OK with this approach, however I don't see any future use of
+s3c_freq_iodbg() without s3c2410-iotiming.c. But it's not anyway
+critical so please pick any variant which you like.
+
+(snip)
+> Well, do we really need to have '#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS'
+> here?
+> I think, just having dependency with CONFIG_S3C241{1,2}_IOTIMING can avoid
+> the build error.
+
+Yes, CONFIG_S3C241{1,2}_IOTIMING dependency is just enough.
+
+(snip)
+>> -extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
+>> -				struct s3c_iotimings *timings);
+>> -
 > 
->  arch/arm/mach-exynos/Kconfig |    1 +
->  arch/arm/mach-exynos/pm.c    |  179 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 180 insertions(+), 0 deletions(-)
-> 
-[...]
-> +
-> +static struct exynos4_pm_domain exynos4_pd_gps = {
-> +	.base = (void __iomem *)S5P_PMU_GPS_CONF,
-> +	.name = "pd-gps",
-> +	.pd = {
-> +		.power_off = exynos4_pd_power_off,
-> +		.power_on = exynos4_pd_power_on,
-> +	},
-> +};
-> +
-> +static struct exynos4_pm_domain *exynos4_pm_domains[] = {
-> +	&exynos4_pd_mfc,
-> +	&exynos4_pd_g3d,
-> +	&exynos4_pd_lcd0,
-> +	&exynos4_pd_lcd1,
-> +	&exynos4_pd_tv,
-> +	&exynos4_pd_cam,
-> +	&exynos4_pd_gps,
-> +};
-> +
-> +static __init void exynos4_pm_init_power_domain(void)
-> +{
-> +	int idx;
-> +	struct device_node *np;
-> +
-> +#ifdef CONFIG_OF
-> +	if (!of_have_populated_dt())
-> +		goto no_dt;
-> +
-> +	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
-> +		struct exynos4_pm_domain *pd;
-> +
-> +		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-> +		if (!pd) {
-> +			pr_err("exynos4_pm_init_power_domain: memalloc "
-> +					"failed\n");
-> +			return;
-> +		}
-> +
-> +		if (of_get_property(np, "samsung,exynos4210-pd-off", NULL))
-> +			pd->is_off = true;
-> +		pd->name = np->name;
-> +		pd->base = of_iomap(np, 0);
+> Yes, why is this duplicated :(
 
-Sorry, I haven't reviewed your patch carefully enough. So for dt platforms
-pd->base is initialized from "reg" property, directly from each power domain's
-DT node. Only the static power domain instantiation for non-dt platforms would
-possibly need some code modifications when new SoCs are added.
+Don't have an idea. I'm new to this platform and to Linux at all so I
+don't know how it appeared.
+Just another harmless mistype I think.
 
-Would be nice to have a relevant patch for *.dts files in this series too. :)
+(snip)
+> So how about at below?
+> If you're ok, will send before v3.2.
 
-> +		pd->pd.power_off = exynos4_pd_power_off;
-> +		pd->pd.power_on = exynos4_pd_power_on;
-> +		pd->pd.of_node = np;
-> +		pm_genpd_init(&pd->pd, NULL, false);
-> +	}
-> +	return;
-> +#endif /* CONFIG_OF */
-> +
-> +no_dt:
-> +	for (idx = 0; idx < ARRAY_SIZE(exynos4_pm_domains); idx++)
-> +		pm_genpd_init(&exynos4_pm_domains[idx]->pd, NULL,
-> +				exynos4_pm_domains[idx]->is_off);
-> +}
+So, as already said, I have no objections.
+And thank you for review.
 
---
-Thanks,
-Sylwester
+-- 
+Best regards, Denis Kuzmenko.
