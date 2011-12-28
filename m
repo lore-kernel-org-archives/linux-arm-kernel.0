@@ -1,232 +1,96 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Dec 2011 16:59:40 +0900
-Subject: [PATCHv2 resend] Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-In-Reply-To: <4EE7BE5F.8020108@solonet.org.ua>
-References: <4EE7BE5F.8020108@solonet.org.ua>
-Message-ID: <01e501ccc536$a6e58fb0$f4b0af10$%kim@samsung.com>
+Date: Wed, 28 Dec 2011 16:59:51 +0900
+Subject: [GIT PULL] Samsung devel-dt for v3.3
+In-Reply-To: <201112272333.18024.arnd@arndb.de>
+References: <087d01ccc1d5$c6aa8300$53ff8900$%kim@samsung.com>
+ <201112272333.18024.arnd@arndb.de>
+Message-ID: <01e601ccc536$ad808a50$08819ef0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Denis Kuzmenko wrote:
+Arnd Bergmann wrote:
 > 
-> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+> On Saturday 24 December 2011, Kukjin Kim wrote:
+> > Hi Arnd and Olof,
+> >
+> > Please pull the samsung-devel-dt for v3.3.
+> > It includes support DT for Samsung EXYNOS4.
 > 
-> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
-> ---
+> Pulled into next/dt, thanks a lot!
 > 
-> Patch is against 3.2-rc4.
-> CONFIG_S3C2410_IOTIMING is not selected for MACH_MINI2440. Because of this
-> the
-> file s3c2410-iotiming.c is not ever compiled and enabling
-> CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined reference to
-> function
-> s3c2410_iotiming_debugfs defined in that file. s3c2410_iotiming_debugfs
-> defined
-> as NULL for this case.
-> 
-> Changelog:
-> v1 -> v2
-> New CONFIG_ symbols S3C241{0,2}_IOTIMING were removed as It was observed
-> that
-> they already present but hidden from user.
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e084b7e..133d005 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2118,7 +2118,7 @@ config CPU_FREQ_S3C24XX_DEBUG
-> 
->  config CPU_FREQ_S3C24XX_IODEBUG
->  	bool "Debug CPUfreq Samsung driver IO timing"
-> -	depends on CPU_FREQ_S3C24XX
-> +	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING ||
-> S3C2412_IOTIMING)
+Thanks.
 
-As you know, CONFIG_CPU_FREQ_S3C24XX_IODEBUG is for enabling of
-s3c_freq_iodbg() and there is no problem when CONFIG_S3C241{0,2}_IOTIMING is
-not selected, even though s3c_freq_iodbg() is used only at
-s3c2410-iotiming.c now. So this is not necessary to fix the problem you
-said.
-
->  	help
->  	  Enable s3c_freq_iodbg for the Samsung S3C CPUfreq core
+> Unfortunately, this got two conflicts against "ARM: exynos4: convert to
+> CONFIG_MULTI_IRQ_HANDLER" from Marc Zyngier, and I suspect my temporary
+> resolution is incorrect:
 > 
-> diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> index dac4760..c465252 100644
-> --- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> +++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> @@ -202,13 +202,23 @@ extern int s3c_plltab_register(struct
-> cpufreq_frequency_table *plls,
->  extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
->  extern struct s3c_iotimings *s3c_cpufreq_getiotimings(void);
+> --- a/arch/arm/mach-exynos/cpu.c
+> +++ b/arch/arm/mach-exynos/cpu.c
+> @@@ -206,6 -209,24 +208,13 @@@ void __init exynos4_init_clocks(int xta
+>         exynos4_setup_clocks();
+>   }
 > 
-> -extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-> -				     struct s3c_cpufreq_config *cfg,
-> -				     union s3c_iobank *iob);
-> -
-> -extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-> -				     struct s3c_cpufreq_config *cfg,
-> -				     union s3c_iobank *iob);
-> +#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
-> +	#ifdef CONFIG_S3C2410_IOTIMING
-> +	extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-> +					     struct s3c_cpufreq_config *cfg,
-> +					     union s3c_iobank *iob);
-> +	#else
-> +	#define s3c2410_iotiming_debugfs	NULL
-> +	#endif
+>  -static void exynos4_gic_irq_fix_base(struct irq_data *d)
+>  -{
+>  -      struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
+>  -
+>  -      gic_data->cpu_base = S5P_VA_GIC_CPU +
+>  -                          (gic_bank_offset * smp_processor_id());
+>  -
+>  -      gic_data->dist_base = S5P_VA_GIC_DIST +
+>  -                          (gic_bank_offset * smp_processor_id());
+>  -}
+>  -
+> + #ifdef CONFIG_OF
+> + static const struct of_device_id exynos4_dt_irq_match[] = {
+> +       { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+> +       {},
+> + };
+> + #endif
 > +
-> +	#ifdef CONFIG_S3C2412_IOTIMING
-> +	extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-> +					     struct s3c_cpufreq_config *cfg,
-> +					     union s3c_iobank *iob);
-> +	#else
-> +	#define s3c2412_iotiming_debugfs	NULL
-> +	#endif
-> +#endif
-
-Well, do we really need to have '#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS'
-here?
-I think, just having dependency with CONFIG_S3C241{1,2}_IOTIMING can avoid
-the build error.
-
+>   void __init exynos4_init_irq(void)
+>   {
+>         int irq;
+> @@@ -213,8 -233,17 +222,13 @@@
 > 
->  #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
->  #define s3c_cpufreq_debugfs_call(x) x
-> @@ -241,10 +251,7 @@ extern void s3c2410_iotiming_set(struct
-> s3c_cpufreq_config *cfg,
->  #endif /* CONFIG_S3C2410_IOTIMING */
+>         gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
 > 
->  /* S3C2412 compatible routines */
-> -
-> -extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
-> -				struct s3c_iotimings *timings);
-> -
-
-Yes, why is this duplicated :(
-
-> +#ifdef CONFIG_S3C2412_IOTIMING
->  extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
->  				struct s3c_iotimings *timings);
+> -       gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU,
+> gic_bank_offset);
+> +       if (!of_have_populated_dt())
+>  -              gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
+> ++              gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST,
+S5P_VA_GIC_CPU,
+> gic_bank_offset);
+> + #ifdef CONFIG_OF
+> +       else
+> +               of_irq_init(exynos4_dt_irq_match);
+> + #endif
 > 
-> @@ -253,6 +260,11 @@ extern int s3c2412_iotiming_calc(struct
-> s3c_cpufreq_config *cfg,
+>  -      gic_arch_extn.irq_eoi = exynos4_gic_irq_fix_base;
+>  -      gic_arch_extn.irq_unmask = exynos4_gic_irq_fix_base;
+>  -      gic_arch_extn.irq_mask = exynos4_gic_irq_fix_base;
+>  -
+>         for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
 > 
->  extern void s3c2412_iotiming_set(struct s3c_cpufreq_config *cfg,
->  				 struct s3c_iotimings *iot);
-> +#else
-> +#define s3c2412_iotiming_calc NULL
-> +#define s3c2412_iotiming_get NULL
-> +#define s3c2412_iotiming_set NULL
-> +#endif
+>                 combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
 > 
->  #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUG
->  #define s3c_freq_dbg(x...) printk(KERN_INFO x)
+> 
+Looks ok to me.
 
-So how about at below?
-If you're ok, will send before v3.2.
+> The other conflict was a one-line change from 1fb3726cf3 "ARM: SAMSUNG:
+> Move timer irq
+> numbers to end of linux irq space" (from Thomas Abraham) in code that was
+> removed
+> by Marc's patch, so I kept removing that.
+> 
+OK.
 
----
->From 41bb50bd22cdc6d3aa7fb75efab78d341f932ae5 Mon Sep 17 00:00:00 2001
-From: Denis Kuzmenko <linux@solonet.org.ua>
-Date: Wed, 28 Dec 2011 14:04:51 +0900
-Subject: [PATCH] ARM: SAMSUNG: Fix build error when selecting
-CPU_FREQ_S3C24XX_DEBUGFS on S3C2440
-
-Following is happened when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
-is selected without building of s3c2410-iotiming.c file:
-
-arch/arm/mach-s3c2440/built-in.o:(.data+0x38c): undefined reference to
-`s3c2410_iotiming_debugfs
-
-Basically, the CONFIG_S3C2410_IOTIMING is not selected for
-MACH_MINI2440. Because the s3c2410-iotiming.c is not ever
-compiled and enabling CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option
-caused undefined reference to s3c2410_iotiming_debugfs()
-defined in that file.  The s3c2410_iotiming_debugfs defined
-as NULL for this case.
-
-Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
-[kgene.kim at samsung.com: removed useless changes]
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/plat-samsung/include/plat/cpu-freq-core.h |   25
-++++++++++++--------
- 1 files changed, 15 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-index dac4760..95509d8 100644
---- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-@@ -202,14 +202,6 @@ extern int s3c_plltab_register(struct
-cpufreq_frequency_table *plls,
- extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
- extern struct s3c_iotimings *s3c_cpufreq_getiotimings(void);
- 
--extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
--				     struct s3c_cpufreq_config *cfg,
--				     union s3c_iobank *iob);
--
--extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
--				     struct s3c_cpufreq_config *cfg,
--				     union s3c_iobank *iob);
--
- #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
- #define s3c_cpufreq_debugfs_call(x) x
- #else
-@@ -226,6 +218,10 @@ extern void s3c2410_cpufreq_setrefresh(struct
-s3c_cpufreq_config *cfg);
- extern void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg);
- 
- #ifdef CONFIG_S3C2410_IOTIMING
-+extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-+				     struct s3c_cpufreq_config *cfg,
-+				     union s3c_iobank *iob);
-+
- extern int s3c2410_iotiming_calc(struct s3c_cpufreq_config *cfg,
- 				 struct s3c_iotimings *iot);
- 
-@@ -235,6 +231,7 @@ extern int s3c2410_iotiming_get(struct
-s3c_cpufreq_config *cfg,
- extern void s3c2410_iotiming_set(struct s3c_cpufreq_config *cfg,
- 				 struct s3c_iotimings *iot);
- #else
-+#define s3c2410_iotiming_debugfs NULL
- #define s3c2410_iotiming_calc NULL
- #define s3c2410_iotiming_get NULL
- #define s3c2410_iotiming_set NULL
-@@ -242,8 +239,10 @@ extern void s3c2410_iotiming_set(struct
-s3c_cpufreq_config *cfg,
- 
- /* S3C2412 compatible routines */
- 
--extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
--				struct s3c_iotimings *timings);
-+#ifdef CONFIG_S3C2412_IOTIMING
-+extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-+				     struct s3c_cpufreq_config *cfg,
-+				     union s3c_iobank *iob);
- 
- extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
- 				struct s3c_iotimings *timings);
-@@ -253,6 +252,12 @@ extern int s3c2412_iotiming_calc(struct
-s3c_cpufreq_config *cfg,
- 
- extern void s3c2412_iotiming_set(struct s3c_cpufreq_config *cfg,
- 				 struct s3c_iotimings *iot);
-+#else
-+#define s3c2412_iotiming_debugfs NULL
-+#define s3c2412_iotiming_calc NULL
-+#define s3c2412_iotiming_get NULL
-+#define s3c2412_iotiming_set NULL
-+#endif /* CONFIG_S3C2412_IOTIMING */
- 
- #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUG
- #define s3c_freq_dbg(x...) printk(KERN_INFO x)
--- 
+> Maybe you can do a merge of your branch with Russell's devel-stable branch
+> and tell me
+> which conflict resolution you would like.
+> 
+OK, if any changes, let you know.
 
 Thanks.
 
