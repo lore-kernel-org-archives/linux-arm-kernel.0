@@ -1,32 +1,17 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 28 Dec 2011 14:27:54 +0800
-Subject: [PATCH 1/2] ARM: imx: add dt support of IRAM
-In-Reply-To: <4EF9F85E.5020203@gmail.com>
-References: <1324949596-27214-1-git-send-email-jason.chen@linaro.org>
- <4EF9F85E.5020203@gmail.com>
-Message-ID: <20111228062753.GB17315@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 27 Dec 2011 22:19:28 -0800
+Subject: [PATCH v2 0/2] Input: tegra-kbc - configure through device tree
+Message-ID: <1325053170-6984-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2011 at 10:54:54AM -0600, Rob Herring wrote:
-> On 12/26/2011 07:33 PM, Jason Chen wrote:
-> > Signed-off-by: Jason Chen <jason.chen@linaro.org>
-> > Signed-off-by: Eric Miao <eric.miao@linaro.org>
-> > ---
-> >  arch/arm/plat-mxc/include/mach/iram.h |    6 ++++++
-> >  arch/arm/plat-mxc/iram_alloc.c        |   16 ++++++++++++++++
-> >  2 files changed, 22 insertions(+), 0 deletions(-)
-> > 
-> 
-> Whatever happened to the generic SRAM support? That with a common DT
-> binding and init would be better.
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-May/051472.html
-> 
-Receiving the patch from Eric and Jason, the first thing I did was
-searching the status of SRAM consolidation series.  But it has not got
-any update since it's proposed back to May.
+The following two patches add device-tree bindings and probing to tegra-kbc,
+and they also provide a simplified way of specifying the, to date, only known
+non-default keymap.
 
--- 
-Regards,
-Shawn
+Fixes since v1: added debounce/repeat delay properties, setup of pin_cfg
+and verified that it works as expected on seaboard. Actual device tree
+update will be posted separately for inclusion through tegra tree.
+
+
+-Olof
