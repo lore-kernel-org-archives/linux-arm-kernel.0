@@ -1,87 +1,43 @@
-From: yanok@emcraft.com (Ilya Yanok)
-Date: Wed, 28 Dec 2011 00:31:33 +0100
-Subject: [PATCH V2] OMAP3: hwmod_data: register dss hwmods after dss_core
-In-Reply-To: <1324562563-27119-1-git-send-email-yanok@emcraft.com>
-References: <1324562563-27119-1-git-send-email-yanok@emcraft.com>
-Message-ID: <1325028693-14728-1-git-send-email-yanok@emcraft.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Wed, 28 Dec 2011 20:05:20 +0800
+Subject: [PATCH V5 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <20111228114237.GF24405@opensource.wolfsonmicro.com>
+References: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
+ <1324974262-30963-5-git-send-email-richard.zhao@linaro.org>
+ <20111228031409.GL15863@b20223-02.ap.freescale.net>
+ <20111228033128.GM15863@b20223-02.ap.freescale.net>
+ <20111228114237.GF24405@opensource.wolfsonmicro.com>
+Message-ID: <20111228120517.GA1691@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dss_core has to be initialized before any other DSS hwmod. Currently
-this is broken as dss_core is listed in chip/revision specific hwmod
-lists while other DSS hwmods are listed in common list which is
-registered first.
+On Wed, Dec 28, 2011 at 11:42:37AM +0000, Mark Brown wrote:
+> On Wed, Dec 28, 2011 at 11:31:29AM +0800, Richard Zhao wrote:
+> > On Wed, Dec 28, 2011 at 11:14:10AM +0800, Richard Zhao wrote:
+> 
+> > > > +		if (cpu_reg) {
+> > > > +			ret = regulator_is_supported_voltage(cpu_reg,
+> > > > +					cpu_volts[i * 2], cpu_volts[i * 2 + 1]);
+> 
+> > > Is there any reason you didn't export symbol regulator_is_supported_voltage?
+> > > and also it don't have !REGULATOR dummy implementation.
+> 
+> > regulator_set_voltage_time and some other functions don't have dummy one
+> > either.
+> 
+> You can't usefully work with voltages without knowing what the actual
+> voltages are - the only sensible stubs we could provide would return
+> errors but then any driver using the stubs would probably fail to do
+> whatever it was doing.  With enable and disable we can sensibly stub
+> things out with an always on regulator.
+Sorry, I can not get your point here. Let me describe the problem I met:
+ - regulator_is_supported_voltage is not exported. when I build clk-reg-cpufreq
+   as kernel module, there's a link error.
+ - I saw linux/regulator/consumer.h has some dummy functions if !REGULATOR. I
+   tried to make clk-reg-cpufreq driver work even !REGULATOR. I think that's
+   why the dummy functions are there. If regulator_get return NULL, it'll avoid
+   calling other regulator functions. But regulator_is_supported_voltage and
+   regulator_set_voltage_time don't have such dummy ones. Undefined functions.
 
-This patch moves DSS hwmods (except for dss_core) to the separate list
-which is registered last to ensure that dss_core is already registered.
-
-This solves the problem with BUG() in L3 interrupt handler on boards
-with DSS enabled in bootloader.
-
-CC: Tomi Valkeinen <tomi.valkeinen@ti.com>
-CC: Archit Taneja <archit@ti.com>
-CC: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Ilya Yanok <yanok@emcraft.com>
----
-
-Changes from V1:
- - Added extended comment
-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   28 ++++++++++++++++++++++------
- 1 files changed, 22 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 5324e8d..f263d3c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -3523,12 +3523,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
- 	&omap3xxx_uart2_hwmod,
- 	&omap3xxx_uart3_hwmod,
- 
--	/* dss class */
--	&omap3xxx_dss_dispc_hwmod,
--	&omap3xxx_dss_dsi1_hwmod,
--	&omap3xxx_dss_rfbi_hwmod,
--	&omap3xxx_dss_venc_hwmod,
--
- 	/* i2c class */
- 	&omap3xxx_i2c1_hwmod,
- 	&omap3xxx_i2c2_hwmod,
-@@ -3635,6 +3629,15 @@ static __initdata struct omap_hwmod *am35xx_hwmods[] = {
- 	NULL
- };
- 
-+static __initdata struct omap_hwmod *omap3xxx_dss_hwmods[] = {
-+	/* dss class */
-+	&omap3xxx_dss_dispc_hwmod,
-+	&omap3xxx_dss_dsi1_hwmod,
-+	&omap3xxx_dss_rfbi_hwmod,
-+	&omap3xxx_dss_venc_hwmod,
-+	NULL
-+};
-+
- int __init omap3xxx_hwmod_init(void)
- {
- 	int r;
-@@ -3708,6 +3711,19 @@ int __init omap3xxx_hwmod_init(void)
- 
- 	if (h)
- 		r = omap_hwmod_register(h);
-+	if (r < 0)
-+		return r;
-+
-+	/*
-+	 * DSS code presumes that dss_core hwmod is handled first,
-+	 * _before_ any other DSS related hwmods so register common
-+	 * DSS hwmods last to ensure that dss_core is already registered.
-+	 * Otherwise some change things may happen, for ex. if dispc
-+	 * is handled before dss_core and DSS is enabled in bootloader
-+	 * DIPSC will be reset with outputs enabled which sometimes leads
-+	 * to unrecoverable L3 error.
-+	 */
-+	r = omap_hwmod_register(omap3xxx_dss_hwmods);
- 
- 	return r;
- }
--- 
-1.7.6.4
+Thanks
+Richard
