@@ -1,98 +1,86 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Dec 2011 16:59:51 +0900
-Subject: [GIT PULL] Samsung devel-dt for v3.3
-In-Reply-To: <201112272333.18024.arnd@arndb.de>
-References: <087d01ccc1d5$c6aa8300$53ff8900$%kim@samsung.com>
- <201112272333.18024.arnd@arndb.de>
-Message-ID: <01e601ccc536$ad808a50$08819ef0$%kim@samsung.com>
+Date: Wed, 28 Dec 2011 17:01:04 +0900
+Subject: [GIT PULL] Samsung cleanup-spi for v3.3
+In-Reply-To: <201112280014.34021.arnd@arndb.de>
+References: <088001ccc1d7$7c0da460$7428ed20$%kim@samsung.com>
+ <201112280014.34021.arnd@arndb.de>
+Message-ID: <01e701ccc536$d8f06200$8ad12600$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd Bergmann wrote:
 > 
 > On Saturday 24 December 2011, Kukjin Kim wrote:
-> > Hi Arnd and Olof,
+> > Please pull the samsung-cleanup-spi for v3.3.
+> > It depends on samsung-devel-spi3 branch...
 > >
-> > Please pull the samsung-devel-dt for v3.3.
-> > It includes support DT for Samsung EXYNOS4.
+> > If any problems, please let me know.
 > 
-> Pulled into next/dt, thanks a lot!
-> 
-Thanks.
-
-> Unfortunately, this got two conflicts against "ARM: exynos4: convert to
-> CONFIG_MULTI_IRQ_HANDLER" from Marc Zyngier, and I suspect my temporary
-> resolution is incorrect:
-> 
-> --- a/arch/arm/mach-exynos/cpu.c
-> +++ b/arch/arm/mach-exynos/cpu.c
-> @@@ -206,6 -209,24 +208,13 @@@ void __init exynos4_init_clocks(int xta
->         exynos4_setup_clocks();
->   }
-> 
->  -static void exynos4_gic_irq_fix_base(struct irq_data *d)
->  -{
->  -      struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
->  -
->  -      gic_data->cpu_base = S5P_VA_GIC_CPU +
->  -                          (gic_bank_offset * smp_processor_id());
->  -
->  -      gic_data->dist_base = S5P_VA_GIC_DIST +
->  -                          (gic_bank_offset * smp_processor_id());
->  -}
->  -
-> + #ifdef CONFIG_OF
-> + static const struct of_device_id exynos4_dt_irq_match[] = {
-> +       { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-> +       {},
-> + };
-> + #endif
-> +
->   void __init exynos4_init_irq(void)
->   {
->         int irq;
-> @@@ -213,8 -233,17 +222,13 @@@
-> 
->         gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
-> 
-> -       gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU,
-> gic_bank_offset);
-> +       if (!of_have_populated_dt())
->  -              gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
-> ++              gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST,
-S5P_VA_GIC_CPU,
-> gic_bank_offset);
-> + #ifdef CONFIG_OF
-> +       else
-> +               of_irq_init(exynos4_dt_irq_match);
-> + #endif
-> 
->  -      gic_arch_extn.irq_eoi = exynos4_gic_irq_fix_base;
->  -      gic_arch_extn.irq_unmask = exynos4_gic_irq_fix_base;
->  -      gic_arch_extn.irq_mask = exynos4_gic_irq_fix_base;
->  -
->         for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
-> 
->                 combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
-> 
-> 
-Looks ok to me.
-
-> The other conflict was a one-line change from 1fb3726cf3 "ARM: SAMSUNG:
-> Move timer irq
-> numbers to end of linux irq space" (from Thomas Abraham) in code that was
-> removed
-> by Marc's patch, so I kept removing that.
+> I've applied next-samsung-cleanup-mmc2, next-samsung-devel-spi3 and
+> next-samsung-cleanup-spi4, all into next/cleanup2 now.
 > 
 OK.
 
-> Maybe you can do a merge of your branch with Russell's devel-stable branch
-> and tell me
-> which conflict resolution you would like.
+> This was the best solution I could come up with, because strictly
+> following
+> the normal rules would have meant creating an insane number of merge
+> commits and sending out each of your branches separately to Linus, after
+> all the other stuff.
 > 
-OK, if any changes, let you know.
+Yes, right. I agree.
 
-Thanks.
+> I normally try to send out all cleanups before everything else, except
+> when a cleanup has a dependency on another branch, in which case I have
+> to create an extra cleanup branch. What you sent me would have
+> meant doing something like:
+> 
+> 1. cleanup
+> 	all cleanup branches except samsung
+> 
+> 2. dt
+> 	all dt branches
+> 
+> 3. devel
+> 	all devel branches, including devel-ohci but not devel-spi
+> 	or devel-mmc-spi
+> 
+> 4.-10.
+> 	everything else except samsung
+> 
+> 11. cleanup2
+> 	only samsung/cleanup-mmc
+> 
+> 12. devel2
+> 	only samsung/devel-spi
+> 
+> 13. cleanup3
+> 	only samsung/cleanup-spi
+> 
+> 14. devel3
+> 	only samsung/devel-mmc-spi
+> 
+> I've now squashed samsung/devel-spi into the cleanup2 branch, which also
+> lets me
+> put cleanup-spi in there, and put it right after next/dt. This works
+> because
+> devel-spi can still be considered a cleanup (although you did not consider
+> it that).
+> 
+Hmm...I thought it's a kind of developing but cleanup2 branch and above
+ordering are ok to me.
+
+> Right now, the order we have in arm-soc is "fixes-non-critical",
+"cleanup",
+> "dt",
+> "cleanup2", "soc", "boards", "devel", "drivers", "pm", "timer", "move".
+> There
+> is some flexibility towards the end, but if you use a different order,
+> that creates
+> circular dependencies which we absolutely don't want.
+> 
+Yes, we don't :)
+
+OK, thanks.
 
 Best regards,
 Kgene.
