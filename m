@@ -1,77 +1,64 @@
-From: carsten.behling@garz-fricke.com (Carsten Behling)
-Date: Wed, 28 Dec 2011 14:36:44 +0100
-Subject: AW: [PATCH v7 0/5] AT91: replace broken TWI driver i2c-at91.c
-In-Reply-To: <4ECFB755.6060509@gmail.com>
-References: <cover.1322062555.git.n.voss@weinmann.de>
- <4ECFB755.6060509@gmail.com>
-Message-ID: <D99582E5322435468A77E74BB0039E7B1D18739F99@SRV02.hamburg.garz-fricke.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 28 Dec 2011 22:01:33 +0800
+Subject: No subject
+Message-ID: <20111228140132.GE10735@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[Resend to cc LAKML.  Sorry.]
 
-I've tested this driver with the pca953x GPIO expander driver with a PCA9554.
+Hi Arnd, Olof,
 
-In the case of 8 GPIO pins (my case) "i2c_smbus_read_byte_data(...)"
-is called to read the registers of the GPIO expander. This results in a at91_twi_xfer with two messages. The first message is to put the register address into the IADR and the second is to read the one byte content of the register.
+Please consider to pull mxs/clk-prepare for 3.3.  I have not collected
+the ack tag from every single subsystem maintainer, but I do not want
+to hold this any longer, since it's close to merge window now.
 
-At the end we have a one byte read with a repeated start condition. 
+Hi Sascha,
 
-I observed that reading out the GPIO status is one read delayed.
-The first read to a register from the pca953x driver does not result in a RXRDY interrupt and at91_twi_read_next_byte(...) is not called.
-Only the completion routine is triggered with a TXCOMP interrupt.
+I send a couple of Richard's patch you have collected here for
+completeness.
 
-Additionally, I took a look at the status flags just after the control flags are set (in at91_do_twi_transfer(...), AT91_TWI_START|AT91_TWI_STOP for the one byte read). Surprisingly, the AT91_TWI_RXRDY flag is zero before the first register read and one for the following reads. According to the manual this flag should be zero after a read on AT91_TWI_RHR.
+Regards,
+Shawn
 
-Reading the AT91_TWI_RHR before the control flags are set to be sure that the AT91_TWI_RXRDY is cleared leads to a never occurring RXRDY interrupt.
+The following changes since commit 384703b8e6cd4c8ef08512e596024e028c91c339:
 
-This looks very strange to me. Can anyone help?
+  Linux 3.2-rc6 (2011-12-16 18:36:26 -0800)
 
-Mit freundlichen Gr??en / Best regards
-Carsten Behling
+are available in the git repository at:
+  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/clk-prepare
 
-Development Engineer
-Garz & Fricke GmbH
-Tempowerkring 2, 21079 Hamburg - Germany
-Amtsgericht Hamburg HRB 60514
-Gesch?ftsf?hrer: Manfred Garz, Matthias Fricke
-Phone: +49 (0) 40 791 899 - 56
-Fax:    +49 40 / 791 899 - 39
-www.garz-fricke.com 
+Richard Zhao (2):
+      clk: add helper functions clk_prepare_enable and clk_disable_unprepare
+      net: fec: add clk_prepare/clk_unprepare
 
- 
+Shawn Guo (10):
+      ARM: mxs: convert platform code to clk_prepare/clk_unprepare
+      dma: mxs-dma: convert to clk_prepare/clk_unprepare
+      mmc: mxs-mmc: convert to clk_prepare/clk_unprepare
+      mtd: gpmi-lib: convert to clk_prepare/clk_unprepare
+      net: flexcan: convert to clk_prepare/clk_unprepare
+      serial: mxs-auart: convert to clk_prepare/clk_unprepare
+      video: mxsfb: convert to clk_prepare/clk_unprepare
+      ASoC: mxs-saif: convert to clk_prepare/clk_unprepare
+      clk: add config option HAVE_CLK_PREPARE into Kconfig
+      ARM: mxs: select HAVE_CLK_PREPARE for clock
 
-
------Urspr?ngliche Nachricht-----
-Von: Hubert Feurstein [mailto:h.feurstein at gmail.com] 
-Gesendet: Freitag, 25. November 2011 16:42
-An: Nikolaus Voss
-Cc: linux-i2c at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; ben-linux at fluff.org; Carsten Behling
-Betreff: Re: [PATCH v7 0/5] AT91: replace broken TWI driver i2c-at91.c
-
-Hi,
-
-I've tested this driver on a 2.6.38 kernel with several i2c clients
-(temp-sensor, audio-codec, touchscreen-controller, w1-bridge,
-io-expanders) and works without problems. SoC: at91sam9g45
-
-Because of the 2.6.38 kernel, I had to skip "[PATCH v7 2/5] Replace
-clk_lookup.con_id with clk_lookup.dev_id entries for twi clk" and used
-instead: at91_clock_associate("twi0_clk", &at91sam9g45_twi0_device.dev,
-"twi_clk");
-
-Best Regards
-Hubert
-
-On 2011-11-23 16:35, Nikolaus Voss wrote:
-> The old driver has two main deficencies:
-> i)  No repeated start (Sr) condiction is possible, this makes it unusable
->     e.g. for most SMBus transfers.
-> ii) I/O was done with polling/busy waiting what caused over-/underruns
->     even at light system loads and clock speeds.
-> 
-> The new driver overcomes these deficencies and in addition allows for
-> more than one TWI interface.
-> 
-
-Tested-by: Hubert Feurstein <h.feurstein@gmail.com>
+ arch/arm/Kconfig                      |    1 +
+ arch/arm/mach-mxs/clock-mx23.c        |   10 +++++-----
+ arch/arm/mach-mxs/clock-mx28.c        |   10 +++++-----
+ arch/arm/mach-mxs/clock.c             |   33 +++++++++++++++++++++++----------
+ arch/arm/mach-mxs/mach-mx28evk.c      |    2 +-
+ arch/arm/mach-mxs/system.c            |    2 +-
+ arch/arm/mach-mxs/timer.c             |    2 +-
+ drivers/clk/Kconfig                   |    3 +++
+ drivers/dma/mxs-dma.c                 |    8 ++++----
+ drivers/mmc/host/mxs-mmc.c            |   10 +++++-----
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   12 ++++++------
+ drivers/net/can/flexcan.c             |   10 +++++-----
+ drivers/net/ethernet/freescale/fec.c  |   10 +++++-----
+ drivers/tty/serial/mxs-auart.c        |    8 ++++----
+ drivers/video/mxsfb.c                 |    8 ++++----
+ include/linux/clk.h                   |   22 ++++++++++++++++++++++
+ sound/soc/mxs/mxs-saif.c              |    4 ++--
+ 17 files changed, 97 insertions(+), 58 deletions(-)
