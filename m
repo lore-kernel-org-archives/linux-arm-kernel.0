@@ -1,50 +1,103 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 28 Dec 2011 13:41:15 -0500 (EST)
-Subject: [PATCH v3] ARM: net: JIT compiler for packet filters
-In-Reply-To: <4EFB3B06.1090203@gmail.com>
-References: <1324404263-913-1-git-send-email-mgherzan@gmail.com>
- <20111220.135526.82432216865290827.davem@davemloft.net>
- <4EFB3B06.1090203@gmail.com>
-Message-ID: <20111228.134115.1976002751167690328.davem@davemloft.net>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Wed, 28 Dec 2011 19:58:11 +0100
+Subject: [PATCH 2/2] ARM: Exynos: Hook up power domains to generic power
+ domain infrastructure
+In-Reply-To: <1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>
+References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
+ <1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>
+ <1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4EFB66C3.4040504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mircea Gherzan <mgherzan@gmail.com>
-Date: Wed, 28 Dec 2011 16:51:34 +0100
+Hi Thomas,
 
-> Am 20.12.2011 19:55, schrieb David Miller:
->> From: Mircea Gherzan<mgherzan@gmail.com>
->> Date: Tue, 20 Dec 2011 19:04:23 +0100
->>
->>> Based of Matt Evans's PPC64 implementation.
->>>
->>> The compiler generates ARM instructions but interworking is
->>> supported for Thumb2 kernels.
->>>
->>> Supports both little and big endian. Unaligned loads are emitted
->>> for ARMv6+. Not all the BPF opcodes that deal with ancillary data
->>> are supported. The scratch memory of the filter lives on the stack.
->>> Hardware integer division is used if it is available.
->>>
->>> Enabled in the same way as for x86-64 and PPC64:
->>>
->>> 	echo 1>  /proc/sys/net/core/bpf_jit_enable
->>>
->>> A value greater than 1 enables opcode output.
->>>
->>> Signed-off-by: Mircea Gherzan<mgherzan@gmail.com>
->>
->> I'm happy with this going in via the ARM tree once all the details
->> are worked out:
+On 12/12/2011 04:46 PM, Thomas Abraham wrote:
+> The generic power domain infrastructure is used to control the power domains
+> available on Exynos4. For non-dt platforms, the power domains are statically
+> instantiated. For dt platforms, the power domain nodes found in the device
+> tree are instantiated.
 > 
-> I do not really care that much about the tree where this is going, as
-> long as it gets into 3.3 :) If you want to take it via the -net tree,
-> please synchronize with Russell (I've uploaded the patch to his
-> tracking system [1]).
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> This patch is mainly derived from Mark Brown's work on generic power domain
+> support for s3c64xx platforms. The existing exynos4 power domain implementation
+> is not removed in this patch. The devices are not yet registered with the power
+> domains for non-dt platforms.
+> 
+>  arch/arm/mach-exynos/Kconfig |    1 +
+>  arch/arm/mach-exynos/pm.c    |  179 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 180 insertions(+), 0 deletions(-)
+> 
+[...]
+> +
+> +static struct exynos4_pm_domain exynos4_pd_gps = {
+> +	.base = (void __iomem *)S5P_PMU_GPS_CONF,
+> +	.name = "pd-gps",
+> +	.pd = {
+> +		.power_off = exynos4_pd_power_off,
+> +		.power_on = exynos4_pd_power_on,
+> +	},
+> +};
+> +
+> +static struct exynos4_pm_domain *exynos4_pm_domains[] = {
+> +	&exynos4_pd_mfc,
+> +	&exynos4_pd_g3d,
+> +	&exynos4_pd_lcd0,
+> +	&exynos4_pd_lcd1,
+> +	&exynos4_pd_tv,
+> +	&exynos4_pd_cam,
+> +	&exynos4_pd_gps,
+> +};
+> +
+> +static __init void exynos4_pm_init_power_domain(void)
+> +{
+> +	int idx;
+> +	struct device_node *np;
+> +
+> +#ifdef CONFIG_OF
+> +	if (!of_have_populated_dt())
+> +		goto no_dt;
+> +
+> +	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
+> +		struct exynos4_pm_domain *pd;
+> +
+> +		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+> +		if (!pd) {
+> +			pr_err("exynos4_pm_init_power_domain: memalloc "
+> +					"failed\n");
+> +			return;
+> +		}
+> +
+> +		if (of_get_property(np, "samsung,exynos4210-pd-off", NULL))
+> +			pd->is_off = true;
+> +		pd->name = np->name;
+> +		pd->base = of_iomap(np, 0);
 
-I think it's much easier if this goes via the ARM tree, so I ask that
-the ARM folks pull this patch in.
+Sorry, I haven't reviewed your patch carefully enough. So for dt platforms
+pd->base is initialized from "reg" property, directly from each power domain's
+DT node. Only the static power domain instantiation for non-dt platforms would
+possibly need some code modifications when new SoCs are added.
 
-Acked-by: David S. Miller <davem@davemloft.net>
+Would be nice to have a relevant patch for *.dts files in this series too. :)
 
-Thanks.
+> +		pd->pd.power_off = exynos4_pd_power_off;
+> +		pd->pd.power_on = exynos4_pd_power_on;
+> +		pd->pd.of_node = np;
+> +		pm_genpd_init(&pd->pd, NULL, false);
+> +	}
+> +	return;
+> +#endif /* CONFIG_OF */
+> +
+> +no_dt:
+> +	for (idx = 0; idx < ARRAY_SIZE(exynos4_pm_domains); idx++)
+> +		pm_genpd_init(&exynos4_pm_domains[idx]->pd, NULL,
+> +				exynos4_pm_domains[idx]->is_off);
+> +}
+
+--
+Thanks,
+Sylwester
