@@ -1,19 +1,65 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Dec 2011 13:07:20 +0000
-Subject: [PATCH] ARM: S3C64XX: Remove hsmmc1 from Cragganmore
-In-Reply-To: <20111228123253.GJ24405@opensource.wolfsonmicro.com>
-References: <1325075179-17187-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <20111228123253.GJ24405@opensource.wolfsonmicro.com>
-Message-ID: <20111228130720.GA19755@sirena.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 28 Dec 2011 21:22:15 +0800
+Subject: [GIT PULL 4/5] Tegra board updates for 3.3
+In-Reply-To: <CAOesGMjMKZ+8e+MtEuBftODbCuCC-2UiiR+VgUq7HEZw-Z2O6Q@mail.gmail.com>
+References: <CAOesGMh7P6-=LbgUbYe1o7iO_-yALjce3H9ujXHW8hhikeTOsQ@mail.gmail.com>
+ <201112272309.11498.arnd@arndb.de>
+ <CAOesGMjMKZ+8e+MtEuBftODbCuCC-2UiiR+VgUq7HEZw-Z2O6Q@mail.gmail.com>
+Message-ID: <20111228132214.GC10735@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2011 at 12:32:53PM +0000, Mark Brown wrote:
-> On Wed, Dec 28, 2011 at 12:26:19PM +0000, Mark Brown wrote:
-> > The second MMC slot was only present on revision 1 of Cragganmore so
-> > remove it. Only MMC0 and MMC2 are there on production systems.
+On Tue, Dec 27, 2011 at 03:23:31PM -0800, Olof Johansson wrote:
+> On Tue, Dec 27, 2011 at 3:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 21 December 2011, Olof Johansson wrote:
+> >> Please pull the below board updates for tegra for the 3.3 merge window.
+> >>
+> >> Some of the board changes went into the soc branch due to close
+> >> dependencies, most of these are pinmux cleanup and prep for pinctrl
+> >> integration.
+> >>
+> >>
+> >> They are based on the for-3.3/soc branch.
+> >
+> > Ok, pulled into the next/boards branch.
+> 
+> Thanks!
+> 
+> >> The following changes since commit 6cc04a4420391c3f034afe8ea6e28d75912a70a3:
+> >>
+> >> ? arm/tegra: Compile tegra_dt_init_irq only when CONFIG_OF (2011-12-19
+> >> 18:07:22 -0800)
+> >>
+> >> are available in the git repository at:
+> >> ? git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/boards
+> >>
+> >> Leon Romanovsky (1):
+> >> ? ? ? ARM: tegra: paz00: Fix board pinmux table.
+> >>
+> >> Marc Dietrich (1):
+> >> ? ? ? ARM: tegra: paz00: add support for wakeup gpio key
+> >>
+> >> Olof Johansson (1):
+> >> ? ? ? arm/tegra: remove __initdata annotation from pinmux tables
+> >>
+> >> Stephen Warren (9):
+> >> ? ? ? arm/tegra: Split Seaboard GPIO table to allow for Ventana
+> >
+> > I only just noticed that you are inconsistent with the formatting of the
+> > patch subjects. We had a discussion about this a few months back and decided
+> > to standardize on "ARM: tegra:" instead of "arm/tegra".
+> >
+> > Please move to that style in future patches.
+> 
+> Ack, I had moved away from ARM: platform: myself,
 
-> Sorry, ignore this - wrong slot.
+Me too.
 
-Gah!  Actually I was right first time and got confused by some other
-bugs as I rebased onto -next.
+> since it seemed like
+> everybody else was. :) I'll move back -- I had missed the discussion.
+> 
+Missed the discussion and will move back, too.
+
+-- 
+Regards,
+Shawn
