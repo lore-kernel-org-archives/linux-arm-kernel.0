@@ -1,11 +1,12 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 28 Dec 2011 22:01:33 +0800
-Subject: No subject
-Message-ID: <20111228140132.GE10735@S2100-06.ap.freescale.net>
+Date: Wed, 28 Dec 2011 22:14:16 +0800
+Subject: [GIT PULL] mxs: clk-prepare for 3.3
+Message-ID: <20111228141415.GB10881@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resend to cc LAKML.  Sorry.]
+[ I really should do this in the morning.  Another resending to add
+  the missing subject. ]
 
 Hi Arnd, Olof,
 
