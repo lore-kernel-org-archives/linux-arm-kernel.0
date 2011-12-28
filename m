@@ -1,33 +1,26 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 28 Dec 2011 11:00:34 +0100
+From: aspotashev@emcraft.com (Alexander Potashev)
+Date: Wed, 28 Dec 2011 14:51:44 +0400
 Subject: Renaming MACH_TYPE_KINETIS_K60 into MACH_TYPE_KINETIS
-In-Reply-To: <1325065882.1584.153.camel@skywanderer.emcraft.com>
+In-Reply-To: <201112281100.35209.marek.vasut@gmail.com>
 References: <1325065882.1584.153.camel@skywanderer.emcraft.com>
-Message-ID: <201112281100.35209.marek.vasut@gmail.com>
+ <201112281100.35209.marek.vasut@gmail.com>
+Message-ID: <1325069504.1584.160.camel@skywanderer.emcraft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
-> 
-> About three weeks ago I registered a machine type for the Freescale
-> Kinetis K60 microcontroller. (
-> http://www.arm.linux.org.uk/developer/machines/list.php?id=3896 )
-> 
-> But later I realized that there should be a single machine type for all
-> Freescale Kinetis MCUs (K10 through K70), because those MCUs are
-> software-compatible. I tried to rename "kinetis_k60" to just "kinetis"
-> at the page mentioned above, but the names of the CONFIG_* macro and the
-> identifier name did not change.
-> 
-> I really do not want to register another machine type since it would be
-> a mess having two machine types - one for Kinetis and another for
-> Kinetis K60. Is it possible to change CONFIG_MACH_KINETIS_K60 to
-> CONFIG_MACH_KINETIS and MACH_TYPE_KINETIS_K60 to MACH_TYPE_KINETIS in
-> the database at http://www.arm.linux.org.uk/developer/machines/ ?
-> 
-> I hope, no one has really started using this machine type yet, so the
-> change is going to be transparent for everyone.
+On Wed, 2011-12-28 at 11:00 +0100, Marek Vasut wrote:
+> If you use FDT, you won't need machine ID at all. 
 
-If you use FDT, you won't need machine ID at all.
+Hi Marek,
 
-M
+You are right, but we have not used FDT for any of our ARM Linux ports
+yet (consistency matters.) If we switch to FDT now, a lot of code will
+need to be rewritten.
+
+That is why I would prefer to stay with machine type-based
+identification.
+
+
+-- 
+Regards,
+Alexander
