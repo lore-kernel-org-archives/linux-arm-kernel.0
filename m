@@ -1,45 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Dec 2011 11:25:46 +0000
-Subject: [PATCH] ARM: S3C64XX: Remove unconditional power domain disables
-Message-ID: <1325071546-28711-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Wed, 28 Dec 2011 11:42:37 +0000
+Subject: [PATCH V5 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <20111228033128.GM15863@b20223-02.ap.freescale.net>
+References: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
+ <1324974262-30963-5-git-send-email-richard.zhao@linaro.org>
+ <20111228031409.GL15863@b20223-02.ap.freescale.net>
+ <20111228033128.GM15863@b20223-02.ap.freescale.net>
+Message-ID: <20111228114237.GF24405@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have software runtime power management support this code is
-redundant.
+On Wed, Dec 28, 2011 at 11:31:29AM +0800, Richard Zhao wrote:
+> On Wed, Dec 28, 2011 at 11:14:10AM +0800, Richard Zhao wrote:
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/pm.c |   13 -------------
- 1 files changed, 0 insertions(+), 13 deletions(-)
+> > > +		if (cpu_reg) {
+> > > +			ret = regulator_is_supported_voltage(cpu_reg,
+> > > +					cpu_volts[i * 2], cpu_volts[i * 2 + 1]);
 
-diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-index 055dac9..7d3e81b 100644
---- a/arch/arm/mach-s3c64xx/pm.c
-+++ b/arch/arm/mach-s3c64xx/pm.c
-@@ -346,23 +346,10 @@ int __init s3c64xx_pm_init(void)
- 
- static __init int s3c64xx_pm_initcall(void)
- {
--	u32 val;
--
- 	pm_cpu_prep = s3c64xx_pm_prepare;
- 	pm_cpu_sleep = s3c64xx_cpu_suspend;
- 	pm_uart_udivslot = 1;
- 
--	/*
--	 * Unconditionally disable power domains that contain only
--	 * blocks which have no mainline driver support.
--	 */
--	val = __raw_readl(S3C64XX_NORMAL_CFG);
--	val &= ~(S3C64XX_NORMALCFG_DOMAIN_G_ON |
--		 S3C64XX_NORMALCFG_DOMAIN_V_ON |
--		 S3C64XX_NORMALCFG_DOMAIN_I_ON |
--		 S3C64XX_NORMALCFG_DOMAIN_P_ON);
--	__raw_writel(val, S3C64XX_NORMAL_CFG);
--
- #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
- 	gpio_request(S3C64XX_GPN(12), "DEBUG_LED0");
- 	gpio_request(S3C64XX_GPN(13), "DEBUG_LED1");
--- 
-1.7.7.3
+> > Is there any reason you didn't export symbol regulator_is_supported_voltage?
+> > and also it don't have !REGULATOR dummy implementation.
+
+> regulator_set_voltage_time and some other functions don't have dummy one
+> either.
+
+You can't usefully work with voltages without knowing what the actual
+voltages are - the only sensible stubs we could provide would return
+errors but then any driver using the stubs would probably fail to do
+whatever it was doing.  With enable and disable we can sensibly stub
+things out with an always on regulator.
