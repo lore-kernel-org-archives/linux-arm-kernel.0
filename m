@@ -1,48 +1,45 @@
-From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
-Date: Wed, 28 Dec 2011 13:10:04 +0200
-Subject: [PATCH] at91: fix at91rm9200 soc subtype handling
-Message-ID: <1325070604-5560-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Dec 2011 11:25:46 +0000
+Subject: [PATCH] ARM: S3C64XX: Remove unconditional power domain disables
+Message-ID: <1325071546-28711-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BGA should be the default SoC subtype but it is set to unknown if
-not explicitly set to PQFP. Currently setting it to PQFP sets subtype
-to BGA as subtypes are swapped in at91rm9200_set_type().
+Now that we have software runtime power management support this code is
+redundant.
 
-Wrong subtype causes GPIO bank D not to work at all.
-
-After this fix BGA subtype is set as default. On boot BGA is printed
-always but it is set to PQFP if requested before setting amount of GPIO
-banks.
-
-Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-at91/setup.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-s3c64xx/pm.c |   13 -------------
+ 1 files changed, 0 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index aa64294..e6b07ad 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -27,9 +27,9 @@ EXPORT_SYMBOL(at91_soc_initdata);
- void __init at91rm9200_set_type(int type)
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index 055dac9..7d3e81b 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -346,23 +346,10 @@ int __init s3c64xx_pm_init(void)
+ 
+ static __init int s3c64xx_pm_initcall(void)
  {
- 	if (type == ARCH_REVISON_9200_PQFP)
--		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
--	else
- 		at91_soc_initdata.subtype = AT91_SOC_RM9200_PQFP;
-+	else
-+		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
- }
+-	u32 val;
+-
+ 	pm_cpu_prep = s3c64xx_pm_prepare;
+ 	pm_cpu_sleep = s3c64xx_cpu_suspend;
+ 	pm_uart_udivslot = 1;
  
- void __init at91_init_irq_default(void)
-@@ -118,6 +118,7 @@ static void __init soc_detect(u32 dbgu_base)
- 
- 	case ARCH_ID_AT91RM9200:
- 		at91_soc_initdata.type = AT91_SOC_RM9200;
-+		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
- 		at91_boot_soc = at91rm9200_soc;
- 		break;
- 
+-	/*
+-	 * Unconditionally disable power domains that contain only
+-	 * blocks which have no mainline driver support.
+-	 */
+-	val = __raw_readl(S3C64XX_NORMAL_CFG);
+-	val &= ~(S3C64XX_NORMALCFG_DOMAIN_G_ON |
+-		 S3C64XX_NORMALCFG_DOMAIN_V_ON |
+-		 S3C64XX_NORMALCFG_DOMAIN_I_ON |
+-		 S3C64XX_NORMALCFG_DOMAIN_P_ON);
+-	__raw_writel(val, S3C64XX_NORMAL_CFG);
+-
+ #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
+ 	gpio_request(S3C64XX_GPN(12), "DEBUG_LED0");
+ 	gpio_request(S3C64XX_GPN(13), "DEBUG_LED1");
 -- 
-1.7.5.4
+1.7.7.3
