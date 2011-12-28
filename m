@@ -1,78 +1,148 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 28 Dec 2011 23:17:54 +0100
-Subject: [PATCH 1/2] PM / Domains: Add OF support
-In-Reply-To: <CAJuYYwT4bW0mMeUb18_WacaybQZskPsiqm6wvfMZOMk3U8UO4w@mail.gmail.com>
-References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
- <201112262144.42211.rjw@sisk.pl>
- <CAJuYYwT4bW0mMeUb18_WacaybQZskPsiqm6wvfMZOMk3U8UO4w@mail.gmail.com>
-Message-ID: <201112282317.54291.rjw@sisk.pl>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 28 Dec 2011 14:52:51 -0800
+Subject: [PATCH] Input: keyboard - add device tree bindings for simple key
+ matrixes
+Message-ID: <1325112771-31941-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 28, 2011, Thomas Abraham wrote:
-> Hi Mark, Rafael,
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Hi,
+This adds a basic device tree binding for simple key matrix data.
 
-> On 27 December 2011 02:14, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > On Monday, December 26, 2011, Mark Brown wrote:
-> >> On Mon, Dec 26, 2011 at 08:13:19PM +0100, Rafael J. Wysocki wrote:
-> >> > On Monday, December 12, 2011, Thomas Abraham wrote:
-> >>
-> >> > > A device node pointer is added to generic pm domain structure to associate
-> >> > > the domain with a node in the device tree.
-> >>
-> >> > That sounds fine except for one thing: PM domains are not devices, so adding
-> >> > "device node" pointers to them is kind of confusing.  Perhaps there should be
-> >> > something like struct dt_node, representing a more general device tree node?
-> >>
-> >> There's struct of_node which is exactly that, though practically
-> >> speaking you need a device if you're going to bind automatically to
-> >> something from the device tree in a sensible fashion and there is actual
-> >> hardware under there so a device does make some sense.
-> 
-> In patch 2/2 of this series, the platform code looks for nodes in
-> device tree that represent a power domain. When a power domain node is
-> found, a generic power domain is instantiated with pm_genpd_init()
-> using the information available from the node in device tree. There is
-> no automatic binding required in this case. The power domain node does
-> represent a hardware that manages the power domain.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-Good.  So would it be possible to use struct of_node instead of
-struct device_node in struct generic_pm_domain?
+Based on email exchange this morning, this is a first cut at a shared
+definition and helper function to parse and fill in the keymap data.
 
-> >>
-> >> This is in part compatibility with the existing Exynos code which uses
-> >> devices to probe the domains for non-DT systems.
-> >
-> > Well, that's not a general case, though.
-> >
-> > It doesn't feel approporiate to use a "device node" pointer for something
-> > that's not based on struct device, at least not a generic level, so I wonder
-> > if there's a different way.
-> 
-> A device node pointer or of_node pointer is a simple pointer to a
-> instance of a node in device tree. All nodes in a device tree need not
-> represent a corresponding 'struct device'. A node in device tree can
-> described a hardware feature such as a power domain supported in the
-> hardware.
+Instead of doing the direct parsing into the final keymap format, I
+chose to fill in the pdata-equivalent since that is how the OF pdata
+fillers work right now if code is to be kept common with the legacy
+platform_device probe interface.
 
-Sure.
+This is a prerequisite for a revised version of the tegra-kbc device
+tree support that I will repost separately once this interface is stable.
 
-> The addition of device tree support for generic power domains in this
-> patchset is generic for all platforms. The platform code instantiates
-> generic power domains from device tree with the of_node pointer
-> assigned to 'struct generic_pm_domain'. Then, in
-> __pm_genpd_add_device(), given a of_node pointer (to gen_pd), it is
-> possible to find a matching power domain to select.
 
-My point was that adding the struct device_node pointer to
-struct generic_pm_domain didn't look good, because that structure didn't
-represent a device in general.  While I understand that it may be regarded
-as a "device object" on some platforms, there are platforms that don't
-regard PM domains as devices.  For this reason (and only for this reason)
-it appears to be more appropriate to use a more generic device tree node
-type for struct generic_pm_domain.
+-Olof
 
-Thanks,
-Rafael
+ .../devicetree/bindings/input/matrix-keymap.txt    |   35 ++++++++++++
+ include/linux/input/matrix_keypad.h                |   55 ++++++++++++++++++++
+ 2 files changed, 90 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/matrix-keymap.txt
+
+diff --git a/Documentation/devicetree/bindings/input/matrix-keymap.txt b/Documentation/devicetree/bindings/input/matrix-keymap.txt
+new file mode 100644
+index 0000000..894f786
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/matrix-keymap.txt
+@@ -0,0 +1,35 @@
++For matrix keyboards there are two kinds of layout bindings using
++linux key codes.
++
++Required properties:
++- compatible: "matrix-keyboard-controller"
++
++For simple keyboards with just a few buttons, you can specify each key
++as a subnode of the keyboard controller, with the following
++properties:
++
++- keypad,row: the row number to which the key is connected.
++- keypad,column: the column number to which the key is connected.
++- linux,code: the key-code to be reported when the key is pressed
++  and released.
++
++Example:
++
++	key_1 {
++		keypad,row = <0>;
++		keypad,column = <3>;
++		linux,code = <2>;
++	};
++
++
++For a more complex keyboard, such as a full laptop, a more compact
++binding can be used instead, with the following property directly in
++the keyboard controller node:
++
++- linux,keymap: an array of 3-cell entries containing the equivalent
++  of the three separate properties above: row, column and linux
++  key-code.
++
++Example:
++	linux,keymap = < 0 3 2
++			 0 4 5 >;
+diff --git a/include/linux/input/matrix_keypad.h b/include/linux/input/matrix_keypad.h
+index fe7c4b9..ff13cd3 100644
+--- a/include/linux/input/matrix_keypad.h
++++ b/include/linux/input/matrix_keypad.h
+@@ -3,6 +3,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/input.h>
++#include <linux/of.h>
+ 
+ #define MATRIX_MAX_ROWS		32
+ #define MATRIX_MAX_COLS		32
+@@ -106,4 +107,58 @@ matrix_keypad_build_keymap(const struct matrix_keymap_data *keymap_data,
+ 	__clear_bit(KEY_RESERVED, keybit);
+ }
+ 
++#ifdef CONFIG_OF
++static inline struct matrix_keymap_data *
++matrix_keyboard_of_fill_keymap(struct device_node *np)
++{
++	struct matrix_keymap_data *kd;
++	struct device_node *knp;
++	int proplen = 0, i;
++	u32 *keymap, row, col, key_code;
++	const __be32 *prop = of_get_property(np, "linux,keymap", &proplen);
++
++	if (!of_device_is_compatible(np, "matrix-keyboard-controller"))
++		return NULL;
++
++	kd = kmalloc(sizeof(*kd), GFP_KERNEL);
++	if (!kd)
++		return NULL;
++	kd->keymap_size = proplen / 3;
++
++	for_each_child_of_node(np, knp)
++		kd->keymap_size++;
++
++	keymap = kzalloc(kd->keymap_size * sizeof(u32), GFP_KERNEL);
++	if (!keymap) {
++		kfree(kd);
++		return NULL;
++	}
++
++	kd->keymap = keymap;
++
++	for (i = 0; i < proplen/3; i++){
++		/* property format is < row column keycode > */
++		row = be32_to_cpup(prop++);
++		col = be32_to_cpup(prop++);
++		key_code = be32_to_cpup(prop++);
++		*keymap++ = KEY(row, col, key_code);
++	}
++
++	for_each_child_of_node(np, knp) {
++               of_property_read_u32(knp, "keypad,row", &row);
++               of_property_read_u32(knp, "keypad,column", &col);
++               of_property_read_u32(knp, "linux,code", &key_code);
++               *keymap++ = KEY(row, col, key_code);
++	}
++
++	return kd;
++}
++#else
++static inline struct matrix_keymap_data *
++matrix_keyboard_of_fill_keymap(struct device_node *np)
++{
++	return NULL;
++}
++#endif
++
+ #endif /* _MATRIX_KEYPAD_H */
+-- 
+1.7.8.GIT
