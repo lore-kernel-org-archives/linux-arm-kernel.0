@@ -1,49 +1,48 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Wed, 28 Dec 2011 12:09:07 +0100
-Subject: [PATCH 2/2] ARM: Exynos: Hook up power domains to generic power
- domain infrastructure
-In-Reply-To: <CAJuYYwTPqCdgzK+bcikNiowHxq33yAuf6B695ZZfCp2pYooxEw@mail.gmail.com>
-References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>	<1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>	<1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>	<4EFA5154.9060606@gmail.com>
- <CAJuYYwTPqCdgzK+bcikNiowHxq33yAuf6B695ZZfCp2pYooxEw@mail.gmail.com>
-Message-ID: <4EFAF8D3.9050204@gmail.com>
+From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
+Date: Wed, 28 Dec 2011 13:10:04 +0200
+Subject: [PATCH] at91: fix at91rm9200 soc subtype handling
+Message-ID: <1325070604-5560-1-git-send-email-veli-pekka.peltola@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+BGA should be the default SoC subtype but it is set to unknown if
+not explicitly set to PQFP. Currently setting it to PQFP sets subtype
+to BGA as subtypes are swapped in at91rm9200_set_type().
 
-On 12/28/2011 06:25 AM, Thomas Abraham wrote:
->>> +
->>> +static struct exynos4_pm_domain exynos4_pd_gps = {
->>> +     .base = (void __iomem *)S5P_PMU_GPS_CONF,
->>> +     .name = "pd-gps",
->>> +     .pd = {
->>> +             .power_off = exynos4_pd_power_off,
->>> +             .power_on = exynos4_pd_power_on,
->>> +     },
->>> +};
->>
->> I'm not sure if arch/arm/mach-exynos/pm.c is the right place to add this.
->> IMHO it would be much better to put PD in separate file, pm-runtime.c
->> or something like this.
-> 
-> Ok. I will move this to a new file pm-runtime.c.
+Wrong subtype causes GPIO bank D not to work at all.
 
-Thanks.
+After this fix BGA subtype is set as default. On boot BGA is printed
+always but it is set to PQFP if requested before setting amount of GPIO
+banks.
 
->> Can we assume various exynos versions will have same S5P_PMU_*_CONF
->> addresses? For old s3c64xx SoCs such assumption could be valid but I'm
->> a bit uncertain about Exynos series.
-> 
-> The addresses could be different, but it can be mapped to a
-> S5P_PMU_*_CONF. Maybe I did not understand your question here.
+Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
+---
+ arch/arm/mach-at91/setup.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-I meant that for handling the newer SoCs (e.g. exynos5) at runtime we might need
-to create new power domain definitions. That's why I suggested new file
-for runtime PM. mach-shmobile has even separate compilation unit per SoC,
-with register definitions put directly in C file. I'm not sure we need separate
-pm-exynos4.c, pm-exynos5.c... For now your patch looks good.
-
---
-
-Regards,
-Sylwester
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index aa64294..e6b07ad 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -27,9 +27,9 @@ EXPORT_SYMBOL(at91_soc_initdata);
+ void __init at91rm9200_set_type(int type)
+ {
+ 	if (type == ARCH_REVISON_9200_PQFP)
+-		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+-	else
+ 		at91_soc_initdata.subtype = AT91_SOC_RM9200_PQFP;
++	else
++		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+ }
+ 
+ void __init at91_init_irq_default(void)
+@@ -118,6 +118,7 @@ static void __init soc_detect(u32 dbgu_base)
+ 
+ 	case ARCH_ID_AT91RM9200:
+ 		at91_soc_initdata.type = AT91_SOC_RM9200;
++		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+ 		at91_boot_soc = at91rm9200_soc;
+ 		break;
+ 
+-- 
+1.7.5.4
