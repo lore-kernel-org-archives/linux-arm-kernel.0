@@ -1,32 +1,43 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Dec 2011 12:05:36 +0000
-Subject: [PATCH] ARM: S3C64XX: Fix build of Cragganmore after SPI changes
-Message-ID: <1325073936-10936-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Wed, 28 Dec 2011 12:14:04 +0000
+Subject: [PATCH V5 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <20111228120517.GA1691@richard-laptop>
+References: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
+ <1324974262-30963-5-git-send-email-richard.zhao@linaro.org>
+ <20111228031409.GL15863@b20223-02.ap.freescale.net>
+ <20111228033128.GM15863@b20223-02.ap.freescale.net>
+ <20111228114237.GF24405@opensource.wolfsonmicro.com>
+ <20111228120517.GA1691@richard-laptop>
+Message-ID: <20111228121403.GI24405@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 875a59 (ARM: SAMSUNG: Consolidation of SPI platform devices to
-plat-samsung) replaced the function s3c64xx_spi_set_info() with
-s3c64xx_spiN_set_platdata() but did not update all the machines, with
-Cragganmore being left. Fix that.
+On Wed, Dec 28, 2011 at 08:05:20PM +0800, Richard Zhao wrote:
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Looks like the problem with your mail client is that it's wrapping at
+exactly 80 characters which is too little - you need to leave space for
+being quoted.
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 3600998..b77331e 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -736,7 +736,7 @@ static void __init crag6410_machine_init(void)
- 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
- 
- 	samsung_keypad_set_platdata(&crag6410_keypad_data);
--        s3c64xx_spi_set_info(0, 0, 1);
-+	s3c64xx_spi0_set_platdata(NULL, 0, 1);
- 
- 	platform_add_devices(crag6410_devices, ARRAY_SIZE(crag6410_devices));
- 
--- 
-1.7.7.3
+> On Wed, Dec 28, 2011 at 11:42:37AM +0000, Mark Brown wrote:
+
+> > You can't usefully work with voltages without knowing what the actual
+> > voltages are - the only sensible stubs we could provide would return
+> > errors but then any driver using the stubs would probably fail to do
+> > whatever it was doing.  With enable and disable we can sensibly stub
+> > things out with an always on regulator.
+
+> Sorry, I can not get your point here. Let me describe the problem I met:
+
+>  - regulator_is_supported_voltage is not exported. when I build clk-reg-cpufreq
+>    as kernel module, there's a link error.
+
+This is an oversight, I've just fixed it.
+
+>  - I saw linux/regulator/consumer.h has some dummy functions if !REGULATOR. I
+>    tried to make clk-reg-cpufreq driver work even !REGULATOR. I think that's
+>    why the dummy functions are there. If regulator_get return NULL, it'll avoid
+>    calling other regulator functions. But regulator_is_supported_voltage and
+>    regulator_set_voltage_time don't have such dummy ones. Undefined functions.
+
+I can only repeat what I wrote above explaining why no stubs are
+provided.
