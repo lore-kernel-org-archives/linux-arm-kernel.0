@@ -1,42 +1,79 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 29 Dec 2011 15:14:08 +0800
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c
-In-Reply-To: <4EFC0AE4.6020608@googlemail.com>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
- <4EFC0AE4.6020608@googlemail.com>
-Message-ID: <20111229071407.GA11474@S2100-06.ap.freescale.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 28 Dec 2011 23:01:50 -0800
+Subject: [PATCH] Input: keyboard - add device tree bindings for simple
+ key matrixes
+In-Reply-To: <CAOesGMiNuW3mexN_8PtunZkaVX4Uph-OgZFr5zLhaB1nih_EEw@mail.gmail.com>
+References: <1325112771-31941-1-git-send-email-olof@lixom.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17755DC8D2@HQMAIL01.nvidia.com>
+ <CAOesGMiNuW3mexN_8PtunZkaVX4Uph-OgZFr5zLhaB1nih_EEw@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17755DC8DB@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 29, 2011 at 07:38:28AM +0100, Dirk Behme wrote:
-> On 06.12.2011 11:27, Lothar Wa?mann wrote:
-> >The following set of patches provides some cleanup and bugfixes for
-> >drivers/net/ethernet/freescale/fec.c and makes the driver buildable as
-> >a module.
+Olof Johansson wrote at Wednesday, December 28, 2011 11:34 PM:
+> On Wed, Dec 28, 2011 at 10:16 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> > Olof Johansson wrote at Wednesday, December 28, 2011 3:53 PM:
+> >> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> >>
+> >> This adds a basic device tree binding for simple key matrix data.
+> >>
+> >> Signed-off-by: Olof Johansson <olof@lixom.net>
+> >> ---
+> >>
+> >> Based on email exchange this morning, this is a first cut at a shared
+> >> definition and helper function to parse and fill in the keymap data.
+> >>
+> >> Instead of doing the direct parsing into the final keymap format, I
+> >> chose to fill in the pdata-equivalent since that is how the OF pdata
+> >> fillers work right now if code is to be kept common with the legacy
+> >> platform_device probe interface.
+> >>
+> >> This is a prerequisite for a revised version of the tegra-kbc device
+> >> tree support that I will repost separately once this interface is stable.
+> > ...
+> >> diff --git a/Documentation/devicetree/bindings/input/matrix-keymap.txt
+> > ...
+> >> +For simple keyboards with just a few buttons, you can specify each key
+> >> +as a subnode of the keyboard controller, with the following
+> >> +properties:
+> >> +
+> >> +- keypad,row: the row number to which the key is connected.
+> >> +- keypad,column: the column number to which the key is connected.
+> >> +- linux,code: the key-code to be reported when the key is pressed
+> >> + ?and released.
+> >> +
+> >> +Example:
+> >> +
+> >> + ? ? key_1 {
+> >> + ? ? ? ? ? ? keypad,row = <0>;
+> >> + ? ? ? ? ? ? keypad,column = <3>;
+> >> + ? ? ? ? ? ? linux,code = <2>;
+> >> + ? ? };
+> >> +
+> >> +
+> >> +For a more complex keyboard, such as a full laptop, a more compact
+> >> +binding can be used instead, with the following property directly in
+> >> +the keyboard controller node:
+> >> +
+> >> +- linux,keymap: an array of 3-cell entries containing the equivalent
+> >> + ?of the three separate properties above: row, column and linux
+> >> + ?key-code.
 > >
-> >Lothar Wa??mann (8):
-> >   misc cleanups
-> >   set con_id in clk_get() call to NULL
-> >   prevent dobule restart of interface on FDX/HDX change
-> >   don't request invalid IRQ
-> >   don't munge MAC address from platform data
-> >   preserve MII/RMII setting in fec_stop()
-> >   fix the .remove code
-> >   make FEC driver buildable as module
-> >
-> >  drivers/net/ethernet/freescale/Kconfig |    2 +-
-> >  drivers/net/ethernet/freescale/fec.c   |   63 ++++++++++++++++++++++----------
-> >  2 files changed, 44 insertions(+), 21 deletions(-)
+> > Why allow two completely different bindings? Is there some deficiency
+> > to the compact binding that means it isn't suitable for all cases?
 > 
-> What's the status of this patch series?
-> 
-> If I remember correctly, most of them got an Ack or Tested-by from
-> Shawn? But one or two need an update (not sure, though)? And the
-> subject should be updated?
-> 
-The series with update has been picked up by David on net-next.
-The LAKML was just missed from the updated posting.
+> The main reason is that the samsung keyboard driver already implements
+> the more verbose one, and allowing that binding to coexist while also
+> providing a more compact one seems like the right thing to do.
+
+Can we deprecate the Samsung format, and only allow it for that Samsung
+device (and allow both there), and require a single format for any other
+keyboard?
+
+The issue here is that U-Boot wants to stay small, and having to allow
+two alternative methods to specify a keyboard is going to bloat the code;
+I expect some pushback adding DT support for just one binding by the time
+they see all the DT parsing code that's needed to do it all right.
 
 -- 
-Regards,
-Shawn
+nvpublic
