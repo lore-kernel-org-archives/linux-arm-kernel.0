@@ -1,42 +1,44 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Dec 2011 12:30:20 +0900
-Subject: [PATCH V1] ARM: EXYNOS: Adds Samsung TRATS board support
-In-Reply-To: <1324966676-5714-1-git-send-email-riverful.kim@samsung.com>
-References: <1324966676-5714-1-git-send-email-riverful.kim@samsung.com>
-Message-ID: <028701ccc5da$31491fc0$93db5f40$%kim@samsung.com>
+Date: Thu, 29 Dec 2011 12:31:58 +0900
+Subject: [PATCH] ARM: S3C64XX: Reduce residency requirement for cpuidle WFI
+ mode
+In-Reply-To: <1324897126-8889-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1324897126-8889-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <028a01ccc5da$6bdeaec0$439c0c40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HeungJun, Kim wrote:
+Mark Brown wrote:
 > 
-> This patch adds Samsung Mobile TRATS board support.
+> Entering and leaving WFI is really cheap so there's no reason to have much
+> of a residency requirement for the state. Lower it to 1ms.
 > 
-> The changes against V0:
->   1) Modify Makefile & boardfile name: from "board-trats.c" to "mach-
-> trats.c"
->   2) Fix name of mmc's fixed regulator: remove "inverted"
->   3) Fix directory name on GPL comments: from "exynos4" to "exynos"
-> 
-> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/mach-exynos/Kconfig      |   11 ++
->  arch/arm/mach-exynos/Makefile     |    1 +
->  arch/arm/mach-exynos/mach-trats.c |  340
-> +++++++++++++++++++++++++++++++++++++
->  3 files changed, 352 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-exynos/mach-trats.c
+>  arch/arm/mach-s3c64xx/cpuidle.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-Hi HeungJun,
+> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-
+> s3c64xx/cpuidle.c
+> index 625d2c7..179460f 100644
+> --- a/arch/arm/mach-s3c64xx/cpuidle.c
+> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
+> @@ -55,7 +55,7 @@ static struct cpuidle_state s3c64xx_cpuidle_set[] = {
+>  	[0] = {
+>  		.enter			= s3c64xx_enter_idle,
+>  		.exit_latency		= 1,
+> -		.target_residency	= 100000,
+> +		.target_residency	= 1,
+>  		.flags			= CPUIDLE_FLAG_TIME_VALID,
+>  		.name			= "IDLE",
+>  		.desc			= "System active, ARM gated",
+> --
+> 1.7.7.3
 
-Thanks for your re-submit.
+OK, will apply.
+Mark, do you want to send this before v3.2?
 
-Hmm, maybe this is v2 not v1?
-
-Anyway, as I said, this conflicts with other ARM consolidation works. So
-please wait until after the merge window for this patch.
-
-Happy New Year.
+Thanks.
 
 Best regards,
 Kgene.
