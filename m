@@ -1,44 +1,44 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Dec 2011 12:36:50 +0900
-Subject: [PATCH] ARM: S3C64XX: Fix build of Cragganmore after SPI changes
-In-Reply-To: <1325073936-10936-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1325073936-10936-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <028e01ccc5db$199c11b0$4cd43510$%kim@samsung.com>
+Date: Thu, 29 Dec 2011 12:37:11 +0900
+Subject: [PATCH] ARM: S3C64XX: Staticise s3c64xx_init_uarts()
+In-Reply-To: <1325121194-32240-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1325121194-32240-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <028f01ccc5db$2658df50$730a9df0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Mark Brown wrote:
 > 
-> Commit 875a59 (ARM: SAMSUNG: Consolidation of SPI platform devices to
-> plat-samsung) replaced the function s3c64xx_spi_set_info() with
-> s3c64xx_spiN_set_platdata() but did not update all the machines, with
-> Cragganmore being left. Fix that.
+> Since the merge of everything into common.c s3c64xx_init_uarts() is now
+> only used within the one source file and should therefore be declared
+> static.
 > 
 > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |    2 +-
+>  arch/arm/mach-s3c64xx/common.c |    2 +-
 >  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410.c
-> index 3600998..b77331e 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -736,7 +736,7 @@ static void __init crag6410_machine_init(void)
->  	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+> diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-
+> s3c64xx/common.c
+> index 8ae5b16..f8cc5a0 100644
+> --- a/arch/arm/mach-s3c64xx/common.c
+> +++ b/arch/arm/mach-s3c64xx/common.c
+> @@ -49,7 +49,7 @@
 > 
->  	samsung_keypad_set_platdata(&crag6410_keypad_data);
-> -        s3c64xx_spi_set_info(0, 0, 1);
-> +	s3c64xx_spi0_set_platdata(NULL, 0, 1);
+>  /* uart registration process */
 > 
->  	platform_add_devices(crag6410_devices,
-> ARRAY_SIZE(crag6410_devices));
-> 
+> -void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+> +static void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int
+no)
+>  {
+>  	s3c24xx_init_uartdevs("s3c6400-uart", s3c64xx_uart_resources, cfg,
+> no);
+>  }
 > --
 > 1.7.7.3
 
-Yeah, some machines can be missed to update.
-Thanks, will apply.
+OK, let me send this to patch system.
+Thanks.
 
 Best regards,
 Kgene.
