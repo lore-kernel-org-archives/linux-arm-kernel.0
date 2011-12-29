@@ -1,67 +1,34 @@
-From: dron0gus@gmail.com (Gusakov Andrey)
-Date: Thu, 29 Dec 2011 17:07:16 +0400
-Subject: [PATCH] S3C: increase hwmon channels to 10
-In-Reply-To: <1325164036-15638-1-git-send-email-dron0gus@gmail.com>
-References: <1325164036-15638-1-git-send-email-dron0gus@gmail.com>
-Message-ID: <1325164036-15638-3-git-send-email-dron0gus@gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 29 Dec 2011 14:22:26 +0100
+Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
+In-Reply-To: <CANrkHUY3Zf4a2K5769Z=7Wng339zB6+z_Tgd4mOPChZ1RvZ=Kw@mail.gmail.com>
+References: <1323868927-3738-1-git-send-email-zonque@gmail.com>
+ <CANrkHUY3Zf4a2K5769Z=7Wng339zB6+z_Tgd4mOPChZ1RvZ=Kw@mail.gmail.com>
+Message-ID: <4EFC6992.4020501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S3C2416/2443 have 10-ch ADC. So increase number of hwmon's channels
-to 10.
+On 12/23/2011 04:40 PM, T Krishnamoorthy, Balaji wrote:
+> On Wed, Dec 14, 2011 at 6:52 PM, Daniel Mack <zonque@gmail.com> wrote:
+>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>> index 101cd31..8215ef9 100644
+>> --- a/drivers/mmc/host/omap_hsmmc.c
+>> +++ b/drivers/mmc/host/omap_hsmmc.c
+>> @@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+>>        if (mmc_slot(host).vcc_aux_disable_is_sleep)
+>>                mmc_slot(host).no_off = 1;
+>>
+>> -       mmc->f_min      = OMAP_MMC_MIN_CLOCK;
+>> -       mmc->f_max      = OMAP_MMC_MAX_CLOCK;
+>> +       mmc->f_min = OMAP_MMC_MIN_CLOCK;
+> 
+> Stray change for f_min ?
 
-Signed-off-by: Gusakov Andrey <dron0gus@gmail.com>
----
- arch/arm/plat-samsung/include/plat/hwmon.h |    2 +-
- drivers/hwmon/s3c-hwmon.c                  |    8 ++++++--
- 2 files changed, 7 insertions(+), 3 deletions(-)
+No, this was intended. The indentation doesn't make sense anymore when
+not grouped with the f_max assignment.
 
-diff --git a/arch/arm/plat-samsung/include/plat/hwmon.h b/arch/arm/plat-samsung/include/plat/hwmon.h
-index c167e44..91d8a13 100644
---- a/arch/arm/plat-samsung/include/plat/hwmon.h
-+++ b/arch/arm/plat-samsung/include/plat/hwmon.h
-@@ -34,7 +34,7 @@ struct s3c_hwmon_chcfg {
-  * @in: One configuration for each possible channel used.
-  */
- struct s3c_hwmon_pdata {
--	struct s3c_hwmon_chcfg	*in[8];
-+	struct s3c_hwmon_chcfg	*in[10];
- };
- 
- /**
-diff --git a/drivers/hwmon/s3c-hwmon.c b/drivers/hwmon/s3c-hwmon.c
-index f6c26d1..894110d 100644
---- a/drivers/hwmon/s3c-hwmon.c
-+++ b/drivers/hwmon/s3c-hwmon.c
-@@ -55,7 +55,7 @@ struct s3c_hwmon {
- 	struct s3c_adc_client	*client;
- 	struct device		*hwmon_dev;
- 
--	struct s3c_hwmon_attr	attrs[8];
-+	struct s3c_hwmon_attr	attrs[10];
- };
- 
- /**
-@@ -119,8 +119,10 @@ DEF_ADC_ATTR(4);
- DEF_ADC_ATTR(5);
- DEF_ADC_ATTR(6);
- DEF_ADC_ATTR(7);
-+DEF_ADC_ATTR(8);
-+DEF_ADC_ATTR(9);
- 
--static struct attribute *s3c_hwmon_attrs[9] = {
-+static struct attribute *s3c_hwmon_attrs[11] = {
- 	&sensor_dev_attr_adc0_raw.dev_attr.attr,
- 	&sensor_dev_attr_adc1_raw.dev_attr.attr,
- 	&sensor_dev_attr_adc2_raw.dev_attr.attr,
-@@ -129,6 +131,8 @@ static struct attribute *s3c_hwmon_attrs[9] = {
- 	&sensor_dev_attr_adc5_raw.dev_attr.attr,
- 	&sensor_dev_attr_adc6_raw.dev_attr.attr,
- 	&sensor_dev_attr_adc7_raw.dev_attr.attr,
-+	&sensor_dev_attr_adc8_raw.dev_attr.attr,
-+	&sensor_dev_attr_adc9_raw.dev_attr.attr,
- 	NULL,
- };
- 
--- 
-1.7.0.4
+Other than that, what is necessary to get this picked? Tony? :)
+
+
+Thanks,
+Daniel
