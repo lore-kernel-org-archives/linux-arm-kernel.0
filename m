@@ -1,31 +1,32 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 29 Dec 2011 01:13:14 +0000
-Subject: [PATCH] ARM: S3C64XX: Staticise s3c64xx_init_uarts()
-Message-ID: <1325121194-32240-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Thu, 29 Dec 2011 01:13:28 +0000
+Subject: [PATCH] ARM: SAMSUNG: Declare struct platform_device in
+ plat/s3c64xx-spi.h
+Message-ID: <1325121208-32295-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the merge of everything into common.c s3c64xx_init_uarts() is now
-only used within the one source file and should therefore be declared
-static.
+The function declarations in plat/s3c64xx-spi.h rely on struct
+platform_device but it's not declared by the header causing compiler
+warnings if it is included prior to another header which does that.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/common.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index 8ae5b16..f8cc5a0 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -49,7 +49,7 @@
+diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+index aea68b6..fa95e9a 100644
+--- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
++++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+@@ -11,6 +11,8 @@
+ #ifndef __S3C64XX_PLAT_SPI_H
+ #define __S3C64XX_PLAT_SPI_H
  
- /* uart registration process */
- 
--void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
-+static void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
- {
- 	s3c24xx_init_uartdevs("s3c6400-uart", s3c64xx_uart_resources, cfg, no);
- }
++struct platform_device;
++
+ /**
+  * struct s3c64xx_spi_csinfo - ChipSelect description
+  * @fb_delay: Slave specific feedback delay.
 -- 
 1.7.7.3
