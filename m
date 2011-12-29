@@ -1,43 +1,29 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Dec 2011 12:31:58 +0900
-Subject: [PATCH] ARM: S3C64XX: Reduce residency requirement for cpuidle WFI
- mode
-In-Reply-To: <1324897126-8889-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1324897126-8889-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <028a01ccc5da$6bdeaec0$439c0c40$%kim@samsung.com>
+Date: Thu, 29 Dec 2011 12:35:14 +0900
+Subject: [PATCH] ARM: S3C64XX: Remove hsmmc1 from Cragganmore
+In-Reply-To: <20111228130720.GA19755@sirena.org.uk>
+References: <1325075179-17187-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <20111228123253.GJ24405@opensource.wolfsonmicro.com>
+ <20111228130720.GA19755@sirena.org.uk>
+Message-ID: <028c01ccc5da$e08162e0$a18428a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Mark Brown wrote:
 > 
-> Entering and leaving WFI is really cheap so there's no reason to have much
-> of a residency requirement for the state. Lower it to 1ms.
+> On Wed, Dec 28, 2011 at 12:32:53PM +0000, Mark Brown wrote:
+> > On Wed, Dec 28, 2011 at 12:26:19PM +0000, Mark Brown wrote:
+> > > The second MMC slot was only present on revision 1 of Cragganmore so
+> > > remove it. Only MMC0 and MMC2 are there on production systems.
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/cpuidle.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> > Sorry, ignore this - wrong slot.
 > 
-> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-
-> s3c64xx/cpuidle.c
-> index 625d2c7..179460f 100644
-> --- a/arch/arm/mach-s3c64xx/cpuidle.c
-> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
-> @@ -55,7 +55,7 @@ static struct cpuidle_state s3c64xx_cpuidle_set[] = {
->  	[0] = {
->  		.enter			= s3c64xx_enter_idle,
->  		.exit_latency		= 1,
-> -		.target_residency	= 100000,
-> +		.target_residency	= 1,
->  		.flags			= CPUIDLE_FLAG_TIME_VALID,
->  		.name			= "IDLE",
->  		.desc			= "System active, ARM gated",
-> --
-> 1.7.7.3
+> Gah!  Actually I was right first time and got confused by some other
+> bugs as I rebased onto -next.
 
-OK, will apply.
-Mark, do you want to send this before v3.2?
+Hahah, Mark, you need some refresh?
 
+Anyway, looks ok to me, will apply.
 Thanks.
 
 Best regards,
