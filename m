@@ -1,152 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 29 Dec 2011 10:46:48 +0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <7FE21149F4667147B645348EC6057885077F82@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-3-git-send-email-b29396@freescale.com>
- <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885077F82@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20111229024647.GA11309@S2100-06.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 29 Dec 2011 12:28:51 +0900
+Subject: [rtc-linux] Re: [PATCH v2 0/4] Implement RTC support for
+ S3C2443/S3C2416/S3C2450
+In-Reply-To: <20111227234957.3bc1d3c3@linux.lan.towertech.it>
+References: <201112121543.42299.heiko@sntech.de>
+ <064801ccbfb1$c5d48e60$517dab20$%kim@samsung.com>
+ <201112210922.12300.heiko@sntech.de> <20111223114300.GA13175@sirena.org.uk>
+ <20111226020119.2c57a26e@linux.lan.towertech.it>
+ <08e301ccc430$beb4dc60$3c1e9520$%kim@samsung.com>
+ <20111227234957.3bc1d3c3@linux.lan.towertech.it>
+Message-ID: <028401ccc5d9$fbef97a0$f3cec6e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2011 at 02:41:25PM +0000, Dong Aisheng-B29396 wrote:
-[...]
-> > You could have nested sub-nodes, say something like:
-> > 
-> > iomuxc at 020e0000 {
-> >     compatible = "fsl,imx6q-iomuxc";
-> >     reg = <0x020e0000 0x4000>;
-> >     fsl,pins {
-> >         ... // fsl-specific pin properties
-> >     };
-> >     fsl,groups {
-> >         ... // fsl-specific group properties
-> >     };
-> >     fsl,functions {
-> >         ... // fsl-specific mux function properties
-> >     };
-> >     pinmux-usage {
-> >         // standardized pinmux "table" properties
-> >         sd4 { // pin group name
-> >             function = "sdio4"; // this function active on it
-> >             ...
-> >         };
-> >         ...
-> >     }
-> >     ...
-> > }
-> > 
-> Yes, I could do that.
-> The extra effort is that we have to manually exclude one pinmux-usage
-> node in pinmux driver since originally i take the child node count of
-> iomuxc as the function count since all child nodes are functions,
-> that why I firstly took the mapping node out of iomuxc, in addition
-> the old way i used seems to be more brief and clear.
+Alessandro Zummo wrote:
 > 
-Stephen suggested you put all the function nodes under node
-'fsl,functions' (not sure prefix fsl is necessary).  In that case,
-of_get_child_count() on 'fsl,functions' still get you the function
-count you want, right?
+> On Tue, 27 Dec 2011 09:44:52 +0900
+> Kukjin Kim <kgene.kim@samsung.com> wrote:
+> 
+> > Please check next-samsung-devel-rtc branch in my tree,
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> >
+> > And if you're ok to send to upstream via samsung tree, please let me
+> know so
+> > that I can add your ack on rtc patches. Of course, if any problems, let
+> me
+> > revert them and they should be re-worked.
+> 
+>  Checked. Please send it via samsung tree. I can only visually check the
+>  code but don't really know if it works and I guess you are in a better
+>  position to know ;)
+> 
+>  Acked-by: Alessandro Zummo <a.zummo@towertech.it>
+> 
+Hi Alessandro,
 
-But we do not bother with it, if we do not have pinmux-usage at all.
-See below ...
+Thanks for your ack.
+This series will be sent to upstream via arm-soc tree.
 
-> I tried adding pinmux-usage as a sub node of iomuxc and got two issues:
-> Taking imx6q as an example:
-> iomuxc at 020e0000 {
->         uart4 {
->                 func-name = "uart4";
->                 grp-name = "uart4grp";
->                 grp-pins = <107 108>;
->                 num-pins = <2>;
->                 grp-mux = <4 4>;
->                 num-mux = <2>;
->         };
-> 
->         sd4 {
->                 func-name = "sd4";
->                 grp-name = "sd4grp";
->                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
->                 num-pins = <10>;
->                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
->                 num-mux = <10>;
->         };
-> 
->         pinmux-mapping {
->                 uart4 {
->                         function = "uart4";
->                         dev = <&uart4>;
->                 };
-> 
->                 usdhc4 {
-> /*			    ctrl-dev-name = "20e0000.iomuxc"; */
->                         function = "sd4";
->                         dev = <&usdhc4>;
->                 };
->         };
-> };
-> 
-> If we remove ctrl-dev-name and get it from its parent node in drivers as
-> you suggested,
-> first, since this work will be done in the common API (pinmux_of_register_mappings
-> Requires pass the pinmux mapping node to it for construct the mapping table)
-> It will introduce a restriction that all platforms should define this node
-> under their pinctrl device node.
-> Second, it seems we cannot get its parent node device or device name in driver
-> (can only get node Name which is not sufficient for construct the pin map table
-> required by pinctrl core) and current device tree subsystem seems do not support
-> get its associated device from a device node.
-> We may not be able to construct ctrl-dev-name or ctrl-dev for struct pinmux_map.
-> I'm not sure if I missed something, if missed please let me know.
-> To support it, we may need to add support for converting device node
-> to device. Not sure it's applicable since I still have not tried it.
-> 
-> The same issue applies to dev using a phandle.
-> 
-We do not bother with it, if we do not have pinmux-usage at all.
-See below ...
+Happy New Year 2012 :)
 
-[...]
-
-> I was ever thought putting a phandle of pinmux function in each device,
-> Then pinmux mapping table seems not need anymore. Like:
-> 
-> usdhc4: usdhc at 0219c000 { /* uSDHC4 */
->         compatible = "fsl,imx6q-usdhc";
-> 	....
->         pinmux = <&pinmux-sd4>;
-> };
-> 
-> iomuxc at 020e0000 {
->         pinmux-sd4 : sd4 {
->                 func-name = "sd4";
->                 grp-name = "sd4grp";
->                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
->                 num-pins = <10>;
->                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
->                 num-mux = <10>;
->         };
-> 
-> It is a pure hw point of view to define node.
-
-That's the way we should go for.  This is exactly the same thing that
-clk and regulator DT support is doing.  And right, in that way, we do
-not need pinmux mapping for DT at all.
-
-> And it may need to implement a of_pinmux_get.
-
-To make the pinmux api generic for both dt and non-dt users, the pinmux
-client driver should still see/call pinmux_get, something like
-of_pinmux_get should be sorted out behind pinmux_get.
-
-> But what about the pin maps without device associated?
-> 
-Do we have such cases?
-
--- 
-Regards,
-Shawn
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
