@@ -1,17 +1,18 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Dec 2011 12:36:31 +0900
-Subject: [PATCH] ARM: S3C64XX: Fix interrupt configuration for PCA935x on
- Cragganmore
-In-Reply-To: <1325121979-3609-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1325121979-3609-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <028d01ccc5db$0e453cb0$2acfb610$%kim@samsung.com>
+Date: Thu, 29 Dec 2011 12:36:50 +0900
+Subject: [PATCH] ARM: S3C64XX: Fix build of Cragganmore after SPI changes
+In-Reply-To: <1325073936-10936-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1325073936-10936-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <028e01ccc5db$199c11b0$4cd43510$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Mark Brown wrote:
 > 
-> 0 is a valid IRQ but the interrupt line for the pca935x certainly isn't
-> connected there which causes it to fail to probe.
+> Commit 875a59 (ARM: SAMSUNG: Consolidation of SPI platform devices to
+> plat-samsung) replaced the function s3c64xx_spi_set_info() with
+> s3c64xx_spiN_set_platdata() but did not update all the machines, with
+> Cragganmore being left. Fix that.
 > 
 > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
@@ -20,25 +21,24 @@ Mark Brown wrote:
 > 
 > diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
 > s3c64xx/mach-crag6410.c
-> index 46dfb14..139d16e 100644
+> index 3600998..b77331e 100644
 > --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
 > +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -357,7 +357,7 @@ static struct platform_device *crag6410_devices[]
-> __initdata = {
+> @@ -736,7 +736,7 @@ static void __init crag6410_machine_init(void)
+>  	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
 > 
->  static struct pca953x_platform_data crag6410_pca_data = {
->  	.gpio_base	= PCA935X_GPIO_BASE,
-> -	.irq_base	= 0,
-> +	.irq_base	= -1,
->  };
+>  	samsung_keypad_set_platdata(&crag6410_keypad_data);
+> -        s3c64xx_spi_set_info(0, 0, 1);
+> +	s3c64xx_spi0_set_platdata(NULL, 0, 1);
 > 
->  /* VDDARM is controlled by DVS1 connected to GPK(0) */
+>  	platform_add_devices(crag6410_devices,
+> ARRAY_SIZE(crag6410_devices));
+> 
 > --
 > 1.7.7.3
 
-OK, so do you want to apply this before v3.2?
-
-Thanks.
+Yeah, some machines can be missed to update.
+Thanks, will apply.
 
 Best regards,
 Kgene.
