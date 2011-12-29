@@ -1,59 +1,43 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Dec 2011 12:44:04 +0900
-Subject: [PATCHv2 resend] Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-In-Reply-To: <4EFB83DE.7080404@solonet.org.ua>
-References: <4EE7BE5F.8020108@solonet.org.ua>
- <01e501ccc536$a6e58fb0$f4b0af10$%kim@samsung.com>
- <4EFB83DE.7080404@solonet.org.ua>
-Message-ID: <029101ccc5dc$1c718360$55548a20$%kim@samsung.com>
+Date: Thu, 29 Dec 2011 12:47:23 +0900
+Subject: [PATCH] ARM: SAMSUNG: Declare struct platform_device in
+ plat/s3c64xx-spi.h
+In-Reply-To: <1325121208-32295-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1325121208-32295-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <029201ccc5dc$92c2aad0$b8480070$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Denis Kuzmenko wrote:
+Mark Brown wrote:
 > 
-> Hi Kukjin,
+> The function declarations in plat/s3c64xx-spi.h rely on struct
+> platform_device but it's not declared by the header causing compiler
+> warnings if it is included prior to another header which does that.
 > 
-Hi Denis,
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+> b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+> index aea68b6..fa95e9a 100644
+> --- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+> +++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+> @@ -11,6 +11,8 @@
+>  #ifndef __S3C64XX_PLAT_SPI_H
+>  #define __S3C64XX_PLAT_SPI_H
+> 
+> +struct platform_device;
+> +
+>  /**
+>   * struct s3c64xx_spi_csinfo - ChipSelect description
+>   * @fb_delay: Slave specific feedback delay.
+> --
+> 1.7.7.3
 
-> Your patch applies (note that it looks like your email-client have
-
-Yeah, if over 76 columns, my e-mail client changes its line so maybe
-happened wrapped long lines.
-
-> wrapped long lines thus broke the path) and works OK. Looks good to me.
-> See some additional comments below.
-> 
-> On 12/28/2011 09:59 AM, Kukjin Kim wrote:
-> > Denis Kuzmenko wrote:
-> (snip)
-> >> +	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING ||
-> >> S3C2412_IOTIMING)
-> >
-> > As you know, CONFIG_CPU_FREQ_S3C24XX_IODEBUG is for enabling of
-> > s3c_freq_iodbg() and there is no problem when
-> CONFIG_S3C241{0,2}_IOTIMING is
-> > not selected, even though s3c_freq_iodbg() is used only at
-> > s3c2410-iotiming.c now. So this is not necessary to fix the problem you
-> > said.
-> 
-> I'm OK with this approach, however I don't see any future use of
-> s3c_freq_iodbg() without s3c2410-iotiming.c. But it's not anyway
-> critical so please pick any variant which you like.
-> 
-Yes. I think we need to sort out the CPUFREQ on S3C24XX next time :)
-
-(snip)
-
-> (snip)
-> > So how about at below?
-> > If you're ok, will send before v3.2.
-> 
-> So, as already said, I have no objections.
-> And thank you for review.
-> 
-
-Thanks and Happy New Year!
+Yes, right. Will apply.
+Thanks.
 
 Best regards,
 Kgene.
