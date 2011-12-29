@@ -1,39 +1,42 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Dec 2011 12:29:36 +0900
-Subject: [PATCH v4] s3c/s3c24xx: arm: leds: Make s3c24xx LEDS driver use
- gpiolib. Fix error disabling pull during probe.
-In-Reply-To: <20111229015640.GB4839@sirena.org.uk>
-References: <4EE7E0E7.1020802@solonet.org.ua>
- <063a01ccbfac$498513c0$dc8f3b40$%kim@samsung.com>
- <4EFB851F.9080805@solonet.org.ua> <20111229015640.GB4839@sirena.org.uk>
-Message-ID: <028601ccc5da$1734a410$459dec30$%kim@samsung.com>
+Date: Thu, 29 Dec 2011 12:30:20 +0900
+Subject: [PATCH V1] ARM: EXYNOS: Adds Samsung TRATS board support
+In-Reply-To: <1324966676-5714-1-git-send-email-riverful.kim@samsung.com>
+References: <1324966676-5714-1-git-send-email-riverful.kim@samsung.com>
+Message-ID: <028701ccc5da$31491fc0$93db5f40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+HeungJun, Kim wrote:
 > 
-> On Wed, Dec 28, 2011 at 11:07:43PM +0200, Denis Kuzmenko wrote:
-> > On 12/21/2011 08:46 AM, Kukjin Kim wrote:
-> > > Denis Kuzmenko wrote:
+> This patch adds Samsung Mobile TRATS board support.
 > 
-> > >> Make s3c24xx LEDS driver use gpiolib. Fix error disabling pull during
-> > >> probe.
+> The changes against V0:
+>   1) Modify Makefile & boardfile name: from "board-trats.c" to "mach-
+> trats.c"
+>   2) Fix name of mmc's fixed regulator: remove "inverted"
+>   3) Fix directory name on GPL comments: from "exynos4" to "exynos"
 > 
-> > >> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig      |   11 ++
+>  arch/arm/mach-exynos/Makefile     |    1 +
+>  arch/arm/mach-exynos/mach-trats.c |  340
+> +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 352 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos/mach-trats.c
 > 
-> > > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> > > Richard, I think, this should be handled in your tree.
-> 
-> > ping Richard
-> 
-> Take a look at the git logs - Richard hasn't been actively maintaining a
-> tree for the LEDs for some time now.
+Hi HeungJun,
 
-Hmm, ok. If we can't get his response before release 3.2, I will try to send
-this via samsung tree.
+Thanks for your re-submit.
 
-Thanks all.
+Hmm, maybe this is v2 not v1?
+
+Anyway, as I said, this conflicts with other ARM consolidation works. So
+please wait until after the merge window for this patch.
+
+Happy New Year.
 
 Best regards,
 Kgene.
