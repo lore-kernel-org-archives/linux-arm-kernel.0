@@ -1,70 +1,115 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 28 Dec 2011 22:16:59 -0800
-Subject: [PATCH] Input: keyboard - add device tree bindings for simple
- key matrixes
-In-Reply-To: <1325112771-31941-1-git-send-email-olof@lixom.net>
-References: <1325112771-31941-1-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17755DC8D2@HQMAIL01.nvidia.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 29 Dec 2011 14:21:03 +0800
+Subject: [PATCH V5 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <1324974262-30963-5-git-send-email-richard.zhao@linaro.org>
+References: <1324974262-30963-1-git-send-email-richard.zhao@linaro.org>
+ <1324974262-30963-5-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111229062102.GA2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Wednesday, December 28, 2011 3:53 PM:
-> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> 
-> This adds a basic device tree binding for simple key matrix data.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
-> 
-> Based on email exchange this morning, this is a first cut at a shared
-> definition and helper function to parse and fill in the keymap data.
-> 
-> Instead of doing the direct parsing into the final keymap format, I
-> chose to fill in the pdata-equivalent since that is how the OF pdata
-> fillers work right now if code is to be kept common with the legacy
-> platform_device probe interface.
-> 
-> This is a prerequisite for a revised version of the tegra-kbc device
-> tree support that I will repost separately once this interface is stable.
-...
-> diff --git a/Documentation/devicetree/bindings/input/matrix-keymap.txt
-...
-> +For simple keyboards with just a few buttons, you can specify each key
-> +as a subnode of the keyboard controller, with the following
-> +properties:
-> +
-> +- keypad,row: the row number to which the key is connected.
-> +- keypad,column: the column number to which the key is connected.
-> +- linux,code: the key-code to be reported when the key is pressed
-> +  and released.
-> +
-> +Example:
-> +
-> +	key_1 {
-> +		keypad,row = <0>;
-> +		keypad,column = <3>;
-> +		linux,code = <2>;
-> +	};
-> +
-> +
-> +For a more complex keyboard, such as a full laptop, a more compact
-> +binding can be used instead, with the following property directly in
-> +the keyboard controller node:
-> +
-> +- linux,keymap: an array of 3-cell entries containing the equivalent
-> +  of the three separate properties above: row, column and linux
-> +  key-code.
+There's still a bug that, after rmmod module, cpu0 still has cpufreq
+sysfs entry.
 
-Why allow two completely different bindings? Is there some deficiency
-to the compact binding that means it isn't suitable for all cases?
+cpufreq_unregister_driver can not clean up everything.
 
-The binding proposed by Simon Glass for U-Boot was just a matrix
-of keycodes, with any unused locations containing zero, e.g. see:
+unfortunately, I don't have much time to debug cpufreq core.
 
-http://patchwork.ozlabs.org/patch/129825/
+Log:
+root at ubuntu:~# insmod /clk-reg-cpufreq.ko 
+clk_reg_cpufreq: regulator cpu get failed.
+trying to register driver clk-reg
+adding CPU 0
+CPU 1 already managed, adding link
+CPU 2 already managed, adding link
+CPU 3 already managed, adding link
+setting new policy for CPU 0: 198000 - 996000 kHz
+new min and max freqs are 198000 - 996000 kHz
+governor switch
+__cpufreq_governor for CPU 0, event 1
+governor: change or update limits
+__cpufreq_governor for CPU 0, event 3
+target for CPU 0: 792000 kHz, relation 0
+initialization complete
+adding CPU 1
+adding CPU 2
+adding CPU 3
+driver clk-reg up and running
+root at ubuntu:~# 
+root at ubuntu:~# 
+root at ubuntu:~# 
+root at ubuntu:~# rmmod clk-reg-cpufreq
+unregistering driver clk-reg
+unregistering CPU 0
+removing link for cpu 1
+removing link for cpu 2
+removing link for cpu 3
+__cpufreq_governor for CPU 0, event 2
+last reference is dropped
+waiting for dropping of refcount
+wait complete
+adding CPU 1
+Restoring governor userspace for cpu 1
+CPU 0 already managed, adding link
+CPU 2 already managed, adding link
+CPU 3 already managed, adding link
+setting new policy for CPU 1: 198000 - 996000 kHz
+new min and max freqs are 198000 - 996000 kHz
+governor switch
+__cpufreq_governor for CPU 1, event 1
+governor: change or update limits
+__cpufreq_governor for CPU 1, event 3
+target for CPU 1: 792000 kHz, relation 0
+initialization complete
+unregistering CPU 0
+removing link
+unregistering CPU 1
+removing link for cpu 2
+removing link for cpu 3
+__cpufreq_governor for CPU 1, event 2
+last reference is dropped
+waiting for dropping of refcount
+wait complete
+adding CPU 2
+Restoring governor userspace for cpu 2
+CPU 0 already managed, adding link
+CPU 1 already managed, adding link
+CPU 3 already managed, adding link
+setting new policy for CPU 2: 198000 - 996000 kHz
+new min and max freqs are 198000 - 996000 kHz
+governor switch
+__cpufreq_governor for CPU 2, event 1
+governor: change or update limits
+__cpufreq_governor for CPU 2, event 3
+target for CPU 2: 792000 kHz, relation 0
+initialization complete
+unregistering CPU 1
+removing link
+unregistering CPU 2
+removing link for cpu 0
+removing link for cpu 3
+__cpufreq_governor for CPU 2, event 2
+last reference is dropped
+waiting for dropping of refcount
+wait complete
+adding CPU 0
+Restoring governor userspace for cpu 0
+CPU 1 already managed, adding link
+CPU 2 already managed, adding link
+CPU 3 already managed, adding link
+setting new policy for CPU 0: 198000 - 996000 kHz
+new min and max freqs are 198000 - 996000 kHz
+governor switch
+__cpufreq_governor for CPU 0, event 1
+governor: change or update limits
+__cpufreq_governor for CPU 0, event 3
+target for CPU 0: 792000 kHz, relation 0
+initialization complete
+unregistering CPU 2
+removing link
+unregistering CPU 3
+removing link
 
-... which is yet another option. We obviously don't want U-Boot and the
-kernel to expect different DT content either.
 
--- 
-nvpublic
+Thanks
+Richard
