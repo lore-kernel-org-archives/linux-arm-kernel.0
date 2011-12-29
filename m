@@ -1,55 +1,59 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Dec 2011 12:37:18 +0900
-Subject: [PATCH] ARM: S3C64XX: Remove unconditional power domain disables
-In-Reply-To: <1325071546-28711-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1325071546-28711-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <029001ccc5db$2a8a5400$7f9efc00$%kim@samsung.com>
+Date: Thu, 29 Dec 2011 12:44:04 +0900
+Subject: [PATCHv2 resend] Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+In-Reply-To: <4EFB83DE.7080404@solonet.org.ua>
+References: <4EE7BE5F.8020108@solonet.org.ua>
+ <01e501ccc536$a6e58fb0$f4b0af10$%kim@samsung.com>
+ <4EFB83DE.7080404@solonet.org.ua>
+Message-ID: <029101ccc5dc$1c718360$55548a20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Denis Kuzmenko wrote:
 > 
-> Now that we have software runtime power management support this code is
-> redundant.
+> Hi Kukjin,
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/pm.c |   13 -------------
->  1 files changed, 0 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-> index 055dac9..7d3e81b 100644
-> --- a/arch/arm/mach-s3c64xx/pm.c
-> +++ b/arch/arm/mach-s3c64xx/pm.c
-> @@ -346,23 +346,10 @@ int __init s3c64xx_pm_init(void)
-> 
->  static __init int s3c64xx_pm_initcall(void)
->  {
-> -	u32 val;
-> -
->  	pm_cpu_prep = s3c64xx_pm_prepare;
->  	pm_cpu_sleep = s3c64xx_cpu_suspend;
->  	pm_uart_udivslot = 1;
-> 
-> -	/*
-> -	 * Unconditionally disable power domains that contain only
-> -	 * blocks which have no mainline driver support.
-> -	 */
-> -	val = __raw_readl(S3C64XX_NORMAL_CFG);
-> -	val &= ~(S3C64XX_NORMALCFG_DOMAIN_G_ON |
-> -		 S3C64XX_NORMALCFG_DOMAIN_V_ON |
-> -		 S3C64XX_NORMALCFG_DOMAIN_I_ON |
-> -		 S3C64XX_NORMALCFG_DOMAIN_P_ON);
-> -	__raw_writel(val, S3C64XX_NORMAL_CFG);
-> -
->  #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
->  	gpio_request(S3C64XX_GPN(12), "DEBUG_LED0");
->  	gpio_request(S3C64XX_GPN(13), "DEBUG_LED1");
-> --
-> 1.7.7.3
+Hi Denis,
 
-OK, will apply.
-Thanks.
+> Your patch applies (note that it looks like your email-client have
+
+Yeah, if over 76 columns, my e-mail client changes its line so maybe
+happened wrapped long lines.
+
+> wrapped long lines thus broke the path) and works OK. Looks good to me.
+> See some additional comments below.
+> 
+> On 12/28/2011 09:59 AM, Kukjin Kim wrote:
+> > Denis Kuzmenko wrote:
+> (snip)
+> >> +	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING ||
+> >> S3C2412_IOTIMING)
+> >
+> > As you know, CONFIG_CPU_FREQ_S3C24XX_IODEBUG is for enabling of
+> > s3c_freq_iodbg() and there is no problem when
+> CONFIG_S3C241{0,2}_IOTIMING is
+> > not selected, even though s3c_freq_iodbg() is used only at
+> > s3c2410-iotiming.c now. So this is not necessary to fix the problem you
+> > said.
+> 
+> I'm OK with this approach, however I don't see any future use of
+> s3c_freq_iodbg() without s3c2410-iotiming.c. But it's not anyway
+> critical so please pick any variant which you like.
+> 
+Yes. I think we need to sort out the CPUFREQ on S3C24XX next time :)
+
+(snip)
+
+> (snip)
+> > So how about at below?
+> > If you're ok, will send before v3.2.
+> 
+> So, as already said, I have no objections.
+> And thank you for review.
+> 
+
+Thanks and Happy New Year!
 
 Best regards,
 Kgene.
