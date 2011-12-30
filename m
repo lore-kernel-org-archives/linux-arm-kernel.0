@@ -1,20 +1,32 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 30 Dec 2011 02:03:24 +0000
-Subject: [PATCH 1/2] ARM: S3C64XX: Fix the memory mapped GPIOs on
+Date: Fri, 30 Dec 2011 02:28:16 +0000
+Subject: [PATCH 2/2] ARM: S3C64XX: Enable power management for WiFi on
  Cragganmore
-In-Reply-To: <02cc01ccc696$c741e400$55c5ac00$%kim@samsung.com>
-References: <1325121813-2066-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <029301ccc5de$58557970$09006c50$%kim@samsung.com>
- <20111229103412.GC2909@opensource.wolfsonmicro.com>
- <02cc01ccc696$c741e400$55c5ac00$%kim@samsung.com>
-Message-ID: <20111230020323.GE9737@opensource.wolfsonmicro.com>
+In-Reply-To: <1325212096-13420-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1325212096-13420-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1325212096-13420-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2011 at 11:00:17AM +0900, Kukjin Kim wrote:
+Allow the SDHCI stack to runtime power manage the WiFi card on Cragganmore
+for better power optimisation.
 
-> Yeah, it's  a little bit...so I'm sorting it out with others for next time
-> :)
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-If you leave it for long enough I'll probably get round to doing it
-myself.
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 139d16e..30730fb 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -693,6 +693,7 @@ static void __init crag6410_map_io(void)
+ static struct s3c_sdhci_platdata crag6410_hsmmc2_pdata = {
+ 	.max_width		= 4,
+ 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
++	.host_caps		= MMC_CAP_POWER_OFF_CARD,
+ };
+ 
+ static void crag6410_cfg_sdhci0(struct platform_device *dev, int width)
+-- 
+1.7.7.3
