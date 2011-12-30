@@ -1,30 +1,34 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 30 Dec 2011 12:45:37 +0800
-Subject: [PATCH] MTD/GPMI : select more modules for GPMI by default
-Message-ID: <1325220337-23165-1-git-send-email-b32955@freescale.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Fri, 30 Dec 2011 14:06:53 +0800
+Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
+Message-ID: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpmi-nand driver needs the mxs-dma driver. So select the
-MXS_DMA by default. So does the MTD_CHAR.
+From: Richard Zhao <richard.zhao@freescale.com>
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
+Fix fixed regulator failed to call regulator_register.
+
+Fixed regulator does not support set voltage operation, so we
+don't need apply_uV.
+
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- drivers/mtd/nand/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/regulator/fixed.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 07c4774..1b14a3a 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -420,6 +420,8 @@ config MTD_NAND_NANDSIM
- config MTD_NAND_GPMI_NAND
-         bool "GPMI NAND Flash Controller driver"
-         depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28)
-+	select MXS_DMA
-+	select MTD_CHAR
- 	select MTD_PARTITIONS
- 	select MTD_CMDLINE_PARTS
-         help
+diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
+index a44a017..fa0c426 100644
+--- a/drivers/regulator/fixed.c
++++ b/drivers/regulator/fixed.c
+@@ -69,6 +69,7 @@ of_get_fixed_voltage_config(struct device *dev)
+ 		return NULL;
+ 
+ 	init_data = config->init_data;
++	init_data->constraints.apply_uV = 0;
+ 
+ 	config->supply_name = init_data->constraints.name;
+ 	if (init_data->constraints.min_uV == init_data->constraints.max_uV) {
 -- 
-1.7.0.4
+1.7.5.4
