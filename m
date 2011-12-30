@@ -1,67 +1,18 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Fri, 30 Dec 2011 18:47:05 +0800
-Subject: [PATCH] ARM: imx6: fix v7_invalidate_l1 by adding I-Cache
- invalidation
-In-Reply-To: <1325237200-10610-1-git-send-email-shawn.guo@linaro.org>
-References: <1325237200-10610-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAB4PhKexxJM+rWhgdQfu9vB16KVT6QpN1ye4kH88pNiLnEyL+Q@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 30 Dec 2011 10:48:50 +0000
+Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
+In-Reply-To: <20111230103830.GD2414@b20223-02.ap.freescale.net>
+References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
+ <20111230103026.GA2766@opensource.wolfsonmicro.com>
+ <20111230103830.GD2414@b20223-02.ap.freescale.net>
+Message-ID: <20111230104850.GE2766@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/12/30 Shawn Guo <shawn.guo@linaro.org>:
-> The recent suspend/resume and reset testing on imx6q discovers that
-> not only D-Cache but also I-Cache has random data and validity when
-> the core comes out of a power recycle.
->
-> This patch adds I-Cache invalidation into v7_invalidate_l1 to make
-> sure both D-Cache and I-Cache invalidated on power-up.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> ?arch/arm/mach-imx/head-v7.S | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
-> index 6229efb..c844112 100644
-> --- a/arch/arm/mach-imx/head-v7.S
-> +++ b/arch/arm/mach-imx/head-v7.S
-> @@ -33,6 +33,7 @@
-> ?*/
-> ?ENTRY(v7_invalidate_l1)
-> ? ? ? ?mov ? ? r0, #0
-> + ? ? ? mcr ? ? p15, 0, r0, c7, c5, 0 ? @ invalidate I cache
-> ? ? ? ?mcr ? ? p15, 2, r0, c0, c0, 0
-> ? ? ? ?mrc ? ? p15, 1, r0, c0, c0, 0
+On Fri, Dec 30, 2011 at 06:38:31PM +0800, Richard Zhao wrote:
 
-I'm wondering why arm linux init core code does not try to invalidate
-i/d-cache before enable it?
-As a formal procedure, we need invalidate i/d cache before actually
-enable it. right?
+> So what's your suggestion of the issue? Below fixed regulator failed
+> to register.
 
-I looked the code: arch/arm/mm/proc-v7.S:
-
-#ifdef HARVARD_CACHE
-        mcr     p15, 0, r10, c7, c5, 0          @ I+BTB cache invalidate
-#endif
-        dsb
-#ifdef CONFIG_MMU
-        mcr     p15, 0, r10, c8, c7, 0          @ invalidate I + D TLBs
-        mcr     p15, 0, r10, c2, c0, 2          @ TTB control register
-        ALT_SMP(orr     r4, r4, #TTB_FLAGS_SMP)
-        ALT_UP(orr      r4, r4, #TTB_FLAGS_UP)
-        mcr     p15, 0, r4, c2, c0, 1           @ load TTB1
-
-It seems that it will try to invalidate when HARVARD_CACHE define. But
-HARVARD_CACHE
-only defined in v6, why?
-
-Jason Liu
->
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+It shouldn't actually be passing on the constraint setting the voltage
+when it constructs the constraints.
