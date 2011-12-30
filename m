@@ -1,38 +1,27 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 30 Dec 2011 19:08:43 +0800
-Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
-In-Reply-To: <20111230104850.GE2766@opensource.wolfsonmicro.com>
-References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
- <20111230103026.GA2766@opensource.wolfsonmicro.com>
- <20111230103830.GD2414@b20223-02.ap.freescale.net>
- <20111230104850.GE2766@opensource.wolfsonmicro.com>
-Message-ID: <20111230110842.GE2414@b20223-02.ap.freescale.net>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Fri, 30 Dec 2011 13:00:42 +0100
+Subject: [RFC] cpufreq: Add S3C2416/S3C2450 cpufreq driver
+In-Reply-To: <20111230082319.GC2414@b20223-02.ap.freescale.net>
+References: <201112292058.07448.heiko@sntech.de>
+ <20111230082319.GC2414@b20223-02.ap.freescale.net>
+Message-ID: <201112301300.43730.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2011 at 10:48:50AM +0000, Mark Brown wrote:
-> On Fri, Dec 30, 2011 at 06:38:31PM +0800, Richard Zhao wrote:
-> 
-> > So what's your suggestion of the issue? Below fixed regulator failed
-> > to register.
-> 
-> It shouldn't actually be passing on the constraint setting the voltage
-> when it constructs the constraints.
---- a/drivers/regulator/of_regulator.c
-+++ b/drivers/regulator/of_regulator.c
-@@ -34,9 +34,6 @@ static void of_get_regulation_constraints(struct device_node *np,
-        /* Voltage change possible? */
-        if (constraints->min_uV != constraints->max_uV)
-                constraints->valid_ops_mask |= REGULATOR_CHANGE_VOLTAGE;
--       /* Only one voltage?  Then make sure it's set. */
--       if (constraints->min_uV == constraints->max_uV)
--               constraints->apply_uV = true;
- 
-        uV_offset = of_get_property(np, "regulator-microvolt-offset", NULL);
-        if (uV_offset)
+Hi Richard,
 
+Am Freitag 30 Dezember 2011, 09:23:21 schrieb Richard Zhao:
+> would it be possible to use clk-reg-cpufreq driver I sent out?
 
-Make sense?
+I thought about it when your driver was introduced first. It would be possible 
+if the frequency scaling would only happen on the armdiv.
 
-Thanks
-Richard
+But as you probably saw in the code the S3C2416 has two clock sources for the 
+armclk (armdiv and hclk) and also special requirements on the switch of those 
+(i.e. when switching to armdiv, force the frequency to be the same as the 
+hclk, to prevent stability issues).
+
+Therefore I don't think these behaviour requirements can be modelled with your 
+clk-reg-cpufreq driver.
+
+Heiko
