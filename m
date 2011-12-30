@@ -1,56 +1,74 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 30 Dec 2011 13:07:42 +0100
-Subject: [RFC] cpufreq: Add S3C2416/S3C2450 cpufreq driver
-In-Reply-To: <CAA11ShBk=HFt6qaZex+VK=DfZtTvrf9bhyLKW0Gk2g_E5D44PA@mail.gmail.com>
-References: <201112292058.07448.heiko@sntech.de>
- <CAA11ShBk=HFt6qaZex+VK=DfZtTvrf9bhyLKW0Gk2g_E5D44PA@mail.gmail.com>
-Message-ID: <201112301307.43109.heiko@sntech.de>
+From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
+Date: Fri, 30 Dec 2011 14:07:11 +0100
+Subject: ftrace performance impact with different configuration
+In-Reply-To: <1325175685.24045.5.camel@gandalf.stny.rr.com>
+References: <CALZhoSRVNp=Sj2u2GHiQhuHOEdrfiM58KzG+RutvJV=8CoCpTQ@mail.gmail.com>
+ <CAH+eYFDb4r235jAGjr7j5R5C+9YK9WeXXjVZGWQUB=330sOi0Q@mail.gmail.com>
+ <1325175685.24045.5.camel@gandalf.stny.rr.com>
+Message-ID: <23257775.9kkYY4quUh@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag 30 Dezember 2011, 08:48:30 schrieb Dron Gus:
-> Hi.
+Le jeudi 29 d?cembre 2011 11:21:25 Steven Rostedt a ?crit :
+> On Thu, 2011-12-29 at 21:12 +0530, Rabin Vincent wrote:
+> > On Thu, Dec 29, 2011 at 14:08, Lei Wen <adrian.wenl@gmail.com> wrote:
+> > > 2. Seem dynamic ftrace also could involve some penalty for the
+> > > running
+> > > system, although it patching the running kernel with nop stub...
+> > > 
+> > > For the second item, is there anyone done some research before that
+> > > could zero the cost for the running system when the tracing is not
+> > > enabled yet?
+> > 
+> > One thing that needs to be fixed (for ARM) is that for the new-style
+> > mcounts, the nop that's currently being done is not really a nop -- it
+> > removes the function call, but there is still an unnecessary push/pop
+> > sequence.  This should be modified to have the push {lr} removed too.
+> > (Two instructions replaced instead of one.)
 > 
-> On Thu, Dec 29, 2011 at 11:58 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> ...
+> Unfortunately you can't do this, at least not when the kernel is
+> preemptible.
 > 
-> > +static int __init s3c2416_cpufreq_driver_init(struct cpufreq_policy
-> > *policy)
+> Say we have:
 > 
-> ...
+> 	push lr
+> 	call mcount
 > 
-> > +       s3c_freq->armdiv = clk_get(NULL, "armdiv");
-> > +       if (IS_ERR(s3c_freq->armdiv)) {
-> > +               pr_err("cpufreq: Unable to obtain ARMDIV: %ld\n",
-> > +                      PTR_ERR(s3c_freq->armdiv));
-> > +               return PTR_ERR(s3c_freq->armdiv);
-> > +       }
-> > +
-> > +       s3c_freq->hclk = clk_get(NULL, "hclk");
-> > +       if (IS_ERR(s3c_freq->hclk)) {
-> > +               pr_warn("cpufreq: Unable to obtain HCLK: %ld\n",
-> > +                      PTR_ERR(s3c_freq->hclk));
-> > +               s3c_freq->hclk = NULL; /*we can live without hclk */
-> > +       }
+> then we convert it to:
 > 
-> clk_put allready obtained "armdiv"?
+> 	nop
+> 	nop
 > 
-> > +
-> > +       s3c_freq->armclk = clk_get(NULL, "armclk");
-> > +       if (IS_ERR(s3c_freq->armclk)) {
-> > +               pr_err("cpufreq: Unable to obtain ARMCLK: %ld\n",
-> > +                      PTR_ERR(s3c_freq->armclk));
-> > +               return PTR_ERR(s3c_freq->armclk);
-> > +       }
+> The conversion to nop should not be an issue, and this is what would be
+> done when the system boots up. But then we enable tracing, some low
+> priority task could have been preempted after executing the first nop,
+> and we call stop machine to do the conversions (if no stop machine, then
+> lets just say a higher prio task is running while we do the
+> conversions). Then we add both the push lr and call back. But when that
+> lower priority task gets scheduled in again, it would have looked like
+> it ran:
 > 
-> Same for "hclk" and "armclk"?
-thanks for finding those, it seems probe also needs a lot more love.
+> 	nop
+> 	call mcount
+> 
+> Since the call to mcount requires that the lr was pushed, this process
+> will crash when the return is done and we never saved the lr.
+> 
+> If you don't like the push. the best thing you can do is convert to:
+> 
+> 	jmp 1f
+> 	call mcount
+> 1:
+> 
+> This may not be as cheap as two nops, but it may be better than a push.
 
-As you were also working on S3C2416 stuff, could you possibly test the driver 
-and see if it still hangs for you?
+Sorry about being a bit naive, but why it is not possible to do it in two 
+steps ?
+call stop_machine to put the jmp which skip the call to mcount
+Then wait until all tasks hits schedule() (synchronize_sched() ?)
+Then modify both instructions to put in place the two nops since we know that 
+nobody is calling mcount.
 
-After I introduced the switch from hclk to armdiv using a forced armdiv=hclk 
-frequency the hangs stopped for me and the devices ran hours with varying 
-workloads without hangs. (also including voltage scaling)
+Thanks,
 
-Heiko
+Philippe
