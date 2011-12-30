@@ -1,53 +1,27 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 30 Dec 2011 11:00:05 +0900
-Subject: [PATCH] ARM: S3C64XX: Fix build of Cragganmore after SPI changes
-References: <1325073936-10936-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <02cb01ccc696$c0088680$40199380$%kim@samsung.com>
+Date: Fri, 30 Dec 2011 11:00:17 +0900
+Subject: [PATCH 1/2] ARM: S3C64XX: Fix the memory mapped GPIOs on
+ Cragganmore
+In-Reply-To: <20111229103412.GC2909@opensource.wolfsonmicro.com>
+References: <1325121813-2066-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <029301ccc5de$58557970$09006c50$%kim@samsung.com>
+ <20111229103412.GC2909@opensource.wolfsonmicro.com>
+Message-ID: <02cc01ccc696$c741e400$55c5ac00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Mark Brown wrote:
 > 
-> Mark Brown wrote:
-> >
-> > Commit 875a59 (ARM: SAMSUNG: Consolidation of SPI platform devices to
-> > plat-samsung) replaced the function s3c64xx_spi_set_info() with
-> > s3c64xx_spiN_set_platdata() but did not update all the machines, with
-> > Cragganmore being left. Fix that.
-> >
-> > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > ---
-> >  arch/arm/mach-s3c64xx/mach-crag6410.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> > s3c64xx/mach-crag6410.c
-> > index 3600998..b77331e 100644
-> > --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> > +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> > @@ -736,7 +736,7 @@ static void __init crag6410_machine_init(void)
-> >  	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
-> >
-> >  	samsung_keypad_set_platdata(&crag6410_keypad_data);
-> > -        s3c64xx_spi_set_info(0, 0, 1);
-> > +	s3c64xx_spi0_set_platdata(NULL, 0, 1);
-> >
-> >  	platform_add_devices(crag6410_devices,
-> > ARRAY_SIZE(crag6410_devices));
-> >
-> > --
-> > 1.7.7.3
+> On Thu, Dec 29, 2011 at 01:00:04PM +0900, Kukjin Kim wrote:
 > 
-> Yeah, some machines can be missed to update.
-> Thanks, will apply.
+> > And Mark, how about using DEFINE_RES_XXX() like following?
 > 
-Hi Mark,
+> That's fine, though the mmgpio one does need to have the name added.
 
-I couldn't look at the line of 's3c64xx_spi_set_info(...);' which is deleted
-in this patch in my tree. So I couldn't apply this.
+Yeah, it's  a little bit...so I'm sorting it out with others for next time
+:)
 
-Do you want to apply this just to add 's3c64xx_spi0_set_platdata()'?
-
+Happy New Year!!!
 Thanks.
 
 Best regards,
