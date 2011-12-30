@@ -1,41 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 30 Dec 2011 14:25:25 -0600
-Subject: [PATCHv2 1/2] gpio: add a driver for the Synopsys DesignWare
- APB GPIO block
-In-Reply-To: <20111230195955.GA3427@page>
-References: <1324345431-12251-1-git-send-email-jamie@jamieiles.com>
- <20111230195955.GA3427@page>
-Message-ID: <4EFE1E35.106@gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 30 Dec 2011 17:25:41 -0500
+Subject: ftrace performance impact with different configuration
+In-Reply-To: <23257775.9kkYY4quUh@laptop>
+References: <CALZhoSRVNp=Sj2u2GHiQhuHOEdrfiM58KzG+RutvJV=8CoCpTQ@mail.gmail.com>
+ <CAH+eYFDb4r235jAGjr7j5R5C+9YK9WeXXjVZGWQUB=330sOi0Q@mail.gmail.com>
+ <1325175685.24045.5.camel@gandalf.stny.rr.com> <23257775.9kkYY4quUh@laptop>
+Message-ID: <1325283941.24045.15.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/30/2011 01:59 PM, Jamie Iles wrote:
-> Grant, Linus,
-> 
-> On Tue, Dec 20, 2011 at 01:43:50AM +0000, Jamie Iles wrote:
->> The Synopsys DesignWare block is used in some ARM devices (picoxcell)
->> and can be configured to provide multiple banks of GPIO pins.  The first
->> bank (A) can also provide IRQ capabilities.
->>
->> v2:	- use Rob Herring's irqdomain in generic irq chip patches
->> 	- use reg property to indicate bank index
->> 	- support irqs on both edges based on LinusW's u300 driver
->>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Linus Walleij <linus.walleij@stericsson.com>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> 
-> Is this driver okay by you guys?  I'd like to get this one in for 3.3 if 
-> at all possible as it's the last patch that allows picoxcell to boot to 
-> a semi useful state without out of tree patches and that would make 
-> testing a lot easier!
+On Fri, 2011-12-30 at 14:07 +0100, Philippe R?tornaz wrote:
 
-We've got to sort out getting irq domains enabled on x86 and MIPS in
-order to merge generic irq chip using domains. I'm not sure that will
-get done in time.
+> Sorry about being a bit naive, but why it is not possible to do it in two 
+> steps ?
+> call stop_machine to put the jmp which skip the call to mcount
+> Then wait until all tasks hits schedule() (synchronize_sched() ?)
 
-Can you leave out the interrupt portion of the driver? Or that is needed
-to get to a useful state.
+Here's the problem. With a preemptible kernel, hitting schedule() does
+not mean that you can guarantee that all tasks have not been
+interrupted.
 
-Rob
+
+	nop (use to be push lr)
+	------------> interrupt
+			set NEED_RESCHED
+			end of interrupt
+			preempt_schedule()
+				schedule()
+
+	[ another processes is now running ]
+	call stop_machine()
+	put in push lr
+	call stop_machine()
+	put in call to mcount
+
+	everything seems to be running fine.
+
+	the low priority task gets scheduled again...
+
+
+				schedule() finishes
+			preempt_schedule() finishes
+			back at tail of return_from_intr in entry_64.S
+			iret
+	call mcount
+			pop lr (which was never pushed)
+			jmp lr
+
+Now we jump back to some random stuff and the stack is corrupted.
+
+There's no way to safely modify two instructions that depend on each
+other in a preemptible kernel, with the exception of waiting for all
+CPUs to hit idle (which may never happen on a busy system). And even
+that may be racy.
+
+-- Steve
+
+> Then modify both instructions to put in place the two nops since we know that 
+> nobody is calling mcount.
