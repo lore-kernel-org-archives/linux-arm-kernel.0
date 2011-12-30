@@ -1,34 +1,25 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 30 Dec 2011 10:51:36 +0900
-Subject: [PATCH] ARM: S3C64XX: Reduce residency requirement for cpuidle WFI
- mode
-In-Reply-To: <20111229103157.GA2909@opensource.wolfsonmicro.com>
-References: <1324897126-8889-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <028a01ccc5da$6bdeaec0$439c0c40$%kim@samsung.com>
- <20111229103157.GA2909@opensource.wolfsonmicro.com>
-Message-ID: <02c801ccc695$906d4a10$b147de30$%kim@samsung.com>
+Date: Fri, 30 Dec 2011 10:51:45 +0900
+Subject: [PATCH] ARM: S3C64XX: Fix interrupt configuration for PCA935x on
+ Cragganmore
+In-Reply-To: <20111229103237.GB2909@opensource.wolfsonmicro.com>
+References: <1325121979-3609-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <028d01ccc5db$0e453cb0$2acfb610$%kim@samsung.com>
+ <20111229103237.GB2909@opensource.wolfsonmicro.com>
+Message-ID: <02c901ccc695$95ce6520$c16b2f60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Mark Brown wrote:
 > 
-> On Thu, Dec 29, 2011 at 12:31:58PM +0900, Kukjin Kim wrote:
-> > Mark Brown wrote:
+> On Thu, Dec 29, 2011 at 12:36:31PM +0900, Kukjin Kim wrote:
 > 
-> > > Entering and leaving WFI is really cheap so there's no reason to have
-> much
-> > > of a residency requirement for the state. Lower it to 1ms.
+> > OK, so do you want to apply this before v3.2?
 > 
-> > > -		.target_residency	= 100000,
-> > > +		.target_residency	= 1,
-> 
-> > OK, will apply.
-> > Mark, do you want to send this before v3.2?
-> 
-> It doesn't seem super urgent, though it'd be nice to get it into 3.3
-> with the original patch adding the support.
+> The problem is mostly cosmetic as the chip isn't actually used by
+> current cosmetics so no need to try to get it into 3.2.
 
-Ah, OK, I've applied this with that.
+OK, I see.
 
 Thanks.
 
