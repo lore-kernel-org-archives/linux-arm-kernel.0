@@ -1,60 +1,79 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 30 Dec 2011 11:28:33 +0800
-Subject: [PATCH 4/4] arm/imx: add mc13892 support into imx51-babbage.dts
-In-Reply-To: <1324479647-4580-5-git-send-email-shawn.guo@linaro.org>
-References: <1324479647-4580-1-git-send-email-shawn.guo@linaro.org>
- <1324479647-4580-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111230032832.GB2414@b20223-02.ap.freescale.net>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Fri, 30 Dec 2011 12:06:11 +0800
+Subject: [PATCH v2] pxa/hx4700: add platform device and I2C info for AK4641
+ codec
+Message-ID: <1325217971.4022.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 11:00:47PM +0800, Shawn Guo wrote:
-> It adds mc13892 support into imx51-babbage device tree source.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts |   93 ++++++++++++++++++++++++++++++++++-
->  1 files changed, 91 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index 564cb8c..728c9e8 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -31,12 +31,14 @@
->  				esdhc at 70004000 { /* ESDHC1 */
->  					fsl,cd-internal;
->  					fsl,wp-internal;
-> +					vmmc-supply = <&vsd_reg>;
->  					status = "okay";
->  				};
->  
->  				esdhc at 70008000 { /* ESDHC2 */
->  					cd-gpios = <&gpio1 6 0>;
->  					wp-gpios = <&gpio1 5 0>;
-> +					vmmc-supply = <&vsd_reg>;
->  					status = "okay";
->  				};
->  
-> @@ -56,8 +58,95 @@
->  						compatible = "fsl,mc13892";
->  						spi-max-frequency = <6000000>;
->  						reg = <0>;
-> -						mc13xxx-irq-gpios = <&gpio1 8 0>;
-> -						fsl,mc13xxx-uses-regulator;
-> +						interrupt-parent = <&gpio1>;
-> +						interrupts = <8>;
-Why do we put everything in /soc node? Isn't it suppose to put
-everything outside SoC outside /soc node?
+The audio on hx4700 needs this to properly work.
 
-In my understanding, i2c/spi node in /soc should only describe the bus
-host controller. Especially i2c is a multi-master bus.
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+---
+v2: Avoid rename AK4641 power GPIOs.
 
-Thanks
-Richard
+ arch/arm/mach-pxa/hx4700.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-> +
-> +						regulators {
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index fb9b62d..208eef1 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -45,6 +45,7 @@
+ #include <mach/hx4700.h>
+ #include <mach/irda.h>
  
-Thanks
-Richard
++#include <sound/ak4641.h>
+ #include <video/platform_lcd.h>
+ #include <video/w100fb.h>
+ 
+@@ -765,6 +766,28 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
+ };
+ 
+ /*
++ * Asahi Kasei AK4641 on I2C
++ */
++
++static struct ak4641_platform_data ak4641_info = {
++	.gpio_power = GPIO27_HX4700_CODEC_ON,
++	.gpio_npdn  = GPIO109_HX4700_CODEC_nPDN,
++};
++
++static struct i2c_board_info i2c_board_info[] __initdata = {
++	{
++		I2C_BOARD_INFO("ak4641", 0x12),
++		.platform_data = &ak4641_info,
++	},
++};
++
++static struct platform_device audio = {
++	.name	= "hx4700-audio",
++	.id	= -1,
++};
++
++
++/*
+  * PCMCIA
+  */
+ 
+@@ -790,6 +813,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&gpio_vbus,
+ 	&power_supply,
+ 	&strataflash,
++	&audio,
+ 	&pcmcia,
+ };
+ 
+@@ -827,6 +851,7 @@ static void __init hx4700_init(void)
+ 	pxa_set_ficp_info(&ficp_info);
+ 	pxa27x_set_i2c_power_info(NULL);
+ 	pxa_set_i2c_info(NULL);
++	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
+ 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
+ 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
+ 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
+-- 
+1.7.5.4
