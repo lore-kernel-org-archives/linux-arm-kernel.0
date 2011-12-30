@@ -1,45 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 30 Dec 2011 12:32:10 +0200
-Subject: [PATCH v2] usb: gadget: Fix build error due to selection of
- USB_FSL_MPH_DR_OF by ARCH_MXC
-In-Reply-To: <CAOMZO5CdBupw2A+4gaDBo-mh=MqimaecTWLUO7PcvAqaDrKihA@mail.gmail.com>
-References: <1324492640-25481-1-git-send-email-fabio.estevam@freescale.com>
- <1324553602-3411-1-git-send-email-fabio.estevam@freescale.com>
- <CAOMZO5CdBupw2A+4gaDBo-mh=MqimaecTWLUO7PcvAqaDrKihA@mail.gmail.com>
-Message-ID: <20111230103209.GA27099@legolas.emea.dhcp.ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 30 Dec 2011 18:38:31 +0800
+Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
+In-Reply-To: <20111230103026.GA2766@opensource.wolfsonmicro.com>
+References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
+ <20111230103026.GA2766@opensource.wolfsonmicro.com>
+Message-ID: <20111230103830.GD2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 29, 2011 at 09:26:24PM -0200, Fabio Estevam wrote:
-> Hi Felipe,
+On Fri, Dec 30, 2011 at 10:30:27AM +0000, Mark Brown wrote:
+> On Fri, Dec 30, 2011 at 02:06:53PM +0800, Richard Zhao wrote:
+> > From: Richard Zhao <richard.zhao@freescale.com>
+> > 
+> > Fix fixed regulator failed to call regulator_register.
+> > 
+> > Fixed regulator does not support set voltage operation, so we
+> > don't need apply_uV.
 > 
-> On Thu, Dec 22, 2011 at 9:33 AM, Fabio Estevam
-> <fabio.estevam@freescale.com> wrote:
-> > USB_FSL_MPH_DR_OF is a PowerPC driver and should not be selected by ARCH_MXC.
-> >
-> > Doing a 'make mx3_defconfig' and selecting i.MX6 we get:
-> >
-> > CC [M] ?drivers/usb/host/fsl-mph-dr-of.o
-> > drivers/usb/host/fsl-mph-dr-of.c: In function 'fsl_usb2_device_register':
-> > drivers/usb/host/fsl-mph-dr-of.c:97: error: 'struct pdev_archdata' has no member named 'dma_mask'
-> >
-> > Fix this error by not allowing USB_FSL_MPH_DR_OF to be selected by ARCH_MXC.
-> >
-> > Cc: stable at kernel.org
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Does this patch look good?
+> No, the regulator drivers shouldn't be fiddling around with their
+> constraints.  Generally the answer is that users shouldn't set
+> constraints that won't work, or perhaps the API needs to be more
+> forgiving.
+So what's your suggestion of the issue? Below fixed regulator failed
+to register.
 
-I'm not looking into patches until Jan 2nd. Sorry. Focussing on some
-internal stuff during the merge window. Hang on for a little while and I
-will soon get back to apply patches.
+reg_2P5V: regulator-2P5V {
+        compatible = "regulator-fixed";
+        regulator-name = "2P5V";
+        regulator-min-microvolt = <2500000>;
+        regulator-max-microvolt = <2500000>;
+        regulator-always-on;
+}
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111230/53e4cf90/attachment.sig>
+Richard
