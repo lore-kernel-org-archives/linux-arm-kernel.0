@@ -1,103 +1,61 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Fri, 30 Dec 2011 10:34:54 +0800
-Subject: [PATCH RESEND] pxa/hx4700: add platform device and I2C info for
- AK4641 codec
-Message-ID: <1325212494.2569.1.camel@phoenix>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Fri, 30 Dec 2011 10:56:02 +0800
+Subject: [PATCH V6 0/7] add a generic cpufreq driver
+Message-ID: <1325213769-11752-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also rename AK4641 power GPIOs to document the codec chip.
+The driver is based on clock and regulator APIs and  support single core
+and multi core ARM SoCs. For multi core, it assume all cores share the
+same clock and voltage.
 
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
-This patch was sent by Dmitry Artamonow on https://lkml.org/lkml/2011/5/18/222
-and was resent on https://lkml.org/lkml/2011/9/12/100
-The audio on hx4700 needs this patch to properly work.
+Thanks Arnd, Mark, Jamie, Shawn, Rob, for your review.
 
- arch/arm/mach-pxa/hx4700.c              |   25 +++++++++++++++++++++++++
- arch/arm/mach-pxa/include/mach/hx4700.h |    4 ++--
- 2 files changed, 27 insertions(+), 2 deletions(-)
+Changes in V6:
+ - add scaling_available_freqs
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index fb9b62d..1e2b627 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -45,6 +45,7 @@
- #include <mach/hx4700.h>
- #include <mach/irda.h>
- 
-+#include <sound/ak4641.h>
- #include <video/platform_lcd.h>
- #include <video/w100fb.h>
- 
-@@ -765,6 +766,28 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
- };
- 
- /*
-+ * Asahi Kasei AK4641 on I2C
-+ */
-+
-+static struct ak4641_platform_data ak4641_info = {
-+	.gpio_power = GPIO27_HX4700_AK4641_POWER,
-+	.gpio_npdn  = GPIO109_HX4700_AK4641_nPDN,
-+};
-+
-+static struct i2c_board_info i2c_board_info[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("ak4641", 0x12),
-+		.platform_data = &ak4641_info,
-+	},
-+};
-+
-+static struct platform_device audio = {
-+	.name	= "hx4700-audio",
-+	.id	= -1,
-+};
-+
-+
-+/*
-  * PCMCIA
-  */
- 
-@@ -790,6 +813,7 @@ static struct platform_device *devices[] __initdata = {
- 	&gpio_vbus,
- 	&power_supply,
- 	&strataflash,
-+	&audio,
- 	&pcmcia,
- };
- 
-@@ -827,6 +851,7 @@ static void __init hx4700_init(void)
- 	pxa_set_ficp_info(&ficp_info);
- 	pxa27x_set_i2c_power_info(NULL);
- 	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
- 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
- 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
- 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
-diff --git a/arch/arm/mach-pxa/include/mach/hx4700.h b/arch/arm/mach-pxa/include/mach/hx4700.h
-index 8bc0291..f0f6015 100644
---- a/arch/arm/mach-pxa/include/mach/hx4700.h
-+++ b/arch/arm/mach-pxa/include/mach/hx4700.h
-@@ -29,7 +29,7 @@
- #define GPIO14_HX4700_nWLAN_IRQ			14
- #define GPIO18_HX4700_RDY			18
- #define GPIO22_HX4700_LCD_RL			22
--#define GPIO27_HX4700_CODEC_ON			27
-+#define GPIO27_HX4700_AK4641_POWER		27
- #define GPIO32_HX4700_RS232_ON			32
- #define GPIO52_HX4700_CPU_nBATT_FAULT		52
- #define GPIO58_HX4700_TSC2046_nPENIRQ		58
-@@ -67,7 +67,7 @@
- #define GPIO105_HX4700_nIR_ON			105
- #define GPIO106_HX4700_CPU_BT_nRESET		106
- #define GPIO107_HX4700_SPK_nSD			107
--#define GPIO109_HX4700_CODEC_nPDN		109
-+#define GPIO109_HX4700_AK4641_nPDN		109
- #define GPIO110_HX4700_LCD_LVDD_3V3_ON		110
- #define GPIO111_HX4700_LCD_AVDD_3V3_ON		111
- #define GPIO112_HX4700_LCD_N2V7_7V3_ON		112
--- 
-1.7.5.4
+Changes in V5:
+ - add more comments
+ - rename trans-latency to clk-trans-latency, and it only describe clk
+   latency. Regulator latency is got from regulator_set_voltage_time.
+
+Changes in v4:
+ - add depends on HAVE_CLK && OF && REGULATOR
+ - add set_cpu_freq fail check
+ - regulator_put wehn module exit
+ - add pr_fmt and convert all printk to pr_xxx
+ - use voltage range
+ - comment and doc fix
+ - add cpu_volts value pre-check in module init
+ - add helpfull module parameter max_freq
+ - remove compatible string check on Arnd's comment.
+ - remove generic-cpufreq to clk-reg-cpufreq
+
+Changes in v3:
+ - move adjusting smp loops_per_jiffy to arm common code,
+   and also adjust global loops_per_jiffy.
+ - remove adjusting loops_per_jiffy in imx and omap cpufreq drivers.
+ - check compatible "generic-cpufreq" when module_init
+ - change printk to pr_xxx
+ - add generic-cpufreq DT binding doc
+
+Changes in v2:
+ - add volatage change support
+ - change '_' in property name to '-'
+ - use initial value to calculate loops_per_jiffy
+ - fix reading cpu_volts property bug 
+ - let cpufreq_frequency_table_cpuinfo routines handle cpu_freq_khz_max/min
+ - don't change freq in arm_cpufreq_exit, because every core share the same freq.
+ - use unsigned long describe frequency as much as possible. Because clk use
+   unsigned long, but cpufreq use unsigned int.
+
+[PATCH V6 1/7] ARM: add cpufreq transiton notifier to adjust
+[PATCH V6 2/7] arm/imx: cpufreq: remove loops_per_jiffy recalculate
+[PATCH V6 3/7] cpufreq: OMAP: remove loops_per_jiffy recalculate for
+[PATCH V6 4/7] cpufreq: add clk-reg cpufreq driver
+[PATCH V6 5/7] dts/imx6q: add cpufreq property
+[PATCH V6 6/7] arm/imx6q: register arm_clk as cpu to clkdev
+[PATCH V6 7/7] arm/imx6q: select ARCH_HAS_CPUFREQ
+
+Thanks
+Richard
