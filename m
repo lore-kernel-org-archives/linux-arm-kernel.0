@@ -1,262 +1,53 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Fri, 30 Dec 2011 11:14:34 +1000
-Subject: Atmel at91x40 ("EB01" eval board) resurected
-In-Reply-To: <CALz2mmXcAk9ZOsAzKMbKVVJ2+Et02+Gxj_z6xSgukC5LjgJTLg@mail.gmail.com>
-References: <CALz2mmXcAk9ZOsAzKMbKVVJ2+Et02+Gxj_z6xSgukC5LjgJTLg@mail.gmail.com>
-Message-ID: <4EFD107A.4010902@snapgear.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 30 Dec 2011 10:50:28 +0900
+Subject: [GIT PULL] Samsung Fixes for v3.2
+Message-ID: <02c701ccc695$685501d0$38ff0570$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Phil,
+Hi Linus,
 
-On 23/12/11 13:18, Phil Budne wrote:
-> I'm new here, so please excuse any protocol violations!
->
-> I decided to see if I could bring up current kernel sources under
-> skyeye  (at91x40 simulation).
-> I've also been working on a port to the more modern AT91SAM7SE using QEMU.
->
-> Attached are:
->
-> diffs from sources from git://github.com/at91linux/linux-at91.git
->   master branch (current as of 12/21/11)
->   many of the changes are in generic arch/arm files.
->
-> Tested on Simulated at91x40xxx "EB01" board
-> kernel built using attached defconfig file.
+This is Samsung fixes for v3.2
 
-There is an at91x40 defconfig in arch/arm/configs/at91x40_defconfig.
-Did you start with that?
+Please pull from:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.2-samsung-fixes-4
 
-I notice that the processor ID you have in your defconfig is quite
-different to the one in there...
+The 'ARM: SAMSUNG: Fix build error...' is fixing of build in some case of
+only selection s3c2440 in kernel configuration and the 'ARM: EXYNOS: Remove
+duplicated...' can cause the detection of overlapped memory region which
+resulted in boot failure.
 
+If any problem, please kindly let me know.
 
-> 4M of RAM at 0x1000000
-> XIP kernel loaded in 4M (of "flash") at 0x1400000
-> root filesystem is a compiled in initramfs
->    too much pain to build ROMfs and map;
->     (drivers/mtd/maps/uclinux.c requires rootfs appended after kernel
->      "uClinux" 11/11/11 dist uclinux.c allows rootfs image at fixed location)
->
->
-> new file attached: mach/arm/mach-at91/at91x40_devices.c
->
-> Runs on locally modified skyeye
->   based on skyeye-v1.2_Rel.tar (had trouble building latest release)
->   adds interrupt driven UART output
->   tweaked for programmed I/O UART input
->   fix for loading XIP data section (load at physical, not virtual address)
->
-> Problems:
->   repeated "free" commands show loss of 12K each time (see atached typescript)
->   same sh binary (from skyeye test suite)
->     does not exhibit this on 2.6 and 2.4 kernels (from the skyeye test suite).
->   breakpointing sys_munmap shows len==0 (could it be an ABI issue?)
+Arnd, since v3.2 is now close at hand, I'm sending this to Linus.
 
-Some comments on the changes below. Ultimately though you need to break this
-single diff up into well defined logical changes. In other words make a patch
-series out of it.
+Linus, Arnd and all Linux guys,
+Happy New Year :)
+Thanks.
 
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index a8997d7..fcb5757 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -116,6 +116,8 @@
->  #define MODULES_END		(END_MEM)
->  #define MODULES_VADDR		(PHYS_OFFSET)
->
-> +#define XIP_VIRT_ADDR(physaddr)  (physaddr)
-> +
->  #endif /* !CONFIG_MMU */
->
->  /*
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 3448a3f..a63102b 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -60,8 +60,12 @@
->  #include "tcm.h"
->
->  #ifndef MEM_SIZE
-> +#ifdef CONFIG_DRAM_SIZE
-> +#define MEM_SIZE	CONFIG_DRAM_SIZE
-> +#else
->  #define MEM_SIZE	(16*1024*1024)
->  #endif
-> +#endif
->
->  #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
->  char fpe_type[8];
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 20b3041..26c7411 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -288,6 +288,7 @@ SECTIONS
->  	NOTES
->
->  	BSS_SECTION(0, 0, 0)
-> +	_ebss = .;			/* uClinux MTD */
+The following changes since commit 5f0a6e2d503896062f641639dacfe5055c2f593b:
 
-You don't need this if you are not using the MTD/uclinux.o driver.
-And your defconfig doesn't have this enabled.
+  Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
 
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.2-samsung-fixes-4
 
->  	_end = .;
->
->  	STABS_DEBUG
-> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> index 242174f..babb6c6 100644
-> --- a/arch/arm/mach-at91/Makefile
-> +++ b/arch/arm/mach-at91/Makefile
-> @@ -19,7 +19,7 @@ obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devi
->  obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o at91sam9_alt_reset.o
->  obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
->  obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
-> -obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
-> +obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o at91x40_devices.o
->
->  # AT91RM9200 board-specific support
->  obj-$(CONFIG_MACH_ONEARM)	+= board-1arm.o
-> diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-> index 56ba3bd..4d5a475 100644
-> --- a/arch/arm/mach-at91/at91x40.c
-> +++ b/arch/arm/mach-at91/at91x40.c
-> @@ -73,6 +73,6 @@ void __init at91x40_init_interrupts(unsigned int priority[NR_AIC_IRQS])
->  	if (!priority)
->  		priority = at91x40_default_irq_priority;
->
-> -	at91_aic_init(priority);
-> +	at91_init_interrupts(priority);
->  }
->
-> diff --git a/arch/arm/mach-at91/board-eb01.c b/arch/arm/mach-at91/board-eb01.c
-> index d2023f2..902ade9 100644
-> --- a/arch/arm/mach-at91/board-eb01.c
-> +++ b/arch/arm/mach-at91/board-eb01.c
-> @@ -38,6 +38,21 @@ static void __init at91eb01_init_irq(void)
->  static void __init at91eb01_init_early(void)
->  {
->  	at91x40_initialize(40000000);
-> +
-> +	/* USART0 ttyS0. (Rx & Tx only) */
-> +	at91_register_uart(AT91X40_ID_USART0, 0, 0);
-> +
-> +	/* USART1 ttyS1. (Rx & Tx only) */
-> +	at91_register_uart(AT91X40_ID_USART1, 1, 0);
-> +
-> +	/* set serial console to ttyS0 (USART0) */
-> +	at91_set_serial_console(0);
-> +}
-> +
-> +static void __init at91eb01_init_machine(void)
-> +{
-> +	/* Serial */
-> +	at91_add_device_serial();
->  }
->
->  MACHINE_START(AT91EB01, "Atmel AT91 EB01")
-> @@ -45,5 +60,5 @@ MACHINE_START(AT91EB01, "Atmel AT91 EB01")
->  	.timer		= &at91x40_timer,
->  	.init_early	= at91eb01_init_early,
->  	.init_irq	= at91eb01_init_irq,
-> +	.init_machine	= at91eb01_init_machine,
->  MACHINE_END
-> -
-> diff --git a/arch/arm/mach-at91/include/mach/at91x40.h b/arch/arm/mach-at91/include/mach/at91x40.h
-> index a152ff8..8d3c57c 100644
-> --- a/arch/arm/mach-at91/include/mach/at91x40.h
-> +++ b/arch/arm/mach-at91/include/mach/at91x40.h
-> @@ -34,8 +34,8 @@
->
->  #define AT91_EBI	(0xffe00000 - AT91_BASE_SYS)	/* External Bus Interface */
->  #define AT91_SF		(0xfff00000 - AT91_BASE_SYS)	/* Special Function */
-> -#define AT91_USART1	(0xfffcc000 - AT91_BASE_SYS)	/* USART 1 */
-> -#define AT91_USART0	(0xfffd0000 - AT91_BASE_SYS)	/* USART 0 */
-> +#define AT91_USART1	0xfffcc000			/* USART 1 */
-> +#define AT91_USART0	0xfffd0000			/* USART 0 */
+Denis Kuzmenko (1):
+      ARM: SAMSUNG: Fix build error when selecting CPU_FREQ_S3C24XX_DEBUGFS
+on S3C2440
 
-You probably want to leave these as they were. Modify your resource defines
-in at91x40_devices.c and add AT91_BASE_SYS to the AT91_USARTx values. That
-is more consistent with all other users of these defines.
+Thomas Abraham (1):
+      ARM: EXYNOS: Remove duplicated SROMC static memory mapping
 
-
->  #define AT91_TC		(0xfffe0000 - AT91_BASE_SYS)	/* Timer Counter */
->  #define AT91_PIOA	(0xffff0000 - AT91_BASE_SYS)	/* PIO Controller A */
->  #define AT91_PS		(0xffff4000 - AT91_BASE_SYS)	/* Power Save */
-> diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-> index 941a98c..f58be4a 100644
-> --- a/arch/arm/mm/nommu.c
-> +++ b/arch/arm/mm/nommu.c
-> @@ -19,12 +19,17 @@
->
->  void __init arm_mm_memblock_reserve(void)
->  {
-> +// causes death by BUG() in mm/bootmem.c mark_bootmem() if outside "DRAM"
-> +// (ie; if using SoC internal SRAM at 0 for vectors, with DRAM elsewhere)
-> +// so make sure vectors are in DRAM!! [not tested with REMAP_VECTORS_TO_RAM]
-> +#if CONFIG_VECTORS_BASE >= CONFIG_DRAM_BASE
->  	/*
->  	 * Register the exception vector page.
->  	 * some architectures which the DRAM is the exception vector to trap,
->  	 * alloc_page breaks with error, although it is not NULL, but "0."
->  	 */
->  	memblock_reserve(CONFIG_VECTORS_BASE, PAGE_SIZE);
-> +#endif
->  }
-
-I need to look back at some of my older working examples to see why
-this is a problem now.
-
-
->  void __init sanity_check_meminfo(void)
-> @@ -38,6 +43,12 @@ void __init sanity_check_meminfo(void)
->  void __init paging_init(struct machine_desc *mdesc)
->  {
->  	bootmem_init();
-> +
-> +	/*
-> +	 * on mach-at91, used to setup "boot_soc"
-> +	 */
-> +	if (mdesc->map_io)
-> +		mdesc->map_io();
->  }
->
->  /*
-> diff --git a/arch/arm/mm/proc-arm7tdmi.S b/arch/arm/mm/proc-arm7tdmi.S
-> index 7e0e1fe..bf9b36d 100644
-> --- a/arch/arm/mm/proc-arm7tdmi.S
-> +++ b/arch/arm/mm/proc-arm7tdmi.S
-> @@ -66,7 +66,6 @@ __arm7tdmi_setup:
->  		string	cpu_elf_name, "v4"
->  		string	cpu_arm7tdmi_name, "ARM7TDMI"
->  		string	cpu_triscenda7_name, "Triscend-A7x"
-> -		string	cpu_at91_name, "Atmel-AT91M40xxx"
->  		string	cpu_s3c3410_name, "Samsung-S3C3410"
->  		string	cpu_s3c44b0x_name, "Samsung-S3C44B0x"
->  		string	cpu_s3c4510b_name, "Samsung-S3C4510B"
-> @@ -101,8 +100,9 @@ __\name\()_proc_info:
->  			cpu_arm7tdmi_name
->  		arm7tdmi_proc_info triscenda7, 0x0001d2ff, 0x0001ffff, \
->  			cpu_triscenda7_name, extra_hwcaps=HWCAP_THUMB
-> -		arm7tdmi_proc_info at91, 0x14000040, 0xfff000e0, \
-> -			cpu_at91_name, extra_hwcaps=HWCAP_THUMB
-> +		// arm7tdmi entry with bit for V4T, HWCAP_THUMB
-> +		arm7tdmi_proc_info arm7tdmi_too, 0x41807700, 0xfff8ff00, \
-> +			cpu_arm7tdmi_name, extra_hwcaps=HWCAP_THUMB
-
-Does skyeye report a processor ID of 0x4180770 when running?
-
-I have used skyeye to run this code in before, and I don't recall
-having to change this.
-
-Regards
-Greg
-
-
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close                             FAX:         +61 7 3217 5323
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+ arch/arm/mach-exynos/cpu.c                         |    5 ----
+ arch/arm/plat-samsung/include/plat/cpu-freq-core.h |   25
+++++++++++++--------
+ 2 files changed, 15 insertions(+), 15 deletions(-)
