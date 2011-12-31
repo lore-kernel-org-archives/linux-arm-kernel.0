@@ -1,48 +1,44 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Sat, 31 Dec 2011 13:48:00 +0800
-Subject: [PATCH] MTD/GPMI : select more modules for GPMI by default
-In-Reply-To: <20111231054432.GE12182@S2100-06.ap.freescale.net>
-References: <1325220337-23165-1-git-send-email-b32955@freescale.com>
- <20111231054432.GE12182@S2100-06.ap.freescale.net>
-Message-ID: <4EFEA210.30606@freescale.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Sat, 31 Dec 2011 14:08:42 +0800
+Subject: [PATCH] ARM: imx6: remove __CPUINIT annotation from
+ v7_invalidate_l1
+In-Reply-To: <20111231053153.GD12182@S2100-06.ap.freescale.net>
+References: <1325296251-11144-1-git-send-email-shawn.guo@linaro.org>
+ <20111231033107.GG2414@b20223-02.ap.freescale.net>
+ <20111231053153.GD12182@S2100-06.ap.freescale.net>
+Message-ID: <20111231060841.GH2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2011?12?31? 13:44, Shawn Guo ??:
-> On Fri, Dec 30, 2011 at 12:45:37PM +0800, Huang Shijie wrote:
->> The gpmi-nand driver needs the mxs-dma driver. So select the
->> MXS_DMA by default. So does the MTD_CHAR.
->>
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
->> ---
->>   drivers/mtd/nand/Kconfig |    2 ++
->>   1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
->> index 07c4774..1b14a3a 100644
->> --- a/drivers/mtd/nand/Kconfig
->> +++ b/drivers/mtd/nand/Kconfig
->> @@ -420,6 +420,8 @@ config MTD_NAND_NANDSIM
->>   config MTD_NAND_GPMI_NAND
->>           bool "GPMI NAND Flash Controller driver"
->>           depends on MTD_NAND&&  (SOC_IMX23 || SOC_IMX28)
->> +	select MXS_DMA
-> We should probably have it depend on MXS_DMA rather than select it.
-IMHO, I think `select` is better. :)
-The MXS_DMA not only service for NAND, but SD card, etc.
-In logic, the GPMI does not depends on MXS_DMA, the GPMI may use SDMA 
-too(just in logically).
+On Sat, Dec 31, 2011 at 01:31:54PM +0800, Shawn Guo wrote:
+> On Sat, Dec 31, 2011 at 11:31:08AM +0800, Richard Zhao wrote:
+> > On Sat, Dec 31, 2011 at 09:50:51AM +0800, Shawn Guo wrote:
+> > > The recent suspend testing on !SMP build discovers that the __CPUINIT
+> > > annotation for v7_invalidate_l1 should not be there, as the function
+> > > is called by resume path for not only SMP but also !SMP build.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > ---
+> > >  arch/arm/mach-imx/head-v7.S |    1 -
+> > >  1 files changed, 0 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
+> > > index c844112..914f2a1 100644
+> > > --- a/arch/arm/mach-imx/head-v7.S
+> > > +++ b/arch/arm/mach-imx/head-v7.S
+> > > @@ -16,7 +16,6 @@
+> > >  #include <asm/hardware/cache-l2x0.h>
+> > >  
+> > >  	.section ".text.head", "ax"
+> > why do we put it this specific section, rather not .text?
+> > 
+> This was cloned from arch/arm/mach-tegra/headsmp.S, I guess :)  But
+> do you see any problem with putting it in ".text.head"?
+No, It just seems strange.
 
-
-Best Regards
-Huang Shijie
-
+Regards,
+Richard
+> 
+> -- 
 > Regards,
 > Shawn
->
->> +	select MTD_CHAR
->>   	select MTD_PARTITIONS
->>   	select MTD_CMDLINE_PARTS
->>           help
->> -- 
->> 1.7.0.4
