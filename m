@@ -1,44 +1,27 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Sat, 31 Dec 2011 14:08:42 +0800
-Subject: [PATCH] ARM: imx6: remove __CPUINIT annotation from
- v7_invalidate_l1
-In-Reply-To: <20111231053153.GD12182@S2100-06.ap.freescale.net>
-References: <1325296251-11144-1-git-send-email-shawn.guo@linaro.org>
- <20111231033107.GG2414@b20223-02.ap.freescale.net>
- <20111231053153.GD12182@S2100-06.ap.freescale.net>
-Message-ID: <20111231060841.GH2414@b20223-02.ap.freescale.net>
+From: jason.chen@linaro.org (Jason Chen)
+Date: Sat, 31 Dec 2011 14:23:34 +0800
+Subject: [PATCH 1/2] ARM: imx6q: add compatible name of iomuxc
+Message-ID: <1325312614-22948-1-git-send-email-jason.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 31, 2011 at 01:31:54PM +0800, Shawn Guo wrote:
-> On Sat, Dec 31, 2011 at 11:31:08AM +0800, Richard Zhao wrote:
-> > On Sat, Dec 31, 2011 at 09:50:51AM +0800, Shawn Guo wrote:
-> > > The recent suspend testing on !SMP build discovers that the __CPUINIT
-> > > annotation for v7_invalidate_l1 should not be there, as the function
-> > > is called by resume path for not only SMP but also !SMP build.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > ---
-> > >  arch/arm/mach-imx/head-v7.S |    1 -
-> > >  1 files changed, 0 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
-> > > index c844112..914f2a1 100644
-> > > --- a/arch/arm/mach-imx/head-v7.S
-> > > +++ b/arch/arm/mach-imx/head-v7.S
-> > > @@ -16,7 +16,6 @@
-> > >  #include <asm/hardware/cache-l2x0.h>
-> > >  
-> > >  	.section ".text.head", "ax"
-> > why do we put it this specific section, rather not .text?
-> > 
-> This was cloned from arch/arm/mach-tegra/headsmp.S, I guess :)  But
-> do you see any problem with putting it in ".text.head"?
-No, It just seems strange.
+Signed-off-by: Jason Chen <jason.chen@linaro.org>
+Signed-off-by: Jason Chen <jason.chen@freescale.com>
+---
+ arch/arm/boot/dts/imx6q.dtsi |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Regards,
-Richard
-> 
-> -- 
-> Regards,
-> Shawn
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 72b78bb..b3b7609 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -391,6 +391,7 @@
+ 			};
+ 
+ 			iomuxc at 020e0000 {
++				compatible = "fsl,imx6q-iomuxc";
+ 				reg = <0x020e0000 0x4000>;
+ 			};
+ 
+-- 
+1.7.4.1
