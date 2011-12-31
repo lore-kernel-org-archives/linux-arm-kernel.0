@@ -1,31 +1,30 @@
-From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
-Date: Sat, 31 Dec 2011 00:31:55 +0100
-Subject: ftrace performance impact with different configuration
-In-Reply-To: <1325283941.24045.15.camel@gandalf.stny.rr.com>
-References: <CALZhoSRVNp=Sj2u2GHiQhuHOEdrfiM58KzG+RutvJV=8CoCpTQ@mail.gmail.com>
- <23257775.9kkYY4quUh@laptop> <1325283941.24045.15.camel@gandalf.stny.rr.com>
-Message-ID: <2631878.q7bjHk7YBM@laptop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 31 Dec 2011 01:02:40 +0000
+Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
+In-Reply-To: <20111230110842.GE2414@b20223-02.ap.freescale.net>
+References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
+ <20111230103026.GA2766@opensource.wolfsonmicro.com>
+ <20111230103830.GD2414@b20223-02.ap.freescale.net>
+ <20111230104850.GE2766@opensource.wolfsonmicro.com>
+ <20111230110842.GE2414@b20223-02.ap.freescale.net>
+Message-ID: <20111231010240.GC5835@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le vendredi 30 d?cembre 2011 17:25:41 Steven Rostedt a ?crit :
-> On Fri, 2011-12-30 at 14:07 +0100, Philippe R?tornaz wrote:
-> > Sorry about being a bit naive, but why it is not possible to do it in
-> > two
-> > steps ?
-> > call stop_machine to put the jmp which skip the call to mcount
-> > Then wait until all tasks hits schedule() (synchronize_sched() ?)
-> (...)
-> There's no way to safely modify two instructions that depend on each
-> other in a preemptible kernel, with the exception of waiting for all
-> CPUs to hit idle (which may never happen on a busy system). And even
-> that may be racy.
-> 
+On Fri, Dec 30, 2011 at 07:08:43PM +0800, Richard Zhao wrote:
+> On Fri, Dec 30, 2011 at 10:48:50AM +0000, Mark Brown wrote:
 
-Thanks for the detailed explanation, I got it now. I guess the only way would 
-be to use the freezer api like freeze_processes() is doing. Looks like it does 
-not worth the pain.
+> > It shouldn't actually be passing on the constraint setting the voltage
+> > when it constructs the constraints.
 
-Thanks ! 
+> --- a/drivers/regulator/of_regulator.c
+> +++ b/drivers/regulator/of_regulator.c
+> @@ -34,9 +34,6 @@ static void of_get_regulation_constraints(struct device_node *np,
+>         /* Voltage change possible? */
+>         if (constraints->min_uV != constraints->max_uV)
+>                 constraints->valid_ops_mask |= REGULATOR_CHANGE_VOLTAGE;
+> -       /* Only one voltage?  Then make sure it's set. */
+> -       if (constraints->min_uV == constraints->max_uV)
+> -               constraints->apply_uV = true;
 
-Philippe
+No!  That's going to break *all* other users.
