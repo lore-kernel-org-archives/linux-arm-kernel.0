@@ -1,58 +1,45 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Sat, 31 Dec 2011 11:31:33 +0800
-Subject: [PATCH v2] MTD/GPMI bugfix : reset the BCH module when it is
- not MX23
-In-Reply-To: <201112310415.02867.marek.vasut@gmail.com>
-References: <1325233646-3343-1-git-send-email-b32955@freescale.com>
- <20111230143658.GA9141@pengutronix.de> <4EFE7236.10609@freescale.com>
- <201112310415.02867.marek.vasut@gmail.com>
-Message-ID: <4EFE8215.8030301@freescale.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Sat, 31 Dec 2011 11:31:08 +0800
+Subject: [PATCH] ARM: imx6: remove __CPUINIT annotation from
+ v7_invalidate_l1
+In-Reply-To: <1325296251-11144-1-git-send-email-shawn.guo@linaro.org>
+References: <1325296251-11144-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111231033107.GG2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
->> Hi,
->>
->>> On Fri, Dec 30, 2011 at 04:27:26PM +0800, Huang Shijie wrote:
->>>> In MX28, if we do not reset the BCH module. The BCH module may
->>>> becomes unstable when the board reboots for several thousands times.
->>> Do you have more details when and why this happens? What happens on MX23
->>> then?
->> In one customer's 3G router which uses the MX28:
->> [0] NAND boot mode, mount the UBIFS in the NAND partition.
->> [1] We used the gpmi_reset_block(r->bch_regs, true) to init the BCH module.
->> [2] The board will automatically reboot again after it booted by NAND
->> boot mode.
->> [3] After reboot more then thousands times(cost nearly one day), the BCH
->> mode became UNSTABLE,
->> the data read out was not right, so the system could not mount the UBIFS.
->>
->> After we use gpmi_reset_block(r->bch_regs, false) to init the BCH
->> module, the bug never happens.
->>
->>
->>
->> The gpmi_reset_block() was coded to avoid the NAND boot bug in MX23. So
->> MX23 does not have the bug.
->>
->>>> Signed-off-by: Huang Shijie<b32955@freescale.com>
->>> Is this Bug 2847 from the errata? Should be mentioned in the commit
->>> message and
->> Yes, this is the bug 2847 from the mx23's errata.
->>
->> I will add some comments to it.
->>
->> Best Regards
->> Huang Shijie
->>
->>> comments of the patch if so.
->>>
->>> Regards,
->>>
->>>     Wolfram
-> Ah, so you confirmed it's a problem with the silicon. Good
->
-yes, the bug in mx23 is really a hardware bug.
+On Sat, Dec 31, 2011 at 09:50:51AM +0800, Shawn Guo wrote:
+> The recent suspend testing on !SMP build discovers that the __CPUINIT
+> annotation for v7_invalidate_l1 should not be there, as the function
+> is called by resume path for not only SMP but also !SMP build.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/head-v7.S |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
+> index c844112..914f2a1 100644
+> --- a/arch/arm/mach-imx/head-v7.S
+> +++ b/arch/arm/mach-imx/head-v7.S
+> @@ -16,7 +16,6 @@
+>  #include <asm/hardware/cache-l2x0.h>
+>  
+>  	.section ".text.head", "ax"
+why do we put it this specific section, rather not .text?
 
-BR
-Huang Shijie
+Thanks
+Richard
+> -	__CPUINIT
+>  
+>  /*
+>   * The secondary kernel init calls v7_flush_dcache_all before it enables
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
