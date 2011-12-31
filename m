@@ -1,30 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 31 Dec 2011 01:02:40 +0000
-Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
-In-Reply-To: <20111230110842.GE2414@b20223-02.ap.freescale.net>
-References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
- <20111230103026.GA2766@opensource.wolfsonmicro.com>
- <20111230103830.GD2414@b20223-02.ap.freescale.net>
- <20111230104850.GE2766@opensource.wolfsonmicro.com>
- <20111230110842.GE2414@b20223-02.ap.freescale.net>
-Message-ID: <20111231010240.GC5835@opensource.wolfsonmicro.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Sat, 31 Dec 2011 01:03:46 +0000
+Subject: [PATCHv2 1/2] gpio: add a driver for the Synopsys DesignWare APB
+ GPIO block
+In-Reply-To: <4EFE1E35.106@gmail.com>
+References: <1324345431-12251-1-git-send-email-jamie@jamieiles.com>
+ <20111230195955.GA3427@page> <4EFE1E35.106@gmail.com>
+Message-ID: <20111231010346.GA3222@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2011 at 07:08:43PM +0800, Richard Zhao wrote:
-> On Fri, Dec 30, 2011 at 10:48:50AM +0000, Mark Brown wrote:
+On Fri, Dec 30, 2011 at 02:25:25PM -0600, Rob Herring wrote:
+> On 12/30/2011 01:59 PM, Jamie Iles wrote:
+> > Grant, Linus,
+> > 
+> > On Tue, Dec 20, 2011 at 01:43:50AM +0000, Jamie Iles wrote:
+> >> The Synopsys DesignWare block is used in some ARM devices (picoxcell)
+> >> and can be configured to provide multiple banks of GPIO pins.  The first
+> >> bank (A) can also provide IRQ capabilities.
+> >>
+> >> v2:	- use Rob Herring's irqdomain in generic irq chip patches
+> >> 	- use reg property to indicate bank index
+> >> 	- support irqs on both edges based on LinusW's u300 driver
+> >>
+> >> Cc: Grant Likely <grant.likely@secretlab.ca>
+> >> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> >> Cc: Rob Herring <rob.herring@calxeda.com>
+> >> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> > 
+> > Is this driver okay by you guys?  I'd like to get this one in for 3.3 if 
+> > at all possible as it's the last patch that allows picoxcell to boot to 
+> > a semi useful state without out of tree patches and that would make 
+> > testing a lot easier!
+> 
+> We've got to sort out getting irq domains enabled on x86 and MIPS in
+> order to merge generic irq chip using domains. I'm not sure that will
+> get done in time.
+> 
+> Can you leave out the interrupt portion of the driver? Or that is needed
+> to get to a useful state.
 
-> > It shouldn't actually be passing on the constraint setting the voltage
-> > when it constructs the constraints.
+Sure, the GPIO is only needed for the NAND interface so the IRQ portion 
+can easily be dropped.  I'll respin the patch just doing basic GPIO but 
+keep the binding details of the interrupt stuff as I can't see that it 
+should change.
 
-> --- a/drivers/regulator/of_regulator.c
-> +++ b/drivers/regulator/of_regulator.c
-> @@ -34,9 +34,6 @@ static void of_get_regulation_constraints(struct device_node *np,
->         /* Voltage change possible? */
->         if (constraints->min_uV != constraints->max_uV)
->                 constraints->valid_ops_mask |= REGULATOR_CHANGE_VOLTAGE;
-> -       /* Only one voltage?  Then make sure it's set. */
-> -       if (constraints->min_uV == constraints->max_uV)
-> -               constraints->apply_uV = true;
+Thanks,
 
-No!  That's going to break *all* other users.
+Jamie
