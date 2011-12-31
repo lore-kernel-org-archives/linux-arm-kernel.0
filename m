@@ -1,91 +1,59 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Sat, 31 Dec 2011 13:48:15 +0000 (GMT)
-Subject: [PATCH v5 2/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x SSP/SPI)
- driver
-Message-ID: <1325339295.30846.YahooMailClassic@web29006.mail.ird.yahoo.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 31 Dec 2011 16:43:38 +0100
+Subject: [PATCH v2] MTD/GPMI bugfix : reset the BCH module when it is not
+ MX23
+In-Reply-To: <4EFE7236.10609@freescale.com>
+References: <1325233646-3343-1-git-send-email-b32955@freescale.com>
+ <20111230143658.GA9141@pengutronix.de>
+ <4EFE7236.10609@freescale.com>
+Message-ID: <20111231154338.GA27544@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Synaptics NavPoint touchpad connected to a PXA27x SSP port
-in SPI slave mode. The driver implements a simple navigation pad. The four
-raised dots are mapped to UP/DOWN/LEFT/RIGHT buttons and the centre of the
-touchpad is mapped to the ENTER button.
+Hi,
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
+On Sat, Dec 31, 2011 at 10:23:50AM +0800, Huang Shijie wrote:
 
-V5:
-Rebased to linux-3.2-rc7.
+> > On Fri, Dec 30, 2011 at 04:27:26PM +0800, Huang Shijie wrote:
+> >> In MX28, if we do not reset the BCH module. The BCH module may
+> >> becomes unstable when the board reboots for several thousands times.
+> > Do you have more details when and why this happens? What happens on MX23 then?
+> In one customer's 3G router which uses the MX28:
+> [0] NAND boot mode, mount the UBIFS in the NAND partition.
+> [1] We used the gpmi_reset_block(r->bch_regs, true) to init the BCH module.
+> [2] The board will automatically reboot again after it booted by NAND
+> boot mode.
+> [3] After reboot more then thousands times(cost nearly one day), the BCH
+> mode became UNSTABLE,
+> the data read out was not right, so the system could not mount the UBIFS.
+> 
+> After we use gpmi_reset_block(r->bch_regs, false) to init the BCH
+> module, the bug never happens.
 
-diff -uprN clean-3.2-rc7/arch/arm/mach-pxa/hx4700.c linux-3.2-rc7/arch/arm/mach-pxa/hx4700.c
---- clean-3.2-rc7/arch/arm/mach-pxa/hx4700.c	2011-12-24 05:51:06.000000000 +0000
-+++ linux-3.2-rc7/arch/arm/mach-pxa/hx4700.c	2011-12-31 12:03:24.543580181 +0000
-@@ -22,6 +22,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/input/navpoint.h>
- #include <linux/lcd.h>
- #include <linux/mfd/htc-egpio.h>
- #include <linux/mfd/asic3.h>
-@@ -111,7 +112,7 @@ static unsigned long hx4700_pin_config[]
- 	GPIO113_I2S_SYSCLK,
- 
- 	/* SSP 1 (NavPoint) */
--	GPIO23_SSP1_SCLK,
-+	GPIO23_SSP1_SCLK_IN,
- 	GPIO24_SSP1_SFRM,
- 	GPIO25_SSP1_TXD,
- 	GPIO26_SSP1_RXD,
-@@ -181,6 +182,23 @@ static struct platform_device gpio_keys
- };
- 
- /*
-+ * Synaptics NavPoint connected to SSP1
-+ */
-+
-+static struct navpoint_platform_data navpoint_platform_data = {
-+	.port	= 1,
-+	.gpio	= GPIO102_HX4700_SYNAPTICS_ON,
-+};
-+
-+static struct platform_device navpoint = {
-+	.name	= "navpoint",
-+	.id	= -1,
-+	.dev = {
-+		.platform_data = &navpoint_platform_data,
-+	},
-+};
-+
-+/*
-  * ASIC3
-  */
- 
-@@ -782,6 +800,7 @@ static struct platform_device pcmcia = {
- static struct platform_device *devices[] __initdata = {
- 	&asic3,
- 	&gpio_keys,
-+	&navpoint,
- 	&backlight,
- 	&w3220,
- 	&hx4700_lcd,
-@@ -806,6 +825,7 @@ static struct gpio global_gpios[] = {
- 	{ GPIO32_HX4700_RS232_ON,         GPIOF_OUT_INIT_HIGH, "RS232_ON" },
- 	{ GPIO71_HX4700_ASIC3_nRESET,     GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
- 	{ GPIO82_HX4700_EUART_RESET,      GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
-+	{ GPIO102_HX4700_SYNAPTICS_ON,    GPIOF_OUT_INIT_LOW,  "SYNAPTICS_ON" },
- 	{ GPIO105_HX4700_nIR_ON,          GPIOF_OUT_INIT_HIGH, "nIR_EN" },
- };
- 
-diff -uprN clean-3.2-rc7/arch/arm/mach-pxa/include/mach/hx4700.h linux-3.2-rc7/arch/arm/mach-pxa/include/mach/hx4700.h
---- clean-3.2-rc7/arch/arm/mach-pxa/include/mach/hx4700.h	2011-12-24 05:51:06.000000000 +0000
-+++ linux-3.2-rc7/arch/arm/mach-pxa/include/mach/hx4700.h	2011-12-31 12:03:24.543580181 +0000
-@@ -62,7 +62,7 @@
- #define GPIO97_HX4700_nBL_DETECT		97
- #define GPIO99_HX4700_KEY_CONTACTS		99
- #define GPIO100_HX4700_AUTO_SENSE		100 /* BL auto brightness */
--#define GPIO102_HX4700_SYNAPTICS_POWER_ON	102
-+#define GPIO102_HX4700_SYNAPTICS_ON		102
- #define GPIO103_HX4700_SYNAPTICS_INT		103
- #define GPIO105_HX4700_nIR_ON			105
- #define GPIO106_HX4700_CPU_BT_nRESET		106
+Yes, I undestood that. I was curious _why_ this happens, for example, because
+of a bug in the rom-code or such. This would then lead to the question if this
+can be fixed by some other means. Because currently it looks like this to me:
+If you would do the above scenario of booting 10000 times on a MX23, then BCH
+could enter the same unstable state (can it?). Since we cannot reset BCH due to
+bug 2847, we have a serious problem, because NAND won't work until the next
+power-cycle? I am curious if my assumptions are true and we have a serious
+problem on the MX23.
+
+> Yes, this is the bug 2847 from the mx23's errata.
+
+OK, thanks.
+
+Kind regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111231/dda562e2/attachment-0001.sig>
