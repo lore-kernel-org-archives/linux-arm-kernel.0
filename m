@@ -1,41 +1,30 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Sat, 31 Dec 2011 09:26:30 +0800
-Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
-In-Reply-To: <20111231010240.GC5835@opensource.wolfsonmicro.com>
-References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
- <20111230103026.GA2766@opensource.wolfsonmicro.com>
- <20111230103830.GD2414@b20223-02.ap.freescale.net>
- <20111230104850.GE2766@opensource.wolfsonmicro.com>
- <20111230110842.GE2414@b20223-02.ap.freescale.net>
- <20111231010240.GC5835@opensource.wolfsonmicro.com>
-Message-ID: <20111231012629.GF2414@b20223-02.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 31 Dec 2011 09:50:51 +0800
+Subject: [PATCH] ARM: imx6: remove __CPUINIT annotation from v7_invalidate_l1
+Message-ID: <1325296251-11144-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The recent suspend testing on !SMP build discovers that the __CPUINIT
+annotation for v7_invalidate_l1 should not be there, as the function
+is called by resume path for not only SMP but also !SMP build.
 
-On Sat, Dec 31, 2011 at 01:02:40AM +0000, Mark Brown wrote:
-> On Fri, Dec 30, 2011 at 07:08:43PM +0800, Richard Zhao wrote:
-> > On Fri, Dec 30, 2011 at 10:48:50AM +0000, Mark Brown wrote:
-> 
-> > > It shouldn't actually be passing on the constraint setting the voltage
-> > > when it constructs the constraints.
-The below code is where fixed regulator construct the constraints.
-> 
-> > --- a/drivers/regulator/of_regulator.c
-> > +++ b/drivers/regulator/of_regulator.c
-> > @@ -34,9 +34,6 @@ static void of_get_regulation_constraints(struct device_node *np,
-> >         /* Voltage change possible? */
-> >         if (constraints->min_uV != constraints->max_uV)
-> >                 constraints->valid_ops_mask |= REGULATOR_CHANGE_VOLTAGE;
-> > -       /* Only one voltage?  Then make sure it's set. */
-> > -       if (constraints->min_uV == constraints->max_uV)
-> > -               constraints->apply_uV = true;
-> 
-> No!  That's going to break *all* other users.
-The above code follows your idea. why you still say no?
-Could you please past some code to show your suggested solution,
-or you send out a patch to fix it?
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/head-v7.S |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Thanks
-Richard
+diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
+index c844112..914f2a1 100644
+--- a/arch/arm/mach-imx/head-v7.S
++++ b/arch/arm/mach-imx/head-v7.S
+@@ -16,7 +16,6 @@
+ #include <asm/hardware/cache-l2x0.h>
+ 
+ 	.section ".text.head", "ax"
+-	__CPUINIT
+ 
+ /*
+  * The secondary kernel init calls v7_flush_dcache_all before it enables
+-- 
+1.7.4.1
