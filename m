@@ -1,30 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 31 Dec 2011 09:50:51 +0800
-Subject: [PATCH] ARM: imx6: remove __CPUINIT annotation from v7_invalidate_l1
-Message-ID: <1325296251-11144-1-git-send-email-shawn.guo@linaro.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Sat, 31 Dec 2011 10:23:50 +0800
+Subject: [PATCH v2] MTD/GPMI bugfix : reset the BCH module when it is
+ not MX23
+In-Reply-To: <20111230143658.GA9141@pengutronix.de>
+References: <1325233646-3343-1-git-send-email-b32955@freescale.com>
+ <20111230143658.GA9141@pengutronix.de>
+Message-ID: <4EFE7236.10609@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent suspend testing on !SMP build discovers that the __CPUINIT
-annotation for v7_invalidate_l1 should not be there, as the function
-is called by resume path for not only SMP but also !SMP build.
+Hi,
+> On Fri, Dec 30, 2011 at 04:27:26PM +0800, Huang Shijie wrote:
+>> In MX28, if we do not reset the BCH module. The BCH module may
+>> becomes unstable when the board reboots for several thousands times.
+> Do you have more details when and why this happens? What happens on MX23 then?
+In one customer's 3G router which uses the MX28:
+[0] NAND boot mode, mount the UBIFS in the NAND partition.
+[1] We used the gpmi_reset_block(r->bch_regs, true) to init the BCH module.
+[2] The board will automatically reboot again after it booted by NAND
+boot mode.
+[3] After reboot more then thousands times(cost nearly one day), the BCH
+mode became UNSTABLE,
+the data read out was not right, so the system could not mount the UBIFS.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/head-v7.S |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+After we use gpmi_reset_block(r->bch_regs, false) to init the BCH
+module, the bug never happens.
 
-diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
-index c844112..914f2a1 100644
---- a/arch/arm/mach-imx/head-v7.S
-+++ b/arch/arm/mach-imx/head-v7.S
-@@ -16,7 +16,6 @@
- #include <asm/hardware/cache-l2x0.h>
- 
- 	.section ".text.head", "ax"
--	__CPUINIT
- 
- /*
-  * The secondary kernel init calls v7_flush_dcache_all before it enables
--- 
-1.7.4.1
+
+
+The gpmi_reset_block() was coded to avoid the NAND boot bug in MX23. So
+MX23 does not have the bug.
+>> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> Is this Bug 2847 from the errata? Should be mentioned in the commit message and
+Yes, this is the bug 2847 from the mx23's errata.
+
+I will add some comments to it.
+
+Best Regards
+Huang Shijie
+> comments of the patch if so.
+>
+> Regards,
+>
+>    Wolfram
+>
