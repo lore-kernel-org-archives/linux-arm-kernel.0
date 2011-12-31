@@ -1,29 +1,42 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 31 Dec 2011 16:46:18 +0100
-Subject: [PATCH] MTD/GPMI : select more modules for GPMI by default
-In-Reply-To: <4EFEB968.2000905@freescale.com>
-References: <1325220337-23165-1-git-send-email-b32955@freescale.com>
- <20111231054432.GE12182@S2100-06.ap.freescale.net>
- <4EFEA210.30606@freescale.com>
- <20111231072441.GF12182@S2100-06.ap.freescale.net>
- <4EFEB968.2000905@freescale.com>
-Message-ID: <20111231154618.GB27544@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 31 Dec 2011 21:59:28 +0000
+Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
+In-Reply-To: <20111231012629.GF2414@b20223-02.ap.freescale.net>
+References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
+ <20111230103026.GA2766@opensource.wolfsonmicro.com>
+ <20111230103830.GD2414@b20223-02.ap.freescale.net>
+ <20111230104850.GE2766@opensource.wolfsonmicro.com>
+ <20111230110842.GE2414@b20223-02.ap.freescale.net>
+ <20111231010240.GC5835@opensource.wolfsonmicro.com>
+ <20111231012629.GF2414@b20223-02.ap.freescale.net>
+Message-ID: <20111231215925.GA12740@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I do not like the GPMI depend on the MXS-DMA. It looks very strange
-> when you do the "make menuconfig".
+On Sat, Dec 31, 2011 at 09:26:30AM +0800, Richard Zhao wrote:
+> On Sat, Dec 31, 2011 at 01:02:40AM +0000, Mark Brown wrote:
 
-That doesn't change that it DOES depend on it :) (You can't use GPMI without
-DMA, right?)
+> > > > It shouldn't actually be passing on the constraint setting the voltage
+> > > > when it constructs the constraints.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111231/ed8a9016/attachment.sig>
+> The below code is where fixed regulator construct the constraints.
+
+It's not code which is specific to the fixed regulator, it's generic
+code that's used by all regulators.
+
+> > > -       /* Only one voltage?  Then make sure it's set. */
+> > > -       if (constraints->min_uV == constraints->max_uV)
+> > > -               constraints->apply_uV = true;
+
+> > No!  That's going to break *all* other users.
+
+> The above code follows your idea. why you still say no?
+
+You're just randomly inserting code for a specific driver into the
+generic regulator API with no consideration for the effect on other
+users.
+
+> Could you please past some code to show your suggested solution,
+> or you send out a patch to fix it?
+
+Not in the immediate future.
