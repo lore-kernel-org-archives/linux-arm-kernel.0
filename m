@@ -1,19 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 1 Jan 2012 14:39:32 +0100
-Subject: [PATCH 1/1] pinctrl: some typo fixes
-In-Reply-To: <1324374719-5654-1-git-send-email-b29396@freescale.com>
-References: <1324374719-5654-1-git-send-email-b29396@freescale.com>
-Message-ID: <CACRpkda5H9i-iCuj5FxC-ByOLJNt8drVfNJx9tdK89fQUX1D6Q@mail.gmail.com>
+Date: Sun, 1 Jan 2012 14:44:51 +0100
+Subject: [PATCH v5 REPOST 1/5] ARM: l2x0/pl310: Refactor Kconfig to be
+ more maintainable
+In-Reply-To: <1324053332-6431-2-git-send-email-dave.martin@linaro.org>
+References: <1324053332-6431-1-git-send-email-dave.martin@linaro.org>
+ <1324053332-6431-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <CACRpkdaZ8fph0tgQMceVKzSNo9gbsaRFrz9c2TKYqYZgtbgdbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 10:51 AM, Dong Aisheng <b29396@freescale.com> wrote:
+On Fri, Dec 16, 2011 at 5:35 PM, Dave Martin <dave.martin@linaro.org> wrote:
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+> Making CACHE_L2X0 depend on (huge list of MACH_ and ARCH_ configs)
+> is bothersome to maintain and likely to lead to merge conflicts.
+(...)
 >
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
+> ? ? ? ?(for cns3xxx)
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> ? ? ? ?(for omap)
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> ? ? ? ?(for imx)
 
-Thanks, applied, minus some conflict that I didn't fix.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+(for ux500)
 
 Yours,
 Linus Walleij
