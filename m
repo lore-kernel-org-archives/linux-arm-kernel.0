@@ -1,96 +1,65 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sun, 1 Jan 2012 22:53:52 +0200
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <201112201536.49754.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <201112091413.03736.arnd@arndb.de>
- <20111220090306.GO3677@valkosipuli.localdomain>
- <201112201536.49754.arnd@arndb.de>
-Message-ID: <20120101205352.GI3677@valkosipuli.localdomain>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sun, 1 Jan 2012 23:33:35 +0100
+Subject: [PATCH v2] MTD/GPMI bugfix : reset the BCH module when it is not
+ MX23
+In-Reply-To: <CAMiH66HsFn4+6-whEC6G-qSPda3+3pBzd50i7iHh9Pg9TXHTXw@mail.gmail.com>
+References: <1325233646-3343-1-git-send-email-b32955@freescale.com>
+ <20111230143658.GA9141@pengutronix.de>
+ <4EFE7236.10609@freescale.com>
+ <20111231154338.GA27544@pengutronix.de>
+ <CAMiH66HsFn4+6-whEC6G-qSPda3+3pBzd50i7iHh9Pg9TXHTXw@mail.gmail.com>
+Message-ID: <20120101223335.GA3756@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi,
 
-On Tue, Dec 20, 2011 at 03:36:49PM +0000, Arnd Bergmann wrote:
-> On Tuesday 20 December 2011, Sakari Ailus wrote:
-> > (I'm jumping into the discussion in the middle, and might miss something
-> > that has already been talked about. I still hope what I'm about to say is
-> > relevant. :-))
-> 
-> It certainly is relevant.
-> 
-> > In subsystems such as V4L2 where drivers deal with such large buffers, the
-> > buffers stay mapped all the time. The user explicitly gives the control of
-> > the buffers to the driver and eventually gets them back. This is already
-> > part of those APIs, whether they're using dma_buf or not. The user could
-> > have, and often has, the same buffers mapped elsewhere.
-> 
-> Do you normally use streaming (dma_{map,sync,unmap}_*) or consistent
-> (dma_{alloc,free}_*) mappings for this then?
+> This happens because we do NOT follow the right init procedure. The IC
+> guy told me.
+> If the BCH was not initialized correctly, it can not guarantees the
+> data is right.
+> This is why the mx28 failed.
+...
+> For mx23, it should not reset the BCH, this is the right init
+> procedure for mx23.
 
-The OMAP 3 ISP driver I'm familiar with uses the OMAP 3 IOMMU / IOVMM API
-which is to be replaced by dmabuf. I'm trying to understand how the dma
-api / dma-buf should be used to achieve a superset of that functionality.
+Okay, this was the information I was looking for. So, the MX23 cannot be reset
+due to bug #2847. But it also does not NEED to be reset, which is unlike the
+MX28 which needs the reset. Correct? Before that, it was only clear that MX23
+cannot be reset. It was not clear (at least to me) if it still could then run
+into the same problems as the MX28 after 10000+x boot cycles. That would be a
+really bad situation: being in need of the reset which we can't do due to 2847.
 
-I think I'm interested in the DMA mapping API. I replied to Sumit's new
-patchset, you're cc'd.
+> But I did not ever boot 10000 times on mx23. I am not sure if it can
+> fail or not.
 
-> > When it comes to passing these buffers between different hardware devices,
-> > either V4L2 or not, the user might not want to perform extra cache flush
-> > when the buffer memory itself is not being touched by the CPU in the process
-> > at all. I'd consider it impossible for the driver to know how the user space
-> > intends to user the buffer.
-> 
-> The easiest solution to this problem would be to only allow consistent mappings
-> to be shared using the dma_buf mechanism. That means we never have to flush.
+Hmm, can't your IC guy tell you? I was hoping he knows if the same problem which
+happens on the MX28 can also happen on the MX23? I don't want to make your life
+unnecessarily hard, but I'd really like to know if I need to warn customers
+when using MX23 and NAND (and if so, we have to update the comment in the code).
 
-Do you mean the memory would be non-cacheable? Accessing memory w/o caching
-is typically prohibitively expensive, so I don't think this could ever be
-the primary means to do the above.
+> > bug 2847, we have a serious problem, because NAND won't work until the next
+> > power-cycle? I am curious if my assumptions are true and we have a serious
+> > problem on the MX23.
+> You can test it if you have time. :)
 
-In some cases non-cacheable can perform better, taking into account the time
-which is required for flusing the cache and the other consequences of that,
-but I still think it's more of an exception than a rule.
-
-> If you don't need the CPU to touch the buffer, that would not have any cost
-> at all, we could even have no kernel mapping at all instead of an uncached
-> mapping on ARM.
-
-I think in general creating unused mappings should really be avoided.
-Creating them consumes time, effort at creation time and possibly also in
-cache related operations.
-
-> > Flushing the cache is quite expensive: typically it's the best to flush the
-> > whole data cache when one needs to flush buffers. The V4L2 DQBUF and QBUF
-> > IOCTLs already have flags to suggest special cache handling for buffers.
-> 
-> [sidenote: whether it makes sense to flush individual cache lines or the entire
-> cache is a decision best left to the architectures. On systems with larger
-> caches than on ARM, e.g. 64MB instead of 512KB, you really want to keep
-> the cache intact.]
-
-That also depend on the buffer size and what the rest of the system is
-doing. I could imagine buffer size, system memory data rate, CPU frequency,
-cache line width and the properties of the cache all affect how fast both of
-the operations are.
-
-It would probably be possible to perform a heuristic analysis on this at
-system startup similar to different software raid algorithm implementations
-( e.g. to use MMX or SSE for sw raid).
-
-Some additional complexity will arise from the fact that on some ARM machines
-one must know all the CPU MMU mappings pointing to a piece of physical
-memory to properly flush them, AFAIR. Naturally a good alternative on such
-system is to pperform full dcache flush / cleaning.
-
-Also, cache handling only affects systems without coherent cache. ARM CPUs
-are finding their ways to servers as well, but I'd guess it'll still take a
-while before we have ARM CPUs with 64 MiB of cache..
+Testing is guessing in this case, the problem could arise after <n+1> cycles if
+I tested <n>. Actually knowing the situation would be more helpful, I'd think.
+If this is not possible to find out, we'd need to add this as a comment, too,
+so people experiencing problems have a pointer which can save them *a lot of*
+time.
 
 Kind regards,
 
+   Wolfram
+
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	jabber/XMPP/Gmail: sailus at retiisi.org.uk
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120101/c526c02f/attachment-0001.sig>
