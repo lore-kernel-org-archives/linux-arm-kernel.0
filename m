@@ -1,65 +1,294 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sun, 1 Jan 2012 23:33:35 +0100
-Subject: [PATCH v2] MTD/GPMI bugfix : reset the BCH module when it is not
- MX23
-In-Reply-To: <CAMiH66HsFn4+6-whEC6G-qSPda3+3pBzd50i7iHh9Pg9TXHTXw@mail.gmail.com>
-References: <1325233646-3343-1-git-send-email-b32955@freescale.com>
- <20111230143658.GA9141@pengutronix.de>
- <4EFE7236.10609@freescale.com>
- <20111231154338.GA27544@pengutronix.de>
- <CAMiH66HsFn4+6-whEC6G-qSPda3+3pBzd50i7iHh9Pg9TXHTXw@mail.gmail.com>
-Message-ID: <20120101223335.GA3756@pengutronix.de>
+From: rob@ti.com (Rob Clark)
+Date: Sun, 1 Jan 2012 17:02:57 -0600
+Subject: [PATCH 2/3] dma-buf: Documentation for buffer sharing framework
+In-Reply-To: <20120101200951.GH3677@valkosipuli.localdomain>
+References: <1324891397-10877-1-git-send-email-sumit.semwal@ti.com>
+ <1324891397-10877-3-git-send-email-sumit.semwal@ti.com>
+ <20120101200951.GH3677@valkosipuli.localdomain>
+Message-ID: <CAF6AEGt_YumXu6Pa3wqFVhCPctYEFBW83aSwEdT1yzrwRTE-Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Jan 1, 2012 at 2:09 PM, Sakari Ailus <sakari.ailus@iki.fi> wrote:
+> Hi Sumit and Arnd,
+>
+> On Mon, Dec 26, 2011 at 02:53:16PM +0530, Sumit Semwal wrote:
+>> Add documentation for dma buffer sharing framework, explaining the
+>> various operations, members and API of the dma buffer sharing
+>> framework.
+>>
+>> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+>> Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
+>> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+>> ---
+>> ?Documentation/dma-buf-sharing.txt | ?224 +++++++++++++++++++++++++++++++++++++
+>> ?1 files changed, 224 insertions(+), 0 deletions(-)
+>> ?create mode 100644 Documentation/dma-buf-sharing.txt
+>>
+>> diff --git a/Documentation/dma-buf-sharing.txt b/Documentation/dma-buf-sharing.txt
+>> new file mode 100644
+>> index 0000000..510eab3
+>> --- /dev/null
+>> +++ b/Documentation/dma-buf-sharing.txt
+>> @@ -0,0 +1,224 @@
+>> + ? ? ? ? ? ? ? ? ? ?DMA Buffer Sharing API Guide
+>> + ? ? ? ? ? ? ? ? ? ?~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?Sumit Semwal
+>> + ? ? ? ? ? ? ? ?<sumit dot semwal@linaro dot org>
+>> + ? ? ? ? ? ? ? ? <sumit dot semwal@ti dot com>
+>> +
+>> +This document serves as a guide to device-driver writers on what is the dma-buf
+>> +buffer sharing API, how to use it for exporting and using shared buffers.
+>> +
+>> +Any device driver which wishes to be a part of DMA buffer sharing, can do so as
+>> +either the 'exporter' of buffers, or the 'user' of buffers.
+>> +
+>> +Say a driver A wants to use buffers created by driver B, then we call B as the
+>> +exporter, and A as buffer-user.
+>> +
+>> +The exporter
+>> +- implements and manages operations[1] for the buffer
+>> +- allows other users to share the buffer by using dma_buf sharing APIs,
+>> +- manages the details of buffer allocation,
+>> +- decides about the actual backing storage where this allocation happens,
+>> +- takes care of any migration of scatterlist - for all (shared) users of this
+>> + ? buffer,
+>> +
+>> +The buffer-user
+>> +- is one of (many) sharing users of the buffer.
+>> +- doesn't need to worry about how the buffer is allocated, or where.
+>> +- needs a mechanism to get access to the scatterlist that makes up this buffer
+>> + ? in memory, mapped into its own address space, so it can access the same area
+>> + ? of memory.
+>> +
+>> +*IMPORTANT*: [see https://lkml.org/lkml/2011/12/20/211 for more details]
+>> +For this first version, A buffer shared using the dma_buf sharing API:
+>> +- *may* be exported to user space using "mmap" *ONLY* by exporter, outside of
+>> + ? this framework.
+>> +- may be used *ONLY* by importers that do not need CPU access to the buffer.
+>> +
+>> +The dma_buf buffer sharing API usage contains the following steps:
+>> +
+>> +1. Exporter announces that it wishes to export a buffer
+>> +2. Userspace gets the file descriptor associated with the exported buffer, and
+>> + ? passes it around to potential buffer-users based on use case
+>> +3. Each buffer-user 'connects' itself to the buffer
+>> +4. When needed, buffer-user requests access to the buffer from exporter
+>> +5. When finished with its use, the buffer-user notifies end-of-DMA to exporter
+>> +6. when buffer-user is done using this buffer completely, it 'disconnects'
+>> + ? itself from the buffer.
+>> +
+>> +
+>> +1. Exporter's announcement of buffer export
+>> +
+>> + ? The buffer exporter announces its wish to export a buffer. In this, it
+>> + ? connects its own private buffer data, provides implementation for operations
+>> + ? that can be performed on the exported dma_buf, and flags for the file
+>> + ? associated with this buffer.
+>> +
+>> + ? Interface:
+>> + ? ? ?struct dma_buf *dma_buf_export(void *priv, struct dma_buf_ops *ops,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?size_t size, int flags)
+>> +
+>> + ? If this succeeds, dma_buf_export allocates a dma_buf structure, and returns a
+>> + ? pointer to the same. It also associates an anonymous file with this buffer,
+>> + ? so it can be exported. On failure to allocate the dma_buf object, it returns
+>> + ? NULL.
+>> +
+>> +2. Userspace gets a handle to pass around to potential buffer-users
+>> +
+>> + ? Userspace entity requests for a file-descriptor (fd) which is a handle to the
+>> + ? anonymous file associated with the buffer. It can then share the fd with other
+>> + ? drivers and/or processes.
+>> +
+>> + ? Interface:
+>> + ? ? ?int dma_buf_fd(struct dma_buf *dmabuf)
+>> +
+>> + ? This API installs an fd for the anonymous file associated with this buffer;
+>> + ? returns either 'fd', or error.
+>> +
+>> +3. Each buffer-user 'connects' itself to the buffer
+>> +
+>> + ? Each buffer-user now gets a reference to the buffer, using the fd passed to
+>> + ? it.
+>> +
+>> + ? Interface:
+>> + ? ? ?struct dma_buf *dma_buf_get(int fd)
+>> +
+>> + ? This API will return a reference to the dma_buf, and increment refcount for
+>> + ? it.
+>> +
+>> + ? After this, the buffer-user needs to attach its device with the buffer, which
+>> + ? helps the exporter to know of device buffer constraints.
+>> +
+>> + ? Interface:
+>> + ? ? ?struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct device *dev)
+>> +
+>> + ? This API returns reference to an attachment structure, which is then used
+>> + ? for scatterlist operations. It will optionally call the 'attach' dma_buf
+>> + ? operation, if provided by the exporter.
+>> +
+>> + ? The dma-buf sharing framework does the bookkeeping bits related to managing
+>> + ? the list of all attachments to a buffer.
+>> +
+>> +Until this stage, the buffer-exporter has the option to choose not to actually
+>> +allocate the backing storage for this buffer, but wait for the first buffer-user
+>> +to request use of buffer for allocation.
+>> +
+>> +
+>> +4. When needed, buffer-user requests access to the buffer
+>> +
+>> + ? Whenever a buffer-user wants to use the buffer for any DMA, it asks for
+>> + ? access to the buffer using dma_buf_map_attachment API. At least one attach to
+>> + ? the buffer must have happened before map_dma_buf can be called.
+>> +
+>> + ? Interface:
+>> + ? ? ?struct sg_table * dma_buf_map_attachment(struct dma_buf_attachment *,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum dma_data_direction);
+>> +
+>> + ? This is a wrapper to dma_buf->ops->map_dma_buf operation, which hides the
+>> + ? "dma_buf->ops->" indirection from the users of this interface.
+>> +
+>> + ? In struct dma_buf_ops, map_dma_buf is defined as
+>> + ? ? ?struct sg_table * (*map_dma_buf)(struct dma_buf_attachment *,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum dma_data_direction);
+>> +
+>> + ? It is one of the buffer operations that must be implemented by the exporter.
+>> + ? It should return the sg_table containing scatterlist for this buffer, mapped
+>> + ? into caller's address space.
+>> +
+>> + ? If this is being called for the first time, the exporter can now choose to
+>> + ? scan through the list of attachments for this buffer, collate the requirements
+>> + ? of the attached devices, and choose an appropriate backing storage for the
+>> + ? buffer.
+>> +
+>> + ? Based on enum dma_data_direction, it might be possible to have multiple users
+>> + ? accessing at the same time (for reading, maybe), or any other kind of sharing
+>> + ? that the exporter might wish to make available to buffer-users.
+>> +
+>> + ? map_dma_buf() operation can return -EINTR if it is interrupted by a signal.
+>> +
+>> +
+>> +5. When finished, the buffer-user notifies end-of-DMA to exporter
+>> +
+>> + ? Once the DMA for the current buffer-user is over, it signals 'end-of-DMA' to
+>> + ? the exporter using the dma_buf_unmap_attachment API.
+>> +
+>> + ? Interface:
+>> + ? ? ?void dma_buf_unmap_attachment(struct dma_buf_attachment *,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct sg_table *);
+>> +
+>> + ? This is a wrapper to dma_buf->ops->unmap_dma_buf() operation, which hides the
+>> + ? "dma_buf->ops->" indirection from the users of this interface.
+>> +
+>> + ? In struct dma_buf_ops, unmap_dma_buf is defined as
+>> + ? ? ?void (*unmap_dma_buf)(struct dma_buf_attachment *, struct sg_table *);
+>> +
+>> + ? unmap_dma_buf signifies the end-of-DMA for the attachment provided. Like
+>> + ? map_dma_buf, this API also must be implemented by the exporter.
+>
+> How is this API expected to be used with user space APIs which use
+> V4L2-style queueing of the buffers, i.e. several hardware devices may have a
+> single buffer mapped at any given point of time and the user is responsible
+> for passing the buffer for processing between hardware devices?
 
-> This happens because we do NOT follow the right init procedure. The IC
-> guy told me.
-> If the BCH was not initialized correctly, it can not guarantees the
-> data is right.
-> This is why the mx28 failed.
-...
-> For mx23, it should not reset the BCH, this is the right init
-> procedure for mx23.
+The intention is that the v4l2 device would attach in when the dmabuf
+descriptor is first seen, and then on subsequent QBUF/DQBUF (or maybe
+just before/after DMA to/from buffer) would map/unmap.  It would be
+the responsibility of the exporter to cache the mapping if appropriate
+between map/unmap calls.  The importer should not care about this.
 
-Okay, this was the information I was looking for. So, the MX23 cannot be reset
-due to bug #2847. But it also does not NEED to be reset, which is unlike the
-MX28 which needs the reset. Correct? Before that, it was only clear that MX23
-cannot be reset. It was not clear (at least to me) if it still could then run
-into the same problems as the MX28 after 10000+x boot cycles. That would be a
-really bad situation: being in need of the reset which we can't do due to 2847.
+Have a look at https://github.com/robclark/kernel-omap4/commits/drmplane-dmabuf
+(or I think sumit has some updated patches for vb2) for an example.
 
-> But I did not ever boot 10000 times on mx23. I am not sure if it can
-> fail or not.
+BR,
+-R
 
-Hmm, can't your IC guy tell you? I was hoping he knows if the same problem which
-happens on the MX28 can also happen on the MX23? I don't want to make your life
-unnecessarily hard, but I'd really like to know if I need to warn customers
-when using MX23 and NAND (and if so, we have to update the comment in the code).
-
-> > bug 2847, we have a serious problem, because NAND won't work until the next
-> > power-cycle? I am curious if my assumptions are true and we have a serious
-> > problem on the MX23.
-> You can test it if you have time. :)
-
-Testing is guessing in this case, the problem could arise after <n+1> cycles if
-I tested <n>. Actually knowing the situation would be more helpful, I'd think.
-If this is not possible to find out, we'd need to add this as a comment, too,
-so people experiencing problems have a pointer which can save them *a lot of*
-time.
-
-Kind regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120101/c526c02f/attachment-0001.sig>
+> In that case also cache handling would need to be performed explicitly by
+> drivers --- the V4L2 API already provides a way to tell drivers to skip
+> cache cleaning or invalidation if the user does not intend to touch the
+> buffer between passing it between two separate devices.
+>
+>> +
+>> +6. when buffer-user is done using this buffer, it 'disconnects' itself from the
+>> + ? buffer.
+>> +
+>> + ? After the buffer-user has no more interest in using this buffer, it should
+>> + ? disconnect itself from the buffer:
+>> +
+>> + ? - it first detaches itself from the buffer.
+>> +
+>> + ? Interface:
+>> + ? ? ?void dma_buf_detach(struct dma_buf *dmabuf,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ?struct dma_buf_attachment *dmabuf_attach);
+>> +
+>> + ? This API removes the attachment from the list in dmabuf, and optionally calls
+>> + ? dma_buf->ops->detach(), if provided by exporter, for any housekeeping bits.
+>> +
+>> + ? - Then, the buffer-user returns the buffer reference to exporter.
+>> +
+>> + ? Interface:
+>> + ? ? void dma_buf_put(struct dma_buf *dmabuf);
+>> +
+>> + ? This API then reduces the refcount for this buffer.
+>> +
+>> + ? If, as a result of this call, the refcount becomes 0, the 'release' file
+>> + ? operation related to this fd is called. It calls the dmabuf->ops->release()
+>> + ? operation in turn, and frees the memory allocated for dmabuf when exported.
+>> +
+>> +NOTES:
+>> +- Importance of attach-detach and {map,unmap}_dma_buf operation pairs
+>> + ? The attach-detach calls allow the exporter to figure out backing-storage
+>> + ? constraints for the currently-interested devices. This allows preferential
+>> + ? allocation, and/or migration of pages across different types of storage
+>> + ? available, if possible.
+>> +
+>> + ? Bracketing of DMA access with {map,unmap}_dma_buf operations is essential
+>> + ? to allow just-in-time backing of storage, and migration mid-way through a
+>> + ? use-case.
+>> +
+>> +- Migration of backing storage if needed
+>> + ? If after
+>> + ? - at least one map_dma_buf has happened,
+>> + ? - and the backing storage has been allocated for this buffer,
+>> + ? another new buffer-user intends to attach itself to this buffer, it might
+>> + ? be allowed, if possible for the exporter.
+>> +
+>> + ? In case it is allowed by the exporter:
+>> + ? ?if the new buffer-user has stricter 'backing-storage constraints', and the
+>> + ? ?exporter can handle these constraints, the exporter can just stall on the
+>> + ? ?map_dma_buf until all outstanding access is completed (as signalled by
+>> + ? ?unmap_dma_buf).
+>
+> I would expect this to take place in V4L2 context when streaming is
+> disabled; it would make sense to return EBUSY instead since it's not known
+> when the unmapping will be done.
+>
+>> + ? ?Once all users have finished accessing and have unmapped this buffer, the
+>> + ? ?exporter could potentially move the buffer to the stricter backing-storage,
+>> + ? ?and then allow further {map,unmap}_dma_buf operations from any buffer-user
+>> + ? ?from the migrated backing-storage.
+>> +
+>> + ? If the exporter cannot fulfil the backing-storage constraints of the new
+>> + ? buffer-user device as requested, dma_buf_attach() would return an error to
+>> + ? denote non-compatibility of the new buffer-sharing request with the current
+>> + ? buffer.
+>> +
+>> + ? If the exporter chooses not to allow an attach() operation once a
+>> + ? map_dma_buf() API has been called, it simply returns an error.
+>> +
+>> +References:
+>> +[1] struct dma_buf_ops in include/linux/dma-buf.h
+>> +[2] All interfaces mentioned above defined in include/linux/dma-buf.h
+>
+> Kind regards,
+>
+> --
+> Sakari Ailus
+> e-mail: sakari.ailus at iki.fi ? ? jabber/XMPP/Gmail: sailus at retiisi.org.uk
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
