@@ -1,28 +1,90 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 01 Jan 2012 09:51:31 -0600
-Subject: Renaming MACH_TYPE_KINETIS_K60 into MACH_TYPE_KINETIS
-In-Reply-To: <1325069504.1584.160.camel@skywanderer.emcraft.com>
-References: <1325065882.1584.153.camel@skywanderer.emcraft.com>
- <201112281100.35209.marek.vasut@gmail.com>
- <1325069504.1584.160.camel@skywanderer.emcraft.com>
-Message-ID: <4F008103.9090001@gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Sun, 01 Jan 2012 16:54:38 +0100
+Subject: [PATCH 01/11] mm: page_alloc: set_migratetype_isolate: drain PCP
+ prior to isolating
+In-Reply-To: <CAOtvUMeAVgDwRNsDTcG07ChYnAuNgNJjQ+sKALJ79=Ezikos-A@mail.gmail.com>
+References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
+ <1325162352-24709-2-git-send-email-m.szyprowski@samsung.com>
+ <CAOtvUMeAVgDwRNsDTcG07ChYnAuNgNJjQ+sKALJ79=Ezikos-A@mail.gmail.com>
+Message-ID: <op.v7ew5cvg3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/28/2011 04:51 AM, Alexander Potashev wrote:
-> On Wed, 2011-12-28 at 11:00 +0100, Marek Vasut wrote:
->> If you use FDT, you won't need machine ID at all. 
-> 
-> Hi Marek,
-> 
-> You are right, but we have not used FDT for any of our ARM Linux ports
-> yet (consistency matters.) If we switch to FDT now, a lot of code will
-> need to be rewritten.
+> On Thu, Dec 29, 2011 at 2:39 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>> From: Michal Nazarewicz <mina86@mina86.com>
+>>
+>> When set_migratetype_isolate() sets pageblock's migrate type, it does
+>> not change each page_private data.  This makes sense, as the function
+>> has no way of knowing what kind of information page_private stores.
 
-Not if you are only talking about the machine identification. You need a
-minimal dts file with a compatible string for the board and add this
-string to your machine desc.
+>> A side effect is that instead of draining pages from all zones,
+>> set_migratetype_isolate() now drain only pages from zone pageblock it
+>> operates on is in.
 
-DT is a requirement for adding any new ARM platform.
+>> +/* Caller must hold zone->lock. */
+>> +static void __zone_drain_local_pages(void *arg)
+>> +{
+>> +       struct per_cpu_pages *pcp;
+>> +       struct zone *zone = arg;
+>> +       unsigned long flags;
+>> +
+>> +       local_irq_save(flags);
+>> +       pcp = &per_cpu_ptr(zone->pageset, smp_processor_id())->pcp;
+>> +       if (pcp->count) {
+>> +               /* Caller holds zone->lock, no need to grab it. */
+>> +               __free_pcppages_bulk(zone, pcp->count, pcp);
+>> +               pcp->count = 0;
+>> +       }
+>> +       local_irq_restore(flags);
+>> +}
+>> +
+>> +/*
+>> + * Like drain_all_pages() but operates on a single zone.  Caller must
+>> + * hold zone->lock.
+>> + */
+>> +static void __zone_drain_all_pages(struct zone *zone)
+>> +{
+>> +       on_each_cpu(__zone_drain_local_pages, zone, 1);
+>> +}
+>> +
 
-Rob
+On Sun, 01 Jan 2012 08:49:13 +0100, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> Please consider whether sending an IPI to all processors in the system
+> and interrupting them is appropriate here.
+>
+> You seem to assume that it is probable that each CPU of the possibly
+> 4,096 (MAXSMP on x86) has a per-cpu page for the specified zone,
+
+I'm not really assuming that (in fact I expect what you fear, ie. that
+most CPUs won't have pages from specified zone an PCP list), however,
+I really need to make sure to get them off all PCP lists.
+
+> otherwise you're just interrupting them out of doing something useful,
+> or save power idle for nothing.
+
+Exactly what's happening now anyway.
+
+> While that may or may not be a reasonable assumption for the general
+> drain_all_pages that drains pcps from all zones, I feel it is less
+> likely to be the right thing once you limit the drain to a single
+> zone.
+
+Currently, set_migratetype_isolate() seem to do more then it needs to,
+ie. it drains all the pages even though all it cares about is a single
+zone.
+
+> Some background on my attempt to reduce "IPI noise" in the system in
+> this context is probably useful here as
+> well: https://lkml.org/lkml/2011/11/22/133
+
+Looks interesting, I'm not entirely sure why it does not end up a race
+condition, but in case of __zone_drain_all_pages() we already hold
+zone->lock, so my fears are somehow gone..  I'll give it a try, and prepare
+a patch for __zone_drain_all_pages().
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
