@@ -1,31 +1,31 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Sun,  1 Jan 2012 22:38:12 +0800
-Subject: [PATCH v2 2/2] dma/imx-sdma: add wmb before enable a channel
-In-Reply-To: <1325428692-11473-1-git-send-email-richard.zhao@linaro.org>
-References: <1325428692-11473-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1325428692-11473-3-git-send-email-richard.zhao@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 01 Jan 2012 09:22:23 -0600
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <CACRpkdbLMW-SXnr6hbpwMqG=-a0wmYtU+YnyR8uLsndUp=UBgQ@mail.gmail.com>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+ <CACRpkdbLMW-SXnr6hbpwMqG=-a0wmYtU+YnyR8uLsndUp=UBgQ@mail.gmail.com>
+Message-ID: <4F007A2F.5010303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_alloc_coherent memory may be bufferable. We need to add
-nececcary memory barrier.
+On 01/01/2012 08:07 AM, Linus Walleij wrote:
+> On Tue, Dec 20, 2011 at 6:40 PM, Dong Aisheng <b29396@freescale.com> wrote:
+> 
+>> From: Dong Aisheng <dong.aisheng@linaro.org>
+>>
+>> This patch provies a common API for driver to use to register pinmux
+>> mappings from dts file. It is needed for dt support.
+> 
+> Overall I feel lost in this discussion due to limited exposure to
+> device tree concepts. If I get Stephen Warrens and one of the
+> DT people's (Rob, Grant) ACK on this I'll be happy to merge it.
+> 
+> Until then, I guess it will need to be refined for the next kernel
+> cycle.
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- drivers/dma/imx-sdma.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Yes. As Stephen has commented, this still needs a bit of work on the
+binding.
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f8e87b5..9301bff 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -394,6 +394,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
- 
- static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
- {
-+	wmb();
- 	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
- }
- 
--- 
-1.7.4.1
+Rob
