@@ -1,54 +1,89 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 1 Jan 2012 08:14:25 +0100
-Subject: [PATCH] dma/imx-sdma: add wmb before enable/run a channel
-In-Reply-To: <1325388460-20678-1-git-send-email-richard.zhao@linaro.org>
-References: <1325388460-20678-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20120101071425.GA25978@pengutronix.de>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Sun, 1 Jan 2012 09:49:13 +0200
+Subject: [PATCH 01/11] mm: page_alloc: set_migratetype_isolate: drain PCP
+ prior to isolating
+In-Reply-To: <1325162352-24709-2-git-send-email-m.szyprowski@samsung.com>
+References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
+ <1325162352-24709-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAOtvUMeAVgDwRNsDTcG07ChYnAuNgNJjQ+sKALJ79=Ezikos-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Richard,
+On Thu, Dec 29, 2011 at 2:39 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> From: Michal Nazarewicz <mina86@mina86.com>
+>
+> When set_migratetype_isolate() sets pageblock's migrate type, it does
+> not change each page_private data. ?This makes sense, as the function
+> has no way of knowing what kind of information page_private stores.
+...
+>
+>
+> A side effect is that instead of draining pages from all zones,
+> set_migratetype_isolate() now drain only pages from zone pageblock it
+> operates on is in.
+>
+...
 
-On Sun, Jan 01, 2012 at 11:27:40AM +0800, Richard Zhao wrote:
-> dma_alloc_coherent memory may be bufferable. We need to add
-> nececcary memory barrier.
-necessary
 
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  drivers/dma/imx-sdma.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index 2ebb2bc..8cd9492 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -403,6 +403,7 @@ static int sdma_run_channel(struct sdma_channel *sdmac)
->  
->  	init_completion(&sdmac->done);
->  
-> +	wmb();
->  	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
->  
->  	ret = wait_for_completion_timeout(&sdmac->done, HZ);
-> @@ -809,6 +810,7 @@ out:
->  
->  static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
->  {
-> +	wmb();
->  	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
->  }
-I don't know the sdma code very well, but wouldn't it be nice to call
-sdma_enable_channel() in sdma_run_channel() instead of open coding it?
+>
+> +/* Caller must hold zone->lock. */
+> +static void __zone_drain_local_pages(void *arg)
+> +{
+> + ? ? ? struct per_cpu_pages *pcp;
+> + ? ? ? struct zone *zone = arg;
+> + ? ? ? unsigned long flags;
+> +
+> + ? ? ? local_irq_save(flags);
+> + ? ? ? pcp = &per_cpu_ptr(zone->pageset, smp_processor_id())->pcp;
+> + ? ? ? if (pcp->count) {
+> + ? ? ? ? ? ? ? /* Caller holds zone->lock, no need to grab it. */
+> + ? ? ? ? ? ? ? __free_pcppages_bulk(zone, pcp->count, pcp);
+> + ? ? ? ? ? ? ? pcp->count = 0;
+> + ? ? ? }
+> + ? ? ? local_irq_restore(flags);
+> +}
+> +
+> +/*
+> + * Like drain_all_pages() but operates on a single zone. ?Caller must
+> + * hold zone->lock.
+> + */
+> +static void __zone_drain_all_pages(struct zone *zone)
+> +{
+> + ? ? ? on_each_cpu(__zone_drain_local_pages, zone, 1);
+> +}
+> +
 
-As you probably need some rearrangements to have sdma_enable_channel()
-declared in sdma_run_channel() this might be better done with a seperate
-patch.
+Please consider whether sending an IPI to all processors in the system
+and interrupting them is appropriate here.
 
-Best regards
-Uwe
+You seem to assume that it is probable that each CPU of the possibly
+4,096 (MAXSMP on x86) has a per-cpu page
+for the specified zone, otherwise you're just interrupting them out of
+doing something useful, or save power idle
+for nothing.
+
+While that may or may not be a reasonable assumption for the general
+drain_all_pages that drains pcps from
+all zones, I feel it is less likely to be the right thing once you
+limit the drain to a single zone.
+
+Some background on my attempt to reduce "IPI noise" in the system in
+this context is probably useful here as
+well: https://lkml.org/lkml/2011/11/22/133
+
+Thanks :-)
+Gilad
+
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Gilad Ben-Yossef
+Chief Coffee Drinker
+gilad at benyossef.com
+Israel Cell: +972-52-8260388
+US Cell: +1-973-8260388
+http://benyossef.com
+
+"Unfortunately, cache misses are an equal opportunity pain provider."
+-- Mike Galbraith, LKML
