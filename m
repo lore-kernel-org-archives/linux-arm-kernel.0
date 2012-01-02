@@ -1,22 +1,17 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Jan 2012 12:27:01 +0000
-Subject: [PATCHv2 1/2] gpio: add a driver for the Synopsys DesignWare APB
- GPIO block
-In-Reply-To: <20120102122400.GA6124@page>
-References: <1324345431-12251-1-git-send-email-jamie@jamieiles.com>
- <20111230195955.GA3427@page> <4EFE1E35.106@gmail.com>
- <20120102121428.GA18443@sirena.org.uk> <20120102122400.GA6124@page>
-Message-ID: <20120102122700.GJ2899@opensource.wolfsonmicro.com>
+Date: Mon, 2 Jan 2012 12:46:06 +0000
+Subject: [PATCH 1/1] regulator/fixed: pass regulator_register of_node
+In-Reply-To: <1325335876-15296-1-git-send-email-richard.zhao@linaro.org>
+References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
+ <1325335876-15296-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120102124605.GE4300@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2012 at 12:24:00PM +0000, Jamie Iles wrote:
+On Sat, Dec 31, 2011 at 08:51:16PM +0800, Richard Zhao wrote:
+> regulator_get needs of_node to find right regulator.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 
-> The IRQ part is dependent on Rob's patches to introduce irq domain 
-> support into the generic chip though, so how about I split this into two 
-> patches, one that does the basic GPIO stuff and another that does the 
-> IRQ portion (with the dependency change) and if Rob's patches don't make 
-> it in we drop the IRQ support for the GPIO?
-
-Yeah, epecially since the IRQ domain stuff is still giving unbootable
-kernels in -next as far as I know.
+Applied, thanks, but please always use subject lines that match the
+subsystem you're submitting against.
