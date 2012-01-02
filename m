@@ -1,21 +1,127 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Jan 2012 12:14:28 +0000
-Subject: [PATCHv2 1/2] gpio: add a driver for the Synopsys DesignWare
- APB GPIO block
-In-Reply-To: <4EFE1E35.106@gmail.com>
-References: <1324345431-12251-1-git-send-email-jamie@jamieiles.com>
- <20111230195955.GA3427@page> <4EFE1E35.106@gmail.com>
-Message-ID: <20120102121428.GA18443@sirena.org.uk>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Mon,  2 Jan 2012 13:18:25 +0100
+Subject: [PATCH 1/2] dmaengine: Fix status handling in imx-dma.
+Message-ID: <1325506706-10028-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2011 at 02:25:25PM -0600, Rob Herring wrote:
+Status must only be changed to DMA_IN_PROGRESS
+when the DMA transfer has really begun.
 
-> We've got to sort out getting irq domains enabled on x86 and MIPS in
-> order to merge generic irq chip using domains. I'm not sure that will
-> get done in time.
+However, since this driver lacks of support for
+multiple descriptors a new flag has to be introduced
+to avoid the prepare function be called multiple times.
 
-> Can you leave out the interrupt portion of the driver? Or that is needed
-> to get to a useful state.
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ drivers/dma/imx-dma.c |   22 +++++++++++++++-------
+ 1 files changed, 15 insertions(+), 7 deletions(-)
 
-Or just add a dependency in Kconfig?
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index d99f71c..9a0ac14 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -43,6 +43,7 @@ struct imxdma_channel {
+ 	enum dma_status			status;
+ 	int				dma_request;
+ 	struct scatterlist		*sg_list;
++	bool				prepared;
+ };
+ 
+ #define MAX_DMA_CHANNELS 8
+@@ -72,6 +73,7 @@ static void imxdma_irq_handler(int channel, void *data)
+ 
+ 	imxdmac->status = DMA_SUCCESS;
+ 	imxdma_handle(imxdmac);
++	imxdmac->prepared = false;
+ }
+ 
+ static void imxdma_err_handler(int channel, void *data, int error)
+@@ -80,6 +82,7 @@ static void imxdma_err_handler(int channel, void *data, int error)
+ 
+ 	imxdmac->status = DMA_ERROR;
+ 	imxdma_handle(imxdmac);
++	imxdmac->prepared = false;
+ }
+ 
+ static void imxdma_progression(int channel, void *data,
+@@ -89,6 +92,7 @@ static void imxdma_progression(int channel, void *data,
+ 
+ 	imxdmac->status = DMA_SUCCESS;
+ 	imxdma_handle(imxdmac);
++	imxdmac->prepared = false;
+ }
+ 
+ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+@@ -103,6 +107,7 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	case DMA_TERMINATE_ALL:
+ 		imxdmac->status = DMA_ERROR;
+ 		imx_dma_disable(imxdmac->imxdma_channel);
++		imxdmac->prepared = false;
+ 		return 0;
+ 	case DMA_SLAVE_CONFIG:
+ 		if (dmaengine_cfg->direction == DMA_FROM_DEVICE) {
+@@ -204,7 +209,7 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
+ 	imxdmac->desc.flags = DMA_CTRL_ACK;
+ 
+ 	imxdmac->status = DMA_SUCCESS;
+-
++	imxdmac->prepared = false;
+ 	return 0;
+ }
+ 
+@@ -230,11 +235,9 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
+ 	int i, ret, dma_length = 0;
+ 	unsigned int dmamode;
+ 
+-	if (imxdmac->status == DMA_IN_PROGRESS)
++	if (imxdmac->prepared)
+ 		return NULL;
+ 
+-	imxdmac->status = DMA_IN_PROGRESS;
+-
+ 	for_each_sg(sgl, sg, sg_len, i) {
+ 		dma_length += sg->length;
+ 	}
+@@ -264,6 +267,8 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
+ 	if (ret)
+ 		return NULL;
+ 
++	imxdmac->prepared = true;
++
+ 	return &imxdmac->desc;
+ }
+ 
+@@ -280,9 +285,8 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+ 	dev_dbg(imxdma->dev, "%s channel: %d buf_len=%d period_len=%d\n",
+ 			__func__, imxdmac->channel, buf_len, period_len);
+ 
+-	if (imxdmac->status == DMA_IN_PROGRESS)
++	if (imxdmac->prepared)
+ 		return NULL;
+-	imxdmac->status = DMA_IN_PROGRESS;
+ 
+ 	ret = imx_dma_setup_progression_handler(imxdmac->imxdma_channel,
+ 			imxdma_progression);
+@@ -325,14 +329,18 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+ 	if (ret)
+ 		return NULL;
+ 
++	imxdmac->prepared = true;
++
+ 	return &imxdmac->desc;
+ }
+ 
+ static void imxdma_issue_pending(struct dma_chan *chan)
+ {
+ 	/*
+-	 * Nothing to do. We only have a single descriptor
++	 * Only change status since we have a single descriptor
+ 	 */
++	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
++	imxdmac->status = DMA_IN_PROGRESS;
+ }
+ 
+ static int __init imxdma_probe(struct platform_device *pdev)
+-- 
+1.7.0.4
