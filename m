@@ -1,46 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 02 Jan 2012 17:00:38 +0100
-Subject: [PATCH] clocksource/ux500-prcmu: fix sched_clock breakage
-In-Reply-To: <1325510583-4487-1-git-send-email-linus.walleij@stericsson.com>
-References: <1325510583-4487-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4F01D4A6.5010906@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  2 Jan 2012 14:19:03 -0200
+Subject: [PATCH] ARM: prom.h: Fix build error by removing unneeded header file
+Message-ID: <1325521143-29482-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Fix the following build error:
 
-On 01/02/2012 02:23 PM, Linus Walleij wrote:
-> commit 2f0778afac79bd8d226225556858a636931eeabc adding
-> runtime-selectable sched_clock() forgot to patch this
-> driver down in drivers/clocksource, this patch fixes
-> the problem.
-> 
-> Reported-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> ---
+  CC [M]  fs/udf/balloc.o
+In file included from /home/fabio/next/linux-next/arch/arm/include/asm/prom.h:16,
+                 from include/linux/of.h:140,
+                 from include/asm-generic/gpio.h:7,
+                 from arch/arm/plat-mxc/include/mach/irqs.h:14,
+                 from /home/fabio/next/linux-next/arch/arm/include/asm/irq.h:4,
+                 from /home/fabio/next/linux-next/arch/arm/include/asm/hardirq.h:6,
+                 from include/linux/hardirq.h:7,
+                 from include/linux/highmem.h:8,
+                 from include/linux/pagemap.h:10,
+                 from include/linux/buffer_head.h:13,
+                 from fs/udf/udfdecl.h:11,
+                 from fs/udf/balloc.c:22:
+/home/fabio/next/linux-next/arch/arm/include/asm/setup.h:146: error: redefinition of 'struct tag'
 
-Compiled and booted the board successfully.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+This build error happens on linux-next by doing:
+make imx_v6_v7_defconfig
+make
 
-Tested-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+ arch/arm/include/asm/prom.h |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-- -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
-
-iQEcBAEBAgAGBQJPAdSmAAoJEAKBbMCpUGYAKAAIAMwJ3MKCS2mCM07mI27Cgchu
-p0342JLh/xiCXeuCGYr8Z1WNGGRsj6GWcLPUs8Uhd8m75o6Hl8s2E+ZC3ki45Uum
-C5uateI4MAh/gUi68aB8wdpzXQm+vr5SAy4pLaVmNUdS+X9XC8p23E3tmfoO9cWI
-Ygk4g1Czzx7HQIANiHNeK0Da2juI6Hv7j5JJ2fm0kw25HEMvg0mQlKoF0U7CiYGe
-KBjoUvR5RG+NcfNplGR+VYjv4xsmDfUo/7AjlPfwJ5n0RPVEJ9R5TAyOtBK/3RA7
-6hUJ+KizevpWh8TxbS8Qz9jdkRXaji+5fy/L53+rxc8hKgfK1DNaMs2mt2eK6Qg=
-=3GNF
------END PGP SIGNATURE-----
+diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+index 6f65ca8..ee03633 100644
+--- a/arch/arm/include/asm/prom.h
++++ b/arch/arm/include/asm/prom.h
+@@ -13,7 +13,6 @@
+ 
+ #ifdef CONFIG_OF
+ 
+-#include <asm/setup.h>
+ #include <asm/irq.h>
+ 
+ extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+-- 
+1.7.1
