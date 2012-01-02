@@ -1,48 +1,66 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 2 Jan 2012 16:00:37 +0530
-Subject: [PATCH v8 19/20] OMAP2+: UART: Do not gate uart clocks if used
- for debug_prints
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D1214304B3E2@DBDE01.ent.ti.com>
-References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
- <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
- <B5906170F1614E41A8A28DE3B8D1214304B3E2@DBDE01.ent.ti.com>
-Message-ID: <CAAL8m4yXD-gpeXNVsCOYeDkYDWmVX8FUcpXKjx6k=AXSF4V9iA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 02 Jan 2012 16:28:45 +0530
+Subject: [PATCH] dmaengine: Add support for MEMCPY for imx-dma.
+In-Reply-To: <CACKLOr0fVMknA+HAbgn3d9_f9tdz4L2Z9Bx4yMU7eLmr1mdXBA@mail.gmail.com>
+References: <1324051191-19507-1-git-send-email-javier.martin@vista-silicon.com>
+ <1324661918.1633.35.camel@vkoul-udesk3>
+ <CACKLOr0fVMknA+HAbgn3d9_f9tdz4L2Z9Bx4yMU7eLmr1mdXBA@mail.gmail.com>
+Message-ID: <1325501925.1540.9.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+On Mon, 2012-01-02 at 11:08 +0100, javier Martin wrote:
+> Hi Vinod,
+> thank you for your review.
+> 
+> On 23 December 2011 18:38, Vinod Koul <vinod.koul@intel.com> wrote:
+> >> @@ -328,6 +329,37 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+> >>       return &imxdmac->desc;
+> >>  }
+> >>
+> >> +static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+> >> +     struct dma_chan *chan, dma_addr_t dest,
+> >> +     dma_addr_t src, size_t len, unsigned long flags)
+> >> +{
+> >> +     struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+> >> +     struct imxdma_engine *imxdma = imxdmac->imxdma;
+> >> +     int ret;
+> >> +
+> >> +     dev_dbg(imxdma->dev, "%s channel: %d src=0x%x dst=0x%x len=%d\n",
+> >> +                     __func__, imxdmac->channel, src, dest, len);
+> >> +
+> >> +     if (imxdmac->status == DMA_IN_PROGRESS)
+> >> +             return NULL;
+> >> +
+> >> +     imxdmac->status = DMA_IN_PROGRESS;
+> > why? prepare doesn't mean DMA is in progress. You can get multiple
+> > descriptors for same channel by calling prepare multiple times.
+> > Even one descriptor can be memcpy whereas other is slave...
+> > In issue_pending this should be moved to DMA_IN_PROGRESS
+> 
+> According to the original developer of this file it only supports a
+> single descriptor. Please, take a look at the following function:
+> 
+> static void imxdma_issue_pending(struct dma_chan *chan)
+> {
+> 	/*
+> 	 * Nothing to do. We only have a single descriptor
+> 	 */
+> }
+> 
+> 
+> Also, the same behavior is present in the other prepare functions:
+> "imxdma_prep_slave_sg" and "imxdma_prep_dma_cyclic".
+> 
+> I think the less painful approach here is merging my patch so that
+> multiple descriptors support can be added later.
+This behavior has nothing to do with single/multiple descriptors.
+Prepare means to prepare the transfer and not to submit. There are other
+APIs given to do the job. Please go thru the Documentation/dmaengine.txt
+as well.
 
-On Mon, Jan 2, 2012 at 2:55 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
-> Hello,
->
-> On Fri, Nov 11, 2011 at 15:31:52, R, Govindraj wrote:
-> [...]
->>
->> - ? ? if ((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
->> + ? ? if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
->> + ? ? ? ? ? ? ? ? ? ? && !uart_debug)
->> ? ? ? ? ? ? ? device_init_wakeup(&pdev->dev, true);
->> ?}
->
-> I was testing this on AM335x and realized that this leads to creation of two
-> 'wakeup' entries for UART. One is created by the tty layer in serial-core.c
-> and the other is created here.
->
-> Here's what I see on a branch based on Tony's 3.2-rc6:
->
-> ./sys/devices/platform/omap/omap_uart.0/power/wakeup
-> ./sys/devices/platform/omap/omap_uart.0/tty/ttyO0/power/wakeup
->
-> Shouldn't the OMAP serial just enable the 'wakeup' entry created by serial-core.c?
+I know some drivers are broken in this respect, but would be great if
+you can fix this behavior here as well.
 
-currently runtime pm is available from omap-serial device and not from tty_dev.
-Setting tty_dev wakeup is to use irq_wakeup from suspend available
-from serail_core layer which I think we are not using for omap-uart
-and we use pad wakeup from suspend path.
-
-Also omap-uart.x/power/wakeup is used to gate uart clocks using runtime
-PM api's in omap-serial driver.
-
---
-Thanks,
-Govindraj.R
+-- 
+~Vinod
