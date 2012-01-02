@@ -1,41 +1,133 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 2 Jan 2012 15:00:21 +0100
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 02 Jan 2012 15:00:36 +0100
 Subject: snowball does not compile on linux-next
 In-Reply-To: <4F01B763.4040201@linaro.org>
-References: <4F0199CF.2070806@linaro.org>
- <CACRpkdbn6H_s8oC3VdqH2CoCZcPkc+hYccLE1UQJZnqB5eSf3Q@mail.gmail.com>
+References: <4F0199CF.2070806@linaro.org>	<CACRpkdbn6H_s8oC3VdqH2CoCZcPkc+hYccLE1UQJZnqB5eSf3Q@mail.gmail.com>
  <4F01B763.4040201@linaro.org>
-Message-ID: <CACRpkdY+jRTdDP_i4-yw-gPTE57U6vG3nxPHw2cPRmzZF73bQQ@mail.gmail.com>
+Message-ID: <4F01B884.3000804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 2, 2012 at 2:55 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
 
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+On 01/02/2012 02:55 PM, Daniel Lezcano wrote:
+>
+> On 01/02/2012 01:59 PM, Linus Walleij wrote:
+>> On Mon, Jan 2, 2012 at 12:49 PM, Daniel Lezcano
+>> <daniel.lezcano@linaro.org> wrote:
+>
+>>> the kernel does not compile when
+>>> CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK is set.
+>>>
+>>> it fails with :
+>>>
+>>> CHK include/linux/version.h CHK include/generated/utsrelease.h
+>>> make[1]: `include/generated/mach-types.h' is up to date. CALL
+>>> scripts/checksyscalls.sh CHK include/generated/compile.h CC
+>>> drivers/clocksource/clksrc-dbx500-prcmu.o
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:61: warning: type
+>>> defaults to ?int? in declaration of ?DEFINE_CLOCK_DATA?
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:61: warning:
+>>> parameter names (without types) in function declaration
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c: In function
+>>> ?sched_clock?: drivers/clocksource/clksrc-dbx500-prcmu.c:72:
+>>> error: implicit declaration of function ?cyc_to_sched_clock?
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:72: error: ?cd?
+>>> undeclared (first use in this function)
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:72: error: (Each
+>>> undeclared identifier is reported only once
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:72: error: for each
+>>> function it appears in.)
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c: In function
+>>> ?clksrc_dbx500_prcmu_update_sched_clock?:
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:78: error: implicit
+>>> declaration of function ?update_sched_clock?
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:78: error: ?cd?
+>>> undeclared (first use in this function)
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c: In function
+>>> ?clksrc_dbx500_prcmu_init?:
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:100: error: implicit
+>>> declaration of function ?init_sched_clock?
+>>> drivers/clocksource/clksrc-dbx500-prcmu.c:100: error: ?cd?
+>>> undeclared (first use in this function) make[2]: ***
+>>> [drivers/clocksource/clksrc-dbx500-prcmu.o] Error 1 make[1]:
+>>> *** [drivers/clocksource] Error 2 make[1]: *** Waiting for
+>>> unfinished jobs.... make: *** [drivers] Error 2 make: ***
+>>> Waiting for unfinished jobs....
+>>>
+>>> Is it dead code ?
+>
+>> No if it was dead it shouldn't get compiled.
+>
+>> It' probably just some fallout from Marc's rewrite of the
+>> sched_clock() stuff, I'll see if I can cook a patch and send off
+>> to Marc.
+>
+> Ok, thanks. I will test the patch you sent.
+>
 > it seems also the commit :
 >
-> commit c15def1cc30edeaa74a97205c936be82cdc86df6
-> Author: Linus Walleij <linus.walleij@linaro.org>
-> Date: ? Thu Dec 15 13:38:40 2011 +0100
+> commit c15def1cc30edeaa74a97205c936be82cdc86df6 Author: Linus
+> Walleij <linus.walleij@linaro.org> Date: Thu Dec 15 13:38:40 2011
+> +0100
 >
-> ? ?ARM: ux500: remove support for early silicon revisions
+> ARM: ux500: remove support for early silicon revisions
 >
-> ? ?The DB8500 ED (Early Drop) and V1 are only available inside of
-> ? ?ST-Ericsson or partners, we have actively replaced and scrapped
-> ? ?these prototypes. All Nova products on the open market (such as
-> ? ?the Snowball board) are based on V2 and later ASIC variants.
-> ? ?So let us focus on supporting the silicon that will be used and
-> ? ?delete this to get a clear overview.
+> The DB8500 ED (Early Drop) and V1 are only available inside of
+> ST-Ericsson or partners, we have actively replaced and scrapped
+> these prototypes. All Nova products on the open market (such as the
+> Snowball board) are based on V2 and later ASIC variants. So let us
+> focus on supporting the silicon that will be used and delete this
+> to get a clear overview.
 >
-> ? ?Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> removed the U8500_PRCMU_TCDM_BASE_V1 macro definition but it is still
-> used in drivers/mfd/db8500-prcmu.c
+> removed the U8500_PRCMU_TCDM_BASE_V1 macro definition but it is
+> still used in drivers/mfd/db8500-prcmu.c
+>
+> The compilation fails with:
+>
+> drivers/mfd/db8500-prcmu.c: In function ?db8500_prcmu_early_init?:
+> drivers/mfd/db8500-prcmu.c:2107: error: ?U8500_PRCMU_TCDM_BASE_V1?
+> undeclared (first use in this function)
+> drivers/mfd/db8500-prcmu.c:2107: error: (Each undeclared identifier
+> is reported only once drivers/mfd/db8500-prcmu.c:2107: error: for
+> each function it appears in.) make[2]: ***
+> [drivers/mfd/db8500-prcmu.o] Error 1 make[1]: *** [drivers/mfd]
+> Error 2 make[1]: *** Waiting for unfinished jobs....
+>
 
-Yes, I have sent the patch removing it from the PRCMU driver
-to the ARM SoC maintainers (you're on CC) so they can merge it
-into their ux500 branch, I intended to do it this way (Sam already
-ACK:ed it) but screwed up some way.
+Please ignore, I missed your patch fixing this.
+I still have to improve my message filters :)
 
-Yours,
-Linus Walleij
+Thanks
+  -- Daniel
+
+_______________________________________________
+linaro-dev mailing list
+linaro-dev at lists.linaro.org
+http://lists.linaro.org/mailman/listinfo/linaro-dev
+
+
+
+- -- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iQEcBAEBAgAGBQJPAbiEAAoJEAKBbMCpUGYAg50IAKMmgwZrbrJirvCMNa3tDOzE
+vwzpE1mAD9p8pL9rMwOaxAdWQBVoJmf6PXnvGemc1DaqE/1WwYtmchanWirII86R
+7B6POSslVlyNpqXhRpDPDYwoQXbE1DoW+NHYCLkn2ju6FTnF/xZwO1kr77aQLrfl
+gSu84kG0oMfVIV2MY1nTsz9n5vv98rn0mllO37HrI6CaIqeZo3qkOye45asjnpF1
+YFhfaMnL21R/lnqVa69Uv/tFEDBbacSEsU67URlOiIlY1OXYL9k9nkhyQqMOpM79
+e29iHoMfkp8978UTy+inVE+HNOPXteN9O9Hy2TklyekUndCorA5b8G8NeufQVq8=
+=PPBU
+-----END PGP SIGNATURE-----
