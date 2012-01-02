@@ -1,189 +1,194 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 2 Jan 2012 01:18:28 -0700
-Subject: [PATCH v2 1/2] Input: tegra-kbc - add device tree bindings
-In-Reply-To: <1325053170-6984-2-git-send-email-olof@lixom.net>
-References: <1325053170-6984-1-git-send-email-olof@lixom.net>
- <1325053170-6984-2-git-send-email-olof@lixom.net>
-Message-ID: <20120102081828.GB18381@ponder.secretlab.ca>
+Date: Mon, 2 Jan 2012 01:54:33 -0700
+Subject: [PATCH v2] gpio: pl061: convert to use generic irq chip
+In-Reply-To: <1324327927-6886-1-git-send-email-robherring2@gmail.com>
+References: <1323876538-20406-8-git-send-email-robherring2@gmail.com>
+ <1324327927-6886-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120102085433.GJ18381@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2011 at 10:19:29PM -0800, Olof Johansson wrote:
-> This adds a simple device tree binding to the tegra keyboard controller.
+On Mon, Dec 19, 2011 at 02:52:07PM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Also, mark the default keymap as __devinitdata since it is not referenced
-> after boot, and shorten the name to not have to avoid line wraps.
+> Convert the pl061 irq_chip code to use the generic irq chip code.
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+> This has the side effect of using 32-bit accesses rather than 8-bit
+> accesses to interrupt registers. The h/w TRM and testing seem to indicate
+> this is fine.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.ml.walleij@gmail.com>
+
+What does this apply against?  It doesn't apply cleanly.
+
+g.
+
 > ---
->  .../devicetree/bindings/input/tegra-kbc.txt        |   18 +++++
->  drivers/input/keyboard/tegra-kbc.c                 |   70 ++++++++++++++++++--
->  2 files changed, 83 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/input/tegra-kbc.txt
+> v2:
+> - put struct irq_chip_generic pointer into struct pl061_gpio instead of domain
+> ptr.
 > 
-> diff --git a/Documentation/devicetree/bindings/input/tegra-kbc.txt b/Documentation/devicetree/bindings/input/tegra-kbc.txt
-> new file mode 100644
-> index 0000000..a7c1d40
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/tegra-kbc.txt
-> @@ -0,0 +1,18 @@
-> +* Tegra keyboard controller
-> +
-> +Required properties:
-> +- compatible : "nvidia,tegra20-kbc"
-> +
-> +Optional properties:
-> +- debounce-delay: delay in milliseconds per row scan for debouncing
-> +- repeat-delay: delay in milliseconds before repeat starts
-> +- ghost-filter : enable ghost filtering for this device
-> +- wakeup-source : configure keyboard as a wakeup source for suspend/resume
-
-I'd like to see a "tegra," prefix on these custom properties, but otherwise
-the binding looks okay to me.  You should also consider a '-ms' suffix on
-the millisecond properties.
-
-Otherwise;
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-> +
-> +Example:
-> +
-> +keyboard: keyboard {
-> +	compatible = "nvidia,tegra20-kbc";
-> +	reg = <0x7000e200 0x100>;
-> +	ghost-filter;
-> +};
-> diff --git a/drivers/input/keyboard/tegra-kbc.c b/drivers/input/keyboard/tegra-kbc.c
-> index cf3228b..4ce6cc8 100644
-> --- a/drivers/input/keyboard/tegra-kbc.c
-> +++ b/drivers/input/keyboard/tegra-kbc.c
-> @@ -26,6 +26,7 @@
->  #include <linux/delay.h>
->  #include <linux/io.h>
->  #include <linux/interrupt.h>
-> +#include <linux/of.h>
->  #include <linux/clk.h>
->  #include <linux/slab.h>
->  #include <mach/clk.h>
-> @@ -82,7 +83,7 @@ struct tegra_kbc {
->  	struct clk *clk;
+>  drivers/gpio/Kconfig      |    1 +
+>  drivers/gpio/gpio-pl061.c |   74 ++++++++++++++++-----------------------------
+>  2 files changed, 27 insertions(+), 48 deletions(-)
+> 
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index 8482a23..4d433e2 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -138,6 +138,7 @@ config GPIO_MXS
+>  config GPIO_PL061
+>  	bool "PrimeCell PL061 GPIO support"
+>  	depends on ARM_AMBA
+> +	select GENERIC_IRQ_CHIP
+>  	help
+>  	  Say yes here to support the PrimeCell PL061 GPIO device
+>  
+> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
+> index fe19dec..96ff6b2 100644
+> --- a/drivers/gpio/gpio-pl061.c
+> +++ b/drivers/gpio/gpio-pl061.c
+> @@ -50,10 +50,10 @@ struct pl061_gpio {
+>  	 * the IRQ code simpler.
+>  	 */
+>  	spinlock_t		lock;		/* GPIO registers */
+> -	spinlock_t		irq_lock;	/* IRQ registers */
+>  
+>  	void __iomem		*base;
+>  	int			irq_base;
+> +	struct irq_chip_generic	*irq_gc;
+>  	struct gpio_chip	gc;
 >  };
 >  
-> -static const u32 tegra_kbc_default_keymap[] = {
-> +static const u32 default_keymap[] __devinitdata = {
->  	KEY(0, 2, KEY_W),
->  	KEY(0, 3, KEY_S),
->  	KEY(0, 4, KEY_A),
-> @@ -217,9 +218,9 @@ static const u32 tegra_kbc_default_keymap[] = {
->  	KEY(31, 4, KEY_HELP),
->  };
->  
-> -static const struct matrix_keymap_data tegra_kbc_default_keymap_data = {
-> -	.keymap		= tegra_kbc_default_keymap,
-> -	.keymap_size	= ARRAY_SIZE(tegra_kbc_default_keymap),
-> +static const struct matrix_keymap_data default_keymap_data __devinitdata = {
-> +	.keymap		= default_keymap,
-> +	.keymap_size	= ARRAY_SIZE(default_keymap),
->  };
->  
->  static void tegra_kbc_report_released_keys(struct input_dev *input,
-> @@ -576,6 +577,55 @@ tegra_kbc_check_pin_cfg(const struct tegra_kbc_platform_data *pdata,
->  	return true;
+> @@ -125,40 +125,10 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
+>  	return chip->irq_base + offset;
 >  }
 >  
-> +#ifdef CONFIG_OF
-> +static struct tegra_kbc_platform_data * __devinit tegra_kbc_dt_parse_pdata(
-> +	struct platform_device *pdev)
-> +{
-> +	struct tegra_kbc_platform_data *pdata;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int i;
-> +	u32 prop;
-> +
-> +	if (!np)
-> +		return NULL;
-> +
-> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +
-> +	if (!of_property_read_u32(np, "debounce-delay", &prop))
-> +		pdata->debounce_cnt = prop;
-> +
-> +	if (!of_property_read_u32(np, "repeat-delay", &prop))
-> +		pdata->repeat_cnt = prop;
-> +
-> +	if (of_find_property(np, "needs-ghost-filter", NULL))
-> +		pdata->use_ghost_filter = true;
-> +
-> +	if (of_find_property(np, "wakeup-source", NULL))
-> +		pdata->wakeup = true;
-> +
-> +	/* All currently known keymaps with device tree support use the same
-> +	 * pin_cfg, so set it up here.
-> +	 */
-> +	for (i = 0; i < KBC_MAX_ROW; i++) {
-> +		pdata->pin_cfg[i].num = i;
-> +		pdata->pin_cfg[i].is_row = true;
-> +	}
-> +	
-> +	for (i = 0; i < KBC_MAX_COL; i++) {
-> +		pdata->pin_cfg[KBC_MAX_ROW + i].num = i;
-> +		pdata->pin_cfg[KBC_MAX_ROW + i].is_row = false;
-> +	}
-> +
-> +	return pdata;
-> +}
-> +#else
-> +static inline struct tegra_kbc_platform_data *tegra_kbc_dt_parse_pdata(
-> +	struct platform_device *pdev)
-> +{
-> +	return NULL;
-> +}
-> +#endif
-> +
->  static int __devinit tegra_kbc_probe(struct platform_device *pdev)
+> -/*
+> - * PL061 GPIO IRQ
+> - */
+> -static void pl061_irq_disable(struct irq_data *d)
+> -{
+> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
+> -	int offset = d->irq - chip->irq_base;
+> -	unsigned long flags;
+> -	u8 gpioie;
+> -
+> -	spin_lock_irqsave(&chip->irq_lock, flags);
+> -	gpioie = readb(chip->base + GPIOIE);
+> -	gpioie &= ~(1 << offset);
+> -	writeb(gpioie, chip->base + GPIOIE);
+> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
+> -}
+> -
+> -static void pl061_irq_enable(struct irq_data *d)
+> -{
+> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
+> -	int offset = d->irq - chip->irq_base;
+> -	unsigned long flags;
+> -	u8 gpioie;
+> -
+> -	spin_lock_irqsave(&chip->irq_lock, flags);
+> -	gpioie = readb(chip->base + GPIOIE);
+> -	gpioie |= 1 << offset;
+> -	writeb(gpioie, chip->base + GPIOIE);
+> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
+> -}
+> -
+>  static int pl061_irq_type(struct irq_data *d, unsigned trigger)
 >  {
->  	const struct tegra_kbc_platform_data *pdata = pdev->dev.platform_data;
-> @@ -590,6 +640,9 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
->  	unsigned int scan_time_rows;
->  
->  	if (!pdata)
-> +		pdata = tegra_kbc_dt_parse_pdata(pdev);
-> +
-> +	if (!pdata)
+> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +	struct pl061_gpio *chip = gc->private;
+>  	int offset = d->irq - chip->irq_base;
+>  	unsigned long flags;
+>  	u8 gpiois, gpioibe, gpioiev;
+> @@ -166,7 +136,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
+>  	if (offset < 0 || offset >= PL061_GPIO_NR)
 >  		return -EINVAL;
 >  
->  	if (!tegra_kbc_check_pin_cfg(pdata, &pdev->dev, &num_rows))
-> @@ -671,7 +724,7 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
+> -	spin_lock_irqsave(&chip->irq_lock, flags);
+> +	raw_spin_lock_irqsave(&gc->lock, flags);
 >  
->  	kbc->use_fn_map = pdata->use_fn_map;
->  	kbc->use_ghost_filter = pdata->use_ghost_filter;
-> -	keymap_data = pdata->keymap_data ?: &tegra_kbc_default_keymap_data;
-> +	keymap_data = pdata->keymap_data ?: &default_keymap_data;
->  	matrix_keypad_build_keymap(keymap_data, KBC_ROW_SHIFT,
->  				   input_dev->keycode, input_dev->keybit);
+>  	gpioiev = readb(chip->base + GPIOIEV);
 >  
-> @@ -793,6 +846,12 @@ static int tegra_kbc_resume(struct device *dev)
+> @@ -195,18 +165,11 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
 >  
->  static SIMPLE_DEV_PM_OPS(tegra_kbc_pm_ops, tegra_kbc_suspend, tegra_kbc_resume);
+>  	writeb(gpioiev, chip->base + GPIOIEV);
 >  
-> +static const struct of_device_id tegra_kbc_of_match[] = {
-> +	{ .compatible = "nvidia,tegra20-kbc", },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, tegra_kbc_of_match);
+> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
+> +	raw_spin_unlock_irqrestore(&gc->lock, flags);
+>  
+>  	return 0;
+>  }
+>  
+> -static struct irq_chip pl061_irqchip = {
+> -	.name		= "GPIO",
+> -	.irq_enable	= pl061_irq_enable,
+> -	.irq_disable	= pl061_irq_disable,
+> -	.irq_set_type	= pl061_irq_type,
+> -};
+> -
+>  static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
+>  {
+>  	struct list_head *chip_list = irq_get_handler_data(irq);
+> @@ -232,6 +195,25 @@ static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
+>  	chained_irq_exit(irqchip, desc);
+>  }
+>  
+> +static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
+> +{
+> +	struct irq_chip_type *ct;
 > +
->  static struct platform_driver tegra_kbc_driver = {
->  	.probe		= tegra_kbc_probe,
->  	.remove		= __devexit_p(tegra_kbc_remove),
-> @@ -800,6 +859,7 @@ static struct platform_driver tegra_kbc_driver = {
->  		.name	= "tegra-kbc",
->  		.owner  = THIS_MODULE,
->  		.pm	= &tegra_kbc_pm_ops,
-> +		.of_match_table = tegra_kbc_of_match,
->  	},
->  };
+> +	chip->irq_gc = irq_alloc_generic_chip("gpio-pl061", 1, irq_base,
+> +					      chip->base, handle_simple_irq);
+> +	chip->irq_gc->private = chip;
+> +
+> +	ct = chip->irq_gc->chip_types;
+> +	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+> +	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+> +	ct->chip.irq_set_type = pl061_irq_type;
+> +	ct->chip.irq_set_wake = irq_gc_set_wake;
+> +	ct->regs.mask = GPIOIE;
+> +
+> +	irq_setup_generic_chip(chip->irq_gc, IRQ_MSK(PL061_GPIO_NR),
+> +			       IRQ_GC_INIT_NESTED_LOCK, IRQ_NOREQUEST, 0);
+> +}
+> +
+>  static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  {
+>  	struct pl061_platform_data *pdata;
+> @@ -269,7 +251,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  	}
 >  
+>  	spin_lock_init(&chip->lock);
+> -	spin_lock_init(&chip->irq_lock);
+>  	INIT_LIST_HEAD(&chip->list);
+>  
+>  	chip->gc.direction_input = pl061_direction_input;
+> @@ -293,6 +274,8 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  	if (chip->irq_base <= 0)
+>  		return 0;
+>  
+> +	pl061_init_gc(chip, chip->irq_base);
+> +
+>  	writeb(0, chip->base + GPIOIE); /* disable irqs */
+>  	irq = dev->irq[0];
+>  	if (irq < 0) {
+> @@ -321,11 +304,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  			else
+>  				pl061_direction_input(&chip->gc, i);
+>  		}
+> -
+> -		irq_set_chip_and_handler(i + chip->irq_base, &pl061_irqchip,
+> -					 handle_simple_irq);
+> -		set_irq_flags(i+chip->irq_base, IRQF_VALID);
+> -		irq_set_chip_data(i + chip->irq_base, chip);
+>  	}
+>  
+>  	return 0;
 > -- 
-> 1.7.8.GIT
+> 1.7.5.4
 > 
