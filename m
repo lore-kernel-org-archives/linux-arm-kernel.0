@@ -1,45 +1,28 @@
 From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Mon, 2 Jan 2012 17:33:10 +0100
-Subject: [PATCH] arm: Fix linux-next compile error in arch/arm/common/gic.c
-Message-ID: <1325521990-4445-1-git-send-email-joerg.roedel@amd.com>
+Date: Mon, 2 Jan 2012 17:35:05 +0100
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <20120102134229.GZ29877@amd.com>
+ <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
+Message-ID: <20120102163504.GC29877@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_SMP=n the following compile error occurs:
+On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
 
-  CC      arch/arm/common/gic.o
-arch/arm/common/gic.c: In function 'gic_init_bases':
-arch/arm/common/gic.c:679:4: error: implicit declaration of function 'cpu_logical_map' [-Werror=implicit-function-declaration]
-cc1: some warnings being treated as errors
+> Ok. I will check my configuration with linux-next git.
 
-This patch fixes the problem.
+Btw, after working around the #error problem and fixing another
+compile-error the same problem still appears with linux-next.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
----
- arch/arm/common/gic.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index b2dc2dd..b33f6b0 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -676,7 +676,10 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 		}
- 
- 		for_each_possible_cpu(cpu) {
--			unsigned long offset = percpu_offset * cpu_logical_map(cpu);
-+			unsigned long offset = percpu_offset;
-+#ifdef CONFIG_SMP
-+			offset *= cpu_logical_map(cpu);
-+#endif
- 			*per_cpu_ptr(gic->dist_base.percpu_base, cpu) = dist_base + offset;
- 			*per_cpu_ptr(gic->cpu_base.percpu_base, cpu) = cpu_base + offset;
- 		}
+	Joerg
+
 -- 
-1.7.5.4
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
