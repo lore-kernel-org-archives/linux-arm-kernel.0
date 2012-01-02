@@ -1,22 +1,59 @@
 From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 2 Jan 2012 10:31:04 +0100
-Subject: [PATCH v4 0/2] Add support form eMMa-PrP in i.MX2 chips as a
- mem2mem device.
-In-Reply-To: <1323690225-15799-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1323690225-15799-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <CACKLOr1RujFbuTnF=DkCTB=paVUq7=j1Ru_RU7DWyuJedM+Cvg@mail.gmail.com>
+Date: Mon, 2 Jan 2012 11:08:17 +0100
+Subject: [PATCH] dmaengine: Add support for MEMCPY for imx-dma.
+In-Reply-To: <1324661918.1633.35.camel@vkoul-udesk3>
+References: <1324051191-19507-1-git-send-email-javier.martin@vista-silicon.com>
+ <1324661918.1633.35.camel@vkoul-udesk3>
+Message-ID: <CACKLOr0fVMknA+HAbgn3d9_f9tdz4L2Z9Bx4yMU7eLmr1mdXBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-do you have any more concerns or comments on this patch?
-I can't find it in media_tree. Has it been merged somewhere else?
+Hi Vinod,
+thank you for your review.
 
-Thank you.
+On 23 December 2011 18:38, Vinod Koul <vinod.koul@intel.com> wrote:
+>> @@ -328,6 +329,37 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+>> ? ? ? return &imxdmac->desc;
+>> ?}
+>>
+>> +static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+>> + ? ? struct dma_chan *chan, dma_addr_t dest,
+>> + ? ? dma_addr_t src, size_t len, unsigned long flags)
+>> +{
+>> + ? ? struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+>> + ? ? struct imxdma_engine *imxdma = imxdmac->imxdma;
+>> + ? ? int ret;
+>> +
+>> + ? ? dev_dbg(imxdma->dev, "%s channel: %d src=0x%x dst=0x%x len=%d\n",
+>> + ? ? ? ? ? ? ? ? ? ? __func__, imxdmac->channel, src, dest, len);
+>> +
+>> + ? ? if (imxdmac->status == DMA_IN_PROGRESS)
+>> + ? ? ? ? ? ? return NULL;
+>> +
+>> + ? ? imxdmac->status = DMA_IN_PROGRESS;
+> why? prepare doesn't mean DMA is in progress. You can get multiple
+> descriptors for same channel by calling prepare multiple times.
+> Even one descriptor can be memcpy whereas other is slave...
+> In issue_pending this should be moved to DMA_IN_PROGRESS
+
+According to the original developer of this file it only supports a
+single descriptor. Please, take a look at the following function:
+
+static void imxdma_issue_pending(struct dma_chan *chan)
+{
+	/*
+	 * Nothing to do. We only have a single descriptor
+	 */
+}
 
 
+Also, the same behavior is present in the other prepare functions:
+"imxdma_prep_slave_sg" and "imxdma_prep_dma_cyclic".
 
--- 
+I think the less painful approach here is merging my patch so that
+multiple descriptors support can be added later.
+
+--
 Javier Martin
 Vista Silicon S.L.
 CDTUC - FASE C - Oficina S-345
