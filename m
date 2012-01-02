@@ -1,57 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Jan 2012 14:39:05 +0000
-Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
-In-Reply-To: <CAH8gqwXopRx7_-wSq9djb_np+XeZE0w1HJ1XxZozGOBCF8Z+ZQ@mail.gmail.com>
-References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
- <20111230103026.GA2766@opensource.wolfsonmicro.com>
- <20111230103830.GD2414@b20223-02.ap.freescale.net>
- <20111230104850.GE2766@opensource.wolfsonmicro.com>
- <20111230110842.GE2414@b20223-02.ap.freescale.net>
- <20111231010240.GC5835@opensource.wolfsonmicro.com>
- <20111231012629.GF2414@b20223-02.ap.freescale.net>
- <20111231215925.GA12740@opensource.wolfsonmicro.com>
- <CAH8gqwXopRx7_-wSq9djb_np+XeZE0w1HJ1XxZozGOBCF8Z+ZQ@mail.gmail.com>
-Message-ID: <20120102143904.GQ4300@opensource.wolfsonmicro.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 2 Jan 2012 17:18:05 +0200
+Subject: [PATCH v1 3/3] arm/tegra: enable tegra30 clock framework
+In-Reply-To: <1325517486-22458-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1325517486-22458-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1325517486-22458-4-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2012 at 09:46:01PM +0800, Richard Zhao wrote:
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/Makefile |    1 +
+ arch/arm/mach-tegra/clock.h  |    1 +
+ arch/arm/mach-tegra/common.c |    1 +
+ 3 files changed, 3 insertions(+), 0 deletions(-)
 
-> On 1 January 2012 05:59, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-
-> > It's not code which is specific to the fixed regulator, it's generic
-> > code that's used by all regulators.
-
-> The original patch is in fixed regulator driver.
-
-Your original patch made no mention of device tree, it just had the
-driver modify its constraints which is clearly not good - aside from the
-design issue what happens if we make const data read only?  Any boards
-that have their constraints marked const will start oopsing.  Your new
-patch makes it impossible to apply a voltage to *any* regulator on a
-device tree which is going to break any system that needs to apply a
-voltage.
-
-You really need to take a step back, think about the consequences of the
-changes you're making and make changes that also make sense at a design
-level.  You can't think only about the one board that you're currently
-working on, it's important that you consider the wider effects of your
-change.
-
-To repeat my previous suggestions you could either make the system more
-forgiving of silly constraints where that makes sense (and remember that
-one of the reasons the core rejects silly constraints is that it wants
-to make absolutely clear that the user wrote what they meant) or make
-sure that silly constraints aren't written in the first place.  For
-example, why not make this a device tree specific change?
-
-> >> Could you please past some code to show your suggested solution,
-> >> or you send out a patch to fix it?
-
-> > Not in the immediate future.
-
-> It's a __bug__ blocking others to use fixed regulator with dt binding.
-
-There's some fairly clear and obvious directions to look at and simply
-demanding that I drop everything and implement them for you too isn't
-really inspiring me to do so.
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index d9bf7c1..c763eb7 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-tegra20-tables.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= pinmux-tegra30-tables.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
++obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_clocks.o
+ obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+ obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
+diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
+index 18f8b85..bc30065 100644
+--- a/arch/arm/mach-tegra/clock.h
++++ b/arch/arm/mach-tegra/clock.h
+@@ -160,6 +160,7 @@ struct tegra_clk_init_table {
+ };
+ 
+ void tegra2_init_clocks(void);
++void tegra30_init_clocks(void);
+ void clk_init(struct clk *clk);
+ struct clk *tegra_get_clock_by_name(const char *name);
+ int clk_reparent(struct clk *c, struct clk *parent);
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 72b666b..1a752e5 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -107,6 +107,7 @@ void __init tegra20_init_early(void)
+ #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+ void __init tegra30_init_early(void)
+ {
++	tegra30_init_clocks();
+ 	tegra_init_cache(0x441, 0x551);
+ }
+ #endif
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
