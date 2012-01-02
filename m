@@ -1,61 +1,57 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 02 Jan 2012 15:21:48 +0100
-Subject: [PATCH] at91: fix at91rm9200 soc subtype handling
-In-Reply-To: <1325070604-5560-1-git-send-email-veli-pekka.peltola@bluegiga.com>
-References: <1325070604-5560-1-git-send-email-veli-pekka.peltola@bluegiga.com>
-Message-ID: <4F01BD7C.6000902@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 2 Jan 2012 14:39:05 +0000
+Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
+In-Reply-To: <CAH8gqwXopRx7_-wSq9djb_np+XeZE0w1HJ1XxZozGOBCF8Z+ZQ@mail.gmail.com>
+References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
+ <20111230103026.GA2766@opensource.wolfsonmicro.com>
+ <20111230103830.GD2414@b20223-02.ap.freescale.net>
+ <20111230104850.GE2766@opensource.wolfsonmicro.com>
+ <20111230110842.GE2414@b20223-02.ap.freescale.net>
+ <20111231010240.GC5835@opensource.wolfsonmicro.com>
+ <20111231012629.GF2414@b20223-02.ap.freescale.net>
+ <20111231215925.GA12740@opensource.wolfsonmicro.com>
+ <CAH8gqwXopRx7_-wSq9djb_np+XeZE0w1HJ1XxZozGOBCF8Z+ZQ@mail.gmail.com>
+Message-ID: <20120102143904.GQ4300@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/28/2011 12:10 PM, Veli-Pekka Peltola :
-> BGA should be the default SoC subtype but it is set to unknown if
-> not explicitly set to PQFP. Currently setting it to PQFP sets subtype
-> to BGA as subtypes are swapped in at91rm9200_set_type().
-> 
-> Wrong subtype causes GPIO bank D not to work at all.
-> 
-> After this fix BGA subtype is set as default. On boot BGA is printed
-> always but it is set to PQFP if requested before setting amount of GPIO
-> banks.
-> 
-> Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
+On Mon, Jan 02, 2012 at 09:46:01PM +0800, Richard Zhao wrote:
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> On 1 January 2012 05:59, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-I will queue it in a "fixes" branch (hopefully for 3.3).
+> > It's not code which is specific to the fixed regulator, it's generic
+> > code that's used by all regulators.
 
-thanks a lot. Best regards,
+> The original patch is in fixed regulator driver.
 
+Your original patch made no mention of device tree, it just had the
+driver modify its constraints which is clearly not good - aside from the
+design issue what happens if we make const data read only?  Any boards
+that have their constraints marked const will start oopsing.  Your new
+patch makes it impossible to apply a voltage to *any* regulator on a
+device tree which is going to break any system that needs to apply a
+voltage.
 
-> ---
->  arch/arm/mach-at91/setup.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index aa64294..e6b07ad 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -27,9 +27,9 @@ EXPORT_SYMBOL(at91_soc_initdata);
->  void __init at91rm9200_set_type(int type)
->  {
->  	if (type == ARCH_REVISON_9200_PQFP)
-> -		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
-> -	else
->  		at91_soc_initdata.subtype = AT91_SOC_RM9200_PQFP;
-> +	else
-> +		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
->  }
->  
->  void __init at91_init_irq_default(void)
-> @@ -118,6 +118,7 @@ static void __init soc_detect(u32 dbgu_base)
->  
->  	case ARCH_ID_AT91RM9200:
->  		at91_soc_initdata.type = AT91_SOC_RM9200;
-> +		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
->  		at91_boot_soc = at91rm9200_soc;
->  		break;
->  
+You really need to take a step back, think about the consequences of the
+changes you're making and make changes that also make sense at a design
+level.  You can't think only about the one board that you're currently
+working on, it's important that you consider the wider effects of your
+change.
 
+To repeat my previous suggestions you could either make the system more
+forgiving of silly constraints where that makes sense (and remember that
+one of the reasons the core rejects silly constraints is that it wants
+to make absolutely clear that the user wrote what they meant) or make
+sure that silly constraints aren't written in the first place.  For
+example, why not make this a device tree specific change?
 
--- 
-Nicolas Ferre
+> >> Could you please past some code to show your suggested solution,
+> >> or you send out a patch to fix it?
+
+> > Not in the immediate future.
+
+> It's a __bug__ blocking others to use fixed regulator with dt binding.
+
+There's some fairly clear and obvious directions to look at and simply
+demanding that I drop everything and implement them for you too isn't
+really inspiring me to do so.
