@@ -1,64 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 2 Jan 2012 13:59:10 +0100
-Subject: snowball does not compile on linux-next
-In-Reply-To: <4F0199CF.2070806@linaro.org>
-References: <4F0199CF.2070806@linaro.org>
-Message-ID: <CACRpkdbn6H_s8oC3VdqH2CoCZcPkc+hYccLE1UQJZnqB5eSf3Q@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Mon, 2 Jan 2012 14:14:16 +0100
+Subject: [PATCH 12/12] ARM: restart: S3C24XX: use new restart hook
+In-Reply-To: <4EF08F02.9010604@samsung.com>
+References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
+ <201112201418.07935.heiko@sntech.de> <4EF08F02.9010604@samsung.com>
+Message-ID: <201201021414.17551.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 2, 2012 at 12:49 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
+Hi Kgene,
 
-> the kernel does not compile when
-> CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK is set.
->
-> it fails with :
->
-> ?CHK ? ? include/linux/version.h
-> ?CHK ? ? include/generated/utsrelease.h
-> make[1]: `include/generated/mach-types.h' is up to date.
-> ?CALL ? ?scripts/checksyscalls.sh
-> ?CHK ? ? include/generated/compile.h
-> ?CC ? ? ?drivers/clocksource/clksrc-dbx500-prcmu.o
-> drivers/clocksource/clksrc-dbx500-prcmu.c:61: warning: type defaults
-> to ?int? in declaration of ?DEFINE_CLOCK_DATA?
-> drivers/clocksource/clksrc-dbx500-prcmu.c:61: warning: parameter names
-> (without types) in function declaration
-> drivers/clocksource/clksrc-dbx500-prcmu.c: In function ?sched_clock?:
-> drivers/clocksource/clksrc-dbx500-prcmu.c:72: error: implicit
-> declaration of function ?cyc_to_sched_clock?
-> drivers/clocksource/clksrc-dbx500-prcmu.c:72: error: ?cd? undeclared
-> (first use in this function)
-> drivers/clocksource/clksrc-dbx500-prcmu.c:72: error: (Each undeclared
-> identifier is reported only once
-> drivers/clocksource/clksrc-dbx500-prcmu.c:72: error: for each function
-> it appears in.)
-> drivers/clocksource/clksrc-dbx500-prcmu.c: In function
-> ?clksrc_dbx500_prcmu_update_sched_clock?:
-> drivers/clocksource/clksrc-dbx500-prcmu.c:78: error: implicit
-> declaration of function ?update_sched_clock?
-> drivers/clocksource/clksrc-dbx500-prcmu.c:78: error: ?cd? undeclared
-> (first use in this function)
-> drivers/clocksource/clksrc-dbx500-prcmu.c: In function
-> ?clksrc_dbx500_prcmu_init?:
-> drivers/clocksource/clksrc-dbx500-prcmu.c:100: error: implicit
-> declaration of function ?init_sched_clock?
-> drivers/clocksource/clksrc-dbx500-prcmu.c:100: error: ?cd? undeclared
-> (first use in this function)
-> make[2]: *** [drivers/clocksource/clksrc-dbx500-prcmu.o] Error 1
-> make[1]: *** [drivers/clocksource] Error 2
-> make[1]: *** Waiting for unfinished jobs....
-> make: *** [drivers] Error 2
-> make: *** Waiting for unfinished jobs....
->
-> Is it dead code ?
+Am Dienstag, 20. Dezember 2011, 14:34:58 schrieb Kukjin Kim:
+> On 12/20/11 22:18, Heiko St?bner wrote:
+> > Am Dienstag, 20. Dezember 2011, 13:48:36 schrieb Kukjin Kim:
+> >> Hook these platforms restart code into the new restart hook rather
+> >> than using arch_reset().
+> >> And adds local header file, common.h in arch/arm/mach-s3c2410/ and
+> >> arch/arm/mach-s3c2440/ directories.
+> >> 
+> >> Cc: Ben Dooks<ben-linux@fluff.org>
+> >> Cc: Russell King<rmk+kernel@arm.linux.org.uk>
+> >> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+> > 
+> > just for my understanding would it not also be possible to move the
+> > function prototype to plat-samsung/include/plat/s3c2410.h and s3c244x.h?
+> 
+> Yeah, we have many choices about that and I will sort out the
+> mach-s3c24.. directories to mach-s3c24xx or just mach-s3c...
+> 
+> > Or should these files vanish in the long run?
+> 
+> Yes, as per Russell's suggestion, I think we don't need that and as a
+> note, I'm working on removing plat-s3c24xx and plat-s5p, just keeping
+> one plat-samsung.
 
-No if it was dead it shouldn't get compiled.
+I'm currently working on introducing a power-domain for the usb-phy of the 
+S3C2443/S3C2416/S3C2450. This is one step mimicing the work of Mark Brown to 
+get better idle handling later on, and also again reduces the number of 
+architecture-calls the hsudc driver does, as requested by Felipe Balbi.
 
-It' probably just some fallout from Marc's rewrite of the
-sched_clock() stuff, I'll see if I can cook a patch and
-send off to Marc.
+Therefore I'm introducing a new s3c2443-pm-common.c. Question now is, should 
+this move directly to plat-samsung?
 
-Yours,
-Linus Walleij
+Thanks
+Heiko
