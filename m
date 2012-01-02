@@ -1,38 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 1 Jan 2012 23:01:27 -0800
-Subject: Circular dependency between <linux/kernel.h> and <asm/bug.h> on
- ARM
-In-Reply-To: <1325472276.13595.200.camel@deadeye>
-References: <1325472276.13595.200.camel@deadeye>
-Message-ID: <CAOesGMgXRev24e0bmGD71J04=Aon7bs0YeK7mwX8Na12uR_b6A@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 2 Jan 2012 00:21:21 -0700
+Subject: [PATCH] Input: keyboard - add device tree bindings for simple
+ key matrixes
+In-Reply-To: <CAOesGMjZoP+FsGWo9cWKvgs8KD9tT6KBHbK5qKX8NTGOY3HUjQ@mail.gmail.com>
+References: <1325112771-31941-1-git-send-email-olof@lixom.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17755DC8D2@HQMAIL01.nvidia.com>
+ <CAOesGMiNuW3mexN_8PtunZkaVX4Uph-OgZFr5zLhaB1nih_EEw@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17755DC8DB@HQMAIL01.nvidia.com>
+ <CAOesGMjZoP+FsGWo9cWKvgs8KD9tT6KBHbK5qKX8NTGOY3HUjQ@mail.gmail.com>
+Message-ID: <20120102072121.GB13015@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 1, 2012 at 6:44 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
-> Commit 87e040b6456fd3416a1f6831c1eedaef5c0a94ff ("ARM: 7017/1: Use
-> generic BUG() handler") makes BUG() use BUILD_BUG_ON(). ?However,
-> BUILD_BUG_ON() is not defined in <linux/bug.h> but in <linux/kernel.h>.
->
-> arch/include/asm/bug.h does not include <linux/kernel.h> and *cannot* do
-> so because the latter already includes <asm/bug.h>.
+On Wed, Dec 28, 2011 at 11:06:02PM -0800, Olof Johansson wrote:
+> On Wed, Dec 28, 2011 at 11:01 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> > Can we deprecate the Samsung format, and only allow it for that Samsung
+> > device (and allow both there), and require a single format for any other
+> > keyboard?
+> 
+> I'm definitely ok with that. Thomas, Grant, Rob? The code in question
+> is queued for 3.3, so it hasn't been out in a real release yet.
+> 
+> Adding Kukjin as well since it's getting merged through his tree.
 
-Sure it can, but it's not ideal. Since the BUILD_BUG_ON is only used
-in bug.h in a #define, it will be resolved below the includes of
-either so there should be no ordering issue between the two.
+Yeah, I'm okay with that.
 
-I coincidentally posted a patch earlier to do just that, I didn't see
-your email until later.
+BTW, please drop the "compatible" value for this binding.  This binding
+describes a common way of describing key mappings, but it isn't a complete
+device binding in and of itself.  Rather, it is a binding used by other
+bindings; and as such no driver should ever bind against it directly.  The
+samsung driver can continue to use the other format if it so desires; there
+is no harm in it doing so.
 
-> Maybe BUILD_BUG_ON() should be moved out to a header of its own, or else
-> this particular use should be moved to some other file. ?This needs to
-> be fixed somehow, as it obviously leads to build failures, e.g.:
->
-> https://buildd.debian.org/status/fetch.php?pkg=linux-2.6&arch=armel&ver=3.2~rc7-1~experimental.1&stamp=1325142904
+Instead, a driver that expects the binding can just call the
+matrix_keyboard_of_fill_keymap() library function without checking
+the compatible list.
 
-Or perhaps moving BUILD_BUG_ON to include/linux/bug.h?
-
-The quickest fix for now might be to take out the BUILD_BUG_ON(),
-especially so close to 3.2-final.
-
-
--Olof
+g.
