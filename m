@@ -1,40 +1,35 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 2 Jan 2012 02:04:54 -0700
-Subject: [PATCH v4 03/12] mfd: twl-core: Add initial DT support for
- twl4030/twl6030
-In-Reply-To: <1324565806-31142-4-git-send-email-b-cousson@ti.com>
-References: <1324565806-31142-1-git-send-email-b-cousson@ti.com>
- <1324565806-31142-4-git-send-email-b-cousson@ti.com>
-Message-ID: <20120102090454.GO18381@ponder.secretlab.ca>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Mon, 2 Jan 2012 09:25:34 +0000
+Subject: [PATCH v8 19/20] OMAP2+: UART: Do not gate uart clocks if used
+ for debug_prints
+In-Reply-To: <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
+References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
+ <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D1214304B3E2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 03:56:37PM +0100, Benoit Cousson wrote:
-> Add initial device-tree support for twl familly chips.
-> The current version is missing the regulator entries due
-> to the lack of DT regulator bindings for the moment.
-> Only the simple sub-modules that do not depend on
-> platform_data information can be initialized properly.
-> 
-> Add irqdomain support.
-> 
-> Add documentation for the Texas Instruments TWL Integrated Chip.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Balaji T K <balajitk@ti.com>
-> Cc: Graeme Gregory <gg@slimlogic.co.uk>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> ---
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index f1391c2..f0de088 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -200,6 +200,7 @@ config MENELAUS
->  config TWL4030_CORE
->  	bool "Texas Instruments TWL4030/TWL5030/TWL6030/TPS659x0 Support"
->  	depends on I2C=y && GENERIC_HARDIRQS
-> +	select IRQ_DOMAIN
+Hello,
 
-As discussed on linux-next, this breaks powerpc.  Drivers cannot select
-IRQ_DOMAIN, it can only be selected by architectures.  Drivers must depend
-on it instead.
+On Fri, Nov 11, 2011 at 15:31:52, R, Govindraj wrote:
+[...]
+>  
+> -	if ((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
+> +	if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
+> +			&& !uart_debug)
+>  		device_init_wakeup(&pdev->dev, true);
+>  }
+
+I was testing this on AM335x and realized that this leads to creation of two
+'wakeup' entries for UART. One is created by the tty layer in serial-core.c
+and the other is created here.
+
+Here's what I see on a branch based on Tony's 3.2-rc6:
+
+./sys/devices/platform/omap/omap_uart.0/power/wakeup
+./sys/devices/platform/omap/omap_uart.0/tty/ttyO0/power/wakeup
+
+Shouldn't the OMAP serial just enable the 'wakeup' entry created by serial-core.c?
+
+Regards,
+Vaibhav
