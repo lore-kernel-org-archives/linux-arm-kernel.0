@@ -1,62 +1,18 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 2 Jan 2012 14:23:03 +0100
-Subject: [PATCH] clocksource/ux500-prcmu: fix sched_clock breakage
-Message-ID: <1325510583-4487-1-git-send-email-linus.walleij@stericsson.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 2 Jan 2012 13:26:31 +0000
+Subject: [PATCH 12/12] ARM: restart: S3C24XX: use new restart hook
+In-Reply-To: <201201021414.17551.heiko@sntech.de>
+References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
+ <201112201418.07935.heiko@sntech.de> <4EF08F02.9010604@samsung.com>
+ <201201021414.17551.heiko@sntech.de>
+Message-ID: <20120102132631.GC18443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 2f0778afac79bd8d226225556858a636931eeabc adding
-runtime-selectable sched_clock() forgot to patch this
-driver down in drivers/clocksource, this patch fixes
-the problem.
+On Mon, Jan 02, 2012 at 02:14:16PM +0100, Heiko St?bner wrote:
 
-Reported-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/clocksource/clksrc-dbx500-prcmu.c |   16 +++-------------
- 1 files changed, 3 insertions(+), 13 deletions(-)
+> Therefore I'm introducing a new s3c2443-pm-common.c. Question now is, should 
+> this move directly to plat-samsung?
 
-diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-index 59feefe..fb6b6d2 100644
---- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-+++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-@@ -58,25 +58,15 @@ static struct clocksource clocksource_dbx500_prcmu = {
- };
- 
- #ifdef CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK
--static DEFINE_CLOCK_DATA(cd);
- 
--unsigned long long notrace sched_clock(void)
-+static u32 notrace dbx500_prcmu_sched_clock_read(void)
- {
--	u32 cyc;
--
- 	if (unlikely(!clksrc_dbx500_timer_base))
- 		return 0;
- 
--	cyc = clksrc_dbx500_prcmu_read(&clocksource_dbx500_prcmu);
--
--	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
-+	return clksrc_dbx500_prcmu_read(&clocksource_dbx500_prcmu);
- }
- 
--static void notrace clksrc_dbx500_prcmu_update_sched_clock(void)
--{
--	u32 cyc = clksrc_dbx500_prcmu_read(&clocksource_dbx500_prcmu);
--	update_sched_clock(&cd, cyc, (u32)~0);
--}
- #endif
- 
- void __init clksrc_dbx500_prcmu_init(void __iomem *base)
-@@ -97,7 +87,7 @@ void __init clksrc_dbx500_prcmu_init(void __iomem *base)
- 		       clksrc_dbx500_timer_base + PRCMU_TIMER_REF);
- 	}
- #ifdef CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK
--	init_sched_clock(&cd, clksrc_dbx500_prcmu_update_sched_clock,
-+	setup_sched_clock(dbx500_prcmu_sched_clock_read,
- 			 32, RATE_32K);
- #endif
- 	clocksource_calc_mult_shift(&clocksource_dbx500_prcmu,
--- 
-1.7.8
+If it's s3c2443 specific I'd expect it'd end up in the relevant mach
+directory?
