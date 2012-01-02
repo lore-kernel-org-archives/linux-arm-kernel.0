@@ -1,194 +1,158 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 2 Jan 2012 01:54:33 -0700
-Subject: [PATCH v2] gpio: pl061: convert to use generic irq chip
-In-Reply-To: <1324327927-6886-1-git-send-email-robherring2@gmail.com>
-References: <1323876538-20406-8-git-send-email-robherring2@gmail.com>
- <1324327927-6886-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120102085433.GJ18381@ponder.secretlab.ca>
+Date: Mon, 2 Jan 2012 02:00:36 -0700
+Subject: [PATCH 7/9] arm/tegra: emc: device tree bindings
+In-Reply-To: <1324599468-12845-8-git-send-email-olof@lixom.net>
+References: <1324599468-12845-1-git-send-email-olof@lixom.net>
+ <1324599468-12845-8-git-send-email-olof@lixom.net>
+Message-ID: <20120102090036.GM18381@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 02:52:07PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Thu, Dec 22, 2011 at 04:17:46PM -0800, Olof Johansson wrote:
+> Device tree bindings for the EMC tables on tegra.
 > 
-> Convert the pl061 irq_chip code to use the generic irq chip code.
-> 
-> This has the side effect of using 32-bit accesses rather than 8-bit
-> accesses to interrupt registers. The h/w TRM and testing seem to indicate
-> this is fine.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Linus Walleij <linus.ml.walleij@gmail.com>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
 
-What does this apply against?  It doesn't apply cleanly.
+Okay by me.
 
-g.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
 > ---
-> v2:
-> - put struct irq_chip_generic pointer into struct pl061_gpio instead of domain
-> ptr.
+>  .../devicetree/bindings/arm/tegra/emc.txt          |  100 ++++++++++++++++++++
+>  arch/arm/boot/dts/tegra20.dtsi                     |    7 ++
+>  2 files changed, 107 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/tegra/emc.txt
 > 
->  drivers/gpio/Kconfig      |    1 +
->  drivers/gpio/gpio-pl061.c |   74 ++++++++++++++++-----------------------------
->  2 files changed, 27 insertions(+), 48 deletions(-)
-> 
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index 8482a23..4d433e2 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -138,6 +138,7 @@ config GPIO_MXS
->  config GPIO_PL061
->  	bool "PrimeCell PL061 GPIO support"
->  	depends on ARM_AMBA
-> +	select GENERIC_IRQ_CHIP
->  	help
->  	  Say yes here to support the PrimeCell PL061 GPIO device
->  
-> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-> index fe19dec..96ff6b2 100644
-> --- a/drivers/gpio/gpio-pl061.c
-> +++ b/drivers/gpio/gpio-pl061.c
-> @@ -50,10 +50,10 @@ struct pl061_gpio {
->  	 * the IRQ code simpler.
->  	 */
->  	spinlock_t		lock;		/* GPIO registers */
-> -	spinlock_t		irq_lock;	/* IRQ registers */
->  
->  	void __iomem		*base;
->  	int			irq_base;
-> +	struct irq_chip_generic	*irq_gc;
->  	struct gpio_chip	gc;
->  };
->  
-> @@ -125,40 +125,10 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
->  	return chip->irq_base + offset;
->  }
->  
-> -/*
-> - * PL061 GPIO IRQ
-> - */
-> -static void pl061_irq_disable(struct irq_data *d)
-> -{
-> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
-> -	int offset = d->irq - chip->irq_base;
-> -	unsigned long flags;
-> -	u8 gpioie;
-> -
-> -	spin_lock_irqsave(&chip->irq_lock, flags);
-> -	gpioie = readb(chip->base + GPIOIE);
-> -	gpioie &= ~(1 << offset);
-> -	writeb(gpioie, chip->base + GPIOIE);
-> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
-> -}
-> -
-> -static void pl061_irq_enable(struct irq_data *d)
-> -{
-> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
-> -	int offset = d->irq - chip->irq_base;
-> -	unsigned long flags;
-> -	u8 gpioie;
-> -
-> -	spin_lock_irqsave(&chip->irq_lock, flags);
-> -	gpioie = readb(chip->base + GPIOIE);
-> -	gpioie |= 1 << offset;
-> -	writeb(gpioie, chip->base + GPIOIE);
-> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
-> -}
-> -
->  static int pl061_irq_type(struct irq_data *d, unsigned trigger)
->  {
-> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> +	struct pl061_gpio *chip = gc->private;
->  	int offset = d->irq - chip->irq_base;
->  	unsigned long flags;
->  	u8 gpiois, gpioibe, gpioiev;
-> @@ -166,7 +136,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
->  	if (offset < 0 || offset >= PL061_GPIO_NR)
->  		return -EINVAL;
->  
-> -	spin_lock_irqsave(&chip->irq_lock, flags);
-> +	raw_spin_lock_irqsave(&gc->lock, flags);
->  
->  	gpioiev = readb(chip->base + GPIOIEV);
->  
-> @@ -195,18 +165,11 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
->  
->  	writeb(gpioiev, chip->base + GPIOIEV);
->  
-> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
-> +	raw_spin_unlock_irqrestore(&gc->lock, flags);
->  
->  	return 0;
->  }
->  
-> -static struct irq_chip pl061_irqchip = {
-> -	.name		= "GPIO",
-> -	.irq_enable	= pl061_irq_enable,
-> -	.irq_disable	= pl061_irq_disable,
-> -	.irq_set_type	= pl061_irq_type,
-> -};
-> -
->  static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
->  {
->  	struct list_head *chip_list = irq_get_handler_data(irq);
-> @@ -232,6 +195,25 @@ static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
->  	chained_irq_exit(irqchip, desc);
->  }
->  
-> +static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
-> +{
-> +	struct irq_chip_type *ct;
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/emc.txt b/Documentation/devicetree/bindings/arm/tegra/emc.txt
+> new file mode 100644
+> index 0000000..09335f8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/tegra/emc.txt
+> @@ -0,0 +1,100 @@
+> +Embedded Memory Controller
 > +
-> +	chip->irq_gc = irq_alloc_generic_chip("gpio-pl061", 1, irq_base,
-> +					      chip->base, handle_simple_irq);
-> +	chip->irq_gc->private = chip;
+> +Properties:
+> +- name : Should be emc
+> +- #address-cells : Should be 1
+> +- #size-cells : Should be 0
+> +- compatible : Should contain "nvidia,tegra20-emc".
+> +- reg : Offset and length of the register set for the device
+> +- nvidia,use-ram-code : If present, the sub-nodes will be addressed
+> +  and chosen using the ramcode board selector. If omitted, only one
+> +  set of tables can be present and said tables will be used
+> +  irrespective of ram-code configuration.
 > +
-> +	ct = chip->irq_gc->chip_types;
-> +	ct->chip.irq_mask = irq_gc_mask_clr_bit;
-> +	ct->chip.irq_unmask = irq_gc_mask_set_bit;
-> +	ct->chip.irq_set_type = pl061_irq_type;
-> +	ct->chip.irq_set_wake = irq_gc_set_wake;
-> +	ct->regs.mask = GPIOIE;
+> +Child device nodes describe the memory settings for different configurations and clock rates.
 > +
-> +	irq_setup_generic_chip(chip->irq_gc, IRQ_MSK(PL061_GPIO_NR),
-> +			       IRQ_GC_INIT_NESTED_LOCK, IRQ_NOREQUEST, 0);
-> +}
+> +Example:
 > +
->  static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  {
->  	struct pl061_platform_data *pdata;
-> @@ -269,7 +251,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  	}
->  
->  	spin_lock_init(&chip->lock);
-> -	spin_lock_init(&chip->irq_lock);
->  	INIT_LIST_HEAD(&chip->list);
->  
->  	chip->gc.direction_input = pl061_direction_input;
-> @@ -293,6 +274,8 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  	if (chip->irq_base <= 0)
->  		return 0;
->  
-> +	pl061_init_gc(chip, chip->irq_base);
+> +	emc at 7000f400 {
+> +		#address-cells = < 1 >;
+> +		#size-cells = < 0 >;
+> +		compatible = "nvidia,tegra20-emc";
+> +		reg = <0x7000f4000 0x200>;
+> +	}
 > +
->  	writeb(0, chip->base + GPIOIE); /* disable irqs */
->  	irq = dev->irq[0];
->  	if (irq < 0) {
-> @@ -321,11 +304,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  			else
->  				pl061_direction_input(&chip->gc, i);
->  		}
-> -
-> -		irq_set_chip_and_handler(i + chip->irq_base, &pl061_irqchip,
-> -					 handle_simple_irq);
-> -		set_irq_flags(i+chip->irq_base, IRQF_VALID);
-> -		irq_set_chip_data(i + chip->irq_base, chip);
->  	}
+> +
+> +Embedded Memory Controller ram-code table
+> +
+> +If the emc node has the nvidia,use-ram-code property present, then the
+> +next level of nodes below the emc table are used to specify which settings
+> +apply for which ram-code settings.
+> +
+> +If the emc node lacks the nvidia,use-ram-code property, this level is omitted
+> +and the tables are stored directly under the emc node (see below).
+> +
+> +Properties:
+> +
+> +- name : Should be emc-tables
+> +- nvidia,ram-code : the binary representation of the ram-code board strappings
+> +  for which this node (and children) are valid.
+> +
+> +
+> +
+> +Embedded Memory Controller configuration table
+> +
+> +This is a table containing the EMC register settings for the various
+> +operating speeds of the memory controller. They are always located as
+> +subnodes of the emc controller node.
+> +
+> +There are two ways of specifying which tables to use:
+> +
+> +* The simplest is if there is just one set of tables in the device tree,
+> +  and they will always be used (based on which frequency is used).
+> +  This is the preferred method, especially when firmware can fill in
+> +  this information based on the specific system information and just
+> +  pass it on to the kernel.
+> +
+> +* The slightly more complex one is when more than one memory configuration
+> +  might exist on the system.  The Tegra20 platform handles this during
+> +  early boot by selecting one out of possible 4 memory settings based
+> +  on a 2-pin "ram code" bootstrap setting on the board. The values of
+> +  these strappings can be read through a register in the SoC, and thus
+> +  used to select which tables to use.
+> +
+> +Properties:
+> +- name : Should be emc-table
+> +- compatible : Should contain "nvidia,tegra20-emc-table".
+> +- reg : either an opaque enumerator to tell different tables apart, or
+> +  the valid frequency for which the table should be used (in kHz).
+> +- clock-frequency : the clock frequency for the EMC at which this
+> +  table should be used (in kHz).
+> +- nvidia,emc-registers : a 46 word array of EMC registers to be programmed
+> +  for operation at the 'clock-frequency' setting.
+> +  The order and contents of the registers are:
+> +    RC, RFC, RAS, RP, R2W, W2R, R2P, W2P, RD_RCD, WR_RCD, RRD, REXT,
+> +    WDV, QUSE, QRST, QSAFE, RDV, REFRESH, BURST_REFRESH_NUM, PDEX2WR,
+> +    PDEX2RD, PCHG2PDEN, ACT2PDEN, AR2PDEN, RW2PDEN, TXSR, TCKE, TFAW,
+> +    TRPAB, TCLKSTABLE, TCLKSTOP, TREFBW, QUSE_EXTRA, FBIO_CFG6, ODT_WRITE,
+> +    ODT_READ, FBIO_CFG5, CFG_DIG_DLL, DLL_XFORM_DQS, DLL_XFORM_QUSE,
+> +    ZCAL_REF_CNT, ZCAL_WAIT_CNT, AUTO_CAL_INTERVAL, CFG_CLKTRIM_0,
+> +    CFG_CLKTRIM_1, CFG_CLKTRIM_2
+> +
+> +		emc-table at 166000 {
+> +			reg = <166000>;
+> +			compatible = "nvidia,tegra20-emc-table";
+> +			clock-frequency = < 166000 >;
+> +			nvidia,emc-registers = < 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+> +						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+> +						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+> +						 0 0 0 0 >;
+> +		};
+> +
+> +		emc-table at 333000 {
+> +			reg = <333000>;
+> +			compatible = "nvidia,tegra20-emc-table";
+> +			clock-frequency = < 333000 >;
+> +			nvidia,emc-registers = < 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+> +						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+> +						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+> +						 0 0 0 0 >;
+> +		};
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index 3da7afd..c162241 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -120,6 +120,13 @@
+>  		interrupts = < 0 91 0x04 >;
+>  	};
 >  
->  	return 0;
+> +	emc at 7000f400 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "nvidia,tegra20-emc";
+> +		reg = <0x7000f400 0x200>;
+> +	};
+> +
+>  	sdhci at c8000000 {
+>  		compatible = "nvidia,tegra20-sdhci";
+>  		reg = <0xc8000000 0x200>;
 > -- 
-> 1.7.5.4
+> 1.7.8.GIT
 > 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
