@@ -1,205 +1,69 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 02 Jan 2012 10:54:36 -0600
-Subject: [PATCH v2] gpio: pl061: convert to use generic irq chip
-In-Reply-To: <20120102085433.GJ18381@ponder.secretlab.ca>
-References: <1323876538-20406-8-git-send-email-robherring2@gmail.com>
- <1324327927-6886-1-git-send-email-robherring2@gmail.com>
- <20120102085433.GJ18381@ponder.secretlab.ca>
-Message-ID: <4F01E14C.9010407@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 2 Jan 2012 23:01:54 +0530
+Subject: [RFC][PATCH 0/4] lcd: platform-lcd: Add lcd panel and device tree
+ support
+In-Reply-To: <CAOesGMirAda7rzZcM74fat0qV8giy3Qniqh4z_oA9OSzMAOwHg@mail.gmail.com>
+References: <1325483675-21908-1-git-send-email-thomas.abraham@linaro.org>
+ <CAOesGMirAda7rzZcM74fat0qV8giy3Qniqh4z_oA9OSzMAOwHg@mail.gmail.com>
+Message-ID: <CAJuYYwTGWHCpEnE5w8b7mmg_oaFiygQSSey7ra+nR+Q9_Bi_tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
+Hi Olof,
 
-On 01/02/2012 02:54 AM, Grant Likely wrote:
-> On Mon, Dec 19, 2011 at 02:52:07PM -0600, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On 2 January 2012 12:18, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Sun, Jan 1, 2012 at 9:54 PM, Thomas Abraham
+> <thomas.abraham@linaro.org> wrote:
+>> The platform-lcd driver depends on platform-specific callbacks to setup the
+>> lcd panel. These callbacks are supplied using driver's platform data. But
+>> for adding device tree support for platform-lcd driver, providing such
+>> callbacks is not possible (without using auxdata).
 >>
->> Convert the pl061 irq_chip code to use the generic irq chip code.
+>> Since the callbacks are usually lcd panel specific, it is possible to include
+>> the lcd panel specific setup and control functionality in the platform-lcd
+>> driver itself, thereby eliminating the need for supplying platform specific
+>> callbacks to the driver. The platform-lcd driver can include support for
+>> multiple lcd panels.
 >>
->> This has the side effect of using 32-bit accesses rather than 8-bit
->> accesses to interrupt registers. The h/w TRM and testing seem to indicate
->> this is fine.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Linus Walleij <linus.ml.walleij@gmail.com>
-> 
-> What does this apply against?  It doesn't apply cleanly.
-> 
+>> This patchset removes the need for platform data for platform-lcd driver and
+>> adds support which can be used to implement lcd panel specific functionality
+>> in the driver. As an example, the support for Hydis hv070wsa lcd panel is added
+>> to the platform-lcd driver which is then used on the Exynos4 based Origen board.
+>> This currently breaks build for other users of platform-lcd driver. Those can be
+>> fixed if this approach is acceptable.
+>
+> I think it would be a better idea to provide a generic binding for the
+> simple LCD panels that just need one or two power GPIOs to be turned
+> on (some tend to need one to activate and one for power control --
+> second might in some cases be handled through a regulator I suppose).
+> I'm sure there will be exceptions to this; panels that have quirks or
+> requirements on various things that will either require an expanded
+> binding, or custom probe functions.
 
-You need the whole series which is available here:
+A majority of the existing users of the platform-lcd driver are using
+a single gpio to enable or disable the display. As you mentioned, a
+generic binding can be added for such lcd panels. There are other
+implementations that use one or more gpios but requires toggling those
+gpios in a panel specific way (usually with some delay). Such
+implementations will require custom panel support included in the
+platfrom-lcd driver. I will prepare a patch for these cases.
 
-git://sources.calxeda.com/kernel/linux.git pl061-domain-v2
+>
+> Especially in the case you are providing -- that lcd driver is only
+> using a single gpio, and it would be much more valuable to have a
+> trivial binding for this that uses shared code for this. Otherwise
+> every single simple panel will need to be added over time.
 
-Rob
+Yes. I agree. It is better to have a common binding and there are many
+panels that can use this generic binding. I will make these changes.
 
-> g.
-> 
->> ---
->> v2:
->> - put struct irq_chip_generic pointer into struct pl061_gpio instead of domain
->> ptr.
->>
->>  drivers/gpio/Kconfig      |    1 +
->>  drivers/gpio/gpio-pl061.c |   74 ++++++++++++++++-----------------------------
->>  2 files changed, 27 insertions(+), 48 deletions(-)
->>
->> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
->> index 8482a23..4d433e2 100644
->> --- a/drivers/gpio/Kconfig
->> +++ b/drivers/gpio/Kconfig
->> @@ -138,6 +138,7 @@ config GPIO_MXS
->>  config GPIO_PL061
->>  	bool "PrimeCell PL061 GPIO support"
->>  	depends on ARM_AMBA
->> +	select GENERIC_IRQ_CHIP
->>  	help
->>  	  Say yes here to support the PrimeCell PL061 GPIO device
->>  
->> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
->> index fe19dec..96ff6b2 100644
->> --- a/drivers/gpio/gpio-pl061.c
->> +++ b/drivers/gpio/gpio-pl061.c
->> @@ -50,10 +50,10 @@ struct pl061_gpio {
->>  	 * the IRQ code simpler.
->>  	 */
->>  	spinlock_t		lock;		/* GPIO registers */
->> -	spinlock_t		irq_lock;	/* IRQ registers */
->>  
->>  	void __iomem		*base;
->>  	int			irq_base;
->> +	struct irq_chip_generic	*irq_gc;
->>  	struct gpio_chip	gc;
->>  };
->>  
->> @@ -125,40 +125,10 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
->>  	return chip->irq_base + offset;
->>  }
->>  
->> -/*
->> - * PL061 GPIO IRQ
->> - */
->> -static void pl061_irq_disable(struct irq_data *d)
->> -{
->> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
->> -	int offset = d->irq - chip->irq_base;
->> -	unsigned long flags;
->> -	u8 gpioie;
->> -
->> -	spin_lock_irqsave(&chip->irq_lock, flags);
->> -	gpioie = readb(chip->base + GPIOIE);
->> -	gpioie &= ~(1 << offset);
->> -	writeb(gpioie, chip->base + GPIOIE);
->> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
->> -}
->> -
->> -static void pl061_irq_enable(struct irq_data *d)
->> -{
->> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
->> -	int offset = d->irq - chip->irq_base;
->> -	unsigned long flags;
->> -	u8 gpioie;
->> -
->> -	spin_lock_irqsave(&chip->irq_lock, flags);
->> -	gpioie = readb(chip->base + GPIOIE);
->> -	gpioie |= 1 << offset;
->> -	writeb(gpioie, chip->base + GPIOIE);
->> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
->> -}
->> -
->>  static int pl061_irq_type(struct irq_data *d, unsigned trigger)
->>  {
->> -	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
->> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->> +	struct pl061_gpio *chip = gc->private;
->>  	int offset = d->irq - chip->irq_base;
->>  	unsigned long flags;
->>  	u8 gpiois, gpioibe, gpioiev;
->> @@ -166,7 +136,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
->>  	if (offset < 0 || offset >= PL061_GPIO_NR)
->>  		return -EINVAL;
->>  
->> -	spin_lock_irqsave(&chip->irq_lock, flags);
->> +	raw_spin_lock_irqsave(&gc->lock, flags);
->>  
->>  	gpioiev = readb(chip->base + GPIOIEV);
->>  
->> @@ -195,18 +165,11 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
->>  
->>  	writeb(gpioiev, chip->base + GPIOIEV);
->>  
->> -	spin_unlock_irqrestore(&chip->irq_lock, flags);
->> +	raw_spin_unlock_irqrestore(&gc->lock, flags);
->>  
->>  	return 0;
->>  }
->>  
->> -static struct irq_chip pl061_irqchip = {
->> -	.name		= "GPIO",
->> -	.irq_enable	= pl061_irq_enable,
->> -	.irq_disable	= pl061_irq_disable,
->> -	.irq_set_type	= pl061_irq_type,
->> -};
->> -
->>  static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
->>  {
->>  	struct list_head *chip_list = irq_get_handler_data(irq);
->> @@ -232,6 +195,25 @@ static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
->>  	chained_irq_exit(irqchip, desc);
->>  }
->>  
->> +static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
->> +{
->> +	struct irq_chip_type *ct;
->> +
->> +	chip->irq_gc = irq_alloc_generic_chip("gpio-pl061", 1, irq_base,
->> +					      chip->base, handle_simple_irq);
->> +	chip->irq_gc->private = chip;
->> +
->> +	ct = chip->irq_gc->chip_types;
->> +	ct->chip.irq_mask = irq_gc_mask_clr_bit;
->> +	ct->chip.irq_unmask = irq_gc_mask_set_bit;
->> +	ct->chip.irq_set_type = pl061_irq_type;
->> +	ct->chip.irq_set_wake = irq_gc_set_wake;
->> +	ct->regs.mask = GPIOIE;
->> +
->> +	irq_setup_generic_chip(chip->irq_gc, IRQ_MSK(PL061_GPIO_NR),
->> +			       IRQ_GC_INIT_NESTED_LOCK, IRQ_NOREQUEST, 0);
->> +}
->> +
->>  static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->>  {
->>  	struct pl061_platform_data *pdata;
->> @@ -269,7 +251,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->>  	}
->>  
->>  	spin_lock_init(&chip->lock);
->> -	spin_lock_init(&chip->irq_lock);
->>  	INIT_LIST_HEAD(&chip->list);
->>  
->>  	chip->gc.direction_input = pl061_direction_input;
->> @@ -293,6 +274,8 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->>  	if (chip->irq_base <= 0)
->>  		return 0;
->>  
->> +	pl061_init_gc(chip, chip->irq_base);
->> +
->>  	writeb(0, chip->base + GPIOIE); /* disable irqs */
->>  	irq = dev->irq[0];
->>  	if (irq < 0) {
->> @@ -321,11 +304,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->>  			else
->>  				pl061_direction_input(&chip->gc, i);
->>  		}
->> -
->> -		irq_set_chip_and_handler(i + chip->irq_base, &pl061_irqchip,
->> -					 handle_simple_irq);
->> -		set_irq_flags(i+chip->irq_base, IRQF_VALID);
->> -		irq_set_chip_data(i + chip->irq_base, chip);
->>  	}
->>  
->>  	return 0;
->> -- 
->> 1.7.5.4
->>
+Thanks for your review.
+
+Regards,
+Thomas.
+
+>
+>
+> -Olof
