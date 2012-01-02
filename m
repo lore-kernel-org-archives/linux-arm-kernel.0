@@ -1,46 +1,52 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Mon, 2 Jan 2012 14:14:16 +0100
-Subject: [PATCH 12/12] ARM: restart: S3C24XX: use new restart hook
-In-Reply-To: <4EF08F02.9010604@samsung.com>
-References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
- <201112201418.07935.heiko@sntech.de> <4EF08F02.9010604@samsung.com>
-Message-ID: <201201021414.17551.heiko@sntech.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 2 Jan 2012 14:17:40 +0100
+Subject: [PATCH] mfd/db8500-prcmu: remove support for early silicon revisions
+Message-ID: <1325510260-4368-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kgene,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Am Dienstag, 20. Dezember 2011, 14:34:58 schrieb Kukjin Kim:
-> On 12/20/11 22:18, Heiko St?bner wrote:
-> > Am Dienstag, 20. Dezember 2011, 13:48:36 schrieb Kukjin Kim:
-> >> Hook these platforms restart code into the new restart hook rather
-> >> than using arch_reset().
-> >> And adds local header file, common.h in arch/arm/mach-s3c2410/ and
-> >> arch/arm/mach-s3c2440/ directories.
-> >> 
-> >> Cc: Ben Dooks<ben-linux@fluff.org>
-> >> Cc: Russell King<rmk+kernel@arm.linux.org.uk>
-> >> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> > 
-> > just for my understanding would it not also be possible to move the
-> > function prototype to plat-samsung/include/plat/s3c2410.h and s3c244x.h?
-> 
-> Yeah, we have many choices about that and I will sort out the
-> mach-s3c24.. directories to mach-s3c24xx or just mach-s3c...
-> 
-> > Or should these files vanish in the long run?
-> 
-> Yes, as per Russell's suggestion, I think we don't need that and as a
-> note, I'm working on removing plat-s3c24xx and plat-s5p, just keeping
-> one plat-samsung.
+The DB8500 ED (Early Drop) and V1 are only available inside of
+ST-Ericsson or partners, we have actively replaced and scrapped
+these prototypes. All Nova products on the open market (such as
+the Snowball board) are based on V2 and later ASIC variants.
+So let us focus on supporting the silicon that will be used and
+delete this to get a clear overview.
 
-I'm currently working on introducing a power-domain for the usb-phy of the 
-S3C2443/S3C2416/S3C2450. This is one step mimicing the work of Mark Brown to 
-get better idle handling later on, and also again reduces the number of 
-architecture-calls the hsudc driver does, as requested by Felipe Balbi.
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Samuel Ortiz <samuel.ortiz@intel.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Hi ARM-SoC guys, can either of you please merge this patch to
+wherever the other ux500 patches are pending? There is some
+cross-dependence on the MFD core and I intended to include this
+patch in the original pull request, but I screwed up, breaking
+linux-next. Thanks.
+---
+ drivers/mfd/db8500-prcmu.c |    7 ++-----
+ 1 files changed, 2 insertions(+), 5 deletions(-)
 
-Therefore I'm introducing a new s3c2443-pm-common.c. Question now is, should 
-this move directly to plat-samsung?
-
-Thanks
-Heiko
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index a25ab9c..af8e0ef 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -2102,14 +2102,11 @@ static struct irq_chip prcmu_irq_chip = {
+ void __init db8500_prcmu_early_init(void)
+ {
+ 	unsigned int i;
+-
+-	if (cpu_is_u8500v1()) {
+-		tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE_V1);
+-	} else if (cpu_is_u8500v2()) {
++	if (cpu_is_u8500v2()) {
+ 		void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
+ 
+ 		if (tcpm_base != NULL) {
+-			int version;
++			u32 version;
+ 			version = readl(tcpm_base + PRCMU_FW_VERSION_OFFSET);
+ 			prcmu_version.project_number = version & 0xFF;
+ 			prcmu_version.api_version = (version >> 8) & 0xFF;
+-- 
+1.7.8
