@@ -1,8 +1,10 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  2 Jan 2012 18:11:53 -0200
-Subject: [PATCH] ARM: setup.c: Change the order of include files to avoid
- build warning
-Message-ID: <1325535113-26551-1-git-send-email-festevam@gmail.com>
+Date: Mon,  2 Jan 2012 18:38:45 -0200
+Subject: [PATCH v2] ARM: setup.c: Fix build warning by removing unneeded
+ header file
+In-Reply-To: <1325535113-26551-1-git-send-email-festevam@gmail.com>
+References: <1325535113-26551-1-git-send-email-festevam@gmail.com>
+Message-ID: <1325536725-28403-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,18 +16,20 @@ arch/arm/include/asm/elf.h:102:1: warning: "vmcore_elf64_check_arch" redefined
 In file included from arch/arm/kernel/setup.c:24:
 include/linux/crash_dump.h:30:1: warning: this is the location of the previous definition
 
-If <asm/elf.h> is defined prior to <linux/crash_dump.h> the warning does not happen because 
-vmcore_elf64_check_arch is defined at <asm/elf.h>, so change the order of the includes to avoid the warning.
+Since commit 93a72052 (crash_dump: export is_kdump_kernel to modules, consolidate elfcorehdr_addr, setup_elfcorehdr and saved_max_pfn)
+the inclusion of <linux/crash_dump.h> is no longer needed.
 
-This warning was introduced by commit cea0bb1b (ARM: 6122/1: kdump: add support for elfcorehdr parameter).
+Remove the inclusion of <linux/crash_dump.h> and the build warning is fixed.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/kernel/setup.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Changes since v1:
+- Instead of changing the order of the includes, simply remove the unneeded crash_dump.h header.
+ arch/arm/kernel/setup.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 129fbd5..749e0b2 100644
+index 129fbd5..303bdb2 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
 @@ -21,7 +21,6 @@
@@ -36,14 +40,5 @@ index 129fbd5..749e0b2 100644
  #include <linux/root_dev.h>
  #include <linux/cpu.h>
  #include <linux/interrupt.h>
-@@ -55,6 +54,8 @@
- #include <asm/unwind.h>
- #include <asm/memblock.h>
- 
-+#include <linux/crash_dump.h>
-+
- #if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
- #include "compat.h"
- #endif
 -- 
 1.7.1
