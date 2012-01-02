@@ -1,35 +1,26 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 2 Jan 2012 09:25:34 +0000
-Subject: [PATCH v8 19/20] OMAP2+: UART: Do not gate uart clocks if used
- for debug_prints
-In-Reply-To: <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
-References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
- <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D1214304B3E2@DBDE01.ent.ti.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 2 Jan 2012 10:31:04 +0100
+Subject: [PATCH v4 0/2] Add support form eMMa-PrP in i.MX2 chips as a
+ mem2mem device.
+In-Reply-To: <1323690225-15799-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1323690225-15799-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <CACKLOr1RujFbuTnF=DkCTB=paVUq7=j1Ru_RU7DWyuJedM+Cvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
+do you have any more concerns or comments on this patch?
+I can't find it in media_tree. Has it been merged somewhere else?
 
-On Fri, Nov 11, 2011 at 15:31:52, R, Govindraj wrote:
-[...]
->  
-> -	if ((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
-> +	if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
-> +			&& !uart_debug)
->  		device_init_wakeup(&pdev->dev, true);
->  }
+Thank you.
 
-I was testing this on AM335x and realized that this leads to creation of two
-'wakeup' entries for UART. One is created by the tty layer in serial-core.c
-and the other is created here.
 
-Here's what I see on a branch based on Tony's 3.2-rc6:
 
-./sys/devices/platform/omap/omap_uart.0/power/wakeup
-./sys/devices/platform/omap/omap_uart.0/tty/ttyO0/power/wakeup
-
-Shouldn't the OMAP serial just enable the 'wakeup' entry created by serial-core.c?
-
-Regards,
-Vaibhav
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
