@@ -1,55 +1,68 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Mon, 02 Jan 2012 23:19:41 +0100
-Subject: [PATCH 2/2] ARM: Exynos: Hook up power domains to generic power
- domain infrastructure
-In-Reply-To: <CAJuYYwQbTJTRdsa9WpQuCtSTYacbrcP3CVBFaAYHP1jLPky10A@mail.gmail.com>
-References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>	<1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>	<1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>	<4EFB66C3.4040504@gmail.com>
- <CAJuYYwQbTJTRdsa9WpQuCtSTYacbrcP3CVBFaAYHP1jLPky10A@mail.gmail.com>
-Message-ID: <4F022D7D.3060802@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 3 Jan 2012 10:34:11 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120103103411.85d160181f361e73f11c401b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi all,
 
-thank you for clarifying.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-s3c64xx/Makefile between commit b024043b6d0d ("ARM: 7245/1:
+S3C64XX: introduce arch/arm/mach-s3c64xx/common.[ch]") from the arm tree
+and commits a60879e7ca17 ("ARM: SAMSUNG: Remove SDHCI bus clocks from
+platform data"), 875a59374cd1 ("ARM: SAMSUNG: Consolidation of SPI
+platform devices to plat-samsung") and 4566c7f7612f ("ARM: S3C64XX:
+Modified files for SPI consolidation work") from the arm-soc tree.
 
-On 01/02/2012 03:14 AM, Thomas Abraham wrote:
-> 
-> The following is a snippet from the dts file used for testing.
-> 
->    [...]
-> 
->    lcd0:power-domain-lcd0 {
->             compatible = "samsung,exynos4210-pd";
->             reg = <0x10023C00 0x10>;
->    };
-> 
->    [...]
-> 
->    fimd0:display-controller {
->             compatible = "samsung,exynos4-fimd";
->             [...]
->             pd = <&lcd0>;
->    };
-> 
-> The fimd (display controller) driver would then do the following.
-> 
-> parp = of_get_property(pdev->dev.of_node, "pd", NULL);
-> pd_np = of_find_node_by_phandle(be32_to_cpup(parp));
-> pm_genpd_of_add_device(pd_np, &pdev->dev);
+I fixed it up (see below) and can carry the fix as necessary.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Sounds interesting. Currently it's platform code that adds devices to
-a corresponding power domain. But doing it at drivers might be more
-convenient for avoiding device/driver/power domain registration
-synchronization issues, especially that knowledge about power domain
-existence may be contained directly in DT description, not needing
-drivers to carry platform specific data.
-
-BTW, I have a feeling that "samsung" is a bit longish prefix for the bindings.
-Didn't you initially consider "sec" for instance ? Probably it is already
-too late for changing that though.
-
-> The lookup is based on the node pointer of the power domain.
-
-Thanks,
-Sylwester
+diff --cc arch/arm/mach-s3c64xx/Makefile
+index f37016c,d7d9bb5..0000000
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@@ -27,21 -26,21 +27,20 @@@ obj-$(CONFIG_PM)		+= pm.o irq-pm.o slee
+  
+  obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
+  
+ -# Device setup
+ +# Device support
+  
+ -obj-$(CONFIG_S3C64XX_SETUP_I2C0) += setup-i2c0.o
+ -obj-$(CONFIG_S3C64XX_SETUP_I2C1) += setup-i2c1.o
+ -obj-$(CONFIG_S3C64XX_SETUP_IDE) += setup-ide.o
+ -obj-$(CONFIG_S3C64XX_SETUP_KEYPAD) += setup-keypad.o
+ -obj-$(CONFIG_S3C64XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
+ -obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
+ -obj-$(CONFIG_S3C64XX_SETUP_SPI) += setup-spi.o
+ +obj-y				+= dev-uart.o
+ +obj-y				+= dev-audio.o
+- obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+  
+ -# PM
+ +# Device setup
+  
+ -obj-$(CONFIG_PM)		+= pm.o
+ -obj-$(CONFIG_PM)		+= sleep.o
+ -obj-$(CONFIG_PM)		+= irq-pm.o
+ +obj-$(CONFIG_S3C64XX_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
+ +obj-$(CONFIG_S3C64XX_SETUP_I2C0)	+= setup-i2c0.o
+ +obj-$(CONFIG_S3C64XX_SETUP_I2C1)	+= setup-i2c1.o
+ +obj-$(CONFIG_S3C64XX_SETUP_IDE)		+= setup-ide.o
+ +obj-$(CONFIG_S3C64XX_SETUP_KEYPAD)	+= setup-keypad.o
+- obj-$(CONFIG_S3C64XX_SETUP_SDHCI)	+= setup-sdhci.o
+ +obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
+++obj-$(CONFIG_S3C64XX_SETUP_SPI)		+= setup-spi.o
+  
+  # Machine support
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120103/ad73c70e/attachment.sig>
