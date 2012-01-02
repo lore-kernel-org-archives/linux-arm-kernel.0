@@ -1,30 +1,21 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Jan 2012 11:59:59 +0000
-Subject: [RFC][PATCH 1/4] lcd: platform-lcd: Eliminate need for platform
- data
-In-Reply-To: <1325483675-21908-2-git-send-email-thomas.abraham@linaro.org>
-References: <1325483675-21908-1-git-send-email-thomas.abraham@linaro.org>
- <1325483675-21908-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20120102115959.GG2899@opensource.wolfsonmicro.com>
+Date: Mon, 2 Jan 2012 12:14:28 +0000
+Subject: [PATCHv2 1/2] gpio: add a driver for the Synopsys DesignWare
+ APB GPIO block
+In-Reply-To: <4EFE1E35.106@gmail.com>
+References: <1324345431-12251-1-git-send-email-jamie@jamieiles.com>
+ <20111230195955.GA3427@page> <4EFE1E35.106@gmail.com>
+Message-ID: <20120102121428.GA18443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2012 at 11:24:32AM +0530, Thomas Abraham wrote:
+On Fri, Dec 30, 2011 at 02:25:25PM -0600, Rob Herring wrote:
 
-> @@ -10,12 +10,3 @@
->   * published by the Free Software Foundation.
->   *
->  */
-> -
-> -struct plat_lcd_data;
-> -struct fb_info;
-> -
-> -struct plat_lcd_data {
-> -	void	(*set_power)(struct plat_lcd_data *, unsigned int power);
-> -	int	(*match_fb)(struct plat_lcd_data *, struct fb_info *);
-> -};
+> We've got to sort out getting irq domains enabled on x86 and MIPS in
+> order to merge generic irq chip using domains. I'm not sure that will
+> get done in time.
 
-This is going to break all existing users as it will stop them compiling
-- they'd either need to be converted en masse to the new style as part
-of the commit doing this or the driver would need to support both
-platform data and new style configuration simultaneously.
+> Can you leave out the interrupt portion of the driver? Or that is needed
+> to get to a useful state.
+
+Or just add a dependency in Kconfig?
