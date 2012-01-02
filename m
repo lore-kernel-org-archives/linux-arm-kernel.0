@@ -1,74 +1,32 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 2 Jan 2012 07:44:09 +0530
-Subject: [PATCH 2/2] ARM: Exynos: Hook up power domains to generic power
- domain infrastructure
-In-Reply-To: <4EFB66C3.4040504@gmail.com>
-References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
- <1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>
- <1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>
- <4EFB66C3.4040504@gmail.com>
-Message-ID: <CAJuYYwQbTJTRdsa9WpQuCtSTYacbrcP3CVBFaAYHP1jLPky10A@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Mon, 02 Jan 2012 02:44:36 +0000
+Subject: Circular dependency between <linux/kernel.h> and <asm/bug.h> on ARM
+Message-ID: <1325472276.13595.200.camel@deadeye>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Commit 87e040b6456fd3416a1f6831c1eedaef5c0a94ff ("ARM: 7017/1: Use
+generic BUG() handler") makes BUG() use BUILD_BUG_ON().  However,
+BUILD_BUG_ON() is not defined in <linux/bug.h> but in <linux/kernel.h>.
 
-On 29 December 2011 00:28, Sylwester Nawrocki <snjw23@gmail.com> wrote:
-> Hi Thomas,
->
-> On 12/12/2011 04:46 PM, Thomas Abraham wrote:
->> The generic power domain infrastructure is used to control the power domains
->> available on Exynos4. For non-dt platforms, the power domains are statically
->> instantiated. For dt platforms, the power domain nodes found in the device
->> tree are instantiated.
->>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->> This patch is mainly derived from Mark Brown's work on generic power domain
->> support for s3c64xx platforms. The existing exynos4 power domain implementation
->> is not removed in this patch. The devices are not yet registered with the power
->> domains for non-dt platforms.
->>
->> ?arch/arm/mach-exynos/Kconfig | ? ?1 +
->> ?arch/arm/mach-exynos/pm.c ? ?| ?179 ++++++++++++++++++++++++++++++++++++++++++
->> ?2 files changed, 180 insertions(+), 0 deletions(-)
+arch/include/asm/bug.h does not include <linux/kernel.h> and *cannot* do
+so because the latter already includes <asm/bug.h>.
 
-[...]
+Maybe BUILD_BUG_ON() should be moved out to a header of its own, or else
+this particular use should be moved to some other file.  This needs to
+be fixed somehow, as it obviously leads to build failures, e.g.:
 
-> Sorry, I haven't reviewed your patch carefully enough. So for dt platforms
-> pd->base is initialized from "reg" property, directly from each power domain's
-> DT node. Only the static power domain instantiation for non-dt platforms would
-> possibly need some code modifications when new SoCs are added.
->
-> Would be nice to have a relevant patch for *.dts files in this series too. :)
+https://buildd.debian.org/status/fetch.php?pkg=linux-2.6&arch=armel&ver=3.2~rc7-1~experimental.1&stamp=1325142904
 
-The following is a snippet from the dts file used for testing.
+Ben.
 
-   [...]
-
-   lcd0:power-domain-lcd0 {
-            compatible = "samsung,exynos4210-pd";
-            reg = <0x10023C00 0x10>;
-   };
-
-   [...]
-
-   fimd0:display-controller {
-            compatible = "samsung,exynos4-fimd";
-            [...]
-            pd = <&lcd0>;
-   };
-
-The fimd (display controller) driver would then do the following.
-
-parp = of_get_property(pdev->dev.of_node, "pd", NULL);
-pd_np = of_find_node_by_phandle(be32_to_cpup(parp));
-pm_genpd_of_add_device(pd_np, &pdev->dev);
-
-The lookup is based on the node pointer of the power domain.
-
-Thanks,
-Thomas.
+-- 
+Ben Hutchings
+All the simple programs have been written, and all the good names taken.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120102/df7dcba0/attachment.sig>
