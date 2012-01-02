@@ -1,33 +1,37 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 2 Jan 2012 09:41:19 +0530
-Subject: [PATCH] Input: keyboard - add device tree bindings for simple key
- matrixes
-In-Reply-To: <CAOesGMjZoP+FsGWo9cWKvgs8KD9tT6KBHbK5qKX8NTGOY3HUjQ@mail.gmail.com>
-References: <1325112771-31941-1-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17755DC8D2@HQMAIL01.nvidia.com>
- <CAOesGMiNuW3mexN_8PtunZkaVX4Uph-OgZFr5zLhaB1nih_EEw@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17755DC8DB@HQMAIL01.nvidia.com>
- <CAOesGMjZoP+FsGWo9cWKvgs8KD9tT6KBHbK5qKX8NTGOY3HUjQ@mail.gmail.com>
-Message-ID: <CAJuYYwQSgM+zevsSZ71LTYnScLq+q=D7KO3uD5A1O_gOnDAQ=A@mail.gmail.com>
+Date: Mon, 02 Jan 2012 11:24:31 +0530
+Subject: [RFC][PATCH 0/4] lcd: platform-lcd: Add lcd panel and device tree
+ support
+Message-ID: <1325483675-21908-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+The platform-lcd driver depends on platform-specific callbacks to setup the
+lcd panel. These callbacks are supplied using driver's platform data. But
+for adding device tree support for platform-lcd driver, providing such
+callbacks is not possible (without using auxdata).
 
-On 29 December 2011 12:36, Olof Johansson <olof@lixom.net> wrote:
-[...]
+Since the callbacks are usually lcd panel specific, it is possible to include
+the lcd panel specific setup and control functionality in the platform-lcd
+driver itself, thereby eliminating the need for supplying platform specific
+callbacks to the driver. The platform-lcd driver can include support for
+multiple lcd panels.
 
->> Can we deprecate the Samsung format, and only allow it for that Samsung
->> device (and allow both there), and require a single format for any other
->> keyboard?
->
-> I'm definitely ok with that. Thomas, Grant, Rob? The code in question
-> is queued for 3.3, so it hasn't been out in a real release yet.
->
-> Adding Kukjin as well since it's getting merged through his tree.
+This patchset removes the need for platform data for platform-lcd driver and
+adds support which can be used to implement lcd panel specific functionality
+in the driver. As an example, the support for Hydis hv070wsa lcd panel is added
+to the platform-lcd driver which is then used on the Exynos4 based Origen board.
+This currently breaks build for other users of platform-lcd driver. Those can be
+fixed if this approach is acceptable.
 
-I am okay with switching to the new keyboard binding. I will modify
-the Samsung keyboard device tree support and prepare a patch.
+Thomas Abraham (4):
+  lcd: platform-lcd: Eliminate need for platform data
+  lcd: platform-lcd: Add support for Hydis hv070wsa lcd panel
+  ARM: Exynos: Remove platform data of platform-lcd driver
+  lcd: platform-lcd: Add device tree support
 
-Thanks,
-Thomas.
+ arch/arm/mach-exynos/mach-origen.c     |   25 +-----
+ drivers/video/backlight/Kconfig        |    6 ++
+ drivers/video/backlight/platform_lcd.c |  128 ++++++++++++++++++++++++++++---
+ include/video/platform_lcd.h           |   11 +--
+ 4 files changed, 129 insertions(+), 41 deletions(-)
