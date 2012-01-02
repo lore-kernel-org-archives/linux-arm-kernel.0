@@ -1,35 +1,238 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun,  1 Jan 2012 21:52:27 -0800
-Subject: [PATCH] ARM: include linux/kernel.h in asm/bug.h
-Message-ID: <1325483547-13853-1-git-send-email-olof@lixom.net>
+Date: Sun,  1 Jan 2012 22:09:17 -0800
+Subject: [PATCH v3] Input: keyboard - add device tree bindings for simple key
+ matrixes
+In-Reply-To: <1325184146-3527-1-git-send-email-olof@lixom.net>
+References: <1325184146-3527-1-git-send-email-olof@lixom.net>
+Message-ID: <1325484557-27695-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__BUG() has a dependency on BUILD_BUG_ON() which comes from
-include/linux/kernel.h. Found with mini2440_defconfig:
+This adds a simple device tree binding for simple key matrix data and
+a helper to fill in the platform data.
 
-In file included from include/linux/mtd/qinfo.h:4:0,
-                 from include/linux/mtd/pfow.h:7,
-                 from drivers/mtd/lpddr/lpddr_cmds.c:27:
-include/linux/mtd/map.h: In function 'inline_map_read':
-include/linux/mtd/map.h:408:3: error: implicit declaration of function 'BUILD_BUG_ON' [-Werror=implicit-function-declaration]
+The implementation is in a shared file outside if drivers/input/keyboard
+since some drivers in drivers/input/misc might be making use of it
+as well.
+
+Changes since v2:
+ * Removed reference to "legacy" format with a subnode per key
+ * Changed to a packed format with one cell per key instead of 3.
+ * Moved new OF helper to separate file
+ * Misc fixups based on comments
+
+Changes since v1:
+ * Removed samsung-style binding support
+ * Added linux,fn-keymap and linux,fn-key optional properties
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/include/asm/bug.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/input/matrix-keymap.txt    |   27 ++++++
+ drivers/input/Kconfig                              |    4 +
+ drivers/input/Makefile                             |    1 +
+ drivers/input/keyboard/Kconfig                     |    1 +
+ drivers/input/of_keymap.c                          |   87 ++++++++++++++++++++
+ include/linux/input/matrix_keypad.h                |   19 ++++
+ 6 files changed, 139 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/matrix-keymap.txt
+ create mode 100644 drivers/input/of_keymap.c
 
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 9abe7a0..0291594 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -1,6 +1,7 @@
- #ifndef _ASMARM_BUG_H
- #define _ASMARM_BUG_H
+diff --git a/Documentation/devicetree/bindings/input/matrix-keymap.txt b/Documentation/devicetree/bindings/input/matrix-keymap.txt
+new file mode 100644
+index 0000000..1db8e12
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/matrix-keymap.txt
+@@ -0,0 +1,27 @@
++A simple common binding for matrix-connected key boards. Currently targeted at
++defining the keys in the scope of linux key codes since that is a stable and
++standardized interface at this time.
++
++Required properties:
++- compatible: "matrix-keyboard-controller"
++- linux,keymap: an array of packed 1-cell entries containing the equivalent
++  of row, column and linux key-code. The 32-bit big endian cell is packed
++  as:
++	row << 24 | column << 16 | key-code
++
++Optional properties:
++- linux,fn-keymap: A separate array of packed 1-cell entries similar to
++  linux,keymap but only to be used when the function key modifier is
++  active. This is used for keyboards that have a software-based modifier
++  key for 'Fn' but that need to describe the custom layout that should
++  be used when said modifier key is active.
++
++- linux,fn-key: a 2-cell entry containing the < row column > of the
++  function modifier key used to switch to the above linux,fn-keymap
++  layout.
++
++Example:
++	linux,keymap = < 0x00030012
++			 0x0102003a >;
++	linux,fn-key = < 2 1 >;
++	linux,fn-keymap = < 0x0002004a >;
+diff --git a/drivers/input/Kconfig b/drivers/input/Kconfig
+index 001b147..3325979 100644
+--- a/drivers/input/Kconfig
++++ b/drivers/input/Kconfig
+@@ -25,6 +25,10 @@ config INPUT
  
+ if INPUT
+ 
++config INPUT_OF_MATRIX_KEYMAP
++	depends on USE_OF
++	bool
++
+ config INPUT_FF_MEMLESS
+ 	tristate "Support for memoryless force-feedback devices"
+ 	help
+diff --git a/drivers/input/Makefile b/drivers/input/Makefile
+index 0c78949..b173a13a 100644
+--- a/drivers/input/Makefile
++++ b/drivers/input/Makefile
+@@ -24,3 +24,4 @@ obj-$(CONFIG_INPUT_TOUCHSCREEN)	+= touchscreen/
+ obj-$(CONFIG_INPUT_MISC)	+= misc/
+ 
+ obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o
++obj-$(CONFIG_INPUT_OF_MATRIX_KEYMAP) += of_keymap.o
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index cdc385b..3371954c 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -394,6 +394,7 @@ config KEYBOARD_NOMADIK
+ config KEYBOARD_TEGRA
+ 	tristate "NVIDIA Tegra internal matrix keyboard controller support"
+ 	depends on ARCH_TEGRA
++	select INPUT_OF_MATRIX_KEYMAP if USE_OF
+ 	help
+ 	  Say Y here if you want to use a matrix keyboard connected directly
+ 	  to the internal keyboard controller on Tegra SoCs.
+diff --git a/drivers/input/of_keymap.c b/drivers/input/of_keymap.c
+new file mode 100644
+index 0000000..b33627d
+--- /dev/null
++++ b/drivers/input/of_keymap.c
+@@ -0,0 +1,87 @@
++/*
++ * Helpers for open firmware matrix keyboard bindings
++ *
++ * Copyright (C) 2012 Google, Inc
++ *
++ * Author:
++ * 	Olof Johansson <olof@lixom.net>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
 +#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/input.h>
++#include <linux/of.h>
++#include <linux/input/matrix_keypad.h>
++#include <linux/export.h>
++#include <linux/gfp.h>
++#include <linux/slab.h>
++
++struct matrix_keymap_data *
++matrix_keyboard_of_fill_keymap(struct device_node *np)
++{
++	struct matrix_keymap_data *kd;
++	int proplen = 0, i;
++	u32 *keymap;
++	const __be32 *prop;
++
++	if (!np)
++		return NULL;
++
++	prop = of_get_property(np, "linux,keymap", &proplen);
++
++	if (!of_device_is_compatible(np, "matrix-keyboard-controller"))
++		return NULL;
++
++	if (proplen % 4) {
++		pr_warn("Malformed linux,keymap property in %s\n",
++			np->full_name);
++		return NULL;
++	}
++
++	kd = kmalloc(sizeof(*kd), GFP_KERNEL);
++	if (!kd)
++		return NULL;
++	kd->keymap_size = proplen / sizeof(u32);
++
++	keymap = kzalloc(kd->keymap_size * sizeof(u32), GFP_KERNEL);
++	if (!keymap) {
++		kfree(kd);
++		return NULL;
++	}
++
++	kd->keymap = keymap;
++
++	for (i = 0; i < kd->keymap_size; i++) {
++		u32 tmp = be32_to_cpup(prop+i);
++		int key_code, row, col;
++
++		row = (tmp >> 24) & 0xff;
++		col = (tmp >> 16) & 0xff;
++		key_code = tmp & 0xffff;
++		*keymap++ = KEY(row, col, key_code);
++	}
++
++	/* FIXME: Need to add handling of the linux,fn-keymap property here */
++
++	return kd;
++}
++EXPORT_SYMBOL_GPL(matrix_keyboard_of_fill_keymap);
++
++void matrix_keyboard_of_free_keymap(const struct matrix_keymap_data *kd)
++{
++	if (!kd)
++		return;
++	kfree(kd->keymap);
++	kfree(kd);
++}
++EXPORT_SYMBOL_GPL(matrix_keyboard_of_free_keymap);
+diff --git a/include/linux/input/matrix_keypad.h b/include/linux/input/matrix_keypad.h
+index fe7c4b9..fcf45ec 100644
+--- a/include/linux/input/matrix_keypad.h
++++ b/include/linux/input/matrix_keypad.h
+@@ -3,6 +3,7 @@
  
- #ifdef CONFIG_BUG
+ #include <linux/types.h>
+ #include <linux/input.h>
++#include <linux/of.h>
  
+ #define MATRIX_MAX_ROWS		32
+ #define MATRIX_MAX_COLS		32
+@@ -106,4 +107,22 @@ matrix_keypad_build_keymap(const struct matrix_keymap_data *keymap_data,
+ 	__clear_bit(KEY_RESERVED, keybit);
+ }
+ 
++#ifdef CONFIG_INPUT_OF_MATRIX_KEYMAP
++struct matrix_keymap_data *
++matrix_keyboard_of_fill_keymap(struct device_node *np);
++
++void matrix_keyboard_of_free_keymap(const struct matrix_keymap_data *kd);
++#else
++static inline struct matrix_keymap_data *
++matrix_keyboard_of_fill_keymap(struct device_node *np)
++{
++	return NULL;
++}
++
++static inline void
++matrix_keyboard_of_free_keymap(const struct matrix_keymap_data *kd)
++{
++}
++#endif
++
+ #endif /* _MATRIX_KEYPAD_H */
 -- 
 1.7.8.GIT
