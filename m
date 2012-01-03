@@ -1,65 +1,43 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 03 Jan 2012 15:54:16 +0100
-Subject: [RFC PATCH 0/8] Add common ARM cpuidle init code
-In-Reply-To: <201112081537.04789.arnd.bergmann@linaro.org>
-References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
- <20111208145653.GF7913@S2100-06.ap.freescale.net>
- <201112081537.04789.arnd.bergmann@linaro.org>
-Message-ID: <4F031698.4010501@linaro.org>
+From: aspotashev@emcraft.com (Alexander Potashev)
+Date: Tue, 03 Jan 2012 15:21:03 +0400
+Subject: Renaming MACH_TYPE_KINETIS_K60 into MACH_TYPE_KINETIS
+In-Reply-To: <20120103110337.GM2914@n2100.arm.linux.org.uk>
+References: <1325065882.1584.153.camel@skywanderer.emcraft.com>
+ <20120103110337.GM2914@n2100.arm.linux.org.uk>
+Message-ID: <2101657.NNXDtBpq3c@myhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2011 04:37 PM, Arnd Bergmann wrote:
-> On Thursday 08 December 2011, Shawn Guo wrote:
->>>
->> With many drivers are being moved into drivers/* from arch/arm/mach-*
->> and arch/arm/plat-*, I'm wondering if we have any problem with doing
->> the same thing on cpuidle.  If we can move these cpuidle drivers into
->> drivers/cpuidle (or drivers/idle, I'm not sure why two folders), that
->> will be the best place for such consolidation to me.
->>
->> Cc-ed linux-pm and Len Brown for helping understand.
->
-> I think we should definitely move them into one of the two directories.
-> The one thing making this a bit nasty is that many SoC implementation
-> need to access some global registers for this and don't have a "device"
-> that can be used for cpuidle with its own register ranges, but it's
-> still better to have the code in a single place IMHO.
+Hi Russell,
 
-Yes, I agree. Moreover that will facilitate to factor out the code which 
-is spread all around the different architecture.
+On 3 ?????? 2012 11:03:37 Russell King - ARM Linux wrote:
+> I notice that you sent me a very similar email on 24th December, which I
+> haven't responded to yet: given that it's the Christmas period, and
+> people take holidays, I think you're being a little hasty over your
+> resending.
 
-The places where there is the drivers cpuidle code are at drivers/idle, 
-driver/acpi, arch/arm, arch/sh/kernel/cpu/mobile/cpuidle, etc ...
+The reason why I have re-sent the message to the mailing list was that I 
+feeled like this discussion should be public, not just that I was bored 
+waiting for the response.
 
-IMHO, before doing some code factoring out, we should move all these 
-drivers to the cpuidle directory, no ?
+Anyway, sorry for the noise.
 
-drivers/idle/intel_idle.c => drivers/cpuidle/intel.c
-drivers/acpi/processor_idle.c => drivers/cpuidle/acpi.c
+> In any case, yes, I can change it.  However, as has already been
+> pointed out, we're moving over to using device tree as the primary form
+> of platform differentiation.  With device tree, machine type numbers
+> are completely meaningless (and aren't actually used by the kernel.)
 
-arch/arm/mach-omap2/cpuidle34xx.c => drivers/cpuidle/omap-34xx.c
-arch/arm/mach-omap2/cpuidle44xx.c => drivers/cpuidle/omap-44xx.c
-arch/arm/mach-shmobile/cpuidle.c  => drivers/cpuidle/arm-shmobile.c
-arch/arm/mach-davinci/cpuidle.c => drivers/cpuidle/davinci.c
-arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/at91.c
-arch/arm/mach-s3c64xx/cpuidle.c => drivers/cpuidle/s3c64xx.c
-arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/exynos.c
-arch/arm/mach-kirkwood/cpuidle.c => drivers/cpuidle/kirkwood.c
-arch/arcm/mach-msm/idle.S => drivers/cpuidle/msm.S
+Thanks in advance for fixing the entry!
 
-That could be a first step and then we move the other archs which could 
-be a bit more tricky like the powerpc.
+> While I will fix the entry, I suspect that Arnd will now refuse to
+> merge any new SoC support for mainline which is not using the device
+> tree.
 
-Does it make sense ?
-
-Thanks
-   -- Daniel
+Linux kernel development in our company is still based on the 2.6.33 version 
+of the kernel. Most of our code is not going to be sent upstream. We will 
+probably think about FDT when upgrading to a newer version of the kernel.
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Alexander
