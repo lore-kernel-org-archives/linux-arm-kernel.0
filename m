@@ -1,30 +1,51 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 03 Jan 2012 10:53:13 +0100
-Subject: [PATCH v4 0/2] Add support form eMMa-PrP in i.MX2 chips as a
- mem2mem device.
-In-Reply-To: <CACKLOr0YczU+jGOuKoRNvOUYhMbc3x_LVk3Gnt-dq+KfppwzFA@mail.gmail.com>
-References: <1323690225-15799-1-git-send-email-javier.martin@vista-silicon.com>
- <CACKLOr1RujFbuTnF=DkCTB=paVUq7=j1Ru_RU7DWyuJedM+Cvg@mail.gmail.com>
- <4F021DCE.8000105@gmail.com>
- <CACKLOr0YczU+jGOuKoRNvOUYhMbc3x_LVk3Gnt-dq+KfppwzFA@mail.gmail.com>
-Message-ID: <4F02D009.8080009@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Jan 2012 09:55:27 +0000
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20120102155820.GB29877@amd.com>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <20120102134229.GZ29877@amd.com>
+ <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
+ <20120102155820.GB29877@amd.com>
+Message-ID: <20120103095527.GI2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2012 08:43 AM, javier Martin wrote:
-> Do you mean I have to set up a public GIT repository? Is this mandatory?
-> I am not a subsystem maintainer, just casual developer.
-
-It's not mandatory. But it helps Mauro to distinguish between RFC and patches
-for merging AFAIK. I think you can ask him to pickup patches from the mailing
-list directly.
-
-> What about this?
+On Mon, Jan 02, 2012 at 04:58:20PM +0100, Joerg Roedel wrote:
+> On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
+> > > I still get
+> > >
+> > > ?LD ? ? ?.tmp_vmlinux1
+> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
+> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
+> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
+> > > make[1]: *** [.tmp_vmlinux1] Error 1
+> > >
+> > > when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
+> > > wrong or is this not expected to work?
+> > >
+> > Do you?
+> > Ok. I will check my configuration with linux-next git.
 > 
-> http://linuxtv.org/wiki/index.php/Maintaining_Git_trees#Patches_submitted_via_email
+> Compiling my exynos-config with linux-next gives me:
+> 
+>   CC      arch/arm/kernel/process.o
+> In file included from /data/lemmy/linux.trees.git/arch/arm/mach-exynos/include/mach/system.h:16:0,
+>                  from /data/lemmy/linux.trees.git/arch/arm/kernel/process.c:64:
+> /data/lemmy/linux.trees.git/arch/arm/plat-samsung/include/plat/system-reset.h:19:2: error: #error Fix me up
+> 
+> I better not ask the question how such an #error statement can come
+> through to linux-next.
 
+It comes through when I stick it in my tree because of a month of asking
+for help to fix something and getting zero response from the maintainers.
 
-Regards,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+It's a way to flag to them that they're doing something wrong - and in
+fact something is broken, and that that brokenness will happen at the
+next merge window unless they get off their butt and do something about
+it.
+
+Patches have been around, but I've had problems merging them, and the
+replacement patches have now appeared after I started my Christmas
+vacation.  As I've just returned, it's going to be a couple of days
+before the #error gets removed (assuming the replacement patches apply.)
