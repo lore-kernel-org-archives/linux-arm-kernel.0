@@ -1,63 +1,68 @@
-From: hamo.by@gmail.com (Yang Bai)
-Date: Tue, 3 Jan 2012 08:44:01 +0800
-Subject: [PATCH] arm: Fix linux-next compile error in arch/arm/common/gic.c
-In-Reply-To: <1325521990-4445-1-git-send-email-joerg.roedel@amd.com>
-References: <1325521990-4445-1-git-send-email-joerg.roedel@amd.com>
-Message-ID: <CAO_0yfOzVCK8OGL5G9Aej+V4AZ12EMFKi3HafAX0JzeW9C3FtQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 03 Jan 2012 10:02:52 +0900
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20120102155820.GB29877@amd.com>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <20120102134229.GZ29877@amd.com>
+ <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
+ <20120102155820.GB29877@amd.com>
+Message-ID: <005a01ccc9b3$6b6a2870$423e7950$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2012 at 12:33 AM, Joerg Roedel <joerg.roedel@amd.com> wrote:
-> With CONFIG_SMP=n the following compile error occurs:
->
-> ?CC ? ? ?arch/arm/common/gic.o
-> arch/arm/common/gic.c: In function 'gic_init_bases':
-> arch/arm/common/gic.c:679:4: error: implicit declaration of function 'cpu_logical_map' [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
->
-> This patch fixes the problem.
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
-> ---
-> ?arch/arm/common/gic.c | ? ?5 ++++-
-> ?1 files changed, 4 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index b2dc2dd..b33f6b0 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -676,7 +676,10 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-> ? ? ? ? ? ? ? ?}
->
-> ? ? ? ? ? ? ? ?for_each_possible_cpu(cpu) {
-> - ? ? ? ? ? ? ? ? ? ? ? unsigned long offset = percpu_offset * cpu_logical_map(cpu);
-> + ? ? ? ? ? ? ? ? ? ? ? unsigned long offset = percpu_offset;
-> +#ifdef CONFIG_SMP
-> + ? ? ? ? ? ? ? ? ? ? ? offset *= cpu_logical_map(cpu);
-> +#endif
-> ? ? ? ? ? ? ? ? ? ? ? ?*per_cpu_ptr(gic->dist_base.percpu_base, cpu) = dist_base + offset;
-> ? ? ? ? ? ? ? ? ? ? ? ?*per_cpu_ptr(gic->cpu_base.percpu_base, cpu) = cpu_base + offset;
-> ? ? ? ? ? ? ? ?}
-> --
-> 1.7.5.4
->
->
+Joerg Roedel wrote:
+> 
+> On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
+> > > I still get
+> > >
+> > > ?LD ? ? ?.tmp_vmlinux1
+> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
+> unknown-linux-gnueabi-ld: no machine record defined
+> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
+> unknown-linux-gnueabi-ld: no machine record defined
+> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
+> unknown-linux-gnueabi-ld: no machine record defined
+> > > make[1]: *** [.tmp_vmlinux1] Error 1
+> > >
+> > > when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
+> > > wrong or is this not expected to work?
+> > >
+> > Do you?
+> > Ok. I will check my configuration with linux-next git.
+> 
+> Compiling my exynos-config with linux-next gives me:
+> 
+>   CC      arch/arm/kernel/process.o
+> In file included from /data/lemmy/linux.trees.git/arch/arm/mach-
+> exynos/include/mach/system.h:16:0,
+>                  from
+/data/lemmy/linux.trees.git/arch/arm/kernel/process.c:64:
+> /data/lemmy/linux.trees.git/arch/arm/plat-samsung/include/plat/system-
+> reset.h:19:2: error: #error Fix me up
+> 
+> I better not ask the question how such an #error statement can come
+> through to linux-next. But what I can say is that I will not merge
+> your code until you guys make sure that your upstream platform code has
+> enough quality so that it at least compiles.
+> 
+Hi Joerg,
 
-Is this the right way to fix it? Or shall we do like this:
+I already knew that, Russell added it so that I can take the ARM restart
+changes seriously.
 
-#ifdef CONFIG_SMP
-...
-#else
-#define cpu_logical_map() 1
-#endif
+Since I pushed exynos restart patches to Russell's patch system so please
+kindly ignore it.
 
-and leave the gic.c code unchanged.
+> I attach the config I used for my compile-test.
+> 
+OK, let me check and if any updates, let you know.
 
-Thanks,
-Yang
+Happy New Year.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
