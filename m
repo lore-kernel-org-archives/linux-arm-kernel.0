@@ -1,28 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 03 Jan 2012 14:33:01 -0800
-Subject: [PATCH] ARM: Remove BUILD_BUG_ON from asm/bug.h
-In-Reply-To: <1325616276-10304-1-git-send-email-sjg@chromium.org>
-References: <1325616276-10304-1-git-send-email-sjg@chromium.org>
-Message-ID: <4F03821D.9080503@codeaurora.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 3 Jan 2012 14:37:44 -0800
+Subject: [PATCH v4] Input: keyboard - add device tree bindings for
+ simple key matrixes
+In-Reply-To: <1325626648-9425-1-git-send-email-olof@lixom.net>
+References: <1325484557-27695-1-git-send-email-olof@lixom.net>
+ <1325626648-9425-1-git-send-email-olof@lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F11FF@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/12 10:44, Simon Glass wrote:
-> BUILD_BUG_ON is defined in linux/kernel.h but that is not included by the
-> asm/bug.h header which uses it. This causes a build error:
->
-> ...include/linux/mtd/map.h: In function 'inline_map_read':
-> ...include/linux/mtd/map.h:408:3: error: implicit declaration of function
-> 'BUILD_BUG_ON' [-Werror=implicit-function-declaration]
->
-> The check is not essential and is not present for other architectures, so
-> just remove it.
+Olof Johansson wrote at Tuesday, January 03, 2012 2:37 PM:
+> This adds a simple device tree binding for simple key matrix data and
+> a helper to fill in the platform data.
+> 
+> The implementation is in a shared file outside if drivers/input/keyboard
+> since some drivers in drivers/input/misc might be making use of it
+> as well.
+> 
+> Changes since v3:
+>  * Dropped compatible field in matrix-keymap.txt
+>  * Dropped linux,fn-key
+>  * Dropped linux,fn-keymap optional property but included guideline on
+>    naming convention
+>  * Now passing property name in to the helper function (or will assume
+>    "linux,keymap" if passed NULL)
 
-I thought this check was put in place to catch changes to struct
-bug_entry being out of sync with the __BUG macro defined in ARM. Why
-can't we include kernel.h instead? Or can you elaborate some more on why
-we don't need this check in the commit text?
+> diff --git a/drivers/input/of_keymap.c b/drivers/input/of_keymap.c
+
+> +struct matrix_keymap_data *
+> +matrix_keyboard_of_fill_keymap(struct device_node *np, char *propname)
+> +{
+...
+> +	kd = kmalloc(sizeof(*kd), GFP_KERNEL);
+> +	if (!kd)
+> +		return NULL;
+
+Should that use kzalloc in case struct matrix_keymap_data grows some
+new fields that people will assume are set to zero since the struct
+would usually be in .data? Still, people should probably grep the code
+when making such changes...
+
+Otherwise,
+
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+nvpublic
