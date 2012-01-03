@@ -1,47 +1,30 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 4 Jan 2012 14:28:17 +0200
-Subject: [PATCH v1 0/3] Tegra30 clockframework
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F1220@HQMAIL01.nvidia.com>
-References: <1325517486-22458-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F1220@HQMAIL01.nvidia.com>
-Message-ID: <20120104122817.GI32619@tbergstrom-lnx.Nvidia.com>
+From: j.kilb@phytec.de (=?ISO-8859-1?Q?J=FCrgen_Kilb?=)
+Date: Tue, 03 Jan 2012 17:17:20 +0100
+Subject: updating machine registry for 2843/pcaal1
+Message-ID: <4F032A10.9030203@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 12:03:30AM +0100, Stephen Warren wrote:
-> Peter De Schrijver wrote at Monday, January 02, 2012 8:18 AM:
-> > This patchset introduces the tegra30 clockframework. Clocks which require
-> > voltage scaling are not included in this version. The implementation doesn't
-> > use the generic clock code yet. It's the intention to move to it, once the
-> > semantics are fully clarified.
-> 
-> I'm not particularly familiar with Tegra's clocks, but nothing really
-> stood out as wrong with this patch on a quick look-through. It'd be great
-> if someone like Colin could look this over.
-> 
-> A couple thoughts below. You've probably thought about some of these
-> already, but I just wanted to make sure:-)
-> 
-> * Are we following the common clock stuff so we can move over once it's
-> ready?
-> 
+Hi Russell,
 
-I think we can use the same approach then OMAP4 to convert this to the common
-clock stuff.
+I've tried to fix the machine name of our product in the machine 
+registry for machine number 2843.
+The correct name is pcaal1. As you can see the machine name and the type 
+macro are correct now.
 
-> * Are Tegra20 and Tegra30 so different we can't re-use any of the code
-> in tegra2_clocks.c for Tegra30?
-> 
+Could you please update the Kconfig macro and the Type Identifier ?
 
-Apart from some small functions (such as clk_measure_input_freq()), it's not
-easy to share code between both.
+is:
+machine_is_pcaal1()
+CONFIG_MACH_PCA102
+MACH_TYPE_PCA102
 
-> * The device names in the peripheral clock table might benefit from a
-> review to make sure they match tegra2_clocks.c for the drivers we've
-> actually upstreamed at least.
+should be:
+machine_is_pcaal1()
+CONFIG_MACH_PCAAL1
+MACH_TYPE_PCAAL1
 
-Good point. I should check that...
+Thanks for your help.
 
-Cheers,
-
-Peter.
+greetings,
+J?rgen
