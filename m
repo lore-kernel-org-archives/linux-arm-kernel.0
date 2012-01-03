@@ -1,51 +1,17 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 3 Jan 2012 20:43:56 +0800
+Date: Tue, 3 Jan 2012 20:45:02 +0800
 Subject: [PATCH] ARM: imx6q: add support for IRAM
-In-Reply-To: <20120103091015.GD2914@n2100.arm.linux.org.uk>
+In-Reply-To: <1324898123-13973-1-git-send-email-jason.chen@linaro.org>
 References: <1324898123-13973-1-git-send-email-jason.chen@linaro.org>
- <20111226134129.GA9014@S2100-06.ap.freescale.net>
- <20120103091015.GD2914@n2100.arm.linux.org.uk>
-Message-ID: <20120103124355.GC13477@S2100-06.ap.freescale.net>
+Message-ID: <20120103124501.GD13477@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 09:10:15AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 26, 2011 at 09:41:30PM +0800, Shawn Guo wrote:
-> > On Mon, Dec 26, 2011 at 07:15:23PM +0800, Jason Chen wrote:
-> > > Signed-off-by: Jason Chen <jason.chen@linaro.org>
-> > > Signed-off-by: Eric Miao <eric.miao@linaro.org>
-> > > ---
-> > >  arch/arm/boot/dts/imx6q.dtsi    |    7 +++++++
-> > >  arch/arm/mach-imx/Kconfig       |    1 +
-> > >  arch/arm/mach-imx/clock-imx6q.c |    3 ++-
-> > >  arch/arm/mach-imx/mach-imx6q.c  |   17 +++++++++++++++++
-> > >  4 files changed, 27 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> > > index 263e8f3..01646b8 100644
-> > > --- a/arch/arm/boot/dts/imx6q.dtsi
-> > > +++ b/arch/arm/boot/dts/imx6q.dtsi
-> > > @@ -80,6 +80,13 @@
-> > >  		};
-> > >  	};
-> > >  
-> > > +	ocram at 00900000 {
-> > > +		compatible = "fsl,imx6q-iram";
-> > 
-> > It should have nothing specific to imx6q, and could be "fsl,iram".
-> > Then we can have some common code across different SoCs to match it.
-> 
-> Why is this even specific to fsl?  Isn't it something that could be
-> specified in a totally generic way?
-> 
-> As I showed with my original set of sram patches, there is not much
-> specific about this on-board RAM: what is specific is how a SoC uses
-> it, and that's up to the rest of the SoC code.
-> 
-As I have not seen any news/updates about the sram consolidation series
-since May, I did not bring up it here.  So what's the state of the
-series?  If it shows up on some stable branch, we would be happy to
-base the work here on it.
+On Mon, Dec 26, 2011 at 07:15:23PM +0800, Jason Chen wrote:
+> +DEF_CLK(ocram_clk,   	  CCGR3, CG14, &ahb_clk,	  NULL);
+
+  CC      arch/arm/mach-imx/clock-imx6q.o
+arch/arm/mach-imx/clock-imx6q.c:1782:1: warning: ?ocram_clk? defined but not used
 
 -- 
 Regards,
