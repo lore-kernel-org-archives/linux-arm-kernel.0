@@ -1,36 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 17:06:15 +0000
-Subject: [PATCH v3] Input: keyboard - add device tree bindings for
- simple key matrixes
-In-Reply-To: <20120103164431.GA31647@core.coreip.homeip.net>
-References: <1325184146-3527-1-git-send-email-olof@lixom.net>
- <1325484557-27695-1-git-send-email-olof@lixom.net>
- <CAPnjgZ1ngJrqB5FgOZDmc-H9KBE0-W75rqTHEPX4D+q0FjYumg@mail.gmail.com>
- <20120103154317.GA27061@quad.lixom.net>
- <CAPnjgZ3xN8+Ve28bcg1OQ4mv5rWvA-9ijP57UsuMQ5D1d=7Xxw@mail.gmail.com>
- <20120103162929.GY2914@n2100.arm.linux.org.uk>
- <20120103164431.GA31647@core.coreip.homeip.net>
-Message-ID: <20120103170615.GZ2914@n2100.arm.linux.org.uk>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 3 Jan 2012 22:37:01 +0530
+Subject: [RFC][PATCH 0/4] lcd: platform-lcd: Add lcd panel and device tree
+ support
+In-Reply-To: <4F02F3FD.4010306@metafoo.de>
+References: <1325483675-21908-1-git-send-email-thomas.abraham@linaro.org>
+ <4F02C50E.9030904@metafoo.de>
+ <CAJuYYwR8hnxJSfaXo4=RWCZ1HQZ1PHci+jY3K5b9ktWXryN0vA@mail.gmail.com>
+ <4F02F3FD.4010306@metafoo.de>
+Message-ID: <CAJuYYwQJcW83EznpWmmZTCjSL9Ka1nztHx=4cpz2yzuhEyPtjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 08:44:32AM -0800, Dmitry Torokhov wrote:
-> On Tue, Jan 03, 2012 at 04:29:30PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Jan 03, 2012 at 08:22:21AM -0800, Simon Glass wrote:
-> > > Can the Linux key codes fit in 8 bits?
-> > 
-> > That depends on your point of view.
-> > 
-> > If you hack on X, then the answer is yes and you ignore the squeels of
-> > your users when certain key presses get misinterpreted.  (The Psion LX
-> > platform, otherwise known as the Netbook Pro, suffered with this problem.)
-> > 
-> > If you are a kernel hacker, the answer is no, because key codes currently
-> > go all the way to 0x300.
-> 
-> For bootloader environment 0-255 range is probably sufficient though,
-> the upper keys are somewhat recent additions to the maps...
+On 3 January 2012 17:56, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> On 01/03/2012 12:54 PM, Thomas Abraham wrote:
+>> Hi Lars,
+>>
+>> On 3 January 2012 14:36, Lars-Peter Clausen <lars@metafoo.de> wrote:
+>>> On 01/02/2012 06:54 AM, Thomas Abraham wrote:
+>>>> The platform-lcd driver depends on platform-specific callbacks to setup the
+>>>> lcd panel. These callbacks are supplied using driver's platform data. But
+>>>> for adding device tree support for platform-lcd driver, providing such
+>>>> callbacks is not possible (without using auxdata).
+>>>>
+>>>> Since the callbacks are usually lcd panel specific, it is possible to include
+>>>> the lcd panel specific setup and control functionality in the platform-lcd
+>>>> driver itself, thereby eliminating the need for supplying platform specific
+>>>> callbacks to the driver. The platform-lcd driver can include support for
+>>>> multiple lcd panels.
+>>>>
+>>>> This patchset removes the need for platform data for platform-lcd driver and
+>>>> adds support which can be used to implement lcd panel specific functionality
+>>>> in the driver. As an example, the support for Hydis hv070wsa lcd panel is added
+>>>> to the platform-lcd driver which is then used on the Exynos4 based Origen board.
+>>>> This currently breaks build for other users of platform-lcd driver. Those can be
+>>>> fixed if this approach is acceptable.
+>>>
+>>> The whole approach looks rather backwards to me. The exact purpose of the
+>>> platform_lcd driver is to redirect the lcd driver callbacks to board code.
+>>> So by removing this support you not only break all the existing driver but
+>>> also create a driver which does nothing. Then you add another layer of
+>>> abstraction to implement custom drivers in this driver. A better approach in
+>>> my opinion is to simply implement these drivers as first level LCD drivers.
+>>> So leave the platform-lcd driver as it is and just add a gpio (or maybe
+>>> regulator) lcd driver instead.
+>>
+>> The existing platform-lcd driver mostly depends on the platform
+>> callbacks for lcd panel power controls. Looking at the current users
+>> of platform-lcd driver, a majority of the users of platform-lcd driver
+>> use a gpio to enable/disable the display/power. The gpio is controlled
+>> by the platform callbacks which the platform-lcd driver calls.
+>>
+>> Hence, it is possible to extend the platform-lcd driver to include the
+>> functionality of managing the gpio for lcd control. The platform code
+>> is only expected to provide a gpio number to the platform-lcd driver.
+>> This allows consolidation of the all the different platform callbacks
+>> that use a gpio for simple enable/disable of the lcd display.
+>>
+>> But there are other users of platform-lcd that do lot more than just
+>> control a single gpio. For such cases, it is possible to reuse the
+>> existing infrastructure of platform-lcd driver and extend it to handle
+>> such lcd panel specific functionality.
+>>
+>> The main advantages that I see here is the consolidation of platform
+>> specific callbacks into the driver which inturn allows adding device
+>> tree support without depending on platform data which have pointers to
+>> platform specific functions. In the next version of this patchset, it
+>> will be ensured that no platform breaks due to this change.
+>
+> Consolidation of the different implementations which use a GPIO to control
+> the LCD state is a good idea. But as I wrote above in this series you added
+> more or less another layer of abstraction. Namely introducing the
+> platform-lcd driver as a intermediate layer between the actual driver and
+> the LCD framework. But the layer is so thin that all it does is to call the
+> plat_lcd_driver_data callback from the lcd_ops callback. There is really no
+> point in doing this since you can setup the lcd_ops callbacks directly. Also
+> following your approach we would end up with a bunch of unrelated LCD
+> drivers in the platform-lcd driver module. The platform-lcd driver is so
+> generic that basically any LCD driver could be implemented on-top of it, but
+> this does not mean it has to.
 
-I assume you deem 'recent' to mean 8 years ago - they've been there since
-at least 2.6.9, which is where the problem I refer to above was first
-noticed.
+Yes, this will lead to including support for multiple lcd panels in
+the platform-lcd driver. But, we get to reuse most of the
+infrastruture in the platform-lcd driver such as module init/cleanup,
+suspend/resume, probe and lcd driver registration. There is a plan to
+include regulator support in the platform-lcd driver as well. If we go
+for independent drivers for all existing users of platform-lcd driver,
+then this common code in platform-lcd driver will have to be
+duplicated in multiple new drivers.
+
+What would be your suggestion considering this. Actually, I don't
+clearly understand the technical/maintainability reasons which do not
+favour including support for multiple types of simple lcd panels in
+the platform-lcd driver.
+
+>
+> As said before, writing a plain LCD driver which implements the GPIO
+> handling and leaving the platform-lcd driver as it is, is in my opinion a
+> better approach.
+
+Thanks,
+Thomas.
