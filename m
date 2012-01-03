@@ -1,85 +1,49 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue,  3 Jan 2012 15:25:17 -0700
-Subject: [PATCH 1/4] ARM: tegra: Introduce define DEBUG_UART_SHIFT
+Date: Tue,  3 Jan 2012 15:25:18 -0700
+Subject: [PATCH 2/4] ARM: tegra: uncompress.h: Store UART address in a variable
 In-Reply-To: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
 References: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1325629520-23018-2-git-send-email-swarren@nvidia.com>
+Message-ID: <1325629520-23018-3-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Doug Anderson <dianders@chromium.org>
 
-This removes the need for the variable "shift" in all functions in
-uncompress.h.
+This will allow a future change to auto-detect which UART to use.
 
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 [swarren: Extracted from a larger patch by Doug]
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/include/mach/uncompress.h |   18 ++++++++++--------
- 1 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/mach-tegra/include/mach/uncompress.h |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
-index 39bd5e5..9797279 100644
+index 9797279..bb3fd35 100644
 --- a/arch/arm/mach-tegra/include/mach/uncompress.h
 +++ b/arch/arm/mach-tegra/include/mach/uncompress.h
-@@ -2,10 +2,12 @@
-  * arch/arm/mach-tegra/include/mach/uncompress.h
-  *
-  * Copyright (C) 2010 Google, Inc.
-+ * Copyright (C) 2011 Google, Inc.
-  *
-  * Author:
-  *	Colin Cross <ccross@google.com>
-  *	Erik Gilling <konkers@google.com>
-+ *	Doug Anderson <dianders@chromium.org>
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -26,17 +28,18 @@
+@@ -30,10 +30,10 @@
  
- #include <mach/iomap.h>
+ #define DEBUG_UART_SHIFT 2
  
-+#define DEBUG_UART_SHIFT 2
++volatile u8 *uart;
 +
  static void putc(int c)
  {
- 	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
--	int shift = 2;
- 
+-	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+-
  	if (uart == NULL)
  		return;
  
--	while (!(uart[UART_LSR << shift] & UART_LSR_THRE))
-+	while (!(uart[UART_LSR << DEBUG_UART_SHIFT] & UART_LSR_THRE))
- 		barrier();
--	uart[UART_TX << shift] = c;
-+	uart[UART_TX << DEBUG_UART_SHIFT] = c;
- }
- 
- static inline void flush(void)
-@@ -48,7 +51,6 @@ static inline void arch_decomp_setup(void)
+@@ -50,8 +50,8 @@ static inline void arch_decomp_setup(void)
+ {
  	volatile u32 *apb_misc = (volatile u32 *)TEGRA_APB_MISC_BASE;
  	u32 chip, div;
- 	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
--	int shift = 2;
+-	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
  
++	uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
  	if (uart == NULL)
  		return;
-@@ -59,10 +61,10 @@ static inline void arch_decomp_setup(void)
- 	else
- 		div = 0x00dd;
  
--	uart[UART_LCR << shift] |= UART_LCR_DLAB;
--	uart[UART_DLL << shift] = div & 0xff;
--	uart[UART_DLM << shift] = div >> 8;
--	uart[UART_LCR << shift] = 3;
-+	uart[UART_LCR << DEBUG_UART_SHIFT] |= UART_LCR_DLAB;
-+	uart[UART_DLL << DEBUG_UART_SHIFT] = div & 0xff;
-+	uart[UART_DLM << DEBUG_UART_SHIFT] = div >> 8;
-+	uart[UART_LCR << DEBUG_UART_SHIFT] = 3;
- }
- 
- static inline void arch_decomp_wdog(void)
 -- 
 1.7.0.4
