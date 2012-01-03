@@ -1,51 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Jan 2012 09:37:52 -0800
-Subject: [GIT PULL] i.MX patches for eukrea boards
-In-Reply-To: <20120103085137.GH5446@pengutronix.de>
-References: <20120103085137.GH5446@pengutronix.de>
-Message-ID: <CAOesGMizj-B4+3tFGMJY0=6e79g+OmzRn+Ou3R5eM_PLJUU=cQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Jan 2012 17:41:23 +0000
+Subject: [PATCH] ARM: imx6: fix v7_invalidate_l1 by adding I-Cache
+ invalidation
+In-Reply-To: <20111231092148.GG12182@S2100-06.ap.freescale.net>
+References: <1325237200-10610-1-git-send-email-shawn.guo@linaro.org>
+ <CAB4PhKexxJM+rWhgdQfu9vB16KVT6QpN1ye4kH88pNiLnEyL+Q@mail.gmail.com>
+ <20111231092148.GG12182@S2100-06.ap.freescale.net>
+Message-ID: <20120103174123.GE2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Sat, Dec 31, 2011 at 05:21:49PM +0800, Shawn Guo wrote:
+> I was ever told by Russell that ARM_ARM permits that cache holds random
+> data out of a power-up.  But I'm not sure if the validity mark can also
+> be randomized.
 
-On Tue, Jan 3, 2012 at 12:51 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Arnd, Olof,
->
-> Please pull the following eukrea board specific patches. They
-> currently conflict with the patches merging mach-mx5 to mach-imx.
-> Let me know if I have to rebase them.
->
-> Sascha
->
-> The following changes since commit 384703b8e6cd4c8ef08512e596024e028c91c339:
->
-> ?Linux 3.2-rc6 (2011-12-16 18:36:26 -0800)
->
-> are available in the git repository at:
-> ?git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-eukrea
->
-> Eric B?nard (9):
-> ? ? ?mxc_udc: add workaround for ENGcm09152 for i.MX25
-> ? ? ?eukrea_cpuimx25: enable workaround ENGcm09152
-> ? ? ?mbimxsd25: add spi controler and spidev support
-> ? ? ?cpuimx25: add watchdog support
-> ? ? ?mbimxsd35: add spi controler and spidev support
-> ? ? ?eukrea-cpuimx51: remove board
-> ? ? ?cpuimx51sd: add watchdog support
-> ? ? ?mbimx51sd: add audio codec support
-> ? ? ?eukrea-cpuimx51sd: support rev2 PCB
+It's worse than that: the ARM ARM says that some caches may require a
+CPU specific sequence to initialize them after power-up.  It's also
+implemenation defined whether entries in the cache can be hit while
+the caches are disabled.  I believe that there's nothing mentioned
+about the state of the validity bits either (which, from my reading,
+could be in a random state.)
 
-Can you please change the patch subjects of these and future patches.
-They should generally be on the form:
+As far as the architecture goes, it doesn't matter provided there is
+an implementation defined sequence which results in the caches being
+properly initialized.
 
-ARM: <platform>: <subplatform or topic>: <...>
+I suspect that an implementation which choses to leave the validity bits
+in a random state _and_ which searches the instruction cache with I=0 in
+the control register would not be reasonable as each time you power up,
+you're playing russian roulette with the contents of the I cache
+interfering with the very first instruction to be executed by the CPU.
 
-So, in your case:
+However, an implementation which guaranteed that there wouldn't be an
+I-cache entry at the reset vector, and specified a sequence which would
+fit inside one cache line, and which had the properties above _would_
+conform.
 
-ARM: imx: ...
+So, this makes for a really interesting situation: by the time we get
+anywhere near the kernel, it may already be too late to invalidate the
+caches if it hasn't already been done.
 
-Thanks!
-
-
--Olof
+We really need boot loaders to have already initialized the caches.
+In the case of secondary CPU bringup, it's possible that the secondary
+CPU may start executing from our trampoline code, and this is why
+platforms are able to specify their own initial code for this.
