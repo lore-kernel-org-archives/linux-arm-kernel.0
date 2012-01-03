@@ -1,225 +1,111 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 3 Jan 2012 16:09:27 -0500
-Subject: [RFC v3 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <CAB2ybb_jZNgQma7dv2qojOf8K0-1wutfMkNr3xjqFvfpw2aNTQ@mail.gmail.com>
-References: <1324283611-18344-1-git-send-email-sumit.semwal@ti.com>
- <1324283611-18344-3-git-send-email-sumit.semwal@ti.com>
- <20111220163650.GB3964@phenom.dumpdata.com>
- <CAB2ybb_jZNgQma7dv2qojOf8K0-1wutfMkNr3xjqFvfpw2aNTQ@mail.gmail.com>
-Message-ID: <20120103210927.GJ17472@phenom.dumpdata.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Jan 2012 21:11:59 +0000
+Subject: [GIT PULL] Samsung devel-dma for v3.3
+In-Reply-To: <037401ccc8e7$e5671380$b0353a80$%kim@samsung.com>
+References: <037401ccc8e7$e5671380$b0353a80$%kim@samsung.com>
+Message-ID: <201201032111.59603.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2011 at 03:22:35PM +0530, Semwal, Sumit wrote:
-> Hi Konrad,
+On Monday 02 January 2012, Kukjin Kim wrote:
+> Hi Arnd and Olof,
 > 
-> On Tue, Dec 20, 2011 at 10:06 PM, Konrad Rzeszutek Wilk
-> <konrad.wilk@oracle.com> wrote:
-> > On Mon, Dec 19, 2011 at 02:03:30PM +0530, Sumit Semwal wrote:
-> >> This is the first step in defining a dma buffer sharing mechanism.
-> >>
-> >> A new buffer object dma_buf is added, with operations and API to allow easy
-> >> sharing of this buffer object across devices.
-> >>
-> >> The framework allows:
-> >> - different devices to 'attach' themselves to this buffer, to facilitate
-> >> ? backing storage negotiation, using dma_buf_attach() API.
-> >
-> > Any thoughts of adding facility to track them? So you can see who is using what?
-> Not for version 1, but it would be a useful addition once we start
-> using this mechanism.
-
-OK. Looking forward to V2.
+> Please pull Samsung devel-dma for v3.3 from following:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next-samsung-devel-dma
 > 
-> >
-> >> - association of a file pointer with each user-buffer and associated
-> >> ? ?allocator-defined operations on that buffer. This operation is called the
-> >> ? ?'export' operation.
-> >
-> > ?'create'? or 'alloc' ?
-> >
-> > export implies an import somwhere and I don't think that is the case here.
-> I will rephrase it as suggested by Rob as well.
+> Its major feature is including merge of pl330 driver into drivers/dma/ and
+> got the ack from Vinod Koul and Linus Walleij and some dma development for
+> Samsung stuff.
 > 
-> >
-> >> - this exported buffer-object to be shared with the other entity by asking for
-> >> ? ?its 'file-descriptor (fd)', and sharing the fd across.
-> >> - a received fd to get the buffer object back, where it can be accessed using
-> >> ? ?the associated exporter-defined operations.
-> >> - the exporter and user to share the scatterlist using map_dma_buf and
-> >> ? ?unmap_dma_buf operations.
-> >>
-> >> Atleast one 'attach()' call is required to be made prior to calling the
-> >> map_dma_buf() operation.
-> >
-> > for the whole memory region or just for the device itself?
-> Rob has very eloquently and kindly explained it in his reply.
-
-Can you include his words of wisdom in the git description?
-
+> As a note, since having dependency with Vinod's slave-dma/next (dma tree)
+> and next-samsung-dt1 branch which has been sent to you for arm-soc/next/dt,
+> that has been provided based on slave-dma/next tree and next-samsung-dt1.
 > 
-> >
-> >>
-> <snip>
-> >> +/*
-> >> + * is_dma_buf_file - Check if struct file* is associated with dma_buf
-> >> + */
-> >> +static inline int is_dma_buf_file(struct file *file)
-> >> +{
-> >> + ? ? return file->f_op == &dma_buf_fops;
-> >> +}
-> >> +
-> >> +/**
-> >
-> > Wrong kerneldoc.
-> I looked into scripts/kernel-doc, and
-> Documentation/kernel-doc-na-HOWTO.txt => both these places mention
-> that the kernel-doc comments have to start with /**, and I couldn't
-> spot an error in what's wrong with my usage - would you please
-> elaborate on what you think is not right?
+> If any problems, please let me know.
 
-The issue I had was with '/**' but let me double-check where I learned
-that /** was a bad. Either way, it is a style-guide thing and the
-Documentation/* trumps what I recall.
+Pulled into a new next/drivers2 branch so I can send the other drivers
+early but delay this until the dma-slave branch is merged, if necessary.
 
-> >
-> <snip>
-> >> +/**
-> >> + * struct dma_buf_attachment - holds device-buffer attachment data
-> >
-> > OK, but what is the purpose of it?
-> I will add that in the comments.
-> >
-> >> + * @dmabuf: buffer for this attachment.
-> >> + * @dev: device attached to the buffer.
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?^^^ this
-> >> + * @node: list_head to allow manipulation of list of dma_buf_attachment.
-> >
-> > Just say: "list of dma_buf_attachment"'
-> ok.
-> >
-> >> + * @priv: exporter-specific attachment data.
-> >
-> > That "exporter-specific.." brings to my mind custom decleration forms. But maybe that is me.
-> :) well, in context of dma-buf 'exporter', it makes sense.
+There were some conflicts between imx changes that went into the dma-slave
+tree and those that went into arm-soc. Sascha, Shawn: can you have a look
+to make sure the resolution below is correct?
 
-Or just private contents of the backend driver. But the naming is not that important
-to inhibit this patch from being merged.
-> 
-> >
-> >> + */
-> >> +struct dma_buf_attachment {
-> >> + ? ? struct dma_buf *dmabuf;
-> >> + ? ? struct device *dev;
-> >> + ? ? struct list_head node;
-> >> + ? ? void *priv;
-> >> +};
-> >
-> > Why don't you move the decleration of this below 'struct dma_buf'?
-> > It would easier than to read this structure..
-> I could do that, but then anyways I will have to do a
-> forward-declaration of dma_buf_attachment, since I have to use it in
-> dma_buf_ops. If it improves readability, I am happy to move it below
-> struct dma_buf
+Thanks,
 
-It is more of just making the readability easier. As in reading from top bottom
-one. But if it is too ugly, don't bother.
-> 
-> >
-> >> +
-> >> +/**
-> >> + * struct dma_buf_ops - operations possible on struct dma_buf
-> >> + * @attach: allows different devices to 'attach' themselves to the given
-> >
-> > register?
-> >> + * ? ? ? buffer. It might return -EBUSY to signal that backing storage
-> >> + * ? ? ? is already allocated and incompatible with the requirements
-> >
-> > Wait.. allocated or attached?
-> This and above comment on 'register' are already answered by Rob in
-> his explanation of the sequence in earlier reply. [the Documentation
-> patch [2/2] also tries to explain it]
+	Arnd
 
-OK. Might want to mention the user to look in the Documentation, in case you don't
-already have it.
-> 
-> >
-> >> + * ? ? ? of requesting device. [optional]
-> >
-> > What is optional? The return value? Or the 'attach' call? If the later , say
-> > that in the first paragraph.
-> >
-> ok, sure. it is meant for the attach op.
-> >
-> >> + * @detach: detach a given device from this buffer. [optional]
-> >> + * @map_dma_buf: returns list of scatter pages allocated, increases usecount
-> >> + * ? ? ? ? ? ?of the buffer. Requires atleast one attach to be called
-> >> + * ? ? ? ? ? ?before. Returned sg list should already be mapped into
-> >> + * ? ? ? ? ? ?_device_ address space. This call may sleep. May also return
-> >
-> > Ok, there is some __might_sleep macro you should put on the function.
-> >
-> That's a nice suggestion; I will add it to the wrapper function for
-> map_dma_buf().
-> 
-> >> + * ? ? ? ? ? ?-EINTR.
-> >
-> > Ok. What is the return code if attach has _not_ been called?
-> Will document it to return -EINVAL if atleast on attach() hasn't been called.
-> 
-> >
-> >> + * @unmap_dma_buf: decreases usecount of buffer, might deallocate scatter
-> >> + * ? ? ? ? ? ? ?pages.
-> >> + * @release: release this buffer; to be called after the last dma_buf_put.
-> >> + * @sync_sg_for_cpu: sync the sg list for cpu.
-> >> + * @sync_sg_for_device: synch the sg list for device.
-> >
-> > Not seeing those two.
-> Oops; removed in v3 - will correct.
-> 
-> >> + */
-> <snip>
-> >> + ? ? /* TODO: Add try_map_dma_buf version, to return immed with -EBUSY
-> >
-> > Ewww. Why? Why not just just the 'map_dma_buf' and return that?
-> Requirement is to allow for blocking and non-blocking versions of
-> map_dma_buf. try_map_dma_buf could be used for the non-blocking
-> version.
-
-Ok. What about just adding that in as a nop function operation. And have an
-initial implementation in the code base that does .. well, nothing except 
-return -ENOSPC and move the TODO to the code instead of it being in the header?
-
-> 
-> >
-> <snip>
-> >> +/**
-> >> + * struct dma_buf - shared buffer object
-> >
-> > Missing the 'size'.
-> Will add.
-> >
-> >> + * @file: file pointer used for sharing buffers across, and for refcounting.
-> >> + * @attachments: list of dma_buf_attachment that denotes all devices attached.
-> >> + * @ops: dma_buf_ops associated with this buffer object
-> >> + * @priv: user specific private data
-> >
-> >
-> > Can you elaborate on this? Is this the "exporter" using this? Or is
-> > it for the "user" using it? If so, why provide it? Wouldn't the
-> > user of this have something like this:
-> >
-> > struct my_dma_bufs {
-> > ? ? ? ?struct dma_buf[20];
-> > ? ? ? ?void *priv;
-> > }
-> >
-> > Anyhow?
-> My bad - it is meant for the exporter - exporter gives this as one of
-> the parameters to 'dma_buf_export()' API. I will correct the comment.
-> >
-> Thanks for your review!
-
-Sure. And please put 'Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>'.
-> Best regards,
-> ~Sumit.
+diff --cc arch/arm/mach-exynos/clock.c
+index da50b1a,5185a25..62e260e
+--- a/arch/arm/mach-exynos/clock.c
++++ b/arch/arm/mach-exynos/clock.c
+@@@ -1322,15 -1308,9 +1330,16 @@@ static struct clk_lookup exynos4_clk_lo
+        CLKDEV_INIT("exynos4210-uart.1", "clk_uart_baud0", &clk_sclk_uart1.clk),
+        CLKDEV_INIT("exynos4210-uart.2", "clk_uart_baud0", &clk_sclk_uart2.clk),
+        CLKDEV_INIT("exynos4210-uart.3", "clk_uart_baud0", &clk_sclk_uart3.clk),
+ +      CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.2", &clk_sclk_mmc0.clk),
+ +      CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &clk_sclk_mmc1.clk),
+ +      CLKDEV_INIT("s3c-sdhci.2", "mmc_busclk.2", &clk_sclk_mmc2.clk),
+ +      CLKDEV_INIT("s3c-sdhci.3", "mmc_busclk.2", &clk_sclk_mmc3.clk),
+        CLKDEV_INIT("dma-pl330.0", "apb_pclk", &clk_pdma0),
+        CLKDEV_INIT("dma-pl330.1", "apb_pclk", &clk_pdma1),
++       CLKDEV_INIT("dma-pl330.2", "apb_pclk", &clk_mdma1),
+ +      CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk0", &clk_sclk_spi0.clk),
+ +      CLKDEV_INIT("s3c64xx-spi.1", "spi_busclk0", &clk_sclk_spi1.clk),
+ +      CLKDEV_INIT("s3c64xx-spi.2", "spi_busclk0", &clk_sclk_spi2.clk),
+  };
+  
+  static int xtal_rate;
+diff --cc drivers/dma/mxs-dma.c
+index fc903c0,493af2f..b06cd4c
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@@ -578,9 -554,9 +554,9 @@@ static int __init mxs_dma_init(struct m
+  {
+        int ret;
+  
+ -      ret = clk_enable(mxs_dma->clk);
+ +      ret = clk_prepare_enable(mxs_dma->clk);
+        if (ret)
+-               goto err_out;
++               return ret;
+  
+        ret = mxs_reset_block(mxs_dma->base);
+        if (ret)
+@@@ -604,11 -580,8 +580,8 @@@
+        writel(MXS_DMA_CHANNELS_MASK << MXS_DMA_CHANNELS,
+                mxs_dma->base + HW_APBHX_CTRL1 + MXS_SET_ADDR);
+  
+-       clk_disable_unprepare(mxs_dma->clk);
+- 
+-       return 0;
+- 
+  err_out:
+ -      clk_disable(mxs_dma->clk);
+++      clk_disable_unprepare(mxs_dma->clk);
+        return ret;
+  }
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -124,7 +124,7 @@ config MV_XOR
+ 
+ config MX3_IPU
+        bool "MX3x Image Processing Unit support"
+-       depends on SOC_IMX31 ||<C2><A0>SOC_IMX35
++       depends on ARCH_MXC
+        select DMA_ENGINE
+        default y
+ 	       help
+@@ -194,33 +201,32 @@ config PL330_DMA
+ config IMX_SDMA
+        tristate "i.MX SDMA support"
+-       depends on ARCH_MX25 || SOC_IMX31 ||<C2><A0>SOC_IMX35 || ARCH_MX5
++       depends on ARCH_MXC
+        select DMA_ENGINE
+        help
+          Support the i.MX SDMA engine. This engine is integrated into
+-         Freescale i.MX25/31/35/51 chips.
++         Freescale i.MX25/31/35/51/53 chips.
+ 
+ config IMX_DMA
+        tristate "i.MX DMA support"
