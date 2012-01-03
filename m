@@ -1,47 +1,86 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 3 Jan 2012 21:25:30 +0800
-Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
-In-Reply-To: <20120103090625.GA2914@n2100.arm.linux.org.uk>
-References: <1324537753-30590-1-git-send-email-richard.zhao@linaro.org>
- <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
- <20111223131851.GB13175@sirena.org.uk>
- <20111224085539.GA1892@richard-laptop>
- <20111224122411.GA13778@sirena.org.uk>
- <20111224132831.GB1803@richard-laptop>
- <20111224134227.GA20908@opensource.wolfsonmicro.com>
- <20111224155227.GC1803@richard-laptop>
- <20111226111030.GC8722@opensource.wolfsonmicro.com>
- <20111226134449.GA4259@richard-laptop>
- <20120103090625.GA2914@n2100.arm.linux.org.uk>
-Message-ID: <CAH8gqwVHc9ROQYZNe6b-cUN0ycWhYj8=vJ0geBXUCYN1+XENQA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Jan 2012 13:43:28 +0000
+Subject: [PATCH] dmaengine/dw_dmac: Add support for device_prep_dma_sg
+In-Reply-To: <1325595816.1540.65.camel@vkoul-udesk3>
+References: <1323766064-13425-1-git-send-email-pratyush.anand@st.com>
+ <1324655898.1633.11.camel@vkoul-udesk3> <4F0192F2.3010506@st.com>
+ <1325503535.1540.17.camel@vkoul-udesk3>
+ <20120103094048.GF2914@n2100.arm.linux.org.uk>
+ <1325595816.1540.65.camel@vkoul-udesk3>
+Message-ID: <20120103134328.GR2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+On Tue, Jan 03, 2012 at 06:33:36PM +0530, Vinod Koul wrote:
+> On Tue, 2012-01-03 at 09:40 +0000, Russell King - ARM Linux wrote:
+> > Wait a moment.  This looks like a disaster waiting to happen.  The DMA
+> > engine code doesn't really handle the DMA API properly as it is - and
+> > that has lead to at least one recent oops report (and it still remains
+> > unresolved.)
+> > 
+> > The DMA API has the idea of buffer ownership: a buffer is either owned by
+> > the CPU, or the DMA device.  Only its owner may explicitly access the
+> > buffer.
+> > 
+> > Before a buffer can be used for DMA, it must be mapped to the DMA device
+> > (using dma_map_sg() or dma_map_single().)  Once this call returns, the
+> > mapping is setup and the CPU must not explicitly access the buffer until
+> > the buffer is unmapped via dma_unmap_sg() or dma_unmap_single().
+> > 
+> > With the DMA engine API, the caller is responsible for mapping the buffer.
+> > 
+> > This means that if you want to ensure that the buffer is correctly aligned,
+> > you must check the alignments _before_ mapping the buffer, and do any
+> > appropriate copies at this stage.
+> > 
+> > So, it must be:
+> > 	- align_sg_list
+> > 	- map aligned lists
+> > 	- prep_dma_sg
+> Yes, that is something I had in mind as well.
+> For slave-dma as we documented, the peripheral driver needs to take care
+> of mapping hence it should do above as you suggested and not the one
+> below.
+> My suggestion was to have a generic alignment routine for sg list (which
+> may be used by other drivers as well) in some common place.
+> > and not
+> > 	- map aligned lists
+> > 	- align_sg_list
+> > 	- prep_dma_sg
+> > because then you're violating the DMA API by having the CPU access an
+> > already mapped buffer - and that will lead to data corruption.
+> > 
+> > Finally, consider this: you have two scatterlists which ask you to copy
+> > between two buffers.  The first is offset by one byte from a 32-bit word
+> > boundary.  The second is offset by two bytes from a 32-bit word
+> > boundary.  Your DMA engine can only perform naturally aligned 32-bit
+> > transfers for both the source and destination.  How do you see this
+> > situation being dealt with?
+> in this case, i don't think dmaengine can perform the task.
+> it should check for required alignments in the respective prepare
+> function, and return error if it cant support it.
+> Nevertheless, all prepare functions should be checking for word
+> alignment of source and destination...
 
-On 3 January 2012 17:06, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 26, 2011 at 09:44:52PM +0800, Richard Zhao wrote:
->> On Mon, Dec 26, 2011 at 11:10:30AM +0000, Mark Brown wrote:
->> > The *call* is there in the regulator subsystem, it's just that none of
->> > the drivers back it up with an actual implementation yet. ?Which turns
->> > out to be a good thing as cpufreq can't currently understand variable
->> > latencies and the governors don't deal well with non-trivial latencies
->> > anyway.
->> but clk API don't have such calls. and many SoCs only adjust clk frequencies, using
->> one single voltage.
->
-> That's because it's often not known - especially in the case of PLLs,
-> data sheets don't tend to specify how long it takes for the PLL to relock
-> after a requested change. ?If it's important that the PLL be locked,
-> there will be a bit to poll (or they'll cause the CPU itself to stall
-> while the PLL is not locked.)
->
-> So, for these kinds of situations, how do you suggest that the clk API
-> provides this information?
-In latest v6 version, I get clk transition latency from dt property, and get
-regulator transition latency from regulator API.
-Could you please help review other arm common changes in v6 version?
+This is sub-optimal, because then you end up with:
 
-Thanks
-Richard
+- align_sg_list
+- map lists
+- prep_dma_sg
+- unmap lists
+- perform manual copy
+
+which, if your map/unmap is non-trivial, means you take an unnecessary hit.
+
+It would be much better if the dmaengine code exposed its alignment
+properties in such a way that:
+
+(a) align_sg_list could be totally generic code
+(b) it can be found out whether the sg list can be handled by the DMA
+    engine
+
+I'd also argue that align_sg_list() probably shouldn't even try to align
+a sg list - it should really just indicate whether the sg list _could_
+be handled by the DMA engine code or not.  (The case where the source
+and destination are identically mis-aligned is probably a rare corner
+case of the mis-aligned sg list.)
