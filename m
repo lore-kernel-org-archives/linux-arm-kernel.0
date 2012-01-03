@@ -1,47 +1,38 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 3 Jan 2012 09:57:42 -0800
-Subject: [PATCH v3] Input: keyboard - add device tree bindings for simple
- key matrixes
-In-Reply-To: <20120103170615.GZ2914@n2100.arm.linux.org.uk>
-References: <1325184146-3527-1-git-send-email-olof@lixom.net>
- <1325484557-27695-1-git-send-email-olof@lixom.net>
- <CAPnjgZ1ngJrqB5FgOZDmc-H9KBE0-W75rqTHEPX4D+q0FjYumg@mail.gmail.com>
- <20120103154317.GA27061@quad.lixom.net>
- <CAPnjgZ3xN8+Ve28bcg1OQ4mv5rWvA-9ijP57UsuMQ5D1d=7Xxw@mail.gmail.com>
- <20120103162929.GY2914@n2100.arm.linux.org.uk>
- <20120103164431.GA31647@core.coreip.homeip.net>
- <20120103170615.GZ2914@n2100.arm.linux.org.uk>
-Message-ID: <20120103175742.GB1041@core.coreip.homeip.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Jan 2012 17:58:14 +0000
+Subject: [PATCH] ARM: imx6: fix v7_invalidate_l1 by adding I-Cache
+ invalidation
+In-Reply-To: <20120103172845.GD2914@n2100.arm.linux.org.uk>
+References: <1325237200-10610-1-git-send-email-shawn.guo@linaro.org>
+ <CAB4PhKexxJM+rWhgdQfu9vB16KVT6QpN1ye4kH88pNiLnEyL+Q@mail.gmail.com>
+ <20120103172845.GD2914@n2100.arm.linux.org.uk>
+Message-ID: <20120103175814.GG22876@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 05:06:15PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 03, 2012 at 08:44:32AM -0800, Dmitry Torokhov wrote:
-> > On Tue, Jan 03, 2012 at 04:29:30PM +0000, Russell King - ARM Linux wrote:
-> > > On Tue, Jan 03, 2012 at 08:22:21AM -0800, Simon Glass wrote:
-> > > > Can the Linux key codes fit in 8 bits?
-> > > 
-> > > That depends on your point of view.
-> > > 
-> > > If you hack on X, then the answer is yes and you ignore the squeels of
-> > > your users when certain key presses get misinterpreted.  (The Psion LX
-> > > platform, otherwise known as the Netbook Pro, suffered with this problem.)
-> > > 
-> > > If you are a kernel hacker, the answer is no, because key codes currently
-> > > go all the way to 0x300.
+On Tue, Jan 03, 2012 at 05:28:45PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Dec 30, 2011 at 06:47:05PM +0800, Jason Liu wrote:
+> > I looked the code: arch/arm/mm/proc-v7.S:
 > > 
-> > For bootloader environment 0-255 range is probably sufficient though,
-> > the upper keys are somewhat recent additions to the maps...
+> > #ifdef HARVARD_CACHE
+> >         mcr     p15, 0, r10, c7, c5, 0          @ I+BTB cache invalidate
+> > #endif
+> >         dsb
+> > #ifdef CONFIG_MMU
+> >         mcr     p15, 0, r10, c8, c7, 0          @ invalidate I + D TLBs
+> >         mcr     p15, 0, r10, c2, c0, 2          @ TTB control register
+> >         ALT_SMP(orr     r4, r4, #TTB_FLAGS_SMP)
+> >         ALT_UP(orr      r4, r4, #TTB_FLAGS_UP)
+> >         mcr     p15, 0, r4, c2, c0, 1           @ load TTB1
+> > 
+> > It seems that it will try to invalidate when HARVARD_CACHE define. But
+> > HARVARD_CACHE only defined in v6, why?
 > 
-> I assume you deem 'recent' to mean 8 years ago - they've been there since
-> at least 2.6.9, which is where the problem I refer to above was first
-> noticed.
+> It's probably a mistake caused when copying proc-v6.S to proc-v7.S and
+> editing it - which I believe is how proc-v7.S was created.  Suggest you
+> ask Catalin to find out more details.
 
-Well, what's 8 years ;) On a more serious note keys above 255 are really
-the extended set - keys of remote controls, camera control, touchpad,
-various aplication launchers, etc that are not very interesting for
-bootloader. But, as Olof mentioned, the encoding must be sufficient for
-Linux as well as bootloader, so limiting it is not a good idea.
+It looks like a bug that has been around for nearly 5 years.
 
 -- 
-Dmitry
+Catalin
