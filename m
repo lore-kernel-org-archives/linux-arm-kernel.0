@@ -1,69 +1,58 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 09:40:48 +0000
-Subject: [PATCH] dmaengine/dw_dmac: Add support for device_prep_dma_sg
-In-Reply-To: <1325503535.1540.17.camel@vkoul-udesk3>
-References: <1323766064-13425-1-git-send-email-pratyush.anand@st.com>
- <1324655898.1633.11.camel@vkoul-udesk3> <4F0192F2.3010506@st.com>
- <1325503535.1540.17.camel@vkoul-udesk3>
-Message-ID: <20120103094048.GF2914@n2100.arm.linux.org.uk>
+Date: Tue, 3 Jan 2012 09:43:56 +0000
+Subject: [PATCH] S3C: fix order of MACH_S3C* checks on GPIO count define
+In-Reply-To: <1325164036-15638-1-git-send-email-dron0gus@gmail.com>
+References: <1325164036-15638-1-git-send-email-dron0gus@gmail.com>
+Message-ID: <20120103094356.GG2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2012 at 04:55:35PM +0530, Vinod Koul wrote:
-> On Mon, 2012-01-02 at 16:50 +0530, Pratyush Anand wrote:
-> > On 12/23/2011 9:28 PM, Vinod Koul wrote:
-> > > On Tue, 2011-12-13 at 14:17 +0530, Pratyush Anand wrote:
-> > >> Memory to memory copy with scatter gather option has been implemented in
-> > >> this patch. Driver can manage even if number of nodes in src and dst
-> > >> list is different.
-> > > The logic looks okay, but it would be great if we could split this
-> > > prepare here.
-> > > Possibly later when we have multiple such cases we can create templates
-> > > for parsing the non linear sg list and create linear lists from it.
-> > >
-> > 
-> > Ok. So you suggest to have one patch with a function to align sglist
-> > w.r.t length, and to implement this dwc_prep_dma_sg with aligned list only.
-> IMO that would be a much better approach
-> > 
-> > Caller of dwc_prep_dma_sg function will also call something like
-> > align_sg_list(unaligned_dsgl, unaligned ssgl, aligned dsgl,aligned ssgl);
-> and this one can be common code in dmaengine
+On Thu, Dec 29, 2011 at 05:07:14PM +0400, Gusakov Andrey wrote:
+> Differnt S3C24XX SoC have different number of GPIO. When building
+> kernel for many S3C24XX SoCs GPIO number defined to minimun possible.
+> This patch reordef ifdef's to define GPIO number to muximum possible.
 
-Wait a moment.  This looks like a disaster waiting to happen.  The DMA
-engine code doesn't really handle the DMA API properly as it is - and
-that has lead to at least one recent oops report (and it still remains
-unresolved.)
+This is error prome.  Please come up with a better solution to this.
 
-The DMA API has the idea of buffer ownership: a buffer is either owned by
-the CPU, or the DMA device.  Only its owner may explicitly access the
-buffer.
+> -#ifdef CONFIG_CPU_S3C244X
+> -#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
+> -#elif defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
+> +#if defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
+>  #define ARCH_NR_GPIOS	(32 * 12 + CONFIG_S3C24XX_GPIO_EXTRA)
+> +#elif defined(CONFIG_CPU_S3C244X)
+> +#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
+>  #else
+>  #define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
+>  #endif
 
-Before a buffer can be used for DMA, it must be mapped to the DMA device
-(using dma_map_sg() or dma_map_single().)  Once this call returns, the
-mapping is setup and the CPU must not explicitly access the buffer until
-the buffer is unmapped via dma_unmap_sg() or dma_unmap_single().
+Maybe something like:
 
-With the DMA engine API, the caller is responsible for mapping the buffer.
+#define S3C2443_NR_GPIOS	(32 * 12)
+#define S3C2416_NR_GPIOS	(32 * 12)
+#define S3C244X_NR_GPIOS	(32 * 9)
 
-This means that if you want to ensure that the buffer is correctly aligned,
-you must check the alignments _before_ mapping the buffer, and do any
-appropriate copies at this stage.
+#define SAMSUNG_NR_GPIOS	(256)
+#if defined (CONFIG_CPU_S3C244X) && S3C244X_NR_GPIOS > SAMSUNG_NR_GPIOS
+#undef SAMSUNG_NR_GPIOS
+#define SAMSUNG_NR_GPIOS	S3C244X_NR_GPIOS
+#endif
+#if defined (CONFIG_CPU_S3C2416) && S3C2416_NR_GPIOS > SAMSUNG_NR_GPIOS
+#undef SAMSUNG_NR_GPIOS
+#define SAMSUNG_NR_GPIOS	S3C2416_NR_GPIOS
+#endif
+#if defined (CONFIG_CPU_S3C2443) && S3C2443_NR_GPIOS > SAMSUNG_NR_GPIOS
+#undef SAMSUNG_NR_GPIOS
+#define SAMSUNG_NR_GPIOS	S3C2443_NR_GPIOS
+#endif
 
-So, it must be:
-	- align_sg_list
-	- map aligned lists
-	- prep_dma_sg
-and not
-	- map aligned lists
-	- align_sg_list
-	- prep_dma_sg
-because then you're violating the DMA API by having the CPU access an
-already mapped buffer - and that will lead to data corruption.
+#define ARCH_NR_GPIOS		(SAMSUNG_NR_GPIOS + CONFIG_S3C24XX_GPIO_EXTRA)
 
-Finally, consider this: you have two scatterlists which ask you to copy
-between two buffers.  The first is offset by one byte from a 32-bit word
-boundary.  The second is offset by two bytes from a 32-bit word
-boundary.  Your DMA engine can only perform naturally aligned 32-bit
-transfers for both the source and destination.  How do you see this
-situation being dealt with?
+or maybe just solve this in Kconfig - we already have this:
+
+config ARCH_NR_GPIO
+        int
+        default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+        default 350 if ARCH_U8500
+        default 0
+
+to set ARCH_NR_GPIO in generic code.
