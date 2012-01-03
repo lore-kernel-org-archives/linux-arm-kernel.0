@@ -1,107 +1,253 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 3 Jan 2012 23:30:58 +0100
-Subject: [PATCH 1/2] PM / Domains: Add OF support
-In-Reply-To: <CAJuYYwQp7gfuovd8kKEe_D+ACyq4OafxZRW_G=U_9zCMOy+prA@mail.gmail.com>
-References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
- <201112282317.54291.rjw@sisk.pl>
- <CAJuYYwQp7gfuovd8kKEe_D+ACyq4OafxZRW_G=U_9zCMOy+prA@mail.gmail.com>
-Message-ID: <201201032330.58602.rjw@sisk.pl>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue,  3 Jan 2012 14:28:22 -0800
+Subject: [PATCH] Input: tegra-kbc - add device tree support
+In-Reply-To: <1325484557-27695-1-git-send-email-olof@lixom.net>
+References: <1325484557-27695-1-git-send-email-olof@lixom.net>
+Message-ID: <1325629702-10307-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 02, 2012, Thomas Abraham wrote:
-> Hi Rafael,
-> 
-> On 29 December 2011 03:47, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > On Wednesday, December 28, 2011, Thomas Abraham wrote:
-> >> Hi Mark, Rafael,
-> >
-> > Hi,
-> >
-> >> On 27 December 2011 02:14, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> >> > On Monday, December 26, 2011, Mark Brown wrote:
-> >> >> On Mon, Dec 26, 2011 at 08:13:19PM +0100, Rafael J. Wysocki wrote:
-> >> >> > On Monday, December 12, 2011, Thomas Abraham wrote:
-> >> >>
-> >> >> > > A device node pointer is added to generic pm domain structure to associate
-> >> >> > > the domain with a node in the device tree.
-> >> >>
-> >> >> > That sounds fine except for one thing: PM domains are not devices, so adding
-> >> >> > "device node" pointers to them is kind of confusing.  Perhaps there should be
-> >> >> > something like struct dt_node, representing a more general device tree node?
-> >> >>
-> >> >> There's struct of_node which is exactly that, though practically
-> >> >> speaking you need a device if you're going to bind automatically to
-> >> >> something from the device tree in a sensible fashion and there is actual
-> >> >> hardware under there so a device does make some sense.
-> >>
-> >> In patch 2/2 of this series, the platform code looks for nodes in
-> >> device tree that represent a power domain. When a power domain node is
-> >> found, a generic power domain is instantiated with pm_genpd_init()
-> >> using the information available from the node in device tree. There is
-> >> no automatic binding required in this case. The power domain node does
-> >> represent a hardware that manages the power domain.
-> >
-> > Good.  So would it be possible to use struct of_node instead of
-> > struct device_node in struct generic_pm_domain?
-> 
-> Sorry, I used 'struct of_node' and 'struct device_node'
-> interchangeably in my reply. All the nodes in a device tree are
-> represented by 'struct device_node'.
-> 
-> >
-> >> >>
-> >> >> This is in part compatibility with the existing Exynos code which uses
-> >> >> devices to probe the domains for non-DT systems.
-> >> >
-> >> > Well, that's not a general case, though.
-> >> >
-> >> > It doesn't feel approporiate to use a "device node" pointer for something
-> >> > that's not based on struct device, at least not a generic level, so I wonder
-> >> > if there's a different way.
-> >>
-> >> A device node pointer or of_node pointer is a simple pointer to a
-> >> instance of a node in device tree. All nodes in a device tree need not
-> >> represent a corresponding 'struct device'. A node in device tree can
-> >> described a hardware feature such as a power domain supported in the
-> >> hardware.
-> >
-> > Sure.
-> >
-> >> The addition of device tree support for generic power domains in this
-> >> patchset is generic for all platforms. The platform code instantiates
-> >> generic power domains from device tree with the of_node pointer
-> >> assigned to 'struct generic_pm_domain'. Then, in
-> >> __pm_genpd_add_device(), given a of_node pointer (to gen_pd), it is
-> >> possible to find a matching power domain to select.
-> >
-> > My point was that adding the struct device_node pointer to
-> > struct generic_pm_domain didn't look good, because that structure didn't
-> > represent a device in general.  While I understand that it may be regarded
-> > as a "device object" on some platforms, there are platforms that don't
-> > regard PM domains as devices.  For this reason (and only for this reason)
-> > it appears to be more appropriate to use a more generic device tree node
-> > type for struct generic_pm_domain.
-> 
-> If a platform uses some hardware controls (register read/writes) to
-> enable/disable/control power domain, then it can be represented in the
-> device tree. But such a node need not represent a 'struct device'.
-> Other nodes in the device tree can then reference the power domain
-> node.
-> 
-> If a platform does not have any hardware knobs for controlling power
-> domains, then probably it will not be represented in the device tree.
-> But I am not sure of this case.
-> 
-> The 'struct device_node' is a representation of a instance of a device
-> tree node. It can represent nodes that are not devices. Hence, it can
-> be used to represent a power domain in a device tree and also included
-> in the 'struct generic_pm_domain'.
+This includes an optional "linux,fn-keymap" binding that is not yet implemented,
+that will be used to specify the Fn-key modifier layout if needed.
 
-OK, so please address my second comment regarding the $subject patch,
-i.e. that you might add a wrapper around the original
-__pm_genpd_add_device() instead of modifying __pm_genpd_add_device()
-itself.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+---
 
-Thanks,
-Rafael
+This patch depends on "Input: keyboard - add device tree bindings for
+simple key matrixes".
+
+
+-Olof
+ .../devicetree/bindings/input/tegra-kbc.txt        |   23 +++++
+ drivers/input/keyboard/tegra-kbc.c                 |  103 ++++++++++++++++++--
+ 2 files changed, 118 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/tegra-kbc.txt
+
+diff --git a/Documentation/devicetree/bindings/input/tegra-kbc.txt b/Documentation/devicetree/bindings/input/tegra-kbc.txt
+new file mode 100644
+index 0000000..b630eeb4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/tegra-kbc.txt
+@@ -0,0 +1,23 @@
++* Tegra keyboard controller
++
++Required properties:
++- compatible: "nvidia,tegra20-kbc", "matrix-keyboard-controller"
++
++Optional properties, in addition to those specified by
++"matrix-keyboard-controller" bindings:
++
++- linux,fn-keymap: a second keymap, same specification as the
++matrix-keyboard-controller spec but to be used when the KEY_FN modifier
++key is pressed.
++- nvidia,debounce-delay-ms: delay in milliseconds per row scan for debouncing
++- nvidia,repeat-delay-ms: delay in milliseconds before repeat starts
++- nvidia,ghost-filter: enable ghost filtering for this device
++- nvidia,wakeup-source: configure keyboard as a wakeup source for suspend/resume
++
++Example:
++
++keyboard: keyboard {
++	compatible = "nvidia,tegra20-kbc";
++	reg = <0x7000e200 0x100>;
++	nvidia,ghost-filter;
++};
+diff --git a/drivers/input/keyboard/tegra-kbc.c b/drivers/input/keyboard/tegra-kbc.c
+index 08d02f2..0794879 100644
+--- a/drivers/input/keyboard/tegra-kbc.c
++++ b/drivers/input/keyboard/tegra-kbc.c
+@@ -26,6 +26,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/interrupt.h>
++#include <linux/of.h>
+ #include <linux/clk.h>
+ #include <linux/slab.h>
+ #include <mach/clk.h>
+@@ -82,7 +83,7 @@ struct tegra_kbc {
+ 	struct clk *clk;
+ };
+ 
+-static const u32 tegra_kbc_default_keymap[] = {
++static const u32 tegra_kbc_default_keymap[] __devinitdata = {
+ 	KEY(0, 2, KEY_W),
+ 	KEY(0, 3, KEY_S),
+ 	KEY(0, 4, KEY_A),
+@@ -217,7 +218,8 @@ static const u32 tegra_kbc_default_keymap[] = {
+ 	KEY(31, 4, KEY_HELP),
+ };
+ 
+-static const struct matrix_keymap_data tegra_kbc_default_keymap_data = {
++static const
++struct matrix_keymap_data tegra_kbc_default_keymap_data __devinitdata = {
+ 	.keymap		= tegra_kbc_default_keymap,
+ 	.keymap_size	= ARRAY_SIZE(tegra_kbc_default_keymap),
+ };
+@@ -576,6 +578,62 @@ tegra_kbc_check_pin_cfg(const struct tegra_kbc_platform_data *pdata,
+ 	return true;
+ }
+ 
++#ifdef CONFIG_OF
++static struct tegra_kbc_platform_data * __devinit
++tegra_kbc_dt_parse_pdata(struct platform_device *pdev)
++{
++	struct tegra_kbc_platform_data *pdata;
++	struct device_node *np = pdev->dev.of_node;
++	u32 prop;
++	int i;
++
++	if (!np)
++		return NULL;
++
++	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return NULL;
++
++	if (!of_property_read_u32(np, "nvidia,debounce-delay-ms", &prop))
++		pdata->debounce_cnt = prop;
++
++	if (!of_property_read_u32(np, "nvidia,repeat-delay-ms", &prop))
++		pdata->repeat_cnt = prop;
++
++	if (of_find_property(np, "nvidia,needs-ghost-filter", NULL))
++		pdata->use_ghost_filter = true;
++
++	if (of_find_property(np, "nvidia,wakeup-source", NULL))
++		pdata->wakeup = true;
++
++	/*
++	 * All currently known keymaps with device tree support use the same
++	 * pin_cfg, so set it up here.
++	 */
++	for (i = 0; i < KBC_MAX_ROW; i++) {
++		pdata->pin_cfg[i].num = i;
++		pdata->pin_cfg[i].is_row = true;
++	}
++
++	for (i = 0; i < KBC_MAX_COL; i++) {
++		pdata->pin_cfg[KBC_MAX_ROW + i].num = i;
++		pdata->pin_cfg[KBC_MAX_ROW + i].is_row = false;
++	}
++
++	pdata->keymap_data = matrix_keyboard_of_fill_keymap(np, "linux,keymap");
++
++	/* FIXME: Add handling of linux,fn-keymap here */
++
++	return pdata;
++}
++#else
++static inline struct tegra_kbc_platform_data *tegra_kbc_dt_parse_pdata(
++	struct platform_device *pdev)
++{
++	return NULL;
++}
++#endif
++
+ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
+ {
+ 	const struct tegra_kbc_platform_data *pdata = pdev->dev.platform_data;
+@@ -590,21 +648,28 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
+ 	unsigned int scan_time_rows;
+ 
+ 	if (!pdata)
+-		return -EINVAL;
++		pdata = tegra_kbc_dt_parse_pdata(pdev);
+ 
+-	if (!tegra_kbc_check_pin_cfg(pdata, &pdev->dev, &num_rows))
++	if (!pdata)
+ 		return -EINVAL;
+ 
++	if (!tegra_kbc_check_pin_cfg(pdata, &pdev->dev, &num_rows)) {
++		err = -EINVAL;
++		goto err_free_pdata;
++	}
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "failed to get I/O memory\n");
+-		return -ENXIO;
++		err = -ENXIO;
++		goto err_free_pdata;
+ 	}
+ 
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(&pdev->dev, "failed to get keyboard IRQ\n");
+-		return -ENXIO;
++		err = -ENXIO;
++		goto err_free_pdata;
+ 	}
+ 
+ 	kbc = kzalloc(sizeof(*kbc), GFP_KERNEL);
+@@ -693,6 +758,9 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, kbc);
+ 	device_init_wakeup(&pdev->dev, pdata->wakeup);
+ 
++	if (!pdev->dev.platform_data)
++		matrix_keyboard_of_free_keymap(pdata->keymap_data);
++
+ 	return 0;
+ 
+ err_free_irq:
+@@ -706,6 +774,11 @@ err_free_mem_region:
+ err_free_mem:
+ 	input_free_device(input_dev);
+ 	kfree(kbc);
++err_free_pdata:
++	if (!pdev->dev.platform_data) {
++		matrix_keyboard_of_free_keymap(pdata->keymap_data);
++		kfree(pdata);
++	}
+ 
+ 	return err;
+ }
+@@ -715,6 +788,8 @@ static int __devexit tegra_kbc_remove(struct platform_device *pdev)
+ 	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
+ 	struct resource *res;
+ 
++	platform_set_drvdata(pdev, NULL);
++
+ 	free_irq(kbc->irq, pdev);
+ 	clk_put(kbc->clk);
+ 
+@@ -723,9 +798,14 @@ static int __devexit tegra_kbc_remove(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(res->start, resource_size(res));
+ 
+-	kfree(kbc);
++	/*
++	 * If we do not have platform data attached to the device we
++	 * allocated it ourselves and thus need to free it.
++	 */
++	if (!pdev->dev.platform_data)
++		kfree(kbc->pdata);
+ 
+-	platform_set_drvdata(pdev, NULL);
++	kfree(kbc);
+ 
+ 	return 0;
+ }
+@@ -793,6 +873,12 @@ static int tegra_kbc_resume(struct device *dev)
+ 
+ static SIMPLE_DEV_PM_OPS(tegra_kbc_pm_ops, tegra_kbc_suspend, tegra_kbc_resume);
+ 
++static const struct of_device_id tegra_kbc_of_match[] = {
++	{ .compatible = "nvidia,tegra20-kbc", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, tegra_kbc_of_match);
++
+ static struct platform_driver tegra_kbc_driver = {
+ 	.probe		= tegra_kbc_probe,
+ 	.remove		= __devexit_p(tegra_kbc_remove),
+@@ -800,6 +886,7 @@ static struct platform_driver tegra_kbc_driver = {
+ 		.name	= "tegra-kbc",
+ 		.owner  = THIS_MODULE,
+ 		.pm	= &tegra_kbc_pm_ops,
++		.of_match_table = tegra_kbc_of_match,
+ 	},
+ };
+ module_platform_driver(tegra_kbc_driver);
+-- 
+1.7.8.GIT
