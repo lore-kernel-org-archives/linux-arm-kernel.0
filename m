@@ -1,43 +1,48 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 3 Jan 2012 10:31:23 +0100
-Subject: [PATCH] arm: Fix linux-next compile error in arch/arm/common/gic.c
-In-Reply-To: <CAO_0yfOzVCK8OGL5G9Aej+V4AZ12EMFKi3HafAX0JzeW9C3FtQ@mail.gmail.com>
-References: <1325521990-4445-1-git-send-email-joerg.roedel@amd.com>
- <CAO_0yfOzVCK8OGL5G9Aej+V4AZ12EMFKi3HafAX0JzeW9C3FtQ@mail.gmail.com>
-Message-ID: <20120103093123.GA7620@8bytes.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 03 Jan 2012 10:37:29 +0100
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20120102134229.GZ29877@amd.com>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <20120102134229.GZ29877@amd.com>
+Message-ID: <00dc01ccc9fb$4fcb7590$ef6260b0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 08:44:01AM +0800, Yang Bai wrote:
-> On Tue, Jan 3, 2012 at 12:33 AM, Joerg Roedel <joerg.roedel@amd.com> wrote:
+Hello,
 
-> > ? ? ? ? ? ? ? ?for_each_possible_cpu(cpu) {
-> > - ? ? ? ? ? ? ? ? ? ? ? unsigned long offset = percpu_offset * cpu_logical_map(cpu);
-> > + ? ? ? ? ? ? ? ? ? ? ? unsigned long offset = percpu_offset;
-> > +#ifdef CONFIG_SMP
-> > + ? ? ? ? ? ? ? ? ? ? ? offset *= cpu_logical_map(cpu);
-> > +#endif
-> > ? ? ? ? ? ? ? ? ? ? ? ?*per_cpu_ptr(gic->dist_base.percpu_base, cpu) = dist_base + offset;
-> > ? ? ? ? ? ? ? ? ? ? ? ?*per_cpu_ptr(gic->cpu_base.percpu_base, cpu) = cpu_base + offset;
-> > ? ? ? ? ? ? ? ?}
-> > --
-> > 1.7.5.4
-> >
-> >
+On Monday, January 02, 2012 2:42 PM Joerg Roedel wrote:
+
+> On Thu, Dec 29, 2011 at 09:24:18PM +0900, KyongHo Cho wrote:
+> > Changes since v7:
+> > - Rebased with the recent commits of the following git branches
+> >   * git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git/next
+> >   * git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/for-next
+> > - Changed magic numbers into macros
+> > - Setting owner of a System MMU in 'iommu' field of dev_archdata
+> > - Verbose message in the default fault handler
+> > - Some bug fixes.
 > 
-> Is this the right way to fix it? Or shall we do like this:
+> I still get
 > 
-> #ifdef CONFIG_SMP
-> ...
-> #else
-> #define cpu_logical_map() 1
-> #endif
+>   LD      .tmp_vmlinux1
+> /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no
+> machine record defined
+> /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no
+> machine record defined
+> /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no
+> machine record defined
+> make[1]: *** [.tmp_vmlinux1] Error 1
 > 
-> and leave the gic.c code unchanged.
+> when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
+> wrong or is this not expected to work?
 
-Well, I don't care ;) But everywhere else in this file the use of
-cpu_logical_map() is #ifdef'ed with CONFIG_SMP. So for consistency my
-proposed variant is better, no?
+Yes, there is something a bit wrong with your kernel configuration. You get this error if 
+there is no board selected to be compiled-in. Please go to kernel configuration and select
+"System Type -> SAMSUNG EXYNOS SoCs Suppport". Then select some hardware board to be 
+compiled in, for example SMDKV310, SMDKC210 and "Mobile NURI board".
 
-
-	Joerg
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
