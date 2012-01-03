@@ -1,41 +1,30 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 03 Jan 2012 15:21:35 -0800
-Subject: [PATCH] Input: tegra-kbc - add device tree support
-In-Reply-To: <CAOesGMhYscMgsNbZ+W0vdcRFmMiV3yQYLRxgGLfMVHKuhEAe-w@mail.gmail.com>
-References: <1325484557-27695-1-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F1203@HQMAIL01.nvidia.com>
- <CAOesGMhYscMgsNbZ+W0vdcRFmMiV3yQYLRxgGLfMVHKuhEAe-w@mail.gmail.com>
-Message-ID: <2662846.nxkJH3EzFi@dtor-d630.eng.vmware.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 03 Jan 2012 15:26:55 -0800
+Subject: [PATCH] ARM: Remove BUILD_BUG_ON from asm/bug.h
+In-Reply-To: <CAPnjgZ1P6bdAGRa-9ZyuNMT7jRAfrH3abWJPkxVeeM7BDKsXTg@mail.gmail.com>
+References: <1325616276-10304-1-git-send-email-sjg@chromium.org>	<4F03821D.9080503@codeaurora.org>
+ <CAPnjgZ1P6bdAGRa-9ZyuNMT7jRAfrH3abWJPkxVeeM7BDKsXTg@mail.gmail.com>
+Message-ID: <4F038EBF.5030408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 03, 2012 02:58:57 PM Olof Johansson wrote:
-> On Tue, Jan 3, 2012 at 2:42 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> > Olof Johansson wrote at Tuesday, January 03, 2012 3:28 PM:
-> >> This includes an optional "linux,fn-keymap" binding that is not yet
-> >> implemented, that will be used to specify the Fn-key modifier layout
-> >> if needed.
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/input/tegra-kbc.txt
-> > 
-> > ...
-> > 
-> >> +Required properties:
-> >> +- compatible: "nvidia,tegra20-kbc", "matrix-keyboard-controller"
-> > 
-> > I think "matrix-keyboard-controller" should be dropped now?
-> 
-> Crap, yeah, I had dropped it but forgot to commit before I did send-email.
-> 
-> Dmitry, if this is the only comment, do you want me to resend or are
-> you OK with editing yourself before applying?
+On 01/03/12 14:40, Simon Glass wrote:
+> Yes that is the reason, but ARM is not unique in this matter, and
+> other archs do not have this check. I did suggest a solution in this
+> thread involving putting the check in a C file instead of header. But
+> it needs an arch-specific #define to specify the size expected by the
+> assembler, and has the disadvantage of moving the check away from the
+> assembler code.
+>
+> It's not that we don't want this check, more that it is not essential
+> (since there is currently no mismatch), it is causing problems and it
+> is risky to try to solve this problem some other way at this late
+> stage in 3.2. So the easiest thing is to remove it, to match other
+> archs.
 
-Olof,
-
-Any chance I could get a patch against my 'next' branch? I already applied
-patch that did DT bindings without keymap support.
-
-Thanks.
+Fair enough. I now see the other thread where this has all been
+discussed. Sorry for the noise.
 
 -- 
-Dmitry
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
