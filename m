@@ -1,50 +1,27 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue, 3 Jan 2012 14:40:46 -0800
-Subject: [PATCH] ARM: Remove BUILD_BUG_ON from asm/bug.h
-In-Reply-To: <4F03821D.9080503@codeaurora.org>
-References: <1325616276-10304-1-git-send-email-sjg@chromium.org>
- <4F03821D.9080503@codeaurora.org>
-Message-ID: <CAPnjgZ1P6bdAGRa-9ZyuNMT7jRAfrH3abWJPkxVeeM7BDKsXTg@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 3 Jan 2012 14:42:19 -0800
+Subject: [PATCH] Input: tegra-kbc - add device tree support
+In-Reply-To: <1325629702-10307-1-git-send-email-olof@lixom.net>
+References: <1325484557-27695-1-git-send-email-olof@lixom.net>
+ <1325629702-10307-1-git-send-email-olof@lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F1203@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Olof Johansson wrote at Tuesday, January 03, 2012 3:28 PM:
+> This includes an optional "linux,fn-keymap" binding that is not yet implemented,
+> that will be used to specify the Fn-key modifier layout if needed.
 
-On Tue, Jan 3, 2012 at 2:33 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 01/03/12 10:44, Simon Glass wrote:
->> BUILD_BUG_ON is defined in linux/kernel.h but that is not included by the
->> asm/bug.h header which uses it. This causes a build error:
->>
->> ...include/linux/mtd/map.h: In function 'inline_map_read':
->> ...include/linux/mtd/map.h:408:3: error: implicit declaration of function
->> 'BUILD_BUG_ON' [-Werror=implicit-function-declaration]
->>
->> The check is not essential and is not present for other architectures, so
->> just remove it.
->
-> I thought this check was put in place to catch changes to struct
-> bug_entry being out of sync with the __BUG macro defined in ARM. Why
-> can't we include kernel.h instead? Or can you elaborate some more on why
-> we don't need this check in the commit text?
+> diff --git a/Documentation/devicetree/bindings/input/tegra-kbc.txt
+...
+> +Required properties:
+> +- compatible: "nvidia,tegra20-kbc", "matrix-keyboard-controller"
 
-Yes that is the reason, but ARM is not unique in this matter, and
-other archs do not have this check. I did suggest a solution in this
-thread involving putting the check in a C file instead of header. But
-it needs an arch-specific #define to specify the size expected by the
-assembler, and has the disadvantage of moving the check away from the
-assembler code.
+I think "matrix-keyboard-controller" should be dropped now?
 
-It's not that we don't want this check, more that it is not essential
-(since there is currently no mismatch), it is causing problems and it
-is risky to try to solve this problem some other way at this late
-stage in 3.2. So the easiest thing is to remove it, to match other
-archs.
+Otherwise,
 
-Regards,
-Simon
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->
+-- 
+nvpublic
