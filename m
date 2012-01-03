@@ -1,194 +1,206 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue, 3 Jan 2012 08:22:21 -0800
-Subject: [PATCH v3] Input: keyboard - add device tree bindings for simple
- key matrixes
-In-Reply-To: <20120103154317.GA27061@quad.lixom.net>
-References: <1325184146-3527-1-git-send-email-olof@lixom.net>
- <1325484557-27695-1-git-send-email-olof@lixom.net>
- <CAPnjgZ1ngJrqB5FgOZDmc-H9KBE0-W75rqTHEPX4D+q0FjYumg@mail.gmail.com>
- <20120103154317.GA27061@quad.lixom.net>
-Message-ID: <CAPnjgZ3xN8+Ve28bcg1OQ4mv5rWvA-9ijP57UsuMQ5D1d=7Xxw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 03 Jan 2012 17:25:32 +0100
+Subject: [PATCH 3/6] ARM: at91/gpio: add DT support
+In-Reply-To: <20111216101147.GA3230@totoro>
+References: <85d531b5686e5eff623bed9618f802198409905f.1323975517.git.nicolas.ferre@atmel.com>
+ <876f676ec80d2db927e379654be76171ca496422.1323975517.git.nicolas.ferre@atmel.com>
+ <20111216101147.GA3230@totoro>
+Message-ID: <4F032BFC.40408@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Tue, Jan 3, 2012 at 7:43 AM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
->
-> On Mon, Jan 02, 2012 at 10:39:04AM -0800, Simon Glass wrote:
->> > diff --git a/Documentation/devicetree/bindings/input/matrix-keymap.txt b/Documentation/devicetree/bindings/input/matrix-keymap.txt
->> > new file mode 100644
->> > index 0000000..1db8e12
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/input/matrix-keymap.txt
->> > @@ -0,0 +1,27 @@
->> > +A simple common binding for matrix-connected key boards. Currently targeted at
->> > +defining the keys in the scope of linux key codes since that is a stable and
->> > +standardized interface at this time.
->> > +
->> > +Required properties:
->> > +- compatible: "matrix-keyboard-controller"
->> > +- linux,keymap: an array of packed 1-cell entries containing the equivalent
->> > + ?of row, column and linux key-code. The 32-bit big endian cell is packed
->> > + ?as:
->> > + ? ? ? row << 24 | column << 16 | key-code
+On 12/16/2011 11:11 AM, Jamie Iles :
+> Hi Nicolas, Jean-Christophe,
+> 
+> This looks pretty good to me, but a couple of minor comments inline.
+> 
+> Jamie
+> 
+> On Thu, Dec 15, 2011 at 08:16:05PM +0100, Nicolas Ferre wrote:
+>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 >>
->> This looks much better than the Samsung binding and the original 3-cell one.
->>
->> U-Boot Tegra (keyboard patch series) currently uses a 16x8 matrix, and
->> uses a single byte (the ASCII character) for a total of 128 bytes per
->> keymap. Since U-Boot does not have (or apparently want) the concept of
->> key codes or the added code and intermediate data this requires, the
->> binding presented here will not suit U-Boot so far.
->>
->> These rows and columns embedded in the cell make it more of a pain to
->> write the fdt description. If you just set up the cells in (column,
->> row) order and set the matrix size (rows, columns) then you end up
->> with 128 entries on Tegra. If you use uint16 then this could be 256
->> bytes instead of 512. The binding you present for Tegra would be 109 *
->> 4 = 436 bytes. However I take your point that Fn maps are much more
->> sparse, so overall this is likely to be similar (512 bytes for either
->> method once Fn mappings are taken into account).
->
-> Looking at the keymap you posted, you define 62 keys and 16 function
-> keys. So if that is all you care about on your particular keyboard,
-> that means that the layout with the 1-cell format is 248 bytes for the
-> base keymap, and 64 bytes for the fn-keymap. The benefit of using the
-> row/column/keycode format is that the table is only as large as the
-> number of keys you care about.
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+> [...]
+>> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+>> index 7ffb893..edb453a 100644
+>> --- a/arch/arm/mach-at91/gpio.c
+>> +++ b/arch/arm/mach-at91/gpio.c
+>> @@ -21,6 +21,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/io.h>
+>>  #include <linux/irqdomain.h>
+>> +#include <linux/of_address.h>
+>>  
+>>  #include <mach/hardware.h>
+>>  #include <mach/at91_pio.h>
+>> @@ -624,40 +625,122 @@ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>>  	}
+>>  }
+>>  
+>> +#ifdef CONFIG_OF_GPIO
+>> +static void __init of_at91_gpio_init_one(struct device_node *np)
+>> +{
+>> +	int alias_id;
+>> +	struct at91_gpio_chip *at91_gpio;
+>> +	const unsigned int *intspec;
+>> +
+>> +	if (!np)
+>> +		return;
+>> +
+>> +	alias_id = of_alias_get_id(np, "gpio");
+>> +	if (alias_id >= MAX_GPIO_BANKS) {
+>> +		pr_err("at91_gpio, failed alias id(%d) > MAX_GPIO_BANKS(%d), ignoring.\n",
+>> +								alias_id, MAX_GPIO_BANKS);
+>> +		return;
+>> +	}
+>> +
+>> +	at91_gpio = &gpio_chip[alias_id];
+>> +	at91_gpio->chip.base = alias_id * at91_gpio->chip.ngpio;
+>> +
+>> +	at91_gpio->regbase = of_iomap(np, 0);
+>> +	if (!at91_gpio->regbase) {
+>> +		pr_err("at91_gpio.%d, failed to map registers, ignoring.\n",
+>> +								alias_id);
+>> +		return;
+>> +	}
+>> +
+>> +	/* Get the interrupts property */
+>> +	intspec = of_get_property(np, "interrupts", NULL);
+>> +	BUG_ON(!intspec);
+>> +	at91_gpio->id = be32_to_cpup(intspec);
+> 
+> Use of_property_read_u32()?  Also, BUG_ON() seems a bit harsh, better to 
+> print a warning and return an error.
+> 
+>> +
+>> +	at91_gpio->clock = clk_get_sys(NULL, at91_gpio->chip.label);
+>> +	if (!at91_gpio->clock) {
+>> +		pr_err("at91_gpio.%d, failed to get clock, ignoring.\n",
+>> +								alias_id);
+>> +		return;
+> 
+> Perhaps	unmap the regs here?
+> 
+>> +	}
+>> +
+>> +	/* enable PIO controller's clock */
+>> +	clk_enable(at91_gpio->clock);
+> 
+> Missing return value check.
+> 
+>> +
+>> +	at91_gpio->chip.of_node = np;
+>> +	gpio_banks = max(gpio_banks, alias_id + 1);
+>> +}
+>> +
+>> +static int __init of_at91_gpio_init(void)
+>> +{
+>> +	struct device_node *np = NULL;
+>> +
+>> +	/*
+>> +	 * This isn't ideal, but it gets things hooked up until this
+>> +	 * driver is converted into a platform_device
+>> +	 */
+>> +	do {
+>> +		np = of_find_compatible_node(np, NULL, "atmel,at91rm9200-gpio");
+>> +
+>> +		of_at91_gpio_init_one(np);
+>> +	} while (np);
+> 
+> for_each_compatible_node9)?
+> 
+>> +
+>> +	return gpio_banks > 0 ? 0 : -EINVAL;
+>> +}
+>> +#else
+>> +static int __init of_at91_gpio_init(void)
+>> +{
+>> +	return -EINVAL;
+>> +}
+>> +#endif
+>> +
+>> +static void __init at91_gpio_init_one(int i, u32 regbase, int id)
+>> +{
+>> +	struct at91_gpio_chip *at91_gpio = &gpio_chip[i];
+>> +
+>> +	at91_gpio->chip.base = i * at91_gpio->chip.ngpio;
+>> +	at91_gpio->id = id;
+>> +
+>> +	at91_gpio->regbase = ioremap(regbase, 512);
+>> +	if (!at91_gpio->regbase) {
+>> +		pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
+>> +		return;
+>> +	}
+>> +
+>> +	at91_gpio->clock = clk_get_sys(NULL, at91_gpio->chip.label);
+>> +	if (!at91_gpio->clock) {
+>> +		pr_err("at91_gpio.%d, failed to get clock, ignoring.\n", i);
+>> +		return;
+>> +	}
+>> +
+>> +	/* enable PIO controller's clock */
+>> +	clk_enable(at91_gpio->clock);
+> 
+> Missing return value check?
+> 
+>> +	gpio_banks = max(gpio_banks, i + 1);
+>> +}
+>> +
+>>  /*
+>>   * Called from the processor-specific init to enable GPIO pin support.
+>>   */
+>>  void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+>>  {
+>> -	unsigned		i;
+>> +	unsigned i;
+>>  	struct at91_gpio_chip *at91_gpio, *last = NULL;
+>>  
+>>  	BUG_ON(nr_banks > MAX_GPIO_BANKS);
+>>  
+>> -	gpio_banks = nr_banks;
+>> +	if (of_at91_gpio_init() < 0) {
+>> +		/* no GPIO controller found in device tree */
+>> +		for (i = 0; i < nr_banks; i++)
+>> +			at91_gpio_init_one(i, data[i].regbase, data[i].id);
+>> +	}
+>>  
+>> -	for (i = 0; i < nr_banks; i++) {
+>> +	for (i = 0; i < gpio_banks; i++) {
+>>  		at91_gpio = &gpio_chip[i];
+>>  
+>> -		at91_gpio->id = data[i].id;
+>> -		at91_gpio->chip.base = i * 32;
+>> -
+>> -		at91_gpio->regbase = ioremap(data[i].regbase, 512);
+>> -		if (!at91_gpio->regbase) {
+>> -			pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
+>> -			continue;
+>> -		}
+>> -
+>> -		at91_gpio->clock = clk_get_sys(NULL, at91_gpio->chip.label);
+>> -		if (!at91_gpio->clock) {
+>> -			pr_err("at91_gpio.%d, failed to get clock, ignoring.\n", i);
+>> -			continue;
+>> -		}
+>> -
+>> -		/* enable PIO controller's clock */
+>> -		clk_enable(at91_gpio->clock);
+>> -
+>> -		/* AT91SAM9263_ID_PIOCDE groups PIOC, PIOD, PIOE */
+>> +		/*
+>> +		 * GPIO controller are grouped on some SoC:
+>> +		 * PIOC, PIOD and PIOE can share the same IRQ line
+>> +		 */
+>>  		if (last && last->id == at91_gpio->id)
+>>  			last->next = at91_gpio;
+>>  		last = at91_gpio;
+>> -- 
 
-Yes - my point is that the number of entries in the 1-byte binding
-(with no row, column embedded) is unlikely to be more than the next
-power of 2. So by avoiding including 2 or 3 unnecessary bytes we can
-actually get a size reduction in most cases. It is also easier to
-enter IMO. Can the Linux key codes fit in 8 bits?
+Ok Jamie, Thanks for your comments: I will address all of them in a
+second revision of this patch that I will post real-soon-now...
 
->
->> But going back to U-Boot, it does not have the intermediate table that
->> you malloc and decant into, it does not understand key codes so
->> doesn't know what to do when Shift is pressed, doesn't understand
->> languages, etc. In order to use these Linux bindings in U-Boot we
->> would need to add new input layer, extra decode code and intermediate
->> tables. I can almost hear the NAKs already (bear in mind fdt only went
->> into U-Boot in the December release and people are more sensitive to
->> code size / performance there than in Linux). I did ask about this on
->> this list a few weeks ago but no response yet.
->>
->> We could perhaps add an alternative direct ASCII binding like this
->> example (which would have to be in a separate node):
->
-> You keep saying "direct ASCII", but your map contains non-ASCII
-> characters. ASCII provides no way at all to specify things such as shift,
-> or arrow keys, or other common new keys on keyboards. Instead you have had to
-> make up an ad-hoc custom map that contains your own special codes for these
-> keys.
->
-> For example, for arrow keys you seem to overload the FS/GS/RS/US. I'm not
-> saying we expect to need to use those ascii codes, but it does seem arbitrary
-> to just grab them for arrow keys. So in essence you have come up with your own
-> encoding of non-ASCII keys instead of reusing what is already available through
-> the linux keycodes.
->
-> Also, for example with return, does it encode as CR, LF or CR+LF? Etc.
->
-> Doing a binding in pseudo-ASCII is just asking for extra complications, in my
-> opinion. Over time that encoding is likely to swell to similar sizes anyway,
-> but still be incompatible.
-
-Yes it would be better to use one binding, just so long as it is
-efficient and doesn't introduce a lot of new complexity in U-Boot
-which is useful only with fdt.
-
->
->> ? ? ? ? ? ? ? ? /* Use a packed binding which doesn't include
->> row,column numbers in each cell */
->> ? ? ? ? ? ? ? ? packed-binding;
->> ? ? ? ? ? ? ? ? matrix-columns = <8>;
->> ? ? ? ? ? ? ? ? matrix-rows = <16>;
->> ? ? ? ? ? ? ? ? ascii-binding; ?/* ASCII characters instead of keycodes */
->> ? ? ? ? ? ? ? u-boot,keymap ?= /size/ 8 <00 ?00 ?'w' 's' 'a' 'z' 00 ?DE
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?00 ?00 ?00 ?00 ?00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?00 ?00 ?00 ?00 ?00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? '5' '4' 'r' 'e' 'f' 'd' 'x' 00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? '7' '6' 't' 'h' 'g' 'v' 'c' ' '
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? '9' '8' 'u' 'y' 'j' 'n' 'b' 5C
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? '-' '0' 'o' 'i' 'l' 'k' ',' 'm'
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?'=' ']' 0D ?00 ?00 ?00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?00 ?00 ?DF ?DF ?00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?00 ?00 ?00 ?DC ?00 ?DD
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?00 ?00 ?00 ?00 ?00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? '[' 'p' 27 ?';' '/' '.' 00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?08 ?'3' '2' 1E ?00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?7F ?00 ?00 ?00 ?1D ?1F ?1C
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?00 ?'q' 00 ?00 ?'1' 00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1B ?'`' 00 ?09 ?00 ?00 ?00 ?00>;
->> ? ? ? ? ? ? ? u-boot,keymap-DF = /size/ 8 <00 ?00 ?'W' 'S' 'A' 'Z' 00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?00 ?00 ?00 ?00 ?00 ?00
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 00 ?00 ?00 ?00 ?00 ?00 ?00 ?00
->> ...
->>
->> The DC-DF codes codes denote Shift, Fn and Ctrl keys which would need
->> a separate keymap - although we could probably calculate the Ctrl one.
->
-> I had included the row/column property in my binding for KEY_FN, but in
-> hindsight it's probably just enough to decode that through the regular key
-> layout, since there will be an entry for it there.
-
-OK - just need some signal as to what key codes are modifiers.
-
->
->> From a point of view of efficiency, drivers can simply keep a pointer
->> to the appropriate property and read out the codes based on
->> (row,column) position.
->>
->> If we have something like this, then in order for the keyboard to work
->> in U-Boot, vendors would need to create a completely separate ASCII
->> mapping. Yes I agree this is a bit of a pain, but the above map is
->> fairly easy to type in, and quite compact.
->
-> It doesn't make sense to come up with a fresh, brand new binding that
-> requires anyone adding a new device to it to do extra work to do two
-> redunant descriptions of the same device. We should be able to find common
-> ground.
-
-Yes I hope so.
-
->
-> The KEY_* codes that are interesting all seem to be in the range of
-> 0-83. In the u-boot case, that means the base KEY*-to-ascii table would
-> be 83 bytes.
->
-> That means that the memory consumption for your case above would be
-> 4*62+4*16=312 bytes for the base+fn table, and then 3*83 = 249 bytes
-> for the KEY*-to-ASCII tables for regular/shift/ctrl, for a total of
-> 561 bytes. I'm sure there will be a few special cases in the code just
-> like you have now for arrow keys, etc, but they don't have to be in the
-> 83-byte table.
->
-> Sure, that is somewhat more than your 4*128 byte tables, but it is also
-> a much more flexible binding that is less likely to hit limitations down
-> the road.
-
-Thanks for looking at this. We still have the need of the intermediate
-table but since that is in BSS I don't think it is a problem.
-
->
->> Given the push-back on the U-Boot list from Linux people about my
->> bindings, I would like to work out the U-Boot side in this thread if
->> possible, since it seems to be dependent on what Linux does. But I
->> hope what is created is efficient enough not to bloat U-Boot or
->> require an new input layer to be added just to use fdt.
->
-> I think it's a great idea to use a common binding, since there will just be
-> wasted effort for vendors to have to create two maps and keep them in sync.
-
-I will have a look at this approach and see what the impact is, and
-reply on this thread.
-
-Regards,
-Simon
-
->
->
-> -Olof
+Best regards,
+-- 
+Nicolas Ferre
