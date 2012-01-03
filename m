@@ -1,86 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 13:43:28 +0000
-Subject: [PATCH] dmaengine/dw_dmac: Add support for device_prep_dma_sg
-In-Reply-To: <1325595816.1540.65.camel@vkoul-udesk3>
-References: <1323766064-13425-1-git-send-email-pratyush.anand@st.com>
- <1324655898.1633.11.camel@vkoul-udesk3> <4F0192F2.3010506@st.com>
- <1325503535.1540.17.camel@vkoul-udesk3>
- <20120103094048.GF2914@n2100.arm.linux.org.uk>
- <1325595816.1540.65.camel@vkoul-udesk3>
-Message-ID: <20120103134328.GR2914@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue,  3 Jan 2012 14:46:47 +0100
+Subject: [PATCH] net: fsl: fec: fix build for mx23-only kernel
+Message-ID: <1325598407-14353-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 06:33:36PM +0530, Vinod Koul wrote:
-> On Tue, 2012-01-03 at 09:40 +0000, Russell King - ARM Linux wrote:
-> > Wait a moment.  This looks like a disaster waiting to happen.  The DMA
-> > engine code doesn't really handle the DMA API properly as it is - and
-> > that has lead to at least one recent oops report (and it still remains
-> > unresolved.)
-> > 
-> > The DMA API has the idea of buffer ownership: a buffer is either owned by
-> > the CPU, or the DMA device.  Only its owner may explicitly access the
-> > buffer.
-> > 
-> > Before a buffer can be used for DMA, it must be mapped to the DMA device
-> > (using dma_map_sg() or dma_map_single().)  Once this call returns, the
-> > mapping is setup and the CPU must not explicitly access the buffer until
-> > the buffer is unmapped via dma_unmap_sg() or dma_unmap_single().
-> > 
-> > With the DMA engine API, the caller is responsible for mapping the buffer.
-> > 
-> > This means that if you want to ensure that the buffer is correctly aligned,
-> > you must check the alignments _before_ mapping the buffer, and do any
-> > appropriate copies at this stage.
-> > 
-> > So, it must be:
-> > 	- align_sg_list
-> > 	- map aligned lists
-> > 	- prep_dma_sg
-> Yes, that is something I had in mind as well.
-> For slave-dma as we documented, the peripheral driver needs to take care
-> of mapping hence it should do above as you suggested and not the one
-> below.
-> My suggestion was to have a generic alignment routine for sg list (which
-> may be used by other drivers as well) in some common place.
-> > and not
-> > 	- map aligned lists
-> > 	- align_sg_list
-> > 	- prep_dma_sg
-> > because then you're violating the DMA API by having the CPU access an
-> > already mapped buffer - and that will lead to data corruption.
-> > 
-> > Finally, consider this: you have two scatterlists which ask you to copy
-> > between two buffers.  The first is offset by one byte from a 32-bit word
-> > boundary.  The second is offset by two bytes from a 32-bit word
-> > boundary.  Your DMA engine can only perform naturally aligned 32-bit
-> > transfers for both the source and destination.  How do you see this
-> > situation being dealt with?
-> in this case, i don't think dmaengine can perform the task.
-> it should check for required alignments in the respective prepare
-> function, and return error if it cant support it.
-> Nevertheless, all prepare functions should be checking for word
-> alignment of source and destination...
+If one only selects mx23-based boards, compile fails:
 
-This is sub-optimal, because then you end up with:
+drivers/net/ethernet/freescale/fec.c:410:2: error: 'FEC_HASH_TABLE_HIGH' undeclared (first use in this function)
+drivers/net/ethernet/freescale/fec.c:411:2: error: 'FEC_HASH_TABLE_LOW' undeclared (first use in this function)
 
-- align_sg_list
-- map lists
-- prep_dma_sg
-- unmap lists
-- perform manual copy
+This is because fec.h uses CONFIG_SOC_IMX28 to determine the register
+layout of the core which makes sense since the MX23 does not have a fec.
+However, Kconfig uses the broader ARCH_MXS symbol and this way even
+makes the fec-driver default for MX23. Adapt Kconfig to use the more
+precise SOC_IMX28 as well.
 
-which, if your map/unmap is non-trivial, means you take an unnecessary hit.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/freescale/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-It would be much better if the dmaengine code exposed its alignment
-properties in such a way that:
-
-(a) align_sg_list could be totally generic code
-(b) it can be found out whether the sg list can be handled by the DMA
-    engine
-
-I'd also argue that align_sg_list() probably shouldn't even try to align
-a sg list - it should really just indicate whether the sg list _could_
-be handled by the DMA engine code or not.  (The case where the source
-and destination are identically mis-aligned is probably a rare corner
-case of the mis-aligned sg list.)
+diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
+index 5272f9d..9de3764 100644
+--- a/drivers/net/ethernet/freescale/Kconfig
++++ b/drivers/net/ethernet/freescale/Kconfig
+@@ -23,8 +23,8 @@ if NET_VENDOR_FREESCALE
+ config FEC
+ 	bool "FEC ethernet controller (of ColdFire and some i.MX CPUs)"
+ 	depends on (M523x || M527x || M5272 || M528x || M520x || M532x || \
+-		   ARCH_MXC || ARCH_MXS)
+-	default ARCH_MXC || ARCH_MXS if ARM
++		   ARCH_MXC || SOC_IMX28)
++	default ARCH_MXC || SOC_IMX28 if ARM
+ 	select PHYLIB
+ 	---help---
+ 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
+-- 
+1.7.7.3
