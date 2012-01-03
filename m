@@ -1,99 +1,41 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Tue,  3 Jan 2012 16:19:12 +0200
-Subject: [RFC PATCH 8/9] smp: refactor on_each_cpu to void returning func
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Tue, 03 Jan 2012 15:25:49 +0100
+Subject: [RFC PATCH 0/9] Remove useless on_each_cpu return value
 In-Reply-To: <1325600353-10895-1-git-send-email-gilad@benyossef.com>
 References: <1325600353-10895-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1325600353-10895-9-git-send-email-gilad@benyossef.com>
+Message-ID: <op.v7iidbwz3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on_each_cpu returns the retunr value of smp_call_function
-which is hard coded to 0.
+On Tue, 03 Jan 2012 15:19:04 +0100, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> on_each_cpu() returns as its own return value the return value of
+> smp_call_function(). smp_call_function() in turn returns a hard
+> coded value of zero.
+>
+> Some callers to on_each_cpu() waste cycles and bloat code space
+> by checking the return value to on_each_cpu(), probably for
+> historical reasons.
+>
+> This patch set refactors callers to not test on_each_cpu()
+> (fixed) return value and then refactors on_each_cpu to
+> return void to avoid confusing future users.
+>
+> In other words, this patch aims to delete 18 source code lines
+> while not changing any functionality :-)
+>
+> I tested as best as I could the x86 changes and compiled some
+> of the others, but I don't have access to all the needed hardware
+> for testing. Reviewers and testers welcome!
 
-Refactor on_each_cpu to a void function and the few callers
-that check the return value to save compares and branches.
+Other then the lack of Signed-off-by in the patches, looks good to me,
+even though personally I'd choose a bottom-up approach, ie. make
+smp_call_function() return void and from that conclude that
+on_each_cpu() can return void.  With those patches, we have a situation,
+where smp_call_function() has a return value which is then lost for no
+immediately apparent reason lost in on_each_cpu().
 
-CC: Michal Nazarewicz <mina86@mina86.com>
-CC: David Airlie <airlied@linux.ie>
-CC: dri-devel at lists.freedesktop.org
-CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-CC: Paul Mackerras <paulus@samba.org>
-CC: Grant Likely <grant.likely@secretlab.ca>
-CC: Rob Herring <rob.herring@calxeda.com>
-CC: linuxppc-dev at lists.ozlabs.org
-CC: devicetree-discuss at lists.ozlabs.org
-CC: Richard Henderson <rth@twiddle.net>
-CC: Ivan Kokshaysky <ink@jurassic.park.msu.ru>
-CC: Matt Turner <mattst88@gmail.com>
-CC: linux-alpha at vger.kernel.org
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: Ingo Molnar <mingo@redhat.com>
-CC: "H. Peter Anvin" <hpa@zytor.com>
-CC: x86 at kernel.org
-CC: Tony Luck <tony.luck@intel.com>
-CC: Fenghua Yu <fenghua.yu@intel.com>
-CC: linux-ia64 at vger.kernel.org
-CC: Will Deacon <will.deacon@arm.com>
-CC: Peter Zijlstra <a.p.zijlstra@chello.nl>
-CC: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
----
- include/linux/smp.h |    7 +++----
- kernel/smp.c        |    6 ++----
- 2 files changed, 5 insertions(+), 8 deletions(-)
-
-diff --git a/include/linux/smp.h b/include/linux/smp.h
-index 8cc38d3..050ddd4 100644
---- a/include/linux/smp.h
-+++ b/include/linux/smp.h
-@@ -99,7 +99,7 @@ static inline void call_function_init(void) { }
- /*
-  * Call a function on all processors
-  */
--int on_each_cpu(smp_call_func_t func, void *info, int wait);
-+void on_each_cpu(smp_call_func_t func, void *info, int wait);
- 
- /*
-  * Mark the boot cpu "online" so that it can call console drivers in
-@@ -126,12 +126,11 @@ static inline int up_smp_call_function(smp_call_func_t func, void *info)
- #define smp_call_function(func, info, wait) \
- 			(up_smp_call_function(func, info))
- #define on_each_cpu(func,info,wait)		\
--	({					\
-+	{					\
- 		local_irq_disable();		\
- 		func(info);			\
- 		local_irq_enable();		\
--		0;				\
--	})
-+	}
- static inline void smp_send_reschedule(int cpu) { }
- #define num_booting_cpus()			1
- #define smp_prepare_boot_cpu()			do {} while (0)
-diff --git a/kernel/smp.c b/kernel/smp.c
-index db197d6..f66a1b2 100644
---- a/kernel/smp.c
-+++ b/kernel/smp.c
-@@ -687,17 +687,15 @@ void __init smp_init(void)
-  * early_boot_irqs_disabled is set.  Use local_irq_save/restore() instead
-  * of local_irq_disable/enable().
-  */
--int on_each_cpu(void (*func) (void *info), void *info, int wait)
-+void on_each_cpu(void (*func) (void *info), void *info, int wait)
- {
- 	unsigned long flags;
--	int ret = 0;
- 
- 	preempt_disable();
--	ret = smp_call_function(func, info, wait);
-+	smp_call_function(func, info, wait);
- 	local_irq_save(flags);
- 	func(info);
- 	local_irq_restore(flags);
- 	preempt_enable();
--	return ret;
- }
- EXPORT_SYMBOL(on_each_cpu);
 -- 
-1.7.0.4
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
