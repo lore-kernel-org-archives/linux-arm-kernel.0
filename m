@@ -1,53 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 14:45:38 +0000
-Subject: Circular dependency between <linux/kernel.h> and <asm/bug.h>
- on ARM
-In-Reply-To: <CAOesGMgXRev24e0bmGD71J04=Aon7bs0YeK7mwX8Na12uR_b6A@mail.gmail.com>
-References: <1325472276.13595.200.camel@deadeye>
- <CAOesGMgXRev24e0bmGD71J04=Aon7bs0YeK7mwX8Na12uR_b6A@mail.gmail.com>
-Message-ID: <20120103144538.GU2914@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 03 Jan 2012 15:54:16 +0100
+Subject: [RFC PATCH 0/8] Add common ARM cpuidle init code
+In-Reply-To: <201112081537.04789.arnd.bergmann@linaro.org>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <20111208145653.GF7913@S2100-06.ap.freescale.net>
+ <201112081537.04789.arnd.bergmann@linaro.org>
+Message-ID: <4F031698.4010501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 01, 2012 at 11:01:27PM -0800, Olof Johansson wrote:
-> On Sun, Jan 1, 2012 at 6:44 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
-> > Commit 87e040b6456fd3416a1f6831c1eedaef5c0a94ff ("ARM: 7017/1: Use
-> > generic BUG() handler") makes BUG() use BUILD_BUG_ON(). ?However,
-> > BUILD_BUG_ON() is not defined in <linux/bug.h> but in <linux/kernel.h>.
-> >
-> > arch/include/asm/bug.h does not include <linux/kernel.h> and *cannot* do
-> > so because the latter already includes <asm/bug.h>.
-> 
-> Sure it can, but it's not ideal. Since the BUILD_BUG_ON is only used
-> in bug.h in a #define, it will be resolved below the includes of
-> either so there should be no ordering issue between the two.
+On 12/08/2011 04:37 PM, Arnd Bergmann wrote:
+> On Thursday 08 December 2011, Shawn Guo wrote:
+>>>
+>> With many drivers are being moved into drivers/* from arch/arm/mach-*
+>> and arch/arm/plat-*, I'm wondering if we have any problem with doing
+>> the same thing on cpuidle.  If we can move these cpuidle drivers into
+>> drivers/cpuidle (or drivers/idle, I'm not sure why two folders), that
+>> will be the best place for such consolidation to me.
+>>
+>> Cc-ed linux-pm and Len Brown for helping understand.
+>
+> I think we should definitely move them into one of the two directories.
+> The one thing making this a bit nasty is that many SoC implementation
+> need to access some global registers for this and don't have a "device"
+> that can be used for cpuidle with its own register ranges, but it's
+> still better to have the code in a single place IMHO.
 
-I disagree - we should not be creating circular dependencies.  This
-creates a mess, and uncertain results.  For instance, if we include
-linux/bug.h or asm/bug.h before linux/kernel.h has been included,
-then we end up with linux/kernel.h being parsed without a definition
-for BUG_ON().
+Yes, I agree. Moreover that will facilitate to factor out the code which 
+is spread all around the different architecture.
 
-However, if linux/kernel.h is included first, we start parsing that,
-include asm/bug.h, asm/bug.h then includes linux/kernel.h which produces
-an empty file, and then we continue parsing asm/bug.h _without_
-BUILD_BUG_ON() defined.
+The places where there is the drivers cpuidle code are at drivers/idle, 
+driver/acpi, arch/arm, arch/sh/kernel/cpu/mobile/cpuidle, etc ...
 
-So, adding linux/kernel.h does _not_ solve the problem.  It solves the
-problem for _some_ cases only.
+IMHO, before doing some code factoring out, we should move all these 
+drivers to the cpuidle directory, no ?
 
-> > Maybe BUILD_BUG_ON() should be moved out to a header of its own, or else
-> > this particular use should be moved to some other file. ?This needs to
-> > be fixed somehow, as it obviously leads to build failures, e.g.:
-> >
-> > https://buildd.debian.org/status/fetch.php?pkg=linux-2.6&arch=armel&ver=3.2~rc7-1~experimental.1&stamp=1325142904
-> 
-> Or perhaps moving BUILD_BUG_ON to include/linux/bug.h?
+drivers/idle/intel_idle.c => drivers/cpuidle/intel.c
+drivers/acpi/processor_idle.c => drivers/cpuidle/acpi.c
 
-and change linux/kernel.h to include linux/bug.h rather than asm/bug.h.
+arch/arm/mach-omap2/cpuidle34xx.c => drivers/cpuidle/omap-34xx.c
+arch/arm/mach-omap2/cpuidle44xx.c => drivers/cpuidle/omap-44xx.c
+arch/arm/mach-shmobile/cpuidle.c  => drivers/cpuidle/arm-shmobile.c
+arch/arm/mach-davinci/cpuidle.c => drivers/cpuidle/davinci.c
+arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/at91.c
+arch/arm/mach-s3c64xx/cpuidle.c => drivers/cpuidle/s3c64xx.c
+arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/exynos.c
+arch/arm/mach-kirkwood/cpuidle.c => drivers/cpuidle/kirkwood.c
+arch/arcm/mach-msm/idle.S => drivers/cpuidle/msm.S
 
-> The quickest fix for now might be to take out the BUILD_BUG_ON(),
-> especially so close to 3.2-final.
+That could be a first step and then we move the other archs which could 
+be a bit more tricky like the powerpc.
 
-I think just remove the BUILD_BUG_ON.  Other architectures have done
-without it, so I see no reason we can't do as well.
+Does it make sense ?
+
+Thanks
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
