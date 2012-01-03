@@ -1,35 +1,65 @@
-From: arnd.bergmann@linaro.org (Arnd Bergmann)
-Date: Tue, 3 Jan 2012 16:02:01 +0000
-Subject: [RFC PATCH 0/8] Add common ARM cpuidle init code
-In-Reply-To: <4F031698.4010501@linaro.org>
-References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
- <201112081537.04789.arnd.bergmann@linaro.org> <4F031698.4010501@linaro.org>
-Message-ID: <201201031602.01072.arnd.bergmann@linaro.org>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Tue, 3 Jan 2012 18:08:33 +0200
+Subject: [RFC PATCH 0/9] Remove useless on_each_cpu return value
+In-Reply-To: <op.v7iidbwz3l0zgt@mpn-glaptop>
+References: <1325600353-10895-1-git-send-email-gilad@benyossef.com>
+ <op.v7iidbwz3l0zgt@mpn-glaptop>
+Message-ID: <CAOtvUMfWRLbXRksacPbO7qWtufsdwh07cn9ko40_A_vxhcDTUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 January 2012, Daniel Lezcano wrote:
-> drivers/idle/intel_idle.c => drivers/cpuidle/intel.c
-> drivers/acpi/processor_idle.c => drivers/cpuidle/acpi.c
-> 
-> arch/arm/mach-omap2/cpuidle34xx.c => drivers/cpuidle/omap-34xx.c
-> arch/arm/mach-omap2/cpuidle44xx.c => drivers/cpuidle/omap-44xx.c
-> arch/arm/mach-shmobile/cpuidle.c  => drivers/cpuidle/arm-shmobile.c
-> arch/arm/mach-davinci/cpuidle.c => drivers/cpuidle/davinci.c
-> arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/at91.c
-> arch/arm/mach-s3c64xx/cpuidle.c => drivers/cpuidle/s3c64xx.c
-> arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/exynos.c
-> arch/arm/mach-kirkwood/cpuidle.c => drivers/cpuidle/kirkwood.c
-> arch/arcm/mach-msm/idle.S => drivers/cpuidle/msm.S
-> 
-> That could be a first step and then we move the other archs which could 
-> be a bit more tricky like the powerpc.
-> 
-> Does it make sense ?
+2012/1/3 Michal Nazarewicz <mina86@mina86.com>:
+> On Tue, 03 Jan 2012 15:19:04 +0100, Gilad Ben-Yossef <gilad@benyossef.com>
+> wrote:
+>>
+>> on_each_cpu() returns as its own return value the return value of
+>> smp_call_function(). smp_call_function() in turn returns a hard
+>> coded value of zero.
+>>
+>> Some callers to on_each_cpu() waste cycles and bloat code space
+>> by checking the return value to on_each_cpu(), probably for
+>> historical reasons.
+>>
+>> This patch set refactors callers to not test on_each_cpu()
+>> (fixed) return value and then refactors on_each_cpu to
+>> return void to avoid confusing future users.
+>>
+>> In other words, this patch aims to delete 18 source code lines
+>> while not changing any functionality :-)
+>>
+>> I tested as best as I could the x86 changes and compiled some
+>> of the others, but I don't have access to all the needed hardware
+>> for testing. Reviewers and testers welcome!
+>
+>
+> Other then the lack of Signed-off-by in the patches, looks good to me,
 
-Sounds good to me. However, if any of the drivers can be built as
-loadable modules, or if there is any intention to make them so,
-the file name should be globally unique and follow a common naming
-scheme, e.g. idle-intel.c, idle-acpi.c, ...
+Blimey! I'll resend with a proper Signed-off-by after more people have
+a chance to
+comment. And thanks for the review.
 
-	Arnd
+> even though personally I'd choose a bottom-up approach, ie. make
+> smp_call_function() return void and from that conclude that
+> on_each_cpu() can return void. ?With those patches, we have a situation,
+> where smp_call_function() has a return value which is then lost for no
+> immediately apparent reason lost in on_each_cpu().
+
+There are so many call site of smp_call_function() that do not check the
+return value right now that I think we can tolerate it for just a
+little bit longer
+until that get fixed as well... :-)
+
+Thanks,
+Gilad
+
+
+-- 
+Gilad Ben-Yossef
+Chief Coffee Drinker
+gilad at benyossef.com
+Israel Cell: +972-52-8260388
+US Cell: +1-973-8260388
+http://benyossef.com
+
+"Unfortunately, cache misses are an equal opportunity pain provider."
+-- Mike Galbraith, LKML
