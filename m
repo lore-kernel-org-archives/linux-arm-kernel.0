@@ -1,39 +1,78 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 03 Jan 2012 10:06:22 +0100
-Subject: [RFC][PATCH 0/4] lcd: platform-lcd: Add lcd panel and device
- tree support
-In-Reply-To: <1325483675-21908-1-git-send-email-thomas.abraham@linaro.org>
-References: <1325483675-21908-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F02C50E.9030904@metafoo.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 03 Jan 2012 10:23:12 +0100
+Subject: [PATCH] at91: fix at91rm9200 soc subtype handling
+In-Reply-To: <4F01BD7C.6000902@atmel.com>
+References: <1325070604-5560-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+ <4F01BD7C.6000902@atmel.com>
+Message-ID: <4F02C900.6090907@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2012 06:54 AM, Thomas Abraham wrote:
-> The platform-lcd driver depends on platform-specific callbacks to setup the
-> lcd panel. These callbacks are supplied using driver's platform data. But
-> for adding device tree support for platform-lcd driver, providing such
-> callbacks is not possible (without using auxdata).
+On 01/02/2012 03:21 PM, Nicolas Ferre :
+> On 12/28/2011 12:10 PM, Veli-Pekka Peltola :
+>> BGA should be the default SoC subtype but it is set to unknown if
+>> not explicitly set to PQFP. Currently setting it to PQFP sets subtype
+>> to BGA as subtypes are swapped in at91rm9200_set_type().
+>>
+>> Wrong subtype causes GPIO bank D not to work at all.
+>>
+>> After this fix BGA subtype is set as default. On boot BGA is printed
+>> always but it is set to PQFP if requested before setting amount of GPIO
+>> banks.
+>>
+>> Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
 > 
-> Since the callbacks are usually lcd panel specific, it is possible to include
-> the lcd panel specific setup and control functionality in the platform-lcd
-> driver itself, thereby eliminating the need for supplying platform specific
-> callbacks to the driver. The platform-lcd driver can include support for
-> multiple lcd panels.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
-> This patchset removes the need for platform data for platform-lcd driver and
-> adds support which can be used to implement lcd panel specific functionality
-> in the driver. As an example, the support for Hydis hv070wsa lcd panel is added
-> to the platform-lcd driver which is then used on the Exynos4 based Origen board.
-> This currently breaks build for other users of platform-lcd driver. Those can be
-> fixed if this approach is acceptable.
+> I will queue it in a "fixes" branch (hopefully for 3.3).
 
-The whole approach looks rather backwards to me. The exact purpose of the
-platform_lcd driver is to redirect the lcd driver callbacks to board code.
-So by removing this support you not only break all the existing driver but
-also create a driver which does nothing. Then you add another layer of
-abstraction to implement custom drivers in this driver. A better approach in
-my opinion is to simply implement these drivers as first level LCD drivers.
-So leave the platform-lcd driver as it is and just add a gpio (or maybe
-regulator) lcd driver instead.
+I come back to this:
+1/ There is definitively a bug in at91rm9200_set_type()
+2/ I do not know if it is a good idea to set BGA subtype by default. I
+would simply keep the "unknown" subtype printed out until the real
+subtype is set by the "*_init_early()" of the board code.
 
-- Lars
+So, I may modify your original patch and submit it for discussion...
+Jean-Christophe, I would like to have your opinion on this.
+
+Best regards,
+
+
+> 
+> thanks a lot. Best regards,
+> 
+> 
+>> ---
+>>  arch/arm/mach-at91/setup.c |    5 +++--
+>>  1 files changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+>> index aa64294..e6b07ad 100644
+>> --- a/arch/arm/mach-at91/setup.c
+>> +++ b/arch/arm/mach-at91/setup.c
+>> @@ -27,9 +27,9 @@ EXPORT_SYMBOL(at91_soc_initdata);
+>>  void __init at91rm9200_set_type(int type)
+>>  {
+>>  	if (type == ARCH_REVISON_9200_PQFP)
+>> -		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+>> -	else
+>>  		at91_soc_initdata.subtype = AT91_SOC_RM9200_PQFP;
+>> +	else
+>> +		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+>>  }
+>>  
+>>  void __init at91_init_irq_default(void)
+>> @@ -118,6 +118,7 @@ static void __init soc_detect(u32 dbgu_base)
+>>  
+>>  	case ARCH_ID_AT91RM9200:
+>>  		at91_soc_initdata.type = AT91_SOC_RM9200;
+>> +		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+>>  		at91_boot_soc = at91rm9200_soc;
+>>  		break;
+>>  
+> 
+> 
+
+
+-- 
+Nicolas Ferre
