@@ -1,37 +1,71 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 3 Jan 2012 15:15:05 +0100
-Subject: [PATCH 1/3] of/base: Take NULL string into account for property
- with multiple strings
-In-Reply-To: <4EEF4401.1060303@gmail.com>
-References: <1323095036-3739-1-git-send-email-b-cousson@ti.com>
- <1323095036-3739-2-git-send-email-b-cousson@ti.com>
- <4EEF4401.1060303@gmail.com>
-Message-ID: <4F030D69.5010709@ti.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Tue, 3 Jan 2012 22:15:06 +0800
+Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <20120103134709.GS2914@n2100.arm.linux.org.uk>
+References: <20111223131851.GB13175@sirena.org.uk>
+ <20111224085539.GA1892@richard-laptop>
+ <20111224122411.GA13778@sirena.org.uk>
+ <20111224132831.GB1803@richard-laptop>
+ <20111224134227.GA20908@opensource.wolfsonmicro.com>
+ <20111224155227.GC1803@richard-laptop>
+ <20111226111030.GC8722@opensource.wolfsonmicro.com>
+ <20111226134449.GA4259@richard-laptop>
+ <20120103090625.GA2914@n2100.arm.linux.org.uk>
+ <CAH8gqwVHc9ROQYZNe6b-cUN0ycWhYj8=vJ0geBXUCYN1+XENQA@mail.gmail.com>
+ <20120103134709.GS2914@n2100.arm.linux.org.uk>
+Message-ID: <CAH8gqwWfTWaa1=OMrADvNTGjjfBwKpjwp9vUkhTLqdAUb_RD+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
-
-On 12/19/2011 3:02 PM, Rob Herring wrote:
-> On 12/05/2011 08:23 AM, Benoit Cousson wrote:
->> The current implementation just ignore any NULL string inserted in a
->> multiple strings property.
->> In some cases we can have a property with a fix number of strings but
->> not necessarily used, like for example in a list of valid pinmux modes.
+On 3 January 2012 21:47, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 03, 2012 at 09:25:30PM +0800, Richard Zhao wrote:
+>> Hi Russel,
 >>
->>   prop = "uart_rx", "uart_tx", "", "", "safe_mode";
->>
->> Do no skip NULL string and take them into account in
->> of_property_read_string_index and of_property_count_strings.
->>
->> Reported-by: Tony Lindgren<tony@atomide.com>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Grant Likely<grant.likely@secretlab.ca>
->> Cc: Rob Herring<rob.herring@calxeda.com>
+>> On 3 January 2012 17:06, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Mon, Dec 26, 2011 at 09:44:52PM +0800, Richard Zhao wrote:
+>> >> On Mon, Dec 26, 2011 at 11:10:30AM +0000, Mark Brown wrote:
+>> >> > The *call* is there in the regulator subsystem, it's just that none of
+>> >> > the drivers back it up with an actual implementation yet. ?Which turns
+>> >> > out to be a good thing as cpufreq can't currently understand variable
+>> >> > latencies and the governors don't deal well with non-trivial latencies
+>> >> > anyway.
+>> >> but clk API don't have such calls. and many SoCs only adjust clk frequencies, using
+>> >> one single voltage.
+>> >
+>> > That's because it's often not known - especially in the case of PLLs,
+>> > data sheets don't tend to specify how long it takes for the PLL to relock
+>> > after a requested change. ?If it's important that the PLL be locked,
+>> > there will be a bit to poll (or they'll cause the CPU itself to stall
+>> > while the PLL is not locked.)
+>> >
+>> > So, for these kinds of situations, how do you suggest that the clk API
+>> > provides this information?
+>> In latest v6 version, I get clk transition latency from dt property, and get
+>> regulator transition latency from regulator API.
+>> Could you please help review other arm common changes in v6 version?
 >
-> Applied. The others need Grant's agreement.
+> You didn't get my point: how do you specify a clock transition latency
+> for a clock with a PLL when the data sheets don't tell you what that is,
+> and they instead give you a bit to poll?
+clk-trans-latency is not a MUST property. If the datasheet don't provide it or
+you don't want to measure, you may not specify the property. In such case
+cpufreq governor ondemand and conservative will not work, because they
+can not determine the sample rate without the latency value.
+>
+> Do you:
+>
+> (a) make up some number and hope that it's representative
+No, I always get it from dt.
 
-New year gentle ping.
+> (b) not specify any transition latency
+It's allowed.
 
-Thanks,
-Benoit
+> (c) think about the problem _now_ and define what it means for a clock
+> ? ?without a transition latency.
+It's ondemand/conservative governors that strongly need the latency value.
+If user don't want to use it, it's fine.
+
+Thanks
+Richard
