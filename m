@@ -1,41 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 09:10:15 +0000
-Subject: [PATCH] ARM: imx6q: add support for IRAM
-In-Reply-To: <20111226134129.GA9014@S2100-06.ap.freescale.net>
-References: <1324898123-13973-1-git-send-email-jason.chen@linaro.org>
- <20111226134129.GA9014@S2100-06.ap.freescale.net>
-Message-ID: <20120103091015.GD2914@n2100.arm.linux.org.uk>
+Date: Tue, 3 Jan 2012 09:11:52 +0000
+Subject: [PATCH] mach-ixp4xx: made gpio functions atomic
+In-Reply-To: <CACW_hTYn1_9fDCve2gg0Wr-DkNqWfaEQXTtT+ooFsBBo9ksivw@mail.gmail.com>
+References: <1319973693-19063-1-git-send-email-fransmeulenbroeks@gmail.com>
+ <CACW_hTYn1_9fDCve2gg0Wr-DkNqWfaEQXTtT+ooFsBBo9ksivw@mail.gmail.com>
+Message-ID: <20120103091152.GE2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 26, 2011 at 09:41:30PM +0800, Shawn Guo wrote:
-> On Mon, Dec 26, 2011 at 07:15:23PM +0800, Jason Chen wrote:
-> > Signed-off-by: Jason Chen <jason.chen@linaro.org>
-> > Signed-off-by: Eric Miao <eric.miao@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/imx6q.dtsi    |    7 +++++++
-> >  arch/arm/mach-imx/Kconfig       |    1 +
-> >  arch/arm/mach-imx/clock-imx6q.c |    3 ++-
-> >  arch/arm/mach-imx/mach-imx6q.c  |   17 +++++++++++++++++
-> >  4 files changed, 27 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> > index 263e8f3..01646b8 100644
-> > --- a/arch/arm/boot/dts/imx6q.dtsi
-> > +++ b/arch/arm/boot/dts/imx6q.dtsi
-> > @@ -80,6 +80,13 @@
-> >  		};
-> >  	};
-> >  
-> > +	ocram at 00900000 {
-> > +		compatible = "fsl,imx6q-iram";
+On Wed, Dec 28, 2011 at 04:45:21PM +0100, Frans Meulenbroeks wrote:
+> Ping.
 > 
-> It should have nothing specific to imx6q, and could be "fsl,iram".
-> Then we can have some common code across different SoCs to match it.
+> Didn't hear anything concerning this patch I submitted 2 months ago.
+> Seems a very trivial patch to me. Would it be possible to apply this (or
+> provide feedback why it is not ok).
 
-Why is this even specific to fsl?  Isn't it something that could be
-specified in a totally generic way?
+This should really be using the gpiolib stuff rather than persisting with
+its own private gpio API invention (and fixing problems in it which
+gpiolib already solves.)
 
-As I showed with my original set of sram patches, there is not much
-specific about this on-board RAM: what is specific is how a SoC uses
-it, and that's up to the rest of the SoC code.
+Any chance someone could look into doing that conversion?
