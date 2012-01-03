@@ -1,51 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 09:55:27 +0000
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20120102155820.GB29877@amd.com>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <20120102134229.GZ29877@amd.com>
- <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
- <20120102155820.GB29877@amd.com>
-Message-ID: <20120103095527.GI2914@n2100.arm.linux.org.uk>
+Date: Tue, 3 Jan 2012 09:59:58 +0000
+Subject: Git pull request: shmobile fix for the vmalloc series
+In-Reply-To: <alpine.LFD.2.02.1201022323090.2907@xanadu.home>
+References: <alpine.LFD.2.02.1201022323090.2907@xanadu.home>
+Message-ID: <20120103095958.GJ2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2012 at 04:58:20PM +0100, Joerg Roedel wrote:
-> On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
-> > > I still get
-> > >
-> > > ?LD ? ? ?.tmp_vmlinux1
-> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
-> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
-> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
-> > > make[1]: *** [.tmp_vmlinux1] Error 1
-> > >
-> > > when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
-> > > wrong or is this not expected to work?
-> > >
-> > Do you?
-> > Ok. I will check my configuration with linux-next git.
+On Mon, Jan 02, 2012 at 11:34:21PM -0500, Nicolas Pitre wrote:
+> Russell, please pull the following into your devel-stable branch:
 > 
-> Compiling my exynos-config with linux-next gives me:
+> 	git://git.linaro.org/people/nico/linux vmalloc
 > 
->   CC      arch/arm/kernel/process.o
-> In file included from /data/lemmy/linux.trees.git/arch/arm/mach-exynos/include/mach/system.h:16:0,
->                  from /data/lemmy/linux.trees.git/arch/arm/kernel/process.c:64:
-> /data/lemmy/linux.trees.git/arch/arm/plat-samsung/include/plat/system-reset.h:19:2: error: #error Fix me up
-> 
-> I better not ask the question how such an #error statement can come
-> through to linux-next.
+> This contains a patch from Magnus Damm fixing the oversized DMA area 
+> issue on shmobile, and a revert of the temporary and noisy workaround 
+> (which is already in your devel-stable branch) that was needed because 
+> of that issue.
 
-It comes through when I stick it in my tree because of a month of asking
-for help to fix something and getting zero response from the maintainers.
+Is there much point?  shmobile shows no sign of fixing their #error for
+the restart changes (and haven't responded to any of my emails) - I
+think we should be thinking about removing this -clearly- unmaintained
+set of platforms.
 
-It's a way to flag to them that they're doing something wrong - and in
-fact something is broken, and that that brokenness will happen at the
-next merge window unless they get off their butt and do something about
-it.
-
-Patches have been around, but I've had problems merging them, and the
-replacement patches have now appeared after I started my Christmas
-vacation.  As I've just returned, it's going to be a couple of days
-before the #error gets removed (assuming the replacement patches apply.)
+So, it currently looks like I'm going to be pushing a #error for them
+in during the next merge window.  I'd much rather just delete the
+unmaintained code to avoid adding those evil things.
