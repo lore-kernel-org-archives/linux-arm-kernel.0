@@ -1,30 +1,31 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 4 Jan 2012 10:47:58 +1100
-Subject: linux-next: interesting merges in the arm-soc tree
-Message-ID: <20120104104758.26b0ca5268d10fbf7b95903a@canb.auug.org.au>
+From: john@szakmeister.net (John Szakmeister)
+Date: Tue, 3 Jan 2012 18:53:50 -0500
+Subject: Best kernel to use and some patches...
+In-Reply-To: <201201032217.51399.marek.vasut@gmail.com>
+References: <CAEBDL5VPv=qmUBp0EZcQSff5sbcb8RqH1JkoktF0Qqu-=1BsRQ@mail.gmail.com>
+ <201201032217.51399.marek.vasut@gmail.com>
+Message-ID: <CAEBDL5XrkMQ0YcFBgf0jTA8pu=J+vFk+CcVoQ8Gr+q4bnedeDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Jan 3, 2012 at 4:17 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+[snip]
+>> Also, we ran into a cache-flushing issue in the 2.6.34 kernel with the
+>> MMC/SDCard subsystem. ?We're running 2.6.34, but the issue still
+>> exists in 2.6.34.10. ?Are you still taking patches for that line?
+>
+> No, check stable kernel releases (hint: kernel.org, keyword "stable")
 
-I noticed that the arm-soc tree has merged in the v4l-dvb and the
-slave-dma trees today.   Is there some good reason for this?  It fixes a
-few conflicts (but that is not excuse) and there may be dependencies in a
-driver on the v4l-dvb tree (but maybe that means that that driver should
-be merged via the v4l-dvb tree - it looks like the "at91/drivers" is
-based on the v4l-dvb tree, so probably doesn't depend on anything else on
-the arm-soc tree).
+Interesting!  It was marked stable the last time I checked (which was
+just before Christmas).  Turns out the last tag was June 26th, 2011,
+so it just fell off that list recently.  Just to make sure I
+understand, once a branch falls from the stable moniker on kernel.org,
+patches are no longer accepted for the branch, correct?
 
-If nothing else, are you sure that neither of those merged trees will
-rebase?  You have also just inherited any bugs in those two trees.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120104/e1afe1e9/attachment-0001.sig>
+I'm sorry for all of the questions, I just want to understand what the
+general flow is, and what we should target so that bugs we fix can
+make it back upstream.
+
+Thanks!
+
+-John
