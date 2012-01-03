@@ -1,40 +1,32 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 02 Jan 2012 22:32:19 -0500 (EST)
-Subject: [PATCH 11/20] ARM: plat-mxc: hook special idle handlers to
- arm_pm_idle
-In-Reply-To: <20111225015322.GC8240@S2100-06.ap.freescale.net>
-References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
- <1324288069-21940-12-git-send-email-nico@fluxnic.net>
- <20111225015322.GC8240@S2100-06.ap.freescale.net>
-Message-ID: <alpine.LFD.2.02.1201022229460.2907@xanadu.home>
+Date: Mon, 02 Jan 2012 23:34:21 -0500 (EST)
+Subject: Git pull request: shmobile fix for the vmalloc series
+Message-ID: <alpine.LFD.2.02.1201022323090.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 25 Dec 2011, Shawn Guo wrote:
+Russell, please pull the following into your devel-stable branch:
 
-> Hi Nico,
-> 
-> On Mon, Dec 19, 2011 at 04:47:40AM -0500, Nicolas Pitre wrote:
-> > ... and remove redundant include of <mach/system.h>.
-> > 
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > ---
-> >  arch/arm/mach-imx/mm-imx3.c             |    4 ++--
-> >  arch/arm/mach-imx/pm-imx27.c            |    3 +--
-> >  arch/arm/mach-mx5/mm.c                  |    2 +-
-> 
-> The hook imx_idle has been removed since v3.2-rc4 as suggested by rmk,
-> so the context is changed here.
+	git://git.linaro.org/people/nico/linux vmalloc
 
-OK, will fix when I rebase.
+This contains a patch from Magnus Damm fixing the oversized DMA area 
+issue on shmobile, and a revert of the temporary and noisy workaround 
+(which is already in your devel-stable branch) that was needed because 
+of that issue.
 
-> >  arch/arm/mach-mxs/pm.c                  |    3 +--
-> 
-> The mxs is a different sub-architecture/platform than imx/mxc, so it
-> might be better to split it out.
+Magnus Damm (1):
+      ARM: mach-shmobile: use standard 2MiB coherent DMA memory size
 
-Yes, in fact it is best to fold that change in the patch called
-"ARM: substitute arch_idle()".
+Nicolas Pitre (1):
+      Revert "ARM: move VMALLOC_END down temporarily for shmobile"
+
+ arch/arm/include/asm/pgtable.h          |    7 -------
+ arch/arm/mach-shmobile/board-ag5evm.c   |    2 --
+ arch/arm/mach-shmobile/board-ap4evb.c   |    2 --
+ arch/arm/mach-shmobile/board-g3evm.c    |    2 --
+ arch/arm/mach-shmobile/board-g4evm.c    |    2 --
+ arch/arm/mach-shmobile/board-mackerel.c |    2 --
+ 6 files changed, 0 insertions(+), 17 deletions(-)
 
 
 Nicolas
