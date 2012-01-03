@@ -1,43 +1,73 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Tue, 3 Jan 2012 11:52:01 +0000
-Subject: [PATCH v8 19/20] OMAP2+: UART: Do not gate uart clocks if used
- for debug_prints
-In-Reply-To: <CAAL8m4yhtUNjoKwECnQEYNoaL-M+RaHXACanAeJW64DPsJ_hWg@mail.gmail.com>
-References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
- <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
- <B5906170F1614E41A8A28DE3B8D1214304B3E2@DBDE01.ent.ti.com>
- <CAAL8m4yXD-gpeXNVsCOYeDkYDWmVX8FUcpXKjx6k=AXSF4V9iA@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D1214304BAD3@DBDE01.ent.ti.com>
- <CAAL8m4yhtUNjoKwECnQEYNoaL-M+RaHXACanAeJW64DPsJ_hWg@mail.gmail.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D1214304BB42@DBDE01.ent.ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 3 Jan 2012 17:24:07 +0530
+Subject: [RFC][PATCH 0/4] lcd: platform-lcd: Add lcd panel and device tree
+ support
+In-Reply-To: <4F02C50E.9030904@metafoo.de>
+References: <1325483675-21908-1-git-send-email-thomas.abraham@linaro.org>
+ <4F02C50E.9030904@metafoo.de>
+Message-ID: <CAJuYYwR8hnxJSfaXo4=RWCZ1HQZ1PHci+jY3K5b9ktWXryN0vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 16:01:52, Govindraj wrote:
-> >
-> > I have basic suspend-resume working on it. Strangely this works irrespective
-> > of the value of tty_dev wakeup entry. Do you know if this is expected on OMAP?
-> >
-> 
-> AFAIK yes.
+Hi Lars,
 
-Ok.
+On 3 January 2012 14:36, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> On 01/02/2012 06:54 AM, Thomas Abraham wrote:
+>> The platform-lcd driver depends on platform-specific callbacks to setup the
+>> lcd panel. These callbacks are supplied using driver's platform data. But
+>> for adding device tree support for platform-lcd driver, providing such
+>> callbacks is not possible (without using auxdata).
+>>
+>> Since the callbacks are usually lcd panel specific, it is possible to include
+>> the lcd panel specific setup and control functionality in the platform-lcd
+>> driver itself, thereby eliminating the need for supplying platform specific
+>> callbacks to the driver. The platform-lcd driver can include support for
+>> multiple lcd panels.
+>>
+>> This patchset removes the need for platform data for platform-lcd driver and
+>> adds support which can be used to implement lcd panel specific functionality
+>> in the driver. As an example, the support for Hydis hv070wsa lcd panel is added
+>> to the platform-lcd driver which is then used on the Exynos4 based Origen board.
+>> This currently breaks build for other users of platform-lcd driver. Those can be
+>> fixed if this approach is acceptable.
+>
+> The whole approach looks rather backwards to me. The exact purpose of the
+> platform_lcd driver is to redirect the lcd driver callbacks to board code.
+> So by removing this support you not only break all the existing driver but
+> also create a driver which does nothing. Then you add another layer of
+> abstraction to implement custom drivers in this driver. A better approach in
+> my opinion is to simply implement these drivers as first level LCD drivers.
+> So leave the platform-lcd driver as it is and just add a gpio (or maybe
+> regulator) lcd driver instead.
 
-> 
-> > The other issue concerning runtime PM is that as soon as I set a non-zero to
-> > the autosuspend_delay_ms I get some garbage characters and eventually the
-> > console stops responding.
-> >
-> > [root at arago /]# cat .../omap_uart.0/power/autosuspend_delay_ms
-> > -1
-> > [root at arago /]# echo 3000 > ?KW???+???+wU.???,z,??.??osuspend_delay??????...
-> > [root at arago /]# <- No response after some time
-> >
-> 
-> try enabling CONFIG_CPU_IDLE for pm qos_usage from uart driver.
-> 
+The existing platform-lcd driver mostly depends on the platform
+callbacks for lcd panel power controls. Looking at the current users
+of platform-lcd driver, a majority of the users of platform-lcd driver
+use a gpio to enable/disable the display/power. The gpio is controlled
+by the platform callbacks which the platform-lcd driver calls.
 
-Its enabled.
+Hence, it is possible to extend the platform-lcd driver to include the
+functionality of managing the gpio for lcd control. The platform code
+is only expected to provide a gpio number to the platform-lcd driver.
+This allows consolidation of the all the different platform callbacks
+that use a gpio for simple enable/disable of the lcd display.
+
+But there are other users of platform-lcd that do lot more than just
+control a single gpio. For such cases, it is possible to reuse the
+existing infrastructure of platform-lcd driver and extend it to handle
+such lcd panel specific functionality.
+
+The main advantages that I see here is the consolidation of platform
+specific callbacks into the driver which inturn allows adding device
+tree support without depending on platform data which have pointers to
+platform specific functions. In the next version of this patchset, it
+will be ensured that no platform breaks due to this change.
+
+Would such a approach be useful and acceptable? Thanks for your
+feedback and comments.
 
 Regards,
-Vaibhav
+Thomas.
+
+>
+> - Lars
