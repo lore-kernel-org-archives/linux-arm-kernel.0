@@ -1,44 +1,71 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Tue, 3 Jan 2012 08:43:09 +0100
-Subject: [PATCH v4 0/2] Add support form eMMa-PrP in i.MX2 chips as a
- mem2mem device.
-In-Reply-To: <4F021DCE.8000105@gmail.com>
-References: <1323690225-15799-1-git-send-email-javier.martin@vista-silicon.com>
- <CACKLOr1RujFbuTnF=DkCTB=paVUq7=j1Ru_RU7DWyuJedM+Cvg@mail.gmail.com>
- <4F021DCE.8000105@gmail.com>
-Message-ID: <CACKLOr0YczU+jGOuKoRNvOUYhMbc3x_LVk3Gnt-dq+KfppwzFA@mail.gmail.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Tue, 3 Jan 2012 17:15:45 +0900
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <005a01ccc9b3$6b6a2870$423e7950$%kim@samsung.com>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <20120102134229.GZ29877@amd.com>
+ <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
+ <20120102155820.GB29877@amd.com>
+ <005a01ccc9b3$6b6a2870$423e7950$%kim@samsung.com>
+Message-ID: <CAHQjnOP6==YL-XE17LRnBymLsFDOiS52HKo4mfGMQUMmqU=xbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 January 2012 22:12, Sylwester Nawrocki <snjw23@gmail.com> wrote:
-> Hi Javier,
+On Tue, Jan 3, 2012 at 10:02 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Joerg Roedel wrote:
+>>
+>> On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
+>> > > I still get
+>> > >
+>> > > ?LD ? ? ?.tmp_vmlinux1
+>> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
+>> unknown-linux-gnueabi-ld: no machine record defined
+>> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
+>> unknown-linux-gnueabi-ld: no machine record defined
+>> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
+>> unknown-linux-gnueabi-ld: no machine record defined
+>> > > make[1]: *** [.tmp_vmlinux1] Error 1
+>> > >
+>> > > when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
+>> > > wrong or is this not expected to work?
+>> > >
+>> > Do you?
+>> > Ok. I will check my configuration with linux-next git.
+>>
+>> Compiling my exynos-config with linux-next gives me:
+>>
+>> ? CC ? ? ?arch/arm/kernel/process.o
+>> In file included from /data/lemmy/linux.trees.git/arch/arm/mach-
+>> exynos/include/mach/system.h:16:0,
+>> ? ? ? ? ? ? ? ? ?from
+> /data/lemmy/linux.trees.git/arch/arm/kernel/process.c:64:
+>> /data/lemmy/linux.trees.git/arch/arm/plat-samsung/include/plat/system-
+>> reset.h:19:2: error: #error Fix me up
+>>
+>> I better not ask the question how such an #error statement can come
+>> through to linux-next. But what I can say is that I will not merge
+>> your code until you guys make sure that your upstream platform code has
+>> enough quality so that it at least compiles.
+>>
+> Hi Joerg,
 >
-> On 01/02/2012 10:31 AM, javier Martin wrote:
->> Hi,
->> do you have any more concerns or comments on this patch?
->> I can't find it in media_tree. Has it been merged somewhere else?
+> I already knew that, Russell added it so that I can take the ARM restart
+> changes seriously.
 >
-> If you think your driver is good enough for merging, if you didn't
-> do so already, you should normally send Mauro a git pull request.
-> Please see:
+> Since I pushed exynos restart patches to Russell's patch system so please
+> kindly ignore it.
 >
-> http://linuxtv.org/wiki/index.php/Maintaining_Git_trees#how_to_submit_a_-git_pull_request
+>> I attach the config I used for my compile-test.
+>>
+> OK, let me check and if any updates, let you know.
 >
-> And here you can find some examples:
-> http://patchwork.linuxtv.org/project/linux-media/list/?state=*&q=PULL&archive=both
 
-Do you mean I have to set up a public GIT repository? Is this mandatory?
-I am not a subsystem maintainer, just casual developer.
+Hi.
 
-What about this?
+Thank you Kukjin.
+I am also going to check about the problem.
 
-http://linuxtv.org/wiki/index.php/Maintaining_Git_trees#Patches_submitted_via_email
+Regards,
 
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+KyongHo.
