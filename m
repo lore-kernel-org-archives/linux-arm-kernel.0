@@ -1,54 +1,37 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Tue, 3 Jan 2012 19:42:46 +0530
-Subject: [PATCH v8 19/20] OMAP2+: UART: Do not gate uart clocks if used
- for debug_prints
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D1214304BB42@DBDE01.ent.ti.com>
-References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
- <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
- <B5906170F1614E41A8A28DE3B8D1214304B3E2@DBDE01.ent.ti.com>
- <CAAL8m4yXD-gpeXNVsCOYeDkYDWmVX8FUcpXKjx6k=AXSF4V9iA@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D1214304BAD3@DBDE01.ent.ti.com>
- <CAAL8m4yhtUNjoKwECnQEYNoaL-M+RaHXACanAeJW64DPsJ_hWg@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D1214304BB42@DBDE01.ent.ti.com>
-Message-ID: <CAAL8m4z-AsVzfubqBy=nP6EN=m6MjTma1+50+aywQ=hmoF6Ejg@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 3 Jan 2012 15:15:05 +0100
+Subject: [PATCH 1/3] of/base: Take NULL string into account for property
+ with multiple strings
+In-Reply-To: <4EEF4401.1060303@gmail.com>
+References: <1323095036-3739-1-git-send-email-b-cousson@ti.com>
+ <1323095036-3739-2-git-send-email-b-cousson@ti.com>
+ <4EEF4401.1060303@gmail.com>
+Message-ID: <4F030D69.5010709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2012 at 5:22 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
-> On Tue, Jan 03, 2012 at 16:01:52, Govindraj wrote:
->> >
->> > I have basic suspend-resume working on it. Strangely this works irrespective
->> > of the value of tty_dev wakeup entry. Do you know if this is expected on OMAP?
->> >
+Hi Grant,
+
+On 12/19/2011 3:02 PM, Rob Herring wrote:
+> On 12/05/2011 08:23 AM, Benoit Cousson wrote:
+>> The current implementation just ignore any NULL string inserted in a
+>> multiple strings property.
+>> In some cases we can have a property with a fix number of strings but
+>> not necessarily used, like for example in a list of valid pinmux modes.
 >>
->> AFAIK yes.
+>>   prop = "uart_rx", "uart_tx", "", "", "safe_mode";
+>>
+>> Do no skip NULL string and take them into account in
+>> of_property_read_string_index and of_property_count_strings.
+>>
+>> Reported-by: Tony Lindgren<tony@atomide.com>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Cc: Rob Herring<rob.herring@calxeda.com>
 >
-> Ok.
->
->>
->> > The other issue concerning runtime PM is that as soon as I set a non-zero to
->> > the autosuspend_delay_ms I get some garbage characters and eventually the
->> > console stops responding.
->> >
->> > [root at arago /]# cat .../omap_uart.0/power/autosuspend_delay_ms
->> > -1
->> > [root at arago /]# echo 3000 > ?KW???+???+wU.???,z,??.??osuspend_delay??????...
->> > [root at arago /]# <- No response after some time
->> >
->>
->> try enabling CONFIG_CPU_IDLE for pm qos_usage from uart driver.
->>
->
-> Its enabled.
+> Applied. The others need Grant's agreement.
 
-I checked on Beagle-xm with latest LO master I don't see that issue.
+New year gentle ping.
 
-Lo master commit used
-commit: 6489f6de3a219dfd23a91261eea1b09fba7ae128
-
-Logs:
-http://pastebin.pandaboard.org/index.php/view/55509914
-
---
 Thanks,
-Govindraj.R
+Benoit
