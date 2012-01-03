@@ -1,63 +1,51 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 3 Jan 2012 09:43:30 +0100
-Subject: [PATCH] dma/imx-sdma: save irq flags when use spin_lock in
- sdma_tx_submit
-In-Reply-To: <1325388606-20732-1-git-send-email-richard.zhao@linaro.org>
-References: <1325388606-20732-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20120103084330.GG5446@pengutronix.de>
+Date: Tue, 3 Jan 2012 09:51:37 +0100
+Subject: [GIT PULL] i.MX patches for eukrea boards
+Message-ID: <20120103085137.GH5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 01, 2012 at 11:30:06AM +0800, Richard Zhao wrote:
-> From: Haitao Zhang <minipanda@linuxrobot.org>
+Hi Arnd, Olof,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Please pull the following eukrea board specific patches. They
+currently conflict with the patches merging mach-mx5 to mach-imx.
+Let me know if I have to rebase them.
 
-> 
-> mx53_loco: fix deadlock report from sdma_tx_submit() during boot
-> 
-> BugLink: http://bugs.launchpad.net/bugs/878701
-> 
-> Adjust to use spin_lock_irqsave()/spin_unlock_irqresotre(), so to
-> make it safe when called from interrupt context.
-> 
-> Signed-off-by: Haitao Zhang <haitao.zhang@linaro.org>
-> Signed-off-by: Eric Miao <eric.miao@linaro.org>
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  drivers/dma/imx-sdma.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index f993955..2b7a88b 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -832,17 +832,18 @@ static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
->  
->  static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
->  {
-> +	unsigned long flags;
->  	struct sdma_channel *sdmac = to_sdma_chan(tx->chan);
->  	struct sdma_engine *sdma = sdmac->sdma;
->  	dma_cookie_t cookie;
->  
-> -	spin_lock_irq(&sdmac->lock);
-> +	spin_lock_irqsave(&sdmac->lock, flags);
->  
->  	cookie = sdma_assign_cookie(sdmac);
->  
->  	sdma_enable_channel(sdma, sdmac->channel);
->  
-> -	spin_unlock_irq(&sdmac->lock);
-> +	spin_unlock_irqrestore(&sdmac->lock, flags);
->  
->  	return cookie;
->  }
-> -- 
-> 1.7.4.1
-> 
-> 
+Sascha
 
+The following changes since commit 384703b8e6cd4c8ef08512e596024e028c91c339:
+
+  Linux 3.2-rc6 (2011-12-16 18:36:26 -0800)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-eukrea
+
+Eric B?nard (9):
+      mxc_udc: add workaround for ENGcm09152 for i.MX25
+      eukrea_cpuimx25: enable workaround ENGcm09152
+      mbimxsd25: add spi controler and spidev support
+      cpuimx25: add watchdog support
+      mbimxsd35: add spi controler and spidev support
+      eukrea-cpuimx51: remove board
+      cpuimx51sd: add watchdog support
+      mbimx51sd: add audio codec support
+      eukrea-cpuimx51sd: support rev2 PCB
+
+ arch/arm/configs/mx5_defconfig                 |    1 -
+ arch/arm/mach-imx/Kconfig                      |    3 +
+ arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |   39 +++
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |   39 +++
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |    2 +
+ arch/arm/mach-mx5/Kconfig                      |   32 +---
+ arch/arm/mach-mx5/Makefile                     |    2 -
+ arch/arm/mach-mx5/board-cpuimx51.c             |  300 ------------------------
+ arch/arm/mach-mx5/board-cpuimx51sd.c           |   49 ++++-
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c   |  206 ----------------
+ arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c   |   28 +++
+ drivers/usb/gadget/fsl_mxc_udc.c               |   22 +-
+ 12 files changed, 167 insertions(+), 556 deletions(-)
+ delete mode 100644 arch/arm/mach-mx5/board-cpuimx51.c
+ delete mode 100644 arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
