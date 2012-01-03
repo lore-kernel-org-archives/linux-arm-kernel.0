@@ -1,31 +1,36 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Tue, 3 Jan 2012 10:39:18 -0800
-Subject: [PATCH] ARM/bcmring: missing sched.h inclusion in dma.c
-Message-ID: <4F034B56.4060704@broadcom.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue,  3 Jan 2012 10:44:36 -0800
+Subject: [PATCH] ARM: Remove BUILD_BUG_ON from asm/bug.h
+Message-ID: <1325616276-10304-1-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add including of sched.h to fix build error.
+BUILD_BUG_ON is defined in linux/kernel.h but that is not included by the
+asm/bug.h header which uses it. This causes a build error:
 
-This patch was submitted a couple of times last year but unfortunately 
-got lost.
+...include/linux/mtd/map.h: In function 'inline_map_read':
+...include/linux/mtd/map.h:408:3: error: implicit declaration of function
+'BUILD_BUG_ON' [-Werror=implicit-function-declaration]
 
-Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
+The check is not essential and is not present for other architectures, so
+just remove it.
+
+Signed-off-by: Simon Glass <sjg@chromium.org>
 ---
-  arch/arm/mach-bcmring/dma.c |    1 +
-  1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/bug.h |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
-index 0ca0005..ab109ff 100644
---- a/arch/arm/mach-bcmring/dma.c
-+++ b/arch/arm/mach-bcmring/dma.c
-@@ -24,6 +24,7 @@
-
-  #include <linux/module.h>
-  #include <linux/device.h>
-+#include <linux/sched.h>
-  #include <linux/dma-mapping.h>
-  #include <linux/interrupt.h>
-  #include <linux/irqreturn.h>
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index 9abe7a0..fac79dc 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -32,7 +32,6 @@
+ 
+ #define __BUG(__file, __line, __value)				\
+ do {								\
+-	BUILD_BUG_ON(sizeof(struct bug_entry) != 12);		\
+ 	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
+ 		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
+ 		"2:\t.asciz " #__file "\n" 			\
 -- 
-1.7.5.4
+1.7.3.1
