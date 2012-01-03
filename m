@@ -1,38 +1,23 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Jan 2012 17:58:14 +0000
-Subject: [PATCH] ARM: imx6: fix v7_invalidate_l1 by adding I-Cache
- invalidation
-In-Reply-To: <20120103172845.GD2914@n2100.arm.linux.org.uk>
-References: <1325237200-10610-1-git-send-email-shawn.guo@linaro.org>
- <CAB4PhKexxJM+rWhgdQfu9vB16KVT6QpN1ye4kH88pNiLnEyL+Q@mail.gmail.com>
- <20120103172845.GD2914@n2100.arm.linux.org.uk>
-Message-ID: <20120103175814.GG22876@arm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 3 Jan 2012 10:03:01 -0800
+Subject: [PATCH] arm/tegra: Support Tegra30 in decompressor UART setup
+In-Reply-To: <1324587719-32731-1-git-send-email-swarren@nvidia.com>
+References: <1324587719-32731-1-git-send-email-swarren@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F10E9@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 05:28:45PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 30, 2011 at 06:47:05PM +0800, Jason Liu wrote:
-> > I looked the code: arch/arm/mm/proc-v7.S:
-> > 
-> > #ifdef HARVARD_CACHE
-> >         mcr     p15, 0, r10, c7, c5, 0          @ I+BTB cache invalidate
-> > #endif
-> >         dsb
-> > #ifdef CONFIG_MMU
-> >         mcr     p15, 0, r10, c8, c7, 0          @ invalidate I + D TLBs
-> >         mcr     p15, 0, r10, c2, c0, 2          @ TTB control register
-> >         ALT_SMP(orr     r4, r4, #TTB_FLAGS_SMP)
-> >         ALT_UP(orr      r4, r4, #TTB_FLAGS_UP)
-> >         mcr     p15, 0, r4, c2, c0, 1           @ load TTB1
-> > 
-> > It seems that it will try to invalidate when HARVARD_CACHE define. But
-> > HARVARD_CACHE only defined in v6, why?
+Stephen Warren wrote at Thursday, December 22, 2011 2:02 PM:
+> On Tegra20, the UART clock runs at 216MHz, whereas on Tegra30 it runs at
+> 408MHz. Modify arch_decomp_setup() to detect Tegra20-vs-Tegra30 at run-
+> time, and program the correct divisor.
 > 
-> It's probably a mistake caused when copying proc-v6.S to proc-v7.S and
-> editing it - which I believe is how proc-v7.S was created.  Suggest you
-> ask Catalin to find out more details.
+> This makes uncompressor messages work correctly on Tegra30. This also
+> fixes early printk, assuming zImage is used and this setup code runs.
 
-It looks like a bug that has been around for nearly 5 years.
+I'll be posting a V2 for this patch soon; I'll rework it to use Tegra's
+CHIPID register instead of a random GIC register, which should make the
+code a little more future-proof.
 
 -- 
-Catalin
+nvpublic
