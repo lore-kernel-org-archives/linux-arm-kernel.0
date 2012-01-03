@@ -1,123 +1,81 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 03 Jan 2012 21:07:05 +0900
-Subject: [PATCH 09/12] ARM: EXYNOS: introduce
- arch/arm/mach-exynos/common.[ch]
-In-Reply-To: <20120103120033.GP2914@n2100.arm.linux.org.uk>
-References: <1324385316-6052-10-git-send-email-kgene.kim@samsung.com>
- <20111223191935.GS2577@n2100.arm.linux.org.uk>
- <088101ccc1d8$d2023b00$7606b100$%kim@samsung.com>
- <08f401ccc469$9a93a800$cfbaf800$%kim@samsung.com>
- <20120103104120.GK2914@n2100.arm.linux.org.uk>
- <012601ccca05$57d732b0$07859810$%kim@samsung.com>
- <20120103105425.GL2914@n2100.arm.linux.org.uk>
- <012801ccca07$037a24a0$0a6e6de0$%kim@samsung.com>
- <20120103112003.GN2914@n2100.arm.linux.org.uk>
- <013b01ccca0e$6c06ce40$44146ac0$%kim@samsung.com>
- <20120103120033.GP2914@n2100.arm.linux.org.uk>
-Message-ID: <013c01ccca10$3570e3a0$a052aae0$%kim@samsung.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 03 Jan 2012 13:26:37 +0100
+Subject: [RFC][PATCH 0/4] lcd: platform-lcd: Add lcd panel and device
+ tree support
+In-Reply-To: <CAJuYYwR8hnxJSfaXo4=RWCZ1HQZ1PHci+jY3K5b9ktWXryN0vA@mail.gmail.com>
+References: <1325483675-21908-1-git-send-email-thomas.abraham@linaro.org>	<4F02C50E.9030904@metafoo.de>
+ <CAJuYYwR8hnxJSfaXo4=RWCZ1HQZ1PHci+jY3K5b9ktWXryN0vA@mail.gmail.com>
+Message-ID: <4F02F3FD.4010306@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+On 01/03/2012 12:54 PM, Thomas Abraham wrote:
+> Hi Lars,
 > 
-> On Tue, Jan 03, 2012 at 08:54:17PM +0900, Kukjin Kim wrote:
-> > Russell King - ARM Linux wrote:
-> > >
-> > > On Tue, Jan 03, 2012 at 08:01:15PM +0900, Kukjin Kim wrote:
-> > > > If any problems, please kindly let me know.
-> > >
-> > > Right, this looks better.  I'm now left with one remaining bit:
-> > >
-> > > arch/arm/mach-exynos/include/mach/system.h:#include <plat/system-
-> reset.h>
-> > > arch/arm/plat-s3c24xx/cpu.c:#include <plat/system-reset.h>
-> > > arch/arm/mach-s3c64xx/include/mach/system.h:#include <plat/system-
-> reset.h>
-> > > arch/arm/mach-s3c2410/include/mach/system.h:#include <plat/system-
-> reset.h>
-> > >
-> >
-> > And,
-> >
-> > arch/arm/mach-s5p64x0/include/mach/system.h:#include <plat/system-
-> reset.h>
-> > arch/arm/mach-s5pc100/include/mach/system.h:#include <plat/system-
-> reset.h>
-> > arch/arm/mach-s5pv210/include/mach/system.h:#include <plat/system-
-> reset.h>
-> >
-> > > and:
-> > >
-> > > arch/arm/plat-samsung/include/plat/system-reset.h:
-> > > ...
-> > > #include <plat/watchdog-reset.h>
-> > >
-> > > static void arch_reset(char mode, const char *cmd)
-> > > {
-> > >         arch_wdt_reset();
-> > > }
-> > >
-> > > I assume that with all the patches I now have merged, arch_reset()
-> > > should never be called on any Samsung platform, and so the include of
-> > > plat/watchdog-reset.h and call of arch_wdt_reset() can be removed in
-> > > my "ARM: restart: plat-samsung: remove plat/reset.h and
-> s5p_reset_hook"
-> > > patch?
-> > >
-> > Yes, if we don't need arch_reset() anymore, we can remove them in your
-> > patch.
-> >
-> > But I'm not sure, because happened following build error. Russell, don't
-> we
-> > need arch_reset()?
-> >
-> > arch/arm/kernel/process.c: In function 'arm_machine_restart':
-> > arch/arm/kernel/process.c:127: error: implicit declaration of function
-> > 'arch_reset'
-> >
-> > > What about arch/arm/plat-s3c24xx/cpu.c's include of system-reset.h?
-> > > Does that need to be replaced with watchdog-reset.h?
-> > >
-> > > That then leads to "ARM: restart: remove the now empty arch_reset()"
-> > > removing system-reset.h and all includes of that file?
-> >
-> > Thanks.
+> On 3 January 2012 14:36, Lars-Peter Clausen <lars@metafoo.de> wrote:
+>> On 01/02/2012 06:54 AM, Thomas Abraham wrote:
+>>> The platform-lcd driver depends on platform-specific callbacks to setup the
+>>> lcd panel. These callbacks are supplied using driver's platform data. But
+>>> for adding device tree support for platform-lcd driver, providing such
+>>> callbacks is not possible (without using auxdata).
+>>>
+>>> Since the callbacks are usually lcd panel specific, it is possible to include
+>>> the lcd panel specific setup and control functionality in the platform-lcd
+>>> driver itself, thereby eliminating the need for supplying platform specific
+>>> callbacks to the driver. The platform-lcd driver can include support for
+>>> multiple lcd panels.
+>>>
+>>> This patchset removes the need for platform data for platform-lcd driver and
+>>> adds support which can be used to implement lcd panel specific functionality
+>>> in the driver. As an example, the support for Hydis hv070wsa lcd panel is added
+>>> to the platform-lcd driver which is then used on the Exynos4 based Origen board.
+>>> This currently breaks build for other users of platform-lcd driver. Those can be
+>>> fixed if this approach is acceptable.
+>>
+>> The whole approach looks rather backwards to me. The exact purpose of the
+>> platform_lcd driver is to redirect the lcd driver callbacks to board code.
+>> So by removing this support you not only break all the existing driver but
+>> also create a driver which does nothing. Then you add another layer of
+>> abstraction to implement custom drivers in this driver. A better approach in
+>> my opinion is to simply implement these drivers as first level LCD drivers.
+>> So leave the platform-lcd driver as it is and just add a gpio (or maybe
+>> regulator) lcd driver instead.
 > 
-> Oh god, I see what you've done.
+> The existing platform-lcd driver mostly depends on the platform
+> callbacks for lcd panel power controls. Looking at the current users
+> of platform-lcd driver, a majority of the users of platform-lcd driver
+> use a gpio to enable/disable the display/power. The gpio is controlled
+> by the platform callbacks which the platform-lcd driver calls.
 > 
-> ARM: 7256/1: restart: S3C64XX: use new restart hook
+> Hence, it is possible to extend the platform-lcd driver to include the
+> functionality of managing the gpio for lcd control. The platform code
+> is only expected to provide a gpio number to the platform-lcd driver.
+> This allows consolidation of the all the different platform callbacks
+> that use a gpio for simple enable/disable of the lcd display.
 > 
-> --- a/arch/arm/mach-s3c64xx/include/mach/system.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/system.h
-> ...
-> -#include <plat/watchdog-reset.h>
-> +#include <plat/system-reset.h>
-> ...
-> -static void arch_reset(char mode, const char *cmd)
-> -{
-> -       if (mode != 's')
-> -               arch_wdt_reset();
-> -
-> -       /* if all else fails, or mode was for soft, jump to 0 */
-> -       soft_restart(0);
-> -}
+> But there are other users of platform-lcd that do lot more than just
+> control a single gpio. For such cases, it is possible to reuse the
+> existing infrastructure of platform-lcd driver and extend it to handle
+> such lcd panel specific functionality.
 > 
-> So we're making everything depend on plat/system-reset.h.  Why?  The
-> end result is to remove arch_reset() entirely, and making it depend
-> on some common definition in some shared header file makes things
-> more complicated and is error prone.  How do I know when everything
-> is fixed up as far as the shared header file goes?
-> 
-> It would be _far_ better if the s3c64xx changes to add the .restart
-> method to _all_ s3c64xx platforms also removed the _contents_ and
-> only the _contents_ of arch_reset(), leaving an empty function there.
+> The main advantages that I see here is the consolidation of platform
+> specific callbacks into the driver which inturn allows adding device
+> tree support without depending on platform data which have pointers to
+> platform specific functions. In the next version of this patchset, it
+> will be ensured that no platform breaks due to this change.
 
-Ooooops :( I see. Let me fix.
+Consolidation of the different implementations which use a GPIO to control
+the LCD state is a good idea. But as I wrote above in this series you added
+more or less another layer of abstraction. Namely introducing the
+platform-lcd driver as a intermediate layer between the actual driver and
+the LCD framework. But the layer is so thin that all it does is to call the
+plat_lcd_driver_data callback from the lcd_ops callback. There is really no
+point in doing this since you can setup the lcd_ops callbacks directly. Also
+following your approach we would end up with a bunch of unrelated LCD
+drivers in the platform-lcd driver module. The platform-lcd driver is so
+generic that basically any LCD driver could be implemented on-top of it, but
+this does not mean it has to.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+As said before, writing a plain LCD driver which implements the GPIO
+handling and leaving the platform-lcd driver as it is, is in my opinion a
+better approach.
