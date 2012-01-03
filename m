@@ -1,64 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Jan 2012 17:32:54 +0000
-Subject: [PATCH] arm: Fix linux-next compile error in arch/arm/common/gic.c
-In-Reply-To: <4F030B34.1090705@arm.com>
-References: <1325521990-4445-1-git-send-email-joerg.roedel@amd.com>
- <CAO_0yfOzVCK8OGL5G9Aej+V4AZ12EMFKi3HafAX0JzeW9C3FtQ@mail.gmail.com>
- <4F02E377.2050409@arm.com> <4F03085F.4060008@gmail.com>
- <4F030B34.1090705@arm.com>
-Message-ID: <20120103173254.GB25541@mudshark.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 3 Jan 2012 09:37:52 -0800
+Subject: [GIT PULL] i.MX patches for eukrea boards
+In-Reply-To: <20120103085137.GH5446@pengutronix.de>
+References: <20120103085137.GH5446@pengutronix.de>
+Message-ID: <CAOesGMizj-B4+3tFGMJY0=6e79g+OmzRn+Ou3R5eM_PLJUU=cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 02:05:40PM +0000, Marc Zyngier wrote:
-> On 03/01/12 13:53, Rob Herring wrote:
-> >>> On Tue, Jan 3, 2012 at 12:33 AM, Joerg Roedel <joerg.roedel@amd.com> wrote:
-> >>>> With CONFIG_SMP=n the following compile error occurs:
-> >>>>
-> >>>>  CC      arch/arm/common/gic.o
-> >>>> arch/arm/common/gic.c: In function 'gic_init_bases':
-> >>>> arch/arm/common/gic.c:679:4: error: implicit declaration of function 'cpu_logical_map' [-Werror=implicit-function-declaration]
-> >>>> cc1: some warnings being treated as errors
+Hi Sascha,
 
-[...]
+On Tue, Jan 3, 2012 at 12:51 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Arnd, Olof,
+>
+> Please pull the following eukrea board specific patches. They
+> currently conflict with the patches merging mach-mx5 to mach-imx.
+> Let me know if I have to rebase them.
+>
+> Sascha
+>
+> The following changes since commit 384703b8e6cd4c8ef08512e596024e028c91c339:
+>
+> ?Linux 3.2-rc6 (2011-12-16 18:36:26 -0800)
+>
+> are available in the git repository at:
+> ?git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-eukrea
+>
+> Eric B?nard (9):
+> ? ? ?mxc_udc: add workaround for ENGcm09152 for i.MX25
+> ? ? ?eukrea_cpuimx25: enable workaround ENGcm09152
+> ? ? ?mbimxsd25: add spi controler and spidev support
+> ? ? ?cpuimx25: add watchdog support
+> ? ? ?mbimxsd35: add spi controler and spidev support
+> ? ? ?eukrea-cpuimx51: remove board
+> ? ? ?cpuimx51sd: add watchdog support
+> ? ? ?mbimx51sd: add audio codec support
+> ? ? ?eukrea-cpuimx51sd: support rev2 PCB
 
-> > IIRC, part of the problem is asm/smp.h is only included by linux/smp.h
-> > for CONFIG_SMP, so this would have to change. Doing that could easily
-> > break other arches.
-> 
-> Ah... good point.
+Can you please change the patch subjects of these and future patches.
+They should generally be on the form:
 
-We could probably move smp_setup_processor_id out of smp.c if we need to as
-it seems as though you can provide a definition of that function even when
-!CONFIG_SMP.
+ARM: <platform>: <subplatform or topic>: <...>
 
-> >>
-> >> Well, both patches are wrong. In the UP case (and assuming we're running
-> >> on physical CPU 0), offset should be 0.
-> >>
-> >> The second patch would be my favorite approach, except that
-> >> cpu_logical_map(x) should return either "x" or 0. And I'm not sure how
-> >> to handle the (unlikely?) case of running a UP kernel on a secondary CPU...
-> > 
-> > Wouldn't this be the case with 2 AMP instances of Linux running?
+So, in your case:
 
-In this configuration, I think returning 0 would probably be the right thing
-to do. If it's anything else, there's the implication that both of your
-kernels are hanging off the same GIC distributor / SCU / L2 Cache etc. and
-so you would need a single SMP kernel (or some funky message passing that we
-don't yet have).
+ARM: imx: ...
 
-The bit we're currently missing is the notion of a cluster ID, but both CPU IDs
-should be 0 for AMP.
+Thanks!
 
-> Yes, or kexec-ing a UP kernel on a secondary CPU. It really looks like
-> we ought to make this cpu_logical_map() independent from CONFIG_SMP.
 
-We could always prevent this from happening by hacking kexec / kexec-tools
-but I think that booting a UP kernel on a CPU other than 0 is rather silly :)
-
-So I'd be inclined to simply move the existing smp_setup_processor_id
-implementation (and the map declaration) into somewhere like kernel/setup.c
-and I think things should work.
-
-Will
+-Olof
