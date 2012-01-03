@@ -1,68 +1,79 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 03 Jan 2012 10:02:52 +0900
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20120102155820.GB29877@amd.com>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <20120102134229.GZ29877@amd.com>
- <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
- <20120102155820.GB29877@amd.com>
-Message-ID: <005a01ccc9b3$6b6a2870$423e7950$%kim@samsung.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Mon, 2 Jan 2012 21:30:10 -0500
+Subject: [PATCH v2] MTD/GPMI bugfix : reset the BCH module when it is not
+ MX23
+In-Reply-To: <20120101223335.GA3756@pengutronix.de>
+References: <1325233646-3343-1-git-send-email-b32955@freescale.com>
+ <20111230143658.GA9141@pengutronix.de>
+ <4EFE7236.10609@freescale.com>
+ <20111231154338.GA27544@pengutronix.de>
+ <CAMiH66HsFn4+6-whEC6G-qSPda3+3pBzd50i7iHh9Pg9TXHTXw@mail.gmail.com>
+ <20120101223335.GA3756@pengutronix.de>
+Message-ID: <CAMiH66Fwh-su6ucLDMM7hhCjH7MJPeavt1u4O=_jWn5w=DyfKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joerg Roedel wrote:
-> 
-> On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
-> > > I still get
-> > >
-> > > ?LD ? ? ?.tmp_vmlinux1
-> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
-> unknown-linux-gnueabi-ld: no machine record defined
-> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
-> unknown-linux-gnueabi-ld: no machine record defined
-> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
-> unknown-linux-gnueabi-ld: no machine record defined
-> > > make[1]: *** [.tmp_vmlinux1] Error 1
-> > >
-> > > when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
-> > > wrong or is this not expected to work?
-> > >
-> > Do you?
-> > Ok. I will check my configuration with linux-next git.
-> 
-> Compiling my exynos-config with linux-next gives me:
-> 
->   CC      arch/arm/kernel/process.o
-> In file included from /data/lemmy/linux.trees.git/arch/arm/mach-
-> exynos/include/mach/system.h:16:0,
->                  from
-/data/lemmy/linux.trees.git/arch/arm/kernel/process.c:64:
-> /data/lemmy/linux.trees.git/arch/arm/plat-samsung/include/plat/system-
-> reset.h:19:2: error: #error Fix me up
-> 
-> I better not ask the question how such an #error statement can come
-> through to linux-next. But what I can say is that I will not merge
-> your code until you guys make sure that your upstream platform code has
-> enough quality so that it at least compiles.
-> 
-Hi Joerg,
+On Sun, Jan 1, 2012 at 5:33 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> Hi,
+>
+>> This happens because we do NOT follow the right init procedure. The IC
+>> guy told me.
+>> If the BCH was not initialized correctly, it can not guarantees the
+>> data is right.
+>> This is why the mx28 failed.
+> ...
+>> For mx23, it should not reset the BCH, this is the right init
+>> procedure for mx23.
+>
+> Okay, this was the information I was looking for. So, the MX23 cannot be reset
+> due to bug #2847. But it also does not NEED to be reset, which is unlike the
+> MX28 which needs the reset. Correct? Before that, it was only clear that MX23
+yes. i think so.
 
-I already knew that, Russell added it so that I can take the ARM restart
-changes seriously.
+> cannot be reset. It was not clear (at least to me) if it still could then run
+> into the same problems as the MX28 after 10000+x boot cycles. That would be a
+> really bad situation: being in need of the reset which we can't do due to 2847.
+I will do the MX23 test, when i am free. It really costs lot of time :(
 
-Since I pushed exynos restart patches to Russell's patch system so please
-kindly ignore it.
+The bug only occurs in the software reboot. If you do hardware
+reboot(power from off to on).
+it does not exit. I am wonder if it's really has the same scenario in
+the real life.
+Who will soft reboot for 10000 continously?
 
-> I attach the config I used for my compile-test.
-> 
-OK, let me check and if any updates, let you know.
 
-Happy New Year.
-Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>> But I did not ever boot 10000 times on mx23. I am not sure if it can
+>> fail or not.
+>
+> Hmm, can't your IC guy tell you? I was hoping he knows if the same problem which
+Our IC guy did not do such tough test as our customers did.
+
+> happens on the MX28 can also happen on the MX23? I don't want to make your life
+> unnecessarily hard, but I'd really like to know if I need to warn customers
+> when using MX23 and NAND (and if so, we have to update the comment in the code).
+>
+>> > bug 2847, we have a serious problem, because NAND won't work until the next
+>> > power-cycle? I am curious if my assumptions are true and we have a serious
+>> > problem on the MX23.
+>> You can test it if you have time. :)
+>
+> Testing is guessing in this case, the problem could arise after <n+1> cycles if
+> I tested <n>. Actually knowing the situation would be more helpful, I'd think.
+> If this is not possible to find out, we'd need to add this as a comment, too,
+> so people experiencing problems have a pointer which can save them *a lot of*
+yes, i agree. add it in next version.
+
+
+Best Regards
+Huang Shijie
+> time.
+>
+> Kind regards,
+>
+> ? Wolfram
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
