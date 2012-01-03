@@ -1,27 +1,45 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 3 Jan 2012 14:42:19 -0800
-Subject: [PATCH] Input: tegra-kbc - add device tree support
-In-Reply-To: <1325629702-10307-1-git-send-email-olof@lixom.net>
-References: <1325484557-27695-1-git-send-email-olof@lixom.net>
- <1325629702-10307-1-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F1203@HQMAIL01.nvidia.com>
+From: ashley.hughes@blueyonder.co.uk (Ash Hughes)
+Date: Tue, 03 Jan 2012 22:45:36 +0000
+Subject: orion5x mpp/gpio issue
+Message-ID: <1325630736.18479.12.camel@ash-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Tuesday, January 03, 2012 3:28 PM:
-> This includes an optional "linux,fn-keymap" binding that is not yet implemented,
-> that will be used to specify the Fn-key modifier layout if needed.
+Hi,
 
-> diff --git a/Documentation/devicetree/bindings/input/tegra-kbc.txt
-...
-> +Required properties:
-> +- compatible: "nvidia,tegra20-kbc", "matrix-keyboard-controller"
+I recently tried to build a new kernel and ran into an error with GPIOs
+on my device. The MPP setup code has changed since I last compiled and
+it now seems that some of the information in the mpp_list is being
+ignored.
 
-I think "matrix-keyboard-controller" should be dropped now?
+I've traced this back to arch/arm/plat-orion/mpp.c. In function:
 
-Otherwise,
+void __init orion_mpp_conf(unsigned int *mpp_list, unsigned int
+variant_mask,
+			   unsigned int mpp_max, unsigned int dev_bus)
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
 
--- 
-nvpublic
+there is the following:
+
+		if (sel != 0)
+			gpio_mode = 0;
+
+sel is the value to be written to the MPP config registers and this is
+not 0 for some pins (>16 and perhaps a few others, see
+arch/arm/plat-orion/mpp.h). This means these pins will not be recorded
+in the orion_gpio_chip valid_input and valid_output vars, which makes
+them unavailable for drivers, despite the mpp_list defined for the
+device (and the device registers being set correctly!).
+
+What is the reason for this limitation? I've seen that some devices
+(e.g. arch/arm/mach-orion5x/d2net-setup.c) use orion_gpio_set_valid to
+manually enable higher GPIOs, along with the comment "/* Configure GPIO
+over MPP max number. */" Is this the correct workaround to enable higher
+GPIOs or should the code above not be included?
+
+Apologies if there has already been a discussion on this, I couldn't
+find one with a quick search!
+
+Many thanks
+
+Ash
