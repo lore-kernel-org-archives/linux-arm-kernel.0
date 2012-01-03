@@ -1,48 +1,46 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 03 Jan 2012 10:37:29 +0100
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20120102134229.GZ29877@amd.com>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <20120102134229.GZ29877@amd.com>
-Message-ID: <00dc01ccc9fb$4fcb7590$ef6260b0$%szyprowski@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue,  3 Jan 2012 12:38:32 +0100
+Subject: [PATCH v2] ARM: at91: fix at91rm9200 soc subtype handling
+In-Reply-To: <4F02C900.6090907@atmel.com>
+References: <4F02C900.6090907@atmel.com>
+Message-ID: <1325590712-23414-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Currently setting it to PQFP changes subtype to BGA as subtypes are
+swapped in at91rm9200_set_type().
 
-On Monday, January 02, 2012 2:42 PM Joerg Roedel wrote:
+Wrong subtype causes GPIO bank D not to work at all.
 
-> On Thu, Dec 29, 2011 at 09:24:18PM +0900, KyongHo Cho wrote:
-> > Changes since v7:
-> > - Rebased with the recent commits of the following git branches
-> >   * git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git/next
-> >   * git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/for-next
-> > - Changed magic numbers into macros
-> > - Setting owner of a System MMU in 'iommu' field of dev_archdata
-> > - Verbose message in the default fault handler
-> > - Some bug fixes.
-> 
-> I still get
-> 
->   LD      .tmp_vmlinux1
-> /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no
-> machine record defined
-> /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no
-> machine record defined
-> /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no
-> machine record defined
-> make[1]: *** [.tmp_vmlinux1] Error 1
-> 
-> when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
-> wrong or is this not expected to work?
+After this fix, subtype is still set as unknown. But board code should
+fill it in with proper value. Another information is thus printed.
 
-Yes, there is something a bit wrong with your kernel configuration. You get this error if 
-there is no board selected to be compiled-in. Please go to kernel configuration and select
-"System Type -> SAMSUNG EXYNOS SoCs Suppport". Then select some hardware board to be 
-compiled in, for example SMDKV310, SMDKC210 and "Mobile NURI board".
+Bug discovery and first implementation made by Veli-Pekka Peltola.
 
-Best regards
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable <stable@vger.kernel.org>
+---
+ arch/arm/mach-at91/setup.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index aa64294..f5bbe0ef 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -27,9 +27,12 @@ EXPORT_SYMBOL(at91_soc_initdata);
+ void __init at91rm9200_set_type(int type)
+ {
+ 	if (type == ARCH_REVISON_9200_PQFP)
+-		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+-	else
+ 		at91_soc_initdata.subtype = AT91_SOC_RM9200_PQFP;
++	else
++		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
++
++	pr_info("AT91: filled in soc subtype: %s\n",
++		at91_get_soc_subtype(&at91_soc_initdata));
+ }
+ 
+ void __init at91_init_irq_default(void)
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.5.4
