@@ -1,57 +1,38 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Tue, 3 Jan 2012 20:41:57 +0100
-Subject: [PATCH 1/4] Remove Telechips ARM subarch from MAINTAINERS
-In-Reply-To: <20120103170824.GA2914@n2100.arm.linux.org.uk>
-References: <20111222211948.GA1201@local> <20111222212240.GB1201@local>
- <20120103170824.GA2914@n2100.arm.linux.org.uk>
-Message-ID: <20120103194156.GA2518@local>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue, 3 Jan 2012 11:50:13 -0800
+Subject: [PATCH] ARM: Remove BUILD_BUG_ON from asm/bug.h
+In-Reply-To: <CAOesGMiN_yOxDT1Xrn3LOU+D027+oC3fxTPkph-WzpVPE-86Mg@mail.gmail.com>
+References: <1325616276-10304-1-git-send-email-sjg@chromium.org>
+ <CAOesGMiN_yOxDT1Xrn3LOU+D027+oC3fxTPkph-WzpVPE-86Mg@mail.gmail.com>
+Message-ID: <CAPnjgZ31hQS35Zq6Mb+cc770vabgtwNYqJoEySbbG-JKGahPnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 05:08:24PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 22, 2011 at 10:22:40PM +0100, Hans J. Koch wrote:
-> > 
-> > The AMR subarchitecture for Telechips SoCs is completely removed,
-> 
-> Apart from this spelling mistake, the rest look fine.  Do you want to
-> send me a pull request with that fixed?
+Hi Olof,
 
-OK, I'll do that tonight.
+On Tue, Jan 3, 2012 at 11:39 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Jan 3, 2012 at 10:44 AM, Simon Glass <sjg@chromium.org> wrote:
+>> BUILD_BUG_ON is defined in linux/kernel.h but that is not included by the
+>> asm/bug.h header which uses it. This causes a build error:
+>>
+>> ...include/linux/mtd/map.h: In function 'inline_map_read':
+>> ...include/linux/mtd/map.h:408:3: error: implicit declaration of function
+>> 'BUILD_BUG_ON' [-Werror=implicit-function-declaration]
+>>
+>> The check is not essential and is not present for other architectures, so
+>> just remove it.
+>>
+>> Signed-off-by: Simon Glass <sjg@chromium.org>
+>
+> Acked-by: Olof Johansson <olof@lixom.net>
+>
+> Simon, have you sent it to Russell's patch tracker? If not, please do.
 
-Thanks,
-Hans
+Done
 
-> 
-> Thanks.
-> 
-> > so there's no need for a MAINTAINERS entry.
-> > 
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Harry Sievers <hsievers@csselectronic.com>
-> > Signed-off-by: Hans J. Koch <hjk@hansjkoch.de>
-> > ---
-> >  MAINTAINERS |    7 -------
-> >  1 files changed, 0 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index b9db108..555afaa 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -1124,13 +1124,6 @@ S:	Supported
-> >  F:	arch/arm/mach-shmobile/
-> >  F:	drivers/sh/
-> >  
-> > -ARM/TELECHIPS ARM ARCHITECTURE
-> > -M:	"Hans J. Koch" <hjk@hansjkoch.de>
-> > -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> > -S:	Maintained
-> > -F:	arch/arm/plat-tcc/
-> > -F:	arch/arm/mach-tcc8k/
-> > -
-> >  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
-> >  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> >  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> > -- 
-> > 1.7.6.3
-> > 
-> 
+Regards,
+Simon
+
+>
+>
+> -Olof
