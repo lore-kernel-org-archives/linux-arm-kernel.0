@@ -1,69 +1,38 @@
-From: amit.kachhap@linaro.org (amit kachhap)
-Date: Tue, 3 Jan 2012 11:52:26 +0530
-Subject: [PATCH V4 0/5] ARM: exynos: Add l2 retention mode cpuidle state
-In-Reply-To: <1323083172-14096-1-git-send-email-amit.kachhap@linaro.org>
-References: <1323083172-14096-1-git-send-email-amit.kachhap@linaro.org>
-Message-ID: <CADGdYn7ZU5xiDvOLMR4wVHEWtF-2p86jNZFCOXMV6PrZXuLWbQ@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 3 Jan 2012 12:12:59 +0530
+Subject: [PATCH RFC] MFD: OMAP: USB: Make the runtime functions depend on
+ CONFIG_PM_RUNTIME
+Message-ID: <1325572979-6090-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mr kim,
+Currently the runtime functions are compiled regardless
+of CONFIG_PM_RUNTIME flag. This patch intends to fix the same by
+using SET_RUNTIME_PM_OPS.
 
-All the comments have been addressed for the Exynos cpu idle patchset.
-The updated patchset was posted about one month back and there have
-been no further comments on the patchset since then.
+Cc : Keshava Munegowda <keshava_mgowda@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+applies on Tony's ehci branch.
+Compile tested only.
 
-As this patchset seems to be stable now, do you think these these
-patches can merged in this 3.3 merge window? Kindly let me know your
-opinion.
+ drivers/mfd/omap-usb-host.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Thanks,
-Amit Daniel
-
-On Mon, Dec 5, 2011 at 4:36 PM, Amit Daniel Kachhap
-<amit.kachhap@linaro.org> wrote:
-> Changes since V3:
-> *Implemented Russell feedback and moved sleep magic 4byte memory before
-> s3c_cpu_resume to data section.
->
-> Changes since V2:
-> *Implemented the suggestion of MyungJoo Ham and used INFORM0/1
-> registers for resume for some board versions.
-> *Added back save/restore through CPU PM notifiers as suggested by
-> Lorenzo Pieralisi. This is useful to restore vfp state.
-> *some patch modularization (s5p/exynos) and proper commit logs.
->
-> Changes since V1:
-> *rebased the whole patch against 3.2-rc1 tree
-> *removed GIC save/restore in AFTR cpuidle state as it is external
-> to cpu powerdomain
-> *Added L2 setup code through device tree
-> *Removed only l2 save/restore registers in sleep
->
-> This Patch series adds support for AFTR mode cpuidle state based on
-> patch (http://www.spinics.net/lists/arm-kernel/msg132243.html) earlier
-> submitted by Jaecheol Lee <jc.lee@samsung.com>.
->
-> This patch uses CPU PM notifiers , common l2 save/restore and
-> new cpu_suspend/resume interfaces and is based on the tip of
-> for-next branch of samsung tree.
-> (git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next).
->
-> Amit Daniel Kachhap (5):
-> ?ARM: exynos: Add support AFTR mode on EXYNOS4210
-> ?ARM: exynos: save L2 settings during bootup
-> ?ARM: s5p: add L2 early resume code
-> ?ARM: exynos: remove useless code to save/restore L2
-> ?ARM: exynos: Enable l2 configuration through device tree
->
-> ?arch/arm/mach-exynos/cpu.c ? ? ? ? ? ? ?| ? 60 +++++++++---
-> ?arch/arm/mach-exynos/cpuidle.c ? ? ? ? ?| ?152 ++++++++++++++++++++++++++++++-
-> ?arch/arm/mach-exynos/include/mach/pmu.h | ? ?2 +
-> ?arch/arm/mach-exynos/pm.c ? ? ? ? ? ? ? | ? 15 ---
-> ?arch/arm/plat-s5p/sleep.S ? ? ? ? ? ? ? | ? 44 ++++++++-
-> ?5 files changed, 233 insertions(+), 40 deletions(-)
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 3f565ef..ef72ebe 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -887,8 +887,8 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct dev_pm_ops usbhsomap_dev_pm_ops = {
+-	.runtime_suspend	= usbhs_runtime_suspend,
+-	.runtime_resume		= usbhs_runtime_resume,
++	SET_RUNTIME_PM_OPS(usbhs_runtime_suspend,
++				usbhs_runtime_resume, NULL)
+ };
+ 
+ static struct platform_driver usbhs_omap_driver = {
+-- 
+1.7.1
