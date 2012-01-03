@@ -1,71 +1,72 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Tue, 3 Jan 2012 17:15:45 +0900
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <005a01ccc9b3$6b6a2870$423e7950$%kim@samsung.com>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <20120102134229.GZ29877@amd.com>
- <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
- <20120102155820.GB29877@amd.com>
- <005a01ccc9b3$6b6a2870$423e7950$%kim@samsung.com>
-Message-ID: <CAHQjnOP6==YL-XE17LRnBymLsFDOiS52HKo4mfGMQUMmqU=xbg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 3 Jan 2012 13:53:28 +0530
+Subject: [PATCH 2/2] ARM: Exynos: Hook up power domains to generic power
+ domain infrastructure
+In-Reply-To: <4F022D7D.3060802@gmail.com>
+References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
+ <1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>
+ <1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>
+ <4EFB66C3.4040504@gmail.com>
+ <CAJuYYwQbTJTRdsa9WpQuCtSTYacbrcP3CVBFaAYHP1jLPky10A@mail.gmail.com>
+ <4F022D7D.3060802@gmail.com>
+Message-ID: <CAJuYYwSGYnyq+hEbgpyvFoAB9LWWLhD2URaWsCC4vMyZwRQVbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2012 at 10:02 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Joerg Roedel wrote:
->>
->> On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
->> > > I still get
->> > >
->> > > ?LD ? ? ?.tmp_vmlinux1
->> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
->> unknown-linux-gnueabi-ld: no machine record defined
->> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
->> unknown-linux-gnueabi-ld: no machine record defined
->> > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-
->> unknown-linux-gnueabi-ld: no machine record defined
->> > > make[1]: *** [.tmp_vmlinux1] Error 1
->> > >
->> > > when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
->> > > wrong or is this not expected to work?
->> > >
->> > Do you?
->> > Ok. I will check my configuration with linux-next git.
->>
->> Compiling my exynos-config with linux-next gives me:
->>
->> ? CC ? ? ?arch/arm/kernel/process.o
->> In file included from /data/lemmy/linux.trees.git/arch/arm/mach-
->> exynos/include/mach/system.h:16:0,
->> ? ? ? ? ? ? ? ? ?from
-> /data/lemmy/linux.trees.git/arch/arm/kernel/process.c:64:
->> /data/lemmy/linux.trees.git/arch/arm/plat-samsung/include/plat/system-
->> reset.h:19:2: error: #error Fix me up
->>
->> I better not ask the question how such an #error statement can come
->> through to linux-next. But what I can say is that I will not merge
->> your code until you guys make sure that your upstream platform code has
->> enough quality so that it at least compiles.
->>
-> Hi Joerg,
->
-> I already knew that, Russell added it so that I can take the ARM restart
-> changes seriously.
->
-> Since I pushed exynos restart patches to Russell's patch system so please
-> kindly ignore it.
->
->> I attach the config I used for my compile-test.
->>
-> OK, let me check and if any updates, let you know.
->
+Hi Sylwester,
 
-Hi.
+On 3 January 2012 03:49, Sylwester Nawrocki <snjw23@gmail.com> wrote:
+> Hi Thomas,
+>
+> thank you for clarifying.
+>
+> On 01/02/2012 03:14 AM, Thomas Abraham wrote:
+>>
+>> The following is a snippet from the dts file used for testing.
+>>
+>> ? ?[...]
+>>
+>> ? ?lcd0:power-domain-lcd0 {
+>> ? ? ? ? ? ? compatible = "samsung,exynos4210-pd";
+>> ? ? ? ? ? ? reg = <0x10023C00 0x10>;
+>> ? ?};
+>>
+>> ? ?[...]
+>>
+>> ? ?fimd0:display-controller {
+>> ? ? ? ? ? ? compatible = "samsung,exynos4-fimd";
+>> ? ? ? ? ? ? [...]
+>> ? ? ? ? ? ? pd = <&lcd0>;
+>> ? ?};
+>>
+>> The fimd (display controller) driver would then do the following.
+>>
+>> parp = of_get_property(pdev->dev.of_node, "pd", NULL);
+>> pd_np = of_find_node_by_phandle(be32_to_cpup(parp));
+>> pm_genpd_of_add_device(pd_np, &pdev->dev);
+>
+> Sounds interesting. Currently it's platform code that adds devices to
+> a corresponding power domain. But doing it at drivers might be more
+> convenient for avoiding device/driver/power domain registration
+> synchronization issues, especially that knowledge about power domain
+> existence may be contained directly in DT description, not needing
+> drivers to carry platform specific data.
+>
+> BTW, I have a feeling that "samsung" is a bit longish prefix for the bindings.
+> Didn't you initially consider "sec" for instance ? Probably it is already
+> too late for changing that though.
 
-Thank you Kukjin.
-I am also going to check about the problem.
+I had not thought of "sec". I agree that "sec" would have been better
+as it is shorter and represents bindings specific to Samsung
+Electronics. But it is not intuitive at the same time. If there is
+greater consensus on using "sec", we could try and request for a
+change but looks difficult to get through.
 
-Regards,
+Thanks,
+Thomas.
 
-KyongHo.
+>
+>> The lookup is based on the node pointer of the power domain.
+>
+> Thanks,
+> Sylwester
