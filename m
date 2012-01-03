@@ -1,68 +1,63 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 3 Jan 2012 10:34:11 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20120103103411.85d160181f361e73f11c401b@canb.auug.org.au>
+From: hamo.by@gmail.com (Yang Bai)
+Date: Tue, 3 Jan 2012 08:44:01 +0800
+Subject: [PATCH] arm: Fix linux-next compile error in arch/arm/common/gic.c
+In-Reply-To: <1325521990-4445-1-git-send-email-joerg.roedel@amd.com>
+References: <1325521990-4445-1-git-send-email-joerg.roedel@amd.com>
+Message-ID: <CAO_0yfOzVCK8OGL5G9Aej+V4AZ12EMFKi3HafAX0JzeW9C3FtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Jan 3, 2012 at 12:33 AM, Joerg Roedel <joerg.roedel@amd.com> wrote:
+> With CONFIG_SMP=n the following compile error occurs:
+>
+> ?CC ? ? ?arch/arm/common/gic.o
+> arch/arm/common/gic.c: In function 'gic_init_bases':
+> arch/arm/common/gic.c:679:4: error: implicit declaration of function 'cpu_logical_map' [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+>
+> This patch fixes the problem.
+>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
+> ---
+> ?arch/arm/common/gic.c | ? ?5 ++++-
+> ?1 files changed, 4 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index b2dc2dd..b33f6b0 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -676,7 +676,10 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+> ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ? ? ? ? ?for_each_possible_cpu(cpu) {
+> - ? ? ? ? ? ? ? ? ? ? ? unsigned long offset = percpu_offset * cpu_logical_map(cpu);
+> + ? ? ? ? ? ? ? ? ? ? ? unsigned long offset = percpu_offset;
+> +#ifdef CONFIG_SMP
+> + ? ? ? ? ? ? ? ? ? ? ? offset *= cpu_logical_map(cpu);
+> +#endif
+> ? ? ? ? ? ? ? ? ? ? ? ?*per_cpu_ptr(gic->dist_base.percpu_base, cpu) = dist_base + offset;
+> ? ? ? ? ? ? ? ? ? ? ? ?*per_cpu_ptr(gic->cpu_base.percpu_base, cpu) = cpu_base + offset;
+> ? ? ? ? ? ? ? ?}
+> --
+> 1.7.5.4
+>
+>
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-s3c64xx/Makefile between commit b024043b6d0d ("ARM: 7245/1:
-S3C64XX: introduce arch/arm/mach-s3c64xx/common.[ch]") from the arm tree
-and commits a60879e7ca17 ("ARM: SAMSUNG: Remove SDHCI bus clocks from
-platform data"), 875a59374cd1 ("ARM: SAMSUNG: Consolidation of SPI
-platform devices to plat-samsung") and 4566c7f7612f ("ARM: S3C64XX:
-Modified files for SPI consolidation work") from the arm-soc tree.
+Is this the right way to fix it? Or shall we do like this:
 
-I fixed it up (see below) and can carry the fix as necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+#ifdef CONFIG_SMP
+...
+#else
+#define cpu_logical_map() 1
+#endif
 
-diff --cc arch/arm/mach-s3c64xx/Makefile
-index f37016c,d7d9bb5..0000000
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@@ -27,21 -26,21 +27,20 @@@ obj-$(CONFIG_PM)		+= pm.o irq-pm.o slee
-  
-  obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
-  
- -# Device setup
- +# Device support
-  
- -obj-$(CONFIG_S3C64XX_SETUP_I2C0) += setup-i2c0.o
- -obj-$(CONFIG_S3C64XX_SETUP_I2C1) += setup-i2c1.o
- -obj-$(CONFIG_S3C64XX_SETUP_IDE) += setup-ide.o
- -obj-$(CONFIG_S3C64XX_SETUP_KEYPAD) += setup-keypad.o
- -obj-$(CONFIG_S3C64XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
- -obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
- -obj-$(CONFIG_S3C64XX_SETUP_SPI) += setup-spi.o
- +obj-y				+= dev-uart.o
- +obj-y				+= dev-audio.o
-- obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
-  
- -# PM
- +# Device setup
-  
- -obj-$(CONFIG_PM)		+= pm.o
- -obj-$(CONFIG_PM)		+= sleep.o
- -obj-$(CONFIG_PM)		+= irq-pm.o
- +obj-$(CONFIG_S3C64XX_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
- +obj-$(CONFIG_S3C64XX_SETUP_I2C0)	+= setup-i2c0.o
- +obj-$(CONFIG_S3C64XX_SETUP_I2C1)	+= setup-i2c1.o
- +obj-$(CONFIG_S3C64XX_SETUP_IDE)		+= setup-ide.o
- +obj-$(CONFIG_S3C64XX_SETUP_KEYPAD)	+= setup-keypad.o
-- obj-$(CONFIG_S3C64XX_SETUP_SDHCI)	+= setup-sdhci.o
- +obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-++obj-$(CONFIG_S3C64XX_SETUP_SPI)		+= setup-spi.o
-  
-  # Machine support
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120103/ad73c70e/attachment.sig>
+and leave the gic.c code unchanged.
+
+Thanks,
+Yang
