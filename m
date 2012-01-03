@@ -1,41 +1,54 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 03 Jan 2012 09:12:42 -0500 (EST)
-Subject: Git pull request: shmobile fix for the vmalloc series
-In-Reply-To: <20120103095958.GJ2914@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1201022323090.2907@xanadu.home>
- <20120103095958.GJ2914@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1201030905530.2907@xanadu.home>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Tue, 3 Jan 2012 19:42:46 +0530
+Subject: [PATCH v8 19/20] OMAP2+: UART: Do not gate uart clocks if used
+ for debug_prints
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D1214304BB42@DBDE01.ent.ti.com>
+References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
+ <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
+ <B5906170F1614E41A8A28DE3B8D1214304B3E2@DBDE01.ent.ti.com>
+ <CAAL8m4yXD-gpeXNVsCOYeDkYDWmVX8FUcpXKjx6k=AXSF4V9iA@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D1214304BAD3@DBDE01.ent.ti.com>
+ <CAAL8m4yhtUNjoKwECnQEYNoaL-M+RaHXACanAeJW64DPsJ_hWg@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D1214304BB42@DBDE01.ent.ti.com>
+Message-ID: <CAAL8m4z-AsVzfubqBy=nP6EN=m6MjTma1+50+aywQ=hmoF6Ejg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Jan 2012, Russell King - ARM Linux wrote:
+On Tue, Jan 3, 2012 at 5:22 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> On Tue, Jan 03, 2012 at 16:01:52, Govindraj wrote:
+>> >
+>> > I have basic suspend-resume working on it. Strangely this works irrespective
+>> > of the value of tty_dev wakeup entry. Do you know if this is expected on OMAP?
+>> >
+>>
+>> AFAIK yes.
+>
+> Ok.
+>
+>>
+>> > The other issue concerning runtime PM is that as soon as I set a non-zero to
+>> > the autosuspend_delay_ms I get some garbage characters and eventually the
+>> > console stops responding.
+>> >
+>> > [root at arago /]# cat .../omap_uart.0/power/autosuspend_delay_ms
+>> > -1
+>> > [root at arago /]# echo 3000 > ?KW???+???+wU.???,z,??.??osuspend_delay??????...
+>> > [root at arago /]# <- No response after some time
+>> >
+>>
+>> try enabling CONFIG_CPU_IDLE for pm qos_usage from uart driver.
+>>
+>
+> Its enabled.
 
-> On Mon, Jan 02, 2012 at 11:34:21PM -0500, Nicolas Pitre wrote:
-> > Russell, please pull the following into your devel-stable branch:
-> > 
-> > 	git://git.linaro.org/people/nico/linux vmalloc
-> > 
-> > This contains a patch from Magnus Damm fixing the oversized DMA area 
-> > issue on shmobile, and a revert of the temporary and noisy workaround 
-> > (which is already in your devel-stable branch) that was needed because 
-> > of that issue.
-> 
-> Is there much point?  shmobile shows no sign of fixing their #error for
-> the restart changes (and haven't responded to any of my emails)
+I checked on Beagle-xm with latest LO master I don't see that issue.
 
-Well, it took them 3 months before they responded to mine with a patch.  
-So it would be fair to merge the fix for this one issue, even if it is 
-only to remove the ugly VMALLOC_END hack from pgtable.h.
+Lo master commit used
+commit: 6489f6de3a219dfd23a91261eea1b09fba7ae128
 
-> I think we should be thinking about removing this -clearly- 
-> unmaintained set of platforms.
-> 
-> So, it currently looks like I'm going to be pushing a #error for them
-> in during the next merge window.  I'd much rather just delete the
-> unmaintained code to avoid adding those evil things.
+Logs:
+http://pastebin.pandaboard.org/index.php/view/55509914
 
-I'd vote for the #error.  My noisy #warning is possibly what created 
-some motion here.
-
-
-Nicolas
+--
+Thanks,
+Govindraj.R
