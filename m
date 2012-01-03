@@ -1,22 +1,28 @@
-From: john@szakmeister.net (John Szakmeister)
-Date: Tue, 3 Jan 2012 14:27:04 -0500
-Subject: Best kernel to use and some patches...
-Message-ID: <CAEBDL5VPv=qmUBp0EZcQSff5sbcb8RqH1JkoktF0Qqu-=1BsRQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 3 Jan 2012 11:39:31 -0800
+Subject: [PATCH] ARM: Remove BUILD_BUG_ON from asm/bug.h
+In-Reply-To: <1325616276-10304-1-git-send-email-sjg@chromium.org>
+References: <1325616276-10304-1-git-send-email-sjg@chromium.org>
+Message-ID: <CAOesGMiN_yOxDT1Xrn3LOU+D027+oC3fxTPkph-WzpVPE-86Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Everyone,
+On Tue, Jan 3, 2012 at 10:44 AM, Simon Glass <sjg@chromium.org> wrote:
+> BUILD_BUG_ON is defined in linux/kernel.h but that is not included by the
+> asm/bug.h header which uses it. This causes a build error:
+>
+> ...include/linux/mtd/map.h: In function 'inline_map_read':
+> ...include/linux/mtd/map.h:408:3: error: implicit declaration of function
+> 'BUILD_BUG_ON' [-Werror=implicit-function-declaration]
+>
+> The check is not essential and is not present for other architectures, so
+> just remove it.
+>
+> Signed-off-by: Simon Glass <sjg@chromium.org>
 
-I hope this is the right forum for the this.  On a project, we're
-currently using the 2.6.34 line of kernel.  After running into some
-issues, we're looking at what to upgrade to for the next rev of our
-product.  Is there a recommended version to use?  Preferably one that
-has some kind of long-term support?
+Acked-by: Olof Johansson <olof@lixom.net>
 
-Also, we ran into a cache-flushing issue in the 2.6.34 kernel with the
-MMC/SDCard subsystem.  We're running 2.6.34, but the issue still
-exists in 2.6.34.10.  Are you still taking patches for that line?
+Simon, have you sent it to Russell's patch tracker? If not, please do.
 
-Thanks!
 
--John
+-Olof
