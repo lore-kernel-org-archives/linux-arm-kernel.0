@@ -1,40 +1,33 @@
-From: joerg.roedel@amd.com ('Joerg Roedel')
-Date: Tue, 3 Jan 2012 14:10:48 +0100
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <00dc01ccc9fb$4fcb7590$ef6260b0$%szyprowski@samsung.com>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <20120102134229.GZ29877@amd.com>
- <00dc01ccc9fb$4fcb7590$ef6260b0$%szyprowski@samsung.com>
-Message-ID: <20120103131048.GD29877@amd.com>
+From: kiko@linaro.org (Christian Robottom Reis)
+Date: Tue, 3 Jan 2012 11:20:33 -0200
+Subject: snowball does not compile on linux-next
+In-Reply-To: <CACRpkdZfaOA0suxO8Gp7mw-VGPFju2dCJwDocO_K7Dx4-2z0Rw@mail.gmail.com>
+References: <4F0199CF.2070806@linaro.org>
+ <CACRpkdbn6H_s8oC3VdqH2CoCZcPkc+hYccLE1UQJZnqB5eSf3Q@mail.gmail.com>
+ <20120102152553.GA9771@async.com.br>
+ <CACRpkdZfaOA0suxO8Gp7mw-VGPFju2dCJwDocO_K7Dx4-2z0Rw@mail.gmail.com>
+Message-ID: <20120103132033.GD9771@async.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Tue, Jan 03, 2012 at 08:19:37AM +0100, Linus Walleij wrote:
+> On Mon, Jan 2, 2012 at 4:25 PM, Christian Robottom Reis <kiko@linaro.org> wrote:
+> > On Mon, Jan 02, 2012 at 01:59:10PM +0100, Linus Walleij wrote:
+> >> On Mon, Jan 2, 2012 at 12:49 PM, Daniel Lezcano
+> >> <daniel.lezcano@linaro.org> wrote:
+> >>
+> >> > the kernel does not compile when
+> >> > CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK is set.
+> >
+> > Should this be in our default configs, or one of our tested configs, so
+> > we can catch this in a CI loop?
+> 
+> It should be in the defconfig already, the problem showed up
+> for Daniel exactly because it was configured in.
 
-On Tue, Jan 03, 2012 at 10:37:29AM +0100, Marek Szyprowski wrote:
-> Yes, there is something a bit wrong with your kernel configuration. You get this error if 
-> there is no board selected to be compiled-in. Please go to kernel configuration and select
-> "System Type -> SAMSUNG EXYNOS SoCs Suppport". Then select some hardware board to be 
-> compiled in, for example SMDKV310, SMDKC210 and "Mobile NURI board".
-
-thanks for this info. I selected a board and compile of linux-next now
-fails with:
-
-  LD      .tmp_vmlinux1
-arch/arm/mach-exynos/built-in.o: In function `exynos4_pm_resume':
-/data/lemmy/linux.trees.git/arch/arm/mach-exynos/pm.c:385: undefined reference to `scu_enable'
-make[1]: *** [.tmp_vmlinux1] Error 1
-
-This is because scu_enable() is only available with CONFIG_SMP=y which
-is not set for Exynos.
-
-
-	Joerg
-
+Okay, then the question is what do we need to do to make a box go red
+and have people notified when it breaks?
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Christian Robottom Reis, Engineering VP
+Brazil (GMT-3) | [+55] 16 9112 6430 | [+1] 612 216 4935
+Linaro.org: Open Source Software for ARM SoCs
