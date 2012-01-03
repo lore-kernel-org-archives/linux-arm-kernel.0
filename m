@@ -1,30 +1,54 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 03 Jan 2012 15:26:55 -0800
-Subject: [PATCH] ARM: Remove BUILD_BUG_ON from asm/bug.h
-In-Reply-To: <CAPnjgZ1P6bdAGRa-9ZyuNMT7jRAfrH3abWJPkxVeeM7BDKsXTg@mail.gmail.com>
-References: <1325616276-10304-1-git-send-email-sjg@chromium.org>	<4F03821D.9080503@codeaurora.org>
- <CAPnjgZ1P6bdAGRa-9ZyuNMT7jRAfrH3abWJPkxVeeM7BDKsXTg@mail.gmail.com>
-Message-ID: <4F038EBF.5030408@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 04 Jan 2012 08:30:03 +0900
+Subject: [GIT PULL] Samsung cleanup for v3.3
+Message-ID: <018701ccca6f$9e6f80f0$db4e82d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/12 14:40, Simon Glass wrote:
-> Yes that is the reason, but ARM is not unique in this matter, and
-> other archs do not have this check. I did suggest a solution in this
-> thread involving putting the check in a C file instead of header. But
-> it needs an arch-specific #define to specify the size expected by the
-> assembler, and has the disadvantage of moving the check away from the
-> assembler code.
->
-> It's not that we don't want this check, more that it is not essential
-> (since there is currently no mismatch), it is causing problems and it
-> is risky to try to solve this problem some other way at this late
-> stage in 3.2. So the easiest thing is to remove it, to match other
-> archs.
+Hi Arnd,
 
-Fair enough. I now see the other thread where this has all been
-discussed. Sorry for the noise.
+Please pull Samsung cleanup for v3.3 from:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+next-samsung-cleanup-samsung
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+There are cleanups for Samsung stuff and there is no dependency with other
+branches.
+
+Sorry for late, I thought sent 'pull request' this :( if any problems,
+please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+
+  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+next-samsung-cleanup-samsung
+
+Jingoo Han (2):
+      ARM: S5PV210: Use gpio_request_one
+      ARM: EXYNOS: Use gpio_request_one
+
+Shawn Guo (1):
+      ARM: EXYNOS: remove exynos4_scu_enable()
+
+Thomas Meyer (1):
+      ARM: SAMSUNG: Use kmemdup rather than duplicating its implementation
+
+ arch/arm/mach-exynos/mach-nuri.c           |    9 ++-------
+ arch/arm/mach-exynos/mach-smdkv310.c       |    4 +---
+ arch/arm/mach-exynos/mach-universal_c210.c |   10 +++-------
+ arch/arm/mach-exynos/pm.c                  |   24 ++----------------------
+ arch/arm/mach-s5pv210/mach-aquila.c        |    3 +--
+ arch/arm/mach-s5pv210/mach-goni.c          |    6 ++----
+ arch/arm/mach-s5pv210/mach-smdkv210.c      |   10 +++-------
+ arch/arm/plat-s3c24xx/dma.c                |    3 +--
+ 8 files changed, 15 insertions(+), 54 deletions(-)
