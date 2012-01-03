@@ -1,78 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 03 Jan 2012 20:01:15 +0900
-Subject: [PATCH 09/12] ARM: EXYNOS: introduce
- arch/arm/mach-exynos/common.[ch]
-In-Reply-To: <20120103105425.GL2914@n2100.arm.linux.org.uk>
-References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
- <1324385316-6052-10-git-send-email-kgene.kim@samsung.com>
- <20111223191935.GS2577@n2100.arm.linux.org.uk>
- <088101ccc1d8$d2023b00$7606b100$%kim@samsung.com>
- <08f401ccc469$9a93a800$cfbaf800$%kim@samsung.com>
- <20120103104120.GK2914@n2100.arm.linux.org.uk>
- <012601ccca05$57d732b0$07859810$%kim@samsung.com>
- <20120103105425.GL2914@n2100.arm.linux.org.uk>
-Message-ID: <012801ccca07$037a24a0$0a6e6de0$%kim@samsung.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 3 Jan 2012 11:59:26 +0100 (CET)
+Subject: [GIT PULL] at91: devices and boards files update for 3.3
+In-Reply-To: <4F02DD2E.9070401@atmel.com>
+References: <4EEA034C.9020800@atmel.com>
+ <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
+ <4EEB73DD.3070505@atmel.com>
+ <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
+ <Pine.LNX.4.64.1112171928380.13817@axis700.grange>
+ <CAOesGMi6-iPPBSP_TgKHf_agGSOrQeoB1CU=xhj8wuM2dQvf0A@mail.gmail.com>
+ <Pine.LNX.4.64.1112180103220.13817@axis700.grange>
+ <CAOesGMiWH--=_fu1ufztb6jZLTDO8_EboDd+hEd=TN-AnRJ3Yw@mail.gmail.com>
+ <4F02DD2E.9070401@atmel.com>
+Message-ID: <Pine.LNX.4.64.1201031156440.6716@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Tue, Jan 03, 2012 at 07:49:18PM +0900, Kukjin Kim wrote:
-> > Russell King - ARM Linux wrote:
-> > > Right, so this is _still_ giving me problems.  7257/1 now applies.
-> 7258/1
-> > > combines my patch "ARM: restart: exynos4: use new restart hook XXX WIP
-> XXX
-> > > WHY IS THERE NO LOCAL HEADERS IN arch/arm/mach-exynos4 XXX" with an
-> update
-> > > from you for the new common.h header, and my "ARM: restart: plat-
-> samsung:
-> > > remove plat/reset.h and s5p_reset_hook" patch.
-> > >
-> > > This is wrong - s5p_reset_hook is used by other Samsung platforms as
-> well,
-> >
-> > Hmm..I thought the s5p_reset_hook() is not used more on other S5P SoCs,
-> > because it has been already cleaned up for S5P64X0, S5PC100 and S5PV210.
-> > Anyway, either way ok to me :)
-> 
-> It's removed by 7252/1 (s5pv210) - what I'm saying is that 'alphabetical'
-> means that the exynos change should come before 7252/1, and because exynos
-> removes the s5p_reset_hook (which is shared between s5pv210 and exynos)
-> things break.
-> 
-Ah ha :)
+(added Mauro and linux-media to CC)
 
-> This is exactly why I kept the change separate: it means that the ordering
-> of the platform specific patches is irrelevant: what matters is that the
-> ordering of platform specific patches to the common patches.  It means
-> you don't have to remember that one of the platform specific patches also
-> touches common code and must be last.
+On Tue, 3 Jan 2012, Nicolas Ferre wrote:
+
+> On 12/20/2011 05:32 AM, Olof Johansson :
+> > On Sat, Dec 17, 2011 at 4:08 PM, Guennadi Liakhovetski
+> > <g.liakhovetski@gmx.de> wrote:
+> > 
+> >>> We can keep one late-merge branch in arm-soc that contain patches with
+> >>> external and possibly late dependencies and submit that branch last,
+> >>> but it would be good if we had a bit of margin to get it in. :)
+> >>
+> >> Ok, let's try this.
+> > 
+> > Sounds good. Let us know when the stable branch is available. Nicolas,
+> > please prepare your branch as soon as possible once you have that info
+> > and send a pull request -- we still want the code into arm-soc
+> > branches very soon.
 > 
-OK, I see. This approach is good.
-
-> > > and its removal can only happen after _all_ the other platforms have
-> been
-> > > converted.  If I place your exynos patchs before the other Samsung
-> patches
-> > > (I'm keeping the platforms in alphabetical order) then things will
-> break.
-> > >
-> > > Please regenerate 7258/1 without my "ARM: restart: plat-samsung:
-> > > remove plat/reset.h and s5p_reset_hook" patch combined.
-> >
-> > OK, let me do it soon.
+> Olof, Guennadi,
 > 
-> Thanks.
+> I rebase today this branch on top of:
+> git://linuxtv.org/gliakhovetski/v4l-dvb.git for-3.3
+> 
+> I send another pull request real-soon-now...
+> Will it be still possible to make it for 3.3 merge window?
 
-I sent updated one to patch system.
-If any problems, please kindly let me know.
+Looks like Mauro still hasn't pulled my branch in. I did ask him on IRC to 
+do this and to push to Linus asap, but maybe he has missed that, I really 
+should have mentioned that in the pull request. Mauro, could you, please, 
+pull and include my branch in your first pull request for Linus for 3.3?
 
-Happy New Year!
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
