@@ -1,34 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 09:06:25 +0000
-Subject: [PATCH v4 4/7] cpufreq: add clk-reg cpufreq driver
-In-Reply-To: <20111226134449.GA4259@richard-laptop>
-References: <1324537753-30590-1-git-send-email-richard.zhao@linaro.org>
- <1324537753-30590-5-git-send-email-richard.zhao@linaro.org>
- <20111223131851.GB13175@sirena.org.uk> <20111224085539.GA1892@richard-laptop>
- <20111224122411.GA13778@sirena.org.uk> <20111224132831.GB1803@richard-laptop>
- <20111224134227.GA20908@opensource.wolfsonmicro.com>
- <20111224155227.GC1803@richard-laptop>
- <20111226111030.GC8722@opensource.wolfsonmicro.com>
- <20111226134449.GA4259@richard-laptop>
-Message-ID: <20120103090625.GA2914@n2100.arm.linux.org.uk>
+Date: Tue, 3 Jan 2012 09:09:24 +0000
+Subject: init_kprobes() takes too much time during boot up
+In-Reply-To: <1324641249.2215.25.camel@linaro1>
+References: <CAMPhdO8T5wwPBYp_n15A88o8YxkXv2t8WOumRyni6WDhJinS3A@mail.gmail.com>
+ <alpine.LFD.2.02.1112222212140.2907@xanadu.home>
+ <1324641249.2215.25.camel@linaro1>
+Message-ID: <20120103090924.GC2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 26, 2011 at 09:44:52PM +0800, Richard Zhao wrote:
-> On Mon, Dec 26, 2011 at 11:10:30AM +0000, Mark Brown wrote:
-> > The *call* is there in the regulator subsystem, it's just that none of
-> > the drivers back it up with an actual implementation yet.  Which turns
-> > out to be a good thing as cpufreq can't currently understand variable
-> > latencies and the governors don't deal well with non-trivial latencies
-> > anyway.
-> but clk API don't have such calls. and many SoCs only adjust clk frequencies, using
-> one single voltage.
+On Fri, Dec 23, 2011 at 11:54:09AM +0000, Jon Medhurst (Tixy) wrote:
+> Does Linux have some general IPI interface we could use to synchronize
+> CPU rather than stop_machine? All we need to do is interrupt other cores
+> and make them wait until we write a new instruction to memory and do a
+> cache flush and relevant barrier instructions.
 
-That's because it's often not known - especially in the case of PLLs,
-data sheets don't tend to specify how long it takes for the PLL to relock
-after a requested change.  If it's important that the PLL be locked,
-there will be a bit to poll (or they'll cause the CPU itself to stall
-while the PLL is not locked.)
-
-So, for these kinds of situations, how do you suggest that the clk API
-provides this information?
+Maybe smp_call_function().  I'm not sure whether making the called
+function spin until the calling CPU sets a flag is a good idea though -
+that sounds like it could cause lockups by preventing other IPIs
+happening.  Bear in mind that calling flush_* functions from IPIs is
+not a good idea because they'll want to IPI themselves - you have to
+use the local_flush_* stuff instead.
