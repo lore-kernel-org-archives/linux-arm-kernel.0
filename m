@@ -1,52 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Jan 2012 09:44:15 -0800
-Subject: [PATCH] Input: keyboard - add device tree bindings for simple key
- matrixes
-In-Reply-To: <20120102072121.GB13015@ponder.secretlab.ca>
-References: <1325112771-31941-1-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17755DC8D2@HQMAIL01.nvidia.com>
- <CAOesGMiNuW3mexN_8PtunZkaVX4Uph-OgZFr5zLhaB1nih_EEw@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17755DC8DB@HQMAIL01.nvidia.com>
- <CAOesGMjZoP+FsGWo9cWKvgs8KD9tT6KBHbK5qKX8NTGOY3HUjQ@mail.gmail.com>
- <20120102072121.GB13015@ponder.secretlab.ca>
-Message-ID: <CAOesGMjxS+AECmZu9pSusmhT+edXkrRYUnOSSs6QAJ7n45sRyA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Jan 2012 17:46:39 +0000
+Subject: [PATCH v2 2/2] dma/imx-sdma: add wmb before enable a channel
+In-Reply-To: <1325428692-11473-3-git-send-email-richard.zhao@linaro.org>
+References: <1325428692-11473-1-git-send-email-richard.zhao@linaro.org>
+ <1325428692-11473-3-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120103174639.GF2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 1, 2012 at 11:21 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Dec 28, 2011 at 11:06:02PM -0800, Olof Johansson wrote:
->> On Wed, Dec 28, 2011 at 11:01 PM, Stephen Warren <swarren@nvidia.com> wrote:
->> > Can we deprecate the Samsung format, and only allow it for that Samsung
->> > device (and allow both there), and require a single format for any other
->> > keyboard?
->>
->> I'm definitely ok with that. Thomas, Grant, Rob? The code in question
->> is queued for 3.3, so it hasn't been out in a real release yet.
->>
->> Adding Kukjin as well since it's getting merged through his tree.
->
-> Yeah, I'm okay with that.
->
-> BTW, please drop the "compatible" value for this binding. ?This binding
-> describes a common way of describing key mappings, but it isn't a complete
-> device binding in and of itself. ?Rather, it is a binding used by other
-> bindings; and as such no driver should ever bind against it directly. ?The
-> samsung driver can continue to use the other format if it so desires; there
-> is no harm in it doing so.
->
-> Instead, a driver that expects the binding can just call the
-> matrix_keyboard_of_fill_keymap() library function without checking
-> the compatible list.
+On Sun, Jan 01, 2012 at 10:38:12PM +0800, Richard Zhao wrote:
+> dma_alloc_coherent memory may be bufferable. We need to add
+> nececcary memory barrier.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  drivers/dma/imx-sdma.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index f8e87b5..9301bff 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -394,6 +394,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
+>  
+>  static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
+>  {
+> +	wmb();
+>  	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
 
-The main reason I had it there today was to make it easier to do a
-versioned binding in case of future revisions, but I guess it's not
-worth the hassle.
+Use writel().  That's what it's there for:
 
-So, in that case I will move out the fn management out of the common
-code as well, and pass in the property name to
-matrix_keyboard_of_fill_keymap. That way, the drivers that need to do
-a fn-keymap can do so outside of the shared code (and it gets rid of
-the FIXME in that case as well). Revised patch in a bit.
-
-
--Olof
+#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+#define __iowmb()               wmb()
+#endif
+#define writel_relaxed(v,c)     ((void)__raw_writel((__force u32) \
+                                        cpu_to_le32(v),__mem_pci(c)))
+#define writel(v,c)             ({ __iowmb(); writel_relaxed(v,c); })
