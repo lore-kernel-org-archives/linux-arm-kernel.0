@@ -1,38 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 17:46:39 +0000
-Subject: [PATCH v2 2/2] dma/imx-sdma: add wmb before enable a channel
-In-Reply-To: <1325428692-11473-3-git-send-email-richard.zhao@linaro.org>
-References: <1325428692-11473-1-git-send-email-richard.zhao@linaro.org>
- <1325428692-11473-3-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20120103174639.GF2914@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 3 Jan 2012 09:46:42 -0800
+Subject: [PATCH v3] Input: keyboard - add device tree bindings for
+ simple key matrixes
+In-Reply-To: <1325484557-27695-1-git-send-email-olof@lixom.net>
+References: <1325184146-3527-1-git-send-email-olof@lixom.net>
+ <1325484557-27695-1-git-send-email-olof@lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F10DC@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 01, 2012 at 10:38:12PM +0800, Richard Zhao wrote:
-> dma_alloc_coherent memory may be bufferable. We need to add
-> nececcary memory barrier.
+Olof Johansson wrote at Sunday, January 01, 2012 11:09 PM:
+> This adds a simple device tree binding for simple key matrix data and
+> a helper to fill in the platform data.
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  drivers/dma/imx-sdma.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> The implementation is in a shared file outside if drivers/input/keyboard
+> since some drivers in drivers/input/misc might be making use of it
+> as well.
 > 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index f8e87b5..9301bff 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -394,6 +394,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
->  
->  static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
->  {
-> +	wmb();
->  	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
+> Changes since v2:
+>  * Removed reference to "legacy" format with a subnode per key
+>  * Changed to a packed format with one cell per key instead of 3.
+>  * Moved new OF helper to separate file
+>  * Misc fixups based on comments
+> 
+> Changes since v1:
+>  * Removed samsung-style binding support
+>  * Added linux,fn-keymap and linux,fn-key optional properties
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-Use writel().  That's what it's there for:
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
-#define __iowmb()               wmb()
-#endif
-#define writel_relaxed(v,c)     ((void)__raw_writel((__force u32) \
-                                        cpu_to_le32(v),__mem_pci(c)))
-#define writel(v,c)             ({ __iowmb(); writel_relaxed(v,c); })
+The new binding looks good to me. I assume the FIXME in the code was
+deliberate.
+
+-- 
+nvpublic
