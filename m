@@ -1,57 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 11:51:02 +0000
-Subject: [PATCH 02/12] ARM: restart: S3C64XX: use new restart hook
-In-Reply-To: <1324385316-6052-3-git-send-email-kgene.kim@samsung.com>
-References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
- <1324385316-6052-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20120103115102.GO2914@n2100.arm.linux.org.uk>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 3 Jan 2012 11:52:01 +0000
+Subject: [PATCH v8 19/20] OMAP2+: UART: Do not gate uart clocks if used
+ for debug_prints
+In-Reply-To: <CAAL8m4yhtUNjoKwECnQEYNoaL-M+RaHXACanAeJW64DPsJ_hWg@mail.gmail.com>
+References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
+ <1321005712-21871-5-git-send-email-govindraj.raja@ti.com>
+ <B5906170F1614E41A8A28DE3B8D1214304B3E2@DBDE01.ent.ti.com>
+ <CAAL8m4yXD-gpeXNVsCOYeDkYDWmVX8FUcpXKjx6k=AXSF4V9iA@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D1214304BAD3@DBDE01.ent.ti.com>
+ <CAAL8m4yhtUNjoKwECnQEYNoaL-M+RaHXACanAeJW64DPsJ_hWg@mail.gmail.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D1214304BB42@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 09:48:26PM +0900, Kukjin Kim wrote:
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/system.h b/arch/arm/mach-s3c64xx/include/mach/system.h
-> index d8ca578..353ed43 100644
-> --- a/arch/arm/mach-s3c64xx/include/mach/system.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/system.h
-> @@ -11,20 +11,9 @@
->  #ifndef __ASM_ARCH_SYSTEM_H
->  #define __ASM_ARCH_SYSTEM_H __FILE__
->  
-> -#include <plat/watchdog-reset.h>
-> -
->  static void arch_idle(void)
->  {
->  	/* nothing here yet */
->  }
->  
-> -static void arch_reset(char mode, const char *cmd)
-> -{
-> -	if (mode != 's')
-> -		arch_wdt_reset();
-> -
-> -	/* if all else fails, or mode was for soft, jump to 0 */
-> -	soft_restart(0);
-> -}
-> -
+On Tue, Jan 03, 2012 at 16:01:52, Govindraj wrote:
+> >
+> > I have basic suspend-resume working on it. Strangely this works irrespective
+> > of the value of tty_dev wakeup entry. Do you know if this is expected on OMAP?
+> >
+> 
+> AFAIK yes.
 
-I just noticed this: if this comes before "ARM: restart: remove the now
-empty arch_reset()" (which it has to) then this will induce a build
-error.
+Ok.
 
-If you have added all the necessary .restart hooks, then this patch should
-remove the _contents_ of arch_reset() but leave the function there.  The
-"ARM: restart: remove the now empty arch_reset()" is the earliest point
-at which arch_reset() can be safely removed from any platform (and that
-can only happen _after_ platforms we care about have been converted.)
+> 
+> > The other issue concerning runtime PM is that as soon as I set a non-zero to
+> > the autosuspend_delay_ms I get some garbage characters and eventually the
+> > console stops responding.
+> >
+> > [root at arago /]# cat .../omap_uart.0/power/autosuspend_delay_ms
+> > -1
+> > [root at arago /]# echo 3000 > ?KW???+???+wU.???,z,??.??osuspend_delay??????...
+> > [root at arago /]# <- No response after some time
+> >
+> 
+> try enabling CONFIG_CPU_IDLE for pm qos_usage from uart driver.
+> 
 
-The dependency chain is:
+Its enabled.
 
-1. Base restart changes + restart cleanups.
-2. Platforms adding their .restart hooks, emptying arch_reset() as they're
-   fully converted.
-Then, once all platforms we care about are converted:
-3. Removal of code calling arch_reset().
-4. Removal of all empty arch_reset() functions and any header files left
-   empty at this point.
-
-So, a patch combining (2) and (4) really doesn't work.
+Regards,
+Vaibhav
