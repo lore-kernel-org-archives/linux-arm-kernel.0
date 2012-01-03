@@ -1,38 +1,26 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Jan 2012 12:12:59 +0530
-Subject: [PATCH RFC] MFD: OMAP: USB: Make the runtime functions depend on
- CONFIG_PM_RUNTIME
-Message-ID: <1325572979-6090-1-git-send-email-shubhrajyoti@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 3 Jan 2012 08:15:03 +0100
+Subject: arm and patch phys offset
+In-Reply-To: <201112130108.25337.michael@walle.cc>
+References: <201112112255.32534.michael@walle.cc>
+ <20111212222157.GG20178@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1112121746330.2907@xanadu.home>
+ <201112130108.25337.michael@walle.cc>
+Message-ID: <CACRpkdZ5V7KgWpLRPZ8yV9p_80gmjibH0EokZ3MoYktpOQssxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the runtime functions are compiled regardless
-of CONFIG_PM_RUNTIME flag. This patch intends to fix the same by
-using SET_RUNTIME_PM_OPS.
+On Tue, Dec 13, 2011 at 1:08 AM, Michael Walle <michael@walle.cc> wrote:
 
-Cc : Keshava Munegowda <keshava_mgowda@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
-applies on Tony's ehci branch.
-Compile tested only.
+> Seems like the l2 cache is enabled after uboot starts the linux kernel. I'll
+> dig deeper into that tomorrow.
 
- drivers/mfd/omap-usb-host.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Try to disable both L2 and L1 cach in U-Boot. That has solved
+similar issues for me.
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 3f565ef..ef72ebe 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -887,8 +887,8 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
- }
- 
- static const struct dev_pm_ops usbhsomap_dev_pm_ops = {
--	.runtime_suspend	= usbhs_runtime_suspend,
--	.runtime_resume		= usbhs_runtime_resume,
-+	SET_RUNTIME_PM_OPS(usbhs_runtime_suspend,
-+				usbhs_runtime_resume, NULL)
- };
- 
- static struct platform_driver usbhs_omap_driver = {
--- 
-1.7.1
+In include/configs/my_board.h
+
+#define CONFIG_SYS_DCACHE_OFF
+
+Yours,
+Linus Walleij
