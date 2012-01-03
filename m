@@ -1,50 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 03 Jan 2012 15:08:54 +0900
-Subject: [PATCH 12/12] ARM: restart: S3C24XX: use new restart hook
-In-Reply-To: <20120102133906.GP4300@opensource.wolfsonmicro.com>
-References: <1324385316-6052-1-git-send-email-kgene.kim@samsung.com>
- <201201021414.17551.heiko@sntech.de> <20120102132631.GC18443@sirena.org.uk>
- <201201021433.57356.heiko@sntech.de>
- <20120102133906.GP4300@opensource.wolfsonmicro.com>
-Message-ID: <00e201ccc9de$2ca008f0$85e01ad0$%kim@samsung.com>
+From: amit.kachhap@linaro.org (amit kachhap)
+Date: Tue, 3 Jan 2012 11:52:26 +0530
+Subject: [PATCH V4 0/5] ARM: exynos: Add l2 retention mode cpuidle state
+In-Reply-To: <1323083172-14096-1-git-send-email-amit.kachhap@linaro.org>
+References: <1323083172-14096-1-git-send-email-amit.kachhap@linaro.org>
+Message-ID: <CADGdYn7ZU5xiDvOLMR4wVHEWtF-2p86jNZFCOXMV6PrZXuLWbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Mon, Jan 02, 2012 at 02:33:57PM +0100, Heiko St?bner wrote:
-> > Am Montag, 2. Januar 2012, 14:26:31 schrieb Mark Brown:
-> > > On Mon, Jan 02, 2012 at 02:14:16PM +0100, Heiko St?bner wrote:
-> 
-> > > > Therefore I'm introducing a new s3c2443-pm-common.c. Question now
-is,
-> > > > should this move directly to plat-samsung?
-> 
-> > > If it's s3c2443 specific I'd expect it'd end up in the relevant mach
-> > > directory?
-> 
-> > nope, it's specific to 2443, 2416 and 2450. These three SoCs seem to
-> share a
-> > lot of features and it seems other common code (i.e. plat-
-> s3c24xx/s3c2443-
-> > clock.c) has got its name from the first SoC that had this feature (the
-> > S3C2443 in 2007).
-> 
-> Oh, right - that's not terribly clear but I guess.
+Hi Mr kim,
 
-Heiko, I think your file can be placed in plat-s3c24xx/ now and if required,
-I will move them into plat-samsung or just mach-s3c24xx. I mean I'm sorting
-out the mach-s3c2410/, mach-s3c2412/, mach-s3c2416/, mach-s3c2440/ and
-mach-s3c2443 directories too.
+All the comments have been addressed for the Exynos cpu idle patchset.
+The updated patchset was posted about one month back and there have
+been no further comments on the patchset since then.
 
-As a note, the working of one plat-samsung will be finished next time for
-v3.4.
+As this patchset seems to be stable now, do you think these these
+patches can merged in this 3.3 merge window? Kindly let me know your
+opinion.
 
-Happy New Year.
-Thanks.
+Thanks,
+Amit Daniel
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+On Mon, Dec 5, 2011 at 4:36 PM, Amit Daniel Kachhap
+<amit.kachhap@linaro.org> wrote:
+> Changes since V3:
+> *Implemented Russell feedback and moved sleep magic 4byte memory before
+> s3c_cpu_resume to data section.
+>
+> Changes since V2:
+> *Implemented the suggestion of MyungJoo Ham and used INFORM0/1
+> registers for resume for some board versions.
+> *Added back save/restore through CPU PM notifiers as suggested by
+> Lorenzo Pieralisi. This is useful to restore vfp state.
+> *some patch modularization (s5p/exynos) and proper commit logs.
+>
+> Changes since V1:
+> *rebased the whole patch against 3.2-rc1 tree
+> *removed GIC save/restore in AFTR cpuidle state as it is external
+> to cpu powerdomain
+> *Added L2 setup code through device tree
+> *Removed only l2 save/restore registers in sleep
+>
+> This Patch series adds support for AFTR mode cpuidle state based on
+> patch (http://www.spinics.net/lists/arm-kernel/msg132243.html) earlier
+> submitted by Jaecheol Lee <jc.lee@samsung.com>.
+>
+> This patch uses CPU PM notifiers , common l2 save/restore and
+> new cpu_suspend/resume interfaces and is based on the tip of
+> for-next branch of samsung tree.
+> (git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next).
+>
+> Amit Daniel Kachhap (5):
+> ?ARM: exynos: Add support AFTR mode on EXYNOS4210
+> ?ARM: exynos: save L2 settings during bootup
+> ?ARM: s5p: add L2 early resume code
+> ?ARM: exynos: remove useless code to save/restore L2
+> ?ARM: exynos: Enable l2 configuration through device tree
+>
+> ?arch/arm/mach-exynos/cpu.c ? ? ? ? ? ? ?| ? 60 +++++++++---
+> ?arch/arm/mach-exynos/cpuidle.c ? ? ? ? ?| ?152 ++++++++++++++++++++++++++++++-
+> ?arch/arm/mach-exynos/include/mach/pmu.h | ? ?2 +
+> ?arch/arm/mach-exynos/pm.c ? ? ? ? ? ? ? | ? 15 ---
+> ?arch/arm/plat-s5p/sleep.S ? ? ? ? ? ? ? | ? 44 ++++++++-
+> ?5 files changed, 233 insertions(+), 40 deletions(-)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
