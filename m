@@ -1,161 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Jan 2012 07:43:17 -0800
-Subject: [PATCH v3] Input: keyboard - add device tree bindings for simple
- key matrixes
-In-Reply-To: <CAPnjgZ1ngJrqB5FgOZDmc-H9KBE0-W75rqTHEPX4D+q0FjYumg@mail.gmail.com>
-References: <1325184146-3527-1-git-send-email-olof@lixom.net>
- <1325484557-27695-1-git-send-email-olof@lixom.net>
- <CAPnjgZ1ngJrqB5FgOZDmc-H9KBE0-W75rqTHEPX4D+q0FjYumg@mail.gmail.com>
-Message-ID: <20120103154317.GA27061@quad.lixom.net>
+From: arnd.bergmann@linaro.org (Arnd Bergmann)
+Date: Tue, 3 Jan 2012 16:02:01 +0000
+Subject: [RFC PATCH 0/8] Add common ARM cpuidle init code
+In-Reply-To: <4F031698.4010501@linaro.org>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <201112081537.04789.arnd.bergmann@linaro.org> <4F031698.4010501@linaro.org>
+Message-ID: <201201031602.01072.arnd.bergmann@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jan 02, 2012 at 10:39:04AM -0800, Simon Glass wrote:
-> > diff --git a/Documentation/devicetree/bindings/input/matrix-keymap.txt b/Documentation/devicetree/bindings/input/matrix-keymap.txt
-> > new file mode 100644
-> > index 0000000..1db8e12
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/input/matrix-keymap.txt
-> > @@ -0,0 +1,27 @@
-> > +A simple common binding for matrix-connected key boards. Currently targeted at
-> > +defining the keys in the scope of linux key codes since that is a stable and
-> > +standardized interface at this time.
-> > +
-> > +Required properties:
-> > +- compatible: "matrix-keyboard-controller"
-> > +- linux,keymap: an array of packed 1-cell entries containing the equivalent
-> > + ?of row, column and linux key-code. The 32-bit big endian cell is packed
-> > + ?as:
-> > + ? ? ? row << 24 | column << 16 | key-code
+On Tuesday 03 January 2012, Daniel Lezcano wrote:
+> drivers/idle/intel_idle.c => drivers/cpuidle/intel.c
+> drivers/acpi/processor_idle.c => drivers/cpuidle/acpi.c
 > 
-> This looks much better than the Samsung binding and the original 3-cell one.
+> arch/arm/mach-omap2/cpuidle34xx.c => drivers/cpuidle/omap-34xx.c
+> arch/arm/mach-omap2/cpuidle44xx.c => drivers/cpuidle/omap-44xx.c
+> arch/arm/mach-shmobile/cpuidle.c  => drivers/cpuidle/arm-shmobile.c
+> arch/arm/mach-davinci/cpuidle.c => drivers/cpuidle/davinci.c
+> arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/at91.c
+> arch/arm/mach-s3c64xx/cpuidle.c => drivers/cpuidle/s3c64xx.c
+> arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/exynos.c
+> arch/arm/mach-kirkwood/cpuidle.c => drivers/cpuidle/kirkwood.c
+> arch/arcm/mach-msm/idle.S => drivers/cpuidle/msm.S
 > 
-> U-Boot Tegra (keyboard patch series) currently uses a 16x8 matrix, and
-> uses a single byte (the ASCII character) for a total of 128 bytes per
-> keymap. Since U-Boot does not have (or apparently want) the concept of
-> key codes or the added code and intermediate data this requires, the
-> binding presented here will not suit U-Boot so far.
->
-> These rows and columns embedded in the cell make it more of a pain to
-> write the fdt description. If you just set up the cells in (column,
-> row) order and set the matrix size (rows, columns) then you end up
-> with 128 entries on Tegra. If you use uint16 then this could be 256
-> bytes instead of 512. The binding you present for Tegra would be 109 *
-> 4 = 436 bytes. However I take your point that Fn maps are much more
-> sparse, so overall this is likely to be similar (512 bytes for either
-> method once Fn mappings are taken into account).
-
-Looking at the keymap you posted, you define 62 keys and 16 function
-keys. So if that is all you care about on your particular keyboard,
-that means that the layout with the 1-cell format is 248 bytes for the
-base keymap, and 64 bytes for the fn-keymap. The benefit of using the
-row/column/keycode format is that the table is only as large as the
-number of keys you care about.
-
-> But going back to U-Boot, it does not have the intermediate table that
-> you malloc and decant into, it does not understand key codes so
-> doesn't know what to do when Shift is pressed, doesn't understand
-> languages, etc. In order to use these Linux bindings in U-Boot we
-> would need to add new input layer, extra decode code and intermediate
-> tables. I can almost hear the NAKs already (bear in mind fdt only went
-> into U-Boot in the December release and people are more sensitive to
-> code size / performance there than in Linux). I did ask about this on
-> this list a few weeks ago but no response yet.
+> That could be a first step and then we move the other archs which could 
+> be a bit more tricky like the powerpc.
 > 
-> We could perhaps add an alternative direct ASCII binding like this
-> example (which would have to be in a separate node):
+> Does it make sense ?
 
-You keep saying "direct ASCII", but your map contains non-ASCII
-characters. ASCII provides no way at all to specify things such as shift,
-or arrow keys, or other common new keys on keyboards. Instead you have had to
-make up an ad-hoc custom map that contains your own special codes for these
-keys.
+Sounds good to me. However, if any of the drivers can be built as
+loadable modules, or if there is any intention to make them so,
+the file name should be globally unique and follow a common naming
+scheme, e.g. idle-intel.c, idle-acpi.c, ...
 
-For example, for arrow keys you seem to overload the FS/GS/RS/US. I'm not
-saying we expect to need to use those ascii codes, but it does seem arbitrary
-to just grab them for arrow keys. So in essence you have come up with your own
-encoding of non-ASCII keys instead of reusing what is already available through
-the linux keycodes.
-
-Also, for example with return, does it encode as CR, LF or CR+LF? Etc.
-
-Doing a binding in pseudo-ASCII is just asking for extra complications, in my
-opinion. Over time that encoding is likely to swell to similar sizes anyway,
-but still be incompatible.
-
->                 /* Use a packed binding which doesn't include
-> row,column numbers in each cell */
->                 packed-binding;
->                 matrix-columns = <8>;
->                 matrix-rows = <16>;
->                 ascii-binding;  /* ASCII characters instead of keycodes */
-> 		u-boot,keymap  = /size/ 8 <00  00  'w' 's' 'a' 'z' 00  DE
-> 				    00  00  00  00  00  00  00  00
-> 				    00  00  00  00  00  00  00  00
-> 				    '5' '4' 'r' 'e' 'f' 'd' 'x' 00
-> 				    '7' '6' 't' 'h' 'g' 'v' 'c' ' '
-> 				    '9' '8' 'u' 'y' 'j' 'n' 'b' 5C
-> 				    '-' '0' 'o' 'i' 'l' 'k' ',' 'm'
-> 				    00  '=' ']' 0D  00  00  00  00
-> 				    00  00  00  00  DF  DF  00  00
-> 				    00  00  00  00  00  DC  00  DD
-> 				    00  00  00  00  00  00  00  00
-> 				    '[' 'p' 27  ';' '/' '.' 00  00
-> 				    00  00  08  '3' '2' 1E  00  00
-> 				    00  7F  00  00  00  1D  1F  1C
-> 				    00  00  00  'q' 00  00  '1' 00
-> 				    1B  '`' 00  09  00  00  00  00>;
-> 		u-boot,keymap-DF = /size/ 8 <00  00  'W' 'S' 'A' 'Z' 00  00
-> 				    00  00  00  00  00  00  00  00
-> 				    00  00  00  00  00  00  00  00
-> ...
-> 
-> The DC-DF codes codes denote Shift, Fn and Ctrl keys which would need
-> a separate keymap - although we could probably calculate the Ctrl one.
-
-I had included the row/column property in my binding for KEY_FN, but in
-hindsight it's probably just enough to decode that through the regular key
-layout, since there will be an entry for it there.
-
-> From a point of view of efficiency, drivers can simply keep a pointer
-> to the appropriate property and read out the codes based on
-> (row,column) position.
->
-> If we have something like this, then in order for the keyboard to work
-> in U-Boot, vendors would need to create a completely separate ASCII
-> mapping. Yes I agree this is a bit of a pain, but the above map is
-> fairly easy to type in, and quite compact.
-
-It doesn't make sense to come up with a fresh, brand new binding that
-requires anyone adding a new device to it to do extra work to do two
-redunant descriptions of the same device. We should be able to find common
-ground.
-
-The KEY_* codes that are interesting all seem to be in the range of
-0-83. In the u-boot case, that means the base KEY*-to-ascii table would
-be 83 bytes.
-
-That means that the memory consumption for your case above would be
-4*62+4*16=312 bytes for the base+fn table, and then 3*83 = 249 bytes
-for the KEY*-to-ASCII tables for regular/shift/ctrl, for a total of
-561 bytes. I'm sure there will be a few special cases in the code just
-like you have now for arrow keys, etc, but they don't have to be in the
-83-byte table.
-
-Sure, that is somewhat more than your 4*128 byte tables, but it is also
-a much more flexible binding that is less likely to hit limitations down
-the road.
-
-> Given the push-back on the U-Boot list from Linux people about my
-> bindings, I would like to work out the U-Boot side in this thread if
-> possible, since it seems to be dependent on what Linux does. But I
-> hope what is created is efficient enough not to bloat U-Boot or
-> require an new input layer to be added just to use fdt.
-
-I think it's a great idea to use a common binding, since there will just be
-wasted effort for vendors to have to create two maps and keep them in sync.
-
-
--Olof
+	Arnd
