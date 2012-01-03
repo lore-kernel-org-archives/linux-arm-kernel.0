@@ -1,35 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Jan 2012 14:58:57 -0800
-Subject: [PATCH] Input: tegra-kbc - add device tree support
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F1203@HQMAIL01.nvidia.com>
-References: <1325484557-27695-1-git-send-email-olof@lixom.net>
- <1325629702-10307-1-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F1203@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMhYscMgsNbZ+W0vdcRFmMiV3yQYLRxgGLfMVHKuhEAe-w@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 3 Jan 2012 15:03:30 -0800
+Subject: [PATCH v1 0/3] Tegra30 clockframework
+In-Reply-To: <1325517486-22458-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1325517486-22458-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F1220@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2012 at 2:42 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Tuesday, January 03, 2012 3:28 PM:
->> This includes an optional "linux,fn-keymap" binding that is not yet implemented,
->> that will be used to specify the Fn-key modifier layout if needed.
->
->> diff --git a/Documentation/devicetree/bindings/input/tegra-kbc.txt
-> ...
->> +Required properties:
->> +- compatible: "nvidia,tegra20-kbc", "matrix-keyboard-controller"
->
-> I think "matrix-keyboard-controller" should be dropped now?
+Peter De Schrijver wrote at Monday, January 02, 2012 8:18 AM:
+> This patchset introduces the tegra30 clockframework. Clocks which require
+> voltage scaling are not included in this version. The implementation doesn't
+> use the generic clock code yet. It's the intention to move to it, once the
+> semantics are fully clarified.
 
-Crap, yeah, I had dropped it but forgot to commit before I did send-email.
+I'm not particularly familiar with Tegra's clocks, but nothing really
+stood out as wrong with this patch on a quick look-through. It'd be great
+if someone like Colin could look this over.
 
-Dmitry, if this is the only comment, do you want me to resend or are
-you OK with editing yourself before applying?
+A couple thoughts below. You've probably thought about some of these
+already, but I just wanted to make sure:-)
 
-> Otherwise,
->
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+* Are we following the common clock stuff so we can move over once it's
+ready?
 
-Thanks!
+* Are Tegra20 and Tegra30 so different we can't re-use any of the code
+in tegra2_clocks.c for Tegra30?
 
--Olof
+* The device names in the peripheral clock table might benefit from a
+review to make sure they match tegra2_clocks.c for the drivers we've
+actually upstreamed at least.
+
+-- 
+nvpublic
