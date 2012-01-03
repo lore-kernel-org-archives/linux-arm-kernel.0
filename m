@@ -1,37 +1,44 @@
-From: michael@walle.cc (Michael Walle)
-Date: Tue, 3 Jan 2012 08:41:22 +0100
-Subject: arm and patch phys offset
-In-Reply-To: <CACRpkdZ5V7KgWpLRPZ8yV9p_80gmjibH0EokZ3MoYktpOQssxw@mail.gmail.com>
-References: <201112112255.32534.michael@walle.cc>
- <20111212222157.GG20178@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1112121746330.2907@xanadu.home>
- <201112130108.25337.michael@walle.cc>
- <CACRpkdZ5V7KgWpLRPZ8yV9p_80gmjibH0EokZ3MoYktpOQssxw@mail.gmail.com>
-Message-ID: <9ba2ef7841feed31c5e4f05a06a7d3ea.squirrel@ssl.serverraum.org>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Tue, 3 Jan 2012 08:43:09 +0100
+Subject: [PATCH v4 0/2] Add support form eMMa-PrP in i.MX2 chips as a
+ mem2mem device.
+In-Reply-To: <4F021DCE.8000105@gmail.com>
+References: <1323690225-15799-1-git-send-email-javier.martin@vista-silicon.com>
+ <CACKLOr1RujFbuTnF=DkCTB=paVUq7=j1Ru_RU7DWyuJedM+Cvg@mail.gmail.com>
+ <4F021DCE.8000105@gmail.com>
+Message-ID: <CACKLOr0YczU+jGOuKoRNvOUYhMbc3x_LVk3Gnt-dq+KfppwzFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 2 January 2012 22:12, Sylwester Nawrocki <snjw23@gmail.com> wrote:
+> Hi Javier,
+>
+> On 01/02/2012 10:31 AM, javier Martin wrote:
+>> Hi,
+>> do you have any more concerns or comments on this patch?
+>> I can't find it in media_tree. Has it been merged somewhere else?
+>
+> If you think your driver is good enough for merging, if you didn't
+> do so already, you should normally send Mauro a git pull request.
+> Please see:
+>
+> http://linuxtv.org/wiki/index.php/Maintaining_Git_trees#how_to_submit_a_-git_pull_request
+>
+> And here you can find some examples:
+> http://patchwork.linuxtv.org/project/linux-media/list/?state=*&q=PULL&archive=both
 
-On Tue, January 3, 2012 08:15, Linus Walleij wrote:
-> On Tue, Dec 13, 2011 at 1:08 AM, Michael Walle <michael@walle.cc> wrote:
->
->> Seems like the l2 cache is enabled after uboot starts the linux kernel.
->> I'll
->> dig deeper into that tomorrow.
->
-> Try to disable both L2 and L1 cach in U-Boot. That has solved
-> similar issues for me.
->
-> In include/configs/my_board.h
->
-> #define CONFIG_SYS_DCACHE_OFF
-but also slow things down in uboot, doesnt it? I've posted a patch on the
-uboot ml which disables the l2 cache upon linux start.
+Do you mean I have to set up a public GIT repository? Is this mandatory?
+I am not a subsystem maintainer, just casual developer.
 
-http://patchwork.ozlabs.org/patch/132533/
+What about this?
 
-You could try that, too.
+http://linuxtv.org/wiki/index.php/Maintaining_Git_trees#Patches_submitted_via_email
 
 -- 
-michael
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
