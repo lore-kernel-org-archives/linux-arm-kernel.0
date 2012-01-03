@@ -1,46 +1,69 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue,  3 Jan 2012 12:38:32 +0100
-Subject: [PATCH v2] ARM: at91: fix at91rm9200 soc subtype handling
-In-Reply-To: <4F02C900.6090907@atmel.com>
-References: <4F02C900.6090907@atmel.com>
-Message-ID: <1325590712-23414-1-git-send-email-nicolas.ferre@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Jan 2012 09:40:48 +0000
+Subject: [PATCH] dmaengine/dw_dmac: Add support for device_prep_dma_sg
+In-Reply-To: <1325503535.1540.17.camel@vkoul-udesk3>
+References: <1323766064-13425-1-git-send-email-pratyush.anand@st.com>
+ <1324655898.1633.11.camel@vkoul-udesk3> <4F0192F2.3010506@st.com>
+ <1325503535.1540.17.camel@vkoul-udesk3>
+Message-ID: <20120103094048.GF2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently setting it to PQFP changes subtype to BGA as subtypes are
-swapped in at91rm9200_set_type().
+On Mon, Jan 02, 2012 at 04:55:35PM +0530, Vinod Koul wrote:
+> On Mon, 2012-01-02 at 16:50 +0530, Pratyush Anand wrote:
+> > On 12/23/2011 9:28 PM, Vinod Koul wrote:
+> > > On Tue, 2011-12-13 at 14:17 +0530, Pratyush Anand wrote:
+> > >> Memory to memory copy with scatter gather option has been implemented in
+> > >> this patch. Driver can manage even if number of nodes in src and dst
+> > >> list is different.
+> > > The logic looks okay, but it would be great if we could split this
+> > > prepare here.
+> > > Possibly later when we have multiple such cases we can create templates
+> > > for parsing the non linear sg list and create linear lists from it.
+> > >
+> > 
+> > Ok. So you suggest to have one patch with a function to align sglist
+> > w.r.t length, and to implement this dwc_prep_dma_sg with aligned list only.
+> IMO that would be a much better approach
+> > 
+> > Caller of dwc_prep_dma_sg function will also call something like
+> > align_sg_list(unaligned_dsgl, unaligned ssgl, aligned dsgl,aligned ssgl);
+> and this one can be common code in dmaengine
 
-Wrong subtype causes GPIO bank D not to work at all.
+Wait a moment.  This looks like a disaster waiting to happen.  The DMA
+engine code doesn't really handle the DMA API properly as it is - and
+that has lead to at least one recent oops report (and it still remains
+unresolved.)
 
-After this fix, subtype is still set as unknown. But board code should
-fill it in with proper value. Another information is thus printed.
+The DMA API has the idea of buffer ownership: a buffer is either owned by
+the CPU, or the DMA device.  Only its owner may explicitly access the
+buffer.
 
-Bug discovery and first implementation made by Veli-Pekka Peltola.
+Before a buffer can be used for DMA, it must be mapped to the DMA device
+(using dma_map_sg() or dma_map_single().)  Once this call returns, the
+mapping is setup and the CPU must not explicitly access the buffer until
+the buffer is unmapped via dma_unmap_sg() or dma_unmap_single().
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org>
----
- arch/arm/mach-at91/setup.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
+With the DMA engine API, the caller is responsible for mapping the buffer.
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index aa64294..f5bbe0ef 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -27,9 +27,12 @@ EXPORT_SYMBOL(at91_soc_initdata);
- void __init at91rm9200_set_type(int type)
- {
- 	if (type == ARCH_REVISON_9200_PQFP)
--		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
--	else
- 		at91_soc_initdata.subtype = AT91_SOC_RM9200_PQFP;
-+	else
-+		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
-+
-+	pr_info("AT91: filled in soc subtype: %s\n",
-+		at91_get_soc_subtype(&at91_soc_initdata));
- }
- 
- void __init at91_init_irq_default(void)
--- 
-1.7.5.4
+This means that if you want to ensure that the buffer is correctly aligned,
+you must check the alignments _before_ mapping the buffer, and do any
+appropriate copies at this stage.
+
+So, it must be:
+	- align_sg_list
+	- map aligned lists
+	- prep_dma_sg
+and not
+	- map aligned lists
+	- align_sg_list
+	- prep_dma_sg
+because then you're violating the DMA API by having the CPU access an
+already mapped buffer - and that will lead to data corruption.
+
+Finally, consider this: you have two scatterlists which ask you to copy
+between two buffers.  The first is offset by one byte from a 32-bit word
+boundary.  The second is offset by two bytes from a 32-bit word
+boundary.  Your DMA engine can only perform naturally aligned 32-bit
+transfers for both the source and destination.  How do you see this
+situation being dealt with?
