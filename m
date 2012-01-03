@@ -1,31 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 17:25:04 +0000
-Subject: DMA: PL330: support for multiple irqs?
-In-Reply-To: <4F03372A.6050809@gmail.com>
-References: <4F03372A.6050809@gmail.com>
-Message-ID: <20120103172504.GC2914@n2100.arm.linux.org.uk>
+Date: Tue, 3 Jan 2012 17:28:45 +0000
+Subject: [PATCH] ARM: imx6: fix v7_invalidate_l1 by adding I-Cache
+ invalidation
+In-Reply-To: <CAB4PhKexxJM+rWhgdQfu9vB16KVT6QpN1ye4kH88pNiLnEyL+Q@mail.gmail.com>
+References: <1325237200-10610-1-git-send-email-shawn.guo@linaro.org>
+ <CAB4PhKexxJM+rWhgdQfu9vB16KVT6QpN1ye4kH88pNiLnEyL+Q@mail.gmail.com>
+Message-ID: <20120103172845.GD2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 06:13:14PM +0100, dirac3000 wrote:
-> I have noticed the current PL330 driver does not provide any support for
-> multiples interrupts, even if the controller allows such implementation
-> (e.g.: one interrupt line for channel).
+On Fri, Dec 30, 2011 at 06:47:05PM +0800, Jason Liu wrote:
+> I looked the code: arch/arm/mm/proc-v7.S:
 > 
-> So far the driver takes the first element of the IRQ field in the
-> amba_device structure and makes a request on that IRQ, but I am working
-> on a PL330 with 7 different IRQ lines (6 for events + 1 for irq_abort).
+> #ifdef HARVARD_CACHE
+>         mcr     p15, 0, r10, c7, c5, 0          @ I+BTB cache invalidate
+> #endif
+>         dsb
+> #ifdef CONFIG_MMU
+>         mcr     p15, 0, r10, c8, c7, 0          @ invalidate I + D TLBs
+>         mcr     p15, 0, r10, c2, c0, 2          @ TTB control register
+>         ALT_SMP(orr     r4, r4, #TTB_FLAGS_SMP)
+>         ALT_UP(orr      r4, r4, #TTB_FLAGS_UP)
+>         mcr     p15, 0, r4, c2, c0, 1           @ load TTB1
+> 
+> It seems that it will try to invalidate when HARVARD_CACHE define. But
+> HARVARD_CACHE only defined in v6, why?
 
-So, you seem to have the first SoC which uses this silly 'lets not use
-the common interrupt' sillyness.
-
-> A possibility would be to change the driver to loop over the
-> amba_device->irq array, but this is limited to max 2 IRQs, and I don't
-> understand this limitation.
-
-That's because no one before has used the separate IRQ lines.  To do
-so just needlessly increases the complexity of the drivers.
-
-It's probably just as easy to arrange your platform code to treat all
-the physical interrupts for the device as one logical interrupt and be
-done with it.
+It's probably a mistake caused when copying proc-v6.S to proc-v7.S and
+editing it - which I believe is how proc-v7.S was created.  Suggest you
+ask Catalin to find out more details.
