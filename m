@@ -1,28 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 3 Jan 2012 13:37:47 -0200
-Subject: [PATCH] net: fsl: fec: fix build for mx23-only kernel
-In-Reply-To: <1325598407-14353-1-git-send-email-w.sang@pengutronix.de>
-References: <1325598407-14353-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <CAOMZO5BmKJP-3y_FxczuGwGfBR_3e2J9z3+gqzs-JDxOtR_PdQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Jan 2012 15:42:18 +0000
+Subject: [PATCH v2] ARM: setup.c: Fix build warning by removing
+ unneeded header file
+In-Reply-To: <1325536725-28403-1-git-send-email-festevam@gmail.com>
+References: <1325535113-26551-1-git-send-email-festevam@gmail.com>
+ <1325536725-28403-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120103154218.GW2914@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2012 at 11:46 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> If one only selects mx23-based boards, compile fails:
->
-> drivers/net/ethernet/freescale/fec.c:410:2: error: 'FEC_HASH_TABLE_HIGH' undeclared (first use in this function)
-> drivers/net/ethernet/freescale/fec.c:411:2: error: 'FEC_HASH_TABLE_LOW' undeclared (first use in this function)
->
-> This is because fec.h uses CONFIG_SOC_IMX28 to determine the register
-> layout of the core which makes sense since the MX23 does not have a fec.
-> However, Kconfig uses the broader ARCH_MXS symbol and this way even
-> makes the fec-driver default for MX23. Adapt Kconfig to use the more
-> precise SOC_IMX28 as well.
->
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: David S. Miller <davem@davemloft.net>
+On Mon, Jan 02, 2012 at 06:38:45PM -0200, Fabio Estevam wrote:
+> Fix the following build warning:
+> 
+>   CC      arch/arm/kernel/setup.o
+> In file included from arch/arm/kernel/setup.c:39:
+> arch/arm/include/asm/elf.h:102:1: warning: "vmcore_elf64_check_arch" redefined
+> In file included from arch/arm/kernel/setup.c:24:
+> include/linux/crash_dump.h:30:1: warning: this is the location of the previous definition
+> 
+> Since commit 93a72052 (crash_dump: export is_kdump_kernel to modules, consolidate elfcorehdr_addr, setup_elfcorehdr and saved_max_pfn)
+> the inclusion of <linux/crash_dump.h> is no longer needed.
+> 
+> Remove the inclusion of <linux/crash_dump.h> and the build warning is fixed.
 
-Acked-by: Fabio Estevam <fabio.estevam@freescale.com>
+Actually, this is fragile.  This is _excessively_ fragile.
+
+linux/crash_dump.h makes no attempt to include asm/elf.h, but it depends
+on stuff in asm/elf.h to determine how stuff inside this file is defined
+at parse time.
+
+So, if asm/elf.h is included after linux/crash_dump.h or not at all, you
+get a different result from the situation where asm/elf.h is included
+before.
+
+Therefore, while this change may on the face of it seem correct, it's
+only a sticky plaster over the problem by avoiding the situation rather
+than fixing it properly.
+
+I won't apply this until the real problem (missing include in
+linux/crash_dump.h) is resolved.
