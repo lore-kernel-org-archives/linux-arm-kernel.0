@@ -1,201 +1,107 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue,  3 Jan 2012 15:25:20 -0700
-Subject: [PATCH 4/4] ARM: tegra: Pass uncompress.h UART selection to DEBUG_LL
-In-Reply-To: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
-References: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1325629520-23018-5-git-send-email-swarren@nvidia.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 3 Jan 2012 23:30:58 +0100
+Subject: [PATCH 1/2] PM / Domains: Add OF support
+In-Reply-To: <CAJuYYwQp7gfuovd8kKEe_D+ACyq4OafxZRW_G=U_9zCMOy+prA@mail.gmail.com>
+References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
+ <201112282317.54291.rjw@sisk.pl>
+ <CAJuYYwQp7gfuovd8kKEe_D+ACyq4OafxZRW_G=U_9zCMOy+prA@mail.gmail.com>
+Message-ID: <201201032330.58602.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-uncompress.h now saves the selected UART's physical address in Tegra's
-IRAM, along with a cookie to indicate validity.
+On Monday, January 02, 2012, Thomas Abraham wrote:
+> Hi Rafael,
+> 
+> On 29 December 2011 03:47, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > On Wednesday, December 28, 2011, Thomas Abraham wrote:
+> >> Hi Mark, Rafael,
+> >
+> > Hi,
+> >
+> >> On 27 December 2011 02:14, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> >> > On Monday, December 26, 2011, Mark Brown wrote:
+> >> >> On Mon, Dec 26, 2011 at 08:13:19PM +0100, Rafael J. Wysocki wrote:
+> >> >> > On Monday, December 12, 2011, Thomas Abraham wrote:
+> >> >>
+> >> >> > > A device node pointer is added to generic pm domain structure to associate
+> >> >> > > the domain with a node in the device tree.
+> >> >>
+> >> >> > That sounds fine except for one thing: PM domains are not devices, so adding
+> >> >> > "device node" pointers to them is kind of confusing.  Perhaps there should be
+> >> >> > something like struct dt_node, representing a more general device tree node?
+> >> >>
+> >> >> There's struct of_node which is exactly that, though practically
+> >> >> speaking you need a device if you're going to bind automatically to
+> >> >> something from the device tree in a sensible fashion and there is actual
+> >> >> hardware under there so a device does make some sense.
+> >>
+> >> In patch 2/2 of this series, the platform code looks for nodes in
+> >> device tree that represent a power domain. When a power domain node is
+> >> found, a generic power domain is instantiated with pm_genpd_init()
+> >> using the information available from the node in device tree. There is
+> >> no automatic binding required in this case. The power domain node does
+> >> represent a hardware that manages the power domain.
+> >
+> > Good.  So would it be possible to use struct of_node instead of
+> > struct device_node in struct generic_pm_domain?
+> 
+> Sorry, I used 'struct of_node' and 'struct device_node'
+> interchangeably in my reply. All the nodes in a device tree are
+> represented by 'struct device_node'.
+> 
+> >
+> >> >>
+> >> >> This is in part compatibility with the existing Exynos code which uses
+> >> >> devices to probe the domains for non-DT systems.
+> >> >
+> >> > Well, that's not a general case, though.
+> >> >
+> >> > It doesn't feel approporiate to use a "device node" pointer for something
+> >> > that's not based on struct device, at least not a generic level, so I wonder
+> >> > if there's a different way.
+> >>
+> >> A device node pointer or of_node pointer is a simple pointer to a
+> >> instance of a node in device tree. All nodes in a device tree need not
+> >> represent a corresponding 'struct device'. A node in device tree can
+> >> described a hardware feature such as a power domain supported in the
+> >> hardware.
+> >
+> > Sure.
+> >
+> >> The addition of device tree support for generic power domains in this
+> >> patchset is generic for all platforms. The platform code instantiates
+> >> generic power domains from device tree with the of_node pointer
+> >> assigned to 'struct generic_pm_domain'. Then, in
+> >> __pm_genpd_add_device(), given a of_node pointer (to gen_pd), it is
+> >> possible to find a matching power domain to select.
+> >
+> > My point was that adding the struct device_node pointer to
+> > struct generic_pm_domain didn't look good, because that structure didn't
+> > represent a device in general.  While I understand that it may be regarded
+> > as a "device object" on some platforms, there are platforms that don't
+> > regard PM domains as devices.  For this reason (and only for this reason)
+> > it appears to be more appropriate to use a more generic device tree node
+> > type for struct generic_pm_domain.
+> 
+> If a platform uses some hardware controls (register read/writes) to
+> enable/disable/control power domain, then it can be represented in the
+> device tree. But such a node need not represent a 'struct device'.
+> Other nodes in the device tree can then reference the power domain
+> node.
+> 
+> If a platform does not have any hardware knobs for controlling power
+> domains, then probably it will not be represented in the device tree.
+> But I am not sure of this case.
+> 
+> The 'struct device_node' is a representation of a instance of a device
+> tree node. It can represent nodes that are not devices. Hence, it can
+> be used to represent a power domain in a device tree and also included
+> in the 'struct generic_pm_domain'.
 
-The first time it's run, macro addruart in debug-macro.S looks for this
-cookie, and if it's present, uses the UART address stored there. If not,
-the static value TEGRA_DEBUG_UART_BASE is used, as was previous behaviour.
-The static behaviour will thus be used when not booting using a zImage.
+OK, so please address my second comment regarding the $subject patch,
+i.e. that you might add a wrapper around the original
+__pm_genpd_add_device() instead of modifying __pm_genpd_add_device()
+itself.
 
-This work was inspired by work by Doug Anderson <dianders@chromium.org>;
-see http://lkml.org/lkml/2011/9/26/284. However, this patch relies on
-the data passing describe above, rather than duplicating the UART
-selection logic in debug-macro.S; the latest selection logic is more
-complex due to the need to check reset/clock bits too.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/common.c                   |   17 +++++
- arch/arm/mach-tegra/include/mach/debug-macro.S |   87 +++++++++++++++++++++---
- arch/arm/mach-tegra/include/mach/uncompress.h  |   12 +++
- 3 files changed, 105 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index a2eb901..76210e5 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -33,6 +33,23 @@
- #include "clock.h"
- #include "fuse.h"
- 
-+/*
-+ * Storage for debug-macro.S's state.
-+ *
-+ * This must be in .data not .bss so that it gets initialized each time the
-+ * kernel is loaded. The data is declared here rather than debug-macro.S so
-+ * that multiple inclusions of debug-macro.S point at the same data.
-+ */
-+#define TEGRA_DEBUG_UART_OFFSET (TEGRA_DEBUG_UART_BASE & 0xFFFF)
-+u32 tegra_uart_config[3] = {
-+	/* Debug UART initialization required */
-+	1,
-+	/* Debug UART physical address */
-+	(u32)(IO_APB_PHYS + TEGRA_DEBUG_UART_OFFSET),
-+	/* Debug UART virtual address */
-+	(u32)(IO_APB_VIRT + TEGRA_DEBUG_UART_OFFSET),
-+};
-+
- #ifdef CONFIG_OF
- static const struct of_device_id tegra_dt_irq_match[] __initconst = {
- 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
-diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/mach-tegra/include/mach/debug-macro.S
-index 619abc6..94802a5 100644
---- a/arch/arm/mach-tegra/include/mach/debug-macro.S
-+++ b/arch/arm/mach-tegra/include/mach/debug-macro.S
-@@ -1,11 +1,17 @@
- /*
-  * arch/arm/mach-tegra/include/mach/debug-macro.S
-  *
-- * Copyright (C) 2010 Google, Inc.
-+ * Copyright (C) 2010,2011 Google, Inc.
-+ * Copyright (C) 2011 NVIDIA CORPORATION. All Rights Reserved.
-  *
-  * Author:
-  *	Colin Cross <ccross@google.com>
-  *	Erik Gilling <konkers@google.com>
-+ *	Doug Anderson <dianders@chromium.org>
-+ *	Stephen Warren <swarren@nvidia.com>
-+ *
-+ * Portions based on mach-omap2's debug-macro.S
-+ * Copyright (C) 1994-1999 Russell King
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -18,18 +24,77 @@
-  *
-  */
- 
-+#include <linux/serial_reg.h>
-+
- #include <mach/io.h>
- #include <mach/iomap.h>
- 
--	.macro  addruart, rp, rv, tmp
--        ldr     \rp, =IO_APB_PHYS       @ physical
--        ldr     \rv, =IO_APB_VIRT        @ virtual
--	orr	\rp, \rp, #(TEGRA_DEBUG_UART_BASE & 0xFF)
--	orr	\rp, \rp, #(TEGRA_DEBUG_UART_BASE & 0xFF00)
--	orr	\rv, \rv, #(TEGRA_DEBUG_UART_BASE & 0xFF)
--	orr	\rv, \rv, #(TEGRA_DEBUG_UART_BASE & 0xFF00)
--	.endm
-+		.macro  addruart, rp, rv, tmp
-+		adr	\rp, 99f		@ actual addr of 99f
-+		ldr	\rv, [\rp]		@ linked addr is stored there
-+		sub	\rv, \rv, \rp		@ offset between the two
-+		ldr	\rp, [\rp, #4]		@ linked tegra_uart_config
-+		sub	\tmp, \rp, \rv		@ actual tegra_uart_config
-+		ldr	\rp, [\tmp]		@ Load tegra_uart_config
-+		cmp	\rp, #1			@ needs intitialization?
-+		bne	100f			@ no; go load the addresses
-+		mov	\rv, #0			@ yes; record init is done
-+		str	\rv, [\tmp]
-+		mov	\rp, #TEGRA_IRAM_BASE	@ See if cookie is in IRAM
-+		ldr	\rv, [\rp, #0x100]
-+		movw	\rp, #0x5254		@ "UART"
-+		movt	\rp, #0x5541
-+		cmp	\rv, \rp		@ Cookie present?
-+		bne	100f			@ No, use default UART
-+		mov	\rp, #TEGRA_IRAM_BASE	@ Load UART address from IRAM
-+		ldr	\rv, [\rp, #0x104]
-+		str	\rv, [\tmp, #4]		@ Store in tegra_uart_phys
-+		sub	\rv, \rv, #IO_APB_PHYS	@ Calculate virt address
-+		add	\rv, \rv, #IO_APB_VIRT
-+		str	\rv, [\tmp, #8]		@ Store in tegra_uart_virt
-+		b	100f
-+
-+		.align
-+99:		.word	.
-+		.word	tegra_uart_config
-+		.ltorg
-+
-+100:		ldr	\rp, [\tmp, #4]		@ Load tegra_uart_phys
-+		ldr	\rv, [\tmp, #8]		@ Load tegra_uart_virt
-+		.endm
-+
-+#define UART_SHIFT 2
-+
-+/*
-+ * Code below is swiped from <asm/hardware/debug-8250.S>, but add an extra
-+ * check to make sure that we aren't in the CONFIG_TEGRA_DEBUG_UART_NONE case.
-+ * We use the fact that all 5 valid UART addresses all have something in the
-+ * 2nd-to-lowest byte.
-+ */
-+
-+		.macro	senduart, rd, rx
-+		tst	\rx, #0x0000ff00
-+		strneb	\rd, [\rx, #UART_TX << UART_SHIFT]
-+1001:
-+		.endm
- 
--#define UART_SHIFT	2
--#include <asm/hardware/debug-8250.S>
-+		.macro	busyuart, rd, rx
-+		tst	\rx, #0x0000ff00
-+		beq	1002f
-+1001:		ldrb	\rd, [\rx, #UART_LSR << UART_SHIFT]
-+		and	\rd, \rd, #UART_LSR_TEMT | UART_LSR_THRE
-+		teq	\rd, #UART_LSR_TEMT | UART_LSR_THRE
-+		bne	1001b
-+1002:
-+		.endm
- 
-+		.macro	waituart, rd, rx
-+#ifdef FLOW_CONTROL
-+		tst	\rx, #0x0000ff00
-+		beq	1002f
-+1001:		ldrb	\rd, [\rx, #UART_MSR << UART_SHIFT]
-+		tst	\rd, #UART_MSR_CTS
-+		beq	1001b
-+1002:
-+#endif
-+		.endm
-diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
-index 4d8e1b7..6bcb2bd 100644
---- a/arch/arm/mach-tegra/include/mach/uncompress.h
-+++ b/arch/arm/mach-tegra/include/mach/uncompress.h
-@@ -48,6 +48,17 @@ static inline void flush(void)
- {
- }
- 
-+static inline void save_uart_address(void)
-+{
-+	u32 *iram = (u32 *)(TEGRA_IRAM_BASE + 0x100);
-+
-+	if (uart) {
-+		iram[0] = 0x55415254; /* "UART" */
-+		iram[1] = (u32)uart;
-+	} else
-+		iram[0] = 0;
-+}
-+
- /*
-  * Setup before decompression.  This is where we do UART selection for
-  * earlyprintk and init the uart_base register.
-@@ -124,6 +135,7 @@ static inline void arch_decomp_setup(void)
- 	}
- 	if (i == ARRAY_SIZE(uarts))
- 		uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
-+	save_uart_address();
- 	if (uart == NULL)
- 		return;
- 
--- 
-1.7.0.4
+Thanks,
+Rafael
