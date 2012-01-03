@@ -1,58 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2012 09:43:56 +0000
-Subject: [PATCH] S3C: fix order of MACH_S3C* checks on GPIO count define
-In-Reply-To: <1325164036-15638-1-git-send-email-dron0gus@gmail.com>
-References: <1325164036-15638-1-git-send-email-dron0gus@gmail.com>
-Message-ID: <20120103094356.GG2914@n2100.arm.linux.org.uk>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 03 Jan 2012 11:48:06 +0200
+Subject: [PATCH 2/2] mt_ventoux: support for TeeJet Mt.Ventoux board
+In-Reply-To: <4EFA4E9C.30307@emcraft.com>
+References: <1324940912-18164-1-git-send-email-yanok@emcraft.com>
+ <1324940912-18164-3-git-send-email-yanok@emcraft.com>
+ <4EF97A41.7050605@compulab.co.il> <4EFA4E9C.30307@emcraft.com>
+Message-ID: <4F02CED6.8090709@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 29, 2011 at 05:07:14PM +0400, Gusakov Andrey wrote:
-> Differnt S3C24XX SoC have different number of GPIO. When building
-> kernel for many S3C24XX SoCs GPIO number defined to minimun possible.
-> This patch reordef ifdef's to define GPIO number to muximum possible.
+Hi Ilya,
 
-This is error prome.  Please come up with a better solution to this.
+On 12/28/11 01:02, Ilya Yanok wrote:
+> On 27.12.2011 11:56, Igor Grinberg wrote:
+>>> +/*
+>>> + * use fake regulator for vdds_dsi as we can't find this pin inside
+>>> + * AM3517 datasheet.
+>>> + */
+>>> +static struct regulator_consumer_supply mt_ventoux_vdds_dsi_supply[] = {
+>>> +	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
+>>> +	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+>>> +};
+>>
+>> Although the TRM states that there is a vdds_dsi signal,
+>> it looks, from the datasheet, that VDDSHV is used to power the DSS.
+>> Either way, it can't be switched off, I think...
+>> Therefore, depending on your board wiring, you can leave it as fixed
+>> regulator or bind to a supply on TPS65023.
+> 
+> I will forward this info to hardware guys and ask about wiring. For now
+> I will leave it as is. Thanks for this information it turned to be some
+> kind of mystery. It would be great if you could give some pointer to the
+> datasheet regarding VDDSHV and DSS.
 
-> -#ifdef CONFIG_CPU_S3C244X
-> -#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
-> -#elif defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
-> +#if defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
->  #define ARCH_NR_GPIOS	(32 * 12 + CONFIG_S3C24XX_GPIO_EXTRA)
-> +#elif defined(CONFIG_CPU_S3C244X)
-> +#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
->  #else
->  #define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
->  #endif
+Well, there is no direct pointer to that information, but
+I've found these facts:
+1) the "Ball Characteristics" tables state that the DSS related pins
+   (and also many others) are powered by the VDDSHV.
+2) the estimated power consumption of VDDSHV is the largest after the
+   VDD_CORE, which is typical for DSS, but it is also one of the largest
+   power domains, so I guess this cannot be a valid argument ;-)
+3) On the "Voltage domains" diagram, only the VDD_CORE is exposed and
+   DSS is not listed in it, but there are other domains which are not
+   exposed... (this only can exclude the DSS from VDD_CORE, but not
+   absolutely, as datasheets can have mistakes or just not give that piece
+   of information).
 
-Maybe something like:
+Still, it is a guess and not verified information.
 
-#define S3C2443_NR_GPIOS	(32 * 12)
-#define S3C2416_NR_GPIOS	(32 * 12)
-#define S3C244X_NR_GPIOS	(32 * 9)
+[...]
 
-#define SAMSUNG_NR_GPIOS	(256)
-#if defined (CONFIG_CPU_S3C244X) && S3C244X_NR_GPIOS > SAMSUNG_NR_GPIOS
-#undef SAMSUNG_NR_GPIOS
-#define SAMSUNG_NR_GPIOS	S3C244X_NR_GPIOS
-#endif
-#if defined (CONFIG_CPU_S3C2416) && S3C2416_NR_GPIOS > SAMSUNG_NR_GPIOS
-#undef SAMSUNG_NR_GPIOS
-#define SAMSUNG_NR_GPIOS	S3C2416_NR_GPIOS
-#endif
-#if defined (CONFIG_CPU_S3C2443) && S3C2443_NR_GPIOS > SAMSUNG_NR_GPIOS
-#undef SAMSUNG_NR_GPIOS
-#define SAMSUNG_NR_GPIOS	S3C2443_NR_GPIOS
-#endif
-
-#define ARCH_NR_GPIOS		(SAMSUNG_NR_GPIOS + CONFIG_S3C24XX_GPIO_EXTRA)
-
-or maybe just solve this in Kconfig - we already have this:
-
-config ARCH_NR_GPIO
-        int
-        default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
-        default 350 if ARCH_U8500
-        default 0
-
-to set ARCH_NR_GPIO in generic code.
+-- 
+Regards,
+Igor.
