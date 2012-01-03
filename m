@@ -1,53 +1,34 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Tue, 3 Jan 2012 19:45:14 +0100
-Subject: [GIT PULL] i.MX patches for eukrea boards
-In-Reply-To: <CAOesGMizj-B4+3tFGMJY0=6e79g+OmzRn+Ou3R5eM_PLJUU=cQ@mail.gmail.com>
-References: <20120103085137.GH5446@pengutronix.de>
- <CAOesGMizj-B4+3tFGMJY0=6e79g+OmzRn+Ou3R5eM_PLJUU=cQ@mail.gmail.com>
-Message-ID: <20120103194514.258d4a91@eb-e6520>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 03 Jan 2012 13:48:51 -0500 (EST)
+Subject: [PATCH] net: fsl: fec: fix build for mx23-only kernel
+In-Reply-To: <CAOMZO5BmKJP-3y_FxczuGwGfBR_3e2J9z3+gqzs-JDxOtR_PdQ@mail.gmail.com>
+References: <1325598407-14353-1-git-send-email-w.sang@pengutronix.de>
+ <CAOMZO5BmKJP-3y_FxczuGwGfBR_3e2J9z3+gqzs-JDxOtR_PdQ@mail.gmail.com>
+Message-ID: <20120103.134851.1069804762867901608.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Sascha,
+From: Fabio Estevam <festevam@gmail.com>
+Date: Tue, 3 Jan 2012 13:37:47 -0200
 
-Le Tue, 3 Jan 2012 09:37:52 -0800,
-Olof Johansson <olof@lixom.net> a ?crit :
-> On Tue, Jan 3, 2012 at 12:51 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > Hi Arnd, Olof,
-> >
-> > Please pull the following eukrea board specific patches. They
-> > currently conflict with the patches merging mach-mx5 to mach-imx.
-> > Let me know if I have to rebase them.
-> >
-> > Sascha
-> >
-> > The following changes since commit 384703b8e6cd4c8ef08512e596024e028c91c339:
-> >
-> > ?Linux 3.2-rc6 (2011-12-16 18:36:26 -0800)
-> >
-> > are available in the git repository at:
-> > ?git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-eukrea
-> >
-> > Eric B?nard (9):
-> > ? ? ?mxc_udc: add workaround for ENGcm09152 for i.MX25
-> > ? ? ?eukrea_cpuimx25: enable workaround ENGcm09152
-> > ? ? ?mbimxsd25: add spi controler and spidev support
-> > ? ? ?cpuimx25: add watchdog support
-> > ? ? ?mbimxsd35: add spi controler and spidev support
-> > ? ? ?eukrea-cpuimx51: remove board
-> > ? ? ?cpuimx51sd: add watchdog support
-> > ? ? ?mbimx51sd: add audio codec support
-> > ? ? ?eukrea-cpuimx51sd: support rev2 PCB
+> On Tue, Jan 3, 2012 at 11:46 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+>> If one only selects mx23-based boards, compile fails:
+>>
+>> drivers/net/ethernet/freescale/fec.c:410:2: error: 'FEC_HASH_TABLE_HIGH' undeclared (first use in this function)
+>> drivers/net/ethernet/freescale/fec.c:411:2: error: 'FEC_HASH_TABLE_LOW' undeclared (first use in this function)
+>>
+>> This is because fec.h uses CONFIG_SOC_IMX28 to determine the register
+>> layout of the core which makes sense since the MX23 does not have a fec.
+>> However, Kconfig uses the broader ARCH_MXS symbol and this way even
+>> makes the fec-driver default for MX23. Adapt Kconfig to use the more
+>> precise SOC_IMX28 as well.
+>>
+>> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+>> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+>> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: David S. Miller <davem@davemloft.net>
 > 
-> Can you please change the patch subjects of these and future patches.
-> They should generally be on the form:
-> 
-> ARM: <platform>: <subplatform or topic>: <...>
-> 
-> So, in your case:
-> 
-> ARM: imx: ...
-> 
-will send a v2 tomorrow
+> Acked-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Eric
+Applied, thanks.
