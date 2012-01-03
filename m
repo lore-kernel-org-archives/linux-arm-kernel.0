@@ -1,20 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 Jan 2012 21:58:57 +0000
-Subject: [PATCH] mfd/db8500-prcmu: remove support for early silicon
- revisions
-In-Reply-To: <1325510260-4368-1-git-send-email-linus.walleij@stericsson.com>
-References: <1325510260-4368-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201201032158.57181.arnd@arndb.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue,  3 Jan 2012 15:05:47 -0700
+Subject: [PATCH V2] arm/tegra: Support Tegra30 in decompressor UART setup
+Message-ID: <1325628347-22140-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 January 2012, Linus Walleij wrote:
-> Hi ARM-SoC guys, can either of you please merge this patch to
-> wherever the other ux500 patches are pending? There is some
-> cross-dependence on the MFD core and I intended to include this
-> patch in the original pull request, but I screwed up, breaking
-> linux-next. Thanks.
+On Tegra20, the UART clock runs at 216MHz, whereas on Tegra30 it runs at
+408MHz. Modify arch_decomp_setup() to detect Tegra20-vs-Tegra30 at run-
+time, and program the correct divisor.
 
-Applied to next/devel.
+This makes uncompressor messages work correctly on Tegra30. This also
+fixes early printk, assuming zImage is used and this setup code runs.
 
-	Arnd
+v2: Use CHIPID register to differentiate between chips, rather than a
+GIC register. This should be more future-proof. Volatile is required
+to prevent the compiler transforming the 32-bit apb_misc register read
+into an 8-bit read of address 1 higher, since the HW only supports 32-
+bit accesses, and will hang on an 8-bit access.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/include/mach/uncompress.h |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
+index 4e83237..39bd5e5 100644
+--- a/arch/arm/mach-tegra/include/mach/uncompress.h
++++ b/arch/arm/mach-tegra/include/mach/uncompress.h
+@@ -45,15 +45,23 @@ static inline void flush(void)
+ 
+ static inline void arch_decomp_setup(void)
+ {
++	volatile u32 *apb_misc = (volatile u32 *)TEGRA_APB_MISC_BASE;
++	u32 chip, div;
+ 	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+ 	int shift = 2;
+ 
+ 	if (uart == NULL)
+ 		return;
+ 
++	chip = (apb_misc[0x804 / 4] >> 8) & 0xff;
++	if (chip == 0x20)
++		div = 0x0075;
++	else
++		div = 0x00dd;
++
+ 	uart[UART_LCR << shift] |= UART_LCR_DLAB;
+-	uart[UART_DLL << shift] = 0x75;
+-	uart[UART_DLM << shift] = 0x0;
++	uart[UART_DLL << shift] = div & 0xff;
++	uart[UART_DLM << shift] = div >> 8;
+ 	uart[UART_LCR << shift] = 3;
+ }
+ 
+-- 
+1.7.0.4
