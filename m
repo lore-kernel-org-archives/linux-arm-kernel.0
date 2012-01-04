@@ -1,61 +1,46 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Wed, 4 Jan 2012 16:01:01 +0100
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20120103095527.GI2914@n2100.arm.linux.org.uk>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <20120102134229.GZ29877@amd.com>
- <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
- <20120102155820.GB29877@amd.com>
- <20120103095527.GI2914@n2100.arm.linux.org.uk>
-Message-ID: <20120104150101.GA3492@amd.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 04 Jan 2012 16:37:25 +0100
+Subject: [PATCH 6/6] mmc: sdhci-s3c: Add device tree support
+In-Reply-To: <CAJuYYwSfC5t6xs-TDT2wBOj1RbQYSpH0wjo9uBcYf7bGyi0t9g@mail.gmail.com>
+References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
+ <1320266163-15292-7-git-send-email-thomas.abraham@linaro.org>
+ <20111107211726.GC28491@ponder.secretlab.ca>
+ <CAJuYYwSfC5t6xs-TDT2wBOj1RbQYSpH0wjo9uBcYf7bGyi0t9g@mail.gmail.com>
+Message-ID: <4F047235.2090503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 09:55:27AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 02, 2012 at 04:58:20PM +0100, Joerg Roedel wrote:
-> > On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
-> > > > I still get
-> > > >
-> > > > ?LD ? ? ?.tmp_vmlinux1
-> > > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
-> > > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
-> > > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
-> > > > make[1]: *** [.tmp_vmlinux1] Error 1
-> > > >
-> > > > when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
-> > > > wrong or is this not expected to work?
-> > > >
-> > > Do you?
-> > > Ok. I will check my configuration with linux-next git.
-> > 
-> > Compiling my exynos-config with linux-next gives me:
-> > 
-> >   CC      arch/arm/kernel/process.o
-> > In file included from /data/lemmy/linux.trees.git/arch/arm/mach-exynos/include/mach/system.h:16:0,
-> >                  from /data/lemmy/linux.trees.git/arch/arm/kernel/process.c:64:
-> > /data/lemmy/linux.trees.git/arch/arm/plat-samsung/include/plat/system-reset.h:19:2: error: #error Fix me up
-> > 
-> > I better not ask the question how such an #error statement can come
-> > through to linux-next.
+Hi Kgene, Thomas
+
+On 11/08/2011 04:23 PM, Thomas Abraham wrote:
+> Hi Grant,
 > 
-> It comes through when I stick it in my tree because of a month of asking
-> for help to fix something and getting zero response from the maintainers.
+> On 8 November 2011 02:47, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On Thu, Nov 03, 2011 at 02:06:03AM +0530, Thomas Abraham wrote:
+>>> Add device tree based discovery support for Samsung's sdhci controller
+>>>
+>>> Cc: Ben Dooks <ben-linux@fluff.org>
+>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>>> ---
+>>> +Example:
+>>> +     sdhci at 12530000 {
+>>> +             compatible = "samsung,exynos4210-sdhci";
+>>> +             reg = <0x12530000 0x100>;
+>>> +             interrupts = <139>;
+>>> +             samsung,sdhci-bus-width = <4>;
+>>> +             linux,mmc_cap_4_bit_data;
+>>
+>> Following on from my reply on patch 5, this is an example of exactly
+>> what I'm talking about.  This node both sets bus-width to '4', and
+>> sets the 4_bit_data flag.  Don't you think that the driver would be
+>> smart enough to set the 4_bit_data flag when the bus width was set to
+>> 4?
 > 
-> It's a way to flag to them that they're doing something wrong - and in
-> fact something is broken, and that that brokenness will happen at the
-> next merge window unless they get off their butt and do something about
-> it.
+> Yes, that is true. I will modify the driver based on your comments and
+> resubmit this patch.
 
-Okay, fine with me if it really will be fixed in 3.3-rc1 :)
+Are we going to have those patches in 3.3-rc1 or only in 3.4 ?
 
-Thanks,
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+--
+Regards,
+Sylwester
