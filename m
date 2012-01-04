@@ -1,148 +1,74 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 04 Jan 2012 11:43:45 +0100
-Subject: [PATCH 2/4] rtc-s3c: make room for more variants in devicetree
- block
-In-Reply-To: <201112211016.51956.heiko@sntech.de>
-References: <201112211014.30695.heiko@sntech.de>
- <201112211016.51956.heiko@sntech.de>
-Message-ID: <4F042D61.2070309@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 4 Jan 2012 12:02:51 +0100
+Subject: [PATCH 2/2] ARM: imx6q: add cpu suspend/resume support in IRAM
+In-Reply-To: <1325312624-22980-1-git-send-email-jason.chen@linaro.org>
+References: <1325312624-22980-1-git-send-email-jason.chen@linaro.org>
+Message-ID: <CACRpkdYu5jz0H_KnEq7JJ5PWJ35R=znjQeYCDcn+KM54zNY6Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Dec 31, 2011 at 7:23 AM, Jason Chen <jason.chen@linaro.org> wrote:
 
-On 12/21/2011 10:16 AM, Heiko St?bner wrote:
-> Use the data field of of_device_id to hold the type for
-> s3c_cpu_type.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/rtc/rtc-s3c.c |   31 ++++++++++++++++++++++---------
->  1 files changed, 22 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index 175067a..2885b25 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -428,6 +428,20 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
->  	return 0;
->  }
->  
-> +static const struct of_device_id s3c_rtc_dt_match[];
+> ?void __init imx6q_pm_init(void)
+> ?{
+> ? ? ? ?/*
+> @@ -67,4 +153,38 @@ void __init imx6q_pm_init(void)
+> ? ? ? ?phys_l2x0_saved_regs = __pa(&l2x0_saved_regs);
+>
+> ? ? ? ?suspend_set_ops(&imx6q_pm_ops);
 > +
-> +static inline int s3c_rtc_get_driver_data(struct platform_device *pdev)
-> +{
-> +#ifdef CONFIG_OF
-> +	if (pdev->dev.of_node) {
-> +		const struct of_device_id *match;
-> +		match = of_match_node(s3c_rtc_dt_match, pdev->dev.of_node);
-> +		return match->data;
-> +	}
-> +#endif
-> +	return platform_get_device_id(pdev)->driver_data;
-> +}
-> +
->  static int __devinit s3c_rtc_probe(struct platform_device *pdev)
->  {
->  	struct rtc_device *rtc;
-> @@ -508,13 +522,7 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
->  		goto err_nortc;
->  	}
->  
-> -#ifdef CONFIG_OF
-> -	if (pdev->dev.of_node)
-> -		s3c_rtc_cpu_type = of_device_is_compatible(pdev->dev.of_node,
-> -			"samsung,s3c6410-rtc") ? TYPE_S3C64XX : TYPE_S3C2410;
-> -	else
-> -#endif
-> -		s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
-> +	s3c_rtc_cpu_type = s3c_rtc_get_driver_data(pdev);
->  
->  	/* Check RTC Time */
->  
-> @@ -638,8 +646,13 @@ static int s3c_rtc_resume(struct platform_device *pdev)
->  
->  #ifdef CONFIG_OF
->  static const struct of_device_id s3c_rtc_dt_match[] = {
-> -	{ .compatible = "samsung,s3c2410-rtc" },
-> -	{ .compatible = "samsung,s3c6410-rtc" },
-> +	{
-> +		.compatible = "samsung,s3c2410-rtc"
-> +		.data = TYPE_S3C2410,
-> +	}, {
-> +		.compatible = "samsung,s3c6410-rtc"
-> +		.data = TYPE_S3C64XX,
-> +	},
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, s3c_rtc_dt_match);
+> + ? ? ? /* Move suspend routine into iRAM */
+(...)
+> diff --git a/arch/arm/mach-imx/suspend-imx6q.S b/arch/arm/mach-imx/suspend-imx6q.S
+(...)
+> +.macro ddr_io_save
+> + ? ? ? ldr ? ? r4, [r9, #0x5ac] /* DRAM_DQM0 */
+> + ? ? ? ldr ? ? r5, [r9, #0x5b4] /* DRAM_DQM1 */
+> + ? ? ? ldr ? ? r6, [r9, #0x528] /* DRAM_DQM2 */
+> + ? ? ? ldr ? ? r7, [r9, #0x520] /* DRAM_DQM3 */
+> + ? ? ? stmfd ? sp!, {r4-r7}
+(etc)
 
-This patch makes compilation with CONFIG_OF enabled fail with errors
-and warnings:
+This is not an elegant solution. I know other platforms have
+done similar things but it's still not elegant.
 
-drivers/rtc/rtc-s3c.c: In function ?s3c_rtc_get_driver_data?:
-drivers/rtc/rtc-s3c.c:454: warning: return makes integer from pointer without a
-cast
-drivers/rtc/rtc-s3c.c: At top level:
-drivers/rtc/rtc-s3c.c:674: error: request for member ?data? in something not a
-structure or union
-drivers/rtc/rtc-s3c.c:677: error: request for member ?data? in something not a
-structure or union
-drivers/rtc/rtc-s3c.c:680: error: request for member ?data? in something not a
-structure or union
-drivers/rtc/rtc-s3c.c:683: error: request for member ?data? in something not a
-structure or union
-make[2]: *** [drivers/rtc/rtc-s3c.o] Error 1
+What we need it real handling of the on-chip memory pool
+and possibility to compile and link directly into the
+on-chip memory areas.
 
-And the following patch fixes this:
+Compare to what we have for TCM:
+Documentation/arm/tcm.txt
+Implemented in:
+arch/arm/kernel/tcm.c
+Linker trickery in:
+arch/arm/kernel/vmlinux.lds.S
 
-8<------------
+An approach similar to this would make it possible to:
 
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index 4498053..9a0d388 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -451,7 +451,7 @@ static inline int s3c_rtc_get_driver_data(struct
-platform_device *pdev)
-        if (pdev->dev.of_node) {
-                const struct of_device_id *match;
-                match = of_match_node(s3c_rtc_dt_match, pdev->dev.of_node);
--               return match->data;
-+               return (int)match->data;
-        }
- #endif
-        return platform_get_device_id(pdev)->driver_data;
-@@ -670,17 +670,17 @@ static int s3c_rtc_resume(struct platform_device *pdev)
- #ifdef CONFIG_OF
- static const struct of_device_id s3c_rtc_dt_match[] = {
-        {
--               .compatible = "samsung,s3c2410-rtc"
--               .data = TYPE_S3C2410,
-+               .compatible = "samsung,s3c2410-rtc",
-+               .data = (void*)TYPE_S3C2410,
-        }, {
--               .compatible = "samsung,s3c2443-rtc"
--               .data = TYPE_S3C2443,
-+               .compatible = "samsung,s3c2443-rtc",
-+               .data = (void*)TYPE_S3C2443,
-        }, {
--               .compatible = "samsung,s3c2416-rtc"
--               .data = TYPE_S3C2416,
-+               .compatible = "samsung,s3c2416-rtc",
-+               .data = (void*)TYPE_S3C2416,
-        }, {
--               .compatible = "samsung,s3c6410-rtc"
--               .data = TYPE_S3C64XX,
-+               .compatible = "samsung,s3c6410-rtc",
-+               .data = (void*)TYPE_S3C64XX,
-        },
-        {},
- };
+- Manage the on-chip heap in a structured way
 
-8<-----------------
+- Write the above assembler code in C and compile it directly
+  into on-chip RAM
 
---
+- Share the same code with other archs and possibly merge
+  it with some of the TCM handling code top create common
+  onchip RAM handling
 
-Regards,
-Sylwester
+- Optionally free up the .TEXT memory pages used by this
+  code after copying it to on-chip RAM (if that RAM is
+  persistent, as it seems to be)
+
+- Make it possible to define MT_MEMORY_ONCHIP (if
+  MT_MEMORY_ITCM isn't good enough) in
+  arch/arm/include/asm/mach/map.h so everybody can
+  use this.
+
+It is also a bit more work and patch iteration involved.
+But the end solution is very appealing IMO. Also,
+multi-platform binaries will complicate the above a bit
+(especially if, say, two platforms have their on-chip
+RAM in the same location...) but I am sure it can be
+solved with proper cleverness and step-by-step measures.
+
+Yours,
+Linus Walleij
