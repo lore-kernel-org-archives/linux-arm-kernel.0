@@ -1,279 +1,277 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed,  4 Jan 2012 17:55:46 +0100
-Subject: [PATCH 1/2][RFC] at91 : move pm.h header to include/mach
-Message-ID: <1325696147-14058-1-git-send-email-daniel.lezcano@linaro.org>
+Date: Wed,  4 Jan 2012 17:55:47 +0100
+Subject: [PATCH 2/2][RFC] at91 : move cpuidle driver to drivers/cpuidle
+ directory
+In-Reply-To: <1325696147-14058-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1325696147-14058-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1325696147-14058-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the location of the pm.h header file to the include directory,
-so it can be included from another place from the current one.
+This patch follows the discussion [1] about moving the cpuidle code which
+is located in the architecture specific to the drivers directory.
 
-That will allow the next patch which moves the cpuidle code to the
-drivers/cpuidle directory.
+[1] http://www.spinics.net/lists/arm-kernel/msg154109.html
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-at91/cpuidle.c         |    2 +-
- arch/arm/mach-at91/include/mach/pm.h |  107 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/pm.c              |    2 +-
- arch/arm/mach-at91/pm.h              |  107 ----------------------------------
- 4 files changed, 109 insertions(+), 109 deletions(-)
- create mode 100644 arch/arm/mach-at91/include/mach/pm.h
- delete mode 100644 arch/arm/mach-at91/pm.h
+ arch/arm/mach-at91/Kconfig   |    5 ++
+ arch/arm/mach-at91/Makefile  |    1 -
+ arch/arm/mach-at91/cpuidle.c |  100 ------------------------------------------
+ drivers/cpuidle/Makefile     |    1 +
+ drivers/cpuidle/at91_idle.c  |  100 ++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 106 insertions(+), 101 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/cpuidle.c
+ create mode 100644 drivers/cpuidle/at91_idle.c
 
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 4f991f2..ddeaf0e 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -18,6 +18,11 @@ config HAVE_AT91_USART4
+ config HAVE_AT91_USART5
+ 	bool
+ 
++config AT91_IDLE
++	bool
++	default y
++	depends on CPU_IDLE
++
+ menu "Atmel AT91 System-on-Chip"
+ 
+ choice
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 242174f..ce0cd4c 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -91,7 +91,6 @@ obj-y				+= leds.o
+ # Power Management
+ obj-$(CONFIG_PM)		+= pm.o
+ obj-$(CONFIG_AT91_SLOW_CLOCK)	+= pm_slowclock.o
+-obj-$(CONFIG_CPU_IDLE)	+= cpuidle.o
+ 
+ ifeq ($(CONFIG_PM_DEBUG),y)
+ CFLAGS_pm.o += -DDEBUG
 diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-index a851e6c..f658154 100644
---- a/arch/arm/mach-at91/cpuidle.c
-+++ b/arch/arm/mach-at91/cpuidle.c
-@@ -21,7 +21,7 @@
- #include <linux/io.h>
- #include <linux/export.h>
- 
--#include "pm.h"
-+#include <mach/pm.h>
- 
- #define AT91_MAX_STATES	2
- 
-diff --git a/arch/arm/mach-at91/include/mach/pm.h b/arch/arm/mach-at91/include/mach/pm.h
-new file mode 100644
-index 0000000..ce9a206
---- /dev/null
-+++ b/arch/arm/mach-at91/include/mach/pm.h
-@@ -0,0 +1,107 @@
-+#ifdef CONFIG_ARCH_AT91RM9200
-+#include <mach/at91rm9200_mc.h>
-+
-+/*
-+ * The AT91RM9200 goes into self-refresh mode with this command, and will
-+ * terminate self-refresh automatically on the next SDRAM access.
-+ *
-+ * Self-refresh mode is exited as soon as a memory access is made, but we don't
-+ * know for sure when that happens. However, we need to restore the low-power
-+ * mode if it was enabled before going idle. Restoring low-power mode while
-+ * still in self-refresh is "not recommended", but seems to work.
-+ */
-+
-+static inline u32 sdram_selfrefresh_enable(void)
-+{
-+	u32 saved_lpr = at91_sys_read(AT91_SDRAMC_LPR);
-+
-+	at91_sys_write(AT91_SDRAMC_LPR, 0);
-+	at91_sys_write(AT91_SDRAMC_SRR, 1);
-+	return saved_lpr;
-+}
-+
-+#define sdram_selfrefresh_disable(saved_lpr)	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
-+#define wait_for_interrupt_enable()		asm volatile ("mcr p15, 0, %0, c7, c0, 4" \
-+								: : "r" (0))
-+
-+#elif defined(CONFIG_ARCH_AT91CAP9)
-+#include <mach/at91cap9_ddrsdr.h>
-+
-+
-+static inline u32 sdram_selfrefresh_enable(void)
-+{
-+	u32 saved_lpr, lpr;
-+
-+	saved_lpr = at91_ramc_read(0, AT91_DDRSDRC_LPR);
-+
-+	lpr = saved_lpr & ~AT91_DDRSDRC_LPCB;
-+	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr | AT91_DDRSDRC_LPCB_SELF_REFRESH);
-+	return saved_lpr;
-+}
-+
-+#define sdram_selfrefresh_disable(saved_lpr)	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr)
-+#define wait_for_interrupt_enable()		cpu_do_idle()
-+
-+#elif defined(CONFIG_ARCH_AT91SAM9G45)
-+#include <mach/at91sam9_ddrsdr.h>
-+
-+/* We manage both DDRAM/SDRAM controllers, we need more than one value to
-+ * remember.
-+ */
-+static u32 saved_lpr1;
-+
-+static inline u32 sdram_selfrefresh_enable(void)
-+{
-+	/* Those tow values allow us to delay self-refresh activation
-+	 * to the maximum. */
-+	u32 lpr0, lpr1;
-+	u32 saved_lpr0;
-+
-+	saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
-+	lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
-+	lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
-+
-+	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
-+	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
-+	lpr0 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
-+
-+	/* self-refresh mode now */
-+	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
-+	at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
-+
-+	return saved_lpr0;
-+}
-+
-+#define sdram_selfrefresh_disable(saved_lpr0)	\
-+	do { \
-+		at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0); \
-+		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1); \
-+	} while (0)
-+#define wait_for_interrupt_enable()		cpu_do_idle()
-+
-+#else
-+#include <mach/at91sam9_sdramc.h>
-+
-+#ifdef CONFIG_ARCH_AT91SAM9263
-+/*
-+ * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
-+ * handle those cases both here and in the Suspend-To-RAM support.
-+ */
-+#warning Assuming EB1 SDRAM controller is *NOT* used
-+#endif
-+
-+static inline u32 sdram_selfrefresh_enable(void)
-+{
-+	u32 saved_lpr, lpr;
-+
-+	saved_lpr = at91_ramc_read(0, AT91_SDRAMC_LPR);
-+
-+	lpr = saved_lpr & ~AT91_SDRAMC_LPCB;
-+	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr | AT91_SDRAMC_LPCB_SELF_REFRESH);
-+	return saved_lpr;
-+}
-+
-+#define sdram_selfrefresh_disable(saved_lpr)	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr)
-+#define wait_for_interrupt_enable()		cpu_do_idle()
-+
-+#endif
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 62ad955..7efac37 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -27,9 +27,9 @@
- 
- #include <mach/at91_pmc.h>
- #include <mach/cpu.h>
-+#include <mach/pm.h>
- 
- #include "generic.h"
--#include "pm.h"
- 
- /*
-  * Show the reason for the previous system reset.
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
 deleted file mode 100644
-index ce9a206..0000000
---- a/arch/arm/mach-at91/pm.h
+index f658154..0000000
+--- a/arch/arm/mach-at91/cpuidle.c
 +++ /dev/null
-@@ -1,107 +0,0 @@
--#ifdef CONFIG_ARCH_AT91RM9200
--#include <mach/at91rm9200_mc.h>
--
+@@ -1,100 +0,0 @@
 -/*
-- * The AT91RM9200 goes into self-refresh mode with this command, and will
-- * terminate self-refresh automatically on the next SDRAM access.
+- * based on arch/arm/mach-kirkwood/cpuidle.c
 - *
-- * Self-refresh mode is exited as soon as a memory access is made, but we don't
-- * know for sure when that happens. However, we need to restore the low-power
-- * mode if it was enabled before going idle. Restoring low-power mode while
-- * still in self-refresh is "not recommended", but seems to work.
+- * CPU idle support for AT91 SoC
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- *
+- * The cpu idle uses wait-for-interrupt and RAM self refresh in order
+- * to implement two idle states -
+- * #1 wait-for-interrupt
+- * #2 wait-for-interrupt and RAM self refresh
 - */
 -
--static inline u32 sdram_selfrefresh_enable(void)
--{
--	u32 saved_lpr = at91_sys_read(AT91_SDRAMC_LPR);
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/cpuidle.h>
+-#include <asm/proc-fns.h>
+-#include <linux/io.h>
+-#include <linux/export.h>
 -
--	at91_sys_write(AT91_SDRAMC_LPR, 0);
--	at91_sys_write(AT91_SDRAMC_SRR, 1);
--	return saved_lpr;
+-#include <mach/pm.h>
+-
+-#define AT91_MAX_STATES	2
+-
+-static DEFINE_PER_CPU(struct cpuidle_device, at91_cpuidle_device);
+-
+-static struct cpuidle_driver at91_idle_driver = {
+-	.name =         "at91_idle",
+-	.owner =        THIS_MODULE,
+-};
+-
+-/* Actual code that puts the SoC in different idle states */
+-static int at91_enter_idle(struct cpuidle_device *dev,
+-			struct cpuidle_driver *drv,
+-			       int index)
+-{
+-	struct timeval before, after;
+-	int idle_time;
+-	u32 saved_lpr;
+-
+-	local_irq_disable();
+-	do_gettimeofday(&before);
+-	if (index == 0)
+-		/* Wait for interrupt state */
+-		cpu_do_idle();
+-	else if (index == 1) {
+-		asm("b 1f; .align 5; 1:");
+-		asm("mcr p15, 0, r0, c7, c10, 4");	/* drain write buffer */
+-		saved_lpr = sdram_selfrefresh_enable();
+-		cpu_do_idle();
+-		sdram_selfrefresh_disable(saved_lpr);
+-	}
+-	do_gettimeofday(&after);
+-	local_irq_enable();
+-	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+-			(after.tv_usec - before.tv_usec);
+-
+-	dev->last_residency = idle_time;
+-	return index;
 -}
 -
--#define sdram_selfrefresh_disable(saved_lpr)	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
--#define wait_for_interrupt_enable()		asm volatile ("mcr p15, 0, %0, c7, c0, 4" \
--								: : "r" (0))
--
--#elif defined(CONFIG_ARCH_AT91CAP9)
--#include <mach/at91cap9_ddrsdr.h>
--
--
--static inline u32 sdram_selfrefresh_enable(void)
+-/* Initialize CPU idle by registering the idle states */
+-static int at91_init_cpuidle(void)
 -{
--	u32 saved_lpr, lpr;
+-	struct cpuidle_device *device;
+-	struct cpuidle_driver *driver = &at91_idle_driver;
 -
--	saved_lpr = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+-	device = &per_cpu(at91_cpuidle_device, smp_processor_id());
+-	device->state_count = AT91_MAX_STATES;
+-	driver->state_count = AT91_MAX_STATES;
 -
--	lpr = saved_lpr & ~AT91_DDRSDRC_LPCB;
--	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr | AT91_DDRSDRC_LPCB_SELF_REFRESH);
--	return saved_lpr;
+-	/* Wait for interrupt state */
+-	driver->states[0].enter = at91_enter_idle;
+-	driver->states[0].exit_latency = 1;
+-	driver->states[0].target_residency = 10000;
+-	driver->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
+-	strcpy(driver->states[0].name, "WFI");
+-	strcpy(driver->states[0].desc, "Wait for interrupt");
+-
+-	/* Wait for interrupt and RAM self refresh state */
+-	driver->states[1].enter = at91_enter_idle;
+-	driver->states[1].exit_latency = 10;
+-	driver->states[1].target_residency = 10000;
+-	driver->states[1].flags = CPUIDLE_FLAG_TIME_VALID;
+-	strcpy(driver->states[1].name, "RAM_SR");
+-	strcpy(driver->states[1].desc, "WFI and RAM Self Refresh");
+-
+-	cpuidle_register_driver(&at91_idle_driver);
+-
+-	if (cpuidle_register_device(device)) {
+-		printk(KERN_ERR "at91_init_cpuidle: Failed registering\n");
+-		return -EIO;
+-	}
+-	return 0;
 -}
 -
--#define sdram_selfrefresh_disable(saved_lpr)	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr)
--#define wait_for_interrupt_enable()		cpu_do_idle()
--
--#elif defined(CONFIG_ARCH_AT91SAM9G45)
--#include <mach/at91sam9_ddrsdr.h>
--
--/* We manage both DDRAM/SDRAM controllers, we need more than one value to
-- * remember.
-- */
--static u32 saved_lpr1;
--
--static inline u32 sdram_selfrefresh_enable(void)
--{
--	/* Those tow values allow us to delay self-refresh activation
--	 * to the maximum. */
--	u32 lpr0, lpr1;
--	u32 saved_lpr0;
--
--	saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
--	lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
--	lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
--
--	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
--	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
--	lpr0 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
--
--	/* self-refresh mode now */
--	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
--	at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
--
--	return saved_lpr0;
--}
--
--#define sdram_selfrefresh_disable(saved_lpr0)	\
--	do { \
--		at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0); \
--		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1); \
--	} while (0)
--#define wait_for_interrupt_enable()		cpu_do_idle()
--
--#else
--#include <mach/at91sam9_sdramc.h>
--
--#ifdef CONFIG_ARCH_AT91SAM9263
--/*
-- * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
-- * handle those cases both here and in the Suspend-To-RAM support.
-- */
--#warning Assuming EB1 SDRAM controller is *NOT* used
--#endif
--
--static inline u32 sdram_selfrefresh_enable(void)
--{
--	u32 saved_lpr, lpr;
--
--	saved_lpr = at91_ramc_read(0, AT91_SDRAMC_LPR);
--
--	lpr = saved_lpr & ~AT91_SDRAMC_LPCB;
--	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr | AT91_SDRAMC_LPCB_SELF_REFRESH);
--	return saved_lpr;
--}
--
--#define sdram_selfrefresh_disable(saved_lpr)	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr)
--#define wait_for_interrupt_enable()		cpu_do_idle()
--
--#endif
+-device_initcall(at91_init_cpuidle);
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index 5634f88..31c9b5f 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -3,3 +3,4 @@
+ #
+ 
+ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
++obj-$(CONFIG_AT91_IDLE) += at91_idle.o
+diff --git a/drivers/cpuidle/at91_idle.c b/drivers/cpuidle/at91_idle.c
+new file mode 100644
+index 0000000..f658154
+--- /dev/null
++++ b/drivers/cpuidle/at91_idle.c
+@@ -0,0 +1,100 @@
++/*
++ * based on arch/arm/mach-kirkwood/cpuidle.c
++ *
++ * CPU idle support for AT91 SoC
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The cpu idle uses wait-for-interrupt and RAM self refresh in order
++ * to implement two idle states -
++ * #1 wait-for-interrupt
++ * #2 wait-for-interrupt and RAM self refresh
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/cpuidle.h>
++#include <asm/proc-fns.h>
++#include <linux/io.h>
++#include <linux/export.h>
++
++#include <mach/pm.h>
++
++#define AT91_MAX_STATES	2
++
++static DEFINE_PER_CPU(struct cpuidle_device, at91_cpuidle_device);
++
++static struct cpuidle_driver at91_idle_driver = {
++	.name =         "at91_idle",
++	.owner =        THIS_MODULE,
++};
++
++/* Actual code that puts the SoC in different idle states */
++static int at91_enter_idle(struct cpuidle_device *dev,
++			struct cpuidle_driver *drv,
++			       int index)
++{
++	struct timeval before, after;
++	int idle_time;
++	u32 saved_lpr;
++
++	local_irq_disable();
++	do_gettimeofday(&before);
++	if (index == 0)
++		/* Wait for interrupt state */
++		cpu_do_idle();
++	else if (index == 1) {
++		asm("b 1f; .align 5; 1:");
++		asm("mcr p15, 0, r0, c7, c10, 4");	/* drain write buffer */
++		saved_lpr = sdram_selfrefresh_enable();
++		cpu_do_idle();
++		sdram_selfrefresh_disable(saved_lpr);
++	}
++	do_gettimeofday(&after);
++	local_irq_enable();
++	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
++			(after.tv_usec - before.tv_usec);
++
++	dev->last_residency = idle_time;
++	return index;
++}
++
++/* Initialize CPU idle by registering the idle states */
++static int at91_init_cpuidle(void)
++{
++	struct cpuidle_device *device;
++	struct cpuidle_driver *driver = &at91_idle_driver;
++
++	device = &per_cpu(at91_cpuidle_device, smp_processor_id());
++	device->state_count = AT91_MAX_STATES;
++	driver->state_count = AT91_MAX_STATES;
++
++	/* Wait for interrupt state */
++	driver->states[0].enter = at91_enter_idle;
++	driver->states[0].exit_latency = 1;
++	driver->states[0].target_residency = 10000;
++	driver->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
++	strcpy(driver->states[0].name, "WFI");
++	strcpy(driver->states[0].desc, "Wait for interrupt");
++
++	/* Wait for interrupt and RAM self refresh state */
++	driver->states[1].enter = at91_enter_idle;
++	driver->states[1].exit_latency = 10;
++	driver->states[1].target_residency = 10000;
++	driver->states[1].flags = CPUIDLE_FLAG_TIME_VALID;
++	strcpy(driver->states[1].name, "RAM_SR");
++	strcpy(driver->states[1].desc, "WFI and RAM Self Refresh");
++
++	cpuidle_register_driver(&at91_idle_driver);
++
++	if (cpuidle_register_device(device)) {
++		printk(KERN_ERR "at91_init_cpuidle: Failed registering\n");
++		return -EIO;
++	}
++	return 0;
++}
++
++device_initcall(at91_init_cpuidle);
 -- 
 1.7.4.1
