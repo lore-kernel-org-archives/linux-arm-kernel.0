@@ -1,41 +1,57 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 4 Jan 2012 12:00:26 -0800
-Subject: [PATCH 6/6] gpio: tegra: Parameterize the number of banks
-In-Reply-To: <4F04AE71.2090203@gmail.com>
-References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
- <1325702378-20863-6-git-send-email-swarren@nvidia.com>
- <4F04AE71.2090203@gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F145E@HQMAIL01.nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Jan 2012 20:04:47 +0000
+Subject: ZenIV (was: Re: Status of arm-soc.git for 3.2)
+In-Reply-To: <20120104191042.GB11810@n2100.arm.linux.org.uk>
+References: <201201032243.06440.arnd@arndb.de>
+ <20120104100016.GK2914@n2100.arm.linux.org.uk>
+ <20120104181703.GA11810@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1201041337370.2907@xanadu.home>
+ <20120104191042.GB11810@n2100.arm.linux.org.uk>
+Message-ID: <20120104200447.GC11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring wrote at Wednesday, January 04, 2012 12:54 PM:
-> On 01/04/2012 12:39 PM, Stephen Warren wrote:
-> > Tegra20's GPIO controller has 7 banks, and Tegra30's controller has 8
-> > banks. Allow the number of banks to be configured at run-time by the
-> > device tree.
-...
-> > diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-...
-> >  Required properties:
-> >  - compatible : "nvidia,tegra20-gpio"
-> >  - reg : Physical base address and length of the controller's registers.
-> > +- nvidia,num-banks : The number of GPIO banks. This should be 7 for
-> > +  Tegra20 and 8 for Tegra30. This must match the number of interrupt
-> > +  specifiers in the interrupts property.
+On Wed, Jan 04, 2012 at 07:10:42PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 04, 2012 at 01:55:48PM -0500, Nicolas Pitre wrote:
+> > On Wed, 4 Jan 2012, Russell King - ARM Linux wrote:
+> > > I've now disabled all access to my git tree there, and restarted apache.
+> > > We will see whether that improves stability - I suspect it will do because
+> > > I reckon that the problem is that the smart git stuff is what's killing
+> > > the machine.
+> > 
+> > I'm sure that is the case.  However faulty hardware could still be the 
+> > root cause, but without the load from Git the machine might become 
+> > loaded lightly enough you might not see any ill effects before quite a 
+> > while.
 > 
-> You can determine the number of banks based on the compatible property
-> rather than needing an additional property.
+> When it's serving the next Fedora release (it's one of the official
+> mirrors) I'm sure any problems like that would become noticable - but
+> they haven't yet.  It purely seems to be something git is doing which
+> is killing the machine.
 
-That's certainly possible.
+I think we've just found the issue causing httpd to die:
 
-However, if say nvidia,tegraNNN-gpio has 9 banks, we then have to
-explicitly edit the driver to know that, whereas by using a property,
-we wouldn't have to change the driver at all to support a future GPIO
-controller. So, isn't it better to explicitly represent this in DT?
+- Fedora systems set a limit at login time on the number of processes a
+  user can run - which is set to a soft limit of 1024.
 
-Note that I have no idea how many GPIO banks our future chips will have,
-so this might not turn out to save any work at all, but perhaps.
+- When someone logs in, their shell inherits this soft rlimit.  This
+  gets inherited by all sub-processes, including through a su to their
+  root shell.
 
--- 
-nvpublic
+- When they restart httpd, httpd also inherits this limit.
+
+- httpd's own internal limits are set to a max clients of 1024.
+
+The problem comes when httpd hits 1024 processes - as it forks as root,
+this succeeds (root is not subjected to this rlimit), and then a
+subsequent setuid() fails with -EAGAIN, causing httpd to experience a
+fatal error.
+
+Obviously, this is not a good combination of things to happen.  It's
+also completely unnoticable to anyone who restarts apache.
+
+So, I've 'fixed' it by raising the rlimit in the httpd startup scripts,
+which should keep it fixed whenever anyone else restarts httpd.
+
+The problem should be solved, and as such I've re-enabled access to
+the git tree.
