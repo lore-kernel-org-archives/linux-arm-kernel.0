@@ -1,23 +1,23 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 4 Jan 2012 14:12:02 -0800
-Subject: [PATCH] ARM/bcmring: fix build error with sp804 clockevents init
-In-Reply-To: <4F034B28.10706@broadcom.com>
-References: <4F034B28.10706@broadcom.com>
-Message-ID: <CAOesGMj1Jv0AqUHHovYLvDTWuz2Xp4UGZGmPxzzFpHd-cM83VA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Jan 2012 22:14:27 +0000
+Subject: [PATCH 1/4] ARM: SAMSUNG: cleanup of rtc register definitions
+In-Reply-To: <201201041515.45025.heiko@sntech.de>
+References: <201112211014.30695.heiko@sntech.de>
+ <201201041512.55126.heiko@sntech.de> <201201041514.57688.heiko@sntech.de>
+ <201201041515.45025.heiko@sntech.de>
+Message-ID: <20120104221427.GL11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 04, 2012 at 03:15:44PM +0100, Heiko St?bner wrote:
+> regs-rtc.h uses a mixture of tabs and spaces and also (x<<y)
+> to format bits. So, before adding new stuff clean up the formatting
+> and also add spaces to the bit definitions (i.e. (x << y) )
 
-On Tue, Jan 3, 2012 at 10:38 AM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
-> Wrong API sp804_clockevents_register() was used and caused build error.
-> So change to use sp804_clockevents_init().
->
-> This patch was submitted a couple of times last year but unfortunately got
-> lost.
+Ok, so this is just a formatting change - and it should stay that way.
 
-Same with this patch as with the dma.c one: It's already fixed in
-mainline top of tree. What tree are you working against?
+However, there's an opportunity missed here.
 
-
--Olof
+Are these register definitions used anywhere else other than in the
+drivers/rtc driver?  If not, they should be placed along side that
+driver or even inside the driver itself.
