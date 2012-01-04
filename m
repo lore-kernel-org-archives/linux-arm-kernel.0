@@ -1,66 +1,24 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 4 Jan 2012 14:32:11 +0200
-Subject: [PATCH 1/2] remoteproc: depend on EXPERIMENTAL
-In-Reply-To: <1324466473-5128-1-git-send-email-ohad@wizery.com>
-References: <1324466473-5128-1-git-send-email-ohad@wizery.com>
-Message-ID: <CAK=WgbZ6jJRKinpysrARUaAHrEjZzycqOP_8KjXeGnpryHU_dQ@mail.gmail.com>
+From: hebert.marcandre@gmail.com (=?ISO-8859-1?Q?Marc=2DAndr=E9_H=E9bert?=)
+Date: Wed, 4 Jan 2012 07:54:06 -0500
+Subject: GPIO matrix and button with single edge IRQ
+Message-ID: <CAHEb4-8Xo=w5GuYQzP8X3h_HW8yHG89T+oGRfZJNa652St=YnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 1:21 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Remoteproc is still under development and as it gets traction we
-> definitely expect to have some changes in the binary format (most probably
-> only in the resource table, e.g. the upcoming move to TLV-based entries).
->
-> Active testing and use of remoteproc is most welcome, but we don't want
-> users to expect backward binary compatibility with the preliminary
-> images we have today.
->
-> Therefore mark remoteproc as EXPERIMENTAL, and explicitly inform the user
-> about this when a new remote processor is registered.
+Hello,
 
-Applied both patches.
+We are developing an i.MX283 custom board. We have a small keypad
+matrix and some gpio buttons. After setting up the necessary platform
+data, I realized when debugging that it couldn't work because the GPIO
+controller does not support dual edge triggers like requested in both
+the matrix_keypad and gpio_keys drivers. For gpio_keys there's always
+gpio_keys_polled that could be used quickly but that's not quite what
+I would need (more like a mix of the 2). For matrix_keypad I don't see
+anything that can be used quickly.
 
->
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Rob Clark <rob@ti.com>
-> Cc: Mark Grosen <mgrosen@ti.com>
-> Cc: Ludovic BARRE <ludovic.barre@stericsson.com>
-> ---
-> ?drivers/remoteproc/Kconfig ? ? ? ? ? | ? ?3 ++-
-> ?drivers/remoteproc/remoteproc_core.c | ? ?3 +++
-> ?2 files changed, 5 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> index 00fb72f..25fc4cc 100644
-> --- a/drivers/remoteproc/Kconfig
-> +++ b/drivers/remoteproc/Kconfig
-> @@ -1,8 +1,9 @@
-> -menu "Remoteproc drivers"
-> +menu "Remoteproc drivers (EXPERIMENTAL)"
->
-> ?# REMOTEPROC gets selected by whoever wants it
-> ?config REMOTEPROC
-> ? ? ? ?tristate
-> + ? ? ? depends on EXPERIMENTAL
->
-> ?config OMAP_REMOTEPROC
-> ? ? ? ?tristate "OMAP remoteproc support"
-> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> index f2354ce..6212b82 100644
-> --- a/drivers/remoteproc/remoteproc_core.c
-> +++ b/drivers/remoteproc/remoteproc_core.c
-> @@ -1275,6 +1275,9 @@ int rproc_register(struct rproc *rproc)
->
-> ? ? ? ?dev_info(rproc->dev, "%s is available\n", rproc->name);
->
-> + ? ? ? dev_info(dev, "Note: remoteproc is still under development and considered experimental.\n");
-> + ? ? ? dev_info(dev, "THE BINARY FORMAT IS NOT YET FINALIZED, and backward compatibility isn't yet guaranteed.\n");
-> +
-> ? ? ? ?/* create debugfs entries */
-> ? ? ? ?rproc_create_debug_dir(rproc);
->
-> --
-> 1.7.5.4
->
+Before starting to customize each driver to support single edge IRQs,
+I was wondering if this had been encountered on other platforms and if
+someone was aware of patches for this.
+
+Thanks
+Marc-Andre Hebert
