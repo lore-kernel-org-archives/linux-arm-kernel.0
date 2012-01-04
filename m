@@ -1,66 +1,61 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 4 Jan 2012 12:48:18 -0700
-Subject: [PATCH 6/6] ARM: at91/board-dt: remove AIC irq domain from board
- file
-In-Reply-To: <9fea5224b3a6544bd07c6e877d12870de9403b98.1323975517.git.nicolas.ferre@atmel.com>
-References: <85d531b5686e5eff623bed9618f802198409905f.1323975517.git.nicolas.ferre@atmel.com>
- <9fea5224b3a6544bd07c6e877d12870de9403b98.1323975517.git.nicolas.ferre@atmel.com>
-Message-ID: <20120104194818.GD15503@ponder.secretlab.ca>
+Date: Wed, 4 Jan 2012 12:50:27 -0700
+Subject: [PATCH 3/6] ARM: dt: tegra30.dtsi: Reformat gpio's interrupts
+ property
+In-Reply-To: <1325702378-20863-3-git-send-email-swarren@nvidia.com>
+References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
+ <1325702378-20863-3-git-send-email-swarren@nvidia.com>
+Message-ID: <20120104195027.GE15503@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2011 at 08:16:08PM +0100, Nicolas Ferre wrote:
-> Adding of irqdomain in AIC code make the specification
-> of the irq domain in board file useless.
+On Wed, Jan 04, 2012 at 11:39:35AM -0700, Stephen Warren wrote:
+> The new content matches tegra20.dtsi, and is < 80 columns.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/boot/dts/tegra30.dtsi |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+> index ee7db98..e5d1406 100644
+> --- a/arch/arm/boot/dts/tegra30.dtsi
+> +++ b/arch/arm/boot/dts/tegra30.dtsi
+> @@ -55,7 +55,13 @@
+>  	gpio: gpio at 6000d000 {
+>  		compatible = "nvidia,tegra30-gpio", "nvidia,tegra20-gpio";
+>  		reg = < 0x6000d000 0x1000 >;
+> -		interrupts = < 0 32 0x04 0 33 0x04 0 34 0x04 0 35 0x04 0 55 0x04 0 87 0x04 0 89 0x04 >;
+> +		interrupts = < 0 32 0x04
+> +			       0 33 0x04
+> +			       0 34 0x04
+> +			       0 35 0x04
+> +			       0 55 0x04
+> +			       0 87 0x04
+> +			       0 89 0x04 >;
+
+Nit: I often find the following form convenient (even if it doesn't change the data generation):
+
+		interrupts = < 0 32 0x04 >,
+			     < 0 33 0x04 >,
+			     < 0 34 0x04 >,
+			     < 0 35 0x04 >,
+			     < 0 55 0x04 >,
+			     < 0 87 0x04 >,
+			     < 0 89 0x04 >;
+
+Otherwise:
 
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-> ---
->  arch/arm/mach-at91/board-dt.c |   15 +--------------
->  1 files changed, 1 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-> index bb6b434..119eda6 100644
-> --- a/arch/arm/mach-at91/board-dt.c
-> +++ b/arch/arm/mach-at91/board-dt.c
-> @@ -15,8 +15,6 @@
->  #include <linux/init.h>
->  #include <linux/module.h>
->  #include <linux/gpio.h>
-> -#include <linux/irqdomain.h>
-> -#include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  
->  #include <mach/hardware.h>
-> @@ -88,17 +86,6 @@ static void __init ek_add_device_nand(void)
->  	at91_add_device_nand(&ek_nand_data);
->  }
->  
-> -static const struct of_device_id aic_of_match[] __initconst = {
-> -	{ .compatible = "atmel,at91rm9200-aic", },
-> -	{},
-> -};
-> -
-> -static void __init at91_dt_init_irq(void)
-> -{
-> -	irq_domain_generate_simple(aic_of_match, 0xfffff000, 0);
-> -	at91_init_irq_default();
-> -}
-> -
->  static void __init at91_dt_device_init(void)
->  {
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> @@ -118,7 +105,7 @@ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
->  	.timer		= &at91sam926x_timer,
->  	.map_io		= at91_map_io,
->  	.init_early	= ek_init_early,
-> -	.init_irq	= at91_dt_init_irq,
-> +	.init_irq	= at91_init_irq_default,
->  	.init_machine	= at91_dt_device_init,
->  	.dt_compat	= at91_dt_board_compat,
->  MACHINE_END
+>  		#gpio-cells = <2>;
+>  		gpio-controller;
+>  	};
 > -- 
-> 1.7.5.4
+> 1.7.0.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
