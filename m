@@ -1,88 +1,70 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 3 Jan 2012 16:35:34 -0700
-Subject: [PATCH 1/7] amp/remoteproc: add framework for controlling remote
- processors
-In-Reply-To: <1319536106-25802-2-git-send-email-ohad@wizery.com>
-References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
- <1319536106-25802-2-git-send-email-ohad@wizery.com>
-Message-ID: <20120103233534.GC2492@ponder.secretlab.ca>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 4 Jan 2012 10:47:54 +0800
+Subject: [PATCH 1/1] regulator/fixed: set constraints.apply_uV to 0
+In-Reply-To: <20120102143904.GQ4300@opensource.wolfsonmicro.com>
+References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
+ <20111230103026.GA2766@opensource.wolfsonmicro.com>
+ <20111230103830.GD2414@b20223-02.ap.freescale.net>
+ <20111230104850.GE2766@opensource.wolfsonmicro.com>
+ <20111230110842.GE2414@b20223-02.ap.freescale.net>
+ <20111231010240.GC5835@opensource.wolfsonmicro.com>
+ <20111231012629.GF2414@b20223-02.ap.freescale.net>
+ <20111231215925.GA12740@opensource.wolfsonmicro.com>
+ <CAH8gqwXopRx7_-wSq9djb_np+XeZE0w1HJ1XxZozGOBCF8Z+ZQ@mail.gmail.com>
+ <20120102143904.GQ4300@opensource.wolfsonmicro.com>
+Message-ID: <20120104024753.GK2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 11:48:20AM +0200, Ohad Ben-Cohen wrote:
-> Modern SoCs typically employ a central symmetric multiprocessing (SMP)
-> application processor running Linux, with several other asymmetric
-> multiprocessing (AMP) heterogeneous processors running different instances
-> of operating system, whether Linux or any other flavor of real-time OS.
+Hi Mark,
+
+On Mon, Jan 02, 2012 at 02:39:05PM +0000, Mark Brown wrote:
+> On Mon, Jan 02, 2012 at 09:46:01PM +0800, Richard Zhao wrote:
 > 
-> Booting a remote processor in an AMP configuration typically involves:
-> - Loading a firmware which contains the OS image
-> - Allocating and providing it required system resources (e.g. memory)
-> - Programming an IOMMU (when relevant)
-> - Powering on the device
+> > On 1 January 2012 05:59, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 > 
-> This patch introduces a generic framework that allows drivers to do
-> that. In the future, this framework will also include runtime power
-> management and error recovery.
+> > > It's not code which is specific to the fixed regulator, it's generic
+> > > code that's used by all regulators.
 > 
-> Based on (but now quite far from) work done by Fernando Guzman Lugo
-> <fernando.lugo@ti.com>.
-[...]
-> +static int rproc_load_segments(struct rproc *rproc, const u8 *elf_data)
-> +{
-> +	struct device *dev = rproc->dev;
-> +	struct elf32_hdr *ehdr;
-> +	struct elf32_phdr *phdr;
-> +	int i, ret = 0;
-> +
-> +	ehdr = (struct elf32_hdr *)elf_data;
-> +	phdr = (struct elf32_phdr *)(elf_data + ehdr->e_phoff);
-> +
-> +	/* go through the available ELF segments */
-> +	for (i = 0; i < ehdr->e_phnum; i++, phdr++) {
-> +		u32 da = phdr->p_paddr;
-> +		u32 memsz = phdr->p_memsz;
-> +		u32 filesz = phdr->p_filesz;
+> > The original patch is in fixed regulator driver.
+> 
+> Your original patch made no mention of device tree, it just had the
+> driver modify its constraints which is clearly not good
+The fix is in function of_get_fixed_voltage_config. I'll add more comments
+in the commit message.
+>  - aside from the
+> design issue what happens if we make const data read only?  Any boards
+> that have their constraints marked const will start oopsing.  Your new
+> patch makes it impossible to apply a voltage to *any* regulator on a
+> device tree which is going to break any system that needs to apply a
+> voltage.
+The code is in dt specific function and for dt constraints is not const.
+> 
+> You really need to take a step back, think about the consequences of the
+> changes you're making and make changes that also make sense at a design
+> level.  You can't think only about the one board that you're currently
+> working on, it's important that you consider the wider effects of your
+> change.
+I was thinking at the point of fixed regulator DT binding user.
+> 
+> To repeat my previous suggestions you could either make the system more
+> forgiving of silly constraints where that makes sense (and remember that
+> one of the reasons the core rejects silly constraints is that it wants
+> to make absolutely clear that the user wrote what they meant) or make
+> sure that silly constraints aren't written in the first place.  For
+> example, why not make this a device tree specific change?
+It is.
 
-This could be an endianess problem.  If the endianess of the host and
-the rproc are different, then what is the endianess of the elf file?
-Is the endianess of the elf file verified before attempting to parse it?
-
-> +/* handle firmware resource entries before booting the remote processor */
-> +static int
-> +rproc_handle_boot_rsc(struct rproc *rproc, struct fw_resource *rsc, int len)
-> +{
-> +	struct device *dev = rproc->dev;
-> +	int ret = 0;
-> +
-> +	while (len >= sizeof(*rsc)) {
-> +		dev_dbg(dev, "rsc: type %d, da 0x%llx, pa 0x%llx, len 0x%x, "
-> +			"id %d, name %s, flags %x\n", rsc->type, rsc->da,
-> +			rsc->pa, rsc->len, rsc->id, rsc->name, rsc->flags);
-> +
-> +		switch (rsc->type) {
-> +		case RSC_CARVEOUT:
-> +			ret = rproc_handle_carveout(rproc, rsc);
-> +			break;
-> +		case RSC_DEVMEM:
-> +			ret = rproc_handle_devmem(rproc, rsc);
-> +			break;
-> +		case RSC_TRACE:
-> +			ret = rproc_handle_trace(rproc, rsc);
-> +			break;
-> +		case RSC_VRING:
-> +			ret = rproc_handle_vring(rproc, rsc);
-> +			break;
-> +		case RSC_VIRTIO_DEV:
-> +			/* this one is handled early upon registration */
-> +			break;
-> +		default:
-> +			dev_warn(dev, "unsupported resource %d\n", rsc->type);
-> +			break;
-> +		}
-
-Nitpick: A look up table would be easier to extend in the future.
-
-Otherwise;
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Thanks
+Richard
+> 
+> > >> Could you please past some code to show your suggested solution,
+> > >> or you send out a patch to fix it?
+> 
+> > > Not in the immediate future.
+> 
+> > It's a __bug__ blocking others to use fixed regulator with dt binding.
+> 
+> There's some fairly clear and obvious directions to look at and simply
+> demanding that I drop everything and implement them for you too isn't
+> really inspiring me to do so.
