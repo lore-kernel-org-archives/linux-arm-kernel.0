@@ -1,36 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed,  4 Jan 2012 17:04:12 +0000
-Subject: [PATCH] ARM: LPAE: Check the CPU support for the long descriptor
- format
-Message-ID: <1325696652-27367-1-git-send-email-catalin.marinas@arm.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 4 Jan 2012 18:27:29 +0100
+Subject: [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <87sjjw70zs.fsf@ti.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <87sjjw70zs.fsf@ti.com>
+Message-ID: <CAMQu2gwsw+RC+Y9P8r9Yjy+ADuQ-tPzcXPPncLxMjjb3tvdbbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a check for the presence of the LPAE feature during the
-CPU initialisation. If not present, it reports an error when
-CONFIG_DEBUG_LL is enabled.
+On Wed, Jan 4, 2012 at 1:41 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Colin Cross <ccross@android.com> writes:
+>
+>
+>> This patch series implements an alternative solution, where each
+>> cpu will wait in the WFI state until all cpus are ready to enter
+>> a coupled state, at which point the coupled state function will
+>> be called on all cpus at approximately the same time.
+>
+> This looks great, and is certainly preferred to hotplug IMO.
+>
+> [...]
+>
+>> None of the platforms I work with have an SMP idle implementation
+>> upstream, so I can't easily show a patch that converts a platform
+>> from hotplug governor to coupled cpuidle states.
+>
+> Basic OMAP4 CPUidle support is in now queued for v3.3 (see omap4
+> branch Tony's tree[1].)
+>
+> Can you (or Santosh) send a patch that adds coupled support to that
+> driver so it can see some broader testing on OMAP4?
+>
+I briefly attempted OMAP4 idle with this series but had some lock
+up related issues which we faced in the older development.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/kernel/head.S |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Then I got busy into other activities which will keep me occupied for
+next few weeks. I will be happy to share the patches in case some one
+would like to have a look till then.
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 54fa641..b26291c 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -99,6 +99,14 @@ ENTRY(stext)
-  THUMB( it	eq )		@ force fixup-able long branch encoding
- 	beq	__error_p			@ yes, error 'p'
- 
-+#ifdef CONFIG_ARM_LPAE
-+	mrc	p15, 0, r3, c0, c1, 4		@ read ID_MMFR0
-+	and	r3, r3, #0xf			@ extract VMSA support
-+	cmp	r3, #5				@ long-descriptor translation table format?
-+ THUMB( it	lo )				@ force fixup-able long branch encoding
-+	blo	__error_p			@ only classic page table format
-+#endif
-+
- #ifndef CONFIG_XIP_KERNEL
- 	adr	r3, 2f
- 	ldmia	r3, {r4, r8}
+Regards
+Santosh
