@@ -1,13 +1,91 @@
-From: specter118@gmail.com (Hu Ruihuan)
-Date: Wed, 4 Jan 2012 22:05:55 +0800
-Subject: the bug of free_memmap
-Message-ID: <CAN-V0CA+B9k-EQ72mafN6w8zhBGsa2EXy1EropaHtAaZRMSK9g@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 4 Jan 2012 15:08:02 +0100
+Subject: [linux-pm] [PATCH 1/3] cpuidle: refactor out cpuidle_enter_state
+In-Reply-To: <1324426147-16735-2-git-send-email-ccross@android.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <1324426147-16735-2-git-send-email-ccross@android.com>
+Message-ID: <CAORVsuV-=h9qVcFB7ezEOV2ptLMT=FJcdvaspLj-qAzFK4-NEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, everyone,
-    I have fount a bug in free_memmap function. When using sparsemem,
-and just a memory section is in a hole, the start_pfn parameter of
-free_memmap will be the last page of the section forward. Then the
-start_pg will be the address of the last page of the section forward
-plus the size of struct page, not the right one.
+Hi Colin,
+
+On Wed, Dec 21, 2011 at 1:09 AM, Colin Cross <ccross@android.com> wrote:
+> Split the code to enter a state and update the stats into a helper
+> function, cpuidle_enter_state, and export it. ?This function will
+> be called by the coupled state code to handle entering the safe
+> state and the final coupled state.
+>
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+> ?drivers/cpuidle/cpuidle.c | ? 43 +++++++++++++++++++++++++++++--------------
+> ?drivers/cpuidle/cpuidle.h | ? ?2 ++
+> ?2 files changed, 31 insertions(+), 14 deletions(-)
+>
+> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+> index 06ce268..1486b3c 100644
+> --- a/drivers/cpuidle/cpuidle.c
+> +++ b/drivers/cpuidle/cpuidle.c
+> @@ -54,6 +54,34 @@ static void cpuidle_kick_cpus(void) {}
+> ?static int __cpuidle_register_device(struct cpuidle_device *dev);
+>
+> ?/**
+> + * cpuidle_enter_state
+> + *
+> + * enter the state and update stats
+> + */
+> +int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
+> + ? ? ? ? ? ? ? int next_state)
+> +{
+> + ? ? ? int entered_state;
+> + ? ? ? struct cpuidle_state *target_state;
+> +
+> + ? ? ? target_state = &drv->states[next_state];
+> +
+> + ? ? ? entered_state = target_state->enter(dev, drv, next_state);
+> +
+> + ? ? ? if (entered_state >= 0) {
+> + ? ? ? ? ? ? ? /* Update cpuidle counters */
+> + ? ? ? ? ? ? ? /* This can be moved to within driver enter routine
+> + ? ? ? ? ? ? ? ?* but that results in multiple copies of same code.
+> + ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? dev->states_usage[entered_state].time +=
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long long)dev->last_residency;
+> + ? ? ? ? ? ? ? dev->states_usage[entered_state].usage++;
+> + ? ? ? }
+> +
+> + ? ? ? return entered_state;
+> +}
+> +
+> +/**
+> ?* cpuidle_idle_call - the main idle loop
+> ?*
+> ?* NOTE: no locks or semaphores should be used here
+> @@ -63,7 +91,6 @@ int cpuidle_idle_call(void)
+> ?{
+> ? ? ? ?struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
+> ? ? ? ?struct cpuidle_driver *drv = cpuidle_get_driver();
+> - ? ? ? struct cpuidle_state *target_state;
+> ? ? ? ?int next_state, entered_state;
+>
+> ? ? ? ?if (off)
+> @@ -92,26 +119,14 @@ int cpuidle_idle_call(void)
+> ? ? ? ? ? ? ? ?return 0;
+> ? ? ? ?}
+>
+> - ? ? ? target_state = &drv->states[next_state];
+> -
+> ? ? ? ?trace_power_start(POWER_CSTATE, next_state, dev->cpu);
+> ? ? ? ?trace_cpu_idle(next_state, dev->cpu);
+>
+> - ? ? ? entered_state = target_state->enter(dev, drv, next_state);
+> + ? ? ? entered_state = cpuidle_enter_state(dev, drv, next_state);
+>
+> ? ? ? ?trace_power_end(dev->cpu);
+> ? ? ? ?trace_cpu_idle(PWR_EVENT_EXIT, dev->cpu);
+The cpu_idle traces are only present in this function and not in
+cpuidle_enter_state. Is that expected? Can all the transitions from
+all the cpus get traced that way?
+
+Regards,
+Jean
