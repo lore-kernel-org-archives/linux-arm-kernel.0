@@ -1,24 +1,29 @@
-From: hebert.marcandre@gmail.com (=?ISO-8859-1?Q?Marc=2DAndr=E9_H=E9bert?=)
-Date: Wed, 4 Jan 2012 07:54:06 -0500
-Subject: GPIO matrix and button with single edge IRQ
-Message-ID: <CAHEb4-8Xo=w5GuYQzP8X3h_HW8yHG89T+oGRfZJNa652St=YnA@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 04 Jan 2012 16:59:13 +0400
+Subject: [PATCH v8 1/2] davinci: vpif: remove machine specific header
+ file inclusion from the driver
+In-Reply-To: <1325661469-4411-2-git-send-email-manjunath.hadli@ti.com>
+References: <1325661469-4411-1-git-send-email-manjunath.hadli@ti.com>
+ <1325661469-4411-2-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <4F044D21.1030204@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello.
 
-We are developing an i.MX283 custom board. We have a small keypad
-matrix and some gpio buttons. After setting up the necessary platform
-data, I realized when debugging that it couldn't work because the GPIO
-controller does not support dual edge triggers like requested in both
-the matrix_keypad and gpio_keys drivers. For gpio_keys there's always
-gpio_keys_polled that could be used quickly but that's not quite what
-I would need (more like a mix of the 2). For matrix_keypad I don't see
-anything that can be used quickly.
+On 04-01-2012 11:17, Manjunath Hadli wrote:
 
-Before starting to customize each driver to support single edge IRQs,
-I was wondering if this had been encountered on other platforms and if
-someone was aware of patches for this.
+> remove unnecessary inclusion of machine specific header files mach/dm646x.h,
+> mach/hardware.h from vpif.h  and aslo mach/dm646x.h from vpif_display.c
+> driver which comes in the way of platform code consolidation.
+> Add linux/i2c.h header file in vpif_types.h which is required for
+> building.
 
-Thanks
-Marc-Andre Hebert
+    This last modification should be in a separate patch. Don;t mix changes 
+having the different purpose.
+
+> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
+> Cc: Mauro Carvalho Chehab<mchehab@infradead.org>
+> Cc: LMML<linux-media@vger.kernel.org>
+
+WBR, Sergei
