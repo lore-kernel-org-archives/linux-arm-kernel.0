@@ -1,101 +1,38 @@
-From: heiko@sntech.de (Heiko =?windows-1252?q?St=FCbner?=)
-Date: Wed, 4 Jan 2012 15:17:30 +0100
-Subject: [PATCH 4/4] ARM: S3C2443/S3C2416: add s3c_rtc_setname and rename rtc
- devices
-In-Reply-To: <201201041514.57688.heiko@sntech.de>
-References: <201112211014.30695.heiko@sntech.de>
- <201201041512.55126.heiko@sntech.de> <201201041514.57688.heiko@sntech.de>
-Message-ID: <201201041517.30523.heiko@sntech.de>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Wed, 4 Jan 2012 14:27:38 +0000
+Subject: [PATCH v8 1/2] davinci: vpif: remove machine specific header
+ file inclusion from the driver
+In-Reply-To: <4F044D21.1030204@mvista.com>
+References: <1325661469-4411-1-git-send-email-manjunath.hadli@ti.com>
+ <1325661469-4411-2-git-send-email-manjunath.hadli@ti.com>
+ <4F044D21.1030204@mvista.com>
+Message-ID: <E99FAA59F8D8D34D8A118DD37F7C8F75019F95@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the S3C24xx SoCs use the same rtc device a renaming capability like in
-the adc driver is necessary.
+Sergei,
+On Wed, Jan 04, 2012 at 18:29:13, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 04-01-2012 11:17, Manjunath Hadli wrote:
+> 
+> > remove unnecessary inclusion of machine specific header files 
+> > mach/dm646x.h, mach/hardware.h from vpif.h  and aslo mach/dm646x.h 
+> > from vpif_display.c driver which comes in the way of platform code consolidation.
+> > Add linux/i2c.h header file in vpif_types.h which is required for 
+> > building.
+> 
+>     This last modification should be in a separate patch. Don;t mix changes having the different purpose.
+It is part of the same modification of removing the machine specific header.
+When the header file was removed, it needed the i2c to be included due to 
+a dependency and hence the inclusion.
 
-This patch adds a s3c_rtc_setname function and names the rtc devices for
-S3C2443 and S3C2416 accordingly.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s3c2416/s3c2416.c               |    2 +
- arch/arm/mach-s3c2443/s3c2443.c               |    2 +
- arch/arm/plat-samsung/include/plat/rtc-core.h |   27 +++++++++++++++++++++++++
- 3 files changed, 31 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/plat/rtc-core.h
-
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
-index ee214bc..604cf98 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -61,6 +61,7 @@
- #include <plat/fb-core.h>
- #include <plat/nand-core.h>
- #include <plat/adc-core.h>
-+#include <plat/rtc-core.h>
- 
- static struct map_desc s3c2416_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -99,6 +100,7 @@ int __init s3c2416_init(void)
- 	s3c_fb_setname("s3c2443-fb");
- 
- 	s3c_adc_setname("s3c2416-adc");
-+	s3c_rtc_setname("s3c2416-rtc");
- 
- #ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2416_pm_syscore_ops);
-diff --git a/arch/arm/mach-s3c2443/s3c2443.c b/arch/arm/mach-s3c2443/s3c2443.c
-index a22b771..9e6be20 100644
---- a/arch/arm/mach-s3c2443/s3c2443.c
-+++ b/arch/arm/mach-s3c2443/s3c2443.c
-@@ -42,6 +42,7 @@
- #include <plat/fb-core.h>
- #include <plat/nand-core.h>
- #include <plat/adc-core.h>
-+#include <plat/rtc-core.h>
- 
- static struct map_desc s3c2443_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -72,6 +73,7 @@ int __init s3c2443_init(void)
- 	s3c_fb_setname("s3c2443-fb");
- 
- 	s3c_adc_setname("s3c2443-adc");
-+	s3c_rtc_setname("s3c2443-rtc");
- 
- 	/* change WDT IRQ number */
- 	s3c_device_wdt.resource[1].start = IRQ_S3C2443_WDT;
-diff --git a/arch/arm/plat-samsung/include/plat/rtc-core.h b/arch/arm/plat-samsung/include/plat/rtc-core.h
-new file mode 100644
-index 0000000..21d8594
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/rtc-core.h
-@@ -0,0 +1,27 @@
-+/* linux/arch/arm/plat-samsung/include/plat/rtc-core.h
-+ *
-+ * Copyright (c) 2011 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * Samsung RTC Controller core functions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_PLAT_RTC_CORE_H
-+#define __ASM_PLAT_RTC_CORE_H __FILE__
-+
-+/* These functions are only for use with the core support code, such as
-+ * the cpu specific initialisation code
-+ */
-+
-+/* re-define device name depending on support. */
-+static inline void s3c_rtc_setname(char *name)
-+{
-+#if defined(CONFIG_SAMSUNG_DEV_RTC) || defined(CONFIG_PLAT_S3C24XX)
-+	s3c_device_rtc.name = name;
-+#endif
-+}
-+
-+#endif /* __ASM_PLAT_RTC_CORE_H */
--- 
-1.7.5.4
+Thx,
+-Manju
+> 
+> > Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
+> > Cc: Mauro Carvalho Chehab<mchehab@infradead.org>
+> > Cc: LMML<linux-media@vger.kernel.org>
+> 
+> WBR, Sergei
+> 
