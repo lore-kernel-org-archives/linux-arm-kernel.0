@@ -1,39 +1,39 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Wed, 4 Jan 2012 17:21:47 -0600
-Subject: [RFC PATCH v2 1/2] cpuidle: Add common init interface and idle
- functionality
-In-Reply-To: <20111222180923.GH29622@opensource.wolfsonmicro.com>
-References: <1323846126-7516-1-git-send-email-rob.lee@linaro.org>
- <1323846126-7516-2-git-send-email-rob.lee@linaro.org>
- <20111222180923.GH29622@opensource.wolfsonmicro.com>
-Message-ID: <CAMXH7KEgPg2F-Trioo+9w9nRuX081jKF8y_Re7mFLxn2-dWutg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed,  4 Jan 2012 15:29:12 -0800
+Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
+Message-ID: <1325719752-818-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark, thanks again for your review.  Will fix the indention in v3.
+Only one of the L2 erratas are needed on T30, but T20/25
+needs a few more.
 
-On 22 December 2011 12:09, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Dec 14, 2011 at 01:02:05AM -0600, Robert Lee wrote:
->> The patch adds some cpuidle initialization functionality commonly
->> duplicated by many platforms. ?The duplicate cpuidle init code of
->> various platfroms has been consolidated to use this common code
->> and successfully rebuilt.
->>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->
-> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->
-> This looks good to me with one small comment:
->
->> +int cpuidle_def_idle(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv, int index) {
->> + ? ? cpu_do_idle();
->> + ? ? return index;
->> +}
->
-> Odd indentation here.
->
-> I'll move my s3c64xx cpuidle code over to this, though I think it'll end
-> up being an incremental patch as Kukjin just said he'd apply it and it'd
-> be nice to get the support into 3.3 if we can.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-tegra/Kconfig |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 373652d..a2c76ee 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -10,6 +10,9 @@ config ARCH_TEGRA_2x_SOC
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB_SUPPORT
+ 	select USB_ULPI_VIEWPORT if USB_SUPPORT
++	select ARM_ERRATA_742230
++	select PL310_ERRATA_753970 if CACHE_PL310
++	select PL310_ERRATA_769419 if CACHE_L2X0
+ 	help
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+@@ -23,6 +26,7 @@ config ARCH_TEGRA_3x_SOC
+ 	select USB_ULPI if USB_SUPPORT
+ 	select USB_ULPI_VIEWPORT if USB_SUPPORT
+ 	select USE_OF
++	select PL310_ERRATA_769419 if CACHE_L2X0
+ 	help
+ 	  Support for NVIDIA Tegra T30 processor family, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+-- 
+1.7.8.GIT
