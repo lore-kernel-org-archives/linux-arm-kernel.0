@@ -1,34 +1,67 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Wed, 4 Jan 2012 11:07:29 +0800
-Subject: [PATCH v2 1/1] regulator: set constraints.apply_uV to 0 in
- of_get_fixed_voltage_config
-In-Reply-To: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
-References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1325646449-21916-1-git-send-email-richard.zhao@linaro.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 4 Jan 2012 11:18:46 +0800
+Subject: [PATCH v4] MTD/GPMI bugfix : reset the BCH module when it is not MX23
+Message-ID: <1325647126-4281-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix fixed regulator using DT failed to call regulator_register.
+In MX28, if we do not reset the BCH module. The BCH module may
+becomes unstable when the board reboots for several thousands times.
+This bug has been catched in customer's production.
 
-of_get_regulator_init_data set apply_uV to 1, but fixed regulator
-doesn't need it. Set it back to 0.
+The patch adds some comments(some from Wolfram Sang), and fixes it now.
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Also change gpmi_reset_block() to static.
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- drivers/regulator/fixed.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   18 ++++++++++++++----
+ 1 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
-index 393f039..e24e3a1 100644
---- a/drivers/regulator/fixed.c
-+++ b/drivers/regulator/fixed.c
-@@ -69,6 +69,7 @@ of_get_fixed_voltage_config(struct device *dev)
- 		return NULL;
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+index de4db76..7523691 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+@@ -69,17 +69,19 @@ static int clear_poll_bit(void __iomem *addr, u32 mask)
+  *  [1] enable the module.
+  *  [2] reset the module.
+  *
+- * In most of the cases, it's ok. But there is a hardware bug in the BCH block.
++ * In most of the cases, it's ok.
++ * But in MX23, there is a hardware bug in the BCH block(see 2847 from errata).
+  * If you try to soft reset the BCH block, it becomes unusable until
+  * the next hard reset. This case occurs in the NAND boot mode. When the board
+  * boots by NAND, the ROM of the chip will initialize the BCH blocks itself.
+  * So If the driver tries to reset the BCH again, the BCH will not work anymore.
+- * You will see a DMA timeout in this case.
++ * You will see a DMA timeout in this case. The bug has been fixed
++ * in the following chips, such as MX28.
+  *
+  * To avoid this bug, just add a new parameter `just_enable` for
+  * the mxs_reset_block(), and rewrite it here.
+  */
+-int gpmi_reset_block(void __iomem *reset_addr, bool just_enable)
++static int gpmi_reset_block(void __iomem *reset_addr, bool just_enable)
+ {
+ 	int ret;
+ 	int timeout = 0x400;
+@@ -206,7 +208,15 @@ int bch_set_geometry(struct gpmi_nand_data *this)
+ 	if (ret)
+ 		goto err_out;
  
- 	init_data = config->init_data;
-+	init_data->constraints.apply_uV = 0;
+-	ret = gpmi_reset_block(r->bch_regs, true);
++	/*
++	* Due to Errata #2847 of the MX23, the BCH cannot be soft reset on this
++	* chip, otherwise it will lock up. So we skip resetting BCH on the MX23.
++	* On the other hand, the MX28 needs the reset, because one case has been
++	* seen where the BCH produced ECC errors constantly after 10000
++	* consecutive reboots. The latter case has not been seen on the MX23 yet,
++	* still we don't know if it could happen there as well.
++	*/
++	ret = gpmi_reset_block(r->bch_regs, GPMI_IS_MX23(this));
+ 	if (ret)
+ 		goto err_out;
  
- 	config->supply_name = init_data->constraints.name;
- 	if (init_data->constraints.min_uV == init_data->constraints.max_uV) {
 -- 
-1.7.5.4
+1.7.0.4
