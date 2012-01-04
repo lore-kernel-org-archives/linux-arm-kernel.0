@@ -1,37 +1,47 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 03 Jan 2012 16:41:27 -0800
-Subject: [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <1324426147-16735-1-git-send-email-ccross@android.com> (Colin
- Cross's message of "Tue, 20 Dec 2011 16:09:04 -0800")
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
-Message-ID: <87sjjw70zs.fsf@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 04 Jan 2012 09:58:24 +0900
+Subject: linux-next: interesting merges in the arm-soc tree
+In-Reply-To: <20120104104758.26b0ca5268d10fbf7b95903a@canb.auug.org.au>
+References: <20120104104758.26b0ca5268d10fbf7b95903a@canb.auug.org.au>
+Message-ID: <01bc01ccca7b$f6483fe0$e2d8bfa0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin Cross <ccross@android.com> writes:
+Stephen Rothwell wrote:
+> 
+> Hi all,
+> 
+Hi,
 
+> I noticed that the arm-soc tree has merged in the v4l-dvb and the
+> slave-dma trees today.   Is there some good reason for this?  It fixes a
 
-> This patch series implements an alternative solution, where each
-> cpu will wait in the WFI state until all cpus are ready to enter
-> a coupled state, at which point the coupled state function will
-> be called on all cpus at approximately the same time.
+I did slave-dma...
 
-This looks great, and is certainly preferred to hotplug IMO.
+Yes, I have created branch for samsung dma on top of slave-dma tree. Because
+samsung tree touched drivers/dma/pl330.c for samsung device tree then the
+arch/arm/common/pl330.c file have been merged into drivers/dma/pl330.c with
+touching samsung stuff and of course there are changes of
+drivers/dma/pl330.c in slave-dma as well. So I did...
 
-[...]
+> few conflicts (but that is not excuse) and there may be dependencies in a
+> driver on the v4l-dvb tree (but maybe that means that that driver should
+> be merged via the v4l-dvb tree - it looks like the "at91/drivers" is
+> based on the v4l-dvb tree, so probably doesn't depend on anything else on
+> the arm-soc tree).
+> 
+> If nothing else, are you sure that neither of those merged trees will
+> rebase?  You have also just inherited any bugs in those two trees.
 
-> None of the platforms I work with have an SMP idle implementation
-> upstream, so I can't easily show a patch that converts a platform
-> from hotplug governor to coupled cpuidle states.  
+I know, Vinod knows I merged his tree for above situation so he will not
+rebase that and Arnd will send that after merging of slave-dma into mainline
+during merge window. So I think, we will not see any problem. :) But if
+wrong, please let me know.
 
-Basic OMAP4 CPUidle support is in now queued for v3.3 (see omap4
-branch Tony's tree[1].)  
+Thanks.
 
-Can you (or Santosh) send a patch that adds coupled support to that
-driver so it can see some broader testing on OMAP4?
-
-Thanks,
-
-Kevin
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
