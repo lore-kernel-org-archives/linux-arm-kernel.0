@@ -1,37 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Jan 2012 19:46:17 -0800
-Subject: [PATCH 4/9] arm/tegra: fuse: add functions to access chip revision
-In-Reply-To: <20111223104751.GA22157@rhein.zuhause.netz>
-References: <1324599468-12845-1-git-send-email-olof@lixom.net>
- <1324599468-12845-5-git-send-email-olof@lixom.net>
- <20111223104751.GA22157@rhein.zuhause.netz>
-Message-ID: <CAOesGMiyG63w5WH7m9ig8rp0p0Ug_D5kcoRLS76SxCTOHjQ=tg@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 4 Jan 2012 15:06:58 +1100
+Subject: linux-next: manual merge of the net-next tree with the arm-soc tree
+Message-ID: <20120104150658.aafd5ae8ebce944e897f1079@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On Fri, Dec 23, 2011 at 2:47 AM, Henning Heinold
-<heinold@inf.fu-berlin.de> wrote:
-> On Thu, Dec 22, 2011 at 04:17:43PM -0800, Olof Johansson wrote:
->> +static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
->> + ? ? [TEGRA_REVISION_UNKNOWN] = "unknown",
->> + ? ? [TEGRA_REVISION_A02] ? ? = "A02",
->> + ? ? [TEGRA_REVISION_A03] ? ? = "A03",
->> + ? ? [TEGRA_REVISION_A03p] ? ?= "A03 prime",
->> + ? ? [TEGRA_REVISION_A04] ? ? = "A04",
->> +};
->> +
->
-> Hi Olof,
->
-> can you please add here [TEGRA_REVISION_A01] = "A01", too. It is used in the nvidia git tree and affects the new beta xorg
-> driver.
+Today's linux-next merge of the net-next tree got a conflict in
+drivers/net/ethernet/freescale/fec.c between commit 0ebafefcaa7a ("net:
+fec: add clk_prepare/clk_unprepare") from the arm-soc tree and commit
+e163cc97f9ac ("net/fec: fix the .remove code") from the net-next tree.
 
+Just context changes.  I fixed it up (see below) and can carry the fix as
+necessary.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-How does it affect the xorg driver? Do you have hardware that is based
-on A01? I wouldn't expect there to be any products out there with it
--- A01 has a handful of errata that is not handled in mainline, etc.
-
-
--Olof
+diff --cc drivers/net/ethernet/freescale/fec.c
+index 112af9b,b0b0445..0000000
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@@ -1638,13 -1657,18 +1657,18 @@@ fec_drv_remove(struct platform_device *
+  	struct net_device *ndev = platform_get_drvdata(pdev);
+  	struct fec_enet_private *fep = netdev_priv(ndev);
+  	struct resource *r;
++ 	int i;
+  
+- 	fec_stop(ndev);
++ 	unregister_netdev(ndev);
+  	fec_enet_mii_remove(fep);
++ 	for (i = 0; i < FEC_IRQ_NUM; i++) {
++ 		int irq = platform_get_irq(pdev, i);
++ 		if (irq > 0)
++ 			free_irq(irq, ndev);
++ 	}
+ -	clk_disable(fep->clk);
+ +	clk_disable_unprepare(fep->clk);
+  	clk_put(fep->clk);
+  	iounmap(fep->hwp);
+- 	unregister_netdev(ndev);
+  	free_netdev(ndev);
+  
+  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120104/5e7f6e25/attachment.sig>
