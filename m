@@ -1,65 +1,46 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 4 Jan 2012 14:56:17 -0700
-Subject: [PATCH v2 02/10] i2c: OMAP: Add DT support for i2c controller
-In-Reply-To: <87obujb1j2.fsf@ti.com>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-3-git-send-email-b-cousson@ti.com> <87hb14q7vj.fsf@ti.com>
- <4F0455D8.7060904@ti.com> <87obujb1j2.fsf@ti.com>
-Message-ID: <CACxGe6stVjLxpDrRpimqefPsyeGRAz3Gd1=myVvfzdupn7kvtQ@mail.gmail.com>
+Date: Wed, 4 Jan 2012 15:00:36 -0700
+Subject: [PATCH 6/6] gpio: tegra: Parameterize the number of banks
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F145E@HQMAIL01.nvidia.com>
+References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
+ <1325702378-20863-6-git-send-email-swarren@nvidia.com>
+ <4F04AE71.2090203@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F145E@HQMAIL01.nvidia.com>
+Message-ID: <CACxGe6tyZKW37sGiDauvikU70ZVLHFVrXjBPJk2Kgee1Rj3sbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2012 at 2:28 PM, Kevin Hilman <khilman@ti.com> wrote:
-> "Cousson, Benoit" <b-cousson@ti.com> writes:
->
->> Hi Kevin,
+On Wed, Jan 4, 2012 at 1:00 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Rob Herring wrote at Wednesday, January 04, 2012 12:54 PM:
+>> On 01/04/2012 12:39 PM, Stephen Warren wrote:
+>> > Tegra20's GPIO controller has 7 banks, and Tegra30's controller has 8
+>> > banks. Allow the number of banks to be configured at run-time by the
+>> > device tree.
+> ...
+>> > diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+> ...
+>> > ?Required properties:
+>> > ?- compatible : "nvidia,tegra20-gpio"
+>> > ?- reg : Physical base address and length of the controller's registers.
+>> > +- nvidia,num-banks : The number of GPIO banks. This should be 7 for
+>> > + ?Tegra20 and 8 for Tegra30. This must match the number of interrupt
+>> > + ?specifiers in the interrupts property.
 >>
->> On 12/14/2011 2:06 AM, Kevin Hilman wrote:
->>> Benoit Cousson<b-cousson@ti.com> ?writes:
->>>
->>>> Add initial DT support to retrieve the frequency using a
->>>> DT attribute instead of the pdata pointer if of_node exist.
->>>>
->>>> Add documentation for omap i2c controller binding.
->>>>
->>>> Based on original patches from Manju and Grant.
->>>>
->>>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->>>> Cc: Ben Dooks<ben-linux@fluff.org>
->>>
->>> This seems indepenent from the rest of the series, and I can queue up
->>> for merge via the I2C tree.
->>>
->>> Benoit, please confirm that we shouldn't have any problems if this patch
->>> goes independently.
->>>
->>> Grant/Rob, with your ack on the bindings, I can queue this up for the
->>> I2C maintainers along with some other OMAP I2C changes for v3.3.
->>
->> I removed the nasty bindings and got the Reviewed-by: from Rob for the
->> v4 [1].
->>
->> Could you take it in your branch? I've just tried merging your
->> for_3.3/i2c/misc on top of my for_3.3/3_omap_dt_i2c_twl branch and
->> tested it successfully on OMAP4 DT boot.
+>> You can determine the number of banks based on the compatible property
+>> rather than needing an additional property.
 >
-> Yes, I'll add v4 to my i2c/misc branch and add Grant's ack and queue.
+> That's certainly possible.
 >
-> Note that Ben Dooks has not responded to any of my queries or pull
-> requests, either for v3.2 fixes or for the v3.3 merge window, so
-> unfortunately it doesn't look like this will make it for v3.3 unless Ben
-> starts responding. ?:(
+> However, if say nvidia,tegraNNN-gpio has 9 banks, we then have to
+> explicitly edit the driver to know that, whereas by using a property,
+> we wouldn't have to change the driver at all to support a future GPIO
+> controller. So, isn't it better to explicitly represent this in DT?
 >
-> Kevin
+> Note that I have no idea how many GPIO banks our future chips will have,
+> so this might not turn out to save any work at all, but perhaps.
 
-Get it into linux-next anyway.  If Ben doesn't respond, then you can
-ask Linus to pull directly near the end of the merge window.  I don't
-see any benefit in making this sit out for another cycle.
+It's an engineering/design decision that requires taste and instinct.
+Either approach is fine, you decide which one will be the best in the
+long term.
 
 g.
-
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
