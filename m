@@ -1,60 +1,65 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 4 Jan 2012 21:52:05 +0800
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20111219091322.GD14542@n2100.arm.linux.org.uk>
-References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
-Message-ID: <20120104135204.GA14741@S2100-06.ap.freescale.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 04 Jan 2012 19:17:49 +0530
+Subject: [PATCH] dmaengine/dw_dmac: Add support for device_prep_dma_sg
+In-Reply-To: <20120103134328.GR2914@n2100.arm.linux.org.uk>
+References: <1323766064-13425-1-git-send-email-pratyush.anand@st.com>
+ <1324655898.1633.11.camel@vkoul-udesk3> <4F0192F2.3010506@st.com>
+ <1325503535.1540.17.camel@vkoul-udesk3>
+ <20120103094048.GF2914@n2100.arm.linux.org.uk>
+ <1325595816.1540.65.camel@vkoul-udesk3>
+ <20120103134328.GR2914@n2100.arm.linux.org.uk>
+Message-ID: <1325684869.1540.77.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2011 at 09:13:22AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 19, 2011 at 05:19:17PM +0800, Shawn Guo wrote:
-> > On Mon, Dec 19, 2011 at 09:13:16AM +0200, Lauri Hintsala wrote:
-> > > On 12/19/2011 09:13 AM, Shawn Guo wrote:
-> > > >The patch looks good.
+On Tue, 2012-01-03 at 13:43 +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 03, 2012 at 06:33:36PM +0530, Vinod Koul wrote:
+> > On Tue, 2012-01-03 at 09:40 +0000, Russell King - ARM Linux wrote:
+> > > Wait a moment.  This looks like a disaster waiting to happen.  The DMA
+> > > engine code doesn't really handle the DMA API properly as it is - and
+> > > that has lead to at least one recent oops report (and it still remains
+> > > unresolved.)
 > > > 
-> > > Thank you for your time.
+> > > The DMA API has the idea of buffer ownership: a buffer is either owned by
+> > > the CPU, or the DMA device.  Only its owner may explicitly access the
+> > > buffer.
 > > > 
-> > > 
-> > > >The only problem I have is I do not see MACH_TYPE_APX4DEVKIT defined
-> > > >in arch/arm/tools/mach-types on either Linus' tree or linux-next
-> > > >tree.  I'm afraid that we will experience the same problem we have
-> > > >experienced with m28evk patch, which broke the whole mxs build for a
-> > > >couple of early -rc of v3.2.
-> > > 
-> > > I see the problem. What is your suggestion? Should we create patch
-> > > to add APX4DEVKIT to mach-types file as you did last time?
-> > > http://permalink.gmane.org/gmane.linux.ports.arm.kernel/140425
-> > > 
-> > > We have register apx4devkit to ARM machine database. Machine id of
-> > > apx4devkit is 3712. For some reason "Kconfig macro" and "type
-> > > identifier" are out of sync in db. DEVKIT string is missing from
-> > > those.
-> > > http://www.arm.linux.org.uk/developer/machines/list.php?id=3712
-> > > 
-> > Hi Russell,
-> > 
-> > We have seen APX4DEVKIT in the ARM machine database.  But you did not
-> > include it in the commit aef1c03 (ARM: Update mach-types) which is
-> > sitting on -next.  Can you please include it as we plan to merge the
-> > board support during the coming merge window?
-> 
-> No.  It will be automatically removed from any update as long as it does
-> not conform to the requirements - that is, in this case, the strings
-> being out of sync indentified in the message to which you replied to.
-> 
-> Someone needs to tell me what the correct entry is supposed to look like.
-> 
-Hi Russell,
+> > > Before a buffer can be used for DMA, it must be mapped to the DMA device
+> > > (using dma_map_sg() or dma_map_single().)  Once this call returns, the
+> > > mapping is setup and the CPU must not explicitly access the buffer until
+> > > the buffer is unmapped via dma_unmap_sg() or dma_unmap_single().
+wouldn't this cause issues with audio users of dmaengine API. They would
+use DMA API to map the buffer and do a prepare (cyclic). And both cpu
+and dma and accessing this?
 
-Any chance to have APX4DEVKIT included in your patch 'ARM: Update
-mach-types' for 3.3?
+> This is sub-optimal, because then you end up with:
+> 
+> - align_sg_list
+> - map lists
+> - prep_dma_sg
+> - unmap lists
+> - perform manual copy
+> 
+> which, if your map/unmap is non-trivial, means you take an unnecessary hit.
+> 
+> It would be much better if the dmaengine code exposed its alignment
+> properties in such a way that:
+> 
+> (a) align_sg_list could be totally generic code
+> (b) it can be found out whether the sg list can be handled by the DMA
+>     engine
+> 
+> I'd also argue that align_sg_list() probably shouldn't even try to align
+> a sg list - it should really just indicate whether the sg list _could_
+> be handled by the DMA engine code or not.  (The case where the source
+> and destination are identically mis-aligned is probably a rare corner
+> case of the mis-aligned sg list.)
+Yes, we could add something like dmaengine_check_align() which would
+check if the given word alignment is supported by dmac or not.
+Based on this peripheral driver can take a right decision on what needs
+to be done.
+Of-course, we would need controller to let dmaengine know the word
+alignment constraints of the dmac.
 
 -- 
-Regards,
-Shawn
+~Vinod
