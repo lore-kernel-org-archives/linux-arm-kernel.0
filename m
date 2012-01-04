@@ -1,38 +1,80 @@
-From: manjunath.hadli@ti.com (Hadli, Manjunath)
-Date: Wed, 4 Jan 2012 14:27:38 +0000
-Subject: [PATCH v8 1/2] davinci: vpif: remove machine specific header
- file inclusion from the driver
-In-Reply-To: <4F044D21.1030204@mvista.com>
-References: <1325661469-4411-1-git-send-email-manjunath.hadli@ti.com>
- <1325661469-4411-2-git-send-email-manjunath.hadli@ti.com>
- <4F044D21.1030204@mvista.com>
-Message-ID: <E99FAA59F8D8D34D8A118DD37F7C8F75019F95@DBDE01.ent.ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 04 Jan 2012 08:32:31 -0600
+Subject: [PATCH v4 3/6] clk: introduce the common clock framework
+In-Reply-To: <20120104021541.GI2414@b20223-02.ap.freescale.net>
+References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
+ <1323834838-2206-4-git-send-email-mturquette@linaro.org>
+ <alpine.LFD.2.02.1112141007550.3020@ionos>
+ <CAJOA=zO=gM2r4pCVo+orLqE9Q1SSw4h5nXsAHo-e_SHZAfvKDA@mail.gmail.com>
+ <20120104021541.GI2414@b20223-02.ap.freescale.net>
+Message-ID: <4F0462FF.1000308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei,
-On Wed, Jan 04, 2012 at 18:29:13, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 04-01-2012 11:17, Manjunath Hadli wrote:
-> 
-> > remove unnecessary inclusion of machine specific header files 
-> > mach/dm646x.h, mach/hardware.h from vpif.h  and aslo mach/dm646x.h 
-> > from vpif_display.c driver which comes in the way of platform code consolidation.
-> > Add linux/i2c.h header file in vpif_types.h which is required for 
-> > building.
-> 
->     This last modification should be in a separate patch. Don;t mix changes having the different purpose.
-It is part of the same modification of removing the machine specific header.
-When the header file was removed, it needed the i2c to be included due to 
-a dependency and hence the inclusion.
+On 01/03/2012 08:15 PM, Richard Zhao wrote:
+> On Fri, Dec 16, 2011 at 04:45:48PM -0800, Turquette, Mike wrote:
+>> On Wed, Dec 14, 2011 at 5:18 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>>> On Tue, 13 Dec 2011, Mike Turquette wrote:
 
-Thx,
--Manju
-> 
-> > Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-> > Cc: Mauro Carvalho Chehab<mchehab@infradead.org>
-> > Cc: LMML<linux-media@vger.kernel.org>
-> 
-> WBR, Sergei
-> 
+snip
+
+>>>> +/**
+>>>> + * clk_init - initialize the data structures in a struct clk
+>>>> + * @dev: device initializing this clk, placeholder for now
+>>>> + * @clk: clk being initialized
+>>>> + *
+>>>> + * Initializes the lists in struct clk, queries the hardware for the
+>>>> + * parent and rate and sets them both.  Adds the clk to the sysfs tree
+>>>> + * topology.
+>>>> + *
+>>>> + * Caller must populate clk->name and clk->flags before calling
+>>>
+>>> I'm not too happy about this construct. That leaves struct clk and its
+>>> members exposed to the world instead of making it a real opaque
+>>> cookie. I know from my own painful experience, that this will lead to
+>>> random fiddling in that data structure in drivers and arch code just
+>>> because the core code has a shortcoming.
+>>>
+>>> Why can't we make struct clk a real cookie and confine the data
+>>> structure to the core code ?
+>>>
+>>> That would change the init call to something like:
+>>>
+>>> struct clk *clk_init(struct device *dev, const struct clk_hw *hw,
+>>>                     struct clk *parent)
+>>>
+>>> And have:
+>>> struct clk_hw {
+>>>       struct clk_hw_ops *ops;
+>>>       const char        *name;
+>>>       unsigned long     flags;
+>>> };
+>>>
+>>> Implementers can do:
+>>> struct my_clk_hw {
+>>>       struct clk_hw    hw;
+>>>       mydata;
+>>> };
+>>>
+>>> And then change the clk ops callbacks to take struct clk_hw * as an
+>>> argument.
+> We have to define static clocks before we adopt DT binding.
+> If clk is opaque and allocate memory in clk core, it'll make hard
+> to define static clocks. And register/init will pass a long parameter
+> list.
+
+DT is not a prerequisite for having dynamically created clocks. You can
+make clock init dynamic without DT.
+
+What data goes in struct clk vs. struct clk_hw could change over time.
+So perhaps we can start with some data in clk_hw and plan to move it to
+struct clk later. Even if almost everything ends up in clk_hw initially,
+at least the structure is in place to have common, core-only data
+separate from platform data.
+
+What is the actual data you need to be static and accessible to the
+platform code? A ptr to parent clk is the main thing I've seen for
+static initialization. So make the parent ptr be struct clk_hw* and
+allow the platforms to access.
+
+Rob
