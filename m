@@ -1,51 +1,31 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 4 Jan 2012 10:31:58 +0800
-Subject: [PATCH v2 2/2] dma/imx-sdma: add wmb before enable a channel
-In-Reply-To: <20120103174639.GF2914@n2100.arm.linux.org.uk>
-References: <1325428692-11473-1-git-send-email-richard.zhao@linaro.org>
- <1325428692-11473-3-git-send-email-richard.zhao@linaro.org>
- <20120103174639.GF2914@n2100.arm.linux.org.uk>
-Message-ID: <20120104023157.GJ2414@b20223-02.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 4 Jan 2012 10:43:45 +0800
+Subject: [PATCH v2] MTD/GPMI bugfix : reset the BCH module when it is
+ not MX23
+In-Reply-To: <20120103111114.GA9083@pengutronix.de>
+References: <1325233646-3343-1-git-send-email-b32955@freescale.com>
+ <20111230143658.GA9141@pengutronix.de> <4EFE7236.10609@freescale.com>
+ <20111231154338.GA27544@pengutronix.de>
+ <CAMiH66HsFn4+6-whEC6G-qSPda3+3pBzd50i7iHh9Pg9TXHTXw@mail.gmail.com>
+ <20120101223335.GA3756@pengutronix.de>
+ <CAMiH66Fwh-su6ucLDMM7hhCjH7MJPeavt1u4O=_jWn5w=DyfKA@mail.gmail.com>
+ <20120103111114.GA9083@pengutronix.de>
+Message-ID: <4F03BCE1.80006@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 05:46:39PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Jan 01, 2012 at 10:38:12PM +0800, Richard Zhao wrote:
-> > dma_alloc_coherent memory may be bufferable. We need to add
-> > nececcary memory barrier.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  drivers/dma/imx-sdma.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> > index f8e87b5..9301bff 100644
-> > --- a/drivers/dma/imx-sdma.c
-> > +++ b/drivers/dma/imx-sdma.c
-> > @@ -394,6 +394,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
-> >  
-> >  static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
-> >  {
-> > +	wmb();
-> >  	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
-> 
-> Use writel().  That's what it's there for:
-> 
-> #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
-> #define __iowmb()               wmb()
-> #endif
-> #define writel_relaxed(v,c)     ((void)__raw_writel((__force u32) \
->                                         cpu_to_le32(v),__mem_pci(c)))
-> #define writel(v,c)             ({ __iowmb(); writel_relaxed(v,c); })
-Why does writel always call wmb? ioremap memory needs mb too?
-Isn't it supposed to be when there's prior touch of dma memory? 
+hi,
+> Due to Errata #2847 of the MX23, the BCH cannot be soft reset on this
+> chip, otherwise it will lock up. So we skip resetting BCH on the MX23.
+> On the other hand, the MX28 needs the reset, because one case has been
+> seen where the BCH produced ECC errors constantly after 10000
+> consecutive reboots. The latter case has not been seen on the MX23 yet,
+> still we don't if it could happen there as well.
+>
+> ===
+>
+> What do you think?
+>
+ok, thanks. I will add this comment to the patch.
 
-Thanks
-Richard
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Huang Shijie
