@@ -1,23 +1,15 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jan 2012 22:14:27 +0000
-Subject: [PATCH 1/4] ARM: SAMSUNG: cleanup of rtc register definitions
-In-Reply-To: <201201041515.45025.heiko@sntech.de>
-References: <201112211014.30695.heiko@sntech.de>
- <201201041512.55126.heiko@sntech.de> <201201041514.57688.heiko@sntech.de>
- <201201041515.45025.heiko@sntech.de>
-Message-ID: <20120104221427.GL11810@n2100.arm.linux.org.uk>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 05 Jan 2012 06:16:54 +0800
+Subject: [PATCH V6 0/7] add a generic cpufreq driver
+In-Reply-To: <1325213769-11752-1-git-send-email-richard.zhao@linaro.org>
+References: <1325213769-11752-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <cc3e6f12-92d8-4467-b3ad-23cbe6440fee@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 03:15:44PM +0100, Heiko St?bner wrote:
-> regs-rtc.h uses a mixture of tabs and spaces and also (x<<y)
-> to format bits. So, before adding new stuff clean up the formatting
-> and also add spaces to the bit definitions (i.e. (x << y) )
+hi Russell,
 
-Ok, so this is just a formatting change - and it should stay that way.
+May I have your ACK, you merge it?
 
-However, there's an opportunity missed here.
-
-Are these register definitions used anywhere else other than in the
-drivers/rtc driver?  If not, they should be placed along side that
-driver or even inside the driver itself.
+Thanks
+Richard
