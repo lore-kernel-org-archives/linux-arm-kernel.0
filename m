@@ -1,32 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jan 2012 21:18:00 +0000
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20120104135204.GA14741@S2100-06.ap.freescale.net>
-References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
- <20120104135204.GA14741@S2100-06.ap.freescale.net>
-Message-ID: <20120104211800.GF11810@n2100.arm.linux.org.uk>
+Date: Wed, 4 Jan 2012 21:26:20 +0000
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20120104150101.GA3492@amd.com>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <20120102134229.GZ29877@amd.com>
+ <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
+ <20120102155820.GB29877@amd.com>
+ <20120103095527.GI2914@n2100.arm.linux.org.uk>
+ <20120104150101.GA3492@amd.com>
+Message-ID: <20120104212620.GG11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 09:52:05PM +0800, Shawn Guo wrote:
-> On Mon, Dec 19, 2011 at 09:13:22AM +0000, Russell King - ARM Linux wrote:
-> > No.  It will be automatically removed from any update as long as it does
-> > not conform to the requirements - that is, in this case, the strings
-> > being out of sync indentified in the message to which you replied to.
+On Wed, Jan 04, 2012 at 04:01:01PM +0100, Joerg Roedel wrote:
+> On Tue, Jan 03, 2012 at 09:55:27AM +0000, Russell King - ARM Linux wrote:
+> > It comes through when I stick it in my tree because of a month of asking
+> > for help to fix something and getting zero response from the maintainers.
 > > 
-> > Someone needs to tell me what the correct entry is supposed to look like.
-> > 
-> Hi Russell,
+> > It's a way to flag to them that they're doing something wrong - and in
+> > fact something is broken, and that that brokenness will happen at the
+> > next merge window unless they get off their butt and do something about
+> > it.
 > 
-> Any chance to have APX4DEVKIT included in your patch 'ARM: Update
-> mach-types' for 3.3?
+> Okay, fine with me if it really will be fixed in 3.3-rc1 :)
 
-As it appears when I run the update script, the answer is yes.  I'll
-update the commit in the next couple of days (I want to reduce the
-number of times I re-merge the tree now that I've a git-rerere immune
-conflict to deal with.)
+I can do better than that - and report that it's fixed now.  It should
+show up in linux-next sometime after Stephen pulls this evening.  The
+#error did its job in this case, and ensured that it got fixed!
