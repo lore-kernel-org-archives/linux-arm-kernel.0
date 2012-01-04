@@ -1,39 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed,  4 Jan 2012 15:29:12 -0800
-Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
-Message-ID: <1325719752-818-1-git-send-email-olof@lixom.net>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Wed, 4 Jan 2012 15:33:11 -0800
+Subject: [PATCH] ARM/bcmring: fix build error with sp804 clockevents init
+In-Reply-To: <CAOesGMj1Jv0AqUHHovYLvDTWuz2Xp4UGZGmPxzzFpHd-cM83VA@mail.gmail.com>
+References: <4F034B28.10706@broadcom.com>
+ <CAOesGMj1Jv0AqUHHovYLvDTWuz2Xp4UGZGmPxzzFpHd-cM83VA@mail.gmail.com>
+Message-ID: <4F04E1B7.5000201@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only one of the L2 erratas are needed on T30, but T20/25
-needs a few more.
+On 1/4/2012 2:12 PM, Olof Johansson wrote:
+> Hi,
+>
+> On Tue, Jan 3, 2012 at 10:38 AM, Jiandong Zheng<jdzheng@broadcom.com>  wrote:
+>> Wrong API sp804_clockevents_register() was used and caused build error.
+>> So change to use sp804_clockevents_init().
+>>
+>> This patch was submitted a couple of times last year but unfortunately got
+>> lost.
+>
+> Same with this patch as with the dma.c one: It's already fixed in
+> mainline top of tree. What tree are you working against?
+>
+>
+Yes, you are right. I forgot to check the latest in linus's tree and 
+stays at 3.1.0.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-tegra/Kconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Please discard this and another one in dma.c.
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 373652d..a2c76ee 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -10,6 +10,9 @@ config ARCH_TEGRA_2x_SOC
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
- 	select USB_ULPI_VIEWPORT if USB_SUPPORT
-+	select ARM_ERRATA_742230
-+	select PL310_ERRATA_753970 if CACHE_PL310
-+	select PL310_ERRATA_769419 if CACHE_L2X0
- 	help
- 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
- 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
-@@ -23,6 +26,7 @@ config ARCH_TEGRA_3x_SOC
- 	select USB_ULPI if USB_SUPPORT
- 	select USB_ULPI_VIEWPORT if USB_SUPPORT
- 	select USE_OF
-+	select PL310_ERRATA_769419 if CACHE_L2X0
- 	help
- 	  Support for NVIDIA Tegra T30 processor family, based on the
- 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
--- 
-1.7.8.GIT
+Thanks.
+JD
