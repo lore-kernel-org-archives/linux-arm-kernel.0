@@ -1,29 +1,46 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 04 Jan 2012 16:59:13 +0400
-Subject: [PATCH v8 1/2] davinci: vpif: remove machine specific header
- file inclusion from the driver
-In-Reply-To: <1325661469-4411-2-git-send-email-manjunath.hadli@ti.com>
-References: <1325661469-4411-1-git-send-email-manjunath.hadli@ti.com>
- <1325661469-4411-2-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4F044D21.1030204@mvista.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 4 Jan 2012 14:36:24 +0100
+Subject: [PATCH v2 02/10] i2c: OMAP: Add DT support for i2c controller
+In-Reply-To: <87hb14q7vj.fsf@ti.com>
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-3-git-send-email-b-cousson@ti.com> <87hb14q7vj.fsf@ti.com>
+Message-ID: <4F0455D8.7060904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Kevin,
 
-On 04-01-2012 11:17, Manjunath Hadli wrote:
+On 12/14/2011 2:06 AM, Kevin Hilman wrote:
+> Benoit Cousson<b-cousson@ti.com>  writes:
+>
+>> Add initial DT support to retrieve the frequency using a
+>> DT attribute instead of the pdata pointer if of_node exist.
+>>
+>> Add documentation for omap i2c controller binding.
+>>
+>> Based on original patches from Manju and Grant.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Ben Dooks<ben-linux@fluff.org>
+>
+> This seems indepenent from the rest of the series, and I can queue up
+> for merge via the I2C tree.
+>
+> Benoit, please confirm that we shouldn't have any problems if this patch
+> goes independently.
+>
+> Grant/Rob, with your ack on the bindings, I can queue this up for the
+> I2C maintainers along with some other OMAP I2C changes for v3.3.
 
-> remove unnecessary inclusion of machine specific header files mach/dm646x.h,
-> mach/hardware.h from vpif.h  and aslo mach/dm646x.h from vpif_display.c
-> driver which comes in the way of platform code consolidation.
-> Add linux/i2c.h header file in vpif_types.h which is required for
-> building.
+I removed the nasty bindings and got the Reviewed-by: from Rob for the 
+v4 [1].
 
-    This last modification should be in a separate patch. Don;t mix changes 
-having the different purpose.
+Could you take it in your branch? I've just tried merging your 
+for_3.3/i2c/misc on top of my for_3.3/3_omap_dt_i2c_twl branch and 
+tested it successfully on OMAP4 DT boot.
 
-> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-> Cc: Mauro Carvalho Chehab<mchehab@infradead.org>
-> Cc: LMML<linux-media@vger.kernel.org>
+Thanks,
+Benoit
 
-WBR, Sergei
+
+[1] http://lkml.org/lkml/2011/12/22/176
