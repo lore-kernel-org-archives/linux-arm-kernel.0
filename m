@@ -1,91 +1,59 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 4 Jan 2012 15:08:02 +0100
-Subject: [linux-pm] [PATCH 1/3] cpuidle: refactor out cpuidle_enter_state
-In-Reply-To: <1324426147-16735-2-git-send-email-ccross@android.com>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <1324426147-16735-2-git-send-email-ccross@android.com>
-Message-ID: <CAORVsuV-=h9qVcFB7ezEOV2ptLMT=FJcdvaspLj-qAzFK4-NEQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?windows-1252?q?St=FCbner?=)
+Date: Wed, 4 Jan 2012 15:12:54 +0100
+Subject: [PATCH 2/4] rtc-s3c: make room for more variants in devicetree
+ block
+In-Reply-To: <201201041251.42509.heiko@sntech.de>
+References: <201112211014.30695.heiko@sntech.de>
+ <4F042D61.2070309@samsung.com> <201201041251.42509.heiko@sntech.de>
+Message-ID: <201201041512.55126.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
+Hi Kgene,
 
-On Wed, Dec 21, 2011 at 1:09 AM, Colin Cross <ccross@android.com> wrote:
-> Split the code to enter a state and update the stats into a helper
-> function, cpuidle_enter_state, and export it. ?This function will
-> be called by the coupled state code to handle entering the safe
-> state and the final coupled state.
->
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
-> ?drivers/cpuidle/cpuidle.c | ? 43 +++++++++++++++++++++++++++++--------------
-> ?drivers/cpuidle/cpuidle.h | ? ?2 ++
-> ?2 files changed, 31 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
-> index 06ce268..1486b3c 100644
-> --- a/drivers/cpuidle/cpuidle.c
-> +++ b/drivers/cpuidle/cpuidle.c
-> @@ -54,6 +54,34 @@ static void cpuidle_kick_cpus(void) {}
-> ?static int __cpuidle_register_device(struct cpuidle_device *dev);
->
-> ?/**
-> + * cpuidle_enter_state
-> + *
-> + * enter the state and update stats
-> + */
-> +int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
-> + ? ? ? ? ? ? ? int next_state)
-> +{
-> + ? ? ? int entered_state;
-> + ? ? ? struct cpuidle_state *target_state;
-> +
-> + ? ? ? target_state = &drv->states[next_state];
-> +
-> + ? ? ? entered_state = target_state->enter(dev, drv, next_state);
-> +
-> + ? ? ? if (entered_state >= 0) {
-> + ? ? ? ? ? ? ? /* Update cpuidle counters */
-> + ? ? ? ? ? ? ? /* This can be moved to within driver enter routine
-> + ? ? ? ? ? ? ? ?* but that results in multiple copies of same code.
-> + ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? dev->states_usage[entered_state].time +=
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long long)dev->last_residency;
-> + ? ? ? ? ? ? ? dev->states_usage[entered_state].usage++;
-> + ? ? ? }
-> +
-> + ? ? ? return entered_state;
-> +}
-> +
-> +/**
-> ?* cpuidle_idle_call - the main idle loop
-> ?*
-> ?* NOTE: no locks or semaphores should be used here
-> @@ -63,7 +91,6 @@ int cpuidle_idle_call(void)
-> ?{
-> ? ? ? ?struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
-> ? ? ? ?struct cpuidle_driver *drv = cpuidle_get_driver();
-> - ? ? ? struct cpuidle_state *target_state;
-> ? ? ? ?int next_state, entered_state;
->
-> ? ? ? ?if (off)
-> @@ -92,26 +119,14 @@ int cpuidle_idle_call(void)
-> ? ? ? ? ? ? ? ?return 0;
-> ? ? ? ?}
->
-> - ? ? ? target_state = &drv->states[next_state];
-> -
-> ? ? ? ?trace_power_start(POWER_CSTATE, next_state, dev->cpu);
-> ? ? ? ?trace_cpu_idle(next_state, dev->cpu);
->
-> - ? ? ? entered_state = target_state->enter(dev, drv, next_state);
-> + ? ? ? entered_state = cpuidle_enter_state(dev, drv, next_state);
->
-> ? ? ? ?trace_power_end(dev->cpu);
-> ? ? ? ?trace_cpu_idle(PWR_EVENT_EXIT, dev->cpu);
-The cpu_idle traces are only present in this function and not in
-cpuidle_enter_state. Is that expected? Can all the transitions from
-all the cpus get traced that way?
+Am Mittwoch, 4. Januar 2012, 12:51:41 schrieb Heiko St?bner:
+> Hi Sylwester,
+> 
+> Am Mittwoch, 4. Januar 2012, 11:43:45 schrieb Sylwester Nawrocki:
+> > Hello,
+> > 
+> > On 12/21/2011 10:16 AM, Heiko St?bner wrote:
+> > > Use the data field of of_device_id to hold the type for
+> > > s3c_cpu_type.
+> > > 
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+> > > ---
+> > 
+> > This patch makes compilation with CONFIG_OF enabled fail with errors
+> > and warnings:
+> > 
+> > drivers/rtc/rtc-s3c.c: In function ?s3c_rtc_get_driver_data?:
+> > drivers/rtc/rtc-s3c.c:454: warning: return makes integer from pointer
+> > without a cast
+> > drivers/rtc/rtc-s3c.c: At top level:
+> > drivers/rtc/rtc-s3c.c:674: error: request for member ?data? in something
+> > not a structure or union
+> > drivers/rtc/rtc-s3c.c:677: error: request for member ?data? in something
+> > not a structure or union
+> > drivers/rtc/rtc-s3c.c:680: error: request for member ?data? in something
+> > not a structure or union
+> > drivers/rtc/rtc-s3c.c:683: error: request for member ?data? in something
+> > not a structure or union
+> > make[2]: *** [drivers/rtc/rtc-s3c.o] Error 1
+> 
+> thanks for spotting this.
+> 
+> @kgene: Should this go on top of the rtc series, or should I prepare a v4
+> with these fixes included?
+never mind, I did both.
 
-Regards,
-Jean
+In reply to this mail you will find:
+- a single patch on top of the 4 original patches, fixing the problems 
+sylwester reported
+- a v4 of the original series including the fixes to the problems, based on 
+the code that you have in your rtc-branch
+
+Please pick the apropriate variant to fix the problem :-)
+
+Heiko
