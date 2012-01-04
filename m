@@ -1,57 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jan 2012 20:04:47 +0000
-Subject: ZenIV (was: Re: Status of arm-soc.git for 3.2)
-In-Reply-To: <20120104191042.GB11810@n2100.arm.linux.org.uk>
-References: <201201032243.06440.arnd@arndb.de>
- <20120104100016.GK2914@n2100.arm.linux.org.uk>
- <20120104181703.GA11810@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1201041337370.2907@xanadu.home>
- <20120104191042.GB11810@n2100.arm.linux.org.uk>
-Message-ID: <20120104200447.GC11810@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 4 Jan 2012 13:08:19 -0700
+Subject: [PATCH 2/3] arm/dts: OMAP: Remove bootargs node from board files
+In-Reply-To: <1323190149-6492-3-git-send-email-b-cousson@ti.com>
+References: <y>
+ <1323190149-6492-3-git-send-email-b-cousson@ti.com>
+Message-ID: <20120104200819.GI15503@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 07:10:42PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 04, 2012 at 01:55:48PM -0500, Nicolas Pitre wrote:
-> > On Wed, 4 Jan 2012, Russell King - ARM Linux wrote:
-> > > I've now disabled all access to my git tree there, and restarted apache.
-> > > We will see whether that improves stability - I suspect it will do because
-> > > I reckon that the problem is that the smart git stuff is what's killing
-> > > the machine.
-> > 
-> > I'm sure that is the case.  However faulty hardware could still be the 
-> > root cause, but without the load from Git the machine might become 
-> > loaded lightly enough you might not see any ill effects before quite a 
-> > while.
+On Tue, Dec 06, 2011 at 05:49:08PM +0100, Benoit Cousson wrote:
+> Since 3.2, the CONFIG_ARM_ATAG_DTB_COMPAT config allows
+> an old bootloader to still use ATAG to provide cmdline.
 > 
-> When it's serving the next Fedora release (it's one of the official
-> mirrors) I'm sure any problems like that would become noticable - but
-> they haven't yet.  It purely seems to be something git is doing which
-> is killing the machine.
+> Remove chosen/bootargs from the DTS board files.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
 
-I think we've just found the issue causing httpd to die:
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-- Fedora systems set a limit at login time on the number of processes a
-  user can run - which is set to a soft limit of 1024.
-
-- When someone logs in, their shell inherits this soft rlimit.  This
-  gets inherited by all sub-processes, including through a su to their
-  root shell.
-
-- When they restart httpd, httpd also inherits this limit.
-
-- httpd's own internal limits are set to a max clients of 1024.
-
-The problem comes when httpd hits 1024 processes - as it forks as root,
-this succeeds (root is not subjected to this rlimit), and then a
-subsequent setuid() fails with -EAGAIN, causing httpd to experience a
-fatal error.
-
-Obviously, this is not a good combination of things to happen.  It's
-also completely unnoticable to anyone who restarts apache.
-
-So, I've 'fixed' it by raising the rlimit in the httpd startup scripts,
-which should keep it fixed whenever anyone else restarts httpd.
-
-The problem should be solved, and as such I've re-enabled access to
-the git tree.
+> ---
+>  arch/arm/boot/dts/omap3-beagle.dts |    9 ---------
+>  arch/arm/boot/dts/omap4-panda.dts  |    9 ---------
+>  arch/arm/boot/dts/omap4-sdp.dts    |    9 ---------
+>  3 files changed, 0 insertions(+), 27 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> index 9486be6..9f72cd4 100644
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -13,15 +13,6 @@
+>  	model = "TI OMAP3 BeagleBoard";
+>  	compatible = "ti,omap3-beagle", "ti,omap3";
+>  
+> -	/*
+> -	 * Since the initial device tree board file does not create any
+> -	 * devices (MMC, network...), the only way to boot is to provide a
+> -	 * ramdisk.
+> -	 */
+> -	chosen {
+> -		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug earlyprintk";
+> -	};
+> -
+>  	memory {
+>  		device_type = "memory";
+>  		reg = <0x80000000 0x20000000>; /* 512 MB */
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> index c702657..9755ad5 100644
+> --- a/arch/arm/boot/dts/omap4-panda.dts
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -13,15 +13,6 @@
+>  	model = "TI OMAP4 PandaBoard";
+>  	compatible = "ti,omap4-panda", "ti,omap4430", "ti,omap4";
+>  
+> -	/*
+> -	 * Since the initial device tree board file does not create any
+> -	 * devices (MMC, network...), the only way to boot is to provide a
+> -	 * ramdisk.
+> -	 */
+> -	chosen {
+> -		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
+> -	};
+> -
+>  	memory {
+>  		device_type = "memory";
+>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index 066e28c..63c6b2b 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -13,15 +13,6 @@
+>  	model = "TI OMAP4 SDP board";
+>  	compatible = "ti,omap4-sdp", "ti,omap4430", "ti,omap4";
+>  
+> -	/*
+> -	 * Since the initial device tree board file does not create any
+> -	 * devices (MMC, network...), the only way to boot is to provide a
+> -	 * ramdisk.
+> -	 */
+> -	chosen {
+> -		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
+> -	};
+> -
+>  	memory {
+>  		device_type = "memory";
+>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
