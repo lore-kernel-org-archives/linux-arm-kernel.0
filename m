@@ -1,25 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jan 2012 22:10:36 +0000
-Subject: [PATCH 1/2][RFC] at91 : move pm.h header to include/mach
-In-Reply-To: <4F048CD9.1050601@gmail.com>
-References: <1325696147-14058-1-git-send-email-daniel.lezcano@linaro.org>
- <4F048CD9.1050601@gmail.com>
-Message-ID: <20120104221036.GK11810@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 4 Jan 2012 14:12:02 -0800
+Subject: [PATCH] ARM/bcmring: fix build error with sp804 clockevents init
+In-Reply-To: <4F034B28.10706@broadcom.com>
+References: <4F034B28.10706@broadcom.com>
+Message-ID: <CAOesGMj1Jv0AqUHHovYLvDTWuz2Xp4UGZGmPxzzFpHd-cM83VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 11:31:05AM -0600, Rob Herring wrote:
-> This header should probably be named something more specific like
-> at91_pm.h or at91_sdram.h. This will be needed to avoid name collisions
-> with mach headers on a single kernel binary.
+Hi,
 
-I think actually the idea that mach/*.h headers can be included by stuff
-outside of arch/arm is something that we should deprecate, because it's
-not going to be sane to make them all unique in this way.
+On Tue, Jan 3, 2012 at 10:38 AM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
+> Wrong API sp804_clockevents_register() was used and caused build error.
+> So change to use sp804_clockevents_init().
+>
+> This patch was submitted a couple of times last year but unfortunately got
+> lost.
 
-Not only that but it prevents the .c files being built on other
-architectures, and provides another reason why the .c file is tied to
-a pariticular SoC - even if the same IP is used in a different SoC, it
-can be used as a reason why not to reuse the .c file.
+Same with this patch as with the dma.c one: It's already fixed in
+mainline top of tree. What tree are you working against?
 
-Let's not give people excuses not to share code!
+
+-Olof
