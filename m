@@ -1,24 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 04 Jan 2012 10:36:45 +0000
-Subject: [PATCH 1/2] mach-sa1100: fix sched_clock breakage
-In-Reply-To: <1325672503-16690-1-git-send-email-linus.walleij@linaro.org>
-References: <1325672503-16690-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4F042BBD.4060206@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  4 Jan 2012 11:37:33 +0100
+Subject: [PATCH] clps711x: fix compilation breakage
+Message-ID: <1325673453-22278-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/12 10:21, Linus Walleij wrote:
-> Fixed up a simple typo in the runtime sched_clock conversion
-> so we compile again.
-> 
-> Cc: Kristoffer Ericson <kristoffer.ericson@gmail.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+The restart patches defined a new restart function in common.c
+but it needs to be declared in common.h to compile properly.
 
-Thanks Linus for fixing this.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-clps711x/common.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
+diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
+index 2b8b801..fc0f065 100644
+--- a/arch/arm/mach-clps711x/common.h
++++ b/arch/arm/mach-clps711x/common.h
+@@ -9,3 +9,4 @@ struct sys_timer;
+ extern void clps711x_map_io(void);
+ extern void clps711x_init_irq(void);
+ extern struct sys_timer clps711x_timer;
++extern void clps711x_restart(char mode, const char *cmd);
 -- 
-Jazz is not dead. It just smells funny...
+1.7.6.4
