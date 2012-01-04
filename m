@@ -1,168 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 4 Jan 2012 10:20:00 +0100
-Subject: [PATCH 1/4] CS89x0 : add platform driver support
-In-Reply-To: <1325628732-14535-1-git-send-email-jaccon.bastiaansen@gmail.com>
-References: <1325628732-14535-1-git-send-email-jaccon.bastiaansen@gmail.com>
-Message-ID: <20120104092000.GP5446@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 04 Jan 2012 10:20:28 +0100
+Subject: [GIT PULL v2] at91: devices and boards files update for 3.3
+In-Reply-To: <201201032139.21163.arnd@arndb.de>
+References: <4EEA034C.9020800@atmel.com> <4F02E1B9.30009@atmel.com>
+ <201201032139.21163.arnd@arndb.de>
+Message-ID: <4F0419DC.6050100@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/03/2012 10:39 PM, Arnd Bergmann :
+> On Tuesday 03 January 2012, Nicolas Ferre wrote:
+>> Arnd, Olof,
+>>
+>> According to our discussion with Olof and Guennadi, I rebased this pull request
+>> on top of V4L git tree:
+>> git://linuxtv.org/gliakhovetski/v4l-dvb.git for-3.3
+>> (v3.2-rc2-262-g7a13e73 today)
+>>
+>> This pull request adds some bits to at91 devices and board files. The ISI driver
+>> is the biggest part and does not have DT support. As ISI has been waited for a 
+>> long time on AT91, I think it is not possible to wait for the DT support. Moreover, 
+>> DT support for this camera sensor + ISI soc interface seems not so trivial and 
+>> will certainly need a handful of kernel releases before being stabilized.
+>>
+>> The following changes since commit 7a13e733707d9cc1225ba07274360da2be9984cb:
+>>
+>>   media i.MX27 camera: Fix field_count handling. (2011-12-29 09:20:04 +0100)
+>>
+>> are available in the git repository at:
+>>   git://github.com/at91linux/linux-at91.git for-arnd-3.3-device_boardV2
+> 
+> Hi Nicolas,
+> 
+> Looks all good to me. I've pulled it into the next/drivers2 branch even though
+> your patches are not really all driver specific. However, the drivers2 branch
+> already holds some samsung changes that have dependencies on external branches,
+> so I can nicely group these together.
+> 
+> How we end up submitting these will depend on the timing of dependencies during
+> the merge window.
 
-Hi Jaccon,
+Ok, very nice. I will keep monitoring it also.
 
-Thanks for continuing this. Some comments inline.
-
-On Tue, Jan 03, 2012 at 11:12:09PM +0100, Jaccon Bastiaansen wrote:
-> @@ -151,6 +153,9 @@
->  #include <asm/system.h>
->  #include <asm/io.h>
->  #include <asm/irq.h>
-> +#ifdef CONFIG_CS89x0_PLATFORM
-> +#include <linux/atomic.h>
-> +#endif
-
-No need to ifdef includes.
-
->  #if ALLOW_DMA
->  #include <asm/dma.h>
->  #endif
-> @@ -173,6 +178,7 @@ static char version[] __initdata =
->  /* The cs8900 has 4 IRQ pins, software selectable. cs8900_irq_map maps
->     them to system IRQ numbers. This mapping is card specific and is set to
->     the configuration of the Cirrus Eval board for this chip. */
-> +#if defined(CONFIG_CS89x0_PLATFORM)
->  #if defined(CONFIG_MACH_IXDP2351)
->  static unsigned int netcard_portlist[] __used __initdata = {IXDP2351_VIRT_CS8900_BASE, 0};
->  static unsigned int cs8900_irq_map[] = {IRQ_IXDP2351_CS8900, 0, 0, 0};
-> @@ -188,7 +194,17 @@ static unsigned int cs8900_irq_map[] = { QQ2440_CS8900_IRQ, 0, 0, 0 };
->  static unsigned int netcard_portlist[] __used __initdata = {
->  	PBC_BASE_ADDRESS + PBC_CS8900A_IOBASE + 0x300, 0
->  };
-> -static unsigned cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
-> +static unsigned int cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
-> +#else
-> +/*
-> + * Counter for the number of CS89x0 platform device instances, which is needed
-> + * because this driver currently supports only one CS89x0 platform device
-> + * instance.
-> + */
-> +static atomic_t platform_dev_cnt = ATOMIC_INIT(0);
-> +static unsigned int cs8900_irq_map[] = {0, 0, 0, 0};
-> +static unsigned int netcard_portlist[] __used __initdata = {0, 0};
-> +#endif
->  #else
->  static unsigned int netcard_portlist[] __used __initdata =
->     { 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
-> @@ -737,7 +753,7 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
->  	} else {
->  		i = lp->isa_config & INT_NO_MASK;
->  		if (lp->chip_type == CS8900) {
-
-[...]
-
->  
-> -#ifdef MODULE
-> +#if defined(MODULE) && !defined(CONFIG_CS89x0_PLATFORM)
->  
->  static struct net_device *dev_cs89x0;
->  
-> @@ -1900,7 +1916,78 @@ cleanup_module(void)
->  	release_region(dev_cs89x0->base_addr, NETCARD_IO_EXTENT);
->  	free_netdev(dev_cs89x0);
->  }
-> -#endif /* MODULE */
-> +#endif /* MODULE && !CONFIG_CS89x0_PLATFORM */
-> +
-> +#ifdef CONFIG_CS89x0_PLATFORM
-> +static int cs89x0_platform_probe(struct platform_device *pdev)
-> +{
-> +	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
-> +	struct resource *mem_res;
-> +	struct resource *irq_res;
-> +	int err;
-> +
-> +	if (!dev)
-> +		return -ENODEV;
-> +
-> +	if (atomic_inc_return(&platform_dev_cnt) != 1)
-> +		return -EBUSY;
-
-This deserves a comment like this:
-
-/*
- * This driver uses global variables. Until this is fixed we can
- * only support a single instance.
- */
-
-> +
-> +	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-
-Don't use virtual addresses in resources. It's wrong. Pass in physical
-addresses here and use ioremap() in the driver.
-
-> +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +	if (mem_res == NULL || irq_res == NULL) {
-> +		pr_warning("memory and/or interrupt resource missing.\n");
-
-dev_warn please
-
-> +		err = -ENOENT;
-> +		goto out;
-> +	}
-> +
-> +	cs8900_irq_map[0] = irq_res->start;
-> +	err = cs89x0_probe1(dev, mem_res->start, 0);
-> +	if (err) {
-> +		pr_warning("no cs8900 or cs8920 detected.\n");
-
-ditto
-
-> +		goto out;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, dev);
-> +	return 0;
-> +
-> +out:
-> +	free_netdev(dev);
-> +	return err;
-> +}
-> +
-> +static int cs89x0_platform_remove(struct platform_device *pdev)
-> +{
-> +	struct net_device *dev = platform_get_drvdata(pdev);
-> +
-> +	unregister_netdev(dev);
-> +	free_netdev(dev);
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver cs89x0_platform_driver = {
-> +	.driver = {
-> +		.name	= DRV_NAME,
-> +		.owner	= THIS_MODULE
-> +	},
-> +	.probe	= cs89x0_platform_probe,
-> +	.remove	= cs89x0_platform_remove
-
-Please add a comma at the end of the last elements aswell. The rationale
-if that we can add elements later without touching the existing lines.
-
->  
->  /*
->   * Local variables:
-> @@ -1911,3 +1998,4 @@ cleanup_module(void)
->   * End:
->   *
->   */
-> +
-
-Please don't add blank lines at the end of files.
-
-Sascha
-
+Thanks a lot, best regards,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
