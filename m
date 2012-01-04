@@ -1,80 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 04 Jan 2012 08:32:31 -0600
-Subject: [PATCH v4 3/6] clk: introduce the common clock framework
-In-Reply-To: <20120104021541.GI2414@b20223-02.ap.freescale.net>
-References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
- <1323834838-2206-4-git-send-email-mturquette@linaro.org>
- <alpine.LFD.2.02.1112141007550.3020@ionos>
- <CAJOA=zO=gM2r4pCVo+orLqE9Q1SSw4h5nXsAHo-e_SHZAfvKDA@mail.gmail.com>
- <20120104021541.GI2414@b20223-02.ap.freescale.net>
-Message-ID: <4F0462FF.1000308@gmail.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Wed, 4 Jan 2012 16:01:01 +0100
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20120103095527.GI2914@n2100.arm.linux.org.uk>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <20120102134229.GZ29877@amd.com>
+ <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
+ <20120102155820.GB29877@amd.com>
+ <20120103095527.GI2914@n2100.arm.linux.org.uk>
+Message-ID: <20120104150101.GA3492@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2012 08:15 PM, Richard Zhao wrote:
-> On Fri, Dec 16, 2011 at 04:45:48PM -0800, Turquette, Mike wrote:
->> On Wed, Dec 14, 2011 at 5:18 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
->>> On Tue, 13 Dec 2011, Mike Turquette wrote:
+On Tue, Jan 03, 2012 at 09:55:27AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 02, 2012 at 04:58:20PM +0100, Joerg Roedel wrote:
+> > On Tue, Jan 03, 2012 at 12:21:30AM +0900, KyongHo Cho wrote:
+> > > > I still get
+> > > >
+> > > > ?LD ? ? ?.tmp_vmlinux1
+> > > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
+> > > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
+> > > > /data/cross/gcc-4.6.0-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-ld: no machine record defined
+> > > > make[1]: *** [.tmp_vmlinux1] Error 1
+> > > >
+> > > > when trying to compile ARM/Exynos with 3.2-rc7. Am I doing something
+> > > > wrong or is this not expected to work?
+> > > >
+> > > Do you?
+> > > Ok. I will check my configuration with linux-next git.
+> > 
+> > Compiling my exynos-config with linux-next gives me:
+> > 
+> >   CC      arch/arm/kernel/process.o
+> > In file included from /data/lemmy/linux.trees.git/arch/arm/mach-exynos/include/mach/system.h:16:0,
+> >                  from /data/lemmy/linux.trees.git/arch/arm/kernel/process.c:64:
+> > /data/lemmy/linux.trees.git/arch/arm/plat-samsung/include/plat/system-reset.h:19:2: error: #error Fix me up
+> > 
+> > I better not ask the question how such an #error statement can come
+> > through to linux-next.
+> 
+> It comes through when I stick it in my tree because of a month of asking
+> for help to fix something and getting zero response from the maintainers.
+> 
+> It's a way to flag to them that they're doing something wrong - and in
+> fact something is broken, and that that brokenness will happen at the
+> next merge window unless they get off their butt and do something about
+> it.
 
-snip
+Okay, fine with me if it really will be fixed in 3.3-rc1 :)
 
->>>> +/**
->>>> + * clk_init - initialize the data structures in a struct clk
->>>> + * @dev: device initializing this clk, placeholder for now
->>>> + * @clk: clk being initialized
->>>> + *
->>>> + * Initializes the lists in struct clk, queries the hardware for the
->>>> + * parent and rate and sets them both.  Adds the clk to the sysfs tree
->>>> + * topology.
->>>> + *
->>>> + * Caller must populate clk->name and clk->flags before calling
->>>
->>> I'm not too happy about this construct. That leaves struct clk and its
->>> members exposed to the world instead of making it a real opaque
->>> cookie. I know from my own painful experience, that this will lead to
->>> random fiddling in that data structure in drivers and arch code just
->>> because the core code has a shortcoming.
->>>
->>> Why can't we make struct clk a real cookie and confine the data
->>> structure to the core code ?
->>>
->>> That would change the init call to something like:
->>>
->>> struct clk *clk_init(struct device *dev, const struct clk_hw *hw,
->>>                     struct clk *parent)
->>>
->>> And have:
->>> struct clk_hw {
->>>       struct clk_hw_ops *ops;
->>>       const char        *name;
->>>       unsigned long     flags;
->>> };
->>>
->>> Implementers can do:
->>> struct my_clk_hw {
->>>       struct clk_hw    hw;
->>>       mydata;
->>> };
->>>
->>> And then change the clk ops callbacks to take struct clk_hw * as an
->>> argument.
-> We have to define static clocks before we adopt DT binding.
-> If clk is opaque and allocate memory in clk core, it'll make hard
-> to define static clocks. And register/init will pass a long parameter
-> list.
+Thanks,
 
-DT is not a prerequisite for having dynamically created clocks. You can
-make clock init dynamic without DT.
+	Joerg
 
-What data goes in struct clk vs. struct clk_hw could change over time.
-So perhaps we can start with some data in clk_hw and plan to move it to
-struct clk later. Even if almost everything ends up in clk_hw initially,
-at least the structure is in place to have common, core-only data
-separate from platform data.
+-- 
+AMD Operating System Research Center
 
-What is the actual data you need to be static and accessible to the
-platform code? A ptr to parent clk is the main thing I've seen for
-static initialization. So make the parent ptr be struct clk_hw* and
-allow the platforms to access.
-
-Rob
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
