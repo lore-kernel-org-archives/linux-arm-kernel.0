@@ -1,46 +1,61 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 03 Jan 2012 16:14:07 -0800
-Subject: [PATCH RFC] MFD: OMAP: USB: Make the runtime functions depend on
- CONFIG_PM_RUNTIME
-In-Reply-To: <1325572979-6090-1-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Tue, 3 Jan 2012 12:12:59 +0530")
-References: <1325572979-6090-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <874nwc8gts.fsf@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  4 Jan 2012 01:39:54 +0100
+Subject: [PATCH] mach-integrator: defconfig for both AP and CP
+Message-ID: <1325637594-20818-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+This updates the Integrator defconfig to include the hardware
+found on the Integrator/CP: SMC91X, CLCD, MMCI/PL180. Further
+the sometimes disrupting VGA_CONSOLE is disabled (those who
+have a VGA card can enable it) and typical default VFAT
+layouts of the MMC cards are supported by enabling VFAT and
+CP437 encoding of the file system.
 
-> Currently the runtime functions are compiled regardless
-> of CONFIG_PM_RUNTIME flag. This patch intends to fix the same by
-> using SET_RUNTIME_PM_OPS.
->
-> Cc : Keshava Munegowda <keshava_mgowda@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
-> applies on Tony's ehci branch.
-> Compile tested only.
+After this my default kernels boot successfully on Integrator
+AP and CP alike.
 
-You also should compile test this with runtime PM disabled.  I believe
-the current patch will lead to 'function defined but not used' warnings.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/configs/integrator_defconfig |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-Kevin
-
->  drivers/mfd/omap-usb-host.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index 3f565ef..ef72ebe 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -887,8 +887,8 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
->  }
->  
->  static const struct dev_pm_ops usbhsomap_dev_pm_ops = {
-> -	.runtime_suspend	= usbhs_runtime_suspend,
-> -	.runtime_resume		= usbhs_runtime_resume,
-> +	SET_RUNTIME_PM_OPS(usbhs_runtime_suspend,
-> +				usbhs_runtime_resume, NULL)
->  };
->  
->  static struct platform_driver usbhs_omap_driver = {
+diff --git a/arch/arm/configs/integrator_defconfig b/arch/arm/configs/integrator_defconfig
+index 1103f62..a8314c3 100644
+--- a/arch/arm/configs/integrator_defconfig
++++ b/arch/arm/configs/integrator_defconfig
+@@ -57,18 +57,24 @@ CONFIG_NETDEVICES=y
+ CONFIG_NET_ETHERNET=y
+ CONFIG_NET_PCI=y
+ CONFIG_E100=y
++CONFIG_SMC91X=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+ # CONFIG_SERIO_SERPORT is not set
+ CONFIG_SERIAL_AMBA_PL010=y
+ CONFIG_SERIAL_AMBA_PL010_CONSOLE=y
+ CONFIG_FB=y
+ CONFIG_FB_MODE_HELPERS=y
++CONFIG_FB_ARMCLCD=y
+ CONFIG_FB_MATROX=y
+ CONFIG_FB_MATROX_MILLENIUM=y
+ CONFIG_FB_MATROX_MYSTIQUE=y
++# CONFIG_VGA_CONSOLE is not set
++CONFIG_MMC=y
++CONFIG_MMC_ARMMMCI=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL030=y
+ CONFIG_EXT2_FS=y
++CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_CRAMFS=y
+@@ -78,5 +84,7 @@ CONFIG_ROOT_NFS=y
+ CONFIG_NFSD=y
+ CONFIG_NFSD_V3=y
+ CONFIG_PARTITION_ADVANCED=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+-- 
+1.7.6.4
