@@ -1,52 +1,104 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 4 Jan 2012 16:21:33 +0000 (GMT)
-Subject: [PATCH v5 1/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x
- SSP/SPI) driver
-In-Reply-To: <4F014E2C.4000402@ti.com>
-Message-ID: <1325694093.98137.YahooMailClassic@web29006.mail.ird.yahoo.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Wed, 4 Jan 2012 16:35:45 +0000
+Subject: [PATCH v6 6/9] ARM: vexpress: Motherboard RS1 memory map support
+In-Reply-To: <1323957761-13553-7-git-send-email-pawel.moll@arm.com>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-7-git-send-email-pawel.moll@arm.com>
+Message-ID: <4F047FE1.5030002@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shubhrajyoti,
+On 15/12/11 14:02, Pawel Moll wrote:
+> This patch adds support for RS1 memory map based Versatile Express
+> motherboard.
+> 
+[...]
+> --- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
+> +++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
+> @@ -10,12 +10,41 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> -#define DEBUG_LL_UART_OFFSET	0x00009000
+> +#define DEBUG_LL_PHYS_BASE		0x10000000
+> +#define DEBUG_LL_UART_OFFSET		0x00009000
+> +
+> +#define DEBUG_LL_PHYS_BASE_RS1		0x1c000000
+> +#define DEBUG_LL_UART_OFFSET_RS1	0x00090000
+> +
+> +#define DEBUG_LL_VIRT_BASE		0xf8000000
+>  
+>  		.macro	addruart,rp,rv,tmp
+> -		mov	\rp, #DEBUG_LL_UART_OFFSET
+> -		orr	\rv, \rp, #0xf8000000	@ virtual base
+> -		orr	\rp, \rp, #0x10000000	@ physical base
+> +
+> +		@ Check the MMU state
+> +#if defined(CONFIG_MMU)
+> +		mrc	p15, 0, \tmp, c1, c0	@ SCTRL
+> +		tst	\tmp, #1		@ MMU enabled?
+> +		moveq	\tmp, #DEBUG_LL_PHYS_BASE
+> +		movne	\tmp, #DEBUG_LL_VIRT_BASE
+> +#else
+> +		mov	\tmp, #DEBUG_LL_PHYS_BASE
+> +#endif
+> +
+> +		@ PL011 present in "original" place?
+> +		orr	\tmp, \tmp, #DEBUG_LL_UART_OFFSET
+> +		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
 
---- On Mon, 2/1/12, Shubhrajyoti <shubhrajyoti@ti.com> wrote:
+This doesn't work with CONFIG_EARLY_PRINTK=y on a system with the RS1
+memory map.   __create_page_tables has only mapped the single physical
+page at 0x1c090000 and thus the test for the UART in the other memory
+map faults.
 
-> > +    int   
->        
-> pressed;    /* 1 = pressed, 0 = released */
-> Could this be bool ?
+I made it work with this hack, but I'm not sure what the correct
+solution would be.
 
-OK.
+diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S
+b/arch/arm/mach-vexpress/include/mach/debug-macro.S
+index 8010ff9..af443b4 100644
+--- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
++++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
+@@ -30,6 +30,7 @@
+ 		mov	\tmp, #DEBUG_LL_PHYS_BASE
+ #endif
 
-> > +config MOUSE_NAVPOINT_PXA27x
-> > +??? tristate "Synaptics NavPoint
-> (PXA27x SSP/SPI)"
-> > +??? depends on PXA27x &&
-> PXA_SSP
-> > +??? help
-> > +??? ? This option enables support
-> for the Synaptics NavPoint connected to
-> > +??? ? a PXA27x SSP port in SPI
-> slave mode. The driver implements a simple
-> > +??? ? navigation pad. The four
-> raised dots are mapped to UP/DOWN/LEFT/RIGHT
-> > +??? ? buttons and the centre of
-> the touchpad is mapped to the ENTER button.
-> Maybe some help on module building as tristate.
++#if 0
+ 		@ PL011 present in "original" place?
+ 		orr	\tmp, \tmp, #DEBUG_LL_UART_OFFSET
+ 		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
+@@ -39,11 +40,12 @@
+ 		moveq	\rp, #DEBUG_LL_UART_OFFSET
+ 		orreq	\rv, \rp, #DEBUG_LL_VIRT_BASE
+ 		orreq	\rp, \rp, #DEBUG_LL_PHYS_BASE
++#endif
 
-OK.
+-		@ RS1 memory map
+-		movne	\rp, #DEBUG_LL_UART_OFFSET_RS1
+-		orrne	\rv, \rp, #DEBUG_LL_VIRT_BASE
+-		orrne	\rp, \rp, #DEBUG_LL_PHYS_BASE_RS1
++       		@ RS1 memory map
++		mov	\rp, #DEBUG_LL_UART_OFFSET_RS1
++		mov	\rv, \rp, #DEBUG_LL_VIRT_BASE
++		orr	\rp, \rp, #DEBUG_LL_PHYS_BASE_RS1
 
-> > +??? ret = request_irq(ssp->irq,
-> navpoint_int, 0, pdev->name, &pdev->dev);
-> Could this be a threadded irq?
+ 		.endm
 
-The reading of the SSDR could not, because that is needed to clear the
-interrupt.
-The initial processing of navpoint_packet() could, but would require a new FIFO between the hard irq and threaded irq handlers to buffer the 16-bit data from the SSDR. Since most of the data is ultimately discarded I can avoid the FIFO by keeping this initial processing in the hard irq handler.
-The final processing of navpoint_packet(), the calls to input_report_key() and input_sync(), could and should. I presume this was your main concern.
+> +		teq	\tmp, #0x11		@ PL011
+> +
+> +		@ Original memory map
+> +		moveq	\rp, #DEBUG_LL_UART_OFFSET
+> +		orreq	\rv, \rp, #DEBUG_LL_VIRT_BASE
+> +		orreq	\rp, \rp, #DEBUG_LL_PHYS_BASE
+> +
+> +		@ RS1 memory map
+> +		movne	\rp, #DEBUG_LL_UART_OFFSET_RS1
+> +		orrne	\rv, \rp, #DEBUG_LL_VIRT_BASE
+> +		orrne	\rp, \rp, #DEBUG_LL_PHYS_BASE_RS1
+> +
+>  		.endm
+>  
+>  #include <asm/hardware/debug-pl01x.S>
 
-> navpoint_resume(&pdev->dev);
-> Could this be pushed to open instead?
-
-It could. In practice the navpoint device would only be opened by the X server, and thus would remain open for the duration of the system anyway.
-But I'm happy to add a new open function.
+David
