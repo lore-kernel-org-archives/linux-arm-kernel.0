@@ -1,116 +1,144 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Wed,  4 Jan 2012 15:12:04 +0800
-Subject: [PATCH] regulator: max8925: fix enabled/disabled judgement mistake
-Message-ID: <1325661124-7734-1-git-send-email-haojian.zhuang@marvell.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 4 Jan 2012 00:17:49 -0700
+Subject: [PATCH 3/3] of/irq: Add interrupts-names property to name an irq
+ resource
+In-Reply-To: <1323095036-3739-4-git-send-email-b-cousson@ti.com>
+References: <1323095036-3739-1-git-send-email-b-cousson@ti.com>
+ <1323095036-3739-4-git-send-email-b-cousson@ti.com>
+Message-ID: <20120104071749.GA15503@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Liu <kliu5@marvell.com>
+On Mon, Dec 05, 2011 at 03:23:56PM +0100, Benoit Cousson wrote:
+> In a HW system, resources in general have name to identify them.
+> The is the case as well for IORESOURCE_IRQ resources filled by DT
+> "interrupts" entries.
+> The current DT mechanism is relying on the "interrupts" order to identify
+> the proper resource. This is error prone and not the natural way to
+> retrieve an information in general.
 
-Max8925 ldo status should be determined by two factors:
-1. power up/down sequence selection(LDOCTL[4:2]).
-2. i2c enable bit(LDOCTL[0]).
+I do not agree with this assessment.  interrupt property order has
+worked quite well for a very long time.  There are some uses cases
+that want to access it by-name, but I expect accessing by-index to
+continue to be the preferred method.  I'm going to drop this paragraph
+from the commit text.
 
-Max8925 ldo support two types of power up/down sequence:
-1. flexible sequence(LDOCTL[4:2] = 0~6).
-2. i2c sequence(LDOCTL[4:2] = 7).
+> Moreover, the resource does support a name and an API is available to
+> allow a driver to retrieve the resource using the name instead of an
+> index.
+> 
+> Add a interrupts-names property to allow the possiblity to provide a name
+> to any interrupts entries.
+> If the name is available, use it to name the resource, otherwise
+> keep the legacy device full name.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  .../devicetree/bindings/interrupts-names.txt       |   50 ++++++++++++++++++++
+>  drivers/of/irq.c                                   |   11 ++++-
+>  2 files changed, 60 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupts-names.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupts-names.txt b/Documentation/devicetree/bindings/interrupts-names.txt
+> new file mode 100644
+> index 0000000..d9a796d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupts-names.txt
+> @@ -0,0 +1,50 @@
+> +interrupts-names property
+> +
+> +In a HW system, physical resources in general have name to identify them.
+> +The is the case as well for interrupt lines.
+> +The current DT mechanism is relying on the "interrupts" order to identify
+> +the proper resource. The interrupts-names is adding the possiblity to
+> +provide a name to interrupts entries.
+> +
+> +Usage:
+> +
+> +This attribute must be used along with a regular interrupts entry. If not
+> +it will be simply ignored.
 
-With flexible sequence selected, the ldo is enabled during power up by default.
-With i2c sequence selected, the ldo is controlled by the i2c enable bit(LDOCTL[0]).
+This documentation is pretty much identical to the reg-names property
+description.  I'll merge the two into a single file.
 
-Signed-off-by: Kevin Liu <kliu5@marvell.com>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- drivers/regulator/max8925-regulator.c |   33 ++++++++++++++++++++-------------
- 1 files changed, 20 insertions(+), 13 deletions(-)
+> +
+> +
+> +Example:
+> +
+> +
+> +l4-abe {
+> +	compatible = "simple-bus";
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +	ranges = <0 0 0x48000000 0x00001000>, /* MPU path */
+> +		 <1 0 0x49000000 0x00001000>; /* L3 path */
+> +	mcasp {
+> +		compatible = "ti,mcasp";
+> +		reg = <0 0x10 0x10>, <0 0x20 0x10>,
+> +		      <1 0x10 0x10>, <1 0x20 0x10>;
+> +		reg-names = "mpu", "dat",
+> +			    "dma", "dma_dat";
+> +		interrupts = <11>, <12>;
+> +		interrupts-names = "rx", "tx";
 
-diff --git a/drivers/regulator/max8925-regulator.c b/drivers/regulator/max8925-regulator.c
-index cc9ec0e..9537f43 100644
---- a/drivers/regulator/max8925-regulator.c
-+++ b/drivers/regulator/max8925-regulator.c
-@@ -24,9 +24,13 @@
- #define SD1_DVM_SHIFT		5		/* SDCTL1 bit5 */
- #define SD1_DVM_EN		6		/* SDV1 bit 6 */
- 
--/* bit definitions in SD & LDO control registers */
--#define OUT_ENABLE   		0x1f		/* Power U/D sequence as I2C */
--#define OUT_DISABLE		0x1e		/* Power U/D sequence as I2C */
-+/* bit definitions in LDO control registers */
-+#define LDO_SEQ_I2C		0x7		/* Power U/D by i2c */
-+#define LDO_SEQ_MASK		0x7		/* Power U/D sequence mask */
-+#define LDO_SEQ_SHIFT		2		/* Power U/D sequence offset */
-+#define LDO_I2C_EN		0x1		/* Enable by i2c */
-+#define LDO_I2C_EN_MASK		0x1		/* Enable mask by i2c */
-+#define LDO_I2C_EN_SHIFT	0		/* Enable offset by i2c */
- 
- struct max8925_regulator_info {
- 	struct regulator_desc	desc;
-@@ -40,7 +44,6 @@ struct max8925_regulator_info {
- 	int	vol_reg;
- 	int	vol_shift;
- 	int	vol_nbits;
--	int	enable_bit;
- 	int	enable_reg;
- };
- 
-@@ -98,8 +101,10 @@ static int max8925_enable(struct regulator_dev *rdev)
- 	struct max8925_regulator_info *info = rdev_get_drvdata(rdev);
- 
- 	return max8925_set_bits(info->i2c, info->enable_reg,
--				OUT_ENABLE << info->enable_bit,
--				OUT_ENABLE << info->enable_bit);
-+				LDO_SEQ_MASK << LDO_SEQ_SHIFT |
-+				LDO_I2C_EN_MASK << LDO_I2C_EN_SHIFT,
-+				LDO_SEQ_I2C << LDO_SEQ_SHIFT |
-+				LDO_I2C_EN << LDO_I2C_EN_SHIFT);
- }
- 
- static int max8925_disable(struct regulator_dev *rdev)
-@@ -107,20 +112,24 @@ static int max8925_disable(struct regulator_dev *rdev)
- 	struct max8925_regulator_info *info = rdev_get_drvdata(rdev);
- 
- 	return max8925_set_bits(info->i2c, info->enable_reg,
--				OUT_ENABLE << info->enable_bit,
--				OUT_DISABLE << info->enable_bit);
-+				LDO_SEQ_MASK << LDO_SEQ_SHIFT |
-+				LDO_I2C_EN_MASK << LDO_I2C_EN_SHIFT,
-+				LDO_SEQ_I2C << LDO_SEQ_SHIFT);
- }
- 
- static int max8925_is_enabled(struct regulator_dev *rdev)
- {
- 	struct max8925_regulator_info *info = rdev_get_drvdata(rdev);
--	int ret;
-+	int ldo_seq, ret;
- 
- 	ret = max8925_reg_read(info->i2c, info->enable_reg);
- 	if (ret < 0)
- 		return ret;
--
--	return ret & (1 << info->enable_bit);
-+	ldo_seq = (ret >> LDO_SEQ_SHIFT) & LDO_SEQ_MASK;
-+	if (ldo_seq != LDO_SEQ_I2C)
-+		return 1;
-+	else
-+		return ret & (LDO_I2C_EN_MASK << LDO_I2C_EN_SHIFT);
- }
- 
- static int max8925_set_dvm_voltage(struct regulator_dev *rdev, int uV)
-@@ -188,7 +197,6 @@ static struct regulator_ops max8925_regulator_ldo_ops = {
- 	.vol_shift	= 0,					\
- 	.vol_nbits	= 6,					\
- 	.enable_reg	= MAX8925_SDCTL##_id,			\
--	.enable_bit	= 0,					\
- }
- 
- #define MAX8925_LDO(_id, min, max, step)			\
-@@ -207,7 +215,6 @@ static struct regulator_ops max8925_regulator_ldo_ops = {
- 	.vol_shift	= 0,					\
- 	.vol_nbits	= 6,					\
- 	.enable_reg	= MAX8925_LDOCTL##_id,			\
--	.enable_bit	= 0,					\
- }
- 
- static struct max8925_regulator_info max8925_regulator_info[] = {
--- 
-1.7.0.4
+Nitpick: I'm going to change the property name to "interrupt-names"
+(dropping the 's' from interrupts).  After playing with the clock
+binding (clocks vs. clock-names) and looking at what could be done
+with the gpio binding (gpios vs. gpio-names), I think it 'feels' more
+consistent to drop the s.
+
+Merged, thanks.
+
+> +	};
+> +
+> +	timer {
+> +		compatible = "ti,timer";
+> +		reg = <0 0x40 0x10>, <1 0x40 0x10>;
+> +		reg-names = "mpu", "dma";
+> +	};
+> +};
+> +
+> +
+> +usb {
+> +	compatible = "ti,usb-host";
+> +	reg = <0x4a064000 0x800>, <0x4a064800 0x200>,
+> +	      <0x4a064c00 0x200>;
+> +	reg-names = "config", "ohci", "ehci";
+> +	interrupts = <14>, <15>;
+> +	interrupts-names = "ohci", "ehci";
+> +};
+> +
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 19c0115..604b53f 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -346,9 +346,18 @@ int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
+>  	/* Only dereference the resource if both the
+>  	 * resource and the irq are valid. */
+>  	if (r && irq != NO_IRQ) {
+> +		const char *name = NULL;
+> +
+> +		/*
+> +		 * Get optional "interrupts-names" property to add a name
+> +		 * to the resource.
+> +		 */
+> +		of_property_read_string_index(dev, "interrupts-names", index,
+> +					      &name);
+> +
+>  		r->start = r->end = irq;
+>  		r->flags = IORESOURCE_IRQ;
+> -		r->name = dev->full_name;
+> +		r->name = name ? name : dev->full_name;
+>  	}
+>  
+>  	return irq;
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
