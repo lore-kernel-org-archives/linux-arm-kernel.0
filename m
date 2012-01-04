@@ -1,24 +1,25 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 4 Jan 2012 17:49:37 +0000
-Subject: GPIO matrix and button with single edge IRQ
-In-Reply-To: <CAHEb4-8Xo=w5GuYQzP8X3h_HW8yHG89T+oGRfZJNa652St=YnA@mail.gmail.com>
-References: <CAHEb4-8Xo=w5GuYQzP8X3h_HW8yHG89T+oGRfZJNa652St=YnA@mail.gmail.com>
-Message-ID: <20120104174937.GA3104@page>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Wed, 4 Jan 2012 12:05:35 -0600
+Subject: [RFC PATCH 0/8] Add common ARM cpuidle init code
+In-Reply-To: <4F041933.70506@linaro.org>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <201112081537.04789.arnd.bergmann@linaro.org>
+ <4F031698.4010501@linaro.org>
+ <201201031602.01072.arnd.bergmann@linaro.org>
+ <4F041933.70506@linaro.org>
+Message-ID: <CAMXH7KEPyK31RT=MZaFdKAQRssX9rOkmcQKhDh5y1+K9mwEqNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Shawn and Arnd,
 
-On Wed, Jan 04, 2012 at 07:54:06AM -0500, Marc-Andr? H?bert wrote:
-> We are developing an i.MX283 custom board. We have a small keypad
-> matrix and some gpio buttons. After setting up the necessary platform
-> data, I realized when debugging that it couldn't work because the GPIO
-> controller does not support dual edge triggers like requested in both
+Sorry for my late reply.  For some reason, I didn't see this thread
+until after Daniel's response.
 
-Does the GPIO controller support both edge types but not at the same 
-time?  LinusW pointed out to me that a couple of other controllers have 
-this restriction but you can work around it in the controller driver:
-
-http://www.spinics.net/lists/arm-kernel/msg152526.html
-
-Jamie
+Per an offline conversation Daniel and I had, since Daniel has
+volunteered to move the other drivers and has already submitted a RFC
+for at91 cpuidle, I will submit a v3 of the common cpuidle code which
+will include moving the i.MX5 cpuidle code to drivers/cpuidle to have
+the best chance of getting this code and an i.MX5 cpuidle driver into
+3.3.  If my code get's merged, then Daniel will re-base his changes
+against the common code.
