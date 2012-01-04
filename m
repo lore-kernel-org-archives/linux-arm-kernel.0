@@ -1,64 +1,48 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 4 Jan 2012 11:14:00 -0700
-Subject: [PATCH v2 06/10] arm/dts: OMAP3: Add i2c controller nodes
-In-Reply-To: <1323439361-1647-7-git-send-email-b-cousson@ti.com>
+Date: Wed, 4 Jan 2012 11:04:32 -0700
+Subject: [PATCH v2 01/10] ARM: OMAP2+: pm: Do not init statically the SR
+ and voltage layer with DT
+In-Reply-To: <1323439361-1647-2-git-send-email-b-cousson@ti.com>
 References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-7-git-send-email-b-cousson@ti.com>
-Message-ID: <20120104181400.GM15503@ponder.secretlab.ca>
+ <1323439361-1647-2-git-send-email-b-cousson@ti.com>
+Message-ID: <20120104180432.GH15503@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 03:02:37PM +0100, Benoit Cousson wrote:
-> Add i2c controllers nodes into the main ocp bus.
+On Fri, Dec 09, 2011 at 03:02:32PM +0100, Benoit Cousson wrote:
+> In the case of DT, the PMIC and SR initialization will be done using
+> a completely different mechanism.
+> 
+> Disable this part if a DT blob is available.
 > 
 > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
 
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
+> Cc: Kevin Hilman <khilman@ti.com>
 > ---
->  arch/arm/boot/dts/omap3.dtsi |   28 ++++++++++++++++++++++++++++
->  1 files changed, 28 insertions(+), 0 deletions(-)
+>  arch/arm/mach-omap2/pm.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 6866dc7..81d8e2c 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -61,5 +61,33 @@
->  			ti,intc-size = <96>;
->  			reg = <0x48200000 0x1000>;
->  		};
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index 1881fe9..ad4f693 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -227,6 +227,14 @@ postcore_initcall(omap2_common_pm_init);
+>  
+>  static int __init omap2_common_pm_late_init(void)
+>  {
+> +	/*
+> +	 * In the case of DT, the PMIC and SR initialization will be done using
+> +	 * a completely different mechanism.
+> +	 * Disable this part if a DT blob is available.
+> +	 */
+> +	if (of_have_populated_dt())
+> +		return 0;
 > +
-> +		/*
-> +		 * Flags for all i2c instances: 0x118
-> +		 * APPLY_ERRATA_I207 | RESET_REGS_POSTIDLE | BUS_SHIFT_2
-> +		 */
-> +		i2c1: i2c at 1 {
-> +			compatible = "ti,omap3-i2c";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			ti,hwmods = "i2c1";
-> +			ti,flags = <0x118>;
-> +		};
-> +
-> +		i2c2: i2c at 2 {
-> +			compatible = "ti,omap3-i2c";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			ti,hwmods = "i2c2";
-> +			ti,flags = <0x118>;
-> +		};
-> +
-> +		i2c3: i2c at 3 {
-> +			compatible = "ti,omap3-i2c";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			ti,hwmods = "i2c3";
-> +			ti,flags = <0x118>;
-> +		};
->  	};
->  };
+>  	/* Init the voltage layer */
+>  	omap_pmic_late_init();
+>  	omap_voltage_late_init();
 > -- 
 > 1.7.0.4
 > 
