@@ -1,57 +1,46 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 4 Jan 2012 11:08:02 -0700
-Subject: [PATCH v2 02/10] i2c: OMAP: Add DT support for i2c controller
-In-Reply-To: <4F0455D8.7060904@ti.com>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-3-git-send-email-b-cousson@ti.com>
- <87hb14q7vj.fsf@ti.com> <4F0455D8.7060904@ti.com>
-Message-ID: <20120104180802.GI15503@ponder.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Jan 2012 19:10:42 +0000
+Subject: ZenIV (was: Re: Status of arm-soc.git for 3.2)
+In-Reply-To: <alpine.LFD.2.02.1201041337370.2907@xanadu.home>
+References: <201201032243.06440.arnd@arndb.de>
+ <20120104100016.GK2914@n2100.arm.linux.org.uk>
+ <20120104181703.GA11810@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1201041337370.2907@xanadu.home>
+Message-ID: <20120104191042.GB11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 02:36:24PM +0100, Cousson, Benoit wrote:
-> Hi Kevin,
+On Wed, Jan 04, 2012 at 01:55:48PM -0500, Nicolas Pitre wrote:
+> On Wed, 4 Jan 2012, Russell King - ARM Linux wrote:
+> > I've now disabled all access to my git tree there, and restarted apache.
+> > We will see whether that improves stability - I suspect it will do because
+> > I reckon that the problem is that the smart git stuff is what's killing
+> > the machine.
 > 
-> On 12/14/2011 2:06 AM, Kevin Hilman wrote:
-> >Benoit Cousson<b-cousson@ti.com>  writes:
-> >
-> >>Add initial DT support to retrieve the frequency using a
-> >>DT attribute instead of the pdata pointer if of_node exist.
-> >>
-> >>Add documentation for omap i2c controller binding.
-> >>
-> >>Based on original patches from Manju and Grant.
-> >>
-> >>Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> >>Cc: Ben Dooks<ben-linux@fluff.org>
-> >
-> >This seems indepenent from the rest of the series, and I can queue up
-> >for merge via the I2C tree.
-> >
-> >Benoit, please confirm that we shouldn't have any problems if this patch
-> >goes independently.
-> >
-> >Grant/Rob, with your ack on the bindings, I can queue this up for the
-> >I2C maintainers along with some other OMAP I2C changes for v3.3.
-> 
-> I removed the nasty bindings and got the Reviewed-by: from Rob for
-> the v4 [1].
-> 
-> Could you take it in your branch? I've just tried merging your
-> for_3.3/i2c/misc on top of my for_3.3/3_omap_dt_i2c_twl branch and
-> tested it successfully on OMAP4 DT boot.
+> I'm sure that is the case.  However faulty hardware could still be the 
+> root cause, but without the load from Git the machine might become 
+> loaded lightly enough you might not see any ill effects before quite a 
+> while.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+When it's serving the next Fedora release (it's one of the official
+mirrors) I'm sure any problems like that would become noticable - but
+they haven't yet.  It purely seems to be something git is doing which
+is killing the machine.
 
-> 
-> Thanks,
-> Benoit
-> 
-> 
-> [1] http://lkml.org/lkml/2011/12/22/176
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Another kernel developer has mentioned to me that he believes that Git
+disagrees with Pentium 4 CPUs, suggesting that Git does something which
+the P4 microcode really doesn't like: he's found that Git is dog slow
+on his P4 machines as well.
+
+That ties up with my experience too.
+
+So, I suggest rather than blaming this problem on the machines, maybe
+there could be something behind this: maybe Git is just plain incompatible
+with Pentium 4 CPUs.
+
+> If so I'd suggest you consider one of the hosting alternatives readily 
+> available to you for publishing your Git tree.  I'm sure any hurdle can 
+> be leveled out very quickly for the core ARM Linux repository.  I can 
+> certainly facilitate things if you wish.
+
+I'm already aware of your attempts in the background.
