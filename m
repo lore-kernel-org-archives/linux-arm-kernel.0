@@ -1,70 +1,71 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 4 Jan 2012 13:11:11 -0700
-Subject: [PATCH 1/3] ARM: OMAP2+: kconfig: Enable devicetree by default
- for OMAP2+ systems
-In-Reply-To: <1323190149-6492-2-git-send-email-b-cousson@ti.com>
-References: <1323190149-6492-2-git-send-email-b-cousson@ti.com>
-Message-ID: <CACxGe6sAEs4H4FR75psy74x9V3mbp6wAdryJbDu8HBZ4tMmyvw@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 04 Jan 2012 15:32:13 -0500 (EST)
+Subject: ZenIV (was: Re: Status of arm-soc.git for 3.2)
+In-Reply-To: <20120104200447.GC11810@n2100.arm.linux.org.uk>
+References: <201201032243.06440.arnd@arndb.de>
+ <20120104100016.GK2914@n2100.arm.linux.org.uk>
+ <20120104181703.GA11810@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1201041337370.2907@xanadu.home>
+ <20120104191042.GB11810@n2100.arm.linux.org.uk>
+ <20120104200447.GC11810@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1201041520380.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 6, 2011 at 9:49 AM, Benoit Cousson <b-cousson@ti.com> wrote:
-> devicetree will become the mandatory boot method for OMAP2+.
-> In order to avoid cluttering the OMAP code with #ifdef CONFIG_OF,
-> select USE_OF by default for every OMAP2+ systems.
-> Select as well the APPENDED_DTB and ATAG_DTB_COMPAT to allow legacy
-> boot loader to keep working properly.
->
-> Enable PROC_DEVICETREE as well.
->
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
+On Wed, 4 Jan 2012, Russell King - ARM Linux wrote:
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> On Wed, Jan 04, 2012 at 07:10:42PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 04, 2012 at 01:55:48PM -0500, Nicolas Pitre wrote:
+> > > On Wed, 4 Jan 2012, Russell King - ARM Linux wrote:
+> > > > I've now disabled all access to my git tree there, and restarted apache.
+> > > > We will see whether that improves stability - I suspect it will do because
+> > > > I reckon that the problem is that the smart git stuff is what's killing
+> > > > the machine.
+> > > 
+> > > I'm sure that is the case.  However faulty hardware could still be the 
+> > > root cause, but without the load from Git the machine might become 
+> > > loaded lightly enough you might not see any ill effects before quite a 
+> > > while.
+> > 
+> > When it's serving the next Fedora release (it's one of the official
+> > mirrors) I'm sure any problems like that would become noticable - but
+> > they haven't yet.  It purely seems to be something git is doing which
+> > is killing the machine.
+> 
+> I think we've just found the issue causing httpd to die:
+> 
+> - Fedora systems set a limit at login time on the number of processes a
+>   user can run - which is set to a soft limit of 1024.
+> 
+> - When someone logs in, their shell inherits this soft rlimit.  This
+>   gets inherited by all sub-processes, including through a su to their
+>   root shell.
+> 
+> - When they restart httpd, httpd also inherits this limit.
+> 
+> - httpd's own internal limits are set to a max clients of 1024.
+> 
+> The problem comes when httpd hits 1024 processes - as it forks as root,
+> this succeeds (root is not subjected to this rlimit), and then a
+> subsequent setuid() fails with -EAGAIN, causing httpd to experience a
+> fatal error.
+> 
+> Obviously, this is not a good combination of things to happen.  It's
+> also completely unnoticable to anyone who restarts apache.
 
-> ---
-> ?arch/arm/mach-omap2/Kconfig | ? ?1 -
-> ?arch/arm/plat-omap/Kconfig ?| ? ?4 ++++
-> ?2 files changed, 4 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index e1293aa..056a812 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -109,7 +109,6 @@ comment "OMAP Board Type"
-> ?config MACH_OMAP_GENERIC
-> ? ? ? ?bool "Generic OMAP2+ board"
-> ? ? ? ?depends on ARCH_OMAP2PLUS
-> - ? ? ? select USE_OF
-> ? ? ? ?default y
-> ? ? ? ?help
-> ? ? ? ? ?Support for generic TI OMAP2+ boards using Flattened Device Tree.
-> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-> index aa59f42..74f41dc 100644
-> --- a/arch/arm/plat-omap/Kconfig
-> +++ b/arch/arm/plat-omap/Kconfig
-> @@ -24,6 +24,10 @@ config ARCH_OMAP2PLUS
-> ? ? ? ?select CLKDEV_LOOKUP
-> ? ? ? ?select GENERIC_IRQ_CHIP
-> ? ? ? ?select OMAP_DM_TIMER
-> + ? ? ? select USE_OF
-> + ? ? ? select ARM_APPENDED_DTB
-> + ? ? ? select ARM_ATAG_DTB_COMPAT
-> + ? ? ? select PROC_DEVICETREE
-> ? ? ? ?help
-> ? ? ? ? ?"Systems based on OMAP2, OMAP3 or OMAP4"
->
-> --
-> 1.7.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Nasty.
+
+> So, I've 'fixed' it by raising the rlimit in the httpd startup scripts,
+> which should keep it fixed whenever anyone else restarts httpd.
+> 
+> The problem should be solved, and as such I've re-enabled access to
+> the git tree.
+
+OK, let's hope things will hold up.
+
+I suspect this might not be correlated to the memory exhaustion ZenIV 
+experienced in the past though.  That might require another kind of 
+solution if that comes again.
 
 
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Nicolas
