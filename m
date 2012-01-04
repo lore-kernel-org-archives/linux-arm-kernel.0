@@ -1,72 +1,49 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Wed,  4 Jan 2012 11:39:33 -0700
-Subject: [PATCH 1/6] ARM: tegra: Remove use of TEGRA_GPIO_TO_IRQ
-Message-ID: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
+Date: Wed,  4 Jan 2012 11:39:34 -0700
+Subject: [PATCH 2/6] dt: tegra gpio: Flesh out binding documentation
+In-Reply-To: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
+References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1325702378-20863-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace compile-time usage of TEGRA_GPIO_TO_IRQ with run-time calls to
-gpio_to_irq(). This will allow the base IRQ number for the Tegra GPIO
-driver to be dynamically allocated in a later patch.
+Document the required reg and interrupts properties.
+Add a complete example.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-This series is 3.4 material (obviously I guess!)
+ .../devicetree/bindings/gpio/gpio_nvidia.txt       |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
- arch/arm/mach-tegra/board-harmony.c  |    2 +-
- arch/arm/mach-tegra/board-seaboard.c |    5 +++--
- 2 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index 789bdc9..c00aadb 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -101,7 +101,6 @@ static struct wm8903_platform_data harmony_wm8903_pdata = {
- static struct i2c_board_info __initdata wm8903_board_info = {
- 	I2C_BOARD_INFO("wm8903", 0x1a),
- 	.platform_data = &harmony_wm8903_pdata,
--	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CDC_IRQ),
- };
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+index eb4b530..50b363c 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+@@ -2,7 +2,25 @@ NVIDIA Tegra 2 GPIO controller
  
- static void __init harmony_i2c_init(void)
-@@ -111,6 +110,7 @@ static void __init harmony_i2c_init(void)
- 	platform_device_register(&tegra_i2c_device3);
- 	platform_device_register(&tegra_i2c_device4);
- 
-+	wm8903_board_info.irq = gpio_to_irq(TEGRA_GPIO_CDC_IRQ);
- 	i2c_register_board_info(0, &wm8903_board_info, 1);
- }
- 
-diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
-index ebac65f..d669847 100644
---- a/arch/arm/mach-tegra/board-seaboard.c
-+++ b/arch/arm/mach-tegra/board-seaboard.c
-@@ -159,7 +159,6 @@ static struct platform_device *seaboard_devices[] __initdata = {
- 
- static struct i2c_board_info __initdata isl29018_device = {
- 	I2C_BOARD_INFO("isl29018", 0x44),
--	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_ISL29018_IRQ),
- };
- 
- static struct i2c_board_info __initdata adt7461_device = {
-@@ -183,7 +182,6 @@ static struct wm8903_platform_data wm8903_pdata = {
- static struct i2c_board_info __initdata wm8903_device = {
- 	I2C_BOARD_INFO("wm8903", 0x1a),
- 	.platform_data = &wm8903_pdata,
--	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CDC_IRQ),
- };
- 
- static int seaboard_ehci_init(void)
-@@ -214,7 +212,10 @@ static void __init seaboard_i2c_init(void)
- 	gpio_request(TEGRA_GPIO_ISL29018_IRQ, "isl29018");
- 	gpio_direction_input(TEGRA_GPIO_ISL29018_IRQ);
- 
-+	isl29018_device.irq = gpio_to_irq(TEGRA_GPIO_ISL29018_IRQ);
- 	i2c_register_board_info(0, &isl29018_device, 1);
+ Required properties:
+ - compatible : "nvidia,tegra20-gpio"
++- reg : Physical base address and length of the controller's registers.
++- interrupts : The interrupt outputs from the controller.
+ - #gpio-cells : Should be two. The first cell is the pin number and the
+   second cell is used to specify optional parameters:
+   - bit 0 specifies polarity (0 for normal, 1 for inverted)
+ - gpio-controller : Marks the device node as a GPIO controller.
 +
-+	wm8903_device.irq = gpio_to_irq(TEGRA_GPIO_CDC_IRQ);
- 	i2c_register_board_info(0, &wm8903_device, 1);
- 
- 	i2c_register_board_info(3, &adt7461_device, 1);
++Example:
++
++gpio: gpio at 6000d000 {
++	compatible = "nvidia,tegra20-gpio";
++	reg = < 0x6000d000 0x1000 >;
++	interrupts = < 0 32 0x04
++		       0 33 0x04
++		       0 34 0x04
++		       0 35 0x04
++		       0 55 0x04
++		       0 87 0x04
++		       0 89 0x04 >;
++	#gpio-cells = <2>;
++	gpio-controller;
++};
 -- 
 1.7.0.4
