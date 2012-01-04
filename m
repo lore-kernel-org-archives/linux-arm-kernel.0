@@ -1,23 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 4 Jan 2012 14:11:26 -0800
-Subject: [PATCH] ARM/bcmring: missing sched.h inclusion in dma.c
-In-Reply-To: <4F034B56.4060704@broadcom.com>
-References: <4F034B56.4060704@broadcom.com>
-Message-ID: <CAOesGMiRhB+qQKixPy_HgQjTseSNKYRmfr2AK5VvFgkqA-R3mg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Jan 2012 22:10:36 +0000
+Subject: [PATCH 1/2][RFC] at91 : move pm.h header to include/mach
+In-Reply-To: <4F048CD9.1050601@gmail.com>
+References: <1325696147-14058-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F048CD9.1050601@gmail.com>
+Message-ID: <20120104221036.GK11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 04, 2012 at 11:31:05AM -0600, Rob Herring wrote:
+> This header should probably be named something more specific like
+> at91_pm.h or at91_sdram.h. This will be needed to avoid name collisions
+> with mach headers on a single kernel binary.
 
-On Tue, Jan 3, 2012 at 10:39 AM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
-> Add including of sched.h to fix build error.
->
-> This patch was submitted a couple of times last year but unfortunately got
-> lost.
+I think actually the idea that mach/*.h headers can be included by stuff
+outside of arch/arm is something that we should deprecate, because it's
+not going to be sane to make them all unique in this way.
 
-What tree is this against? In 3.2-rc7, linux/sched.h is already
-included in that file (and the patch doesn't apply cleanly because of
-this).
+Not only that but it prevents the .c files being built on other
+architectures, and provides another reason why the .c file is tied to
+a pariticular SoC - even if the same IP is used in a different SoC, it
+can be used as a reason why not to reuse the .c file.
 
-
--Olof
+Let's not give people excuses not to share code!
