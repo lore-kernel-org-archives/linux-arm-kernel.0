@@ -1,65 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jan 2012 09:17:08 +0000
-Subject: [PATCH] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
-In-Reply-To: <CAN1soZzeJi=QKCz4zuUk0LRyWFfACtq363QnqxO9D0RdUGTbxw@mail.gmail.com>
-References: <1323728465.801.YahooMailClassic@web29018.mail.ird.yahoo.com>
- <CA+gwMcc3tbGXmFHQt=y7mwprXumh7sgMSE_e7B0L2LbQ-Hk2fg@mail.gmail.com>
- <20111221191901.GA18261@rainbow>
- <CAN1soZzwMQh7cMF_1QR5zzzy895qb+QkKP+AXp+7VnwCFykNgg@mail.gmail.com>
- <20111222194907.GA29166@rainbow>
- <CAN1soZzeJi=QKCz4zuUk0LRyWFfACtq363QnqxO9D0RdUGTbxw@mail.gmail.com>
-Message-ID: <20120104091708.GJ2914@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 04 Jan 2012 10:17:39 +0100
+Subject: [RFC PATCH 0/8] Add common ARM cpuidle init code
+In-Reply-To: <201201031602.01072.arnd.bergmann@linaro.org>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <201112081537.04789.arnd.bergmann@linaro.org> <4F031698.4010501@linaro.org>
+ <201201031602.01072.arnd.bergmann@linaro.org>
+Message-ID: <4F041933.70506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 02:41:47PM +0800, Haojian Zhuang wrote:
-> On Fri, Dec 23, 2011 at 3:49 AM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> > On 13:58 Thu 22 Dec ? ? , Haojian Zhuang wrote:
-> >> On Thu, Dec 22, 2011 at 3:19 AM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> >> >
-> >> > Yes, I also think increasing ARCH_NR_GPIO is the way to go.
-> >> > BTW, there's a patchset floating around which moves such custom
-> >> > settings of ARCH_NR_GPIO from mach/gpio.h into Kconfig variable:
-> >> > http://lkml.indiana.edu/hypermail/linux/kernel/1111.0/01433.html
-> >> >
-> >> > I'm not sure though if it's going to be merged into 3.3
-> >> >
-> >> I think configuring ARCH_NR_GPIO is not a good solution. Since
-> >> building one image
-> >> is a target. While multiple archs are built together, what will happen?
-> >
-> > Setting custom ARCH_NR_GPIO in mach/gpio.h does scale only inside one
-> > sub-arch, but the patch from the set above which migrates ARCH_NR_GPIO to
-> > arch/arm/include/asm/gpio.h and converts it into Kconfig variable should
-> > help to select proper ARCH_NR_GPIO even for multi-arch kernels
-> > (Kconfig's magic will ensure that proper maximal value of ARCH_NR_GPIO
-> > is selected for each combination of platforms)
-> >
-> > See the patch here:
-> > http://lkml.indiana.edu/hypermail/linux/kernel/1111.0/01431.html
-> >
-> > and Russell's explanation of Kconfig magic here:
-> > http://lkml.indiana.edu/hypermail/linux/kernel/1111.0/01577.html
-> >
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+On 01/03/2012 05:02 PM, Arnd Bergmann wrote:
+> On Tuesday 03 January 2012, Daniel Lezcano wrote:
+>> drivers/idle/intel_idle.c => drivers/cpuidle/intel.c
+>> drivers/acpi/processor_idle.c => drivers/cpuidle/acpi.c
+>>
+>> arch/arm/mach-omap2/cpuidle34xx.c => drivers/cpuidle/omap-34xx.c
+>> arch/arm/mach-omap2/cpuidle44xx.c => drivers/cpuidle/omap-44xx.c
+>> arch/arm/mach-shmobile/cpuidle.c  => drivers/cpuidle/arm-shmobile.c
+>> arch/arm/mach-davinci/cpuidle.c => drivers/cpuidle/davinci.c
+>> arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/at91.c
+>> arch/arm/mach-s3c64xx/cpuidle.c => drivers/cpuidle/s3c64xx.c
+>> arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/exynos.c
+>> arch/arm/mach-kirkwood/cpuidle.c => drivers/cpuidle/kirkwood.c
+>> arch/arcm/mach-msm/idle.S => drivers/cpuidle/msm.S
+>>
+>> That could be a first step and then we move the other archs which could 
+>> be a bit more tricky like the powerpc.
+>>
+>> Does it make sense ?
 > 
-> Excuse me to response so late.
-> 
-> Russell,
-> 
-> Since I failed to access your git tree, I can't verity whether the ARCH_NR_GPIO
-> patch set is merged into your tree. Could you help to confirm this?
+> Sounds good to me. However, if any of the drivers can be built as
+> loadable modules, or if there is any intention to make them so,
+> the file name should be globally unique and follow a common naming
+> scheme, e.g. idle-intel.c, idle-acpi.c, ...
 
-commit 44986ab056076e9dc9fb9f8b4729afef7fa72616
-Author: Peter De Schrijver (NVIDIA) <pdeschrijver@nvidia.com>
-Date:   Wed Dec 21 10:48:45 2011 +0100
+Makes sense.
 
-    ARM: 7240/1: Make ARCH_NR_GPIO a Kconfig variable
+Thanks
+  -- Daniel
 
-    Change ARCH_NR_GPIO into a Kconfig variable as suggested by Russel King.
-    This makes ARCH_NR_GPIO single zImage friendly. The default value for
-    tegra is defined as well.
+- -- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-    Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
 
-?
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iQEcBAEBAgAGBQJPBBkzAAoJEAKBbMCpUGYAGoYH/3rFgCMaMXk71dEmm19gsq3l
+FtSRbqeP+OXT+yDEaOG8cQr807Bn899WQrj6UY6gyRTHVPqlaPa4kKi09Jsn90BX
+NMVVs4NyzZUrbV0Bofdw8D2Y2cMmVCs8xZfaU4FXa7eOvxEzSQImJVZhNvE8aGB3
+b2h1r6Pp0fwXzJqJVvNRdzo49OONn/9l70YLf1pcimLpsmV/P3K5RTcTWMaYbuGW
+FOudqawFQ8xDG7lQPMT4/kiVbHXNKq1VeDZvmenVvXdg0kRm9ptJ3kV4e5TrO1lO
+RsiZAQiUn2NMt7RHZJimLzTd2ZXl3U2sQbRYbfe35VonSy8DjiCNkbjefVBj/JM=
+=fVpl
+-----END PGP SIGNATURE-----
