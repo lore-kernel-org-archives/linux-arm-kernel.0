@@ -1,23 +1,15 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 4 Jan 2012 11:15:08 -0700
-Subject: [PATCH v2 09/10] arm/dts: omap3-beagle: Add twl4030 and i2c EEPROM
-In-Reply-To: <1323439361-1647-10-git-send-email-b-cousson@ti.com>
+Date: Wed, 4 Jan 2012 11:14:00 -0700
+Subject: [PATCH v2 06/10] arm/dts: OMAP3: Add i2c controller nodes
+In-Reply-To: <1323439361-1647-7-git-send-email-b-cousson@ti.com>
 References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-10-git-send-email-b-cousson@ti.com>
-Message-ID: <20120104181508.GP15503@ponder.secretlab.ca>
+ <1323439361-1647-7-git-send-email-b-cousson@ti.com>
+Message-ID: <20120104181400.GM15503@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 03:02:40PM +0100, Benoit Cousson wrote:
-> Add required clock frequencies for the i2c client devices existing
-> on beagle board.
-> 
-> Add the twl4030 basic description with only the twl_rtc module.
-> 
-> Add the EEPROM node.
-> 
-> Based on original patch from Manju:
-> http://www.spinics.net/lists/linux-omap/msg55831.html
+On Fri, Dec 09, 2011 at 03:02:37PM +0100, Benoit Cousson wrote:
+> Add i2c controllers nodes into the main ocp bus.
 > 
 > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 > Cc: Grant Likely <grant.likely@secretlab.ca>
@@ -26,55 +18,52 @@ On Fri, Dec 09, 2011 at 03:02:40PM +0100, Benoit Cousson wrote:
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
 > ---
->  arch/arm/boot/dts/omap3-beagle.dts |   38 ++++++++++++++++++++++++++++++++++++
->  1 files changed, 38 insertions(+), 0 deletions(-)
+>  arch/arm/boot/dts/omap3.dtsi |   28 ++++++++++++++++++++++++++++
+>  1 files changed, 28 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index 9f72cd4..b648279 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -18,3 +18,41 @@
->  		reg = <0x80000000 0x20000000>; /* 512 MB */
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index 6866dc7..81d8e2c 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -61,5 +61,33 @@
+>  			ti,intc-size = <96>;
+>  			reg = <0x48200000 0x1000>;
+>  		};
+> +
+> +		/*
+> +		 * Flags for all i2c instances: 0x118
+> +		 * APPLY_ERRATA_I207 | RESET_REGS_POSTIDLE | BUS_SHIFT_2
+> +		 */
+> +		i2c1: i2c at 1 {
+> +			compatible = "ti,omap3-i2c";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			ti,hwmods = "i2c1";
+> +			ti,flags = <0x118>;
+> +		};
+> +
+> +		i2c2: i2c at 2 {
+> +			compatible = "ti,omap3-i2c";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			ti,hwmods = "i2c2";
+> +			ti,flags = <0x118>;
+> +		};
+> +
+> +		i2c3: i2c at 3 {
+> +			compatible = "ti,omap3-i2c";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			ti,hwmods = "i2c3";
+> +			ti,flags = <0x118>;
+> +		};
 >  	};
 >  };
-> +
-> +&i2c1 {
-> +	clock-frequency = <2600000>;
-> +
-> +	/*
-> +	 * Integrated Power Management Chip
-> +	 */
-> +	twl at 48 {
-> +		compatible = "ti,twl4030";
-> +		reg = <0x48>;
-> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		interrupt-parent = <&intc>;
-> +
-> +		twl_rtc {
-> +			compatible = "ti,twl4030-rtc";
-> +			interrupts = <11>;
-> +		};
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <100000>;
-> +
-> +	/*
-> +	 * Display monitor features are burnt in the EEPROM
-> +	 * as EDID data.
-> +	 */
-> +	eeprom at 50 {
-> +		compatible = "ti,eeprom";
-> +		reg = <0x50>;
-> +	};
-> +};
 > -- 
 > 1.7.0.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
