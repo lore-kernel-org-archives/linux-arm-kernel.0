@@ -1,46 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jan 2012 19:10:42 +0000
-Subject: ZenIV (was: Re: Status of arm-soc.git for 3.2)
-In-Reply-To: <alpine.LFD.2.02.1201041337370.2907@xanadu.home>
-References: <201201032243.06440.arnd@arndb.de>
- <20120104100016.GK2914@n2100.arm.linux.org.uk>
- <20120104181703.GA11810@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1201041337370.2907@xanadu.home>
-Message-ID: <20120104191042.GB11810@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 4 Jan 2012 11:14:55 -0700
+Subject: [PATCH v2 08/10] arm/dts: omap4-sdp: Add twl6030, i2c3 and i2c4
+ devices
+In-Reply-To: <1323439361-1647-9-git-send-email-b-cousson@ti.com>
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-9-git-send-email-b-cousson@ti.com>
+Message-ID: <20120104181455.GO15503@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 01:55:48PM -0500, Nicolas Pitre wrote:
-> On Wed, 4 Jan 2012, Russell King - ARM Linux wrote:
-> > I've now disabled all access to my git tree there, and restarted apache.
-> > We will see whether that improves stability - I suspect it will do because
-> > I reckon that the problem is that the smart git stuff is what's killing
-> > the machine.
+On Fri, Dec 09, 2011 at 03:02:39PM +0100, Benoit Cousson wrote:
+> Update DTS file with required clock frequencies
+> for the i2c client devices existing on sdp4430.
 > 
-> I'm sure that is the case.  However faulty hardware could still be the 
-> root cause, but without the load from Git the machine might become 
-> loaded lightly enough you might not see any ill effects before quite a 
-> while.
+> Add the twl6030 node inside the i2c1 controller node.
+> This is the minimal support needed to boot OMAP4 boards
+> without any crash.
+> The support for all the features included in this MFD will be
+> added later.
+> 
+> Add the RTC submodule inside the twl node.
+> 
+> Add tmp105 temperature sensor in i2c3
+> Add bh1780 Ambient Light Sensor in i2c3
+> Add hmc5843 3-Axis Digital Compass in i2c4
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
 
-When it's serving the next Fedora release (it's one of the official
-mirrors) I'm sure any problems like that would become noticable - but
-they haven't yet.  It purely seems to be something git is doing which
-is killing the machine.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Another kernel developer has mentioned to me that he believes that Git
-disagrees with Pentium 4 CPUs, suggesting that Git does something which
-the P4 microcode really doesn't like: he's found that Git is dog slow
-on his P4 machines as well.
-
-That ties up with my experience too.
-
-So, I suggest rather than blaming this problem on the machines, maybe
-there could be something behind this: maybe Git is just plain incompatible
-with Pentium 4 CPUs.
-
-> If so I'd suggest you consider one of the hosting alternatives readily 
-> available to you for publishing your Git tree.  I'm sure any hurdle can 
-> be leveled out very quickly for the core ARM Linux repository.  I can 
-> certainly facilitate things if you wish.
-
-I'm already aware of your attempts in the background.
+> ---
+>  arch/arm/boot/dts/omap4-sdp.dts |   63 +++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 63 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index 63c6b2b..0ab14cb 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -18,3 +18,66 @@
+>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+>  	};
+>  };
+> +
+> +&i2c1 {
+> +	clock-frequency = <400000>;
+> +
+> +	/*
+> +	 * Integrated Power Management Chip
+> +	 * http://www.ti.com/lit/ds/symlink/twl6030.pdf
+> +	 */
+> +	twl at 48 {
+> +		compatible = "ti,twl6030";
+> +		reg = <0x48>;
+> +		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+> +		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		interrupt-parent = <&gic>;
+> +
+> +		/* twl is a MFD, so it will contain a bunch of sub-ips */
+> +		rtc {
+> +			compatible = "ti,twl4030-rtc";
+> +			interrupts = <11>;
+> +		};
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <400000>;
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <400000>;
+> +
+> +	/*
+> +	 * Temperature Sensor
+> +	 * http://www.ti.com/lit/ds/symlink/tmp105.pdf
+> +	 */
+> +	tmp105 at 48 {
+> +		compatible = "ti,tmp105";
+> +		reg = <0x48>;
+> +	};
+> +
+> +	/*
+> +	 * Ambient Light Sensor
+> +	 * http://www.rohm.com/products/databook/sensor/pdf/bh1780gli-e.pdf
+> +	 */
+> +	bh1780 at 29 {
+> +		compatible = "rohm,bh1780";
+> +		reg = <0x29>;
+> +	};
+> +};
+> +
+> +&i2c4 {
+> +	clock-frequency = <400000>;
+> +
+> +	/*
+> +	 * 3-Axis Digital Compass
+> +	 * http://www.sparkfun.com/datasheets/Sensors/Magneto/HMC5843.pdf
+> +	 */
+> +	hmc5843 at 1e {
+> +		compatible = "honeywell,hmc5843";
+> +		reg = <0x1e>;
+> +	};
+> +};
+> -- 
+> 1.7.0.4
+> 
