@@ -1,28 +1,31 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 4 Jan 2012 13:50:36 +0800
-Subject: [GIT PULL] pxa for-next for V3.3
-Message-ID: <CAN1soZxoJcmBff7PVLvMHTd2FZ3=wYWoR2TOtPQYxPnHogf6kg@mail.gmail.com>
+Date: Wed, 4 Jan 2012 13:52:32 +0800
+Subject: [GIT PULL] pxa gpio for V3.3
+Message-ID: <CAN1soZyqP_oXOt62mCpAGb48qqMa+wous0FP+SS6aCduqFyVvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-Please help to merge these patches from for-next branch of pxa git tree.
+Please pull these patches from pxa gpio branch.
 
-The following changes since commit 157e8bf8b4823bfcdefa6c1548002374b61f61df:
+The following changes since commit b5d798cc7a221aec50baf496c482280f1b809143:
 
-  Revert "rtc: Disable the alarm in the hardware" (2012-01-03 17:32:13 -0800)
+  Input: zylonite-wm97xx - replace IRQ_GPIO() with gpio_to_irq()
+(2011-12-28 10:14:18 +0000)
 
 are available in the git repository at:
-  http://github.com/hzhuang1/linux.git for-next
+  http://github.com/hzhuang1/linux.git gpio
 
-Axel Lin (2):
-      pxa/hx4700: add platform device and I2C info for AK4641 codec
-      ARM: pxa: fix error handling in pxa2xx_drv_pcmcia_probe
+Haojian Zhuang (2):
+      gpio: pxa: request pinmux function for gpio
+      ARM: mmp: fix missing gpio name in irq resource
 
- arch/arm/mach-pxa/hx4700.c   |   25 +++++++++++++++++++++++++
- drivers/pcmcia/pxa2xx_base.c |   12 +++---------
- 2 files changed, 28 insertions(+), 9 deletions(-)
+ arch/arm/mach-mmp/mmp2.c   |    1 +
+ arch/arm/mach-mmp/pxa168.c |    1 +
+ arch/arm/mach-mmp/pxa910.c |    1 +
+ drivers/gpio/gpio-pxa.c    |   13 +++++++++++++
+ 4 files changed, 16 insertions(+), 0 deletions(-)
 
 Best Regards
 Haojian
