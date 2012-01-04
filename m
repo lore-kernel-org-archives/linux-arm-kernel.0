@@ -1,30 +1,66 @@
-From: j.kilb@phytec.de (=?ISO-8859-1?Q?J=FCrgen_Kilb?=)
-Date: Tue, 03 Jan 2012 17:17:20 +0100
-Subject: updating machine registry for 2843/pcaal1
-Message-ID: <4F032A10.9030203@phytec.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 4 Jan 2012 14:32:11 +0200
+Subject: [PATCH 1/2] remoteproc: depend on EXPERIMENTAL
+In-Reply-To: <1324466473-5128-1-git-send-email-ohad@wizery.com>
+References: <1324466473-5128-1-git-send-email-ohad@wizery.com>
+Message-ID: <CAK=WgbZ6jJRKinpysrARUaAHrEjZzycqOP_8KjXeGnpryHU_dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Dec 21, 2011 at 1:21 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Remoteproc is still under development and as it gets traction we
+> definitely expect to have some changes in the binary format (most probably
+> only in the resource table, e.g. the upcoming move to TLV-based entries).
+>
+> Active testing and use of remoteproc is most welcome, but we don't want
+> users to expect backward binary compatibility with the preliminary
+> images we have today.
+>
+> Therefore mark remoteproc as EXPERIMENTAL, and explicitly inform the user
+> about this when a new remote processor is registered.
 
-I've tried to fix the machine name of our product in the machine 
-registry for machine number 2843.
-The correct name is pcaal1. As you can see the machine name and the type 
-macro are correct now.
+Applied both patches.
 
-Could you please update the Kconfig macro and the Type Identifier ?
-
-is:
-machine_is_pcaal1()
-CONFIG_MACH_PCA102
-MACH_TYPE_PCA102
-
-should be:
-machine_is_pcaal1()
-CONFIG_MACH_PCAAL1
-MACH_TYPE_PCAAL1
-
-Thanks for your help.
-
-greetings,
-J?rgen
+>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Rob Clark <rob@ti.com>
+> Cc: Mark Grosen <mgrosen@ti.com>
+> Cc: Ludovic BARRE <ludovic.barre@stericsson.com>
+> ---
+> ?drivers/remoteproc/Kconfig ? ? ? ? ? | ? ?3 ++-
+> ?drivers/remoteproc/remoteproc_core.c | ? ?3 +++
+> ?2 files changed, 5 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> index 00fb72f..25fc4cc 100644
+> --- a/drivers/remoteproc/Kconfig
+> +++ b/drivers/remoteproc/Kconfig
+> @@ -1,8 +1,9 @@
+> -menu "Remoteproc drivers"
+> +menu "Remoteproc drivers (EXPERIMENTAL)"
+>
+> ?# REMOTEPROC gets selected by whoever wants it
+> ?config REMOTEPROC
+> ? ? ? ?tristate
+> + ? ? ? depends on EXPERIMENTAL
+>
+> ?config OMAP_REMOTEPROC
+> ? ? ? ?tristate "OMAP remoteproc support"
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index f2354ce..6212b82 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -1275,6 +1275,9 @@ int rproc_register(struct rproc *rproc)
+>
+> ? ? ? ?dev_info(rproc->dev, "%s is available\n", rproc->name);
+>
+> + ? ? ? dev_info(dev, "Note: remoteproc is still under development and considered experimental.\n");
+> + ? ? ? dev_info(dev, "THE BINARY FORMAT IS NOT YET FINALIZED, and backward compatibility isn't yet guaranteed.\n");
+> +
+> ? ? ? ?/* create debugfs entries */
+> ? ? ? ?rproc_create_debug_dir(rproc);
+>
+> --
+> 1.7.5.4
+>
