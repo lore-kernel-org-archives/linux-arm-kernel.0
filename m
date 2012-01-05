@@ -1,148 +1,85 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 05 Jan 2012 17:26:48 +0100
-Subject: [PATCH v4 1/6] ARM: at91/aic: add irq domain and device tree
- support
-In-Reply-To: <20120104194059.GY15503@ponder.secretlab.ca>
-References: <1323976568-20244-1-git-send-email-nicolas.ferre@atmel.com>
- <85d531b5686e5eff623bed9618f802198409905f.1323975517.git.nicolas.ferre@atmel.com>
- <20120104194059.GY15503@ponder.secretlab.ca>
-Message-ID: <4F05CF48.5050007@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jan 2012 16:26:50 +0000
+Subject: [PATCH v2 00/15] Make SMP timers standalone
+In-Reply-To: <4F05CC0D.6090101@arm.com>
+References: <4F048EC4.40900@arm.com>
+ <20120104214748.GH11810@n2100.arm.linux.org.uk>
+ <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
+ <4F0584B5.60908@arm.com>
+ <CAMQu2gxuBNRWYKyKRdzvv_m49DyLoODVbC=rKDHDAMTnxe+6+A@mail.gmail.com>
+ <4F058744.4030503@arm.com> <20120105112602.GQ11810@n2100.arm.linux.org.uk>
+ <4F058B1C.2070109@arm.com> <20120105121026.GS11810@n2100.arm.linux.org.uk>
+ <4F05CC0D.6090101@arm.com>
+Message-ID: <20120105162650.GY11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
-
-Thanks for your review.
-
-Some answer following...
-
-On 01/04/2012 08:40 PM, Grant Likely :
-
-[..]
-
->> --- a/arch/arm/mach-at91/irq.c
->> +++ b/arch/arm/mach-at91/irq.c
->> @@ -24,6 +24,10 @@
->>  #include <linux/module.h>
->>  #include <linux/mm.h>
->>  #include <linux/types.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/err.h>
->>  
->>  #include <mach/hardware.h>
->>  #include <asm/irq.h>
->> @@ -34,22 +38,28 @@
->>  #include <asm/mach/map.h>
->>  
->>  void __iomem *at91_aic_base;
->> +static struct irq_domain at91_aic_domain;
->> +
->> +static inline unsigned int aic_irq(struct irq_data *d)
->> +{
->> +	return d->hwirq;
->> +}
+On Thu, Jan 05, 2012 at 04:13:01PM +0000, Marc Zyngier wrote:
+> On 05/01/12 12:10, Russell King - ARM Linux wrote:
+> > On Thu, Jan 05, 2012 at 11:35:56AM +0000, Marc Zyngier wrote:
+> >> On 05/01/12 11:26, Russell King - ARM Linux wrote:
+> >>> Look, local timers *are* special.  They're not the same as global timers.
+> >>> They're treated differently.  Ripping out the local timer setup stuff
+> >>> from the SMP code is not the right solution, especially when we've
+> >>> already got a separation of the local timer core from the hardware
+> >>> implementation.
+> >>
+> >> OK. I'll try to work out something different.
+> > 
+> > Why?  What's wrong with the existing structure?
 > 
-> This is a useless macro.  Drop it.
-
-Ok. That was overkill ;-)
-
-[..]
-
->> @@ -90,13 +100,13 @@ static u32 backups;
->>  
->>  static int at91_aic_set_wake(struct irq_data *d, unsigned value)
->>  {
->> -	if (unlikely(d->irq >= 32))
->> +	if (unlikely(aic_irq(d) >= at91_aic_domain.nr_irq))
-> I don't think you need to derefernce the irq_domain.nr_irq here.  Just
-> keep the test for >= 32.
-
-Well I would like to keep it referring to this value as we may increase
-the number of irq handled by this controller in the future...
-
-[..]
-
->> +#if defined(CONFIG_OF)
->> +static int __init __at91_aic_of_init(struct device_node *node,
->> +				     struct device_node *parent)
->> +{
->> +	at91_aic_base = of_iomap(node, 0);
->> +	at91_aic_domain.of_node = of_node_get(node);
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct of_device_id aic_ids[] __initconst = {
->> +	{ .compatible = "atmel,at91rm9200-aic", .data = __at91_aic_of_init },
->> +	{ /*sentinel*/ }
->> +};
->> +
->> +static void __init at91_aic_of_init(void)
->> +{
->> +	of_irq_init(aic_ids);
->> +}
->> +#else
->> +static void __init at91_aic_of_init(void) {}
->> +#endif
->> +
->>  /*
->>   * Initialize the AIC interrupt controller.
->>   */
->>  void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
->>  {
->>  	unsigned int i;
->> +	int hwirq, irq;
->>  
->> -	at91_aic_base = ioremap(AT91_AIC, 512);
->> +	if(of_have_populated_dt())
->> +		at91_aic_of_init();
->> +	else
->> +		at91_aic_base = ioremap(AT91_AIC, 512);
->>  
->>  	if (!at91_aic_base)
->> -		panic("Impossible to ioremap AT91_AIC\n");
->> +		panic("Unable to ioremap AIC registers\n");
->> +
->> +	/* Add irq domain for AIC */
->> +	at91_aic_domain.nr_irq = NR_AIC_IRQS;
->> +	at91_aic_domain.irq_base = irq_alloc_descs(-1, AIC_BASE_IRQ,
->> +						at91_aic_domain.nr_irq, 0);
->> +	if (IS_ERR_VALUE(at91_aic_domain.irq_base)) {
->> +		WARN(1, "Cannot allocate irq_descs, assuming pre-allocated\n");
->> +		at91_aic_domain.irq_base = AIC_BASE_IRQ;
->> +	}
->> +	at91_aic_domain.ops = &irq_domain_simple_ops;
->> +	irq_domain_add(&at91_aic_domain);
+> My main goal here is not to use a local timer as a global timer, but
+> rather to be able to support multiple local timer implementations in the
+> same kernel (TWD, MCT...). The "local timer on UP" is merely a consequence.
 > 
-> Nothing special is being done with the irq domain.  Please use
-> irq_domain_add_simple().  It will make things easier for the next
-> round of irq_domain patches that I'm getting ready to post.
+> I could come up with another registration interface that fits into the
+> existing structure, but I thought something could be done with what we
+> currently have.
 
-Fair enough, but I have one question: how do I specify "nr_irq" in the
-domain created by irq_domain_add_simple()? Maybe it is not needed?
+That's easy - but the solution depends on exactly how you're trying to
+solve it.
 
+In local_timer.h:
 
->>  	/*
->>  	 * The IVR is used by macro get_irqnr_and_base to read and verify.
->>  	 * The irq number is NR_AIC_IRQS when a spurious interrupt has occurred.
->>  	 */
->> -	for (i = 0; i < NR_AIC_IRQS; i++) {
->> +	irq_domain_for_each_irq((&at91_aic_domain), hwirq, irq) {
->> +
-> 
-> Same here; the driver is written for a fixed number of irqs
-> (NR_AIC_IRQs).  You don't need to reference the irq_domain for that.
+struct local_timer {
+	int (*setup)(struct clock_event_device *);
+	void (*stop)(struct clock_event_device *);
+};
 
-Yes, Ditto: this fixed number may change in the future...
+int local_timer_register(struct local_timer *);
 
-> Otherwise;
-> 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+In arch/arm/kernel/smp.c:
 
-Ok, I will rework a new revision...
+static struct local_timer *local_timer;
 
-Thanks, best regards,
--- 
-Nicolas Ferre
+int local_timer_register(struct local_timer *lt)
+{
+	if (local_timer)
+		return -EBUSY;
+	local_timer = lt;
+	return 0;
+}
+
+static int local_timer_setup(struct clock_event_device *ce)
+{
+	return local_timer ? local_timer->setup(ce) : -ENXIO;
+}
+
+static void local_timer_stop(struct clock_event_device *ce)
+{
+	if (local_timer)
+		local_timer->stop(ce);
+}
+
+And, for twd:
+
+struct local_timer twd_local_timer = {
+	.setup = twd_timer_setup,
+	.stop = twd_timer_stop,
+};
+
+But... it's not quite that simple because platforms need to intercept the
+local_timer_setup() call to do platform specific things - such as finding
+the twd base, and setting the twd IRQ.  That can be solved by moving
+that out of platform code (why is it there in the first place?) into
+smp_twd.c, and providing twd_local_timer_dt.
