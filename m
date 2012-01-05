@@ -1,149 +1,157 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 5 Jan 2012 17:55:17 +0100 (CET)
-Subject: [PATCH 1/2 v3] V4L: atmel-isi: add code to enable/disable ISI_MCK
- clock
-In-Reply-To: <CAOesGMiWH--=_fu1ufztb6jZLTDO8_EboDd+hEd=TN-AnRJ3Yw@mail.gmail.com>
-References: <4EEA034C.9020800@atmel.com>
- <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
- <4EEB73DD.3070505@atmel.com>
- <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
- <Pine.LNX.4.64.1112171928380.13817@axis700.grange>
- <CAOesGMi6-iPPBSP_TgKHf_agGSOrQeoB1CU=xhj8wuM2dQvf0A@mail.gmail.com>
- <Pine.LNX.4.64.1112180103220.13817@axis700.grange>
- <CAOesGMiWH--=_fu1ufztb6jZLTDO8_EboDd+hEd=TN-AnRJ3Yw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1201051752220.23644@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jan 2012 16:55:21 +0000
+Subject: [PATCH v2 00/15] Make SMP timers standalone
+In-Reply-To: <20120105162650.GY11810@n2100.arm.linux.org.uk>
+References: <20120104214748.GH11810@n2100.arm.linux.org.uk>
+ <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
+ <4F0584B5.60908@arm.com>
+ <CAMQu2gxuBNRWYKyKRdzvv_m49DyLoODVbC=rKDHDAMTnxe+6+A@mail.gmail.com>
+ <4F058744.4030503@arm.com> <20120105112602.GQ11810@n2100.arm.linux.org.uk>
+ <4F058B1C.2070109@arm.com> <20120105121026.GS11810@n2100.arm.linux.org.uk>
+ <4F05CC0D.6090101@arm.com> <20120105162650.GY11810@n2100.arm.linux.org.uk>
+Message-ID: <20120105165521.GB11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Wu <josh.wu@atmel.com>
+On Thu, Jan 05, 2012 at 04:26:50PM +0000, Russell King - ARM Linux wrote:
+> But... it's not quite that simple because platforms need to intercept the
+> local_timer_setup() call to do platform specific things - such as finding
+> the twd base, and setting the twd IRQ.  That can be solved by moving
+> that out of platform code (why is it there in the first place?) into
+> smp_twd.c, and providing twd_local_timer_dt.
 
-This patch
-- add ISI_MCK clock enable/disable code.
-- change field name in isi_platform_data structure
+And that's something we really should do anyway - we already have two
+implementations which are virtually identical to each other for no real
+reason other than people like to mess around in their own platform stuff
+rather than solving problems at higher levels.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
-[g.liakhovetski at gmx.de: fix label names]
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+So, I'll queue this patch after the next merge window.
+
+Note: there's no need for that WARN_ON and subsequent oops in each of
+these setup functions - it can return an error, in which case we'll
+fall back to a broadcasted tick for the CPU.
+
+8<---------
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+ARM: TWD: Move DT code into smp_twd.c
+
+Rather than have each platform implement their own DT veneer to discover
+the base address and IRQ for their TWD, move this code into the TWD
+driver itself.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
+ arch/arm/include/asm/smp_twd.h      |    1 +
+ arch/arm/kernel/smp_twd.c           |   21 +++++++++++++++++++++
+ arch/arm/mach-highbank/localtimer.c |   14 +-------------
+ arch/arm/mach-imx/localtimer.c      |   14 +-------------
+ 4 files changed, 24 insertions(+), 26 deletions(-)
 
-Arnd, please, pull this patch via your tree to avoid having to wait for 
-the V4L tree, Mauro has acked it.
-
- drivers/media/video/atmel-isi.c |   31 +++++++++++++++++++++++++++++--
- include/media/atmel-isi.h       |    4 +++-
- 2 files changed, 32 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
-index b25bd7b..9fe4519 100644
---- a/drivers/media/video/atmel-isi.c
-+++ b/drivers/media/video/atmel-isi.c
-@@ -90,7 +90,10 @@ struct atmel_isi {
- 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index ef9ffba9..855f58e 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -23,6 +23,7 @@ struct clock_event_device;
+ extern void __iomem *twd_base;
  
- 	struct completion		complete;
-+	/* ISI peripherial clock */
- 	struct clk			*pclk;
-+	/* ISI_MCK, feed to camera sensor to generate pixel clock */
-+	struct clk			*mck;
- 	unsigned int			irq;
+ void twd_timer_setup(struct clock_event_device *);
++int twd_timer_setup_dt(struct clock_event_device *);
+ void twd_timer_stop(struct clock_event_device *);
  
- 	struct isi_platform_data	*pdata;
-@@ -766,6 +769,12 @@ static int isi_camera_add_device(struct soc_camera_device *icd)
- 	if (ret)
- 		return ret;
+ #endif
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index c8e9385..f43f039 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -20,6 +20,9 @@
+ #include <linux/clockchips.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
  
-+	ret = clk_enable(isi->mck);
-+	if (ret) {
-+		clk_disable(isi->pclk);
-+		return ret;
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
+@@ -266,3 +269,21 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 					0xf, 0xffffffff);
+ 	enable_percpu_irq(clk->irq, 0);
+ }
++
++int __cpuinit twd_timer_setup_dt(struct clock_event_device *clk)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
++	if (np) {
++		if (!twd_base) {
++			twd_base = of_iomap(np, 0);
++			if (!twd_base)
++				return -ENOMEM;
++		}
++		evt->irq = irq_of_parse_and_map(np, 0);
 +	}
++	twd_timer_setup(evt);
 +
- 	isi->icd = icd;
- 	dev_dbg(icd->parent, "Atmel ISI Camera driver attached to camera %d\n",
- 		 icd->devnum);
-@@ -779,6 +788,7 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
++	return 0;
++}
+diff --git a/arch/arm/mach-highbank/localtimer.c b/arch/arm/mach-highbank/localtimer.c
+index 5a00e79..1b6c0d1 100644
+--- a/arch/arm/mach-highbank/localtimer.c
++++ b/arch/arm/mach-highbank/localtimer.c
+@@ -16,9 +16,6 @@
+  */
+ #include <linux/init.h>
+ #include <linux/clockchips.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
  
- 	BUG_ON(icd != isi->icd);
+ #include <asm/smp_twd.h>
  
-+	clk_disable(isi->mck);
- 	clk_disable(isi->pclk);
- 	isi->icd = NULL;
+@@ -27,14 +24,5 @@
+  */
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
+-	struct device_node *np;
+-
+-	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
+-	if (!twd_base) {
+-		twd_base = of_iomap(np, 0);
+-		WARN_ON(!twd_base);
+-	}
+-	evt->irq = irq_of_parse_and_map(np, 0);
+-	twd_timer_setup(evt);
+-	return 0;
++	return twd_timer_setup_dt(evt);
+ }
+diff --git a/arch/arm/mach-imx/localtimer.c b/arch/arm/mach-imx/localtimer.c
+index 3a16351..1252c22 100644
+--- a/arch/arm/mach-imx/localtimer.c
++++ b/arch/arm/mach-imx/localtimer.c
+@@ -12,8 +12,6 @@
  
-@@ -874,7 +884,7 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
+ #include <linux/init.h>
+ #include <linux/clockchips.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+ #include <asm/smp_twd.h>
  
- 	if (isi->pdata->has_emb_sync)
- 		cfg1 |= ISI_CFG1_EMB_SYNC;
--	if (isi->pdata->isi_full_mode)
-+	if (isi->pdata->full_mode)
- 		cfg1 |= ISI_CFG1_FULL_MODE;
- 
- 	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-@@ -912,6 +922,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
- 			isi->fb_descriptors_phys);
- 
- 	iounmap(isi->regs);
-+	clk_put(isi->mck);
- 	clk_put(isi->pclk);
- 	kfree(isi);
- 
-@@ -930,7 +941,7 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 	struct isi_platform_data *pdata;
- 
- 	pdata = dev->platform_data;
--	if (!pdata || !pdata->data_width_flags) {
-+	if (!pdata || !pdata->data_width_flags || !pdata->mck_hz) {
- 		dev_err(&pdev->dev,
- 			"No config available for Atmel ISI\n");
- 		return -EINVAL;
-@@ -959,6 +970,19 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&isi->video_buffer_list);
- 	INIT_LIST_HEAD(&isi->dma_desc_head);
- 
-+	/* Get ISI_MCK, provided by programmable clock or external clock */
-+	isi->mck = clk_get(dev, "isi_mck");
-+	if (IS_ERR(isi->mck)) {
-+		dev_err(dev, "Failed to get isi_mck\n");
-+		ret = PTR_ERR(isi->mck);
-+		goto err_clk_get;
-+	}
-+
-+	/* Set ISI_MCK's frequency, it should be faster than pixel clock */
-+	ret = clk_set_rate(isi->mck, pdata->mck_hz);
-+	if (ret < 0)
-+		goto err_set_mck_rate;
-+
- 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
- 				sizeof(struct fbd) * MAX_BUFFER_NUM,
- 				&isi->fb_descriptors_phys,
-@@ -1034,6 +1058,9 @@ err_alloc_ctx:
- 			isi->p_fb_descriptors,
- 			isi->fb_descriptors_phys);
- err_alloc_descriptors:
-+err_set_mck_rate:
-+	clk_put(isi->mck);
-+err_clk_get:
- 	kfree(isi);
- err_alloc_isi:
- 	clk_put(pclk);
-diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
-index 26cece5..6568230 100644
---- a/include/media/atmel-isi.h
-+++ b/include/media/atmel-isi.h
-@@ -110,10 +110,12 @@ struct isi_platform_data {
- 	u8 hsync_act_low;
- 	u8 vsync_act_low;
- 	u8 pclk_act_falling;
--	u8 isi_full_mode;
-+	u8 full_mode;
- 	u32 data_width_flags;
- 	/* Using for ISI_CFG1 */
- 	u32 frate;
-+	/* Using for ISI_MCK */
-+	u32 mck_hz;
- };
- 
- #endif /* __ATMEL_ISI_H__ */
--- 
-1.7.2.5
+ /*
+@@ -21,15 +19,5 @@
+  */
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
+-	struct device_node *np;
+-
+-	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
+-	if (!twd_base) {
+-		twd_base = of_iomap(np, 0);
+-		WARN_ON(!twd_base);
+-	}
+-	evt->irq = irq_of_parse_and_map(np, 0);
+-	twd_timer_setup(evt);
+-
+-	return 0;
++	return twd_timer_setup_dt(evt);
+ }
