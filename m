@@ -1,44 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 05 Jan 2012 11:35:56 +0000
-Subject: [PATCH v2 00/15] Make SMP timers standalone
-In-Reply-To: <20120105112602.GQ11810@n2100.arm.linux.org.uk>
-References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
- <20111222193216.GO2577@n2100.arm.linux.org.uk> <4F048EC4.40900@arm.com>
- <20120104214748.GH11810@n2100.arm.linux.org.uk>
- <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
- <4F0584B5.60908@arm.com>
- <CAMQu2gxuBNRWYKyKRdzvv_m49DyLoODVbC=rKDHDAMTnxe+6+A@mail.gmail.com>
- <4F058744.4030503@arm.com> <20120105112602.GQ11810@n2100.arm.linux.org.uk>
-Message-ID: <4F058B1C.2070109@arm.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Thu, 5 Jan 2012 12:47:32 +0100
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20120104212620.GG11810@n2100.arm.linux.org.uk>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <20120102134229.GZ29877@amd.com>
+ <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
+ <20120102155820.GB29877@amd.com>
+ <20120103095527.GI2914@n2100.arm.linux.org.uk>
+ <20120104150101.GA3492@amd.com>
+ <20120104212620.GG11810@n2100.arm.linux.org.uk>
+Message-ID: <20120105114732.GA7166@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/12 11:26, Russell King - ARM Linux wrote:
-> On Thu, Jan 05, 2012 at 11:19:32AM +0000, Marc Zyngier wrote:
->> Global timer is still present, configured and enabled. The kernel just
->> happens to select TWD as a better timer. Should TWD be turned off,
->> gp_timer will be selected again.
+On Wed, Jan 04, 2012 at 09:26:20PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 04, 2012 at 04:01:01PM +0100, Joerg Roedel wrote:
+> > On Tue, Jan 03, 2012 at 09:55:27AM +0000, Russell King - ARM Linux wrote:
+> > > It comes through when I stick it in my tree because of a month of asking
+> > > for help to fix something and getting zero response from the maintainers.
+> > > 
+> > > It's a way to flag to them that they're doing something wrong - and in
+> > > fact something is broken, and that that brokenness will happen at the
+> > > next merge window unless they get off their butt and do something about
+> > > it.
+> > 
+> > Okay, fine with me if it really will be fixed in 3.3-rc1 :)
 > 
-> And at that point, the core time keeping code will find a local timer
-> clock event structure and expect it's broadcast method to be implemented
-> and working, as I described in my initial reply.
-> 
->> This is also what happens with the current implementation, and my
->> patches don't change that.
-> 
-> Yes they do, because they omit the broadcast method.
+> I can do better than that - and report that it's fixed now.  It should
+> show up in linux-next sometime after Stephen pulls this evening.  The
+> #error did its job in this case, and ensured that it got fixed!
 
-I forgot to mention I restored this functionality after you pointed that
-out (I made smp_timer_broadcast a global symbol).
+Great. So it looks like I can finally compile-test Exynos and merge
+their IOMMU driver after the merge window :)
 
-> Look, local timers *are* special.  They're not the same as global timers.
-> They're treated differently.  Ripping out the local timer setup stuff
-> from the SMP code is not the right solution, especially when we've
-> already got a separation of the local timer core from the hardware
-> implementation.
+Thanks,
 
-OK. I'll try to work out something different.
+	Joerg
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
