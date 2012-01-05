@@ -1,40 +1,80 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 05 Jan 2012 08:28:23 +0100
-Subject: [RFC 1/8] gpio/microblaze: Eliminate duplication of
- of_get_named_gpio_flags()
-In-Reply-To: <20120104183057.GU15503@ponder.secretlab.ca>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-2-git-send-email-grant.likely@secretlab.ca>
- <4EF1B36A.8050304@monstr.eu> <20120104183057.GU15503@ponder.secretlab.ca>
-Message-ID: <4F055117.7060901@monstr.eu>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 5 Jan 2012 15:58:03 +0800
+Subject: [PATCH 2/2] ARM: imx6q: add cpu suspend/resume support in IRAM
+In-Reply-To: <CACRpkdYu5jz0H_KnEq7JJ5PWJ35R=znjQeYCDcn+KM54zNY6Nw@mail.gmail.com>
+References: <1325312624-22980-1-git-send-email-jason.chen@linaro.org>
+ <CACRpkdYu5jz0H_KnEq7JJ5PWJ35R=znjQeYCDcn+KM54zNY6Nw@mail.gmail.com>
+Message-ID: <20120105075802.GG14741@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote:
-> On Wed, Dec 21, 2011 at 11:22:34AM +0100, Michal Simek wrote:
->> Grant Likely wrote:
->>> of_reset_gpio_handle() is largely a cut-and-paste copy of
->>> of_get_named_gpio_flags(). There really isn't any reason for the
->>> split, so this patch deletes the duplicate function
->>>
->>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->>> Cc: Michal Simek <monstr@monstr.eu>
->>> ---
->>> arch/microblaze/kernel/reset.c |   43 +--------------------------------------
->>> 1 files changed, 2 insertions(+), 41 deletions(-)
->> Sorry for taking to long.
->>
->> Tested and applied to microblaze tree.
+On Wed, Jan 04, 2012 at 12:02:51PM +0100, Linus Walleij wrote:
+> On Sat, Dec 31, 2011 at 7:23 AM, Jason Chen <jason.chen@linaro.org> wrote:
 > 
-> I'd rather take this one through the gpio tree if that is okay.
-
-OK. Please do.
-
-Thanks,
-Michal
+> > ?void __init imx6q_pm_init(void)
+> > ?{
+> > ? ? ? ?/*
+> > @@ -67,4 +153,38 @@ void __init imx6q_pm_init(void)
+> > ? ? ? ?phys_l2x0_saved_regs = __pa(&l2x0_saved_regs);
+> >
+> > ? ? ? ?suspend_set_ops(&imx6q_pm_ops);
+> > +
+> > + ? ? ? /* Move suspend routine into iRAM */
+> (...)
+> > diff --git a/arch/arm/mach-imx/suspend-imx6q.S b/arch/arm/mach-imx/suspend-imx6q.S
+> (...)
+> > +.macro ddr_io_save
+> > + ? ? ? ldr ? ? r4, [r9, #0x5ac] /* DRAM_DQM0 */
+> > + ? ? ? ldr ? ? r5, [r9, #0x5b4] /* DRAM_DQM1 */
+> > + ? ? ? ldr ? ? r6, [r9, #0x528] /* DRAM_DQM2 */
+> > + ? ? ? ldr ? ? r7, [r9, #0x520] /* DRAM_DQM3 */
+> > + ? ? ? stmfd ? sp!, {r4-r7}
+> (etc)
+> 
+> This is not an elegant solution. I know other platforms have
+> done similar things but it's still not elegant.
+> 
+> What we need it real handling of the on-chip memory pool
+> and possibility to compile and link directly into the
+> on-chip memory areas.
+> 
+> Compare to what we have for TCM:
+> Documentation/arm/tcm.txt
+> Implemented in:
+> arch/arm/kernel/tcm.c
+> Linker trickery in:
+> arch/arm/kernel/vmlinux.lds.S
+> 
+> An approach similar to this would make it possible to:
+> 
+> - Manage the on-chip heap in a structured way
+> 
+> - Write the above assembler code in C and compile it directly
+>   into on-chip RAM
+> 
+> - Share the same code with other archs and possibly merge
+>   it with some of the TCM handling code top create common
+>   onchip RAM handling
+> 
+> - Optionally free up the .TEXT memory pages used by this
+>   code after copying it to on-chip RAM (if that RAM is
+>   persistent, as it seems to be)
+> 
+> - Make it possible to define MT_MEMORY_ONCHIP (if
+>   MT_MEMORY_ITCM isn't good enough) in
+>   arch/arm/include/asm/mach/map.h so everybody can
+>   use this.
+> 
+> It is also a bit more work and patch iteration involved.
+> But the end solution is very appealing IMO. Also,
+> multi-platform binaries will complicate the above a bit
+> (especially if, say, two platforms have their on-chip
+> RAM in the same location...) but I am sure it can be
+> solved with proper cleverness and step-by-step measures.
+> 
+It looks really interesting and appealing.  We absolutely should
+take a deep look into the suggestion.  Thanks, Linus.
 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+Regards,
+Shawn
