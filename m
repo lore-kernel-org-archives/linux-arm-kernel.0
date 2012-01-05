@@ -1,64 +1,39 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 5 Jan 2012 14:56:29 +0000
-Subject: [PATCH v2] ARM: at91: pit add DT support
-In-Reply-To: <4F05B8A1.2010003@atmel.com>
-References: <1318799895-5121-4-git-send-email-plagnioj@jcrosoft.com>
- <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
- <20120105120049.GB4641@page> <4F05B8A1.2010003@atmel.com>
-Message-ID: <20120105145629.GB10530@page>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 05 Jan 2012 08:59:13 -0600
+Subject: [PULL] gpio pl061 for 3.3
+Message-ID: <4F05BAC1.1000706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 03:50:09PM +0100, Nicolas Ferre wrote:
-> On 01/05/2012 01:00 PM, Jamie Iles :
-> > Hi Nicolas, Jean-Christophe,
-> > 
-> > On Thu, Jan 05, 2012 at 02:48:28PM +0100, Nicolas Ferre wrote:
-> >> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>
-> >> Retreive registers address and IRQ from device tree entry. Fall back
-> >> to built-in values if an error occurs.
-> >>
-> >> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
-> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >> ---
-> > [...]
-> >> diff --git a/arch/arm/mach-at91/at91sam926x_time.c 
-> >> b/arch/arm/mach-at91/at91sam926x_time.c
-> >> index d89ead7..5d4c308 100644
-> >> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> >> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> >> @@ -14,6 +14,8 @@
-> > [...]
-> >> +static int __init of_at91sam926x_pit_init(void)
-> >> +{
-> >> +	struct device_node *np;
-> >> +
-> >> +	np = of_find_matching_node(NULL, timer_ids);
-> >> +	if (!np)
-> >> +		goto err;
-> >> +
-> >> +	pit_base_addr = of_iomap(np, 0);
-> >> +	if (!pit_base_addr)
-> >> +		goto node_err;
-> >> +
-> >> +	/* Get the interrupts property */
-> >> +	if (of_property_read_u32(np, "interrupts", &at91sam926x_pit_irq.irq))
-> >> +		goto ioremap_err;
-> > 
-> > I think you want:
-> > 
-> > 	at91sam926x_pit_irq.irq = irq_of_parse_and_map(np, 0);
-> > 
-> > to make sure the IRQ is converted to a Linux IRQ and not a hwirq.
-> 
-> Yes, that definitively makes sense. BTW, without a DT entry, how should
-> I map a hwirq, with the irq_domain_to_irq() helper? But I will need
-> access to the interrupt controller "struct irq_domain"...
+Grant,
 
-If you aren't booting with DT then at the moment I think on AT91 you 
-have statically assigned irq_descs and IRQ numbers so you don't need to 
-map them, you just know what IRQ number to request at compile time.
+Since it seems irqdomain issues aren't going to get sorted out for 3.3,
+please pull the pl061 changes which are not dependent on irqdomain.
+Sorry it is a bit late.
 
-Jamie
+The following changes since commit 5f0a6e2d503896062f641639dacfe5055c2f593b:
+
+  Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
+
+are available in the git repository at:
+  git://sources.calxeda.com/kernel/linux.git gpio-for-grant
+
+Rob Herring (5):
+      gpio: pl061: use chained_irq_* functions in irq handler
+      gpio: pl061: convert to use 0 for no irq
+      ARM: realview: convert pl061 no irq to 0 instead of -1
+      gpio: pl061: convert to use generic irq chip
+      gpio: pl061: remove combined interrupt
+
+ arch/arm/mach-realview/realview_eb.c     |    3 -
+ arch/arm/mach-realview/realview_pb1176.c |    3 -
+ arch/arm/mach-realview/realview_pb11mp.c |    3 -
+ arch/arm/mach-realview/realview_pba8.c   |    3 -
+ arch/arm/mach-realview/realview_pbx.c    |    3 -
+ drivers/gpio/Kconfig                     |    1 +
+ drivers/gpio/gpio-pl061.c                |  132
+++++++++++--------------------
+ include/linux/amba/pl061.h               |    2 +-
+ 8 files changed, 44 insertions(+), 106 deletions(-)
+
+Rob
