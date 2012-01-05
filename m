@@ -1,47 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Jan 2012 09:48:58 +0000
-Subject: [PATCH] ARM: proc-v7: remove harvard cache stuff
-In-Reply-To: <1325745462-6560-1-git-send-email-shawn.guo@linaro.org>
-References: <20120103175814.GG22876@arm.com>
- <1325745462-6560-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120105094857.GA21121@arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 5 Jan 2012 03:17:17 -0700
+Subject: Anyone interested in another ARM kernel workshop in February?
+In-Reply-To: <029101ccbac8$56dbe960$0493bc20$%kim@samsung.com>
+References: <CACxGe6vc+9bcr2S0vgeNwr7Oo370FxwZ_TZCZZ2ZyC+A_ir_0A@mail.gmail.com>
+ <CACxGe6vBNtgPpHzJg+pFcT3as_us3XeSJwSzd1kYzko3_8rrCg@mail.gmail.com>
+ <20111213082452.GI7148@opensource.wolfsonmicro.com>
+ <20111213153605.GQ20297@mudshark.cambridge.arm.com>
+ <029101ccbac8$56dbe960$0493bc20$%kim@samsung.com>
+Message-ID: <CACxGe6ta7JLuP7uWO9CR+gqsPVh8RjSNJqOKUwrMg_HptPxyeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 06:37:42AM +0000, Shawn Guo wrote:
-> The harvard cache related comment and code in proc-v7.S were copied
-> from proc-v6.S by mistake, so let's remove them.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mm/proc-v7.S |    7 -------
->  1 files changed, 0 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index e70a737..59a4077 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -271,10 +271,6 @@ ENDPROC(cpu_v7_do_resume)
->   *	Initialise TLB, Caches, and MMU state ready to switch the MMU
->   *	on.  Return in r0 the new CP15 C1 control register setting.
->   *
-> - *	We automatically detect if we have a Harvard cache, and use the
-> - *	Harvard cache control instructions insead of the unified cache
-> - *	control instructions.
-> - *
->   *	This should be able to cover all ARMv7 cores.
->   *
->   *	It is assumed that:
-> @@ -373,9 +369,6 @@ __v7_setup:
->  #endif
->  
->  3:	mov	r10, #0
-> -#ifdef HARVARD_CACHE
-> -	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
-> -#endif
+[Throwing out to a wider audience.  I originally contacted only the
+attendees of the Prague summit, but now I'm cc'ing linux-arm-kernel]
 
-I thought we still need to invalidate the I-cache, maybe moving it
-higher up after the v7_flush_dcache_all call.
+I'm organizing another ARM maintainership summit this February in
+conjunction with Linaro Connect[1], Feb 6-10 in San Francisco.  Format
+will be similar to the meeting we held in Prague at kernel summit with
+time for both meetings and hacking sessions.  Linaro Connect is
+organized with meetings and summits each morning, and hacking sprints
+in the afternoon.  I'm planing one 1/2 day arm maintainership summit
+meeting early in the week (Monday or Tuesday), and you're invited to
+participate in any of the Linaro Connect sessions.  See the schedule
+page on the Linaro Connect website for an early list of the organized
+sessions.
+
+If you're going to attend, then I need you to do two things:
+
+1. Register to attend at the Linaro Connect website [2].
+2. Subscribe to the blueprint so I know that you'll be there [3].
+
+[1] http://connect.linaro.org
+[2] http://connect.linaro.org/events/event/lcq1-12/#welcome
+[3] https://blueprints.launchpad.net/linux-linaro/+spec/linaro-kernel-q112-maintainer-summit
+
+I'll begin working on putting together an agenda.  Please send me
+nominations for topics.
+
+Thanks,
+g.
+
+On Wed, Dec 14, 2011 at 6:24 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Will Deacon wrote:
+>>
+>> On Tue, Dec 13, 2011 at 08:24:53AM +0000, Mark Brown wrote:
+>> > On Fri, Dec 09, 2011 at 11:55:44PM -0700, Grant Likely wrote:
+>> >
+>> > > Linaro is extending an invitation out to all ARM kernel maintainers to
+>> > > attend Linaro Connect in San Francisco the week of February 6-10 (the
+>> week
+>> > > before Android Builders and ELC). If there is interest, then I can
+>> organize
+>> > > a workshop much like what we did in Prague.
+>> >
+>> > > What say you?
+>> >
+>> > I'm interested but would need to check about travel.
+>>
+> Me too :)
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+
+
 
 -- 
-Catalin
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
