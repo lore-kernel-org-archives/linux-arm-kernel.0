@@ -1,56 +1,34 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 5 Jan 2012 15:59:21 +0800
-Subject: [PATCH v3 1/2] dma/imx-sdma: let sdma_run_channel call
- sdma_enable_channel
+Date: Thu, 5 Jan 2012 15:59:22 +0800
+Subject: [PATCH v3 2/2] dma/imx-sdma: use writel to write register when enable
+ a channel
 In-Reply-To: <1325750362-22598-1-git-send-email-richard.zhao@linaro.org>
 References: <1325750362-22598-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1325750362-22598-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1325750362-22598-3-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let all enable channel code call sdma_enable_channel.
+dma_alloc_coherent memory may be bufferable when set
+CONFIG_ARM_DMA_MEM_BUFFERABLE. We need to add nececcary
+memory barrier. writel implicitly call wmb in such case.
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- drivers/dma/imx-sdma.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/dma/imx-sdma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f59fd8f..c2bc4f1 100644
+index c2bc4f1..e987468 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -394,6 +394,11 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
- 	return 0;
- }
+@@ -396,7 +396,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
  
-+static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
-+{
-+	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
-+}
-+
- /*
-  * sdma_run_channel - run a channel and wait till it's done
-  */
-@@ -405,7 +410,7 @@ static int sdma_run_channel(struct sdma_channel *sdmac)
- 
- 	init_completion(&sdmac->done);
- 
--	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
-+	sdma_enable_channel(sdma, channel);
- 
- 	ret = wait_for_completion_timeout(&sdmac->done, HZ);
- 
-@@ -811,11 +816,6 @@ out:
- 	return ret;
- }
- 
--static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
--{
--	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
--}
--
- static dma_cookie_t sdma_assign_cookie(struct sdma_channel *sdmac)
+ static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
  {
- 	dma_cookie_t cookie = sdmac->chan.cookie;
+-	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
++	writel(1 << channel, sdma->regs + SDMA_H_START);
+ }
+ 
+ /*
 -- 
 1.7.5.4
