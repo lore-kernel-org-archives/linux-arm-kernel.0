@@ -1,34 +1,78 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 5 Jan 2012 09:04:31 +0530
-Subject: [PATCH] gpio: pl061: remove combined interrupt
-In-Reply-To: <1325705506-24230-1-git-send-email-robherring2@gmail.com>
-References: <1325705506-24230-1-git-send-email-robherring2@gmail.com>
-Message-ID: <4F051A47.3020401@st.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 4 Jan 2012 22:43:56 -0500
+Subject: Circular dependency between <linux/kernel.h> and <asm/bug.h> on
+ ARM
+In-Reply-To: <20120103144538.GU2914@n2100.arm.linux.org.uk>
+References: <1325472276.13595.200.camel@deadeye>
+ <CAOesGMgXRev24e0bmGD71J04=Aon7bs0YeK7mwX8Na12uR_b6A@mail.gmail.com>
+ <20120103144538.GU2914@n2100.arm.linux.org.uk>
+Message-ID: <CAP=VYLpP393c0MYxPPR2j6jkLyyUQWjQBWg3RfbpJyuWxi+psA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/5/2012 1:01 AM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Drivers should not have a dependency on NR_IRQS. Doing so may break with
-> SPARSE_IRQ enabled. As there are no in kernel users of the pl061 which
-> have multiple instances with their interrupts combined to a single parent
-> interrupt, remove this functionality. If this capability is needed later,
-> it could be supported more cleanly by just using a devicetree property.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Cc: Baruch Siach <baruch@tkos.co.il>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  drivers/gpio/gpio-pl061.c |   44 ++++++++------------------------------------
->  1 files changed, 8 insertions(+), 36 deletions(-)
+On Tue, Jan 3, 2012 at 9:45 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jan 01, 2012 at 11:01:27PM -0800, Olof Johansson wrote:
+>> On Sun, Jan 1, 2012 at 6:44 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
+>> > Commit 87e040b6456fd3416a1f6831c1eedaef5c0a94ff ("ARM: 7017/1: Use
+>> > generic BUG() handler") makes BUG() use BUILD_BUG_ON(). ?However,
+>> > BUILD_BUG_ON() is not defined in <linux/bug.h> but in <linux/kernel.h>.
+>> >
+>> > arch/include/asm/bug.h does not include <linux/kernel.h> and *cannot* do
+>> > so because the latter already includes <asm/bug.h>.
+>>
+>> Sure it can, but it's not ideal. Since the BUILD_BUG_ON is only used
+>> in bug.h in a #define, it will be resolved below the includes of
+>> either so there should be no ordering issue between the two.
+>
+> I disagree - we should not be creating circular dependencies. ?This
+> creates a mess, and uncertain results. ?For instance, if we include
+> linux/bug.h or asm/bug.h before linux/kernel.h has been included,
+> then we end up with linux/kernel.h being parsed without a definition
+> for BUG_ON().
+>
+> However, if linux/kernel.h is included first, we start parsing that,
+> include asm/bug.h, asm/bug.h then includes linux/kernel.h which produces
+> an empty file, and then we continue parsing asm/bug.h _without_
+> BUILD_BUG_ON() defined.
+>
+> So, adding linux/kernel.h does _not_ solve the problem. ?It solves the
+> problem for _some_ cases only.
+>
+>> > Maybe BUILD_BUG_ON() should be moved out to a header of its own, or else
+>> > this particular use should be moved to some other file. ?This needs to
+>> > be fixed somehow, as it obviously leads to build failures, e.g.:
+>> >
+>> > https://buildd.debian.org/status/fetch.php?pkg=linux-2.6&arch=armel&ver=3.2~rc7-1~experimental.1&stamp=1325142904
+>>
+>> Or perhaps moving BUILD_BUG_ON to include/linux/bug.h?
+>
+> and change linux/kernel.h to include linux/bug.h rather than asm/bug.h.
 
-Looks fine.
+Actually, kernel.h doesn't need to include any variant of bug.h at all.
 
-Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
+I started on cleaning this up a few weeks back, but didn't have the time
+to get it ready for 3.3 -- so my intent is to do so for linux-next that will
+be the 3.4 release.  The Work In Progress can be seen here:
 
--- 
-viresh
+http://git.kernel.org/?p=linux/kernel/git/paulg/linux.git;a=shortlog;h=refs/heads/bug.h-cleanup-WIP
+
+I only mention it here since I'd hate to see anyone waste time on
+duplicating work that is already done.
+
+Thanks,
+Paul.
+
+---
+
+>
+>> The quickest fix for now might be to take out the BUILD_BUG_ON(),
+>> especially so close to 3.2-final.
+>
+> I think just remove the BUILD_BUG_ON. ?Other architectures have done
+> without it, so I see no reason we can't do as well.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
