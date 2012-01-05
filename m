@@ -1,68 +1,37 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 5 Jan 2012 11:21:21 +0100
-Subject: [PATCH v2 03/10] mfd: twl-core: Add initial DT support for
- twl4030/twl6030
-In-Reply-To: <20120104181224.GJ15503@ponder.secretlab.ca>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
- <1323439361-1647-4-git-send-email-b-cousson@ti.com>
- <20120104181224.GJ15503@ponder.secretlab.ca>
-Message-ID: <4F0579A1.2080102@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Jan 2012 11:26:12 +0100
+Subject: [PATCH v2 00/15] Make SMP timers standalone
+In-Reply-To: <20120105011704.GA8870@codeaurora.org>
+References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
+ <20111222193216.GO2577@n2100.arm.linux.org.uk>
+ <4F048EC4.40900@arm.com> <20120105011704.GA8870@codeaurora.org>
+Message-ID: <CACRpkdYjQPoY60XdhTwgLYbTrQMhC=Wxk5Y=hP2Vr0DngUJbxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
-
-On 1/4/2012 7:12 PM, Grant Likely wrote:
-> On Fri, Dec 09, 2011 at 03:02:34PM +0100, Benoit Cousson wrote:
-
-[...]
-
->> @@ -1183,22 +1187,53 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
->>   	int				status;
->>   	unsigned			i;
->>   	struct twl4030_platform_data	*pdata = client->dev.platform_data;
->> +	struct device_node		*node = client->dev.of_node;
->>   	u8 temp;
->>   	int ret = 0;
->>
->> +	if (node&&  !pdata) {
->> +		/*
->> +		 * XXX: Temporary fake pdata until the information
->> +		 * is correctly retrieved by every TWL modules from DT.
->> +		 */
->> +		pdata = kzalloc(sizeof(struct twl4030_platform_data),
->> +				GFP_KERNEL);
+On Thu, Jan 5, 2012 at 2:17 AM, David Brown <davidb@codeaurora.org> wrote:
+> On Wed, Jan 04, 2012 at 05:39:16PM +0000, Marc Zyngier wrote:
+>> I do. But on some non-SMP platforms, the local timer and the global
+>> timer can actually be the same (MSM is one example of this, and the UP
+>> version of the Cortex A15 is another).
 >
-> devm_kzalloc() so that it gets cleaned up on remove.
+> On SMP MSM, we use the CPU0 local timer as the global timer. ?They are
+> the same on non-SMP as well,
 
-Yep, it was already updated like that in the v4.
+Does this mean your CPU0 local timer is always on, always clocked?
+And do you use ARMs SMP TWD IP block for that?
 
->> +		if (!pdata) {
->> +			status = -ENOMEM;
->> +			goto exit;
->> +		}
->> +
->> +		/*
->> +		 * XXX: For the moment the IRQs for TWL seems to be encoded in
->> +		 * the global OMAP space. That should be cleaned to allow
->> +		 * dynamically adding a new IRQ controller.
->> +		 */
->> +		if ((id->driver_data)&  TWL6030_CLASS) {
->> +			pdata->irq_base = TWL6030_IRQ_BASE;
->> +			pdata->irq_end = pdata->irq_base + TWL6030_BASE_NR_IRQS;
->> +		} else {
->> +			pdata->irq_base = TWL4030_IRQ_BASE;
->> +			pdata->irq_end = pdata->irq_base + TWL4030_BASE_NR_IRQS;
->> +		}
->> +		irq_domain_add_simple(node, pdata->irq_base);
->
-> Yes, you'll want a follow-up patch to convert to dynamically allocated
-> irqs... but I've got to merge the final irq_domain work first.  :-)
+> I guess, but as Russell says, I'm not
+> sure what the concept of a local timer would mean on non-SMP.
 
-Yes. I already have a version based on Rob's series, but did not push it 
-since Rob was not confident with the merge of that feature for 3.3.
+I think this looks like one big misunderstanding. I understood it as
+the SMP TWD block is synthesized also on UP silicon, i.e. same
+hardware, and so it will need to use the driver from
+arch/arm/kernel/smp_twd.c, however there is nothing local
+about that apart from being in close locality of the CPU.
 
-> Acked-by: Grant Likely<grant.likely@secretlab.ca>
+Let us talk about the SMP TWD timer block for A8/A9 systems if
+that is what it's all about (is it? maybe I'm confused too...)
+and architectured timers for A15.
 
-Thanks,
-Benoit
+Linus Walleij
