@@ -1,48 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jan 2012 14:54:25 +0000
-Subject: [PATCH v2 1/2] DMA: PL330: Merge PL330 driver into drivers/dma/
-In-Reply-To: <1323654668-32504-1-git-send-email-boojin.kim@samsung.com>
-References: <1323654668-32504-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <20120105145425.GW11810@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 5 Jan 2012 14:56:29 +0000
+Subject: [PATCH v2] ARM: at91: pit add DT support
+In-Reply-To: <4F05B8A1.2010003@atmel.com>
+References: <1318799895-5121-4-git-send-email-plagnioj@jcrosoft.com>
+ <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
+ <20120105120049.GB4641@page> <4F05B8A1.2010003@atmel.com>
+Message-ID: <20120105145629.GB10530@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 10:51:08AM +0900, Boojin Kim wrote:
-> Currently there were two part of DMAC PL330 driver for
-> support old styled s3c-pl330 which has been merged into
-> drivers/dma/pl330.c driver. Actually, there is no reason
-> to separate them now.
+On Thu, Jan 05, 2012 at 03:50:09PM +0100, Nicolas Ferre wrote:
+> On 01/05/2012 01:00 PM, Jamie Iles :
+> > Hi Nicolas, Jean-Christophe,
+> > 
+> > On Thu, Jan 05, 2012 at 02:48:28PM +0100, Nicolas Ferre wrote:
+> >> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >>
+> >> Retreive registers address and IRQ from device tree entry. Fall back
+> >> to built-in values if an error occurs.
+> >>
+> >> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
+> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >> ---
+> > [...]
+> >> diff --git a/arch/arm/mach-at91/at91sam926x_time.c 
+> >> b/arch/arm/mach-at91/at91sam926x_time.c
+> >> index d89ead7..5d4c308 100644
+> >> --- a/arch/arm/mach-at91/at91sam926x_time.c
+> >> +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> >> @@ -14,6 +14,8 @@
+> > [...]
+> >> +static int __init of_at91sam926x_pit_init(void)
+> >> +{
+> >> +	struct device_node *np;
+> >> +
+> >> +	np = of_find_matching_node(NULL, timer_ids);
+> >> +	if (!np)
+> >> +		goto err;
+> >> +
+> >> +	pit_base_addr = of_iomap(np, 0);
+> >> +	if (!pit_base_addr)
+> >> +		goto node_err;
+> >> +
+> >> +	/* Get the interrupts property */
+> >> +	if (of_property_read_u32(np, "interrupts", &at91sam926x_pit_irq.irq))
+> >> +		goto ioremap_err;
+> > 
+> > I think you want:
+> > 
+> > 	at91sam926x_pit_irq.irq = irq_of_parse_and_map(np, 0);
+> > 
+> > to make sure the IRQ is converted to a Linux IRQ and not a hwirq.
 > 
-> Basically this patch merges arch/arm/common/pl330.c into
-> drivers/dma/pl330.c driver and removes useless exported
-> symbol, externed function and so on.
-> 
-> The newer pl330 driver tested on SMDKV310 and SMDK4212 boards
-> 
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> Change since V1:
-> Modify the order of definitions/declarations according to linux coding rules.
-> ---
->  arch/arm/common/Kconfig               |    3 -
->  arch/arm/common/Makefile              |    1 -
->  arch/arm/common/pl330.c               | 1971 ---------------------------------
->  arch/arm/include/asm/hardware/pl330.h |  333 +++---
->  drivers/dma/Kconfig                   |    1 -
->  drivers/dma/pl330.c                   | 1892 +++++++++++++++++++++++++++++++
->  6 files changed, 2074 insertions(+), 2127 deletions(-)
->  delete mode 100644 arch/arm/common/pl330.c
+> Yes, that definitively makes sense. BTW, without a DT entry, how should
+> I map a hwirq, with the irq_domain_to_irq() helper? But I will need
+> access to the interrupt controller "struct irq_domain"...
 
-Now that the PL330 code is entirely out of arch/arm, the header should no
-longer be in asm/hardware/pl330.h.
+If you aren't booting with DT then at the moment I think on AT91 you 
+have statically assigned irq_descs and IRQ numbers so you don't need to 
+map them, you just know what IRQ number to request at compile time.
 
-Definitions private to the driver should be in drivers/dma/pl330.c or a
-header file co-located.  Other definitions for interfaces to that driver
-(eg, platform data) should be in include/linux/amba.
-
-That can be the subject of a follow-up patch if this is already finalized.
+Jamie
