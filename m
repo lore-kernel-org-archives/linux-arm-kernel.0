@@ -1,48 +1,40 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 5 Jan 2012 08:23:06 +0100
-Subject: [PATCH 5/6] gpio: tegra: Dynamically allocate IRQ base, and
- support DT
-In-Reply-To: <1325702378-20863-5-git-send-email-swarren@nvidia.com>
-References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
- <1325702378-20863-5-git-send-email-swarren@nvidia.com>
-Message-ID: <20120105072306.GA3980@avionic-0098.mockup.avionic-design.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 05 Jan 2012 08:28:23 +0100
+Subject: [RFC 1/8] gpio/microblaze: Eliminate duplication of
+ of_get_named_gpio_flags()
+In-Reply-To: <20120104183057.GU15503@ponder.secretlab.ca>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-2-git-send-email-grant.likely@secretlab.ca>
+ <4EF1B36A.8050304@monstr.eu> <20120104183057.GU15503@ponder.secretlab.ca>
+Message-ID: <4F055117.7060901@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> @@ -343,6 +344,16 @@ static int __devinit tegra_gpio_probe(struct platform_device *pdev)
->  	int i;
->  	int j;
->  
-> +	irq_domain.irq_base = irq_alloc_descs(-1, 0, TEGRA_NR_GPIOS, 0);
-> +	if (irq_domain.irq_base < 0) {
-> +		dev_err(&pdev->dev, "Couldn't allocate IRQ numbers\n");
-> +		return -ENODEV;
-> +	}
-> +	irq_domain.nr_irq = TEGRA_NR_GPIOS;
-> +	irq_domain.ops = &irq_domain_simple_ops;
-> +	irq_domain.of_node = pdev->dev.of_node;
-> +	irq_domain_add(&irq_domain);
+Grant Likely wrote:
+> On Wed, Dec 21, 2011 at 11:22:34AM +0100, Michal Simek wrote:
+>> Grant Likely wrote:
+>>> of_reset_gpio_handle() is largely a cut-and-paste copy of
+>>> of_get_named_gpio_flags(). There really isn't any reason for the
+>>> split, so this patch deletes the duplicate function
+>>>
+>>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+>>> Cc: Michal Simek <monstr@monstr.eu>
+>>> ---
+>>> arch/microblaze/kernel/reset.c |   43 +--------------------------------------
+>>> 1 files changed, 2 insertions(+), 41 deletions(-)
+>> Sorry for taking to long.
+>>
+>> Tested and applied to microblaze tree.
+> 
+> I'd rather take this one through the gpio tree if that is okay.
 
-I was wondering: except for setting the nr_irq field this is pretty much what
-irq_domain_add_simple() does. While I get that you need access to the domain
-later on and cannot use the helper, I'm still wondering why the nr_irq field
-is not initialized by irq_domain_add_simple().
+OK. Please do.
 
-I have a driver for a GPIO/IRQ expander that does exactly the same and was
-always wondering why the irq_data.hwirq field isn't properly setup, and
-irq_domain.nr_irq being 0 seems to be exactly the reason. So am I supposed to
-not use irq_domain_add_simple() in this case or should we rather update the
-helper to take a nr_irq parameter that can be used to initialize the nr_irq
-field?
+Thanks,
+Michal
 
-Thierry
-
-P.S.: sorry for hijacking
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120105/9b493e95/attachment-0001.sig>
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
