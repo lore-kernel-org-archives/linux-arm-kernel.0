@@ -1,75 +1,68 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 5 Jan 2012 03:17:17 -0700
-Subject: Anyone interested in another ARM kernel workshop in February?
-In-Reply-To: <029101ccbac8$56dbe960$0493bc20$%kim@samsung.com>
-References: <CACxGe6vc+9bcr2S0vgeNwr7Oo370FxwZ_TZCZZ2ZyC+A_ir_0A@mail.gmail.com>
- <CACxGe6vBNtgPpHzJg+pFcT3as_us3XeSJwSzd1kYzko3_8rrCg@mail.gmail.com>
- <20111213082452.GI7148@opensource.wolfsonmicro.com>
- <20111213153605.GQ20297@mudshark.cambridge.arm.com>
- <029101ccbac8$56dbe960$0493bc20$%kim@samsung.com>
-Message-ID: <CACxGe6ta7JLuP7uWO9CR+gqsPVh8RjSNJqOKUwrMg_HptPxyeA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 5 Jan 2012 11:21:21 +0100
+Subject: [PATCH v2 03/10] mfd: twl-core: Add initial DT support for
+ twl4030/twl6030
+In-Reply-To: <20120104181224.GJ15503@ponder.secretlab.ca>
+References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
+ <1323439361-1647-4-git-send-email-b-cousson@ti.com>
+ <20120104181224.GJ15503@ponder.secretlab.ca>
+Message-ID: <4F0579A1.2080102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Throwing out to a wider audience.  I originally contacted only the
-attendees of the Prague summit, but now I'm cc'ing linux-arm-kernel]
+Hi Grant,
 
-I'm organizing another ARM maintainership summit this February in
-conjunction with Linaro Connect[1], Feb 6-10 in San Francisco.  Format
-will be similar to the meeting we held in Prague at kernel summit with
-time for both meetings and hacking sessions.  Linaro Connect is
-organized with meetings and summits each morning, and hacking sprints
-in the afternoon.  I'm planing one 1/2 day arm maintainership summit
-meeting early in the week (Monday or Tuesday), and you're invited to
-participate in any of the Linaro Connect sessions.  See the schedule
-page on the Linaro Connect website for an early list of the organized
-sessions.
+On 1/4/2012 7:12 PM, Grant Likely wrote:
+> On Fri, Dec 09, 2011 at 03:02:34PM +0100, Benoit Cousson wrote:
 
-If you're going to attend, then I need you to do two things:
+[...]
 
-1. Register to attend at the Linaro Connect website [2].
-2. Subscribe to the blueprint so I know that you'll be there [3].
+>> @@ -1183,22 +1187,53 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>>   	int				status;
+>>   	unsigned			i;
+>>   	struct twl4030_platform_data	*pdata = client->dev.platform_data;
+>> +	struct device_node		*node = client->dev.of_node;
+>>   	u8 temp;
+>>   	int ret = 0;
+>>
+>> +	if (node&&  !pdata) {
+>> +		/*
+>> +		 * XXX: Temporary fake pdata until the information
+>> +		 * is correctly retrieved by every TWL modules from DT.
+>> +		 */
+>> +		pdata = kzalloc(sizeof(struct twl4030_platform_data),
+>> +				GFP_KERNEL);
+>
+> devm_kzalloc() so that it gets cleaned up on remove.
 
-[1] http://connect.linaro.org
-[2] http://connect.linaro.org/events/event/lcq1-12/#welcome
-[3] https://blueprints.launchpad.net/linux-linaro/+spec/linaro-kernel-q112-maintainer-summit
+Yep, it was already updated like that in the v4.
 
-I'll begin working on putting together an agenda.  Please send me
-nominations for topics.
+>> +		if (!pdata) {
+>> +			status = -ENOMEM;
+>> +			goto exit;
+>> +		}
+>> +
+>> +		/*
+>> +		 * XXX: For the moment the IRQs for TWL seems to be encoded in
+>> +		 * the global OMAP space. That should be cleaned to allow
+>> +		 * dynamically adding a new IRQ controller.
+>> +		 */
+>> +		if ((id->driver_data)&  TWL6030_CLASS) {
+>> +			pdata->irq_base = TWL6030_IRQ_BASE;
+>> +			pdata->irq_end = pdata->irq_base + TWL6030_BASE_NR_IRQS;
+>> +		} else {
+>> +			pdata->irq_base = TWL4030_IRQ_BASE;
+>> +			pdata->irq_end = pdata->irq_base + TWL4030_BASE_NR_IRQS;
+>> +		}
+>> +		irq_domain_add_simple(node, pdata->irq_base);
+>
+> Yes, you'll want a follow-up patch to convert to dynamically allocated
+> irqs... but I've got to merge the final irq_domain work first.  :-)
+
+Yes. I already have a version based on Rob's series, but did not push it 
+since Rob was not confident with the merge of that feature for 3.3.
+
+> Acked-by: Grant Likely<grant.likely@secretlab.ca>
 
 Thanks,
-g.
-
-On Wed, Dec 14, 2011 at 6:24 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Will Deacon wrote:
->>
->> On Tue, Dec 13, 2011 at 08:24:53AM +0000, Mark Brown wrote:
->> > On Fri, Dec 09, 2011 at 11:55:44PM -0700, Grant Likely wrote:
->> >
->> > > Linaro is extending an invitation out to all ARM kernel maintainers to
->> > > attend Linaro Connect in San Francisco the week of February 6-10 (the
->> week
->> > > before Android Builders and ELC). If there is interest, then I can
->> organize
->> > > a workshop much like what we did in Prague.
->> >
->> > > What say you?
->> >
->> > I'm interested but would need to check about travel.
->>
-> Me too :)
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Benoit
