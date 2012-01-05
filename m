@@ -1,62 +1,129 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 5 Jan 2012 13:17:36 +0000
-Subject: [PATCH 5/6] gpio: tegra: Dynamically allocate IRQ base, and
- support DT
-In-Reply-To: <1325702378-20863-5-git-send-email-swarren@nvidia.com>
-References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
- <1325702378-20863-5-git-send-email-swarren@nvidia.com>
-Message-ID: <20120105131736.GC4641@page>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 5 Jan 2012 15:31:45 +0200
+Subject: [PATCH v2] arm/tegra: add support for tegra30 interrupts
+Message-ID: <1325770305-21637-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Tegra30 has 1 extra legacy interrupt controller. Use the GIC ITLinesNumber
+field to determine how many interrupt controllers we have and initialize
+appropriately. Also make room for the extra tegra30 interrupts by moving
+the GPIO IRQ base. This shouldn't affect existing code as it determines the
+correct IRQ number for GPIOs using TEGRA_GPIO_TO_IRQ().
 
-On Wed, Jan 04, 2012 at 11:39:37AM -0700, Stephen Warren wrote:
-> Enhance the driver to dynamically allocate the base IRQ number, and
-> create an IRQ domain for itself. The use of an IRQ domain ensures that
-> any device tree node interrupts properties are correctly parsed.
-> 
-> Describe interrupt-related properties in the device tree binding docs,
-> and the contents of "child" node interrupts property.
-> 
-> Update tegra*.dtsi to specify the required interrupt-related properties.
-> 
-> Finally, remove the definition of TEGRA_GPIO_TO_IRQ; this macro no longer
-> gives correct results since the IRQ numbers for GPIOs are dynamically
-> allocated.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This patch depends on:
-> http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
-> devel-stable c87fb57346fc7653ace98769f148e0dcd88ac1ee
-> ---
->  .../devicetree/bindings/gpio/gpio_nvidia.txt       |   12 +++++++++
->  arch/arm/boot/dts/tegra20.dtsi                     |    2 +
->  arch/arm/boot/dts/tegra30.dtsi                     |    2 +
->  arch/arm/mach-tegra/include/mach/gpio-tegra.h      |    2 -
->  drivers/gpio/gpio-tegra.c                          |   25 ++++++++++++++-----
->  5 files changed, 34 insertions(+), 9 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-> index 50b363c..d114e19 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-> @@ -8,6 +8,16 @@ Required properties:
->    second cell is used to specify optional parameters:
->    - bit 0 specifies polarity (0 for normal, 1 for inverted)
->  - gpio-controller : Marks the device node as a GPIO controller.
-> +- #interrupt-cells : Should be 2.
-> +  The first cell is the GPIO number.
-> +  The second cell is used to specify flags:
-> +    bits[3:0] trigger type and level flags:
-> +      1 = low-to-high edge triggered.
-> +      2 = high-to-low edge triggered.
-> +      4 = active high level-sensitive.
-> +      8 = active low level-sensitive.
-> +      Valid combinations are 1, 2, 3, 4, 8.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Tested-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Colin Cross <ccross@android.com>
 
-It looks to me like the tegra gpio driver can do IRQ_TYPE_EDGE_BOTH so I 
-would expect 12 to be a valid combination too no?
+---
+This patch is against
+git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.3/soc
+commit 6cc04a4420391c3f034afe8ea6e28d75912a70a3
 
-Jamie
+On top of this the following patches are needed:
+
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7240/1
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7244/1
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7241/1
+---
+ arch/arm/mach-tegra/include/mach/iomap.h |    3 +++
+ arch/arm/mach-tegra/include/mach/irqs.h  |    7 ++++---
+ arch/arm/mach-tegra/irq.c                |   20 ++++++++++++++++----
+ 3 files changed, 23 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+index 19dec3a..67644c9 100644
+--- a/arch/arm/mach-tegra/include/mach/iomap.h
++++ b/arch/arm/mach-tegra/include/mach/iomap.h
+@@ -74,6 +74,9 @@
+ #define TEGRA_QUATERNARY_ICTLR_BASE	0x60004300
+ #define TEGRA_QUATERNARY_ICTLR_SIZE	SZ_64
+ 
++#define TEGRA_QUINARY_ICTLR_BASE	0x60004400
++#define TEGRA_QUINARY_ICTLR_SIZE	SZ_64
++
+ #define TEGRA_TMR1_BASE			0x60005000
+ #define TEGRA_TMR1_SIZE			SZ_8
+ 
+diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
+index a2146cd..aad1a2c 100644
+--- a/arch/arm/mach-tegra/include/mach/irqs.h
++++ b/arch/arm/mach-tegra/include/mach/irqs.h
+@@ -165,11 +165,12 @@
+ #define INT_QUAD_RES_30			(INT_QUAD_BASE + 30)
+ #define INT_QUAD_RES_31			(INT_QUAD_BASE + 31)
+ 
+-#define INT_MAIN_NR			(INT_QUAD_BASE + 32 - INT_PRI_BASE)
+-
++/* Tegra30 has 5 banks of 32 IRQs */
++#define INT_MAIN_NR			(32 * 5)
+ #define INT_GPIO_BASE			(INT_PRI_BASE + INT_MAIN_NR)
+ 
+-#define INT_GPIO_NR			(28 * 8)
++/* Tegra30 has 8 banks of 32 GPIOs */
++#define INT_GPIO_NR			(32 * 8)
+ 
+ #define TEGRA_NR_IRQS			(INT_GPIO_BASE + INT_GPIO_NR)
+ 
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 004b0fd..6ad5255 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -48,14 +48,16 @@
+ #define ICTLR_COP_IER_CLR	0x38
+ #define ICTLR_COP_IEP_CLASS	0x3c
+ 
+-#define NUM_ICTLRS 4
+ #define FIRST_LEGACY_IRQ 32
+ 
++static int num_ictlrs;
++
+ static void __iomem *ictlr_reg_base[] = {
+ 	IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE),
+ 	IO_ADDRESS(TEGRA_SECONDARY_ICTLR_BASE),
+ 	IO_ADDRESS(TEGRA_TERTIARY_ICTLR_BASE),
+ 	IO_ADDRESS(TEGRA_QUATERNARY_ICTLR_BASE),
++	IO_ADDRESS(TEGRA_QUINARY_ICTLR_BASE),
+ };
+ 
+ static inline void tegra_irq_write_mask(unsigned int irq, unsigned long reg)
+@@ -64,7 +66,7 @@ static inline void tegra_irq_write_mask(unsigned int irq, unsigned long reg)
+ 	u32 mask;
+ 
+ 	BUG_ON(irq < FIRST_LEGACY_IRQ ||
+-		irq >= FIRST_LEGACY_IRQ + NUM_ICTLRS * 32);
++		irq >= FIRST_LEGACY_IRQ + num_ictlrs * 32);
+ 
+ 	base = ictlr_reg_base[(irq - FIRST_LEGACY_IRQ) / 32];
+ 	mask = BIT((irq - FIRST_LEGACY_IRQ) % 32);
+@@ -117,8 +119,18 @@ static int tegra_retrigger(struct irq_data *d)
+ void __init tegra_init_irq(void)
+ {
+ 	int i;
++	void __iomem *distbase;
++
++	distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
++	num_ictlrs = readl_relaxed(distbase + GIC_DIST_CTR) & 0x1f;
++
++	if (num_ictlrs > ARRAY_SIZE(ictlr_reg_base)) {
++		WARN(1, "Too many (%d) interrupt controllers found. Maximum is %d.",
++			num_ictlrs, ARRAY_SIZE(ictlr_reg_base));
++		num_ictlrs = ARRAY_SIZE(ictlr_reg_base);
++	}
+ 
+-	for (i = 0; i < NUM_ICTLRS; i++) {
++	for (i = 0; i < num_ictlrs; i++) {
+ 		void __iomem *ictlr = ictlr_reg_base[i];
+ 		writel(~0, ictlr + ICTLR_CPU_IER_CLR);
+ 		writel(0, ictlr + ICTLR_CPU_IEP_CLASS);
+@@ -135,6 +147,6 @@ void __init tegra_init_irq(void)
+ 	 * initialized elsewhere under DT.
+ 	 */
+ 	if (!of_have_populated_dt())
+-		gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
++		gic_init(0, 29, distbase,
+ 			IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
+ }
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
