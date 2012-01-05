@@ -1,171 +1,112 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 4 Jan 2012 17:01:03 -0800
-Subject: [PATCH v5 2/2] video: backlight: support s6e8ax0 panel driver
- based on MIPI DSI
-In-Reply-To: <4EF15F9C.9030807@samsung.com>
-References: <4EF15F9C.9030807@samsung.com>
-Message-ID: <20120104170103.bae938a9.akpm@linux-foundation.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 4 Jan 2012 17:01:43 -0800
+Subject: [PATCH v4 3/6] clk: introduce the common clock framework
+In-Reply-To: <4F0462FF.1000308@gmail.com>
+References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
+ <1323834838-2206-4-git-send-email-mturquette@linaro.org>
+ <alpine.LFD.2.02.1112141007550.3020@ionos>
+ <CAJOA=zO=gM2r4pCVo+orLqE9Q1SSw4h5nXsAHo-e_SHZAfvKDA@mail.gmail.com>
+ <20120104021541.GI2414@b20223-02.ap.freescale.net>
+ <4F0462FF.1000308@gmail.com>
+Message-ID: <CAJOA=zPw7UuhE4R3SsBeyzQ2_iN29Zv-ExaUTTFCah+GoFSfNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Dec 2011 13:25:00 +0900
-Donghwa Lee <dh09.lee@samsung.com> wrote:
-
-> 
-> This patch is amoled panel driver based MIPI DSI interface.
-> S6E8AX0 means it may includes many other ldi controllers, for example,
-> S6E8AA0, S6E8AB0, and so on.
-> 
-> This patch can be modified depending on each panel properites. For example,
-> second parameter of panel condition register can be changed depending on
-> ldi controller or amoled type.
-> 
+On Wed, Jan 4, 2012 at 6:32 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 01/03/2012 08:15 PM, Richard Zhao wrote:
+>> On Fri, Dec 16, 2011 at 04:45:48PM -0800, Turquette, Mike wrote:
+>>> On Wed, Dec 14, 2011 at 5:18 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>>>> On Tue, 13 Dec 2011, Mike Turquette wrote:
 >
-> ...
+> snip
 >
-> +static unsigned char s6e8ax0_22_gamma_30[] = {
-> +	0xFA, 0x01, 0x60, 0x10, 0x60, 0xF5, 0x00, 0xFF, 0xAD, 0xAF,
-> +	0xBA, 0xC3, 0xD8, 0xC5, 0x9F, 0xC6, 0x9E, 0xC1, 0xDC, 0xC0,
-> +	0x00, 0x61, 0x00, 0x5A, 0x00, 0x74,
-> +};
-> +
+>>>>> +/**
+>>>>> + * clk_init - initialize the data structures in a struct clk
+>>>>> + * @dev: device initializing this clk, placeholder for now
+>>>>> + * @clk: clk being initialized
+>>>>> + *
+>>>>> + * Initializes the lists in struct clk, queries the hardware for the
+>>>>> + * parent and rate and sets them both. ?Adds the clk to the sysfs tree
+>>>>> + * topology.
+>>>>> + *
+>>>>> + * Caller must populate clk->name and clk->flags before calling
+>>>>
+>>>> I'm not too happy about this construct. That leaves struct clk and its
+>>>> members exposed to the world instead of making it a real opaque
+>>>> cookie. I know from my own painful experience, that this will lead to
+>>>> random fiddling in that data structure in drivers and arch code just
+>>>> because the core code has a shortcoming.
+>>>>
+>>>> Why can't we make struct clk a real cookie and confine the data
+>>>> structure to the core code ?
+>>>>
+>>>> That would change the init call to something like:
+>>>>
+>>>> struct clk *clk_init(struct device *dev, const struct clk_hw *hw,
+>>>> ? ? ? ? ? ? ? ? ? ? struct clk *parent)
+>>>>
+>>>> And have:
+>>>> struct clk_hw {
+>>>> ? ? ? struct clk_hw_ops *ops;
+>>>> ? ? ? const char ? ? ? ?*name;
+>>>> ? ? ? unsigned long ? ? flags;
+>>>> };
+>>>>
+>>>> Implementers can do:
+>>>> struct my_clk_hw {
+>>>> ? ? ? struct clk_hw ? ?hw;
+>>>> ? ? ? mydata;
+>>>> };
+>>>>
+>>>> And then change the clk ops callbacks to take struct clk_hw * as an
+>>>> argument.
+>> We have to define static clocks before we adopt DT binding.
+>> If clk is opaque and allocate memory in clk core, it'll make hard
+>> to define static clocks. And register/init will pass a long parameter
+>> list.
 >
-> ...
->
-> +static unsigned char s6e8ax0_22_gamma_300[] = {
-> +	0xFA, 0x01, 0x60, 0x10, 0x60, 0xB5, 0xD3, 0xBD, 0xB1, 0xD2,
-> +	0xB0, 0xC0, 0xDC, 0xC0, 0x94, 0xBA, 0x91, 0xAC, 0xC5, 0xA9,
-> +	0x00, 0xC2, 0x00, 0xB7, 0x00, 0xED,
-> +};
-> +
-> +static unsigned char *s6e8ax0_22_gamma_table[] = {
-> +	s6e8ax0_22_gamma_30,
-> +	s6e8ax0_22_gamma_50,
-> +	s6e8ax0_22_gamma_60,
-> +	s6e8ax0_22_gamma_70,
-> +	s6e8ax0_22_gamma_80,
-> +	s6e8ax0_22_gamma_90,
-> +	s6e8ax0_22_gamma_100,
-> +	s6e8ax0_22_gamma_120,
-> +	s6e8ax0_22_gamma_130,
-> +	s6e8ax0_22_gamma_140,
-> +	s6e8ax0_22_gamma_150,
-> +	s6e8ax0_22_gamma_160,
-> +	s6e8ax0_22_gamma_170,
-> +	s6e8ax0_22_gamma_180,
-> +	s6e8ax0_22_gamma_190,
-> +	s6e8ax0_22_gamma_200,
-> +	s6e8ax0_22_gamma_210,
-> +	s6e8ax0_22_gamma_220,
-> +	s6e8ax0_22_gamma_230,
-> +	s6e8ax0_22_gamma_240,
-> +	s6e8ax0_22_gamma_250,
-> +	s6e8ax0_22_gamma_260,
-> +	s6e8ax0_22_gamma_270,
-> +	s6e8ax0_22_gamma_280,
-> +	s6e8ax0_22_gamma_300,
-> +};
+> DT is not a prerequisite for having dynamically created clocks. You can
+> make clock init dynamic without DT.
 
-I suggest making all the above arrays const.  Otherwise the compiler
-might end up deciding to needlessly allocate space in writeable storage
-for them.
+Agreed.
 
-If that means that ops->cmd_write() needs constification as well then
-let's just do that, for it is the right thing to do.
+> What data goes in struct clk vs. struct clk_hw could change over time.
+> So perhaps we can start with some data in clk_hw and plan to move it to
+> struct clk later. Even if almost everything ends up in clk_hw initially,
+> at least the structure is in place to have common, core-only data
+> separate from platform data.
 
-> +static void s6e8ax0_panel_cond(struct s6e8ax0 *lcd)
-> +{
-> +	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
-> +
-> +	unsigned char data_to_send[] = {
-> +		0xf8, 0x3d, 0x35, 0x00, 0x00, 0x00, 0x93, 0x00, 0x3c,
-> +		0x7d, 0x08, 0x27, 0x7d, 0x3f, 0x00, 0x00, 0x00, 0x20,
-> +		0x04, 0x08, 0x6e, 0x00, 0x00, 0x00, 0x02, 0x08, 0x08,
-> +		0x23, 0x23, 0xc0, 0xc8, 0x08, 0x48, 0xc1, 0x00, 0xc1,
-> +		0xff, 0xff, 0xc8
-> +	};
+What is the point of this?
 
-Arrays like this certainly should be const.  As it stands, the compiler
-needs to generate room on the stack and generate a local copy of the
-array each time this function is called!
+The original clk_hw was defined simply as:
 
-> +	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
-> +		data_to_send, ARRAY_SIZE(data_to_send));
-> +}
-> +
-> +static void s6e8ax0_display_cond(struct s6e8ax0 *lcd)
-> +{
-> +	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
-> +	unsigned char data_to_send[] = {
-> +		0xf2, 0x80, 0x03, 0x0d
-> +	};
-> +
-> +	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
-> +		data_to_send, ARRAY_SIZE(data_to_send));
-> +}
-> +
-> +/* Gamma 2.2 Setting (200cd, 7500K, 10MPCD) */
-> +static void s6e8ax0_gamma_cond(struct s6e8ax0 *lcd)
-> +{
-> +	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
-> +	unsigned int gamma = lcd->bd->props.brightness;
-> +
-> +	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
-> +			s6e8ax0_22_gamma_table[gamma],
-> +			ARRAY_SIZE(s6e8ax0_22_gamma_table));
+struct clk_hw {
+        struct clk *clk;
+};
 
-This seems wrong.  ARRAY_SIZE(s6e8ax0_22_gamma_table) does not
-represent the size of s6e8ax0_22_gamma_table[gamma]!
+It's only purpose in life was as a handle for navigation between the
+opaque struct clk and the hardware-specific struct my_clk_hw.  struct
+clk_hw is defined in clk.h and everyone can see it.  If we're suddenly
+OK putting clk data in this structure then why bother with an opaque
+struct clk at all?
 
-> +}
-> +
->
-> ...
->
-> +static int s6e8ax0_update_gamma_ctrl(struct s6e8ax0 *lcd, int brightness)
-> +{
-> +	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
-> +
-> +	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
-> +			s6e8ax0_22_gamma_table[brightness],
-> +			ARRAY_SIZE(s6e8ax0_22_gamma_table));
+> What is the actual data you need to be static and accessible to the
+> platform code? A ptr to parent clk is the main thing I've seen for
+> static initialization. So make the parent ptr be struct clk_hw* and
+> allow the platforms to access.
 
-Ditto.
+To answer your question on what data we're trying to expose: platform
+code commonly needs the parent pointer and the clk rate (and by
+extension, the rate of the parent).  For debug/error prints it is also
+nice to have the clk name.  Generic clk flags are also conceivably
+something that platform code might want.
 
-> +	/* update gamma table. */
-> +	s6e8ax0_gamma_update(lcd);
-> +	lcd->gamma = brightness;
-> +
-> +	return 0;
-> +}
-> +
->
-> ...
->
-> +static void s6e8ax0_power_on(struct mipi_dsim_lcd_device *dsim_dev, int power)
-> +{
-> +	struct s6e8ax0 *lcd = dev_get_drvdata(&dsim_dev->dev);
-> +
-> +	msleep(lcd->ddi_pd->power_on_delay);
-> +
-> +	/* lcd power on */
-> +	if (power)
-> +		s6e8ax0_regulator_enable(lcd);
-> +	else
-> +		s6e8ax0_regulator_disable(lcd);
-> +
-> +	msleep(lcd->ddi_pd->reset_delay);
-> +
-> +	/* lcd reset */
-> +	if (lcd->ddi_pd->reset)
-> +		lcd->ddi_pd->reset(lcd->ld);
-> +	msleep(5);
-> +}
+I'd like to spin the question around: if we're OK exposing some stuff
+(in your example above, the parent pointer), then what clk data are
+you trying to hide?
 
-Maybe we should hold lcd->lock across this function to prevent other
-code paths from getting in and fiddling with the hardware while it is
-powering on?
+Regards,
+Mike
 
 >
-> ...
->
+> Rob
