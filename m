@@ -1,85 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jan 2012 16:26:50 +0000
-Subject: [PATCH v2 00/15] Make SMP timers standalone
-In-Reply-To: <4F05CC0D.6090101@arm.com>
-References: <4F048EC4.40900@arm.com>
- <20120104214748.GH11810@n2100.arm.linux.org.uk>
- <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
- <4F0584B5.60908@arm.com>
- <CAMQu2gxuBNRWYKyKRdzvv_m49DyLoODVbC=rKDHDAMTnxe+6+A@mail.gmail.com>
- <4F058744.4030503@arm.com> <20120105112602.GQ11810@n2100.arm.linux.org.uk>
- <4F058B1C.2070109@arm.com> <20120105121026.GS11810@n2100.arm.linux.org.uk>
- <4F05CC0D.6090101@arm.com>
-Message-ID: <20120105162650.GY11810@n2100.arm.linux.org.uk>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Thu, 05 Jan 2012 17:30:27 +0100
+Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
+In-Reply-To: <1325719752-818-1-git-send-email-olof@lixom.net>
+References: <1325719752-818-1-git-send-email-olof@lixom.net>
+Message-ID: <6121078.4q2inFFXlB@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 04:13:01PM +0000, Marc Zyngier wrote:
-> On 05/01/12 12:10, Russell King - ARM Linux wrote:
-> > On Thu, Jan 05, 2012 at 11:35:56AM +0000, Marc Zyngier wrote:
-> >> On 05/01/12 11:26, Russell King - ARM Linux wrote:
-> >>> Look, local timers *are* special.  They're not the same as global timers.
-> >>> They're treated differently.  Ripping out the local timer setup stuff
-> >>> from the SMP code is not the right solution, especially when we've
-> >>> already got a separation of the local timer core from the hardware
-> >>> implementation.
-> >>
-> >> OK. I'll try to work out something different.
-> > 
-> > Why?  What's wrong with the existing structure?
+Hi,
+
+Am Mittwoch, 4. Januar 2012, 15:29:12 schrieb Olof Johansson:
+> Only one of the L2 erratas are needed on T30, but T20/25
+> needs a few more.
+
+can we have a word from someone from NVIDIA about which Tegra versions/revisions need 
+which erratum applied? 
+
+Currently the kernel has selections for the following errata (on ARM):
+
+	T2x		T30
+					ERRATA_430973			Stale prediction on replaced interworking branch
+					ERRATA_458693			Processor deadlock when a false hazard is created
+					ERRATA_460075			Data written to the L2 cache can be overwritten
+											with stale data
+	x				ERRATA_742230			DMB operation may be faulty
+					ERRATA_742231			Incorrect hazard handling in the SCU may lead to
+											data corruption
+					PL310_ERRATA_588369	Clean & Invalidate maintenance operations do not
+											invalidate clean lines
+					ERRATA_720789			TLBIASIDIS and TLBIMVAIS operations can broadcast
+											a faulty ASID
+					PL310_ERRATA_727915	Background Clean & Invalidate by Way operation
+											can cause data corruption
+					ERRATA_743622			Faulty hazard checking in the Store Buffer may
+											lead to data corruption
+					ERRATA_751472			Interrupted ICIALLUIS may prevent completion of
+											broadcasted operation
+	x				PL310_ERRATA_753970	cache sync operation may be faulty
+					ERRATA_754322			possible faulty MMU translations following an ASID
+											switch
+					ERRATA_754327			no automatic Store Buffer drain
+					ERRATA_764369			Data cache line maintenance operation by MVA may
+											not succeed
+	x		x		PL310_ERRATA_769419	no automatic Store Buffer drain
+
+With Olofs patch, the following errata are enabled by tegra_defconfig:
+
+742230(T2x), 753970(T2x), 769419(T2x + T30)
+
+I have the feeling that at least 764369 also needs to be enabled. From the 
+description: ... affecting Cortex-A9 MPCore with two or more processors (all                                                                         
+current revisions). I wonder if this includes multi *cores*.
+
+The TRM is not very detailed about this topic. Having this info will likely remove 
+some headache for non OEM custumers.
+
+Marc
+
+
 > 
-> My main goal here is not to use a local timer as a global timer, but
-> rather to be able to support multiple local timer implementations in the
-> same kernel (TWD, MCT...). The "local timer on UP" is merely a consequence.
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm/mach-tegra/Kconfig |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> I could come up with another registration interface that fits into the
-> existing structure, but I thought something could be done with what we
-> currently have.
-
-That's easy - but the solution depends on exactly how you're trying to
-solve it.
-
-In local_timer.h:
-
-struct local_timer {
-	int (*setup)(struct clock_event_device *);
-	void (*stop)(struct clock_event_device *);
-};
-
-int local_timer_register(struct local_timer *);
-
-In arch/arm/kernel/smp.c:
-
-static struct local_timer *local_timer;
-
-int local_timer_register(struct local_timer *lt)
-{
-	if (local_timer)
-		return -EBUSY;
-	local_timer = lt;
-	return 0;
-}
-
-static int local_timer_setup(struct clock_event_device *ce)
-{
-	return local_timer ? local_timer->setup(ce) : -ENXIO;
-}
-
-static void local_timer_stop(struct clock_event_device *ce)
-{
-	if (local_timer)
-		local_timer->stop(ce);
-}
-
-And, for twd:
-
-struct local_timer twd_local_timer = {
-	.setup = twd_timer_setup,
-	.stop = twd_timer_stop,
-};
-
-But... it's not quite that simple because platforms need to intercept the
-local_timer_setup() call to do platform specific things - such as finding
-the twd base, and setting the twd IRQ.  That can be solved by moving
-that out of platform code (why is it there in the first place?) into
-smp_twd.c, and providing twd_local_timer_dt.
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> index 373652d..a2c76ee 100644
+> --- a/arch/arm/mach-tegra/Kconfig
+> +++ b/arch/arm/mach-tegra/Kconfig
+> @@ -10,6 +10,9 @@ config ARCH_TEGRA_2x_SOC
+>  	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>  	select USB_ULPI if USB_SUPPORT
+>  	select USB_ULPI_VIEWPORT if USB_SUPPORT
+> +	select ARM_ERRATA_742230
+> +	select PL310_ERRATA_753970 if CACHE_PL310
+> +	select PL310_ERRATA_769419 if CACHE_L2X0
+>  	help
+>  	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+>  	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+> @@ -23,6 +26,7 @@ config ARCH_TEGRA_3x_SOC
+>  	select USB_ULPI if USB_SUPPORT
+>  	select USB_ULPI_VIEWPORT if USB_SUPPORT
+>  	select USE_OF
+> +	select PL310_ERRATA_769419 if CACHE_L2X0
+>  	help
+>  	  Support for NVIDIA Tegra T30 processor family, based on the
+>  	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
