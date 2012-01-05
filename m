@@ -1,100 +1,52 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 4 Jan 2012 16:27:24 -0800
-Subject: [PATCH 9/9] arm/tegra: emc: device tree support
-In-Reply-To: <1324599468-12845-10-git-send-email-olof@lixom.net>
-References: <1324599468-12845-1-git-send-email-olof@lixom.net>
- <1324599468-12845-10-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F15B3@HQMAIL01.nvidia.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 5 Jan 2012 11:27:52 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120105112752.5bc8a1fe745dfe3adbc45fe9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Thursday, December 22, 2011 5:18 PM:
-> Add device tree support to the emc driver, filling in the platform data
-> based on the DT bindings.
+Hi all,
 
-> diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
-...
->  out_fail:
->  	mutex_unlock(&tegra_apb_dma_lock);
-> -	return true;
-> +	return false;
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-exynos/Makefile between commit cc511b8d84d8 ("ARM: 7257/1:
+EXYNOS: introduce arch/arm/mach-exynos/common.[ch]") from the arm tree
+and commit fca3de6ab9bf ("ARM: EXYNOS: Limit usage of pl330 device
+instance to non-dt build") from the arm-soc tree.
 
-There's the Easter egg;-)
-
-> diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
-
-> +#ifdef CONFIG_OF
-> +static struct device_node *tegra_emc_ramcode_devnode(struct device_node *np)
-> +{
-> +	struct device_node *iter;
-> +	u32 reg;
-> +
-> +	for_each_child_of_node(np, iter) {
-> +		if (!of_property_read_u32(np, "nvidia,ram-code", &reg))
-> +			continue;
-
-I think that test is inverted; it returns 0 on success.
-
-> +static struct tegra_emc_pdata *tegra_emc_dt_parse_pdata(
-> +		struct platform_device *pdev)
-...
-> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +	pdata->tables = devm_kzalloc(&pdev->dev,
-> +				     sizeof(struct tegra_emc_table) * num_tables,
-> +				     GFP_KERNEL);
-
-May as well use sizeof(*pdata->tables) there too for consistency?
-
-> +
-> +	i = 0;
-> +	for_each_child_of_node(tnp, iter) {
-> +		u32 prop;
-> +
-> +		ret = of_property_read_u32(iter, "clock-frequency", &prop);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "no clock-frequency in %s\n",
-> +				iter->full_name);
-> +			continue;
-
-Not goto out?
-
-> +		}
-> +		pdata->tables[i].rate = prop;
-> +
-> +		ret = of_property_read_u32_array(iter, "nvidia,emc-registers",
-> +						 pdata->tables[i].regs,
-> +						 TEGRA_EMC_NUM_REGS);
-> +		if (ret) {
-> +			dev_err(&pdev->dev,
-> +				"malformed emc-registers property in %s\n",
-> +				iter->full_name);
-> +			continue;
-> +		}
-> +
-> +		i++;
-> +	}
-> +	pdata->num_tables = i;
-
-Or here, "if (i != num_tables) error"?
-
-> +
-> +out:
-> +	of_node_put(tnp);
-> +	return pdata;
-> +}
-
-+static struct tegra_emc_pdata __devinit *tegra_emc_fill_pdata(struct platform_device *pdev)
-+{	
-...
-+	pdata->tables[0].rate = clk_get_rate(c);
-...
-+	dev_info(&pdev->dev, "no tables provided, using settings for %ld kHz\n",
-+		 pdata->tables[0].rate / 2000);
-
-Is that right; I'm not sure if the /2 should be applied to what's stored
-in .rate, or to the EMC clock value from clk_get_rate(). Similarly, is
-the DT frequency the /2 version; there's no /2 in the DT parsing, but I
-think I expect there to be.
-
+I fixed it up (see below) and can carry the fix as necessary.
 -- 
-nvpublic
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-exynos/Makefile
+index bcb9efc,db527ab..0000000
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@@ -19,8 -19,6 +19,8 @@@ obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-e
+  obj-$(CONFIG_PM)		+= pm.o
+  obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+  
+- obj-$(CONFIG_ARCH_EXYNOS4)	+= dma.o pmu.o
+++obj-$(CONFIG_ARCH_EXYNOS4)	+= pmu.o
+ +
+  obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+  
+  obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
+@@@ -46,8 -46,9 +48,10 @@@ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-
+  obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
+  obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
+  obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
++ obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
++ obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
+  
+ +obj-$(CONFIG_ARCH_EXYNOS4)		+= setup-i2c0.o
+  obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
+  obj-$(CONFIG_EXYNOS4_SETUP_FIMD0)	+= setup-fimd0.o
+  obj-$(CONFIG_EXYNOS4_SETUP_I2C1)	+= setup-i2c1.o
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120105/daab7956/attachment.sig>
