@@ -1,139 +1,130 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 5 Jan 2012 11:00:28 -0700
-Subject: [PATCH v3] ARM: at91: pit add DT support
-In-Reply-To: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
- <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20120105180028.GB22653@ponder.secretlab.ca>
+Date: Thu, 5 Jan 2012 11:02:18 -0700
+Subject: [PATCH v4 1/6] ARM: at91/aic: add irq domain and device tree
+ support
+In-Reply-To: <4F05CF48.5050007@atmel.com>
+References: <1323976568-20244-1-git-send-email-nicolas.ferre@atmel.com>
+ <85d531b5686e5eff623bed9618f802198409905f.1323975517.git.nicolas.ferre@atmel.com>
+ <20120104194059.GY15503@ponder.secretlab.ca>
+ <4F05CF48.5050007@atmel.com>
+Message-ID: <20120105180218.GC22653@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 06:25:48PM +0100, Nicolas Ferre wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On Thu, Jan 05, 2012 at 05:26:48PM +0100, Nicolas Ferre wrote:
+> Hi Grant,
 > 
-> Retreive registers address and IRQ from device tree entry. Fall back
-> to built-in values if an error occurs.
+> Thanks for your review.
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> v3: - use irq_of_parse_and_map() for handling irq numbers specified by DT.
->       Correction proposed by Jamie Iles.
+> Some answer following...
 > 
-> v2: - new specification of irq numbers in DT (due to modification of AIC code)
->     - new error path in of_at91sam926x_pit_init()
->     - fall back to built-in values if an error occurs
->     - use of of_property_read_u32() to get irq property
+> On 01/04/2012 08:40 PM, Grant Likely :
 > 
->  .../devicetree/bindings/arm/atmel-at91.txt         |    8 +++
->  arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 ++
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++
->  arch/arm/mach-at91/at91sam926x_time.c              |   53 +++++++++++++++++++-
->  4 files changed, 70 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
+> [..]
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> new file mode 100644
-> index 0000000..380f711
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -0,0 +1,8 @@
-> +Atmel AT91 device tree bindings.
-> +================================
-> +
-> +PIT Timer required properties:
-> +- compatible: Should be "atmel,at91sam9260-pit"
-> +- reg: Should contain registers location and length
-> +- interrupts: Should contain interrupt for the PIT which is the IRQ line
-> +  shared across all System Controller members.
-> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> index 0d21872..5c4be7e 100644
-> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> @@ -57,6 +57,11 @@
->  				reg = <0xfffff000 0x200>;
->  			};
->  
-> +			pit: timer at fffffd30 {
-> +				compatible = "atmel,at91sam9260-pit";
-> +				reg = <0xfffffd30 0xf>;
-> +				interrupts = <1 4>;
-> +			};
->  
->  			pioA: gpio at fffff400 {
->  				compatible = "atmel,at91rm9200-gpio";
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index b977a79..0d21c8e 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -58,6 +58,12 @@
->  				reg = <0xfffff000 0x200>;
->  			};
->  
-> +			pit: timer at fffffd30 {
-> +				compatible = "atmel,at91sam9260-pit";
-> +				reg = <0xfffffd30 0xf>;
-> +				interrupts = <1 4>;
-> +			};
-> +
->  			dma: dma-controller at ffffec00 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-> index d89ead7..534a992 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -14,6 +14,9 @@
->  #include <linux/kernel.h>
->  #include <linux/clk.h>
->  #include <linux/clockchips.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
->  
->  #include <asm/mach/time.h>
->  
-> @@ -133,7 +136,8 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
->  static struct irqaction at91sam926x_pit_irq = {
->  	.name		= "at91_tick",
->  	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> -	.handler	= at91sam926x_pit_interrupt
-> +	.handler	= at91sam926x_pit_interrupt,
-> +	.irq		= AT91_ID_SYS,
->  };
->  
->  static void at91sam926x_pit_reset(void)
-> @@ -149,6 +153,49 @@ static void at91sam926x_pit_reset(void)
->  	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
->  }
->  
-> +#ifdef CONFIG_OF
-> +static struct of_device_id timer_ids[] = {
-> +	{ .compatible = "atmel,at91sam9260-pit" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static int __init of_at91sam926x_pit_init(void)
-> +{
-> +	struct device_node	*np;
-> +	int			ret;
-> +
-> +	np = of_find_matching_node(NULL, timer_ids);
-> +	if (!np)
-> +		goto err;
-> +
-> +	pit_base_addr = of_iomap(np, 0);
-> +	if (!pit_base_addr)
-> +		goto node_err;
-> +
-> +	/* Get the interrupts property */
-> +	ret = irq_of_parse_and_map(np, 0);
-> +	if (ret <= 0)
-> +		goto ioremap_err;
+> >> --- a/arch/arm/mach-at91/irq.c
+> >> +++ b/arch/arm/mach-at91/irq.c
+> >> @@ -24,6 +24,10 @@
+> >>  #include <linux/module.h>
+> >>  #include <linux/mm.h>
+> >>  #include <linux/types.h>
+> >> +#include <linux/of_address.h>
+> >> +#include <linux/of_irq.h>
+> >> +#include <linux/irqdomain.h>
+> >> +#include <linux/err.h>
+> >>  
+> >>  #include <mach/hardware.h>
+> >>  #include <asm/irq.h>
+> >> @@ -34,22 +38,28 @@
+> >>  #include <asm/mach/map.h>
+> >>  
+> >>  void __iomem *at91_aic_base;
+> >> +static struct irq_domain at91_aic_domain;
+> >> +
+> >> +static inline unsigned int aic_irq(struct irq_data *d)
+> >> +{
+> >> +	return d->hwirq;
+> >> +}
+> > 
+> > This is a useless macro.  Drop it.
+> 
+> Ok. That was overkill ;-)
+> 
+> [..]
+> 
+> >> @@ -90,13 +100,13 @@ static u32 backups;
+> >>  
+> >>  static int at91_aic_set_wake(struct irq_data *d, unsigned value)
+> >>  {
+> >> -	if (unlikely(d->irq >= 32))
+> >> +	if (unlikely(aic_irq(d) >= at91_aic_domain.nr_irq))
+> > I don't think you need to derefernce the irq_domain.nr_irq here.  Just
+> > keep the test for >= 32.
+> 
+> Well I would like to keep it referring to this value as we may increase
+> the number of irq handled by this controller in the future...
+> 
+> [..]
+> 
+> >> +#if defined(CONFIG_OF)
+> >> +static int __init __at91_aic_of_init(struct device_node *node,
+> >> +				     struct device_node *parent)
+> >> +{
+> >> +	at91_aic_base = of_iomap(node, 0);
+> >> +	at91_aic_domain.of_node = of_node_get(node);
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static const struct of_device_id aic_ids[] __initconst = {
+> >> +	{ .compatible = "atmel,at91rm9200-aic", .data = __at91_aic_of_init },
+> >> +	{ /*sentinel*/ }
+> >> +};
+> >> +
+> >> +static void __init at91_aic_of_init(void)
+> >> +{
+> >> +	of_irq_init(aic_ids);
+> >> +}
+> >> +#else
+> >> +static void __init at91_aic_of_init(void) {}
+> >> +#endif
+> >> +
+> >>  /*
+> >>   * Initialize the AIC interrupt controller.
+> >>   */
+> >>  void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+> >>  {
+> >>  	unsigned int i;
+> >> +	int hwirq, irq;
+> >>  
+> >> -	at91_aic_base = ioremap(AT91_AIC, 512);
+> >> +	if(of_have_populated_dt())
+> >> +		at91_aic_of_init();
+> >> +	else
+> >> +		at91_aic_base = ioremap(AT91_AIC, 512);
+> >>  
+> >>  	if (!at91_aic_base)
+> >> -		panic("Impossible to ioremap AT91_AIC\n");
+> >> +		panic("Unable to ioremap AIC registers\n");
+> >> +
+> >> +	/* Add irq domain for AIC */
+> >> +	at91_aic_domain.nr_irq = NR_AIC_IRQS;
+> >> +	at91_aic_domain.irq_base = irq_alloc_descs(-1, AIC_BASE_IRQ,
+> >> +						at91_aic_domain.nr_irq, 0);
+> >> +	if (IS_ERR_VALUE(at91_aic_domain.irq_base)) {
+> >> +		WARN(1, "Cannot allocate irq_descs, assuming pre-allocated\n");
+> >> +		at91_aic_domain.irq_base = AIC_BASE_IRQ;
+> >> +	}
+> >> +	at91_aic_domain.ops = &irq_domain_simple_ops;
+> >> +	irq_domain_add(&at91_aic_domain);
+> > 
+> > Nothing special is being done with the irq domain.  Please use
+> > irq_domain_add_simple().  It will make things easier for the next
+> > round of irq_domain patches that I'm getting ready to post.
+> 
+> Fair enough, but I have one question: how do I specify "nr_irq" in the
+> domain created by irq_domain_add_simple()? Maybe it is not needed?
 
-if (!ret)
-
-The DT irq functions return 0 on failure.
+Fix the irq_domain_add_simple() helper to accept a nr_irq parameter.  :-)
 
 g.
