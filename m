@@ -1,43 +1,43 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 5 Jan 2012 15:58:56 +0200
-Subject: [PATCH 1/7] amp/remoteproc: add framework for controlling remote
- processors
-In-Reply-To: <20120103233534.GC2492@ponder.secretlab.ca>
-References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
- <1319536106-25802-2-git-send-email-ohad@wizery.com>
- <20120103233534.GC2492@ponder.secretlab.ca>
-Message-ID: <CAK=WgbZTiS9czticnt4a1TKkR0SmsNKEvdHXfQpwC-N5DMjFXg@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 5 Jan 2012 21:59:51 +0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <CACRpkdbLMW-SXnr6hbpwMqG=-a0wmYtU+YnyR8uLsndUp=UBgQ@mail.gmail.com>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+ <CACRpkdbLMW-SXnr6hbpwMqG=-a0wmYtU+YnyR8uLsndUp=UBgQ@mail.gmail.com>
+Message-ID: <CAA+hA=TMoj9uCuSCBf1J3a_sJ5HpGZwB3Ua769OKFeoLVMooyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2012 at 1:35 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> + ? ? /* go through the available ELF segments */
->> + ? ? for (i = 0; i < ehdr->e_phnum; i++, phdr++) {
->> + ? ? ? ? ? ? u32 da = phdr->p_paddr;
->> + ? ? ? ? ? ? u32 memsz = phdr->p_memsz;
->> + ? ? ? ? ? ? u32 filesz = phdr->p_filesz;
+On Sun, Jan 1, 2012 at 10:07 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Dec 20, 2011 at 6:40 PM, Dong Aisheng <b29396@freescale.com> wrote:
 >
-> This could be an endianess problem. ?If the endianess of the host and
-> the rproc are different, then what is the endianess of the elf file?
-> Is the endianess of the elf file verified before attempting to parse it?
-...
-> Nitpick: A look up table would be easier to extend in the future.
+>> From: Dong Aisheng <dong.aisheng@linaro.org>
+>>
+>> This patch provies a common API for driver to use to register pinmux
+>> mappings from dts file. It is needed for dt support.
 >
-> Otherwise;
+> Overall I feel lost in this discussion due to limited exposure to
+> device tree concepts. If I get Stephen Warrens and one of the
+> DT people's (Rob, Grant) ACK on this I'll be happy to merge it.
 >
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Until then, I guess it will need to be refined for the next kernel
+> cycle.
+>
+Yes, i refined the patch and sent out again.
+The main issue formerly discussed are where to place the pinmux map
+for binding.
+The new found is that if we use the way as regulator does on dt binding,
+it seems we do not need define pinmux map in dts file since the device node
+relationship already reflects it.
+I'm not sure if it's suitable for pinctrl subsystem,
+but I tried that way in the new patch i sent.
+However, it still have a few issues that it does not support hog_on_boot via
+dt and does not support multi groups since the usage is a little
+different without
+pinmux map.
+We may still need some discussion on how to cover that two issue.
 
-Thanks, Grant!
-
-If I may, I'll add something like this to the commit log:
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca> (minus two
-Reported-by issues)
-
-And then we could fix those two issues in two subsequent patches
-(carrying your Reported-by) so reviewing the change would be much
-easier, and we don't end up changing code (that has been lying in
-linux-next) just before it is sent it to Linus.
-
-Thanks a lot for your review!
-Ohad.
+Regards
+Dong Aisheng
