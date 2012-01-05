@@ -1,228 +1,188 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 05 Jan 2012 20:07:53 +0100
-Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with
- gpio controlled panel reset
-In-Reply-To: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
-References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F05F509.6020405@metafoo.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 5 Jan 2012 15:38:06 -0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <7FE21149F4667147B645348EC6057885077F82@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885077F82@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F1887@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> [...]
+Dong Aisheng-B29396 wrote at Tuesday, December 27, 2011 7:41 AM:
+> Stephen Warren wrote at Sunday, December 25, 2011 11:37 AM:
+> > Dong Aisheng-B29396 wrote at Thursday, December 22, 2011 1:18 AM:
+> > > Stephen Warren wrote at Wednesday, December 21, 2011 8:39 AM:
+> > > > Dong Aisheng wrote at Tuesday, December 20, 2011 10:41 AM:
+> > > > > This patch provies a common API for driver to use to register
+> > > > > pinmux mappings from dts file. It is needed for dt support.
+> > > >
+> > > > Dong,
+> > > >
+> > > > Thanks for providing a concrete binding to get discussion started. I
+> > > > had intended to do this myself, but got side-tracked on other things.
+> > > >
+> > > > I'll comment exclusively on the documentation in this patch, since
+> > > > any changes there will require the code to be changed.
+...
+> > > > b) The top-level node ("imx6q-sabreauto-map" below) is not tied to
+> > > > any particular piece of hardware (no compatible flag, not reg
+> > > > property etc.)
+> > >
+> > > My original purpose was that it was not a hw device node, it was just
+> > > created for containing pin map information and referenced by a phandle
+> > > in iomuxc deivce node
+> > > like:
+> > >
+> > > iomuxc at 020e0000 {
+> > >         compatible = "fsl,imx6q-iomuxc";
+> > >         reg = <0x020e0000 0x4000>;
+> > >         fsl,pinmux-map = <&pinmux>;
+> > > 	  ...
+> > > }
+> > >
+> > > I could also make it as a sub node of iomuxc, but original design is
+> > > that sub nodes of Ioxmuc are already representing each pinmux functions.
+> > > To avoid conflict, I put the imx6q-sabreauto-map node out of iomuxc
+> > > since a phandle (fsl,pinmux-map ) does the same work well.
+> >
+> > You could have nested sub-nodes, say something like:
+> >
+> > iomuxc at 020e0000 {
+> >     compatible = "fsl,imx6q-iomuxc";
+> >     reg = <0x020e0000 0x4000>;
+> >     fsl,pins {
+> >         ... // fsl-specific pin properties
+> >     };
+> >     fsl,groups {
+> >         ... // fsl-specific group properties
+> >     };
+> >     fsl,functions {
+> >         ... // fsl-specific mux function properties
+> >     };
+> >     pinmux-usage {
+> >         // standardized pinmux "table" properties
+> >         sd4 { // pin group name
+> >             function = "sdio4"; // this function active on it
+> >             ...
+> >         };
+> >         ...
+> >     }
+> >     ...
+> > }
+> >
+> Yes, I could do that.
+> The extra effort is that we have to manually exclude one pinmux-usage
+> node in pinmux driver since originally i take the child node count of
+> iomuxc as the function count since all child nodes are functions,
+> that why I firstly took the mapping node out of iomuxc, in addition
+> the old way i used seems to be more brief and clear.
 > 
-> diff --git a/Documentation/devicetree/bindings/lcd/lcd-pwrctrl.txt b/Documentation/devicetree/bindings/lcd/lcd-pwrctrl.txt
-> new file mode 100644
-> index 0000000..941e2ff
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/lcd/lcd-pwrctrl.txt
-> @@ -0,0 +1,39 @@
-> +* Power controller for simple lcd panels
-> +
-> +Some LCD panels provide a simple control interface for the host system. The
-> +control mechanism would include a nRESET line connected to a gpio of the host
-> +system and a Vcc supply line which the host can optionally be controlled using
-> +a voltage regulator. Such simple panels do not support serial command
-> +interface (such as i2c or spi) or memory-mapped-io interface.
-> +
-> +Required properties:
-> +- compatible: should be 'lcd,powerctrl'
-> +- gpios: The GPIO number of the host system used to control the nRESET line.
-> +  The format of the gpio specifier depends on the gpio controller of the
-> +  host system.
-> +
-> +Optional properties:
-> +- lcd,pwrctrl-nreset-gpio-invert: When the nRESET line is asserted low, the
-> +  lcd panel is reset and stays in reset mode as long as the nRESET line is
-> +  asserted low. This is the default behaviour of most lcd panels. If a lcd
-> +  panel requires the nRESET line to be asserted high for panel reset, then
-> +  this property is used.
+> I tried adding pinmux-usage as a sub node of iomuxc and got two issues:
+> Taking imx6q as an example:
+>
+> iomuxc at 020e0000 {
+>         uart4 {
+>                 func-name = "uart4";
+>                 grp-name = "uart4grp";
+>                 grp-pins = <107 108>;
+>                 num-pins = <2>;
+>                 grp-mux = <4 4>;
+>                 num-mux = <2>;
+>         };
+> 
+>         sd4 {
+>                 func-name = "sd4";
+>                 grp-name = "sd4grp";
+>                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
+>                 num-pins = <10>;
+>                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
+>                 num-mux = <10>;
+>         };
+> 
+>         pinmux-mapping {
+>                 uart4 {
+>                         function = "uart4";
+>                         dev = <&uart4>;
+>                 };
+> 
+>                 usdhc4 {
+> /*			    ctrl-dev-name = "20e0000.iomuxc"; */
+>                         function = "sd4";
+>                         dev = <&usdhc4>;
+>                 };
+>         };
+> };
+> 
+> If we remove ctrl-dev-name and get it from its parent node in drivers as
+> you suggested,
+> first, since this work will be done in the common API (pinmux_of_register_mappings
+> Requires pass the pinmux mapping node to it for construct the mapping table)
+> It will introduce a restriction that all platforms should define this node
+> under their pinctrl device node.
 
-Maybe use OF_GPIO_ACTIVE_LOW here instead. That would make active high the
-default but be a bit more consistent.
+This seems reasonable to me; the pinmux controller would be defining the
+mux options/... that it's providing to the rest of the DT.
 
-> +- lcd,pwrctrl-min-uV: If a regulator controls the Vcc voltage of the lcd panel,
-> +  this property specifies the minimum voltage the regulator should supply.
-> +  The value of this property should in in micro-volts.
-> +- lcd,pwrctrl-max-uV: If a regulator controls the Vcc voltage of the lcd panel,
-> +  this property specifies the maximum voltage the regulator should limit to
-> +  on the Vcc line. The value of this property should in in micro-volts.
+> Second, it seems we cannot get its parent node device or device name in driver
+> (can only get node Name which is not sufficient for construct the pin map table
+> required by pinctrl core) and current device tree subsystem seems do not support
+> get its associated device from a device node.
+> We may not be able to construct ctrl-dev-name or ctrl-dev for struct pinmux_map.
+> I'm not sure if I missed something, if missed please let me know.
+> To support it, we may need to add support for converting device node
+> to device. Not sure it's applicable since I still have not tried it.
 
-The min and max voltage should rather be specified through the regulator
-constraints.
+That functionality is pretty easy to implement; it already exists for
+other subsystems that refer to parent/controller/... nodes using phandles.
+for example, take a look at the implementation of of_node_to_gpiochip()
+in drivers/of/gpio.c, which calls gpiochip_find() with a custom match
+function that simply compares the gpio_chip's of_node field. Once you
+have the chip, you have the device, and can store that in the constructed
+mapping table, or call dev_name() on it. I assume there's something similar
+for interrupts.
 
+...
+> > > The same question applies to clock and regulator: does each device
+> > > need Define its clock and regulator properties?
+> >
+> > Yes, in those cases I believe each device does contain a phandle to the
+> > resources it uses.
+>
+> I was ever thought putting a phandle of pinmux function in each device,
+> Then pinmux mapping table seems not need anymore. Like:
+> 
+> usdhc4: usdhc at 0219c000 { /* uSDHC4 */
+>         compatible = "fsl,imx6q-usdhc";
+> 	....
+>         pinmux = <&pinmux-sd4>;
+> };
+> 
+> iomuxc at 020e0000 {
+>         pinmux-sd4 : sd4 {
+>                 func-name = "sd4";
+>                 grp-name = "sd4grp";
+>                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
+>                 num-pins = <10>;
+>                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
+>                 num-mux = <10>;
+>         };
+> 
+> It is a pure hw point of view to define node.
+> And it may need to implement a of_pinmux_get.
 
-> +- vcc-lcd-supply: phandle of the regulator that controls the vcc supply to
-> +  the lcd panel.
-> +
-[...]
-> diff --git a/drivers/video/backlight/lcd_pwrctrl.c b/drivers/video/backlight/lcd_pwrctrl.c
-> new file mode 100644
-> index 0000000..6f3110b
-> --- /dev/null
-> +++ b/drivers/video/backlight/lcd_pwrctrl.c
-> @@ -0,0 +1,231 @@
-> [...]
-> +static int lcd_pwrctrl_set_power(struct lcd_device *lcd, int power)
-> +{
-> +	struct lcd_pwrctrl *lp = lcd_get_data(lcd);
-> +	struct lcd_pwrctrl_data *pd = lp->pdata;
-> +	int lcd_enable, lcd_reset;
-> +
-> +	lcd_enable = (power == FB_BLANK_POWERDOWN || lp->suspended) ? 0 : 1;
-> +	lcd_reset = (pd->invert) ? !lcd_enable : lcd_enable;
-> +
-> +	if (IS_ERR(lp->regulator))
-> +		goto no_regulator;
+> But what about the pin maps without device associated?
 
-I wouldn't use a goto here.
+Indeed; that's why I'd tend towards defining a table of pinmux usage in
+the pinmux node, and having other devices refer to that table.
 
-> +
-> +	if (lcd_enable) {
-> +		if ((pd->min_uV || pd->max_uV) &&
-> +			regulator_set_voltage(lp->regulator,
-> +						pd->min_uV, pd->max_uV))
-> +				dev_info(lp->dev,
-> +					"regulator voltage set failed\n");
-> +		if (regulator_enable(lp->regulator))
-> +			dev_info(lp->dev, "failed to enable regulator\n");
-> +	} else {
-> +		regulator_disable(lp->regulator);
-> +	}
+Still, if the pinmux definitions are in the device nodes, we could simply
+make the pinmux controller have such a definition itself too, for the
+"system hog" case.
 
-I think you have to make sure that the regulator enable and disable calls are
-balanced.
-
-> +
-> + no_regulator:
-> +	gpio_direction_output(lp->pdata->gpio, lcd_reset);
-> +	lp->power = power;
-> +	return 0;
-> +}
-> +
-[...]
-> +
-> +#ifdef CONFIG_OF
-
-I think you can remove all the CONFIG_OF ifdefs, the of API should stub itself out.
-
-> +static void __devinit lcd_pwrctrl_parse_dt(struct device *dev,
-> +					struct lcd_pwrctrl_data *pdata)
-> +{
-> +	struct device_node *np = dev->of_node;
-> +
-> +	pdata->gpio = of_get_gpio(np, 0);
-> +	if (of_get_property(np, "lcd,pwrctrl-nreset-gpio-invert", NULL))
-> +		pdata->invert = true;
-> +	of_property_read_u32(np, "lcd,pwrctrl-min-uV", &pdata->min_uV);
-> +	of_property_read_u32(np, "lcd,pwrctrl-max-uV", &pdata->max_uV);
-> +}
-> +#endif
-> +
-> +static int __devinit lcd_pwrctrl_probe(struct platform_device *pdev)
-> +{
-> +	struct lcd_pwrctrl *lp;
-> +	struct lcd_pwrctrl_data *pdata = pdev->dev.platform_data;
-> +	struct device *dev = &pdev->dev;
-> +	int err;
-> +
-> +#ifdef CONFIG_OF
-> +	if (dev->of_node) {
-> +		pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> +		if (!pdata) {
-> +			dev_err(dev, "memory allocation for pdata failed\n");
-> +			return -ENOMEM;
-> +		}
-> +		lcd_pwrctrl_parse_dt(dev, pdata);
-> +	}
-> +#endif
-> +
-> +	if (!pdata) {
-> +		dev_err(dev, "platform data not available\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	err = gpio_request(pdata->gpio, "LCD-nRESET");
-> +	if (err) {
-> +		dev_err(dev, "gpio [%d] request failed\n", pdata->gpio);
-> +		return err;
-> +	}
-> +
-> +	lp = devm_kzalloc(dev, sizeof(struct lcd_pwrctrl), GFP_KERNEL);
-> +	if (!lp) {
-> +		dev_err(dev, "memory allocation failed for private data\n");
-> +		return -ENOMEM;
-
-You are leaking the gpio here.
-
-> +	}
-> +
-> +	/*
-> +	 * If power to lcd and/or lcd interface is controlled using a regulator,
-> +	 * get the handle to the regulator for later use during power switching.
-> +	 */
-> +	lp->regulator = regulator_get(dev, "vcc-lcd");
-> +	if (IS_ERR(lp->regulator))
-> +		dev_info(dev, "could not find regulator\n");
-> +
-> +	lp->dev = dev;
-> +	lp->pdata = pdata;
-> +	lp->lcd = lcd_device_register(dev_name(dev), dev, lp, &lcd_pwrctrl_ops);
-> +	if (IS_ERR(lp->lcd)) {
-> +		dev_err(dev, "cannot register lcd device\n");
-> +		regulator_put(lp->regulator);
-
-And here.
-
-> +		return PTR_ERR(lp->lcd);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, lp);
-> +	lcd_pwrctrl_set_power(lp->lcd, FB_BLANK_NORMAL);
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id lcd_pwrctrl_match[] = {
-> +	{ .compatible = "lcd,powerctrl", },
-> +	{},
-> +};
-
-MODULE_DEVICE_TABLE(...)
-
-> +#endif
-
-
-> +static struct platform_driver lcd_pwrctrl_driver = {
-> +	.driver		= {
-> +		.name	= "lcd-pwrctrl",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(lcd_pwrctrl_match),
-> +	},
-> +	.probe		= lcd_pwrctrl_probe,
-> +	.remove		= lcd_pwrctrl_remove,
-> +	.suspend	= lcd_pwrctrl_suspend,
-> +	.resume		= lcd_pwrctrl_resume,
-
-please use dev_pm_ops instead of the legacy callbacks
-
-> +};
-> +
-> +static int __init lcd_pwrctrl_init(void)
-> +{
-> +	return platform_driver_register(&lcd_pwrctrl_driver);
-> +}
-> +
-> +static void __exit lcd_pwrctrl_cleanup(void)
-> +{
-> +	platform_driver_unregister(&lcd_pwrctrl_driver);
-> +}
-> +
-> +module_init(lcd_pwrctrl_init);
-> +module_exit(lcd_pwrctrl_cleanup);
-
-module_platform_driver(&lcd_pwrctrl_driver);
-
-> +
-> +MODULE_AUTHOR("Thomas Abraham <thomas.ab@samsung.com>");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_ALIAS("platform:lcd-pwrctrl");
+-- 
+nvpublic
