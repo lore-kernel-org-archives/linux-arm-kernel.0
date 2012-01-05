@@ -1,41 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jan 2012 11:31:06 +0000
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20120104211800.GF11810@n2100.arm.linux.org.uk>
-References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
- <20120104135204.GA14741@S2100-06.ap.freescale.net>
- <20120104211800.GF11810@n2100.arm.linux.org.uk>
-Message-ID: <20120105113106.GR11810@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 5 Jan 2012 12:31:36 +0100
+Subject: [PATCH v2 00/15] Make SMP timers standalone
+In-Reply-To: <4F058744.4030503@arm.com>
+References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
+ <20111222193216.GO2577@n2100.arm.linux.org.uk> <4F048EC4.40900@arm.com>
+ <20120104214748.GH11810@n2100.arm.linux.org.uk>
+ <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
+ <4F0584B5.60908@arm.com>
+ <CAMQu2gxuBNRWYKyKRdzvv_m49DyLoODVbC=rKDHDAMTnxe+6+A@mail.gmail.com>
+ <4F058744.4030503@arm.com>
+Message-ID: <CAMQu2gxXoXOqzZEc=52T=gryoWn6EB0n9wJM3CzHMMmcwrxu4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 09:18:00PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 04, 2012 at 09:52:05PM +0800, Shawn Guo wrote:
-> > On Mon, Dec 19, 2011 at 09:13:22AM +0000, Russell King - ARM Linux wrote:
-> > > No.  It will be automatically removed from any update as long as it does
-> > > not conform to the requirements - that is, in this case, the strings
-> > > being out of sync indentified in the message to which you replied to.
-> > > 
-> > > Someone needs to tell me what the correct entry is supposed to look like.
-> > > 
-> > Hi Russell,
-> > 
-> > Any chance to have APX4DEVKIT included in your patch 'ARM: Update
-> > mach-types' for 3.3?
-> 
-> As it appears when I run the update script, the answer is yes.  I'll
-> update the commit in the next couple of days (I want to reduce the
-> number of times I re-merge the tree now that I've a git-rerere immune
-> conflict to deal with.)
+On Thu, Jan 5, 2012 at 12:19 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 05/01/12 11:13, Shilimkar, Santosh wrote:
+>> On Thu, Jan 5, 2012 at 12:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 05/01/12 00:00, Linus Walleij wrote:
+>>>> However IIRC this situation does not occur in the ARM reference
+>>>> designs, notably Versatile Express since it simply isn't designed to
+>>>> be power-agressive in this way and does not gate the clock or
+>>>> power down the CPU power domain, it's always on, always
+>>>> clocked (albeit with shifting frequency).
+>>>>
+>>>> The Vexpress seem to register a clockevent for its SP804
+>>>> timer, and even though I've never used this machine I guess
+>>>> it would tick a few ticks during boot and then as TWD is
+>>>> registered it switches to that (due to higher .rate) and
+>>>> no IRQ is ever fired on the SP804 again.
+>>>>
+>>>> Does this correspond to what is seen in /proc/interrupts
+>>>> on the Vexpress?
+>>>
+>>> Yes. You get about 8 ticks worth of SP804, and then switch to TWD for good.
+>>>
+>>>> And does the system really work if you simply delete the
+>>>> code registering the SP804 clockevent from
+>>>> mach-vexpress/ct-ca9x4.c?
+>>>
+>>> No, because you need the global timer to calibrate the TWD on this
+>>> platform. But on the VE with a Cortex-A15 tile, the system works
+>>> perfectly with the architected timers being the only one in the system
+>>> (the SP804 is left unconfigured).
+>>>
+>>> But now that your cpufreq-aware patches are in -next, I can boot a Panda
+>>> without a single tick of the global timer (OMAP4 provides the "smp-twd"
+>>> clock).
+>>>
+>> That's only because CPUIDLE low power states are not enabled. You
+>> do that and without global timer, system will just die
+>
+> Global timer is still present, configured and enabled. The kernel just
+> happens to select TWD as a better timer. Should TWD be turned off,
+> gp_timer will be selected again.
+>
+> This is also what happens with the current implementation, and my
+> patches don't change that.
+>
+Great. Thanks for clarifying Marc.
 
-I'll change that - as 3.2 was released last night.  I'm not going to
-update mach-types now as that would be suicide - updating it will
-mean a bunch of entries will be deleted, and we don't know whether that
-will cause build failures.
-
-So... not this side of the merge window.
+Regards
+Santosh
