@@ -1,47 +1,81 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 5 Jan 2012 11:08:11 -0700
-Subject: [PULL] gpio pl061 for 3.3
-In-Reply-To: <4F05BAC1.1000706@gmail.com>
-References: <4F05BAC1.1000706@gmail.com>
-Message-ID: <20120105180811.GD22653@ponder.secretlab.ca>
+Date: Thu, 5 Jan 2012 11:09:24 -0700
+Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
+In-Reply-To: <4F05ABAF.8080702@ti.com>
+References: <1324019153-13316-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A80719AC@DBDE01.ent.ti.com>
+ <4F05ABAF.8080702@ti.com>
+Message-ID: <20120105180924.GE22653@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 08:59:13AM -0600, Rob Herring wrote:
-> Grant,
+On Thu, Jan 05, 2012 at 02:54:55PM +0100, Cousson, Benoit wrote:
+> Hi Vaibhav,
 > 
-> Since it seems irqdomain issues aren't going to get sorted out for 3.3,
-> please pull the pl061 changes which are not dependent on irqdomain.
-> Sorry it is a bit late.
+> On 1/5/2012 12:18 PM, Hiremath, Vaibhav wrote:
+> >>From: Hiremath, Vaibhav
+> >>Sent: Friday, December 16, 2011 12:36 PM
+> >>To: linux-omap at vger.kernel.org
+> >>Cc: tony at atomide.com; linux-arm-kernel at lists.infradead.org; devicetree-
+> >>discuss at lists.ozlabs.org; grant.likely at secretlab.ca; Cousson, Benoit;
+> >>Hiremath, Vaibhav
+> >>Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
+> >>
+> >>Add OMAP3 EVM (OMAP3530, AM/DM37x) DTS file to use the omap3.dtsi SoC file,
+> >>along with memory node information.
+> >>
+> >>Signed-off-by: Vaibhav Hiremath<hvaibhav@ti.com>
+> >>---
+> >>Boot tested it on AM/DM37x EVM, kernel parses the info correctly.
+> >>
+> >>  arch/arm/boot/dts/omap3-evm.dts |   20 ++++++++++++++++++++
+> >>  1 files changed, 20 insertions(+), 0 deletions(-)
+> >>  create mode 100644 arch/arm/boot/dts/omap3-evm.dts
+> >>
+> >>diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-
+> >>evm.dts
+> >>new file mode 100644
+> >>index 0000000..2eee16e
+> >>--- /dev/null
+> >>+++ b/arch/arm/boot/dts/omap3-evm.dts
+> >>@@ -0,0 +1,20 @@
+> >>+/*
+> >>+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> >>+ *
+> >>+ * This program is free software; you can redistribute it and/or modify
+> >>+ * it under the terms of the GNU General Public License version 2 as
+> >>+ * published by the Free Software Foundation.
+> >>+ */
+> >>+/dts-v1/;
+> >>+
+> >>+/include/ "omap3.dtsi"
+> >>+
+> >>+/ {
+> >>+	model = "TI OMAP3 EVM (OMAP3530, AM/DM37x)";
+> >>+	compatible = "ti,omap3-evm", "ti,omap3";
+> >>+
+> >>+	memory {
+> >>+		device_type = "memory";
+> >>+		reg =<0x80000000 0x10000000>; /* 256 MB */
+> >>+	};
+> >>+};
+> >Can this merged? OR anybody has any comments here?
 > 
-> The following changes since commit 5f0a6e2d503896062f641639dacfe5055c2f593b:
+> I guess that with Rob or Grant's ack, Tony should be able to merge it.
+> That being said, since it is outside mach-omap, I'm not sure what
+> the right path is.
+> I can add it in my DTS series, but that one will have dependencies
+> with the i2c driver DT adaptation.
 > 
->   Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
-> 
-> are available in the git repository at:
->   git://sources.calxeda.com/kernel/linux.git gpio-for-grant
+> FWIW, Acked-by: Benoit Cousson <b-cousson@ti.com>
 
-Merged, thanks.
-
-g.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
 > 
-> Rob Herring (5):
->       gpio: pl061: use chained_irq_* functions in irq handler
->       gpio: pl061: convert to use 0 for no irq
->       ARM: realview: convert pl061 no irq to 0 instead of -1
->       gpio: pl061: convert to use generic irq chip
->       gpio: pl061: remove combined interrupt
+> Regards,
+> Benoit
 > 
->  arch/arm/mach-realview/realview_eb.c     |    3 -
->  arch/arm/mach-realview/realview_pb1176.c |    3 -
->  arch/arm/mach-realview/realview_pb11mp.c |    3 -
->  arch/arm/mach-realview/realview_pba8.c   |    3 -
->  arch/arm/mach-realview/realview_pbx.c    |    3 -
->  drivers/gpio/Kconfig                     |    1 +
->  drivers/gpio/gpio-pl061.c                |  132
-> ++++++++++--------------------
->  include/linux/amba/pl061.h               |    2 +-
->  8 files changed, 44 insertions(+), 106 deletions(-)
-> 
-> Rob
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
