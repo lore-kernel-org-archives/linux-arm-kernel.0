@@ -1,25 +1,42 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Thu, 5 Jan 2012 10:42:57 -0600
-Subject: [RFC PATCH v2 1/2] cpuidle: Add common init interface and idle
- functionality
-In-Reply-To: <20120105093240.GM11810@n2100.arm.linux.org.uk>
-References: <1323846126-7516-1-git-send-email-rob.lee@linaro.org>
- <1323846126-7516-2-git-send-email-rob.lee@linaro.org>
- <20120105093240.GM11810@n2100.arm.linux.org.uk>
-Message-ID: <CAMXH7KGeo9mtDdJ8oNiHMXrxz=4STWc+BabE=AQVNH_fUo=q9g@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 5 Jan 2012 22:13:32 +0530
+Subject: [PATCH 6/6] mmc: sdhci-s3c: Add device tree support
+In-Reply-To: <4F05CE60.5090402@samsung.com>
+References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
+ <1320266163-15292-7-git-send-email-thomas.abraham@linaro.org>
+ <20111107211726.GC28491@ponder.secretlab.ca>
+ <CAJuYYwSfC5t6xs-TDT2wBOj1RbQYSpH0wjo9uBcYf7bGyi0t9g@mail.gmail.com>
+ <4F047235.2090503@samsung.com>
+ <CAJuYYwTMpde-528t=vQnbkJv_gG7xuOr05b1K-+H-RxYRX0iEQ@mail.gmail.com>
+ <4F05CE60.5090402@samsung.com>
+Message-ID: <CAJuYYwRiubBo5Y4K_x_VPeRWOzmHgegyV4Sh=Eee6JgfAmP2iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2012 03:32, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Dec 14, 2011 at 01:02:05AM -0600, Robert Lee wrote:
->> + ? ? asm("b 1f; .align 5; 1:");
->> + ? ? asm("mcr p15, 0, r0, c7, c10, 4"); ? ? ?/* drain write buffer */
->
-> Err, no. ?The compiler is free to add whatever instructions it sees
-> fit between these two asm() statements.
->
-> If you want to ask the compiler to issue a set of assembly instructions
-> as a block, you have to use just one asm() statement.
+Hi Sylwester,
 
-Thanks.  I will fix that in v3.
+On 5 January 2012 21:52, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+[...]
+
+>> Sorry for the delaying in completing this patchset. I will redo this
+>> patchset and submit it soon. But 3.3-rc1 looks unlikely.
+>
+> Ok, thanks. It's fine, there is no rush. I was just curious because we have
+> reused this sdhci driver update series and it seemed essential for initial
+> DT support on Exynos4 machines. Just FYI I have prepared initial DT support
+> patches for the S5P MIPI-CSI2 (s5p-mipi-csis) receiver driver.
+> But the whole camera subsystem needs more work, i.e. resource dependencies
+> (clock) between all involved devices (like image sensors and video capture
+> platform devices) need to be resolved and method of registering sub-devices
+> in the V4L2 core will likely need to be changed.
+
+Thanks for the information. It was helpful to know that you are working on this.
+
+Regards,
+Thomas.
+
+>
+>
+> --
+> Thanks,
+> Sylwester
