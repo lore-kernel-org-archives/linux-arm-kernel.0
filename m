@@ -1,59 +1,376 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 05 Jan 2012 11:24:43 -0600
-Subject: [PATCH 6/6] gpio: tegra: Parameterize the number of banks
-In-Reply-To: <CACxGe6tyZKW37sGiDauvikU70ZVLHFVrXjBPJk2Kgee1Rj3sbg@mail.gmail.com>
-References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
- <1325702378-20863-6-git-send-email-swarren@nvidia.com>
- <4F04AE71.2090203@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F145E@HQMAIL01.nvidia.com>
- <CACxGe6tyZKW37sGiDauvikU70ZVLHFVrXjBPJk2Kgee1Rj3sbg@mail.gmail.com>
-Message-ID: <4F05DCDB.40806@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu,  5 Jan 2012 20:42:46 +0100
+Subject: [PATCH v3 3/6] ARM: at91/gpio: add DT support
+In-Reply-To: <1325615688-16860-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1325615688-16860-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1325792566-32700-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2012 04:00 PM, Grant Likely wrote:
-> On Wed, Jan 4, 2012 at 1:00 PM, Stephen Warren <swarren@nvidia.com> wrote:
->> Rob Herring wrote at Wednesday, January 04, 2012 12:54 PM:
->>> On 01/04/2012 12:39 PM, Stephen Warren wrote:
->>>> Tegra20's GPIO controller has 7 banks, and Tegra30's controller has 8
->>>> banks. Allow the number of banks to be configured at run-time by the
->>>> device tree.
->> ...
->>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
->> ...
->>>>  Required properties:
->>>>  - compatible : "nvidia,tegra20-gpio"
->>>>  - reg : Physical base address and length of the controller's registers.
->>>> +- nvidia,num-banks : The number of GPIO banks. This should be 7 for
->>>> +  Tegra20 and 8 for Tegra30. This must match the number of interrupt
->>>> +  specifiers in the interrupts property.
->>>
->>> You can determine the number of banks based on the compatible property
->>> rather than needing an additional property.
->>
->> That's certainly possible.
->>
->> However, if say nvidia,tegraNNN-gpio has 9 banks, we then have to
->> explicitly edit the driver to know that, whereas by using a property,
->> we wouldn't have to change the driver at all to support a future GPIO
->> controller. So, isn't it better to explicitly represent this in DT?
->>
->> Note that I have no idea how many GPIO banks our future chips will have,
->> so this might not turn out to save any work at all, but perhaps.
-> 
-> It's an engineering/design decision that requires taste and instinct.
-> Either approach is fine, you decide which one will be the best in the
-> long term.
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Agreed. I'm really fine with it either way.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+---
+v3: - Corrections proposed by Russell King:
+      - use of clk_prepare()/clk_unprepare()
+      - helper function to setup the clock for both DT/non DT init functions
 
-Trying to predict future h/w is a bit pointless IMO. H/w designers
-always find new ways to do things differently. i.MX family has gpio
-interrupts hooked up 3 different ways for example. How would you handle
-the case that the banks are sparsely implemented?
+v2: - no BUG_ON() anymore in case of an "interrupts" property missing
+      just stop configuring the gpio bank
+    - review error path in both of_at91_gpio_init_one() and
+      at91_gpio_init_one()
+    - use for_each_compatible_node() iterator instead of a homemade loop
 
-Is adding support for a different number of banks every couple of years
-really an issue? It's much more important to have properties for which
-change with every board.
+ .../devicetree/bindings/gpio/gpio_at91.txt         |   20 +++
+ arch/arm/boot/dts/at91sam9g20.dtsi                 |   28 ++++
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   45 ++++++
+ arch/arm/mach-at91/gpio.c                          |  162 ++++++++++++++++---
+ 4 files changed, 229 insertions(+), 26 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio_at91.txt
 
-Rob
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_at91.txt b/Documentation/devicetree/bindings/gpio/gpio_at91.txt
+new file mode 100644
+index 0000000..a7bcaec
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio_at91.txt
+@@ -0,0 +1,20 @@
++* Atmel GPIO controller (PIO)
++
++Required properties:
++- compatible: "atmel,at91rm9200-gpio"
++- reg: Should contain GPIO controller registers location and length
++- interrupts: Should be the port interrupt shared by all the pins.
++- #gpio-cells: Should be two.  The first cell is the pin number and
++  the second cell is used to specify optional parameters (currently
++  unused).
++- gpio-controller: Marks the device node as a GPIO controller.
++
++Example:
++	pioA: gpio at fffff200 {
++		compatible = "atmel,at91rm9200-gpio";
++		reg = <0xfffff200 0x100>;
++		interrupts = <2 4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++	};
++
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 0782f80..ea942b5 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -23,6 +23,9 @@
+ 		serial4 = &usart3;
+ 		serial5 = &usart4;
+ 		serial6 = &usart5;
++		gpio0 = &pioA;
++		gpio1 = &pioB;
++		gpio2 = &pioC;
+ 	};
+ 	cpus {
+ 		cpu at 0 {
+@@ -54,6 +57,31 @@
+ 				reg = <0xfffff000 0x200>;
+ 			};
+ 
++
++			pioA: gpio at fffff400 {
++				compatible = "atmel,at91rm9200-gpio";
++				reg = <0xfffff400 0x100>;
++				interrupts = <2 4>;
++				#gpio-cells = <2>;
++				gpio-controller;
++			};
++
++			pioB: gpio at fffff600 {
++				compatible = "atmel,at91rm9200-gpio";
++				reg = <0xfffff600 0x100>;
++				interrupts = <3 4>;
++				#gpio-cells = <2>;
++				gpio-controller;
++			};
++
++			pioC: gpio at fffff800 {
++				compatible = "atmel,at91rm9200-gpio";
++				reg = <0xfffff800 0x100>;
++				interrupts = <4 4>;
++				#gpio-cells = <2>;
++				gpio-controller;
++			};
++
+ 			dbgu: serial at fffff200 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index e89b1d7..ebc9617 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -22,6 +22,11 @@
+ 		serial2 = &usart1;
+ 		serial3 = &usart2;
+ 		serial4 = &usart3;
++		gpio0 = &pioA;
++		gpio1 = &pioB;
++		gpio2 = &pioC;
++		gpio3 = &pioD;
++		gpio4 = &pioE;
+ 	};
+ 	cpus {
+ 		cpu at 0 {
+@@ -59,6 +64,46 @@
+ 				interrupts = <21 4>;
+ 			};
+ 
++			pioA: gpio at fffff200 {
++				compatible = "atmel,at91rm9200-gpio";
++				reg = <0xfffff200 0x100>;
++				interrupts = <2 4>;
++				#gpio-cells = <2>;
++				gpio-controller;
++			};
++
++			pioB: gpio at fffff400 {
++				compatible = "atmel,at91rm9200-gpio";
++				reg = <0xfffff400 0x100>;
++				interrupts = <3 4>;
++				#gpio-cells = <2>;
++				gpio-controller;
++			};
++
++			pioC: gpio at fffff600 {
++				compatible = "atmel,at91rm9200-gpio";
++				reg = <0xfffff600 0x100>;
++				interrupts = <4 4>;
++				#gpio-cells = <2>;
++				gpio-controller;
++			};
++
++			pioD: gpio at fffff800 {
++				compatible = "atmel,at91rm9200-gpio";
++				reg = <0xfffff800 0x100>;
++				interrupts = <5 4>;
++				#gpio-cells = <2>;
++				gpio-controller;
++			};
++
++			pioE: gpio at fffffa00 {
++				compatible = "atmel,at91rm9200-gpio";
++				reg = <0xfffffa00 0x100>;
++				interrupts = <5 4>;
++				#gpio-cells = <2>;
++				gpio-controller;
++			};
++
+ 			dbgu: serial at ffffee00 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index 7ffb893..c03e289 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -21,6 +21,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/irqdomain.h>
++#include <linux/of_address.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/at91_pio.h>
+@@ -303,9 +304,10 @@ void at91_gpio_suspend(void)
+ 		__raw_writel(backups[i], pio + PIO_IDR);
+ 		__raw_writel(wakeups[i], pio + PIO_IER);
+ 
+-		if (!wakeups[i])
++		if (!wakeups[i]) {
++			clk_unprepare(gpio_chip[i].clock);
+ 			clk_disable(gpio_chip[i].clock);
+-		else {
++		} else {
+ #ifdef CONFIG_PM_DEBUG
+ 			printk(KERN_DEBUG "GPIO-%c may wake for %08x\n", 'A'+i, wakeups[i]);
+ #endif
+@@ -320,8 +322,10 @@ void at91_gpio_resume(void)
+ 	for (i = 0; i < gpio_banks; i++) {
+ 		void __iomem	*pio = gpio_chip[i].regbase;
+ 
+-		if (!wakeups[i])
+-			clk_enable(gpio_chip[i].clock);
++		if (!wakeups[i]) {
++			if (clk_prepare(gpio_chip[i].clock) == 0)
++				clk_enable(gpio_chip[i].clock);
++		}
+ 
+ 		__raw_writel(wakeups[i], pio + PIO_IDR);
+ 		__raw_writel(backups[i], pio + PIO_IER);
+@@ -624,40 +628,146 @@ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 	}
+ }
+ 
++static int __init at91_gpio_setup_clk(int i)
++{
++	struct at91_gpio_chip *at91_gpio = &gpio_chip[i];
++
++	/* retreive PIO controller's clock */
++	at91_gpio->clock = clk_get_sys(NULL, at91_gpio->chip.label);
++	if (IS_ERR(at91_gpio->clock)) {
++		pr_err("at91_gpio.%d, failed to get clock, ignoring.\n", i);
++		goto err;
++	}
++
++	if (clk_prepare(at91_gpio->clock))
++		goto clk_prep_err;
++
++	/* enable PIO controller's clock */
++	if(clk_enable(at91_gpio->clock)) {
++		pr_err("at91_gpio.%d, failed to enable clock, ignoring.\n", i);
++		goto clk_err;
++	}
++
++	return;
++
++clk_err:
++	clk_unprepare(at91_gpio->clock);
++clk_prep_err:
++	clk_put(at91_gpio->clock);
++err:
++}
++
++#ifdef CONFIG_OF_GPIO
++static void __init of_at91_gpio_init_one(struct device_node *np)
++{
++	int alias_id;
++	struct at91_gpio_chip *at91_gpio;
++
++	if (!np)
++		return;
++
++	alias_id = of_alias_get_id(np, "gpio");
++	if (alias_id >= MAX_GPIO_BANKS) {
++		pr_err("at91_gpio, failed alias id(%d) > MAX_GPIO_BANKS(%d), ignoring.\n",
++						alias_id, MAX_GPIO_BANKS);
++		return;
++	}
++
++	at91_gpio = &gpio_chip[alias_id];
++	at91_gpio->chip.base = alias_id * at91_gpio->chip.ngpio;
++
++	at91_gpio->regbase = of_iomap(np, 0);
++	if (!at91_gpio->regbase) {
++		pr_err("at91_gpio.%d, failed to map registers, ignoring.\n",
++								alias_id);
++		return;
++	}
++
++	/* Get the interrupts property */
++	if (of_property_read_u32(np, "interrupts", &at91_gpio->id)) {
++		pr_err("at91_gpio.%d, failed to get interrupts property, ignoring.\n",
++								alias_id);
++		goto ioremap_err;
++	}
++
++	/* Setup clock */
++	if (!at91_gpio_setup_clk(alias_id))
++		goto ioremap_err;
++
++	at91_gpio->chip.of_node = np;
++	gpio_banks = max(gpio_banks, alias_id + 1);
++	return;
++
++ioremap_err:
++	iounmap(at91_gpio->regbase);
++}
++
++static int __init of_at91_gpio_init(void)
++{
++	struct device_node *np = NULL;
++
++	/*
++	 * This isn't ideal, but it gets things hooked up until this
++	 * driver is converted into a platform_device
++	 */
++	for_each_compatible_node(np, NULL, "atmel,at91rm9200-gpio")
++		of_at91_gpio_init_one(np);
++
++	return gpio_banks > 0 ? 0 : -EINVAL;
++}
++#else
++static int __init of_at91_gpio_init(void)
++{
++	return -EINVAL;
++}
++#endif
++
++static void __init at91_gpio_init_one(int i, u32 regbase, int id)
++{
++	struct at91_gpio_chip *at91_gpio = &gpio_chip[i];
++
++	at91_gpio->chip.base = i * at91_gpio->chip.ngpio;
++	at91_gpio->id = id;
++
++	at91_gpio->regbase = ioremap(regbase, 512);
++	if (!at91_gpio->regbase) {
++		pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
++		return;
++	}
++
++	if (!at91_gpio_setup_clk(i))
++		goto ioremap_err;
++
++	gpio_banks = max(gpio_banks, i + 1);
++	return;
++
++ioremap_err:
++	iounmap(at91_gpio->regbase);
++}
++
+ /*
+  * Called from the processor-specific init to enable GPIO pin support.
+  */
+ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+ {
+-	unsigned		i;
++	unsigned i;
+ 	struct at91_gpio_chip *at91_gpio, *last = NULL;
+ 
+ 	BUG_ON(nr_banks > MAX_GPIO_BANKS);
+ 
+-	gpio_banks = nr_banks;
++	if (of_at91_gpio_init() < 0) {
++		/* No GPIO controller found in device tree */
++		for (i = 0; i < nr_banks; i++)
++			at91_gpio_init_one(i, data[i].regbase, data[i].id);
++	}
+ 
+-	for (i = 0; i < nr_banks; i++) {
++	for (i = 0; i < gpio_banks; i++) {
+ 		at91_gpio = &gpio_chip[i];
+ 
+-		at91_gpio->id = data[i].id;
+-		at91_gpio->chip.base = i * 32;
+-
+-		at91_gpio->regbase = ioremap(data[i].regbase, 512);
+-		if (!at91_gpio->regbase) {
+-			pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
+-			continue;
+-		}
+-
+-		at91_gpio->clock = clk_get_sys(NULL, at91_gpio->chip.label);
+-		if (!at91_gpio->clock) {
+-			pr_err("at91_gpio.%d, failed to get clock, ignoring.\n", i);
+-			continue;
+-		}
+-
+-		/* enable PIO controller's clock */
+-		clk_enable(at91_gpio->clock);
+-
+-		/* AT91SAM9263_ID_PIOCDE groups PIOC, PIOD, PIOE */
++		/*
++		 * GPIO controller are grouped on some SoC:
++		 * PIOC, PIOD and PIOE can share the same IRQ line
++		 */
+ 		if (last && last->id == at91_gpio->id)
+ 			last->next = at91_gpio;
+ 		last = at91_gpio;
+-- 
+1.7.5.4
