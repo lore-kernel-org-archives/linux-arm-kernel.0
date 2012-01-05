@@ -1,40 +1,30 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 5 Jan 2012 13:24:25 -0600
-Subject: [PATCH v4 1/4] OMAP3: hwmod data: add mmu data for iva and isp
-In-Reply-To: <201112252208.20148.laurent.pinchart@ideasonboard.com>
-References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
- <CAMP44s2H7v6dRPXO6eBBNrYAnym_ZLdmKcAQPmYyCC6Wo5qOmw@mail.gmail.com>
- <CAB-zwWhNNW1GEYr019xecuZTYhR55HpNGrhGjJdE1CEAfFSriQ@mail.gmail.com>
- <201112252208.20148.laurent.pinchart@ideasonboard.com>
-Message-ID: <CAB-zwWgZ5QBFBBRQNYrpbcVo4QaZ8MYLVCMDsvAe7scHQSBBKw@mail.gmail.com>
+From: johlstei@codeaurora.org (johlstei)
+Date: Thu, 05 Jan 2012 11:34:14 -0800
+Subject: [PATCH v2 00/15] Make SMP timers standalone
+In-Reply-To: <CACRpkdYjQPoY60XdhTwgLYbTrQMhC=Wxk5Y=hP2Vr0DngUJbxg@mail.gmail.com>
+References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>	<20111222193216.GO2577@n2100.arm.linux.org.uk>	<4F048EC4.40900@arm.com>	<20120105011704.GA8870@codeaurora.org>
+ <CACRpkdYjQPoY60XdhTwgLYbTrQMhC=Wxk5Y=hP2Vr0DngUJbxg@mail.gmail.com>
+Message-ID: <4F05FB36.7020509@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent
-
-On Sun, Dec 25, 2011 at 3:08 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> > I'm not sure how this clock stuff works, but I'm guessing the device
->> > is supposed to go to sleep at some points in time, and with your patch
->> > "OMAP3/4: iommu: adapt to runtime pm" it won't, as long as the module
->> > is loaded, unless I'm missing something.
->>
->> The device should be able to be put to sleep at anytime when it is NOT
->> being used. AFAIK there is no mechanism for the main processor (the
->> one running the kernel) to know when the other iommus are not being
->> used, given that they are in independent processors/subsystems, at
->> least for the ones in the DSP or M3 processors. Once the user releases
->> its iommu resource it means it is no longer using it, at that point
->> the device can be put to sleep.
+On 01/05/2012 02:26 AM, Linus Walleij wrote:
+> On Thu, Jan 5, 2012 at 2:17 AM, David Brown<davidb@codeaurora.org>  wrote:
+>> On Wed, Jan 04, 2012 at 05:39:16PM +0000, Marc Zyngier wrote:
+>>> I do. But on some non-SMP platforms, the local timer and the global
+>>> timer can actually be the same (MSM is one example of this, and the UP
+>>> version of the Cortex A15 is another).
+>> On SMP MSM, we use the CPU0 local timer as the global timer.  They are
+>> the same on non-SMP as well,
+> Does this mean your CPU0 local timer is always on, always clocked?
+> And do you use ARMs SMP TWD IP block for that?
 >
-> How should the OMAP3 ISP driver proceed to make sure that its IOMMU is clocked
-> off when it doesn't need it ?
+Yes, CPU0's local timer is always on. We use it as a global clocksource, 
+as well
+as for udelay on both cores. It is not ARM's SMP TWD block, it is our 
+own. The
+timer blocks can each be read from both CPUs, but can only generate IRQs 
+to one
+or the other.
 
-If there is an specific scenario where the iommu should be disabled,
-iommu_detach_device can be called to release the iommu resource. On
-suspend/resume scenarios runtime pm callbacks should still be able to
-put the device in idle.
-
-Regards,
-
-Omar
+Jeff
