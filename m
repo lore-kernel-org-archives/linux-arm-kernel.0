@@ -1,35 +1,25 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu,  5 Jan 2012 13:29:30 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jan 2012 20:33:46 +0000
 Subject: [PATCH] ARM: Fix typo in conversion of ARCH_NR_GPIOS to Kconfig
-Message-ID: <1325795370-21576-1-git-send-email-swarren@nvidia.com>
+In-Reply-To: <1325795370-21576-1-git-send-email-swarren@nvidia.com>
+References: <1325795370-21576-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20120105203346.GE11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 44986ab "ARM: 7240/1: Make ARCH_NR_GPIO a Kconfig variable"
-spelled ARCH_NR_GPIOS as ARCH_NR_GPIO, hence making the change
-ineffective. This change fixes that.
+On Thu, Jan 05, 2012 at 01:29:30PM -0700, Stephen Warren wrote:
+> Commit 44986ab "ARM: 7240/1: Make ARCH_NR_GPIO a Kconfig variable"
+> spelled ARCH_NR_GPIOS as ARCH_NR_GPIO, hence making the change
+> ineffective. This change fixes that.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This should probably go into 3.3 since the patch it fixes is there. I
+> don't think this issue affects any Tegra platform, but I didn't investigate
+> the other platforms that set CONFIG_ARCH_NR_GPIO by default now.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This should probably go into 3.3 since the patch it fixes is there. I
-don't think this issue affects any Tegra platform, but I didn't investigate
-the other platforms that set CONFIG_ARCH_NR_GPIO by default now.
+Bah, I've just sent my first batch of pull requests to Linus.  Oh well,
+things can stay as they are until I send the second set roughly half way
+through.  Please stick it in the patch system so it doesn't get forgotten.
 
- arch/arm/include/asm/gpio.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
-index 7151753..c402e9b 100644
---- a/arch/arm/include/asm/gpio.h
-+++ b/arch/arm/include/asm/gpio.h
-@@ -2,7 +2,7 @@
- #define _ARCH_ARM_GPIO_H
- 
- #if CONFIG_ARCH_NR_GPIO > 0
--#define ARCH_NR_GPIO CONFIG_ARCH_NR_GPIO
-+#define ARCH_NR_GPIOS CONFIG_ARCH_NR_GPIO
- #endif
- 
- /* not all ARM platforms necessarily support this API ... */
--- 
-1.7.0.4
+Thanks.
