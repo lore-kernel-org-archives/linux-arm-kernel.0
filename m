@@ -1,71 +1,43 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 5 Jan 2012 14:54:55 +0100
-Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
-In-Reply-To: <79CD15C6BA57404B839C016229A409A80719AC@DBDE01.ent.ti.com>
-References: <1324019153-13316-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A80719AC@DBDE01.ent.ti.com>
-Message-ID: <4F05ABAF.8080702@ti.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 5 Jan 2012 15:58:56 +0200
+Subject: [PATCH 1/7] amp/remoteproc: add framework for controlling remote
+ processors
+In-Reply-To: <20120103233534.GC2492@ponder.secretlab.ca>
+References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+ <1319536106-25802-2-git-send-email-ohad@wizery.com>
+ <20120103233534.GC2492@ponder.secretlab.ca>
+Message-ID: <CAK=WgbZTiS9czticnt4a1TKkR0SmsNKEvdHXfQpwC-N5DMjFXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+On Wed, Jan 4, 2012 at 1:35 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> + ? ? /* go through the available ELF segments */
+>> + ? ? for (i = 0; i < ehdr->e_phnum; i++, phdr++) {
+>> + ? ? ? ? ? ? u32 da = phdr->p_paddr;
+>> + ? ? ? ? ? ? u32 memsz = phdr->p_memsz;
+>> + ? ? ? ? ? ? u32 filesz = phdr->p_filesz;
+>
+> This could be an endianess problem. ?If the endianess of the host and
+> the rproc are different, then what is the endianess of the elf file?
+> Is the endianess of the elf file verified before attempting to parse it?
+...
+> Nitpick: A look up table would be easier to extend in the future.
+>
+> Otherwise;
+>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-On 1/5/2012 12:18 PM, Hiremath, Vaibhav wrote:
->> From: Hiremath, Vaibhav
->> Sent: Friday, December 16, 2011 12:36 PM
->> To: linux-omap at vger.kernel.org
->> Cc: tony at atomide.com; linux-arm-kernel at lists.infradead.org; devicetree-
->> discuss at lists.ozlabs.org; grant.likely at secretlab.ca; Cousson, Benoit;
->> Hiremath, Vaibhav
->> Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
->>
->> Add OMAP3 EVM (OMAP3530, AM/DM37x) DTS file to use the omap3.dtsi SoC file,
->> along with memory node information.
->>
->> Signed-off-by: Vaibhav Hiremath<hvaibhav@ti.com>
->> ---
->> Boot tested it on AM/DM37x EVM, kernel parses the info correctly.
->>
->>   arch/arm/boot/dts/omap3-evm.dts |   20 ++++++++++++++++++++
->>   1 files changed, 20 insertions(+), 0 deletions(-)
->>   create mode 100644 arch/arm/boot/dts/omap3-evm.dts
->>
->> diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-
->> evm.dts
->> new file mode 100644
->> index 0000000..2eee16e
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap3-evm.dts
->> @@ -0,0 +1,20 @@
->> +/*
->> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +/dts-v1/;
->> +
->> +/include/ "omap3.dtsi"
->> +
->> +/ {
->> +	model = "TI OMAP3 EVM (OMAP3530, AM/DM37x)";
->> +	compatible = "ti,omap3-evm", "ti,omap3";
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg =<0x80000000 0x10000000>; /* 256 MB */
->> +	};
->> +};
-> Can this merged? OR anybody has any comments here?
+Thanks, Grant!
 
-I guess that with Rob or Grant's ack, Tony should be able to merge it.
-That being said, since it is outside mach-omap, I'm not sure what the 
-right path is.
-I can add it in my DTS series, but that one will have dependencies with 
-the i2c driver DT adaptation.
+If I may, I'll add something like this to the commit log:
 
-FWIW, Acked-by: Benoit Cousson <b-cousson@ti.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca> (minus two
+Reported-by issues)
 
-Regards,
-Benoit
+And then we could fix those two issues in two subsequent patches
+(carrying your Reported-by) so reviewing the change would be much
+easier, and we don't end up changing code (that has been lying in
+linux-next) just before it is sent it to Linus.
+
+Thanks a lot for your review!
+Ohad.
