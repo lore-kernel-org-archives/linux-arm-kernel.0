@@ -1,58 +1,148 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 05 Jan 2012 17:22:56 +0100
-Subject: [PATCH 6/6] mmc: sdhci-s3c: Add device tree support
-In-Reply-To: <CAJuYYwTMpde-528t=vQnbkJv_gG7xuOr05b1K-+H-RxYRX0iEQ@mail.gmail.com>
-References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
- <1320266163-15292-7-git-send-email-thomas.abraham@linaro.org>
- <20111107211726.GC28491@ponder.secretlab.ca>
- <CAJuYYwSfC5t6xs-TDT2wBOj1RbQYSpH0wjo9uBcYf7bGyi0t9g@mail.gmail.com>
- <4F047235.2090503@samsung.com>
- <CAJuYYwTMpde-528t=vQnbkJv_gG7xuOr05b1K-+H-RxYRX0iEQ@mail.gmail.com>
-Message-ID: <4F05CE60.5090402@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 05 Jan 2012 17:26:48 +0100
+Subject: [PATCH v4 1/6] ARM: at91/aic: add irq domain and device tree
+ support
+In-Reply-To: <20120104194059.GY15503@ponder.secretlab.ca>
+References: <1323976568-20244-1-git-send-email-nicolas.ferre@atmel.com>
+ <85d531b5686e5eff623bed9618f802198409905f.1323975517.git.nicolas.ferre@atmel.com>
+ <20120104194059.GY15503@ponder.secretlab.ca>
+Message-ID: <4F05CF48.5050007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Grant,
 
-On 01/05/2012 04:45 PM, Thomas Abraham wrote:
->>>> On Thu, Nov 03, 2011 at 02:06:03AM +0530, Thomas Abraham wrote:
->>>>> Add device tree based discovery support for Samsung's sdhci controller
->>>>>
->>>>> Cc: Ben Dooks <ben-linux@fluff.org>
->>>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->>>>> ---
->>>>> +Example:
->>>>> +     sdhci at 12530000 {
->>>>> +             compatible = "samsung,exynos4210-sdhci";
->>>>> +             reg = <0x12530000 0x100>;
->>>>> +             interrupts = <139>;
->>>>> +             samsung,sdhci-bus-width = <4>;
->>>>> +             linux,mmc_cap_4_bit_data;
->>>>
->>>> Following on from my reply on patch 5, this is an example of exactly
->>>> what I'm talking about.  This node both sets bus-width to '4', and
->>>> sets the 4_bit_data flag.  Don't you think that the driver would be
->>>> smart enough to set the 4_bit_data flag when the bus width was set to
->>>> 4?
->>>
->>> Yes, that is true. I will modify the driver based on your comments and
->>> resubmit this patch.
->>
->> Are we going to have those patches in 3.3-rc1 or only in 3.4 ?
+Thanks for your review.
+
+Some answer following...
+
+On 01/04/2012 08:40 PM, Grant Likely :
+
+[..]
+
+>> --- a/arch/arm/mach-at91/irq.c
+>> +++ b/arch/arm/mach-at91/irq.c
+>> @@ -24,6 +24,10 @@
+>>  #include <linux/module.h>
+>>  #include <linux/mm.h>
+>>  #include <linux/types.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/irqdomain.h>
+>> +#include <linux/err.h>
+>>  
+>>  #include <mach/hardware.h>
+>>  #include <asm/irq.h>
+>> @@ -34,22 +38,28 @@
+>>  #include <asm/mach/map.h>
+>>  
+>>  void __iomem *at91_aic_base;
+>> +static struct irq_domain at91_aic_domain;
+>> +
+>> +static inline unsigned int aic_irq(struct irq_data *d)
+>> +{
+>> +	return d->hwirq;
+>> +}
 > 
-> Sorry for the delaying in completing this patchset. I will redo this
-> patchset and submit it soon. But 3.3-rc1 looks unlikely.
+> This is a useless macro.  Drop it.
 
-Ok, thanks. It's fine, there is no rush. I was just curious because we have
-reused this sdhci driver update series and it seemed essential for initial
-DT support on Exynos4 machines. Just FYI I have prepared initial DT support
-patches for the S5P MIPI-CSI2 (s5p-mipi-csis) receiver driver.
-But the whole camera subsystem needs more work, i.e. resource dependencies
-(clock) between all involved devices (like image sensors and video capture
-platform devices) need to be resolved and method of registering sub-devices
-in the V4L2 core will likely need to be changed.
+Ok. That was overkill ;-)
+
+[..]
+
+>> @@ -90,13 +100,13 @@ static u32 backups;
+>>  
+>>  static int at91_aic_set_wake(struct irq_data *d, unsigned value)
+>>  {
+>> -	if (unlikely(d->irq >= 32))
+>> +	if (unlikely(aic_irq(d) >= at91_aic_domain.nr_irq))
+> I don't think you need to derefernce the irq_domain.nr_irq here.  Just
+> keep the test for >= 32.
+
+Well I would like to keep it referring to this value as we may increase
+the number of irq handled by this controller in the future...
+
+[..]
+
+>> +#if defined(CONFIG_OF)
+>> +static int __init __at91_aic_of_init(struct device_node *node,
+>> +				     struct device_node *parent)
+>> +{
+>> +	at91_aic_base = of_iomap(node, 0);
+>> +	at91_aic_domain.of_node = of_node_get(node);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id aic_ids[] __initconst = {
+>> +	{ .compatible = "atmel,at91rm9200-aic", .data = __at91_aic_of_init },
+>> +	{ /*sentinel*/ }
+>> +};
+>> +
+>> +static void __init at91_aic_of_init(void)
+>> +{
+>> +	of_irq_init(aic_ids);
+>> +}
+>> +#else
+>> +static void __init at91_aic_of_init(void) {}
+>> +#endif
+>> +
+>>  /*
+>>   * Initialize the AIC interrupt controller.
+>>   */
+>>  void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+>>  {
+>>  	unsigned int i;
+>> +	int hwirq, irq;
+>>  
+>> -	at91_aic_base = ioremap(AT91_AIC, 512);
+>> +	if(of_have_populated_dt())
+>> +		at91_aic_of_init();
+>> +	else
+>> +		at91_aic_base = ioremap(AT91_AIC, 512);
+>>  
+>>  	if (!at91_aic_base)
+>> -		panic("Impossible to ioremap AT91_AIC\n");
+>> +		panic("Unable to ioremap AIC registers\n");
+>> +
+>> +	/* Add irq domain for AIC */
+>> +	at91_aic_domain.nr_irq = NR_AIC_IRQS;
+>> +	at91_aic_domain.irq_base = irq_alloc_descs(-1, AIC_BASE_IRQ,
+>> +						at91_aic_domain.nr_irq, 0);
+>> +	if (IS_ERR_VALUE(at91_aic_domain.irq_base)) {
+>> +		WARN(1, "Cannot allocate irq_descs, assuming pre-allocated\n");
+>> +		at91_aic_domain.irq_base = AIC_BASE_IRQ;
+>> +	}
+>> +	at91_aic_domain.ops = &irq_domain_simple_ops;
+>> +	irq_domain_add(&at91_aic_domain);
+> 
+> Nothing special is being done with the irq domain.  Please use
+> irq_domain_add_simple().  It will make things easier for the next
+> round of irq_domain patches that I'm getting ready to post.
+
+Fair enough, but I have one question: how do I specify "nr_irq" in the
+domain created by irq_domain_add_simple()? Maybe it is not needed?
 
 
+>>  	/*
+>>  	 * The IVR is used by macro get_irqnr_and_base to read and verify.
+>>  	 * The irq number is NR_AIC_IRQS when a spurious interrupt has occurred.
+>>  	 */
+>> -	for (i = 0; i < NR_AIC_IRQS; i++) {
+>> +	irq_domain_for_each_irq((&at91_aic_domain), hwirq, irq) {
+>> +
+> 
+> Same here; the driver is written for a fixed number of irqs
+> (NR_AIC_IRQs).  You don't need to reference the irq_domain for that.
+
+Yes, Ditto: this fixed number may change in the future...
+
+> Otherwise;
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+Ok, I will rework a new revision...
+
+Thanks, best regards,
 -- 
-Thanks,
-Sylwester
+Nicolas Ferre
