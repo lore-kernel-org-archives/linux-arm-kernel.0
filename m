@@ -1,188 +1,25 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 05 Jan 2012 10:42:27 -0600
-Subject: [PATCH v3] ARM: at91: pit add DT support
-In-Reply-To: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
- <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4F05D2F3.40704@gmail.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Thu, 5 Jan 2012 10:42:57 -0600
+Subject: [RFC PATCH v2 1/2] cpuidle: Add common init interface and idle
+ functionality
+In-Reply-To: <20120105093240.GM11810@n2100.arm.linux.org.uk>
+References: <1323846126-7516-1-git-send-email-rob.lee@linaro.org>
+ <1323846126-7516-2-git-send-email-rob.lee@linaro.org>
+ <20120105093240.GM11810@n2100.arm.linux.org.uk>
+Message-ID: <CAMXH7KGeo9mtDdJ8oNiHMXrxz=4STWc+BabE=AQVNH_fUo=q9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2012 11:25 AM, Nicolas Ferre wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> Retreive registers address and IRQ from device tree entry. Fall back
-> to built-in values if an error occurs.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> v3: - use irq_of_parse_and_map() for handling irq numbers specified by DT.
->       Correction proposed by Jamie Iles.
-> 
-> v2: - new specification of irq numbers in DT (due to modification of AIC code)
->     - new error path in of_at91sam926x_pit_init()
->     - fall back to built-in values if an error occurs
->     - use of of_property_read_u32() to get irq property
-> 
->  .../devicetree/bindings/arm/atmel-at91.txt         |    8 +++
->  arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 ++
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++
->  arch/arm/mach-at91/at91sam926x_time.c              |   53 +++++++++++++++++++-
->  4 files changed, 70 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> new file mode 100644
-> index 0000000..380f711
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -0,0 +1,8 @@
-> +Atmel AT91 device tree bindings.
-> +================================
-> +
-> +PIT Timer required properties:
-> +- compatible: Should be "atmel,at91sam9260-pit"
-> +- reg: Should contain registers location and length
-> +- interrupts: Should contain interrupt for the PIT which is the IRQ line
-> +  shared across all System Controller members.
-> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> index 0d21872..5c4be7e 100644
-> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> @@ -57,6 +57,11 @@
->  				reg = <0xfffff000 0x200>;
->  			};
->  
-> +			pit: timer at fffffd30 {
-> +				compatible = "atmel,at91sam9260-pit";
-> +				reg = <0xfffffd30 0xf>;
-> +				interrupts = <1 4>;
-> +			};
->  
->  			pioA: gpio at fffff400 {
->  				compatible = "atmel,at91rm9200-gpio";
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index b977a79..0d21c8e 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -58,6 +58,12 @@
->  				reg = <0xfffff000 0x200>;
->  			};
->  
-> +			pit: timer at fffffd30 {
-> +				compatible = "atmel,at91sam9260-pit";
-> +				reg = <0xfffffd30 0xf>;
-> +				interrupts = <1 4>;
-> +			};
-> +
->  			dma: dma-controller at ffffec00 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-> index d89ead7..534a992 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -14,6 +14,9 @@
->  #include <linux/kernel.h>
->  #include <linux/clk.h>
->  #include <linux/clockchips.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
->  
->  #include <asm/mach/time.h>
->  
-> @@ -133,7 +136,8 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
->  static struct irqaction at91sam926x_pit_irq = {
->  	.name		= "at91_tick",
->  	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> -	.handler	= at91sam926x_pit_interrupt
-> +	.handler	= at91sam926x_pit_interrupt,
-> +	.irq		= AT91_ID_SYS,
->  };
->  
->  static void at91sam926x_pit_reset(void)
-> @@ -149,6 +153,49 @@ static void at91sam926x_pit_reset(void)
->  	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
->  }
->  
-> +#ifdef CONFIG_OF
-> +static struct of_device_id timer_ids[] = {
-> +	{ .compatible = "atmel,at91sam9260-pit" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static int __init of_at91sam926x_pit_init(void)
-> +{
-> +	struct device_node	*np;
-> +	int			ret;
-> +
-> +	np = of_find_matching_node(NULL, timer_ids);
-> +	if (!np)
-> +		goto err;
-> +
-> +	pit_base_addr = of_iomap(np, 0);
-> +	if (!pit_base_addr)
-> +		goto node_err;
-> +
-> +	/* Get the interrupts property */
-> +	ret = irq_of_parse_and_map(np, 0);
-> +	if (ret <= 0)
-> +		goto ioremap_err;
-> +	at91sam926x_pit_irq.irq = ret;
-> +
-> +	of_node_put(np);
-> +
-> +	return 0;
-> +
-> +ioremap_err:
-> +	iounmap(pit_base_addr);
-> +node_err:
-> +	of_node_put(np);
-> +err:
-> +	return -EINVAL;
-> +}
-> +#else
-> +static int __init of_at91sam926x_pit_init(void)
-> +{
-> +	return -EINVAL;
-> +}
-> +#endif
-> +
->  /*
->   * Set up both clocksource and clockevent support.
->   */
-> @@ -177,7 +224,7 @@ static void __init at91sam926x_pit_init(void)
->  	clocksource_register_hz(&pit_clk, pit_rate);
->  
->  	/* Set up irq handler */
-> -	setup_irq(AT91_ID_SYS, &at91sam926x_pit_irq);
-> +	setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
->  
->  	/* Set up and register clockevents */
->  	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
-> @@ -193,6 +240,8 @@ static void at91sam926x_pit_suspend(void)
->  
->  void __init at91sam926x_ioremap_pit(u32 addr)
->  {
-> +	if (!of_at91sam926x_pit_init())
-> +		return;
+On 5 January 2012 03:32, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Dec 14, 2011 at 01:02:05AM -0600, Robert Lee wrote:
+>> + ? ? asm("b 1f; .align 5; 1:");
+>> + ? ? asm("mcr p15, 0, r0, c7, c10, 4"); ? ? ?/* drain write buffer */
+>
+> Err, no. ?The compiler is free to add whatever instructions it sees
+> fit between these two asm() statements.
+>
+> If you want to ask the compiler to issue a set of assembly instructions
+> as a block, you have to use just one asm() statement.
 
-This seems backwards to me. I don't have the ioremap changes in my tree,
-but shouldn't the caller of at91sam926x_ioremap_pit be changed to
-something like this:
-
-	if (of_at91sam926x_pit_init() < 0)
-		at91sam926x_ioremap_pit(addr);
-
-Otherwise,
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-Rob
-
->  	pit_base_addr = ioremap(addr, 16);
->  
->  	if (!pit_base_addr)
+Thanks.  I will fix that in v3.
