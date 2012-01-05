@@ -1,85 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 05 Jan 2012 11:32:28 +0900
-Subject: [PATCH] rtc-s3c: Fix breakage introduced by S3C2443/S3C2416
- support
-In-Reply-To: <201201041514.16813.heiko@sntech.de>
-References: <201112211014.30695.heiko@sntech.de>
- <201201041251.42509.heiko@sntech.de> <201201041512.55126.heiko@sntech.de>
- <201201041514.16813.heiko@sntech.de>
-Message-ID: <00f701cccb52$446af9c0$cd40ed40$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 5 Jan 2012 11:21:11 +0800
+Subject: [RFC PATCH v2 2/2] ARM: imx: Add mx5 cpuidle implmentation
+In-Reply-To: <CAMXH7KEHsighKYkPhhgHmE9s7sxtP4hz8L+Z+LMsrD14kiqJJQ@mail.gmail.com>
+References: <1323846126-7516-1-git-send-email-rob.lee@linaro.org>
+ <1323846126-7516-3-git-send-email-rob.lee@linaro.org>
+ <20111222175027.GG29622@opensource.wolfsonmicro.com>
+ <CAMXH7KEHsighKYkPhhgHmE9s7sxtP4hz8L+Z+LMsrD14kiqJJQ@mail.gmail.com>
+Message-ID: <20120105032110.GC14741@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+On Wed, Jan 04, 2012 at 05:35:39PM -0600, Rob Lee wrote:
+> On 22 December 2011 11:50, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Wed, Dec 14, 2011 at 01:02:06AM -0600, Robert Lee wrote:
+> >
+> >> + ? ? clk_enable(&gpc_dvfs_clk);
+> >
+> > Should these enables be in the cpuidle code? ?The device appears to have
+> > been working fine without them thus far... ?Alternatively, if they
+> > should be on anyway does this need to be split out and sent as a bug
+> > fix?
 > 
-> Commits 7006ee4f (rtc-s3c: make room for more variants in devicetree
-block)
-> and 6c0a2365 (rtc-s3c: add variants for S3C2443 and S3C2416)
-> introduced build-failures with enabled CONFIG_USE_OF option.
+> This clock is used by the existing pm_suspend code for i.MX51 and
+> other future code being worked on.  Since it uses extremely minimal
+> power and is required to be enabled during low power modes, it seemed
+> cleanest to just enable it during clock init.
+
++1
+
+Regards,
+Shawn
+
+> But I forgot to remove
+> it from it's enabling from i.MX51 pm_suspend code so I can do that for
+> v3.
 > 
-> This patch fixes missing "," in s3c_rtc_dt_match and wrong handling of
-> the of_device_id.data property.
-> 
-> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Arnd,
-Could you please pick this up in your next/driver2 for samsung-rtc?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> ---
->  drivers/rtc/rtc-s3c.c |   18 +++++++++---------
->  1 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index bb0f320..2b4feb8 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -449,7 +449,7 @@ static inline int s3c_rtc_get_driver_data(struct
-> platform_device *pdev)
->  	if (pdev->dev.of_node) {
->  		const struct of_device_id *match;
->  		match = of_match_node(s3c_rtc_dt_match, pdev->dev.of_node);
-> -		return match->data;
-> +		return (int)match->data;
->  	}
->  #endif
->  	return platform_get_device_id(pdev)->driver_data;
-> @@ -667,17 +667,17 @@ static int s3c_rtc_resume(struct platform_device
-> *pdev)
->  #ifdef CONFIG_OF
->  static const struct of_device_id s3c_rtc_dt_match[] = {
->  	{
-> -		.compatible = "samsung,s3c2410-rtc"
-> -		.data = TYPE_S3C2410,
-> +		.compatible = "samsung,s3c2410-rtc",
-> +		.data = (void *)TYPE_S3C2410,
->  	}, {
-> -		.compatible = "samsung,s3c2416-rtc"
-> -		.data = TYPE_S3C2416,
-> +		.compatible = "samsung,s3c2416-rtc",
-> +		.data = (void *)TYPE_S3C2416,
->  	}, {
-> -		.compatible = "samsung,s3c2443-rtc"
-> -		.data = TYPE_S3C2443,
-> +		.compatible = "samsung,s3c2443-rtc",
-> +		.data = (void *)TYPE_S3C2443,
->  	}, {
-> -		.compatible = "samsung,s3c6410-rtc"
-> -		.data = TYPE_S3C64XX,
-> +		.compatible = "samsung,s3c6410-rtc",
-> +		.data = (void *)TYPE_S3C64XX,
->  	},
->  	{},
->  };
-> --
-> 1.7.5.4
