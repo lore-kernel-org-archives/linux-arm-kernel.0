@@ -1,30 +1,125 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 5 Jan 2012 14:03:28 -0800
-Subject: [PATCH 0/4] ARM: tegra: Automatic UART selection for earlyprintk
-In-Reply-To: <CAD=FV=WE51BbXdkQ9zjVCR_vjuHR5qn0YR+RteL-Q30bZ59BCA@mail.gmail.com>
-References: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
- <CAD=FV=X8p5RXKc0CW4KYzmoCw7tkOrahD2tnqKfXqqRR6MEAJQ@mail.gmail.com>
- <CAD=FV=WE51BbXdkQ9zjVCR_vjuHR5qn0YR+RteL-Q30bZ59BCA@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F180C@HQMAIL01.nvidia.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Thu, 05 Jan 2012 23:03:41 +0100
+Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
+In-Reply-To: <CAD=FV=V3qO-=DOz5Qc95fyYJC4656WvmUYGXMAHgXcGf96+aeQ@mail.gmail.com>
+References: <1325719752-818-1-git-send-email-olof@lixom.net>
+ <6121078.4q2inFFXlB@fb07-iapwap2>
+ <CAD=FV=V3qO-=DOz5Qc95fyYJC4656WvmUYGXMAHgXcGf96+aeQ@mail.gmail.com>
+Message-ID: <3197939.ZpLiSGWdou@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson wrote at Wednesday, January 04, 2012 4:48 PM:
-...
-> 2. I'm slightly concerned about cramming stuff into IRAM, since
-> ? ?I don't have a good concept of what IRAM adresses are used when.
-> ? ?When I grep for IRAM users in our kernel, I see
-> ? ?TEGRA_AVP_RESUME_ADDR is using the base of IRAM. ?We're not going
-> ? ?to be hosing suspend/resume or anything else with this CL, are we?
-> ? ?In the very least, I'd perfer to see a #define for the '0x100' and
-> ? ?the '0x55415254' so that we can correlate the constants in
-> ? ?uncompress.h and debug-macro.S
+On Thursday 05 January 2012 10:40:48 Doug Anderson wrote:
+> I can't comment on the L2 stuff (haven't looked there), but just going
+> by Cortex-A9 revisions (T25 has roughly r1p1 and T30 has r2p7), I've
+> got this table:
+> 
+> Errata             T25 (A9 ~r1p1)   T30 (A9 r2p7)    Applies to
+> ARM_ERRATA_364296                                    pre A8
+> ARM_ERRATA_411920                                    pre A8
+> ARM_ERRATA_430973                                    A8
+> ARM_ERRATA_458693                                    A8
+> ARM_ERRATA_460075                                    A8
+> ARM_ERRATA_720789  yes                               A9 (prior to r2p0)
+> ARM_ERRATA_742230  yes                               A9 (r1p0..r2p2)
+> ARM_ERRATA_742231                                    A9 (r2p0..r2p2)
+> ARM_ERRATA_743622                                    A9 (r2p0..r2p2)
+> ARM_ERRATA_751472  yes              yes              A9 (prior to r3p0)
+> ARM_ERRATA_754322                   yes              A9 (r2p*, r3p*)
+> ARM_ERRATA_754327  yes                               A9 (prior to r2p0)
+> ARM_ERRATA_764369  yes              yes              A9 MPCore (all revs)
+> 
+> ...so that means we should also be adding in 720789 (T2x), 751472
+> (T2x, T30), 754322 (T30), 754327 (T2x), 764369 (T2x, T30).
 
-I discussed this with a few people, and it sounds like it's safe to use
-IRAM for this. However, I did discover a few other uses of IRAM too, in
-our downstream kernels anyway, so I'll certainly create arch/arm/mach-
-tegra/include/mach/irammap.h that provides defines for all the IRAM
-offsets, what they're used for, and when.
+AFAIK, 720789 (TLBIASIDIS and TLBIMVAIS operations can broadcast a faulty 
+ASID) is fixed in userspace (or gcc) nowadays (at least in Ubuntu) so I think 
+this can be neglected.
 
--- 
-nvpublic
+Marc
+
+> Certainly appreciate anyone checking my work and definitely appreciate
+> input from nVidia.
+> 
+> -Doug
+> 
+> ---
+> 
+> On Thu, Jan 5, 2012 at 8:30 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+> > Hi,
+> > 
+> > Am Mittwoch, 4. Januar 2012, 15:29:12 schrieb Olof Johansson:
+> > > Only one of the L2 erratas are needed on T30, but T20/25
+> > > needs a few more.
+> > 
+> > can we have a word from someone from NVIDIA about which Tegra
+> > versions/revisions need which erratum applied?
+> > 
+> > Currently the kernel has selections for the following errata (on ARM):
+> > 
+> >        T2x             T30
+> >                                        ERRATA_430973                  
+> > Stale prediction on replaced interworking branch ERRATA_458693        
+> >           Processor deadlock when a false hazard is created
+> > ERRATA_460075                   Data written to the L2 cache can be
+> > overwritten with stale data x                              
+> > ERRATA_742230                   DMB operation may be faulty
+> > ERRATA_742231                   Incorrect hazard handling in the SCU
+> > may lead to data corruption PL310_ERRATA_588369     Clean & Invalidate
+> > maintenance operations do not invalidate clean lines ERRATA_720789    
+> >               TLBIASIDIS and TLBIMVAIS operations can broadcast a
+> > faulty ASID PL310_ERRATA_727915     Background Clean & Invalidate by
+> > Way operation can cause data corruption ERRATA_743622                  
+> > Faulty hazard checking in the Store Buffer may lead to data corruption
+> > ERRATA_751472                   Interrupted ICIALLUIS may prevent
+> > completion of broadcasted operation x                              
+> > PL310_ERRATA_753970     cache sync operation may be faulty
+> > ERRATA_754322                   possible faulty MMU translations
+> > following an ASID switch ERRATA_754327                   no automatic
+> > Store Buffer drain ERRATA_764369                   Data cache line
+> > maintenance operation by MVA may not succeed x               x        
+> >       PL310_ERRATA_769419     no automatic Store Buffer drain
+> > 
+> > With Olofs patch, the following errata are enabled by tegra_defconfig:
+> > 
+> > 742230(T2x), 753970(T2x), 769419(T2x + T30)
+> > 
+> > I have the feeling that at least 764369 also needs to be enabled. From
+> > the description: ... affecting Cortex-A9 MPCore with two or more
+> > processors (all current revisions). I wonder if this includes multi
+> > *cores*.
+> > 
+> > The TRM is not very detailed about this topic. Having this info will
+> > likely remove some headache for non OEM custumers.
+> > 
+> > Marc
+> > 
+> > > Signed-off-by: Olof Johansson <olof@lixom.net>
+> > > ---
+> > >  arch/arm/mach-tegra/Kconfig |    4 ++++
+> > >  1 files changed, 4 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-tegra/Kconfig
+> > > b/arch/arm/mach-tegra/Kconfig
+> > > index 373652d..a2c76ee 100644
+> > > --- a/arch/arm/mach-tegra/Kconfig
+> > > +++ b/arch/arm/mach-tegra/Kconfig
+> > > @@ -10,6 +10,9 @@ config ARCH_TEGRA_2x_SOC
+> > >       select USB_ARCH_HAS_EHCI if USB_SUPPORT
+> > >       select USB_ULPI if USB_SUPPORT
+> > >       select USB_ULPI_VIEWPORT if USB_SUPPORT
+> > > +     select ARM_ERRATA_742230
+> > > +     select PL310_ERRATA_753970 if CACHE_PL310
+> > > +     select PL310_ERRATA_769419 if CACHE_L2X0
+> > >       help
+> > >         Support for NVIDIA Tegra AP20 and T20 processors, based on
+> > > the
+> > >         ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+> > > @@ -23,6 +26,7 @@ config ARCH_TEGRA_3x_SOC
+> > >       select USB_ULPI if USB_SUPPORT
+> > >       select USB_ULPI_VIEWPORT if USB_SUPPORT
+> > >       select USE_OF
+> > > +     select PL310_ERRATA_769419 if CACHE_L2X0
+> > >       help
+> > >         Support for NVIDIA Tegra T30 processor family, based on the
+> > >         ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
