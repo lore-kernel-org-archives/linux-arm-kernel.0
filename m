@@ -1,78 +1,159 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 4 Jan 2012 22:43:56 -0500
-Subject: Circular dependency between <linux/kernel.h> and <asm/bug.h> on
- ARM
-In-Reply-To: <20120103144538.GU2914@n2100.arm.linux.org.uk>
-References: <1325472276.13595.200.camel@deadeye>
- <CAOesGMgXRev24e0bmGD71J04=Aon7bs0YeK7mwX8Na12uR_b6A@mail.gmail.com>
- <20120103144538.GU2914@n2100.arm.linux.org.uk>
-Message-ID: <CAP=VYLpP393c0MYxPPR2j6jkLyyUQWjQBWg3RfbpJyuWxi+psA@mail.gmail.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 4 Jan 2012 20:07:28 -0800
+Subject: [PATCH v4 3/6] clk: introduce the common clock framework
+In-Reply-To: <4F0506D0.30109@gmail.com>
+References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
+ <1323834838-2206-4-git-send-email-mturquette@linaro.org>
+ <alpine.LFD.2.02.1112141007550.3020@ionos>
+ <CAJOA=zO=gM2r4pCVo+orLqE9Q1SSw4h5nXsAHo-e_SHZAfvKDA@mail.gmail.com>
+ <20120104021541.GI2414@b20223-02.ap.freescale.net>
+ <4F0462FF.1000308@gmail.com>
+ <CAJOA=zPw7UuhE4R3SsBeyzQ2_iN29Zv-ExaUTTFCah+GoFSfNQ@mail.gmail.com>
+ <4F0506D0.30109@gmail.com>
+Message-ID: <CAJOA=zPgwiOSoyZK1SpzZVZfTOmwruTR=WO+gRdVZrZVzNuPSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2012 at 9:45 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Jan 01, 2012 at 11:01:27PM -0800, Olof Johansson wrote:
->> On Sun, Jan 1, 2012 at 6:44 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
->> > Commit 87e040b6456fd3416a1f6831c1eedaef5c0a94ff ("ARM: 7017/1: Use
->> > generic BUG() handler") makes BUG() use BUILD_BUG_ON(). ?However,
->> > BUILD_BUG_ON() is not defined in <linux/bug.h> but in <linux/kernel.h>.
->> >
->> > arch/include/asm/bug.h does not include <linux/kernel.h> and *cannot* do
->> > so because the latter already includes <asm/bug.h>.
+On Wed, Jan 4, 2012 at 6:11 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 01/04/2012 07:01 PM, Turquette, Mike wrote:
+>> On Wed, Jan 4, 2012 at 6:32 AM, Rob Herring <robherring2@gmail.com> wrote:
+>>> On 01/03/2012 08:15 PM, Richard Zhao wrote:
+>>>> On Fri, Dec 16, 2011 at 04:45:48PM -0800, Turquette, Mike wrote:
+>>>>> On Wed, Dec 14, 2011 at 5:18 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>>>>>> On Tue, 13 Dec 2011, Mike Turquette wrote:
+>>>
+>>> snip
+>>>
+>>>>>>> +/**
+>>>>>>> + * clk_init - initialize the data structures in a struct clk
+>>>>>>> + * @dev: device initializing this clk, placeholder for now
+>>>>>>> + * @clk: clk being initialized
+>>>>>>> + *
+>>>>>>> + * Initializes the lists in struct clk, queries the hardware for the
+>>>>>>> + * parent and rate and sets them both. ?Adds the clk to the sysfs tree
+>>>>>>> + * topology.
+>>>>>>> + *
+>>>>>>> + * Caller must populate clk->name and clk->flags before calling
+>>>>>>
+>>>>>> I'm not too happy about this construct. That leaves struct clk and its
+>>>>>> members exposed to the world instead of making it a real opaque
+>>>>>> cookie. I know from my own painful experience, that this will lead to
+>>>>>> random fiddling in that data structure in drivers and arch code just
+>>>>>> because the core code has a shortcoming.
+>>>>>>
+>>>>>> Why can't we make struct clk a real cookie and confine the data
+>>>>>> structure to the core code ?
+>>>>>>
+>>>>>> That would change the init call to something like:
+>>>>>>
+>>>>>> struct clk *clk_init(struct device *dev, const struct clk_hw *hw,
+>>>>>> ? ? ? ? ? ? ? ? ? ? struct clk *parent)
+>>>>>>
+>>>>>> And have:
+>>>>>> struct clk_hw {
+>>>>>> ? ? ? struct clk_hw_ops *ops;
+>>>>>> ? ? ? const char ? ? ? ?*name;
+>>>>>> ? ? ? unsigned long ? ? flags;
+>>>>>> };
+>>>>>>
+>>>>>> Implementers can do:
+>>>>>> struct my_clk_hw {
+>>>>>> ? ? ? struct clk_hw ? ?hw;
+>>>>>> ? ? ? mydata;
+>>>>>> };
+>>>>>>
+>>>>>> And then change the clk ops callbacks to take struct clk_hw * as an
+>>>>>> argument.
+>>>> We have to define static clocks before we adopt DT binding.
+>>>> If clk is opaque and allocate memory in clk core, it'll make hard
+>>>> to define static clocks. And register/init will pass a long parameter
+>>>> list.
+>>>
+>>> DT is not a prerequisite for having dynamically created clocks. You can
+>>> make clock init dynamic without DT.
 >>
->> Sure it can, but it's not ideal. Since the BUILD_BUG_ON is only used
->> in bug.h in a #define, it will be resolved below the includes of
->> either so there should be no ordering issue between the two.
->
-> I disagree - we should not be creating circular dependencies. ?This
-> creates a mess, and uncertain results. ?For instance, if we include
-> linux/bug.h or asm/bug.h before linux/kernel.h has been included,
-> then we end up with linux/kernel.h being parsed without a definition
-> for BUG_ON().
->
-> However, if linux/kernel.h is included first, we start parsing that,
-> include asm/bug.h, asm/bug.h then includes linux/kernel.h which produces
-> an empty file, and then we continue parsing asm/bug.h _without_
-> BUILD_BUG_ON() defined.
->
-> So, adding linux/kernel.h does _not_ solve the problem. ?It solves the
-> problem for _some_ cases only.
->
->> > Maybe BUILD_BUG_ON() should be moved out to a header of its own, or else
->> > this particular use should be moved to some other file. ?This needs to
->> > be fixed somehow, as it obviously leads to build failures, e.g.:
->> >
->> > https://buildd.debian.org/status/fetch.php?pkg=linux-2.6&arch=armel&ver=3.2~rc7-1~experimental.1&stamp=1325142904
+>> Agreed.
 >>
->> Or perhaps moving BUILD_BUG_ON to include/linux/bug.h?
+>>> What data goes in struct clk vs. struct clk_hw could change over time.
+>>> So perhaps we can start with some data in clk_hw and plan to move it to
+>>> struct clk later. Even if almost everything ends up in clk_hw initially,
+>>> at least the structure is in place to have common, core-only data
+>>> separate from platform data.
+>>
+>> What is the point of this?
 >
-> and change linux/kernel.h to include linux/bug.h rather than asm/bug.h.
+> To have a way forward. It would be nice to have a clk infrastructure
+> before I retire...
 
-Actually, kernel.h doesn't need to include any variant of bug.h at all.
-
-I started on cleaning this up a few weeks back, but didn't have the time
-to get it ready for 3.3 -- so my intent is to do so for linux-next that will
-be the 3.4 release.  The Work In Progress can be seen here:
-
-http://git.kernel.org/?p=linux/kernel/git/paulg/linux.git;a=shortlog;h=refs/heads/bug.h-cleanup-WIP
-
-I only mention it here since I'd hate to see anyone waste time on
-duplicating work that is already done.
-
-Thanks,
-Paul.
-
----
+Haha, agreed.
 
 >
->> The quickest fix for now might be to take out the BUILD_BUG_ON(),
->> especially so close to 3.2-final.
+>> The original clk_hw was defined simply as:
+>>
+>> struct clk_hw {
+>> ? ? ? ? struct clk *clk;
+>> };
+>>
+>> It's only purpose in life was as a handle for navigation between the
+>> opaque struct clk and the hardware-specific struct my_clk_hw. ?struct
+>> clk_hw is defined in clk.h and everyone can see it. ?If we're suddenly
+>> OK putting clk data in this structure then why bother with an opaque
+>> struct clk at all?
+>>
+>>> What is the actual data you need to be static and accessible to the
+>>> platform code? A ptr to parent clk is the main thing I've seen for
+>>> static initialization. So make the parent ptr be struct clk_hw* and
+>>> allow the platforms to access.
+>>
+>> To answer your question on what data we're trying to expose: platform
+>> code commonly needs the parent pointer and the clk rate (and by
+>> extension, the rate of the parent). ?For debug/error prints it is also
+>> nice to have the clk name. ?Generic clk flags are also conceivably
+>> something that platform code might want.
 >
-> I think just remove the BUILD_BUG_ON. ?Other architectures have done
-> without it, so I see no reason we can't do as well.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
+> I agree with the need to have the parent and flags from a static init
+> perspective. There's not really a good reason the others can't be
+> accessed thru accessors though.
+>
+>> I'd like to spin the question around: if we're OK exposing some stuff
+>> (in your example above, the parent pointer), then what clk data are
+>> you trying to hide?
+>
+> Well, everything from drivers which the current clk implementations do
+> hide. Catching abuse in with drivers coming in from all different trees
+> and lists will be impossible.
+>
+> For platform code it is more fuzzy. I don't think platform code should
+> be allowed to muck with prepare/enable counts for example.
+
+So there is a clear dichotomy: drivers shouldn't be exposed to any of
+it and platform code should be exposed to some of it.
+
+How about a drivers/clk/clk-private.h which will define struct clk and
+must only be included by clk drivers in drivers/clk/*?
+
+This establishes a bright line between those things which are allowed
+to know the details of struct clk and those that are not: namely that
+clk drivers in drivers/clk/ may use '#include "clk-private.h"'.
+Obviously struct clk is opaque to the rest of the kernel (in the same
+way it has been prior to the common clk patches) and there is no need
+for struct clk_hw anymore.  Also helper functions are no longer needed
+for clock driver code, which I think *is* a manageable set of code to
+review.  Also clk drivers must live in drivers/clk/ for this to work
+(without a big ugly path in someone's #include directive somewhere).
+
+Thoughts?
+
+Regards,
+Mike
+
+>
+> Rob
+>
+>>
+>> Regards,
+>> Mike
+>>
+>>>
+>>> Rob
+>
