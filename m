@@ -1,28 +1,159 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 5 Jan 2012 14:02:53 +0100
-Subject: [PATCH v4] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <4F059BCB.9050504@bluegiga.com>
-References: <1325766081-27864-1-git-send-email-lauri.hintsala@bluegiga.com>
- <4F059BCB.9050504@bluegiga.com>
-Message-ID: <20120105130253.GA2562@pengutronix.de>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 5 Jan 2012 21:14:13 +0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <20111229024647.GA11309@S2100-06.ap.freescale.net>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885077F82@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20111229024647.GA11309@S2100-06.ap.freescale.net>
+Message-ID: <CAA+hA=Tx0==PLFSN-vqOkRKmKZ-5FvzTNZqRwCLov+FcQxiNNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 29, 2011 at 10:46 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Tue, Dec 27, 2011 at 02:41:25PM +0000, Dong Aisheng-B29396 wrote:
+> [...]
+>> > You could have nested sub-nodes, say something like:
+>> >
+>> > iomuxc at 020e0000 {
+>> > ? ? compatible = "fsl,imx6q-iomuxc";
+>> > ? ? reg = <0x020e0000 0x4000>;
+>> > ? ? fsl,pins {
+>> > ? ? ? ? ... // fsl-specific pin properties
+>> > ? ? };
+>> > ? ? fsl,groups {
+>> > ? ? ? ? ... // fsl-specific group properties
+>> > ? ? };
+>> > ? ? fsl,functions {
+>> > ? ? ? ? ... // fsl-specific mux function properties
+>> > ? ? };
+>> > ? ? pinmux-usage {
+>> > ? ? ? ? // standardized pinmux "table" properties
+>> > ? ? ? ? sd4 { // pin group name
+>> > ? ? ? ? ? ? function = "sdio4"; // this function active on it
+>> > ? ? ? ? ? ? ...
+>> > ? ? ? ? };
+>> > ? ? ? ? ...
+>> > ? ? }
+>> > ? ? ...
+>> > }
+>> >
+>> Yes, I could do that.
+>> The extra effort is that we have to manually exclude one pinmux-usage
+>> node in pinmux driver since originally i take the child node count of
+>> iomuxc as the function count since all child nodes are functions,
+>> that why I firstly took the mapping node out of iomuxc, in addition
+>> the old way i used seems to be more brief and clear.
+>>
+> Stephen suggested you put all the function nodes under node
+> 'fsl,functions' (not sure prefix fsl is necessary). ?In that case,
+> of_get_child_count() on 'fsl,functions' still get you the function
+> count you want, right?
+>
+> But we do not bother with it, if we do not have pinmux-usage at all.
+> See below ...
+>
+>> I tried adding pinmux-usage as a sub node of iomuxc and got two issues:
+>> Taking imx6q as an example:
+>> iomuxc at 020e0000 {
+>> ? ? ? ? uart4 {
+>> ? ? ? ? ? ? ? ? func-name = "uart4";
+>> ? ? ? ? ? ? ? ? grp-name = "uart4grp";
+>> ? ? ? ? ? ? ? ? grp-pins = <107 108>;
+>> ? ? ? ? ? ? ? ? num-pins = <2>;
+>> ? ? ? ? ? ? ? ? grp-mux = <4 4>;
+>> ? ? ? ? ? ? ? ? num-mux = <2>;
+>> ? ? ? ? };
+>>
+>> ? ? ? ? sd4 {
+>> ? ? ? ? ? ? ? ? func-name = "sd4";
+>> ? ? ? ? ? ? ? ? grp-name = "sd4grp";
+>> ? ? ? ? ? ? ? ? grp-pins = <170 171 180 181 182 183 184 185 186 187>;
+>> ? ? ? ? ? ? ? ? num-pins = <10>;
+>> ? ? ? ? ? ? ? ? grp-mux = <0 0 1 1 1 1 1 1 1 1>;
+>> ? ? ? ? ? ? ? ? num-mux = <10>;
+>> ? ? ? ? };
+>>
+>> ? ? ? ? pinmux-mapping {
+>> ? ? ? ? ? ? ? ? uart4 {
+>> ? ? ? ? ? ? ? ? ? ? ? ? function = "uart4";
+>> ? ? ? ? ? ? ? ? ? ? ? ? dev = <&uart4>;
+>> ? ? ? ? ? ? ? ? };
+>>
+>> ? ? ? ? ? ? ? ? usdhc4 {
+>> /* ? ? ? ? ? ? ? ? ? ? ? ?ctrl-dev-name = "20e0000.iomuxc"; */
+>> ? ? ? ? ? ? ? ? ? ? ? ? function = "sd4";
+>> ? ? ? ? ? ? ? ? ? ? ? ? dev = <&usdhc4>;
+>> ? ? ? ? ? ? ? ? };
+>> ? ? ? ? };
+>> };
+>>
+>> If we remove ctrl-dev-name and get it from its parent node in drivers as
+>> you suggested,
+>> first, since this work will be done in the common API (pinmux_of_register_mappings
+>> Requires pass the pinmux mapping node to it for construct the mapping table)
+>> It will introduce a restriction that all platforms should define this node
+>> under their pinctrl device node.
+>> Second, it seems we cannot get its parent node device or device name in driver
+>> (can only get node Name which is not sufficient for construct the pin map table
+>> required by pinctrl core) and current device tree subsystem seems do not support
+>> get its associated device from a device node.
+>> We may not be able to construct ctrl-dev-name or ctrl-dev for struct pinmux_map.
+>> I'm not sure if I missed something, if missed please let me know.
+>> To support it, we may need to add support for converting device node
+>> to device. Not sure it's applicable since I still have not tried it.
+>>
+>> The same issue applies to dev using a phandle.
+>>
+> We do not bother with it, if we do not have pinmux-usage at all.
+> See below ...
+>
+> [...]
+>
+>> I was ever thought putting a phandle of pinmux function in each device,
+>> Then pinmux mapping table seems not need anymore. Like:
+>>
+>> usdhc4: usdhc at 0219c000 { /* uSDHC4 */
+>> ? ? ? ? compatible = "fsl,imx6q-usdhc";
+>> ? ? ? ....
+>> ? ? ? ? pinmux = <&pinmux-sd4>;
+>> };
+>>
+>> iomuxc at 020e0000 {
+>> ? ? ? ? pinmux-sd4 : sd4 {
+>> ? ? ? ? ? ? ? ? func-name = "sd4";
+>> ? ? ? ? ? ? ? ? grp-name = "sd4grp";
+>> ? ? ? ? ? ? ? ? grp-pins = <170 171 180 181 182 183 184 185 186 187>;
+>> ? ? ? ? ? ? ? ? num-pins = <10>;
+>> ? ? ? ? ? ? ? ? grp-mux = <0 0 1 1 1 1 1 1 1 1>;
+>> ? ? ? ? ? ? ? ? num-mux = <10>;
+>> ? ? ? ? };
+>>
+>> It is a pure hw point of view to define node.
+>
+> That's the way we should go for. ?This is exactly the same thing that
+> clk and regulator DT support is doing. ?And right, in that way, we do
+> not need pinmux mapping for DT at all.
+>
+I tried this way and basically it works but has a few limitations due to
+via dt.
+I will send out patch in this thread for discussion.
 
-> Shawn: Should we temporary add following lines into headers? Any
-> better suggestions?
+>> And it may need to implement a of_pinmux_get.
+>
+> To make the pinmux api generic for both dt and non-dt users, the pinmux
+> client driver should still see/call pinmux_get, something like
+> of_pinmux_get should be sorted out behind pinmux_get.
+>
+>> But what about the pin maps without device associated?
+>>
+> Do we have such cases?
+>
+It's hog_on_boot function.
 
-Why can't we simply use HW_DIGCTL_CHIPID? This register is at 0x8001c310
-for both, MX23 and MX28.
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120105/ba497e9b/attachment.sig>
+Regards
+Dong Aisheng
