@@ -1,68 +1,95 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 05 Jan 2012 16:39:43 +0100
-Subject: [PATCH 01/11] mm: page_alloc: set_migratetype_isolate: drain PCP
- prior to isolating
-In-Reply-To: <1325162352-24709-2-git-send-email-m.szyprowski@samsung.com>
-References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
- <1325162352-24709-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <op.v7ma4hm33l0zgt@mpn-glaptop>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 05 Jan 2012 21:15:22 +0530
+Subject: [PATCH] ARM: Exynos: Use lcd power control driver for lcd panel
+Message-ID: <1325778322-27143-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Dec 2011 13:39:02 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> From: Michal Nazarewicz <mina86@mina86.com>
->
-> When set_migratetype_isolate() sets pageblock's migrate type, it does
-> not change each page_private data.  This makes sense, as the function
-> has no way of knowing what kind of information page_private stores.
->
-> Unfortunately, if a page is on PCP list, it's page_private indicates
-> its migrate type.  This means, that if a page on PCP list gets
-> isolated, a call to free_pcppages_bulk() will assume it has the old
-> migrate type rather than MIGRATE_ISOLATE.  This means, that a page
-> which should be isolated, will end up on a free list of it's old
-> migrate type.
->
-> Coincidentally, at the very end, set_migratetype_isolate() calls
-> drain_all_pages() which leads to calling free_pcppages_bulk(), which
-> does the wrong thing.
->
-> To avoid this situation, this commit moves the draining prior to
-> setting pageblock's migratetype and moving pages from old free list to
-> MIGRATETYPE_ISOLATE's free list.
->
-> Because of spin locks this is a non-trivial change however as both
-> set_migratetype_isolate() and free_pcppages_bulk() grab zone->lock.
-> To solve this problem, this commit renames free_pcppages_bulk() to
-> __free_pcppages_bulk() and changes it so that it no longer grabs
-> zone->lock instead requiring caller to hold it.  This commit later
-> adds a __zone_drain_all_pages() function which works just like
-> drain_all_pages() expects that it drains only pages from a single zone
-> and assumes that caller holds zone->lock.
+The Hydis hv070wsa lcd panel used with the Origen board uses a gpio
+for reset and the Vcc supply to the panel can be controlled using
+a voltage regulator. Switch to using the lcd power control driver
+for controlling the power to the lcd panel.
 
-As it turns out, with some more testing on SMP systems, this whole patch
-turned out to be incorrect.
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+The 'apply_uV' of buck7 regulator which controls the Vcc of the lcd panel
+is modified to be 0. The regulator need not start supplying power to the
+lcd panel at boot time. The lcd driver will turn on the power to the lcd
+panel when frame buffer driver has to output data to the lcd panel.
 
-We have been thinking about other approach and, if we were to use something
-else then the first patch from CMAv17[1], the best thing we could came up
-with was to unconditionally call drain_all_pages() at the beginning of
-set_migratetype_isolate() before the call to spin_lock_irqsave().  It has
-a possible race condition but a nightly stress test did have not shown any
-problems.
+ arch/arm/mach-exynos/mach-origen.c |   36 +++++++++++-------------------------
+ 1 files changed, 11 insertions(+), 25 deletions(-)
 
-Nonetheless, the cleanest, in my opinion, solution is to use the first patch
- from CMAv17 which can be found at [1].
-
-So, to sum up: if you intend to test CMAv18, instead of applying this first
-patch either use first patch from CMAv17[1] or put an unconditional call to
-drain_all_pages() at the beginning of set_migrate_isolate() function.
-
-Sorry for the troubles.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg148494.html
-
+diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+index 23fc5cb..522fad7 100644
+--- a/arch/arm/mach-exynos/mach-origen.c
++++ b/arch/arm/mach-exynos/mach-origen.c
+@@ -25,7 +25,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+-#include <video/platform_lcd.h>
++#include <video/lcd_pwrctrl.h>
+ 
+ #include <plat/regs-serial.h>
+ #include <plat/regs-fb-v4.h>
+@@ -127,7 +127,7 @@ static struct regulator_consumer_supply __initdata buck3_consumer[] = {
+ 	REGULATOR_SUPPLY("vdd_g3d", "mali_drm"), /* G3D */
+ };
+ static struct regulator_consumer_supply __initdata buck7_consumer[] = {
+-	REGULATOR_SUPPLY("vcc", "platform-lcd"), /* LCD */
++	REGULATOR_SUPPLY("vcc-lcd", "lcd-pwrctrl.0"), /* LCD */
+ };
+ 
+ static struct regulator_init_data __initdata max8997_ldo1_data = {
+@@ -382,9 +382,10 @@ static struct regulator_init_data __initdata max8997_buck7_data = {
+ 		.name		= "VDD_LCD_3.3V",
+ 		.min_uV		= 3300000,
+ 		.max_uV		= 3300000,
+-		.boot_on	= 1,
+-		.apply_uV	= 1,
+-		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.boot_on	= 0,
++		.apply_uV	= 0,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS |
++					REGULATOR_CHANGE_VOLTAGE,
+ 		.state_mem	= {
+ 			.disabled	= 1
+ 		},
+@@ -554,29 +555,14 @@ static struct platform_device origen_device_gpiokeys = {
+ 	},
+ };
+ 
+-static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
+-{
+-	int ret;
+-
+-	if (power)
+-		ret = gpio_request_one(EXYNOS4_GPE3(4),
+-					GPIOF_OUT_INIT_HIGH, "GPE3_4");
+-	else
+-		ret = gpio_request_one(EXYNOS4_GPE3(4),
+-					GPIOF_OUT_INIT_LOW, "GPE3_4");
+-
+-	gpio_free(EXYNOS4_GPE3(4));
+-
+-	if (ret)
+-		pr_err("failed to request gpio for LCD power: %d\n", ret);
+-}
+-
+-static struct plat_lcd_data origen_lcd_hv070wsa_data = {
+-	.set_power = lcd_hv070wsa_set_power,
++static struct lcd_pwrctrl_data origen_lcd_hv070wsa_data = {
++	.gpio	= EXYNOS4_GPE3(4),
++	.min_uV = 3300000,
++	.max_uV	= 3300000,
+ };
+ 
+ static struct platform_device origen_lcd_hv070wsa = {
+-	.name			= "platform-lcd",
++	.name			= "lcd-pwrctrl",
+ 	.dev.parent		= &s5p_device_fimd0.dev,
+ 	.dev.platform_data	= &origen_lcd_hv070wsa_data,
+ };
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+1.6.6.rc2
