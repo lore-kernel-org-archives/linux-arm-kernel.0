@@ -1,88 +1,188 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Thu, 05 Jan 2012 17:30:27 +0100
-Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
-In-Reply-To: <1325719752-818-1-git-send-email-olof@lixom.net>
-References: <1325719752-818-1-git-send-email-olof@lixom.net>
-Message-ID: <6121078.4q2inFFXlB@fb07-iapwap2>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 05 Jan 2012 10:42:27 -0600
+Subject: [PATCH v3] ARM: at91: pit add DT support
+In-Reply-To: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
+ <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4F05D2F3.40704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Mittwoch, 4. Januar 2012, 15:29:12 schrieb Olof Johansson:
-> Only one of the L2 erratas are needed on T30, but T20/25
-> needs a few more.
-
-can we have a word from someone from NVIDIA about which Tegra versions/revisions need 
-which erratum applied? 
-
-Currently the kernel has selections for the following errata (on ARM):
-
-	T2x		T30
-					ERRATA_430973			Stale prediction on replaced interworking branch
-					ERRATA_458693			Processor deadlock when a false hazard is created
-					ERRATA_460075			Data written to the L2 cache can be overwritten
-											with stale data
-	x				ERRATA_742230			DMB operation may be faulty
-					ERRATA_742231			Incorrect hazard handling in the SCU may lead to
-											data corruption
-					PL310_ERRATA_588369	Clean & Invalidate maintenance operations do not
-											invalidate clean lines
-					ERRATA_720789			TLBIASIDIS and TLBIMVAIS operations can broadcast
-											a faulty ASID
-					PL310_ERRATA_727915	Background Clean & Invalidate by Way operation
-											can cause data corruption
-					ERRATA_743622			Faulty hazard checking in the Store Buffer may
-											lead to data corruption
-					ERRATA_751472			Interrupted ICIALLUIS may prevent completion of
-											broadcasted operation
-	x				PL310_ERRATA_753970	cache sync operation may be faulty
-					ERRATA_754322			possible faulty MMU translations following an ASID
-											switch
-					ERRATA_754327			no automatic Store Buffer drain
-					ERRATA_764369			Data cache line maintenance operation by MVA may
-											not succeed
-	x		x		PL310_ERRATA_769419	no automatic Store Buffer drain
-
-With Olofs patch, the following errata are enabled by tegra_defconfig:
-
-742230(T2x), 753970(T2x), 769419(T2x + T30)
-
-I have the feeling that at least 764369 also needs to be enabled. From the 
-description: ... affecting Cortex-A9 MPCore with two or more processors (all                                                                         
-current revisions). I wonder if this includes multi *cores*.
-
-The TRM is not very detailed about this topic. Having this info will likely remove 
-some headache for non OEM custumers.
-
-Marc
-
-
+On 01/05/2012 11:25 AM, Nicolas Ferre wrote:
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Retreive registers address and IRQ from device tree entry. Fall back
+> to built-in values if an error occurs.
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
->  arch/arm/mach-tegra/Kconfig |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
+> v3: - use irq_of_parse_and_map() for handling irq numbers specified by DT.
+>       Correction proposed by Jamie Iles.
 > 
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> index 373652d..a2c76ee 100644
-> --- a/arch/arm/mach-tegra/Kconfig
-> +++ b/arch/arm/mach-tegra/Kconfig
-> @@ -10,6 +10,9 @@ config ARCH_TEGRA_2x_SOC
->  	select USB_ARCH_HAS_EHCI if USB_SUPPORT
->  	select USB_ULPI if USB_SUPPORT
->  	select USB_ULPI_VIEWPORT if USB_SUPPORT
-> +	select ARM_ERRATA_742230
-> +	select PL310_ERRATA_753970 if CACHE_PL310
-> +	select PL310_ERRATA_769419 if CACHE_L2X0
->  	help
->  	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
->  	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
-> @@ -23,6 +26,7 @@ config ARCH_TEGRA_3x_SOC
->  	select USB_ULPI if USB_SUPPORT
->  	select USB_ULPI_VIEWPORT if USB_SUPPORT
->  	select USE_OF
-> +	select PL310_ERRATA_769419 if CACHE_L2X0
->  	help
->  	  Support for NVIDIA Tegra T30 processor family, based on the
->  	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+> v2: - new specification of irq numbers in DT (due to modification of AIC code)
+>     - new error path in of_at91sam926x_pit_init()
+>     - fall back to built-in values if an error occurs
+>     - use of of_property_read_u32() to get irq property
+> 
+>  .../devicetree/bindings/arm/atmel-at91.txt         |    8 +++
+>  arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 ++
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++
+>  arch/arm/mach-at91/at91sam926x_time.c              |   53 +++++++++++++++++++-
+>  4 files changed, 70 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> new file mode 100644
+> index 0000000..380f711
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -0,0 +1,8 @@
+> +Atmel AT91 device tree bindings.
+> +================================
+> +
+> +PIT Timer required properties:
+> +- compatible: Should be "atmel,at91sam9260-pit"
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain interrupt for the PIT which is the IRQ line
+> +  shared across all System Controller members.
+> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+> index 0d21872..5c4be7e 100644
+> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+> @@ -57,6 +57,11 @@
+>  				reg = <0xfffff000 0x200>;
+>  			};
+>  
+> +			pit: timer at fffffd30 {
+> +				compatible = "atmel,at91sam9260-pit";
+> +				reg = <0xfffffd30 0xf>;
+> +				interrupts = <1 4>;
+> +			};
+>  
+>  			pioA: gpio at fffff400 {
+>  				compatible = "atmel,at91rm9200-gpio";
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index b977a79..0d21c8e 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -58,6 +58,12 @@
+>  				reg = <0xfffff000 0x200>;
+>  			};
+>  
+> +			pit: timer at fffffd30 {
+> +				compatible = "atmel,at91sam9260-pit";
+> +				reg = <0xfffffd30 0xf>;
+> +				interrupts = <1 4>;
+> +			};
+> +
+>  			dma: dma-controller at ffffec00 {
+>  				compatible = "atmel,at91sam9g45-dma";
+>  				reg = <0xffffec00 0x200>;
+> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+> index d89ead7..534a992 100644
+> --- a/arch/arm/mach-at91/at91sam926x_time.c
+> +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> @@ -14,6 +14,9 @@
+>  #include <linux/kernel.h>
+>  #include <linux/clk.h>
+>  #include <linux/clockchips.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  
+>  #include <asm/mach/time.h>
+>  
+> @@ -133,7 +136,8 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+>  static struct irqaction at91sam926x_pit_irq = {
+>  	.name		= "at91_tick",
+>  	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> -	.handler	= at91sam926x_pit_interrupt
+> +	.handler	= at91sam926x_pit_interrupt,
+> +	.irq		= AT91_ID_SYS,
+>  };
+>  
+>  static void at91sam926x_pit_reset(void)
+> @@ -149,6 +153,49 @@ static void at91sam926x_pit_reset(void)
+>  	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static struct of_device_id timer_ids[] = {
+> +	{ .compatible = "atmel,at91sam9260-pit" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int __init of_at91sam926x_pit_init(void)
+> +{
+> +	struct device_node	*np;
+> +	int			ret;
+> +
+> +	np = of_find_matching_node(NULL, timer_ids);
+> +	if (!np)
+> +		goto err;
+> +
+> +	pit_base_addr = of_iomap(np, 0);
+> +	if (!pit_base_addr)
+> +		goto node_err;
+> +
+> +	/* Get the interrupts property */
+> +	ret = irq_of_parse_and_map(np, 0);
+> +	if (ret <= 0)
+> +		goto ioremap_err;
+> +	at91sam926x_pit_irq.irq = ret;
+> +
+> +	of_node_put(np);
+> +
+> +	return 0;
+> +
+> +ioremap_err:
+> +	iounmap(pit_base_addr);
+> +node_err:
+> +	of_node_put(np);
+> +err:
+> +	return -EINVAL;
+> +}
+> +#else
+> +static int __init of_at91sam926x_pit_init(void)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif
+> +
+>  /*
+>   * Set up both clocksource and clockevent support.
+>   */
+> @@ -177,7 +224,7 @@ static void __init at91sam926x_pit_init(void)
+>  	clocksource_register_hz(&pit_clk, pit_rate);
+>  
+>  	/* Set up irq handler */
+> -	setup_irq(AT91_ID_SYS, &at91sam926x_pit_irq);
+> +	setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
+>  
+>  	/* Set up and register clockevents */
+>  	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
+> @@ -193,6 +240,8 @@ static void at91sam926x_pit_suspend(void)
+>  
+>  void __init at91sam926x_ioremap_pit(u32 addr)
+>  {
+> +	if (!of_at91sam926x_pit_init())
+> +		return;
+
+This seems backwards to me. I don't have the ioremap changes in my tree,
+but shouldn't the caller of at91sam926x_ioremap_pit be changed to
+something like this:
+
+	if (of_at91sam926x_pit_init() < 0)
+		at91sam926x_ioremap_pit(addr);
+
+Otherwise,
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+Rob
+
+>  	pit_base_addr = ioremap(addr, 16);
+>  
+>  	if (!pit_base_addr)
