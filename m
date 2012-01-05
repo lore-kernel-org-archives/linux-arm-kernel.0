@@ -1,64 +1,58 @@
 From: amit.kachhap@linaro.org (Amit Daniel Kachhap)
-Date: Thu,  5 Jan 2012 09:55:24 +0530
-Subject: [PATCH V5 4/5] ARM: exynos: remove useless code to save/restore L2
+Date: Thu,  5 Jan 2012 09:55:25 +0530
+Subject: [PATCH V5 5/5] ARM: exynos: Enable l2 configuration through device
+ tree
 In-Reply-To: <1325737525-12869-1-git-send-email-amit.kachhap@linaro.org>
 References: <1325737525-12869-1-git-send-email-amit.kachhap@linaro.org>
-Message-ID: <1325737525-12869-5-git-send-email-amit.kachhap@linaro.org>
+Message-ID: <1325737525-12869-6-git-send-email-amit.kachhap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the merge of CPU PM notifiers and L2 resume code, this patch
-removes useless code to save and restore L2 registers.
+This patch enables calling generic l2 setup functions if device tree is used.
 
-This is now automatically covered by suspend calls which integrated
-CPU PM notifiers and new sleep code that allows to resume L2 before MMU
-is turned on.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
 ---
- arch/arm/mach-exynos/pm.c |   15 ---------------
- 1 files changed, 0 insertions(+), 15 deletions(-)
+ arch/arm/mach-exynos/common.c |   14 ++++++++++++--
+ 1 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index a4f61a4..2dd55a1 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -155,13 +155,6 @@ static struct sleep_save exynos4_core_save[] = {
- 	SAVE_ITEM(S5P_SROM_BC3),
- };
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index f8bb808..e91b92d 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -47,6 +47,8 @@
+ #include <plat/regs-serial.h>
  
--static struct sleep_save exynos4_l2cc_save[] = {
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL),
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_DATA_LATENCY_CTRL),
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_PREFETCH_CTRL),
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_POWER_CTRL),
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_AUX_CTRL),
--};
+ #include "common.h"
++#define L2_AUX_VAL 0x7C470001
++#define L2_AUX_MASK 0xC200ffff
  
- /* For Cortex-A9 Diagnostic and Power control register */
- static unsigned int save_arm_register[2];
-@@ -182,7 +175,6 @@ static void exynos4_pm_prepare(void)
- 	u32 tmp;
+ static const char name_exynos4210[] = "EXYNOS4210";
+ static const char name_exynos4212[] = "EXYNOS4212";
+@@ -453,6 +455,15 @@ core_initcall(exynos4_core_init);
+ #ifdef CONFIG_CACHE_L2X0
+ static int __init exynos4_l2x0_cache_init(void)
+ {
++#ifdef CONFIG_OF
++	int ret;
++	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
++	if (!ret) {
++		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
++		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
++		return 0;
++	}
++#endif
+ 	if (!(__raw_readl(S5P_VA_L2CC + L2X0_CTRL) & 0x1)) {
+ 		l2x0_saved_regs.phy_base = EXYNOS4_PA_L2CC;
+ 		/* TAG, Data Latency Control: 2 cycles */
+@@ -486,8 +497,7 @@ static int __init exynos4_l2x0_cache_init(void)
+ 		clean_dcache_area(&l2x0_saved_regs, sizeof(struct l2x0_regs));
+ 	}
  
- 	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
--	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
- 	s3c_pm_do_save(exynos4_epll_save, ARRAY_SIZE(exynos4_epll_save));
- 	s3c_pm_do_save(exynos4_vpll_save, ARRAY_SIZE(exynos4_vpll_save));
- 
-@@ -386,13 +378,6 @@ static void exynos4_pm_resume(void)
- 
- 	scu_enable(S5P_VA_SCU);
- 
--#ifdef CONFIG_CACHE_L2X0
--	s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
--	outer_inv_all();
--	/* enable L2X0*/
--	writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
--#endif
+-	l2x0_init(S5P_VA_L2CC, 0x7C470001, 0xC200ffff);
 -
- early_wakeup:
- 	return;
++	l2x0_init(S5P_VA_L2CC, L2_AUX_VAL, L2_AUX_MASK);
+ 	return 0;
  }
+ 
 -- 
 1.7.1
