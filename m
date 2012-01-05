@@ -1,45 +1,45 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Thu, 5 Jan 2012 13:49:05 +0100
-Subject: [GIT PULL] Remove Telechips ARM subarch
-In-Reply-To: <20120105104926.GN11810@n2100.arm.linux.org.uk>
-References: <20111222211948.GA1201@local> <20111222212240.GB1201@local>
- <20120103170824.GA2914@n2100.arm.linux.org.uk>
- <20120104030052.GC2518@local>
- <20120105104926.GN11810@n2100.arm.linux.org.uk>
-Message-ID: <20120105124905.GA6616@local>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jan 2012 12:53:26 +0000
+Subject: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU
+ driver
+In-Reply-To: <20120105091718.3fb378b2a1d390f9dd63c396@nvidia.com>
+References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
+ <20120105091718.3fb378b2a1d390f9dd63c396@nvidia.com>
+Message-ID: <20120105125326.GT11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 10:49:26AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 04, 2012 at 04:00:53AM +0100, Hans J. Koch wrote:
-> > On Tue, Jan 03, 2012 at 05:08:24PM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Dec 22, 2011 at 10:22:40PM +0100, Hans J. Koch wrote:
-> > > > 
-> > > > The AMR subarchitecture for Telechips SoCs is completely removed,
-> > > 
-> > > Apart from this spelling mistake, the rest look fine.  Do you want to
-> > > send me a pull request with that fixed?
-> > 
-> > OK, typo fixed.
-> > 
-> > The following changes since commit 5f0a6e2d503896062f641639dacfe5055c2f593b:
-> > 
-> >   Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
-> > 
-> > are available in the git repository at:
-> >   git://hansjkoch.de/git/linux-tcc for-russell
-> 
-> Well, it looks like an include or two was missed in arch/arm/Kconfig:
-> 
-> scripts/kconfig/conf --silentoldconfig Kconfig
-> arch/arm/Kconfig:1066: can't open file "arch/arm/plat-tcc/Kconfig"
+On Thu, Jan 05, 2012 at 09:17:18AM +0200, Hiroshi Doyu wrote:
+> Just for DMA mapping test from MPU side, the following one is used.
 
-Grrmpf, yes. Sorry.
+This patch is buggy.
 
-> 
-> Could you quickly fix that and I'll re-pull it?
+> +static void dmaapi_test_map_page(struct device *dev)
+> +{
+> +	struct page *page;
+> +	dma_addr_t dma_addr;
+> +	void *cpu_addr;
+> +
+> +	page = alloc_page(GFP_KERNEL);
+> +	BUG_ON(!page);
+> +
+> +	dma_addr = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_TO_DEVICE);
+> +	BUG_ON(!dma_addr);
+> +
+> +	cpu_addr = kmap(page);
+> +	BUG_ON(!cpu_addr);
+> +	memset(cpu_addr, 0xa5, PAGE_SIZE);
+> +	kunmap(cpu_addr);
 
-OK, fixed. Please pull again.
+The DMA API works like this:
 
-Thanks,
-Hans
+- The CPU owns the page or buffer and can access it.
+- You map the page or buffer.
+- The device owns the page or buffer; the CPU must explicitly access it.
+- You unmap the page or buffer.
+- The CPU again owns the page/buffer and can access it.
+
+Please respect the DMA API rules.
+
+So.  Once dma_map_page() has returned, you must not kmap() or otherwise
+access the data contained in that page until after you have unmapped it.
