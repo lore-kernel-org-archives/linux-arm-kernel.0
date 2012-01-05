@@ -1,59 +1,54 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 5 Jan 2012 17:19:05 +0800
-Subject: [PATCH v3 2/2] dma/imx-sdma: use writel to write register when
- enable a channel
-In-Reply-To: <20120105092316.GB1729@S2101-09.ap.freescale.net>
-References: <1325750362-22598-1-git-send-email-richard.zhao@linaro.org>
- <1325750362-22598-3-git-send-email-richard.zhao@linaro.org>
- <20120105092316.GB1729@S2101-09.ap.freescale.net>
-Message-ID: <20120105091904.GO2414@b20223-02.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Jan 2012 17:42:38 +0800
+Subject: [PATCH 1/2] arm/mxc: make imx_dma_is_general_purpose more
+ generic for sdma
+In-Reply-To: <1325733074-10749-1-git-send-email-richard.zhao@linaro.org>
+References: <1325733074-10749-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120105094236.GC1729@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+The arm-soc maintainers are requiring patch subject be like
 
-On Thu, Jan 05, 2012 at 05:23:17PM +0800, Shawn Guo wrote:
-> On Thu, Jan 05, 2012 at 03:59:22PM +0800, Richard Zhao wrote:
-> > dma_alloc_coherent memory may be bufferable when set
-> > CONFIG_ARM_DMA_MEM_BUFFERABLE. We need to add nececcary
-> > memory barrier. writel implicitly call wmb in such case.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  drivers/dma/imx-sdma.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> > index c2bc4f1..e987468 100644
-> > --- a/drivers/dma/imx-sdma.c
-> > +++ b/drivers/dma/imx-sdma.c
-> > @@ -396,7 +396,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
-> >  
-> >  static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
-> >  {
-> > -	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
-> > +	writel(1 << channel, sdma->regs + SDMA_H_START);
-> >  }
-> >  
+ARM: <platform>: ...
+
+In this case, it's "ARM: mxc: ..."
+
+On Thu, Jan 05, 2012 at 11:11:13AM +0800, Richard Zhao wrote:
+> sdma device names var when use device tree.
+
+I think this needs some level rewording.  For given SoC, the name is
+fixed, and the name may vary from SoC to SoC, whether or not it's
+device tree case.
+
+Other than that, it looks good to me.
+
+Regards,
+Shawn
+
+> So we just check
+> whether it includes "sdma" substring.
 > 
-> As educated by Arnd, generally it's safer to use pair of readl/writel
-> than __raw_readl/__raw_writel in driver.  I'm wondering if it's a good
-> opportunity for us to change the pair all over this driver.
-Russel mentioned that too. But I cannot understand.
-If CONFIG_ARM_DMA_MEM_BUFFERABLE, readl/writel always call rmb/wmb. Do
-we realy need it? It might affect performance.
-
-Du to the concern, I didn't convert all the readl/writel.
-
-Thanks
-Richard
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/plat-mxc/include/mach/dma.h |    3 +--
+>  1 files changed, 1 insertions(+), 2 deletions(-)
 > 
+> diff --git a/arch/arm/plat-mxc/include/mach/dma.h b/arch/arm/plat-mxc/include/mach/dma.h
+> index 233d0a5..1b90803 100644
+> --- a/arch/arm/plat-mxc/include/mach/dma.h
+> +++ b/arch/arm/plat-mxc/include/mach/dma.h
+> @@ -60,8 +60,7 @@ static inline int imx_dma_is_ipu(struct dma_chan *chan)
+>  
+>  static inline int imx_dma_is_general_purpose(struct dma_chan *chan)
+>  {
+> -	return !strcmp(dev_name(chan->device->dev), "imx31-sdma") ||
+> -		!strcmp(dev_name(chan->device->dev), "imx35-sdma") ||
+> +	return strstr(dev_name(chan->device->dev), "sdma") ||
+>  		!strcmp(dev_name(chan->device->dev), "imx-dma");
+>  }
+>  
 > -- 
-> Regards,
-> Shawn
+> 1.7.5.4
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
