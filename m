@@ -1,35 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jan 2012 11:01:11 +0000
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 05 Jan 2012 11:08:37 +0000
 Subject: [PATCH v2 00/15] Make SMP timers standalone
-In-Reply-To: <CACRpkdYjQPoY60XdhTwgLYbTrQMhC=Wxk5Y=hP2Vr0DngUJbxg@mail.gmail.com>
+In-Reply-To: <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
 References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
- <20111222193216.GO2577@n2100.arm.linux.org.uk> <4F048EC4.40900@arm.com>
- <20120105011704.GA8870@codeaurora.org>
- <CACRpkdYjQPoY60XdhTwgLYbTrQMhC=Wxk5Y=hP2Vr0DngUJbxg@mail.gmail.com>
-Message-ID: <20120105110111.GO11810@n2100.arm.linux.org.uk>
+ <20111222193216.GO2577@n2100.arm.linux.org.uk>	<4F048EC4.40900@arm.com>
+ <20120104214748.GH11810@n2100.arm.linux.org.uk>
+ <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
+Message-ID: <4F0584B5.60908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 11:26:12AM +0100, Linus Walleij wrote:
-> I think this looks like one big misunderstanding. I understood it as
-> the SMP TWD block is synthesized also on UP silicon, i.e. same
-> hardware, and so it will need to use the driver from
-> arch/arm/kernel/smp_twd.c, however there is nothing local
-> about that apart from being in close locality of the CPU.
+On 05/01/12 00:00, Linus Walleij wrote:
+> However IIRC this situation does not occur in the ARM reference
+> designs, notably Versatile Express since it simply isn't designed to
+> be power-agressive in this way and does not gate the clock or
+> power down the CPU power domain, it's always on, always
+> clocked (albeit with shifting frequency).
+> 
+> The Vexpress seem to register a clockevent for its SP804
+> timer, and even though I've never used this machine I guess
+> it would tick a few ticks during boot and then as TWD is
+> registered it switches to that (due to higher .rate) and
+> no IRQ is ever fired on the SP804 again.
+> 
+> Does this correspond to what is seen in /proc/interrupts
+> on the Vexpress?
 
-Yes indeed.  The TWD code is architected to plug into the local timer
-code via a set of well defined hooks.
+Yes. You get about 8 ticks worth of SP804, and then switch to TWD for good.
 
-It's entirely possible to call the TWD setup function with a non-local
-timer clock event structure if you have a TWD which is a global timer.
-The percpu stuff for storage will just work on UP systems, so that's
-not a concern.  What could be is the percpu IRQ stuff, which presumably
-wouldn't be available on non-SMP systems.
+> And does the system really work if you simply delete the
+> code registering the SP804 clockevent from
+> mach-vexpress/ct-ca9x4.c?
 
-Apart from that, I think the current architecture is right - it separates
-the hardware timer code from the local-timer specifics, and allows the
-hardware timer driver to be re-used if needed.
+No, because you need the global timer to calibrate the TWD on this
+platform. But on the VE with a Cortex-A15 tile, the system works
+perfectly with the architected timers being the only one in the system
+(the SP804 is left unconfigured).
 
-Trying to make local timers as a general rule work as global timers is,
-I think, a big mistake.  I've no problem with making a local timer hardware
-_implementation_ work as a global timer though.
+But now that your cpufreq-aware patches are in -next, I can boot a Panda
+without a single tick of the global timer (OMAP4 provides the "smp-twd"
+clock).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
