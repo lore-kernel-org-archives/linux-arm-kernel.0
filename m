@@ -1,148 +1,79 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 5 Jan 2012 19:46:05 +0100
-Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the
- snapshot image size is anticipative
-In-Reply-To: <CAGsJ_4ziRj1oEhmMYjc6yJvS2FHYn+uRWmSaggnJQQjqi=B6gw@mail.gmail.com>
-References: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
- <CAGsJ_4ziRj1oEhmMYjc6yJvS2FHYn+uRWmSaggnJQQjqi=B6gw@mail.gmail.com>
-Message-ID: <20120105184604.GA11065@atrey.karlin.mff.cuni.cz>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 05 Jan 2012 20:20:33 +0100
+Subject: [PATCH 01/11] mm: page_alloc: set_migratetype_isolate: drain PCP
+ prior to isolating
+In-Reply-To: <op.v7ma4hm33l0zgt@mpn-glaptop>
+References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
+ <1325162352-24709-2-git-send-email-m.szyprowski@samsung.com>
+ <op.v7ma4hm33l0zgt@mpn-glaptop>
+Message-ID: <000601cccbdf$18a87320$49f95960$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello,
 
-Is the check even useful these days? Should we remove it altogether?
+On Thursday, January 05, 2012 4:40 PM Micha? Nazarewicz wrote:
 
-       	     	  	       	     	       Pavel
-
-
-> Pavel ,Rafael, any feedback?
-> -barry
+> On Thu, 29 Dec 2011 13:39:02 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > From: Michal Nazarewicz <mina86@mina86.com>
+> >
+> > When set_migratetype_isolate() sets pageblock's migrate type, it does
+> > not change each page_private data.  This makes sense, as the function
+> > has no way of knowing what kind of information page_private stores.
+> >
+> > Unfortunately, if a page is on PCP list, it's page_private indicates
+> > its migrate type.  This means, that if a page on PCP list gets
+> > isolated, a call to free_pcppages_bulk() will assume it has the old
+> > migrate type rather than MIGRATE_ISOLATE.  This means, that a page
+> > which should be isolated, will end up on a free list of it's old
+> > migrate type.
+> >
+> > Coincidentally, at the very end, set_migratetype_isolate() calls
+> > drain_all_pages() which leads to calling free_pcppages_bulk(), which
+> > does the wrong thing.
+> >
+> > To avoid this situation, this commit moves the draining prior to
+> > setting pageblock's migratetype and moving pages from old free list to
+> > MIGRATETYPE_ISOLATE's free list.
+> >
+> > Because of spin locks this is a non-trivial change however as both
+> > set_migratetype_isolate() and free_pcppages_bulk() grab zone->lock.
+> > To solve this problem, this commit renames free_pcppages_bulk() to
+> > __free_pcppages_bulk() and changes it so that it no longer grabs
+> > zone->lock instead requiring caller to hold it.  This commit later
+> > adds a __zone_drain_all_pages() function which works just like
+> > drain_all_pages() expects that it drains only pages from a single zone
+> > and assumes that caller holds zone->lock.
 > 
-> 2011/11/25 Barry Song <Barry.Song@csr.com>:
-> > From: Barry Song <baohua.song@csr.com>
-> >
-> > Current swsusp requires swap partitions even larger than real saved pages
-> > based on the worst compression ratio:
-> > but for an embedded system, which has limited storage space, then it might
-> > can't give the large partition to save snapshot.
-> > In the another way, some embedded systems can definitely know the most size
-> > needed for snapshot since they run some specific application lists.
-> > So this patch provides the possibility for users to tell kernel even
-> > the system has a little snapshot partition, but it is still enough.
-> > For example, if the system need to save 120MB memory, origin swsusp will require
-> > a 130MB partition to save snapshot. but if users know 30MB is enough for them(
-> > compressed image will be less than 30MB), they just make a 30MB partition by
-> > echo 0 > /sys/power/check_swap_size
-> >
-> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> > Cc: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
-> > ---
-> > ?-v2:drop swap_enough bootargs and use /sys/power/check_swap_size node
-> >
-> > ?Documentation/power/interface.txt | ? ?5 +++++
-> > ?kernel/power/hibernate.c ? ? ? ? ?| ? 22 ++++++++++++++++++++++
-> > ?kernel/power/power.h ? ? ? ? ? ? ?| ? ?2 ++
-> > ?kernel/power/swap.c ? ? ? ? ? ? ? | ? ?9 +++++++++
-> > ?4 files changed, 38 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/Documentation/power/interface.txt b/Documentation/power/interface.txt
-> > index c537834..5e205f0 100644
-> > --- a/Documentation/power/interface.txt
-> > +++ b/Documentation/power/interface.txt
-> > @@ -47,6 +47,11 @@ Writing to this file will accept one of
-> > ? ? ? ?'testproc'
-> > ? ? ? ?'test'
-> >
-> > +/sys/power/check_swap_size controls whether we can skip checking the swap
-> > +partition size by worst compression ratio. If users know the swap partition
-> > +is enough for compressed snapshot, write 0 to /sys/power/check_swap_size.
-> > +It is useful for an embedded system with known running softwares.
-> > +
-> > ?/sys/power/image_size controls the size of the image created by
-> > ?the suspend-to-disk mechanism. ?It can be written a string
-> > ?representing a non-negative integer that will be used as an upper
-> > diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-> > index 1c53f7f..5552473 100644
-> > --- a/kernel/power/hibernate.c
-> > +++ b/kernel/power/hibernate.c
-> > @@ -1024,11 +1024,33 @@ static ssize_t reserved_size_store(struct kobject *kobj,
-> >
-> > ?power_attr(reserved_size);
-> >
-> > +static ssize_t check_swap_size_show(struct kobject *kobj, struct kobj_attribute *attr,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?char *buf)
-> > +{
-> > + ? ? ? return sprintf(buf, "%d\n", check_swap_size);
-> > +}
-> > +
-> > +static ssize_t check_swap_size_store(struct kobject *kobj, struct kobj_attribute *attr,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const char *buf, size_t n)
-> > +{
-> > + ? ? ? int check_size;
-> > +
-> > + ? ? ? if (sscanf(buf, "%d", &check_size) == 1) {
-> > + ? ? ? ? ? ? ? check_swap_size = check_size;
-> > + ? ? ? ? ? ? ? return n;
-> > + ? ? ? }
-> > +
-> > + ? ? ? return -EINVAL;
-> > +}
-> > +
-> > +power_attr(check_swap_size);
-> > +
-> > ?static struct attribute * g[] = {
-> > ? ? ? ?&disk_attr.attr,
-> > ? ? ? ?&resume_attr.attr,
-> > ? ? ? ?&image_size_attr.attr,
-> > ? ? ? ?&reserved_size_attr.attr,
-> > + ? ? ? &check_swap_size_attr.attr,
-> > ? ? ? ?NULL,
-> > ?};
-> >
-> > diff --git a/kernel/power/power.h b/kernel/power/power.h
-> > index 23a2db1..4f0fa78 100644
-> > --- a/kernel/power/power.h
-> > +++ b/kernel/power/power.h
-> > @@ -74,6 +74,8 @@ static struct kobj_attribute _name##_attr = { \
-> >
-> > ?/* Preferred image size in bytes (default 500 MB) */
-> > ?extern unsigned long image_size;
-> > +/* If 0, skip checking whether the swap size is enough for compressed snapshot */
-> > +extern int check_swap_size;
-> > ?/* Size of memory reserved for drivers (default SPARE_PAGES x PAGE_SIZE) */
-> > ?extern unsigned long reserved_size;
-> > ?extern int in_suspend;
-> > diff --git a/kernel/power/swap.c b/kernel/power/swap.c
-> > index 11a594c..db90195 100644
-> > --- a/kernel/power/swap.c
-> > +++ b/kernel/power/swap.c
-> > @@ -37,6 +37,12 @@
-> > ?#define HIBERNATE_SIG ?"S1SUSPEND"
-> >
-> > ?/*
-> > + * if users know swap partitions are enough for compressed snapshots,
-> > + * echo 0 > /sys/power/check_swap_size
-> > + */
-> > +int check_swap_size = 1;
-> > +
-> > +/*
-> > ?* ? ? The swap map is a data structure used for keeping track of each page
-> > ?* ? ? written to a swap partition. ?It consists of many swap_map_page
-> > ?* ? ? structures that contain each an array of MAP_PAGE_ENTRIES swap entries.
-> > @@ -772,6 +778,9 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
-> > ? ? ? ?unsigned int free_swap = count_swap_pages(root_swap, 1);
-> > ? ? ? ?unsigned int required;
-> >
-> > + ? ? ? if (!check_swap_size)
-> > + ? ? ? ? ? ? ? return 1;
-> > +
-> > ? ? ? ?pr_debug("PM: Free swap pages: %u\n", free_swap);
-> >
-> > ? ? ? ?required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
-> > --
-> > 1.7.1
+> As it turns out, with some more testing on SMP systems, this whole patch
+> turned out to be incorrect.
+> 
+> We have been thinking about other approach and, if we were to use something
+> else then the first patch from CMAv17[1], the best thing we could came up
+> with was to unconditionally call drain_all_pages() at the beginning of
+> set_migratetype_isolate() before the call to spin_lock_irqsave().  It has
+> a possible race condition but a nightly stress test did have not shown any
+> problems.
+> 
+> Nonetheless, the cleanest, in my opinion, solution is to use the first patch
+>  from CMAv17 which can be found at [1].
+> 
+> So, to sum up: if you intend to test CMAv18, instead of applying this first
+> patch either use first patch from CMAv17[1] or put an unconditional call to
+> drain_all_pages() at the beginning of set_migrate_isolate() function.
+> 
+> Sorry for the troubles.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg148494.html
 
+I've updated our public git repository to include this workaround. You can
+pull the patches from the following addresses:
+
+git://git.infradead.org/users/kmpark/linux-samsung 3.2-rc7-cma-v18
+
+http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/3.2-rc7-cma-v18
+
+Best regards
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Marek Szyprowski
+Samsung Poland R&D Center
