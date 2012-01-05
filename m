@@ -1,37 +1,119 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 4 Jan 2012 17:17:04 -0800
-Subject: [PATCH v2 00/15] Make SMP timers standalone
-In-Reply-To: <4F048EC4.40900@arm.com>
-References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
- <20111222193216.GO2577@n2100.arm.linux.org.uk>
- <4F048EC4.40900@arm.com>
-Message-ID: <20120105011704.GA8870@codeaurora.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 5 Jan 2012 09:23:18 +0800
+Subject: [PATCH v4 3/6] clk: introduce the common clock framework
+In-Reply-To: <CAJOA=zPw7UuhE4R3SsBeyzQ2_iN29Zv-ExaUTTFCah+GoFSfNQ@mail.gmail.com>
+References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
+ <1323834838-2206-4-git-send-email-mturquette@linaro.org>
+ <alpine.LFD.2.02.1112141007550.3020@ionos>
+ <CAJOA=zO=gM2r4pCVo+orLqE9Q1SSw4h5nXsAHo-e_SHZAfvKDA@mail.gmail.com>
+ <20120104021541.GI2414@b20223-02.ap.freescale.net>
+ <4F0462FF.1000308@gmail.com>
+ <CAJOA=zPw7UuhE4R3SsBeyzQ2_iN29Zv-ExaUTTFCah+GoFSfNQ@mail.gmail.com>
+Message-ID: <20120105012317.GM2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 05:39:16PM +0000, Marc Zyngier wrote:
-> On 22/12/11 19:32, Russell King - ARM Linux wrote:
+On Wed, Jan 04, 2012 at 05:01:43PM -0800, Turquette, Mike wrote:
+> On Wed, Jan 4, 2012 at 6:32 AM, Rob Herring <robherring2@gmail.com> wrote:
+> > On 01/03/2012 08:15 PM, Richard Zhao wrote:
+> >> On Fri, Dec 16, 2011 at 04:45:48PM -0800, Turquette, Mike wrote:
+> >>> On Wed, Dec 14, 2011 at 5:18 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> >>>> On Tue, 13 Dec 2011, Mike Turquette wrote:
+> >
+> > snip
+> >
+> >>>>> +/**
+> >>>>> + * clk_init - initialize the data structures in a struct clk
+> >>>>> + * @dev: device initializing this clk, placeholder for now
+> >>>>> + * @clk: clk being initialized
+> >>>>> + *
+> >>>>> + * Initializes the lists in struct clk, queries the hardware for the
+> >>>>> + * parent and rate and sets them both. ?Adds the clk to the sysfs tree
+> >>>>> + * topology.
+> >>>>> + *
+> >>>>> + * Caller must populate clk->name and clk->flags before calling
+> >>>>
+> >>>> I'm not too happy about this construct. That leaves struct clk and its
+> >>>> members exposed to the world instead of making it a real opaque
+> >>>> cookie. I know from my own painful experience, that this will lead to
+> >>>> random fiddling in that data structure in drivers and arch code just
+> >>>> because the core code has a shortcoming.
+> >>>>
+> >>>> Why can't we make struct clk a real cookie and confine the data
+> >>>> structure to the core code ?
+> >>>>
+> >>>> That would change the init call to something like:
+> >>>>
+> >>>> struct clk *clk_init(struct device *dev, const struct clk_hw *hw,
+> >>>> ? ? ? ? ? ? ? ? ? ? struct clk *parent)
+> >>>>
+> >>>> And have:
+> >>>> struct clk_hw {
+> >>>> ? ? ? struct clk_hw_ops *ops;
+> >>>> ? ? ? const char ? ? ? ?*name;
+> >>>> ? ? ? unsigned long ? ? flags;
+> >>>> };
+> >>>>
+> >>>> Implementers can do:
+> >>>> struct my_clk_hw {
+> >>>> ? ? ? struct clk_hw ? ?hw;
+> >>>> ? ? ? mydata;
+> >>>> };
+> >>>>
+> >>>> And then change the clk ops callbacks to take struct clk_hw * as an
+> >>>> argument.
+> >> We have to define static clocks before we adopt DT binding.
+> >> If clk is opaque and allocate memory in clk core, it'll make hard
+> >> to define static clocks. And register/init will pass a long parameter
+> >> list.
+> >
+> > DT is not a prerequisite for having dynamically created clocks. You can
+> > make clock init dynamic without DT.
+I can not find clock info at runtime without DT. If I use static info, I
+find it was hard/strange to define and register it, using Mike's early patches.
 > 
-> Hi Russell,
+> Agreed.
 > 
-> > On Thu, Dec 22, 2011 at 05:27:30PM +0000, Marc Zyngier wrote:
-> >> The proposal is to convert local timer drivers to be "standalone" (not
-> >> relying on the local timer infrastructure) and to use a CPU notifier
-> >> to have the timer brought up or down on non-boot CPUs.
-> > 
-> > You do realise that it's pointless having local timers on non-SMP hardware.
-> > On such hardware, you have a single timer instead.
+> > What data goes in struct clk vs. struct clk_hw could change over time.
+> > So perhaps we can start with some data in clk_hw and plan to move it to
+> > struct clk later. Even if almost everything ends up in clk_hw initially,
+> > at least the structure is in place to have common, core-only data
+> > separate from platform data.
 > 
-> I do. But on some non-SMP platforms, the local timer and the global
-> timer can actually be the same (MSM is one example of this, and the UP
-> version of the Cortex A15 is another).
-
-On SMP MSM, we use the CPU0 local timer as the global timer.  They are
-the same on non-SMP as well, I guess, but as Russell says, I'm not
-sure what the concept of a local timer would mean on non-SMP.
-
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> What is the point of this?
+> 
+> The original clk_hw was defined simply as:
+> 
+> struct clk_hw {
+>         struct clk *clk;
+> };
+> 
+> It's only purpose in life was as a handle for navigation between the
+> opaque struct clk and the hardware-specific struct my_clk_hw.  struct
+> clk_hw is defined in clk.h and everyone can see it.  If we're suddenly
+> OK putting clk data in this structure then why bother with an opaque
+> struct clk at all?
+I think Rob meant one time a step to make it opaque. But it'll make
+clk core always changing, easier mess, and let clk driver confused.
+> 
+> > What is the actual data you need to be static and accessible to the
+> > platform code? A ptr to parent clk is the main thing I've seen for
+> > static initialization. So make the parent ptr be struct clk_hw* and
+> > allow the platforms to access.
+> 
+> To answer your question on what data we're trying to expose: platform
+> code commonly needs the parent pointer and the clk rate (and by
+> extension, the rate of the parent).  For debug/error prints it is also
+> nice to have the clk name.  Generic clk flags are also conceivably
+> something that platform code might want.
+> 
+> I'd like to spin the question around: if we're OK exposing some stuff
+> (in your example above, the parent pointer), then what clk data are
+> you trying to hide?
+> 
+> Regards,
+> Mike
+> 
+> >
+> > Rob
+> 
