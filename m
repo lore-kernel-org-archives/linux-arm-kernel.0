@@ -1,79 +1,40 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 05 Jan 2012 20:20:33 +0100
-Subject: [PATCH 01/11] mm: page_alloc: set_migratetype_isolate: drain PCP
- prior to isolating
-In-Reply-To: <op.v7ma4hm33l0zgt@mpn-glaptop>
-References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
- <1325162352-24709-2-git-send-email-m.szyprowski@samsung.com>
- <op.v7ma4hm33l0zgt@mpn-glaptop>
-Message-ID: <000601cccbdf$18a87320$49f95960$%szyprowski@samsung.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Thu, 5 Jan 2012 13:24:25 -0600
+Subject: [PATCH v4 1/4] OMAP3: hwmod data: add mmu data for iva and isp
+In-Reply-To: <201112252208.20148.laurent.pinchart@ideasonboard.com>
+References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
+ <CAMP44s2H7v6dRPXO6eBBNrYAnym_ZLdmKcAQPmYyCC6Wo5qOmw@mail.gmail.com>
+ <CAB-zwWhNNW1GEYr019xecuZTYhR55HpNGrhGjJdE1CEAfFSriQ@mail.gmail.com>
+ <201112252208.20148.laurent.pinchart@ideasonboard.com>
+Message-ID: <CAB-zwWgZ5QBFBBRQNYrpbcVo4QaZ8MYLVCMDsvAe7scHQSBBKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Laurent
 
-On Thursday, January 05, 2012 4:40 PM Micha? Nazarewicz wrote:
+On Sun, Dec 25, 2011 at 3:08 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>> > I'm not sure how this clock stuff works, but I'm guessing the device
+>> > is supposed to go to sleep at some points in time, and with your patch
+>> > "OMAP3/4: iommu: adapt to runtime pm" it won't, as long as the module
+>> > is loaded, unless I'm missing something.
+>>
+>> The device should be able to be put to sleep at anytime when it is NOT
+>> being used. AFAIK there is no mechanism for the main processor (the
+>> one running the kernel) to know when the other iommus are not being
+>> used, given that they are in independent processors/subsystems, at
+>> least for the ones in the DSP or M3 processors. Once the user releases
+>> its iommu resource it means it is no longer using it, at that point
+>> the device can be put to sleep.
+>
+> How should the OMAP3 ISP driver proceed to make sure that its IOMMU is clocked
+> off when it doesn't need it ?
 
-> On Thu, 29 Dec 2011 13:39:02 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > From: Michal Nazarewicz <mina86@mina86.com>
-> >
-> > When set_migratetype_isolate() sets pageblock's migrate type, it does
-> > not change each page_private data.  This makes sense, as the function
-> > has no way of knowing what kind of information page_private stores.
-> >
-> > Unfortunately, if a page is on PCP list, it's page_private indicates
-> > its migrate type.  This means, that if a page on PCP list gets
-> > isolated, a call to free_pcppages_bulk() will assume it has the old
-> > migrate type rather than MIGRATE_ISOLATE.  This means, that a page
-> > which should be isolated, will end up on a free list of it's old
-> > migrate type.
-> >
-> > Coincidentally, at the very end, set_migratetype_isolate() calls
-> > drain_all_pages() which leads to calling free_pcppages_bulk(), which
-> > does the wrong thing.
-> >
-> > To avoid this situation, this commit moves the draining prior to
-> > setting pageblock's migratetype and moving pages from old free list to
-> > MIGRATETYPE_ISOLATE's free list.
-> >
-> > Because of spin locks this is a non-trivial change however as both
-> > set_migratetype_isolate() and free_pcppages_bulk() grab zone->lock.
-> > To solve this problem, this commit renames free_pcppages_bulk() to
-> > __free_pcppages_bulk() and changes it so that it no longer grabs
-> > zone->lock instead requiring caller to hold it.  This commit later
-> > adds a __zone_drain_all_pages() function which works just like
-> > drain_all_pages() expects that it drains only pages from a single zone
-> > and assumes that caller holds zone->lock.
-> 
-> As it turns out, with some more testing on SMP systems, this whole patch
-> turned out to be incorrect.
-> 
-> We have been thinking about other approach and, if we were to use something
-> else then the first patch from CMAv17[1], the best thing we could came up
-> with was to unconditionally call drain_all_pages() at the beginning of
-> set_migratetype_isolate() before the call to spin_lock_irqsave().  It has
-> a possible race condition but a nightly stress test did have not shown any
-> problems.
-> 
-> Nonetheless, the cleanest, in my opinion, solution is to use the first patch
->  from CMAv17 which can be found at [1].
-> 
-> So, to sum up: if you intend to test CMAv18, instead of applying this first
-> patch either use first patch from CMAv17[1] or put an unconditional call to
-> drain_all_pages() at the beginning of set_migrate_isolate() function.
-> 
-> Sorry for the troubles.
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg148494.html
+If there is an specific scenario where the iommu should be disabled,
+iommu_detach_device can be called to release the iommu resource. On
+suspend/resume scenarios runtime pm callbacks should still be able to
+put the device in idle.
 
-I've updated our public git repository to include this workaround. You can
-pull the patches from the following addresses:
+Regards,
 
-git://git.infradead.org/users/kmpark/linux-samsung 3.2-rc7-cma-v18
-
-http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/3.2-rc7-cma-v18
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Omar
