@@ -1,54 +1,40 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 5 Jan 2012 12:00:49 +0000
-Subject: [PATCH v2] ARM: at91: pit add DT support
-In-Reply-To: <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1318799895-5121-4-git-send-email-plagnioj@jcrosoft.com>
- <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20120105120049.GB4641@page>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Jan 2012 20:15:26 +0800
+Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
+ Development Kit
+In-Reply-To: <20120105113106.GR11810@n2100.arm.linux.org.uk>
+References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <20111219071350.GH4962@S2100-06.ap.freescale.net>
+ <4EEEE40C.3000200@bluegiga.com>
+ <20111219091916.GJ4962@S2100-06.ap.freescale.net>
+ <20111219091322.GD14542@n2100.arm.linux.org.uk>
+ <20120104135204.GA14741@S2100-06.ap.freescale.net>
+ <20120104211800.GF11810@n2100.arm.linux.org.uk>
+ <20120105113106.GR11810@n2100.arm.linux.org.uk>
+Message-ID: <20120105121523.GE1729@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas, Jean-Christophe,
-
-On Thu, Jan 05, 2012 at 02:48:28PM +0100, Nicolas Ferre wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On Thu, Jan 05, 2012 at 11:31:06AM +0000, Russell King - ARM Linux wrote:
+> I'll change that - as 3.2 was released last night.  I'm not going to
+> update mach-types now as that would be suicide - updating it will
+> mean a bunch of entries will be deleted, and we don't know whether that
+> will cause build failures.
 > 
-> Retreive registers address and IRQ from device tree entry. Fall back
-> to built-in values if an error occurs.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-[...]
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c 
-> b/arch/arm/mach-at91/at91sam926x_time.c
-> index d89ead7..5d4c308 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -14,6 +14,8 @@
-[...]
-> +static int __init of_at91sam926x_pit_init(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_matching_node(NULL, timer_ids);
-> +	if (!np)
-> +		goto err;
-> +
-> +	pit_base_addr = of_iomap(np, 0);
-> +	if (!pit_base_addr)
-> +		goto node_err;
-> +
-> +	/* Get the interrupts property */
-> +	if (of_property_read_u32(np, "interrupts", &at91sam926x_pit_irq.irq))
-> +		goto ioremap_err;
+> So... not this side of the merge window.
 
-I think you want:
+Ok, thanks for letting us know.
 
-	at91sam926x_pit_irq.irq = irq_of_parse_and_map(np, 0);
+Lauri,
 
-to make sure the IRQ is converted to a Linux IRQ and not a hwirq.  Other 
-than that looks fine to me.
+It seems that you have to split the mxs_defconfig change out, so that
+I can send the patch to Arnd without waiting for mach-types update.
+And we can send mxs_defconfig update later when mach-types update hits
+mainline.
 
-Jamie
+We really need to take the action quickly, or the patch will likely
+miss another merge window.
+
+-- 
+Regards,
+Shawn
