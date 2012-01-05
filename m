@@ -1,33 +1,46 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Thu, 05 Jan 2012 14:08:54 +0200
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20120105121523.GE1729@S2101-09.ap.freescale.net>
-References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
- <20120104135204.GA14741@S2100-06.ap.freescale.net>
- <20120104211800.GF11810@n2100.arm.linux.org.uk>
- <20120105113106.GR11810@n2100.arm.linux.org.uk>
- <20120105121523.GE1729@S2101-09.ap.freescale.net>
-Message-ID: <4F0592D6.6040108@bluegiga.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jan 2012 12:10:26 +0000
+Subject: [PATCH v2 00/15] Make SMP timers standalone
+In-Reply-To: <4F058B1C.2070109@arm.com>
+References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
+ <20111222193216.GO2577@n2100.arm.linux.org.uk> <4F048EC4.40900@arm.com>
+ <20120104214748.GH11810@n2100.arm.linux.org.uk>
+ <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
+ <4F0584B5.60908@arm.com>
+ <CAMQu2gxuBNRWYKyKRdzvv_m49DyLoODVbC=rKDHDAMTnxe+6+A@mail.gmail.com>
+ <4F058744.4030503@arm.com> <20120105112602.GQ11810@n2100.arm.linux.org.uk>
+ <4F058B1C.2070109@arm.com>
+Message-ID: <20120105121026.GS11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2012 02:15 PM, Shawn Guo wrote:
->> So... not this side of the merge window.
->
-> Ok, thanks for letting us know.
->
-> Lauri,
->
-> It seems that you have to split the mxs_defconfig change out, so that
-> I can send the patch to Arnd without waiting for mach-types update.
-> And we can send mxs_defconfig update later when mach-types update hits
-> mainline.
+On Thu, Jan 05, 2012 at 11:35:56AM +0000, Marc Zyngier wrote:
+> On 05/01/12 11:26, Russell King - ARM Linux wrote:
+> > Look, local timers *are* special.  They're not the same as global timers.
+> > They're treated differently.  Ripping out the local timer setup stuff
+> > from the SMP code is not the right solution, especially when we've
+> > already got a separation of the local timer core from the hardware
+> > implementation.
+> 
+> OK. I'll try to work out something different.
 
-Ok, I'll do immediately new patch without mxs_defconfig change.
+Why?  What's wrong with the existing structure?
 
-Lauri
+If you want to use the TWD as a global timer, that's easy to do:
+
+static struct clock_event_device twd_global_ce = {
+	.irq = whatever_irq,
+	.cpumask = cpu_mask_all,
+};
+
+static int __init twd_global_timer(void)
+{
+	twd_base = ioremap(twd_phys, SZ_4K);
+	if (!twd_base)
+		return -ENOMEM;
+	twd_timer_setup(&twd_global_ce);
+	return 0;
+}
+
+And no need to mess around with the local timer structure in
+arch/arm/kernel/smp.c.
