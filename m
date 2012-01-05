@@ -1,142 +1,28 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 5 Jan 2012 07:37:55 +0200
-Subject: [PATCH] gpio: pl061: remove combined interrupt
-In-Reply-To: <1325705506-24230-1-git-send-email-robherring2@gmail.com>
-References: <1325705506-24230-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120105053755.GB3054@sapphire.tkos.co.il>
+From: jason.chen@freescale.com (Jason Chen)
+Date: Thu, 5 Jan 2012 13:40:01 +0800
+Subject: [PATCH] ARM: imx6q: add support for IRAM
+In-Reply-To: <20120105054753.GD14741@S2100-06.ap.freescale.net>
+References: <1324898123-13973-1-git-send-email-jason.chen@linaro.org>
+ <20120103124501.GD13477@S2100-06.ap.freescale.net>
+ <20120105051047.GB2687@weitway>
+ <20120105054753.GD14741@S2100-06.ap.freescale.net>
+Message-ID: <20120105054000.GC2687@weitway>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Wed, Jan 04, 2012 at 01:31:46PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Thu, Jan 05, 2012 at 01:47:54PM +0800, Shawn Guo wrote:
+> On Thu, Jan 05, 2012 at 01:10:48PM +0800, Jason Chen wrote:
+> > On Tue, Jan 03, 2012 at 08:45:02PM +0800, Shawn Guo wrote:
+> > > On Mon, Dec 26, 2011 at 07:15:23PM +0800, Jason Chen wrote:
+> > > > +DEF_CLK(ocram_clk,   	  CCGR3, CG14, &ahb_clk,	  NULL);
+> > > 
+> > >   CC      arch/arm/mach-imx/clock-imx6q.o
+> > > arch/arm/mach-imx/clock-imx6q.c:1782:1: warning: ?ocram_clk? defined but not used
+> > it should be a dependcy of vpu/sdma who using IRAM, they can be added.
 > 
-> Drivers should not have a dependency on NR_IRQS. Doing so may break with
-> SPARSE_IRQ enabled. As there are no in kernel users of the pl061 which
-> have multiple instances with their interrupts combined to a single parent
-> interrupt, remove this functionality. If this capability is needed later,
-> it could be supported more cleanly by just using a devicetree property.
-
-Well, I couldn't upstream the platform I was working on. Anyway, if adding 
-support for a single interrupt source for multiple instances is as easy as you 
-describe I'm fine with this change.
-
-Acked-by: Baruch Siach <baruch@tkos.co.il>
-
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Cc: Baruch Siach <baruch@tkos.co.il>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  drivers/gpio/gpio-pl061.c |   44 ++++++++------------------------------------
->  1 files changed, 8 insertions(+), 36 deletions(-)
+> My point is your patch should not introduce any warning at any time.
+sure, will fix it.
 > 
-> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-> index fe19dec..ee0e4b3 100644
-> --- a/drivers/gpio/gpio-pl061.c
-> +++ b/drivers/gpio/gpio-pl061.c
-> @@ -12,7 +12,6 @@
->  #include <linux/spinlock.h>
->  #include <linux/errno.h>
->  #include <linux/module.h>
-> -#include <linux/list.h>
->  #include <linux/io.h>
->  #include <linux/ioport.h>
->  #include <linux/irq.h>
-> @@ -37,13 +36,6 @@
->  #define PL061_GPIO_NR	8
->  
->  struct pl061_gpio {
-> -	/* We use a list of pl061_gpio structs for each trigger IRQ in the main
-> -	 * interrupts controller of the system. We need this to support systems
-> -	 * in which more that one PL061s are connected to the same IRQ. The ISR
-> -	 * interates through this list to find the source of the interrupt.
-> -	 */
-> -	struct list_head	list;
-> -
->  	/* Each of the two spinlocks protects a different set of hardware
->  	 * regiters and data structurs. This decouples the code of the IRQ from
->  	 * the GPIO code. This also makes the case of a GPIO routine call from
-> @@ -209,26 +201,20 @@ static struct irq_chip pl061_irqchip = {
->  
->  static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
->  {
-> -	struct list_head *chip_list = irq_get_handler_data(irq);
-> -	struct list_head *ptr;
-> -	struct pl061_gpio *chip;
-> +	unsigned long pending;
-> +	int offset;
-> +	struct pl061_gpio *chip = irq_desc_get_handler_data(desc);
->  	struct irq_chip *irqchip = irq_desc_get_chip(desc);
->  
->  	chained_irq_enter(irqchip, desc);
-> -	list_for_each(ptr, chip_list) {
-> -		unsigned long pending;
-> -		int offset;
-> -
-> -		chip = list_entry(ptr, struct pl061_gpio, list);
-> -		pending = readb(chip->base + GPIOMIS);
-> -		writeb(pending, chip->base + GPIOIC);
-> -
-> -		if (pending == 0)
-> -			continue;
->  
-> +	pending = readb(chip->base + GPIOMIS);
-> +	writeb(pending, chip->base + GPIOIC);
-> +	if (pending) {
->  		for_each_set_bit(offset, &pending, PL061_GPIO_NR)
->  			generic_handle_irq(pl061_to_irq(&chip->gc, offset));
->  	}
-> +
->  	chained_irq_exit(irqchip, desc);
->  }
->  
-> @@ -236,9 +222,7 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  {
->  	struct pl061_platform_data *pdata;
->  	struct pl061_gpio *chip;
-> -	struct list_head *chip_list;
->  	int ret, irq, i;
-> -	static DECLARE_BITMAP(init_irq, NR_IRQS);
->  
->  	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
->  	if (chip == NULL)
-> @@ -270,7 +254,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  
->  	spin_lock_init(&chip->lock);
->  	spin_lock_init(&chip->irq_lock);
-> -	INIT_LIST_HEAD(&chip->list);
->  
->  	chip->gc.direction_input = pl061_direction_input;
->  	chip->gc.direction_output = pl061_direction_output;
-> @@ -300,18 +283,7 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  		goto iounmap;
->  	}
->  	irq_set_chained_handler(irq, pl061_irq_handler);
-> -	if (!test_and_set_bit(irq, init_irq)) { /* list initialized? */
-> -		chip_list = kmalloc(sizeof(*chip_list), GFP_KERNEL);
-> -		if (chip_list == NULL) {
-> -			clear_bit(irq, init_irq);
-> -			ret = -ENOMEM;
-> -			goto iounmap;
-> -		}
-> -		INIT_LIST_HEAD(chip_list);
-> -		irq_set_handler_data(irq, chip_list);
-> -	} else
-> -		chip_list = irq_get_handler_data(irq);
-> -	list_add(&chip->list, chip_list);
-> +	irq_set_handler_data(irq, chip);
->  
->  	for (i = 0; i < PL061_GPIO_NR; i++) {
->  		if (pdata) {
 > -- 
-> 1.7.5.4
-> 
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> Regards,
+> Shawn
