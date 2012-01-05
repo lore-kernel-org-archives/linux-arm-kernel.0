@@ -1,21 +1,35 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 5 Jan 2012 12:38:35 -0800
-Subject: [PATCH v2] arm/tegra: add support for tegra30 interrupts
-In-Reply-To: <1325770305-21637-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1325770305-21637-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F17AB@HQMAIL01.nvidia.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu,  5 Jan 2012 19:33:08 -0200
+Subject: [PATCH] ARM: imx: iomux-v1.h: Fix build error due to __init annotation
+Message-ID: <1325799188-24921-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Thursday, January 05, 2012 6:32 AM:
-> Tegra30 has 1 extra legacy interrupt controller. Use the GIC ITLinesNumber
-> field to determine how many interrupt controllers we have and initialize
-> appropriately. Also make room for the extra tegra30 interrupts by moving
-> the GPIO IRQ base. This shouldn't affect existing code as it determines the
-> correct IRQ number for GPIOs using TEGRA_GPIO_TO_IRQ().
+Fix the following build error found when building imx_v4_v5_defconfig:
 
-Due to a typo in ARM patch 7240/1, this current patch also relies on
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7271/1
+  CC      arch/arm/mach-imx/mach-imx27ipcam.o
+In file included from arch/arm/plat-mxc/include/mach/iomux-mx27.h:23,
+                 from arch/arm/mach-imx/mach-imx27ipcam.c:22:
+arch/arm/plat-mxc/include/mach/iomux-v1.h:99: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'imx_iomuxv1_init'
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+This applies against linux-next
+
+ arch/arm/plat-mxc/include/mach/iomux-v1.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-v1.h b/arch/arm/plat-mxc/include/mach/iomux-v1.h
+index 6fa8a70..f7d1804 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-v1.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-v1.h
+@@ -96,6 +96,6 @@ extern int mxc_gpio_mode(int gpio_mode);
+ extern int mxc_gpio_setup_multiple_pins(const int *pin_list, unsigned count,
+ 		const char *label);
+ 
+-extern int __init imx_iomuxv1_init(void __iomem *base, int numports);
++extern int imx_iomuxv1_init(void __iomem *base, int numports);
+ 
+ #endif /* __MACH_IOMUX_V1_H__ */
 -- 
-nvpublic
+1.7.1
