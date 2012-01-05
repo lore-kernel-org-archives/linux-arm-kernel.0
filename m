@@ -1,35 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu,  5 Jan 2012 19:33:08 -0200
-Subject: [PATCH] ARM: imx: iomux-v1.h: Fix build error due to __init annotation
-Message-ID: <1325799188-24921-1-git-send-email-festevam@gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 5 Jan 2012 14:03:28 -0800
+Subject: [PATCH 0/4] ARM: tegra: Automatic UART selection for earlyprintk
+In-Reply-To: <CAD=FV=WE51BbXdkQ9zjVCR_vjuHR5qn0YR+RteL-Q30bZ59BCA@mail.gmail.com>
+References: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
+ <CAD=FV=X8p5RXKc0CW4KYzmoCw7tkOrahD2tnqKfXqqRR6MEAJQ@mail.gmail.com>
+ <CAD=FV=WE51BbXdkQ9zjVCR_vjuHR5qn0YR+RteL-Q30bZ59BCA@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F180C@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build error found when building imx_v4_v5_defconfig:
+Doug Anderson wrote at Wednesday, January 04, 2012 4:48 PM:
+...
+> 2. I'm slightly concerned about cramming stuff into IRAM, since
+> ? ?I don't have a good concept of what IRAM adresses are used when.
+> ? ?When I grep for IRAM users in our kernel, I see
+> ? ?TEGRA_AVP_RESUME_ADDR is using the base of IRAM. ?We're not going
+> ? ?to be hosing suspend/resume or anything else with this CL, are we?
+> ? ?In the very least, I'd perfer to see a #define for the '0x100' and
+> ? ?the '0x55415254' so that we can correlate the constants in
+> ? ?uncompress.h and debug-macro.S
 
-  CC      arch/arm/mach-imx/mach-imx27ipcam.o
-In file included from arch/arm/plat-mxc/include/mach/iomux-mx27.h:23,
-                 from arch/arm/mach-imx/mach-imx27ipcam.c:22:
-arch/arm/plat-mxc/include/mach/iomux-v1.h:99: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'imx_iomuxv1_init'
+I discussed this with a few people, and it sounds like it's safe to use
+IRAM for this. However, I did discover a few other uses of IRAM too, in
+our downstream kernels anyway, so I'll certainly create arch/arm/mach-
+tegra/include/mach/irammap.h that provides defines for all the IRAM
+offsets, what they're used for, and when.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-This applies against linux-next
-
- arch/arm/plat-mxc/include/mach/iomux-v1.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v1.h b/arch/arm/plat-mxc/include/mach/iomux-v1.h
-index 6fa8a70..f7d1804 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v1.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v1.h
-@@ -96,6 +96,6 @@ extern int mxc_gpio_mode(int gpio_mode);
- extern int mxc_gpio_setup_multiple_pins(const int *pin_list, unsigned count,
- 		const char *label);
- 
--extern int __init imx_iomuxv1_init(void __iomem *base, int numports);
-+extern int imx_iomuxv1_init(void __iomem *base, int numports);
- 
- #endif /* __MACH_IOMUX_V1_H__ */
 -- 
-1.7.1
+nvpublic
