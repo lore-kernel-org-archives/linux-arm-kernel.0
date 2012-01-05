@@ -1,54 +1,139 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 5 Jan 2012 10:56:03 -0700
-Subject: [PATCH 5/6] gpio: tegra: Dynamically allocate IRQ base, and
- support DT
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F16C2@HQMAIL01.nvidia.com>
-References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
- <1325702378-20863-5-git-send-email-swarren@nvidia.com>
- <20120105072306.GA3980@avionic-0098.mockup.avionic-design.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F16C2@HQMAIL01.nvidia.com>
-Message-ID: <20120105175603.GA22653@ponder.secretlab.ca>
+Date: Thu, 5 Jan 2012 11:00:28 -0700
+Subject: [PATCH v3] ARM: at91: pit add DT support
+In-Reply-To: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
+ <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20120105180028.GB22653@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 09:47:44AM -0800, Stephen Warren wrote:
-> Thierry Reding wrote at Thursday, January 05, 2012 12:23 AM:
-> > * Stephen Warren wrote:
-> > > @@ -343,6 +344,16 @@ static int __devinit tegra_gpio_probe(struct platform_device *pdev)
-> > >  	int i;
-> > >  	int j;
-> > >
-> > > +	irq_domain.irq_base = irq_alloc_descs(-1, 0, TEGRA_NR_GPIOS, 0);
-> > > +	if (irq_domain.irq_base < 0) {
-> > > +		dev_err(&pdev->dev, "Couldn't allocate IRQ numbers\n");
-> > > +		return -ENODEV;
-> > > +	}
-> > > +	irq_domain.nr_irq = TEGRA_NR_GPIOS;
-> > > +	irq_domain.ops = &irq_domain_simple_ops;
-> > > +	irq_domain.of_node = pdev->dev.of_node;
-> > > +	irq_domain_add(&irq_domain);
-> > 
-> > I was wondering: except for setting the nr_irq field this is pretty much what
-> > irq_domain_add_simple() does. While I get that you need access to the domain
-> > later on and cannot use the helper, I'm still wondering why the nr_irq field
-> > is not initialized by irq_domain_add_simple().
+On Thu, Jan 05, 2012 at 06:25:48PM +0100, Nicolas Ferre wrote:
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> I'm not completely sure, but I think irq_domain_add_simple() was initially
-> added as a transition measure; it looks like all the current users are for
-> a single top-level interrupt controller where the Linux IRQ numbers are
-> used directly in the .dts files. Once you add other interrupt controllers
-> into the mix, the API as-is starts to make less sense.
+> Retreive registers address and IRQ from device tree entry. Fall back
+> to built-in values if an error occurs.
 > 
-> > I have a driver for a GPIO/IRQ expander that does exactly the same and was
-> > always wondering why the irq_data.hwirq field isn't properly setup, and
-> > irq_domain.nr_irq being 0 seems to be exactly the reason. So am I supposed to
-> > not use irq_domain_add_simple() in this case or should we rather update the
-> > helper to take a nr_irq parameter that can be used to initialize the nr_irq
-> > field?
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> v3: - use irq_of_parse_and_map() for handling irq numbers specified by DT.
+>       Correction proposed by Jamie Iles.
 > 
-> I think updating the helper like that makes sense, and also have it return
-> the IRQ domain object. Grant, do you agree?
+> v2: - new specification of irq numbers in DT (due to modification of AIC code)
+>     - new error path in of_at91sam926x_pit_init()
+>     - fall back to built-in values if an error occurs
+>     - use of of_property_read_u32() to get irq property
+> 
+>  .../devicetree/bindings/arm/atmel-at91.txt         |    8 +++
+>  arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 ++
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++
+>  arch/arm/mach-at91/at91sam926x_time.c              |   53 +++++++++++++++++++-
+>  4 files changed, 70 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> new file mode 100644
+> index 0000000..380f711
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -0,0 +1,8 @@
+> +Atmel AT91 device tree bindings.
+> +================================
+> +
+> +PIT Timer required properties:
+> +- compatible: Should be "atmel,at91sam9260-pit"
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain interrupt for the PIT which is the IRQ line
+> +  shared across all System Controller members.
+> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+> index 0d21872..5c4be7e 100644
+> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+> @@ -57,6 +57,11 @@
+>  				reg = <0xfffff000 0x200>;
+>  			};
+>  
+> +			pit: timer at fffffd30 {
+> +				compatible = "atmel,at91sam9260-pit";
+> +				reg = <0xfffffd30 0xf>;
+> +				interrupts = <1 4>;
+> +			};
+>  
+>  			pioA: gpio at fffff400 {
+>  				compatible = "atmel,at91rm9200-gpio";
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index b977a79..0d21c8e 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -58,6 +58,12 @@
+>  				reg = <0xfffff000 0x200>;
+>  			};
+>  
+> +			pit: timer at fffffd30 {
+> +				compatible = "atmel,at91sam9260-pit";
+> +				reg = <0xfffffd30 0xf>;
+> +				interrupts = <1 4>;
+> +			};
+> +
+>  			dma: dma-controller at ffffec00 {
+>  				compatible = "atmel,at91sam9g45-dma";
+>  				reg = <0xffffec00 0x200>;
+> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+> index d89ead7..534a992 100644
+> --- a/arch/arm/mach-at91/at91sam926x_time.c
+> +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> @@ -14,6 +14,9 @@
+>  #include <linux/kernel.h>
+>  #include <linux/clk.h>
+>  #include <linux/clockchips.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  
+>  #include <asm/mach/time.h>
+>  
+> @@ -133,7 +136,8 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+>  static struct irqaction at91sam926x_pit_irq = {
+>  	.name		= "at91_tick",
+>  	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> -	.handler	= at91sam926x_pit_interrupt
+> +	.handler	= at91sam926x_pit_interrupt,
+> +	.irq		= AT91_ID_SYS,
+>  };
+>  
+>  static void at91sam926x_pit_reset(void)
+> @@ -149,6 +153,49 @@ static void at91sam926x_pit_reset(void)
+>  	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static struct of_device_id timer_ids[] = {
+> +	{ .compatible = "atmel,at91sam9260-pit" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int __init of_at91sam926x_pit_init(void)
+> +{
+> +	struct device_node	*np;
+> +	int			ret;
+> +
+> +	np = of_find_matching_node(NULL, timer_ids);
+> +	if (!np)
+> +		goto err;
+> +
+> +	pit_base_addr = of_iomap(np, 0);
+> +	if (!pit_base_addr)
+> +		goto node_err;
+> +
+> +	/* Get the interrupts property */
+> +	ret = irq_of_parse_and_map(np, 0);
+> +	if (ret <= 0)
+> +		goto ioremap_err;
 
-Update the helper.
+if (!ret)
+
+The DT irq functions return 0 on failure.
 
 g.
