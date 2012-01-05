@@ -1,30 +1,50 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 5 Jan 2012 14:08:43 -0800
-Subject: [PATCH v2] arm/tegra: fuse: add functions to access chip revision
-In-Reply-To: <1325742641-384-1-git-send-email-olof@lixom.net>
-References: <1324599468-12845-5-git-send-email-olof@lixom.net>
- <1325742641-384-1-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F1814@HQMAIL01.nvidia.com>
+Date: Thu, 5 Jan 2012 14:14:18 -0800
+Subject: [PATCH v3] arm/tegra: emc: convert tegra2_emc to a platform driver
+In-Reply-To: <1325743288-2460-1-git-send-email-olof@lixom.net>
+References: <1325742994-1178-1-git-send-email-olof@lixom.net>
+ <1325743288-2460-1-git-send-email-olof@lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F1818@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Wednesday, January 04, 2012 10:51 PM:
-> Add function to get chip revision, and print it out at boot time.
+Olof Johansson wrote at Wednesday, January 04, 2012 11:01 PM:
+> This is the first step in making it device-tree aware and get rid of the
+> in-kernel EMC tables (of which there are none in mainline, thankfully).
 > 
-> Restructure the fuse access to just use cached variables instead
-> of always reading the fuses, and export those variables directly
-> instead of using accessor functions.
+> Changes since v2:
 > 
-> Add a SKU ID table of currently known values.
-> 
-> Based on code originally by Colin Cross <ccross@android.com>.
+> * D'oh -- missed a couple of variables that were added, never used and then
+>   later removed in a later patch.
 > 
 > Changes since v1:
 > 
-> * Add A01 minor rev support
-> * Don't decode for A03p on anything but T2x
+> * Fixed messed up indentation
+> * Removed code that should be gone (was added here and removed later in series)
 > 
 > Signed-off-by: Olof Johansson <olof@lixom.net>
+...
+> diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
+...
+> +static int __devinit tegra_emc_probe(struct platform_device *pdev)
+...
+> +	if (!request_mem_region(res->start, resource_size(res), "tegra_emc")) {
+> +		dev_err(&pdev->dev, "failed to request register region\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	emc_regbase = ioremap(res->start, resource_size(res));
+
+Don't you need to error-check the ioremap() result, and undo the
+request_mem_region() too? Or, use the devm variant to request the
+region. The rest of the code checks emc_pdev!=NULL which won't detect
+this failure.
+
+Isn't there a get_resource && request && remap function now; I think I
+recall a patch that wraps all that into one function, but it might have
+been DT-only.
+
+Otherwise,
 
 Acked-by: Stephen Warren <swarren@nvidia.com>
 
