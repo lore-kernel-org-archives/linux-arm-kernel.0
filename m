@@ -1,47 +1,63 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 5 Jan 2012 12:13:26 +0100
-Subject: [PATCH v2 00/15] Make SMP timers standalone
-In-Reply-To: <4F0584B5.60908@arm.com>
-References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
- <20111222193216.GO2577@n2100.arm.linux.org.uk> <4F048EC4.40900@arm.com>
- <20120104214748.GH11810@n2100.arm.linux.org.uk>
- <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
- <4F0584B5.60908@arm.com>
-Message-ID: <CAMQu2gxuBNRWYKyKRdzvv_m49DyLoODVbC=rKDHDAMTnxe+6+A@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 5 Jan 2012 11:18:42 +0000
+Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
+In-Reply-To: <1324019153-13316-1-git-send-email-hvaibhav@ti.com>
+References: <1324019153-13316-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A80719AC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2012 at 12:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 05/01/12 00:00, Linus Walleij wrote:
->> However IIRC this situation does not occur in the ARM reference
->> designs, notably Versatile Express since it simply isn't designed to
->> be power-agressive in this way and does not gate the clock or
->> power down the CPU power domain, it's always on, always
->> clocked (albeit with shifting frequency).
->>
->> The Vexpress seem to register a clockevent for its SP804
->> timer, and even though I've never used this machine I guess
->> it would tick a few ticks during boot and then as TWD is
->> registered it switches to that (due to higher .rate) and
->> no IRQ is ever fired on the SP804 again.
->>
->> Does this correspond to what is seen in /proc/interrupts
->> on the Vexpress?
->
-> Yes. You get about 8 ticks worth of SP804, and then switch to TWD for good.
->
->> And does the system really work if you simply delete the
->> code registering the SP804 clockevent from
->> mach-vexpress/ct-ca9x4.c?
->
-> No, because you need the global timer to calibrate the TWD on this
-> platform. But on the VE with a Cortex-A15 tile, the system works
-> perfectly with the architected timers being the only one in the system
-> (the SP804 is left unconfigured).
->
-> But now that your cpufreq-aware patches are in -next, I can boot a Panda
-> without a single tick of the global timer (OMAP4 provides the "smp-twd"
-> clock).
->
-That's only because CPUIDLE low power states are not enabled. You
-do that and without global timer, system will just die
+> -----Original Message-----
+> From: Hiremath, Vaibhav
+> Sent: Friday, December 16, 2011 12:36 PM
+> To: linux-omap at vger.kernel.org
+> Cc: tony at atomide.com; linux-arm-kernel at lists.infradead.org; devicetree-
+> discuss at lists.ozlabs.org; grant.likely at secretlab.ca; Cousson, Benoit;
+> Hiremath, Vaibhav
+> Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
+> 
+> Add OMAP3 EVM (OMAP3530, AM/DM37x) DTS file to use the omap3.dtsi SoC file,
+> along with memory node information.
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> ---
+> Boot tested it on AM/DM37x EVM, kernel parses the info correctly.
+> 
+>  arch/arm/boot/dts/omap3-evm.dts |   20 ++++++++++++++++++++
+>  1 files changed, 20 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap3-evm.dts
+> 
+> diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-
+> evm.dts
+> new file mode 100644
+> index 0000000..2eee16e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-evm.dts
+> @@ -0,0 +1,20 @@
+> +/*
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +/include/ "omap3.dtsi"
+> +
+> +/ {
+> +	model = "TI OMAP3 EVM (OMAP3530, AM/DM37x)";
+> +	compatible = "ti,omap3-evm", "ti,omap3";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x10000000>; /* 256 MB */
+> +	};
+> +};
+Can this merged? OR anybody has any comments here?
+
+Thanks,
+Vaibhav
+
+> --
+> 1.7.0.4
