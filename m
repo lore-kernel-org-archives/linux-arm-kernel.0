@@ -1,63 +1,34 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 05 Jan 2012 12:26:28 +0100
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
- remove unsupported 15bit modes
-In-Reply-To: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk> (Peter
- Korsgaard's message of "Thu, 13 Oct 2011 16:52:50 +0200")
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <87zke29yqj.fsf@macbook.be.48ers.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jan 2012 11:26:02 +0000
+Subject: [PATCH v2 00/15] Make SMP timers standalone
+In-Reply-To: <4F058744.4030503@arm.com>
+References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>
+ <20111222193216.GO2577@n2100.arm.linux.org.uk> <4F048EC4.40900@arm.com>
+ <20120104214748.GH11810@n2100.arm.linux.org.uk>
+ <CACRpkdZPEYc3xNNb1w4st86bLGMW0ePbEA6+V4opHXe6Sk=u2g@mail.gmail.com>
+ <4F0584B5.60908@arm.com>
+ <CAMQu2gxuBNRWYKyKRdzvv_m49DyLoODVbC=rKDHDAMTnxe+6+A@mail.gmail.com>
+ <4F058744.4030503@arm.com>
+Message-ID: <20120105112602.GQ11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Peter" == Peter Korsgaard <jacmet@sunsite.dk> writes:
+On Thu, Jan 05, 2012 at 11:19:32AM +0000, Marc Zyngier wrote:
+> Global timer is still present, configured and enabled. The kernel just
+> happens to select TWD as a better timer. Should TWD be turned off,
+> gp_timer will be selected again.
 
- Peter> Allow framebuffer to be configured in 16bit mode when panel is
- Peter> wired in (the default) BGR configuration, and don't claim to
- Peter> support 15bit input modes, which the LCD controller cannot
- Peter> handle.
+And at that point, the core time keeping code will find a local timer
+clock event structure and expect it's broadcast method to be implemented
+and working, as I described in my initial reply.
 
-Ping? Nicolas, you added it to your at91-lcd branch - But it doesn't seem
-to have gone any further.
+> This is also what happens with the current implementation, and my
+> patches don't change that.
 
- Peter> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
- Peter> ---
- Peter>  drivers/video/atmel_lcdfb.c |   12 +++---------
- Peter>  1 files changed, 3 insertions(+), 9 deletions(-)
+Yes they do, because they omit the broadcast method.
 
- Peter> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
- Peter> index 7ca3eaf..143f6d9 100644
- Peter> --- a/drivers/video/atmel_lcdfb.c
- Peter> +++ b/drivers/video/atmel_lcdfb.c
- Peter> @@ -418,24 +418,18 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
- var-> red.length = var->green.length = var->blue.length
- Peter>  			= var->bits_per_pixel;
- Peter>  		break;
- Peter> -	case 15:
- Peter>  	case 16:
- Peter>  		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
- Peter>  			/* RGB:565 mode */
- var-> red.offset = 11;
- var-> blue.offset = 0;
- Peter> -			var->green.length = 6;
- Peter> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
- Peter> -			var->red.offset = 10;
- Peter> -			var->blue.offset = 0;
- Peter> -			var->green.length = 5;
- Peter>  		} else {
- Peter> -			/* BGR:555 mode */
- Peter> +			/* BGR:565 mode */
- var-> red.offset = 0;
- Peter> -			var->blue.offset = 10;
- Peter> -			var->green.length = 5;
- Peter> +			var->blue.offset = 11;
- Peter>  		}
- var-> green.offset = 5;
- Peter> +		var->green.length = 6;
- var-> red.length = var->blue.length = 5;
- Peter>  		break;
- Peter>  	case 32:
- Peter> -- 
- Peter> 1.7.6.3
-
--- 
-Bye, Peter Korsgaard
+Look, local timers *are* special.  They're not the same as global timers.
+They're treated differently.  Ripping out the local timer setup stuff
+from the SMP code is not the right solution, especially when we've
+already got a separation of the local timer core from the hardware
+implementation.
