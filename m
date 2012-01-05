@@ -1,119 +1,66 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 5 Jan 2012 09:23:18 +0800
-Subject: [PATCH v4 3/6] clk: introduce the common clock framework
-In-Reply-To: <CAJOA=zPw7UuhE4R3SsBeyzQ2_iN29Zv-ExaUTTFCah+GoFSfNQ@mail.gmail.com>
-References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
- <1323834838-2206-4-git-send-email-mturquette@linaro.org>
- <alpine.LFD.2.02.1112141007550.3020@ionos>
- <CAJOA=zO=gM2r4pCVo+orLqE9Q1SSw4h5nXsAHo-e_SHZAfvKDA@mail.gmail.com>
- <20120104021541.GI2414@b20223-02.ap.freescale.net>
- <4F0462FF.1000308@gmail.com>
- <CAJOA=zPw7UuhE4R3SsBeyzQ2_iN29Zv-ExaUTTFCah+GoFSfNQ@mail.gmail.com>
-Message-ID: <20120105012317.GM2414@b20223-02.ap.freescale.net>
+Date: Thu, 5 Jan 2012 09:56:10 +0800
+Subject: [PATCH v2 2/2] dma/imx-sdma: add wmb before enable a channel
+In-Reply-To: <20120104023157.GJ2414@b20223-02.ap.freescale.net>
+References: <1325428692-11473-1-git-send-email-richard.zhao@linaro.org>
+ <1325428692-11473-3-git-send-email-richard.zhao@linaro.org>
+ <20120103174639.GF2914@n2100.arm.linux.org.uk>
+ <20120104023157.GJ2414@b20223-02.ap.freescale.net>
+Message-ID: <20120105015609.GN2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2012 at 05:01:43PM -0800, Turquette, Mike wrote:
-> On Wed, Jan 4, 2012 at 6:32 AM, Rob Herring <robherring2@gmail.com> wrote:
-> > On 01/03/2012 08:15 PM, Richard Zhao wrote:
-> >> On Fri, Dec 16, 2011 at 04:45:48PM -0800, Turquette, Mike wrote:
-> >>> On Wed, Dec 14, 2011 at 5:18 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> >>>> On Tue, 13 Dec 2011, Mike Turquette wrote:
-> >
-> > snip
-> >
-> >>>>> +/**
-> >>>>> + * clk_init - initialize the data structures in a struct clk
-> >>>>> + * @dev: device initializing this clk, placeholder for now
-> >>>>> + * @clk: clk being initialized
-> >>>>> + *
-> >>>>> + * Initializes the lists in struct clk, queries the hardware for the
-> >>>>> + * parent and rate and sets them both. ?Adds the clk to the sysfs tree
-> >>>>> + * topology.
-> >>>>> + *
-> >>>>> + * Caller must populate clk->name and clk->flags before calling
-> >>>>
-> >>>> I'm not too happy about this construct. That leaves struct clk and its
-> >>>> members exposed to the world instead of making it a real opaque
-> >>>> cookie. I know from my own painful experience, that this will lead to
-> >>>> random fiddling in that data structure in drivers and arch code just
-> >>>> because the core code has a shortcoming.
-> >>>>
-> >>>> Why can't we make struct clk a real cookie and confine the data
-> >>>> structure to the core code ?
-> >>>>
-> >>>> That would change the init call to something like:
-> >>>>
-> >>>> struct clk *clk_init(struct device *dev, const struct clk_hw *hw,
-> >>>> ? ? ? ? ? ? ? ? ? ? struct clk *parent)
-> >>>>
-> >>>> And have:
-> >>>> struct clk_hw {
-> >>>> ? ? ? struct clk_hw_ops *ops;
-> >>>> ? ? ? const char ? ? ? ?*name;
-> >>>> ? ? ? unsigned long ? ? flags;
-> >>>> };
-> >>>>
-> >>>> Implementers can do:
-> >>>> struct my_clk_hw {
-> >>>> ? ? ? struct clk_hw ? ?hw;
-> >>>> ? ? ? mydata;
-> >>>> };
-> >>>>
-> >>>> And then change the clk ops callbacks to take struct clk_hw * as an
-> >>>> argument.
-> >> We have to define static clocks before we adopt DT binding.
-> >> If clk is opaque and allocate memory in clk core, it'll make hard
-> >> to define static clocks. And register/init will pass a long parameter
-> >> list.
-> >
-> > DT is not a prerequisite for having dynamically created clocks. You can
-> > make clock init dynamic without DT.
-I can not find clock info at runtime without DT. If I use static info, I
-find it was hard/strange to define and register it, using Mike's early patches.
+Hi Sascha,
+
+On Wed, Jan 04, 2012 at 10:31:58AM +0800, Richard Zhao wrote:
+> On Tue, Jan 03, 2012 at 05:46:39PM +0000, Russell King - ARM Linux wrote:
+> > On Sun, Jan 01, 2012 at 10:38:12PM +0800, Richard Zhao wrote:
+> > > dma_alloc_coherent memory may be bufferable. We need to add
+> > > nececcary memory barrier.
+> > > 
+> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > ---
+> > >  drivers/dma/imx-sdma.c |    1 +
+> > >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> > > index f8e87b5..9301bff 100644
+> > > --- a/drivers/dma/imx-sdma.c
+> > > +++ b/drivers/dma/imx-sdma.c
+> > > @@ -394,6 +394,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
+> > >  
+> > >  static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
+> > >  {
+> > > +	wmb();
+> > >  	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
+> > 
+> > Use writel().  That's what it's there for:
+> > 
+> > #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+> > #define __iowmb()               wmb()
+> > #endif
+> > #define writel_relaxed(v,c)     ((void)__raw_writel((__force u32) \
+> >                                         cpu_to_le32(v),__mem_pci(c)))
+> > #define writel(v,c)             ({ __iowmb(); writel_relaxed(v,c); })
+> Why does writel always call wmb? ioremap memory needs mb too?
+> Isn't it supposed to be when there's prior touch of dma memory? 
+What do you think?
+
+Thanks
+Richard
 > 
-> Agreed.
+> Thanks
+> Richard
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
 > 
-> > What data goes in struct clk vs. struct clk_hw could change over time.
-> > So perhaps we can start with some data in clk_hw and plan to move it to
-> > struct clk later. Even if almost everything ends up in clk_hw initially,
-> > at least the structure is in place to have common, core-only data
-> > separate from platform data.
 > 
-> What is the point of this?
-> 
-> The original clk_hw was defined simply as:
-> 
-> struct clk_hw {
->         struct clk *clk;
-> };
-> 
-> It's only purpose in life was as a handle for navigation between the
-> opaque struct clk and the hardware-specific struct my_clk_hw.  struct
-> clk_hw is defined in clk.h and everyone can see it.  If we're suddenly
-> OK putting clk data in this structure then why bother with an opaque
-> struct clk at all?
-I think Rob meant one time a step to make it opaque. But it'll make
-clk core always changing, easier mess, and let clk driver confused.
-> 
-> > What is the actual data you need to be static and accessible to the
-> > platform code? A ptr to parent clk is the main thing I've seen for
-> > static initialization. So make the parent ptr be struct clk_hw* and
-> > allow the platforms to access.
-> 
-> To answer your question on what data we're trying to expose: platform
-> code commonly needs the parent pointer and the clk rate (and by
-> extension, the rate of the parent).  For debug/error prints it is also
-> nice to have the clk name.  Generic clk flags are also conceivably
-> something that platform code might want.
-> 
-> I'd like to spin the question around: if we're OK exposing some stuff
-> (in your example above, the parent pointer), then what clk data are
-> you trying to hide?
-> 
-> Regards,
-> Mike
-> 
-> >
-> > Rob
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
