@@ -1,20 +1,40 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 5 Jan 2012 17:14:36 +0800
-Subject: [PATCH v3 1/2] dma/imx-sdma: let sdma_run_channel call
- sdma_enable_channel
-In-Reply-To: <1325750362-22598-2-git-send-email-richard.zhao@linaro.org>
+Date: Thu, 5 Jan 2012 17:23:17 +0800
+Subject: [PATCH v3 2/2] dma/imx-sdma: use writel to write register when
+ enable a channel
+In-Reply-To: <1325750362-22598-3-git-send-email-richard.zhao@linaro.org>
 References: <1325750362-22598-1-git-send-email-richard.zhao@linaro.org>
- <1325750362-22598-2-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20120105091434.GA1729@S2101-09.ap.freescale.net>
+ <1325750362-22598-3-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120105092316.GB1729@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 03:59:21PM +0800, Richard Zhao wrote:
-> Let all enable channel code call sdma_enable_channel.
+On Thu, Jan 05, 2012 at 03:59:22PM +0800, Richard Zhao wrote:
+> dma_alloc_coherent memory may be bufferable when set
+> CONFIG_ARM_DMA_MEM_BUFFERABLE. We need to add nececcary
+> memory barrier. writel implicitly call wmb in such case.
 > 
 > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  drivers/dma/imx-sdma.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index c2bc4f1..e987468 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -396,7 +396,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
+>  
+>  static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
+>  {
+> -	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
+> +	writel(1 << channel, sdma->regs + SDMA_H_START);
+>  }
+>  
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+As educated by Arnd, generally it's safer to use pair of readl/writel
+than __raw_readl/__raw_writel in driver.  I'm wondering if it's a good
+opportunity for us to change the pair all over this driver.
 
 -- 
 Regards,
