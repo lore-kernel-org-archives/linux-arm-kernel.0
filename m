@@ -1,52 +1,58 @@
-From: hamo.by@gmail.com (hamo.by at gmail.com)
-Date: Thu,  5 Jan 2012 20:44:46 +0800
-Subject: [PATCH RFC] arm: Define cpu_logical_map when CONFIG_SMP is not set
-Message-ID: <1325767486-6392-1-git-send-email-hamo.by@gmail.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Thu, 05 Jan 2012 14:47:07 +0200
+Subject: [PATCH v4] ARM: mxs: Add initial support for Bluegiga APX4
+ Development Kit
+In-Reply-To: <1325766081-27864-1-git-send-email-lauri.hintsala@bluegiga.com>
+References: <1325766081-27864-1-git-send-email-lauri.hintsala@bluegiga.com>
+Message-ID: <4F059BCB.9050504@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yang Bai <hamo.by@gmail.com>
+Sorry guys, this patch raises compiler errors.
 
-If CONFIG_SMP is not set, define cpu_logical_map(cpu) as
-(cpu), this fixes the problem described in this mail:
-https://lkml.org/lkml/2012/1/2/142
+On 01/05/2012 02:21 PM, Lauri Hintsala wrote:
+> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+> index bde5f66..7e72a6c 100644
+> --- a/arch/arm/mach-mxs/include/mach/mxs.h
+> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
+> @@ -33,6 +33,7 @@
+>   		machine_is_stmp378x() ||				\
+>   		0)
+>   #define cpu_is_mx28()		(					\
+> +		machine_is_apx4devkit() ||				\
+>   		machine_is_mx28evk() ||					\
+>   		machine_is_m28evk() ||					\
+>   		machine_is_tx28() ||					\
 
-Signed-off-by: Yang Bai <hamo.by@gmail.com>
----
- arch/arm/include/asm/smp.h |   12 ++++++++----
- 1 files changed, 8 insertions(+), 4 deletions(-)
+machine_is_apx4devkit is undefiend.
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 1e5717a..0a06ead 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -10,14 +10,12 @@
- #ifndef __ASM_ARM_SMP_H
- #define __ASM_ARM_SMP_H
- 
-+#ifdef CONFIG_SMP
-+
- #include <linux/threads.h>
- #include <linux/cpumask.h>
- #include <linux/thread_info.h>
- 
--#ifndef CONFIG_SMP
--# error "<asm/smp.h> included in non-SMP build"
--#endif
--
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -99,4 +97,10 @@ extern void platform_cpu_enable(unsigned int cpu);
- extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- 
-+#else
-+
-+#define cpu_logical_map(cpu)	(cpu)
-+
-+#endif /* CONFIG_SMP */
-+
- #endif /* ifndef __ASM_ARM_SMP_H */
--- 
-1.7.8.2
+
+> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+> index 6777674..3e5309d 100644
+> --- a/arch/arm/mach-mxs/include/mach/uncompress.h
+> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+> @@ -62,6 +62,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+>   	case MACH_TYPE_MX23EVK:
+>   		mxs_duart_base = MX23_DUART_BASE_ADDR;
+>   		break;
+> +	case MACH_TYPE_APX4DEVKIT:
+>   	case MACH_TYPE_MX28EVK:
+>   	case MACH_TYPE_M28EVK:
+>   	case MACH_TYPE_TX28:
+
+Also MACH_TYPE_APX4DEVKIT is undefiend.
+
+
+Shawn: Should we temporary add following lines into headers? Any better 
+suggestions?
+
+#ifndef machine_is_apx4devkit
+#define machine_is_apx4devkit() 0
+#endif
+
+#ifndef MACH_TYPE_APX4DEVKIT
+#define MACH_TYPE_APX4DEVKIT 0
+#endif
+
+BR,
+Lauri
