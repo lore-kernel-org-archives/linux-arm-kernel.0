@@ -1,272 +1,204 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed,  4 Jan 2012 21:49:14 -0800
-Subject: [PATCH v2] arm/tegra: use APB DMA for accessing APB devices
-In-Reply-To: <1324599468-12845-3-git-send-email-olof@lixom.net>
-References: <1324599468-12845-3-git-send-email-olof@lixom.net>
-Message-ID: <1325742554-32735-1-git-send-email-olof@lixom.net>
+Date: Wed,  4 Jan 2012 21:50:41 -0800
+Subject: [PATCH v2] arm/tegra: fuse: add functions to access chip revision
+In-Reply-To: <1324599468-12845-5-git-send-email-olof@lixom.net>
+References: <1324599468-12845-5-git-send-email-olof@lixom.net>
+Message-ID: <1325742641-384-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra2 hangs if APB registers are accessed from the cpu during an
-apb dma operation. The workaround is to use apb dma to read/write the
-registers instead.
+Add function to get chip revision, and print it out at boot time.
 
-There is a dependency loop between fuses, clocks, and APBDMA.  If dma
-is enabled, fuse reads must go through APBDMA to avoid corruption due
-to a hw bug.  APBDMA requires a clock to be enabled.  Clocks must read
-a fuse to determine allowable cpu frequencies.
+Restructure the fuse access to just use cached variables instead
+of always reading the fuses, and export those variables directly
+instead of using accessor functions.
 
-Separate out the fuse DMA initialization, and allow the fuse read
-and write functions to be called without using DMA before the DMA
-initialization has been completed.  Access to the fuses before APBDMA
-is initialized won't hit the hardware bug because nothing else can be
-using DMA.
+Add a SKU ID table of currently known values.
 
-Original fuse registar access code from Varun Wadekar
-<vwadekar@nvidia.com>, improved by Colin Cross <ccross@android.com>
-and later moved to separate driver by Jon Mayo <jmayo@nvidia.com>.
-
-Major refactoring/cleanup by Olof Johansson <olof@lixom.net>.
+Based on code originally by Colin Cross <ccross@android.com>.
 
 Changes since v1:
 
-* fix 'return false' on error condition
-* use constant instead of 0 for req_sel
-* dequeue dma ops in case of timeout
+* Add A01 minor rev support
+* Don't decode for A03p on anything but T2x
 
-From: Jon Mayo <jmayo@nvidia.com>.
-Signed-off-by: Jon Mayo <jmayo@nvidia.com>.
 Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mach-tegra/Makefile |    2 +-
- arch/arm/mach-tegra/apbio.c  |  145 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/apbio.h  |   39 +++++++++++
- arch/arm/mach-tegra/dma.c    |    2 +
- 4 files changed, 187 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-tegra/apbio.c
- create mode 100644 arch/arm/mach-tegra/apbio.h
+ arch/arm/mach-tegra/fuse.c          |   85 ++++++++++++++++++++++++-----------
+ arch/arm/mach-tegra/fuse.h          |   32 +++++++++++--
+ arch/arm/mach-tegra/tegra2_clocks.c |    2 +-
+ 3 files changed, 86 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index e120ff5..23d15fb 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -15,7 +15,7 @@ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= pinmux-tegra30-tables.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
- obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
--obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
-+obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o apbio.o
- obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
- obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
- obj-$(CONFIG_USB_SUPPORT)		+= usb_phy.o
-diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
-new file mode 100644
-index 0000000..bec20cd
---- /dev/null
-+++ b/arch/arm/mach-tegra/apbio.c
-@@ -0,0 +1,145 @@
-+/*
-+ * Copyright (C) 2010 NVIDIA Corporation.
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/spinlock.h>
-+#include <linux/completion.h>
-+#include <linux/sched.h>
-+#include <linux/mutex.h>
-+
-+#include <mach/dma.h>
-+#include <mach/iomap.h>
-+
-+#include "apbio.h"
-+
-+static DEFINE_MUTEX(tegra_apb_dma_lock);
-+
-+static struct tegra_dma_channel *tegra_apb_dma;
-+static u32 *tegra_apb_bb;
-+static dma_addr_t tegra_apb_bb_phys;
-+static DECLARE_COMPLETION(tegra_apb_wait);
-+
-+bool tegra_apb_init(void)
-+{
-+	struct tegra_dma_channel *ch;
-+
-+	mutex_lock(&tegra_apb_dma_lock);
-+
-+	/* Check to see if we raced to setup */
-+	if (tegra_apb_dma)
-+		goto out;
-+
-+	ch = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT |
-+		TEGRA_DMA_SHARED);
-+
-+	if (!ch)
-+		goto out_fail;
-+
-+	tegra_apb_bb = dma_alloc_coherent(NULL, sizeof(u32),
-+		&tegra_apb_bb_phys, GFP_KERNEL);
-+	if (!tegra_apb_bb) {
-+		pr_err("%s: can not allocate bounce buffer\n", __func__);
-+		tegra_dma_free_channel(ch);
-+		goto out_fail;
-+	}
-+
-+	tegra_apb_dma = ch;
-+out:
-+	mutex_unlock(&tegra_apb_dma_lock);
-+	return true;
-+
-+out_fail:
-+	mutex_unlock(&tegra_apb_dma_lock);
-+	return false;
-+}
-+
-+static void apb_dma_complete(struct tegra_dma_req *req)
-+{
-+	complete(&tegra_apb_wait);
-+}
-+
-+u32 tegra_apb_readl(unsigned long offset)
-+{
-+	struct tegra_dma_req req;
-+	int ret;
-+
-+	if (!tegra_apb_dma && !tegra_apb_init())
-+		return readl(IO_TO_VIRT(offset));
-+
-+	mutex_lock(&tegra_apb_dma_lock);
-+	req.complete = apb_dma_complete;
-+	req.to_memory = 1;
-+	req.dest_addr = tegra_apb_bb_phys;
-+	req.dest_bus_width = 32;
-+	req.dest_wrap = 1;
-+	req.source_addr = offset;
-+	req.source_bus_width = 32;
-+	req.source_wrap = 4;
-+	req.req_sel = TEGRA_DMA_REQ_SEL_CNTR;
-+	req.size = 4;
-+
-+	INIT_COMPLETION(tegra_apb_wait);
-+
-+	tegra_dma_enqueue_req(tegra_apb_dma, &req);
-+
-+	ret = wait_for_completion_timeout(&tegra_apb_wait,
-+		msecs_to_jiffies(50));
-+
-+	if (WARN(ret == 0, "apb read dma timed out")) {
-+		*(u32 *)tegra_apb_bb = 0;
-+		tegra_dma_dequeue_req(tegra_apb_dma, &req);
-+	}
-+
-+	mutex_unlock(&tegra_apb_dma_lock);
-+	return *((u32 *)tegra_apb_bb);
-+}
-+
-+void tegra_apb_writel(u32 value, unsigned long offset)
-+{
-+	struct tegra_dma_req req;
-+	int ret;
-+
-+	if (!tegra_apb_dma && !tegra_apb_init()) {
-+		writel(value, IO_TO_VIRT(offset));
-+		return;
-+	}
-+
-+	mutex_lock(&tegra_apb_dma_lock);
-+	*((u32 *)tegra_apb_bb) = value;
-+	req.complete = apb_dma_complete;
-+	req.to_memory = 0;
-+	req.dest_addr = offset;
-+	req.dest_wrap = 4;
-+	req.dest_bus_width = 32;
-+	req.source_addr = tegra_apb_bb_phys;
-+	req.source_bus_width = 32;
-+	req.source_wrap = 1;
-+	req.req_sel = TEGRA_DMA_REQ_SEL_CNTR;
-+	req.size = 4;
-+
-+	INIT_COMPLETION(tegra_apb_wait);
-+
-+	tegra_dma_enqueue_req(tegra_apb_dma, &req);
-+
-+	ret = wait_for_completion_timeout(&tegra_apb_wait,
-+		msecs_to_jiffies(50));
-+
-+	if (WARN(ret == 0, "apb write dma timed out"))
-+		tegra_dma_dequeue_req(tegra_apb_dma, &req);
-+
-+	mutex_unlock(&tegra_apb_dma_lock);
-+}
-diff --git a/arch/arm/mach-tegra/apbio.h b/arch/arm/mach-tegra/apbio.h
-new file mode 100644
-index 0000000..8b49e8c
---- /dev/null
-+++ b/arch/arm/mach-tegra/apbio.h
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright (C) 2010 NVIDIA Corporation.
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __MACH_TEGRA_APBIO_H
-+#define __MACH_TEGRA_APBIO_H
-+
-+#ifdef CONFIG_TEGRA_SYSTEM_DMA
-+
-+u32 tegra_apb_readl(unsigned long offset);
-+void tegra_apb_writel(u32 value, unsigned long offset);
-+
-+#else
-+#include <asm/io.h>
-+#include <mach/io.h>
-+
-+static inline u32 tegra_apb_readl(unsigned long offset)
-+{
-+        return readl(IO_TO_VIRT(offset));
-+}
-+
-+static inline void tegra_apb_writel(u32 value, unsigned long offset)
-+{
-+        writel(value, IO_TO_VIRT(offset));
-+}
-+#endif
-+
-+#endif
-diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
-index 98b33c8..122e467 100644
---- a/arch/arm/mach-tegra/dma.c
-+++ b/arch/arm/mach-tegra/dma.c
-@@ -33,6 +33,8 @@
- #include <mach/iomap.h>
- #include <mach/suspend.h>
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index daf3f57..b1895c5 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -30,20 +30,75 @@
+ #define FUSE_SKU_INFO		0x110
+ #define FUSE_SPARE_BIT		0x200
  
-+#include "apbio.h"
++int tegra_sku_id;
++int tegra_cpu_process_id;
++int tegra_core_process_id;
++enum tegra_revision tegra_revision;
 +
- #define APB_DMA_GEN				0x000
- #define GEN_ENABLE				(1<<31)
++static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
++	[TEGRA_REVISION_UNKNOWN] = "unknown",
++	[TEGRA_REVISION_A01]     = "A01",
++	[TEGRA_REVISION_A02]     = "A02",
++	[TEGRA_REVISION_A03]     = "A03",
++	[TEGRA_REVISION_A03p]    = "A03 prime",
++	[TEGRA_REVISION_A04]     = "A04",
++};
++
+ static inline u32 tegra_fuse_readl(unsigned long offset)
+ {
+ 	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
+ }
+ 
++static inline bool get_spare_fuse(int bit)
++{
++	return tegra_fuse_readl(FUSE_SPARE_BIT + bit * 4);
++}
++
++static enum tegra_revision tegra_get_revision(void)
++{
++	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
++	u32 id = readl(chip_id);
++	u32 minor_rev = (id >> 16) & 0xf;
++	u32 chipid = (id >> 8) & 0xff;
++
++	switch (minor_rev) {
++	case 1:
++		return TEGRA_REVISION_A01;
++	case 2:
++		return TEGRA_REVISION_A02;
++	case 3:
++		if (chipid == 0x20 && (get_spare_fuse(18) || get_spare_fuse(19)))
++			return TEGRA_REVISION_A03p;
++		else
++			return TEGRA_REVISION_A03;
++	case 4:
++		return TEGRA_REVISION_A04;
++	default:
++		return TEGRA_REVISION_UNKNOWN;
++	}
++}
++
+ void tegra_init_fuse(void)
+ {
+ 	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
+ 	reg |= 1 << 28;
+ 	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
+ 
+-	pr_info("Tegra SKU: %d CPU Process: %d Core Process: %d\n",
+-		tegra_sku_id(), tegra_cpu_process_id(),
+-		tegra_core_process_id());
++	reg = tegra_fuse_readl(FUSE_SKU_INFO);
++	tegra_sku_id = reg & 0xFF;
++
++	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
++	tegra_cpu_process_id = (reg >> 6) & 3;
++
++	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
++	tegra_core_process_id = (reg >> 12) & 3;
++
++	tegra_revision = tegra_get_revision();
++
++	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
++		tegra_revision_name[tegra_get_revision()],
++		tegra_sku_id, tegra_cpu_process_id,
++		tegra_core_process_id);
+ }
+ 
+ unsigned long long tegra_chip_uid(void)
+@@ -54,27 +109,3 @@ unsigned long long tegra_chip_uid(void)
+ 	hi = tegra_fuse_readl(FUSE_UID_HIGH);
+ 	return (hi << 32ull) | lo;
+ }
+-
+-int tegra_sku_id(void)
+-{
+-	int sku_id;
+-	u32 reg = tegra_fuse_readl(FUSE_SKU_INFO);
+-	sku_id = reg & 0xFF;
+-	return sku_id;
+-}
+-
+-int tegra_cpu_process_id(void)
+-{
+-	int cpu_process_id;
+-	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
+-	cpu_process_id = (reg >> 6) & 3;
+-	return cpu_process_id;
+-}
+-
+-int tegra_core_process_id(void)
+-{
+-	int core_process_id;
+-	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
+-	core_process_id = (reg >> 12) & 3;
+-	return core_process_id;
+-}
+diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
+index 584b2e2..7576aaf 100644
+--- a/arch/arm/mach-tegra/fuse.h
++++ b/arch/arm/mach-tegra/fuse.h
+@@ -1,6 +1,4 @@
+ /*
+- * arch/arm/mach-tegra/fuse.c
+- *
+  * Copyright (C) 2010 Google, Inc.
+  *
+  * Author:
+@@ -17,8 +15,32 @@
+  *
+  */
+ 
++#ifndef __MACH_TEGRA_FUSE_H
++#define __MACH_TEGRA_FUSE_H
++
++enum tegra_revision {
++	TEGRA_REVISION_UNKNOWN = 0,
++	TEGRA_REVISION_A01,
++	TEGRA_REVISION_A02,
++	TEGRA_REVISION_A03,
++	TEGRA_REVISION_A03p,
++	TEGRA_REVISION_A04,
++	TEGRA_REVISION_MAX,
++};
++
++#define SKU_ID_T20	8
++#define SKU_ID_T25SE	20
++#define SKU_ID_AP25	23
++#define SKU_ID_T25	24
++#define SKU_ID_AP25E	27
++#define SKU_ID_T25E	28
++
++extern int tegra_sku_id;
++extern int tegra_cpu_process_id;
++extern int tegra_core_process_id;
++extern enum tegra_revision tegra_revision;
++
+ unsigned long long tegra_chip_uid(void);
+-int tegra_sku_id(void);
+-int tegra_cpu_process_id(void);
+-int tegra_core_process_id(void);
+ void tegra_init_fuse(void);
++
++#endif
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index ff9e6b6..74d314fd 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -720,7 +720,7 @@ static void tegra2_pllx_clk_init(struct clk *c)
+ {
+ 	tegra2_pll_clk_init(c);
+ 
+-	if (tegra_sku_id() == 7)
++	if (tegra_sku_id == 7)
+ 		c->max_rate = 750000000;
+ }
  
 -- 
 1.7.8.GIT
