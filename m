@@ -1,123 +1,171 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 4 Jan 2012 16:35:21 -0800
-Subject: [PATCH 9/9] arm/tegra: emc: device tree support
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F15B3@HQMAIL01.nvidia.com>
-References: <1324599468-12845-1-git-send-email-olof@lixom.net>
- <1324599468-12845-10-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F15B3@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMgq7g9-CEiC0E-hWKeLpGXSQ76bQ94-pkCaZYnRk+B+NQ@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 4 Jan 2012 17:01:03 -0800
+Subject: [PATCH v5 2/2] video: backlight: support s6e8ax0 panel driver
+ based on MIPI DSI
+In-Reply-To: <4EF15F9C.9030807@samsung.com>
+References: <4EF15F9C.9030807@samsung.com>
+Message-ID: <20120104170103.bae938a9.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2012 at 4:27 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Thursday, December 22, 2011 5:18 PM:
->> Add device tree support to the emc driver, filling in the platform data
->> based on the DT bindings.
+On Wed, 21 Dec 2011 13:25:00 +0900
+Donghwa Lee <dh09.lee@samsung.com> wrote:
+
+> 
+> This patch is amoled panel driver based MIPI DSI interface.
+> S6E8AX0 means it may includes many other ldi controllers, for example,
+> S6E8AA0, S6E8AB0, and so on.
+> 
+> This patch can be modified depending on each panel properites. For example,
+> second parameter of panel condition register can be changed depending on
+> ldi controller or amoled type.
+> 
 >
->> diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
 > ...
->> ?out_fail:
->> ? ? ? mutex_unlock(&tegra_apb_dma_lock);
->> - ? ? return true;
->> + ? ? return false;
 >
-> There's the Easter egg;-)
-
-Yep, will move.
-
+> +static unsigned char s6e8ax0_22_gamma_30[] = {
+> +	0xFA, 0x01, 0x60, 0x10, 0x60, 0xF5, 0x00, 0xFF, 0xAD, 0xAF,
+> +	0xBA, 0xC3, 0xD8, 0xC5, 0x9F, 0xC6, 0x9E, 0xC1, 0xDC, 0xC0,
+> +	0x00, 0x61, 0x00, 0x5A, 0x00, 0x74,
+> +};
+> +
 >
->> diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
->
->> +#ifdef CONFIG_OF
->> +static struct device_node *tegra_emc_ramcode_devnode(struct device_node *np)
->> +{
->> + ? ? struct device_node *iter;
->> + ? ? u32 reg;
->> +
->> + ? ? for_each_child_of_node(np, iter) {
->> + ? ? ? ? ? ? if (!of_property_read_u32(np, "nvidia,ram-code", &reg))
->> + ? ? ? ? ? ? ? ? ? ? continue;
->
-> I think that test is inverted; it returns 0 on success.
-
-D'oh, thanks.
-
->
->> +static struct tegra_emc_pdata *tegra_emc_dt_parse_pdata(
->> + ? ? ? ? ? ? struct platform_device *pdev)
 > ...
->> + ? ? pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
->> + ? ? pdata->tables = devm_kzalloc(&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(struct tegra_emc_table) * num_tables,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
 >
-> May as well use sizeof(*pdata->tables) there too for consistency?
+> +static unsigned char s6e8ax0_22_gamma_300[] = {
+> +	0xFA, 0x01, 0x60, 0x10, 0x60, 0xB5, 0xD3, 0xBD, 0xB1, 0xD2,
+> +	0xB0, 0xC0, 0xDC, 0xC0, 0x94, 0xBA, 0x91, 0xAC, 0xC5, 0xA9,
+> +	0x00, 0xC2, 0x00, 0xB7, 0x00, 0xED,
+> +};
+> +
+> +static unsigned char *s6e8ax0_22_gamma_table[] = {
+> +	s6e8ax0_22_gamma_30,
+> +	s6e8ax0_22_gamma_50,
+> +	s6e8ax0_22_gamma_60,
+> +	s6e8ax0_22_gamma_70,
+> +	s6e8ax0_22_gamma_80,
+> +	s6e8ax0_22_gamma_90,
+> +	s6e8ax0_22_gamma_100,
+> +	s6e8ax0_22_gamma_120,
+> +	s6e8ax0_22_gamma_130,
+> +	s6e8ax0_22_gamma_140,
+> +	s6e8ax0_22_gamma_150,
+> +	s6e8ax0_22_gamma_160,
+> +	s6e8ax0_22_gamma_170,
+> +	s6e8ax0_22_gamma_180,
+> +	s6e8ax0_22_gamma_190,
+> +	s6e8ax0_22_gamma_200,
+> +	s6e8ax0_22_gamma_210,
+> +	s6e8ax0_22_gamma_220,
+> +	s6e8ax0_22_gamma_230,
+> +	s6e8ax0_22_gamma_240,
+> +	s6e8ax0_22_gamma_250,
+> +	s6e8ax0_22_gamma_260,
+> +	s6e8ax0_22_gamma_270,
+> +	s6e8ax0_22_gamma_280,
+> +	s6e8ax0_22_gamma_300,
+> +};
 
-Sure, can change it.
+I suggest making all the above arrays const.  Otherwise the compiler
+might end up deciding to needlessly allocate space in writeable storage
+for them.
 
->
->> +
->> + ? ? i = 0;
->> + ? ? for_each_child_of_node(tnp, iter) {
->> + ? ? ? ? ? ? u32 prop;
->> +
->> + ? ? ? ? ? ? ret = of_property_read_u32(iter, "clock-frequency", &prop);
->> + ? ? ? ? ? ? if (ret) {
->> + ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev, "no clock-frequency in %s\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? iter->full_name);
->> + ? ? ? ? ? ? ? ? ? ? continue;
->
-> Not goto out?
+If that means that ops->cmd_write() needs constification as well then
+let's just do that, for it is the right thing to do.
 
-If there's ever another child-node added by someone (by mistake or
-otherwise), this would start to fail. I'd rather try to survive it and
-just not use the malformed entries.
-
->> + ? ? ? ? ? ? }
->> + ? ? ? ? ? ? pdata->tables[i].rate = prop;
->> +
->> + ? ? ? ? ? ? ret = of_property_read_u32_array(iter, "nvidia,emc-registers",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pdata->tables[i].regs,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?TEGRA_EMC_NUM_REGS);
->> + ? ? ? ? ? ? if (ret) {
->> + ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "malformed emc-registers property in %s\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? iter->full_name);
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? i++;
->> + ? ? }
->> + ? ? pdata->num_tables = i;
->
-> Or here, "if (i != num_tables) error"?
-
-Same, I'd rather try to use what we got.
-
-
->> +
->> +out:
->> + ? ? of_node_put(tnp);
->> + ? ? return pdata;
->> +}
->
-> +static struct tegra_emc_pdata __devinit *tegra_emc_fill_pdata(struct platform_device *pdev)
+> +static void s6e8ax0_panel_cond(struct s6e8ax0 *lcd)
 > +{
-> ...
-> + ? ? ? pdata->tables[0].rate = clk_get_rate(c);
-> ...
-> + ? ? ? dev_info(&pdev->dev, "no tables provided, using settings for %ld kHz\n",
-> + ? ? ? ? ? ? ? ?pdata->tables[0].rate / 2000);
+> +	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
+> +
+> +	unsigned char data_to_send[] = {
+> +		0xf8, 0x3d, 0x35, 0x00, 0x00, 0x00, 0x93, 0x00, 0x3c,
+> +		0x7d, 0x08, 0x27, 0x7d, 0x3f, 0x00, 0x00, 0x00, 0x20,
+> +		0x04, 0x08, 0x6e, 0x00, 0x00, 0x00, 0x02, 0x08, 0x08,
+> +		0x23, 0x23, 0xc0, 0xc8, 0x08, 0x48, 0xc1, 0x00, 0xc1,
+> +		0xff, 0xff, 0xc8
+> +	};
+
+Arrays like this certainly should be const.  As it stands, the compiler
+needs to generate room on the stack and generate a local copy of the
+array each time this function is called!
+
+> +	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
+> +		data_to_send, ARRAY_SIZE(data_to_send));
+> +}
+> +
+> +static void s6e8ax0_display_cond(struct s6e8ax0 *lcd)
+> +{
+> +	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
+> +	unsigned char data_to_send[] = {
+> +		0xf2, 0x80, 0x03, 0x0d
+> +	};
+> +
+> +	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
+> +		data_to_send, ARRAY_SIZE(data_to_send));
+> +}
+> +
+> +/* Gamma 2.2 Setting (200cd, 7500K, 10MPCD) */
+> +static void s6e8ax0_gamma_cond(struct s6e8ax0 *lcd)
+> +{
+> +	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
+> +	unsigned int gamma = lcd->bd->props.brightness;
+> +
+> +	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
+> +			s6e8ax0_22_gamma_table[gamma],
+> +			ARRAY_SIZE(s6e8ax0_22_gamma_table));
+
+This seems wrong.  ARRAY_SIZE(s6e8ax0_22_gamma_table) does not
+represent the size of s6e8ax0_22_gamma_table[gamma]!
+
+> +}
+> +
 >
-> Is that right; I'm not sure if the /2 should be applied to what's stored
-> in .rate, or to the EMC clock value from clk_get_rate(). Similarly, is
-> the DT frequency the /2 version; there's no /2 in the DT parsing, but I
-> think I expect there to be.
+> ...
+>
+> +static int s6e8ax0_update_gamma_ctrl(struct s6e8ax0 *lcd, int brightness)
+> +{
+> +	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
+> +
+> +	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
+> +			s6e8ax0_22_gamma_table[brightness],
+> +			ARRAY_SIZE(s6e8ax0_22_gamma_table));
 
-The EMC clock is 2x the memory speed (on T20), so the above will print
-out the actual speed of memory, not of the EMC block. The DT binding
-is based on the EMC clock. I guess that could be considered
-inconsistent, I can update the message to clarify.
+Ditto.
 
+> +	/* update gamma table. */
+> +	s6e8ax0_gamma_update(lcd);
+> +	lcd->gamma = brightness;
+> +
+> +	return 0;
+> +}
+> +
+>
+> ...
+>
+> +static void s6e8ax0_power_on(struct mipi_dsim_lcd_device *dsim_dev, int power)
+> +{
+> +	struct s6e8ax0 *lcd = dev_get_drvdata(&dsim_dev->dev);
+> +
+> +	msleep(lcd->ddi_pd->power_on_delay);
+> +
+> +	/* lcd power on */
+> +	if (power)
+> +		s6e8ax0_regulator_enable(lcd);
+> +	else
+> +		s6e8ax0_regulator_disable(lcd);
+> +
+> +	msleep(lcd->ddi_pd->reset_delay);
+> +
+> +	/* lcd reset */
+> +	if (lcd->ddi_pd->reset)
+> +		lcd->ddi_pd->reset(lcd->ld);
+> +	msleep(5);
+> +}
 
--Olof
+Maybe we should hold lcd->lock across this function to prevent other
+code paths from getting in and fiddling with the hardware while it is
+powering on?
+
+>
+> ...
+>
