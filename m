@@ -1,42 +1,37 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 5 Jan 2012 22:13:32 +0530
-Subject: [PATCH 6/6] mmc: sdhci-s3c: Add device tree support
-In-Reply-To: <4F05CE60.5090402@samsung.com>
-References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
- <1320266163-15292-7-git-send-email-thomas.abraham@linaro.org>
- <20111107211726.GC28491@ponder.secretlab.ca>
- <CAJuYYwSfC5t6xs-TDT2wBOj1RbQYSpH0wjo9uBcYf7bGyi0t9g@mail.gmail.com>
- <4F047235.2090503@samsung.com>
- <CAJuYYwTMpde-528t=vQnbkJv_gG7xuOr05b1K-+H-RxYRX0iEQ@mail.gmail.com>
- <4F05CE60.5090402@samsung.com>
-Message-ID: <CAJuYYwRiubBo5Y4K_x_VPeRWOzmHgegyV4Sh=Eee6JgfAmP2iA@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 5 Jan 2012 08:47:15 -0800
+Subject: [PATCH 5/6] gpio: tegra: Dynamically allocate IRQ base, and
+ support DT
+In-Reply-To: <20120105131736.GC4641@page>
+References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
+ <1325702378-20863-5-git-send-email-swarren@nvidia.com>
+ <20120105131736.GC4641@page>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17761F1683@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Jamie Iles wrote at Thursday, January 05, 2012 6:18 AM:
+> On Wed, Jan 04, 2012 at 11:39:37AM -0700, Stephen Warren wrote:
+> > Enhance the driver to dynamically allocate the base IRQ number, and
+> > create an IRQ domain for itself. The use of an IRQ domain ensures that
+> > any device tree node interrupts properties are correctly parsed.
+...
+> > diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+...
+> > +- #interrupt-cells : Should be 2.
+> > +  The first cell is the GPIO number.
+> > +  The second cell is used to specify flags:
+> > +    bits[3:0] trigger type and level flags:
+> > +      1 = low-to-high edge triggered.
+> > +      2 = high-to-low edge triggered.
+> > +      4 = active high level-sensitive.
+> > +      8 = active low level-sensitive.
+> > +      Valid combinations are 1, 2, 3, 4, 8.
+> 
+> It looks to me like the tegra gpio driver can do IRQ_TYPE_EDGE_BOTH so I
+> would expect 12 to be a valid combination too no?
 
-On 5 January 2012 21:52, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-[...]
+I believe EDGE_BOTH is 3 (OR of edge low and edge high)
 
->> Sorry for the delaying in completing this patchset. I will redo this
->> patchset and submit it soon. But 3.3-rc1 looks unlikely.
->
-> Ok, thanks. It's fine, there is no rush. I was just curious because we have
-> reused this sdhci driver update series and it seemed essential for initial
-> DT support on Exynos4 machines. Just FYI I have prepared initial DT support
-> patches for the S5P MIPI-CSI2 (s5p-mipi-csis) receiver driver.
-> But the whole camera subsystem needs more work, i.e. resource dependencies
-> (clock) between all involved devices (like image sensors and video capture
-> platform devices) need to be resolved and method of registering sub-devices
-> in the V4L2 core will likely need to be changed.
-
-Thanks for the information. It was helpful to know that you are working on this.
-
-Regards,
-Thomas.
-
->
->
-> --
-> Thanks,
-> Sylwester
+-- 
+nvpbulic
