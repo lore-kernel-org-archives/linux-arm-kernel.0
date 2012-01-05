@@ -1,60 +1,65 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 5 Jan 2012 22:24:09 +0800
-Subject: [PATCH 2/2] arm/imx6q: add cko1 clock
-In-Reply-To: <20120105135311.GF1729@S2101-09.ap.freescale.net>
-References: <1325733074-10749-1-git-send-email-richard.zhao@linaro.org>
- <1325733074-10749-2-git-send-email-richard.zhao@linaro.org>
- <20120105135311.GF1729@S2101-09.ap.freescale.net>
-Message-ID: <20120105142409.GA26848@b20223-02.ap.freescale.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 5 Jan 2012 15:29:30 +0100
+Subject: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU
+ driver
+In-Reply-To: <20120105125326.GT11810@n2100.arm.linux.org.uk>
+References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com><20120105091718.3fb378b2a1d390f9dd63c396@nvidia.com><20120105125326.GT11810@n2100.arm.linux.org.uk>
+Message-ID: <20120105.162930.604365154868332443.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 09:53:13PM +0800, Shawn Guo wrote:
-> On Thu, Jan 05, 2012 at 11:11:14AM +0800, Richard Zhao wrote:
-> > imx6q-sabrelite board use it as audio codec clock.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  arch/arm/mach-imx/clock-imx6q.c |   74 ++++++++++++++++++++++++++++++++++++++-
-> >  1 files changed, 73 insertions(+), 1 deletions(-)
-> > 
-> It mostly looks good.  A couple of comments below though:
-> 
-> * Again, use "ARM: imx6q: ..." for patch subject in this case.
-ok
-> 
-> * To reflect the CKO hardware hierarchy, we should probably have 3 clks
->   there, cko_clk, cko1_clk and cko2_clk, and have cko_clk be the parent
->   of the later two, as cko1_cko2_sel bit was designed for this.
-The origin idea is to only add clocks I used. cko1_cko2_sel is default
-zero, so I didn't add cko2. It's fine if you need all cko1/cko2.
-> 
-> [...]
-> 
-> > @@ -1680,7 +1734,7 @@ static int _clk_set_parent(struct clk *clk, struct clk *parent)
-> >  			break;
-> >  		i++;
-> >  	}
-> > -	if (!m->parents[i])
-> > +	if (!m->parents[i] || m->parents[i] == &dummy_clk)
-> 
-> Is this change necessarily included in this patch?
-Yes. cko clocks always may have many parents. Some of them we never use.
-So there's a hole in the parents array.
-For cko1, we don't have video_27M_clk_root.
+Hi Russell,
 
-Thanks
-Richard
-> 
-> Regards,
-> Shawn
-> 
-> >  		return -EINVAL;
-> >  
-> >  	val = readl_relaxed(m->reg);
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Subject: Re: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU driver
+Date: Thu, 5 Jan 2012 13:53:26 +0100
+Message-ID: <20120105125326.GT11810@n2100.arm.linux.org.uk>
+
+> On Thu, Jan 05, 2012 at 09:17:18AM +0200, Hiroshi Doyu wrote:
+> > Just for DMA mapping test from MPU side, the following one is used.
+>
+> This patch is buggy.
+>
+> > +static void dmaapi_test_map_page(struct device *dev)
+> > +{
+> > +	struct page *page;
+> > +	dma_addr_t dma_addr;
+> > +	void *cpu_addr;
+> > +
+> > +	page = alloc_page(GFP_KERNEL);
+> > +	BUG_ON(!page);
+> > +
+> > +	dma_addr = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_TO_DEVICE);
+> > +	BUG_ON(!dma_addr);
+> > +
+> > +	cpu_addr = kmap(page);
+> > +	BUG_ON(!cpu_addr);
+> > +	memset(cpu_addr, 0xa5, PAGE_SIZE);
+> > +	kunmap(cpu_addr);
+>
+> The DMA API works like this:
+>
+> - The CPU owns the page or buffer and can access it.
+> - You map the page or buffer.
+> - The device owns the page or buffer; the CPU must explicitly access it.
+> - You unmap the page or buffer.
+> - The CPU again owns the page/buffer and can access it.
+>
+> Please respect the DMA API rules.
+
+Right, I do.
+
+> So.  Once dma_map_page() has returned, you must not kmap() or otherwise
+> access the data contained in that page until after you have unmapped it.
+
+Ok, the above function order should be as below?
+
+  page = alloc_page(GFP_KERNEL);
+      cpu_addr = kmap(page);
+      memset(cpu_addr, 0xa5, PAGE_SIZE);
+  	dma_addr = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_TO_DEVICE);
+  	    < expect GPU does something >
+  	dma_unmap_page(dev, dma_addr, PAGE_SIZE, DMA_TO_DEVICE);
+      < CPU can access data here again>
+      kunmap(cpu_addr);
+  __free_page(page);
