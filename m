@@ -1,14 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed,  4 Jan 2012 21:56:34 -0800
-Subject: [PATCH v2] arm/tegra: emc: convert tegra2_emc to a platform driver
-In-Reply-To: <1324599468-12845-7-git-send-email-olof@lixom.net>
-References: <1324599468-12845-7-git-send-email-olof@lixom.net>
-Message-ID: <1325742994-1178-1-git-send-email-olof@lixom.net>
+Date: Wed,  4 Jan 2012 22:01:28 -0800
+Subject: [PATCH v3] arm/tegra: emc: convert tegra2_emc to a platform driver
+In-Reply-To: <1325742994-1178-1-git-send-email-olof@lixom.net>
+References: <1325742994-1178-1-git-send-email-olof@lixom.net>
+Message-ID: <1325743288-2460-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is the first step in making it device-tree aware and get rid of the
 in-kernel EMC tables (of which there are none in mainline, thankfully).
+
+Changes since v2:
+
+* D'oh -- missed a couple of variables that were added, never used and then
+  later removed in a later patch.
 
 Changes since v1:
 
@@ -17,14 +22,14 @@ Changes since v1:
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mach-tegra/tegra2_emc.c        |   96 +++++++++++++++++++++++-------
+ arch/arm/mach-tegra/tegra2_emc.c        |   92 +++++++++++++++++++++++--------
  arch/arm/mach-tegra/tegra2_emc.h        |   11 +--
  include/linux/platform_data/tegra_emc.h |   34 +++++++++++
- 3 files changed, 111 insertions(+), 30 deletions(-)
+ 3 files changed, 107 insertions(+), 30 deletions(-)
  create mode 100644 include/linux/platform_data/tegra_emc.h
 
 diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
-index 0f7ae6e..604d6fc 100644
+index 0f7ae6e..ad70180 100644
 --- a/arch/arm/mach-tegra/tegra2_emc.c
 +++ b/arch/arm/mach-tegra/tegra2_emc.c
 @@ -20,6 +20,8 @@
@@ -105,7 +110,7 @@ index 0f7ae6e..604d6fc 100644
  }
  
  /*
-@@ -142,37 +143,86 @@ long tegra_emc_round_rate(unsigned long rate)
+@@ -142,37 +143,82 @@ long tegra_emc_round_rate(unsigned long rate)
   */
  int tegra_emc_set_rate(unsigned long rate)
  {
@@ -140,20 +145,18 @@ index 0f7ae6e..604d6fc 100644
  	for (j = 0; j < TEGRA_EMC_NUM_REGS; j++)
 -		emc_writel(tegra_emc_table[i].regs[j], emc_reg_addr[j]);
 +		emc_writel(pdata->tables[i].regs[j], emc_reg_addr[j]);
-+
+ 
+-	emc_readl(tegra_emc_table[i].regs[TEGRA_EMC_NUM_REGS - 1]);
 +	emc_readl(pdata->tables[i].regs[TEGRA_EMC_NUM_REGS - 1]);
-+
-+	return 0;
-+}
-+
+ 
+ 	return 0;
+ }
+ 
+-void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 +static int __devinit tegra_emc_probe(struct platform_device *pdev)
 +{
 +	struct tegra_emc_pdata *pdata;
-+	struct clk *c = clk_get_sys("emc", NULL);
-+	struct clk *user;
 +	struct resource *res;
-+	unsigned long max = 0;
-+	int i;
 +
 +	if (!emc_enable) {
 +		dev_err(&pdev->dev, "disabled per module parameter\n");
@@ -177,15 +180,13 @@ index 0f7ae6e..604d6fc 100644
 +		dev_err(&pdev->dev, "failed to request register region\n");
 +		return -EBUSY;
 +	}
- 
--	emc_readl(tegra_emc_table[i].regs[TEGRA_EMC_NUM_REGS - 1]);
++
 +	emc_regbase = ioremap(res->start, resource_size(res));
 +	emc_pdev = pdev;
- 
- 	return 0;
- }
- 
--void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
++
++	return 0;
++}
++
 +static struct platform_driver tegra_emc_driver = {
 +	.driver         = {
 +		.name   = "tegra-emc",
