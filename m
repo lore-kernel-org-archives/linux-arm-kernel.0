@@ -1,30 +1,49 @@
-From: johlstei@codeaurora.org (johlstei)
-Date: Thu, 05 Jan 2012 11:34:14 -0800
-Subject: [PATCH v2 00/15] Make SMP timers standalone
-In-Reply-To: <CACRpkdYjQPoY60XdhTwgLYbTrQMhC=Wxk5Y=hP2Vr0DngUJbxg@mail.gmail.com>
-References: <1324574865-5367-1-git-send-email-marc.zyngier@arm.com>	<20111222193216.GO2577@n2100.arm.linux.org.uk>	<4F048EC4.40900@arm.com>	<20120105011704.GA8870@codeaurora.org>
- <CACRpkdYjQPoY60XdhTwgLYbTrQMhC=Wxk5Y=hP2Vr0DngUJbxg@mail.gmail.com>
-Message-ID: <4F05FB36.7020509@codeaurora.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 5 Jan 2012 12:04:44 -0800
+Subject: [PATCH v4 2/6] Documentation: common clk API
+In-Reply-To: <20120105143105.GA2865@matterhorn1>
+References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
+ <1323834838-2206-3-git-send-email-mturquette@linaro.org>
+ <20120105143105.GA2865@matterhorn1>
+Message-ID: <CAJOA=zMEPW1vX_+KVexoLh0r4kO+vZ4zJQhsgDxwuu_7edFTgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2012 02:26 AM, Linus Walleij wrote:
-> On Thu, Jan 5, 2012 at 2:17 AM, David Brown<davidb@codeaurora.org>  wrote:
->> On Wed, Jan 04, 2012 at 05:39:16PM +0000, Marc Zyngier wrote:
->>> I do. But on some non-SMP platforms, the local timer and the global
->>> timer can actually be the same (MSM is one example of this, and the UP
->>> version of the Cortex A15 is another).
->> On SMP MSM, we use the CPU0 local timer as the global timer.  They are
->> the same on non-SMP as well,
-> Does this mean your CPU0 local timer is always on, always clocked?
-> And do you use ARMs SMP TWD IP block for that?
+On Thu, Jan 5, 2012 at 6:31 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+> Tiny, tiny typo...
 >
-Yes, CPU0's local timer is always on. We use it as a global clocksource, 
-as well
-as for udelay on both cores. It is not ARM's SMP TWD block, it is our 
-own. The
-timer blocks can each be read from both CPUs, but can only generate IRQs 
-to one
-or the other.
+> On 11 Dec 13, Mike Turquette wrote:
+>
+>> +clk_set_rate deserves a special mention because it is more complex than
+>> +the other operations. ?There are three key concepts to the common
+>> +clk_set_rate implementation:
+>> +
+>> +1) recursively traversing up the clk tree and changing clk rates, one
+>> +parent at a time, if each clk allows it
+>> +2) failing to change rate if the clk is enabled and must only change
+>> +rates while disabled
+>> +3) using clk rate change notifiers to allow devices to handle dynamic
+>> +rate changes for clks which do support changing rates while enabled
+>> +
+>> +For the simple, non-recursive case the call graph looks like:
+>> +
+>> +clk_set_rate(clk, rate);
+>> + ? ? __clk_set_rate(clk, rate);
+>> + ? ? ? ? ? ? clk->round_rate(clk, rate *parent_rate);
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?^^^^^^^^
+>
+> need a comma here? The next sentence kept me busy for 5 mins.
 
-Jeff
+Thanks, will fix in next submission (along with general rework of
+messy documentation).
+
+Mike
+
+>
+>> + ? ? ? ? ? ? clk->set_rate(clk, rate);
+>> +
+>> +You might be wondering what that third paramater in .round_rate is. ?If
+>> +a clk supports the CLK_PARENT_SET_RATE flag then that enables it's
+>> +hardware-specific .round_rate function to provide a new rate that the
+>> +parent should transition to. ?For example, imagine a rate-adjustable clk
+>> +A that is the parent of clk B, which has a fixed divider of 2.
