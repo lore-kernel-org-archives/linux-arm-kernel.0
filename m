@@ -1,122 +1,188 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 6 Jan 2012 22:20:53 +0800
-Subject: [RFC][PATCH] ARM: NUC900: Rename nuc900-audio platform device to
- nuc900-ac97
-In-Reply-To: <1325850987.2773.2.camel@phoenix>
-References: <1325850987.2773.2.camel@phoenix>
-Message-ID: <CAKT61h8vpk4xLEoKDJcLnAL54q-XzHj73LTwHb8LgxEx38+c=Q@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  6 Jan 2012 17:20:30 +0100
+Subject: [PATCH v4] ARM: at91: pit add DT support
+In-Reply-To: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1325866830-13259-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/6, Axel Lin <axel.lin@gmail.com>:
-> This change ensures the platform device name matches nuc900-ac97 platform
-> driver name.
->
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+Retreive registers address and IRQ from device tree entry. Fall back
+to built-in values if an error occurs.
 
-> ---
-> Hi ZongShun,
-> I don't have this hardware, I'd appreciate if you can test this patch.
-> This patch is against linux-next 20120103.
-> Thanks,
-> Axel
->  arch/arm/mach-w90x900/clksel.c |    2 +-
->  arch/arm/mach-w90x900/cpu.c    |    2 +-
->  arch/arm/mach-w90x900/dev.c    |    6 +++---
->  arch/arm/mach-w90x900/mfp.c    |    2 +-
->  sound/soc/nuc900/nuc900-ac97.c |    2 +-
->  5 files changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-w90x900/clksel.c b/arch/arm/mach-w90x900/clksel.c
-> index 3de4a52..06d867dc 100644
-> --- a/arch/arm/mach-w90x900/clksel.c
-> +++ b/arch/arm/mach-w90x900/clksel.c
-> @@ -48,7 +48,7 @@ static void clock_source_select(const char *dev_id,
-> unsigned int clkval)
->  		offset = ATAOFFSET;
->  	else if (strcmp(dev_id, "nuc900-lcd") == 0)
->  		offset = LCDOFFSET;
-> -	else if (strcmp(dev_id, "nuc900-audio") == 0)
-> +	else if (strcmp(dev_id, "nuc900-ac97") == 0)
->  		offset = AUDOFFSET;
->  	else
->  		offset = CPUOFFSET;
-> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
-> index 604e1db..9a06619 100644
-> --- a/arch/arm/mach-w90x900/cpu.c
-> +++ b/arch/arm/mach-w90x900/cpu.c
-> @@ -79,7 +79,7 @@ static DEFINE_CLK(timer4, 23);
->
->  static struct clk_lookup nuc900_clkregs[] = {
->  	DEF_CLKLOOK(&clk_lcd, "nuc900-lcd", NULL),
-> -	DEF_CLKLOOK(&clk_audio, "nuc900-audio", NULL),
-> +	DEF_CLKLOOK(&clk_audio, "nuc900-ac97", NULL),
->  	DEF_CLKLOOK(&clk_fmi, "nuc900-fmi", NULL),
->  	DEF_CLKLOOK(&clk_ms, "nuc900-fmi", "MS"),
->  	DEF_CLKLOOK(&clk_sd, "nuc900-fmi", "SD"),
-> diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
-> index 5b0c38a..78110be 100644
-> --- a/arch/arm/mach-w90x900/dev.c
-> +++ b/arch/arm/mach-w90x900/dev.c
-> @@ -501,8 +501,8 @@ static struct resource nuc900_ac97_resource[] = {
->
->  };
->
-> -struct platform_device nuc900_device_audio = {
-> -	.name		= "nuc900-audio",
-> +struct platform_device nuc900_device_ac97 = {
-> +	.name		= "nuc900-ac97",
->  	.id		= -1,
->  	.num_resources	= ARRAY_SIZE(nuc900_ac97_resource),
->  	.resource	= nuc900_ac97_resource,
-> @@ -523,7 +523,7 @@ static struct platform_device *nuc900_public_dev[]
-> __initdata = {
->  	&nuc900_device_emc,
->  	&nuc900_device_spi,
->  	&nuc900_device_wdt,
-> -	&nuc900_device_audio,
-> +	&nuc900_device_ac97,
->  };
->
->  /* Provide adding specific CPU platform devices API */
-> diff --git a/arch/arm/mach-w90x900/mfp.c b/arch/arm/mach-w90x900/mfp.c
-> index 9dd7461..c58d142 100644
-> --- a/arch/arm/mach-w90x900/mfp.c
-> +++ b/arch/arm/mach-w90x900/mfp.c
-> @@ -155,7 +155,7 @@ void mfp_set_groupg(struct device *dev, const char
-> *subname)
->  	} else if (strcmp(dev_id, "nuc900-i2c1") == 0) {
->  		mfpen &= ~(GPIOG2TO3);
->  		mfpen |= ENI2C1;/*enable i2c1*/
-> -	} else if (strcmp(dev_id, "nuc900-audio") == 0) {
-> +	} else if (strcmp(dev_id, "nuc900-ac97") == 0) {
->  		mfpen &= ~(GPIOG22TO23);
->  		mfpen |= ENAC97;/*enable AC97*/
->  	} else if (strcmp(dev_id, "nuc900-mmc-port1") == 0) {
-> diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
-> index 45d11dd..946020a 100644
-> --- a/sound/soc/nuc900/nuc900-ac97.c
-> +++ b/sound/soc/nuc900/nuc900-ac97.c
-> @@ -366,7 +366,7 @@ static int __devinit nuc900_ac97_drvprobe(struct
-> platform_device *pdev)
->  		goto out3;
->
->  	/* enbale ac97 multifunction pin */
-> -	mfp_set_groupg(nuc900_audio->dev, "nuc900-audio");
-> +	mfp_set_groupg(nuc900_audio->dev, NULL);
->
->  	return 0;
->
-> --
-> 1.7.5.4
->
->
->
->
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+[nicolas.ferre at atmel.com: change error path and interrupts property handling]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+---
+v4: - change of_at91sam926x_pit_init() return value usage logic as
+      suggested by Rob Herring
+    - irq_of_parse_and_map() returns 0 on error: change test according to 
+      Grant Likely note.
 
+v3: - use irq_of_parse_and_map() for handling irq numbers specified by DT.
+      Correction proposed by Jamie Iles.
 
+v2: - new specification of irq numbers in DT (due to modification of AIC code)
+    - new error path in of_at91sam926x_pit_init()
+    - fall back to built-in values if an error occurs
+    - use of of_property_read_u32() to get irq property
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |    8 +++
+ arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 ++
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++
+ arch/arm/mach-at91/at91sam926x_time.c              |   60 ++++++++++++++++++--
+ 4 files changed, 73 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+new file mode 100644
+index 0000000..380f711
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -0,0 +1,8 @@
++Atmel AT91 device tree bindings.
++================================
++
++PIT Timer required properties:
++- compatible: Should be "atmel,at91sam9260-pit"
++- reg: Should contain registers location and length
++- interrupts: Should contain interrupt for the PIT which is the IRQ line
++  shared across all System Controller members.
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index ea942b5..e10842a 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -57,6 +57,11 @@
+ 				reg = <0xfffff000 0x200>;
+ 			};
+ 
++			pit: timer at fffffd30 {
++				compatible = "atmel,at91sam9260-pit";
++				reg = <0xfffffd30 0xf>;
++				interrupts = <1 4>;
++			};
+ 
+ 			pioA: gpio at fffff400 {
+ 				compatible = "atmel,at91rm9200-gpio";
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index ebc9617..28a678f 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -58,6 +58,12 @@
+ 				reg = <0xfffff000 0x200>;
+ 			};
+ 
++			pit: timer at fffffd30 {
++				compatible = "atmel,at91sam9260-pit";
++				reg = <0xfffffd30 0xf>;
++				interrupts = <1 4>;
++			};
++
+ 			dma: dma-controller at ffffec00 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffec00 0x200>;
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index d89ead7..802fea3 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -14,6 +14,9 @@
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
+ #include <linux/clockchips.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
+ 
+ #include <asm/mach/time.h>
+ 
+@@ -133,7 +136,8 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ static struct irqaction at91sam926x_pit_irq = {
+ 	.name		= "at91_tick",
+ 	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= at91sam926x_pit_interrupt
++	.handler	= at91sam926x_pit_interrupt,
++	.irq		= AT91_ID_SYS,
+ };
+ 
+ static void at91sam926x_pit_reset(void)
+@@ -149,6 +153,49 @@ static void at91sam926x_pit_reset(void)
+ 	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id timer_ids[] = {
++	{ .compatible = "atmel,at91sam9260-pit" },
++	{ /* sentinel */ }
++};
++
++static int __init of_at91sam926x_pit_init(void)
++{
++	struct device_node	*np;
++	int			ret;
++
++	np = of_find_matching_node(NULL, timer_ids);
++	if (!np)
++		goto err;
++
++	pit_base_addr = of_iomap(np, 0);
++	if (!pit_base_addr)
++		goto node_err;
++
++	/* Get the interrupts property */
++	ret = irq_of_parse_and_map(np, 0);
++	if (!ret)
++		goto ioremap_err;
++	at91sam926x_pit_irq.irq = ret;
++
++	of_node_put(np);
++
++	return 0;
++
++ioremap_err:
++	iounmap(pit_base_addr);
++node_err:
++	of_node_put(np);
++err:
++	return -EINVAL;
++}
++#else
++static int __init of_at91sam926x_pit_init(void)
++{
++	return -EINVAL;
++}
++#endif
++
+ /*
+  * Set up both clocksource and clockevent support.
+  */
+@@ -177,7 +224,7 @@ static void __init at91sam926x_pit_init(void)
+ 	clocksource_register_hz(&pit_clk, pit_rate);
+ 
+ 	/* Set up irq handler */
+-	setup_irq(AT91_ID_SYS, &at91sam926x_pit_irq);
++	setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
+ 
+ 	/* Set up and register clockevents */
+ 	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
+@@ -193,10 +240,11 @@ static void at91sam926x_pit_suspend(void)
+ 
+ void __init at91sam926x_ioremap_pit(u32 addr)
+ {
+-	pit_base_addr = ioremap(addr, 16);
+-
+-	if (!pit_base_addr)
+-		panic("Impossible to ioremap PIT\n");
++	if (of_at91sam926x_pit_init() < 0) {
++		pit_base_addr = ioremap(addr, 16);
++		if (!pit_base_addr)
++			panic("Impossible to ioremap PIT\n");
++	}
+ }
+ 
+ struct sys_timer at91sam926x_timer = {
 -- 
-Wan ZongShun.
-www.mcuos.com
+1.7.5.4
