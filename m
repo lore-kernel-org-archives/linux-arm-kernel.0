@@ -1,41 +1,40 @@
-From: arnd.bergmann@linaro.org (Arnd Bergmann)
-Date: Fri, 6 Jan 2012 17:30:33 +0000
-Subject: [PATCH 1/2] at91 : move pm.h header to arch/arm/include/asm
-In-Reply-To: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <201201061730.33525.arnd.bergmann@linaro.org>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Fri, 6 Jan 2012 21:40:33 +0300
+Subject: [PATCH] DaVinci: can only power up domains on DM644x
+In-Reply-To: <201109151829.49256.sshtylyov@ru.mvista.com>
+References: <201109151829.49256.sshtylyov@ru.mvista.com>
+Message-ID: <201201062140.33712.sshtylyov@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 January 2012, Daniel Lezcano wrote:
-> Move the location of the pm.h header file to the include directory,
-> so it can be included from another place from the current one.
-> 
-> That will allow the next patch which moves the cpuidle code to the
-> drivers/cpuidle directory.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/{mach-at91/pm.h => include/asm/at91_pm.h} |    0
->  arch/arm/mach-at91/cpuidle.c                       |    2 +-
->  arch/arm/mach-at91/pm.c                            |    2 +-
->  3 files changed, 2 insertions(+), 2 deletions(-)
->  rename arch/arm/{mach-at91/pm.h => include/asm/at91_pm.h} (100%)
+Only DM644x has the domain power up procedure documented; for all other SoCs a
+bootloader probably should have powered the domain up. Print error message and
+give up if it hasn't done so.
 
-Moving the driver is great, as we have previously discussed, but
-the header file does not belong into include/asm really, because it
-is too hardware specific and we are trying to keep such stuff out
-of that place.
+Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 
-One option would be to move the pm.c along with the cpuidle.c file,
-in particular that might turn out to be a good idea if other
-platforms have the same requirement.
+---
+Sekhar, I haven't forgotten about that patch we discussed, just lacked time...
 
-Aside from that, it would be good to hear from the AT91 maintainers
-how they want to deal with the removal of CONFIG_ARCH_AT91_*
-conditionals, which AFACIT will be necessary anyway in order to allow
-building a single kernel across multiple at91 targets. Once that
-problem is solved for pm.h, the question of where to place that header
-may be resolved, too.
+ arch/arm/mach-davinci/psc.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-	Arnd
+Index: linux-davinci/arch/arm/mach-davinci/psc.c
+===================================================================
+--- linux-davinci.orig/arch/arm/mach-davinci/psc.c
++++ linux-davinci/arch/arm/mach-davinci/psc.c
+@@ -81,6 +81,14 @@ void davinci_psc_config(unsigned int dom
+ 
+ 	pdstat = __raw_readl(psc_base + PDSTAT + 4 * domain);
+ 	if ((pdstat & PDSTAT_STATE_MASK) == 0) {
++		/* Only DM644x has the domain power up procedure documented. */
++		if (!cpu_is_davinci_dm644x()) {
++			pr_err("Don't know how to power on domain %u of PSC%u, "
++			       "probably bootloader should have done this!",
++			       domain, ctlr);
++			BUG();
++		}
++
+ 		pdctl = __raw_readl(psc_base + PDCTL + 4 * domain);
+ 		pdctl |= PDCTL_NEXT;
+ 		__raw_writel(pdctl, psc_base + PDCTL + 4 * domain);
