@@ -1,34 +1,62 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 6 Jan 2012 11:25:38 +0800
-Subject: [PATCH 1/6] ARM: mxc: make imx_dma_is_general_purpose more generic
- for sdma
+Date: Fri, 6 Jan 2012 11:25:43 +0800
+Subject: [PATCH 6/6] ARM: imx6q-sabrelite: add audmux support
 In-Reply-To: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
 References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1325820343-11875-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1325820343-11875-7-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sdma device names vary for different SoC. So we just check
-whether it includes "sdma" substring.
+- enable audmux in dts
+- enable audmux in Kconfig
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/plat-mxc/include/mach/dma.h |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
+ arch/arm/boot/dts/imx6q.dtsi          |    2 ++
+ arch/arm/mach-imx/Kconfig             |    1 +
+ 3 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/dma.h b/arch/arm/plat-mxc/include/mach/dma.h
-index 233d0a5..1b90803 100644
---- a/arch/arm/plat-mxc/include/mach/dma.h
-+++ b/arch/arm/plat-mxc/include/mach/dma.h
-@@ -60,8 +60,7 @@ static inline int imx_dma_is_ipu(struct dma_chan *chan)
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 567b664..cae7151 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -41,6 +41,10 @@
+ 				status = "okay";
+ 			};
  
- static inline int imx_dma_is_general_purpose(struct dma_chan *chan)
- {
--	return !strcmp(dev_name(chan->device->dev), "imx31-sdma") ||
--		!strcmp(dev_name(chan->device->dev), "imx35-sdma") ||
-+	return strstr(dev_name(chan->device->dev), "sdma") ||
- 		!strcmp(dev_name(chan->device->dev), "imx-dma");
- }
++			audmux at 021d8000 {
++				status = "okay";
++			};
++
+ 			uart2: uart at 021e8000 {
+ 				status = "okay";
+ 			};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 263e8f3..12ed20c 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -527,7 +527,9 @@
+ 			};
  
+ 			audmux at 021d8000 {
++				compatible = "fsl,audmux-v2";
+ 				reg = <0x021d8000 0x4000>;
++				status = "disabled";
+ 			};
+ 
+ 			mipi at 021dc000 { /* MIPI-CSI */
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 6538972..67f0fe7 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -836,6 +836,7 @@ comment "i.MX6 family:"
+ config SOC_IMX6Q
+ 	bool "i.MX6 Quad support"
+ 	select ARM_CPU_SUSPEND if PM
++	select ARCH_MXC_AUDMUX_V2
+ 	select ARM_GIC
+ 	select CACHE_L2X0
+ 	select CPU_V7
 -- 
 1.7.5.4
