@@ -1,84 +1,18 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 06 Jan 2012 12:56:04 -0600
-Subject: [PATCH v2 0/5] ARM: OMAP2+: Interrupt controllers adaptation to DT
-In-Reply-To: <4F07239D.8000607@ti.com>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
- <4EF44DFF.4090300@ti.com> <4F07239D.8000607@ti.com>
-Message-ID: <4F0743C4.7000201@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 6 Jan 2012 11:01:26 -0800
+Subject: [PATCH v2 1/1] regulator: set constraints.apply_uV to 0 in
+ of_get_fixed_voltage_config
+In-Reply-To: <1325646449-21916-1-git-send-email-richard.zhao@linaro.org>
+References: <1325225213-29655-1-git-send-email-richard.zhao@linaro.org>
+ <1325646449-21916-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120106190124.GE2893@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2012 10:38 AM, Cousson, Benoit wrote:
-> Hi Rob/Grant,
+On Wed, Jan 04, 2012 at 11:07:29AM +0800, Richard Zhao wrote:
+> Fix fixed regulator using DT failed to call regulator_register.
 > 
-> Gentle ping on that series too. This should the last one:-)
-> 
-Sorry about that. For the series:
+> of_get_regulator_init_data set apply_uV to 1, but fixed regulator
+> doesn't need it. Set it back to 0.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-Rob
-
-> Thanks,
-> Benoit
-> 
-> On 12/23/2011 10:46 AM, Cousson, Benoit wrote:
->> Hi Rob,
->>
->> Are you OK with that update?
->>
->> Thanks,
->> Benoit
->>
->> On 12/20/2011 2:39 PM, Benoit Cousson wrote:
->>> Hi Tony and Rob,
->>>
->>> Here is the series to take advantage of the new DT interrupt init
->>> mechanism.
->>> Thanks to Marc's CONFIG_MULTI_IRQ_HANDLER series, OMAP4 just has to
->>> use the
->>> default GIC binding and does not need some OMAP specific hacks anymore.
->>> OMAP2 and 3 are using a simple interrupt controller that can thus expose
->>> a simpler binding.
->>>
->>> This update, compared to v1 [1], is introducing the IRQ domain for the
->>> OMAP2&3 INTC by default for both DT and none-DT build.
->>> Please note that in the near future that code can even be simplier
->>> with the
->>> introduction of the domain support inside generic irq chip.
->>>
->>> This series is based on lo/dt branch to get the needed cleanup and
->>> fixes for
->>> OMAP.
->>>
->>> The series is available here for reference:
->>> git://gitorious.org/omap-pm/linux.git for_3.3/2_dt_irq
->>>
->>> Regards,
->>> Benoit
->>>
->>> [1] http://www.spinics.net/lists/linux-omap/msg61152.html
->>>
->>>
->>> Benoit Cousson (5):
->>> arm/dts: OMAP4: Update DTS file with new GIC bindings
->>> ARM: OMAP2/3: intc: Add irqdomain support
->>> ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
->>> arm/dts: OMAP3: Add interrupt-controller bindings for INTC
->>> ARM: OMAP2+: board-generic: Use of_irq_init API
->>>
->>> .../devicetree/bindings/arm/omap/intc.txt | 27 +++++++++++
->>> arch/arm/boot/dts/omap3.dtsi | 6 ++-
->>> arch/arm/boot/dts/omap4.dtsi | 3 +-
->>> arch/arm/mach-omap2/board-generic.c | 30 +++++++------
->>> arch/arm/mach-omap2/common.h | 10 ++++
->>> arch/arm/mach-omap2/irq.c | 48 ++++++++++++++++++--
->>> 6 files changed, 103 insertions(+), 21 deletions(-)
->>> create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
->>>
->>
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+Applied, thanks.
