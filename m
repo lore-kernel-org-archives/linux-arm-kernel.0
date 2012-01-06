@@ -1,66 +1,103 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 6 Jan 2012 12:40:29 +0100
-Subject: [PATCH 1/2] ARM: mxs: detect SoC by checking CHIPID register
-In-Reply-To: <1325817712-4573-2-git-send-email-shawn.guo@linaro.org>
-References: <1325817712-4573-1-git-send-email-shawn.guo@linaro.org>
- <1325817712-4573-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120106114029.GB2610@pengutronix.de>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Fri, 06 Jan 2012 19:56:27 +0800
+Subject: [RFC][PATCH] ARM: NUC900: Rename nuc900-audio platform device to
+ nuc900-ac97
+Message-ID: <1325850987.2773.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 10:41:51AM +0800, Shawn Guo wrote:
-> Both imx23 and imx28 have CHIPID register at address 0x8001c310, which
-> can be used to identify the SoC.  This patch changes cpu_is_xxx and
-> __arch_decomp_setup to use this CHIPID register than machine type to
-> detect the chip between imx23 and imx28, so that we do not need to
-> change these functions whenever a new board/machine gets added.
-> 
-> Suggested-by: Wolfram Sang <w.sang@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+This change ensures the platform device name matches nuc900-ac97 platform
+driver name.
 
-[...]
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+Hi ZongShun,
+I don't have this hardware, I'd appreciate if you can test this patch.
+This patch is against linux-next 20120103.
+Thanks,
+Axel
+ arch/arm/mach-w90x900/clksel.c |    2 +-
+ arch/arm/mach-w90x900/cpu.c    |    2 +-
+ arch/arm/mach-w90x900/dev.c    |    6 +++---
+ arch/arm/mach-w90x900/mfp.c    |    2 +-
+ sound/soc/nuc900/nuc900-ac97.c |    2 +-
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
-> +
-> +/*
-> + * MXS CPU types
-> + */
-> +#define CHIPID	(MXS_IO_ADDRESS(MXS_DIGCTL_BASE_ADDR) + 0x310)
-
-Hmm, in general I don't like accessing single registers this way. Since
-we only read, it might work for now, but I think it will turn ugly the
-more we use from DIGCTL (which is annoying to abstract, yes).
-
-0x310 should not be hardcoded. CHIPID could be MXS_CHIPID.
-
-> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
-> index 6777674..a8de26d 100644
-> --- a/arch/arm/mach-mxs/include/mach/uncompress.h
-> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
-> @@ -55,16 +55,17 @@ static inline void flush(void)
->  
->  #define MX23_DUART_BASE_ADDR	0x80070000
->  #define MX28_DUART_BASE_ADDR	0x80074000
-> +#define MXS_DIGCTL_CHIPID	0x8001c310
->  
->  static inline void __arch_decomp_setup(unsigned long arch_id)
->  {
-> -	switch (arch_id) {
-> -	case MACH_TYPE_MX23EVK:
-> +	u16 chipid = (*(volatile unsigned long *) MXS_DIGCTL_CHIPID) >> 16;
-
-Can't we use the cpu_is-functions here?
-
-Regards,
-
-   Wolfram
-
+diff --git a/arch/arm/mach-w90x900/clksel.c b/arch/arm/mach-w90x900/clksel.c
+index 3de4a52..06d867dc 100644
+--- a/arch/arm/mach-w90x900/clksel.c
++++ b/arch/arm/mach-w90x900/clksel.c
+@@ -48,7 +48,7 @@ static void clock_source_select(const char *dev_id, unsigned int clkval)
+ 		offset = ATAOFFSET;
+ 	else if (strcmp(dev_id, "nuc900-lcd") == 0)
+ 		offset = LCDOFFSET;
+-	else if (strcmp(dev_id, "nuc900-audio") == 0)
++	else if (strcmp(dev_id, "nuc900-ac97") == 0)
+ 		offset = AUDOFFSET;
+ 	else
+ 		offset = CPUOFFSET;
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 604e1db..9a06619 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -79,7 +79,7 @@ static DEFINE_CLK(timer4, 23);
+ 
+ static struct clk_lookup nuc900_clkregs[] = {
+ 	DEF_CLKLOOK(&clk_lcd, "nuc900-lcd", NULL),
+-	DEF_CLKLOOK(&clk_audio, "nuc900-audio", NULL),
++	DEF_CLKLOOK(&clk_audio, "nuc900-ac97", NULL),
+ 	DEF_CLKLOOK(&clk_fmi, "nuc900-fmi", NULL),
+ 	DEF_CLKLOOK(&clk_ms, "nuc900-fmi", "MS"),
+ 	DEF_CLKLOOK(&clk_sd, "nuc900-fmi", "SD"),
+diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
+index 5b0c38a..78110be 100644
+--- a/arch/arm/mach-w90x900/dev.c
++++ b/arch/arm/mach-w90x900/dev.c
+@@ -501,8 +501,8 @@ static struct resource nuc900_ac97_resource[] = {
+ 
+ };
+ 
+-struct platform_device nuc900_device_audio = {
+-	.name		= "nuc900-audio",
++struct platform_device nuc900_device_ac97 = {
++	.name		= "nuc900-ac97",
+ 	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(nuc900_ac97_resource),
+ 	.resource	= nuc900_ac97_resource,
+@@ -523,7 +523,7 @@ static struct platform_device *nuc900_public_dev[] __initdata = {
+ 	&nuc900_device_emc,
+ 	&nuc900_device_spi,
+ 	&nuc900_device_wdt,
+-	&nuc900_device_audio,
++	&nuc900_device_ac97,
+ };
+ 
+ /* Provide adding specific CPU platform devices API */
+diff --git a/arch/arm/mach-w90x900/mfp.c b/arch/arm/mach-w90x900/mfp.c
+index 9dd7461..c58d142 100644
+--- a/arch/arm/mach-w90x900/mfp.c
++++ b/arch/arm/mach-w90x900/mfp.c
+@@ -155,7 +155,7 @@ void mfp_set_groupg(struct device *dev, const char *subname)
+ 	} else if (strcmp(dev_id, "nuc900-i2c1") == 0) {
+ 		mfpen &= ~(GPIOG2TO3);
+ 		mfpen |= ENI2C1;/*enable i2c1*/
+-	} else if (strcmp(dev_id, "nuc900-audio") == 0) {
++	} else if (strcmp(dev_id, "nuc900-ac97") == 0) {
+ 		mfpen &= ~(GPIOG22TO23);
+ 		mfpen |= ENAC97;/*enable AC97*/
+ 	} else if (strcmp(dev_id, "nuc900-mmc-port1") == 0) {
+diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
+index 45d11dd..946020a 100644
+--- a/sound/soc/nuc900/nuc900-ac97.c
++++ b/sound/soc/nuc900/nuc900-ac97.c
+@@ -366,7 +366,7 @@ static int __devinit nuc900_ac97_drvprobe(struct platform_device *pdev)
+ 		goto out3;
+ 
+ 	/* enbale ac97 multifunction pin */
+-	mfp_set_groupg(nuc900_audio->dev, "nuc900-audio");
++	mfp_set_groupg(nuc900_audio->dev, NULL);
+ 
+ 	return 0;
+ 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120106/a5c81ef0/attachment.sig>
+1.7.5.4
