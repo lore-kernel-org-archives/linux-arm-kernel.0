@@ -1,43 +1,48 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 6 Jan 2012 14:43:02 +0100
-Subject: [PATCH 1/2] ARM: mxs: detect SoC by checking CHIPID register
-In-Reply-To: <20120106133908.GD4790@S2101-09.ap.freescale.net>
-References: <1325817712-4573-1-git-send-email-shawn.guo@linaro.org>
- <1325817712-4573-2-git-send-email-shawn.guo@linaro.org>
- <20120106114029.GB2610@pengutronix.de>
- <20120106133908.GD4790@S2101-09.ap.freescale.net>
-Message-ID: <20120106134302.GC2610@pengutronix.de>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Fri, 6 Jan 2012 14:56:52 +0100
+Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
+In-Reply-To: <3197939.ZpLiSGWdou@ax5200p>
+References: <1325719752-818-1-git-send-email-olof@lixom.net>
+ <6121078.4q2inFFXlB@fb07-iapwap2>
+ <CAD=FV=V3qO-=DOz5Qc95fyYJC4656WvmUYGXMAHgXcGf96+aeQ@mail.gmail.com>
+ <3197939.ZpLiSGWdou@ax5200p>
+Message-ID: <20230.64932.51663.410120@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Marc Dietrich writes:
+ > On Thursday 05 January 2012 10:40:48 Doug Anderson wrote:
+ > > I can't comment on the L2 stuff (haven't looked there), but just going
+ > > by Cortex-A9 revisions (T25 has roughly r1p1 and T30 has r2p7), I've
+ > > got this table:
+ > > 
+ > > Errata             T25 (A9 ~r1p1)   T30 (A9 r2p7)    Applies to
+ > > ARM_ERRATA_364296                                    pre A8
+ > > ARM_ERRATA_411920                                    pre A8
+ > > ARM_ERRATA_430973                                    A8
+ > > ARM_ERRATA_458693                                    A8
+ > > ARM_ERRATA_460075                                    A8
+ > > ARM_ERRATA_720789  yes                               A9 (prior to r2p0)
+ > > ARM_ERRATA_742230  yes                               A9 (r1p0..r2p2)
+ > > ARM_ERRATA_742231                                    A9 (r2p0..r2p2)
+ > > ARM_ERRATA_743622                                    A9 (r2p0..r2p2)
+ > > ARM_ERRATA_751472  yes              yes              A9 (prior to r3p0)
+ > > ARM_ERRATA_754322                   yes              A9 (r2p*, r3p*)
+ > > ARM_ERRATA_754327  yes                               A9 (prior to r2p0)
+ > > ARM_ERRATA_764369  yes              yes              A9 MPCore (all revs)
+ > > 
+ > > ...so that means we should also be adding in 720789 (T2x), 751472
+ > > (T2x, T30), 754322 (T30), 754327 (T2x), 764369 (T2x, T30).
+ > 
+ > AFAIK, 720789 (TLBIASIDIS and TLBIMVAIS operations can broadcast a faulty 
+ > ASID) is fixed in userspace (or gcc) nowadays (at least in Ubuntu) so I think 
+ > this can be neglected.
 
-> > 0x310 should not be hardcoded. CHIPID could be MXS_CHIPID.
-> > 
-> I thought about those when I wrote the code, and decided not to bother,
-> since they are very really limited in mxs.h.  But now I think I should
-> bother, because your comments are here.
+Not everyone uses Ubuntu.
 
-:) I think 0x310 should be defined in digctl.h (which was introduced by
-Aisheng IIRC). Then, we at least know which functionality from DIGCTL is
-used currently.
+Can you provide a reference to the corresponding gcc and/or Ubuntu patch?
 
-> > Can't we use the cpu_is-functions here?
-> > 
-> No.  We are running with MMU off here.
-
-Right, thanks, missed that.
-
-Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120106/c17eb839/attachment.sig>
+(I got a Tegra-2 based trimslice last summer, but it's been completely
+unreliable under load (hangs hard during "make -j2" gcc bootstraps),
+hence I'm looking for patches or any other information that can help
+me fix or work around whatever bugs it has.)
