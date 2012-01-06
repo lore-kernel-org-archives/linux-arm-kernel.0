@@ -1,32 +1,24 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 05 Jan 2012 16:13:51 -0800
-Subject: [GIT PULL] I2C: OMAP: misc. updates for v3.3
-Message-ID: <87boqh7kn4.fsf@ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 6 Jan 2012 08:53:37 +0800
+Subject: [PATCH V6 0/7] add a generic cpufreq driver
+In-Reply-To: <cc3e6f12-92d8-4467-b3ad-23cbe6440fee@email.android.com>
+References: <1325213769-11752-1-git-send-email-richard.zhao@linaro.org>
+ <cc3e6f12-92d8-4467-b3ad-23cbe6440fee@email.android.com>
+Message-ID: <20120106005336.GP2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
-
-Here's a few OMAP I2C updates for the v3.3 merge window.
-
-Thanks,
-
-Kevin
-
-The following changes since commit 3f6b2a8bd6e4ff43269d89066a9fe06a0e5ba961:
-
-  I2C: OMAP: correct SYSC register offset for OMAP4 (2011-12-13 11:35:56 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/i2c/misc
-
-Benoit Cousson (1):
-      i2c: OMAP: Add DT support for i2c controller
-
-Jan Weitzel (1):
-      I2C: OMAP: NACK without STP
-
- Documentation/devicetree/bindings/i2c/omap-i2c.txt |   30 ++++++
- drivers/i2c/busses/i2c-omap.c                      |  108 +++++++++++++-------
- 2 files changed, 99 insertions(+), 39 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
+On Thu, Jan 05, 2012 at 06:16:54AM +0800, Richard Zhao wrote:
+> hi Russell,
+> 
+> May I have your ACK, you merge it?
+Russell, ping
+> 
+> Thanks
+> Richard
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
