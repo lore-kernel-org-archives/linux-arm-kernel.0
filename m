@@ -1,72 +1,56 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 6 Jan 2012 17:38:53 +0100
-Subject: [PATCH v2 0/5] ARM: OMAP2+: Interrupt controllers adaptation to DT
-In-Reply-To: <4EF44DFF.4090300@ti.com>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
- <4EF44DFF.4090300@ti.com>
-Message-ID: <4F07239D.8000607@ti.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri,  6 Jan 2012 16:39:57 +0000
+Subject: [PATCH] versatile: don't generate a duplicate IRQ domain
+Message-ID: <1325867997-20761-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob/Grant,
+Now that the VIC driver handles the irqdomain natively we don't need to
+generate one in the versatile core code.  Longer term we should move the
+initialisation of both IRQ controllers to using of_irq_init() but
+that'll need a little more work.
 
-Gentle ping on that series too. This should the last one:-)
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
 
-Thanks,
-Benoit
+I don't have a versatile platform so I can't run-test this, but I
+suspect that when booting with device tree without this patch it'll warn
+with "error: irq_desc already assigned to a domain".
 
-On 12/23/2011 10:46 AM, Cousson, Benoit wrote:
-> Hi Rob,
->
-> Are you OK with that update?
->
-> Thanks,
-> Benoit
->
-> On 12/20/2011 2:39 PM, Benoit Cousson wrote:
->> Hi Tony and Rob,
->>
->> Here is the series to take advantage of the new DT interrupt init
->> mechanism.
->> Thanks to Marc's CONFIG_MULTI_IRQ_HANDLER series, OMAP4 just has to
->> use the
->> default GIC binding and does not need some OMAP specific hacks anymore.
->> OMAP2 and 3 are using a simple interrupt controller that can thus expose
->> a simpler binding.
->>
->> This update, compared to v1 [1], is introducing the IRQ domain for the
->> OMAP2&3 INTC by default for both DT and none-DT build.
->> Please note that in the near future that code can even be simplier
->> with the
->> introduction of the domain support inside generic irq chip.
->>
->> This series is based on lo/dt branch to get the needed cleanup and
->> fixes for
->> OMAP.
->>
->> The series is available here for reference:
->> git://gitorious.org/omap-pm/linux.git for_3.3/2_dt_irq
->>
->> Regards,
->> Benoit
->>
->> [1] http://www.spinics.net/lists/linux-omap/msg61152.html
->>
->>
->> Benoit Cousson (5):
->> arm/dts: OMAP4: Update DTS file with new GIC bindings
->> ARM: OMAP2/3: intc: Add irqdomain support
->> ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
->> arm/dts: OMAP3: Add interrupt-controller bindings for INTC
->> ARM: OMAP2+: board-generic: Use of_irq_init API
->>
->> .../devicetree/bindings/arm/omap/intc.txt | 27 +++++++++++
->> arch/arm/boot/dts/omap3.dtsi | 6 ++-
->> arch/arm/boot/dts/omap4.dtsi | 3 +-
->> arch/arm/mach-omap2/board-generic.c | 30 +++++++------
->> arch/arm/mach-omap2/common.h | 10 ++++
->> arch/arm/mach-omap2/irq.c | 48 ++++++++++++++++++--
->> 6 files changed, 103 insertions(+), 21 deletions(-)
->> create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
->>
->
+I don't think this can be converted to of_irq_init() straight away
+without having all of the devices using IRQ's from DT and not relying on
+static IRQ numbers and without the hardware to test it I don't have
+enough confidence to do that.
+
+ arch/arm/mach-versatile/core.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index cbcda61..e716fa4 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -86,12 +86,6 @@ static struct fpga_irq_data sic_irq = {
+ #define PIC_MASK	0
+ #endif
+ 
+-/* Lookup table for finding a DT node that represents the vic instance */
+-static const struct of_device_id vic_of_match[] __initconst = {
+-	{ .compatible = "arm,versatile-vic", },
+-	{}
+-};
+-
+ static const struct of_device_id sic_of_match[] __initconst = {
+ 	{ .compatible = "arm,versatile-sic", },
+ 	{}
+@@ -100,7 +94,6 @@ static const struct of_device_id sic_of_match[] __initconst = {
+ void __init versatile_init_irq(void)
+ {
+ 	vic_init(VA_VIC_BASE, IRQ_VIC_START, ~0, 0);
+-	irq_domain_generate_simple(vic_of_match, VERSATILE_VIC_BASE, IRQ_VIC_START);
+ 
+ 	writel(~0, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
+ 
+-- 
+1.7.5.4
