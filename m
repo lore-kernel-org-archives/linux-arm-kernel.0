@@ -1,69 +1,60 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sat, 7 Jan 2012 00:26:46 +0100
-Subject: [PATCH 5/8] S3C2443: move io-init to SoC specific files
+Date: Sat, 7 Jan 2012 00:27:27 +0100
+Subject: [PATCH 6/8] S3C2440: move io-init to SoC specific files
 In-Reply-To: <201201070022.40431.heiko@sntech.de>
 References: <201201070022.40431.heiko@sntech.de>
-Message-ID: <201201070026.46322.heiko@sntech.de>
+Message-ID: <201201070027.28003.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce common.h/common.c to replace calls to s3c24xx_init_io
-and make the s3c2443.h header obsolete.
+Introduce common.c to replace calls to s3c24xx_init_io
+and make the s3c244x.h header obsolete.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/mach-s3c2443/Makefile               |    2 +-
- arch/arm/mach-s3c2443/clock.c                |    3 +-
- arch/arm/mach-s3c2443/common.c               |   70 ++++++++++++++++++++++++++
- arch/arm/mach-s3c2443/common.h               |   31 +++++++++++
- arch/arm/mach-s3c2443/mach-smdk2443.c        |    5 +-
- arch/arm/mach-s3c2443/s3c2443.c              |    3 +-
- arch/arm/plat-s3c24xx/cpu.c                  |   11 ----
- arch/arm/plat-samsung/include/plat/s3c2443.h |   34 ------------
- 8 files changed, 109 insertions(+), 50 deletions(-)
- create mode 100644 arch/arm/mach-s3c2443/common.c
- create mode 100644 arch/arm/mach-s3c2443/common.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2443.h
+ arch/arm/mach-s3c2440/Makefile               |    2 +-
+ arch/arm/mach-s3c2440/common.c               |  100 ++++++++++++++++++++++++++
+ arch/arm/mach-s3c2440/common.h               |   20 +++++
+ arch/arm/mach-s3c2440/dsc.c                  |    2 +-
+ arch/arm/mach-s3c2440/mach-anubis.c          |    2 +-
+ arch/arm/mach-s3c2440/mach-at2440evb.c       |    2 +-
+ arch/arm/mach-s3c2440/mach-gta02.c           |    2 +-
+ arch/arm/mach-s3c2440/mach-mini2440.c        |    2 +-
+ arch/arm/mach-s3c2440/mach-nexcoder.c        |    3 +-
+ arch/arm/mach-s3c2440/mach-osiris.c          |    2 +-
+ arch/arm/mach-s3c2440/mach-rx1950.c          |    2 +-
+ arch/arm/mach-s3c2440/mach-rx3715.c          |    2 +-
+ arch/arm/mach-s3c2440/mach-smdk2440.c        |    3 +-
+ arch/arm/mach-s3c2440/s3c2440.c              |    3 +-
+ arch/arm/mach-s3c2440/s3c2442.c              |    3 +-
+ arch/arm/mach-s3c2440/s3c244x.c              |    3 +-
+ arch/arm/plat-s3c24xx/cpu.c                  |   41 -----------
+ arch/arm/plat-samsung/include/plat/s3c244x.h |   42 -----------
+ 18 files changed, 137 insertions(+), 99 deletions(-)
+ create mode 100644 arch/arm/mach-s3c2440/common.c
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c244x.h
 
-diff --git a/arch/arm/mach-s3c2443/Makefile b/arch/arm/mach-s3c2443/Makefile
-index d1843c9..4e3cef0 100644
---- a/arch/arm/mach-s3c2443/Makefile
-+++ b/arch/arm/mach-s3c2443/Makefile
+diff --git a/arch/arm/mach-s3c2440/Makefile b/arch/arm/mach-s3c2440/Makefile
+index d5440fa..b7b76fa 100644
+--- a/arch/arm/mach-s3c2440/Makefile
++++ b/arch/arm/mach-s3c2440/Makefile
 @@ -9,7 +9,7 @@ obj-m				:=
  obj-n				:=
  obj-				:=
  
--obj-$(CONFIG_CPU_S3C2443)	+= s3c2443.o
-+obj-$(CONFIG_CPU_S3C2443)	+= s3c2443.o common.o
- obj-$(CONFIG_CPU_S3C2443)	+= irq.o
- obj-$(CONFIG_CPU_S3C2443)	+= clock.o
+-obj-$(CONFIG_CPU_S3C2440)	+= s3c2440.o dsc.o
++obj-$(CONFIG_CPU_S3C2440)	+= s3c2440.o dsc.o common.o
+ obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
  
-diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
-index 1c2c088..ac45f58 100644
---- a/arch/arm/mach-s3c2443/clock.c
-+++ b/arch/arm/mach-s3c2443/clock.c
-@@ -41,11 +41,12 @@
- 
- #include <plat/cpu-freq.h>
- 
--#include <plat/s3c2443.h>
- #include <plat/clock.h>
- #include <plat/clock-clksrc.h>
- #include <plat/cpu.h>
- 
-+#include "common.h"
-+
- /* We currently have to assume that the system is running
-  * from the XTPll input, and that all ***REFCLKs are being
-  * fed from it, as we cannot read the state of OM[4] from
-diff --git a/arch/arm/mach-s3c2443/common.c b/arch/arm/mach-s3c2443/common.c
+ obj-$(CONFIG_CPU_S3C2440)	+= irq.o
+diff --git a/arch/arm/mach-s3c2440/common.c b/arch/arm/mach-s3c2440/common.c
 new file mode 100644
-index 0000000..674317c
+index 0000000..a8f1bb6
 --- /dev/null
-+++ b/arch/arm/mach-s3c2443/common.c
-@@ -0,0 +1,70 @@
++++ b/arch/arm/mach-s3c2440/common.c
+@@ -0,0 +1,100 @@
 +/*
-+ * S3C2443 CPU Support
++ * S3C244X CPU Support
 + *
 + * Copyright (c) 2004-2005 Simtec Electronics
 + *	http://www.simtec.co.uk/products/SWLINUX/
@@ -98,17 +89,47 @@ index 0000000..674317c
 +
 +/* table of supported CPUs */
 +
-+static const char name_s3c2443[]  = "S3C2443";
++static const char name_s3c2440[]  = "S3C2440";
++static const char name_s3c2442[]  = "S3C2442";
++static const char name_s3c2442b[]  = "S3C2442B";
++static const char name_s3c2440a[] = "S3C2440A";
 +
 +static struct cpu_table cpu_ids[] __initdata = {
 +	{
-+		.idcode		= 0x32443001,
++		.idcode		= 0x32440000,
 +		.idmask		= 0xffffffff,
-+		.map_io		= s3c2443_map_io,
-+		.init_clocks	= s3c2443_init_clocks,
-+		.init_uarts	= s3c2443_init_uarts,
-+		.init		= s3c2443_init,
-+		.name		= name_s3c2443,
++		.map_io		= s3c2440_map_io,
++		.init_clocks	= s3c244x_init_clocks,
++		.init_uarts	= s3c244x_init_uarts,
++		.init		= s3c2440_init,
++		.name		= name_s3c2440
++	},
++	{
++		.idcode		= 0x32440001,
++		.idmask		= 0xffffffff,
++		.map_io		= s3c2440_map_io,
++		.init_clocks	= s3c244x_init_clocks,
++		.init_uarts	= s3c244x_init_uarts,
++		.init		= s3c2440_init,
++		.name		= name_s3c2440a
++	},
++	{
++		.idcode		= 0x32440aaa,
++		.idmask		= 0xffffffff,
++		.map_io		= s3c2442_map_io,
++		.init_clocks	= s3c244x_init_clocks,
++		.init_uarts	= s3c244x_init_uarts,
++		.init		= s3c2442_init,
++		.name		= name_s3c2442
++	},
++	{
++		.idcode		= 0x32440aab,
++		.idmask		= 0xffffffff,
++		.map_io		= s3c2442_map_io,
++		.init_clocks	= s3c244x_init_clocks,
++		.init_uarts	= s3c244x_init_uarts,
++		.init		= s3c2442_init,
++		.name		= name_s3c2442b
 +	},
 +};
 +
@@ -121,7 +142,7 @@ index 0000000..674317c
 +	IODESC_ENT(UART)
 +};
 +
-+void __init s3c2443_init_io(struct map_desc *mach_desc, int size)
++void __init s3c244x_init_io(struct map_desc *mach_desc, int size)
 +{
 +	/* initialise the io descriptors we need for initialisation */
 +	iotable_init(mach_desc, size);
@@ -132,168 +153,357 @@ index 0000000..674317c
 +
 +	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
 +}
-diff --git a/arch/arm/mach-s3c2443/common.h b/arch/arm/mach-s3c2443/common.h
-new file mode 100644
-index 0000000..4f94da4
---- /dev/null
-+++ b/arch/arm/mach-s3c2443/common.h
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright (c) 2004-2005 Simtec Electronics
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *
-+ * Header file for s3c2443 cpu support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ARCH_ARM_MACH_S3C2443_COMMON_H
-+#define __ARCH_ARM_MACH_S3C2443_COMMON_H
-+
-+struct s3c2410_uartcfg;
-+
-+extern  int s3c2443_init(void);
-+
-+extern void s3c2443_map_io(void);
-+
-+extern void s3c2443_init_uarts(struct s3c2410_uartcfg *cfg, int no);
-+
-+extern void s3c2443_init_clocks(int xtal);
-+
-+extern  int s3c2443_baseclk_add(void);
-+
-+extern void s3c2443_restart(char mode, const char *cmd);
-+
-+extern void s3c2443_init_io(struct map_desc *mach_desc, int size);
-+
-+#endif
-diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c2443/mach-smdk2443.c
-index 2092369..113643b 100644
---- a/arch/arm/mach-s3c2443/mach-smdk2443.c
-+++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
-@@ -40,13 +40,14 @@
- #include <plat/iic.h>
+diff --git a/arch/arm/mach-s3c2440/common.h b/arch/arm/mach-s3c2440/common.h
+index db8a98a..5debd8b 100644
+--- a/arch/arm/mach-s3c2440/common.h
++++ b/arch/arm/mach-s3c2440/common.h
+@@ -12,6 +12,26 @@
+ #ifndef __ARCH_ARM_MACH_S3C2440_COMMON_H
+ #define __ARCH_ARM_MACH_S3C2440_COMMON_H
  
++extern void s3c244x_map_io(void);
++
++extern void s3c244x_init_uarts(struct s3c2410_uartcfg *cfg, int no);
++
++extern void s3c244x_init_clocks(int xtal);
++
+ void s3c2440_restart(char mode, const char *cmd);
+ 
++extern void s3c244x_init_io(struct map_desc *mach_desc, int size);
++
++#ifdef CONFIG_CPU_S3C2440
++extern  int s3c2440_init(void);
++
++extern void s3c2440_map_io(void);
++#endif
++
++#ifdef CONFIG_CPU_S3C2442
++extern  int s3c2442_init(void);
++
++extern void s3c2442_map_io(void);
++#endif
++
+ #endif /* __ARCH_ARM_MACH_S3C2440_COMMON_H */
+diff --git a/arch/arm/mach-s3c2440/dsc.c b/arch/arm/mach-s3c2440/dsc.c
+index 9ea66e3..a0e9fa5 100644
+--- a/arch/arm/mach-s3c2440/dsc.c
++++ b/arch/arm/mach-s3c2440/dsc.c
+@@ -28,7 +28,7 @@
+ #include <mach/regs-dsc.h>
+ 
+ #include <plat/cpu.h>
+-#include <plat/s3c244x.h>
++#include "common.h"
+ 
+ int s3c2440_set_dsc(unsigned int pin, unsigned int value)
+ {
+diff --git a/arch/arm/mach-s3c2440/mach-anubis.c b/arch/arm/mach-s3c2440/mach-anubis.c
+index 2456955..0c16578 100644
+--- a/arch/arm/mach-s3c2440/mach-anubis.c
++++ b/arch/arm/mach-s3c2440/mach-anubis.c
+@@ -450,7 +450,7 @@ static void __init anubis_map_io(void)
+ 
+ 	s3c24xx_register_clocks(anubis_clocks, ARRAY_SIZE(anubis_clocks));
+ 
+-	s3c24xx_init_io(anubis_iodesc, ARRAY_SIZE(anubis_iodesc));
++	s3c244x_init_io(anubis_iodesc, ARRAY_SIZE(anubis_iodesc));
+ 	s3c24xx_init_clocks(0);
+ 	s3c24xx_init_uarts(anubis_uartcfgs, ARRAY_SIZE(anubis_uartcfgs));
+ 
+diff --git a/arch/arm/mach-s3c2440/mach-at2440evb.c b/arch/arm/mach-s3c2440/mach-at2440evb.c
+index d6a9763..65010c5 100644
+--- a/arch/arm/mach-s3c2440/mach-at2440evb.c
++++ b/arch/arm/mach-s3c2440/mach-at2440evb.c
+@@ -200,7 +200,7 @@ static struct platform_device *at2440evb_devices[] __initdata = {
+ 
+ static void __init at2440evb_map_io(void)
+ {
+-	s3c24xx_init_io(at2440evb_iodesc, ARRAY_SIZE(at2440evb_iodesc));
++	s3c244x_init_io(at2440evb_iodesc, ARRAY_SIZE(at2440evb_iodesc));
+ 	s3c24xx_init_clocks(16934400);
+ 	s3c24xx_init_uarts(at2440evb_uartcfgs, ARRAY_SIZE(at2440evb_uartcfgs));
+ }
+diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
+index 5859e60..e8d2eb9 100644
+--- a/arch/arm/mach-s3c2440/mach-gta02.c
++++ b/arch/arm/mach-s3c2440/mach-gta02.c
+@@ -508,7 +508,7 @@ static struct platform_device gta02_buttons_device = {
+ 
+ static void __init gta02_map_io(void)
+ {
+-	s3c24xx_init_io(gta02_iodesc, ARRAY_SIZE(gta02_iodesc));
++	s3c244x_init_io(gta02_iodesc, ARRAY_SIZE(gta02_iodesc));
+ 	s3c24xx_init_clocks(12000000);
+ 	s3c24xx_init_uarts(gta02_uartcfgs, ARRAY_SIZE(gta02_uartcfgs));
+ }
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index adbbb85..68adfd6 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -535,7 +535,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
+ 
+ static void __init mini2440_map_io(void)
+ {
+-	s3c24xx_init_io(mini2440_iodesc, ARRAY_SIZE(mini2440_iodesc));
++	s3c244x_init_io(mini2440_iodesc, ARRAY_SIZE(mini2440_iodesc));
+ 	s3c24xx_init_clocks(12000000);
+ 	s3c24xx_init_uarts(mini2440_uartcfgs, ARRAY_SIZE(mini2440_uartcfgs));
+ }
+diff --git a/arch/arm/mach-s3c2440/mach-nexcoder.c b/arch/arm/mach-s3c2440/mach-nexcoder.c
+index 40eaf84..d714a35 100644
+--- a/arch/arm/mach-s3c2440/mach-nexcoder.c
++++ b/arch/arm/mach-s3c2440/mach-nexcoder.c
+@@ -42,7 +42,6 @@
+ 
+ #include <plat/gpio-cfg.h>
  #include <plat/s3c2410.h>
--#include <plat/s3c2443.h>
+-#include <plat/s3c244x.h>
  #include <plat/clock.h>
  #include <plat/devs.h>
  #include <plat/cpu.h>
+@@ -138,7 +137,7 @@ static void __init nexcoder_sensorboard_init(void)
  
- #include <plat/common-smdk.h>
+ static void __init nexcoder_map_io(void)
+ {
+-	s3c24xx_init_io(nexcoder_iodesc, ARRAY_SIZE(nexcoder_iodesc));
++	s3c244x_init_io(nexcoder_iodesc, ARRAY_SIZE(nexcoder_iodesc));
+ 	s3c24xx_init_clocks(0);
+ 	s3c24xx_init_uarts(nexcoder_uartcfgs, ARRAY_SIZE(nexcoder_uartcfgs));
+ 
+diff --git a/arch/arm/mach-s3c2440/mach-osiris.c b/arch/arm/mach-s3c2440/mach-osiris.c
+index 4c480ef..5ae3608 100644
+--- a/arch/arm/mach-s3c2440/mach-osiris.c
++++ b/arch/arm/mach-s3c2440/mach-osiris.c
+@@ -391,7 +391,7 @@ static void __init osiris_map_io(void)
+ 
+ 	s3c24xx_register_clocks(osiris_clocks, ARRAY_SIZE(osiris_clocks));
+ 
+-	s3c24xx_init_io(osiris_iodesc, ARRAY_SIZE(osiris_iodesc));
++	s3c244x_init_io(osiris_iodesc, ARRAY_SIZE(osiris_iodesc));
+ 	s3c24xx_init_clocks(0);
+ 	s3c24xx_init_uarts(osiris_uartcfgs, ARRAY_SIZE(osiris_uartcfgs));
+ 
+diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
+index f892e8b..ee452e0 100644
+--- a/arch/arm/mach-s3c2440/mach-rx1950.c
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c
+@@ -746,7 +746,7 @@ static void __init rx1950_map_io(void)
+ 
+ 	s3c24xx_register_clocks(rx1950_clocks, ARRAY_SIZE(rx1950_clocks));
+ 
+-	s3c24xx_init_io(rx1950_iodesc, ARRAY_SIZE(rx1950_iodesc));
++	s3c244x_init_io(rx1950_iodesc, ARRAY_SIZE(rx1950_iodesc));
+ 	s3c24xx_init_clocks(16934000);
+ 	s3c24xx_init_uarts(rx1950_uartcfgs, ARRAY_SIZE(rx1950_uartcfgs));
+ 
+diff --git a/arch/arm/mach-s3c2440/mach-rx3715.c b/arch/arm/mach-s3c2440/mach-rx3715.c
+index 88d648a..0ee00c2 100644
+--- a/arch/arm/mach-s3c2440/mach-rx3715.c
++++ b/arch/arm/mach-s3c2440/mach-rx3715.c
+@@ -176,7 +176,7 @@ static struct platform_device *rx3715_devices[] __initdata = {
+ 
+ static void __init rx3715_map_io(void)
+ {
+-	s3c24xx_init_io(rx3715_iodesc, ARRAY_SIZE(rx3715_iodesc));
++	s3c244x_init_io(rx3715_iodesc, ARRAY_SIZE(rx3715_iodesc));
+ 	s3c24xx_init_clocks(16934000);
+ 	s3c24xx_init_uarts(rx3715_uartcfgs, ARRAY_SIZE(rx3715_uartcfgs));
+ }
+diff --git a/arch/arm/mach-s3c2440/mach-smdk2440.c b/arch/arm/mach-s3c2440/mach-smdk2440.c
+index 1deb60d..c65ef15 100644
+--- a/arch/arm/mach-s3c2440/mach-smdk2440.c
++++ b/arch/arm/mach-s3c2440/mach-smdk2440.c
+@@ -40,7 +40,6 @@
+ #include <plat/iic.h>
+ 
+ #include <plat/s3c2410.h>
+-#include <plat/s3c244x.h>
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+@@ -161,7 +160,7 @@ static struct platform_device *smdk2440_devices[] __initdata = {
+ 
+ static void __init smdk2440_map_io(void)
+ {
+-	s3c24xx_init_io(smdk2440_iodesc, ARRAY_SIZE(smdk2440_iodesc));
++	s3c244x_init_io(smdk2440_iodesc, ARRAY_SIZE(smdk2440_iodesc));
+ 	s3c24xx_init_clocks(16934400);
+ 	s3c24xx_init_uarts(smdk2440_uartcfgs, ARRAY_SIZE(smdk2440_uartcfgs));
+ }
+diff --git a/arch/arm/mach-s3c2440/s3c2440.c b/arch/arm/mach-s3c2440/s3c2440.c
+index 01a8dc8..24b9398 100644
+--- a/arch/arm/mach-s3c2440/s3c2440.c
++++ b/arch/arm/mach-s3c2440/s3c2440.c
+@@ -33,7 +33,6 @@
+ 
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+-#include <plat/s3c244x.h>
+ #include <plat/pm.h>
+ #include <plat/watchdog-reset.h>
+ 
+@@ -41,6 +40,8 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/gpio-cfg-helpers.h>
  
 +#include "common.h"
 +
- static struct map_desc smdk2443_iodesc[] __initdata = {
- 	/* ISA IO Space map (memory space selected by A24) */
+ static struct sys_device s3c2440_sysdev = {
+ 	.cls		= &s3c2440_sysclass,
+ };
+diff --git a/arch/arm/mach-s3c2440/s3c2442.c b/arch/arm/mach-s3c2440/s3c2442.c
+index 2c822e0..1dd136c 100644
+--- a/arch/arm/mach-s3c2440/s3c2442.c
++++ b/arch/arm/mach-s3c2440/s3c2442.c
+@@ -45,13 +45,14 @@
  
-@@ -120,7 +121,7 @@ static struct platform_device *smdk2443_devices[] __initdata = {
+ #include <plat/clock.h>
+ #include <plat/cpu.h>
+-#include <plat/s3c244x.h>
+ #include <plat/pm.h>
  
- static void __init smdk2443_map_io(void)
- {
--	s3c24xx_init_io(smdk2443_iodesc, ARRAY_SIZE(smdk2443_iodesc));
-+	s3c2443_init_io(smdk2443_iodesc, ARRAY_SIZE(smdk2443_iodesc));
- 	s3c24xx_init_clocks(12000000);
- 	s3c24xx_init_uarts(smdk2443_uartcfgs, ARRAY_SIZE(smdk2443_uartcfgs));
- }
-diff --git a/arch/arm/mach-s3c2443/s3c2443.c b/arch/arm/mach-s3c2443/s3c2443.c
-index 45e7280..ecc1249 100644
---- a/arch/arm/mach-s3c2443/s3c2443.c
-+++ b/arch/arm/mach-s3c2443/s3c2443.c
-@@ -35,7 +35,6 @@
  #include <plat/gpio-core.h>
  #include <plat/gpio-cfg.h>
  #include <plat/gpio-cfg-helpers.h>
--#include <plat/s3c2443.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/fb-core.h>
-@@ -43,6 +42,8 @@
- #include <plat/adc-core.h>
- #include <plat/rtc-core.h>
  
 +#include "common.h"
 +
- static struct map_desc s3c2443_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
+ /* S3C2442 extended clock support */
+ 
+ static unsigned long s3c2442_camif_upll_round(struct clk *clk,
+diff --git a/arch/arm/mach-s3c2440/s3c244x.c b/arch/arm/mach-s3c2440/s3c244x.c
+index 7e8a23d..57c9683 100644
+--- a/arch/arm/mach-s3c2440/s3c244x.c
++++ b/arch/arm/mach-s3c2440/s3c244x.c
+@@ -39,7 +39,6 @@
+ #include <mach/regs-dsc.h>
+ 
+ #include <plat/s3c2410.h>
+-#include <plat/s3c244x.h>
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+@@ -47,6 +46,8 @@
+ #include <plat/pll.h>
+ #include <plat/nand-core.h>
+ 
++#include "common.h"
++
+ static struct map_desc s3c244x_iodesc[] __initdata = {
  	IODESC_ENT(CLKPWR),
+ 	IODESC_ENT(TIMER),
 diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
-index 7532026..742fa03 100644
+index 742fa03..f91727f 100644
 --- a/arch/arm/plat-s3c24xx/cpu.c
 +++ b/arch/arm/plat-s3c24xx/cpu.c
-@@ -48,7 +48,6 @@
+@@ -47,17 +47,12 @@
+ #include <plat/clock.h>
  #include <plat/s3c2410.h>
  #include <plat/s3c2412.h>
- #include <plat/s3c244x.h>
--#include <plat/s3c2443.h>
+-#include <plat/s3c244x.h>
  
  /* table of supported CPUs */
  
-@@ -57,7 +56,6 @@ static const char name_s3c2412[]  = "S3C2412";
- static const char name_s3c2440[]  = "S3C2440";
- static const char name_s3c2442[]  = "S3C2442";
- static const char name_s3c2442b[]  = "S3C2442B";
--static const char name_s3c2443[]  = "S3C2443";
+ static const char name_s3c2410[]  = "S3C2410";
+ static const char name_s3c2412[]  = "S3C2412";
+-static const char name_s3c2440[]  = "S3C2440";
+-static const char name_s3c2442[]  = "S3C2442";
+-static const char name_s3c2442b[]  = "S3C2442B";
  static const char name_s3c2410a[] = "S3C2410A";
- static const char name_s3c2440a[] = "S3C2440A";
+-static const char name_s3c2440a[] = "S3C2440A";
  
-@@ -134,15 +132,6 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.init		= s3c2412_init,
- 		.name		= name_s3c2412,
+ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+@@ -79,42 +74,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.name		= name_s3c2410a
  	},
--	{
--		.idcode		= 0x32443001,
+ 	{
+-		.idcode		= 0x32440000,
 -		.idmask		= 0xffffffff,
--		.map_io		= s3c2443_map_io,
--		.init_clocks	= s3c2443_init_clocks,
--		.init_uarts	= s3c2443_init_uarts,
--		.init		= s3c2443_init,
--		.name		= name_s3c2443,
+-		.map_io		= s3c2440_map_io,
+-		.init_clocks	= s3c244x_init_clocks,
+-		.init_uarts	= s3c244x_init_uarts,
+-		.init		= s3c2440_init,
+-		.name		= name_s3c2440
 -	},
- };
- 
- /* minimal IO mapping */
-diff --git a/arch/arm/plat-samsung/include/plat/s3c2443.h b/arch/arm/plat-samsung/include/plat/s3c2443.h
+-	{
+-		.idcode		= 0x32440001,
+-		.idmask		= 0xffffffff,
+-		.map_io		= s3c2440_map_io,
+-		.init_clocks	= s3c244x_init_clocks,
+-		.init_uarts	= s3c244x_init_uarts,
+-		.init		= s3c2440_init,
+-		.name		= name_s3c2440a
+-	},
+-	{
+-		.idcode		= 0x32440aaa,
+-		.idmask		= 0xffffffff,
+-		.map_io		= s3c2442_map_io,
+-		.init_clocks	= s3c244x_init_clocks,
+-		.init_uarts	= s3c244x_init_uarts,
+-		.init		= s3c2442_init,
+-		.name		= name_s3c2442
+-	},
+-	{
+-		.idcode		= 0x32440aab,
+-		.idmask		= 0xffffffff,
+-		.map_io		= s3c2442_map_io,
+-		.init_clocks	= s3c244x_init_clocks,
+-		.init_uarts	= s3c244x_init_uarts,
+-		.init		= s3c2442_init,
+-		.name		= name_s3c2442b
+-	},
+-	{
+ 		.idcode		= 0x32412001,
+ 		.idmask		= 0xffffffff,
+ 		.map_io		= s3c2412_map_io,
+diff --git a/arch/arm/plat-samsung/include/plat/s3c244x.h b/arch/arm/plat-samsung/include/plat/s3c244x.h
 deleted file mode 100644
-index a5b794f..0000000
---- a/arch/arm/plat-samsung/include/plat/s3c2443.h
+index ea0c961..0000000
+--- a/arch/arm/plat-samsung/include/plat/s3c244x.h
 +++ /dev/null
-@@ -1,34 +0,0 @@
--/* linux/arch/arm/plat-samsung/include/plat/s3c2443.h
+@@ -1,42 +0,0 @@
+-/* linux/arch/arm/plat-samsung/include/plat/s3c244x.h
 - *
 - * Copyright (c) 2004-2005 Simtec Electronics
 - *	Ben Dooks <ben@simtec.co.uk>
 - *
-- * Header file for s3c2443 cpu support
+- * Header file for S3C2440 and S3C2442 cpu support
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
 -*/
 -
--#ifdef CONFIG_CPU_S3C2443
+-#if defined(CONFIG_CPU_S3C2440) || defined(CONFIG_CPU_S3C2442)
 -
--struct s3c2410_uartcfg;
+-extern void s3c244x_map_io(void);
 -
--extern  int s3c2443_init(void);
+-extern void s3c244x_init_uarts(struct s3c2410_uartcfg *cfg, int no);
 -
--extern void s3c2443_map_io(void);
+-extern void s3c244x_init_clocks(int xtal);
 -
--extern void s3c2443_init_uarts(struct s3c2410_uartcfg *cfg, int no);
--
--extern void s3c2443_init_clocks(int xtal);
--
--extern  int s3c2443_baseclk_add(void);
--
--extern void s3c2443_restart(char mode, const char *cmd);
 -#else
--#define s3c2443_init_clocks NULL
--#define s3c2443_init_uarts NULL
--#define s3c2443_map_io NULL
--#define s3c2443_init NULL
--#define s3c2443_restart NULL
+-#define s3c244x_init_clocks NULL
+-#define s3c244x_init_uarts NULL
+-#endif
+-
+-#ifdef CONFIG_CPU_S3C2440
+-extern  int s3c2440_init(void);
+-
+-extern void s3c2440_map_io(void);
+-#else
+-#define s3c2440_init NULL
+-#define s3c2440_map_io NULL
+-#endif
+-
+-#ifdef CONFIG_CPU_S3C2442
+-extern  int s3c2442_init(void);
+-
+-extern void s3c2442_map_io(void);
+-#else
+-#define s3c2442_init NULL
+-#define s3c2442_map_io NULL
 -#endif
 -- 
 1.7.5.4
