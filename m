@@ -1,87 +1,44 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Thu, 5 Jan 2012 20:12:22 -0800
-Subject: Circular dependency between <linux/kernel.h> and <asm/bug.h> on
- ARM
-In-Reply-To: <CAP=VYLpP393c0MYxPPR2j6jkLyyUQWjQBWg3RfbpJyuWxi+psA@mail.gmail.com>
-References: <1325472276.13595.200.camel@deadeye>
- <CAOesGMgXRev24e0bmGD71J04=Aon7bs0YeK7mwX8Na12uR_b6A@mail.gmail.com>
- <20120103144538.GU2914@n2100.arm.linux.org.uk>
- <CAP=VYLpP393c0MYxPPR2j6jkLyyUQWjQBWg3RfbpJyuWxi+psA@mail.gmail.com>
-Message-ID: <CAPnjgZ0Q1Y0Um0fm8fHxd1tN_rFe+5Y0DPOvUYFZnodG2Q-cUA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Jan 2012 13:27:51 +0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+Message-ID: <20120106052748.GA4790@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2012 at 7:43 PM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> On Tue, Jan 3, 2012 at 9:45 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Sun, Jan 01, 2012 at 11:01:27PM -0800, Olof Johansson wrote:
->>> On Sun, Jan 1, 2012 at 6:44 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
->>> > Commit 87e040b6456fd3416a1f6831c1eedaef5c0a94ff ("ARM: 7017/1: Use
->>> > generic BUG() handler") makes BUG() use BUILD_BUG_ON(). ?However,
->>> > BUILD_BUG_ON() is not defined in <linux/bug.h> but in <linux/kernel.h>.
->>> >
->>> > arch/include/asm/bug.h does not include <linux/kernel.h> and *cannot* do
->>> > so because the latter already includes <asm/bug.h>.
->>>
->>> Sure it can, but it's not ideal. Since the BUILD_BUG_ON is only used
->>> in bug.h in a #define, it will be resolved below the includes of
->>> either so there should be no ordering issue between the two.
->>
->> I disagree - we should not be creating circular dependencies. ?This
->> creates a mess, and uncertain results. ?For instance, if we include
->> linux/bug.h or asm/bug.h before linux/kernel.h has been included,
->> then we end up with linux/kernel.h being parsed without a definition
->> for BUG_ON().
->>
->> However, if linux/kernel.h is included first, we start parsing that,
->> include asm/bug.h, asm/bug.h then includes linux/kernel.h which produces
->> an empty file, and then we continue parsing asm/bug.h _without_
->> BUILD_BUG_ON() defined.
->>
->> So, adding linux/kernel.h does _not_ solve the problem. ?It solves the
->> problem for _some_ cases only.
->>
->>> > Maybe BUILD_BUG_ON() should be moved out to a header of its own, or else
->>> > this particular use should be moved to some other file. ?This needs to
->>> > be fixed somehow, as it obviously leads to build failures, e.g.:
->>> >
->>> > https://buildd.debian.org/status/fetch.php?pkg=linux-2.6&arch=armel&ver=3.2~rc7-1~experimental.1&stamp=1325142904
->>>
->>> Or perhaps moving BUILD_BUG_ON to include/linux/bug.h?
->>
->> and change linux/kernel.h to include linux/bug.h rather than asm/bug.h.
->
-> Actually, kernel.h doesn't need to include any variant of bug.h at all.
->
-> I started on cleaning this up a few weeks back, but didn't have the time
-> to get it ready for 3.3 -- so my intent is to do so for linux-next that will
-> be the 3.4 release. ?The Work In Progress can be seen here:
->
-> http://git.kernel.org/?p=linux/kernel/git/paulg/linux.git;a=shortlog;h=refs/heads/bug.h-cleanup-WIP
->
-> I only mention it here since I'd hate to see anyone waste time on
-> duplicating work that is already done.
+On Thu, Jan 05, 2012 at 05:05:46PM -0800, Stephen Warren wrote:
+> I'm confused because the node has properties for function name and
+> group name which make sense to define the mux setting for that group.
+> However, I'm not sure what the grp-pins/num-pins/grp-mux/num-mux
+> properties are for; if those properties define the available mux options
+> and for the group and set of pins included in the group, I think the node
+> is representing too many things in one place. I'd expect to see:
+> 
+> a) Either data in the pinctrl driver
 
-Thanks Paul, I hope it goes well.
+For imx, I'm against this.
+
+> or separate DT nodes to define each
+> available pin group, mux function, etc.; the definition of what the SoC
+> itself can do.
+
+This works for me.  But we do not necessarily need to enumerate all
+the possible groups from the beginning.  Instead, we can add the groups
+incrementally.
 
 Regards,
-Simon
+Shawn
 
->
-> Thanks,
-> Paul.
->
-> ---
->
->>
->>> The quickest fix for now might be to take out the BUILD_BUG_ON(),
->>> especially so close to 3.2-final.
->>
->> I think just remove the BUILD_BUG_ON. ?Other architectures have done
->> without it, so I see no reason we can't do as well.
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at ?http://www.tux.org/lkml/
+> 
+> b) The configuration of each pin group that's used by the particular board.
+> All that's relevant here is the mux selection for each pin groups; things
+> like which pins are included in each group are defined by the SoC not the
+> board and hence wouldn't be included in a per-board node.
