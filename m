@@ -1,188 +1,344 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  6 Jan 2012 17:20:30 +0100
-Subject: [PATCH v4] ARM: at91: pit add DT support
-In-Reply-To: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1325866830-13259-1-git-send-email-nicolas.ferre@atmel.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri,  6 Jan 2012 15:28:25 +0100
+Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
+Message-ID: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+The irq_domain_add() function needs the number of interrupts in the
+domain to properly initialize them. In addition the allocated domain
+is now returned by the irq_domain_{add,generate}_simple() helpers.
 
-Retreive registers address and IRQ from device tree entry. Fall back
-to built-in values if an error occurs.
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-[nicolas.ferre at atmel.com: change error path and interrupts property handling]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
-v4: - change of_at91sam926x_pit_init() return value usage logic as
-      suggested by Rob Herring
-    - irq_of_parse_and_map() returns 0 on error: change test according to 
-      Grant Likely note.
+ arch/arm/mach-at91/board-dt.c         |    6 +++++-
+ arch/arm/mach-imx/imx51-dt.c          |   13 +++++++++++--
+ arch/arm/mach-imx/imx53-dt.c          |   13 +++++++++++--
+ arch/arm/mach-imx/mach-imx6q.c        |    4 +++-
+ arch/arm/mach-msm/board-msm8x60.c     |    7 +++++--
+ arch/arm/mach-omap2/board-generic.c   |    7 +++++--
+ arch/arm/mach-prima2/irq.c            |    4 +++-
+ arch/arm/mach-versatile/core.c        |   10 ++++++++--
+ arch/arm/plat-mxc/include/mach/irqs.h |    1 +
+ arch/arm/plat-mxc/tzic.c              |    2 --
+ include/linux/irqdomain.h             |   27 ++++++++++++++++++++++-----
+ kernel/irq/irqdomain.c                |   30 +++++++++++++++++++-----------
+ 12 files changed, 93 insertions(+), 31 deletions(-)
 
-v3: - use irq_of_parse_and_map() for handling irq numbers specified by DT.
-      Correction proposed by Jamie Iles.
-
-v2: - new specification of irq numbers in DT (due to modification of AIC code)
-    - new error path in of_at91sam926x_pit_init()
-    - fall back to built-in values if an error occurs
-    - use of of_property_read_u32() to get irq property
-
- .../devicetree/bindings/arm/atmel-at91.txt         |    8 +++
- arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 ++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++
- arch/arm/mach-at91/at91sam926x_time.c              |   60 ++++++++++++++++++--
- 4 files changed, 73 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-new file mode 100644
-index 0000000..380f711
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -0,0 +1,8 @@
-+Atmel AT91 device tree bindings.
-+================================
-+
-+PIT Timer required properties:
-+- compatible: Should be "atmel,at91sam9260-pit"
-+- reg: Should contain registers location and length
-+- interrupts: Should contain interrupt for the PIT which is the IRQ line
-+  shared across all System Controller members.
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index ea942b5..e10842a 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -57,6 +57,11 @@
- 				reg = <0xfffff000 0x200>;
- 			};
+diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+index bb6b434..12f003d 100644
+--- a/arch/arm/mach-at91/board-dt.c
++++ b/arch/arm/mach-at91/board-dt.c
+@@ -95,7 +95,11 @@ static const struct of_device_id aic_of_match[] __initconst = {
  
-+			pit: timer at fffffd30 {
-+				compatible = "atmel,at91sam9260-pit";
-+				reg = <0xfffffd30 0xf>;
-+				interrupts = <1 4>;
-+			};
- 
- 			pioA: gpio at fffff400 {
- 				compatible = "atmel,at91rm9200-gpio";
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index ebc9617..28a678f 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -58,6 +58,12 @@
- 				reg = <0xfffff000 0x200>;
- 			};
- 
-+			pit: timer at fffffd30 {
-+				compatible = "atmel,at91sam9260-pit";
-+				reg = <0xfffffd30 0xf>;
-+				interrupts = <1 4>;
-+			};
-+
- 			dma: dma-controller at ffffec00 {
- 				compatible = "atmel,at91sam9g45-dma";
- 				reg = <0xffffec00 0x200>;
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index d89ead7..802fea3 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -14,6 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/clk.h>
- #include <linux/clockchips.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- 
- #include <asm/mach/time.h>
- 
-@@ -133,7 +136,8 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- static struct irqaction at91sam926x_pit_irq = {
- 	.name		= "at91_tick",
- 	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= at91sam926x_pit_interrupt
-+	.handler	= at91sam926x_pit_interrupt,
-+	.irq		= AT91_ID_SYS,
- };
- 
- static void at91sam926x_pit_reset(void)
-@@ -149,6 +153,49 @@ static void at91sam926x_pit_reset(void)
- 	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id timer_ids[] = {
-+	{ .compatible = "atmel,at91sam9260-pit" },
-+	{ /* sentinel */ }
-+};
-+
-+static int __init of_at91sam926x_pit_init(void)
-+{
-+	struct device_node	*np;
-+	int			ret;
-+
-+	np = of_find_matching_node(NULL, timer_ids);
-+	if (!np)
-+		goto err;
-+
-+	pit_base_addr = of_iomap(np, 0);
-+	if (!pit_base_addr)
-+		goto node_err;
-+
-+	/* Get the interrupts property */
-+	ret = irq_of_parse_and_map(np, 0);
-+	if (!ret)
-+		goto ioremap_err;
-+	at91sam926x_pit_irq.irq = ret;
-+
-+	of_node_put(np);
-+
-+	return 0;
-+
-+ioremap_err:
-+	iounmap(pit_base_addr);
-+node_err:
-+	of_node_put(np);
-+err:
-+	return -EINVAL;
-+}
-+#else
-+static int __init of_at91sam926x_pit_init(void)
-+{
-+	return -EINVAL;
-+}
-+#endif
-+
- /*
-  * Set up both clocksource and clockevent support.
-  */
-@@ -177,7 +224,7 @@ static void __init at91sam926x_pit_init(void)
- 	clocksource_register_hz(&pit_clk, pit_rate);
- 
- 	/* Set up irq handler */
--	setup_irq(AT91_ID_SYS, &at91sam926x_pit_irq);
-+	setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
- 
- 	/* Set up and register clockevents */
- 	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
-@@ -193,10 +240,11 @@ static void at91sam926x_pit_suspend(void)
- 
- void __init at91sam926x_ioremap_pit(u32 addr)
+ static void __init at91_dt_init_irq(void)
  {
--	pit_base_addr = ioremap(addr, 16);
--
--	if (!pit_base_addr)
--		panic("Impossible to ioremap PIT\n");
-+	if (of_at91sam926x_pit_init() < 0) {
-+		pit_base_addr = ioremap(addr, 16);
-+		if (!pit_base_addr)
-+			panic("Impossible to ioremap PIT\n");
-+	}
+-	irq_domain_generate_simple(aic_of_match, 0xfffff000, 0);
++	struct irq_domain *domain;
++
++	domain = irq_domain_generate_simple(aic_of_match, 0xfffff000, 0,
++			NR_AIC_IRQS);
++	WARN_ON(IS_ERR(domain));
+ 	at91_init_irq_default();
  }
  
- struct sys_timer at91sam926x_timer = {
+diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
+index e6bad17..72bf94c 100644
+--- a/arch/arm/mach-imx/imx51-dt.c
++++ b/arch/arm/mach-imx/imx51-dt.c
+@@ -47,7 +47,12 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
+ static int __init imx51_tzic_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+-	irq_domain_add_simple(np, 0);
++	struct irq_domain *domain;
++
++	domain = irq_domain_add_simple(np, 0, TZIC_NUM_IRQS);
++	if (IS_ERR(domain))
++		return PTR_ERR(domain);
++
+ 	return 0;
+ }
+ 
+@@ -55,9 +60,13 @@ static int __init imx51_gpio_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+ 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
++	struct irq_domain *domain;
+ 
+ 	gpio_irq_base -= 32;
+-	irq_domain_add_simple(np, gpio_irq_base);
++
++	domain = irq_domain_add_simple(np, gpio_irq_base, 32);
++	if (IS_ERR(domain))
++		return PTR_ERR(domain);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
+index 05ebb3e..ccae620 100644
+--- a/arch/arm/mach-imx/imx53-dt.c
++++ b/arch/arm/mach-imx/imx53-dt.c
+@@ -51,7 +51,12 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
+ static int __init imx53_tzic_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+-	irq_domain_add_simple(np, 0);
++	struct irq_domain *domain;
++
++	domain = irq_domain_add_simple(np, 0, TZIC_NUM_IRQS);
++	if (IS_ERR(domain))
++		return PTR_ERR(domain);
++
+ 	return 0;
+ }
+ 
+@@ -59,9 +64,13 @@ static int __init imx53_gpio_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+ 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
++	struct irq_domain *domain;
+ 
+ 	gpio_irq_base -= 32;
+-	irq_domain_add_simple(np, gpio_irq_base);
++
++	domain = irq_domain_add_simple(np, gpio_irq_base, 32);
++	if (IS_ERR(domain))
++		return PTR_ERR(domain);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index c257281..9ed7812 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -95,9 +95,11 @@ static int __init imx6q_gpio_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+ 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
++	struct irq_domain *domain;
+ 
+ 	gpio_irq_base -= 32;
+-	irq_domain_add_simple(np, gpio_irq_base);
++	domain = irq_domain_add_simple(np, gpio_irq_base, 32);
++	WARN_ON(IS_ERR(domain));
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 0a11342..a50c7e2 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -84,8 +84,11 @@ static void __init msm8x60_dt_init(void)
+ 
+ 	node = of_find_matching_node_by_address(NULL, msm_dt_gic_match,
+ 			MSM8X60_QGIC_DIST_PHYS);
+-	if (node)
+-		irq_domain_add_simple(node, GIC_SPI_START);
++	if (node) {
++		struct irq_domain *domain = irq_domain_add_simple(node,
++				GIC_SPI_START, NR_MSM_IRQS);
++		WARN_ON(IS_ERR(domain));
++	}
+ 
+ 	if (of_machine_is_compatible("qcom,msm8660-surf")) {
+ 		printk(KERN_INFO "Init surf UART registers\n");
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index d587560..bf67781 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -66,8 +66,11 @@ static struct of_device_id intc_match[] __initdata = {
+ static void __init omap_generic_init(void)
+ {
+ 	struct device_node *node = of_find_matching_node(NULL, intc_match);
+-	if (node)
+-		irq_domain_add_simple(node, 0);
++	if (node) {
++		struct irq_domain *domain;
++		domain = irq_domain_add_simple(node, 0, INTCPS_NR_IRQS);
++		WARN_ON(IS_ERR(domain));
++	}
+ 
+ 	omap_sdrc_init(NULL, NULL);
+ 
+diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
+index d93ceef..d3c5136 100644
+--- a/arch/arm/mach-prima2/irq.c
++++ b/arch/arm/mach-prima2/irq.c
+@@ -58,6 +58,7 @@ static struct of_device_id intc_ids[]  = {
+ 
+ void __init sirfsoc_of_irq_init(void)
+ {
++	struct irq_domain *domain;
+ 	struct device_node *np;
+ 
+ 	np = of_find_matching_node(NULL, intc_ids);
+@@ -68,7 +69,8 @@ void __init sirfsoc_of_irq_init(void)
+ 	if (!sirfsoc_intc_base)
+ 		panic("unable to map intc cpu registers\n");
+ 
+-	irq_domain_add_simple(np, 0);
++	domain = irq_domain_add_simple(np, 0, NR_IRQS);
++	WARN_ON(IS_ERR(domain));
+ 
+ 	of_node_put(np);
+ 
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index 02b7b93..6c40be4 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -98,13 +98,19 @@ static const struct of_device_id sic_of_match[] __initconst = {
+ 
+ void __init versatile_init_irq(void)
+ {
++	struct irq_domain *domain;
++
+ 	vic_init(VA_VIC_BASE, IRQ_VIC_START, ~0, 0);
+-	irq_domain_generate_simple(vic_of_match, VERSATILE_VIC_BASE, IRQ_VIC_START);
++	domain = irq_domain_generate_simple(vic_of_match, VERSATILE_VIC_BASE,
++			IRQ_VIC_START, IRQ_VIC_END - IRQ_VIC_START + 1);
++	WARN_ON(IS_ERR(domain));
+ 
+ 	writel(~0, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
+ 
+ 	fpga_irq_init(IRQ_VICSOURCE31, ~PIC_MASK, &sic_irq);
+-	irq_domain_generate_simple(sic_of_match, VERSATILE_SIC_BASE, IRQ_SIC_START);
++	domain = irq_domain_generate_simple(sic_of_match, VERSATILE_SIC_BASE,
++			IRQ_SIC_START, IRQ_SIC_END - IRQ_SIC_START + 1);
++	WARN_ON(IS_ERR(domain));
+ 
+ 	/*
+ 	 * Interrupts on secondary controller from 0 to 8 are routed to
+diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+index fd9efb0..2fda5aa 100644
+--- a/arch/arm/plat-mxc/include/mach/irqs.h
++++ b/arch/arm/plat-mxc/include/mach/irqs.h
+@@ -54,6 +54,7 @@
+ /* REVISIT: Add IPU irqs on IMX51 */
+ 
+ #define NR_IRQS			(MXC_IPU_IRQ_START + MX3_IPU_IRQS)
++#define TZIC_NUM_IRQS		128
+ 
+ extern int imx_irq_set_priority(unsigned char irq, unsigned char prio);
+ 
+diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+index 98308ec..98b23b8 100644
+--- a/arch/arm/plat-mxc/tzic.c
++++ b/arch/arm/plat-mxc/tzic.c
+@@ -50,8 +50,6 @@
+ 
+ void __iomem *tzic_base; /* Used as irq controller base in entry-macro.S */
+ 
+-#define TZIC_NUM_IRQS 128
+-
+ #ifdef CONFIG_FIQ
+ static int tzic_set_irq_fiq(unsigned int irq, unsigned int type)
+ {
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index bd4272b..1538d4c 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -15,6 +15,7 @@
+ #ifndef _LINUX_IRQDOMAIN_H
+ #define _LINUX_IRQDOMAIN_H
+ 
++#include <linux/err.h>
+ #include <linux/irq.h>
+ #include <linux/mod_devicetable.h>
+ 
+@@ -96,12 +97,28 @@ extern struct irq_domain_ops irq_domain_simple_ops;
+ #endif /* CONFIG_IRQ_DOMAIN */
+ 
+ #if defined(CONFIG_IRQ_DOMAIN) && defined(CONFIG_OF_IRQ)
+-extern void irq_domain_add_simple(struct device_node *controller, int irq_base);
+-extern void irq_domain_generate_simple(const struct of_device_id *match,
+-					u64 phys_base, unsigned int irq_start);
++extern struct irq_domain *irq_domain_add_simple(struct device_node *controller,
++						unsigned int irq_base,
++						unsigned int nr_irq);
++extern struct irq_domain *irq_domain_generate_simple(const struct of_device_id *match,
++						     u64 phys_base,
++						     unsigned int irq_start,
++						     unsigned int nr_irq);
+ #else /* CONFIG_IRQ_DOMAIN && CONFIG_OF_IRQ */
+-static inline void irq_domain_generate_simple(const struct of_device_id *match,
+-					u64 phys_base, unsigned int irq_start) { }
++static inline struct irq_domain *irq_domain_add_simple(struct device_node *controller,
++						       int irq_base,
++						       unsigned int nr_irq)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++static inline struct irq_domain *irq_domain_generate_simple(const struct of_device_id *match,
++							    u64 phys_base,
++							    unsigned int irq_start,
++							    unsigned int nr_irq)
++{
++	return ERR_PTR(-ENOSYS);
++}
+ #endif /* CONFIG_IRQ_DOMAIN && CONFIG_OF_IRQ */
+ 
+ #endif /* _LINUX_IRQDOMAIN_H */
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 1f9e265..807c44b 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -147,36 +147,44 @@ int irq_domain_simple_dt_translate(struct irq_domain *d,
+ }
+ 
+ /**
+- * irq_domain_create_simple() - Set up a 'simple' translation range
++ * irq_domain_add_simple() - Set up a 'simple' translation range
+  */
+-void irq_domain_add_simple(struct device_node *controller, int irq_base)
++struct irq_domain *irq_domain_add_simple(struct device_node *controller,
++					 unsigned int irq_base,
++					 unsigned int nr_irq)
+ {
+ 	struct irq_domain *domain;
+ 
+ 	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+-	if (!domain) {
+-		WARN_ON(1);
+-		return;
+-	}
++	if (!domain)
++		return ERR_PTR(-ENOMEM);
+ 
+ 	domain->irq_base = irq_base;
++	domain->nr_irq = nr_irq;
+ 	domain->of_node = of_node_get(controller);
+ 	domain->ops = &irq_domain_simple_ops;
+ 	irq_domain_add(domain);
++
++	return domain;
+ }
+ EXPORT_SYMBOL_GPL(irq_domain_add_simple);
+ 
+-void irq_domain_generate_simple(const struct of_device_id *match,
+-				u64 phys_base, unsigned int irq_start)
++struct irq_domain *irq_domain_generate_simple(const struct of_device_id *match,
++					      u64 phys_base,
++					      unsigned int irq_start,
++					      unsigned int nr_irq)
+ {
++	struct irq_domain *domain = ERR_PTR(-ENODEV);
+ 	struct device_node *node;
+-	pr_info("looking for phys_base=%llx, irq_start=%i\n",
+-		(unsigned long long) phys_base, (int) irq_start);
++	pr_info("looking for phys_base=%llx, irq_start=%u, nr_irq=%u\n",
++		(unsigned long long) phys_base, irq_start, nr_irq);
+ 	node = of_find_matching_node_by_address(NULL, match, phys_base);
+ 	if (node)
+-		irq_domain_add_simple(node, irq_start);
++		domain = irq_domain_add_simple(node, irq_start, nr_irq);
+ 	else
+ 		pr_info("no node found\n");
++
++	return domain;
+ }
+ EXPORT_SYMBOL_GPL(irq_domain_generate_simple);
+ #endif /* CONFIG_OF_IRQ */
 -- 
-1.7.5.4
+1.7.8.1
