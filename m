@@ -1,56 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 6 Jan 2012 13:43:11 +0100
-Subject: [PATCH 1/2] dmaengine: Fix status handling in imx-dma.
-In-Reply-To: <1325848224.1540.102.camel@vkoul-udesk3>
-References: <1325506706-10028-1-git-send-email-javier.martin@vista-silicon.com>
- <1325829389.1540.95.camel@vkoul-udesk3>
- <20120106093752.GH5446@pengutronix.de>
- <1325848224.1540.102.camel@vkoul-udesk3>
-Message-ID: <20120106124311.GJ5446@pengutronix.de>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Fri,  6 Jan 2012 18:17:30 +0530
+Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
+Message-ID: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 04:40:24PM +0530, Vinod Koul wrote:
-> On Fri, 2012-01-06 at 10:37 +0100, Sascha Hauer wrote:
-> > On Fri, Jan 06, 2012 at 11:26:29AM +0530, Vinod Koul wrote:
-> > > On Mon, 2012-01-02 at 13:18 +0100, Javier Martin wrote:
-> > > > Status must only be changed to DMA_IN_PROGRESS
-> > > > when the DMA transfer has really begun.
-> > > > 
-> > > > However, since this driver lacks of support for
-> > > > multiple descriptors a new flag has to be introduced
-> > > > to avoid the prepare function be called multiple times.
-> > > Thanks this is the right approach to fix this driver
-> > > 
-> > > But this will obviously break any users of this driver as they need to
-> > > call the right APIs now :D
-> > > 
-> > > Sacha: can you check this patch and see which users of this driver will
-> > > break. we need those fixes to go along this patch as well
-> > 
-> > Which users should break? I just tried with the mxcmmc driver and this
-> > one does not break.
-> > 
-> > I do not really understand this patch anyway. It changes imxdmac->status
-> > to a write-only variable and introduces a imxdmac->prepared variable
-> > with the same meaning. This patch is a complicated no-op.
-> > 
-> > What was the original problem? The fact that we used a enum dma_status
-> > with the wrong semantics? In that case I suggest to simply replace this
-> > variable. All we need to track is that we do not enter
-> > imxdma_prep_slave_sg with an already running transfer.
-> the memcpy patch submitted earlier didn't use correct dmaengine API. a
-> descriptor is not supposed to be started in prepare. The reason given
-> was the driver already does so for all other prepares, so i suggested to
-> fix that. Descriptors should be started in issue_pending only.
+Following are the changes we have done from the previous
+v1 posted here: https://lkml.org/lkml/2011/12/22/148 
 
-The transfer is not started in prepare but in imxdmac->desc.tx_submit
+As our ADM Scatter-gather hardware needs
+-32-bit command configuration parameter
+ apart from 
+-32-bit source address
+-32-bit destination address
+-16-bit length
 
-Sascha
+So,we have added new parameter in struct scatterlist to support xfer descriptor
+specific private data, and for supporting ADM Box mode DMA we added new
+API and data structure.
+  
+Ravi Kumar V (2):
+  dmaengine: Add support for per xfer specific privatedata & box dma
+  msm: DMAEngine: Add DMAEngine driver based on old MSM DMA APIs
 
+ arch/arm/mach-msm/include/mach/dma.h |   33 ++
+ drivers/dma/Kconfig                  |   12 +
+ drivers/dma/Makefile                 |    1 +
+ drivers/dma/msm-dma.c                |  764 ++++++++++++++++++++++++++++++++++
+ include/asm-generic/scatterlist.h    |    1 +
+ include/linux/dmaengine.h            |   17 +-
+ 6 files changed, 827 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/dma/msm-dma.c
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
