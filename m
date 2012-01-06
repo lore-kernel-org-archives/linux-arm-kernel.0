@@ -1,44 +1,67 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Fri, 6 Jan 2012 15:10:09 -0600
-Subject: [RFC PATCH v2 2/2] ARM: imx: Add mx5 cpuidle implmentation
-In-Reply-To: <20120105055508.GD11867@opensource.wolfsonmicro.com>
-References: <1323846126-7516-1-git-send-email-rob.lee@linaro.org>
- <1323846126-7516-3-git-send-email-rob.lee@linaro.org>
- <20111222175027.GG29622@opensource.wolfsonmicro.com>
- <CAMXH7KEHsighKYkPhhgHmE9s7sxtP4hz8L+Z+LMsrD14kiqJJQ@mail.gmail.com>
- <20120105055508.GD11867@opensource.wolfsonmicro.com>
-Message-ID: <CAMXH7KEb9LLmpWP=Jqz7exPGe1WXFtBiu+avh67R7vStAqzRSg@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 6 Jan 2012 13:13:08 -0800
+Subject: [PATCH v1 0/3] Tegra30 clockframework
+In-Reply-To: <1325517486-22458-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1325517486-22458-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE39F6B@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 January 2012 23:55, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Jan 04, 2012 at 05:35:39PM -0600, Rob Lee wrote:
->> On 22 December 2011 11:50, Mark Brown
->> > On Wed, Dec 14, 2011 at 01:02:06AM -0600, Robert Lee wrote:
->
->> >> + ? ? clk_enable(&gpc_dvfs_clk);
->
->> > Should these enables be in the cpuidle code? ?The device appears to have
->> > been working fine without them thus far... ?Alternatively, if they
->> > should be on anyway does this need to be split out and sent as a bug
->> > fix?
->
->> This clock is used by the existing pm_suspend code for i.MX51 and
->> other future code being worked on. ?Since it uses extremely minimal
->> power and is required to be enabled during low power modes, it seemed
->> cleanest to just enable it during clock init. ?But I forgot to remove
->> it from it's enabling from i.MX51 pm_suspend code so I can do that for
->> v3.
->
-> Sounds like it's worth splitting out and getting it merged as quickly as
-> possible then? ?It wasn't the code I was querying, it was the way it is
-> being merged.
+Peter De Schrijver wrote at Monday, January 02, 2012 8:18 AM:
+> This patchset introduces the tegra30 clockframework. Clocks which require
+> voltage scaling are not included in this version. The implementation doesn't
+> use the generic clock code yet. It's the intention to move to it, once the
+> semantics are fully clarified.
 
-Sure, I can split this portion out as a separate patch.  I'd prefer to
-keep it as part of this patch series though as the existing usage and
-implementation of this clock works ok, it's just not the best
-implementation once another driver needs to use this clock.  And it
-may raise concern if implemented by itself with a pressing reason
-being shown.  At least that's my thoughts.  I'm fairly new to the
-community so please tolerate anything dumb I say and help understand
-the ways of the force.
+I tried testing this, and the kernel crashes/hangs as shown below:
+
+[    0.088340] CPU: Testing write buffer coherency: ok
+[    0.093638] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.099573] Division by zero in kernel.
+[    0.103643] [<c001396c>] (unwind_backtrace+0x0/0x11c) from [<c013c1cc>] (Ldiv0_64+0x8/0x18)
+[    0.112332] [<c013c1cc>] (Ldiv0_64+0x8/0x18) from [<c0056754>] (clockevents_config.part.0+0x1c/0x64)
+[    0.121810] [<c0056754>] (clockevents_config.part.0+0x1c/0x64) from [<c00569ac>] (clockevents_config_and_register+0x20/0x2c)
+[    0.133433] [<c00569ac>] (clockevents_config_and_register+0x20/0x2c) from [<c0280fec>] (twd_timer_setup+0x144/0x190)
+[    0.144335] [<c0280fec>] (twd_timer_setup+0x144/0x190) from [<c0281334>] (local_timer_setup+0x10/0x18)
+[    0.153986] [<c0281334>] (local_timer_setup+0x10/0x18) from [<c0280c00>] (percpu_timer_setup+0x54/0xa8)
+[    0.163727] [<c0280c00>] (percpu_timer_setup+0x54/0xa8) from [<c03904e0>] (smp_prepare_cpus+0x6c/0x90)
+[    0.173391] [<c03904e0>] (smp_prepare_cpus+0x6c/0x90) from [<c038d844>] (kernel_init+0x48/0x12c)
+[    0.182520] [<c038d844>] (kernel_init+0x48/0x12c) from [<c000ebf4>] (kernel_thread_exit+0x0/0x8)
+[    0.191628] ------------[ cut here ]------------
+[    0.196454] WARNING: at kernel/time/clockevents.c:46 clockevent_delta2ns+0x3c/0x84()
+[    0.204490] Modules linked in:
+[    0.207735] [<c001396c>] (unwind_backtrace+0x0/0x11c) from [<c0022284>] (warn_slowpath_common+0x4c/0x64)
+[    0.217568] [<c0022284>] (warn_slowpath_common+0x4c/0x64) from [<c00222b4>] (warn_slowpath_null+0x18/0x1c)
+[    0.227577] [<c00222b4>] (warn_slowpath_null+0x18/0x1c) from [<c005668c>] (clockevent_delta2ns+0x3c/0x84)
+[    0.237497] [<c005668c>] (clockevent_delta2ns+0x3c/0x84) from [<c0056780>] (clockevents_config.part.0+0x48/0x64)
+[    0.248040] [<c0056780>] (clockevents_config.part.0+0x48/0x64) from [<c00569ac>] (clockevents_config_and_register+0x20/0x2c)
+[    0.259654] [<c00569ac>] (clockevents_config_and_register+0x20/0x2c) from [<c0280fec>] (twd_timer_setup+0x144/0x190)
+[    0.270553] [<c0280fec>] (twd_timer_setup+0x144/0x190) from [<c0281334>] (local_timer_setup+0x10/0x18)
+[    0.280202] [<c0281334>] (local_timer_setup+0x10/0x18) from [<c0280c00>] (percpu_timer_setup+0x54/0xa8)
+[    0.289934] [<c0280c00>] (percpu_timer_setup+0x54/0xa8) from [<c03904e0>] (smp_prepare_cpus+0x6c/0x90)
+[    0.299582] [<c03904e0>] (smp_prepare_cpus+0x6c/0x90) from [<c038d844>] (kernel_init+0x48/0x12c)
+[    0.308699] [<c038d844>] (kernel_init+0x48/0x12c) from [<c000ebf4>] (kernel_thread_exit+0x0/0x8)
+[    0.317830] ---[ end trace 1b75b31a2719ed1c ]---
+[    0.322697] Setting up static identity map for 0x8028cf98 - 0x8028cff0
+<<no more output>>
+
+Without these patches, the same tree gets all the way to waiting for the
+root filesystem:
+
+[    0.088329] CPU: Testing write buffer coherency: ok
+[    0.093631] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.099545] smp_twd: clock not found: -2
+[    0.103667] Calibrating local timer... 500.06MHz.
+[    0.161249] Setting up static identity map for 0x8028a918 - 0x8028a970
+[    2.261492] CPU1: failed to come online
+[    2.265684] Brought up 1 CPUs
+[    2.268813] SMP: Total of 1 processors activated (1987.37 BogoMIPS).
+...
+[    2.704845] Registering SWP/SWPB emulation handler
+[    2.710558] Waiting for root device /dev/mmcblk1p1...
+
+I tested using commit e4421e71fa89bee67d2b67079041ca346ae49ea3 in my
+per-user repo on nv-tegra.nvidia.com.
+
+-- 
+nvpublic
