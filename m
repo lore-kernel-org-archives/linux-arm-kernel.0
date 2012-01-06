@@ -1,72 +1,76 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 Jan 2012 10:47:06 +0900
-Subject: [PATCH v2 1/2] DMA: PL330: Merge PL330 driver into drivers/dma/
-In-Reply-To: <20120105145425.GW11810@n2100.arm.linux.org.uk>
-References: <1323654668-32504-1-git-send-email-boojin.kim@samsung.com>
- <20120105145425.GW11810@n2100.arm.linux.org.uk>
-Message-ID: <02c901cccc15$18d82620$4a887260$%kim@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 06 Jan 2012 11:16:06 +0900
+Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with gpio
+ controlled panel reset
+In-Reply-To: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
+References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <001401cccc19$25b52920$711f7b60$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Hi, Thomas.
+> -----Original Message-----
+> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
+> Sent: Friday, January 06, 2012 12:42 AM
+> Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with gpio controlled panel reset
 > 
-> On Mon, Dec 12, 2011 at 10:51:08AM +0900, Boojin Kim wrote:
-> > Currently there were two part of DMAC PL330 driver for
-> > support old styled s3c-pl330 which has been merged into
-> > drivers/dma/pl330.c driver. Actually, there is no reason
-> > to separate them now.
-> >
-> > Basically this patch merges arch/arm/common/pl330.c into
-> > drivers/dma/pl330.c driver and removes useless exported
-> > symbol, externed function and so on.
-> >
-> > The newer pl330 driver tested on SMDKV310 and SMDK4212 boards
-> >
-> > Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> >
-> > Change since V1:
-> > Modify the order of definitions/declarations according to linux coding
-> rules.
-> > ---
-> >  arch/arm/common/Kconfig               |    3 -
-> >  arch/arm/common/Makefile              |    1 -
-> >  arch/arm/common/pl330.c               | 1971
-------------------------------
+> Add a lcd panel driver for simple raster-type lcd's which uses a gpio
+> controlled panel reset. The driver controls the nRESET line of the panel
+> using a gpio connected from the host system. The Vcc supply to the panel
+> is (optionally) controlled using a voltage regulator. This driver excludes
+> support for lcd panels that use a serial command interface or direct
+> memory mapped IO interface.
+> 
+> Suggested-by: Lars-Peter Clausen <lars@metafoo.de>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 > ---
-> >  arch/arm/include/asm/hardware/pl330.h |  333 +++---
-> >  drivers/dma/Kconfig                   |    1 -
-> >  drivers/dma/pl330.c                   | 1892
-+++++++++++++++++++++++++++++++
-> >  6 files changed, 2074 insertions(+), 2127 deletions(-)
-> >  delete mode 100644 arch/arm/common/pl330.c
+>  .../devicetree/bindings/lcd/lcd-pwrctrl.txt        |   39 ++++
+>  drivers/video/backlight/Kconfig                    |    7 +
+>  drivers/video/backlight/Makefile                   |    1 +
+>  drivers/video/backlight/lcd_pwrctrl.c              |  231 ++++++++++++++++++++
+>  include/video/lcd_pwrctrl.h                        |   30 +++
+>  5 files changed, 308 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/lcd/lcd-pwrctrl.txt
+>  create mode 100644 drivers/video/backlight/lcd_pwrctrl.c
+>  create mode 100644 include/video/lcd_pwrctrl.h
 > 
-> Now that the PL330 code is entirely out of arch/arm, the header should no
-> longer be in asm/hardware/pl330.h.
-> 
-Yes, right.
-
-> Definitions private to the driver should be in drivers/dma/pl330.c or a
-> header file co-located.  Other definitions for interfaces to that driver
-> (eg, platform data) should be in include/linux/amba.
-> 
-OK.
-
-> That can be the subject of a follow-up patch if this is already finalized.
-
-Yes, this has been already sent to arm-soc for this merge window. So we need
-another one for address comments from you.
-
-Boojin, could you please do that?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> [...]
+> --- a/drivers/video/backlight/Makefile
+> +++ b/drivers/video/backlight/Makefile
+> @@ -8,6 +8,7 @@ obj-$(CONFIG_LCD_LMS283GF05)	   += lms283gf05.o
+>  obj-$(CONFIG_LCD_LTV350QV)	   += ltv350qv.o
+>  obj-$(CONFIG_LCD_ILI9320)	   += ili9320.o
+>  obj-$(CONFIG_LCD_PLATFORM)	   += platform_lcd.o
+> +obj-$(CONFIG_LCD_PWRCTRL) 	   += lcd_pwrctrl.o
+Can you remove unnecessary space?
+Please use <tab><space><space><space> instead of <space><tab><space><space><space>
+between PWRCTRL) and += lcd_.
+> [...]
+> +static struct platform_driver lcd_pwrctrl_driver = {
+> +	.driver		= {
+> +		.name	= "lcd-pwrctrl",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(lcd_pwrctrl_match),
+> +	},
+> +	.probe		= lcd_pwrctrl_probe,
+> +	.remove		= lcd_pwrctrl_remove,
+> +	.suspend	= lcd_pwrctrl_suspend,
+> +	.resume		= lcd_pwrctrl_resume,
+Please use 'struct dev_pm_ops'.
+> +};
+> +
+> +static int __init lcd_pwrctrl_init(void)
+> +{
+> +	return platform_driver_register(&lcd_pwrctrl_driver);
+> +}
+> +
+> +static void __exit lcd_pwrctrl_cleanup(void)
+> +{
+> +	platform_driver_unregister(&lcd_pwrctrl_driver);
+> +}
+> +
+> +module_init(lcd_pwrctrl_init);
+> +module_exit(lcd_pwrctrl_cleanup);
+Use module_platform_driver(lcd_pwrctrl_driver).
+It can make the code simpler.
+> [...]
