@@ -1,50 +1,56 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 06 Jan 2012 10:26:17 -0600
-Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
-In-Reply-To: <20120106160744.GA7687@codeaurora.org>
-References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
- <20120106160744.GA7687@codeaurora.org>
-Message-ID: <4F0720A9.8070400@gmail.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Fri, 6 Jan 2012 16:26:15 +0000
+Subject: [PATCH V2 1/4] i2c: tegra: Add __devinit/exit to probe/remove
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF176BE92E21@HQMAIL01.nvidia.com>
+References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
+ <20111220015634.GA27789@quad.lixom.net>
+ <CAM=Q2cs8K4vraWPNqervcmxEqUGiAbng+44+L9OhD3ijPw9tAA@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF176BE92E21@HQMAIL01.nvidia.com>
+Message-ID: <20120106162615.GA8441@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2012 10:07 AM, David Brown wrote:
-> On Fri, Jan 06, 2012 at 03:28:25PM +0100, Thierry Reding wrote:
->> diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
->> index 0a11342..a50c7e2 100644
->> --- a/arch/arm/mach-msm/board-msm8x60.c
->> +++ b/arch/arm/mach-msm/board-msm8x60.c
->> @@ -84,8 +84,11 @@ static void __init msm8x60_dt_init(void)
->>  
->>  	node = of_find_matching_node_by_address(NULL, msm_dt_gic_match,
->>  			MSM8X60_QGIC_DIST_PHYS);
->> -	if (node)
->> -		irq_domain_add_simple(node, GIC_SPI_START);
->> +	if (node) {
->> +		struct irq_domain *domain = irq_domain_add_simple(node,
->> +				GIC_SPI_START, NR_MSM_IRQS);
->> +		WARN_ON(IS_ERR(domain));
->> +	}
->>  
->>  	if (of_machine_is_compatible("qcom,msm8660-surf")) {
->>  		printk(KERN_INFO "Init surf UART registers\n");
+On Tue, Dec 20, 2011 at 01:47:29PM -0800, Stephen Warren wrote:
+> Shubhrajyoti Datta wrote at Monday, December 19, 2011 11:15 PM:
+> ...
+> > Hi Stephen ,
+> > could you check this one also
+> > thanks.
+> > 
+> > From: Shubhrajyoti D <shubhrajyoti@ti.com>
+> > Date: Tue, 20 Dec 2011 11:40:51 +0530
+> > Subject: [PATCH] I2C : tegra : devexit in remove
+> > 
+> > Adding I2C __devexxit in remove
+> > 
+> > Cc: Stephen Warren <swarren@nvidia.com>
+> > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 > 
-> This is probably a consequence of MSM not really being "simple", but
-> just using that.  However, NR_MSM_IRQS is only the number of IRQs on
-> the MSM core.  There are also GPIO irqs, and potentially board IRQs
-> (the board has an I2C-based chip with a bunch of IRQ lines on it).
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 > 
-> The only define that captures this now is 'NR_IRQS', even though we're
-> trying to get rid of that.
+> Ben or Olof,
 > 
-> Ultimately, the correct answer will be to get the various interrupt
-> controllers using their own domains, but for now, this needs to be a
-> larger value to avoid missing a bunch of the interrupts.
+> > -       .remove  = tegra_i2c_remove,
+> > +       .remove  =__devexit_p(tegra_i2c_remove),
+> 
+> When you apply this, can you fix it up to add a space after the = in
+> the modified line? If you want, I can post an updated version to do that.
 
-No. This should only be the number of interrupts for a controller as the
-interrupt numbers in the device tree should be relative to a controller
-and not the Linux virq number. The numbering in the dts needs to be
-correct. You don't need a domain until you start getting the interrupts
-from the dts.
+Let me know if you want anything applying or a pull-request processed.
 
-Rob
+I think once fixed the patches would be fine and I ack them:
+
+Acked-by: Ben Dooks <ben-linux@fluff.org>
+ 
+> -- 
+> nvpublic
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
