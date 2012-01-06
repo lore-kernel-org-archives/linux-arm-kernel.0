@@ -1,296 +1,70 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 6 Jan 2012 10:03:07 -0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-3-git-send-email-b29396@freescale.com>
- <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Fri, 06 Jan 2012 19:36:37 +0100
+Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
+In-Reply-To: <20230.64932.51663.410120@pilspetsen.it.uu.se>
+References: <1325719752-818-1-git-send-email-olof@lixom.net>
+ <3197939.ZpLiSGWdou@ax5200p> <20230.64932.51663.410120@pilspetsen.it.uu.se>
+Message-ID: <4535343.dMzhSsBukX@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dong Aisheng-B29396 wrote at Friday, January 06, 2012 4:34 AM:
-> Stephen Warren wrote at Friday, January 06, 2012 9:06 AM:
-> > Dong Aisheng wrote at Thursday, January 05, 2012 6:48 AM:
-> > > On Sun, Dec 25, 2011 at 11:37 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> > > > Dong Aisheng-B29396 wrote at Thursday, December 22, 2011 1:18 AM:
-> > ...
-> > > diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl.txt
-> > ...
-> > > +Examples:
-> > > +soc {
-> > > +	aips-bus at 02000000 { /* AIPS1 */
-> > > +		iomuxc at 020e0000 {
-> > > +			pinctrl_uart4: uart4 {
-> > > +				func-name = "uart4";
-> > > +				grp-name = "uart4grp";
-> > > +				grp-pins = <107 108>;
-> > > +				num-pins = <2>;
-> > > +				grp-mux = <4 4>;
-> > > +				num-mux = <2>;
-> > > +			};
-> >
-> > Before I get too far into reviewing this path, could you explain the above node
-> > in a little more detail; what it is and what the properties define?
-> >
-> grp-pins is the group of pins for this function.
-> grp-mux is the corresponding mux setting of each pin in that group for this specific
-> function.
-> num-pins and num-mux are the number of pins and mux. They're mainly used for sanity
-> Checking in driver since it's easy to make a mistake when write too many pins for a
-> function. These two could be removed finally.
-
-I see now.
-
-I'd definitely be inclined to drop the num-pins and num-mux properties;
-The values are just len(grp-pins)/4. You can still check that
-len(grp-pins)==len(grp-mux) if you want to catch typos etc.
-
-So, this does appear to be conflating the two things: The definition of
-what pins are in a pingroup, and the mux function for a particular
-setting of that pingroup. I think you need separate nodes for this.
-
-Without separate nodes, there will eventually be a lot of duplication.
-A made-up example of the same uart4grp allowing either of two functions
-uart3, uart4 to be muxed out onto it:
-
-aips-bus at 02000000 { /* AIPS1 */
-	iomuxc at 020e0000 {
-		pinctrl_uart4_3: uart4 at option_3 {
-			func-name = "uart3";
-			grp-name = "uart4grp";
-			grp-pins = <107 108>;
-			num-pins = <2>;
-			grp-mux = <3 3>;
-			num-mux = <2>;
-		};
-		pinctrl_uart4_4: uart4 at option_4 {
-			func-name = "uart4";
-			grp-name = "uart4grp";
-			grp-pins = <107 108>;
-			num-pins = <2>;
-			grp-mux = <3 3>;
-			num-mux = <2>;
-		};
-	}
-};
-
-Now I understand that initially you aren't going to type out the complete
-list of every available option into imx6q.dtsi because it's probably huge,
-but the binding does need to allow you to do so without duplicating a lot
-of data, because eventually you'll get boards that use a larger and larger
-subset of all the options, so the number you need to represent at once in
-imx6q.dtsi will grow.
-
-So I think you need to model the IMX pinmux controller's bindings more on
-how the pinctrl subsystem represents objects; separate definitions of pins,
-groups of pins, functions, and board settings. Something more like:
-
-imx6q.dtsi:
-
-aips-bus at 02000000 { /* AIPS1 */
-	iomuxc at 020e0000 {
-		/* FIXME: Perhaps need pin nodes here to name them too */
-
-		/* A node per group of pins. Each lists the group name, and
-		 * the list of pins in the group */
-		foogrp: group at 100 {
-			grp-name = "foogrp";
-			grp-pins = <100 101>;
-		};
-		bargrp: group at 102 {
-			grp-name = "bargrp";
-			grp-pins = <102 103>;
-		};
-		bazgrp: group at 104 {
-			grp-name = "bargrp";
-			grp-pins = <104 105>;
-		};
-		/* A node per function that can be muxed onto pin groups,
-		 * each listing the function name, the set of groups it can
-		 * be muxed onto, and the mux selector value to program into
-		 * the groups' mux control register to select it */
-		uart3func: func at 0 {
-			func-name = "uart3";
-			/* Length of locations and mux-value must match */
-			locations = <&foogrp &bargrp>;
-			mux-value = <0 4>;
-		};
-		uart4func: func at 1 {
-			func-name = "uart4";
-			locations = <&bargrp &bazgrp>;
-			mux-value = <6 3>;
-		};
-	}
-};
-
-Or, instead of separate locations and mux-value properties with matching
-lengths, perhaps a node for each location:
-
-		uart3func: func at 0 {
-			func-name = "uart3";
-			location at 0 {
-				location = <&foogrp>;
-				mux-value = <0>;
-			};
-			location at 1 {
-				location = <&bargrp>;
-				mux-value = <4>;
-			};
-		};
-
-That's more long-winded, but might be more easily extensible if we need
-to add more properties later.
-
-Now in the board's .dts file, you need to specify for each device the
-list of pinmux groups the device needs to use, and the function to
-select for each group. Perhaps something like:
-
-board.dts:
-
-usdhc at 0219c000 { /* uSDHC4 */
-        fsl,card-wired;
-        status = "okay";
-        pinmux = <&foogrp &uart3func &bazgrp &uart4func>;
-};
-
-I haven't convinced myself that's actually a good binding, but I think
-it does represent the data required for muxing. Some potential issues
-as before:
-
-* Do we need to add flags to each entry in the list; GPIO/interrupt do?
-
-* Should "pinmux" be a node, and the configuration of each group be a
-separate sub-node, so we can add more properties to each "table" entry
-in the future, e.g. pin config parameters?
-
-* For Tegra, I elected to put the definitions of pins, groups, and
-functions into the driver rather than in the device tree. This avoids
-parsing a heck of a lot of data from device tree. That means there isn't
-any per-function node that can be referred to by phandle. Does it make
-sense to refer to groups and functions by string name or integer ID
-instead of phandle? Perhaps:
-
-usdhc at 0219c000 { /* uSDHC4 */
-	fsl,card-wired;
-	status = "okay";
-	pinmux = {
-		group at 0 {
-			group = "foo";
-			function = "uart3";
-			/* You could add pin config options here too */
-		};
-		group at 1 {
-			group = "baz";
-			function = "uart4";
-		};
-	};
-};
-
-I guess referring to things by name isn't that idiomatic for device tree.
-Using integers here would be fine too, so long as dtc gets support for
-named constants:
-
-imx6q.dtsi:
-
-/define/ IMX_PINGRP_FOO 0
-/define/ IMX_PINGRP_BAR 1
-/define/ IMX_PINGRP_BAZ 2
-/define/ IMX_PINFUNC_UART3 0
-/define/ IMX_PINFUNC_UART4 1
-...
-
-board .dts:
-
-usdhc at 0219c000 { /* uSDHC4 */
-	fsl,card-wired;
-	status = "okay";
-	pinmux = {
-		group at 0 {
-			group = <IMX_PINGRP_FOO>;
-			function = <IMX_PINFUNC_UART3>;
-			/* You could add pin config options here too */
-		};
-		group at 1 {
-			group = <IMX_PINGRP_BAZ>;
-			function = <IMX_PINFUNC_UART4>;
-		};
-	};
-};
-
-> > I'm confused because the node has properties for function name and group name
-> > which make sense to define the mux setting for that group.
-> > However, I'm not sure what the grp-pins/num-pins/grp-mux/num-mux properties are
-> > for; if those properties define the available mux options and for the group and
-> > set of pins included in the group, I think the node is representing too many
-> > things in one place. I'd expect to see:
-> >
-> > a) Either data in the pinctrl driver or separate DT nodes to define each
-> > available pin group, mux function, etc.; the definition of what the SoC itself
-> > can do.
-> >
-> > b) The configuration of each pin group that's used by the particular board.
-> > All that's relevant here is the mux selection for each pin groups; things like
-> > which pins are included in each group are defined by the SoC not the board and
-> > hence wouldn't be included in a per-board node.
->
-> We still have not started pin config work.
-> For pinmux, one way we thought is trying to define pin groups
-> in soc dts file and reference that pin group by a phandle in board dts file.
-> It could be:
-> In the soc dts file arch/arm/boot/dts/imx6q.dtsi:
->
-> iomuxc at 020e0000 {
->         reg = <0x020e0000 0x4000>;
->         pinmux-groups {
->                 pingrp_uart4: uart4 {
->                         grp-pins = <107 108>;
->                         grp-mux = <4 4>;
->                 };
+On Friday 06 January 2012 14:56:52 Mikael Pettersson wrote:
+> Marc Dietrich writes:
+>  > On Thursday 05 January 2012 10:40:48 Doug Anderson wrote:
+>  > > I can't comment on the L2 stuff (haven't looked there), but just
+>  > > going
+>  > > by Cortex-A9 revisions (T25 has roughly r1p1 and T30 has r2p7),
+>  > > I've
+>  > > got this table:
+>  > > 
+>  > > Errata             T25 (A9 ~r1p1)   T30 (A9 r2p7)    Applies to
+>  > > ARM_ERRATA_364296                                    pre A8
+>  > > ARM_ERRATA_411920                                    pre A8
+>  > > ARM_ERRATA_430973                                    A8
+>  > > ARM_ERRATA_458693                                    A8
+>  > > ARM_ERRATA_460075                                    A8
+>  > > ARM_ERRATA_720789  yes                               A9 (prior to
+>  > > r2p0) ARM_ERRATA_742230  yes                               A9
+>  > > (r1p0..r2p2) ARM_ERRATA_742231                                   
+>  > > A9 (r2p0..r2p2) ARM_ERRATA_743622                                
+>  > >    A9 (r2p0..r2p2) ARM_ERRATA_751472  yes              yes       
+>  > >       A9 (prior to r3p0) ARM_ERRATA_754322                   yes 
+>  > >             A9 (r2p*, r3p*) ARM_ERRATA_754327  yes               
+>  > >                A9 (prior to r2p0) ARM_ERRATA_764369  yes         
+>  > >     yes              A9 MPCore (all revs)
+>  > > 
+>  > > ...so that means we should also be adding in 720789 (T2x), 751472
+>  > > (T2x, T30), 754322 (T30), 754327 (T2x), 764369 (T2x, T30).
+>  > 
+>  > AFAIK, 720789 (TLBIASIDIS and TLBIMVAIS operations can broadcast a
+>  > faulty ASID) is fixed in userspace (or gcc) nowadays (at least in
+>  > Ubuntu) so I think this can be neglected.
 > 
->                 pingrp_sd4: sd4 {
->                         grp-pins = <170 171 180 181 182 183 184 185 186 187>;
->                         grp-mux = <0 0 1 1 1 1 1 1 1 1>;
->                 }
->         }
-> };
-> 
-> In board dts file:
-> usdhc at 0219c000 { /* uSDHC4 */
->         fsl,card-wired;
->         status = "okay";
->         pinmux = <&pinctrl_sd4>;
-> };
-> 
-> uart3: uart at 021f0000 { /* UART4 */
->         status = "okay";
->         pinmux = <&pinctrl_uart4>;
-> };
-> 
-> iomuxc at 020e0000 {
->         pinctrl_uart4: uart4 {
->                 group = <&pingrp_uart4>;
->                 pinconfig = ....;
->         };
-> 
->         pinctrl_sd4: sd4 {
->                 group = <&pingrp_sd4>;
->                 pinconfig = ....;
->         };
-> };
-> 
-> Then we know the whole map information for a specific device without a pinmux map.
-> Do you think if it's ok?
-> 
-> BTW, for imx we won't define all possible groups since most are useless and
-> It's hard to cover all cases due to the issue raised by Sascha before.
-> We only define what we're most using firstly.
+> Not everyone uses Ubuntu.
 
--- 
-nvpublic
+yeah, I know. I just said this because nvidias reference filesystem is based 
+upon it.
+
+> Can you provide a reference to the corresponding gcc and/or Ubuntu patch?
+
+all I found in the haste is 
+https://bugs.launchpad.net/ubuntu/+source/eglibc/+bug/739374
+
+I think in the end gcc was patched not emit get/set_tls syscalls but to use 
+MCR/MRC cp15 ops (sorry, I don't know what this means - just copied from irc 
+log). This meant that the whole userspace needed recompilation. It is possible 
+that all newer gcc behave like this. As far as I understood, enabling the 
+erratum in the kernel with fixed userspace will make the problem reapear. 
+Someone with more knowledge may correct me.
+
+> (I got a Tegra-2 based trimslice last summer, but it's been completely
+> unreliable under load (hangs hard during "make -j2" gcc bootstraps),
+> hence I'm looking for patches or any other information that can help
+> me fix or work around whatever bugs it has.)
+
+I think this can't be related to the erratum above because it manifestated 
+itself in a segfault or illegal instruction userspace error.
+
+Did you tried to ask in the trimslice forum about this error?
+
+Marc
