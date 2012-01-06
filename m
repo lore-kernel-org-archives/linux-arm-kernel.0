@@ -1,322 +1,479 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  6 Jan 2012 10:41:52 +0800
-Subject: [PATCH 2/2] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <1325817712-4573-1-git-send-email-shawn.guo@linaro.org>
-References: <1325817712-4573-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1325817712-4573-3-git-send-email-shawn.guo@linaro.org>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Fri, 6 Jan 2012 02:36:12 +0000 (GMT)
+Subject: [PATCH v6 1/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x SSP/SPI)
+ driver
+Message-ID: <1325817372.60830.YahooMailClassic@web29004.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+Add support for the Synaptics NavPoint touchpad connected to a PXA27x SSP port
+in SPI slave mode. The driver implements a simple navigation pad. The four
+raised dots are mapped to UP/DOWN/LEFT/RIGHT buttons and the centre of the
+touchpad is mapped to the ENTER button.
 
-Added initial support for APX4 Development Kit with RTC, LED, Ethernet,
-Audio, SDIO, I2C, DUART and AUART support.
-
-Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 ---
- arch/arm/mach-mxs/Kconfig           |   16 +++
- arch/arm/mach-mxs/Makefile          |    1 +
- arch/arm/mach-mxs/mach-apx4devkit.c |  245 +++++++++++++++++++++++++++++++++++
- 3 files changed, 262 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index cf00b3e..c57f996 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -83,6 +83,18 @@ config MODULE_M28
- 	select MXS_HAVE_PLATFORM_MXSFB
- 	select MXS_OCOTP
+V6:
+Added some help on module building as tristate.
+Changed driver_data.pressed type from int to bool.
+Added threaded irq handler for input_report_key() & input_sync() calls.
+Added navpoint_open() & navpoint_close() for hardware up/down.
+Corrected dev_id argument to free_irq().
+Rebased to linux-3.2.
+
+diff -uprN clean-3.2/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h linux-3.2/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
+--- clean-3.2/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h	2012-01-04 23:55:44.000000000 +0000
++++ linux-3.2/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h	2012-01-06 02:08:14.689816477 +0000
+@@ -206,6 +206,7 @@
+ #define GPIO113_I2S_SYSCLK	MFP_CFG_OUT(GPIO113, AF1, DRIVE_LOW)
  
-+config MODULE_APX4
-+	bool
-+	select SOC_IMX28
-+	select LEDS_GPIO_REGISTER
-+	select MXS_HAVE_AMBA_DUART
-+	select MXS_HAVE_PLATFORM_AUART
-+	select MXS_HAVE_PLATFORM_FEC
-+	select MXS_HAVE_PLATFORM_MXS_I2C
-+	select MXS_HAVE_PLATFORM_MXS_MMC
-+	select MXS_HAVE_PLATFORM_MXS_SAIF
-+	select MXS_OCOTP
+ /* SSP 1 */
++#define GPIO23_SSP1_SCLK_IN	MFP_CFG_IN(GPIO23, AF2)
+ #define GPIO23_SSP1_SCLK	MFP_CFG_OUT(GPIO23, AF2, DRIVE_LOW)
+ #define GPIO29_SSP1_SCLK	MFP_CFG_IN(GPIO29, AF3)
+ #define GPIO27_SSP1_SYSCLK	MFP_CFG_OUT(GPIO27, AF1, DRIVE_LOW)
+diff -uprN clean-3.2/drivers/input/mouse/Kconfig linux-3.2/drivers/input/mouse/Kconfig
+--- clean-3.2/drivers/input/mouse/Kconfig	2012-01-04 23:55:44.000000000 +0000
++++ linux-3.2/drivers/input/mouse/Kconfig	2012-01-06 02:19:16.874081315 +0000
+@@ -322,4 +322,16 @@ config MOUSE_SYNAPTICS_I2C
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called synaptics_i2c.
+ 
++config MOUSE_NAVPOINT_PXA27x
++	tristate "Synaptics NavPoint (PXA27x SSP/SPI)"
++	depends on PXA27x && PXA_SSP
++	help
++	  This option enables support for the Synaptics NavPoint connected to
++	  a PXA27x SSP port in SPI slave mode. The driver implements a simple
++	  navigation pad. The four raised dots are mapped to UP/DOWN/LEFT/RIGHT
++	  buttons and the centre of the touchpad is mapped to the ENTER button.
 +
- config MACH_TX28
- 	bool "Ka-Ro TX28 module"
- 	select MODULE_TX28
-@@ -91,4 +103,8 @@ config MACH_M28EVK
- 	bool "Support DENX M28EVK Platform"
- 	select MODULE_M28
- 
-+config MACH_APX4DEVKIT
-+	bool "Support Bluegiga APX4 Development Kit"
-+	select MODULE_APX4
++	  To compile this driver as a module, choose M here: the
++	  module will be called navpoint.
 +
  endif
-diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-index 8c93b24..908bf9a 100644
---- a/arch/arm/mach-mxs/Makefile
-+++ b/arch/arm/mach-mxs/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
- obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
- obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
- obj-$(CONFIG_MACH_M28EVK)    += mach-m28evk.o
-+obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
- obj-$(CONFIG_MODULE_TX28) += module-tx28.o
- obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
- 
-diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
-new file mode 100644
-index 0000000..08693f1
---- /dev/null
-+++ b/arch/arm/mach-mxs/mach-apx4devkit.c
-@@ -0,0 +1,245 @@
+diff -uprN clean-3.2/drivers/input/mouse/Makefile linux-3.2/drivers/input/mouse/Makefile
+--- clean-3.2/drivers/input/mouse/Makefile	2012-01-04 23:55:44.000000000 +0000
++++ linux-3.2/drivers/input/mouse/Makefile	2012-01-06 02:08:14.689816477 +0000
+@@ -12,6 +12,7 @@ obj-$(CONFIG_MOUSE_GPIO)		+= gpio_mouse.
+ obj-$(CONFIG_MOUSE_INPORT)		+= inport.o
+ obj-$(CONFIG_MOUSE_LOGIBM)		+= logibm.o
+ obj-$(CONFIG_MOUSE_MAPLE)		+= maplemouse.o
++obj-$(CONFIG_MOUSE_NAVPOINT_PXA27x)	+= navpoint.o
+ obj-$(CONFIG_MOUSE_PC110PAD)		+= pc110pad.o
+ obj-$(CONFIG_MOUSE_PS2)			+= psmouse.o
+ obj-$(CONFIG_MOUSE_PXA930_TRKBALL)	+= pxa930_trkball.o
+diff -uprN clean-3.2/drivers/input/mouse/navpoint.c linux-3.2/drivers/input/mouse/navpoint.c
+--- clean-3.2/drivers/input/mouse/navpoint.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-3.2/drivers/input/mouse/navpoint.c	2012-01-06 02:15:31.444629423 +0000
+@@ -0,0 +1,393 @@
 +/*
-+ * Copyright (C) 2011
-+ * Lauri Hintsala, Bluegiga, <lauri.hintsala@bluegiga.com>
-+ * Veli-Pekka Peltola, Bluegiga, <veli-pekka.peltola@bluegiga.com>
++ *  Copyright (C) 2012 Paul Parsons <lost.distance@yahoo.com>
 + *
-+ * based on: mach-mx28evk.c
-+ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
 + */
 +
-+#include <linux/delay.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/leds.h>
 +#include <linux/clk.h>
-+#include <linux/i2c.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
-+#include <linux/micrel_phy.h>
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/input.h>
++#include <linux/input/navpoint.h>
++#include <linux/interrupt.h>
++#include <linux/pxa2xx_ssp.h>
++#include <linux/slab.h>
 +
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
++/*
++ *	Synaptics NavPoint (PXA27x SSP/SPI) driver.
++ */
 +
-+#include <mach/common.h>
-+#include <mach/iomux-mx28.h>
++/*
++ *	Synaptics Modular Embedded Protocol: Module Packet Format.
++ *	Module header byte 2:0 = Length (# bytes that follow)
++ *	Module header byte 4:3 = Control
++ *	Module header byte 7:5 = Module Address
++ */
++#define HEADER_LENGTH(byte)	((byte) & 0x07)
++#define HEADER_CONTROL(byte)	(((byte) >> 3) & 0x03)
++#define HEADER_ADDRESS(byte)	((byte) >> 5)
 +
-+#include "devices-mx28.h"
++/*
++ *	Two bitmaps represent the current and reported key press dispositions:
++ *	a producer bitmap maintained by navpoint_hardint(),
++ *	a consumer bitmap maintained by navpoint_softint().
++ */
++#define BIT_LEFT	(1<<0)
++#define BIT_RIGHT	(1<<1)
++#define BIT_DOWN	(1<<2)
++#define BIT_UP		(1<<3)
++#define BIT_ENTER	(1<<4)
 +
-+#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
-+
-+static const iomux_cfg_t apx4devkit_pads[] __initconst = {
-+	/* duart */
-+	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
-+	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
-+
-+	/* auart0 */
-+	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
-+	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
-+	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
-+	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
-+
-+	/* auart1 */
-+	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
-+	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
-+
-+	/* auart2 */
-+	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
-+	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
-+
-+	/* auart3 */
-+	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
-+	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
-+
-+#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
-+	/* fec0 */
-+	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
-+	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
-+	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
-+	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
-+	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
-+	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
-+	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
-+	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
-+	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
-+
-+	/* i2c */
-+	MX28_PAD_I2C0_SCL__I2C0_SCL,
-+	MX28_PAD_I2C0_SDA__I2C0_SDA,
-+
-+	/* mmc0 */
-+	MX28_PAD_SSP0_DATA0__SSP0_D0 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_DATA1__SSP0_D1 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_DATA2__SSP0_D2 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_DATA3__SSP0_D3 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_DATA4__SSP0_D4 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_DATA5__SSP0_D5 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_DATA6__SSP0_D6 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_DATA7__SSP0_D7 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_CMD__SSP0_CMD |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-+	MX28_PAD_SSP0_SCK__SSP0_SCK |
-+		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-+
-+	/* led */
-+	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
-+
-+	/* saif0 & saif1 */
-+	MX28_PAD_SAIF0_MCLK__SAIF0_MCLK |
-+		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SAIF0_LRCLK__SAIF0_LRCLK |
-+		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK |
-+		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0 |
-+		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_SAIF1_SDATA0__SAIF1_SDATA0 |
-+		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++struct driver_data {
++	struct ssp_device	*ssp;
++	int			gpio;
++	struct input_dev	*input;
++	int			index;
++	uint8_t			data[1+HEADER_LENGTH(0xff)];
++	bool			pressed;	/* 1 = pressed, 0 = released */
++	int			bit;		/* Bit of last key pressed */
++	unsigned		prod;		/* Producer bitmap */
++	unsigned		cons;		/* Consumer bitmap */
 +};
 +
-+/* led */
-+static const struct gpio_led apx4devkit_leds[] __initconst = {
-+	{
-+		.name = "user-led",
-+		.default_trigger = "heartbeat",
-+		.gpio = APX4DEVKIT_GPIO_USERLED,
-+	},
-+};
++static const u32 sscr0 = 0
++	| SSCR0_TUM		/* TIM = 1; No TUR interrupts */
++	| SSCR0_RIM		/* RIM = 1; No ROR interrupts */
++	| SSCR0_SSE		/* SSE = 1; SSP enabled */
++	| SSCR0_Motorola	/* FRF = 0; Motorola SPI */
++	| SSCR0_DataSize(16)	/* DSS = 15; Data size = 16-bit */
++	;
++static const u32 sscr1 = 0
++	| SSCR1_SCFR		/* SCFR = 1; SSPSCLK only during transfers */
++	| SSCR1_SCLKDIR		/* SCLKDIR = 1; Slave mode */
++	| SSCR1_SFRMDIR		/* SFRMDIR = 1; Slave mode */
++	| SSCR1_RWOT		/* RWOT = 1; Receive without transmit mode */
++	| SSCR1_RxTresh(1)	/* RFT = 0; Receive FIFO threshold = 1 */
++	| SSCR1_SPH		/* SPH = 1; SSPSCLK inactive 0.5 + 1 cycles */
++	| SSCR1_RIE		/* RIE = 1; Receive FIFO interrupt enabled */
++	;
++static const u32 sssr = 0
++	| SSSR_BCE		/* BCE = 1; Clear BCE */
++	| SSSR_TUR		/* TUR = 1; Clear TUR */
++	| SSSR_EOC		/* EOC = 1; Clear EOC */
++	| SSSR_TINT		/* TINT = 1; Clear TINT */
++	| SSSR_PINT		/* PINT = 1; Clear PINT */
++	| SSSR_ROR		/* ROR = 1; Clear ROR */
++	;
 +
-+static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
-+	.leds = apx4devkit_leds,
-+	.num_leds = ARRAY_SIZE(apx4devkit_leds),
-+};
++/*
++ *	MEP Query $22: Touchpad Coordinate Range Query is not supported by
++ *	the NavPoint module, so sampled values provide the default limits.
++ */
++static int west = 2416;		/* 1/3 width */
++module_param(west, int, 0644);
++MODULE_PARM_DESC(west, "X coordinate limit for KEY_LEFT. Default = 2416");
++static int east = 3904;		/* 2/3 width */
++module_param(east, int, 0644);
++MODULE_PARM_DESC(east, "X coordinate limit for KEY_RIGHT. Default = 3904");
++static int south = 2480;	/* 1/3 height */
++module_param(south, int, 0644);
++MODULE_PARM_DESC(south, "Y coordinate limit for KEY_DOWN. Default = 2480");
++static int north = 3424;	/* 2/3 height */
++module_param(north, int, 0644);
++MODULE_PARM_DESC(north, "Y coordinate limit for KEY_UP. Default = 3424");
 +
-+static const struct fec_platform_data mx28_fec_pdata __initconst = {
-+	.phy = PHY_INTERFACE_MODE_RMII,
-+};
-+
-+static const struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initconst = {
-+	.wp_gpio = -EINVAL,
-+	.flags = SLOTF_4_BIT_CAPABLE,
-+};
-+
-+static const struct i2c_board_info apx4devkit_i2c_boardinfo[] __initconst = {
-+	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
-+	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
-+};
-+
-+#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || \
-+		defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
-+static struct regulator_consumer_supply apx4devkit_audio_consumer_supplies[] = {
-+	REGULATOR_SUPPLY("VDDA", "0-000a"),
-+	REGULATOR_SUPPLY("VDDIO", "0-000a"),
-+};
-+
-+static struct regulator_init_data apx4devkit_vdd_reg_init_data = {
-+	.constraints	= {
-+		.name	= "3V3",
-+		.always_on = 1,
-+	},
-+	.consumer_supplies = apx4devkit_audio_consumer_supplies,
-+	.num_consumer_supplies = ARRAY_SIZE(apx4devkit_audio_consumer_supplies),
-+};
-+
-+static struct fixed_voltage_config apx4devkit_vdd_pdata = {
-+	.supply_name	= "board-3V3",
-+	.microvolts	= 3300000,
-+	.gpio		= -EINVAL,
-+	.enabled_at_boot = 1,
-+	.init_data	= &apx4devkit_vdd_reg_init_data,
-+};
-+
-+static struct platform_device apx4devkit_voltage_regulator = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= -1,
-+	.num_resources	= 0,
-+	.dev		= {
-+		.platform_data	= &apx4devkit_vdd_pdata,
-+	},
-+};
-+
-+static void __init apx4devkit_add_regulators(void)
++static bool navpoint_packet(struct device *dev)
 +{
-+	platform_device_register(&apx4devkit_voltage_regulator);
++	struct driver_data *drv_data = dev_get_drvdata(dev);
++	bool ret;
++	bool pressed;
++	int bit;
++
++	ret = false;
++
++	switch (drv_data->data[0]) {
++	case 0xff:	/* Garbage (packet?) between reset and Hello packet */
++	case 0x00:	/* Module 0, NULL packet */
++		break;
++	case 0x0e:	/* Module 0, Absolute packet */
++		pressed = (drv_data->data[1] & 0x01);
++		if (drv_data->pressed == pressed)	/* No change */
++			break;
++		drv_data->pressed = pressed;
++		if (pressed) {
++			unsigned x, y;
++
++			x = ((drv_data->data[2] & 0x1f) << 8)
++				| drv_data->data[3];
++			y = ((drv_data->data[4] & 0x1f) << 8)
++				| drv_data->data[5];
++			if (x < west)
++				bit = BIT_LEFT;
++			else if (x >= east)
++				bit = BIT_RIGHT;
++			else if (y < south)
++				bit = BIT_DOWN;
++			else if (y >= north)
++				bit = BIT_UP;
++			else /* Middle */
++				bit = BIT_ENTER;
++			drv_data->bit = bit;
++		} else {
++			/* Released: use last key pressed */
++			bit = drv_data->bit;
++		}
++		drv_data->prod ^= bit;
++		ret = true;
++		break;
++	case 0x19:	/* Module 0, Hello packet */
++		if ((drv_data->data[1] & 0xf0) == 0x10)
++			break;
++		/* FALLTHROUGH */
++	default:
++		dev_warn(dev, "spurious packet: 0x%02x,0x%02x,...\n",
++			drv_data->data[0],
++			drv_data->data[1]);
++		break;
++	}
++
++	return ret;
 +}
-+#else
-+static void __init apx4devkit_add_regulators(void) {}
-+#endif
 +
-+static int apx4devkit_phy_fixup(struct phy_device *phy)
++static irqreturn_t navpoint_hardint(int irq, void *dev_id)
 +{
-+	phy->dev_flags |= MICREL_PHY_50MHZ_CLK;
++	struct device *dev = dev_id;
++	struct driver_data *drv_data = dev_get_drvdata(dev);
++	struct ssp_device *ssp = drv_data->ssp;
++	u32 status;
++	irqreturn_t ret;
++
++	status = pxa_ssp_read_reg(ssp, SSSR);
++	ret = IRQ_NONE;
++
++	if (status & sssr) {
++		dev_warn(dev, "spurious interrupt: 0x%02x\n", status);
++		pxa_ssp_write_reg(ssp, SSSR, (status & sssr));
++		ret = IRQ_HANDLED;
++	}
++
++	while (status & SSSR_RNE) {
++		u32 data;
++
++		data = pxa_ssp_read_reg(ssp, SSDR);
++		drv_data->data[drv_data->index + 0] = (data >> 8);
++		drv_data->data[drv_data->index + 1] = data;
++		drv_data->index += 2;
++		if (HEADER_LENGTH(drv_data->data[0]) < drv_data->index) {
++			if (navpoint_packet(dev))
++				ret = IRQ_WAKE_THREAD;
++			drv_data->index = 0;
++		}
++		status = pxa_ssp_read_reg(ssp, SSSR);
++	}
++
++	return ret;
++}
++
++static irqreturn_t navpoint_softint(int irq, void *dev_id)
++{
++	struct device *dev = dev_id;
++	struct driver_data *drv_data = dev_get_drvdata(dev);
++	unsigned prod;
++	unsigned diff;
++
++	prod = drv_data->prod;
++	diff = drv_data->cons ^ prod;
++	drv_data->cons = prod;
++
++	if (diff & BIT_LEFT)
++		input_report_key(drv_data->input, KEY_LEFT, prod & BIT_LEFT);
++	if (diff & BIT_RIGHT)
++		input_report_key(drv_data->input, KEY_RIGHT, prod & BIT_RIGHT);
++	if (diff & BIT_DOWN)
++		input_report_key(drv_data->input, KEY_DOWN, prod & BIT_DOWN);
++	if (diff & BIT_UP)
++		input_report_key(drv_data->input, KEY_UP, prod & BIT_UP);
++	if (diff & BIT_ENTER)
++		input_report_key(drv_data->input, KEY_ENTER, prod & BIT_ENTER);
++	input_sync(drv_data->input);
++
++	return IRQ_HANDLED;
++}
++
++static int navpoint_suspend(struct device *dev)
++{
++	struct driver_data *drv_data = dev_get_drvdata(dev);
++	struct ssp_device *ssp = drv_data->ssp;
++
++	gpio_set_value(drv_data->gpio, 0);
++
++	pxa_ssp_write_reg(ssp, SSCR0, 0);
++
++	clk_disable(ssp->clk);
++
 +	return 0;
 +}
 +
-+static void __init apx4devkit_init(void)
++static int navpoint_resume(struct device *dev)
 +{
-+	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
-+			ARRAY_SIZE(apx4devkit_pads));
++	struct driver_data *drv_data = dev_get_drvdata(dev);
++	struct ssp_device *ssp = drv_data->ssp;
++	int timeout;
 +
-+	mx28_add_duart();
-+	mx28_add_auart0();
-+	mx28_add_auart1();
-+	mx28_add_auart2();
-+	mx28_add_auart3();
++	clk_enable(ssp->clk);
 +
-+	/*
-+	 * Register fixup for the Micrel KS8031 PHY clock
-+	 * (shares same ID with KS8051)
-+	 */
-+	phy_register_fixup_for_uid(PHY_ID_KS8051, MICREL_PHY_ID_MASK,
-+			apx4devkit_phy_fixup);
++	pxa_ssp_write_reg(ssp, SSCR1, sscr1);
++	pxa_ssp_write_reg(ssp, SSSR, sssr);
++	pxa_ssp_write_reg(ssp, SSTO, 0);
++	pxa_ssp_write_reg(ssp, SSCR0, sscr0);	/* SSCR0_SSE written last */
 +
-+	mx28_add_fec(0, &mx28_fec_pdata);
++	/* Wait until SSP port is ready for slave clock operations */
++	for (timeout = 100; timeout != 0; --timeout) {
++		if (!(pxa_ssp_read_reg(ssp, SSSR) & SSSR_CSS))
++			break;
++		msleep(1);
++	}
++	if (timeout == 0)
++		dev_err(dev, "timeout waiting for SSSR[CSS] to clear\n");
 +
-+	mx28_add_mxs_mmc(0, &apx4devkit_mmc_pdata);
++	gpio_set_value(drv_data->gpio, 1);
 +
-+	gpio_led_register_device(0, &apx4devkit_led_data);
-+
-+	mx28_add_saif(0);
-+	mx28_add_saif(1);
-+
-+	apx4devkit_add_regulators();
-+
-+	mx28_add_mxs_i2c(0);
-+	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
-+			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
-+
-+	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0, NULL, 0);
++	return 0;
 +}
 +
-+static void __init apx4devkit_timer_init(void)
++#ifdef CONFIG_SUSPEND
++static const struct dev_pm_ops navpoint_pm_ops = {
++	.suspend	= navpoint_suspend,
++	.resume		= navpoint_resume,
++};
++#endif
++
++static int navpoint_open(struct input_dev *input)
 +{
-+	mx28_clocks_init();
++	return navpoint_resume(input->dev.parent);
 +}
 +
-+static struct sys_timer apx4devkit_timer = {
-+	.init	= apx4devkit_timer_init,
++static void navpoint_close(struct input_dev *input)
++{
++	navpoint_suspend(input->dev.parent);
++}
++
++static int __devinit navpoint_probe(struct platform_device *pdev)
++{
++	struct navpoint_platform_data *pdata = pdev->dev.platform_data;
++	int ret;
++	struct ssp_device *ssp;
++	struct input_dev *input;
++	struct driver_data *drv_data;
++
++	ssp = pxa_ssp_request(pdata->port, pdev->name);
++	if (!ssp) {
++		ret = -ENODEV;
++		goto ret0;
++	}
++
++	/* HaRET does not disable devices before jumping into Linux */
++	if (pxa_ssp_read_reg(ssp, SSCR0) & SSCR0_SSE) {
++		gpio_set_value(pdata->gpio, 0);
++		pxa_ssp_write_reg(ssp, SSCR0, 0);
++		dev_warn(&pdev->dev, "ssp%d already enabled\n", pdata->port);
++	}
++
++	input = input_allocate_device();
++	if (!input) {
++		ret = -ENOMEM;
++		goto ret1;
++	}
++	input->name = pdev->name;
++	__set_bit(EV_KEY, input->evbit);
++	__set_bit(KEY_ENTER, input->keybit);
++	__set_bit(KEY_UP, input->keybit);
++	__set_bit(KEY_LEFT, input->keybit);
++	__set_bit(KEY_RIGHT, input->keybit);
++	__set_bit(KEY_DOWN, input->keybit);
++	input->open = navpoint_open;
++	input->close = navpoint_close;
++	input->dev.parent = &pdev->dev;
++
++	drv_data = kzalloc(sizeof(*drv_data), GFP_KERNEL);
++	if (!drv_data) {
++		ret = -ENOMEM;
++		goto ret2;
++	}
++	drv_data->ssp = ssp;
++	drv_data->gpio = pdata->gpio;
++	drv_data->input = input;
++	platform_set_drvdata(pdev, drv_data);
++
++	ret = request_threaded_irq(ssp->irq, navpoint_hardint, navpoint_softint,
++		0, pdev->name, &pdev->dev);
++	if (ret)
++		goto ret3;
++
++	ret = input_register_device(input);
++	if (ret)
++		goto ret4;
++
++	dev_info(&pdev->dev, "ssp%d, irq %d\n", pdata->port, ssp->irq);
++
++	return 0;
++
++ret4:
++	free_irq(ssp->irq, &pdev->dev);
++ret3:
++	kfree(drv_data);
++ret2:
++	input_free_device(input);
++ret1:
++	pxa_ssp_free(ssp);
++ret0:
++	return ret;
++}
++
++static int __devexit navpoint_remove(struct platform_device *pdev)
++{
++	struct driver_data *drv_data = platform_get_drvdata(pdev);
++	struct input_dev *input = drv_data->input;
++	struct ssp_device *ssp = drv_data->ssp;
++
++	input_unregister_device(input);
++
++	free_irq(ssp->irq, &pdev->dev);
++
++	kfree(drv_data);
++
++	pxa_ssp_free(ssp);
++
++	return 0;
++}
++
++static struct platform_driver navpoint_driver = {
++	.probe		= navpoint_probe,
++	.remove		= __devexit_p(navpoint_remove),
++	.driver = {
++		.name	= "navpoint",
++		.owner	= THIS_MODULE,
++#ifdef CONFIG_SUSPEND
++		.pm	= &navpoint_pm_ops,
++#endif
++	},
 +};
 +
-+MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
-+	.map_io		= mx28_map_io,
-+	.init_irq	= mx28_init_irq,
-+	.timer		= &apx4devkit_timer,
-+	.init_machine	= apx4devkit_init,
-+MACHINE_END
--- 
-1.7.4.1
++static int __init navpoint_init(void)
++{
++	return platform_driver_register(&navpoint_driver);
++}
++
++static void __exit navpoint_exit(void)
++{
++	platform_driver_unregister(&navpoint_driver);
++}
++
++module_init(navpoint_init);
++module_exit(navpoint_exit);
++
++MODULE_AUTHOR("Paul Parsons <lost.distance@yahoo.com>");
++MODULE_DESCRIPTION("Synaptics NavPoint (PXA27x SSP/SPI) driver");
++MODULE_LICENSE("GPL");
+diff -uprN clean-3.2/include/linux/input/navpoint.h linux-3.2/include/linux/input/navpoint.h
+--- clean-3.2/include/linux/input/navpoint.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-3.2/include/linux/input/navpoint.h	2012-01-06 02:13:08.751710401 +0000
+@@ -0,0 +1,12 @@
++/*
++ *  Copyright (C) 2012 Paul Parsons <lost.distance@yahoo.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++struct navpoint_platform_data {
++	int		port;		/* PXA SSP port for pxa_ssp_request() */
++	int		gpio;		/* GPIO for power on/off */
++};
