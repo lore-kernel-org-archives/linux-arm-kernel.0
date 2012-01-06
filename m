@@ -1,51 +1,42 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 06 Jan 2012 16:40:24 +0530
-Subject: [PATCH 1/2] dmaengine: Fix status handling in imx-dma.
-In-Reply-To: <20120106093752.GH5446@pengutronix.de>
-References: <1325506706-10028-1-git-send-email-javier.martin@vista-silicon.com>
- <1325829389.1540.95.camel@vkoul-udesk3>
- <20120106093752.GH5446@pengutronix.de>
-Message-ID: <1325848224.1540.102.camel@vkoul-udesk3>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Fri, 06 Jan 2012 13:26:04 +0200
+Subject: [PATCH 0/2] ARM: mxs: use CHIPID hardware to detect SoC
+In-Reply-To: <1325817712-4573-1-git-send-email-shawn.guo@linaro.org>
+References: <1325817712-4573-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F06DA4C.1090606@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-01-06 at 10:37 +0100, Sascha Hauer wrote:
-> On Fri, Jan 06, 2012 at 11:26:29AM +0530, Vinod Koul wrote:
-> > On Mon, 2012-01-02 at 13:18 +0100, Javier Martin wrote:
-> > > Status must only be changed to DMA_IN_PROGRESS
-> > > when the DMA transfer has really begun.
-> > > 
-> > > However, since this driver lacks of support for
-> > > multiple descriptors a new flag has to be introduced
-> > > to avoid the prepare function be called multiple times.
-> > Thanks this is the right approach to fix this driver
-> > 
-> > But this will obviously break any users of this driver as they need to
-> > call the right APIs now :D
-> > 
-> > Sacha: can you check this patch and see which users of this driver will
-> > break. we need those fixes to go along this patch as well
-> 
-> Which users should break? I just tried with the mxcmmc driver and this
-> one does not break.
-> 
-> I do not really understand this patch anyway. It changes imxdmac->status
-> to a write-only variable and introduces a imxdmac->prepared variable
-> with the same meaning. This patch is a complicated no-op.
-> 
-> What was the original problem? The fact that we used a enum dma_status
-> with the wrong semantics? In that case I suggest to simply replace this
-> variable. All we need to track is that we do not enter
-> imxdma_prep_slave_sg with an already running transfer.
-the memcpy patch submitted earlier didn't use correct dmaengine API. a
-descriptor is not supposed to be started in prepare. The reason given
-was the driver already does so for all other prepares, so i suggested to
-fix that. Descriptors should be started in issue_pending only.
+I'm not able to test patches until Monday. I'll test these when I'm back 
+to office. Anyway patches looks good for me. Thanks!
 
-I thought that change is done in this patch (looks like i didn't look
-too carefully), so if prepare is used per API definition, clients which
-dont call issue_pending would break...
+Lauri
 
 
--- 
-~Vinod
+On 01/06/2012 04:41 AM, Shawn Guo wrote:
+> As suggested by Wolfram, the first patch changes cpu_is_xxx and
+> __arch_decomp_setup to use the CHIPID register than machine type to
+> detect the chip between imx23 and imx28, so that we do not need to
+> change these functions whenever a new board/machine gets added.
+>
+> The second one is a rebase of patch [1] on above patch.
+>
+> Regards,
+> Shawn
+>
+> [1] [PATCH v4] ARM: mxs: Add initial support for Bluegiga APX4 Development Kit
+>
+> ---
+>
+> Lauri Hintsala (1):
+>        ARM: mxs: Add initial support for Bluegiga APX4 Development Kit
+>
+> Shawn Guo (1):
+>        ARM: mxs: detect SoC by checking CHIPID register
+>
+>   arch/arm/mach-mxs/Kconfig                   |   16 ++
+>   arch/arm/mach-mxs/Makefile                  |    1 +
+>   arch/arm/mach-mxs/include/mach/mxs.h        |   28 ++--
+>   arch/arm/mach-mxs/include/mach/uncompress.h |   11 +-
+>   arch/arm/mach-mxs/mach-apx4devkit.c         |  245 +++++++++++++++++++++++++++
+>   5 files changed, 283 insertions(+), 18 deletions(-)
