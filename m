@@ -1,43 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Jan 2012 17:22:27 -0800
-Subject: [PATCH v2] arm/tegra: use APB DMA for accessing APB devices
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F1812@HQMAIL01.nvidia.com>
-References: <1324599468-12845-3-git-send-email-olof@lixom.net>
- <1325742554-32735-1-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F1812@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMg7GbEeMXAsftq+eZuqEOTLgeufePSC3h4mKn1cVnuEWQ@mail.gmail.com>
+Date: Thu, 5 Jan 2012 17:26:05 -0800
+Subject: [PATCH v2] arm/tegra: emc: device tree support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F182F@HQMAIL01.nvidia.com>
+References: <1324599468-12845-10-git-send-email-olof@lixom.net>
+ <1325743338-2533-1-git-send-email-olof@lixom.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F182F@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMhwTuiJJC=sO8MkFtfkaA=OAxxNXGkPs5av27bLzVJxBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2012 at 2:07 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Wednesday, January 04, 2012 10:49 PM:
->> Tegra2 hangs if APB registers are accessed from the cpu during an
->> apb dma operation. The workaround is to use apb dma to read/write the
->> registers instead.
+On Thu, Jan 5, 2012 at 2:35 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Wednesday, January 04, 2012 11:02 PM:
+>> Add device tree support to the emc driver, filling in the platform data
+>> based on the DT bindings.
+>>
+>> Changes since v1:
+>>
+>> * Unmangled some messed up patch squashes, moving changes to earlier patches
+>> * Flipped an of_property_read_u32 return value test
+>> * Clarified clock settings message on case where no table is provided
+>>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ...
->> diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
+>> diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
 > ...
->> +u32 tegra_apb_readl(unsigned long offset)
+>> +static struct tegra_emc_pdata __devinit *tegra_emc_fill_pdata(struct platform_device *pdev)
 > ...
->> + ? ? INIT_COMPLETION(tegra_apb_wait);
->> +
->> + ? ? tegra_dma_enqueue_req(tegra_apb_dma, &req);
->> +
->> + ? ? ret = wait_for_completion_timeout(&tegra_apb_wait,
->> + ? ? ? ? ? ? msecs_to_jiffies(50));
->> +
->> + ? ? if (WARN(ret == 0, "apb read dma timed out")) {
->> + ? ? ? ? ? ? *(u32 *)tegra_apb_bb = 0;
->> + ? ? ? ? ? ? tegra_dma_dequeue_req(tegra_apb_dma, &req);
+>> + ? ? pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+>> + ? ? pdata->tables = devm_kzalloc(&pdev->dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(struct tegra_emc_table),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
 >
-> I think you need to swap those last two lines to make absolutely sure
-> that the timeout handling doesn't race with an actual DMA completion.
-
-Ah, of course. Fixing that without reposting.
-
-
+> You could convert that one to sizeof(*pdata->tables) too, although feel
+> free to ignore this picky comment, or fix it up when you apply the change.
+>
+> Otherwise,
+>
 > Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Thanks!
+
+Done, thanks.
 
 -Olof
