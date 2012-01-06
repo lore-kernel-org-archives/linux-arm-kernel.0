@@ -1,49 +1,50 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Fri, 6 Jan 2012 16:22:39 +0000
-Subject: [PATCH V2 1/4] i2c: tegra: Add __devinit/exit to probe/remove
-In-Reply-To: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
-References: <1324189772-26914-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120106162239.GR19115@trinity.fluff.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 06 Jan 2012 10:26:17 -0600
+Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
+In-Reply-To: <20120106160744.GA7687@codeaurora.org>
+References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
+ <20120106160744.GA7687@codeaurora.org>
+Message-ID: <4F0720A9.8070400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 17, 2011 at 11:29:29PM -0700, Stephen Warren wrote:
-> This fixes some section mismatch build warnings.
+On 01/06/2012 10:07 AM, David Brown wrote:
+> On Fri, Jan 06, 2012 at 03:28:25PM +0100, Thierry Reding wrote:
+>> diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+>> index 0a11342..a50c7e2 100644
+>> --- a/arch/arm/mach-msm/board-msm8x60.c
+>> +++ b/arch/arm/mach-msm/board-msm8x60.c
+>> @@ -84,8 +84,11 @@ static void __init msm8x60_dt_init(void)
+>>  
+>>  	node = of_find_matching_node_by_address(NULL, msm_dt_gic_match,
+>>  			MSM8X60_QGIC_DIST_PHYS);
+>> -	if (node)
+>> -		irq_domain_add_simple(node, GIC_SPI_START);
+>> +	if (node) {
+>> +		struct irq_domain *domain = irq_domain_add_simple(node,
+>> +				GIC_SPI_START, NR_MSM_IRQS);
+>> +		WARN_ON(IS_ERR(domain));
+>> +	}
+>>  
+>>  	if (of_machine_is_compatible("qcom,msm8660-surf")) {
+>>  		printk(KERN_INFO "Init surf UART registers\n");
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> v2: New patch.
+> This is probably a consequence of MSM not really being "simple", but
+> just using that.  However, NR_MSM_IRQS is only the number of IRQs on
+> the MSM core.  There are also GPIO irqs, and potentially board IRQs
+> (the board has an I2C-based chip with a bunch of IRQ lines on it).
 > 
->  drivers/i2c/busses/i2c-tegra.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> The only define that captures this now is 'NR_IRQS', even though we're
+> trying to get rid of that.
 > 
-> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-> index 46b6500..e8560ed 100644
-> --- a/drivers/i2c/busses/i2c-tegra.c
-> +++ b/drivers/i2c/busses/i2c-tegra.c
-> @@ -558,7 +558,7 @@ static const struct i2c_algorithm tegra_i2c_algo = {
->  	.functionality	= tegra_i2c_func,
->  };
->  
-> -static int tegra_i2c_probe(struct platform_device *pdev)
-> +static int __devinit tegra_i2c_probe(struct platform_device *pdev)
->  {
->  	struct tegra_i2c_dev *i2c_dev;
->  	struct tegra_i2c_platform_data *pdata = pdev->dev.platform_data;
-> @@ -690,7 +690,7 @@ err_iounmap:
->  	return ret;
->  }
->  
-> -static int tegra_i2c_remove(struct platform_device *pdev)
-> +static int __devexit tegra_i2c_remove(struct platform_device *pdev)
->  {
->  	struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
->  	i2c_del_adapter(&i2c_dev->adapter);
+> Ultimately, the correct answer will be to get the various interrupt
+> controllers using their own domains, but for now, this needs to be a
+> larger value to avoid missing a bunch of the interrupts.
 
-You need t oupdate the platform driver's .remove method with __devexit_p
-to ensure that it nulls it out.
+No. This should only be the number of interrupts for a controller as the
+interrupt numbers in the device tree should be relative to a controller
+and not the Linux virq number. The numbering in the dts needs to be
+correct. You don't need a domain until you start getting the interrupts
+from the dts.
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Rob
