@@ -1,48 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Jan 2012 12:27:17 -0800
-Subject: [GIT PULL] Samsung devel-rtc for v3.3
-In-Reply-To: <037601ccc8e9$07e2c8e0$17a85aa0$%kim@samsung.com>
-References: <037601ccc8e9$07e2c8e0$17a85aa0$%kim@samsung.com>
-Message-ID: <CAOesGMhV5agC1LFgZ3jrDXy=Hcj2-TtydfnKsVAXoSHSBKEu=g@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri,  6 Jan 2012 13:43:20 -0700
+Subject: [PATCH V2 2/4] ARM: tegra: uncompress.h: Store UART address in a
+ variable
+In-Reply-To: <1325882602-7573-1-git-send-email-swarren@nvidia.com>
+References: <1325882602-7573-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1325882602-7573-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Doug Anderson <dianders@chromium.org>
 
-On Sun, Jan 1, 2012 at 4:54 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd and Olof,
->
-> Please pull Samsung devel-rtc for v3.3 from following.
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next-samsung-devel-rtc
->
-> It is including support rtc for S3C2443 and S3C2416 and got the ack from
-> Alessandro Zummo.
->
-> Since next-samsung-dt1 branch touch drivers/rtc, it has been made based on
-> next-samsung-dt1 branch.
->
-> If any problems please let me know.
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> The following changes since commit 0561ceabd0f13871900d116278fe9268aeb714d1:
->
-> ?ARM: dts: Add intial dts file for EXYNOS4210 SoC, SMDKV310 and ORIGEN
-> (2011-12-23 10:07:12 +0900)
->
-> are available in the git repository at:
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next-samsung-devel-rtc
+This will allow a future change to auto-detect which UART to use.
 
-Just following up with email since I didn't see one:
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+[swarren: Extracted from a larger patch by Doug]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/include/mach/uncompress.h |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Looks like Arnd pulled this into next/drivers2 already. Thanks!
-
--Olof
+diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
+index 9797279..bb3fd35 100644
+--- a/arch/arm/mach-tegra/include/mach/uncompress.h
++++ b/arch/arm/mach-tegra/include/mach/uncompress.h
+@@ -30,10 +30,10 @@
+ 
+ #define DEBUG_UART_SHIFT 2
+ 
++volatile u8 *uart;
++
+ static void putc(int c)
+ {
+-	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+-
+ 	if (uart == NULL)
+ 		return;
+ 
+@@ -50,8 +50,8 @@ static inline void arch_decomp_setup(void)
+ {
+ 	volatile u32 *apb_misc = (volatile u32 *)TEGRA_APB_MISC_BASE;
+ 	u32 chip, div;
+-	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+ 
++	uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+ 	if (uart == NULL)
+ 		return;
+ 
+-- 
+1.7.0.4
