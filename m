@@ -1,33 +1,79 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Jan 2012 13:58:57 -0800
-Subject: [GIT PULL] imx: pm changes for 3.3, part 2
-In-Reply-To: <20120105061905.GE14741@S2100-06.ap.freescale.net>
-References: <20120105061905.GE14741@S2100-06.ap.freescale.net>
-Message-ID: <CAOesGMj3J038_r4ePNdo58GNpy=uhtjTL-a2GDaGgiu6=gOWLQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sat, 07 Jan 2012 00:19:53 +0100
+Subject: [PATCH 1/2] at91 : move pm.h header to arch/arm/include/asm
+In-Reply-To: <201201061730.33525.arnd.bergmann@linaro.org>
+References: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
+ <201201061730.33525.arnd.bergmann@linaro.org>
+Message-ID: <4F078199.201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2012 at 10:19 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> Hi Arnd, Olof,
->
-> Please pull the following two patches for 3.3.
->
-> Regards,
-> Shawn
->
-> The following changes since commit 5f0a6e2d503896062f641639dacfe5055c2f593b:
->
-> ?Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
->
-> are available in the git repository at:
-> ?git://git.linaro.org/people/shawnguo/linux-2.6.git imx/pm2
->
-> Shawn Guo (2):
-> ? ? ?ARM: imx6: fix v7_invalidate_l1 by adding I-Cache invalidation
-> ? ? ?ARM: imx6: remove __CPUINIT annotation from v7_invalidate_l1
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Thanks, since both of these look like valid fixes (and not features),
-I've added them to imx6/pm and next/pm for 3.3.
+On 01/06/2012 06:30 PM, Arnd Bergmann wrote:
+> On Friday 06 January 2012, Daniel Lezcano wrote:
+>> Move the location of the pm.h header file to the include directory,
+>> so it can be included from another place from the current one.
+>>
+>> That will allow the next patch which moves the cpuidle code to the
+>> drivers/cpuidle directory.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>  arch/arm/{mach-at91/pm.h => include/asm/at91_pm.h} |    0
+>>  arch/arm/mach-at91/cpuidle.c                       |    2 +-
+>>  arch/arm/mach-at91/pm.c                            |    2 +-
+>>  3 files changed, 2 insertions(+), 2 deletions(-)
+>>  rename arch/arm/{mach-at91/pm.h => include/asm/at91_pm.h} (100%)
+> 
+> Moving the driver is great, as we have previously discussed, but
+> the header file does not belong into include/asm really, because it
+> is too hardware specific and we are trying to keep such stuff out
+> of that place.
+> 
+> One option would be to move the pm.c along with the cpuidle.c file,
+> in particular that might turn out to be a good idea if other
+> platforms have the same requirement.
+> 
+> Aside from that, it would be good to hear from the AT91 maintainers
+> how they want to deal with the removal of CONFIG_ARCH_AT91_*
+> conditionals, which AFACIT will be necessary anyway in order to allow
+> building a single kernel across multiple at91 targets. Once that
+> problem is solved for pm.h, the question of where to place that header
+> may be resolved, too.
+
+Mmmh, the problem will be more complex with other architectures I think.
+
+For instance, the omap cpuidle driver includes
+
+#include "powerdomain.h"
+#include "clockdomain.h"
+
+#include "pm.h"
+#include "control.h"
+#include "common.h"
+
+These include files are used by the other .c files in the same directory.
 
 
--Olof
+
+- -- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iQEcBAEBAgAGBQJPB4GZAAoJEAKBbMCpUGYAI1YH/jJIoBtKku7YgXfBTj9Mqf92
+nQQqDoGiQGNNXM2TDBKS4t8EyiRa9YuHYHAYS16JaoUPDTj1Zwzo3E3fTFLQcFi6
+x0l3H82c6VvnqtY6qwO5ym9bB8m9kSdJjAFqIDPO987hOB4jeFBA6EE4SgcMuiHR
+4rWzQVZjHtA1nf/9yrcVgwush75psWNHudnLn/0TyM14efuys0xUx+EMWqQzmpzj
+aBc+TgWn/HUXX261VCYmTgUIo/L/xV7eU/IRSR7Nd8AWPp6hrm4x2C4SO5Kt8JFE
+OA2peOGEIlNqre4tuKf4QXT1/QkiwTW6j194wag3kaLHBaARnXT/vX+xnYVqzjU=
+=2H/1
+-----END PGP SIGNATURE-----
