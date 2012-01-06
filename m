@@ -1,48 +1,93 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 7 Jan 2012 15:50:08 +0100
-Subject: Status of arm-soc.git for 3.2
-In-Reply-To: <201201062336.31181.arnd@arndb.de>
-References: <201201032243.06440.arnd@arndb.de>
- <20120104100016.GK2914@n2100.arm.linux.org.uk>
- <201201062336.31181.arnd@arndb.de>
-Message-ID: <20120107145008.GG25978@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri,  6 Jan 2012 14:03:08 +0900
+Subject: [PATCH 1/2] mmc: core: Separate the timeout value for cache-ctrl
+Message-ID: <1325826189-29953-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 11:36:30PM +0000, Arnd Bergmann wrote:
-> On Wednesday 04 January 2012, Russell King - ARM Linux wrote:
-> > On Tue, Jan 03, 2012 at 10:43:06PM +0000, Arnd Bergmann wrote:
-> > > The merge window is almost there, so it's time to look at what we've queued
-> > > up in the arm-soc tree. There is a total of 55 branches with 386 non-merge
-> > > changesets on top of mainline and the dependencies (linux-arm, v4l and
-> > > dmaengine). The total diffstat is:
-> > > 
-> > >  676 files changed, 19694 insertions(+), 12633 deletions(-)
-> > 
-> > Well, my tree looks like this:
-> >   937 files changed, 8150 insertions(+), 10774 deletions(-)
-> >
-> > > I would like to stop adding non-bugfix patches into the branches above now
-> > > for 3.2, and instead merge everything that I receive from now on into
-> > > late/* branches, so we don't destabilize the patches that are already there
-> > > and so I can feel more comfortable about sending everything in the next/*
-> > > branches upstream ASAP.
-> > 
-> > I think that's a must - for both our trees.  We have quite a number of
-> > conflicts in linux-next between our trees and other trees - some of them
-> > due to duplicated commits being applied.
-> 
-> Hmm, I'll have to check that, I was hoping that we manged to weed out
-> the duplicated commits. Do you have a list, or some (semi-)automated
-> way to find those, or are those just random commits you stumbled
-> over.
-You can look at
+From: Seungwon Jeon <tgih.jun@samsung.com>
 
-	git log --left-right --cherry-mark arm-soc...rmk ^linus/master | grep =
+Turning the cache off implies flushing cache which doesn't define
+maximum timeout unlike cache-on. This patch will apply the generic
+CMD6 timeout only for cache-on. Additionally the kernel message is
+added for checking failure case of cache-on.
 
-Best regards
-Uwe
+Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+Signed-off-by: Chris Ball <cjb@laptop.org>
+---
+ drivers/mmc/core/core.c |   21 ++++++++++++---------
+ drivers/mmc/core/mmc.c  |   13 +++++++++++--
+ 2 files changed, 23 insertions(+), 11 deletions(-)
 
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index cb74f28..91bb100 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -2426,6 +2426,7 @@ EXPORT_SYMBOL(mmc_flush_cache);
+ int mmc_cache_ctrl(struct mmc_host *host, u8 enable)
+ {
+ 	struct mmc_card *card = host->card;
++	unsigned int timeout;
+ 	int err = 0;
+ 
+ 	if (!(host->caps2 & MMC_CAP2_CACHE_CTRL) ||
+@@ -2436,16 +2437,18 @@ int mmc_cache_ctrl(struct mmc_host *host, u8 enable)
+ 			(card->ext_csd.cache_size > 0)) {
+ 		enable = !!enable;
+ 
+-		if (card->ext_csd.cache_ctrl ^ enable)
++		if (card->ext_csd.cache_ctrl ^ enable) {
++			timeout = enable ? card->ext_csd.generic_cmd6_time : 0;
+ 			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+-					EXT_CSD_CACHE_CTRL, enable, 0);
+-		if (err)
+-			pr_err("%s: cache %s error %d\n",
+-					mmc_hostname(card->host),
+-					enable ? "on" : "off",
+-					err);
+-		else
+-			card->ext_csd.cache_ctrl = enable;
++					EXT_CSD_CACHE_CTRL, enable, timeout);
++			if (err)
++				pr_err("%s: cache %s error %d\n",
++						mmc_hostname(card->host),
++						enable ? "on" : "off",
++						err);
++			else
++				card->ext_csd.cache_ctrl = enable;
++		}
+ 	}
+ 
+ 	return err;
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index 94456b1..04a160f 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1085,14 +1085,23 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+ 	if ((host->caps2 & MMC_CAP2_CACHE_CTRL) &&
+ 			card->ext_csd.cache_size > 0) {
+ 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+-				EXT_CSD_CACHE_CTRL, 1, 0);
++				EXT_CSD_CACHE_CTRL, 1,
++				card->ext_csd.generic_cmd6_time);
+ 		if (err && err != -EBADMSG)
+ 			goto free_card;
+ 
+ 		/*
+ 		 * Only if no error, cache is turned on successfully.
+ 		 */
+-		card->ext_csd.cache_ctrl = err ? 0 : 1;
++		if (err) {
++			pr_warning("%s: Cache is supported, "
++					"but failed to turn on (%d)\n",
++					mmc_hostname(card->host), err);
++			card->ext_csd.cache_ctrl = 0;
++			err = 0;
++		} else {
++			card->ext_csd.cache_ctrl = 1;
++		}
+ 	}
+ 
+ 	if (!oldcard)
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.1
