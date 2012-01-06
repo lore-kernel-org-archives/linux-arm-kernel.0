@@ -1,45 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Jan 2012 17:20:36 -0800
-Subject: [PATCH 7/9] arm/tegra: emc: device tree bindings
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F18A6@HQMAIL01.nvidia.com>
-References: <1324599468-12845-1-git-send-email-olof@lixom.net>
- <1324599468-12845-8-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18A6@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMjeVm_PcsBnxfKX9Oe96QUaCsJrvuESCRZq5vwq9gD5xA@mail.gmail.com>
+Date: Thu, 5 Jan 2012 17:22:27 -0800
+Subject: [PATCH v2] arm/tegra: use APB DMA for accessing APB devices
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F1812@HQMAIL01.nvidia.com>
+References: <1324599468-12845-3-git-send-email-olof@lixom.net>
+ <1325742554-32735-1-git-send-email-olof@lixom.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F1812@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMg7GbEeMXAsftq+eZuqEOTLgeufePSC3h4mKn1cVnuEWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2012 at 4:01 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Thursday, December 22, 2011 5:18 PM:
->> Device tree bindings for the EMC tables on tegra.
+On Thu, Jan 5, 2012 at 2:07 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Wednesday, January 04, 2012 10:49 PM:
+>> Tegra2 hangs if APB registers are accessed from the cpu during an
+>> apb dma operation. The workaround is to use apb dma to read/write the
+>> registers instead.
 > ...
->> diff --git a/Documentation/devicetree/bindings/arm/tegra/emc.txt
+>> diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
 > ...
->> +Embedded Memory Controller ram-code table
+>> +u32 tegra_apb_readl(unsigned long offset)
 > ...
->> +- name : Should be emc-tables
->> +- nvidia,ram-code : the binary representation of the ram-code board strappings
->> + ?for which this node (and children) are valid.
-> ...
->> +Embedded Memory Controller configuration table
-> ...
->> +- name : Should be emc-table
->> +- compatible : Should contain "nvidia,tegra20-emc-table".
->> +- reg : either an opaque enumerator to tell different tables apart, or
-> ...
+>> + ? ? INIT_COMPLETION(tegra_apb_wait);
+>> +
+>> + ? ? tegra_dma_enqueue_req(tegra_apb_dma, &req);
+>> +
+>> + ? ? ret = wait_for_completion_timeout(&tegra_apb_wait,
+>> + ? ? ? ? ? ? msecs_to_jiffies(50));
+>> +
+>> + ? ? if (WARN(ret == 0, "apb read dma timed out")) {
+>> + ? ? ? ? ? ? *(u32 *)tegra_apb_bb = 0;
+>> + ? ? ? ? ? ? tegra_dma_dequeue_req(tegra_apb_dma, &req);
 >
-> One more thought:
->
-> For consistency, should the "emc-tables" node also require a compatible
-> value? I suppose the existence of an "nvidia,ram-code" property is quite
-> likely to be indication enough that the node is compatible, but I wonder
-> if we shouldn't require and check an explicit compatible value at this
-> level too?
+> I think you need to swap those last two lines to make absolutely sure
+> that the timeout handling doesn't race with an actual DMA completion.
 
-I can add it, it's trivial to add another check in
-tegra_emc_ramcode_devnode, but I don't think there's much need to
-bother. As long as nothing else is added that uses nvidia,ram-code as
-a property we'll be OK, and we can control that.
+Ah, of course. Fixing that without reposting.
 
+
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+
+Thanks!
 
 -Olof
