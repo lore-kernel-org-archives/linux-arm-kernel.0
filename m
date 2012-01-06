@@ -1,57 +1,46 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 6 Jan 2012 17:12:12 +0100
-Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
-In-Reply-To: <20120106160744.GA7687@codeaurora.org>
-References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
- <20120106160744.GA7687@codeaurora.org>
-Message-ID: <20120106161212.GA5593@avionic-0098.mockup.avionic-design.de>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Fri, 6 Jan 2012 16:16:39 +0000
+Subject: [GIT PULL] I2C: OMAP: misc. updates for v3.3
+In-Reply-To: <87boqh7kn4.fsf@ti.com>
+References: <87boqh7kn4.fsf@ti.com>
+Message-ID: <20120106161639.GP19115@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* David Brown wrote:
-> On Fri, Jan 06, 2012 at 03:28:25PM +0100, Thierry Reding wrote:
-> > diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-> > index 0a11342..a50c7e2 100644
-> > --- a/arch/arm/mach-msm/board-msm8x60.c
-> > +++ b/arch/arm/mach-msm/board-msm8x60.c
-> > @@ -84,8 +84,11 @@ static void __init msm8x60_dt_init(void)
-> >  
-> >  	node = of_find_matching_node_by_address(NULL, msm_dt_gic_match,
-> >  			MSM8X60_QGIC_DIST_PHYS);
-> > -	if (node)
-> > -		irq_domain_add_simple(node, GIC_SPI_START);
-> > +	if (node) {
-> > +		struct irq_domain *domain = irq_domain_add_simple(node,
-> > +				GIC_SPI_START, NR_MSM_IRQS);
-> > +		WARN_ON(IS_ERR(domain));
-> > +	}
-> >  
-> >  	if (of_machine_is_compatible("qcom,msm8660-surf")) {
-> >  		printk(KERN_INFO "Init surf UART registers\n");
+On Thu, Jan 05, 2012 at 04:13:51PM -0800, Kevin Hilman wrote:
+> Hi Ben,
 > 
-> This is probably a consequence of MSM not really being "simple", but
-> just using that.  However, NR_MSM_IRQS is only the number of IRQs on
-> the MSM core.  There are also GPIO irqs, and potentially board IRQs
-> (the board has an I2C-based chip with a bunch of IRQ lines on it).
+> Here's a few OMAP I2C updates for the v3.3 merge window.
+
+ok, added these to my i2c-next and for-33/i2c/omap.
+ 
+> Thanks,
 > 
-> The only define that captures this now is 'NR_IRQS', even though we're
-> trying to get rid of that.
+> Kevin
 > 
-> Ultimately, the correct answer will be to get the various interrupt
-> controllers using their own domains,
+> The following changes since commit 3f6b2a8bd6e4ff43269d89066a9fe06a0e5ba961:
+> 
+>   I2C: OMAP: correct SYSC register offset for OMAP4 (2011-12-13 11:35:56 -0800)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/i2c/misc
+> 
+> Benoit Cousson (1):
+>       i2c: OMAP: Add DT support for i2c controller
+> 
+> Jan Weitzel (1):
+>       I2C: OMAP: NACK without STP
+> 
+>  Documentation/devicetree/bindings/i2c/omap-i2c.txt |   30 ++++++
+>  drivers/i2c/busses/i2c-omap.c                      |  108 +++++++++++++-------
+>  2 files changed, 99 insertions(+), 39 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Yes.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-> but for now, this needs to be a larger value to avoid missing a bunch of
-> the interrupts.
-
-Okay, I'll make it NR_IRQS then.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120106/337e705a/attachment.sig>
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
