@@ -1,28 +1,32 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Fri, 06 Jan 2012 14:03:01 +0100
-Subject: [RFC PATCH 0/9] Remove useless on_each_cpu return value
-In-Reply-To: <1325600353-10895-1-git-send-email-gilad@benyossef.com>
-References: <1325600353-10895-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1325854981.2442.25.camel@twins>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Jan 2012 21:14:14 +0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <20120106131411.GA6372@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-01-03 at 16:19 +0200, Gilad Ben-Yossef wrote:
-> on_each_cpu() returns as its own return value the return value of 
-> smp_call_function(). smp_call_function() in turn returns a hard 
-> coded value of zero.
-> 
-> Some callers to on_each_cpu() waste cycles and bloat code space
-> by checking the return value to on_each_cpu(), probably for 
-> historical reasons.
+On Fri, Jan 06, 2012 at 11:33:54AM +0000, Dong Aisheng-B29396 wrote:
+> In board dts file:
+> usdhc at 0219c000 { /* uSDHC4 */
+>         fsl,card-wired;
+>         status = "okay";
+>         pinmux = <&pinctrl_sd4>;
 
-hysterical raisins,, yumm! :-)
+Would it be more proper to have the phandle named as 'pinctrl' than
+'pinmux'?
 
-> This patch set refactors callers to not test on_each_cpu()
-> (fixed) return value and then refactors on_each_cpu to
-> return void to avoid confusing future users.
-> 
+> };
 
-Seems sane enough, fwiw:
-
-Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+-- 
+Regards,
+Shawn
