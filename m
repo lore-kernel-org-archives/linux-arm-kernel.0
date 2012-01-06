@@ -1,47 +1,25 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 6 Jan 2012 08:04:28 -0700
-Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
-In-Reply-To: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <CACxGe6sXmC2A0ihsK=rmQ8jQ61xcc7re=LgzPPJm8wHvvkFb4Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri,  6 Jan 2012 23:39:24 +0800
+Subject: [PATCH v2 0/2] ARM: mxs: use CHIPID register to detect SoC
+Message-ID: <1325864366-17995-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Changes since v1:
+ * Define CHIPID register offset in digctl.h
+ * Rename macro CHIPID to MXS_CHIPID
+ * Remove mach-types.h inclusion from uncompress.h
 
-On Fri, Jan 6, 2012 at 7:28 AM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
-> The irq_domain_add() function needs the number of interrupts in the
-> domain to properly initialize them. In addition the allocated domain
-> is now returned by the irq_domain_{add,generate}_simple() helpers.
+Lauri Hintsala (1):
+      ARM: mxs: Add initial support for Bluegiga APX4 Development Kit
 
-The commit text should also include the justification for renaming
-irq_domain_create_simple() -> irq_domain_add_simple()
+Shawn Guo (1):
+      ARM: mxs: detect SoC by checking CHIPID register
 
->
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
-> ?/**
-> - * irq_domain_create_simple() - Set up a 'simple' translation range
-> + * irq_domain_add_simple() - Set up a 'simple' translation range
-> ?*/
-> -void irq_domain_add_simple(struct device_node *controller, int irq_base)
-> +struct irq_domain *irq_domain_add_simple(struct device_node *controller,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int irq_base,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int nr_irq)
-> ?{
-> ? ? ? ?struct irq_domain *domain;
->
-> ? ? ? ?domain = kzalloc(sizeof(*domain), GFP_KERNEL);
-> - ? ? ? if (!domain) {
-> - ? ? ? ? ? ? ? WARN_ON(1);
-> - ? ? ? ? ? ? ? return;
-> - ? ? ? }
-> + ? ? ? if (!domain)
-> + ? ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
-
-Don't use the ERR_PTR() pattern (it's a horrible pattern IMHO).
-Return NULL on failure and keep the WARN_ON() in this function.
-Otherwise looks good.  Thanks for writing this patch.
-
-g.
+ arch/arm/mach-mxs/Kconfig                   |   16 ++
+ arch/arm/mach-mxs/Makefile                  |    1 +
+ arch/arm/mach-mxs/include/mach/digctl.h     |    1 +
+ arch/arm/mach-mxs/include/mach/mxs.h        |   29 ++--
+ arch/arm/mach-mxs/include/mach/uncompress.h |   13 +-
+ arch/arm/mach-mxs/mach-apx4devkit.c         |  245 +++++++++++++++++++++++++++
+ 6 files changed, 285 insertions(+), 20 deletions(-)
