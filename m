@@ -1,161 +1,116 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 6 Jan 2012 10:37:52 +0100
-Subject: [PATCH 1/2] dmaengine: Fix status handling in imx-dma.
-In-Reply-To: <1325829389.1540.95.camel@vkoul-udesk3>
-References: <1325506706-10028-1-git-send-email-javier.martin@vista-silicon.com>
- <1325829389.1540.95.camel@vkoul-udesk3>
-Message-ID: <20120106093752.GH5446@pengutronix.de>
+Date: Fri, 6 Jan 2012 10:38:56 +0100
+Subject: [PATCH 5/6] ARM: mxc: add dt support for audmux-v2
+In-Reply-To: <20120106092124.GT2414@b20223-02.ap.freescale.net>
+References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
+ <1325820343-11875-6-git-send-email-richard.zhao@linaro.org>
+ <20120106091315.GG5446@pengutronix.de>
+ <20120106092124.GT2414@b20223-02.ap.freescale.net>
+Message-ID: <20120106093856.GI5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 11:26:29AM +0530, Vinod Koul wrote:
-> On Mon, 2012-01-02 at 13:18 +0100, Javier Martin wrote:
-> > Status must only be changed to DMA_IN_PROGRESS
-> > when the DMA transfer has really begun.
+On Fri, Jan 06, 2012 at 05:21:24PM +0800, Richard Zhao wrote:
+> On Fri, Jan 06, 2012 at 10:13:15AM +0100, Sascha Hauer wrote:
+> > On Fri, Jan 06, 2012 at 11:25:42AM +0800, Richard Zhao wrote:
+> > > If CONFIG_OF, we create a audmux device driver.
+> > > 
+> > > For other platforms that don't set CONFIG_OF, it still initialize
+> > > everything in postcore_initcall. I didn't create device driver for
+> > > them, because it would be big change and one day the platforms will
+> > > convert to device tree too.
+> > > 
+> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > ---
+> > >  arch/arm/plat-mxc/audmux-v2.c |   59 +++++++++++++++++++++++++++++++++++++++++
+> > >  1 files changed, 59 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
+> > > index 8cced35..87e05e2 100644
+> > > --- a/arch/arm/plat-mxc/audmux-v2.c
+> > > +++ b/arch/arm/plat-mxc/audmux-v2.c
+> > > @@ -20,7 +20,9 @@
+> > >  #include <linux/io.h>
+> > >  #include <linux/clk.h>
+> > >  #include <linux/debugfs.h>
+> > > +#include <linux/platform_device.h>
+> > >  #include <linux/slab.h>
+> > > +#include <linux/of.h>
+> > >  #include <mach/audmux.h>
+> > >  #include <mach/hardware.h>
+> > >  
+> > > @@ -184,8 +186,64 @@ int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(mxc_audmux_v2_configure_port);
+> > >  
+> > > +#ifdef CONFIG_OF
+> > > +
+> > > +static int audmux_v2_probe(struct platform_device *pdev)
+> > > +{
+> > > +	struct resource *res;
+> > > +	int ret = 0;
+> > > +
+> > > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > +	if (!res)
+> > > +		return -ENODEV;
+> > > +	if (!request_mem_region(res->start, resource_size(res), "audmux_v2")) {
+> > > +		dev_err(&pdev->dev, "request_mem_region failed\n");
+> > > +		return -EBUSY;
+> > > +	}
+> > > +
+> > > +	audmux_base = ioremap(res->start, resource_size(res));
+> > > +	if (!audmux_base) {
+> > > +		dev_err(&pdev->dev, "ioremap failed\n");
+> > > +		ret = -ENODEV;
+> > > +		goto failed_ioremap;
+> > > +	}
+> > > +
+> > > +	audmux_clk = clk_get(NULL, "audmux");
+> > > +	if (IS_ERR(audmux_clk)) {
+> > > +			dev_warn(&pdev->dev, "%s: cannot get clock: %d\n",
+> > > +				__func__, ret);
+> > > +			audmux_clk = NULL;
+> > > +	}
+> > > +
+> > > +	audmux_debugfs_init();
+> > > +	return 0;
+> > > +
+> > > +failed_ioremap:
+> > > +	release_mem_region(res->start, resource_size(res));
+> > > +
+> > > +	return ret;
+> > > +}
+> > > +
+> > > +static const struct of_device_id audmux_v2_dt_ids[] = {
+> > > +	{ .compatible = "fsl,audmux-v2", },
+> > > +	{ /* sentinel */ }
+> > > +};
+> > > +
+> > > +static struct platform_driver audmux_v2_driver = {
+> > > +	.probe = audmux_v2_probe,
+> > > +	.driver = {
+> > > +		.name = "audmux_v2",
+> > > +		.of_match_table = audmux_v2_dt_ids,
+> > > +	},
+> > > +};
+> > > +
+> > > +#endif
+> > > +
+> > >  static int mxc_audmux_v2_init(void)
+> > >  {
+> > > +#ifdef CONFIG_OF
+> > > +	return platform_driver_register(&audmux_v2_driver);
+> > > +#else
 > > 
-> > However, since this driver lacks of support for
-> > multiple descriptors a new flag has to be introduced
-> > to avoid the prepare function be called multiple times.
-> Thanks this is the right approach to fix this driver
-> 
-> But this will obviously break any users of this driver as they need to
-> call the right APIs now :D
-> 
-> Sacha: can you check this patch and see which users of this driver will
-> break. we need those fixes to go along this patch as well
+> > Don't do this. Just because CONFIG_OF is enabled does not mean that this
+> > kernel is only used for OF. This #else breaks starting the kernel the
+> > traditional machid way.
+> You are right. Look like I have to convert audmux to platform devices
+> for all platforms.
 
-Which users should break? I just tried with the mxcmmc driver and this
-one does not break.
-
-I do not really understand this patch anyway. It changes imxdmac->status
-to a write-only variable and introduces a imxdmac->prepared variable
-with the same meaning. This patch is a complicated no-op.
-
-What was the original problem? The fact that we used a enum dma_status
-with the wrong semantics? In that case I suggest to simply replace this
-variable. All we need to track is that we do not enter
-imxdma_prep_slave_sg with an already running transfer.
+I hoped you would say this :)
 
 Sascha
-
-> > 
-> > Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> > ---
-> >  drivers/dma/imx-dma.c |   22 +++++++++++++++-------
-> >  1 files changed, 15 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-> > index d99f71c..9a0ac14 100644
-> > --- a/drivers/dma/imx-dma.c
-> > +++ b/drivers/dma/imx-dma.c
-> > @@ -43,6 +43,7 @@ struct imxdma_channel {
-> >  	enum dma_status			status;
-> >  	int				dma_request;
-> >  	struct scatterlist		*sg_list;
-> > +	bool				prepared;
-> >  };
-> >  
-> >  #define MAX_DMA_CHANNELS 8
-> > @@ -72,6 +73,7 @@ static void imxdma_irq_handler(int channel, void *data)
-> >  
-> >  	imxdmac->status = DMA_SUCCESS;
-> >  	imxdma_handle(imxdmac);
-> > +	imxdmac->prepared = false;
-> >  }
-> >  
-> >  static void imxdma_err_handler(int channel, void *data, int error)
-> > @@ -80,6 +82,7 @@ static void imxdma_err_handler(int channel, void *data, int error)
-> >  
-> >  	imxdmac->status = DMA_ERROR;
-> >  	imxdma_handle(imxdmac);
-> > +	imxdmac->prepared = false;
-> >  }
-> >  
-> >  static void imxdma_progression(int channel, void *data,
-> > @@ -89,6 +92,7 @@ static void imxdma_progression(int channel, void *data,
-> >  
-> >  	imxdmac->status = DMA_SUCCESS;
-> >  	imxdma_handle(imxdmac);
-> > +	imxdmac->prepared = false;
-> >  }
-> >  
-> >  static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> > @@ -103,6 +107,7 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> >  	case DMA_TERMINATE_ALL:
-> >  		imxdmac->status = DMA_ERROR;
-> >  		imx_dma_disable(imxdmac->imxdma_channel);
-> > +		imxdmac->prepared = false;
-> >  		return 0;
-> >  	case DMA_SLAVE_CONFIG:
-> >  		if (dmaengine_cfg->direction == DMA_FROM_DEVICE) {
-> > @@ -204,7 +209,7 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
-> >  	imxdmac->desc.flags = DMA_CTRL_ACK;
-> >  
-> >  	imxdmac->status = DMA_SUCCESS;
-> > -
-> > +	imxdmac->prepared = false;
-> >  	return 0;
-> >  }
-> >  
-> > @@ -230,11 +235,9 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
-> >  	int i, ret, dma_length = 0;
-> >  	unsigned int dmamode;
-> >  
-> > -	if (imxdmac->status == DMA_IN_PROGRESS)
-> > +	if (imxdmac->prepared)
-> >  		return NULL;
-> >  
-> > -	imxdmac->status = DMA_IN_PROGRESS;
-> > -
-> >  	for_each_sg(sgl, sg, sg_len, i) {
-> >  		dma_length += sg->length;
-> >  	}
-> > @@ -264,6 +267,8 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
-> >  	if (ret)
-> >  		return NULL;
-> >  
-> > +	imxdmac->prepared = true;
-> > +
-> >  	return &imxdmac->desc;
-> >  }
-> >  
-> > @@ -280,9 +285,8 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
-> >  	dev_dbg(imxdma->dev, "%s channel: %d buf_len=%d period_len=%d\n",
-> >  			__func__, imxdmac->channel, buf_len, period_len);
-> >  
-> > -	if (imxdmac->status == DMA_IN_PROGRESS)
-> > +	if (imxdmac->prepared)
-> >  		return NULL;
-> > -	imxdmac->status = DMA_IN_PROGRESS;
-> >  
-> >  	ret = imx_dma_setup_progression_handler(imxdmac->imxdma_channel,
-> >  			imxdma_progression);
-> > @@ -325,14 +329,18 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
-> >  	if (ret)
-> >  		return NULL;
-> >  
-> > +	imxdmac->prepared = true;
-> > +
-> >  	return &imxdmac->desc;
-> >  }
-> >  
-> >  static void imxdma_issue_pending(struct dma_chan *chan)
-> >  {
-> >  	/*
-> > -	 * Nothing to do. We only have a single descriptor
-> > +	 * Only change status since we have a single descriptor
-> >  	 */
-> > +	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-> > +	imxdmac->status = DMA_IN_PROGRESS;
-> >  }
-> >  
-> >  static int __init imxdma_probe(struct platform_device *pdev)
-> 
-> 
-> -- 
-> ~Vinod
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
