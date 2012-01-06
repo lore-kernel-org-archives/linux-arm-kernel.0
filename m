@@ -1,47 +1,35 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 6 Jan 2012 17:58:43 +0100
-Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
-In-Reply-To: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4F072843.6050306@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 6 Jan 2012 09:17:48 -0800
+Subject: [PATCH v4] ARM: tegra: emc: convert tegra2_emc to a platform
+ driver
+In-Reply-To: <1325814163-23980-1-git-send-email-olof@lixom.net>
+References: <1325743288-2460-1-git-send-email-olof@lixom.net>
+ <1325814163-23980-1-git-send-email-olof@lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE39E37@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Olof Johansson wrote at Thursday, January 05, 2012 6:43 PM:
+> This is the first step in making it device-tree aware and get rid of the
+> in-kernel EMC tables (of which there are none in mainline, thankfully).
+> 
+> Changes since v3:
+> 
+> * moved to devm_request_and_ioremap() in probe()
+> *
+> Changes since v2:
+> 
+> * D'oh -- missed a couple of variables that were added, never used and then
+>   later removed in a later patch.
+> 
+> Changes since v1:
+> 
+> * Fixed messed up indentation
+> * Removed code that should be gone (was added here and removed later in series)
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-On 1/6/2012 3:28 PM, Thierry Reding wrote:
-> The irq_domain_add() function needs the number of interrupts in the
-> domain to properly initialize them. In addition the allocated domain
-> is now returned by the irq_domain_{add,generate}_simple() helpers.
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-[...]
-
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index d587560..bf67781 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -66,8 +66,11 @@ static struct of_device_id intc_match[] __initdata = {
->   static void __init omap_generic_init(void)
->   {
->   	struct device_node *node = of_find_matching_node(NULL, intc_match);
-> -	if (node)
-> -		irq_domain_add_simple(node, 0);
-> +	if (node) {
-> +		struct irq_domain *domain;
-> +		domain = irq_domain_add_simple(node, 0, INTCPS_NR_IRQS);
-
-The number of interrupts will depend on the OMAP generation. That one is 
-just valid for the 3430 INTC controller.
-Since the previous code was using zero, I guess that using 0 there 
-should be fine.
-
-Moreover, that piece of code should not exist anymore on 3.3 if the 
-series I sent last month to leverage Rob's DT interrupt init is merged [1].
-
-I've just ping Rob and Grant on that series to get a status.
-
-Regards,
-Benoit
-
-
-[1] http://www.spinics.net/lists/linux-omap/msg62124.html
+-- 
+nvpublic
