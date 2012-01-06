@@ -1,103 +1,56 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Fri, 06 Jan 2012 19:56:27 +0800
-Subject: [RFC][PATCH] ARM: NUC900: Rename nuc900-audio platform device to
- nuc900-ac97
-Message-ID: <1325850987.2773.2.camel@phoenix>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 6 Jan 2012 13:43:11 +0100
+Subject: [PATCH 1/2] dmaengine: Fix status handling in imx-dma.
+In-Reply-To: <1325848224.1540.102.camel@vkoul-udesk3>
+References: <1325506706-10028-1-git-send-email-javier.martin@vista-silicon.com>
+ <1325829389.1540.95.camel@vkoul-udesk3>
+ <20120106093752.GH5446@pengutronix.de>
+ <1325848224.1540.102.camel@vkoul-udesk3>
+Message-ID: <20120106124311.GJ5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change ensures the platform device name matches nuc900-ac97 platform
-driver name.
+On Fri, Jan 06, 2012 at 04:40:24PM +0530, Vinod Koul wrote:
+> On Fri, 2012-01-06 at 10:37 +0100, Sascha Hauer wrote:
+> > On Fri, Jan 06, 2012 at 11:26:29AM +0530, Vinod Koul wrote:
+> > > On Mon, 2012-01-02 at 13:18 +0100, Javier Martin wrote:
+> > > > Status must only be changed to DMA_IN_PROGRESS
+> > > > when the DMA transfer has really begun.
+> > > > 
+> > > > However, since this driver lacks of support for
+> > > > multiple descriptors a new flag has to be introduced
+> > > > to avoid the prepare function be called multiple times.
+> > > Thanks this is the right approach to fix this driver
+> > > 
+> > > But this will obviously break any users of this driver as they need to
+> > > call the right APIs now :D
+> > > 
+> > > Sacha: can you check this patch and see which users of this driver will
+> > > break. we need those fixes to go along this patch as well
+> > 
+> > Which users should break? I just tried with the mxcmmc driver and this
+> > one does not break.
+> > 
+> > I do not really understand this patch anyway. It changes imxdmac->status
+> > to a write-only variable and introduces a imxdmac->prepared variable
+> > with the same meaning. This patch is a complicated no-op.
+> > 
+> > What was the original problem? The fact that we used a enum dma_status
+> > with the wrong semantics? In that case I suggest to simply replace this
+> > variable. All we need to track is that we do not enter
+> > imxdma_prep_slave_sg with an already running transfer.
+> the memcpy patch submitted earlier didn't use correct dmaengine API. a
+> descriptor is not supposed to be started in prepare. The reason given
+> was the driver already does so for all other prepares, so i suggested to
+> fix that. Descriptors should be started in issue_pending only.
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
-Hi ZongShun,
-I don't have this hardware, I'd appreciate if you can test this patch.
-This patch is against linux-next 20120103.
-Thanks,
-Axel
- arch/arm/mach-w90x900/clksel.c |    2 +-
- arch/arm/mach-w90x900/cpu.c    |    2 +-
- arch/arm/mach-w90x900/dev.c    |    6 +++---
- arch/arm/mach-w90x900/mfp.c    |    2 +-
- sound/soc/nuc900/nuc900-ac97.c |    2 +-
- 5 files changed, 7 insertions(+), 7 deletions(-)
+The transfer is not started in prepare but in imxdmac->desc.tx_submit
 
-diff --git a/arch/arm/mach-w90x900/clksel.c b/arch/arm/mach-w90x900/clksel.c
-index 3de4a52..06d867dc 100644
---- a/arch/arm/mach-w90x900/clksel.c
-+++ b/arch/arm/mach-w90x900/clksel.c
-@@ -48,7 +48,7 @@ static void clock_source_select(const char *dev_id, unsigned int clkval)
- 		offset = ATAOFFSET;
- 	else if (strcmp(dev_id, "nuc900-lcd") == 0)
- 		offset = LCDOFFSET;
--	else if (strcmp(dev_id, "nuc900-audio") == 0)
-+	else if (strcmp(dev_id, "nuc900-ac97") == 0)
- 		offset = AUDOFFSET;
- 	else
- 		offset = CPUOFFSET;
-diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
-index 604e1db..9a06619 100644
---- a/arch/arm/mach-w90x900/cpu.c
-+++ b/arch/arm/mach-w90x900/cpu.c
-@@ -79,7 +79,7 @@ static DEFINE_CLK(timer4, 23);
- 
- static struct clk_lookup nuc900_clkregs[] = {
- 	DEF_CLKLOOK(&clk_lcd, "nuc900-lcd", NULL),
--	DEF_CLKLOOK(&clk_audio, "nuc900-audio", NULL),
-+	DEF_CLKLOOK(&clk_audio, "nuc900-ac97", NULL),
- 	DEF_CLKLOOK(&clk_fmi, "nuc900-fmi", NULL),
- 	DEF_CLKLOOK(&clk_ms, "nuc900-fmi", "MS"),
- 	DEF_CLKLOOK(&clk_sd, "nuc900-fmi", "SD"),
-diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
-index 5b0c38a..78110be 100644
---- a/arch/arm/mach-w90x900/dev.c
-+++ b/arch/arm/mach-w90x900/dev.c
-@@ -501,8 +501,8 @@ static struct resource nuc900_ac97_resource[] = {
- 
- };
- 
--struct platform_device nuc900_device_audio = {
--	.name		= "nuc900-audio",
-+struct platform_device nuc900_device_ac97 = {
-+	.name		= "nuc900-ac97",
- 	.id		= -1,
- 	.num_resources	= ARRAY_SIZE(nuc900_ac97_resource),
- 	.resource	= nuc900_ac97_resource,
-@@ -523,7 +523,7 @@ static struct platform_device *nuc900_public_dev[] __initdata = {
- 	&nuc900_device_emc,
- 	&nuc900_device_spi,
- 	&nuc900_device_wdt,
--	&nuc900_device_audio,
-+	&nuc900_device_ac97,
- };
- 
- /* Provide adding specific CPU platform devices API */
-diff --git a/arch/arm/mach-w90x900/mfp.c b/arch/arm/mach-w90x900/mfp.c
-index 9dd7461..c58d142 100644
---- a/arch/arm/mach-w90x900/mfp.c
-+++ b/arch/arm/mach-w90x900/mfp.c
-@@ -155,7 +155,7 @@ void mfp_set_groupg(struct device *dev, const char *subname)
- 	} else if (strcmp(dev_id, "nuc900-i2c1") == 0) {
- 		mfpen &= ~(GPIOG2TO3);
- 		mfpen |= ENI2C1;/*enable i2c1*/
--	} else if (strcmp(dev_id, "nuc900-audio") == 0) {
-+	} else if (strcmp(dev_id, "nuc900-ac97") == 0) {
- 		mfpen &= ~(GPIOG22TO23);
- 		mfpen |= ENAC97;/*enable AC97*/
- 	} else if (strcmp(dev_id, "nuc900-mmc-port1") == 0) {
-diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
-index 45d11dd..946020a 100644
---- a/sound/soc/nuc900/nuc900-ac97.c
-+++ b/sound/soc/nuc900/nuc900-ac97.c
-@@ -366,7 +366,7 @@ static int __devinit nuc900_ac97_drvprobe(struct platform_device *pdev)
- 		goto out3;
- 
- 	/* enbale ac97 multifunction pin */
--	mfp_set_groupg(nuc900_audio->dev, "nuc900-audio");
-+	mfp_set_groupg(nuc900_audio->dev, NULL);
- 
- 	return 0;
- 
+Sascha
+
+
 -- 
-1.7.5.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
