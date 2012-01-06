@@ -1,16 +1,16 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 06 Jan 2012 14:36:42 +0100
+Date: Fri, 06 Jan 2012 14:37:41 +0100
 Subject: [PATCH v3] ARM: at91: pit add DT support
-In-Reply-To: <4F05D2F3.40704@gmail.com>
+In-Reply-To: <20120105180028.GB22653@ponder.secretlab.ca>
 References: <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
  <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
- <4F05D2F3.40704@gmail.com>
-Message-ID: <4F06F8EA.30104@atmel.com>
+ <20120105180028.GB22653@ponder.secretlab.ca>
+Message-ID: <4F06F925.1030204@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2012 05:42 PM, Rob Herring :
-> On 01/05/2012 11:25 AM, Nicolas Ferre wrote:
+On 01/05/2012 07:00 PM, Grant Likely :
+> On Thu, Jan 05, 2012 at 06:25:48PM +0100, Nicolas Ferre wrote:
 >> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 >>
 >> Retreive registers address and IRQ from device tree entry. Fall back
@@ -42,26 +42,16 @@ On 01/05/2012 05:42 PM, Rob Herring :
 
 [..]
 
->>  void __init at91sam926x_ioremap_pit(u32 addr)
->>  {
->> +	if (!of_at91sam926x_pit_init())
->> +		return;
+>> +	/* Get the interrupts property */
+>> +	ret = irq_of_parse_and_map(np, 0);
+>> +	if (ret <= 0)
+>> +		goto ioremap_err;
 > 
-> This seems backwards to me. I don't have the ioremap changes in my tree,
-> but shouldn't the caller of at91sam926x_ioremap_pit be changed to
-> something like this:
+> if (!ret)
 > 
-> 	if (of_at91sam926x_pit_init() < 0)
-> 		at91sam926x_ioremap_pit(addr);
+> The DT irq functions return 0 on failure.
 
-Yes, you are right, it will be more readable the other way around.
-
-I repost another revision now.
-
-> Otherwise,
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-Thanks for your review.
+Ok, modified in new revision.
 
 Best regards,
 -- 
