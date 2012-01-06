@@ -1,64 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  6 Jan 2012 16:48:35 +0100
-Subject: [PATCH 2/2] at91 : move cpuidle driver to drivers/cpuidle directory
-In-Reply-To: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1325864915-794-2-git-send-email-daniel.lezcano@linaro.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 6 Jan 2012 08:07:44 -0800
+Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
+In-Reply-To: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20120106160744.GA7687@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch follows the discussion about moving the cpuidle code which
-is located in the architecture specific to the drivers directory.
+On Fri, Jan 06, 2012 at 03:28:25PM +0100, Thierry Reding wrote:
+> diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+> index 0a11342..a50c7e2 100644
+> --- a/arch/arm/mach-msm/board-msm8x60.c
+> +++ b/arch/arm/mach-msm/board-msm8x60.c
+> @@ -84,8 +84,11 @@ static void __init msm8x60_dt_init(void)
+>  
+>  	node = of_find_matching_node_by_address(NULL, msm_dt_gic_match,
+>  			MSM8X60_QGIC_DIST_PHYS);
+> -	if (node)
+> -		irq_domain_add_simple(node, GIC_SPI_START);
+> +	if (node) {
+> +		struct irq_domain *domain = irq_domain_add_simple(node,
+> +				GIC_SPI_START, NR_MSM_IRQS);
+> +		WARN_ON(IS_ERR(domain));
+> +	}
+>  
+>  	if (of_machine_is_compatible("qcom,msm8660-surf")) {
+>  		printk(KERN_INFO "Init surf UART registers\n");
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-at91/Kconfig                         |    5 +++++
- arch/arm/mach-at91/Makefile                        |    1 -
- drivers/cpuidle/Makefile                           |    1 +
- .../cpuidle.c => drivers/cpuidle/at91_idle.c       |    0
- 4 files changed, 6 insertions(+), 1 deletions(-)
- rename arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/at91_idle.c (100%)
+This is probably a consequence of MSM not really being "simple", but
+just using that.  However, NR_MSM_IRQS is only the number of IRQs on
+the MSM core.  There are also GPIO irqs, and potentially board IRQs
+(the board has an I2C-based chip with a bunch of IRQ lines on it).
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 4f991f2..ddeaf0e 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -18,6 +18,11 @@ config HAVE_AT91_USART4
- config HAVE_AT91_USART5
- 	bool
- 
-+config AT91_IDLE
-+	bool
-+	default y
-+	depends on CPU_IDLE
-+
- menu "Atmel AT91 System-on-Chip"
- 
- choice
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 242174f..ce0cd4c 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -91,7 +91,6 @@ obj-y				+= leds.o
- # Power Management
- obj-$(CONFIG_PM)		+= pm.o
- obj-$(CONFIG_AT91_SLOW_CLOCK)	+= pm_slowclock.o
--obj-$(CONFIG_CPU_IDLE)	+= cpuidle.o
- 
- ifeq ($(CONFIG_PM_DEBUG),y)
- CFLAGS_pm.o += -DDEBUG
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 5634f88..31c9b5f 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -3,3 +3,4 @@
- #
- 
- obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
-+obj-$(CONFIG_AT91_IDLE) += at91_idle.o
-diff --git a/arch/arm/mach-at91/cpuidle.c b/drivers/cpuidle/at91_idle.c
-similarity index 100%
-rename from arch/arm/mach-at91/cpuidle.c
-rename to drivers/cpuidle/at91_idle.c
+The only define that captures this now is 'NR_IRQS', even though we're
+trying to get rid of that.
+
+Ultimately, the correct answer will be to get the various interrupt
+controllers using their own domains, but for now, this needs to be a
+larger value to avoid missing a bunch of the interrupts.
+
+David
+
 -- 
-1.7.4.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
