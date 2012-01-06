@@ -1,76 +1,158 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 06 Jan 2012 11:16:06 +0900
-Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with gpio
- controlled panel reset
-In-Reply-To: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
-References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <001401cccc19$25b52920$711f7b60$%han@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 6 Jan 2012 10:20:49 +0800
+Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the
+ snapshot image size is anticipative
+In-Reply-To: <20120105184604.GA11065@atrey.karlin.mff.cuni.cz>
+References: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
+ <CAGsJ_4ziRj1oEhmMYjc6yJvS2FHYn+uRWmSaggnJQQjqi=B6gw@mail.gmail.com>
+ <20120105184604.GA11065@atrey.karlin.mff.cuni.cz>
+Message-ID: <CAGsJ_4ypEKZLXf0KU81=dRADcxesxKVyqg0UnEKGaxthNMZQ-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Thomas.
-> -----Original Message-----
-> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
-> Sent: Friday, January 06, 2012 12:42 AM
-> Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with gpio controlled panel reset
-> 
-> Add a lcd panel driver for simple raster-type lcd's which uses a gpio
-> controlled panel reset. The driver controls the nRESET line of the panel
-> using a gpio connected from the host system. The Vcc supply to the panel
-> is (optionally) controlled using a voltage regulator. This driver excludes
-> support for lcd panels that use a serial command interface or direct
-> memory mapped IO interface.
-> 
-> Suggested-by: Lars-Peter Clausen <lars@metafoo.de>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  .../devicetree/bindings/lcd/lcd-pwrctrl.txt        |   39 ++++
->  drivers/video/backlight/Kconfig                    |    7 +
->  drivers/video/backlight/Makefile                   |    1 +
->  drivers/video/backlight/lcd_pwrctrl.c              |  231 ++++++++++++++++++++
->  include/video/lcd_pwrctrl.h                        |   30 +++
->  5 files changed, 308 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/lcd/lcd-pwrctrl.txt
->  create mode 100644 drivers/video/backlight/lcd_pwrctrl.c
->  create mode 100644 include/video/lcd_pwrctrl.h
-> 
-> [...]
-> --- a/drivers/video/backlight/Makefile
-> +++ b/drivers/video/backlight/Makefile
-> @@ -8,6 +8,7 @@ obj-$(CONFIG_LCD_LMS283GF05)	   += lms283gf05.o
->  obj-$(CONFIG_LCD_LTV350QV)	   += ltv350qv.o
->  obj-$(CONFIG_LCD_ILI9320)	   += ili9320.o
->  obj-$(CONFIG_LCD_PLATFORM)	   += platform_lcd.o
-> +obj-$(CONFIG_LCD_PWRCTRL) 	   += lcd_pwrctrl.o
-Can you remove unnecessary space?
-Please use <tab><space><space><space> instead of <space><tab><space><space><space>
-between PWRCTRL) and += lcd_.
-> [...]
-> +static struct platform_driver lcd_pwrctrl_driver = {
-> +	.driver		= {
-> +		.name	= "lcd-pwrctrl",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(lcd_pwrctrl_match),
-> +	},
-> +	.probe		= lcd_pwrctrl_probe,
-> +	.remove		= lcd_pwrctrl_remove,
-> +	.suspend	= lcd_pwrctrl_suspend,
-> +	.resume		= lcd_pwrctrl_resume,
-Please use 'struct dev_pm_ops'.
-> +};
-> +
-> +static int __init lcd_pwrctrl_init(void)
-> +{
-> +	return platform_driver_register(&lcd_pwrctrl_driver);
-> +}
-> +
-> +static void __exit lcd_pwrctrl_cleanup(void)
-> +{
-> +	platform_driver_unregister(&lcd_pwrctrl_driver);
-> +}
-> +
-> +module_init(lcd_pwrctrl_init);
-> +module_exit(lcd_pwrctrl_cleanup);
-Use module_platform_driver(lcd_pwrctrl_driver).
-It can make the code simpler.
-> [...]
+2012/1/6 Pavel Machek <pavel@ucw.cz>:
+> Hi!
+>
+> Is the check even useful these days? Should we remove it altogether?
+
+i think we can let users or distributions decide whether it is useful.
+On PC, disk space is not an issue, people might run many applications
+while doing hibernation, so snapshot is much big. an early check will
+improve user experience because people don't need to wait a long time
+and find space is not enough.
+for embedded system, SoC solutions can know whether the space is
+enough since they know what are running while doing hibernation, so
+they can skip the check by setting the flag in sysfs.
+that is why i had this patch sent.
+>
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Pavel
+>
+>
+>> Pavel ,Rafael, any feedback?
+>> -barry
+>>
+>> 2011/11/25 Barry Song <Barry.Song@csr.com>:
+>> > From: Barry Song <baohua.song@csr.com>
+>> >
+>> > Current swsusp requires swap partitions even larger than real saved pages
+>> > based on the worst compression ratio:
+>> > but for an embedded system, which has limited storage space, then it might
+>> > can't give the large partition to save snapshot.
+>> > In the another way, some embedded systems can definitely know the most size
+>> > needed for snapshot since they run some specific application lists.
+>> > So this patch provides the possibility for users to tell kernel even
+>> > the system has a little snapshot partition, but it is still enough.
+>> > For example, if the system need to save 120MB memory, origin swsusp will require
+>> > a 130MB partition to save snapshot. but if users know 30MB is enough for them(
+>> > compressed image will be less than 30MB), they just make a 30MB partition by
+>> > echo 0 > /sys/power/check_swap_size
+>> >
+>> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> > Cc: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
+>> > ---
+>> > ?-v2:drop swap_enough bootargs and use /sys/power/check_swap_size node
+>> >
+>> > ?Documentation/power/interface.txt | ? ?5 +++++
+>> > ?kernel/power/hibernate.c ? ? ? ? ?| ? 22 ++++++++++++++++++++++
+>> > ?kernel/power/power.h ? ? ? ? ? ? ?| ? ?2 ++
+>> > ?kernel/power/swap.c ? ? ? ? ? ? ? | ? ?9 +++++++++
+>> > ?4 files changed, 38 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/Documentation/power/interface.txt b/Documentation/power/interface.txt
+>> > index c537834..5e205f0 100644
+>> > --- a/Documentation/power/interface.txt
+>> > +++ b/Documentation/power/interface.txt
+>> > @@ -47,6 +47,11 @@ Writing to this file will accept one of
+>> > ? ? ? ?'testproc'
+>> > ? ? ? ?'test'
+>> >
+>> > +/sys/power/check_swap_size controls whether we can skip checking the swap
+>> > +partition size by worst compression ratio. If users know the swap partition
+>> > +is enough for compressed snapshot, write 0 to /sys/power/check_swap_size.
+>> > +It is useful for an embedded system with known running softwares.
+>> > +
+>> > ?/sys/power/image_size controls the size of the image created by
+>> > ?the suspend-to-disk mechanism. ?It can be written a string
+>> > ?representing a non-negative integer that will be used as an upper
+>> > diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+>> > index 1c53f7f..5552473 100644
+>> > --- a/kernel/power/hibernate.c
+>> > +++ b/kernel/power/hibernate.c
+>> > @@ -1024,11 +1024,33 @@ static ssize_t reserved_size_store(struct kobject *kobj,
+>> >
+>> > ?power_attr(reserved_size);
+>> >
+>> > +static ssize_t check_swap_size_show(struct kobject *kobj, struct kobj_attribute *attr,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?char *buf)
+>> > +{
+>> > + ? ? ? return sprintf(buf, "%d\n", check_swap_size);
+>> > +}
+>> > +
+>> > +static ssize_t check_swap_size_store(struct kobject *kobj, struct kobj_attribute *attr,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const char *buf, size_t n)
+>> > +{
+>> > + ? ? ? int check_size;
+>> > +
+>> > + ? ? ? if (sscanf(buf, "%d", &check_size) == 1) {
+>> > + ? ? ? ? ? ? ? check_swap_size = check_size;
+>> > + ? ? ? ? ? ? ? return n;
+>> > + ? ? ? }
+>> > +
+>> > + ? ? ? return -EINVAL;
+>> > +}
+>> > +
+>> > +power_attr(check_swap_size);
+>> > +
+>> > ?static struct attribute * g[] = {
+>> > ? ? ? ?&disk_attr.attr,
+>> > ? ? ? ?&resume_attr.attr,
+>> > ? ? ? ?&image_size_attr.attr,
+>> > ? ? ? ?&reserved_size_attr.attr,
+>> > + ? ? ? &check_swap_size_attr.attr,
+>> > ? ? ? ?NULL,
+>> > ?};
+>> >
+>> > diff --git a/kernel/power/power.h b/kernel/power/power.h
+>> > index 23a2db1..4f0fa78 100644
+>> > --- a/kernel/power/power.h
+>> > +++ b/kernel/power/power.h
+>> > @@ -74,6 +74,8 @@ static struct kobj_attribute _name##_attr = { \
+>> >
+>> > ?/* Preferred image size in bytes (default 500 MB) */
+>> > ?extern unsigned long image_size;
+>> > +/* If 0, skip checking whether the swap size is enough for compressed snapshot */
+>> > +extern int check_swap_size;
+>> > ?/* Size of memory reserved for drivers (default SPARE_PAGES x PAGE_SIZE) */
+>> > ?extern unsigned long reserved_size;
+>> > ?extern int in_suspend;
+>> > diff --git a/kernel/power/swap.c b/kernel/power/swap.c
+>> > index 11a594c..db90195 100644
+>> > --- a/kernel/power/swap.c
+>> > +++ b/kernel/power/swap.c
+>> > @@ -37,6 +37,12 @@
+>> > ?#define HIBERNATE_SIG ?"S1SUSPEND"
+>> >
+>> > ?/*
+>> > + * if users know swap partitions are enough for compressed snapshots,
+>> > + * echo 0 > /sys/power/check_swap_size
+>> > + */
+>> > +int check_swap_size = 1;
+>> > +
+>> > +/*
+>> > ?* ? ? The swap map is a data structure used for keeping track of each page
+>> > ?* ? ? written to a swap partition. ?It consists of many swap_map_page
+>> > ?* ? ? structures that contain each an array of MAP_PAGE_ENTRIES swap entries.
+>> > @@ -772,6 +778,9 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
+>> > ? ? ? ?unsigned int free_swap = count_swap_pages(root_swap, 1);
+>> > ? ? ? ?unsigned int required;
+>> >
+>> > + ? ? ? if (!check_swap_size)
+>> > + ? ? ? ? ? ? ? return 1;
+>> > +
+>> > ? ? ? ?pr_debug("PM: Free swap pages: %u\n", free_swap);
+>> >
+>> > ? ? ? ?required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
+>> > --
+>> > 1.7.1
+>
+-barry
