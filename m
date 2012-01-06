@@ -1,64 +1,84 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 6 Jan 2012 10:52:49 -0800
-Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
-In-Reply-To: <4F0720A9.8070400@gmail.com>
-References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
- <20120106160744.GA7687@codeaurora.org> <4F0720A9.8070400@gmail.com>
-Message-ID: <20120106185249.GA10668@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 06 Jan 2012 12:56:04 -0600
+Subject: [PATCH v2 0/5] ARM: OMAP2+: Interrupt controllers adaptation to DT
+In-Reply-To: <4F07239D.8000607@ti.com>
+References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
+ <4EF44DFF.4090300@ti.com> <4F07239D.8000607@ti.com>
+Message-ID: <4F0743C4.7000201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 10:26:17AM -0600, Rob Herring wrote:
-> On 01/06/2012 10:07 AM, David Brown wrote:
-> > On Fri, Jan 06, 2012 at 03:28:25PM +0100, Thierry Reding wrote:
-> >> diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-> >> index 0a11342..a50c7e2 100644
-> >> --- a/arch/arm/mach-msm/board-msm8x60.c
-> >> +++ b/arch/arm/mach-msm/board-msm8x60.c
-> >> @@ -84,8 +84,11 @@ static void __init msm8x60_dt_init(void)
-> >>  
-> >>  	node = of_find_matching_node_by_address(NULL, msm_dt_gic_match,
-> >>  			MSM8X60_QGIC_DIST_PHYS);
-> >> -	if (node)
-> >> -		irq_domain_add_simple(node, GIC_SPI_START);
-> >> +	if (node) {
-> >> +		struct irq_domain *domain = irq_domain_add_simple(node,
-> >> +				GIC_SPI_START, NR_MSM_IRQS);
-> >> +		WARN_ON(IS_ERR(domain));
-> >> +	}
-> >>  
-> >>  	if (of_machine_is_compatible("qcom,msm8660-surf")) {
-> >>  		printk(KERN_INFO "Init surf UART registers\n");
-> > 
-> > This is probably a consequence of MSM not really being "simple", but
-> > just using that.  However, NR_MSM_IRQS is only the number of IRQs on
-> > the MSM core.  There are also GPIO irqs, and potentially board IRQs
-> > (the board has an I2C-based chip with a bunch of IRQ lines on it).
-> > 
-> > The only define that captures this now is 'NR_IRQS', even though we're
-> > trying to get rid of that.
-> > 
-> > Ultimately, the correct answer will be to get the various interrupt
-> > controllers using their own domains, but for now, this needs to be a
-> > larger value to avoid missing a bunch of the interrupts.
+On 01/06/2012 10:38 AM, Cousson, Benoit wrote:
+> Hi Rob/Grant,
 > 
-> No. This should only be the number of interrupts for a controller as the
-> interrupt numbers in the device tree should be relative to a controller
-> and not the Linux virq number. The numbering in the dts needs to be
-> correct. You don't need a domain until you start getting the interrupts
-> from the dts.
+> Gentle ping on that series too. This should the last one:-)
+> 
+Sorry about that. For the series:
 
-Yes, _should only be_.  And, you're probably right that we shouldn't
-change this, and should use the NR_MSM_IRQS.  When a DTS device needs
-to use a GPIO IRQ, the GPIO controller should properly register its
-own domain.  The only IRQ in the DT is an MSM IRQ, so this doesn't
-actually break anything.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-So, Thierry, please leave it as NR_MSM_IRQS as in your original
-patch.  In that form.
+Rob
 
-Acked-by: David Brown <davidb@codeaurora.org>
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Thanks,
+> Benoit
+> 
+> On 12/23/2011 10:46 AM, Cousson, Benoit wrote:
+>> Hi Rob,
+>>
+>> Are you OK with that update?
+>>
+>> Thanks,
+>> Benoit
+>>
+>> On 12/20/2011 2:39 PM, Benoit Cousson wrote:
+>>> Hi Tony and Rob,
+>>>
+>>> Here is the series to take advantage of the new DT interrupt init
+>>> mechanism.
+>>> Thanks to Marc's CONFIG_MULTI_IRQ_HANDLER series, OMAP4 just has to
+>>> use the
+>>> default GIC binding and does not need some OMAP specific hacks anymore.
+>>> OMAP2 and 3 are using a simple interrupt controller that can thus expose
+>>> a simpler binding.
+>>>
+>>> This update, compared to v1 [1], is introducing the IRQ domain for the
+>>> OMAP2&3 INTC by default for both DT and none-DT build.
+>>> Please note that in the near future that code can even be simplier
+>>> with the
+>>> introduction of the domain support inside generic irq chip.
+>>>
+>>> This series is based on lo/dt branch to get the needed cleanup and
+>>> fixes for
+>>> OMAP.
+>>>
+>>> The series is available here for reference:
+>>> git://gitorious.org/omap-pm/linux.git for_3.3/2_dt_irq
+>>>
+>>> Regards,
+>>> Benoit
+>>>
+>>> [1] http://www.spinics.net/lists/linux-omap/msg61152.html
+>>>
+>>>
+>>> Benoit Cousson (5):
+>>> arm/dts: OMAP4: Update DTS file with new GIC bindings
+>>> ARM: OMAP2/3: intc: Add irqdomain support
+>>> ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
+>>> arm/dts: OMAP3: Add interrupt-controller bindings for INTC
+>>> ARM: OMAP2+: board-generic: Use of_irq_init API
+>>>
+>>> .../devicetree/bindings/arm/omap/intc.txt | 27 +++++++++++
+>>> arch/arm/boot/dts/omap3.dtsi | 6 ++-
+>>> arch/arm/boot/dts/omap4.dtsi | 3 +-
+>>> arch/arm/mach-omap2/board-generic.c | 30 +++++++------
+>>> arch/arm/mach-omap2/common.h | 10 ++++
+>>> arch/arm/mach-omap2/irq.c | 48 ++++++++++++++++++--
+>>> 6 files changed, 103 insertions(+), 21 deletions(-)
+>>> create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
+>>>
+>>
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
