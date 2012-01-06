@@ -1,44 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Jan 2012 17:26:05 -0800
-Subject: [PATCH v2] arm/tegra: emc: device tree support
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F182F@HQMAIL01.nvidia.com>
-References: <1324599468-12845-10-git-send-email-olof@lixom.net>
- <1325743338-2533-1-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F182F@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMhwTuiJJC=sO8MkFtfkaA=OAxxNXGkPs5av27bLzVJxBA@mail.gmail.com>
+Date: Thu, 5 Jan 2012 17:36:46 -0800
+Subject: [PATCH v3] arm/tegra: emc: convert tegra2_emc to a platform driver
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F1818@HQMAIL01.nvidia.com>
+References: <1325742994-1178-1-git-send-email-olof@lixom.net>
+ <1325743288-2460-1-git-send-email-olof@lixom.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F1818@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMg7e4bVjyzZ25VarPVFvMpGcKioVSDN=Esn9u6S4idRoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2012 at 2:35 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Wednesday, January 04, 2012 11:02 PM:
->> Add device tree support to the emc driver, filling in the platform data
->> based on the DT bindings.
+On Thu, Jan 5, 2012 at 2:14 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Wednesday, January 04, 2012 11:01 PM:
+>> This is the first step in making it device-tree aware and get rid of the
+>> in-kernel EMC tables (of which there are none in mainline, thankfully).
+>>
+>> Changes since v2:
+>>
+>> * D'oh -- missed a couple of variables that were added, never used and then
+>> ? later removed in a later patch.
 >>
 >> Changes since v1:
 >>
->> * Unmangled some messed up patch squashes, moving changes to earlier patches
->> * Flipped an of_property_read_u32 return value test
->> * Clarified clock settings message on case where no table is provided
+>> * Fixed messed up indentation
+>> * Removed code that should be gone (was added here and removed later in series)
 >>
 >> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ...
 >> diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
 > ...
->> +static struct tegra_emc_pdata __devinit *tegra_emc_fill_pdata(struct platform_device *pdev)
+>> +static int __devinit tegra_emc_probe(struct platform_device *pdev)
 > ...
->> + ? ? pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
->> + ? ? pdata->tables = devm_kzalloc(&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(struct tegra_emc_table),
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
+>> + ? ? if (!request_mem_region(res->start, resource_size(res), "tegra_emc")) {
+>> + ? ? ? ? ? ? dev_err(&pdev->dev, "failed to request register region\n");
+>> + ? ? ? ? ? ? return -EBUSY;
+>> + ? ? }
+>> +
+>> + ? ? emc_regbase = ioremap(res->start, resource_size(res));
 >
-> You could convert that one to sizeof(*pdata->tables) too, although feel
-> free to ignore this picky comment, or fix it up when you apply the change.
+> Don't you need to error-check the ioremap() result, and undo the
+> request_mem_region() too? Or, use the devm variant to request the
+> region. The rest of the code checks emc_pdev!=NULL which won't detect
+> this failure.
 >
-> Otherwise,
->
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Isn't there a get_resource && request && remap function now; I think I
+> recall a patch that wraps all that into one function, but it might have
+> been DT-only.
 
+Nope, it's there -- devm_request_and_ioremap(). I'll move it over to
+that and repost, it's a good idea.
 
-Done, thanks.
 
 -Olof
