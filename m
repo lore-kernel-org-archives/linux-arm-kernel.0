@@ -1,46 +1,57 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Fri, 6 Jan 2012 16:16:39 +0000
-Subject: [GIT PULL] I2C: OMAP: misc. updates for v3.3
-In-Reply-To: <87boqh7kn4.fsf@ti.com>
-References: <87boqh7kn4.fsf@ti.com>
-Message-ID: <20120106161639.GP19115@trinity.fluff.org>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 6 Jan 2012 17:20:16 +0100
+Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
+In-Reply-To: <CACxGe6sXmC2A0ihsK=rmQ8jQ61xcc7re=LgzPPJm8wHvvkFb4Q@mail.gmail.com>
+References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
+ <CACxGe6sXmC2A0ihsK=rmQ8jQ61xcc7re=LgzPPJm8wHvvkFb4Q@mail.gmail.com>
+Message-ID: <20120106162016.GB5593@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 04:13:51PM -0800, Kevin Hilman wrote:
-> Hi Ben,
+* Grant Likely wrote:
+> Hi Thierry,
 > 
-> Here's a few OMAP I2C updates for the v3.3 merge window.
+> On Fri, Jan 6, 2012 at 7:28 AM, Thierry Reding
+> <thierry.reding@avionic-design.de> wrote:
+> > The irq_domain_add() function needs the number of interrupts in the
+> > domain to properly initialize them. In addition the allocated domain
+> > is now returned by the irq_domain_{add,generate}_simple() helpers.
+> 
+> The commit text should also include the justification for renaming
+> irq_domain_create_simple() -> irq_domain_add_simple()
 
-ok, added these to my i2c-next and for-33/i2c/omap.
- 
-> Thanks,
-> 
-> Kevin
-> 
-> The following changes since commit 3f6b2a8bd6e4ff43269d89066a9fe06a0e5ba961:
-> 
->   I2C: OMAP: correct SYSC register offset for OMAP4 (2011-12-13 11:35:56 -0800)
-> 
-> are available in the git repository at:
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/i2c/misc
-> 
-> Benoit Cousson (1):
->       i2c: OMAP: Add DT support for i2c controller
-> 
-> Jan Weitzel (1):
->       I2C: OMAP: NACK without STP
-> 
->  Documentation/devicetree/bindings/i2c/omap-i2c.txt |   30 ++++++
->  drivers/i2c/busses/i2c-omap.c                      |  108 +++++++++++++-------
->  2 files changed, 99 insertions(+), 39 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Actually the commit only fixes up the comment. The function has always been
+called irq_domain_add_simple().
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+For reference, this was introduced in commit 7e71330.
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+> > ? ? ? ?domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+> > - ? ? ? if (!domain) {
+> > - ? ? ? ? ? ? ? WARN_ON(1);
+> > - ? ? ? ? ? ? ? return;
+> > - ? ? ? }
+> > + ? ? ? if (!domain)
+> > + ? ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
+> 
+> Don't use the ERR_PTR() pattern (it's a horrible pattern IMHO).
+
+Returning NULL here is probably okay. Can the ERR_PTR stay in
+irq_domain_generate_simple(), though? It has two error conditions and
+handling both by returning NULL may not be what we want.
+
+> Return NULL on failure and keep the WARN_ON() in this function.
+> Otherwise looks good.  Thanks for writing this patch.
+
+I thought it would be better to pull the WARN_ON out of the function because
+we now actually have a way to determine if the call succeeded in the caller.
+In most cases I assume the caller will be much better suited to handle the
+situation gracefully such that the WARN_ON is not required.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120106/2aac3dfa/attachment.sig>
