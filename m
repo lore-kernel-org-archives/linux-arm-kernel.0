@@ -1,30 +1,48 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri,  6 Jan 2012 11:21:24 -0800
-Subject: [PATCH] ARM: msm: vreg is a module and so needs module.h
-Message-ID: <1325877684-14095-1-git-send-email-davidb@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 6 Jan 2012 12:27:17 -0800
+Subject: [GIT PULL] Samsung devel-rtc for v3.3
+In-Reply-To: <037601ccc8e9$07e2c8e0$17a85aa0$%kim@samsung.com>
+References: <037601ccc8e9$07e2c8e0$17a85aa0$%kim@samsung.com>
+Message-ID: <CAOesGMhV5agC1LFgZ3jrDXy=Hcj2-TtydfnKsVAXoSHSBKEu=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM7201 vreg appears to have gotten missed in the module.h
-cleanup.
+Hi,
 
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
- arch/arm/mach-msm/vreg.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+On Sun, Jan 1, 2012 at 4:54 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd and Olof,
+>
+> Please pull Samsung devel-rtc for v3.3 from following.
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next-samsung-devel-rtc
+>
+> It is including support rtc for S3C2443 and S3C2416 and got the ack from
+> Alessandro Zummo.
+>
+> Since next-samsung-dt1 branch touch drivers/rtc, it has been made based on
+> next-samsung-dt1 branch.
+>
+> If any problems please let me know.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> The following changes since commit 0561ceabd0f13871900d116278fe9268aeb714d1:
+>
+> ?ARM: dts: Add intial dts file for EXYNOS4210 SoC, SMDKV310 and ORIGEN
+> (2011-12-23 10:07:12 +0900)
+>
+> are available in the git repository at:
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next-samsung-devel-rtc
 
-diff --git a/arch/arm/mach-msm/vreg.c b/arch/arm/mach-msm/vreg.c
-index a9103bc..bd66ed0 100644
---- a/arch/arm/mach-msm/vreg.c
-+++ b/arch/arm/mach-msm/vreg.c
-@@ -19,6 +19,7 @@
- #include <linux/device.h>
- #include <linux/init.h>
- #include <linux/debugfs.h>
-+#include <linux/module.h>
- #include <linux/string.h>
- #include <mach/vreg.h>
- 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Just following up with email since I didn't see one:
+
+Looks like Arnd pulled this into next/drivers2 already. Thanks!
+
+-Olof
