@@ -1,66 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 6 Jan 2012 21:39:11 +0800
-Subject: [PATCH 1/2] ARM: mxs: detect SoC by checking CHIPID register
-In-Reply-To: <20120106114029.GB2610@pengutronix.de>
-References: <1325817712-4573-1-git-send-email-shawn.guo@linaro.org>
- <1325817712-4573-2-git-send-email-shawn.guo@linaro.org>
- <20120106114029.GB2610@pengutronix.de>
-Message-ID: <20120106133908.GD4790@S2101-09.ap.freescale.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 06 Jan 2012 14:36:42 +0100
+Subject: [PATCH v3] ARM: at91: pit add DT support
+In-Reply-To: <4F05D2F3.40704@gmail.com>
+References: <1325771308-19770-1-git-send-email-nicolas.ferre@atmel.com>
+ <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
+ <4F05D2F3.40704@gmail.com>
+Message-ID: <4F06F8EA.30104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 12:40:29PM +0100, Wolfram Sang wrote:
-> On Fri, Jan 06, 2012 at 10:41:51AM +0800, Shawn Guo wrote:
-> > Both imx23 and imx28 have CHIPID register at address 0x8001c310, which
-> > can be used to identify the SoC.  This patch changes cpu_is_xxx and
-> > __arch_decomp_setup to use this CHIPID register than machine type to
-> > detect the chip between imx23 and imx28, so that we do not need to
-> > change these functions whenever a new board/machine gets added.
-> > 
-> > Suggested-by: Wolfram Sang <w.sang@pengutronix.de>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> [...]
-> 
-> > +
-> > +/*
-> > + * MXS CPU types
-> > + */
-> > +#define CHIPID	(MXS_IO_ADDRESS(MXS_DIGCTL_BASE_ADDR) + 0x310)
-> 
-> Hmm, in general I don't like accessing single registers this way. Since
-> we only read, it might work for now, but I think it will turn ugly the
-> more we use from DIGCTL (which is annoying to abstract, yes).
-> 
-I agree with you.  But I do not really want to start writing a digctl.c 
-just from this patch series.
+On 01/05/2012 05:42 PM, Rob Herring :
+> On 01/05/2012 11:25 AM, Nicolas Ferre wrote:
+>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>
+>> Retreive registers address and IRQ from device tree entry. Fall back
+>> to built-in values if an error occurs.
+>>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>> v3: - use irq_of_parse_and_map() for handling irq numbers specified by DT.
+>>       Correction proposed by Jamie Iles.
+>>
+>> v2: - new specification of irq numbers in DT (due to modification of AIC code)
+>>     - new error path in of_at91sam926x_pit_init()
+>>     - fall back to built-in values if an error occurs
+>>     - use of of_property_read_u32() to get irq property
+>>
+>>  .../devicetree/bindings/arm/atmel-at91.txt         |    8 +++
+>>  arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 ++
+>>  arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++
+>>  arch/arm/mach-at91/at91sam926x_time.c              |   53 +++++++++++++++++++-
+>>  4 files changed, 70 insertions(+), 2 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
 
-> 0x310 should not be hardcoded. CHIPID could be MXS_CHIPID.
-> 
-I thought about those when I wrote the code, and decided not to bother,
-since they are very really limited in mxs.h.  But now I think I should
-bother, because your comments are here.
+[..]
 
-> > diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
-> > index 6777674..a8de26d 100644
-> > --- a/arch/arm/mach-mxs/include/mach/uncompress.h
-> > +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
-> > @@ -55,16 +55,17 @@ static inline void flush(void)
-> >  
-> >  #define MX23_DUART_BASE_ADDR	0x80070000
-> >  #define MX28_DUART_BASE_ADDR	0x80074000
-> > +#define MXS_DIGCTL_CHIPID	0x8001c310
-> >  
-> >  static inline void __arch_decomp_setup(unsigned long arch_id)
-> >  {
-> > -	switch (arch_id) {
-> > -	case MACH_TYPE_MX23EVK:
-> > +	u16 chipid = (*(volatile unsigned long *) MXS_DIGCTL_CHIPID) >> 16;
-> 
-> Can't we use the cpu_is-functions here?
-> 
-No.  We are running with MMU off here.
+>> --- a/arch/arm/mach-at91/at91sam926x_time.c
+>> +++ b/arch/arm/mach-at91/at91sam926x_time.c
 
+[..]
+
+>>  void __init at91sam926x_ioremap_pit(u32 addr)
+>>  {
+>> +	if (!of_at91sam926x_pit_init())
+>> +		return;
+> 
+> This seems backwards to me. I don't have the ioremap changes in my tree,
+> but shouldn't the caller of at91sam926x_ioremap_pit be changed to
+> something like this:
+> 
+> 	if (of_at91sam926x_pit_init() < 0)
+> 		at91sam926x_ioremap_pit(addr);
+
+Yes, you are right, it will be more readable the other way around.
+
+I repost another revision now.
+
+> Otherwise,
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+Thanks for your review.
+
+Best regards,
 -- 
-Regards,
-Shawn
+Nicolas Ferre
