@@ -1,48 +1,122 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 6 Jan 2012 14:56:52 +0100
-Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
-In-Reply-To: <3197939.ZpLiSGWdou@ax5200p>
-References: <1325719752-818-1-git-send-email-olof@lixom.net>
- <6121078.4q2inFFXlB@fb07-iapwap2>
- <CAD=FV=V3qO-=DOz5Qc95fyYJC4656WvmUYGXMAHgXcGf96+aeQ@mail.gmail.com>
- <3197939.ZpLiSGWdou@ax5200p>
-Message-ID: <20230.64932.51663.410120@pilspetsen.it.uu.se>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 6 Jan 2012 22:20:53 +0800
+Subject: [RFC][PATCH] ARM: NUC900: Rename nuc900-audio platform device to
+ nuc900-ac97
+In-Reply-To: <1325850987.2773.2.camel@phoenix>
+References: <1325850987.2773.2.camel@phoenix>
+Message-ID: <CAKT61h8vpk4xLEoKDJcLnAL54q-XzHj73LTwHb8LgxEx38+c=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Dietrich writes:
- > On Thursday 05 January 2012 10:40:48 Doug Anderson wrote:
- > > I can't comment on the L2 stuff (haven't looked there), but just going
- > > by Cortex-A9 revisions (T25 has roughly r1p1 and T30 has r2p7), I've
- > > got this table:
- > > 
- > > Errata             T25 (A9 ~r1p1)   T30 (A9 r2p7)    Applies to
- > > ARM_ERRATA_364296                                    pre A8
- > > ARM_ERRATA_411920                                    pre A8
- > > ARM_ERRATA_430973                                    A8
- > > ARM_ERRATA_458693                                    A8
- > > ARM_ERRATA_460075                                    A8
- > > ARM_ERRATA_720789  yes                               A9 (prior to r2p0)
- > > ARM_ERRATA_742230  yes                               A9 (r1p0..r2p2)
- > > ARM_ERRATA_742231                                    A9 (r2p0..r2p2)
- > > ARM_ERRATA_743622                                    A9 (r2p0..r2p2)
- > > ARM_ERRATA_751472  yes              yes              A9 (prior to r3p0)
- > > ARM_ERRATA_754322                   yes              A9 (r2p*, r3p*)
- > > ARM_ERRATA_754327  yes                               A9 (prior to r2p0)
- > > ARM_ERRATA_764369  yes              yes              A9 MPCore (all revs)
- > > 
- > > ...so that means we should also be adding in 720789 (T2x), 751472
- > > (T2x, T30), 754322 (T30), 754327 (T2x), 764369 (T2x, T30).
- > 
- > AFAIK, 720789 (TLBIASIDIS and TLBIMVAIS operations can broadcast a faulty 
- > ASID) is fixed in userspace (or gcc) nowadays (at least in Ubuntu) so I think 
- > this can be neglected.
+2012/1/6, Axel Lin <axel.lin@gmail.com>:
+> This change ensures the platform device name matches nuc900-ac97 platform
+> driver name.
+>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 
-Not everyone uses Ubuntu.
+Acked-by: Wan Zongshun <mcuos.com@gmail.com>
 
-Can you provide a reference to the corresponding gcc and/or Ubuntu patch?
+> ---
+> Hi ZongShun,
+> I don't have this hardware, I'd appreciate if you can test this patch.
+> This patch is against linux-next 20120103.
+> Thanks,
+> Axel
+>  arch/arm/mach-w90x900/clksel.c |    2 +-
+>  arch/arm/mach-w90x900/cpu.c    |    2 +-
+>  arch/arm/mach-w90x900/dev.c    |    6 +++---
+>  arch/arm/mach-w90x900/mfp.c    |    2 +-
+>  sound/soc/nuc900/nuc900-ac97.c |    2 +-
+>  5 files changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-w90x900/clksel.c b/arch/arm/mach-w90x900/clksel.c
+> index 3de4a52..06d867dc 100644
+> --- a/arch/arm/mach-w90x900/clksel.c
+> +++ b/arch/arm/mach-w90x900/clksel.c
+> @@ -48,7 +48,7 @@ static void clock_source_select(const char *dev_id,
+> unsigned int clkval)
+>  		offset = ATAOFFSET;
+>  	else if (strcmp(dev_id, "nuc900-lcd") == 0)
+>  		offset = LCDOFFSET;
+> -	else if (strcmp(dev_id, "nuc900-audio") == 0)
+> +	else if (strcmp(dev_id, "nuc900-ac97") == 0)
+>  		offset = AUDOFFSET;
+>  	else
+>  		offset = CPUOFFSET;
+> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+> index 604e1db..9a06619 100644
+> --- a/arch/arm/mach-w90x900/cpu.c
+> +++ b/arch/arm/mach-w90x900/cpu.c
+> @@ -79,7 +79,7 @@ static DEFINE_CLK(timer4, 23);
+>
+>  static struct clk_lookup nuc900_clkregs[] = {
+>  	DEF_CLKLOOK(&clk_lcd, "nuc900-lcd", NULL),
+> -	DEF_CLKLOOK(&clk_audio, "nuc900-audio", NULL),
+> +	DEF_CLKLOOK(&clk_audio, "nuc900-ac97", NULL),
+>  	DEF_CLKLOOK(&clk_fmi, "nuc900-fmi", NULL),
+>  	DEF_CLKLOOK(&clk_ms, "nuc900-fmi", "MS"),
+>  	DEF_CLKLOOK(&clk_sd, "nuc900-fmi", "SD"),
+> diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
+> index 5b0c38a..78110be 100644
+> --- a/arch/arm/mach-w90x900/dev.c
+> +++ b/arch/arm/mach-w90x900/dev.c
+> @@ -501,8 +501,8 @@ static struct resource nuc900_ac97_resource[] = {
+>
+>  };
+>
+> -struct platform_device nuc900_device_audio = {
+> -	.name		= "nuc900-audio",
+> +struct platform_device nuc900_device_ac97 = {
+> +	.name		= "nuc900-ac97",
+>  	.id		= -1,
+>  	.num_resources	= ARRAY_SIZE(nuc900_ac97_resource),
+>  	.resource	= nuc900_ac97_resource,
+> @@ -523,7 +523,7 @@ static struct platform_device *nuc900_public_dev[]
+> __initdata = {
+>  	&nuc900_device_emc,
+>  	&nuc900_device_spi,
+>  	&nuc900_device_wdt,
+> -	&nuc900_device_audio,
+> +	&nuc900_device_ac97,
+>  };
+>
+>  /* Provide adding specific CPU platform devices API */
+> diff --git a/arch/arm/mach-w90x900/mfp.c b/arch/arm/mach-w90x900/mfp.c
+> index 9dd7461..c58d142 100644
+> --- a/arch/arm/mach-w90x900/mfp.c
+> +++ b/arch/arm/mach-w90x900/mfp.c
+> @@ -155,7 +155,7 @@ void mfp_set_groupg(struct device *dev, const char
+> *subname)
+>  	} else if (strcmp(dev_id, "nuc900-i2c1") == 0) {
+>  		mfpen &= ~(GPIOG2TO3);
+>  		mfpen |= ENI2C1;/*enable i2c1*/
+> -	} else if (strcmp(dev_id, "nuc900-audio") == 0) {
+> +	} else if (strcmp(dev_id, "nuc900-ac97") == 0) {
+>  		mfpen &= ~(GPIOG22TO23);
+>  		mfpen |= ENAC97;/*enable AC97*/
+>  	} else if (strcmp(dev_id, "nuc900-mmc-port1") == 0) {
+> diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
+> index 45d11dd..946020a 100644
+> --- a/sound/soc/nuc900/nuc900-ac97.c
+> +++ b/sound/soc/nuc900/nuc900-ac97.c
+> @@ -366,7 +366,7 @@ static int __devinit nuc900_ac97_drvprobe(struct
+> platform_device *pdev)
+>  		goto out3;
+>
+>  	/* enbale ac97 multifunction pin */
+> -	mfp_set_groupg(nuc900_audio->dev, "nuc900-audio");
+> +	mfp_set_groupg(nuc900_audio->dev, NULL);
+>
+>  	return 0;
+>
+> --
+> 1.7.5.4
+>
+>
+>
+>
 
-(I got a Tegra-2 based trimslice last summer, but it's been completely
-unreliable under load (hangs hard during "make -j2" gcc bootstraps),
-hence I'm looking for patches or any other information that can help
-me fix or work around whatever bugs it has.)
+
+-- 
+Wan ZongShun.
+www.mcuos.com
