@@ -1,44 +1,233 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 6 Jan 2012 13:27:51 +0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-3-git-send-email-b29396@freescale.com>
- <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
-Message-ID: <20120106052748.GA4790@S2101-09.ap.freescale.net>
+From: Josh.wu@atmel.com (Wu, Josh)
+Date: Fri, 6 Jan 2012 13:49:24 +0800
+Subject: [PATCH 1/2 v3] V4L: atmel-isi: add code to enable/disable ISI_MCK
+ clock
+In-Reply-To: <Pine.LNX.4.64.1201051820060.23644@axis700.grange>
+References: <4EEA034C.9020800@atmel.com>
+ <CAOesGMiEg-8LA9-yUXRrDwGLGfVeFn7Xax9jhkDr+fZ5GU06QA@mail.gmail.com>
+ <4EEB73DD.3070505@atmel.com>
+ <CAOesGMjC8tOY52LV=E9=KX_FbcC-eMoNHJ4E87vOrqk44=zJnA@mail.gmail.com>
+ <Pine.LNX.4.64.1112171928380.13817@axis700.grange>
+ <CAOesGMi6-iPPBSP_TgKHf_agGSOrQeoB1CU=xhj8wuM2dQvf0A@mail.gmail.com>
+ <Pine.LNX.4.64.1112180103220.13817@axis700.grange>
+ <CAOesGMiWH--=_fu1ufztb6jZLTDO8_EboDd+hEd=TN-AnRJ3Yw@mail.gmail.com>
+ <Pine.LNX.4.64.1201051752220.23644@axis700.grange>
+ <20120105170913.GC11810@n2100.arm.linux.org.uk> <4F05DAA1.2030207@atmel.com>
+ <Pine.LNX.4.64.1201051820060.23644@axis700.grange>
+Message-ID: <4C79549CB6F772498162A641D92D532803F33A4A@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 05:05:46PM -0800, Stephen Warren wrote:
-> I'm confused because the node has properties for function name and
-> group name which make sense to define the mux setting for that group.
-> However, I'm not sure what the grp-pins/num-pins/grp-mux/num-mux
-> properties are for; if those properties define the available mux options
-> and for the group and set of pins included in the group, I think the node
-> is representing too many things in one place. I'd expect to see:
-> 
-> a) Either data in the pinctrl driver
+Hi, Guennadi
 
-For imx, I'm against this.
+On Friday, January 06, 2012 1:22 AM, Guennadi Liakhovetski wrote:
 
-> or separate DT nodes to define each
-> available pin group, mux function, etc.; the definition of what the SoC
-> itself can do.
+> On Thu, 5 Jan 2012, Nicolas Ferre wrote:
 
-This works for me.  But we do not necessarily need to enumerate all
-the possible groups from the beginning.  Instead, we can add the groups
-incrementally.
+>> On 01/05/2012 06:09 PM, Russell King - ARM Linux :
+>> > clk_prepare/clk_unprepare?
+>> 
+>> Right, Guennadi, this modification has already made by Josh and it
+was the second patch of this series:
+>> "[PATCH v3 2/2] [media] V4L: atmel-isi: add
+clk_prepare()/clk_unprepare() functions"
 
-Regards,
-Shawn
+> Right, but not for this patch... I'll let him fix it here too.
 
-> 
-> b) The configuration of each pin group that's used by the particular board.
-> All that's relevant here is the mux selection for each pin groups; things
-> like which pins are included in each group are defined by the SoC not the
-> board and hence wouldn't be included in a per-board node.
+I checked the second patch: "[PATCH v3 2/2] [media] V4L: atmel-isi: add
+clk_prepare()/clk_unprepare() functions", it can be applied after this
+patch in the branch for-3.3 in your git tree.
+
+Could you give me more details about that I need to fix in the second
+patch?
+
+Best Regards,
+Josh Wu
+
+>> Moreover, I thought that both of them should go through v4l git
+tree?...
+
+> It could, but another arm patch depends on this one, so, we decided,
+it 
+> would be easier to pull also this one via arm.
+
+>> If it is not the case anymore, I think that Olof and Arnd prefer to
+pull 
+>> from git better than individual patches.
+
+> Hm, this shouldn't be a problem normally...
+
+> Thanks
+> Guennadi
+
+>> 
+>> Best regards,
+>> 
+>> > On Thu, Jan 05, 2012 at 05:55:17PM +0100, Guennadi Liakhovetski
+wrote:
+>> >> From: Josh Wu <josh.wu@atmel.com>
+>> >>
+>> >> This patch
+>> >> - add ISI_MCK clock enable/disable code.
+>> >> - change field name in isi_platform_data structure
+>> >>
+>> >> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> >> [g.liakhovetski at gmx.de: fix label names]
+>> >> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>> >> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> >> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+>> >> ---
+>> >>
+>> >> Arnd, please, pull this patch via your tree to avoid having to
+wait for 
+>> >> the V4L tree, Mauro has acked it.
+>> >>
+>> >>  drivers/media/video/atmel-isi.c |   31
++++++++++++++++++++++++++++++--
+>> >>  include/media/atmel-isi.h       |    4 +++-
+>> >>  2 files changed, 32 insertions(+), 3 deletions(-)
+>> >>
+>> >> diff --git a/drivers/media/video/atmel-isi.c
+b/drivers/media/video/atmel-isi.c
+>> >> index b25bd7b..9fe4519 100644
+>> >> --- a/drivers/media/video/atmel-isi.c
+>> >> +++ b/drivers/media/video/atmel-isi.c
+>> >> @@ -90,7 +90,10 @@ struct atmel_isi {
+>> >>  	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
+>> >>  
+>> >>  	struct completion		complete;
+>> >> +	/* ISI peripherial clock */
+>> >>  	struct clk			*pclk;
+>> >> +	/* ISI_MCK, feed to camera sensor to generate pixel clock */
+>> >> +	struct clk			*mck;
+>> >>  	unsigned int			irq;
+>> >>  
+>> >>  	struct isi_platform_data	*pdata;
+>> >> @@ -766,6 +769,12 @@ static int isi_camera_add_device(struct
+soc_camera_device *icd)
+>> >>  	if (ret)
+>> >>  		return ret;
+>> >>  
+>> >> +	ret = clk_enable(isi->mck);
+>> >> +	if (ret) {
+>> >> +		clk_disable(isi->pclk);
+>> >> +		return ret;
+>> >> +	}
+>> >> +
+>> >>  	isi->icd = icd;
+>> >>  	dev_dbg(icd->parent, "Atmel ISI Camera driver attached to camera
+%d\n",
+>> >>  		 icd->devnum);
+>> >> @@ -779,6 +788,7 @@ static void isi_camera_remove_device(struct
+soc_camera_device *icd)
+>> >>  
+>> >>  	BUG_ON(icd != isi->icd);
+>> >>  
+>> >> +	clk_disable(isi->mck);
+>> >>  	clk_disable(isi->pclk);
+>> >>  	isi->icd = NULL;
+>> >>  
+>> >> @@ -874,7 +884,7 @@ static int isi_camera_set_bus_param(struct
+soc_camera_device *icd)
+>> >>  
+>> >>  	if (isi->pdata->has_emb_sync)
+>> >>  		cfg1 |= ISI_CFG1_EMB_SYNC;
+>> >> -	if (isi->pdata->isi_full_mode)
+>> >> +	if (isi->pdata->full_mode)
+>> >>  		cfg1 |= ISI_CFG1_FULL_MODE;
+>> >>  
+>> >>  	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>> >> @@ -912,6 +922,7 @@ static int __devexit atmel_isi_remove(struct
+platform_device *pdev)
+>> >>  			isi->fb_descriptors_phys);
+>> >>  
+>> >>  	iounmap(isi->regs);
+>> >> +	clk_put(isi->mck);
+>> >>  	clk_put(isi->pclk);
+>> >>  	kfree(isi);
+>> >>  
+>> >> @@ -930,7 +941,7 @@ static int __devinit atmel_isi_probe(struct
+platform_device *pdev)
+>> >>  	struct isi_platform_data *pdata;
+>> >>  
+>> >>  	pdata = dev->platform_data;
+>> >> -	if (!pdata || !pdata->data_width_flags) {
+>> >> +	if (!pdata || !pdata->data_width_flags || !pdata->mck_hz) {
+>> >>  		dev_err(&pdev->dev,
+>> >>  			"No config available for Atmel ISI\n");
+>> >>  		return -EINVAL;
+>> >> @@ -959,6 +970,19 @@ static int __devinit atmel_isi_probe(struct
+platform_device *pdev)
+>> >>  	INIT_LIST_HEAD(&isi->video_buffer_list);
+>> >>  	INIT_LIST_HEAD(&isi->dma_desc_head);
+>> >>  
+>> >> +	/* Get ISI_MCK, provided by programmable clock or external clock
+*/
+>> >> +	isi->mck = clk_get(dev, "isi_mck");
+>> >> +	if (IS_ERR(isi->mck)) {
+>> >> +		dev_err(dev, "Failed to get isi_mck\n");
+>> >> +		ret = PTR_ERR(isi->mck);
+>> >> +		goto err_clk_get;
+>> >> +	}
+>> >> +
+>> >> +	/* Set ISI_MCK's frequency, it should be faster than pixel clock
+*/
+>> >> +	ret = clk_set_rate(isi->mck, pdata->mck_hz);
+>> >> +	if (ret < 0)
+>> >> +		goto err_set_mck_rate;
+>> >> +
+>> >>  	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+>> >>  				sizeof(struct fbd) * MAX_BUFFER_NUM,
+>> >>  				&isi->fb_descriptors_phys,
+>> >> @@ -1034,6 +1058,9 @@ err_alloc_ctx:
+>> >>  			isi->p_fb_descriptors,
+>> >>  			isi->fb_descriptors_phys);
+>> >>  err_alloc_descriptors:
+>> >> +err_set_mck_rate:
+>> >> +	clk_put(isi->mck);
+>> >> +err_clk_get:
+>> >>  	kfree(isi);
+>> >>  err_alloc_isi:
+>> >>  	clk_put(pclk);
+>> >> diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
+>> >> index 26cece5..6568230 100644
+>> >> --- a/include/media/atmel-isi.h
+>> >> +++ b/include/media/atmel-isi.h
+>> >> @@ -110,10 +110,12 @@ struct isi_platform_data {
+>> >>  	u8 hsync_act_low;
+>> >>  	u8 vsync_act_low;
+>> >>  	u8 pclk_act_falling;
+>> >> -	u8 isi_full_mode;
+>> >> +	u8 full_mode;
+>> >>  	u32 data_width_flags;
+>> >>  	/* Using for ISI_CFG1 */
+>> >>  	u32 frate;
+>> >> +	/* Using for ISI_MCK */
+>> >> +	u32 mck_hz;
+>> >>  };
+>> >>  
+>> >>  #endif /* __ATMEL_ISI_H__ */
+>> >> -- 
+>> >> 1.7.2.5
+>> >>
+>> >>
+>> >> _______________________________________________
+>> >> linux-arm-kernel mailing list
+>> >> linux-arm-kernel at lists.infradead.org
+>> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> > 
+>> 
+>> 
+>> -- 
+>> Nicolas Ferre
+>> 
+
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
