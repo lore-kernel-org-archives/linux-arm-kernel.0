@@ -1,31 +1,18 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 6 Jan 2012 06:53:09 +0000
-Subject: [PATCH 2/2] ARM: davinci: convert sched_clock() to use common
- infrastructure
-In-Reply-To: <20120103090711.GB2914@n2100.arm.linux.org.uk>
-References: <1324663040-2859-1-git-send-email-nsekhar@ti.com>
- <1324663040-2859-2-git-send-email-nsekhar@ti.com>
- <20120103090711.GB2914@n2100.arm.linux.org.uk>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B605F899@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Jan 2012 08:48:41 +0000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+In-Reply-To: <20120106120317.500c45afe95ae20b4b6648a0@canb.auug.org.au>
+References: <20120106120317.500c45afe95ae20b4b6648a0@canb.auug.org.au>
+Message-ID: <20120106084841.GJ11810@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Linus, 
-
-On Tue, Jan 03, 2012 at 14:37:11, Russell King - ARM Linux wrote:
-> On Fri, Dec 23, 2011 at 11:27:20PM +0530, Sekhar Nori wrote:
-> > Convert davinci to use the common sched_clock() infrastructure
-> > for extending 32bit counters to full 64-bit nanoseconds.
-> > 
-> > Eventually clocksource timer should be initialized from init_early
-> > so there would be no need to use a dummy clocksource read at start.
+On Fri, Jan 06, 2012 at 12:03:17PM +1100, Stephen Rothwell wrote:
+> Hi all,
 > 
-> Please see patch 7205/2.
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-omap2/pm34xx.c between commit e6ab10af962d ("ARM: OMAP:
+> convert idle handlers from pm_idle to arm_pm_idle") from the arm tree and
+> commit 2fd149645eb4 ("") from the arm-soc tree.
 
-Thanks for the pointers. I rebased this series on latest linux-next
-and got things working again.
-
-I will post updated patches soon.
-
-Thanks,
-Sekhar
+Err, there's an empty description of a commit in the arm-soc tree?
