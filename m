@@ -1,32 +1,36 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 7 Jan 2012 23:50:08 +0100
-Subject: [PATCH v2 1/2] ARM: mxs: detect SoC by checking CHIPID register
-In-Reply-To: <1325864366-17995-2-git-send-email-shawn.guo@linaro.org>
-References: <1325864366-17995-1-git-send-email-shawn.guo@linaro.org>
- <1325864366-17995-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120107225008.GA24081@pengutronix.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Sat, 07 Jan 2012 19:32:12 +0100
+Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with
+ gpio controlled panel reset
+In-Reply-To: <20120107182319.GA13181@n2100.arm.linux.org.uk>
+References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
+ <20120107182319.GA13181@n2100.arm.linux.org.uk>
+Message-ID: <4F088FAC.3000200@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 11:39:25PM +0800, Shawn Guo wrote:
-> Both imx23 and imx28 have CHIPID register at address 0x8001c310, which
-> can be used to identify the SoC.  This patch changes cpu_is_xxx and
-> __arch_decomp_setup to use this CHIPID register than machine type to
-> detect the chip between imx23 and imx28, so that we do not need to
-> change these functions whenever a new board/machine gets added.
+On 01/07/2012 07:23 PM, Russell King - ARM Linux wrote:
+> On Thu, Jan 05, 2012 at 09:12:26PM +0530, Thomas Abraham wrote:
+>> Add a lcd panel driver for simple raster-type lcd's which uses a gpio
+>> controlled panel reset. The driver controls the nRESET line of the panel
+>> using a gpio connected from the host system. The Vcc supply to the panel
+>> is (optionally) controlled using a voltage regulator. This driver excludes
+>> support for lcd panels that use a serial command interface or direct
+>> memory mapped IO interface.
 > 
-> Suggested-by: Wolfram Sang <w.sang@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> I'm trying to work out what kind of LCD panel this is for.  I assume
+> not the panels which would be connected to a SoC, which have a parallel
+> interface to a frame buffer device (LCD controller)?
+> 
+> If this is for these kinds of LCD panels, how are you handling the
+> timing required for active panels - some of which must not be powered
+> up without the LCD controller first being setup and enabled, and must
+> be powered down before the LCD controller is disabled.
+> 
+> I've seen this requirement with panels connected to ARM Ltd's development
+> boards, and also some SoCs.
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+This is handled by the LCD framework. Or at least should be, see this patchset
+http://www.spinics.net/lists/linux-fbdev/msg04503.html
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120107/f7b599b1/attachment-0001.sig>
+- Lars
