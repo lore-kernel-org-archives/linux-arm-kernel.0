@@ -1,77 +1,23 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sat, 7 Jan 2012 17:53:43 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-In-Reply-To: <20120107044439.GE4790@S2101-09.ap.freescale.net>
-References: <20120106120345.8157a839b1c924315d728eea@canb.auug.org.au>
- <20120107044439.GE4790@S2101-09.ap.freescale.net>
-Message-ID: <20120107175343.0939b70809a3356955d20e2c@canb.auug.org.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sat, 07 Jan 2012 13:44:00 +0530
+Subject: [PATCH 1/2] dmaengine: Fix status handling in imx-dma.
+In-Reply-To: <20120106124311.GJ5446@pengutronix.de>
+References: <1325506706-10028-1-git-send-email-javier.martin@vista-silicon.com>
+ <1325829389.1540.95.camel@vkoul-udesk3>
+ <20120106093752.GH5446@pengutronix.de>
+ <1325848224.1540.102.camel@vkoul-udesk3>
+ <20120106124311.GJ5446@pengutronix.de>
+Message-ID: <1325924040.1540.104.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On Sat, 7 Jan 2012 12:44:42 +0800 Shawn Guo <shawn.guo@linaro.org> wrote:
->
-> On Fri, Jan 06, 2012 at 12:03:45PM +1100, Stephen Rothwell wrote:
-> > diff --cc arch/arm/mach-imx/mm-imx5.c
-> > index 65139a6,bc17dfe..0000000
-> > --- a/arch/arm/mach-imx/mm-imx5.c
-> > +++ b/arch/arm/mach-imx/mm-imx5.c
-> > @@@ -21,9 -22,27 +22,24 @@@
-> >   #include <mach/devices-common.h>
-> >   #include <mach/iomux-v3.h>
-> >   
-> > + static struct clk *gpc_dvfs_clk;
-> > + 
-> >   static void imx5_idle(void)
-> >   {
-> >  -	if (!need_resched()) {
-> >  -		/* gpc clock is needed for SRPG */
-> >  -		if (gpc_dvfs_clk == NULL) {
-> >  -			gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
-> >  -			if (IS_ERR(gpc_dvfs_clk))
-> >  -				goto err0;
-> >  -		}
-> >  -		clk_enable(gpc_dvfs_clk);
-> >  -		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-> >  -		if (tzic_enable_wake())
-> >  -			goto err1;
-> >  -		cpu_do_idle();
-> >  -err1:
-> >  -		clk_disable(gpc_dvfs_clk);
-> > ++	/* gpc clock is needed for SRPG */
-> > ++	if (gpc_dvfs_clk == NULL) {
-> > ++		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
-> > ++		if (IS_ERR(gpc_dvfs_clk))
-> > ++			goto err0;
-> > + 	}
-> > ++	clk_enable(gpc_dvfs_clk);
-> >  +	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-> > ++	if (tzic_enable_wake())
-> > ++		goto err1;
-> > ++	cpu_do_idle();
-> > ++err1:
-> > ++	clk_disable(gpc_dvfs_clk);
-> > + err0:
-> >  -	local_irq_enable();
+On Fri, 2012-01-06 at 13:43 +0100, Sascha Hauer wrote:
+> On Fri, Jan 06, 2012 at 04:40:24PM +0530, Vinod Koul wrote:
+> The transfer is not started in prepare but in imxdmac->desc.tx_submit
 > 
-> This results in a compile error.
-> 
->   CC      arch/arm/mach-imx/mm-imx5.o
-> arch/arm/mach-imx/mm-imx5.c: In function ?imx5_idle?:
-> arch/arm/mach-imx/mm-imx5.c:42:1: error: label at end of compound statement
+Well that's incorrect as well. It should be done in issue_pending
 
-Ooops.  Sorry about that.  Just remove the label and turn the "goto err0"
-into "return".
+Care to fix this up?
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120107/fe7f51e2/attachment-0001.sig>
+~Vinod
