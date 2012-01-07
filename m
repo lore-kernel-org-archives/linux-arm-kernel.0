@@ -1,93 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri,  6 Jan 2012 14:03:08 +0900
-Subject: [PATCH 1/2] mmc: core: Separate the timeout value for cache-ctrl
-Message-ID: <1325826189-29953-1-git-send-email-kgene.kim@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 7 Jan 2012 17:12:26 +0100
+Subject: [PATCH v4 1/4] OMAP3: hwmod data: add mmu data for iva and isp
+In-Reply-To: <CAB-zwWgZ5QBFBBRQNYrpbcVo4QaZ8MYLVCMDsvAe7scHQSBBKw@mail.gmail.com>
+References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
+ <201112252208.20148.laurent.pinchart@ideasonboard.com>
+ <CAB-zwWgZ5QBFBBRQNYrpbcVo4QaZ8MYLVCMDsvAe7scHQSBBKw@mail.gmail.com>
+Message-ID: <201201071712.28142.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Seungwon Jeon <tgih.jun@samsung.com>
+Hi Omar,
 
-Turning the cache off implies flushing cache which doesn't define
-maximum timeout unlike cache-on. This patch will apply the generic
-CMD6 timeout only for cache-on. Additionally the kernel message is
-added for checking failure case of cache-on.
+On Thursday 05 January 2012 20:24:25 Ramirez Luna, Omar wrote:
+> On Sun, Dec 25, 2011 at 3:08 PM, Laurent Pinchart wrote:
+> >> > I'm not sure how this clock stuff works, but I'm guessing the device
+> >> > is supposed to go to sleep at some points in time, and with your patch
+> >> > "OMAP3/4: iommu: adapt to runtime pm" it won't, as long as the module
+> >> > is loaded, unless I'm missing something.
+> >> 
+> >> The device should be able to be put to sleep at anytime when it is NOT
+> >> being used. AFAIK there is no mechanism for the main processor (the
+> >> one running the kernel) to know when the other iommus are not being
+> >> used, given that they are in independent processors/subsystems, at
+> >> least for the ones in the DSP or M3 processors. Once the user releases
+> >> its iommu resource it means it is no longer using it, at that point
+> >> the device can be put to sleep.
+> > 
+> > How should the OMAP3 ISP driver proceed to make sure that its IOMMU is
+> > clocked off when it doesn't need it ?
+> 
+> If there is an specific scenario where the iommu should be disabled,
+> iommu_detach_device can be called to release the iommu resource. On
+> suspend/resume scenarios runtime pm callbacks should still be able to
+> put the device in idle.
 
-Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-Signed-off-by: Chris Ball <cjb@laptop.org>
----
- drivers/mmc/core/core.c |   21 ++++++++++++---------
- drivers/mmc/core/mmc.c  |   13 +++++++++++--
- 2 files changed, 23 insertions(+), 11 deletions(-)
+Runtime PM might indeed be a better option. The OMAP3 ISP doesn't need to 
+IOMMU until video streams are started, so we should keep it powered down in 
+that case.
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index cb74f28..91bb100 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -2426,6 +2426,7 @@ EXPORT_SYMBOL(mmc_flush_cache);
- int mmc_cache_ctrl(struct mmc_host *host, u8 enable)
- {
- 	struct mmc_card *card = host->card;
-+	unsigned int timeout;
- 	int err = 0;
- 
- 	if (!(host->caps2 & MMC_CAP2_CACHE_CTRL) ||
-@@ -2436,16 +2437,18 @@ int mmc_cache_ctrl(struct mmc_host *host, u8 enable)
- 			(card->ext_csd.cache_size > 0)) {
- 		enable = !!enable;
- 
--		if (card->ext_csd.cache_ctrl ^ enable)
-+		if (card->ext_csd.cache_ctrl ^ enable) {
-+			timeout = enable ? card->ext_csd.generic_cmd6_time : 0;
- 			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
--					EXT_CSD_CACHE_CTRL, enable, 0);
--		if (err)
--			pr_err("%s: cache %s error %d\n",
--					mmc_hostname(card->host),
--					enable ? "on" : "off",
--					err);
--		else
--			card->ext_csd.cache_ctrl = enable;
-+					EXT_CSD_CACHE_CTRL, enable, timeout);
-+			if (err)
-+				pr_err("%s: cache %s error %d\n",
-+						mmc_hostname(card->host),
-+						enable ? "on" : "off",
-+						err);
-+			else
-+				card->ext_csd.cache_ctrl = enable;
-+		}
- 	}
- 
- 	return err;
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index 94456b1..04a160f 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -1085,14 +1085,23 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
- 	if ((host->caps2 & MMC_CAP2_CACHE_CTRL) &&
- 			card->ext_csd.cache_size > 0) {
- 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
--				EXT_CSD_CACHE_CTRL, 1, 0);
-+				EXT_CSD_CACHE_CTRL, 1,
-+				card->ext_csd.generic_cmd6_time);
- 		if (err && err != -EBADMSG)
- 			goto free_card;
- 
- 		/*
- 		 * Only if no error, cache is turned on successfully.
- 		 */
--		card->ext_csd.cache_ctrl = err ? 0 : 1;
-+		if (err) {
-+			pr_warning("%s: Cache is supported, "
-+					"but failed to turn on (%d)\n",
-+					mmc_hostname(card->host), err);
-+			card->ext_csd.cache_ctrl = 0;
-+			err = 0;
-+		} else {
-+			card->ext_csd.cache_ctrl = 1;
-+		}
- 	}
- 
- 	if (!oldcard)
 -- 
-1.7.1
+Regards,
+
+Laurent Pinchart
