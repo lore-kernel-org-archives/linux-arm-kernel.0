@@ -1,29 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 7 Jan 2012 17:28:28 +0000
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 7 Jan 2012 18:23:19 +0000
 Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with
  gpio controlled panel reset
-In-Reply-To: <CAJuYYwRxuZAm_JpLw1fN2ypnFc6TocH6veRmCeuqENvZHSz3kg@mail.gmail.com>
+In-Reply-To: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
 References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
- <4F05F509.6020405@metafoo.de>
- <20120106064929.GB3496@opensource.wolfsonmicro.com>
- <CAJuYYwRxuZAm_JpLw1fN2ypnFc6TocH6veRmCeuqENvZHSz3kg@mail.gmail.com>
-Message-ID: <20120107172826.GA355@opensource.wolfsonmicro.com>
+Message-ID: <20120107182319.GA13181@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 07, 2012 at 04:34:34PM +0530, Thomas Abraham wrote:
-> On 6 January 2012 12:19, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+On Thu, Jan 05, 2012 at 09:12:26PM +0530, Thomas Abraham wrote:
+> Add a lcd panel driver for simple raster-type lcd's which uses a gpio
+> controlled panel reset. The driver controls the nRESET line of the panel
+> using a gpio connected from the host system. The Vcc supply to the panel
+> is (optionally) controlled using a voltage regulator. This driver excludes
+> support for lcd panels that use a serial command interface or direct
+> memory mapped IO interface.
 
-> > In principle it should be specified in both places to account for shared
-> > supplies though for all practical purposes for an LCD panel I can't see
-> > multiple users sharing the same regulator and varying the voltage at
-> > runtime.
+I'm trying to work out what kind of LCD panel this is for.  I assume
+not the panels which would be connected to a SoC, which have a parallel
+interface to a frame buffer device (LCD controller)?
 
-> It is assumed here that the boot loader as not set the output voltage
-> of the regulator that supports variable voltage ranges. So these
-> values help in setting up the regulator for LCD display.
+If this is for these kinds of LCD panels, how are you handling the
+timing required for active panels - some of which must not be powered
+up without the LCD controller first being setup and enabled, and must
+be powered down before the LCD controller is disabled.
 
-Remember that the regulator API won't allow consumers to configure
-voltages unless there are constraints granting permission.  Users will
-need to set both the LCD vales and the regulator constraints values to
-actually allow configuration to happen.
+I've seen this requirement with panels connected to ARM Ltd's development
+boards, and also some SoCs.
