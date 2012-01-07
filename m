@@ -1,85 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Jan 2012 19:21:12 +0000
-Subject: [PATCH v2 2/2] msm: DMAEngine: Add DMAEngine driver based on
- old MSM DMA APIs
-In-Reply-To: <20120107185443.GA19216@codeaurora.org>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1325854052-21402-3-git-send-email-kumarrav@codeaurora.org>
- <1325901569.10425.14.camel@m0nster> <20120107185443.GA19216@codeaurora.org>
-Message-ID: <20120107192112.GB13181@n2100.arm.linux.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 07 Jan 2012 12:22:31 -0800 (PST)
+Subject: linux-next: net/smsc911x compile error on next-20120106
+In-Reply-To: <CAAQ0ZWSRzUM2rdhfWDqang6Baat6x-gEso5hQGEkbOqFjM-sMQ@mail.gmail.com>
+References: <CAAQ0ZWSRzUM2rdhfWDqang6Baat6x-gEso5hQGEkbOqFjM-sMQ@mail.gmail.com>
+Message-ID: <20120107.122231.981626055647748882.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 07, 2012 at 10:54:43AM -0800, David Brown wrote:
-> On Fri, Jan 06, 2012 at 05:59:29PM -0800, Daniel Walker wrote:
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Sat, 7 Jan 2012 13:55:41 +0800
+
+> Hi Stephen, David,
 > 
-> > > diff --git a/drivers/dma/msm-dma.c b/drivers/dma/msm-dma.c
-> > > new file mode 100644
-> > > index 0000000..51d9a2b
-> > > --- /dev/null
-> > > +++ b/drivers/dma/msm-dma.c
-> > > ...
-> > > +static void msm_chan_desc_cleanup(struct msm_dma_chan *chan)
-> > > +{
-> > > +	struct msm_dma_desc_sw *desc, *_desc;
-> > > +	unsigned long flags;
-> > > +
-> > > +	dev_dbg(chan->dev, "Cleaning completed descriptor of channel %d\n",
-> > > +							chan->chan_id);
-> > > +	spin_lock_irqsave(&chan->lock, flags);
-> > > +
-> > > +	list_for_each_entry_safe(desc, _desc, &chan->active_list, node) {
-> > > +		dma_async_tx_callback callback;
-> > > +		void *callback_param;
-> > > +
-> > > +		if (msm_dma_desc_status(chan, desc) == DMA_IN_PROGRESS)
-> > > +			break;
-> > > +
-> > > +		/* Remove from the list of running transactions */
-> > > +		list_del(&desc->node);
-> > > +
-> > > +		/* Run the link descriptor callback function */
-> > > +		callback = desc->async_tx.callback;
-> > > +		callback_param = desc->async_tx.callback_param;
-> > > +		if (callback) {
-> > > +			spin_unlock_irqrestore(&chan->lock, flags);
-> > > +			callback(callback_param);
-> > 
-> > Are you sure unlocking here is safe? at_hdmac.c holds the lock the
-> > entire time, and fsldma.c deletes the entire list, then runs the
-> > operations.
+> I just ran into the following compile error when building
+> next-20120106 with imx_v6_v7_defconfig.
 > 
-> Good catch.
-> 
-> According to a comment in at_hdmac.c, it is safe to hold the lock
-> while calling the callbacks, so that's probably the easiest solution.
-> I suspect that you've got something in another driver expecting the
-> lock to be released, and that might have to be changed.
 
-It is _not_ safe to hold the lock while calling callbacks.
+I just commited the following to fix this, thanks:
 
-Please refer to the DMA engine documentation, found here:
+--------------------
+smsc911x: Unconditionally include linux/smscphy.h in smsc911x.h
 
-Documentation/dmaengine.txt
+The energy detect enable/disable code in the driver uses some
+register defines in this header unconditionally, so guarding
+the smscphy.h header include with CONFIG_SMSC_PHY leads to
+build failures in some configurations.
 
-section 3:
+Reported-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/smsc/smsc911x.h |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-   Note:
-        Although the async_tx API specifies that completion callback
-        routines cannot submit any new operations, this is not the
-        case for slave/cyclic DMA.
-
-        For slave DMA, the subsequent transaction may not be available
-        for submission prior to callback function being invoked, so
-        slave DMA callbacks are permitted to prepare and submit a new
-        transaction.
-
-        For cyclic DMA, a callback function may wish to terminate the
-        DMA via dmaengine_terminate_all().
-
-*       Therefore, it is important that DMA engine drivers drop any
-*       locks before calling the callback function which may cause a
-*       deadlock.
-
-        Note that callbacks will always be invoked from the DMA
-        engines tasklet, never from interrupt context.
+diff --git a/drivers/net/ethernet/smsc/smsc911x.h b/drivers/net/ethernet/smsc/smsc911x.h
+index 938ecf2..9ad5e5d 100644
+--- a/drivers/net/ethernet/smsc/smsc911x.h
++++ b/drivers/net/ethernet/smsc/smsc911x.h
+@@ -401,8 +401,6 @@
+ #include <asm/smsc911x.h>
+ #endif
+ 
+-#ifdef CONFIG_SMSC_PHY
+ #include <linux/smscphy.h>
+-#endif
+ 
+ #endif				/* __SMSC911X_H__ */
+-- 
+1.7.6.5
