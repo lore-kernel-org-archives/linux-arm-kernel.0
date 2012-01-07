@@ -1,23 +1,71 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sat, 07 Jan 2012 13:44:00 +0530
-Subject: [PATCH 1/2] dmaengine: Fix status handling in imx-dma.
-In-Reply-To: <20120106124311.GJ5446@pengutronix.de>
-References: <1325506706-10028-1-git-send-email-javier.martin@vista-silicon.com>
- <1325829389.1540.95.camel@vkoul-udesk3>
- <20120106093752.GH5446@pengutronix.de>
- <1325848224.1540.102.camel@vkoul-udesk3>
- <20120106124311.GJ5446@pengutronix.de>
-Message-ID: <1325924040.1540.104.camel@vkoul-udesk3>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 07 Jan 2012 19:05:10 +0900
+Subject: [GIT PULL] Samsung devel-rtc for v3.3
+In-Reply-To: <CAOesGMhV5agC1LFgZ3jrDXy=Hcj2-TtydfnKsVAXoSHSBKEu=g@mail.gmail.com>
+References: <037601ccc8e9$07e2c8e0$17a85aa0$%kim@samsung.com>
+ <CAOesGMhV5agC1LFgZ3jrDXy=Hcj2-TtydfnKsVAXoSHSBKEu=g@mail.gmail.com>
+Message-ID: <00f301cccd23$d727f010$8577d030$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-01-06 at 13:43 +0100, Sascha Hauer wrote:
-> On Fri, Jan 06, 2012 at 04:40:24PM +0530, Vinod Koul wrote:
-> The transfer is not started in prepare but in imxdmac->desc.tx_submit
+
+
+> -----Original Message-----
+> From: Olof Johansson [mailto:olof at lixom.net]
+> Sent: Saturday, January 07, 2012 5:27 AM
+> To: Kukjin Kim
+> Cc: Arnd Bergmann; linux-arm-kernel at lists.infradead.org; linux-samsung-
+> soc at vger.kernel.org; Alessandro Zummo
+> Subject: Re: [GIT PULL] Samsung devel-rtc for v3.3
 > 
-Well that's incorrect as well. It should be done in issue_pending
+> Hi,
+> 
+> On Sun, Jan 1, 2012 at 4:54 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Hi Arnd and Olof,
+> >
+> > Please pull Samsung devel-rtc for v3.3 from following.
+> > ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > next-samsung-devel-rtc
+> >
+> > It is including support rtc for S3C2443 and S3C2416 and got the ack from
+> > Alessandro Zummo.
+> >
+> > Since next-samsung-dt1 branch touch drivers/rtc, it has been made based
+> on
+> > next-samsung-dt1 branch.
+> >
+> > If any problems please let me know.
+> >
+> > Thanks.
+> >
+> > Best regards,
+> > Kgene.
+> > --
+> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> > SW Solution Development Team, Samsung Electronics Co., Ltd.
+> >
+> > The following changes since commit
+> 0561ceabd0f13871900d116278fe9268aeb714d1:
+> >
+> > ?ARM: dts: Add intial dts file for EXYNOS4210 SoC, SMDKV310 and ORIGEN
+> > (2011-12-23 10:07:12 +0900)
+> >
+> > are available in the git repository at:
+> > ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > next-samsung-devel-rtc
+> 
+> Just following up with email since I didn't see one:
+> 
+> Looks like Arnd pulled this into next/drivers2 already. Thanks!
+> 
+Hi Olof,
 
-Care to fix this up?
+Yes, I looked at them into next/drivers2.
 
--- 
-~Vinod
+Thanks :)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
