@@ -1,36 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Jan 2012 11:59:14 +0000
-Subject: [PATCH] ARM: S3C24XX: Fix build error for missing
- <mach/system-reset.h>
-In-Reply-To: <010101cccd32$2cf0cfe0$86d26fa0$%kim@samsung.com>
-References: <010101cccd32$2cf0cfe0$86d26fa0$%kim@samsung.com>
-Message-ID: <20120107115914.GE13857@n2100.arm.linux.org.uk>
+Date: Sat, 7 Jan 2012 12:02:30 +0000
+Subject: [PATCH] GPIO: sa1100: implement proper gpiolib gpio_to_irq
+ conversion
+In-Reply-To: <CACRpkdZ-W_JHYj2SHZb7wSVHKmnv7UiCgHE84DDcJfX0d_oTSA@mail.gmail.com>
+References: <20111218182457.GV14542@n2100.arm.linux.org.uk>
+ <CACRpkdZ-W_JHYj2SHZb7wSVHKmnv7UiCgHE84DDcJfX0d_oTSA@mail.gmail.com>
+Message-ID: <20120107120230.GF13857@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 07, 2012 at 08:47:47PM +0900, Kukjin Kim wrote:
-> Since the arch/arm/mach-s3c2410/include/mach/system-reset.h has
-> been removed by commit f88b8979 ("ARM: restart: remove the now
-> empty arch_reset()"), so the inclusion of <mach/system-reset.h>
-> should be removed at the plat-s3c24xx/cpu.c file.
+On Mon, Dec 19, 2011 at 12:17:01AM +0100, Linus Walleij wrote:
+> On Sun, Dec 18, 2011 at 7:24 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
 > 
-> The build error happens like following:
->   arch/arm/plat-s3c24xx/cpu.c:41: fatal error: mach/system-reset.h: No such file or directory
+> > From: Russell King <rmk+kernel@arm.linux.org.uk>
+> >
+> > The existing gpio_to_irq() implementation on sa1100 only translates
+> > validly for internal GPIOs. ?Since this sub-arch enables GPIOLIB
+> > support, this results in buggy translations for non-internal GPIOs.
+> >
+> > Get rid of the private gpio_to_irq() implementation, replacing it
+> > with the .to_irq method in the sa1100 gpio chip instead.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> Russell,
-> 
-> I think, you missed removing this in your patch.
+> Thanks Russell!
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-This rather proves the point that the way Samsung stuff is organized is
-just too complicated to be properly understood.  Yes, it's getting better
-as a result of some of the points I raised, but I feel its still too
-opaque for anyone except those who know it intimiately to get to grips
-with it properly, and follow how the code is organized through all those
-plat-* and mach-* directories.
+Grant,
 
-> If you have patches to send to Linus for this merge window,
-> could you please send this together? Or...?
+Have you queued this up or is it going to be missed for this merge window?
 
-Please put it in the patch system and I'll queue it up.  Thanks.
+Thanks.
