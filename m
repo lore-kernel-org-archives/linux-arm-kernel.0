@@ -1,47 +1,85 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Sat, 7 Jan 2012 11:08:52 -0800
-Subject: MSM's mach/system.h
-In-Reply-To: <20120107105950.GD13857@n2100.arm.linux.org.uk>
-References: <20120107105950.GD13857@n2100.arm.linux.org.uk>
-Message-ID: <20120107190851.GB19216@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 7 Jan 2012 19:21:12 +0000
+Subject: [PATCH v2 2/2] msm: DMAEngine: Add DMAEngine driver based on
+ old MSM DMA APIs
+In-Reply-To: <20120107185443.GA19216@codeaurora.org>
+References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
+ <1325854052-21402-3-git-send-email-kumarrav@codeaurora.org>
+ <1325901569.10425.14.camel@m0nster> <20120107185443.GA19216@codeaurora.org>
+Message-ID: <20120107192112.GB13181@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 07, 2012 at 10:59:51AM +0000, Russell King - ARM Linux wrote:
-> Guys,
+On Sat, Jan 07, 2012 at 10:54:43AM -0800, David Brown wrote:
+> On Fri, Jan 06, 2012 at 05:59:29PM -0800, Daniel Walker wrote:
 > 
-> MSM's mach/system.h is now almost empty, except for this:
+> > > diff --git a/drivers/dma/msm-dma.c b/drivers/dma/msm-dma.c
+> > > new file mode 100644
+> > > index 0000000..51d9a2b
+> > > --- /dev/null
+> > > +++ b/drivers/dma/msm-dma.c
+> > > ...
+> > > +static void msm_chan_desc_cleanup(struct msm_dma_chan *chan)
+> > > +{
+> > > +	struct msm_dma_desc_sw *desc, *_desc;
+> > > +	unsigned long flags;
+> > > +
+> > > +	dev_dbg(chan->dev, "Cleaning completed descriptor of channel %d\n",
+> > > +							chan->chan_id);
+> > > +	spin_lock_irqsave(&chan->lock, flags);
+> > > +
+> > > +	list_for_each_entry_safe(desc, _desc, &chan->active_list, node) {
+> > > +		dma_async_tx_callback callback;
+> > > +		void *callback_param;
+> > > +
+> > > +		if (msm_dma_desc_status(chan, desc) == DMA_IN_PROGRESS)
+> > > +			break;
+> > > +
+> > > +		/* Remove from the list of running transactions */
+> > > +		list_del(&desc->node);
+> > > +
+> > > +		/* Run the link descriptor callback function */
+> > > +		callback = desc->async_tx.callback;
+> > > +		callback_param = desc->async_tx.callback_param;
+> > > +		if (callback) {
+> > > +			spin_unlock_irqrestore(&chan->lock, flags);
+> > > +			callback(callback_param);
+> > 
+> > Are you sure unlocking here is safe? at_hdmac.c holds the lock the
+> > entire time, and fsldma.c deletes the entire list, then runs the
+> > operations.
 > 
-> extern void (*msm_hw_reset_hook)(void);
+> Good catch.
 > 
-> Grepping around for this, I find only one place where it's called, and
-> nowhere it's set:
-> 
-> $ grep -r msm_hw_reset_hook arch/arm/*msm* drivers/
-> arch/arm/mach-msm/include/mach/system.h:extern void (*msm_hw_reset_hook)(void);
-> arch/arm/mach-msm/smd.c:void (*msm_hw_reset_hook)(void);
-> arch/arm/mach-msm/smd.c:    if (msm_hw_reset_hook)
-> arch/arm/mach-msm/smd.c:            msm_hw_reset_hook();
+> According to a comment in at_hdmac.c, it is safe to hold the lock
+> while calling the callbacks, so that's probably the easiest solution.
+> I suspect that you've got something in another driver expecting the
+> lock to be released, and that might have to be changed.
 
-Also somewhat disturbing that the hook is declared again in the smd.c
-driver, so the declaration in mach/system.h isn't really even used.
+It is _not_ safe to hold the lock while calling callbacks.
 
-> As we've virtually eliminated the mach/system.h include (the only
-> remaining ones apart from this are the three unconverted platforms for
-> the restart changes), can this declaration move to somewhere else, or
-> can this read-only hook be removed?
+Please refer to the DMA engine documentation, found here:
 
-As far as I can tell, nothing even uses it in the main Android tree.
-It looks like it got copied from another arch, never filled in, and
-never used for anything.
+Documentation/dmaengine.txt
 
-It appears that plat-s5p, and mach-s3c2410 also have an unused hook.
+section 3:
 
-I can make a patch, but I'm not sure what it should be based on.  Or,
-feel free to remove it.
+   Note:
+        Although the async_tx API specifies that completion callback
+        routines cannot submit any new operations, this is not the
+        case for slave/cyclic DMA.
 
-David
+        For slave DMA, the subsequent transaction may not be available
+        for submission prior to callback function being invoked, so
+        slave DMA callbacks are permitted to prepare and submit a new
+        transaction.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+        For cyclic DMA, a callback function may wish to terminate the
+        DMA via dmaengine_terminate_all().
+
+*       Therefore, it is important that DMA engine drivers drop any
+*       locks before calling the callback function which may cause a
+*       deadlock.
+
+        Note that callbacks will always be invoked from the DMA
+        engines tasklet, never from interrupt context.
