@@ -1,44 +1,29 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 7 Jan 2012 17:12:26 +0100
-Subject: [PATCH v4 1/4] OMAP3: hwmod data: add mmu data for iva and isp
-In-Reply-To: <CAB-zwWgZ5QBFBBRQNYrpbcVo4QaZ8MYLVCMDsvAe7scHQSBBKw@mail.gmail.com>
-References: <1323922709-6986-1-git-send-email-omar.ramirez@ti.com>
- <201112252208.20148.laurent.pinchart@ideasonboard.com>
- <CAB-zwWgZ5QBFBBRQNYrpbcVo4QaZ8MYLVCMDsvAe7scHQSBBKw@mail.gmail.com>
-Message-ID: <201201071712.28142.laurent.pinchart@ideasonboard.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 7 Jan 2012 17:28:28 +0000
+Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with
+ gpio controlled panel reset
+In-Reply-To: <CAJuYYwRxuZAm_JpLw1fN2ypnFc6TocH6veRmCeuqENvZHSz3kg@mail.gmail.com>
+References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
+ <4F05F509.6020405@metafoo.de>
+ <20120106064929.GB3496@opensource.wolfsonmicro.com>
+ <CAJuYYwRxuZAm_JpLw1fN2ypnFc6TocH6veRmCeuqENvZHSz3kg@mail.gmail.com>
+Message-ID: <20120107172826.GA355@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
+On Sat, Jan 07, 2012 at 04:34:34PM +0530, Thomas Abraham wrote:
+> On 6 January 2012 12:19, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-On Thursday 05 January 2012 20:24:25 Ramirez Luna, Omar wrote:
-> On Sun, Dec 25, 2011 at 3:08 PM, Laurent Pinchart wrote:
-> >> > I'm not sure how this clock stuff works, but I'm guessing the device
-> >> > is supposed to go to sleep at some points in time, and with your patch
-> >> > "OMAP3/4: iommu: adapt to runtime pm" it won't, as long as the module
-> >> > is loaded, unless I'm missing something.
-> >> 
-> >> The device should be able to be put to sleep at anytime when it is NOT
-> >> being used. AFAIK there is no mechanism for the main processor (the
-> >> one running the kernel) to know when the other iommus are not being
-> >> used, given that they are in independent processors/subsystems, at
-> >> least for the ones in the DSP or M3 processors. Once the user releases
-> >> its iommu resource it means it is no longer using it, at that point
-> >> the device can be put to sleep.
-> > 
-> > How should the OMAP3 ISP driver proceed to make sure that its IOMMU is
-> > clocked off when it doesn't need it ?
-> 
-> If there is an specific scenario where the iommu should be disabled,
-> iommu_detach_device can be called to release the iommu resource. On
-> suspend/resume scenarios runtime pm callbacks should still be able to
-> put the device in idle.
+> > In principle it should be specified in both places to account for shared
+> > supplies though for all practical purposes for an LCD panel I can't see
+> > multiple users sharing the same regulator and varying the voltage at
+> > runtime.
 
-Runtime PM might indeed be a better option. The OMAP3 ISP doesn't need to 
-IOMMU until video streams are started, so we should keep it powered down in 
-that case.
+> It is assumed here that the boot loader as not set the output voltage
+> of the regulator that supports variable voltage ranges. So these
+> values help in setting up the regulator for LCD display.
 
--- 
-Regards,
-
-Laurent Pinchart
+Remember that the regulator API won't allow consumers to configure
+voltages unless there are constraints granting permission.  Users will
+need to set both the LCD vales and the regulator constraints values to
+actually allow configuration to happen.
