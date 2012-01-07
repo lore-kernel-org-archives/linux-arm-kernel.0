@@ -1,22 +1,18 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 6 Jan 2012 16:02:35 -0800
-Subject: [PATCH v2 1/2] dmaengine: Add support for per xfer specific
- privatedata & box dma
-In-Reply-To: <1325854052-21402-2-git-send-email-kumarrav@codeaurora.org>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1325854052-21402-2-git-send-email-kumarrav@codeaurora.org>
-Message-ID: <20120107000234.GA29645@codeaurora.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 7 Jan 2012 00:53:50 +0000
+Subject: [PATCH v8 2/2] davinci: CQ93VC: remove machine specific header
+ file inclusion from codec driver
+In-Reply-To: <1325661469-4411-3-git-send-email-manjunath.hadli@ti.com>
+References: <1325661469-4411-1-git-send-email-manjunath.hadli@ti.com>
+ <1325661469-4411-3-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <20120107005350.GA26307@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 06:17:31PM +0530, Ravi Kumar V wrote:
+On Wed, Jan 04, 2012 at 12:47:49PM +0530, Manjunath Hadli wrote:
+> remove unnecessary inclusion of machine specific header
+> file mach/dm365.h from cq93vc.c voice codec driver
+> which comes in the way of platform code consolidation.
 
-> Change-Id: Ia9ee19f2c253e68b8e5ff254a57478dcc51014ca
-
-Make sure these Change-Id lines aren't in patch emails.
-
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+*Always* CC maintainers on patches.  If you send me a copy directly this
+looks OK.
