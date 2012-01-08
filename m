@@ -1,46 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Jan 2012 10:38:23 +0000
-Subject: [PATCH 12/14] mmc: mmci: Decrease current consumption in suspend
-In-Reply-To: <1323106560-5218-13-git-send-email-ulf.hansson@stericsson.com>
-References: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
- <1323106560-5218-13-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20120108103823.GB21765@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 8 Jan 2012 11:40:28 +0100
+Subject: [PATCH] ARM: PXA: Zipit Z2: Fix oops in z2_power_off
+In-Reply-To: <CA+E=qVfYMwV_TuAdaDAZVfQfcx5-g-JEr1tUQsuwBcPpvCav+g@mail.gmail.com>
+References: <1326011616-3546-1-git-send-email-anarsoul@gmail.com>
+ <201201080956.51789.marek.vasut@gmail.com>
+ <CA+E=qVfYMwV_TuAdaDAZVfQfcx5-g-JEr1tUQsuwBcPpvCav+g@mail.gmail.com>
+Message-ID: <201201081140.29275.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 06:35:58PM +0100, Ulf Hansson wrote:
-> To decrease current consumption in suspend state the
-> VCORE regulator, the MCLK and PCLK for the ARM PL18x
-> are now disabled.
+> 2012/1/8 Marek Vasut <marek.vasut@gmail.com>:
+> > That's why I said this patch (suspend the device to make it feel like
+> > powerdown) is bullshit in the first place.
 > 
-> When resuming the resourses are re-enabled and
-> register values for MMCICLOCK, MMCIPOWER and MMCIMASK0
-> are restored.
+> Marek, 'deepsleep' suspend on Z2 is a way to save battery power for
+> monthes. I blew the dust off my Z2 recently (did not touch it for
+> ~2monthes), it was in fake poweroff (deepsleep), and battery is still
+> charged (not full however). I believe it can't be achieved with
+> 'sleep' suspend.
 
-I still do not agree with this.  The MMC core driver should be shutting
-down the interface (turning off the MMC clock, disabling the MMC power).
-And indeed it does:
+But you can put the device into this deepsleep-suspend without faking shutdown, 
+right?
 
-int mmc_suspend_host(struct mmc_host *host)
-{
-...
-        if (!err && !mmc_card_keep_power(host))
-                mmc_power_off(host);
-}
+> I agree that it looks weird, but it's hardware bizzarity. Btw, do you
+> have suggestions how to make it clean?
 
-void mmc_power_off(struct mmc_host *host)
-{
-...
-        host->ios.power_mode = MMC_POWER_OFF;
-        host->ios.bus_width = MMC_BUS_WIDTH_1;
-        host->ios.timing = MMC_TIMING_LEGACY;
-        mmc_set_ios(host);
-...
-}
-
-On ARM primecells we can _not_ go from power off to power on without
-first going through the power up state, so this simple save-and-restore
-will not do - we have to go through the proper power up sequence.
-
-Why do you think that the MMC core is not shutting down the power and
-clock registers on suspend?
+Yea ... why won't deepsleep suspend work via standard suspend interface?
+> 
+> Vasily.
