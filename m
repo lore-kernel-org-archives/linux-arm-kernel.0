@@ -1,155 +1,35 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Sun, 8 Jan 2012 22:44:22 +0800
-Subject: [PATCH v4 2/2] dma/imx-sdma: convert _raw_readl/_raw_writel to
- readl/writel
-In-Reply-To: <1326033862-25351-1-git-send-email-richard.zhao@linaro.org>
-References: <1326033862-25351-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1326033862-25351-3-git-send-email-richard.zhao@linaro.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sun, 8 Jan 2012 15:45:58 +0100
+Subject: mxs: enable phy-clock in the driver?
+Message-ID: <20120108144558.GB2544@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-readl/writel is more genric. And if CONFIG_ARM_DMA_MEM_BUFFERABLE,
-they includes necessary memory barriers.
+Hi Shawn,
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- drivers/dma/imx-sdma.c |   44 ++++++++++++++++++++++----------------------
- 1 files changed, 22 insertions(+), 22 deletions(-)
+I recently noticed that my tx28 board did not have net when booting from NAND
+(before that, barebox was setting up the network). Adding lines like these from
+mx28evk helped:
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index c2bc4f1..2cc96c4 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -368,9 +368,9 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
- 	if (event_override && mcu_override && dsp_override)
- 		return -EINVAL;
- 
--	evt = __raw_readl(sdma->regs + SDMA_H_EVTOVR);
--	mcu = __raw_readl(sdma->regs + SDMA_H_HOSTOVR);
--	dsp = __raw_readl(sdma->regs + SDMA_H_DSPOVR);
-+	evt = readl(sdma->regs + SDMA_H_EVTOVR);
-+	mcu = readl(sdma->regs + SDMA_H_HOSTOVR);
-+	dsp = readl(sdma->regs + SDMA_H_DSPOVR);
- 
- 	if (dsp_override)
- 		dsp &= ~(1 << channel);
-@@ -387,16 +387,16 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
- 	else
- 		mcu |= (1 << channel);
- 
--	__raw_writel(evt, sdma->regs + SDMA_H_EVTOVR);
--	__raw_writel(mcu, sdma->regs + SDMA_H_HOSTOVR);
--	__raw_writel(dsp, sdma->regs + SDMA_H_DSPOVR);
-+	writel(evt, sdma->regs + SDMA_H_EVTOVR);
-+	writel(mcu, sdma->regs + SDMA_H_HOSTOVR);
-+	writel(dsp, sdma->regs + SDMA_H_DSPOVR);
- 
- 	return 0;
- }
- 
- static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
- {
--	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
-+	writel(1 << channel, sdma->regs + SDMA_H_START);
- }
- 
- /*
-@@ -460,9 +460,9 @@ static void sdma_event_enable(struct sdma_channel *sdmac, unsigned int event)
- 	u32 val;
- 	u32 chnenbl = chnenbl_ofs(sdma, event);
- 
--	val = __raw_readl(sdma->regs + chnenbl);
-+	val = readl(sdma->regs + chnenbl);
- 	val |= (1 << channel);
--	__raw_writel(val, sdma->regs + chnenbl);
-+	writel(val, sdma->regs + chnenbl);
- }
- 
- static void sdma_event_disable(struct sdma_channel *sdmac, unsigned int event)
-@@ -472,9 +472,9 @@ static void sdma_event_disable(struct sdma_channel *sdmac, unsigned int event)
- 	u32 chnenbl = chnenbl_ofs(sdma, event);
- 	u32 val;
- 
--	val = __raw_readl(sdma->regs + chnenbl);
-+	val = readl(sdma->regs + chnenbl);
- 	val &= ~(1 << channel);
--	__raw_writel(val, sdma->regs + chnenbl);
-+	writel(val, sdma->regs + chnenbl);
- }
- 
- static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
-@@ -552,8 +552,8 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
- 	struct sdma_engine *sdma = dev_id;
- 	u32 stat;
- 
--	stat = __raw_readl(sdma->regs + SDMA_H_INTR);
--	__raw_writel(stat, sdma->regs + SDMA_H_INTR);
-+	stat = readl(sdma->regs + SDMA_H_INTR);
-+	writel(stat, sdma->regs + SDMA_H_INTR);
- 
- 	while (stat) {
- 		int channel = fls(stat) - 1;
-@@ -707,7 +707,7 @@ static void sdma_disable_channel(struct sdma_channel *sdmac)
- 	struct sdma_engine *sdma = sdmac->sdma;
- 	int channel = sdmac->channel;
- 
--	__raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
-+	writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
- 	sdmac->status = DMA_ERROR;
- }
- 
-@@ -780,7 +780,7 @@ static int sdma_set_channel_priority(struct sdma_channel *sdmac,
- 		return -EINVAL;
- 	}
- 
--	__raw_writel(priority, sdma->regs + SDMA_CHNPRI_0 + 4 * channel);
-+	writel(priority, sdma->regs + SDMA_CHNPRI_0 + 4 * channel);
- 
- 	return 0;
- }
-@@ -1228,7 +1228,7 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 	clk_enable(sdma->clk);
- 
- 	/* Be sure SDMA has not started yet */
--	__raw_writel(0, sdma->regs + SDMA_H_C0PTR);
-+	writel(0, sdma->regs + SDMA_H_C0PTR);
- 
- 	sdma->channel_control = dma_alloc_coherent(NULL,
- 			MAX_DMA_CHANNELS * sizeof (struct sdma_channel_control) +
-@@ -1251,11 +1251,11 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 
- 	/* disable all channels */
- 	for (i = 0; i < sdma->num_events; i++)
--		__raw_writel(0, sdma->regs + chnenbl_ofs(sdma, i));
-+		writel(0, sdma->regs + chnenbl_ofs(sdma, i));
- 
- 	/* All channels have priority 0 */
- 	for (i = 0; i < MAX_DMA_CHANNELS; i++)
--		__raw_writel(0, sdma->regs + SDMA_CHNPRI_0 + i * 4);
-+		writel(0, sdma->regs + SDMA_CHNPRI_0 + i * 4);
- 
- 	ret = sdma_request_channel(&sdma->channel[0]);
- 	if (ret)
-@@ -1264,16 +1264,16 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 	sdma_config_ownership(&sdma->channel[0], false, true, false);
- 
- 	/* Set Command Channel (Channel Zero) */
--	__raw_writel(0x4050, sdma->regs + SDMA_CHN0ADDR);
-+	writel(0x4050, sdma->regs + SDMA_CHN0ADDR);
- 
- 	/* Set bits of CONFIG register but with static context switching */
- 	/* FIXME: Check whether to set ACR bit depending on clock ratios */
--	__raw_writel(0, sdma->regs + SDMA_H_CONFIG);
-+	writel(0, sdma->regs + SDMA_H_CONFIG);
- 
--	__raw_writel(ccb_phys, sdma->regs + SDMA_H_C0PTR);
-+	writel(ccb_phys, sdma->regs + SDMA_H_C0PTR);
- 
- 	/* Set bits of CONFIG register with given context switching mode */
--	__raw_writel(SDMA_H_CONFIG_CSM, sdma->regs + SDMA_H_CONFIG);
-+	writel(SDMA_H_CONFIG_CSM, sdma->regs + SDMA_H_CONFIG);
- 
- 	/* Initializes channel's priorities */
- 	sdma_set_channel_priority(&sdma->channel[0], 7);
+228         /* Enable fec phy clock */
+229         clk = clk_get_sys("pll2", NULL);
+230         if (!IS_ERR(clk))
+231                 clk_enable(clk);
+
+So, if every board seems to need this, I'd think this should rather be in the
+driver? Am I correct or is there something I have overlooked?
+
+Regards,
+
+   Wolfram
+
 -- 
-1.7.5.4
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120108/33bc4499/attachment.sig>
