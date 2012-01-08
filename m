@@ -1,47 +1,60 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Sat, 7 Jan 2012 16:45:02 -0800
-Subject: [2.6.37 -> 2.6.38 regression] "mv64xxx: I2C bus locked, block:
- 1, time_left: 0" every few seconds
-In-Reply-To: <20120101073255.GA2402@elie.hsd1.il.comcast.net>
-References: <20120101042401.4bef017e@natsu>
- <20120101073255.GA2402@elie.hsd1.il.comcast.net>
-Message-ID: <20120108004502.GA20549@ericsson.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Sat, 7 Jan 2012 17:05:31 -0800
+Subject: [PATCH v4] Input: keyboard - add device tree bindings for simple
+ key matrixes
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F11FF@HQMAIL01.nvidia.com>
+References: <1325484557-27695-1-git-send-email-olof@lixom.net>
+ <1325626648-9425-1-git-send-email-olof@lixom.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F11FF@HQMAIL01.nvidia.com>
+Message-ID: <CAPnjgZ3G7yFOrngJP=KtJNcgAWtZg3xn22tRMMi+pUnZ2rJpBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 01, 2012 at 01:32:55AM -0600, Jonathan Nieder wrote:
-> Hi,
-> 
-> Roman Mamedov wrote[1]:
-> 
-> > This bug is still present for me in the latest kernel version in
-> > Debian testing (3.1.6).
-> >
-> > The last properly working kernel version seems to be:
-> [...]
-> > And the problem occurs since:
-> [...]
-> 
-> Thanks.  Arnaud, any hints?  To summarize:
-> 
->  - Michael Ott reported with Debian kernel 2.6.38-3 (which is closely
->    based on stable v2.6.38.2):
-> 
-> 	syslog tell me every few seconds:
-> 	i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> 
->  - Manuel Roeder reported the same and found that upstream v2.6.38
->    triggers the problem and v2.6.37.6 does not.
-> 
->  - Roman Mamedov finds the bug present in Debian 3.1.6-1 (which
->    is closely based on stable v3.1.6) and Debian 2.6.37-2 (based on
->    stable v2.6.37.2) but not Debian 2.6.37-1 (based on mainline
->    v2.6.37).
-> 
-> The regression range described above seems a little inconsistent to
-> me, so maybe there's something more going on.
-> 
-Points to commit eda6bee6c7e67b5bd17bdbced0926f5687f686d5 (i2c-mv64xxx: send repeated START
-between messages in xfer). Maybe you can back it out and see if it makes a difference.
+Hi Olof,
 
-Guenter
+On Tue, Jan 3, 2012 at 2:37 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Tuesday, January 03, 2012 2:37 PM:
+>> This adds a simple device tree binding for simple key matrix data and
+>> a helper to fill in the platform data.
+>>
+>> The implementation is in a shared file outside if drivers/input/keyboard
+>> since some drivers in drivers/input/misc might be making use of it
+>> as well.
+>>
+>> Changes since v3:
+>> ?* Dropped compatible field in matrix-keymap.txt
+>> ?* Dropped linux,fn-key
+>> ?* Dropped linux,fn-keymap optional property but included guideline on
+>> ? ?naming convention
+>> ?* Now passing property name in to the helper function (or will assume
+>> ? ?"linux,keymap" if passed NULL)
+>
+>> diff --git a/drivers/input/of_keymap.c b/drivers/input/of_keymap.c
+>
+>> +struct matrix_keymap_data *
+>> +matrix_keyboard_of_fill_keymap(struct device_node *np, char *propname)
+>> +{
+> ...
+>> + ? ? kd = kmalloc(sizeof(*kd), GFP_KERNEL);
+>> + ? ? if (!kd)
+>> + ? ? ? ? ? ? return NULL;
+>
+> Should that use kzalloc in case struct matrix_keymap_data grows some
+> new fields that people will assume are set to zero since the struct
+> would usually be in .data? Still, people should probably grep the code
+> when making such changes...
+>
+> Otherwise,
+>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+
+Do you have a Tegra .dts binding for the Seaboard keyboard that I can
+test with please?
+
+Regards,
+Simon
+
+>
+> --
+> nvpublic
+>
