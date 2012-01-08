@@ -1,36 +1,65 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 8 Jan 2012 21:56:43 +0100
-Subject: [PATCH 0/3] s3c-hsudc powerdomain using generic power domains
-Message-ID: <201201082156.44142.heiko@sntech.de>
+Date: Sun, 8 Jan 2012 21:57:55 +0100
+Subject: [PATCH 1/3] s3c-hsudc: Use helper functions instead of generic
+ container_of
+In-Reply-To: <201201082156.44142.heiko@sntech.de>
+References: <201201082156.44142.heiko@sntech.de>
+Message-ID: <201201082157.55898.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S3C2443/S3C2416/S3C2450 contain a power domain for the usb phy.
-Up until now the s3c-hsudc was writing directly to the PWRCFG register
-in the (un)init_phy functions to control it.
+The helper functions were definied but never used until now.
 
-This patchset introduces a power domain for the usbphy and hooks the
-hsudc-device to it. The new runtime_pm calls then handle the enabling
-and disabling of the power domain on udc start and stop.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/usb/gadget/s3c-hsudc.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-As a result another arch dependency is gone from the driver.
-
-This set applies cleanly to linux-next from 2012-01-06 and is
-tested on S3C2416 hardware.
-
-Heiko Stuebner (3):
-  s3c-hsudc: Use helper functions instead of generic container_of
-  s3c-hsudc: add basic runtime_pm calls
-  S3C2443: add power domain for usb phy
-
- arch/arm/mach-s3c2416/Kconfig             |    1 +
- arch/arm/mach-s3c2443/Kconfig             |    1 +
- arch/arm/plat-s3c24xx/Kconfig             |    7 +++
- arch/arm/plat-s3c24xx/Makefile            |    1 +
- arch/arm/plat-s3c24xx/s3c2443-pm-common.c |   65 +++++++++++++++++++++++++++++
- drivers/usb/gadget/s3c-hsudc.c            |   25 ++++++-----
- 6 files changed, 89 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm/plat-s3c24xx/s3c2443-pm-common.c
-
+diff --git a/drivers/usb/gadget/s3c-hsudc.c b/drivers/usb/gadget/s3c-hsudc.c
+index df8661d..41b3a58 100644
+--- a/drivers/usb/gadget/s3c-hsudc.c
++++ b/drivers/usb/gadget/s3c-hsudc.c
+@@ -759,7 +759,7 @@ static int s3c_hsudc_ep_enable(struct usb_ep *_ep,
+ 	unsigned long flags;
+ 	u32 ecr = 0;
+ 
+-	hsep = container_of(_ep, struct s3c_hsudc_ep, ep);
++	hsep = our_ep(_ep);
+ 	if (!_ep || !desc || hsep->desc || _ep->name == ep0name
+ 		|| desc->bDescriptorType != USB_DT_ENDPOINT
+ 		|| hsep->bEndpointAddress != desc->bEndpointAddress
+@@ -853,7 +853,7 @@ static void s3c_hsudc_free_request(struct usb_ep *ep, struct usb_request *_req)
+ {
+ 	struct s3c_hsudc_req *hsreq;
+ 
+-	hsreq = container_of(_req, struct s3c_hsudc_req, req);
++	hsreq = our_req(_req);
+ 	WARN_ON(!list_empty(&hsreq->queue));
+ 	kfree(hsreq);
+ }
+@@ -876,12 +876,12 @@ static int s3c_hsudc_queue(struct usb_ep *_ep, struct usb_request *_req,
+ 	u32 offset;
+ 	u32 csr;
+ 
+-	hsreq = container_of(_req, struct s3c_hsudc_req, req);
++	hsreq = our_req(_req);
+ 	if ((!_req || !_req->complete || !_req->buf ||
+ 		!list_empty(&hsreq->queue)))
+ 		return -EINVAL;
+ 
+-	hsep = container_of(_ep, struct s3c_hsudc_ep, ep);
++	hsep = our_ep(_ep);
+ 	hsudc = hsep->dev;
+ 	if (!hsudc->driver || hsudc->gadget.speed == USB_SPEED_UNKNOWN)
+ 		return -ESHUTDOWN;
+@@ -935,7 +935,7 @@ static int s3c_hsudc_dequeue(struct usb_ep *_ep, struct usb_request *_req)
+ 	struct s3c_hsudc_req *hsreq;
+ 	unsigned long flags;
+ 
+-	hsep = container_of(_ep, struct s3c_hsudc_ep, ep);
++	hsep = our_ep(_ep);
+ 	if (!_ep || hsep->ep.name == ep0name)
+ 		return -EINVAL;
+ 
 -- 
 1.7.2.3
