@@ -1,35 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sun, 8 Jan 2012 15:45:58 +0100
-Subject: mxs: enable phy-clock in the driver?
-Message-ID: <20120108144558.GB2544@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 8 Jan 2012 23:02:36 +0800
+Subject: [PATCH 6/6] ARM: imx6q-sabrelite: add audmux support
+In-Reply-To: <1325820343-11875-7-git-send-email-richard.zhao@linaro.org>
+References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
+ <1325820343-11875-7-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120108150234.GF20216@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Fri, Jan 06, 2012 at 11:25:43AM +0800, Richard Zhao wrote:
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -527,7 +527,9 @@
+>  			};
+>  
+>  			audmux at 021d8000 {
+> +				compatible = "fsl,audmux-v2";
 
-I recently noticed that my tx28 board did not have net when booting from NAND
-(before that, barebox was setting up the network). Adding lines like these from
-mx28evk helped:
+This is not a good compatible string, because the version number is
+not defined by hardware.  Even it is defined by hardware, the version
+number is not as stable as soc to identify specific hardware block.
+You can look at uart, cspi, sdma etc. for examples.
 
-228         /* Enable fec phy clock */
-229         clk = clk_get_sys("pll2", NULL);
-230         if (!IS_ERR(clk))
-231                 clk_enable(clk);
-
-So, if every board seems to need this, I'd think this should rather be in the
-driver? Am I correct or is there something I have overlooked?
-
-Regards,
-
-   Wolfram
+>  				reg = <0x021d8000 0x4000>;
+> +				status = "disabled";
+>  			};
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120108/33bc4499/attachment.sig>
+Regards,
+Shawn
