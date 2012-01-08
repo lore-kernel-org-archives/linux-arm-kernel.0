@@ -1,101 +1,89 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Sun,  8 Jan 2012 15:32:28 +0200
-Subject: [RFC PATCH v2 8/9] smp: refactor on_each_cpu to void returning func
-In-Reply-To: <1326029549-2794-1-git-send-email-gilad@benyossef.com>
-References: <1326029549-2794-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1326029549-2794-9-git-send-email-gilad@benyossef.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 8 Jan 2012 22:52:56 +0800
+Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
+In-Reply-To: <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
+References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
+ <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120108145254.GE20216@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on_each_cpu returns the retunr value of smp_call_function
-which is hard coded to 0.
+On Fri, Jan 06, 2012 at 11:25:41AM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6q-sabrelite.dts |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index 3f4b45e..567b664 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -44,6 +44,18 @@
+>  			uart2: uart at 021e8000 {
+>  				status = "okay";
+>  			};
+> +
+> +			i2c at 021a0000 { /* I2C1 */
+> +				status = "okay";
+> +				clock-frequency = <100000>;
+> +
+> +				codec: sgtl5000 at 0a {
+> +					compatible = "fsl,sgtl5000";
+> +					reg = <0x0a>;
+> +					VDDA-supply = <&reg_2P5V>;
+> +					VDDIO-supply = <&reg_3P3V>;
 
-Refactor on_each_cpu to a void function and the few callers
-that check the return value to save compares and branches.
+I would prefer to have them named vdda-supply and vddio-supply.  But
+I just learnt that they do not work, because sgtl5000 driver
+(sound/soc/codecs/sgtl5000.c) has the supply_names in upper case, while
+unlike of_node_cmp() is strcasecmp(), of_prop_cmp() is just strcmp().
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
-Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Reviewed-by: Michal Nazarewicz <mina86@mina86.com>
-CC: David Airlie <airlied@linux.ie>
-CC: dri-devel at lists.freedesktop.org
-CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-CC: Paul Mackerras <paulus@samba.org>
-CC: Grant Likely <grant.likely@secretlab.ca>
-CC: Rob Herring <rob.herring@calxeda.com>
-CC: linuxppc-dev at lists.ozlabs.org
-CC: devicetree-discuss at lists.ozlabs.org
-CC: Richard Henderson <rth@twiddle.net>
-CC: Ivan Kokshaysky <ink@jurassic.park.msu.ru>
-CC: Matt Turner <mattst88@gmail.com>
-CC: linux-alpha at vger.kernel.org
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: Ingo Molnar <mingo@redhat.com>
-CC: "H. Peter Anvin" <hpa@zytor.com>
-CC: x86 at kernel.org
-CC: Tony Luck <tony.luck@intel.com>
-CC: Fenghua Yu <fenghua.yu@intel.com>
-CC: linux-ia64 at vger.kernel.org
-CC: Will Deacon <will.deacon@arm.com>
-CC: Peter Zijlstra <a.p.zijlstra@chello.nl>
-CC: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
----
- include/linux/smp.h |    7 +++----
- kernel/smp.c        |    6 ++----
- 2 files changed, 5 insertions(+), 8 deletions(-)
+But the convention on property name is really all using lower case,
+and mixing cases there looks odd, so I'm thinking about the changes
+below on of_get_regulator().
 
-diff --git a/include/linux/smp.h b/include/linux/smp.h
-index 8cc38d3..050ddd4 100644
---- a/include/linux/smp.h
-+++ b/include/linux/smp.h
-@@ -99,7 +99,7 @@ static inline void call_function_init(void) { }
- /*
-  * Call a function on all processors
-  */
--int on_each_cpu(smp_call_func_t func, void *info, int wait);
-+void on_each_cpu(smp_call_func_t func, void *info, int wait);
- 
- /*
-  * Mark the boot cpu "online" so that it can call console drivers in
-@@ -126,12 +126,11 @@ static inline int up_smp_call_function(smp_call_func_t func, void *info)
- #define smp_call_function(func, info, wait) \
- 			(up_smp_call_function(func, info))
- #define on_each_cpu(func,info,wait)		\
--	({					\
-+	{					\
- 		local_irq_disable();		\
- 		func(info);			\
- 		local_irq_enable();		\
--		0;				\
--	})
-+	}
- static inline void smp_send_reschedule(int cpu) { }
- #define num_booting_cpus()			1
- #define smp_prepare_boot_cpu()			do {} while (0)
-diff --git a/kernel/smp.c b/kernel/smp.c
-index db197d6..f66a1b2 100644
---- a/kernel/smp.c
-+++ b/kernel/smp.c
-@@ -687,17 +687,15 @@ void __init smp_init(void)
-  * early_boot_irqs_disabled is set.  Use local_irq_save/restore() instead
-  * of local_irq_disable/enable().
-  */
--int on_each_cpu(void (*func) (void *info), void *info, int wait)
-+void on_each_cpu(void (*func) (void *info), void *info, int wait)
+Mark, how do you think?
+
+8<---
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index ca86f39..b89eb43 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -17,6 +17,7 @@
+
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/ctype.h>
+ #include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/slab.h>
+@@ -147,10 +148,15 @@ static struct device_node *of_get_regulator(struct device *dev, const char *supp
  {
- 	unsigned long flags;
--	int ret = 0;
+        struct device_node *regnode = NULL;
+        char prop_name[32]; /* 32 is max size of property name */
++       int i = 0;
+
+        dev_dbg(dev, "Looking up %s-supply from device tree\n", supply);
+
+        snprintf(prop_name, 32, "%s-supply", supply);
++       while (prop_name[i] && i < 32) {
++               prop_name[i] = tolower(prop_name[i]);
++               i++;
++       }
+        regnode = of_parse_phandle(dev->of_node, prop_name, 0);
+
+        if (!regnode) {
+--->8
  
- 	preempt_disable();
--	ret = smp_call_function(func, info, wait);
-+	smp_call_function(func, info, wait);
- 	local_irq_save(flags);
- 	func(info);
- 	local_irq_restore(flags);
- 	preempt_enable();
--	return ret;
- }
- EXPORT_SYMBOL(on_each_cpu);
--- 
-1.7.0.4
+Regards,
+Shawn
+
+> +				};
+> +			};
+>  		};
+>  	};
+>  
+> -- 
+> 1.7.5.4
+> 
+> 
