@@ -1,229 +1,92 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 8 Jan 2012 22:22:57 +0100
-Subject: [PATCH 1/2] S3C24XX: remove unused spi gpio setup functions
+Date: Sun, 8 Jan 2012 22:23:32 +0100
+Subject: [PATCH 2/2] S3C24XX: move spi-s3c24xx platdata out of mach
 In-Reply-To: <201201082222.11305.heiko@sntech.de>
 References: <201201082222.11305.heiko@sntech.de>
-Message-ID: <201201082222.58231.heiko@sntech.de>
+Message-ID: <201201082223.32677.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A grep through the kernel source revealed that neither the
-config-options nor the defined functions are used anywhere
-in the kernel.
-
-There was also no activity in this regard through the last kernel
-releases, so it seems this situation will not change in the future.
-
-Therefore this patch removes this seemingly dead code.
+spi.h now only contains the definition of the platform data structure
+for the driver in spi-s3c24xx.c . Therefore it does not need to stay
+in include/mach but can instead live in linux/spi/s3c24xx.h .
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/mach-s3c2410/include/mach/spi.h     |   11 -------
- arch/arm/plat-s3c24xx/Kconfig                |   20 -------------
- arch/arm/plat-s3c24xx/Makefile               |    6 ----
- arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c |   36 ------------------------
- arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c   |   38 --------------------------
- arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c    |   36 ------------------------
- 6 files changed, 0 insertions(+), 147 deletions(-)
- delete mode 100644 arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c
- delete mode 100644 arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c
- delete mode 100644 arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c
+ arch/arm/mach-s3c2410/include/mach/spi.h |   27 ---------------------------
+ arch/arm/mach-s3c2440/mach-gta02.c       |    2 +-
+ drivers/spi/spi-s3c24xx.c                |    2 +-
+ 3 files changed, 2 insertions(+), 29 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2410/include/mach/spi.h
 
 diff --git a/arch/arm/mach-s3c2410/include/mach/spi.h b/arch/arm/mach-s3c2410/include/mach/spi.h
-index 4d95883..2a686c0 100644
+deleted file mode 100644
+index 2a686c0..0000000
 --- a/arch/arm/mach-s3c2410/include/mach/spi.h
-+++ b/arch/arm/mach-s3c2410/include/mach/spi.h
-@@ -24,15 +24,4 @@ struct s3c2410_spi_info {
- 	void (*set_cs)(struct s3c2410_spi_info *spi, int cs, int pol);
- };
- 
--/* Standard setup / suspend routines for SPI GPIO pins. */
--
--extern void s3c24xx_spi_gpiocfg_bus0_gpe11_12_13(struct s3c2410_spi_info *spi,
--						 int enable);
--
--extern void s3c24xx_spi_gpiocfg_bus1_gpg5_6_7(struct s3c2410_spi_info *spi,
--					      int enable);
--
--extern void s3c24xx_spi_gpiocfg_bus1_gpd8_9_10(struct s3c2410_spi_info *spi,
--					       int enable);
--
- #endif /* __ASM_ARCH_SPI_H */
-diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
-index d8973ac..6b1d918 100644
---- a/arch/arm/plat-s3c24xx/Kconfig
-+++ b/arch/arm/plat-s3c24xx/Kconfig
-@@ -98,26 +98,6 @@ config S3C2410_DMA_DEBUG
- 	  Enable debugging output for the DMA code. This option sends info
- 	  to the kernel log, at priority KERN_DEBUG.
- 
--# SPI default pin configuration code
--
--config S3C24XX_SPI_BUS0_GPE11_GPE12_GPE13
--	bool
--	help
--	  SPI GPIO configuration code for BUS0 when connected to
--	  GPE11, GPE12 and GPE13.
--
--config S3C24XX_SPI_BUS1_GPG5_GPG6_GPG7
--	bool
--	help
--	  SPI GPIO configuration code for BUS 1 when connected to
--	  GPG5, GPG6 and GPG7.
--
--config S3C24XX_SPI_BUS1_GPD8_GPD9_GPD10
--	bool
--	help
--	  SPI GPIO configuration code for BUS 1 when connected to
--	  GPD8, GPD9 and GPD10.
--
- # common code for s3c24xx based machines, such as the SMDKs.
- 
- # cpu frequency items common between s3c2410 and s3c2440/s3c2442
-diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
-index 419d622..d07f67c 100644
---- a/arch/arm/plat-s3c24xx/Makefile
-+++ b/arch/arm/plat-s3c24xx/Makefile
-@@ -37,12 +37,6 @@ obj-$(CONFIG_S3C2410_CPUFREQ_UTILS) += s3c2410-cpufreq-utils.o
- obj-$(CONFIG_ARCH_S3C2410)	+= setup-i2c.o
- obj-$(CONFIG_S3C2410_SETUP_TS)	+= setup-ts.o
- 
--# SPI gpio central GPIO functions
--
--obj-$(CONFIG_S3C24XX_SPI_BUS0_GPE11_GPE12_GPE13) += spi-bus0-gpe11_12_13.o
--obj-$(CONFIG_S3C24XX_SPI_BUS1_GPG5_GPG6_GPG7)    += spi-bus1-gpg5_6_7.o
--obj-$(CONFIG_S3C24XX_SPI_BUS1_GPD8_GPD9_GPD10)	 += spi-bus1-gpd8_9_10.o
--
- # machine common support
- 
- obj-$(CONFIG_MACH_SMDK)		+= common-smdk.o
-diff --git a/arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c b/arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c
-deleted file mode 100644
-index 704175b..0000000
---- a/arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c
 +++ /dev/null
-@@ -1,36 +0,0 @@
--/* linux/arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c
+@@ -1,27 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/spi.h
 - *
-- * Copyright (c) 2008 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
+- * Copyright (c) 2006 Simtec Electronics
 - *	Ben Dooks <ben@simtec.co.uk>
 - *
-- * S3C24XX SPI - gpio configuration for bus 0 on gpe11,12,13
+- * S3C2410 - SPI Controller platform_device info
 - *
 - * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License.
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
 -*/
 -
--#include <linux/kernel.h>
--#include <linux/gpio.h>
+-#ifndef __ASM_ARCH_SPI_H
+-#define __ASM_ARCH_SPI_H __FILE__
 -
+-struct s3c2410_spi_info {
+-	int			 pin_cs;	/* simple gpio cs */
+-	unsigned int		 num_cs;	/* total chipselects */
+-	int			 bus_num;       /* bus number to use. */
+-
+-	unsigned int		 use_fiq:1;	/* use fiq */
+-
+-	void (*gpio_setup)(struct s3c2410_spi_info *spi, int enable);
+-	void (*set_cs)(struct s3c2410_spi_info *spi, int cs, int pol);
+-};
+-
+-#endif /* __ASM_ARCH_SPI_H */
+diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
+index e8d2eb9..236514c 100644
+--- a/arch/arm/mach-s3c2440/mach-gta02.c
++++ b/arch/arm/mach-s3c2440/mach-gta02.c
+@@ -38,6 +38,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/serial_core.h>
+ #include <linux/spi/spi.h>
++#include <linux/spi/s3c24xx.h>
+ 
+ #include <linux/mmc/host.h>
+ 
+@@ -73,7 +74,6 @@
+ #include <mach/regs-gpioj.h>
+ #include <mach/fb.h>
+ 
 -#include <mach/spi.h>
--#include <mach/regs-gpio.h>
--
--void s3c24xx_spi_gpiocfg_bus0_gpe11_12_13(struct s3c2410_spi_info *spi,
--					  int enable)
--{
--	if (enable) {
--		s3c_gpio_cfgpin(S3C2410_GPE(13), S3C2410_GPE13_SPICLK0);
--		s3c_gpio_cfgpin(S3C2410_GPE(12), S3C2410_GPE12_SPIMOSI0);
--		s3c_gpio_cfgpin(S3C2410_GPE(11), S3C2410_GPE11_SPIMISO0);
--		s3c2410_gpio_pullup(S3C2410_GPE(11), 0);
--		s3c2410_gpio_pullup(S3C2410_GPE(13), 0);
--	} else {
--		s3c_gpio_cfgpin(S3C2410_GPE(13), S3C2410_GPIO_INPUT);
--		s3c_gpio_cfgpin(S3C2410_GPE(11), S3C2410_GPIO_INPUT);
--		s3c_gpio_setpull(S3C2410_GPE(11), S3C_GPIO_PULL_NONE);
--		s3c_gpio_setpull(S3C2410_GPE(12), S3C_GPIO_PULL_NONE);
--		s3c_gpio_setpull(S3C2410_GPE(13), S3C_GPIO_PULL_NONE);
--	}
--}
-diff --git a/arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c b/arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c
-deleted file mode 100644
-index 72457af..0000000
---- a/arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c
-+++ /dev/null
-@@ -1,38 +0,0 @@
--/* linux/arch/arm/plat-s3c24xx/spi-bus0-gpd8_9_10.c
-- *
-- * Copyright (c) 2008 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C24XX SPI - gpio configuration for bus 1 on gpd8,9,10
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License.
--*/
--
--#include <linux/kernel.h>
--#include <linux/gpio.h>
--
+ #include <plat/usb-control.h>
+ #include <mach/regs-mem.h>
+ #include <mach/hardware.h>
+diff --git a/drivers/spi/spi-s3c24xx.c b/drivers/spi/spi-s3c24xx.c
+index fc06453..8ee7d79 100644
+--- a/drivers/spi/spi-s3c24xx.c
++++ b/drivers/spi/spi-s3c24xx.c
+@@ -24,10 +24,10 @@
+ 
+ #include <linux/spi/spi.h>
+ #include <linux/spi/spi_bitbang.h>
++#include <linux/spi/s3c24xx.h>
+ #include <linux/module.h>
+ 
+ #include <plat/regs-spi.h>
 -#include <mach/spi.h>
--#include <mach/regs-gpio.h>
--
--void s3c24xx_spi_gpiocfg_bus1_gpd8_9_10(struct s3c2410_spi_info *spi,
--					int enable)
--{
--
--	printk(KERN_INFO "%s(%d)\n", __func__, enable);
--	if (enable) {
--		s3c_gpio_cfgpin(S3C2410_GPD(10), S3C2440_GPD10_SPICLK1);
--		s3c_gpio_cfgpin(S3C2410_GPD(9), S3C2440_GPD9_SPIMOSI1);
--		s3c_gpio_cfgpin(S3C2410_GPD(8), S3C2440_GPD8_SPIMISO1);
--		s3c2410_gpio_pullup(S3C2410_GPD(10), 0);
--		s3c2410_gpio_pullup(S3C2410_GPD(9), 0);
--	} else {
--		s3c_gpio_cfgpin(S3C2410_GPD(8), S3C2410_GPIO_INPUT);
--		s3c_gpio_cfgpin(S3C2410_GPD(9), S3C2410_GPIO_INPUT);
--		s3c_gpio_setpull(S3C2410_GPD(10), S3C_GPIO_PULL_NONE);
--		s3c_gpio_setpull(S3C2410_GPD(9), S3C_GPIO_PULL_NONE);
--		s3c_gpio_setpull(S3C2410_GPD(8), S3C_GPIO_PULL_NONE);
--	}
--}
-diff --git a/arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c b/arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c
-deleted file mode 100644
-index c3972b6..0000000
---- a/arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c
-+++ /dev/null
-@@ -1,36 +0,0 @@
--/* linux/arch/arm/plat-s3c24xx/spi-bus0-gpg5_6_7.c
-- *
-- * Copyright (c) 2008 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C24XX SPI - gpio configuration for bus 1 on gpg5,6,7
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License.
--*/
--
--#include <linux/kernel.h>
--#include <linux/gpio.h>
--
--#include <mach/spi.h>
--#include <mach/regs-gpio.h>
--
--void s3c24xx_spi_gpiocfg_bus1_gpg5_6_7(struct s3c2410_spi_info *spi,
--				       int enable)
--{
--	if (enable) {
--		s3c_gpio_cfgpin(S3C2410_GPG(7), S3C2410_GPG7_SPICLK1);
--		s3c_gpio_cfgpin(S3C2410_GPG(6), S3C2410_GPG6_SPIMOSI1);
--		s3c_gpio_cfgpin(S3C2410_GPG(5), S3C2410_GPG5_SPIMISO1);
--		s3c2410_gpio_pullup(S3C2410_GPG(5), 0);
--		s3c2410_gpio_pullup(S3C2410_GPG(6), 0);
--	} else {
--		s3c_gpio_cfgpin(S3C2410_GPG(7), S3C2410_GPIO_INPUT);
--		s3c_gpio_cfgpin(S3C2410_GPG(5), S3C2410_GPIO_INPUT);
--		s3c_gpio_setpull(S3C2410_GPG(5), S3C_GPIO_PULL_NONE);
--		s3c_gpio_setpull(S3C2410_GPG(6), S3C_GPIO_PULL_NONE);
--		s3c_gpio_setpull(S3C2410_GPG(7), S3C_GPIO_PULL_NONE);
--	}
--}
+ 
+ #include <plat/fiq.h>
+ #include <asm/fiq.h>
 -- 
 1.7.2.3
