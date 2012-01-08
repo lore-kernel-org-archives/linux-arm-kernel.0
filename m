@@ -1,36 +1,98 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sat, 07 Jan 2012 19:32:12 +0100
-Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with
- gpio controlled panel reset
-In-Reply-To: <20120107182319.GA13181@n2100.arm.linux.org.uk>
-References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
- <20120107182319.GA13181@n2100.arm.linux.org.uk>
-Message-ID: <4F088FAC.3000200@metafoo.de>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Sat, 07 Jan 2012 16:13:56 -0800
+Subject: [PATCH v2 2/2] msm: DMAEngine: Add DMAEngine driver based on
+ old MSM DMA APIs
+In-Reply-To: <20120107192112.GB13181@n2100.arm.linux.org.uk>
+References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
+ <1325854052-21402-3-git-send-email-kumarrav@codeaurora.org>
+ <1325901569.10425.14.camel@m0nster> <20120107185443.GA19216@codeaurora.org>
+ <20120107192112.GB13181@n2100.arm.linux.org.uk>
+Message-ID: <1325981636.16037.6.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2012 07:23 PM, Russell King - ARM Linux wrote:
-> On Thu, Jan 05, 2012 at 09:12:26PM +0530, Thomas Abraham wrote:
->> Add a lcd panel driver for simple raster-type lcd's which uses a gpio
->> controlled panel reset. The driver controls the nRESET line of the panel
->> using a gpio connected from the host system. The Vcc supply to the panel
->> is (optionally) controlled using a voltage regulator. This driver excludes
->> support for lcd panels that use a serial command interface or direct
->> memory mapped IO interface.
+On Sat, 2012-01-07 at 19:21 +0000, Russell King - ARM Linux wrote:
+> On Sat, Jan 07, 2012 at 10:54:43AM -0800, David Brown wrote:
+> > On Fri, Jan 06, 2012 at 05:59:29PM -0800, Daniel Walker wrote:
+> > 
+> > > > diff --git a/drivers/dma/msm-dma.c b/drivers/dma/msm-dma.c
+> > > > new file mode 100644
+> > > > index 0000000..51d9a2b
+> > > > --- /dev/null
+> > > > +++ b/drivers/dma/msm-dma.c
+> > > > ...
+> > > > +static void msm_chan_desc_cleanup(struct msm_dma_chan *chan)
+> > > > +{
+> > > > +	struct msm_dma_desc_sw *desc, *_desc;
+> > > > +	unsigned long flags;
+> > > > +
+> > > > +	dev_dbg(chan->dev, "Cleaning completed descriptor of channel %d\n",
+> > > > +							chan->chan_id);
+> > > > +	spin_lock_irqsave(&chan->lock, flags);
+> > > > +
+> > > > +	list_for_each_entry_safe(desc, _desc, &chan->active_list, node) {
+> > > > +		dma_async_tx_callback callback;
+> > > > +		void *callback_param;
+> > > > +
+> > > > +		if (msm_dma_desc_status(chan, desc) == DMA_IN_PROGRESS)
+> > > > +			break;
+> > > > +
+> > > > +		/* Remove from the list of running transactions */
+> > > > +		list_del(&desc->node);
+> > > > +
+> > > > +		/* Run the link descriptor callback function */
+> > > > +		callback = desc->async_tx.callback;
+> > > > +		callback_param = desc->async_tx.callback_param;
+> > > > +		if (callback) {
+> > > > +			spin_unlock_irqrestore(&chan->lock, flags);
+> > > > +			callback(callback_param);
+> > > 
+> > > Are you sure unlocking here is safe? at_hdmac.c holds the lock the
+> > > entire time, and fsldma.c deletes the entire list, then runs the
+> > > operations.
+> > 
+> > Good catch.
+> > 
+> > According to a comment in at_hdmac.c, it is safe to hold the lock
+> > while calling the callbacks, so that's probably the easiest solution.
+> > I suspect that you've got something in another driver expecting the
+> > lock to be released, and that might have to be changed.
 > 
-> I'm trying to work out what kind of LCD panel this is for.  I assume
-> not the panels which would be connected to a SoC, which have a parallel
-> interface to a frame buffer device (LCD controller)?
+> It is _not_ safe to hold the lock while calling callbacks.
 > 
-> If this is for these kinds of LCD panels, how are you handling the
-> timing required for active panels - some of which must not be powered
-> up without the LCD controller first being setup and enabled, and must
-> be powered down before the LCD controller is disabled.
+> Please refer to the DMA engine documentation, found here:
 > 
-> I've seen this requirement with panels connected to ARM Ltd's development
-> boards, and also some SoCs.
+> Documentation/dmaengine.txt
+> 
+> section 3:
+> 
+>    Note:
+>         Although the async_tx API specifies that completion callback
+>         routines cannot submit any new operations, this is not the
+>         case for slave/cyclic DMA.
+> 
+>         For slave DMA, the subsequent transaction may not be available
+>         for submission prior to callback function being invoked, so
+>         slave DMA callbacks are permitted to prepare and submit a new
+>         transaction.
+> 
+>         For cyclic DMA, a callback function may wish to terminate the
+>         DMA via dmaengine_terminate_all().
+> 
+> *       Therefore, it is important that DMA engine drivers drop any
+> *       locks before calling the callback function which may cause a
+> *       deadlock.
 
-This is handled by the LCD framework. Or at least should be, see this patchset
-http://www.spinics.net/lists/linux-fbdev/msg04503.html
+Here's the comment from at_hdmac.c .
 
-- Lars
+                /*
+                 * The API requires that no submissions are done from a
+                 * callback, so we don't need to drop the lock here
+                 */
+                if (callback)
+                        callback(param);
+
+I don't know much about the DMA engine, but maybe there is some special
+case here that makes this ok.. (CC'ed Nicolas Ferre)
+
+Daniel
