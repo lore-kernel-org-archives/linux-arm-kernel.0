@@ -1,177 +1,133 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 8 Jan 2012 21:59:02 +0100
-Subject: [PATCH 3/3] S3C2443: add power domain for usb phy
-In-Reply-To: <201201082156.44142.heiko@sntech.de>
-References: <201201082156.44142.heiko@sntech.de>
-Message-ID: <201201082159.02368.heiko@sntech.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 8 Jan 2012 22:23:18 +0100
+Subject: [PATCH v2 1/2] PM / Domains: Add OF support
+In-Reply-To: <1325931055-14486-2-git-send-email-thomas.abraham@linaro.org>
+References: <1325931055-14486-1-git-send-email-thomas.abraham@linaro.org>
+ <1325931055-14486-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <201201082223.18603.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy-power-handling is common to S3C2443/2416/2450, so introduce a
-s3c2443-pm-common.c to handle this for all of them.
+On Saturday, January 07, 2012, Thomas Abraham wrote:
+> A device node pointer is added to generic pm domain structure to associate
+> the domain with a node in the device tree. The platform code parses the
+> device tree to find available nodes representing the generic power domain,
+> instantiates the available domains and initializes them by calling
+> pm_genpd_init().
+> 
+> Nodes representing the devices include a phandle of the power domain to
+> which it belongs. As these devices get instantiated, the driver code
+> checkes for availability of a power domain phandle, converts the phandle
+> to a device node and uses the new pm_genpd_of_add_device() api to
+> associate the device with a power domain.
+> 
+> pm_genpd_of_add_device() runs through its list of registered power domains
+> and matches the OF node of the domain with the one specified as the
+> parameter. If a match is found, the device is associated with the matched
+> domain.
+> 
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-This makes it possible to remove the raw write to the PWRCFG-register
-from the s3c-hsudc driver.
+I can take this patch for 3.4, but your [2/2] depends on it, so I'm not
+sure how to handle that.  If you want me to take the other patch too,
+it'll need ACKs from the Exynos maintaniers.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/mach-s3c2416/Kconfig             |    1 +
- arch/arm/mach-s3c2443/Kconfig             |    1 +
- arch/arm/plat-s3c24xx/Kconfig             |    7 +++
- arch/arm/plat-s3c24xx/Makefile            |    1 +
- arch/arm/plat-s3c24xx/s3c2443-pm-common.c |   65 +++++++++++++++++++++++++++++
- drivers/usb/gadget/s3c-hsudc.c            |    6 ---
- 6 files changed, 75 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/plat-s3c24xx/s3c2443-pm-common.c
+Thanks,
+Rafael
 
-diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
-index 84c7b03..240aef7 100644
---- a/arch/arm/mach-s3c2416/Kconfig
-+++ b/arch/arm/mach-s3c2416/Kconfig
-@@ -15,6 +15,7 @@ config CPU_S3C2416
- 	select CPU_LLSERIAL_S3C2440
- 	select SAMSUNG_CLKSRC
- 	select S3C2443_CLOCK
-+	select S3C2443_PM_COMMON
- 	help
- 	  Support for the S3C2416 SoC from the S3C24XX line
- 
-diff --git a/arch/arm/mach-s3c2443/Kconfig b/arch/arm/mach-s3c2443/Kconfig
-index 8814031..3bff23f 100644
---- a/arch/arm/mach-s3c2443/Kconfig
-+++ b/arch/arm/mach-s3c2443/Kconfig
-@@ -10,6 +10,7 @@ config CPU_S3C2443
- 	select CPU_LLSERIAL_S3C2440
- 	select SAMSUNG_CLKSRC
- 	select S3C2443_CLOCK
-+	select S3C2443_PM_COMMON
- 	help
- 	  Support for the S3C2443 SoC from the S3C24XX line
- 
-diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
-index d8973ac..0a9f37c 100644
---- a/arch/arm/plat-s3c24xx/Kconfig
-+++ b/arch/arm/plat-s3c24xx/Kconfig
-@@ -50,6 +50,13 @@ config S3C2443_CLOCK
- 	  Clock code for the S3C2443 and similar processors, which includes
- 	  the S3C2416 and S3C2450.
- 
-+config S3C2443_PM_COMMON
-+	bool
-+	select PM_GENERIC_DOMAINS
-+	help
-+	  Common power management code for the S3C2443 and similar processors,
-+	  which include the S3C2416 and S3C2450.
-+
- config S3C24XX_DCLK
- 	bool
- 	help
-diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
-index b2b0112..300f77c 100644
---- a/arch/arm/plat-s3c24xx/Makefile
-+++ b/arch/arm/plat-s3c24xx/Makefile
-@@ -29,6 +29,7 @@ obj-$(CONFIG_PM)		+= irq-pm.o
- obj-$(CONFIG_PM)		+= sleep.o
- obj-$(CONFIG_S3C2410_CLOCK)	+= s3c2410-clock.o
- obj-$(CONFIG_S3C2443_CLOCK)	+= s3c2443-clock.o
-+obj-$(CONFIG_S3C2443_PM_COMMON)	+= s3c2443-pm-common.o
- obj-$(CONFIG_S3C2410_DMA)	+= dma.o
- obj-$(CONFIG_S3C2410_IOTIMING)	+= s3c2410-iotiming.o
- obj-$(CONFIG_S3C2412_IOTIMING)	+= s3c2412-iotiming.o
-diff --git a/arch/arm/plat-s3c24xx/s3c2443-pm-common.c b/arch/arm/plat-s3c24xx/s3c2443-pm-common.c
-new file mode 100644
-index 0000000..b9aaf9a
---- /dev/null
-+++ b/arch/arm/plat-s3c24xx/s3c2443-pm-common.c
-@@ -0,0 +1,65 @@
-+/*
-+ * S3C2443,S3C2416,S3C2450 Power management support
-+ *
-+ * Copyright (c) 2011 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+*/
-+
-+#include <linux/io.h>
-+#include <linux/pm_domain.h>
-+
-+#include <mach/regs-s3c2443-clock.h>
-+#include <plat/devs.h>
-+
-+
-+static int s3c2443_usbphy_off(struct generic_pm_domain *domain)
-+{
-+	u32 val;
-+
-+	val = __raw_readl(S3C2443_PWRCFG);
-+	val &= ~(S3C2443_PWRCFG_USBPHY);
-+	__raw_writel(val, S3C2443_PWRCFG);
-+
-+	return 0;
-+}
-+
-+static int s3c2443_usbphy_on(struct generic_pm_domain *domain)
-+{
-+	u32 val;
-+
-+	val = __raw_readl(S3C2443_PWRCFG);
-+	val |= S3C2443_PWRCFG_USBPHY;
-+	__raw_writel(val, S3C2443_PWRCFG);
-+
-+	return 0;
-+}
-+
-+static struct generic_pm_domain s3c2443_usbphy_pd = {
-+	.power_off = s3c2443_usbphy_off,
-+	.power_on = s3c2443_usbphy_on,
-+};
-+
-+static int __init s3c2443_pm_common_init(void)
-+{
-+	pm_genpd_init(&s3c2443_usbphy_pd, NULL, false);
-+	pm_genpd_add_device(&s3c2443_usbphy_pd, &s3c_device_usb_hsudc.dev);
-+
-+	return 0;
-+}
-+arch_initcall(s3c2443_pm_common_init);
-+
-+static __init int s3c2443_pm_common_late_initcall(void)
-+{
-+	pm_genpd_poweroff_unused();
-+	return 0;
-+}
-+late_initcall(s3c2443_pm_common_late_initcall);
-diff --git a/drivers/usb/gadget/s3c-hsudc.c b/drivers/usb/gadget/s3c-hsudc.c
-index 5e87293..9a81ad3 100644
---- a/drivers/usb/gadget/s3c-hsudc.c
-+++ b/drivers/usb/gadget/s3c-hsudc.c
-@@ -195,9 +195,6 @@ static void s3c_hsudc_init_phy(void)
- {
- 	u32 cfg;
- 
--	cfg = readl(S3C2443_PWRCFG) | S3C2443_PWRCFG_USBPHY;
--	writel(cfg, S3C2443_PWRCFG);
--
- 	cfg = readl(S3C2443_URSTCON);
- 	cfg |= (S3C2443_URSTCON_FUNCRST | S3C2443_URSTCON_PHYRST);
- 	writel(cfg, S3C2443_URSTCON);
-@@ -229,9 +226,6 @@ static void s3c_hsudc_uninit_phy(void)
- {
- 	u32 cfg;
- 
--	cfg = readl(S3C2443_PWRCFG) & ~S3C2443_PWRCFG_USBPHY;
--	writel(cfg, S3C2443_PWRCFG);
--
- 	writel(S3C2443_PHYPWR_FSUSPEND, S3C2443_PHYPWR);
- 
- 	cfg = readl(S3C2443_UCLKCON) & ~S3C2443_UCLKCON_FUNC_CLKEN;
--- 
-1.7.2.3
+
+> ---
+>  drivers/base/power/domain.c |   32 ++++++++++++++++++++++++++++++++
+>  include/linux/pm_domain.h   |   12 ++++++++++++
+>  2 files changed, 44 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 92e6a90..9ee1f7b 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1171,6 +1171,38 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+>  }
+>  
+>  /**
+> + * __pm_genpd_of_add_device - Add a device to an I/O PM domain.
+> + * @genpd_node: Device tree node pointer representing a PM domain to which the
+> + *   the device is added to.
+> + * @dev: Device to be added.
+> + * @td: Set of PM QoS timing parameters to attach to the device.
+> + */
+> +int __pm_genpd_of_add_device(struct device_node *genpd_node, struct device *dev,
+> +			     struct gpd_timing_data *td)
+> +{
+> +	struct generic_pm_domain *genpd = NULL, *gpd;
+> +
+> +	dev_dbg(dev, "%s()\n", __func__);
+> +
+> +	if (IS_ERR_OR_NULL(genpd_node) || IS_ERR_OR_NULL(dev))
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&gpd_list_lock);
+> +	list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
+> +		if (gpd->of_node == genpd_node) {
+> +			genpd = gpd;
+> +			break;
+> +		}
+> +	}
+> +	mutex_unlock(&gpd_list_lock);
+> +
+> +	if (!genpd)
+> +		return -EINVAL;
+> +
+> +	return __pm_genpd_add_device(genpd, dev, td);
+> +}
+> +
+> +/**
+>   * pm_genpd_remove_device - Remove a device from an I/O PM domain.
+>   * @genpd: PM domain to remove the device from.
+>   * @dev: Device to be removed.
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index a03a0ad..e3ff875 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -11,6 +11,7 @@
+>  
+>  #include <linux/device.h>
+>  #include <linux/err.h>
+> +#include <linux/of.h>
+>  
+>  enum gpd_status {
+>  	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
+> @@ -70,6 +71,7 @@ struct generic_pm_domain {
+>  	s64 break_even_ns;	/* Power break even for the entire domain. */
+>  	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
+>  	ktime_t power_off_time;
+> +	struct device_node *of_node; /* Node in device tree */
+>  };
+>  
+>  static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+> @@ -117,12 +119,22 @@ extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
+>  				 struct device *dev,
+>  				 struct gpd_timing_data *td);
+>  
+> +extern int __pm_genpd_of_add_device(struct device_node *genpd_node,
+> +				    struct device *dev,
+> +				    struct gpd_timing_data *td);
+> +
+>  static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
+>  				      struct device *dev)
+>  {
+>  	return __pm_genpd_add_device(genpd, dev, NULL);
+>  }
+>  
+> +static inline int pm_genpd_of_add_device(struct device_node *genpd_node,
+> +					 struct device *dev)
+> +{
+> +	return __pm_genpd_of_add_device(genpd_node, dev, NULL);
+> +}
+> +
+>  extern int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+>  				  struct device *dev);
+>  extern int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+> 
