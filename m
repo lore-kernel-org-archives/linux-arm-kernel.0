@@ -1,92 +1,165 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 8 Jan 2012 22:23:32 +0100
-Subject: [PATCH 2/2] S3C24XX: move spi-s3c24xx platdata out of mach
-In-Reply-To: <201201082222.11305.heiko@sntech.de>
-References: <201201082222.11305.heiko@sntech.de>
-Message-ID: <201201082223.32677.heiko@sntech.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 8 Jan 2012 22:31:44 +0100
+Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the
+ snapshot image size is anticipative
+In-Reply-To: <CAGsJ_4ypEKZLXf0KU81=dRADcxesxKVyqg0UnEKGaxthNMZQ-g@mail.gmail.com>
+References: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
+ <20120105184604.GA11065@atrey.karlin.mff.cuni.cz>
+ <CAGsJ_4ypEKZLXf0KU81=dRADcxesxKVyqg0UnEKGaxthNMZQ-g@mail.gmail.com>
+Message-ID: <201201082231.44510.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-spi.h now only contains the definition of the platform data structure
-for the driver in spi-s3c24xx.c . Therefore it does not need to stay
-in include/mach but can instead live in linux/spi/s3c24xx.h .
+On Friday, January 06, 2012, Barry Song wrote:
+> 2012/1/6 Pavel Machek <pavel@ucw.cz>:
+> > Hi!
+> >
+> > Is the check even useful these days? Should we remove it altogether?
+> 
+> i think we can let users or distributions decide whether it is useful.
+> On PC, disk space is not an issue, people might run many applications
+> while doing hibernation, so snapshot is much big. an early check will
+> improve user experience because people don't need to wait a long time
+> and find space is not enough.
+> for embedded system, SoC solutions can know whether the space is
+> enough since they know what are running while doing hibernation, so
+> they can skip the check by setting the flag in sysfs.
+> that is why i had this patch sent.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/mach-s3c2410/include/mach/spi.h |   27 ---------------------------
- arch/arm/mach-s3c2440/mach-gta02.c       |    2 +-
- drivers/spi/spi-s3c24xx.c                |    2 +-
- 3 files changed, 2 insertions(+), 29 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/include/mach/spi.h
+I agree with Pavel that it's better to drop the check altogether.
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/spi.h b/arch/arm/mach-s3c2410/include/mach/spi.h
-deleted file mode 100644
-index 2a686c0..0000000
---- a/arch/arm/mach-s3c2410/include/mach/spi.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/spi.h
-- *
-- * Copyright (c) 2006 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C2410 - SPI Controller platform_device info
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_SPI_H
--#define __ASM_ARCH_SPI_H __FILE__
--
--struct s3c2410_spi_info {
--	int			 pin_cs;	/* simple gpio cs */
--	unsigned int		 num_cs;	/* total chipselects */
--	int			 bus_num;       /* bus number to use. */
--
--	unsigned int		 use_fiq:1;	/* use fiq */
--
--	void (*gpio_setup)(struct s3c2410_spi_info *spi, int enable);
--	void (*set_cs)(struct s3c2410_spi_info *spi, int cs, int pol);
--};
--
--#endif /* __ASM_ARCH_SPI_H */
-diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
-index e8d2eb9..236514c 100644
---- a/arch/arm/mach-s3c2440/mach-gta02.c
-+++ b/arch/arm/mach-s3c2440/mach-gta02.c
-@@ -38,6 +38,7 @@
- #include <linux/platform_device.h>
- #include <linux/serial_core.h>
- #include <linux/spi/spi.h>
-+#include <linux/spi/s3c24xx.h>
- 
- #include <linux/mmc/host.h>
- 
-@@ -73,7 +74,6 @@
- #include <mach/regs-gpioj.h>
- #include <mach/fb.h>
- 
--#include <mach/spi.h>
- #include <plat/usb-control.h>
- #include <mach/regs-mem.h>
- #include <mach/hardware.h>
-diff --git a/drivers/spi/spi-s3c24xx.c b/drivers/spi/spi-s3c24xx.c
-index fc06453..8ee7d79 100644
---- a/drivers/spi/spi-s3c24xx.c
-+++ b/drivers/spi/spi-s3c24xx.c
-@@ -24,10 +24,10 @@
- 
- #include <linux/spi/spi.h>
- #include <linux/spi/spi_bitbang.h>
-+#include <linux/spi/s3c24xx.h>
- #include <linux/module.h>
- 
- #include <plat/regs-spi.h>
--#include <mach/spi.h>
- 
- #include <plat/fiq.h>
- #include <asm/fiq.h>
--- 
-1.7.2.3
+The sysfs switch you're adding doesn't seem to be very useful, as PC
+users won't touch it and whoever needs it to be 0, will always set it
+that way and won't change it afterwards.
+
+Thanks,
+Rafael
+
+
+> >> 2011/11/25 Barry Song <Barry.Song@csr.com>:
+> >> > From: Barry Song <baohua.song@csr.com>
+> >> >
+> >> > Current swsusp requires swap partitions even larger than real saved pages
+> >> > based on the worst compression ratio:
+> >> > but for an embedded system, which has limited storage space, then it might
+> >> > can't give the large partition to save snapshot.
+> >> > In the another way, some embedded systems can definitely know the most size
+> >> > needed for snapshot since they run some specific application lists.
+> >> > So this patch provides the possibility for users to tell kernel even
+> >> > the system has a little snapshot partition, but it is still enough.
+> >> > For example, if the system need to save 120MB memory, origin swsusp will require
+> >> > a 130MB partition to save snapshot. but if users know 30MB is enough for them(
+> >> > compressed image will be less than 30MB), they just make a 30MB partition by
+> >> > echo 0 > /sys/power/check_swap_size
+> >> >
+> >> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> >> > Cc: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
+> >> > ---
+> >> >  -v2:drop swap_enough bootargs and use /sys/power/check_swap_size node
+> >> >
+> >> >  Documentation/power/interface.txt |    5 +++++
+> >> >  kernel/power/hibernate.c          |   22 ++++++++++++++++++++++
+> >> >  kernel/power/power.h              |    2 ++
+> >> >  kernel/power/swap.c               |    9 +++++++++
+> >> >  4 files changed, 38 insertions(+), 0 deletions(-)
+> >> >
+> >> > diff --git a/Documentation/power/interface.txt b/Documentation/power/interface.txt
+> >> > index c537834..5e205f0 100644
+> >> > --- a/Documentation/power/interface.txt
+> >> > +++ b/Documentation/power/interface.txt
+> >> > @@ -47,6 +47,11 @@ Writing to this file will accept one of
+> >> >        'testproc'
+> >> >        'test'
+> >> >
+> >> > +/sys/power/check_swap_size controls whether we can skip checking the swap
+> >> > +partition size by worst compression ratio. If users know the swap partition
+> >> > +is enough for compressed snapshot, write 0 to /sys/power/check_swap_size.
+> >> > +It is useful for an embedded system with known running softwares.
+> >> > +
+> >> >  /sys/power/image_size controls the size of the image created by
+> >> >  the suspend-to-disk mechanism.  It can be written a string
+> >> >  representing a non-negative integer that will be used as an upper
+> >> > diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+> >> > index 1c53f7f..5552473 100644
+> >> > --- a/kernel/power/hibernate.c
+> >> > +++ b/kernel/power/hibernate.c
+> >> > @@ -1024,11 +1024,33 @@ static ssize_t reserved_size_store(struct kobject *kobj,
+> >> >
+> >> >  power_attr(reserved_size);
+> >> >
+> >> > +static ssize_t check_swap_size_show(struct kobject *kobj, struct kobj_attribute *attr,
+> >> > +                              char *buf)
+> >> > +{
+> >> > +       return sprintf(buf, "%d\n", check_swap_size);
+> >> > +}
+> >> > +
+> >> > +static ssize_t check_swap_size_store(struct kobject *kobj, struct kobj_attribute *attr,
+> >> > +                               const char *buf, size_t n)
+> >> > +{
+> >> > +       int check_size;
+> >> > +
+> >> > +       if (sscanf(buf, "%d", &check_size) == 1) {
+> >> > +               check_swap_size = check_size;
+> >> > +               return n;
+> >> > +       }
+> >> > +
+> >> > +       return -EINVAL;
+> >> > +}
+> >> > +
+> >> > +power_attr(check_swap_size);
+> >> > +
+> >> >  static struct attribute * g[] = {
+> >> >        &disk_attr.attr,
+> >> >        &resume_attr.attr,
+> >> >        &image_size_attr.attr,
+> >> >        &reserved_size_attr.attr,
+> >> > +       &check_swap_size_attr.attr,
+> >> >        NULL,
+> >> >  };
+> >> >
+> >> > diff --git a/kernel/power/power.h b/kernel/power/power.h
+> >> > index 23a2db1..4f0fa78 100644
+> >> > --- a/kernel/power/power.h
+> >> > +++ b/kernel/power/power.h
+> >> > @@ -74,6 +74,8 @@ static struct kobj_attribute _name##_attr = { \
+> >> >
+> >> >  /* Preferred image size in bytes (default 500 MB) */
+> >> >  extern unsigned long image_size;
+> >> > +/* If 0, skip checking whether the swap size is enough for compressed snapshot */
+> >> > +extern int check_swap_size;
+> >> >  /* Size of memory reserved for drivers (default SPARE_PAGES x PAGE_SIZE) */
+> >> >  extern unsigned long reserved_size;
+> >> >  extern int in_suspend;
+> >> > diff --git a/kernel/power/swap.c b/kernel/power/swap.c
+> >> > index 11a594c..db90195 100644
+> >> > --- a/kernel/power/swap.c
+> >> > +++ b/kernel/power/swap.c
+> >> > @@ -37,6 +37,12 @@
+> >> >  #define HIBERNATE_SIG  "S1SUSPEND"
+> >> >
+> >> >  /*
+> >> > + * if users know swap partitions are enough for compressed snapshots,
+> >> > + * echo 0 > /sys/power/check_swap_size
+> >> > + */
+> >> > +int check_swap_size = 1;
+> >> > +
+> >> > +/*
+> >> >  *     The swap map is a data structure used for keeping track of each page
+> >> >  *     written to a swap partition.  It consists of many swap_map_page
+> >> >  *     structures that contain each an array of MAP_PAGE_ENTRIES swap entries.
+> >> > @@ -772,6 +778,9 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
+> >> >        unsigned int free_swap = count_swap_pages(root_swap, 1);
+> >> >        unsigned int required;
+> >> >
+> >> > +       if (!check_swap_size)
+> >> > +               return 1;
+> >> > +
+> >> >        pr_debug("PM: Free swap pages: %u\n", free_swap);
+> >> >
+> >> >        required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
+> >> > --
+> >> > 1.7.1
+> >
+> -barry
+> 
+> 
