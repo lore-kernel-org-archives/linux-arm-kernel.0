@@ -1,60 +1,26 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Sat, 7 Jan 2012 17:05:31 -0800
-Subject: [PATCH v4] Input: keyboard - add device tree bindings for simple
- key matrixes
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17761F11FF@HQMAIL01.nvidia.com>
-References: <1325484557-27695-1-git-send-email-olof@lixom.net>
- <1325626648-9425-1-git-send-email-olof@lixom.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F11FF@HQMAIL01.nvidia.com>
-Message-ID: <CAPnjgZ3G7yFOrngJP=KtJNcgAWtZg3xn22tRMMi+pUnZ2rJpBQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 8 Jan 2012 11:32:40 +0800
+Subject: MX28 fec clock frequency
+In-Reply-To: <4F06D643.6080602@prolan.hu>
+References: <4F06D643.6080602@prolan.hu>
+Message-ID: <20120108033238.GA19721@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Peter,
 
-On Tue, Jan 3, 2012 at 2:37 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Tuesday, January 03, 2012 2:37 PM:
->> This adds a simple device tree binding for simple key matrix data and
->> a helper to fill in the platform data.
->>
->> The implementation is in a shared file outside if drivers/input/keyboard
->> since some drivers in drivers/input/misc might be making use of it
->> as well.
->>
->> Changes since v3:
->> ?* Dropped compatible field in matrix-keymap.txt
->> ?* Dropped linux,fn-key
->> ?* Dropped linux,fn-keymap optional property but included guideline on
->> ? ?naming convention
->> ?* Now passing property name in to the helper function (or will assume
->> ? ?"linux,keymap" if passed NULL)
->
->> diff --git a/drivers/input/of_keymap.c b/drivers/input/of_keymap.c
->
->> +struct matrix_keymap_data *
->> +matrix_keyboard_of_fill_keymap(struct device_node *np, char *propname)
->> +{
-> ...
->> + ? ? kd = kmalloc(sizeof(*kd), GFP_KERNEL);
->> + ? ? if (!kd)
->> + ? ? ? ? ? ? return NULL;
->
-> Should that use kzalloc in case struct matrix_keymap_data grows some
-> new fields that people will assume are set to zero since the struct
-> would usually be in .data? Still, people should probably grep the code
-> when making such changes...
->
-> Otherwise,
->
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+On Fri, Jan 06, 2012 at 12:08:51PM +0100, Peter Rusko wrote:
+> Hi all,
+> 
+> I'm trying to get the fec clock frequency on the i.MX28 processor. I0
+> need it for a PTP clock and it seems that I get a wrong value:
+> clk_get_rate returns 151578947.
+> 
 
-Do you have a Tegra .dts binding for the Seaboard keyboard that I can
-test with please?
+The ptp clock (CLK_ENET_TIME) was missed from the initial imx28 clock
+support.  The fec_clk which is one child of hbus_clk (151 MHz) is
+taken as MDIO clock in fec driver.
 
+-- 
 Regards,
-Simon
-
->
-> --
-> nvpublic
->
+Shawn
