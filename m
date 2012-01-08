@@ -1,197 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 8 Jan 2012 16:27:23 +0800
-Subject: [PATCH] arm: imx6q: bypass anatop regulator during suspend
-In-Reply-To: <1325740842-5464-1-git-send-email-jason.chen@linaro.org>
-References: <1325740842-5464-1-git-send-email-jason.chen@linaro.org>
-Message-ID: <20120108082650.GA20216@S2101-09.ap.freescale.net>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun,  8 Jan 2012 11:33:36 +0300
+Subject: [PATCH] ARM: PXA: Zipit Z2: Fix oops in z2_power_off
+Message-ID: <1326011616-3546-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For subject, please make it be like 'ARM: imx6q: ...'
+pxa27x_set_pwrmode is marked with __init, so it's not legitimate
+to call it in pm_power_off hook.
 
-On Thu, Jan 05, 2012 at 01:20:42PM +0800, Jason Chen wrote:
-> enable bit CCM_CLPCR_wb_per_at_lpm to decrease leakage during suspend.
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ arch/arm/mach-pxa/z2.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-It looks odd to have capital and lower case mixed in name
-'CCM_CLPCR_wb_per_at_lpm'.
-
-> enable bit CCM_CCR_RBC_EN to disable/bypass anatop regulator during suspend.
-> 
-> Signed-off-by: Jason Chen <jason.chen@linaro.org>
-> Signed-off-by: Jason Chen <jason.chen@freescale.com>
-> ---
->  arch/arm/mach-imx/clock-imx6q.c |   31 +++++++++++++++---------
->  arch/arm/mach-imx/pm-imx6q.c    |   48 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 67 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-> index 56a7a3f..11d2453 100644
-> --- a/arch/arm/mach-imx/clock-imx6q.c
-> +++ b/arch/arm/mach-imx/clock-imx6q.c
-> @@ -115,6 +115,8 @@
->  #define CG14		28
->  #define CG15		30
->  
-> +#define BM_CCR_RBC_EN			(0x1 << 27)
-> +
->  #define BM_CCSR_PLL1_SW_SEL		(0x1 << 2)
->  #define BM_CCSR_STEP_SEL		(0x1 << 8)
->  
-> @@ -1916,33 +1918,38 @@ static struct clk_lookup lookups[] = {
->  
->  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
->  {
-> -	u32 val = readl_relaxed(CLPCR);
-> +	u32 clpcr = readl_relaxed(CLPCR);
-> +	u32 ccr = readl_relaxed(CCR);
->  
-> -	val &= ~BM_CLPCR_LPM;
-> +	clpcr &= ~(BM_CLPCR_LPM | BM_CLPCR_VSTBY | BM_CLPCR_SBYOS
-> +			| BM_CLPCR_STBY_COUNT | BM_CLPCR_WB_PER_AT_LPM);
-> +	ccr &= ~(BM_CCR_RBC_EN);
-
-Unneeded parentheses.
-
->  	switch (mode) {
->  	case WAIT_CLOCKED:
->  		break;
->  	case WAIT_UNCLOCKED:
-> -		val |= 0x1 << BP_CLPCR_LPM;
-> +		clpcr |= 0x1 << BP_CLPCR_LPM;
->  		break;
->  	case STOP_POWER_ON:
-> -		val |= 0x2 << BP_CLPCR_LPM;
-> +		clpcr |= 0x2 << BP_CLPCR_LPM;
->  		break;
->  	case WAIT_UNCLOCKED_POWER_OFF:
-> -		val |= 0x1 << BP_CLPCR_LPM;
-> -		val &= ~BM_CLPCR_VSTBY;
-> -		val &= ~BM_CLPCR_SBYOS;
-> +		clpcr |= 0x1 << BP_CLPCR_LPM;
->  		break;
->  	case STOP_POWER_OFF:
-> -		val |= 0x2 << BP_CLPCR_LPM;
-> -		val |= 0x3 << BP_CLPCR_STBY_COUNT;
-> -		val |= BM_CLPCR_VSTBY;
-> -		val |= BM_CLPCR_SBYOS;
-> +		clpcr |= 0x2 << BP_CLPCR_LPM;
-> +		clpcr |= 0x3 << BP_CLPCR_STBY_COUNT;
-> +		clpcr |= BM_CLPCR_VSTBY;
-> +		clpcr |= BM_CLPCR_SBYOS;
-> +		clpcr |= BM_CLPCR_WB_PER_AT_LPM;
-> +		/* assert anatop_reg_bypass signal */
-
-We do not have to put the comment here, as it does not help too much.
-
-> +		ccr |= BM_CCR_RBC_EN;
->  		break;
->  	default:
->  		return -EINVAL;
->  	}
-> -	writel_relaxed(val, CLPCR);
-> +	writel_relaxed(clpcr, CLPCR);
-> +	writel_relaxed(ccr, CCR);
->  
->  	return 0;
->  }
-> diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-> index f20f191..72a1399 100644
-> --- a/arch/arm/mach-imx/pm-imx6q.c
-> +++ b/arch/arm/mach-imx/pm-imx6q.c
-> @@ -13,6 +13,7 @@
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/suspend.h>
->  #include <asm/cacheflush.h>
->  #include <asm/proc-fns.h>
-> @@ -22,6 +23,41 @@
->  #include <mach/hardware.h>
->  
->  extern unsigned long phys_l2x0_saved_regs;
-> +static void __iomem *anatop_base;
-> +
-> +#define ANATOP_REG_2P5			0x130
-> +#define BM_ANATOP_REG_2P5_WEAK_EN	(0x1 << 18)
-> +
-> +static int imx6q_anatop_reg_pre_suspend(void)
-> +{
-> +	/*
-> +	 * enable anatop weak 2p5 regulator, which should use
-> +	 * regulator API after anatop regulator implementation.
-> +	 */
-> +	if (anatop_base) {
-> +		unsigned int reg_2p5;
-> +		reg_2p5 = readl(anatop_base + ANATOP_REG_2P5);
-> +		reg_2p5 |= BM_ANATOP_REG_2P5_WEAK_EN;
-> +		writel(reg_2p5, anatop_base + ANATOP_REG_2P5);
-> +	} else
-> +		return -EINVAL;
-> +
-> +	return 0;
-> +}
-> +
-> +static void imx6q_anatop_reg_post_resume(void)
-> +{
-> +	/*
-> +	 * disable anatop weak 2p5 regulator, which should use
-> +	 * regulator API after anatop regulator implementation.
-> +	 */
-> +	if (anatop_base) {
-> +		unsigned int reg_2p5;
-> +		reg_2p5 = readl(anatop_base + ANATOP_REG_2P5);
-> +		reg_2p5 &= ~BM_ANATOP_REG_2P5_WEAK_EN;
-> +		writel(reg_2p5, anatop_base + ANATOP_REG_2P5);
-> +	}
-> +}
->  
-I do not like to have these anatop functions implemented in pm-imx6q.c.
-
->  static int imx6q_suspend_finish(unsigned long val)
->  {
-> @@ -33,6 +69,8 @@ static int imx6q_pm_enter(suspend_state_t state)
->  {
->  	switch (state) {
->  	case PM_SUSPEND_MEM:
-> +		if (imx6q_anatop_reg_pre_suspend() < 0)
-> +			return -EINVAL;
->  		imx6q_set_lpm(STOP_POWER_OFF);
->  		imx_gpc_pre_suspend();
->  		imx_set_cpu_jump(0, v7_cpu_resume);
-> @@ -40,6 +78,7 @@ static int imx6q_pm_enter(suspend_state_t state)
->  		cpu_suspend(0, imx6q_suspend_finish);
->  		imx_smp_prepare();
->  		imx_gpc_post_resume();
-> +		imx6q_anatop_reg_post_resume();
->  		break;
->  	default:
->  		return -EINVAL;
-> @@ -55,6 +94,15 @@ static const struct platform_suspend_ops imx6q_pm_ops = {
->  
->  void __init imx6q_pm_init(void)
->  {
-> +	struct device_node *np;
-> +
-> +	/*
-> +	 * remap anatop to adjust anatop regulator, which should
-> +	 * remove after anatop regulator driver implementation.
-> +	 */
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
-> +	anatop_base = of_iomap(np, 0);
-> +
-
-I would wait for anatop regulator driver being ready before we add
-this bypass support, so that we can save all this unnecessary churn
-in the pm-imx6q.c.
-
-Regards,
-Shawn
-
->  	/*
->  	 * The l2x0 core code provides an infrastucture to save and restore
->  	 * l2x0 registers across suspend/resume cycle.  But because imx6q
-> -- 
-> 1.7.4.1
-> 
-> 
+diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+index 0fb5617..8b0ce77 100644
+--- a/arch/arm/mach-pxa/z2.c
++++ b/arch/arm/mach-pxa/z2.c
+@@ -33,6 +33,7 @@
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/suspend.h>
+ 
+ #include <mach/pxa27x.h>
+ #include <mach/mfp-pxa27x.h>
+@@ -739,8 +740,7 @@ static void z2_power_off(void)
+ 	 */
+ 	PSPR = 0x0;
+ 	local_irq_disable();
+-	pxa27x_set_pwrmode(PWRMODE_DEEPSLEEP);
+-	pxa27x_cpu_pm_enter(PM_SUSPEND_MEM);
++	cpu_suspend(PWRMODE_DEEPSLEEP, pxa27x_finish_suspend);
+ }
+ #else
+ #define z2_power_off   NULL
+-- 
+1.7.8.1
