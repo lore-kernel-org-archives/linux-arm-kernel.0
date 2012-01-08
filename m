@@ -1,58 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Jan 2012 00:21:04 +0000
-Subject: [PATCH v2 2/2] msm: DMAEngine: Add DMAEngine driver based on
- old MSM DMA APIs
-In-Reply-To: <1325981636.16037.6.camel@m0nster>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1325854052-21402-3-git-send-email-kumarrav@codeaurora.org>
- <1325901569.10425.14.camel@m0nster> <20120107185443.GA19216@codeaurora.org>
- <20120107192112.GB13181@n2100.arm.linux.org.uk>
- <1325981636.16037.6.camel@m0nster>
-Message-ID: <20120108002104.GC13181@n2100.arm.linux.org.uk>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Sat, 7 Jan 2012 16:45:02 -0800
+Subject: [2.6.37 -> 2.6.38 regression] "mv64xxx: I2C bus locked, block:
+ 1, time_left: 0" every few seconds
+In-Reply-To: <20120101073255.GA2402@elie.hsd1.il.comcast.net>
+References: <20120101042401.4bef017e@natsu>
+ <20120101073255.GA2402@elie.hsd1.il.comcast.net>
+Message-ID: <20120108004502.GA20549@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 07, 2012 at 04:13:56PM -0800, Daniel Walker wrote:
-> On Sat, 2012-01-07 at 19:21 +0000, Russell King - ARM Linux wrote:
-> > Please refer to the DMA engine documentation, found here:
-> > 
-> > Documentation/dmaengine.txt
-> > 
-> > section 3:
-> > 
-> >    Note:
-> >         Although the async_tx API specifies that completion callback
-> >         routines cannot submit any new operations, this is not the
-> >         case for slave/cyclic DMA.
-> > 
-> >         For slave DMA, the subsequent transaction may not be available
-> >         for submission prior to callback function being invoked, so
-> >         slave DMA callbacks are permitted to prepare and submit a new
-> >         transaction.
-> > 
-> >         For cyclic DMA, a callback function may wish to terminate the
-> >         DMA via dmaengine_terminate_all().
-> > 
-> > *       Therefore, it is important that DMA engine drivers drop any
-> > *       locks before calling the callback function which may cause a
-> > *       deadlock.
+On Sun, Jan 01, 2012 at 01:32:55AM -0600, Jonathan Nieder wrote:
+> Hi,
 > 
-> Here's the comment from at_hdmac.c .
+> Roman Mamedov wrote[1]:
 > 
->                 /*
->                  * The API requires that no submissions are done from a
->                  * callback, so we don't need to drop the lock here
->                  */
->                 if (callback)
->                         callback(param);
+> > This bug is still present for me in the latest kernel version in
+> > Debian testing (3.1.6).
+> >
+> > The last properly working kernel version seems to be:
+> [...]
+> > And the problem occurs since:
+> [...]
 > 
-> I don't know much about the DMA engine, but maybe there is some special
-> case here that makes this ok.. (CC'ed Nicolas Ferre)
+> Thanks.  Arnaud, any hints?  To summarize:
+> 
+>  - Michael Ott reported with Debian kernel 2.6.38-3 (which is closely
+>    based on stable v2.6.38.2):
+> 
+> 	syslog tell me every few seconds:
+> 	i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+> 
+>  - Manuel Roeder reported the same and found that upstream v2.6.38
+>    triggers the problem and v2.6.37.6 does not.
+> 
+>  - Roman Mamedov finds the bug present in Debian 3.1.6-1 (which
+>    is closely based on stable v3.1.6) and Debian 2.6.37-2 (based on
+>    stable v2.6.37.2) but not Debian 2.6.37-1 (based on mainline
+>    v2.6.37).
+> 
+> The regression range described above seems a little inconsistent to
+> me, so maybe there's something more going on.
+> 
+Points to commit eda6bee6c7e67b5bd17bdbced0926f5687f686d5 (i2c-mv64xxx: send repeated START
+between messages in xfer). Maybe you can back it out and see if it makes a difference.
 
-If you read the note fully, you'll notice that there's a difference
-between the async_tx API and the slave/cyclic DMA API (it's covered
-in the first paragraph.)
-
-Plus that documentation was written by me, reviewed by Dan and Vinod
-and accepted.  You can treat it as authoritive, and take from it that
-at_hdmac.c is buggy.
+Guenter
