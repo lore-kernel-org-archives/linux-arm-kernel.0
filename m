@@ -1,48 +1,58 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Sun, 8 Jan 2012 18:10:09 +0200
-Subject: [RFC PATCH 0/9] Remove useless on_each_cpu return value
-In-Reply-To: <1325854981.2442.25.camel@twins>
-References: <1325600353-10895-1-git-send-email-gilad@benyossef.com>
- <1325854981.2442.25.camel@twins>
-Message-ID: <CAOtvUMe0pXKTrJGhkc=OFvqYS1R_PXU9qbSAP8Ld5U7NhFvCSw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 8 Jan 2012 16:12:12 +0000
+Subject: [RFC PATCH v2 1/9] arm: avoid using on_each_cpu hard coded ret
+ value
+In-Reply-To: <1326029549-2794-2-git-send-email-gilad@benyossef.com>
+References: <1326029549-2794-1-git-send-email-gilad@benyossef.com>
+ <1326029549-2794-2-git-send-email-gilad@benyossef.com>
+Message-ID: <20120108161212.GD21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 6, 2012 at 3:03 PM, Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
-> On Tue, 2012-01-03 at 16:19 +0200, Gilad Ben-Yossef wrote:
->> on_each_cpu() returns as its own return value the return value of
->> smp_call_function(). smp_call_function() in turn returns a hard
->> coded value of zero.
->>
->> Some callers to on_each_cpu() waste cycles and bloat code space
->> by checking the return value to on_each_cpu(), probably for
->> historical reasons.
->
-> hysterical raisins,, yumm! :-)
->
->> This patch set refactors callers to not test on_each_cpu()
->> (fixed) return value and then refactors on_each_cpu to
->> return void to avoid confusing future users.
->>
->
-> Seems sane enough, fwiw:
->
+On Sun, Jan 08, 2012 at 03:32:21PM +0200, Gilad Ben-Yossef wrote:
+> on_each_cpu always returns a hard coded return code of zero.
+> 
+> Removing all tests based on this return value saves run time
+> cycles for compares and code bloat for branches.
+> 
+> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 > Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Reviewed-by: Michal Nazarewicz <mina86@mina86.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> CC: Paul Mackerras <paulus@samba.org>
+> CC: Ingo Molnar <mingo@elte.hu>
+> CC: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+> CC: Russell King <linux@arm.linux.org.uk>
 
-Thanks for the review :-)
+Reviewed-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I just sent out a V2. No changes except I've added the needed signed-off-by.
+> CC: Grant Likely <grant.likely@secretlab.ca>
+> CC: Rob Herring <rob.herring@calxeda.com>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: devicetree-discuss at lists.ozlabs.org
+> ---
+>  arch/arm/kernel/perf_event.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 5bb91bf..6e9acb7 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -616,7 +616,7 @@ static int __init
+>  cpu_pmu_reset(void)
+>  {
+>  	if (cpu_pmu && cpu_pmu->reset)
+> -		return on_each_cpu(cpu_pmu->reset, NULL, 1);
+> +		on_each_cpu(cpu_pmu->reset, NULL, 1);
 
-Gilad
+There's not much to review here...
 
+Thanks.
 
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
-gilad at benyossef.com
-Israel Cell: +972-52-8260388
-US Cell: +1-973-8260388
-http://benyossef.com
-
-"Unfortunately, cache misses are an equal opportunity pain provider."
--- Mike Galbraith, LKML
+>  	return 0;
+>  }
+>  arch_initcall(cpu_pmu_reset);
+> -- 
+> 1.7.0.4
+> 
