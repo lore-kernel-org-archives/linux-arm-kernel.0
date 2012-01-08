@@ -1,46 +1,84 @@
 From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Sun,  8 Jan 2012 15:32:21 +0200
-Subject: [RFC PATCH v2 1/9] arm: avoid using on_each_cpu hard coded ret value
-In-Reply-To: <1326029549-2794-1-git-send-email-gilad@benyossef.com>
-References: <1326029549-2794-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1326029549-2794-2-git-send-email-gilad@benyossef.com>
+Date: Sun,  8 Jan 2012 15:32:20 +0200
+Subject: [RFC PATCH v2 0/9] Remove useless on_each_cpu return value
+Message-ID: <1326029549-2794-1-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on_each_cpu always returns a hard coded return code of zero.
+on_each_cpu() returns as its own return value the return value of
+smp_call_function(). smp_call_function() in turn returns a hard
+coded value of zero.
 
-Removing all tests based on this return value saves run time
-cycles for compares and code bloat for branches.
+Some callers to on_each_cpu() waste cycles and bloat code space
+by checking the return value to on_each_cpu(), probably for
+historical reasons.
+
+This patch set refactors callers to not test on_each_cpu()
+(fixed) return value and then refactors on_each_cpu to
+return void to avoid confusing future users.
+
+In other words, this patch aims to delete 18 source code lines
+while not changing any functionality :-)
+
+I tested as best as I could the x86 changes and compiled some
+of the others, but I don't have access to all the needed hardware
+for testing. Reviewers and testers welcome!
+
+The only change from the first version is the addition of a 
+proper Signed-off-by line.
+
+This patch set is also available on branch on_each_cpu_ret_v2
+at git://github.com/gby/linux.git
 
 Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
 Reviewed-by: Michal Nazarewicz <mina86@mina86.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Peter Zijlstra <a.p.zijlstra@chello.nl>
+CC: Michal Nazarewicz <mina86@mina86.com>
+CC: David Airlie <airlied@linux.ie>
+CC: dri-devel at lists.freedesktop.org
+CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 CC: Paul Mackerras <paulus@samba.org>
-CC: Ingo Molnar <mingo@elte.hu>
-CC: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-CC: Russell King <linux@arm.linux.org.uk>
 CC: Grant Likely <grant.likely@secretlab.ca>
 CC: Rob Herring <rob.herring@calxeda.com>
-CC: linux-arm-kernel at lists.infradead.org
+CC: linuxppc-dev at lists.ozlabs.org
 CC: devicetree-discuss at lists.ozlabs.org
----
- arch/arm/kernel/perf_event.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+CC: Richard Henderson <rth@twiddle.net>
+CC: Ivan Kokshaysky <ink@jurassic.park.msu.ru>
+CC: Matt Turner <mattst88@gmail.com>
+CC: linux-alpha at vger.kernel.org
+CC: Thomas Gleixner <tglx@linutronix.de>
+CC: Ingo Molnar <mingo@redhat.com>
+CC: "H. Peter Anvin" <hpa@zytor.com>
+CC: x86 at kernel.org
+CC: Tony Luck <tony.luck@intel.com>
+CC: Fenghua Yu <fenghua.yu@intel.com>
+CC: linux-ia64 at vger.kernel.org
+CC: Will Deacon <will.deacon@arm.com>
+CC: Peter Zijlstra <a.p.zijlstra@chello.nl>
+CC: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: linux-arm-kernel at lists.infradead.org
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 5bb91bf..6e9acb7 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -616,7 +616,7 @@ static int __init
- cpu_pmu_reset(void)
- {
- 	if (cpu_pmu && cpu_pmu->reset)
--		return on_each_cpu(cpu_pmu->reset, NULL, 1);
-+		on_each_cpu(cpu_pmu->reset, NULL, 1);
- 	return 0;
- }
- arch_initcall(cpu_pmu_reset);
--- 
-1.7.0.4
+
+Gilad Ben-Yossef (9):
+  arm: avoid using on_each_cpu hard coded ret value
+  ia64: avoid using on_each_cpu hard coded ret value
+  x86: avoid using on_each_cpu hard coded ret value
+  alpha: avoid using on_each_cpu hard coded ret value
+  ppc: avoid using on_each_cpu hard coded ret value
+  agp: avoid using on_each_cpu hard coded ret value
+  drm: avoid using on_each_cpu hard coded ret value
+  smp: refactor on_each_cpu to void returning func
+  x86: refactor wbinvd_on_all_cpus to void function
+
+ arch/alpha/kernel/smp.c      |    7 ++-----
+ arch/arm/kernel/perf_event.c |    2 +-
+ arch/ia64/kernel/perfmon.c   |   12 ++----------
+ arch/powerpc/kernel/rtas.c   |    3 +--
+ arch/x86/include/asm/smp.h   |    5 ++---
+ arch/x86/lib/cache-smp.c     |    4 ++--
+ drivers/char/agp/generic.c   |    3 +--
+ drivers/gpu/drm/drm_cache.c  |    3 +--
+ include/linux/smp.h          |    7 +++----
+ kernel/smp.c                 |    6 ++----
+ 10 files changed, 17 insertions(+), 35 deletions(-)
