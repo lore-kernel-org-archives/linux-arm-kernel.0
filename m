@@ -1,26 +1,38 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 8 Jan 2012 11:32:40 +0800
-Subject: MX28 fec clock frequency
-In-Reply-To: <4F06D643.6080602@prolan.hu>
-References: <4F06D643.6080602@prolan.hu>
-Message-ID: <20120108033238.GA19721@S2101-09.ap.freescale.net>
+Date: Sun, 8 Jan 2012 11:44:10 +0800
+Subject: [GIT PULL] mxs: board support for 3.3
+Message-ID: <20120108034408.GB19721@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Arnd, Olof,
 
-On Fri, Jan 06, 2012 at 12:08:51PM +0100, Peter Rusko wrote:
-> Hi all,
-> 
-> I'm trying to get the fec clock frequency on the i.MX28 processor. I0
-> need it for a PTP clock and it seems that I get a wrong value:
-> clk_get_rate returns 151578947.
-> 
+As I promised to Lauri, I will send his board support for 3.3.  I know
+even if it gets pulled, it will go to 'late/*' which is not guaranteed
+to be sent for 3.3.  But anyway, here it is.  Please consider to pull.
 
-The ptp clock (CLK_ENET_TIME) was missed from the initial imx28 clock
-support.  The fec_clk which is one child of hbus_clk (151 MHz) is
-taken as MDIO clock in fec driver.
-
--- 
 Regards,
 Shawn
+
+The following changes since commit 33e1ef2fd56569528d1c22fe37e9c020eadd91be:
+
+  Merge remote-tracking branch 'arm-soc/mxs/saif' into mxs/board (2012-01-06 23:06:12 +0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/boards
+
+Lauri Hintsala (1):
+      ARM: mxs: Add initial support for Bluegiga APX4 Development Kit
+
+Shawn Guo (1):
+      ARM: mxs: detect SoC by checking CHIPID register
+
+ arch/arm/mach-mxs/Kconfig                   |   16 ++
+ arch/arm/mach-mxs/Makefile                  |    1 +
+ arch/arm/mach-mxs/include/mach/digctl.h     |    1 +
+ arch/arm/mach-mxs/include/mach/mxs.h        |   29 ++--
+ arch/arm/mach-mxs/include/mach/uncompress.h |   13 +-
+ arch/arm/mach-mxs/mach-apx4devkit.c         |  245 +++++++++++++++++++++++++++
+ 6 files changed, 285 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
