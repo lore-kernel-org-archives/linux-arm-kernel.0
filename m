@@ -1,37 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 8 Jan 2012 12:55:05 -0800
-Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <20120108145254.GE20216@S2101-09.ap.freescale.net>
-References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
- <20120108145254.GE20216@S2101-09.ap.freescale.net>
-Message-ID: <20120108205504.GF29065@opensource.wolfsonmicro.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 8 Jan 2012 21:56:43 +0100
+Subject: [PATCH 0/3] s3c-hsudc powerdomain using generic power domains
+Message-ID: <201201082156.44142.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 08, 2012 at 10:52:56PM +0800, Shawn Guo wrote:
-> On Fri, Jan 06, 2012 at 11:25:41AM +0800, Richard Zhao wrote:
+The S3C2443/S3C2416/S3C2450 contain a power domain for the usb phy.
+Up until now the s3c-hsudc was writing directly to the PWRCFG register
+in the (un)init_phy functions to control it.
 
-> > +					VDDA-supply = <&reg_2P5V>;
-> > +					VDDIO-supply = <&reg_3P3V>;
+This patchset introduces a power domain for the usbphy and hooks the
+hsudc-device to it. The new runtime_pm calls then handle the enabling
+and disabling of the power domain on udc start and stop.
 
-> I would prefer to have them named vdda-supply and vddio-supply.  But
-> I just learnt that they do not work, because sgtl5000 driver
-> (sound/soc/codecs/sgtl5000.c) has the supply_names in upper case, while
-> unlike of_node_cmp() is strcasecmp(), of_prop_cmp() is just strcmp().
+As a result another arch dependency is gone from the driver.
 
-> But the convention on property name is really all using lower case,
-> and mixing cases there looks odd, so I'm thinking about the changes
-> below on of_get_regulator().
+This set applies cleanly to linux-next from 2012-01-06 and is
+tested on S3C2416 hardware.
 
->         snprintf(prop_name, 32, "%s-supply", supply);
-> +       while (prop_name[i] && i < 32) {
-> +               prop_name[i] = tolower(prop_name[i]);
-> +               i++;
-> +       }
+Heiko Stuebner (3):
+  s3c-hsudc: Use helper functions instead of generic container_of
+  s3c-hsudc: add basic runtime_pm calls
+  S3C2443: add power domain for usb phy
 
-There's two big problems here.  One is that we clearly shouldn't be
-open coding this here but adding a function for it.  The other is that
-this is going to break any existing device tree which has upper cased
-supplies.  If we were going to do something here I'd go with case
-insensitve matching though I'm not sure it's a real problem.
+ arch/arm/mach-s3c2416/Kconfig             |    1 +
+ arch/arm/mach-s3c2443/Kconfig             |    1 +
+ arch/arm/plat-s3c24xx/Kconfig             |    7 +++
+ arch/arm/plat-s3c24xx/Makefile            |    1 +
+ arch/arm/plat-s3c24xx/s3c2443-pm-common.c |   65 +++++++++++++++++++++++++++++
+ drivers/usb/gadget/s3c-hsudc.c            |   25 ++++++-----
+ 6 files changed, 89 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/plat-s3c24xx/s3c2443-pm-common.c
+
+-- 
+1.7.2.3
