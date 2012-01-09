@@ -1,74 +1,27 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 10 Jan 2012 07:30:07 +0800
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120109224945.GA23090@mudshark.cambridge.arm.com>
-References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
- <4F0B182D.7060507@us.ibm.com>
- <20120109224945.GA23090@mudshark.cambridge.arm.com>
-Message-ID: <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 9 Jan 2012 15:34:39 -0800
+Subject: [GIT PULL] msm fix for v3.2-rc.
+Message-ID: <20120109233439.GA13911@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Small fix that prevented msm7201 from building.
 
-On Tue, Jan 10, 2012 at 6:49 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jan 09, 2012 at 04:39:09PM +0000, Maynard Johnson wrote:
->> On 01/08/2012 8:58 PM, Lik Lik wrote:
->> > Hi all,
->
-> Hi guys [adding a bunch of people to CC because this issue is really
-> annoying me now],
->
->> > I am an oprofile user and I need to profile one of my applications on a TI OMAP4
->> > platform (pandaboard, to be specific). I have ubuntu 11.10 installed. My problem
->> > is that oprofile always use the timer interrupt mode but doesn't recognize the
->> > hardware counters, which I am sure my platform has.
->
-> First and foremost, we can't currently generate PMU interrupts on OMAP4 in
-> mainline. There are some additional patches required for these to work:
->
-> http://marc.info/?l=linux-arm-kernel&m=131946761428296&w=2
->
-> However, as Stephane has pointed out here:
->
-> http://marc.info/?l=linux-omap&m=132585784125352&w=2
->
-> the interrupts still don't seem to work, even with the patches above
-> applied.
->
-> Ming Lei doesn't seem to be replying to email anymore, so maybe somebody
+The following changes since commit 805a6af8dba5dfdd35ec35dc52ec0122400b2610:
 
-Sorry, I am on a trip now and no pandboard at my hand, so I may have
-time to verify
-the latest mainline next week after I return home.
+  Linux 3.2 (2012-01-04 15:55:44 -0800)
 
-I remembered that last time I verified these patches on 3.2-rc2 and
-3.2-rc2 next tree,
-and perf did work well on my pandaboard.
+are available in the git repository at:
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-fix
 
-Also seems there were reports that omap4 perf may not work on some specific
-uboot version even with these patches.
+there is a signed tag 'davidb-msm-fix'.
 
-> else on linux-omap could please help us? I'm hoping that we're just missing
-> some patches from somewhere, but it would be great if somebody could verify
-> this (and indeed, verify that the interrupts we're registering in the thread
-> above look sane).
->
->> OProfile userspace support for ARM Cortex-A9 was added by Will Deacon in June
->> 2010. ?This support is available in OProfile 0.9.7. ?According to Will's
->> posting, the kernel support was due to be added to Ubuntu Maverick, so I would
->> expect your version should support CA9 out of the box. ?If not already using
->> oprofile 0.9.7, please upgrade to that version and retry. ?If it still doesn't
->> work, please re-post with complete information (kernel version, oprofile command
->> output, and contents of /dev/oprofile/cpu_type).
->
-> If with the latest OProfile, `timer mode' is still reported then you should
-> check that you have CONFIG_HW_PERF_EVENTS enabled in your kernel. It still
-> won't work though, because of the problems I mentioned above.
+David Brown (1):
+      ARM: msm: vreg is a module and so needs module.h
 
-If debug message from 'dmesg' can be provided, maybe we can find clue
-about the problem.
+ arch/arm/mach-msm/vreg.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-thanks,
---
-Ming Lei
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
