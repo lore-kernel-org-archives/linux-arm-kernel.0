@@ -1,27 +1,61 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 9 Jan 2012 15:34:39 -0800
-Subject: [GIT PULL] msm fix for v3.2-rc.
-Message-ID: <20120109233439.GA13911@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 09 Jan 2012 15:52:15 -0800
+Subject: [PATCH RFCv2] MFD: OMAP: USB: Make the runtime functions depend
+ on CONFIG_PM_RUNTIME
+In-Reply-To: <1326108657-23595-1-git-send-email-shubhrajyoti@ti.com>
+ (Shubhrajyoti D.'s message of "Mon, 9 Jan 2012 17:00:57 +0530")
+References: <1326108657-23595-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <87hb04xwls.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Small fix that prevented msm7201 from building.
+Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 
-The following changes since commit 805a6af8dba5dfdd35ec35dc52ec0122400b2610:
+> Currently the runtime functions are compiled regardless
+> of CONFIG_PM_RUNTIME flag. This patch intends to fix the same by
+> using SET_RUNTIME_PM_OPS.
+>
+> Cc : Keshava Munegowda <keshava_mgowda@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+> applies on Tony's ehci branch.
+> Compile tested only.
 
-  Linux 3.2 (2012-01-04 15:55:44 -0800)
+Lookd right to me:
 
-are available in the git repository at:
-  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-fix
+Reviewed-by: Kevin Hilman <khilman@ti.com>
 
-there is a signed tag 'davidb-msm-fix'.
-
-David Brown (1):
-      ARM: msm: vreg is a module and so needs module.h
-
- arch/arm/mach-msm/vreg.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>  drivers/mfd/omap-usb-host.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+> index 3f565ef..2896d6b 100644
+> --- a/drivers/mfd/omap-usb-host.c
+> +++ b/drivers/mfd/omap-usb-host.c
+> @@ -422,6 +422,7 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_PM_RUNTIME
+>  static int usbhs_runtime_resume(struct device *dev)
+>  {
+>  	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
+> @@ -489,6 +490,7 @@ static int usbhs_runtime_suspend(struct device *dev)
+>  
+>  	return 0;
+>  }
+> +#endif
+>  
+>  static void omap_usbhs_init(struct device *dev)
+>  {
+> @@ -887,8 +889,8 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
+>  }
+>  
+>  static const struct dev_pm_ops usbhsomap_dev_pm_ops = {
+> -	.runtime_suspend	= usbhs_runtime_suspend,
+> -	.runtime_resume		= usbhs_runtime_resume,
+> +	SET_RUNTIME_PM_OPS(usbhs_runtime_suspend,
+> +				usbhs_runtime_resume, NULL)
+>  };
+>  
+>  static struct platform_driver usbhs_omap_driver = {
