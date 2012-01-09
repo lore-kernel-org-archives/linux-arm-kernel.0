@@ -1,59 +1,63 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Mon, 9 Jan 2012 09:39:48 +0900
-Subject: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU
- driver
-In-Reply-To: <20120105125326.GT11810@n2100.arm.linux.org.uk>
-References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
- <20120105091718.3fb378b2a1d390f9dd63c396@nvidia.com>
- <20120105125326.GT11810@n2100.arm.linux.org.uk>
-Message-ID: <CAHQjnONDAmH+zpSmmOCCs9aYxT+LJGso98=exf+_WFYKT=fE3A@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Jan 2012 08:56:05 +0800
+Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
+In-Reply-To: <20120108205504.GF29065@opensource.wolfsonmicro.com>
+References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
+ <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
+ <20120108145254.GE20216@S2101-09.ap.freescale.net>
+ <20120108205504.GF29065@opensource.wolfsonmicro.com>
+Message-ID: <20120109005603.GA1835@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2012 at 9:53 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jan 05, 2012 at 09:17:18AM +0200, Hiroshi Doyu wrote:
->> Just for DMA mapping test from MPU side, the following one is used.
->
-> This patch is buggy.
->
->> +static void dmaapi_test_map_page(struct device *dev)
->> +{
->> + ? ? struct page *page;
->> + ? ? dma_addr_t dma_addr;
->> + ? ? void *cpu_addr;
->> +
->> + ? ? page = alloc_page(GFP_KERNEL);
->> + ? ? BUG_ON(!page);
->> +
->> + ? ? dma_addr = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_TO_DEVICE);
->> + ? ? BUG_ON(!dma_addr);
->> +
->> + ? ? cpu_addr = kmap(page);
->> + ? ? BUG_ON(!cpu_addr);
->> + ? ? memset(cpu_addr, 0xa5, PAGE_SIZE);
->> + ? ? kunmap(cpu_addr);
->
-> The DMA API works like this:
->
-> - The CPU owns the page or buffer and can access it.
-> - You map the page or buffer.
-> - The device owns the page or buffer; the CPU must explicitly access it.
+On Sun, Jan 08, 2012 at 12:55:05PM -0800, Mark Brown wrote:
+> On Sun, Jan 08, 2012 at 10:52:56PM +0800, Shawn Guo wrote:
+> > On Fri, Jan 06, 2012 at 11:25:41AM +0800, Richard Zhao wrote:
+> 
+> > > +					VDDA-supply = <&reg_2P5V>;
+> > > +					VDDIO-supply = <&reg_3P3V>;
+> 
+> > I would prefer to have them named vdda-supply and vddio-supply.  But
+> > I just learnt that they do not work, because sgtl5000 driver
+> > (sound/soc/codecs/sgtl5000.c) has the supply_names in upper case, while
+> > unlike of_node_cmp() is strcasecmp(), of_prop_cmp() is just strcmp().
+> 
+> > But the convention on property name is really all using lower case,
+> > and mixing cases there looks odd, so I'm thinking about the changes
+> > below on of_get_regulator().
+> 
+> >         snprintf(prop_name, 32, "%s-supply", supply);
+> > +       while (prop_name[i] && i < 32) {
+> > +               prop_name[i] = tolower(prop_name[i]);
+> > +               i++;
+> > +       }
+> 
+> There's two big problems here.  One is that we clearly shouldn't be
+> open coding this here but adding a function for it.  The other is that
+> this is going to break any existing device tree which has upper cased
+> supplies.  If we were going to do something here I'd go with case
+> insensitve matching though I'm not sure it's a real problem.
 
-I don't understand what  "CPU must __explicitly__ access it" means.
+Ok, let's test device tree maintainers.
 
-Do you mean that CPU must access the mapped buffer when
-it __explicitly__ knows that the access does not cause any side effect?
+Grant, Rob,
 
+Could the problem we are seeing here be a good reason to make the
+following change?
 
-> - You unmap the page or buffer.
-> - The CPU again owns the page/buffer and can access it.
->
-> Please respect the DMA API rules.
->
-> So. ?Once dma_map_page() has returned, you must not kmap() or otherwise
-> access the data contained in that page until after you have unmapped it.
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+diff --git a/include/linux/of.h b/include/linux/of.h
+index a75a831..c26c20f 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -147,7 +147,7 @@ static inline unsigned long of_read_ulong(const __be32 *cell, int size)
+ /* Default string compare functions, Allow arch asm/prom.h to override */
+ #if !defined(of_compat_cmp)
+ #define of_compat_cmp(s1, s2, l)       strcasecmp((s1), (s2))
+-#define of_prop_cmp(s1, s2)            strcmp((s1), (s2))
++#define of_prop_cmp(s1, s2)            strcasecmp((s1), (s2))
+ #define of_node_cmp(s1, s2)            strcasecmp((s1), (s2))
+ #endif
+
+-- 
+Regards,
+Shawn
