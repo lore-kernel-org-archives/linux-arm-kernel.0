@@ -1,77 +1,52 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Mon, 09 Jan 2012 08:14:50 +0100
-Subject: [PATCH v7] ARM: net: JIT compiler for packet filters
-In-Reply-To: <1325937154-2656-1-git-send-email-mgherzan@gmail.com>
-References: <1325937154-2656-1-git-send-email-mgherzan@gmail.com>
-Message-ID: <1326093290.2627.0.camel@edumazet-laptop>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 9 Jan 2012 08:17:17 +0100
+Subject: mxs: enable phy-clock in the driver?
+In-Reply-To: <20120109072121.GN1835@S2101-09.ap.freescale.net>
+References: <20120108144558.GB2544@pengutronix.de>
+ <20120109013404.GD1835@S2101-09.ap.freescale.net>
+ <20234.35823.411762.856482@ipc1.ka-ro>
+ <20120109065845.GL1835@S2101-09.ap.freescale.net>
+ <20234.37290.114047.36369@ipc1.ka-ro>
+ <20120109072121.GN1835@S2101-09.ap.freescale.net>
+Message-ID: <20234.38013.186263.46846@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le samedi 07 janvier 2012 ? 12:52 +0100, Mircea Gherzan a ?crit :
-> Based of Matt Evans's PPC64 implementation.
-> 
-> The compiler generates ARM instructions but interworking is
-> supported for Thumb2 kernels.
-> 
-> Supports both little and big endian. Unaligned loads are emitted
-> for ARMv6+. Not all the BPF opcodes that deal with ancillary data
-> are supported. The scratch memory of the filter lives on the stack.
-> Hardware integer division is used if it is available.
-> 
-> Enabled in the same way as for x86-64 and PPC64:
-> 
-> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
-> 
-> A value greater than 1 enables opcode output.
-> 
-> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
-> ---
-> 
-> Changes in v7:
->  * fix the intruction generation for LDX_MSH, OR_X, LSH_K,
->    RSH_K and JMP_JA
->  * fix the condition for saving the A register
->  * use fls() instead of the compiler builtin
->  * punt to the interpreter on absolute loads with K < 0
->  * check for invalid data references
->  * support the NEG opcode
->  * clear X in the prologue based on a context flag
->  * simplify the conditional jumps
-> 
-> Changes in v6:
->  * fix the code generation for the ANC_CPU opcode
-> 
-> Changes in v5:
->  * replace SEEN_LEN with SEEN_SKB
->  * set ctx->seen when handling some ancillary data opcodes
-> 
-> Changes in v4:
->  * first check if the JIT compiler is enabled
->  * fix the code generation for the LDX_MSH opcode
-> 
-> Changes in v3:
->  * no longer depend on EABI and !Thumb2
->  * add BLX "emulation" for ARMv4 without Thumb
->  * use the integer divide instruction on Cortex-A15
->  * fix the handling of the DIV_K opcode
->  * use a C wrapper for __aeabi_uidiv
->  * fix the generation of the epilogue (non-FP case)
-> 
-> Changes in v2:
->  * enable the compiler only for ARMv5+ because of the BLX instruction
->  * use the same comparison for the ARM version checks
->  * use misaligned accesses on ARMv6
->  * fix the SEEN_MEM
->  * fix the mem_words_used()
-> 
->  arch/arm/Kconfig          |    1 +
->  arch/arm/Makefile         |    1 +
->  arch/arm/net/Makefile     |    3 +
->  arch/arm/net/bpf_jit_32.c |  912 +++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/net/bpf_jit_32.h |  190 ++++++++++
->  5 files changed, 1107 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/net/Makefile
->  create mode 100644 arch/arm/net/bpf_jit_32.c
->  create mode 100644 arch/arm/net/bpf_jit_32.h
+Hi,
 
-Acked-by: Eric Dumazet <eric.dumazet@gmail.com>
+Shawn Guo writes:
+> On Mon, Jan 09, 2012 at 08:05:14AM +0100, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Shawn Guo writes:
+> > > On Mon, Jan 09, 2012 at 07:40:47AM +0100, Lothar Wa?mann wrote:
+> > > > The TX28 derives its PHY clock from the ENET_CLK pin of the
+> > > > processor. Thus the CLK_ENET_TIME should be enabled by the driver as
+> > > > mentioned in <20120108033238.GA19721@S2101-09.ap.freescale.net>
+> > > > 
+> > > Can you give a web link for that message?
+> > > 
+> > It's your own email from "Sun, 8 Jan 2012 11:32:40 +0800" with the
+> > subject "Re: MX28 fec clock frequency":
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/079556.html
+> > 
+> Ah, yes.  But what I said there is the CLK_ENET_TIME should be enabled
+> by PTP support, not the need of clocking external phy required by
+> particular board design.
+> 
+My point was, that it is the same clock. Thus, not "pll2" but
+"enet_ptp" or whatever it's name will be needs to be enabled for the
+Ethernet PHY on TX28.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
