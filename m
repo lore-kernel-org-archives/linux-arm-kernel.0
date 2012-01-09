@@ -1,42 +1,52 @@
-From: neilb@suse.de (NeilBrown)
-Date: Mon, 9 Jan 2012 13:14:12 +1100
-Subject: [PATCH] omap: add rcu_locking to omap2_set_init_voltage.
-Message-ID: <20120109131412.6238edf3@notabene.brown>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 9 Jan 2012 10:17:03 +0800
+Subject: [RFC PATCH v3 3/5] pinctrl: imx: add pinctrl imx driver
+In-Reply-To: <20120109020848.GF1835@S2101-09.ap.freescale.net>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-4-git-send-email-b29396@freescale.com>
+ <20120108130542.GC2203@richard-laptop>
+ <20120109020848.GF1835@S2101-09.ap.freescale.net>
+Message-ID: <20120109021702.GV2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 09, 2012 at 10:08:51AM +0800, Shawn Guo wrote:
+> On Sun, Jan 08, 2012 at 09:05:44PM +0800, Richard Zhao wrote:
+> > > +enum imx_imx53_pinctrl_pads {
+> > > +	MX53_GPIO_19 = 0,
+> > > +	MX53_KEY_COL0 = 1,
+> > > +	MX53_KEY_ROW0 = 2,
+> > > +	MX53_KEY_COL1 = 3,
+> > > +	MX53_KEY_ROW1 = 4,
+> > > +	MX53_KEY_COL2 = 5,
+> > > +	MX53_KEY_ROW2 = 6,
+> > ...
+> > Why not describe it in dts and make this file generic for imx?
+> > One node for one pad,
+> 
+> Doing this will bloat the device tree dramatically.  Actually I had
+> a patch doing so before the pinctrl subsystem was born, but it
+> concerned Grant a lot for that reason and thus died.
+are you against describing pad in dts or one node per pad?
+one node per pad is just a tip to extend pad property, to support
+other features (pinconf in your word).
+> 
+> > it'll be easy to extend pad properties. You know
+> > the pad may set pull up/down, open drain, drive strenth, daisy chain etc.
+> > The features have to be supported, to make your model usefull.
+> > 
+> As Aisheng mentioned, the pinconf support will be added later.
+I expect pinconf come together, and get a ready-to-use patch series.
 
-opp_find_freq_ceil and opp_get_voltage are documented as requiring
-rcu_lock to be held.  So hold it.
-
-Signed-off-by: NeilBrown <neilb@suse.de>
-
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 00bff46..470976e 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -174,14 +174,17 @@ static int __init omap2_set_init_voltage(char *vdd_name, char *clk_name,
- 	freq = clk->rate;
- 	clk_put(clk);
- 
-+	rcu_read_lock();
- 	opp = opp_find_freq_ceil(dev, &freq);
- 	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
- 		pr_err("%s: unable to find boot up OPP for vdd_%s\n",
- 			__func__, vdd_name);
- 		goto exit;
- 	}
- 
- 	bootup_volt = opp_get_voltage(opp);
-+	rcu_read_unlock();
- 	if (!bootup_volt) {
- 		pr_err("%s: unable to find voltage corresponding "
- 			"to the bootup OPP for vdd_%s\n", __func__, vdd_name);
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120109/0cd918f9/attachment.sig>
+Thanks
+Richard
+> 
+> -- 
+> Regards,
+> Shawn
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
