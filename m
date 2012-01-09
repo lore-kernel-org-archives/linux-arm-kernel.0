@@ -1,9 +1,9 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  9 Jan 2012 16:45:42 -0600
-Subject: [PATCH 2/6] ARM: realview: remove incorrect BSYM usage
+Date: Mon,  9 Jan 2012 16:45:43 -0600
+Subject: [PATCH 3/6] ARM: vexpress: remove incorrect BSYM usage
 In-Reply-To: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
 References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326149146-19756-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1326149146-19756-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,30 +15,30 @@ kernels.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Dave Martin <dave.martin@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-realview/platsmp.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/mach-vexpress/platsmp.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index e83c654..17c878d 100644
---- a/arch/arm/mach-realview/platsmp.c
-+++ b/arch/arm/mach-realview/platsmp.c
-@@ -17,7 +17,6 @@
- #include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <asm/smp_scu.h>
--#include <asm/unified.h>
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index 2b5f7ac..124ffb1 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -13,8 +13,6 @@
+ #include <linux/smp.h>
+ #include <linux/io.h>
  
- #include <mach/board-eb.h>
- #include <mach/board-pb11mp.h>
-@@ -75,6 +74,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
+-#include <asm/unified.h>
+-
+ #include <mach/motherboard.h>
+ #define V2M_PA_CS7 0x10000000
+ 
+@@ -46,6 +44,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
  	 * secondary CPU branches to this address.
  	 */
--	__raw_writel(BSYM(virt_to_phys(versatile_secondary_startup)),
-+	__raw_writel(virt_to_phys(versatile_secondary_startup),
- 		     __io_address(REALVIEW_SYS_FLAGSSET));
+ 	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
+-	writel(BSYM(virt_to_phys(versatile_secondary_startup)),
++	writel(virt_to_phys(versatile_secondary_startup),
+ 		MMIO_P2V(V2M_SYS_FLAGSSET));
  }
 -- 
 1.7.5.4
