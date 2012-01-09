@@ -1,21 +1,86 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 9 Jan 2012 11:51:51 +0300
-Subject: [PATCH] ARM: PXA: Zipit Z2: Fix oops in z2_power_off
-In-Reply-To: <201201090058.44041.marek.vasut@gmail.com>
-References: <1326011616-3546-1-git-send-email-anarsoul@gmail.com>
- <201201081140.29275.marek.vasut@gmail.com>
- <CA+E=qVcJtT9L0kkRT2NAw1Sefeje9vRjqCSLQbm=Z=X4AO+Law@mail.gmail.com>
- <201201090058.44041.marek.vasut@gmail.com>
-Message-ID: <CA+E=qVcYsa487rSAa48ZrJU64f1z1bbNXgjDnq23Y45WqwiXMg@mail.gmail.com>
+From: mgherzan@gmail.com (Mircea Gherzan)
+Date: Mon, 9 Jan 2012 10:58:34 +0200
+Subject: [PATCH v7] ARM: net: JIT compiler for packet filters
+In-Reply-To: <1326093290.2627.0.camel@edumazet-laptop>
+References: <1325937154-2656-1-git-send-email-mgherzan@gmail.com>
+ <1326093290.2627.0.camel@edumazet-laptop>
+Message-ID: <20120109085834.GA7724@swarm.cs.pub.ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/9 Marek Vasut <marek.vasut@gmail.com>:
+On Mon, Jan 09, 2012 at 08:14:50AM +0100, Eric Dumazet wrote:
+> Le samedi 07 janvier 2012 ? 12:52 +0100, Mircea Gherzan a ?crit :
+> > Based of Matt Evans's PPC64 implementation.
+> > 
+> > The compiler generates ARM instructions but interworking is
+> > supported for Thumb2 kernels.
+> > 
+> > Supports both little and big endian. Unaligned loads are emitted
+> > for ARMv6+. Not all the BPF opcodes that deal with ancillary data
+> > are supported. The scratch memory of the filter lives on the stack.
+> > Hardware integer division is used if it is available.
+> > 
+> > Enabled in the same way as for x86-64 and PPC64:
+> > 
+> > 	echo 1 > /proc/sys/net/core/bpf_jit_enable
+> > 
+> > A value greater than 1 enables opcode output.
+> > 
+> > Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+> > ---
+> > 
+> > Changes in v7:
+> >  * fix the intruction generation for LDX_MSH, OR_X, LSH_K,
+> >    RSH_K and JMP_JA
+> >  * fix the condition for saving the A register
+> >  * use fls() instead of the compiler builtin
+> >  * punt to the interpreter on absolute loads with K < 0
+> >  * check for invalid data references
+> >  * support the NEG opcode
+> >  * clear X in the prologue based on a context flag
+> >  * simplify the conditional jumps
+> > 
+> > Changes in v6:
+> >  * fix the code generation for the ANC_CPU opcode
+> > 
+> > Changes in v5:
+> >  * replace SEEN_LEN with SEEN_SKB
+> >  * set ctx->seen when handling some ancillary data opcodes
+> > 
+> > Changes in v4:
+> >  * first check if the JIT compiler is enabled
+> >  * fix the code generation for the LDX_MSH opcode
+> > 
+> > Changes in v3:
+> >  * no longer depend on EABI and !Thumb2
+> >  * add BLX "emulation" for ARMv4 without Thumb
+> >  * use the integer divide instruction on Cortex-A15
+> >  * fix the handling of the DIV_K opcode
+> >  * use a C wrapper for __aeabi_uidiv
+> >  * fix the generation of the epilogue (non-FP case)
+> > 
+> > Changes in v2:
+> >  * enable the compiler only for ARMv5+ because of the BLX instruction
+> >  * use the same comparison for the ARM version checks
+> >  * use misaligned accesses on ARMv6
+> >  * fix the SEEN_MEM
+> >  * fix the mem_words_used()
+> > 
+> >  arch/arm/Kconfig          |    1 +
+> >  arch/arm/Makefile         |    1 +
+> >  arch/arm/net/Makefile     |    3 +
+> >  arch/arm/net/bpf_jit_32.c |  912 +++++++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/net/bpf_jit_32.h |  190 ++++++++++
+> >  5 files changed, 1107 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/net/Makefile
+> >  create mode 100644 arch/arm/net/bpf_jit_32.c
+> >  create mode 100644 arch/arm/net/bpf_jit_32.h
+> 
+> Acked-by: Eric Dumazet <eric.dumazet@gmail.com>
+> 
 
->> Nope, it does not work. Looks like device disables power on memory in
->> deepsleep.
->
-> Why?
+Updated it in the patch tracking system as 7259/2. Since we're in the
+middle of the merge window, can this one get into 3.3?
 
-In deepsleep PXA27x deasserts SYS_EN pin, and looks like when it's
-deasserted there's no power on SDRAM (on Zipit). Just guess.
+Thanks,
+Mircea
