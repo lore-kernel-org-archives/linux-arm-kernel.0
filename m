@@ -1,73 +1,42 @@
-From: airlied@gmail.com (Dave Airlie)
-Date: Mon, 9 Jan 2012 08:11:03 +0000
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <20120109081030.GA3723@phenom.ffwll.local>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
- <CAAQKjZPFh6666JKc-XJfKYePQ_F0MNF6FkY=zKypWb52VVX3YQ@mail.gmail.com>
- <20120109081030.GA3723@phenom.ffwll.local>
-Message-ID: <CAPM=9twA_LRL_L88fF1010dQVAx4OY_pydPky_8qpGkAD5fOqg@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 9 Jan 2012 00:26:41 -0800
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <CAOesGMhLE3wxM=F9OkHT-bQpsVp8Uc6eE8Uk+WN9pLuz5BRLBw@mail.gmail.com>
+ <20120108204953.GA20043@sirena.org.uk>
+ <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
+Message-ID: <20120109082640.GI22134@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 9, 2012 at 8:10 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Mon, Jan 09, 2012 at 03:20:48PM +0900, InKi Dae wrote:
->> I has test dmabuf based drm gem module for exynos and I found one problem.
->> you can refer to this test repository:
->> http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/exynos-drm-dmabuf
->>
->> at this repository, I added some exception codes for resource release
->> in addition to Dave's patch sets.
->>
->> let's suppose we use dmabuf based vb2 and drm gem with physically
->> continuous memory(no IOMMU) and we try to share allocated buffer
->> between them(v4l2 and drm driver).
->>
->> 1. request memory allocation through drm gem interface.
->> 2. request DRM_SET_PRIME ioctl with the gem handle to get a fd to the
->> gem object.
->> - internally, private gem based dmabuf moudle calls drm_buf_export()
->> to register allocated gem object to fd.
->> 3. request qbuf with the fd(got from 2) and DMABUF type to set the
->> buffer to v4l2 based device.
->> - internally, vb2 plug in module gets a buffer to the fd and then
->> calls dmabuf->ops->map_dmabuf() callback to get the sg table
->> containing physical memory info to the gem object. and then the
->> physical memory info would be copied to vb2_xx_buf object.
->> for DMABUF feature for v4l2 and videobuf2 framework, you can refer to
->> this repository:
->> git://github.com/robclark/kernel-omap4.git drmplane-dmabuf
->>
->> after that, if v4l2 driver want to release vb2_xx_buf object with
->> allocated memory region by user request, how should we do?. refcount
->> to vb2_xx_buf is dependent on videobuf2 framework. so when vb2_xx_buf
->> object is released videobuf2 framework don't know who is using the
->> physical memory region. so this physical memory region is released and
->> when drm driver tries to access the region or to release it also, a
->> problem would be induced.
->>
->> for this problem, I added get_shared_cnt() callback to dma-buf.h but
->> I'm not sure that this is good way. maybe there may be better way.
->> if there is any missing point, please let me know.
->
-> The dma_buf object needs to hold a reference on the underlying
-> (necessarily reference-counted) buffer object when the exporter creates
-> the dma_buf handle. This reference should then get dropped in the
-> exporters dma_buf->ops->release() function, which is only getting called
-> when the last reference to the dma_buf disappears.
->
-> If this doesn't work like that currently, we have a bug, and exporting the
-> reference count or something similar can't fix that.
->
-> Yours, Daniel
->
-> PS: Please cut down the original mail when replying, otherwise it's pretty
-> hard to find your response ;-)
+On Sun, Jan 08, 2012 at 05:21:02PM -0800, Olof Johansson wrote:
 
-And also the importer needs to realise it doesn't own the pages in the
-sg_table and when its freeing its backing memory it shouldn't free
-those pages. So for GEM objects we have to keep track if we allocated
-the pages or we got them from an dma buf.
+> Mark, Kukjin, can either of you split out the fixes in a separate branch?
 
-Dave.
+Here's some of them, there were a few others I'm aware of that depended
+on feature updates.  Ideally we'd actually get all the changes that have
+been in -next in.
+
+The following changes since commit 5f0a6e2d503896062f641639dacfe5055c2f593b:
+
+  Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git fixes/samsung
+
+Mark Brown (5):
+      ARM: SAMSUNG: Fix GPIO space reservation for S3C64xx platforms
+      ARM: S3C64XX: Correct reservation of GPIOs for CPU module on Cragganmore
+      ARM: SAMSUNG: Guard against multiple inclusion of plat/dma.h
+      ARM: SAMSUNG: dma-ops.h needs mach/dma.h
+      ARM: SAMSUNG: Declare struct platform_device in plat/s3c64xx-spi.h
+
+ arch/arm/mach-s3c64xx/Kconfig                    |    6 +++---
+ arch/arm/mach-s3c64xx/include/mach/crag6410.h    |    3 ++-
+ arch/arm/mach-s3c64xx/mach-crag6410.c            |    2 +-
+ arch/arm/plat-samsung/Kconfig                    |    8 ++++++++
+ arch/arm/plat-samsung/include/plat/dma-ops.h     |    1 +
+ arch/arm/plat-samsung/include/plat/dma.h         |    6 +++++-
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 ++
+ 7 files changed, 22 insertions(+), 6 deletions(-)
