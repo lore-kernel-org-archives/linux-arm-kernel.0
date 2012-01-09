@@ -1,42 +1,55 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 9 Jan 2012 00:26:41 -0800
-Subject: [GIT PULL] Samsung devel for v3.3
-In-Reply-To: <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
-References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
- <CAOesGMhLE3wxM=F9OkHT-bQpsVp8Uc6eE8Uk+WN9pLuz5BRLBw@mail.gmail.com>
- <20120108204953.GA20043@sirena.org.uk>
- <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
-Message-ID: <20120109082640.GI22134@opensource.wolfsonmicro.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 9 Jan 2012 09:28:15 +0100
+Subject: [RFC PATCH 1/9] arm: avoid using on_each_cpu hard coded ret value
+In-Reply-To: <1325600353-10895-2-git-send-email-gilad@benyossef.com>
+References: <1325600353-10895-1-git-send-email-gilad@benyossef.com>
+ <1325600353-10895-2-git-send-email-gilad@benyossef.com>
+Message-ID: <20120109082815.GB14252@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 08, 2012 at 05:21:02PM -0800, Olof Johansson wrote:
+On Tue, Jan 03, 2012 at 04:19:05PM +0200, Gilad Ben-Yossef wrote:
+> on_each_cpu always returns a hard coded return code of zero.
+> 
+> Removing all tests based on this return value saves run time
+> cycles for compares and code bloat for branches.
+> 
+> Cc: Michal Nazarewicz <mina86@mina86.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> CC: Paul Mackerras <paulus@samba.org>
+> CC: Ingo Molnar <mingo@elte.hu>
+> CC: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Grant Likely <grant.likely@secretlab.ca>
+> CC: Rob Herring <rob.herring@calxeda.com>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: devicetree-discuss at lists.ozlabs.org
+> ---
+>  arch/arm/kernel/perf_event.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 88b0941..bfd58d8 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -617,7 +617,7 @@ static int __init
+>  cpu_pmu_reset(void)
+>  {
+>  	if (cpu_pmu && cpu_pmu->reset)
+> -		return on_each_cpu(cpu_pmu->reset, NULL, 1);
+> +		on_each_cpu(cpu_pmu->reset, NULL, 1);
+>  	return 0;
+>  }
+>  arch_initcall(cpu_pmu_reset);
+This patch results in no binary change for my test build with SMP=n and
+it saves one instruction on SMP=y.
 
-> Mark, Kukjin, can either of you split out the fixes in a separate branch?
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Here's some of them, there were a few others I'm aware of that depended
-on feature updates.  Ideally we'd actually get all the changes that have
-been in -next in.
+Thanks
+Uwe
 
-The following changes since commit 5f0a6e2d503896062f641639dacfe5055c2f593b:
-
-  Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git fixes/samsung
-
-Mark Brown (5):
-      ARM: SAMSUNG: Fix GPIO space reservation for S3C64xx platforms
-      ARM: S3C64XX: Correct reservation of GPIOs for CPU module on Cragganmore
-      ARM: SAMSUNG: Guard against multiple inclusion of plat/dma.h
-      ARM: SAMSUNG: dma-ops.h needs mach/dma.h
-      ARM: SAMSUNG: Declare struct platform_device in plat/s3c64xx-spi.h
-
- arch/arm/mach-s3c64xx/Kconfig                    |    6 +++---
- arch/arm/mach-s3c64xx/include/mach/crag6410.h    |    3 ++-
- arch/arm/mach-s3c64xx/mach-crag6410.c            |    2 +-
- arch/arm/plat-samsung/Kconfig                    |    8 ++++++++
- arch/arm/plat-samsung/include/plat/dma-ops.h     |    1 +
- arch/arm/plat-samsung/include/plat/dma.h         |    6 +++++-
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 ++
- 7 files changed, 22 insertions(+), 6 deletions(-)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
