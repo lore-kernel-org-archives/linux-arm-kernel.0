@@ -1,315 +1,622 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Sun, 8 Jan 2012 22:18:06 -0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <20120109015625.GE1835@S2101-09.ap.freescale.net>
-References: <1324402840-32451-3-git-send-email-b29396@freescale.com>
- <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <20120107135445.GI4790@S2101-09.ap.freescale.net>
- <20120108125156.GB2203@richard-laptop>
- <20120109015625.GE1835@S2101-09.ap.freescale.net>
-Message-ID: <CAPnjgZ1LL7g_s1e+Pe-XN27yTNL4SCZvm6swJ_zX=ZULQirOxQ@mail.gmail.com>
+From: daeinki@gmail.com (InKi Dae)
+Date: Mon, 9 Jan 2012 15:20:48 +0900
+Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
+Message-ID: <CAAQKjZPFh6666JKc-XJfKYePQ_F0MNF6FkY=zKypWb52VVX3YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-[snip lots of discussion]
-
-Someone copied me on this so I feel I can sneak in with a response. I
-have read this entire thread and implemented Tegra pinmux in U-boot,
-but not much else on the topic so have limited understanding,
-particular of the kernel pinmux setup, unfortunately. Sorry if I have
-the wrong end of the stick on some of this, but I hope my comments are
-useful.
-
-1. Symbolic names
-
-> Stephen said:
-> It's a real pity that dtc doesn't have a way of doing named integer
-> constants, so this could be re-written as e.g.:
-> SoC .dtsi file:
-> /define/ TEGRA_MUX_FUNC_SD4 234
-
-IMO this is essential for pinmux. Stephen has already done a patch
-which implements this feature. The alternative is bindings with lots
-of arbitrary numbers - lots of errors, lots of confusion, lots of
-pain. He has asked a few times on the device-tree list for this
-feature to be accepted. I believe it should be, and pinmux brough in
-with that in mind. Turning symbols into numbers is the role of the
-device tree compiler I think.
-
-If Stephen's proposed grammar needs tweaking that is fine, but I think
-we are pushing the limits of a pure numerical representation here.
-
-
-2. Stephen also said:
-
-> We also need to consider compatibility and extensibility. A DT binding
-> is an ABI between the kernel and whatever is providing it, and so we
-> need to be able to maintain and extend it in a compatible fashion, just
-> like the user-space syscall ABI. Now it's true that the .dts files are
-> currently part of the kernel source tree and can be rev'd in sync with
-> kernel changes, but that may not always be the case moving forward.
+2011/12/2 Sumit Semwal <sumit.semwal@ti.com>:
+> This is the first step in defining a dma buffer sharing mechanism.
 >
-> In other words, taking a board with an old device tree embedded into
-> Flash and running a new kernel using that device tree should work just
-> like running the original kernel did.
+> A new buffer object dma_buf is added, with operations and API to allow easy
+> sharing of this buffer object across devices.
+>
+> The framework allows:
+> - different devices to 'attach' themselves to this buffer, to facilitate
+> ?backing storage negotiation, using dma_buf_attach() API.
+> - association of a file pointer with each user-buffer and associated
+> ? allocator-defined operations on that buffer. This operation is called the
+> ? 'export' operation.
+> - this exported buffer-object to be shared with the other entity by asking for
+> ? its 'file-descriptor (fd)', and sharing the fd across.
+> - a received fd to get the buffer object back, where it can be accessed using
+> ? the associated exporter-defined operations.
+> - the exporter and user to share the scatterlist using map_dma_buf and
+> ? unmap_dma_buf operations.
+>
+> Atleast one 'attach()' call is required to be made prior to calling the
+> map_dma_buf() operation.
+>
+> Couple of building blocks in map_dma_buf() are added to ease introduction
+> of sync'ing across exporter and users, and late allocation by the exporter.
+>
+> *OPTIONALLY*: mmap() file operation is provided for the associated 'fd', as
+> wrapper over the optional allocator defined mmap(), to be used by devices
+> that might need one.
+>
+> More details are there in the documentation patch.
+>
+> This is based on design suggestions from many people at the mini-summits[1],
+> most notably from Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
+> Daniel Vetter <daniel@ffwll.ch>.
+>
+> The implementation is inspired from proof-of-concept patch-set from
+> Tomasz Stanislawski <t.stanislaws@samsung.com>, who demonstrated buffer sharing
+> between two v4l2 devices. [2]
+>
+> [1]: https://wiki.linaro.org/OfficeofCTO/MemoryManagement
+> [2]: http://lwn.net/Articles/454389
+>
+> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+> Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
+> ---
+> ?drivers/base/Kconfig ? ?| ? 10 ++
+> ?drivers/base/Makefile ? | ? ?1 +
+> ?drivers/base/dma-buf.c ?| ?290 +++++++++++++++++++++++++++++++++++++++++++++++
+> ?include/linux/dma-buf.h | ?176 ++++++++++++++++++++++++++++
+> ?4 files changed, 477 insertions(+), 0 deletions(-)
+> ?create mode 100644 drivers/base/dma-buf.c
+> ?create mode 100644 include/linux/dma-buf.h
+>
+> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+> index 21cf46f..07d8095 100644
+> --- a/drivers/base/Kconfig
+> +++ b/drivers/base/Kconfig
+> @@ -174,4 +174,14 @@ config SYS_HYPERVISOR
+>
+> ?source "drivers/base/regmap/Kconfig"
+>
+> +config DMA_SHARED_BUFFER
+> + ? ? ? bool "Buffer framework to be shared between drivers"
+> + ? ? ? default n
+> + ? ? ? depends on ANON_INODES
+> + ? ? ? help
+> + ? ? ? ? This option enables the framework for buffer-sharing between
+> + ? ? ? ? multiple drivers. A buffer is associated with a file using driver
+> + ? ? ? ? APIs extension; the file's descriptor can then be passed on to other
+> + ? ? ? ? driver.
+> +
+> ?endmenu
+> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+> index 99a375a..d0df046 100644
+> --- a/drivers/base/Makefile
+> +++ b/drivers/base/Makefile
+> @@ -8,6 +8,7 @@ obj-$(CONFIG_DEVTMPFS) ?+= devtmpfs.o
+> ?obj-y ? ? ? ? ? ? ? ? ?+= power/
+> ?obj-$(CONFIG_HAS_DMA) ?+= dma-mapping.o
+> ?obj-$(CONFIG_HAVE_GENERIC_DMA_COHERENT) += dma-coherent.o
+> +obj-$(CONFIG_DMA_SHARED_BUFFER) += dma-buf.o
+> ?obj-$(CONFIG_ISA) ? ? ?+= isa.o
+> ?obj-$(CONFIG_FW_LOADER) ? ? ? ?+= firmware_class.o
+> ?obj-$(CONFIG_NUMA) ? ? += node.o
+> diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
+> new file mode 100644
+> index 0000000..4b9005e
+> --- /dev/null
+> +++ b/drivers/base/dma-buf.c
+> @@ -0,0 +1,290 @@
+> +/*
+> + * Framework for buffer objects that can be shared across devices/subsystems.
+> + *
+> + * Copyright(C) 2011 Linaro Limited. All rights reserved.
+> + * Author: Sumit Semwal <sumit.semwal@ti.com>
+> + *
+> + * Many thanks to linaro-mm-sig list, and specially
+> + * Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
+> + * Daniel Vetter <daniel@ffwll.ch> for their support in creation and
+> + * refining of this idea.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program. ?If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/fs.h>
+> +#include <linux/slab.h>
+> +#include <linux/dma-buf.h>
+> +#include <linux/anon_inodes.h>
+> +#include <linux/export.h>
+> +
+> +static inline int is_dma_buf_file(struct file *);
+> +
+> +static int dma_buf_mmap(struct file *file, struct vm_area_struct *vma)
+> +{
+> + ? ? ? struct dma_buf *dmabuf;
+> +
+> + ? ? ? if (!is_dma_buf_file(file))
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? dmabuf = file->private_data;
+> +
+> + ? ? ? if (!dmabuf->ops->mmap)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? return dmabuf->ops->mmap(dmabuf, vma);
+> +}
+> +
+> +static int dma_buf_release(struct inode *inode, struct file *file)
+> +{
+> + ? ? ? struct dma_buf *dmabuf;
+> +
+> + ? ? ? if (!is_dma_buf_file(file))
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? dmabuf = file->private_data;
+> +
+> + ? ? ? dmabuf->ops->release(dmabuf);
+> + ? ? ? kfree(dmabuf);
+> + ? ? ? return 0;
+> +}
+> +
+> +static const struct file_operations dma_buf_fops = {
+> + ? ? ? .mmap ? ? ? ? ? = dma_buf_mmap,
+> + ? ? ? .release ? ? ? ?= dma_buf_release,
+> +};
+> +
+> +/*
+> + * is_dma_buf_file - Check if struct file* is associated with dma_buf
+> + */
+> +static inline int is_dma_buf_file(struct file *file)
+> +{
+> + ? ? ? return file->f_op == &dma_buf_fops;
+> +}
+> +
+> +/**
+> + * dma_buf_export - Creates a new dma_buf, and associates an anon file
+> + * with this buffer,so it can be exported.
+> + * Also connect the allocator specific data and ops to the buffer.
+> + *
+> + * @priv: ? ? ?[in] ? ?Attach private data of allocator to this buffer
+> + * @ops: ? ? ? [in] ? ?Attach allocator-defined dma buf ops to the new buffer.
+> + * @flags: ? ? [in] ? ?mode flags for the file.
+> + *
+> + * Returns, on success, a newly created dma_buf object, which wraps the
+> + * supplied private data and operations for dma_buf_ops. On failure to
+> + * allocate the dma_buf object, it can return NULL.
+> + *
+> + */
+> +struct dma_buf *dma_buf_export(void *priv, struct dma_buf_ops *ops,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int flags)
+> +{
+> + ? ? ? struct dma_buf *dmabuf;
+> + ? ? ? struct file *file;
+> +
+> + ? ? ? BUG_ON(!priv || !ops);
+> +
+> + ? ? ? dmabuf = kzalloc(sizeof(struct dma_buf), GFP_KERNEL);
+> + ? ? ? if (dmabuf == NULL)
+> + ? ? ? ? ? ? ? return dmabuf;
+> +
+> + ? ? ? dmabuf->priv = priv;
+> + ? ? ? dmabuf->ops = ops;
+> +
+> + ? ? ? file = anon_inode_getfile("dmabuf", &dma_buf_fops, dmabuf, flags);
+> +
+> + ? ? ? dmabuf->file = file;
+> +
+> + ? ? ? mutex_init(&dmabuf->lock);
+> + ? ? ? INIT_LIST_HEAD(&dmabuf->attachments);
+> +
+> + ? ? ? return dmabuf;
+> +}
+> +EXPORT_SYMBOL(dma_buf_export);
+> +
+> +
+> +/**
+> + * dma_buf_fd - returns a file descriptor for the given dma_buf
+> + * @dmabuf: ? ?[in] ? ?pointer to dma_buf for which fd is required.
+> + *
+> + * On success, returns an associated 'fd'. Else, returns error.
+> + */
+> +int dma_buf_fd(struct dma_buf *dmabuf)
+> +{
+> + ? ? ? int error, fd;
+> +
+> + ? ? ? if (!dmabuf->file)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? error = get_unused_fd_flags(0);
+> + ? ? ? if (error < 0)
+> + ? ? ? ? ? ? ? return error;
+> + ? ? ? fd = error;
+> +
+> + ? ? ? fd_install(fd, dmabuf->file);
+> +
+> + ? ? ? return fd;
+> +}
+> +EXPORT_SYMBOL(dma_buf_fd);
+> +
+> +/**
+> + * dma_buf_get - returns the dma_buf structure related to an fd
+> + * @fd: ? ? ? ?[in] ? ?fd associated with the dma_buf to be returned
+> + *
+> + * On success, returns the dma_buf structure associated with an fd; uses
+> + * file's refcounting done by fget to increase refcount. returns ERR_PTR
+> + * otherwise.
+> + */
+> +struct dma_buf *dma_buf_get(int fd)
+> +{
+> + ? ? ? struct file *file;
+> +
+> + ? ? ? file = fget(fd);
+> +
+> + ? ? ? if (!file)
+> + ? ? ? ? ? ? ? return ERR_PTR(-EBADF);
+> +
+> + ? ? ? if (!is_dma_buf_file(file)) {
+> + ? ? ? ? ? ? ? fput(file);
+> + ? ? ? ? ? ? ? return ERR_PTR(-EINVAL);
+> + ? ? ? }
+> +
+> + ? ? ? return file->private_data;
+> +}
+> +EXPORT_SYMBOL(dma_buf_get);
+> +
+> +/**
+> + * dma_buf_put - decreases refcount of the buffer
+> + * @dmabuf: ? ?[in] ? ?buffer to reduce refcount of
+> + *
+> + * Uses file's refcounting done implicitly by fput()
+> + */
+> +void dma_buf_put(struct dma_buf *dmabuf)
+> +{
+> + ? ? ? BUG_ON(!dmabuf->file);
+> +
+> + ? ? ? fput(dmabuf->file);
+> +}
+> +EXPORT_SYMBOL(dma_buf_put);
+> +
+> +/**
+> + * dma_buf_attach - Add the device to dma_buf's attachments list; optionally,
+> + * calls attach() of dma_buf_ops to allow device-specific attach functionality
+> + * @dmabuf: ? ?[in] ? ?buffer to attach device to.
+> + * @dev: ? ? ? [in] ? ?device to be attached.
+> + *
+> + * Returns struct dma_buf_attachment * for this attachment; may return NULL.
+> + *
+> + */
+> +struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device *dev)
+> +{
+> + ? ? ? struct dma_buf_attachment *attach;
+> + ? ? ? int ret;
+> +
+> + ? ? ? BUG_ON(!dmabuf || !dev);
+> +
+> + ? ? ? attach = kzalloc(sizeof(struct dma_buf_attachment), GFP_KERNEL);
+> + ? ? ? if (attach == NULL)
+> + ? ? ? ? ? ? ? goto err_alloc;
+> +
+> + ? ? ? mutex_lock(&dmabuf->lock);
+> +
+> + ? ? ? attach->dev = dev;
+> + ? ? ? attach->dmabuf = dmabuf;
+> + ? ? ? if (dmabuf->ops->attach) {
+> + ? ? ? ? ? ? ? ret = dmabuf->ops->attach(dmabuf, dev, attach);
+> + ? ? ? ? ? ? ? if (!ret)
+> + ? ? ? ? ? ? ? ? ? ? ? goto err_attach;
+> + ? ? ? }
+> + ? ? ? list_add(&attach->node, &dmabuf->attachments);
+> +
+> + ? ? ? mutex_unlock(&dmabuf->lock);
+> +
+> +err_alloc:
+> + ? ? ? return attach;
+> +err_attach:
+> + ? ? ? kfree(attach);
+> + ? ? ? mutex_unlock(&dmabuf->lock);
+> + ? ? ? return ERR_PTR(ret);
+> +}
+> +EXPORT_SYMBOL(dma_buf_attach);
+> +
+> +/**
+> + * dma_buf_detach - Remove the given attachment from dmabuf's attachments list;
+> + * optionally calls detach() of dma_buf_ops for device-specific detach
+> + * @dmabuf: ? ?[in] ? ?buffer to detach from.
+> + * @attach: ? ?[in] ? ?attachment to be detached; is free'd after this call.
+> + *
+> + */
+> +void dma_buf_detach(struct dma_buf *dmabuf, struct dma_buf_attachment *attach)
+> +{
+> + ? ? ? BUG_ON(!dmabuf || !attach);
+> +
+> + ? ? ? mutex_lock(&dmabuf->lock);
+> + ? ? ? list_del(&attach->node);
+> + ? ? ? if (dmabuf->ops->detach)
+> + ? ? ? ? ? ? ? dmabuf->ops->detach(dmabuf, attach);
+> +
+> + ? ? ? mutex_unlock(&dmabuf->lock);
+> + ? ? ? kfree(attach);
+> +}
+> +EXPORT_SYMBOL(dma_buf_detach);
+> +
+> +/**
+> + * dma_buf_map_attachment - Returns the scatterlist table of the attachment;
+> + * mapped into _device_ address space. Is a wrapper for map_dma_buf() of the
+> + * dma_buf_ops.
+> + * @attach: ? ?[in] ? ?attachment whose scatterlist is to be returned
+> + * @direction: [in] ? ?direction of DMA transfer
+> + *
+> + * Returns sg_table containing the scatterlist to be returned; may return NULL
+> + * or ERR_PTR.
+> + *
+> + */
+> +struct sg_table * dma_buf_map_attachment(struct dma_buf_attachment *attach,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum dma_data_direction direction)
+> +{
+> + ? ? ? struct sg_table *sg_table = ERR_PTR(-EINVAL);
+> +
+> + ? ? ? BUG_ON(!attach || !attach->dmabuf);
+> +
+> + ? ? ? mutex_lock(&attach->dmabuf->lock);
+> + ? ? ? if (attach->dmabuf->ops->map_dma_buf)
+> + ? ? ? ? ? ? ? sg_table = attach->dmabuf->ops->map_dma_buf(attach, direction);
+> + ? ? ? mutex_unlock(&attach->dmabuf->lock);
+> +
+> + ? ? ? return sg_table;
+> +}
+> +EXPORT_SYMBOL(dma_buf_map_attachment);
+> +
+> +/**
+> + * dma_buf_unmap_attachment - unmaps and decreases usecount of the buffer;might
+> + * deallocate the scatterlist associated. Is a wrapper for unmap_dma_buf() of
+> + * dma_buf_ops.
+> + * @attach: ? ?[in] ? ?attachment to unmap buffer from
+> + * @sg_table: ?[in] ? ?scatterlist info of the buffer to unmap
+> + *
+> + */
+> +void dma_buf_unmap_attachment(struct dma_buf_attachment *attach,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct sg_table *sg_table)
+> +{
+> + ? ? ? BUG_ON(!attach || !attach->dmabuf || !sg_table);
+> +
+> + ? ? ? mutex_lock(&attach->dmabuf->lock);
+> + ? ? ? if (attach->dmabuf->ops->unmap_dma_buf)
+> + ? ? ? ? ? ? ? attach->dmabuf->ops->unmap_dma_buf(attach, sg_table);
+> + ? ? ? mutex_unlock(&attach->dmabuf->lock);
+> +
+> +}
+> +EXPORT_SYMBOL(dma_buf_unmap_attachment);
+> diff --git a/include/linux/dma-buf.h b/include/linux/dma-buf.h
+> new file mode 100644
+> index 0000000..db4b384
+> --- /dev/null
+> +++ b/include/linux/dma-buf.h
+> @@ -0,0 +1,176 @@
+> +/*
+> + * Header file for dma buffer sharing framework.
+> + *
+> + * Copyright(C) 2011 Linaro Limited. All rights reserved.
+> + * Author: Sumit Semwal <sumit.semwal@ti.com>
+> + *
+> + * Many thanks to linaro-mm-sig list, and specially
+> + * Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
+> + * Daniel Vetter <daniel@ffwll.ch> for their support in creation and
+> + * refining of this idea.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program. ?If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __DMA_BUF_H__
+> +#define __DMA_BUF_H__
+> +
+> +#include <linux/file.h>
+> +#include <linux/err.h>
+> +#include <linux/device.h>
+> +#include <linux/scatterlist.h>
+> +#include <linux/list.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +struct dma_buf;
+> +
+> +/**
+> + * struct dma_buf_attachment - holds device-buffer attachment data
+> + * @dmabuf: buffer for this attachment.
+> + * @dev: device attached to the buffer.
+> + * @node: list_head to allow manipulation of list of dma_buf_attachment.
+> + * @priv: exporter-specific attachment data.
+> + */
+> +struct dma_buf_attachment {
+> + ? ? ? struct dma_buf *dmabuf;
+> + ? ? ? struct device *dev;
+> + ? ? ? struct list_head node;
+> + ? ? ? void *priv;
+> +};
+> +
+> +/**
+> + * struct dma_buf_ops - operations possible on struct dma_buf
+> + * @attach: allows different devices to 'attach' themselves to the given
+> + * ? ? ? ? buffer. It might return -EBUSY to signal that backing storage
+> + * ? ? ? ? is already allocated and incompatible with the requirements
+> + * ? ? ? ? of requesting device. [optional]
+> + * @detach: detach a given device from this buffer. [optional]
+> + * @map_dma_buf: returns list of scatter pages allocated, increases usecount
+> + * ? ? ? ? ? ? ?of the buffer. Requires atleast one attach to be called
+> + * ? ? ? ? ? ? ?before. Returned sg list should already be mapped into
+> + * ? ? ? ? ? ? ?_device_ address space. This call may sleep.
+> + * @unmap_dma_buf: decreases usecount of buffer, might deallocate scatter
+> + * ? ? ? ? ? ? ? ?pages.
+> + * @mmap: memory map this buffer - optional.
+> + * @release: release this buffer; to be called after the last dma_buf_put.
+> + * @sync_sg_for_cpu: sync the sg list for cpu.
+> + * @sync_sg_for_device: synch the sg list for device.
+> + */
+> +struct dma_buf_ops {
+> + ? ? ? int (*attach)(struct dma_buf *, struct device *,
+> + ? ? ? ? ? ? ? ? ? ? ? struct dma_buf_attachment *);
+> +
+> + ? ? ? void (*detach)(struct dma_buf *, struct dma_buf_attachment *);
+> +
+> + ? ? ? /* For {map,unmap}_dma_buf below, any specific buffer attributes
+> + ? ? ? ?* required should get added to device_dma_parameters accessible
+> + ? ? ? ?* via dev->dma_params.
+> + ? ? ? ?*/
+> + ? ? ? struct sg_table * (*map_dma_buf)(struct dma_buf_attachment *,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum dma_data_direction);
+> + ? ? ? void (*unmap_dma_buf)(struct dma_buf_attachment *,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct sg_table *);
+> + ? ? ? /* TODO: Add try_map_dma_buf version, to return immed with -EBUSY
+> + ? ? ? ?* if the call would block.
+> + ? ? ? ?*/
 
-While this is true we should remember that SOCs will change and
-evolve, and we don't actually need a device tree for a Tegra 2 (say)
-to be able to boot a Tegra 3 kernel. So each time we create a new SOC
-in a family, we have the opportunity to update the fdt, potentially in
-an incompatible way, since we know that the old boot loader and new
-kernel are incompatible anyway.
+I has test dmabuf based drm gem module for exynos and I found one problem.
+you can refer to this test repository:
+http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/exynos-drm-dmabuf
 
-Anyway we are looking at pinmux from a 2012 view of how SOCs do
-things. We can't predict what things will look like in the future. The
-device tree format is great for making things extensible, but there is
-an efficiency cost also.
+at this repository, I added some exception codes for resource release
+in addition to Dave's patch sets.
 
-Backwards compatibility can create a lot of problems with newer
-designs, so I don't think we should be slaves to it. We are backwards
-compatible because it aids understanding, is necessary for kernels to
-run across different boards, etc., not just for its own sake. If in
-the future we decide that the approach agreed now no longer servers
-the purpose and has too much baggage, we can change it. Similar things
-happen in the rest of the kernel.
+let's suppose we use dmabuf based vb2 and drm gem with physically
+continuous memory(no IOMMU) and we try to share allocated buffer
+between them(v4l2 and drm driver).
 
-Also IMO updating the kernel without the device tree doesn't make a
-huge amount of sense. Why not just update both? Really to me the
-device tree is almost like static data for the kernel. It is a worthy
-goal to keep it as static as possible, but if it changes I don' t
-think it is the end of civilisation.
+1. request memory allocation through drm gem interface.
+2. request DRM_SET_PRIME ioctl with the gem handle to get a fd to the
+gem object.
+- internally, private gem based dmabuf moudle calls drm_buf_export()
+to register allocated gem object to fd.
+3. request qbuf with the fd(got from 2) and DMABUF type to set the
+buffer to v4l2 based device.
+- internally, vb2 plug in module gets a buffer to the fd and then
+calls dmabuf->ops->map_dmabuf() callback to get the sg table
+containing physical memory info to the gem object. and then the
+physical memory info would be copied to vb2_xx_buf object.
+for DMABUF feature for v4l2 and videobuf2 framework, you can refer to
+this repository:
+git://github.com/robclark/kernel-omap4.git drmplane-dmabuf
 
+after that, if v4l2 driver want to release vb2_xx_buf object with
+allocated memory region by user request, how should we do?. refcount
+to vb2_xx_buf is dependent on videobuf2 framework. so when vb2_xx_buf
+object is released videobuf2 framework don't know who is using the
+physical memory region. so this physical memory region is released and
+when drm driver tries to access the region or to release it also, a
+problem would be induced.
 
-3. Efficiency
+for this problem, I added get_shared_cnt() callback to dma-buf.h but
+I'm not sure that this is good way. maybe there may be better way.
+if there is any missing point, please let me know.
 
-There has been talk about using strings to link things. IMO this is
-inefficient and slow compared to integers and device trees already
-have phandles. Some platforms will care more than others, but if the
-reason for using strings is that the device tree format does not
-support symbolic representation of integers, then see 1 above.
+Thanks.
 
-
-4. Who bears the pain?
-
-There is a lot of complexity in pinmux - if we continue to split the
-device tree into an SOC file and a board file then we should think
-about which one bears the brunt of the complexity. IMO it should be
-the SOC file. The SOC file is written by very clever engineers working
-for the SOC vendor. They are motivated to get their SOC working
-properly and for it to be easy for customers to access the glorious
-ground-breaking feature therein. On the other hand, the board file (to
-the extent it is not just copied from the vendor's example) is put
-together by people with little knowledge of the SOC, limited time to
-do the work and minimal interest in the wonders of the device tree
-structure.
-
-With this in mind I think the pinmux complexity should mostly be in
-the SOC file. This includes the selection of valid pinmux options.
-After all, despite the many possible ways that functions could be
-brought out of the chip, only a certain few ways typically make sense.
-For example, an SDMMC peripheral needs clock and command pins - unless
-these are connected then nothing with work. Similarly there is no
-sense in having two data[0] pins brought out for the same SDMMC port.
-
-In fact the SOC vendor generally has a good idea about the different
-options and mostly there are a small number of useful ones. So why
-don't we just enumerate these in the SOC file and let the board select
-what it wants in a single setting?
-
-
-5. Start at the top: function mux
-
-I propose adding a new level at the top, a function mux. This
-basically routes functions to one of 2-3 predefined options. So UART1
-can come out on 3 different sets of pins, SDMMC2 on two sets, etc.
-These are recommended from the vendor and in common use (e.g. on
-reference designs), so should be easy to use.
-
-Below the function mux is the group mux. Here we specify a list of pin
-groups and which function each group is assigned to. Together these
-2-3 groups join to give us the pins that the function mux needs.
-
-Below the pin groups are the pins. Some SOCs will have only one pin
-per group, some will have a group mux that really just moves entire
-functions around.
-
-IMO the top level belongs with the board file. If the board designer
-wants to depart from common options they can suffer the pain of
-dropping down to the group level.
-
-So at the board level it would be nice to do something like this:
-
-sdhci at c8000400 {
-	funcmux = <&sdmmc3-funcmux 0 0>;  /* funcmux phandle, config option, flags */
-};
-
-which means that we want this SDMMC port to use configuration 0 (out
-of perhaps 2-3 recommended options the SOC provides for bringing out
-this SDMMC function) and that there are no special flags required. Or:
-
-emmc: sdhci at c8000600 {
-	funcmux = <&sdmmc4-funcmux 1 OPT_SDMMC_8BIT>;
-}
-
-which means for this port we want to use configuration 1 with 8-bit wide data.
-
-Something like this is easy for the board files to deal with. It fits
-with the way reference designs are done (selecting from a few
-options). It allows flags to specify different options like 4-bit or
-8-bit wide SDMMC which can affect what pinmux groups are affected.
-
-Some boot loaders might even implement things only at the funcmux
-level, with hard-coded configuration of the actual pin groups in
-static data in their code, without reference to the device tree. This
-might allow them to operate with a vastly truncated device tree. They
-might be very motivated to do this if the full device tree consists of
-20KB of strings :-)
-
-
-6. Groups
-
-Already done in the discussion prior to this email:
-
-uart4func: func at 1 {
-       func-name = "uart4";
-       locations = <&bargrp &bazgrp>;
-       mux-value = <6 3>;
-};
-
-but how above adding a flag cell and putting the locations and values
-into the same property, like:
-
-uart4func: func at 1 {
-       func-name = "uart4";
-       locations = <&bargrp 6 0>
-		<&bazgrp 3 SOME_FLAG>;
-};
-
-
-So the SDMMC example might have three options for SDMMC4: a 4-bit one,
-and two 8-bit ones (changing 'locations' to 'groups'):
-
-sdmmc4-funcmux : sdmmc4_funcmux at 0 {
-	setting at 0 {
-		config = <0>;
-		option = <OPT_SDMMC_8BIT>;
-		groups = <&pingrp-atc FUNC_SDIO4 0> /* clk, cmd, data 1, 3, 5, 7 */
-			<&pingrp-atd FUNC_SDIO4 0>; /* data 0, 2, 4, 6 */
-	};
-
-	setting at 1 {
-		config = <1>;
-		option = <0>;
-		groups = <&pingrp-atb FUNC_SDIO4 0>  /* clock, command */
-			<&pingrp-gma FUNC_SDIO4 0>; /* data[3:0] */
-	};
-
-	setting at 2 {
-		config = <1>;
-		option = <OPT_SDMMC_8BIT>;
-		groups = <&pingrp-atb FUNC_SDIO4 0>  /* clock, command */
-			<&pingrp-gma FUNC_SDIO4 0> /* data[3:0] */
-			<&pingrp-gme FUNC_SDIO4 0>; /* data [7:4] */
-	};
-};
-
-The 'config' property refers to the second cell of the reference in
-the funcmux. The option property refers to the third cell. Essentially
-the vendor is recommending three possible options for SDMMC4 and the
-board can choose which one it likes.
-
-The disadvantage is that the last two share the pingrp-atb setting,
-and the last just adds an extra group, but no matter. It is easy to
-understand.
-
-A related problem is that the options must each be enumerated. Maybe
-that doesn't matter either for the moment.
-
-Then for the groups, again already done above, but I am less clear on
-the exact binding that is arrived at above. Something like this?
-
-pingrp-atb: pingrp_atb at 0 {
-	locations = <&pin-i02 &pin-t07>;
-	control = <&pinmux 0>;
-	/* 4 options available, numbered 0 to 3 */
-	functions = <FUNC_IDE   FUNC_NAND   FUNC_GMI   FUNC_SDIO4>;
-	/* do we want to specify what the flags do here? I assume they are
-           globally understood by the pinmux system rather than specific to
-	   each group */
-};
-
-pingrp-atd: pingrp_atd at 0 {
-	locations = <&pin-h01 &pin-h02 &pin-h03 &pin-h04>;
-	control = <&pinmux 3>;  /* 3 is the pinmux controller's ID for the atd group */
-	/* 4 options available, numbered 0 to 3 */
-	functions = <FUNC_IDE   FUNC_NAND   FUNC_GMI   FUNC_SDIO4>;
-};
-
-
-(It is probably obvious, but FUNC_SDIO4 is not just the value 3. It
-might be 21 - the pinmux code searches the list of 4 options for
-FUNC_SDIO4. The position it finds it in this case is 3, so that is the
-value written to &pinmux)
-
-
-7. Pins
-
-At this level I'm not sure if a device tree representation adds much.
-Maybe connect the GPIOs?
-
-pin-i02: pin_i02 at 0 {
-	name = "i02";
-	gpio = <&gpio 66>;
-};
-
-pin-t07: pin_t07 at 0 {
-	name = "t07";
-	gpio = <&gpio 167>;
-};
-
-
-8. Flexibility
-
-Someone asked how to deal with an LCD output with 16 bits each of
-which can be on two pins. Know you of such an SOC? If so, then it is
-still possible that the SOC would provide a few basic 'common' options
-at the funcmux level. But board designers may have to steel themselves
-and dive into the the pingroup level.
-
-Where an SOC has no groups but only pins, then perhaps the funcmux can
-still be provided, but uses a 'pins' property instead of 'groups':
-
-sdmmc4-funcmux : sdmmc4_funcmux at 0 {
-        ...
-	setting at 2 {
-		config = <1>;
-		option = <OPT_SDMMC_8BIT>;
-		pins = <&pin-i02 FUNC_SDIO4 0>  /* clock */
-			<&pin-t07 FUNC_SDIO4 0>  /* command */
-			<&pin-a00 FUNC_SDIO4 0>  /* data[0] */
-			<&pin-a01 FUNC_SDIO4 0>  /* data[1] */
-			<&pin-a02 FUNC_SDIO4 0>  /* data[2] */
-			<&pin-a03 FUNC_SDIO4 0>;  /* data[3] */
-			<&pin-a04 FUNC_SDIO4 0>;  /* data[4] */
-			<&pin-a05 FUNC_SDIO4 0>;  /* data[5] */
-			<&pin-a06 FUNC_SDIO4 0>;  /* data[6] */
-			<&pin-a07 FUNC_SDIO4 0>;  /* data[7] */
-	};
-};
-
-IMO this sort of thing makes it even more desirable to have a
-high-level pinmux feature in the device tree. Again, the board
-designer can dive into pins by defining his own custom funcmux-level
-things, so no flexibility is lost.
-
-Regards,
-Simon
+> +
+> + ? ? ? /* allow mmap optionally for devices that need it */
+> + ? ? ? int (*mmap)(struct dma_buf *, struct vm_area_struct *);
+> + ? ? ? /* after final dma_buf_put() */
+> + ? ? ? void (*release)(struct dma_buf *);
+> +
+> + ? ? ? /* allow allocator to take care of cache ops */
+> + ? ? ? void (*sync_sg_for_cpu) (struct dma_buf *, struct device *);
+> + ? ? ? void (*sync_sg_for_device)(struct dma_buf *, struct device *);
+> +};
+> +
+> +/**
+> + * struct dma_buf - shared buffer object
+> + * @file: file pointer used for sharing buffers across, and for refcounting.
+> + * @attachments: list of dma_buf_attachment that denotes all devices attached.
+> + * @ops: dma_buf_ops associated with this buffer object
+> + * @priv: user specific private data
+> + */
+> +struct dma_buf {
+> + ? ? ? size_t size;
+> + ? ? ? struct file *file;
+> + ? ? ? struct list_head attachments;
+> + ? ? ? const struct dma_buf_ops *ops;
+> + ? ? ? /* mutex to serialize list manipulation and other ops */
+> + ? ? ? struct mutex lock;
+> + ? ? ? void *priv;
+> +};
+> +
+> +#ifdef CONFIG_DMA_SHARED_BUFFER
+> +struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device *dev);
+> +void dma_buf_detach(struct dma_buf *dmabuf,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_buf_attachment *dmabuf_attach);
+> +struct dma_buf *dma_buf_export(void *priv, struct dma_buf_ops *ops, int flags);
+> +int dma_buf_fd(struct dma_buf *dmabuf);
+> +struct dma_buf *dma_buf_get(int fd);
+> +void dma_buf_put(struct dma_buf *dmabuf);
+> +
+> +struct sg_table * dma_buf_map_attachment(struct dma_buf_attachment *,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum dma_data_direction);
+> +void dma_buf_unmap_attachment(struct dma_buf_attachment *, struct sg_table *);
+> +#else
+> +
+> +static inline struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device *dev)
+> +{
+> + ? ? ? return ERR_PTR(-ENODEV);
+> +}
+> +
+> +static inline void dma_buf_detach(struct dma_buf *dmabuf,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_buf_attachment *dmabuf_attach)
+> +{
+> + ? ? ? return;
+> +}
+> +
+> +static inline struct dma_buf *dma_buf_export(void *priv,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_buf_ops *ops,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int flags)
+> +{
+> + ? ? ? return ERR_PTR(-ENODEV);
+> +}
+> +
+> +static inline int dma_buf_fd(struct dma_buf *dmabuf)
+> +{
+> + ? ? ? return -ENODEV;
+> +}
+> +
+> +static inline struct dma_buf *dma_buf_get(int fd)
+> +{
+> + ? ? ? return ERR_PTR(-ENODEV);
+> +}
+> +
+> +static inline void dma_buf_put(struct dma_buf *dmabuf)
+> +{
+> + ? ? ? return;
+> +}
+> +
+> +static inline struct sg_table * dma_buf_map_attachment(
+> + ? ? ? struct dma_buf_attachment *, enum dma_data_direction)
+> +{
+> + ? ? ? return ERR_PTR(-ENODEV);
+> +}
+> +
+> +static inline void dma_buf_unmap_attachment(struct dma_buf_attachment *,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct sg_table *)
+> +{
+> + ? ? ? return;
+> +}
+> +
+> +#endif /* CONFIG_DMA_SHARED_BUFFER */
+> +
+> +#endif /* __DMA_BUF_H__ */
+> --
+> 1.7.4.1
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org. ?For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Fight unfair telecom internet charges in Canada: sign http://stopthemeter.ca/
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
