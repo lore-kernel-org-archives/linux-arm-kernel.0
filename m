@@ -1,83 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 09 Jan 2012 14:36:03 +0100
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
- remove unsupported 15bit modes
-In-Reply-To: <4F0A55D7.50707@gmx.de>
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <87zke29yqj.fsf@macbook.be.48ers.dk> <4F0A55D7.50707@gmx.de>
-Message-ID: <4F0AED43.3030204@atmel.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 09 Jan 2012 14:54:32 +0100
+Subject: [PATCH 1/2] at91 : move pm.h header to arch/arm/include/asm
+In-Reply-To: <20120109112920.GJ21765@n2100.arm.linux.org.uk>
+References: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
+ <201201061730.33525.arnd.bergmann@linaro.org> <4F0ACD35.1000600@linaro.org>
+ <20120109112920.GJ21765@n2100.arm.linux.org.uk>
+Message-ID: <4F0AF198.1030803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2012 03:49 AM, Florian Tobias Schandinat :
-> Hi Peter,
-> 
-> On 01/05/2012 11:26 AM, Peter Korsgaard wrote:
->>>>>>> "Peter" == Peter Korsgaard <jacmet@sunsite.dk> writes:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+On 01/09/2012 12:29 PM, Russell King - ARM Linux wrote:
+> On Mon, Jan 09, 2012 at 12:19:17PM +0100, Daniel Lezcano wrote:
+>> Actually, the header moves from :
 >>
->>  Peter> Allow framebuffer to be configured in 16bit mode when panel is
->>  Peter> wired in (the default) BGR configuration, and don't claim to
->>  Peter> support 15bit input modes, which the LCD controller cannot
->>  Peter> handle.
+>> 	arch/arm/mach-at91/pm.h
+>> to:
+>> 	arch/arm/include/asm/at91_pm.h.
 >>
->> Ping? Nicolas, you added it to your at91-lcd branch - But it doesn't seem
->> to have gone any further.
+>> This place and the renaming of the file complies with the comments of
+>> Russell,
 > 
-> I could also take care of this patch but I'd prefer if it gets an Acked-by of
-> someone at Atmel (or someone else who knows the hardware) as I cannot really
-> tell whether it is correct.
+> No it doesn't.  There's absolutely no way in hell I want arch/arm/include/asm
+> to be littered with hundreds of crappy platform specific header files.
 
-Here is my:
+Ok. Actually there are 9 pm.h files but I agree with a domino effect we
+can have more header files brought to this directory like "control.h",
+"powerdomain.h", etc ...
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Does it make sense to merge all the pm.h file in a single pm.h which
+will be located in arch/arm/include/asm ?
 
-Thank you Florian for taking care of it.
+And we separate the different archs specific with #ifdef
+CONFIG_ARCH_AT91, CONFIG_ARCH_OMAP, etc ...
 
-Best regards,
+The resulting file will be bigger but that will be easier to find a
+pattern we can factor out in the header file and that will encourage the
+developers to share the code across the different arch.
 
->>  Peter> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
->>  Peter> ---
->>  Peter>  drivers/video/atmel_lcdfb.c |   12 +++---------
->>  Peter>  1 files changed, 3 insertions(+), 9 deletions(-)
->>
->>  Peter> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
->>  Peter> index 7ca3eaf..143f6d9 100644
->>  Peter> --- a/drivers/video/atmel_lcdfb.c
->>  Peter> +++ b/drivers/video/atmel_lcdfb.c
->>  Peter> @@ -418,24 +418,18 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
->>  var-> red.length = var->green.length = var->blue.length
->>  Peter>  			= var->bits_per_pixel;
->>  Peter>  		break;
->>  Peter> -	case 15:
->>  Peter>  	case 16:
->>  Peter>  		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
->>  Peter>  			/* RGB:565 mode */
->>  var-> red.offset = 11;
->>  var-> blue.offset = 0;
->>  Peter> -			var->green.length = 6;
->>  Peter> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
->>  Peter> -			var->red.offset = 10;
->>  Peter> -			var->blue.offset = 0;
->>  Peter> -			var->green.length = 5;
->>  Peter>  		} else {
->>  Peter> -			/* BGR:555 mode */
->>  Peter> +			/* BGR:565 mode */
->>  var-> red.offset = 0;
->>  Peter> -			var->blue.offset = 10;
->>  Peter> -			var->green.length = 5;
->>  Peter> +			var->blue.offset = 11;
->>  Peter>  		}
->>  var-> green.offset = 5;
->>  Peter> +		var->green.length = 6;
->>  var-> red.length = var->blue.length = 5;
->>  Peter>  		break;
->>  Peter>  	case 32:
->>  Peter> -- 
->>  Peter> 1.7.6.3
->>
-> 
-> 
+Thanks
+  -- Daniel
 
+- -- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
--- 
-Nicolas Ferre
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iQEcBAEBAgAGBQJPCvGYAAoJEAKBbMCpUGYAGTMH/iLSep3kiUfxJiDLlxLoPkcs
+pyvJGnD/leJOvykxd6QQ3dCs+4i2tbYnMEGVtfYWbTHOraOTa1u5oRcS/F0yNOYu
+kifKYyLKJPT9lkYlaDBU9/cWZDhHdAQpu+2vKnVDIJLeSwBDxCEROoPQaWGs2cnw
+0k06iCE/Zq9V5duFE/u7n0RX7XpJCLmdMcRDRw2GW7WuZ6DA2BeU2MEFudQ1NLK1
+bB9zyVVCBxPVVdqjgaSagU0LTCPUeHALsYQVUqpPYMuYK30/ACyakyA/jLFn52lD
+x47ybOuLOGSl4c0/wS1duCBbIFNYsT/kBcVXFXA/usAaCjW12H7OV+9MEA7lB8E=
+=y5HS
+-----END PGP SIGNATURE-----
