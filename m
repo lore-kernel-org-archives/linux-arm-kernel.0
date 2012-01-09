@@ -1,50 +1,61 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Mon, 9 Jan 2012 21:25:12 +0800
-Subject: [PATCH v4 2/2] dma/imx-sdma: convert _raw_readl/_raw_writel to
- readl/writel
-In-Reply-To: <20120109115143.GL21765@n2100.arm.linux.org.uk>
-References: <1326033862-25351-1-git-send-email-richard.zhao@linaro.org>
- <1326033862-25351-3-git-send-email-richard.zhao@linaro.org>
- <20120109115143.GL21765@n2100.arm.linux.org.uk>
-Message-ID: <CAMPhdO84p=0D3KrrFnwup4igoh4oNWXOCbW+BOkoRiC8m=JnmQ@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 9 Jan 2012 14:31:44 +0100
+Subject: [PATCH v2 1/5] arm/dts: OMAP4: Update DTS file with new GIC
+ bindings
+In-Reply-To: <4F07680E.8000404@gmail.com>
+References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
+ <1324388398-2683-2-git-send-email-b-cousson@ti.com>
+ <20120106211558.GA7457@ponder.secretlab.ca> <4F07680E.8000404@gmail.com>
+Message-ID: <4F0AEC40.3040200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 9, 2012 at 7:51 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Jan 08, 2012 at 10:44:22PM +0800, Richard Zhao wrote:
->> readl/writel is more genric. And if CONFIG_ARM_DMA_MEM_BUFFERABLE,
->> they includes necessary memory barriers.
->
-> In a DMA engine driver, you need to use the barrier accessors when:
->
-> 1. You finally enable the DMA engine to perform a transfer.
-> ? The included barrier ensures that writes to the descriptors are visible
-> ? to the DMA engine.
->
-> 2. You read from a status register before examining the descriptors.
-> ? This ensures that the descriptor accesses won't be ordered before the
-> ? status register read.
->
-> Provided other accesses are within the same 1K region, the remainder of
-> them do not have to be the strictly ordered accessors, and you can use
-> the _relaxed variants (but only in ARM specific drivers.)
+On 1/6/2012 10:30 PM, Rob Herring wrote:
+> On 01/06/2012 03:15 PM, Grant Likely wrote:
+>> On Tue, Dec 20, 2011 at 02:39:54PM +0100, Benoit Cousson wrote:
+>>> The GIC binding was updated in 3.2 and expect 3 interrupt-cells.
+>>> - Update the #interrupt-cells
+>>> - interrupt-parent seems to be needed as well for the top level GIC
+>>
+>> Hmmm... it shouldn't be.  If it is then it is a bug.
+> 
+> I think this is an old comment which I fixed in 3.2, so interrupt-parent
+> can be removed.
 
-Russell,
+I've just tried, and indeed, it works now.
 
-Does this also mean when endian conversion is not necessary, the __raw_*
-version will be better here? Or generally the _relaxed variants are more
-recommended as endian conversion will be optimized away anyway with
-these AMBA accesses as both sides are little-endian?
+Please find below the patch updated accordingly.
 
->
-> So, if your DMA engine has a control register, and a descriptor pointer
-> register, you can write the descriptor pointer register with a
-> writel_relaxed(). ?When you write the control register to enable the
-> transfer, use writel() to ensure there's a barrier so the descriptors
-> are visible.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Benoit
+
+---
+>From f9ebe0ff11e7cbbba0d7499420ff2f358e44a297 Mon Sep 17 00:00:00 2001
+From: Benoit Cousson <b-cousson@ti.com>
+Date: Fri, 25 Nov 2011 12:11:52 +0100
+Subject: [PATCH v3 1/5] arm/dts: OMAP4: Update DTS file with new GIC bindings
+
+The GIC binding was updated in 3.2 and expects 3 interrupt-cells.
+- Update the #interrupt-cells
+
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 4c61c82..4b2bff1 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -95,7 +95,7 @@
+ 		gic: interrupt-controller at 48241000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <3>;
+ 			reg = <0x48241000 0x1000>,
+ 			      <0x48240100 0x0100>;
+ 		};
+-- 
+1.7.0.4
