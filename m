@@ -1,28 +1,54 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Jan 2012 10:32:48 +0100
-Subject: [PATCH 2/4] ASoC: i.MX: Add missing dma_async_issue_pending
+Date: Mon,  9 Jan 2012 10:32:50 +0100
+Subject: [PATCH 4/4] dma: imx-sdma: start transfer in issue_pending
 In-Reply-To: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
 References: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1326101570-3716-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1326101570-3716-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The DMA API requires that transfers are started in issue_pending
+instead of tx_submit. Fix this.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- sound/soc/imx/imx-pcm-dma-mx2.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/dma/imx-sdma.c |   11 +++++------
+ 1 files changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/sound/soc/imx/imx-pcm-dma-mx2.c b/sound/soc/imx/imx-pcm-dma-mx2.c
-index 43fdc24f..88aa95c 100644
---- a/sound/soc/imx/imx-pcm-dma-mx2.c
-+++ b/sound/soc/imx/imx-pcm-dma-mx2.c
-@@ -204,6 +204,7 @@ static int snd_imx_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
- 	case SNDRV_PCM_TRIGGER_RESUME:
- 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
- 		dmaengine_submit(iprtd->desc);
-+		dma_async_issue_pending(iprtd->dma_chan);
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index f993955..eb28bb0 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -833,15 +833,12 @@ static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
+ static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(tx->chan);
+-	struct sdma_engine *sdma = sdmac->sdma;
+ 	dma_cookie_t cookie;
  
- 		break;
+ 	spin_lock_irq(&sdmac->lock);
  
+ 	cookie = sdma_assign_cookie(sdmac);
+ 
+-	sdma_enable_channel(sdma, sdmac->channel);
+-
+ 	spin_unlock_irq(&sdmac->lock);
+ 
+ 	return cookie;
+@@ -1126,9 +1123,11 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
+ 
+ static void sdma_issue_pending(struct dma_chan *chan)
+ {
+-	/*
+-	 * Nothing to do. We only have a single descriptor
+-	 */
++	struct sdma_channel *sdmac = to_sdma_chan(chan);
++	struct sdma_engine *sdma = sdmac->sdma;
++
++	if (sdmac->status == DMA_IN_PROGRESS)
++		sdma_enable_channel(sdma, sdmac->channel);
+ }
+ 
+ #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
 -- 
 1.7.7.3
