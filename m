@@ -1,52 +1,67 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 9 Jan 2012 08:17:17 +0100
-Subject: mxs: enable phy-clock in the driver?
-In-Reply-To: <20120109072121.GN1835@S2101-09.ap.freescale.net>
-References: <20120108144558.GB2544@pengutronix.de>
- <20120109013404.GD1835@S2101-09.ap.freescale.net>
- <20234.35823.411762.856482@ipc1.ka-ro>
- <20120109065845.GL1835@S2101-09.ap.freescale.net>
- <20234.37290.114047.36369@ipc1.ka-ro>
- <20120109072121.GN1835@S2101-09.ap.freescale.net>
-Message-ID: <20234.38013.186263.46846@ipc1.ka-ro>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 9 Jan 2012 09:10:30 +0100
+Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <CAAQKjZPFh6666JKc-XJfKYePQ_F0MNF6FkY=zKypWb52VVX3YQ@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
+ <CAAQKjZPFh6666JKc-XJfKYePQ_F0MNF6FkY=zKypWb52VVX3YQ@mail.gmail.com>
+Message-ID: <20120109081030.GA3723@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Shawn Guo writes:
-> On Mon, Jan 09, 2012 at 08:05:14AM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Shawn Guo writes:
-> > > On Mon, Jan 09, 2012 at 07:40:47AM +0100, Lothar Wa?mann wrote:
-> > > > The TX28 derives its PHY clock from the ENET_CLK pin of the
-> > > > processor. Thus the CLK_ENET_TIME should be enabled by the driver as
-> > > > mentioned in <20120108033238.GA19721@S2101-09.ap.freescale.net>
-> > > > 
-> > > Can you give a web link for that message?
-> > > 
-> > It's your own email from "Sun, 8 Jan 2012 11:32:40 +0800" with the
-> > subject "Re: MX28 fec clock frequency":
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/079556.html
-> > 
-> Ah, yes.  But what I said there is the CLK_ENET_TIME should be enabled
-> by PTP support, not the need of clocking external phy required by
-> particular board design.
+On Mon, Jan 09, 2012 at 03:20:48PM +0900, InKi Dae wrote:
+> I has test dmabuf based drm gem module for exynos and I found one problem.
+> you can refer to this test repository:
+> http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/exynos-drm-dmabuf
 > 
-My point was, that it is the same clock. Thus, not "pll2" but
-"enet_ptp" or whatever it's name will be needs to be enabled for the
-Ethernet PHY on TX28.
+> at this repository, I added some exception codes for resource release
+> in addition to Dave's patch sets.
+> 
+> let's suppose we use dmabuf based vb2 and drm gem with physically
+> continuous memory(no IOMMU) and we try to share allocated buffer
+> between them(v4l2 and drm driver).
+> 
+> 1. request memory allocation through drm gem interface.
+> 2. request DRM_SET_PRIME ioctl with the gem handle to get a fd to the
+> gem object.
+> - internally, private gem based dmabuf moudle calls drm_buf_export()
+> to register allocated gem object to fd.
+> 3. request qbuf with the fd(got from 2) and DMABUF type to set the
+> buffer to v4l2 based device.
+> - internally, vb2 plug in module gets a buffer to the fd and then
+> calls dmabuf->ops->map_dmabuf() callback to get the sg table
+> containing physical memory info to the gem object. and then the
+> physical memory info would be copied to vb2_xx_buf object.
+> for DMABUF feature for v4l2 and videobuf2 framework, you can refer to
+> this repository:
+> git://github.com/robclark/kernel-omap4.git drmplane-dmabuf
+> 
+> after that, if v4l2 driver want to release vb2_xx_buf object with
+> allocated memory region by user request, how should we do?. refcount
+> to vb2_xx_buf is dependent on videobuf2 framework. so when vb2_xx_buf
+> object is released videobuf2 framework don't know who is using the
+> physical memory region. so this physical memory region is released and
+> when drm driver tries to access the region or to release it also, a
+> problem would be induced.
+> 
+> for this problem, I added get_shared_cnt() callback to dma-buf.h but
+> I'm not sure that this is good way. maybe there may be better way.
+> if there is any missing point, please let me know.
 
+The dma_buf object needs to hold a reference on the underlying
+(necessarily reference-counted) buffer object when the exporter creates
+the dma_buf handle. This reference should then get dropped in the
+exporters dma_buf->ops->release() function, which is only getting called
+when the last reference to the dma_buf disappears.
 
-Lothar Wa?mann
+If this doesn't work like that currently, we have a bug, and exporting the
+reference count or something similar can't fix that.
+
+Yours, Daniel
+
+PS: Please cut down the original mail when replying, otherwise it's pretty
+hard to find your response ;-)
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
