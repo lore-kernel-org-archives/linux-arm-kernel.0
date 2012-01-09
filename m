@@ -1,9 +1,9 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  9 Jan 2012 16:45:43 -0600
-Subject: [PATCH 3/6] ARM: vexpress: remove incorrect BSYM usage
+Date: Mon,  9 Jan 2012 16:45:44 -0600
+Subject: [PATCH 4/6] ARM: imx: remove incorrect BSYM usage
 In-Reply-To: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
 References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326149146-19756-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1326149146-19756-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,30 +15,32 @@ kernels.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Dave Martin <dave.martin@linaro.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-vexpress/platsmp.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/src.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 2b5f7ac..124ffb1 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -13,8 +13,6 @@
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index 4bde04f..29bd124 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -15,7 +15,6 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
  #include <linux/smp.h>
- #include <linux/io.h>
- 
 -#include <asm/unified.h>
--
- #include <mach/motherboard.h>
- #define V2M_PA_CS7 0x10000000
  
-@@ -46,6 +44,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * secondary CPU branches to this address.
- 	 */
- 	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
--	writel(BSYM(virt_to_phys(versatile_secondary_startup)),
-+	writel(virt_to_phys(versatile_secondary_startup),
- 		MMIO_P2V(V2M_SYS_FLAGSSET));
+ #define SRC_SCR				0x000
+ #define SRC_GPR1			0x020
+@@ -43,7 +42,7 @@ void imx_enable_cpu(int cpu, bool enable)
+ void imx_set_cpu_jump(int cpu, void *jump_addr)
+ {
+ 	cpu = cpu_logical_map(cpu);
+-	writel_relaxed(BSYM(virt_to_phys(jump_addr)),
++	writel_relaxed(virt_to_phys(jump_addr),
+ 		       src_base + SRC_GPR1 + cpu * 8);
  }
+ 
 -- 
 1.7.5.4
