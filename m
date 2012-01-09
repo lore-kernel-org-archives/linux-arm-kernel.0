@@ -1,47 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Jan 2012 09:58:39 +0000
-Subject: [GIT PULL] Samsung devel for v3.3
-In-Reply-To: <20120108204953.GA20043@sirena.org.uk>
-References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
- <CAOesGMhLE3wxM=F9OkHT-bQpsVp8Uc6eE8Uk+WN9pLuz5BRLBw@mail.gmail.com>
- <20120108204953.GA20043@sirena.org.uk>
-Message-ID: <20120109095839.GH21765@n2100.arm.linux.org.uk>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 9 Jan 2012 11:11:06 +0100
+Subject: [RFC] Future TTM DMA direction
+In-Reply-To: <4F0AB558.3050902@vmware.com>
+References: <4F0AB558.3050902@vmware.com>
+Message-ID: <20120109101105.GC3723@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 08, 2012 at 08:49:53PM +0000, Mark Brown wrote:
-> On Fri, Jan 06, 2012 at 01:58:29PM -0800, Olof Johansson wrote:
+On Mon, Jan 09, 2012 at 10:37:28AM +0100, Thomas Hellstrom wrote:
+> Hi!
 > 
-> > > Please pull Samsung devel for v3.3 from:
-> > > ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > > next-samsung-devel-samsung
+> When TTM was originally written, it was assumed that GPU apertures
+> could address pages directly, and that the CPU could access those
+> pages without explicit synchronization. The process of binding a
+> page to a GPU translation table was a simple one-step operation, and
+> we needed to worry about fragmentation in the GPU aperture only.
 > 
-> > Thanks. I've pulled this into late/devel, based on earlier email from
-> > Arnd we might end up sending this in towards the end of the merge
-> > window, but there's also a chance it will wait for 3.4.
+> Now that we "sort of" support DMA memory there are three things I
+> think are missing:
 > 
-> That'd be extremely disappointing, especially given that there's some
-> bug fixes in there for updates going in this merge window without which
-> mainline is going to have problems on s3c64xx (mostly the GPIO stuff).
+> 1) We can't gracefully handle coherent DMA OOMs or coherent DMA
+> (Including CMA) memory fragmentation leading to failed allocations.
+> 2) We can't handle dynamic mapping of pages into and out of dma, and
+> corresponding IOMMU space shortage or fragmentation, and CPU
+> synchronization.
+> 3) We have no straightforward way of moving pages between devices.
+> 
+> I think a reasonable way to support this is to make binding to a
+> non-fixed (system page based) TTM memory type a two-step binding
+> process, so that a TTM placement consists of (DMA_TYPE, MEMORY_TYPE)
+> instead of only (MEMORY_TYPE).
+> 
+> In step 1) the bo is bound to a specific DMA type. These could be
+> for example:
+> (NONE, DYNAMIC, COHERENT, CMA), .... device dependent types could be
+> allowed as well.
+> In this step, we perform dma_sync_for_device, or allocate
+> dma-specific pages maintaining LRU lists so that if we receive a DMA
+> memory allocation OOM, we can unbind bo:s bound to the same DMA
+> type. Standard graphics cards would then, for example, use the NONE
+> DMA type when run on bare metal or COHERENT when run on Xen. A
+> "COHERENT" OOM condition would then lead to eviction of another bo.
+> (Note that DMA eviction might involve data copies and be costly, but
+> still better than failing).
+> Binding with the DYNAMIC memory type would mean that CPU accesses
+> are disallowed, and that user-space CPU page mappings might need to
+> be killed, with a corresponding sync_for_cpu if they are faulted in
+> again (perhaps on a page-by-page basis). Any attempt to bo_kmap() a
+> bo page bound to DYNAMIC DMA mapping should trigger a BUG.
+> 
+> In step 2) The bo is bound to the GPU in the same way it's done
+> today. Evicting from DMA will of course also trigger an evict from
+> GPU, but an evict from GPU will not trigger a DMA evict.
+> 
+> Making a bo "anonymous" and thus moveable between devices would then
+> mean binding it to the "NONE" DMA type.
+> 
+> Comments, suggestions?
 
-Here we go again with sucky work practices.
+Well I think we need to solve outstanding issues in the dma_buf framework
+first. Currently dma_buf isn't really up to par to handle coherency
+between the cpu and devices and there's also not yet any way to handle dma
+address space fragmentation/exhaustion.
 
-This sucky behaviour has been around for a long time, I've long since
-given up complaining about it as it's exactly like talking to a bloody
-brick wall.  People just continue mixing development and fixes together.
+I fear that if you jump ahead with improving the ttm support alone we
+might end up with something incompatible to the stuff dma_buf eventually
+will grow, resulting in decent amounts of wasted efforts.
 
-They then wonder why their fixes don't make it into mainline in a timely
-fashion.
+Cc'ed a bunch of relevant lists to foster input from people.
 
-Maybe delaying the whole lot will make people change their behaviour:
-it's a behaviour that needs to change at the submitters end.  There's
-nothing which Olof or Arnd can reasonably do to expedite the fixes.
+For a starter you seem to want much more low-level integration with the
+dma api than existing users commonly need. E.g. if I understand things
+correctly drivers just call dma_alloc_coherent and the platform/board code
+then decides whether the device needs a contigious allocation from cma or
+whether something else is good, too (e.g. vmalloc for the cpu + iommu).
+Another thing is that I think doing lru eviction in case of dma address
+space exhaustion (or fragmentation) needs at least awereness of what's
+going on in the upper layers. iommus are commonly shared between devices
+and I presume that two ttm drivers sitting behind the same iommu and
+fighting over it's resources can lead to some hilarious outcomes.
 
-So, please direct your complaints to the submitter for not having a
-work practice which ensures that fixes receive a higher submission
-priority.
-
-Note: Linus _has_ taken a copy of linux-next (read the 3.2 release email),
-and _is_ checking whether development stuff was in linux-next prior to
-the merge window opening.  It would be very unwise to send new development
-which wasn't already there.
+Cheers, Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
