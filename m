@@ -1,33 +1,47 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 09 Jan 2012 13:20:13 +0100
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
- remove unsupported 15bit modes
-In-Reply-To: <20120109121322.GM21765@n2100.arm.linux.org.uk> (Russell King's
- message of "Mon, 9 Jan 2012 12:13:22 +0000")
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <4F0AC2B1.8010601@atmel.com>
- <20120109121322.GM21765@n2100.arm.linux.org.uk>
-Message-ID: <87mx9xdq4i.fsf@macbook.be.48ers.dk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 9 Jan 2012 13:38:29 +0100
+Subject: [PATCH] ARM: PXA: Zipit Z2: Fix oops in z2_power_off
+In-Reply-To: <20120109121712.GN21765@n2100.arm.linux.org.uk>
+References: <1326011616-3546-1-git-send-email-anarsoul@gmail.com>
+ <201201091313.31535.marek.vasut@gmail.com>
+ <20120109121712.GN21765@n2100.arm.linux.org.uk>
+Message-ID: <201201091338.29680.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Russell" == Russell King <- ARM Linux <linux@arm.linux.org.uk>> writes:
+> On Mon, Jan 09, 2012 at 01:13:31PM +0100, Marek Vasut wrote:
+> > > 2012/1/9 Marek Vasut <marek.vasut@gmail.com>:
+> > > >> Nope, it does not work. Looks like device disables power on memory
+> > > >> in deepsleep.
+> > > > 
+> > > > Why?
+> > > 
+> > > In deepsleep PXA27x deasserts SYS_EN pin, and looks like when it's
+> > > deasserted there's no power on SDRAM (on Zipit). Just guess.
+> > 
+> > Then maybe implement suspend-to-disk ? There was a patch for omap on the
+> > list, maybe it's even merged.
+> 
+> What are hell you going on about? 
 
-Hi,
+Cool your jets Russell.
 
- Russell> You describe the RGB555 vs RGB565 via the bitfield values in
- Russell> var->red, var-> green and var->blue.  So, RGB(or BGR)565 has
- Russell> var->green.length with 6, and RGB(or BGR)555 has this as 5.
- Russell> In both cases, bits_per_pixel is 16 as that's the width of a
- Russell> pixel in the frame buffer.
+> Why would someone want to even try
+> implementing suspend-to-disk in the power off hook?
 
- Russell> If the bitfield can't be interpreted by the driver as
- Russell> identifying one of these combinations, then you're supposed to
- Russell> chose one (and in the case where it's fixed by hardware, you
- Russell> set the bitfields according to what the hardware supports.)
+I'm not talking about the powerdown hook anymore, but a way how to avoid it as 
+much as possible via standard means.
 
-Indeed, and as the hardware can only interprete 1/2/4/8 paletted and
-16/24 RGB, we shouldn't claim to support 15bit.
+> Why would you even
+> want to try to preserve the system state in a power off hook?
 
--- 
-Bye, Peter Korsgaard
+Not in poweroff hook. Btw. I'm still convinced the bootloader should handle this 
+-- the powerdown should just reset the thing and tell bootloader to deepsleep 
+it.
+
+> 
+> Nothing much you've said in this thread makes sense so far.  What is
+> the point you're trying to raise, other than a personal dislike for
+> using the deep sleep mode to simulate an apparant 'power off' condition?
+
+See above.
