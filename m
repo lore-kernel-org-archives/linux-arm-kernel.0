@@ -1,25 +1,31 @@
-From: rob@ti.com (Rob Clark)
-Date: Mon, 9 Jan 2012 09:17:05 -0600
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <CAAQKjZMEsuib18RYE7OvZPUqhKnvrZ8i3+EMuZSXr9KPVygo_Q@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
- <CAAQKjZPFh6666JKc-XJfKYePQ_F0MNF6FkY=zKypWb52VVX3YQ@mail.gmail.com>
- <20120109081030.GA3723@phenom.ffwll.local>
- <CAAQKjZMEsuib18RYE7OvZPUqhKnvrZ8i3+EMuZSXr9KPVygo_Q@mail.gmail.com>
-Message-ID: <CAF6AEGsTGOxyTX6Xijvm8UXGjtVTtYg5X5xfJo8D+47o+xU+bA@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 9 Jan 2012 17:26:03 +0200
+Subject: [PATCH v2 0/3] Tegra30 clockframework
+In-Reply-To: <1326121937-32054-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1326121937-32054-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20120109152603.GV32619@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 9, 2012 at 4:10 AM, InKi Dae <daeinki@gmail.com> wrote:
-> note : in case of sharing a buffer between v4l2 and drm driver, the
-> memory info would be copied vb2_xx_buf to xx_gem or xx_gem to
-> vb2_xx_buf through sg table. in this case, only memory info is used to
-> share, not some objects.
+On Mon, Jan 09, 2012 at 04:12:10PM +0100, Peter De Schrijver wrote:
+> This patchset introduces the tegra30 clockframework. Clocks which require
+> voltage scaling are not included in this version. The implementation doesn't
+> use the generic clock code yet. It's the intention to move to it, once the
+> semantics are fully clarified.
+> 
+> ---
+> 
+> Changes in v2:
+>  * Fix parent clocks for TWD. This makes the SMP configuration booting again.
+> 
+> Peter De Schrijver (3):
+>   ARM: tegra: add support for new clock framework features
+>   ARM: tegra: implement basic tegra30 clock framework
+>   ARM: tegra: enable tegra30 clock framework
 
-which v4l2/vb2 patches are you looking at?  The patches I was using,
-vb2 holds a reference to the 'struct dma_buf *' internally, not just
-keeping the sg_table
+Oops. Now I sent everything twice... Will send it again with the correct
+topic etc.
 
-BR,
--R
+Cheers,
+
+Peter.
