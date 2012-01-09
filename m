@@ -1,42 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Jan 2012 13:27:22 +0800
-Subject: [PATCH 6/6] ARM: imx6q-sabrelite: add audmux support
-In-Reply-To: <20120109011948.GB1835@S2101-09.ap.freescale.net>
-References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-7-git-send-email-richard.zhao@linaro.org>
- <20120108150234.GF20216@S2101-09.ap.freescale.net>
- <20120108145813.GA23822@b20223-02.ap.freescale.net>
- <20120109011948.GB1835@S2101-09.ap.freescale.net>
-Message-ID: <20120109052719.GH1835@S2101-09.ap.freescale.net>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Mon, 9 Jan 2012 05:31:02 +0000
+Subject: [PATCHv12 0/9] OMAP3+: PRCM chain handler
+In-Reply-To: <20111215213358.26632.44165.stgit@dusk>
+References: <20111215213358.26632.44165.stgit@dusk>
+Message-ID: <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 09:19:50AM +0800, Shawn Guo wrote:
-> On Sun, Jan 08, 2012 at 10:58:14PM +0800, Richard Zhao wrote:
-> > On Sun, Jan 08, 2012 at 11:02:36PM +0800, Shawn Guo wrote:
-> > > On Fri, Jan 06, 2012 at 11:25:43AM +0800, Richard Zhao wrote:
-> > > > --- a/arch/arm/boot/dts/imx6q.dtsi
-> > > > +++ b/arch/arm/boot/dts/imx6q.dtsi
-> > > > @@ -527,7 +527,9 @@
-> > > >  			};
-> > > >  
-> > > >  			audmux at 021d8000 {
-> > > > +				compatible = "fsl,audmux-v2";
-> > > 
-> > > This is not a good compatible string, because the version number is
-> > > not defined by hardware.  Even it is defined by hardware, the version
-> > > number is not as stable as soc to identify specific hardware block.
-> > > You can look at uart, cspi, sdma etc. for examples.
-> > compatible = "fsl,imx6q-audmux", "fsl,imx25-audmux";
-> > I forgot imx25 or imx31 is oldest. Is it ok for you?
-> > 
-> Yes.
+Hi Paul,
 
-Forgot mentioning that imx31 was born earlier than imx25, so I would
-expect it be: 
+On Fri, Dec 16, 2011 at 03:06:09, Paul Walmsley wrote:
+> Hi,
+> 
+> This is a repost of Tero's PRCM chain handler patch set with a few changes:
+> 
+> - A new mux patch has been added to place hwmod mux entries with
+>   OMAP_DEVICE_PAD_WAKEUP set into the dynamic list
+> 
+> - Several OCP barriers have been added to PRM writes to try to protect
+>   against races between PRM register writes and the MPU
+> 
+> - Kerneldoc documentation has been added
+> 
+> - The pending IRQ test functions have been split into per-SoC versions
+> 
+> - Some patches have been rearranged and merged to avoid churn
+> 
+> - The PRM IRQ handler is now installed on OMAP4
+> 
 
-	compatible = "fsl,imx6q-audmux", "fsl,imx31-audmux";
+I found a few (minor) issues with this patch series.
 
--- 
+1. IO and wakeup events are not supported on AM33XX. Since cpu_is_34xx()
+holds true for AM33XX I ended up adding a !cpu_is_am33xx() check in 
+omap3xxx_prcm_init() to bypass the chain handler registration.
+
+Without such a check we were seeing a crash in USB since USB_CLKCTRL on 
+AM33XX just happens to be at the IRQENABLE_MPU_OFFSET of OMAP3.
+Hope such cpu_is_*() checks are acceptable.
+
+2. With the above check in place, there' a warning during boot
+
+"mux: Failed to setup hwmod io irq -22"
+
+This is coming due to request_irq() for the IO event without a PRCM chain
+handler being registered. Maybe there should be check for *prcm_irq_setup
+before request_irq()?
+
+3. [PATCH 9/9] adds an entry for "wkup" event on OMAP4. Carried over from OMAP3?
+
 Regards,
-Shawn
+Vaibhav
