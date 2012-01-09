@@ -1,7 +1,7 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Jan 2012 14:52:40 +0800
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 8 Jan 2012 22:43:29 -0800
 Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <20120109062511.GP29065@opensource.wolfsonmicro.com>
+In-Reply-To: <20120109065238.GK1835@S2101-09.ap.freescale.net>
 References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
  <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
  <20120108145254.GE20216@S2101-09.ap.freescale.net>
@@ -10,28 +10,22 @@ References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
  <4F0A613F.80509@gmail.com>
  <CAMPhdO9gaZQ0oQpfmvvL6MWP_6L9XCOdXYNSgjqDWLQ73XpRpw@mail.gmail.com>
  <20120109062511.GP29065@opensource.wolfsonmicro.com>
-Message-ID: <20120109065238.GK1835@S2101-09.ap.freescale.net>
+ <20120109065238.GK1835@S2101-09.ap.freescale.net>
+Message-ID: <20120109064328.GS29065@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 08, 2012 at 10:25:12PM -0800, Mark Brown wrote:
-> On Mon, Jan 09, 2012 at 01:05:39PM +0800, Eric Miao wrote:
-> 
-> > > If you want lower case names, then change the sgtl5000 code to lower
-> > > case names.
-> 
-> > +1, I'd vote for consistent lower case names.
-> 
-> That would be non-idiomatic for the regulators - the idiom for the
-> regulator API is to use upper case names as that's the idiom used to
-> label supplies in datasheets and schematics.
+On Mon, Jan 09, 2012 at 02:52:40PM +0800, Shawn Guo wrote:
+> On Sun, Jan 08, 2012 at 10:25:12PM -0800, Mark Brown wrote:
 
-Hmm, the idiom seems not so strong.
+> > That would be non-idiomatic for the regulators - the idiom for the
+> > regulator API is to use upper case names as that's the idiom used to
+> > label supplies in datasheets and schematics.
 
-drivers/mmc/host/sdhci.c:
+> Hmm, the idiom seems not so strong.
 
-	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
+> drivers/mmc/host/sdhci.c:
 
--- 
-Regards,
-Shawn
+> 	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
+
+It's purely an idiom, there's nothing enforcing it.
