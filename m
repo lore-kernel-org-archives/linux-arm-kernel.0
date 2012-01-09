@@ -1,49 +1,112 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 09 Jan 2012 10:40:03 +0900
-Subject: [GIT PULL] Samsung devel for v3.3
-In-Reply-To: <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
-References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
- <CAOesGMhLE3wxM=F9OkHT-bQpsVp8Uc6eE8Uk+WN9pLuz5BRLBw@mail.gmail.com>
- <20120108204953.GA20043@sirena.org.uk>
- <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
-Message-ID: <01a301ccce6f$9bb51790$d31f46b0$%kim@samsung.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 9 Jan 2012 10:41:30 +0900
+Subject: [PATCH] ARM: EXYNOS: Fix build error which was from common.c and
+ old cpu.c
+In-Reply-To: <01a001ccce6d$d9f3ea60$8ddbbf20$%kim@samsung.com>
+References: <01a001ccce6d$d9f3ea60$8ddbbf20$%kim@samsung.com>
+Message-ID: <CAH9JG2Xxc=_rSp-vDfNp+V8hoYfQSQaJQy0nVXADsMXH-rUknw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Sun, Jan 8, 2012 at 12:49 PM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
-> > On Fri, Jan 06, 2012 at 01:58:29PM -0800, Olof Johansson wrote:
-> >
-> >> > Please pull Samsung devel for v3.3 from:
-> >> > ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> >> > next-samsung-devel-samsung
-> >
-> >> Thanks. I've pulled this into late/devel, based on earlier email from
-> >> Arnd we might end up sending this in towards the end of the merge
-> >> window, but there's also a chance it will wait for 3.4.
-> >
-> > That'd be extremely disappointing, especially given that there's some
-> > bug fixes in there for updates going in this merge window without which
-> > mainline is going to have problems on s3c64xx (mostly the GPIO stuff).
-> 
-> Of course bug fixes should go in.
-> 
-> Mark, Kukjin, can either of you split out the fixes in a separate branch?
-> 
-Hi Olof,
+On 1/9/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> This fixes build error and wrong merge conflicts.
+> arch/arm/mach-exynos/common.c: In function 'exynos4_gic_irq_fix_base':
+> arch/arm/mach-exynos/common.c:393: error: dereferencing pointer to
+> incomplete type
+> arch/arm/mach-exynos/common.c:396: error: dereferencing pointer to
+> incomplete type
+>
+> Following A and B have been created from different base and the build
+> error was casued in the process of merging and should be fixed in this
+> merge window.
 
-In my opinion, as you know, it would be better to us if you could send this in this merge window.
-Actually, it does not have any dependency with others, in addition, for a long time this has been included in linux-next for this
-merge window.
-If this can be missed from sending list to Linus, please kindly let me know. Let me send this to Linus at the end of this merge
-window.
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Do the same job. boot tested.
+>
+> A. commit db0d4db ("ARM: gic: allow GIC to support non-banked setups"),
+>   commit 4e44d2c ("ARM: exynos4: convert to CONFIG_MULTI_IRQ_HANDLER")
+>   and commit 69676c3 ("ARM: exynos4: Fix build error due to
+>   'gic_bank_offset' undeclared")
+>
+> B. commit cc511b8 ("ARM: 7257/1: EXYNOS: introduce arch/arm/mach-exynos/
+>   common.[ch]") introduced common.[ch]")
+>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Axel Lin <axel.lin@gmail.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> Hi Russell,
+>
+> This should be fixed, I'm sending this to patch system.
+> If you're ok with this, please pick it up for this merge window.
+>
+> Thanks.
+>
+>  arch/arm/mach-exynos/common.c |   20 +++-----------------
+>  1 files changed, 3 insertions(+), 17 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index b6ac6ee..647c843 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/serial_core.h>
+>
+>  #include <asm/proc-fns.h>
+> +#include <asm/exception.h>
+Not needed.
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/hardware/gic.h>
+>  #include <asm/mach/map.h>
+> @@ -43,8 +44,6 @@
+>
+>  #include "common.h"
+>
+> -unsigned int gic_bank_offset __read_mostly;
+> -
+>  static const char name_exynos4210[] = "EXYNOS4210";
+>  static const char name_exynos4212[] = "EXYNOS4212";
+>  static const char name_exynos4412[] = "EXYNOS4412";
+> @@ -386,27 +385,14 @@ static void __init combiner_init(unsigned int
+> combiner_nr, void __iomem *base,
+>  	}
+>  }
+>
+> -static void exynos4_gic_irq_fix_base(struct irq_data *d)
+> -{
+> -	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
+> -
+> -	gic_data->cpu_base = S5P_VA_GIC_CPU +
+> -			    (gic_bank_offset * smp_processor_id());
+> -
+> -	gic_data->dist_base = S5P_VA_GIC_DIST +
+> -			    (gic_bank_offset * smp_processor_id());
+> -}
+> -
+>  void __init exynos4_init_irq(void)
+>  {
+>  	int irq;
+> +	unsigned int gic_bank_offset;
+>
+>  	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
+>
+> -	gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
+> -	gic_arch_extn.irq_eoi = exynos4_gic_irq_fix_base;
+> -	gic_arch_extn.irq_unmask = exynos4_gic_irq_fix_base;
+> -	gic_arch_extn.irq_mask = exynos4_gic_irq_fix_base;
+> +	gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU,
+> gic_bank_offset);
+>
+>  	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
+>
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
