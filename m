@@ -1,46 +1,59 @@
 From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Mon, 9 Jan 2012 09:32:12 +0900
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20120105114732.GA7166@amd.com>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <20120102134229.GZ29877@amd.com>
- <CAHQjnON3XYZ9cAK0kqsY4QzMzESD1wOzxt-fiQCq3TJfDObFiw@mail.gmail.com>
- <20120102155820.GB29877@amd.com>
- <20120103095527.GI2914@n2100.arm.linux.org.uk>
- <20120104150101.GA3492@amd.com>
- <20120104212620.GG11810@n2100.arm.linux.org.uk>
- <20120105114732.GA7166@amd.com>
-Message-ID: <CAHQjnOPB=APDXvDosWbEfas0-CKmBf-ATivfkOFOGYP9iGdbtw@mail.gmail.com>
+Date: Mon, 9 Jan 2012 09:39:48 +0900
+Subject: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU
+ driver
+In-Reply-To: <20120105125326.GT11810@n2100.arm.linux.org.uk>
+References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
+ <20120105091718.3fb378b2a1d390f9dd63c396@nvidia.com>
+ <20120105125326.GT11810@n2100.arm.linux.org.uk>
+Message-ID: <CAHQjnONDAmH+zpSmmOCCs9aYxT+LJGso98=exf+_WFYKT=fE3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2012 at 8:47 PM, Joerg Roedel <joerg.roedel@amd.com> wrote:
-> On Wed, Jan 04, 2012 at 09:26:20PM +0000, Russell King - ARM Linux wrote:
->> On Wed, Jan 04, 2012 at 04:01:01PM +0100, Joerg Roedel wrote:
->> > On Tue, Jan 03, 2012 at 09:55:27AM +0000, Russell King - ARM Linux wrote:
->> > > It comes through when I stick it in my tree because of a month of asking
->> > > for help to fix something and getting zero response from the maintainers.
->> > >
->> > > It's a way to flag to them that they're doing something wrong - and in
->> > > fact something is broken, and that that brokenness will happen at the
->> > > next merge window unless they get off their butt and do something about
->> > > it.
->> >
->> > Okay, fine with me if it really will be fixed in 3.3-rc1 :)
->>
->> I can do better than that - and report that it's fixed now. ?It should
->> show up in linux-next sometime after Stephen pulls this evening. ?The
->> #error did its job in this case, and ensured that it got fixed!
+On Thu, Jan 5, 2012 at 9:53 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 05, 2012 at 09:17:18AM +0200, Hiroshi Doyu wrote:
+>> Just for DMA mapping test from MPU side, the following one is used.
 >
-> Great. So it looks like I can finally compile-test Exynos and merge
-> their IOMMU driver after the merge window :)
+> This patch is buggy.
 >
+>> +static void dmaapi_test_map_page(struct device *dev)
+>> +{
+>> + ? ? struct page *page;
+>> + ? ? dma_addr_t dma_addr;
+>> + ? ? void *cpu_addr;
+>> +
+>> + ? ? page = alloc_page(GFP_KERNEL);
+>> + ? ? BUG_ON(!page);
+>> +
+>> + ? ? dma_addr = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_TO_DEVICE);
+>> + ? ? BUG_ON(!dma_addr);
+>> +
+>> + ? ? cpu_addr = kmap(page);
+>> + ? ? BUG_ON(!cpu_addr);
+>> + ? ? memset(cpu_addr, 0xa5, PAGE_SIZE);
+>> + ? ? kunmap(cpu_addr);
+>
+> The DMA API works like this:
+>
+> - The CPU owns the page or buffer and can access it.
+> - You map the page or buffer.
+> - The device owns the page or buffer; the CPU must explicitly access it.
 
-Thanks to you, Marek and Russell for helps to compile the driver.
+I don't understand what  "CPU must __explicitly__ access it" means.
 
-I've learned many things from you.
+Do you mean that CPU must access the mapped buffer when
+it __explicitly__ knows that the access does not cause any side effect?
 
-Regards,
 
-KyongHo.
+> - You unmap the page or buffer.
+> - The CPU again owns the page/buffer and can access it.
+>
+> Please respect the DMA API rules.
+>
+> So. ?Once dma_map_page() has returned, you must not kmap() or otherwise
+> access the data contained in that page until after you have unmapped it.
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
