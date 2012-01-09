@@ -1,74 +1,56 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Mon, 09 Jan 2012 02:49:59 +0000
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
- remove unsupported 15bit modes
-In-Reply-To: <87zke29yqj.fsf@macbook.be.48ers.dk>
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <87zke29yqj.fsf@macbook.be.48ers.dk>
-Message-ID: <4F0A55D7.50707@gmx.de>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 9 Jan 2012 10:50:52 +0800
+Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the
+ snapshot image size is anticipative
+In-Reply-To: <201201082231.44510.rjw@sisk.pl>
+References: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
+ <20120105184604.GA11065@atrey.karlin.mff.cuni.cz>
+ <CAGsJ_4ypEKZLXf0KU81=dRADcxesxKVyqg0UnEKGaxthNMZQ-g@mail.gmail.com>
+ <201201082231.44510.rjw@sisk.pl>
+Message-ID: <CAGsJ_4y+fQ14yDzD1FxtutD7b17KqK+voaywHAZuS0SXK5Z_xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+2012/1/9 Rafael J. Wysocki <rjw@sisk.pl>:
+> On Friday, January 06, 2012, Barry Song wrote:
+>> 2012/1/6 Pavel Machek <pavel@ucw.cz>:
+>> > Hi!
+>> >
+>> > Is the check even useful these days? Should we remove it altogether?
+>>
+>> i think we can let users or distributions decide whether it is useful.
+>> On PC, disk space is not an issue, people might run many applications
+>> while doing hibernation, so snapshot is much big. an early check will
+>> improve user experience because people don't need to wait a long time
+>> and find space is not enough.
+>> for embedded system, SoC solutions can know whether the space is
+>> enough since they know what are running while doing hibernation, so
+>> they can skip the check by setting the flag in sysfs.
+>> that is why i had this patch sent.
+>
+> I agree with Pavel that it's better to drop the check altogether.
+>
+> The sysfs switch you're adding doesn't seem to be very useful, as PC
+> users won't touch it and whoever needs it to be 0, will always set it
+> that way and won't change it afterwards.
 
-On 01/05/2012 11:26 AM, Peter Korsgaard wrote:
->>>>>> "Peter" == Peter Korsgaard <jacmet@sunsite.dk> writes:
-> 
->  Peter> Allow framebuffer to be configured in 16bit mode when panel is
->  Peter> wired in (the default) BGR configuration, and don't claim to
->  Peter> support 15bit input modes, which the LCD controller cannot
->  Peter> handle.
-> 
-> Ping? Nicolas, you added it to your at91-lcd branch - But it doesn't seem
-> to have gone any further.
+ok. if we don't have the check, in case swap partition is not enough,
+writing failure will happen, system still can restore to normal
+status:
 
-I could also take care of this patch but I'd prefer if it gets an Acked-by of
-someone at Atmel (or someone else who knows the hardware) as I cannot really
-tell whether it is correct.
+for example, in the following test, only 27% data is written with a
+small partition, "Restarting tasks ... done" will make system restore
+to normal status.
+
+[   11.2080 27%
+[   11.403274] PM: Wrote uncompressed 34920 kbytes in 0.65 seconds (53.72 MB/s)
+[   11.407649] PM: Wrote compressed 3500 kbytes in 0.65 seconds (5.38 MB/s)
+[   11.447176] Restarting tasks ... done.
+[   11.448801] ...
 
 
-Best regards,
+>
+> Thanks,
+> Rafael
 
-Florian Tobias Schandinat
-
-> 
->  Peter> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
->  Peter> ---
->  Peter>  drivers/video/atmel_lcdfb.c |   12 +++---------
->  Peter>  1 files changed, 3 insertions(+), 9 deletions(-)
-> 
->  Peter> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
->  Peter> index 7ca3eaf..143f6d9 100644
->  Peter> --- a/drivers/video/atmel_lcdfb.c
->  Peter> +++ b/drivers/video/atmel_lcdfb.c
->  Peter> @@ -418,24 +418,18 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
->  var-> red.length = var->green.length = var->blue.length
->  Peter>  			= var->bits_per_pixel;
->  Peter>  		break;
->  Peter> -	case 15:
->  Peter>  	case 16:
->  Peter>  		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
->  Peter>  			/* RGB:565 mode */
->  var-> red.offset = 11;
->  var-> blue.offset = 0;
->  Peter> -			var->green.length = 6;
->  Peter> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
->  Peter> -			var->red.offset = 10;
->  Peter> -			var->blue.offset = 0;
->  Peter> -			var->green.length = 5;
->  Peter>  		} else {
->  Peter> -			/* BGR:555 mode */
->  Peter> +			/* BGR:565 mode */
->  var-> red.offset = 0;
->  Peter> -			var->blue.offset = 10;
->  Peter> -			var->green.length = 5;
->  Peter> +			var->blue.offset = 11;
->  Peter>  		}
->  var-> green.offset = 5;
->  Peter> +		var->green.length = 6;
->  var-> red.length = var->blue.length = 5;
->  Peter>  		break;
->  Peter>  	case 32:
->  Peter> -- 
->  Peter> 1.7.6.3
-> 
+-barry
