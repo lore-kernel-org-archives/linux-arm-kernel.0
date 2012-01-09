@@ -1,48 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Jan 2012 13:21:01 +0000
-Subject: [PATCH] ARM: PXA: Zipit Z2: Fix oops in z2_power_off
-In-Reply-To: <201201091338.29680.marek.vasut@gmail.com>
-References: <1326011616-3546-1-git-send-email-anarsoul@gmail.com>
- <201201091313.31535.marek.vasut@gmail.com>
- <20120109121712.GN21765@n2100.arm.linux.org.uk>
- <201201091338.29680.marek.vasut@gmail.com>
-Message-ID: <20120109132100.GO21765@n2100.arm.linux.org.uk>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 9 Jan 2012 18:53:05 +0530
+Subject: [PATCH v2 2/2] ARM: Exynos: Hook up power domains to generic
+ power domain infrastructure
+In-Reply-To: <CAH9JG2WWLrEkEMQp5m0itk7Sw3HRJ8CpDBrj3trjGPCv6qYHkw@mail.gmail.com>
+References: <1325931055-14486-1-git-send-email-thomas.abraham@linaro.org>
+ <1325931055-14486-3-git-send-email-thomas.abraham@linaro.org>
+ <CAH9JG2WWLrEkEMQp5m0itk7Sw3HRJ8CpDBrj3trjGPCv6qYHkw@mail.gmail.com>
+Message-ID: <CAJuYYwSOcAtiV3fGOyzOD0eZiuf-T8wai13HpqNNDk3TXuP5Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 01:38:29PM +0100, Marek Vasut wrote:
-> > On Mon, Jan 09, 2012 at 01:13:31PM +0100, Marek Vasut wrote:
-> > > > 2012/1/9 Marek Vasut <marek.vasut@gmail.com>:
-> > > > >> Nope, it does not work. Looks like device disables power on memory
-> > > > >> in deepsleep.
-> > > > > 
-> > > > > Why?
-> > > > 
-> > > > In deepsleep PXA27x deasserts SYS_EN pin, and looks like when it's
-> > > > deasserted there's no power on SDRAM (on Zipit). Just guess.
-> > > 
-> > > Then maybe implement suspend-to-disk ? There was a patch for omap on the
-> > > list, maybe it's even merged.
-> > 
-> > What are hell you going on about? 
-> 
-> Cool your jets Russell.
-> 
-> > Why would someone want to even try
-> > implementing suspend-to-disk in the power off hook?
-> 
-> I'm not talking about the powerdown hook anymore, but a way how to avoid it as 
-> much as possible via standard means.
+Dear Mr. Park.
 
-Maybe you should state that you are deviating from the subject of this
-email thread to aid your readers understanding?
+On 9 January 2012 05:57, Kyungmin Park <kyungmin.park@samsung.com> wrote:
+[...]
 
-> > Why would you even
-> > want to try to preserve the system state in a power off hook?
-> 
-> Not in poweroff hook. Btw. I'm still convinced the bootloader should handle this 
-> -- the powerdown should just reset the thing and tell bootloader to deepsleep 
-> it.
+>> + * Exynos4 specific wrapper around the generic power domain
+>> + */
+>> +struct exynos4_pm_domain {
+>> + ? ? void __iomem *base;
+>> + ? ? char const *name;
+>> + ? ? bool is_off;
+>> + ? ? struct generic_pm_domain pd;
+>> +};
+> Even though you tested it at exynos4, we already know exynos5 will be used soon.
+> so start to use the exynos prefix if possible.
 
-Why should the boot loader be involved?  The boot loader is all about
-bringing the system _up_, not taking it down.
+Ok. I will change exynos4 to exynos.
+
+[...]
+
+>> +
+>> +static __init int exynos4_pm_init_power_domain(void)
+>> +{
+>> + ? ? int idx;
+>> + ? ? struct device_node *np;
+> The np is only used at CONFIG_ON.
+
+Ok. I will rework this.
+
+>> +
+>> +#ifdef CONFIG_OF
+>> + ? ? if (!of_have_populated_dt())
+>> + ? ? ? ? ? ? goto no_dt;
+>> +
+>> + ? ? for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
+>> + ? ? ? ? ? ? struct exynos4_pm_domain *pd;
+>> +
+>> + ? ? ? ? ? ? pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+>> + ? ? ? ? ? ? if (!pd) {
+>> + ? ? ? ? ? ? ? ? ? ? pr_err("exynos4_pm_init_power_domain: failed to "
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "allocate memory for domain\n");
+>> + ? ? ? ? ? ? ? ? ? ? return -ENOMEM;
+>> + ? ? ? ? ? ? }
+>> +
+>> + ? ? ? ? ? ? if (of_get_property(np, "samsung,exynos4210-pd-off", NULL))
+>> + ? ? ? ? ? ? ? ? ? ? pd->is_off = true;
+>> + ? ? ? ? ? ? pd->name = np->name;
+>> + ? ? ? ? ? ? pd->base = of_iomap(np, 0);
+>> + ? ? ? ? ? ? pd->pd.power_off = exynos4_pd_power_off;
+>> + ? ? ? ? ? ? pd->pd.power_on = exynos4_pd_power_on;
+>> + ? ? ? ? ? ? pd->pd.of_node = np;
+>> + ? ? ? ? ? ? pm_genpd_init(&pd->pd, NULL, false);
+>> + ? ? }
+>> + ? ? return 0;
+>> +#endif /* CONFIG_OF */
+>> +
+>> + no_dt:
+> You should add the "#endif /* CONFIG_OF */ since no_dt is used at
+> CONFIG_OF case.
+
+Ok.
+
+>> + ? ? for (idx = 0; idx < ARRAY_SIZE(exynos4_pm_domains); idx++)
+>> + ? ? ? ? ? ? pm_genpd_init(&exynos4_pm_domains[idx]->pd, NULL,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? exynos4_pm_domains[idx]->is_off);
+>> +
+
+[...]
+
+>> +#ifdef CONFIG_S5P_DEV_CSIS0
+>> + ? ? if (pm_genpd_add_device(&exynos4_pd_cam.pd, &s5p_device_mipi_csis0.dev))
+>> + ? ? ? ? ? ? pr_info("error in adding csis0 to cam power domain\n");
+>> +#endif
+> Also need to add CSIS1 as Sylwester mentioned.
+
+Ok. I will add CSIS1.
+
+Thanks for your review.
+
+Regards,
+Thomas.
