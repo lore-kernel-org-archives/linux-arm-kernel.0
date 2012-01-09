@@ -1,16 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 9 Jan 2012 08:13:02 -0800
-Subject: [PATCH 2/4] ASoC: i.MX: Add missing dma_async_issue_pending
-In-Reply-To: <1326101570-3716-3-git-send-email-s.hauer@pengutronix.de>
-References: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
- <1326101570-3716-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120109161301.GB2974@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 09 Jan 2012 17:17:18 +0100
+Subject: [PATCH 2/2] atmel_lcdfb: Use proper blanking on negative contrast
+ polarity
+In-Reply-To: <1317801598-23757-2-git-send-email-alexander.stein@systec-electronic.com>
+References: <1317801598-23757-1-git-send-email-alexander.stein@systec-electronic.com>
+ <1317801598-23757-2-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <4F0B130E.10701@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 10:32:48AM +0100, Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On 10/05/2011 09:59 AM, Alexander Stein :
+> If used with negative polarity the PWM unit cannot be disabled. This would
+> result in a full contrast screen.
+> Instead let the PWM unit enabled using 0x0 as compare value which darkens
+> the display.
+> In result no power saving is possible if inverted contrast polarity
+> is used.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Ok, this patch looks correct.
 
-but I guess I can just apply it immediately?
+> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Florian, you can propagate this one upstream.
+
+Thanks you, best regards,
+
+> ---
+>  drivers/video/atmel_lcdfb.c |    5 ++++-
+>  1 files changed, 4 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+> index 816d528..2bd75b5 100644
+> --- a/drivers/video/atmel_lcdfb.c
+> +++ b/drivers/video/atmel_lcdfb.c
+> @@ -96,8 +96,11 @@ static int atmel_bl_update_status(struct backlight_device *bl)
+>  		brightness = 0;
+>  
+>  	lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_VAL, brightness);
+> -	lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_CTR,
+> +	if (contrast_ctr & ATMEL_LCDC_POL_POSITIVE)
+> +		lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_CTR,
+>  			brightness ? contrast_ctr : 0);
+> +	else
+> +		lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_CTR, contrast_ctr);
+>  
+>  	bl->props.fb_blank = bl->props.power = sinfo->bl_power = power;
+>  
+
+
+-- 
+Nicolas Ferre
