@@ -1,55 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Jan 2012 22:49:46 +0000
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <4F0B182D.7060507@us.ibm.com>
-References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
- <4F0B182D.7060507@us.ibm.com>
-Message-ID: <20120109224945.GA23090@mudshark.cambridge.arm.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 9 Jan 2012 14:55:34 -0800
+Subject: [GIT PULL 00/11] arm-soc changes
+In-Reply-To: <1326147171-13752-1-git-send-email-arnd@arndb.de>
+References: <1326147171-13752-1-git-send-email-arnd@arndb.de>
+Message-ID: <CA+55aFzV5yRB9toW2efXWRKmYzKKRnLHd5FnF=As0vBgFb=OsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 04:39:09PM +0000, Maynard Johnson wrote:
-> On 01/08/2012 8:58 PM, Lik Lik wrote:
-> > Hi all,
+On Mon, Jan 9, 2012 at 2:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> For each branch "next/foo", there is also a signed tag "foo" on the
+> arm-soc git. Please pull whichever of these you prefer.
 
-Hi guys [adding a bunch of people to CC because this issue is really
-annoying me now],
+So I pulled the tags, because not only do I then get the signature,
+but the merge message will automatically also end up containing your
+notes that you put in the tags. Which is a nice feature worth pointing
+out to people: when you send me pull-requests, you can add commentary
+that actually gets saved in the tag.
 
-> > I am an oprofile user and I need to profile one of my applications on a TI OMAP4
-> > platform (pandaboard, to be specific). I have ubuntu 11.10 installed. My problem
-> > is that oprofile always use the timer interrupt mode but doesn't recognize the
-> > hardware counters, which I am sure my platform has.
+So to give an example from Arnd's series, look at commit e8cbce976050
+in the current -git tree (just pushed out, since I did the merges just
+moments ago):
 
-First and foremost, we can't currently generate PMU interrupts on OMAP4 in
-mainline. There are some additional patches required for these to work:
+  [torvalds at i5 linux]$ git show e8cbce976050
+  commit e8cbce976050a9f874a8b07012ddeb9b9eb59603
+  Merge: b3c37522928b 27fdb577435e
+  Author: Linus Torvalds <torvalds@linux-foundation.org>
+  Date:   Mon Jan 9 14:40:48 2012 -0800
 
-http://marc.info/?l=linux-arm-kernel&m=131946761428296&w=2
+    Merge tag 'timer' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
 
-However, as Stephane has pointed out here:
+    timer changes for msm
 
-http://marc.info/?l=linux-omap&m=132585784125352&w=2
+    A very simple series. We used to have more churn in the timer
+    area, so this is kept separate. Will probably put this into the
+    drivers series next time.
 
-the interrupts still don't seem to work, even with the patches above
-applied.
+    * tag 'timer' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc:
+      msm: timer: Use clockevents_config_and_register()
+      msm: timer: Setup interrupt after registering clockevent
+      msm: timer: Remove SoC specific #ifdefs
+      msm: timer: Remove msm_clocks[] and simplify code
+      msm: timer: Fix ONESHOT mode interrupts
+      msm: timer: Use GPT for clockevents and DGT for clocksource
+      msm: timer: Cleanup #includes and #defines
+      msm: timer: Tighten #ifdef for local timer support
 
-Ming Lei doesn't seem to be replying to email anymore, so maybe somebody
-else on linux-omap could please help us? I'm hoping that we're just missing
-some patches from somewhere, but it would be great if somebody could verify
-this (and indeed, verify that the interrupts we're registering in the thread
-above look sane).
+where those "timer changes for msm" and the comment about a simple
+series were all from Arnd's tag.
 
-> OProfile userspace support for ARM Cortex-A9 was added by Will Deacon in June 
-> 2010.  This support is available in OProfile 0.9.7.  According to Will's 
-> posting, the kernel support was due to be added to Ubuntu Maverick, so I would 
-> expect your version should support CA9 out of the box.  If not already using 
-> oprofile 0.9.7, please upgrade to that version and retry.  If it still doesn't 
-> work, please re-post with complete information (kernel version, oprofile command 
-> output, and contents of /dev/oprofile/cpu_type).
+Now, you don't *have* to do these kinds of descriptions, and I do end
+up editing them if they look odd (eg Arnd saying "I" when the commit
+then ends up being mine), but I wanted to point it out because some
+submaintainers may end up enjoying the capability to add notes to the
+merge to explain things better.
 
-If with the latest OProfile, `timer mode' is still reported then you should
-check that you have CONFIG_HW_PERF_EVENTS enabled in your kernel. It still
-won't work though, because of the problems I mentioned above.
+And Arnd, please do double-check that I didn't mess up any of the
+(pretty trivial) merge conflicts..
 
-Cheers,
-
-Will
+                         Linus
