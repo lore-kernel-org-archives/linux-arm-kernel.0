@@ -1,75 +1,84 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 09 Jan 2012 12:13:10 +0100
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
- remove unsupported 15bit modes
-In-Reply-To: <4F0AC2B1.8010601@atmel.com> (Nicolas Ferre's message of "Mon, 09
- Jan 2012 11:34:25 +0100")
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <4F0AC2B1.8010601@atmel.com>
-Message-ID: <87ty45dt89.fsf@macbook.be.48ers.dk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 09 Jan 2012 12:19:17 +0100
+Subject: [PATCH 1/2] at91 : move pm.h header to arch/arm/include/asm
+In-Reply-To: <201201061730.33525.arnd.bergmann@linaro.org>
+References: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
+ <201201061730.33525.arnd.bergmann@linaro.org>
+Message-ID: <4F0ACD35.1000600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Nicolas" == Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
- Nicolas> On 10/13/2011 04:52 PM, Peter Korsgaard :
- >> Allow framebuffer to be configured in 16bit mode when panel is wired in
- >> (the default) BGR configuration, and don't claim to support 15bit input
- >> modes, which the LCD controller cannot handle.
- >> 
- >> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+On 01/06/2012 06:30 PM, Arnd Bergmann wrote:
+> On Friday 06 January 2012, Daniel Lezcano wrote:
+>> Move the location of the pm.h header file to the include directory,
+>> so it can be included from another place from the current one.
+>>
+>> That will allow the next patch which moves the cpuidle code to the
+>> drivers/cpuidle directory.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>  arch/arm/{mach-at91/pm.h => include/asm/at91_pm.h} |    0
+>>  arch/arm/mach-at91/cpuidle.c                       |    2 +-
+>>  arch/arm/mach-at91/pm.c                            |    2 +-
+>>  3 files changed, 2 insertions(+), 2 deletions(-)
+>>  rename arch/arm/{mach-at91/pm.h => include/asm/at91_pm.h} (100%)
+> 
+> Moving the driver is great, as we have previously discussed, but
+> the header file does not belong into include/asm really, because it
+> is too hardware specific and we are trying to keep such stuff out
+> of that place.
 
- Nicolas> Hi Peter,
+Hi Arnd,
 
- Nicolas> Sorry for not having more responsive concerning the two
- Nicolas> patches that you posted about atmel_lcdfb driver.
+I just want to clarify because I am not sure there is no confusion here
+where the header will be moved to. The diff annotation is not clear and
+suggests the file is moved to "next/include/asm".
 
-No problem.
+Actually, the header moves from :
 
- Nicolas> I have a question though about this one...
+	arch/arm/mach-at91/pm.h
+to:
+	arch/arm/include/asm/at91_pm.h.
 
- >> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
- >> -			var->red.offset = 10;
- >> -			var->blue.offset = 0;
- >> -			var->green.length = 5;
+This place and the renaming of the file complies with the comments of
+Russell, where this place is shared across the different ARM
+architectures, Rob where the file is renamed for a single kernel image
+and you where the cpuidle driver is moved to the drivers directory.
+Looking at different drivers, it appears that is the case for the other
+drivers.
 
- Nicolas> Maybe I have missed something but I do not know why you are removing
- Nicolas> this part of the configuration? A board at least is using this wiring
- Nicolas> mode...
+For instance:
 
-Because it is arguable wrong as far as I understand the HW.
-There's two parts here:
+i7300_idle.c includes arch/x86/include/asm/idle.h
+intel_idle.c includes arch/x86/include/asm/msr.h
 
-- 1: Format of framebuffer memory
-- 2: Wiring of LCD (RGB/BGR order and number of bits)
+So, from my POV, that makes sense to move pm.h to this directory, no ?
 
->From the datasheet, the following framebuffer formats are supported:
+Thanks
+  -- Daniel
 
-1, 2, 4, 8 bits per pixel (palletized), 16, 24 bits per pixel
-(non-palletized) for TFT.
 
-So it doesn't really support RGB555 mode. The controller reads up to
-32bit of framebuffer data and outputs 24bit on the LCD pins. You CAN
-wire up a RGB555 panel by just skipping the LSB green of a RGB565
-wiring, but that is independent of the framebufffer format. The
-controller/driver doesn't do any RGB/BGR swapping, so the RBG/BGR wiring
-settings are just used as a software hint (in FBIOGET_VSCREENINFO) about
-the meaning of the individual bits of a pixel in the framebuffer.
 
-Similar you can connect a 12bit 4:4:4 panel by just connecting it to the
-MSB LCD pins.
+- -- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-So in conclusion, I think we should just have:
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
 
-- ATMEL_LCDC_WIRING_RGB
-- ATMEL_LCDC_WIRING_BGR
-- ATMEL_LCDC_WIRING_RGB565
-- ATMEL_LCDC_WIRING_BGR565
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
 
-These simply define framebuffer bit order (RGB/BGR) and preferred
-default bit depth (16/24).
-
-I hope this makes it more clear.
-
--- 
-Bye, Peter Korsgaard
+iQEcBAEBAgAGBQJPCs01AAoJEAKBbMCpUGYABb4IAMUuSl8Q0s6cKr8E7sgTGp3F
+r758UVNTYR5X4AX67kmBRDeQGvnG/yifFAmTZ31G6fk5NKLuUMm6giiXua83PYfV
+KvOKX30JHtqYhutcZyYemMTm5fgS1PbRmjEvEillaP9W7/SiKmg3hoOpPXPFW1k7
+8Td6rN3SosCblBYcmq0BMqb3oHwjEXnfBJmkxELA37I5J6D33X8v4YUJ0QYANlcp
+MK8yNg3U6IAqLXAa8jvzWVbDLwaewj+kYkHwr4cFCBLnX5mKuBx387AsA8GD6dzt
+VmvoAi2PyX5D6hmSX58CVxHKnjke+iOsDKU9jWhwVRccPNrnstl1DlINknvZnk4=
+=1otd
+-----END PGP SIGNATURE-----
