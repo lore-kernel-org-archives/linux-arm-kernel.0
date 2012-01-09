@@ -1,52 +1,74 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 9 Jan 2012 10:17:03 +0800
-Subject: [RFC PATCH v3 3/5] pinctrl: imx: add pinctrl imx driver
-In-Reply-To: <20120109020848.GF1835@S2101-09.ap.freescale.net>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-4-git-send-email-b29396@freescale.com>
- <20120108130542.GC2203@richard-laptop>
- <20120109020848.GF1835@S2101-09.ap.freescale.net>
-Message-ID: <20120109021702.GV2414@b20223-02.ap.freescale.net>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Mon, 09 Jan 2012 02:49:59 +0000
+Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
+ remove unsupported 15bit modes
+In-Reply-To: <87zke29yqj.fsf@macbook.be.48ers.dk>
+References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
+ <87zke29yqj.fsf@macbook.be.48ers.dk>
+Message-ID: <4F0A55D7.50707@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 10:08:51AM +0800, Shawn Guo wrote:
-> On Sun, Jan 08, 2012 at 09:05:44PM +0800, Richard Zhao wrote:
-> > > +enum imx_imx53_pinctrl_pads {
-> > > +	MX53_GPIO_19 = 0,
-> > > +	MX53_KEY_COL0 = 1,
-> > > +	MX53_KEY_ROW0 = 2,
-> > > +	MX53_KEY_COL1 = 3,
-> > > +	MX53_KEY_ROW1 = 4,
-> > > +	MX53_KEY_COL2 = 5,
-> > > +	MX53_KEY_ROW2 = 6,
-> > ...
-> > Why not describe it in dts and make this file generic for imx?
-> > One node for one pad,
-> 
-> Doing this will bloat the device tree dramatically.  Actually I had
-> a patch doing so before the pinctrl subsystem was born, but it
-> concerned Grant a lot for that reason and thus died.
-are you against describing pad in dts or one node per pad?
-one node per pad is just a tip to extend pad property, to support
-other features (pinconf in your word).
-> 
-> > it'll be easy to extend pad properties. You know
-> > the pad may set pull up/down, open drain, drive strenth, daisy chain etc.
-> > The features have to be supported, to make your model usefull.
-> > 
-> As Aisheng mentioned, the pinconf support will be added later.
-I expect pinconf come together, and get a ready-to-use patch series.
+Hi Peter,
 
-Thanks
-Richard
+On 01/05/2012 11:26 AM, Peter Korsgaard wrote:
+>>>>>> "Peter" == Peter Korsgaard <jacmet@sunsite.dk> writes:
 > 
-> -- 
-> Regards,
-> Shawn
+>  Peter> Allow framebuffer to be configured in 16bit mode when panel is
+>  Peter> wired in (the default) BGR configuration, and don't claim to
+>  Peter> support 15bit input modes, which the LCD controller cannot
+>  Peter> handle.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Ping? Nicolas, you added it to your at91-lcd branch - But it doesn't seem
+> to have gone any further.
+
+I could also take care of this patch but I'd prefer if it gets an Acked-by of
+someone at Atmel (or someone else who knows the hardware) as I cannot really
+tell whether it is correct.
+
+
+Best regards,
+
+Florian Tobias Schandinat
+
+> 
+>  Peter> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+>  Peter> ---
+>  Peter>  drivers/video/atmel_lcdfb.c |   12 +++---------
+>  Peter>  1 files changed, 3 insertions(+), 9 deletions(-)
+> 
+>  Peter> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+>  Peter> index 7ca3eaf..143f6d9 100644
+>  Peter> --- a/drivers/video/atmel_lcdfb.c
+>  Peter> +++ b/drivers/video/atmel_lcdfb.c
+>  Peter> @@ -418,24 +418,18 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
+>  var-> red.length = var->green.length = var->blue.length
+>  Peter>  			= var->bits_per_pixel;
+>  Peter>  		break;
+>  Peter> -	case 15:
+>  Peter>  	case 16:
+>  Peter>  		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
+>  Peter>  			/* RGB:565 mode */
+>  var-> red.offset = 11;
+>  var-> blue.offset = 0;
+>  Peter> -			var->green.length = 6;
+>  Peter> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
+>  Peter> -			var->red.offset = 10;
+>  Peter> -			var->blue.offset = 0;
+>  Peter> -			var->green.length = 5;
+>  Peter>  		} else {
+>  Peter> -			/* BGR:555 mode */
+>  Peter> +			/* BGR:565 mode */
+>  var-> red.offset = 0;
+>  Peter> -			var->blue.offset = 10;
+>  Peter> -			var->green.length = 5;
+>  Peter> +			var->blue.offset = 11;
+>  Peter>  		}
+>  var-> green.offset = 5;
+>  Peter> +		var->green.length = 6;
+>  var-> red.length = var->blue.length = 5;
+>  Peter>  		break;
+>  Peter>  	case 32:
+>  Peter> -- 
+>  Peter> 1.7.6.3
 > 
