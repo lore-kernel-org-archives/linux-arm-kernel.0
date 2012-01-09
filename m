@@ -1,54 +1,31 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Jan 2012 10:32:50 +0100
-Subject: [PATCH 4/4] dma: imx-sdma: start transfer in issue_pending
-In-Reply-To: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
-References: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1326101570-3716-5-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 9 Jan 2012 10:33:58 +0100
+Subject: [PATCH v4 0/2] mx-sdma: memory barrier fix
+In-Reply-To: <1326033862-25351-1-git-send-email-richard.zhao@linaro.org>
+References: <1326033862-25351-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120109093358.GN5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA API requires that transfers are started in issue_pending
-instead of tx_submit. Fix this.
+On Sun, Jan 08, 2012 at 10:44:20PM +0800, Richard Zhao wrote:
+> Changes in v4:
+>  - convert all _raw_readl/_raw_writel to readl/writel.
+> 
+> Changes in v3:
+>  - use writel instead of explicitly call wmb.
+> 
+> Changes in v2:
+>  - add "let sdma_run_channel call sdma_enable_channel"
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/dma/imx-sdma.c |   11 +++++------
- 1 files changed, 5 insertions(+), 6 deletions(-)
+Both
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f993955..eb28bb0 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -833,15 +833,12 @@ static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
- static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
- {
- 	struct sdma_channel *sdmac = to_sdma_chan(tx->chan);
--	struct sdma_engine *sdma = sdmac->sdma;
- 	dma_cookie_t cookie;
- 
- 	spin_lock_irq(&sdmac->lock);
- 
- 	cookie = sdma_assign_cookie(sdmac);
- 
--	sdma_enable_channel(sdma, sdmac->channel);
--
- 	spin_unlock_irq(&sdmac->lock);
- 
- 	return cookie;
-@@ -1126,9 +1123,11 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
- 
- static void sdma_issue_pending(struct dma_chan *chan)
- {
--	/*
--	 * Nothing to do. We only have a single descriptor
--	 */
-+	struct sdma_channel *sdmac = to_sdma_chan(chan);
-+	struct sdma_engine *sdma = sdmac->sdma;
-+
-+	if (sdmac->status == DMA_IN_PROGRESS)
-+		sdma_enable_channel(sdma, sdmac->channel);
- }
- 
- #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
+
+
 -- 
-1.7.7.3
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
