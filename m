@@ -1,51 +1,47 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 9 Jan 2012 10:56:24 +0100
-Subject: [PATCH v2 2/5] ARM: OMAP2/3: intc: Add irqdomain support
-In-Reply-To: <20120106212230.GB7457@ponder.secretlab.ca>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
- <1324388398-2683-3-git-send-email-b-cousson@ti.com>
- <20120106212230.GB7457@ponder.secretlab.ca>
-Message-ID: <4F0AB9C8.10501@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Jan 2012 09:58:39 +0000
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <20120108204953.GA20043@sirena.org.uk>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <CAOesGMhLE3wxM=F9OkHT-bQpsVp8Uc6eE8Uk+WN9pLuz5BRLBw@mail.gmail.com>
+ <20120108204953.GA20043@sirena.org.uk>
+Message-ID: <20120109095839.GH21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Sun, Jan 08, 2012 at 08:49:53PM +0000, Mark Brown wrote:
+> On Fri, Jan 06, 2012 at 01:58:29PM -0800, Olof Johansson wrote:
+> 
+> > > Please pull Samsung devel for v3.3 from:
+> > > ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > > next-samsung-devel-samsung
+> 
+> > Thanks. I've pulled this into late/devel, based on earlier email from
+> > Arnd we might end up sending this in towards the end of the merge
+> > window, but there's also a chance it will wait for 3.4.
+> 
+> That'd be extremely disappointing, especially given that there's some
+> bug fixes in there for updates going in this merge window without which
+> mainline is going to have problems on s3c64xx (mostly the GPIO stuff).
 
-On 1/6/2012 10:22 PM, Grant Likely wrote:
-> On Tue, Dec 20, 2011 at 02:39:55PM +0100, Benoit Cousson wrote:
+Here we go again with sucky work practices.
 
-[...]
+This sucky behaviour has been around for a long time, I've long since
+given up complaining about it as it's exactly like talking to a bloody
+brick wall.  People just continue mixing development and fixes together.
 
->> +	/*
->> +	 * XXX: Use a 0 irq_base for the moment since the legacy devices
->> +	 * created statically are expected a hwirq = irq mapping.
->> +	 * A proper offset will be added later, when IRQ resource creation
->> +	 * will be handled by DT.
->> +	 */
->> +	domain.irq_base = 0;
->> +	domain.nr_irq = nr_irqs;
->> +	domain.ops =&irq_domain_simple_ops;
->> +	irq_domain_add(&domain);
->
-> The omap doesn't need anything special from irq_domain.  You can use
-> irq_domain_add_simple().  A recent patch was posted that makes
-> irq_domain_add_simple() accepts a nr_irqs parameter and returns the
-> allocated irq domain.
+They then wonder why their fixes don't make it into mainline in a timely
+fashion.
 
-Yes, I saw that, but in fact as discussed previously with Rob, even the 
-irq_domain_add_simple should become useless when Rob's series to convert 
-generic-chip to use irq_domain will be merged.
+Maybe delaying the whole lot will make people change their behaviour:
+it's a behaviour that needs to change at the submitters end.  There's
+nothing which Olof or Arnd can reasonably do to expedite the fixes.
 
-I have a patch ready for that, but like Nico for AT91, I decided to 
-avoid that dependency for 3.3, since that series was not yet stable.
+So, please direct your complaints to the submitter for not having a
+work practice which ensures that fixes receive a higher submission
+priority.
 
-> However, that isn't enough reason for me to reject this patch if there
-> is any opportunity to get it into v3.3 provided you promise to fix it
-> up later.
-
-Yes, I do :-)
-
-> Acked-by: Grant Likely<grant.likely@secretlab.ca>
-
-Thanks,
-Benoit
+Note: Linus _has_ taken a copy of linux-next (read the 3.2 release email),
+and _is_ checking whether development stuff was in linux-next prior to
+the merge window opening.  It would be very unwise to send new development
+which wasn't already there.
