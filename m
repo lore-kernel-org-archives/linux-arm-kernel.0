@@ -1,9 +1,9 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  9 Jan 2012 16:45:41 -0600
-Subject: [PATCH 1/6] ARM: exynos: remove incorrect BSYM usage
+Date: Mon,  9 Jan 2012 16:45:42 -0600
+Subject: [PATCH 2/6] ARM: realview: remove incorrect BSYM usage
 In-Reply-To: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
 References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326149146-19756-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1326149146-19756-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,39 +15,30 @@ kernels.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Dave Martin <dave.martin@linaro.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-exynos/platsmp.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-realview/platsmp.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 60bc45e..683aec7 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -24,7 +24,6 @@
- #include <asm/cacheflush.h>
+diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
+index e83c654..17c878d 100644
+--- a/arch/arm/mach-realview/platsmp.c
++++ b/arch/arm/mach-realview/platsmp.c
+@@ -17,7 +17,6 @@
  #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
  #include <asm/smp_scu.h>
 -#include <asm/unified.h>
  
- #include <mach/hardware.h>
- #include <mach/regs-clock.h>
-@@ -137,7 +136,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	while (time_before(jiffies, timeout)) {
- 		smp_rmb();
- 
--		__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-+		__raw_writel(virt_to_phys(exynos4_secondary_startup),
- 			CPU1_BOOT_REG);
- 		gic_raise_softirq(cpumask_of(cpu), 1);
- 
-@@ -192,6 +191,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ #include <mach/board-eb.h>
+ #include <mach/board-pb11mp.h>
+@@ -75,6 +74,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
  	 * until it receives a soft interrupt, and then the
  	 * secondary CPU branches to this address.
  	 */
--	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-+	__raw_writel(virt_to_phys(exynos4_secondary_startup),
- 			CPU1_BOOT_REG);
+-	__raw_writel(BSYM(virt_to_phys(versatile_secondary_startup)),
++	__raw_writel(virt_to_phys(versatile_secondary_startup),
+ 		     __io_address(REALVIEW_SYS_FLAGSSET));
  }
 -- 
 1.7.5.4
