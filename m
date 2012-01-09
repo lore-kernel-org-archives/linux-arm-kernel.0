@@ -1,55 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 9 Jan 2012 09:28:15 +0100
-Subject: [RFC PATCH 1/9] arm: avoid using on_each_cpu hard coded ret value
-In-Reply-To: <1325600353-10895-2-git-send-email-gilad@benyossef.com>
-References: <1325600353-10895-1-git-send-email-gilad@benyossef.com>
- <1325600353-10895-2-git-send-email-gilad@benyossef.com>
-Message-ID: <20120109082815.GB14252@pengutronix.de>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Mon, 9 Jan 2012 16:49:00 +0800
+Subject: [PATCH 2/2] dma/imx-sdma: move clk_enable out of sdma_request_channel
+In-Reply-To: <1326098940-3697-1-git-send-email-richard.zhao@linaro.org>
+References: <1326098940-3697-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1326098940-3697-2-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 04:19:05PM +0200, Gilad Ben-Yossef wrote:
-> on_each_cpu always returns a hard coded return code of zero.
-> 
-> Removing all tests based on this return value saves run time
-> cycles for compares and code bloat for branches.
-> 
-> Cc: Michal Nazarewicz <mina86@mina86.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> CC: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> CC: Paul Mackerras <paulus@samba.org>
-> CC: Ingo Molnar <mingo@elte.hu>
-> CC: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Grant Likely <grant.likely@secretlab.ca>
-> CC: Rob Herring <rob.herring@calxeda.com>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: devicetree-discuss at lists.ozlabs.org
-> ---
->  arch/arm/kernel/perf_event.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 88b0941..bfd58d8 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -617,7 +617,7 @@ static int __init
->  cpu_pmu_reset(void)
->  {
->  	if (cpu_pmu && cpu_pmu->reset)
-> -		return on_each_cpu(cpu_pmu->reset, NULL, 1);
-> +		on_each_cpu(cpu_pmu->reset, NULL, 1);
->  	return 0;
->  }
->  arch_initcall(cpu_pmu_reset);
-This patch results in no binary change for my test build with SMP=n and
-it saves one instruction on SMP=y.
+It makes clk_enable/disable pair more readable, and fix one bug:
+sdma_init calls sdma_request_channel, but seems don't know
+sdma_request_channel enabled the clok.
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+---
+ drivers/dma/imx-sdma.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-Thanks
-Uwe
-
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 6376009..2a0e02d 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -802,8 +802,6 @@ static int sdma_request_channel(struct sdma_channel *sdmac)
+ 	sdma->channel_control[channel].base_bd_ptr = sdmac->bd_phys;
+ 	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
+ 
+-	clk_enable(sdma->clk);
+-
+ 	sdma_set_channel_priority(sdmac, MXC_SDMA_DEFAULT_PRIORITY);
+ 
+ 	init_completion(&sdmac->done);
+@@ -875,6 +873,9 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
+ 
+ 	sdmac->peripheral_type = data->peripheral_type;
+ 	sdmac->event_id0 = data->dma_request;
++
++	clk_enable(sdmac->sdma->clk);
++
+ 	ret = sdma_request_channel(sdmac);
+ 	if (ret)
+ 		return ret;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.5.4
