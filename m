@@ -1,9 +1,9 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 9 Jan 2012 17:12:14 +0200
-Subject: [PATCH v2 3/3] arm/tegra: enable tegra30 clock framework
+Date: Mon, 9 Jan 2012 17:12:15 +0200
+Subject: [PATCH v2 3/3] ARM: tegra: enable tegra30 clock framework
 In-Reply-To: <1326121937-32054-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1326121937-32054-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1326121937-32054-5-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1326121937-32054-6-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
