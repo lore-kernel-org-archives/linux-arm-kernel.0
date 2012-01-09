@@ -1,64 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 09 Jan 2012 14:54:32 +0100
-Subject: [PATCH 1/2] at91 : move pm.h header to arch/arm/include/asm
-In-Reply-To: <20120109112920.GJ21765@n2100.arm.linux.org.uk>
-References: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
- <201201061730.33525.arnd.bergmann@linaro.org> <4F0ACD35.1000600@linaro.org>
- <20120109112920.GJ21765@n2100.arm.linux.org.uk>
-Message-ID: <4F0AF198.1030803@linaro.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 9 Jan 2012 14:57:17 +0100
+Subject: [GIT PULL] ARM: OMAP2+: Interrupt controllers adaptation to DT
+Message-ID: <4F0AF23D.9040103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Hi Tony,
 
-On 01/09/2012 12:29 PM, Russell King - ARM Linux wrote:
-> On Mon, Jan 09, 2012 at 12:19:17PM +0100, Daniel Lezcano wrote:
->> Actually, the header moves from :
->>
->> 	arch/arm/mach-at91/pm.h
->> to:
->> 	arch/arm/include/asm/at91_pm.h.
->>
->> This place and the renaming of the file complies with the comments of
->> Russell,
-> 
-> No it doesn't.  There's absolutely no way in hell I want arch/arm/include/asm
-> to be littered with hundreds of crappy platform specific header files.
+If this is not too late, could you please pull the OMAP interrupt controllers adaptation to device tree?
 
-Ok. Actually there are 9 pm.h files but I agree with a domino effect we
-can have more header files brought to this directory like "control.h",
-"powerdomain.h", etc ...
+This series is based on your lo/dt branch to get the DTS and board cleanup.
 
-Does it make sense to merge all the pm.h file in a single pm.h which
-will be located in arch/arm/include/asm ?
+Thanks,
+Benoit
 
-And we separate the different archs specific with #ifdef
-CONFIG_ARCH_AT91, CONFIG_ARCH_OMAP, etc ...
 
-The resulting file will be bigger but that will be easier to find a
-pattern we can factor out in the header file and that will encourage the
-developers to share the code across the different arch.
+The following changes since commit 40c0591f0a349ec074357e05c6ab1a3bc951807c:
+  Benoit Cousson (1):
+        ARM: OMAP2+: kconfig: Enable devicetree by default for OMAP2+ systems
 
-Thanks
-  -- Daniel
+are available in the git repository at:
 
-- -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.3/dt_irq
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Benoit Cousson (5):
+      arm/dts: OMAP4: Update DTS file with new GIC bindings
+      ARM: OMAP2/3: intc: Add irqdomain support
+      ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
+      arm/dts: OMAP3: Add interrupt-controller bindings for INTC
+      ARM: OMAP2+: board-generic: Use of_irq_init API
 
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
-
-iQEcBAEBAgAGBQJPCvGYAAoJEAKBbMCpUGYAGTMH/iLSep3kiUfxJiDLlxLoPkcs
-pyvJGnD/leJOvykxd6QQ3dCs+4i2tbYnMEGVtfYWbTHOraOTa1u5oRcS/F0yNOYu
-kifKYyLKJPT9lkYlaDBU9/cWZDhHdAQpu+2vKnVDIJLeSwBDxCEROoPQaWGs2cnw
-0k06iCE/Zq9V5duFE/u7n0RX7XpJCLmdMcRDRw2GW7WuZ6DA2BeU2MEFudQ1NLK1
-bB9zyVVCBxPVVdqjgaSagU0LTCPUeHALsYQVUqpPYMuYK30/ACyakyA/jLFn52lD
-x47ybOuLOGSl4c0/wS1duCBbIFNYsT/kBcVXFXA/usAaCjW12H7OV+9MEA7lB8E=
-=y5HS
------END PGP SIGNATURE-----
+ .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++++
+ arch/arm/boot/dts/omap3.dtsi                       |    6 ++-
+ arch/arm/boot/dts/omap4.dtsi                       |    2 +-
+ arch/arm/mach-omap2/board-generic.c                |   30 +++++++------
+ arch/arm/mach-omap2/common.h                       |   10 ++++
+ arch/arm/mach-omap2/irq.c                          |   48 ++++++++++++++++++--
+ 6 files changed, 102 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
