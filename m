@@ -1,86 +1,56 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Mon, 9 Jan 2012 10:58:34 +0200
-Subject: [PATCH v7] ARM: net: JIT compiler for packet filters
-In-Reply-To: <1326093290.2627.0.camel@edumazet-laptop>
-References: <1325937154-2656-1-git-send-email-mgherzan@gmail.com>
- <1326093290.2627.0.camel@edumazet-laptop>
-Message-ID: <20120109085834.GA7724@swarm.cs.pub.ro>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 9 Jan 2012 10:03:12 +0100
+Subject: [PATCH] irqdomain: Initialize number of IRQs for simple domains
+In-Reply-To: <4F072843.6050306@ti.com>
+References: <1325860112-22051-1-git-send-email-thierry.reding@avionic-design.de>
+ <4F072843.6050306@ti.com>
+Message-ID: <20120109090311.GA10040@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 08:14:50AM +0100, Eric Dumazet wrote:
-> Le samedi 07 janvier 2012 ? 12:52 +0100, Mircea Gherzan a ?crit :
-> > Based of Matt Evans's PPC64 implementation.
-> > 
-> > The compiler generates ARM instructions but interworking is
-> > supported for Thumb2 kernels.
-> > 
-> > Supports both little and big endian. Unaligned loads are emitted
-> > for ARMv6+. Not all the BPF opcodes that deal with ancillary data
-> > are supported. The scratch memory of the filter lives on the stack.
-> > Hardware integer division is used if it is available.
-> > 
-> > Enabled in the same way as for x86-64 and PPC64:
-> > 
-> > 	echo 1 > /proc/sys/net/core/bpf_jit_enable
-> > 
-> > A value greater than 1 enables opcode output.
-> > 
-> > Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
-> > ---
-> > 
-> > Changes in v7:
-> >  * fix the intruction generation for LDX_MSH, OR_X, LSH_K,
-> >    RSH_K and JMP_JA
-> >  * fix the condition for saving the A register
-> >  * use fls() instead of the compiler builtin
-> >  * punt to the interpreter on absolute loads with K < 0
-> >  * check for invalid data references
-> >  * support the NEG opcode
-> >  * clear X in the prologue based on a context flag
-> >  * simplify the conditional jumps
-> > 
-> > Changes in v6:
-> >  * fix the code generation for the ANC_CPU opcode
-> > 
-> > Changes in v5:
-> >  * replace SEEN_LEN with SEEN_SKB
-> >  * set ctx->seen when handling some ancillary data opcodes
-> > 
-> > Changes in v4:
-> >  * first check if the JIT compiler is enabled
-> >  * fix the code generation for the LDX_MSH opcode
-> > 
-> > Changes in v3:
-> >  * no longer depend on EABI and !Thumb2
-> >  * add BLX "emulation" for ARMv4 without Thumb
-> >  * use the integer divide instruction on Cortex-A15
-> >  * fix the handling of the DIV_K opcode
-> >  * use a C wrapper for __aeabi_uidiv
-> >  * fix the generation of the epilogue (non-FP case)
-> > 
-> > Changes in v2:
-> >  * enable the compiler only for ARMv5+ because of the BLX instruction
-> >  * use the same comparison for the ARM version checks
-> >  * use misaligned accesses on ARMv6
-> >  * fix the SEEN_MEM
-> >  * fix the mem_words_used()
-> > 
-> >  arch/arm/Kconfig          |    1 +
-> >  arch/arm/Makefile         |    1 +
-> >  arch/arm/net/Makefile     |    3 +
-> >  arch/arm/net/bpf_jit_32.c |  912 +++++++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/net/bpf_jit_32.h |  190 ++++++++++
-> >  5 files changed, 1107 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/net/Makefile
-> >  create mode 100644 arch/arm/net/bpf_jit_32.c
-> >  create mode 100644 arch/arm/net/bpf_jit_32.h
+* Cousson, Benoit wrote:
+> Hi Thierry,
 > 
-> Acked-by: Eric Dumazet <eric.dumazet@gmail.com>
+> On 1/6/2012 3:28 PM, Thierry Reding wrote:
+> >The irq_domain_add() function needs the number of interrupts in the
+> >domain to properly initialize them. In addition the allocated domain
+> >is now returned by the irq_domain_{add,generate}_simple() helpers.
 > 
+> [...]
+> 
+> >diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> >index d587560..bf67781 100644
+> >--- a/arch/arm/mach-omap2/board-generic.c
+> >+++ b/arch/arm/mach-omap2/board-generic.c
+> >@@ -66,8 +66,11 @@ static struct of_device_id intc_match[] __initdata = {
+> >  static void __init omap_generic_init(void)
+> >  {
+> >  	struct device_node *node = of_find_matching_node(NULL, intc_match);
+> >-	if (node)
+> >-		irq_domain_add_simple(node, 0);
+> >+	if (node) {
+> >+		struct irq_domain *domain;
+> >+		domain = irq_domain_add_simple(node, 0, INTCPS_NR_IRQS);
+> 
+> The number of interrupts will depend on the OMAP generation. That
+> one is just valid for the 3430 INTC controller.
+> Since the previous code was using zero, I guess that using 0 there
+> should be fine.
+> 
+> Moreover, that piece of code should not exist anymore on 3.3 if the
+> series I sent last month to leverage Rob's DT interrupt init is
+> merged [1].
+> 
+> I've just ping Rob and Grant on that series to get a status.
 
-Updated it in the patch tracking system as 7259/2. Since we're in the
-middle of the merge window, can this one get into 3.3?
+Okay, so I guess we should wait for you patch to go in first and I'll update
+this patch on top of that. I assume we can coordinate things in linux-next?
 
-Thanks,
-Mircea
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120109/1b0fd953/attachment.sig>
