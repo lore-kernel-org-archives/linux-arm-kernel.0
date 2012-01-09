@@ -1,49 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Jan 2012 14:47:31 +0800
-Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <4F0A613F.80509@gmail.com>
-References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
- <20120108145254.GE20216@S2101-09.ap.freescale.net>
- <20120108205504.GF29065@opensource.wolfsonmicro.com>
- <20120109005603.GA1835@S2101-09.ap.freescale.net>
- <4F0A613F.80509@gmail.com>
-Message-ID: <20120109064729.GJ1835@S2101-09.ap.freescale.net>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 9 Jan 2012 07:40:47 +0100
+Subject: mxs: enable phy-clock in the driver?
+In-Reply-To: <20120109013404.GD1835@S2101-09.ap.freescale.net>
+References: <20120108144558.GB2544@pengutronix.de>
+ <20120109013404.GD1835@S2101-09.ap.freescale.net>
+Message-ID: <20234.35823.411762.856482@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 08, 2012 at 09:38:39PM -0600, Rob Herring wrote:
-> On 01/08/2012 06:56 PM, Shawn Guo wrote:
-> > diff --git a/include/linux/of.h b/include/linux/of.h
-> > index a75a831..c26c20f 100644
-> > --- a/include/linux/of.h
-> > +++ b/include/linux/of.h
-> > @@ -147,7 +147,7 @@ static inline unsigned long of_read_ulong(const __be32 *cell, int size)
-> >  /* Default string compare functions, Allow arch asm/prom.h to override */
-> >  #if !defined(of_compat_cmp)
-> >  #define of_compat_cmp(s1, s2, l)       strcasecmp((s1), (s2))
-> > -#define of_prop_cmp(s1, s2)            strcmp((s1), (s2))
-> > +#define of_prop_cmp(s1, s2)            strcasecmp((s1), (s2))
-> >  #define of_node_cmp(s1, s2)            strcasecmp((s1), (s2))
-> >  #endif
-> 
-> Device-trees are case sensitive,
+Hi,
 
-I do not believe this is true, as of_compat_cmp() and of_node_cmp()
-are clearly defined as strcasecmp() above.
-
-> so I don't think we want to go globally
-> changing that behavior.
+Shawn Guo writes:
+> On Sun, Jan 08, 2012 at 03:45:58PM +0100, Wolfram Sang wrote:
+> > Hi Shawn,
+> > 
+> > I recently noticed that my tx28 board did not have net when booting from NAND
+> > (before that, barebox was setting up the network). Adding lines like these from
+> > mx28evk helped:
+> > 
+> > 228         /* Enable fec phy clock */
+> > 229         clk = clk_get_sys("pll2", NULL);
+> > 230         if (!IS_ERR(clk))
+> > 231                 clk_enable(clk);
+> > 
+> > So, if every board seems to need this, I'd think this should rather be in the
+> > driver? Am I correct or is there something I have overlooked?
+> > 
+> Hmm, as far as I know, at least m28evk from denx does not need this.
+> Different from that imx28 supplies clock to phy on mx28evk board,
+> m28evk has phy supply clock to imx28. 
 > 
-> If you want lower case names, then change the sgtl5000 code to lower
-> case names.
-> 
-I do not have a strong opinion about which is the one we should change
-among OF, regulator and sgtl5000.  But I think it's the convention
-that we should keep property name in dts all lower case.  I'm actually
-even fine with this odd mixing case name, if you tell that it's okay
-to override the convention for some cases.
+The TX28 derives its PHY clock from the ENET_CLK pin of the
+processor. Thus the CLK_ENET_TIME should be enabled by the driver as
+mentioned in <20120108033238.GA19721@S2101-09.ap.freescale.net>
 
+
+Lothar Wa?mann
 -- 
-Regards,
-Shawn
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
