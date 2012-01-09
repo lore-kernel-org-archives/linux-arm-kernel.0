@@ -1,29 +1,77 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 8 Jan 2012 23:12:56 -0800
-Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <20120109071714.GM1835@S2101-09.ap.freescale.net>
-References: <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
- <20120108145254.GE20216@S2101-09.ap.freescale.net>
- <20120108205504.GF29065@opensource.wolfsonmicro.com>
- <20120109005603.GA1835@S2101-09.ap.freescale.net>
- <4F0A613F.80509@gmail.com>
- <CAMPhdO9gaZQ0oQpfmvvL6MWP_6L9XCOdXYNSgjqDWLQ73XpRpw@mail.gmail.com>
- <20120109062511.GP29065@opensource.wolfsonmicro.com>
- <20120109065238.GK1835@S2101-09.ap.freescale.net>
- <20120109064328.GS29065@opensource.wolfsonmicro.com>
- <20120109071714.GM1835@S2101-09.ap.freescale.net>
-Message-ID: <20120109071255.GB22134@opensource.wolfsonmicro.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Mon, 09 Jan 2012 08:14:50 +0100
+Subject: [PATCH v7] ARM: net: JIT compiler for packet filters
+In-Reply-To: <1325937154-2656-1-git-send-email-mgherzan@gmail.com>
+References: <1325937154-2656-1-git-send-email-mgherzan@gmail.com>
+Message-ID: <1326093290.2627.0.camel@edumazet-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 03:17:16PM +0800, Shawn Guo wrote:
-> On Sun, Jan 08, 2012 at 10:43:29PM -0800, Mark Brown wrote:
+Le samedi 07 janvier 2012 ? 12:52 +0100, Mircea Gherzan a ?crit :
+> Based of Matt Evans's PPC64 implementation.
+> 
+> The compiler generates ARM instructions but interworking is
+> supported for Thumb2 kernels.
+> 
+> Supports both little and big endian. Unaligned loads are emitted
+> for ARMv6+. Not all the BPF opcodes that deal with ancillary data
+> are supported. The scratch memory of the filter lives on the stack.
+> Hardware integer division is used if it is available.
+> 
+> Enabled in the same way as for x86-64 and PPC64:
+> 
+> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
+> 
+> A value greater than 1 enables opcode output.
+> 
+> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+> ---
+> 
+> Changes in v7:
+>  * fix the intruction generation for LDX_MSH, OR_X, LSH_K,
+>    RSH_K and JMP_JA
+>  * fix the condition for saving the A register
+>  * use fls() instead of the compiler builtin
+>  * punt to the interpreter on absolute loads with K < 0
+>  * check for invalid data references
+>  * support the NEG opcode
+>  * clear X in the prologue based on a context flag
+>  * simplify the conditional jumps
+> 
+> Changes in v6:
+>  * fix the code generation for the ANC_CPU opcode
+> 
+> Changes in v5:
+>  * replace SEEN_LEN with SEEN_SKB
+>  * set ctx->seen when handling some ancillary data opcodes
+> 
+> Changes in v4:
+>  * first check if the JIT compiler is enabled
+>  * fix the code generation for the LDX_MSH opcode
+> 
+> Changes in v3:
+>  * no longer depend on EABI and !Thumb2
+>  * add BLX "emulation" for ARMv4 without Thumb
+>  * use the integer divide instruction on Cortex-A15
+>  * fix the handling of the DIV_K opcode
+>  * use a C wrapper for __aeabi_uidiv
+>  * fix the generation of the epilogue (non-FP case)
+> 
+> Changes in v2:
+>  * enable the compiler only for ARMv5+ because of the BLX instruction
+>  * use the same comparison for the ARM version checks
+>  * use misaligned accesses on ARMv6
+>  * fix the SEEN_MEM
+>  * fix the mem_words_used()
+> 
+>  arch/arm/Kconfig          |    1 +
+>  arch/arm/Makefile         |    1 +
+>  arch/arm/net/Makefile     |    3 +
+>  arch/arm/net/bpf_jit_32.c |  912 +++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/net/bpf_jit_32.h |  190 ++++++++++
+>  5 files changed, 1107 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/net/Makefile
+>  create mode 100644 arch/arm/net/bpf_jit_32.c
+>  create mode 100644 arch/arm/net/bpf_jit_32.h
 
-> > It's purely an idiom, there's nothing enforcing it.
-
-> Actually, a rough calculation on 'git grep regulator_get drivers/'
-> output tells 80% callers are using lower case.
-
-Add in the ASoC stuff (which I actually actively review) and I suspect
-the number changes.  Anyway, there is a good solid reason for wanting
-capitals in the code so...
+Acked-by: Eric Dumazet <eric.dumazet@gmail.com>
