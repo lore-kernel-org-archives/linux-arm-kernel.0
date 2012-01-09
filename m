@@ -1,57 +1,56 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 9 Jan 2012 17:25:04 +0100
-Subject: [PATCH] ARM: PXA: Zipit Z2: Fix oops in z2_power_off
-In-Reply-To: <20120109132100.GO21765@n2100.arm.linux.org.uk>
-References: <1326011616-3546-1-git-send-email-anarsoul@gmail.com>
- <201201091338.29680.marek.vasut@gmail.com>
- <20120109132100.GO21765@n2100.arm.linux.org.uk>
-Message-ID: <201201091725.04631.marek.vasut@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 9 Jan 2012 17:34:53 +0100
+Subject: [GIT PULL] ARM: OMAP3+: Add DT support for i2c, twl6030 and EVM
+Message-ID: <4F0B172D.6020105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, Jan 09, 2012 at 01:38:29PM +0100, Marek Vasut wrote:
-> > > On Mon, Jan 09, 2012 at 01:13:31PM +0100, Marek Vasut wrote:
-> > > > > 2012/1/9 Marek Vasut <marek.vasut@gmail.com>:
-> > > > > >> Nope, it does not work. Looks like device disables power on
-> > > > > >> memory in deepsleep.
-> > > > > > 
-> > > > > > Why?
-> > > > > 
-> > > > > In deepsleep PXA27x deasserts SYS_EN pin, and looks like when it's
-> > > > > deasserted there's no power on SDRAM (on Zipit). Just guess.
-> > > > 
-> > > > Then maybe implement suspend-to-disk ? There was a patch for omap on
-> > > > the list, maybe it's even merged.
-> > > 
-> > > What are hell you going on about?
-> > 
-> > Cool your jets Russell.
-> > 
-> > > Why would someone want to even try
-> > > implementing suspend-to-disk in the power off hook?
-> > 
-> > I'm not talking about the powerdown hook anymore, but a way how to avoid
-> > it as much as possible via standard means.
-> 
-> Maybe you should state that you are deviating from the subject of this
-> email thread to aid your readers understanding?
+Hi Tony,
 
-I think it was pretty clear already. OK
+If this is not too late, could you please pull the various OMAP device tree patches?
 
-> 
-> > > Why would you even
-> > > want to try to preserve the system state in a power off hook?
-> > 
-> > Not in poweroff hook. Btw. I'm still convinced the bootloader should
-> > handle this -- the powerdown should just reset the thing and tell
-> > bootloader to deepsleep it.
-> 
-> Why should the boot loader be involved?  The boot loader is all about
-> bringing the system _up_, not taking it down.
+This series assume that all the drivers adaptation to DT are already merged and is based on my previous interrupt controller series.
+It means it has a strong dependency with i2c tree, mfd tree and rtc tree.
 
-Why would you bloat kernel with non-standard crap? The firmware should handle 
-this if the hardware is broken (and even if this sounds acpi-ish, I still 
-consider this particular thing should be handled by firmware). Especially since 
-what the device does in the end is simply restart anyway.
+I added as well the patch from Vaibhav for EVM early DT support.
 
-M
+Thanks,
+Benoit
+
+
+The following changes since commit 89f504c5376bb09bd08bb3a3fe4c80949a594069:
+  Benoit Cousson (1):
+        ARM: OMAP2+: board-generic: Use of_irq_init API
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.3/dt_i2c_twl_evm
+
+Benoit Cousson (9):
+      ARM: OMAP2+: pm: Do not init statically the SR and voltage layer with DT
+      arm/dts: OMAP4: Add i2c controller nodes
+      arm/dts: OMAP3: Add i2c controller nodes
+      arm/dts: twl6030: Add DTS file for twl6030 PMIC
+      arm/dts: twl4030: Add DTS file for twl4030 PM + Audio IC
+      arm/dts: omap4-panda: Add twl6030 and i2c EEPROM
+      arm/dts: omap4-sdp: Add twl6030, i2c3 and i2c4 devices
+      arm/dts: omap3-beagle: Add twl4030 and i2c EEPROM
+      ARM: OMAP2+: board-generic: Remove i2c static init
+
+Vaibhav Hiremath (1):
+      arm/dts: Add support for TI OMAP3 EVM board
+
+ arch/arm/boot/dts/omap3-beagle.dts  |   29 +++++++++++++++++++
+ arch/arm/boot/dts/omap3-evm.dts     |   20 +++++++++++++
+ arch/arm/boot/dts/omap3.dtsi        |   21 ++++++++++++++
+ arch/arm/boot/dts/omap4-panda.dts   |   34 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts     |   53 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi        |   28 ++++++++++++++++++
+ arch/arm/boot/dts/twl4030.dtsi      |   21 ++++++++++++++
+ arch/arm/boot/dts/twl6030.dtsi      |   22 ++++++++++++++
+ arch/arm/mach-omap2/board-generic.c |   48 +------------------------------
+ arch/arm/mach-omap2/pm.c            |    8 +++++
+ 10 files changed, 238 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-evm.dts
+ create mode 100644 arch/arm/boot/dts/twl4030.dtsi
+ create mode 100644 arch/arm/boot/dts/twl6030.dtsi
