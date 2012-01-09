@@ -1,69 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 08 Jan 2012 21:38:39 -0600
-Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <20120109005603.GA1835@S2101-09.ap.freescale.net>
-References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
- <20120108145254.GE20216@S2101-09.ap.freescale.net>
- <20120108205504.GF29065@opensource.wolfsonmicro.com>
- <20120109005603.GA1835@S2101-09.ap.freescale.net>
-Message-ID: <4F0A613F.80509@gmail.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Mon, 9 Jan 2012 12:56:23 +0800
+Subject: [PATCH] PM:Hibernation: drop the check of swap space size for
+ compressed image
+Message-ID: <1326084983-22237-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2012 06:56 PM, Shawn Guo wrote:
-> On Sun, Jan 08, 2012 at 12:55:05PM -0800, Mark Brown wrote:
->> On Sun, Jan 08, 2012 at 10:52:56PM +0800, Shawn Guo wrote:
->>> On Fri, Jan 06, 2012 at 11:25:41AM +0800, Richard Zhao wrote:
->>
->>>> +					VDDA-supply = <&reg_2P5V>;
->>>> +					VDDIO-supply = <&reg_3P3V>;
->>
->>> I would prefer to have them named vdda-supply and vddio-supply.  But
->>> I just learnt that they do not work, because sgtl5000 driver
->>> (sound/soc/codecs/sgtl5000.c) has the supply_names in upper case, while
->>> unlike of_node_cmp() is strcasecmp(), of_prop_cmp() is just strcmp().
->>
->>> But the convention on property name is really all using lower case,
->>> and mixing cases there looks odd, so I'm thinking about the changes
->>> below on of_get_regulator().
->>
->>>         snprintf(prop_name, 32, "%s-supply", supply);
->>> +       while (prop_name[i] && i < 32) {
->>> +               prop_name[i] = tolower(prop_name[i]);
->>> +               i++;
->>> +       }
->>
->> There's two big problems here.  One is that we clearly shouldn't be
->> open coding this here but adding a function for it.  The other is that
->> this is going to break any existing device tree which has upper cased
->> supplies.  If we were going to do something here I'd go with case
->> insensitve matching though I'm not sure it's a real problem.
-> 
-> Ok, let's test device tree maintainers.
-> 
-> Grant, Rob,
-> 
-> Could the problem we are seeing here be a good reason to make the
-> following change?
-> 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index a75a831..c26c20f 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -147,7 +147,7 @@ static inline unsigned long of_read_ulong(const __be32 *cell, int size)
->  /* Default string compare functions, Allow arch asm/prom.h to override */
->  #if !defined(of_compat_cmp)
->  #define of_compat_cmp(s1, s2, l)       strcasecmp((s1), (s2))
-> -#define of_prop_cmp(s1, s2)            strcmp((s1), (s2))
-> +#define of_prop_cmp(s1, s2)            strcasecmp((s1), (s2))
->  #define of_node_cmp(s1, s2)            strcasecmp((s1), (s2))
->  #endif
+From: Barry Song <Baohua.Song@csr.com>
 
-Device-trees are case sensitive, so I don't think we want to go globally
-changing that behavior.
+For compressed image, the space required is not known until
+we finish compressing and writing all pages.
+This patch drops the check, and if swap space is not enough
+finally, system can still restore to normal after writing
+swap fails for compressed images.
 
-If you want lower case names, then change the sgtl5000 code to lower
-case names.
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ kernel/power/swap.c |   13 +++++++------
+ 1 files changed, 7 insertions(+), 6 deletions(-)
 
-Rob
+diff --git a/kernel/power/swap.c b/kernel/power/swap.c
+index 11a594c..c8306a5 100644
+--- a/kernel/power/swap.c
++++ b/kernel/power/swap.c
+@@ -774,8 +774,7 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
+ 
+ 	pr_debug("PM: Free swap pages: %u\n", free_swap);
+ 
+-	required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
+-		nr_pages : (nr_pages * LZO_CMP_PAGES) / LZO_UNC_PAGES + 1);
++	required = PAGES_FOR_IO + nr_pages;
+ 	return free_swap > required;
+ }
+ 
+@@ -803,10 +802,12 @@ int swsusp_write(unsigned int flags)
+ 		printk(KERN_ERR "PM: Cannot get swap writer\n");
+ 		return error;
+ 	}
+-	if (!enough_swap(pages, flags)) {
+-		printk(KERN_ERR "PM: Not enough free swap\n");
+-		error = -ENOSPC;
+-		goto out_finish;
++	if (flags & SF_NOCOMPRESS_MODE) {
++		if (!enough_swap(pages, flags)) {
++			printk(KERN_ERR "PM: Not enough free swap\n");
++			error = -ENOSPC;
++			goto out_finish;
++		}
+ 	}
+ 	memset(&snapshot, 0, sizeof(struct snapshot_handle));
+ 	error = snapshot_read_next(&snapshot);
+-- 
+1.7.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
