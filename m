@@ -1,63 +1,37 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 09 Jan 2012 10:53:38 +0900
-Subject: [PATCH v2] ARM: Exynos4: use s5p-timer for Universal_c210 board
-Message-ID: <20120109015338.GA25429@july>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Jan 2012 10:08:51 +0800
+Subject: [RFC PATCH v3 3/5] pinctrl: imx: add pinctrl imx driver
+In-Reply-To: <20120108130542.GC2203@richard-laptop>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-4-git-send-email-b29396@freescale.com>
+ <20120108130542.GC2203@richard-laptop>
+Message-ID: <20120109020848.GF1835@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Szyprowski <m.szyprowski@samsung.com>
+On Sun, Jan 08, 2012 at 09:05:44PM +0800, Richard Zhao wrote:
+> > +enum imx_imx53_pinctrl_pads {
+> > +	MX53_GPIO_19 = 0,
+> > +	MX53_KEY_COL0 = 1,
+> > +	MX53_KEY_ROW0 = 2,
+> > +	MX53_KEY_COL1 = 3,
+> > +	MX53_KEY_ROW1 = 4,
+> > +	MX53_KEY_COL2 = 5,
+> > +	MX53_KEY_ROW2 = 6,
+> ...
+> Why not describe it in dts and make this file generic for imx?
+> One node for one pad,
 
-Commit 069d4e743 removed support for local timers and forced to use MCT as
-event source. However MCT is not operating properly on early revision (EVT0)
-of Exynos4 SoCs. All UniversalC210 boards are based on Exynos4 EVT0, so that
-commit broke support for it. This patch provides a workaround that enables
-UniversalC210 boards to boot again. s5p-timer is used as an event source.
+Doing this will bloat the device tree dramatically.  Actually I had
+a patch doing so before the pinctrl subsystem was born, but it
+concerned Grant a lot for that reason and thus died.
 
-and commit 2f0778afac79bd8d226225556858a636931eeabc <ARM: 7205/2: sched_clock: allow sched_clock to be selected@runtime> can be make a boot both sched_clock support or not.
+> it'll be easy to extend pad properties. You know
+> the pad may set pull up/down, open drain, drive strenth, daisy chain etc.
+> The features have to be supported, to make your model usefull.
+> 
+As Aisheng mentioned, the pinconf support will be added later.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index e1efbca..b813a40 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -207,6 +207,9 @@ config MACH_ARMLEX4210
- config MACH_UNIVERSAL_C210
- 	bool "Mobile UNIVERSAL_C210 Board"
- 	select CPU_EXYNOS4210
-+	select S5P_HRT
-+	select CLKSRC_MMIO
-+	select HAVE_SCHED_CLOCK
- 	select S5P_GPIO_INT
- 	select S5P_DEV_FIMC0
- 	select S5P_DEV_FIMC1
-diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-index 52aea97..639b403 100644
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@ -36,6 +36,7 @@
- #include <plat/mfc.h>
- #include <plat/sdhci.h>
- #include <plat/pd.h>
-+#include <plat/s5p-time.h>
- #include <plat/regs-fb-v4.h>
- #include <plat/fimc-core.h>
- #include <plat/camport.h>
-@@ -997,6 +998,7 @@ static void __init universal_map_io(void)
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
- }
- 
- void s5p_tv_setup(void)
-@@ -1062,7 +1064,7 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
- 	.map_io		= universal_map_io,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= universal_machine_init,
--	.timer		= &exynos4_timer,
-+	.timer		= &s5p_timer,
- 	.reserve        = &universal_reserve,
- 	.restart	= exynos4_restart,
- MACHINE_END
+-- 
+Regards,
+Shawn
