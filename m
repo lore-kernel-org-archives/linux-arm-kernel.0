@@ -1,35 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 8 Jan 2012 17:21:02 -0800
-Subject: [GIT PULL] Samsung devel for v3.3
-In-Reply-To: <20120108204953.GA20043@sirena.org.uk>
-References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
- <CAOesGMhLE3wxM=F9OkHT-bQpsVp8Uc6eE8Uk+WN9pLuz5BRLBw@mail.gmail.com>
- <20120108204953.GA20043@sirena.org.uk>
-Message-ID: <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Jan 2012 09:34:06 +0800
+Subject: mxs: enable phy-clock in the driver?
+In-Reply-To: <20120108144558.GB2544@pengutronix.de>
+References: <20120108144558.GB2544@pengutronix.de>
+Message-ID: <20120109013404.GD1835@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 8, 2012 at 12:49 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Jan 06, 2012 at 01:58:29PM -0800, Olof Johansson wrote:
->
->> > Please pull Samsung devel for v3.3 from:
->> > ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> > next-samsung-devel-samsung
->
->> Thanks. I've pulled this into late/devel, based on earlier email from
->> Arnd we might end up sending this in towards the end of the merge
->> window, but there's also a chance it will wait for 3.4.
->
-> That'd be extremely disappointing, especially given that there's some
-> bug fixes in there for updates going in this merge window without which
-> mainline is going to have problems on s3c64xx (mostly the GPIO stuff).
+On Sun, Jan 08, 2012 at 03:45:58PM +0100, Wolfram Sang wrote:
+> Hi Shawn,
+> 
+> I recently noticed that my tx28 board did not have net when booting from NAND
+> (before that, barebox was setting up the network). Adding lines like these from
+> mx28evk helped:
+> 
+> 228         /* Enable fec phy clock */
+> 229         clk = clk_get_sys("pll2", NULL);
+> 230         if (!IS_ERR(clk))
+> 231                 clk_enable(clk);
+> 
+> So, if every board seems to need this, I'd think this should rather be in the
+> driver? Am I correct or is there something I have overlooked?
+> 
+Hmm, as far as I know, at least m28evk from denx does not need this.
+Different from that imx28 supplies clock to phy on mx28evk board,
+m28evk has phy supply clock to imx28. 
 
-Of course bug fixes should go in.
-
-Mark, Kukjin, can either of you split out the fixes in a separate branch?
-
-
-Thanks,
-
--Olof
+-- 
+Regards,
+Shawn
