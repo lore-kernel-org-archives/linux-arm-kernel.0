@@ -1,56 +1,53 @@
-From: rusko.peter@prolan.hu (Peter Rusko)
-Date: Mon, 9 Jan 2012 15:07:44 +0100
-Subject: MX28 fec clock frequency
-In-Reply-To: <20120108033238.GA19721@S2101-09.ap.freescale.net>
-References: <4F06D643.6080602@prolan.hu>
- <20120108033238.GA19721@S2101-09.ap.freescale.net>
-Message-ID: <4F0AF4B0.4030403@prolan.hu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Jan 2012 14:12:14 +0000
+Subject: [PATCH v4 2/2] dma/imx-sdma: convert _raw_readl/_raw_writel to
+ readl/writel
+In-Reply-To: <CAMPhdO84p=0D3KrrFnwup4igoh4oNWXOCbW+BOkoRiC8m=JnmQ@mail.gmail.com>
+References: <1326033862-25351-1-git-send-email-richard.zhao@linaro.org>
+ <1326033862-25351-3-git-send-email-richard.zhao@linaro.org>
+ <20120109115143.GL21765@n2100.arm.linux.org.uk>
+ <CAMPhdO84p=0D3KrrFnwup4igoh4oNWXOCbW+BOkoRiC8m=JnmQ@mail.gmail.com>
+Message-ID: <20120109141214.GP21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-01-08 04:32, Shawn Guo wrote:
-> Hi Peter,
->
-> On Fri, Jan 06, 2012 at 12:08:51PM +0100, Peter Rusko wrote:
->> Hi all,
->>
->> I'm trying to get the fec clock frequency on the i.MX28 processor. I0
->> need it for a PTP clock and it seems that I get a wrong value:
->> clk_get_rate returns 151578947.
->>
->
-> The ptp clock (CLK_ENET_TIME) was missed from the initial imx28 clock
-> support.  The fec_clk which is one child of hbus_clk (151 MHz) is
-> taken as MDIO clock in fec driver.
->
+On Mon, Jan 09, 2012 at 09:25:12PM +0800, Eric Miao wrote:
+> Does this also mean when endian conversion is not necessary, the __raw_*
+> version will be better here? Or generally the _relaxed variants are more
+> recommended as endian conversion will be optimized away anyway with
+> these AMBA accesses as both sides are little-endian?
 
-I'm working on a ptp driver now and I can't deal with the clock.
+Useless endian conversions are always optimized away.  Here's the
+definitions:
 
-I've added the CLK_ENET_TIME clock and set it to 40MHz. It should give a
-25ns period for the counter in ptp. However the ptp clock is too slow.
+If your CPU is operating in little endian mode, for 32-bit and 16-bit:
 
-If i increase the number (up to the maximum, which is 0x7f), the clock
-is still slower then normal. It's like the CLK_ENET_TIME frequency is
-less then I think. What can be the problem?
+#define __cpu_to_le32(x) ((__force __le32)(__u32)(x))
+#define __le32_to_cpu(x) ((__force __u32)(__le32)(x))
+#define __cpu_to_le16(x) ((__force __le16)(__u16)(x))
+#define __le16_to_cpu(x) ((__force __u16)(__le16)(x))
 
-I've attached a patch.
+So these are just casts to keep sparse happy and able to check this stuff.
 
-Regards,
--- 
-Rusk? P?ter
-Fejleszt?m?rn?k
+#define __cpu_to_be32(x) ((__force __be32)__swab32((x)))
+#define __be32_to_cpu(x) __swab32((__force __u32)(__be32)(x))
+#define __cpu_to_be16(x) ((__force __be16)__swab16((x)))
+#define __be16_to_cpu(x) __swab16((__force __u16)(__be16)(x))
 
-Prolan Zrt. / Prolan Co.
-Hungary 2011 Budakal?sz, Szentendrei ?t 1-3.
-Tel./Phone: +36 20 954 3118
-Fax: +36 26 540 420
-E-mail: rusko.peter at prolan.hu
-Web: www.prolan.hu
-Timezone:CET
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: fec_ptp.patch
-Type: text/x-patch
-Size: 19053 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120109/09c41f10/attachment-0001.bin>
+These do the endian conversion.
+
+If your CPU is running in big endian mode:
+
+#define __cpu_to_le32(x) ((__force __le32)__swab32((x)))
+#define __le32_to_cpu(x) __swab32((__force __u32)(__le32)(x))
+#define __cpu_to_le16(x) ((__force __le16)__swab16((x)))
+#define __le16_to_cpu(x) __swab16((__force __u16)(__le16)(x))
+
+So these do the endian conversion, and:
+
+#define __cpu_to_be32(x) ((__force __be32)(__u32)(x))
+#define __be32_to_cpu(x) ((__force __u32)(__be32)(x))
+#define __cpu_to_be16(x) ((__force __be16)(__u16)(x))
+#define __be16_to_cpu(x) ((__force __u16)(__be16)(x))
+
+These are just casts.
