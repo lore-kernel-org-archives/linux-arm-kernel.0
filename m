@@ -1,39 +1,34 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Jan 2012 15:17:16 +0800
-Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <20120109064328.GS29065@opensource.wolfsonmicro.com>
-References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
- <20120108145254.GE20216@S2101-09.ap.freescale.net>
- <20120108205504.GF29065@opensource.wolfsonmicro.com>
- <20120109005603.GA1835@S2101-09.ap.freescale.net>
- <4F0A613F.80509@gmail.com>
- <CAMPhdO9gaZQ0oQpfmvvL6MWP_6L9XCOdXYNSgjqDWLQ73XpRpw@mail.gmail.com>
- <20120109062511.GP29065@opensource.wolfsonmicro.com>
- <20120109065238.GK1835@S2101-09.ap.freescale.net>
- <20120109064328.GS29065@opensource.wolfsonmicro.com>
-Message-ID: <20120109071714.GM1835@S2101-09.ap.freescale.net>
+Date: Mon, 9 Jan 2012 15:21:23 +0800
+Subject: mxs: enable phy-clock in the driver?
+In-Reply-To: <20234.37290.114047.36369@ipc1.ka-ro>
+References: <20120108144558.GB2544@pengutronix.de>
+ <20120109013404.GD1835@S2101-09.ap.freescale.net>
+ <20234.35823.411762.856482@ipc1.ka-ro>
+ <20120109065845.GL1835@S2101-09.ap.freescale.net>
+ <20234.37290.114047.36369@ipc1.ka-ro>
+Message-ID: <20120109072121.GN1835@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 08, 2012 at 10:43:29PM -0800, Mark Brown wrote:
-> On Mon, Jan 09, 2012 at 02:52:40PM +0800, Shawn Guo wrote:
-> > On Sun, Jan 08, 2012 at 10:25:12PM -0800, Mark Brown wrote:
+On Mon, Jan 09, 2012 at 08:05:14AM +0100, Lothar Wa?mann wrote:
+> Hi,
 > 
-> > > That would be non-idiomatic for the regulators - the idiom for the
-> > > regulator API is to use upper case names as that's the idiom used to
-> > > label supplies in datasheets and schematics.
+> Shawn Guo writes:
+> > On Mon, Jan 09, 2012 at 07:40:47AM +0100, Lothar Wa?mann wrote:
+> > > The TX28 derives its PHY clock from the ENET_CLK pin of the
+> > > processor. Thus the CLK_ENET_TIME should be enabled by the driver as
+> > > mentioned in <20120108033238.GA19721@S2101-09.ap.freescale.net>
+> > > 
+> > Can you give a web link for that message?
+> > 
+> It's your own email from "Sun, 8 Jan 2012 11:32:40 +0800" with the
+> subject "Re: MX28 fec clock frequency":
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/079556.html
 > 
-> > Hmm, the idiom seems not so strong.
-> 
-> > drivers/mmc/host/sdhci.c:
-> 
-> > 	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
-> 
-> It's purely an idiom, there's nothing enforcing it.
-
-Actually, a rough calculation on 'git grep regulator_get drivers/'
-output tells 80% callers are using lower case.
+Ah, yes.  But what I said there is the CLK_ENET_TIME should be enabled
+by PTP support, not the need of clocking external phy required by
+particular board design.
 
 -- 
 Regards,
