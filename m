@@ -1,46 +1,46 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  9 Jan 2012 16:45:44 -0600
-Subject: [PATCH 4/6] ARM: imx: remove incorrect BSYM usage
+Date: Mon,  9 Jan 2012 16:45:46 -0600
+Subject: [PATCH 6/6] ARM: make BSYM macro assembly only
 In-Reply-To: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
 References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326149146-19756-5-git-send-email-robherring2@gmail.com>
+Message-ID: <1326149146-19756-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
 BSYM macro is only needed for assembly files and its usage in c files is
-wrong, so remove it. The linker will correctly set bit 0 for Thumb2
-kernels.
+wrong, so only define it for assembly.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Dave Martin <dave.martin@linaro.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/src.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/unified.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-index 4bde04f..29bd124 100644
---- a/arch/arm/mach-imx/src.c
-+++ b/arch/arm/mach-imx/src.c
-@@ -15,7 +15,6 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/smp.h>
--#include <asm/unified.h>
+diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
+index bc63116..f5989f4 100644
+--- a/arch/arm/include/asm/unified.h
++++ b/arch/arm/include/asm/unified.h
+@@ -37,8 +37,8 @@
+ #define THUMB(x...)	x
+ #ifdef __ASSEMBLY__
+ #define W(instr)	instr.w
+-#endif
+ #define BSYM(sym)	sym + 1
++#endif
  
- #define SRC_SCR				0x000
- #define SRC_GPR1			0x020
-@@ -43,7 +42,7 @@ void imx_enable_cpu(int cpu, bool enable)
- void imx_set_cpu_jump(int cpu, void *jump_addr)
- {
- 	cpu = cpu_logical_map(cpu);
--	writel_relaxed(BSYM(virt_to_phys(jump_addr)),
-+	writel_relaxed(virt_to_phys(jump_addr),
- 		       src_base + SRC_GPR1 + cpu * 8);
- }
+ #else	/* !CONFIG_THUMB2_KERNEL */
+ 
+@@ -49,8 +49,8 @@
+ #define THUMB(x...)
+ #ifdef __ASSEMBLY__
+ #define W(instr)	instr
+-#endif
+ #define BSYM(sym)	sym
++#endif
+ 
+ #endif	/* CONFIG_THUMB2_KERNEL */
  
 -- 
 1.7.5.4
