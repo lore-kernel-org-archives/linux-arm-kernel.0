@@ -1,61 +1,82 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 9 Jan 2012 14:31:44 +0100
-Subject: [PATCH v2 1/5] arm/dts: OMAP4: Update DTS file with new GIC
- bindings
-In-Reply-To: <4F07680E.8000404@gmail.com>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
- <1324388398-2683-2-git-send-email-b-cousson@ti.com>
- <20120106211558.GA7457@ponder.secretlab.ca> <4F07680E.8000404@gmail.com>
-Message-ID: <4F0AEC40.3040200@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 09 Jan 2012 14:32:46 +0100
+Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
+ remove unsupported 15bit modes
+In-Reply-To: <87ty45dt89.fsf@macbook.be.48ers.dk>
+References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
+ <4F0AC2B1.8010601@atmel.com> <87ty45dt89.fsf@macbook.be.48ers.dk>
+Message-ID: <4F0AEC7E.5050403@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/6/2012 10:30 PM, Rob Herring wrote:
-> On 01/06/2012 03:15 PM, Grant Likely wrote:
->> On Tue, Dec 20, 2011 at 02:39:54PM +0100, Benoit Cousson wrote:
->>> The GIC binding was updated in 3.2 and expect 3 interrupt-cells.
->>> - Update the #interrupt-cells
->>> - interrupt-parent seems to be needed as well for the top level GIC
->>
->> Hmmm... it shouldn't be.  If it is then it is a bug.
+On 01/09/2012 12:13 PM, Peter Korsgaard :
+>>>>>> "Nicolas" == Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 > 
-> I think this is an old comment which I fixed in 3.2, so interrupt-parent
-> can be removed.
+>  Nicolas> On 10/13/2011 04:52 PM, Peter Korsgaard :
+>  >> Allow framebuffer to be configured in 16bit mode when panel is wired in
+>  >> (the default) BGR configuration, and don't claim to support 15bit input
+>  >> modes, which the LCD controller cannot handle.
+>  >> 
+>  >> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+> 
+>  Nicolas> Hi Peter,
+> 
+>  Nicolas> Sorry for not having more responsive concerning the two
+>  Nicolas> patches that you posted about atmel_lcdfb driver.
+> 
+> No problem.
+> 
+>  Nicolas> I have a question though about this one...
+> 
+>  >> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
+>  >> -			var->red.offset = 10;
+>  >> -			var->blue.offset = 0;
+>  >> -			var->green.length = 5;
+> 
+>  Nicolas> Maybe I have missed something but I do not know why you are removing
+>  Nicolas> this part of the configuration? A board at least is using this wiring
+>  Nicolas> mode...
+> 
+> Because it is arguable wrong as far as I understand the HW.
+> There's two parts here:
+> 
+> - 1: Format of framebuffer memory
+> - 2: Wiring of LCD (RGB/BGR order and number of bits)
+> 
+>>From the datasheet, the following framebuffer formats are supported:
+> 
+> 1, 2, 4, 8 bits per pixel (palletized), 16, 24 bits per pixel
+> (non-palletized) for TFT.
+> 
+> So it doesn't really support RGB555 mode. The controller reads up to
+> 32bit of framebuffer data and outputs 24bit on the LCD pins. You CAN
+> wire up a RGB555 panel by just skipping the LSB green of a RGB565
+> wiring, but that is independent of the framebufffer format. The
+> controller/driver doesn't do any RGB/BGR swapping, so the RBG/BGR wiring
+> settings are just used as a software hint (in FBIOGET_VSCREENINFO) about
+> the meaning of the individual bits of a pixel in the framebuffer.
+> 
+> Similar you can connect a 12bit 4:4:4 panel by just connecting it to the
+> MSB LCD pins.
 
-I've just tried, and indeed, it works now.
+Yes. Thanks to Russell and you for the explanation.
 
-Please find below the patch updated accordingly.
+I acknowledge your two patches right now.
 
-Thanks,
-Benoit
+> So in conclusion, I think we should just have:
+> 
+> - ATMEL_LCDC_WIRING_RGB
+> - ATMEL_LCDC_WIRING_BGR
+> - ATMEL_LCDC_WIRING_RGB565
+> - ATMEL_LCDC_WIRING_BGR565
+> 
+> These simply define framebuffer bit order (RGB/BGR) and preferred
+> default bit depth (16/24).
 
----
->From f9ebe0ff11e7cbbba0d7499420ff2f358e44a297 Mon Sep 17 00:00:00 2001
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Fri, 25 Nov 2011 12:11:52 +0100
-Subject: [PATCH v3 1/5] arm/dts: OMAP4: Update DTS file with new GIC bindings
+Maybe we can think about a patch that removes the RGB555 variable from
+the header (include/video/atmel_lcdc.h) and the board file that is using
+it (board-neocore926.c).
 
-The GIC binding was updated in 3.2 and expects 3 interrupt-cells.
-- Update the #interrupt-cells
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/boot/dts/omap4.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 4c61c82..4b2bff1 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -95,7 +95,7 @@
- 		gic: interrupt-controller at 48241000 {
- 			compatible = "arm,cortex-a9-gic";
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <3>;
- 			reg = <0x48241000 0x1000>,
- 			      <0x48240100 0x0100>;
- 		};
+Best regards,
 -- 
-1.7.0.4
+Nicolas Ferre
