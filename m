@@ -1,9 +1,10 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 9 Jan 2012 17:12:11 +0200
-Subject: [PATCH v2 1/3] arm/tegra: add support for new clock framework features
+Date: Mon, 9 Jan 2012 17:12:12 +0200
+Subject: [PATCH v2 1/3] ARM: tegra: add support for new clock framework
+ features
 In-Reply-To: <1326121937-32054-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1326121937-32054-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1326121937-32054-2-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1326121937-32054-3-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
