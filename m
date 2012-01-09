@@ -1,155 +1,189 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 09 Jan 2012 15:21:44 +0100
-Subject: [PATCH 1/2] atmel_lcdfb: Adjust HFP calculation so it matches
- the manual.
-In-Reply-To: <1317801598-23757-1-git-send-email-alexander.stein@systec-electronic.com>
-References: <1317801598-23757-1-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <4F0AF7F8.8040300@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Jan 2012 14:44:43 +0000
+Subject: [PATCH 1/2] at91 : move pm.h header to arch/arm/include/asm
+In-Reply-To: <4F0AF198.1030803@linaro.org>
+References: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
+ <201201061730.33525.arnd.bergmann@linaro.org> <4F0ACD35.1000600@linaro.org>
+ <20120109112920.GJ21765@n2100.arm.linux.org.uk> <4F0AF198.1030803@linaro.org>
+Message-ID: <20120109144443.GQ21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2011 09:59 AM, Alexander Stein :
-> In the AT91SAM9263 Manual the HFP part in LCDTIM2 is described as follows:
->   * HFP: Horizontal Front Porch
->   Number of idle LCDDOTCK cycles at the end of the line.
->   Idle period is (HFP+2) LCDDOTCK cycles.
-
-Hi Alexander,
-
-Unfortunately this is not true for all the SoC that embed the
-atmel_lcdfb... So I may need to rework this patch but it is certainly
-not applicable in the current form.
-
-Florian, can you please remove it from your git tree?
-
-Thanks,
-
-Best regards,
-
-> It is only a minor issue. I also changed all boards using atmel_lcdfb
-> I found to respect the new calculation.
+On Mon, Jan 09, 2012 at 02:54:32PM +0100, Daniel Lezcano wrote:
+> On 01/09/2012 12:29 PM, Russell King - ARM Linux wrote:
+> > On Mon, Jan 09, 2012 at 12:19:17PM +0100, Daniel Lezcano wrote:
+> >> Actually, the header moves from :
+> >>
+> >> 	arch/arm/mach-at91/pm.h
+> >> to:
+> >> 	arch/arm/include/asm/at91_pm.h.
+> >>
+> >> This place and the renaming of the file complies with the comments of
+> >> Russell,
+> > 
+> > No it doesn't.  There's absolutely no way in hell I want arch/arm/include/asm
+> > to be littered with hundreds of crappy platform specific header files.
 > 
-> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> ---
->  arch/arm/mach-at91/board-cap9adk.c      |    2 +-
->  arch/arm/mach-at91/board-neocore926.c   |    2 +-
->  arch/arm/mach-at91/board-sam9261ek.c    |    4 ++-
->  arch/arm/mach-at91/board-sam9263ek.c    |    2 +-
->  arch/arm/mach-at91/board-sam9m10g45ek.c |    2 +-
->  arch/arm/mach-at91/board-sam9rlek.c     |    2 +-
->  drivers/video/atmel_lcdfb.c             |    4 ++--
->  7 files changed, 9 insertions(+), 9 deletions(-)
+> Ok. Actually there are 9 pm.h files but I agree with a domino effect we
+> can have more header files brought to this directory like "control.h",
+> "powerdomain.h", etc ...
 > 
-> diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
-> index 679b0b7..ae962bf 100644
-> --- a/arch/arm/mach-at91/board-cap9adk.c
-> +++ b/arch/arm/mach-at91/board-cap9adk.c
-> @@ -304,7 +304,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->  		.xres		= 240,		.yres		= 320,
->  		.pixclock	= KHZ2PICOS(4965),
->  
-> -		.left_margin	= 1,		.right_margin	= 33,
-> +		.left_margin	= 1,		.right_margin	= 34,
->  		.upper_margin	= 1,		.lower_margin	= 0,
->  		.hsync_len	= 5,		.vsync_len	= 1,
->  
-> diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-> index 9bc6ab3..583878e 100644
-> --- a/arch/arm/mach-at91/board-neocore926.c
-> +++ b/arch/arm/mach-at91/board-neocore926.c
-> @@ -235,7 +235,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->  		.xres		= 240,		.yres		= 320,
->  		.pixclock	= KHZ2PICOS(5000),
->  
-> -		.left_margin	= 1,		.right_margin	= 33,
-> +		.left_margin	= 1,		.right_margin	= 34,
->  		.upper_margin	= 1,		.lower_margin	= 0,
->  		.hsync_len	= 5,		.vsync_len	= 1,
->  
-> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-> index 5096a0e..8dda83b 100644
-> --- a/arch/arm/mach-at91/board-sam9261ek.c
-> +++ b/arch/arm/mach-at91/board-sam9261ek.c
-> @@ -370,7 +370,7 @@ static struct fb_videomode at91_stn_modes[] = {
->  		.xres           = 320,          .yres           = 240,
->  		.pixclock       = KHZ2PICOS(1440),
->  
-> -		.left_margin    = 1,            .right_margin   = 1,
-> +		.left_margin    = 1,            .right_margin   = 2,
->  		.upper_margin   = 0,            .lower_margin   = 0,
->  		.hsync_len      = 1,            .vsync_len      = 1,
->  
-> @@ -431,7 +431,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->  		.xres		= 240,		.yres		= 320,
->  		.pixclock	= KHZ2PICOS(4965),
->  
-> -		.left_margin	= 1,		.right_margin	= 33,
-> +		.left_margin	= 1,		.right_margin	= 34,
->  		.upper_margin	= 1,		.lower_margin	= 0,
->  		.hsync_len	= 5,		.vsync_len	= 1,
->  
-> diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-> index ea8f185..e260070 100644
-> --- a/arch/arm/mach-at91/board-sam9263ek.c
-> +++ b/arch/arm/mach-at91/board-sam9263ek.c
-> @@ -258,7 +258,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->  		.xres		= 240,		.yres		= 320,
->  		.pixclock	= KHZ2PICOS(4965),
->  
-> -		.left_margin	= 1,		.right_margin	= 33,
-> +		.left_margin	= 1,		.right_margin	= 34,
->  		.upper_margin	= 1,		.lower_margin	= 0,
->  		.hsync_len	= 5,		.vsync_len	= 1,
->  
-> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> index ad234cc..5e9a5ca 100644
-> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> @@ -197,7 +197,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->  		.xres		= 480,		.yres		= 272,
->  		.pixclock	= KHZ2PICOS(9000),
->  
-> -		.left_margin	= 1,		.right_margin	= 1,
-> +		.left_margin	= 1,		.right_margin	= 2,
->  		.upper_margin	= 40,		.lower_margin	= 1,
->  		.hsync_len	= 45,		.vsync_len	= 1,
->  
-> diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-> index 4f14b54..ad9e5c9 100644
-> --- a/arch/arm/mach-at91/board-sam9rlek.c
-> +++ b/arch/arm/mach-at91/board-sam9rlek.c
-> @@ -154,7 +154,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->  		.xres		= 240,		.yres		= 320,
->  		.pixclock	= KHZ2PICOS(4965),
->  
-> -		.left_margin	= 1,		.right_margin	= 33,
-> +		.left_margin	= 1,		.right_margin	= 34,
->  		.upper_margin	= 1,		.lower_margin	= 0,
->  		.hsync_len	= 5,		.vsync_len	= 1,
->  
-> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-> index 817ab60..816d528 100644
-> --- a/drivers/video/atmel_lcdfb.c
-> +++ b/drivers/video/atmel_lcdfb.c
-> @@ -393,7 +393,7 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
->  	var->lower_margin = min_t(u32, var->lower_margin,
->  			ATMEL_LCDC_VFP);
->  	var->right_margin = min_t(u32, var->right_margin,
-> -			(ATMEL_LCDC_HFP >> ATMEL_LCDC_HFP_OFFSET) + 1);
-> +			(ATMEL_LCDC_HFP >> ATMEL_LCDC_HFP_OFFSET) + 2);
->  	var->hsync_len = min_t(u32, var->hsync_len,
->  			(ATMEL_LCDC_HPW >> ATMEL_LCDC_HPW_OFFSET) + 1);
->  	var->left_margin = min_t(u32, var->left_margin,
-> @@ -578,7 +578,7 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
->  	lcdc_writel(sinfo, ATMEL_LCDC_TIM1, value);
->  
->  	/* Horizontal timing */
-> -	value = (info->var.right_margin - 1) << ATMEL_LCDC_HFP_OFFSET;
-> +	value = (info->var.right_margin - 2) << ATMEL_LCDC_HFP_OFFSET;
->  	value |= (info->var.hsync_len - 1) << ATMEL_LCDC_HPW_OFFSET;
->  	value |= (info->var.left_margin - 1);
->  	dev_dbg(info->device, "  * LCDTIM2 = %08lx\n", value);
+> Does it make sense to merge all the pm.h file in a single pm.h which
+> will be located in arch/arm/include/asm ?
 
+No it doesn't.  If moving something out of arch/arm means that we have to
+buggerize the header files, then moving it out of arch/arm is the wrong
+thing to do.  What the need to bugger about with header files is telling
+you is that the code you're moving (in its existing form) is intimitely
+tied to the SoC.
 
--- 
-Nicolas Ferre
+There's two solutions to that: either leave it where it is, or first
+sort out why it's intimitely tied, and what can be done to remove its
+dependence on the SoC.
+
+I've finally taken a deeper look at what's going on here... 
+
+arch/arm/mach-at91/pm.h is full of crap:
+
+#ifdef CONFIG_ARCH_AT91RM9200
+static inline u32 sdram_selfrefresh_enable(void)
+{
+...
+}
+#elif defined(CONFIG_ARCH_AT91CAP9)
+static inline u32 sdram_selfrefresh_enable(void)
+{
+...
+}
+#elif defined(CONFIG_ARCH_AT91SAM9G45)
+static inline u32 sdram_selfrefresh_enable(void)
+{
+...
+}
+#else
+static inline u32 sdram_selfrefresh_enable(void)
+{
+...
+}
+#endif
+
+And there's no way this should ever move out of arch/arm/mach-at91,
+ever.  It's a totally broken structure, and it needs fixing.  A first
+step, from just looking at the file, to fix this within the bounds of
+AT91 would be:
+
+struct at91_pm_ops {
+	u32 (*sdram_selfrefresh_enable)(void);
+	void (*sdram_selfrefresh_disable)(u32);
+	void (*wait_for_interrupt)(void);
+};
+
+in a header file, and then have the AT91RM9200, etc code providing
+a set of functions and operation structure to be registered with the
+core code.
+
+That reduces this pm.h file right down to just this structure
+definition.
+
+However, looking at pm.c though, is any of this really necessary?
+
+static int at91_pm_enter(suspend_state_t state)
+{
+        u32 saved_lpr;
+
+        at91_gpio_suspend();
+        at91_irq_suspend();
+
+Argh, why are these specific suspend calls here - why aren't these
+implemented using the syscore_ops stuff?  (Treat that as a separate
+complaint.)
+
+        switch (state) {
+                case PM_SUSPEND_MEM:
+
+Argh, why the extra indent (it's something which CodingStyle recommends
+against.)
+
+			...
+                case PM_SUSPEND_STANDBY:
+                        /*
+                         * NOTE: the Wait-for-Interrupt instruction needs to be
+                         * in icache so no SDRAM accesses are needed until the
+                         * wakeup IRQ occurs and self-refresh is terminated.
+                         * For ARM 926 based chips, this requirement is weaker
+                         * as at91sam9 can access a RAM in self-refresh mode.
+                         */
+                        asm volatile (  "mov r0, #0\n\t"
+                                        "b 1f\n\t"
+                                        ".align 5\n\t"
+                                        "1: mcr p15, 0, r0, c7, c10, 4\n\t"
+                                        : /* no output */
+                                        : /* no input */
+                                        : "r0");
+                        saved_lpr = sdram_selfrefresh_enable();
+                        wait_for_interrupt_enable();
+                        sdram_selfrefresh_disable(saved_lpr);
+                        break;
+
+This code has no guarantees what so ever that the compiler won't break
+it - and doing my suggestion above will break it.  Your
+wait_for_interrupt_enable() even calls out to other code in some cases.
+
+So, what I suggest instead is to have the 'standby' state call a SoC
+specific function, where you can have much better control over the
+code generation:
+
+void (*at91_standby)(void);
+...
+
+static int at91_pm_enter(suspend_state_t state)
+{
+        switch (state) {
+...
+	case PM_SUSPEND_STANDBY:
+		if (at91_standby)
+			at91_standby();
+		break;
+
+Then, have the SoC specific code implement a function in each SoC
+specific file:
+
+static void at91rm9200_standby(void)
+{
+	u32 lpr = at91_sys_read(AT91_SDRAMC_LPR);
+
+	asm volatile(
+		"b	1f\n\t"
+	"	.align	5\n\t"
+	"1:	mcr	p15, 0, %0, c7, c10, 4\n\t"
+	"	str	%1, [%2]\n\t"
+	"	str	%3, [%4]\n\t"
+	"	mcr	p15, 0, %0, c7, c0, 4\n\t"
+	"	str	%5, [%2]"
+		:
+		: "r" (0), "r" (0), "r" (virt-addr-of-LPR),
+		  "r" (1), "r" (virt-addr-of-SRR),
+		  "r" (lpr));
+}
+
+...
+
+void at91rm9200_init_early(void)
+{
+	at91_standby = at91rm9200_standby;
+}
+
+This makes sure that the code is aligned, and you know how those register
+writes are going to be done - and you know that they're going to be kept
+as one chunk of assembly.  This can also replace the buggy code found in
+cpuidle.c:
+
+                asm("b 1f; .align 5; 1:");
+                asm("mcr p15, 0, r0, c7, c10, 4");      /* drain write buffer */                saved_lpr = sdram_selfrefresh_enable();
+                cpu_do_idle();
+                sdram_selfrefresh_disable(saved_lpr);
+
+with a call to at91_standby().
+
+I think this has to be done _first_ before there's any thought about
+moving cpuidle out of arch/arm/mach-at91.
