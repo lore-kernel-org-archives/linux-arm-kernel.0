@@ -1,110 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 8 Jan 2012 21:42:25 -0800
-Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF and
- DDR
-In-Reply-To: <4F09D10B.7010807@ti.com>
-References: <1324303533-17458-1-git-send-email-aneesh@ti.com>
- <4EEFC23A.30201@gmail.com> <20111219233559.GW6464@atomide.com>
- <4EF0671B.7090508@ti.com> <4EF0824A.9060208@ti.com>
- <4EF096C9.1070808@ti.com> <4F09D10B.7010807@ti.com>
-Message-ID: <CAOesGMjFmM=gXddvFzW+BYqOedySjPVZ6hjwsF-F40Wr9BvSLg@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 9 Jan 2012 13:58:52 +0800
+Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
+In-Reply-To: <CAMPhdO9gaZQ0oQpfmvvL6MWP_6L9XCOdXYNSgjqDWLQ73XpRpw@mail.gmail.com>
+References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
+ <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
+ <20120108145254.GE20216@S2101-09.ap.freescale.net>
+ <20120108205504.GF29065@opensource.wolfsonmicro.com>
+ <20120109005603.GA1835@S2101-09.ap.freescale.net>
+ <4F0A613F.80509@gmail.com>
+ <CAMPhdO9gaZQ0oQpfmvvL6MWP_6L9XCOdXYNSgjqDWLQ73XpRpw@mail.gmail.com>
+Message-ID: <20120109055850.GW2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 09, 2012 at 01:05:39PM +0800, Eric Miao wrote:
+> >> ?/* Default string compare functions, Allow arch asm/prom.h to override */
+> >> ?#if !defined(of_compat_cmp)
+> >> ?#define of_compat_cmp(s1, s2, l) ? ? ? strcasecmp((s1), (s2))
+> >> -#define of_prop_cmp(s1, s2) ? ? ? ? ? ?strcmp((s1), (s2))
+> >> +#define of_prop_cmp(s1, s2) ? ? ? ? ? ?strcasecmp((s1), (s2))
+> >> ?#define of_node_cmp(s1, s2) ? ? ? ? ? ?strcasecmp((s1), (s2))
+> >> ?#endif
+> >
+> > Device-trees are case sensitive, so I don't think we want to go globally
+> > changing that behavior.
+> >
+> > If you want lower case names, then change the sgtl5000 code to lower
+> > case names.
+> 
+> +1, I'd vote for consistent lower case names.
+sgtl5000 is used by many other platforms too. I doubt why we do the
+big change just because it's convention or looks nice.
+As I said in other mails, I don't feel good about the lower case
+convention:
+ - hw spec or sch may use upper case, lower case don't reflect exact.
+ - the lower case rule might have to extend to other subsystems, for
+   example, regulator. I bet it's not the only case when we get more
+   and more DT bindings.
 
-On Sun, Jan 8, 2012 at 9:23 AM, Aneesh V <aneesh@ti.com> wrote:
-> Hi,
->
->
-> On Tuesday 20 December 2011 03:08 PM, Aneesh V wrote:
->>
->> Hi Benoit
->>
->> On Tuesday 20 December 2011 06:10 PM, Cousson, Benoit wrote:
->>>
->>> Hi Aneesh,
->>>
->>
->> <snip>
->>
->>>>>> In general, is it really feasible to parse the DTB before DDR is
->>>>>> initialized?
->>>>>
->>>>>
->>>>> Changing timings is still needed for DVFS during runtime.
->>>>>
->>>>> But we can boot to userspace with bootloader set timings, so I'm
->>>>
->>>>
->>>> As far as I understand, in the current out-of-tree DVFS implementation
->>>> for OMAP, DVFS can start even before user-space.
->>>
->>>
->>> Maybe it is the case, but that does not mean it should.
->>> We can potentially delay the DVFS init until the user-space is started.
->>> This should not be considered as a big constraint.
-
-Or at least until ramdisk is available, and store the tables there.
-It's a matter of seconds, delaying DVFS initialization until then
-shouldn't be the end of the world.
-
->>>
->>>>> thinking that maybe these timings should be just set by loadable
->>>>> modules. Just the configuration of which timings to select should
->>>>> be passed via DT. Something in compatible like:
->>>>>
->>>>> .compatible = "ti,omap3630", "sdram-micron-mt46h32m32lf-6";
->>>>>
->>>>> And that should allow the SDRC driver to only accept timings for
->>>>> "sdram-micron-mt46h32m32lf-6".
->>>>
->>>>
->>>> Do you mean one module per memory device and have all timing data in
->>>> the respective module? Wouldn't this clutter the kernel proper with all
->>>> these tables. By having the timing data in DT, it can be eventually
->>>> moved out of kernel eventually, right?
->>>
->>>
->>> Yes, that's the theory, but referring to Olof's point, this is not
->>> necessarily the goal of DT to store all the information that are not
->>> board dependent.
->>> In this case, each DDR will have it sets of well known AC timings data
->>> that will never depend of the board config. In this case, storing that
->>> inside DT might not be the best solution.
->>>
->>> In fact we always had the same kind of discussion for the pinmux data
->>> and for the clock data...
->>>
->>> The conclusion being that most of the static data does not have to be in
->>> the DTS.
->>> But since Linus was complaining about the huge amount of data inside the
->>> kernel, it is not obvious what the best solution is:-)
->>
->>
->> Hmm.. I get the point now. Linus' complaint is what I had in mind too.
->> My humble opinion is to have such data in DTS but re-use it as much as
->> possible. That is, we could have something like a "sdram-micron-
->> mt46h32m32lf-6.dtsi"(as you suggested before) that can be included by
->> board level DTS files. I think the fact that dts files are organized at
->> arch level today is limiting such re-use. Please correct me if I am
->> wrong.
->
->
-> Gentle reminder on this one. Are we aligned on having the DDR timings
-> in device tree?
-
-I didn't revisit the thread until today, unfortunately, but the
-approach suggested by Tony sounds quite intriguing: Only encode the
-memory chip id, and have the driver request firmware (not a module)
-for that model that contains the SPD (if it isn't provided by the
-memory module itself, which it rarely is on embedded platforms). That
-data can then be parsed by the kernel like regular SPD.
-
-As a second-best option, encoding in SPD format in the device-tree
-through dtsi files sounds like a reasonable approach: the format is
-already standardized and drivers who can already deal with i2c-based
-SPD data can just use it (with some minor changes).
-
-
--Olof
+Thanks
+Richard
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
