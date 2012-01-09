@@ -1,54 +1,53 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 9 Jan 2012 17:00:57 +0530
-Subject: [PATCH RFCv2] MFD: OMAP: USB: Make the runtime functions depend on
- CONFIG_PM_RUNTIME
-Message-ID: <1326108657-23595-1-git-send-email-shubhrajyoti@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Jan 2012 11:45:10 +0000
+Subject: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU
+ driver
+In-Reply-To: <CAHQjnONDAmH+zpSmmOCCs9aYxT+LJGso98=exf+_WFYKT=fE3A@mail.gmail.com>
+References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
+ <20120105091718.3fb378b2a1d390f9dd63c396@nvidia.com>
+ <20120105125326.GT11810@n2100.arm.linux.org.uk>
+ <CAHQjnONDAmH+zpSmmOCCs9aYxT+LJGso98=exf+_WFYKT=fE3A@mail.gmail.com>
+Message-ID: <20120109114510.GK21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the runtime functions are compiled regardless
-of CONFIG_PM_RUNTIME flag. This patch intends to fix the same by
-using SET_RUNTIME_PM_OPS.
+On Mon, Jan 09, 2012 at 09:39:48AM +0900, KyongHo Cho wrote:
+> On Thu, Jan 5, 2012 at 9:53 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Jan 05, 2012 at 09:17:18AM +0200, Hiroshi Doyu wrote:
+> >> Just for DMA mapping test from MPU side, the following one is used.
+> >
+> > This patch is buggy.
+> >
+> >> +static void dmaapi_test_map_page(struct device *dev)
+> >> +{
+> >> + ? ? struct page *page;
+> >> + ? ? dma_addr_t dma_addr;
+> >> + ? ? void *cpu_addr;
+> >> +
+> >> + ? ? page = alloc_page(GFP_KERNEL);
+> >> + ? ? BUG_ON(!page);
+> >> +
+> >> + ? ? dma_addr = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_TO_DEVICE);
+> >> + ? ? BUG_ON(!dma_addr);
+> >> +
+> >> + ? ? cpu_addr = kmap(page);
+> >> + ? ? BUG_ON(!cpu_addr);
+> >> + ? ? memset(cpu_addr, 0xa5, PAGE_SIZE);
+> >> + ? ? kunmap(cpu_addr);
+> >
+> > The DMA API works like this:
+> >
+> > - The CPU owns the page or buffer and can access it.
+> > - You map the page or buffer.
+> > - The device owns the page or buffer; the CPU must explicitly access it.
 
-Cc : Keshava Munegowda <keshava_mgowda@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
-applies on Tony's ehci branch.
-Compile tested only.
+Sorry, that 'must' should have been a 'must not'.
 
- drivers/mfd/omap-usb-host.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+> I don't understand what  "CPU must __explicitly__ access it" means.
+> 
+> Do you mean that CPU must access the mapped buffer when
+> it __explicitly__ knows that the access does not cause any side effect?
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 3f565ef..2896d6b 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -422,6 +422,7 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
- 	}
- }
- 
-+#ifdef CONFIG_PM_RUNTIME
- static int usbhs_runtime_resume(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
-@@ -489,6 +490,7 @@ static int usbhs_runtime_suspend(struct device *dev)
- 
- 	return 0;
- }
-+#endif
- 
- static void omap_usbhs_init(struct device *dev)
- {
-@@ -887,8 +889,8 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
- }
- 
- static const struct dev_pm_ops usbhsomap_dev_pm_ops = {
--	.runtime_suspend	= usbhs_runtime_suspend,
--	.runtime_resume		= usbhs_runtime_resume,
-+	SET_RUNTIME_PM_OPS(usbhs_runtime_suspend,
-+				usbhs_runtime_resume, NULL)
- };
- 
- static struct platform_driver usbhs_omap_driver = {
--- 
-1.7.1
+No - I mean that the program must not attempt to read or write the
+buffer.
