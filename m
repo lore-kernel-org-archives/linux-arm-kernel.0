@@ -1,42 +1,54 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 9 Jan 2012 13:30:05 -0800
-Subject: [RESEND PATCH v2 0/3] Tegra30 clockframework
-In-Reply-To: <1326123315-32670-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1326123315-32670-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 9 Jan 2012 22:46:34 +0100
+Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the
+ snapshot image size is anticipative
+In-Reply-To: <CAGsJ_4y+fQ14yDzD1FxtutD7b17KqK+voaywHAZuS0SXK5Z_xQ@mail.gmail.com>
+References: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
+ <201201082231.44510.rjw@sisk.pl>
+ <CAGsJ_4y+fQ14yDzD1FxtutD7b17KqK+voaywHAZuS0SXK5Z_xQ@mail.gmail.com>
+Message-ID: <201201092246.35170.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Monday, January 09, 2012 8:35 AM:
-> This patchset introduces the tegra30 clockframework. Clocks which require
-> voltage scaling are not included in this version. The implementation doesn't
-> use the generic clock code yet. It's the intention to move to it, once the
-> semantics are fully clarified.
+On Monday, January 09, 2012, Barry Song wrote:
+> 2012/1/9 Rafael J. Wysocki <rjw@sisk.pl>:
+> > On Friday, January 06, 2012, Barry Song wrote:
+> >> 2012/1/6 Pavel Machek <pavel@ucw.cz>:
+> >> > Hi!
+> >> >
+> >> > Is the check even useful these days? Should we remove it altogether?
+> >>
+> >> i think we can let users or distributions decide whether it is useful.
+> >> On PC, disk space is not an issue, people might run many applications
+> >> while doing hibernation, so snapshot is much big. an early check will
+> >> improve user experience because people don't need to wait a long time
+> >> and find space is not enough.
+> >> for embedded system, SoC solutions can know whether the space is
+> >> enough since they know what are running while doing hibernation, so
+> >> they can skip the check by setting the flag in sysfs.
+> >> that is why i had this patch sent.
+> >
+> > I agree with Pavel that it's better to drop the check altogether.
+> >
+> > The sysfs switch you're adding doesn't seem to be very useful, as PC
+> > users won't touch it and whoever needs it to be 0, will always set it
+> > that way and won't change it afterwards.
 > 
-> ---
+> ok. if we don't have the check, in case swap partition is not enough,
+> writing failure will happen, system still can restore to normal
+> status:
 > 
-> Changes in v2:
->  * Fix parent clocks for TWD. This makes the SMP configuration booting again.
+> for example, in the following test, only 27% data is written with a
+> small partition, "Restarting tasks ... done" will make system restore
+> to normal status.
+> 
+> [   11.2080 27%
+> [   11.403274] PM: Wrote uncompressed 34920 kbytes in 0.65 seconds (53.72 MB/s)
+> [   11.407649] PM: Wrote compressed 3500 kbytes in 0.65 seconds (5.38 MB/s)
+> [   11.447176] Restarting tasks ... done.
+> [   11.448801] ...
 
-Peter,
+That's exactly correct.
 
-This version seems to still boot as well as without these patches.
-
-I hacked some AUXDATA into board-dt-tegra30.c in an attempt to get SDHCI
-working, but found that:
-
-a) sdhci_add_host() fails due to:
-
-mmc0: Hardware doesn't specify timeout clock frequency.
-
-I haven't investigated why this happens.
-
-b) More directly related to these patches, when sdhci_add_host() fails,
-sdhci_tegra_probe() calls clk_disable() and clk_put() on its clock. One
-of these hangs somehow. I assume that's a bug in this clock patch?
-
-A couple of I2C devices did end up probing OK with these patches plus
-AUXDATA, although I doubt any I2C accesses were actually performed.
-
--- 
-nvpublic
+Thanks,
+Rafael
