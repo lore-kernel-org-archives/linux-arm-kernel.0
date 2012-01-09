@@ -1,48 +1,25 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 9 Jan 2012 16:12:51 +0100
-Subject: [PATCH 10/14] mmc: mmci: Cache MMCICLOCK and MMCIPOWER register
-In-Reply-To: <20120108102533.GA21765@n2100.arm.linux.org.uk>
-References: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
- <1323106560-5218-11-git-send-email-ulf.hansson@stericsson.com>
- <20120108102533.GA21765@n2100.arm.linux.org.uk>
-Message-ID: <4F0B03F3.4020005@stericsson.com>
+From: rob@ti.com (Rob Clark)
+Date: Mon, 9 Jan 2012 09:17:05 -0600
+Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <CAAQKjZMEsuib18RYE7OvZPUqhKnvrZ8i3+EMuZSXr9KPVygo_Q@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
+ <CAAQKjZPFh6666JKc-XJfKYePQ_F0MNF6FkY=zKypWb52VVX3YQ@mail.gmail.com>
+ <20120109081030.GA3723@phenom.ffwll.local>
+ <CAAQKjZMEsuib18RYE7OvZPUqhKnvrZ8i3+EMuZSXr9KPVygo_Q@mail.gmail.com>
+Message-ID: <CAF6AEGsTGOxyTX6Xijvm8UXGjtVTtYg5X5xfJo8D+47o+xU+bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+On Mon, Jan 9, 2012 at 4:10 AM, InKi Dae <daeinki@gmail.com> wrote:
+> note : in case of sharing a buffer between v4l2 and drm driver, the
+> memory info would be copied vb2_xx_buf to xx_gem or xx_gem to
+> vb2_xx_buf through sg table. in this case, only memory info is used to
+> share, not some objects.
 
-Russell King - ARM Linux wrote:
-> On Mon, Dec 05, 2011 at 06:35:56PM +0100, Ulf Hansson wrote:
->> Instead of reading a register value everytime we need to
->> apply a new value for it, maintain a cached copy for it.
->> This also means we are able to skip writes that are not
->> needed.
-> 
-> I'm not sure this is a good idea.  The ARM Primecells require a certain
-> number of bus clocks and MCLK periods between writes to both these
-> registers, and reading them back helps to ensure that we conform to
-> that requirement.  Maintaining a cached copy of them allows faster
-> writes to these registers which could cause that requirement to be
-> violated.
+which v4l2/vb2 patches are you looking at?  The patches I was using,
+vb2 holds a reference to the 'struct dma_buf *' internally, not just
+keeping the sg_table
 
-I were just about to update my patch according to your proposal, when I 
-realized the only place were the registers were previously "read before 
-write", were at an SDIO corner case in pio_write.
-
-Earlier the register values were always written, without considering the 
-old value. Thus the impact with this patch is kind of only decreasing 
-the number of writes and affects a corner case for SDIO.
-
-Do you anyway prefer to add a register "read before write" even if it 
-never has been needed before?
-
-> 
-> What you could do is read the register, modify, and check whether the
-> modification has had any effect before writing it back.  That will
-> allow unnecessary writes to still be skipped.
-> 
-
-Sorry for spamming you.
-
-BR
-Ulf Hansson
+BR,
+-R
