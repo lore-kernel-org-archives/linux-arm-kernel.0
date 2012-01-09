@@ -1,74 +1,57 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 09 Jan 2012 11:34:25 +0100
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
- remove unsupported 15bit modes
-In-Reply-To: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <4F0AC2B1.8010601@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Jan 2012 10:51:06 +0000
+Subject: [PATCH 3/4] dma: imx-dma: start transfer in issue_pending
+In-Reply-To: <1326101570-3716-4-git-send-email-s.hauer@pengutronix.de>
+References: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
+ <1326101570-3716-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120109105106.GI21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2011 04:52 PM, Peter Korsgaard :
-> Allow framebuffer to be configured in 16bit mode when panel is wired in
-> (the default) BGR configuration, and don't claim to support 15bit input
-> modes, which the LCD controller cannot handle.
+On Mon, Jan 09, 2012 at 10:32:49AM +0100, Sascha Hauer wrote:
+> The DMA API requires that transfers are started in issue_pending
+
+DMA engine API != DMA API.
+
+> instead of tx_submit. Fix this.
 > 
-> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
-
-Hi Peter,
-
-Sorry for not having more responsive concerning the two patches that you
-posted about atmel_lcdfb driver.
-
-
-I have a question though about this one...
-
-
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  drivers/video/atmel_lcdfb.c |   12 +++---------
->  1 files changed, 3 insertions(+), 9 deletions(-)
+>  drivers/dma/imx-dma.c |    9 ++++-----
+>  1 files changed, 4 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-> index 7ca3eaf..143f6d9 100644
-> --- a/drivers/video/atmel_lcdfb.c
-> +++ b/drivers/video/atmel_lcdfb.c
-> @@ -418,24 +418,18 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
->  		var->red.length = var->green.length = var->blue.length
->  			= var->bits_per_pixel;
->  		break;
-> -	case 15:
->  	case 16:
->  		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
->  			/* RGB:565 mode */
->  			var->red.offset = 11;
->  			var->blue.offset = 0;
-> -			var->green.length = 6;
-> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
-> -			var->red.offset = 10;
-> -			var->blue.offset = 0;
-> -			var->green.length = 5;
-
-Maybe I have missed something but I do not know why you are removing
-this part of the configuration? A board at least is using this wiring
-mode...
-
-
->  		} else {
-> -			/* BGR:555 mode */
-> +			/* BGR:565 mode */
->  			var->red.offset = 0;
-> -			var->blue.offset = 10;
-> -			var->green.length = 5;
-> +			var->blue.offset = 11;
->  		}
->  		var->green.offset = 5;
-> +		var->green.length = 6;
->  		var->red.length = var->blue.length = 5;
->  		break;
-
-Maybe we can separate both 15 and 16 cases but I do not know if we can
-remove completely the 15 RGB555 mode...
-
-Best regards,
--- 
-Nicolas Ferre
+> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+> index 4be55f9..217207b 100644
+> --- a/drivers/dma/imx-dma.c
+> +++ b/drivers/dma/imx-dma.c
+> @@ -186,8 +186,6 @@ static dma_cookie_t imxdma_tx_submit(struct dma_async_tx_descriptor *tx)
+>  
+>  	cookie = imxdma_assign_cookie(imxdmac);
+>  
+> -	imx_dma_enable(imxdmac->imxdma_channel);
+> -
+>  	spin_unlock_irq(&imxdmac->lock);
+>  
+>  	return cookie;
+> @@ -332,9 +330,10 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+>  
+>  static void imxdma_issue_pending(struct dma_chan *chan)
+>  {
+> -	/*
+> -	 * Nothing to do. We only have a single descriptor
+> -	 */
+> +	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+> +
+> +	if (imxdmac->status == DMA_IN_PROGRESS)
+> +		imx_dma_enable(imxdmac->imxdma_channel);
+>  }
+>  
+>  static int __init imxdma_probe(struct platform_device *pdev)
+> -- 
+> 1.7.7.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
