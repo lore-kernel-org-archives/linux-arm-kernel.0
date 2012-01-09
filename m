@@ -1,28 +1,42 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Mon, 9 Jan 2012 13:05:39 +0800
-Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <4F0A613F.80509@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Jan 2012 13:27:22 +0800
+Subject: [PATCH 6/6] ARM: imx6q-sabrelite: add audmux support
+In-Reply-To: <20120109011948.GB1835@S2101-09.ap.freescale.net>
 References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
- <20120108145254.GE20216@S2101-09.ap.freescale.net>
- <20120108205504.GF29065@opensource.wolfsonmicro.com>
- <20120109005603.GA1835@S2101-09.ap.freescale.net> <4F0A613F.80509@gmail.com>
-Message-ID: <CAMPhdO9gaZQ0oQpfmvvL6MWP_6L9XCOdXYNSgjqDWLQ73XpRpw@mail.gmail.com>
+ <1325820343-11875-7-git-send-email-richard.zhao@linaro.org>
+ <20120108150234.GF20216@S2101-09.ap.freescale.net>
+ <20120108145813.GA23822@b20223-02.ap.freescale.net>
+ <20120109011948.GB1835@S2101-09.ap.freescale.net>
+Message-ID: <20120109052719.GH1835@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> ?/* Default string compare functions, Allow arch asm/prom.h to override */
->> ?#if !defined(of_compat_cmp)
->> ?#define of_compat_cmp(s1, s2, l) ? ? ? strcasecmp((s1), (s2))
->> -#define of_prop_cmp(s1, s2) ? ? ? ? ? ?strcmp((s1), (s2))
->> +#define of_prop_cmp(s1, s2) ? ? ? ? ? ?strcasecmp((s1), (s2))
->> ?#define of_node_cmp(s1, s2) ? ? ? ? ? ?strcasecmp((s1), (s2))
->> ?#endif
->
-> Device-trees are case sensitive, so I don't think we want to go globally
-> changing that behavior.
->
-> If you want lower case names, then change the sgtl5000 code to lower
-> case names.
+On Mon, Jan 09, 2012 at 09:19:50AM +0800, Shawn Guo wrote:
+> On Sun, Jan 08, 2012 at 10:58:14PM +0800, Richard Zhao wrote:
+> > On Sun, Jan 08, 2012 at 11:02:36PM +0800, Shawn Guo wrote:
+> > > On Fri, Jan 06, 2012 at 11:25:43AM +0800, Richard Zhao wrote:
+> > > > --- a/arch/arm/boot/dts/imx6q.dtsi
+> > > > +++ b/arch/arm/boot/dts/imx6q.dtsi
+> > > > @@ -527,7 +527,9 @@
+> > > >  			};
+> > > >  
+> > > >  			audmux at 021d8000 {
+> > > > +				compatible = "fsl,audmux-v2";
+> > > 
+> > > This is not a good compatible string, because the version number is
+> > > not defined by hardware.  Even it is defined by hardware, the version
+> > > number is not as stable as soc to identify specific hardware block.
+> > > You can look at uart, cspi, sdma etc. for examples.
+> > compatible = "fsl,imx6q-audmux", "fsl,imx25-audmux";
+> > I forgot imx25 or imx31 is oldest. Is it ok for you?
+> > 
+> Yes.
 
-+1, I'd vote for consistent lower case names.
+Forgot mentioning that imx31 was born earlier than imx25, so I would
+expect it be: 
+
+	compatible = "fsl,imx6q-audmux", "fsl,imx31-audmux";
+
+-- 
+Regards,
+Shawn
