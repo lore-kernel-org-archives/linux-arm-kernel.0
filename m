@@ -1,44 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  9 Jan 2012 16:45:45 -0600
-Subject: [PATCH 5/6] ARM: highbank: remove incorrect BSYM usage
-In-Reply-To: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
-References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326149146-19756-6-git-send-email-robherring2@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Jan 2012 22:49:46 +0000
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <4F0B182D.7060507@us.ibm.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+Message-ID: <20120109224945.GA23090@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Mon, Jan 09, 2012 at 04:39:09PM +0000, Maynard Johnson wrote:
+> On 01/08/2012 8:58 PM, Lik Lik wrote:
+> > Hi all,
 
-BSYM macro is only needed for assembly files and its usage in c files is
-wrong, so remove it. The linker will correctly set bit 0 for Thumb2
-kernels.
+Hi guys [adding a bunch of people to CC because this issue is really
+annoying me now],
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/mach-highbank/highbank.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+> > I am an oprofile user and I need to profile one of my applications on a TI OMAP4
+> > platform (pandaboard, to be specific). I have ubuntu 11.10 installed. My problem
+> > is that oprofile always use the timer interrupt mode but doesn't recognize the
+> > hardware counters, which I am sure my platform has.
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 804c4a5..7afbe1e 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -25,7 +25,6 @@
- #include <linux/smp.h>
- 
- #include <asm/cacheflush.h>
--#include <asm/unified.h>
- #include <asm/smp_scu.h>
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/timer-sp.h>
-@@ -76,7 +75,7 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
- #ifdef CONFIG_SMP
- 	cpu = cpu_logical_map(cpu);
- #endif
--	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
-+	writel(virt_to_phys(jump_addr), HB_JUMP_TABLE_VIRT(cpu));
- 	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
- 	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
- 			  HB_JUMP_TABLE_PHYS(cpu) + 15);
--- 
-1.7.5.4
+First and foremost, we can't currently generate PMU interrupts on OMAP4 in
+mainline. There are some additional patches required for these to work:
+
+http://marc.info/?l=linux-arm-kernel&m=131946761428296&w=2
+
+However, as Stephane has pointed out here:
+
+http://marc.info/?l=linux-omap&m=132585784125352&w=2
+
+the interrupts still don't seem to work, even with the patches above
+applied.
+
+Ming Lei doesn't seem to be replying to email anymore, so maybe somebody
+else on linux-omap could please help us? I'm hoping that we're just missing
+some patches from somewhere, but it would be great if somebody could verify
+this (and indeed, verify that the interrupts we're registering in the thread
+above look sane).
+
+> OProfile userspace support for ARM Cortex-A9 was added by Will Deacon in June 
+> 2010.  This support is available in OProfile 0.9.7.  According to Will's 
+> posting, the kernel support was due to be added to Ubuntu Maverick, so I would 
+> expect your version should support CA9 out of the box.  If not already using 
+> oprofile 0.9.7, please upgrade to that version and retry.  If it still doesn't 
+> work, please re-post with complete information (kernel version, oprofile command 
+> output, and contents of /dev/oprofile/cpu_type).
+
+If with the latest OProfile, `timer mode' is still reported then you should
+check that you have CONFIG_HW_PERF_EVENTS enabled in your kernel. It still
+won't work though, because of the problems I mentioned above.
+
+Cheers,
+
+Will
