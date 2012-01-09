@@ -1,76 +1,20 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 09 Jan 2012 08:46:23 -0600
-Subject: [PATCH 1/2] at91 : move pm.h header to arch/arm/include/asm
-In-Reply-To: <4F0AF198.1030803@linaro.org>
-References: <1325864915-794-1-git-send-email-daniel.lezcano@linaro.org>
- <201201061730.33525.arnd.bergmann@linaro.org> <4F0ACD35.1000600@linaro.org>
- <20120109112920.GJ21765@n2100.arm.linux.org.uk> <4F0AF198.1030803@linaro.org>
-Message-ID: <4F0AFDBF.9050704@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Jan 2012 14:46:27 +0000
+Subject: [PATCH v4 2/2] dma/imx-sdma: convert _raw_readl/_raw_writel to
+ readl/writel
+In-Reply-To: <20120109142125.GA1854@richard-laptop>
+References: <1326033862-25351-1-git-send-email-richard.zhao@linaro.org>
+ <1326033862-25351-3-git-send-email-richard.zhao@linaro.org>
+ <20120109115143.GL21765@n2100.arm.linux.org.uk>
+ <20120109142125.GA1854@richard-laptop>
+Message-ID: <20120109144627.GR21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2012 07:54 AM, Daniel Lezcano wrote:
-> -----BEGIN PGP SIGNED MESSAGE-----
-> Hash: SHA1
-> 
-> On 01/09/2012 12:29 PM, Russell King - ARM Linux wrote:
->> On Mon, Jan 09, 2012 at 12:19:17PM +0100, Daniel Lezcano wrote:
->>> Actually, the header moves from :
->>>
->>> 	arch/arm/mach-at91/pm.h
->>> to:
->>> 	arch/arm/include/asm/at91_pm.h.
->>>
->>> This place and the renaming of the file complies with the comments of
->>> Russell,
->>
->> No it doesn't.  There's absolutely no way in hell I want arch/arm/include/asm
->> to be littered with hundreds of crappy platform specific header files.
-> 
-> Ok. Actually there are 9 pm.h files but I agree with a domino effect we
-> can have more header files brought to this directory like "control.h",
-> "powerdomain.h", etc ...
-> 
-> Does it make sense to merge all the pm.h file in a single pm.h which
-> will be located in arch/arm/include/asm ?
-> 
-> And we separate the different archs specific with #ifdef
-> CONFIG_ARCH_AT91, CONFIG_ARCH_OMAP, etc ...
-> 
-> The resulting file will be bigger but that will be easier to find a
-> pattern we can factor out in the header file and that will encourage the
-> developers to share the code across the different arch.
-> 
+On Mon, Jan 09, 2012 at 10:21:28PM +0800, Richard Zhao wrote:
+> Freescale power pc also has sdma, I guess we can use _relaxed till they
+> tend to use the same driver ( I don't know when).
 
-No!! Is moving this even necessary with Rob Lee's common cpuidle driver?
-There obviously needs to be some coordination here.
-
-wait_for_interrupt_enable is not used by cpuidle, so you can move that
-into pm.c. SDRAM self-refresh setup may be common enough we can define
-standard function ptrs for that and move more code into the common
-cpuidle driver.
-
-Rob
-
-> Thanks
->   -- Daniel
-> 
-> - -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1.4.11 (GNU/Linux)
-> Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
-> 
-> iQEcBAEBAgAGBQJPCvGYAAoJEAKBbMCpUGYAGTMH/iLSep3kiUfxJiDLlxLoPkcs
-> pyvJGnD/leJOvykxd6QQ3dCs+4i2tbYnMEGVtfYWbTHOraOTa1u5oRcS/F0yNOYu
-> kifKYyLKJPT9lkYlaDBU9/cWZDhHdAQpu+2vKnVDIJLeSwBDxCEROoPQaWGs2cnw
-> 0k06iCE/Zq9V5duFE/u7n0RX7XpJCLmdMcRDRw2GW7WuZ6DA2BeU2MEFudQ1NLK1
-> bB9zyVVCBxPVVdqjgaSagU0LTCPUeHALsYQVUqpPYMuYK30/ACyakyA/jLFn52lD
-> x47ybOuLOGSl4c0/wS1duCBbIFNYsT/kBcVXFXA/usAaCjW12H7OV+9MEA7lB8E=
-> =y5HS
-> -----END PGP SIGNATURE-----
+The answer to that is to persuade powerpc to gain the _relaxed versions
+(which can simply call the non-relaxed versions as a first stab.)  They
+have the readx_relaxed() stuff already.
