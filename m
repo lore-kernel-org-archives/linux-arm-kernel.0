@@ -1,53 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Jan 2012 14:12:14 +0000
-Subject: [PATCH v4 2/2] dma/imx-sdma: convert _raw_readl/_raw_writel to
- readl/writel
-In-Reply-To: <CAMPhdO84p=0D3KrrFnwup4igoh4oNWXOCbW+BOkoRiC8m=JnmQ@mail.gmail.com>
-References: <1326033862-25351-1-git-send-email-richard.zhao@linaro.org>
- <1326033862-25351-3-git-send-email-richard.zhao@linaro.org>
- <20120109115143.GL21765@n2100.arm.linux.org.uk>
- <CAMPhdO84p=0D3KrrFnwup4igoh4oNWXOCbW+BOkoRiC8m=JnmQ@mail.gmail.com>
-Message-ID: <20120109141214.GP21765@n2100.arm.linux.org.uk>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 9 Jan 2012 15:12:45 +0100
+Subject: [PATCH 12/14] mmc: mmci: Decrease current consumption in	suspend
+In-Reply-To: <20120108103823.GB21765@n2100.arm.linux.org.uk>
+References: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
+ <1323106560-5218-13-git-send-email-ulf.hansson@stericsson.com>
+ <20120108103823.GB21765@n2100.arm.linux.org.uk>
+Message-ID: <4F0AF5DD.8080707@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 09:25:12PM +0800, Eric Miao wrote:
-> Does this also mean when endian conversion is not necessary, the __raw_*
-> version will be better here? Or generally the _relaxed variants are more
-> recommended as endian conversion will be optimized away anyway with
-> these AMBA accesses as both sides are little-endian?
+Russell King - ARM Linux wrote:
+> On Mon, Dec 05, 2011 at 06:35:58PM +0100, Ulf Hansson wrote:
+>> To decrease current consumption in suspend state the
+>> VCORE regulator, the MCLK and PCLK for the ARM PL18x
+>> are now disabled.
+>>
+>> When resuming the resourses are re-enabled and
+>> register values for MMCICLOCK, MMCIPOWER and MMCIMASK0
+>> are restored.
+> 
+> I still do not agree with this.  The MMC core driver should be shutting
+> down the interface (turning off the MMC clock, disabling the MMC power).
+> And indeed it does:
+> 
+> int mmc_suspend_host(struct mmc_host *host)
+> {
+> ...
+>         if (!err && !mmc_card_keep_power(host))
+>                 mmc_power_off(host);
+> }
+> 
 
-Useless endian conversions are always optimized away.  Here's the
-definitions:
+If mmc_power_off gets called, this will mean cutting the power to the 
+card. Either through the MMCIPOWER register(ARM rimecells) or by using 
+the host->vcc regulator (ST-versions). Similar actions is done for 
+MMCICLOCK register, which in the end means the clock to the card gets gated.
 
-If your CPU is operating in little endian mode, for 32-bit and 16-bit:
+The MCLK (host->clk), the PCLK (amba_pclk) and the regulator 
+(amba_vcore) is not disabled. This should only be handled during probe, 
+suspend/resume and remove I believe.
 
-#define __cpu_to_le32(x) ((__force __le32)(__u32)(x))
-#define __le32_to_cpu(x) ((__force __u32)(__le32)(x))
-#define __cpu_to_le16(x) ((__force __le16)(__u16)(x))
-#define __le16_to_cpu(x) ((__force __u16)(__le16)(x))
+> void mmc_power_off(struct mmc_host *host)
+> {
+> ...
+>         host->ios.power_mode = MMC_POWER_OFF;
+>         host->ios.bus_width = MMC_BUS_WIDTH_1;
+>         host->ios.timing = MMC_TIMING_LEGACY;
+>         mmc_set_ios(host);
+> ...
+> }
+> 
+> On ARM primecells we can _not_ go from power off to power on without
+> first going through the power up state, so this simple save-and-restore
+> will not do - we have to go through the proper power up sequence.
 
-So these are just casts to keep sparse happy and able to check this stuff.
+This will be handled when doing mmc_resume_host so there should be no 
+problems for ARM Primecells. It might be the naming of these functions 
+that kind of confuses you at this state. For runtime PM, these names 
+(mmci_save and mmci_restore) make more sence. :-) Right now they are 
+kind of only used for "enable"/"disable" clocks and regulators.
 
-#define __cpu_to_be32(x) ((__force __be32)__swab32((x)))
-#define __be32_to_cpu(x) __swab32((__force __u32)(__be32)(x))
-#define __cpu_to_be16(x) ((__force __be16)__swab16((x)))
-#define __be16_to_cpu(x) __swab16((__force __u16)(__be16)(x))
+I can change the patch to only do the enable/disable part if you like 
+that better at this stage. But since the earlier version of suspend 
+function reset the MMCIMASK0 to zero, I thought reseting the other 
+registers as well would be okay at this stage.
 
-These do the endian conversion.
+If you review the patch "mmci: Implement PM runtime callbacks to save 
+power" together with this one, it should hopefully bring you more 
+clarity how I have thought around this hole thing.
 
-If your CPU is running in big endian mode:
+> 
+> Why do you think that the MMC core is not shutting down the power and
+> clock registers on suspend?
+> 
 
-#define __cpu_to_le32(x) ((__force __le32)__swab32((x)))
-#define __le32_to_cpu(x) __swab32((__force __u32)(__le32)(x))
-#define __cpu_to_le16(x) ((__force __le16)__swab16((x)))
-#define __le16_to_cpu(x) __swab16((__force __u16)(__le16)(x))
-
-So these do the endian conversion, and:
-
-#define __cpu_to_be32(x) ((__force __be32)(__u32)(x))
-#define __be32_to_cpu(x) ((__force __u32)(__be32)(x))
-#define __cpu_to_be16(x) ((__force __be16)(__u16)(x))
-#define __be16_to_cpu(x) ((__force __u16)(__be16)(x))
-
-These are just casts.
+Br
+Ulf Hansson
