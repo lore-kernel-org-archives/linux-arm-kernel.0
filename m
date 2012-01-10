@@ -1,204 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 10 Jan 2012 09:34:00 +0100
-Subject: [PATCH v4] ARM: at91: pit add DT support
-In-Reply-To: <20120109173917.GO2854@game.jcrosoft.org>
-References: <1325784348-29481-1-git-send-email-nicolas.ferre@atmel.com>
- <1325866830-13259-1-git-send-email-nicolas.ferre@atmel.com>
- <4F071799.3030200@gmail.com> <20120109173917.GO2854@game.jcrosoft.org>
-Message-ID: <4F0BF7F8.40001@atmel.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 10 Jan 2012 16:38:43 +0800
+Subject: [RFC PATCH v3 3/5] pinctrl: imx: add pinctrl imx driver
+In-Reply-To: <20120109063136.GI1835@S2101-09.ap.freescale.net>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-4-git-send-email-b29396@freescale.com>
+ <20120108130542.GC2203@richard-laptop>
+ <20120109020848.GF1835@S2101-09.ap.freescale.net>
+ <20120109021702.GV2414@b20223-02.ap.freescale.net>
+ <20120109063136.GI1835@S2101-09.ap.freescale.net>
+Message-ID: <20120110083842.GA2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2012 06:39 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 09:47 Fri 06 Jan     , Rob Herring wrote:
->> On 01/06/2012 10:20 AM, Nicolas Ferre wrote:
->>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>>
->>> Retreive registers address and IRQ from device tree entry. Fall back
->>> to built-in values if an error occurs.
->>>
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> [nicolas.ferre at atmel.com: change error path and interrupts property handling]
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
->>> Acked-by: Rob Herring <rob.herring@calxeda.com>
->>> ---
->>> v4: - change of_at91sam926x_pit_init() return value usage logic as
->>>       suggested by Rob Herring
->>>     - irq_of_parse_and_map() returns 0 on error: change test according to 
->>>       Grant Likely note.
->>>
->>> v3: - use irq_of_parse_and_map() for handling irq numbers specified by DT.
->>>       Correction proposed by Jamie Iles.
->>>
->>> v2: - new specification of irq numbers in DT (due to modification of AIC code)
->>>     - new error path in of_at91sam926x_pit_init()
->>>     - fall back to built-in values if an error occurs
->>>     - use of of_property_read_u32() to get irq property
->>>
->>>  .../devicetree/bindings/arm/atmel-at91.txt         |    8 +++
->>>  arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 ++
->>>  arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++
->>>  arch/arm/mach-at91/at91sam926x_time.c              |   60 ++++++++++++++++++--
->>>  4 files changed, 73 insertions(+), 6 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
->>> new file mode 100644
->>> index 0000000..380f711
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
->>> @@ -0,0 +1,8 @@
->>> +Atmel AT91 device tree bindings.
->>> +================================
->>> +
->>> +PIT Timer required properties:
->>> +- compatible: Should be "atmel,at91sam9260-pit"
->>> +- reg: Should contain registers location and length
->>> +- interrupts: Should contain interrupt for the PIT which is the IRQ line
->>> +  shared across all System Controller members.
->>> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
->>> index ea942b5..e10842a 100644
->>> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
->>> @@ -57,6 +57,11 @@
->>>  				reg = <0xfffff000 0x200>;
->>>  			};
->>>  
->>> +			pit: timer at fffffd30 {
->>> +				compatible = "atmel,at91sam9260-pit";
->>> +				reg = <0xfffffd30 0xf>;
->>> +				interrupts = <1 4>;
->>> +			};
->>>  
->>>  			pioA: gpio at fffff400 {
->>>  				compatible = "atmel,at91rm9200-gpio";
->>> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
->>> index ebc9617..28a678f 100644
->>> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
->>> @@ -58,6 +58,12 @@
->>>  				reg = <0xfffff000 0x200>;
->>>  			};
->>>  
->>> +			pit: timer at fffffd30 {
->>> +				compatible = "atmel,at91sam9260-pit";
->>> +				reg = <0xfffffd30 0xf>;
->>> +				interrupts = <1 4>;
->>> +			};
->>> +
->>>  			dma: dma-controller at ffffec00 {
->>>  				compatible = "atmel,at91sam9g45-dma";
->>>  				reg = <0xffffec00 0x200>;
->>> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
->>> index d89ead7..802fea3 100644
->>> --- a/arch/arm/mach-at91/at91sam926x_time.c
->>> +++ b/arch/arm/mach-at91/at91sam926x_time.c
->>> @@ -14,6 +14,9 @@
->>>  #include <linux/kernel.h>
->>>  #include <linux/clk.h>
->>>  #include <linux/clockchips.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/of_irq.h>
->>>  
->>>  #include <asm/mach/time.h>
->>>  
->>> @@ -133,7 +136,8 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
->>>  static struct irqaction at91sam926x_pit_irq = {
->>>  	.name		= "at91_tick",
->>>  	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
->>> -	.handler	= at91sam926x_pit_interrupt
->>> +	.handler	= at91sam926x_pit_interrupt,
->>> +	.irq		= AT91_ID_SYS,
->>>  };
->>>  
->>>  static void at91sam926x_pit_reset(void)
->>> @@ -149,6 +153,49 @@ static void at91sam926x_pit_reset(void)
->>>  	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
->>>  }
->>>  
->>> +#ifdef CONFIG_OF
->>> +static struct of_device_id timer_ids[] = {
->>> +	{ .compatible = "atmel,at91sam9260-pit" },
->>> +	{ /* sentinel */ }
->>> +};
->>> +
->>> +static int __init of_at91sam926x_pit_init(void)
->>> +{
->>> +	struct device_node	*np;
->>> +	int			ret;
->>> +
->>> +	np = of_find_matching_node(NULL, timer_ids);
->>> +	if (!np)
->>> +		goto err;
->>> +
->>> +	pit_base_addr = of_iomap(np, 0);
->>> +	if (!pit_base_addr)
->>> +		goto node_err;
->>> +
->>> +	/* Get the interrupts property */
->>> +	ret = irq_of_parse_and_map(np, 0);
->>> +	if (!ret)
->>> +		goto ioremap_err;
->>> +	at91sam926x_pit_irq.irq = ret;
->>> +
->>> +	of_node_put(np);
->>> +
->>> +	return 0;
->>> +
->>> +ioremap_err:
->>> +	iounmap(pit_base_addr);
->>> +node_err:
->>> +	of_node_put(np);
->>> +err:
->>> +	return -EINVAL;
->>> +}
->>> +#else
->>> +static int __init of_at91sam926x_pit_init(void)
->>> +{
->>> +	return -EINVAL;
->>> +}
->>> +#endif
->>> +
->>>  /*
->>>   * Set up both clocksource and clockevent support.
->>>   */
->>> @@ -177,7 +224,7 @@ static void __init at91sam926x_pit_init(void)
->>>  	clocksource_register_hz(&pit_clk, pit_rate);
->>>  
->>>  	/* Set up irq handler */
->>> -	setup_irq(AT91_ID_SYS, &at91sam926x_pit_irq);
->>> +	setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
->>>  
->>>  	/* Set up and register clockevents */
->>>  	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
->>> @@ -193,10 +240,11 @@ static void at91sam926x_pit_suspend(void)
->>>  
->>>  void __init at91sam926x_ioremap_pit(u32 addr)
->>>  {
->>> -	pit_base_addr = ioremap(addr, 16);
->>> -
->>> -	if (!pit_base_addr)
->>> -		panic("Impossible to ioremap PIT\n");
->>> +	if (of_at91sam926x_pit_init() < 0) {
->>> +		pit_base_addr = ioremap(addr, 16);
->>> +		if (!pit_base_addr)
->>> +			panic("Impossible to ioremap PIT\n");
->>> +	}
->>
->> This is not what I meant. I meant call either at91sam926x_ioremap_pit or
->> of_at91sam926x_pit_init. Don't nest the calls and keep the OF and non-OF
->> init somewhat separate. The fact that you are passing in the physical
->> address and then ignoring it for the OF case is what I have issue with.
+On Mon, Jan 09, 2012 at 02:32:12PM +0800, Shawn Guo wrote:
+> On Mon, Jan 09, 2012 at 10:17:03AM +0800, Richard Zhao wrote:
+> > On Mon, Jan 09, 2012 at 10:08:51AM +0800, Shawn Guo wrote:
+> > > On Sun, Jan 08, 2012 at 09:05:44PM +0800, Richard Zhao wrote:
+> > > > > +enum imx_imx53_pinctrl_pads {
+> > > > > +	MX53_GPIO_19 = 0,
+> > > > > +	MX53_KEY_COL0 = 1,
+> > > > > +	MX53_KEY_ROW0 = 2,
+> > > > > +	MX53_KEY_COL1 = 3,
+> > > > > +	MX53_KEY_ROW1 = 4,
+> > > > > +	MX53_KEY_COL2 = 5,
+> > > > > +	MX53_KEY_ROW2 = 6,
+> > > > ...
+> > > > Why not describe it in dts and make this file generic for imx?
+> > > > One node for one pad,
+> > > 
+> > > Doing this will bloat the device tree dramatically.  Actually I had
+> > > a patch doing so before the pinctrl subsystem was born, but it
+> > > concerned Grant a lot for that reason and thus died.
+> > are you against describing pad in dts or one node per pad?
+> > one node per pad is just a tip to extend pad property, to support
+> > other features (pinconf in your word).
 > 
-> the DT pure soc will pass NULL for soc that support both or only non of we
-> pass the PHY addr
+> I definitely want to describe pinconf in device tree, though what's
+> the best interface for pinctrl client driver to talk to pinconf is
+> still vague to me.
+> 
+> > > 
+> > > > it'll be easy to extend pad properties. You know
+> > > > the pad may set pull up/down, open drain, drive strenth, daisy chain etc.
+> > > > The features have to be supported, to make your model usefull.
+> > > > 
+> > > As Aisheng mentioned, the pinconf support will be added later.
+> > I expect pinconf come together, and get a ready-to-use patch series.
+> > 
+> As I was educated by Linus.W, we can not drink ocean and we need to
+> split big chunk of work into pieces and achieve it step by step.
+Sure, we can not drink out the ocean :). But if people can not use it
+in real case, how do we verify the driver? How do we know the driver
+goes in the right way?
 
-Yes, but don't your prefer to have another call that we can use as the
-interface? In the future we will only have DT enabled SoC so maintaining
-the need for this NULL parameter does not make much sense...
-
-Bye,
--- 
-Nicolas Ferre
+Thanks
+Richard
+> 
+> -- 
+> Regards,
+> Shawn
+> 
