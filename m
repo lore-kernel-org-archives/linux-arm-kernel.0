@@ -1,45 +1,38 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Tue, 10 Jan 2012 12:35:50 -1000
-Subject: [PATCH] ARM: vexpress: initial device tree support
-In-Reply-To: <4F0CB485.9010106@freescale.com>
-References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
- <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
- <4F0B897A.20502@firmworks.com>
- <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
- <4F0CB485.9010106@freescale.com>
-Message-ID: <4F0CBD46.2010909@firmworks.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 10 Jan 2012 22:37:13 +0000
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <201201102013.54958.arnd@arndb.de>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <alpine.LFD.2.02.1201101341040.2722@xanadu.home>
+ <20120110184643.GF7164@opensource.wolfsonmicro.com>
+ <201201102013.54958.arnd@arndb.de>
+Message-ID: <20120110223712.GL7164@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/10/2012 11:58 AM, Timur Tabi wrote:
-> Jamie Lokier wrote:
->
->> It still needs to know *which* I2C bus master is connected to the
->> display. Some graphics hardware has multiple, e.g. one to talk with
->> the DVI/HDMI transmitter, another connected by cable to the display.
->
-> Yes, this is my problem.  I have multiple I2C busses on my system, and there's no way to guess which one is connected to the DVI port.  A phandle in the device tree is the only way I can figure out which I2C bus to use.  But there's another problem.  I can use of_find_i2c_device_by_node() to determine the i2c_client (and therefore, the i2c_adapter) to use for fb_ddc_read().  However, that function only works if the I2C device was probed.  That typically is done by the I2C driver for the device, but there is no "edid" device driver.  So my framebuffer driver is going to have to pretend to be one.
+On Tue, Jan 10, 2012 at 08:13:54PM +0000, Arnd Bergmann wrote:
+> On Tuesday 10 January 2012, Mark Brown wrote:
 
-It seems to me that having the framebuffer driver handle the EDID 
-"driver" function is exactly the right thing.  The framebuffer driver is 
-the only thing that cares about EDID information.  Given a phandle 
-reference to an I2C interface, the "driver" is just "call the I2C read 
-routine" - plus, in your case, toggling the GPIO pin.
+> > That sounds like it'd be helpful overall but it's something that has to
+> > be sorted out at the maintainer level.  I'm guessing there's not really
+> > much that contributors can do here?
 
-That GPIO pin thing is annoying, but not sufficiently complex or common 
-that it warrants having a separate EDID driver.  You could define a 
-platform-specific property to tell your framebuffer driver that it needs 
-to do that GPIO thing.  It's a hack, but the GPIO thing is inherently a 
-hack, so there will be some ugliness somewhere as a result.
+> I think you did everything as good as you could, we just need to routinely
+> call for everyone to submit stuff in time. A number of maintainers sent stuff
+> after Christmas (which I expected to start the merge window) and were mostly
+> lucky because Linus gave us an extra 10 days to sort things out.
 
->
-> I wish there were some way to obtain the i2c_adapter struct more easily.
->
->> I have worked with devices that shared the same I2C for DDC and
->> talking with on-board devices. (That was a bad idea, as some monitors
->> clamp the lines high or low excessively even when switched off.) Point
->> here is sometimes there's a dedicated one for DDC; sometimes there isn't.
->
-> I also have this problem.  I need to toggle a GPIO in order to get the I2C bus connected to the DVI port.  The same I2C bus is used for the audio codec and a bunch of other devices.  Our SOC has four I2C busses, so I don't understand why the board designed didn't dedicate one for the DDC.  But I can easily work around this issue.
->
->
+I guess it would also be useful to have some way to compare what's in
+-next with what's in the arm-soc tree and chase people if that diff gets
+big.  I do also wonder if it's worth letting people push stuff to you
+more aggressively - right now you seem to be asking people to batch
+things up and I wonder if that's making it a it easier for things to end
+up dropping on the floor if a time based routine isn't working well for
+people.
+
+> end, samsung also did for the most part but not entirely and you were
+> unfortunate to be the contributor of the patches that missed out.
+
+It's not just me, I'm just vocal and perhaps more to the point spend a
+reasonable amount of time chasing stuff into various trees so want to
+figure out if I need to change what I'm doing with that.
