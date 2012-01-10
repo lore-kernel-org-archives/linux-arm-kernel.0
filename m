@@ -1,21 +1,26 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 10 Jan 2012 12:44:15 -0800
-Subject: [GIT PULL] msm fix for v3.2-rc.
-In-Reply-To: <20120109233439.GA13911@codeaurora.org>
-References: <20120109233439.GA13911@codeaurora.org>
-Message-ID: <20120110204415.GA31264@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Jan 2012 21:06:08 +0000
+Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode, remove
+ unsupported 15bit modes
+In-Reply-To: <20120110140218.GB7180@jl-vm1.vm.bytemark.co.uk>
+References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
+ <4F0AC2B1.8010601@atmel.com> <87ty45dt89.fsf@macbook.be.48ers.dk>
+ <20120110140218.GB7180@jl-vm1.vm.bytemark.co.uk>
+Message-ID: <20120110210608.GB1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 03:34:39PM -0800, David Brown wrote:
-> Subject: Re: [GIT PULL] msm fix for v3.2-rc.
+On Tue, Jan 10, 2012 at 02:02:18PM +0000, Jamie Lokier wrote:
+> If you're connecting an RGB555 or RGB444 panel, don't you want the
+> software using the framebuffer to know this so it will dither appropriately?
+> 
+> E.g. gradients look "bandy" if drawn in RGB565 then green's LSB is dropped.
 
-BTW, this is supposed to be for v3.3.  It's a one line fix, so it'd be
-nice if it can make the merge window, but it's also appropriate for
-rc2.
+This is why you use the bitfield stuff to tell userspace what the
+actual properties of the framebuffer are.
 
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+(However, there are some userspace programs which ignore that
+information and think they know better than the kernel about how a
+frame buffer is organised - which is a constant pain in the butt when
+you have a display which isn't BGR.  But that's really a userspace
+bug in those silly programs.)
