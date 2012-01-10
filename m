@@ -1,237 +1,141 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Tue, 10 Jan 2012 14:45:25 +0000
-Subject: [PATCH 07/11] mm: add optional memory reclaim in split_free_page()
-In-Reply-To: <1325162352-24709-8-git-send-email-m.szyprowski@samsung.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Tue, 10 Jan 2012 16:04:10 +0100
+Subject: [PATCH 02/11] mm: compaction: introduce
+ isolate_{free,migrate}pages_range().
+In-Reply-To: <20120110134351.GA3910@csn.ul.ie>
 References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
- <1325162352-24709-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120110144525.GD3910@csn.ul.ie>
+ <1325162352-24709-3-git-send-email-m.szyprowski@samsung.com>
+ <20120110134351.GA3910@csn.ul.ie>
+Message-ID: <op.v7vis8ap3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 29, 2011 at 01:39:08PM +0100, Marek Szyprowski wrote:
-> split_free_page() function is used by migration code to grab a free page
-> once the migration has been finished. This function must obey the same
-> rules as memory allocation functions to keep the correct level of
-> memory watermarks. Memory compaction code calls it under locks, so it
-> cannot perform any *_slowpath style reclaim. However when this function
-> is called by migration code for Contiguous Memory Allocator, the sleeping
-> context is permitted and the function can make a real reclaim to ensure
-> that the call succeeds.
-> 
-> The reclaim code is based on the __alloc_page_slowpath() function.
-> 
+On Tue, 10 Jan 2012 14:43:51 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
 
-This feels like it's at the wrong level entirely.
+> On Thu, Dec 29, 2011 at 01:39:03PM +0100, Marek Szyprowski wrote:
+>> From: Michal Nazarewicz <mina86@mina86.com>
 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> CC: Michal Nazarewicz <mina86@mina86.com>
-> ---
->  include/linux/mm.h |    2 +-
->  mm/compaction.c    |    6 ++--
->  mm/internal.h      |    2 +-
->  mm/page_alloc.c    |   79 +++++++++++++++++++++++++++++++++++++++------------
->  4 files changed, 65 insertions(+), 24 deletions(-)
-> 
-> diff --git a/include/linux/mm.h b/include/linux/mm.h
-> index 4baadd1..8b15b21 100644
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -450,7 +450,7 @@ void put_page(struct page *page);
->  void put_pages_list(struct list_head *pages);
->  
->  void split_page(struct page *page, unsigned int order);
-> -int split_free_page(struct page *page);
-> +int split_free_page(struct page *page, int force_reclaim);
->  
->  /*
->   * Compound pages have a destructor function.  Provide a
-> diff --git a/mm/compaction.c b/mm/compaction.c
-> index 46783b4..d6c5cb7 100644
-> --- a/mm/compaction.c
-> +++ b/mm/compaction.c
-> @@ -46,7 +46,7 @@ static inline bool is_migrate_cma_or_movable(int migratetype)
->  unsigned long
->  isolate_freepages_range(struct zone *zone,
->  			unsigned long start_pfn, unsigned long end_pfn,
-> -			struct list_head *freelist)
-> +			struct list_head *freelist, int force_reclaim)
+>> +static unsigned long
+>> +isolate_freepages_range(struct zone *zone,
+>> +			unsigned long start_pfn, unsigned long end_pfn,
+>> +			struct list_head *freelist)
+>>  {
+>> -	unsigned long zone_end_pfn, end_pfn;
+>> -	int nr_scanned = 0, total_isolated = 0;
+>> -	struct page *cursor;
+>> -
+>> -	/* Get the last PFN we should scan for free pages at */
+>> -	zone_end_pfn = zone->zone_start_pfn + zone->spanned_pages;
+>> -	end_pfn = min(blockpfn + pageblock_nr_pages, zone_end_pfn);
+>> +	unsigned long nr_scanned = 0, total_isolated = 0;
+>> +	unsigned long pfn = start_pfn;
+>> +	struct page *page;
+>>
+>> -	/* Find the first usable PFN in the block to initialse page cursor */
+>> -	for (; blockpfn < end_pfn; blockpfn++) {
+>> -		if (pfn_valid_within(blockpfn))
+>> -			break;
+>> -	}
+>> -	cursor = pfn_to_page(blockpfn);
+>> +	VM_BUG_ON(!pfn_valid(pfn));
+>> +	page = pfn_to_page(pfn);
+>
+> The existing code is able to find the first usable PFN in a pageblock
+> with pfn_valid_within(). It's allowed to do that because it knows
+> the pageblock is valid so calling pfn_valid() is unnecessary.
+>
+> It is curious to change this to something that can sometimes BUG_ON
+> !pfn_valid(pfn) instead of having a PFN walker that knows how to
+> handle pfn_valid().
 
-bool
+Actually, this walker seem redundant since one is already present in
+isolate_freepages(), ie. if !pfn_valid(pfn) then the loop in
+isolate_freepages() will ?continue;? and the function will never get
+called.
 
-but this is the first hint that something is wrong with the
-layering. The function is about "isolating free pages" but this patch
-is making it also about reclaim. If CMA cares about the watermarks,
-it should be the one calling try_to_free_pages(), not wedging it into
-the side of compaction.
+>> +cleanup:
+>> +	/*
+>> +	 * Undo what we have done so far, and return.  We know all pages from
+>> +	 * [start_pfn, pfn) are free because we have just freed them.  If one of
+>> +	 * the page in the range was not freed, we would end up here earlier.
+>> +	 */
+>> +	for (; start_pfn < pfn; ++start_pfn)
+>> +		__free_page(pfn_to_page(start_pfn));
+>> +	return 0;
+>
+> This returns 0 even though you could have isolated some pages.
 
->  {
->  	unsigned long nr_scanned = 0, total_isolated = 0;
->  	unsigned long pfn = start_pfn;
-> @@ -67,7 +67,7 @@ isolate_freepages_range(struct zone *zone,
->  			goto next;
->  
->  		/* Found a free page, break it into order-0 pages */
-> -		n = split_free_page(page);
-> +		n = split_free_page(page, force_reclaim);
->  		total_isolated += n;
->  		if (freelist) {
->  			struct page *p = page;
+The loop's intention is to ?unisolate? (ie. free) anything that got
+isolated, so at the end number of isolated pages in in fact zero.
 
-Second hint - split_free_page() is not a name that indicates it should
-have anything to do with reclaim.
+> Overall, there would have been less contortion if you
+> implemented isolate_freepages_range() in terms of the existing
+> isolate_freepages_block. Something that looked kinda like this not
+> compiled untested illustration.
+>
+> static unsigned long isolate_freepages_range(struct zone *zone,
+>                         unsigned long start_pfn, unsigned long end_pfn,
+>                         struct list_head *list)
+> {
+>         unsigned long pfn = start_pfn;
+>         unsigned long isolated;
+>
+>         for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_pages) {
+>                 if (!pfn_valid(pfn))
+>                         continue;
+>                 isolated += isolate_freepages_block(zone, pfn, list);
+>         }
+>
+>         return isolated;
+> }
+>
+> I neglected to update isolate_freepages_block() to take the end_pfn
+> meaning it will in fact isolate too much but that would be easy to
+> address.
 
-> @@ -376,7 +376,7 @@ static void isolate_freepages(struct zone *zone,
->  		if (suitable_migration_target(page)) {
->  			end_pfn = min(pfn + pageblock_nr_pages, zone_end_pfn);
->  			isolated = isolate_freepages_range(zone, pfn,
-> -					end_pfn, freelist);
-> +					end_pfn, freelist, false);
->  			nr_freepages += isolated;
->  		}
->  		spin_unlock_irqrestore(&zone->lock, flags);
-> diff --git a/mm/internal.h b/mm/internal.h
-> index 4a226d8..8b80027 100644
-> --- a/mm/internal.h
-> +++ b/mm/internal.h
-> @@ -129,7 +129,7 @@ struct compact_control {
->  unsigned long
->  isolate_freepages_range(struct zone *zone,
->  			unsigned long start, unsigned long end,
-> -			struct list_head *freelist);
-> +			struct list_head *freelist, int force_reclaim);
->  unsigned long
->  isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
->  			   unsigned long low_pfn, unsigned long end_pfn);
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 8b47c85..a3d5892 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -1302,17 +1302,65 @@ void split_page(struct page *page, unsigned int order)
->  		set_page_refcounted(page + i);
->  }
->  
-> +static inline
-> +void wake_all_kswapd(unsigned int order, struct zonelist *zonelist,
-> +						enum zone_type high_zoneidx,
-> +						enum zone_type classzone_idx)
-> +{
-> +	struct zoneref *z;
-> +	struct zone *zone;
-> +
-> +	for_each_zone_zonelist(zone, z, zonelist, high_zoneidx)
-> +		wakeup_kswapd(zone, order, classzone_idx);
-> +}
-> +
-> +/*
-> + * Trigger memory pressure bump to reclaim at least 2^order of free pages.
-> + * Does similar work as it is done in __alloc_pages_slowpath(). Used only
-> + * by migration code to allocate contiguous memory range.
-> + */
-> +static int __force_memory_reclaim(int order, struct zone *zone)
-> +{
-> +	gfp_t gfp_mask = GFP_HIGHUSER_MOVABLE;
-> +	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
-> +	struct zonelist *zonelist = node_zonelist(0, gfp_mask);
-> +	struct reclaim_state reclaim_state;
-> +	int did_some_progress = 0;
-> +
-> +	wake_all_kswapd(order, zonelist, high_zoneidx, zone_idx(zone));
-> +
-> +	/* We now go into synchronous reclaim */
-> +	cpuset_memory_pressure_bump();
-> +	current->flags |= PF_MEMALLOC;
-> +	lockdep_set_current_reclaim_state(gfp_mask);
-> +	reclaim_state.reclaimed_slab = 0;
-> +	current->reclaim_state = &reclaim_state;
-> +
-> +	did_some_progress = try_to_free_pages(zonelist, order, gfp_mask, NULL);
-> +
-> +	current->reclaim_state = NULL;
-> +	lockdep_clear_current_reclaim_state();
-> +	current->flags &= ~PF_MEMALLOC;
-> +
-> +	cond_resched();
-> +
-> +	if (!did_some_progress) {
-> +		/* Exhausted what can be done so it's blamo time */
-> +		out_of_memory(zonelist, gfp_mask, order, NULL);
-> +	}
-> +	return order;
-> +}
+This is not a problem since my isolate_freepages_range() implementation
+can go beyond end_pfn, anyway.
 
-At the very least, __alloc_pages_direct_reclaim() should be sharing this
-code.
+Of course, the function taking end_pfn is an optimisation since it does
+not have to compute zone_end each time.
 
-> +
->  /*
->   * Similar to split_page except the page is already free. As this is only
->   * being used for migration, the migratetype of the block also changes.
-> - * As this is called with interrupts disabled, the caller is responsible
-> - * for calling arch_alloc_page() and kernel_map_page() after interrupts
-> - * are enabled.
-> + * The caller is responsible for calling arch_alloc_page() and kernel_map_page()
-> + * after interrupts are enabled.
->   *
->   * Note: this is probably too low level an operation for use in drivers.
->   * Please consult with lkml before using this in your driver.
->   */
-> -int split_free_page(struct page *page)
-> +int split_free_page(struct page *page, int force_reclaim)
->  {
->  	unsigned int order;
->  	unsigned long watermark;
-> @@ -1323,10 +1371,15 @@ int split_free_page(struct page *page)
->  	zone = page_zone(page);
->  	order = page_order(page);
->  
-> +try_again:
->  	/* Obey watermarks as if the page was being allocated */
->  	watermark = low_wmark_pages(zone) + (1 << order);
-> -	if (!zone_watermark_ok(zone, 0, watermark, 0, 0))
-> -		return 0;
-> +	if (!zone_watermark_ok(zone, 0, watermark, 0, 0)) {
-> +		if (force_reclaim && __force_memory_reclaim(order, zone))
-> +			goto try_again;
-> +		else
-> +			return 0;
-> +	}
->  
->  	/* Remove page from free list */
->  	list_del(&page->lru);
-> @@ -2086,18 +2139,6 @@ __alloc_pages_high_priority(gfp_t gfp_mask, unsigned int order,
->  	return page;
->  }
->  
-> -static inline
-> -void wake_all_kswapd(unsigned int order, struct zonelist *zonelist,
-> -						enum zone_type high_zoneidx,
-> -						enum zone_type classzone_idx)
-> -{
-> -	struct zoneref *z;
-> -	struct zone *zone;
-> -
-> -	for_each_zone_zonelist(zone, z, zonelist, high_zoneidx)
-> -		wakeup_kswapd(zone, order, classzone_idx);
-> -}
-> -
->  static inline int
->  gfp_to_alloc_flags(gfp_t gfp_mask)
->  {
-> @@ -5917,7 +5958,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
->  
->  	outer_start = start & (~0UL << ret);
->  	outer_end = isolate_freepages_range(page_zone(pfn_to_page(outer_start)),
-> -					    outer_start, end, NULL);
-> +					    outer_start, end, NULL, true);
->  	if (!outer_end) {
->  		ret = -EBUSY;
->  		goto done;
+> It would be up to yourself whether to shuffle the tracepoint
+> around because with this example it will be triggered once per
+> pageblock. You'd still need the cleanup code and freelist check in
+> isolate_freepages_block() of course.
+>
+> The point is that it would minimise the disruption to the existing
+> code and easier to get details like pfn_valid() right without odd
+> contortions, more gotos than should be necessary and trying to keep
+> pfn and page straight.
 
-I think it makes far more sense to have the logic related to calling
-try_to_free_pages here in alloc_contig_range rather than trying to pass
-it into compaction helper functions.
+Even though I'd personally go with my approach, I see merit in your point,
+so will change.
+
+>>  }
+>>
+>>  /* Returns true if the page is within a block suitable for migration to */
+
+>> @@ -365,17 +403,49 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
+>>  		nr_isolated++;
+>>
+>>  		/* Avoid isolating too much */
+>> -		if (cc->nr_migratepages == COMPACT_CLUSTER_MAX)
+>> +		if (cc->nr_migratepages == COMPACT_CLUSTER_MAX) {
+>> +			++low_pfn;
+>>  			break;
+>> +		}
+>>  	}
+>
+> This minor optimisation is unrelated to the implementation of
+> isolate_migratepages_range() and should be in its own patch.
+
+It's actually not a mere minor optimisation, but rather making the function work
+according to the documentation added, ie. that it returns ?PFN of the first page
+that was not scanned?.
 
 -- 
-Mel Gorman
-SUSE Labs
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
