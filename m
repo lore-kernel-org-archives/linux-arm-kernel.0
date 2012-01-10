@@ -1,36 +1,70 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 09 Jan 2012 16:57:24 -0800
-Subject: [PATCH v9 REPOST 00/25] gpio/omap: driver cleanup and fixes
-In-Reply-To: <1325002176-25626-1-git-send-email-tarun.kanti@ti.com> (Tarun
- Kanti DebBarma's message of "Tue, 27 Dec 2011 21:39:11 +0530")
-References: <1325002176-25626-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87ty44wf0r.fsf@ti.com>
+Date: Mon, 09 Jan 2012 17:19:52 -0800
+Subject: [PATCHv12 0/9] OMAP3+: PRCM chain handler
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
+ (Vaibhav Bedia's message of "Mon, 9 Jan 2012 05:31:02 +0000")
+References: <20111215213358.26632.44165.stgit@dusk>
+ <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
+Message-ID: <87obucuzev.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarun,
+"Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+> Hi Paul,
+>
+> On Fri, Dec 16, 2011 at 03:06:09, Paul Walmsley wrote:
+>> Hi,
+>> 
+>> This is a repost of Tero's PRCM chain handler patch set with a few changes:
+>> 
+>> - A new mux patch has been added to place hwmod mux entries with
+>>   OMAP_DEVICE_PAD_WAKEUP set into the dynamic list
+>> 
+>> - Several OCP barriers have been added to PRM writes to try to protect
+>>   against races between PRM register writes and the MPU
+>> 
+>> - Kerneldoc documentation has been added
+>> 
+>> - The pending IRQ test functions have been split into per-SoC versions
+>> 
+>> - Some patches have been rearranged and merged to avoid churn
+>> 
+>> - The PRM IRQ handler is now installed on OMAP4
+>> 
+>
+> I found a few (minor) issues with this patch series.
+>
+> 1. IO and wakeup events are not supported on AM33XX. Since cpu_is_34xx()
+> holds true for AM33XX I ended up adding a !cpu_is_am33xx() check in 
+> omap3xxx_prcm_init() to bypass the chain handler registration.
 
-> This series is continuation of cleanup of OMAP GPIO driver and fixes.
-> The cleanup include getting rid of cpu_is_* checks wherever possible,
-> use of gpio_bank list instead of static array, use of unique platform
-> specific value associated data member to OMAP platforms to avoid
-> cpu_is_* checks. The series also include PM runtime support.
+> Without such a check we were seeing a crash in USB since USB_CLKCTRL on 
+> AM33XX just happens to be at the IRQENABLE_MPU_OFFSET of OMAP3.
+> Hope such cpu_is_*() checks are acceptable.
 
-Since this is now a "real" driver under drivers, please repost this
-including the GPIO maintainer (Grant Likely <grant.likely@secretlab.ca>)
-and LKML.
+We try to avoid them, especially when we already have existing feature
+flag for IO wakeups.
 
-Also, for ease of testing with all the other OMAP features that are
-already queued for upstream, please rebase on top of Tony's 'uart'
-branch.
+Does something like (completely untested) patch below work for you?
 
-After the above, I will do some final testing and queue a branch for
-Grant, but it's too late for the v3.3 merge window, but we'll get this
-into v3.4.  We'll also get it into Tony's "testing" branch so it can see
-some broader testing as well.
-
-Thanks,
+Of course, that implies that that feature flag is initialized correctly
+for AM33xx.
 
 Kevin
+
+
+
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index c1c4d86..87451d9 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -302,7 +302,7 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
+ 
+ static int __init omap3xxx_prcm_init(void)
+ {
+-	if (cpu_is_omap34xx())
++	if (cpu_is_omap34xx() && omap3_has_io_wakeup())
+ 		return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
+ 	return 0;
+ }
