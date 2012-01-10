@@ -1,59 +1,55 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Tue, 10 Jan 2012 11:41:08 +0000
-Subject: [PATCHv12 0/9] OMAP3+: PRCM chain handler
-In-Reply-To: <87obucuzev.fsf@ti.com>
-References: <20111215213358.26632.44165.stgit@dusk>
- <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
- <87obucuzev.fsf@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D1214304EDAC@DBDE01.ent.ti.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 10 Jan 2012 19:55:25 +0800
+Subject: [RFC PATCH v2 4/8] media: videobuf2: introduce VIDEOBUF2_PAGE
+ memops
+In-Reply-To: <013701cccf81$7c0cdb90$742692b0$%szyprowski@samsung.com>
+References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
+ <1323871214-25435-5-git-send-email-ming.lei@canonical.com>
+ <010501ccc08c$1c7b7870$55726950$%szyprowski@samsung.com>
+ <CACVXFVOqMmakPW-aAdp005RDLuV5oc6-JfjQHr-2bFRzZi2zDQ@mail.gmail.com>
+ <015201ccc156$033f73a0$09be5ae0$%szyprowski@samsung.com>
+ <CACVXFVNdczv=tu7VG24766myCnGDRWAjkthbdfMwTGzTwFCoBA@mail.gmail.com>
+ <015301ccc15f$053e61d0$0fbb2570$%szyprowski@samsung.com>
+ <CACVXFVMrRTS7TUtj7bqCWeF4zx11yT6mOq4syOkZv=Ejoo0LMw@mail.gmail.com>
+ <013701cccf81$7c0cdb90$742692b0$%szyprowski@samsung.com>
+Message-ID: <CACVXFVMUfGCMGReJqoD5ap1QxiDMPEwnd9Sq2FZQRjCRxugEng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi,
 
-On Tue, Jan 10, 2012 at 06:49:52, Hilman, Kevin wrote:
-[...]
-> >
-> > 1. IO and wakeup events are not supported on AM33XX. Since cpu_is_34xx()
-> > holds true for AM33XX I ended up adding a !cpu_is_am33xx() check in 
-> > omap3xxx_prcm_init() to bypass the chain handler registration.
-> 
-> > Without such a check we were seeing a crash in USB since USB_CLKCTRL on 
-> > AM33XX just happens to be at the IRQENABLE_MPU_OFFSET of OMAP3.
-> > Hope such cpu_is_*() checks are acceptable.
-> 
-> We try to avoid them, especially when we already have existing feature
-> flag for IO wakeups.
-> 
-> Does something like (completely untested) patch below work for you?
-> 
-> Of course, that implies that that feature flag is initialized correctly
-> for AM33xx.
-> 
-> Kevin
-> 
-> 
-> 
-> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> index c1c4d86..87451d9 100644
-> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> @@ -302,7 +302,7 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
->  
->  static int __init omap3xxx_prcm_init(void)
->  {
-> -	if (cpu_is_omap34xx())
-> +	if (cpu_is_omap34xx() && omap3_has_io_wakeup())
->  		return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
->  	return 0;
->  }
-> 
+On Tue, Jan 10, 2012 at 6:20 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
-I'll try this out once we have feature flag initialized on AM33xx.
-Can the cpu_is_omap34xx() check be completely dropped in that case?
-Or is there some other reason for retaining it?
+>> Sorry, could you describe the abuse problem in a bit detail?
+>
+> Videobuf2 requires memory module handlers to provide vaddr method to provide a pointer in
+> kernel virtual address space to video data (buffer content). It is used for example by
 
-I guess we'll still need a way to avoid the error message from mux.c
+Yes, this is what the patch is doing, __get_free_pages just  returns
+the kernel virtual
+address which will be passed to driver.
 
-Regards,
-Vaibhav
+> read()/write() io method emulator. Memory allocator/handler should not be specific to any
+> particular use case in the device driver. That's the design. Simple.
+
+Most of the patch is copied from videobuf-vmalloc.c, and the
+interfaces are totally same
+with videobuf-vmalloc.c.
+
+>
+> I your case you want to give pointer to struct page from the memory allocator to the
+
+In my case, the pointer to struct page is not required to the driver
+at all, so I think you
+have misunderstood the patch, don't I?
+
+> driver. The cookie method has been introduced exactly for this purpose. Memory allocator
+> also provides a simple inline function to convert generic 'void *' return type from cookie
+> method to allocator specific structure/pointer. vb2_dma_contig_plane_dma_addr() and
+> vb2_dma_sg_plane_desc() were examples how does passing allocator specific type though the
+> cookie method works.
+
+thanks,
+--
+Ming Lei
