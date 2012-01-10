@@ -1,59 +1,69 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 10 Jan 2012 17:03:49 +0100
-Subject: [PATCH 0/5] at91sam9g45 reset fix
-Message-ID: <20120110160349.GV2854@game.jcrosoft.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 10 Jan 2012 18:22:18 +0200
+Subject: [PATCH] ARM: tegra: initialize basic system clocks
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
+Message-ID: <1326212538-15419-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Initialize basic system clocks and provide a auxdata table to allow some
+peripheral drivers to find their clocks.
 
-	this patch series fix the reset on sam9g45 and cap9
-	as they share the same sdram IP
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-	this will also make the rstc soc independent
+---
 
-The following changes since commit e4e11180dfa545233e5145919b75b7fac88638df:
+Stephen,
 
-  Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/viro/vfs (2012-01-09 17:37:37 -0800)
+This should fix the hang you observed when sdhci_add_host() fails.
+---
+ arch/arm/mach-tegra/board-dt-tegra30.c |   24 +++++++++++++++++++++++-
+ 1 files changed, 23 insertions(+), 1 deletions(-)
 
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git for-arnd-reset-fix
-
-Jean-Christophe PLAGNIOL-VILLARD (5):
-      ARM: at91: fix cap9 ddrsdr register
-      ARM: at91: merge at91cap9_ddrsdr.h in at91sam9_ddrsdr.h
-      ARM: at91: introduce AT91_SAM9_ALT_RESET to select the at91sam9 alternative reset
-      ARM: at91: make rstc soc independent
-      ARM: at91: Fix at91sam9g45 and at91cap9 reset
-
- arch/arm/mach-at91/Kconfig                        |   14 +++
- arch/arm/mach-at91/Makefile                       |   14 ++-
- arch/arm/mach-at91/at91cap9.c                     |    9 +--
- arch/arm/mach-at91/at91sam9260.c                  |    1 +
- arch/arm/mach-at91/at91sam9261.c                  |    1 +
- arch/arm/mach-at91/at91sam9263.c                  |    1 +
- arch/arm/mach-at91/at91sam9_alt_reset.S           |    7 +-
- arch/arm/mach-at91/at91sam9g45.c                  |    7 +-
- arch/arm/mach-at91/at91sam9g45_reset.S            |   40 ++++++++
- arch/arm/mach-at91/at91sam9rl.c                   |    1 +
- arch/arm/mach-at91/generic.h                      |    2 +
- arch/arm/mach-at91/include/mach/at91_rstc.h       |   18 +++-
- arch/arm/mach-at91/include/mach/at91cap9.h        |    2 +-
- arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h |  108 ---------------------
- arch/arm/mach-at91/include/mach/at91sam9260.h     |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9261.h     |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9263.h     |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |   30 ++++--
- arch/arm/mach-at91/include/mach/at91sam9g45.h     |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9rl.h      |    2 +-
- arch/arm/mach-at91/pm.c                           |    9 +--
- arch/arm/mach-at91/pm.h                           |    8 +-
- arch/arm/mach-at91/pm_slowclock.S                 |    5 +-
- arch/arm/mach-at91/setup.c                        |    9 ++
- 24 files changed, 132 insertions(+), 164 deletions(-)
- create mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
- delete mode 100644 arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
-
-Best Regards,
-J.
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index 3c197e2..b4124b1 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -34,16 +34,38 @@
+ #include <asm/hardware/gic.h>
+ 
+ #include "board.h"
++#include "clock.h"
+ 
+ static struct of_device_id tegra_dt_match_table[] __initdata = {
+ 	{ .compatible = "simple-bus", },
+ 	{}
+ };
+ 
++struct of_dev_auxdata tegra30_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000000, "sdhci-tegra.0", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000200, "sdhci-tegra.1", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000400, "sdhci-tegra.2", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000600, "sdhci-tegra.3", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C000, "tegra-i2c.0", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C400, "tegra-i2c.1", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C500, "tegra-i2c.2", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C700, "tegra-i2c.3", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000D000, "tegra-i2c.4", NULL),
++	{}
++};
++
++static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
++	/* name		parent		rate		enabled */
++	{ "uartd",	"pll_p",	408000000,	true },
++	{ NULL,		NULL,		0,		0},
++};
++
+ static void __init tegra30_dt_init(void)
+ {
++	tegra_clk_init_from_table(tegra_dt_clk_init_table);
++
+ 	of_platform_populate(NULL, tegra_dt_match_table,
+-				NULL, NULL);
++				tegra30_auxdata_lookup, NULL);
+ }
+ 
+ static const char *tegra30_dt_board_compat[] = {
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
