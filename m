@@ -1,70 +1,54 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 09 Jan 2012 17:19:52 -0800
-Subject: [PATCHv12 0/9] OMAP3+: PRCM chain handler
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
- (Vaibhav Bedia's message of "Mon, 9 Jan 2012 05:31:02 +0000")
-References: <20111215213358.26632.44165.stgit@dusk>
- <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
-Message-ID: <87obucuzev.fsf@ti.com>
+From: daeinki@gmail.com (InKi Dae)
+Date: Tue, 10 Jan 2012 10:34:39 +0900
+Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <CAF6AEGsTGOxyTX6Xijvm8UXGjtVTtYg5X5xfJo8D+47o+xU+bA@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
+ <CAAQKjZPFh6666JKc-XJfKYePQ_F0MNF6FkY=zKypWb52VVX3YQ@mail.gmail.com>
+ <20120109081030.GA3723@phenom.ffwll.local>
+ <CAAQKjZMEsuib18RYE7OvZPUqhKnvrZ8i3+EMuZSXr9KPVygo_Q@mail.gmail.com>
+ <CAF6AEGsTGOxyTX6Xijvm8UXGjtVTtYg5X5xfJo8D+47o+xU+bA@mail.gmail.com>
+Message-ID: <CAAQKjZNM51Oenhi-S-9kyq_mLYHBEsMQA3M6=6L_XNnKu5pLbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
-
-> Hi Paul,
+2012/1/10 Rob Clark <rob@ti.com>:
+> On Mon, Jan 9, 2012 at 4:10 AM, InKi Dae <daeinki@gmail.com> wrote:
+>> note : in case of sharing a buffer between v4l2 and drm driver, the
+>> memory info would be copied vb2_xx_buf to xx_gem or xx_gem to
+>> vb2_xx_buf through sg table. in this case, only memory info is used to
+>> share, not some objects.
 >
-> On Fri, Dec 16, 2011 at 03:06:09, Paul Walmsley wrote:
->> Hi,
->> 
->> This is a repost of Tero's PRCM chain handler patch set with a few changes:
->> 
->> - A new mux patch has been added to place hwmod mux entries with
->>   OMAP_DEVICE_PAD_WAKEUP set into the dynamic list
->> 
->> - Several OCP barriers have been added to PRM writes to try to protect
->>   against races between PRM register writes and the MPU
->> 
->> - Kerneldoc documentation has been added
->> 
->> - The pending IRQ test functions have been split into per-SoC versions
->> 
->> - Some patches have been rearranged and merged to avoid churn
->> 
->> - The PRM IRQ handler is now installed on OMAP4
->> 
+> which v4l2/vb2 patches are you looking at? ?The patches I was using,
+> vb2 holds a reference to the 'struct dma_buf *' internally, not just
+> keeping the sg_table
 >
-> I found a few (minor) issues with this patch series.
->
-> 1. IO and wakeup events are not supported on AM33XX. Since cpu_is_34xx()
-> holds true for AM33XX I ended up adding a !cpu_is_am33xx() check in 
-> omap3xxx_prcm_init() to bypass the chain handler registration.
 
-> Without such a check we were seeing a crash in USB since USB_CLKCTRL on 
-> AM33XX just happens to be at the IRQENABLE_MPU_OFFSET of OMAP3.
-> Hope such cpu_is_*() checks are acceptable.
+yes, not keeping the sg_table. I mean... see a example below please.
 
-We try to avoid them, especially when we already have existing feature
-flag for IO wakeups.
+static void vb2_dma_contig_map_dmabuf(void *mem_priv)
+{
+    struct sg_table *sg;
+     ...
+     sg = dma_buf_map_attachment(buf->db_attach, dir);
+     ...
+     buf->dma_addr = sg_dma_address(sg->sgl);
+     ...
+}
 
-Does something like (completely untested) patch below work for you?
+at least with no IOMMU, the memory information(containing physical
+memory address) would be copied to vb2_xx_buf object if drm gem
+exported its own buffer and vb2 wants to use that buffer at this time,
+sg table is used to share that buffer. and the problem I pointed out
+is that this buffer(also physical memory region) could be released by
+vb2 framework(as you know, vb2_xx_buf object and the memory region for
+buf->dma_addr pointing) but the Exporter(drm gem) couldn't know that
+so some problems would be induced once drm gem tries to release or
+access that buffer. and I have tried to resolve this issue adding
+get_shared_cnt() callback to dma-buf.h but I'm not sure that this is
+good way. maybe there would be better way.
 
-Of course, that implies that that feature flag is initialized correctly
-for AM33xx.
+Thanks.
 
-Kevin
-
-
-
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-index c1c4d86..87451d9 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-@@ -302,7 +302,7 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
- 
- static int __init omap3xxx_prcm_init(void)
- {
--	if (cpu_is_omap34xx())
-+	if (cpu_is_omap34xx() && omap3_has_io_wakeup())
- 		return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
- 	return 0;
- }
+> BR,
+> -R
