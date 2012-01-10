@@ -1,28 +1,33 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 10 Jan 2012 15:39:48 -0800
-Subject: [PATCH-V2 0/2] arm:omap:am33xx: Add voltage and power domain data
-In-Reply-To: <1324803628-16790-1-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Sun, 25 Dec 2011 14:30:26 +0530")
-References: <1324803628-16790-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <87ty43f7p7.fsf@ti.com>
+From: akpm@linux-foundation.org (akpm at linux-foundation.org)
+Date: Tue, 10 Jan 2012 15:40:06 -0800
+Subject: [patch 2/2] arm, exec: remove redundant set_fs(USER_DS)
+Message-ID: <20120110234007.2798B2000B9@hpza10.eem.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <hvaibhav@ti.com> writes:
+From: Mathias Krause <minipli@googlemail.com>
+Subject: arm, exec: remove redundant set_fs(USER_DS)
 
-> Last time I had submitted a big patch-series, almost changing >7.5K lines
-> for AM33XX voltage, power, clock and HWMOD data support (as a RFC);
-> which I believe is very hard to review and difficult to manage also.
-> So I decided to split the patches as and when they are clean
-> and ready for review/merge/acceptance,
+The address limit is already set in flush_old_exec() so this
+set_fs(USER_DS) is redundant.
 
-FYI... 
+Signed-off-by: Mathias Krause <minipli@googlemail.com>
+Cc: Russell King <rmk@arm.linux.org.uk>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
 
-In usually (but not always) helps to specifically Cc the maintainers of
-the code you're changin.  In this case, Paul & Benoit are maintaining
-most of this core code/data, so you should make sure they are Cc'd as
-well.
+ arch/arm/include/asm/processor.h |    1 -
+ 1 file changed, 1 deletion(-)
 
-Thanks,
-
-Kevin
+diff -puN arch/arm/include/asm/processor.h~arm-exec-remove-redundant-set_fsuser_ds arch/arm/include/asm/processor.h
+--- a/arch/arm/include/asm/processor.h~arm-exec-remove-redundant-set_fsuser_ds
++++ a/arch/arm/include/asm/processor.h
+@@ -55,7 +55,6 @@ struct thread_struct {
+ #define start_thread(regs,pc,sp)					\
+ ({									\
+ 	unsigned long *stack = (unsigned long *)sp;			\
+-	set_fs(USER_DS);						\
+ 	memset(regs->uregs, 0, sizeof(regs->uregs));			\
+ 	if (current->personality & ADDR_LIMIT_32BIT)			\
+ 		regs->ARM_cpsr = USR_MODE;				\
+_
