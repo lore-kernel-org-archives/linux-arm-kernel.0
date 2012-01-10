@@ -1,30 +1,40 @@
-From: rusko.peter@prolan.hu (Peter Rusko)
-Date: Tue, 10 Jan 2012 14:08:31 +0100
-Subject: MX28 fec clock frequency
-In-Reply-To: <20120110082138.GF23362@S2101-09.ap.freescale.net>
-References: <4F06D643.6080602@prolan.hu>
- <20120108033238.GA19721@S2101-09.ap.freescale.net>
- <4F0AF4B0.4030403@prolan.hu>
- <20120110082138.GF23362@S2101-09.ap.freescale.net>
-Message-ID: <4F0C384F.10706@prolan.hu>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 10 Jan 2012 14:17:01 +0100
+Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
+ remove unsupported 15bit modes
+In-Reply-To: <20120110130146.GC2057@taskit.de> (Christian Glindkamp's message
+ of "Tue, 10 Jan 2012 14:01:46 +0100")
+References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
+ <4F0AC2B1.8010601@atmel.com> <87ty45dt89.fsf@macbook.be.48ers.dk>
+ <20120110130146.GC2057@taskit.de>
+Message-ID: <87ty43d7ea.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm not sure it's causing the problem you are seeing.  But from i.MX28
-> spec, it seems that bit BUSY_TIME of register HW_CLKCTRL_ENET should
-> be polled for new divider setting?
->
+>>>>> "Christian" == Christian Glindkamp <christian.glindkamp@taskit.de> writes:
 
-Thank you, I've added the check, but unfortunately it didn't help :(
+Hi,
+
+ >> So it doesn't really support RGB555 mode. The controller reads up to
+ >> 32bit of framebuffer data and outputs 24bit on the LCD pins. You CAN
+ >> wire up a RGB555 panel by just skipping the LSB green of a RGB565
+ >> wiring, but that is independent of the framebufffer format.
+
+ Christian> But the AT91SAM9261/AT91SAM9263 do not have a native RGB565
+ Christian> format if it is configured for 16bit (so it does not read
+ Christian> 32bit and output 24bit but just 16bit) but uses BGR555 with
+ Christian> an additional intensity bit in the MSB like the palette
+ Christian> where you also kept the BGR555 format. How can you get
+ Christian> correct colors on these processors if this code above is
+ Christian> removed?
+
+Ahh, I wasn't aware of that (I'm using 9g45). I guess we need to do
+something similar to what I did for the palette handling:
+
+https://github.com/at91linux/linux-at91/commit/7a256fc44c1892ad3166363ba309d9996a49e7b8
+
+E.G. keep the RBG555/BGR555 format for the old devices, and my proposed
+change for the new ones. I'll cook something up.
 
 -- 
-Rusk? P?ter
-Fejleszt?m?rn?k
-
-Prolan Zrt. / Prolan Co.
-Hungary 2011 Budakal?sz, Szentendrei ?t 1-3.
-Tel./Phone: +36 20 954 3118
-Fax: +36 26 540 420
-E-mail: rusko.peter at prolan.hu
-Web: www.prolan.hu
-Timezone:CET
+Bye, Peter Korsgaard
