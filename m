@@ -1,56 +1,31 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 10 Jan 2012 15:01:45 +0800
-Subject: [PATCH 1/6] dma/imx-sdma: let sdma_run_channel call
- sdma_enable_channel
-Message-ID: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+Date: Tue, 10 Jan 2012 15:01:49 +0800
+Subject: [PATCH 5/6] dma/imx-sdma: use num_events to validate event_id0
+In-Reply-To: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1326178910-14044-5-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let all enable channel code call sdma_enable_channel.
+event number is not always 32. use num_events for checking instead.
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/dma/imx-sdma.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/dma/imx-sdma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f59fd8f..c2bc4f1 100644
+index 015d93f..22fd561 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -394,6 +394,11 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
- 	return 0;
- }
+@@ -723,7 +723,7 @@ static int sdma_config_channel(struct sdma_channel *sdmac)
+ 	sdmac->per_addr = 0;
  
-+static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
-+{
-+	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
-+}
-+
- /*
-  * sdma_run_channel - run a channel and wait till it's done
-  */
-@@ -405,7 +410,7 @@ static int sdma_run_channel(struct sdma_channel *sdmac)
- 
- 	init_completion(&sdmac->done);
- 
--	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
-+	sdma_enable_channel(sdma, channel);
- 
- 	ret = wait_for_completion_timeout(&sdmac->done, HZ);
- 
-@@ -811,11 +816,6 @@ out:
- 	return ret;
- }
- 
--static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
--{
--	__raw_writel(1 << channel, sdma->regs + SDMA_H_START);
--}
--
- static dma_cookie_t sdma_assign_cookie(struct sdma_channel *sdmac)
- {
- 	dma_cookie_t cookie = sdmac->chan.cookie;
+ 	if (sdmac->event_id0) {
+-		if (sdmac->event_id0 > 32)
++		if (sdmac->event_id0 >= sdmac->sdma->num_events)
+ 			return -EINVAL;
+ 		sdma_event_enable(sdmac, sdmac->event_id0);
+ 	}
 -- 
 1.7.5.4
