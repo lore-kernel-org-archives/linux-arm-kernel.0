@@ -1,62 +1,31 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 10 Jan 2012 16:38:43 +0800
-Subject: [RFC PATCH v3 3/5] pinctrl: imx: add pinctrl imx driver
-In-Reply-To: <20120109063136.GI1835@S2101-09.ap.freescale.net>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-4-git-send-email-b29396@freescale.com>
- <20120108130542.GC2203@richard-laptop>
- <20120109020848.GF1835@S2101-09.ap.freescale.net>
- <20120109021702.GV2414@b20223-02.ap.freescale.net>
- <20120109063136.GI1835@S2101-09.ap.freescale.net>
-Message-ID: <20120110083842.GA2414@b20223-02.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 Jan 2012 09:39:22 +0100
+Subject: [PATCH 2/4] ASoC: i.MX: Add missing dma_async_issue_pending
+In-Reply-To: <20120109161301.GB2974@opensource.wolfsonmicro.com>
+References: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
+ <1326101570-3716-3-git-send-email-s.hauer@pengutronix.de>
+ <20120109161301.GB2974@opensource.wolfsonmicro.com>
+Message-ID: <20120110083922.GT5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 02:32:12PM +0800, Shawn Guo wrote:
-> On Mon, Jan 09, 2012 at 10:17:03AM +0800, Richard Zhao wrote:
-> > On Mon, Jan 09, 2012 at 10:08:51AM +0800, Shawn Guo wrote:
-> > > On Sun, Jan 08, 2012 at 09:05:44PM +0800, Richard Zhao wrote:
-> > > > > +enum imx_imx53_pinctrl_pads {
-> > > > > +	MX53_GPIO_19 = 0,
-> > > > > +	MX53_KEY_COL0 = 1,
-> > > > > +	MX53_KEY_ROW0 = 2,
-> > > > > +	MX53_KEY_COL1 = 3,
-> > > > > +	MX53_KEY_ROW1 = 4,
-> > > > > +	MX53_KEY_COL2 = 5,
-> > > > > +	MX53_KEY_ROW2 = 6,
-> > > > ...
-> > > > Why not describe it in dts and make this file generic for imx?
-> > > > One node for one pad,
-> > > 
-> > > Doing this will bloat the device tree dramatically.  Actually I had
-> > > a patch doing so before the pinctrl subsystem was born, but it
-> > > concerned Grant a lot for that reason and thus died.
-> > are you against describing pad in dts or one node per pad?
-> > one node per pad is just a tip to extend pad property, to support
-> > other features (pinconf in your word).
+On Mon, Jan 09, 2012 at 08:13:02AM -0800, Mark Brown wrote:
+> On Mon, Jan 09, 2012 at 10:32:48AM +0100, Sascha Hauer wrote:
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> I definitely want to describe pinconf in device tree, though what's
-> the best interface for pinctrl client driver to talk to pinconf is
-> still vague to me.
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > 
-> > > 
-> > > > it'll be easy to extend pad properties. You know
-> > > > the pad may set pull up/down, open drain, drive strenth, daisy chain etc.
-> > > > The features have to be supported, to make your model usefull.
-> > > > 
-> > > As Aisheng mentioned, the pinconf support will be added later.
-> > I expect pinconf come together, and get a ready-to-use patch series.
-> > 
-> As I was educated by Linus.W, we can not drink ocean and we need to
-> split big chunk of work into pieces and achieve it step by step.
-Sure, we can not drink out the ocean :). But if people can not use it
-in real case, how do we verify the driver? How do we know the driver
-goes in the right way?
+> but I guess I can just apply it immediately?
 
-Thanks
-Richard
-> 
-> -- 
-> Regards,
-> Shawn
-> 
+The ASoC patch (also the mmc driver patch) have to be applied
+before the dma driver patches. To make this sure I think it's
+best when Vinoud applies the whole series.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
