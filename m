@@ -1,9 +1,9 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 10 Jan 2012 09:42:28 +0100
-Subject: [PATCH 00/14] DMA-mapping framework redesign preparation
-In-Reply-To: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
-References: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <012501cccf73$c90246a0$5b06d3e0$%szyprowski@samsung.com>
+Date: Tue, 10 Jan 2012 09:42:37 +0100
+Subject: [PATCH 0/8 v4] ARM: DMA-mapping framework redesign
+In-Reply-To: <1323448798-18184-1-git-send-email-m.szyprowski@samsung.com>
+References: <1323448798-18184-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <012601cccf73$ce09a8f0$6a1cfad0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
