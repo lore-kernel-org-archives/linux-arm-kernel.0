@@ -1,44 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 10 Jan 2012 17:24:30 -0200
-Subject: [PATCH] ARM: imx: Fix build error due to redefinition of
- 'mx50_io_desc'
-Message-ID: <1326223470-30116-1-git-send-email-festevam@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 10 Jan 2012 13:44:54 -0500 (EST)
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <20120110183123.GD7164@opensource.wolfsonmicro.com>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
+ <01a301ccce6f$9bb51790$d31f46b0$%kim@samsung.com>
+ <201201091556.34817.arnd@arndb.de>
+ <20120109161152.GA2974@opensource.wolfsonmicro.com>
+ <20120110090635.GT21765@n2100.arm.linux.org.uk>
+ <20120110183123.GD7164@opensource.wolfsonmicro.com>
+Message-ID: <alpine.LFD.2.02.1201101341040.2722@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build error:
+On Tue, 10 Jan 2012, Mark Brown wrote:
 
-CC      arch/arm/mach-imx/mm-imx5.o
-arch/arm/mach-imx/mm-imx5.c:57: error: redefinition of 'mx50_io_desc'
-arch/arm/mach-imx/mm-imx5.c:47: note: previous definition of 'mx50_io_desc' was here
+> So, is there anything that people like me who are contributing to rather
+> than maintaining things can do to help here beyond chasing maintainers?
+> 
+> Generally my process is roughly to monitor what goes into -next and
+> chase people if things don't make it in there but that's not working
+> well here as things are appearing in -next.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-This applies against linux-next
+Maybe the Samsung maintainer(s) should target early merge into the 
+arm-soc tree instead of going straight to linux-next only.  The former 
+ends up in the later anyway.
 
- arch/arm/mach-imx/mm-imx5.c |   10 ----------
- 1 files changed, 0 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index 2f04f8a..16671b7 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -52,16 +52,6 @@ static struct map_desc mx50_io_desc[] __initdata = {
- };
- 
- /*
-- * Define the MX50 memory map.
-- */
--static struct map_desc mx50_io_desc[] __initdata = {
--	imx_map_entry(MX50, TZIC, MT_DEVICE),
--	imx_map_entry(MX50, SPBA0, MT_DEVICE),
--	imx_map_entry(MX50, AIPS1, MT_DEVICE),
--	imx_map_entry(MX50, AIPS2, MT_DEVICE),
--};
--
--/*
-  * Define the MX51 memory map.
-  */
- static struct map_desc mx51_io_desc[] __initdata = {
--- 
-1.7.1
+Nicolas
