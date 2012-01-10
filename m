@@ -1,36 +1,57 @@
-From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Tue, 10 Jan 2012 01:05:39 -0800
-Subject: [PATCH v4 2/3] ARM: mmp: enable pinmux in mmp platform
-In-Reply-To: <CACRpkdbPk8GEvW7uewMXZcW7ghfry8X0Hgiz3uj4zOrpDgK4hQ@mail.gmail.com>
-References: <1325643995-20745-1-git-send-email-haojian.zhuang@marvell.com>
- <1325643995-20745-3-git-send-email-haojian.zhuang@marvell.com>,
- <CACRpkdbPk8GEvW7uewMXZcW7ghfry8X0Hgiz3uj4zOrpDgK4hQ@mail.gmail.com>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C060A87D719@SC-VEXCH1.marvell.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Jan 2012 09:06:35 +0000
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <20120109161152.GA2974@opensource.wolfsonmicro.com>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
+ <01a301ccce6f$9bb51790$d31f46b0$%kim@samsung.com>
+ <201201091556.34817.arnd@arndb.de>
+ <20120109161152.GA2974@opensource.wolfsonmicro.com>
+Message-ID: <20120110090635.GT21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do you mean the 1st & 2nd patch or the 3rd patch?
+On Mon, Jan 09, 2012 at 08:11:54AM -0800, Mark Brown wrote:
+> On Mon, Jan 09, 2012 at 03:56:34PM +0000, Arnd Bergmann wrote:
+> 
+> > Of course we will take all bug fixes. Just rebase the rest on top of 3.3-rc1
+> > and we can take it right away for 3.4.
+> 
+> I've sent a pull request earlier in the thread for the main ones I'm
+> aware of (which are mostly fixes for things introduced in this cycle) -
+> the others I'm aware of are all specific to Cragganmore and given that
+> we can't get any of the features for that merged the fixes aren't going
+> to have any practical effect until we can manage to get the feature
+> stuff merged so it's not really worth the effort.
+> 
+> This really is very disappointing.
 
-Thanks
-Haojian
-________________________________________
-From: Linus Walleij [linus.walleij at linaro.org]
-Sent: Tuesday, January 10, 2012 4:52 PM
-To: Haojian Zhuang
-Cc: swarren at nvidia.com; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; eric.y.miao at gmail.com; linux at arm.linux.org.uk; arnd at arndb.de
-Subject: Re: [PATCH v4 2/3] ARM: mmp: enable pinmux in mmp platform
+No it isn't.
 
-On Wed, Jan 4, 2012 at 3:26 AM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
+What is really disappointing is the lack of responsive maintainers for the
+Samsung stuff.  It took _two_ bloody months to get the Samsung platforms
+sorted for the restart changes in spite of reminding, and a last minute
+rush over the course of a couple of days (one _in_ the merge window) to
+get it properly merged into my tree.
 
-> Configuring pinmux in brownstone, aspenite & ttc dkb platform. The functions
-> of pins are initialized in platform driver.
+The only reason something happened was because I stuck a #error into
+the Samsung code in linux-next and people started reporting that Samsung
+had broken.
 
-I tried to apply this patch but I can't, I suspect it is dependent on
-some changes
-in the PXA tree?
+This is not the worst of it - Nicolas took _three_ months to get a response
+from the shmobile maintainers.  I never got a response from the shmobile
+maintainers for the restart changes - so congratulations to the shmobile
+maintainers, shmobile is now broken.
 
-I can apply this after the merge window once PXA is pulled in and ready.
+The alternative was basically Samsung ending up like shmobile is today.
+Maybe that's what should have happened to save folk like Arnd such a
+horrible job now.
 
-Yours,
-Linus Walleij
+So, I support Arnd's view: the Samsung stuff is just too late.  Even the
+restart updates (which is what has caused this) were too late.  Anything
+which causes new merge conflicts in the Samsung code is not acceptable at
+this point, even if it's a 'fix' patch.  We've wasted far too much time
+trying to get Samsung stuff sorted far too late in the cycle.
+
+Let this be an object lesson in what happens if you leave stuff until the
+last minute.
