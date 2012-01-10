@@ -1,40 +1,47 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 10 Jan 2012 14:02:18 +0000
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode, remove
- unsupported 15bit modes
-In-Reply-To: <87ty45dt89.fsf@macbook.be.48ers.dk>
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <4F0AC2B1.8010601@atmel.com> <87ty45dt89.fsf@macbook.be.48ers.dk>
-Message-ID: <20120110140218.GB7180@jl-vm1.vm.bytemark.co.uk>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Tue, 10 Jan 2012 15:02:25 +0100
+Subject: [PATCH 5/6] dma/imx-sdma: use num_events to validate event_id0
+In-Reply-To: <1326178910-14044-5-git-send-email-richard.zhao@linaro.org>
+References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+ <1326178910-14044-5-git-send-email-richard.zhao@linaro.org>
+Message-ID: <4F0C44F1.9060703@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Korsgaard wrote:
-> Because it is arguable wrong as far as I understand the HW.
-> There's two parts here:
+On 10.01.2012 08:01, Richard Zhao wrote:
+> event number is not always 32. use num_events for checking instead.
 > 
-> - 1: Format of framebuffer memory
-> - 2: Wiring of LCD (RGB/BGR order and number of bits)
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  drivers/dma/imx-sdma.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> >From the datasheet, the following framebuffer formats are supported:
-> 
-> 1, 2, 4, 8 bits per pixel (palletized), 16, 24 bits per pixel
-> (non-palletized) for TFT.
-> 
-> So it doesn't really support RGB555 mode. The controller reads up to
-> 32bit of framebuffer data and outputs 24bit on the LCD pins. You CAN
-> wire up a RGB555 panel by just skipping the LSB green of a RGB565
-> wiring, but that is independent of the framebufffer format. The
-> controller/driver doesn't do any RGB/BGR swapping, so the RBG/BGR wiring
-> settings are just used as a software hint (in FBIOGET_VSCREENINFO) about
-> the meaning of the individual bits of a pixel in the framebuffer.
-> 
-> Similar you can connect a 12bit 4:4:4 panel by just connecting it to the
-> MSB LCD pins.
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index 015d93f..22fd561 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -723,7 +723,7 @@ static int sdma_config_channel(struct sdma_channel *sdmac)
+>  	sdmac->per_addr = 0;
+>  
+>  	if (sdmac->event_id0) {
+> -		if (sdmac->event_id0 > 32)
+> +		if (sdmac->event_id0 >= sdmac->sdma->num_events)
+>  			return -EINVAL;
+>  		sdma_event_enable(sdmac, sdmac->event_id0);
+>  	}
 
-If you're connecting an RGB555 or RGB444 panel, don't you want the
-software using the framebuffer to know this so it will dither appropriately?
+In your git you have
 
-E.g. gradients look "bandy" if drawn in RGB565 then green's LSB is dropped.
+http://git.linaro.org/gitweb?p=people/riczhao/linux-2.6.git;a=commitdiff;h=4bd46e7f8ade05984ee89222bc0523b656d017d2
 
--- Jamie
+-       if (sdmac->event_id0) {
+-               if (sdmac->event_id0 > 32)
+-                       return -EINVAL;
++       if (sdmac->event_id0)
+                 sdma_event_enable(sdmac, sdmac->event_id0);
+
+I your git version outdated and replaced by this patch?
+
+Best regards
+
+Dirk
