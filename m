@@ -1,52 +1,56 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 10 Jan 2012 17:24:21 +0100
-Subject: [PATCH 1/5] ARM: at91: fix cap9 ddrsdr register
-In-Reply-To: <20120110160349.GV2854@game.jcrosoft.org>
-References: <20120110160349.GV2854@game.jcrosoft.org>
-Message-ID: <1326212665-1881-1-git-send-email-plagnioj@jcrosoft.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 10 Jan 2012 18:39:05 +0200
+Subject: [RESEND PATCH v2 0/3] Tegra30 clockframework
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
+References: <1326123315-32670-1-git-send-email-pdeschrijver@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
+Message-ID: <20120110163905.GL32619@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fix AT91_DDRSDRC_MODE it's 3bit
+On Mon, Jan 09, 2012 at 10:30:05PM +0100, Stephen Warren wrote:
+> Peter De Schrijver wrote at Monday, January 09, 2012 8:35 AM:
+> > This patchset introduces the tegra30 clockframework. Clocks which require
+> > voltage scaling are not included in this version. The implementation doesn't
+> > use the generic clock code yet. It's the intention to move to it, once the
+> > semantics are fully clarified.
+> > 
+> > ---
+> > 
+> > Changes in v2:
+> >  * Fix parent clocks for TWD. This makes the SMP configuration booting again.
+> 
+> Peter,
+> 
+> This version seems to still boot as well as without these patches.
+> 
+> I hacked some AUXDATA into board-dt-tegra30.c in an attempt to get SDHCI
+> working, but found that:
+> 
+> a) sdhci_add_host() fails due to:
+> 
+> mmc0: Hardware doesn't specify timeout clock frequency.
+> 
+> I haven't investigated why this happens.
+> 
 
-add missing AT91_DDRSDRC_NR_14, AT91_DDRSDRC_DBW (16 and 32 bits support)
+I had a look at it, but I haven't found the rootcause.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+> b) More directly related to these patches, when sdhci_add_host() fails,
+> sdhci_tegra_probe() calls clk_disable() and clk_put() on its clock. One
+> of these hangs somehow. I assume that's a bug in this clock patch?
+> 
 
-diff --git a/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h b/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
-index 976f4a6..d21932d 100644
---- a/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
-+++ b/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
-@@ -16,7 +16,7 @@
- #define AT91CAP9_DDRSDR_H
- 
- #define AT91_DDRSDRC_MR		0x00	/* Mode Register */
--#define		AT91_DDRSDRC_MODE	(0xf << 0)		/* Command Mode */
-+#define		AT91_DDRSDRC_MODE	(0x7 << 0)		/* Command Mode */
- #define			AT91_DDRSDRC_MODE_NORMAL		0
- #define			AT91_DDRSDRC_MODE_NOP		1
- #define			AT91_DDRSDRC_MODE_PRECHARGE	2
-@@ -42,6 +42,7 @@
- #define			AT91_DDRSDRC_NR_11	(0 << 2)
- #define			AT91_DDRSDRC_NR_12	(1 << 2)
- #define			AT91_DDRSDRC_NR_13	(2 << 2)
-+#define			AT91_DDRSDRC_NR_14	(3 << 2)
- #define		AT91_DDRSDRC_CAS	(7 << 4)		/* CAS Latency */
- #define			AT91_DDRSDRC_CAS_2	(2 << 4)
- #define			AT91_DDRSDRC_CAS_3	(3 << 4)
-@@ -86,6 +87,9 @@
- #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
- #define			AT91_DDRSDRC_MD_DDR		2
- #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
-+#define		AT91_DDRSDRC_DBW	(1 << 4)		/* Data Bus Width */
-+#define			AT91_DDRSDRC_DBW_32BITS		(0 <<  4)
-+#define			AT91_DDRSDRC_DBW_16BITS		(1 <<  4)
- 
- #define AT91_DDRSDRC_DLLR	0x20	/* DLL Information Register */
- #define		AT91_DDRSDRC_MDINC	(1 << 0)		/* Master Delay increment */
--- 
-1.7.7
+Sortof. The rootcause for this one is that pll_p gets disabled when
+sdhci_tegra_probe() calls  clk_disable(). pll_p also provides the input clock
+for UARTD however, so the next printk() call will hang the system. The reason
+for this is that no kernel driver has actually enabled the UARTD clock at that
+point, and thus pll_p hasn't been turned on from a clock framework point of
+view.
+Workaround is to enable UARTD in board-dt-tegra30 like we do for tegra20. I
+guess we need a better solution to cope with a different UART being the
+console UART. (See next mail)
+
+Cheers,
+
+Peter.
