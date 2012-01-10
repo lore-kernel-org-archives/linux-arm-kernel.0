@@ -1,41 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Jan 2012 23:41:12 +0800
-Subject: [PATCH v2] irqdomain: Initialize number of IRQs for simple domains
-In-Reply-To: <1326191059-26411-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1326191059-26411-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20120110154109.GB27831@S2101-09.ap.freescale.net>
+From: rusko.peter@prolan.hu (Peter Rusko)
+Date: Tue, 10 Jan 2012 16:39:37 +0100
+Subject: MX28 fec clock frequency
+In-Reply-To: <20120110140043.GC26599@S2101-09.ap.freescale.net>
+References: <4F06D643.6080602@prolan.hu>
+ <20120108033238.GA19721@S2101-09.ap.freescale.net>
+ <4F0AF4B0.4030403@prolan.hu>
+ <20120110082138.GF23362@S2101-09.ap.freescale.net> <4F0C384F.10706@prolan.hu>
+ <20120110140043.GC26599@S2101-09.ap.freescale.net>
+Message-ID: <4F0C5BB9.3070203@prolan.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2012 at 11:24:11AM +0100, Thierry Reding wrote:
-> The irq_domain_add() function needs the number of interrupts in the
-> domain to properly initialize them. In addition the allocated domain
-> is now returned by the irq_domain_{add,generate}_simple() helpers.
-> 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: David Brown <davidb@codeaurora.org>
-> ---
-> Note: This patch should not be applied yet. There is a conflict with a
->       pending patch[0] by Benoit Cousson that will obsolete the OMAP2
->       hunk in this patch.
-> 
->       [0]: http://www.spinics.net/lists/linux-omap/msg62124.html
-> 
-> Changes in v2:
->  - Don't use ERR_PTR, keep the WARN_ON(1) and return NULL as requested
->    by Grant Likely.
->  - Integrate i.MX cleanup patch by Shawn Guo.
-> 
-...
->  arch/arm/mach-imx/imx51-dt.c          |   13 +++++++++++--
->  arch/arm/mach-imx/imx53-dt.c          |   13 +++++++++++--
->  arch/arm/mach-imx/mach-imx6q.c        |    6 +++++-
-...
->  arch/arm/plat-mxc/include/mach/irqs.h |   13 +++++++------
->  arch/arm/plat-mxc/tzic.c              |    2 --
+On 2012-01-10 15:00, Shawn Guo wrote:
+> Another point worth checking is bit field ATIME_INC of register
+> HW_ENET_MAC_ATIME_INC.  It should be 25 if your CLK_ENET_TIME runs
+> at 40 MHz.
+>
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+No, that was set correctly. Finally, I've found my mistake. I've 
+overwritten the other bits when writing the divider so xtal clock was 
+selected automatically.
+Silly little mistake, isn't it? :) Anyway, thank you for your help.
 
-Regards,
-Shawn
+-- 
+Rusk? P?ter
+Fejleszt?m?rn?k
+
+Prolan Zrt. / Prolan Co.
+Hungary 2011 Budakal?sz, Szentendrei ?t 1-3.
+Tel./Phone: +36 20 954 3118
+Fax: +36 26 540 420
+E-mail: rusko.peter at prolan.hu
+Web: www.prolan.hu
+Timezone:CET
