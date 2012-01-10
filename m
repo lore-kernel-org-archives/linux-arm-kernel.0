@@ -1,275 +1,182 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 10 Jan 2012 17:24:22 +0100
-Subject: [PATCH 2/5] ARM: at91: merge at91cap9_ddrsdr.h in at91sam9_ddrsdr.h
+Date: Tue, 10 Jan 2012 17:24:25 +0100
+Subject: [PATCH 5/5] ARM: at91: Fix at91sam9g45 and at91cap9 reset
 In-Reply-To: <20120110160349.GV2854@game.jcrosoft.org>
 References: <20120110160349.GV2854@game.jcrosoft.org>
-Message-ID: <1326212665-1881-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1326212665-1881-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+As on the other sam9 we need to cleanly shutdown the DDR before rebooting
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h |  112 ---------------------
- arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |   30 ++++--
- arch/arm/mach-at91/pm.h                           |    8 +-
- arch/arm/mach-at91/pm_slowclock.S                 |    5 +-
- 4 files changed, 26 insertions(+), 129 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
+ arch/arm/mach-at91/Kconfig             |    5 ++++
+ arch/arm/mach-at91/Makefile            |    1 +
+ arch/arm/mach-at91/at91cap9.c          |    8 +-----
+ arch/arm/mach-at91/at91sam9g45.c       |    6 ----
+ arch/arm/mach-at91/at91sam9g45_reset.S |   40 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/generic.h           |    1 +
+ 6 files changed, 48 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
 
-diff --git a/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h b/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
-deleted file mode 100644
-index d21932d..0000000
---- a/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
-+++ /dev/null
-@@ -1,112 +0,0 @@
--/*
-- * arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
-- *
-- *  (C) 2008 Andrew Victor
-- *
-- * DDR/SDR Controller (DDRSDRC) - System peripherals registers.
-- * Based on AT91CAP9 datasheet revision B.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 4275577..71feb00 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -21,6 +21,9 @@ config HAVE_AT91_USART5
+ config AT91_SAM9_ALT_RESET
+ 	bool
+ 
++config AT91_SAM9G45_RESET
++	bool
++
+ menu "Atmel AT91 System-on-Chip"
+ 
+ choice
+@@ -97,6 +100,7 @@ config ARCH_AT91SAM9G45
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
+ 	select HAVE_AT91_DBGU1
++	select AT91_SAM9G45_RESET
+ 
+ config ARCH_AT91CAP9
+ 	bool "AT91CAP9"
+@@ -105,6 +109,7 @@ config ARCH_AT91CAP9
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
+ 	select HAVE_AT91_DBGU1
++	select AT91_SAM9G45_RESET
+ 
+ config ARCH_AT91X40
+ 	bool "AT91x40"
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index e8e961b..705e1fb 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -9,6 +9,7 @@ obj-		:=
+ 
+ obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
+ obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
++obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
+ 
+ # CPU-specific support
+ obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o at91rm9200_devices.o
+diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+index 7a2309e..a42edc2 100644
+--- a/arch/arm/mach-at91/at91cap9.c
++++ b/arch/arm/mach-at91/at91cap9.c
+@@ -21,7 +21,6 @@
+ #include <mach/cpu.h>
+ #include <mach/at91cap9.h>
+ #include <mach/at91_pmc.h>
+-#include <mach/at91_rstc.h>
+ 
+ #include "soc.h"
+ #include "generic.h"
+@@ -314,11 +313,6 @@ static struct at91_gpio_bank at91cap9_gpio[] __initdata = {
+ 	}
+ };
+ 
+-static void at91cap9_restart(char mode, const char *cmd)
+-{
+-	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
+-}
 -
--#ifndef AT91CAP9_DDRSDR_H
--#define AT91CAP9_DDRSDR_H
--
--#define AT91_DDRSDRC_MR		0x00	/* Mode Register */
--#define		AT91_DDRSDRC_MODE	(0x7 << 0)		/* Command Mode */
--#define			AT91_DDRSDRC_MODE_NORMAL		0
--#define			AT91_DDRSDRC_MODE_NOP		1
--#define			AT91_DDRSDRC_MODE_PRECHARGE	2
--#define			AT91_DDRSDRC_MODE_LMR		3
--#define			AT91_DDRSDRC_MODE_REFRESH	4
--#define			AT91_DDRSDRC_MODE_EXT_LMR	5
--#define			AT91_DDRSDRC_MODE_DEEP		6
--
--#define AT91_DDRSDRC_RTR	0x04	/* Refresh Timer Register */
--#define		AT91_DDRSDRC_COUNT	(0xfff << 0)		/* Refresh Timer Counter */
--
--#define AT91_DDRSDRC_CR		0x08	/* Configuration Register */
--#define		AT91_DDRSDRC_NC		(3 << 0)		/* Number of Column Bits */
--#define			AT91_DDRSDRC_NC_SDR8	(0 << 0)
--#define			AT91_DDRSDRC_NC_SDR9	(1 << 0)
--#define			AT91_DDRSDRC_NC_SDR10	(2 << 0)
--#define			AT91_DDRSDRC_NC_SDR11	(3 << 0)
--#define			AT91_DDRSDRC_NC_DDR9	(0 << 0)
--#define			AT91_DDRSDRC_NC_DDR10	(1 << 0)
--#define			AT91_DDRSDRC_NC_DDR11	(2 << 0)
--#define			AT91_DDRSDRC_NC_DDR12	(3 << 0)
--#define		AT91_DDRSDRC_NR		(3 << 2)		/* Number of Row Bits */
--#define			AT91_DDRSDRC_NR_11	(0 << 2)
--#define			AT91_DDRSDRC_NR_12	(1 << 2)
--#define			AT91_DDRSDRC_NR_13	(2 << 2)
--#define			AT91_DDRSDRC_NR_14	(3 << 2)
--#define		AT91_DDRSDRC_CAS	(7 << 4)		/* CAS Latency */
--#define			AT91_DDRSDRC_CAS_2	(2 << 4)
--#define			AT91_DDRSDRC_CAS_3	(3 << 4)
--#define			AT91_DDRSDRC_CAS_25	(6 << 4)
--#define		AT91_DDRSDRC_DLL	(1 << 7)		/* Reset DLL */
--#define		AT91_DDRSDRC_DICDS	(1 << 8)		/* Output impedance control */
--
--#define AT91_DDRSDRC_T0PR	0x0C	/* Timing 0 Register */
--#define		AT91_DDRSDRC_TRAS	(0xf <<  0)		/* Active to Precharge delay */
--#define		AT91_DDRSDRC_TRCD	(0xf <<  4)		/* Row to Column delay */
--#define		AT91_DDRSDRC_TWR	(0xf <<  8)		/* Write recovery delay */
--#define		AT91_DDRSDRC_TRC	(0xf << 12)		/* Row cycle delay */
--#define		AT91_DDRSDRC_TRP	(0xf << 16)		/* Row precharge delay */
--#define		AT91_DDRSDRC_TRRD	(0xf << 20)		/* Active BankA to BankB */
--#define		AT91_DDRSDRC_TWTR	(1   << 24)		/* Internal Write to Read delay */
--#define		AT91_DDRSDRC_TMRD	(0xf << 28)		/* Load mode to active/refresh delay */
--
--#define AT91_DDRSDRC_T1PR	0x10	/* Timing 1 Register */
--#define		AT91_DDRSDRC_TRFC	(0x1f << 0)		/* Row Cycle Delay */
--#define		AT91_DDRSDRC_TXSNR	(0xff << 8)		/* Exit self-refresh to non-read */
--#define		AT91_DDRSDRC_TXSRD	(0xff << 16)		/* Exit self-refresh to read */
--#define		AT91_DDRSDRC_TXP	(0xf  << 24)		/* Exit power-down delay */
--
--#define AT91_DDRSDRC_LPR	0x18	/* Low Power Register */
--#define		AT91_DDRSDRC_LPCB		(3 << 0)	/* Low-power Configurations */
--#define			AT91_DDRSDRC_LPCB_DISABLE		0
--#define			AT91_DDRSDRC_LPCB_SELF_REFRESH		1
--#define			AT91_DDRSDRC_LPCB_POWER_DOWN		2
--#define			AT91_DDRSDRC_LPCB_DEEP_POWER_DOWN	3
--#define		AT91_DDRSDRC_CLKFR		(1 << 2)	/* Clock Frozen */
--#define		AT91_DDRSDRC_PASR		(7 << 4)	/* Partial Array Self Refresh */
--#define		AT91_DDRSDRC_TCSR		(3 << 8)	/* Temperature Compensated Self Refresh */
--#define		AT91_DDRSDRC_DS			(3 << 10)	/* Drive Strength */
--#define		AT91_DDRSDRC_TIMEOUT		(3 << 12)	/* Time to define when Low Power Mode is enabled */
--#define			AT91_DDRSDRC_TIMEOUT_0_CLK_CYCLES	(0 << 12)
--#define			AT91_DDRSDRC_TIMEOUT_64_CLK_CYCLES	(1 << 12)
--#define			AT91_DDRSDRC_TIMEOUT_128_CLK_CYCLES	(2 << 12)
--
--#define AT91_DDRSDRC_MDR	0x1C	/* Memory Device Register */
--#define		AT91_DDRSDRC_MD		(3 << 0)		/* Memory Device Type */
--#define			AT91_DDRSDRC_MD_SDR		0
--#define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
--#define			AT91_DDRSDRC_MD_DDR		2
--#define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
--#define		AT91_DDRSDRC_DBW	(1 << 4)		/* Data Bus Width */
--#define			AT91_DDRSDRC_DBW_32BITS		(0 <<  4)
--#define			AT91_DDRSDRC_DBW_16BITS		(1 <<  4)
--
--#define AT91_DDRSDRC_DLLR	0x20	/* DLL Information Register */
--#define		AT91_DDRSDRC_MDINC	(1 << 0)		/* Master Delay increment */
--#define		AT91_DDRSDRC_MDDEC	(1 << 1)		/* Master Delay decrement */
--#define		AT91_DDRSDRC_MDOVF	(1 << 2)		/* Master Delay Overflow */
--#define		AT91_DDRSDRC_SDCOVF	(1 << 3)		/* Slave Delay Correction Overflow */
--#define		AT91_DDRSDRC_SDCUDF	(1 << 4)		/* Slave Delay Correction Underflow */
--#define		AT91_DDRSDRC_SDERF	(1 << 5)		/* Slave Delay Correction error */
--#define		AT91_DDRSDRC_MDVAL	(0xff <<  8)		/* Master Delay value */
--#define		AT91_DDRSDRC_SDVAL	(0xff << 16)		/* Slave Delay value */
--#define		AT91_DDRSDRC_SDCVAL	(0xff << 24)		/* Slave Delay Correction value */
--
--/* Register access macros */
--#define at91_ramc_read(num, reg) \
--	at91_sys_read(AT91_DDRSDRC##num + reg)
--#define at91_ramc_write(num, reg, value) \
--	at91_sys_write(AT91_DDRSDRC##num + reg, value)
--
--
--#endif
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h b/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
-index d27b15b..e2f8da8 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
-@@ -46,10 +46,10 @@
- #define			AT91_DDRSDRC_CAS_25	(6 << 4)
- #define		AT91_DDRSDRC_RST_DLL	(1 << 7)		/* Reset DLL */
- #define		AT91_DDRSDRC_DICDS	(1 << 8)		/* Output impedance control */
--#define		AT91_DDRSDRC_DIS_DLL	(1 << 9)		/* Disable DLL */
--#define		AT91_DDRSDRC_OCD	(1 << 12)		/* Off-Chip Driver */
--#define		AT91_DDRSDRC_DQMS	(1 << 16)		/* Mask Data is Shared */
--#define		AT91_DDRSDRC_ACTBST	(1 << 18)		/* Active Bank X to Burst Stop Read Access Bank Y */
-+#define		AT91_DDRSDRC_DIS_DLL	(1 << 9)		/* Disable DLL [SAM9 Only] */
-+#define		AT91_DDRSDRC_OCD	(1 << 12)		/* Off-Chip Driver [SAM9 Only] */
-+#define		AT91_DDRSDRC_DQMS	(1 << 16)		/* Mask Data is Shared [SAM9 Only] */
-+#define		AT91_DDRSDRC_ACTBST	(1 << 18)		/* Active Bank X to Burst Stop Read Access Bank Y [SAM9 Only] */
+ /* --------------------------------------------------------------------
+  *  AT91CAP9 processor initialization
+  * -------------------------------------------------------------------- */
+@@ -338,7 +332,7 @@ static void __init at91cap9_ioremap_registers(void)
  
- #define AT91_DDRSDRC_T0PR	0x0C	/* Timing 0 Register */
- #define		AT91_DDRSDRC_TRAS	(0xf <<  0)		/* Active to Precharge delay */
-@@ -59,7 +59,8 @@
- #define		AT91_DDRSDRC_TRP	(0xf << 16)		/* Row precharge delay */
- #define		AT91_DDRSDRC_TRRD	(0xf << 20)		/* Active BankA to BankB */
- #define		AT91_DDRSDRC_TWTR	(0x7 << 24)		/* Internal Write to Read delay */
--#define		AT91_DDRSDRC_RED_WRRD	(0x1 << 27)		/* Reduce Write to Read Delay */
-+#define		AT91CAP9_DDRSDRC_TWTR	(1   << 24)		/* Internal Write to Read delay */
-+#define		AT91_DDRSDRC_RED_WRRD	(0x1 << 27)		/* Reduce Write to Read Delay [SAM9 Only] */
- #define		AT91_DDRSDRC_TMRD	(0xf << 28)		/* Load mode to active/refresh delay */
- 
- #define AT91_DDRSDRC_T1PR	0x10	/* Timing 1 Register */
-@@ -68,13 +69,14 @@
- #define		AT91_DDRSDRC_TXSRD	(0xff << 16)		/* Exit self-refresh to read */
- #define		AT91_DDRSDRC_TXP	(0xf  << 24)		/* Exit power-down delay */
- 
--#define AT91_DDRSDRC_T2PR	0x14	/* Timing 2 Register */
-+#define AT91_DDRSDRC_T2PR	0x14	/* Timing 2 Register [SAM9 Only] */
- #define		AT91_DDRSDRC_TXARD	(0xf  << 0)		/* Exit active power down delay to read command in mode "Fast Exit" */
- #define		AT91_DDRSDRC_TXARDS	(0xf  << 4)		/* Exit active power down delay to read command in mode "Slow Exit" */
- #define		AT91_DDRSDRC_TRPA	(0xf  << 8)		/* Row Precharge All delay */
- #define		AT91_DDRSDRC_TRTP	(0x7  << 12)		/* Read to Precharge delay */
- 
- #define AT91_DDRSDRC_LPR	0x1C	/* Low Power Register */
-+#define AT91CAP9_DDRSDRC_LPR	0x18	/* Low Power Register */
- #define		AT91_DDRSDRC_LPCB	(3 << 0)		/* Low-power Configurations */
- #define			AT91_DDRSDRC_LPCB_DISABLE		0
- #define			AT91_DDRSDRC_LPCB_SELF_REFRESH		1
-@@ -92,32 +94,40 @@
- #define		AT91_DDRSDRC_UPD_MR	(3 << 20)	 /* Update load mode register and extended mode register */
- 
- #define AT91_DDRSDRC_MDR	0x20	/* Memory Device Register */
-+#define AT91CAP9_DDRSDRC_MDR	0x1C	/* Memory Device Register */
- #define		AT91_DDRSDRC_MD		(3 << 0)		/* Memory Device Type */
- #define			AT91_DDRSDRC_MD_SDR		0
- #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
-+#define			AT91CAP9_DDRSDRC_MD_DDR		2
- #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
--#define			AT91_DDRSDRC_MD_DDR2		6
-+#define			AT91_DDRSDRC_MD_DDR2		6	/* [SAM9 Only] */
- #define		AT91_DDRSDRC_DBW	(1 << 4)		/* Data Bus Width */
- #define			AT91_DDRSDRC_DBW_32BITS		(0 <<  4)
- #define			AT91_DDRSDRC_DBW_16BITS		(1 <<  4)
- 
- #define AT91_DDRSDRC_DLL	0x24	/* DLL Information Register */
-+#define AT91CAP9_DDRSDRC_DLL	0x20	/* DLL Information Register */
- #define		AT91_DDRSDRC_MDINC	(1 << 0)		/* Master Delay increment */
- #define		AT91_DDRSDRC_MDDEC	(1 << 1)		/* Master Delay decrement */
- #define		AT91_DDRSDRC_MDOVF	(1 << 2)		/* Master Delay Overflow */
-+#define		AT91CAP9_DDRSDRC_SDCOVF	(1 << 3)		/* Slave Delay Correction Overflow */
-+#define		AT91CAP9_DDRSDRC_SDCUDF	(1 << 4)		/* Slave Delay Correction Underflow */
-+#define		AT91CAP9_DDRSDRC_SDERF	(1 << 5)		/* Slave Delay Correction error */
- #define		AT91_DDRSDRC_MDVAL	(0xff <<  8)		/* Master Delay value */
-+#define		AT91CAP9_DDRSDRC_SDVAL	(0xff << 16)		/* Slave Delay value */
-+#define		AT91CAP9_DDRSDRC_SDCVAL	(0xff << 24)		/* Slave Delay Correction value */
- 
--#define AT91_DDRSDRC_HS		0x2C	/* High Speed Register */
-+#define AT91_DDRSDRC_HS		0x2C	/* High Speed Register [SAM9 Only] */
- #define		AT91_DDRSDRC_DIS_ATCP_RD	(1 << 2)	/* Anticip read access is disabled */
- 
- #define AT91_DDRSDRC_DELAY(n)	(0x30 + (0x4 * (n)))	/* Delay I/O Register n */
- 
--#define AT91_DDRSDRC_WPMR	0xE4	/* Write Protect Mode Register */
-+#define AT91_DDRSDRC_WPMR	0xE4	/* Write Protect Mode Register [SAM9 Only] */
- #define		AT91_DDRSDRC_WP		(1 << 0)		/* Write protect enable */
- #define		AT91_DDRSDRC_WPKEY	(0xffffff << 8)		/* Write protect key */
- #define		AT91_DDRSDRC_KEY	(0x444452 << 8)		/* Write protect key = "DDR" */
- 
--#define AT91_DDRSDRC_WPSR	0xE8	/* Write Protect Status Register */
-+#define AT91_DDRSDRC_WPSR	0xE8	/* Write Protect Status Register [SAM9 Only] */
- #define		AT91_DDRSDRC_WPVS	(1 << 0)		/* Write protect violation status */
- #define		AT91_DDRSDRC_WPVSRC	(0xffff << 8)		/* Write protect violation source */
- 
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index ce9a206..7eb40d2 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -25,21 +25,21 @@ static inline u32 sdram_selfrefresh_enable(void)
- 								: : "r" (0))
- 
- #elif defined(CONFIG_ARCH_AT91CAP9)
--#include <mach/at91cap9_ddrsdr.h>
-+#include <mach/at91sam9_ddrsdr.h>
- 
- 
- static inline u32 sdram_selfrefresh_enable(void)
+ static void __init at91cap9_initialize(void)
  {
- 	u32 saved_lpr, lpr;
+-	arm_pm_restart = at91cap9_restart;
++	arm_pm_restart = at91sam9g45_restart;
+ 	at91_extern_irq = (1 << AT91CAP9_ID_IRQ0) | (1 << AT91CAP9_ID_IRQ1);
  
--	saved_lpr = at91_ramc_read(0, AT91_DDRSDRC_LPR);
-+	saved_lpr = at91_ramc_read(0, AT91CAP9_DDRSDRC_LPR);
+ 	/* Register GPIO subsystem */
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index ec6a2db..1cb6a96 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -18,7 +18,6 @@
+ #include <asm/mach/map.h>
+ #include <mach/at91sam9g45.h>
+ #include <mach/at91_pmc.h>
+-#include <mach/at91_rstc.h>
+ #include <mach/cpu.h>
  
- 	lpr = saved_lpr & ~AT91_DDRSDRC_LPCB;
--	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr | AT91_DDRSDRC_LPCB_SELF_REFRESH);
-+	at91_ramc_write(0, AT91CAP9_DDRSDRC_LPR, lpr | AT91_DDRSDRC_LPCB_SELF_REFRESH);
- 	return saved_lpr;
- }
+ #include "soc.h"
+@@ -318,11 +317,6 @@ static struct at91_gpio_bank at91sam9g45_gpio[] __initdata = {
+ 	}
+ };
  
--#define sdram_selfrefresh_disable(saved_lpr)	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr)
-+#define sdram_selfrefresh_disable(saved_lpr)	at91_ramc_write(0, AT91CAP9_DDRSDRC_LPR, saved_lpr)
- #define wait_for_interrupt_enable()		cpu_do_idle()
+-static void at91sam9g45_restart(char mode, const char *cmd)
+-{
+-	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
+-}
+-
+ /* --------------------------------------------------------------------
+  *  AT91SAM9G45 processor initialization
+  * -------------------------------------------------------------------- */
+diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
+new file mode 100644
+index 0000000..0468be1
+--- /dev/null
++++ b/arch/arm/mach-at91/at91sam9g45_reset.S
+@@ -0,0 +1,40 @@
++/*
++ * reset AT91SAM9G45 as per errata
++ *
++ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcosoft.com>
++ *
++ * unless the SDRAM is cleanly shutdown before we hit the
++ * reset register it can be left driving the data bus and
++ * killing the chance of a subsequent boot from NAND
++ *
++ * GPLv2 Only
++ */
++
++#include <linux/linkage.h>
++#include <mach/hardware.h>
++#include <mach/at91sam9_ddrsdr.h>
++#include <mach/at91_rstc.h>
++
++			.arm
++
++			.globl	at91sam9g45_restart
++
++at91sam9g45_restart:
++			ldr	r0, .at91_va_base_sdramc0	@ preload constants
++			ldr	r1, =at91_rstc_base
++			ldr	r1, [r1]
++
++			mov	r2, #1
++			mov	r3, #AT91_DDRSDRC_LPCB_POWER_DOWN
++			ldr	r4, =AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST
++
++			.balign	32				@ align to cache line
++
++			str	r2, [r0, #AT91_DDRSDRC_RTR]	@ disable DDR0 access
++			str	r3, [r0, #AT91_DDRSDRC_LPR]	@ power down DDR0
++			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
++
++			b	.
++
++.at91_va_base_sdramc0:
++	.word AT91_VA_BASE_SYS + AT91_DDRSDRC0
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 62e508b..5941334 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -60,6 +60,7 @@ extern void at91_irq_resume(void);
+ /* reset */
+ extern void at91_ioremap_rstc(u32 base_addr);
+ extern void at91sam9_alt_restart(char, const char *);
++extern void at91sam9g45_restart(char, const char *);
  
- #elif defined(CONFIG_ARCH_AT91SAM9G45)
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index f7922a4..92dfb84 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -18,9 +18,8 @@
- 
- #if defined(CONFIG_ARCH_AT91RM9200)
- #include <mach/at91rm9200_mc.h>
--#elif defined(CONFIG_ARCH_AT91CAP9)
--#include <mach/at91cap9_ddrsdr.h>
--#elif defined(CONFIG_ARCH_AT91SAM9G45)
-+#elif defined(CONFIG_ARCH_AT91CAP9) \
-+	|| defined(CONFIG_ARCH_AT91SAM9G45)
- #include <mach/at91sam9_ddrsdr.h>
- #else
- #include <mach/at91sam9_sdramc.h>
+ /* shutdown */
+ extern void at91_ioremap_shdwc(u32 base_addr);
 -- 
 1.7.7
