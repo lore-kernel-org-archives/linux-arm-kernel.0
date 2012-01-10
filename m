@@ -1,57 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Jan 2012 09:06:35 +0000
-Subject: [GIT PULL] Samsung devel for v3.3
-In-Reply-To: <20120109161152.GA2974@opensource.wolfsonmicro.com>
-References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
- <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
- <01a301ccce6f$9bb51790$d31f46b0$%kim@samsung.com>
- <201201091556.34817.arnd@arndb.de>
- <20120109161152.GA2974@opensource.wolfsonmicro.com>
-Message-ID: <20120110090635.GT21765@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Jan 2012 10:13:12 +0100
+Subject: [PATCH v4 1/3] pinctrl: enable pinmux for mmp series
+In-Reply-To: <1325643995-20745-2-git-send-email-haojian.zhuang@marvell.com>
+References: <1325643995-20745-1-git-send-email-haojian.zhuang@marvell.com>
+ <1325643995-20745-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <CACRpkdaA49pxgseaZNZggQx0GGc3P14tmFzTnxT3fTc2XAJcTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 08:11:54AM -0800, Mark Brown wrote:
-> On Mon, Jan 09, 2012 at 03:56:34PM +0000, Arnd Bergmann wrote:
-> 
-> > Of course we will take all bug fixes. Just rebase the rest on top of 3.3-rc1
-> > and we can take it right away for 3.4.
-> 
-> I've sent a pull request earlier in the thread for the main ones I'm
-> aware of (which are mostly fixes for things introduced in this cycle) -
-> the others I'm aware of are all specific to Cragganmore and given that
-> we can't get any of the features for that merged the fixes aren't going
-> to have any practical effect until we can manage to get the feature
-> stuff merged so it's not really worth the effort.
-> 
-> This really is very disappointing.
+On Wed, Jan 4, 2012 at 3:26 AM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
 
-No it isn't.
+> Support PXA168/PXA910/MMP2 pinmux. Now only support function switch.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-What is really disappointing is the lack of responsive maintainers for the
-Samsung stuff.  It took _two_ bloody months to get the Samsung platforms
-sorted for the restart changes in spite of reminding, and a last minute
-rush over the course of a couple of days (one _in_ the merge window) to
-get it properly merged into my tree.
+I've applied this to my devel branch. It's pretty huge but since it's
+split over three files I guess I can live with it. I can also see that
+you have really made an effort to cover the PXA variants and
+these drivers give a real good abstraction and understanding of
+this muxing hardware so WELL DONE!
 
-The only reason something happened was because I stuck a #error into
-the Samsung code in linux-next and people started reporting that Samsung
-had broken.
+I fixed a number of whitespace issues, so please base your further
+work upon my tree (once it emerges after the merge window).
 
-This is not the worst of it - Nicolas took _three_ months to get a response
-from the shmobile maintainers.  I never got a response from the shmobile
-maintainers for the restart changes - so congratulations to the shmobile
-maintainers, shmobile is now broken.
+I also removed the .maxpin on all pinctrl_desc:s, since that is
+gone now, we get the max pin from the pin list instead, so it's
+self-describing.
 
-The alternative was basically Samsung ending up like shmobile is today.
-Maybe that's what should have happened to save folk like Arnd such a
-horrible job now.
+When I see things like this:
 
-So, I support Arnd's view: the Samsung stuff is just too late.  Even the
-restart updates (which is what has caused this) were too late.  Anything
-which causes new merge conflicts in the Samsung code is not acceptable at
-this point, even if it's a 'fix' patch.  We've wasted far too much time
-trying to get Samsung stuff sorted far too late in the cycle.
+	PINCTRL_PIN(GPIO0, "GPIO0"),
+	PINCTRL_PIN(GPIO1, "GPIO1"),
+	PINCTRL_PIN(GPIO2, "GPIO2"),
+	PINCTRL_PIN(GPIO3, "GPIO3"),
+	PINCTRL_PIN(GPIO4, "GPIO4"),
+	PINCTRL_PIN(GPIO5, "GPIO5"),
 
-Let this be an object lesson in what happens if you leave stuff until the
-last minute.
+I wish I could have loops in the preprocessor and just
+PINCTRL_PIN_RANGE("GPIO", start, end)
+but sadly I can't. So as mentioned earlier we might go for
+some static inline helper that can generate that array before you
+assign it to your pin controller.
+
+Maybe the device tree is the answer to everything (as usual). Given the
+time it seems to take to find consensus around DT stuff we might just
+have to wait and see.
+
+Yours,
+Linus Walleij
