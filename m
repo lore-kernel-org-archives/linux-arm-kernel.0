@@ -1,26 +1,41 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Tue, 10 Jan 2012 10:55:59 +0000
-Subject: [RFC PATCH v3 3/5] pinctrl: imx: add pinctrl imx driver
-In-Reply-To: <CACRpkdZ=G+=Aq49r9VYa1ZGMg=Sy3Dy3kHNbbcFRp-Hn6y1ZqQ@mail.gmail.com>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-4-git-send-email-b29396@freescale.com>
- <20120108130542.GC2203@richard-laptop>
- <20120109020848.GF1835@S2101-09.ap.freescale.net>
- <20120109021702.GV2414@b20223-02.ap.freescale.net>
- <20120109063136.GI1835@S2101-09.ap.freescale.net>
- <20120110083842.GA2414@b20223-02.ap.freescale.net>
- <CACRpkdZ=G+=Aq49r9VYa1ZGMg=Sy3Dy3kHNbbcFRp-Hn6y1ZqQ@mail.gmail.com>
-Message-ID: <7FE21149F4667147B645348EC605788508B006@039-SN2MPN1-013.039d.mgd.msft.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 10 Jan 2012 11:04:33 +0000
+Subject: [PATCH] ARM: vexpress: initial device tree support
+In-Reply-To: <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
+References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
+ <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
+Message-ID: <20120110110433.GA2336@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Next from discussions with Stpehen I've sort of figured out that we need a
-> config mapping table of sorts and then a means to activate entries of that table
-> at runtime. I'm trying to come up with something for this.
+On Mon, Jan 09, 2012 at 11:26:38PM +0000, Tabi Timur-B04825 wrote:
+> On Wed, Sep 21, 2011 at 4:19 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> >
+> > ? ? ?* edid -- It should be possible to have a fairly generic binding
+> > ? ? ? ?for EDID interfaces, but none seems to exist yet. ?Discussion
+> > ? ? ? ?is needed regarding what form this should take.
+> >
+> > ? ? ? ?This might more appropriately be called "ddc" (or some
+> > ? ? ? ?variation on that), since EDID seems only to describe the
+> > ? ? ? ?format of the ID data retrievable via this interface; not the
+> > ? ? ? ?interface itself.
 > 
-Good to hear this.
-I did not catch up your steps before, so I did not give much comment on the pinctrl core.
-I would try to do it if I can now.
+> Has there been any progress on this issue?  I'm looking to add EDID
+> support to a PowerPC device tree.  A TI developer is using
+> "ti,eeprom", but I'm not sure that's a good choice.
 
-Regards
-Dong Aisheng
+It turns out that because of the way things are wired up on vexpress, the
+EDID is not really usable; so I wasn't planning to do anything about it.
+
+
+I don't really know enough about this field to comment on whether it's
+genuinely useful to have a specific binding for EDID.  If it's enough
+to reference the appropriate I2C bus node from the display device node,
+then I guess we don't necessarily need to worry about having a separate
+binding.
+
+If it makes no sense to attempt make EDID access fully generic, that
+would sound like the right approach.
+
+Cheers
+---Dave
