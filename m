@@ -1,26 +1,29 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 10 Jan 2012 09:47:26 -0800
-Subject: [PATCHV2 REPOST 5/7] ARM: OMAP3PLUS PM: Add IO Daisychain support
- via hwmod mux
-In-Reply-To: <8739bnsb6o.fsf@ti.com>
-References: <1323878477-21122-1-git-send-email-vishwanath.bs@ti.com>
- <1323878477-21122-6-git-send-email-vishwanath.bs@ti.com>
- <8739bnsb6o.fsf@ti.com>
-Message-ID: <4F0C79AE.308@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 10 Jan 2012 09:55:26 -0800
+Subject: [PATCH V2 1/4] ARM: tegra: Introduce define DEBUG_UART_SHIFT
+In-Reply-To: <1325882602-7573-1-git-send-email-swarren@nvidia.com>
+References: <1325882602-7573-1-git-send-email-swarren@nvidia.com>
+Message-ID: <CAD=FV=Xqw69kkAgxz84PMSirkXTwiUZ8tmHZm-kvkom3EpduYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2012 09:46 AM, Kevin Hilman wrote:
-> Vishwanath BS<vishwanath.bs@ti.com>  writes:
+On Fri, Jan 6, 2012 at 12:43 PM, Stephen Warren <swarren@nvidia.com> wrote:
 >
->> >  IO Daisychain feature has to be triggered whenever there is a change in
->> >  device's mux configuration (See section 3.9.4 in OMAP4 Public TRM vP).
- >
-> ...in addition to the triggering still happening in the idle path,
-> right?   IIUC, after this series, there's still a call in omap_sram_idle().
+> From: Doug Anderson <dianders@chromium.org>
+>
+> This removes the need for the variable "shift" in all functions in
+> uncompress.h.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> [swarren: Extracted from a larger patch by Doug]
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-oops, please ignore this comment.  I see the answer in PATCH 6/7.
+For the series (patch V2 1-4):
 
-Sorry for the noise.
+Tested-by: Doug Anderson <dianders@chromium.org>
+Acked-by: Doug Anderson <dianders@chromium.org>
 
-Kevin
+
+Thank you again!
+
+-Doug
