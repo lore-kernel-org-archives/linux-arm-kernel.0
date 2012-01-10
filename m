@@ -1,35 +1,32 @@
-From: rusko.peter@prolan.hu (Peter Rusko)
-Date: Tue, 10 Jan 2012 16:39:37 +0100
-Subject: MX28 fec clock frequency
-In-Reply-To: <20120110140043.GC26599@S2101-09.ap.freescale.net>
-References: <4F06D643.6080602@prolan.hu>
- <20120108033238.GA19721@S2101-09.ap.freescale.net>
- <4F0AF4B0.4030403@prolan.hu>
- <20120110082138.GF23362@S2101-09.ap.freescale.net> <4F0C384F.10706@prolan.hu>
- <20120110140043.GC26599@S2101-09.ap.freescale.net>
-Message-ID: <4F0C5BB9.3070203@prolan.hu>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 10 Jan 2012 08:08:56 -0800
+Subject: [GIT PULL 05/11] SoC-level changes for tegra and omap
+In-Reply-To: <20120110083933.GS21765@n2100.arm.linux.org.uk>
+References: <1326147171-13752-1-git-send-email-arnd@arndb.de>
+ <1326147171-13752-6-git-send-email-arnd@arndb.de>
+ <CA+55aFyaOnJhrZOFnRiShH9kTeGEG8O8m9spvKF=c36QzjSvBA@mail.gmail.com>
+ <20120110083933.GS21765@n2100.arm.linux.org.uk>
+Message-ID: <CA+55aFw15sw0PWtom88vJx1M45CLuvpZABQAxMOQ+xowz8Xq2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-01-10 15:00, Shawn Guo wrote:
-> Another point worth checking is bit field ATIME_INC of register
-> HW_ENET_MAC_ATIME_INC.  It should be 25 if your CLK_ENET_TIME runs
-> at 40 MHz.
+On Tue, Jan 10, 2012 at 12:39 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 >
+> What about using -C instead (which implies -M, but also detects copies) ?
 
-No, that was set correctly. Finally, I've found my mistake. I've 
-overwritten the other bits when writing the divider so xtal clock was 
-selected automatically.
-Silly little mistake, isn't it? :) Anyway, thank you for your help.
+I don't mind -C. It sometimes causes differences to what I see by
+default, but those differences are often interesting.
 
--- 
-Rusk? P?ter
-Fejleszt?m?rn?k
+But while it's interesting and relevant (unlike the non-rename patch
+that is just noisy), it also can hide lots of lines. With -C, you can
+get a diffstat that is actually fairly small, but that adds a lot of
+lines to the kernel (because somebody just copied large files with
+small changes), and if that happens I do want to see it as a "big
+change". So for me, the plain "just show renames" is a good default.
 
-Prolan Zrt. / Prolan Co.
-Hungary 2011 Budakal?sz, Szentendrei ?t 1-3.
-Tel./Phone: +36 20 954 3118
-Fax: +36 26 540 420
-E-mail: rusko.peter at prolan.hu
-Web: www.prolan.hu
-Timezone:CET
+So there is absolutely nothing wrong with -C. It's not what I use, but
+when I see that the diffstats don't match, it's easy to notice why,
+and that information is often fairly interesting, so I don't mind.
+
+                    Linus
