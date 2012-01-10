@@ -1,57 +1,40 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 10 Jan 2012 10:39:05 +0000
-Subject: [PATCH v2] irqdomain: Initialize number of IRQs for simple domains
-In-Reply-To: <1326191059-26411-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1326191059-26411-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20120110103905.GC3226@page>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Jan 2012 11:43:28 +0100
+Subject: [RFC PATCH v3 3/5] pinctrl: imx: add pinctrl imx driver
+In-Reply-To: <20120110083842.GA2414@b20223-02.ap.freescale.net>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-4-git-send-email-b29396@freescale.com>
+ <20120108130542.GC2203@richard-laptop>
+ <20120109020848.GF1835@S2101-09.ap.freescale.net>
+ <20120109021702.GV2414@b20223-02.ap.freescale.net>
+ <20120109063136.GI1835@S2101-09.ap.freescale.net>
+ <20120110083842.GA2414@b20223-02.ap.freescale.net>
+Message-ID: <CACRpkdZ=G+=Aq49r9VYa1ZGMg=Sy3Dy3kHNbbcFRp-Hn6y1ZqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Tue, Jan 10, 2012 at 9:38 AM, Richard Zhao
+<richard.zhao@freescale.com> wrote:
+> On Mon, Jan 09, 2012 at 02:32:12PM +0800, Shawn Guo wrote:
+>> As I was educated by Linus.W, we can not drink ocean and we need to
+>> split big chunk of work into pieces and achieve it step by step.
+> Sure, we can not drink out the ocean :). But if people can not use it
+> in real case, how do we verify the driver? How do we know the driver
+> goes in the right way?
 
-On Tue, Jan 10, 2012 at 11:24:11AM +0100, Thierry Reding wrote:
-> The irq_domain_add() function needs the number of interrupts in the
-> domain to properly initialize them. In addition the allocated domain
-> is now returned by the irq_domain_{add,generate}_simple() helpers.
-> 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: David Brown <davidb@codeaurora.org>
-> ---
-> Note: This patch should not be applied yet. There is a conflict with a
->       pending patch[0] by Benoit Cousson that will obsolete the OMAP2
->       hunk in this patch.
-> 
->       [0]: http://www.spinics.net/lists/linux-omap/msg62124.html
+If you prefer to do a big upfront design of the entire driver then please
+by all means do that.
 
-I also have a patch in Russell's tracker to remove one of the calls for 
-versatile (for the VIC) that is no longer needed.
+What we need to know right now is what you need from the pin
+controller core to do that. We have a (custom) pinconf API now,
+does it fit the bill?
 
-> diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-> index e6bad17..811ce88 100644
-> --- a/arch/arm/mach-imx/imx51-dt.c
-> +++ b/arch/arm/mach-imx/imx51-dt.c
-> @@ -47,7 +47,12 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
->  static int __init imx51_tzic_add_irq_domain(struct device_node *np,
->  				struct device_node *interrupt_parent)
->  {
-> -	irq_domain_add_simple(np, 0);
-> +	struct irq_domain *domain;
-> +
-> +	domain = irq_domain_add_simple(np, 0, TZIC_NUM_IRQS);
-> +	if (!domain)
-> +		return -ENOMEM;
-> +
->  	return 0;
->  }
+I have spent some time on generic pin config, it was not much
+commented so if it helps you please ACK the patches.
 
-A real nit, but could this be written as:
+Next from discussions with Stpehen I've sort of figured out that
+we need a config mapping table of sorts and then a means to activate
+entries of that table at runtime. I'm trying to come up with something
+for this.
 
-	return irq_domain_add_simple(np, 0, TZIC_NUM_IRQS) ? 0 : -ENOMEM;
-
-to make it a little more concise (and the same for the others)?  Not a 
-big deal though, so either way:
-
-Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-
-Jamie
+Yours,
