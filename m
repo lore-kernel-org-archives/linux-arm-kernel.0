@@ -1,182 +1,361 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 10 Jan 2012 17:24:25 +0100
-Subject: [PATCH 5/5] ARM: at91: Fix at91sam9g45 and at91cap9 reset
+Date: Tue, 10 Jan 2012 17:24:24 +0100
+Subject: [PATCH 4/5] ARM: at91: make rstc soc independent
 In-Reply-To: <20120110160349.GV2854@game.jcrosoft.org>
 References: <20120110160349.GV2854@game.jcrosoft.org>
-Message-ID: <1326212665-1881-5-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1326212665-1881-4-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-As on the other sam9 we need to cleanly shutdown the DDR before rebooting
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/Kconfig             |    5 ++++
- arch/arm/mach-at91/Makefile            |    1 +
- arch/arm/mach-at91/at91cap9.c          |    8 +-----
- arch/arm/mach-at91/at91sam9g45.c       |    6 ----
- arch/arm/mach-at91/at91sam9g45_reset.S |   40 ++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/generic.h           |    1 +
- 6 files changed, 48 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
+ arch/arm/mach-at91/at91cap9.c                 |    1 +
+ arch/arm/mach-at91/at91sam9260.c              |    1 +
+ arch/arm/mach-at91/at91sam9261.c              |    1 +
+ arch/arm/mach-at91/at91sam9263.c              |    1 +
+ arch/arm/mach-at91/at91sam9_alt_reset.S       |    7 +++----
+ arch/arm/mach-at91/at91sam9g45.c              |    1 +
+ arch/arm/mach-at91/at91sam9rl.c               |    1 +
+ arch/arm/mach-at91/generic.h                  |    1 +
+ arch/arm/mach-at91/include/mach/at91_rstc.h   |   18 +++++++++++++++---
+ arch/arm/mach-at91/include/mach/at91cap9.h    |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9260.h |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9261.h |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9263.h |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
+ arch/arm/mach-at91/pm.c                       |    9 ++-------
+ arch/arm/mach-at91/setup.c                    |    9 +++++++++
+ 17 files changed, 42 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 4275577..71feb00 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -21,6 +21,9 @@ config HAVE_AT91_USART5
- config AT91_SAM9_ALT_RESET
- 	bool
- 
-+config AT91_SAM9G45_RESET
-+	bool
-+
- menu "Atmel AT91 System-on-Chip"
- 
- choice
-@@ -97,6 +100,7 @@ config ARCH_AT91SAM9G45
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
- 	select HAVE_AT91_DBGU1
-+	select AT91_SAM9G45_RESET
- 
- config ARCH_AT91CAP9
- 	bool "AT91CAP9"
-@@ -105,6 +109,7 @@ config ARCH_AT91CAP9
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
- 	select HAVE_AT91_DBGU1
-+	select AT91_SAM9G45_RESET
- 
- config ARCH_AT91X40
- 	bool "AT91x40"
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index e8e961b..705e1fb 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -9,6 +9,7 @@ obj-		:=
- 
- obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
- obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
-+obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
- 
- # CPU-specific support
- obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o at91rm9200_devices.o
 diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index 7a2309e..a42edc2 100644
+index edb879a..7a2309e 100644
 --- a/arch/arm/mach-at91/at91cap9.c
 +++ b/arch/arm/mach-at91/at91cap9.c
-@@ -21,7 +21,6 @@
- #include <mach/cpu.h>
- #include <mach/at91cap9.h>
- #include <mach/at91_pmc.h>
--#include <mach/at91_rstc.h>
- 
- #include "soc.h"
- #include "generic.h"
-@@ -314,11 +313,6 @@ static struct at91_gpio_bank at91cap9_gpio[] __initdata = {
- 	}
- };
- 
--static void at91cap9_restart(char mode, const char *cmd)
--{
--	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
--}
--
- /* --------------------------------------------------------------------
-  *  AT91CAP9 processor initialization
-  * -------------------------------------------------------------------- */
-@@ -338,7 +332,7 @@ static void __init at91cap9_ioremap_registers(void)
- 
- static void __init at91cap9_initialize(void)
+@@ -331,6 +331,7 @@ static void __init at91cap9_map_io(void)
+ static void __init at91cap9_ioremap_registers(void)
  {
--	arm_pm_restart = at91cap9_restart;
-+	arm_pm_restart = at91sam9g45_restart;
- 	at91_extern_irq = (1 << AT91CAP9_ID_IRQ0) | (1 << AT91CAP9_ID_IRQ1);
+ 	at91_ioremap_shdwc(AT91CAP9_BASE_SHDWC);
++	at91_ioremap_rstc(AT91CAP9_BASE_RSTC);
+ 	at91sam926x_ioremap_pit(AT91CAP9_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91CAP9_BASE_SMC);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 5e46e4a..d4036ba 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -323,6 +323,7 @@ static void __init at91sam9260_map_io(void)
+ static void __init at91sam9260_ioremap_registers(void)
+ {
+ 	at91_ioremap_shdwc(AT91SAM9260_BASE_SHDWC);
++	at91_ioremap_rstc(AT91SAM9260_BASE_RSTC);
+ 	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index b85b9ea..023c2ff 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -281,6 +281,7 @@ static void __init at91sam9261_map_io(void)
+ static void __init at91sam9261_ioremap_registers(void)
+ {
+ 	at91_ioremap_shdwc(AT91SAM9261_BASE_SHDWC);
++	at91_ioremap_rstc(AT91SAM9261_BASE_RSTC);
+ 	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 79e3669..75e876c 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -301,6 +301,7 @@ static void __init at91sam9263_map_io(void)
+ static void __init at91sam9263_ioremap_registers(void)
+ {
+ 	at91_ioremap_shdwc(AT91SAM9263_BASE_SHDWC);
++	at91_ioremap_rstc(AT91SAM9263_BASE_RSTC);
+ 	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9263_BASE_SMC0);
+ 	at91sam9_ioremap_smc(1, AT91SAM9263_BASE_SMC1);
+diff --git a/arch/arm/mach-at91/at91sam9_alt_reset.S b/arch/arm/mach-at91/at91sam9_alt_reset.S
+index d3f931c..518e423 100644
+--- a/arch/arm/mach-at91/at91sam9_alt_reset.S
++++ b/arch/arm/mach-at91/at91sam9_alt_reset.S
+@@ -23,7 +23,8 @@
+ 			.globl	at91sam9_alt_restart
  
- 	/* Register GPIO subsystem */
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index ec6a2db..1cb6a96 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -18,7 +18,6 @@
- #include <asm/mach/map.h>
- #include <mach/at91sam9g45.h>
- #include <mach/at91_pmc.h>
--#include <mach/at91_rstc.h>
- #include <mach/cpu.h>
- 
- #include "soc.h"
-@@ -318,11 +317,6 @@ static struct at91_gpio_bank at91sam9g45_gpio[] __initdata = {
- 	}
- };
- 
--static void at91sam9g45_restart(char mode, const char *cmd)
--{
--	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
--}
--
- /* --------------------------------------------------------------------
-  *  AT91SAM9G45 processor initialization
-  * -------------------------------------------------------------------- */
-diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
-new file mode 100644
-index 0000000..0468be1
---- /dev/null
-+++ b/arch/arm/mach-at91/at91sam9g45_reset.S
-@@ -0,0 +1,40 @@
-+/*
-+ * reset AT91SAM9G45 as per errata
-+ *
-+ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcosoft.com>
-+ *
-+ * unless the SDRAM is cleanly shutdown before we hit the
-+ * reset register it can be left driving the data bus and
-+ * killing the chance of a subsequent boot from NAND
-+ *
-+ * GPLv2 Only
-+ */
-+
-+#include <linux/linkage.h>
-+#include <mach/hardware.h>
-+#include <mach/at91sam9_ddrsdr.h>
-+#include <mach/at91_rstc.h>
-+
-+			.arm
-+
-+			.globl	at91sam9g45_restart
-+
-+at91sam9g45_restart:
-+			ldr	r0, .at91_va_base_sdramc0	@ preload constants
+ at91sam9_alt_restart:	ldr	r0, .at91_va_base_sdramc	@ preload constants
+-			ldr	r1, .at91_va_base_rstc_cr
 +			ldr	r1, =at91_rstc_base
 +			ldr	r1, [r1]
-+
-+			mov	r2, #1
-+			mov	r3, #AT91_DDRSDRC_LPCB_POWER_DOWN
-+			ldr	r4, =AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST
-+
-+			.balign	32				@ align to cache line
-+
-+			str	r2, [r0, #AT91_DDRSDRC_RTR]	@ disable DDR0 access
-+			str	r3, [r0, #AT91_DDRSDRC_LPR]	@ power down DDR0
+ 
+ 			mov	r2, #1
+ 			mov	r3, #AT91_SDRAMC_LPCB_POWER_DOWN
+@@ -33,11 +34,9 @@ at91sam9_alt_restart:	ldr	r0, .at91_va_base_sdramc	@ preload constants
+ 
+ 			str	r2, [r0, #AT91_SDRAMC_TR]	@ disable SDRAM access
+ 			str	r3, [r0, #AT91_SDRAMC_LPR]	@ power down SDRAM
+-			str	r4, [r1]			@ reset processor
 +			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
-+
-+			b	.
-+
-+.at91_va_base_sdramc0:
-+	.word AT91_VA_BASE_SYS + AT91_DDRSDRC0
+ 
+ 			b	.
+ 
+ .at91_va_base_sdramc:
+ 	.word AT91_VA_BASE_SYS + AT91_SDRAMC0
+-.at91_va_base_rstc_cr:
+-	.word AT91_VA_BASE_SYS + AT91_RSTC_CR
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 7032dd3..ec6a2db 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -336,6 +336,7 @@ static void __init at91sam9g45_map_io(void)
+ static void __init at91sam9g45_ioremap_registers(void)
+ {
+ 	at91_ioremap_shdwc(AT91SAM9G45_BASE_SHDWC);
++	at91_ioremap_rstc(AT91SAM9G45_BASE_RSTC);
+ 	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9G45_BASE_SMC);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index d6bcb1d..d2c91a8 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -286,6 +286,7 @@ static void __init at91sam9rl_map_io(void)
+ static void __init at91sam9rl_ioremap_registers(void)
+ {
+ 	at91_ioremap_shdwc(AT91SAM9RL_BASE_SHDWC);
++	at91_ioremap_rstc(AT91SAM9RL_BASE_RSTC);
+ 	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
+ }
 diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 62e508b..5941334 100644
+index 4866b81..62e508b 100644
 --- a/arch/arm/mach-at91/generic.h
 +++ b/arch/arm/mach-at91/generic.h
-@@ -60,6 +60,7 @@ extern void at91_irq_resume(void);
+@@ -58,6 +58,7 @@ extern void at91_irq_suspend(void);
+ extern void at91_irq_resume(void);
+ 
  /* reset */
- extern void at91_ioremap_rstc(u32 base_addr);
++extern void at91_ioremap_rstc(u32 base_addr);
  extern void at91sam9_alt_restart(char, const char *);
-+extern void at91sam9g45_restart(char, const char *);
  
  /* shutdown */
- extern void at91_ioremap_shdwc(u32 base_addr);
+diff --git a/arch/arm/mach-at91/include/mach/at91_rstc.h b/arch/arm/mach-at91/include/mach/at91_rstc.h
+index cbd2bf0..875fa33 100644
+--- a/arch/arm/mach-at91/include/mach/at91_rstc.h
++++ b/arch/arm/mach-at91/include/mach/at91_rstc.h
+@@ -16,13 +16,25 @@
+ #ifndef AT91_RSTC_H
+ #define AT91_RSTC_H
+ 
+-#define AT91_RSTC_CR		(AT91_RSTC + 0x00)	/* Reset Controller Control Register */
++#ifndef __ASSEMBLY__
++extern void __iomem *at91_rstc_base;
++
++#define at91_rstc_read(field) \
++	__raw_readl(at91_rstc_base + field)
++
++#define at91_rstc_write(field, value) \
++	__raw_writel(value, at91_rstc_base + field);
++#else
++.extern at91_rstc_base
++#endif
++
++#define AT91_RSTC_CR		0x00			/* Reset Controller Control Register */
+ #define		AT91_RSTC_PROCRST	(1 << 0)		/* Processor Reset */
+ #define		AT91_RSTC_PERRST	(1 << 2)		/* Peripheral Reset */
+ #define		AT91_RSTC_EXTRST	(1 << 3)		/* External Reset */
+ #define		AT91_RSTC_KEY		(0xa5 << 24)		/* KEY Password */
+ 
+-#define AT91_RSTC_SR		(AT91_RSTC + 0x04)	/* Reset Controller Status Register */
++#define AT91_RSTC_SR		0x04			/* Reset Controller Status Register */
+ #define		AT91_RSTC_URSTS		(1 << 0)		/* User Reset Status */
+ #define		AT91_RSTC_RSTTYP	(7 << 8)		/* Reset Type */
+ #define			AT91_RSTC_RSTTYP_GENERAL	(0 << 8)
+@@ -33,7 +45,7 @@
+ #define		AT91_RSTC_NRSTL		(1 << 16)		/* NRST Pin Level */
+ #define		AT91_RSTC_SRCMP		(1 << 17)		/* Software Reset Command in Progress */
+ 
+-#define AT91_RSTC_MR		(AT91_RSTC + 0x08)	/* Reset Controller Mode Register */
++#define AT91_RSTC_MR		0x08			/* Reset Controller Mode Register */
+ #define		AT91_RSTC_URSTEN	(1 << 0)		/* User Reset Enable */
+ #define		AT91_RSTC_URSTIEN	(1 << 4)		/* User Reset Interrupt Enable */
+ #define		AT91_RSTC_ERSTL		(0xf << 8)		/* External Reset Length */
+diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
+index 4c0e2f6..61d9529 100644
+--- a/arch/arm/mach-at91/include/mach/at91cap9.h
++++ b/arch/arm/mach-at91/include/mach/at91cap9.h
+@@ -83,7 +83,6 @@
+ #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+-#define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+ #define AT91_GPBR	(cpu_is_at91cap9_revB() ?	\
+ 			(0xfffffd50 - AT91_BASE_SYS) :	\
+ 			(0xfffffd60 - AT91_BASE_SYS))
+@@ -96,6 +95,7 @@
+ #define AT91CAP9_BASE_PIOB	0xfffff400
+ #define AT91CAP9_BASE_PIOC	0xfffff600
+ #define AT91CAP9_BASE_PIOD	0xfffff800
++#define AT91CAP9_BASE_RSTC	0xfffffd00
+ #define AT91CAP9_BASE_SHDWC	0xfffffd10
+ #define AT91CAP9_BASE_RTT	0xfffffd20
+ #define AT91CAP9_BASE_PIT	0xfffffd30
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+index f937c47..fa5ca27 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9260.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+@@ -83,7 +83,6 @@
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+-#define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+ #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+ 
+ #define AT91SAM9260_BASE_ECC	0xffffe800
+@@ -92,6 +91,7 @@
+ #define AT91SAM9260_BASE_PIOA	0xfffff400
+ #define AT91SAM9260_BASE_PIOB	0xfffff600
+ #define AT91SAM9260_BASE_PIOC	0xfffff800
++#define AT91SAM9260_BASE_RSTC	0xfffffd00
+ #define AT91SAM9260_BASE_SHDWC	0xfffffd10
+ #define AT91SAM9260_BASE_RTT	0xfffffd20
+ #define AT91SAM9260_BASE_PIT	0xfffffd30
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
+index 175604e..7cde2d3 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9261.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
+@@ -68,7 +68,6 @@
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+-#define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+ #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+ 
+ #define AT91SAM9261_BASE_SMC	0xffffec00
+@@ -76,6 +75,7 @@
+ #define AT91SAM9261_BASE_PIOA	0xfffff400
+ #define AT91SAM9261_BASE_PIOB	0xfffff600
+ #define AT91SAM9261_BASE_PIOC	0xfffff800
++#define AT91SAM9261_BASE_RSTC	0xfffffd00
+ #define AT91SAM9261_BASE_SHDWC	0xfffffd10
+ #define AT91SAM9261_BASE_RTT	0xfffffd20
+ #define AT91SAM9261_BASE_PIT	0xfffffd30
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
+index 80c9150..5949abd 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9263.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
+@@ -78,7 +78,6 @@
+ #define AT91_SDRAMC1	(0xffffe800 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffec00 - AT91_BASE_SYS)
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+-#define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+ 
+ #define AT91SAM9263_BASE_ECC0	0xffffe000
+@@ -91,6 +90,7 @@
+ #define AT91SAM9263_BASE_PIOC	0xfffff600
+ #define AT91SAM9263_BASE_PIOD	0xfffff800
+ #define AT91SAM9263_BASE_PIOE	0xfffffa00
++#define AT91SAM9263_BASE_RSTC	0xfffffd00
+ #define AT91SAM9263_BASE_SHDWC	0xfffffd10
+ #define AT91SAM9263_BASE_RTT0	0xfffffd20
+ #define AT91SAM9263_BASE_PIT	0xfffffd30
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+index f0c23c9..dd9c95e 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+@@ -90,7 +90,6 @@
+ #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+-#define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+ 
+ #define AT91SAM9G45_BASE_ECC	0xffffe200
+@@ -102,6 +101,7 @@
+ #define AT91SAM9G45_BASE_PIOC	0xfffff600
+ #define AT91SAM9G45_BASE_PIOD	0xfffff800
+ #define AT91SAM9G45_BASE_PIOE	0xfffffa00
++#define AT91SAM9G45_BASE_RSTC	0xfffffd00
+ #define AT91SAM9G45_BASE_SHDWC	0xfffffd10
+ #define AT91SAM9G45_BASE_RTT	0xfffffd20
+ #define AT91SAM9G45_BASE_PIT	0xfffffd30
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+index 2bb359e..d7bead7 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+@@ -72,7 +72,6 @@
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+-#define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+ #define AT91_SCKCR	(0xfffffd50 - AT91_BASE_SYS)
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+ 
+@@ -84,6 +83,7 @@
+ #define AT91SAM9RL_BASE_PIOB	0xfffff600
+ #define AT91SAM9RL_BASE_PIOC	0xfffff800
+ #define AT91SAM9RL_BASE_PIOD	0xfffffa00
++#define AT91SAM9RL_BASE_RSTC	0xfffffd00
+ #define AT91SAM9RL_BASE_SHDWC	0xfffffd10
+ #define AT91SAM9RL_BASE_RTT	0xfffffd20
+ #define AT91SAM9RL_BASE_PIT	0xfffffd30
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 62ad955..1606379 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -34,7 +34,6 @@
+ /*
+  * Show the reason for the previous system reset.
+  */
+-#if defined(AT91_RSTC)
+ 
+ #include <mach/at91_rstc.h>
+ #include <mach/at91_shdwc.h>
+@@ -58,10 +57,10 @@ static void __init show_reset_status(void)
+ 	char *reason, *r2 = reset;
+ 	u32 reset_type, wake_type;
+ 
+-	if (!at91_shdwc_base)
++	if (!at91_shdwc_base || !at91_rstc_base)
+ 		return;
+ 
+-	reset_type = at91_sys_read(AT91_RSTC_SR) & AT91_RSTC_RSTTYP;
++	reset_type = at91_rstc_read(AT91_RSTC_SR) & AT91_RSTC_RSTTYP;
+ 	wake_type = at91_shdwc_read(AT91_SHDW_SR);
+ 
+ 	switch (reset_type) {
+@@ -102,10 +101,6 @@ static void __init show_reset_status(void)
+ 	}
+ 	pr_info("AT91: Starting after %s %s\n", reason, r2);
+ }
+-#else
+-static void __init show_reset_status(void) {}
+-#endif
+-
+ 
+ static int at91_pm_valid_state(suspend_state_t state)
+ {
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 8bdcc3c..8a1b692 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -281,6 +281,15 @@ void __init at91_ioremap_shdwc(u32 base_addr)
+ 	pm_power_off = at91sam9_poweroff;
+ }
+ 
++void __iomem *at91_rstc_base;
++
++void __init at91_ioremap_rstc(u32 base_addr)
++{
++	at91_rstc_base = ioremap(base_addr, 16);
++	if (!at91_rstc_base)
++		panic("Impossible to ioremap at91_rstc_base\n");
++}
++
+ void __init at91_initialize(unsigned long main_clock)
+ {
+ 	at91_boot_soc.ioremap_registers();
 -- 
 1.7.7
