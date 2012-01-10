@@ -1,28 +1,25 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 10 Jan 2012 09:23:52 -0800
-Subject: [PATCH] ARM: tegra: initialize basic system clocks
-In-Reply-To: <1326212538-15419-1-git-send-email-pdeschrijver@nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
- <1326212538-15419-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A404@HQMAIL01.nvidia.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 10 Jan 2012 09:26:10 -0800
+Subject: [PATCHV2 REPOST 0/7] ARM: OMAP3PLUS PM: Add IO DaisyChain support
+ via hwmod mux
+In-Reply-To: <1323878477-21122-1-git-send-email-vishwanath.bs@ti.com>
+ (Vishwanath BS's message of "Wed, 14 Dec 2011 21:31:10 +0530")
+References: <1323878477-21122-1-git-send-email-vishwanath.bs@ti.com>
+Message-ID: <878vlftqod.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Tuesday, January 10, 2012 9:22 AM:
-> Initialize basic system clocks and provide a auxdata table to allow some
-> peripheral drivers to find their clocks.
-...
-> This should fix the hang you observed when sdhci_add_host() fails.
+Vishwanath BS <vishwanath.bs@ti.com> writes:
 
-Yes, it does. This plus the Tegra30 clock patch series you posted stops
-I2C and SDHCI drivers complaining about a lack of clocks during boot,
-which is a great step forwards, even if SDHCI doesn't yet initialize
-successfully. Thanks.
+> The following patch series provides IO Daisychain feature via omap hwmod mux framework.
+> The patch series has been generated against Tero's V11 irq chaining series [1].
 
-This patch and the clock series:
+Tero's series has now been reworked a bit by Paul for merging in v3.3.
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Can you rebase and retest this against Tony's 'uart' branch which now
+includes the reworked PRCM handler as well as the UART runtime PM series
+that is queued for v3.3.
 
--- 
-nvpublic
+Thanks,
+
+Kevin
