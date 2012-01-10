@@ -1,62 +1,88 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Jan 2012 11:16:31 +0800
-Subject: [PATCH 4/6] ARM: imx: remove incorrect BSYM usage
-In-Reply-To: <1326149146-19756-5-git-send-email-robherring2@gmail.com>
-References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
- <1326149146-19756-5-git-send-email-robherring2@gmail.com>
-Message-ID: <20120110031629.GD23362@S2101-09.ap.freescale.net>
+Date: Tue, 10 Jan 2012 11:40:13 +0800
+Subject: [PATCH] MXS: apx4devkit: add platform data for saif
+In-Reply-To: <1326120846-32554-1-git-send-email-lauri.hintsala@bluegiga.com>
+References: <1325864366-17995-1-git-send-email-shawn.guo@linaro.org>
+ <1326120846-32554-1-git-send-email-lauri.hintsala@bluegiga.com>
+Message-ID: <20120110033950.GE23362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 04:45:44PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+Please make the patch subject like: 'ARM: mxs: apx4devkit: ...'
+
+On Mon, Jan 09, 2012 at 04:54:06PM +0200, Lauri Hintsala wrote:
+> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> cc: shawn.guo at linaro.org
+> ---
 > 
-> BSYM macro is only needed for assembly files and its usage in c files is
-> wrong, so remove it. The linker will correctly set bit 0 for Thumb2
-> kernels.
+> Hi Shawn,
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+> My patch was based on mainline tree and saif patches broke it. This
+> patch fixes compiling issue which was caused by saif patches. If you
+> think so we can apply also this patch later when apx4devkit is pulled to
+> mainline (hopefully to 3.3).
 
-Tested on imx6 and confirmed the following:
+I doubt that Arnd and Olof will send it for 3.3, since it's missed
+arm-soc 'next' branch.  But we can send this patch as a fix to arm-soc
+anyway, when the board support gets pulled to arm-soc tree.
 
- * Without patch, Thumb2 build fails to bring up secondary cores.
- * With the patch applied, both ARM and Thumb2 builds work just fine.
+> 
+> Lauri
+> 
+> 
+>  arch/arm/mach-mxs/mach-apx4devkit.c |   18 ++++++++++++++++--
+>  1 files changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
+> index 08693f1..013aae5 100644
+> --- a/arch/arm/mach-mxs/mach-apx4devkit.c
+> +++ b/arch/arm/mach-mxs/mach-apx4devkit.c
+> @@ -33,6 +33,7 @@
+>  
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx28.h>
+> +#include <mach/digctl.h>
 
-So,
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Nit: I would suggest put the new line in the second row to have them
+alphabetically sorted as a group of <mach/*> inclusion.
 
 Regards,
 Shawn
 
-> ---
->  arch/arm/mach-imx/src.c |    3 +--
->  1 files changed, 1 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-> index 4bde04f..29bd124 100644
-> --- a/arch/arm/mach-imx/src.c
-> +++ b/arch/arm/mach-imx/src.c
-> @@ -15,7 +15,6 @@
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/smp.h>
-> -#include <asm/unified.h>
 >  
->  #define SRC_SCR				0x000
->  #define SRC_GPR1			0x020
-> @@ -43,7 +42,7 @@ void imx_enable_cpu(int cpu, bool enable)
->  void imx_set_cpu_jump(int cpu, void *jump_addr)
->  {
->  	cpu = cpu_logical_map(cpu);
-> -	writel_relaxed(BSYM(virt_to_phys(jump_addr)),
-> +	writel_relaxed(virt_to_phys(jump_addr),
->  		       src_base + SRC_GPR1 + cpu * 8);
+>  #include "devices-mx28.h"
+>  
+> @@ -192,6 +193,18 @@ static int apx4devkit_phy_fixup(struct phy_device *phy)
+>  	return 0;
 >  }
 >  
+> +static const struct mxs_saif_platform_data
+> +                       apx4devkit_mxs_saif_pdata[] __initconst = {
+> +       /* working on EXTMSTR0 mode (saif0 master, saif1 slave) */
+> +       {
+> +               .master_mode = 1,
+> +               .master_id = 0,
+> +       }, {
+> +               .master_mode = 0,
+> +               .master_id = 0,
+> +       },
+> +};
+> +
+>  static void __init apx4devkit_init(void)
+>  {
+>  	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
+> @@ -216,8 +229,9 @@ static void __init apx4devkit_init(void)
+>  
+>  	gpio_led_register_device(0, &apx4devkit_led_data);
+>  
+> -	mx28_add_saif(0);
+> -	mx28_add_saif(1);
+> +	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
+> +	mx28_add_saif(0, &apx4devkit_mxs_saif_pdata[0]);
+> +	mx28_add_saif(1, &apx4devkit_mxs_saif_pdata[1]);
+>  
+>  	apx4devkit_add_regulators();
+>  
 > -- 
-> 1.7.5.4
+> 1.7.4.1
 > 
