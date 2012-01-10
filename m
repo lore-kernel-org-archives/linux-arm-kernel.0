@@ -1,55 +1,86 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 10 Jan 2012 19:55:25 +0800
-Subject: [RFC PATCH v2 4/8] media: videobuf2: introduce VIDEOBUF2_PAGE
- memops
-In-Reply-To: <013701cccf81$7c0cdb90$742692b0$%szyprowski@samsung.com>
-References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>
- <1323871214-25435-5-git-send-email-ming.lei@canonical.com>
- <010501ccc08c$1c7b7870$55726950$%szyprowski@samsung.com>
- <CACVXFVOqMmakPW-aAdp005RDLuV5oc6-JfjQHr-2bFRzZi2zDQ@mail.gmail.com>
- <015201ccc156$033f73a0$09be5ae0$%szyprowski@samsung.com>
- <CACVXFVNdczv=tu7VG24766myCnGDRWAjkthbdfMwTGzTwFCoBA@mail.gmail.com>
- <015301ccc15f$053e61d0$0fbb2570$%szyprowski@samsung.com>
- <CACVXFVMrRTS7TUtj7bqCWeF4zx11yT6mOq4syOkZv=Ejoo0LMw@mail.gmail.com>
- <013701cccf81$7c0cdb90$742692b0$%szyprowski@samsung.com>
-Message-ID: <CACVXFVMUfGCMGReJqoD5ap1QxiDMPEwnd9Sq2FZQRjCRxugEng@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 10 Jan 2012 12:04:02 +0000
+Subject: [PATCH 3/6] ARM: vexpress: remove incorrect BSYM usage
+In-Reply-To: <1326149146-19756-4-git-send-email-robherring2@gmail.com>
+References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
+ <1326149146-19756-4-git-send-email-robherring2@gmail.com>
+Message-ID: <20120110120402.GB2336@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 09, 2012 at 04:45:43PM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> BSYM macro is only needed for assembly files and its usage in c files is
+> wrong, so remove it. The linker will correctly set bit 0 for Thumb2
+> kernels.
 
-On Tue, Jan 10, 2012 at 6:20 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+Pawel posted a patch to do this for realview and vexpress:
 
->> Sorry, could you describe the abuse problem in a bit detail?
->
-> Videobuf2 requires memory module handlers to provide vaddr method to provide a pointer in
-> kernel virtual address space to video data (buffer content). It is used for example by
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/077014.html
 
-Yes, this is what the patch is doing, __get_free_pages just  returns
-the kernel virtual
-address which will be passed to driver.
+I don't know whether this is currently headed for merge.  Without the
+ENDPROC additions in plat-versatile/platsmp.S, taking the BSYM away
+causes breakage.  (The missing ENDPROC is the true bug here.)
 
-> read()/write() io method emulator. Memory allocator/handler should not be specific to any
-> particular use case in the device driver. That's the design. Simple.
 
-Most of the patch is copied from videobuf-vmalloc.c, and the
-interfaces are totally same
-with videobuf-vmalloc.c.
+The changes look sensible, but break realview and vexpress as-is.
+I suggest you coordinate with Pawel and either add the ENDPROC stuff
+into your series, or drop those patches (but then you'll have to wait
+to merge your series, otherwise the removal of the BSYM() macro for
+C code will cause the realview/vexpress code to break).
 
->
-> I your case you want to give pointer to struct page from the memory allocator to the
+If you've not already done so, double-check that the target function is
+either C or properly-annotated assembler in each case.  However, so far
+as I can see, all the cases are correct, except for realview and
+vexpress.
 
-In my case, the pointer to struct page is not required to the driver
-at all, so I think you
-have misunderstood the patch, don't I?
 
-> driver. The cookie method has been introduced exactly for this purpose. Memory allocator
-> also provides a simple inline function to convert generic 'void *' return type from cookie
-> method to allocator specific structure/pointer. vb2_dma_contig_plane_dma_addr() and
-> vb2_dma_sg_plane_desc() were examples how does passing allocator specific type though the
-> cookie method works.
+After all these changes, BSYM will only be used in:
 
-thanks,
---
-Ming Lei
+boot/compressed/head.S
+include/asm/entry-macro-multi.S
+include/asm/unified.h
+kernel/entry-armv.S
+kernel/entry-common.S
+kernel/head-nommu.S
+kernel/head.S
+kernel/sleep.S
+lib/call_with_stack.S
+
+... so providing it only for assembler ought to be OK.
+
+Cheers
+---Dave
+
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Dave Martin <dave.martin@linaro.org>
+> ---
+>  arch/arm/mach-vexpress/platsmp.c |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index 2b5f7ac..124ffb1 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -13,8 +13,6 @@
+>  #include <linux/smp.h>
+>  #include <linux/io.h>
+>  
+> -#include <asm/unified.h>
+> -
+>  #include <mach/motherboard.h>
+>  #define V2M_PA_CS7 0x10000000
+>  
+> @@ -46,6 +44,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>  	 * secondary CPU branches to this address.
+>  	 */
+>  	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
+> -	writel(BSYM(virt_to_phys(versatile_secondary_startup)),
+> +	writel(virt_to_phys(versatile_secondary_startup),
+>  		MMIO_P2V(V2M_SYS_FLAGSSET));
+>  }
+> -- 
+> 1.7.5.4
+> 
