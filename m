@@ -1,35 +1,39 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 10 Jan 2012 15:01:50 +0800
-Subject: [PATCH 6/6] dma/imx-sdma: check whether event_id0 < 32 when set
- event_mask
+Date: Tue, 10 Jan 2012 15:01:47 +0800
+Subject: [PATCH 3/6] dma/imx-sdma: call sdma_set_channel_priority after
+ sdma_request_channel
 In-Reply-To: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
 References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1326178910-14044-6-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1326178910-14044-3-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+sdma_request_channel sets the default priority. sdma_alloc_chan_resources
+should call sdma_set_channel_priority thereafter to over write it.
+
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/dma/imx-sdma.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
+ drivers/dma/imx-sdma.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 22fd561..1d5b6ab 100644
+index 63f4752..b40f630 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -753,8 +753,11 @@ static int sdma_config_channel(struct sdma_channel *sdmac)
- 			if (sdmac->event_id0 > 31)
- 				sdmac->watermark_level |= 1 << 30;
- 		} else {
--			sdmac->event_mask0 = 1 << sdmac->event_id0;
--			sdmac->event_mask1 = 1 << (sdmac->event_id0 - 32);
-+			if (sdmac->event_id0 < 32)
-+				sdmac->event_mask0 = 1 << sdmac->event_id0;
-+			else
-+				sdmac->event_mask1 =
-+						1 << (sdmac->event_id0 - 32);
- 		}
- 		/* Watermark Level */
- 		sdmac->watermark_level |= sdmac->watermark_level;
+@@ -875,11 +875,11 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
+ 
+ 	sdmac->peripheral_type = data->peripheral_type;
+ 	sdmac->event_id0 = data->dma_request;
+-	ret = sdma_set_channel_priority(sdmac, prio);
++	ret = sdma_request_channel(sdmac);
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = sdma_request_channel(sdmac);
++	ret = sdma_set_channel_priority(sdmac, prio);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 1.7.5.4
