@@ -1,41 +1,28 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 10 Jan 2012 17:42:36 +0100
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
- remove unsupported 15bit modes
-In-Reply-To: <20120110130146.GC2057@taskit.de> (Christian Glindkamp's message
- of "Tue, 10 Jan 2012 14:01:46 +0100")
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <4F0AC2B1.8010601@atmel.com> <87ty45dt89.fsf@macbook.be.48ers.dk>
- <20120110130146.GC2057@taskit.de>
-Message-ID: <8762gjcxvn.fsf@macbook.be.48ers.dk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 10 Jan 2012 09:23:52 -0800
+Subject: [PATCH] ARM: tegra: initialize basic system clocks
+In-Reply-To: <1326212538-15419-1-git-send-email-pdeschrijver@nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
+ <1326212538-15419-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A404@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Christian" == Christian Glindkamp <christian.glindkamp@taskit.de> writes:
+Peter De Schrijver wrote at Tuesday, January 10, 2012 9:22 AM:
+> Initialize basic system clocks and provide a auxdata table to allow some
+> peripheral drivers to find their clocks.
+...
+> This should fix the hang you observed when sdhci_add_host() fails.
 
-Hi,
+Yes, it does. This plus the Tegra30 clock patch series you posted stops
+I2C and SDHCI drivers complaining about a lack of clocks during boot,
+which is a great step forwards, even if SDHCI doesn't yet initialize
+successfully. Thanks.
 
- >> So it doesn't really support RGB555 mode. The controller reads up to
- >> 32bit of framebuffer data and outputs 24bit on the LCD pins. You CAN
- >> wire up a RGB555 panel by just skipping the LSB green of a RGB565
- >> wiring, but that is independent of the framebufffer format.
+This patch and the clock series:
 
- Christian> But the AT91SAM9261/AT91SAM9263 do not have a native RGB565
- Christian> format if it is configured for 16bit (so it does not read
- Christian> 32bit and output 24bit but just 16bit) but uses BGR555 with
- Christian> an additional intensity bit in the MSB like the palette
- Christian> where you also kept the BGR555 format. How can you get
- Christian> correct colors on these processors if this code above is
- Christian> removed?
-
-I now had a look at the 9261/9263 datasheets, and don't find any
-explicit mention of the bit layout of the 16bit/24bit modes. Just to be
-completely sure:
-
-- 16bit mode is IBGR-1555 (independently of little/big/wince mode?)
-- 24bit is BGR-888 (packed) or XBGR-8888 (unpacked)
-
-Right?
+Tested-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
 -- 
-Bye, Peter Korsgaard
+nvpublic
