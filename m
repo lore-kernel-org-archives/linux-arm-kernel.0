@@ -1,40 +1,25 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 10 Jan 2012 14:17:01 +0100
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
- remove unsupported 15bit modes
-In-Reply-To: <20120110130146.GC2057@taskit.de> (Christian Glindkamp's message
- of "Tue, 10 Jan 2012 14:01:46 +0100")
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <4F0AC2B1.8010601@atmel.com> <87ty45dt89.fsf@macbook.be.48ers.dk>
- <20120110130146.GC2057@taskit.de>
-Message-ID: <87ty43d7ea.fsf@macbook.be.48ers.dk>
+From: stigge@antcom.de (stigge at antcom.de)
+Date: Tue, 10 Jan 2012 14:36:33 +0100
+Subject: [PATCH] Correct bad gpio naming
+Message-ID: <1326202593-5533-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Christian" == Christian Glindkamp <christian.glindkamp@taskit.de> writes:
+One of the GPIO names in drivers/gpio/gpio-lpc32xx.c
+was bad. Renaming gpi000 -> gpio00
 
-Hi,
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
- >> So it doesn't really support RGB555 mode. The controller reads up to
- >> 32bit of framebuffer data and outputs 24bit on the LCD pins. You CAN
- >> wire up a RGB555 panel by just skipping the LSB green of a RGB565
- >> wiring, but that is independent of the framebufffer format.
-
- Christian> But the AT91SAM9261/AT91SAM9263 do not have a native RGB565
- Christian> format if it is configured for 16bit (so it does not read
- Christian> 32bit and output 24bit but just 16bit) but uses BGR555 with
- Christian> an additional intensity bit in the MSB like the palette
- Christian> where you also kept the BGR555 format. How can you get
- Christian> correct colors on these processors if this code above is
- Christian> removed?
-
-Ahh, I wasn't aware of that (I'm using 9g45). I guess we need to do
-something similar to what I did for the palette handling:
-
-https://github.com/at91linux/linux-at91/commit/7a256fc44c1892ad3166363ba309d9996a49e7b8
-
-E.G. keep the RBG555/BGR555 format for the old devices, and my proposed
-change for the new ones. I'll cook something up.
-
--- 
-Bye, Peter Korsgaard
+diff --git a/drivers/gpio/gpio-lpc32xx.c b/drivers/gpio/gpio-lpc32xx.c
+index 5b69480..ddfacc5 100644
+--- a/drivers/gpio/gpio-lpc32xx.c
++++ b/drivers/gpio/gpio-lpc32xx.c
+@@ -96,7 +96,7 @@ static const char *gpio_p2_names[LPC32XX_GPIO_P2_MAX] = {
+ };
+ 
+ static const char *gpio_p3_names[LPC32XX_GPIO_P3_MAX] = {
+-	"gpi000", "gpio01", "gpio02", "gpio03",
++	"gpio00", "gpio01", "gpio02", "gpio03",
+ 	"gpio04", "gpio05"
+ };
+ 
