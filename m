@@ -1,60 +1,44 @@
-From: christian.glindkamp@taskit.de (Christian Glindkamp)
-Date: Tue, 10 Jan 2012 14:01:46 +0100
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode, remove
- unsupported 15bit modes
-In-Reply-To: <87ty45dt89.fsf@macbook.be.48ers.dk>
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <4F0AC2B1.8010601@atmel.com> <87ty45dt89.fsf@macbook.be.48ers.dk>
-Message-ID: <20120110130146.GC2057@taskit.de>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 10 Jan 2012 18:34:27 +0530
+Subject: BUG: sleeping function called from invalid context at
+ include/linux/freezer.h:45
+In-Reply-To: <CAH9JG2XniMv5dVf1DixGNaQAJk-sZjnV9HfYeihEJP3JDyC4+Q@mail.gmail.com>
+References: <CAH9JG2XniMv5dVf1DixGNaQAJk-sZjnV9HfYeihEJP3JDyC4+Q@mail.gmail.com>
+Message-ID: <4F0C375B.7040600@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-01-09 12:13, Peter Korsgaard wrote:
-> >>>>> "Nicolas" == Nicolas Ferre <nicolas.ferre@atmel.com> writes:
-> 
->  Nicolas> On 10/13/2011 04:52 PM, Peter Korsgaard :
->  >> Allow framebuffer to be configured in 16bit mode when panel is wired in
->  >> (the default) BGR configuration, and don't claim to support 15bit input
->  >> modes, which the LCD controller cannot handle.
->  >> 
->  >> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
-> 
->  Nicolas> Hi Peter,
-> 
->  Nicolas> Sorry for not having more responsive concerning the two
->  Nicolas> patches that you posted about atmel_lcdfb driver.
-> 
-> No problem.
-> 
->  Nicolas> I have a question though about this one...
-> 
->  >> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
->  >> -			var->red.offset = 10;
->  >> -			var->blue.offset = 0;
->  >> -			var->green.length = 5;
-> 
->  Nicolas> Maybe I have missed something but I do not know why you are removing
->  Nicolas> this part of the configuration? A board at least is using this wiring
->  Nicolas> mode...
-> 
-> Because it is arguable wrong as far as I understand the HW.
-> There's two parts here:
-> 
-> - 1: Format of framebuffer memory
-> - 2: Wiring of LCD (RGB/BGR order and number of bits)
-> 
-> From the datasheet, the following framebuffer formats are supported:
-> 
-> 1, 2, 4, 8 bits per pixel (palletized), 16, 24 bits per pixel
-> (non-palletized) for TFT.
-> 
-> So it doesn't really support RGB555 mode. The controller reads up to
-> 32bit of framebuffer data and outputs 24bit on the LCD pins. You CAN
-> wire up a RGB555 panel by just skipping the LSB green of a RGB565
-> wiring, but that is independent of the framebufffer format.
+On 01/10/2012 09:57 AM, Kyungmin Park wrote:
 
-But the AT91SAM9261/AT91SAM9263 do not have a native RGB565 format if it
-is configured for 16bit (so it does not read 32bit and output 24bit but
-just 16bit) but uses BGR555 with an additional intensity bit in the MSB
-like the palette where you also kept the BGR555 format. How can you get
-correct colors on these processors if this code above is removed?
+> Dear all
+> 
+> with the latest kernel. I got the below bug message.
+> It calls the sleep function. Does it intended operation?
+> 
+> static inline bool try_to_freeze(void)
+> {
+>         might_sleep();
+>         if (likely(!freezing(current)))
+>                 return false;
+>         return __refrigerator(false);
+> }
+> 
+> # poweroff
+> [    6.852523] BUG: sleeping function called from invalid context at
+> include/linux/freezer.h:45
+> [    6.859489] in_atomic(): 0, irqs_disabled(): 128, pid: 1, name: init
+> [    6.865846] [<c0013508>] (unwind_backtrace+0x0/0xec) from
+> [<c0010124>] (do_signal+0x88/0x588)
+> [    6.874337] [<c0010124>] (do_signal+0x88/0x588) from [<c001063c>]
+> (do_notify_resume+0x18/0x38)
+> [    6.882928] [<c001063c>] (do_notify_resume+0x18/0x38) from
+> [<c000dc18>] (work_pending+0x24/0x28)
+> 
+
+
+You seem to be running on Arm architecture. Can you please try the patch
+at https://lkml.org/lkml/2011/8/25/231 ?
+
+Regards,
+Srivatsa S. Bhat
+IBM Linux Technology Center
