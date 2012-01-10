@@ -1,51 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Jan 2012 10:13:12 +0100
-Subject: [PATCH v4 1/3] pinctrl: enable pinmux for mmp series
-In-Reply-To: <1325643995-20745-2-git-send-email-haojian.zhuang@marvell.com>
-References: <1325643995-20745-1-git-send-email-haojian.zhuang@marvell.com>
- <1325643995-20745-2-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <CACRpkdaA49pxgseaZNZggQx0GGc3P14tmFzTnxT3fTc2XAJcTA@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 10 Jan 2012 10:18:06 +0100
+Subject: [RFC] Future TTM DMA direction
+In-Reply-To: <4F0AC908.90708@vmware.com>
+References: <4F0AB558.3050902@vmware.com>
+ <20120109101105.GC3723@phenom.ffwll.local>
+ <4F0AC908.90708@vmware.com>
+Message-ID: <20120110091806.GC3979@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2012 at 3:26 AM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
+Hi Thomas,
 
-> Support PXA168/PXA910/MMP2 pinmux. Now only support function switch.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+On Mon, Jan 09, 2012 at 12:01:28PM +0100, Thomas Hellstrom wrote:
+> Thanks for your input. I think this is mostly orthogonal to dma_buf, and
+> really a way to adapt TTM to be DMA-api aware. That's currently done
+> within the TTM backends. CMA was mearly included as an example that
+> might not be relevant.
+> 
+> I haven't followed dma_buf that closely lately, but if it's growing
+> from being just
+> a way to share buffer objects between devices to something providing
+> also low-level
+> allocators with fragmentation prevention, there's definitely an overlap.
+> However, on the dma_buf meeting in Budapest there seemed to be
+> little or no interest
+> in robust buffer allocation / fragmentation prevention although I
+> remember bringing
+> it up to the point where I felt annoying :).
 
-I've applied this to my devel branch. It's pretty huge but since it's
-split over three files I guess I can live with it. I can also see that
-you have really made an effort to cover the PXA variants and
-these drivers give a real good abstraction and understanding of
-this muxing hardware so WELL DONE!
+Well, I've shot at you quite a bit too, and I still think it's too much
+for the first few iterations. But I also think we will need a cleverer
+dma subsystem sooner or later (even if it's just around dma_buf) so that's
+why I've dragged your rfc out of the drm corner ;-)
 
-I fixed a number of whitespace issues, so please base your further
-work upon my tree (once it emerges after the merge window).
-
-I also removed the .maxpin on all pinctrl_desc:s, since that is
-gone now, we get the max pin from the pin list instead, so it's
-self-describing.
-
-When I see things like this:
-
-	PINCTRL_PIN(GPIO0, "GPIO0"),
-	PINCTRL_PIN(GPIO1, "GPIO1"),
-	PINCTRL_PIN(GPIO2, "GPIO2"),
-	PINCTRL_PIN(GPIO3, "GPIO3"),
-	PINCTRL_PIN(GPIO4, "GPIO4"),
-	PINCTRL_PIN(GPIO5, "GPIO5"),
-
-I wish I could have loops in the preprocessor and just
-PINCTRL_PIN_RANGE("GPIO", start, end)
-but sadly I can't. So as mentioned earlier we might go for
-some static inline helper that can generate that array before you
-assign it to your pin controller.
-
-Maybe the device tree is the answer to everything (as usual). Given the
-time it seems to take to find consensus around DT stuff we might just
-have to wait and see.
-
-Yours,
-Linus Walleij
+Cheers, Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
