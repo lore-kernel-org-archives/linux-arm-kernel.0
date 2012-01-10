@@ -1,47 +1,44 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Tue, 10 Jan 2012 06:43:35 +0000
-Subject: How to configure SGTL5000 ASoC as master?
-In-Reply-To: <4F0BD878.40508@bluegiga.com>
-References: <4F0BD878.40508@bluegiga.com>
-Message-ID: <7FE21149F4667147B645348EC605788508AA69@039-SN2MPN1-013.039d.mgd.msft.net>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Tue, 10 Jan 2012 15:01:48 +0800
+Subject: [PATCH 4/6] dma/imx-sdma: move clk_enable out of sdma_request_channel
+In-Reply-To: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1326178910-14044-4-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Lauri Hintsala [mailto:lauri.hintsala at bluegiga.com]
-> Sent: Tuesday, January 10, 2012 2:20 PM
-> To: Dong Aisheng-B29396
-> Cc: alsa-devel at alsa-project.org; linux-arm-kernel at lists.infradead.org
-> Subject: MXS: How to configure SGTL5000 ASoC as master?
-> Importance: High
-> 
-> Hi,
-> 
-> SGTL5000 ASoC is hard coded to be slave in sound/soc/mxs/mxs-sgtl5000.c.
-Yes, Saif TX can only work on master mode so we simply only support master mode
-for both saif rx/tx.
+It makes clk_enable/disable pair more readable, and fix one bug:
+sdma_init calls sdma_request_channel, but seems don't know
+sdma_request_channel enabled the clok.
 
-> In our HW design mclk of ASoC is sourced from external oscillator.
-> Because of our design ASoC should be configured as master. In that case master
-IIRC using external mclk does not mean sgtl5000 has to be master.
-And as I said above, saif tx can only be master, that's a hw limitation.
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/dma/imx-sdma.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-> clock of SAIF should be disabled.
-> 
-You can leave it there without using it.
-
-> Is there any plan to have configuration for mxs-sgtl5000 driver? What is
-> preferred way to solve this issue?
-> 
-We can extend the mxs-sgtl5000 driver to support external mclk.
-(but sgtl5000 as master mode is not supported).
-I did not have time to do it recently, also I did not have such board.
-If somebody wants to do it I will be happy to review.
-
-> BR,
-> Lauri Hintsala
-> 
-> p.s. I resent this mail because I wasn't subscriber of alsa-devel mailing list.
-
-Regards
-Dong Aisheng
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index b40f630..015d93f 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -802,8 +802,6 @@ static int sdma_request_channel(struct sdma_channel *sdmac)
+ 	sdma->channel_control[channel].base_bd_ptr = sdmac->bd_phys;
+ 	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
+ 
+-	clk_enable(sdma->clk);
+-
+ 	sdma_set_channel_priority(sdmac, MXC_SDMA_DEFAULT_PRIORITY);
+ 
+ 	init_completion(&sdmac->done);
+@@ -875,6 +873,9 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
+ 
+ 	sdmac->peripheral_type = data->peripheral_type;
+ 	sdmac->event_id0 = data->dma_request;
++
++	clk_enable(sdmac->sdma->clk);
++
+ 	ret = sdma_request_channel(sdmac);
+ 	if (ret)
+ 		return ret;
+-- 
+1.7.5.4
