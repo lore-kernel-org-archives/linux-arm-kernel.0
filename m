@@ -1,26 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Jan 2012 21:06:08 +0000
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode, remove
- unsupported 15bit modes
-In-Reply-To: <20120110140218.GB7180@jl-vm1.vm.bytemark.co.uk>
-References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
- <4F0AC2B1.8010601@atmel.com> <87ty45dt89.fsf@macbook.be.48ers.dk>
- <20120110140218.GB7180@jl-vm1.vm.bytemark.co.uk>
-Message-ID: <20120110210608.GB1068@n2100.arm.linux.org.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 10 Jan 2012 23:56:54 +0200
+Subject: [PATCH 1/3] ATMEL: fix nand ecc support
+In-Reply-To: <1325933370-17475-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1325933370-17475-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1326232616.2335.11.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2012 at 02:02:18PM +0000, Jamie Lokier wrote:
-> If you're connecting an RGB555 or RGB444 panel, don't you want the
-> software using the framebuffer to know this so it will dither appropriately?
-> 
-> E.g. gradients look "bandy" if drawn in RGB565 then green's LSB is dropped.
+On Sat, 2012-01-07 at 11:49 +0100, Jean-Christophe PLAGNIOL-VILLARD
+wrote:
+> +#ifndef __ATMEL_NAND_H__
+> +#define __ATMEL_NAND_H__
+> +
+> +#include <linux/mtd/nand.h>
+> +
+> + /* NAND / SmartMedia */
+> +struct atmel_nand_data {
+> +	int		enable_pin;		/* chip enable */
+> +	int		det_pin;		/* card detect */
+> +	int		rdy_pin;		/* ready/busy */
+> +	u8		rdy_pin_active_low;	/* rdy_pin value is inverted */
+> +	u8		ale;			/* address line number connected to ALE */
+> +	u8		cle;			/* address line number connected to CLE */
+> +	u8		bus_width_16;		/* buswidth is 16 bit */
+> +	u8		ecc_mode;		/* ecc mode */
+> +	struct mtd_partition *parts;
+> +	unsigned int	num_parts;
+> +};
+> +
+> +#endif /* __ATMEL_NAND_H__ */
 
-This is why you use the bitfield stuff to tell userspace what the
-actual properties of the framebuffer are.
+The "include/linux" directory, I think, should generally contain only
+those headers which define some "userspace-kernel" or "kernel subsystem"
+API. This file defines Atmel NAND driver's, so it should not be placed
+there.
 
-(However, there are some userspace programs which ignore that
-information and think they know better than the kernel about how a
-frame buffer is organised - which is a constant pain in the butt when
-you have a display which isn't BGR.  But that's really a userspace
-bug in those silly programs.)
+I am not sure "include/linux" is the best place for this header - is it?
+
+Artem.
