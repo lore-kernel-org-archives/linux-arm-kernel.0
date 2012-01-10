@@ -1,54 +1,207 @@
-From: daeinki@gmail.com (InKi Dae)
-Date: Tue, 10 Jan 2012 10:34:39 +0900
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <CAF6AEGsTGOxyTX6Xijvm8UXGjtVTtYg5X5xfJo8D+47o+xU+bA@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
- <CAAQKjZPFh6666JKc-XJfKYePQ_F0MNF6FkY=zKypWb52VVX3YQ@mail.gmail.com>
- <20120109081030.GA3723@phenom.ffwll.local>
- <CAAQKjZMEsuib18RYE7OvZPUqhKnvrZ8i3+EMuZSXr9KPVygo_Q@mail.gmail.com>
- <CAF6AEGsTGOxyTX6Xijvm8UXGjtVTtYg5X5xfJo8D+47o+xU+bA@mail.gmail.com>
-Message-ID: <CAAQKjZNM51Oenhi-S-9kyq_mLYHBEsMQA3M6=6L_XNnKu5pLbA@mail.gmail.com>
+From: jason.chen@freescale.com (Jason Chen)
+Date: Tue, 10 Jan 2012 10:03:14 +0800
+Subject: [PATCH] arm: imx6q: bypass anatop regulator during suspend
+In-Reply-To: <20120108082650.GA20216@S2101-09.ap.freescale.net>
+References: <1325740842-5464-1-git-send-email-jason.chen@linaro.org>
+ <20120108082650.GA20216@S2101-09.ap.freescale.net>
+Message-ID: <20120110020313.GA3204@weitway>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/10 Rob Clark <rob@ti.com>:
-> On Mon, Jan 9, 2012 at 4:10 AM, InKi Dae <daeinki@gmail.com> wrote:
->> note : in case of sharing a buffer between v4l2 and drm driver, the
->> memory info would be copied vb2_xx_buf to xx_gem or xx_gem to
->> vb2_xx_buf through sg table. in this case, only memory info is used to
->> share, not some objects.
->
-> which v4l2/vb2 patches are you looking at? ?The patches I was using,
-> vb2 holds a reference to the 'struct dma_buf *' internally, not just
-> keeping the sg_table
->
-
-yes, not keeping the sg_table. I mean... see a example below please.
-
-static void vb2_dma_contig_map_dmabuf(void *mem_priv)
-{
-    struct sg_table *sg;
-     ...
-     sg = dma_buf_map_attachment(buf->db_attach, dir);
-     ...
-     buf->dma_addr = sg_dma_address(sg->sgl);
-     ...
-}
-
-at least with no IOMMU, the memory information(containing physical
-memory address) would be copied to vb2_xx_buf object if drm gem
-exported its own buffer and vb2 wants to use that buffer at this time,
-sg table is used to share that buffer. and the problem I pointed out
-is that this buffer(also physical memory region) could be released by
-vb2 framework(as you know, vb2_xx_buf object and the memory region for
-buf->dma_addr pointing) but the Exporter(drm gem) couldn't know that
-so some problems would be induced once drm gem tries to release or
-access that buffer. and I have tried to resolve this issue adding
-get_shared_cnt() callback to dma-buf.h but I'm not sure that this is
-good way. maybe there would be better way.
-
-Thanks.
-
-> BR,
-> -R
+On Sun, Jan 08, 2012 at 04:27:23PM +0800, Shawn Guo wrote:
+Ok, then we wait for anatop regulator first.
+Thanks
+> For subject, please make it be like 'ARM: imx6q: ...'
+> 
+> On Thu, Jan 05, 2012 at 01:20:42PM +0800, Jason Chen wrote:
+> > enable bit CCM_CLPCR_wb_per_at_lpm to decrease leakage during suspend.
+> 
+> It looks odd to have capital and lower case mixed in name
+> 'CCM_CLPCR_wb_per_at_lpm'.
+> 
+> > enable bit CCM_CCR_RBC_EN to disable/bypass anatop regulator during suspend.
+> > 
+> > Signed-off-by: Jason Chen <jason.chen@linaro.org>
+> > Signed-off-by: Jason Chen <jason.chen@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/clock-imx6q.c |   31 +++++++++++++++---------
+> >  arch/arm/mach-imx/pm-imx6q.c    |   48 +++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 67 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+> > index 56a7a3f..11d2453 100644
+> > --- a/arch/arm/mach-imx/clock-imx6q.c
+> > +++ b/arch/arm/mach-imx/clock-imx6q.c
+> > @@ -115,6 +115,8 @@
+> >  #define CG14		28
+> >  #define CG15		30
+> >  
+> > +#define BM_CCR_RBC_EN			(0x1 << 27)
+> > +
+> >  #define BM_CCSR_PLL1_SW_SEL		(0x1 << 2)
+> >  #define BM_CCSR_STEP_SEL		(0x1 << 8)
+> >  
+> > @@ -1916,33 +1918,38 @@ static struct clk_lookup lookups[] = {
+> >  
+> >  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+> >  {
+> > -	u32 val = readl_relaxed(CLPCR);
+> > +	u32 clpcr = readl_relaxed(CLPCR);
+> > +	u32 ccr = readl_relaxed(CCR);
+> >  
+> > -	val &= ~BM_CLPCR_LPM;
+> > +	clpcr &= ~(BM_CLPCR_LPM | BM_CLPCR_VSTBY | BM_CLPCR_SBYOS
+> > +			| BM_CLPCR_STBY_COUNT | BM_CLPCR_WB_PER_AT_LPM);
+> > +	ccr &= ~(BM_CCR_RBC_EN);
+> 
+> Unneeded parentheses.
+> 
+> >  	switch (mode) {
+> >  	case WAIT_CLOCKED:
+> >  		break;
+> >  	case WAIT_UNCLOCKED:
+> > -		val |= 0x1 << BP_CLPCR_LPM;
+> > +		clpcr |= 0x1 << BP_CLPCR_LPM;
+> >  		break;
+> >  	case STOP_POWER_ON:
+> > -		val |= 0x2 << BP_CLPCR_LPM;
+> > +		clpcr |= 0x2 << BP_CLPCR_LPM;
+> >  		break;
+> >  	case WAIT_UNCLOCKED_POWER_OFF:
+> > -		val |= 0x1 << BP_CLPCR_LPM;
+> > -		val &= ~BM_CLPCR_VSTBY;
+> > -		val &= ~BM_CLPCR_SBYOS;
+> > +		clpcr |= 0x1 << BP_CLPCR_LPM;
+> >  		break;
+> >  	case STOP_POWER_OFF:
+> > -		val |= 0x2 << BP_CLPCR_LPM;
+> > -		val |= 0x3 << BP_CLPCR_STBY_COUNT;
+> > -		val |= BM_CLPCR_VSTBY;
+> > -		val |= BM_CLPCR_SBYOS;
+> > +		clpcr |= 0x2 << BP_CLPCR_LPM;
+> > +		clpcr |= 0x3 << BP_CLPCR_STBY_COUNT;
+> > +		clpcr |= BM_CLPCR_VSTBY;
+> > +		clpcr |= BM_CLPCR_SBYOS;
+> > +		clpcr |= BM_CLPCR_WB_PER_AT_LPM;
+> > +		/* assert anatop_reg_bypass signal */
+> 
+> We do not have to put the comment here, as it does not help too much.
+> 
+> > +		ccr |= BM_CCR_RBC_EN;
+> >  		break;
+> >  	default:
+> >  		return -EINVAL;
+> >  	}
+> > -	writel_relaxed(val, CLPCR);
+> > +	writel_relaxed(clpcr, CLPCR);
+> > +	writel_relaxed(ccr, CCR);
+> >  
+> >  	return 0;
+> >  }
+> > diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+> > index f20f191..72a1399 100644
+> > --- a/arch/arm/mach-imx/pm-imx6q.c
+> > +++ b/arch/arm/mach-imx/pm-imx6q.c
+> > @@ -13,6 +13,7 @@
+> >  #include <linux/init.h>
+> >  #include <linux/io.h>
+> >  #include <linux/of.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/suspend.h>
+> >  #include <asm/cacheflush.h>
+> >  #include <asm/proc-fns.h>
+> > @@ -22,6 +23,41 @@
+> >  #include <mach/hardware.h>
+> >  
+> >  extern unsigned long phys_l2x0_saved_regs;
+> > +static void __iomem *anatop_base;
+> > +
+> > +#define ANATOP_REG_2P5			0x130
+> > +#define BM_ANATOP_REG_2P5_WEAK_EN	(0x1 << 18)
+> > +
+> > +static int imx6q_anatop_reg_pre_suspend(void)
+> > +{
+> > +	/*
+> > +	 * enable anatop weak 2p5 regulator, which should use
+> > +	 * regulator API after anatop regulator implementation.
+> > +	 */
+> > +	if (anatop_base) {
+> > +		unsigned int reg_2p5;
+> > +		reg_2p5 = readl(anatop_base + ANATOP_REG_2P5);
+> > +		reg_2p5 |= BM_ANATOP_REG_2P5_WEAK_EN;
+> > +		writel(reg_2p5, anatop_base + ANATOP_REG_2P5);
+> > +	} else
+> > +		return -EINVAL;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void imx6q_anatop_reg_post_resume(void)
+> > +{
+> > +	/*
+> > +	 * disable anatop weak 2p5 regulator, which should use
+> > +	 * regulator API after anatop regulator implementation.
+> > +	 */
+> > +	if (anatop_base) {
+> > +		unsigned int reg_2p5;
+> > +		reg_2p5 = readl(anatop_base + ANATOP_REG_2P5);
+> > +		reg_2p5 &= ~BM_ANATOP_REG_2P5_WEAK_EN;
+> > +		writel(reg_2p5, anatop_base + ANATOP_REG_2P5);
+> > +	}
+> > +}
+> >  
+> I do not like to have these anatop functions implemented in pm-imx6q.c.
+> 
+> >  static int imx6q_suspend_finish(unsigned long val)
+> >  {
+> > @@ -33,6 +69,8 @@ static int imx6q_pm_enter(suspend_state_t state)
+> >  {
+> >  	switch (state) {
+> >  	case PM_SUSPEND_MEM:
+> > +		if (imx6q_anatop_reg_pre_suspend() < 0)
+> > +			return -EINVAL;
+> >  		imx6q_set_lpm(STOP_POWER_OFF);
+> >  		imx_gpc_pre_suspend();
+> >  		imx_set_cpu_jump(0, v7_cpu_resume);
+> > @@ -40,6 +78,7 @@ static int imx6q_pm_enter(suspend_state_t state)
+> >  		cpu_suspend(0, imx6q_suspend_finish);
+> >  		imx_smp_prepare();
+> >  		imx_gpc_post_resume();
+> > +		imx6q_anatop_reg_post_resume();
+> >  		break;
+> >  	default:
+> >  		return -EINVAL;
+> > @@ -55,6 +94,15 @@ static const struct platform_suspend_ops imx6q_pm_ops = {
+> >  
+> >  void __init imx6q_pm_init(void)
+> >  {
+> > +	struct device_node *np;
+> > +
+> > +	/*
+> > +	 * remap anatop to adjust anatop regulator, which should
+> > +	 * remove after anatop regulator driver implementation.
+> > +	 */
+> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
+> > +	anatop_base = of_iomap(np, 0);
+> > +
+> 
+> I would wait for anatop regulator driver being ready before we add
+> this bypass support, so that we can save all this unnecessary churn
+> in the pm-imx6q.c.
+> 
+> Regards,
+> Shawn
+> 
+> >  	/*
+> >  	 * The l2x0 core code provides an infrastucture to save and restore
+> >  	 * l2x0 registers across suspend/resume cycle.  But because imx6q
+> > -- 
+> > 1.7.4.1
+> > 
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
