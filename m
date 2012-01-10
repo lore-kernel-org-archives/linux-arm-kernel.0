@@ -1,39 +1,79 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 10 Jan 2012 15:01:47 +0800
-Subject: [PATCH 3/6] dma/imx-sdma: call sdma_set_channel_priority after
- sdma_request_channel
-In-Reply-To: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
-References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1326178910-14044-3-git-send-email-richard.zhao@linaro.org>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Tue, 10 Jan 2012 07:02:24 +0000
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE39E40@HQMAIL01.nvidia.com>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885077F82@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F1887@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788507F615@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE39E40@HQMAIL01.nvidia.com>
+Message-ID: <7FE21149F4667147B645348EC605788508AB04@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sdma_request_channel sets the default priority. sdma_alloc_chan_resources
-should call sdma_set_channel_priority thereafter to over write it.
+> -----Original Message-----
+> From: Stephen Warren [mailto:swarren at nvidia.com]
+> Sent: Saturday, January 07, 2012 1:24 AM
+> To: Dong Aisheng-B29396; linux-kernel at vger.kernel.org
+> Cc: linus.walleij at stericsson.com; s.hauer at pengutronix.de;
+> rob.herring at calxeda.com; linux-arm-kernel at lists.infradead.org;
+> kernel at pengutronix.de; cjb at laptop.org; devicetree-discuss at lists.ozlabs.org
+> Subject: RE: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+> mappings
+> Importance: High
+> 
+> Dong Aisheng-B29396 wrote at Friday, January 06, 2012 3:51 AM:
+> > Stephen Warren wrote at Friday, January 06, 2012 7:38 AM:
+> > > Dong Aisheng-B29396 wrote at Tuesday, December 27, 2011 7:41 AM:
+> ...
+> > > > But what about the pin maps without device associated?
+> > >
+> > > Indeed; that's why I'd tend towards defining a table of pinmux usage
+> > > in the pinmux node, and having other devices refer to that table.
+> >
+> > Currently we still prefer to use device node relationship to reflect
+> > the pinmux map if we can since as you said pinmux map is little
+> > depending on the pinctrl subsystem implementation.
+> > And I'm trying to do it now.
+> >
+> > > Still, if the pinmux definitions are in the device nodes, we could
+> > > simply make the pinmux controller have such a definition itself too, for the
+> "system hog"
+> > > case.
+> >
+> > Yes, that way I think is like:
+> > iomuxc at 020e0000 {
+> >         pinctrl_uart4: uart4 {
+> >                 grp-pins = <107 108>;
+> >                 grp-mux = <4 4>;
+> > 		   hog_on_boot;
+> >         };
+> > }
+> 
+> If pinmux usage is defined in each individual device node,
+Per my understanding a phandle to the pinmux usage defined in iomuxc node
+Is also ok.
+The next, you also pointed out before, we need to find a at least semi-standardized
+per-device "pinmux" property which is suitable for all platforms.
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/dma/imx-sdma.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+> and the "hog"
+> setup is included in the pinmux controller's own device node, then there's no
+> need for a "hog_on_boot" property; any pinmux setup node that's inside the
+> pinmux controller node would automatically be a "hog" entry, and could be
+> activated as soon as the pinmux controller was probed and registered with the
+> pinctrl subsystem.
+> 
++1
+I think this is a right solution for dt without a pinmux map.
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 63f4752..b40f630 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -875,11 +875,11 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
- 
- 	sdmac->peripheral_type = data->peripheral_type;
- 	sdmac->event_id0 = data->dma_request;
--	ret = sdma_set_channel_priority(sdmac, prio);
-+	ret = sdma_request_channel(sdmac);
- 	if (ret)
- 		return ret;
- 
--	ret = sdma_request_channel(sdmac);
-+	ret = sdma_set_channel_priority(sdmac, prio);
- 	if (ret)
- 		return ret;
- 
--- 
-1.7.5.4
+> (as a minor nit, DT usually uses - not _ in property names, so that would be
+> "hog-on-boot").
+> 
+> --
+> nvpublic
+> 
