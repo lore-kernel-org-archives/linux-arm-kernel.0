@@ -1,31 +1,18 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Jan 2012 09:39:22 +0100
-Subject: [PATCH 2/4] ASoC: i.MX: Add missing dma_async_issue_pending
-In-Reply-To: <20120109161301.GB2974@opensource.wolfsonmicro.com>
-References: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
- <1326101570-3716-3-git-send-email-s.hauer@pengutronix.de>
- <20120109161301.GB2974@opensource.wolfsonmicro.com>
-Message-ID: <20120110083922.GT5446@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Jan 2012 08:39:33 +0000
+Subject: [GIT PULL 05/11] SoC-level changes for tegra and omap
+In-Reply-To: <CA+55aFyaOnJhrZOFnRiShH9kTeGEG8O8m9spvKF=c36QzjSvBA@mail.gmail.com>
+References: <1326147171-13752-1-git-send-email-arnd@arndb.de>
+ <1326147171-13752-6-git-send-email-arnd@arndb.de>
+ <CA+55aFyaOnJhrZOFnRiShH9kTeGEG8O8m9spvKF=c36QzjSvBA@mail.gmail.com>
+Message-ID: <20120110083933.GS21765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2012 at 08:13:02AM -0800, Mark Brown wrote:
-> On Mon, Jan 09, 2012 at 10:32:48AM +0100, Sascha Hauer wrote:
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> 
-> but I guess I can just apply it immediately?
+On Mon, Jan 09, 2012 at 02:37:17PM -0800, Linus Torvalds wrote:
+> Please do use -M, because it ends up making diffstats *so* much more
+> readable when there are renames (instead of big delete-create diffs,
+> you get a small diffstat that actually is much more relevant to what
+> happened).
 
-The ASoC patch (also the mmc driver patch) have to be applied
-before the dma driver patches. To make this sure I think it's
-best when Vinoud applies the whole series.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+What about using -C instead (which implies -M, but also detects copies) ?
