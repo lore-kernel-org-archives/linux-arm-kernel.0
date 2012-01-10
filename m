@@ -1,69 +1,108 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 10 Jan 2012 18:22:18 +0200
-Subject: [PATCH] ARM: tegra: initialize basic system clocks
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
-Message-ID: <1326212538-15419-1-git-send-email-pdeschrijver@nvidia.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 10 Jan 2012 17:24:23 +0100
+Subject: [PATCH 3/5] ARM: at91: introduce AT91_SAM9_ALT_RESET to select the
+ at91sam9 alternative reset
+In-Reply-To: <20120110160349.GV2854@game.jcrosoft.org>
+References: <20120110160349.GV2854@game.jcrosoft.org>
+Message-ID: <1326212665-1881-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize basic system clocks and provide a auxdata table to allow some
-peripheral drivers to find their clocks.
-
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
+ arch/arm/mach-at91/Kconfig  |    9 +++++++++
+ arch/arm/mach-at91/Makefile |   13 +++++++------
+ 2 files changed, 16 insertions(+), 6 deletions(-)
 
-Stephen,
-
-This should fix the hang you observed when sdhci_add_host() fails.
----
- arch/arm/mach-tegra/board-dt-tegra30.c |   24 +++++++++++++++++++++++-
- 1 files changed, 23 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
-index 3c197e2..b4124b1 100644
---- a/arch/arm/mach-tegra/board-dt-tegra30.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra30.c
-@@ -34,16 +34,38 @@
- #include <asm/hardware/gic.h>
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 4f991f2..4275577 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -18,6 +18,9 @@ config HAVE_AT91_USART4
+ config HAVE_AT91_USART5
+ 	bool
  
- #include "board.h"
-+#include "clock.h"
- 
- static struct of_device_id tegra_dt_match_table[] __initdata = {
- 	{ .compatible = "simple-bus", },
- 	{}
- };
- 
-+struct of_dev_auxdata tegra30_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000000, "sdhci-tegra.0", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000200, "sdhci-tegra.1", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000400, "sdhci-tegra.2", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", 0x78000600, "sdhci-tegra.3", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C000, "tegra-i2c.0", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C400, "tegra-i2c.1", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C500, "tegra-i2c.2", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C700, "tegra-i2c.3", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000D000, "tegra-i2c.4", NULL),
-+	{}
-+};
++config AT91_SAM9_ALT_RESET
++	bool
 +
-+static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
-+	/* name		parent		rate		enabled */
-+	{ "uartd",	"pll_p",	408000000,	true },
-+	{ NULL,		NULL,		0,		0},
-+};
-+
- static void __init tegra30_dt_init(void)
- {
-+	tegra_clk_init_from_table(tegra_dt_clk_init_table);
-+
- 	of_platform_populate(NULL, tegra_dt_match_table,
--				NULL, NULL);
-+				tegra30_auxdata_lookup, NULL);
- }
+ menu "Atmel AT91 System-on-Chip"
  
- static const char *tegra30_dt_board_compat[] = {
+ choice
+@@ -39,6 +42,7 @@ config ARCH_AT91SAM9260
+ 	select HAVE_AT91_USART4
+ 	select HAVE_AT91_USART5
+ 	select HAVE_NET_MACB
++	select AT91_SAM9_ALT_RESET
+ 
+ config ARCH_AT91SAM9261
+ 	bool "AT91SAM9261"
+@@ -46,6 +50,7 @@ config ARCH_AT91SAM9261
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_AT91_DBGU0
++	select AT91_SAM9_ALT_RESET
+ 
+ config ARCH_AT91SAM9G10
+ 	bool "AT91SAM9G10"
+@@ -53,6 +58,7 @@ config ARCH_AT91SAM9G10
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
++	select AT91_SAM9_ALT_RESET
+ 
+ config ARCH_AT91SAM9263
+ 	bool "AT91SAM9263"
+@@ -61,6 +67,7 @@ config ARCH_AT91SAM9263
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
+ 	select HAVE_AT91_DBGU1
++	select AT91_SAM9_ALT_RESET
+ 
+ config ARCH_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+@@ -69,6 +76,7 @@ config ARCH_AT91SAM9RL
+ 	select HAVE_AT91_USART3
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_AT91_DBGU0
++	select AT91_SAM9_ALT_RESET
+ 
+ config ARCH_AT91SAM9G20
+ 	bool "AT91SAM9G20"
+@@ -79,6 +87,7 @@ config ARCH_AT91SAM9G20
+ 	select HAVE_AT91_USART4
+ 	select HAVE_AT91_USART5
+ 	select HAVE_NET_MACB
++	select AT91_SAM9_ALT_RESET
+ 
+ config ARCH_AT91SAM9G45
+ 	bool "AT91SAM9G45"
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 242174f..e8e961b 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -8,15 +8,16 @@ obj-n		:=
+ obj-		:=
+ 
+ obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
++obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
+ 
+ # CPU-specific support
+ obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o at91rm9200_devices.o
+-obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o at91sam9_alt_reset.o
+-obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o at91sam9_alt_reset.o
+-obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o at91sam9_alt_reset.o
+-obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o at91sam9_alt_reset.o
+-obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o at91sam9_alt_reset.o
+-obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o at91sam9_alt_reset.o
++obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+1.7.7
