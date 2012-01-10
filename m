@@ -1,65 +1,62 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 10 Jan 2012 07:13:33 -0800
-Subject: [PATCHv12 0/9] OMAP3+: PRCM chain handler
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D1214304EDAC@DBDE01.ent.ti.com>
- (Vaibhav Bedia's message of "Tue, 10 Jan 2012 11:41:08 +0000")
-References: <20111215213358.26632.44165.stgit@dusk>
- <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
- <87obucuzev.fsf@ti.com>
- <B5906170F1614E41A8A28DE3B8D1214304EDAC@DBDE01.ent.ti.com>
-Message-ID: <878vlfvbdu.fsf@ti.com>
+Date: Tue, 10 Jan 2012 07:26:06 -0800
+Subject: [PATCHv8 4/5] OMAP: I2C: Remove the reset in the init path
+In-Reply-To: <CANQgH-YLez8B-t8nf9_M8samn9YWUa7LcOFx6uPFrJE9tnXB1Q@mail.gmail.com>
+ (Shubhrajyoti Datta's message of "Tue, 10 Jan 2012 11:54:13 +0530")
+References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
+ <1323773758-6375-5-git-send-email-shubhrajyoti@ti.com>
+ <alpine.DEB.2.00.1112160139010.12660@utopia.booyaka.com>
+ <4EEB086A.2050607@ti.com>
+ <CANQgH-Ze1S6sy1uhzy_b8GWOCjF4+-9DOCcUn9mq1kAaT+Y7FA@mail.gmail.com>
+ <CANQgH-YLez8B-t8nf9_M8samn9YWUa7LcOFx6uPFrJE9tnXB1Q@mail.gmail.com>
+Message-ID: <87hb03tw8h.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
+"Datta, Shubhrajyoti" <shubhrajyoti@ti.com> writes:
 
-> Hi Kevin,
->
-> On Tue, Jan 10, 2012 at 06:49:52, Hilman, Kevin wrote:
-> [...]
->> >
->> > 1. IO and wakeup events are not supported on AM33XX. Since cpu_is_34xx()
->> > holds true for AM33XX I ended up adding a !cpu_is_am33xx() check in 
->> > omap3xxx_prcm_init() to bypass the chain handler registration.
->> 
->> > Without such a check we were seeing a crash in USB since USB_CLKCTRL on 
->> > AM33XX just happens to be at the IRQENABLE_MPU_OFFSET of OMAP3.
->> > Hope such cpu_is_*() checks are acceptable.
->> 
->> We try to avoid them, especially when we already have existing feature
->> flag for IO wakeups.
->> 
->> Does something like (completely untested) patch below work for you?
->> 
->> Of course, that implies that that feature flag is initialized correctly
->> for AM33xx.
->> 
->> Kevin
->> 
->> 
->> 
->> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
->> index c1c4d86..87451d9 100644
->> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
->> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
->> @@ -302,7 +302,7 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
->>  
->>  static int __init omap3xxx_prcm_init(void)
->>  {
->> -	if (cpu_is_omap34xx())
->> +	if (cpu_is_omap34xx() && omap3_has_io_wakeup())
->>  		return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
->>  	return 0;
->>  }
->> 
->
-> I'll try this out once we have feature flag initialized on AM33xx.
-> Can the cpu_is_omap34xx() check be completely dropped in that case?
-> Or is there some other reason for retaining it?
+> On Tue, Jan 10, 2012 at 11:53 AM, Datta, Shubhrajyoti
+> <shubhrajyoti@ti.com> wrote:
+>>
+>>
+>>
+>> On Fri, Dec 16, 2011 at 2:29 PM, Shubhrajyoti <shubhrajyoti@ti.com> wrote:
+>>>
+>>> Ben,
+>>>
+>>> On Friday 16 December 2011 02:10 PM, Paul Walmsley wrote:
+>>> > Hi
+>>> >
+>>> > On Tue, 13 Dec 2011, Shubhrajyoti D wrote:
+>>> >
+>>> >> - ?The reset in the driver at init is not needed anymore as the
+>>> >> ? ?hwmod framework takes care of reseting it.
+>>> >> - ?Reset is removed from omap_i2c_init, which was called
+>>> >> ? ?not only during probe, but also after time out and error handling.
+>>> >> ? ?device_reset were added in those places to effect the reset.
+>>> >> - ?Earlier the hwmod SYSC settings were over-written in the driver.
+>>> >> ? ?Removing the same and letting the hwmod take care of the settings.
+>>> >> - ?Clean up the SYSS_RESETDONE_MASK macro as it is no longer needed.
+>>> >> - ?Clean up the SYSCONFIG SYSC bit definition macros.
+>>> >> - ?Fix the typos in wakeup.
+>>> >>
+>>> >> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>>> >> ---
+>>> >> ?drivers/i2c/busses/i2c-omap.c | ? 83 +++++++++++-----------------------------
+>>> >> ?1 files changed, 23 insertions(+), 60 deletions(-)
+>>> > This patch either needs to be acked by Ben with a note that it's okay for
+>>> > us to merge through the OMAP tree, or needs to be merged by Ben during the
+>>> > 3.4 merge window, after patches 1-3 have reached the mainline tree.
+>>> I agree.
+>>> Ben do you have any comments .
+>>
+>>
+> If there are no further comments can this be merged also ?
 
-The reason it is there is because that function is called from an
-initcall.  By default, the kernel builds in support for OMAP2/3/4, so
-that initcall will get called on every SoC.  Since it should only happen
-for OMAP3, the cpu_is_ check is used.
+As Benoit mentioned earlier, the addition of new pdata fields will cause
+problems with the DT support already queued for v3.3.
+
+This series should be reworked on top of the DT support which Ben has
+now queued for v3.3 (my branch: for_3.3/i2c/misc)
 
 Kevin
