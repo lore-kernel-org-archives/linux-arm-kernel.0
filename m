@@ -1,29 +1,62 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 11 Jan 2012 13:31:46 +1100
-Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
-Message-ID: <20120111133146.990e2b7115c9fa80e8fc3234@canb.auug.org.au>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Wed, 11 Jan 2012 14:14:25 +1100
+Subject: [PATCH 00/11] ep93xx: Move SoC private bits to core
+Message-ID: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+This patch series is an effort to move the ep93xx SoC specific code out
+of drivers and include/mach into arch/arm/mach-ep93xx. This work
+involves the following changes:
 
-Today's linux-next merge of the v4l-dvb tree got conflicts in a large
-number of files between commits from the arm-soc tree and commits from the
-v4l-dvb tree.  You have rebased the v4l-dvb tree onto v3.2 while the
-arm-soc tree had merged a previous version. you have then added a lot
-more commits on top of the result - which produces all the conflicts.  :-(
+ - Create a new private header called soc.h to replace most of 
+   mach/include/ep93xx-regs.h
+ - Move the Maverick crunch code from arch/arm/kernel to mach-ep93xx
+ - Move all system controller access to the ep93xx core code
 
-This is exactly the sort of pain I alluded to when I first noted that the
-v4l-dvb tree had been merged into the arm-soc tree ...
+There are a small handful of defines left in ep93xx-regs.h which are
+used by both the ep93xx core and include/mach files (uncompress.h,
+debug-macro.S, etc).
 
-Not happy.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120111/3b0aa678/attachment.sig>
+Ryan Mallon (11):
+  ep93xx: Move PHYS_BASE defines to local SoC header file
+  ep93xx: Move GPIO defines to gpio-ep93xx.h
+  ep93xx: Move peripheral defines to local SoC header
+  ep93xx: Configure GPIO ports in core code
+  ep93xx: Move arch_reset to core.c
+  ep93xx: Don't use system controller defines in audio drivers
+  ep93xx: Make syscon access functions private to SoC
+  ep93xx: Move EP93XX_WATCHDOG_BASE define to driver
+  ep93xx: Move crunch code to mach-ep93xx directory
+  ep93xx: Move EP93XX_SYSCON defines to SoC private header
+  ep93xx: Remove unnecessary includes of ep93xx-regs.h
+
+ arch/arm/kernel/Makefile                        |    3 -
+ arch/arm/mach-ep93xx/Makefile                   |    3 +
+ arch/arm/mach-ep93xx/adssphere.c                |    1 +
+ arch/arm/mach-ep93xx/clock.c                    |    1 +
+ arch/arm/mach-ep93xx/core.c                     |   47 ++++--
+ arch/arm/{kernel => mach-ep93xx}/crunch-bits.S  |    0
+ arch/arm/{kernel => mach-ep93xx}/crunch.c       |    4 +-
+ arch/arm/mach-ep93xx/dma.c                      |    2 +
+ arch/arm/mach-ep93xx/edb93xx.c                  |    2 +
+ arch/arm/mach-ep93xx/gesbc9312.c                |    1 +
+ arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |  191 +--------------------
+ arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |   10 +
+ arch/arm/mach-ep93xx/include/mach/hardware.h    |    1 -
+ arch/arm/mach-ep93xx/include/mach/platform.h    |   16 +--
+ arch/arm/mach-ep93xx/include/mach/system.h      |   14 +--
+ arch/arm/mach-ep93xx/micro9.c                   |    1 +
+ arch/arm/mach-ep93xx/simone.c                   |    2 +
+ arch/arm/mach-ep93xx/snappercl15.c              |    2 +
+ arch/arm/mach-ep93xx/soc.h                      |  210 +++++++++++++++++++++++
+ arch/arm/mach-ep93xx/ts72xx.c                   |    2 +
+ arch/arm/mach-ep93xx/vision_ep9307.c            |    2 +
+ drivers/gpio/gpio-ep93xx.c                      |    7 -
+ drivers/watchdog/ep93xx_wdt.c                   |    2 +
+ sound/soc/ep93xx/edb93xx.c                      |    4 +-
+ sound/soc/ep93xx/snappercl15.c                  |    4 +-
+ 25 files changed, 279 insertions(+), 253 deletions(-)
+ rename arch/arm/{kernel => mach-ep93xx}/crunch-bits.S (100%)
+ rename arch/arm/{kernel => mach-ep93xx}/crunch.c (98%)
+ create mode 100644 arch/arm/mach-ep93xx/soc.h
