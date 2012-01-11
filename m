@@ -1,76 +1,220 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 11 Jan 2012 14:14:34 +1100
-Subject: [PATCH 09/11] ep93xx: Move crunch code to mach-ep93xx directory
+Date: Wed, 11 Jan 2012 14:14:35 +1100
+Subject: [PATCH 10/11] ep93xx: Move EP93XX_SYSCON defines to SoC private header
 In-Reply-To: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
 References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
-Message-ID: <1326251676-7593-10-git-send-email-rmallon@gmail.com>
+Message-ID: <1326251676-7593-11-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The crunch code in arch/arm/kernel is specific to the EP93xx. Move it
-to the mach-ep93xx directory. This removes the need for the
-EP93XX_SYSCON defines to be exported to arch/arm/kernel.
+The EP93XX_SYSCON defines are now no longer needed outside of the
+EP93xx SoC core code, so they can be moved to a private header.
 
 Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 Cc: Mika Westerberg <mika.westerberg@iki.fi>
-Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Ryan Mallon <rmallon@gmail.com>
 ---
- arch/arm/kernel/Makefile                       |    3 ---
- arch/arm/mach-ep93xx/Makefile                  |    3 +++
- arch/arm/{kernel => mach-ep93xx}/crunch-bits.S |    0
- arch/arm/{kernel => mach-ep93xx}/crunch.c      |    2 ++
- 4 files changed, 5 insertions(+), 3 deletions(-)
- rename arch/arm/{kernel => mach-ep93xx}/crunch-bits.S (100%)
- rename arch/arm/{kernel => mach-ep93xx}/crunch.c (99%)
+ arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   90 -----------------------
+ arch/arm/mach-ep93xx/soc.h                      |   90 +++++++++++++++++++++++
+ 2 files changed, 90 insertions(+), 90 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 16eed6a..57aa6c9 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -62,9 +62,6 @@ obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
- CFLAGS_swp_emulate.o		:= -Wa,-march=armv7-a
- obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+index 225790d..c64d742 100644
+--- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
++++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+@@ -38,94 +38,4 @@
+ #define EP93XX_UART3_PHYS_BASE		EP93XX_APB_PHYS(0x000e0000)
+ #define EP93XX_UART3_BASE		EP93XX_APB_IOMEM(0x000e0000)
  
--obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
--AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+-#define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000)
+-#define EP93XX_SYSCON_REG(x)		(EP93XX_SYSCON_BASE + (x))
+-#define EP93XX_SYSCON_POWER_STATE	EP93XX_SYSCON_REG(0x00)
+-#define EP93XX_SYSCON_PWRCNT		EP93XX_SYSCON_REG(0x04)
+-#define EP93XX_SYSCON_PWRCNT_FIR_EN	(1<<31)
+-#define EP93XX_SYSCON_PWRCNT_UARTBAUD	(1<<29)
+-#define EP93XX_SYSCON_PWRCNT_USH_EN	(1<<28)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2M1	(1<<27)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2M0	(1<<26)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P8	(1<<25)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P9	(1<<24)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P6	(1<<23)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P7	(1<<22)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P4	(1<<21)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P5	(1<<20)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P2	(1<<19)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P3	(1<<18)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P0	(1<<17)
+-#define EP93XX_SYSCON_PWRCNT_DMA_M2P1	(1<<16)
+-#define EP93XX_SYSCON_HALT		EP93XX_SYSCON_REG(0x08)
+-#define EP93XX_SYSCON_STANDBY		EP93XX_SYSCON_REG(0x0c)
+-#define EP93XX_SYSCON_CLKSET1		EP93XX_SYSCON_REG(0x20)
+-#define EP93XX_SYSCON_CLKSET1_NBYP1	(1<<23)
+-#define EP93XX_SYSCON_CLKSET2		EP93XX_SYSCON_REG(0x24)
+-#define EP93XX_SYSCON_CLKSET2_NBYP2	(1<<19)
+-#define EP93XX_SYSCON_CLKSET2_PLL2_EN	(1<<18)
+-#define EP93XX_SYSCON_DEVCFG		EP93XX_SYSCON_REG(0x80)
+-#define EP93XX_SYSCON_DEVCFG_SWRST	(1<<31)
+-#define EP93XX_SYSCON_DEVCFG_D1ONG	(1<<30)
+-#define EP93XX_SYSCON_DEVCFG_D0ONG	(1<<29)
+-#define EP93XX_SYSCON_DEVCFG_IONU2	(1<<28)
+-#define EP93XX_SYSCON_DEVCFG_GONK	(1<<27)
+-#define EP93XX_SYSCON_DEVCFG_TONG	(1<<26)
+-#define EP93XX_SYSCON_DEVCFG_MONG	(1<<25)
+-#define EP93XX_SYSCON_DEVCFG_U3EN	(1<<24)
+-#define EP93XX_SYSCON_DEVCFG_CPENA	(1<<23)
+-#define EP93XX_SYSCON_DEVCFG_A2ONG	(1<<22)
+-#define EP93XX_SYSCON_DEVCFG_A1ONG	(1<<21)
+-#define EP93XX_SYSCON_DEVCFG_U2EN	(1<<20)
+-#define EP93XX_SYSCON_DEVCFG_EXVC	(1<<19)
+-#define EP93XX_SYSCON_DEVCFG_U1EN	(1<<18)
+-#define EP93XX_SYSCON_DEVCFG_TIN	(1<<17)
+-#define EP93XX_SYSCON_DEVCFG_HC3IN	(1<<15)
+-#define EP93XX_SYSCON_DEVCFG_HC3EN	(1<<14)
+-#define EP93XX_SYSCON_DEVCFG_HC1IN	(1<<13)
+-#define EP93XX_SYSCON_DEVCFG_HC1EN	(1<<12)
+-#define EP93XX_SYSCON_DEVCFG_HONIDE	(1<<11)
+-#define EP93XX_SYSCON_DEVCFG_GONIDE	(1<<10)
+-#define EP93XX_SYSCON_DEVCFG_PONG	(1<<9)
+-#define EP93XX_SYSCON_DEVCFG_EONIDE	(1<<8)
+-#define EP93XX_SYSCON_DEVCFG_I2SONSSP	(1<<7)
+-#define EP93XX_SYSCON_DEVCFG_I2SONAC97	(1<<6)
+-#define EP93XX_SYSCON_DEVCFG_RASONP3	(1<<4)
+-#define EP93XX_SYSCON_DEVCFG_RAS	(1<<3)
+-#define EP93XX_SYSCON_DEVCFG_ADCPD	(1<<2)
+-#define EP93XX_SYSCON_DEVCFG_KEYS	(1<<1)
+-#define EP93XX_SYSCON_DEVCFG_SHENA	(1<<0)
+-#define EP93XX_SYSCON_VIDCLKDIV		EP93XX_SYSCON_REG(0x84)
+-#define EP93XX_SYSCON_CLKDIV_ENABLE	(1<<15)
+-#define EP93XX_SYSCON_CLKDIV_ESEL	(1<<14)
+-#define EP93XX_SYSCON_CLKDIV_PSEL	(1<<13)
+-#define EP93XX_SYSCON_CLKDIV_PDIV_SHIFT	8
+-#define EP93XX_SYSCON_I2SCLKDIV		EP93XX_SYSCON_REG(0x8c)
+-#define EP93XX_SYSCON_I2SCLKDIV_SENA	(1<<31)
+-#define EP93XX_SYSCON_I2SCLKDIV_ORIDE   (1<<29)
+-#define EP93XX_SYSCON_I2SCLKDIV_SPOL	(1<<19)
+-#define EP93XX_I2SCLKDIV_SDIV		(1 << 16)
+-#define EP93XX_I2SCLKDIV_LRDIV32	(0 << 17)
+-#define EP93XX_I2SCLKDIV_LRDIV64	(1 << 17)
+-#define EP93XX_I2SCLKDIV_LRDIV128 	(2 << 17)
+-#define EP93XX_I2SCLKDIV_LRDIV_MASK 	(3 << 17)
+-#define EP93XX_SYSCON_KEYTCHCLKDIV	EP93XX_SYSCON_REG(0x90)
+-#define EP93XX_SYSCON_KEYTCHCLKDIV_TSEN	(1<<31)
+-#define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
+-#define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
+-#define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
+-#define EP93XX_SYSCON_SYSCFG		EP93XX_SYSCON_REG(0x9c)
+-#define EP93XX_SYSCON_SYSCFG_REV_MASK	(0xf0000000)
+-#define EP93XX_SYSCON_SYSCFG_REV_SHIFT	(28)
+-#define EP93XX_SYSCON_SYSCFG_SBOOT	(1<<8)
+-#define EP93XX_SYSCON_SYSCFG_LCSN7	(1<<7)
+-#define EP93XX_SYSCON_SYSCFG_LCSN6	(1<<6)
+-#define EP93XX_SYSCON_SYSCFG_LASDO	(1<<5)
+-#define EP93XX_SYSCON_SYSCFG_LEEDA	(1<<4)
+-#define EP93XX_SYSCON_SYSCFG_LEECLK	(1<<3)
+-#define EP93XX_SYSCON_SYSCFG_LCSN2	(1<<1)
+-#define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
+-#define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
 -
- obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
- obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
- obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
-diff --git a/arch/arm/mach-ep93xx/Makefile b/arch/arm/mach-ep93xx/Makefile
-index 574209d..0dc51f9 100644
---- a/arch/arm/mach-ep93xx/Makefile
-+++ b/arch/arm/mach-ep93xx/Makefile
-@@ -8,6 +8,9 @@ obj-			:=
+-
+ #endif
+diff --git a/arch/arm/mach-ep93xx/soc.h b/arch/arm/mach-ep93xx/soc.h
+index 958282a..0e1041d 100644
+--- a/arch/arm/mach-ep93xx/soc.h
++++ b/arch/arm/mach-ep93xx/soc.h
+@@ -115,4 +115,94 @@ static inline void ep93xx_devcfg_clear_bits(unsigned int bits)
+ #define EP93XX_RTC_PHYS_BASE		EP93XX_APB_PHYS(0x00120000)
+ #define EP93XX_RTC_BASE			EP93XX_APB_IOMEM(0x00120000)
  
- obj-$(CONFIG_EP93XX_DMA)	+= dma.o
- 
-+obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
-+AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
++/* System controller */
++#define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000)
++#define EP93XX_SYSCON_REG(x)		(EP93XX_SYSCON_BASE + (x))
++#define EP93XX_SYSCON_POWER_STATE	EP93XX_SYSCON_REG(0x00)
++#define EP93XX_SYSCON_PWRCNT		EP93XX_SYSCON_REG(0x04)
++#define EP93XX_SYSCON_PWRCNT_FIR_EN	(1<<31)
++#define EP93XX_SYSCON_PWRCNT_UARTBAUD	(1<<29)
++#define EP93XX_SYSCON_PWRCNT_USH_EN	(1<<28)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2M1	(1<<27)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2M0	(1<<26)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P8	(1<<25)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P9	(1<<24)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P6	(1<<23)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P7	(1<<22)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P4	(1<<21)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P5	(1<<20)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P2	(1<<19)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P3	(1<<18)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P0	(1<<17)
++#define EP93XX_SYSCON_PWRCNT_DMA_M2P1	(1<<16)
++#define EP93XX_SYSCON_HALT		EP93XX_SYSCON_REG(0x08)
++#define EP93XX_SYSCON_STANDBY		EP93XX_SYSCON_REG(0x0c)
++#define EP93XX_SYSCON_CLKSET1		EP93XX_SYSCON_REG(0x20)
++#define EP93XX_SYSCON_CLKSET1_NBYP1	(1<<23)
++#define EP93XX_SYSCON_CLKSET2		EP93XX_SYSCON_REG(0x24)
++#define EP93XX_SYSCON_CLKSET2_NBYP2	(1<<19)
++#define EP93XX_SYSCON_CLKSET2_PLL2_EN	(1<<18)
++#define EP93XX_SYSCON_DEVCFG		EP93XX_SYSCON_REG(0x80)
++#define EP93XX_SYSCON_DEVCFG_SWRST	(1<<31)
++#define EP93XX_SYSCON_DEVCFG_D1ONG	(1<<30)
++#define EP93XX_SYSCON_DEVCFG_D0ONG	(1<<29)
++#define EP93XX_SYSCON_DEVCFG_IONU2	(1<<28)
++#define EP93XX_SYSCON_DEVCFG_GONK	(1<<27)
++#define EP93XX_SYSCON_DEVCFG_TONG	(1<<26)
++#define EP93XX_SYSCON_DEVCFG_MONG	(1<<25)
++#define EP93XX_SYSCON_DEVCFG_U3EN	(1<<24)
++#define EP93XX_SYSCON_DEVCFG_CPENA	(1<<23)
++#define EP93XX_SYSCON_DEVCFG_A2ONG	(1<<22)
++#define EP93XX_SYSCON_DEVCFG_A1ONG	(1<<21)
++#define EP93XX_SYSCON_DEVCFG_U2EN	(1<<20)
++#define EP93XX_SYSCON_DEVCFG_EXVC	(1<<19)
++#define EP93XX_SYSCON_DEVCFG_U1EN	(1<<18)
++#define EP93XX_SYSCON_DEVCFG_TIN	(1<<17)
++#define EP93XX_SYSCON_DEVCFG_HC3IN	(1<<15)
++#define EP93XX_SYSCON_DEVCFG_HC3EN	(1<<14)
++#define EP93XX_SYSCON_DEVCFG_HC1IN	(1<<13)
++#define EP93XX_SYSCON_DEVCFG_HC1EN	(1<<12)
++#define EP93XX_SYSCON_DEVCFG_HONIDE	(1<<11)
++#define EP93XX_SYSCON_DEVCFG_GONIDE	(1<<10)
++#define EP93XX_SYSCON_DEVCFG_PONG	(1<<9)
++#define EP93XX_SYSCON_DEVCFG_EONIDE	(1<<8)
++#define EP93XX_SYSCON_DEVCFG_I2SONSSP	(1<<7)
++#define EP93XX_SYSCON_DEVCFG_I2SONAC97	(1<<6)
++#define EP93XX_SYSCON_DEVCFG_RASONP3	(1<<4)
++#define EP93XX_SYSCON_DEVCFG_RAS	(1<<3)
++#define EP93XX_SYSCON_DEVCFG_ADCPD	(1<<2)
++#define EP93XX_SYSCON_DEVCFG_KEYS	(1<<1)
++#define EP93XX_SYSCON_DEVCFG_SHENA	(1<<0)
++#define EP93XX_SYSCON_VIDCLKDIV		EP93XX_SYSCON_REG(0x84)
++#define EP93XX_SYSCON_CLKDIV_ENABLE	(1<<15)
++#define EP93XX_SYSCON_CLKDIV_ESEL	(1<<14)
++#define EP93XX_SYSCON_CLKDIV_PSEL	(1<<13)
++#define EP93XX_SYSCON_CLKDIV_PDIV_SHIFT	8
++#define EP93XX_SYSCON_I2SCLKDIV		EP93XX_SYSCON_REG(0x8c)
++#define EP93XX_SYSCON_I2SCLKDIV_SENA	(1<<31)
++#define EP93XX_SYSCON_I2SCLKDIV_ORIDE   (1<<29)
++#define EP93XX_SYSCON_I2SCLKDIV_SPOL	(1<<19)
++#define EP93XX_I2SCLKDIV_SDIV		(1 << 16)
++#define EP93XX_I2SCLKDIV_LRDIV32	(0 << 17)
++#define EP93XX_I2SCLKDIV_LRDIV64	(1 << 17)
++#define EP93XX_I2SCLKDIV_LRDIV128 	(2 << 17)
++#define EP93XX_I2SCLKDIV_LRDIV_MASK 	(3 << 17)
++#define EP93XX_SYSCON_KEYTCHCLKDIV	EP93XX_SYSCON_REG(0x90)
++#define EP93XX_SYSCON_KEYTCHCLKDIV_TSEN	(1<<31)
++#define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
++#define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
++#define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
++#define EP93XX_SYSCON_SYSCFG		EP93XX_SYSCON_REG(0x9c)
++#define EP93XX_SYSCON_SYSCFG_REV_MASK	(0xf0000000)
++#define EP93XX_SYSCON_SYSCFG_REV_SHIFT	(28)
++#define EP93XX_SYSCON_SYSCFG_SBOOT	(1<<8)
++#define EP93XX_SYSCON_SYSCFG_LCSN7	(1<<7)
++#define EP93XX_SYSCON_SYSCFG_LCSN6	(1<<6)
++#define EP93XX_SYSCON_SYSCFG_LASDO	(1<<5)
++#define EP93XX_SYSCON_SYSCFG_LEEDA	(1<<4)
++#define EP93XX_SYSCON_SYSCFG_LEECLK	(1<<3)
++#define EP93XX_SYSCON_SYSCFG_LCSN2	(1<<1)
++#define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
++#define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
 +
- obj-$(CONFIG_MACH_ADSSPHERE)	+= adssphere.o
- obj-$(CONFIG_MACH_EDB93XX)	+= edb93xx.o
- obj-$(CONFIG_MACH_GESBC9312)	+= gesbc9312.o
-diff --git a/arch/arm/kernel/crunch-bits.S b/arch/arm/mach-ep93xx/crunch-bits.S
-similarity index 100%
-rename from arch/arm/kernel/crunch-bits.S
-rename to arch/arm/mach-ep93xx/crunch-bits.S
-diff --git a/arch/arm/kernel/crunch.c b/arch/arm/mach-ep93xx/crunch.c
-similarity index 99%
-rename from arch/arm/kernel/crunch.c
-rename to arch/arm/mach-ep93xx/crunch.c
-index 25ef223..d05ed0b 100644
---- a/arch/arm/kernel/crunch.c
-+++ b/arch/arm/mach-ep93xx/crunch.c
-@@ -19,6 +19,8 @@
- #include <mach/ep93xx-regs.h>
- #include <asm/thread_notify.h>
- 
-+#include "soc.h"
-+
- struct crunch_state *crunch_owner;
- 
- void crunch_task_release(struct thread_info *thread)
+ #endif /* _EP93XX_PHYS_BASE_H */
 -- 
 1.7.0.4
