@@ -1,50 +1,114 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 11 Jan 2012 11:41:56 -0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <20120110130511.GA26599@S2101-09.ap.freescale.net>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-3-git-send-email-b29396@freescale.com>
- <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120110130511.GA26599@S2101-09.ap.freescale.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A74D@HQMAIL01.nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Jan 2012 19:43:34 +0000
+Subject: [PATCH 5/7] at91 : fix dirty hack for the selfrefresh function
+In-Reply-To: <201201111827.18890.arnd.bergmann@linaro.org>
+References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
+ <1326293740-15735-6-git-send-email-daniel.lezcano@linaro.org>
+ <20120111165508.GC1068@n2100.arm.linux.org.uk>
+ <201201111827.18890.arnd.bergmann@linaro.org>
+Message-ID: <20120111194334.GF1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote at Tuesday, January 10, 2012 6:05 AM:
-> On Tue, Jan 10, 2012 at 08:21:05AM +0000, Dong Aisheng-B29396 wrote:
-> > Here what I wonder is that do we need to allow the platform to use a func-name
-> > property in their pinmux func node or pinmux group node to specify the name.
+On Wed, Jan 11, 2012 at 06:27:18PM +0000, Arnd Bergmann wrote:
+> On Wednesday 11 January 2012, Russell King - ARM Linux wrote:
+> > > @@ -49,9 +49,9 @@ static int at91_enter_idle(struct cpuidle_device *dev,
+> > >       else if (index == 1) {
+> > >               asm("b 1f; .align 5; 1:");
+> > >               asm("mcr p15, 0, r0, c7, c10, 4");      /* drain write buffer */
+> > > -             saved_lpr = sdram_selfrefresh_enable();
+> > > +             sdram_selfrefresh_enable(&rs);
+> > 
+> > What's the point of draining the write buffer if you then pass a buffer
+> > to this function to write data to?
+> > 
+> > If the requirement is that the write buffer is drained before issue a
+> > wait-for-interrupt instruction (in cpu_do_idle()) then this code
+> > violates that.
 > 
-> I do not see the necessity.
-> 
-> > If it is allowed, then it could be flexible for soc to define their names.
-> > If not there may be limitations on their node names since we can only get it from
-> > the node name.
-> 
-> To me, the node name is perfectly fine to be used for that purpose.
+> Does that mean the existing AT91SAM9G45 version of sdram_selfrefresh_enable
+> is broken already? It writes to the static saved_lpr1 variable after
+> the write buffers are drained, which is what this patch was trying to
+> clean up.
 
-I'd prefer if we could use integers over strings if at all possible, but
-that does have a dependency on dtc getting a syntax to define named
-constants, or the kernel pre-processing the .dts files before passing
-them to dtc.
+It works because we're lucky - this is what the compiler is producing
+for my test build of this file (for AT91SAM9RL):
 
-But if we have to use strings, I will point out that the pin names I
-chose for Tegra may not be suitable as DT node names; I don't /think/
-the DT node names can contain spaces, but I chose to name the Tegra
-pinctrl pins after both their pin name and GPIO name so that it's
-easier to correlate the two:
+ 100:   e3a00000        mov     r0, #0  ; 0x0
+ 104:   ea000005        b       120 <at91_pm_enter+0x84>
+ 108:   e1a00000        nop                     (mov r0,r0)
+ 10c:   e1a00000        nop                     (mov r0,r0)
+ 110:   e1a00000        nop                     (mov r0,r0)
+ 114:   e1a00000        nop                     (mov r0,r0)
+ 118:   e1a00000        nop                     (mov r0,r0)
+ 11c:   e1a00000        nop                     (mov r0,r0)
+ 120:   ee070f9a        mcr     15, 0, r0, cr7, cr10, {4}
+ 124:   e59f404c        ldr     r4, [pc, #76]   ; 178 <at91_pm_enter+0xdc>
+ 128:   e51455ef        ldr     r5, [r4, #-1519]
+ 12c:   e3c53003        bic     r3, r5, #3      ; 0x3
+ 130:   e3833001        orr     r3, r3, #1      ; 0x1
+ 134:   e50435ef        str     r3, [r4, #-1519]
+ 138:   ebfffffe        bl      0 <cpu_arm926_do_idle>
+ 13c:   e50455ef        str     r5, [r4, #-1519]
+...
+ 178:   feffefff        .word   0xfeffefff
 
-        PINCTRL_PIN(TEGRA_PIN_SDIO3_CLK_PA6, "SDIO3_CLK PA6"),
+The two str instructions there are to access virtual address 0xfeffefff -
+1519 = 0xfeffea10, which is a device register.  It keeps 'saved_lpr' in
+r5, ready for the write to restore the value after the idle call.
 
-Now, I could change that, but I'd prefer not to.
+Thankfully, *my* compiler hasn't decided to add many additional
+instructions into that code path, but that's not to say that a newer
+(or older) compiler may not do.
 
--- 
-nvpublic
+For SAM9G45:
+
+ 100:   e3a00000        mov     r0, #0  ; 0x0
+ 104:   ea000005        b       120 <at91_pm_enter+0x84>
+ 108:   e1a00000        nop                     (mov r0,r0)
+ 10c:   e1a00000        nop                     (mov r0,r0)
+ 110:   e1a00000        nop                     (mov r0,r0)
+ 114:   e1a00000        nop                     (mov r0,r0)
+ 118:   e1a00000        nop                     (mov r0,r0)
+ 11c:   e1a00000        nop                     (mov r0,r0)
+ 120:   ee070f9a        mcr     15, 0, r0, cr7, cr10, {4}
+ 124:   e59f406c        ldr     r4, [pc, #108]  ; 198 <at91_pm_enter+0xfc>
+ 128:   e59f606c        ldr     r6, [pc, #108]  ; 19c <at91_pm_enter+0x100>
+ 12c:   e5141be3        ldr     r1, [r4, #-3043]
+ 130:   e51459e3        ldr     r5, [r4, #-2531]
+ 134:   e3c12003        bic     r2, r1, #3      ; 0x3
+ 138:   e3c53003        bic     r3, r5, #3      ; 0x3
+ 13c:   e3833001        orr     r3, r3, #1      ; 0x1
+ 140:   e3822001        orr     r2, r2, #1      ; 0x1
+ 144:   e50439e3        str     r3, [r4, #-2531]
+ 148:   e5042be3        str     r2, [r4, #-3043]
+ 14c:   e5861000        str     r1, [r6]
+ 150:   ebfffffe        bl      0 <cpu_arm926_do_idle>
+ 154:   e5963000        ldr     r3, [r6]
+ 158:   e50459e3        str     r5, [r4, #-2531]
+ 15c:   e5043be3        str     r3, [r4, #-3043]
+
+ 198:   feffefff        .word   0xfeffefff
+ 19c:   00000000        .word   0x00000000
+                        19c: R_ARM_ABS32        .bss
+
+And there is an additional store in there to a BSS initialized variable
+(via r6).
+
+My guess is that r6 is sharing a cache line which is already cached, and
+so the write is hitting that cache line and remaining unwritten out to
+memory.  In other words, this also is probably mere luck.
+
+On the other hand, we have another DWB in cpu_arm926_do_idle itself.
+
+Whether any of this matters depends on _why_ that DWB is in the AT91
+code itself - is it something that needs to be done before placing the
+SDRAM into self-refresh mode, or is it being done merely because the
+ARM926 docs say that a DWB is needed before WFI?
+
+If the latter, it can be dispensed with because the CPU specific code
+is already doing that.
+
+In any case, I think we need someone to speak up who knows this bit of
+the AT91 code, and it needs fixing so that it's less reliant on luck -
+otherwise cleanups could introduce some rather horrible bugs.
