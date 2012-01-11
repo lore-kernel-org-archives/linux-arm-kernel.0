@@ -1,72 +1,53 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 11 Jan 2012 15:23:44 +0100
-Subject: [PATCHv8 4/5] OMAP: I2C: Remove the reset in the init path
-In-Reply-To: <alpine.DEB.2.00.1201110619090.31702@utopia.booyaka.com>
-References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
- <1323773758-6375-5-git-send-email-shubhrajyoti@ti.com>
- <alpine.DEB.2.00.1112160139010.12660@utopia.booyaka.com>
- <4EEB086A.2050607@ti.com>
- <CANQgH-Ze1S6sy1uhzy_b8GWOCjF4+-9DOCcUn9mq1kAaT+Y7FA@mail.gmail.com>
- <CANQgH-YLez8B-t8nf9_M8samn9YWUa7LcOFx6uPFrJE9tnXB1Q@mail.gmail.com>
- <87hb03tw8h.fsf@ti.com> <4F0D26DF.1020108@ti.com>
- <alpine.DEB.2.00.1201110619090.31702@utopia.booyaka.com>
-Message-ID: <4F0D9B70.3000309@ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 11 Jan 2012 15:24:40 +0100
+Subject: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU
+ driver
+In-Reply-To: <20120105144631.GV11810@n2100.arm.linux.org.uk>
+References: <20120105125326.GT11810@n2100.arm.linux.org.uk><20120105.162930.604365154868332443.hdoyu@nvidia.com><20120105144631.GV11810@n2100.arm.linux.org.uk>
+Message-ID: <20120111.162440.1854857348878391112.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/11/2012 2:29 PM, Paul Walmsley wrote:
-> On Wed, 11 Jan 2012, Shubhrajyoti wrote:
->
->> On Tuesday 10 January 2012 08:56 PM, Kevin Hilman wrote:
->>> "Datta, Shubhrajyoti"<shubhrajyoti@ti.com>  writes:
->>>
->>>> On Tue, Jan 10, 2012 at 11:53 AM, Datta, Shubhrajyoti
->>>> <shubhrajyoti@ti.com>  wrote:
->>>>>
->>>>> On Fri, Dec 16, 2011 at 2:29 PM, Shubhrajyoti<shubhrajyoti@ti.com>  wrote:
->>>>>> On Friday 16 December 2011 02:10 PM, Paul Walmsley wrote:
->>>>>>
->>>>>>> This patch either needs to be acked by Ben with a note that it's okay for
->>>>>>> us to merge through the OMAP tree, or needs to be merged by Ben during the
->>>>>>> 3.4 merge window, after patches 1-3 have reached the mainline tree.
->>>>>> I agree.
->>>>>> Ben do you have any comments .
->>>>>
->>>> If there are no further comments can this be merged also ?
->>> As Benoit mentioned earlier, the addition of new pdata fields will cause
->>> problems with the DT support already queued for v3.3.
->>>
->>> This series should be reworked on top of the DT support which Ben has
->>> now queued for v3.3 (my branch: for_3.3/i2c/misc)
->>
->> Yes will rework it.
->
-> Depending on what you plan to do, you'll probably need to coordinate this
-> with Tony also.  He's already pulled some of the patches from this series
-> into his i2c branch.
->
-> The real question is how you plan to handle the device reset function,
-> given that the driver should compile on a non-OMAP build (meaning that you
-> can't call omap_device*() functions from the driver directly), nor should
-> the driver touch the SYSCONFIG register directly.
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Subject: Re: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU driver
+Date: Thu, 5 Jan 2012 15:46:31 +0100
+Message-ID: <20120105144631.GV11810@n2100.arm.linux.org.uk>
 
-Something that puzzle me on that point is most architecture does not use 
-plateform_device and thus does not have any pdata to hack some custom 
-function pointers here an there.
-It means that there is probably some better solution to handle that.
+> On Thu, Jan 05, 2012 at 03:29:30PM +0100, Hiroshi Doyu wrote:
+> > Ok, the above function order should be as below?
+> > 
+> >   page = alloc_page(GFP_KERNEL);
+> >       cpu_addr = kmap(page);
+> >       memset(cpu_addr, 0xa5, PAGE_SIZE);
+> >   	dma_addr = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_TO_DEVICE);
+> >   	    < expect GPU does something >
+> >   	dma_unmap_page(dev, dma_addr, PAGE_SIZE, DMA_TO_DEVICE);
+> >       < CPU can access data here again>
+> >       kunmap(cpu_addr);
+> >   __free_page(page);
+> 
+> That should work, but it's not particularly nice to wrap kmap around
+> the DMA API.
+> 
+> Bear in mind that alloc_page(GFP_KERNEL) will always give you a lowmem
+> page.  So, you might as well do:
+> 
+> 	page = alloc_page(GFP_KERNEL);
+> 	cpu_addr = page_address(page);
+> 	memset()
+> 	dma_addr = dma_map_single(dev, cpu_addr, PAGE_SIZE, DMA_TO_DEVICE);
+> 		< GPU access >
+> 	dma_unmap_single(dev, dma_ddr, PAGE_SIZE, DMA_TO_DEVICE);
+> 	< CPU access >
+> 	__free_page(page);
+> 
+> and this doesn't raise any issues with kmap vs DMA API.
 
-AFAIU, the way PPC is handling that is by splitting the driver in a 
-generic part and in a platform specific part.
-
-You can then add any OMAP specific hacks in the OMAP specific part while 
-keeping most of generic code in a generic driver.
-
-In this case, we just have to implement a small shim that will handle 
-the OMAP specific code for the reset. The generic driver will handle the 
-rest.
-
-Maybe I'm missing some important details, but that does seems easily 
-doable for the i2c case.
-
-Regards,
-Benoit
+Attached the update one just in case that someone wants to use it for theirs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-NOT-FOR-MERGE-TEST-Simple-dma-iommu-mapping-API-TEST.patch
+Type: text/x-patch
+Size: 6451 bytes
+Desc: 0001-NOT-FOR-MERGE-TEST-Simple-dma-iommu-mapping-API-TEST.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120111/f10945ee/attachment.bin>
