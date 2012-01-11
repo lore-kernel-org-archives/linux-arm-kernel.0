@@ -1,62 +1,59 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 11 Jan 2012 14:14:25 +1100
-Subject: [PATCH 00/11] ep93xx: Move SoC private bits to core
-Message-ID: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+Date: Wed, 11 Jan 2012 14:14:27 +1100
+Subject: [PATCH 02/11] ep93xx: Move GPIO defines to gpio-ep93xx.h
+In-Reply-To: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+Message-ID: <1326251676-7593-3-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is an effort to move the ep93xx SoC specific code out
-of drivers and include/mach into arch/arm/mach-ep93xx. This work
-involves the following changes:
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Mika Westerberg <mika.westerberg@iki.fi>
+Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+---
+ arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    8 --------
+ arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |   10 ++++++++++
+ 2 files changed, 10 insertions(+), 8 deletions(-)
 
- - Create a new private header called soc.h to replace most of 
-   mach/include/ep93xx-regs.h
- - Move the Maverick crunch code from arch/arm/kernel to mach-ep93xx
- - Move all system controller access to the ep93xx core code
-
-There are a small handful of defines left in ep93xx-regs.h which are
-used by both the ep93xx core and include/mach files (uncompress.h,
-debug-macro.S, etc).
-
-Ryan Mallon (11):
-  ep93xx: Move PHYS_BASE defines to local SoC header file
-  ep93xx: Move GPIO defines to gpio-ep93xx.h
-  ep93xx: Move peripheral defines to local SoC header
-  ep93xx: Configure GPIO ports in core code
-  ep93xx: Move arch_reset to core.c
-  ep93xx: Don't use system controller defines in audio drivers
-  ep93xx: Make syscon access functions private to SoC
-  ep93xx: Move EP93XX_WATCHDOG_BASE define to driver
-  ep93xx: Move crunch code to mach-ep93xx directory
-  ep93xx: Move EP93XX_SYSCON defines to SoC private header
-  ep93xx: Remove unnecessary includes of ep93xx-regs.h
-
- arch/arm/kernel/Makefile                        |    3 -
- arch/arm/mach-ep93xx/Makefile                   |    3 +
- arch/arm/mach-ep93xx/adssphere.c                |    1 +
- arch/arm/mach-ep93xx/clock.c                    |    1 +
- arch/arm/mach-ep93xx/core.c                     |   47 ++++--
- arch/arm/{kernel => mach-ep93xx}/crunch-bits.S  |    0
- arch/arm/{kernel => mach-ep93xx}/crunch.c       |    4 +-
- arch/arm/mach-ep93xx/dma.c                      |    2 +
- arch/arm/mach-ep93xx/edb93xx.c                  |    2 +
- arch/arm/mach-ep93xx/gesbc9312.c                |    1 +
- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |  191 +--------------------
- arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |   10 +
- arch/arm/mach-ep93xx/include/mach/hardware.h    |    1 -
- arch/arm/mach-ep93xx/include/mach/platform.h    |   16 +--
- arch/arm/mach-ep93xx/include/mach/system.h      |   14 +--
- arch/arm/mach-ep93xx/micro9.c                   |    1 +
- arch/arm/mach-ep93xx/simone.c                   |    2 +
- arch/arm/mach-ep93xx/snappercl15.c              |    2 +
- arch/arm/mach-ep93xx/soc.h                      |  210 +++++++++++++++++++++++
- arch/arm/mach-ep93xx/ts72xx.c                   |    2 +
- arch/arm/mach-ep93xx/vision_ep9307.c            |    2 +
- drivers/gpio/gpio-ep93xx.c                      |    7 -
- drivers/watchdog/ep93xx_wdt.c                   |    2 +
- sound/soc/ep93xx/edb93xx.c                      |    4 +-
- sound/soc/ep93xx/snappercl15.c                  |    4 +-
- 25 files changed, 279 insertions(+), 253 deletions(-)
- rename arch/arm/{kernel => mach-ep93xx}/crunch-bits.S (100%)
- rename arch/arm/{kernel => mach-ep93xx}/crunch.c (98%)
- create mode 100644 arch/arm/mach-ep93xx/soc.h
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+index b029305..72b8687 100644
+--- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
++++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+@@ -64,14 +64,6 @@
+ 
+ #define EP93XX_SECURITY_BASE		EP93XX_APB_IOMEM(0x00030000)
+ 
+-#define EP93XX_GPIO_PHYS_BASE		EP93XX_APB_PHYS(0x00040000)
+-#define EP93XX_GPIO_BASE		EP93XX_APB_IOMEM(0x00040000)
+-#define EP93XX_GPIO_REG(x)		(EP93XX_GPIO_BASE + (x))
+-#define EP93XX_GPIO_F_INT_STATUS	EP93XX_GPIO_REG(0x5c)
+-#define EP93XX_GPIO_A_INT_STATUS	EP93XX_GPIO_REG(0xa0)
+-#define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
+-#define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
+-
+ #define EP93XX_AAC_PHYS_BASE		EP93XX_APB_PHYS(0x00080000)
+ #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
+ 
+diff --git a/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h b/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
+index 8aff2ea..6d7c571 100644
+--- a/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
++++ b/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
+@@ -3,6 +3,16 @@
+ #ifndef __GPIO_EP93XX_H
+ #define __GPIO_EP93XX_H
+ 
++#include <mach/ep93xx-regs.h>
++
++#define EP93XX_GPIO_PHYS_BASE		EP93XX_APB_PHYS(0x00040000)
++#define EP93XX_GPIO_BASE		EP93XX_APB_IOMEM(0x00040000)
++#define EP93XX_GPIO_REG(x)		(EP93XX_GPIO_BASE + (x))
++#define EP93XX_GPIO_F_INT_STATUS	EP93XX_GPIO_REG(0x5c)
++#define EP93XX_GPIO_A_INT_STATUS	EP93XX_GPIO_REG(0xa0)
++#define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
++#define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
++
+ /* GPIO port A.  */
+ #define EP93XX_GPIO_LINE_A(x)		((x) + 0)
+ #define EP93XX_GPIO_LINE_EGPIO0		EP93XX_GPIO_LINE_A(0)
+-- 
+1.7.0.4
