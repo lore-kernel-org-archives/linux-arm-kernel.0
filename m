@@ -1,59 +1,94 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 Jan 2012 09:32:05 -0600
-Subject: [PATCH 1/6] ARM: exynos: remove incorrect BSYM usage
-In-Reply-To: <1326149146-19756-2-git-send-email-robherring2@gmail.com>
-References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
- <1326149146-19756-2-git-send-email-robherring2@gmail.com>
-Message-ID: <4F0DAB75.7020006@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 11 Jan 2012 16:57:31 +0100
+Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
+In-Reply-To: <201201111450.02798.arnd@arndb.de>
+References: <20120111133146.990e2b7115c9fa80e8fc3234@canb.auug.org.au>
+ <Pine.LNX.4.64.1201110933480.1191@axis700.grange>
+ <4F0D65F6.8080209@infradead.org> <201201111450.02798.arnd@arndb.de>
+Message-ID: <4F0DB16B.3010302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2012 04:45 PM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 01/11/2012 03:50 PM, Arnd Bergmann :
+> On Wednesday 11 January 2012, Mauro Carvalho Chehab wrote:
+>> What I and Guennadi agreed (http://linuxtv.org/irc/v4l/index.php?date=2012-01-05)
+>> were to do just the reverse:
+>>
+>> He would be sending you one single patch with my ack, that would allow the 
+>> arm tree to be merged [1], I would wait for a few days for the arm tree to
+>> be pulled, and then I would rebase my -next tree to remove that patch
+>> from it.
+>>
+>> [1] http://git.linuxtv.org/gliakhovetski/v4l-dvb.git/commitdiff/88c6599d97b489ac543fa352159a81f60bddded7
 > 
-> BSYM macro is only needed for assembly files and its usage in c files is
-> wrong, so remove it. The linker will correctly set bit 0 for Thumb2
-> kernels.
+> It's just not what happened. I got this series from Nicolas:
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-
-This needs an ENDPROC as well for exynos4_secondary_startup. And so do
-msm and ux500 as well.
-
-Rob
-
->  arch/arm/mach-exynos/platsmp.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
+> 7a1834b ARM: at91: Update struct atmel_nand_data to support PMECC
+> 9356fba ARM: at91/dma: DMA controller registering with DT support
+> 31527e7 ARM: at91/dma: remove platform data from DMA controller
+> 226e3aa ARM: at91: add Atmel ISI and ov2640 support on sam9m10g45 board
+> e889a64 ARM: at91: add clock selection parameter for at91_add_device_isi()
+> 7a13e73 media i.MX27 camera: Fix field_count handling.
+> 166b37f media i.MX27 camera: add support for YUV420 format.
+> 88c6599 V4L: atmel-isi: add code to enable/disable ISI_MCK clock
+> ... (the rest of v4l at the time)
 > 
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 60bc45e..683aec7 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -24,7 +24,6 @@
->  #include <asm/cacheflush.h>
->  #include <asm/hardware/gic.h>
->  #include <asm/smp_scu.h>
-> -#include <asm/unified.h>
->  
->  #include <mach/hardware.h>
->  #include <mach/regs-clock.h>
-> @@ -137,7 +136,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	while (time_before(jiffies, timeout)) {
->  		smp_rmb();
->  
-> -		__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-> +		__raw_writel(virt_to_phys(exynos4_secondary_startup),
->  			CPU1_BOOT_REG);
->  		gic_raise_softirq(cpumask_of(cpu), 1);
->  
-> @@ -192,6 +191,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
->  	 * until it receives a soft interrupt, and then the
->  	 * secondary CPU branches to this address.
->  	 */
-> -	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-> +	__raw_writel(virt_to_phys(exynos4_secondary_startup),
->  			CPU1_BOOT_REG);
->  }
+> and I merged it into the next/drivers2 branch, explaining that I would
+> merge these as soon as the dependencies in v4l are merged. :(
+> 
+>> My -next tree were never meant to be stable. It is just a patch repository
+>> where I merge from the real development repository, in order to test them
+>> against the hole changes. From time to time, when bad things happen
+>> (patch conflicts, compilation breakages, requests to remove bad patches),
+>> I just rebase it.
+> 
+> Ok, thanks for the confirmation.
+> 
+>> I prefer if you could just pick this patch from Guennadi's tree:
+>>  http://git.linuxtv.org/gliakhovetski/v4l-dvb.git/commitdiff/88c6599d97b489ac543fa352159a81f60bddded7
+>>
+>> and add my ack on it, removing the v4l-dvb merge from yours.
+>>
+>> Linus seems to prefer to have the arch trees merged before the drivers
+>> tree, with makes sense.
+> 
+> I think it's better for you to just send everything you have right away,
+> including the atmel-isi patch.
+> 
+> I'll drop the remaining atmel patches from my next/drivers2 branch and let
+> Nicolas send me a new rebased pull request for 3.4. The patches in question
+> look simple enough, but if the developers can't get a simple dependency right
+> after discussing it for weeks, I'd rather not take it this time.
+
+I am so astonished and sad about all this! I have the feeling of having
+done exactly what Guennadi and Olof had asked me to do: What I get at
+the end: people having a bad feeling about my work, not expected merge
+conflicts which annoy everybody (only for a ridiculous amount of code),
+my patches delayed and a comment saying that I cannot handle simple
+dependency...
+Nice result!
+
+- Guennadi did not want to take SoC/board code in his tree
+=> I had to take those lines of code through at91/arm-soc breaking the
+   patch series and allowing the introduction of an out-of-sync merge
+
+- I built a pull request with only the SoC/board code on top of a
+  Linus' -rc tag (yes, that was breaking compilation on certain
+  configurations in the meantime)
+=> I was told that I should bring the v4l dependency with my branch
+
+- I resent a "pull request" on top of v4l branch after a discussion
+  between Guennadi, Olof and me. The conclusion of this discussion was
+  quite obvious:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/145196
+=> It was supposed to be the last time I moved those patches around...
+
+I have understood and approved all the reasons for the requested
+changes, of course. But for which gain?
+
+Ok... well, it looks like a massive incomprehension which took us time
+and ends up by wastefulness.
+
+Best regards,
+-- 
+Nicolas Ferre
