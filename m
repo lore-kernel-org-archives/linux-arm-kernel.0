@@ -1,60 +1,74 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 11 Jan 2012 14:14:29 +1100
-Subject: [PATCH 04/11] ep93xx: Configure GPIO ports in core code
+Date: Wed, 11 Jan 2012 14:14:30 +1100
+Subject: [PATCH 05/11] ep93xx: Move arch_reset to core.c
 In-Reply-To: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
 References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
-Message-ID: <1326251676-7593-5-git-send-email-rmallon@gmail.com>
+Message-ID: <1326251676-7593-6-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the pinmux setting of the EP93xx GPIOs to the core code. This
-removes the need for the GPIO driver to have access to the system
-controller registers.
+Move the arch_reset function from include/mach/system.h to core.c.
+This removes the need for the EP93XX_SYSCON_DEVCFG defines to be
+exported in the include/mach headers.
 
 Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 Cc: Mika Westerberg <mika.westerberg@iki.fi>
-Cc: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Ryan Mallon <rmallon@gmail.com>
 ---
- arch/arm/mach-ep93xx/core.c |    7 +++++++
- drivers/gpio/gpio-ep93xx.c  |    7 -------
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-ep93xx/core.c                |   18 ++++++++++++++++++
+ arch/arm/mach-ep93xx/include/mach/system.h |   14 +-------------
+ 2 files changed, 19 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index dcb10c2..978c5a6 100644
+index 978c5a6..bd59696 100644
 --- a/arch/arm/mach-ep93xx/core.c
 +++ b/arch/arm/mach-ep93xx/core.c
-@@ -896,6 +896,13 @@ void __init ep93xx_init_devices(void)
- 	/* Disallow access to MaverickCrunch initially */
- 	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
+@@ -240,6 +240,24 @@ unsigned int ep93xx_chip_revision(void)
+ }
  
-+	/* Default all ports to GPIO */
-+	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
-+			       EP93XX_SYSCON_DEVCFG_GONK |
-+			       EP93XX_SYSCON_DEVCFG_EONIDE |
-+			       EP93XX_SYSCON_DEVCFG_GONIDE |
-+			       EP93XX_SYSCON_DEVCFG_HONIDE);
+ /*************************************************************************
++ * Reset handling for EP93xx
++ *************************************************************************/
 +
- 	/* Get the GPIO working early, other devices need it */
- 	platform_device_register(&ep93xx_gpio_device);
++void arch_reset(char mode, const char *cmd)
++{
++	local_irq_disable();
++
++	/*
++	 * Set then clear the SWRST bit to initiate a software reset
++	 */
++	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
++	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
++
++	while (1)
++		;
++}
++
++/*************************************************************************
+  * EP93xx GPIO
+  *************************************************************************/
+ static struct resource ep93xx_gpio_resource[] = {
+diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
+index 6d661fe..3d1ec74 100644
+--- a/arch/arm/mach-ep93xx/include/mach/system.h
++++ b/arch/arm/mach-ep93xx/include/mach/system.h
+@@ -9,16 +9,4 @@ static inline void arch_idle(void)
+ 	cpu_do_idle();
+ }
  
-diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
-index 1c0fc37..4ca5642 100644
---- a/drivers/gpio/gpio-ep93xx.c
-+++ b/drivers/gpio/gpio-ep93xx.c
-@@ -378,13 +378,6 @@ static int __devinit ep93xx_gpio_probe(struct platform_device *pdev)
- 	}
- 	ep93xx_gpio->mmio_base = mmio;
- 
--	/* Default all ports to GPIO */
--	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
--			       EP93XX_SYSCON_DEVCFG_GONK |
--			       EP93XX_SYSCON_DEVCFG_EONIDE |
--			       EP93XX_SYSCON_DEVCFG_GONIDE |
--			       EP93XX_SYSCON_DEVCFG_HONIDE);
+-static inline void arch_reset(char mode, const char *cmd)
+-{
+-	local_irq_disable();
 -
- 	for (i = 0; i < ARRAY_SIZE(ep93xx_gpio_banks); i++) {
- 		struct bgpio_chip *bgc = &ep93xx_gpio->bgc[i];
- 		struct ep93xx_gpio_bank *bank = &ep93xx_gpio_banks[i];
+-	/*
+-	 * Set then clear the SWRST bit to initiate a software reset
+-	 */
+-	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+-	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+-
+-	while (1)
+-		;
+-}
++extern void arch_reset(char mode, const char *cmd);
 -- 
 1.7.0.4
