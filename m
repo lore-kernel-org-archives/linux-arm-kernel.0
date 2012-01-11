@@ -1,73 +1,57 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 11 Jan 2012 10:05:04 +0100
-Subject: [PATCH 3/3] plat-nomadik: modernize MTU timer
-Message-ID: <1326272704-5746-1-git-send-email-linus.walleij@stericsson.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 11 Jan 2012 18:16:54 +0900
+Subject: [PATCH] video: s3c-fb: Add device tree support
+In-Reply-To: <1326139307-25112-1-git-send-email-thomas.abraham@linaro.org>
+References: <1326139307-25112-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <004401ccd041$c2f66100$48e32300$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi, Thomas.
 
-Modernize the MTU timer to rely on the clockevents core to
-calculate mult and shift and setup the clock event.
+> -----Original Message-----
+> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
+> Sent: Tuesday, January 10, 2012 5:02 AM
+> To: linux-fbdev at vger.kernel.org; devicetree-discuss at lists.ozlabs.org
+> Cc: FlorianSchandinat at gmx.de; grant.likely at secretlab.ca; rob.herring at calxeda.com; linux-arm-
+> kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; kgene.kim at samsung.com;
+> jg1.han at samsung.com; patches at linaro.org
+> Subject: [PATCH] video: s3c-fb: Add device tree support
+> 
+> Add device tree based discovery support for Samsung's display controller.
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  .../devicetree/bindings/fb/samsung-fb.txt          |  103 ++++++++++
+>  drivers/video/s3c-fb.c                             |  209 +++++++++++++++++++-
+>  2 files changed, 304 insertions(+), 8 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/fb/samsung-fb.txt
+> 
+> [...]
+>
+> +- samsung,fimd-bpp: Specifies the bits per pixel. Two values should be
+> +  specified in the following order.
+> +    - max-bpp: maximum required bpp for the overlay.
+> +    - default-bpp: bpp supported by the overlay.
+> [...]
+> +		fimd-overlay0 {
+> +			samsung,fimd-htiming = <64 16 48 1024>;
+> +			samsung,fimd-vtiming = <64 16 3 600>;
+> +			samsung,fimd-bpp = <24 32>;
+> +		};
+> +
+> +		fimd-overlay1 {
+> +			samsung,fimd-htiming = <64 16 48 200>;
+> +			samsung,fimd-vtiming = <64 16 3 100>;
+> +			samsung,fimd-bpp = <16 32>;
+> +		};
+> +	};
+In the above 'samsung-fb.txt', the order is defined as max-bpp and default-bpp.
+However, <24 32> and <16 32> seems to be wrong.
+It should be <32 24> and <32 16>, respectively.
+Max bpp would be 32bpp in s3c-fb.
 
-Cc: Alessandro Rubini <rubini@unipv.it>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/plat-nomadik/timer.c |   22 ++--------------------
- 1 files changed, 2 insertions(+), 20 deletions(-)
-
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index 954a862..6ae6f86 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -21,12 +21,6 @@
- #include <asm/sched_clock.h>
- 
- /*
-- * Guaranteed runtime conversion range in seconds for
-- * the clocksource and clockevent.
-- */
--#define MTU_MIN_RANGE 4
--
--/*
-  * The MTU device hosts four different counters, with 4 set of
-  * registers. These are register names.
-  */
-@@ -102,7 +96,6 @@ static int nmdk_clkevt_next(unsigned long evt, struct clock_event_device *ev)
- void nmdk_clkevt_reset(void)
- {
- 	if (clkevt_periodic) {
--
- 		/* Timer: configure load and background-load, and fire it up */
- 		writel(nmdk_cycle, mtu_base + MTU_LR(1));
- 		writel(nmdk_cycle, mtu_base + MTU_BGLR(1));
-@@ -120,7 +113,6 @@ void nmdk_clkevt_reset(void)
- static void nmdk_clkevt_mode(enum clock_event_mode mode,
- 			     struct clock_event_device *dev)
- {
--
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		clkevt_periodic = true;
-@@ -224,17 +216,7 @@ void __init nmdk_timer_init(void __iomem *base)
- 	setup_sched_clock(nomadik_read_sched_clock, 32, rate);
- #endif
- 
--	/* Timer 1 is used for events */
--
--	clockevents_calc_mult_shift(&nmdk_clkevt, rate, MTU_MIN_RANGE);
--
--	nmdk_clkevt.max_delta_ns =
--		clockevent_delta2ns(0xffffffff, &nmdk_clkevt);
--	nmdk_clkevt.min_delta_ns =
--		clockevent_delta2ns(0x00000002, &nmdk_clkevt);
--	nmdk_clkevt.cpumask	= cpumask_of(0);
--
--	/* Register irq and clockevents */
-+	/* Timer 1 is used for events, register irq and clockevents */
- 	setup_irq(IRQ_MTU0, &nmdk_timer_irq);
--	clockevents_register_device(&nmdk_clkevt);
-+	clockevents_config_and_register(&nmdk_clkevt, rate, 2, 0xffffffffU);
- }
--- 
-1.7.8
+Best regards,
+Jingoo Han
