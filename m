@@ -1,42 +1,30 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 11 Jan 2012 16:28:53 +0530
-Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with
- gpio controlled panel reset
-In-Reply-To: <20120107182319.GA13181@n2100.arm.linux.org.uk>
-References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
- <20120107182319.GA13181@n2100.arm.linux.org.uk>
-Message-ID: <CAJuYYwR6tySTcD9RdNcuGhqCRT2mSLep2sMf1MOJViXEbFEwxw@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 11 Jan 2012 11:59:46 +0100
+Subject: mxs: enable phy-clock in the driver?
+In-Reply-To: <20120108144558.GB2544@pengutronix.de>
+References: <20120108144558.GB2544@pengutronix.de>
+Message-ID: <201201111159.46678.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+> Hi Shawn,
+> 
+> I recently noticed that my tx28 board did not have net when booting from
+> NAND (before that, barebox was setting up the network). Adding lines like
+> these from mx28evk helped:
+> 
+> 228         /* Enable fec phy clock */
+> 229         clk = clk_get_sys("pll2", NULL);
+> 230         if (!IS_ERR(clk))
+> 231                 clk_enable(clk);
+> 
+> So, if every board seems to need this, I'd think this should rather be in
+> the driver? Am I correct or is there something I have overlooked?
+> 
+> Regards,
+> 
+>    Wolfram
 
-On 7 January 2012 23:53, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jan 05, 2012 at 09:12:26PM +0530, Thomas Abraham wrote:
->> Add a lcd panel driver for simple raster-type lcd's which uses a gpio
->> controlled panel reset. The driver controls the nRESET line of the panel
->> using a gpio connected from the host system. The Vcc supply to the panel
->> is (optionally) controlled using a voltage regulator. This driver excludes
->> support for lcd panels that use a serial command interface or direct
->> memory mapped IO interface.
->
-> I'm trying to work out what kind of LCD panel this is for. ?I assume
-> not the panels which would be connected to a SoC, which have a parallel
-> interface to a frame buffer device (LCD controller)?
->
-> If this is for these kinds of LCD panels, how are you handling the
-> timing required for active panels - some of which must not be powered
-> up without the LCD controller first being setup and enabled, and must
-> be powered down before the LCD controller is disabled.
->
-> I've seen this requirement with panels connected to ARM Ltd's development
-> boards, and also some SoCs.
+Did you really disable the clock to FEC or only the PHY didn't have clock?
 
-This patch is for passive panels that use a nRESET line controlled by
-a SoC GPIO and the panel do not use serial command interface (i2c or
-spi) or memory-mapped-io for panel control. Panels that just need a
-nRESET to be controlled can be handled by this driver.
-
-Thanks,
-Thomas.
+M
