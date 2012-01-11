@@ -1,84 +1,86 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 11 Jan 2012 15:55:40 +0100
-Subject: [PATCH 7/7] at91 : fix compilation warning
-In-Reply-To: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1326293740-15735-8-git-send-email-daniel.lezcano@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 11 Jan 2012 08:07:11 -0700 (MST)
+Subject: [PATCHv8 4/5] OMAP: I2C: Remove the reset in the init path
+In-Reply-To: <4F0D9589.1080609@ti.com>
+References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
+ <1323773758-6375-5-git-send-email-shubhrajyoti@ti.com>
+ <alpine.DEB.2.00.1112160139010.12660@utopia.booyaka.com>
+ <4EEB086A.2050607@ti.com>
+ <CANQgH-Ze1S6sy1uhzy_b8GWOCjF4+-9DOCcUn9mq1kAaT+Y7FA@mail.gmail.com>
+ <CANQgH-YLez8B-t8nf9_M8samn9YWUa7LcOFx6uPFrJE9tnXB1Q@mail.gmail.com>
+ <87hb03tw8h.fsf@ti.com> <4F0D26DF.1020108@ti.com>
+ <alpine.DEB.2.00.1201110619090.31702@utopia.booyaka.com>
+ <4F0D9589.1080609@ti.com>
+Message-ID: <alpine.DEB.2.00.1201110714221.31702@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the clock routine in a function. That will prevent to have
-a warning from the compiler to say there is unused variable.
+On Wed, 11 Jan 2012, Shubhrajyoti wrote:
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-at91/pm.c |   40 ++++++++++++++++++++++++----------------
- 1 files changed, 24 insertions(+), 16 deletions(-)
+> On Wednesday 11 January 2012 06:59 PM, Paul Walmsley wrote:
+>
+> > The real question is how you plan to handle the device reset function, 
+> > given that the driver should compile on a non-OMAP build (meaning that you 
+> > can't call omap_device*() functions from the driver directly), nor should 
+> > the driver touch the SYSCONFIG register directly.
+> 
+> Paul I thought through it myself not very clear.
+> - One way is to find some way for the dt to pass function pointer. Or maybe
+> a flag that  activates a static function / hwmod func.
+>  
+> Will give this a little more thought and get back. I have not any answer
+> right now.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index f97bbfa..2250773 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -132,6 +132,28 @@ static int at91_pm_begin(suspend_state_t state)
- 	return 0;
- }
- 
-+static inline int at91_program_clock(unsigned long scsr)
-+{
-+#ifdef CONFIG_AT91_PROGRAMMABLE_CLOCKS
-+	int i;
-+
-+	/* PCK0..PCK3 must be disabled, or configured to use clk32k */
-+	for (i = 0; i < 4; i++) {
-+		u32 css;
-+
-+		if ((scsr & (AT91_PMC_PCK0 << i)) == 0)
-+			continue;
-+
-+		css = at91_sys_read(AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
-+		if (css != AT91_PMC_CSS_SLOW) {
-+			pr_err("AT91: PM - Suspend-to-RAM with PCK%d src %d\n", i, css);
-+			return -1;
-+		}
-+	}
-+#endif
-+	return 0;
-+}
-+
- /*
-  * Verify that all the clocks are correct before entering
-  * slow-clock mode.
-@@ -139,7 +161,6 @@ static int at91_pm_begin(suspend_state_t state)
- static int at91_pm_verify_clocks(void)
- {
- 	unsigned long scsr;
--	int i;
- 
- 	scsr = at91_sys_read(AT91_PMC_SCSR);
- 
-@@ -162,21 +183,8 @@ static int at91_pm_verify_clocks(void)
- 		}
- 	}
- 
--#ifdef CONFIG_AT91_PROGRAMMABLE_CLOCKS
--	/* PCK0..PCK3 must be disabled, or configured to use clk32k */
--	for (i = 0; i < 4; i++) {
--		u32 css;
--
--		if ((scsr & (AT91_PMC_PCK0 << i)) == 0)
--			continue;
--
--		css = at91_sys_read(AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
--		if (css != AT91_PMC_CSS_SLOW) {
--			pr_err("AT91: PM - Suspend-to-RAM with PCK%d src %d\n", i, css);
--			return 0;
--		}
--	}
--#endif
-+	if (at91_program_clock(scsr))
-+		return 0;
- 
- 	return 1;
- }
--- 
-1.7.4.1
+Well, if it makes you feel any better, no one else seems to have thought 
+through it very much either :-(
+
+To me this is essentially implementing a bus-level (or really, 
+integration-level) reset of the device.  This seems to be a function that 
+many other buses might support.  So let's look at some of the other 
+common Linux bus implementations.
+
+PCI has pci_reset_function() in drivers/pci/pci.c, which a handful of 
+PCI-specific drivers call. USB has usb_reset_device() in 
+drivers/usb/core/hub.c, also called by a handful of devices.
+
+So there's precedent for the use case.
+
+Incidentally, this is the kind of thing that ideally should be supported 
+via a common function pointer in struct bus_type or maybe struct device. 
+So rather than the driver calling pci_reset_function() or 
+usb_reset_device(), it seems preferable for the driver to do something 
+like:
+
+    if (dev->bus->device_reset)
+        dev->bus->device_reset(dev);
+
+It seems best to avoid binding a driver tightly to a particular bus 
+whenever possible.
+
+...
+
+Now to consider something like this from an OMAP perspective.
+
+In a rough approximation of an ideal world, much of the hwmod and 
+omap_device code would live somewhere like drivers/omap_bus/.  Our devices 
+would be omap_device based rather than platform_device or of_device based.  
+We could export omap_device_reset() and then the I2C driver could call 
+this directly.  We're at least a year away from this (if ever): we need 
+PRM, CM, SCM drivers; we'd need to have a real omap_bus and omap_device 
+that our drivers would use, unlike the faux omap_device we have now.  
+Maybe the latter is never going to happen now due to the DT situation.
+So any solution that would depend on these steps as prerequisites might 
+easily be delayed for an infinite amount of time.
+
+But let's say that a device_reset() function pointer existed inside the 
+common struct bus_type in include/linux/device.h, as discussed above.  
+>From an OMAP perspective, we could simply set that to point to 
+omap_device_reset() in the OMAP-specific device creation code or DT 
+notifier callback code.  PCI and USB code could set it to point to their 
+own reset functions.  Something like the code fragment above would be 
+recommended for all device drivers to do an integration device reset.
+
+Anyway, just an idea.
+
+
+- Paul
