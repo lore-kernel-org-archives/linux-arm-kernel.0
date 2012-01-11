@@ -1,49 +1,66 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Wed, 11 Jan 2012 12:54:04 +0100
-Subject: [PATCH 1/3] ATMEL: fix nand ecc support
-In-Reply-To: <1325933370-17475-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1325933370-17475-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20120111115404.GA15221@samfundet.no>
+From: rajanikanth.hv@stericsson.com (Rajanikanth H V)
+Date: Wed, 11 Jan 2012 17:49:01 +0530
+Subject: tty/serial: Need clarification on Support for 4+M Baudrate
+Message-ID: <20120111121901.GA4034@bnru05>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Sat 07 Jan 2012 11:49:28 +0100 or thereabout, Jean-Christophe PLAGNIOL-VILLARD wrote:
+Ref:
+	kernel version 3.0.8
 
-Hello,
+Platform: ARM Based SOC, UART:amba pl011
 
-> so we can now choose for the board the ecc mode (ecc soft, soft bch, no ecc
-> and hardware)
-> 
-> set ecc mode in the boards to soft as currently in the driver
-> 
-> move platform data to a common header
-> include/linux/atmel_nand.h
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-> Cc: linux-mtd at lists.infradead.org
+I have a requirement to interface UART with an external microcontroller 
+using baud rate above 4Mbps, hence following is my approach to apply
+the changes. Can any one review/provide me appropriate approach.
 
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 
-> ---
-> Hi David,
-> 
-> 	If you don't
-> 	I'll apply this via ARM tree
 
-Sounds fine by me.
-
-<snipp AT91 changes>
-
->  arch/avr32/boards/atngw100/setup.c          |    1 +
->  arch/avr32/boards/atstk1000/atstk1002.c     |    1 +
->  arch/avr32/mach-at32ap/include/mach/board.h |   13 +------------
-
-These AVR32 changes seems sane, thanks for the update.
-
-<snipp diff>
-
--- 
-mvh
-Hans-Christian Egtvedt
+diff --git a/arch/arm/include/asm/termbits.h b/arch/arm/include/asm/termbits.h
+index 704135d..556f5fb 100644
+--- a/arch/arm/include/asm/termbits.h
++++ b/arch/arm/include/asm/termbits.h
+@@ -155,6 +155,8 @@ struct ktermios {
+ #define  B3000000 0010015
+ #define  B3500000 0010016
+ #define  B4000000 0010017
++#define  B4050000 0010020
++#define  B4800000 0010021
+ #define CIBAUD	  002003600000		/* input baud rate */
+ #define CMSPAR    010000000000		/* mark or space (stick) parity */
+ #define CRTSCTS	  020000000000		/* flow control */
+diff --git a/drivers/tty/tty_ioctl.c b/drivers/tty/tty_ioctl.c
+index 53f2442..59c0682 100644
+--- a/drivers/tty/tty_ioctl.c
++++ b/drivers/tty/tty_ioctl.c
+@@ -203,7 +203,7 @@ static const speed_t baud_table[] = {
+ 	76800, 153600, 307200, 614400, 921600
+ #else
+ 	500000, 576000, 921600, 1000000, 1152000, 1500000, 2000000,
+-	2500000, 3000000, 3500000, 4000000
++	2500000, 3000000, 3500000, 4000000, 4050000, 4800000
+ #endif
+ };
+ 
+@@ -213,7 +213,7 @@ static const tcflag_t baud_bits[] = {
+ 	B1200, B1800, B2400, B4800, B9600, B19200, B38400,
+ 	B57600, B115200, B230400, B460800, B500000, B576000,
+ 	B921600, B1000000, B1152000, B1500000, B2000000, B2500000,
+-	B3000000, B3500000, B4000000
++	B3000000, B3500000, B4000000, B4050000, B4800000
+ };
+ #else
+ static const tcflag_t baud_bits[] = {
+diff --git a/include/asm-generic/termbits.h b/include/asm-generic/termbits.h
+index 232b478..f71e72f 100644
+--- a/include/asm-generic/termbits.h
++++ b/include/asm-generic/termbits.h
+@@ -156,6 +156,8 @@ struct ktermios {
+ #define  B3000000 0010015
+ #define  B3500000 0010016
+ #define  B4000000 0010017
++#define  B4050000 0010020
++#define  B4800000 0010021
+ #define CIBAUD	  002003600000	/* input baud rate */
+ #define CMSPAR	  010000000000	/* mark or space (stick) parity */
+ #define CRTSCTS	  020000000000	/* flow control */
