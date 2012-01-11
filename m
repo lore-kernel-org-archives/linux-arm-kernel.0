@@ -1,21 +1,42 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 11 Jan 2012 14:14:25 +0100
-Subject: [PATCH 05/15] ARM: OMAP4: convert to twd_local_timer_register()
- interface
-In-Reply-To: <1326287334-1905-6-git-send-email-marc.zyngier@arm.com>
-References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
- <1326287334-1905-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAMQu2gzGBS-+GV9J+HMRQnr3c1Qk-Z2Js=G_xqMpmH4qOuFTXA@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Wed, 11 Jan 2012 18:51:44 +0530
+Subject: [PATCH RFC] OMAP: I2C: Fix the mismatch of pm_runtime enable and
+ disable
+Message-ID: <1326288104-10544-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 2:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> Add support for the new smp_twd runtime registration interface
-> to the OMAP4 platforms, and remove the old compile-time support.
-> Tested on Panda.
->
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Currently the i2c driver calls the pm_runtime_enable and never
+the disable. This may cause a warning when pm_runtime_enable
+checks for the count match.Attempting to fix the same by calling
+pm_runtime_disable in the error and the remove path.
+
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 12d402c..abc7b5b 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1070,6 +1070,7 @@ err_unuse_clocks:
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(dev->dev);
+ 	iounmap(dev->base);
++	pm_runtime_disable(&pdev->dev);
+ err_free_mem:
+ 	platform_set_drvdata(pdev, NULL);
+ 	kfree(dev);
+@@ -1085,6 +1086,7 @@ omap_i2c_remove(struct platform_device *pdev)
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+ 	struct resource		*mem;
+ 
++	pm_runtime_disable(&pdev->dev);
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	free_irq(dev->irq, dev);
+-- 
+1.7.1
