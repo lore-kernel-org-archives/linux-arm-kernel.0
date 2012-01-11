@@ -1,428 +1,443 @@
-From: rob.lee@linaro.org (Robert Lee)
-Date: Wed, 11 Jan 2012 01:18:05 -0600
-Subject: [RFC] ARM: imx: Add imx6q thermal
-Message-ID: <1326266285-11656-1-git-send-email-rob.lee@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 11 Jan 2012 09:05:17 +0100
+Subject: [PATCH V2 1/4] CS89x0 : add platform driver support
+In-Reply-To: <1326237197-23594-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1326237197-23594-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <20120111080517.GJ14252@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add thermal support for i.MX6Q.  Uses recently submitted common
-cpu_cooling functionality shown here:
+Hello Jaccon,
 
-http://www.spinics.net/lists/linux-pm/msg26500.html
+On Wed, Jan 11, 2012 at 12:13:17AM +0100, Jaccon Bastiaansen wrote:
+> The CS89x0 ethernet controller is used on a number of evaluation
+> boards, such as the MX31ADS. The current driver has memory address and
+> IRQ settings for each board on which this controller is used. Driver
+> updates are therefore required to support other boards that also use
+> the CS89x0. To avoid these driver updates, a better mechanism
+> (platform driver support) is added to communicate the board dependent
+> settings to the driver.
+> 
+> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+> ---
+>  drivers/net/Space.c                  |    4 +
+>  drivers/net/ethernet/cirrus/Kconfig  |   19 +++--
+>  drivers/net/ethernet/cirrus/cs89x0.c |  147 +++++++++++++++++++++++++++++-----
+>  3 files changed, 143 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/net/Space.c b/drivers/net/Space.c
+> index 068c356..00fe11b 100644
+> --- a/drivers/net/Space.c
+> +++ b/drivers/net/Space.c
+> @@ -190,8 +190,12 @@ static struct devprobe2 isa_probes[] __initdata = {
+>  	{seeq8005_probe, 0},
+>  #endif
+>  #ifdef CONFIG_CS89x0
+> +#if !defined(CONFIG_CS89x0_PLATFORM) || defined(CONFIG_MACH_IXDP2351) || \
+> +	defined(CONFIG_ARCH_IXDP2X01) || defined(CONFIG_MACH_QQ2440) || \
+> +	defined(CONFIG_MACH_MX31ADS)
+>   	{cs89x0_probe, 0},
+>  #endif
+> +#endif
+>  #ifdef CONFIG_AT1700
+>  	{at1700_probe, 0},
+>  #endif
+> diff --git a/drivers/net/ethernet/cirrus/Kconfig b/drivers/net/ethernet/cirrus/Kconfig
+> index 1f8648f..3784b1b 100644
+> --- a/drivers/net/ethernet/cirrus/Kconfig
+> +++ b/drivers/net/ethernet/cirrus/Kconfig
+> @@ -5,8 +5,7 @@
+>  config NET_VENDOR_CIRRUS
+>  	bool "Cirrus devices"
+>  	default y
+> -	depends on ISA || EISA || MACH_IXDP2351 || ARCH_IXDP2X01 \
+> -		|| MACH_MX31ADS || MACH_QQ2440 || (ARM && ARCH_EP93XX) || MAC
+> +	depends on ISA || EISA || ARM || (ARM && ARCH_EP93XX) || MAC
+>  	---help---
+>  	  If you have a network (Ethernet) card belonging to this class, say Y
+>  	  and read the Ethernet-HOWTO, available from
+> @@ -21,8 +20,7 @@ if NET_VENDOR_CIRRUS
+>  
+>  config CS89x0
+>  	tristate "CS89x0 support"
+> -	depends on (ISA || EISA || MACH_IXDP2351 \
+> -		|| ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440)
+> +	depends on ISA || EISA || ARM
+>  	---help---
+>  	  Support for CS89x0 chipset based Ethernet cards. If you have a
+>  	  network (Ethernet) card of this type, say Y and read the
+> @@ -33,10 +31,15 @@ config CS89x0
+>  	  To compile this driver as a module, choose M here. The module
+>  	  will be called cs89x0.
+>  
+> -config CS89x0_NONISA_IRQ
+> -	def_bool y
+> -	depends on CS89x0 != n
+> -	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440
+> +config CS89x0_PLATFORM
+> +	bool "CS89x0 platform driver support"
+> +	depends on CS89x0
+> +	help
+> +	  Say Y to compile the cs89x0 driver as a platform driver. This
+> +	  makes this driver suitable for use on certain evaluation boards
+> +	  such as the iMX21ADS.
+> +
+> +	  If you are unsure, say N.
+>  
+>  config EP93XX_ETH
+>  	tristate "EP93xx Ethernet support"
+> diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
+> index f328da2..d6c6398 100644
+> --- a/drivers/net/ethernet/cirrus/cs89x0.c
+> +++ b/drivers/net/ethernet/cirrus/cs89x0.c
+> @@ -100,9 +100,6 @@
+>  
+>  */
+>  
+> -/* Always include 'config.h' first in case the user wants to turn on
+> -   or override something. */
+> -#include <linux/module.h>
+>  
+>  /*
+>   * Set this to zero to disable DMA code
+> @@ -131,9 +128,12 @@
+>  
+>  */
+>  
+> +#include <linux/module.h>
+> +#include <linux/printk.h>
+>  #include <linux/errno.h>
+>  #include <linux/netdevice.h>
+>  #include <linux/etherdevice.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/kernel.h>
+>  #include <linux/types.h>
+>  #include <linux/fcntl.h>
+> @@ -151,13 +151,14 @@
+>  #include <asm/system.h>
+>  #include <asm/io.h>
+>  #include <asm/irq.h>
+> +#include <linux/atomic.h>
+>  #if ALLOW_DMA
+>  #include <asm/dma.h>
+>  #endif
+>  
+>  #include "cs89x0.h"
+>  
+> -static char version[] __initdata =
+> +static char version[] =
+Isn't it possible to use __devinitdata here and accordingly __devinit
+for the other functions?
 
-Have some todo items but basic implementation is done and I'd like to
-get any helpful feedback on it.
+>  "cs89x0.c: v2.4.3-pre1 Russell Nelson <nelson@crynwr.com>, Andrew Morton\n";
+>  
+>  #define DRV_NAME "cs89x0"
+> @@ -173,6 +174,7 @@ static char version[] __initdata =
+>  /* The cs8900 has 4 IRQ pins, software selectable. cs8900_irq_map maps
+>     them to system IRQ numbers. This mapping is card specific and is set to
+>     the configuration of the Cirrus Eval board for this chip. */
+> +#if defined(CONFIG_CS89x0_PLATFORM)
+>  #if defined(CONFIG_MACH_IXDP2351)
+>  static unsigned int netcard_portlist[] __used __initdata = {IXDP2351_VIRT_CS8900_BASE, 0};
+>  static unsigned int cs8900_irq_map[] = {IRQ_IXDP2351_CS8900, 0, 0, 0};
+> @@ -189,6 +191,7 @@ static unsigned int netcard_portlist[] __used __initdata = {
+>  	PBC_BASE_ADDRESS + PBC_CS8900A_IOBASE + 0x300, 0
+>  };
+>  static unsigned cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
+> +#endif
+>  #else
+>  static unsigned int netcard_portlist[] __used __initdata =
+>     { 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
+> @@ -236,6 +239,11 @@ struct net_local {
+>  	unsigned char *end_dma_buff;	/* points to the end of the buffer */
+>  	unsigned char *rx_dma_ptr;	/* points to the next packet  */
+>  #endif
+> +#ifdef CONFIG_CS89x0_PLATFORM
+> +	void *virt_addr;	/* Virtual address for accessing the CS890x. */
+> +	unsigned long phys_addr;/* Physical address for accessing the CS89x0. */
+> +	unsigned long size;	/* Length of CS89x0 memory region. */
+> +#endif
+>  };
+>  
+>  /* Index to functions, as function prototypes. */
+> @@ -294,6 +302,9 @@ static int __init media_fn(char *str)
+>  __setup("cs89x0_media=", media_fn);
+>  
+>  
+> +#if !defined(CONFIG_CS89x0_PLATFORM) || defined(CONFIG_MACH_IXDP2351) || \
+> +	defined(CONFIG_ARCH_IXDP2X01) || defined(CONFIG_MACH_QQ2440) ||  \
+> +	defined(CONFIG_MACH_MX31ADS)
+CONFIG_ARM similar to your changes to Kconfig?
 
-Todo:
-- Add sensor calibration.
-- Re-organize code/files if deemed necessary by community.
+>  /* Check for a network adaptor of this type, and return '0' iff one exists.
+>     If dev->base_addr == 0, probe all likely locations.
+>     If dev->base_addr == 1, always return failure.
+> @@ -343,6 +354,7 @@ out:
+>  	return ERR_PTR(err);
+>  }
+>  #endif
+> +#endif
+>  
+>  #if defined(CONFIG_MACH_IXDP2351)
+>  static u16
+> @@ -424,7 +436,7 @@ writereg(struct net_device *dev, u16 regno, u16 value)
+>  	writeword(dev->base_addr, DATA_PORT, value);
+>  }
+>  
+> -static int __init
+> +static int
+>  wait_eeprom_ready(struct net_device *dev)
+>  {
+>  	int timeout = jiffies;
+> @@ -437,7 +449,7 @@ wait_eeprom_ready(struct net_device *dev)
+>  	return 0;
+>  }
+>  
+> -static int __init
+> +static int
+>  get_eeprom_data(struct net_device *dev, int off, int len, int *buffer)
+>  {
+>  	int i;
+> @@ -455,7 +467,7 @@ get_eeprom_data(struct net_device *dev, int off, int len, int *buffer)
+>          return 0;
+>  }
+>  
+> -static int  __init
+> +static int
+>  get_eeprom_cksum(int off, int len, int *buffer)
+>  {
+>  	int i, cksum;
+> @@ -503,7 +515,7 @@ static const struct net_device_ops net_ops = {
+>     Return 0 on success.
+>   */
+>  
+> -static int __init
+> +static int
+>  cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
+>  {
+>  	struct net_local *lp = netdev_priv(dev);
+> @@ -736,10 +748,8 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
+>  			dev->irq = i;
+>  	} else {
+>  		i = lp->isa_config & INT_NO_MASK;
+> +#ifndef CONFIG_CS89x0_PLATFORM
+>  		if (lp->chip_type == CS8900) {
+> -#ifdef CONFIG_CS89x0_NONISA_IRQ
+> -		        i = cs8900_irq_map[0];
+> -#else
+>  			/* Translate the IRQ using the IRQ mapping table. */
+>  			if (i >= ARRAY_SIZE(cs8900_irq_map))
+>  				printk("\ncs89x0: invalid ISA interrupt number %d\n", i);
+> @@ -747,6 +757,7 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
+>  				i = cs8900_irq_map[i];
+>  
+>  			lp->irq_map = CS8900_IRQ_MAP; /* fixed IRQ map for CS8900 */
+> +
+unrelated
 
-Signed-off-by: Robert Lee <rob.lee@linaro.org>
----
- drivers/thermal/Kconfig         |    6 +
- drivers/thermal/Makefile        |    1 +
- drivers/thermal/imx6q_thermal.c |  370 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 377 insertions(+), 0 deletions(-)
- create mode 100644 drivers/thermal/imx6q_thermal.c
+>  		} else {
+>  			int irq_map_buff[IRQ_MAP_LEN/2];
+>  
+> @@ -756,8 +767,8 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
+>  				if ((irq_map_buff[0] & 0xff) == PNP_IRQ_FRMT)
+>  					lp->irq_map = (irq_map_buff[0]>>8) | (irq_map_buff[1] << 8);
+>  			}
+> -#endif
+>  		}
+> +#endif
+>  		if (!dev->irq)
+>  			dev->irq = i;
+>  	}
+> @@ -954,10 +965,10 @@ skip_this_frame:
+>  static void __init reset_chip(struct net_device *dev)
+>  {
+>  #if !defined(CONFIG_MACH_MX31ADS)
+> -#if !defined(CS89x0_NONISA_IRQ)
+> +#if !defined(CONFIG_CS89x0_PLATFORM)
+>  	struct net_local *lp = netdev_priv(dev);
+>  	int ioaddr = dev->base_addr;
+> -#endif /* CS89x0_NONISA_IRQ */
+> +#endif /* CONFIG_CS89x0_PLATFORM */
+>  	int reset_start_time;
+>  
+>  	writereg(dev, PP_SelfCTL, readreg(dev, PP_SelfCTL) | POWER_ON_RESET);
+> @@ -965,7 +976,7 @@ static void __init reset_chip(struct net_device *dev)
+>  	/* wait 30 ms */
+>  	msleep(30);
+>  
+> -#if !defined(CS89x0_NONISA_IRQ)
+> +#if !defined(CONFIG_CS89x0_PLATFORM)
+>  	if (lp->chip_type != CS8900) {
+>  		/* Hardware problem requires PNP registers to be reconfigured after a reset */
+>  		writeword(ioaddr, ADD_PORT, PP_CS8920_ISAINT);
+> @@ -976,7 +987,7 @@ static void __init reset_chip(struct net_device *dev)
+>  		outb((dev->mem_start >> 16) & 0xff, ioaddr + DATA_PORT);
+>  		outb((dev->mem_start >> 8) & 0xff,   ioaddr + DATA_PORT + 1);
+>  	}
+> -#endif /* CS89x0_NONISA_IRQ */
+> +#endif /* CONFIG_CS89x0_PLATFORM */
+>  
+>  	/* Wait until the chip is reset */
+>  	reset_start_time = jiffies;
+> @@ -1168,6 +1179,9 @@ write_irq(struct net_device *dev, int chip_type, int irq)
+>  	int i;
+>  
+>  	if (chip_type == CS8900) {
+> +#if !defined(CONFIG_CS89x0_PLATFORM) || defined(CONFIG_MACH_IXDP2351) || \
+> +	defined(CONFIG_ARCH_IXDP2X01) || defined(CONFIG_MACH_QQ2440) ||  \
+> +	defined(CONFIG_MACH_MX31ADS)
+>  		/* Search the mapping table for the corresponding IRQ pin. */
+>  		for (i = 0; i != ARRAY_SIZE(cs8900_irq_map); i++)
+>  			if (cs8900_irq_map[i] == irq)
+> @@ -1175,6 +1189,10 @@ write_irq(struct net_device *dev, int chip_type, int irq)
+>  		/* Not found */
+>  		if (i == ARRAY_SIZE(cs8900_irq_map))
+>  			i = 3;
+> +#else
+> +		/* INTRQ0 pin is used for interrupt generation. */
+> +		i = 0;
+> +#endif
+>  		writereg(dev, PP_CS8900_ISAINT, i);
+>  	} else {
+>  		writereg(dev, PP_CS8920_ISAINT, irq);
+> @@ -1228,7 +1246,7 @@ net_open(struct net_device *dev)
+>  	}
+>  	else
+>  	{
+> -#ifndef CONFIG_CS89x0_NONISA_IRQ
+> +#ifndef CONFIG_CS89x0_PLATFORM
+>  		if (((1 << dev->irq) & lp->irq_map) == 0) {
+>  			printk(KERN_ERR "%s: IRQ %d is not in our map of allowable IRQs, which is %x\n",
+>                                 dev->name, dev->irq, lp->irq_map);
+> @@ -1746,7 +1764,7 @@ static int set_mac_address(struct net_device *dev, void *p)
+>  	return 0;
+>  }
+>  
+> -#ifdef MODULE
+> +#if defined(MODULE) && !defined(CONFIG_CS89x0_PLATFORM)
+>  
+>  static struct net_device *dev_cs89x0;
+>  
+> @@ -1900,7 +1918,98 @@ cleanup_module(void)
+>  	release_region(dev_cs89x0->base_addr, NETCARD_IO_EXTENT);
+>  	free_netdev(dev_cs89x0);
+>  }
+> -#endif /* MODULE */
+> +#endif /* MODULE && !CONFIG_CS89x0_PLATFORM */
+> +
+> +#ifdef CONFIG_CS89x0_PLATFORM
+> +static int cs89x0_platform_probe(struct platform_device *pdev)
+> +{
+> +	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
+> +	struct net_local *lp = netdev_priv(dev);
+> +	struct resource *mem_res;
+> +	struct resource *irq_res;
+> +	int err;
+> +
+> +	if (!dev)
+> +		return -ENODEV;
+> +
+> +	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (mem_res == NULL || irq_res == NULL) {
+> +		dev_warn(&dev->dev, "memory/interrupt resource missing.\n");
+> +		err = -ENOENT;
+> +		goto free;
+> +	}
+> +
+> +	lp->phys_addr = mem_res->start;
+> +	lp->size = mem_res->end - mem_res->start + 1;
+> +	if (!request_mem_region(lp->phys_addr, lp->size, DRV_NAME)) {
+> +		dev_warn(&dev->dev, "request_mem_region() failed.\n");
+> +		err = -ENOMEM;
+> +		goto free;
+> +	}
+> +
+> +	lp->virt_addr = ioremap(lp->phys_addr, lp->size);
+> +	if (!lp->virt_addr) {
+> +		dev_warn(&dev->dev, "ioremap() failed.\n");
+> +		err = -ENOMEM;
+> +		goto release;
+> +	}
+> +
+> +	dev->irq = irq_res->start;
+for irqs there is platform_get_irq. The usage isn't considerably easier,
+but I'd still prefer it being used. (Note to check with <= 0 for
+validity like:
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 298c1cd..dd8cede 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -29,3 +29,9 @@ config CPU_THERMAL
- 	  This will be useful for platforms using the generic thermal interface
- 	  and not the ACPI interface.
- 	  If you want this support, you should say Y or M here.
-+
-+config IMX6Q_THERMAL
-+	bool "IMX6Q Thermal interface support"
-+	depends on THERMAL && CPU_THERMAL
-+	help
-+	  Adds thermal management for IMX6Q.
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index 655cbc4..e2bcffe 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -4,3 +4,4 @@
- 
- obj-$(CONFIG_THERMAL)		+= thermal_sys.o
- obj-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
-+obj-$(CONFIG_IMX6Q_THERMAL)	+= imx6q_thermal.o
-diff --git a/drivers/thermal/imx6q_thermal.c b/drivers/thermal/imx6q_thermal.c
-new file mode 100644
-index 0000000..161a1a9
---- /dev/null
-+++ b/drivers/thermal/imx6q_thermal.c
-@@ -0,0 +1,370 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2012 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/* i.MX6Q Thermal Implementation */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/dmi.h>
-+#include <linux/init.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/types.h>
-+#include <linux/thermal.h>
-+#include <linux/io.h>
-+#include <linux/syscalls.h>
-+#include <linux/cpufreq.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/smp.h>
-+#include <linux/cpu_cooling.h>
-+
-+/* register define of anatop */
-+#define HW_ANADIG_ANA_MISC0	(0x00000150)
-+#define HW_ANADIG_ANA_MISC0_SET	(0x00000154)
-+#define HW_ANADIG_ANA_MISC0_CLR	(0x00000158)
-+#define HW_ANADIG_ANA_MISC0_TOG	(0x0000015c)
-+
-+#define HW_ANADIG_TEMPSENSE0	(0x00000180)
-+#define HW_ANADIG_TEMPSENSE0_SET	(0x00000184)
-+#define HW_ANADIG_TEMPSENSE0_CLR	(0x00000188)
-+#define HW_ANADIG_TEMPSENSE0_TOG	(0x0000018c)
-+
-+#define HW_ANADIG_TEMPSENSE1	(0x00000190)
-+#define HW_ANADIG_TEMPSENSE1_SET	(0x00000194)
-+#define HW_ANADIG_TEMPSENSE1_CLR	(0x00000198)
-+
-+#define BM_ANADIG_ANA_MISC0_REFTOP_SELBIASOFF 0x00000008
-+
-+#define BP_ANADIG_TEMPSENSE0_TEMP_VALUE      8
-+#define BM_ANADIG_TEMPSENSE0_TEMP_VALUE 0x000FFF00
-+#define BF_ANADIG_TEMPSENSE0_TEMP_VALUE(v)  \
-+	(((v) << 8) & BM_ANADIG_TEMPSENSE0_TEMP_VALUE)
-+#define BM_ANADIG_TEMPSENSE0_FINISHED 0x00000004
-+#define BM_ANADIG_TEMPSENSE0_MEASURE_TEMP 0x00000002
-+#define BM_ANADIG_TEMPSENSE0_POWER_DOWN 0x00000001
-+
-+#define BP_ANADIG_TEMPSENSE1_MEASURE_FREQ      0
-+#define BM_ANADIG_TEMPSENSE1_MEASURE_FREQ 0x0000FFFF
-+#define BF_ANADIG_TEMPSENSE1_MEASURE_FREQ(v)  \
-+	(((v) << 0) & BM_ANADIG_TEMPSENSE1_MEASURE_FREQ)
-+
-+#define CONVER_CONST			14113  /* need to add calibration */
-+#define CONVER_DIV				17259
-+#define REG_VALUE_TO_CEL(val) (((CONVER_CONST - val * 10)\
-+			* 1000) / CONVER_DIV);
-+
-+#define IMX6Q_THERMAL_POLLING_FREQUENCY_MS 1000
-+#define IMX6Q_THERMAL_ACT_TRP_PTS 3
-+/* assumption: always one critical trip point */
-+#define IMX6Q_THERMAL_TOTAL_TRP_PTS (IMX6Q_THERMAL_ACT_TRP_PTS + 1)
-+#define IMX6Q_THERMAL_DEBUG 1
-+
-+struct trip_point {
-+	u8 temp; /* in celcius */
-+	u8 type;
-+};
-+
-+struct imx6q_thermal_data {
-+	struct trip_point trp_pts[IMX6Q_THERMAL_TOTAL_TRP_PTS];
-+	struct freq_pctg_table freq_tab[IMX6Q_THERMAL_ACT_TRP_PTS];
-+};
-+
-+struct thermal_sensor_conf {
-+	char	*name;
-+	int	(*read_temperature)(void *data);
-+};
-+
-+static int imx6q_get_temp(struct thermal_zone_device *thermal,
-+				  unsigned long *temp);
-+
-+static struct thermal_sensor_conf imx6q_sensor_conf = {
-+	.name			= "imx6q-temp_sens",
-+	.read_temperature	= (int (*)(void *))imx6q_get_temp,
-+
-+};
-+
-+/*
-+ * This data defines the various trip points that will trigger action
-+ * when crossed.
-+ */
-+static struct imx6q_thermal_data thermal_data = {
-+	.trp_pts[0] = {
-+		.temp	 = 85,
-+		.type	 = THERMAL_TRIP_STATE_ACTIVE,
-+	},
-+	.freq_tab[0] = {
-+		.freq_clip_pctg[0] = 25,
-+	},
-+	.trp_pts[1] = {
-+		.temp	 = 90,
-+		.type	 = THERMAL_TRIP_STATE_ACTIVE,
-+	},
-+	.freq_tab[1] = {
-+		.freq_clip_pctg[0] = 65,
-+	},
-+	.trp_pts[2] = {
-+		.temp	 = 95,
-+		.type	 = THERMAL_TRIP_STATE_ACTIVE,
-+	},
-+	.freq_tab[2] = {
-+		.freq_clip_pctg[0] = 99,
-+	},
-+	.trp_pts[3] = {
-+		.temp	 = 100,
-+		.type	 = THERMAL_TRIP_CRITICAL,
-+	},
-+};
-+
-+struct imx6q_thermal_zone {
-+	struct thermal_zone_device *therm_dev;
-+	struct thermal_cooling_device *cool_dev;
-+	struct thermal_sensor_conf *sensor_conf;
-+	struct imx6q_thermal_data *thermal_data;
-+};
-+
-+static struct imx6q_thermal_zone *th_zone;
-+
-+static void __iomem *anatop_base;
-+
-+static int imx6q_get_mode(struct thermal_zone_device *thermal,
-+			    enum thermal_device_mode *mode)
-+{
-+	*mode = THERMAL_DEVICE_ENABLED;
-+	return 0;
-+}
-+
-+static int imx6q_get_trip_type(struct thermal_zone_device *thermal, int trip,
-+				 enum thermal_trip_type *type)
-+{
-+	if (trip >= IMX6Q_THERMAL_TOTAL_TRP_PTS)
-+		return -EINVAL;
-+
-+	*type = th_zone->thermal_data->trp_pts[trip].type;
-+
-+	return 0;
-+}
-+
-+static int imx6q_get_trip_temp(struct thermal_zone_device *thermal, int trip,
-+				 unsigned long *temp)
-+{
-+	if (trip >= IMX6Q_THERMAL_TOTAL_TRP_PTS)
-+		return -EINVAL;
-+
-+	*temp = th_zone->thermal_data->trp_pts[trip].temp;
-+
-+	/*convert the temperature into millicelsius*/
-+	*temp = *temp * 1000;
-+	return 0;
-+}
-+
-+static int imx6q_get_crit_temp(struct thermal_zone_device *thermal,
-+				 unsigned long *temp)
-+{
-+
-+	*temp = th_zone->thermal_data->trp_pts[
-+		IMX6Q_THERMAL_TOTAL_TRP_PTS - 1].temp;
-+	/*convert the temperature into millicelsius*/
-+	*temp = *temp * 1000;
-+	return 0;
-+}
-+
-+static int imx6q_bind(struct thermal_zone_device *thermal,
-+			struct thermal_cooling_device *cdev)
-+{
-+	/* if the cooling device is the one from imx6 bind it */
-+	if (cdev != th_zone->cool_dev)
-+		return 0;
-+
-+	if (thermal_zone_bind_cooling_device(thermal, 0, cdev)) {
-+		pr_err("error binding cooling dev\n");
-+		return -EINVAL;
-+	}
-+	if (thermal_zone_bind_cooling_device(thermal, 1, cdev)) {
-+		pr_err("error binding cooling dev\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int imx6q_unbind(struct thermal_zone_device *thermal,
-+			  struct thermal_cooling_device *cdev)
-+{
-+	if (cdev != th_zone->cool_dev)
-+		return 0;
-+	if (thermal_zone_unbind_cooling_device(thermal, 0, cdev)) {
-+		pr_err("error unbinding cooling dev\n");
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static int imx6q_temp_sens_reg_dump(void)
-+{
-+	if (!anatop_base) {
-+		pr_info("anatop_base is not initialized!!!\n");
-+		return -EINVAL;
-+	}
-+	pr_info("HW_ANADIG_TEMPSENSE0 = 0x%x\n",
-+			readl_relaxed(anatop_base + HW_ANADIG_TEMPSENSE0));
-+	pr_info("HW_ANADIG_TEMPSENSE1 = 0x%x\n",
-+			readl_relaxed(anatop_base + HW_ANADIG_TEMPSENSE1));
-+	return 0;
-+}
-+
-+static int imx6q_get_temp(struct thermal_zone_device *thermal,
-+				  unsigned long *temp)
-+{
-+	unsigned int tmp;
-+	unsigned int reg;
-+
-+	/*
-+	 * For now we only using single measure.  Every time we measure
-+	 * the temperature, we will power on/down the anadig module
-+	 */
-+	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
-+		anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
-+
-+	writel_relaxed(BM_ANADIG_TEMPSENSE0_FINISHED,
-+		anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
-+
-+	writel_relaxed(BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
-+		anatop_base + HW_ANADIG_TEMPSENSE0_SET);
-+	/*
-+	 * According to designers, may take up to ~17us for hardware to make
-+	 * a measurement.  But because we have a 'finished' status bit, so we
-+	 * check it just in case the designers are liars.
-+	 */
-+	do  {
-+		msleep(1);
-+	} while (!(readl_relaxed(anatop_base + HW_ANADIG_TEMPSENSE0)
-+		& BM_ANADIG_TEMPSENSE0_FINISHED));
-+
-+	reg = readl_relaxed(anatop_base + HW_ANADIG_TEMPSENSE0);
-+
-+	tmp = (reg & BM_ANADIG_TEMPSENSE0_TEMP_VALUE)
-+			>> BP_ANADIG_TEMPSENSE0_TEMP_VALUE;
-+
-+#if IMX6Q_THERMAL_DEBUG
-+	imx6q_temp_sens_reg_dump();
-+#endif
-+	writel_relaxed(BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
-+		anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
-+
-+	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
-+			anatop_base + HW_ANADIG_TEMPSENSE0_SET);
-+
-+	*temp = REG_VALUE_TO_CEL(tmp);
-+
-+#if IMX6Q_THERMAL_DEBUG
-+	pr_info("Temperature is %lu C\n", *temp);
-+#endif
-+	return 0;
-+}
-+
-+/* bind callback functions to thermalzone */
-+static struct thermal_zone_device_ops imx6q_dev_ops = {
-+	.bind = imx6q_bind,
-+	.unbind = imx6q_unbind,
-+	.get_temp = imx6q_get_temp,
-+	.get_mode = imx6q_get_mode,
-+	.get_trip_type = imx6q_get_trip_type,
-+	.get_trip_temp = imx6q_get_trip_temp,
-+	.get_crit_temp = imx6q_get_crit_temp,
-+};
-+
-+void imx6q_unregister_thermal(void)
-+{
-+	if (th_zone && th_zone->cool_dev)
-+		cpufreq_cooling_unregister();
-+
-+	if (th_zone && th_zone->therm_dev)
-+		thermal_zone_device_unregister(th_zone->therm_dev);
-+
-+	kfree(th_zone);
-+
-+	pr_info("i.MX6Q: Kernel Thermal management unregistered\n");
-+}
-+EXPORT_SYMBOL(imx6q_unregister_thermal);
-+
-+int __init imx6q_register_thermal(void)
-+{
-+	struct device_node *np;
-+	int ret;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
-+	anatop_base = of_iomap(np, 0);
-+
-+	if (!anatop_base) {
-+		pr_err("Could not retrieve anantop-base\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Make sure sensor is in known good state for measurements */
-+	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
-+			anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
-+	writel_relaxed(BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
-+		anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
-+	writel_relaxed(BM_ANADIG_TEMPSENSE1_MEASURE_FREQ,
-+		anatop_base + HW_ANADIG_TEMPSENSE1_CLR);
-+	writel_relaxed(BM_ANADIG_ANA_MISC0_REFTOP_SELBIASOFF,
-+			anatop_base + HW_ANADIG_ANA_MISC0_SET);
-+	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
-+			anatop_base + HW_ANADIG_TEMPSENSE0_SET);
-+
-+	th_zone = kzalloc(sizeof(struct imx6q_thermal_zone), GFP_KERNEL);
-+	if (!th_zone) {
-+		ret = -ENOMEM;
-+		goto err_unregister;
-+	}
-+
-+	th_zone->sensor_conf = &imx6q_sensor_conf;
-+
-+	th_zone->thermal_data = &thermal_data;
-+	if (!th_zone->thermal_data) {
-+		pr_err("Temperature sensor data not initialised\n");
-+		ret = -EINVAL;
-+		goto err_unregister;
-+	}
-+
-+	th_zone->cool_dev = cpufreq_cooling_register(
-+		(struct freq_pctg_table *)th_zone->thermal_data->freq_tab,
-+		IMX6Q_THERMAL_ACT_TRP_PTS, cpumask_of(0));
-+
-+	if (IS_ERR(th_zone->cool_dev)) {
-+		pr_err("Failed to register cpufreq cooling device\n");
-+		ret = -EINVAL;
-+		goto err_unregister;
-+	}
-+
-+	th_zone->therm_dev = thermal_zone_device_register(
-+		th_zone->sensor_conf->name, 3, NULL, &imx6q_dev_ops,
-+		0, 0, 0, IMX6Q_THERMAL_POLLING_FREQUENCY_MS);
-+
-+	if (IS_ERR(th_zone->therm_dev)) {
-+		pr_err("Failed to register thermal zone device\n");
-+		ret = -EINVAL;
-+		goto err_unregister;
-+	}
-+
-+	pr_info("i.MX6: Kernel Thermal management registered\n");
-+
-+	return 0;
-+
-+err_unregister:
-+	imx6q_unregister_thermal();
-+	return ret;
-+}
-+EXPORT_SYMBOL(imx6q_register_thermal);
-+
-+module_init(imx6q_register_thermal);
+	dev->irq = platform_get_irq(pdev, 0)
+	if (dev->irq <= 0)
+		goto error_handling;
+
+)
+
+> +	err = cs89x0_probe1(dev, (int)lp->virt_addr, 0);
+> +	if (err) {
+> +		dev_warn(&dev->dev, "no cs8900 or cs8920 detected.\n");
+> +		goto unmap;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, dev);
+> +	return 0;
+> +
+> +unmap:
+> +	iounmap(lp->virt_addr);
+> +release:
+> +	release_mem_region(lp->phys_addr, lp->size);
+> +free:
+> +	free_netdev(dev);
+> +	return err;
+> +}
+> +
+> +static int cs89x0_platform_remove(struct platform_device *pdev)
+> +{
+> +	struct net_device *dev = platform_get_drvdata(pdev);
+> +	struct net_local *lp = netdev_priv(dev);
+> +
+> +	unregister_netdev(dev);
+> +	iounmap(lp->virt_addr);
+> +	release_mem_region(lp->phys_addr, lp->size);
+> +	free_netdev(dev);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver cs89x0_platform_driver = {
+> +	.driver = {
+> +		.name	= DRV_NAME,
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe	= cs89x0_platform_probe,
+> +	.remove	= cs89x0_platform_remove,
+After .driver you used a space, aber .probe and .remove a tab. Please
+make this uniform. (If you want to know my personal preference: A single
+space. Otherwise (well unless you use a single tab) either the layout
+gets broken when a member with a longer name is added or you have to
+touch unrelated lines.)
+
+> +};
+> +
+> +static int __init cs89x0_init(void)
+> +{
+> +	return platform_driver_register(&cs89x0_platform_driver);
+> +}
+> +
+> +module_init(cs89x0_init);
+> +
+> +static void __exit cs89x0_cleanup(void)
+> +{
+> +	platform_driver_unregister(&cs89x0_platform_driver);
+> +}
+> +
+> +module_exit(cs89x0_cleanup);
+It should be possible to use module_platform_driver here. See
+
+	http://mid.gmane.org/1326250797-17716-1-git-send-email-festevam at gmail.com
+
+for an example.
+
+Best regards
+Uwe
+
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
