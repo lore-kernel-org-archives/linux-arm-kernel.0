@@ -1,60 +1,62 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Wed, 11 Jan 2012 19:55:37 +0530
-Subject: [PATCH RFC] OMAP: I2C: Fix the mismatch of pm_runtime enable
- and disable
-In-Reply-To: <CANOLnONdYYybbSP143+TeLxjfdEg1krcZjHwf140Fm5Y8rHogA@mail.gmail.com>
-References: <1326288104-10544-1-git-send-email-shubhrajyoti@ti.com>
- <CANOLnONdYYybbSP143+TeLxjfdEg1krcZjHwf140Fm5Y8rHogA@mail.gmail.com>
-Message-ID: <4F0D9BE1.6070209@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jan 2012 14:50:02 +0000
+Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
+In-Reply-To: <4F0D65F6.8080209@infradead.org>
+References: <20120111133146.990e2b7115c9fa80e8fc3234@canb.auug.org.au>
+ <Pine.LNX.4.64.1201110933480.1191@axis700.grange>
+ <4F0D65F6.8080209@infradead.org>
+Message-ID: <201201111450.02798.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 January 2012 07:29 PM, Grazvydas Ignotas wrote:
-> On Wed, Jan 11, 2012 at 3:21 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
->> Currently the i2c driver calls the pm_runtime_enable and never
->> the disable. This may cause a warning when pm_runtime_enable
->> checks for the count match.Attempting to fix the same by calling
->> pm_runtime_disable in the error and the remove path.
-> I remember seeing Felipe doing the reverse to musb here:
-> http://marc.info/?l=linux-omap&m=132432610700952&w=2
-> so I'm confused here.
-Strange however  I see many drivers doing the same in the kernel
-on greping . Besides I expect a warn to come up.
+On Wednesday 11 January 2012, Mauro Carvalho Chehab wrote:
+> What I and Guennadi agreed (http://linuxtv.org/irc/v4l/index.php?date=2012-01-05)
+> were to do just the reverse:
+> 
+> He would be sending you one single patch with my ack, that would allow the 
+> arm tree to be merged [1], I would wait for a few days for the arm tree to
+> be pulled, and then I would rebase my -next tree to remove that patch
+> from it.
+> 
+> [1] http://git.linuxtv.org/gliakhovetski/v4l-dvb.git/commitdiff/88c6599d97b489ac543fa352159a81f60bddded7
 
-Felipe could you explain the issue?
+It's just not what happened. I got this series from Nicolas:
 
+7a1834b ARM: at91: Update struct atmel_nand_data to support PMECC
+9356fba ARM: at91/dma: DMA controller registering with DT support
+31527e7 ARM: at91/dma: remove platform data from DMA controller
+226e3aa ARM: at91: add Atmel ISI and ov2640 support on sam9m10g45 board
+e889a64 ARM: at91: add clock selection parameter for at91_add_device_isi()
+7a13e73 media i.MX27 camera: Fix field_count handling.
+166b37f media i.MX27 camera: add support for YUV420 format.
+88c6599 V4L: atmel-isi: add code to enable/disable ISI_MCK clock
+... (the rest of v4l at the time)
 
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->> ---
->>  drivers/i2c/busses/i2c-omap.c |    2 ++
->>  1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
->> index 12d402c..abc7b5b 100644
->> --- a/drivers/i2c/busses/i2c-omap.c
->> +++ b/drivers/i2c/busses/i2c-omap.c
->> @@ -1070,6 +1070,7 @@ err_unuse_clocks:
->>        omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->>        pm_runtime_put(dev->dev);
->>        iounmap(dev->base);
->> +       pm_runtime_disable(&pdev->dev);
->>  err_free_mem:
->>        platform_set_drvdata(pdev, NULL);
->>        kfree(dev);
->> @@ -1085,6 +1086,7 @@ omap_i2c_remove(struct platform_device *pdev)
->>        struct omap_i2c_dev     *dev = platform_get_drvdata(pdev);
->>        struct resource         *mem;
->>
->> +       pm_runtime_disable(&pdev->dev);
->>        platform_set_drvdata(pdev, NULL);
->>
->>        free_irq(dev->irq, dev);
->> --
->> 1.7.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+and I merged it into the next/drivers2 branch, explaining that I would
+merge these as soon as the dependencies in v4l are merged. :(
+
+> My -next tree were never meant to be stable. It is just a patch repository
+> where I merge from the real development repository, in order to test them
+> against the hole changes. From time to time, when bad things happen
+> (patch conflicts, compilation breakages, requests to remove bad patches),
+> I just rebase it.
+
+Ok, thanks for the confirmation.
+
+> I prefer if you could just pick this patch from Guennadi's tree:
+>  http://git.linuxtv.org/gliakhovetski/v4l-dvb.git/commitdiff/88c6599d97b489ac543fa352159a81f60bddded7
+>
+> and add my ack on it, removing the v4l-dvb merge from yours.
+>
+> Linus seems to prefer to have the arch trees merged before the drivers
+> tree, with makes sense.
+
+I think it's better for you to just send everything you have right away,
+including the atmel-isi patch.
+
+I'll drop the remaining atmel patches from my next/drivers2 branch and let
+Nicolas send me a new rebased pull request for 3.4. The patches in question
+look simple enough, but if the developers can't get a simple dependency right
+after discussing it for weeks, I'd rather not take it this time.
+
+	Arnd
