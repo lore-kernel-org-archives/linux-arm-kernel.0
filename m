@@ -1,36 +1,49 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 11 Jan 2012 13:57:20 -0800
-Subject: [PATCH] ARM: vexpress: initial device tree support
-In-Reply-To: <4F0E0113.9090703@freescale.com>
-References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
- <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
- <4F0B897A.20502@firmworks.com>
- <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
- <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
- <4F0CD7BC.7080409@freescale.com> <4F0D2F90.8020801@firmworks.com>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A770@HQMAIL01.nvidia.com>
- <4F0DF1E6.40602@freescale.com>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A777@HQMAIL01.nvidia.com>
- <4F0E0113.9090703@freescale.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A7C0@HQMAIL01.nvidia.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 11 Jan 2012 14:28:20 -0800
+Subject: [PATCH v2] I2C: OMAP: Recover from Bus Busy condition
+In-Reply-To: <1326303693-30106-1-git-send-email-shubhrajyoti@ti.com>
+ (Shubhrajyoti D.'s message of "Wed, 11 Jan 2012 23:11:33 +0530")
+References: <1326303693-30106-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <87vcoh27sr.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Timur Tabi wrote at Wednesday, January 11, 2012 2:37 PM:
-...
-> I also noticed that the I2C interface is not enabled until after the console opens the framebuffer.
-> That means it's impossible for EDID data to be available before the console switches to the video
-> device.  That doesn't seem right.
+Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 
-I think what you need is this:
+> From: Vikram Pandita <vikram.pandita@ti.com>
+>
+> In case a peripheral is driving SDA bus low (ie. a start condition), provide
+> a constant clock output using the test mode of the OMAP I2C controller to
+> try and clear the bus. Soft reset I2C controller after attempting the bus clear
+> to ensure that controller is in a good state.
+>
+> Based upon Vikram Pandita's patch from TI Android 3.0 kernel and modified for
+> mainline by Jon Hunter. 
+>
+> A couple differences from the original patch ...
+> 1. Add a new function for bus clear
+> 2. Ensure that the CON.I2C_EN bit is set when using the SYSTEST feature to
+>    output a permanent clock. This bit needs to be set and tpyically it would
+>    be set by the unidle function but this is not the case for all OMAP
+>    generations.
+> 3. Program the SYSTEST setting only the bits we care about. However, restore
+>    SYSTEST registers to there original state as some OMAP generations do not
+>    implement perform a soft-reset.
+> 4. Clear the CON register after performing the bus clear, so when we call the
+>    init function the controller is disabled and the init function will
+>    re-enable later.
+>
+> Cc:  Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+> Original patch can be found here:
+> http://git.omapzoom.org/?p=kernel/omap.git;a=commit;h=a2ab04192ba25e60f95ba1ff3af5601a2d7b5bd1
+> applies on Kevin's for_3.3/i2c/misc
 
-https://lkml.org/lkml/2011/10/7/14
+Please also explain how this was tested, and on what platforms.
 
-That may not be the latest version of the patches; I'm not quite sure
-what the status is right now.
+Thanks,
 
-Then, FB probe could be deferred until after I2C probe, and the EDID
-would be available.
-
--- 
-nvpublic
+Kevin
