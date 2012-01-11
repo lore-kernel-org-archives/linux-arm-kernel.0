@@ -1,35 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Jan 2012 16:19:05 +0000
-Subject: [GIT PULL] Samsung devel for v3.3
-In-Reply-To: <20120110223712.GL7164@opensource.wolfsonmicro.com>
-References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
- <201201102013.54958.arnd@arndb.de>
- <20120110223712.GL7164@opensource.wolfsonmicro.com>
-Message-ID: <201201111619.05650.arnd@arndb.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 11 Jan 2012 16:26:39 +0000
+Subject: [PATCH-V2 1/2] arm:omap:am33xx: Add voltage domain data
+In-Reply-To: <87ipkjpg0o.fsf@ti.com>
+References: <1324803628-16790-1-git-send-email-hvaibhav@ti.com>
+ <1324803628-16790-2-git-send-email-hvaibhav@ti.com> <87ipkjpg0o.fsf@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317A10A8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 January 2012, Mark Brown wrote:
+On Tue, Jan 10, 2012 at 23:59:59, Hilman, Kevin wrote:
+> Vaibhav Hiremath <hvaibhav@ti.com> writes:
+> 
+> > Currently dummy voltage domain data is being created
+> > in order to succeed boot process, nothing has been done
+> > w.r.t actual hardware (voltage control).
+> >
+> > Also, hook up the AM33XX voltage domain to OMAP framework.
+> >
+> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> 
+> Data looks OK, but why the dummy voltage domains?   Does this device not
+> support voltage scaling? 
+> 
+It does support voltage scaling.
 
-> I do also wonder if it's worth letting people push stuff to you
-> more aggressively - right now you seem to be asking people to batch
-> things up and I wonder if that's making it a it easier for things to end
-> up dropping on the floor if a time based routine isn't working well for
-> people.
+Kevin,
+This is part of initial baseport patches and complete PM support 
+along with voltage scaling will follow slowly as-n-when it is ready for submission.
+We still haven't got full power management working internally which we can submit immediately.
 
-I really wish people would push stuff into arm-soc more aggressively,
-and I certainly didn't want to give the impression that maintainers
-should let their stuff sit in linux-next before sending it to us.
 
-It's absolutely fine to send multiple updates per branch for arm-soc
-as stuff comes in, as long as we can keep track of the dependencies
-and we don't have to rebase the stuff that's already merged.
+> Also, I think it was my idea in an earlier review to add the 
+> '.scalable = false', but it's not really necessary since the default is
+> false.  Sorry 'bout that.
+> 
 
-I would also prefer if people stopped having their own trees included
-in next, but I know that I'm sometimes slow to pick up patches that
-were submitted to arm-soc and that it helps people if they can get
-earlier integration testing that way. Hopefully we're also getting
-better at dealing with pull requests quickly so that there is no
-need for the other tree in linux-next any more.
+Sorry it's my miss as well, I should have conformed it before submission.
+I will correct it in next version.
 
-	Arnd
+Thanks,
+Vaibhav
+
+> Kevin
+> 
