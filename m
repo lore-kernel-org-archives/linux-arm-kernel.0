@@ -1,94 +1,35 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jan 2012 20:53:38 +0800
-Subject: [PATCH 6/6] dma/imx-sdma: check whether event_id0 < 32 when set
- event_mask
-In-Reply-To: <20120111123555.GA1916@richard-laptop>
-References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
- <1326178910-14044-6-git-send-email-richard.zhao@linaro.org>
- <20120110142008.GE26599@S2101-09.ap.freescale.net>
- <20120110142939.GB2019@richard-laptop>
- <20120110153836.GA27831@S2101-09.ap.freescale.net>
- <20120111005322.GB2414@b20223-02.ap.freescale.net>
- <20120111014730.GE2414@b20223-02.ap.freescale.net>
- <CAMPhdO9sGWTomtyMSTe_jC2GfvtdLR=M-z3Uzpesm9efBzhSqA@mail.gmail.com>
- <20120111123555.GA1916@richard-laptop>
-Message-ID: <20120111125337.GA27484@b20223-02.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Jan 2012 21:07:24 +0800
+Subject: [PATCH v2 1/2] ARM: mxs: detect SoC by checking CHIPID register
+In-Reply-To: <201201111154.59344.marek.vasut@gmail.com>
+References: <1325864366-17995-1-git-send-email-shawn.guo@linaro.org>
+ <1325864366-17995-2-git-send-email-shawn.guo@linaro.org>
+ <201201111154.59344.marek.vasut@gmail.com>
+Message-ID: <20120111130721.GA20968@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 08:35:57PM +0800, Richard Zhao wrote:
-> On Wed, Jan 11, 2012 at 02:37:08PM +0800, Eric Miao wrote:
-> > On Wed, Jan 11, 2012 at 9:47 AM, Richard Zhao
-> > <richard.zhao@freescale.com> wrote:
-> > > On Wed, Jan 11, 2012 at 08:53:23AM +0800, Richard Zhao wrote:
-> > >> On Tue, Jan 10, 2012 at 11:38:39PM +0800, Shawn Guo wrote:
-> > >> > On Tue, Jan 10, 2012 at 10:29:42PM +0800, Richard Zhao wrote:
-> > >> > > On Tue, Jan 10, 2012 at 10:20:10PM +0800, Shawn Guo wrote:
-> > >> > > > On Tue, Jan 10, 2012 at 03:01:50PM +0800, Richard Zhao wrote:
-> > >> > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > >> > > > > ---
-> > >> > > >
-> > >> > > > I think it deserves a sensible commit message explaining why the patch
-> > >> > > > is needed.
-> > >> > > If event_id0 < 32, 1 << (sdmac->event_id0 - 32) is not zero.
-> > >> This meant to make you clear about the patch. I'll add it in commit
-> > >> message.
-> > > unsigned int t = 31;
-> > > printf("%d %08x\n", t, 1 << (t-32));
-> > >
-> > > I test above code on both x86 and arm. They shows different results.
-> > > x86: 31 80000000
-> > > arm: 31 00000000
-> > >
-> > > I think we still need this patch. we shoud not let it depends on gcc's
-> > > behavior.
-> > >
-> > > Thanks
-> > > Richard
-> > >> > >
-> > >> > My point is you may explain the exact problem you are seeing without
-> > >> > this patch
-> > >> The kernel don't have event_id < 32 case yet. I found the bug when
-> > >> I review the code.
-> > >> > and how the patch helps here. ?In general, doing so would
-> > >> > win a warm feeling from reviewers much more easily than leaving the
-> > >> > commit message empty there.
-> > >> I understand your point that comment as much as possible.
-> > >>
+On Wed, Jan 11, 2012 at 11:54:59AM +0100, Marek Vasut wrote:
+> > Both imx23 and imx28 have CHIPID register at address 0x8001c310, which
+> > can be used to identify the SoC.  This patch changes cpu_is_xxx and
+> > __arch_decomp_setup to use this CHIPID register than machine type to
+> > detect the chip between imx23 and imx28, so that we do not need to
+> > change these functions whenever a new board/machine gets added.
 > > 
-> > Shawn,
-> > 
-> > I think Richard has made the issue quite clear here, the original
-> > code does seem to have some problems even to me, who do not
-> > understand the very details of the SDMA:
-> > 
-> > -                       sdmac->event_mask0 = 1 << sdmac->event_id0;
-> > -                       sdmac->event_mask1 = 1 << (sdmac->event_id0 - 32);
-> > 
-> > 1. if sdmac->event_id0 >= 32, which will cause event_mask0 to be incorrect
-> > 2. if sdmac->event_id < 32, sdmac->event_mask1 will be incorrect
-> > 
-> > An alternate way is to use the standard bit operations:
-> > 
-> > struct sdma_channel {
-> > 
-> > 	...
-> > 
-> > 	unsigned long event_mask[2];
-> > 
-> > 	...
-> > };
-> > 
-> > 	set_bit(sdmac->event_id0, event_mask);
-> > 
-> > Which avoids branch instructions and add a bit protection for the operation
-> > to be atomic enough (event_mask0/1 won't be inconsistent).
-> It's a good idea.
-I'm not sure whether I can always use bitops for every bit operation case,
-event it don't need atomic. bitops has locks to be atomic. 
-
-Thanks
-Richard
-> Thanks
-> Richard
+> > Suggested-by: Wolfram Sang <w.sang@pengutronix.de>
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
 > 
+> Looks nice, please add my:
+> 
+> Acked-by: Marek Vasut <marek.vasut@gmail.com>
+> 
+Sorry, the patch has been sent to arm-soc.
+
+> Also please keep me in Cc with mxs patches.
+> 
+Ok, will do.
+
+-- 
+Regards,
+Shawn
