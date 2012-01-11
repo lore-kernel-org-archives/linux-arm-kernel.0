@@ -1,35 +1,40 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 11 Jan 2012 15:22:34 -0800
-Subject: [PATCH V6 4/7] cpufreq: add clk-reg cpufreq driver
-In-Reply-To: <1325213769-11752-5-git-send-email-richard.zhao@linaro.org>
- (Richard Zhao's message of "Fri, 30 Dec 2011 10:56:06 +0800")
-References: <1325213769-11752-1-git-send-email-richard.zhao@linaro.org>
- <1325213769-11752-5-git-send-email-richard.zhao@linaro.org>
-Message-ID: <87aa5t25ad.fsf@ti.com>
+From: timur@freescale.com (Timur Tabi)
+Date: Wed, 11 Jan 2012 17:32:44 -0600
+Subject: [PATCH] ARM: vexpress: initial device tree support
+In-Reply-To: <4F0E1923.4090703@firmworks.com>
+References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
+ <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
+ <4F0B897A.20502@firmworks.com>
+ <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
+ <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
+ <4F0CD7BC.7080409@freescale.com> <4F0D2F90.8020801@firmworks.com>
+ <4F0DEE4F.3080103@freescale.com> <4F0E1923.4090703@firmworks.com>
+Message-ID: <4F0E1C1C.70909@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@linaro.org> writes:
+Mitch Bradley wrote:
+> You make device nodes for each of the i2c adapters 
 
-> The driver get cpu operation point table from device tree cpu0 node,
+We have that already.
 
-Since we already have an existing OPP infrastructure in the kernel,
-seems like  this driver should get OPPs by asking the OPP layer.
+> (possibly with a GPIO 
+> I2C mux node underneath the EDID one), 
 
-This approach assumes the OPP layer is static at boot time and not
-changing, however that's not the case in practice.
+Ok.
 
-The OPP layer could be extended to read boot-time OPPs from DT if
-desired, but since the OPPs are also populated/enabled/disabled
-dynamicaly on some platforms (e.g. OMAP), I think the any generic
-CPUfreq driver should use the OPP interface and not DT directly.
+> then you point to the correct 
+> adapter (or mux) node with a phandle-valued property in the video node.
 
-> and adjusts operating points using clk and regulator APIs.
+The only connection between a device tree node and an I2C object is the
+of_find_i2c_device_by_node() function.  That requires the I2C device to be
+instantiated.
 
-For a generic driver, the regulator used should also be configurable.
+> Of course, you need the deferral patch cited in another message.
 
-For example, this driver currently assumes a regulator named "cpu" for
-all instances.   If you had separate clusters with independent voltage
-control, you'd likely have a separate regulator for each cluster.
+Last I heard, it's not ready.  I suspect it will be part of kernel 3.4, at
+the earliest.
 
-Kevin
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
