@@ -1,38 +1,22 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Jan 2012 09:44:13 +0100
-Subject: Anyone interested in another ARM kernel workshop in February?
-In-Reply-To: <CACxGe6ta7JLuP7uWO9CR+gqsPVh8RjSNJqOKUwrMg_HptPxyeA@mail.gmail.com>
-References: <CACxGe6vc+9bcr2S0vgeNwr7Oo370FxwZ_TZCZZ2ZyC+A_ir_0A@mail.gmail.com>
- <CACxGe6vBNtgPpHzJg+pFcT3as_us3XeSJwSzd1kYzko3_8rrCg@mail.gmail.com>
- <20111213082452.GI7148@opensource.wolfsonmicro.com>
- <20111213153605.GQ20297@mudshark.cambridge.arm.com>
- <029101ccbac8$56dbe960$0493bc20$%kim@samsung.com>
- <CACxGe6ta7JLuP7uWO9CR+gqsPVh8RjSNJqOKUwrMg_HptPxyeA@mail.gmail.com>
-Message-ID: <20120111084413.GW5446@pengutronix.de>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Wed, 11 Jan 2012 17:45:47 +0900
+Subject: ARM kexec SMP problem using exynos4210
+Message-ID: <4F0D4C3B.80208@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 03:17:17AM -0700, Grant Likely wrote:
-> [Throwing out to a wider audience.  I originally contacted only the
-> attendees of the Prague summit, but now I'm cc'ing linux-arm-kernel]
-> 
-> I'm organizing another ARM maintainership summit this February in
-> conjunction with Linaro Connect[1], Feb 6-10 in San Francisco.  Format
-> will be similar to the meeting we held in Prague at kernel summit with
-> time for both meetings and hacking sessions.  Linaro Connect is
-> organized with meetings and summits each morning, and hacking sprints
-> in the afternoon.  I'm planing one 1/2 day arm maintainership summit
-> meeting early in the week (Monday or Tuesday), and you're invited to
-> participate in any of the Linaro Connect sessions.  See the schedule
-> page on the Linaro Connect website for an early list of the organized
-> sessions.
+Hi,
 
-Unfortunately I won't be able to attend.
+I have tested kexec to Nuri board using Exynos4210(Dual-core ARM
+Cortex-A9) on the latest mainline kernel but i am facing one problem.
 
-Sascha
+The kernel enabled SMP, kernel_kexec() calls machine_shutdown to stop
+all cpus except current cpu and jumps to the new kernel but the kernel
+is hanged soon.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I used cpu_down(1) to make disabled cpu1 instead of smp_send_stop of
+machine_shutdown and it is booted successfully to new kernel.
+
+Any ideas?
+
+Thanks.
