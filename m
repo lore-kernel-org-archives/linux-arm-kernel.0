@@ -1,35 +1,138 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 11 Jan 2012 14:08:40 +0100
-Subject: [PATCH v2 1/2] ARM: mxs: detect SoC by checking CHIPID register
-In-Reply-To: <20120111130721.GA20968@S2101-09.ap.freescale.net>
-References: <1325864366-17995-1-git-send-email-shawn.guo@linaro.org>
- <201201111154.59344.marek.vasut@gmail.com>
- <20120111130721.GA20968@S2101-09.ap.freescale.net>
-Message-ID: <201201111408.40760.marek.vasut@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Jan 2012 13:08:46 +0000
+Subject: [PATCH 07/15] ARM: tegra: convert to twd_local_timer_register()
+ interface
+In-Reply-To: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
+References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326287334-1905-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, Jan 11, 2012 at 11:54:59AM +0100, Marek Vasut wrote:
-> > > Both imx23 and imx28 have CHIPID register at address 0x8001c310, which
-> > > can be used to identify the SoC.  This patch changes cpu_is_xxx and
-> > > __arch_decomp_setup to use this CHIPID register than machine type to
-> > > detect the chip between imx23 and imx28, so that we do not need to
-> > > change these functions whenever a new board/machine gets added.
-> > > 
-> > > Suggested-by: Wolfram Sang <w.sang@pengutronix.de>
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > ---
-> > 
-> > Looks nice, please add my:
-> > 
-> > Acked-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-> Sorry, the patch has been sent to arm-soc.
+Add support for the new smp_twd runtime registration interface
+to the tegra platforms, and remove the old compile-time support.
+Tested on Harmony.
 
-No problem
-> 
-> > Also please keep me in Cc with mxs patches.
-> 
-> Ok, will do.
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Colin Cross <ccross@android.com>
+Cc: Olof Johansson <olof@lixom.net>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-tegra/Makefile     |    2 +-
+ arch/arm/mach-tegra/localtimer.c |   26 --------------------------
+ arch/arm/mach-tegra/timer.c      |   34 +++++++++++++++++++++++++++++-----
+ 3 files changed, 30 insertions(+), 32 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/localtimer.c
 
-Thanks
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index e120ff5..f7d0443 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -13,7 +13,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-tegra20-tables.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= pinmux-tegra30-tables.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
+-obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
++obj-$(CONFIG_SMP)                       += platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+ obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
+ obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
+diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
+deleted file mode 100644
+index e91d681..0000000
+--- a/arch/arm/mach-tegra/localtimer.c
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- *  arch/arm/mach-tegra/localtimer.c
+- *
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->irq = IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-	return 0;
+-}
+diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+index 1d1acda..f50e320 100644
+--- a/arch/arm/mach-tegra/timer.c
++++ b/arch/arm/mach-tegra/timer.c
+@@ -28,7 +28,7 @@
+ #include <linux/io.h>
+ 
+ #include <asm/mach/time.h>
+-#include <asm/localtimer.h>
++#include <asm/smp_twd.h>
+ #include <asm/sched_clock.h>
+ 
+ #include <mach/iomap.h>
+@@ -162,6 +162,32 @@ static struct irqaction tegra_timer_irq = {
+ 	.irq		= INT_TMR3,
+ };
+ 
++#ifdef CONFIG_HAVE_ARM_TWD
++static struct twd_local_timer twd_local_timer __initdata = {
++	.res =	{
++		{
++			.start	= TEGRA_ARM_PERIF_BASE + 0x600,
++			.end	= TEGRA_ARM_PERIF_BASE + 0x610,
++			.flags	= IORESOURCE_MEM,
++		},
++		{
++			.start	= IRQ_LOCALTIMER,
++			.end	= IRQ_LOCALTIMER,
++			.flags	= IORESOURCE_IRQ,
++		},
++	},
++};
++
++static void __init tegra_twd_init(void)
++{
++	int err = twd_local_timer_register(&twd_local_timer);
++	if (err)
++		pr_err("twd_local_timer_register failed %d\n", err);
++}
++#else
++#define tegra_twd_init	NULL
++#endif
++
+ static void __init tegra_init_timer(void)
+ {
+ 	struct clk *clk;
+@@ -188,10 +214,6 @@ static void __init tegra_init_timer(void)
+ 	else
+ 		clk_enable(clk);
+ 
+-#ifdef CONFIG_HAVE_ARM_TWD
+-	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
+-#endif
+-
+ 	switch (rate) {
+ 	case 12000000:
+ 		timer_writel(0x000b, TIMERUS_USEC_CFG);
+@@ -231,6 +253,8 @@ static void __init tegra_init_timer(void)
+ 	tegra_clockevent.cpumask = cpu_all_mask;
+ 	tegra_clockevent.irq = tegra_timer_irq.irq;
+ 	clockevents_register_device(&tegra_clockevent);
++
++	late_time_init = tegra_twd_init;
+ }
+ 
+ struct sys_timer tegra_timer = {
+-- 
+1.7.7.1
