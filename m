@@ -1,53 +1,60 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 11 Jan 2012 15:24:40 +0100
-Subject: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU
- driver
-In-Reply-To: <20120105144631.GV11810@n2100.arm.linux.org.uk>
-References: <20120105125326.GT11810@n2100.arm.linux.org.uk><20120105.162930.604365154868332443.hdoyu@nvidia.com><20120105144631.GV11810@n2100.arm.linux.org.uk>
-Message-ID: <20120111.162440.1854857348878391112.hdoyu@nvidia.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Wed, 11 Jan 2012 19:55:37 +0530
+Subject: [PATCH RFC] OMAP: I2C: Fix the mismatch of pm_runtime enable
+ and disable
+In-Reply-To: <CANOLnONdYYybbSP143+TeLxjfdEg1krcZjHwf140Fm5Y8rHogA@mail.gmail.com>
+References: <1326288104-10544-1-git-send-email-shubhrajyoti@ti.com>
+ <CANOLnONdYYybbSP143+TeLxjfdEg1krcZjHwf140Fm5Y8rHogA@mail.gmail.com>
+Message-ID: <4F0D9BE1.6070209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Subject: Re: [PATCH v3 0/2] ARM: IOMMU: tegra: Add iommu_ops for GART/SMMU driver
-Date: Thu, 5 Jan 2012 15:46:31 +0100
-Message-ID: <20120105144631.GV11810@n2100.arm.linux.org.uk>
+On Wednesday 11 January 2012 07:29 PM, Grazvydas Ignotas wrote:
+> On Wed, Jan 11, 2012 at 3:21 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+>> Currently the i2c driver calls the pm_runtime_enable and never
+>> the disable. This may cause a warning when pm_runtime_enable
+>> checks for the count match.Attempting to fix the same by calling
+>> pm_runtime_disable in the error and the remove path.
+> I remember seeing Felipe doing the reverse to musb here:
+> http://marc.info/?l=linux-omap&m=132432610700952&w=2
+> so I'm confused here.
+Strange however  I see many drivers doing the same in the kernel
+on greping . Besides I expect a warn to come up.
 
-> On Thu, Jan 05, 2012 at 03:29:30PM +0100, Hiroshi Doyu wrote:
-> > Ok, the above function order should be as below?
-> > 
-> >   page = alloc_page(GFP_KERNEL);
-> >       cpu_addr = kmap(page);
-> >       memset(cpu_addr, 0xa5, PAGE_SIZE);
-> >   	dma_addr = dma_map_page(dev, page, 0, PAGE_SIZE, DMA_TO_DEVICE);
-> >   	    < expect GPU does something >
-> >   	dma_unmap_page(dev, dma_addr, PAGE_SIZE, DMA_TO_DEVICE);
-> >       < CPU can access data here again>
-> >       kunmap(cpu_addr);
-> >   __free_page(page);
-> 
-> That should work, but it's not particularly nice to wrap kmap around
-> the DMA API.
-> 
-> Bear in mind that alloc_page(GFP_KERNEL) will always give you a lowmem
-> page.  So, you might as well do:
-> 
-> 	page = alloc_page(GFP_KERNEL);
-> 	cpu_addr = page_address(page);
-> 	memset()
-> 	dma_addr = dma_map_single(dev, cpu_addr, PAGE_SIZE, DMA_TO_DEVICE);
-> 		< GPU access >
-> 	dma_unmap_single(dev, dma_ddr, PAGE_SIZE, DMA_TO_DEVICE);
-> 	< CPU access >
-> 	__free_page(page);
-> 
-> and this doesn't raise any issues with kmap vs DMA API.
+Felipe could you explain the issue?
 
-Attached the update one just in case that someone wants to use it for theirs.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-NOT-FOR-MERGE-TEST-Simple-dma-iommu-mapping-API-TEST.patch
-Type: text/x-patch
-Size: 6451 bytes
-Desc: 0001-NOT-FOR-MERGE-TEST-Simple-dma-iommu-mapping-API-TEST.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120111/f10945ee/attachment.bin>
+
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>>  drivers/i2c/busses/i2c-omap.c |    2 ++
+>>  1 files changed, 2 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>> index 12d402c..abc7b5b 100644
+>> --- a/drivers/i2c/busses/i2c-omap.c
+>> +++ b/drivers/i2c/busses/i2c-omap.c
+>> @@ -1070,6 +1070,7 @@ err_unuse_clocks:
+>>        omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>>        pm_runtime_put(dev->dev);
+>>        iounmap(dev->base);
+>> +       pm_runtime_disable(&pdev->dev);
+>>  err_free_mem:
+>>        platform_set_drvdata(pdev, NULL);
+>>        kfree(dev);
+>> @@ -1085,6 +1086,7 @@ omap_i2c_remove(struct platform_device *pdev)
+>>        struct omap_i2c_dev     *dev = platform_get_drvdata(pdev);
+>>        struct resource         *mem;
+>>
+>> +       pm_runtime_disable(&pdev->dev);
+>>        platform_set_drvdata(pdev, NULL);
+>>
+>>        free_irq(dev->irq, dev);
+>> --
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
