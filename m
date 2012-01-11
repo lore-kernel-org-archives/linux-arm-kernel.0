@@ -1,74 +1,31 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 11 Jan 2012 16:41:33 +0530
-Subject: [PATCH] video: s3c-fb: Add device tree support
-In-Reply-To: <004401ccd041$c2f66100$48e32300$%han@samsung.com>
-References: <1326139307-25112-1-git-send-email-thomas.abraham@linaro.org>
- <004401ccd041$c2f66100$48e32300$%han@samsung.com>
-Message-ID: <CAJuYYwTAtFxDtnDOrOKLwbi+CKZ7CMPZ5QMvQ2=mR4_36qAYPQ@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 11 Jan 2012 13:25:27 +0200
+Subject: [PATCH v4] MTD/GPMI bugfix : reset the BCH module when it is
+ not MX23
+In-Reply-To: <20120111104339.GB2605@pengutronix.de>
+References: <1325647126-4281-1-git-send-email-b32955@freescale.com>
+ <1326185340.8847.11.camel@sauron.fi.intel.com>
+ <20120111104339.GB2605@pengutronix.de>
+Message-ID: <1326281127.24577.10.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mr. Han,
+On Wed, 2012-01-11 at 11:43 +0100, Wolfram Sang wrote:
+> > Pushed to l2-mtd-2.6.git, thanks!
+> 
+> I somehow missed this patch, if it's not too late, you can add my
+> 
+> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
-On 11 January 2012 14:46, Jingoo Han <jg1.han@samsung.com> wrote:
-> Hi, Thomas.
->
->> -----Original Message-----
->> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
->> Sent: Tuesday, January 10, 2012 5:02 AM
->> To: linux-fbdev at vger.kernel.org; devicetree-discuss at lists.ozlabs.org
->> Cc: FlorianSchandinat at gmx.de; grant.likely at secretlab.ca; rob.herring at calxeda.com; linux-arm-
->> kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; kgene.kim at samsung.com;
->> jg1.han at samsung.com; patches at linaro.org
->> Subject: [PATCH] video: s3c-fb: Add device tree support
->>
->> Add device tree based discovery support for Samsung's display controller.
->>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->> ?.../devicetree/bindings/fb/samsung-fb.txt ? ? ? ? ?| ?103 ++++++++++
->> ?drivers/video/s3c-fb.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ?209 +++++++++++++++++++-
->> ?2 files changed, 304 insertions(+), 8 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/fb/samsung-fb.txt
->>
->> [...]
->>
->> +- samsung,fimd-bpp: Specifies the bits per pixel. Two values should be
->> + ?specified in the following order.
->> + ? ?- max-bpp: maximum required bpp for the overlay.
->> + ? ?- default-bpp: bpp supported by the overlay.
->> [...]
->> + ? ? ? ? ? ? fimd-overlay0 {
->> + ? ? ? ? ? ? ? ? ? ? samsung,fimd-htiming = <64 16 48 1024>;
->> + ? ? ? ? ? ? ? ? ? ? samsung,fimd-vtiming = <64 16 3 600>;
->> + ? ? ? ? ? ? ? ? ? ? samsung,fimd-bpp = <24 32>;
->> + ? ? ? ? ? ? };
->> +
->> + ? ? ? ? ? ? fimd-overlay1 {
->> + ? ? ? ? ? ? ? ? ? ? samsung,fimd-htiming = <64 16 48 200>;
->> + ? ? ? ? ? ? ? ? ? ? samsung,fimd-vtiming = <64 16 3 100>;
->> + ? ? ? ? ? ? ? ? ? ? samsung,fimd-bpp = <16 32>;
->> + ? ? ? ? ? ? };
->> + ? ? };
-> In the above 'samsung-fb.txt', the order is defined as max-bpp and default-bpp.
-> However, <24 32> and <16 32> seems to be wrong.
-> It should be <32 24> and <32 16>, respectively.
-> Max bpp would be 32bpp in s3c-fb.
+Sorry, it is upstream already.
 
-You are right. I will change the order in the documentation as
-default-bpp and then max-bpp. Thanks for correction.
-
-Regards,
-Thomas.
-
->
-> Best regards,
-> Jingoo Han
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120111/bfbc7ad9/attachment.sig>
