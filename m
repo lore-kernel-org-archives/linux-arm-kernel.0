@@ -1,82 +1,126 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Jan 2012 13:08:40 +0000
-Subject: [PATCH 01/15] ARM: smp_twd: make local_timer_stop a symbol instead of
- a #define
+Date: Wed, 11 Jan 2012 13:08:53 +0000
+Subject: [PATCH 14/15] ARM: local timers: convert MSM to runtime registration
+ interface
 In-Reply-To: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
 References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326287334-1905-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326287334-1905-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_HAVE_ARM_TWD is selected, local_timer_stop is a #define,
-while all other local timers are using a real function.
+Convert the MSM timers to the runtime registration interface.
 
-Convert it to an alias of twd_timer_stop, as it helps converting
-all local timers to another internal API in a sane way.
-
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: David Brown <davidb@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/localtimer.h |    6 +-----
- arch/arm/include/asm/smp_twd.h    |    1 -
- arch/arm/kernel/smp_twd.c         |    7 ++++++-
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-msm/timer.c |   79 +++++++++++++++++++++++++--------------------
+ 1 files changed, 44 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index c6a1842..7e1b2c5 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -26,17 +26,13 @@ void percpu_timer_setup(void);
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 11d0d8f..0b13bec 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -127,6 +127,45 @@ static struct clocksource msm_clocksource = {
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
  
- #include "smp_twd.h"
- 
--#define local_timer_stop(c)	twd_timer_stop((c))
--
--#else
-+#endif
- 
- /*
-  * Stop the local timer
-  */
- void local_timer_stop(struct clock_event_device *);
- 
--#endif
--
- /*
-  * Setup a local timer interrupt for a CPU.
-  */
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index ef9ffba9..bf8449d 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -23,6 +23,5 @@ struct clock_event_device;
- extern void __iomem *twd_base;
- 
- void twd_timer_setup(struct clock_event_device *);
--void twd_timer_stop(struct clock_event_device *);
- 
- #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index c8e9385..95a0c14 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -87,12 +87,17 @@ int twd_timer_ack(void)
- 	return 0;
- }
- 
--void twd_timer_stop(struct clock_event_device *clk)
-+static void twd_timer_stop(struct clock_event_device *clk)
- {
- 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
- 	disable_percpu_irq(clk->irq);
- }
- 
-+/* Temporary hack to be removed when all TWD users are converted to
-+   the new registration interface */
-+void local_timer_stop(struct clock_event_device *clk)
-+	__attribute__ ((alias ("twd_timer_stop")));
++#ifdef CONFIG_LOCAL_TIMERS
++static int __cpuinit msm_local_timer_setup(struct clock_event_device *evt)
++{
++	/* Use existing clock_event for cpu 0 */
++	if (!smp_processor_id())
++		return 0;
 +
- #ifdef CONFIG_CPU_FREQ
++	writel_relaxed(0, event_base + TIMER_ENABLE);
++	writel_relaxed(0, event_base + TIMER_CLEAR);
++	writel_relaxed(~0, event_base + TIMER_MATCH_VAL);
++	evt->irq = msm_clockevent.irq;
++	evt->name = "local_timer";
++	evt->features = msm_clockevent.features;
++	evt->rating = msm_clockevent.rating;
++	evt->set_mode = msm_timer_set_mode;
++	evt->set_next_event = msm_timer_set_next_event;
++	evt->shift = msm_clockevent.shift;
++	evt->mult = div_sc(GPT_HZ, NSEC_PER_SEC, evt->shift);
++	evt->max_delta_ns = clockevent_delta2ns(0xf0000000, evt);
++	evt->min_delta_ns = clockevent_delta2ns(4, evt);
++
++	*__this_cpu_ptr(msm_evt.percpu_evt) = evt;
++	clockevents_register_device(evt);
++	enable_percpu_irq(evt->irq, 0);
++	return 0;
++}
++
++static void msm_local_timer_stop(struct clock_event_device *evt)
++{
++	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
++	disable_percpu_irq(evt->irq);
++}
++
++static struct local_timer_ops msm_local_timer_ops __initdata = {
++	.setup	= msm_local_timer_setup,
++	.stop	= msm_local_timer_stop,
++};
++#endif /* CONFIG_LOCAL_TIMERS */
++
+ static void __init msm_timer_init(void)
+ {
+ 	struct clock_event_device *ce = &msm_clockevent;
+@@ -173,8 +212,12 @@ static void __init msm_timer_init(void)
+ 		*__this_cpu_ptr(msm_evt.percpu_evt) = ce;
+ 		res = request_percpu_irq(ce->irq, msm_timer_interrupt,
+ 					 ce->name, msm_evt.percpu_evt);
+-		if (!res)
++		if (!res) {
+ 			enable_percpu_irq(ce->irq, 0);
++#ifdef CONFIG_LOCAL_TIMERS
++			local_timer_register(&msm_local_timer_ops);
++#endif
++		}
+ 	} else {
+ 		msm_evt.evt = ce;
+ 		res = request_irq(ce->irq, msm_timer_interrupt,
+@@ -191,40 +234,6 @@ err:
+ 		pr_err("clocksource_register failed\n");
+ }
  
- /*
+-#ifdef CONFIG_LOCAL_TIMERS
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	/* Use existing clock_event for cpu 0 */
+-	if (!smp_processor_id())
+-		return 0;
+-
+-	writel_relaxed(0, event_base + TIMER_ENABLE);
+-	writel_relaxed(0, event_base + TIMER_CLEAR);
+-	writel_relaxed(~0, event_base + TIMER_MATCH_VAL);
+-	evt->irq = msm_clockevent.irq;
+-	evt->name = "local_timer";
+-	evt->features = msm_clockevent.features;
+-	evt->rating = msm_clockevent.rating;
+-	evt->set_mode = msm_timer_set_mode;
+-	evt->set_next_event = msm_timer_set_next_event;
+-	evt->shift = msm_clockevent.shift;
+-	evt->mult = div_sc(GPT_HZ, NSEC_PER_SEC, evt->shift);
+-	evt->max_delta_ns = clockevent_delta2ns(0xf0000000, evt);
+-	evt->min_delta_ns = clockevent_delta2ns(4, evt);
+-
+-	*__this_cpu_ptr(msm_evt.percpu_evt) = evt;
+-	clockevents_register_device(evt);
+-	enable_percpu_irq(evt->irq, 0);
+-	return 0;
+-}
+-
+-void local_timer_stop(struct clock_event_device *evt)
+-{
+-	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+-	disable_percpu_irq(evt->irq);
+-}
+-#endif /* CONFIG_LOCAL_TIMERS */
+-
+ struct sys_timer msm_timer = {
+ 	.init = msm_timer_init
+ };
 -- 
 1.7.7.1
