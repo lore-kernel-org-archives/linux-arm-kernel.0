@@ -1,88 +1,107 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 11 Jan 2012 15:55:36 +0100
-Subject: [PATCH 3/7] at91 : group headers inclusion for the memory controller
+Date: Wed, 11 Jan 2012 15:55:37 +0100
+Subject: [PATCH 4/7] at91 : convert pm.h macros to static inline functions
 In-Reply-To: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1326293740-15735-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1326293740-15735-5-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Group the headers inclusion depending on the arch in a single memory
-controller file in order to clarify the pm.h header.
+Change the macros to inline functions. That will allow to group
+the different functions definitions in a single function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-at91/include/mach/at91_mc.h |   22 ++++++++++++++++++++++
- arch/arm/mach-at91/pm.h                   |    6 ++----
- 2 files changed, 24 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-at91/include/mach/at91_mc.h
+ arch/arm/mach-at91/pm.h |   52 +++++++++++++++++++++++++++++-----------------
+ 1 files changed, 33 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_mc.h b/arch/arm/mach-at91/include/mach/at91_mc.h
-new file mode 100644
-index 0000000..c705ba9
---- /dev/null
-+++ b/arch/arm/mach-at91/include/mach/at91_mc.h
-@@ -0,0 +1,22 @@
-+/*
-+ * AT91 Memory controller
-+ *
-+ * Copyright (C) 2012 Daniel Lezcano <daniel.lezcano@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#ifndef __ARCH_ARM_MACH_AT91_MC
-+#define __ARCH_ARM_MACH_AT91_MC
-+
-+#ifdef CONFIG_ARCH_AT91RM9200
-+#include <mach/at91rm9200_mc.h>
-+#elif defined(CONFIG_ARCH_AT91CAP9)
-+#include <mach/at91cap9_ddrsdr.h>
-+#else
-+#include <mach/at91sam9_sdramc.h>
-+#endif
-+
-+#endif
 diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 325ef76..fc48bef 100644
+index fc48bef..3aa8b66 100644
 --- a/arch/arm/mach-at91/pm.h
 +++ b/arch/arm/mach-at91/pm.h
-@@ -11,8 +11,9 @@
- #ifndef __ARCH_ARM_MACH_AT91_PM
- #define __ARCH_ARM_MACH_AT91_PM
+@@ -34,12 +34,15 @@ static inline u32 sdram_selfrefresh_enable(void)
+ 	return saved_lpr;
+ }
  
-+#include <mach/at91_mc.h>
-+
- #ifdef CONFIG_ARCH_AT91RM9200
--#include <mach/at91rm9200_mc.h>
+-#define sdram_selfrefresh_disable(saved_lpr) \
+-	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
++static inline void sdram_selfrefresh_disable(u32 saved_lpr)
++{
++	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr);
++}
  
- /*
-  * The AT91RM9200 goes into self-refresh mode with this command, and will
-@@ -41,7 +42,6 @@ static inline u32 sdram_selfrefresh_enable(void)
- 		      : : "r" (0))
+-#define wait_for_interrupt_enable() \
+-	asm volatile ("mcr p15, 0, %0, c7, c0, 4" \
+-		      : : "r" (0))
++static inline void wait_for_interrupt_enable(void)
++{
++	asm volatile ("mcr p15, 0, %0, c7, c0, 4" : : "r" (0));
++}
  
  #elif defined(CONFIG_ARCH_AT91CAP9)
--#include <mach/at91cap9_ddrsdr.h>
  
- static inline u32 sdram_selfrefresh_enable(void)
- {
-@@ -62,7 +62,6 @@ static inline u32 sdram_selfrefresh_enable(void)
- 	cpu_do_idle()
+@@ -55,11 +58,15 @@ static inline u32 sdram_selfrefresh_enable(void)
+ 	return saved_lpr;
+ }
+ 
+-#define sdram_selfrefresh_disable(saved_lpr) \
+-	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr)
++static inline void sdram_selfrefresh_disable(u32 saved_lpr)
++{
++	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr);
++}
+ 
+-#define wait_for_interrupt_enable() \
+-	cpu_do_idle()
++static inline void wait_for_interrupt_enable(void)
++{
++	cpu_do_idle();
++}
  
  #elif defined(CONFIG_ARCH_AT91SAM9G45)
--#include <mach/at91sam9_ddrsdr.h>
  
- /* We manage both DDRAM/SDRAM controllers, we need more than one value to
-  * remember.
-@@ -100,7 +99,6 @@ static inline u32 sdram_selfrefresh_enable(void)
- #define wait_for_interrupt_enable()		cpu_do_idle()
+@@ -90,13 +97,16 @@ static inline u32 sdram_selfrefresh_enable(void)
+ 	return saved_lpr0;
+ }
+ 
+-#define sdram_selfrefresh_disable(saved_lpr0)	\
+-	do { \
+-		at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0); \
+-		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1); \
+-	} while (0)
++static inline void sdram_selfrefresh_disable(u32 saved_lpr0)
++{
++	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
++	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
++}
+ 
+-#define wait_for_interrupt_enable()		cpu_do_idle()
++static inline void wait_for_interrupt_enable(void)
++{
++	cpu_do_idle();
++}
  
  #else
--#include <mach/at91sam9_sdramc.h>
  
- #ifdef CONFIG_ARCH_AT91SAM9263
- /*
+@@ -120,11 +130,15 @@ static inline u32 sdram_selfrefresh_enable(void)
+ 	return saved_lpr;
+ }
+ 
+-#define sdram_selfrefresh_disable(saved_lpr) \
+-	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr)
++static inline void sdram_selfrefresh_disable(u32 saved_lpr)
++{
++	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
++}
+ 
+-#define wait_for_interrupt_enable() \
+-	cpu_do_idle()
++static inline void wait_for_interrupt_enable(void)
++{
++	cpu_do_idle();
++}
+ 
+ #endif
+ 
 -- 
 1.7.4.1
