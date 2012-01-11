@@ -1,35 +1,66 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 11 Jan 2012 21:37:32 +1100
-Subject: linux-next: please update the i.MX tree
-In-Reply-To: <20120111083429.GU5446@pengutronix.de>
-References: <20120110115218.e00ab8c01abd5b9ae9a3b166@canb.auug.org.au>
- <20120110083020.GR5446@pengutronix.de>
- <20120111093457.af3caeabe2dbf50b70942334@canb.auug.org.au>
- <20120111083429.GU5446@pengutronix.de>
-Message-ID: <20120111213732.019071ba3da4d7ca2615c68b@canb.auug.org.au>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 11 Jan 2012 16:21:57 +0530
+Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with
+ gpio controlled panel reset
+In-Reply-To: <20120107172826.GA355@opensource.wolfsonmicro.com>
+References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
+ <4F05F509.6020405@metafoo.de>
+ <20120106064929.GB3496@opensource.wolfsonmicro.com>
+ <CAJuYYwRxuZAm_JpLw1fN2ypnFc6TocH6veRmCeuqENvZHSz3kg@mail.gmail.com>
+ <20120107172826.GA355@opensource.wolfsonmicro.com>
+Message-ID: <CAJuYYwSuDzUWgnSJHO0vwjYH7zscC9=j_=JuOUuJy9shHpPUuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi Mark,
 
-On Wed, 11 Jan 2012 09:34:29 +0100 Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On 7 January 2012 22:58, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Sat, Jan 07, 2012 at 04:34:34PM +0530, Thomas Abraham wrote:
+>> On 6 January 2012 12:19, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+>>> +       if (lcd_enable) {
+>>>+               if ((pd->min_uV || pd->max_uV) &&
+>>>+                       regulator_set_voltage(lp->regulator,
+>>>+                                               pd->min_uV, pd->max_uV))
+>>>+                               dev_info(lp->dev,
+>>>+                                       "regulator voltage set failed\n");
+>>>+               if (regulator_enable(lp->regulator))
+>>>+                       dev_info(lp->dev, "failed to enable regulator\n");
+>>>+       } else {
+>>>+               regulator_disable(lp->regulator);
+>>>+       }
 >
-> On Wed, Jan 11, 2012 at 09:34:57AM +1100, Stephen Rothwell wrote:
-> > 
-> > Should I, instead, just remove that tree from linux-next and let you send
-> > stuff just via the arm-soc (or arm)tree?
-> 
-> Yes, that's probably best. That's what I do anyway.
+>> > In principle it should be specified in both places to account for shared
+>> > supplies though for all practical purposes for an LCD panel I can't see
+>> > multiple users sharing the same regulator and varying the voltage at
+>> > runtime.
+>
+>> It is assumed here that the boot loader as not set the output voltage
+>> of the regulator that supports variable voltage ranges. So these
+>> values help in setting up the regulator for LCD display.
+>
+> Remember that the regulator API won't allow consumers to configure
+> voltages unless there are constraints granting permission. ?Users will
+> need to set both the LCD vales and the regulator constraints values to
+> actually allow configuration to happen.
 
-OK, done.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120111/c7944f39/attachment.sig>
+In the case of Exynos4 based Origen board, buck7 of max8997 supplies
+power to the lcd panel. buck7 is capable of supplying power at
+different voltage levels but for Origen board, it is required to
+supply only 3.3V. The constraints for buck7 can specify 'apply_uV' and
+this will ensure that buck7 is configured to supply 3.3V.
+
+But 'apply_uV' seems to be not ideal for regulators that supply power
+to lcd panels. It would be better to power lcd panels only when video
+data has to be displayed.
+
+If 'apply_uV' is not used, then regulator_enable() does not set the
+correct output voltage. So regulator_set_voltage() call is required.
+If the regulator does not support multiple voltage ranges, then in the
+above code min_uV and max_uV should be zero which then bypasses
+regulator_set_voltage().
+
+Hence, the call to regulator_set_voltage() is required in the above
+code fragment.
+
+Thanks,
+Thomas.
