@@ -1,168 +1,62 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Wed, 11 Jan 2012 22:39:41 +0000
-Subject: [PATCH 1/2] atmel_lcdfb: Adjust HFP calculation so it matches
- the manual.
-In-Reply-To: <4F0AF7F8.8040300@atmel.com>
-References: <1317801598-23757-1-git-send-email-alexander.stein@systec-electronic.com>
- <4F0AF7F8.8040300@atmel.com>
-Message-ID: <4F0E0FAD.6080404@gmx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 12 Jan 2012 07:01:12 +0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A74D@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20120110130511.GA26599@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A74D@HQMAIL01.nvidia.com>
+Message-ID: <20120111230110.GE20968@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas, Alexander,
+On Wed, Jan 11, 2012 at 11:41:56AM -0800, Stephen Warren wrote:
+> Shawn Guo wrote at Tuesday, January 10, 2012 6:05 AM:
+> > On Tue, Jan 10, 2012 at 08:21:05AM +0000, Dong Aisheng-B29396 wrote:
+> > > Here what I wonder is that do we need to allow the platform to use a func-name
+> > > property in their pinmux func node or pinmux group node to specify the name.
+> > 
+> > I do not see the necessity.
+> > 
+> > > If it is allowed, then it could be flexible for soc to define their names.
+> > > If not there may be limitations on their node names since we can only get it from
+> > > the node name.
+> > 
+> > To me, the node name is perfectly fine to be used for that purpose.
+> 
+> I'd prefer if we could use integers over strings if at all possible, but
+> that does have a dependency on dtc getting a syntax to define named
+> constants, or the kernel pre-processing the .dts files before passing
+> them to dtc.
+> 
+> But if we have to use strings, I will point out that the pin names I
+> chose for Tegra may not be suitable as DT node names; I don't /think/
+> the DT node names can contain spaces, but I chose to name the Tegra
+> pinctrl pins after both their pin name and GPIO name so that it's
+> easier to correlate the two:
+> 
+>         PINCTRL_PIN(TEGRA_PIN_SDIO3_CLK_PA6, "SDIO3_CLK PA6"),
+> 
+> Now, I could change that, but I'd prefer not to.
+> 
+Hmm, we are talking about function name and pingroup name instead of
+individual pin name. In your pinctrl-tegra20.c, they are .name and
+.groups as below.
 
-On 01/09/2012 02:21 PM, Nicolas Ferre wrote:
-> On 10/05/2011 09:59 AM, Alexander Stein :
->> In the AT91SAM9263 Manual the HFP part in LCDTIM2 is described as follows:
->>   * HFP: Horizontal Front Porch
->>   Number of idle LCDDOTCK cycles at the end of the line.
->>   Idle period is (HFP+2) LCDDOTCK cycles.
-> 
-> Hi Alexander,
-> 
-> Unfortunately this is not true for all the SoC that embed the
-> atmel_lcdfb... So I may need to rework this patch but it is certainly
-> not applicable in the current form.
-> 
-> Florian, can you please remove it from your git tree?
+#define FUNCTION(fname)                                \
+       {                                               \
+               .name = #fname,                         \
+               .groups = fname##_groups,               \
+               .ngroups = ARRAY_SIZE(fname##_groups),  \
+       }
 
-Done, I reverted this patch for now.
-For the other patches, those that are currently in my tree, I will ask Linus to
-pull them really soon. For the others I'll take care of them after the merge
-window is closed.
-
-
-Best regards,
-
-Florian Tobias Schandinat
-
-> 
-> Thanks,
-> 
-> Best regards,
-> 
->> It is only a minor issue. I also changed all boards using atmel_lcdfb
->> I found to respect the new calculation.
->>
->> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
->> ---
->>  arch/arm/mach-at91/board-cap9adk.c      |    2 +-
->>  arch/arm/mach-at91/board-neocore926.c   |    2 +-
->>  arch/arm/mach-at91/board-sam9261ek.c    |    4 ++-
->>  arch/arm/mach-at91/board-sam9263ek.c    |    2 +-
->>  arch/arm/mach-at91/board-sam9m10g45ek.c |    2 +-
->>  arch/arm/mach-at91/board-sam9rlek.c     |    2 +-
->>  drivers/video/atmel_lcdfb.c             |    4 ++--
->>  7 files changed, 9 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
->> index 679b0b7..ae962bf 100644
->> --- a/arch/arm/mach-at91/board-cap9adk.c
->> +++ b/arch/arm/mach-at91/board-cap9adk.c
->> @@ -304,7 +304,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->>  		.xres		= 240,		.yres		= 320,
->>  		.pixclock	= KHZ2PICOS(4965),
->>  
->> -		.left_margin	= 1,		.right_margin	= 33,
->> +		.left_margin	= 1,		.right_margin	= 34,
->>  		.upper_margin	= 1,		.lower_margin	= 0,
->>  		.hsync_len	= 5,		.vsync_len	= 1,
->>  
->> diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
->> index 9bc6ab3..583878e 100644
->> --- a/arch/arm/mach-at91/board-neocore926.c
->> +++ b/arch/arm/mach-at91/board-neocore926.c
->> @@ -235,7 +235,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->>  		.xres		= 240,		.yres		= 320,
->>  		.pixclock	= KHZ2PICOS(5000),
->>  
->> -		.left_margin	= 1,		.right_margin	= 33,
->> +		.left_margin	= 1,		.right_margin	= 34,
->>  		.upper_margin	= 1,		.lower_margin	= 0,
->>  		.hsync_len	= 5,		.vsync_len	= 1,
->>  
->> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
->> index 5096a0e..8dda83b 100644
->> --- a/arch/arm/mach-at91/board-sam9261ek.c
->> +++ b/arch/arm/mach-at91/board-sam9261ek.c
->> @@ -370,7 +370,7 @@ static struct fb_videomode at91_stn_modes[] = {
->>  		.xres           = 320,          .yres           = 240,
->>  		.pixclock       = KHZ2PICOS(1440),
->>  
->> -		.left_margin    = 1,            .right_margin   = 1,
->> +		.left_margin    = 1,            .right_margin   = 2,
->>  		.upper_margin   = 0,            .lower_margin   = 0,
->>  		.hsync_len      = 1,            .vsync_len      = 1,
->>  
->> @@ -431,7 +431,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->>  		.xres		= 240,		.yres		= 320,
->>  		.pixclock	= KHZ2PICOS(4965),
->>  
->> -		.left_margin	= 1,		.right_margin	= 33,
->> +		.left_margin	= 1,		.right_margin	= 34,
->>  		.upper_margin	= 1,		.lower_margin	= 0,
->>  		.hsync_len	= 5,		.vsync_len	= 1,
->>  
->> diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
->> index ea8f185..e260070 100644
->> --- a/arch/arm/mach-at91/board-sam9263ek.c
->> +++ b/arch/arm/mach-at91/board-sam9263ek.c
->> @@ -258,7 +258,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->>  		.xres		= 240,		.yres		= 320,
->>  		.pixclock	= KHZ2PICOS(4965),
->>  
->> -		.left_margin	= 1,		.right_margin	= 33,
->> +		.left_margin	= 1,		.right_margin	= 34,
->>  		.upper_margin	= 1,		.lower_margin	= 0,
->>  		.hsync_len	= 5,		.vsync_len	= 1,
->>  
->> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
->> index ad234cc..5e9a5ca 100644
->> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
->> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
->> @@ -197,7 +197,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->>  		.xres		= 480,		.yres		= 272,
->>  		.pixclock	= KHZ2PICOS(9000),
->>  
->> -		.left_margin	= 1,		.right_margin	= 1,
->> +		.left_margin	= 1,		.right_margin	= 2,
->>  		.upper_margin	= 40,		.lower_margin	= 1,
->>  		.hsync_len	= 45,		.vsync_len	= 1,
->>  
->> diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
->> index 4f14b54..ad9e5c9 100644
->> --- a/arch/arm/mach-at91/board-sam9rlek.c
->> +++ b/arch/arm/mach-at91/board-sam9rlek.c
->> @@ -154,7 +154,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
->>  		.xres		= 240,		.yres		= 320,
->>  		.pixclock	= KHZ2PICOS(4965),
->>  
->> -		.left_margin	= 1,		.right_margin	= 33,
->> +		.left_margin	= 1,		.right_margin	= 34,
->>  		.upper_margin	= 1,		.lower_margin	= 0,
->>  		.hsync_len	= 5,		.vsync_len	= 1,
->>  
->> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
->> index 817ab60..816d528 100644
->> --- a/drivers/video/atmel_lcdfb.c
->> +++ b/drivers/video/atmel_lcdfb.c
->> @@ -393,7 +393,7 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
->>  	var->lower_margin = min_t(u32, var->lower_margin,
->>  			ATMEL_LCDC_VFP);
->>  	var->right_margin = min_t(u32, var->right_margin,
->> -			(ATMEL_LCDC_HFP >> ATMEL_LCDC_HFP_OFFSET) + 1);
->> +			(ATMEL_LCDC_HFP >> ATMEL_LCDC_HFP_OFFSET) + 2);
->>  	var->hsync_len = min_t(u32, var->hsync_len,
->>  			(ATMEL_LCDC_HPW >> ATMEL_LCDC_HPW_OFFSET) + 1);
->>  	var->left_margin = min_t(u32, var->left_margin,
->> @@ -578,7 +578,7 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
->>  	lcdc_writel(sinfo, ATMEL_LCDC_TIM1, value);
->>  
->>  	/* Horizontal timing */
->> -	value = (info->var.right_margin - 1) << ATMEL_LCDC_HFP_OFFSET;
->> +	value = (info->var.right_margin - 2) << ATMEL_LCDC_HFP_OFFSET;
->>  	value |= (info->var.hsync_len - 1) << ATMEL_LCDC_HPW_OFFSET;
->>  	value |= (info->var.left_margin - 1);
->>  	dev_dbg(info->device, "  * LCDTIM2 = %08lx\n", value);
-> 
-> 
+-- 
+Regards,
+Shawn
