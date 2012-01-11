@@ -1,49 +1,168 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 11 Jan 2012 14:28:20 -0800
-Subject: [PATCH v2] I2C: OMAP: Recover from Bus Busy condition
-In-Reply-To: <1326303693-30106-1-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Wed, 11 Jan 2012 23:11:33 +0530")
-References: <1326303693-30106-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87vcoh27sr.fsf@ti.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Wed, 11 Jan 2012 22:39:41 +0000
+Subject: [PATCH 1/2] atmel_lcdfb: Adjust HFP calculation so it matches
+ the manual.
+In-Reply-To: <4F0AF7F8.8040300@atmel.com>
+References: <1317801598-23757-1-git-send-email-alexander.stein@systec-electronic.com>
+ <4F0AF7F8.8040300@atmel.com>
+Message-ID: <4F0E0FAD.6080404@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+Hi Nicolas, Alexander,
 
-> From: Vikram Pandita <vikram.pandita@ti.com>
->
-> In case a peripheral is driving SDA bus low (ie. a start condition), provide
-> a constant clock output using the test mode of the OMAP I2C controller to
-> try and clear the bus. Soft reset I2C controller after attempting the bus clear
-> to ensure that controller is in a good state.
->
-> Based upon Vikram Pandita's patch from TI Android 3.0 kernel and modified for
-> mainline by Jon Hunter. 
->
-> A couple differences from the original patch ...
-> 1. Add a new function for bus clear
-> 2. Ensure that the CON.I2C_EN bit is set when using the SYSTEST feature to
->    output a permanent clock. This bit needs to be set and tpyically it would
->    be set by the unidle function but this is not the case for all OMAP
->    generations.
-> 3. Program the SYSTEST setting only the bits we care about. However, restore
->    SYSTEST registers to there original state as some OMAP generations do not
->    implement perform a soft-reset.
-> 4. Clear the CON register after performing the bus clear, so when we call the
->    init function the controller is disabled and the init function will
->    re-enable later.
->
-> Cc:  Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
-> Original patch can be found here:
-> http://git.omapzoom.org/?p=kernel/omap.git;a=commit;h=a2ab04192ba25e60f95ba1ff3af5601a2d7b5bd1
-> applies on Kevin's for_3.3/i2c/misc
+On 01/09/2012 02:21 PM, Nicolas Ferre wrote:
+> On 10/05/2011 09:59 AM, Alexander Stein :
+>> In the AT91SAM9263 Manual the HFP part in LCDTIM2 is described as follows:
+>>   * HFP: Horizontal Front Porch
+>>   Number of idle LCDDOTCK cycles at the end of the line.
+>>   Idle period is (HFP+2) LCDDOTCK cycles.
+> 
+> Hi Alexander,
+> 
+> Unfortunately this is not true for all the SoC that embed the
+> atmel_lcdfb... So I may need to rework this patch but it is certainly
+> not applicable in the current form.
+> 
+> Florian, can you please remove it from your git tree?
 
-Please also explain how this was tested, and on what platforms.
+Done, I reverted this patch for now.
+For the other patches, those that are currently in my tree, I will ask Linus to
+pull them really soon. For the others I'll take care of them after the merge
+window is closed.
 
-Thanks,
 
-Kevin
+Best regards,
+
+Florian Tobias Schandinat
+
+> 
+> Thanks,
+> 
+> Best regards,
+> 
+>> It is only a minor issue. I also changed all boards using atmel_lcdfb
+>> I found to respect the new calculation.
+>>
+>> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+>> ---
+>>  arch/arm/mach-at91/board-cap9adk.c      |    2 +-
+>>  arch/arm/mach-at91/board-neocore926.c   |    2 +-
+>>  arch/arm/mach-at91/board-sam9261ek.c    |    4 ++-
+>>  arch/arm/mach-at91/board-sam9263ek.c    |    2 +-
+>>  arch/arm/mach-at91/board-sam9m10g45ek.c |    2 +-
+>>  arch/arm/mach-at91/board-sam9rlek.c     |    2 +-
+>>  drivers/video/atmel_lcdfb.c             |    4 ++--
+>>  7 files changed, 9 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
+>> index 679b0b7..ae962bf 100644
+>> --- a/arch/arm/mach-at91/board-cap9adk.c
+>> +++ b/arch/arm/mach-at91/board-cap9adk.c
+>> @@ -304,7 +304,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
+>>  		.xres		= 240,		.yres		= 320,
+>>  		.pixclock	= KHZ2PICOS(4965),
+>>  
+>> -		.left_margin	= 1,		.right_margin	= 33,
+>> +		.left_margin	= 1,		.right_margin	= 34,
+>>  		.upper_margin	= 1,		.lower_margin	= 0,
+>>  		.hsync_len	= 5,		.vsync_len	= 1,
+>>  
+>> diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
+>> index 9bc6ab3..583878e 100644
+>> --- a/arch/arm/mach-at91/board-neocore926.c
+>> +++ b/arch/arm/mach-at91/board-neocore926.c
+>> @@ -235,7 +235,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
+>>  		.xres		= 240,		.yres		= 320,
+>>  		.pixclock	= KHZ2PICOS(5000),
+>>  
+>> -		.left_margin	= 1,		.right_margin	= 33,
+>> +		.left_margin	= 1,		.right_margin	= 34,
+>>  		.upper_margin	= 1,		.lower_margin	= 0,
+>>  		.hsync_len	= 5,		.vsync_len	= 1,
+>>  
+>> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+>> index 5096a0e..8dda83b 100644
+>> --- a/arch/arm/mach-at91/board-sam9261ek.c
+>> +++ b/arch/arm/mach-at91/board-sam9261ek.c
+>> @@ -370,7 +370,7 @@ static struct fb_videomode at91_stn_modes[] = {
+>>  		.xres           = 320,          .yres           = 240,
+>>  		.pixclock       = KHZ2PICOS(1440),
+>>  
+>> -		.left_margin    = 1,            .right_margin   = 1,
+>> +		.left_margin    = 1,            .right_margin   = 2,
+>>  		.upper_margin   = 0,            .lower_margin   = 0,
+>>  		.hsync_len      = 1,            .vsync_len      = 1,
+>>  
+>> @@ -431,7 +431,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
+>>  		.xres		= 240,		.yres		= 320,
+>>  		.pixclock	= KHZ2PICOS(4965),
+>>  
+>> -		.left_margin	= 1,		.right_margin	= 33,
+>> +		.left_margin	= 1,		.right_margin	= 34,
+>>  		.upper_margin	= 1,		.lower_margin	= 0,
+>>  		.hsync_len	= 5,		.vsync_len	= 1,
+>>  
+>> diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
+>> index ea8f185..e260070 100644
+>> --- a/arch/arm/mach-at91/board-sam9263ek.c
+>> +++ b/arch/arm/mach-at91/board-sam9263ek.c
+>> @@ -258,7 +258,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
+>>  		.xres		= 240,		.yres		= 320,
+>>  		.pixclock	= KHZ2PICOS(4965),
+>>  
+>> -		.left_margin	= 1,		.right_margin	= 33,
+>> +		.left_margin	= 1,		.right_margin	= 34,
+>>  		.upper_margin	= 1,		.lower_margin	= 0,
+>>  		.hsync_len	= 5,		.vsync_len	= 1,
+>>  
+>> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+>> index ad234cc..5e9a5ca 100644
+>> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+>> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+>> @@ -197,7 +197,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
+>>  		.xres		= 480,		.yres		= 272,
+>>  		.pixclock	= KHZ2PICOS(9000),
+>>  
+>> -		.left_margin	= 1,		.right_margin	= 1,
+>> +		.left_margin	= 1,		.right_margin	= 2,
+>>  		.upper_margin	= 40,		.lower_margin	= 1,
+>>  		.hsync_len	= 45,		.vsync_len	= 1,
+>>  
+>> diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
+>> index 4f14b54..ad9e5c9 100644
+>> --- a/arch/arm/mach-at91/board-sam9rlek.c
+>> +++ b/arch/arm/mach-at91/board-sam9rlek.c
+>> @@ -154,7 +154,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
+>>  		.xres		= 240,		.yres		= 320,
+>>  		.pixclock	= KHZ2PICOS(4965),
+>>  
+>> -		.left_margin	= 1,		.right_margin	= 33,
+>> +		.left_margin	= 1,		.right_margin	= 34,
+>>  		.upper_margin	= 1,		.lower_margin	= 0,
+>>  		.hsync_len	= 5,		.vsync_len	= 1,
+>>  
+>> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+>> index 817ab60..816d528 100644
+>> --- a/drivers/video/atmel_lcdfb.c
+>> +++ b/drivers/video/atmel_lcdfb.c
+>> @@ -393,7 +393,7 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
+>>  	var->lower_margin = min_t(u32, var->lower_margin,
+>>  			ATMEL_LCDC_VFP);
+>>  	var->right_margin = min_t(u32, var->right_margin,
+>> -			(ATMEL_LCDC_HFP >> ATMEL_LCDC_HFP_OFFSET) + 1);
+>> +			(ATMEL_LCDC_HFP >> ATMEL_LCDC_HFP_OFFSET) + 2);
+>>  	var->hsync_len = min_t(u32, var->hsync_len,
+>>  			(ATMEL_LCDC_HPW >> ATMEL_LCDC_HPW_OFFSET) + 1);
+>>  	var->left_margin = min_t(u32, var->left_margin,
+>> @@ -578,7 +578,7 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
+>>  	lcdc_writel(sinfo, ATMEL_LCDC_TIM1, value);
+>>  
+>>  	/* Horizontal timing */
+>> -	value = (info->var.right_margin - 1) << ATMEL_LCDC_HFP_OFFSET;
+>> +	value = (info->var.right_margin - 2) << ATMEL_LCDC_HFP_OFFSET;
+>>  	value |= (info->var.hsync_len - 1) << ATMEL_LCDC_HPW_OFFSET;
+>>  	value |= (info->var.left_margin - 1);
+>>  	dev_dbg(info->device, "  * LCDTIM2 = %08lx\n", value);
+> 
+> 
