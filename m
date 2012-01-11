@@ -1,57 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Jan 2012 08:22:52 -0700 (MST)
-Subject: [PATCHv8 4/5] OMAP: I2C: Remove the reset in the init path
-In-Reply-To: <4F0D9B70.3000309@ti.com>
-References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
- <1323773758-6375-5-git-send-email-shubhrajyoti@ti.com>
- <alpine.DEB.2.00.1112160139010.12660@utopia.booyaka.com>
- <4EEB086A.2050607@ti.com>
- <CANQgH-Ze1S6sy1uhzy_b8GWOCjF4+-9DOCcUn9mq1kAaT+Y7FA@mail.gmail.com>
- <CANQgH-YLez8B-t8nf9_M8samn9YWUa7LcOFx6uPFrJE9tnXB1Q@mail.gmail.com>
- <87hb03tw8h.fsf@ti.com> <4F0D26DF.1020108@ti.com>
- <alpine.DEB.2.00.1201110619090.31702@utopia.booyaka.com>
- <4F0D9B70.3000309@ti.com>
-Message-ID: <alpine.DEB.2.00.1201110809530.31702@utopia.booyaka.com>
+From: arnd.bergmann@linaro.org (Arnd Bergmann)
+Date: Wed, 11 Jan 2012 15:23:57 +0000
+Subject: [PATCH 0/7] at91 : pm.h cleanups
+In-Reply-To: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <201201111523.57368.arnd.bergmann@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Jan 2012, Cousson, Benoit wrote:
-
-> Something that puzzle me on that point is most architecture does not use
-> plateform_device and thus does not have any pdata to hack some custom function
-> pointers here an there.
-> It means that there is probably some better solution to handle that.
-
-PCI and USB have their own bus-level device reset functions that are 
-exported from bus code that lives under drivers/.  In a similar fashion, 
-we could export omap_device_reset() from our arch/arm/plat-omap code.  
-But that would require that arch/arm/plat-omap and arch/arm/mach-omap2 
-code to be compiled for any ARM build that includes i2c-omap.c.  This 
-would be good to avoid, under the principle that drivers should be 
-buildable for any architecture.  (This is also why we wish to remove 
-omap_{read,write}*() and cpu_is_omap() from any drivers which contain 
-those.)
-
-The intention a few years ago was to eventually create a a real omap_bus 
-and omap_device, with the bus/device integration code living under 
-drivers.  In such a situation, we'd be able to use something like the 
-PCI/USB approach cleanly, since there wouldn't be dependencies to arch/ 
-code.
-
-> AFAIU, the way PPC is handling that is by splitting the driver in a generic
-> part and in a platform specific part.
->
-> You can then add any OMAP specific hacks in the OMAP specific part while 
-> keeping most of generic code in a generic driver.
+On Wednesday 11 January 2012, Daniel Lezcano wrote:
 > 
-> In this case, we just have to implement a small shim that will handle the OMAP
-> specific code for the reset. The generic driver will handle the rest.
-> 
-> Maybe I'm missing some important details, but that does seems easily doable
-> for the i2c case.
+> This patchset is the first series to cleanup some code around pm.h, pm.c and
+> cpuidle. The next series will bring more cleanups and finally the third series
+> will change the different functions into ops where we can export the structure
+> definition in order to encapsulate the code and move the at91's cpuidle driver
+> to the drivers/cpuidle directory.
 
-Hmm.  How do those drivers call the platform-specific code in a way that 
-allows those drivers to be built for non-PPC platforms?
+Hi Daniel,
 
+These all look like useful cleanups. You don't really have to split them
+up into so small units, but it doesn't hurt if you do. Patch 5 seems to
+actually fix a bug, but probably a harmless one.
 
-- Paul
+It's not clear where you're headed though, I hope that becomes more obvious
+in the next patches. The tricky bit that will have to be done is to turn
+all the #ifdef checks into runtime here. You have moved the #include for the
+memory controller into a new header, but that is not actually progress
+on this larger problem. It would be nice to move the
+sdram_selfrefresh_enable/disable functions into a .c file that uses
+cpu_is_at91...() to do runtime detection, but AFAICT that won't work
+because you have to guarantee that all the code between these is
+in the cache, right?
+
+	Arnd
