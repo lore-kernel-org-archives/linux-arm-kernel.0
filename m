@@ -1,63 +1,69 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jan 2012 09:40:07 +0800
-Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <CAOMZO5Ax_+sWM_0gULkvu+rzy3f-FDzVOKMxhY=dgk8hBMvXEA@mail.gmail.com>
-References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-5-git-send-email-richard.zhao@linaro.org>
- <CAOMZO5Ax_+sWM_0gULkvu+rzy3f-FDzVOKMxhY=dgk8hBMvXEA@mail.gmail.com>
-Message-ID: <20120111014006.GD2414@b20223-02.ap.freescale.net>
+Date: Wed, 11 Jan 2012 09:47:30 +0800
+Subject: [PATCH 6/6] dma/imx-sdma: check whether event_id0 < 32 when set
+ event_mask
+In-Reply-To: <20120111005322.GB2414@b20223-02.ap.freescale.net>
+References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+ <1326178910-14044-6-git-send-email-richard.zhao@linaro.org>
+ <20120110142008.GE26599@S2101-09.ap.freescale.net>
+ <20120110142939.GB2019@richard-laptop>
+ <20120110153836.GA27831@S2101-09.ap.freescale.net>
+ <20120111005322.GB2414@b20223-02.ap.freescale.net>
+Message-ID: <20120111014730.GE2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2012 at 11:33:10PM -0200, Fabio Estevam wrote:
-> Hi Richard,
-> 
-> On Fri, Jan 6, 2012 at 1:25 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> > ?arch/arm/boot/dts/imx6q-sabrelite.dts | ? 12 ++++++++++++
-> > ?1 files changed, 12 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > index 3f4b45e..567b664 100644
-> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > @@ -44,6 +44,18 @@
-> > ? ? ? ? ? ? ? ? ? ? ? ?uart2: uart at 021e8000 {
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?status = "okay";
-> > ? ? ? ? ? ? ? ? ? ? ? ?};
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? i2c at 021a0000 { /* I2C1 */
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? status = "okay";
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? clock-frequency = <100000>;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? codec: sgtl5000 at 0a {
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "fsl,sgtl5000";
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg = <0x0a>;
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? VDDA-supply = <&reg_2P5V>;
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? VDDIO-supply = <&reg_3P3V>;
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? };
-> > + ? ? ? ? ? ? ? ? ? ? ? };
-> > ? ? ? ? ? ? ? ?};
-> > ? ? ? ?};
-> >
-> 
-> I don't see a  sound/soc/imx/imx-sgtl5000.c file yet, so I am
-> wondering how did you test this?
-> 
-> Maybe I missed a patch. Could you please clarify?
-I test it using linaro freescale landing team kernel. Actually
-I'm upstreaming the audio work I did for linaro. Because audio
-involves too much subsystem, I split it into several set of patch.
-Finally, you'll see imx-sgtl5000.c.
+On Wed, Jan 11, 2012 at 08:53:23AM +0800, Richard Zhao wrote:
+> On Tue, Jan 10, 2012 at 11:38:39PM +0800, Shawn Guo wrote:
+> > On Tue, Jan 10, 2012 at 10:29:42PM +0800, Richard Zhao wrote:
+> > > On Tue, Jan 10, 2012 at 10:20:10PM +0800, Shawn Guo wrote:
+> > > > On Tue, Jan 10, 2012 at 03:01:50PM +0800, Richard Zhao wrote:
+> > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > > > ---
+> > > > 
+> > > > I think it deserves a sensible commit message explaining why the patch
+> > > > is needed.
+> > > If event_id0 < 32, 1 << (sdmac->event_id0 - 32) is not zero.
+> This meant to make you clear about the patch. I'll add it in commit
+> message.
+unsigned int t = 31;
+printf("%d %08x\n", t, 1 << (t-32));
+
+I test above code on both x86 and arm. They shows different results.
+x86: 31 80000000
+arm: 31 00000000
+
+I think we still need this patch. we shoud not let it depends on gcc's
+behavior.
 
 Thanks
 Richard
+> > > 
+> > My point is you may explain the exact problem you are seeing without
+> > this patch
+> The kernel don't have event_id < 32 case yet. I found the bug when
+> I review the code.
+> > and how the patch helps here.  In general, doing so would
+> > win a warm feeling from reviewers much more easily than leaving the
+> > commit message empty there.
+> I understand your point that comment as much as possible.
 > 
-> Regards,
+> Thanks
+> Richard
+> > 
+> > -- 
+> > Regards,
+> > Shawn
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
 > 
-> Fabio Estevam
+> 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
