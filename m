@@ -1,55 +1,53 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Wed, 11 Jan 2012 11:36:23 +0530
-Subject: [PATCHv8 4/5] OMAP: I2C: Remove the reset in the init path
-In-Reply-To: <87hb03tw8h.fsf@ti.com>
-References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>	<1323773758-6375-5-git-send-email-shubhrajyoti@ti.com>	<alpine.DEB.2.00.1112160139010.12660@utopia.booyaka.com>	<4EEB086A.2050607@ti.com>	<CANQgH-Ze1S6sy1uhzy_b8GWOCjF4+-9DOCcUn9mq1kAaT+Y7FA@mail.gmail.com>	<CANQgH-YLez8B-t8nf9_M8samn9YWUa7LcOFx6uPFrJE9tnXB1Q@mail.gmail.com>
- <87hb03tw8h.fsf@ti.com>
-Message-ID: <4F0D26DF.1020108@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 11 Jan 2012 15:20:17 +0900
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <20120110090635.GT21765@n2100.arm.linux.org.uk>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
+ <01a301ccce6f$9bb51790$d31f46b0$%kim@samsung.com>
+ <201201091556.34817.arnd@arndb.de>
+ <20120109161152.GA2974@opensource.wolfsonmicro.com>
+ <20120110090635.GT21765@n2100.arm.linux.org.uk>
+Message-ID: <021901ccd029$167f4da0$437de8e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 January 2012 08:56 PM, Kevin Hilman wrote:
-> "Datta, Shubhrajyoti" <shubhrajyoti@ti.com> writes:
->
->> On Tue, Jan 10, 2012 at 11:53 AM, Datta, Shubhrajyoti
->> <shubhrajyoti@ti.com> wrote:
->>>
->>>
->>> On Fri, Dec 16, 2011 at 2:29 PM, Shubhrajyoti <shubhrajyoti@ti.com> wrote:
->>>> Ben,
->>>>
->>>> On Friday 16 December 2011 02:10 PM, Paul Walmsley wrote:
->>>>> Hi
->>>>>
->>>>> On Tue, 13 Dec 2011, Shubhrajyoti D wrote:
->>>>>
->>>>>> -  The reset in the driver at init is not needed anymore as the
->>>>>>    hwmod framework takes care of reseting it.
->>>>>> -  Reset is removed from omap_i2c_init, which was called
->>>>>>    not only during probe, but also after time out and error handling.
->>>>>>    device_reset were added in those places to effect the reset.
->>>>>> -  Earlier the hwmod SYSC settings were over-written in the driver.
->>>>>>    Removing the same and letting the hwmod take care of the settings.
->>>>>> -  Clean up the SYSS_RESETDONE_MASK macro as it is no longer needed.
->>>>>> -  Clean up the SYSCONFIG SYSC bit definition macros.
->>>>>> -  Fix the typos in wakeup.
->>>>>>
->>>>>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->>>>>> ---
->>>>>>  drivers/i2c/busses/i2c-omap.c |   83 +++++++++++-----------------------------
->>>>>>  1 files changed, 23 insertions(+), 60 deletions(-)
->>>>> This patch either needs to be acked by Ben with a note that it's okay for
->>>>> us to merge through the OMAP tree, or needs to be merged by Ben during the
->>>>> 3.4 merge window, after patches 1-3 have reached the mainline tree.
->>>> I agree.
->>>> Ben do you have any comments .
->>>
->> If there are no further comments can this be merged also ?
-> As Benoit mentioned earlier, the addition of new pdata fields will cause
-> problems with the DT support already queued for v3.3.
->
-> This series should be reworked on top of the DT support which Ben has
-> now queued for v3.3 (my branch: for_3.3/i2c/misc)
+Russell King - ARM Linux wrote:
+> 
+> On Mon, Jan 09, 2012 at 08:11:54AM -0800, Mark Brown wrote:
 
-Yes will rework it.
-> Kevin
+[...]
+
+> > This really is very disappointing.
+> 
+> No it isn't.
+> 
+> What is really disappointing is the lack of responsive maintainers for the
+> Samsung stuff.  It took _two_ bloody months to get the Samsung platforms
+> sorted for the restart changes in spite of reminding, and a last minute
+> rush over the course of a couple of days (one _in_ the merge window) to
+> get it properly merged into my tree.
+> 
+Yeah, I had to do earlier and it's true that many conflicts caused from my
+late ARM restart working for Samsung stuff.
+
+[...]
+
+> So, I support Arnd's view: the Samsung stuff is just too late.  Even the
+> restart updates (which is what has caused this) were too late.  Anything
+> which causes new merge conflicts in the Samsung code is not acceptable at
+> this point, even if it's a 'fix' patch.  We've wasted far too much time
+> trying to get Samsung stuff sorted far too late in the cycle.
+> 
+> Let this be an object lesson in what happens if you leave stuff until the
+> last minute.
+
+I will do more carefully next time and of course not too late.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
