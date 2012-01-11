@@ -1,10 +1,9 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 11 Jan 2012 10:28:43 -0800
+Date: Wed, 11 Jan 2012 10:37:36 -0800
 Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
  mappings
-In-Reply-To: <20120108125156.GB2203@richard-laptop>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-3-git-send-email-b29396@freescale.com>
+In-Reply-To: <20120109015625.GE1835@S2101-09.ap.freescale.net>
+References: <1324402840-32451-3-git-send-email-b29396@freescale.com>
  <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
  <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
  <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
@@ -14,72 +13,86 @@ References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
  <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
  <20120107135445.GI4790@S2101-09.ap.freescale.net>
  <20120108125156.GB2203@richard-laptop>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6EF@HQMAIL01.nvidia.com>
+ <20120109015625.GE1835@S2101-09.ap.freescale.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6FB@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao wrote at Sunday, January 08, 2012 5:52 AM:
-> On Sat, Jan 07, 2012 at 09:54:48PM +0800, Shawn Guo wrote:
-> > On Fri, Jan 06, 2012 at 10:03:07AM -0800, Stephen Warren wrote:
-...
-> > > Without separate nodes, there will eventually be a lot of duplication.
-> > > A made-up example of the same uart4grp allowing either of two functions
-> > > uart3, uart4 to be muxed out onto it:
+Shawn Guo wrote at Sunday, January 08, 2012 6:56 PM:
+> On Sun, Jan 08, 2012 at 08:51:59PM +0800, Richard Zhao wrote:
+> ...
+> > > > So, this does appear to be conflating the two things: The definition of
+> > > > what pins are in a pingroup, and the mux function for a particular
+> > > > setting of that pingroup. I think you need separate nodes for this.
+> > > >
+> > > At least for imx, we do not have mux function setting for pingroup.
+> > > Instead, it only applies to individual pin.
+> > I think it depends on function definition of pinmux driver. For the
+> > imx example patch, it's one-to-one.
+> 
+> It should depend on particular imx soc pinmux design rather than
+> pinmux driver.  If it's always one-to-one case, we do not need
+> pinmux at all.  Aisheng's patch just did not enumerate all the groups
+> for given function.  Instead, it puts a couple simple examples there
+> for demonstration.
+> 
+> ...
+> 
+> > > > 		uart4func: func at 1 {
+> > > > 			func-name = "uart4";
+> > > > 			locations = <&bargrp &bazgrp>;
+> > > > 			mux-value = <6 3>;
+> > > > 		};
 > > >
-> > > aips-bus at 02000000 { /* AIPS1 */
-> > > 	iomuxc at 020e0000 {
-> > > 		pinctrl_uart4_3: uart4 at option_3 {
-> > > 			func-name = "uart3";
-> > > 			grp-name = "uart4grp";
-> > > 			grp-pins = <107 108>;
-> > > 			num-pins = <2>;
-> > > 			grp-mux = <3 3>;
-> > > 			num-mux = <2>;
-> > > 		};
-> > > 		pinctrl_uart4_4: uart4 at option_4 {
-> > > 			func-name = "uart4";
-> > > 			grp-name = "uart4grp";
-> > > 			grp-pins = <107 108>;
-> > > 			num-pins = <2>;
-> > > 			grp-mux = <3 3>;
-> > > 			num-mux = <2>;
-> > > 		};
-> > > 	}
-> > > };
-> > >
-> > > Now I understand that initially you aren't going to type out the complete
-> > > list of every available option into imx6q.dtsi because it's probably huge,
-> > > but the binding does need to allow you to do so without duplicating a lot
-> > > of data, because eventually you'll get boards that use a larger and larger
-> > > subset of all the options, so the number you need to represent at once in
-> > > imx6q.dtsi will grow.
->
-> If we don't want to lose flexibity, the pin group number will be huge
-> than you think. For example, 16bit display interface, has two alternatives
-> for every pin. The group number will be 2^16.
+> > > I prefer to have function node defined in <board>.dtsi, since it's
+> > > all about defining phandle to the correct pingroup, which should be
+> > > decided by board design.
+> > group and function are one-to-one mapped for imx.
+> 
+> Again, it's not the case.
+> 
+> > So if you put function
+> > in board dts, why not put pin group there too?
+> 
+> If we put pingroup data in <board>.dts, the data will be likely get
+> duplicated a lot in different board dts files.  For example, if
+> imx6q-sabrelite chooses the same pingroup for usdhc3 and usdhc4 as
+> imx6q-arm2, the pingroup data will be duplicated between imx6q-arm2.dts
+> and imx6q-sabrelite.dts.
+> 
+> On the contrary, putting pingroup data in <soc>.dtsi and having function
+> node in <board>.dts with phandle pointing to the correct pingroup will
+> help avoid such data duplication.
 
-I originally misunderstood IMX HW; I though the HW muxed at a group-of-
-pins level (as Tegra does), but actually it's muxing at a per-pin level,
-hence some of what I wrote may have been confusing to people familiar
-with how IMX HW really works.
+Oh, when I wrote in my first mail today that I'd expand on one of my
+points when responding to Richard Zhao's email, I actually meant when
+responding to this email. Sorry for the confusion!
 
-So yes, I definitely agree that representing all possible mux combinations
-(combinations of pins in use and the mux function selected for them) could
-be extremely large and we don't want to enumerate /that/ list anywhere; in
-.dts files or in the pinctrl driver.
+So, I don't agree with putting the "combinations" in the SoC .dtsi file,
+since that could grow it into a huge file that contains a lot of nodes
+that are used on some board somewhere, but typically not the "current"
+board that's including it.
 
-So, as a result of that, and as I mentioned in my immediately previous
-email, I don't think those two nodes "uart4 at option_3", "uart4 at option_4"
-should be in the SoC .dtsi file.
+However, I do see that there are probably lots of common combinations
+that get re-used across multiple boards, and you might want a common
+place to put those definitions so they don't need to be cut/paste
+everywhere.
 
-Later you wrote:
+So, why not create specific include files (.dtsi files) for each of those
+combinations? Each include could define one particular common combination
+of pin mux usage, or perhaps even a set of them if they're commonly used
+together. Each board file would include the SoC .dtsi file, the relevant
+set of "pinmux config" .dtsi files, and then include anything custom to
+that board. Remember, that include files simply get merged into the device
+tree, so you can easily add based definitions (like) regs for e.g. an
+SDHCI controller in a SoC .dtsi file, the pinmux properties in a .dtsi
+file specific to SHDCI controller 3, and then e.g. CD/WP/power GPIOs in
+the final board .dts file.
 
-> group and function are one-to-one mapped for imx. So if you put function
-> in board dts, why not put pin group there too?
-
-I agree, I think: Everything that defines the board-specific usage of
-the pinmux should be part of the board's .dtsi file, not the SoC's .dtsi
-file.
+Following this model, we can initially just put the pinmux config into
+each board file, then factor it out into new .dtsi files as/when we see
+duplication. We get to start off simple, then clean up by refactoring as
+we go.
 
 -- 
 nvpublic
