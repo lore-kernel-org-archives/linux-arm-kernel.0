@@ -1,90 +1,62 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 11 Jan 2012 17:29:28 +0100
-Subject: [PATCH 0/7] at91 : pm.h cleanups
-In-Reply-To: <201201111523.57368.arnd.bergmann@linaro.org>
-References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
- <201201111523.57368.arnd.bergmann@linaro.org>
-Message-ID: <4F0DB8E8.3060001@linaro.org>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Wed, 11 Jan 2012 17:29:36 +0100
+Subject: [PATCH] net: fsl: fec: handle 10Mbps speed in RMII mode
+Message-ID: <1326299376-22853-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+when the link is 10 Mbps and the mode is RMII, it's necessary
+to set FRCONT to 1 in MIIGSK_CFGR to divide the RMII source
+clock by 10 in order to support 10 Mbps operations.
 
-On 01/11/2012 04:23 PM, Arnd Bergmann wrote:
-> On Wednesday 11 January 2012, Daniel Lezcano wrote:
->>
->> This patchset is the first series to cleanup some code around pm.h, pm.c and
->> cpuidle. The next series will bring more cleanups and finally the third series
->> will change the different functions into ops where we can export the structure
->> definition in order to encapsulate the code and move the at91's cpuidle driver
->> to the drivers/cpuidle directory.
-> 
-> Hi Daniel,
-> 
-> These all look like useful cleanups. You don't really have to split them
-> up into so small units, but it doesn't hurt if you do. Patch 5 seems to
-> actually fix a bug, but probably a harmless one.
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ drivers/net/ethernet/freescale/fec.c |   10 ++++++++--
+ drivers/net/ethernet/freescale/fec.h |    4 ++++
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-Thanks Arnd for reviewing the patchset.
-
-> It's not clear where you're headed though, I hope that becomes more obvious
-> in the next patches. 
-
-Yes, I think that will become more obvious in the next patches. The
-objective is to cleanup the code first, unify the api and change that to
-some ops we will register at boot time.
-
-Also, I will address Russell's comment about the standby function to be
-defined.
-
-> The tricky bit that will have to be done is to turn
-> all the #ifdef checks into runtime here. You have moved the #include for the
-> memory controller into a new header, but that is not actually progress
-> on this larger problem.
-
-The next patches will include the header from the .c file. IMHO,
-including a single file in a .c is more clear than a lot of #ifdef.
-
-> It would be nice to move the
-> sdram_selfrefresh_enable/disable functions into a .c file that uses
-> cpu_is_at91...() to do runtime detection.
-
-These patches are about separating the SoC specific code from the
-cpuidle driver code in order to move this one to the drivers directory.
-
-AFAIU, we agreed the drivers directory is the right place for the
-cpuidle drivers. There is a lot of cleanup to be done on the different
-SoC/arch and I would like to focus on that rather than fixing different
-problems at the same time. By the way achieving this goal will benefit
-to the single kernel image goal.
-
-The next patchset will move these functions to the .c file and define an
-ops structure which will be included from the cpuidle drivers.
-
-I am not sure how to do runtime detection but as soon as this is defined
-with ops, it will be trivial to register the right ops at boot time and
-prevent unneeded cpu_is_at91 checks in the idle functions.
-
-Thanks
-  -- Daniel
-
-- -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
-
-iQEcBAEBAgAGBQJPDbjoAAoJEAKBbMCpUGYATkQIAL6vVMgYQjeMcsXxD1VC+Xem
-5e+xQEjGcItj0rbj5LAgAVrTxLAw9p+33xx5vjwOEa65mVm10bkkb3put9zKkKVz
-QjilwywAzQ8LMsapJ5mIIQEOfXWOC41+cNbyKr150ydplSjuXIfgs255nCEsojtc
-8kNGsgKjh7+vxE/3LCwa+kMz39rVHMxgle2JB+ThLZpv+c/wz/JXhZwOfjgH5ERL
-K9neVmSS5N/LIzVh1IcXk0UxF4NDnSnoSadKWpxvxtnI1kb3oDiHXersq3BlIa8x
-7wgohka5NlhzEmLeWzZ49DlOfZ5zyHIgzKeU8sY13ccZvxHDQuzqrv49AaM2PEM=
-=4six
------END PGP SIGNATURE-----
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index ddcbbb3..89532ab 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -476,6 +476,7 @@ fec_restart(struct net_device *ndev, int duplex)
+ 	} else {
+ #ifdef FEC_MIIGSK_ENR
+ 		if (id_entry->driver_data & FEC_QUIRK_USE_GASKET) {
++			u32 miigsk;
+ 			/* disable the gasket and wait */
+ 			writel(0, fep->hwp + FEC_MIIGSK_ENR);
+ 			while (readl(fep->hwp + FEC_MIIGSK_ENR) & 4)
+@@ -486,8 +487,13 @@ fec_restart(struct net_device *ndev, int duplex)
+ 			 *   RMII, 50 MHz, no loopback, no echo
+ 			 *   MII, 25 MHz, no loopback, no echo
+ 			 */
+-			writel((fep->phy_interface == PHY_INTERFACE_MODE_RMII) ?
+-					1 : 0, fep->hwp + FEC_MIIGSK_CFGR);
++			miigsk = (fep->phy_interface == PHY_INTERFACE_MODE_RMII)
++				? FEC_MIIGSK_RMII_MODE : FEC_MIIGSK_MII_MODE;
++			if (fep->phy_dev) {
++				if (fep->phy_dev->speed == SPEED_10)
++					miigsk |= FEC_MIIGSK_FRCONT_10M;
++			}
++			writel(miigsk, fep->hwp + FEC_MIIGSK_CFGR);
+ 
+ 
+ 			/* re-enable the gasket */
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 8b2c6d7..6870d9e 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -47,6 +47,10 @@
+ #define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
+ #define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
+ 
++#define FEC_MIIGSK_MII_MODE		0x00
++#define FEC_MIIGSK_RMII_MODE	0x01
++#define FEC_MIIGSK_FRCONT_10M	0x40
++
+ #else
+ 
+ #define FEC_ECNTRL		0x000 /* Ethernet control reg */
+-- 
+1.7.7.5
