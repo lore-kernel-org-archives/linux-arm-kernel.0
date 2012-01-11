@@ -1,267 +1,58 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Jan 2012 13:08:45 +0000
-Subject: [PATCH 06/15] ARM: plat-versatile: convert to
- twd_local_timer_register() interface
+Date: Wed, 11 Jan 2012 13:08:44 +0000
+Subject: [PATCH 05/15] ARM: OMAP4: convert to twd_local_timer_register()
+ interface
 In-Reply-To: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
 References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326287334-1905-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326287334-1905-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add support for the new smp_twd runtime registration interface
-to the RealView/VE platforms, and remove the old compile-time support.
-Tested on EB11MP.
+to the OMAP4 platforms, and remove the old compile-time support.
+Tested on Panda.
 
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-realview/realview_eb.c     |   34 ++++++++++++++++++++++++++---
- arch/arm/mach-realview/realview_pb11mp.c |   32 ++++++++++++++++++++++++---
- arch/arm/mach-realview/realview_pbx.c    |   31 ++++++++++++++++++++++++--
- arch/arm/mach-vexpress/ct-ca9x4.c        |   30 +++++++++++++++++++++++--
- arch/arm/plat-versatile/Makefile         |    1 -
- arch/arm/plat-versatile/localtimer.c     |   27 -----------------------
- 6 files changed, 113 insertions(+), 42 deletions(-)
- delete mode 100644 arch/arm/plat-versatile/localtimer.c
+ arch/arm/mach-omap2/Makefile    |    1 -
+ arch/arm/mach-omap2/timer-mpu.c |   39 ---------------------------------------
+ arch/arm/mach-omap2/timer.c     |   33 ++++++++++++++++++++++++++++-----
+ 3 files changed, 28 insertions(+), 45 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
 
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index e629621..6c5e61d 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -36,7 +36,7 @@
- #include <asm/pgtable.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
--#include <asm/localtimer.h>
-+#include <asm/smp_twd.h>
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index fc9b238..27ea7c2 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -23,7 +23,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
  
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -388,6 +388,34 @@ static void realview_eb11mp_fixup(void)
- 	realview_eb_isp1761_resources[1].end	= IRQ_EB11MP_USB;
- }
- 
-+#ifdef CONFIG_HAVE_ARM_TWD
-+static struct twd_local_timer twd_local_timer __initdata = {
-+	.res =	{
-+		{
-+			.start	= REALVIEW_EB11MP_TWD_BASE,
-+			.end	= REALVIEW_EB11MP_TWD_BASE + 0xff,
-+			.flags	= IORESOURCE_MEM,
-+		},
-+		{
-+			.start	= IRQ_LOCALTIMER,
-+			.end	= IRQ_LOCALTIMER,
-+			.flags	= IORESOURCE_IRQ,
-+		},
-+	},
-+};
-+
-+static void __init realview_eb_twd_init(void)
-+{
-+	if (core_tile_eb11mp() || core_tile_a9mp()) {
-+		int err = twd_local_timer_register(&twd_local_timer);
-+		if (err)
-+			pr_err("twd_local_timer_register failed %d\n", err);
-+	}
-+}
-+#else
-+#define realview_eb_twd_init	NULL
-+#endif
-+
- static void __init realview_eb_timer_init(void)
- {
- 	unsigned int timer_irq;
-@@ -398,9 +426,7 @@ static void __init realview_eb_timer_init(void)
- 	timer3_va_base = __io_address(REALVIEW_EB_TIMER2_3_BASE) + 0x20;
- 
- 	if (core_tile_eb11mp() || core_tile_a9mp()) {
--#ifdef CONFIG_LOCAL_TIMERS
--		twd_base = __io_address(REALVIEW_EB11MP_TWD_BASE);
--#endif
-+		late_time_init = realview_eb_twd_init;
- 		timer_irq = IRQ_EB11MP_TIMER0_1;
- 	} else
- 		timer_irq = IRQ_EB_TIMER0_1;
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index 127a3fd..73840be 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -36,7 +36,7 @@
- #include <asm/pgtable.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
--#include <asm/localtimer.h>
-+#include <asm/smp_twd.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
-@@ -295,6 +295,32 @@ static void __init gic_init_irq(void)
- 	gic_cascade_irq(1, IRQ_TC11MP_PB_IRQ1);
- }
- 
-+#ifdef CONFIG_HAVE_ARM_TWD
-+static struct twd_local_timer twd_local_timer __initdata = {
-+	.res =	{
-+		{
-+			.start	= REALVIEW_TC11MP_TWD_BASE,
-+			.end	= REALVIEW_TC11MP_TWD_BASE + 0x10,
-+			.flags	= IORESOURCE_MEM,
-+		},
-+		{
-+			.start	= IRQ_LOCALTIMER,
-+			.end	= IRQ_LOCALTIMER,
-+			.flags	= IORESOURCE_IRQ,
-+		},
-+	},
-+};
-+
-+static void __init realview_pb11mp_twd_init(void)
-+{
-+	int err = twd_local_timer_register(&twd_local_timer);
-+	if (err)
-+		pr_err("twd_local_timer_register failed %d\n", err);
-+}
-+#else
-+#define realview_pb11mp_twd_init	NULL
-+#endif
-+
- static void __init realview_pb11mp_timer_init(void)
- {
- 	timer0_va_base = __io_address(REALVIEW_PB11MP_TIMER0_1_BASE);
-@@ -302,10 +328,8 @@ static void __init realview_pb11mp_timer_init(void)
- 	timer2_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE);
- 	timer3_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE) + 0x20;
- 
--#ifdef CONFIG_LOCAL_TIMERS
--	twd_base = __io_address(REALVIEW_TC11MP_TWD_BASE);
--#endif
- 	realview_timer_init(IRQ_TC11MP_TIMER0_1);
-+	late_time_init = realview_pb11mp_twd_init;
- }
- 
- static struct sys_timer realview_pb11mp_timer = {
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index ac71564..ded5dda 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -298,6 +298,32 @@ static void __init gic_init_irq(void)
- 	}
- }
- 
-+#ifdef CONFIG_HAVE_ARM_TWD
-+static struct twd_local_timer twd_local_timer __initdata = {
-+	.res =	{
-+		{
-+			.start	= REALVIEW_PBX_TILE_TWD_BASE,
-+			.end	= REALVIEW_PBX_TILE_TWD_BASE + 0x10,
-+			.flags	= IORESOURCE_MEM,
-+		},
-+		{
-+			.start	= IRQ_LOCALTIMER,
-+			.end	= IRQ_LOCALTIMER,
-+			.flags	= IORESOURCE_IRQ,
-+		},
-+	},
-+};
-+
-+static void __init realview_pbx_twd_init(void)
-+{
-+	int err = twd_local_timer_register(&twd_local_timer);
-+	if (err)
-+		pr_err("twd_local_timer_register failed %d\n", err);
-+}
-+#else
-+#define realview_pbx_twd_init	NULL
-+#endif
-+
- static void __init realview_pbx_timer_init(void)
- {
- 	timer0_va_base = __io_address(REALVIEW_PBX_TIMER0_1_BASE);
-@@ -305,10 +331,9 @@ static void __init realview_pbx_timer_init(void)
- 	timer2_va_base = __io_address(REALVIEW_PBX_TIMER2_3_BASE);
- 	timer3_va_base = __io_address(REALVIEW_PBX_TIMER2_3_BASE) + 0x20;
- 
--#ifdef CONFIG_LOCAL_TIMERS
- 	if (core_tile_pbx11mp() || core_tile_pbxa9mp())
--		twd_base = __io_address(REALVIEW_PBX_TILE_TWD_BASE);
--#endif
-+		late_time_init = realview_pbx_twd_init;
-+
- 	realview_timer_init(IRQ_PBX_TIMER0_1);
- }
- 
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 2b1e836..eed2a5b 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -53,9 +53,6 @@ static struct map_desc ct_ca9x4_io_desc[] __initdata = {
- 
- static void __init ct_ca9x4_map_io(void)
- {
--#ifdef CONFIG_LOCAL_TIMERS
--	twd_base = MMIO_P2V(A9_MPCORE_TWD);
--#endif
- 	iotable_init(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
- }
- 
-@@ -191,9 +188,36 @@ static struct platform_device pmu_device = {
- 	.resource	= pmu_resources,
- };
- 
-+#ifdef CONFIG_HAVE_ARM_TWD
-+static struct twd_local_timer twd_local_timer __initdata = {
-+	.res =	{
-+		{
-+			.start	= A9_MPCORE_TWD,
-+			.end	= A9_MPCORE_TWD + 0x10,
-+			.flags	= IORESOURCE_MEM,
-+		},
-+		{
-+			.start	= IRQ_LOCALTIMER,
-+			.end	= IRQ_LOCALTIMER,
-+			.flags	= IORESOURCE_IRQ,
-+		},
-+	},
-+};
-+
-+static void __init ca9x4_twd_init(void)
-+{
-+	int err = twd_local_timer_register(&twd_local_timer);
-+	if (err)
-+		pr_err("twd_local_timer_register failed %d\n", err);
-+}
-+#else
-+#define ca9x4_twd_init	NULL
-+#endif
-+
- static void __init ct_ca9x4_init_early(void)
- {
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+	late_time_init = ca9x4_twd_init;
- }
- 
- static void __init ct_ca9x4_init(void)
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 69714db..a5cb194 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -1,5 +1,4 @@
- obj-y	:= clock.o
--obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
- obj-$(CONFIG_PLAT_VERSATILE_CLCD) += clcd.o
- obj-$(CONFIG_PLAT_VERSATILE_FPGA_IRQ) += fpga-irq.o
- obj-$(CONFIG_PLAT_VERSATILE_LEDS) += leds.o
-diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
+ # SMP support ONLY available for OMAP4
+ obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o \
+ 					   sleep44xx.o
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
 deleted file mode 100644
-index 0fb3961..0000000
---- a/arch/arm/plat-versatile/localtimer.c
+index 31c0ac4..0000000
+--- a/arch/arm/mach-omap2/timer-mpu.c
 +++ /dev/null
-@@ -1,27 +0,0 @@
+@@ -1,39 +0,0 @@
 -/*
-- *  linux/arch/arm/plat-versatile/localtimer.c
+- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
+- * own timer in it's MPU domain. These timers will be driving the
+- * linux kernel SMP tick framework when active. These timers are not
+- * part of the wake up domain.
 - *
-- *  Copyright (C) 2002 ARM Ltd.
-- *  All Rights Reserved
+- * Copyright (C) 2009 Texas Instruments, Inc.
+- *
+- * Author:
+- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
+- *
+- * This file is based on arm realview smp platform file.
+- * Copyright (C) 2002 ARM Ltd.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
@@ -270,19 +61,78 @@ index 0fb3961..0000000
 -#include <linux/init.h>
 -#include <linux/smp.h>
 -#include <linux/clockchips.h>
--
+-#include <asm/irq.h>
 -#include <asm/smp_twd.h>
 -#include <asm/localtimer.h>
--#include <mach/irqs.h>
 -
 -/*
 - * Setup the local clock events for a CPU.
 - */
 -int __cpuinit local_timer_setup(struct clock_event_device *evt)
 -{
--	evt->irq = IRQ_LOCALTIMER;
+-	/* Local timers are not supprted on OMAP4430 ES1.0 */
+-	if (omap_rev() == OMAP4430_REV_ES1_0)
+-		return -ENXIO;
+-
+-	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
 -	twd_timer_setup(evt);
 -	return 0;
 -}
+-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 6eeff0e..5017e84 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -39,7 +39,7 @@
+ 
+ #include <asm/mach/time.h>
+ #include <plat/dmtimer.h>
+-#include <asm/localtimer.h>
++#include <asm/smp_twd.h>
+ #include <asm/sched_clock.h>
+ #include "common.h"
+ #include <plat/omap_hwmod.h>
+@@ -324,14 +324,37 @@ OMAP_SYS_TIMER(3_secure)
+ #endif
+ 
+ #ifdef CONFIG_ARCH_OMAP4
+-static void __init omap4_timer_init(void)
+-{
+ #ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
+-	BUG_ON(!twd_base);
++static struct twd_local_timer twd_local_timer __initdata = {
++	.res =	{
++		{
++			.start  = OMAP44XX_LOCAL_TWD_BASE,
++			.end    = OMAP44XX_LOCAL_TWD_BASE + 0x10,
++			.flags  = IORESOURCE_MEM,
++		},
++		{
++			.start  = OMAP44XX_IRQ_LOCALTIMER,
++			.end    = OMAP44XX_IRQ_LOCALTIMER,
++			.flags  = IORESOURCE_IRQ,
++		},
++	},
++};
+ #endif
++
++static void __init omap4_timer_init(void)
++{
+ 	omap2_gp_clockevent_init(1, OMAP4_CLKEV_SOURCE);
+ 	omap2_gp_clocksource_init(2, OMAP4_MPU_SOURCE);
++#ifdef CONFIG_LOCAL_TIMERS
++	/* Local timers are not supprted on OMAP4430 ES1.0 */
++	if (omap_rev() != OMAP4430_REV_ES1_0) {
++		int err;
++
++		err = twd_local_timer_register(&twd_local_timer);
++		if (err)
++			pr_err("twd_local_timer_register failed %d\n", err);
++	}
++#endif
+ }
+ OMAP_SYS_TIMER(4)
+ #endif
 -- 
 1.7.7.1
