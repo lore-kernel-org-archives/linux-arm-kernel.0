@@ -1,53 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 11 Jan 2012 15:20:17 +0900
-Subject: [GIT PULL] Samsung devel for v3.3
-In-Reply-To: <20120110090635.GT21765@n2100.arm.linux.org.uk>
-References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
- <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
- <01a301ccce6f$9bb51790$d31f46b0$%kim@samsung.com>
- <201201091556.34817.arnd@arndb.de>
- <20120109161152.GA2974@opensource.wolfsonmicro.com>
- <20120110090635.GT21765@n2100.arm.linux.org.uk>
-Message-ID: <021901ccd029$167f4da0$437de8e0$%kim@samsung.com>
+From: rajeev-dlh.kumar@st.com (Rajeev Kumar)
+Date: Wed, 11 Jan 2012 11:53:09 +0530
+Subject: [PATCH] dmaengine/dw_dmac: Hibernation support in dw_dmac
+Message-ID: <1326262989-18608-1-git-send-email-rajeev-dlh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Mon, Jan 09, 2012 at 08:11:54AM -0800, Mark Brown wrote:
+The suspend and resume implementation is through dev_pm_ops in dmac. So
+in order to support hibernation, freeze, thaw and restore features are required.
 
-[...]
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+---
+ drivers/dma/dw_dmac.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-> > This really is very disappointing.
-> 
-> No it isn't.
-> 
-> What is really disappointing is the lack of responsive maintainers for the
-> Samsung stuff.  It took _two_ bloody months to get the Samsung platforms
-> sorted for the restart changes in spite of reminding, and a last minute
-> rush over the course of a couple of days (one _in_ the merge window) to
-> get it properly merged into my tree.
-> 
-Yeah, I had to do earlier and it's true that many conflicts caused from my
-late ARM restart working for Samsung stuff.
-
-[...]
-
-> So, I support Arnd's view: the Samsung stuff is just too late.  Even the
-> restart updates (which is what has caused this) were too late.  Anything
-> which causes new merge conflicts in the Samsung code is not acceptable at
-> this point, even if it's a 'fix' patch.  We've wasted far too much time
-> trying to get Samsung stuff sorted far too late in the cycle.
-> 
-> Let this be an object lesson in what happens if you leave stuff until the
-> last minute.
-
-I will do more carefully next time and of course not too late.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index d2e1c25..cb346d6 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -1568,6 +1568,9 @@ static int dw_resume_noirq(struct device *dev)
+ static const struct dev_pm_ops dw_dev_pm_ops = {
+ 	.suspend_noirq = dw_suspend_noirq,
+ 	.resume_noirq = dw_resume_noirq,
++	.freeze_noirq = dw_suspend_noirq,
++	.thaw_noirq =	dw_resume_noirq,
++	.restore_noirq = dw_resume_noirq,
+ };
+ 
+ static struct platform_driver dw_driver = {
+-- 
+1.6.0.2
