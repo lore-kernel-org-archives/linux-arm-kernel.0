@@ -1,58 +1,42 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 11 Jan 2012 15:59:22 +0200
-Subject: [PATCH RFC] OMAP: I2C: Fix the mismatch of pm_runtime enable and
- disable
-In-Reply-To: <1326288104-10544-1-git-send-email-shubhrajyoti@ti.com>
-References: <1326288104-10544-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CANOLnONdYYybbSP143+TeLxjfdEg1krcZjHwf140Fm5Y8rHogA@mail.gmail.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Wed, 11 Jan 2012 15:06:52 +0100
+Subject: [PATCH v7 0/5] AT91: replace broken TWI driver i2c-at91.c
+In-Reply-To: <D99582E5322435468A77E74BB0039E7B1D18739F99@SRV02.hamburg.garz-fricke.de>
+References: <cover.1322062555.git.n.voss@weinmann.de>
+ <4ECFB755.6060509@gmail.com>
+ <D99582E5322435468A77E74BB0039E7B1D18739F99@SRV02.hamburg.garz-fricke.de>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D0882DEF3E8@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 3:21 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> Currently the i2c driver calls the pm_runtime_enable and never
-> the disable. This may cause a warning when pm_runtime_enable
-> checks for the count match.Attempting to fix the same by calling
-> pm_runtime_disable in the error and the remove path.
+Hi,
 
-I remember seeing Felipe doing the reverse to musb here:
-http://marc.info/?l=linux-omap&m=132432610700952&w=2
-so I'm confused here.
+Carsten Behling wrote on 2011-12-28:
+> I've tested this driver with the pca953x GPIO expander driver with a PCA9554.
+> 
+> In the case of 8 GPIO pins (my case) "i2c_smbus_read_byte_data(...)"
+[...]
+> I observed that reading out the GPIO status is one read delayed.
+> The first read to a register from the pca953x driver does not result in a
+> RXRDY interrupt and at91_twi_read_next_byte(...) is not called.
+> Only the completion routine is triggered with a TXCOMP interrupt.
 
->
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
-> ?drivers/i2c/busses/i2c-omap.c | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 12d402c..abc7b5b 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1070,6 +1070,7 @@ err_unuse_clocks:
-> ? ? ? ?omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-> ? ? ? ?pm_runtime_put(dev->dev);
-> ? ? ? ?iounmap(dev->base);
-> + ? ? ? pm_runtime_disable(&pdev->dev);
-> ?err_free_mem:
-> ? ? ? ?platform_set_drvdata(pdev, NULL);
-> ? ? ? ?kfree(dev);
-> @@ -1085,6 +1086,7 @@ omap_i2c_remove(struct platform_device *pdev)
-> ? ? ? ?struct omap_i2c_dev ? ? *dev = platform_get_drvdata(pdev);
-> ? ? ? ?struct resource ? ? ? ? *mem;
->
-> + ? ? ? pm_runtime_disable(&pdev->dev);
-> ? ? ? ?platform_set_drvdata(pdev, NULL);
->
-> ? ? ? ?free_irq(dev->irq, dev);
-> --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+Which SOC are you using? This is probably a hardware bug since on my
+at91sam9g45 i2c_smbus_read_byte_data() works reliably without any
+problems. Please check the errata and see if there is a useable
+workaround. If not, the driver should be disabled for your SOC.
 
--- 
-Gra?vydas
+> Additionally, I took a look at the status flags just after the control flags
+> are set (in at91_do_twi_transfer(...), AT91_TWI_START|AT91_TWI_STOP for the
+> one byte read). Surprisingly, the AT91_TWI_RXRDY flag is zero before the first
+> register read and one for the following reads. According to the manual this
+> flag should be zero after a read on AT91_TWI_RHR.
+> 
+> Reading the AT91_TWI_RHR before the control flags are set to be sure that the
+> AT91_TWI_RXRDY is cleared leads to a never occurring RXRDY interrupt.
+
+Again, this behavior does not conform to the datasheet, I suspect documented
+or undocumented errata... At91rm9200 has at least one erratum for which I
+imported a workaround from the old driver (which does not use interrupts).
+
+Niko
