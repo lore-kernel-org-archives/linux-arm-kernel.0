@@ -1,50 +1,52 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Jan 2012 21:35:00 +0800
-Subject: [PATCH 6/6] dma/imx-sdma: check whether event_id0 < 32 when set
- event_mask
-In-Reply-To: <20120111130910.GC27484@b20223-02.ap.freescale.net>
-References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
- <1326178910-14044-6-git-send-email-richard.zhao@linaro.org>
- <20120110142008.GE26599@S2101-09.ap.freescale.net>
- <20120110142939.GB2019@richard-laptop>
- <20120110153836.GA27831@S2101-09.ap.freescale.net>
- <20120111005322.GB2414@b20223-02.ap.freescale.net>
- <20120111014730.GE2414@b20223-02.ap.freescale.net>
- <CAMPhdO9sGWTomtyMSTe_jC2GfvtdLR=M-z3Uzpesm9efBzhSqA@mail.gmail.com>
- <20120111131615.GC20968@S2101-09.ap.freescale.net>
- <20120111130910.GC27484@b20223-02.ap.freescale.net>
-Message-ID: <20120111133458.GD20968@S2101-09.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 11 Jan 2012 06:29:06 -0700 (MST)
+Subject: [PATCHv8 4/5] OMAP: I2C: Remove the reset in the init path
+In-Reply-To: <4F0D26DF.1020108@ti.com>
+References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
+ <1323773758-6375-5-git-send-email-shubhrajyoti@ti.com>
+ <alpine.DEB.2.00.1112160139010.12660@utopia.booyaka.com>
+ <4EEB086A.2050607@ti.com>
+ <CANQgH-Ze1S6sy1uhzy_b8GWOCjF4+-9DOCcUn9mq1kAaT+Y7FA@mail.gmail.com>
+ <CANQgH-YLez8B-t8nf9_M8samn9YWUa7LcOFx6uPFrJE9tnXB1Q@mail.gmail.com>
+ <87hb03tw8h.fsf@ti.com> <4F0D26DF.1020108@ti.com>
+Message-ID: <alpine.DEB.2.00.1201110619090.31702@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 09:09:11PM +0800, Richard Zhao wrote:
-> On Wed, Jan 11, 2012 at 09:16:17PM +0800, Shawn Guo wrote:
-> > On Wed, Jan 11, 2012 at 02:37:08PM +0800, Eric Miao wrote:
-> > > I think Richard has made the issue quite clear here, the original
-> > 
-> > Yes, he has made it clear, but only after I asked for more comments,
-> > not with the empty commit message.
-> > 
-> > > code does seem to have some problems even to me, who do not
-> > > understand the very details of the SDMA:
-> > > 
-> > > -                       sdmac->event_mask0 = 1 << sdmac->event_id0;
-> > > -                       sdmac->event_mask1 = 1 << (sdmac->event_id0 - 32);
-> > > 
-> > > 1. if sdmac->event_id0 >= 32, which will cause event_mask0 to be incorrect
-> > > 2. if sdmac->event_id < 32, sdmac->event_mask1 will be incorrect
-> > > 
-> > My testing tells this is not the case.  The event_mask0 will be 0 in
-> > case 1) and event_mask1 will be 0 in case 2), which is quite what we
-> > expect.  And I do not believe you will see any functionality bug with
-> > the existing code.
-> Please see my mail mentioned "we shoud not let it depends on gcc's
-> behavior."
+On Wed, 11 Jan 2012, Shubhrajyoti wrote:
 
-In this case, I would rather believe that the author is smart enough
-to write the code intentionally based on his good understanding on
-behavior of arm-gcc.
+> On Tuesday 10 January 2012 08:56 PM, Kevin Hilman wrote:
+> > "Datta, Shubhrajyoti" <shubhrajyoti@ti.com> writes:
+> >
+> >> On Tue, Jan 10, 2012 at 11:53 AM, Datta, Shubhrajyoti
+> >> <shubhrajyoti@ti.com> wrote:
+> >>>
+> >>> On Fri, Dec 16, 2011 at 2:29 PM, Shubhrajyoti <shubhrajyoti@ti.com> wrote:
+> >>>> On Friday 16 December 2011 02:10 PM, Paul Walmsley wrote:
+> >>>>
+> >>>>> This patch either needs to be acked by Ben with a note that it's okay for
+> >>>>> us to merge through the OMAP tree, or needs to be merged by Ben during the
+> >>>>> 3.4 merge window, after patches 1-3 have reached the mainline tree.
+> >>>> I agree.
+> >>>> Ben do you have any comments .
+> >>>
+> >> If there are no further comments can this be merged also ?
+> > As Benoit mentioned earlier, the addition of new pdata fields will cause
+> > problems with the DT support already queued for v3.3.
+> >
+> > This series should be reworked on top of the DT support which Ben has
+> > now queued for v3.3 (my branch: for_3.3/i2c/misc)
+> 
+> Yes will rework it.
 
--- 
-Regards,
-Shawn
+Depending on what you plan to do, you'll probably need to coordinate this 
+with Tony also.  He's already pulled some of the patches from this series 
+into his i2c branch.
+
+The real question is how you plan to handle the device reset function, 
+given that the driver should compile on a non-OMAP build (meaning that you 
+can't call omap_device*() functions from the driver directly), nor should 
+the driver touch the SYSCONFIG register directly.
+
+
+- Paul
