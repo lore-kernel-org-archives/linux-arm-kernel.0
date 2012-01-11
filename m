@@ -1,28 +1,28 @@
-From: B29882@freescale.com (McClintock Matthew-B29882)
-Date: Wed, 11 Jan 2012 17:20:43 +0000
-Subject: ARM kexec SMP problem using exynos4210
-In-Reply-To: <20120111110319.GB27887@mudshark.cambridge.arm.com>
-References: <4F0D49DD.80305@samsung.com>
- <20120111100623.GA27887@mudshark.cambridge.arm.com>
- <4F0D6316.4090800@samsung.com>
- <20120111110319.GB27887@mudshark.cambridge.arm.com>
-Message-ID: <CAEsOVNfWdHfy3XinAd836RqUpj6hF+7B8Af-3+vX14XuDV1niQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 11 Jan 2012 17:29:20 +0000
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <CAOesGMhDeN9N5A+xVGzM2aoO7YWMkxdpYxZ4o1VV42g_NP6tnQ@mail.gmail.com>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <201201102013.54958.arnd@arndb.de>
+ <20120110223712.GL7164@opensource.wolfsonmicro.com>
+ <201201111619.05650.arnd@arndb.de>
+ <CAOesGMhDeN9N5A+xVGzM2aoO7YWMkxdpYxZ4o1VV42g_NP6tnQ@mail.gmail.com>
+Message-ID: <20120111172918.GA24213@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 5:03 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jan 11, 2012 at 10:23:18AM +0000, Joonyoung Shim wrote:
->> One more question, generally boot cpu is first cpu(cpu0). If current
->> cpu is secondary cpu(cpu1), smp_send_stop of machine_shutdown will stop
->> first cpu and next kernel will try to boot on secondary cpu. Is it
->> possible?
->
-> I added the cpu_logical_map stuff for this, so the kernel can handle it.
-> That said, your platform may have restrictions about the boot CPU so if it
-> doesn't work, you'll need to taskset the kexec command to CPU 0.
+On Wed, Jan 11, 2012 at 08:50:54AM -0800, Olof Johansson wrote:
+> On Wed, Jan 11, 2012 at 8:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Would this negatively effect kdump though where you might not be able
-to switch back to cpu0? I think It's best to be able to boot on any
-core.
+> > I would also prefer if people stopped having their own trees included
+> > in next, but I know that I'm sometimes slow to pick up patches that
 
--M
+> I also have to admit, as tegra maintainer, that it is convenient to
+> have my tree in linux-next, and have things show up in linux-next as
+> soon as I pick it up, and then send arm-soc pull requests about once a
+> week or so. While we should reduce latency to pull into arm-soc,
+> getting pull requests daily will be a bit on the heavy side.
+
+Plus it also means that if there are problems you can resolve it
+directly rather than having to get the fixes included in a separate tree
+which helps cut down on latencies.
