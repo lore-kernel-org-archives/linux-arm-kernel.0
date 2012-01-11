@@ -1,20 +1,48 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 11 Jan 2012 15:17:17 -0800
-Subject: [PATCH] ARM: tegra: Harmony PCIe: Remove unnecessary include
-In-Reply-To: <1326323440-23977-1-git-send-email-swarren@nvidia.com>
-References: <1326323440-23977-1-git-send-email-swarren@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A80F@HQMAIL01.nvidia.com>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Wed, 11 Jan 2012 13:20:03 -1000
+Subject: [PATCH] ARM: vexpress: initial device tree support
+In-Reply-To: <4F0DEE4F.3080103@freescale.com>
+References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
+ <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
+ <4F0B897A.20502@firmworks.com>
+ <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
+ <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
+ <4F0CD7BC.7080409@freescale.com> <4F0D2F90.8020801@firmworks.com>
+ <4F0DEE4F.3080103@freescale.com>
+Message-ID: <4F0E1923.4090703@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Wednesday, January 11, 2012 4:11 PM:
-> This file no longer uses pinmux APIs, and hence doesn't need to include
-> a pinmux header.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+On 1/11/2012 10:17 AM, Timur Tabi wrote:
+> Mitch Bradley wrote:
+>
+>> I think that would not be a good design.  Presence and location of EDID
+>> data is not something that a generic I2C driver should know.  It's the
+>> video controller that knows that EDID exists, where it is located
+>> (device ID 0x50 and addresses within that device), and what it means.
+>
+> But the video driver does not know what I2C *bus* it's on.  I have been unable to come up with a way to obtain the proper i2c_adapter object to use when looking for EDID data.
 
-Oops. Ignore this; I see it was already fixed up when arm-soc's for-next
-was rebuilt.
+You make device nodes for each of the i2c adapters (possibly with a GPIO 
+I2C mux node underneath the EDID one), then you point to the correct 
+adapter (or mux) node with a phandle-valued property in the video node.
 
--- 
-nvpublic
+Of course, you need the deferral patch cited in another message.
+
+>
+>>>   That won't work if I have multiple video controllers, since I won't know which EDID data goes with which video controller.  I tried adding a call to i2c_add_driver() in my framebuffer driver, but the I2C probe function was called *after* the framebuffer's probe function, so that doesn't help me.
+>>
+>> Then there needs to be some sort of ordering or dependency to ensure
+>> that the I2C driver is activated before the framebuffer driver tries to
+>> use it.
+>
+> I don't know how to do that, either.
+>
+>> Either way, you need platform-dependent functions to do the switching,
+>> and you need to select the appropriate channel.  Personally, I don't see
+>> the advantage of using the mux device in this case.  It's just adding
+>> complexity with no payback.
+>
+> I'm always in favor of doing things the simpler way.
+>
+>
