@@ -1,32 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Jan 2012 14:03:53 -0200
-Subject: [PATCH] ARM: elf.h: Remove duplicate definition of task_struct
-Message-ID: <1326297833-4353-1-git-send-email-festevam@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jan 2012 16:19:05 +0000
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <20120110223712.GL7164@opensource.wolfsonmicro.com>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <201201102013.54958.arnd@arndb.de>
+ <20120110223712.GL7164@opensource.wolfsonmicro.com>
+Message-ID: <201201111619.05650.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit ea5ce655b (arch/arm/include/asm/elf.h: forward-declare the task-struct)
-missed to remove a previous declaration of 'task_struct'.
+On Tuesday 10 January 2012, Mark Brown wrote:
 
-Remove one of the declarations.
+> I do also wonder if it's worth letting people push stuff to you
+> more aggressively - right now you seem to be asking people to batch
+> things up and I wonder if that's making it a it easier for things to end
+> up dropping on the floor if a time based routine isn't working well for
+> people.
 
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/include/asm/elf.h |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+I really wish people would push stuff into arm-soc more aggressively,
+and I certainly didn't want to give the impression that maintainers
+should let their stuff sit in linux-next before sending it to us.
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index 0e9ce8d..ca4fdd9 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -104,7 +104,6 @@ extern int elf_check_arch(const struct elf32_hdr *);
- extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
- #define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
- 
--struct task_struct;
- int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
- #define ELF_CORE_COPY_TASK_REGS dump_task_regs
- 
--- 
-1.7.1
+It's absolutely fine to send multiple updates per branch for arm-soc
+as stuff comes in, as long as we can keep track of the dependencies
+and we don't have to rebase the stuff that's already merged.
+
+I would also prefer if people stopped having their own trees included
+in next, but I know that I'm sometimes slow to pick up patches that
+were submitted to arm-soc and that it helps people if they can get
+earlier integration testing that way. Hopefully we're also getting
+better at dealing with pull requests quickly so that there is no
+need for the other tree in linux-next any more.
+
+	Arnd
