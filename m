@@ -1,220 +1,76 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 11 Jan 2012 14:14:35 +1100
-Subject: [PATCH 10/11] ep93xx: Move EP93XX_SYSCON defines to SoC private header
+Date: Wed, 11 Jan 2012 14:14:36 +1100
+Subject: [PATCH 11/11] ep93xx: Remove unnecessary includes of ep93xx-regs.h
 In-Reply-To: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
 References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
-Message-ID: <1326251676-7593-11-git-send-email-rmallon@gmail.com>
+Message-ID: <1326251676-7593-12-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EP93XX_SYSCON defines are now no longer needed outside of the
-EP93xx SoC core code, so they can be moved to a private header.
+Remove the include of ep93xx-regs.h from files which no longer need
+it, notably include/mach/hardware.h. An explict include of
+ep93xx-regs.h is needed in the EP93xx watchdog driver for the
+EP93XX_APB_IOMEM macro.
 
 Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 Cc: Mika Westerberg <mika.westerberg@iki.fi>
 Signed-off-by: Ryan Mallon <rmallon@gmail.com>
 ---
- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   90 -----------------------
- arch/arm/mach-ep93xx/soc.h                      |   90 +++++++++++++++++++++++
- 2 files changed, 90 insertions(+), 90 deletions(-)
+ arch/arm/mach-ep93xx/crunch.c                |    2 +-
+ arch/arm/mach-ep93xx/include/mach/hardware.h |    1 -
+ arch/arm/mach-ep93xx/soc.h                   |    2 ++
+ drivers/watchdog/ep93xx_wdt.c                |    1 +
+ 4 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-index 225790d..c64d742 100644
---- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-@@ -38,94 +38,4 @@
- #define EP93XX_UART3_PHYS_BASE		EP93XX_APB_PHYS(0x000e0000)
- #define EP93XX_UART3_BASE		EP93XX_APB_IOMEM(0x000e0000)
+diff --git a/arch/arm/mach-ep93xx/crunch.c b/arch/arm/mach-ep93xx/crunch.c
+index d05ed0b..74753e2 100644
+--- a/arch/arm/mach-ep93xx/crunch.c
++++ b/arch/arm/mach-ep93xx/crunch.c
+@@ -16,7 +16,7 @@
+ #include <linux/sched.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+-#include <mach/ep93xx-regs.h>
++
+ #include <asm/thread_notify.h>
  
--#define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000)
--#define EP93XX_SYSCON_REG(x)		(EP93XX_SYSCON_BASE + (x))
--#define EP93XX_SYSCON_POWER_STATE	EP93XX_SYSCON_REG(0x00)
--#define EP93XX_SYSCON_PWRCNT		EP93XX_SYSCON_REG(0x04)
--#define EP93XX_SYSCON_PWRCNT_FIR_EN	(1<<31)
--#define EP93XX_SYSCON_PWRCNT_UARTBAUD	(1<<29)
--#define EP93XX_SYSCON_PWRCNT_USH_EN	(1<<28)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2M1	(1<<27)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2M0	(1<<26)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P8	(1<<25)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P9	(1<<24)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P6	(1<<23)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P7	(1<<22)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P4	(1<<21)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P5	(1<<20)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P2	(1<<19)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P3	(1<<18)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P0	(1<<17)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P1	(1<<16)
--#define EP93XX_SYSCON_HALT		EP93XX_SYSCON_REG(0x08)
--#define EP93XX_SYSCON_STANDBY		EP93XX_SYSCON_REG(0x0c)
--#define EP93XX_SYSCON_CLKSET1		EP93XX_SYSCON_REG(0x20)
--#define EP93XX_SYSCON_CLKSET1_NBYP1	(1<<23)
--#define EP93XX_SYSCON_CLKSET2		EP93XX_SYSCON_REG(0x24)
--#define EP93XX_SYSCON_CLKSET2_NBYP2	(1<<19)
--#define EP93XX_SYSCON_CLKSET2_PLL2_EN	(1<<18)
--#define EP93XX_SYSCON_DEVCFG		EP93XX_SYSCON_REG(0x80)
--#define EP93XX_SYSCON_DEVCFG_SWRST	(1<<31)
--#define EP93XX_SYSCON_DEVCFG_D1ONG	(1<<30)
--#define EP93XX_SYSCON_DEVCFG_D0ONG	(1<<29)
--#define EP93XX_SYSCON_DEVCFG_IONU2	(1<<28)
--#define EP93XX_SYSCON_DEVCFG_GONK	(1<<27)
--#define EP93XX_SYSCON_DEVCFG_TONG	(1<<26)
--#define EP93XX_SYSCON_DEVCFG_MONG	(1<<25)
--#define EP93XX_SYSCON_DEVCFG_U3EN	(1<<24)
--#define EP93XX_SYSCON_DEVCFG_CPENA	(1<<23)
--#define EP93XX_SYSCON_DEVCFG_A2ONG	(1<<22)
--#define EP93XX_SYSCON_DEVCFG_A1ONG	(1<<21)
--#define EP93XX_SYSCON_DEVCFG_U2EN	(1<<20)
--#define EP93XX_SYSCON_DEVCFG_EXVC	(1<<19)
--#define EP93XX_SYSCON_DEVCFG_U1EN	(1<<18)
--#define EP93XX_SYSCON_DEVCFG_TIN	(1<<17)
--#define EP93XX_SYSCON_DEVCFG_HC3IN	(1<<15)
--#define EP93XX_SYSCON_DEVCFG_HC3EN	(1<<14)
--#define EP93XX_SYSCON_DEVCFG_HC1IN	(1<<13)
--#define EP93XX_SYSCON_DEVCFG_HC1EN	(1<<12)
--#define EP93XX_SYSCON_DEVCFG_HONIDE	(1<<11)
--#define EP93XX_SYSCON_DEVCFG_GONIDE	(1<<10)
--#define EP93XX_SYSCON_DEVCFG_PONG	(1<<9)
--#define EP93XX_SYSCON_DEVCFG_EONIDE	(1<<8)
--#define EP93XX_SYSCON_DEVCFG_I2SONSSP	(1<<7)
--#define EP93XX_SYSCON_DEVCFG_I2SONAC97	(1<<6)
--#define EP93XX_SYSCON_DEVCFG_RASONP3	(1<<4)
--#define EP93XX_SYSCON_DEVCFG_RAS	(1<<3)
--#define EP93XX_SYSCON_DEVCFG_ADCPD	(1<<2)
--#define EP93XX_SYSCON_DEVCFG_KEYS	(1<<1)
--#define EP93XX_SYSCON_DEVCFG_SHENA	(1<<0)
--#define EP93XX_SYSCON_VIDCLKDIV		EP93XX_SYSCON_REG(0x84)
--#define EP93XX_SYSCON_CLKDIV_ENABLE	(1<<15)
--#define EP93XX_SYSCON_CLKDIV_ESEL	(1<<14)
--#define EP93XX_SYSCON_CLKDIV_PSEL	(1<<13)
--#define EP93XX_SYSCON_CLKDIV_PDIV_SHIFT	8
--#define EP93XX_SYSCON_I2SCLKDIV		EP93XX_SYSCON_REG(0x8c)
--#define EP93XX_SYSCON_I2SCLKDIV_SENA	(1<<31)
--#define EP93XX_SYSCON_I2SCLKDIV_ORIDE   (1<<29)
--#define EP93XX_SYSCON_I2SCLKDIV_SPOL	(1<<19)
--#define EP93XX_I2SCLKDIV_SDIV		(1 << 16)
--#define EP93XX_I2SCLKDIV_LRDIV32	(0 << 17)
--#define EP93XX_I2SCLKDIV_LRDIV64	(1 << 17)
--#define EP93XX_I2SCLKDIV_LRDIV128 	(2 << 17)
--#define EP93XX_I2SCLKDIV_LRDIV_MASK 	(3 << 17)
--#define EP93XX_SYSCON_KEYTCHCLKDIV	EP93XX_SYSCON_REG(0x90)
--#define EP93XX_SYSCON_KEYTCHCLKDIV_TSEN	(1<<31)
--#define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
--#define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
--#define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
--#define EP93XX_SYSCON_SYSCFG		EP93XX_SYSCON_REG(0x9c)
--#define EP93XX_SYSCON_SYSCFG_REV_MASK	(0xf0000000)
--#define EP93XX_SYSCON_SYSCFG_REV_SHIFT	(28)
--#define EP93XX_SYSCON_SYSCFG_SBOOT	(1<<8)
--#define EP93XX_SYSCON_SYSCFG_LCSN7	(1<<7)
--#define EP93XX_SYSCON_SYSCFG_LCSN6	(1<<6)
--#define EP93XX_SYSCON_SYSCFG_LASDO	(1<<5)
--#define EP93XX_SYSCON_SYSCFG_LEEDA	(1<<4)
--#define EP93XX_SYSCON_SYSCFG_LEECLK	(1<<3)
--#define EP93XX_SYSCON_SYSCFG_LCSN2	(1<<1)
--#define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
--#define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
--
--
- #endif
+ #include "soc.h"
+diff --git a/arch/arm/mach-ep93xx/include/mach/hardware.h b/arch/arm/mach-ep93xx/include/mach/hardware.h
+index 4df8428..efcd478 100644
+--- a/arch/arm/mach-ep93xx/include/mach/hardware.h
++++ b/arch/arm/mach-ep93xx/include/mach/hardware.h
+@@ -5,7 +5,6 @@
+ #ifndef __ASM_ARCH_HARDWARE_H
+ #define __ASM_ARCH_HARDWARE_H
+ 
+-#include <mach/ep93xx-regs.h>
+ #include <mach/platform.h>
+ 
+ /*
 diff --git a/arch/arm/mach-ep93xx/soc.h b/arch/arm/mach-ep93xx/soc.h
-index 958282a..0e1041d 100644
+index 0e1041d..0a64e4a 100644
 --- a/arch/arm/mach-ep93xx/soc.h
 +++ b/arch/arm/mach-ep93xx/soc.h
-@@ -115,4 +115,94 @@ static inline void ep93xx_devcfg_clear_bits(unsigned int bits)
- #define EP93XX_RTC_PHYS_BASE		EP93XX_APB_PHYS(0x00120000)
- #define EP93XX_RTC_BASE			EP93XX_APB_IOMEM(0x00120000)
+@@ -13,6 +13,8 @@
+ #ifndef _EP93XX_SOC_H
+ #define _EP93XX_SOC_H
  
-+/* System controller */
-+#define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000)
-+#define EP93XX_SYSCON_REG(x)		(EP93XX_SYSCON_BASE + (x))
-+#define EP93XX_SYSCON_POWER_STATE	EP93XX_SYSCON_REG(0x00)
-+#define EP93XX_SYSCON_PWRCNT		EP93XX_SYSCON_REG(0x04)
-+#define EP93XX_SYSCON_PWRCNT_FIR_EN	(1<<31)
-+#define EP93XX_SYSCON_PWRCNT_UARTBAUD	(1<<29)
-+#define EP93XX_SYSCON_PWRCNT_USH_EN	(1<<28)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2M1	(1<<27)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2M0	(1<<26)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P8	(1<<25)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P9	(1<<24)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P6	(1<<23)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P7	(1<<22)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P4	(1<<21)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P5	(1<<20)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P2	(1<<19)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P3	(1<<18)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P0	(1<<17)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P1	(1<<16)
-+#define EP93XX_SYSCON_HALT		EP93XX_SYSCON_REG(0x08)
-+#define EP93XX_SYSCON_STANDBY		EP93XX_SYSCON_REG(0x0c)
-+#define EP93XX_SYSCON_CLKSET1		EP93XX_SYSCON_REG(0x20)
-+#define EP93XX_SYSCON_CLKSET1_NBYP1	(1<<23)
-+#define EP93XX_SYSCON_CLKSET2		EP93XX_SYSCON_REG(0x24)
-+#define EP93XX_SYSCON_CLKSET2_NBYP2	(1<<19)
-+#define EP93XX_SYSCON_CLKSET2_PLL2_EN	(1<<18)
-+#define EP93XX_SYSCON_DEVCFG		EP93XX_SYSCON_REG(0x80)
-+#define EP93XX_SYSCON_DEVCFG_SWRST	(1<<31)
-+#define EP93XX_SYSCON_DEVCFG_D1ONG	(1<<30)
-+#define EP93XX_SYSCON_DEVCFG_D0ONG	(1<<29)
-+#define EP93XX_SYSCON_DEVCFG_IONU2	(1<<28)
-+#define EP93XX_SYSCON_DEVCFG_GONK	(1<<27)
-+#define EP93XX_SYSCON_DEVCFG_TONG	(1<<26)
-+#define EP93XX_SYSCON_DEVCFG_MONG	(1<<25)
-+#define EP93XX_SYSCON_DEVCFG_U3EN	(1<<24)
-+#define EP93XX_SYSCON_DEVCFG_CPENA	(1<<23)
-+#define EP93XX_SYSCON_DEVCFG_A2ONG	(1<<22)
-+#define EP93XX_SYSCON_DEVCFG_A1ONG	(1<<21)
-+#define EP93XX_SYSCON_DEVCFG_U2EN	(1<<20)
-+#define EP93XX_SYSCON_DEVCFG_EXVC	(1<<19)
-+#define EP93XX_SYSCON_DEVCFG_U1EN	(1<<18)
-+#define EP93XX_SYSCON_DEVCFG_TIN	(1<<17)
-+#define EP93XX_SYSCON_DEVCFG_HC3IN	(1<<15)
-+#define EP93XX_SYSCON_DEVCFG_HC3EN	(1<<14)
-+#define EP93XX_SYSCON_DEVCFG_HC1IN	(1<<13)
-+#define EP93XX_SYSCON_DEVCFG_HC1EN	(1<<12)
-+#define EP93XX_SYSCON_DEVCFG_HONIDE	(1<<11)
-+#define EP93XX_SYSCON_DEVCFG_GONIDE	(1<<10)
-+#define EP93XX_SYSCON_DEVCFG_PONG	(1<<9)
-+#define EP93XX_SYSCON_DEVCFG_EONIDE	(1<<8)
-+#define EP93XX_SYSCON_DEVCFG_I2SONSSP	(1<<7)
-+#define EP93XX_SYSCON_DEVCFG_I2SONAC97	(1<<6)
-+#define EP93XX_SYSCON_DEVCFG_RASONP3	(1<<4)
-+#define EP93XX_SYSCON_DEVCFG_RAS	(1<<3)
-+#define EP93XX_SYSCON_DEVCFG_ADCPD	(1<<2)
-+#define EP93XX_SYSCON_DEVCFG_KEYS	(1<<1)
-+#define EP93XX_SYSCON_DEVCFG_SHENA	(1<<0)
-+#define EP93XX_SYSCON_VIDCLKDIV		EP93XX_SYSCON_REG(0x84)
-+#define EP93XX_SYSCON_CLKDIV_ENABLE	(1<<15)
-+#define EP93XX_SYSCON_CLKDIV_ESEL	(1<<14)
-+#define EP93XX_SYSCON_CLKDIV_PSEL	(1<<13)
-+#define EP93XX_SYSCON_CLKDIV_PDIV_SHIFT	8
-+#define EP93XX_SYSCON_I2SCLKDIV		EP93XX_SYSCON_REG(0x8c)
-+#define EP93XX_SYSCON_I2SCLKDIV_SENA	(1<<31)
-+#define EP93XX_SYSCON_I2SCLKDIV_ORIDE   (1<<29)
-+#define EP93XX_SYSCON_I2SCLKDIV_SPOL	(1<<19)
-+#define EP93XX_I2SCLKDIV_SDIV		(1 << 16)
-+#define EP93XX_I2SCLKDIV_LRDIV32	(0 << 17)
-+#define EP93XX_I2SCLKDIV_LRDIV64	(1 << 17)
-+#define EP93XX_I2SCLKDIV_LRDIV128 	(2 << 17)
-+#define EP93XX_I2SCLKDIV_LRDIV_MASK 	(3 << 17)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV	EP93XX_SYSCON_REG(0x90)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV_TSEN	(1<<31)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
-+#define EP93XX_SYSCON_SYSCFG		EP93XX_SYSCON_REG(0x9c)
-+#define EP93XX_SYSCON_SYSCFG_REV_MASK	(0xf0000000)
-+#define EP93XX_SYSCON_SYSCFG_REV_SHIFT	(28)
-+#define EP93XX_SYSCON_SYSCFG_SBOOT	(1<<8)
-+#define EP93XX_SYSCON_SYSCFG_LCSN7	(1<<7)
-+#define EP93XX_SYSCON_SYSCFG_LCSN6	(1<<6)
-+#define EP93XX_SYSCON_SYSCFG_LASDO	(1<<5)
-+#define EP93XX_SYSCON_SYSCFG_LEEDA	(1<<4)
-+#define EP93XX_SYSCON_SYSCFG_LEECLK	(1<<3)
-+#define EP93XX_SYSCON_SYSCFG_LCSN2	(1<<1)
-+#define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
-+#define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
++#include <mach/ep93xx-regs.h>
 +
- #endif /* _EP93XX_PHYS_BASE_H */
+ /* EP93xx System Controller software locked register write */
+ void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg);
+ void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits);
+diff --git a/drivers/watchdog/ep93xx_wdt.c b/drivers/watchdog/ep93xx_wdt.c
+index 82f648a..3d7f691 100644
+--- a/drivers/watchdog/ep93xx_wdt.c
++++ b/drivers/watchdog/ep93xx_wdt.c
+@@ -31,6 +31,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/io.h>
+ #include <mach/hardware.h>
++#include <mach/ep93xx-regs.h>
+ 
+ #define WDT_VERSION	"0.3"
+ #define PFX		"ep93xx_wdt: "
 -- 
 1.7.0.4
