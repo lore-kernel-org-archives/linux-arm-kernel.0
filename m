@@ -1,72 +1,53 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 11 Jan 2012 13:49:01 +0000
-Subject: [PATCHv12 0/9] OMAP3+: PRCM chain handler
-In-Reply-To: <878vlfvbdu.fsf@ti.com>
-References: <20111215213358.26632.44165.stgit@dusk>
- <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
- <87obucuzev.fsf@ti.com>
- <B5906170F1614E41A8A28DE3B8D1214304EDAC@DBDE01.ent.ti.com>
- <878vlfvbdu.fsf@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D1214331775000@DQHE04.ent.ti.com>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Wed, 11 Jan 2012 21:48:58 +0800
+Subject: [PATCH 6/6] dma/imx-sdma: check whether event_id0 < 32 when set
+ event_mask
+In-Reply-To: <20120111133458.GD20968@S2101-09.ap.freescale.net>
+References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+ <1326178910-14044-6-git-send-email-richard.zhao@linaro.org>
+ <20120110142008.GE26599@S2101-09.ap.freescale.net>
+ <20120110142939.GB2019@richard-laptop>
+ <20120110153836.GA27831@S2101-09.ap.freescale.net>
+ <20120111005322.GB2414@b20223-02.ap.freescale.net>
+ <20120111014730.GE2414@b20223-02.ap.freescale.net>
+ <CAMPhdO9sGWTomtyMSTe_jC2GfvtdLR=M-z3Uzpesm9efBzhSqA@mail.gmail.com>
+ <20120111131615.GC20968@S2101-09.ap.freescale.net>
+ <20120111130910.GC27484@b20223-02.ap.freescale.net>
+ <20120111133458.GD20968@S2101-09.ap.freescale.net>
+Message-ID: <CAMPhdO_sZGUwNmrrh1uemOff1mzG4WLFPLq2jbPt1n+mfydcpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2012 at 20:43:33, Hilman, Kevin wrote:
-> "Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
-> 
-> > Hi Kevin,
-> >
-> > On Tue, Jan 10, 2012 at 06:49:52, Hilman, Kevin wrote:
-> > [...]
-> >> >
-> >> > 1. IO and wakeup events are not supported on AM33XX. Since cpu_is_34xx()
-> >> > holds true for AM33XX I ended up adding a !cpu_is_am33xx() check in 
-> >> > omap3xxx_prcm_init() to bypass the chain handler registration.
-> >> 
-> >> > Without such a check we were seeing a crash in USB since USB_CLKCTRL on 
-> >> > AM33XX just happens to be at the IRQENABLE_MPU_OFFSET of OMAP3.
-> >> > Hope such cpu_is_*() checks are acceptable.
-> >> 
-> >> We try to avoid them, especially when we already have existing feature
-> >> flag for IO wakeups.
-> >> 
-> >> Does something like (completely untested) patch below work for you?
-> >> 
-> >> Of course, that implies that that feature flag is initialized correctly
-> >> for AM33xx.
-> >> 
-> >> Kevin
-> >> 
-> >> 
-> >> 
-> >> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> >> index c1c4d86..87451d9 100644
-> >> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> >> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> >> @@ -302,7 +302,7 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
-> >>  
-> >>  static int __init omap3xxx_prcm_init(void)
-> >>  {
-> >> -	if (cpu_is_omap34xx())
-> >> +	if (cpu_is_omap34xx() && omap3_has_io_wakeup())
-> >>  		return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
-> >>  	return 0;
-> >>  }
-> >> 
-> >
-> > I'll try this out once we have feature flag initialized on AM33xx.
-> > Can the cpu_is_omap34xx() check be completely dropped in that case?
-> > Or is there some other reason for retaining it?
-> 
-> The reason it is there is because that function is called from an
-> initcall.  By default, the kernel builds in support for OMAP2/3/4, so
-> that initcall will get called on every SoC.  Since it should only happen
-> for OMAP3, the cpu_is_ check is used.
-> 
+On Wed, Jan 11, 2012 at 9:35 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Jan 11, 2012 at 09:09:11PM +0800, Richard Zhao wrote:
+>> On Wed, Jan 11, 2012 at 09:16:17PM +0800, Shawn Guo wrote:
+>> > On Wed, Jan 11, 2012 at 02:37:08PM +0800, Eric Miao wrote:
+>> > > I think Richard has made the issue quite clear here, the original
+>> >
+>> > Yes, he has made it clear, but only after I asked for more comments,
+>> > not with the empty commit message.
+>> >
+>> > > code does seem to have some problems even to me, who do not
+>> > > understand the very details of the SDMA:
+>> > >
+>> > > - ? ? ? ? ? ? ? ? ? ? ? sdmac->event_mask0 = 1 << sdmac->event_id0;
+>> > > - ? ? ? ? ? ? ? ? ? ? ? sdmac->event_mask1 = 1 << (sdmac->event_id0 - 32);
+>> > >
+>> > > 1. if sdmac->event_id0 >= 32, which will cause event_mask0 to be incorrect
+>> > > 2. if sdmac->event_id < 32, sdmac->event_mask1 will be incorrect
+>> > >
+>> > My testing tells this is not the case. ?The event_mask0 will be 0 in
+>> > case 1) and event_mask1 will be 0 in case 2), which is quite what we
+>> > expect. ?And I do not believe you will see any functionality bug with
+>> > the existing code.
+>> Please see my mail mentioned "we shoud not let it depends on gcc's
+>> behavior."
+>
+> In this case, I would rather believe that the author is smart enough
+> to write the code intentionally based on his good understanding on
+> behavior of arm-gcc.
 
-I guess my question was misunderstood. My question was regarding your proposed
-patch. If omap3_has_io_wakeup() is sufficient to decide whether or not to
-register the chain handler is there still a need for cpu_is_omap34xx()?
-
-Regards,
-Vaibhav
+Either using the tricky gcc behavior which _will_ vary along version changes,
+or using "hard to understand code" is BAD idea. We don't write good code
+depending on author's "smartness", we write code so that it's understandable
+and maintainable.
