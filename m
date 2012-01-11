@@ -1,45 +1,48 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 11 Jan 2012 00:49:28 +0000
-Subject: [PATCH 1/3] ATMEL: fix nand ecc support
-In-Reply-To: <1326232616.2335.11.camel@koala>
-References: <1325933370-17475-1-git-send-email-plagnioj@jcrosoft.com>
- <1326232616.2335.11.camel@koala>
-Message-ID: <20120111004928.GE3226@page>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 11 Jan 2012 08:53:23 +0800
+Subject: [PATCH 6/6] dma/imx-sdma: check whether event_id0 < 32 when set
+ event_mask
+In-Reply-To: <20120110153836.GA27831@S2101-09.ap.freescale.net>
+References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
+ <1326178910-14044-6-git-send-email-richard.zhao@linaro.org>
+ <20120110142008.GE26599@S2101-09.ap.freescale.net>
+ <20120110142939.GB2019@richard-laptop>
+ <20120110153836.GA27831@S2101-09.ap.freescale.net>
+Message-ID: <20120111005322.GB2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2012 at 11:56:54PM +0200, Artem Bityutskiy wrote:
-> On Sat, 2012-01-07 at 11:49 +0100, Jean-Christophe PLAGNIOL-VILLARD
-> wrote:
-> > +#ifndef __ATMEL_NAND_H__
-> > +#define __ATMEL_NAND_H__
-> > +
-> > +#include <linux/mtd/nand.h>
-> > +
-> > + /* NAND / SmartMedia */
-> > +struct atmel_nand_data {
-> > +	int		enable_pin;		/* chip enable */
-> > +	int		det_pin;		/* card detect */
-> > +	int		rdy_pin;		/* ready/busy */
-> > +	u8		rdy_pin_active_low;	/* rdy_pin value is inverted */
-> > +	u8		ale;			/* address line number connected to ALE */
-> > +	u8		cle;			/* address line number connected to CLE */
-> > +	u8		bus_width_16;		/* buswidth is 16 bit */
-> > +	u8		ecc_mode;		/* ecc mode */
-> > +	struct mtd_partition *parts;
-> > +	unsigned int	num_parts;
-> > +};
-> > +
-> > +#endif /* __ATMEL_NAND_H__ */
-> 
-> The "include/linux" directory, I think, should generally contain only
-> those headers which define some "userspace-kernel" or "kernel subsystem"
-> API. This file defines Atmel NAND driver's, so it should not be placed
-> there.
-> 
-> I am not sure "include/linux" is the best place for this header - is it?
+On Tue, Jan 10, 2012 at 11:38:39PM +0800, Shawn Guo wrote:
+> On Tue, Jan 10, 2012 at 10:29:42PM +0800, Richard Zhao wrote:
+> > On Tue, Jan 10, 2012 at 10:20:10PM +0800, Shawn Guo wrote:
+> > > On Tue, Jan 10, 2012 at 03:01:50PM +0800, Richard Zhao wrote:
+> > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > > ---
+> > > 
+> > > I think it deserves a sensible commit message explaining why the patch
+> > > is needed.
+> > If event_id0 < 32, 1 << (sdmac->event_id0 - 32) is not zero.
+This meant to make you clear about the patch. I'll add it in commit
+message.
+> > 
+> My point is you may explain the exact problem you are seeing without
+> this patch
+The kernel don't have event_id < 32 case yet. I found the bug when
+I review the code.
+> and how the patch helps here.  In general, doing so would
+> win a warm feeling from reviewers much more easily than leaving the
+> commit message empty there.
+I understand your point that comment as much as possible.
 
-If this is platform data, which it looks like to me then 
-include/linux/platform_data would be a great home for it.
-
-Jamie
+Thanks
+Richard
+> 
+> -- 
+> Regards,
+> Shawn
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
