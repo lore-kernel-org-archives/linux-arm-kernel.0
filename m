@@ -1,48 +1,30 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Wed, 11 Jan 2012 13:20:03 -1000
-Subject: [PATCH] ARM: vexpress: initial device tree support
-In-Reply-To: <4F0DEE4F.3080103@freescale.com>
-References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
- <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
- <4F0B897A.20502@firmworks.com>
- <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
- <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
- <4F0CD7BC.7080409@freescale.com> <4F0D2F90.8020801@firmworks.com>
- <4F0DEE4F.3080103@freescale.com>
-Message-ID: <4F0E1923.4090703@firmworks.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Wed, 11 Jan 2012 15:21:46 -0800
+Subject: [GIT PULL 05/11] SoC-level changes for tegra and omap
+In-Reply-To: <CAMuHMdVvQzdxw0B3ZMtJej=9Qwm7Qbd5aenSOfa=QPhX8UUt2w@mail.gmail.com>
+References: <1326147171-13752-1-git-send-email-arnd@arndb.de>
+ <CA+55aFw15sw0PWtom88vJx1M45CLuvpZABQAxMOQ+xowz8Xq2A@mail.gmail.com>
+ <7vty438575.fsf@alter.siamese.dyndns.org> <201201111812.46431.arnd@arndb.de>
+ <CAMuHMdVvQzdxw0B3ZMtJej=9Qwm7Qbd5aenSOfa=QPhX8UUt2w@mail.gmail.com>
+Message-ID: <CA+55aFxDdCUd_h2Xk3H3giO4GsAE05Y8-uN1tqRNOJiKV-mhGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/11/2012 10:17 AM, Timur Tabi wrote:
-> Mitch Bradley wrote:
+On Wed, Jan 11, 2012 at 12:29 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
 >
->> I think that would not be a good design.  Presence and location of EDID
->> data is not something that a generic I2C driver should know.  It's the
->> video controller that knows that EDID exists, where it is located
->> (device ID 0x50 and addresses within that device), and what it means.
->
-> But the video driver does not know what I2C *bus* it's on.  I have been unable to come up with a way to obtain the proper i2c_adapter object to use when looking for EDID data.
+> And all of this would look nice if you would have done a rebase on top of the
+> latest tagged version of Linus' tree that contains all prerequisites, right?
 
-You make device nodes for each of the i2c adapters (possibly with a GPIO 
-I2C mux node underneath the EDID one), then you point to the correct 
-adapter (or mux) node with a phandle-valued property in the video node.
+Rebasing means that nobody else can depend on or work with that tree,
+so it's a no-no.
 
-Of course, you need the deferral patch cited in another message.
+Sure, it works if you are the only person touching it, but then you
+had better not export it at all, so what's the point?
 
->
->>>   That won't work if I have multiple video controllers, since I won't know which EDID data goes with which video controller.  I tried adding a call to i2c_add_driver() in my framebuffer driver, but the I2C probe function was called *after* the framebuffer's probe function, so that doesn't help me.
->>
->> Then there needs to be some sort of ordering or dependency to ensure
->> that the I2C driver is activated before the framebuffer driver tries to
->> use it.
->
-> I don't know how to do that, either.
->
->> Either way, you need platform-dependent functions to do the switching,
->> and you need to select the appropriate channel.  Personally, I don't see
->> the advantage of using the mux device in this case.  It's just adding
->> complexity with no payback.
->
-> I'm always in favor of doing things the simpler way.
->
->
+We have had independent problems in another branch exactly because it
+was rebased and people merged it, so bringing up rebasing as a
+"solution" is wrong-headed. It just causes *more* problems of other
+kinds, even if it may make git request-pull trivial.
+
+                        Linus
