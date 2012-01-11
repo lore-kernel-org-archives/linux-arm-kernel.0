@@ -1,40 +1,104 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Wed, 11 Jan 2012 17:32:44 -0600
-Subject: [PATCH] ARM: vexpress: initial device tree support
-In-Reply-To: <4F0E1923.4090703@firmworks.com>
-References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
- <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
- <4F0B897A.20502@firmworks.com>
- <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
- <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
- <4F0CD7BC.7080409@freescale.com> <4F0D2F90.8020801@firmworks.com>
- <4F0DEE4F.3080103@freescale.com> <4F0E1923.4090703@firmworks.com>
-Message-ID: <4F0E1C1C.70909@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 12 Jan 2012 07:56:36 +0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6FB@HQMAIL01.nvidia.com>
+References: <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
+ <20120107135445.GI4790@S2101-09.ap.freescale.net>
+ <20120108125156.GB2203@richard-laptop>
+ <20120109015625.GE1835@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6FB@HQMAIL01.nvidia.com>
+Message-ID: <20120111235634.GG20968@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mitch Bradley wrote:
-> You make device nodes for each of the i2c adapters 
+On Wed, Jan 11, 2012 at 10:37:36AM -0800, Stephen Warren wrote:
+> Shawn Guo wrote at Sunday, January 08, 2012 6:56 PM:
+> > On Sun, Jan 08, 2012 at 08:51:59PM +0800, Richard Zhao wrote:
+> > ...
+> > > > > So, this does appear to be conflating the two things: The definition of
+> > > > > what pins are in a pingroup, and the mux function for a particular
+> > > > > setting of that pingroup. I think you need separate nodes for this.
+> > > > >
+> > > > At least for imx, we do not have mux function setting for pingroup.
+> > > > Instead, it only applies to individual pin.
+> > > I think it depends on function definition of pinmux driver. For the
+> > > imx example patch, it's one-to-one.
+> > 
+> > It should depend on particular imx soc pinmux design rather than
+> > pinmux driver.  If it's always one-to-one case, we do not need
+> > pinmux at all.  Aisheng's patch just did not enumerate all the groups
+> > for given function.  Instead, it puts a couple simple examples there
+> > for demonstration.
+> > 
+> > ...
+> > 
+> > > > > 		uart4func: func at 1 {
+> > > > > 			func-name = "uart4";
+> > > > > 			locations = <&bargrp &bazgrp>;
+> > > > > 			mux-value = <6 3>;
+> > > > > 		};
+> > > >
+> > > > I prefer to have function node defined in <board>.dtsi, since it's
+> > > > all about defining phandle to the correct pingroup, which should be
+> > > > decided by board design.
+> > > group and function are one-to-one mapped for imx.
+> > 
+> > Again, it's not the case.
+> > 
+> > > So if you put function
+> > > in board dts, why not put pin group there too?
+> > 
+> > If we put pingroup data in <board>.dts, the data will be likely get
+> > duplicated a lot in different board dts files.  For example, if
+> > imx6q-sabrelite chooses the same pingroup for usdhc3 and usdhc4 as
+> > imx6q-arm2, the pingroup data will be duplicated between imx6q-arm2.dts
+> > and imx6q-sabrelite.dts.
+> > 
+> > On the contrary, putting pingroup data in <soc>.dtsi and having function
+> > node in <board>.dts with phandle pointing to the correct pingroup will
+> > help avoid such data duplication.
+> 
+> Oh, when I wrote in my first mail today that I'd expand on one of my
+> points when responding to Richard Zhao's email, I actually meant when
+> responding to this email. Sorry for the confusion!
+> 
+> So, I don't agree with putting the "combinations" in the SoC .dtsi file,
+> since that could grow it into a huge file that contains a lot of nodes
+> that are used on some board somewhere, but typically not the "current"
+> board that's including it.
+> 
+> However, I do see that there are probably lots of common combinations
+> that get re-used across multiple boards, and you might want a common
+> place to put those definitions so they don't need to be cut/paste
+> everywhere.
+> 
+> So, why not create specific include files (.dtsi files) for each of those
+> combinations? Each include could define one particular common combination
+> of pin mux usage, or perhaps even a set of them if they're commonly used
+> together. Each board file would include the SoC .dtsi file, the relevant
+> set of "pinmux config" .dtsi files, and then include anything custom to
+> that board.
 
-We have that already.
+This is somehow overkilled to me.  Doing this will create a big mount
+of .dtsi files to bloat folder arch/arm/boot/dts.  Putting the
+'combinations' in <soc>.dtsi seems perfect fine to me.
 
-> (possibly with a GPIO 
-> I2C mux node underneath the EDID one), 
+Regards,
+Shawn
 
-Ok.
-
-> then you point to the correct 
-> adapter (or mux) node with a phandle-valued property in the video node.
-
-The only connection between a device tree node and an I2C object is the
-of_find_i2c_device_by_node() function.  That requires the I2C device to be
-instantiated.
-
-> Of course, you need the deferral patch cited in another message.
-
-Last I heard, it's not ready.  I suspect it will be part of kernel 3.4, at
-the earliest.
-
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+> Remember, that include files simply get merged into the device
+> tree, so you can easily add based definitions (like) regs for e.g. an
+> SDHCI controller in a SoC .dtsi file, the pinmux properties in a .dtsi
+> file specific to SHDCI controller 3, and then e.g. CD/WP/power GPIOs in
+> the final board .dts file.
+> 
+> Following this model, we can initially just put the pinmux config into
+> each board file, then factor it out into new .dtsi files as/when we see
+> duplication. We get to start off simple, then clean up by refactoring as
+> we go.
