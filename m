@@ -1,138 +1,109 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Jan 2012 13:08:44 +0000
-Subject: [PATCH 05/15] ARM: OMAP4: convert to twd_local_timer_register()
+Date: Wed, 11 Jan 2012 13:08:50 +0000
+Subject: [PATCH 11/15] ARM: imx6q: convert to twd_local_timer_register()
  interface
 In-Reply-To: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
 References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326287334-1905-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326287334-1905-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add support for the new smp_twd runtime registration interface
-to the OMAP4 platforms, and remove the old compile-time support.
-Tested on Panda.
+to the imx6q platforms, and remove the old compile-time support.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-omap2/Makefile    |    1 -
- arch/arm/mach-omap2/timer-mpu.c |   39 ---------------------------------------
- arch/arm/mach-omap2/timer.c     |   33 ++++++++++++++++++++++++++++-----
- 3 files changed, 28 insertions(+), 45 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
+ arch/arm/mach-imx/Makefile     |    1 -
+ arch/arm/mach-imx/localtimer.c |   35 -----------------------------------
+ arch/arm/mach-imx/mach-imx6q.c |   11 +++++++++++
+ 3 files changed, 11 insertions(+), 36 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/localtimer.c
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index fc9b238..27ea7c2 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -23,7 +23,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 88531b6..a633e3f 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -71,7 +71,6 @@ obj-$(CONFIG_CPU_V7) += head-v7.o
+ AFLAGS_head-v7.o :=-Wa,-march=armv7-a
+ obj-$(CONFIG_SMP) += platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+-obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
  
- # SMP support ONLY available for OMAP4
- obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
--obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
- obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o \
- 					   sleep44xx.o
-diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
+ # i.MX5 based machines
+ obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
+diff --git a/arch/arm/mach-imx/localtimer.c b/arch/arm/mach-imx/localtimer.c
 deleted file mode 100644
-index 31c0ac4..0000000
---- a/arch/arm/mach-omap2/timer-mpu.c
+index 3a16351..0000000
+--- a/arch/arm/mach-imx/localtimer.c
 +++ /dev/null
-@@ -1,39 +0,0 @@
+@@ -1,35 +0,0 @@
 -/*
-- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
-- * own timer in it's MPU domain. These timers will be driving the
-- * linux kernel SMP tick framework when active. These timers are not
-- * part of the wake up domain.
+- * Copyright 2011 Freescale Semiconductor, Inc.
+- * Copyright 2011 Linaro Ltd.
 - *
-- * Copyright (C) 2009 Texas Instruments, Inc.
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
 - *
-- * Author:
-- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
-- *
-- * This file is based on arm realview smp platform file.
-- * Copyright (C) 2002 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
 - */
+-
 -#include <linux/init.h>
--#include <linux/smp.h>
 -#include <linux/clockchips.h>
--#include <asm/irq.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
 -#include <asm/smp_twd.h>
--#include <asm/localtimer.h>
 -
 -/*
 - * Setup the local clock events for a CPU.
 - */
 -int __cpuinit local_timer_setup(struct clock_event_device *evt)
 -{
--	/* Local timers are not supprted on OMAP4430 ES1.0 */
--	if (omap_rev() == OMAP4430_REV_ES1_0)
--		return -ENXIO;
+-	struct device_node *np;
 -
--	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
+-	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
+-	if (!twd_base) {
+-		twd_base = of_iomap(np, 0);
+-		WARN_ON(!twd_base);
+-	}
+-	evt->irq = irq_of_parse_and_map(np, 0);
 -	twd_timer_setup(evt);
+-
 -	return 0;
 -}
--
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 6eeff0e..5017e84 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -39,7 +39,7 @@
- 
- #include <asm/mach/time.h>
- #include <plat/dmtimer.h>
--#include <asm/localtimer.h>
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index c257281..5cd916c 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -21,6 +21,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
+ #include <linux/micrel_phy.h>
 +#include <asm/smp_twd.h>
- #include <asm/sched_clock.h>
- #include "common.h"
- #include <plat/omap_hwmod.h>
-@@ -324,14 +324,37 @@ OMAP_SYS_TIMER(3_secure)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--static void __init omap4_timer_init(void)
--{
- #ifdef CONFIG_LOCAL_TIMERS
--	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
--	BUG_ON(!twd_base);
-+static struct twd_local_timer twd_local_timer __initdata = {
-+	.res =	{
-+		{
-+			.start  = OMAP44XX_LOCAL_TWD_BASE,
-+			.end    = OMAP44XX_LOCAL_TWD_BASE + 0x10,
-+			.flags  = IORESOURCE_MEM,
-+		},
-+		{
-+			.start  = OMAP44XX_IRQ_LOCALTIMER,
-+			.end    = OMAP44XX_IRQ_LOCALTIMER,
-+			.flags  = IORESOURCE_IRQ,
-+		},
-+	},
-+};
- #endif
-+
-+static void __init omap4_timer_init(void)
-+{
- 	omap2_gp_clockevent_init(1, OMAP4_CLKEV_SOURCE);
- 	omap2_gp_clocksource_init(2, OMAP4_MPU_SOURCE);
-+#ifdef CONFIG_LOCAL_TIMERS
-+	/* Local timers are not supprted on OMAP4430 ES1.0 */
-+	if (omap_rev() != OMAP4430_REV_ES1_0) {
-+		int err;
-+
-+		err = twd_local_timer_register(&twd_local_timer);
-+		if (err)
-+			pr_err("twd_local_timer_register failed %d\n", err);
-+	}
-+#endif
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+@@ -116,9 +117,19 @@ static void __init imx6q_init_irq(void)
+ 	of_irq_init(imx6q_irq_match);
  }
- OMAP_SYS_TIMER(4)
- #endif
+ 
++#ifdef CONFIG_HAVE_ARM_TWD
++static void __init imx6q_twd_init(void)
++{
++	twd_local_timer_of_register();
++}
++#else
++#define imx6q_twd_init		NULL
++#endif
++
+ static void __init imx6q_timer_init(void)
+ {
+ 	mx6q_clocks_init();
++	late_time_init = imx6q_twd_init;
+ }
+ 
+ static struct sys_timer imx6q_timer = {
 -- 
 1.7.7.1
