@@ -1,34 +1,59 @@
-From: arnd.bergmann@linaro.org (Arnd Bergmann)
-Date: Wed, 11 Jan 2012 15:23:57 +0000
-Subject: [PATCH 0/7] at91 : pm.h cleanups
-In-Reply-To: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <201201111523.57368.arnd.bergmann@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 11 Jan 2012 09:32:05 -0600
+Subject: [PATCH 1/6] ARM: exynos: remove incorrect BSYM usage
+In-Reply-To: <1326149146-19756-2-git-send-email-robherring2@gmail.com>
+References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
+ <1326149146-19756-2-git-send-email-robherring2@gmail.com>
+Message-ID: <4F0DAB75.7020006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 January 2012, Daniel Lezcano wrote:
+On 01/09/2012 04:45 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> This patchset is the first series to cleanup some code around pm.h, pm.c and
-> cpuidle. The next series will bring more cleanups and finally the third series
-> will change the different functions into ops where we can export the structure
-> definition in order to encapsulate the code and move the at91's cpuidle driver
-> to the drivers/cpuidle directory.
+> BSYM macro is only needed for assembly files and its usage in c files is
+> wrong, so remove it. The linker will correctly set bit 0 for Thumb2
+> kernels.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Dave Martin <dave.martin@linaro.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> ---
 
-Hi Daniel,
+This needs an ENDPROC as well for exynos4_secondary_startup. And so do
+msm and ux500 as well.
 
-These all look like useful cleanups. You don't really have to split them
-up into so small units, but it doesn't hurt if you do. Patch 5 seems to
-actually fix a bug, but probably a harmless one.
+Rob
 
-It's not clear where you're headed though, I hope that becomes more obvious
-in the next patches. The tricky bit that will have to be done is to turn
-all the #ifdef checks into runtime here. You have moved the #include for the
-memory controller into a new header, but that is not actually progress
-on this larger problem. It would be nice to move the
-sdram_selfrefresh_enable/disable functions into a .c file that uses
-cpu_is_at91...() to do runtime detection, but AFAICT that won't work
-because you have to guarantee that all the code between these is
-in the cache, right?
-
-	Arnd
+>  arch/arm/mach-exynos/platsmp.c |    5 ++---
+>  1 files changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index 60bc45e..683aec7 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -24,7 +24,6 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/hardware/gic.h>
+>  #include <asm/smp_scu.h>
+> -#include <asm/unified.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/regs-clock.h>
+> @@ -137,7 +136,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	while (time_before(jiffies, timeout)) {
+>  		smp_rmb();
+>  
+> -		__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
+> +		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+>  			CPU1_BOOT_REG);
+>  		gic_raise_softirq(cpumask_of(cpu), 1);
+>  
+> @@ -192,6 +191,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>  	 * until it receives a soft interrupt, and then the
+>  	 * secondary CPU branches to this address.
+>  	 */
+> -	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
+> +	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+>  			CPU1_BOOT_REG);
+>  }
