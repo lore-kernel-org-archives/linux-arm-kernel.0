@@ -1,22 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Jan 2012 13:26:06 +0800
-Subject: [PATCH 5/6] ARM: mxc: add dt support for audmux-v2
-In-Reply-To: <20120106092124.GT2414@b20223-02.ap.freescale.net>
-References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-6-git-send-email-richard.zhao@linaro.org>
- <20120106091315.GG5446@pengutronix.de>
- <20120106092124.GT2414@b20223-02.ap.freescale.net>
-Message-ID: <20120111052603.GA28509@S2101-09.ap.freescale.net>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Wed, 11 Jan 2012 11:24:40 +0530
+Subject: [PATCH RFC] omap-serial :Make the suspend/resume functions depend on
+ CONFIG_PM_SLEEP.
+Message-ID: <1326261280-3895-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2012 at 05:21:24PM +0800, Richard Zhao wrote:
-> You are right. Look like I have to convert audmux to platform devices
-> for all platforms.
-> 
-With doing so, it may be also good for us to move this driver into
-sound/soc/imx/.  Any particular reason to keep it in platform?
+    The macro SET_SYSTEM_SLEEP_PM_OPS  depends CONFIG_PM_SLEEP. The patch
+    defines the suspend and resume functions for CONFIG_PM_SLEEP instead of
+    CONFIG_SUSPEND.
 
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+applies on Tony's uart branch
+
+ drivers/tty/serial/omap-serial.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 91b0f65..eb90a01 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1160,7 +1160,7 @@ static struct uart_driver serial_omap_reg = {
+ 	.cons		= OMAP_CONSOLE,
+ };
+ 
+-#ifdef CONFIG_SUSPEND
++#ifdef CONFIG_PM_SLEEP
+ static int serial_omap_suspend(struct device *dev)
+ {
+ 	struct uart_omap_port *up = dev_get_drvdata(dev);
 -- 
-Regards,
-Shawn
+1.7.1
