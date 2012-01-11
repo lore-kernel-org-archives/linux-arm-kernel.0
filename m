@@ -1,46 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Jan 2012 09:34:29 +0100
-Subject: linux-next: please update the i.MX tree
-In-Reply-To: <20120111093457.af3caeabe2dbf50b70942334@canb.auug.org.au>
-References: <20120110115218.e00ab8c01abd5b9ae9a3b166@canb.auug.org.au>
- <20120110083020.GR5446@pengutronix.de>
- <20120111093457.af3caeabe2dbf50b70942334@canb.auug.org.au>
-Message-ID: <20120111083429.GU5446@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 11 Jan 2012 09:36:51 +0100 (CET)
+Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
+In-Reply-To: <CAOesGMh0W1hvpySB8jtVBojZtoniHXur98Bzq1Feh3vAD4CkOg@mail.gmail.com>
+References: <20120111133146.990e2b7115c9fa80e8fc3234@canb.auug.org.au>
+ <CAOesGMh0W1hvpySB8jtVBojZtoniHXur98Bzq1Feh3vAD4CkOg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1201110933480.1191@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 09:34:57AM +1100, Stephen Rothwell wrote:
-> Hi Sascha,
-> 
-> On Tue, 10 Jan 2012 09:30:20 +0100 Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Tue, 10 Jan 2012, Olof Johansson wrote:
+
+> On Tue, Jan 10, 2012 at 6:31 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> > Hi Mauro,
 > >
-> > On Tue, Jan 10, 2012 at 11:52:18AM +1100, Stephen Rothwell wrote:
-> > > 
-> > > It looks like most (if not all) of the i.MX tree has been merged into the
-> > > arm-soc (and Linus') tree, so could you please update the i.MX tree to
-> > > eliminate the conflicts I am getting.
-> > 
-> > Did this. Sorry, I was not aware that there is something in this branch.
+> > Today's linux-next merge of the v4l-dvb tree got conflicts in a large
+> > number of files between commits from the arm-soc tree and commits from the
+> > v4l-dvb tree. ?You have rebased the v4l-dvb tree onto v3.2 while the
+> > arm-soc tree had merged a previous version. you have then added a lot
+> > more commits on top of the result - which produces all the conflicts. ?:-(
+> >
+> > This is exactly the sort of pain I alluded to when I first noted that the
+> > v4l-dvb tree had been merged into the arm-soc tree ...
 > 
-> Did you push it out? I just checked and it hasn't changed. Just to be
-> clear, I am fetching git://git.pengutronix.de/git/imx/linux-2.6.git
-> branch for-next and it hasn't changed since last September.
-
-I failed to wait until my push returned. It failed due to
-non-fast-forward pushing. Really fixed this now.
-
+> We do this every now and then though, it's not an issue as long as
+> nothing stupid is done with the dependent branch at the other end.
+> I.e. if it's actually a stable branch (which we got promised that it
+> was).
 > 
-> Should I, instead, just remove that tree from linux-next and let you send
-> stuff just via the arm-soc (or arm)tree?
+> So, why was the whole v4l tree rebased? Guennadi, you said it was
+> going to be a stable branch? What happened?
 
-Yes, that's probably best. That's what I do anyway.
+Sorry, I don't think I _promised_ anything, I even don't think I said 
+anything at all about the stability of that branch. On the contrary - I 
+suggested you to only take _one_ patch, about which we knew, that some ARM 
+patches depended upon, for which I've got Mauro's ack. This has been done 
+with the sole purpose for you to avoid any dependencies. Instead you 
+decided to pull the whole branch.
 
-Sascha
+> > Not happy.
+> 
+> No kidding.  Mauro, can you undo your rebase or should I remove the
+> dependent branch (and the at91 branch that needs it) from arm-soc
+> instead?
 
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
