@@ -1,60 +1,57 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 Jan 2012 09:19:11 -0600
-Subject: [PATCH 3/6] ARM: vexpress: remove incorrect BSYM usage
-In-Reply-To: <20120110120402.GB2336@linaro.org>
-References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
- <1326149146-19756-4-git-send-email-robherring2@gmail.com>
- <20120110120402.GB2336@linaro.org>
-Message-ID: <4F0DA86F.3020401@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 11 Jan 2012 08:22:52 -0700 (MST)
+Subject: [PATCHv8 4/5] OMAP: I2C: Remove the reset in the init path
+In-Reply-To: <4F0D9B70.3000309@ti.com>
+References: <1323773758-6375-1-git-send-email-shubhrajyoti@ti.com>
+ <1323773758-6375-5-git-send-email-shubhrajyoti@ti.com>
+ <alpine.DEB.2.00.1112160139010.12660@utopia.booyaka.com>
+ <4EEB086A.2050607@ti.com>
+ <CANQgH-Ze1S6sy1uhzy_b8GWOCjF4+-9DOCcUn9mq1kAaT+Y7FA@mail.gmail.com>
+ <CANQgH-YLez8B-t8nf9_M8samn9YWUa7LcOFx6uPFrJE9tnXB1Q@mail.gmail.com>
+ <87hb03tw8h.fsf@ti.com> <4F0D26DF.1020108@ti.com>
+ <alpine.DEB.2.00.1201110619090.31702@utopia.booyaka.com>
+ <4F0D9B70.3000309@ti.com>
+Message-ID: <alpine.DEB.2.00.1201110809530.31702@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2012 06:04 AM, Dave Martin wrote:
-> On Mon, Jan 09, 2012 at 04:45:43PM -0600, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> BSYM macro is only needed for assembly files and its usage in c files is
->> wrong, so remove it. The linker will correctly set bit 0 for Thumb2
->> kernels.
-> 
-> Pawel posted a patch to do this for realview and vexpress:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/077014.html
-> 
-> I don't know whether this is currently headed for merge.  Without the
-> ENDPROC additions in plat-versatile/platsmp.S, taking the BSYM away
-> causes breakage.  (The missing ENDPROC is the true bug here.)
+On Wed, 11 Jan 2012, Cousson, Benoit wrote:
 
-Pawel, what's the status? I can pick up your patch if it's not queued up.
+> Something that puzzle me on that point is most architecture does not use
+> plateform_device and thus does not have any pdata to hack some custom function
+> pointers here an there.
+> It means that there is probably some better solution to handle that.
 
-> 
-> The changes look sensible, but break realview and vexpress as-is.
-> I suggest you coordinate with Pawel and either add the ENDPROC stuff
-> into your series, or drop those patches (but then you'll have to wait
-> to merge your series, otherwise the removal of the BSYM() macro for
-> C code will cause the realview/vexpress code to break).
-> 
-> If you've not already done so, double-check that the target function is
-> either C or properly-annotated assembler in each case.  However, so far
-> as I can see, all the cases are correct, except for realview and
-> vexpress.
-> 
-> 
-> After all these changes, BSYM will only be used in:
-> 
-> boot/compressed/head.S
-> include/asm/entry-macro-multi.S
-> include/asm/unified.h
-> kernel/entry-armv.S
-> kernel/entry-common.S
-> kernel/head-nommu.S
-> kernel/head.S
-> kernel/sleep.S
-> lib/call_with_stack.S
-> 
-> ... so providing it only for assembler ought to be OK.
-> 
+PCI and USB have their own bus-level device reset functions that are 
+exported from bus code that lives under drivers/.  In a similar fashion, 
+we could export omap_device_reset() from our arch/arm/plat-omap code.  
+But that would require that arch/arm/plat-omap and arch/arm/mach-omap2 
+code to be compiled for any ARM build that includes i2c-omap.c.  This 
+would be good to avoid, under the principle that drivers should be 
+buildable for any architecture.  (This is also why we wish to remove 
+omap_{read,write}*() and cpu_is_omap() from any drivers which contain 
+those.)
 
-So is that an ack for the last patch?
+The intention a few years ago was to eventually create a a real omap_bus 
+and omap_device, with the bus/device integration code living under 
+drivers.  In such a situation, we'd be able to use something like the 
+PCI/USB approach cleanly, since there wouldn't be dependencies to arch/ 
+code.
 
-Rob
+> AFAIU, the way PPC is handling that is by splitting the driver in a generic
+> part and in a platform specific part.
+>
+> You can then add any OMAP specific hacks in the OMAP specific part while 
+> keeping most of generic code in a generic driver.
+> 
+> In this case, we just have to implement a small shim that will handle the OMAP
+> specific code for the reset. The generic driver will handle the rest.
+> 
+> Maybe I'm missing some important details, but that does seems easily doable
+> for the i2c case.
+
+Hmm.  How do those drivers call the platform-specific code in a way that 
+allows those drivers to be built for non-PPC platforms?
+
+
+- Paul
