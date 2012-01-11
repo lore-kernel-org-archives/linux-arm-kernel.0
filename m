@@ -1,45 +1,46 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 11 Jan 2012 15:25:20 +0530
-Subject: [PATCH] gpio/gpio-pl061: No need of thaw and poweroff routines for
- hibernate
-Message-ID: <7662253849428ce018fb7f7359e0585fca9fb597.1326274467.git.viresh.kumar@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Jan 2012 10:06:23 +0000
+Subject: ARM kexec SMP problem using exynos4210
+In-Reply-To: <4F0D49DD.80305@samsung.com>
+References: <4F0D49DD.80305@samsung.com>
+Message-ID: <20120111100623.GA27887@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pl061 uses same routines for suspend/freeze/poweroff and resume/thaw/restore.
-We are only saving and restoring register values on these routines.
+On Wed, Jan 11, 2012 at 08:35:41AM +0000, Joonyoung Shim wrote:
+> Hi,
 
-During hibernation, in freeze() we take a snapshot of gpio registers. In thaw()
-we don't actually need to restore these registers, as power was never shut down
-till now. Similarly, in poweroff() we don't need to take snapshot of these
-registers again, as it was done during freeze() and by now the image is already
-saved on disk.
+Hello [adding linux-arm-kernel],
 
-This patch passes poweroff() and thaw() routines as NULL to avoid this extra
-work done.
+> I have tested kexec to Nuri board using Exynos4210(Dual-core ARM
+> Cortex-A9) on the latest mainline kernel but i am facing one problem.
+> 
+> The kernel enabled SMP, kernel_kexec() calls machine_shutdown to stop
+> all cpus except current cpu and jumps to the new kernel but the kernel
+> is hanged soon.
+> 
+> I used cpu_down(1) to make disabled cpu1 instead of smp_send_stop of
+> machine_shutdown and it is booted successfully to new kernel.
+> 
+> Any ideas?
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/gpio/gpio-pl061.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+I suspect that the secondary CPUs are not being parked correctly in the first
+kernel. For this, you need to implement platform_cpu_kill for your platform.
 
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index 84ba1dd..45b884b 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -430,7 +430,12 @@ static int pl061_resume(struct device *dev)
- 	return 0;
- }
- 
--static SIMPLE_DEV_PM_OPS(pl061_dev_pm_ops, pl061_suspend, pl061_resume);
-+static const struct dev_pm_ops pl061_dev_pm_ops = {
-+	.suspend = pl061_suspend,
-+	.resume = pl061_resume,
-+	.freeze = pl061_suspend,
-+	.restore = pl061_resume,
-+};
- #endif
- 
- static struct amba_id pl061_ids[] = {
--- 
-1.7.8.110.g4cb5d
+Given that exynos just does:
+
+int platform_cpu_kill(unsigned int cpu)
+{
+	return 1;
+}
+
+then I'm not surprised it doesn't work. Try adding something in there which puts
+the CPU into a state where it can be booted by the next kernel.
+
+I considered adding a purely software mechanism for doing this (in fact, I
+prototyped something up on vexpress) but after discussions with some board
+maintainers it became clear that most SMP SoCs have hardware assists for
+hotplug, and the software approach is really only need for things like the
+ARM development boards.
+
+Will
