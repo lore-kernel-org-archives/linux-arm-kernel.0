@@ -1,30 +1,22 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 11 Jan 2012 11:59:46 +0100
-Subject: mxs: enable phy-clock in the driver?
-In-Reply-To: <20120108144558.GB2544@pengutronix.de>
-References: <20120108144558.GB2544@pengutronix.de>
-Message-ID: <201201111159.46678.marek.vasut@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Jan 2012 11:03:20 +0000
+Subject: ARM kexec SMP problem using exynos4210
+In-Reply-To: <4F0D6316.4090800@samsung.com>
+References: <4F0D49DD.80305@samsung.com>
+ <20120111100623.GA27887@mudshark.cambridge.arm.com>
+ <4F0D6316.4090800@samsung.com>
+Message-ID: <20120111110319.GB27887@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi Shawn,
-> 
-> I recently noticed that my tx28 board did not have net when booting from
-> NAND (before that, barebox was setting up the network). Adding lines like
-> these from mx28evk helped:
-> 
-> 228         /* Enable fec phy clock */
-> 229         clk = clk_get_sys("pll2", NULL);
-> 230         if (!IS_ERR(clk))
-> 231                 clk_enable(clk);
-> 
-> So, if every board seems to need this, I'd think this should rather be in
-> the driver? Am I correct or is there something I have overlooked?
-> 
-> Regards,
-> 
->    Wolfram
+On Wed, Jan 11, 2012 at 10:23:18AM +0000, Joonyoung Shim wrote:
+> One more question, generally boot cpu is first cpu(cpu0). If current
+> cpu is secondary cpu(cpu1), smp_send_stop of machine_shutdown will stop
+> first cpu and next kernel will try to boot on secondary cpu. Is it
+> possible?
 
-Did you really disable the clock to FEC or only the PHY didn't have clock?
+I added the cpu_logical_map stuff for this, so the kernel can handle it.
+That said, your platform may have restrictions about the boot CPU so if it
+doesn't work, you'll need to taskset the kexec command to CPU 0.
 
-M
+Will
