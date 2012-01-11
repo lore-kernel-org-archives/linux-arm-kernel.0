@@ -1,35 +1,45 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Tue, 10 Jan 2012 18:28:44 -0600
-Subject: [PATCH] ARM: vexpress: initial device tree support
-In-Reply-To: <4F0CBD46.2010909@firmworks.com>
-References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
- <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
- <4F0B897A.20502@firmworks.com>
- <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
- <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
-Message-ID: <4F0CD7BC.7080409@freescale.com>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Wed, 11 Jan 2012 01:45:52 +0100
+Subject: Adding support for DoC G3 on Motorola A780, some help needed.
+Message-ID: <20120111014552.0dca6f3e34e2f24cf3a58f0f@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mitch Bradley wrote:
-> It seems to me that having the framebuffer driver handle the EDID 
-> "driver" function is exactly the right thing.  The framebuffer driver is 
-> the only thing that cares about EDID information.  Given a phandle 
-> reference to an I2C interface, the "driver" is just "call the I2C read 
-> routine" - plus, in your case, toggling the GPIO pin.
+Hi Robert, LAK folks,
 
-Do you think I should have the I2C probe function read the EDID data, and then store it in some global variable?  That won't work if I have multiple video controllers, since I won't know which EDID data goes with which video controller.  I tried adding a call to i2c_add_driver() in my framebuffer driver, but the I2C probe function was called *after* the framebuffer's probe function, so that doesn't help me.  
+I saw that a driver for the DoC G3 NAND chip has been added to linux-3.2
+(and write support is coming to 3.3, right?); some EZX phones like the
+Motorola A780 and E680 supported by OpenEZX[1] are using this chip
+AFAWK, but they also come with a NOR chip[2].
 
-> That GPIO pin thing is annoying, but not sufficiently complex or common 
-> that it warrants having a separate EDID driver.  You could define a 
-> platform-specific property to tell your framebuffer driver that it needs 
-> to do that GPIO thing.  It's a hack, but the GPIO thing is inherently a 
-> hack, so there will be some ugliness somewhere as a result.
+Can you please give me some directions about adding support for the
+docg3 to the A780? The changes will look somewhat similar to the
+ones for the MIOA701[3], but we have the NOR too and I have some doubts.
 
-I have two platform-specific functions, "enabled_edid" and "disable_edid", that I call before/after calling fb_ddc_read().  This seems to work well, and I already have a mechanism for calling platform-specific functions from the framebuffer driver.
+My questions are:
+  - How can I find out the resource to use? I can telnet to the
+    original firmware using linux-2.4.
+  - What are the __raw_writel() calls in [3] for?
+  - How are the partitions specified with the docg3 driver?
 
-However, Stephen Warren said I should be using the I2C mux feature instead.  
+Thanks a lot,
+   Antonio
+
+[1] http://openezx.org
+[2] http://cgit.openezx.org/openezx/tree/arch/arm/mach-pxa/ezx.c?h=ezx/current#n1067
+[3] http://thread.gmane.org/gmane.linux.ports.arm.kernel/144806
 
 -- 
-Timur Tabi
-Linux kernel developer at Freescale
+Antonio Ospite
+http://ao2.it
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120111/0988d58c/attachment.sig>
