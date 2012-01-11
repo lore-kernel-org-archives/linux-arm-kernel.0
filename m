@@ -1,51 +1,173 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Jan 2012 21:09:11 +0800
-Subject: [PATCH 6/6] dma/imx-sdma: check whether event_id0 < 32 when set
- event_mask
-In-Reply-To: <20120111131615.GC20968@S2101-09.ap.freescale.net>
-References: <1326178910-14044-1-git-send-email-richard.zhao@linaro.org>
- <1326178910-14044-6-git-send-email-richard.zhao@linaro.org>
- <20120110142008.GE26599@S2101-09.ap.freescale.net>
- <20120110142939.GB2019@richard-laptop>
- <20120110153836.GA27831@S2101-09.ap.freescale.net>
- <20120111005322.GB2414@b20223-02.ap.freescale.net>
- <20120111014730.GE2414@b20223-02.ap.freescale.net>
- <CAMPhdO9sGWTomtyMSTe_jC2GfvtdLR=M-z3Uzpesm9efBzhSqA@mail.gmail.com>
- <20120111131615.GC20968@S2101-09.ap.freescale.net>
-Message-ID: <20120111130910.GC27484@b20223-02.ap.freescale.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Jan 2012 13:08:43 +0000
+Subject: [PATCH 04/15] ARM: smp_twd: add device tree support
+In-Reply-To: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
+References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326287334-1905-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 09:16:17PM +0800, Shawn Guo wrote:
-> On Wed, Jan 11, 2012 at 02:37:08PM +0800, Eric Miao wrote:
-> > I think Richard has made the issue quite clear here, the original
-> 
-> Yes, he has made it clear, but only after I asked for more comments,
-> not with the empty commit message.
-> 
-> > code does seem to have some problems even to me, who do not
-> > understand the very details of the SDMA:
-> > 
-> > -                       sdmac->event_mask0 = 1 << sdmac->event_id0;
-> > -                       sdmac->event_mask1 = 1 << (sdmac->event_id0 - 32);
-> > 
-> > 1. if sdmac->event_id0 >= 32, which will cause event_mask0 to be incorrect
-> > 2. if sdmac->event_id < 32, sdmac->event_mask1 will be incorrect
-> > 
-> My testing tells this is not the case.  The event_mask0 will be 0 in
-> case 1) and event_mask1 will be 0 in case 2), which is quite what we
-> expect.  And I do not believe you will see any functionality bug with
-> the existing code.
-Please see my mail mentioned "we shoud not let it depends on gcc's
-behavior."
-> 
-> See, that's why we need verbose commit message to make the patch and
-> the problem it's trying to address very clear.
-I never doubt it.
+Add bindings to support DT discovery of the ARM Timer Watchdog
+(aka TWD). Only the timer side is converted by this patch.
 
-Thanks
-Richard
-> 
-> Regards,
-> Shawn
-> 
+Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/devicetree/bindings/arm/twd.txt |   29 +++++++++++
+ arch/arm/include/asm/smp_twd.h                |    1 +
+ arch/arm/kernel/smp_twd.c                     |   68 ++++++++++++++++++++-----
+ 3 files changed, 85 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
+new file mode 100644
+index 0000000..a9d5587
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/twd.txt
+@@ -0,0 +1,29 @@
++* ARM Timer Watchdog
++
++ARM 11MP, Cortex-A5 and Cortex-A9 are often associated with a per-core
++Timer-Watchdog (aka TWD), which provides both a per-cpu local timer
++and watchdog.
++
++The TWD is usually attached to a GIC to deliver its two per-processor
++interrupts.
++
++Main node required properties:
++
++- compatible : Should be one of:
++	"arm,cortex-a9-twd"
++	"arm,cortex-a5-twd"
++	"arm,arm11mp-twd"
++	"arm,smp-twd"
++
++- interrupts : Two interrupts to each core, the first one for the
++  timer, the second one for the watchdog.
++
++- reg : Specify the base address and the size of the TWD.
++
++Example:
++
++	twd at 2c000600 {
++		compatible = "arm,arm11mp-twd", "arm,smp-twd";
++		reg = <0x2c000600 0x100>;
++		interrupts = <1 13 0xf01 1 14 0xf01>;
++	};
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index 9b6ff85..e8998c9 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -31,5 +31,6 @@ struct twd_local_timer {
+ };
+ 
+ int twd_local_timer_register(struct twd_local_timer *);
++int twd_local_timer_of_register(void);
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index be245c7..53ddef8 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -20,6 +20,8 @@
+ #include <linux/clockchips.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
+ 
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
+@@ -282,37 +284,77 @@ static struct local_timer_ops twd_lt_ops = {
+ 	.stop	= twd_timer_stop,
+ };
+ 
+-int __init twd_local_timer_register(struct twd_local_timer *tlt)
++static int __init twd_local_timer_common_register(void)
+ {
+ 	int err;
+ 
+-	if (twd_base || twd_evt)
+-		return -EBUSY;
+-
+-	twd_ppi	= tlt->res[1].start;
+-
+ 	twd_evt = alloc_percpu(struct clock_event_device *);
+-	twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
+-	if (!twd_base || !twd_evt) {
++	if (!twd_evt) {
+ 		err = -ENOMEM;
+-		goto out;
++		goto out_free;
+ 	}
+ 
+ 	err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_evt);
+ 	if (err) {
+ 		pr_err("twd: can't register interrupt %d (%d)\n", twd_ppi, err);
+-		goto out;
++		goto out_free;
+ 	}
+ 
+ 	err = local_timer_register(&twd_lt_ops);
+ 	if (err)
+-		goto out;
++		goto out_irq;
+ 
+ 	return 0;
+ 
+-out:
++out_irq:
++	free_percpu_irq(twd_ppi, twd_evt);
++out_free:
+ 	iounmap(twd_base);
++	twd_base = NULL;
+ 	free_percpu(twd_evt);
+-	twd_base = twd_evt = NULL;
++
+ 	return err;
+ }
++
++int __init twd_local_timer_register(struct twd_local_timer *tlt)
++{
++	if (twd_base || twd_evt)
++		return -EBUSY;
++
++	twd_ppi	= tlt->res[1].start;
++
++	twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
++	if (!twd_base)
++		return -ENOMEM;
++
++	return twd_local_timer_common_register();
++}
++
++#ifdef CONFIG_OF
++const static struct of_device_id twd_of_match[] __initconst = {
++	{ .compatible = "arm,smp-twd", 		},
++	{ .compatible = "arm,cortex-a9-twd",	},
++	{ .compatible = "arm,cortex-a5-twd",	},
++	{ .compatible = "arm,arm11mp-twd",	},
++	{ },
++};
++
++int __init twd_local_timer_of_register(void)
++{
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, twd_of_match);
++	if (!np)
++		return -ENODEV;
++
++	twd_ppi = irq_of_parse_and_map(np, 0);
++	if (!twd_ppi)
++		return -EINVAL;
++
++	twd_base = of_iomap(np, 0);
++	if (!twd_base)
++		return -ENOMEM;
++
++	return twd_local_timer_common_register();
++}
++#endif
+-- 
+1.7.7.1
