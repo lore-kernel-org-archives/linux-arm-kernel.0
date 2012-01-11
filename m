@@ -1,57 +1,43 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 11 Jan 2012 09:57:15 +0900
-Subject: BUG: sleeping function called from invalid context at
- include/linux/freezer.h:45
-In-Reply-To: <4F0C375B.7040600@linux.vnet.ibm.com>
-References: <CAH9JG2XniMv5dVf1DixGNaQAJk-sZjnV9HfYeihEJP3JDyC4+Q@mail.gmail.com>
- <4F0C375B.7040600@linux.vnet.ibm.com>
-Message-ID: <CAH9JG2WQakNYM=CVbKmtSAB-09Vphh6xRVghrnXdiJu_Jrqetw@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 11 Jan 2012 08:57:54 +0800
+Subject: [PATCH 4/6] arm/dts: imx6q-sabrelite: add sgtl5000 audio codec
+In-Reply-To: <20120109071255.GB22134@opensource.wolfsonmicro.com>
+References: <20120108145254.GE20216@S2101-09.ap.freescale.net>
+ <20120108205504.GF29065@opensource.wolfsonmicro.com>
+ <20120109005603.GA1835@S2101-09.ap.freescale.net>
+ <4F0A613F.80509@gmail.com>
+ <CAMPhdO9gaZQ0oQpfmvvL6MWP_6L9XCOdXYNSgjqDWLQ73XpRpw@mail.gmail.com>
+ <20120109062511.GP29065@opensource.wolfsonmicro.com>
+ <20120109065238.GK1835@S2101-09.ap.freescale.net>
+ <20120109064328.GS29065@opensource.wolfsonmicro.com>
+ <20120109071714.GM1835@S2101-09.ap.freescale.net>
+ <20120109071255.GB22134@opensource.wolfsonmicro.com>
+Message-ID: <20120111005753.GC2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/10/12, Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com> wrote:
-> On 01/10/2012 09:57 AM, Kyungmin Park wrote:
->
->> Dear all
->>
->> with the latest kernel. I got the below bug message.
->> It calls the sleep function. Does it intended operation?
->>
->> static inline bool try_to_freeze(void)
->> {
->>         might_sleep();
->>         if (likely(!freezing(current)))
->>                 return false;
->>         return __refrigerator(false);
->> }
->>
->> # poweroff
->> [    6.852523] BUG: sleeping function called from invalid context at
->> include/linux/freezer.h:45
->> [    6.859489] in_atomic(): 0, irqs_disabled(): 128, pid: 1, name: init
->> [    6.865846] [<c0013508>] (unwind_backtrace+0x0/0xec) from
->> [<c0010124>] (do_signal+0x88/0x588)
->> [    6.874337] [<c0010124>] (do_signal+0x88/0x588) from [<c001063c>]
->> (do_notify_resume+0x18/0x38)
->> [    6.882928] [<c001063c>] (do_notify_resume+0x18/0x38) from
->> [<c000dc18>] (work_pending+0x24/0x28)
->>
->
->
-> You seem to be running on Arm architecture. Can you please try the patch
-> at https://lkml.org/lkml/2011/8/25/231 ?
+On Sun, Jan 08, 2012 at 11:12:56PM -0800, Mark Brown wrote:
+> On Mon, Jan 09, 2012 at 03:17:16PM +0800, Shawn Guo wrote:
+> > On Sun, Jan 08, 2012 at 10:43:29PM -0800, Mark Brown wrote:
+> 
+> > > It's purely an idiom, there's nothing enforcing it.
+> 
+> > Actually, a rough calculation on 'git grep regulator_get drivers/'
+> > output tells 80% callers are using lower case.
+> 
+> Add in the ASoC stuff (which I actually actively review) and I suspect
+> the number changes.  Anyway, there is a good solid reason for wanting
+> capitals in the code so...
+Shawn and Mark,
 
-Thank you,
-It's working and I read the all mails related with this issue. and
-need to fix it at arm side.
+Could you get agreement on it?
+I incline to not forcing upper case property names.
 
-I think some more codes from arm are needed to work it properly.
-
-Thank you,
-Kyungmin Park
->
-> Regards,
-> Srivatsa S. Bhat
-> IBM Linux Technology Center
->
->
+Thanks
+Richard
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
