@@ -1,30 +1,35 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 11 Jan 2012 15:21:46 -0800
-Subject: [GIT PULL 05/11] SoC-level changes for tegra and omap
-In-Reply-To: <CAMuHMdVvQzdxw0B3ZMtJej=9Qwm7Qbd5aenSOfa=QPhX8UUt2w@mail.gmail.com>
-References: <1326147171-13752-1-git-send-email-arnd@arndb.de>
- <CA+55aFw15sw0PWtom88vJx1M45CLuvpZABQAxMOQ+xowz8Xq2A@mail.gmail.com>
- <7vty438575.fsf@alter.siamese.dyndns.org> <201201111812.46431.arnd@arndb.de>
- <CAMuHMdVvQzdxw0B3ZMtJej=9Qwm7Qbd5aenSOfa=QPhX8UUt2w@mail.gmail.com>
-Message-ID: <CA+55aFxDdCUd_h2Xk3H3giO4GsAE05Y8-uN1tqRNOJiKV-mhGg@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 11 Jan 2012 15:22:34 -0800
+Subject: [PATCH V6 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <1325213769-11752-5-git-send-email-richard.zhao@linaro.org>
+ (Richard Zhao's message of "Fri, 30 Dec 2011 10:56:06 +0800")
+References: <1325213769-11752-1-git-send-email-richard.zhao@linaro.org>
+ <1325213769-11752-5-git-send-email-richard.zhao@linaro.org>
+Message-ID: <87aa5t25ad.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 12:29 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
->
-> And all of this would look nice if you would have done a rebase on top of the
-> latest tagged version of Linus' tree that contains all prerequisites, right?
+Richard Zhao <richard.zhao@linaro.org> writes:
 
-Rebasing means that nobody else can depend on or work with that tree,
-so it's a no-no.
+> The driver get cpu operation point table from device tree cpu0 node,
 
-Sure, it works if you are the only person touching it, but then you
-had better not export it at all, so what's the point?
+Since we already have an existing OPP infrastructure in the kernel,
+seems like  this driver should get OPPs by asking the OPP layer.
 
-We have had independent problems in another branch exactly because it
-was rebased and people merged it, so bringing up rebasing as a
-"solution" is wrong-headed. It just causes *more* problems of other
-kinds, even if it may make git request-pull trivial.
+This approach assumes the OPP layer is static at boot time and not
+changing, however that's not the case in practice.
 
-                        Linus
+The OPP layer could be extended to read boot-time OPPs from DT if
+desired, but since the OPPs are also populated/enabled/disabled
+dynamicaly on some platforms (e.g. OMAP), I think the any generic
+CPUfreq driver should use the OPP interface and not DT directly.
+
+> and adjusts operating points using clk and regulator APIs.
+
+For a generic driver, the regulator used should also be configurable.
+
+For example, this driver currently assumes a regulator named "cpu" for
+all instances.   If you had separate clusters with independent voltage
+control, you'd likely have a separate regulator for each cluster.
+
+Kevin
