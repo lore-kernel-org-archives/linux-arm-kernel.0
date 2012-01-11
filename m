@@ -1,86 +1,72 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 11 Jan 2012 15:28:11 +0200
-Subject: [PATCH] ARM: OMAP3: fix build on !CONFIG_IOMMU_API
-Message-ID: <1326288491-25146-1-git-send-email-ohad@wizery.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 11 Jan 2012 13:49:01 +0000
+Subject: [PATCHv12 0/9] OMAP3+: PRCM chain handler
+In-Reply-To: <878vlfvbdu.fsf@ti.com>
+References: <20111215213358.26632.44165.stgit@dusk>
+ <B5906170F1614E41A8A28DE3B8D1214304DF4E@DBDE01.ent.ti.com>
+ <87obucuzev.fsf@ti.com>
+ <B5906170F1614E41A8A28DE3B8D1214304EDAC@DBDE01.ent.ti.com>
+ <878vlfvbdu.fsf@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D1214331775000@DQHE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap3isp depends on CONFIG_IOMMU_API, so avoid registering its
-device (and defining its configuration structs) on !CONFIG_IOMMU_API.
+On Tue, Jan 10, 2012 at 20:43:33, Hilman, Kevin wrote:
+> "Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
+> 
+> > Hi Kevin,
+> >
+> > On Tue, Jan 10, 2012 at 06:49:52, Hilman, Kevin wrote:
+> > [...]
+> >> >
+> >> > 1. IO and wakeup events are not supported on AM33XX. Since cpu_is_34xx()
+> >> > holds true for AM33XX I ended up adding a !cpu_is_am33xx() check in 
+> >> > omap3xxx_prcm_init() to bypass the chain handler registration.
+> >> 
+> >> > Without such a check we were seeing a crash in USB since USB_CLKCTRL on 
+> >> > AM33XX just happens to be at the IRQENABLE_MPU_OFFSET of OMAP3.
+> >> > Hope such cpu_is_*() checks are acceptable.
+> >> 
+> >> We try to avoid them, especially when we already have existing feature
+> >> flag for IO wakeups.
+> >> 
+> >> Does something like (completely untested) patch below work for you?
+> >> 
+> >> Of course, that implies that that feature flag is initialized correctly
+> >> for AM33xx.
+> >> 
+> >> Kevin
+> >> 
+> >> 
+> >> 
+> >> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> >> index c1c4d86..87451d9 100644
+> >> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> >> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> >> @@ -302,7 +302,7 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
+> >>  
+> >>  static int __init omap3xxx_prcm_init(void)
+> >>  {
+> >> -	if (cpu_is_omap34xx())
+> >> +	if (cpu_is_omap34xx() && omap3_has_io_wakeup())
+> >>  		return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
+> >>  	return 0;
+> >>  }
+> >> 
+> >
+> > I'll try this out once we have feature flag initialized on AM33xx.
+> > Can the cpu_is_omap34xx() check be completely dropped in that case?
+> > Or is there some other reason for retaining it?
+> 
+> The reason it is there is because that function is called from an
+> initcall.  By default, the kernel builds in support for OMAP2/3/4, so
+> that initcall will get called on every SoC.  Since it should only happen
+> for OMAP3, the cpu_is_ check is used.
+> 
 
-This is generally nice to have, but more importantly, it fixes:
+I guess my question was misunderstood. My question was regarding your proposed
+patch. If omap3_has_io_wakeup() is sufficient to decide whether or not to
+register the chain handler is there still a need for cpu_is_omap34xx()?
 
-arch/arm/plat-omap/include/plat/iommu.h: In function 'dev_to_omap_iommu':
-arch/arm/plat-omap/include/plat/iommu.h:135: error: 'struct
-dev_archdata' has no member named 'iommu'
-arch/arm/mach-omap2/devices.c: In function 'omap3_init_camera':
-arch/arm/mach-omap2/devices.c:222: error: 'struct dev_archdata' has no
-member named 'iommu'
-make[1]: *** [arch/arm/mach-omap2/devices.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
-
-Which happens because while setting up the omap3isp device we try
-to access the (now nonexistent) iommu member of dev_archdata.
-
-Compile tested with omap2plus_defconfig on today's:
-
-commit e343a895a9f342f239c5e3c5ffc6c0b1707e6244
-Merge: 06792c4 193a667
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Tue Jan 10 18:04:27 2012 -0800
-
-    Merge tag 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/mst/vhost
-
-Reported-by: Govindraj Raja <govindraj.raja@ti.com>
-Reported-by: Arik Nemtsov <arik@wizery.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Joerg Roedel <Joerg.Roedel@amd.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
-Sorry guys, my bad.
-
- arch/arm/mach-omap2/devices.c |   14 +++++++++++++-
- 1 files changed, 13 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 46dfd1a..0b510ad 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -28,7 +28,6 @@
- #include <plat/board.h>
- #include <plat/mcbsp.h>
- #include <plat/mmc.h>
--#include <plat/iommu.h>
- #include <plat/dma.h>
- #include <plat/omap_hwmod.h>
- #include <plat/omap_device.h>
-@@ -128,6 +127,10 @@ static struct platform_device omap2cam_device = {
- };
- #endif
- 
-+#if defined(CONFIG_IOMMU_API)
-+
-+#include <plat/iommu.h>
-+
- static struct resource omap3isp_resources[] = {
- 	{
- 		.start		= OMAP3430_ISP_BASE,
-@@ -224,6 +227,15 @@ int omap3_init_camera(struct isp_platform_data *pdata)
- 	return platform_device_register(&omap3isp_device);
- }
- 
-+#else /* !CONFIG_IOMMU_API */
-+
-+int omap3_init_camera(struct isp_platform_data *pdata)
-+{
-+	return 0;
-+}
-+
-+#endif
-+
- static inline void omap_init_camera(void)
- {
- #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
--- 
-1.7.5.4
+Regards,
+Vaibhav
