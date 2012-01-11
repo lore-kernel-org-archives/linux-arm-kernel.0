@@ -1,51 +1,38 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 11 Jan 2012 09:36:51 +0100 (CET)
-Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
-In-Reply-To: <CAOesGMh0W1hvpySB8jtVBojZtoniHXur98Bzq1Feh3vAD4CkOg@mail.gmail.com>
-References: <20120111133146.990e2b7115c9fa80e8fc3234@canb.auug.org.au>
- <CAOesGMh0W1hvpySB8jtVBojZtoniHXur98Bzq1Feh3vAD4CkOg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1201110933480.1191@axis700.grange>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Jan 2012 09:44:13 +0100
+Subject: Anyone interested in another ARM kernel workshop in February?
+In-Reply-To: <CACxGe6ta7JLuP7uWO9CR+gqsPVh8RjSNJqOKUwrMg_HptPxyeA@mail.gmail.com>
+References: <CACxGe6vc+9bcr2S0vgeNwr7Oo370FxwZ_TZCZZ2ZyC+A_ir_0A@mail.gmail.com>
+ <CACxGe6vBNtgPpHzJg+pFcT3as_us3XeSJwSzd1kYzko3_8rrCg@mail.gmail.com>
+ <20111213082452.GI7148@opensource.wolfsonmicro.com>
+ <20111213153605.GQ20297@mudshark.cambridge.arm.com>
+ <029101ccbac8$56dbe960$0493bc20$%kim@samsung.com>
+ <CACxGe6ta7JLuP7uWO9CR+gqsPVh8RjSNJqOKUwrMg_HptPxyeA@mail.gmail.com>
+Message-ID: <20120111084413.GW5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Jan 2012, Olof Johansson wrote:
-
-> On Tue, Jan 10, 2012 at 6:31 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> > Hi Mauro,
-> >
-> > Today's linux-next merge of the v4l-dvb tree got conflicts in a large
-> > number of files between commits from the arm-soc tree and commits from the
-> > v4l-dvb tree. ?You have rebased the v4l-dvb tree onto v3.2 while the
-> > arm-soc tree had merged a previous version. you have then added a lot
-> > more commits on top of the result - which produces all the conflicts. ?:-(
-> >
-> > This is exactly the sort of pain I alluded to when I first noted that the
-> > v4l-dvb tree had been merged into the arm-soc tree ...
+On Thu, Jan 05, 2012 at 03:17:17AM -0700, Grant Likely wrote:
+> [Throwing out to a wider audience.  I originally contacted only the
+> attendees of the Prague summit, but now I'm cc'ing linux-arm-kernel]
 > 
-> We do this every now and then though, it's not an issue as long as
-> nothing stupid is done with the dependent branch at the other end.
-> I.e. if it's actually a stable branch (which we got promised that it
-> was).
-> 
-> So, why was the whole v4l tree rebased? Guennadi, you said it was
-> going to be a stable branch? What happened?
+> I'm organizing another ARM maintainership summit this February in
+> conjunction with Linaro Connect[1], Feb 6-10 in San Francisco.  Format
+> will be similar to the meeting we held in Prague at kernel summit with
+> time for both meetings and hacking sessions.  Linaro Connect is
+> organized with meetings and summits each morning, and hacking sprints
+> in the afternoon.  I'm planing one 1/2 day arm maintainership summit
+> meeting early in the week (Monday or Tuesday), and you're invited to
+> participate in any of the Linaro Connect sessions.  See the schedule
+> page on the Linaro Connect website for an early list of the organized
+> sessions.
 
-Sorry, I don't think I _promised_ anything, I even don't think I said 
-anything at all about the stability of that branch. On the contrary - I 
-suggested you to only take _one_ patch, about which we knew, that some ARM 
-patches depended upon, for which I've got Mauro's ack. This has been done 
-with the sole purpose for you to avoid any dependencies. Instead you 
-decided to pull the whole branch.
+Unfortunately I won't be able to attend.
 
-> > Not happy.
-> 
-> No kidding.  Mauro, can you undo your rebase or should I remove the
-> dependent branch (and the at91 branch that needs it) from arm-soc
-> instead?
+Sascha
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
