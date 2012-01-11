@@ -1,37 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 10 Jan 2012 21:08:49 -0800
-Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
-In-Reply-To: <20120111133146.990e2b7115c9fa80e8fc3234@canb.auug.org.au>
-References: <20120111133146.990e2b7115c9fa80e8fc3234@canb.auug.org.au>
-Message-ID: <CAOesGMh0W1hvpySB8jtVBojZtoniHXur98Bzq1Feh3vAD4CkOg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Jan 2012 13:26:06 +0800
+Subject: [PATCH 5/6] ARM: mxc: add dt support for audmux-v2
+In-Reply-To: <20120106092124.GT2414@b20223-02.ap.freescale.net>
+References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
+ <1325820343-11875-6-git-send-email-richard.zhao@linaro.org>
+ <20120106091315.GG5446@pengutronix.de>
+ <20120106092124.GT2414@b20223-02.ap.freescale.net>
+Message-ID: <20120111052603.GA28509@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2012 at 6:31 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Mauro,
->
-> Today's linux-next merge of the v4l-dvb tree got conflicts in a large
-> number of files between commits from the arm-soc tree and commits from the
-> v4l-dvb tree. ?You have rebased the v4l-dvb tree onto v3.2 while the
-> arm-soc tree had merged a previous version. you have then added a lot
-> more commits on top of the result - which produces all the conflicts. ?:-(
->
-> This is exactly the sort of pain I alluded to when I first noted that the
-> v4l-dvb tree had been merged into the arm-soc tree ...
+On Fri, Jan 06, 2012 at 05:21:24PM +0800, Richard Zhao wrote:
+> You are right. Look like I have to convert audmux to platform devices
+> for all platforms.
+> 
+With doing so, it may be also good for us to move this driver into
+sound/soc/imx/.  Any particular reason to keep it in platform?
 
-We do this every now and then though, it's not an issue as long as
-nothing stupid is done with the dependent branch at the other end.
-I.e. if it's actually a stable branch (which we got promised that it
-was).
-
-So, why was the whole v4l tree rebased? Guennadi, you said it was
-going to be a stable branch? What happened?
-
-> Not happy.
-
-No kidding.  Mauro, can you undo your rebase or should I remove the
-dependent branch (and the at91 branch that needs it) from arm-soc
-instead?
-
-
--Olof
+-- 
+Regards,
+Shawn
