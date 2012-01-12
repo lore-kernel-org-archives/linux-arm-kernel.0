@@ -1,117 +1,196 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 12 Jan 2012 18:37:28 +0000
-Subject: Clock API and "maximum rate"
-In-Reply-To: <CAKGA1bnT+OK1sUGXpHmmBQqt5iqpaPCaRWvB40XLuE5Zt13GPw@mail.gmail.com>
-References: <CAKGA1bmZGxxSfwGkpdyt7c-UYUTj+mV2AZhmhCUSEKTd12Q+4Q@mail.gmail.com>
- <20120111165844.GL3226@page>
- <CAKGA1bnZLDXEBAL4MPa48vKEkjn6t-0Umekgy2Y9c8p0Y8CLyQ@mail.gmail.com>
- <20120112141128.GK1068@n2100.arm.linux.org.uk>
- <CAKGA1bnT+OK1sUGXpHmmBQqt5iqpaPCaRWvB40XLuE5Zt13GPw@mail.gmail.com>
-Message-ID: <20120112183728.GA13991@page>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 12 Jan 2012 21:01:15 +0200
+Subject: [GIT PULL] adding rpmsg and remoteproc to 3.3
+Message-ID: <CAK=WgbbZBUiQkCOd=XqT9X_KexKKPft3NB6MCPK1DXfPcqAZ2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 08:48:11AM -0600, Matt Sealey wrote:
-> On Thu, Jan 12, 2012 at 8:11 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Jan 12, 2012 at 07:49:35AM -0600, Matt Sealey wrote:
-> >> On Wed, Jan 11, 2012 at 10:58 AM, Jamie Iles <jamie@jamieiles.com> wrote:
-> >> > Hi Matt,
-> >> >
-> >> > On Wed, Jan 11, 2012 at 10:30:15AM -0600, Matt Sealey wrote:
-> >> >> Just a curious question, is there any safe way in the current API or
-> >> >> even by peeking a little behind the scenes to find out what the
-> >> >> maximum clock rate would be for a given named clock or struct clk?
-> >> >
-> >> > How about:
-> >> >
-> >> > ? ? ? ?long max = clk_round_rate(clk, ~0LU);
-> >> >
-> >> > clk_round_rate() is one of the optional API calls though.
-> >>
-> >> Luckily implemented in this case :) Seems to do the trick, thanks.
-> >
-> > If it's not implemented, but there is an implemented clk_set_rate(), feel
-> > free to complain at whoever created the implementation.
-> >
-> > If there's a clk_set_rate() implementation, then there's _already_ an
-> > implementation of clk_round_rate() internally doing the rounding for the
-> > set_rate function, so there's really no excuse not to expose that via
-> > clk_round_rate().
-> >
-> > clk_round_rate() is supposed to tell you what you end up with if you
-> > ask clk_set_rate() to set the exact same value you passed in - but
-> > clk_round_rate() won't modify the hardware.
-> >
-> > So, clk_round_rate/clk_set_rate really should be thought of being
-> > implemented as this:
-> >
-> > long clk_round_rate(struct clk *clk, unsigned long rate)
-> > {
-> > ? ? ? ?return __clk_round_rate(clk, rate);
-> > }
-> >
-> > int clk_set_rate(struct clk *clk, unsigned long rate)
-> > {
-> > ? ? ? ?long rate = __clk_round_rate(clk, rate);
-> >
-> > ? ? ? ?if (rate < 0)
-> > ? ? ? ? ? ? ? ?return rate;
-> >
-> > ? ? ? ?return __clk_set_rate(clk, rate);
-> > }
-> 
-> Right. On i.MX it seems not to round first, but to assume you passed a
-> rounded rate? I assume the upper level clk API does the above, so the
-> low level doesn't have to?
+Hi Linus,
 
-Well each platform implements the whole clock API itself at the moment 
-so I guess the higher layer is in plat-mxc?  If so then something like 
-the (untested) patch below may do the trick.  clk_round_rate() for this 
-platform returns 0 when it fails though and that's not right from the 
-API:
+Please pull:
 
-/**
- * clk_round_rate - adjust a rate to the exact rate a clock can provide
- * @clk: clock source
- * @rate: desired clock rate in Hz
- *
- * Returns rounded clock rate in Hz, or negative errno.
- */
+git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next-acked
 
-Jamie
+To get the remoteproc and rpmsg frameworks, and a few fixes that were
+collected after the frameworks were already merged into linux-next.
 
-8<---
+(I also tried to push this as a signed tag "rpmsg-for-3.3" but
+am not sure how successful that feat really was)
 
-diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-index 2ed3ab1..64f679b 100644
---- a/arch/arm/plat-mxc/clock.c
-+++ b/arch/arm/plat-mxc/clock.c
-@@ -134,7 +134,7 @@ EXPORT_SYMBOL(clk_get_rate);
- long clk_round_rate(struct clk *clk, unsigned long rate)
- {
- 	if (clk == NULL || IS_ERR(clk) || !clk->round_rate)
--		return 0;
-+		return -EOPNOTSUPP;
- 
- 	return clk->round_rate(clk, rate);
- }
-@@ -146,12 +146,17 @@ EXPORT_SYMBOL(clk_round_rate);
- int clk_set_rate(struct clk *clk, unsigned long rate)
- {
- 	int ret = -EINVAL;
-+	long rounded_rate;
- 
- 	if (clk == NULL || IS_ERR(clk) || clk->set_rate == NULL || rate == 0)
- 		return ret;
- 
-+	rounded_rate = clock_round_rate(clk, rate);
-+	if (rounded_rate < 0)
-+		return rounded_rate;
-+
- 	mutex_lock(&clocks_mutex);
--	ret = clk->set_rate(clk, rate);
-+	ret = clk->set_rate(clk, rounded_rate);
- 	mutex_unlock(&clocks_mutex);
- 
- 	return ret;
+All the patches have been sitting in linux-next for awhile now
+(except the small last two which are there for only slightly more than a week,
+because I waited a bit longer than usually needed after posting
+and before committing).
+
+The commit date of the entire patch-set is only a few days old,
+because I felt it's worth rebasing that branch in order to add
+Acks I've just received from Grant. Other than adding those Acks to
+the commit logs there is virtually no other change (neither in the
+code nor in the commit logs) from the original for-next branch (which
+we have merged in linux-next today). I hope my decision was reasonable. If
+not, and you prefer the non-rebased for-next branch, then it still exists in my
+tree.
+
+At some point we did briefly discuss whether this should perhaps go through the
+arm-soc tree. Either way seemed fine, but eventually Arnd tended that
+I do send it to you directly, because (unfortunately) Arnd didn't get to
+do a detailed review of the last iteration of the patches. So we do
+have Arnd's support, but (unfortunately) not his explicit Acked-by.
+
+And now for some background on this (as I recently wrote in a side
+thread with you, so sorry if you already read it):
+
+Almost every SoC today have several extra cores (DSP or whatnot)
+which usually employ some hardware multimedia accelerators and are
+used to offload CPU-intensive tasks from the main application
+processor. These other cores are used in an asymmetric multiprocessing
+configurations, i.e. they run their own instance of operating system
+(which can be some flavor of RTOS, or Linux, or whatnot. anything
+goes).
+
+Virtually every SoC vendor have this (lots of ARM vendors, but it's
+definitely not limited to ARM), and they all have their own stack of drivers for
+controlling, and communicating with, those remote cores. And it's
+usually quite huge (tens of thousands loc) and very vendor-specific and
+out-of-tree code.
+
+So we're trying to fix this by introducing some generic code that'd
+control those remote cores and let drivers talk to them, which all
+vendors could then use.
+
+Remoteproc is the framework for controlling those cores
+(acquire/configure hardware resources, load firmware, power up/down),
+and rpmsg is an inter-processor communication bus which allows drivers
+to talk with remote services (simply by sending and receiving messages
+over dedicated channels).
+
+Rpmsg is using virtio (as suggested by Arnd) to avoid re-implementing
+another shared memory "wire" protocol. And of course to be able to reuse all the
+existing virtio drivers (e.g. net, block, console) with a remote core backend.
+
+Much more details can be found in the commit logs, in the detailed
+documentations and in the cover letter of the public submissions:
+
+- https://lkml.org/lkml/2011/6/21/47 (first submission)
+- https://lkml.org/lkml/2011/10/25/139 (second submission)
+
+The general feedback is good and it looks like there's support across the
+board for this, with no expressed objection. Ideally, though, I would prefer to
+have more explicit Acks on the patches, so the support we received
+would be explicitly reflected in the commit logs too. However, I do understand
+this requires folks to carve out considerable time for review, which
+isn't always possible...
+
+This patch set only provides basic functionality (boot a remote core
+and start talking with it, essentially). There's still more work to do
+upstream until a real product can ship with mainline code (e.g.
+runtime PM, error recovery, productive rpmsg drivers, ...), but as an
+increasing number of parties (spanning several vendors) are now
+starting to work with remoteproc/rpmsg, I feel it'd be beneficial to
+merge it at this point in order to make collaboration easier. But If
+you feel additional explicit Acks are required then by no means we can
+wait another round and go harvest those Acks.
+
+If you do decide to merge this then there are two simple merge-related
+issues to expect with the 3.3 virtio changes:
+1. adopt the recent s/virtqueue_add_buf_gfp/virtqueue_add_buf/ rename
+2. tell vring_new_virtqueue() we're not interested in weak smp barriers
+
+For reference, I already fixed those two issues on top of a rebased
+branch called 'for-next-acked-merged'. Or if you prefer I can also
+just send you the patches for this separately. I could have also
+pulled Rusty's branch in and fixed the issues in my tree before
+sending you the pull request, but I wasn't sure if that was
+preferable.
+
+After the initial rpmsg/remoteproc support will be merged, I expect to
+start maintaining those two frameworks using two dedicated trees,
+because their development is quite orthogonal.
+
+Another small detail, which isn't very relevant to this pull request but
+is still nice to know, is that the recently announced Galaxy Nexus
+phone is already using remoteproc and rpmsg to control OMAP4's
+two M3 cores and offload tasks to the hardware multimedia accelerators
+which they employ. And I'm really happy we managed to submit the
+patches to LKML much _before_ the phone was shipped :)
+
+Last but not least: the homogeneous authorship of the patch set as
+reflected below is somewhat misleading: this whole work is the result of
+an effort done by many people, including (but not limited to) Mark Grosen,
+Brian Swetland, Fernando Guzman Lugo, Suman Anna, Iliyan Malchev,
+Anthony Gil and more. And also thanks to great review comments from
+Grant Likely, Arnd Bergmann, Stephen Boyd and more. So thanks everyone!
+
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+
+  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+for-next-acked
+
+Mark Grosen (2):
+      remoteproc: do not require an iommu
+      remoteproc: avoid registering a virtio device if not supported
+
+Ohad Ben-Cohen (13):
+      remoteproc: add framework for controlling remote processors
+      remoteproc: add debugfs entries
+      remoteproc: create rpmsg virtio device
+      remoteproc/omap: add a remoteproc driver for OMAP4
+      rpmsg: add virtio-based remote processor messaging bus
+      samples/rpmsg: add an rpmsg driver sample
+      remoteproc: remove unused resource type
+      remoteproc/omap: utilize module_platform_driver
+      remoteproc: look for truncated firmware images
+      remoteproc: add Kconfig menu
+      rpmsg: add Kconfig menu
+      remoteproc: depends on EXPERIMENTAL
+      rpmsg: depends on EXPERIMENTAL
+
+ Documentation/ABI/testing/sysfs-bus-rpmsg    |   75 ++
+ Documentation/remoteproc.txt                 |  324 ++++++
+ Documentation/rpmsg.txt                      |  293 ++++++
+ MAINTAINERS                                  |    7 +
+ arch/arm/plat-omap/include/plat/remoteproc.h |   57 +
+ drivers/Kconfig                              |    4 +
+ drivers/Makefile                             |    2 +
+ drivers/remoteproc/Kconfig                   |   29 +
+ drivers/remoteproc/Makefile                  |    9 +
+ drivers/remoteproc/omap_remoteproc.c         |  238 +++++
+ drivers/remoteproc/omap_remoteproc.h         |   69 ++
+ drivers/remoteproc/remoteproc_core.c         | 1438 ++++++++++++++++++++++++++
+ drivers/remoteproc/remoteproc_debugfs.c      |  179 ++++
+ drivers/remoteproc/remoteproc_internal.h     |   44 +
+ drivers/remoteproc/remoteproc_rpmsg.c        |  295 ++++++
+ drivers/rpmsg/Kconfig                        |   10 +
+ drivers/rpmsg/Makefile                       |    1 +
+ drivers/rpmsg/virtio_rpmsg_bus.c             | 1026 ++++++++++++++++++
+ include/linux/mod_devicetable.h              |    9 +
+ include/linux/remoteproc.h                   |  264 +++++
+ include/linux/rpmsg.h                        |  326 ++++++
+ include/linux/virtio_ids.h                   |    1 +
+ samples/Kconfig                              |    8 +
+ samples/Makefile                             |    2 +-
+ samples/rpmsg/Makefile                       |    1 +
+ samples/rpmsg/rpmsg_client_sample.c          |  100 ++
+ 26 files changed, 4810 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-rpmsg
+ create mode 100644 Documentation/remoteproc.txt
+ create mode 100644 Documentation/rpmsg.txt
+ create mode 100644 arch/arm/plat-omap/include/plat/remoteproc.h
+ create mode 100644 drivers/remoteproc/Kconfig
+ create mode 100644 drivers/remoteproc/Makefile
+ create mode 100644 drivers/remoteproc/omap_remoteproc.c
+ create mode 100644 drivers/remoteproc/omap_remoteproc.h
+ create mode 100644 drivers/remoteproc/remoteproc_core.c
+ create mode 100644 drivers/remoteproc/remoteproc_debugfs.c
+ create mode 100644 drivers/remoteproc/remoteproc_internal.h
+ create mode 100644 drivers/remoteproc/remoteproc_rpmsg.c
+ create mode 100644 drivers/rpmsg/Kconfig
+ create mode 100644 drivers/rpmsg/Makefile
+ create mode 100644 drivers/rpmsg/virtio_rpmsg_bus.c
+ create mode 100644 include/linux/remoteproc.h
+ create mode 100644 include/linux/rpmsg.h
+ create mode 100644 samples/rpmsg/Makefile
+ create mode 100644 samples/rpmsg/rpmsg_client_sample.c
