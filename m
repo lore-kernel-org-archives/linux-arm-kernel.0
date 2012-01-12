@@ -1,47 +1,74 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 12 Jan 2012 11:31:09 -0600
-Subject: [PATCH v2 0/7] BSYM macro removal and secondary startup fixes
-Message-ID: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
+Date: Thu, 12 Jan 2012 11:31:10 -0600
+Subject: [PATCH v2 1/7] ARM: versatile: Add missing ENDPROC to headsmp.S
+In-Reply-To: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
+References: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1326389476-11569-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: Pawel Moll <pawel.moll@arm.com>
 
-BSYM macro usage is generally unnecessary in .c files if assembly functions
-are properly annotated with ENTRY/ENDPROC. BSYM combined with properly
-annotated assembly functions or C functions generates a wrong address
-on Thumb2 builds causing secondary cores to fail to boot.
+Once the ENDPROC is in place, BSYM() in not longer necessary
+to get correct pointer to versatile_secondary_startup().
 
-Tested Thumb2 SMP boot on highbank and imx6.
-
-Changes in v2:
-- Add missing ENDPROC annotation for all secondary startup functions.
-- Use Pawel's patch for ARM boards instead.
-
-Rob
-
-Pawel Moll (1):
-  ARM: versatile: Add missing ENDPROC to headsmp.S
-
-Rob Herring (6):
-  ARM: msm: Add missing ENDPROC to headsmp.S
-  ARM: ux500: add missing ENDPROC to headsmp.S
-  ARM: exynos: remove incorrect BSYM usage
-  ARM: imx: remove incorrect BSYM usage
-  ARM: highbank: remove incorrect BSYM usage
-  ARM: make BSYM macro assembly only
-
- arch/arm/include/asm/unified.h    |    4 ++--
- arch/arm/mach-exynos/headsmp.S    |    1 +
- arch/arm/mach-exynos/platsmp.c    |    5 ++---
- arch/arm/mach-highbank/highbank.c |    3 +--
- arch/arm/mach-imx/src.c           |    3 +--
- arch/arm/mach-msm/headsmp.S       |    1 +
+Tested-by: Jon Medhurst <tixy@linaro.org>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
  arch/arm/mach-realview/platsmp.c  |    3 +--
- arch/arm/mach-ux500/headsmp.S     |    1 +
  arch/arm/mach-vexpress/platsmp.c  |    4 +---
  arch/arm/plat-versatile/headsmp.S |    1 +
- 10 files changed, 12 insertions(+), 14 deletions(-)
+ 3 files changed, 3 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
+index e83c654..17c878d 100644
+--- a/arch/arm/mach-realview/platsmp.c
++++ b/arch/arm/mach-realview/platsmp.c
+@@ -17,7 +17,6 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
+ #include <asm/smp_scu.h>
+-#include <asm/unified.h>
+ 
+ #include <mach/board-eb.h>
+ #include <mach/board-pb11mp.h>
+@@ -75,6 +74,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	 * until it receives a soft interrupt, and then the
+ 	 * secondary CPU branches to this address.
+ 	 */
+-	__raw_writel(BSYM(virt_to_phys(versatile_secondary_startup)),
++	__raw_writel(virt_to_phys(versatile_secondary_startup),
+ 		     __io_address(REALVIEW_SYS_FLAGSSET));
+ }
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index 2b5f7ac..124ffb1 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -13,8 +13,6 @@
+ #include <linux/smp.h>
+ #include <linux/io.h>
+ 
+-#include <asm/unified.h>
+-
+ #include <mach/motherboard.h>
+ #define V2M_PA_CS7 0x10000000
+ 
+@@ -46,6 +44,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	 * secondary CPU branches to this address.
+ 	 */
+ 	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
+-	writel(BSYM(virt_to_phys(versatile_secondary_startup)),
++	writel(virt_to_phys(versatile_secondary_startup),
+ 		MMIO_P2V(V2M_SYS_FLAGSSET));
+ }
+diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+index d397a1f..dd703ef 100644
+--- a/arch/arm/plat-versatile/headsmp.S
++++ b/arch/arm/plat-versatile/headsmp.S
+@@ -38,3 +38,4 @@ pen:	ldr	r7, [r6]
+ 	.align
+ 1:	.long	.
+ 	.long	pen_release
++ENDPROC(versatile_secondary_startup)
 -- 
 1.7.5.4
