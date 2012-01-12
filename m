@@ -1,44 +1,37 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 11 Jan 2012 22:41:36 -0800
-Subject: [GIT PULL 05/11] SoC-level changes for tegra and omap
-In-Reply-To: <CAMuHMdWnoKowa0atP0k5X4vukJTnQSNSh9gibxd1Y2e60qK3RQ@mail.gmail.com>
-References: <1326147171-13752-1-git-send-email-arnd@arndb.de>
- <CA+55aFw15sw0PWtom88vJx1M45CLuvpZABQAxMOQ+xowz8Xq2A@mail.gmail.com>
- <7vty438575.fsf@alter.siamese.dyndns.org> <201201111812.46431.arnd@arndb.de>
- <CAMuHMdVvQzdxw0B3ZMtJej=9Qwm7Qbd5aenSOfa=QPhX8UUt2w@mail.gmail.com>
- <CA+55aFxDdCUd_h2Xk3H3giO4GsAE05Y8-uN1tqRNOJiKV-mhGg@mail.gmail.com>
- <CAMuHMdWnoKowa0atP0k5X4vukJTnQSNSh9gibxd1Y2e60qK3RQ@mail.gmail.com>
-Message-ID: <CA+55aFxY5JGEGgeR8S8JKR_xC75g8MYOiVvGfisQGxf5oXD+7Q@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 12 Jan 2012 08:15:09 +0100
+Subject: [RFC] ARM: imx: Add imx6q thermal
+In-Reply-To: <1326266285-11656-1-git-send-email-rob.lee@linaro.org>
+References: <1326266285-11656-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <4F0E887D.2090009@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 10:32 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
->
-> That's why you need two branches:
-> ?1. a non-rebasing one for development,
-> ?2. a rebasing one containing cherry-picked (possibly folded) commits for
-> ? ? preparing for upstream delivery.
+Hi Rob,
 
-Stop being a moron.
+On 11.01.2012 08:18, Robert Lee wrote:
+> Add thermal support for i.MX6Q.  Uses recently submitted common
+> cpu_cooling functionality shown here:
+> 
+> http://www.spinics.net/lists/linux-pm/msg26500.html
+> 
+> Have some todo items but basic implementation is done and I'd like to
+> get any helpful feedback on it.
+> 
+> Todo:
+> - Add sensor calibration.
+> - Re-organize code/files if deemed necessary by community.
 
-Go back and read the "nobody can work with you". If you rebase for
-upstream delivery, then that means that everybody that works with you
-are workign with a tree that isn't ready for delivery, and that they
-cannot rely on.
+Just fyi, I had a short discussion with Eric Miao about this. The 
+conclusion was:
 
-Just don't do it. If your tree is so ugly that you can't deliver it
-upstream, then don't deliver it sideways or downstream either. Keep it
-in your own pants, and don't make it public at all. Since nobody can
-trust it anyway, and since it isn't the final end result, why even
-bother? They can't rely on it, they can't work with it.
+The patch itself is OK. It's just lacking some features, but these can 
+be added later. The driver supports thermal reading only, but not 
+accurate as the thermal calibration data is burned into the FUSE, and 
+differ from chip to chip. At the moment only incorrect thermal 
+information will be exposed to user space. The patch is lacking 
+connections to cpufreq and cpu hotplug, but those could be added later, too.
 
-So here's the *real* solution:
+Best regards
 
- - make sure your development tree is in good enough shape that you
-can make it public, and can ask me to pull it.
-
-It really is that simple. If you don't think it's in good enough
-shape, don't make it public.
-
-                Linus
+Dirk
