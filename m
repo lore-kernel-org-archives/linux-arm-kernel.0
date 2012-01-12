@@ -1,53 +1,32 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 12 Jan 2012 17:22:41 +0200
-Subject: [PATCH] ARM: OMAP: fix MMC2 loopback clock handling
-In-Reply-To: <1326378405-27632-1-git-send-email-notasas@gmail.com>
-References: <1326378405-27632-1-git-send-email-notasas@gmail.com>
-Message-ID: <4F0EFAC1.2080003@compulab.co.il>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Thu, 12 Jan 2012 17:24:30 +0200
+Subject: [PATCH RFC] OMAP: I2C: Fix the mismatch of pm_runtime enable and
+ disable
+In-Reply-To: <4F0D9BE1.6070209@ti.com>
+References: <1326288104-10544-1-git-send-email-shubhrajyoti@ti.com>
+ <CANOLnONdYYybbSP143+TeLxjfdEg1krcZjHwf140Fm5Y8rHogA@mail.gmail.com>
+ <4F0D9BE1.6070209@ti.com>
+Message-ID: <CAMP44s3TUEU9rdc7m73yEDrUu=-TgesypiBg=iVtg+gXodSfYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/12 16:26, Grazvydas Ignotas wrote:
-> Currently MMC2 setup code can only enable loopback clock and
-> relies on reset value for boards that need to have it disabled.
-> This causes a problem with certain bootloaders that always enable
-> that clock, resulting with unwanted bootloader dependencies.
-> 
-> Fix this by making it disable the clock if board data says so.
-> 
-> Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+On Wed, Jan 11, 2012 at 4:25 PM, Shubhrajyoti <shubhrajyoti@ti.com> wrote:
+> On Wednesday 11 January 2012 07:29 PM, Grazvydas Ignotas wrote:
+>> On Wed, Jan 11, 2012 at 3:21 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+>>> Currently the i2c driver calls the pm_runtime_enable and never
+>>> the disable. This may cause a warning when pm_runtime_enable
+>>> checks for the count match.Attempting to fix the same by calling
+>>> pm_runtime_disable in the error and the remove path.
+>> I remember seeing Felipe doing the reverse to musb here:
+>> http://marc.info/?l=linux-omap&m=132432610700952&w=2
+>> so I'm confused here.
+> Strange however ?I see many drivers doing the same in the kernel
+> on greping . Besides I expect a warn to come up.
+>
+> Felipe could you explain the issue?
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-
-> ---
-> depends on "ARM: OMAP: fix erroneous mmc2 clock change on mmc3 setup"
-> http://marc.info/?l=linux-omap&m=132416866125291&w=2
-> 
->  arch/arm/mach-omap2/hsmmc.c |    9 +++++----
->  1 files changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-> index 8658bd7..ad0adb5 100644
-> --- a/arch/arm/mach-omap2/hsmmc.c
-> +++ b/arch/arm/mach-omap2/hsmmc.c
-> @@ -175,11 +175,12 @@ static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
->  {
->  	u32 reg;
->  
-> -	if (mmc->slots[0].internal_clock) {
-> -		reg = omap_ctrl_readl(control_devconf1_offset);
-> +	reg = omap_ctrl_readl(control_devconf1_offset);
-> +	if (mmc->slots[0].internal_clock)
->  		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
-> -		omap_ctrl_writel(reg, control_devconf1_offset);
-> -	}
-> +	else
-> +		reg &= ~OMAP2_MMCSDIO2ADPCLKISEL;
-> +	omap_ctrl_writel(reg, control_devconf1_offset);
->  }
->  
->  static void hsmmc2_before_set_reg(struct device *dev, int slot,
+When do you see the warning? kfree(dev) should disable runtime pm, but
+without waking up the device.
 
 -- 
-Regards,
-Igor.
+Felipe Contreras
