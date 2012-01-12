@@ -1,83 +1,54 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 12 Jan 2012 16:11:07 +0100
-Subject: [PATCH 3/5] S3C2443/S3C2416: add get_rate for clk_p
+Date: Thu, 12 Jan 2012 16:11:48 +0100
+Subject: [PATCH 4/5] S3C2443/S3C2416: remove call to s3c24xx_setup_clocks
 In-Reply-To: <201201121609.24110.heiko@sntech.de>
 References: <201201121609.24110.heiko@sntech.de>
-Message-ID: <201201121611.08240.heiko@sntech.de>
+Message-ID: <201201121611.48328.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the rate of clk_p is calculated once and set through the
-s3c24xx_setup_clocks call. As the clk_p is a child of clk_h we can
-evaluate its divider and calculate the rate in get_rate.
+As the clocks can calculate their rate themself now, there is no
+need to set it statically.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/plat-s3c24xx/s3c2443-clock.c |   28 ++++++++++++++++++++++++----
- 1 files changed, 24 insertions(+), 4 deletions(-)
+ arch/arm/plat-s3c24xx/s3c2443-clock.c |   14 +++-----------
+ 1 files changed, 3 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/plat-s3c24xx/s3c2443-clock.c b/arch/arm/plat-s3c24xx/s3c2443-clock.c
-index 8b9ee8b..bf86dd1 100644
+index bf86dd1..127550c 100644
 --- a/arch/arm/plat-s3c24xx/s3c2443-clock.c
 +++ b/arch/arm/plat-s3c24xx/s3c2443-clock.c
-@@ -179,6 +179,25 @@ static struct clk_ops clk_h_ops = {
- 	.get_rate	= s3c2443_hclkdiv_getrate,
- };
- 
-+/* pclk divider
-+ *
-+ * divides the hclk and provides the pclk.
-+ */
-+
-+static unsigned long s3c2443_pclkdiv_getrate(struct clk *clk)
-+{
-+	unsigned long rate = clk_get_rate(clk->parent);
-+	unsigned long clkdiv0 = __raw_readl(S3C2443_CLKDIV0);
-+
-+	clkdiv0 = ((clkdiv0 & S3C2443_CLKDIV0_HALF_PCLK) ? 1 : 0);
-+
-+	return rate / (clkdiv0 + 1);
-+}
-+
-+static struct clk_ops clk_p_ops = {
-+	.get_rate	= s3c2443_pclkdiv_getrate,
-+};
-+
- /* armdiv
-  *
-  * this clock is sourced from msysclk and can have a number of
-@@ -541,7 +560,6 @@ void __init_or_cpufreq s3c2443_common_setup_clocks(pll_fn get_mpll)
- {
- 	unsigned long epllcon = __raw_readl(S3C2443_EPLLCON);
- 	unsigned long mpllcon = __raw_readl(S3C2443_MPLLCON);
--	unsigned long clkdiv0 = __raw_readl(S3C2443_CLKDIV0);
+@@ -563,9 +563,6 @@ void __init_or_cpufreq s3c2443_common_setup_clocks(pll_fn get_mpll)
  	struct clk *xtal_clk;
  	unsigned long xtal;
  	unsigned long pll;
-@@ -559,7 +577,7 @@ void __init_or_cpufreq s3c2443_common_setup_clocks(pll_fn get_mpll)
+-	unsigned long fclk;
+-	unsigned long hclk;
+-	unsigned long pclk;
+ 	int ptr;
  
- 	fclk = clk_get_rate(&clk_armdiv);
- 	hclk = clk_get_rate(&clk_h);
--	pclk = hclk / ((clkdiv0 & S3C2443_CLKDIV0_HALF_PCLK) ? 2 : 1);
-+	pclk = clk_get_rate(&clk_p);
+ 	xtal_clk = clk_get(NULL, "xtal");
+@@ -574,17 +571,12 @@ void __init_or_cpufreq s3c2443_common_setup_clocks(pll_fn get_mpll)
  
- 	s3c24xx_setup_clocks(fclk, hclk, pclk);
+ 	pll = get_mpll(mpllcon, xtal);
+ 	clk_msysclk.clk.rate = pll;
+-
+-	fclk = clk_get_rate(&clk_armdiv);
+-	hclk = clk_get_rate(&clk_h);
+-	pclk = clk_get_rate(&clk_p);
+-
+-	s3c24xx_setup_clocks(fclk, hclk, pclk);
++	clk_mpll.rate = pll;
  
-@@ -622,11 +640,13 @@ void __init s3c2443_common_init_clocks(int xtal, pll_fn get_mpll,
- 	nr_armdiv = nr_divs;
- 	armdivmask = divmask;
+ 	printk("CPU: MPLL %s %ld.%03ld MHz, cpu %ld.%03ld MHz, mem %ld.%03ld MHz, pclk %ld.%03ld MHz\n",
+ 	       (mpllcon & S3C2443_PLLCON_OFF) ? "off":"on",
+-	       print_mhz(pll), print_mhz(fclk),
+-	       print_mhz(hclk), print_mhz(pclk));
++	       print_mhz(pll), print_mhz(clk_get_rate(&clk_armdiv)),
++	       print_mhz(clk_get_rate(&clk_h)), print_mhz(clk_get_rate(&clk_p)));
  
--	/* s3c2443 parents h and p clocks from prediv */
-+	/* s3c2443 parents h clock from prediv */
- 	clk_h.parent = &clk_prediv;
- 	clk_h.ops = &clk_h_ops;
- 
--	clk_p.parent = &clk_prediv;
-+	/* and p clock from h clock */
-+	clk_p.parent = &clk_h;
-+	clk_p.ops = &clk_p_ops;
- 
- 	clk_usb_bus.parent = &clk_usb_bus_host.clk;
- 	clk_epll.parent = &clk_epllref.clk;
+ 	for (ptr = 0; ptr < ARRAY_SIZE(clksrc_clks); ptr++)
+ 		s3c_set_clksrc(&clksrc_clks[ptr], true);
 -- 
 1.7.5.4
