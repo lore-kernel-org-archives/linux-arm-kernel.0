@@ -1,49 +1,55 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Thu, 12 Jan 2012 14:39:00 +0000
-Subject: tty/serial: Need clarification on Support for 4+M Baudrate
-In-Reply-To: <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A630D@EXDCVYMBSTM005.EQ1STM.local>
-References: <20120111121901.GA4034@bnru05>
- <20120111123025.244a9cf5@pyramind.ukuu.org.uk>
- <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A605A@EXDCVYMBSTM005.EQ1STM.local>
- <20120112114913.21809bed@pyramind.ukuu.org.uk>
- <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A630D@EXDCVYMBSTM005.EQ1STM.local>
-Message-ID: <20120112143900.27b92668@pyramind.ukuu.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Jan 2012 15:41:29 +0100
+Subject: [PATCH 5/7] at91 : fix dirty hack for the selfrefresh function
+In-Reply-To: <20120111194334.GF1068@n2100.arm.linux.org.uk>
+References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
+ <1326293740-15735-6-git-send-email-daniel.lezcano@linaro.org>
+ <20120111165508.GC1068@n2100.arm.linux.org.uk>
+ <201201111827.18890.arnd.bergmann@linaro.org>
+ <20120111194334.GF1068@n2100.arm.linux.org.uk>
+Message-ID: <4F0EF119.3000605@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Jan 2012 15:20:46 +0100
-Rajanikanth H V <rajanikanth.hv@stericsson.com> wrote:
+On 01/11/2012 08:43 PM, Russell King - ARM Linux :
 
-> Alan,
+[..]
+
+> On the other hand, we have another DWB in cpu_arm926_do_idle itself.
 > 
-> FYI: I am not using application, rather I have a Bluetooth driver invoking
-> encode_baud_rate(...), please find log below.
-> 
-> I made sure that c_ispeed = c_ospeed = 4.05M Baud, however I see 
-> tty_termios_encode_baud_rate(...) is normalizing to 4.0
-> 
-> 
-> manual trace log below:
-> ======================================================================================
-> 
-> 4.05M Arbitrary Baud Setting Sequence:
-> [    9.664703] alloc_set_baud_rate_cmd Setting arbitrary baudrate using BOTHER baudrate:89 c_cflag:020000016262
-> [    9.774658] XXXXXX_hci_uart_set_baudrate c_cflag:020000016262 baud:4050000
+> Whether any of this matters depends on _why_ that DWB is in the AT91
+> code itself - is it something that needs to be done before placing the
+> SDRAM into self-refresh mode, or is it being done merely because the
+> ARM926 docs say that a DWB is needed before WFI?
 
-4050000 seems a bit odd - you want cflag&CBAUD == BOTHER so I'd expect
-the low bits to end rather different things to 6262 ?
+We have two cases here:
 
-So something like
+For the venerable at91rm9200: DWB is needed before putting SDRAM into
+self-refresh because any subsequent access to SDRAM will force it to
+resume from self-refresh state. Of course for this case, it is important
+to make sure that no access to SDRAM is made before the
+wait-for-interrupt instruction.
 
-	struct ktermios new = *tty->termios;
-	new.c_cflag &= ~(CBAUD|CIBAUD);
-	new.c_cflag |= BOTHER;
-	new.c_ispeed = 4050000;
-	new.c_ospeed = 4050000;
-	tty_set_termios(tty, &new);	/* Can sleep */
+For all other SAM9 SoCs: no additional DWB is needed because RAM
+controller manages self-refresh state even if accesses are still done to
+the memory.
 
-	/* Returned new will now hold actual values selected */
+> If the latter, it can be dispensed with because the CPU specific code
+> is already doing that.
 
-should do the trick providing the low level driver supports the rate.
+Yes, exactly, but only for SAM9, not for RM9200.
 
-Alan
+> In any case, I think we need someone to speak up who knows this bit of
+> the AT91 code, and it needs fixing so that it's less reliant on luck -
+> otherwise cleanups could introduce some rather horrible bugs.
+
+Ok, Daniel, tell me how I can help you. Is there any information that is
+missing on your side?
+
+BTW, you may save time by skipping all CAP9 related changes (and remove
+the code): We shall remove its support in kernel for 3.4 release:
+https://lkml.org/lkml/2012/1/6/161
+
+Best regards,
+-- 
+Nicolas Ferre
