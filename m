@@ -1,38 +1,34 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Thu, 12 Jan 2012 13:02:27 +0530
-Subject: [PATCH RFC] omap-serial: make serial_omap_restore_context depend
- on CONFIG_PM_RUNTIME
-In-Reply-To: <1326261400-3929-1-git-send-email-shubhrajyoti@ti.com>
-References: <1326261400-3929-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CAAL8m4x5wf_XtPSe=GEG9tokrZmbVy4j5rbuwmoLYBuiVaWMWg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 12 Jan 2012 13:13:29 +0530
+Subject: [PATCH v2 0/2] Add lcd driver for panels with gpio controlled panel
+ reset
+Message-ID: <1326354211-27064-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 11:26 AM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> The function serial_omap_restore_context is called only from
-> serial_omap_runtime_resume which depends on CONFIG_PM_RUNTIME. Make
-> serial_omap_restore_context also compile conditionally.
->
-> if CONFIG_PM_RUNTIME is not defined below warn may be seen.
->
-> ?LD ? ? ?net/xfrm/built-in.o
-> drivers/tty/serial/omap-serial.c:1524: warning: 'serial_omap_restore_context' defined but not used
-> ?CC ? ? ?drivers/tty/vt/selection.o
->
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Changes since v1:
+- Fixed gpio leak, added MODULE_DEVICE_TABLE and dev_pm_ops.
+- Changed device tree bindings.
 
-Acked-by: Govindraj.R <govindraj.raja@ti.com>
+This patchset adds support for passive panels that do not use a nRESET line
+which is controlled by a GPIO of the host system and which do not use a
+serial comamnd interface (i2c or spi) or memory-mapped-io interface.
 
-> ---
-> applies on Tony's uart branch
->
+The first patch adds driver for passive raster-type lcd's with gpio controlled
+panel reset. It includes support for both dt and non-dt platforms. The second
+patch adds support for using this driver on Origen board.
 
-Should apply on cleanly on mainline also
-Please check.
+Thomas Abraham (2):
+  backlight: lcd: add driver for raster-type lcd's with gpio controlled panel reset
+  ARM: Exynos: Use lcd power control driver for lcd panel
 
-Same comments for other patch (omap-serial :Make the
-suspend/resume functions depend on CONFIG_PM_SLEEP)
-
---
-Thanks,
-Govindraj.R
+ .../devicetree/bindings/lcd/lcd-pwrctrl.txt        |   48 ++++
+ arch/arm/mach-exynos/mach-origen.c                 |   29 +--
+ drivers/video/backlight/Kconfig                    |    7 +
+ drivers/video/backlight/Makefile                   |    1 +
+ drivers/video/backlight/lcd_pwrctrl.c              |  232 ++++++++++++++++++++
+ include/video/lcd_pwrctrl.h                        |   34 +++
+ 6 files changed, 328 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/lcd/lcd-pwrctrl.txt
+ create mode 100644 drivers/video/backlight/lcd_pwrctrl.c
+ create mode 100644 include/video/lcd_pwrctrl.h
