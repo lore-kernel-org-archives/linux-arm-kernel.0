@@ -1,30 +1,36 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 12 Jan 2012 16:54:20 +0800
-Subject: [PATCH 5/6] ARM: mxc: add dt support for audmux-v2
-In-Reply-To: <20120111173826.GB24213@opensource.wolfsonmicro.com>
-References: <1325820343-11875-1-git-send-email-richard.zhao@linaro.org>
- <1325820343-11875-6-git-send-email-richard.zhao@linaro.org>
- <20120106091315.GG5446@pengutronix.de>
- <20120106092124.GT2414@b20223-02.ap.freescale.net>
- <20120111052603.GA28509@S2101-09.ap.freescale.net>
- <20120111130243.GB27484@b20223-02.ap.freescale.net>
- <20120111173826.GB24213@opensource.wolfsonmicro.com>
-Message-ID: <20120112085419.GG2414@b20223-02.ap.freescale.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 12 Jan 2012 14:28:33 +0530
+Subject: [PATCH V2] dmaengine/dw_dmac: Hibernation support in dw_dmac
+In-Reply-To: <1326358055-6576-1-git-send-email-rajeev-dlh.kumar@st.com>
+References: <1326358055-6576-1-git-send-email-rajeev-dlh.kumar@st.com>
+Message-ID: <4F0EA0B9.2090700@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 05:38:27PM +0000, Mark Brown wrote:
-> On Wed, Jan 11, 2012 at 09:02:44PM +0800, Richard Zhao wrote:
-> > On Wed, Jan 11, 2012 at 01:26:06PM +0800, Shawn Guo wrote:
+On 1/12/2012 2:17 PM, Rajeev KUMAR wrote:
+> The suspend and resume implementation is through dev_pm_ops in dmac. So
+> in order to support hibernation, freeze, thaw, restore and poweroff
+> features are required.
 > 
-> > > With doing so, it may be also good for us to move this driver into
-> > > sound/soc/imx/.  Any particular reason to keep it in platform?
+> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> ---
+>  drivers/dma/dw_dmac.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> > Yes, we can move it out. But I'm not sure we can put it in asoc,
-> > because it's not a standard part of ASoC. Mark?
-> 
-> It should be supported using standard ASoC mechanisms.
-Anyway, it needs another patch. I'll not do it in this patch series.
+> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+> index 9b592b0..3a3d7ed 100644
+> --- a/drivers/dma/dw_dmac.c
+> +++ b/drivers/dma/dw_dmac.c
+> @@ -1562,6 +1562,10 @@ static int dw_resume_noirq(struct device *dev)
+>  static const struct dev_pm_ops dw_dev_pm_ops = {
+>  	.suspend_noirq = dw_suspend_noirq,
+>  	.resume_noirq = dw_resume_noirq,
+> +	.freeze_noirq = dw_suspend_noirq,
+> +	.thaw_noirq = dw_resume_noirq,
+> +	.restore_noirq = dw_resume_noirq,
+> +	.poweroff_noirq = dw_suspend_noirq,
 
-Thanks
-Richard
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
+
+-- 
+viresh
