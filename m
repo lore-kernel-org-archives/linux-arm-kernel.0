@@ -1,72 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 Jan 2012 14:36:26 +0000
-Subject: [PATCH 04/15] ARM: smp_twd: add device tree support
-In-Reply-To: <4F0DF9B3.3080804@gmail.com>
-References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
- <1326287334-1905-5-git-send-email-marc.zyngier@arm.com>
- <4F0DF9B3.3080804@gmail.com>
-Message-ID: <4F0EEFEA.1020305@arm.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Thu, 12 Jan 2012 14:39:00 +0000
+Subject: tty/serial: Need clarification on Support for 4+M Baudrate
+In-Reply-To: <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A630D@EXDCVYMBSTM005.EQ1STM.local>
+References: <20120111121901.GA4034@bnru05>
+ <20120111123025.244a9cf5@pyramind.ukuu.org.uk>
+ <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A605A@EXDCVYMBSTM005.EQ1STM.local>
+ <20120112114913.21809bed@pyramind.ukuu.org.uk>
+ <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A630D@EXDCVYMBSTM005.EQ1STM.local>
+Message-ID: <20120112143900.27b92668@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Thu, 12 Jan 2012 15:20:46 +0100
+Rajanikanth H V <rajanikanth.hv@stericsson.com> wrote:
 
-On 11/01/12 21:05, Rob Herring wrote:
-> On 01/11/2012 07:08 AM, Marc Zyngier wrote:
->> Add bindings to support DT discovery of the ARM Timer Watchdog
->> (aka TWD). Only the timer side is converted by this patch.
->>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  Documentation/devicetree/bindings/arm/twd.txt |   29 +++++++++++
->>  arch/arm/include/asm/smp_twd.h                |    1 +
->>  arch/arm/kernel/smp_twd.c                     |   68 ++++++++++++++++++++-----
->>  3 files changed, 85 insertions(+), 13 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
->> new file mode 100644
->> index 0000000..a9d5587
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/twd.txt
->> @@ -0,0 +1,29 @@
->> +* ARM Timer Watchdog
->> +
->> +ARM 11MP, Cortex-A5 and Cortex-A9 are often associated with a per-core
->> +Timer-Watchdog (aka TWD), which provides both a per-cpu local timer
->> +and watchdog.
->> +
->> +The TWD is usually attached to a GIC to deliver its two per-processor
->> +interrupts.
->> +
->> +Main node required properties:
->> +
->> +- compatible : Should be one of:
->> +	"arm,cortex-a9-twd"
->> +	"arm,cortex-a5-twd"
->> +	"arm,arm11mp-twd"
->> +	"arm,smp-twd"
->> +
->> +- interrupts : Two interrupts to each core, the first one for the
->> +  timer, the second one for the watchdog.
->> +
->> +- reg : Specify the base address and the size of the TWD.
->> +
->> +Example:
->> +
->> +	twd at 2c000600 {
->> +		compatible = "arm,arm11mp-twd", "arm,smp-twd";
->> +		reg = <0x2c000600 0x100>;
->> +		interrupts = <1 13 0xf01 1 14 0xf01>;
->> +	};
+> Alan,
 > 
-> Why not split the watchdog and timer into 2 nodes? It may not matter
-> since there is no driver for the timer. If there was, we would have a
-> problem as you can't match 2 drivers to 1 node.
+> FYI: I am not using application, rather I have a Bluetooth driver invoking
+> encode_baud_rate(...), please find log below.
+> 
+> I made sure that c_ispeed = c_ospeed = 4.05M Baud, however I see 
+> tty_termios_encode_baud_rate(...) is normalizing to 4.0
+> 
+> 
+> manual trace log below:
+> ======================================================================================
+> 
+> 4.05M Arbitrary Baud Setting Sequence:
+> [    9.664703] alloc_set_baud_rate_cmd Setting arbitrary baudrate using BOTHER baudrate:89 c_cflag:020000016262
+> [    9.774658] XXXXXX_hci_uart_set_baudrate c_cflag:020000016262 baud:4050000
 
-Don't we hit the opposite problem - two nodes with the same address?
+4050000 seems a bit odd - you want cflag&CBAUD == BOTHER so I'd expect
+the low bits to end rather different things to 6262 ?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+So something like
+
+	struct ktermios new = *tty->termios;
+	new.c_cflag &= ~(CBAUD|CIBAUD);
+	new.c_cflag |= BOTHER;
+	new.c_ispeed = 4050000;
+	new.c_ospeed = 4050000;
+	tty_set_termios(tty, &new);	/* Can sleep */
+
+	/* Returned new will now hold actual values selected */
+
+should do the trick providing the low level driver supports the rate.
+
+Alan
