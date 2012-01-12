@@ -1,102 +1,45 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 12 Jan 2012 15:02:04 +0530
-Subject: [PATCH RFC] omap-serial: Fix the error handling in the omap_serial
- probe
-Message-ID: <1326360724-7898-1-git-send-email-shubhrajyoti@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 12 Jan 2012 10:36:18 +0100
+Subject: [RFC] ARM: imx: Add imx6q thermal
+In-Reply-To: <1326266285-11656-1-git-send-email-rob.lee@linaro.org>
+References: <1326266285-11656-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <20120112093618.GB5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch does the following
+On Wed, Jan 11, 2012 at 01:18:05AM -0600, Robert Lee wrote:
+> Add thermal support for i.MX6Q.  Uses recently submitted common
+> cpu_cooling functionality shown here:
+> 
+> http://www.spinics.net/lists/linux-pm/msg26500.html
+> 
+> Have some todo items but basic implementation is done and I'd like to
+> get any helpful feedback on it.
 
-- The pm_runtime_disable is called in the remove not in the error
-  case of probe.The patch calls the pm_runtime_disable in the error
-  case.
-- The  up is not freed in the error path. Fix the memory leak by calling
- kfree in the error path.
-- Also the iounmap is not called fix the same by calling iounmap in the
-  error case of probe and remove .
-- Make the name of the error tags more meaningful.
+Generally shouldn't this be a regular driver?
 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/tty/serial/omap-serial.c |   27 +++++++++++++++++----------
- 1 files changed, 17 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index eb90a01..29fe6fd 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1369,14 +1369,14 @@ static int serial_omap_probe(struct platform_device *pdev)
- 
- 	dma_rx = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
- 	if (!dma_rx) {
--		ret = -EINVAL;
--		goto err;
-+		ret = -ENXIO;
-+		goto do_release_region;
- 	}
- 
- 	dma_tx = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
- 	if (!dma_tx) {
--		ret = -EINVAL;
--		goto err;
-+		ret = -ENXIO;
-+		goto do_release_region;
- 	}
- 
- 	up = kzalloc(sizeof(*up), GFP_KERNEL);
-@@ -1403,7 +1403,7 @@ static int serial_omap_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "failed to get alias/pdev id, errno %d\n",
- 								up->port.line);
- 		ret = -ENODEV;
--		goto err;
-+		goto err_port_line;
- 	}
- 
- 	sprintf(up->name, "OMAP UART%d", up->port.line);
-@@ -1412,7 +1412,7 @@ static int serial_omap_probe(struct platform_device *pdev)
- 	if (!up->port.membase) {
- 		dev_err(&pdev->dev, "can't ioremap UART\n");
- 		ret = -ENOMEM;
--		goto err;
-+		goto err_ioremap;
- 	}
- 
- 	up->port.flags = omap_up_info->flags;
-@@ -1458,16 +1458,22 @@ static int serial_omap_probe(struct platform_device *pdev)
- 
- 	ret = uart_add_one_port(&serial_omap_reg, &up->port);
- 	if (ret != 0)
--		goto do_release_region;
-+		goto err_add_port;
- 
- 	pm_runtime_put(&pdev->dev);
- 	platform_set_drvdata(pdev, up);
- 	return 0;
--err:
--	dev_err(&pdev->dev, "[UART%d]: failure [%s]: %d\n",
--				pdev->id, __func__, ret);
-+
-+err_add_port:
-+	pm_runtime_disable(&pdev->dev);
-+	iounmap(up->port.membase);
-+err_ioremap:
-+err_port_line:
-+	kfree(up);
- do_release_region:
- 	release_mem_region(mem->start, resource_size(mem));
-+	dev_err(&pdev->dev, "[UART%d]: failure [%s]: %d\n",
-+				pdev->id, __func__, ret);
- 	return ret;
- }
- 
-@@ -1476,6 +1482,7 @@ static int serial_omap_remove(struct platform_device *dev)
- 	struct uart_omap_port *up = platform_get_drvdata(dev);
- 
- 	if (up) {
-+		iounmap(up->port.membase);
- 		pm_runtime_disable(&up->pdev->dev);
- 		uart_remove_one_port(&serial_omap_reg, &up->port);
- 		pm_qos_remove_request(&up->pm_qos_request);
+> +
+> +/* register define of anatop */
+> +#define HW_ANADIG_ANA_MISC0	(0x00000150)
+> +#define HW_ANADIG_ANA_MISC0_SET	(0x00000154)
+> +#define HW_ANADIG_ANA_MISC0_CLR	(0x00000158)
+> +#define HW_ANADIG_ANA_MISC0_TOG	(0x0000015c)
+
+unnecessary braces. Please remove.
+
+> +
+> +#if IMX6Q_THERMAL_DEBUG
+> +	pr_info("Temperature is %lu C\n", *temp);
+> +#endif
+
+Please don't add your own debug defines which then issue
+messages with pr_info. Use pr_debug in the first place.
+
+Sascha
+
 -- 
-1.7.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
