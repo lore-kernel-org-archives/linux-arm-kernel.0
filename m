@@ -1,47 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 Jan 2012 12:00:14 +0000
-Subject: [PATCH 08/15] ARM: shmobile: convert to twd_local_timer_register()
- interface
-In-Reply-To: <4F0EC2F0.1000409@arm.com>
-References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
- <1326287334-1905-9-git-send-email-marc.zyngier@arm.com>
- <20120112091905.GJ1068@n2100.arm.linux.org.uk> <4F0EC2F0.1000409@arm.com>
-Message-ID: <4F0ECB4E.5060109@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 12 Jan 2012 13:07:13 +0100
+Subject: [PATCH] ARM: OMAP3: fix build on !CONFIG_IOMMU_API
+In-Reply-To: <1326288491-25146-1-git-send-email-ohad@wizery.com>
+References: <1326288491-25146-1-git-send-email-ohad@wizery.com>
+Message-ID: <201201121307.15698.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/12 11:24, Marc Zyngier wrote:
-> On 12/01/12 09:19, Russell King - ARM Linux wrote:
->> On Wed, Jan 11, 2012 at 01:08:47PM +0000, Marc Zyngier wrote:
->>>  static void __init shmobile_late_time_init(void)
->>>  {
->>>  	/*
->>> @@ -34,6 +37,8 @@ static void __init shmobile_late_time_init(void)
->>>  	 */
->>>  	early_platform_driver_register_all("earlytimer");
->>>  	early_platform_driver_probe("earlytimer", 2, 0);
->>> +	if (local_timer_hook)
->>> +		local_timer_hook();
->>
->> This is why late_timer_init() should be avoided at all cost - you can
->> only have one of them and once you've used it once, you need to invent
->> new hooks to hook other stuff into there.
->>
->> In any case, I don't think this is necessary for TWD as ioremap should
->> be available for regions which have already been statically mapped now
->> that Nicolas' patches are in mainline.
+Hi Ohad,
+
+On Wednesday 11 January 2012 14:28:11 Ohad Ben-Cohen wrote:
+> omap3isp depends on CONFIG_IOMMU_API, so avoid registering its
+> device (and defining its configuration structs) on !CONFIG_IOMMU_API.
 > 
-> Indeed, it should work now, and I'll remove the use of late_time_init.
+> This is generally nice to have, but more importantly, it fixes:
 > 
-> shmobile has another problem though: it doesn't have the smp_twd clock,
-> which means we have to rely on calibration, and this will only work if
-> the global timer is already up and running (hence the ugly hook).
+> arch/arm/plat-omap/include/plat/iommu.h: In function 'dev_to_omap_iommu':
+> arch/arm/plat-omap/include/plat/iommu.h:135: error: 'struct
+> dev_archdata' has no member named 'iommu'
+> arch/arm/mach-omap2/devices.c: In function 'omap3_init_camera':
+> arch/arm/mach-omap2/devices.c:222: error: 'struct dev_archdata' has no
+> member named 'iommu'
+> make[1]: *** [arch/arm/mach-omap2/devices.o] Error 1
+> make: *** [arch/arm/mach-omap2] Error 2
+> 
+> Which happens because while setting up the omap3isp device we try
+> to access the (now nonexistent) iommu member of dev_archdata.
+> 
+> Compile tested with omap2plus_defconfig on today's:
+> 
+> commit e343a895a9f342f239c5e3c5ffc6c0b1707e6244
+> Merge: 06792c4 193a667
+> Author: Linus Torvalds <torvalds@linux-foundation.org>
+> Date:   Tue Jan 10 18:04:27 2012 -0800
+> 
+>     Merge tag 'for-linus' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/mst/vhost
+> 
+> Reported-by: Govindraj Raja <govindraj.raja@ti.com>
+> Reported-by: Arik Nemtsov <arik@wizery.com>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Joerg Roedel <Joerg.Roedel@amd.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Actually, it should work just fine without the hook. The global timer
-will be running by the time we call local_timer_setup(), so the hook can go.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-I'll post an updated patch series later.
+> ---
+> Sorry guys, my bad.
+> 
+>  arch/arm/mach-omap2/devices.c |   14 +++++++++++++-
+>  1 files changed, 13 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index 46dfd1a..0b510ad 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -28,7 +28,6 @@
+>  #include <plat/board.h>
+>  #include <plat/mcbsp.h>
+>  #include <plat/mmc.h>
+> -#include <plat/iommu.h>
+>  #include <plat/dma.h>
+>  #include <plat/omap_hwmod.h>
+>  #include <plat/omap_device.h>
+> @@ -128,6 +127,10 @@ static struct platform_device omap2cam_device = {
+>  };
+>  #endif
+> 
+> +#if defined(CONFIG_IOMMU_API)
+> +
+> +#include <plat/iommu.h>
+> +
+>  static struct resource omap3isp_resources[] = {
+>  	{
+>  		.start		= OMAP3430_ISP_BASE,
+> @@ -224,6 +227,15 @@ int omap3_init_camera(struct isp_platform_data *pdata)
+>  	return platform_device_register(&omap3isp_device);
+>  }
+> 
+> +#else /* !CONFIG_IOMMU_API */
+> +
+> +int omap3_init_camera(struct isp_platform_data *pdata)
+> +{
+> +	return 0;
+> +}
+> +
+> +#endif
+> +
+>  static inline void omap_init_camera(void)
+>  {
+>  #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+
+Laurent Pinchart
