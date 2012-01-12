@@ -1,51 +1,53 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 12 Jan 2012 13:25:09 +0530
-Subject: [PATCH v2 0/4] ARM: Exynos4: Add irq domain and device tree
- support for wakeup interrupts
-In-Reply-To: <1323586301-24537-1-git-send-email-thomas.abraham@linaro.org>
-References: <1323586301-24537-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAJuYYwTcVFAT2uUV6sLYQgaphNLLYd8+AMFjNEie-nvxJeFX2Q@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 12 Jan 2012 16:23:01 +0800
+Subject: [PATCH V6 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <87aa5t25ad.fsf@ti.com>
+References: <1325213769-11752-1-git-send-email-richard.zhao@linaro.org>
+ <1325213769-11752-5-git-send-email-richard.zhao@linaro.org>
+ <87aa5t25ad.fsf@ti.com>
+Message-ID: <20120112082300.GF2414@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 December 2011 12:21, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> Changes since v1: (only patch 4/4 has changes)
-> - Fixes based on Rob's comments:
-> ?a. Fixed the function prototype of exynos4_init_irq_eint(void)
-> ?b. Included interrupt-parent as an optional property for wakeup interrupt
-> ? ? ?controller node.
->
-> Samsung Exynos4 includes 32 external wakeup interrupt sources. This patchset
-> adds irq domain and device tree support for these interrupts.
->
-> This patchset is based on the following tree.
-> http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git ?for-next
->
-> This patchset should be applied after applying the following patch.
-> [PATCH] ARM: Exynos: Add irq domain and device tree support for interrupt combiner
->
-> This patchset depends on the following patch from Jamie Iles.
-> [PATCH] irqdomain: export irq_domain._simple_op.s for !CONFIG_OF
->
-> Thomas Abraham (4):
-> ?arm: exynos4: simplify EINT number to linux irq number translation
-> ?arm: exynos4: add irq_domain support for wakeup interrupts
-> ?arm: exynos4: remove arch_initcall for wakeup interrupt source initialization
-> ?arm: exynos4: add device tree support for external wakeup interrupt controller
->
-> ?.../bindings/arm/samsung/wakeup-eint.txt ? ? ? ? ? | ? 26 +++++
-> ?arch/arm/mach-exynos/cpu.c ? ? ? ? ? ? ? ? ? ? ? ? | ? ?6 +-
-> ?arch/arm/mach-exynos/include/mach/regs-gpio.h ? ? ?| ? ?4 +-
-> ?arch/arm/mach-exynos/irq-eint.c ? ? ? ? ? ? ? ? ? ?| ? 98 ++++++++++----------
-> ?arch/arm/plat-samsung/include/plat/exynos4.h ? ? ? | ? ?4 +
-> ?5 files changed, 86 insertions(+), 52 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/arm/samsung/wakeup-eint.txt
+On Wed, Jan 11, 2012 at 03:22:34PM -0800, Kevin Hilman wrote:
+> Richard Zhao <richard.zhao@linaro.org> writes:
+> 
+> > The driver get cpu operation point table from device tree cpu0 node,
+> 
+> Since we already have an existing OPP infrastructure in the kernel,
+> seems like  this driver should get OPPs by asking the OPP layer.
+When I created the patch, there's only omap cpufreq driver using
+OPP. If it depends on OPP, it might prevent users who have not
+adopted OPP from using the driver.
+> 
+> This approach assumes the OPP layer is static at boot time and not
+> changing, however that's not the case in practice.
+> 
+> The OPP layer could be extended to read boot-time OPPs from DT if
+> desired, but since the OPPs are also populated/enabled/disabled
+> dynamicaly on some platforms (e.g. OMAP), I think the any generic
+> CPUfreq driver should use the OPP interface and not DT directly.
+> 
+> > and adjusts operating points using clk and regulator APIs.
+> 
+> For a generic driver, the regulator used should also be configurable.
+> 
+> For example, this driver currently assumes a regulator named "cpu" for
+> all instances.   If you had separate clusters with independent voltage
+> control, you'd likely have a separate regulator for each cluster.
+The driver, for now, assumes all cpu cores uses the same clk and voltage.
+It's correct for most arm multi-core SoC.
+Do you have real case to need different voltage/clk?
+And the regulator will be specified in dts after cpu convert from sys
+device to normal device.
 
-Hi,
-
-This patchset adds dt and irq-domain support for exynos4 wakeup (eint)
-interrupts. If there any comments on this patchset, please let me
-know.
-
-Thanks,
-Thomas.
+Thanks
+Richard
+> 
+> Kevin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
