@@ -1,98 +1,49 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 12 Jan 2012 13:07:13 +0100
-Subject: [PATCH] ARM: OMAP3: fix build on !CONFIG_IOMMU_API
-In-Reply-To: <1326288491-25146-1-git-send-email-ohad@wizery.com>
-References: <1326288491-25146-1-git-send-email-ohad@wizery.com>
-Message-ID: <201201121307.15698.laurent.pinchart@ideasonboard.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 12 Jan 2012 12:09:20 +0000
+Subject: [PATCH] ARM: vexpress: initial device tree support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A848@HQMAIL01.nvidia.com>
+References: <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
+ <4F0B897A.20502@firmworks.com>
+ <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
+ <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
+ <4F0CD7BC.7080409@freescale.com> <4F0D2F90.8020801@firmworks.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A770@HQMAIL01.nvidia.com>
+ <4F0E1843.7030207@firmworks.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A848@HQMAIL01.nvidia.com>
+Message-ID: <20120112120920.GF7180@jl-vm1.vm.bytemark.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Stephen Warren wrote:
+> Mitch Bradley wrote at Wednesday, January 11, 2012 4:16 PM:
+> > Perhaps I'm missing something, but it appears to me that the model is to
+> > set the correct GPIO state before each use, instead of a
+> > save-set-use-restore model.
+> 
+> That's true, but the select action happens implicitly inside the I2C
+> core for any and all transactions, AIUI, so the two modes are equivalent.
 
-On Wednesday 11 January 2012 14:28:11 Ohad Ben-Cohen wrote:
-> omap3isp depends on CONFIG_IOMMU_API, so avoid registering its
-> device (and defining its configuration structs) on !CONFIG_IOMMU_API.
-> 
-> This is generally nice to have, but more importantly, it fixes:
-> 
-> arch/arm/plat-omap/include/plat/iommu.h: In function 'dev_to_omap_iommu':
-> arch/arm/plat-omap/include/plat/iommu.h:135: error: 'struct
-> dev_archdata' has no member named 'iommu'
-> arch/arm/mach-omap2/devices.c: In function 'omap3_init_camera':
-> arch/arm/mach-omap2/devices.c:222: error: 'struct dev_archdata' has no
-> member named 'iommu'
-> make[1]: *** [arch/arm/mach-omap2/devices.o] Error 1
-> make: *** [arch/arm/mach-omap2] Error 2
-> 
-> Which happens because while setting up the omap3isp device we try
-> to access the (now nonexistent) iommu member of dev_archdata.
-> 
-> Compile tested with omap2plus_defconfig on today's:
-> 
-> commit e343a895a9f342f239c5e3c5ffc6c0b1707e6244
-> Merge: 06792c4 193a667
-> Author: Linus Torvalds <torvalds@linux-foundation.org>
-> Date:   Tue Jan 10 18:04:27 2012 -0800
-> 
->     Merge tag 'for-linus' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/mst/vhost
-> 
-> Reported-by: Govindraj Raja <govindraj.raja@ti.com>
-> Reported-by: Arik Nemtsov <arik@wizery.com>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Joerg Roedel <Joerg.Roedel@amd.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+If there is some reason why it would be desirable to deselect
+the DDC I2C bus after transactions, that could be added as an option
+to the GPIO I2C mux, but I can't think of a reason.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> For an I2C mux that is controlled via I2C, you can just add the mux
+> node as a child of the I2C controller, since it has an I2C address,
+> and so putting it there makes sense.
 
-> ---
-> Sorry guys, my bad.
-> 
->  arch/arm/mach-omap2/devices.c |   14 +++++++++++++-
->  1 files changed, 13 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index 46dfd1a..0b510ad 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -28,7 +28,6 @@
->  #include <plat/board.h>
->  #include <plat/mcbsp.h>
->  #include <plat/mmc.h>
-> -#include <plat/iommu.h>
->  #include <plat/dma.h>
->  #include <plat/omap_hwmod.h>
->  #include <plat/omap_device.h>
-> @@ -128,6 +127,10 @@ static struct platform_device omap2cam_device = {
->  };
->  #endif
-> 
-> +#if defined(CONFIG_IOMMU_API)
-> +
-> +#include <plat/iommu.h>
-> +
->  static struct resource omap3isp_resources[] = {
->  	{
->  		.start		= OMAP3430_ISP_BASE,
-> @@ -224,6 +227,15 @@ int omap3_init_camera(struct isp_platform_data *pdata)
->  	return platform_device_register(&omap3isp_device);
->  }
-> 
-> +#else /* !CONFIG_IOMMU_API */
-> +
-> +int omap3_init_camera(struct isp_platform_data *pdata)
-> +{
-> +	return 0;
-> +}
-> +
-> +#endif
-> +
->  static inline void omap_init_camera(void)
->  {
->  #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
+Only if the mux's I2C slave is on the near side of the mux so that
+it's always addressable regardless of mux state, and if it's on the
+same I2C.
 
--- 
-Regards,
+> But for an I2C mux that's controlled using GPIOs or pinmux, there's no
+> I2C address so I guess the mux shouldn't be directly underneath the I2C
+> controller.
 
-Laurent Pinchart
+It's connected to: (a) an I2C, and (b) a GPIO.
+
+It can't be child of both, but I don't see why the GPIO can't be
+referred by phandle and the I2C it's muxing be the direct parent.
+That seems more natural to me.
+
+All the best,
+-- Jamie
