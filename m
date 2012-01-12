@@ -1,55 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 12 Jan 2012 15:41:29 +0100
-Subject: [PATCH 5/7] at91 : fix dirty hack for the selfrefresh function
-In-Reply-To: <20120111194334.GF1068@n2100.arm.linux.org.uk>
-References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
- <1326293740-15735-6-git-send-email-daniel.lezcano@linaro.org>
- <20120111165508.GC1068@n2100.arm.linux.org.uk>
- <201201111827.18890.arnd.bergmann@linaro.org>
- <20120111194334.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <4F0EF119.3000605@atmel.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Thu, 12 Jan 2012 08:48:11 -0600
+Subject: Clock API and "maximum rate"
+In-Reply-To: <20120112141128.GK1068@n2100.arm.linux.org.uk>
+References: <CAKGA1bmZGxxSfwGkpdyt7c-UYUTj+mV2AZhmhCUSEKTd12Q+4Q@mail.gmail.com>
+ <20120111165844.GL3226@page>
+ <CAKGA1bnZLDXEBAL4MPa48vKEkjn6t-0Umekgy2Y9c8p0Y8CLyQ@mail.gmail.com>
+ <20120112141128.GK1068@n2100.arm.linux.org.uk>
+Message-ID: <CAKGA1bnT+OK1sUGXpHmmBQqt5iqpaPCaRWvB40XLuE5Zt13GPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2012 08:43 PM, Russell King - ARM Linux :
+On Thu, Jan 12, 2012 at 8:11 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 12, 2012 at 07:49:35AM -0600, Matt Sealey wrote:
+>> On Wed, Jan 11, 2012 at 10:58 AM, Jamie Iles <jamie@jamieiles.com> wrote:
+>> > Hi Matt,
+>> >
+>> > On Wed, Jan 11, 2012 at 10:30:15AM -0600, Matt Sealey wrote:
+>> >> Just a curious question, is there any safe way in the current API or
+>> >> even by peeking a little behind the scenes to find out what the
+>> >> maximum clock rate would be for a given named clock or struct clk?
+>> >
+>> > How about:
+>> >
+>> > ? ? ? ?long max = clk_round_rate(clk, ~0LU);
+>> >
+>> > clk_round_rate() is one of the optional API calls though.
+>>
+>> Luckily implemented in this case :) Seems to do the trick, thanks.
+>
+> If it's not implemented, but there is an implemented clk_set_rate(), feel
+> free to complain at whoever created the implementation.
+>
+> If there's a clk_set_rate() implementation, then there's _already_ an
+> implementation of clk_round_rate() internally doing the rounding for the
+> set_rate function, so there's really no excuse not to expose that via
+> clk_round_rate().
+>
+> clk_round_rate() is supposed to tell you what you end up with if you
+> ask clk_set_rate() to set the exact same value you passed in - but
+> clk_round_rate() won't modify the hardware.
+>
+> So, clk_round_rate/clk_set_rate really should be thought of being
+> implemented as this:
+>
+> long clk_round_rate(struct clk *clk, unsigned long rate)
+> {
+> ? ? ? ?return __clk_round_rate(clk, rate);
+> }
+>
+> int clk_set_rate(struct clk *clk, unsigned long rate)
+> {
+> ? ? ? ?long rate = __clk_round_rate(clk, rate);
+>
+> ? ? ? ?if (rate < 0)
+> ? ? ? ? ? ? ? ?return rate;
+>
+> ? ? ? ?return __clk_set_rate(clk, rate);
+> }
 
-[..]
+Right. On i.MX it seems not to round first, but to assume you passed a
+rounded rate? I assume the upper level clk API does the above, so the
+low level doesn't have to?
 
-> On the other hand, we have another DWB in cpu_arm926_do_idle itself.
-> 
-> Whether any of this matters depends on _why_ that DWB is in the AT91
-> code itself - is it something that needs to be done before placing the
-> SDRAM into self-refresh mode, or is it being done merely because the
-> ARM926 docs say that a DWB is needed before WFI?
-
-We have two cases here:
-
-For the venerable at91rm9200: DWB is needed before putting SDRAM into
-self-refresh because any subsequent access to SDRAM will force it to
-resume from self-refresh state. Of course for this case, it is important
-to make sure that no access to SDRAM is made before the
-wait-for-interrupt instruction.
-
-For all other SAM9 SoCs: no additional DWB is needed because RAM
-controller manages self-refresh state even if accesses are still done to
-the memory.
-
-> If the latter, it can be dispensed with because the CPU specific code
-> is already doing that.
-
-Yes, exactly, but only for SAM9, not for RM9200.
-
-> In any case, I think we need someone to speak up who knows this bit of
-> the AT91 code, and it needs fixing so that it's less reliant on luck -
-> otherwise cleanups could introduce some rather horrible bugs.
-
-Ok, Daniel, tell me how I can help you. Is there any information that is
-missing on your side?
-
-BTW, you may save time by skipping all CAP9 related changes (and remove
-the code): We shall remove its support in kernel for 3.4 release:
-https://lkml.org/lkml/2012/1/6/161
-
-Best regards,
 -- 
-Nicolas Ferre
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
