@@ -1,71 +1,51 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Thu, 12 Jan 2012 07:45:30 +0000
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <20120112040345.GA21802@S2101-09.ap.freescale.net>
-References: <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <20120107135445.GI4790@S2101-09.ap.freescale.net>
- <20120108125156.GB2203@richard-laptop>
- <20120109015625.GE1835@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6FB@HQMAIL01.nvidia.com>
- <20120111235634.GG20968@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A83A@HQMAIL01.nvidia.com>
- <20120112040345.GA21802@S2101-09.ap.freescale.net>
-Message-ID: <7FE21149F4667147B645348EC605788508E6E3@039-SN2MPN1-013.039d.mgd.msft.net>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 12 Jan 2012 13:25:09 +0530
+Subject: [PATCH v2 0/4] ARM: Exynos4: Add irq domain and device tree
+ support for wakeup interrupts
+In-Reply-To: <1323586301-24537-1-git-send-email-thomas.abraham@linaro.org>
+References: <1323586301-24537-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAJuYYwTcVFAT2uUV6sLYQgaphNLLYd8+AMFjNEie-nvxJeFX2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> Sent: Thursday, January 12, 2012 12:04 PM
-> To: Stephen Warren
-> Cc: Richard Zhao; linus.walleij at stericsson.com; s.hauer at pengutronix.de; linux-
-> kernel at vger.kernel.org; rob.herring at calxeda.com; kernel at pengutronix.de; Simon
-> Glass (sjg at chromium.org); cjb at laptop.org; Dong Aisheng-B29396; devicetree-
-> discuss at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; Dong Aisheng
-> Subject: Re: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
-> mappings
-> Importance: High
-> 
-> On Wed, Jan 11, 2012 at 03:59:26PM -0800, Stephen Warren wrote:
-> > Shawn Guo wrote at Wednesday, January 11, 2012 4:57 PM:
-> > > This is somehow overkilled to me.  Doing this will create a big
-> > > mount of .dtsi files to bloat folder arch/arm/boot/dts.  Putting the
-> > > 'combinations' in <soc>.dtsi seems perfect fine to me.
-> >
-> > I see a couple problems with that approach:
-> >
-> > 1) <soc>.dtsi gets very bloated,
-> 
-> In theory, it's possible.  But in the real world, I do not think this will be an
-> issue.  From the experience from working on previous imx platforms, the mux
-> chosen on Freescale reference design board will likely be reused on custom
-> boards much.
-> 
-I'm don't think it's a big issue.
-If we really find it getting very bloated, we will refine it later.
+On 11 December 2011 12:21, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> Changes since v1: (only patch 4/4 has changes)
+> - Fixes based on Rob's comments:
+> ?a. Fixed the function prototype of exynos4_init_irq_eint(void)
+> ?b. Included interrupt-parent as an optional property for wakeup interrupt
+> ? ? ?controller node.
+>
+> Samsung Exynos4 includes 32 external wakeup interrupt sources. This patchset
+> adds irq domain and device tree support for these interrupts.
+>
+> This patchset is based on the following tree.
+> http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git ?for-next
+>
+> This patchset should be applied after applying the following patch.
+> [PATCH] ARM: Exynos: Add irq domain and device tree support for interrupt combiner
+>
+> This patchset depends on the following patch from Jamie Iles.
+> [PATCH] irqdomain: export irq_domain._simple_op.s for !CONFIG_OF
+>
+> Thomas Abraham (4):
+> ?arm: exynos4: simplify EINT number to linux irq number translation
+> ?arm: exynos4: add irq_domain support for wakeup interrupts
+> ?arm: exynos4: remove arch_initcall for wakeup interrupt source initialization
+> ?arm: exynos4: add device tree support for external wakeup interrupt controller
+>
+> ?.../bindings/arm/samsung/wakeup-eint.txt ? ? ? ? ? | ? 26 +++++
+> ?arch/arm/mach-exynos/cpu.c ? ? ? ? ? ? ? ? ? ? ? ? | ? ?6 +-
+> ?arch/arm/mach-exynos/include/mach/regs-gpio.h ? ? ?| ? ?4 +-
+> ?arch/arm/mach-exynos/irq-eint.c ? ? ? ? ? ? ? ? ? ?| ? 98 ++++++++++----------
+> ?arch/arm/plat-samsung/include/plat/exynos4.h ? ? ? | ? ?4 +
+> ?5 files changed, 86 insertions(+), 52 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/arm/samsung/wakeup-eint.txt
 
-> > and wastes space containing board-
-> > specific data for boards other than the "current" one.
-> 
-> Technically, it's not the board specific data, because what pins can be put
-> together consisting of a function is really soc specific.
-> 
-Yes, it's true.
+Hi,
 
-> >
-> > 2) We need to invent some more complex DT format so you can reference
-> > these canned combinations from the device drivers, rather than simply
-> > enumerating the mux value for each pin/group.
-> 
-> Sorry, I do not get that.
-> 
-> Regards,
-> Shawn
-> 
-> >
-> > You could put the combination .dtsi files in arch/arm/boot/dts/<soc>
-> > to maintain some extra order.
+This patchset adds dt and irq-domain support for exynos4 wakeup (eint)
+interrupts. If there any comments on this patchset, please let me
+know.
+
+Thanks,
+Thomas.
