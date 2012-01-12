@@ -1,24 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jan 2012 21:00:55 +0000
-Subject: [PATCH] arm: omap4: Fix omap_barriers_init for generic ioremap
- changes
-In-Reply-To: <CAMQu2gxR4jXb_Sx_d4r-v_KKVXW=f5vOSJNKGfHy6F7_W1OquQ@mail.gmail.com>
-References: <20120112184256.GA2287@atomide.com>
- <20120112200443.GA16726@n2100.arm.linux.org.uk>
- <20120112201112.GB16726@n2100.arm.linux.org.uk>
- <CAMQu2gw+cYgY-Pn=3wbYBVxtGULvRG9H326-z_aHP+yMeD8RLg@mail.gmail.com>
- <20120112202712.GC16726@n2100.arm.linux.org.uk>
- <CAMQu2gxR4jXb_Sx_d4r-v_KKVXW=f5vOSJNKGfHy6F7_W1OquQ@mail.gmail.com>
-Message-ID: <20120112210055.GD16726@n2100.arm.linux.org.uk>
+From: sjg@chromium.org (Simon Glass)
+Date: Thu, 12 Jan 2012 13:01:51 -0800
+Subject: [PATCH 7/9] arm/tegra: emc: device tree bindings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D1DCF@HQMAIL01.nvidia.com>
+References: <1324599468-12845-1-git-send-email-olof@lixom.net>
+ <1324599468-12845-8-git-send-email-olof@lixom.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18A6@HQMAIL01.nvidia.com>
+ <CAOesGMjeVm_PcsBnxfKX9Oe96QUaCsJrvuESCRZq5vwq9gD5xA@mail.gmail.com>
+ <CAPnjgZ2p63C1UNr_RxCcwKjjqJFXzZppXD14hXh85zXH35POrw@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D1DCF@HQMAIL01.nvidia.com>
+Message-ID: <CAPnjgZ1Bw6DUnbA2_z3CR_bcwNe29SDAvVXdb=g-hYV-hjc9Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 09:32:40PM +0100, Shilimkar, Santosh wrote:
-> OK. Point taken.
+Hi Stephen,
 
-Can you also explain this in the code:
+On Thu, Jan 12, 2012 at 12:50 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Simon Glass wrote at Thursday, January 12, 2012 1:04 PM:
+>> On Thu, Jan 5, 2012 at 5:20 PM, Olof Johansson <olof@lixom.net> wrote:
+>> > On Thu, Jan 5, 2012 at 4:01 PM, Stephen Warren <swarren@nvidia.com> wrote:
+>> >> Olof Johansson wrote at Thursday, December 22, 2011 5:18 PM:
+>> >>> Device tree bindings for the EMC tables on tegra.
+> ...
+>> I am looking at maybe bringing this into U-Boot.
+>>
+>> Do you have an example of the ram-code table? Would it look something like this?
+>
+> There's an example for Seaboard here:
+>
+> http://patchwork.ozlabs.org/patch/132929/
+>
+> The base EMC node was added earlier in the patch series:
+>
+> http://patchwork.ozlabs.org/patch/132928/
 
-	size = ALIGN(PAGE_SIZE, SZ_1M);
+Thanks for that. There is a single level example, but from what I can
+tell it will do fine for U-Boot.
 
-Isn't that just SZ_1M written in a rather complex way?  A comment may be
-a better way of explaining it.
+Regards,
+Simon
+
+>
+> --
+> nvpublic
+>
