@@ -1,9 +1,10 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu, 12 Jan 2012 22:49:30 +0100
-Subject: [PATCH 4/5] drivers/media/video/s5p-mfc/s5p_mfc.c: adjust double test
+Date: Thu, 12 Jan 2012 22:49:28 +0100
+Subject: [PATCH v2 2/5] drivers/media/video/s5p-fimc/fimc-capture.c: adjust
+ double test
 In-Reply-To: <1326404970-1084-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1326404970-1084-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1326404970-1084-5-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1326404970-1084-3-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -31,22 +32,41 @@ expression E;
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
-There is an img_height field, so it is my guess that that should be tested
-instead of testing the img_width field again.
+There is a height field, so it is my guess that that should be tested
+instead of testing the width field again.
 
- drivers/media/video/s5p-mfc/s5p_mfc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/media/video/s5p-fimc/fimc-capture.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/media/video/s5p-mfc/s5p_mfc.c b/drivers/media/video/s5p-mfc/s5p_mfc.c
-index 8be8b54..53126f2 100644
---- a/drivers/media/video/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/video/s5p-mfc/s5p_mfc.c
-@@ -475,7 +475,7 @@ static void s5p_mfc_handle_seq_done(struct s5p_mfc_ctx *ctx,
- 			ctx->mv_size = 0;
+diff --git a/drivers/media/video/s5p-fimc/fimc-capture.c b/drivers/media/video/s5p-fimc/fimc-capture.c
+index 2cc3b91..13dd598 100644
+--- a/drivers/media/video/s5p-fimc/fimc-capture.c
++++ b/drivers/media/video/s5p-fimc/fimc-capture.c
+@@ -689,7 +689,7 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
+ 			mf->code = 0;
+ 			continue;
  		}
- 		ctx->dpb_count = s5p_mfc_get_dpb_count();
--		if (ctx->img_width == 0 || ctx->img_width == 0)
-+		if (ctx->img_width == 0 || ctx->img_height == 0)
- 			ctx->state = MFCINST_ERROR;
- 		else
- 			ctx->state = MFCINST_HEAD_PARSED;
+-		if (mf->width != tfmt->width || mf->width != tfmt->width) {
++		if (mf->width != tfmt->width || mf->height != tfmt->height) {
+ 			u32 fcc = ffmt->fourcc;
+ 			tfmt->width  = mf->width;
+ 			tfmt->height = mf->height;
+@@ -698,7 +698,8 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
+ 					       NULL, &fcc, FIMC_SD_PAD_SOURCE);
+ 			if (ffmt && ffmt->mbus_code)
+ 				mf->code = ffmt->mbus_code;
+-			if (mf->width != tfmt->width || mf->width != tfmt->width)
++			if (mf->width != tfmt->width ||
++			    mf->height != tfmt->height)
+ 				continue;
+ 			tfmt->code = mf->code;
+ 		}
+@@ -706,7 +707,7 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
+ 			ret = v4l2_subdev_call(csis, pad, set_fmt, NULL, &sfmt);
+ 
+ 		if (mf->code == tfmt->code &&
+-		    mf->width == tfmt->width && mf->width == tfmt->width)
++		    mf->width == tfmt->width && mf->height == tfmt->height)
+ 			break;
+ 	}
+ 
