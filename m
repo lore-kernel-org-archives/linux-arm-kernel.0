@@ -1,40 +1,41 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 12 Jan 2012 12:00:11 +0100
-Subject: mxs-auart serial driver DMA support?
-In-Reply-To: <4F0EB5BB.1060008@bluegiga.com>
-References: <4F0E7EB0.2060906@bluegiga.com>
- <20120112094244.GA2775@pengutronix.de>
- <4F0EB5BB.1060008@bluegiga.com>
-Message-ID: <20120112110010.GF2775@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Jan 2012 11:24:32 +0000
+Subject: [PATCH 08/15] ARM: shmobile: convert to twd_local_timer_register()
+ interface
+In-Reply-To: <20120112091905.GJ1068@n2100.arm.linux.org.uk>
+References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
+ <1326287334-1905-9-git-send-email-marc.zyngier@arm.com>
+ <20120112091905.GJ1068@n2100.arm.linux.org.uk>
+Message-ID: <4F0EC2F0.1000409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 12:28:11PM +0200, Lauri Hintsala wrote:
-> On 01/12/2012 11:42 AM, Wolfram Sang wrote:
-> >
-> >>Any plans to add DMA support for mxs-auart serial driver? I noticed
-> >>it is impossible to archive full 3.25 Mbs speed with current one.
-> >
-> >No plans from our side, currently.
+On 12/01/12 09:19, Russell King - ARM Linux wrote:
+> On Wed, Jan 11, 2012 at 01:08:47PM +0000, Marc Zyngier wrote:
+>>  static void __init shmobile_late_time_init(void)
+>>  {
+>>  	/*
+>> @@ -34,6 +37,8 @@ static void __init shmobile_late_time_init(void)
+>>  	 */
+>>  	early_platform_driver_register_all("earlytimer");
+>>  	early_platform_driver_probe("earlytimer", 2, 0);
+>> +	if (local_timer_hook)
+>> +		local_timer_hook();
 > 
-> OK, AUART works fine with 115200 bps but over that it loose data
-> randomly. I have seen fifo overrun errors during receiving data with
-> 1Mbs and over. So current driver is unuseful with higher baud rates.
+> This is why late_timer_init() should be avoided at all cost - you can
+> only have one of them and once you've used it once, you need to invent
+> new hooks to hook other stuff into there.
+> 
+> In any case, I don't think this is necessary for TWD as ioremap should
+> be available for regions which have already been statically mapped now
+> that Nicolas' patches are in mainline.
 
-Care to send a patch adding this information to Kconfig help text and/or
-source code? Would be much more useful there, I think.
+Indeed, it should work now, and I'll remove the use of late_time_init.
 
-Regards,
+shmobile has another problem though: it doesn't have the smp_twd clock,
+which means we have to rely on calibration, and this will only work if
+the global timer is already up and running (hence the ugly hook).
 
-   Wolfram
-
+	M.
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120112/a517d75b/attachment.sig>
+Jazz is not dead. It just smells funny...
