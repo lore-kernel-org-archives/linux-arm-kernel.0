@@ -1,72 +1,42 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu, 12 Jan 2012 22:49:28 +0100
-Subject: [PATCH v2 2/5] drivers/media/video/s5p-fimc/fimc-capture.c: adjust
- double test
-In-Reply-To: <1326404970-1084-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1326404970-1084-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1326404970-1084-3-git-send-email-Julia.Lawall@lip6.fr>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 12 Jan 2012 21:58:01 +0000
+Subject: [PATCH] versatile: don't generate a duplicate IRQ domain
+In-Reply-To: <20120112203756.GM1068@n2100.arm.linux.org.uk>
+References: <1325867997-20761-1-git-send-email-jamie@jamieiles.com>
+ <20120112203756.GM1068@n2100.arm.linux.org.uk>
+Message-ID: <20120112215801.GB13991@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+Hi Russell,
 
-Rewrite a duplicated test to test the correct value
+On Thu, Jan 12, 2012 at 08:37:56PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 06, 2012 at 04:39:57PM +0000, Jamie Iles wrote:
+> > Now that the VIC driver handles the irqdomain natively we don't need to
+> > generate one in the versatile core code.  Longer term we should move the
+> > initialisation of both IRQ controllers to using of_irq_init() but
+> > that'll need a little more work.
+> > 
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> 
+> Please confirm that this patch can be applied ontop of commit
+> 356b95424cfb456e14a59eaa579422ce014c424b
+> (Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/geert/linux-m68k)
 
-The semantic match that finds this problem is as follows:
-(http://coccinelle.lip6.fr/)
+OK, this does apply, but it doesn't fail in the way I had expected.  
+Actually, it doesn't barf at all because the generated domain that my 
+patch removes has 0 IRQ's so it never gets attached to the irq_desc's.
 
-// <smpl>
-@@
-expression E;
-@@
+However, this patch is still valid as we end up with two domains 
+associated with the VIC but we get lucky as the real domain is 
+registered first.  I can update the patch description to reflect this if 
+you still want to apply it.
 
-(
-* E
-  || ... || E
-|
-* E
-  && ... && E
-)
-// </smpl>
+Incidentally, I've managed to get the versatile kernel booting under 
+qemu (using an experimental build with DT support, up to trying to mount 
+a rootfs), which seems to work nicely.  I just need to find a suitable 
+rootfs and that'll be a nice test system.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
-There is a height field, so it is my guess that that should be tested
-instead of testing the width field again.
-
- drivers/media/video/s5p-fimc/fimc-capture.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/media/video/s5p-fimc/fimc-capture.c b/drivers/media/video/s5p-fimc/fimc-capture.c
-index 2cc3b91..13dd598 100644
---- a/drivers/media/video/s5p-fimc/fimc-capture.c
-+++ b/drivers/media/video/s5p-fimc/fimc-capture.c
-@@ -689,7 +689,7 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
- 			mf->code = 0;
- 			continue;
- 		}
--		if (mf->width != tfmt->width || mf->width != tfmt->width) {
-+		if (mf->width != tfmt->width || mf->height != tfmt->height) {
- 			u32 fcc = ffmt->fourcc;
- 			tfmt->width  = mf->width;
- 			tfmt->height = mf->height;
-@@ -698,7 +698,8 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
- 					       NULL, &fcc, FIMC_SD_PAD_SOURCE);
- 			if (ffmt && ffmt->mbus_code)
- 				mf->code = ffmt->mbus_code;
--			if (mf->width != tfmt->width || mf->width != tfmt->width)
-+			if (mf->width != tfmt->width ||
-+			    mf->height != tfmt->height)
- 				continue;
- 			tfmt->code = mf->code;
- 		}
-@@ -706,7 +707,7 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
- 			ret = v4l2_subdev_call(csis, pad, set_fmt, NULL, &sfmt);
- 
- 		if (mf->code == tfmt->code &&
--		    mf->width == tfmt->width && mf->width == tfmt->width)
-+		    mf->width == tfmt->width && mf->height == tfmt->height)
- 			break;
- 	}
- 
+Jamie
