@@ -1,76 +1,38 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Wed, 11 Jan 2012 14:47:27 -1000
-Subject: [PATCH] ARM: vexpress: initial device tree support
-In-Reply-To: <4F0E2B95.7070402@firmworks.com>
-References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
- <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
- <4F0B897A.20502@firmworks.com>
- <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
- <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
- <4F0CD7BC.7080409@freescale.com> <4F0D2F90.8020801@firmworks.com>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A770@HQMAIL01.nvidia.com>
- <4F0E1843.7030207@firmworks.com>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A848@HQMAIL01.nvidia.com>
- <4F0E2B95.7070402@firmworks.com>
-Message-ID: <4F0E2D9F.5080909@firmworks.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 12 Jan 2012 07:04:32 +0530
+Subject: [PATCH] backlight: lcd: add driver for raster-type lcd's with
+ gpio controlled panel reset
+In-Reply-To: <20120111174540.GE24213@opensource.wolfsonmicro.com>
+References: <1325778146-27056-1-git-send-email-thomas.abraham@linaro.org>
+ <4F05F509.6020405@metafoo.de>
+ <20120106064929.GB3496@opensource.wolfsonmicro.com>
+ <CAJuYYwRxuZAm_JpLw1fN2ypnFc6TocH6veRmCeuqENvZHSz3kg@mail.gmail.com>
+ <20120107172826.GA355@opensource.wolfsonmicro.com>
+ <CAJuYYwSuDzUWgnSJHO0vwjYH7zscC9=j_=JuOUuJy9shHpPUuA@mail.gmail.com>
+ <20120111174540.GE24213@opensource.wolfsonmicro.com>
+Message-ID: <CAJuYYwRabVbUx7FWDjjRbQ2A8qowj1qHpN9unxXPgi3HfBVtuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-More nits picked below ...
+On 11 January 2012 23:15, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Jan 11, 2012 at 04:21:57PM +0530, Thomas Abraham wrote:
+>
+>> In the case of Exynos4 based Origen board, buck7 of max8997 supplies
+>> power to the lcd panel. buck7 is capable of supplying power at
+>> different voltage levels but for Origen board, it is required to
+>> supply only 3.3V. The constraints for buck7 can specify 'apply_uV' and
+>> this will ensure that buck7 is configured to supply 3.3V.
+>
+>> But 'apply_uV' seems to be not ideal for regulators that supply power
+>> to lcd panels. It would be better to power lcd panels only when video
+>> data has to be displayed.
+>
+> What makes you say this? ?Enabling and disabling a regulator are
+> entirely orthogonal to setting the regulator voltage.
 
+Sorry, I got this wrong. I will remove the regulator_set_voltage()
+call from the driver.
 
- >
- > i2c1: i2c at 7000c000 {
- >      #address-cells =<1>;
- >      #size-cells =<0>;
- >      compatible = "nvidia,tegra20-i2c";
- >      reg =<0x7000C000 0x100>;
- >      interrupts =<0 38 0x04>;
- > };
- >
- > mux at 0 {
-
-The name "i2cmux" might be more evocative.
-
- >      #address-cells =<1>;
- >      #size-cells =<0>;
- >      compatible = "nvidia,tegra20-i2c";
- >      parent-bus =<&i2c1>;
- >      gpios =<&gpio 100 0&gpio 101 0>;
- >      gpio-values-idle =<0>; /* bitmask of values */
- >
- >      bus at 0 {
-
-Since this implements the i2c bus abstraction, the name should be "i2c"
-
- >          #address-cells =<1>;
- >          #size-cells =<0>;
- >          /*
- >           * The GPIO values to set as a bitmask.
- >           * Formatted like gpio-i2cmux.c's mux->data.values[i].
- >           * Or name this gpio-values?
- >           */
- >          reg =<1>;
- >
- >          wm8903: wm8903 at 1a {
- >              compatible = "wlf,wm8903";
- >              reg =<0x1a>;
- >              ...
- >          };
- >      };
- >
- >      bus at 1 {
-
-Ditto, name should be "i2c"
-
- >          #address-cells =<1>;
- >          #size-cells =<0>;
- >          reg =<2>;
- >
- >          light-sensor at 44 {
- >              compatible = "isil,isl29018";
- >              reg =<0x44>;
- >              ...
- >          };
- >      };
- > };
+Thanks,
+Thomas.
