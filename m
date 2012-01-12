@@ -1,45 +1,35 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 12 Jan 2012 10:36:18 +0100
-Subject: [RFC] ARM: imx: Add imx6q thermal
-In-Reply-To: <1326266285-11656-1-git-send-email-rob.lee@linaro.org>
-References: <1326266285-11656-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <20120112093618.GB5446@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 12 Jan 2012 10:42:45 +0100
+Subject: mxs-auart serial driver DMA support?
+In-Reply-To: <4F0E7EB0.2060906@bluegiga.com>
+References: <4F0E7EB0.2060906@bluegiga.com>
+Message-ID: <20120112094244.GA2775@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 01:18:05AM -0600, Robert Lee wrote:
-> Add thermal support for i.MX6Q.  Uses recently submitted common
-> cpu_cooling functionality shown here:
-> 
-> http://www.spinics.net/lists/linux-pm/msg26500.html
-> 
-> Have some todo items but basic implementation is done and I'd like to
-> get any helpful feedback on it.
 
-Generally shouldn't this be a regular driver?
+> Any plans to add DMA support for mxs-auart serial driver? I noticed
+> it is impossible to archive full 3.25 Mbs speed with current one.
 
+No plans from our side, currently.
 
-> +
-> +/* register define of anatop */
-> +#define HW_ANADIG_ANA_MISC0	(0x00000150)
-> +#define HW_ANADIG_ANA_MISC0_SET	(0x00000154)
-> +#define HW_ANADIG_ANA_MISC0_CLR	(0x00000158)
-> +#define HW_ANADIG_ANA_MISC0_TOG	(0x0000015c)
+> As I understood porting DMA support from freescale's driver is not
+> trivial because MXS DMA implementation has been changed to mainline
+> version.
 
-unnecessary braces. Please remove.
+Yes, luckily. DMAENGINE is really the way to go.
 
-> +
-> +#if IMX6Q_THERMAL_DEBUG
-> +	pr_info("Temperature is %lu C\n", *temp);
-> +#endif
+Regards,
 
-Please don't add your own debug defines which then issue
-messages with pr_info. Use pr_debug in the first place.
-
-Sascha
+   Wolfram
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Wolfram Sang                |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120112/267d55f1/attachment.sig>
