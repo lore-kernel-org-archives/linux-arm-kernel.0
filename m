@@ -1,7 +1,7 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu, 12 Jan 2012 10:55:17 +0100
-Subject: [PATCH 15/15] arch/arm/mach-omap2/smartreflex.c: add missing iounmap
-Message-ID: <1326362117-29371-15-git-send-email-Julia.Lawall@lip6.fr>
+Date: Thu, 12 Jan 2012 10:55:12 +0100
+Subject: [PATCH 10/15] arch/arm/mach-imx/mach-mx53_ard.c: add missing iounmap
+Message-ID: <1326362117-29371-10-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -34,19 +34,22 @@ iounmap(e);
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- arch/arm/mach-omap2/smartreflex.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/mach-mx53_ard.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 9dd9345..7e755bb 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -897,7 +897,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		ret = sr_late_init(sr_info);
- 		if (ret) {
- 			pr_warning("%s: Error in SR late init\n", __func__);
--			return ret;
-+			goto err_iounmap;
- 		}
- 	}
+diff --git a/arch/arm/mach-imx/mach-mx53_ard.c b/arch/arm/mach-imx/mach-mx53_ard.c
+index 08dfb76..753f4fc 100644
+--- a/arch/arm/mach-imx/mach-mx53_ard.c
++++ b/arch/arm/mach-imx/mach-mx53_ard.c
+@@ -188,8 +188,10 @@ static int weim_cs_config(void)
+ 		return -ENOMEM;
  
+ 	iomuxc_base = ioremap(MX53_IOMUXC_BASE_ADDR, SZ_4K);
+-	if (!iomuxc_base)
++	if (!iomuxc_base) {
++		iounmap(weim_base);
+ 		return -ENOMEM;
++	}
+ 
+ 	/* CS1 timings for LAN9220 */
+ 	writel(0x20001, (weim_base + 0x18));
