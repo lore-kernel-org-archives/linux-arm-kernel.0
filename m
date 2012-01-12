@@ -1,107 +1,179 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 11 Jan 2012 15:59:26 -0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <20120111235634.GG20968@S2101-09.ap.freescale.net>
-References: <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <20120107135445.GI4790@S2101-09.ap.freescale.net>
- <20120108125156.GB2203@richard-laptop>
- <20120109015625.GE1835@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6FB@HQMAIL01.nvidia.com>
- <20120111235634.GG20968@S2101-09.ap.freescale.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A83A@HQMAIL01.nvidia.com>
+Date: Wed, 11 Jan 2012 16:15:39 -0800
+Subject: [PATCH] ARM: vexpress: initial device tree support
+In-Reply-To: <4F0E1843.7030207@firmworks.com>
+References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
+ <CAOZdJXXPJEaFO-ymvb_TsTJ6W2T7_aWXA=9RZprVmKBOn9cu8A@mail.gmail.com>
+ <4F0B897A.20502@firmworks.com>
+ <20120110122252.GA7180@jl-vm1.vm.bytemark.co.uk>
+ <4F0CB485.9010106@freescale.com> <4F0CBD46.2010909@firmworks.com>
+ <4F0CD7BC.7080409@freescale.com> <4F0D2F90.8020801@firmworks.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A770@HQMAIL01.nvidia.com>
+ <4F0E1843.7030207@firmworks.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A848@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote at Wednesday, January 11, 2012 4:57 PM:
-> On Wed, Jan 11, 2012 at 10:37:36AM -0800, Stephen Warren wrote:
-> > Shawn Guo wrote at Sunday, January 08, 2012 6:56 PM:
-> > > On Sun, Jan 08, 2012 at 08:51:59PM +0800, Richard Zhao wrote:
-> > > ...
-> > > > > > So, this does appear to be conflating the two things: The definition of
-> > > > > > what pins are in a pingroup, and the mux function for a particular
-> > > > > > setting of that pingroup. I think you need separate nodes for this.
-> > > > > >
-> > > > > At least for imx, we do not have mux function setting for pingroup.
-> > > > > Instead, it only applies to individual pin.
-> > > > I think it depends on function definition of pinmux driver. For the
-> > > > imx example patch, it's one-to-one.
-> > >
-> > > It should depend on particular imx soc pinmux design rather than
-> > > pinmux driver.  If it's always one-to-one case, we do not need
-> > > pinmux at all.  Aisheng's patch just did not enumerate all the groups
-> > > for given function.  Instead, it puts a couple simple examples there
-> > > for demonstration.
-> > >
-> > > ...
-> > >
-> > > > > > 		uart4func: func at 1 {
-> > > > > > 			func-name = "uart4";
-> > > > > > 			locations = <&bargrp &bazgrp>;
-> > > > > > 			mux-value = <6 3>;
-> > > > > > 		};
-> > > > >
-> > > > > I prefer to have function node defined in <board>.dtsi, since it's
-> > > > > all about defining phandle to the correct pingroup, which should be
-> > > > > decided by board design.
-> > > > group and function are one-to-one mapped for imx.
-> > >
-> > > Again, it's not the case.
-> > >
-> > > > So if you put function
-> > > > in board dts, why not put pin group there too?
-> > >
-> > > If we put pingroup data in <board>.dts, the data will be likely get
-> > > duplicated a lot in different board dts files.  For example, if
-> > > imx6q-sabrelite chooses the same pingroup for usdhc3 and usdhc4 as
-> > > imx6q-arm2, the pingroup data will be duplicated between imx6q-arm2.dts
-> > > and imx6q-sabrelite.dts.
-> > >
-> > > On the contrary, putting pingroup data in <soc>.dtsi and having function
-> > > node in <board>.dts with phandle pointing to the correct pingroup will
-> > > help avoid such data duplication.
+Mitch Bradley wrote at Wednesday, January 11, 2012 4:16 PM:
+> On 1/11/2012 10:29 AM, Stephen Warren wrote:
+> > Mitch Bradley wrote at Tuesday, January 10, 2012 11:43 PM:
+> >> On 1/10/2012 2:28 PM, Timur Tabi wrote:
+> >>> Mitch Bradley wrote:
+> > ...
+> >>>> That GPIO pin thing is annoying, but not sufficiently complex or common
+> >>>> that it warrants having a separate EDID driver.  You could define a
+> >>>> platform-specific property to tell your framebuffer driver that it needs
+> >>>> to do that GPIO thing.  It's a hack, but the GPIO thing is inherently a
+> >>>> hack, so there will be some ugliness somewhere as a result.
+> >>>
+> >>> I have two platform-specific functions, "enabled_edid" and "disable_edid", that I call
+> before/after
+> >>> calling fb_ddc_read().  This seems to work well, and I already have a mechanism for calling
+> platform-
+> >>> specific functions from the framebuffer driver.
+> >>>
+> >>> However, Stephen Warren said I should be using the I2C mux feature instead.
+> >>
+> >> I2C mux is a plausible solution, as is your enable/disable thing.  At
+> >> some level they are equivalent.  I2C mux is a formalization of your
+> >> solution, in which the mux device's select method must be written to
+> >> perform the function of your enable/disable edid functions.
+> >>
+> >> Either way, you need platform-dependent functions to do the switching,
+> >> and you need to select the appropriate channel.  Personally, I don't see
+> >> the advantage of using the mux device in this case.
 > >
-> > Oh, when I wrote in my first mail today that I'd expand on one of my
-> > points when responding to Richard Zhao's email, I actually meant when
-> > responding to this email. Sorry for the confusion!
-> >
-> > So, I don't agree with putting the "combinations" in the SoC .dtsi file,
-> > since that could grow it into a huge file that contains a lot of nodes
-> > that are used on some board somewhere, but typically not the "current"
-> > board that's including it.
-> >
-> > However, I do see that there are probably lots of common combinations
-> > that get re-used across multiple boards, and you might want a common
-> > place to put those definitions so they don't need to be cut/paste
-> > everywhere.
-> >
-> > So, why not create specific include files (.dtsi files) for each of those
-> > combinations? Each include could define one particular common combination
-> > of pin mux usage, or perhaps even a set of them if they're commonly used
-> > together. Each board file would include the SoC .dtsi file, the relevant
-> > set of "pinmux config" .dtsi files, and then include anything custom to
-> > that board.
+> > The main advantage I see is that you explicitly don't need any platform-
+> > specific functions to do the switching; you end up with platform-agnostic
+> > code (the I2C GPIO mux driver) and platform-specific configuration for
+> > that driver (the GPIO ID to use).
 > 
-> This is somehow overkilled to me.  Doing this will create a big mount
-> of .dtsi files to bloat folder arch/arm/boot/dts.  Putting the
-> 'combinations' in <soc>.dtsi seems perfect fine to me.
+> 
+> Oh, I didn't know about the I2C GPIO Mux driver.  I was looking at
+> i2c-mux.c .  I now see gpio-i2cmux.c, which indeed seems to do the right
+> thing.
+> 
+> > The display driver just talks to the
+> > I2C API for the DDC I2C bus, and doesn't do anything to switch between
+> > the busses; the I2C GPIO mux driver does all that internally. Thus, the
+> > display driver will work fine on boards that don't need this muxing with
+> > zero changes; the board simply wouldn't register the mux driver.
+> >
+> >> It's just adding
+> >> complexity with no payback.  If there were several channels that needed
+> >> to be accessed in an interspersed fashion, the mux device would  be much
+> >> cleaner.  But in this case, there is a single "back channel" that only
+> >> needs to be accessed once and can subsequently be ignored.
+> >
+> > Well, the EDID needs to be read on every hotplug event, so it's certainly
+> > not a one-time thing.
+> >
+> >> The video
+> >> driver can grab a lock, call enable_edid(), read out the EDID data into
+> >> an array, call disable_edid(), release the lock, and that is it.  The
+> >> other users of that I2C bus can ignore the hidden EDID.
+> >
+> > Other I2C users/devices also shouldn't be impacted by the mux; they
+> > would continue to use the existing I2C APIs for the bus their devices
+> > are attached to, and not know about the mux.
+> 
+> If other devices that are on the same bus as the EDID don't use the mux,
+> how does one ensure that the GPIO is restored to the non-EDID
+> setting when the display driver is finished?
 
-I see a couple problems with that approach:
+The I2C busses are set up like this:
 
-1) <soc>.dtsi gets very bloated, and wastes space containing board-
-specific data for boards other than the "current" one.
+                bus 0        bus 1
+I2C controller -------> mux ------> dev a, dev b, dev c, ...
+                           \------> dev x, dev y, dev z, ...
+                             bus 2
 
-2) We need to invent some more complex DT format so you can reference
-these canned combinations from the device drivers, rather than simply
-enumerating the mux value for each pin/group.
+Thus all devices are on a child I2C bus of the mux and none on the raw
+HW bus exposed by the I2C controller itself.
 
-You could put the combination .dtsi files in arch/arm/boot/dts/<soc> to
-maintain some extra order.
+The I2C core will always call gpiomux_select before each transaction,
+which will set the GPIOs appropriately for bus 1 or bus 2, depending
+on which device is being communicated with.
+
+> Perhaps I'm missing something, but it appears to me that the model is to
+> set the correct GPIO state before each use, instead of a
+> save-set-use-restore model.
+
+That's true, but the select action happens implicitly inside the I2C
+core for any and all transactions, AIUI, so the two modes are equivalent.
+
+> In any case, if there is a good way to instantiate the GPIO mux device
+> from the device tree, it certainly provides a ready-made solution.  Each
+> device that is on the bus in question would have a device node that is a
+> child of the GPIO mux node, and the display driver could have a
+> phandle-valued property pointing to the mux node, plus a property
+> declaring the selection value (or perhaps a single 2-cell property with
+> phandle, selection-value).
+
+That's probably the difficult part.
+
+For an I2C mux that is controlled via I2C, you can just add the mux
+node as a child of the I2C controller, since it has an I2C address,
+and so putting it there makes sense.
+
+But for an I2C mux that's controlled using GPIOs or pinmux, there's no
+I2C address so I guess the mux shouldn't be directly underneath the I2C
+controller.
+
+Perhaps the DT binding for such an I2C mux can refer to the parent I2C
+controller by phandle?
+
+Inside the I2C mux DT node, I think we can have a child node for each
+bus, and then use standard I2C child node addressing for all the nodes
+within these bus nodes.
+
+Perhaps:
+
+i2c1: i2c at 7000c000 {
+    #address-cells = <1>;
+    #size-cells = <0>;
+    compatible = "nvidia,tegra20-i2c";
+    reg = <0x7000C000 0x100>;
+    interrupts = <0 38 0x04>;
+};
+
+mux at 0 {
+    #address-cells = <1>;
+    #size-cells = <0>;
+    compatible = "nvidia,tegra20-i2c";
+    parent-bus = <&i2c1>;
+    gpios = <&gpio 100 0 &gpio 101 0>;
+    gpio-values-idle = <0>; /* bitmask of values */
+
+    bus at 0 {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        /*
+         * The GPIO values to set as a bitmask.
+         * Formatted like gpio-i2cmux.c's mux->data.values[i].
+         * Or name this gpio-values?
+         */
+        reg = <1>;
+
+        wm8903: wm8903 at 1a {
+            compatible = "wlf,wm8903";
+            reg = <0x1a>;
+            ...
+        };
+    };
+
+    bus at 1 {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        reg = <2>;
+
+        light-sensor at 44 {
+            compatible = "isil,isl29018";
+            reg = <0x44>;
+            ...
+        };
+    };
+};
 
 -- 
 nvpublic
