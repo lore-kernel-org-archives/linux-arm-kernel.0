@@ -1,68 +1,57 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu, 12 Jan 2012 22:33:06 +0100
-Subject: [PATCH 2/4] drivers/media/video/s5p-fimc/fimc-capture.c: adjust
- double test
-In-Reply-To: <1326403988-872-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1326403988-872-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1326403988-872-3-git-send-email-Julia.Lawall@lip6.fr>
+From: sjg@chromium.org (Simon Glass)
+Date: Thu, 12 Jan 2012 13:48:10 -0800
+Subject: [PATCH 7/9] arm/tegra: emc: device tree bindings
+In-Reply-To: <1324599468-12845-8-git-send-email-olof@lixom.net>
+References: <1324599468-12845-1-git-send-email-olof@lixom.net>
+ <1324599468-12845-8-git-send-email-olof@lixom.net>
+Message-ID: <CAPnjgZ2vLiNWTweDduMgpEF-Jeucszvef20p3abv0kk6Pj3XTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+Hi Olof,
 
-Rewrite a duplicated test to test the correct value
+On Thu, Dec 22, 2011 at 4:17 PM, Olof Johansson <olof@lixom.net> wrote:
+> Device tree bindings for the EMC tables on tegra.
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> ---
+> ?.../devicetree/bindings/arm/tegra/emc.txt ? ? ? ? ?| ?100 ++++++++++++++++++++
+> ?arch/arm/boot/dts/tegra20.dtsi ? ? ? ? ? ? ? ? ? ? | ? ?7 ++
+> ?2 files changed, 107 insertions(+), 0 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/arm/tegra/emc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/emc.txt b/Documentation/devicetree/bindings/arm/tegra/emc.txt
+> new file mode 100644
+> index 0000000..09335f8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/tegra/emc.txt
+> @@ -0,0 +1,100 @@
+> +Embedded Memory Controller
+> +
+> +Properties:
+> +- name : Should be emc
+> +- #address-cells : Should be 1
+> +- #size-cells : Should be 0
+> +- compatible : Should contain "nvidia,tegra20-emc".
+> +- reg : Offset and length of the register set for the device
+> +- nvidia,use-ram-code : If present, the sub-nodes will be addressed
+> + ?and chosen using the ramcode board selector. If omitted, only one
+> + ?set of tables can be present and said tables will be used
+> + ?irrespective of ram-code configuration.
+> +
+> +Child device nodes describe the memory settings for different configurations and clock rates.
+> +
+> +Example:
+> +
+> + ? ? ? emc at 7000f400 {
+> + ? ? ? ? ? ? ? #address-cells = < 1 >;
+> + ? ? ? ? ? ? ? #size-cells = < 0 >;
+> + ? ? ? ? ? ? ? compatible = "nvidia,tegra20-emc";
+> + ? ? ? ? ? ? ? reg = <0x7000f4000 0x200>;
 
-The semantic match that finds this problem is as follows:
-(http://coccinelle.lip6.fr/)
+Minor point - that should be 0x7000f400.
 
-// <smpl>
-@@
-expression E;
-@@
-
-(
-* E
-  || ... || E
-|
-* E
-  && ... && E
-)
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/media/video/s5p-fimc/fimc-capture.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/media/video/s5p-fimc/fimc-capture.c b/drivers/media/video/s5p-fimc/fimc-capture.c
-index 2cc3b91..eb38ae5 100644
---- a/drivers/media/video/s5p-fimc/fimc-capture.c
-+++ b/drivers/media/video/s5p-fimc/fimc-capture.c
-@@ -689,7 +689,7 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
- 			mf->code = 0;
- 			continue;
- 		}
--		if (mf->width != tfmt->width || mf->width != tfmt->width) {
-+		if (mf->width != tfmt->width || mf->height != tfmt->height) {
- 			u32 fcc = ffmt->fourcc;
- 			tfmt->width  = mf->width;
- 			tfmt->height = mf->height;
-@@ -698,7 +698,7 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
- 					       NULL, &fcc, FIMC_SD_PAD_SOURCE);
- 			if (ffmt && ffmt->mbus_code)
- 				mf->code = ffmt->mbus_code;
--			if (mf->width != tfmt->width || mf->width != tfmt->width)
-+			if (mf->width != tfmt->width || mf->height != tfmt->height)
- 				continue;
- 			tfmt->code = mf->code;
- 		}
-@@ -706,7 +706,7 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
- 			ret = v4l2_subdev_call(csis, pad, set_fmt, NULL, &sfmt);
- 
- 		if (mf->code == tfmt->code &&
--		    mf->width == tfmt->width && mf->width == tfmt->width)
-+		    mf->width == tfmt->width && mf->height == tfmt->height)
- 			break;
- 	}
- 
+Regards,
+SImon
