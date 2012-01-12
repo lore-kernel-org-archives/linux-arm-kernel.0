@@ -1,45 +1,72 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Thu, 12 Jan 2012 16:26:45 +0200
-Subject: [PATCH] ARM: OMAP: fix MMC2 loopback clock handling
-Message-ID: <1326378405-27632-1-git-send-email-notasas@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Jan 2012 14:36:26 +0000
+Subject: [PATCH 04/15] ARM: smp_twd: add device tree support
+In-Reply-To: <4F0DF9B3.3080804@gmail.com>
+References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
+ <1326287334-1905-5-git-send-email-marc.zyngier@arm.com>
+ <4F0DF9B3.3080804@gmail.com>
+Message-ID: <4F0EEFEA.1020305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently MMC2 setup code can only enable loopback clock and
-relies on reset value for boards that need to have it disabled.
-This causes a problem with certain bootloaders that always enable
-that clock, resulting with unwanted bootloader dependencies.
+Hi Rob,
 
-Fix this by making it disable the clock if board data says so.
+On 11/01/12 21:05, Rob Herring wrote:
+> On 01/11/2012 07:08 AM, Marc Zyngier wrote:
+>> Add bindings to support DT discovery of the ARM Timer Watchdog
+>> (aka TWD). Only the timer side is converted by this patch.
+>>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/twd.txt |   29 +++++++++++
+>>  arch/arm/include/asm/smp_twd.h                |    1 +
+>>  arch/arm/kernel/smp_twd.c                     |   68 ++++++++++++++++++++-----
+>>  3 files changed, 85 insertions(+), 13 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
+>> new file mode 100644
+>> index 0000000..a9d5587
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/twd.txt
+>> @@ -0,0 +1,29 @@
+>> +* ARM Timer Watchdog
+>> +
+>> +ARM 11MP, Cortex-A5 and Cortex-A9 are often associated with a per-core
+>> +Timer-Watchdog (aka TWD), which provides both a per-cpu local timer
+>> +and watchdog.
+>> +
+>> +The TWD is usually attached to a GIC to deliver its two per-processor
+>> +interrupts.
+>> +
+>> +Main node required properties:
+>> +
+>> +- compatible : Should be one of:
+>> +	"arm,cortex-a9-twd"
+>> +	"arm,cortex-a5-twd"
+>> +	"arm,arm11mp-twd"
+>> +	"arm,smp-twd"
+>> +
+>> +- interrupts : Two interrupts to each core, the first one for the
+>> +  timer, the second one for the watchdog.
+>> +
+>> +- reg : Specify the base address and the size of the TWD.
+>> +
+>> +Example:
+>> +
+>> +	twd at 2c000600 {
+>> +		compatible = "arm,arm11mp-twd", "arm,smp-twd";
+>> +		reg = <0x2c000600 0x100>;
+>> +		interrupts = <1 13 0xf01 1 14 0xf01>;
+>> +	};
+> 
+> Why not split the watchdog and timer into 2 nodes? It may not matter
+> since there is no driver for the timer. If there was, we would have a
+> problem as you can't match 2 drivers to 1 node.
 
-Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
----
-depends on "ARM: OMAP: fix erroneous mmc2 clock change on mmc3 setup"
-http://marc.info/?l=linux-omap&m=132416866125291&w=2
+Don't we hit the opposite problem - two nodes with the same address?
 
- arch/arm/mach-omap2/hsmmc.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index 8658bd7..ad0adb5 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -175,11 +175,12 @@ static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
- {
- 	u32 reg;
- 
--	if (mmc->slots[0].internal_clock) {
--		reg = omap_ctrl_readl(control_devconf1_offset);
-+	reg = omap_ctrl_readl(control_devconf1_offset);
-+	if (mmc->slots[0].internal_clock)
- 		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
--		omap_ctrl_writel(reg, control_devconf1_offset);
--	}
-+	else
-+		reg &= ~OMAP2_MMCSDIO2ADPCLKISEL;
-+	omap_ctrl_writel(reg, control_devconf1_offset);
- }
- 
- static void hsmmc2_before_set_reg(struct device *dev, int slot,
+	M.
 -- 
-1.7.0.4
+Jazz is not dead. It just smells funny...
