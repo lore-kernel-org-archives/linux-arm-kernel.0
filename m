@@ -1,123 +1,93 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 13 Jan 2012 00:44:01 +0000
-Subject: [PATCH 2/2] versatile: dt: register interrupt controllers from dt
-In-Reply-To: <1326415441-17695-1-git-send-email-jamie@jamieiles.com>
-References: <1326415441-17695-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1326415441-17695-3-git-send-email-jamie@jamieiles.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 12 Jan 2012 17:47:38 -0700
+Subject: [RFC 13/14] irq_domain: Remove 'new' irq_domain in favour of the
+ ppc one
+In-Reply-To: <4F0F7B60.5040701@gmail.com>
+References: <1326313337-24603-1-git-send-email-grant.likely@secretlab.ca>
+ <1326313337-24603-14-git-send-email-grant.likely@secretlab.ca>
+ <4F0DFC0F.2090005@gmail.com>
+ <CACxGe6vVSO0cTgPurr6jFoo9QF_W02UaABOFYadCTQGU9dcwmg@mail.gmail.com>
+ <4F0F7B60.5040701@gmail.com>
+Message-ID: <CACxGe6vER6hTr0ez9_=bTL+F1n3DZHCa9Yc9fVGQ36i=X62sVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch the versatile_dt board to instantiate both interrupt controllers
-from the device tree using the of_irq_init() helper.
+On Thu, Jan 12, 2012 at 5:31 PM, Rob Herring <robherring2@gmail.com> wrote:
+> Adding lakml...
+>
+> On 01/11/2012 03:27 PM, Grant Likely wrote:
+>> On Wed, Jan 11, 2012 at 2:15 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>> Grant,
+>>>
+>>> On 01/11/2012 02:22 PM, Grant Likely wrote:
+>>>> This patch removes the simplistic implementation of irq_domains and enables
+>>>> the powerpc infrastructure for all irq_domain users. ?The powerpc
+>>>> infrastructure includes support for complex mappings between Linux and
+>>>> hardware irq numbers, and can manage allocation of irq_descs.
+>>>>
+>>>> This patch also converts the few users of irq_domain_add()/irq_domain_del()
+>>>> to call irq_domain_add_legacy() instead.
+>>>
+>>> So what is the non-legacy way? Legacy implies we don't want to do it
+>>> that way. I guess until we remove all non-DT platforms with GIC we are
+>>> stuck with legacy. That seems like it could be a ways out until we get
+>>> there.
+>>
+>> Non-legacy is letting the irq_domain manage the irq_desc allocations.
+>> Some of the controllers will be easy to convert, some will be more
+>> difficult. ?The primary thing that really blocks getting away from the
+>> legacy method is anything that expects hardcoded #defined irq numbers.
+>> ?The goal is to convert all users over to the linear revmap method.
+>>
+>
+> So I gave this a spin on highbank. I ran into a couple problems.
+>
+> I had to revert "irqdesc: Consolidate irq reservation logic" which is in
+> your branch, but not this series. irq_alloc_desc_from was returning -EEXIST.
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/mach-versatile/core.c         |   27 ++++++++-------------------
- arch/arm/mach-versatile/core.h         |    1 +
- arch/arm/mach-versatile/versatile_dt.c |   15 ++++++++++++++-
- 3 files changed, 23 insertions(+), 20 deletions(-)
+Hmmm... I thought I sorted that out.  Thanks for letting me know.
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index cbcda61..1ad2447 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -86,27 +86,9 @@ static struct fpga_irq_data sic_irq = {
- #define PIC_MASK	0
- #endif
- 
--/* Lookup table for finding a DT node that represents the vic instance */
--static const struct of_device_id vic_of_match[] __initconst = {
--	{ .compatible = "arm,versatile-vic", },
--	{}
--};
--
--static const struct of_device_id sic_of_match[] __initconst = {
--	{ .compatible = "arm,versatile-sic", },
--	{}
--};
--
--void __init versatile_init_irq(void)
-+void __init versatile_route_irqs(void)
- {
--	vic_init(VA_VIC_BASE, IRQ_VIC_START, ~0, 0);
--	irq_domain_generate_simple(vic_of_match, VERSATILE_VIC_BASE, IRQ_VIC_START);
--
- 	writel(~0, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
--
--	fpga_irq_init(IRQ_VICSOURCE31, ~PIC_MASK, &sic_irq);
--	irq_domain_generate_simple(sic_of_match, VERSATILE_SIC_BASE, IRQ_SIC_START);
--
- 	/*
- 	 * Interrupts on secondary controller from 0 to 8 are routed to
- 	 * source 31 on PIC.
-@@ -117,6 +99,13 @@ void __init versatile_init_irq(void)
- 	writel(PIC_MASK, VA_SIC_BASE + SIC_INT_PIC_ENABLE);
- }
- 
-+void __init versatile_init_irq(void)
-+{
-+	versatile_route_irqs();
-+	vic_init(VA_VIC_BASE, IRQ_VIC_START, ~0, 0);
-+	fpga_irq_init(IRQ_VICSOURCE31, ~PIC_MASK, &sic_irq);
-+}
-+
- static struct map_desc versatile_io_desc[] __initdata = {
- 	{
- 		.virtual	=  IO_ADDRESS(VERSATILE_SYS_BASE),
-diff --git a/arch/arm/mach-versatile/core.h b/arch/arm/mach-versatile/core.h
-index 2ef2f55..1117e32 100644
---- a/arch/arm/mach-versatile/core.h
-+++ b/arch/arm/mach-versatile/core.h
-@@ -29,6 +29,7 @@ extern void __init versatile_init(void);
- extern void __init versatile_init_early(void);
- extern void __init versatile_init_irq(void);
- extern void __init versatile_map_io(void);
-+extern void __init versatile_route_irqs(void);
- extern struct sys_timer versatile_timer;
- extern void versatile_restart(char, const char *);
- extern unsigned int mmc_status(struct device *dev);
-diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
-index ae5ad3c..abb310d 100644
---- a/arch/arm/mach-versatile/versatile_dt.c
-+++ b/arch/arm/mach-versatile/versatile_dt.c
-@@ -27,6 +27,7 @@
- #include <asm/hardware/vic.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+#include <plat/fpga-irq.h>
- 
- #include "core.h"
- 
-@@ -36,6 +37,18 @@ static void __init versatile_dt_init(void)
- 			     versatile_auxdata_lookup, NULL);
- }
- 
-+static const struct of_device_id versatile_intc_of_match[] = {
-+	{ .compatible = "arm,versatile-vic", .data = vic_of_init, },
-+	{ .compatible = "arm,versatile-sic", .data = sic_of_init, },
-+	{ /* Sentinel */ }
-+};
-+
-+static void __init versatile_dt_init_irq(void)
-+{
-+	versatile_route_irqs();
-+	of_irq_init(versatile_intc_of_match);
-+}
-+
- static const char *versatile_dt_match[] __initconst = {
- 	"arm,versatile-ab",
- 	"arm,versatile-pb",
-@@ -45,7 +58,7 @@ static const char *versatile_dt_match[] __initconst = {
- DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
- 	.map_io		= versatile_map_io,
- 	.init_early	= versatile_init_early,
--	.init_irq	= versatile_init_irq,
-+	.init_irq	= versatile_dt_init_irq,
- 	.handle_irq	= vic_handle_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_dt_init,
+>
+> The GIC code did not work which I think is specific to using gic_of_init
+> which makes irq_start = -1. With that it still doesn't work. It dies in
+> gic_set_type... I've found one problem which I'll reply inline to, but I
+> think this is a dead end path anyway.
+
+Haha, I'm not surprised.  That last patch was only compile tested on
+platforms using the gic.  I'm not surprised that I flubbed it.
+
+> You have removed the irq_alloc_descs call from the GIC which is a step
+> backwards. Several of the ARM DT enabled platforms are at the point they
+> can fully support dynamic virq base for each irqchip. I changed the
+> domain from legacy to linear and got things working.
+> The issue with
+
+I hadn't actually intended to remove the irq_alloc_descs in this
+patch.  That was a leftover hunk from when I was playing with going
+straight to irq_domain_add_linear().  For this specific patch, I'll
+put the alloc back in and test it that way.  A follow-on patch can do
+a proper conversion to the linear revmap.
+
+> linear is for SPARSE_IRQ. The default behavior on ARM for SPARSE_IRQ is
+> all nr_irqs are allocated at boot time before any controller is
+> initialized. The only platform with a GIC and requiring SPARSE_IRQ is
+> shmobile, but it is also the only one that calls irq_alloc_desc
+> functions for it's interrupts. So I think we are okay there. The problem
+> occurs when enabling SPARSE_IRQ for a non-DT platform with a GIC and
+> with irqchips that don't call irq_alloc_desc for their irqs. IMHO, this
+> should be an okay trade-off. There's no advantage to enabling SPARSE_IRQ
+> on ARM for platforms that don't require it. All the platforms with a GIC
+> have active work to convert to DT (except shmobile which I think is
+> okay), so it's a temporary issue.
+
+Actually, I believe Thomas' long term goal is to always enable
+SPARSE_IRQ and remove the option entirely, so it should still be
+properly resolved. I'll take a look next week if I don't get to it
+tomorrow.  I need to resurrect my vexpress qemu test environment so I
+can test the permutations.
+
+g.
+
 -- 
-1.7.5.4
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
