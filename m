@@ -1,75 +1,127 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 13 Jan 2012 12:05:05 -0600
-Subject: [PATCH 04/11] ep93xx: Configure GPIO ports in core code
-In-Reply-To: <4F0FD694.4060705@gmail.com>
-References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-5-git-send-email-rmallon@gmail.com>
- <20120113062707.GA4147@mwesterb-mobl.ger.corp.intel.com>
- <4F0FD694.4060705@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB29@AUSP01VMBX24.collaborationhost.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 13 Jan 2012 10:16:36 -0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <20120113034558.GA12184@S2101-09.ap.freescale.net>
+References: <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
+ <20120107135445.GI4790@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6E5@HQMAIL01.nvidia.com>
+ <20120112033941.GH20968@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D1DCC@HQMAIL01.nvidia.com>
+ <20120113034558.GA12184@S2101-09.ap.freescale.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17801D1F9D@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 13, 2012 12:01 AM, Ryan Mallon wrote:
-> On 13/01/12 17:27, Mika Westerberg wrote:
->> On Wed, Jan 11, 2012 at 02:14:29PM +1100, Ryan Mallon wrote:
->>> Move the pinmux setting of the EP93xx GPIOs to the core code. This 
->>> removes the need for the GPIO driver to have access to the system 
->>> controller registers.
->>>
->>> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
->>> Cc: Mika Westerberg <mika.westerberg@iki.fi>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
->>> ---
->>>  arch/arm/mach-ep93xx/core.c |    7 +++++++
->>>  drivers/gpio/gpio-ep93xx.c  |    7 -------
->>>  2 files changed, 7 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-ep93xx/core.c 
->>> b/arch/arm/mach-ep93xx/core.c index dcb10c2..978c5a6 100644
->>> --- a/arch/arm/mach-ep93xx/core.c
->>> +++ b/arch/arm/mach-ep93xx/core.c
->>> @@ -896,6 +896,13 @@ void __init ep93xx_init_devices(void)
->>>  	/* Disallow access to MaverickCrunch initially */
->>>  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
->>>  
->>> +	/* Default all ports to GPIO */
->>> +	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
->>> +			       EP93XX_SYSCON_DEVCFG_GONK |
->>> +			       EP93XX_SYSCON_DEVCFG_EONIDE |
->>> +			       EP93XX_SYSCON_DEVCFG_GONIDE |
->>> +			       EP93XX_SYSCON_DEVCFG_HONIDE);
->>> +
->> Doesn't this now change the behaviour? Now you unconditionally mux the 
->> pins whereas before they were only muxed if we had GPIO driver enabled.
+Shawn Guo wrote at Thursday, January 12, 2012 8:46 PM:
+> On Thu, Jan 12, 2012 at 12:46:52PM -0800, Stephen Warren wrote:
+> > Shawn Guo wrote at Wednesday, January 11, 2012 8:40 PM:
+> > > On Wed, Jan 11, 2012 at 10:17:40AM -0800, Stephen Warren wrote:
+> > ...
+> > > > So, my position is that:
+> > > >
+> > > > * Something (either the pinctrl driver, or the SoC .dtsi file) should
+> > > > enumerate all available muxable entities that exist in the SoC (pins for
+> > > > IMX, groups for Tegra).
+> > >
+> > > Yes, we enumerate all available pins in pinctrl driver for imx.
+> > >
+> > > > * Something (either the pinctrl driver, or the SoC .dtsi file) should
+> > > > enumerate all the available functions that can be assigned to a muxable
+> > > > entity.
+> > >
+> > > In theory, yes.  But I hope you would agree we do not need to
+> > > necessarily do this for case like imx.
+> >
+> > Discussing just the Linux driver internals right now; ignoring device
+> > tree:
+> >
+> > Pinctrl won't let you use a function on a pin/group if that function
+> > isn't enumerated and doesn't list that pin/group as a valid location
+> > for that function. Given that, I'm not sure how you can avoid enumerating
+> > all functions and their legal locations?
 >
-> True, but I think the previous behaviour was broken anyway. If the gpio driver
-> was installed after any driver which has muxed gpio pins for other purposes
-> then it will override those settings. All of the ep93xx drivers will mux the pins
-> they need at probe time. IIRC, before the gpio driver was moved out of
-> arch/arm/mach-ep93xx we muxed all the pins unconditionally anyway.
+> I agree with you that we should enumerate all available functions in
+> pinctrl driver, if we want to stick to the original pinctrl subsystem
+> design.  But as you can see, this enumeration for case like imx is
+> going to be huge data.  We would rather have both pingroup and function
+> defined in respective board file as needed.  I know doing so actually
+> violates the original idea of pinctrl subsystem, and will have data
+> duplication among different board files.  But that's a compromise.
+> And even Linus.W agreed on this compromise in the thread below.
+> 
+> http://thread.gmane.org/gmane.linux.kernel/1223968/focus=1224470
+> 
+> All above is about non-dt case.  For dt case, we will have both pingroup
+> and function describe in dts, and that's way we are purchasing.
+
+For reference, that message is:
+
+Linusw wrote:
+> On Mon, Dec 5, 2011 at 3:43 AM, Dong Aisheng <dongas86 <at> gmail.com> wrote:
+> > My current plan is to define all (might be frequently) used functoin
+> > and groups for the exist upstreamed board like 53 Loco and etc, is
+> > that ok?
 >
-> I can update the changelog to reflect the changed behaviour, but I don't think
-> it will cause problems for anyone. Will see if Hartley has any comments.
+> Yes, but do it in respective board file, so if we say, one day
+> stops to support a certain board we can just delete that board
+> file and be done with it.
+>
+> Plus this gives us a nice separation as we move toward
+> device trees. (I think.)
 
-Actually, there shouldn't be any change in behavior.
+My interpretation of what Dong wrote there is "I'm only going to define
+the functions and groups that are actually in use by upstream boards,
+not everything the SoC supports". However, your (Shawn's) references to
+the email, it sounds like you're interpreting what Dong wrong as "I'm
+going to define some virtual groups that don't exist in HW but represent
+common use-cases of the HW".
 
-The gpio-ep93xx driver is always enabled in drivers/gpio/Kconfig when ARCH_EP93XX
-Is enabled:
+Admittedly, the wording of Linusw's actually seems to agree more with how
+you're interpreting what Dong said, but in that case, I don't think his
+reply makes sense - the whole purpose of the mux mapping table is to
+represent the board-specific configuration. If we're going to circumvent
+it, we should completely remove it from the pinctrl subsystem, rather than
+having some boards avoid using it by creating virtual pin groups instead.
 
-config GPIO_EP93XX
-	def_bool y
-	depends on ARCH_EP93XX
-	select GPIO_GENERIC
+> > > For imx6q example, we have 193 pins as the muxable entities, and for
+> > > each of those pin, there are 8 alternative functions.  Let's see what
+> > > we will have if we enumerate all the available functions for each pin.
+...
+> > > We simply do not want to over bloat imx6q pinctrl driver with such
+> > > enumeration.
+> >
+> > Yes, I see you'd end up with a huge number of function definitions here.
+> >
+> > You may be able to avoid this by changing the way you name/number the
+> > functions though.
+> >
+> > The example above has a unique function name for every individual signal.
+> > instead, can you name functions based on the controller they connect to?
+> >
+> > So, instead of having:
+> >
+> > IMX6Q_PAD_SD2_DAT1__USDHC2_DAT1
+> > IMX6Q_PAD_SD2_DAT2__USDHC2_DAT2
+> > IMX6Q_PAD_SD2_DAT3__USDHC2_DAT3
+> > IMX6Q_PAD_SD2_DAT4__USDHC2_DAT4
+> >
+> > Can you replace this with a single:
+> >
+> > IMX_FUNC_USDHC2
+>
+> So all 'enum imx6q_pad_*' goes away, and instead, we define macros
+> IMX_FUNC_* at controller basis, correct?
 
-Because it's a hidden Kconfig option it cannot be disabled.
+Yes, something like that. The best set to choose probably differs based
+on the SoC and its mux capabilities. But thinking more, if you're going
+along this kind of route, I'd prefer to just define the "func0", "func1",
+... "func7" functions that represent the raw HW selection instead.
 
-Since the gpio-ep93xx driver is the first driver registered it also ends up being the
-first one probed. So the gpiomux ends up getting set before any other driver is
-loaded anyway.
-
-The other drivers then setup the gpiomux as required as they load.
-
-Regards,
-Hartley
+-- 
+nvpublic
