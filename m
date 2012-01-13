@@ -1,76 +1,66 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 13 Jan 2012 06:14:17 +0000
-Subject: [PATCH v2 4/5] arm/dts: OMAP3: Add interrupt-controller
- bindings for INTC
-In-Reply-To: <1324388398-2683-5-git-send-email-b-cousson@ti.com>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
- <1324388398-2683-5-git-send-email-b-cousson@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317A43FC@DBDE01.ent.ti.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Fri, 13 Jan 2012 08:27:07 +0200
+Subject: [PATCH 04/11] ep93xx: Configure GPIO ports in core code
+In-Reply-To: <1326251676-7593-5-git-send-email-rmallon@gmail.com>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+ <1326251676-7593-5-git-send-email-rmallon@gmail.com>
+Message-ID: <20120113062707.GA4147@mwesterb-mobl.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2011 at 19:09:57, Cousson, Benoit wrote:
-> Update the DTS with the proper information required by the
-> INTC bindings.
+On Wed, Jan 11, 2012 at 02:14:29PM +1100, Ryan Mallon wrote:
+> Move the pinmux setting of the EP93xx GPIOs to the core code. This
+> removes the need for the GPIO driver to have access to the system
+> controller registers.
 > 
-> - Add the number of interrupt lines
-> - Add the reg and the compatible entries.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Mika Westerberg <mika.westerberg@iki.fi>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
 > ---
->  arch/arm/boot/dts/omap3.dtsi |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
+>  arch/arm/mach-ep93xx/core.c |    7 +++++++
+>  drivers/gpio/gpio-ep93xx.c  |    7 -------
+>  2 files changed, 7 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index d202bb5..6866dc7 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -54,10 +54,12 @@
->  		ranges;
->  		ti,hwmods = "l3_main";
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index dcb10c2..978c5a6 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -896,6 +896,13 @@ void __init ep93xx_init_devices(void)
+>  	/* Disallow access to MaverickCrunch initially */
+>  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
 >  
-> -		intc: interrupt-controller at 1 {
-> -			compatible = "ti,omap3-intc";
-> +		intc: interrupt-controller at 48200000 {
-> +			compatible = "ti,omap2-intc";
->  			interrupt-controller;
->  			#interrupt-cells = <1>;
-> +			ti,intc-size = <96>;
-Can we configure/change this field in platform specific .dts file?
-OR
-Is there condition based configuration possible in DT?
+> +	/* Default all ports to GPIO */
+> +	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
+> +			       EP93XX_SYSCON_DEVCFG_GONK |
+> +			       EP93XX_SYSCON_DEVCFG_EONIDE |
+> +			       EP93XX_SYSCON_DEVCFG_GONIDE |
+> +			       EP93XX_SYSCON_DEVCFG_HONIDE);
+> +
 
-To be specific,
+Doesn't this now change the behaviour? Now you unconditionally mux the pins
+whereas before they were only muxed if we had GPIO driver enabled.
 
-I am adding support for AM335x EVM (using all your DT support patches),
-The device is considered as OMAP3 variant and when it comes to INTC support,
-I need to configure it to value "128", rest everything is same 
-(including base add).
-
-Can I do something like
-
-File - am335x-evm.dts
-
-/include/ "omap3.dtsi"
-
-....
-Again change the specific fields of " intc: interrupt-controller"?
-....
-
-How can this be handled?
-
-Thanks,
-Vaibhav
-> +			reg = <0x48200000 0x1000>;
->  		};
->  	};
->  };
+>  	/* Get the GPIO working early, other devices need it */
+>  	platform_device_register(&ep93xx_gpio_device);
+>  
+> diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
+> index 1c0fc37..4ca5642 100644
+> --- a/drivers/gpio/gpio-ep93xx.c
+> +++ b/drivers/gpio/gpio-ep93xx.c
+> @@ -378,13 +378,6 @@ static int __devinit ep93xx_gpio_probe(struct platform_device *pdev)
+>  	}
+>  	ep93xx_gpio->mmio_base = mmio;
+>  
+> -	/* Default all ports to GPIO */
+> -	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
+> -			       EP93XX_SYSCON_DEVCFG_GONK |
+> -			       EP93XX_SYSCON_DEVCFG_EONIDE |
+> -			       EP93XX_SYSCON_DEVCFG_GONIDE |
+> -			       EP93XX_SYSCON_DEVCFG_HONIDE);
+> -
+>  	for (i = 0; i < ARRAY_SIZE(ep93xx_gpio_banks); i++) {
+>  		struct bgpio_chip *bgc = &ep93xx_gpio->bgc[i];
+>  		struct ep93xx_gpio_bank *bank = &ep93xx_gpio_banks[i];
 > -- 
 > 1.7.0.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
