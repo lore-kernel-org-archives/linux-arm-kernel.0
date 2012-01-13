@@ -1,39 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jan 2012 15:35:56 +0000
-Subject: [RFC PATCH] proc: clear_refs: do not clear reserved pages
-In-Reply-To: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
-References: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20120113153556.GY1068@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 13 Jan 2012 13:40:15 -0200
+Subject: [PATCH v2] ARM: setup.c: Fix build warning by removing unneeded
+ header file
+In-Reply-To: <20120103154218.GW2914@n2100.arm.linux.org.uk>
+References: <1325535113-26551-1-git-send-email-festevam@gmail.com>
+ <1325536725-28403-1-git-send-email-festevam@gmail.com>
+ <20120103154218.GW2914@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5A_wN_LyozrE6i01aE0A8-POr8Qm19-GU3F6qt9LOHhrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 03:13:07PM +0000, Will Deacon wrote:
-> /proc/pid/clear_refs is used to clear the Referenced and YOUNG bits for
-> pages and corresponding page table entries of the task with PID pid,
-> which includes any special mappings inserted into the page tables in
-> order to provide things like vDSOs and user helper functions.
-> 
-> On ARM this causes a problem because the vectors page is mapped as a
-> global mapping and since ec706dab ("ARM: add a vma entry for the user
-> accessible vector page"), a VMA is also inserted into each task for this
-> page to aid unwinding through signals and syscall restarts. Since the
-> vectors page is required for handling faults, clearing the YOUNG bit
-> (and subsequently writing a faulting pte) means that we lose the vectors
-> page *globally* and cannot fault it back in. This results in a system
-> deadlock on the next exception.
-> 
-> This patch avoids clearing the aforementioned bits for reserved pages,
-> therefore leaving the vectors page intact on ARM. Since reserved pages
-> are not candidates for swap, this change should not have any impact on
-> the usefulness of clear_refs.
+Russell,
 
-Having just looked at mm/swapfile.c, what ensures that we don't try to swap
-the vectors page out?
+On Tue, Jan 3, 2012 at 1:42 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-I thought that VM_IO or VM_RESERVED once guaranteed that the vma wouldn't
-be scanned, but I don't see anything in there which tests these flags.
-As a result, it seems to me that the original patch is wrong, and we need
-to keep the vectors page completely out of the vma list to prevent it
-ever being made old.
+> I won't apply this until the real problem (missing include in
+> linux/crash_dump.h) is resolved.
 
-Maybe the MM gurus can comment?
+As per your recommendation, I sent a patch to fix the missing include
+in crash_dump.h.
+
+It appears at Linus' tree as commit 1f536b9e
+(include/linux/crash_dump.h needs elf.h) now.
+
+Should I submit this patch on your patch tracking system?
+
+Regards,
+
+Fabio Estevam
