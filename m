@@ -1,74 +1,68 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Fri, 13 Jan 2012 22:30:15 +0100
-Subject: [PATCH] video: s3c-fb: Add device tree support
-In-Reply-To: <4F109C04.5090600@gmail.com>
-References: <1326139307-25112-1-git-send-email-thomas.abraham@linaro.org>
- <4F109C04.5090600@gmail.com>
-Message-ID: <4F10A267.2020608@gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Sat, 14 Jan 2012 08:35:01 +1100
+Subject: [PATCH 01/11] ep93xx: Move PHYS_BASE defines to local SoC header
+ file
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3F99EBAE8@AUSP01VMBX24.collaborationhost.net>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+ <1326251676-7593-2-git-send-email-rmallon@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F001F3F99EBAE8@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F10A385.7080007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2012 10:03 PM, Sylwester Nawrocki wrote:
-> On 01/09/2012 09:01 PM, Thomas Abraham wrote:
+On 14/01/12 04:18, H Hartley Sweeten wrote:
+> On Tuesday, January 10, 2012 8:14 PM, Ryan Mallon wrote:
+>> The PHYS_BASE defines in arch/arm/mach-ep93xx/include/mach-ep93xx-regs.h
+>> are only used in the SoC code. Move the defines to a local header file.
 >>
->> +	for (idx = 0; idx<   nr_gpios; idx++) {
->> +		gpio = of_get_gpio(dev->of_node, idx);
->> +		if (!gpio_is_valid(gpio)) {
->> +			dev_err(dev, "invalid gpio[%d]: %d\n", idx, gpio);
->> +			return -EINVAL;
->> +		}
+>> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+>> Cc: Mika Westerberg <mika.westerberg@iki.fi>
+>> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+>> ---
+>>  arch/arm/mach-ep93xx/adssphere.c                |    1 +
+>>  arch/arm/mach-ep93xx/edb93xx.c                  |    2 +
+>>  arch/arm/mach-ep93xx/gesbc9312.c                |    1 +
+>>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   34 ---------------
+>>  arch/arm/mach-ep93xx/micro9.c                   |    1 +
+>>  arch/arm/mach-ep93xx/simone.c                   |    2 +
+>>  arch/arm/mach-ep93xx/snappercl15.c              |    2 +
+>>  arch/arm/mach-ep93xx/soc.h                      |   50 +++++++++++++++++++++++
+>>  arch/arm/mach-ep93xx/ts72xx.c                   |    2 +
+>>  arch/arm/mach-ep93xx/vision_ep9307.c            |    2 +
+>>  10 files changed, 63 insertions(+), 34 deletions(-)  create mode 100644 arch/arm/mach-ep93xx/soc.h
+> <snip>
+>
+>> diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c index 70ef8c5..24df3ff 100644
+>> --- a/arch/arm/mach-ep93xx/edb93xx.c
+>> +++ b/arch/arm/mach-ep93xx/edb93xx.c
+>> @@ -42,6 +42,8 @@
+>>  #include <asm/mach-types.h>
+>>  #include <asm/mach/arch.h>
+>>  
+>> +#include "soc.h"
 >> +
->> +		if (!request)
->> +			continue;
+>  
+> Nitpick... Unnecessary whitespace...
+>
+> <snip>
+>
+>> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c index 8b2f143..f5965db 100644
+>> --- a/arch/arm/mach-ep93xx/ts72xx.c
+>> +++ b/arch/arm/mach-ep93xx/ts72xx.c
+>> @@ -27,6 +27,8 @@
+>>  #include <asm/mach/map.h>
+>>  #include <asm/mach/arch.h>
+>>  
+>> +#include "soc.h"
 >> +
->> +		ret = gpio_request(gpio, "fimd");
-> 
-> Is it how it normally is supposed to be done, i.e. configuring a gpio
-> _before_ it has been requested ? of_get_gpio() indirectly touches the
-> gpio controller and gpio_request() doesn't seem to serve its purpose
-> in this case, i.e. if there is situation like:
-> 
-> driver A                        driver B
-> 
-> of_get_gpio(nodeA, gpioA);
->                                  of_get_gpio(nodeB, gpioA);
-> gpio_request(gpioA);
->                                  gpio_request(gpioB);
-                                               s/B/A
-> 
-> driver B will end up with configuration of gpioA from nodeA, not from
-> nodeB.
- 
-ugh, I put it wrong, it should instead read:
+> Nitpick... Unnecessary whitespace...
 
-"driver A will end up with configuration of gpioA from nodeB, not from
-nodeA."
- 
-> As there are few drivers doing that I must be missing something,
-> not sure what..
-> I realize the GPIO number needs to be known in order for a GPIO to be
-> requested. Shouldn't of_get_gpio() be extended to allow locking gpio
-> controller's module and marking a GPIO as requested in advance ?
-> 
->> +		if (ret) {
->> +			dev_err(dev, "gpio [%d] request failed\n", gpio);
->> +			goto gpio_free;
->> +		}
->> +		sfb->gpios[idx] = gpio;
->> +	}
->> +	return 0;
->> +
->> +gpio_free:
->> +	while (--idx>= 0)
->> +		gpio_free(sfb->gpios[idx]);
->> +	return ret;
->> +}
->> +
->> +static void s3c_fb_dt_free_gpios(struct s3c_fb *sfb)
->> +{
->> +	unsigned int idx, nr_gpio;
->> +
->> +	nr_gpio = sfb->pdata->win[0]->max_bpp + 4;
->> +	for (idx = 0; idx<   nr_gpio; idx++)
->> +		gpio_free(sfb->gpios[idx]);
->> +}
+Oops, will fix.
+
+>  
+> Other than that... Looks ok.
+>
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>
+Thanks,
+~Ryan
