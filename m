@@ -1,99 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 13 Jan 2012 12:31:31 +0000
-Subject: [PATCH v2 4/5] arm/dts: OMAP3: Add interrupt-controller
- bindings for INTC
-In-Reply-To: <4F100F6B.2050303@ti.com>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
- <1324388398-2683-5-git-send-email-b-cousson@ti.com>
- <79CD15C6BA57404B839C016229A409A8317A43FC@DBDE01.ent.ti.com>
- <4F100F6B.2050303@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317A4E77@DBDE01.ent.ti.com>
+From: mans.rullgard@linaro.org (Mans Rullgard)
+Date: Fri, 13 Jan 2012 12:36:31 +0000
+Subject: [PATCH] ARM: pl330: fix null pointer dereference in pl330_chan_ctrl()
+Message-ID: <1326458191-23492-1-git-send-email-mans.rullgard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 16:33:07, Cousson, Benoit wrote:
-> Hi Vaibhav,
-> 
-> On 1/13/2012 7:14 AM, Hiremath, Vaibhav wrote:
-> > On Tue, Dec 20, 2011 at 19:09:57, Cousson, Benoit wrote:
-> 
-> [...]
-> 
-> >> +++ b/arch/arm/boot/dts/omap3.dtsi
-> >> @@ -54,10 +54,12 @@
-> >>   		ranges;
-> >>   		ti,hwmods = "l3_main";
-> >>
-> >> -		intc: interrupt-controller at 1 {
-> >> -			compatible = "ti,omap3-intc";
-> >> +		intc: interrupt-controller at 48200000 {
-> >> +			compatible = "ti,omap2-intc";
-> >>   			interrupt-controller;
-> >>   			#interrupt-cells =<1>;
-> >> +			ti,intc-size =<96>;
-> > Can we configure/change this field in platform specific .dts file?
-> > OR
-> > Is there condition based configuration possible in DT?
-> 
-> I'm not sure to fully understand how your two options differ.
-> Otherwise, yes the DT it can be configured, that why I exposed this 
-> attribute.
-> The intc code was already supporting the ti81xx with 128 lines as well, 
-> hence the need to make it configurable.
+This fixes the thrd->req_running field being accessed before thrd
+is checked for null.  The error was introduced in abb959f.
 
-I wanted to use DT configuration completely here, using existing
-omap_init_irq.
-And I personally think, lets not use different implementation only because
-number of interrupts are different.
+Signed-off-by: Mans Rullgard <mans.rullgard@linaro.org>
+---
+ arch/arm/common/pl330.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-> The other option was two handle that in the driver with 2 different 
-> compatible strings.
-> 
-> > To be specific,
-> >
-> > I am adding support for AM335x EVM (using all your DT support patches),
-> > The device is considered as OMAP3 variant and when it comes to INTC support,
-> > I need to configure it to value "128", rest everything is same
-> > (including base add).
-> >
-> > Can I do something like
-> >
-> > File - am335x-evm.dts
-> >
-> > /include/ "omap3.dtsi"
-> >
-> > ....
-> > Again change the specific fields of " intc: interrupt-controller"?
-> 
-> Yes.
-> 
-> > ....
-> >
-> > How can this be handled?
-> 
-> After the include, you can redefine the node and the hierarchy:
-> 
-> +	ocp {
-> +		intc: interrupt-controller at 48200000 {
-> +			ti,intc-size = <128>;
-> +		};
-> ...
-> 
-> or use the label directly:
-> 
-> +&intc: {
-> +	ti,intc-size =<128>;
-> +}
-> 
-> You can have a look at the way i2c or twl are using the include so far.
-> 
-Thanks, I will trying this now...
-And if it works, then I can submit the patches...
-
-
-Thanks,
-Vaibhav
-
-> Regards,
-> Benoit
-> 
+diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+index 8d8df74..67abef5 100644
+--- a/arch/arm/common/pl330.c
++++ b/arch/arm/common/pl330.c
+@@ -1496,12 +1496,13 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+ 	struct pl330_thread *thrd = ch_id;
+ 	struct pl330_dmac *pl330;
+ 	unsigned long flags;
+-	int ret = 0, active = thrd->req_running;
++	int ret = 0, active;
+ 
+ 	if (!thrd || thrd->free || thrd->dmac->state == DYING)
+ 		return -EINVAL;
+ 
+ 	pl330 = thrd->dmac;
++	active = thrd->req_running;
+ 
+ 	spin_lock_irqsave(&pl330->lock, flags);
+ 
+-- 
+1.7.8.3
