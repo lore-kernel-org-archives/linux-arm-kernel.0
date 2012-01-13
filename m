@@ -1,34 +1,34 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jan 2012 10:34:03 -0600
-Subject: [RFC PATCH 02/10] sound: pxa2xx-ac97: include mach/irqs.h directly
+Date: Fri, 13 Jan 2012 10:34:04 -0600
+Subject: [RFC PATCH 03/10] ARM: mc146818rtc: remove unnecessary include of
+ mach/irqs.h
 In-Reply-To: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
 References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326472451-9002-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1326472451-9002-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-In preparation of removing mach/irqs.h include from asm/irq.h, include
-mach/irqs.h directly.
+The include of mach/irqs.h isn't needed, so remove it. Compiled CMOS rtc
+driver.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- sound/arm/pxa2xx-ac97-lib.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/mc146818rtc.h |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-index d1aa421..0e9e822 100644
---- a/sound/arm/pxa2xx-ac97-lib.c
-+++ b/sound/arm/pxa2xx-ac97-lib.c
-@@ -21,7 +21,7 @@
- #include <sound/ac97_codec.h>
- #include <sound/pxa2xx-lib.h>
+diff --git a/arch/arm/include/asm/mc146818rtc.h b/arch/arm/include/asm/mc146818rtc.h
+index 6b884d2..d535470 100644
+--- a/arch/arm/include/asm/mc146818rtc.h
++++ b/arch/arm/include/asm/mc146818rtc.h
+@@ -5,7 +5,6 @@
+ #define _ASM_MC146818RTC_H
  
--#include <asm/irq.h>
-+#include <mach/irqs.h>
- #include <mach/regs-ac97.h>
- #include <mach/audio.h>
+ #include <linux/io.h>
+-#include <mach/irqs.h>
  
+ #ifndef RTC_PORT
+ #define RTC_PORT(x)	(0x70 + (x))
 -- 
 1.7.5.4
