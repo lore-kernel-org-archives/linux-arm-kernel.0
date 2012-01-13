@@ -1,22 +1,52 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 13 Jan 2012 08:54:58 -0500 (EST)
-Subject: [PATCH 00/20] arch_idle() cleanup and mach/system.h removal
-In-Reply-To: <20120113104358.GR1068@n2100.arm.linux.org.uk>
-References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
- <20120113104358.GR1068@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1201130853250.2722@xanadu.home>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 13 Jan 2012 14:03:39 +0000
+Subject: [PATCH 6/6] ARM: make BSYM macro assembly only
+In-Reply-To: <1326149146-19756-7-git-send-email-robherring2@gmail.com>
+References: <1326149146-19756-1-git-send-email-robherring2@gmail.com>
+ <1326149146-19756-7-git-send-email-robherring2@gmail.com>
+Message-ID: <20120113140320.GA2227@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jan 2012, Russell King - ARM Linux wrote:
+On Mon, Jan 09, 2012 at 04:45:46PM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> BSYM macro is only needed for assembly files and its usage in c files is
+> wrong, so only define it for assembly.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Dave Martin <dave.martin@linaro.org>
 
-> So, sending a pull request for the idle stuff in the last two days of
-> the merge window, for a change which is quite big, which conflicts,
-> which wasn't in -next before the merge window is just asking for trouble,
-> and I'm not going to do it.
+Acked-by: Dave Martin <dave.martin@linaro.org>
 
-Too bad.  Let's try to stage this early in your devel-stable branch for 
-next cycle then.
-
-
-Nicolas
+> ---
+>  arch/arm/include/asm/unified.h |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
+> index bc63116..f5989f4 100644
+> --- a/arch/arm/include/asm/unified.h
+> +++ b/arch/arm/include/asm/unified.h
+> @@ -37,8 +37,8 @@
+>  #define THUMB(x...)	x
+>  #ifdef __ASSEMBLY__
+>  #define W(instr)	instr.w
+> -#endif
+>  #define BSYM(sym)	sym + 1
+> +#endif
+>  
+>  #else	/* !CONFIG_THUMB2_KERNEL */
+>  
+> @@ -49,8 +49,8 @@
+>  #define THUMB(x...)
+>  #ifdef __ASSEMBLY__
+>  #define W(instr)	instr
+> -#endif
+>  #define BSYM(sym)	sym
+> +#endif
+>  
+>  #endif	/* CONFIG_THUMB2_KERNEL */
+>  
+> -- 
+> 1.7.5.4
+> 
