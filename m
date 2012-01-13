@@ -1,82 +1,178 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Jan 2012 18:28:40 +0000
-Subject: [PATCH v2 13/15] ARM: local timers: convert exynos to runtime
- registration interface
+Date: Fri, 13 Jan 2012 18:28:35 +0000
+Subject: [PATCH v2 08/15] ARM: shmobile: convert to twd_local_timer_register()
+ interface
 In-Reply-To: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
 References: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326479322-6033-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326479322-6033-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the Exynos MCT timers to the runtime registration interface.
-Tested on Origen.
+Add support for the new smp_twd runtime registration interface
+to the shmobile platforms, and remove the old compile-time support.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-exynos/mct.c |   18 ++++++++++--------
- 1 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/mach-shmobile/Makefile              |    1 -
+ arch/arm/mach-shmobile/include/mach/common.h |    2 ++
+ arch/arm/mach-shmobile/localtimer.c          |   26 --------------------------
+ arch/arm/mach-shmobile/platsmp.c             |    1 -
+ arch/arm/mach-shmobile/smp-r8a7779.c         |    8 +++-----
+ arch/arm/mach-shmobile/smp-sh73a0.c          |    8 +++-----
+ arch/arm/mach-shmobile/timer.c               |   10 ++++++++++
+ 7 files changed, 18 insertions(+), 38 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/localtimer.c
 
-diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-index 85b5527..1cf46eb 100644
---- a/arch/arm/mach-exynos/mct.c
-+++ b/arch/arm/mach-exynos/mct.c
-@@ -21,6 +21,7 @@
- #include <linux/percpu.h>
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 7ad6954..e7c2590 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -16,7 +16,6 @@ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o clock-r8a7779.o intc-r8a7779.o
+ # SMP objects
+ smp-y				:= platsmp.o headsmp.o
+ smp-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+-smp-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o
  
- #include <asm/hardware/gic.h>
-+#include <asm/localtimer.h>
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index e4b945e..9fde3eb 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -2,6 +2,8 @@
+ #define __ARCH_MACH_COMMON_H
  
- #include <plat/cpu.h>
- 
-@@ -375,7 +376,7 @@ static struct irqaction mct_tick1_event_irq = {
- 	.handler	= exynos4_mct_tick_isr,
- };
- 
--static void exynos4_mct_tick_init(struct clock_event_device *evt)
-+static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
- {
- 	struct mct_clock_event_device *mevt;
- 	unsigned int cpu = smp_processor_id();
-@@ -417,17 +418,11 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
- 	} else {
- 		enable_percpu_irq(IRQ_MCT_LOCALTIMER, 0);
- 	}
--}
+ extern struct sys_timer shmobile_timer;
++struct twd_local_timer;
++void shmobile_twd_init(struct twd_local_timer *twd_local_timer);
+ extern void shmobile_setup_console(void);
+ extern void shmobile_secondary_vector(void);
+ extern int shmobile_platform_cpu_kill(unsigned int cpu);
+diff --git a/arch/arm/mach-shmobile/localtimer.c b/arch/arm/mach-shmobile/localtimer.c
+deleted file mode 100644
+index ad9ccc9..0000000
+--- a/arch/arm/mach-shmobile/localtimer.c
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- * SMP support for R-Mobile / SH-Mobile - local timer portion
+- *
+- * Copyright (C) 2010  Magnus Damm
+- *
+- * Based on vexpress, Copyright (C) 2002 ARM Ltd, All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
 -
--/* Setup the local clock events for a CPU */
+-/*
+- * Setup the local clock events for a CPU.
+- */
 -int __cpuinit local_timer_setup(struct clock_event_device *evt)
 -{
--	exynos4_mct_tick_init(evt);
+-	evt->irq = 29;
+-	twd_timer_setup(evt);
+-	return 0;
+-}
+diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
+index 9933812..45fa392 100644
+--- a/arch/arm/mach-shmobile/platsmp.c
++++ b/arch/arm/mach-shmobile/platsmp.c
+@@ -17,7 +17,6 @@
+ #include <linux/smp.h>
+ #include <linux/io.h>
+ #include <asm/hardware/gic.h>
+-#include <asm/localtimer.h>
+ #include <asm/mach-types.h>
+ #include <mach/common.h>
  
- 	return 0;
- }
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index cc97ef8..8e0b81e 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -63,6 +63,8 @@ static void __iomem *scu_base_addr(void)
+ static DEFINE_SPINLOCK(scu_lock);
+ static unsigned long tmp;
  
--void local_timer_stop(struct clock_event_device *evt)
-+static void exynos4_local_timer_stop(struct clock_event_device *evt)
++static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
++
+ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
  {
- 	unsigned int cpu = smp_processor_id();
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-@@ -439,6 +434,11 @@ void local_timer_stop(struct clock_event_device *evt)
- 	else
- 		disable_percpu_irq(IRQ_MCT_LOCALTIMER);
- }
-+
-+static struct local_timer_ops exynos4_mct_tick_ops __initdata = {
-+	.setup	= exynos4_local_timer_setup,
-+	.stop	= exynos4_local_timer_stop,
-+};
- #endif /* CONFIG_LOCAL_TIMERS */
+ 	void __iomem *scu_base = scu_base_addr();
+@@ -81,11 +83,7 @@ unsigned int __init r8a7779_get_core_count(void)
+ {
+ 	void __iomem *scu_base = scu_base_addr();
  
- static void __init exynos4_timer_resources(void)
-@@ -458,6 +458,8 @@ static void __init exynos4_timer_resources(void)
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     IRQ_MCT_LOCALTIMER, err);
- 	}
-+
-+	local_timer_register(&exynos4_mct_tick_ops);
- #endif /* CONFIG_LOCAL_TIMERS */
+-#ifdef CONFIG_HAVE_ARM_TWD
+-	/* twd_base needs to be initialized before percpu_timer_setup() */
+-	twd_base = (void __iomem *)0xf0000600;
+-#endif
+-
++	sh73a0_twd_init(&twd_local_timer);
+ 	return scu_get_core_count(scu_base);
  }
  
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index be1ade7..fb78b83 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -41,6 +41,8 @@ static void __iomem *scu_base_addr(void)
+ static DEFINE_SPINLOCK(scu_lock);
+ static unsigned long tmp;
+ 
++static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
++
+ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
+ {
+ 	void __iomem *scu_base = scu_base_addr();
+@@ -59,11 +61,7 @@ unsigned int __init sh73a0_get_core_count(void)
+ {
+ 	void __iomem *scu_base = scu_base_addr();
+ 
+-#ifdef CONFIG_HAVE_ARM_TWD
+-	/* twd_base needs to be initialized before percpu_timer_setup() */
+-	twd_base = (void __iomem *)0xf0000600;
+-#endif
+-
++	sh73a0_twd_init(&twd_local_timer);
+ 	return scu_get_core_count(scu_base);
+ }
+ 
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+index 895794b..be16231 100644
+--- a/arch/arm/mach-shmobile/timer.c
++++ b/arch/arm/mach-shmobile/timer.c
+@@ -20,6 +20,7 @@
+  */
+ #include <linux/platform_device.h>
+ #include <asm/mach/time.h>
++#include <asm/smp_twd.h>
+ 
+ static void __init shmobile_late_time_init(void)
+ {
+@@ -41,6 +42,15 @@ static void __init shmobile_timer_init(void)
+ 	late_time_init = shmobile_late_time_init;
+ }
+ 
++void __init shmobile_twd_init(struct twd_local_timer *twd_local_timer)
++{
++#ifdef CONFIG_HAVE_ARM_TWD
++	int err = twd_local_timer_register(twd_local_timer);
++	if (err)
++		pr_err("twd_local_timer_register failed %d\n", err);
++#endif
++}
++
+ struct sys_timer shmobile_timer = {
+ 	.init		= shmobile_timer_init,
+ };
 -- 
 1.7.7.1
