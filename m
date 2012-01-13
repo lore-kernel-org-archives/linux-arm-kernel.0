@@ -1,18 +1,24 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 13 Jan 2012 17:38:24 +0800
-Subject: [PATCH] backlight: pwm_bl: move suspend/resume entries from
- platform_driver to driver.pm
-In-Reply-To: <4F0FFA58.7010702@cn.fujitsu.com>
-References: <1322704427-11876-1-git-send-email-Barry.Song@csr.com>
- <4F0FFA58.7010702@cn.fujitsu.com>
-Message-ID: <CAGsJ_4zhe1C4hVzmpcQYS5LDzxM==M6acQEH2eXM5aCvnf+XNQ@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 13 Jan 2012 18:55:43 +0900
+Subject: [PATCH] ARM: Fix typo in conversion of ARCH_NR_GPIOS to Kconfig
+In-Reply-To: <1325795370-21576-1-git-send-email-swarren@nvidia.com>
+References: <1325795370-21576-1-git-send-email-swarren@nvidia.com>
+Message-ID: <CANqRtoRnLZewfcQ-ZNd0yGodq0-xia3ND4E9gQminU=fkyh0Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 6, 2012 at 5:29 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Commit 44986ab "ARM: 7240/1: Make ARCH_NR_GPIO a Kconfig variable"
+> spelled ARCH_NR_GPIOS as ARCH_NR_GPIO, hence making the change
+> ineffective. This change fixes that.
 >
-> Why not use SIMPLE_DEV_PM_OPS instead?
->
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This should probably go into 3.3 since the patch it fixes is there. I
+> don't think this issue affects any Tegra platform, but I didn't investigate
+> the other platforms that set CONFIG_ARCH_NR_GPIO by default now.
 
-Mark's revision merged did use SIMPLE_DEV_PM_OPS
+Thanks for this! We would like to see this included in 3.3 to fix
+regressions on most ARM shmobile SoCs.
 
--barry
+Acked-by: Magnus Damm <damm@opensource.se>
