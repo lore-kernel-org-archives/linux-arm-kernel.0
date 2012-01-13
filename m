@@ -1,99 +1,83 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jan 2012 10:34:06 -0600
-Subject: [RFC PATCH 05/10] sh: intc: remove dependency on NR_IRQS
+Date: Fri, 13 Jan 2012 10:34:07 -0600
+Subject: [RFC PATCH 06/10] ARM: mmp: remove NR_IRQS
 In-Reply-To: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
 References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326472451-9002-6-git-send-email-robherring2@gmail.com>
+Message-ID: <1326472451-9002-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-SH intc has a compile time dependency on NR_IRQS. Make this dependency a
-local define so that shmobile (and ARM in general) can have run-time
-NR_IRQS setting. SH has NR_IRQS set to 512 and shmobile has NR_IRQS set to
-1024, so we are using the maximum.
+Remove NR_IRQS and add a per machine .nr_irqs setting.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- drivers/sh/intc/balancing.c |    2 +-
- drivers/sh/intc/core.c      |    2 +-
- drivers/sh/intc/handle.c    |    2 +-
- drivers/sh/intc/internals.h |    9 +++++++++
- drivers/sh/intc/virq.c      |    2 +-
- 5 files changed, 13 insertions(+), 4 deletions(-)
+ arch/arm/mach-mmp/avengers_lite.c     |    1 +
+ arch/arm/mach-mmp/include/mach/irqs.h |    2 --
+ arch/arm/mach-mmp/irq-mmp2.c          |    1 +
+ arch/arm/mach-mmp/jasper.c            |    1 +
+ arch/arm/mach-mmp/tavorevb.c          |    1 +
+ 5 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/sh/intc/balancing.c b/drivers/sh/intc/balancing.c
-index cec7a96..bc78080 100644
---- a/drivers/sh/intc/balancing.c
-+++ b/drivers/sh/intc/balancing.c
-@@ -9,7 +9,7 @@
-  */
- #include "internals.h"
+diff --git a/arch/arm/mach-mmp/avengers_lite.c b/arch/arm/mach-mmp/avengers_lite.c
+index b148a9d..0fd60fb 100644
+--- a/arch/arm/mach-mmp/avengers_lite.c
++++ b/arch/arm/mach-mmp/avengers_lite.c
+@@ -43,6 +43,7 @@ static void __init avengers_lite_init(void)
  
--static unsigned long dist_handle[NR_IRQS];
-+static unsigned long dist_handle[INTC_NR_IRQS];
+ MACHINE_START(AVENGERS_LITE, "PXA168 Avengers lite Development Platform")
+ 	.map_io		= mmp_map_io,
++	.nr_irqs	= IRQ_BOARD_START,
+ 	.init_irq       = pxa168_init_irq,
+ 	.timer          = &pxa168_timer,
+ 	.init_machine   = avengers_lite_init,
+diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
+index 34635a0..25e6d60 100644
+--- a/arch/arm/mach-mmp/include/mach/irqs.h
++++ b/arch/arm/mach-mmp/include/mach/irqs.h
+@@ -224,6 +224,4 @@
  
- void intc_balancing_enable(unsigned int irq)
- {
-diff --git a/drivers/sh/intc/core.c b/drivers/sh/intc/core.c
-index e53e449..2fde897 100644
---- a/drivers/sh/intc/core.c
-+++ b/drivers/sh/intc/core.c
-@@ -42,7 +42,7 @@ unsigned int nr_intc_controllers;
-  * - this needs to be at least 2 for 5-bit priorities on 7780
-  */
- static unsigned int default_prio_level = 2;	/* 2 - 16 */
--static unsigned int intc_prio_level[NR_IRQS];	/* for now */
-+static unsigned int intc_prio_level[INTC_NR_IRQS];	/* for now */
+ #define IRQ_BOARD_START			(IRQ_GPIO_START + MMP_NR_BUILTIN_GPIO)
  
- unsigned int intc_get_dfl_prio_level(void)
- {
-diff --git a/drivers/sh/intc/handle.c b/drivers/sh/intc/handle.c
-index 057ce56..f461d53 100644
---- a/drivers/sh/intc/handle.c
-+++ b/drivers/sh/intc/handle.c
-@@ -13,7 +13,7 @@
- #include <linux/spinlock.h>
- #include "internals.h"
+-#define NR_IRQS				(IRQ_BOARD_START)
+-
+ #endif /* __ASM_MACH_IRQS_H */
+diff --git a/arch/arm/mach-mmp/irq-mmp2.c b/arch/arm/mach-mmp/irq-mmp2.c
+index d21c544..7895d27 100644
+--- a/arch/arm/mach-mmp/irq-mmp2.c
++++ b/arch/arm/mach-mmp/irq-mmp2.c
+@@ -15,6 +15,7 @@
+ #include <linux/irq.h>
+ #include <linux/io.h>
  
--static unsigned long ack_handle[NR_IRQS];
-+static unsigned long ack_handle[INTC_NR_IRQS];
++#include <mach/irqs.h>
+ #include <mach/regs-icu.h>
+ #include <mach/mmp2.h>
  
- static intc_enum __init intc_grp_id(struct intc_desc *desc,
- 				    intc_enum enum_id)
-diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
-index b0e9155..469f092 100644
---- a/drivers/sh/intc/internals.h
-+++ b/drivers/sh/intc/internals.h
-@@ -6,6 +6,15 @@
- #include <linux/radix-tree.h>
- #include <linux/device.h>
+diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
+index 96cf5c8..8f80c31 100644
+--- a/arch/arm/mach-mmp/jasper.c
++++ b/arch/arm/mach-mmp/jasper.c
+@@ -19,6 +19,7 @@
+ #include <linux/mfd/max8925.h>
+ #include <linux/interrupt.h>
  
-+#define INTC_NR_IRQS	1024
-+
-+#ifndef evt2irq
-+#define evt2irq(evt)            (((evt) >> 5) - 16)
-+#endif
-+#ifndef irq2evt
-+#define irq2evt(irq)            (((irq) + 16) << 5)
-+#endif
-+
- #define _INTC_MK(fn, mode, addr_e, addr_d, width, shift) \
- 	((shift) | ((width) << 5) | ((fn) << 9) | ((mode) << 13) | \
- 	 ((addr_e) << 16) | ((addr_d << 24)))
-diff --git a/drivers/sh/intc/virq.c b/drivers/sh/intc/virq.c
-index c7ec49f..93cec21 100644
---- a/drivers/sh/intc/virq.c
-+++ b/drivers/sh/intc/virq.c
-@@ -17,7 +17,7 @@
- #include <linux/export.h>
- #include "internals.h"
++#include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/addr-map.h>
+diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
+index 8e3b5af0..d3ba655 100644
+--- a/arch/arm/mach-mmp/tavorevb.c
++++ b/arch/arm/mach-mmp/tavorevb.c
+@@ -102,6 +102,7 @@ static void __init tavorevb_init(void)
  
--static struct intc_map_entry intc_irq_xlate[NR_IRQS];
-+static struct intc_map_entry intc_irq_xlate[INTC_NR_IRQS];
- 
- struct intc_virq_list {
- 	unsigned int irq;
+ MACHINE_START(TAVOREVB, "PXA910 Evaluation Board (aka TavorEVB)")
+ 	.map_io		= mmp_map_io,
++	.nr_irqs	= IRQ_BOARD_START,
+ 	.init_irq       = pxa910_init_irq,
+ 	.timer          = &pxa910_timer,
+ 	.init_machine   = tavorevb_init,
 -- 
 1.7.5.4
