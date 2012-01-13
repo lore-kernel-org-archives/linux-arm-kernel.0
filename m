@@ -1,90 +1,75 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 13 Jan 2012 01:42:50 +0000
-Subject: [PATCH 0/2] Full DT IRQ support for versatile
-In-Reply-To: <CACxGe6v-gkW+pDP-2hTcf7WqeMBtx+H80Xymj7SqS8nqin9qUA@mail.gmail.com>
-References: <1326415441-17695-1-git-send-email-jamie@jamieiles.com>
- <CACxGe6v-gkW+pDP-2hTcf7WqeMBtx+H80Xymj7SqS8nqin9qUA@mail.gmail.com>
-Message-ID: <20120113014250.GD14007@page>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 12 Jan 2012 19:20:34 -0700
+Subject: [RFC 13/14] irq_domain: Remove 'new' irq_domain in favour of the
+ ppc one
+In-Reply-To: <4F0F7B60.5040701@gmail.com>
+References: <1326313337-24603-1-git-send-email-grant.likely@secretlab.ca>
+ <1326313337-24603-14-git-send-email-grant.likely@secretlab.ca>
+ <4F0DFC0F.2090005@gmail.com>
+ <CACxGe6vVSO0cTgPurr6jFoo9QF_W02UaABOFYadCTQGU9dcwmg@mail.gmail.com>
+ <4F0F7B60.5040701@gmail.com>
+Message-ID: <20120113022034.GA25999@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 06:20:37PM -0700, Grant Likely wrote:
-> On Thu, Jan 12, 2012 at 5:43 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> > These patches move versatile over to instantiating both interrupt
-> > controllers from the device tree. ?I've tested this in qemu for both DT
-> > and non-DT platforms but only with an initramfs. ?I've seen interrupts
-> > generated on both controllers for both boot methods.
-> >
-> > Grant, Rob, this makes use of irqdomain again as I'm not sure what the
-> > replacement is going to look like yet. ?versatile works with DT in
-> > mainline, but that's kind of lucky... ?I know there's been patches to
-> > make irq_domain_add_simple() return the irq_domain and can rebase if
-> > needed.
+On Thu, Jan 12, 2012 at 06:31:28PM -0600, Rob Herring wrote:
+> Adding lakml...
 > 
-> I posted the patches for finishing up irq_domain migration yesterday.
-> irq_domain_add_simple() can trivially be changed to
-> irq_domain_add_legacy. I'll try out these
-> patches on top of my irqdomain/next branch
+> On 01/11/2012 03:27 PM, Grant Likely wrote:
+> > On Wed, Jan 11, 2012 at 2:15 PM, Rob Herring <robherring2@gmail.com> wrote:
+> >> Grant,
+> >>
+> >> On 01/11/2012 02:22 PM, Grant Likely wrote:
+> >>> This patch removes the simplistic implementation of irq_domains and enables
+> >>> the powerpc infrastructure for all irq_domain users.  The powerpc
+> >>> infrastructure includes support for complex mappings between Linux and
+> >>> hardware irq numbers, and can manage allocation of irq_descs.
+> >>>
+> >>> This patch also converts the few users of irq_domain_add()/irq_domain_del()
+> >>> to call irq_domain_add_legacy() instead.
+> >>
+> >> So what is the non-legacy way? Legacy implies we don't want to do it
+> >> that way. I guess until we remove all non-DT platforms with GIC we are
+> >> stuck with legacy. That seems like it could be a ways out until we get
+> >> there.
+> > 
+> > Non-legacy is letting the irq_domain manage the irq_desc allocations.
+> > Some of the controllers will be easy to convert, some will be more
+> > difficult.  The primary thing that really blocks getting away from the
+> > legacy method is anything that expects hardcoded #defined irq numbers.
+> >  The goal is to convert all users over to the linear revmap method.
+> > 
+> 
+> So I gave this a spin on highbank. I ran into a couple problems.
+> 
+> I had to revert "irqdesc: Consolidate irq reservation logic" which is in
+> your branch, but not this series. irq_alloc_desc_from was returning -EEXIST.
 
-Excellent!  I've just grabbed your branch and given it a spin.  I fixed 
-up my patches with the patch below and had to revert "irqdesc: 
-Consolidate irq reservation logic" as I saw Rob mentioned as I was 
-getting negative irq_desc's allocated but otherwise it works nicely!
+Gah, I flubbed that patch too.  Try this on top of it:
 
-I've also tested your tree with the irqdesc patch reverted on picoxcell 
-and that's working nicely too!
+---
 
-Jamie
-
-8<----
-
-diff --git a/arch/arm/plat-versatile/fpga-irq.c b/arch/arm/plat-versatile/fpga-irq.c
-index fd87b06..c4dac93 100644
---- a/arch/arm/plat-versatile/fpga-irq.c
-+++ b/arch/arm/plat-versatile/fpga-irq.c
-@@ -59,10 +59,9 @@ void __init fpga_irq_init(int parent_irq, u32 valid, struct fpga_irq_data *f)
- 	f->chip.irq_ack = fpga_irq_mask;
- 	f->chip.irq_mask = fpga_irq_mask;
- 	f->chip.irq_unmask = fpga_irq_unmask;
--	f->domain.irq_base = f->irq_start;
--	f->domain.nr_irq = 32;
--	f->domain.ops = &irq_domain_simple_ops;
--	irq_domain_add(&f->domain);
-+	if (!f->domain)
-+		f->domain = irq_domain_add_legacy(NULL, 32, f->irq_start,
-+						  0, &irq_domain_simple_ops);
- 
- 	if (parent_irq != -1) {
- 		irq_set_handler_data(parent_irq, f);
-@@ -103,7 +102,8 @@ int __init sic_of_init(struct device_node *np, struct device_node *parent)
- 		err = sic_data->irq_start;
- 		goto out_unmap;
+diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
+index 8a9e2ec..11feb2f 100644
+--- a/kernel/irq/irqdesc.c
++++ b/kernel/irq/irqdesc.c
+@@ -375,6 +375,9 @@ __irq_reserve_irqs(int irq, unsigned int from, unsigned int cnt)
  	}
--	sic_data->domain.of_node = of_node_get(np);
-+	sic_data->domain = irq_domain_add_legacy(np, 32, sic_data->irq_start,
-+						 0, &irq_domain_simple_ops);
  
- 	fpga_irq_init(irq, ~0, sic_data);
+ 	bitmap_set(allocated_irqs, start, cnt);
++	mutex_unlock(&sparse_irq_lock);
++	return start;
++
+ err:
+ 	mutex_unlock(&sparse_irq_lock);
+ 	return ret;
+@@ -408,7 +411,8 @@ EXPORT_SYMBOL_GPL(__irq_alloc_descs);
+  */
+ int irq_reserve_irqs(unsigned int from, unsigned int cnt)
+ {
+-	return __irq_reserve_irqs(from, from, cnt);
++	int start = __irq_reserve_irqs(from, from, cnt);
++	return start < 0 ? start : 0;
+ }
  
-diff --git a/arch/arm/plat-versatile/include/plat/fpga-irq.h b/arch/arm/plat-versatile/include/plat/fpga-irq.h
-index a1391f3..5e300e9 100644
---- a/arch/arm/plat-versatile/include/plat/fpga-irq.h
-+++ b/arch/arm/plat-versatile/include/plat/fpga-irq.h
-@@ -1,15 +1,14 @@
- #ifndef PLAT_FPGA_IRQ_H
- #define PLAT_FPGA_IRQ_H
- 
--#include <linux/irqdomain.h>
--
- struct device_node;
-+struct irq_domain;
- 
- struct fpga_irq_data {
- 	void __iomem *base;
- 	unsigned int irq_start;
- 	struct irq_chip chip;
--	struct irq_domain domain;
-+	struct irq_domain *domain;
- };
- 
- void fpga_irq_init(int, u32, struct fpga_irq_data *);
+ /**
