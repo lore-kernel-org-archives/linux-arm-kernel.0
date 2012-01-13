@@ -1,83 +1,191 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jan 2012 10:34:07 -0600
-Subject: [RFC PATCH 06/10] ARM: mmp: remove NR_IRQS
+Date: Fri, 13 Jan 2012 10:34:09 -0600
+Subject: [RFC PATCH 08/10] ARM: shmobile: remove NR_IRQS
 In-Reply-To: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
 References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326472451-9002-7-git-send-email-robherring2@gmail.com>
+Message-ID: <1326472451-9002-9-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Remove NR_IRQS and add a per machine .nr_irqs setting.
+Remove NR_IRQS and explicitly include mach/irqs.h as needed. shmobile
+properly allocates irq_descs for each irqchip, so setting .nr_irqs for
+each machine is not needed.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-mmp/avengers_lite.c     |    1 +
- arch/arm/mach-mmp/include/mach/irqs.h |    2 --
- arch/arm/mach-mmp/irq-mmp2.c          |    1 +
- arch/arm/mach-mmp/jasper.c            |    1 +
- arch/arm/mach-mmp/tavorevb.c          |    1 +
- 5 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/board-g3evm.c       |    1 +
+ arch/arm/mach-shmobile/board-g4evm.c       |    1 +
+ arch/arm/mach-shmobile/board-kota2.c       |    1 +
+ arch/arm/mach-shmobile/board-mackerel.c    |    1 +
+ arch/arm/mach-shmobile/include/mach/irqs.h |    2 --
+ arch/arm/mach-shmobile/intc-sh7367.c       |    1 +
+ arch/arm/mach-shmobile/intc-sh7372.c       |    1 +
+ arch/arm/mach-shmobile/intc-sh7377.c       |    1 +
+ arch/arm/mach-shmobile/intc-sh73a0.c       |    1 +
+ arch/arm/mach-shmobile/setup-sh7367.c      |    1 +
+ arch/arm/mach-shmobile/setup-sh7372.c      |    1 +
+ arch/arm/mach-shmobile/setup-sh7377.c      |    1 +
+ arch/arm/mach-shmobile/setup-sh73a0.c      |    1 +
+ 13 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/avengers_lite.c b/arch/arm/mach-mmp/avengers_lite.c
-index b148a9d..0fd60fb 100644
---- a/arch/arm/mach-mmp/avengers_lite.c
-+++ b/arch/arm/mach-mmp/avengers_lite.c
-@@ -43,6 +43,7 @@ static void __init avengers_lite_init(void)
- 
- MACHINE_START(AVENGERS_LITE, "PXA168 Avengers lite Development Platform")
- 	.map_io		= mmp_map_io,
-+	.nr_irqs	= IRQ_BOARD_START,
- 	.init_irq       = pxa168_init_irq,
- 	.timer          = &pxa168_timer,
- 	.init_machine   = avengers_lite_init,
-diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
-index 34635a0..25e6d60 100644
---- a/arch/arm/mach-mmp/include/mach/irqs.h
-+++ b/arch/arm/mach-mmp/include/mach/irqs.h
-@@ -224,6 +224,4 @@
- 
- #define IRQ_BOARD_START			(IRQ_GPIO_START + MMP_NR_BUILTIN_GPIO)
- 
--#define NR_IRQS				(IRQ_BOARD_START)
--
- #endif /* __ASM_MACH_IRQS_H */
-diff --git a/arch/arm/mach-mmp/irq-mmp2.c b/arch/arm/mach-mmp/irq-mmp2.c
-index d21c544..7895d27 100644
---- a/arch/arm/mach-mmp/irq-mmp2.c
-+++ b/arch/arm/mach-mmp/irq-mmp2.c
-@@ -15,6 +15,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
- 
+diff --git a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board-g3evm.c
+index 72d5572..6dbdc42 100644
+--- a/arch/arm/mach-shmobile/board-g3evm.c
++++ b/arch/arm/mach-shmobile/board-g3evm.c
+@@ -33,6 +33,7 @@
+ #include <linux/input.h>
+ #include <linux/input/sh_keysc.h>
+ #include <linux/dma-mapping.h>
 +#include <mach/irqs.h>
- #include <mach/regs-icu.h>
- #include <mach/mmp2.h>
+ #include <mach/sh7367.h>
+ #include <mach/common.h>
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
+index 2220b88..2936ccc 100644
+--- a/arch/arm/mach-shmobile/board-g4evm.c
++++ b/arch/arm/mach-shmobile/board-g4evm.c
+@@ -34,6 +34,7 @@
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/gpio.h>
+ #include <linux/dma-mapping.h>
++#include <mach/irqs.h>
+ #include <mach/sh7377.h>
+ #include <mach/common.h>
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-shmobile/board-kota2.c b/arch/arm/mach-shmobile/board-kota2.c
+index 857ceee..c71780b 100644
+--- a/arch/arm/mach-shmobile/board-kota2.c
++++ b/arch/arm/mach-shmobile/board-kota2.c
+@@ -39,6 +39,7 @@
+ #include <linux/mfd/tmio.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <mach/hardware.h>
++#include <mach/irqs.h>
+ #include <mach/sh73a0.h>
+ #include <mach/common.h>
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index ed52566..a5d09f5 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -55,6 +55,7 @@
+ #include <sound/sh_fsi.h>
  
-diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
-index 96cf5c8..8f80c31 100644
---- a/arch/arm/mach-mmp/jasper.c
-+++ b/arch/arm/mach-mmp/jasper.c
-@@ -19,6 +19,7 @@
- #include <linux/mfd/max8925.h>
- #include <linux/interrupt.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <mach/sh7372.h>
  
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-shmobile/include/mach/irqs.h b/arch/arm/mach-shmobile/include/mach/irqs.h
+index dcb714f..4ccb562 100644
+--- a/arch/arm/mach-shmobile/include/mach/irqs.h
++++ b/arch/arm/mach-shmobile/include/mach/irqs.h
+@@ -1,8 +1,6 @@
+ #ifndef __ASM_MACH_IRQS_H
+ #define __ASM_MACH_IRQS_H
+ 
+-#define NR_IRQS         1024
+-
+ /* GIC */
+ #define gic_spi(nr)		((nr) + 32)
+ 
+diff --git a/arch/arm/mach-shmobile/intc-sh7367.c b/arch/arm/mach-shmobile/intc-sh7367.c
+index cfde9bf..5bf7764 100644
+--- a/arch/arm/mach-shmobile/intc-sh7367.c
++++ b/arch/arm/mach-shmobile/intc-sh7367.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/sh_intc.h>
+ #include <mach/intc.h>
 +#include <mach/irqs.h>
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
- #include <mach/addr-map.h>
-diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
-index 8e3b5af0..d3ba655 100644
---- a/arch/arm/mach-mmp/tavorevb.c
-+++ b/arch/arm/mach-mmp/tavorevb.c
-@@ -102,6 +102,7 @@ static void __init tavorevb_init(void)
  
- MACHINE_START(TAVOREVB, "PXA910 Evaluation Board (aka TavorEVB)")
- 	.map_io		= mmp_map_io,
-+	.nr_irqs	= IRQ_BOARD_START,
- 	.init_irq       = pxa910_init_irq,
- 	.timer          = &pxa910_timer,
- 	.init_machine   = tavorevb_init,
+diff --git a/arch/arm/mach-shmobile/intc-sh7372.c b/arch/arm/mach-shmobile/intc-sh7372.c
+index 89afcab..6447e0a 100644
+--- a/arch/arm/mach-shmobile/intc-sh7372.c
++++ b/arch/arm/mach-shmobile/intc-sh7372.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/sh_intc.h>
+ #include <mach/intc.h>
++#include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+diff --git a/arch/arm/mach-shmobile/intc-sh7377.c b/arch/arm/mach-shmobile/intc-sh7377.c
+index 2af4e6e..b84a460 100644
+--- a/arch/arm/mach-shmobile/intc-sh7377.c
++++ b/arch/arm/mach-shmobile/intc-sh7377.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/sh_intc.h>
+ #include <mach/intc.h>
++#include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index 1eda6b0..9a8207c 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/sh_intc.h>
+ #include <mach/intc.h>
++#include <mach/irqs.h>
+ #include <mach/sh73a0.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-shmobile/setup-sh7367.c b/arch/arm/mach-shmobile/setup-sh7367.c
+index e546017..8e848198 100644
+--- a/arch/arm/mach-shmobile/setup-sh7367.c
++++ b/arch/arm/mach-shmobile/setup-sh7367.c
+@@ -29,6 +29,7 @@
+ #include <linux/serial_sci.h>
+ #include <linux/sh_timer.h>
+ #include <mach/hardware.h>
++#include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index c197f9d..6045b79 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -32,6 +32,7 @@
+ #include <linux/sh_timer.h>
+ #include <linux/pm_domain.h>
+ #include <mach/hardware.h>
++#include <mach/irqs.h>
+ #include <mach/sh7372.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-shmobile/setup-sh7377.c b/arch/arm/mach-shmobile/setup-sh7377.c
+index bb405b8..747ed8e 100644
+--- a/arch/arm/mach-shmobile/setup-sh7377.c
++++ b/arch/arm/mach-shmobile/setup-sh7377.c
+@@ -30,6 +30,7 @@
+ #include <linux/sh_intc.h>
+ #include <linux/sh_timer.h>
+ #include <mach/hardware.h>
++#include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index e46821c..dcf00ef 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -31,6 +31,7 @@
+ #include <linux/sh_intc.h>
+ #include <linux/sh_timer.h>
+ #include <mach/hardware.h>
++#include <mach/irqs.h>
+ #include <mach/sh73a0.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
 -- 
 1.7.5.4
