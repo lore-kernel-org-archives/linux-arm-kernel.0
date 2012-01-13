@@ -1,109 +1,71 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 13 Jan 2012 14:14:23 +0900
-Subject: [PATCH] watchdog: fix error in probe() of s3c2410_wdt (reset at
- booting)
-Message-ID: <1326431663-4638-1-git-send-email-myungjoo.ham@samsung.com>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Fri, 13 Jan 2012 14:33:54 +0900
+Subject: [PATCH 4/4] drivers/media/video/s5p-mfc/s5p_mfc.c: adjust double
+ test
+In-Reply-To: <1326403988-872-5-git-send-email-Julia.Lawall@lip6.fr>
+References: <1326403988-872-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1326403988-872-5-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CAH9JG2VcYqqvS6uu1upemTrfD_Cfq+4qh6VR=cxRFUT84g9MmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probe function of s3c2410 watchdog calls request_irq before initializing
-required value (wdt_count). This incurs resetting watchdog counter value
-and watchdog-reboot during booting up.
+All patches.
 
-This patch addresses such an issue by calling request_irq later.
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Error handling in probe function and calling oder in remove function are
-also revised accordingly.
+To Marek,
+Please collect all patches and send git request pull.
 
-Reported-by: Chanwoo Park <cw00.choi@samsung.com>
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/watchdog/s3c2410_wdt.c |   29 +++++++++++++++--------------
- 1 files changed, 15 insertions(+), 14 deletions(-)
+Thank you,
+Kyungmin Park
 
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index a79e384..07bd768 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -342,22 +342,17 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- 		goto err_map;
- 	}
- 
--	ret = request_irq(wdt_irq->start, s3c2410wdt_irq, 0, pdev->name, pdev);
--	if (ret != 0) {
--		dev_err(dev, "failed to install irq (%d)\n", ret);
--		goto err_map;
--	}
--
- 	wdt_clock = clk_get(&pdev->dev, "watchdog");
- 	if (IS_ERR(wdt_clock)) {
- 		dev_err(dev, "failed to find watchdog clock source\n");
- 		ret = PTR_ERR(wdt_clock);
--		goto err_irq;
-+		goto err_map;
- 	}
- 
- 	clk_enable(wdt_clock);
- 
--	if (s3c2410wdt_cpufreq_register() < 0) {
-+	ret = s3c2410wdt_cpufreq_register();
-+	if (ret < 0) {
- 		printk(KERN_ERR PFX "failed to register cpufreq\n");
- 		goto err_clk;
- 	}
-@@ -395,6 +390,12 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- 		s3c2410wdt_stop(&s3c2410_wdd);
- 	}
- 
-+	ret = request_irq(wdt_irq->start, s3c2410wdt_irq, 0, pdev->name, pdev);
-+	if (ret != 0) {
-+		dev_err(dev, "failed to install irq (%d)\n", ret);
-+		goto err_reg;
-+	}
-+
- 	/* print out a statement of readiness */
- 
- 	wtcon = readl(wdt_base + S3C2410_WTCON);
-@@ -406,6 +407,9 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+ err_reg:
-+	watchdog_unregister_device(&s3c2410_wdd);
-+
-  err_cpufreq:
- 	s3c2410wdt_cpufreq_deregister();
- 
-@@ -413,9 +417,6 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- 	clk_disable(wdt_clock);
- 	clk_put(wdt_clock);
- 
-- err_irq:
--	free_irq(wdt_irq->start, pdev);
--
-  err_map:
- 	iounmap(wdt_base);
- 
-@@ -428,6 +429,9 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- 
- static int __devexit s3c2410wdt_remove(struct platform_device *dev)
- {
-+	free_irq(wdt_irq->start, dev);
-+	wdt_irq = NULL;
-+
- 	watchdog_unregister_device(&s3c2410_wdd);
- 
- 	s3c2410wdt_cpufreq_deregister();
-@@ -436,9 +440,6 @@ static int __devexit s3c2410wdt_remove(struct platform_device *dev)
- 	clk_put(wdt_clock);
- 	wdt_clock = NULL;
- 
--	free_irq(wdt_irq->start, dev);
--	wdt_irq = NULL;
--
- 	iounmap(wdt_base);
- 
- 	release_mem_region(wdt_mem->start, resource_size(wdt_mem));
--- 
-1.7.4.1
+On 1/13/12, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> Rewrite a duplicated test to test the correct value
+>
+> The semantic match that finds this problem is as follows:
+> (http://coccinelle.lip6.fr/)
+>
+> // <smpl>
+> @@
+> expression E;
+> @@
+>
+> (
+> * E
+>   || ... || E
+> |
+> * E
+>   && ... && E
+> )
+> // </smpl>
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> ---
+>  drivers/media/video/s5p-mfc/s5p_mfc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/media/video/s5p-mfc/s5p_mfc.c
+> b/drivers/media/video/s5p-mfc/s5p_mfc.c
+> index 8be8b54..53126f2 100644
+> --- a/drivers/media/video/s5p-mfc/s5p_mfc.c
+> +++ b/drivers/media/video/s5p-mfc/s5p_mfc.c
+> @@ -475,7 +475,7 @@ static void s5p_mfc_handle_seq_done(struct s5p_mfc_ctx
+> *ctx,
+>  			ctx->mv_size = 0;
+>  		}
+>  		ctx->dpb_count = s5p_mfc_get_dpb_count();
+> -		if (ctx->img_width == 0 || ctx->img_width == 0)
+> +		if (ctx->img_width == 0 || ctx->img_height == 0)
+>  			ctx->state = MFCINST_ERROR;
+>  		else
+>  			ctx->state = MFCINST_HEAD_PARSED;
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
