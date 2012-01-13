@@ -1,33 +1,68 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 13 Jan 2012 16:48:16 -0600
-Subject: [PATCH 08/11] ep93xx: Move EP93XX_WATCHDOG_BASE define to driver
-In-Reply-To: <4F10A63F.1050100@gmail.com>
-References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-9-git-send-email-rmallon@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F001F3F99EBB0B@AUSP01VMBX24.collaborationhost.net>
- <4F10A63F.1050100@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBCB3@AUSP01VMBX24.collaborationhost.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 13 Jan 2012 17:55:27 -0500 (EST)
+Subject: [RFC PATCH] proc: clear_refs: do not clear reserved pages
+In-Reply-To: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
+References: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1201131748380.2722@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 13, 2012 2:47 PM, Ryan Mallon wrote:
-> On 14/01/12 04:45, H Hartley Sweeten wrote:
->> I have a patch to convert the watchdog driver to a platform device and 
->> use the WatchDog Timer Driver Core.  This patch will end up moving the 
->> base define to soc.h instead. But, for now, this looks good.
->
-> Is your patch ready to go? I'm in no rush to get these patches in, and I
-> can add it to this series if you like, which would get rid of the need for
-> this patch and would also mean that we don't need the include of
-> <mach/ep93xx-regs.h> in the watchdog driver in the final patch.
+On Fri, 13 Jan 2012, Will Deacon wrote:
 
-Right now I just have the WatchDog Timer Driver Core conversion done.
-But, it needs to be retested against the current mainline.
+> /proc/pid/clear_refs is used to clear the Referenced and YOUNG bits for
+> pages and corresponding page table entries of the task with PID pid,
+> which includes any special mappings inserted into the page tables in
+> order to provide things like vDSOs and user helper functions.
+> 
+> On ARM this causes a problem because the vectors page is mapped as a
+> global mapping and since ec706dab ("ARM: add a vma entry for the user
+> accessible vector page"), a VMA is also inserted into each task for this
+> page to aid unwinding through signals and syscall restarts. Since the
+> vectors page is required for handling faults, clearing the YOUNG bit
+> (and subsequently writing a faulting pte) means that we lose the vectors
+> page *globally* and cannot fault it back in. This results in a system
+> deadlock on the next exception.
+> 
+> This patch avoids clearing the aforementioned bits for reserved pages,
+> therefore leaving the vectors page intact on ARM. Since reserved pages
+> are not candidates for swap, this change should not have any impact on
+> the usefulness of clear_refs.
+> 
+> Cc: David Rientjes <rientjes@google.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Reported-by: Moussa Ba <moussaba@micron.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Converting the driver into a platform device is trivial after that.
+Given Andrew's answer, this should be fine wrt Russell's concern.
 
-Let's go with what you have for right now. If/when It hits linux-next I'll
-rebase my patch against that.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Regards,
-Hartley
+> An aside: if you want to see this problem in action, just run:
+> 
+> $ echo 1 > /proc/self/clear_refs
+> 
+> on an ARM platform (as any user) and watch your system hang. I think this
+> has been the case since 2.6.37, so I'll CC stable once people are happy
+> with the fix.
+> 
+>  fs/proc/task_mmu.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+> index e418c5a..7dcd2a2 100644
+> --- a/fs/proc/task_mmu.c
+> +++ b/fs/proc/task_mmu.c
+> @@ -518,6 +518,9 @@ static int clear_refs_pte_range(pmd_t *pmd, unsigned long addr,
+>  		if (!page)
+>  			continue;
+>  
+> +		if (PageReserved(page))
+> +			continue;
+> +
+>  		/* Clear accessed and referenced bits. */
+>  		ptep_test_and_clear_young(vma, addr, pte);
+>  		ClearPageReferenced(page);
+> -- 
+> 1.7.4.1
+> 
