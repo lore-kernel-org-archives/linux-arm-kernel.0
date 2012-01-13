@@ -1,87 +1,36 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 13 Jan 2012 15:41:04 +0100
-Subject: omap clocksource timer selection: dmtimer OR 32K-Sync timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8317A4FD9@DBDE01.ent.ti.com>
-References: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
- <CAMQu2gxYQOHX8n2RLfkLBw5hQMdvH389DfrguLtzpLcpmqBQMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A8317A4FD9@DBDE01.ent.ti.com>
-Message-ID: <CAMQu2gxkBV87YQE7SPmLXh0RZBR+SNHzHE5H-PVjuef+1UZp8Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Jan 2012 22:53:24 +0800
+Subject: [PATCH v4 3/6] clk: introduce the common clock framework
+In-Reply-To: <4F0F7507.3080501@codeaurora.org>
+References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
+ <1323834838-2206-4-git-send-email-mturquette@linaro.org>
+ <alpine.LFD.2.02.1112141007550.3020@ionos>
+ <CAJOA=zO=gM2r4pCVo+orLqE9Q1SSw4h5nXsAHo-e_SHZAfvKDA@mail.gmail.com>
+ <20120104021541.GI2414@b20223-02.ap.freescale.net>
+ <4F0462FF.1000308@gmail.com>
+ <CAJOA=zPw7UuhE4R3SsBeyzQ2_iN29Zv-ExaUTTFCah+GoFSfNQ@mail.gmail.com>
+ <4F0506D0.30109@gmail.com>
+ <CAJOA=zPgwiOSoyZK1SpzZVZfTOmwruTR=WO+gRdVZrZVzNuPSA@mail.gmail.com>
+ <4F0F7507.3080501@codeaurora.org>
+Message-ID: <20120113145321.GB1810@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 2:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> On Fri, Jan 13, 2012 at 18:19:24, Shilimkar, Santosh wrote:
->> On Fri, Jan 13, 2012 at 1:21 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
->> > Hi,
->> >
->> > In case of AM33xx family of devices, we do not have 32K Sync timer
->> > (32K Counter) available; and the current implementation is based on
->> > compile-time option, where clock-source is chosen by something like,
->> >
->> > File - arch/arm/mach-omap2/timer.c
->> >
->> > #ifdef CONFIG_OMAP_32K_TIMER
->> > static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
->> > {
->> > ...
->> > }
->> > #else
->> > static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
->> > {
->> > ...
->> > }
->> > #endif
->> >
->> >
->> > But in order to support multi-omap build, we must
->> > make run-time decision to use the timer for kernel clock-source, either of -
->> >
->> > ?- DMTIMER
->> > ?- 32K Sync Timer
->> >
->> > The DMTIMER is already migrated to the HWMOD framework, but 32K Timer code
->> > has not yet migrated to it. So the question here is,
->> >
->> > 1) Does it make sense to migrate counter_32k.c to search entry in hwmod
->> > ? table and if 32k_sync timer is available in hwmod table then use 32K
->> > ? timer for Kernel clock-source
->> > ? OR
->> > ? Fall back to DMTIMER.
->> >
->> > ? OMAP4 hwmod table already has entry,
->> >
->> > ? static struct omap_hwmod omap44xx_counter_32k_hwmod = {
->> > ? ? ? ? .name ? ? ? ? ? = "counter_32k",
->> > ? ...
->> > ? };
->> >
->> > ? We need to have similar entries in all devices where 32K timer is present.
->> >
->> > 2) OR simply add another cpu_is_am33xx() and then fall back to dmtimer?
->> > ? Just to prove this, everything works here, I modified the code for this
->> > ? and tested it on both AM335x EVM and AM37xEVM and it works fine for me.
->> >
->> >
->> > Any comments?? OR Better approach? OR anything which I am missing here?
->> >
->> You can register both the clock sources together with different
->> rating. Based on rating
->> timer code will automatically pick the better clock-source of two.
->> Ratings is based on the resolution of the timer.
->>
-> Santosh,
->
-> ?- Still current compile time implementation must be changed/cleaned, right?
-Yes. But that should be trivial.
+On Thu, Jan 12, 2012 at 04:04:23PM -0800, Saravana Kannan wrote:
+> While the original clk_hw suggestion was well intentioned, it just
+> forces too many unnecessary dereferences and indirection. It also
+> prevents static init of some fields as others have mentioned.
+> Overall, it made the MSM clock code a mess when I tried to convert
+> it to the common clock framework during Linaro Connect Q4 2011.
+> 
+> The current off-tree MSM clock code uses a very similar approach to
+> what the original patches that Jeremy sent out did. When Mike sent
+> out the patches that removed clk_hw, the MSM code was much clearer
+> and easier to convert to the common clock framework.
+> 
+I share the same feeling with migrating imx6 clock support to v2 and
+v3 of this series.  (v2 uses clk_hw, and v3 removes clk_hw.)
 
-> ?- The 32k timer doesn't exist at all on AM33xx device, so you can not
-> ? (and should not) Register this timer.
->
-Well there are many init call happens on various IP's which are not supported
-across SOCs.
-
-Look at L2X0 cache init for example. In such cases you just return by not
-doing anything on that hardware IP.
-
-Regards
-Santosh
+-- 
+Regards,
+Shawn
