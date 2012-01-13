@@ -1,40 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jan 2012 16:02:47 -0600
-Subject: [RFC PATCH 04/10] ARM: it8152: explicitly include mach/irqs.h
-In-Reply-To: <1326472451-9002-5-git-send-email-robherring2@gmail.com>
-References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
- <1326472451-9002-5-git-send-email-robherring2@gmail.com>
-Message-ID: <4F10AA07.8010803@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 13 Jan 2012 14:13:44 -0800
+Subject: [PATCH 06/11] ep93xx: Don't use system controller defines in
+ audio drivers
+In-Reply-To: <4F10A4F7.60503@gmail.com>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+ <1326251676-7593-7-git-send-email-rmallon@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F001F3F99EBB04@AUSP01VMBX24.collaborationhost.net>
+ <4F10A4F7.60503@gmail.com>
+Message-ID: <20120113221343.GB1013@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2012 10:34 AM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> In preparation to make mach/irqs.h optional, directly include mach/irq.h
-> to get IRQ_BOARD_START.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/include/asm/hardware/it8152.h |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/hardware/it8152.h b/arch/arm/include/asm/hardware/it8152.h
-> index 43cab49..73f84fa 100644
-> --- a/arch/arm/include/asm/hardware/it8152.h
-> +++ b/arch/arm/include/asm/hardware/it8152.h
-> @@ -9,6 +9,9 @@
->  
->  #ifndef __ASM_HARDWARE_IT8152_H
->  #define __ASM_HARDWARE_IT8152_H
-> +
-> +#include <mach/irqs.h>
-> +
+On Sat, Jan 14, 2012 at 08:41:11AM +1100, Ryan Mallon wrote:
+> On 14/01/12 04:35, H Hartley Sweeten wrote:
 
-This include is needed for IRQ_BOARD_START which could also be
-problematic outside a single mach dir. The IT8152 is only used on 1
-family of pxa2xx boards. The part and board with it are EOL as well, so
-we're not going to see new users of this code. Perhaps the it8152 code
-should just be moved into mach-pxa?
+> > Maybe the ep93xx_i2s_acquire() function should be renamed to something
+> > like ep93xx_i2s_ac97_acquire() so that the i2s configuration is understood.
+> > This should address Mark Brown's issue.
 
-Rob
+> Mark has already picked this patch up. I can probably modify it and get
+> him to grab the new one, but the reason I didn't change the name is
+> because there have been only two users of this function for a couple of
+> years now, and the ep93xx is obsolete, so its unlikely that we are going
+> to need a new function anyway.
+
+If you do change it then please send an incremental patch rather than a
+new version.  I'm OK whatever you guys decide here.
