@@ -1,38 +1,53 @@
-From: mans.rullgard@linaro.org (Mans Rullgard)
-Date: Fri, 13 Jan 2012 19:46:22 +0000
-Subject: [PATCH] ARM: pl330: fix null pointer dereference in pl330_chan_ctrl()
-In-Reply-To: <4F103620.8070504@arm.com>
-References: <4F103620.8070504@arm.com>
-Message-ID: <1326483982-13610-1-git-send-email-mans.rullgard@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2012 20:00:30 +0000
+Subject: [PATCH] Simpad: use DEFINE_SPINLOCK()
+Message-ID: <20120113200030.GD1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the thrd->req_running field being accessed before thrd
-is checked for null.  The error was introduced in abb959f.
+Use DEFINE_SPINLOCK() rather than a run-time initializer, which avoids
+the need to wait for the spinlock to be explicitly initialized before
+its used.
 
-Signed-off-by: Mans Rullgard <mans.rullgard@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/pl330.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Jochen,
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 3a6e042..cb3e597 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -1568,12 +1568,13 @@ static int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
- 	struct pl330_thread *thrd = ch_id;
- 	struct pl330_dmac *pl330;
- 	unsigned long flags;
--	int ret = 0, active = thrd->req_running;
-+	int ret = 0, active;
+I wonder why you didn't use this initializer first time around - it's
+there so you can declare spinlocks in static data without needing to
+write code to explicitly initialize them.
+
+ arch/arm/mach-sa1100/simpad.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index cdb9d19..4ddfcc3 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -41,7 +41,7 @@
+  */
  
- 	if (!thrd || thrd->free || thrd->dmac->state == DYING)
- 		return -EINVAL;
+ static long cs3_shadow;
+-static spinlock_t cs3_lock;
++static DEFINE_SPINLOCK(cs3_lock);
+ static struct gpio_chip cs3_gpio;
  
- 	pl330 = thrd->dmac;
-+	active = thrd->req_running;
+ long simpad_get_cs3_ro(void)
+@@ -197,7 +197,7 @@ static void __init simpad_map_io(void)
+ 	/* Initialize CS3 */
+ 	cs3_shadow = (EN1 | EN0 | LED2_ON | DISPLAY_ON |
+ 		RS232_ON | ENABLE_5V | RESET_SIMCARD | DECT_POWER_ON);
+-	__simpad_write_cs3(); /* Spinlocks not yet initialized */
++	__simpad_write_cs3();
  
- 	spin_lock_irqsave(&pl330->lock, flags);
+         sa1100_register_uart_fns(&simpad_port_fns);
+ 	sa1100_register_uart(0, 3);  /* serial interface */
+@@ -354,8 +354,6 @@ static int __init simpad_init(void)
+ {
+ 	int ret;
  
--- 
-1.7.8.3
+-	spin_lock_init(&cs3_lock);
+-
+ 	cs3_gpio.label = "simpad_cs3";
+ 	cs3_gpio.base = SIMPAD_CS3_GPIO_BASE;
+ 	cs3_gpio.ngpio = 24;
