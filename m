@@ -1,40 +1,34 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Thu, 12 Jan 2012 18:38:01 -0600
-Subject: [PATCH 5/7] at91 : fix dirty hack for the selfrefresh function
-In-Reply-To: <20120112193639.GL1068@n2100.arm.linux.org.uk>
-References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
- <1326293740-15735-6-git-send-email-daniel.lezcano@linaro.org>
- <20120111165508.GC1068@n2100.arm.linux.org.uk>
- <201201111827.18890.arnd.bergmann@linaro.org>
- <20120111194334.GF1068@n2100.arm.linux.org.uk>
- <4F0EF119.3000605@atmel.com>
- <20120112193639.GL1068@n2100.arm.linux.org.uk>
-Message-ID: <CAMXH7KEX+pMZvSnb5HHuMFaPbupSx+qCJkGtoDLTDkaboHCoMQ@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 13 Jan 2012 00:43:59 +0000
+Subject: [PATCH 0/2] Full DT IRQ support for versatile
+Message-ID: <1326415441-17695-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 1:36 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+These patches move versatile over to instantiating both interrupt
+controllers from the device tree.  I've tested this in qemu for both DT
+and non-DT platforms but only with an initramfs.  I've seen interrupts
+generated on both controllers for both boot methods.
 
-> Okay, that makes sense (because everything but rm9200 branches out to
-> one of the cpu idle functions.)
->
-> It also supports my second idea described in
-> http://lists.arm.linux.org.uk/lurker/message/20120109.144443.3626e5a6.en.html
-> See the paragraph starting "So, what I suggest instead" at that URL and
-> following text.
->
-> The reason I think this is the best solution is:
-> (a) we move the CPU dependencies into each CPU file
-> (b) we localize the quirks needed for each CPU into its own specific code
-> (c) we can select at run time between the various standby functions
->
-> These are all AT91 specific wins. ?What it also gets us is _much_ less
-> exported code from arch/arm/mach-at91 when the CPU idle stuff moves out,
-> reducing it down to just a mere function pointer, and, because the AT91
-> specific idle stuff is hidden behind this it potentially opens the door
-> towards some consolidation in this area between different SoCs.
+Grant, Rob, this makes use of irqdomain again as I'm not sure what the
+replacement is going to look like yet.  versatile works with DT in
+mainline, but that's kind of lucky...  I know there's been patches to
+make irq_domain_add_simple() return the irq_domain and can rebase if
+needed.
 
-Apologies if this is a dumb question, but for the arch/arm/mach-at91
-function pointer that needs to be exported, what is the recommended
-method for exporting it to a file that needs it in drivers/cpuidle?
+Jamie Iles (2):
+  versatile: sic: add device tree bindings
+  versatile: dt: register interrupt controllers from dt
+
+ .../devicetree/bindings/arm/versatile-sic.txt      |   27 ++++++++++
+ arch/arm/mach-versatile/core.c                     |   27 +++-------
+ arch/arm/mach-versatile/core.h                     |    1 +
+ arch/arm/mach-versatile/versatile_dt.c             |   15 +++++-
+ arch/arm/plat-versatile/Kconfig                    |    1 +
+ arch/arm/plat-versatile/fpga-irq.c                 |   51 +++++++++++++++++++-
+ arch/arm/plat-versatile/include/plat/fpga-irq.h    |    6 ++
+ 7 files changed, 106 insertions(+), 22 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/versatile-sic.txt
+
+-- 
+1.7.5.4
