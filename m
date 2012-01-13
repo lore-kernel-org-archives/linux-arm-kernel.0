@@ -1,59 +1,92 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Fri, 13 Jan 2012 10:12:30 +0200
-Subject: [PATCH 04/11] ep93xx: Configure GPIO ports in core code
-In-Reply-To: <4F0FD694.4060705@gmail.com>
-References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-5-git-send-email-rmallon@gmail.com>
- <20120113062707.GA4147@mwesterb-mobl.ger.corp.intel.com>
- <4F0FD694.4060705@gmail.com>
-Message-ID: <20120113081230.GA23197@mwesterb-mobl.ger.corp.intel.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 13 Jan 2012 17:17:17 +0800
+Subject: [PATCH] backlight: pwm_bl: move suspend/resume entries from
+ platform_driver to driver.pm
+In-Reply-To: <CAMPhdO-BEgNkHERx-0mE5B4kTZ90wjAgWbWMBNdfTioyWFP5zA@mail.gmail.com>
+References: <1322704427-11876-1-git-send-email-Barry.Song@csr.com>
+ <CAMPhdO-BEgNkHERx-0mE5B4kTZ90wjAgWbWMBNdfTioyWFP5zA@mail.gmail.com>
+Message-ID: <CAGsJ_4xp6S6nAmGbGP320qtkVPnyA614XUDeqipiSnLKtbbY9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 06:00:36PM +1100, Ryan Mallon wrote:
-> On 13/01/12 17:27, Mika Westerberg wrote:
-> > On Wed, Jan 11, 2012 at 02:14:29PM +1100, Ryan Mallon wrote:
-> >> Move the pinmux setting of the EP93xx GPIOs to the core code. This
-> >> removes the need for the GPIO driver to have access to the system
-> >> controller registers.
-> >>
-> >> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> >> Cc: Mika Westerberg <mika.westerberg@iki.fi>
-> >> Cc: Grant Likely <grant.likely@secretlab.ca>
-> >> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
-> >> ---
-> >>  arch/arm/mach-ep93xx/core.c |    7 +++++++
-> >>  drivers/gpio/gpio-ep93xx.c  |    7 -------
-> >>  2 files changed, 7 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> >> index dcb10c2..978c5a6 100644
-> >> --- a/arch/arm/mach-ep93xx/core.c
-> >> +++ b/arch/arm/mach-ep93xx/core.c
-> >> @@ -896,6 +896,13 @@ void __init ep93xx_init_devices(void)
-> >>  	/* Disallow access to MaverickCrunch initially */
-> >>  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
-> >>  
-> >> +	/* Default all ports to GPIO */
-> >> +	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
-> >> +			       EP93XX_SYSCON_DEVCFG_GONK |
-> >> +			       EP93XX_SYSCON_DEVCFG_EONIDE |
-> >> +			       EP93XX_SYSCON_DEVCFG_GONIDE |
-> >> +			       EP93XX_SYSCON_DEVCFG_HONIDE);
-> >> +
-> > Doesn't this now change the behaviour? Now you unconditionally mux the pins
-> > whereas before they were only muxed if we had GPIO driver enabled.
-> 
-> True, but I think the previous behaviour was broken anyway. If the gpio
-> driver was installed after any driver which has muxed gpio pins for
-> other purposes then it will override those settings. All of the ep93xx
-> drivers will mux the pins they need at probe time. IIRC, before the gpio
-> driver was moved out of arch/arm/mach-ep93xx we muxed all the pins
-> unconditionally anyway.
+2011/12/1 Eric Miao <eric.y.miao@gmail.com>:
+> On Thu, Dec 1, 2011 at 9:53 AM, Barry Song <Barry.Song@csr.com> wrote:
+>> From: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
+>>
+>> At first, people are moving suspend/resume entries from platform_driver
+>> to driver.pm for many drivers.
+>> On the other hand, if we use swsusp to do hibernation for an embedded
+>> system using pwm_bl, in the process of preparing snapshot, backlight
+>> will be off and make lcd black screen. This gives bad user experiences.
+>> This patch will fix this issue as swsusp will go to call pm.freeze()
+>> but not platform_driver.suspend. we have no pm.freeze() for pwm_bl, so
+>> the lcd black screen will disappear.
+>>
+>> Signed-off-by: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>
+> Acked-by: Eric Miao <eric.y.miao@gmail.com>
 
-Ah, right. So now it actually behaves better since it's not dependent on which
-phase the GPIO driver is probed.
+Eric, thanks. Mark Brown's "backlight: convert pwm_bl to dev_pm_ops"
+http://www.spinics.net/lists/mm-commits/msg86844.html
+did seem and has been merged as commit e2c17bc6f.
 
-Thus,
 
-Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
+>
+>> ---
+>> ?drivers/video/backlight/pwm_bl.c | ? 15 ++++++++++-----
+>> ?1 files changed, 10 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+>> index 8b5b2a4..50f3134 100644
+>> --- a/drivers/video/backlight/pwm_bl.c
+>> +++ b/drivers/video/backlight/pwm_bl.c
+>> @@ -169,9 +169,9 @@ static int pwm_backlight_remove(struct platform_device *pdev)
+>> ?}
+>>
+>> ?#ifdef CONFIG_PM
+>> -static int pwm_backlight_suspend(struct platform_device *pdev,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pm_message_t state)
+>> +static int pwm_backlight_suspend(struct device *dev)
+>> ?{
+>> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
+>> ? ? ? ?struct backlight_device *bl = platform_get_drvdata(pdev);
+>> ? ? ? ?struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
+>>
+>> @@ -184,8 +184,9 @@ static int pwm_backlight_suspend(struct platform_device *pdev,
+>> ? ? ? ?return 0;
+>> ?}
+>>
+>> -static int pwm_backlight_resume(struct platform_device *pdev)
+>> +static int pwm_backlight_resume(struct device *dev)
+>> ?{
+>> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
+>> ? ? ? ?struct backlight_device *bl = platform_get_drvdata(pdev);
+>>
+>> ? ? ? ?backlight_update_status(bl);
+>> @@ -196,15 +197,19 @@ static int pwm_backlight_resume(struct platform_device *pdev)
+>> ?#define pwm_backlight_resume ? NULL
+>> ?#endif
+>>
+>> +static const struct dev_pm_ops pwm_backlight_pm_ops = {
+>> + ? ? ? .suspend = pwm_backlight_suspend,
+>> + ? ? ? .resume = pwm_backlight_resume,
+>> +};
+>> +
+>> ?static struct platform_driver pwm_backlight_driver = {
+>> ? ? ? ?.driver ? ? ? ? = {
+>> ? ? ? ? ? ? ? ?.name ? = "pwm-backlight",
+>> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
+>> + ? ? ? ? ? ? ? .pm ? ? = &pwm_backlight_pm_ops,
+>> ? ? ? ?},
+>> ? ? ? ?.probe ? ? ? ? ?= pwm_backlight_probe,
+>> ? ? ? ?.remove ? ? ? ? = pwm_backlight_remove,
+>> - ? ? ? .suspend ? ? ? ?= pwm_backlight_suspend,
+>> - ? ? ? .resume ? ? ? ? = pwm_backlight_resume,
+>> ?};
+>>
+>> ?static int __init pwm_backlight_init(void)
+>> --
+>> 1.7.1
+
+-barry
