@@ -1,67 +1,71 @@
-From: b.van.den.berg.nl@gmail.com (Bas van den Berg)
-Date: Fri, 13 Jan 2012 13:48:13 +0100
-Subject: [PATCH] ARM: mach-davinci: removed un-existing pll1_sysclk4-7
- clock domains
-Message-ID: <20120113124811.GA9223@altenpts-laptop>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 13 Jan 2012 13:49:24 +0100
+Subject: omap clocksource timer selection: dmtimer OR 32K-Sync timer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
+References: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
+Message-ID: <CAMQu2gxYQOHX8n2RLfkLBw5hQMdvH389DfrguLtzpLcpmqBQMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sysclk4-7 only exist for pll0. for pll1 sysclk1-3 exist.
+On Fri, Jan 13, 2012 at 1:21 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> Hi,
+>
+> In case of AM33xx family of devices, we do not have 32K Sync timer
+> (32K Counter) available; and the current implementation is based on
+> compile-time option, where clock-source is chosen by something like,
+>
+> File - arch/arm/mach-omap2/timer.c
+>
+> #ifdef CONFIG_OMAP_32K_TIMER
+> static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+> {
+> ...
+> }
+> #else
+> static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+> {
+> ...
+> }
+> #endif
+>
+>
+> But in order to support multi-omap build, we must
+> make run-time decision to use the timer for kernel clock-source, either of -
+>
+> ?- DMTIMER
+> ?- 32K Sync Timer
+>
+> The DMTIMER is already migrated to the HWMOD framework, but 32K Timer code
+> has not yet migrated to it. So the question here is,
+>
+> 1) Does it make sense to migrate counter_32k.c to search entry in hwmod
+> ? table and if 32k_sync timer is available in hwmod table then use 32K
+> ? timer for Kernel clock-source
+> ? OR
+> ? Fall back to DMTIMER.
+>
+> ? OMAP4 hwmod table already has entry,
+>
+> ? static struct omap_hwmod omap44xx_counter_32k_hwmod = {
+> ? ? ? ? .name ? ? ? ? ? = "counter_32k",
+> ? ...
+> ? };
+>
+> ? We need to have similar entries in all devices where 32K timer is present.
+>
+> 2) OR simply add another cpu_is_am33xx() and then fall back to dmtimer?
+> ? Just to prove this, everything works here, I modified the code for this
+> ? and tested it on both AM335x EVM and AM37xEVM and it works fine for me.
+>
+>
+> Any comments?? OR Better approach? OR anything which I am missing here?
+>
+You can register both the clock sources together with different
+rating. Based on rating
+timer code will automatically pick the better clock-source of two.
+Ratings is based on the resolution of the timer.
 
-Signed-off-by: Bas van den Berg <b.van.den.berg.nl@gmail.com>
----
- arch/arm/mach-davinci/da850.c |   32 --------------------------------
- 1 files changed, 0 insertions(+), 32 deletions(-)
+That should remove the CONFIG option depedency.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 0ed7fdb..992c4c4 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -153,34 +153,6 @@ static struct clk pll1_sysclk3 = {
- 	.div_reg	= PLLDIV3,
- };
- 
--static struct clk pll1_sysclk4 = {
--	.name		= "pll1_sysclk4",
--	.parent		= &pll1_clk,
--	.flags		= CLK_PLL,
--	.div_reg	= PLLDIV4,
--};
--
--static struct clk pll1_sysclk5 = {
--	.name		= "pll1_sysclk5",
--	.parent		= &pll1_clk,
--	.flags		= CLK_PLL,
--	.div_reg	= PLLDIV5,
--};
--
--static struct clk pll1_sysclk6 = {
--	.name		= "pll0_sysclk6",
--	.parent		= &pll0_clk,
--	.flags		= CLK_PLL,
--	.div_reg	= PLLDIV6,
--};
--
--static struct clk pll1_sysclk7 = {
--	.name		= "pll1_sysclk7",
--	.parent		= &pll1_clk,
--	.flags		= CLK_PLL,
--	.div_reg	= PLLDIV7,
--};
--
- static struct clk i2c0_clk = {
- 	.name		= "i2c0",
- 	.parent		= &pll0_aux_clk,
-@@ -397,10 +369,6 @@ static struct clk_lookup da850_clks[] = {
- 	CLK(NULL,		"pll1_aux",	&pll1_aux_clk),
- 	CLK(NULL,		"pll1_sysclk2",	&pll1_sysclk2),
- 	CLK(NULL,		"pll1_sysclk3",	&pll1_sysclk3),
--	CLK(NULL,		"pll1_sysclk4",	&pll1_sysclk4),
--	CLK(NULL,		"pll1_sysclk5",	&pll1_sysclk5),
--	CLK(NULL,		"pll1_sysclk6",	&pll1_sysclk6),
--	CLK(NULL,		"pll1_sysclk7",	&pll1_sysclk7),
- 	CLK("i2c_davinci.1",	NULL,		&i2c0_clk),
- 	CLK(NULL,		"timer0",	&timerp64_0_clk),
- 	CLK("watchdog",		NULL,		&timerp64_1_clk),
--- 
-1.7.0.4
+Regards
+Santosh
