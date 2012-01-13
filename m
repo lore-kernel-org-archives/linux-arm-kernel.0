@@ -1,36 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Jan 2012 22:53:24 +0800
-Subject: [PATCH v4 3/6] clk: introduce the common clock framework
-In-Reply-To: <4F0F7507.3080501@codeaurora.org>
-References: <1323834838-2206-1-git-send-email-mturquette@linaro.org>
- <1323834838-2206-4-git-send-email-mturquette@linaro.org>
- <alpine.LFD.2.02.1112141007550.3020@ionos>
- <CAJOA=zO=gM2r4pCVo+orLqE9Q1SSw4h5nXsAHo-e_SHZAfvKDA@mail.gmail.com>
- <20120104021541.GI2414@b20223-02.ap.freescale.net>
- <4F0462FF.1000308@gmail.com>
- <CAJOA=zPw7UuhE4R3SsBeyzQ2_iN29Zv-ExaUTTFCah+GoFSfNQ@mail.gmail.com>
- <4F0506D0.30109@gmail.com>
- <CAJOA=zPgwiOSoyZK1SpzZVZfTOmwruTR=WO+gRdVZrZVzNuPSA@mail.gmail.com>
- <4F0F7507.3080501@codeaurora.org>
-Message-ID: <20120113145321.GB1810@S2101-09.ap.freescale.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Jan 2012 08:46:32 -0600
+Subject: [PATCH v2 3/7] ARM: ux500: add missing ENDPROC to headsmp.S
+In-Reply-To: <20120113142415.GD2227@linaro.org>
+References: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
+ <1326389476-11569-4-git-send-email-robherring2@gmail.com>
+ <20120113142415.GD2227@linaro.org>
+Message-ID: <4F1043C8.5080107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 04:04:23PM -0800, Saravana Kannan wrote:
-> While the original clk_hw suggestion was well intentioned, it just
-> forces too many unnecessary dereferences and indirection. It also
-> prevents static init of some fields as others have mentioned.
-> Overall, it made the MSM clock code a mess when I tried to convert
-> it to the common clock framework during Linaro Connect Q4 2011.
+On 01/13/2012 08:24 AM, Dave Martin wrote:
+> On Thu, Jan 12, 2012 at 11:31:12AM -0600, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Once the ENDPROC is in place, BSYM() in not longer necessary
+>> to get correct pointer to u8500_secondary_startup().
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+>> Cc: Linus Walleij <linus.walleij@stericsson.com>
 > 
-> The current off-tree MSM clock code uses a very similar approach to
-> what the original patches that Jeremy sent out did. When Mike sent
-> out the patches that removed clk_hw, the MSM code was much clearer
-> and easier to convert to the common clock framework.
+> The words at label 1 may be misaligned in a Thumb kernel, which is
+> undesirable.
 > 
-I share the same feeling with migrating imx6 clock support to v2 and
-v3 of this series.  (v2 uses clk_hw, and v3 removes clk_hw.)
+> It probably makes sense to add a .align 2 before that label
+> as part of this patch.
+> 
 
--- 
-Regards,
-Shawn
+Not a new problem, but I'll fix that as well.
+
+Rob
+
+> Cheers
+> ---Dave
+> 
+>> ---
+>>  arch/arm/mach-ux500/headsmp.S |    1 +
+>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
+>> index 64fa451..d03843d 100644
+>> --- a/arch/arm/mach-ux500/headsmp.S
+>> +++ b/arch/arm/mach-ux500/headsmp.S
+>> @@ -32,6 +32,7 @@ pen:	ldr	r7, [r6]
+>>  	 * should now contain the SVC stack for this core
+>>  	 */
+>>  	b	secondary_startup
+>> +ENDPROC(u8500_secondary_startup)
+>>  
+>>  1:	.long	.
+>>  	.long	pen_release
+>> -- 
+>> 1.7.5.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
