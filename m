@@ -1,47 +1,31 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Fri, 13 Jan 2012 22:45:55 +0100
-Subject: [PATCH] watchdog: fix error in probe() of s3c2410_wdt (reset
- at booting)
-In-Reply-To: <20120113111117.GT1068@n2100.arm.linux.org.uk>
-References: <1326431663-4638-1-git-send-email-myungjoo.ham@samsung.com>
- <20120113111117.GT1068@n2100.arm.linux.org.uk>
-Message-ID: <20120113214555.GA19495@infomag.iguana.be>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2012 21:52:39 +0000
+Subject: [PATCH 09/11] ep93xx: Move crunch code to mach-ep93xx directory
+In-Reply-To: <4F109F45.9020105@gmail.com>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+ <1326251676-7593-10-git-send-email-rmallon@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F001F3F99EBB11@AUSP01VMBX24.collaborationhost.net>
+ <4F109F45.9020105@gmail.com>
+Message-ID: <20120113215239.GG1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jan 14, 2012 at 08:16:53AM +1100, Ryan Mallon wrote:
+> I was hoping that Russell would make some comment here about whether
+> moving this file out of arch/arm/kernel is okay to do.
 
-On Fri, Jan 13, 2012 at 11:11:17AM +0000, Russell King - ARM Linux wrote:
+I have no objection to SoC specific code moving out of arch-generic areas
+into SoC specific areas - provided it doesn't cause any abonimations!
 
-> On Fri, Jan 13, 2012 at 02:14:23PM +0900, MyungJoo Ham wrote:
-> > Probe function of s3c2410 watchdog calls request_irq before initializing
-> > required value (wdt_count). This incurs resetting watchdog counter value
-> > and watchdog-reboot during booting up.
-> > 
-> > This patch addresses such an issue by calling request_irq later.
-> > 
-> > Error handling in probe function and calling oder in remove function are
-> > also revised accordingly.
-> 
-> On the other hand, this patch violates the general principle that you set
-> the device up _before_ you publish it to userspace.
-> 
-> In the case where you add the watchdog device, but then the subsequent
-> request_irq() fails, there is a window where the watchdog device could
-> be opened and started.  You then fall out through the error paths, and
-> the module could be removed.
-> 
-> Don't do this.  Always setup the device first.  Then publish it.  Never
-> the other way around.
+> I assume it had
+> some reason to be there in the first place. I have only done build
+> testing so far since I don't have any ep93xx hardware to test on, and
+> have never actually used crunch anyway.
 
-Russell was faster in replying, but I would have given the same NAK:
-the registering of the watchdog means that userspace get access/control over
-the watchdog device. So the request_irq should be done before that.
+I suspect it was there because the iwmmxt stuff was also in that directory,
+and at the time we didn't have the notifier in place to be able to properly
+broadcast events that ISA extensions needed to react to context switching
+etc.
 
-In your trouble description you wrote: "Probe function of s3c2410 watchdog
-calls request_irq before initializing required value (wdt_count)."
-Should we not fix the initialization of the wdt_count value instead of the
-request_irq? i will have a look at the code somewhere this weekend.
-
-Mvg,
-Wim.
+Now that we do have all that in place, I don't think there's much reason
+it lives in arch/arm/kernel.
