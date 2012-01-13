@@ -1,58 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 Jan 2012 12:10:47 +0100
-Subject: [PATCH RFC] ARM: at91: removal of CAP9 SoC family
-In-Reply-To: <1325864033-20012-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1325864033-20012-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4F101137.1020804@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2012 11:11:17 +0000
+Subject: [PATCH] watchdog: fix error in probe() of s3c2410_wdt (reset
+ at booting)
+In-Reply-To: <1326431663-4638-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1326431663-4638-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <20120113111117.GT1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2012 04:33 PM, Nicolas Ferre :
-> Atmel CAP9 family is not maintained well and products may be
-> difficult to find now. It will allow to save workforce and
-> remove LOC during current cleanup process.
+On Fri, Jan 13, 2012 at 02:14:23PM +0900, MyungJoo Ham wrote:
+> Probe function of s3c2410 watchdog calls request_irq before initializing
+> required value (wdt_count). This incurs resetting watchdog counter value
+> and watchdog-reboot during booting up.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  Documentation/feature-removal-schedule.txt |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
+> This patch addresses such an issue by calling request_irq later.
+> 
+> Error handling in probe function and calling oder in remove function are
+> also revised accordingly.
 
-Hi Andrew, Greg,
+On the other hand, this patch violates the general principle that you set
+the device up _before_ you publish it to userspace.
 
-Can you please take this patch or is somebody else in charge of this file?
+In the case where you add the watchdog device, but then the subsequent
+request_irq() fails, there is a window where the watchdog device could
+be opened and started.  You then fall out through the error paths, and
+the module could be removed.
 
-It it is going to mainline through you, can you add also:
-
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-
-Or tell me to resend a complete patch.
-
-Thanks for your help, best regards,
-
-
-> diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
-> index 3d84912..23dfea5 100644
-> --- a/Documentation/feature-removal-schedule.txt
-> +++ b/Documentation/feature-removal-schedule.txt
-> @@ -551,3 +551,17 @@ When:	3.5
->  Why:	The iwlagn module has been renamed iwlwifi.  The alias will be around
->  	for backward compatibility for several cycles and then dropped.
->  Who:	Don Fry <donald.h.fry@intel.com>
-> +
-> +----------------------------
-> +
-> +What:	The CAP9 SoC family will be removed
-> +When:	3.4
-> +Files:	arch/arm/mach-at91/at91cap9.c
-> +	arch/arm/mach-at91/at91cap9_devices.c
-> +	arch/arm/mach-at91/include/mach/at91cap9.h
-> +	arch/arm/mach-at91/include/mach/at91cap9_matrix.h
-> +	arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
-> +	arch/arm/mach-at91/board-cap9adk.c
-> +Why:	The code is not actively maintained and platforms are now hard to find.
-> +Who:	Nicolas Ferre <nicolas.ferre@atmel.com>
-> +	Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-
-
--- 
-Nicolas Ferre
+Don't do this.  Always setup the device first.  Then publish it.  Never
+the other way around.
