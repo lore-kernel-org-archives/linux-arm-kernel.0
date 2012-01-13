@@ -1,48 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Jan 2012 22:23:22 +0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <4F10362D.3020507@stericsson.com>
-References: <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A76A@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508E7B0@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D1DD6@HQMAIL01.nvidia.com>
- <20120113035506.GB12184@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC605788508FD9C@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120113133552.GB17029@S2101-09.ap.freescale.net>
- <4F10362D.3020507@stericsson.com>
-Message-ID: <20120113142319.GA1810@S2101-09.ap.freescale.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 13 Jan 2012 14:24:15 +0000
+Subject: [PATCH v2 3/7] ARM: ux500: add missing ENDPROC to headsmp.S
+In-Reply-To: <1326389476-11569-4-git-send-email-robherring2@gmail.com>
+References: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
+ <1326389476-11569-4-git-send-email-robherring2@gmail.com>
+Message-ID: <20120113142415.GD2227@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 02:48:29PM +0100, Linus Walleij wrote:
-> On 01/13/2012 02:35 PM, Shawn Guo wrote:
-> >My guess is that Linus.W did not get any chance to take the dt case
-> >into account with his first design of pinctrl core.  But I guess he
-> >is open to any reasonable change to pinctrl core for dt adoption.
-> >Linus?
+On Thu, Jan 12, 2012 at 11:31:12AM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Any patches welcome.
+> Once the ENDPROC is in place, BSYM() in not longer necessary
+> to get correct pointer to u8500_secondary_startup().
 > 
-> However we cannot *require* DT for pinctrl to work, there
-> are archs that do not use DT and these must also be able
-> to use pinctrl. For example arch/blackfin have expressed
-> interest IIRC.
-> 
-Definitely.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
 
-> Then the question of whether to also support mixed configs
-> where some callers get data from DT and some from
-> platform data. I suspect that this is necessary for the
-> single kernel goal.
-> 
-Yes.  Right now, imx3, imx5 and imx6 have supported single kernel
-image.  We probably can not convert these three platforms all over
-to pinctrl subsystem at one time.  So we definitely need that
-support to make the conversion/merge them one by one possible.
+The words at label 1 may be misaligned in a Thumb kernel, which is
+undesirable.
 
--- 
-Regards,
-Shawn
+It probably makes sense to add a .align 2 before that label
+as part of this patch.
+
+Cheers
+---Dave
+
+> ---
+>  arch/arm/mach-ux500/headsmp.S |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
+> index 64fa451..d03843d 100644
+> --- a/arch/arm/mach-ux500/headsmp.S
+> +++ b/arch/arm/mach-ux500/headsmp.S
+> @@ -32,6 +32,7 @@ pen:	ldr	r7, [r6]
+>  	 * should now contain the SVC stack for this core
+>  	 */
+>  	b	secondary_startup
+> +ENDPROC(u8500_secondary_startup)
+>  
+>  1:	.long	.
+>  	.long	pen_release
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
