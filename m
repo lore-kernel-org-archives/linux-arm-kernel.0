@@ -1,31 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jan 2012 21:52:39 +0000
-Subject: [PATCH 09/11] ep93xx: Move crunch code to mach-ep93xx directory
-In-Reply-To: <4F109F45.9020105@gmail.com>
-References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-10-git-send-email-rmallon@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F001F3F99EBB11@AUSP01VMBX24.collaborationhost.net>
- <4F109F45.9020105@gmail.com>
-Message-ID: <20120113215239.GG1068@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Jan 2012 16:02:47 -0600
+Subject: [RFC PATCH 04/10] ARM: it8152: explicitly include mach/irqs.h
+In-Reply-To: <1326472451-9002-5-git-send-email-robherring2@gmail.com>
+References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
+ <1326472451-9002-5-git-send-email-robherring2@gmail.com>
+Message-ID: <4F10AA07.8010803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2012 at 08:16:53AM +1100, Ryan Mallon wrote:
-> I was hoping that Russell would make some comment here about whether
-> moving this file out of arch/arm/kernel is okay to do.
+On 01/13/2012 10:34 AM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> In preparation to make mach/irqs.h optional, directly include mach/irq.h
+> to get IRQ_BOARD_START.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/include/asm/hardware/it8152.h |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/hardware/it8152.h b/arch/arm/include/asm/hardware/it8152.h
+> index 43cab49..73f84fa 100644
+> --- a/arch/arm/include/asm/hardware/it8152.h
+> +++ b/arch/arm/include/asm/hardware/it8152.h
+> @@ -9,6 +9,9 @@
+>  
+>  #ifndef __ASM_HARDWARE_IT8152_H
+>  #define __ASM_HARDWARE_IT8152_H
+> +
+> +#include <mach/irqs.h>
+> +
 
-I have no objection to SoC specific code moving out of arch-generic areas
-into SoC specific areas - provided it doesn't cause any abonimations!
+This include is needed for IRQ_BOARD_START which could also be
+problematic outside a single mach dir. The IT8152 is only used on 1
+family of pxa2xx boards. The part and board with it are EOL as well, so
+we're not going to see new users of this code. Perhaps the it8152 code
+should just be moved into mach-pxa?
 
-> I assume it had
-> some reason to be there in the first place. I have only done build
-> testing so far since I don't have any ep93xx hardware to test on, and
-> have never actually used crunch anyway.
-
-I suspect it was there because the iwmmxt stuff was also in that directory,
-and at the time we didn't have the notifier in place to be able to properly
-broadcast events that ISA extensions needed to react to context switching
-etc.
-
-Now that we do have all that in place, I don't think there's much reason
-it lives in arch/arm/kernel.
+Rob
