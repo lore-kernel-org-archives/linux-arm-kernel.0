@@ -1,44 +1,39 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 13 Jan 2012 16:19:35 +0100
-Subject: omap clocksource timer selection: dmtimer OR 32K-Sync timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
-References: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
-Message-ID: <4F104B87.8080003@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2012 15:35:56 +0000
+Subject: [RFC PATCH] proc: clear_refs: do not clear reserved pages
+In-Reply-To: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
+References: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20120113153556.GY1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/13/2012 1:21 PM, Hiremath, Vaibhav wrote:
-> Hi,
->
-> In case of AM33xx family of devices, we do not have 32K Sync timer
-> (32K Counter) available; and the current implementation is based on
-> compile-time option, where clock-source is chosen by something like,
->
-> File - arch/arm/mach-omap2/timer.c
->
-> #ifdef CONFIG_OMAP_32K_TIMER
-> static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
-> {
-> ...
-> }
-> #else
-> static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
-> {
-> ...
-> }
-> #endif
->
->
-> But in order to support multi-omap build, we must
-> make run-time decision to use the timer for kernel clock-source, either of -
->
->   - DMTIMER
->   - 32K Sync Timer
->
-> The DMTIMER is already migrated to the HWMOD framework, but 32K Timer code
-> has not yet migrated to it. So the question here is,
+On Fri, Jan 13, 2012 at 03:13:07PM +0000, Will Deacon wrote:
+> /proc/pid/clear_refs is used to clear the Referenced and YOUNG bits for
+> pages and corresponding page table entries of the task with PID pid,
+> which includes any special mappings inserted into the page tables in
+> order to provide things like vDSOs and user helper functions.
+> 
+> On ARM this causes a problem because the vectors page is mapped as a
+> global mapping and since ec706dab ("ARM: add a vma entry for the user
+> accessible vector page"), a VMA is also inserted into each task for this
+> page to aid unwinding through signals and syscall restarts. Since the
+> vectors page is required for handling faults, clearing the YOUNG bit
+> (and subsequently writing a faulting pte) means that we lose the vectors
+> page *globally* and cannot fault it back in. This results in a system
+> deadlock on the next exception.
+> 
+> This patch avoids clearing the aforementioned bits for reserved pages,
+> therefore leaving the vectors page intact on ARM. Since reserved pages
+> are not candidates for swap, this change should not have any impact on
+> the usefulness of clear_refs.
 
-A series was sent to do that by Felipe last year, but we somehow forgot 
-to rebase it on newer kernel and thus never reposted it.
+Having just looked at mm/swapfile.c, what ensures that we don't try to swap
+the vectors page out?
 
-Benoit
+I thought that VM_IO or VM_RESERVED once guaranteed that the vma wouldn't
+be scanned, but I don't see anything in there which tests these flags.
+As a result, it seems to me that the original patch is wrong, and we need
+to keep the vectors page completely out of the vma list to prevent it
+ever being made old.
+
+Maybe the MM gurus can comment?
