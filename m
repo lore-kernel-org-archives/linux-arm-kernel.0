@@ -1,32 +1,93 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Fri, 13 Jan 2012 21:04:31 +0100
-Subject: [PATCH 04/11] mm: page_alloc: introduce alloc_contig_range()
-In-Reply-To: <20120110141613.GB3910@csn.ul.ie>
-References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
- <1325162352-24709-5-git-send-email-m.szyprowski@samsung.com>
- <20120110141613.GB3910@csn.ul.ie>
-Message-ID: <op.v71gpt1b3l0zgt@mpn-glaptop>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 13 Jan 2012 15:30:52 -0500 (EST)
+Subject: [RFC PATCH 06/10] ARM: mmp: remove NR_IRQS
+In-Reply-To: <1326472451-9002-7-git-send-email-robherring2@gmail.com>
+References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
+ <1326472451-9002-7-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1201131526050.2722@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Dec 29, 2011 at 01:39:05PM +0100, Marek Szyprowski wrote:
->> From: Michal Nazarewicz <mina86@mina86.com>
->> +	/* Make sure all pages are isolated. */
->> +	if (!ret) {
->> +		lru_add_drain_all();
->> +		drain_all_pages();
->> +		if (WARN_ON(test_pages_isolated(start, end)))
->> +			ret = -EBUSY;
->> +	}
+On Fri, 13 Jan 2012, Rob Herring wrote:
 
-On Tue, 10 Jan 2012 15:16:13 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> Another global IPI seems overkill. Drain pages only from the local CPU
-> (drain_pages(get_cpu()); put_cpu()) and test if the pages are isolated.
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Remove NR_IRQS and add a per machine .nr_irqs setting.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-Is get_cpu() + put_cpu() required? Won't drain_local_pages() work?
+While it is true that NR_IRQS was defined in terms of IRQ_BOARD_START 
+down in the confines of mach/irqs.h, I don't think IRQ_BOARD_START is 
+such a good macro name to spread around for what it should mean.  
+Perhaps MMP_MAX_IRQS or the like would be more self describing.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+> ---
+>  arch/arm/mach-mmp/avengers_lite.c     |    1 +
+>  arch/arm/mach-mmp/include/mach/irqs.h |    2 --
+>  arch/arm/mach-mmp/irq-mmp2.c          |    1 +
+>  arch/arm/mach-mmp/jasper.c            |    1 +
+>  arch/arm/mach-mmp/tavorevb.c          |    1 +
+>  5 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mmp/avengers_lite.c b/arch/arm/mach-mmp/avengers_lite.c
+> index b148a9d..0fd60fb 100644
+> --- a/arch/arm/mach-mmp/avengers_lite.c
+> +++ b/arch/arm/mach-mmp/avengers_lite.c
+> @@ -43,6 +43,7 @@ static void __init avengers_lite_init(void)
+>  
+>  MACHINE_START(AVENGERS_LITE, "PXA168 Avengers lite Development Platform")
+>  	.map_io		= mmp_map_io,
+> +	.nr_irqs	= IRQ_BOARD_START,
+>  	.init_irq       = pxa168_init_irq,
+>  	.timer          = &pxa168_timer,
+>  	.init_machine   = avengers_lite_init,
+> diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
+> index 34635a0..25e6d60 100644
+> --- a/arch/arm/mach-mmp/include/mach/irqs.h
+> +++ b/arch/arm/mach-mmp/include/mach/irqs.h
+> @@ -224,6 +224,4 @@
+>  
+>  #define IRQ_BOARD_START			(IRQ_GPIO_START + MMP_NR_BUILTIN_GPIO)
+>  
+> -#define NR_IRQS				(IRQ_BOARD_START)
+> -
+>  #endif /* __ASM_MACH_IRQS_H */
+> diff --git a/arch/arm/mach-mmp/irq-mmp2.c b/arch/arm/mach-mmp/irq-mmp2.c
+> index d21c544..7895d27 100644
+> --- a/arch/arm/mach-mmp/irq-mmp2.c
+> +++ b/arch/arm/mach-mmp/irq-mmp2.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/io.h>
+>  
+> +#include <mach/irqs.h>
+>  #include <mach/regs-icu.h>
+>  #include <mach/mmp2.h>
+>  
+> diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
+> index 96cf5c8..8f80c31 100644
+> --- a/arch/arm/mach-mmp/jasper.c
+> +++ b/arch/arm/mach-mmp/jasper.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/mfd/max8925.h>
+>  #include <linux/interrupt.h>
+>  
+> +#include <mach/irqs.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  #include <mach/addr-map.h>
+> diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
+> index 8e3b5af0..d3ba655 100644
+> --- a/arch/arm/mach-mmp/tavorevb.c
+> +++ b/arch/arm/mach-mmp/tavorevb.c
+> @@ -102,6 +102,7 @@ static void __init tavorevb_init(void)
+>  
+>  MACHINE_START(TAVOREVB, "PXA910 Evaluation Board (aka TavorEVB)")
+>  	.map_io		= mmp_map_io,
+> +	.nr_irqs	= IRQ_BOARD_START,
+>  	.init_irq       = pxa910_init_irq,
+>  	.timer          = &pxa910_timer,
+>  	.init_machine   = tavorevb_init,
+> -- 
+> 1.7.5.4
+> 
