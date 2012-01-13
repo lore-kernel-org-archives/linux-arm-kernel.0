@@ -1,27 +1,32 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 13 Jan 2012 11:52:24 -0600
-Subject: [PATCH 10/11] ep93xx: Move EP93XX_SYSCON defines to SoC private
- header
-In-Reply-To: <1326251676-7593-11-git-send-email-rmallon@gmail.com>
+Date: Fri, 13 Jan 2012 11:54:52 -0600
+Subject: [PATCH 11/11] ep93xx: Remove unnecessary includes of ep93xx-regs.h
+In-Reply-To: <1326251676-7593-12-git-send-email-rmallon@gmail.com>
 References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-11-git-send-email-rmallon@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB13@AUSP01VMBX24.collaborationhost.net>
+ <1326251676-7593-12-git-send-email-rmallon@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB19@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday, January 10, 2012 8:15 PM, Ryan Mallon wrote:
->
-> The EP93XX_SYSCON defines are now no longer needed outside of
-> the EP93xx SoC core code, so they can be moved to a private header.
 > 
+> Remove the include of ep93xx-regs.h from files which no longer need
+> it, notably include/mach/hardware.h. An explict include of ep93xx-regs.h
+>  is needed in the EP93xx watchdog driver for the EP93XX_APB_IOMEM macro.
+>
 > Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 > Cc: Mika Westerberg <mika.westerberg@iki.fi>
 > Signed-off-by: Ryan Mallon <rmallon@gmail.com>
 > ---
->  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   90 -----------------------
->  arch/arm/mach-ep93xx/soc.h                      |   90 +++++++++++++++++++++++
->  2 files changed, 90 insertions(+), 90 deletions(-)
+>  arch/arm/mach-ep93xx/crunch.c                |    2 +-
+>  arch/arm/mach-ep93xx/include/mach/hardware.h |    1 -
+>  arch/arm/mach-ep93xx/soc.h                   |    2 ++
+>  drivers/watchdog/ep93xx_wdt.c                |    1 +
+>  4 files changed, 4 insertions(+), 2 deletions(-)
 
-Looks good.
+My patch to convert the watchdog driver to a platform device using the
+WatchDog Timer Core will also remove the need to include ep93xx-regs.h.
+
+But for now this looks good.
 
 Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
