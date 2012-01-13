@@ -1,71 +1,76 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Fri, 13 Jan 2012 14:33:54 +0900
-Subject: [PATCH 4/4] drivers/media/video/s5p-mfc/s5p_mfc.c: adjust double
- test
-In-Reply-To: <1326403988-872-5-git-send-email-Julia.Lawall@lip6.fr>
-References: <1326403988-872-1-git-send-email-Julia.Lawall@lip6.fr>
- <1326403988-872-5-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <CAH9JG2VcYqqvS6uu1upemTrfD_Cfq+4qh6VR=cxRFUT84g9MmQ@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 13 Jan 2012 06:14:17 +0000
+Subject: [PATCH v2 4/5] arm/dts: OMAP3: Add interrupt-controller
+ bindings for INTC
+In-Reply-To: <1324388398-2683-5-git-send-email-b-cousson@ti.com>
+References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
+ <1324388398-2683-5-git-send-email-b-cousson@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317A43FC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All patches.
-
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-
-To Marek,
-Please collect all patches and send git request pull.
-
-Thank you,
-Kyungmin Park
-
-On 1/13/12, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
->
-> Rewrite a duplicated test to test the correct value
->
-> The semantic match that finds this problem is as follows:
-> (http://coccinelle.lip6.fr/)
->
-> // <smpl>
-> @@
-> expression E;
-> @@
->
-> (
-> * E
->   || ... || E
-> |
-> * E
->   && ... && E
-> )
-> // </smpl>
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->
+On Tue, Dec 20, 2011 at 19:09:57, Cousson, Benoit wrote:
+> Update the DTS with the proper information required by the
+> INTC bindings.
+> 
+> - Add the number of interrupt lines
+> - Add the reg and the compatible entries.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
 > ---
->  drivers/media/video/s5p-mfc/s5p_mfc.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/media/video/s5p-mfc/s5p_mfc.c
-> b/drivers/media/video/s5p-mfc/s5p_mfc.c
-> index 8be8b54..53126f2 100644
-> --- a/drivers/media/video/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/video/s5p-mfc/s5p_mfc.c
-> @@ -475,7 +475,7 @@ static void s5p_mfc_handle_seq_done(struct s5p_mfc_ctx
-> *ctx,
->  			ctx->mv_size = 0;
->  		}
->  		ctx->dpb_count = s5p_mfc_get_dpb_count();
-> -		if (ctx->img_width == 0 || ctx->img_width == 0)
-> +		if (ctx->img_width == 0 || ctx->img_height == 0)
->  			ctx->state = MFCINST_ERROR;
->  		else
->  			ctx->state = MFCINST_HEAD_PARSED;
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+>  arch/arm/boot/dts/omap3.dtsi |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index d202bb5..6866dc7 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -54,10 +54,12 @@
+>  		ranges;
+>  		ti,hwmods = "l3_main";
+>  
+> -		intc: interrupt-controller at 1 {
+> -			compatible = "ti,omap3-intc";
+> +		intc: interrupt-controller at 48200000 {
+> +			compatible = "ti,omap2-intc";
+>  			interrupt-controller;
+>  			#interrupt-cells = <1>;
+> +			ti,intc-size = <96>;
+Can we configure/change this field in platform specific .dts file?
+OR
+Is there condition based configuration possible in DT?
+
+To be specific,
+
+I am adding support for AM335x EVM (using all your DT support patches),
+The device is considered as OMAP3 variant and when it comes to INTC support,
+I need to configure it to value "128", rest everything is same 
+(including base add).
+
+Can I do something like
+
+File - am335x-evm.dts
+
+/include/ "omap3.dtsi"
+
+....
+Again change the specific fields of " intc: interrupt-controller"?
+....
+
+How can this be handled?
+
+Thanks,
+Vaibhav
+> +			reg = <0x48200000 0x1000>;
+>  		};
+>  	};
+>  };
+> -- 
+> 1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
