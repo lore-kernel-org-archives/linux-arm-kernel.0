@@ -1,81 +1,27 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 13 Jan 2012 11:51:04 -0600
-Subject: [PATCH 09/11] ep93xx: Move crunch code to mach-ep93xx directory
-In-Reply-To: <1326251676-7593-10-git-send-email-rmallon@gmail.com>
+Date: Fri, 13 Jan 2012 11:52:24 -0600
+Subject: [PATCH 10/11] ep93xx: Move EP93XX_SYSCON defines to SoC private
+ header
+In-Reply-To: <1326251676-7593-11-git-send-email-rmallon@gmail.com>
 References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-10-git-send-email-rmallon@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB11@AUSP01VMBX24.collaborationhost.net>
+ <1326251676-7593-11-git-send-email-rmallon@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB13@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday, January 10, 2012 8:15 PM, Ryan Mallon wrote:
 >
-> The crunch code in arch/arm/kernel is specific to the EP93xx. Move
-> it to the mach-ep93xx directory. This removes the need for the
-> EP93XX_SYSCON defines to be exported to arch/arm/kernel.
+> The EP93XX_SYSCON defines are now no longer needed outside of
+> the EP93xx SoC core code, so they can be moved to a private header.
 > 
 > Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 > Cc: Mika Westerberg <mika.westerberg@iki.fi>
-> Cc: Russell King <linux@arm.linux.org.uk>
 > Signed-off-by: Ryan Mallon <rmallon@gmail.com>
 > ---
->  arch/arm/kernel/Makefile                       |    3 ---
->  arch/arm/mach-ep93xx/Makefile                  |    3 +++
->  arch/arm/{kernel => mach-ep93xx}/crunch-bits.S |    0
->  arch/arm/{kernel => mach-ep93xx}/crunch.c      |    2 ++
->  4 files changed, 5 insertions(+), 3 deletions(-)  rename arch/arm/{kernel => mach-ep93xx}/crunch-bits.S (100%)  rename arch/arm/{kernel => mach-ep93xx}/crunch.c (99%)
->
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile index 16eed6a..57aa6c9 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -62,9 +62,6 @@ obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
->  CFLAGS_swp_emulate.o		:= -Wa,-march=armv7-a
->  obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
->  
-> -obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
-> -AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
-> -
->  obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
->  obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
->  obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
-> diff --git a/arch/arm/mach-ep93xx/Makefile b/arch/arm/mach-ep93xx/Makefile index 574209d..0dc51f9 100644
-> --- a/arch/arm/mach-ep93xx/Makefile
-> +++ b/arch/arm/mach-ep93xx/Makefile
-> @@ -8,6 +8,9 @@ obj-			:=
->  
->  obj-$(CONFIG_EP93XX_DMA)	+= dma.o
->  
-> +obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
-> +AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
-> +
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   90 -----------------------
+>  arch/arm/mach-ep93xx/soc.h                      |   90 +++++++++++++++++++++++
+>  2 files changed, 90 insertions(+), 90 deletions(-)
 
-Nitpick... Care to align the core stuff above this while you are touching this file?
-
-Also, does the compile order matter here? Should the crunch stuff come before
-the dma driver?
-
->  obj-$(CONFIG_MACH_ADSSPHERE)	+= adssphere.o
->  obj-$(CONFIG_MACH_EDB93XX)	+= edb93xx.o
->  obj-$(CONFIG_MACH_GESBC9312)	+= gesbc9312.o
-> diff --git a/arch/arm/kernel/crunch-bits.S b/arch/arm/mach-ep93xx/crunch-bits.S
-> similarity index 100%
-> rename from arch/arm/kernel/crunch-bits.S rename to arch/arm/mach-ep93xx/crunch-bits.S
-> diff --git a/arch/arm/kernel/crunch.c b/arch/arm/mach-ep93xx/crunch.c similarity index 99% rename from arch/arm/kernel/crunch.c rename to arch/arm/mach-ep93xx/crunch.c index > 25ef223..d05ed0b 100644
-> --- a/arch/arm/kernel/crunch.c
-> +++ b/arch/arm/mach-ep93xx/crunch.c
-> @@ -19,6 +19,8 @@
->  #include <mach/ep93xx-regs.h>
->  #include <asm/thread_notify.h>
->  
-> +#include "soc.h"
-> +
->  struct crunch_state *crunch_owner;
->  
->  void crunch_task_release(struct thread_info *thread)
-
-While you are moving this, is there anything you can do about the sparse
-warning regarding the crunch_owner variable?
-
-Regardless, looks good.
+Looks good.
 
 Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
