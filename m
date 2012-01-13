@@ -1,110 +1,52 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 13 Jan 2012 14:27:34 +0000
-Subject: [PATCH v2 4/5] arm/dts: OMAP3: Add interrupt-controller
- bindings for INTC
-In-Reply-To: <4F102B24.7090302@ti.com>
-References: <1324388398-2683-1-git-send-email-b-cousson@ti.com>
- <1324388398-2683-5-git-send-email-b-cousson@ti.com>
- <79CD15C6BA57404B839C016229A409A8317A43FC@DBDE01.ent.ti.com>
- <4F100F6B.2050303@ti.com>
- <79CD15C6BA57404B839C016229A409A8317A4E77@DBDE01.ent.ti.com>
- <4F102B24.7090302@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317A5112@DBDE01.ent.ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 13 Jan 2012 14:27:52 +0000
+Subject: [PATCH v2 5/7] ARM: imx: remove incorrect BSYM usage
+In-Reply-To: <1326389476-11569-6-git-send-email-robherring2@gmail.com>
+References: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
+ <1326389476-11569-6-git-send-email-robherring2@gmail.com>
+Message-ID: <20120113142752.GF2227@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 18:31:24, Cousson, Benoit wrote:
-> On 1/13/2012 1:31 PM, Hiremath, Vaibhav wrote:
-> > On Fri, Jan 13, 2012 at 16:33:07, Cousson, Benoit wrote:
-> >> Hi Vaibhav,
-> >>
-> >> On 1/13/2012 7:14 AM, Hiremath, Vaibhav wrote:
-> >>> On Tue, Dec 20, 2011 at 19:09:57, Cousson, Benoit wrote:
-> >>
-> >> [...]
-> >>
-> >>>> +++ b/arch/arm/boot/dts/omap3.dtsi
-> >>>> @@ -54,10 +54,12 @@
-> >>>>    		ranges;
-> >>>>    		ti,hwmods = "l3_main";
-> >>>>
-> >>>> -		intc: interrupt-controller at 1 {
-> >>>> -			compatible = "ti,omap3-intc";
-> >>>> +		intc: interrupt-controller at 48200000 {
-> >>>> +			compatible = "ti,omap2-intc";
-> >>>>    			interrupt-controller;
-> >>>>    			#interrupt-cells =<1>;
-> >>>> +			ti,intc-size =<96>;
-> >>> Can we configure/change this field in platform specific .dts file?
-> >>> OR
-> >>> Is there condition based configuration possible in DT?
-> >>
-> >> I'm not sure to fully understand how your two options differ.
-> >> Otherwise, yes the DT it can be configured, that why I exposed this
-> >> attribute.
-> >> The intc code was already supporting the ti81xx with 128 lines as well,
-> >> hence the need to make it configurable.
-> >
-> > I wanted to use DT configuration completely here, using existing
-> > omap_init_irq.
-> > And I personally think, lets not use different implementation only because
-> > number of interrupts are different.
+On Thu, Jan 12, 2012 at 11:31:14AM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Sure, that was the goal of that binding. Anyway, my point was that the 
-> driver was already generic enough to handle OMAP2, OMAP3 and TI81xx.
+> BSYM macro is only needed for assembly files and its usage in c files is
+> wrong, so remove it. The linker will correctly set bit 0 for Thumb2
+> kernels.
 > 
-> >> The other option was two handle that in the driver with 2 different
-> >> compatible strings.
-> >>
-> >>> To be specific,
-> >>>
-> >>> I am adding support for AM335x EVM (using all your DT support patches),
-> >>> The device is considered as OMAP3 variant and when it comes to INTC support,
-> >>> I need to configure it to value "128", rest everything is same
-> >>> (including base add).
-> >>>
-> >>> Can I do something like
-> >>>
-> >>> File - am335x-evm.dts
-> >>>
-> >>> /include/ "omap3.dtsi"
-> >>>
-> >>> ....
-> >>> Again change the specific fields of " intc: interrupt-controller"?
-> >>
-> >> Yes.
-> >>
-> >>> ....
-> >>>
-> >>> How can this be handled?
-> >>
-> >> After the include, you can redefine the node and the hierarchy:
-> >>
-> >> +	ocp {
-> >> +		intc: interrupt-controller at 48200000 {
-> >> +			ti,intc-size =<128>;
-> >> +		};
-> >> ...
-> >>
-> >> or use the label directly:
-> >>
-> >> +&intc: {
-> >> +	ti,intc-size =<128>;
-> >> +}
-> >>
-> >> You can have a look at the way i2c or twl are using the include so far.
-> >>
-> > Thanks, I will trying this now...
-> > And if it works, then I can submit the patches...
-> 
-> Well, it should in theory :-)
-> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Dave Martin <dave.martin@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks Benoit, it is working. Submitting patches now...
+Acked-by: Dave Martin <dave.martin@linaro.org>
 
-Thanks,
-Vaibhav
-
-> Regards,
-> Benoit
+> ---
+>  arch/arm/mach-imx/src.c |    3 +--
+>  1 files changed, 1 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+> index 4bde04f..29bd124 100644
+> --- a/arch/arm/mach-imx/src.c
+> +++ b/arch/arm/mach-imx/src.c
+> @@ -15,7 +15,6 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/smp.h>
+> -#include <asm/unified.h>
+>  
+>  #define SRC_SCR				0x000
+>  #define SRC_GPR1			0x020
+> @@ -43,7 +42,7 @@ void imx_enable_cpu(int cpu, bool enable)
+>  void imx_set_cpu_jump(int cpu, void *jump_addr)
+>  {
+>  	cpu = cpu_logical_map(cpu);
+> -	writel_relaxed(BSYM(virt_to_phys(jump_addr)),
+> +	writel_relaxed(virt_to_phys(jump_addr),
+>  		       src_base + SRC_GPR1 + cpu * 8);
+>  }
+>  
+> -- 
+> 1.7.5.4
 > 
