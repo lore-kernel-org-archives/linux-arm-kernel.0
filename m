@@ -1,31 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jan 2012 16:52:13 +0000
-Subject: [RFC PATCH 03/10] ARM: mc146818rtc: remove unnecessary include
- of mach/irqs.h
-In-Reply-To: <1326472451-9002-4-git-send-email-robherring2@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Jan 2012 10:58:01 -0600
+Subject: [RFC PATCH 01/10] rtc: sa1100: include mach/irqs.h instead of
+ asm/irq.h
+In-Reply-To: <20120113164336.GA1068@n2100.arm.linux.org.uk>
 References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
- <1326472451-9002-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20120113165213.GB1068@n2100.arm.linux.org.uk>
+ <1326472451-9002-2-git-send-email-robherring2@gmail.com>
+ <20120113164336.GA1068@n2100.arm.linux.org.uk>
+Message-ID: <4F106299.8050306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 10:34:04AM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 01/13/2012 10:43 AM, Russell King - ARM Linux wrote:
+> On Fri, Jan 13, 2012 at 10:34:02AM -0600, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Since asm/irq.h may not include mach/irqs.h, include mach/irqs.h directly.
 > 
-> The include of mach/irqs.h isn't needed, so remove it. Compiled CMOS rtc
-> driver.
+> Rather than doing this, we should be eliminating the need for these
+> old drivers to include mach/irqs.h at all.
+> 
+> Adding the resources to the platform device, and then using at least
+> the IRQ resource(s) would be a definite step forward (and a relatively
+> easy one to do.)
+> 
 
-I'm not sure how safe this is - there are some drivers using mc146818rtc.h
-which get their IRQ via this header file (it's known as RTC_IRQ.)  So we
-need to verify that nothing breaks as a result of that definition going
-away when this file is included.
+Well, this has just happened in 3.3. So I can now drop this one I think.
 
-It looks like it's just drivers/char/rtc.c, which we don't use anymore
-on ARM.  So this should be safe.
+Rob
 
-It might be worth adding:
-
-#define RTC_IRQ BUILD_BUG_ON(true)
-
-or something like that, to catch any users of it (even though that'll then
-cause drivers/char/rtc.c to fail if built on ARM, which it shouldn't be.)
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>>  drivers/rtc/rtc-sa1100.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
+>> index 4595d3e..144fa06 100644
+>> --- a/drivers/rtc/rtc-sa1100.c
+>> +++ b/drivers/rtc/rtc-sa1100.c
+>> @@ -33,7 +33,7 @@
+>>  #include <linux/io.h>
+>>  
+>>  #include <mach/hardware.h>
+>> -#include <asm/irq.h>
+>> +#include <mach/irqs.h>
+>>  
+>>  #define RTC_DEF_DIVIDER		(32768 - 1)
+>>  #define RTC_DEF_TRIM		0
+>> -- 
+>> 1.7.5.4
+>>
