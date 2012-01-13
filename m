@@ -1,103 +1,149 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Jan 2012 18:28:29 +0000
-Subject: [PATCH v2 02/15] ARM: local timers: introduce a new registration
- interface
+Date: Fri, 13 Jan 2012 18:28:30 +0000
+Subject: [PATCH v2 03/15] ARM: smp_twd: add runtime registration support
 In-Reply-To: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
 References: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326479322-6033-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326479322-6033-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to switch to a runtime selectable local timer,
-add a registration interface that timer drivers can use to
-register to the core.
-
-local_timer_setup() and local_timer_stop() are made weak symbols
-in order not to break existing setups.
+Add support for the new registration interface to smp_twd.
+Platforms can populate a struct twd_local_timer with MMIO
+and IRQ resources, and then call twd_local_timer_register()
+to have the timer registered with the core.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/localtimer.h |   15 +++++++++++++++
- arch/arm/kernel/smp.c             |   27 +++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/smp_twd.h |   18 +++++++++++++-
+ arch/arm/kernel/smp_twd.c      |   51 +++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 65 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index 7e1b2c5..f088d63 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -15,6 +15,11 @@
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index bf8449d..16c89b7 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -18,10 +18,26 @@
+ #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
+ #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
  
++#include <linux/ioport.h>
++
  struct clock_event_device;
  
-+struct local_timer_ops {
-+	int  (*setup)(struct clock_event_device *);
-+	void (*stop)(struct clock_event_device *);
+ extern void __iomem *twd_base;
+ 
+-void twd_timer_setup(struct clock_event_device *);
++int twd_timer_setup(struct clock_event_device *);
++
++struct twd_local_timer {
++	struct resource	res[2];
 +};
 +
++#define DEFINE_TWD_LOCAL_TIMER(name,base,irq)	\
++struct twd_local_timer name __initdata = {	\
++	.res	= {				\
++		DEFINE_RES_MEM(base, 0x10),	\
++		DEFINE_RES_IRQ(irq),		\
++	},					\
++};
++
++int twd_local_timer_register(struct twd_local_timer *);
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 95a0c14..be245c7 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -32,6 +32,7 @@ static struct clk *twd_clk;
+ static unsigned long twd_timer_rate;
+ 
+ static struct clock_event_device __percpu **twd_evt;
++static int twd_ppi;
+ 
+ static void twd_set_mode(enum clock_event_mode mode,
+ 			struct clock_event_device *clk)
+@@ -227,7 +228,7 @@ static struct clk *twd_get_clock(void)
  /*
-  * Setup a per-cpu timer, whether it be a local timer or dummy broadcast
+  * Setup the local clock events for a CPU.
   */
-@@ -38,6 +43,11 @@ void local_timer_stop(struct clock_event_device *);
-  */
- int local_timer_setup(struct clock_event_device *);
- 
-+/*
-+ * Register a local timer driver
-+ */
-+int local_timer_register(struct local_timer_ops *);
-+
- #else
- 
- static inline int local_timer_setup(struct clock_event_device *evt)
-@@ -48,6 +58,11 @@ static inline int local_timer_setup(struct clock_event_device *evt)
- static inline void local_timer_stop(struct clock_event_device *evt)
+-void __cpuinit twd_timer_setup(struct clock_event_device *clk)
++int __cpuinit twd_timer_setup(struct clock_event_device *clk)
  {
- }
-+
-+static inline int local_timer_register(struct local_timer_ops *ops)
-+{
-+	return -ENXIO;
-+}
- #endif
+ 	struct clock_event_device **this_cpu_clk;
  
- #endif
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 57db122..52c66f5 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -475,6 +475,33 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
- 	clockevents_register_device(evt);
- }
+@@ -237,7 +238,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 		twd_evt = alloc_percpu(struct clock_event_device *);
+ 		if (!twd_evt) {
+ 			pr_err("twd: can't allocate memory\n");
+-			return;
++			return -ENOMEM;
+ 		}
  
-+static struct local_timer_ops *lt_ops;
+ 		err = request_percpu_irq(clk->irq, twd_handler,
+@@ -245,7 +246,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 		if (err) {
+ 			pr_err("twd: can't register interrupt %d (%d)\n",
+ 			       clk->irq, err);
+-			return;
++			return err;
+ 		}
+ 	}
+ 
+@@ -263,6 +264,8 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
++	if (!clk->irq)
++		clk->irq = twd_ppi;
+ 
+ 	this_cpu_clk = __this_cpu_ptr(twd_evt);
+ 	*this_cpu_clk = clk;
+@@ -270,4 +273,46 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clockevents_config_and_register(clk, twd_timer_rate,
+ 					0xf, 0xffffffff);
+ 	enable_percpu_irq(clk->irq, 0);
 +
-+#ifdef CONFIG_LOCAL_TIMERS
-+int local_timer_register(struct local_timer_ops *ops)
-+{
-+	if (lt_ops)
-+		return -EBUSY;
-+
-+	lt_ops = ops;
 +	return 0;
 +}
-+#endif
 +
-+int __attribute__ ((weak)) local_timer_setup(struct clock_event_device *clk)
++static struct local_timer_ops twd_lt_ops = {
++	.setup	= twd_timer_setup,
++	.stop	= twd_timer_stop,
++};
++
++int __init twd_local_timer_register(struct twd_local_timer *tlt)
 +{
-+	if (lt_ops)
-+		return lt_ops->setup(clk);
++	int err;
 +
-+	return -ENXIO;
-+}
++	if (twd_base || twd_evt)
++		return -EBUSY;
 +
-+void __attribute__ ((weak)) local_timer_stop(struct clock_event_device *clk)
-+{
-+	if (lt_ops)
-+		lt_ops->stop(clk);
-+}
++	twd_ppi	= tlt->res[1].start;
 +
- void __cpuinit percpu_timer_setup(void)
- {
- 	unsigned int cpu = smp_processor_id();
++	twd_evt = alloc_percpu(struct clock_event_device *);
++	twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
++	if (!twd_base || !twd_evt) {
++		err = -ENOMEM;
++		goto out;
++	}
++
++	err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_evt);
++	if (err) {
++		pr_err("twd: can't register interrupt %d (%d)\n", twd_ppi, err);
++		goto out;
++	}
++
++	err = local_timer_register(&twd_lt_ops);
++	if (err)
++		goto out;
++
++	return 0;
++
++out:
++	iounmap(twd_base);
++	free_percpu(twd_evt);
++	twd_base = twd_evt = NULL;
++	return err;
+ }
 -- 
 1.7.7.1
