@@ -1,63 +1,25 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 13 Jan 2012 11:18:31 -0600
-Subject: [PATCH 01/11] ep93xx: Move PHYS_BASE defines to local SoC
- header file
-In-Reply-To: <1326251676-7593-2-git-send-email-rmallon@gmail.com>
+Date: Fri, 13 Jan 2012 11:22:36 -0600
+Subject: [PATCH 02/11] ep93xx: Move GPIO defines to gpio-ep93xx.h
+In-Reply-To: <1326251676-7593-3-git-send-email-rmallon@gmail.com>
 References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-2-git-send-email-rmallon@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBAE8@AUSP01VMBX24.collaborationhost.net>
+ <1326251676-7593-3-git-send-email-rmallon@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBAEF@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday, January 10, 2012 8:14 PM, Ryan Mallon wrote:
 >
-> The PHYS_BASE defines in arch/arm/mach-ep93xx/include/mach-ep93xx-regs.h
-> are only used in the SoC code. Move the defines to a local header file.
->
 > Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 > Cc: Mika Westerberg <mika.westerberg@iki.fi>
 > Signed-off-by: Ryan Mallon <rmallon@gmail.com>
 > ---
->  arch/arm/mach-ep93xx/adssphere.c                |    1 +
->  arch/arm/mach-ep93xx/edb93xx.c                  |    2 +
->  arch/arm/mach-ep93xx/gesbc9312.c                |    1 +
->  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   34 ---------------
->  arch/arm/mach-ep93xx/micro9.c                   |    1 +
->  arch/arm/mach-ep93xx/simone.c                   |    2 +
->  arch/arm/mach-ep93xx/snappercl15.c              |    2 +
->  arch/arm/mach-ep93xx/soc.h                      |   50 +++++++++++++++++++++++
->  arch/arm/mach-ep93xx/ts72xx.c                   |    2 +
->  arch/arm/mach-ep93xx/vision_ep9307.c            |    2 +
->  10 files changed, 63 insertions(+), 34 deletions(-)  create mode 100644 arch/arm/mach-ep93xx/soc.h
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    8 --------
+>  arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |   10 ++++++++++
+>  2 files changed, 10 insertions(+), 8 deletions(-)
 
-<snip>
+Nitpick... You should add a commit comment.
 
-> diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c index 70ef8c5..24df3ff 100644
-> --- a/arch/arm/mach-ep93xx/edb93xx.c
-> +++ b/arch/arm/mach-ep93xx/edb93xx.c
-> @@ -42,6 +42,8 @@
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
->  
-> +#include "soc.h"
-> +
- 
-Nitpick... Unnecessary whitespace...
-
-<snip>
-
-> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c index 8b2f143..f5965db 100644
-> --- a/arch/arm/mach-ep93xx/ts72xx.c
-> +++ b/arch/arm/mach-ep93xx/ts72xx.c
-> @@ -27,6 +27,8 @@
->  #include <asm/mach/map.h>
->  #include <asm/mach/arch.h>
->  
-> +#include "soc.h"
-> +
-
-Nitpick... Unnecessary whitespace...
- 
-Other than that... Looks ok.
+Other than that, looks good.
 
 Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
