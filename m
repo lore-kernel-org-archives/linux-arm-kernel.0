@@ -1,66 +1,96 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Fri, 13 Jan 2012 22:03:00 +0100
-Subject: [PATCH] video: s3c-fb: Add device tree support
-In-Reply-To: <1326139307-25112-1-git-send-email-thomas.abraham@linaro.org>
-References: <1326139307-25112-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F109C04.5090600@gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Sat, 14 Jan 2012 08:16:53 +1100
+Subject: [PATCH 09/11] ep93xx: Move crunch code to mach-ep93xx directory
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB11@AUSP01VMBX24.collaborationhost.net>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+ <1326251676-7593-10-git-send-email-rmallon@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F001F3F99EBB11@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F109F45.9020105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2012 09:01 PM, Thomas Abraham wrote:
+On 14/01/12 04:51, H Hartley Sweeten wrote:
+> On Tuesday, January 10, 2012 8:15 PM, Ryan Mallon wrote:
+>> The crunch code in arch/arm/kernel is specific to the EP93xx. Move
+>> it to the mach-ep93xx directory. This removes the need for the
+>> EP93XX_SYSCON defines to be exported to arch/arm/kernel.
+>>
+>> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+>> Cc: Mika Westerberg <mika.westerberg@iki.fi>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+>> ---
+>>  arch/arm/kernel/Makefile                       |    3 ---
+>>  arch/arm/mach-ep93xx/Makefile                  |    3 +++
+>>  arch/arm/{kernel => mach-ep93xx}/crunch-bits.S |    0
+>>  arch/arm/{kernel => mach-ep93xx}/crunch.c      |    2 ++
+>>  4 files changed, 5 insertions(+), 3 deletions(-)  rename arch/arm/{kernel => mach-ep93xx}/crunch-bits.S (100%)  rename arch/arm/{kernel => mach-ep93xx}/crunch.c (99%)
+>>
+>> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile index 16eed6a..57aa6c9 100644
+>> --- a/arch/arm/kernel/Makefile
+>> +++ b/arch/arm/kernel/Makefile
+>> @@ -62,9 +62,6 @@ obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
+>>  CFLAGS_swp_emulate.o		:= -Wa,-march=armv7-a
+>>  obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+>>  
+>> -obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+>> -AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+>> -
+>>  obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
+>>  obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+>>  obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
+>> diff --git a/arch/arm/mach-ep93xx/Makefile b/arch/arm/mach-ep93xx/Makefile index 574209d..0dc51f9 100644
+>> --- a/arch/arm/mach-ep93xx/Makefile
+>> +++ b/arch/arm/mach-ep93xx/Makefile
+>> @@ -8,6 +8,9 @@ obj-			:=
+>>  
+>>  obj-$(CONFIG_EP93XX_DMA)	+= dma.o
+>>  
+>> +obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+>> +AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+>> +
+> Nitpick... Care to align the core stuff above this while you are touching this file?
 >
-> +	for (idx = 0; idx<  nr_gpios; idx++) {
-> +		gpio = of_get_gpio(dev->of_node, idx);
-> +		if (!gpio_is_valid(gpio)) {
-> +			dev_err(dev, "invalid gpio[%d]: %d\n", idx, gpio);
-> +			return -EINVAL;
-> +		}
-> +
-> +		if (!request)
-> +			continue;
-> +
-> +		ret = gpio_request(gpio, "fimd");
+> Also, does the compile order matter here? Should the crunch stuff come before
+> the dma driver?
 
-Is it how it normally is supposed to be done, i.e. configuring a gpio
-_before_ it has been requested ? of_get_gpio() indirectly touches the
-gpio controller and gpio_request() doesn't seem to serve its purpose
-in this case, i.e. if there is situation like:
+I was hoping that Russell would make some comment here about whether
+moving this file out of arch/arm/kernel is okay to do. I assume it had
+some reason to be there in the first place. I have only done build
+testing so far since I don't have any ep93xx hardware to test on, and
+have never actually used crunch anyway.
 
-driver A                        driver B
+I don't want to make unnecessary changes in this patch. I think the
+include of "soc.h" should actually get moved to the next patch also, so
+that this patch becomes a straight out move.
 
-of_get_gpio(nodeA, gpioA);
-                                of_get_gpio(nodeB, gpioA);
-gpio_request(gpioA);
-                                gpio_request(gpioB);
+>>  obj-$(CONFIG_MACH_ADSSPHERE)	+= adssphere.o
+>>  obj-$(CONFIG_MACH_EDB93XX)	+= edb93xx.o
+>>  obj-$(CONFIG_MACH_GESBC9312)	+= gesbc9312.o
+>> diff --git a/arch/arm/kernel/crunch-bits.S b/arch/arm/mach-ep93xx/crunch-bits.S
+>> similarity index 100%
+>> rename from arch/arm/kernel/crunch-bits.S rename to arch/arm/mach-ep93xx/crunch-bits.S
+>> diff --git a/arch/arm/kernel/crunch.c b/arch/arm/mach-ep93xx/crunch.c similarity index 99% rename from arch/arm/kernel/crunch.c rename to arch/arm/mach-ep93xx/crunch.c index > 25ef223..d05ed0b 100644
+>> --- a/arch/arm/kernel/crunch.c
+>> +++ b/arch/arm/mach-ep93xx/crunch.c
+>> @@ -19,6 +19,8 @@
+>>  #include <mach/ep93xx-regs.h>
+>>  #include <asm/thread_notify.h>
+>>  
+>> +#include "soc.h"
+>> +
+>>  struct crunch_state *crunch_owner;
+>>  
+>>  void crunch_task_release(struct thread_info *thread)
+> While you are moving this, is there anything you can do about the sparse
+> warning regarding the crunch_owner variable?
+>
 
-driver B will end up with configuration of gpioA from nodeA, not from 
-nodeB. 
+What is the warning?
 
-As there are few drivers doing that I must be missing something,
-not sure what..
-I realize the GPIO number needs to be known in order for a GPIO to be
-requested. Shouldn't of_get_gpio() be extended to allow locking gpio
-controller's module and marking a GPIO as requested in advance ?
-
-> +		if (ret) {
-> +			dev_err(dev, "gpio [%d] request failed\n", gpio);
-> +			goto gpio_free;
-> +		}
-> +		sfb->gpios[idx] = gpio;
-> +	}
-> +	return 0;
-> +
-> +gpio_free:
-> +	while (--idx>= 0)
-> +		gpio_free(sfb->gpios[idx]);
-> +	return ret;
-> +}
-> +
-> +static void s3c_fb_dt_free_gpios(struct s3c_fb *sfb)
-> +{
-> +	unsigned int idx, nr_gpio;
-> +
-> +	nr_gpio = sfb->pdata->win[0]->max_bpp + 4;
-> +	for (idx = 0; idx<  nr_gpio; idx++)
-> +		gpio_free(sfb->gpios[idx]);
-> +}
+> Regardless, looks good.
+>
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>
+Thanks,
+~Ryan
