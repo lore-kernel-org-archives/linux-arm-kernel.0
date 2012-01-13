@@ -1,85 +1,55 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 13 Jan 2012 14:09:31 +0000
-Subject: [PATCH v2 1/7] ARM: versatile: Add missing ENDPROC to headsmp.S
-In-Reply-To: <1326389476-11569-2-git-send-email-robherring2@gmail.com>
+Date: Fri, 13 Jan 2012 14:10:44 +0000
+Subject: [PATCH v2 7/7] ARM: make BSYM macro assembly only
+In-Reply-To: <1326389476-11569-8-git-send-email-robherring2@gmail.com>
 References: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
- <1326389476-11569-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20120113140931.GB2227@linaro.org>
+ <1326389476-11569-8-git-send-email-robherring2@gmail.com>
+Message-ID: <20120113141044.GC2227@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 11:31:10AM -0600, Rob Herring wrote:
-> From: Pawel Moll <pawel.moll@arm.com>
+On Thu, Jan 12, 2012 at 11:31:16AM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Once the ENDPROC is in place, BSYM() in not longer necessary
-> to get correct pointer to versatile_secondary_startup().
+> BSYM macro is only needed for assembly files and its usage in c files is
+> wrong, so only define it for assembly.
 > 
-> Tested-by: Jon Medhurst <tixy@linaro.org>
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Dave Martin <dave.martin@linaro.org>
+
+I already acked the previously posted version, but it's essentially the
+same, so:
 
 Acked-by: Dave Martin <dave.martin@linaro.org>
 
 > ---
->  arch/arm/mach-realview/platsmp.c  |    3 +--
->  arch/arm/mach-vexpress/platsmp.c  |    4 +---
->  arch/arm/plat-versatile/headsmp.S |    1 +
->  3 files changed, 3 insertions(+), 5 deletions(-)
+>  arch/arm/include/asm/unified.h |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-> index e83c654..17c878d 100644
-> --- a/arch/arm/mach-realview/platsmp.c
-> +++ b/arch/arm/mach-realview/platsmp.c
-> @@ -17,7 +17,6 @@
->  #include <asm/hardware/gic.h>
->  #include <asm/mach-types.h>
->  #include <asm/smp_scu.h>
-> -#include <asm/unified.h>
+> diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
+> index bc63116..f5989f4 100644
+> --- a/arch/arm/include/asm/unified.h
+> +++ b/arch/arm/include/asm/unified.h
+> @@ -37,8 +37,8 @@
+>  #define THUMB(x...)	x
+>  #ifdef __ASSEMBLY__
+>  #define W(instr)	instr.w
+> -#endif
+>  #define BSYM(sym)	sym + 1
+> +#endif
 >  
->  #include <mach/board-eb.h>
->  #include <mach/board-pb11mp.h>
-> @@ -75,6 +74,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
->  	 * until it receives a soft interrupt, and then the
->  	 * secondary CPU branches to this address.
->  	 */
-> -	__raw_writel(BSYM(virt_to_phys(versatile_secondary_startup)),
-> +	__raw_writel(virt_to_phys(versatile_secondary_startup),
->  		     __io_address(REALVIEW_SYS_FLAGSSET));
->  }
-> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-> index 2b5f7ac..124ffb1 100644
-> --- a/arch/arm/mach-vexpress/platsmp.c
-> +++ b/arch/arm/mach-vexpress/platsmp.c
-> @@ -13,8 +13,6 @@
->  #include <linux/smp.h>
->  #include <linux/io.h>
+>  #else	/* !CONFIG_THUMB2_KERNEL */
 >  
-> -#include <asm/unified.h>
-> -
->  #include <mach/motherboard.h>
->  #define V2M_PA_CS7 0x10000000
+> @@ -49,8 +49,8 @@
+>  #define THUMB(x...)
+>  #ifdef __ASSEMBLY__
+>  #define W(instr)	instr
+> -#endif
+>  #define BSYM(sym)	sym
+> +#endif
 >  
-> @@ -46,6 +44,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
->  	 * secondary CPU branches to this address.
->  	 */
->  	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
-> -	writel(BSYM(virt_to_phys(versatile_secondary_startup)),
-> +	writel(virt_to_phys(versatile_secondary_startup),
->  		MMIO_P2V(V2M_SYS_FLAGSSET));
->  }
-> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-> index d397a1f..dd703ef 100644
-> --- a/arch/arm/plat-versatile/headsmp.S
-> +++ b/arch/arm/plat-versatile/headsmp.S
-> @@ -38,3 +38,4 @@ pen:	ldr	r7, [r6]
->  	.align
->  1:	.long	.
->  	.long	pen_release
-> +ENDPROC(versatile_secondary_startup)
+>  #endif	/* CONFIG_THUMB2_KERNEL */
+>  
 > -- 
 > 1.7.5.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
