@@ -1,57 +1,87 @@
-From: rajanikanth.hv@stericsson.com (Rajanikanth H V)
-Date: Fri, 13 Jan 2012 15:36:39 +0100
-Subject: tty/serial: Need clarification on Support for 4+M Baudrate
-In-Reply-To: <20120112143900.27b92668@pyramind.ukuu.org.uk>
-References: <20120111121901.GA4034@bnru05>
- <20120111123025.244a9cf5@pyramind.ukuu.org.uk>
- <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A605A@EXDCVYMBSTM005.EQ1STM.local>
- <20120112114913.21809bed@pyramind.ukuu.org.uk>
- <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A630D@EXDCVYMBSTM005.EQ1STM.local>
- <20120112143900.27b92668@pyramind.ukuu.org.uk>
-Message-ID: <2B1D156D95AE9B4EAD379CB9E465FE7324AF2F2087@EXDCVYMBSTM005.EQ1STM.local>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 13 Jan 2012 15:41:04 +0100
+Subject: omap clocksource timer selection: dmtimer OR 32K-Sync timer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A8317A4FD9@DBDE01.ent.ti.com>
+References: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
+ <CAMQu2gxYQOHX8n2RLfkLBw5hQMdvH389DfrguLtzpLcpmqBQMA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A8317A4FD9@DBDE01.ent.ti.com>
+Message-ID: <CAMQu2gxkBV87YQE7SPmLXh0RZBR+SNHzHE5H-PVjuef+1UZp8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, explicit termios(with flags) structure usage helped(log below), however, 
-the dependent Bluetooth uart driver switches the uart baud rates
-between 115K(during initialization), 9600(during low power) and
-4+M(data tfr), in this juncture I need to handle termios structure switching
-accordingly else I see c_cflags getting messed up effecting next baud switch change.
+On Fri, Jan 13, 2012 at 2:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> On Fri, Jan 13, 2012 at 18:19:24, Shilimkar, Santosh wrote:
+>> On Fri, Jan 13, 2012 at 1:21 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+>> > Hi,
+>> >
+>> > In case of AM33xx family of devices, we do not have 32K Sync timer
+>> > (32K Counter) available; and the current implementation is based on
+>> > compile-time option, where clock-source is chosen by something like,
+>> >
+>> > File - arch/arm/mach-omap2/timer.c
+>> >
+>> > #ifdef CONFIG_OMAP_32K_TIMER
+>> > static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+>> > {
+>> > ...
+>> > }
+>> > #else
+>> > static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+>> > {
+>> > ...
+>> > }
+>> > #endif
+>> >
+>> >
+>> > But in order to support multi-omap build, we must
+>> > make run-time decision to use the timer for kernel clock-source, either of -
+>> >
+>> > ?- DMTIMER
+>> > ?- 32K Sync Timer
+>> >
+>> > The DMTIMER is already migrated to the HWMOD framework, but 32K Timer code
+>> > has not yet migrated to it. So the question here is,
+>> >
+>> > 1) Does it make sense to migrate counter_32k.c to search entry in hwmod
+>> > ? table and if 32k_sync timer is available in hwmod table then use 32K
+>> > ? timer for Kernel clock-source
+>> > ? OR
+>> > ? Fall back to DMTIMER.
+>> >
+>> > ? OMAP4 hwmod table already has entry,
+>> >
+>> > ? static struct omap_hwmod omap44xx_counter_32k_hwmod = {
+>> > ? ? ? ? .name ? ? ? ? ? = "counter_32k",
+>> > ? ...
+>> > ? };
+>> >
+>> > ? We need to have similar entries in all devices where 32K timer is present.
+>> >
+>> > 2) OR simply add another cpu_is_am33xx() and then fall back to dmtimer?
+>> > ? Just to prove this, everything works here, I modified the code for this
+>> > ? and tested it on both AM335x EVM and AM37xEVM and it works fine for me.
+>> >
+>> >
+>> > Any comments?? OR Better approach? OR anything which I am missing here?
+>> >
+>> You can register both the clock sources together with different
+>> rating. Based on rating
+>> timer code will automatically pick the better clock-source of two.
+>> Ratings is based on the resolution of the timer.
+>>
+> Santosh,
+>
+> ?- Still current compile time implementation must be changed/cleaned, right?
+Yes. But that should be trivial.
 
-================================
-[    9.070648] alloc_set_baud_rate_cmd Setting arbitrary baudrate using BOTHER baudrate:89 c_cflag:020000016260
-[    9.164581] tty_termios_encode_baud_rate c_ispeed:4050000 c_ospeed:4050000 c_cflag:020000016260
-[    9.173278] tty_termios_encode_baud_rate checking precise weird baudrate c_cflag:020000006260 oclose:0 iclose:81000 ibinput:0
-[    9.187103] tty_termios_encode_baud_rate did we find close match? i:31 n_baud_table31 ifound:30 ofound:-1
-[    9.197570] tty_termios_encode_baud_rate BOTHER, c_cflag:022003616260
-[    9.214630] tty_termios_baud_rate:(Arb'ry baud set) c_cflag:022003616260 cbaud:010000
-[    9.222503] pl011_set_termios i_speed:4050000 o_speed:4050000
-[    9.231384] tty_termios_baud_rate:(Arb'ry baud set) c_cflag:022003616260 cbaud:010000
-[    9.246643] pl011_set_termios baud:4050000 uart_clk:38400000 port:0 IBRD:1 FBRD:12
-[    9.254730] XXXXXX-uart XXXXXX-uart.0: Baud rate changed to 4050000 baud
-================================
+> ?- The 32k timer doesn't exist at all on AM33xx device, so you can not
+> ? (and should not) Register this timer.
+>
+Well there are many init call happens on various IP's which are not supported
+across SOCs.
 
-Thanks,
-Rajanikanth
+Look at L2X0 cache init for example. In such cases you just return by not
+doing anything on that hardware IP.
 
-> 4.05M Arbitrary Baud Setting Sequence:
-> [    9.664703] alloc_set_baud_rate_cmd Setting arbitrary baudrate using BOTHER baudrate:89 c_cflag:020000016262
-> [    9.774658] XXXXXX_hci_uart_set_baudrate c_cflag:020000016262 baud:4050000
-
-4050000 seems a bit odd - you want cflag&CBAUD == BOTHER so I'd expect
-the low bits to end rather different things to 6262 ?
-
-So something like
-
-	struct ktermios new = *tty->termios;
-	new.c_cflag &= ~(CBAUD|CIBAUD);
-	new.c_cflag |= BOTHER;
-	new.c_ispeed = 4050000;
-	new.c_ospeed = 4050000;
-	tty_set_termios(tty, &new);	/* Can sleep */
-
-	/* Returned new will now hold actual values selected */
-
-should do the trick providing the low level driver supports the rate.
-
-Alan
+Regards
+Santosh
