@@ -1,34 +1,58 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Fri, 13 Jan 2012 12:07:28 +0100
-Subject: [PATCH] ARM: OMAP3: fix build on !CONFIG_IOMMU_API
-In-Reply-To: <1326288491-25146-1-git-send-email-ohad@wizery.com>
-References: <1326288491-25146-1-git-send-email-ohad@wizery.com>
-Message-ID: <20120113110728.GC2275@amd.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 13 Jan 2012 12:10:47 +0100
+Subject: [PATCH RFC] ARM: at91: removal of CAP9 SoC family
+In-Reply-To: <1325864033-20012-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1325864033-20012-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4F101137.1020804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 03:28:11PM +0200, Ohad Ben-Cohen wrote:
-> omap3isp depends on CONFIG_IOMMU_API, so avoid registering its
-> device (and defining its configuration structs) on !CONFIG_IOMMU_API.
+On 01/06/2012 04:33 PM, Nicolas Ferre :
+> Atmel CAP9 family is not maintained well and products may be
+> difficult to find now. It will allow to save workforce and
+> remove LOC during current cleanup process.
 > 
-> This is generally nice to have, but more importantly, it fixes:
-> 
-> arch/arm/plat-omap/include/plat/iommu.h: In function 'dev_to_omap_iommu':
-> arch/arm/plat-omap/include/plat/iommu.h:135: error: 'struct
-> dev_archdata' has no member named 'iommu'
-> arch/arm/mach-omap2/devices.c: In function 'omap3_init_camera':
-> arch/arm/mach-omap2/devices.c:222: error: 'struct dev_archdata' has no
-> member named 'iommu'
-> make[1]: *** [arch/arm/mach-omap2/devices.o] Error 1
-> make: *** [arch/arm/mach-omap2] Error 2
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  Documentation/feature-removal-schedule.txt |   14 ++++++++++++++
+>  1 files changed, 14 insertions(+), 0 deletions(-)
 
-Will apply it as soon as the merge window closes.
+Hi Andrew, Greg,
 
-	Joerg
+Can you please take this patch or is somebody else in charge of this file?
+
+It it is going to mainline through you, can you add also:
+
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+Or tell me to resend a complete patch.
+
+Thanks for your help, best regards,
+
+
+> diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
+> index 3d84912..23dfea5 100644
+> --- a/Documentation/feature-removal-schedule.txt
+> +++ b/Documentation/feature-removal-schedule.txt
+> @@ -551,3 +551,17 @@ When:	3.5
+>  Why:	The iwlagn module has been renamed iwlwifi.  The alias will be around
+>  	for backward compatibility for several cycles and then dropped.
+>  Who:	Don Fry <donald.h.fry@intel.com>
+> +
+> +----------------------------
+> +
+> +What:	The CAP9 SoC family will be removed
+> +When:	3.4
+> +Files:	arch/arm/mach-at91/at91cap9.c
+> +	arch/arm/mach-at91/at91cap9_devices.c
+> +	arch/arm/mach-at91/include/mach/at91cap9.h
+> +	arch/arm/mach-at91/include/mach/at91cap9_matrix.h
+> +	arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
+> +	arch/arm/mach-at91/board-cap9adk.c
+> +Why:	The code is not actively maintained and platforms are now hard to find.
+> +Who:	Nicolas Ferre <nicolas.ferre@atmel.com>
+> +	Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
 
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Nicolas Ferre
