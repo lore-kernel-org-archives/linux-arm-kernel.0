@@ -1,90 +1,59 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Fri, 13 Jan 2012 08:07:35 +0000
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <20120113035506.GB12184@S2101-09.ap.freescale.net>
-References: <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A76A@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508E7B0@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D1DD6@HQMAIL01.nvidia.com>
- <20120113035506.GB12184@S2101-09.ap.freescale.net>
-Message-ID: <7FE21149F4667147B645348EC605788508FD9C@039-SN2MPN1-013.039d.mgd.msft.net>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Fri, 13 Jan 2012 10:12:30 +0200
+Subject: [PATCH 04/11] ep93xx: Configure GPIO ports in core code
+In-Reply-To: <4F0FD694.4060705@gmail.com>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+ <1326251676-7593-5-git-send-email-rmallon@gmail.com>
+ <20120113062707.GA4147@mwesterb-mobl.ger.corp.intel.com>
+ <4F0FD694.4060705@gmail.com>
+Message-ID: <20120113081230.GA23197@mwesterb-mobl.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> Sent: Friday, January 13, 2012 11:55 AM
-> To: Stephen Warren
-> Cc: Dong Aisheng-B29396; Dong Aisheng; linux-kernel at vger.kernel.org;
-> linus.walleij at stericsson.com; s.hauer at pengutronix.de; rob.herring at calxeda.com;
-> linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de; cjb at laptop.org;
-> devicetree-discuss at lists.ozlabs.org; Simon Glass (sjg at chromium.org)
-> Subject: Re: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
-> mappings
-> Importance: High
+On Fri, Jan 13, 2012 at 06:00:36PM +1100, Ryan Mallon wrote:
+> On 13/01/12 17:27, Mika Westerberg wrote:
+> > On Wed, Jan 11, 2012 at 02:14:29PM +1100, Ryan Mallon wrote:
+> >> Move the pinmux setting of the EP93xx GPIOs to the core code. This
+> >> removes the need for the GPIO driver to have access to the system
+> >> controller registers.
+> >>
+> >> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> >> Cc: Mika Westerberg <mika.westerberg@iki.fi>
+> >> Cc: Grant Likely <grant.likely@secretlab.ca>
+> >> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+> >> ---
+> >>  arch/arm/mach-ep93xx/core.c |    7 +++++++
+> >>  drivers/gpio/gpio-ep93xx.c  |    7 -------
+> >>  2 files changed, 7 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> >> index dcb10c2..978c5a6 100644
+> >> --- a/arch/arm/mach-ep93xx/core.c
+> >> +++ b/arch/arm/mach-ep93xx/core.c
+> >> @@ -896,6 +896,13 @@ void __init ep93xx_init_devices(void)
+> >>  	/* Disallow access to MaverickCrunch initially */
+> >>  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
+> >>  
+> >> +	/* Default all ports to GPIO */
+> >> +	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
+> >> +			       EP93XX_SYSCON_DEVCFG_GONK |
+> >> +			       EP93XX_SYSCON_DEVCFG_EONIDE |
+> >> +			       EP93XX_SYSCON_DEVCFG_GONIDE |
+> >> +			       EP93XX_SYSCON_DEVCFG_HONIDE);
+> >> +
+> > Doesn't this now change the behaviour? Now you unconditionally mux the pins
+> > whereas before they were only muxed if we had GPIO driver enabled.
 > 
-> On Thu, Jan 12, 2012 at 12:56:52PM -0800, Stephen Warren wrote:
-> > Dong Aisheng wrote at Thursday, January 12, 2012 1:36 AM:
-> > > Stephen Warren wrote at Thursday, January 12, 2012 4:18 AM:
-> > > > Dong Aisheng wrote at Tuesday, January 10, 2012 1:21 AM:
-> > > > > Stephen Warren wrote at Saturday, January 07, 2012 2:03 AM:
-> > ...
-> > > > Personally, I think I'd be OK with the sysfs pinctrl map file only
-> > > > containing the map entries for devices that had used the pinctrl
-> > > > API, and hence only parsing the pinmux properties in pinmux_get().
-> > >
-> > > Actually I already did it like that in the patch I sent:
-> > > https://lkml.org/lkml/2012/1/5/153
-> > >
-> > > Originally I'd like to do like that but I found an inconsistent
-> > > issue that the sysfs pinctrl map file will behave differently
-> > > between dt and non-dt Platform. For non-dt, it means showing all
-> > > exist map entries. For dt, it means Only used pinmux map entries.
-> > >
-> > > And in current design when device calls pinmux_get, it will search a
-> > > predefined pinmux_maps array to find which function and group it is binded
-> to.
-> > > If switch to the new way, we only dynamically create pinmux map and
-> > > dynamically register it when pinmux_get is called, first we need to
-> > > change the code path in pinmux_get in a totally different way,
-> > > second for support that we may also better to change pinmux_maps array to a
-> list.
-> > > But after changing the pinmux_maps to a list, what about using in non-dt?
-> > >
-> > > So without any strong reason i still think it would be better to
-> > > keep consistency With the non-dt pinctrl subsystem.
-> > > And the effort would be minimum since besides constructing the map
-> > > by parsing Device tree, everyting is the same as before in pinmux
-> > > map and we could re-use the current code.
-> >
-> > OK. I think this can work out pretty easily with a bus notifier as I
-> > mentioned before.
-> >
-Sorry I did not catch your idea before.
-I will try to see if I can find an example.
+> True, but I think the previous behaviour was broken anyway. If the gpio
+> driver was installed after any driver which has muxed gpio pins for
+> other purposes then it will override those settings. All of the ep93xx
+> drivers will mux the pins they need at probe time. IIRC, before the gpio
+> driver was moved out of arch/arm/mach-ep93xx we muxed all the pins
+> unconditionally anyway.
 
-> > But, one thought on doing this in pinmux_get(). I'd simply implement a
-> > Function that read a DT node's pinmux property/node, converted it to a
-> > pinmux mapping table, and registered it with the pinctrl core. Then,
-> > pinmux_get() could simply call this before doing anything else at all.
-> > I don't think you'd need to modify how pinmux_get() worked at all.
-> >
-> This sounds like a pretty good idea to me.
-> 
-This does not fix the inconsistency issue.
-Additionally as I said before, for better support dynamically register pinmux
-Map, it looks we'd better change the pinmux_maps array to a list.
-However this is for dt case.
-But for non-dt case, the static array is just ok.
-So there's conflict.
-Not sure if any better idea to fix this.
+Ah, right. So now it actually behaves better since it's not dependent on which
+phase the GPIO driver is probed.
 
-Regards
-Dong Aisheng
+Thus,
+
+Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
