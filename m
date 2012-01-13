@@ -1,276 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jan 2012 15:04:21 +0000
-Subject: [PATCH] arm: omap4: Fix omap_barriers_init for generic ioremap
- changes
-In-Reply-To: <20120113140520.GE16726@n2100.arm.linux.org.uk>
-References: <20120112184256.GA2287@atomide.com>
- <alpine.LFD.2.02.1201121441580.2722@xanadu.home>
- <alpine.LFD.2.02.1201121447270.2722@xanadu.home>
- <20120112195951.GB2287@atomide.com>
- <20120113140520.GE16726@n2100.arm.linux.org.uk>
-Message-ID: <20120113150421.GF16726@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Jan 2012 15:13:07 +0000
+Subject: [RFC PATCH] proc: clear_refs: do not clear reserved pages
+Message-ID: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 02:05:20PM +0000, Russell King - ARM Linux wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> ARM: Add arm_memblock_steal() to allocate memory away from the kernel
-> 
-> Several platforms are now using the memblock_alloc+memblock_free+
-> memblock_remove trick to obtain memory which won't be mapped in the
-> kernel's page tables.  Most platforms do this (correctly) in the
-> ->reserve callback.  However, OMAP has started to call these functions
-> outside of this callback, and this is extremely unsafe - memory will
-> not be unmapped, and could well be given out after memblock is no
-> longer responsible for its management.
-> 
-> So, provide arm_memblock_steal() to perform this function, and ensure
-> that it panic()s if it is used inappropriately.  Convert everyone
-> over, including OMAP.
-> 
-> As a result, OMAP will panic on boot with this change.  OMAP needs to
-> be fixed, or 137d105d50 (ARM: OMAP4: Fix errata i688 with MPU
-> interconnect barriers.) reverted until such time it can be fixed
-> correctly.
+/proc/pid/clear_refs is used to clear the Referenced and YOUNG bits for
+pages and corresponding page table entries of the task with PID pid,
+which includes any special mappings inserted into the page tables in
+order to provide things like vDSOs and user helper functions.
 
-Santosh points out that this is only used if the errata i688 option is
-enabled, so I've added to this patch to make this config option depend
-on BROKEN, marked it as such, and commited the result to my fixes branch.
+On ARM this causes a problem because the vectors page is mapped as a
+global mapping and since ec706dab ("ARM: add a vma entry for the user
+accessible vector page"), a VMA is also inserted into each task for this
+page to aid unwinding through signals and syscall restarts. Since the
+vectors page is required for handling faults, clearing the YOUNG bit
+(and subsequently writing a faulting pte) means that we lose the vectors
+page *globally* and cannot fault it back in. This results in a system
+deadlock on the next exception.
 
-I'll be planning to push this to Linus sometime on Monday.
+This patch avoids clearing the aforementioned bits for reserved pages,
+therefore leaving the vectors page intact on ARM. Since reserved pages
+are not candidates for swap, this change should not have any impact on
+the usefulness of clear_refs.
 
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/include/asm/memblock.h      |    2 ++
->  arch/arm/mach-imx/mach-mx31_3ds.c    |    5 ++---
->  arch/arm/mach-imx/mach-mx31moboard.c |    5 ++---
->  arch/arm/mach-imx/mach-pcm037.c      |    5 ++---
->  arch/arm/mach-omap2/omap-secure.c    |   13 ++-----------
->  arch/arm/mach-omap2/omap4-common.c   |   10 +++-------
->  arch/arm/mm/init.c                   |   17 +++++++++++++++++
->  arch/arm/plat-omap/devices.c         |    5 ++---
->  8 files changed, 32 insertions(+), 30 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/memblock.h b/arch/arm/include/asm/memblock.h
-> index b8da2e4..00ca5f9 100644
-> --- a/arch/arm/include/asm/memblock.h
-> +++ b/arch/arm/include/asm/memblock.h
-> @@ -6,4 +6,6 @@ struct machine_desc;
->  
->  extern void arm_memblock_init(struct meminfo *, struct machine_desc *);
->  
-> +phys_addr_t arm_memblock_steal(phys_addr_t size, phys_addr_t align);
-> +
->  #endif
-> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-> index 89c3325..4d1aab1 100644
-> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-> @@ -36,6 +36,7 @@
->  #include <asm/mach/time.h>
->  #include <asm/memory.h>
->  #include <asm/mach/map.h>
-> +#include <asm/memblock.h>
->  #include <mach/common.h>
->  #include <mach/iomux-mx3.h>
->  #include <mach/3ds_debugboard.h>
-> @@ -754,10 +755,8 @@ static struct sys_timer mx31_3ds_timer = {
->  static void __init mx31_3ds_reserve(void)
->  {
->  	/* reserve MX31_3DS_CAMERA_BUF_SIZE bytes for mx3-camera */
-> -	mx3_camera_base = memblock_alloc(MX31_3DS_CAMERA_BUF_SIZE,
-> +	mx3_camera_base = arm_memblock_steal(MX31_3DS_CAMERA_BUF_SIZE,
->  					 MX31_3DS_CAMERA_BUF_SIZE);
-> -	memblock_free(mx3_camera_base, MX31_3DS_CAMERA_BUF_SIZE);
-> -	memblock_remove(mx3_camera_base, MX31_3DS_CAMERA_BUF_SIZE);
->  }
->  
->  MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
-> diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-> index b95981d..f225262 100644
-> --- a/arch/arm/mach-imx/mach-mx31moboard.c
-> +++ b/arch/arm/mach-imx/mach-mx31moboard.c
-> @@ -41,6 +41,7 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach/time.h>
->  #include <asm/mach/map.h>
-> +#include <asm/memblock.h>
->  #include <mach/board-mx31moboard.h>
->  #include <mach/common.h>
->  #include <mach/hardware.h>
-> @@ -584,10 +585,8 @@ struct sys_timer mx31moboard_timer = {
->  static void __init mx31moboard_reserve(void)
->  {
->  	/* reserve 4 MiB for mx3-camera */
-> -	mx3_camera_base = memblock_alloc(MX3_CAMERA_BUF_SIZE,
-> +	mx3_camera_base = arm_memblock_steal(MX3_CAMERA_BUF_SIZE,
->  			MX3_CAMERA_BUF_SIZE);
-> -	memblock_free(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
-> -	memblock_remove(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
->  }
->  
->  MACHINE_START(MX31MOBOARD, "EPFL Mobots mx31moboard")
-> diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
-> index d7e1516..e48854b 100644
-> --- a/arch/arm/mach-imx/mach-pcm037.c
-> +++ b/arch/arm/mach-imx/mach-pcm037.c
-> @@ -39,6 +39,7 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach/time.h>
->  #include <asm/mach/map.h>
-> +#include <asm/memblock.h>
->  #include <mach/common.h>
->  #include <mach/hardware.h>
->  #include <mach/iomux-mx3.h>
-> @@ -680,10 +681,8 @@ struct sys_timer pcm037_timer = {
->  static void __init pcm037_reserve(void)
->  {
->  	/* reserve 4 MiB for mx3-camera */
-> -	mx3_camera_base = memblock_alloc(MX3_CAMERA_BUF_SIZE,
-> +	mx3_camera_base = arm_memblock_steal(MX3_CAMERA_BUF_SIZE,
->  			MX3_CAMERA_BUF_SIZE);
-> -	memblock_free(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
-> -	memblock_remove(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
->  }
->  
->  MACHINE_START(PCM037, "Phytec Phycore pcm037")
-> diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
-> index 69f3c72..d8f8ef4 100644
-> --- a/arch/arm/mach-omap2/omap-secure.c
-> +++ b/arch/arm/mach-omap2/omap-secure.c
-> @@ -16,6 +16,7 @@
->  #include <linux/memblock.h>
->  
->  #include <asm/cacheflush.h>
-> +#include <asm/memblock.h>
->  
->  #include <mach/omap-secure.h>
->  
-> @@ -57,20 +58,10 @@ u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
->  /* Allocate the memory to save secure ram */
->  int __init omap_secure_ram_reserve_memblock(void)
->  {
-> -	phys_addr_t paddr;
->  	u32 size = OMAP_SECURE_RAM_STORAGE;
->  
->  	size = ALIGN(size, SZ_1M);
-> -	paddr = memblock_alloc(size, SZ_1M);
-> -	if (!paddr) {
-> -		pr_err("%s: failed to reserve %x bytes\n",
-> -				__func__, size);
-> -		return -ENOMEM;
-> -	}
-> -	memblock_free(paddr, size);
-> -	memblock_remove(paddr, size);
-> -
-> -	omap_secure_memblock_base = paddr;
-> +	omap_secure_memblock_base = arm_memblock_steal(size, SZ_1M);
->  
->  	return 0;
->  }
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index bc16c81..40a8fbc 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -20,6 +20,7 @@
->  #include <asm/hardware/gic.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach/map.h>
-> +#include <asm/memblock.h>
->  
->  #include <plat/irqs.h>
->  #include <plat/sram.h>
-> @@ -61,13 +62,8 @@ static int __init omap_barriers_init(void)
->  		return -ENODEV;
->  
->  	size = ALIGN(PAGE_SIZE, SZ_1M);
-> -	paddr = memblock_alloc(size, SZ_1M);
-> -	if (!paddr) {
-> -		pr_err("%s: failed to reserve 4 Kbytes\n", __func__);
-> -		return -ENOMEM;
-> -	}
-> -	memblock_free(paddr, size);
-> -	memblock_remove(paddr, size);
-> +	paddr = arm_memblock_steal(size, SZ_1M);
-> +
->  	dram_io_desc[0].virtual = OMAP4_DRAM_BARRIER_VA;
->  	dram_io_desc[0].pfn = __phys_to_pfn(paddr);
->  	dram_io_desc[0].length = size;
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index e34ea8a..6ec1226 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -22,6 +22,7 @@
->  #include <linux/memblock.h>
->  
->  #include <asm/mach-types.h>
-> +#include <asm/memblock.h>
->  #include <asm/prom.h>
->  #include <asm/sections.h>
->  #include <asm/setup.h>
-> @@ -307,6 +308,22 @@ static void arm_memory_present(void)
->  }
->  #endif
->  
-> +static bool arm_memblock_steal_permitted = true;
-> +
-> +phys_addr_t arm_memblock_steal(phys_addr_t size, phys_addr_t align)
-> +{
-> +	phys_addr_t phys;
-> +
-> +	if (!arm_memblock_steal_permitted)
-> +		panic("arm_memblock_steal used in an unsafe manner\n");
-> +
-> +	phys = memblock_alloc(size, align);
-> +	memblock_free(phys, size);
-> +	memblock_remove(phys, size);
-> +
-> +	return phys;
-> +}
-> +
->  void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
->  {
->  	int i;
-> @@ -349,6 +366,7 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
->  	if (mdesc->reserve)
->  		mdesc->reserve();
->  
-> +	arm_memblock_steal_permitted = false;
->  	memblock_allow_resize();
->  	memblock_dump_all();
->  }
-> diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
-> index 1971932..60278f4 100644
-> --- a/arch/arm/plat-omap/devices.c
-> +++ b/arch/arm/plat-omap/devices.c
-> @@ -20,6 +20,7 @@
->  #include <mach/hardware.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/map.h>
-> +#include <asm/memblock.h>
->  
->  #include <plat/tc.h>
->  #include <plat/board.h>
-> @@ -164,14 +165,12 @@ void __init omap_dsp_reserve_sdram_memblock(void)
->  	if (!size)
->  		return;
->  
-> -	paddr = memblock_alloc(size, SZ_1M);
-> +	paddr = arm_memblock_steal(size, SZ_1M);
->  	if (!paddr) {
->  		pr_err("%s: failed to reserve %x bytes\n",
->  				__func__, size);
->  		return;
->  	}
-> -	memblock_free(paddr, size);
-> -	memblock_remove(paddr, size);
->  
->  	omap_dsp_phys_mempool_base = paddr;
->  }
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cc: David Rientjes <rientjes@google.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Reported-by: Moussa Ba <moussaba@micron.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+An aside: if you want to see this problem in action, just run:
+
+$ echo 1 > /proc/self/clear_refs
+
+on an ARM platform (as any user) and watch your system hang. I think this
+has been the case since 2.6.37, so I'll CC stable once people are happy
+with the fix.
+
+ fs/proc/task_mmu.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+index e418c5a..7dcd2a2 100644
+--- a/fs/proc/task_mmu.c
++++ b/fs/proc/task_mmu.c
+@@ -518,6 +518,9 @@ static int clear_refs_pte_range(pmd_t *pmd, unsigned long addr,
+ 		if (!page)
+ 			continue;
+ 
++		if (PageReserved(page))
++			continue;
++
+ 		/* Clear accessed and referenced bits. */
+ 		ptep_test_and_clear_young(vma, addr, pte);
+ 		ClearPageReferenced(page);
+-- 
+1.7.4.1
