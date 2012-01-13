@@ -1,50 +1,28 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 13 Jan 2012 14:43:28 -0800
-Subject: [RFC PATCH] proc: clear_refs: do not clear reserved pages
-In-Reply-To: <20120113153556.GY1068@n2100.arm.linux.org.uk>
-References: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
- <20120113153556.GY1068@n2100.arm.linux.org.uk>
-Message-ID: <20120113144328.564cb50e.akpm@linux-foundation.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2012 22:47:09 +0000
+Subject: [PATCH v2 14/15] ARM: local timers: convert MSM to runtime
+ registration interface
+In-Reply-To: <20120113223740.GA23036@codeaurora.org>
+References: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
+ <1326479322-6033-15-git-send-email-marc.zyngier@arm.com>
+ <20120113223740.GA23036@codeaurora.org>
+Message-ID: <20120113224709.GH1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jan 2012 15:35:56 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Fri, Jan 13, 2012 at 03:13:07PM +0000, Will Deacon wrote:
-> > /proc/pid/clear_refs is used to clear the Referenced and YOUNG bits for
-> > pages and corresponding page table entries of the task with PID pid,
-> > which includes any special mappings inserted into the page tables in
-> > order to provide things like vDSOs and user helper functions.
+On Fri, Jan 13, 2012 at 02:37:40PM -0800, David Brown wrote:
+> On Fri, Jan 13, 2012 at 06:28:41PM +0000, Marc Zyngier wrote:
+> > Convert the MSM timers to the runtime registration interface.
 > > 
-> > On ARM this causes a problem because the vectors page is mapped as a
-> > global mapping and since ec706dab ("ARM: add a vma entry for the user
-> > accessible vector page"), a VMA is also inserted into each task for this
-> > page to aid unwinding through signals and syscall restarts. Since the
-> > vectors page is required for handling faults, clearing the YOUNG bit
-> > (and subsequently writing a faulting pte) means that we lose the vectors
-> > page *globally* and cannot fault it back in. This results in a system
-> > deadlock on the next exception.
-> > 
-> > This patch avoids clearing the aforementioned bits for reserved pages,
-> > therefore leaving the vectors page intact on ARM. Since reserved pages
-> > are not candidates for swap, this change should not have any impact on
-> > the usefulness of clear_refs.
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Tested-by: David Brown <davidb@codeaurora.org>
+> > Acked-by: David Brown <davidb@codeaurora.org>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Having just looked at mm/swapfile.c, what ensures that we don't try to swap
-> the vectors page out?
+> Ok, this is definitely now consistenly causing cpu hotplug to fail.
+> I'll look in to this further, but for now, please removed my Tested-by
+> and Acked-by.
 
-Scanning and swapout access the page via the vm's page LRU lists. 
-These magical pages shouldn't be on the LRU, so the VM won't pester
-them.  If those pages did get added to the LRU somwhoe then yes,
-there's a problem.
-
-> I thought that VM_IO or VM_RESERVED once guaranteed that the vma wouldn't
-> be scanned, but I don't see anything in there which tests these flags.
-> As a result, it seems to me that the original patch is wrong, and we need
-> to keep the vectors page completely out of the vma list to prevent it
-> ever being made old.
-> 
-> Maybe the MM gurus can comment?
-
-The MM guru is Hugh.
+That'll be because the local_timer_ops structure is marked __initdata
+but is used after init has completed.  It should be marked __cpuinitdata
+if it's used for CPU bringup (which it is.)
