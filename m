@@ -1,12 +1,12 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jan 2012 23:17:30 +0000
+Date: Fri, 13 Jan 2012 23:18:20 +0000
 Subject: [PATCH] GPIO: sa1100: implement proper gpiolib gpio_to_irq
  conversion
 In-Reply-To: <20120107120230.GF13857@n2100.arm.linux.org.uk>
 References: <20111218182457.GV14542@n2100.arm.linux.org.uk>
  <CACRpkdZ-W_JHYj2SHZb7wSVHKmnv7UiCgHE84DDcJfX0d_oTSA@mail.gmail.com>
  <20120107120230.GF13857@n2100.arm.linux.org.uk>
-Message-ID: <20120113231730.GI1068@n2100.arm.linux.org.uk>
+Message-ID: <20120113231820.GJ1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -34,5 +34,8 @@ On Sat, Jan 07, 2012 at 12:02:30PM +0000, Russell King - ARM Linux wrote:
 > Have you queued this up or is it going to be missed for this merge window?
 > 
 > Thanks.
+
+Let's try that again, this time with Grant in the To: line rather than
+Linus.
 
 Ping.
