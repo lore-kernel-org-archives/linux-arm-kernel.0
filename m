@@ -1,28 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 13 Jan 2012 14:13:44 -0800
-Subject: [PATCH 06/11] ep93xx: Don't use system controller defines in
- audio drivers
-In-Reply-To: <4F10A4F7.60503@gmail.com>
-References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-7-git-send-email-rmallon@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F001F3F99EBB04@AUSP01VMBX24.collaborationhost.net>
- <4F10A4F7.60503@gmail.com>
-Message-ID: <20120113221343.GB1013@opensource.wolfsonmicro.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 13 Jan 2012 17:26:27 -0500 (EST)
+Subject: [RFC PATCH 01/10] rtc: sa1100: include mach/irqs.h instead of
+ asm/irq.h
+In-Reply-To: <20120113214540.GF1068@n2100.arm.linux.org.uk>
+References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
+ <1326472451-9002-2-git-send-email-robherring2@gmail.com>
+ <20120113164336.GA1068@n2100.arm.linux.org.uk> <4F106299.8050306@gmail.com>
+ <alpine.LFD.2.02.1201131536040.2722@xanadu.home>
+ <20120113214540.GF1068@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1201131700520.2722@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2012 at 08:41:11AM +1100, Ryan Mallon wrote:
-> On 14/01/12 04:35, H Hartley Sweeten wrote:
+On Fri, 13 Jan 2012, Russell King - ARM Linux wrote:
 
-> > Maybe the ep93xx_i2s_acquire() function should be renamed to something
-> > like ep93xx_i2s_ac97_acquire() so that the i2s configuration is understood.
-> > This should address Mark Brown's issue.
+> Why put so much work into a mostly dead platform?  Well, it's one of the
+> few decent platforms which I have, which actually has working DMA hardware.
+> Why audio?  It's one of those which provides a significant stress test on
+> DMA stuff being correct.  Why IrDA?  It can reconfigure a DMA channel (eg,
+> burst size) on the fly when it switches between SIR/FIR mode.
+> 
+> It may be 12 years old but it's still a very useful platform to develop
+> non-hardware specific features on!
 
-> Mark has already picked this patch up. I can probably modify it and get
-> him to grab the new one, but the reason I didn't change the name is
-> because there have been only two users of this function for a couple of
-> years now, and the ep93xx is obsolete, so its unlikely that we are going
-> to need a new function anyway.
+Absolutely.  Having a simple (by today's standard) platform to develop 
+new interfaces is certainly a good way to make sure things work in 
+practice, and that provides a nice examples for others to follow.
 
-If you do change it then please send an incremental patch rather than a
-new version.  I'm OK whatever you guys decide here.
+
+Nicolas
