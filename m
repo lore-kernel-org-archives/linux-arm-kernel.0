@@ -1,74 +1,54 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 13 Jan 2012 17:42:45 +0000
-Subject: [RFC PATCH 00/10] Make mach/irqs.h optional
-In-Reply-To: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
-References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120113174245.GA30497@page>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 13 Jan 2012 11:45:39 -0600
+Subject: [PATCH 08/11] ep93xx: Move EP93XX_WATCHDOG_BASE define to driver
+In-Reply-To: <1326251676-7593-9-git-send-email-rmallon@gmail.com>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+ <1326251676-7593-9-git-send-email-rmallon@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB0B@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 10:34:01AM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Tuesday, January 10, 2012 8:15 PM, Ryan Mallon wrote:
+>
+> The EP93xx watchdog driver is the only user of this define, move it there.
 > 
-> This series removes the include of mach/irqs.h from asm/irq.h when
-> SPARSE_IRQ is selected. Platforms which select SPARSE_IRQ have been
-> updated.
-> 
-> This breaks platforms where SPARSE_IRQ is user selectable. This is on
-> purpose so that SPARSE_IRQ gets properly supported. We could push
-> HAVE_SPARSE_IRQ option down to the platforms that select it if that is
-> preferred. But as recent experience has shown, perhaps breaking platforms
-> is the only way to get some platforms updated.
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Mika Westerberg <mika.westerberg@iki.fi>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
+> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+> ---
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    2 --
+>  drivers/watchdog/ep93xx_wdt.c                   |    1 +
+>  2 files changed, 1 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> index 387f745..225790d 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> @@ -127,7 +127,5 @@
+>  #define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
+>  #define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
+>  
+> -#define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
+> -
+>  
+>  #endif
+> diff --git a/drivers/watchdog/ep93xx_wdt.c b/drivers/watchdog/ep93xx_wdt.c index 726b7df..82f648a 100644
+> --- a/drivers/watchdog/ep93xx_wdt.c
+> +++ b/drivers/watchdog/ep93xx_wdt.c
+> @@ -49,6 +49,7 @@ static unsigned long boot_status;
+>  #define WDT_IN_USE		0
+>  #define WDT_OK_TO_CLOSE		1
+>  
+> +#define EP93XX_WATCHDOG_BASE	EP93XX_APB_IOMEM(0x00140000)
+>  #define EP93XX_WDT_REG(x)	(EP93XX_WATCHDOG_BASE + (x))
+>  #define EP93XX_WDT_WATCHDOG	EP93XX_WDT_REG(0x00)
+>  #define EP93XX_WDT_WDSTATUS	EP93XX_WDT_REG(0x04)
 
-Nice one Rob!  Patch below to remove irqs.h for picoxcell too if you 
-could add that one to your series.
+Ryan,
 
-Tested-by: Jamie Iles <jamie@jamieiles.com>
+I have a patch to convert the watchdog driver to a platform device and
+use the WatchDog Timer Driver Core.  This patch will end up moving the
+base define to soc.h instead. But, for now, this looks good.
 
-Jamie
-
-8<---
-
->From 2d07b017bb06be86bd01686f98c699f1eff0ac10 Mon Sep 17 00:00:00 2001
-From: Jamie Iles <jamie@jamieiles.com>
-Date: Fri, 13 Jan 2012 17:40:05 +0000
-Subject: [PATCH] ARM: picoxcell: remove mach/irqs.h
-
-picoxcell uses SPARSE_IRQ which means we don't need a mach/irqs.h
-anymore so kill it off.
-
-Cc: Rob Herring <robherring2@gmail.com>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/mach-picoxcell/include/mach/irqs.h |   20 --------------------
- 1 files changed, 0 insertions(+), 20 deletions(-)
- delete mode 100644 arch/arm/mach-picoxcell/include/mach/irqs.h
-
-diff --git a/arch/arm/mach-picoxcell/include/mach/irqs.h b/arch/arm/mach-picoxcell/include/mach/irqs.h
-deleted file mode 100644
-index 59eac1e..0000000
---- a/arch/arm/mach-picoxcell/include/mach/irqs.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--#ifndef __MACH_IRQS_H
--#define __MACH_IRQS_H
--
--/* We dynamically allocate our irq_desc's. */
--#define NR_IRQS				0
--
--#endif /* __MACH_IRQS_H */
--- 
-1.7.5.4
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
