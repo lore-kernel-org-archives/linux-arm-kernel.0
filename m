@@ -1,60 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jan 2012 10:34:11 -0600
-Subject: [RFC PATCH 10/10] ARM: highbank: select SPARSE_IRQ and remove irqs.h
-In-Reply-To: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2012 16:43:36 +0000
+Subject: [RFC PATCH 01/10] rtc: sa1100: include mach/irqs.h instead of
+ asm/irq.h
+In-Reply-To: <1326472451-9002-2-git-send-email-robherring2@gmail.com>
 References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1326472451-9002-11-git-send-email-robherring2@gmail.com>
+ <1326472451-9002-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20120113164336.GA1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Fri, Jan 13, 2012 at 10:34:02AM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Since asm/irq.h may not include mach/irqs.h, include mach/irqs.h directly.
 
-irqs.h is optional now for SPARSE_IRQ, so select it and remove mach/irqs.h
-from highbank.
+Rather than doing this, we should be eliminating the need for these
+old drivers to include mach/irqs.h at all.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/Kconfig                           |    1 +
- arch/arm/mach-highbank/highbank.c          |    1 -
- arch/arm/mach-highbank/include/mach/irqs.h |    6 ------
- 3 files changed, 1 insertions(+), 7 deletions(-)
- delete mode 100644 arch/arm/mach-highbank/include/mach/irqs.h
+Adding the resources to the platform device, and then using at least
+the IRQ resource(s) would be a definite step forward (and a relatively
+easy one to do.)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 24626b0..a3c19cb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -350,6 +350,7 @@ config ARCH_HIGHBANK
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU
- 	select HAVE_SMP
-+	select SPARSE_IRQ
- 	select USE_OF
- 	help
- 	  Support for the Calxeda Highbank SoC based boards.
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 804c4a5..3257d48 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -34,7 +34,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
--#include <mach/irqs.h>
- 
- #include "core.h"
- #include "sysregs.h"
-diff --git a/arch/arm/mach-highbank/include/mach/irqs.h b/arch/arm/mach-highbank/include/mach/irqs.h
-deleted file mode 100644
-index 9746aab..0000000
---- a/arch/arm/mach-highbank/include/mach/irqs.h
-+++ /dev/null
-@@ -1,6 +0,0 @@
--#ifndef __MACH_IRQS_H
--#define __MACH_IRQS_H
--
--#define NR_IRQS			192
--
--#endif
--- 
-1.7.5.4
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  drivers/rtc/rtc-sa1100.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
+> index 4595d3e..144fa06 100644
+> --- a/drivers/rtc/rtc-sa1100.c
+> +++ b/drivers/rtc/rtc-sa1100.c
+> @@ -33,7 +33,7 @@
+>  #include <linux/io.h>
+>  
+>  #include <mach/hardware.h>
+> -#include <asm/irq.h>
+> +#include <mach/irqs.h>
+>  
+>  #define RTC_DEF_DIVIDER		(32768 - 1)
+>  #define RTC_DEF_TRIM		0
+> -- 
+> 1.7.5.4
+> 
