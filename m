@@ -1,24 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jan 2012 14:07:23 +0000
-Subject: [PATCH 00/20] arch_idle() cleanup and mach/system.h removal
-In-Reply-To: <alpine.LFD.2.02.1201130853250.2722@xanadu.home>
-References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
- <20120113104358.GR1068@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1201130853250.2722@xanadu.home>
-Message-ID: <20120113140723.GW1068@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 13 Jan 2012 14:09:31 +0000
+Subject: [PATCH v2 1/7] ARM: versatile: Add missing ENDPROC to headsmp.S
+In-Reply-To: <1326389476-11569-2-git-send-email-robherring2@gmail.com>
+References: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
+ <1326389476-11569-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20120113140931.GB2227@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 08:54:58AM -0500, Nicolas Pitre wrote:
-> On Fri, 13 Jan 2012, Russell King - ARM Linux wrote:
+On Thu, Jan 12, 2012 at 11:31:10AM -0600, Rob Herring wrote:
+> From: Pawel Moll <pawel.moll@arm.com>
 > 
-> > So, sending a pull request for the idle stuff in the last two days of
-> > the merge window, for a change which is quite big, which conflicts,
-> > which wasn't in -next before the merge window is just asking for trouble,
-> > and I'm not going to do it.
+> Once the ENDPROC is in place, BSYM() in not longer necessary
+> to get correct pointer to versatile_secondary_startup().
 > 
-> Too bad.  Let's try to stage this early in your devel-stable branch for 
-> next cycle then.
+> Tested-by: Jon Medhurst <tixy@linaro.org>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-Arnd and myself just agreed this; once rc1 is out, could you please rebase
-on that, resend the pull request, and we'll merge it into both trees.
+Acked-by: Dave Martin <dave.martin@linaro.org>
+
+> ---
+>  arch/arm/mach-realview/platsmp.c  |    3 +--
+>  arch/arm/mach-vexpress/platsmp.c  |    4 +---
+>  arch/arm/plat-versatile/headsmp.S |    1 +
+>  3 files changed, 3 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
+> index e83c654..17c878d 100644
+> --- a/arch/arm/mach-realview/platsmp.c
+> +++ b/arch/arm/mach-realview/platsmp.c
+> @@ -17,7 +17,6 @@
+>  #include <asm/hardware/gic.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/smp_scu.h>
+> -#include <asm/unified.h>
+>  
+>  #include <mach/board-eb.h>
+>  #include <mach/board-pb11mp.h>
+> @@ -75,6 +74,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>  	 * until it receives a soft interrupt, and then the
+>  	 * secondary CPU branches to this address.
+>  	 */
+> -	__raw_writel(BSYM(virt_to_phys(versatile_secondary_startup)),
+> +	__raw_writel(virt_to_phys(versatile_secondary_startup),
+>  		     __io_address(REALVIEW_SYS_FLAGSSET));
+>  }
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index 2b5f7ac..124ffb1 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -13,8 +13,6 @@
+>  #include <linux/smp.h>
+>  #include <linux/io.h>
+>  
+> -#include <asm/unified.h>
+> -
+>  #include <mach/motherboard.h>
+>  #define V2M_PA_CS7 0x10000000
+>  
+> @@ -46,6 +44,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>  	 * secondary CPU branches to this address.
+>  	 */
+>  	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
+> -	writel(BSYM(virt_to_phys(versatile_secondary_startup)),
+> +	writel(virt_to_phys(versatile_secondary_startup),
+>  		MMIO_P2V(V2M_SYS_FLAGSSET));
+>  }
+> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+> index d397a1f..dd703ef 100644
+> --- a/arch/arm/plat-versatile/headsmp.S
+> +++ b/arch/arm/plat-versatile/headsmp.S
+> @@ -38,3 +38,4 @@ pen:	ldr	r7, [r6]
+>  	.align
+>  1:	.long	.
+>  	.long	pen_release
+> +ENDPROC(versatile_secondary_startup)
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
