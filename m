@@ -1,28 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jan 2012 22:47:09 +0000
-Subject: [PATCH v2 14/15] ARM: local timers: convert MSM to runtime
- registration interface
-In-Reply-To: <20120113223740.GA23036@codeaurora.org>
-References: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
- <1326479322-6033-15-git-send-email-marc.zyngier@arm.com>
- <20120113223740.GA23036@codeaurora.org>
-Message-ID: <20120113224709.GH1068@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 13 Jan 2012 16:48:16 -0600
+Subject: [PATCH 08/11] ep93xx: Move EP93XX_WATCHDOG_BASE define to driver
+In-Reply-To: <4F10A63F.1050100@gmail.com>
+References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
+ <1326251676-7593-9-git-send-email-rmallon@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F001F3F99EBB0B@AUSP01VMBX24.collaborationhost.net>
+ <4F10A63F.1050100@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F99EBCB3@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 02:37:40PM -0800, David Brown wrote:
-> On Fri, Jan 13, 2012 at 06:28:41PM +0000, Marc Zyngier wrote:
-> > Convert the MSM timers to the runtime registration interface.
-> > 
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Tested-by: David Brown <davidb@codeaurora.org>
-> > Acked-by: David Brown <davidb@codeaurora.org>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Ok, this is definitely now consistenly causing cpu hotplug to fail.
-> I'll look in to this further, but for now, please removed my Tested-by
-> and Acked-by.
+On Friday, January 13, 2012 2:47 PM, Ryan Mallon wrote:
+> On 14/01/12 04:45, H Hartley Sweeten wrote:
+>> I have a patch to convert the watchdog driver to a platform device and 
+>> use the WatchDog Timer Driver Core.  This patch will end up moving the 
+>> base define to soc.h instead. But, for now, this looks good.
+>
+> Is your patch ready to go? I'm in no rush to get these patches in, and I
+> can add it to this series if you like, which would get rid of the need for
+> this patch and would also mean that we don't need the include of
+> <mach/ep93xx-regs.h> in the watchdog driver in the final patch.
 
-That'll be because the local_timer_ops structure is marked __initdata
-but is used after init has completed.  It should be marked __cpuinitdata
-if it's used for CPU bringup (which it is.)
+Right now I just have the WatchDog Timer Driver Core conversion done.
+But, it needs to be retested against the current mainline.
+
+Converting the driver into a platform device is trivial after that.
+
+Let's go with what you have for right now. If/when It hits linux-next I'll
+rebase my patch against that.
+
+Regards,
+Hartley
