@@ -1,44 +1,84 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Jan 2012 21:35:54 +0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <7FE21149F4667147B645348EC605788508FD9C@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A76A@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508E7B0@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D1DD6@HQMAIL01.nvidia.com>
- <20120113035506.GB12184@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC605788508FD9C@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20120113133552.GB17029@S2101-09.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 13 Jan 2012 13:42:36 +0000
+Subject: omap clocksource timer selection: dmtimer OR 32K-Sync timer
+In-Reply-To: <CAMQu2gxYQOHX8n2RLfkLBw5hQMdvH389DfrguLtzpLcpmqBQMA@mail.gmail.com>
+References: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
+ <CAMQu2gxYQOHX8n2RLfkLBw5hQMdvH389DfrguLtzpLcpmqBQMA@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317A4FD9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 08:07:35AM +0000, Dong Aisheng-B29396 wrote:
-> > > But, one thought on doing this in pinmux_get(). I'd simply implement a
-> > > Function that read a DT node's pinmux property/node, converted it to a
-> > > pinmux mapping table, and registered it with the pinctrl core. Then,
-> > > pinmux_get() could simply call this before doing anything else at all.
-> > > I don't think you'd need to modify how pinmux_get() worked at all.
-> > >
-> > This sounds like a pretty good idea to me.
-> > 
-> This does not fix the inconsistency issue.
-> Additionally as I said before, for better support dynamically register pinmux
-> Map, it looks we'd better change the pinmux_maps array to a list.
-> However this is for dt case.
-> But for non-dt case, the static array is just ok.
-> So there's conflict.
-> Not sure if any better idea to fix this.
+On Fri, Jan 13, 2012 at 18:19:24, Shilimkar, Santosh wrote:
+> On Fri, Jan 13, 2012 at 1:21 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> > Hi,
+> >
+> > In case of AM33xx family of devices, we do not have 32K Sync timer
+> > (32K Counter) available; and the current implementation is based on
+> > compile-time option, where clock-source is chosen by something like,
+> >
+> > File - arch/arm/mach-omap2/timer.c
+> >
+> > #ifdef CONFIG_OMAP_32K_TIMER
+> > static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+> > {
+> > ...
+> > }
+> > #else
+> > static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+> > {
+> > ...
+> > }
+> > #endif
+> >
+> >
+> > But in order to support multi-omap build, we must
+> > make run-time decision to use the timer for kernel clock-source, either of -
+> >
+> > ?- DMTIMER
+> > ?- 32K Sync Timer
+> >
+> > The DMTIMER is already migrated to the HWMOD framework, but 32K Timer code
+> > has not yet migrated to it. So the question here is,
+> >
+> > 1) Does it make sense to migrate counter_32k.c to search entry in hwmod
+> > ? table and if 32k_sync timer is available in hwmod table then use 32K
+> > ? timer for Kernel clock-source
+> > ? OR
+> > ? Fall back to DMTIMER.
+> >
+> > ? OMAP4 hwmod table already has entry,
+> >
+> > ? static struct omap_hwmod omap44xx_counter_32k_hwmod = {
+> > ? ? ? ? .name ? ? ? ? ? = "counter_32k",
+> > ? ...
+> > ? };
+> >
+> > ? We need to have similar entries in all devices where 32K timer is present.
+> >
+> > 2) OR simply add another cpu_is_am33xx() and then fall back to dmtimer?
+> > ? Just to prove this, everything works here, I modified the code for this
+> > ? and tested it on both AM335x EVM and AM37xEVM and it works fine for me.
+> >
+> >
+> > Any comments?? OR Better approach? OR anything which I am missing here?
+> >
+> You can register both the clock sources together with different
+> rating. Based on rating
+> timer code will automatically pick the better clock-source of two.
+> Ratings is based on the resolution of the timer.
 > 
-My guess is that Linus.W did not get any chance to take the dt case
-into account with his first design of pinctrl core.  But I guess he
-is open to any reasonable change to pinctrl core for dt adoption.
-Linus?
+Santosh,
 
--- 
-Regards,
-Shawn
+ - Still current compile time implementation must be changed/cleaned, right?
+ - The 32k timer doesn't exist at all on AM33xx device, so you can not
+   (and should not) Register this timer. 
+
+
+Thanks,
+Vaibhav
+
+> That should remove the CONFIG option depedency.
+> 
+> Regards
+> Santosh
+> 
