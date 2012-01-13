@@ -1,93 +1,261 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 13 Jan 2012 15:30:52 -0500 (EST)
-Subject: [RFC PATCH 06/10] ARM: mmp: remove NR_IRQS
-In-Reply-To: <1326472451-9002-7-git-send-email-robherring2@gmail.com>
-References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
- <1326472451-9002-7-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1201131526050.2722@xanadu.home>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 13 Jan 2012 12:39:42 -0800
+Subject: Pinmux bindings proposal
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jan 2012, Rob Herring wrote:
+I thought a bit more about pinmux DT bindings. I came up with something
+that I like well enough, and is pretty similar to the binding that Dong
+posted recently. I think it'll work for both Tegra's and IMX's needs.
+Please take a look!
 
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Remove NR_IRQS and add a per machine .nr_irqs setting.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Note: I've used named constants below just to make this easier to read.
+We still don't have a solution to actually use named constants in dtc yet.
 
-While it is true that NR_IRQS was defined in terms of IRQ_BOARD_START 
-down in the confines of mach/irqs.h, I don't think IRQ_BOARD_START is 
-such a good macro name to spread around for what it should mean.  
-Perhaps MMP_MAX_IRQS or the like would be more self describing.
+tegra20.dtsi:
 
-> ---
->  arch/arm/mach-mmp/avengers_lite.c     |    1 +
->  arch/arm/mach-mmp/include/mach/irqs.h |    2 --
->  arch/arm/mach-mmp/irq-mmp2.c          |    1 +
->  arch/arm/mach-mmp/jasper.c            |    1 +
->  arch/arm/mach-mmp/tavorevb.c          |    1 +
->  5 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mmp/avengers_lite.c b/arch/arm/mach-mmp/avengers_lite.c
-> index b148a9d..0fd60fb 100644
-> --- a/arch/arm/mach-mmp/avengers_lite.c
-> +++ b/arch/arm/mach-mmp/avengers_lite.c
-> @@ -43,6 +43,7 @@ static void __init avengers_lite_init(void)
->  
->  MACHINE_START(AVENGERS_LITE, "PXA168 Avengers lite Development Platform")
->  	.map_io		= mmp_map_io,
-> +	.nr_irqs	= IRQ_BOARD_START,
->  	.init_irq       = pxa168_init_irq,
->  	.timer          = &pxa168_timer,
->  	.init_machine   = avengers_lite_init,
-> diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
-> index 34635a0..25e6d60 100644
-> --- a/arch/arm/mach-mmp/include/mach/irqs.h
-> +++ b/arch/arm/mach-mmp/include/mach/irqs.h
-> @@ -224,6 +224,4 @@
->  
->  #define IRQ_BOARD_START			(IRQ_GPIO_START + MMP_NR_BUILTIN_GPIO)
->  
-> -#define NR_IRQS				(IRQ_BOARD_START)
-> -
->  #endif /* __ASM_MACH_IRQS_H */
-> diff --git a/arch/arm/mach-mmp/irq-mmp2.c b/arch/arm/mach-mmp/irq-mmp2.c
-> index d21c544..7895d27 100644
-> --- a/arch/arm/mach-mmp/irq-mmp2.c
-> +++ b/arch/arm/mach-mmp/irq-mmp2.c
-> @@ -15,6 +15,7 @@
->  #include <linux/irq.h>
->  #include <linux/io.h>
->  
-> +#include <mach/irqs.h>
->  #include <mach/regs-icu.h>
->  #include <mach/mmp2.h>
->  
-> diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
-> index 96cf5c8..8f80c31 100644
-> --- a/arch/arm/mach-mmp/jasper.c
-> +++ b/arch/arm/mach-mmp/jasper.c
-> @@ -19,6 +19,7 @@
->  #include <linux/mfd/max8925.h>
->  #include <linux/interrupt.h>
->  
-> +#include <mach/irqs.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
->  #include <mach/addr-map.h>
-> diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
-> index 8e3b5af0..d3ba655 100644
-> --- a/arch/arm/mach-mmp/tavorevb.c
-> +++ b/arch/arm/mach-mmp/tavorevb.c
-> @@ -102,6 +102,7 @@ static void __init tavorevb_init(void)
->  
->  MACHINE_START(TAVOREVB, "PXA910 Evaluation Board (aka TavorEVB)")
->  	.map_io		= mmp_map_io,
-> +	.nr_irqs	= IRQ_BOARD_START,
->  	.init_irq       = pxa910_init_irq,
->  	.timer          = &pxa910_timer,
->  	.init_machine   = tavorevb_init,
-> -- 
-> 1.7.5.4
-> 
+/ {
+        tegra_pmx: pinmux at 70000000 {
+                compatible = "nvidia,tegra20-pinmux";
+                reg = <0x70000014 0x10   /* Tri-state registers */
+                       0x70000080 0x20   /* Mux registers */
+                       0x700000a0 0x14   /* Pull-up/down registers */
+                       0x70000868 0xa8>; /* Pad control registers */
+        };
+
+        sdhci at c8000200 {
+                compatible = "nvidia,tegra20-sdhci";
+                reg = <0xc8000200 0x200>;
+                interrupts = <0 15 0x04>;
+        };
+};
+
+tegra-harmony.dts:
+
+/{
+        sdhci at c8000200 {
+                cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+                wp-gpios = <&gpio 57 0>; /* gpio PH1 */
+                power-gpios = <&gpio 155 0>; /* gpio PT3 */
+
+                /*
+                 * A list of named configurations that this device needs.
+                 * Format is a list of <"name" &phandle_of_pmx_configuration>
+                 *
+                 * Multiple "name"s are needed e.g. to support active/suspend,
+                 * or whatever device-defined states are appropriate. The
+                 * device defines which names are needed, just like a device
+                 * defines which regulators, clocks, GPIOs, interrupts, ...
+                 * it needs.
+                 *
+                 * This example shows a 1:1 relation between name and phandle.
+                 * We might want a 1:n relation, so that we can blend multiple
+                 * pre-defined sets of data together, e.g. one pre-defined set
+                 * for the pin mux configuration, another for the pin config
+                 * settings, both being put into the single "default" setting
+                 * for this one device.
+                 *
+                 * A pinmux controller can contain this property too, to
+                 * define "hogged" or "system" pin mux configuration.
+                 *
+                 * Note: Mixing strings and integers in a property seems
+                 * unusual. However, I have seen other bindings floating
+                 * around that are starting to do this...
+                 */
+                pinmux =
+                        <"default" &pmx_sdhci_active>
+                        <"suspend" &pmx_sdhci_suspend>;
+
+                /* 1:n example: */
+                pinmux =
+                        <"default" &pmx_sdhci_mux_a>
+                        <"default" &pmx_sdhci_pincfg_a>
+                        <"suspend" &pmx_sdhci_mux_a>
+                        <"suspend" &pmx_sdhci_pincfg_a_suspend>;
+
+                /*
+                 * Alternative: One property for each required state. But,
+                 * how does pinctrl core know which properties to parse?
+                 * Every property named "pinctrl*" seems a little too far-
+                 * reaching. Perhaps if we used vendor-name "pinmux", that'd
+                 * be OK, i.e. pinmux,default and pinmux,suspend?
+                 */
+                pinmux = <&pmx_sdhci_active>;
+                pinmux-suspend <&pmx_sdhci_suspend>;
+
+                /* 1:n example: */
+                pinmux = <&pmx_sdhci_mux_a &pmx_sdhci_pincfg_a>
+                pinmux-suspend = <&pmx_sdhci_mux_a &pmx_sdhci_pincfg_a_suspend>;
+
+                /*
+                 * The actual definition of the complete state of the
+                 * pinmux as required by some driver.
+                 *
+                 * These can be either directly in the device node, or
+                 * somewhere in tegra20.dtsi in order to provide pre-
+                 * selected/common configurations. Hence, they're referred
+                 * to by phandle above.
+                 */
+                pmx_sdhci_active: {
+                        /*
+                         * Pin mux settings. Mandatory?
+                         * Not mandatory if the 1:1 mentioned above is
+                         * extended to 1:n.
+                         *
+                         * Format is <&pmx_controller_phandle muxable_entity_id
+                         * selected_function>.
+                         *
+                         * The pmx phandle is required since there may be more
+                         * than one pinmux controller in the system. Even if
+                         * this node is inside the pinmux controller itself, I
+                         * think it's simpler to just always have this field
+                         * present in the binding for consistency.
+                         *
+                         * Alternative: Format is <&pmx_controller_phandle
+                         * pmx_controller_specific_data>. In this case, the
+                         * pmx controller needs to define #pinmux-mux-cells,
+                         * and provide the pinctrl core with a mapping
+                         * function to handle the rest of the data in the
+                         * property. This is how GPIOs and interrupts work.
+                         * However, this will probably interact badly with
+                         * wanting to parse the entire pinmux map early in
+                         * boot, when perhaps the pinctrl core is initialized,
+                         * but the pinctrl driver itself is not.
+                         */
+                        mux =
+                                <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+                                <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>
+                                /* Syntax example */
+                                <&foo_pmx FOO_PMX_PG_X FOO_PMX_MUX_0>;
+                        /*
+                         * Pin configuration settings. Optional.
+                         *
+                         * Format is <&pmx_controller_phandle muxable_entity_id
+                         * configuration_option configuration_value>.
+                         */
+                        config =
+                                <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+                                <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+                                <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+                                <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+                        /*
+                         * Perhaps allow additional custom properties here to
+                         * express things we haven't thought of. The pinctrl
+                         * drivers would be responsible for parsing them.
+                         */
+                };
+                pmx_sdhci_standby: {
+                        mux =
+                                <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+                                <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
+                        config =
+                                <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
+                                <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
+                                <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+                                <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+                                <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+                                <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+                };
+        };
+};
+
+Integer IDs for "muxable entities": Pins on IMX, pin groups on Tegra:
+
+    TEGRA_PMX_PG_DTA
+    TEGRA_PMX_PG_DTD
+
+Each individual pinmux driver's bindings needs to define what each integer
+ID represents.
+
+Integer IDs for the "mux functions". Note that these are the raw values
+written into hardware, not any driver-defined abstraction, and not any
+kind of "virtual group" that's been invented to make OEMs life easier:
+
+    TEGRA_PMX_MUX_0
+    TEGRA_PMX_MUX_1
+    ...
+    TEGRA_PMX_MUX_3 (for Tegra, 7 for IMX)
+
+Since these are the raw IDs that go into HW, there's no need to specify
+each ID's meanings in the binding.
+
+Integer IDs for "pin config parameters":
+
+    TEGRA_PMX_CONF_TRISTATE
+    TEGRA_PMX_CONF_DRIVE_STRENGTH
+    TEGRA_PMX_CONF_SLEW_RATE
+
+Each individual pinmux driver's bindings needs to define what each integer
+ID represents, and what the legal "value"s are for each one.
+
+Advantages:
+
+* Provides for both mux settings and "pin configuration".
+
+* Allows the "pinmux configuration" nodes to be part of the SoC .dtsi
+  file if desired to provide pre-defined pinmux configurations to
+  choose from.
+
+* Allows the "pinmux configuration" nodes to be part of the per-device
+  node if you don't want to use pre-defined configurations.
+
+* When pre-defined configurations are present, if you need something
+  custom, you can do it easily.
+
+* Can augment pre-defined configurations by listing n nodes for each
+  "name"d pinmux configuration, e.g. to add one extra pin config
+  value.
+
+* Parsing is still quite simple:
+  1) Parse "pinmux" property in device node to get phandle.
+  2) Parse "mux" property in the node reference by the phandle,
+     splitting into a list of pmx phandle, entity, mux func.
+  3) For each entry, pass entity, function to the appropriate mux
+     driver. (For U-Boot, this might mean check that the phandle
+     points at the expected place, and ignore the entry if not?)
+ 4) Mux driver simply converts "muxable entity" to the register
+    address, write the "function" value straight to the register.
+
+Disadvantages:
+
+* If you're not using pre-defined configurations, you still have to dump
+  all the pinmux configuration into a sub-node of the device node, and
+  have a property point at it using a phandle. This is slightly more
+  complex than simply putting the mux/config properties right into the
+  device node. However, it additionally allows one to have multiple
+  "name"d configurations (e.g. for suspend) very easily, and isn't overly
+  complex, so I can live with this.
+
+Changes to pinctrl subsystem:
+
+Very little, I think:
+
+* Need to pass raw function IDs through to the driver instead of the driver
+  defining some logical table. Actually, this is just a change to individual
+  drivers, since they can define the functions "func0", "func1", ... "funcn"
+  as I mentioned before.
+
+* Need to add the code to actually parse this of course.
+
+One additional thought: If dtc does grow named constants, we can provide
+HW-function-based names for the mux functions, e.g.:
+
+TEGRA_PMX_DTA_RSVD0 0
+TEGRA_PMX_DTA_SDIO2 1
+TEGRA_PMX_DTA_VI    2
+TEGRA_PMX_DTA_RSVD3 3
+
+TEGRA_PMX_DTF_I2C3  0
+TEGRA_PMX_DTF_RSVD1 1
+TEGRA_PMX_DTF_VI    2
+TEGRA_PMX_DTF_RSVD3 3
+...
+
+That'd allow the .dts to include functionality-based named for the mux
+function selection, but the .dtb to still include the raw HW mux field
+values. And this is something completely within the control of the SoC
+.dtsi file; if you don't like it, you don't have to do it.
+
+-- 
+nvpublic
