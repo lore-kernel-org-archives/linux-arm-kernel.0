@@ -1,63 +1,60 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Sat, 14 Jan 2012 08:43:01 +1100
-Subject: [PATCH 07/11] ep93xx: Make syscon access functions private to SoC
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB05@AUSP01VMBX24.collaborationhost.net>
+Date: Sat, 14 Jan 2012 08:46:39 +1100
+Subject: [PATCH 08/11] ep93xx: Move EP93XX_WATCHDOG_BASE define to driver
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3F99EBB0B@AUSP01VMBX24.collaborationhost.net>
 References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
- <1326251676-7593-8-git-send-email-rmallon@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F001F3F99EBB05@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4F10A565.9060907@gmail.com>
+ <1326251676-7593-9-git-send-email-rmallon@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F001F3F99EBB0B@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F10A63F.1050100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/12 04:38, H Hartley Sweeten wrote:
+On 14/01/12 04:45, H Hartley Sweeten wrote:
 > On Tuesday, January 10, 2012 8:15 PM, Ryan Mallon wrote:
->> The syscon access functions are no longer used outside of the
->> core EP93xx code. Move their definitions into the SoC code.
+>> The EP93xx watchdog driver is the only user of this define, move it there.
 >>
 >> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 >> Cc: Mika Westerberg <mika.westerberg@iki.fi>
+>> Cc: Wim Van Sebroeck <wim@iguana.be>
 >> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
 >> ---
->>  arch/arm/mach-ep93xx/clock.c                 |    1 +
->>  arch/arm/mach-ep93xx/core.c                  |    2 --
->>  arch/arm/mach-ep93xx/include/mach/platform.h |   14 --------------
->>  arch/arm/mach-ep93xx/soc.h                   |   14 ++++++++++++++
->>  4 files changed, 15 insertions(+), 16 deletions(-)
-> It looks like part of this patch is word wrapped, or it could just be me...
-
-Odd, not sure what happened there. The code I have looks correct, and it
-was sent using git format-patch/send-email.
-
-> <snip>
->
->> diff --git a/arch/arm/mach-ep93xx/soc.h b/arch/arm/mach-ep93xx/soc.h index b0ef89b..958282a 100644
->> --- a/arch/arm/mach-ep93xx/soc.h
->> +++ b/arch/arm/mach-ep93xx/soc.h
->> @@ -13,6 +13,20 @@
->>  #ifndef _EP93XX_SOC_H
->>  #define _EP93XX_SOC_H
+>>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    2 --
+>>  drivers/watchdog/ep93xx_wdt.c                   |    1 +
+>>  2 files changed, 1 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+>> index 387f745..225790d 100644
+>> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+>> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+>> @@ -127,7 +127,5 @@
+>>  #define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
+>>  #define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
 >>  
->> +/* EP93xx System Controller software locked register write */ void 
->> +ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg); void 
->> +ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int 
->> +clear_bits);
->> +
->> +static inline void ep93xx_devcfg_set_bits(unsigned int bits) {
->> +	ep93xx_devcfg_set_clear(bits, 0x00);
->> +}
->> +
->> +static inline void ep93xx_devcfg_clear_bits(unsigned int bits) {
->> +	ep93xx_devcfg_set_clear(0x00, bits);
->> +}
->> +
->>  /*
->>   * EP93xx Physical Memory Map:
->>   *
-> I would prefer these functions to be after all the #define's.  But, your call...
+>> -#define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
+>> -
+>>  
+>>  #endif
+>> diff --git a/drivers/watchdog/ep93xx_wdt.c b/drivers/watchdog/ep93xx_wdt.c index 726b7df..82f648a 100644
+>> --- a/drivers/watchdog/ep93xx_wdt.c
+>> +++ b/drivers/watchdog/ep93xx_wdt.c
+>> @@ -49,6 +49,7 @@ static unsigned long boot_status;
+>>  #define WDT_IN_USE		0
+>>  #define WDT_OK_TO_CLOSE		1
+>>  
+>> +#define EP93XX_WATCHDOG_BASE	EP93XX_APB_IOMEM(0x00140000)
+>>  #define EP93XX_WDT_REG(x)	(EP93XX_WATCHDOG_BASE + (x))
+>>  #define EP93XX_WDT_WATCHDOG	EP93XX_WDT_REG(0x00)
+>>  #define EP93XX_WDT_WDSTATUS	EP93XX_WDT_REG(0x04)
+> Ryan,
 >
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->
-I'll move them.
+> I have a patch to convert the watchdog driver to a platform device and
+> use the WatchDog Timer Driver Core.  This patch will end up moving the
+> base define to soc.h instead. But, for now, this looks good.
+
+Is your patch ready to go? I'm in no rush to get these patches in, and I
+can add it to this series if you like, which would get rid of the need
+for this patch and would also mean that we don't need the include of
+<mach/ep93xx-regs.h> in the watchdog driver in the final patch.
 
 Thanks,
 ~Ryan
