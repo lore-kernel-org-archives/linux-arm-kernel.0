@@ -1,45 +1,26 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 13 Jan 2012 19:12:31 +0200
-Subject: [PATCH] arm: omap4: Fix omap_barriers_init for generic ioremap
- changes
-In-Reply-To: <20120113140520.GE16726@n2100.arm.linux.org.uk>
-References: <20120112184256.GA2287@atomide.com>
- <alpine.LFD.2.02.1201121441580.2722@xanadu.home>
- <alpine.LFD.2.02.1201121447270.2722@xanadu.home>
- <20120112195951.GB2287@atomide.com>
- <20120113140520.GE16726@n2100.arm.linux.org.uk>
-Message-ID: <CAMP44s2XNnOAiDCf1mbtpRV5MAk4LLFdgBpuOQg=pc9aakiDEQ@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 13 Jan 2012 18:16:18 +0100
+Subject: [PATCH V6 4/7] cpufreq: add clk-reg cpufreq driver
+In-Reply-To: <874nw0sfdn.fsf@ti.com>
+References: <1325213769-11752-1-git-send-email-richard.zhao@linaro.org>
+ <1325213769-11752-5-git-send-email-richard.zhao@linaro.org>
+ <87aa5t25ad.fsf@ti.com> <20120112082300.GF2414@b20223-02.ap.freescale.net>
+ <874nw0sfdn.fsf@ti.com>
+Message-ID: <4F1066E2.1020804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 4:05 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> +phys_addr_t arm_memblock_steal(phys_addr_t size, phys_addr_t align)
-> +{
-> + ? ? ? phys_addr_t phys;
-> +
-> + ? ? ? if (!arm_memblock_steal_permitted)
-> + ? ? ? ? ? ? ? panic("arm_memblock_steal used in an unsafe manner\n");
-> +
-> + ? ? ? phys = memblock_alloc(size, align);
-> + ? ? ? memblock_free(phys, size);
-> + ? ? ? memblock_remove(phys, size);
-> +
-> + ? ? ? return phys;
-> +}
+On 1/12/2012 11:52 PM, Kevin Hilman wrote:
+> Richard Zhao<richard.zhao@freescale.com>  writes:
 
-Excellent! I think I suggested a function like that at some point.
+[...]
 
-But I wonder about the 'align' argument. I think most people just
-copy-pasted SZ_1M, although I think originally you suggested SZ_2M,
-maybe it would make sense to align 'align' to SZ_1M, or set SZ_1M if
-it's 0 for convenience.
+>> Do you have real case to need different voltage/clk?
+>
+> Sure, any system with independently scalable CPUs/clusters.
 
-Also, what about people that need memblock_alloc_base? AFAIK OMAP 3
-secure ram needs to be below certain area (I wonder why the current
-code is not handling that).
+AFAIK, in the ARM SoC world there is a least the MSM8660 that does 
+support that today.
 
-Cheers.
-
--- 
-Felipe Contreras
+Regards,
+Benoit
