@@ -1,50 +1,57 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 13 Jan 2012 14:29:06 +0000
-Subject: [PATCH v2 6/7] ARM: highbank: remove incorrect BSYM usage
-In-Reply-To: <1326389476-11569-7-git-send-email-robherring2@gmail.com>
-References: <1326389476-11569-1-git-send-email-robherring2@gmail.com>
- <1326389476-11569-7-git-send-email-robherring2@gmail.com>
-Message-ID: <20120113142906.GG2227@linaro.org>
+From: rajanikanth.hv@stericsson.com (Rajanikanth H V)
+Date: Fri, 13 Jan 2012 15:36:39 +0100
+Subject: tty/serial: Need clarification on Support for 4+M Baudrate
+In-Reply-To: <20120112143900.27b92668@pyramind.ukuu.org.uk>
+References: <20120111121901.GA4034@bnru05>
+ <20120111123025.244a9cf5@pyramind.ukuu.org.uk>
+ <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A605A@EXDCVYMBSTM005.EQ1STM.local>
+ <20120112114913.21809bed@pyramind.ukuu.org.uk>
+ <2B1D156D95AE9B4EAD379CB9E465FE7324AF2A630D@EXDCVYMBSTM005.EQ1STM.local>
+ <20120112143900.27b92668@pyramind.ukuu.org.uk>
+Message-ID: <2B1D156D95AE9B4EAD379CB9E465FE7324AF2F2087@EXDCVYMBSTM005.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 11:31:15AM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> BSYM macro is only needed for assembly files and its usage in c files is
-> wrong, so remove it. The linker will correctly set bit 0 for Thumb2
-> kernels.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Dave Martin <dave.martin@linaro.org>
+Thanks, explicit termios(with flags) structure usage helped(log below), however, 
+the dependent Bluetooth uart driver switches the uart baud rates
+between 115K(during initialization), 9600(during low power) and
+4+M(data tfr), in this juncture I need to handle termios structure switching
+accordingly else I see c_cflags getting messed up effecting next baud switch change.
 
-Acked-by: Dave Martin <dave.martin@linaro.org>
+================================
+[    9.070648] alloc_set_baud_rate_cmd Setting arbitrary baudrate using BOTHER baudrate:89 c_cflag:020000016260
+[    9.164581] tty_termios_encode_baud_rate c_ispeed:4050000 c_ospeed:4050000 c_cflag:020000016260
+[    9.173278] tty_termios_encode_baud_rate checking precise weird baudrate c_cflag:020000006260 oclose:0 iclose:81000 ibinput:0
+[    9.187103] tty_termios_encode_baud_rate did we find close match? i:31 n_baud_table31 ifound:30 ofound:-1
+[    9.197570] tty_termios_encode_baud_rate BOTHER, c_cflag:022003616260
+[    9.214630] tty_termios_baud_rate:(Arb'ry baud set) c_cflag:022003616260 cbaud:010000
+[    9.222503] pl011_set_termios i_speed:4050000 o_speed:4050000
+[    9.231384] tty_termios_baud_rate:(Arb'ry baud set) c_cflag:022003616260 cbaud:010000
+[    9.246643] pl011_set_termios baud:4050000 uart_clk:38400000 port:0 IBRD:1 FBRD:12
+[    9.254730] XXXXXX-uart XXXXXX-uart.0: Baud rate changed to 4050000 baud
+================================
 
-> ---
->  arch/arm/mach-highbank/highbank.c |    3 +--
->  1 files changed, 1 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-> index 804c4a5..7afbe1e 100644
-> --- a/arch/arm/mach-highbank/highbank.c
-> +++ b/arch/arm/mach-highbank/highbank.c
-> @@ -25,7 +25,6 @@
->  #include <linux/smp.h>
->  
->  #include <asm/cacheflush.h>
-> -#include <asm/unified.h>
->  #include <asm/smp_scu.h>
->  #include <asm/hardware/arm_timer.h>
->  #include <asm/hardware/timer-sp.h>
-> @@ -76,7 +75,7 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
->  #ifdef CONFIG_SMP
->  	cpu = cpu_logical_map(cpu);
->  #endif
-> -	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
-> +	writel(virt_to_phys(jump_addr), HB_JUMP_TABLE_VIRT(cpu));
->  	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
->  	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
->  			  HB_JUMP_TABLE_PHYS(cpu) + 15);
-> -- 
-> 1.7.5.4
-> 
+Thanks,
+Rajanikanth
+
+> 4.05M Arbitrary Baud Setting Sequence:
+> [    9.664703] alloc_set_baud_rate_cmd Setting arbitrary baudrate using BOTHER baudrate:89 c_cflag:020000016262
+> [    9.774658] XXXXXX_hci_uart_set_baudrate c_cflag:020000016262 baud:4050000
+
+4050000 seems a bit odd - you want cflag&CBAUD == BOTHER so I'd expect
+the low bits to end rather different things to 6262 ?
+
+So something like
+
+	struct ktermios new = *tty->termios;
+	new.c_cflag &= ~(CBAUD|CIBAUD);
+	new.c_cflag |= BOTHER;
+	new.c_ispeed = 4050000;
+	new.c_ospeed = 4050000;
+	tty_set_termios(tty, &new);	/* Can sleep */
+
+	/* Returned new will now hold actual values selected */
+
+should do the trick providing the low level driver supports the rate.
+
+Alan
