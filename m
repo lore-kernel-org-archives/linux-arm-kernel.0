@@ -1,30 +1,33 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 13 Jan 2012 18:51:21 -0500 (EST)
-Subject: [RFC PATCH 01/10] rtc: sa1100: include mach/irqs.h instead of
- asm/irq.h
-In-Reply-To: <4F10BC7B.4040405@gmail.com>
-References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
- <1326472451-9002-2-git-send-email-robherring2@gmail.com>
- <20120113164336.GA1068@n2100.arm.linux.org.uk> <4F106299.8050306@gmail.com>
- <alpine.LFD.2.02.1201131536040.2722@xanadu.home> <4F10BC7B.4040405@gmail.com>
-Message-ID: <alpine.LFD.2.02.1201131847560.2722@xanadu.home>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 14 Jan 2012 09:10:33 +0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D1FAB@HQMAIL01.nvidia.com>
+References: <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A76A@HQMAIL01.nvidia.com>
+ <CAA+hA=RCmctmQJU4-k7YhzQDMi8KuyisBqOFhuMd3RV4_E=gCA@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D1FAB@HQMAIL01.nvidia.com>
+Message-ID: <20120114011029.GC1810@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jan 2012, Rob Herring wrote:
-
-> On 01/13/2012 02:46 PM, Nicolas Pitre wrote:
-> > Another problem that resources solve (and your original patch didn't 
-> > make it any better nor worse) has to do with include file search paths.  
-> > Once we start building more than one SOC in the kernel, we won't be able 
-> > to support the inclusion of <mach/whatever.h> from driver code anymore 
-> > since this could refer to more than one instances of 
-> > arch/arm/mach-*/include/mach/whatever.h.
+On Fri, Jan 13, 2012 at 10:33:21AM -0800, Stephen Warren wrote:
+> So of_device_alloc(), which is called by of_platform_populate() for each
+> device, already parses basic DT content such as reg and interrupts, and
+> converts them to Linux resources. I'd consider parsing any pinmux properties
+> and registering them with the pinctrl subsystem to be of a similar nature,
+> so adding some code to of_device_alloc() that calls a core pinmux function
+> to parse the DT node seems reasonable to me.
 > 
-> I'm fully aware of this issue and was not trying to solve that here.
+I hardly believe that device tree maintainers would agree here.
+Grant, Rob?
 
-I know you are aware (maybe I should have mentioned it explicitly).
-This comment was more for the wider audience.
-
-
-Nicolas
+-- 
+Regards,
+Shawn
