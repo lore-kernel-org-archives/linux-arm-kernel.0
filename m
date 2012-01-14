@@ -1,198 +1,636 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Sat, 14 Jan 2012 20:58:15 +0100
-Subject: [PATCH V3 4/4] CS89x0 : add CS89x0 platform device to the iMX31ADS
- board
-Message-ID: <1326571095-27921-1-git-send-email-jaccon.bastiaansen@gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sat, 14 Jan 2012 22:09:57 +0100
+Subject: [PATCH] cpufreq: Add S3C2416/S3C2450 cpufreq driver
+Message-ID: <201201142209.58453.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CS89x0 networking support to the iMX31ADS board by using the
-platform driver support in the CS89x0 driver.
+The S3C2416/S3C2450 SoCs support two sources for the armclk.
 
-Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+The first source is the so called armdiv which divides the msysclk down
+to provide necessary cpu rates. In this mode the core voltage must be
+always at 1.3V. The frequency from the armdiv is not allowed to be
+lower than the hclk frequency.
+
+In the second mode the armclk can be sourced directly from the hclk in
+the so called "dynamic voltags scaling" (dvs) mode. Here the armdiv
+isn't used at all. Also in this mode the core voltage may be lowered.
+Existing hardware and tests with it suggest 1.0V as sufficient.
+
+When changing the clock source to the armdiv from the hclk, the SoC
+shows stability issues if the new frequency is higher than the current
+hclk frequency. Hence the driver always forces the armdiv to the hclk
+frequency before the source change and lets the cpufreq issue another
+set_target call for higher frequencies.
+
+To mark the hclk frequency as lower as the corresponding armdiv
+frequency it is set 1MHz below the real frequency. This lets the cpufreq
+framework change between 133MHz based on hclk and 133MHz based on armdiv
+at will.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/configs/mx3_defconfig                 |    2 +
- arch/arm/mach-imx/mach-mx31ads.c               |   44 ++++++++++++++++++++++--
- arch/arm/plat-mxc/include/mach/board-mx31ads.h |   33 ------------------
- drivers/net/ethernet/cirrus/cs89x0.c           |    7 ----
- 4 files changed, 43 insertions(+), 43 deletions(-)
- delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
+changes since RFC: reboot-notifier to leave dvs mode on reboot
+and a lot of cleanups
 
-diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
-index cb0717f..5d2bc6e 100644
---- a/arch/arm/configs/mx3_defconfig
-+++ b/arch/arm/configs/mx3_defconfig
-@@ -66,6 +66,8 @@ CONFIG_NETDEVICES=y
- CONFIG_SMSC_PHY=y
- CONFIG_NET_ETHERNET=y
- CONFIG_SMSC911X=y
-+CONFIG_CS89x0=y
-+CONFIG_CS89x0_PLATFORM=y
- CONFIG_DNET=y
- # CONFIG_NETDEV_1000 is not set
- # CONFIG_NETDEV_10000 is not set
-diff --git a/arch/arm/mach-imx/mach-mx31ads.c b/arch/arm/mach-imx/mach-mx31ads.c
-index 9cc1a49..5dd4163 100644
---- a/arch/arm/mach-imx/mach-mx31ads.c
-+++ b/arch/arm/mach-imx/mach-mx31ads.c
-@@ -28,7 +28,6 @@
- #include <asm/memory.h>
- #include <asm/mach/map.h>
- #include <mach/common.h>
--#include <mach/board-mx31ads.h>
- #include <mach/iomux-mx3.h>
+ drivers/cpufreq/Kconfig.arm       |   22 ++
+ drivers/cpufreq/Makefile          |    1 +
+ drivers/cpufreq/s3c2416-cpufreq.c |  542 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 565 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/cpufreq/s3c2416-cpufreq.c
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 72a0044..56c1dca 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -2,6 +2,28 @@
+ # ARM CPU Frequency scaling drivers
+ #
  
- #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
-@@ -39,6 +38,9 @@
- 
- #include "devices-imx31.h"
- 
-+/* Base address of PBC controller */
-+#define PBC_BASE_ADDRESS	MX31_CS4_BASE_ADDR_VIRT
++config ARM_S3C2416_CPUFREQ
++	bool "S3C2416 CPU Frequency scaling support"
++	depends on CPU_S3C2416
++	help
++	  This adds the CPUFreq driver for the Samsung S3C2416 and
++	  S3C2450 SoC. The S3C2416 supports changing the rate of the
++	  armdiv clock source and also entering a so called dynamic
++	  voltage scaling mode in which it is possible to reduce the
++	  core voltage of the cpu.
 +
- /* PBC Board interrupt status register */
- #define PBC_INTSTATUS           0x000016
- 
-@@ -62,6 +64,7 @@
- #define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
- #define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
- 
-+#define MXC_EXP_IO_BASE		MXC_BOARD_IRQ_START
- #define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
- 
- #define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
-@@ -69,6 +72,11 @@
- 
- #define MXC_MAX_EXP_IO_LINES	16
- 
-+/* CS8900 */
-+#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
-+#define CS4_CS8900_MMIO_START	0x20000
-+#define CS4_CS8900_MMIO_END	0x2FFFF
++	  If in doubt, say N.
 +
- /*
-  * The serial port definition structure.
-  */
-@@ -101,11 +109,37 @@ static struct platform_device serial_device = {
- 	},
- };
- 
-+static const struct resource mx31ads_cs8900_resources[] __initconst = {
-+	{
-+		.start = MX31_CS4_BASE_ADDR + CS4_CS8900_MMIO_START,
-+		.end = MX31_CS4_BASE_ADDR + CS4_CS8900_MMIO_END,
-+		.flags = IORESOURCE_MEM
-+	},
-+	{
-+		.start = EXPIO_INT_ENET_INT,
-+		.end = EXPIO_INT_ENET_INT,
-+		.flags = IORESOURCE_IRQ
-+	}
++config ARM_S3C2416_CPUFREQ_VCORESCALE
++	bool "Allow voltage scaling for S3C2416 arm core (EXPERIMENTAL)"
++	depends on ARM_S3C2416_CPUFREQ && REGULATOR && EXPERIMENTAL
++	help
++	  Enable CPU voltage scaling when entering the dvs mode.
++	  It uses information gathered through existing hardware and
++	  tests but not documented in any datasheet.
++
++	  If in doubt, say N.
++
+ config ARM_S3C64XX_CPUFREQ
+ 	bool "Samsung S3C64XX"
+ 	depends on CPU_S3C6410
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index ce75fcb..98bb3e7 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -40,6 +40,7 @@ obj-$(CONFIG_X86_CPUFREQ_NFORCE2)	+= cpufreq-nforce2.o
+ ##################################################################################
+ # ARM SoC drivers
+ obj-$(CONFIG_UX500_SOC_DB8500)		+= db8500-cpufreq.o
++obj-$(CONFIG_ARM_S3C2416_CPUFREQ)	+= s3c2416-cpufreq.o
+ obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
+ obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
+diff --git a/drivers/cpufreq/s3c2416-cpufreq.c b/drivers/cpufreq/s3c2416-cpufreq.c
+new file mode 100644
+index 0000000..2d13b6b
+--- /dev/null
++++ b/drivers/cpufreq/s3c2416-cpufreq.c
+@@ -0,0 +1,542 @@
++/*
++ * S3C2416/2450 CPUfreq Support
++ *
++ * Copyright 2011 Heiko Stuebner <heiko@sntech.de>
++ *
++ * based on s3c64xx_cpufreq.c
++ *
++ * Copyright 2009 Wolfson Microelectronics plc
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/cpufreq.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/regulator/consumer.h>
++#include <linux/reboot.h>
++#include <linux/module.h>
++
++static DEFINE_MUTEX(cpufreq_lock);
++
++struct s3c2416_data {
++	struct clk *armdiv;
++	struct clk *armclk;
++	struct clk *hclk;
++
++	unsigned long regulator_latency;
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++	struct regulator *vddarm;
++#endif
++
++	struct cpufreq_frequency_table *freq_table;
++
++	bool is_dvs;
++	bool disable_dvs;
 +};
 +
-+static const struct platform_device_info mx31ads_cs8900_devinfo __initconst = {
-+	.name = "cs89x0",
-+	.id = 0,
-+	.res = mx31ads_cs8900_resources,
-+	.num_res = ARRAY_SIZE(mx31ads_cs8900_resources),
++static struct s3c2416_data s3c2416_cpufreq;
++
++struct s3c2416_dvfs {
++	unsigned int vddarm_min;
++	unsigned int vddarm_max;
 +};
 +
- static int __init mxc_init_extuart(void)
- {
- 	return platform_device_register(&serial_device);
- }
- 
-+static void __init mxc_init_ext_ethernet(void)
++/* pseudo-frequency for dvs mode */
++#define FREQ_DVS	132333
++
++/* frequency to sleep and reboot in
++ * it's essential to leave dvs, as some boards do not reconfigure the
++ * regulator on reboot
++ */
++#define FREQ_SLEEP	133333
++
++/* Sources for the ARMCLK */
++#define SOURCE_HCLK	0
++#define SOURCE_ARMDIV	1
++
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++/* S3C2416 only supports changing the voltage in the dvs-mode.
++ * Voltages down to 1.0V seem to work, so we take what the regulator
++ * can get us.
++ */
++static struct s3c2416_dvfs s3c2416_dvfs_table[] = {
++	[SOURCE_HCLK] = {  950000, 1250000 },
++	[SOURCE_ARMDIV] = { 1250000, 1350000 },
++};
++#endif
++
++static struct cpufreq_frequency_table s3c2416_freq_table[] = {
++	{ SOURCE_HCLK, FREQ_DVS },
++	{ SOURCE_ARMDIV, 133333 },
++	{ SOURCE_ARMDIV, 266666 },
++	{ SOURCE_ARMDIV, 400000 },
++	{ 0, CPUFREQ_TABLE_END },
++};
++
++static struct cpufreq_frequency_table s3c2450_freq_table[] = {
++	{ SOURCE_HCLK, FREQ_DVS },
++	{ SOURCE_ARMDIV, 133333 },
++	{ SOURCE_ARMDIV, 266666 },
++	{ SOURCE_ARMDIV, 533333 },
++	{ 0, CPUFREQ_TABLE_END },
++};
++
++static int s3c2416_cpufreq_verify_speed(struct cpufreq_policy *policy)
 +{
-+	platform_device_register_full(
-+		(struct platform_device_info *)&mx31ads_cs8900_devinfo);
++	struct s3c2416_data *s3c_freq = &s3c2416_cpufreq;
++
++	if (policy->cpu != 0)
++		return -EINVAL;
++
++	return cpufreq_frequency_table_verify(policy, s3c_freq->freq_table);
 +}
 +
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -492,12 +526,15 @@ static void __init mxc_init_audio(void)
- 	mxc_iomux_setup_multiple_pins(ssi_pins, ARRAY_SIZE(ssi_pins), "ssi");
- }
- 
--/* static mappings */
-+/*
-+ * static mappings, starting from the CS4 start address up to the start address
-+ * of the CS8900.
-+ */
- static struct map_desc mx31ads_io_desc[] __initdata = {
- 	{
- 		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
- 		.pfn		= __phys_to_pfn(MX31_CS4_BASE_ADDR),
--		.length		= MX31_CS4_SIZE / 2,
-+		.length		= CS4_CS8900_MMIO_START,
- 		.type		= MT_DEVICE
- 	},
- };
-@@ -522,6 +559,7 @@ static void __init mx31ads_init(void)
- 	mxc_init_imx_uart();
- 	mxc_init_i2c();
- 	mxc_init_audio();
-+	mxc_init_ext_ethernet();
- }
- 
- static void __init mx31ads_timer_init(void)
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31ads.h b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-deleted file mode 100644
-index 94b60dd..0000000
---- a/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-- */
--
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __ASM_ARCH_MXC_BOARD_MX31ADS_H__
--#define __ASM_ARCH_MXC_BOARD_MX31ADS_H__
--
--#include <mach/hardware.h>
--
--/*
-- * These symbols are used by drivers/net/cs89x0.c.
-- * This is ugly as hell, but we have to provide them until
-- * someone fixed the driver.
-- */
--
--/* Base address of PBC controller */
--#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
--/* Offsets for the PBC Controller register */
--
--/* Ethernet Controller IO base address */
--#define PBC_CS8900A_IOBASE      0x020000
--
--#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
--
--#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
--
--#endif /* __ASM_ARCH_MXC_BOARD_MX31ADS_H__ */
-diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-index 9ae248e..40c11f6 100644
---- a/drivers/net/ethernet/cirrus/cs89x0.c
-+++ b/drivers/net/ethernet/cirrus/cs89x0.c
-@@ -182,13 +182,6 @@ static unsigned int cs8900_irq_map[] = {IRQ_IXDP2351_CS8900, 0, 0, 0};
- #define CS89x0_NONISA_IRQ
- static unsigned int netcard_portlist[] __used __initdata = {IXDP2X01_CS8900_VIRT_BASE, 0};
- static unsigned int cs8900_irq_map[] = {IRQ_IXDP2X01_CS8900, 0, 0, 0};
--#elif defined(CONFIG_MACH_MX31ADS)
--#define CS89x0_NONISA_IRQ
--#include <mach/board-mx31ads.h>
--static unsigned int netcard_portlist[] __used __initdata = {
--	PBC_BASE_ADDRESS + PBC_CS8900A_IOBASE + 0x300, 0
--};
--static unsigned cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
- #else
- #ifndef CONFIG_CS89x0_PLATFORM
- static unsigned int netcard_portlist[] __used __initdata =
++static unsigned int s3c2416_cpufreq_get_speed(unsigned int cpu)
++{
++	struct s3c2416_data *s3c_freq = &s3c2416_cpufreq;
++
++	if (cpu != 0)
++		return 0;
++
++	/* return our pseudo-frequency when in dvs mode */
++	if (s3c_freq->is_dvs)
++		return FREQ_DVS;
++
++	return clk_get_rate(s3c_freq->armclk) / 1000;
++}
++
++static int s3c2416_cpufreq_set_armdiv(struct s3c2416_data *s3c_freq,
++				      unsigned int freq)
++{
++	int ret;
++
++	if (clk_get_rate(s3c_freq->armdiv) / 1000 != freq) {
++		ret = clk_set_rate(s3c_freq->armdiv, freq * 1000);
++		if (ret < 0) {
++			pr_err("cpufreq: Failed to set armdiv rate %dkHz: %d\n",
++			       freq, ret);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int s3c2416_cpufreq_enter_dvs(struct s3c2416_data *s3c_freq, int idx)
++{
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++	struct s3c2416_dvfs *dvfs;
++#endif
++	int ret;
++
++	if (s3c_freq->is_dvs) {
++		pr_debug("cpufreq: already in dvs mode, nothing to do\n");
++		return 0;
++	}
++
++	pr_debug("cpufreq: switching armclk to hclk (%lukHz)\n",
++		 clk_get_rate(s3c_freq->hclk) / 1000);
++	ret = clk_set_parent(s3c_freq->armclk, s3c_freq->hclk);
++	if (ret < 0) {
++		pr_err("cpufreq: Failed to switch armclk to hclk: %d\n", ret);
++		return ret;
++	}
++
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++	/* changing the core voltage is only allowed when in dvs mode */
++	if (s3c_freq->vddarm) {
++		dvfs = &s3c2416_dvfs_table[idx];
++
++		pr_debug("cpufreq: setting regultor to %d-%d\n",
++			 dvfs->vddarm_min, dvfs->vddarm_max);
++		ret = regulator_set_voltage(s3c_freq->vddarm,
++					    dvfs->vddarm_min,
++					    dvfs->vddarm_max);
++
++		/* when lowering the voltage failed, there is nothing to do */
++		if (ret != 0)
++			pr_err("cpufreq: Failed to set VDDARM: %d\n", ret);
++	}
++#endif
++
++	s3c_freq->is_dvs = 1;
++
++	return 0;
++}
++
++static int s3c2416_cpufreq_leave_dvs(struct s3c2416_data *s3c_freq, int idx)
++{
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++	struct s3c2416_dvfs *dvfs;
++#endif
++	int ret;
++
++	if (!s3c_freq->is_dvs) {
++		pr_debug("cpufreq: not in dvs mode, so can't leave\n");
++		return 0;
++	}
++
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++	if (s3c_freq->vddarm) {
++		dvfs = &s3c2416_dvfs_table[idx];
++
++		pr_debug("cpufreq: setting regultor to %d-%d\n",
++			 dvfs->vddarm_min, dvfs->vddarm_max);
++		ret = regulator_set_voltage(s3c_freq->vddarm,
++					    dvfs->vddarm_min,
++					    dvfs->vddarm_max);
++		if (ret != 0) {
++			pr_err("cpufreq: Failed to set VDDARM: %d\n", ret);
++			return ret;
++		}
++	}
++#endif
++
++	/* force armdiv to hclk frequency for transition from dvs*/
++	if (clk_get_rate(s3c_freq->armdiv) > clk_get_rate(s3c_freq->hclk)) {
++		pr_debug("cpufreq: force armdiv to hclk frequency (%lukHz)\n",
++			 clk_get_rate(s3c_freq->hclk) / 1000);
++		ret = s3c2416_cpufreq_set_armdiv(s3c_freq,
++					clk_get_rate(s3c_freq->hclk) / 1000);
++		if (ret < 0) {
++			pr_err("cpufreq: Failed to to set the armdiv to %lukHz: %d\n",
++			       clk_get_rate(s3c_freq->hclk) / 1000, ret);
++			return ret;
++		}
++	}
++
++	pr_debug("cpufreq: switching armclk parent to armdiv (%lukHz)\n",
++			clk_get_rate(s3c_freq->armdiv) / 1000);
++
++	ret = clk_set_parent(s3c_freq->armclk, s3c_freq->armdiv);
++	if (ret < 0) {
++		pr_err("cpufreq: Failed to switch armclk clock parent to armdiv: %d\n",
++		       ret);
++		return ret;
++	}
++
++	s3c_freq->is_dvs = 0;
++
++	return 0;
++}
++
++static int s3c2416_cpufreq_set_target(struct cpufreq_policy *policy,
++				      unsigned int target_freq,
++				      unsigned int relation)
++{
++	struct s3c2416_data *s3c_freq = &s3c2416_cpufreq;
++	struct cpufreq_freqs freqs;
++	int idx, ret, to_dvs = 0;
++	unsigned int i;
++
++	mutex_lock(&cpufreq_lock);
++
++	pr_debug("cpufreq: to %dKHz, relation %d\n", target_freq, relation);
++
++	ret = cpufreq_frequency_table_target(policy, s3c_freq->freq_table,
++					     target_freq, relation, &i);
++	if (ret != 0)
++		goto out;
++
++	idx = s3c_freq->freq_table[i].index;
++
++	if (idx == SOURCE_HCLK)
++		to_dvs = 1;
++
++	/* switching to dvs when it's not allowed */
++	if (to_dvs && s3c_freq->disable_dvs) {
++		pr_debug("cpufreq: entering dvs mode not allowed\n");
++		ret = -EINVAL;
++		goto out;
++	}
++
++	freqs.cpu = 0;
++	freqs.flags = 0;
++	freqs.old = s3c_freq->is_dvs ? FREQ_DVS
++				     : clk_get_rate(s3c_freq->armclk) / 1000;
++
++	/* When leavin dvs mode, always switch the armdiv to the hclk rate
++	 * The S3C2416 has stability issues when switching directly to
++	 * higher frequencies.
++	 */
++	freqs.new = (s3c_freq->is_dvs && !to_dvs)
++				? clk_get_rate(s3c_freq->hclk) / 1000
++				: s3c_freq->freq_table[i].frequency;
++
++	pr_debug("cpufreq: Transition %d-%dkHz\n", freqs.old, freqs.new);
++
++	if (!to_dvs && freqs.old == freqs.new)
++		goto out;
++
++	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++
++	if (to_dvs) {
++		pr_debug("cpufreq: enter dvs\n");
++		ret = s3c2416_cpufreq_enter_dvs(s3c_freq, idx);
++	} else if (s3c_freq->is_dvs) {
++		pr_debug("cpufreq: leave dvs\n");
++		ret = s3c2416_cpufreq_leave_dvs(s3c_freq, idx);
++	} else {
++		pr_debug("cpufreq: change armdiv to %dkHz\n", freqs.new);
++		ret = s3c2416_cpufreq_set_armdiv(s3c_freq, freqs.new);
++	}
++
++	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++
++out:
++	mutex_unlock(&cpufreq_lock);
++
++	return ret;
++}
++
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++static void __init s3c2416_cpufreq_cfg_regulator(struct s3c2416_data *s3c_freq)
++{
++	int count, v, i, found;
++	struct cpufreq_frequency_table *freq;
++	struct s3c2416_dvfs *dvfs;
++
++	count = regulator_count_voltages(s3c_freq->vddarm);
++	if (count < 0) {
++		pr_err("cpufreq: Unable to check supported voltages\n");
++		return;
++	}
++
++	freq = s3c_freq->freq_table;
++	while (count > 0 && freq->frequency != CPUFREQ_TABLE_END) {
++		if (freq->frequency == CPUFREQ_ENTRY_INVALID)
++			continue;
++
++		dvfs = &s3c2416_dvfs_table[freq->index];
++		found = 0;
++
++		/* Check only the min-voltage, more is always ok on S3C2416 */
++		for (i = 0; i < count; i++) {
++			v = regulator_list_voltage(s3c_freq->vddarm, i);
++			if (v >= dvfs->vddarm_min)
++				found = 1;
++		}
++
++		if (!found) {
++			pr_debug("cpufreq: %dkHz unsupported by regulator\n",
++				 freq->frequency);
++			freq->frequency = CPUFREQ_ENTRY_INVALID;
++		}
++
++		freq++;
++	}
++
++	/* Guessed */
++	s3c_freq->regulator_latency = 1 * 1000 * 1000;
++}
++#endif
++
++static int s3c2416_cpufreq_reboot_notifier_evt(struct notifier_block *this,
++					       unsigned long event, void *ptr)
++{
++	struct s3c2416_data *s3c_freq = &s3c2416_cpufreq;
++	int ret;
++
++	mutex_lock(&cpufreq_lock);
++
++	/* disable further changes */
++	s3c_freq->disable_dvs = 1;
++
++	mutex_unlock(&cpufreq_lock);
++
++	/* some boards don't reconfigure the regulator on reboot, which
++	 * could lead to undervolting the cpu when the clock is reset.
++	 * Therefore we always leave the DVS mode on reboot.
++	 */
++	if (s3c_freq->is_dvs) {
++		pr_debug("cpufreq: leave dvs on reboot\n");
++		ret = cpufreq_driver_target(cpufreq_cpu_get(0), FREQ_SLEEP, 0);
++		if (ret < 0)
++			return NOTIFY_BAD;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block s3c2416_cpufreq_reboot_notifier = {
++	.notifier_call = s3c2416_cpufreq_reboot_notifier_evt,
++};
++
++static int __init s3c2416_cpufreq_driver_init(struct cpufreq_policy *policy)
++{
++	struct s3c2416_data *s3c_freq = &s3c2416_cpufreq;
++	struct cpufreq_frequency_table *freq;
++	struct clk *msysclk;
++	unsigned long rate;
++	int ret;
++
++	if (policy->cpu != 0)
++		return -EINVAL;
++
++	msysclk = clk_get(NULL, "msysclk");
++	if (IS_ERR(msysclk)) {
++		ret = PTR_ERR(msysclk);
++		pr_err("cpufreq: Unable to obtain msysclk: %d\n", ret);
++		return ret;
++	}
++
++	/*
++	 * S3C2416 and S3C2450 share the same processor-ID and also provide no
++	 * other means to distinguish them other than through the rate of
++	 * msysclk. On S3C2416 msysclk runs at 800MHz and on S3C2450 at 533MHz.
++	 */
++	rate = clk_get_rate(msysclk);
++	if (rate == 800 * 1000 * 1000) {
++		pr_info("cpufreq: msysclk running at %lukHz, using S3C2416 frequency table\n",
++			rate / 1000);
++		s3c_freq->freq_table = s3c2416_freq_table;
++		policy->cpuinfo.max_freq = 400000;
++	} else if (rate / 1000 == 533333) {
++		pr_info("cpufreq: msysclk running at %lukHz, using S3C2450 frequency table\n",
++			rate / 1000);
++		s3c_freq->freq_table = s3c2450_freq_table;
++		policy->cpuinfo.max_freq = 533333;
++	}
++
++	/* not needed anymore */
++	clk_put(msysclk);
++
++	if (s3c_freq->freq_table == NULL) {
++		pr_err("cpufreq: No frequency information for this CPU, msysclk at %lukHz\n",
++		       rate / 1000);
++		return -ENODEV;
++	}
++
++	s3c_freq->is_dvs = 0;
++
++	s3c_freq->armdiv = clk_get(NULL, "armdiv");
++	if (IS_ERR(s3c_freq->armdiv)) {
++		ret = PTR_ERR(s3c_freq->armdiv);
++		pr_err("cpufreq: Unable to obtain ARMDIV: %d\n", ret);
++		return ret;
++	}
++
++	s3c_freq->hclk = clk_get(NULL, "hclk");
++	if (IS_ERR(s3c_freq->hclk)) {
++		ret = PTR_ERR(s3c_freq->hclk);
++		pr_err("cpufreq: Unable to obtain HCLK: %d\n", ret);
++		goto err_hclk;
++	}
++
++	/* chech hclk rate, we only support the common 133MHz for now
++	 * hclk could also run at 66MHz, but this not often used
++	 */
++	rate = clk_get_rate(s3c_freq->hclk);
++	if (rate < 133 * 1000 * 1000) {
++		pr_err("cpufreq: HCLK not@133MHz\n");
++		clk_put(s3c_freq->hclk);
++		ret = -EINVAL;
++		goto err_armclk;
++	}
++
++	s3c_freq->armclk = clk_get(NULL, "armclk");
++	if (IS_ERR(s3c_freq->armclk)) {
++		ret = PTR_ERR(s3c_freq->armclk);
++		pr_err("cpufreq: Unable to obtain ARMCLK: %d\n", ret);
++		goto err_armclk;
++	}
++
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++	s3c_freq->vddarm = regulator_get(NULL, "vddarm");
++	if (IS_ERR(s3c_freq->vddarm)) {
++		ret = PTR_ERR(s3c_freq->vddarm);
++		pr_err("cpufreq: Failed to obtain VDDARM: %d\n", ret);
++		goto err_vddarm;
++	}
++
++	s3c2416_cpufreq_cfg_regulator(s3c_freq);
++#else
++	s3c_freq->regulator_latency = 0;
++#endif
++
++	freq = s3c_freq->freq_table;
++	while (freq->frequency != CPUFREQ_TABLE_END) {
++		/* special handling for dvs mode */
++		if (freq->index == 0) {
++			if (!s3c_freq->hclk) {
++				pr_debug("cpufreq: %dkHz unsupported as it would need unavailable dvs mode\n",
++					 freq->frequency);
++				freq->frequency = CPUFREQ_ENTRY_INVALID;
++			} else {
++				freq++;
++				continue;
++			}
++		}
++
++		/* Check for frequencies we can generate */
++		rate = clk_round_rate(s3c_freq->armdiv,
++				      freq->frequency * 1000);
++		rate /= 1000;
++		if (rate != freq->frequency) {
++			pr_debug("cpufreq: %dkHz unsupported by clock (clk_round_rate return %lu)\n",
++				 freq->frequency, rate);
++			freq->frequency = CPUFREQ_ENTRY_INVALID;
++		}
++
++		freq++;
++	}
++
++	policy->cur = clk_get_rate(s3c_freq->armclk) / 1000;
++
++	/* Datasheet says PLL stabalisation time must be at least 300us,
++	 * so but add some fudge. (reference in LOCKCON0 register description)
++	 */
++	policy->cpuinfo.transition_latency = (500 * 1000) +
++					     s3c_freq->regulator_latency;
++
++	ret = cpufreq_frequency_table_cpuinfo(policy, s3c_freq->freq_table);
++	if (ret)
++		goto err_freq_table;
++
++	cpufreq_frequency_table_get_attr(s3c_freq->freq_table, 0);
++
++	register_reboot_notifier(&s3c2416_cpufreq_reboot_notifier);
++
++	return 0;
++
++err_freq_table:
++#ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
++	regulator_put(s3c_freq->vddarm);
++err_vddarm:
++#endif
++	clk_put(s3c_freq->armclk);
++err_armclk:
++	clk_put(s3c_freq->hclk);
++err_hclk:
++	clk_put(s3c_freq->armdiv);
++
++	return ret;
++}
++
++static struct freq_attr *s3c2416_cpufreq_attr[] = {
++	&cpufreq_freq_attr_scaling_available_freqs,
++	NULL,
++};
++
++static struct cpufreq_driver s3c2416_cpufreq_driver = {
++	.owner		= THIS_MODULE,
++	.flags          = 0,
++	.verify		= s3c2416_cpufreq_verify_speed,
++	.target		= s3c2416_cpufreq_set_target,
++	.get		= s3c2416_cpufreq_get_speed,
++	.init		= s3c2416_cpufreq_driver_init,
++	.name		= "s3c2416",
++	.attr		= s3c2416_cpufreq_attr,
++};
++
++static int __init s3c2416_cpufreq_init(void)
++{
++	return cpufreq_register_driver(&s3c2416_cpufreq_driver);
++}
++module_init(s3c2416_cpufreq_init);
 -- 
-1.7.1
+1.7.2.3
