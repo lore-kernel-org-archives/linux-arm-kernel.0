@@ -1,58 +1,77 @@
-From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
-Date: Sat, 14 Jan 2012 13:59:17 +0100
-Subject: [PATCH 2/2] mach-sa1100: modernize and cleanup timer code
-In-Reply-To: <20120114120924.GQ1068@n2100.arm.linux.org.uk>
-References: <1325672513-16725-1-git-send-email-linus.walleij@linaro.org>
- <20120112161034.GE2645@Boggieman>
- <CACRpkdYZaxfArU3_i3RuhxT1-wMM80gn6pnZG_mMwg=Ba-oRgQ@mail.gmail.com>
- <20120114084221.GM1068@n2100.arm.linux.org.uk>
- <CACRpkdYSKSV2cGrk5zTP5FhkkUc2Gvz344C=kqeheMAyNsfV8Q@mail.gmail.com>
- <20120114120924.GQ1068@n2100.arm.linux.org.uk>
-Message-ID: <20120114125917.GA2915@Boggieman>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 14 Jan 2012 09:06:08 -0600
+Subject: [PATCH v2 10/15] ARM: highbank: convert to
+ twd_local_timer_register() interface
+In-Reply-To: <20120114024126.GE1810@S2101-09.ap.freescale.net>
+References: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
+ <1326479322-6033-11-git-send-email-marc.zyngier@arm.com>
+ <4F1080EB.1010909@gmail.com>
+ <20120114024126.GE1810@S2101-09.ap.freescale.net>
+Message-ID: <4F1199E0.5000003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2012 at 12:09:24PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Jan 14, 2012 at 12:41:21PM +0100, Linus Walleij wrote:
-> > 2012/1/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > > On Sat, Jan 14, 2012 at 08:33:54AM +0100, Linus Walleij wrote:
-> > >> On Thu, Jan 12, 2012 at 5:10 PM, Kristoffer Ericson
-> > >> <kristoffer.ericson@gmail.com> wrote:
-> > >>
-> > >> > Urs?kta f?rseningen, fick n?got minne kring att cpu klockningen inte fungerade korrekt
-> > >> > om man inte satte direkt systemklock v?rde. Var n?got som pratade med russell om
-> > >> > f?r n?got ?r sedan.
-> > >>
-> > >> Menar du detta:
-> > >> MIN_OSCR_DELTA * 2
-> > >>
-> > >> S? ?r det ju med i den nya koden oxo, det ?r ingen semantisk skillnad
-> > >> s? vitt jag kan se...
-> > >>
-> > >> Det enda som egentligen ?ndras ?r att minimum lapse mellan tv? events
-> > >> (mult+shift) ber?knas av clockevent core.
-> > >
-> > > If you speak english on these lists, other people might be able to
-> > > understand what you're saying.
-> > 
+On 01/13/2012 08:41 PM, Shawn Guo wrote:
+> On Fri, Jan 13, 2012 at 01:07:23PM -0600, Rob Herring wrote:
+>> On 01/13/2012 12:28 PM, Marc Zyngier wrote:
+>>> Add support for the new smp_twd runtime registration interface
+>>> to the highbank platforms, and remove the old compile-time support.
+>>>
+>>> The highbank DTS file is updated to match the TWD DT documentation.
+>>>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> A couple of minor things below. Otherwise,
+>>
+>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>>
+>>> ---
+>>>  arch/arm/boot/dts/highbank.dts      |    4 +-
+>>>  arch/arm/mach-highbank/Makefile     |    1 -
+>>>  arch/arm/mach-highbank/highbank.c   |    5 ++++
+>>>  arch/arm/mach-highbank/localtimer.c |   40 -----------------------------------
+>>>  4 files changed, 7 insertions(+), 43 deletions(-)
+>>>  delete mode 100644 arch/arm/mach-highbank/localtimer.c
+>>>
+>>> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
+>>> index 305635b..661373a 100644
+>>> --- a/arch/arm/boot/dts/highbank.dts
+>>> +++ b/arch/arm/boot/dts/highbank.dts
+>>> @@ -72,13 +72,13 @@
+>>>  		ranges;
+>>>  
+>>>  		timer at fff10600 {
+>>> -			compatible = "arm,smp-twd";
+>>> +			compatible = "arm,cortex-a9-twd-timer";
+>>>  			reg = <0xfff10600 0x20>;
+>>>  			interrupts = <1 13 0xf04>;
+>>
+>> Would you mind fixing these to be edge triggered.
+>>
+> This would just be an indication, since not only SGI but also PPI has
+> a read-only Interrupt Configuration Register.  So does the patch below
+> make sense?
 
-Sorry, same mistake here :)
+That is implementation dependent for PPIs IIRC. Whether it's
+programmable or not, you still need to know the type of interrupt
+(although it doesn't seem to matter here).
 
+Rob
 
-> > Haha sorry Russell I didn't notice that the response was in LAKML :-)
-> > 
-> > So Kristoffer remarked that the CPU clocking was sensitive on the
-> > SA1100 so he wanted to test it first.
-> > 
-> > And I said that apart from the minimum scheduling interval now
-> > handled by the clockevent core it should be semantically equivalent.
-> > 
-> > But it never hurts to test it so I'll wait for Kristoffers ACK.
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index b2dc2dd..23a075f 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -186,8 +186,8 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+>         bool enabled = false;
+>         u32 val;
 > 
-
-Ive looked at it and it checks out as you said. So acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
-After Russels suggestion of course.
-
-
-> The only point I have on the patch is that it shouldn't use CLOCK_TICK_RATE
-> lets try to get away from this horrible definition in mach/timex.h.
+> -       /* Interrupt configuration for SGIs can't be changed */
+> -       if (gicirq < 16)
+> +       /* Interrupt configuration for SGIs and PPIs can't be changed */
+> +       if (gicirq < 32)
+>                 return -EINVAL;
+> 
+>         if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+> 
