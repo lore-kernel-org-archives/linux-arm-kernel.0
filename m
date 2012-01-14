@@ -1,116 +1,105 @@
-From: hughd@google.com (Hugh Dickins)
-Date: Sat, 14 Jan 2012 09:36:37 -0800 (PST)
-Subject: [RFC PATCH] proc: clear_refs: do not clear reserved pages
-In-Reply-To: <alpine.LFD.2.02.1201131748380.2722@xanadu.home>
-References: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1201131748380.2722@xanadu.home>
-Message-ID: <alpine.LSU.2.00.1201140901260.2381@eggly.anvils>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sun, 15 Jan 2012 01:58:03 +0800
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D1FAB@HQMAIL01.nvidia.com>
+References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
+ <1324402840-32451-3-git-send-email-b29396@freescale.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A76A@HQMAIL01.nvidia.com>
+ <CAA+hA=RCmctmQJU4-k7YhzQDMi8KuyisBqOFhuMd3RV4_E=gCA@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D1FAB@HQMAIL01.nvidia.com>
+Message-ID: <CAA+hA=TKNS+rYZ34Ev9ebRF12CEfBQQY71E+GUKNJoWHZTgLWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jan 2012, Nicolas Pitre wrote:
-> On Fri, 13 Jan 2012, Will Deacon wrote:
-> 
-> > /proc/pid/clear_refs is used to clear the Referenced and YOUNG bits for
-> > pages and corresponding page table entries of the task with PID pid,
-> > which includes any special mappings inserted into the page tables in
-> > order to provide things like vDSOs and user helper functions.
-> > 
-> > On ARM this causes a problem because the vectors page is mapped as a
-> > global mapping and since ec706dab ("ARM: add a vma entry for the user
-> > accessible vector page"), a VMA is also inserted into each task for this
-> > page to aid unwinding through signals and syscall restarts. Since the
-> > vectors page is required for handling faults, clearing the YOUNG bit
-> > (and subsequently writing a faulting pte) means that we lose the vectors
-> > page *globally* and cannot fault it back in. This results in a system
-> > deadlock on the next exception.
-> > 
-> > This patch avoids clearing the aforementioned bits for reserved pages,
-> > therefore leaving the vectors page intact on ARM. Since reserved pages
-> > are not candidates for swap, this change should not have any impact on
-> > the usefulness of clear_refs.
-> > 
-> > Cc: David Rientjes <rientjes@google.com>
-> > Cc: Andrew Morton <akpm@linux-foundation.org>
-> > Cc: Nicolas Pitre <nico@fluxnic.net>
-> > Reported-by: Moussa Ba <moussaba@micron.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Given Andrew's answer, this should be fine wrt Russell's concern.
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+On Sat, Jan 14, 2012 at 2:33 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Dong Aisheng wrote at Friday, January 13, 2012 10:12 AM:
+>> On Thu, Jan 12, 2012 at 4:17 AM, Stephen Warren <swarren@nvidia.com> wrote:
+>> ...
+>> >> To keep consistency as the currently design of pinctrl subsystem and also meet
+>> >> the dt design philosophy, we still do not introduce a pinmux map in dt.
+>> >> Instead, we choose to scan all the device node with a 'pinmux' phandle to construct
+>> >> a pinmux map table before register the pin controller device(here we may also scan
+>> >> the hog_on_boot node) and I guess it's easy to do that.
+>> > ...
+>> >> (Without scan the device node to construct the pinmux map table, we can only get the map
+>> >> Information when we run the pinmux_get.
+>> >> See: https://lkml.org/lkml/2012/1/5/153
+>> >> So no pinmux map table exists and we surely do not want to see that the sysfs exporting
+>> >> pinmux map information works in dt but unwork in non-dt)
+>> >
+>> > Hmmm. I'm not sure that the pinctrl code should actively scan all nodes
+>> > in the device tree for pin mux properties. That seems a little invasive;
+>> > how does pinctrl know which nodes it really should be looking at, and
+>> > which nodes are random internal parts of some device's custom binding?
+>> >
+>> > Personally, I think I'd be OK with the sysfs pinctrl map file only
+>> > containing the map entries for devices that had used the pinctrl API,
+>> > and hence only parsing the pinmux properties in pinmux_get().
+>> >
+>> > However, we could perhaps do better by registering a bus notifier, and
+>> > pro-actively parsing the top-level DT node (if there is one) for every
+>> > device that is created. That way, the mapping would be parsed as soon
+>> > as the device was created (or perhaps after probe?).
+>>
+>> After refer to usb bus notifier, usb core will register a bus notifier.
+>> When a new usb bus is registered, it will notify the usb core for a
+>> new bus added.
+>>
+>> So i guess you mean pinctrl core provides a notifier to handle the map
+>> creation when new map is found during parsing each device node, right?
+>
+> Yes.
+>
+>> But it seems parsing of device node and creation of device is at the very early
+>> stage when call of_platform_populate in .init_machine code and pinctrl subsystem
+>> may still have not change to run to register a bus notifier.
+>
+> That's possible. There are some early initcalls that might work out
+> fine for this,
+Ok, looks .init_machine is the level of ARCH_INIT, will try a earlier one.
+and we may add that init function in pinctrl core if it's reasonable.
 
-Yes, it should be okay as an urgent fix for -stable.
-But going forward, I doubt it's the right answer: comments below.
+> but...
+but what?
 
-> 
-> > An aside: if you want to see this problem in action, just run:
-> > 
-> > $ echo 1 > /proc/self/clear_refs
-> > 
-> > on an ARM platform (as any user) and watch your system hang. I think this
-> > has been the case since 2.6.37, so I'll CC stable once people are happy
-> > with the fix.
-> > 
-> >  fs/proc/task_mmu.c |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-> > index e418c5a..7dcd2a2 100644
-> > --- a/fs/proc/task_mmu.c
-> > +++ b/fs/proc/task_mmu.c
-> > @@ -518,6 +518,9 @@ static int clear_refs_pte_range(pmd_t *pmd, unsigned long addr,
+>
+>> And i'm not sure it's the right place for of_platform.c to handle
+>> pinmux things when create new devices.
+>
+> So of_device_alloc(), which is called by of_platform_populate() for each
+> device, already parses basic DT content such as reg and interrupts, and
+> converts them to Linux resources. I'd consider parsing any pinmux properties
+> and registering them with the pinctrl subsystem to be of a similar nature,
+> so adding some code to of_device_alloc() that calls a core pinmux function
+> to parse the DT node seems reasonable to me.
+>
+It's not perfect to me since pinmux map looks not the pure hw
+conception like reg/int.
+but i wonder if we can find a better way, (scanning?)
 
-What got me worried was the line just above the context shown below:
-    		page = vm_normal_page(vma, addr, ptent);
-> >  		if (!page)
-> >  			continue;
-
-This is not a normal page, and it's worrying that vm_normal_page() did
-not catch it: I wonder how many other places that could be a problem
-(but I have not actually identified any).
-
-vm_normal_page() doesn't catch it because at the time it was written,
-we thought we were on the point of removing both PageReserved and
-VM_RESERVED (both of whose meanings are imprecise), and there was no
-need for it to check either of them.  But nobody found time to do the
-final (not entirely trivial) cleanup, removing the definitions.
-
-Maybe ec706dab added a need for it to check one of those; though you
-can understand my reluctance to spread PageReserved any further than
-it goes already.  I was looking for VM_ flags which might serve you
-better, when I thought...
-
-This is a horrible hack vma, which is very liable to introduce bugs
-of this nature, because not many people are at all aware of it.
-But we've had a horrible hack vma for years, the gate_vma (see
-mm/memory.c), and that seems to share many characteristics with your
-vectors page (most notably, being in kernel not user address space).
-
-Please, going forward, can you delete your vectors page code, and
-use the gate_vma for it?  Extending it a little if it somehow does
-not satsify your need.  Or else can you please explain (ec706dab
-does not) why the gate_vma does not suit you.
-
-I'm not saying the horrible hack gate_vma mechanism is any safer
-than yours (the latest bug in it was fixed all of 13 days ago).
-But I am saying that one horrible hack is safer than two.
-
-> >  
-> > +		if (PageReserved(page))
-> > +			continue;
-
-Let's note in passing that this does change the "behaviour" of clear_refs
-on the ZERO_PAGE; but it doesn't make any functional difference, we just
-need to be aware of it, in case someone tries examining /proc/pid/smaps
-after /proc/pid/clear_refs, and complains that some pages are left marked
-referenced which were cleared before.  Doesn't make a real difference.
-
-> > +
-> >  		/* Clear accessed and referenced bits. */
-> >  		ptep_test_and_clear_young(vma, addr, pte);
-> >  		ClearPageReferenced(page);
-> > -- 
-> > 1.7.4.1
-
-Hugh
+>> I wonder it may not work for pinmux map case.
+>> If pinctrl core does not provide notifier, who else can be the right
+>> one to privide it?
+>>
+>> > The only case this
+>> > might not cover is DT nodes for which the kernel doesn't actually have
+>> > a driver, and hence no device is created.
+>>
+>> Per my understanding, the device creation should be independent on the driver.
+>> I don't know why no device is created if not have a driver.
+>> Did i miss something?
+>
+> Yes, I think the device gets created irrespective, so this isn't actually a problem
+>
+> --
+> nvpublic
+>
