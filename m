@@ -1,105 +1,117 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 15 Jan 2012 01:58:03 +0800
+Date: Sun, 15 Jan 2012 02:21:19 +0800
 Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
  mappings
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D1FAB@HQMAIL01.nvidia.com>
-References: <1324402840-32451-1-git-send-email-b29396@freescale.com>
- <1324402840-32451-3-git-send-email-b29396@freescale.com>
- <74CDBE0F657A3D45AFBB94109FB122FF176BE92F00@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+In-Reply-To: <20120114012213.GD1810@S2101-09.ap.freescale.net>
+References: <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
  <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
  <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
  <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A76A@HQMAIL01.nvidia.com>
- <CAA+hA=RCmctmQJU4-k7YhzQDMi8KuyisBqOFhuMd3RV4_E=gCA@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D1FAB@HQMAIL01.nvidia.com>
-Message-ID: <CAA+hA=TKNS+rYZ34Ev9ebRF12CEfBQQY71E+GUKNJoWHZTgLWw@mail.gmail.com>
+ <20120107135445.GI4790@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6E5@HQMAIL01.nvidia.com>
+ <20120112033941.GH20968@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D1DCC@HQMAIL01.nvidia.com>
+ <20120113034558.GA12184@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D1F9D@HQMAIL01.nvidia.com>
+ <20120114012213.GD1810@S2101-09.ap.freescale.net>
+Message-ID: <CAA+hA=TrT=KSJGRyMeqW8u2BQ0xdW1o7hpJFENwRP7povc7ONg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2012 at 2:33 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Dong Aisheng wrote at Friday, January 13, 2012 10:12 AM:
->> On Thu, Jan 12, 2012 at 4:17 AM, Stephen Warren <swarren@nvidia.com> wrote:
+On Sat, Jan 14, 2012 at 9:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Fri, Jan 13, 2012 at 10:16:36AM -0800, Stephen Warren wrote:
+> ...
+>> For reference, that message is:
+>>
+>> Linusw wrote:
+>> > On Mon, Dec 5, 2011 at 3:43 AM, Dong Aisheng <dongas86 <at> gmail.com> wrote:
+>> > > My current plan is to define all (might be frequently) used functoin
+>> > > and groups for the exist upstreamed board like 53 Loco and etc, is
+>> > > that ok?
+>> >
+>> > Yes, but do it in respective board file, so if we say, one day
+>> > stops to support a certain board we can just delete that board
+>> > file and be done with it.
+>> >
+>> > Plus this gives us a nice separation as we move toward
+>> > device trees. (I think.)
+>>
+>> My interpretation of what Dong wrote there is "I'm only going to define
+>> the functions and groups that are actually in use by upstream boards,
+>> not everything the SoC supports". However, your (Shawn's) references to
+>> the email, it sounds like you're interpreting what Dong wrong as "I'm
+>> going to define some virtual groups that don't exist in HW but represent
+>> common use-cases of the HW".
+>>
+> Then what does the word 'groups' in Dong's sentence means with your
+> understanding, considering there is no HW level pingroup on imx?
+>
+>> Admittedly, the wording of Linusw's actually seems to agree more with how
+>> you're interpreting what Dong said, but in that case, I don't think his
+>> reply makes sense - the whole purpose of the mux mapping table is to
+>> represent the board-specific configuration. If we're going to circumvent
+>> it, we should completely remove it from the pinctrl subsystem, rather than
+>> having some boards avoid using it by creating virtual pin groups instead.
+>>
+> IMO, it's a compromise. ?It still makes sense to have concept of
+> pingroup in pinctrl subsystem, because platforms like Tegra have
+> the HW pingroup.
+>
+IMO can we the 'virtual' pin groups for IMX first in this very first step?
+At least we found it works for IMX and easy to us and it's also
+suitable for Tegra
+, maybe others too. It also meets the design of current pinctrl subsystem.
+And we can discuss and add individual pin support for dt later if really need,
+that could avoid introducing much complexity for pinctrl dt support in
+the first.
+
+Beside although IMX does not group the pins together as a separate unit,
+usually the pins are used in 'predefined' groups(from the meaning of pad name)
+in most cases.
+I think it's ok to think those pins a hw group:
+like SD1_CMD, SD1_CLK, SD1_DAT0..SD1_DAT7 although those pins can also
+be used as other function.
+
+Regards
+Dong Aisheng
+
+>> > > > For imx6q example, we have 193 pins as the muxable entities, and for
+>> > > > each of those pin, there are 8 alternative functions. ?Let's see what
+>> > > > we will have if we enumerate all the available functions for each pin.
 >> ...
->> >> To keep consistency as the currently design of pinctrl subsystem and also meet
->> >> the dt design philosophy, we still do not introduce a pinmux map in dt.
->> >> Instead, we choose to scan all the device node with a 'pinmux' phandle to construct
->> >> a pinmux map table before register the pin controller device(here we may also scan
->> >> the hog_on_boot node) and I guess it's easy to do that.
->> > ...
->> >> (Without scan the device node to construct the pinmux map table, we can only get the map
->> >> Information when we run the pinmux_get.
->> >> See: https://lkml.org/lkml/2012/1/5/153
->> >> So no pinmux map table exists and we surely do not want to see that the sysfs exporting
->> >> pinmux map information works in dt but unwork in non-dt)
+>> > > > We simply do not want to over bloat imx6q pinctrl driver with such
+>> > > > enumeration.
+>> > >
+>> > > Yes, I see you'd end up with a huge number of function definitions here.
+>> > >
+>> > > You may be able to avoid this by changing the way you name/number the
+>> > > functions though.
+>> > >
+>> > > The example above has a unique function name for every individual signal.
+>> > > instead, can you name functions based on the controller they connect to?
+>> > >
+>> > > So, instead of having:
+>> > >
+>> > > IMX6Q_PAD_SD2_DAT1__USDHC2_DAT1
+>> > > IMX6Q_PAD_SD2_DAT2__USDHC2_DAT2
+>> > > IMX6Q_PAD_SD2_DAT3__USDHC2_DAT3
+>> > > IMX6Q_PAD_SD2_DAT4__USDHC2_DAT4
+>> > >
+>> > > Can you replace this with a single:
+>> > >
+>> > > IMX_FUNC_USDHC2
 >> >
->> > Hmmm. I'm not sure that the pinctrl code should actively scan all nodes
->> > in the device tree for pin mux properties. That seems a little invasive;
->> > how does pinctrl know which nodes it really should be looking at, and
->> > which nodes are random internal parts of some device's custom binding?
->> >
->> > Personally, I think I'd be OK with the sysfs pinctrl map file only
->> > containing the map entries for devices that had used the pinctrl API,
->> > and hence only parsing the pinmux properties in pinmux_get().
->> >
->> > However, we could perhaps do better by registering a bus notifier, and
->> > pro-actively parsing the top-level DT node (if there is one) for every
->> > device that is created. That way, the mapping would be parsed as soon
->> > as the device was created (or perhaps after probe?).
+>> > So all 'enum imx6q_pad_*' goes away, and instead, we define macros
+>> > IMX_FUNC_* at controller basis, correct?
 >>
->> After refer to usb bus notifier, usb core will register a bus notifier.
->> When a new usb bus is registered, it will notify the usb core for a
->> new bus added.
+>> Yes, something like that. The best set to choose probably differs based
+>> on the SoC and its mux capabilities. But thinking more, if you're going
+>> along this kind of route, I'd prefer to just define the "func0", "func1",
+>> ... "func7" functions that represent the raw HW selection instead.
 >>
->> So i guess you mean pinctrl core provides a notifier to handle the map
->> creation when new map is found during parsing each device node, right?
->
-> Yes.
->
->> But it seems parsing of device node and creation of device is at the very early
->> stage when call of_platform_populate in .init_machine code and pinctrl subsystem
->> may still have not change to run to register a bus notifier.
->
-> That's possible. There are some early initcalls that might work out
-> fine for this,
-Ok, looks .init_machine is the level of ARCH_INIT, will try a earlier one.
-and we may add that init function in pinctrl core if it's reasonable.
-
-> but...
-but what?
-
->
->> And i'm not sure it's the right place for of_platform.c to handle
->> pinmux things when create new devices.
->
-> So of_device_alloc(), which is called by of_platform_populate() for each
-> device, already parses basic DT content such as reg and interrupts, and
-> converts them to Linux resources. I'd consider parsing any pinmux properties
-> and registering them with the pinctrl subsystem to be of a similar nature,
-> so adding some code to of_device_alloc() that calls a core pinmux function
-> to parse the DT node seems reasonable to me.
->
-It's not perfect to me since pinmux map looks not the pure hw
-conception like reg/int.
-but i wonder if we can find a better way, (scanning?)
-
->> I wonder it may not work for pinmux map case.
->> If pinctrl core does not provide notifier, who else can be the right
->> one to privide it?
->>
->> > The only case this
->> > might not cover is DT nodes for which the kernel doesn't actually have
->> > a driver, and hence no device is created.
->>
->> Per my understanding, the device creation should be independent on the driver.
->> I don't know why no device is created if not have a driver.
->> Did i miss something?
->
-> Yes, I think the device gets created irrespective, so this isn't actually a problem
+> In this case, I do not see any point to define them, since it does not
+> make too much difference than integer 0, 1, ..., 7.
 >
 > --
-> nvpublic
->
+> Regards,
+> Shawn
