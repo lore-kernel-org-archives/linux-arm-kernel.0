@@ -1,47 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 14 Jan 2012 12:09:24 +0000
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Sat, 14 Jan 2012 13:59:17 +0100
 Subject: [PATCH 2/2] mach-sa1100: modernize and cleanup timer code
-In-Reply-To: <CACRpkdYSKSV2cGrk5zTP5FhkkUc2Gvz344C=kqeheMAyNsfV8Q@mail.gmail.com>
+In-Reply-To: <20120114120924.GQ1068@n2100.arm.linux.org.uk>
 References: <1325672513-16725-1-git-send-email-linus.walleij@linaro.org>
  <20120112161034.GE2645@Boggieman>
  <CACRpkdYZaxfArU3_i3RuhxT1-wMM80gn6pnZG_mMwg=Ba-oRgQ@mail.gmail.com>
  <20120114084221.GM1068@n2100.arm.linux.org.uk>
  <CACRpkdYSKSV2cGrk5zTP5FhkkUc2Gvz344C=kqeheMAyNsfV8Q@mail.gmail.com>
-Message-ID: <20120114120924.GQ1068@n2100.arm.linux.org.uk>
+ <20120114120924.GQ1068@n2100.arm.linux.org.uk>
+Message-ID: <20120114125917.GA2915@Boggieman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2012 at 12:41:21PM +0100, Linus Walleij wrote:
-> 2012/1/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Sat, Jan 14, 2012 at 08:33:54AM +0100, Linus Walleij wrote:
-> >> On Thu, Jan 12, 2012 at 5:10 PM, Kristoffer Ericson
-> >> <kristoffer.ericson@gmail.com> wrote:
-> >>
-> >> > Urs?kta f?rseningen, fick n?got minne kring att cpu klockningen inte fungerade korrekt
-> >> > om man inte satte direkt systemklock v?rde. Var n?got som pratade med russell om
-> >> > f?r n?got ?r sedan.
-> >>
-> >> Menar du detta:
-> >> MIN_OSCR_DELTA * 2
-> >>
-> >> S? ?r det ju med i den nya koden oxo, det ?r ingen semantisk skillnad
-> >> s? vitt jag kan se...
-> >>
-> >> Det enda som egentligen ?ndras ?r att minimum lapse mellan tv? events
-> >> (mult+shift) ber?knas av clockevent core.
-> >
-> > If you speak english on these lists, other people might be able to
-> > understand what you're saying.
-> 
-> Haha sorry Russell I didn't notice that the response was in LAKML :-)
-> 
-> So Kristoffer remarked that the CPU clocking was sensitive on the
-> SA1100 so he wanted to test it first.
-> 
-> And I said that apart from the minimum scheduling interval now
-> handled by the clockevent core it should be semantically equivalent.
-> 
-> But it never hurts to test it so I'll wait for Kristoffers ACK.
+On Sat, Jan 14, 2012 at 12:09:24PM +0000, Russell King - ARM Linux wrote:
+> On Sat, Jan 14, 2012 at 12:41:21PM +0100, Linus Walleij wrote:
+> > 2012/1/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > > On Sat, Jan 14, 2012 at 08:33:54AM +0100, Linus Walleij wrote:
+> > >> On Thu, Jan 12, 2012 at 5:10 PM, Kristoffer Ericson
+> > >> <kristoffer.ericson@gmail.com> wrote:
+> > >>
+> > >> > Urs?kta f?rseningen, fick n?got minne kring att cpu klockningen inte fungerade korrekt
+> > >> > om man inte satte direkt systemklock v?rde. Var n?got som pratade med russell om
+> > >> > f?r n?got ?r sedan.
+> > >>
+> > >> Menar du detta:
+> > >> MIN_OSCR_DELTA * 2
+> > >>
+> > >> S? ?r det ju med i den nya koden oxo, det ?r ingen semantisk skillnad
+> > >> s? vitt jag kan se...
+> > >>
+> > >> Det enda som egentligen ?ndras ?r att minimum lapse mellan tv? events
+> > >> (mult+shift) ber?knas av clockevent core.
+> > >
+> > > If you speak english on these lists, other people might be able to
+> > > understand what you're saying.
+> > 
 
-The only point I have on the patch is that it shouldn't use CLOCK_TICK_RATE
-lets try to get away from this horrible definition in mach/timex.h.
+Sorry, same mistake here :)
+
+
+> > Haha sorry Russell I didn't notice that the response was in LAKML :-)
+> > 
+> > So Kristoffer remarked that the CPU clocking was sensitive on the
+> > SA1100 so he wanted to test it first.
+> > 
+> > And I said that apart from the minimum scheduling interval now
+> > handled by the clockevent core it should be semantically equivalent.
+> > 
+> > But it never hurts to test it so I'll wait for Kristoffers ACK.
+> 
+
+Ive looked at it and it checks out as you said. So acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
+After Russels suggestion of course.
+
+
+> The only point I have on the patch is that it shouldn't use CLOCK_TICK_RATE
+> lets try to get away from this horrible definition in mach/timex.h.
