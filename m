@@ -1,72 +1,139 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 14 Jan 2012 10:41:29 +0800
-Subject: [PATCH v2 10/15] ARM: highbank: convert to
+Date: Sat, 14 Jan 2012 10:47:09 +0800
+Subject: [PATCH v2 11/15] ARM: imx6q: convert to
  twd_local_timer_register() interface
-In-Reply-To: <4F1080EB.1010909@gmail.com>
+In-Reply-To: <1326479322-6033-12-git-send-email-marc.zyngier@arm.com>
 References: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
- <1326479322-6033-11-git-send-email-marc.zyngier@arm.com>
- <4F1080EB.1010909@gmail.com>
-Message-ID: <20120114024126.GE1810@S2101-09.ap.freescale.net>
+ <1326479322-6033-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20120114024706.GF1810@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 01:07:23PM -0600, Rob Herring wrote:
-> On 01/13/2012 12:28 PM, Marc Zyngier wrote:
-> > Add support for the new smp_twd runtime registration interface
-> > to the highbank platforms, and remove the old compile-time support.
-> > 
-> > The highbank DTS file is updated to match the TWD DT documentation.
-> > 
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Fri, Jan 13, 2012 at 06:28:38PM +0000, Marc Zyngier wrote:
+> Add support for the new smp_twd runtime registration interface
+> to the imx6q platforms, and remove the old compile-time support.
 > 
-> A couple of minor things below. Otherwise,
+> The imx6q DTS file is updated to match the TWD DT documentation.
+> Also present in this patch a DTS fix to the timer interrupt routing
+> (the PPI connection uses bits [15:8]).
 > 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> 
-> > ---
-> >  arch/arm/boot/dts/highbank.dts      |    4 +-
-> >  arch/arm/mach-highbank/Makefile     |    1 -
-> >  arch/arm/mach-highbank/highbank.c   |    5 ++++
-> >  arch/arm/mach-highbank/localtimer.c |   40 -----------------------------------
-> >  4 files changed, 7 insertions(+), 43 deletions(-)
-> >  delete mode 100644 arch/arm/mach-highbank/localtimer.c
-> > 
-> > diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-> > index 305635b..661373a 100644
-> > --- a/arch/arm/boot/dts/highbank.dts
-> > +++ b/arch/arm/boot/dts/highbank.dts
-> > @@ -72,13 +72,13 @@
-> >  		ranges;
-> >  
-> >  		timer at fff10600 {
-> > -			compatible = "arm,smp-twd";
-> > +			compatible = "arm,cortex-a9-twd-timer";
-> >  			reg = <0xfff10600 0x20>;
-> >  			interrupts = <1 13 0xf04>;
-> 
-> Would you mind fixing these to be edge triggered.
-> 
-This would just be an indication, since not only SGI but also PPI has
-a read-only Interrupt Configuration Register.  So does the patch below
-make sense?
+Thanks for the fixing.
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index b2dc2dd..23a075f 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -186,8 +186,8 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
-        bool enabled = false;
-        u32 val;
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi   |    6 +++---
+>  arch/arm/mach-imx/Makefile     |    1 -
+>  arch/arm/mach-imx/localtimer.c |   35 -----------------------------------
+>  arch/arm/mach-imx/mach-imx6q.c |    5 +++++
+>  4 files changed, 8 insertions(+), 39 deletions(-)
+>  delete mode 100644 arch/arm/mach-imx/localtimer.c
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 263e8f3..16e9f8c 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -88,9 +88,9 @@
+>  		ranges;
+>  
+>  		timer at 00a00600 {
+> -			compatible = "arm,smp-twd";
+> -			reg = <0x00a00600 0x100>;
+> -			interrupts = <1 13 0xf4>;
+> +			compatible = "arm,cortex-a9-twd-timer";
+> +			reg = <0x00a00600 0x20>;
+> +			interrupts = <1 13 0xf04>;
 
--       /* Interrupt configuration for SGIs can't be changed */
--       if (gicirq < 16)
-+       /* Interrupt configuration for SGIs and PPIs can't be changed */
-+       if (gicirq < 32)
-                return -EINVAL;
+I would also prefer to fix it as 0xf01, even though it's just an
+indication.
 
-        if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+>  		};
+>  
+>  		L2: l2-cache at 00a02000 {
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index f5920c2..dd46f07 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -69,7 +69,6 @@ obj-$(CONFIG_CPU_V7) += head-v7.o
+>  AFLAGS_head-v7.o :=-Wa,-march=armv7-a
+>  obj-$(CONFIG_SMP) += platsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+> -obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
+>  obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o
+>  
+>  ifeq ($(CONFIG_PM),y)
+> diff --git a/arch/arm/mach-imx/localtimer.c b/arch/arm/mach-imx/localtimer.c
+> deleted file mode 100644
+> index 3a16351..0000000
+> --- a/arch/arm/mach-imx/localtimer.c
+> +++ /dev/null
+> @@ -1,35 +0,0 @@
+> -/*
+> - * Copyright 2011 Freescale Semiconductor, Inc.
+> - * Copyright 2011 Linaro Ltd.
+> - *
+> - * The code contained herein is licensed under the GNU General Public
+> - * License. You may obtain a copy of the GNU General Public License
+> - * Version 2 or later at the following locations:
+> - *
+> - * http://www.opensource.org/licenses/gpl-license.html
+> - * http://www.gnu.org/copyleft/gpl.html
+> - */
+> -
+> -#include <linux/init.h>
+> -#include <linux/clockchips.h>
+> -#include <linux/of_address.h>
+> -#include <linux/of_irq.h>
+> -#include <asm/smp_twd.h>
+> -
+> -/*
+> - * Setup the local clock events for a CPU.
+> - */
+> -int __cpuinit local_timer_setup(struct clock_event_device *evt)
+> -{
+> -	struct device_node *np;
+> -
+> -	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
+> -	if (!twd_base) {
+> -		twd_base = of_iomap(np, 0);
+> -		WARN_ON(!twd_base);
+> -	}
+> -	evt->irq = irq_of_parse_and_map(np, 0);
+> -	twd_timer_setup(evt);
+> -
+> -	return 0;
+> -}
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index c257281..9365d9c 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/phy.h>
+>  #include <linux/micrel_phy.h>
+> +#include <asm/smp_twd.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/hardware/gic.h>
+>  #include <asm/mach/arch.h>
+> @@ -118,7 +119,11 @@ static void __init imx6q_init_irq(void)
+>  
+>  static void __init imx6q_timer_init(void)
+>  {
+> +	int err;
+> +
+>  	mx6q_clocks_init();
+> +	twd_local_timer_of_register();
 
--- 
+err = twd_local_timer_of_register();
+
 Regards,
 Shawn
+
+> +	WARN_ON(err);
+>  }
+>  
+>  static struct sys_timer imx6q_timer = {
+> -- 
+> 1.7.7.1
+> 
+> 
