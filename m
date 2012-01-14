@@ -1,31 +1,24 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sat, 14 Jan 2012 21:07:36 +0200
-Subject: [PATCH 00/11] ep93xx: Move SoC private bits to core
-In-Reply-To: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
-References: <1326251676-7593-1-git-send-email-rmallon@gmail.com>
-Message-ID: <20120114190736.GA20641@mwesterb-mobl.ger.corp.intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 14 Jan 2012 20:34:35 +0100
+Subject: [PATCH 2/2] mach-sa1100: modernize and cleanup timer code
+In-Reply-To: <20120114120924.GQ1068@n2100.arm.linux.org.uk>
+References: <1325672513-16725-1-git-send-email-linus.walleij@linaro.org>
+ <20120112161034.GE2645@Boggieman>
+ <CACRpkdYZaxfArU3_i3RuhxT1-wMM80gn6pnZG_mMwg=Ba-oRgQ@mail.gmail.com>
+ <20120114084221.GM1068@n2100.arm.linux.org.uk>
+ <CACRpkdYSKSV2cGrk5zTP5FhkkUc2Gvz344C=kqeheMAyNsfV8Q@mail.gmail.com>
+ <20120114120924.GQ1068@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZskkFtzAVSX=rrxb1=NacLKiY0pZZ8ODevfwLQCE=oaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 02:14:25PM +1100, Ryan Mallon wrote:
-> This patch series is an effort to move the ep93xx SoC specific code out
-> of drivers and include/mach into arch/arm/mach-ep93xx. This work
-> involves the following changes:
-> 
->  - Create a new private header called soc.h to replace most of 
->    mach/include/ep93xx-regs.h
->  - Move the Maverick crunch code from arch/arm/kernel to mach-ep93xx
->  - Move all system controller access to the ep93xx core code
-> 
-> There are a small handful of defines left in ep93xx-regs.h which are
-> used by both the ep93xx core and include/mach files (uncompress.h,
-> debug-macro.S, etc).
+On Sat, Jan 14, 2012 at 1:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Sorry for the delay. I went through the series and it looks good to me. You
-can add
+> The only point I have on the patch is that it shouldn't use CLOCK_TICK_RATE
+> lets try to get away from this horrible definition in mach/timex.h.
 
-Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
-
-for all the patches, if you like.
+OK I'll replace that with (clockrate / HZ) as is custom.
 
 Thanks!
+Linus Walleij
