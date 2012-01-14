@@ -1,77 +1,71 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 14 Jan 2012 09:06:08 -0600
-Subject: [PATCH v2 10/15] ARM: highbank: convert to
- twd_local_timer_register() interface
-In-Reply-To: <20120114024126.GE1810@S2101-09.ap.freescale.net>
-References: <1326479322-6033-1-git-send-email-marc.zyngier@arm.com>
- <1326479322-6033-11-git-send-email-marc.zyngier@arm.com>
- <4F1080EB.1010909@gmail.com>
- <20120114024126.GE1810@S2101-09.ap.freescale.net>
-Message-ID: <4F1199E0.5000003@gmail.com>
+Date: Sat, 14 Jan 2012 09:15:54 -0600
+Subject: [PATCH 6/6] gpio: tegra: Parameterize the number of banks
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D2039@HQMAIL01.nvidia.com>
+References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
+ <1325702378-20863-6-git-send-email-swarren@nvidia.com>
+ <4F04AE71.2090203@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F145E@HQMAIL01.nvidia.com>
+ <CACxGe6tyZKW37sGiDauvikU70ZVLHFVrXjBPJk2Kgee1Rj3sbg@mail.gmail.com>
+ <4F05DCDB.40806@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D2039@HQMAIL01.nvidia.com>
+Message-ID: <4F119C2A.6020107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2012 08:41 PM, Shawn Guo wrote:
-> On Fri, Jan 13, 2012 at 01:07:23PM -0600, Rob Herring wrote:
->> On 01/13/2012 12:28 PM, Marc Zyngier wrote:
->>> Add support for the new smp_twd runtime registration interface
->>> to the highbank platforms, and remove the old compile-time support.
+On 01/13/2012 02:55 PM, Stephen Warren wrote:
+> Rob Herring wrote at Thursday, January 05, 2012 10:25 AM:
+>> On 01/04/2012 04:00 PM, Grant Likely wrote:
+>>> On Wed, Jan 4, 2012 at 1:00 PM, Stephen Warren <swarren@nvidia.com> wrote:
+>>>> Rob Herring wrote at Wednesday, January 04, 2012 12:54 PM:
+>>>>> On 01/04/2012 12:39 PM, Stephen Warren wrote:
+>>>>>> Tegra20's GPIO controller has 7 banks, and Tegra30's controller has 8
+>>>>>> banks. Allow the number of banks to be configured at run-time by the
+>>>>>> device tree.
+>>>> ...
+>>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+>>>> ...
+>>>>>>  Required properties:
+>>>>>>  - compatible : "nvidia,tegra20-gpio"
+>>>>>>  - reg : Physical base address and length of the controller's registers.
+>>>>>> +- nvidia,num-banks : The number of GPIO banks. This should be 7 for
+>>>>>> +  Tegra20 and 8 for Tegra30. This must match the number of interrupt
+>>>>>> +  specifiers in the interrupts property.
+>>>>>
+>>>>> You can determine the number of banks based on the compatible property
+>>>>> rather than needing an additional property.
+>>>>
+>>>> That's certainly possible.
+>>>>
+>>>> However, if say nvidia,tegraNNN-gpio has 9 banks, we then have to
+>>>> explicitly edit the driver to know that, whereas by using a property,
+>>>> we wouldn't have to change the driver at all to support a future GPIO
+>>>> controller. So, isn't it better to explicitly represent this in DT?
+>>>>
+>>>> Note that I have no idea how many GPIO banks our future chips will have,
+>>>> so this might not turn out to save any work at all, but perhaps.
 >>>
->>> The highbank DTS file is updated to match the TWD DT documentation.
->>>
->>> Cc: Rob Herring <rob.herring@calxeda.com>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> It's an engineering/design decision that requires taste and instinct.
+>>> Either approach is fine, you decide which one will be the best in the
+>>> long term.
 >>
->> A couple of minor things below. Otherwise,
+>> Agreed. I'm really fine with it either way.
 >>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>> Trying to predict future h/w is a bit pointless IMO. H/w designers
+>> always find new ways to do things differently. i.MX family has gpio
+>> interrupts hooked up 3 different ways for example. How would you handle
+>> the case that the banks are sparsely implemented?
 >>
->>> ---
->>>  arch/arm/boot/dts/highbank.dts      |    4 +-
->>>  arch/arm/mach-highbank/Makefile     |    1 -
->>>  arch/arm/mach-highbank/highbank.c   |    5 ++++
->>>  arch/arm/mach-highbank/localtimer.c |   40 -----------------------------------
->>>  4 files changed, 7 insertions(+), 43 deletions(-)
->>>  delete mode 100644 arch/arm/mach-highbank/localtimer.c
->>>
->>> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
->>> index 305635b..661373a 100644
->>> --- a/arch/arm/boot/dts/highbank.dts
->>> +++ b/arch/arm/boot/dts/highbank.dts
->>> @@ -72,13 +72,13 @@
->>>  		ranges;
->>>  
->>>  		timer at fff10600 {
->>> -			compatible = "arm,smp-twd";
->>> +			compatible = "arm,cortex-a9-twd-timer";
->>>  			reg = <0xfff10600 0x20>;
->>>  			interrupts = <1 13 0xf04>;
->>
->> Would you mind fixing these to be edge triggered.
->>
-> This would just be an indication, since not only SGI but also PPI has
-> a read-only Interrupt Configuration Register.  So does the patch below
-> make sense?
+>> Is adding support for a different number of banks every couple of years
+>> really an issue? It's much more important to have properties for which
+>> change with every board.
+> 
+> Thinking about this some more, I'm tempted to rework this patch to remove
+> the extra DT property and just "detect" the number of banks based on the
+> length of the interrupts property, (well, actually the number of IRQ
+> resources that the platform device has) since each bank has its own
+> interrupt. Does anyone disagree with doing that?
 
-That is implementation dependent for PPIs IIRC. Whether it's
-programmable or not, you still need to know the type of interrupt
-(although it doesn't seem to matter here).
+Sounds fine too me.
 
 Rob
-
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index b2dc2dd..23a075f 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -186,8 +186,8 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
->         bool enabled = false;
->         u32 val;
-> 
-> -       /* Interrupt configuration for SGIs can't be changed */
-> -       if (gicirq < 16)
-> +       /* Interrupt configuration for SGIs and PPIs can't be changed */
-> +       if (gicirq < 32)
->                 return -EINVAL;
-> 
->         if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-> 
