@@ -1,45 +1,37 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Jan 2012 12:41:21 +0100
-Subject: [PATCH 2/2] mach-sa1100: modernize and cleanup timer code
-In-Reply-To: <20120114084221.GM1068@n2100.arm.linux.org.uk>
-References: <1325672513-16725-1-git-send-email-linus.walleij@linaro.org>
- <20120112161034.GE2645@Boggieman>
- <CACRpkdYZaxfArU3_i3RuhxT1-wMM80gn6pnZG_mMwg=Ba-oRgQ@mail.gmail.com>
- <20120114084221.GM1068@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYSKSV2cGrk5zTP5FhkkUc2Gvz344C=kqeheMAyNsfV8Q@mail.gmail.com>
+Date: Sat, 14 Jan 2012 12:43:57 +0100
+Subject: [PATCH 09/15] ARM: ux500: convert to twd_local_timer_register()
+ interface
+In-Reply-To: <4F0EE75D.7090504@arm.com>
+References: <1326287334-1905-1-git-send-email-marc.zyngier@arm.com>
+ <1326287334-1905-10-git-send-email-marc.zyngier@arm.com>
+ <CACRpkdaePjAAkbE7QW-SP4FMa8Wx8LonqBpN+CdzwjOuYE8WVA@mail.gmail.com>
+ <4F0EE75D.7090504@arm.com>
+Message-ID: <CACRpkdZBNUZ--sh=-9Zm_GB5QRqixNrCK=C92Xm9oMim7SrNPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sat, Jan 14, 2012 at 08:33:54AM +0100, Linus Walleij wrote:
->> On Thu, Jan 12, 2012 at 5:10 PM, Kristoffer Ericson
->> <kristoffer.ericson@gmail.com> wrote:
+On Thu, Jan 12, 2012 at 2:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 11/01/12 23:53, Linus Walleij wrote:
+>> On Wed, Jan 11, 2012 at 2:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 >>
->> > Urs?kta f?rseningen, fick n?got minne kring att cpu klockningen inte fungerade korrekt
->> > om man inte satte direkt systemklock v?rde. Var n?got som pratade med russell om
->> > f?r n?got ?r sedan.
+>>> Add support for the new smp_twd runtime registration interface
+>>> to the ux500 platforms, and remove the old compile-time support.
+>>>
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >>
->> Menar du detta:
->> MIN_OSCR_DELTA * 2
->>
->> S? ?r det ju med i den nya koden oxo, det ?r ingen semantisk skillnad
->> s? vitt jag kan se...
->>
->> Det enda som egentligen ?ndras ?r att minimum lapse mellan tv? events
->> (mult+shift) ber?knas av clockevent core.
+>> Looks good! There will be collisions with the plat-nomadik
+>> timers I sent out yesterday, so I don't know if it makes sense
+>> to bring all timer stuff on a single ARM-SoC branch?
+>> (Or the SoC maintainers rely on git rerere...)
 >
-> If you speak english on these lists, other people might be able to
-> understand what you're saying.
+> I guess I could collect all timer patches in a single branch if that's
+> helpful to anyone.
 
-Haha sorry Russell I didn't notice that the response was in LAKML :-)
-
-So Kristoffer remarked that the CPU clocking was sensitive on the
-SA1100 so he wanted to test it first.
-
-And I said that apart from the minimum scheduling interval now
-handled by the clockevent core it should be semantically equivalent.
-
-But it never hurts to test it so I'll wait for Kristoffers ACK.
+I was more thinking along the lines of doing timer consolidation
+on a single branch in ARM-SoC, so I'll include a note on that
+when I ask Arnd+Olof to pull my changes, and let them decide.
 
 Yours,
 Linus Walleij
