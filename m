@@ -1,42 +1,91 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 15 Jan 2012 13:07:36 +0100
-Subject: [PATCH] ARM: Fix regression caused by ARCH_NR_GPIOS removal
-In-Reply-To: <20120114233626.GA11769@n2100.arm.linux.org.uk>
-References: <201201150033.25885.rjw@sisk.pl>
- <20120114233626.GA11769@n2100.arm.linux.org.uk>
-Message-ID: <201201151307.36813.rjw@sisk.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 15 Jan 2012 12:06:03 +0000
+Subject: [RFC/PATCH] Fix long-term regression in genirq irq_set_irq_type()
+ handling
+Message-ID: <20120115120603.GR1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, January 15, 2012, Russell King - ARM Linux wrote:
-> On Sun, Jan 15, 2012 at 12:33:25AM +0100, Rafael J. Wysocki wrote:
-> > From: Rafael J. Wysocki <rjw@sisk.pl>
-> > 
-> > Commit 3dea19e826da3dd43b3dc308aca299c0b7263c6b (ARM: 7244/1:
-> > mach-shmobile: Use CONFIG_ARCH_NR_GPIO) removed ARCH_NR_GPIOS
-> > and introduced ARCH_NR_GPIO instead without changing the users
-> > of that symbol.  As a result, the kernels including that commit
-> > don't boot on my test-bed Mackerel board.
-> > 
-> > Fix the problem by defining ARCH_NR_GPIOS again.
-> 
-> I'm aware of it, and have:
-> 
-> commit ca95023e7521729d3ace6fb3b9c53281c510a18c
-> Author: Stephen Warren <swarren@nvidia.com>
-> Date:   Thu Jan 5 21:36:27 2012 +0100
-> 
->     ARM: 7271/1: Fix typo in conversion of ARCH_NR_GPIOS to Kconfig
->     
->     Commit 44986ab "ARM: 7240/1: Make ARCH_NR_GPIO a Kconfig variable"
->     spelled ARCH_NR_GPIOS as ARCH_NR_GPIO, hence making the change
->     ineffective. This change fixes that.
->     
->     Signed-off-by: Stephen Warren <swarren@nvidia.com>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> already queued up.
+In 2008, commit 0c5d1eb77a8be (genirq: record trigger type) modified
+the way set_irq_type() handles the 'no trigger' condition.  However,
+this has an adverse effect on PCMCIA support on Intel StrongARM and
+probably PXA platforms.
 
-Cool, thanks!
+PCMCIA has several status signals on the socket which can trigger
+interrupts; some of these status signals depend on the card's mode
+(whether it is configured in memory or IO mode).  For example, cards
+have a 'Ready/IRQ' signal: in memory mode, this provides an indication
+to PCMCIA that the card has finished its power up initialization.  In
+IO mode, it provides the device interrupt signal.  Other status signals
+switch between on-board battery status and loud speaker output.
 
-Rafael
+In classical PCMCIA implementations, where you have a specific socket
+controller, the controller provides a method to mask interrupts from the
+socket, and importantly ignore any state transitions on the pins which
+correspond with interrupts once masked.  This masking prevents unwanted
+events caused by the removal and application of socket power being
+forwarded.
+
+However, on platforms where there is no socket controller, the PCMCIA
+status and interrupt signals are routed to standard edge-triggered
+GPIOs.  These GPIOs can be configured to interrupt on rising edge,
+falling edge, or never.  This is where the problems start.
+
+Edge triggered interrupts are required to record events while disabled
+via the usual methods of {free,request,disable,enable}_irq() to prevent
+problems with dropped interrupts (eg, the 8390 driver uses disable_irq()
+to defer the delivery of interrupts).  As a result, these interfaces can
+not be used to implement the desired behaviour.
+
+The side effect of this is that if the 'Ready/IRQ' GPIO is disabled via
+disable_irq() on suspend, and enabled via enable_irq() after resume, we
+will record the state transitions caused by powering events as valid
+interrupts, and foward them to the card driver, which may attempt to
+access a card which is not powered up.
+
+This leads delays resume while drivers spin in their interrupt handlers,
+and complaints from drivers before they realize what's happened.
+
+Moreover, in the case of the 'Ready/IRQ' signal, this is requested and
+freed by the card driver itself; the PCMCIA core has no idea whether
+the interrupt is requested, and, therefore, whether a call to disable_irq() 
+would be valid.  (We tried this around 2.4.17 / 2.5.1 kernel era, and
+ended up throwing it out because of this problem.)
+
+Therefore, it was decided back in around 2002 to disable the edge
+triggering instead, resulting in all state transitions on the GPIO being
+ignored.  That's what we actually need the hardware to do.
+
+The commit above changes this behaviour; it explicitly prevents the
+'no trigger' state being selected.
+
+The reason that request_irq() does not accept the 'no trigger' state is
+for compatibility with existing drivers which do not provide their
+desired triggering configuration.  The set_irq_type() function is 'new'
+and not used by non-trigger aware drivers.
+
+Therefore, revert this change, and restore previously working platforms
+back to their former state.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+Alternatively, genirq needs to provide a proper 'really disable this
+IRQ input and ignore all state transitions on it' interface.
+
+ kernel/irq/chip.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index f7c543a..4dbc9c9 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -61,8 +61,7 @@ int irq_set_irq_type(unsigned int irq, unsigned int type)
+ 		return -EINVAL;
+ 
+ 	type &= IRQ_TYPE_SENSE_MASK;
+-	if (type != IRQ_TYPE_NONE)
+-		ret = __irq_set_trigger(desc, irq, type);
++	ret = __irq_set_trigger(desc, irq, type);
+ 	irq_put_desc_busunlock(desc, flags);
+ 	return ret;
+ }
