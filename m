@@ -1,56 +1,140 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 15 Jan 2012 12:15:09 +0000
-Subject: [RFC] Fix handling of pending IRQs at request time
-Message-ID: <20120115121509.GS1068@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 15 Jan 2012 15:07:07 +0000
+Subject: [RFC PATCH] proc: clear_refs: do not clear reserved pages
+In-Reply-To: <alpine.LSU.2.00.1201140901260.2381@eggly.anvils>
+References: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1201131748380.2722@xanadu.home>
+ <alpine.LSU.2.00.1201140901260.2381@eggly.anvils>
+Message-ID: <20120115150706.GA7474@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an interrupt is marked as pending, and then subsequently requested,
-the interrupt is not delivered to the handler.  The pending status is
-entirely ignored, and is left set.  The patch below ensures that this
-pending status is acted upon while requesting the interrupt.
+Hi Hugh,
 
-This matters for two reasons:
+Thanks for the explanation.
 
-1. If a suspend/resume cycle subsequently occurs, upon resume, we call
-   check_irq_resend() while the interrupt layer is resuming.  This notices
-   the pending IRQ, and tries to deliver it.
+On Sat, Jan 14, 2012 at 05:36:37PM +0000, Hugh Dickins wrote:
+> On Fri, 13 Jan 2012, Nicolas Pitre wrote:
+> > Given Andrew's answer, this should be fine wrt Russell's concern.
+> > 
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> 
+> Yes, it should be okay as an urgent fix for -stable.
+> But going forward, I doubt it's the right answer: comments below.
 
-   However, at this time, the device drivers have not been resumed.  If
-   the device is behind a serial bus which has not been configured, this
-   can cause the kernel to hang or timeout while trying to access the
-   inaccessible device.
+Ok great, getting this into -stable ASAP would be much appreciated. Can
+somebody pick it up please?
 
-2. If the device whose interrupt is being requested has already asserted
-   its interrupt signal (and is holding it at its own active level) we
-   need to process that interrupt to clear down the interrupt, to allow
-   an edge-triggered interrupt input to respond to subsequent activations.
+> Please, going forward, can you delete your vectors page code, and
+> use the gate_vma for it?  Extending it a little if it somehow does
+> not satsify your need.  Or else can you please explain (ec706dab
+> does not) why the gate_vma does not suit you.
+> 
+> I'm not saying the horrible hack gate_vma mechanism is any safer
+> than yours (the latest bug in it was fixed all of 13 days ago).
+> But I am saying that one horrible hack is safer than two.
 
-This can be caused by an interrupt occuring after free_irq(), the flow
-handler noticing that it's been disabled, and recording an IRQS_PENDING
-status, or by use of the probe_irq_*() functions.  Either gets us to the
-state where we have IRQS_PENDING set, and remaining set indefinitely
-after a subsequent request_irq() succeeds.
+Something like what I've got below seems to do the trick, and clear_refs
+also seems to behave when it's presented with the gate_vma. If Russell is
+happy with the approach, we can move to the gate_vma in the future.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- kernel/irq/manage.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+Thanks,
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 1da999f..ef21e65 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1026,9 +1026,10 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
- 		if (new->flags & IRQF_ONESHOT)
- 			desc->istate |= IRQS_ONESHOT;
+Will
+
+
+    ARM: vectors: use gate_vma for vectors user mapping
+    
+    The current user mapping for the vectors page is inserted as a `horrible
+    hack vma' into each task via arch_setup_additional_pages. This causes
+    problems with the MM subsystem and vm_normal_page, as described here:
+    
+    https://lkml.org/lkml/2012/1/14/55
+    
+    Following the suggestion from Hugh in the above thread, this patch uses
+    the gate_vma for the vectors user mapping, therefore consolidating
+    the horrible hack VMAs into one.
+    
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index 0e9ce8d..38050b1 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -130,8 +130,4 @@ struct mm_struct;
+ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
+ #define arch_randomize_brk arch_randomize_brk
  
--		if (irq_settings_can_autoenable(desc))
-+		if (irq_settings_can_autoenable(desc)) {
- 			irq_startup(desc);
--		else
-+			check_irq_resend(desc, irq);
-+		} else
- 			/* Undo nested disables: */
- 			desc->depth = 1;
+-extern int vectors_user_mapping(void);
+-#define arch_setup_additional_pages(bprm, uses_interp) vectors_user_mapping()
+-#define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+-
+ #endif
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index ca94653..e851aa3 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -151,6 +151,8 @@ extern void __cpu_copy_user_highpage(struct page *to, struct page *from,
+ #define clear_page(page)	memset((void *)(page), 0, PAGE_SIZE)
+ extern void copy_page(void *to, const void *from);
  
++#define __HAVE_ARCH_GATE_AREA 1
++
+ #include <asm/pgtable-2level-types.h>
+ 
+ #endif /* CONFIG_MMU */
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 3d0c6fb..c13b8f6 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -493,22 +493,40 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
+ #ifdef CONFIG_MMU
+ /*
+  * The vectors page is always readable from user space for the
+- * atomic helpers and the signal restart code.  Let's declare a mapping
+- * for it so it is visible through ptrace and /proc/<pid>/mem.
++ * atomic helpers and the signal restart code. Insert it into the
++ * gate_vma so that it is visible through ptrace and /proc/<pid>/mem.
+  */
++static struct vm_area_struct gate_vma;
+ 
+-int vectors_user_mapping(void)
++static int __init gate_vma_init(void)
+ {
+-	struct mm_struct *mm = current->mm;
+-	return install_special_mapping(mm, 0xffff0000, PAGE_SIZE,
+-				       VM_READ | VM_EXEC |
+-				       VM_MAYREAD | VM_MAYEXEC |
+-				       VM_ALWAYSDUMP | VM_RESERVED,
+-				       NULL);
++	gate_vma.vm_start	= 0xffff0000;
++	gate_vma.vm_end		= 0xffff0000 + PAGE_SIZE;
++	gate_vma.vm_page_prot	= PAGE_READONLY_EXEC;
++	gate_vma.vm_flags	= VM_READ | VM_EXEC |
++				  VM_MAYREAD | VM_MAYEXEC |
++				  VM_ALWAYSDUMP;
++	return 0;
++}
++arch_initcall(gate_vma_init);
++
++struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
++{
++	return &gate_vma;
++}
++
++int in_gate_area(struct mm_struct *mm, unsigned long addr)
++{
++	return (addr >= gate_vma.vm_start) && (addr < gate_vma.vm_end);
++}
++
++int in_gate_area_no_mm(unsigned long addr)
++{
++	return in_gate_area(NULL, addr);
+ }
+ 
+ const char *arch_vma_name(struct vm_area_struct *vma)
+ {
+-	return (vma->vm_start == 0xffff0000) ? "[vectors]" : NULL;
++	return (vma == &gate_vma) ? "[vectors]" : NULL;
+ }
+ #endif
