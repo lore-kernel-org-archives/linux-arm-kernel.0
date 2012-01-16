@@ -1,90 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2012 12:05:37 +0000
-Subject: [PATCH 2/2] ARM: prima2: convert to common sched_clock()
- implementation
-In-Reply-To: <1326715537-14968-1-git-send-email-marc.zyngier@arm.com>
-References: <1326715537-14968-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326715537-14968-3-git-send-email-marc.zyngier@arm.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 16 Jan 2012 13:43:03 +0100
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <20120116105949.GG16726@n2100.arm.linux.org.uk>
+References: <WC20120116100344.4204CC@terrafix.co.uk>
+ <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
+ <20120116105949.GG16726@n2100.arm.linux.org.uk>
+Message-ID: <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prima2 has its own sched_clock() implementation, which gets in the
-way of a single zImage. Moving to the common sched_clock framework
-makes the code slightly cleaner (the mapping hack in sched_clock()
-goes away...).
+On Mon, Jan 16, 2012 at 11:59 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jan 16, 2012 at 11:18:21AM +0100, Shilimkar, Santosh wrote:
+>> + linux-arm, Russell and Catalin
+>>
+>> On Mon, Jan 16, 2012 at 11:03 AM, Joe Woodward <jw@terrafix.co.uk> wrote:
+>> > The latest uBoot release (2011.12) disables the L2/outer cache during boot on OMAP boards.
+>> >
+>> > uBoot commit: "armv7: disable L2 cache in cleanup_before_linux()" on 6th Dec 2011 by Aneesh V adds the following to
+>> > uBootSources/arch/arm/cpu/armv7/cpu.c:cleanup_before_linux():
+>> > ?...
+>> > ?v7_out_cache_disable();
+>> >
+>> > The commit message implies this change was to make booting reliable on OMAP4 by disabling L2 cache before jumping to Linux. Sadly
+>> > this commit also affects OMAP3-based boards...
+>> >
+>> > Since switching to uBoot 2011.12 I'm seeing about half the performance on my GUSMTIX Overo (OMAP3530).
+>> >
+>> > In the kernel sources there seem to be OMAP4 specific functions for re-enabling the L2 cache (omap4-common.c:omap_l2_cache_init()),
+>> > but none for OMAP3.
+>> >
+>> > So my question is... do we expect that Linux should be re-enabling the L2/outer cache during boot after uBoot has disabled it on OMAP3?
+>> >
+>> Yes. Kernel already does enabled L2 on A8 CPU's but OMAP3 needs a
+>> secure call and then the patching becomes
+>> that much difficult.
+>>
+>> We need some kind of generic hook in proc*_setup() function where in
+>> such secure bits can be turned ON.
+>
+> You can't have that kind of hook: there is no stack here to call other
+> functions, plus we aren't running with the MMU on at that point so
+> only carefully crafted assembly could be used.
+>
+This code will be in assembly and that's what I have
+been using. Not having stack shoudn't be a blocker
+and can be work-around in this code. And this API
+has to be anyway called before MMU is enabled.
 
-Cc: Barry Song <baohua.song@csr.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/Kconfig             |    1 +
- arch/arm/mach-prima2/timer.c |   21 +++++++--------------
- 2 files changed, 8 insertions(+), 14 deletions(-)
+> Why is it soo difficult to issue the secure call?
+>
+Nothing difficult.
+It is just that there is no place today where platform
+can call these secure API's Call where ?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cb75734..a18550e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -388,6 +388,7 @@ config ARCH_PRIMA2
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
- 	select GENERIC_IRQ_CHIP
-+	select HAVE_SCHED_CLOCK
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select USE_OF
- 	select ZONE_DMA
-diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer.c
-index b7a6091..0d024b1 100644
---- a/arch/arm/mach-prima2/timer.c
-+++ b/arch/arm/mach-prima2/timer.c
-@@ -18,6 +18,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <mach/map.h>
-+#include <asm/sched_clock.h>
- #include <asm/mach/time.h>
- 
- #define SIRFSOC_TIMER_COUNTER_LO	0x0000
-@@ -165,21 +166,9 @@ static struct irqaction sirfsoc_timer_irq = {
- };
- 
- /* Overwrite weak default sched_clock with more precise one */
--unsigned long long notrace sched_clock(void)
-+static u32 notrace sirfsoc_read_sched_clock(void)
- {
--	static int is_mapped;
--
--	/*
--	 * sched_clock is called earlier than .init of sys_timer
--	 * if we map timer memory in .init of sys_timer, system
--	 * will panic due to illegal memory access
--	 */
--	if (!is_mapped) {
--		sirfsoc_of_timer_map();
--		is_mapped = 1;
--	}
--
--	return sirfsoc_timer_read(NULL) * (NSEC_PER_SEC / CLOCK_TICK_RATE);
-+	return (u32)(sirfsoc_timer_read(NULL) & 0xffffffff);
- }
- 
- static void __init sirfsoc_clockevent_init(void)
-@@ -210,6 +199,8 @@ static void __init sirfsoc_timer_init(void)
- 	BUG_ON(rate < CLOCK_TICK_RATE);
- 	BUG_ON(rate % CLOCK_TICK_RATE);
- 
-+	sirfsoc_of_timer_map();
-+
- 	writel_relaxed(rate / CLOCK_TICK_RATE / 2 - 1, sirfsoc_timer_base + SIRFSOC_TIMER_DIV);
- 	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_LO);
- 	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_HI);
-@@ -217,6 +208,8 @@ static void __init sirfsoc_timer_init(void)
- 
- 	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE));
- 
-+	setup_sched_clock(sirfsoc_read_sched_clock, 32, CLOCK_TICK_RATE);
-+
- 	BUG_ON(setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq));
- 
- 	sirfsoc_clockevent_init();
--- 
-1.7.7.1
+> This just proves my point that the lack of consistent secure monitor API
+> for these kinds of basic service _are_ a big problem, one which ARM Ltd
+> should have addressed when they invented this stuff. ?My view continues
+> to be that the secure monitor API is a total abortion, one which should
+> never have been allowed to happen.
+
+Am not sure what you mean because secure API
+as such isn't a problem. If you mean one standard interface
+for all the ARM SOC's then that's something won't be
+easy to handled because it is tied up the security architecture
+which can vary across SoCs.
+
+Regards
+Santosh
