@@ -1,47 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 16 Jan 2012 09:19:52 -0600
-Subject: [PULL] Thumb2 BSYM fixes and cleanup
-Message-ID: <4F144018.7080104@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jan 2012 15:41:47 +0000
+Subject: [PATCH] ARM: hotplug: ensure that we copy the affinity mask when
+ migrating IRQs
+Message-ID: <1326728507-9916-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+When a CPU is hotplugged off, we migrate any IRQs currently affine to it
+away and onto another online CPU by calling the irq_set_affinity function
+of the relevant interrupt controller chip. This function returns either
+IRQ_SET_MASK_OK or IRQ_SET_MASK_OK_NOCOPY, to indicate whether
+irq_data.affinity was updated. In the case of the former, the migration
+code should update the mask itself, as is done by irq_set_affinity.
 
-Please pull this fix/cleanup for SMP secondary boot on Thumb2 kernels.
-This has been tested on highbank, imx, and versatile. I've gotten no
-feedback for other platforms. This can wait for after rc1 if you prefer.
+The current code does not update affinity mask and potentially leaves
+/proc/irq/n/smp_affinity identifying an offline CPU, which confuses
+userspace IRQ balancing daemons.
 
-Pawel's patch is also in the VExpress DT support series, but it looks
-like that is not going into 3.3 so I've included it here.
+This patch updates migrate_one_irq to copy the affinity mask when
+the interrupt chip returns IRQ_SET_MASK_OK after changing the affinity
+of an interrupt.
 
-Rob
+Reported-by: Leif Lindholm <leif.lindholm@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/irq.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-The following changes since commit 805a6af8dba5dfdd35ec35dc52ec0122400b2610:
-
-  Linux 3.2 (2012-01-04 15:55:44 -0800)
-
-are available in the git repository at:
-  git://sources.calxeda.com/kernel/linux.git fixes-for-arm-soc
-
-Pawel Moll (1):
-      ARM: versatile: Add missing ENDPROC to headsmp.S
-
-Rob Herring (6):
-      ARM: msm: Add missing ENDPROC to headsmp.S
-      ARM: ux500: add missing ENDPROC to headsmp.S
-      ARM: exynos: remove incorrect BSYM usage
-      ARM: imx: remove incorrect BSYM usage
-      ARM: highbank: remove incorrect BSYM usage
-      ARM: make BSYM macro assembly only
-
- arch/arm/include/asm/unified.h    |    4 ++--
- arch/arm/mach-exynos/headsmp.S    |    2 ++
- arch/arm/mach-exynos/platsmp.c    |    5 ++---
- arch/arm/mach-highbank/highbank.c |    3 +--
- arch/arm/mach-imx/src.c           |    3 +--
- arch/arm/mach-msm/headsmp.S       |    1 +
- arch/arm/mach-realview/platsmp.c  |    3 +--
- arch/arm/mach-ux500/headsmp.S     |    2 ++
- arch/arm/mach-vexpress/platsmp.c  |    4 +---
- arch/arm/plat-versatile/headsmp.S |    1 +
- 10 files changed, 14 insertions(+), 14 deletions(-)
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 3efd82c..831435d 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -156,10 +156,10 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	}
+ 
+ 	c = irq_data_get_irq_chip(d);
+-	if (c->irq_set_affinity)
+-		c->irq_set_affinity(d, affinity, true);
+-	else
++	if (!c->irq_set_affinity)
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
++	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK)
++		cpumask_copy(d->affinity, affinity);
+ 
+ 	return ret;
+ }
+-- 
+1.7.4.1
