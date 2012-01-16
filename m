@@ -1,71 +1,210 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 16 Jan 2012 16:50:52 +0100
-Subject: [V3 3/6] RTC: sa1100: support sa1100, pxa and mmp soc families
-In-Reply-To: <20111130135710.GC18533@game.jcrosoft.org>
-References: <1322634646-4460-1-git-send-email-jtzhou@marvell.com>
- <20111130135710.GC18533@game.jcrosoft.org>
-Message-ID: <201201161650.52283.marek.vasut@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 16 Jan 2012 09:59:44 -0600
+Subject: [PATCH v3 04/15] ARM: smp_twd: add device tree support
+In-Reply-To: <1326721960-2224-5-git-send-email-marc.zyngier@arm.com>
+References: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
+ <1326721960-2224-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4F144970.5070000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 14:30 Wed 30 Nov     , Jett.Zhou wrote:
-> > Since the regmap of rtc on sa1100, pxa and mmp Marvell soc families are
-> > almost the same, so re-arch the rtc-sa1100 to support them.
-> > 
-> > Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> > Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+On 01/16/2012 07:52 AM, Marc Zyngier wrote:
+> Add bindings to support DT discovery of the ARM Timer Watchdog
+> (aka TWD). Only the timer side is converted by this patch.
 > 
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> just one comment
-> 
-> > ---
-> > 
-> >  arch/arm/mach-pxa/devices.c    |   20 +++
-> >  arch/arm/mach-sa1100/generic.c |   20 +++
-> >  drivers/rtc/Kconfig            |    2 +-
-> >  drivers/rtc/rtc-sa1100.c       |  256
-> >  +++++++++++++++++++++++++++------------ 4 files changed, 218
-> >  insertions(+), 80 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-> > index 2e04254..8b134c3 100644
-> > --- a/arch/arm/mach-pxa/devices.c
-> > +++ b/arch/arm/mach-pxa/devices.c
-> > @@ -415,9 +415,29 @@ static struct resource pxa_rtc_resources[] = {
-> > 
-> >  	},
-> >  
-> >  };
-> > 
-> > +static struct resource sa1100_rtc_resources[] = {
-> > +	[0] = {
-> > +		.start  = 0x40900000,
-> > +		.end	= 0x409000ff,
-> > +		.flags  = IORESOURCE_MEM,
-> > +	},
-> > +	[1] = {
-> > +		.start  = IRQ_RTC1Hz,
-> > +		.end    = IRQ_RTC1Hz,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +	[2] = {
-> > +		.start  = IRQ_RTCAlrm,
-> > +		.end    = IRQ_RTCAlrm,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> 
-> please the MACRO
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
 
-What? You mean "use uppercase" ?
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
+>  Documentation/devicetree/bindings/arm/twd.txt |   48 +++++++++++++++
+>  arch/arm/include/asm/smp_twd.h                |    8 +++
+>  arch/arm/kernel/smp_twd.c                     |   77 ++++++++++++++++++++----
+>  3 files changed, 120 insertions(+), 13 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
 > 
-> Best Regards,
-> J
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
+> new file mode 100644
+> index 0000000..75b8610
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/twd.txt
+> @@ -0,0 +1,48 @@
+> +* ARM Timer Watchdog
+> +
+> +ARM 11MP, Cortex-A5 and Cortex-A9 are often associated with a per-core
+> +Timer-Watchdog (aka TWD), which provides both a per-cpu local timer
+> +and watchdog.
+> +
+> +The TWD is usually attached to a GIC to deliver its two per-processor
+> +interrupts.
+> +
+> +** Timer node required properties:
+> +
+> +- compatible : Should be one of:
+> +	"arm,cortex-a9-twd-timer"
+> +	"arm,cortex-a5-twd-timer"
+> +	"arm,arm11mp-twd-timer"
+> +
+> +- interrupts : One interrupt to each core
+> +
+> +- reg : Specify the base address and the size of the TWD timer
+> +	register window.
+> +
+> +Example:
+> +
+> +	twd-timer at 2c000600 {
+> +		compatible = "arm,arm11mp-twd-timer"";
+> +		reg = <0x2c000600 0x20>;
+> +		interrupts = <1 13 0xf01>;
+> +	};
+> +
+> +** Watchdog node properties:
+> +
+> +- compatible : Should be one of:
+> +	"arm,cortex-a9-twd-wdt"
+> +	"arm,cortex-a5-twd-wdt"
+> +	"arm,arm11mp-twd-wdt"
+> +
+> +- interrupts : One interrupt to each core
+> +
+> +- reg : Specify the base address and the size of the TWD watchdog
+> +	register window.
+> +
+> +Example:
+> +
+> +	twd-watchdog at 2c000620 {
+> +		compatible = "arm,arm11mp-twd-wdt";
+> +		reg = <0x2c000620 0x20>;
+> +		interrupts = <1 14 0xf01>;
+> +	};
+> diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+> index 16c89b7..23c5bc4 100644
+> --- a/arch/arm/include/asm/smp_twd.h
+> +++ b/arch/arm/include/asm/smp_twd.h
+> @@ -40,4 +40,12 @@ struct twd_local_timer name __initdata = {	\
+>  
+>  int twd_local_timer_register(struct twd_local_timer *);
+>  
+> +#if CONFIG_HAVE_ARM_TWD
+> +void twd_local_timer_of_register(void);
+> +#else
+> +static inline void twd_local_timer_of_register(void)
+> +{
+> +}
+> +#endif
+> +
+>  #endif
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index f105e91..d2dce64 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -20,6 +20,8 @@
+>  #include <linux/clockchips.h>
+>  #include <linux/irq.h>
+>  #include <linux/io.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_address.h>
+>  
+>  #include <asm/smp_twd.h>
+>  #include <asm/localtimer.h>
+> @@ -282,37 +284,86 @@ static struct local_timer_ops twd_lt_ops __cpuinitdata = {
+>  	.stop	= twd_timer_stop,
+>  };
+>  
+> -int __init twd_local_timer_register(struct twd_local_timer *tlt)
+> +static int __init twd_local_timer_common_register(void)
+>  {
+>  	int err;
+>  
+> -	if (twd_base || twd_evt)
+> -		return -EBUSY;
+> -
+> -	twd_ppi	= tlt->res[1].start;
+> -
+>  	twd_evt = alloc_percpu(struct clock_event_device *);
+> -	twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
+> -	if (!twd_base || !twd_evt) {
+> +	if (!twd_evt) {
+>  		err = -ENOMEM;
+> -		goto out;
+> +		goto out_free;
+>  	}
+>  
+>  	err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_evt);
+>  	if (err) {
+>  		pr_err("twd: can't register interrupt %d (%d)\n", twd_ppi, err);
+> -		goto out;
+> +		goto out_free;
+>  	}
+>  
+>  	err = local_timer_register(&twd_lt_ops);
+>  	if (err)
+> -		goto out;
+> +		goto out_irq;
+>  
+>  	return 0;
+>  
+> -out:
+> +out_irq:
+> +	free_percpu_irq(twd_ppi, twd_evt);
+> +out_free:
+>  	iounmap(twd_base);
+> +	twd_base = NULL;
+>  	free_percpu(twd_evt);
+> -	twd_base = twd_evt = NULL;
+> +
+>  	return err;
+>  }
+> +
+> +int __init twd_local_timer_register(struct twd_local_timer *tlt)
+> +{
+> +	if (twd_base || twd_evt)
+> +		return -EBUSY;
+> +
+> +	twd_ppi	= tlt->res[1].start;
+> +
+> +	twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
+> +	if (!twd_base)
+> +		return -ENOMEM;
+> +
+> +	return twd_local_timer_common_register();
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +const static struct of_device_id twd_of_match[] __initconst = {
+> +	{ .compatible = "arm,cortex-a9-twd-timer",	},
+> +	{ .compatible = "arm,cortex-a5-twd-timer",	},
+> +	{ .compatible = "arm,arm11mp-twd-timer",	},
+> +	{ },
+> +};
+> +
+> +void __init twd_local_timer_of_register(void)
+> +{
+> +	struct device_node *np;
+> +	int err;
+> +
+> +	np = of_find_matching_node(NULL, twd_of_match);
+> +	if (!np) {
+> +		err = -ENODEV;
+> +		goto out;
+> +	}
+> +
+> +	twd_ppi = irq_of_parse_and_map(np, 0);
+> +	if (!twd_ppi) {
+> +		err = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	twd_base = of_iomap(np, 0);
+> +	if (!twd_base) {
+> +		err = -ENOMEM;
+> +		goto out;
+> +	}
+> +
+> +	err = twd_local_timer_common_register();
+> +
+> +out:
+> +	WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
+> +}
+> +#endif
