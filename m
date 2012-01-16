@@ -1,67 +1,63 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2012 13:52:33 +0000
-Subject: [PATCH v3 08/15] ARM: shmobile: convert to twd_local_timer_register()
+Date: Mon, 16 Jan 2012 13:52:34 +0000
+Subject: [PATCH v3 09/15] ARM: ux500: convert to twd_local_timer_register()
  interface
 In-Reply-To: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
 References: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326721960-2224-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326721960-2224-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add support for the new smp_twd runtime registration interface
-to the shmobile platforms, and remove the old compile-time support.
+to the ux500 platforms, and remove the old compile-time support.
 
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Paul Mundt <lethal@linux-sh.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-shmobile/Makefile              |    1 -
- arch/arm/mach-shmobile/include/mach/common.h |    2 ++
- arch/arm/mach-shmobile/localtimer.c          |   26 --------------------------
- arch/arm/mach-shmobile/platsmp.c             |    1 -
- arch/arm/mach-shmobile/smp-r8a7779.c         |    8 +++-----
- arch/arm/mach-shmobile/smp-sh73a0.c          |    8 +++-----
- arch/arm/mach-shmobile/timer.c               |   10 ++++++++++
- 7 files changed, 18 insertions(+), 38 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/localtimer.c
+ arch/arm/mach-ux500/Makefile     |    1 -
+ arch/arm/mach-ux500/cpu.c        |    1 -
+ arch/arm/mach-ux500/localtimer.c |   29 -----------------------------
+ arch/arm/mach-ux500/timer.c      |   32 +++++++++++++++++++++++++-------
+ 4 files changed, 25 insertions(+), 38 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/localtimer.c
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 7ad6954..e7c2590 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -16,7 +16,6 @@ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o clock-r8a7779.o intc-r8a7779.o
- # SMP objects
- smp-y				:= platsmp.o headsmp.o
- smp-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
--smp-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 6bd2f45..35b3894 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -15,7 +15,6 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
+ obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+-obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem-irq-db5500.o
+ obj-$(CONFIG_U5500_MBOX)	+= mbox-db5500.o
  
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index e4b945e..9fde3eb 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -2,6 +2,8 @@
- #define __ARCH_MACH_COMMON_H
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index f418574..851308b 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -14,7 +14,6 @@
  
- extern struct sys_timer shmobile_timer;
-+struct twd_local_timer;
-+void shmobile_twd_init(struct twd_local_timer *twd_local_timer);
- extern void shmobile_setup_console(void);
- extern void shmobile_secondary_vector(void);
- extern int shmobile_platform_cpu_kill(unsigned int cpu);
-diff --git a/arch/arm/mach-shmobile/localtimer.c b/arch/arm/mach-shmobile/localtimer.c
+ #include <asm/hardware/gic.h>
+ #include <asm/mach/map.h>
+-#include <asm/localtimer.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/setup.h>
+diff --git a/arch/arm/mach-ux500/localtimer.c b/arch/arm/mach-ux500/localtimer.c
 deleted file mode 100644
-index ad9ccc9..0000000
---- a/arch/arm/mach-shmobile/localtimer.c
+index 5ba1133..0000000
+--- a/arch/arm/mach-ux500/localtimer.c
 +++ /dev/null
-@@ -1,26 +0,0 @@
+@@ -1,29 +0,0 @@
 -/*
-- * SMP support for R-Mobile / SH-Mobile - local timer portion
+- * Copyright (C) 2008-2009 ST-Ericsson
+- * Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
 - *
-- * Copyright (C) 2010  Magnus Damm
+- * This file is heavily based on relaview platform, almost a copy.
 - *
-- * Based on vexpress, Copyright (C) 2002 ARM Ltd, All Rights Reserved
+- * Copyright (C) 2002 ARM Ltd.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
@@ -70,6 +66,8 @@ index ad9ccc9..0000000
 -#include <linux/init.h>
 -#include <linux/smp.h>
 -#include <linux/clockchips.h>
+-
+-#include <asm/irq.h>
 -#include <asm/smp_twd.h>
 -#include <asm/localtimer.h>
 -
@@ -78,101 +76,73 @@ index ad9ccc9..0000000
 - */
 -int __cpuinit local_timer_setup(struct clock_event_device *evt)
 -{
--	evt->irq = 29;
+-	evt->irq = IRQ_LOCALTIMER;
 -	twd_timer_setup(evt);
 -	return 0;
 -}
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index 9933812..45fa392 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -17,7 +17,6 @@
- #include <linux/smp.h>
- #include <linux/io.h>
- #include <asm/hardware/gic.h>
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+index aea467d..cadf982 100644
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@ -8,27 +8,44 @@
+ #include <linux/errno.h>
+ #include <linux/clksrc-dbx500-prcmu.h>
+ 
 -#include <asm/localtimer.h>
- #include <asm/mach-types.h>
- #include <mach/common.h>
- 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index cc97ef8..7e056d3 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -63,6 +63,8 @@ static void __iomem *scu_base_addr(void)
- static DEFINE_SPINLOCK(scu_lock);
- static unsigned long tmp;
- 
-+static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
-+
- static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
- {
- 	void __iomem *scu_base = scu_base_addr();
-@@ -81,11 +83,7 @@ unsigned int __init r8a7779_get_core_count(void)
- {
- 	void __iomem *scu_base = scu_base_addr();
- 
--#ifdef CONFIG_HAVE_ARM_TWD
--	/* twd_base needs to be initialized before percpu_timer_setup() */
--	twd_base = (void __iomem *)0xf0000600;
--#endif
--
-+	shmobile_twd_init(&twd_local_timer);
- 	return scu_get_core_count(scu_base);
- }
- 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index be1ade7..8e0906f 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -41,6 +41,8 @@ static void __iomem *scu_base_addr(void)
- static DEFINE_SPINLOCK(scu_lock);
- static unsigned long tmp;
- 
-+static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
-+
- static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
- {
- 	void __iomem *scu_base = scu_base_addr();
-@@ -59,11 +61,7 @@ unsigned int __init sh73a0_get_core_count(void)
- {
- 	void __iomem *scu_base = scu_base_addr();
- 
--#ifdef CONFIG_HAVE_ARM_TWD
--	/* twd_base needs to be initialized before percpu_timer_setup() */
--	twd_base = (void __iomem *)0xf0000600;
--#endif
--
-+	shmobile_twd_init(&twd_local_timer);
- 	return scu_get_core_count(scu_base);
- }
- 
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-index 895794b..be16231 100644
---- a/arch/arm/mach-shmobile/timer.c
-+++ b/arch/arm/mach-shmobile/timer.c
-@@ -20,6 +20,7 @@
-  */
- #include <linux/platform_device.h>
- #include <asm/mach/time.h>
 +#include <asm/smp_twd.h>
  
- static void __init shmobile_late_time_init(void)
- {
-@@ -41,6 +42,15 @@ static void __init shmobile_timer_init(void)
- 	late_time_init = shmobile_late_time_init;
- }
+ #include <plat/mtu.h>
  
-+void __init shmobile_twd_init(struct twd_local_timer *twd_local_timer)
-+{
+ #include <mach/setup.h>
+ #include <mach/hardware.h>
+ 
 +#ifdef CONFIG_HAVE_ARM_TWD
-+	int err = twd_local_timer_register(twd_local_timer);
++static DEFINE_TWD_LOCAL_TIMER(u5500_twd_local_timer,
++			      U5500_TWD_BASE, IRQ_LOCALTIMER);
++static DEFINE_TWD_LOCAL_TIMER(u8500_twd_local_timer,
++			      U8500_TWD_BASE, IRQ_LOCALTIMER);
++
++static void __init ux500_twd_init(void)
++{
++	struct twd_local_timer *twd_local_timer;
++	int err;
++
++	twd_local_timer = cpu_is_u5500() ? &u5500_twd_local_timer :
++					   &u8500_twd_local_timer;
++
++	err = twd_local_timer_register(twd_local_timer);
 +	if (err)
 +		pr_err("twd_local_timer_register failed %d\n", err);
-+#endif
 +}
++#else
++#define ux500_twd_init()	do { } while(0)
++#endif
 +
- struct sys_timer shmobile_timer = {
- 	.init		= shmobile_timer_init,
- };
+ static void __init ux500_timer_init(void)
+ {
+ 	void __iomem *prcmu_timer_base;
++	int err;
+ 
+ 	if (cpu_is_u5500()) {
+-#ifdef CONFIG_LOCAL_TIMERS
+-		twd_base = __io_address(U5500_TWD_BASE);
+-#endif
+ 		mtu_base = __io_address(U5500_MTU0_BASE);
+ 		prcmu_timer_base = __io_address(U5500_PRCMU_TIMER_3_BASE);
+ 	} else if (cpu_is_u8500()) {
+-#ifdef CONFIG_LOCAL_TIMERS
+-		twd_base = __io_address(U8500_TWD_BASE);
+-#endif
+ 		mtu_base = __io_address(U8500_MTU0_BASE);
+ 		prcmu_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
+ 	} else {
+@@ -54,6 +71,7 @@ static void __init ux500_timer_init(void)
+ 
+ 	nmdk_timer_init();
+ 	clksrc_dbx500_prcmu_init(prcmu_timer_base);
++	ux500_twd_init();
+ }
+ 
+ static void ux500_timer_reset(void)
 -- 
 1.7.7.1
