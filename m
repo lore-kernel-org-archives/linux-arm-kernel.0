@@ -1,22 +1,56 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 16 Jan 2012 18:59:15 +0200
-Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <20120116162933.GG14252@pengutronix.de>
-References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
- <20120116162933.GG14252@pengutronix.de>
-Message-ID: <CAK=WgbZ0k1i7k6DMpKjEyCbZotGckU3GQvgW-+Hp_gAgkL66gA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 16 Jan 2012 09:07:44 -0800
+Subject: [PATCH] ARM: Print BUG instead of undefined instruction on BUG_ON()
+Message-ID: <1326733664-4095-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> OK, it's online now at
->
-> ? ? ? ?http://git.pengutronix.de/?p=ukl/linux-2.6.git;a=shortlog;h=refs/heads/efm32
-> ? ? ? ?git://git.pengutronix.de/git/ukl/linux.git efm32
->
-> Please note that this is work in progress and has some rough edges. ...
-> but at least it boots on my machine.
+The ARM kernel uses undefined instructions to implement
+BUG/BUG_ON(). This leads to problems where people don't read one
+line above the Oops message and see the "kernel BUG at ..."
+message and so they wrongly assume the kernel has hit an
+undefined instruction.
 
-Great, thanks !
+Instead of printing:
+
+ Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
+
+print
+
+ Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+
+This should prevent people from thinking the BUG_ON was an
+undefined instruction when it was actually intentional.
+
+Cc: Simon Glass <sjg@chromium.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/kernel/traps.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 99a5727..f84dfe6 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -266,6 +266,7 @@ void die(const char *str, struct pt_regs *regs, int err)
+ {
+ 	struct thread_info *thread = current_thread_info();
+ 	int ret;
++	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
+ 
+ 	oops_enter();
+ 
+@@ -273,7 +274,9 @@ void die(const char *str, struct pt_regs *regs, int err)
+ 	console_verbose();
+ 	bust_spinlocks(1);
+ 	if (!user_mode(regs))
+-		report_bug(regs->ARM_pc, regs);
++		bug_type = report_bug(regs->ARM_pc, regs);
++	if (bug_type != BUG_TRAP_TYPE_NONE)
++		str = "Oops - BUG";
+ 	ret = __die(str, err, thread, regs);
+ 
+ 	if (regs && kexec_should_crash(thread->task))
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
