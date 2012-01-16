@@ -1,38 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2012 16:28:34 +0000
-Subject: [PATCH] ARM: smp_twd: make sure timer is stopped before registration
-Message-ID: <1326731314-24086-1-git-send-email-marc.zyngier@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 16 Jan 2012 17:29:33 +0100
+Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
+ Cortex-M3 SoCs
+In-Reply-To: <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
+References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
+Message-ID: <20120116162933.GG14252@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On secondary CPUs, the Timer Control Register is not reset
-to a sane value before the timer is registered, and the TRM
-doesn't seem to indicate any reset value either. In some cases,
-the kernel will take an interrupt too early, depending on what
-junk was present in the registers at reset time.
+On Wed, Dec 21, 2011 at 07:31:56PM +0200, Ohad Ben-Cohen wrote:
+> Hi Uwe,
+> 
+> 2011/12/21 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > If you're interested in the details I can publish my tree I think.
+> 
+> Definitely interested - it could be very nice if you can publish that tree.
+OK, it's online now at
 
-The fix is to set the Timer Control Register to 0 before
-registering the clock_event_device and enabling the interrupt.
+	http://git.pengutronix.de/?p=ukl/linux-2.6.git;a=shortlog;h=refs/heads/efm32
+	git://git.pengutronix.de/git/ukl/linux.git efm32
 
-Problem seen on VE (Cortex A5) and Tegra.
+Please note that this is work in progress and has some rough edges. ...
+but at least it boots on my machine.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/smp_twd.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Best regards
+Uwe
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 0feb728..0cc5427 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -237,6 +237,8 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	else
- 		twd_calibrate_rate();
- 
-+	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);		
-+
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
- 			CLOCK_EVT_FEAT_C3STOP;
 -- 
-1.7.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
