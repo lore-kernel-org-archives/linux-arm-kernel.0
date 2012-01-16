@@ -1,37 +1,43 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Mon, 16 Jan 2012 12:03:32 +0100
-Subject: [PATCH] ARM: OMAP3: fix build on !CONFIG_IOMMU_API
-In-Reply-To: <1326288491-25146-1-git-send-email-ohad@wizery.com>
-References: <1326288491-25146-1-git-send-email-ohad@wizery.com>
-Message-ID: <20120116110332.GB19394@amd.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi KASAGAR)
+Date: Mon, 16 Jan 2012 16:35:29 +0530
+Subject: [PATCH 1/2] mach-ux500: cache operations are atomic on PL310
+In-Reply-To: <20120113181422.GB24373@mudshark.cambridge.arm.com>
+References: <1326346663-6112-1-git-send-email-srinidhi.kasagar@stericsson.com>
+ <20120113181422.GB24373@mudshark.cambridge.arm.com>
+Message-ID: <20120116110528.GA24824@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 03:28:11PM +0200, Ohad Ben-Cohen wrote:
-> omap3isp depends on CONFIG_IOMMU_API, so avoid registering its
-> device (and defining its configuration structs) on !CONFIG_IOMMU_API.
+On Fri, Jan 13, 2012 at 19:14:22 +0100, Will Deacon wrote:
+> Hi guys,
 > 
-> This is generally nice to have, but more importantly, it fixes:
+> On Thu, Jan 12, 2012 at 05:37:42AM +0000, Srinidhi KASAGAR wrote:
+> > Apply ERRATA_753970 for ux500 variant of cache sync too
+> > 
+> > Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> >  arch/arm/mach-ux500/cache-l2x0.c |   11 ++++++++---
+> >  1 files changed, 8 insertions(+), 3 deletions(-)
 > 
-> arch/arm/plat-omap/include/plat/iommu.h: In function 'dev_to_omap_iommu':
-> arch/arm/plat-omap/include/plat/iommu.h:135: error: 'struct
-> dev_archdata' has no member named 'iommu'
-> arch/arm/mach-omap2/devices.c: In function 'omap3_init_camera':
-> arch/arm/mach-omap2/devices.c:222: error: 'struct dev_archdata' has no
-> member named 'iommu'
-> make[1]: *** [arch/arm/mach-omap2/devices.o] Error 1
-> make: *** [arch/arm/mach-omap2] Error 2
+> I hadn't noticed the existence of this file before, but this patch really
+> shows why it's not a good idea to copy files out of core ARM code and into
+> the mach-* directories. I see that the commit introducing this file 458eef2f
+> ("mach-ux500: factor out l2x0 handling code") mentions that mach-imx does
+> the same thing, but I can't find the code there.
 > 
-> Which happens because while setting up the omap3isp device we try
-> to access the (now nonexistent) iommu member of dev_archdata.
-> 
-> Compile tested with omap2plus_defconfig on today's:
+> On top of that, it seems as though you provide an inv_all implementation
+> but your disable function is empty. Surely this can lead to data loss?
 
-Applied. Will send pull-request soon.
+We can't disable l2x0 from non secure mode and either we do not have
+special SMI to handle the same and hence it is empty. So for kexec
+to work on this platform we need to have a non-locking variant of
+inv_all() otherwise we seems to be looping forever in spin locks
+as such L1 caches are disabled at that moment in cpu_proc_fin().
+So we had to override this inv_all for this machine.
 
--- 
-AMD Operating System Research Center
+Otherwise, what do you suggest? Whats the effect if we remove
+that spin lock in inv_all as such I don't see much users using
+inv_all.
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+srinidhi
