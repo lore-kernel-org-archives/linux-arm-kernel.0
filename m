@@ -1,39 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jan 2012 15:44:18 +0000
-Subject: [PATCH 2/2] ARM: cache: assume 64-byte L1 cachelines for ARMv7 CPUs
-In-Reply-To: <1326728658-10029-1-git-send-email-will.deacon@arm.com>
-References: <1326728658-10029-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1326728658-10029-2-git-send-email-will.deacon@arm.com>
+Date: Mon, 16 Jan 2012 15:45:55 +0000
+Subject: [PATCH 2/2] ARM: SCU: use cpu_logical_map for per-CPU low power mode
+In-Reply-To: <1326728755-10133-1-git-send-email-will.deacon@arm.com>
+References: <1326728755-10133-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1326728755-10133-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To ensure correct alignment of cacheline-aligned data, the maximum
-cacheline size needs to be known at compile time.
+scu_power_mode changes the power mode for the current CPU, which it
+determines from smp_processor_id(). However, this assumes that the
+physical CPU number is equal to Linux's logical CPU number and if this
+is not true, we will power off the wrong CPU.
 
-Since Cortex-A8 and Cortex-A15 have 64-byte cachelines (and it is likely
-that there will be future ARMv7 implementations with the same line size)
-then it makes sense to assume that CPU_V7 implies a 64-byte L1 cacheline
-size. For CPUs with smaller caches, this will result in some harmless
-padding but will help with single zImage work and avoid hitting subtle
-bugs with misaligned data structures.
+This patch uses cpu_logical_map to translate the logical CPU number
+into a physical one in scu_power_mode.
 
+Reported-by: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/kernel/smp_scu.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 4cefb57..493e5ea5 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -887,7 +887,7 @@ config ARM_L1_CACHE_SHIFT_6
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 8f5dd79..b9f015e 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -11,6 +11,7 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
  
- config ARM_L1_CACHE_SHIFT
- 	int
--	default 6 if ARM_L1_CACHE_SHIFT_6
-+	default 6 if ARM_L1_CACHE_SHIFT_6 || CPU_V7
- 	default 5
++#include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+@@ -74,7 +75,7 @@ void scu_enable(void __iomem *scu_base)
+ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ {
+ 	unsigned int val;
+-	int cpu = smp_processor_id();
++	int cpu = cpu_logical_map(smp_processor_id());
  
- config ARM_DMA_MEM_BUFFERABLE
+ 	if (mode > 3 || mode == 1 || cpu > 3)
+ 		return -EINVAL;
 -- 
 1.7.4.1
