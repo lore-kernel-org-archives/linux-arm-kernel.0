@@ -1,29 +1,23 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Mon, 16 Jan 2012 19:09:40 +1100
-Subject: [PATCH 04/14] PowerPC: adapt for dma_map_ops changes
-In-Reply-To: <1324643253-3024-5-git-send-email-m.szyprowski@samsung.com>
-References: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
- <1324643253-3024-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120116080940.GF4512@truffala.fritz.box>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Jan 2012 12:05:35 +0000
+Subject: [PATCH 0/2] Convert remaining platforms to common sched_clock()
+Message-ID: <1326715537-14968-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2011 at 01:27:23PM +0100, Marek Szyprowski wrote:
-> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> 
-> Adapt core PowerPC architecture code for dma_map_ops changes: replace
-> alloc/free_coherent with generic alloc/free methods.
-> 
-> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Only two platforms are left with their own sched_clock() implementation.
+This patch series converts them, leading in both cases to some cleanup.
 
-Looks sane.
+Compile tested only.
 
-Reviewed-by: David Gibson <david@gibson.dropbear.id.au>
+Marc Zyngier (2):
+  ARM: davinci: convert to common sched_clock() implementation
+  ARM: prima2: convert to common sched_clock() implementation
+
+ arch/arm/Kconfig             |    2 ++
+ arch/arm/mach-davinci/time.c |   24 +++++++-----------------
+ arch/arm/mach-prima2/timer.c |   21 +++++++--------------
+ 3 files changed, 16 insertions(+), 31 deletions(-)
 
 -- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+1.7.7.1
