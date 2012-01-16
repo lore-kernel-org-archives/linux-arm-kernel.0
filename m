@@ -1,52 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2012 16:10:03 +0000
-Subject: [PATCH 1/2] ARM: logical_cpu_map: decouple CPU mapping from SMP
-In-Reply-To: <1326728755-10133-1-git-send-email-will.deacon@arm.com>
-References: <1326728755-10133-1-git-send-email-will.deacon@arm.com>
-Message-ID: <4F144BDB.1090908@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Jan 2012 16:10:09 +0000
+Subject: [V3 3/6] RTC: sa1100: support sa1100, pxa and mmp soc families
+In-Reply-To: <201201161650.52283.marek.vasut@gmail.com>
+References: <1322634646-4460-1-git-send-email-jtzhou@marvell.com>
+ <20111130135710.GC18533@game.jcrosoft.org>
+ <201201161650.52283.marek.vasut@gmail.com>
+Message-ID: <20120116161009.GB32049@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/12 15:45, Will Deacon wrote:
-> It turns out that the logical CPU mapping is useful even when !CONFIG_SMP
-> for manipulation of devices like interrupt and power controllers when
-> running a UP kernel on a CPU other than 0. This can happen when kexecing
-> a UP image from an SMP kernel.
+On Mon, Jan 16, 2012 at 04:50:52PM +0100, Marek Vasut wrote:
+> > On 14:30 Wed 30 Nov     , Jett.Zhou wrote:
+> > > Since the regmap of rtc on sa1100, pxa and mmp Marvell soc families are
+> > > almost the same, so re-arch the rtc-sa1100 to support them.
+> > > 
+> > > Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> > > Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> > 
+> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > 
+> > just one comment
+> > 
+> > > ---
+> > > 
+> > >  arch/arm/mach-pxa/devices.c    |   20 +++
+> > >  arch/arm/mach-sa1100/generic.c |   20 +++
+> > >  drivers/rtc/Kconfig            |    2 +-
+> > >  drivers/rtc/rtc-sa1100.c       |  256
+> > >  +++++++++++++++++++++++++++------------ 4 files changed, 218
+> > >  insertions(+), 80 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+> > > index 2e04254..8b134c3 100644
+> > > --- a/arch/arm/mach-pxa/devices.c
+> > > +++ b/arch/arm/mach-pxa/devices.c
+> > > @@ -415,9 +415,29 @@ static struct resource pxa_rtc_resources[] = {
+> > > 
+> > >  	},
+> > >  
+> > >  };
+> > > 
+> > > +static struct resource sa1100_rtc_resources[] = {
+> > > +	[0] = {
+> > > +		.start  = 0x40900000,
+> > > +		.end	= 0x409000ff,
+> > > +		.flags  = IORESOURCE_MEM,
+> > > +	},
+> > > +	[1] = {
+> > > +		.start  = IRQ_RTC1Hz,
+> > > +		.end    = IRQ_RTC1Hz,
+> > > +		.flags  = IORESOURCE_IRQ,
+> > > +	},
+> > > +	[2] = {
+> > > +		.start  = IRQ_RTCAlrm,
+> > > +		.end    = IRQ_RTCAlrm,
+> > > +		.flags  = IORESOURCE_IRQ,
+> > > +	},
+> > 
+> > please the MACRO
 > 
-> In the future, multi-cluster systems running AMP configurations will
-> require something similar for mapping cluster IDs, so it makes sense to
-> decouple this logic in preparation for this support.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Yang Bai <hamo.by@gmail.com>
-> Reported-by: Joerg Roedel <joerg.roedel@amd.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/common/gic.c               |    7 ++-----
->  arch/arm/include/asm/smp.h          |    6 ------
->  arch/arm/include/asm/smp_plat.h     |    6 ++++++
->  arch/arm/kernel/setup.c             |   14 ++++++++++++++
->  arch/arm/kernel/smp.c               |   14 --------------
->  arch/arm/mach-exynos/hotplug.c      |    1 +
->  arch/arm/mach-exynos/platsmp.c      |    1 +
->  arch/arm/mach-highbank/highbank.c   |    3 +--
->  arch/arm/mach-imx/src.c             |    5 +----
->  arch/arm/mach-msm/hotplug.c         |    1 +
->  arch/arm/mach-msm/platsmp.c         |    1 +
->  arch/arm/mach-realview/hotplug.c    |    1 +
->  arch/arm/mach-shmobile/smp-sh73a0.c |    1 +
->  arch/arm/mach-ux500/hotplug.c       |    1 +
->  arch/arm/mach-ux500/platsmp.c       |    1 +
->  arch/arm/mach-vexpress/hotplug.c    |    1 +
->  arch/arm/plat-versatile/platsmp.c   |    1 +
->  17 files changed, 34 insertions(+), 31 deletions(-)
+> What? You mean "use uppercase" ?
 
-You may want to also add a #include <asm/smp_plat.h> to
-arch/arm/mach-shmobile/smp-r8a7779.c (a newcomer in Linus' tree).
-
-Otherwise:
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The DEFINE_RES_xxx() macros.
