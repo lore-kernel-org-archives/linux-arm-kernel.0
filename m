@@ -1,29 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Jan 2012 10:46:00 +0100
-Subject: [PATCH v3] pinctrl: add support for group and pinmux states
-In-Reply-To: <7FE21149F4667147B645348EC60578850910C3@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1326673015-963-1-git-send-email-linus.walleij@stericsson.com>
- <7FE21149F4667147B645348EC60578850910C3@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <CACRpkdaLEasbm-_Vg9VzD+EwwJst1yLQ1sruPaHtFASxcRXXUA@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 16 Jan 2012 15:20:28 +0530
+Subject: [PATCH 0/9] dmaengine: Pl08x and dw_dmac updates
+Message-ID: <cover.1326707233.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 9:26 AM, Dong Aisheng-B29396
-<B29396@freescale.com> wrote:
+Hi Vinod/Dan,
 
-> The question is that we allow customer to define pingroup state and this is
-> independent on pinctrl core.
+This patchset does following:
+- Adds DMA_SLAVE_CONFIG for dw_dmac driver
+- Adds device_fc (device flow control) field in struct DMA_SLAVE_CONFIG
+- Updates pl08x driver according to that
+- Fixes few issues/bugs in dw_dmac driver
+- Includes earlier patchset sent by Rajeev for cleanly applying this patchset
 
-You are right, this patch might not be helpful :-(
+Rajeev KUMAR (1):
+  dmaengine/dw_dmac: Hibernation support in dw_dmac
 
-I had bad dreams after writing it, and I think I also missed Stephens point,
-that the pinctrl core should iteratively call the config interface of the
-controller while walking a config.
+Viresh Kumar (7):
+  dmaengine: Add flow controller information to dma_slave_config
+  dmaengine/amba-pl08x: Take flow controller info from DMA_SLAVE_CONFIG
+  dmaengine/dw_dmac: Don't use magic number for total number of
+    channels
+  dmaengine/dw_dmac: Use platform_get_drvdata instead of accessing dev
+    directly
+  dmaengine/dw_dmac: Don't handle block interrupts
+  dmaengine/dw_dmac: Unmap all memory buffers after completion of slave
+    transfers
+  dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
 
-I am authoring a different proposal which is much closer to the pinmux
-maps, and thus closer to what you're currently doing with the device
-tree bindings and all.
+ drivers/dma/amba-pl08x.c   |    4 +-
+ drivers/dma/dw_dmac.c      |  171 ++++++++++++++++++++++++++------------------
+ drivers/dma/dw_dmac_regs.h |    3 +
+ include/linux/amba/pl08x.h |    8 +-
+ include/linux/dmaengine.h  |    5 ++
+ include/linux/dw_dmac.h    |    6 --
+ 6 files changed, 115 insertions(+), 82 deletions(-)
 
-Hold on, hope to post this later today.
-
-Linus Walleij
+-- 
+1.7.8.110.g4cb5d
