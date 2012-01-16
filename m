@@ -1,119 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2012 13:52:40 +0000
-Subject: [PATCH v3 15/15] ARM: local timers: make the runtime registration
- interface mandatory
-In-Reply-To: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
-References: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326721960-2224-16-git-send-email-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jan 2012 14:50:08 +0000
+Subject: [PATCH 1/2] mach-ux500: cache operations are atomic on PL310
+In-Reply-To: <20120116110528.GA24824@bnru02>
+References: <1326346663-6112-1-git-send-email-srinidhi.kasagar@stericsson.com>
+ <20120113181422.GB24373@mudshark.cambridge.arm.com>
+ <20120116110528.GA24824@bnru02>
+Message-ID: <20120116145008.GH9068@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all traces of the compile-time local timer interface,
-and make the runtime selection mandatory.
+On Mon, Jan 16, 2012 at 11:05:29AM +0000, Srinidhi KASAGAR wrote:
+> On Fri, Jan 13, 2012 at 19:14:22 +0100, Will Deacon wrote:
+> > Hi guys,
+> > 
+> > On Thu, Jan 12, 2012 at 05:37:42AM +0000, Srinidhi KASAGAR wrote:
+> > > Apply ERRATA_753970 for ux500 variant of cache sync too
+> > > 
+> > > Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > > ---
+> > >  arch/arm/mach-ux500/cache-l2x0.c |   11 ++++++++---
+> > >  1 files changed, 8 insertions(+), 3 deletions(-)
+> > 
+> > I hadn't noticed the existence of this file before, but this patch really
+> > shows why it's not a good idea to copy files out of core ARM code and into
+> > the mach-* directories. I see that the commit introducing this file 458eef2f
+> > ("mach-ux500: factor out l2x0 handling code") mentions that mach-imx does
+> > the same thing, but I can't find the code there.
+> > 
+> > On top of that, it seems as though you provide an inv_all implementation
+> > but your disable function is empty. Surely this can lead to data loss?
+> 
+> We can't disable l2x0 from non secure mode and either we do not have
+> special SMI to handle the same and hence it is empty. So for kexec
+> to work on this platform we need to have a non-locking variant of
+> inv_all() otherwise we seems to be looping forever in spin locks
+> as such L1 caches are disabled at that moment in cpu_proc_fin().
+> So we had to override this inv_all for this machine.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/localtimer.h |   26 --------------------------
- arch/arm/kernel/smp.c             |   23 ++++++-----------------
- 2 files changed, 6 insertions(+), 43 deletions(-)
+Actually, now that I've fixed kexec, we don't use inv_all in that path. It's
+only used in the power management code now, it seems. But my point still
+stands - invalidating a cache that is enabled is a *really* bad idea, that's
+why we have this in cache-l2x0.c:
 
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index 955eed1..f77ffc1 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -19,38 +19,12 @@ struct local_timer_ops {
- 	void (*stop)(struct clock_event_device *);
- };
- 
--/*
-- * Setup a per-cpu timer, whether it be a local timer or dummy broadcast
-- */
--void percpu_timer_setup(void);
--
- #ifdef CONFIG_LOCAL_TIMERS
- /*
-- * Stop the local timer
-- */
--void local_timer_stop(struct clock_event_device *);
--
--/*
-- * Setup a local timer interrupt for a CPU.
-- */
--int local_timer_setup(struct clock_event_device *);
--
--/*
-  * Register a local timer driver
-  */
- int local_timer_register(struct local_timer_ops *);
--
- #else
--
--static inline int local_timer_setup(struct clock_event_device *evt)
--{
--	return -ENXIO;
--}
--
--static inline void local_timer_stop(struct clock_event_device *evt)
--{
--}
--
- static inline int local_timer_register(struct local_timer_ops *ops)
- {
- 	return -ENXIO;
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 69d5f8b..09c720e 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -260,6 +260,8 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
- 	store_cpu_topology(cpuid);
- }
- 
-+static void percpu_timer_setup(void);
-+
- /*
-  * This is the secondary CPU boot entry.  We're using this CPUs
-  * idle thread stack, but a set of temporary page tables.
-@@ -488,21 +490,7 @@ int local_timer_register(struct local_timer_ops *ops)
- }
- #endif
- 
--int __cpuinit __attribute__ ((weak)) local_timer_setup(struct clock_event_device *clk)
--{
--	if (lt_ops)
--		return lt_ops->setup(clk);
--
--	return -ENXIO;
--}
--
--void __attribute__ ((weak)) local_timer_stop(struct clock_event_device *clk)
--{
--	if (lt_ops)
--		lt_ops->stop(clk);
--}
--
--void __cpuinit percpu_timer_setup(void)
-+static void __cpuinit percpu_timer_setup(void)
- {
- 	unsigned int cpu = smp_processor_id();
- 	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
-@@ -510,7 +498,7 @@ void __cpuinit percpu_timer_setup(void)
- 	evt->cpumask = cpumask_of(cpu);
- 	evt->broadcast = smp_timer_broadcast;
- 
--	if (local_timer_setup(evt))
-+	if (!lt_ops || lt_ops->setup(evt))
- 		broadcast_timer_setup(evt);
- }
- 
-@@ -525,7 +513,8 @@ static void percpu_timer_stop(void)
- 	unsigned int cpu = smp_processor_id();
- 	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
- 
--	local_timer_stop(evt);
-+	if (lt_ops)
-+		lt_ops->stop(evt);
- }
- #endif
- 
--- 
-1.7.7.1
+	/* Invalidating when L2 is enabled is a nono */
+	BUG_ON(readl(l2x0_base + L2X0_CTRL) & 1);
+
+> Otherwise, what do you suggest? Whats the effect if we remove
+> that spin lock in inv_all as such I don't see much users using
+> inv_all.
+
+The lock needs to stay. Besides, the problem isn't with inv_all, the problem
+is with not being able to disable the outer cache. So can't you just do
+something nasty like:
+
+	outer_cache.disable = NULL;
+
+after your call to l2x0_init?
+
+Also, if you can't disable the L2 from non-secure, does that mean that you
+boot Linux with the L2 enabled?
+
+Will
