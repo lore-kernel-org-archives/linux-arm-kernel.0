@@ -1,91 +1,67 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Jan 2012 07:33:17 +0100
-Subject: [PATCH v2] mach-sa1100: modernize and cleanup timer code
-Message-ID: <1326695597-26534-1-git-send-email-linus.walleij@linaro.org>
+From: b.van.den.berg.nl@gmail.com (Bas van den Berg)
+Date: Mon, 16 Jan 2012 07:46:02 +0100
+Subject: [PATCH] ARM: mach-davinci DA850: removed un-existing
+ pll1_sysclk4-7 clock domains
+Message-ID: <20120116064559.GA3025@altenpts-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This gets rid of the hairy mult/shift calculation for SA1100
-timers and relies on clockevent core to figure this out, and removes
-the hard-coded rate constant and instead define a timer clock in
-the clock implementation and get the frequency from that. This
-kills all uses of CLOCK_TICK_RATE in mach-sa1100.
+DA850: sysclk4-7 only exist for pll0. for pll1 sysclk1-3 exist.
 
-Cc: Deepak Saxena <deepak.saxena@linaro.org>
-Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Bas van den Berg <b.van.den.berg.nl@gmail.com>
 ---
- arch/arm/mach-sa1100/clock.c |    2 ++
- arch/arm/mach-sa1100/time.c  |   26 ++++++++++++++++----------
- 2 files changed, 18 insertions(+), 10 deletions(-)
+ arch/arm/mach-davinci/da850.c |   32 --------------------------------
+ 1 files changed, 0 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-index d6df9f6..9c24b3c 100644
---- a/arch/arm/mach-sa1100/clock.c
-+++ b/arch/arm/mach-sa1100/clock.c
-@@ -113,10 +113,12 @@ const struct clkops clk_dummy_ops = {
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 0ed7fdb..992c4c4 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -153,34 +153,6 @@ static struct clk pll1_sysclk3 = {
+ 	.div_reg	= PLLDIV3,
  };
  
- static DEFINE_CLK(gpio27, &clk_gpio27_ops, 3686400);
-+static DEFINE_CLK(timer, &clk_dummy_ops, 3686400);
- static DEFINE_CLK(dummy, &clk_dummy_ops, 0);
- 
- static struct clk_lookup sa11xx_clkregs[] = {
- 	INIT_CLKREG(&clk_gpio27, "sa1111.0", NULL),
-+	INIT_CLKREG(&clk_timer, "sa1100-timer", NULL),
- 	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
- };
- 
-diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
-index 69e3353..db71bc1 100644
---- a/arch/arm/mach-sa1100/time.c
-+++ b/arch/arm/mach-sa1100/time.c
-@@ -14,6 +14,8 @@
- #include <linux/irq.h>
- #include <linux/timex.h>
- #include <linux/clockchips.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
- 
- #include <asm/mach/time.h>
- #include <asm/sched_clock.h>
-@@ -85,23 +87,27 @@ static struct irqaction sa1100_timer_irq = {
- 
- static void __init sa1100_timer_init(void)
- {
-+	struct clk *clk;
-+	unsigned long rate;
-+
-+	/* Since this clock is vital for system operation we bug out */
-+	clk = clk_get_sys("sa1100-timer", NULL);
-+	BUG_ON(IS_ERR(clk));
-+	BUG_ON(clk_prepare(clk));
-+	BUG_ON(clk_enable(clk));
-+	rate = clk_get_rate(clk);
-+
- 	OIER = 0;
- 	OSSR = OSSR_M0 | OSSR_M1 | OSSR_M2 | OSSR_M3;
- 
--	setup_sched_clock(sa1100_read_sched_clock, 32, 3686400);
+-static struct clk pll1_sysclk4 = {
+-	.name		= "pll1_sysclk4",
+-	.parent		= &pll1_clk,
+-	.flags		= CLK_PLL,
+-	.div_reg	= PLLDIV4,
+-};
 -
--	clockevents_calc_mult_shift(&ckevt_sa1100_osmr0, 3686400, 4);
--	ckevt_sa1100_osmr0.max_delta_ns =
--		clockevent_delta2ns(0x7fffffff, &ckevt_sa1100_osmr0);
--	ckevt_sa1100_osmr0.min_delta_ns =
--		clockevent_delta2ns(MIN_OSCR_DELTA * 2, &ckevt_sa1100_osmr0) + 1;
-+	setup_sched_clock(sa1100_read_sched_clock, 32, rate);
- 	ckevt_sa1100_osmr0.cpumask = cpumask_of(0);
+-static struct clk pll1_sysclk5 = {
+-	.name		= "pll1_sysclk5",
+-	.parent		= &pll1_clk,
+-	.flags		= CLK_PLL,
+-	.div_reg	= PLLDIV5,
+-};
 -
- 	setup_irq(IRQ_OST0, &sa1100_timer_irq);
- 
--	clocksource_mmio_init(&OSCR, "oscr", CLOCK_TICK_RATE, 200, 32,
-+	clocksource_mmio_init(&OSCR, "oscr", rate, 200, 32,
- 		clocksource_mmio_readl_up);
--	clockevents_register_device(&ckevt_sa1100_osmr0);
-+	clockevents_config_and_register(&ckevt_sa1100_osmr0, rate,
-+					MIN_OSCR_DELTA * 2, 0x7fffffff);
- }
- 
- #ifdef CONFIG_PM
+-static struct clk pll1_sysclk6 = {
+-	.name		= "pll0_sysclk6",
+-	.parent		= &pll0_clk,
+-	.flags		= CLK_PLL,
+-	.div_reg	= PLLDIV6,
+-};
+-
+-static struct clk pll1_sysclk7 = {
+-	.name		= "pll1_sysclk7",
+-	.parent		= &pll1_clk,
+-	.flags		= CLK_PLL,
+-	.div_reg	= PLLDIV7,
+-};
+-
+ static struct clk i2c0_clk = {
+ 	.name		= "i2c0",
+ 	.parent		= &pll0_aux_clk,
+@@ -397,10 +369,6 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"pll1_aux",	&pll1_aux_clk),
+ 	CLK(NULL,		"pll1_sysclk2",	&pll1_sysclk2),
+ 	CLK(NULL,		"pll1_sysclk3",	&pll1_sysclk3),
+-	CLK(NULL,		"pll1_sysclk4",	&pll1_sysclk4),
+-	CLK(NULL,		"pll1_sysclk5",	&pll1_sysclk5),
+-	CLK(NULL,		"pll1_sysclk6",	&pll1_sysclk6),
+-	CLK(NULL,		"pll1_sysclk7",	&pll1_sysclk7),
+ 	CLK("i2c_davinci.1",	NULL,		&i2c0_clk),
+ 	CLK(NULL,		"timer0",	&timerp64_0_clk),
+ 	CLK("watchdog",		NULL,		&timerp64_1_clk),
 -- 
-1.7.7.5
+1.7.0.4
