@@ -1,127 +1,103 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2012 13:52:30 +0000
-Subject: [PATCH v3 05/15] ARM: OMAP4: convert to twd_local_timer_register()
+Date: Mon, 16 Jan 2012 13:52:27 +0000
+Subject: [PATCH v3 02/15] ARM: local timers: introduce a new registration
  interface
 In-Reply-To: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
 References: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326721960-2224-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326721960-2224-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the new smp_twd runtime registration interface
-to the OMAP4 platforms, and remove the old compile-time support.
-Tested on Panda.
+In order to switch to a runtime selectable local timer,
+add a registration interface that timer drivers can use to
+register to the core.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+local_timer_setup() and local_timer_stop() are made weak symbols
+in order not to break existing setups.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-omap2/Makefile    |    1 -
- arch/arm/mach-omap2/timer-mpu.c |   39 ---------------------------------------
- arch/arm/mach-omap2/timer.c     |   22 +++++++++++++++++-----
- 3 files changed, 17 insertions(+), 45 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
+ arch/arm/include/asm/localtimer.h |   15 +++++++++++++++
+ arch/arm/kernel/smp.c             |   27 +++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index fc9b238..27ea7c2 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -23,7 +23,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index 7e1b2c5..f088d63 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -15,6 +15,11 @@
  
- # SMP support ONLY available for OMAP4
- obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
--obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
- obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o \
- 					   sleep44xx.o
-diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
-deleted file mode 100644
-index 31c0ac4..0000000
---- a/arch/arm/mach-omap2/timer-mpu.c
-+++ /dev/null
-@@ -1,39 +0,0 @@
--/*
-- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
-- * own timer in it's MPU domain. These timers will be driving the
-- * linux kernel SMP tick framework when active. These timers are not
-- * part of the wake up domain.
-- *
-- * Copyright (C) 2009 Texas Instruments, Inc.
-- *
-- * Author:
-- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
-- *
-- * This file is based on arm realview smp platform file.
-- * Copyright (C) 2002 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/init.h>
--#include <linux/smp.h>
--#include <linux/clockchips.h>
--#include <asm/irq.h>
--#include <asm/smp_twd.h>
--#include <asm/localtimer.h>
--
--/*
-- * Setup the local clock events for a CPU.
-- */
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	/* Local timers are not supprted on OMAP4430 ES1.0 */
--	if (omap_rev() == OMAP4430_REV_ES1_0)
--		return -ENXIO;
--
--	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
--	twd_timer_setup(evt);
--	return 0;
--}
--
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 6eeff0e..d07e733 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -39,7 +39,7 @@
+ struct clock_event_device;
  
- #include <asm/mach/time.h>
- #include <plat/dmtimer.h>
--#include <asm/localtimer.h>
-+#include <asm/smp_twd.h>
- #include <asm/sched_clock.h>
- #include "common.h"
- #include <plat/omap_hwmod.h>
-@@ -324,14 +324,26 @@ OMAP_SYS_TIMER(3_secure)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--static void __init omap4_timer_init(void)
--{
- #ifdef CONFIG_LOCAL_TIMERS
--	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
--	BUG_ON(!twd_base);
-+static DEFINE_TWD_LOCAL_TIMER(twd_local_timer,
-+			      OMAP44XX_LOCAL_TWD_BASE,
-+			      OMAP44XX_IRQ_LOCALTIMER);
- #endif
++struct local_timer_ops {
++	int  (*setup)(struct clock_event_device *);
++	void (*stop)(struct clock_event_device *);
++};
 +
-+static void __init omap4_timer_init(void)
-+{
- 	omap2_gp_clockevent_init(1, OMAP4_CLKEV_SOURCE);
- 	omap2_gp_clocksource_init(2, OMAP4_MPU_SOURCE);
-+#ifdef CONFIG_LOCAL_TIMERS
-+	/* Local timers are not supprted on OMAP4430 ES1.0 */
-+	if (omap_rev() != OMAP4430_REV_ES1_0) {
-+		int err;
+ /*
+  * Setup a per-cpu timer, whether it be a local timer or dummy broadcast
+  */
+@@ -38,6 +43,11 @@ void local_timer_stop(struct clock_event_device *);
+  */
+ int local_timer_setup(struct clock_event_device *);
+ 
++/*
++ * Register a local timer driver
++ */
++int local_timer_register(struct local_timer_ops *);
 +
-+		err = twd_local_timer_register(&twd_local_timer);
-+		if (err)
-+			pr_err("twd_local_timer_register failed %d\n", err);
-+	}
-+#endif
+ #else
+ 
+ static inline int local_timer_setup(struct clock_event_device *evt)
+@@ -48,6 +58,11 @@ static inline int local_timer_setup(struct clock_event_device *evt)
+ static inline void local_timer_stop(struct clock_event_device *evt)
+ {
  }
- OMAP_SYS_TIMER(4)
++
++static inline int local_timer_register(struct local_timer_ops *ops)
++{
++	return -ENXIO;
++}
  #endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 57db122..69d5f8b 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -475,6 +475,33 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+ 	clockevents_register_device(evt);
+ }
+ 
++static struct local_timer_ops *lt_ops;
++
++#ifdef CONFIG_LOCAL_TIMERS
++int local_timer_register(struct local_timer_ops *ops)
++{
++	if (lt_ops)
++		return -EBUSY;
++
++	lt_ops = ops;
++	return 0;
++}
++#endif
++
++int __cpuinit __attribute__ ((weak)) local_timer_setup(struct clock_event_device *clk)
++{
++	if (lt_ops)
++		return lt_ops->setup(clk);
++
++	return -ENXIO;
++}
++
++void __attribute__ ((weak)) local_timer_stop(struct clock_event_device *clk)
++{
++	if (lt_ops)
++		lt_ops->stop(clk);
++}
++
+ void __cpuinit percpu_timer_setup(void)
+ {
+ 	unsigned int cpu = smp_processor_id();
 -- 
 1.7.7.1
