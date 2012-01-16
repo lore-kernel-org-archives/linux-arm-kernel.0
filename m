@@ -1,73 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 16 Jan 2012 13:04:58 -0700 (MST)
-Subject: [PATCH v6 0/6] PM QoS: implement the OMAP low level constraints
- management code
-In-Reply-To: <CAORVsuVNvvPu6it7r_uxc0f6H-9kpo6SChTTGkdqpLmzMDNxvQ@mail.gmail.com>
-References: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
- <alpine.DEB.2.00.1112191337420.12660@utopia.booyaka.com>
- <CAORVsuVNvvPu6it7r_uxc0f6H-9kpo6SChTTGkdqpLmzMDNxvQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1201161301450.16675@utopia.booyaka.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 16 Jan 2012 13:05:23 -0700
+Subject: [PATCH] ep93xx: fix build of vision_ep93xx.c
+Message-ID: <201201161305.23508.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Fix build breakage due to the following commits:
 
-On Mon, 16 Jan 2012, Jean Pihet wrote:
+Commit bd5f12a24766c1f299def0a78b008d4746f528f2
+  ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics
 
-> Speaking of the locking, currently a spinlock is used and it could be
-> replaced by a more efficient mutex. This is ok at the condition that
-> this code is not called from interrupt context?
-> 
-> Kevin,
-> Do you know if the per-device constraint code can be called from
-> interrupt context?
+Commit 257af9f9725aa8a863b306659208a031135d59e7
+  ARM: 7041/1: gpio-ep93xx: hookup the to_irq callback in the driver
 
-It can't be.  It uses a mutex itself.  So a mutex is what we want.  Take a 
-look at drivers/base/power/qos.c:dev_pm_qos_update_request() (included 
-below)
+The vision_ep9307 machine uses the ep93xx build-in gpios and needs to
+include <mach/gpio-ep93xx.h> to pickup the defines.
 
+The gpio_to_irq() call is now a callback to the gpio-ep93xx.c driver
+and cannot be used as a constant initializer for the .irq member of
+struct i2c_board_info.
 
-- Paul
+Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
 
+---
 
-/**
- * dev_pm_qos_update_request - modifies an existing qos request
- * @req : handle to list element holding a dev_pm_qos request to use
- * @new_value: defines the qos request
- *
- * Updates an existing dev PM qos request along with updating the
- * target value.
- *
- * Attempts are made to make this code callable on hot code paths.
- *
- * Returns 1 if the aggregated constraint value has changed,
- * 0 if the aggregated constraint value has not changed,
- * -EINVAL in case of wrong parameters, -ENODEV if the device has been
- * removed from the system
- */
-int dev_pm_qos_update_request(struct dev_pm_qos_request *req,
-			      s32 new_value)
-{
-	int ret = 0;
-
-	if (!req) /*guard against callers passing in null */
-		return -EINVAL;
-
-	if (WARN(!dev_pm_qos_request_active(req),
-		 "%s() called for unknown object\n", __func__))
-		return -EINVAL;
-
-	mutex_lock(&dev_pm_qos_mtx);
-
-	if (req->dev->power.constraints) {
-		if (new_value != req->node.prio)
-			ret = apply_constraint(req, PM_QOS_UPDATE_REQ,
-					       new_value);
-	} else {
-		/* Return if the device has been removed */
-		ret = -ENODEV;
-	}
-
-	mutex_unlock(&dev_pm_qos_mtx);
-	return ret;
-}
+diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+index 03dd401..d5fb44f 100644
+--- a/arch/arm/mach-ep93xx/vision_ep9307.c
++++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+@@ -32,6 +32,7 @@
+ #include <mach/hardware.h>
+ #include <mach/fb.h>
+ #include <mach/ep93xx_spi.h>
++#include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+@@ -153,7 +154,6 @@ static struct i2c_board_info vision_i2c_info[] __initdata = {
+ 	}, {
+ 		I2C_BOARD_INFO("pca9539", 0x74),
+ 		.platform_data	= &pca953x_74_gpio_data,
+-		.irq		= gpio_to_irq(EP93XX_GPIO_LINE_F(7)),
+ 	}, {
+ 		I2C_BOARD_INFO("pca9539", 0x75),
+ 		.platform_data	= &pca953x_75_gpio_data,
+@@ -348,6 +348,8 @@ static void __init vision_init_machine(void)
+ 				"pca9539:74"))
+ 		pr_warn("cannot request interrupt gpio for pca9539:74\n");
+ 
++	vision_i2c_info[1].irq = gpio_to_irq(EP93XX_GPIO_LINE_F(7));
++
+ 	ep93xx_register_i2c(&vision_i2c_gpio_data, vision_i2c_info,
+ 				ARRAY_SIZE(vision_i2c_info));
+ 	ep93xx_register_spi(&vision_spi_master, vision_spi_board_info,
