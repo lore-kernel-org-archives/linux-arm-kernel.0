@@ -1,23 +1,33 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 16 Jan 2012 17:14:55 +0530
-Subject: [PATCH 7/8] dmaengine/dw_dmac: Unmap all memory buffers after
- completion of slave transfers
-In-Reply-To: <20120116105448.GT1068@n2100.arm.linux.org.uk>
-References: <cover.1326707233.git.viresh.kumar@st.com>
- <5e5d0fcff79b9b78e64c7424317d6b77736eca43.1326707233.git.viresh.kumar@st.com>
- <20120116105448.GT1068@n2100.arm.linux.org.uk>
-Message-ID: <4F140DB7.3060300@st.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Mon, 16 Jan 2012 12:57:10 +1100
+Subject: [PATCH 01/14] common: dma-mapping: introduce alloc_attrs and
+ free_attrs methods
+In-Reply-To: <1324643253-3024-2-git-send-email-m.szyprowski@samsung.com>
+References: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
+ <1324643253-3024-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120116015710.GD4512@truffala.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/16/2012 4:24 PM, Russell King - ARM Linux wrote:
-> Note that DMA engine drivers are not responsible for unmapping the buffers
-> when the transfer completes - that is the responsibility of the caller.
+On Fri, Dec 23, 2011 at 01:27:20PM +0100, Marek Szyprowski wrote:
+> Introduce new generic alloc and free methods with attributes argument.
 > 
-> The automatic buffer unmapping is required for the async_tx APIs and
-> offload APIs.
+> Existing alloc_coherent and free_coherent can be implemented on top of the
+> new calls with NULL attributes argument. Later also dma_alloc_non_coherent
+> can be implemented using DMA_ATTR_NONCOHERENT attribute as well as
+> dma_alloc_writecombine with separate DMA_ATTR_WRITECOMBINE attribute.
+> 
+> This way the drivers will get more generic, platform independent way of
+> allocating dma buffers with specific parameters.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-In dw_dmac, it is only done for slave transfers. Is this Okay ??
+Looks sensible to me.
 
+Reviewed-by: David Gibson <david@gibson.dropbear.ud.au>
 -- 
-viresh
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
