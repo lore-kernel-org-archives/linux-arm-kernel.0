@@ -1,30 +1,50 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Jan 2012 10:54:48 +0000
-Subject: [PATCH 7/8] dmaengine/dw_dmac: Unmap all memory buffers after
- completion of slave transfers
-In-Reply-To: <5e5d0fcff79b9b78e64c7424317d6b77736eca43.1326707233.git.viresh.kumar@st.com>
-References: <cover.1326707233.git.viresh.kumar@st.com>
- <5e5d0fcff79b9b78e64c7424317d6b77736eca43.1326707233.git.viresh.kumar@st.com>
-Message-ID: <20120116105448.GT1068@n2100.arm.linux.org.uk>
+Date: Mon, 16 Jan 2012 10:59:49 +0000
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
+ by uBoot)?
+In-Reply-To: <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
+References: <WC20120116100344.4204CC@terrafix.co.uk>
+ <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
+Message-ID: <20120116105949.GG16726@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 03:20:35PM +0530, Viresh Kumar wrote:
-> Currently, after completion of transfer, source address or destination address
-> of only the first LLI descriptor is unmapped. And length passed for unmap is
-> total length of all descriptors in the list. Which means unmapping code assumed
-> that the memory buffers pointed to by the descriptors will be physically
-> contiguous, which might not be the case. It is possible for other drivers to
-> pass sglist to slave_sg(), in which all buffers are scattered throughout the
-> memory.
+On Mon, Jan 16, 2012 at 11:18:21AM +0100, Shilimkar, Santosh wrote:
+> + linux-arm, Russell and Catalin
 > 
-> This patch intends to fix this wrong expectation of dw_dmac. Now, first desc
-> will not contain total length of transfer. But individual descriptors will
-> contain their individual lengths. Finally, we will call unmap for all
-> descriptors.
+> On Mon, Jan 16, 2012 at 11:03 AM, Joe Woodward <jw@terrafix.co.uk> wrote:
+> > The latest uBoot release (2011.12) disables the L2/outer cache during boot on OMAP boards.
+> >
+> > uBoot commit: "armv7: disable L2 cache in cleanup_before_linux()" on 6th Dec 2011 by Aneesh V adds the following to
+> > uBootSources/arch/arm/cpu/armv7/cpu.c:cleanup_before_linux():
+> > ?...
+> > ?v7_out_cache_disable();
+> >
+> > The commit message implies this change was to make booting reliable on OMAP4 by disabling L2 cache before jumping to Linux. Sadly
+> > this commit also affects OMAP3-based boards...
+> >
+> > Since switching to uBoot 2011.12 I'm seeing about half the performance on my GUSMTIX Overo (OMAP3530).
+> >
+> > In the kernel sources there seem to be OMAP4 specific functions for re-enabling the L2 cache (omap4-common.c:omap_l2_cache_init()),
+> > but none for OMAP3.
+> >
+> > So my question is... do we expect that Linux should be re-enabling the L2/outer cache during boot after uBoot has disabled it on OMAP3?
+> >
+> Yes. Kernel already does enabled L2 on A8 CPU's but OMAP3 needs a
+> secure call and then the patching becomes
+> that much difficult.
+> 
+> We need some kind of generic hook in proc*_setup() function where in
+> such secure bits can be turned ON.
 
-Note that DMA engine drivers are not responsible for unmapping the buffers
-when the transfer completes - that is the responsibility of the caller.
+You can't have that kind of hook: there is no stack here to call other
+functions, plus we aren't running with the MMU on at that point so
+only carefully crafted assembly could be used.
 
-The automatic buffer unmapping is required for the async_tx APIs and
-offload APIs.
+Why is it soo difficult to issue the secure call?
+
+This just proves my point that the lack of consistent secure monitor API
+for these kinds of basic service _are_ a big problem, one which ARM Ltd
+should have addressed when they invented this stuff.  My view continues
+to be that the secure monitor API is a total abortion, one which should
+never have been allowed to happen.
