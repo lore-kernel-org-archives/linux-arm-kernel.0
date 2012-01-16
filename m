@@ -1,49 +1,56 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jan 2012 15:41:47 +0000
-Subject: [PATCH] ARM: hotplug: ensure that we copy the affinity mask when
- migrating IRQs
-Message-ID: <1326728507-9916-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 16 Jan 2012 15:44:17 +0000
+Subject: [PATCH 1/2] ARM: vmlinux.lds.S: do not hardcode cacheline size as 32
+ bytes
+Message-ID: <1326728658-10029-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is hotplugged off, we migrate any IRQs currently affine to it
-away and onto another online CPU by calling the irq_set_affinity function
-of the relevant interrupt controller chip. This function returns either
-IRQ_SET_MASK_OK or IRQ_SET_MASK_OK_NOCOPY, to indicate whether
-irq_data.affinity was updated. In the case of the former, the migration
-code should update the mask itself, as is done by irq_set_affinity.
+The linker script assumes a cacheline size of 32 bytes when aligning
+the .data..cacheline_aligned and .data..percpu sections.
 
-The current code does not update affinity mask and potentially leaves
-/proc/irq/n/smp_affinity identifying an offline CPU, which confuses
-userspace IRQ balancing daemons.
+This patch updates the script to use L1_CACHE_BYTES, which should be set
+to 64 on platforms that require it.
 
-This patch updates migrate_one_irq to copy the affinity mask when
-the interrupt chip returns IRQ_SET_MASK_OK after changing the affinity
-of an interrupt.
-
-Reported-by: Leif Lindholm <leif.lindholm@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/irq.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 3efd82c..831435d 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -156,10 +156,10 @@ static bool migrate_one_irq(struct irq_desc *desc)
+v2: incorporated suggestions from Stephen Boyd
+
+ arch/arm/kernel/vmlinux.lds.S |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index f76e755..1077e4f 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -4,6 +4,7 @@
+  */
+ 
+ #include <asm-generic/vmlinux.lds.h>
++#include <asm/cache.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
+@@ -181,7 +182,7 @@ SECTIONS
  	}
+ #endif
  
- 	c = irq_data_get_irq_chip(d);
--	if (c->irq_set_affinity)
--		c->irq_set_affinity(d, affinity, true);
--	else
-+	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
-+	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK)
-+		cpumask_copy(d->affinity, affinity);
+-	PERCPU_SECTION(32)
++	PERCPU_SECTION(L1_CACHE_BYTES)
  
- 	return ret;
- }
+ #ifdef CONFIG_XIP_KERNEL
+ 	__data_loc = ALIGN(4);		/* location in binary */
+@@ -212,8 +213,8 @@ SECTIONS
+ #endif
+ 
+ 		NOSAVE_DATA
+-		CACHELINE_ALIGNED_DATA(32)
+-		READ_MOSTLY_DATA(32)
++		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
++		READ_MOSTLY_DATA(L1_CACHE_BYTES)
+ 
+ 		/*
+ 		 * The exception fixup table (might need resorting at runtime)
 -- 
 1.7.4.1
