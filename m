@@ -1,68 +1,103 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 16 Jan 2012 14:22:13 +0100
-Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
- uBoot)?
-In-Reply-To: <20120116131329.GA928@n2100.arm.linux.org.uk>
-References: <WC20120116100344.4204CC@terrafix.co.uk>
- <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
- <20120116105949.GG16726@n2100.arm.linux.org.uk>
- <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
- <20120116131329.GA928@n2100.arm.linux.org.uk>
-Message-ID: <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Jan 2012 13:52:25 +0000
+Subject: [PATCH v3 00/15] Runtime registration for local timers
+Message-ID: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 2:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 16, 2012 at 01:43:03PM +0100, Shilimkar, Santosh wrote:
->> This code will be in assembly and that's what I have
->> been using. Not having stack shoudn't be a blocker
->> and can be work-around in this code. And this API
->> has to be anyway called before MMU is enabled.
->
-> What about SMC on OMAP potentially corrupting most of the integer
-> registers? ?What if it corrupts an integer register which we depend
-> upon? ?You don't have a stack here to save those registers. ?We'd
-> need at least one additional register to save the old 'lr' value.
->
-That's right.
+This patches series switches the various local timers implementation
+(TWD, MCT, MSM timer) to be registered at runtime instead of being
+hardwired at compile time. In the process, TWD gets an OF binding that
+is used by highbank and imx6q.
 
-> What about other secure monitors? ?Some implementations require you to
-> give parameters via memory. ?How do you obtain that memory that early
-> on in the kernel boot (you haven't parsed anything here.)
->
-> Not only that but you're asking to make the kernel boot a _lot_ more
-> fragile, when people start stuffing all kinds of utter shite into this
-> hook - and then we're burdened again with the old 'my kernel won't
-> boot and it remains silent, well your debug code is utter shite get rid
-> of it' crap that we used to have in the early 2000s.
->
-> I really don't want to go anywhere near that situation.
->
-Fair point. It will be harder to maintain and won't be consistent.
+Tested on EB11MP, OMAP4, Tegra and Exynos4. Based on Linus' tree as of
+some random point today.
 
->> Am not sure what you mean because secure API
->> as such isn't a problem. If you mean one standard interface
->> for all the ARM SOC's then that's something won't be
->> easy to handled because it is tied up the security architecture
->> which can vary across SoCs.
->
-> The latter. ?This is exactly the kind of pain I forsaw with this security
-> shite, and when I heard about it I was utterly dismayed at ARM Ltd for
-> coming up with such a brain-dead lack of design here.
->
-> You're having to struggle with the results of that by having lots of
-> SoC specific hooks all around the place to fiddle with this that and the
-> other. ?Your need to have something called from the early assembly code
-> is just yet more of that disease caused by ARM Ltd's lack of forsight
-> on this matter.
->
-> I have no solution for you on this
+Branch also available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git local_timers-v3.3-rc0
 
-I managed use some secure macro kind of code but as you said it
-will be really hard to maintain.
+* From v2:
+- Fix __initdata anotations that should have been __cpuinitdata
+  (reported by David Brown and Russell King)
+- Fix interrupt trigger in DTS file for highbank and imx6q
+  (as requested by Rob Herring and Shawn Guo)
+- Move warning to twd_local_timer_of_register()
+  (as requested by Rob Herring)
+- Fix shmobile compilation fix (reported by Magnus Damm)
+- Fold local_timer_{setup,stop}() into percpu_timer_{setup,stop}()
 
-So we are stuck with this issue then.
+* From initial version:
 
-Regards
-Santosh
+- Moved away from late_time_init, making the code even simpler
+- Added a DEFINE_TWD_LOCAL_TIMER() macro to reduce the init cluter
+- Updated TWD DT support to have separate nodes for timer and watchdog
+- Added support for the new r8a7779 shmobile that suddenly appeared
+- Fixed a tiny dts bug on imx6q
+
+Marc Zyngier (15):
+  ARM: smp_twd: make local_timer_stop a symbol instead of a #define
+  ARM: local timers: introduce a new registration interface
+  ARM: smp_twd: add runtime registration support
+  ARM: smp_twd: add device tree support
+  ARM: OMAP4: convert to twd_local_timer_register() interface
+  ARM: plat-versatile: convert to twd_local_timer_register() interface
+  ARM: tegra: convert to twd_local_timer_register() interface
+  ARM: shmobile: convert to twd_local_timer_register() interface
+  ARM: ux500: convert to twd_local_timer_register() interface
+  ARM: highbank: convert to twd_local_timer_register() interface
+  ARM: imx6q: convert to twd_local_timer_register() interface
+  ARM: smp_twd: remove old local timer interface
+  ARM: local timers: convert exynos to runtime registration interface
+  ARM: local timers: convert MSM to runtime registration interface
+  ARM: local timers: make the runtime registration interface mandatory
+
+ Documentation/devicetree/bindings/arm/twd.txt |   48 ++++++++++
+ arch/arm/boot/dts/highbank.dts                |    8 +-
+ arch/arm/boot/dts/imx6q.dtsi                  |    6 +-
+ arch/arm/include/asm/localtimer.h             |   37 ++------
+ arch/arm/include/asm/smp_twd.h                |   25 ++++-
+ arch/arm/kernel/smp.c                         |   22 ++++-
+ arch/arm/kernel/smp_twd.c                     |  123 ++++++++++++++++++++-----
+ arch/arm/mach-exynos/mct.c                    |   18 ++--
+ arch/arm/mach-highbank/Makefile               |    1 -
+ arch/arm/mach-highbank/highbank.c             |    3 +
+ arch/arm/mach-highbank/localtimer.c           |   40 --------
+ arch/arm/mach-imx/Makefile                    |    1 -
+ arch/arm/mach-imx/localtimer.c                |   35 -------
+ arch/arm/mach-imx/mach-imx6q.c                |    2 +
+ arch/arm/mach-msm/timer.c                     |   79 +++++++++-------
+ arch/arm/mach-omap2/Makefile                  |    1 -
+ arch/arm/mach-omap2/timer-mpu.c               |   39 --------
+ arch/arm/mach-omap2/timer.c                   |   22 ++++-
+ arch/arm/mach-realview/realview_eb.c          |   27 ++++-
+ arch/arm/mach-realview/realview_pb11mp.c      |   21 ++++-
+ arch/arm/mach-realview/realview_pbx.c         |   20 +++-
+ arch/arm/mach-shmobile/Makefile               |    1 -
+ arch/arm/mach-shmobile/include/mach/common.h  |    2 +
+ arch/arm/mach-shmobile/localtimer.c           |   26 -----
+ arch/arm/mach-shmobile/platsmp.c              |    1 -
+ arch/arm/mach-shmobile/smp-r8a7779.c          |    8 +-
+ arch/arm/mach-shmobile/smp-sh73a0.c           |    8 +-
+ arch/arm/mach-shmobile/timer.c                |   10 ++
+ arch/arm/mach-tegra/Makefile                  |    2 +-
+ arch/arm/mach-tegra/localtimer.c              |   26 -----
+ arch/arm/mach-tegra/timer.c                   |   22 ++++-
+ arch/arm/mach-ux500/Makefile                  |    1 -
+ arch/arm/mach-ux500/cpu.c                     |    1 -
+ arch/arm/mach-ux500/localtimer.c              |   29 ------
+ arch/arm/mach-ux500/timer.c                   |   32 +++++--
+ arch/arm/mach-vexpress/ct-ca9x4.c             |   17 +++-
+ arch/arm/plat-versatile/Makefile              |    1 -
+ arch/arm/plat-versatile/localtimer.c          |   27 ------
+ 38 files changed, 407 insertions(+), 385 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
+ delete mode 100644 arch/arm/mach-highbank/localtimer.c
+ delete mode 100644 arch/arm/mach-imx/localtimer.c
+ delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
+ delete mode 100644 arch/arm/mach-shmobile/localtimer.c
+ delete mode 100644 arch/arm/mach-tegra/localtimer.c
+ delete mode 100644 arch/arm/mach-ux500/localtimer.c
+ delete mode 100644 arch/arm/plat-versatile/localtimer.c
+
+-- 
+1.7.7.1
