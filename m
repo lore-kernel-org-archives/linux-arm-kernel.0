@@ -1,82 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2012 13:52:38 +0000
-Subject: [PATCH v3 13/15] ARM: local timers: convert exynos to runtime
- registration interface
+Date: Mon, 16 Jan 2012 13:52:26 +0000
+Subject: [PATCH v3 01/15] ARM: smp_twd: make local_timer_stop a symbol instead
+ of a #define
 In-Reply-To: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
 References: <1326721960-2224-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326721960-2224-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1326721960-2224-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the Exynos MCT timers to the runtime registration interface.
-Tested on Origen.
+When CONFIG_HAVE_ARM_TWD is selected, local_timer_stop is a #define,
+while all other local timers are using a real function.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Convert it to an alias of twd_timer_stop, as it helps converting
+all local timers to another internal API in a sane way.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-exynos/mct.c |   18 ++++++++++--------
- 1 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/localtimer.h |    6 +-----
+ arch/arm/include/asm/smp_twd.h    |    1 -
+ arch/arm/kernel/smp_twd.c         |    7 ++++++-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-index 85b5527..edc4b94 100644
---- a/arch/arm/mach-exynos/mct.c
-+++ b/arch/arm/mach-exynos/mct.c
-@@ -21,6 +21,7 @@
- #include <linux/percpu.h>
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index c6a1842..7e1b2c5 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -26,17 +26,13 @@ void percpu_timer_setup(void);
  
- #include <asm/hardware/gic.h>
-+#include <asm/localtimer.h>
+ #include "smp_twd.h"
  
- #include <plat/cpu.h>
- 
-@@ -375,7 +376,7 @@ static struct irqaction mct_tick1_event_irq = {
- 	.handler	= exynos4_mct_tick_isr,
- };
- 
--static void exynos4_mct_tick_init(struct clock_event_device *evt)
-+static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
- {
- 	struct mct_clock_event_device *mevt;
- 	unsigned int cpu = smp_processor_id();
-@@ -417,17 +418,11 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
- 	} else {
- 		enable_percpu_irq(IRQ_MCT_LOCALTIMER, 0);
- 	}
--}
+-#define local_timer_stop(c)	twd_timer_stop((c))
 -
--/* Setup the local clock events for a CPU */
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	exynos4_mct_tick_init(evt);
+-#else
++#endif
  
+ /*
+  * Stop the local timer
+  */
+ void local_timer_stop(struct clock_event_device *);
+ 
+-#endif
+-
+ /*
+  * Setup a local timer interrupt for a CPU.
+  */
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index ef9ffba9..bf8449d 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -23,6 +23,5 @@ struct clock_event_device;
+ extern void __iomem *twd_base;
+ 
+ void twd_timer_setup(struct clock_event_device *);
+-void twd_timer_stop(struct clock_event_device *);
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index c8e9385..95a0c14 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -87,12 +87,17 @@ int twd_timer_ack(void)
  	return 0;
  }
  
--void local_timer_stop(struct clock_event_device *evt)
-+static void exynos4_local_timer_stop(struct clock_event_device *evt)
+-void twd_timer_stop(struct clock_event_device *clk)
++static void twd_timer_stop(struct clock_event_device *clk)
  {
- 	unsigned int cpu = smp_processor_id();
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-@@ -439,6 +434,11 @@ void local_timer_stop(struct clock_event_device *evt)
- 	else
- 		disable_percpu_irq(IRQ_MCT_LOCALTIMER);
- }
-+
-+static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
-+	.setup	= exynos4_local_timer_setup,
-+	.stop	= exynos4_local_timer_stop,
-+};
- #endif /* CONFIG_LOCAL_TIMERS */
- 
- static void __init exynos4_timer_resources(void)
-@@ -458,6 +458,8 @@ static void __init exynos4_timer_resources(void)
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     IRQ_MCT_LOCALTIMER, err);
- 	}
-+
-+	local_timer_register(&exynos4_mct_tick_ops);
- #endif /* CONFIG_LOCAL_TIMERS */
+ 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+ 	disable_percpu_irq(clk->irq);
  }
  
++/* Temporary hack to be removed when all TWD users are converted to
++   the new registration interface */
++void local_timer_stop(struct clock_event_device *clk)
++	__attribute__ ((alias ("twd_timer_stop")));
++
+ #ifdef CONFIG_CPU_FREQ
+ 
+ /*
 -- 
 1.7.7.1
