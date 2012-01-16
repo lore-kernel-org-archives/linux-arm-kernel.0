@@ -1,68 +1,57 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 16 Jan 2012 09:16:22 +0000
-Subject: omap clocksource timer selection: dmtimer OR 32K-Sync timer
-In-Reply-To: <20120113165003.GJ15299@atomide.com>
-References: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
- <CAMQu2gxYQOHX8n2RLfkLBw5hQMdvH389DfrguLtzpLcpmqBQMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A8317A4FD9@DBDE01.ent.ti.com>
- <CAMQu2gxkBV87YQE7SPmLXh0RZBR+SNHzHE5H-PVjuef+1UZp8Q@mail.gmail.com>
- <20120113165003.GJ15299@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317A6A9D@DBDE01.ent.ti.com>
+From: Jon.Povey@racelogic.co.uk (Jon Povey)
+Date: Mon, 16 Jan 2012 09:20:03 +0000
+Subject: DaVinci unbanked GPIO IRQs broken
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B63178FB3F@DBDE01.ent.ti.com>
+Message-ID: <70E876B0EA86DD4BAF101844BC814DFE0BF403D9FD@Cloud.RL.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 22:20:03, Tony Lindgren wrote:
-> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120113 06:08]:
-> > On Fri, Jan 13, 2012 at 2:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> > > On Fri, Jan 13, 2012 at 18:19:24, Shilimkar, Santosh wrote:
-> > >> > ? ...
-> > >> > ? };
-> > >> >
-> > >> > ? We need to have similar entries in all devices where 32K timer is present.
-> > >> >
-> > >> > 2) OR simply add another cpu_is_am33xx() and then fall back to dmtimer?
-> > >> > ? Just to prove this, everything works here, I modified the code for this
-> > >> > ? and tested it on both AM335x EVM and AM37xEVM and it works fine for me.
-> > >> >
-> > >> >
-> > >> > Any comments?? OR Better approach? OR anything which I am missing here?
-> 
-> Why don't you just add a new entry to mach-omap2/timer.c using the OMAP_SYS_TIMER
-> macro?
-> 
-Tony,
+Nori, Sekhar wrote:
+> On Wed, Jan 11, 2012 at 17:17:34, Jon Povey wrote:
+>> Unbanked GPIO IRQs (I am on DM365) seem to have been broken
+>> by commit aac4dd1dab8acfc244d697473d2a5f4424a5746c, conversion
+>> to generic irq chip, leading to an oops from request_irq().
 
-The entry is already present in mach-olmap2/timer.c
+> The root cause indeed seems to be chip_data getting
+> overwritten.
+>
+> I made a patch for it and was able to test that requesting IRQ
+> number 44 doesn't oops. Yet to figure out if there is an easy way
+> to trigger an unbanked GPIO IRQ on the EVM, so a large part of
+> the patch is actually untested. Anyway, can you give this patch
+> a shot (hopefully not mailer mangled)? I don't like the fact that
+> it increases davinci_soc_info usage, but first lets see if it fixes
+> the issue.
 
-OMAP_SYS_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, 2, OMAP4_MPU_SOURCE)
-OMAP_SYS_TIMER(3_am33xx)
+gpio_export(n, 1) and using sysfs to set the gpio to output can be
+used to test.
 
+Tried quickly rebasing my stuff to 3.2, your patch fixes the oops, but
+the interrupt does not trigger. I don't have time to investigate why not
+right now, sorry. But I did try reverting the genirq change too, and
+the interrupt handler still wasn't called, so maybe something else
+broke somewhere, or it could be something needs updating in my board
+support.
 
-The issue is not related to this, more with respect to compile time 
-Code -
+I tried applying this patch (modulo gpio path change) to my 3.0-rc7
+base with the genirq stuff left in.
+I still get an oops and backtrace when requesting the irq!
 
-#ifdef CONFIG_OMAP_32K_TIMER
-static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
-{
-	32K TIMER code
-}
-#else
-static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
-{
-	DMTIMER code
-}
-#endif
+If this is clearer:
 
-Omap2plus_defconfig enabled option "CONFIG_OMAP_32K_TIMER", so from
-Multi-omap point of view it will break AM335x.
+3.2 vanilla: oops requesting irq
+3.2 + your patch: no oops, isr is not run
+3.2 + reverted genirq: no oops, isr is not run
 
-Thanks,
-Vaibhav
+3.0-rc7: oops requesting irq
+3.0-rc7 + your patch: oops requesting irq
+3.0-rc7 + reverted genirq: no oops, isr works
 
-> See for example the omap3_secure timer set up. That should allow
-> specifying the clock source already.
-> 
-> Regards,
-> 
-> Tony
-> 
+--
+Jon Povey
+jon.povey at racelogic.co.uk
+
+Racelogic is a limited company registered in England. Registered number 2743719 .
+Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
+
+The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
