@@ -1,102 +1,29 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 16 Jan 2012 11:28:08 -0700
-Subject: Pinmux bindings proposal
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
-Message-ID: <20120116182808.GG4223@ponder.secretlab.ca>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 16 Jan 2012 10:30:23 -0800
+Subject: [PATCH 1/2] ARM: vmlinux.lds.S: do not hardcode cacheline size
+ as 32 bytes
+In-Reply-To: <20120116182622.GC11088@mudshark.cambridge.arm.com>
+References: <1326728658-10029-1-git-send-email-will.deacon@arm.com>
+ <4F146AEA.90600@codeaurora.org>
+ <20120116182622.GC11088@mudshark.cambridge.arm.com>
+Message-ID: <4F146CBF.6030104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 12:39:42PM -0800, Stephen Warren wrote:
-> I thought a bit more about pinmux DT bindings. I came up with something
-> that I like well enough, and is pretty similar to the binding that Dong
-> posted recently. I think it'll work for both Tegra's and IMX's needs.
-> Please take a look!
-> 
-> Note: I've used named constants below just to make this easier to read.
-> We still don't have a solution to actually use named constants in dtc yet.
-> 
-> tegra20.dtsi:
-> 
-> / {
->         tegra_pmx: pinmux at 70000000 {
->                 compatible = "nvidia,tegra20-pinmux";
->                 reg = <0x70000014 0x10   /* Tri-state registers */
->                        0x70000080 0x20   /* Mux registers */
->                        0x700000a0 0x14   /* Pull-up/down registers */
->                        0x70000868 0xa8>; /* Pad control registers */
->         };
-> 
->         sdhci at c8000200 {
->                 compatible = "nvidia,tegra20-sdhci";
->                 reg = <0xc8000200 0x200>;
->                 interrupts = <0 15 0x04>;
->         };
-> };
-> 
-> tegra-harmony.dts:
-> 
-> /{
->         sdhci at c8000200 {
->                 cd-gpios = <&gpio 69 0>; /* gpio PI5 */
->                 wp-gpios = <&gpio 57 0>; /* gpio PH1 */
->                 power-gpios = <&gpio 155 0>; /* gpio PT3 */
-> 
->                 /*
->                  * A list of named configurations that this device needs.
->                  * Format is a list of <"name" &phandle_of_pmx_configuration>
->                  *
->                  * Multiple "name"s are needed e.g. to support active/suspend,
->                  * or whatever device-defined states are appropriate. The
->                  * device defines which names are needed, just like a device
->                  * defines which regulators, clocks, GPIOs, interrupts, ...
->                  * it needs.
->                  *
->                  * This example shows a 1:1 relation between name and phandle.
->                  * We might want a 1:n relation, so that we can blend multiple
->                  * pre-defined sets of data together, e.g. one pre-defined set
->                  * for the pin mux configuration, another for the pin config
->                  * settings, both being put into the single "default" setting
->                  * for this one device.
->                  *
->                  * A pinmux controller can contain this property too, to
->                  * define "hogged" or "system" pin mux configuration.
->                  *
->                  * Note: Mixing strings and integers in a property seems
->                  * unusual. However, I have seen other bindings floating
->                  * around that are starting to do this...
->                  */
->                 pinmux =
->                         <"default" &pmx_sdhci_active>
->                         <"suspend" &pmx_sdhci_suspend>;
-> 
->                 /* 1:n example: */
->                 pinmux =
->                         <"default" &pmx_sdhci_mux_a>
->                         <"default" &pmx_sdhci_pincfg_a>
->                         <"suspend" &pmx_sdhci_mux_a>
->                         <"suspend" &pmx_sdhci_pincfg_a_suspend>;
+On 01/16/12 10:26, Will Deacon wrote:
+> On Mon, Jan 16, 2012 at 06:22:34PM +0000, Stephen Boyd wrote:
+>>
+>> What do you think about aligning the exception fixup table to the same
+>> value?
+> Hmm, I'm not sure I see what that gains us over the current 32-byte
+> alignment. Are you seeing any measurable performance difference with it being
+> cacheline-aligned?
+>
 
+I haven't measured anything yet. I just see that it's another value
+hard-coded to 32 in the linker script and that tile has decided to use
+L1_CACHE_BYTES for it.
 
-Yeah, don't do this.  Mixing phandle, string and cell values in a
-property gets messy and could become troublesome to parse.  I've
-backed away from it in the clk binding.
-
-pinumx-* is better, but I'm not thrilled with it and I avoided that
-pattern too for the latest iteration of the clk binding.  I prefer
-using a "pinmux" + "pinmux-names" pair of properties when dealing with
-an array of like objects (ie. reg, interrupts, clks, etc), but that
-might not fit well since each setting has multiple state nodes.
-
-> 
->                 /*
->                  * Alternative: One property for each required state. But,
->                  * how does pinctrl core know which properties to parse?
->                  * Every property named "pinctrl*" seems a little too far-
->                  * reaching. Perhaps if we used vendor-name "pinmux", that'd
->                  * be OK, i.e. pinmux,default and pinmux,suspend?
-
-It isn't actually a vendor name, so don't use a ','.  "pinmux-" prefix
-is fine.
-
-g.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
