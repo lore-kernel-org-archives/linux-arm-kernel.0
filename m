@@ -1,40 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 16 Jan 2012 19:33:09 +0000
-Subject: [PATCH v2 1/2] backlight: lcd: add driver for raster-type lcd's
- with gpio controlled panel reset
-In-Reply-To: <1326354211-27064-2-git-send-email-thomas.abraham@linaro.org>
-References: <1326354211-27064-1-git-send-email-thomas.abraham@linaro.org>
- <1326354211-27064-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20120116193309.GG3514@opensource.wolfsonmicro.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 16 Jan 2012 14:35:43 -0500 (EST)
+Subject: [PATCH 1/2] ARM: vmlinux.lds.S: do not hardcode cacheline size as
+ 32 bytes
+In-Reply-To: <20120116191118.GF11088@mudshark.cambridge.arm.com>
+References: <20120116191118.GF11088@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1201161425040.2722@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 01:13:30PM +0530, Thomas Abraham wrote:
+On Mon, 16 Jan 2012, Will Deacon wrote:
 
-> +			/* set regulator voltage if specified */
-> +			if (pd->min_uV || pd->max_uV)
-> +				if (regulator_set_voltage(lp->regulator,
-> +						pd->min_uV, pd->max_uV))
-> +					dev_info(lp->dev,
-> +						"voltage set failed\n");
-> +			if (regulator_enable(lp->regulator))
-> +				dev_info(lp->dev, "regulator enable failed\n");
+> On Mon, Jan 16, 2012 at 06:30:23PM +0000, Stephen Boyd wrote:
+> > On 01/16/12 10:26, Will Deacon wrote:
+> > > On Mon, Jan 16, 2012 at 06:22:34PM +0000, Stephen Boyd wrote:
+> > >>
+> > >> What do you think about aligning the exception fixup table to the same
+> > >> value?
+> > > Hmm, I'm not sure I see what that gains us over the current 32-byte
+> > > alignment. Are you seeing any measurable performance difference with it being
+> > > cacheline-aligned?
+> > >
+> > 
+> > I haven't measured anything yet. I just see that it's another value
+> > hard-coded to 32 in the linker script and that tile has decided to use
+> > L1_CACHE_BYTES for it.
+> 
+> Hmm, that's intriguing. The exception table entries are 8 bytes on ARM and
+> are aligned as such by things like the USER macro, so I'm not sure why we
+> align the section to 32 bytes. I guess it must be for performance reasons,
+> but whether that's due to cacheline size, I don't know.
+> 
+> Nico, can you enlighten us please (it was introduced in 13b1f64c ("[ARM]
+> 3008/1: the exception table is not read-only"))?
 
-You should really pay more attention to the errors here, especially for
-the enable - this function does return an error code so you could
-usefully tell the caller about failures.
+It probably was due to the fact that the surrounding data was also cache 
+line aligned.  I don't think there is any particular reason why it 
+should be aligned to a cache line boundary given that the list is 
+accessed with a binary search.  The minimum required alignment would be 
+__alignof__(struct exception_table_entry).
 
-> +	/*
-> +	 * If power to lcd and/or lcd interface is controlled using a regulator,
-> +	 * get the handle to the regulator for later use during power switching.
-> +	 */
-> +	lp->regulator = regulator_get(dev, "vcc-lcd");
-> +	if (IS_ERR(lp->regulator))
-> +		dev_info(dev, "could not find regulator\n");
 
-It's much better style to assume that there will be a regulator in the
-code and let the core worry about stubbing it out.  Given that you don't
-offer any support for varying the voltage dynamically I'd suggest just
-removing the set_voltage() support for now - if someone adds it they can
-always add additional properties and worry about handling that situation
-then.
+Nicolas
