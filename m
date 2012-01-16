@@ -1,71 +1,42 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 16 Jan 2012 13:43:03 +0100
-Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
- uBoot)?
-In-Reply-To: <20120116105949.GG16726@n2100.arm.linux.org.uk>
-References: <WC20120116100344.4204CC@terrafix.co.uk>
- <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
- <20120116105949.GG16726@n2100.arm.linux.org.uk>
-Message-ID: <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 16 Jan 2012 13:48:11 +0100
+Subject: [PATCH 04/11] mm: page_alloc: introduce alloc_contig_range()
+In-Reply-To: <20120116090110.GA2929@csn.ul.ie>
+References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
+ <1325162352-24709-5-git-send-email-m.szyprowski@samsung.com>
+ <20120110141613.GB3910@csn.ul.ie> <op.v71gpt1b3l0zgt@mpn-glaptop>
+ <20120116090110.GA2929@csn.ul.ie>
+Message-ID: <op.v76giluf3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 11:59 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 16, 2012 at 11:18:21AM +0100, Shilimkar, Santosh wrote:
->> + linux-arm, Russell and Catalin
+On Mon, 16 Jan 2012 10:01:10 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
+
+> On Fri, Jan 13, 2012 at 09:04:31PM +0100, Michal Nazarewicz wrote:
+>> >On Thu, Dec 29, 2011 at 01:39:05PM +0100, Marek Szyprowski wrote:
+>> >>From: Michal Nazarewicz <mina86@mina86.com>
+>> >>+	/* Make sure all pages are isolated. */
+>> >>+	if (!ret) {
+>> >>+		lru_add_drain_all();
+>> >>+		drain_all_pages();
+>> >>+		if (WARN_ON(test_pages_isolated(start, end)))
+>> >>+			ret = -EBUSY;
+>> >>+	}
 >>
->> On Mon, Jan 16, 2012 at 11:03 AM, Joe Woodward <jw@terrafix.co.uk> wrote:
->> > The latest uBoot release (2011.12) disables the L2/outer cache during boot on OMAP boards.
->> >
->> > uBoot commit: "armv7: disable L2 cache in cleanup_before_linux()" on 6th Dec 2011 by Aneesh V adds the following to
->> > uBootSources/arch/arm/cpu/armv7/cpu.c:cleanup_before_linux():
->> > ?...
->> > ?v7_out_cache_disable();
->> >
->> > The commit message implies this change was to make booting reliable on OMAP4 by disabling L2 cache before jumping to Linux. Sadly
->> > this commit also affects OMAP3-based boards...
->> >
->> > Since switching to uBoot 2011.12 I'm seeing about half the performance on my GUSMTIX Overo (OMAP3530).
->> >
->> > In the kernel sources there seem to be OMAP4 specific functions for re-enabling the L2 cache (omap4-common.c:omap_l2_cache_init()),
->> > but none for OMAP3.
->> >
->> > So my question is... do we expect that Linux should be re-enabling the L2/outer cache during boot after uBoot has disabled it on OMAP3?
->> >
->> Yes. Kernel already does enabled L2 on A8 CPU's but OMAP3 needs a
->> secure call and then the patching becomes
->> that much difficult.
+>> On Tue, 10 Jan 2012 15:16:13 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
+>> >Another global IPI seems overkill. Drain pages only from the local CPU
+>> >(drain_pages(get_cpu()); put_cpu()) and test if the pages are isolated.
 >>
->> We need some kind of generic hook in proc*_setup() function where in
->> such secure bits can be turned ON.
+>> Is get_cpu() + put_cpu() required? Won't drain_local_pages() work?
+>>
 >
-> You can't have that kind of hook: there is no stack here to call other
-> functions, plus we aren't running with the MMU on at that point so
-> only carefully crafted assembly could be used.
->
-This code will be in assembly and that's what I have
-been using. Not having stack shoudn't be a blocker
-and can be work-around in this code. And this API
-has to be anyway called before MMU is enabled.
+> drain_local_pages() calls smp_processor_id() without preemption
+> disabled.
 
-> Why is it soo difficult to issue the secure call?
->
-Nothing difficult.
-It is just that there is no place today where platform
-can call these secure API's Call where ?
+Thanks, I wasn't sure if preemption is an issue.
 
-> This just proves my point that the lack of consistent secure monitor API
-> for these kinds of basic service _are_ a big problem, one which ARM Ltd
-> should have addressed when they invented this stuff. ?My view continues
-> to be that the secure monitor API is a total abortion, one which should
-> never have been allowed to happen.
-
-Am not sure what you mean because secure API
-as such isn't a problem. If you mean one standard interface
-for all the ARM SOC's then that's something won't be
-easy to handled because it is tied up the security architecture
-which can vary across SoCs.
-
-Regards
-Santosh
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
