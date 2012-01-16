@@ -1,66 +1,73 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 16 Jan 2012 20:57:51 +0100
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 16 Jan 2012 13:04:58 -0700 (MST)
 Subject: [PATCH v6 0/6] PM QoS: implement the OMAP low level constraints
  management code
-In-Reply-To: <alpine.DEB.2.00.1112191337420.12660@utopia.booyaka.com>
+In-Reply-To: <CAORVsuVNvvPu6it7r_uxc0f6H-9kpo6SChTTGkdqpLmzMDNxvQ@mail.gmail.com>
 References: <1323874304-5001-1-git-send-email-j-pihet@ti.com>
  <alpine.DEB.2.00.1112191337420.12660@utopia.booyaka.com>
-Message-ID: <CAORVsuVNvvPu6it7r_uxc0f6H-9kpo6SChTTGkdqpLmzMDNxvQ@mail.gmail.com>
+ <CAORVsuVNvvPu6it7r_uxc0f6H-9kpo6SChTTGkdqpLmzMDNxvQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1201161301450.16675@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul, Kevin,
+Hi
 
-On Mon, Dec 19, 2011 at 10:02 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi Jean
->
-> I'm really sorry it's taken me so long to do detailed review of these
-> patches for merging... anyway -
->
-> On Wed, 14 Dec 2011, jean.pihet at newoldbits.com wrote:
->
->> From: Jean Pihet <j-pihet@ti.com>
->>
->> . Implement the devices wake-up latency constraints using the global
->> ? device PM QoS notification handler which applies the constraints to the
->> ? underlying layer
->> . Implement the low level code which controls the power domains next power
->> ? states, through the hwmod and pwrdm layers
->> . Add cpuidle and power domains wake-up latency figures for OMAP3, cf.
->> ? comments in the code and [1] for the details on where the numbers
->> ? are magically coming from
->> . Implement the relation between the cpuidle and per-device PM QoS frameworks
->> ? in the OMAP3 specific idle callbacks.
->> ? The chosen C-state shall satisfy the following conditions:
->> ? ?. the 'valid' field is enabled,
->> ? ?. it satisfies the enable_off_mode flag,
->> ? ?. the next state for MPU and CORE power domains is not lower than the
->> ? ? ?state programmed by the per-device PM QoS.
->
-> I've been reviewing these closely. ?It looks to me that are some issues
-> that need to be resolved before all of them are mergeable.
->
-> One issue that I noticed in this series is that there are some locking
-> issues in patch 1. ?It looks to me that calls to
-> _pwrdm_wakeuplat_update_pwrst() can race with each other, since it's
-> called outside the lock?
-I fixed this by moving the lock so that it includes the update of the
-next power state.
+On Mon, 16 Jan 2012, Jean Pihet wrote:
 
-Speaking of the locking, currently a spinlock is used and it could be
-replaced by a more efficient mutex. This is ok at the condition that
-this code is not called from interrupt context?
+> Speaking of the locking, currently a spinlock is used and it could be
+> replaced by a more efficient mutex. This is ok at the condition that
+> this code is not called from interrupt context?
+> 
+> Kevin,
+> Do you know if the per-device constraint code can be called from
+> interrupt context?
 
-Kevin,
-Do you know if the per-device constraint code can be called from
-interrupt context?
+It can't be.  It uses a mutex itself.  So a mutex is what we want.  Take a 
+look at drivers/base/power/qos.c:dev_pm_qos_update_request() (included 
+below)
 
->
 
-...
+- Paul
 
->
->
-> - Paul
 
-Jean
+/**
+ * dev_pm_qos_update_request - modifies an existing qos request
+ * @req : handle to list element holding a dev_pm_qos request to use
+ * @new_value: defines the qos request
+ *
+ * Updates an existing dev PM qos request along with updating the
+ * target value.
+ *
+ * Attempts are made to make this code callable on hot code paths.
+ *
+ * Returns 1 if the aggregated constraint value has changed,
+ * 0 if the aggregated constraint value has not changed,
+ * -EINVAL in case of wrong parameters, -ENODEV if the device has been
+ * removed from the system
+ */
+int dev_pm_qos_update_request(struct dev_pm_qos_request *req,
+			      s32 new_value)
+{
+	int ret = 0;
+
+	if (!req) /*guard against callers passing in null */
+		return -EINVAL;
+
+	if (WARN(!dev_pm_qos_request_active(req),
+		 "%s() called for unknown object\n", __func__))
+		return -EINVAL;
+
+	mutex_lock(&dev_pm_qos_mtx);
+
+	if (req->dev->power.constraints) {
+		if (new_value != req->node.prio)
+			ret = apply_constraint(req, PM_QOS_UPDATE_REQ,
+					       new_value);
+	} else {
+		/* Return if the device has been removed */
+		ret = -ENODEV;
+	}
+
+	mutex_unlock(&dev_pm_qos_mtx);
+	return ret;
+}
