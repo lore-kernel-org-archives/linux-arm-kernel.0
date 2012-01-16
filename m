@@ -1,28 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Jan 2012 16:54:22 +0000
-Subject: [PATCH] ARM: protect usage of cr_alignment by #ifdef
- CONFIG_CPU_CP15
-In-Reply-To: <1326732555-17915-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1326732555-17915-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120116165422.GC32049@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 16 Jan 2012 18:59:15 +0200
+Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
+ Cortex-M3 SoCs
+In-Reply-To: <20120116162933.GG14252@pengutronix.de>
+References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
+ <20120116162933.GG14252@pengutronix.de>
+Message-ID: <CAK=WgbZ0k1i7k6DMpKjEyCbZotGckU3GQvgW-+Hp_gAgkL66gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 05:49:15PM +0100, Uwe Kleine-K?nig wrote:
-> cr_alignment is defined in arch/arm/kernel/entry-armv.S. When a build
-> doesn't include this file but arch/arm/kernel/head-common.S the latter
-> intruduces an invalid reference to cr_alignment.
-> 
-> So handle cr_alignment not being available in head-common.S and for
-> completeness only define and use cr_alignment (and cr_no_alignment) when
-> CONFIG_CPU_CP15 is enabled.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> currently arch/arm/kernel/entry-armv.S is used unconditionally, but the
-> Cortex-M3 port in my tree doesn't need it. So this patch fixex a build
-> error only in my tree and it's not urgent to include it.
+2012/1/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> OK, it's online now at
+>
+> ? ? ? ?http://git.pengutronix.de/?p=ukl/linux-2.6.git;a=shortlog;h=refs/heads/efm32
+> ? ? ? ?git://git.pengutronix.de/git/ukl/linux.git efm32
+>
+> Please note that this is work in progress and has some rough edges. ...
+> but at least it boots on my machine.
 
-We'll wait then until we can see what you're replacing that file with.
+Great, thanks !
