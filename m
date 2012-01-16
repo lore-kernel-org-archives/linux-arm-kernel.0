@@ -1,32 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Jan 2012 19:06:37 +0000
-Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <20120116181002.GC12267@arm.com>
-References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
- <20120116162933.GG14252@pengutronix.de>
- <20120116174039.GD32049@n2100.arm.linux.org.uk>
- <20120116181002.GC12267@arm.com>
-Message-ID: <20120116190637.GE32049@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jan 2012 19:11:18 +0000
+Subject: [PATCH 1/2] ARM: vmlinux.lds.S: do not hardcode cacheline size
+ as 32 bytes
+In-Reply-To: <4F146CBF.6030104@codeaurora.org>
+Message-ID: <20120116191118.GF11088@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 06:10:02PM +0000, Catalin Marinas wrote:
-> On Mon, Jan 16, 2012 at 05:40:39PM +0000, Russell King - ARM Linux wrote:
-> > The VFP stuff - adding 'clean' which is kernel state to the _user_
-> > _exported_ VFP hardware structure is a bad idea.  So this needlessly
-> > causes a variation in the kernels userspace API.  Please find somewhere
-> > else to keep kernel internal state.  (As that patch comes from Catalin,
-> > then that comment is directed to Catalin.)
+On Mon, Jan 16, 2012 at 06:30:23PM +0000, Stephen Boyd wrote:
+> On 01/16/12 10:26, Will Deacon wrote:
+> > On Mon, Jan 16, 2012 at 06:22:34PM +0000, Stephen Boyd wrote:
+> >>
+> >> What do you think about aligning the exception fixup table to the same
+> >> value?
+> > Hmm, I'm not sure I see what that gains us over the current 32-byte
+> > alignment. Are you seeing any measurable performance difference with it being
+> > cacheline-aligned?
+> >
 > 
-> Are you sure we export vfp_hard_struct to user? That's a kernel-only
-> structure (and it's not by any means stable, given the number of
-> #ifdef's it has). I would also argue that 'clean' is a hardware state
-> (inferred from the exception return value).
+> I haven't measured anything yet. I just see that it's another value
+> hard-coded to 32 in the linker script and that tile has decided to use
+> L1_CACHE_BYTES for it.
 
-Actually, looking at arch/arm/kernel/ptrace.c, we only export the
-fpregs and fpscr, so this should be fine.
+Hmm, that's intriguing. The exception table entries are 8 bytes on ARM and
+are aligned as such by things like the USER macro, so I'm not sure why we
+align the section to 32 bytes. I guess it must be for performance reasons,
+but whether that's due to cacheline size, I don't know.
 
-Still, I don't see why we need this 'clean' state, when normal VFP
-doesn't need it.  Maybe you could explain why it's necessary?
+Nico, can you enlighten us please (it was introduced in 13b1f64c ("[ARM]
+3008/1: the exception table is not read-only"))?
+
+Cheers,
+
+Will
