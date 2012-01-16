@@ -1,238 +1,77 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 16 Jan 2012 15:20:36 +0530
-Subject: [PATCH 8/8] dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
-In-Reply-To: <cover.1326707233.git.viresh.kumar@st.com>
-References: <cover.1326707233.git.viresh.kumar@st.com>
-Message-ID: <7c1e6fd573d5cd348b22f8363c9960fe5efcd658.1326707233.git.viresh.kumar@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jan 2012 10:06:00 +0000
+Subject: [RFC PATCH] proc: clear_refs: do not clear reserved pages
+In-Reply-To: <alpine.LFD.2.02.1201152314420.2722@xanadu.home>
+References: <1326467587-22218-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1201131748380.2722@xanadu.home>
+ <alpine.LSU.2.00.1201140901260.2381@eggly.anvils>
+ <20120115150706.GA7474@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1201152314420.2722@xanadu.home>
+Message-ID: <20120116100600.GA9068@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for DMA_SLAVE_CONFIG in dwc DMAC controller.
+On Mon, Jan 16, 2012 at 04:19:43AM +0000, Nicolas Pitre wrote:
+> On Sun, 15 Jan 2012, Will Deacon wrote:
+> > Something like what I've got below seems to do the trick, and clear_refs
+> > also seems to behave when it's presented with the gate_vma. If Russell is
+> > happy with the approach, we can move to the gate_vma in the future.
+> 
+> I like it much better, although I haven't tested it fully yet.
+> 
+> However your patch is missing the worst of the current ARM hack I would 
+> be glad to see go as follows:
+> 
+> diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+> index 71605d9f8e..876e545297 100644
+> --- a/arch/arm/include/asm/mmu_context.h
+> +++ b/arch/arm/include/asm/mmu_context.h
+> @@ -18,6 +18,7 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/cachetype.h>
+>  #include <asm/proc-fns.h>
+> +#include <asm-generic/mm_hooks.h>
+>  
+>  void __check_kvm_seq(struct mm_struct *mm);
+>  
+> @@ -133,32 +135,4 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+>  #define deactivate_mm(tsk,mm)	do { } while (0)
+>  #define activate_mm(prev,next)	switch_mm(prev, next, NULL)
+>  
+> -/*
+> - * We are inserting a "fake" vma for the user-accessible vector page so
+> - * gdb and friends can get to it through ptrace and /proc/<pid>/mem.
+> - * But we also want to remove it before the generic code gets to see it
+> - * during process exit or the unmapping of it would  cause total havoc.
+> - * (the macro is used as remove_vma() is static to mm/mmap.c)
+> - */
+> -#define arch_exit_mmap(mm) \
+> -do { \
+> -	struct vm_area_struct *high_vma = find_vma(mm, 0xffff0000); \
+> -	if (high_vma) { \
+> -		BUG_ON(high_vma->vm_next);  /* it should be last */ \
+> -		if (high_vma->vm_prev) \
+> -			high_vma->vm_prev->vm_next = NULL; \
+> -		else \
+> -			mm->mmap = NULL; \
+> -		rb_erase(&high_vma->vm_rb, &mm->mm_rb); \
+> -		mm->mmap_cache = NULL; \
+> -		mm->map_count--; \
+> -		remove_vma(high_vma); \
+> -	} \
+> -} while (0)
+> -
+> -static inline void arch_dup_mmap(struct mm_struct *oldmm,
+> -				 struct mm_struct *mm)
+> -{
+> -}
+> -
+>  #endif
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/dma/dw_dmac.c      |   78 ++++++++++++++++++++++++++++++++------------
- drivers/dma/dw_dmac_regs.h |    3 ++
- include/linux/dw_dmac.h    |    6 ---
- 3 files changed, 60 insertions(+), 27 deletions(-)
+Nice, I missed those hunks! I'm more than happy to include this for v2
+(which I'll just post to the ARM list). I'll also give this some testing on
+the boards that I have.
 
-diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index c33c06b..6252dce 100644
---- a/drivers/dma/dw_dmac.c
-+++ b/drivers/dma/dw_dmac.c
-@@ -33,12 +33,14 @@
-  * which does not support descriptor writeback.
-  */
- 
--#define DWC_DEFAULT_CTLLO(private) ({				\
--		struct dw_dma_slave *__slave = (private);	\
-+#define DWC_DEFAULT_CTLLO(chan) ({				\
-+		struct dw_dma_slave *__slave = (chan->private);	\
-+		struct dw_dma_chan *dwc = to_dw_dma_chan(chan);	\
-+		struct dma_slave_config	*sconfig = &dwc->dma_sconfig;	\
- 		int dms = __slave ? __slave->dst_master : 0;	\
- 		int sms = __slave ? __slave->src_master : 1;	\
--		u8 smsize = __slave ? __slave->src_msize : DW_DMA_MSIZE_16; \
--		u8 dmsize = __slave ? __slave->dst_msize : DW_DMA_MSIZE_16; \
-+		u8 smsize = __slave ? sconfig->src_maxburst : DW_DMA_MSIZE_16; \
-+		u8 dmsize = __slave ? sconfig->dst_maxburst : DW_DMA_MSIZE_16; \
- 								\
- 		(DWC_CTLL_DST_MSIZE(dmsize)			\
- 		 | DWC_CTLL_SRC_MSIZE(smsize)			\
-@@ -664,7 +666,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 	else
- 		src_width = dst_width = 0;
- 
--	ctllo = DWC_DEFAULT_CTLLO(chan->private)
-+	ctllo = DWC_DEFAULT_CTLLO(chan)
- 			| DWC_CTLL_DST_WIDTH(dst_width)
- 			| DWC_CTLL_SRC_WIDTH(src_width)
- 			| DWC_CTLL_DST_INC
-@@ -725,6 +727,7 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- {
- 	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
- 	struct dw_dma_slave	*dws = chan->private;
-+	struct dma_slave_config	*sconfig = &dwc->dma_sconfig;
- 	struct dw_desc		*prev;
- 	struct dw_desc		*first;
- 	u32			ctllo;
-@@ -739,17 +742,18 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	if (unlikely(!dws || !sg_len))
- 		return NULL;
- 
--	reg_width = dws->reg_width;
- 	prev = first = NULL;
- 
- 	switch (direction) {
- 	case DMA_MEM_TO_DEV:
--		ctllo = (DWC_DEFAULT_CTLLO(chan->private)
-+		reg_width = sconfig->dst_addr_width;
-+		reg = sconfig->dst_addr;
-+		ctllo = (DWC_DEFAULT_CTLLO(chan)
- 				| DWC_CTLL_DST_WIDTH(reg_width)
- 				| DWC_CTLL_DST_FIX
- 				| DWC_CTLL_SRC_INC
--				| DWC_CTLL_FC(dws->fc));
--		reg = dws->tx_reg;
-+				| DWC_CTLL_FC(sconfig->device_fc));
-+
- 		for_each_sg(sgl, sg, sg_len, i) {
- 			struct dw_desc	*desc;
- 			u32		len, dlen, mem;
-@@ -801,13 +805,14 @@ slave_sg_todev_fill_desc:
- 		}
- 		break;
- 	case DMA_DEV_TO_MEM:
--		ctllo = (DWC_DEFAULT_CTLLO(chan->private)
-+		reg_width = sconfig->src_addr_width;
-+		reg = sconfig->src_addr;
-+		ctllo = (DWC_DEFAULT_CTLLO(chan)
- 				| DWC_CTLL_SRC_WIDTH(reg_width)
- 				| DWC_CTLL_DST_INC
- 				| DWC_CTLL_SRC_FIX
--				| DWC_CTLL_FC(dws->fc));
-+				| DWC_CTLL_FC(sconfig->device_fc));
- 
--		reg = dws->rx_reg;
- 		for_each_sg(sgl, sg, sg_len, i) {
- 			struct dw_desc	*desc;
- 			u32		len, dlen, mem;
-@@ -877,6 +882,29 @@ err_desc_get:
- 	return NULL;
- }
- 
-+static int
-+set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
-+{
-+	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
-+
-+	/* Check if it is chan is configured for slave transfers */
-+	if (!chan->private)
-+		return -EINVAL;
-+
-+	memcpy(&dwc->dma_sconfig, sconfig, sizeof(*sconfig));
-+
-+	/*
-+	 * Fix sconfig's burst size according to dw_dmac. We need to convert
-+	 * them as: 1 -> 0, 2 -> 1, 4 -> 2, 8 -> 3, 16 -> 4.
-+	 *
-+	 * This can be done by findiding least significant bit set: n & (n - 1)
-+	 */
-+	sconfig->src_maxburst &= sconfig->src_maxburst - 1;
-+	sconfig->dst_maxburst &= sconfig->dst_maxburst - 1;
-+
-+	return 0;
-+}
-+
- static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		       unsigned long arg)
- {
-@@ -926,8 +954,11 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		/* Flush all pending and queued descriptors */
- 		list_for_each_entry_safe(desc, _desc, &list, desc_node)
- 			dwc_descriptor_complete(dwc, desc, false);
--	} else
-+	} else if (cmd == DMA_SLAVE_CONFIG) {
-+		return set_runtime_config(chan, (struct dma_slave_config *)arg);
-+	} else {
- 		return -ENXIO;
-+	}
- 
- 	return 0;
- }
-@@ -1168,11 +1199,11 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
- 		enum dma_transfer_direction direction)
- {
- 	struct dw_dma_chan		*dwc = to_dw_dma_chan(chan);
-+	struct dma_slave_config		*sconfig = &dwc->dma_sconfig;
- 	struct dw_cyclic_desc		*cdesc;
- 	struct dw_cyclic_desc		*retval = NULL;
- 	struct dw_desc			*desc;
- 	struct dw_desc			*last = NULL;
--	struct dw_dma_slave		*dws = chan->private;
- 	unsigned long			was_cyclic;
- 	unsigned int			reg_width;
- 	unsigned int			periods;
-@@ -1196,7 +1227,12 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
- 	}
- 
- 	retval = ERR_PTR(-EINVAL);
--	reg_width = dws->reg_width;
-+
-+	if (direction == DMA_MEM_TO_DEV)
-+		reg_width = sconfig->dst_addr_width;
-+	else
-+		reg_width = sconfig->src_addr_width;
-+
- 	periods = buf_len / period_len;
- 
- 	/* Check for too big/unaligned periods and unaligned DMA buffer. */
-@@ -1229,25 +1265,25 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
- 
- 		switch (direction) {
- 		case DMA_MEM_TO_DEV:
--			desc->lli.dar = dws->tx_reg;
-+			desc->lli.dar = sconfig->dst_addr;
- 			desc->lli.sar = buf_addr + (period_len * i);
--			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan->private)
-+			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan)
- 					| DWC_CTLL_DST_WIDTH(reg_width)
- 					| DWC_CTLL_SRC_WIDTH(reg_width)
- 					| DWC_CTLL_DST_FIX
- 					| DWC_CTLL_SRC_INC
--					| DWC_CTLL_FC(dws->fc)
-+					| DWC_CTLL_FC(sconfig->device_fc)
- 					| DWC_CTLL_INT_EN);
- 			break;
- 		case DMA_DEV_TO_MEM:
- 			desc->lli.dar = buf_addr + (period_len * i);
--			desc->lli.sar = dws->rx_reg;
--			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan->private)
-+			desc->lli.sar = sconfig->src_addr;
-+			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan)
- 					| DWC_CTLL_SRC_WIDTH(reg_width)
- 					| DWC_CTLL_DST_WIDTH(reg_width)
- 					| DWC_CTLL_DST_INC
- 					| DWC_CTLL_SRC_FIX
--					| DWC_CTLL_FC(dws->fc)
-+					| DWC_CTLL_FC(sconfig->device_fc)
- 					| DWC_CTLL_INT_EN);
- 			break;
- 		default:
-diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
-index 5eef694..2005d30 100644
---- a/drivers/dma/dw_dmac_regs.h
-+++ b/drivers/dma/dw_dmac_regs.h
-@@ -153,6 +153,9 @@ struct dw_dma_chan {
- 	struct dw_cyclic_desc	*cdesc;
- 
- 	unsigned int		descs_allocated;
-+
-+	/* configuration passed via DMA_SLAVE_CONFIG */
-+	struct dma_slave_config dma_sconfig;
- };
- 
- static inline struct dw_dma_chan_regs __iomem *
-diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
-index f2c64f9..67271d8 100644
---- a/include/linux/dw_dmac.h
-+++ b/include/linux/dw_dmac.h
-@@ -86,16 +86,10 @@ enum dw_dma_fc {
-  */
- struct dw_dma_slave {
- 	struct device		*dma_dev;
--	dma_addr_t		tx_reg;
--	dma_addr_t		rx_reg;
--	enum dw_dma_slave_width	reg_width;
- 	u32			cfg_hi;
- 	u32			cfg_lo;
- 	u8			src_master;
- 	u8			dst_master;
--	u8			src_msize;
--	u8			dst_msize;
--	u8			fc;
- };
- 
- /* Platform-configurable bits in CFG_HI */
--- 
-1.7.8.110.g4cb5d
+Thanks,
+
+Will
