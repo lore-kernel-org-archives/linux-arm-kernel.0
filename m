@@ -1,41 +1,38 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 16 Jan 2012 15:20:28 +0530
-Subject: [PATCH 0/9] dmaengine: Pl08x and dw_dmac updates
-Message-ID: <cover.1326707233.git.viresh.kumar@st.com>
+Date: Mon, 16 Jan 2012 15:20:29 +0530
+Subject: [PATCH 1/8] dmaengine/dw_dmac: Hibernation support in dw_dmac
+In-Reply-To: <cover.1326707233.git.viresh.kumar@st.com>
+References: <cover.1326707233.git.viresh.kumar@st.com>
+Message-ID: <91f435464b40009113ddc3d2287f10d81e498654.1326707233.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod/Dan,
+From: Rajeev KUMAR <rajeev-dlh.kumar@st.com>
 
-This patchset does following:
-- Adds DMA_SLAVE_CONFIG for dw_dmac driver
-- Adds device_fc (device flow control) field in struct DMA_SLAVE_CONFIG
-- Updates pl08x driver according to that
-- Fixes few issues/bugs in dw_dmac driver
-- Includes earlier patchset sent by Rajeev for cleanly applying this patchset
+The suspend and resume implementation is through dev_pm_ops in dmac. So
+in order to support hibernation, freeze, thaw, restore and poweroff
+features are required.
 
-Rajeev KUMAR (1):
-  dmaengine/dw_dmac: Hibernation support in dw_dmac
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/dma/dw_dmac.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Viresh Kumar (7):
-  dmaengine: Add flow controller information to dma_slave_config
-  dmaengine/amba-pl08x: Take flow controller info from DMA_SLAVE_CONFIG
-  dmaengine/dw_dmac: Don't use magic number for total number of
-    channels
-  dmaengine/dw_dmac: Use platform_get_drvdata instead of accessing dev
-    directly
-  dmaengine/dw_dmac: Don't handle block interrupts
-  dmaengine/dw_dmac: Unmap all memory buffers after completion of slave
-    transfers
-  dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
-
- drivers/dma/amba-pl08x.c   |    4 +-
- drivers/dma/dw_dmac.c      |  171 ++++++++++++++++++++++++++------------------
- drivers/dma/dw_dmac_regs.h |    3 +
- include/linux/amba/pl08x.h |    8 +-
- include/linux/dmaengine.h  |    5 ++
- include/linux/dw_dmac.h    |    6 --
- 6 files changed, 115 insertions(+), 82 deletions(-)
-
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index 9b592b0..3a3d7ed 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -1562,6 +1562,10 @@ static int dw_resume_noirq(struct device *dev)
+ static const struct dev_pm_ops dw_dev_pm_ops = {
+ 	.suspend_noirq = dw_suspend_noirq,
+ 	.resume_noirq = dw_resume_noirq,
++	.freeze_noirq = dw_suspend_noirq,
++	.thaw_noirq = dw_resume_noirq,
++	.restore_noirq = dw_resume_noirq,
++	.poweroff_noirq = dw_suspend_noirq,
+ };
+ 
+ static struct platform_driver dw_driver = {
 -- 
 1.7.8.110.g4cb5d
