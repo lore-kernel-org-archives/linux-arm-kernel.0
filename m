@@ -1,35 +1,68 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Mon, 16 Jan 2012 09:01:10 +0000
-Subject: [PATCH 04/11] mm: page_alloc: introduce alloc_contig_range()
-In-Reply-To: <op.v71gpt1b3l0zgt@mpn-glaptop>
-References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
- <1325162352-24709-5-git-send-email-m.szyprowski@samsung.com>
- <20120110141613.GB3910@csn.ul.ie> <op.v71gpt1b3l0zgt@mpn-glaptop>
-Message-ID: <20120116090110.GA2929@csn.ul.ie>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 16 Jan 2012 09:16:22 +0000
+Subject: omap clocksource timer selection: dmtimer OR 32K-Sync timer
+In-Reply-To: <20120113165003.GJ15299@atomide.com>
+References: <79CD15C6BA57404B839C016229A409A8317A4E2E@DBDE01.ent.ti.com>
+ <CAMQu2gxYQOHX8n2RLfkLBw5hQMdvH389DfrguLtzpLcpmqBQMA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A8317A4FD9@DBDE01.ent.ti.com>
+ <CAMQu2gxkBV87YQE7SPmLXh0RZBR+SNHzHE5H-PVjuef+1UZp8Q@mail.gmail.com>
+ <20120113165003.GJ15299@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317A6A9D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2012 at 09:04:31PM +0100, Michal Nazarewicz wrote:
-> >On Thu, Dec 29, 2011 at 01:39:05PM +0100, Marek Szyprowski wrote:
-> >>From: Michal Nazarewicz <mina86@mina86.com>
-> >>+	/* Make sure all pages are isolated. */
-> >>+	if (!ret) {
-> >>+		lru_add_drain_all();
-> >>+		drain_all_pages();
-> >>+		if (WARN_ON(test_pages_isolated(start, end)))
-> >>+			ret = -EBUSY;
-> >>+	}
+On Fri, Jan 13, 2012 at 22:20:03, Tony Lindgren wrote:
+> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120113 06:08]:
+> > On Fri, Jan 13, 2012 at 2:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> > > On Fri, Jan 13, 2012 at 18:19:24, Shilimkar, Santosh wrote:
+> > >> > ? ...
+> > >> > ? };
+> > >> >
+> > >> > ? We need to have similar entries in all devices where 32K timer is present.
+> > >> >
+> > >> > 2) OR simply add another cpu_is_am33xx() and then fall back to dmtimer?
+> > >> > ? Just to prove this, everything works here, I modified the code for this
+> > >> > ? and tested it on both AM335x EVM and AM37xEVM and it works fine for me.
+> > >> >
+> > >> >
+> > >> > Any comments?? OR Better approach? OR anything which I am missing here?
 > 
-> On Tue, 10 Jan 2012 15:16:13 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> >Another global IPI seems overkill. Drain pages only from the local CPU
-> >(drain_pages(get_cpu()); put_cpu()) and test if the pages are isolated.
+> Why don't you just add a new entry to mach-omap2/timer.c using the OMAP_SYS_TIMER
+> macro?
 > 
-> Is get_cpu() + put_cpu() required? Won't drain_local_pages() work?
-> 
+Tony,
 
-drain_local_pages() calls smp_processor_id() without preemption
-disabled. 
+The entry is already present in mach-olmap2/timer.c
 
--- 
-Mel Gorman
-SUSE Labs
+OMAP_SYS_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, 2, OMAP4_MPU_SOURCE)
+OMAP_SYS_TIMER(3_am33xx)
+
+
+The issue is not related to this, more with respect to compile time 
+Code -
+
+#ifdef CONFIG_OMAP_32K_TIMER
+static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+{
+	32K TIMER code
+}
+#else
+static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+{
+	DMTIMER code
+}
+#endif
+
+Omap2plus_defconfig enabled option "CONFIG_OMAP_32K_TIMER", so from
+Multi-omap point of view it will break AM335x.
+
+Thanks,
+Vaibhav
+
+> See for example the omap3_secure timer set up. That should allow
+> specifying the clock source already.
+> 
+> Regards,
+> 
+> Tony
+> 
