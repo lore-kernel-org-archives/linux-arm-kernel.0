@@ -1,57 +1,29 @@
-From: Jon.Povey@racelogic.co.uk (Jon Povey)
-Date: Mon, 16 Jan 2012 09:20:03 +0000
-Subject: DaVinci unbanked GPIO IRQs broken
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B63178FB3F@DBDE01.ent.ti.com>
-Message-ID: <70E876B0EA86DD4BAF101844BC814DFE0BF403D9FD@Cloud.RL.local>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Jan 2012 10:46:00 +0100
+Subject: [PATCH v3] pinctrl: add support for group and pinmux states
+In-Reply-To: <7FE21149F4667147B645348EC60578850910C3@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1326673015-963-1-git-send-email-linus.walleij@stericsson.com>
+ <7FE21149F4667147B645348EC60578850910C3@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <CACRpkdaLEasbm-_Vg9VzD+EwwJst1yLQ1sruPaHtFASxcRXXUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nori, Sekhar wrote:
-> On Wed, Jan 11, 2012 at 17:17:34, Jon Povey wrote:
->> Unbanked GPIO IRQs (I am on DM365) seem to have been broken
->> by commit aac4dd1dab8acfc244d697473d2a5f4424a5746c, conversion
->> to generic irq chip, leading to an oops from request_irq().
+On Mon, Jan 16, 2012 at 9:26 AM, Dong Aisheng-B29396
+<B29396@freescale.com> wrote:
 
-> The root cause indeed seems to be chip_data getting
-> overwritten.
->
-> I made a patch for it and was able to test that requesting IRQ
-> number 44 doesn't oops. Yet to figure out if there is an easy way
-> to trigger an unbanked GPIO IRQ on the EVM, so a large part of
-> the patch is actually untested. Anyway, can you give this patch
-> a shot (hopefully not mailer mangled)? I don't like the fact that
-> it increases davinci_soc_info usage, but first lets see if it fixes
-> the issue.
+> The question is that we allow customer to define pingroup state and this is
+> independent on pinctrl core.
 
-gpio_export(n, 1) and using sysfs to set the gpio to output can be
-used to test.
+You are right, this patch might not be helpful :-(
 
-Tried quickly rebasing my stuff to 3.2, your patch fixes the oops, but
-the interrupt does not trigger. I don't have time to investigate why not
-right now, sorry. But I did try reverting the genirq change too, and
-the interrupt handler still wasn't called, so maybe something else
-broke somewhere, or it could be something needs updating in my board
-support.
+I had bad dreams after writing it, and I think I also missed Stephens point,
+that the pinctrl core should iteratively call the config interface of the
+controller while walking a config.
 
-I tried applying this patch (modulo gpio path change) to my 3.0-rc7
-base with the genirq stuff left in.
-I still get an oops and backtrace when requesting the irq!
+I am authoring a different proposal which is much closer to the pinmux
+maps, and thus closer to what you're currently doing with the device
+tree bindings and all.
 
-If this is clearer:
+Hold on, hope to post this later today.
 
-3.2 vanilla: oops requesting irq
-3.2 + your patch: no oops, isr is not run
-3.2 + reverted genirq: no oops, isr is not run
-
-3.0-rc7: oops requesting irq
-3.0-rc7 + your patch: oops requesting irq
-3.0-rc7 + reverted genirq: no oops, isr works
-
---
-Jon Povey
-jon.povey at racelogic.co.uk
-
-Racelogic is a limited company registered in England. Registered number 2743719 .
-Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
-
-The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
+Linus Walleij
