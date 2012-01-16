@@ -1,48 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jan 2012 18:56:45 +0000
-Subject: [PATCH] ARM: tls: remove covert channel via TPIDRURW
-In-Reply-To: <CAHXqBFLhTq_mJ+SV+STDOwdxACGkiuk4-W_v2LKw1J_YnTS5vw@mail.gmail.com>
-References: <1326728815-10236-1-git-send-email-will.deacon@arm.com>
- <CAHXqBF+ZhY57875zsv6C3M_gHPiFLL+FbvoJqi0H2Ow1Cgx+Vg@mail.gmail.com>
- <20120116181711.GB11088@mudshark.cambridge.arm.com>
- <CAHXqBFLhTq_mJ+SV+STDOwdxACGkiuk4-W_v2LKw1J_YnTS5vw@mail.gmail.com>
-Message-ID: <20120116185644.GE11088@mudshark.cambridge.arm.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 16 Jan 2012 17:01:17 -0200
+Subject: [PATCH] ARM: clock-mx28: Fix end of loop condition
+Message-ID: <1326740477-21576-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 06:25:48PM +0000, Micha? Miros?aw wrote:
-> W dniu 16 stycznia 2012 19:17 u?ytkownik Will Deacon
-> <will.deacon@arm.com> napisa?:
-> > On Mon, Jan 16, 2012 at 06:14:27PM +0000, Micha? Miros?aw wrote:
-> >> 2012/1/16 Will Deacon <will.deacon@arm.com>:
-> >> > TPIDRURW is a user read/write register forming part of the group of
-> >> > thread registers in more recent versions of the ARM architecture (~v6+).
-> >> >
-> >> > Currently, the kernel does not touch this register, which allows tasks
-> >> > to communicate covertly by reading and writing to the register without
-> >> > context-switching affecting its contents.
-> >> >
-> >> > This patch clears TPIDRURW when TPIDRURO is updated via the set_tls
-> >> > macro, which is called directly from __switch_to. Since the current
-> >> > behaviour makes the register useless to userspace as far as thread
-> >> > pointers are concerned, simply clearing the register (rather than saving
-> >> > and restoring it) will not cause any problems to userspace.
-> >> So why not fix it instead of leaving it useless?
-> > Could do, but since nobody is asking for it and it would become part of the
-> > user-ABI if we did preserve it, I don't see the need right now.
-> >
-> > Do you have a compelling use-case for this register?
-> 
-> Not really.
+From: Fabio Estevam <festevam@gmail.com>
 
-Ok, it would be interesting to know if anybody has a good application for
-this though. Until then, I don't think it's worth the extra space in our
-thread_info structure.
+Selecting audio on a mx28evk the saif driver was failing:
 
-> Clearing the register will allow a thread to notice when it gets
-> switched. I don't know if that's an issue, though.
+[    0.660000] saif0_clk_set_rate: divider writing timeout                     
+[    0.670000] mxs-sgtl5000: probe of mxs-sgtl5000.0 failed with error -110    
+[    0.670000] ALSA device list:                                               
+[    0.680000]   No soundcards found.    
 
-Yes, that's definitely worth bearing in mind, although I don't think it's a
-problem (and if it is, it's certainly better than what we had before!).
+The timeout on saif0_clk_set_rate was due to the wrong condition for the end of loop.
 
-Will
+After fixing it, the audio driver can be correctly probed and becomes functional.
+
+While at it, fix the other locations where the similar issue occurs.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mxs/clock-mx28.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5d68e41..ee9e04b 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -396,7 +396,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 	}								\
+ 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##dr);		\
+ 									\
+-	for (i = 10000; i; i--)						\
++	for (i = 10000; i < 0; i--)					\
+ 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +			\
+ 			HW_CLKCTRL_##dr) & bm_busy))			\
+ 			break;						\
+@@ -439,7 +439,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 	}								\
+ 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##dr);		\
+ 									\
+-	for (i = 10000; i; i--)						\
++	for (i = 10000; i < 0; i--)					\
+ 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +			\
+ 			HW_CLKCTRL_##dr) & BM_CLKCTRL_##dr##_BUSY))	\
+ 			break;						\
+@@ -479,7 +479,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 	reg |= div << BP_CLKCTRL_##rs##_DIV;				\
+ 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
+ 									\
+-	for (i = 10000; i; i--)						\
++	for (i = 10000; i < 0; i--)					\
+ 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +			\
+ 			HW_CLKCTRL_##rs) & BM_CLKCTRL_##rs##_BUSY))	\
+ 			break;						\
+@@ -756,7 +756,7 @@ static int clk_misc_init(void)
+ 	reg |= 3 << BP_CLKCTRL_HBUS_DIV;
+ 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_HBUS);
+ 
+-	for (i = 10000; i; i--)
++	for (i = 10000; i < 0; i--)
+ 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +
+ 			HW_CLKCTRL_HBUS) & BM_CLKCTRL_HBUS_ASM_BUSY))
+ 			break;
+-- 
+1.7.1
