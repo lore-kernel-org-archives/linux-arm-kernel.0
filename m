@@ -1,69 +1,32 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 16 Jan 2012 17:01:17 -0200
-Subject: [PATCH] ARM: clock-mx28: Fix end of loop condition
-Message-ID: <1326740477-21576-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Jan 2012 19:06:37 +0000
+Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
+ Cortex-M3 SoCs
+In-Reply-To: <20120116181002.GC12267@arm.com>
+References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
+ <20120116162933.GG14252@pengutronix.de>
+ <20120116174039.GD32049@n2100.arm.linux.org.uk>
+ <20120116181002.GC12267@arm.com>
+Message-ID: <20120116190637.GE32049@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <festevam@gmail.com>
+On Mon, Jan 16, 2012 at 06:10:02PM +0000, Catalin Marinas wrote:
+> On Mon, Jan 16, 2012 at 05:40:39PM +0000, Russell King - ARM Linux wrote:
+> > The VFP stuff - adding 'clean' which is kernel state to the _user_
+> > _exported_ VFP hardware structure is a bad idea.  So this needlessly
+> > causes a variation in the kernels userspace API.  Please find somewhere
+> > else to keep kernel internal state.  (As that patch comes from Catalin,
+> > then that comment is directed to Catalin.)
+> 
+> Are you sure we export vfp_hard_struct to user? That's a kernel-only
+> structure (and it's not by any means stable, given the number of
+> #ifdef's it has). I would also argue that 'clean' is a hardware state
+> (inferred from the exception return value).
 
-Selecting audio on a mx28evk the saif driver was failing:
+Actually, looking at arch/arm/kernel/ptrace.c, we only export the
+fpregs and fpscr, so this should be fine.
 
-[    0.660000] saif0_clk_set_rate: divider writing timeout                     
-[    0.670000] mxs-sgtl5000: probe of mxs-sgtl5000.0 failed with error -110    
-[    0.670000] ALSA device list:                                               
-[    0.680000]   No soundcards found.    
-
-The timeout on saif0_clk_set_rate was due to the wrong condition for the end of loop.
-
-After fixing it, the audio driver can be correctly probed and becomes functional.
-
-While at it, fix the other locations where the similar issue occurs.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mxs/clock-mx28.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 5d68e41..ee9e04b 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -396,7 +396,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
- 	}								\
- 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##dr);		\
- 									\
--	for (i = 10000; i; i--)						\
-+	for (i = 10000; i < 0; i--)					\
- 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +			\
- 			HW_CLKCTRL_##dr) & bm_busy))			\
- 			break;						\
-@@ -439,7 +439,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
- 	}								\
- 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##dr);		\
- 									\
--	for (i = 10000; i; i--)						\
-+	for (i = 10000; i < 0; i--)					\
- 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +			\
- 			HW_CLKCTRL_##dr) & BM_CLKCTRL_##dr##_BUSY))	\
- 			break;						\
-@@ -479,7 +479,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
- 	reg |= div << BP_CLKCTRL_##rs##_DIV;				\
- 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
- 									\
--	for (i = 10000; i; i--)						\
-+	for (i = 10000; i < 0; i--)					\
- 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +			\
- 			HW_CLKCTRL_##rs) & BM_CLKCTRL_##rs##_BUSY))	\
- 			break;						\
-@@ -756,7 +756,7 @@ static int clk_misc_init(void)
- 	reg |= 3 << BP_CLKCTRL_HBUS_DIV;
- 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_HBUS);
- 
--	for (i = 10000; i; i--)
-+	for (i = 10000; i < 0; i--)
- 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +
- 			HW_CLKCTRL_HBUS) & BM_CLKCTRL_HBUS_ASM_BUSY))
- 			break;
--- 
-1.7.1
+Still, I don't see why we need this 'clean' state, when normal VFP
+doesn't need it.  Maybe you could explain why it's necessary?
