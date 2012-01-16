@@ -1,58 +1,84 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 16 Jan 2012 15:20:30 +0530
-Subject: [PATCH 2/8] dmaengine: Add flow controller information to
- dma_slave_config
+Date: Mon, 16 Jan 2012 15:20:31 +0530
+Subject: [PATCH 3/8] dmaengine/amba-pl08x: Take flow controller info from
+ DMA_SLAVE_CONFIG
 In-Reply-To: <cover.1326707233.git.viresh.kumar@st.com>
 References: <cover.1326707233.git.viresh.kumar@st.com>
-Message-ID: <5f9ec59562e86536c4123f61891b95590293030f.1326707233.git.viresh.kumar@st.com>
+Message-ID: <440741a5b465e03fbe30820ca351e90118976b3e.1326707233.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Flow controller is programmable for few controllers and there are few
-intelligent peripherals like, Synopsys JPEG controller, that needs to be a flow
-controller of DMA transfers on dest side.
-
-For this, currently two drivers, pl08x and dw_dmac, support flow controller to
-be passed from platform to these drivers.
-
-Perhaps, this should be a part of struct dma_slave_config. This patch adds
-another field device_fc to this structure. User drivers must pass this as true
-if they want to be flow controller of certain transfers.
+Flow controller information is passed now from DMA_SLAVE_CONFIG option. This
+patch makes changes in pl08x driver to use device_fc from it instead of platform
+data.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- include/linux/dmaengine.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/dma/amba-pl08x.c   |    4 +++-
+ include/linux/amba/pl08x.h |    8 ++++----
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 5532bb8..dd1915f 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -25,6 +25,7 @@
- #include <linux/uio.h>
- #include <linux/scatterlist.h>
- #include <linux/bitmap.h>
-+#include <linux/types.h>
- #include <asm/page.h>
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 9ebceca..e1a71f0 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -1139,6 +1139,8 @@ static int dma_set_runtime_config(struct dma_chan *chan,
+ 	cctl |= burst << PL080_CONTROL_SB_SIZE_SHIFT;
+ 	cctl |= burst << PL080_CONTROL_DB_SIZE_SHIFT;
  
- /**
-@@ -330,6 +331,9 @@ enum dma_slave_buswidth {
-  * may or may not be applicable on memory sources.
-  * @dst_maxburst: same as src_maxburst but for destination target
-  * mutatis mutandis.
++	plchan->device_fc = config->device_fc;
++
+ 	if (plchan->runtime_direction == DMA_DEV_TO_MEM) {
+ 		plchan->src_addr = config->src_addr;
+ 		plchan->src_cctl = pl08x_cctl(cctl) | PL080_CONTROL_DST_INCR |
+@@ -1370,7 +1372,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
+ 		return NULL;
+ 	}
+ 
+-	if (plchan->cd->device_fc)
++	if (plchan->device_fc)
+ 		tmp = (direction == DMA_MEM_TO_DEV) ? PL080_FLOW_MEM2PER_PER :
+ 			PL080_FLOW_PER2MEM_PER;
+ 	else
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index 033f6aa..2c58853 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -47,9 +47,6 @@ enum {
+  * @muxval: a number usually used to poke into some mux regiser to
+  * mux in the signal to this channel
+  * @cctl_opt: default options for the channel control register
+- * @device_fc: Flow Controller Settings for ccfg register. Only valid for slave
+- * channels. Fill with 'true' if peripheral should be flow controller. Direction
+- * will be selected at Runtime.
+  * @addr: source/target address in physical memory for this DMA channel,
+  * can be the address of a FIFO register for burst requests for example.
+  * This can be left undefined if the PrimeCell API is used for configuring
+@@ -68,7 +65,6 @@ struct pl08x_channel_data {
+ 	int max_signal;
+ 	u32 muxval;
+ 	u32 cctl;
+-	bool device_fc;
+ 	dma_addr_t addr;
+ 	bool circular_buffer;
+ 	bool single;
+@@ -183,6 +179,9 @@ enum pl08x_dma_chan_state {
+  * @host: a pointer to the host (internal use)
+  * @state: whether the channel is idle, paused, running etc
+  * @slave: whether this channel is a device (slave) or for memcpy
 + * @device_fc: Flow Controller Settings for ccfg register. Only valid for slave
 + * channels. Fill with 'true' if peripheral should be flow controller. Direction
 + * will be selected at Runtime.
-  *
-  * This struct is passed in as configuration data to a DMA engine
-  * in order to set up a certain channel for DMA transport at runtime.
-@@ -356,6 +360,7 @@ struct dma_slave_config {
- 	enum dma_slave_buswidth dst_addr_width;
- 	u32 src_maxburst;
- 	u32 dst_maxburst;
+  * @waiting: a TX descriptor on this channel which is waiting for a physical
+  * channel to become available
+  */
+@@ -205,6 +204,7 @@ struct pl08x_dma_chan {
+ 	struct pl08x_driver_data *host;
+ 	enum pl08x_dma_chan_state state;
+ 	bool slave;
 +	bool device_fc;
+ 	struct pl08x_txd *waiting;
  };
  
- static inline const char *dma_chan_name(struct dma_chan *chan)
 -- 
 1.7.8.110.g4cb5d
