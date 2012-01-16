@@ -1,32 +1,209 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 16 Jan 2012 17:29:33 +0100
-Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
-References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
-Message-ID: <20120116162933.GG14252@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 16 Jan 2012 17:49:15 +0100
+Subject: [PATCH] ARM: protect usage of cr_alignment by #ifdef CONFIG_CPU_CP15
+Message-ID: <1326732555-17915-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2011 at 07:31:56PM +0200, Ohad Ben-Cohen wrote:
-> Hi Uwe,
-> 
-> 2011/12/21 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > If you're interested in the details I can publish my tree I think.
-> 
-> Definitely interested - it could be very nice if you can publish that tree.
-OK, it's online now at
+cr_alignment is defined in arch/arm/kernel/entry-armv.S. When a build
+doesn't include this file but arch/arm/kernel/head-common.S the latter
+intruduces an invalid reference to cr_alignment.
 
-	http://git.pengutronix.de/?p=ukl/linux-2.6.git;a=shortlog;h=refs/heads/efm32
-	git://git.pengutronix.de/git/ukl/linux.git efm32
+So handle cr_alignment not being available in head-common.S and for
+completeness only define and use cr_alignment (and cr_no_alignment) when
+CONFIG_CPU_CP15 is enabled.
 
-Please note that this is work in progress and has some rough edges. ...
-but at least it boots on my machine.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
+
+currently arch/arm/kernel/entry-armv.S is used unconditionally, but the
+Cortex-M3 port in my tree doesn't need it. So this patch fixex a build
+error only in my tree and it's not urgent to include it.
 
 Best regards
 Uwe
 
+ arch/arm/include/asm/system.h |    2 ++
+ arch/arm/kernel/entry-armv.S  |    4 ++++
+ arch/arm/kernel/head-common.S |    9 +++++++--
+ arch/arm/kernel/setup.c       |    8 ++++++--
+ arch/arm/mm/alignment.c       |    6 ++++++
+ arch/arm/mm/mmu.c             |    8 +++++++-
+ 6 files changed, 32 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 984014b..54c9921 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -177,6 +177,7 @@ extern unsigned int user_debug;
+ #define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
+ #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
+ 
++#ifdef CONFIG_CPU_CP15
+ extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
+ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+ 
+@@ -216,6 +217,7 @@ static inline void set_copro_access(unsigned int val)
+ 	  : : "r" (val) : "cc");
+ 	isb();
+ }
++#endif
+ 
+ /*
+  * switch_mm() may do a full cache flush over the context switch,
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index b145f16..7782e7d 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -315,8 +315,10 @@ __pabt_svc:
+ ENDPROC(__pabt_svc)
+ 
+ 	.align	5
++#ifdef CONFIG_CPU_CP15
+ .LCcralign:
+ 	.word	cr_alignment
++#endif
+ #ifdef MULTI_DABORT
+ .LCprocfns:
+ 	.word	processor
+@@ -1147,12 +1149,14 @@ __vectors_end:
+ 
+ 	.data
+ 
++#ifdef CONFIG_CPU_CP15
+ 	.globl	cr_alignment
+ 	.globl	cr_no_alignment
+ cr_alignment:
+ 	.space	4
+ cr_no_alignment:
+ 	.space	4
++#endif
+ 
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+ 	.globl	handle_arch_irq
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 854bd22..2f560c5 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -98,8 +98,9 @@ __mmap_switched:
+ 	str	r9, [r4]			@ Save processor ID
+ 	str	r1, [r5]			@ Save machine type
+ 	str	r2, [r6]			@ Save atags pointer
+-	bic	r4, r0, #CR_A			@ Clear 'A' bit
+-	stmia	r7, {r0, r4}			@ Save control register values
++	cmp	r7, #0
++	bicne	r4, r0, #CR_A			@ Clear 'A' bit
++	stmneia	r7, {r0, r4}			@ Save control register values
+ 	b	start_kernel
+ ENDPROC(__mmap_switched)
+ 
+@@ -113,7 +114,11 @@ __mmap_switched_data:
+ 	.long	processor_id			@ r4
+ 	.long	__machine_arch_type		@ r5
+ 	.long	__atags_pointer			@ r6
++#ifdef CONFIG_CPU_CP15
+ 	.long	cr_alignment			@ r7
++#else
++	.long	0
++#endif
+ 	.long	init_thread_union + THREAD_START_SP @ sp
+ 	.size	__mmap_switched_data, . - __mmap_switched_data
+ 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 8fc2c8f..d37a02fa 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -457,9 +457,13 @@ static void __init setup_processor(void)
+ 	cpu_cache = *list->cache;
+ #endif
+ 
+-	printk("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
++	printk("CPU: %s [%08x] revision %d (ARMv%s)",
+ 	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
+-	       proc_arch[cpu_architecture()], cr_alignment);
++	       proc_arch[cpu_architecture()]);
++
++#ifdef CONFIG_CPU_CP15
++	printk(KERN_CONT ", cr=%08lx\n", cr_alignment);
++#endif
+ 
+ 	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
+ 		 list->arch_name, ENDIANNESS);
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index c335c76..56da01c 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -89,7 +89,11 @@ core_param(alignment, ai_usermode, int, 0600);
+ /* Return true if and only if the ARMv6 unaligned access model is in use. */
+ static bool cpu_is_v6_unaligned(void)
+ {
++#ifdef CONFIG_CPU_CP15
+ 	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
++#else
++	return 0;
++#endif
+ }
+ 
+ static int safe_usermode(int new_usermode, bool warn)
+@@ -961,12 +965,14 @@ static int __init alignment_init(void)
+ 		return -ENOMEM;
+ #endif
+ 
++#ifdef CONFIG_CPU_CP15
+ 	if (cpu_is_v6_unaligned()) {
+ 		cr_alignment &= ~CR_A;
+ 		cr_no_alignment &= ~CR_A;
+ 		set_cr(cr_alignment);
+ 		ai_usermode = safe_usermode(ai_usermode, false);
+ 	}
++#endif
+ 
+ 	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
+ 			"alignment exception");
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 8b8446a..d5a170a 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -106,8 +106,10 @@ static int __init early_cachepolicy(char *p)
+ 	for (i = 0; i < ARRAY_SIZE(cache_policies); i++) {
+ 		if (strcmp(p, cache_policies[i].policy) == 0) {
+ 			cachepolicy = i;
++#ifdef CONFIG_CPU_CP15
+ 			cr_alignment &= ~cache_policies[i].cr_mask;
+ 			cr_no_alignment &= ~cache_policies[i].cr_mask;
++#endif
+ 			break;
+ 		}
+ 	}
+@@ -125,7 +127,9 @@ static int __init early_cachepolicy(char *p)
+ 		cachepolicy = CPOLICY_WRITEBACK;
+ 	}
+ 	flush_cache_all();
++#ifdef CONFIG_CPU_CP15
+ 	set_cr(cr_alignment);
++#endif
+ 	return 0;
+ }
+ early_param("cachepolicy", early_cachepolicy);
+@@ -158,6 +162,7 @@ static int __init early_ecc(char *p)
+ }
+ early_param("ecc", early_ecc);
+ 
++#ifdef CONFIG_CPU_CP15
+ static int __init noalign_setup(char *__unused)
+ {
+ 	cr_alignment &= ~CR_A;
+@@ -166,8 +171,9 @@ static int __init noalign_setup(char *__unused)
+ 	return 1;
+ }
+ __setup("noalign", noalign_setup);
++#endif
+ 
+-#ifndef CONFIG_SMP
++#if !defined(CONFIG_SMP) && defined(CONFIG_CPU_CP15)
+ void adjust_cr(unsigned long mask, unsigned long set)
+ {
+ 	unsigned long flags;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.8.3
