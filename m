@@ -1,50 +1,29 @@
-From: leon@leon.nu (Leon Romanovsky)
-Date: Mon, 16 Jan 2012 13:31:50 +0200
-Subject: [PATCH v2] [INCREMENTAL] Input: tegra-kbc - add device tree
- support
-In-Reply-To: <1325639956-27502-1-git-send-email-olof@lixom.net>
-References: <1325639956-27502-1-git-send-email-olof@lixom.net>
-Message-ID: <CALq1K=LShfkwyfx+G3rqp9OdHzRoZzXremr2tH7guJTLZaqbRw@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 16 Jan 2012 17:12:29 +0530
+Subject: [PATCH 8/8] dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
+In-Reply-To: <7c1e6fd573d5cd348b22f8363c9960fe5efcd658.1326707233.git.viresh.kumar@st.com>
+References: <cover.1326707233.git.viresh.kumar@st.com>
+ <7c1e6fd573d5cd348b22f8363c9960fe5efcd658.1326707233.git.viresh.kumar@st.com>
+Message-ID: <4F140D25.1000309@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2012 at 03:19, Olof Johansson <olof@lixom.net> wrote:
->
-> This is an incremental patch updating to the revised bindings for matrix keyboards.
->
-> This includes an optional "linux,fn-keymap" binding that is not yet implemented,
-> that will be used to specify the Fn-key modifier layout if needed.
->
-> New for v2:
-> * Removed references to "matrix-keyboard-controller" compatible values
-> * Rebased to be incremental on top of previous patch.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> Acked-by: Stephen Warren <swarren@nvidia.com>
->
-> ---
->
-> Dmitry,
->
-> Here's an incremental patch to go on top of your next branch.
->
-> Regards,
->
-> -Olof
-> ---
-> ?.../devicetree/bindings/input/tegra-kbc.txt ? ? ? ?| ? 17 ++++++++++-----
-> ?drivers/input/keyboard/tegra-kbc.c ? ? ? ? ? ? ? ? | ? 21 +++++++++++++++----
-> ?2 files changed, 27 insertions(+), 11 deletions(-)
+On 1/16/2012 3:20 PM, Viresh KUMAR wrote:
+> +	/*
+> +	 * Fix sconfig's burst size according to dw_dmac. We need to convert
+> +	 * them as: 1 -> 0, 2 -> 1, 4 -> 2, 8 -> 3, 16 -> 4.
+> +	 *
+> +	 * This can be done by findiding least significant bit set: n & (n - 1)
+> +	 */
+> +	sconfig->src_maxburst &= sconfig->src_maxburst - 1;
+> +	sconfig->dst_maxburst &= sconfig->dst_maxburst - 1;
 
-For any reasons this patch is missing from for-next branch and the
-absence of the lines below prevents from linux-next-20120116 build
-(and previous too).
-> + ? ? ? u32 prop;
-> + ? ? ? int i;
+Perhaps, this looks incorrect. It will always return 0. :(
+Can somebody suggest any inbuild function to do this, i think
 
-http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=blob;f=drivers/input/keyboard/tegra-kbc.c;h=a136e2e832beff1e740c8c9a79ad850b01fe14c2;hb=refs/heads/stable#l589
+find_next_bit(sconfig->src_maxburst, sizeof(sconfig->src_maxburst), 0)
 
---
-Leon Romanovsky | Independent Linux Consultant
-? ? ? ??www.leon.nu?| leon at leon.nu
+will do it.
+
+-- 
+viresh
