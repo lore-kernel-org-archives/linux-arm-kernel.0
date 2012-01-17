@@ -1,74 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Jan 2012 11:32:23 +0000
-Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <20120116190637.GE32049@n2100.arm.linux.org.uk>
-References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
- <20120116162933.GG14252@pengutronix.de>
- <20120116174039.GD32049@n2100.arm.linux.org.uk>
- <20120116181002.GC12267@arm.com>
- <20120116190637.GE32049@n2100.arm.linux.org.uk>
-Message-ID: <20120117113222.GA11475@arm.com>
+From: aneesh@ti.com (Aneesh V)
+Date: Tue, 17 Jan 2012 17:31:28 +0530
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
+ by uBoot)?
+In-Reply-To: <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+References: <WC20120116100344.4204CC@terrafix.co.uk>
+ <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
+ <20120116105949.GG16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+ <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+Message-ID: <4F156318.7030309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 07:06:37PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 16, 2012 at 06:10:02PM +0000, Catalin Marinas wrote:
-> > On Mon, Jan 16, 2012 at 05:40:39PM +0000, Russell King - ARM Linux wrote:
-> > > The VFP stuff - adding 'clean' which is kernel state to the _user_
-> > > _exported_ VFP hardware structure is a bad idea.  So this needlessly
-> > > causes a variation in the kernels userspace API.  Please find somewhere
-> > > else to keep kernel internal state.  (As that patch comes from Catalin,
-> > > then that comment is directed to Catalin.)
-> > 
-> > Are you sure we export vfp_hard_struct to user? That's a kernel-only
-> > structure (and it's not by any means stable, given the number of
-> > #ifdef's it has). I would also argue that 'clean' is a hardware state
-> > (inferred from the exception return value).
-> 
-> Actually, looking at arch/arm/kernel/ptrace.c, we only export the
-> fpregs and fpscr, so this should be fine.
-> 
-> Still, I don't see why we need this 'clean' state, when normal VFP
-> doesn't need it.  Maybe you could explain why it's necessary?
+Santosh, Russel,
 
-The FP support on the M profile is a bit different (in terms of control
-registers) from the A/R profiles. The M profile has built-in knowledge
-of the AAPCS for automatically preservation of certain registers during
-exceptions and it can also do lazy saving of the S0-S15 FP registers.
-In general the M processors are meant to be simpler to use without a
-complex OS (especially if thread switching is done synchronously at SVC
-time rather than during interrupts).
+On Monday 16 January 2012 06:52 PM, Shilimkar, Santosh wrote:
+> On Mon, Jan 16, 2012 at 2:13 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk>  wrote:
+>> On Mon, Jan 16, 2012 at 01:43:03PM +0100, Shilimkar, Santosh wrote:
+>>> This code will be in assembly and that's what I have
+>>> been using. Not having stack shoudn't be a blocker
+>>> and can be work-around in this code. And this API
+>>> has to be anyway called before MMU is enabled.
+>>
+>> What about SMC on OMAP potentially corrupting most of the integer
+>> registers?  What if it corrupts an integer register which we depend
+>> upon?  You don't have a stack here to save those registers.  We'd
+>> need at least one additional register to save the old 'lr' value.
+>>
+> That's right.
+>
+>> What about other secure monitors?  Some implementations require you to
+>> give parameters via memory.  How do you obtain that memory that early
+>> on in the kernel boot (you haven't parsed anything here.)
+>>
+>> Not only that but you're asking to make the kernel boot a _lot_ more
+>> fragile, when people start stuffing all kinds of utter shite into this
+>> hook - and then we're burdened again with the old 'my kernel won't
+>> boot and it remains silent, well your debug code is utter shite get rid
+>> of it' crap that we used to have in the early 2000s.
+>>
+>> I really don't want to go anywhere near that situation.
+>>
+> Fair point. It will be harder to maintain and won't be consistent.
+>
+>>> Am not sure what you mean because secure API
+>>> as such isn't a problem. If you mean one standard interface
+>>> for all the ARM SOC's then that's something won't be
+>>> easy to handled because it is tied up the security architecture
+>>> which can vary across SoCs.
+>>
+>> The latter.  This is exactly the kind of pain I forsaw with this security
+>> shite, and when I heard about it I was utterly dismayed at ARM Ltd for
+>> coming up with such a brain-dead lack of design here.
+>>
+>> You're having to struggle with the results of that by having lots of
+>> SoC specific hooks all around the place to fiddle with this that and the
+>> other.  Your need to have something called from the early assembly code
+>> is just yet more of that disease caused by ARM Ltd's lack of forsight
+>> on this matter.
+>>
+>> I have no solution for you on this
+>
+> I managed use some secure macro kind of code but as you said it
+> will be really hard to maintain.
+>
+> So we are stuck with this issue then.
 
-For example, when user space gets an exception, the M core saves R0-R3,
-R12, LR, PC, xPSR on the user stack automatically. It also preserves
-space for S0-S15 and FPSCR but does not save them (it remembers the
-address though for lazy saving if new thread uses the FP). If another
-thread tries to use the FP for the first time, it saves the old FP state
-and initialises a new one for the current thread automatically. But once
-a thread touched the FP, its state is no longer 'clean' and it is
-automatically loaded (non-lazily) from the stack when switching to such
-thread while saving the old one on the previous stack. When switching
-between two threads that have never used the FP, the processor does not
-do any FP state switching.
+Can't we delay the L2 initialization a bit and do it when we have a
+stack, like we do in OMAP4 (early_initcall)? Am I missing something?
 
-However, it does not save S16-S31 as the AAPCS specifies that they are
-caller-saved. Linux needs to do this and it uses the 'clean' state to
-detect whether a thread used the FP or not. The disadvantage is that if
-a thread ever used FP, its state is always saved/restored at context
-switch.
-
-Of course, we can change all this and disable the hardware automatic
-saving while implementing a pure software lazy switching solution using
-the CPACR (there is no FPEXC). But at the time this was the simplest
-implementation, given that Cortex-M3 doesn't even have an FP unit (it
-came with Cortex-M4) and most M3 software around didn't touch the FP at
-all.
-
-BTW, if you are fine with trying to get the M support into mainline, I'm
-happy to revisit the code (probably with Uwe's help given that I don't
-have much time available).
-
--- 
-Catalin
+br,
+Aneesh
