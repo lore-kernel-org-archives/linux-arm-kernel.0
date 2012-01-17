@@ -1,35 +1,37 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 17 Jan 2012 15:34:24 +0100
-Subject: [PATCH 5/8] mmc: mmci: Support MMC_PM_KEEP_POWER
-In-Reply-To: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1326810867-5346-6-git-send-email-ulf.hansson@stericsson.com>
+Date: Tue, 17 Jan 2012 15:34:19 +0100
+Subject: [PATCH 0/8] mmc: mmci: Improved PM and SDIO support 
+Message-ID: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MMC_PM_KEEP_POWER to pm_caps so SDIO clients are able
-to use this option to prevent power off in suspend.
+This patch series replaces previous version of the series below:
+	- Improved PM support, cleanup and bugfixes
+	- Improvements and bugfixes for SDIO
 
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/mmc/host/mmci.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Patches that were accepted has been removed from the series and the
+ones left has been rebased.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 76ce2cd..3defe69 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1319,6 +1319,9 @@ static int __devinit mmci_probe(struct amba_device *dev,
- 		mmc->ocr_avail = plat->ocr_mask;
- 	mmc->caps = plat->capabilities;
- 
-+	/* We support these PM capabilities. */
-+	mmc->pm_caps = MMC_PM_KEEP_POWER;
-+
- 	/*
- 	 * We can do SGIO
- 	 */
+Patch 1 to 5:
+	- PM patches.
+Patch 6 - 8:
+	- SDIO patches.
+
+Per Forlin (1):
+  mmc: mmci: Add constraints on alignment for SDIO
+
+Ulf Hansson (7):
+  mmc: mmci: Cache MMCICLOCK and MMCIPOWER register
+  mmc: mmci: Decrease current consumption in suspend
+  mmc: mmci: Implement PM runtime callbacks to save power
+  mmc: mmci: Use ios_handler to save power
+  mmc: mmci: Support MMC_PM_KEEP_POWER
+  mmc: mmci: Fix incorrect handling of HW flow control for SDIO
+  mmc: mmci: Support any block sizes for ux500v2 variant
+
+ drivers/mmc/host/mmci.c |  251 ++++++++++++++++++++++++++++++++++++++++-------
+ drivers/mmc/host/mmci.h |   10 ++-
+ 2 files changed, 222 insertions(+), 39 deletions(-)
+
 -- 
 1.7.5.4
