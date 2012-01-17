@@ -1,43 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jan 2012 17:35:05 +0000
-Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
-In-Reply-To: <1326749786-13035-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1326749786-13035-1-git-send-email-maxime.ripard@free-electrons.com>
- <1326749786-13035-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <201201171735.06166.arnd@arndb.de>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 17 Jan 2012 12:39:29 -0500 (EST)
+Subject: [PATCH V3 1/4] CS89x0 : add platform driver support
+In-Reply-To: <1326570996-27818-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1326570996-27818-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <20120117.123929.1033968651111164006.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 January 2012, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Jonathan Cameron <jic23@cam.ac.uk>
-> Cc: Marek Vasut <marek.vasut@gmail.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
+From: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+Date: Sat, 14 Jan 2012 20:56:36 +0100
 
-I think I reviewed this driver before, but I don't remember any of the
-details I may have complained about. I assume everything was fixed,
-since the driver looks good in this version ;-)
+> -	depends on ISA || EISA || MACH_IXDP2351 || ARCH_IXDP2X01 \
+> -		|| MACH_MX31ADS || MACH_QQ2440 || (ARM && ARCH_EP93XX) || MAC
+> +	depends on ISA || EISA || ARM || (ARM && ARCH_EP93XX) || MAC
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Two general comments:
-
-* Please add a changeset description (i.e. thetext above your
-Signed-off-by: line) for every patch you do. Just read a few
-dozen patches that get posted to lkml to get a feeling for
-what would be useful to have in there. For a new driver, it
-would be helpful to know what hardware uses this driver and
-what the device does there.
-
-* Over time, we will get stricter in requiring device tree
-bindings for new platform devices, to replace platform_data
-where appropriate. It's not required yet, but it would be nice
-to describe the long-term plan in submissions that add new
-platform_data but no device tree bindings.
-
-	Arnd
+The expression "ARM || (ARM && ARCH_EP93XX)" should be reduced to
+just plain "ARM", which is equivalent.
