@@ -1,36 +1,29 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Tue, 17 Jan 2012 12:02:37 +0530
-Subject: [PATCH v2 2/2] msm: DMAEngine: Add DMAEngine driver based on
- old MSM DMA APIs
-In-Reply-To: <4F0ACB65.3040802@codeaurora.org>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1325854052-21402-3-git-send-email-kumarrav@codeaurora.org>
- <1325901569.10425.14.camel@m0nster> <4F0ACB65.3040802@codeaurora.org>
-Message-ID: <4F151605.4050700@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 16 Jan 2012 22:39:53 -0800
+Subject: [GIT PULL] Samsung fixes for v3.3
+In-Reply-To: <4F0DC85F.2040204@samsung.com>
+References: <4F0DC85F.2040204@samsung.com>
+Message-ID: <CAOesGMhTi3hc5CTQ=sdOQzV+g9BG37PbLj-tXgdSh1CFJ0t45g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/9/2012 4:41 PM, Ravi Kumar V wrote:
-> On 1/7/2012 7:29 AM, Daniel Walker wrote:
->> On Fri, 2012-01-06 at 18:17 +0530, Ravi Kumar V wrote:
->>> Add DMAEngine based driver using the old MSM DMA APIs internally.
->>> The benefit of this approach is that not all the drivers
->>> have to get converted to DMAEngine APIs simultaneosly while
->>> both the drivers can stay enabled in the kernel. The client
->>> drivers using the old MSM APIs directly can now convert to
->>> DMAEngine one by one.
->>>
->>> Change-Id: I3647ed7b8c73b3078dfa8877a3560db3cb0a2373
->>> Signed-off-by: Ravi Kumar V<kumarrav@codeaurora.org>
->>> ---
->
-> I will address the comments in next patch release, i will wait for
-> sometime for vinod comments and release new patch v3.
->
-> Ravi
+Hi,
 
-Dan please can you review my patches and let me know your comments.
+On Wed, Jan 11, 2012 at 9:35 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd and Olof,
+>
+> Here is first fixes of Samsung stuff for v3.3.
+>
+> Please pull that from following:
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> samsung-fixes
+>
+> If any problems, please let me know.
+>
+> As a note, as we discussed, please kindly ignore previous 'pull request' of
+> next-samsung-devel-samsung which maybe are in late/devel.
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks, pulled and I will drop the next-samsung-devel-samsung branch.
+
+
+-Olof
