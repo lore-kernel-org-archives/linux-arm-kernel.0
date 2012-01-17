@@ -1,132 +1,29 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 17 Jan 2012 15:48:19 +0530
-Subject: [PATCH v2] I2C : OMAP : make omap_i2c_unidle/idle functions depend on
- CONFIG_PM_RUNTIME
-Message-ID: <1326795499-13508-1-git-send-email-shubhrajyoti@ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 17 Jan 2012 15:49:41 +0530
+Subject: [PATCH 8/8] dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
+In-Reply-To: <4F153C33.5060805@st.com>
+References: <cover.1326707233.git.viresh.kumar@st.com>
+ <7c1e6fd573d5cd348b22f8363c9960fe5efcd658.1326707233.git.viresh.kumar@st.com>
+ <4F140D25.1000309@st.com>
+ <CACRpkdbY7ZOwY6GR4t+GODYL4yAdH-PXExmwp84R+Gz2W19X7w@mail.gmail.com>
+ <4F153C33.5060805@st.com>
+Message-ID: <4F154B3D.7050705@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The functions omap_i2c_unidle/idle are called from omap_i2c_runtime_resume
-and omap_i2c_runtime_suspend which is compiled for CONFIG_PM_RUNTIME.
-This patch removes the omap_i2c_unidle/idle functions and folds them
-into the runtime callbacks.
+On 1/17/2012 2:45 PM, Viresh Kumar wrote:
+> On 1/17/2012 2:19 PM, Linus Walleij wrote:
+>> > Are you looking for ffs() from <linus/bitops.h>?
+>> > 
+>> > find-first-set (the include boils down to include/asm-generic/bitops/ffs.h
+>> > if you want to check the implementation).
+> Thanks, but it might not solve the issue. :(
+> Actually this will retain the first Least Significant Bit (which is 1)
+> and will mark all other zero. So it will give output 0b10 for 0b110
+> 
 
-This fixes the below warn when CONFIG_PM_RUNTIME is not defined
+Oops!! I didn't looked at fls in the implementation. :(
+You are right. This will solve my issue.
 
- CC      arch/arm/mach-omap2/board-ti8168evm.o
-drivers/i2c/busses/i2c-omap.c:272: warning: 'omap_i2c_unidle' defined but not used
-drivers/i2c/busses/i2c-omap.c:293: warning: 'omap_i2c_idle' defined but not used
-  CC      net/ipv4/ip_forward.o
-
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
-Rebased to Kevin's tree i2c misc branch
-Tested on omsp4sdp and omap3sdp
-
-
- drivers/i2c/busses/i2c-omap.c |   75 +++++++++++++++++-----------------------
- 1 files changed, 32 insertions(+), 43 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index f713eac..914bed8 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -269,47 +269,6 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
- }
- 
--static void omap_i2c_unidle(struct omap_i2c_dev *dev)
--{
--	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
--		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, dev->syscstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
--	}
--
--	/*
--	 * Don't write to this register if the IE state is 0 as it can
--	 * cause deadlock.
--	 */
--	if (dev->iestate)
--		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
--}
--
--static void omap_i2c_idle(struct omap_i2c_dev *dev)
--{
--	u16 iv;
--
--	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
--	if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
--		omap_i2c_write_reg(dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
--	else
--		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, 0);
--
--	if (dev->rev < OMAP_I2C_OMAP1_REV_2) {
--		iv = omap_i2c_read_reg(dev, OMAP_I2C_IV_REG); /* Read clears */
--	} else {
--		omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, dev->iestate);
--
--		/* Flush posted write */
--		omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
--	}
--}
--
- static int omap_i2c_init(struct omap_i2c_dev *dev)
- {
- 	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
-@@ -1163,8 +1122,22 @@ static int omap_i2c_runtime_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-+	u16 iv;
-+
-+	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
-+	if (_dev->dtrev == OMAP_I2C_IP_VERSION_2)
-+		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
-+	else
-+		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
-+
-+	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
-+		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
-+	} else {
-+		omap_i2c_write_reg(_dev, OMAP_I2C_STAT_REG, _dev->iestate);
- 
--	omap_i2c_idle(_dev);
-+		/* Flush posted write */
-+		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
-+	}
- 
- 	return 0;
- }
-@@ -1174,7 +1147,23 @@ static int omap_i2c_runtime_resume(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
- 
--	omap_i2c_unidle(_dev);
-+	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
-+		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+	}
-+
-+	/*
-+	 * Don't write to this register if the IE state is 0 as it can
-+	 * cause deadlock.
-+	 */
-+	if (_dev->iestate)
-+		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
- 
- 	return 0;
- }
 -- 
-1.7.1
+viresh
