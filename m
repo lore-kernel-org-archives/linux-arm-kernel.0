@@ -1,51 +1,67 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 17 Jan 2012 20:03:01 +0100
-Subject: [PATCH v2] ARM: mx28: Clear CLKGATE bit prior to changing DIV
- field
-In-Reply-To: <1326823131-27447-1-git-send-email-fabio.estevam@freescale.com>
-References: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
- <1326823131-27447-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <201201172003.01808.marek.vasut@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Jan 2012 20:08:35 +0100
+Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
+In-Reply-To: <201201171735.06166.arnd@arndb.de>
+References: <1326749786-13035-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1326749786-13035-3-git-send-email-maxime.ripard@free-electrons.com>
+ <201201171735.06166.arnd@arndb.de>
+Message-ID: <4F15C733.8000404@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> MX28 Reference Manual states the following about the CLKGATE bit of
-> register HW_CLKCTRL_SAIF0:
-> 
-> "The DIV field can change ONLY when this clock gate bit field is low."
-> 
-> So clear this bit prior to writing to the DIV field as required.
-> 
-> This also fixes the following error during mxs-sgtl5000 probe.
-> 
-> [    0.660000] saif0_clk_set_rate: divider writing timeout
-> [    0.670000] mxs-sgtl5000: probe of mxs-sgtl5000.0 failed with error -110
-> [    0.670000] ALSA device list:
-> [    0.680000]   No soundcards found.
-> 
-> Audio is functional after this change.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Clear CLKGATE  and DIV fields at the same time
-> 
->  arch/arm/mach-mxs/clock-mx28.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c
-> b/arch/arm/mach-mxs/clock-mx28.c index 5d68e41..0bcfd97 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -475,7 +475,7 @@ static int name##_set_rate(struct clk *clk, unsigned
-> long rate)		\ return -EINVAL;						
-\
->  									\
->  	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
-> -	reg &= ~BM_CLKCTRL_##rs##_DIV;					\
-> +	reg &= ~(BM_CLKCTRL_##rs##_CLKGATE | BM_CLKCTRL_##rs##_DIV);	\
->  	reg |= div << BP_CLKCTRL_##rs##_DIV;				\
->  	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
->  									\
+Hi Arnd,
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
+On 17/01/2012 18:35, Arnd Bergmann wrote:
+> On Monday 16 January 2012, Maxime Ripard wrote:
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Cc: Jonathan Cameron <jic23@cam.ac.uk>
+>> Cc: Marek Vasut <marek.vasut@gmail.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+> 
+> I think I reviewed this driver before, but I don't remember any of the
+> details I may have complained about. I assume everything was fixed,
+> since the driver looks good in this version ;-)
+
+You did, and as far as I remember, you did not complained much. but
+actually, I've rewritten a large enough part of this driver to make the
+Acked-by you gave at the time at best outdated. That's why I dropped all
+the SoB and friends to a Cc.
+
+I mentionned it in the cover letter, but I forgot to Cc you one that one
+too, my bad...
+
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Two general comments:
+> 
+> * Please add a changeset description (i.e. thetext above your
+> Signed-off-by: line) for every patch you do. Just read a few
+> dozen patches that get posted to lkml to get a feeling for
+> what would be useful to have in there. For a new driver, it
+> would be helpful to know what hardware uses this driver and
+> what the device does there.
+
+Ok, will do.
+
+> * Over time, we will get stricter in requiring device tree
+> bindings for new platform devices, to replace platform_data
+> where appropriate. It's not required yet, but it would be nice
+> to describe the long-term plan in submissions that add new
+> platform_data but no device tree bindings.
+
+The main point of rewriting a part of it was exactly to make the
+transition to device-tree and single kernel image easier when the time
+comes.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
