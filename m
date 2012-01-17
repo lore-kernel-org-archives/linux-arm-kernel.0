@@ -1,67 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jan 2012 20:08:35 +0100
-Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
-In-Reply-To: <201201171735.06166.arnd@arndb.de>
-References: <1326749786-13035-1-git-send-email-maxime.ripard@free-electrons.com>
- <1326749786-13035-3-git-send-email-maxime.ripard@free-electrons.com>
- <201201171735.06166.arnd@arndb.de>
-Message-ID: <4F15C733.8000404@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Jan 2012 19:09:25 +0000
+Subject: [PATCH v3 2/3] ARM: vmlinux.lds.S: align the exception fixup
+ table to a 4-byte boundary
+In-Reply-To: <alpine.LFD.2.02.1201171314120.2722@xanadu.home>
+References: <1326818876-4818-1-git-send-email-will.deacon@arm.com>
+ <1326818876-4818-2-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1201171314120.2722@xanadu.home>
+Message-ID: <20120117190925.GK27350@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 17/01/2012 18:35, Arnd Bergmann wrote:
-> On Monday 16 January 2012, Maxime Ripard wrote:
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>
->> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Cc: Jonathan Cameron <jic23@cam.ac.uk>
->> Cc: Marek Vasut <marek.vasut@gmail.com>
->> Cc: Arnd Bergmann <arnd@arndb.de>
+On Tue, Jan 17, 2012 at 06:18:47PM +0000, Nicolas Pitre wrote:
+> On Tue, 17 Jan 2012, Will Deacon wrote:
 > 
-> I think I reviewed this driver before, but I don't remember any of the
-> details I may have complained about. I assume everything was fixed,
-> since the driver looks good in this version ;-)
-
-You did, and as far as I remember, you did not complained much. but
-actually, I've rewritten a large enough part of this driver to make the
-Acked-by you gave at the time at best outdated. That's why I dropped all
-the SoB and friends to a Cc.
-
-I mentionned it in the cover letter, but I forgot to Cc you one that one
-too, my bad...
-
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > The exception fixup table is currently aligned to a 32-byte boundary.
+> > Whilst this won't cause any problems, the exception_table_entry
+> > structures contain only a pair of unsigned longs, so 4-byte alignment
+> > is all that is required.
 > 
-> Two general comments:
+> If the table was also walked from start to end, that could also be an 
+> argument for aligning it to a cache line so the first access always 
+> fetches a whole cache line worth of usable data.  But the access is done 
+> through a binary search which is totally random as far as access pattern 
+> goes.  That would be worth mentioning in the commit log.
+
+Good point, I'll add that to the message.
+
+> With that:
 > 
-> * Please add a changeset description (i.e. thetext above your
-> Signed-off-by: line) for every patch you do. Just read a few
-> dozen patches that get posted to lkml to get a feeling for
-> what would be useful to have in there. For a new driver, it
-> would be helpful to know what hardware uses this driver and
-> what the device does there.
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Ok, will do.
+Thanks Nicolas!
 
-> * Over time, we will get stricter in requiring device tree
-> bindings for new platform devices, to replace platform_data
-> where appropriate. It's not required yet, but it would be nice
-> to describe the long-term plan in submissions that add new
-> platform_data but no device tree bindings.
-
-The main point of rewriting a part of it was exactly to make the
-transition to device-tree and single kernel image easier when the time
-comes.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
