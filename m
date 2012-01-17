@@ -1,102 +1,63 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2012 22:58:04 -0800
-Subject: [GIT PULL] arm-soc fixes for 3.3-rc1
-Message-ID: <20120117065804.GA31953@quad.lixom.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 17 Jan 2012 16:22:47 +0900
+Subject: [PATCH v2 1/2] PM / Domains: Add OF support
+In-Reply-To: <201201082223.18603.rjw@sisk.pl>
+References: <1325931055-14486-1-git-send-email-thomas.abraham@linaro.org>
+ <1325931055-14486-2-git-send-email-thomas.abraham@linaro.org>
+ <201201082223.18603.rjw@sisk.pl>
+Message-ID: <001e01ccd4e8$d04b03a0$70e10ae0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Rafael J. Wysocki wrote:
+> 
+> On Saturday, January 07, 2012, Thomas Abraham wrote:
+> > A device node pointer is added to generic pm domain structure to
+> associate
+> > the domain with a node in the device tree. The platform code parses the
+> > device tree to find available nodes representing the generic power
+> domain,
+> > instantiates the available domains and initializes them by calling
+> > pm_genpd_init().
+> >
+> > Nodes representing the devices include a phandle of the power domain to
+> > which it belongs. As these devices get instantiated, the driver code
+> > checkes for availability of a power domain phandle, converts the phandle
+> > to a device node and uses the new pm_genpd_of_add_device() api to
+> > associate the device with a power domain.
+> >
+> > pm_genpd_of_add_device() runs through its list of registered power
+> domains
+> > and matches the OF node of the domain with the one specified as the
+> > parameter. If a match is found, the device is associated with the
+> matched
+> > domain.
+> >
+> > Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> 
+> I can take this patch for 3.4, but your [2/2] depends on it, so I'm not
+> sure how to handle that.  If you want me to take the other patch too,
+> it'll need ACKs from the Exynos maintaniers.
+> 
+Hi Rafael,
 
-Once the dmaengine pull request that was sent this morning lands, the remaining
-dependencies for arm-soc pull requests should be resolved.
+Basically, looks ok to me.
 
-Until then, here is a batch of fixes for -rc1.
+But it would be good if [v3 2/2] patch of this series (this patch) could be
+applied in samsung tree to avoid conflicts as it modifies many files. I
+don't want to make a trouble when sending my tree to upstream. Of course, as
+you said, this have a dependency with [v2 1/2]. So if you're ok, let me
+create topic branch will have both(1/2 and 2/2) to merge in your tree.
 
-Thanks!
+How do you think?
 
--Olof
+Thanks.
 
-
-
-The following changes since commit c2bc3a316a7281f67e36b34dac2802cbe36a9128:
-
-  Merge branch 'x86/rdrand' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip (2012-01-16 18:23:09 -0800)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git arm-soc-fixes-20120116
-
-for you to fetch changes up to 090e648a20a43d71fc2d63e0d8ff8ec6822e2396:
-
-  Merge branch 'samsung-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2012-01-16 22:46:19 -0800)
-
-----------------------------------------------------------------
-
-ARM: fixes for ARM platforms
-
-Some fallout from the 3.3. merge window as well as a couple bug fixes
-for older preexisting bugs that seem valid to include at this time:
-
-* sched_clock changes broke picoxcell, fix included
-* BSYM bugs causing issues with thumb2-built kernels on SMP
-* Missing module.h include on msm.
-* A collection of bugfixes for samsung platforms that didn't make it into
-  the first pull requests.
-
-----------------------------------------------------------------
-David Brown (1):
-      ARM: msm: vreg is a module and so needs module.h
-
-Jamie Iles (1):
-      ARM: picoxcell: fix sched_clock() cleanup fallout
-
-Mark Brown (7):
-      ARM: SAMSUNG: Guard against multiple inclusion of plat/dma.h
-      ARM: SAMSUNG: dma-ops.h needs mach/dma.h
-      ARM: SAMSUNG: Declare struct platform_device in plat/s3c64xx-spi.h
-      ARM: S3C64XX: Remove unconditional power domain disables
-      ARM: S3C64XX: Remove hsmmc1 from Cragganmore
-      ARM: S3C64XX: Fix the memory mapped GPIOs on Cragganmore
-      ARM: S3C64XX: Fix interrupt configuration for PCA935x on Cragganmore
-
-Olof Johansson (4):
-      Merge branch 'picoxcell-fixes' of git://github.com/jamieiles/linux-2.6-ji into fixes
-      Merge branch 'msm-fix' of git://codeaurora.org/quic/kernel/davidb/linux-msm into fixes
-      Merge branch 'fixes-for-arm-soc' of git://sources.calxeda.com/kernel/linux into fixes
-      Merge branch 'samsung-fixes' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-
-Pawel Moll (1):
-      ARM: versatile: Add missing ENDPROC to headsmp.S
-
-Rob Herring (6):
-      ARM: msm: Add missing ENDPROC to headsmp.S
-      ARM: ux500: add missing ENDPROC to headsmp.S
-      ARM: exynos: remove incorrect BSYM usage
-      ARM: imx: remove incorrect BSYM usage
-      ARM: highbank: remove incorrect BSYM usage
-      ARM: make BSYM macro assembly only
-
-Tushar Behera (1):
-      ARM: EXYNOS: Invert VCLK polarity for framebuffer on ORIGEN
-
- arch/arm/include/asm/unified.h                   |    4 ++--
- arch/arm/mach-exynos/headsmp.S                   |    2 ++
- arch/arm/mach-exynos/mach-origen.c               |    3 ++-
- arch/arm/mach-exynos/platsmp.c                   |    5 ++---
- arch/arm/mach-highbank/highbank.c                |    3 +--
- arch/arm/mach-imx/src.c                          |    3 +--
- arch/arm/mach-msm/headsmp.S                      |    1 +
- arch/arm/mach-msm/vreg.c                         |    1 +
- arch/arm/mach-picoxcell/time.c                   |    2 +-
- arch/arm/mach-realview/platsmp.c                 |    3 +--
- arch/arm/mach-s3c64xx/include/mach/crag6410.h    |    1 +
- arch/arm/mach-s3c64xx/mach-crag6410.c            |   13 +++----------
- arch/arm/mach-s3c64xx/pm.c                       |   13 -------------
- arch/arm/mach-ux500/headsmp.S                    |    2 ++
- arch/arm/mach-vexpress/platsmp.c                 |    4 +---
- arch/arm/plat-samsung/include/plat/dma-ops.h     |    1 +
- arch/arm/plat-samsung/include/plat/dma.h         |    6 +++++-
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 ++
- arch/arm/plat-versatile/headsmp.S                |    1 +
- 19 files changed, 30 insertions(+), 40 deletions(-)
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
