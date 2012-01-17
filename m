@@ -1,28 +1,18 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Jan 2012 12:14:14 +0000
-Subject: [PATCH] ARM: cortex-a7: move proc_info out of !CONFIG_ARM_LPAE
- block
-In-Reply-To: <1326740096-6409-1-git-send-email-will.deacon@arm.com>
-References: <1326740096-6409-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20120117121413.GD11475@arm.com>
+From: shabbirkhank@gmail.com (shabbir)
+Date: Tue, 17 Jan 2012 11:22:06 +0000 (UTC)
+Subject: booting hangs after enabling =?utf-8?b?Q09ORklHX0VBUkxZX1BSSU5USw==?=
+Message-ID: <loom.20120117T121146-86@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 06:54:56PM +0000, Will Deacon wrote:
-> The merging of commits 1b6ba46b ("ARM: LPAE: MMU setup for the 3-level
-> page table format") and b4244738 ("ARM: 7202/1: Add Cortex-A7 proc info")
-> during the merge window ended up putting the Cortex-A7 proc_info into a
-> code block guarded by !CONFIG_ARM_LPAE. This makes Cortex-A7 platforms
-> unbootable when LPAE is enabled.
-> 
-> This patch moves the proc_info structure for Cortex-A7 outside of the
-> guarded block.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi Russel
+ I have ported linux 3.0 kernel to ARM board,it is successfully booting,but when
+i enabled the CONFIG_EARLY_PRINTK in kernel hacking->kernel debugging->kernel
+low level debugging from make menuconfig,kernel booting hangs after
+Uncompressing linux...done,booting the kernel.But the same thing when i have
+tested with ARM versatile PB board everything works fine,i dont know what's
+wrong with my board.Please help me in this isssue
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
--- 
-Catalin
+Thanks
+Regards
+Shabbir
