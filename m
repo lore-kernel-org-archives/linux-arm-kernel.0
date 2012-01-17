@@ -1,63 +1,57 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Tue, 17 Jan 2012 23:19:28 +0100
-Subject: [Linaro-mm-sig] [PATCH 04/11] mm: page_alloc: introduce
- alloc_contig_range()
-In-Reply-To: <CA+K6fF6A1kPUW-2Mw5+W_QaTuLfU0_m0aMYRLOg98mFKwZOhtQ@mail.gmail.com>
-References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
- <1325162352-24709-5-git-send-email-m.szyprowski@samsung.com>
- <CA+K6fF6A1kPUW-2Mw5+W_QaTuLfU0_m0aMYRLOg98mFKwZOhtQ@mail.gmail.com>
-Message-ID: <op.v781mqwl3l0zgt@mpn-glaptop>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 17 Jan 2012 23:23:12 +0100
+Subject: [PATCH 4/8] S3C2416: move io-init to SoC specific files
+In-Reply-To: <20120117214336.GX1068@n2100.arm.linux.org.uk>
+References: <201201172210.51953.heiko@sntech.de>
+ <201201172213.26769.heiko@sntech.de>
+ <20120117214336.GX1068@n2100.arm.linux.org.uk>
+Message-ID: <201201172323.12958.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Jan 2012 22:54:28 +0100, sandeep patil <psandeep.s@gmail.com> wrote:
+Am Dienstag 17 Januar 2012, 22:43:36 schrieb Russell King - ARM Linux:
+> On Tue, Jan 17, 2012 at 10:13:26PM +0100, Heiko St?bner wrote:
+> > +/* minimal IO mapping */
+> > +
+> > +static struct map_desc s3c_iodesc[] __initdata = {
+> > +	IODESC_ENT(GPIO),
+> > +	IODESC_ENT(IRQ),
+> > +	IODESC_ENT(MEMCTRL),
+> > +	IODESC_ENT(UART)
+> > +};
+> > +
+> > +void __init s3c2416_init_io(struct map_desc *mach_desc, int size)
+> > +{
+> > +	/* initialise the io descriptors we need for initialisation */
+> > +	iotable_init(mach_desc, size);
+> > +	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
+> > +
+> > +	samsung_cpu_id = __raw_readl(S3C24XX_GSTATUS1);
+> > +	s3c24xx_init_cpu();
+> > +
+> > +	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+> > +}
+> 
+> Why do we need this implemented in every Samsung mach directory?
+> Why not provide a new function in arch/arm/plat-s3c24xx/cpu.c:
+> 
+> void __init s3c24xx_common_init_io(void __iomem *id_reg, struct cpu_table
+> *ids, size_t nr_ids)
+> {
+> 	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
+> 
+> 	samsung_cpu_id = __raw_readl(id_reg);
+> 	s3c24xx_init_cpu();
+> 	s3c_init_cpu(samsung_cpu_id, ids, nr_ids);
+> }
+> 
+> and then this becomes:
+> 
+> void __init s3c2416_init_io(struct map_desc *mach_desc, int size)
+> {
+> 	/* initialise the io descriptors we need for initialisation */
+> 	iotable_init(mach_desc, size);
+> 	s3c24xx_common_init_io(S3C24XX_GSTATUS1, cpu_ids, ARRAY_SIZE(cpu_ids));
+> }
 
-> Marek,
->
-> I am running a CMA test where I keep allocating from a CMA region as long
-> as the allocation fails due to lack of space.
->
-> However, I am seeing failures much before I expect them to happen.
-> When the allocation fails, I see a warning coming from __alloc_contig_range(),
-> because test_pages_isolated() returned "true".
-
-Yeah, we are wondering ourselves about that.  Could you try cherry-picking
-commit ad10eb079c97e27b4d27bc755c605226ce1625de (update migrate type on pcp
-when isolating) from git://github.com/mina86/linux-2.6.git?  It probably won't
-apply cleanly but resolving the conflicts should not be hard (alternatively
-you can try branch cma from the same repo but it is a work in progress at the
-moment).
-
-> I tried to find out why this happened and added in a debug print inside
-> __test_page_isolated_in_pageblock(). Here's the resulting log ..
-
-[...]
-
-> From the log it looks like the warning showed up because page->private
-> is set to MIGRATE_CMA instead of MIGRATE_ISOLATED.
-
-My understanding of that situation is that the page is on pcp list in which
-cases it's page_private is not updated.  Draining and the first patch in
-the series (and also the commit I've pointed to above) are designed to fix
-that but I'm unsure why they don't work all the time.
-
-> I've also had a test case where it failed because (page_count() != 0)
-
-
-
-> Have you or anyone else seen this during the CMA testing?
->
-> Also, could this be because we are finding a page within (start, end)
-> that actually belongs to a higher order Buddy block ?
-
-Higher order free buddy blocks are skipped in the ?if (PageBuddy(page))?
-path of __test_page_isolated_in_pageblock().  Then again, now that I think
-of it, something fishy may be happening on the edges.  Moving the check
-outside of __alloc_contig_migrate_range() after outer_start is calculated
-in alloc_contig_range() could help.  I'll take a look at it.
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+this looks nice, and you're right of course, this is much saner.
