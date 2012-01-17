@@ -1,33 +1,38 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Tue, 17 Jan 2012 15:40:44 +0530
-Subject: [PATCH 8/8] dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
-In-Reply-To: <4F140D25.1000309@st.com>
-References: <cover.1326707233.git.viresh.kumar@st.com>
- <7c1e6fd573d5cd348b22f8363c9960fe5efcd658.1326707233.git.viresh.kumar@st.com>
- <4F140D25.1000309@st.com>
-Message-ID: <CAJe_ZhfYgz5LEO7VqOJ8Qo+PZWrMNNvdfvCGQWMMq-TrbmL+xw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Jan 2012 10:11:29 +0000
+Subject: [PATCH 1/2] ARM: vmlinux.lds.S: do not hardcode cacheline size
+ as 32 bytes
+In-Reply-To: <alpine.LFD.2.02.1201161425040.2722@xanadu.home>
+References: <20120116191118.GF11088@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1201161425040.2722@xanadu.home>
+Message-ID: <20120117101129.GA9230@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 January 2012 17:12, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 1/16/2012 3:20 PM, Viresh KUMAR wrote:
->> + ? ? /*
->> + ? ? ?* Fix sconfig's burst size according to dw_dmac. We need to convert
->> + ? ? ?* them as: 1 -> 0, 2 -> 1, 4 -> 2, 8 -> 3, 16 -> 4.
->> + ? ? ?*
->> + ? ? ?* This can be done by findiding least significant bit set: n & (n - 1)
->> + ? ? ?*/
->> + ? ? sconfig->src_maxburst &= sconfig->src_maxburst - 1;
->> + ? ? sconfig->dst_maxburst &= sconfig->dst_maxburst - 1;
->
-> Perhaps, this looks incorrect. It will always return 0. :(
-> Can somebody suggest any inbuild function to do this, i think
->
-Calculating log2(n) which isn't very tidy. For that reason usually we make do
-the other way around by saving values as power of 2 and simply left shifting
-1 by that value.
-In case at hand since most likely only valid values are power of 2,
-maybe you can do
-    maxburst = ffs(maxburst) - 1
+On Mon, Jan 16, 2012 at 07:35:43PM +0000, Nicolas Pitre wrote:
+> On Mon, 16 Jan 2012, Will Deacon wrote:
+> > On Mon, Jan 16, 2012 at 06:30:23PM +0000, Stephen Boyd wrote:
+> > > I haven't measured anything yet. I just see that it's another value
+> > > hard-coded to 32 in the linker script and that tile has decided to use
+> > > L1_CACHE_BYTES for it.
+> > 
+> > Hmm, that's intriguing. The exception table entries are 8 bytes on ARM and
+> > are aligned as such by things like the USER macro, so I'm not sure why we
+> > align the section to 32 bytes. I guess it must be for performance reasons,
+> > but whether that's due to cacheline size, I don't know.
+> > 
+> > Nico, can you enlighten us please (it was introduced in 13b1f64c ("[ARM]
+> > 3008/1: the exception table is not read-only"))?
+> 
+> It probably was due to the fact that the surrounding data was also cache 
+> line aligned.  I don't think there is any particular reason why it 
+> should be aligned to a cache line boundary given that the list is 
+> accessed with a binary search.  The minimum required alignment would be 
+> __alignof__(struct exception_table_entry).
 
--j
+Given that the struct just contains two unsigned longs, we should be alright
+with 4 byte alignment here. I can add a follow-on patch to change that.
+
+Thanks,
+
+Will
