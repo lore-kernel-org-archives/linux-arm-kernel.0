@@ -1,53 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Jan 2012 16:47:54 +0000
-Subject: [PATCH v3 1/3] ARM: vmlinux.lds.S: do not hardcode cacheline size as
- 32 bytes
-Message-ID: <1326818876-4818-1-git-send-email-will.deacon@arm.com>
+Date: Tue, 17 Jan 2012 16:47:55 +0000
+Subject: [PATCH v3 2/3] ARM: vmlinux.lds.S: align the exception fixup table to
+ a 4-byte boundary
+In-Reply-To: <1326818876-4818-1-git-send-email-will.deacon@arm.com>
+References: <1326818876-4818-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1326818876-4818-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The linker script assumes a cacheline size of 32 bytes when aligning
-the .data..cacheline_aligned and .data..percpu sections.
+The exception fixup table is currently aligned to a 32-byte boundary.
+Whilst this won't cause any problems, the exception_table_entry
+structures contain only a pair of unsigned longs, so 4-byte alignment
+is all that is required.
 
-This patch updates the script to use L1_CACHE_BYTES, which should be set
-to 64 on platforms that require it.
-
+Cc: Nicolas Pitre <nico@fluxnic.net>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/vmlinux.lds.S |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/kernel/vmlinux.lds.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index f76e755..1077e4f 100644
+index 1077e4f..1e19691 100644
 --- a/arch/arm/kernel/vmlinux.lds.S
 +++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -4,6 +4,7 @@
-  */
- 
- #include <asm-generic/vmlinux.lds.h>
-+#include <asm/cache.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
-@@ -181,7 +182,7 @@ SECTIONS
- 	}
- #endif
- 
--	PERCPU_SECTION(32)
-+	PERCPU_SECTION(L1_CACHE_BYTES)
- 
- #ifdef CONFIG_XIP_KERNEL
- 	__data_loc = ALIGN(4);		/* location in binary */
-@@ -212,8 +213,8 @@ SECTIONS
- #endif
- 
- 		NOSAVE_DATA
--		CACHELINE_ALIGNED_DATA(32)
--		READ_MOSTLY_DATA(32)
-+		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
-+		READ_MOSTLY_DATA(L1_CACHE_BYTES)
- 
+@@ -219,7 +219,7 @@ SECTIONS
  		/*
  		 * The exception fixup table (might need resorting at runtime)
+ 		 */
+-		. = ALIGN(32);
++		. = ALIGN(4);
+ 		__start___ex_table = .;
+ #ifdef CONFIG_MMU
+ 		*(__ex_table)
 -- 
 1.7.4.1
