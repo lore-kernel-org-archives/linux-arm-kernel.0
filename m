@@ -1,8 +1,8 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Jan 2012 13:39:18 +0000
+Date: Tue, 17 Jan 2012 13:41:43 +0000
 Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
  by uBoot)?
-In-Reply-To: <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+In-Reply-To: <4F15692D.4070100@ti.com>
 References: <WC20120116100344.4204CC@terrafix.co.uk>
  <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
  <20120116105949.GG16726@n2100.arm.linux.org.uk>
@@ -11,60 +11,53 @@ References: <WC20120116100344.4204CC@terrafix.co.uk>
  <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
  <WC20120117085444.17057E@terrafix.co.uk>
  <20120117121138.GC11475@arm.com> <4F15692D.4070100@ti.com>
- <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
-Message-ID: <20120117133918.GE11475@arm.com>
+Message-ID: <20120117134143.GF11475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 12:40:54PM +0000, Shilimkar, Santosh wrote:
-> On Tue, Jan 17, 2012 at 1:27 PM, Aneesh V <aneesh@ti.com> wrote:
-> > Hi Catalin,
-> >
-> >
-> > On Tuesday 17 January 2012 05:41 PM, Catalin Marinas wrote:
-> >>
-> >> On Tue, Jan 17, 2012 at 08:54:44AM +0000, Joe Woodward wrote:
-> >>>
-> >>> So, is the upshot of this that the kernel isn't going to be in a
-> >>> position to enable the L2/outer cache on OMAP3 (due to the need for
-> >>> hacky/unmaintainable code)?
-> >>>
-> >>> Hence the bootloader/uBoot had better leave it enabled...
-> >>
-> >> It could but the Linux decompressor needs to be aware and either flush
-> >> the L2 (more difficult as it doesn't have all the device information) or
-> >
-> > Cortex-A8 is aware of L2$ and can flush it, isn't it?
-> >
-> >> set the page table attributes to outer non-cacheable (TEX[2:0] = 0b100).
-> >
-> > If the above is right, this is not needed right?
->
-> Well the L2 can be configured as inner or outer, so above
-> alone won't work.
+On Tue, Jan 17, 2012 at 12:27:25PM +0000, Aneesh V wrote:
+> Hi Catalin,
 > 
-> Boot-loader disabling L2 cache ( all caches)  is still right thing
-> and that's what kernel expect.
+> On Tuesday 17 January 2012 05:41 PM, Catalin Marinas wrote:
+> > On Tue, Jan 17, 2012 at 08:54:44AM +0000, Joe Woodward wrote:
+> >> So, is the upshot of this that the kernel isn't going to be in a
+> >> position to enable the L2/outer cache on OMAP3 (due to the need for
+> >> hacky/unmaintainable code)?
+> >>
+> >> Hence the bootloader/uBoot had better leave it enabled...
+> >
+> > It could but the Linux decompressor needs to be aware and either flush
+> > the L2 (more difficult as it doesn't have all the device information) or
 > 
-> Since the early kernel code can't be patches for A8, may be
-> delaying L2 enabled would work.
+> Cortex-A8 is aware of L2$ and can flush it, isn't it?
 
-Ah, I missed the fact that the L2 is an inner cache on OMAP3+A8. In this
-case, I would argue to just leave it enabled since as long as the MMU is
-off it won't be accessed. Why does U-Boot need to disable the L2 (I
-suspect via some auxiliary control register)?
+As I said to Santosh, I only had the outer cache in mind (e.g. PL310).
+There is no extra configuration needed in the kernel decompressor in
+this case.
 
-> But then on A15, we are back to square one since there is no
-> control to turn ON/OFF l2 cache.
+> > set the page table attributes to outer non-cacheable (TEX[2:0] = 0b100).
+> 
+> If the above is right, this is not needed right?
 
-Well, it's an inner cache, it gets disabled/enabled via the SCTLR.M bit
-as is the L1 cache. It does not need to be disabled independently.
+Correct, since L2 is inner cache.
 
-> On A15 infact there are other CP15 registers which needs to be set
-> before MMU is enabled to have best configuration.
+> > The latter may still not work if there are stale L2 cache lines left by
+> > U-Boot (and that's always possible unless U-Boot also uses outer
+> > non-cacheable memory attributes).
+> 
+> U-Boot flushes the caches before disabling it. On top of it, it does an
+> invalidate after the disabling the caches to cover some corner case.
+> So, it's guaranteed that there won't be any stale entries in L2 after
+> U-Boot.
+> 
+> So, we could as well leave L2$ enabled (and invalidated) and caches
+> disabled globally after U-Boot.
 
-Yes, there are, and my view is that it is up to the platform firmware to
-set things right.
+Yes.
+
+> But I thought enabling L2$ again in kernel is the cleaner solution.
+
+Why? It gets enabled via SCTLR.M together with L1.
 
 -- 
 Catalin
