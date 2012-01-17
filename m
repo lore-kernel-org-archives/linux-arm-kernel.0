@@ -1,58 +1,84 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 17 Jan 2012 16:22:47 +0900
-Subject: [PATCH v2 1/2] PM / Domains: Add OF support
-In-Reply-To: <201201082223.18603.rjw@sisk.pl>
-References: <1325931055-14486-1-git-send-email-thomas.abraham@linaro.org>
- <1325931055-14486-2-git-send-email-thomas.abraham@linaro.org>
- <201201082223.18603.rjw@sisk.pl>
-Message-ID: <001e01ccd4e8$d04b03a0$70e10ae0$%kim@samsung.com>
+Date: Tue, 17 Jan 2012 16:23:01 +0900
+Subject: [GIT PULL] Samsung devel for v3.3
+In-Reply-To: <CAOesGMiU+-wfxsfha7GTO3s7dHysP65gcrbJsLWhBpZNT9O+UQ@mail.gmail.com>
+References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
+ <CAOesGMhLE3wxM=F9OkHT-bQpsVp8Uc6eE8Uk+WN9pLuz5BRLBw@mail.gmail.com>
+ <20120108204953.GA20043@sirena.org.uk>
+ <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
+ <20120109082640.GI22134@opensource.wolfsonmicro.com>
+ <CAOesGMiU+-wfxsfha7GTO3s7dHysP65gcrbJsLWhBpZNT9O+UQ@mail.gmail.com>
+Message-ID: <001f01ccd4e8$d8456730$88d03590$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki wrote:
+Olof Johansson wrote:
 > 
-> On Saturday, January 07, 2012, Thomas Abraham wrote:
-> > A device node pointer is added to generic pm domain structure to
-> associate
-> > the domain with a node in the device tree. The platform code parses the
-> > device tree to find available nodes representing the generic power
-> domain,
-> > instantiates the available domains and initializes them by calling
-> > pm_genpd_init().
-> >
-> > Nodes representing the devices include a phandle of the power domain to
-> > which it belongs. As these devices get instantiated, the driver code
-> > checkes for availability of a power domain phandle, converts the phandle
-> > to a device node and uses the new pm_genpd_of_add_device() api to
-> > associate the device with a power domain.
-> >
-> > pm_genpd_of_add_device() runs through its list of registered power
-> domains
-> > and matches the OF node of the domain with the one specified as the
-> > parameter. If a match is found, the device is associated with the
-> matched
-> > domain.
-> >
-> > Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> Hi,
 > 
-> I can take this patch for 3.4, but your [2/2] depends on it, so I'm not
-> sure how to handle that.  If you want me to take the other patch too,
-> it'll need ACKs from the Exynos maintaniers.
+Hi Olof,
+
+> On Mon, Jan 9, 2012 at 12:26 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Sun, Jan 08, 2012 at 05:21:02PM -0800, Olof Johansson wrote:
+> >
+> >> Mark, Kukjin, can either of you split out the fixes in a separate
+> branch?
+> >
+> > Here's some of them, there were a few others I'm aware of that depended
+> > on feature updates. ?Ideally we'd actually get all the changes that have
+> > been in -next in.
+> >
+> > The following changes since commit
+> 5f0a6e2d503896062f641639dacfe5055c2f593b:
+> >
+> > ?Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
+> >
+> > are available in the git repository at:
+> > ?git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git
+> fixes/samsung
+> >
+> > Mark Brown (5):
+> > ? ? ?ARM: SAMSUNG: Fix GPIO space reservation for S3C64xx platforms
+> > ? ? ?ARM: S3C64XX: Correct reservation of GPIOs for CPU module on
+> Cragganmore
 > 
-Hi Rafael,
+> The above two don't seem to have been in the branch that was sent by
+> Kukjin, it had:
+> 
+>       ARM: EXYNOS: Invert VCLK polarity for framebuffer on ORIGEN
+>       ARM: S3C64XX: Fix interrupt configuration for PCA935x on Cragganmore
+>       ARM: S3C64XX: Fix the memory mapped GPIOs on Cragganmore
+>       ARM: S3C64XX: Remove hsmmc1 from Cragganmore
+>       ARM: S3C64XX: Remove unconditional power domain disables
+>       ARM: SAMSUNG: Declare struct platform_device in plat/s3c64xx-spi.h
+>       ARM: SAMSUNG: dma-ops.h needs mach/dma.h
+>       ARM: SAMSUNG: Guard against multiple inclusion of plat/dma.h
+> 
+> I've pulled the branch from him.
+> 
+No, please drop it because above you said are in mainline now.
 
-Basically, looks ok to me.
+- commit 4ff13995("ARM: SAMSUNG: Fix GPIO space reservation for S3C64xx
+platforms") 
+- commit aaed44e1("ARM: S3C64XX: Correct reservation of GPIOs for CPU module
+on Cragganmore")
 
-But it would be good if [v3 2/2] patch of this series (this patch) could be
-applied in samsung tree to avoid conflicts as it modifies many files. I
-don't want to make a trouble when sending my tree to upstream. Of course, as
-you said, this have a dependency with [v2 1/2]. So if you're ok, let me
-create topic branch will have both(1/2 and 2/2) to merge in your tree.
+Seems to be merged via arm-soc/next/boards and there was some
+mis-communications.
+(Refer to the commit 8df97495 ("Merge branch 'samsung/board' into
+next/boards"))
 
-How do you think?
+Sorry for bothering.
+
+> Kukjin, please consider picking up the missing two patches above and
+> send another pull request with those and any other needed fixes.
+> 
+As I said, please ignore next-samsung-devel-samsung and Mark's
+fixes/samsung.
+I think, you can go ahead with my previous pull request, samsung-fixes.
+
+If any problems, please let me know.
 
 Thanks.
 
