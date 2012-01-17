@@ -1,145 +1,74 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi KASAGAR)
-Date: Tue, 17 Jan 2012 16:57:43 +0530
-Subject: [PATCH 1/2] mach-ux500: cache operations are atomic on PL310
-In-Reply-To: <20120117103023.GB9230@mudshark.cambridge.arm.com>
-References: <1326346663-6112-1-git-send-email-srinidhi.kasagar@stericsson.com>
- <20120113181422.GB24373@mudshark.cambridge.arm.com>
- <20120116110528.GA24824@bnru02>
- <20120116145008.GH9068@mudshark.cambridge.arm.com>
- <20120117062224.GA26832@bnru02>
- <20120117103023.GB9230@mudshark.cambridge.arm.com>
-Message-ID: <20120117112741.GA14426@bnru02>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Jan 2012 11:32:23 +0000
+Subject: [RFC PATCH] ARM: new architecture for Energy Micro's EFM32
+ Cortex-M3 SoCs
+In-Reply-To: <20120116190637.GE32049@n2100.arm.linux.org.uk>
+References: <1324480428-13344-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CADMYwHzE0HeBKjA55ApQo0k5AW8+Za3kT8u5HnMorXEk4PQxjA@mail.gmail.com>
+ <20120116162933.GG14252@pengutronix.de>
+ <20120116174039.GD32049@n2100.arm.linux.org.uk>
+ <20120116181002.GC12267@arm.com>
+ <20120116190637.GE32049@n2100.arm.linux.org.uk>
+Message-ID: <20120117113222.GA11475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 11:30:23 +0100, Will Deacon wrote:
-> Hi Srinidhi,
-> 
-> On Tue, Jan 17, 2012 at 06:22:26AM +0000, Srinidhi KASAGAR wrote:
-> > On Mon, Jan 16, 2012 at 15:50:08 +0100, Will Deacon wrote:
-> > > The lock needs to stay. Besides, the problem isn't with inv_all, the problem
-> > > is with not being able to disable the outer cache. So can't you just do
-> > > something nasty like:
-> > > 
-> > > 	outer_cache.disable = NULL;
-> > > 
-> > > after your call to l2x0_init?
+On Mon, Jan 16, 2012 at 07:06:37PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 16, 2012 at 06:10:02PM +0000, Catalin Marinas wrote:
+> > On Mon, Jan 16, 2012 at 05:40:39PM +0000, Russell King - ARM Linux wrote:
+> > > The VFP stuff - adding 'clean' which is kernel state to the _user_
+> > > _exported_ VFP hardware structure is a bad idea.  So this needlessly
+> > > causes a variation in the kernels userspace API.  Please find somewhere
+> > > else to keep kernel internal state.  (As that patch comes from Catalin,
+> > > then that comment is directed to Catalin.)
 > > 
-> > hmm..patch below
+> > Are you sure we export vfp_hard_struct to user? That's a kernel-only
+> > structure (and it's not by any means stable, given the number of
+> > #ifdef's it has). I would also argue that 'clean' is a hardware state
+> > (inferred from the exception return value).
 > 
-> Thanks. Comments inline.
+> Actually, looking at arch/arm/kernel/ptrace.c, we only export the
+> fpregs and fpscr, so this should be fine.
 > 
-> > > 
-> > > Also, if you can't disable the L2 from non-secure, does that mean that you
-> > > boot Linux with the L2 enabled?
-> > 
-> > Yes, we boot with L2 enabled.
-> 
-> Interesting. I'm surprised you don't have problems with stale data on the
-> D-side after the decompressor. Maybe you're lucky with the mappings being no
-> write allocate.
+> Still, I don't see why we need this 'clean' state, when normal VFP
+> doesn't need it.  Maybe you could explain why it's necessary?
 
-Actually the pre bootloader makes sure that L2 is clean before relinquishing
-the control to kernel decompressor.
+The FP support on the M profile is a bit different (in terms of control
+registers) from the A/R profiles. The M profile has built-in knowledge
+of the AAPCS for automatically preservation of certain registers during
+exceptions and it can also do lazy saving of the S0-S15 FP registers.
+In general the M processors are meant to be simpler to use without a
+complex OS (especially if thread switching is done synchronously at SVC
+time rather than during interrupts).
 
-> 
-> > From 46fdbda7d2d9a9f4df0933341bcc467b3bdd03d6 Mon Sep 17 00:00:00 2001
-> > From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> > Date: Tue, 17 Jan 2012 11:29:39 +0530
-> > Subject: [PATCH] mach-ux500: Do not override outer.inv_all
-> > 
-> > outer.inv_all is currently being used only in kexec path.
-> > Invalidating outer cache without disabling it is a big
-> > nono, and so, remove the machine specific outer.inv_all
-> > assuming that kexec does not call inv_all in its path.
-> 
-> Please change this comment. Kexec doesn't do this anymore.
+For example, when user space gets an exception, the M core saves R0-R3,
+R12, LR, PC, xPSR on the user stack automatically. It also preserves
+space for S0-S15 and FPSCR but does not save them (it remembers the
+address though for lazy saving if new thread uses the FP). If another
+thread tries to use the FP for the first time, it saves the old FP state
+and initialises a new one for the current thread automatically. But once
+a thread touched the FP, its state is no longer 'clean' and it is
+automatically loaded (non-lazily) from the stack when switching to such
+thread while saving the old one on the previous stack. When switching
+between two threads that have never used the FP, the processor does not
+do any FP state switching.
 
-Done, patch below.
+However, it does not save S16-S31 as the AAPCS specifies that they are
+caller-saved. Linux needs to do this and it uses the 'clean' state to
+detect whether a thread used the FP or not. The disadvantage is that if
+a thread ever used FP, its state is always saved/restored at context
+switch.
 
+Of course, we can change all this and disable the hardware automatic
+saving while implementing a pure software lazy switching solution using
+the CPACR (there is no FPEXC). But at the time this was the simplest
+implementation, given that Cortex-M3 doesn't even have an FP unit (it
+came with Cortex-M4) and most M3 software around didn't touch the FP at
+all.
 
->From a8cf7e2f7b58c3ef860be58fa72cd0c51e2be487 Mon Sep 17 00:00:00 2001
-From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Date: Tue, 17 Jan 2012 11:29:39 +0530
-Subject: [PATCH] mach-ux500: Do not override outer.inv_all
+BTW, if you are fine with trying to get the M support into mainline, I'm
+happy to revisit the code (probably with Uwe's help given that I don't
+have much time available).
 
-Invalidating outer cache without disabling it is a big
-nono, and so, remove the machine specific outer.inv_all
-
-And at the same time it does not prevent us overriding
-outer.disable as we do not have any such secure SMI to
-handle the same while kexec disables the outer cache.
-
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
----
- arch/arm/mach-ux500/cache-l2x0.c |   48 +++++--------------------------------
- 1 files changed, 7 insertions(+), 41 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 122ddde..45111c8 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -12,44 +12,6 @@
- 
- static void __iomem *l2x0_base;
- 
--static inline void ux500_cache_wait(void __iomem *reg, unsigned long mask)
--{
--	/* wait for the operation to complete */
--	while (readl_relaxed(reg) & mask)
--		cpu_relax();
--}
--
--static inline void ux500_cache_sync(void)
--{
--	writel_relaxed(0, l2x0_base + L2X0_CACHE_SYNC);
--	ux500_cache_wait(l2x0_base + L2X0_CACHE_SYNC, 1);
--}
--
--/*
-- * The L2 cache cannot be turned off in the non-secure world.
-- * Dummy until a secure service is in place.
-- */
--static void ux500_l2x0_disable(void)
--{
--}
--
--/*
-- * This is only called when doing a kexec, just after turning off the L2
-- * and L1 cache, and it is surrounded by a spinlock in the generic version.
-- * However, we're not really turning off the L2 cache right now and the
-- * PL310 does not support exclusive accesses (used to implement the spinlock).
-- * So, the invalidation needs to be done without the spinlock.
-- */
--static void ux500_l2x0_inv_all(void)
--{
--	uint32_t l2x0_way_mask = (1<<16) - 1;	/* Bitmask of active ways */
--
--	/* invalidate all ways */
--	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
--	ux500_cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
--	ux500_cache_sync();
--}
--
- static int __init ux500_l2x0_unlock(void)
- {
- 	int i;
-@@ -85,9 +47,13 @@ static int __init ux500_l2x0_init(void)
- 	/* 64KB way size, 8 way associativity, force WA */
- 	l2x0_init(l2x0_base, 0x3e060000, 0xc0000fff);
- 
--	/* Override invalidate function */
--	outer_cache.disable = ux500_l2x0_disable;
--	outer_cache.inv_all = ux500_l2x0_inv_all;
-+	/*
-+	 * We can't disable l2 as we are in non secure mode, currently
-+	 * this seems being called only during kexec path. So let's
-+	 * override outer.disable with nasty assignment until we have
-+	 * some SMI service available.
-+	 */
-+	outer_cache.disable = NULL;
- 
- 	return 0;
- }
 -- 
-1.7.4.3
+Catalin
