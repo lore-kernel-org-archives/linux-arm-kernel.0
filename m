@@ -1,54 +1,63 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 17 Jan 2012 13:26:06 -0500
-Subject: [PATCH 2/2] Kbuild: Use dtc's -d (dependency) option
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D2255@HQMAIL01.nvidia.com>
-References: <1326134295-15547-1-git-send-email-swarren@nvidia.com>
- <1326134295-15547-2-git-send-email-swarren@nvidia.com>
- <1326310587.2535.291.camel@deneb.redhat.com> <4F1206F1.5090405@suse.cz>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D2255@HQMAIL01.nvidia.com>
-Message-ID: <1326824773.20239.12.camel@deneb.redhat.com>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Wed, 18 Jan 2012 02:45:14 +0800
+Subject: [PATCH] mx53_loco: add DA9053 PMIC support
+In-Reply-To: <87fwffmk2p.fsf@lebrac.rtp-net.org>
+References: <1326733853-13956-1-git-send-email-paul.liu@linaro.org>	<1326733853-13956-2-git-send-email-paul.liu@linaro.org>
+ <87fwffmk2p.fsf@lebrac.rtp-net.org>
+Message-ID: <4F15C1BA.6090308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-01-17 at 09:20 -0800, Stephen Warren wrote:
-> Michal Marek wrote at Saturday, January 14, 2012 3:51 PM:
-> > On 11.1.2012 20:36, Mark Salter wrote:
-> > > On Mon, 2012-01-09 at 11:38 -0700, Stephen Warren wrote:
-> > >> This hooks dtc into Kbuild's dependency system.
-> > >>
-> > >> Thus, for example, "make dtbs" will rebuild tegra-harmony.dtb if only
-> > >> tegra20.dtsi has changed yet tegra-harmony.dts has not. The previous
-> > >> lack of this feature recently caused me to have very confusing "git
-> > >> bisect" results.
-> > >>
-> > >> For ARM, it's obvious what to add to $(targets). I'm not familiar enough
-> > >> with other architectures to know what to add there. Powerpc appears to
-> > >> already add various .dtb files into $(targets), but the other archs may
-> > >> need something added to $(targets) to work.
-> > >>
-> > >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > >>
-> > >
-> > > Acked-by: Mark Salter <msalter@redhat.com>
-> > >
-> > > For the arch/c6x bit.
-> > 
-> > As the C6X port has been merged in this merge window, I can't easily
-> > apply this patch to my kbuild branch and at the same time please Linus
-> > by basing the pull request on a tagged release. So I'm going to drop the
-> > arch/c6x part to keep the kbuild branch "pretty" and let either Mark or
-> > Stephen send the patch to Linus directly, once he has merged the kbuild
-> > branch. Would that work?
-> 
-> I was assuming my patches were for 3.4 rather than 3.3, since it's pretty
-> late for new features in 3.3. In that case, there wouldn't be an issue,
-> right?
-> 
-> If you do want to go ahead and push my patches into 3.3, your proposal
-> looks fine to me. Mark, do you want me to push the patch to Linus, or
-> do you want to pick it up?
+Thanks all.
 
-It would probably be best to keep it all together, but if there's a need
-to break out c6x individually, I don't mind picking it up.
+I'm preparing another new upload to fix all the problems.
 
---Mark
+(2012?01?17? 05:08), Arnaud Patard (Rtp) wrote:
+> "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org> writes:
+> 
+> Hi,
+> 
+>> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+
+>> +
+>> +#define MX53_LOCO_DA9052_IRQ			(6*32 + 11)	/* GPIO7_11 */
+> 
+> you're aware that there's a IMX_GPIO_NR() macro for defining gpio,
+> right ? Moreover, why not putting it with other #defines for gpio in the
+> top of the file ?
+
+Thanks. My fault. I'll change to use this macro.
+
+> 
+>> diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+>> index fd9efb0..9fb56eb 100644
+>> --- a/arch/arm/plat-mxc/include/mach/irqs.h
+>> +++ b/arch/arm/plat-mxc/include/mach/irqs.h
+>> @@ -53,7 +53,15 @@
+>>  #endif
+>>  /* REVISIT: Add IPU irqs on IMX51 */
+>>  
+>> -#define NR_IRQS			(MXC_IPU_IRQ_START + MX3_IPU_IRQS)
+>> +#define MXC_PMIC_IRQ_START	(MXC_IPU_IRQ_START + MX3_IPU_IRQS)
+>> +
+>> +#ifdef CONFIG_MACH_MX53_LOCO
+>> +#define MXC_PMIC_IRQS 32
+>> +#else
+>> +#define MXC_PMIC_IRQS 0
+>> +#endif
+> 
+> So, each board using a pmic needing some irqs will need to add a
+> #ifdef/#define combo ? Can it be made more generic ? How will it work
+> with a kernel compiled for several machines, say loco and an other using
+> a pmic using more than 32 irqs ?
+> 
+
+Sorry. Any possible suggestions?
+
+I'm thinking about using CONFIG_SPARSE_IRQ
+and then we can use .nr_irqs in MACHINE_START block so I can acquire
+more irqs there.
+But I don't know if this is another intrusive way.
+
+Many Thanks,
+Paul
