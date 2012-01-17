@@ -1,154 +1,87 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 17 Jan 2012 11:21:30 -0800
+Date: Tue, 17 Jan 2012 11:28:50 -0800
 Subject: Pinmux bindings proposal
-In-Reply-To: <20120117082334.GA31295@S2101-09.ap.freescale.net>
+In-Reply-To: <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
 References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
  <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
  <20120117082334.GA31295@S2101-09.ap.freescale.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17801D22EB@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote at Tuesday, January 17, 2012 1:24 AM:
-> On Mon, Jan 16, 2012 at 12:50:02PM +0000, Dong Aisheng-B29396 wrote:
-...
-> > >                          * Not mandatory if the 1:1 mentioned above is
-> > >                          * extended to 1:n.
-> > >                          *
-> > >                          * Format is <&pmx_controller_phandle muxable_entity_id
-> > >                          * selected_function>.
-> > >                          *
-> > >                          * The pmx phandle is required since there may be more
-> > >                          * than one pinmux controller in the system. Even if
-> > >                          * this node is inside the pinmux controller itself, I
-> > >                          * think it's simpler to just always have this field
-> > >                          * present in the binding for consistency.
-> > >                          *
-> > >                          * Alternative: Format is <&pmx_controller_phandle
-> > >                          * pmx_controller_specific_data>. In this case, the
-> > >                          * pmx controller needs to define #pinmux-mux-cells,
-> > >                          * and provide the pinctrl core with a mapping
-> > >                          * function to handle the rest of the data in the
-> > >                          * property. This is how GPIOs and interrupts work.
-> > >                          * However, this will probably interact badly with
-> > >                          * wanting to parse the entire pinmux map early in
-> > >                          * boot, when perhaps the pinctrl core is initialized,
-> > >                          * but the pinctrl driver itself is not.
-> > >                          */
-> > >                         mux =
-> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
-> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>
-> > >                                 /* Syntax example */
-> > >                                 <&foo_pmx FOO_PMX_PG_X FOO_PMX_MUX_0>;
+Dong Aisheng wrote at Tuesday, January 17, 2012 2:47 AM:
+> Shawn Guo wrote at Tuesday, January 17, 2012 4:24 PM:
+> > On Mon, Jan 16, 2012 at 12:50:02PM +0000, Dong Aisheng-B29396 wrote:
+> > > Stephen Warren wrote:
+> > ...
+> > > >                         mux =
+> > > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> > > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>
+> > > >                                 /* Syntax example */
+> > > >                                 <&foo_pmx FOO_PMX_PG_X FOO_PMX_MUX_0>;
+> > >
+> > > I'm still think how do we construct the pinmux map for such binding.
+> > > The format you're using is:
+> > > <&pmx_controller_phandle muxable_entity_id selected_function> For
+> > > contruct pinmux map, we need to know at least 3 things for a device:
+> > > a) pinctrl device b) function name c) group name.
+> > > For a, we can get it from this binding.
+> > > But for b and c, since they are constants, how to convert to name string?
 > >
-> > I'm still think how do we construct the pinmux map for such binding.
-> > The format you're using is:
-> > <&pmx_controller_phandle muxable_entity_id selected_function>
-> > For contruct pinmux map, we need to know at least 3 things for a device:
-> > a) pinctrl device b) function name c) group name.
-> > For a, we can get it from this binding.
-> > But for b and c, since they are constants, how to convert to name string?
-> 
-> I guess, for function name, it should be retrieved from the client
-> device node, and for the group name, it should be retrieved from the
-> node here.
+> > I guess, for function name, it should be retrieved from the client device node,
+> > and for the group name, it should be retrieved from the node here.
 >
-> For above example, the function name can be picked from sdhci device
-> node pinctr-names property I proposed, and the group name can just be
-> 'pmx_sdhci_active', which is not a very nice name here and reminds me
-> the following point.
+> I guess Stephen's idea is to retrieving the function name and group name
+> From the pinctrl driver since Tagre prefers to define those things in driver
+> Rather than in board file or soc.dts file.
+> But it does not fit for IMX since we define it in soc.dts.
 
-I responded directly to Dong's email re: how to map the DT values into
-something for pinctrl. The mapping being described here isn't quite
-what I had in mind....
+You can still get the data from the driver, even if the driver got the
+data from the DT instead of static tables.
 
-> Considering the different pinctrl configurations for the same client
-> device usually share the same pinmux and only pinconf varies.  It may
-> worth introducing another level phandle reference.  Something like
-> the following:
+> > For above example, the function name can be picked from sdhci device node
+> > pinctr-names property I proposed,
+>
+> If I understand correctly, the pinctrl-names property you proposed represents
+> The pin group state.
 
-I don't think there's a need for another level of indirection. The 1:n
-model I was talking about already handles this, I believe. See below.
+Yes, that's my understanding.
 
-> 	pinmux_sdhci: pinmux-sdhci {
-> 		mux =
-> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
-> 	};
+...
+> And in this way we're still using virtual groups.
+> It has no big difference as we did before like:
+> pinmux-groups {
+>         uart4grp: group at 0 {
+>                 grp-name = "uart4grp";
+>                 grp-pins = <107 108>;
+>                 grp-mux = <4 4>;
+>         };
 > 
-> 	pinconf_sdhci_active: pinconf-sdhci-active {
-> 		config =
-> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
-> 	};
-> 
-> 	pinconf_sdhci_suspend: pinconf-sdhci-suspend {
-> 		config =
-> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
-> 	};
+>         sd4grp: group at 1 {
+>                 grp-name = "sd4grp";
+>                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
+>                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
+>         };
+> };
 
-Those 3 nodes make sense to me.
+I'd prefer not to call these virtual groups, since "group" already has
+a meaning to the pinctrl subsystem that is somewhat different. As you've
+probably noticed, I've been using the term "pre-defined/canned pin
+configuration"!
 
-> 	pinctrl_sdhci_active: pinctrl-sdhci-active {
-> 		pinmux = <&pinmux_sdhci>;
-> 		pinconf = <&pinconf_sdhci_active>;
-> 	};
-> 
-> 	pinctrl_sdhci_suspend: pinctrl-sdhci-suspend {
-> 		pinmux = <&pinmux_sdhci>;
-> 		pinconf = <&pinconf_sdhci_suspend>;
-> 	};
+> The real problem is do we need to support individual pin mux
+> Or still using virtual pin group?
+>
+> For the way Stephen proposed, we can only support individual pin mux
+> Since IMX pins are not grouped together in HW.
 
-I think we can avoid those 2 nodes.
+I think the "mux" and "config" properties I had in my proposal should
+deal purely with raw HW entities; nothing virtual/pre-defined/canned/...
 
-> 	sdhci at c8000200 {
-> 		...
-> 		pinctrl = <&pinctrl_sdhci_active> <&pinctrl_sdhci_suspend>;
-> 		pinctrl-names = "active", "suspend";
-> 	};
-
-And rewrite that node as:
-
-sdhci at c8000200 {
-    ...
-    pinctrl = <&pinmux_sdhci> <&pinconf_sdhci_active>
-              <&pinmux_sdhci> <&pinconf_sdhci_suspend>;
-    pinctrl-names = "active", "active", "suspend", "suspend";
-};
-
-The only slight disadvantage here is that the person constructing the
-pinctrl/pinctrl-names properties needs to know to explicitly list both
-the separate mux/config phandles for each value in pinctrl-names. Still,
-this seems a reasonable compromise; the user is still picking from a
-bunch of pre-defined/canned nodes, they simply need to list 2 (or n in
-general) of them for each state.
-
-> This will be pretty useful for imx6 usdhc case, which will have 3
-> pinctrl configuration for each usdhc device (imx6 has 4 usdhc devices),
-> pinctrl-50mhz, pinctrl-100mhz and pinctrl-200mhz.  All these 3 states
-> have the exactly same pinmux settings, and only varies on pinconf.
-
-Yes, I definitely agree there's a need for this.
-
-As an aside, I wonder if the following would be any better:
-
-sdhci at c8000200 {
-    ...
-    pinctrl = <&pinmux_sdhci> <&pinconf_sdhci_active>
-              <&pinmux_sdhci> <&pinconf_sdhci_suspend>;
-    /* Number of entries in pinctrl for each in pinctrl-names */
-    pinctrl-entries = <2 2>;
-    pinctrl-names = "active", "suspend";
-};
-
-That seems more complex though.
+You can get what you're calling "virtual groups" simply by defining a
+bunch of pinmux configuration nodes in the pin controller's device node
+and exclusively referencing those in the per-device pinctrl properties.
 
 -- 
 nvpublic
