@@ -1,60 +1,104 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 17 Jan 2012 13:24:21 -0200
-Subject: [PATCH] ARM: clock-mx28: Fix end of loop condition
-In-Reply-To: <CAOMZO5BQ1BCdf2HkUXG55dtfUk-4sSZE6TqnZ+gO9zwXVWt5vw@mail.gmail.com>
-References: <1326740477-21576-1-git-send-email-fabio.estevam@freescale.com>
- <CAOMZO5B1ABUr1bqW8f_YLjtE46DBkFt1HocZVziv0barHq1TJg@mail.gmail.com>
- <201201162152.59997.marek.vasut@gmail.com>
- <CAOMZO5BQ1BCdf2HkUXG55dtfUk-4sSZE6TqnZ+gO9zwXVWt5vw@mail.gmail.com>
-Message-ID: <CAOMZO5CAkP4ugh-nLU=wqBPXTNePuxerWugd_tKxB3TDQ+0dsg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 17 Jan 2012 16:28:20 +0100
+Subject: [PATCH] at_hdmac: bugfix for enabling channel irq
+In-Reply-To: <201201171023.q0HANwSE024485@gatekeeper.vosshq.de>
+References: <201201171023.q0HANwSE024485@gatekeeper.vosshq.de>
+Message-ID: <4F159394.7040409@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/16/12, Fabio Estevam <festevam@gmail.com> wrote:
+On 01/17/2012 10:28 AM, Nikolaus Voss :
+> commit 463894705e4089d0ff69e7d877312d496ac70e5b deleted redundant
+> chan_id and chancnt initialization in dma drivers as this is done
+> in dma_async_device_register().
+> 
+> However, atc_enable_irq() relied on chan_id set before registering
+> the device, what left only channel 0 functional for this driver.
+> 
+> This patch introduces atc_enable/disable_chan_irq() as a variant
+> of atc_enable/disable_irq() with the channel as explicit argument.
+> 
+> Signed-off-by: Nikolaus Voss <n.voss@weinmann.de>
 
-> I will make more tests to confirm and post a new patch.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable <stable@vger.kernel.org>
 
-On my tests I am always getting the BUSY bit of HW_CLKCTRL_SAIF0 as 1,
-no matter the timeout I add.
+Vinod, can you please queue it in a "fixes" branch for 3.3. The stable
+tag is needed to address errors in 3.2 kernel series.
 
-BUSY bit is bit 29 of this register and matches the mx28 reference
-manual description.
+Nikolaus, thanks for your fix.
 
-Looking at the Freescale kernel this BUSY bit is defined as 1 instead.
+Best regards,
 
-If I do the change below:
+> ---
+>  drivers/dma/at_hdmac.c      |    4 ++--
+>  drivers/dma/at_hdmac_regs.h |   17 ++++++++---------
+>  2 files changed, 10 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index fcfa0a8..a60adbf 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -1286,7 +1286,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>  
+>  		tasklet_init(&atchan->tasklet, atc_tasklet,
+>  				(unsigned long)atchan);
+> -		atc_enable_irq(atchan);
+> +		atc_enable_chan_irq(atdma, i);
+>  	}
+>  
+>  	/* set base routines */
+> @@ -1353,7 +1353,7 @@ static int __exit at_dma_remove(struct platform_device *pdev)
+>  		struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+>  
+>  		/* Disable interrupts */
+> -		atc_disable_irq(atchan);
+> +		atc_disable_chan_irq(atdma, chan->chan_id);
+>  		tasklet_disable(&atchan->tasklet);
+>  
+>  		tasklet_kill(&atchan->tasklet);
+> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+> index aa4c9ae..5aa82b4 100644
+> --- a/drivers/dma/at_hdmac_regs.h
+> +++ b/drivers/dma/at_hdmac_regs.h
+> @@ -326,28 +326,27 @@ static void atc_dump_lli(struct at_dma_chan *atchan, struct at_lli *lli)
+>  }
+>  
+>  
+> -static void atc_setup_irq(struct at_dma_chan *atchan, int on)
+> +static void atc_setup_irq(struct at_dma *atdma, int chan_id, int on)
+>  {
+> -	struct at_dma	*atdma = to_at_dma(atchan->chan_common.device);
+> -	u32		ebci;
+> +	u32 ebci;
+>  
+>  	/* enable interrupts on buffer transfer completion & error */
+> -	ebci =    AT_DMA_BTC(atchan->chan_common.chan_id)
+> -		| AT_DMA_ERR(atchan->chan_common.chan_id);
+> +	ebci =    AT_DMA_BTC(chan_id)
+> +		| AT_DMA_ERR(chan_id);
+>  	if (on)
+>  		dma_writel(atdma, EBCIER, ebci);
+>  	else
+>  		dma_writel(atdma, EBCIDR, ebci);
+>  }
+>  
+> -static inline void atc_enable_irq(struct at_dma_chan *atchan)
+> +static void atc_enable_chan_irq(struct at_dma *atdma, int chan_id)
+>  {
+> -	atc_setup_irq(atchan, 1);
+> +	atc_setup_irq(atdma, chan_id, 1);
+>  }
+>  
+> -static inline void atc_disable_irq(struct at_dma_chan *atchan)
+> +static void atc_disable_chan_irq(struct at_dma *atdma, int chan_id)
+>  {
+> -	atc_setup_irq(atchan, 0);
+> +	atc_setup_irq(atdma, chan_id, 0);
+>  }
+>  
+>  
 
-diff --git a/arch/arm/mach-mxs/regs-clkctrl-mx28.h
-b/arch/arm/mach-mxs/regs-clkctrl-mx28.h
-index 7d1b061..1813ff0 100644
---- a/arch/arm/mach-mxs/regs-clkctrl-mx28.h
-+++ b/arch/arm/mach-mxs/regs-clkctrl-mx28.h
-@@ -288,7 +288,7 @@
 
- #define BP_CLKCTRL_SAIF0_CLKGATE	31
- #define BM_CLKCTRL_SAIF0_CLKGATE	0x80000000
--#define BM_CLKCTRL_SAIF0_BUSY	0x20000000
-+#define BM_CLKCTRL_SAIF0_BUSY		1
- #define BM_CLKCTRL_SAIF0_DIV_FRAC_EN	0x00010000
- #define BP_CLKCTRL_SAIF0_DIV	0
- #define BM_CLKCTRL_SAIF0_DIV	0x0000FFFF
-@@ -299,7 +299,7 @@
-
- #define BP_CLKCTRL_SAIF1_CLKGATE	31
- #define BM_CLKCTRL_SAIF1_CLKGATE	0x80000000
--#define BM_CLKCTRL_SAIF1_BUSY	0x20000000
-+#define BM_CLKCTRL_SAIF1_BUSY		1
- #define BM_CLKCTRL_SAIF1_DIV_FRAC_EN	0x00010000
- #define BP_CLKCTRL_SAIF1_DIV	0
- #define BM_CLKCTRL_SAIF1_DIV	0x0000FFFF
-
-,then audio can correctly work.
-
-Will clarify with Freescale team about this.
-
-I plan to also send a patch for replacing the for loops with a proper
-timeout mechanism as suggested by Wolfram.
-
-Regards,
-
-Fabio Estevam
+-- 
+Nicolas Ferre
