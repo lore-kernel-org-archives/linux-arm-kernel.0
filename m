@@ -1,118 +1,73 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 17 Jan 2012 15:34:21 +0100
-Subject: [PATCH 2/8] mmc: mmci: Decrease current consumption in suspend
+Date: Tue, 17 Jan 2012 15:34:23 +0100
+Subject: [PATCH 4/8] mmc: mmci: Use ios_handler to save power
 In-Reply-To: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1326810867-5346-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1326810867-5346-5-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To decrease current consumption in suspend state the
-VCORE regulator, the MCLK and PCLK for the ARM PL18x
-are now disabled.
+To disable a levelshifter when we are in an idle state will
+decrease current consumption. We make use of the ios_handler
+at runtime suspend and at regular suspend to accomplish this.
 
-When resuming the resourses are re-enabled and
-register values for MMCICLOCK, MMCIPOWER and MMCIMASK0
-are restored.
+Of course depending on the used levelshifter the decrease of
+current differs. For ST6G3244ME the value is up to ~200 uA.
 
 Tested-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mmc/host/mmci.c |   64 ++++++++++++++++++++++++++++++++++++++++++----
- 1 files changed, 58 insertions(+), 6 deletions(-)
+ drivers/mmc/host/mmci.c |   19 ++++++++++++++++++-
+ 1 files changed, 18 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 0de2f3d..cd7e144 100644
+index a7c8f8f..76ce2cd 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -1497,6 +1497,60 @@ static int __devexit mmci_remove(struct amba_device *dev)
- }
- 
- #ifdef CONFIG_SUSPEND
-+static int mmci_save(struct amba_device *dev)
-+{
-+	struct mmc_host *mmc = amba_get_drvdata(dev);
-+	unsigned long flags;
-+
-+	if (mmc) {
-+		struct mmci_host *host = mmc_priv(mmc);
-+
-+		spin_lock_irqsave(&host->lock, flags);
-+
-+		/*
-+		 * Make sure we do not get any interrupts when we disabled the
-+		 * clock and the regulator and as well make sure to clear the
-+		 * registers for clock and power.
-+		 */
-+		writel(0, host->base + MMCIMASK0);
-+		writel(0, host->base + MMCIPOWER);
-+		writel(0, host->base + MMCICLOCK);
-+
-+		spin_unlock_irqrestore(&host->lock, flags);
-+
-+		clk_unprepare(host->clk);
-+		clk_disable(host->clk);
-+		amba_vcore_disable(dev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mmci_restore(struct amba_device *dev)
-+{
-+	struct mmc_host *mmc = amba_get_drvdata(dev);
-+	unsigned long flags;
-+
-+	if (mmc) {
-+		struct mmci_host *host = mmc_priv(mmc);
-+
-+		amba_vcore_enable(dev);
-+		clk_prepare(host->clk);
-+		clk_enable(host->clk);
-+
-+		spin_lock_irqsave(&host->lock, flags);
-+
-+		/* Restore registers and re-enable interrupts. */
-+		writel(host->clk_reg, host->base + MMCICLOCK);
-+		writel(host->pwr_reg, host->base + MMCIPOWER);
-+		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
-+
-+		spin_unlock_irqrestore(&host->lock, flags);
-+	}
-+
-+	return 0;
-+}
-+
- static int mmci_suspend(struct device *dev)
+@@ -1505,10 +1505,22 @@ static int mmci_save(struct amba_device *dev)
  {
- 	struct amba_device *adev = to_amba_device(dev);
-@@ -1504,12 +1558,11 @@ static int mmci_suspend(struct device *dev)
- 	int ret = 0;
+ 	struct mmc_host *mmc = amba_get_drvdata(dev);
+ 	unsigned long flags;
++	struct mmc_ios ios;
++	int ret = 0;
  
  	if (mmc) {
--		struct mmci_host *host = mmc_priv(mmc);
--
- 		ret = mmc_suspend_host(mmc);
- 		if (ret == 0) {
- 			pm_runtime_get_sync(dev);
--			writel(0, host->base + MMCIMASK0);
-+			mmci_save(adev);
-+			amba_pclk_disable(adev);
- 		}
+ 		struct mmci_host *host = mmc_priv(mmc);
+ 
++		/* Let the ios_handler act on a POWER_OFF to save power. */
++		if (host->plat->ios_handler) {
++			memcpy(&ios, &mmc->ios, sizeof(struct mmc_ios));
++			ios.power_mode = MMC_POWER_OFF;
++			ret = host->plat->ios_handler(mmc_dev(mmc),
++						      &ios);
++			if (ret)
++				return ret;
++		}
++
+ 		spin_lock_irqsave(&host->lock, flags);
+ 
+ 		/*
+@@ -1527,7 +1539,7 @@ static int mmci_save(struct amba_device *dev)
+ 		amba_vcore_disable(dev);
  	}
  
-@@ -1523,9 +1576,8 @@ static int mmci_resume(struct device *dev)
- 	int ret = 0;
+-	return 0;
++	return ret;
+ }
  
- 	if (mmc) {
--		struct mmci_host *host = mmc_priv(mmc);
--
--		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
-+		amba_pclk_enable(adev);
-+		mmci_restore(adev);
- 		pm_runtime_put(dev);
+ static int mmci_restore(struct amba_device *dev)
+@@ -1550,6 +1562,11 @@ static int mmci_restore(struct amba_device *dev)
+ 		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
  
- 		ret = mmc_resume_host(mmc);
+ 		spin_unlock_irqrestore(&host->lock, flags);
++
++		/* Restore settings done by the ios_handler. */
++		if (host->plat->ios_handler)
++			host->plat->ios_handler(mmc_dev(mmc),
++						&mmc->ios);
+ 	}
+ 
+ 	return 0;
 -- 
 1.7.5.4
