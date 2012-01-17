@@ -1,129 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Jan 2012 10:30:23 +0000
-Subject: [PATCH 1/2] mach-ux500: cache operations are atomic on PL310
-In-Reply-To: <20120117062224.GA26832@bnru02>
-References: <1326346663-6112-1-git-send-email-srinidhi.kasagar@stericsson.com>
- <20120113181422.GB24373@mudshark.cambridge.arm.com>
- <20120116110528.GA24824@bnru02>
- <20120116145008.GH9068@mudshark.cambridge.arm.com>
- <20120117062224.GA26832@bnru02>
-Message-ID: <20120117103023.GB9230@mudshark.cambridge.arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 17 Jan 2012 11:52:28 +0100
+Subject: [PATCH] serial: amba-pl011: lock console writes against interrupts
+Message-ID: <1326797548-3353-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinidhi,
+From: Rabin Vincent <rabin.vincent@stericsson.com>
 
-On Tue, Jan 17, 2012 at 06:22:26AM +0000, Srinidhi KASAGAR wrote:
-> On Mon, Jan 16, 2012 at 15:50:08 +0100, Will Deacon wrote:
-> > The lock needs to stay. Besides, the problem isn't with inv_all, the problem
-> > is with not being able to disable the outer cache. So can't you just do
-> > something nasty like:
-> > 
-> > 	outer_cache.disable = NULL;
-> > 
-> > after your call to l2x0_init?
-> 
-> hmm..patch below
+Protect against pl011_console_write() and the interrupt for
+the console UART running concurrently on different CPUs.
 
-Thanks. Comments inline.
+Otherwise the console_write could spin for a long time
+waiting for the UART to become not busy, while the other
+CPU continuously services UART interrupts and keeps the
+UART busy.
 
-> > 
-> > Also, if you can't disable the L2 from non-secure, does that mean that you
-> > boot Linux with the L2 enabled?
-> 
-> Yes, we boot with L2 enabled.
+The checks for sysrq and oops_in_progress are taken
+from 8250.c.
 
-Interesting. I'm surprised you don't have problems with stale data on the
-D-side after the decompressor. Maybe you're lucky with the mappings being no
-write allocate.
+Cc: stable at kernel.org
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+Reviewed-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Reviewed-by: Bibek Basu <bibek.basu@stericsson.com>
+Reviewed-by: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/tty/serial/amba-pl011.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-> From 46fdbda7d2d9a9f4df0933341bcc467b3bdd03d6 Mon Sep 17 00:00:00 2001
-> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> Date: Tue, 17 Jan 2012 11:29:39 +0530
-> Subject: [PATCH] mach-ux500: Do not override outer.inv_all
-> 
-> outer.inv_all is currently being used only in kexec path.
-> Invalidating outer cache without disabling it is a big
-> nono, and so, remove the machine specific outer.inv_all
-> assuming that kexec does not call inv_all in its path.
-
-Please change this comment. Kexec doesn't do this anymore.
-
-> And at the same time it does not prevent us overriding
-> outer.disable as we do not have any such secure SMI to
-> handle the same while kexec disables the outer cache.
-> 
-> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> ---
->  arch/arm/mach-ux500/cache-l2x0.c |   48 +++++--------------------------------
->  1 files changed, 7 insertions(+), 41 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-> index 122ddde..45111c8 100644
-> --- a/arch/arm/mach-ux500/cache-l2x0.c
-> +++ b/arch/arm/mach-ux500/cache-l2x0.c
-> @@ -12,44 +12,6 @@
->  
->  static void __iomem *l2x0_base;
->  
-> -static inline void ux500_cache_wait(void __iomem *reg, unsigned long mask)
-> -{
-> -	/* wait for the operation to complete */
-> -	while (readl_relaxed(reg) & mask)
-> -		cpu_relax();
-> -}
-> -
-> -static inline void ux500_cache_sync(void)
-> -{
-> -	writel_relaxed(0, l2x0_base + L2X0_CACHE_SYNC);
-> -	ux500_cache_wait(l2x0_base + L2X0_CACHE_SYNC, 1);
-> -}
-> -
-> -/*
-> - * The L2 cache cannot be turned off in the non-secure world.
-> - * Dummy until a secure service is in place.
-> - */
-> -static void ux500_l2x0_disable(void)
-> -{
-> -}
-> -
-> -/*
-> - * This is only called when doing a kexec, just after turning off the L2
-> - * and L1 cache, and it is surrounded by a spinlock in the generic version.
-> - * However, we're not really turning off the L2 cache right now and the
-> - * PL310 does not support exclusive accesses (used to implement the spinlock).
-> - * So, the invalidation needs to be done without the spinlock.
-> - */
-> -static void ux500_l2x0_inv_all(void)
-> -{
-> -	uint32_t l2x0_way_mask = (1<<16) - 1;	/* Bitmask of active ways */
-> -
-> -	/* invalidate all ways */
-> -	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
-> -	ux500_cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
-> -	ux500_cache_sync();
-> -}
-> -
->  static int __init ux500_l2x0_unlock(void)
->  {
->  	int i;
-> @@ -85,9 +47,13 @@ static int __init ux500_l2x0_init(void)
->  	/* 64KB way size, 8 way associativity, force WA */
->  	l2x0_init(l2x0_base, 0x3e060000, 0xc0000fff);
->  
-> -	/* Override invalidate function */
-> -	outer_cache.disable = ux500_l2x0_disable;
-> -	outer_cache.inv_all = ux500_l2x0_inv_all;
-> +	/*
-> +	 * We can't disable l2 as we are in non secure mode, currently
-> +	 * this seems being called only during kexec path. So let's
-> +	 * override outer.disable with nasty assignment until we have
-> +	 * some SMI service available.
-> +	 */
-> +	outer_cache.disable = NULL;
-
-Much better!
-
-Cheers,
-
-Will
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 6958594..89178b4 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1740,9 +1740,19 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ {
+ 	struct uart_amba_port *uap = amba_ports[co->index];
+ 	unsigned int status, old_cr, new_cr;
++	unsigned long flags;
++	int locked = 1;
+ 
+ 	clk_enable(uap->clk);
+ 
++	local_irq_save(flags);
++	if (uap->port.sysrq)
++		locked = 0;
++	else if (oops_in_progress)
++		locked = spin_trylock(&uap->port.lock);
++	else
++		spin_lock(&uap->port.lock);
++
+ 	/*
+ 	 *	First save the CR then disable the interrupts
+ 	 */
+@@ -1762,6 +1772,10 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	} while (status & UART01x_FR_BUSY);
+ 	writew(old_cr, uap->port.membase + UART011_CR);
+ 
++	if (locked)
++		spin_unlock(&uap->port.lock);
++	local_irq_restore(flags);
++
+ 	clk_disable(uap->clk);
+ }
+ 
+-- 
+1.7.8
