@@ -1,35 +1,28 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Jan 2012 12:11:38 +0000
-Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
- by uBoot)?
-In-Reply-To: <WC20120117085444.17057E@terrafix.co.uk>
-References: <WC20120116100344.4204CC@terrafix.co.uk>
- <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
- <20120116105949.GG16726@n2100.arm.linux.org.uk>
- <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
- <20120116131329.GA928@n2100.arm.linux.org.uk>
- <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
- <WC20120117085444.17057E@terrafix.co.uk>
-Message-ID: <20120117121138.GC11475@arm.com>
+Date: Tue, 17 Jan 2012 12:14:14 +0000
+Subject: [PATCH] ARM: cortex-a7: move proc_info out of !CONFIG_ARM_LPAE
+ block
+In-Reply-To: <1326740096-6409-1-git-send-email-will.deacon@arm.com>
+References: <1326740096-6409-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20120117121413.GD11475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 08:54:44AM +0000, Joe Woodward wrote:
-> So, is the upshot of this that the kernel isn't going to be in a
-> position to enable the L2/outer cache on OMAP3 (due to the need for
-> hacky/unmaintainable code)?
+On Mon, Jan 16, 2012 at 06:54:56PM +0000, Will Deacon wrote:
+> The merging of commits 1b6ba46b ("ARM: LPAE: MMU setup for the 3-level
+> page table format") and b4244738 ("ARM: 7202/1: Add Cortex-A7 proc info")
+> during the merge window ended up putting the Cortex-A7 proc_info into a
+> code block guarded by !CONFIG_ARM_LPAE. This makes Cortex-A7 platforms
+> unbootable when LPAE is enabled.
 > 
-> Hence the bootloader/uBoot had better leave it enabled...
+> This patch moves the proc_info structure for Cortex-A7 outside of the
+> guarded block.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-It could but the Linux decompressor needs to be aware and either flush
-the L2 (more difficult as it doesn't have all the device information) or
-set the page table attributes to outer non-cacheable (TEX[2:0] = 0b100).
-The latter may still not work if there are stale L2 cache lines left by
-U-Boot (and that's always possible unless U-Boot also uses outer
-non-cacheable memory attributes).
-
-But I would agree with Aneesh - can we not enabled the L2 at a later
-point?
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
 -- 
 Catalin
