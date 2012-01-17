@@ -1,103 +1,67 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Tue, 17 Jan 2012 10:54:20 +0900
-Subject: [RFC PATCH 05/10] sh: intc: remove dependency on NR_IRQS
-In-Reply-To: <1326472451-9002-6-git-send-email-robherring2@gmail.com>
-References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
- <1326472451-9002-6-git-send-email-robherring2@gmail.com>
-Message-ID: <CABMQnVKfitZu01_sKeVoC94y3GjbfTHqFEZ8ANWF4PCqA6F-Ug@mail.gmail.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Tue, 17 Jan 2012 11:00:54 +0900
+Subject: [PATCH] watchdog: fix error in probe() of s3c2410_wdt (reset at
+ booting)
+In-Reply-To: <20120113214555.GA19495@infomag.iguana.be>
+References: <1326431663-4638-1-git-send-email-myungjoo.ham@samsung.com>
+ <20120113111117.GT1068@n2100.arm.linux.org.uk>
+ <20120113214555.GA19495@infomag.iguana.be>
+Message-ID: <CAJ0PZbSpL0-LNHfU7TTM06tPi1B4VgCp=oyPA06qAjp8PoPT2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jan 14, 2012 at 6:45 AM, Wim Van Sebroeck <wim@iguana.be> wrote:
+> Hi,
+>
+> On Fri, Jan 13, 2012 at 11:11:17AM +0000, Russell King - ARM Linux wrote:
+>
+>> On Fri, Jan 13, 2012 at 02:14:23PM +0900, MyungJoo Ham wrote:
+>> > Probe function of s3c2410 watchdog calls request_irq before initializing
+>> > required value (wdt_count). This incurs resetting watchdog counter value
+>> > and watchdog-reboot during booting up.
+>> >
+>> > This patch addresses such an issue by calling request_irq later.
+>> >
+>> > Error handling in probe function and calling oder in remove function are
+>> > also revised accordingly.
+>>
+>> On the other hand, this patch violates the general principle that you set
+>> the device up _before_ you publish it to userspace.
+>>
+>> In the case where you add the watchdog device, but then the subsequent
+>> request_irq() fails, there is a window where the watchdog device could
+>> be opened and started. ?You then fall out through the error paths, and
+>> the module could be removed.
+>>
+>> Don't do this. ?Always setup the device first. ?Then publish it. ?Never
+>> the other way around.
+>
+> Russell was faster in replying, but I would have given the same NAK:
+> the registering of the watchdog means that userspace get access/control over
+> the watchdog device. So the request_irq should be done before that.
+>
+> In your trouble description you wrote: "Probe function of s3c2410 watchdog
+> calls request_irq before initializing required value (wdt_count)."
+> Should we not fix the initialization of the wdt_count value instead of the
+> request_irq? i will have a look at the code somewhere this weekend.
+>
+> Mvg,
+> Wim.
+>
 
-2012/1/14 Rob Herring <robherring2@gmail.com>:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> SH intc has a compile time dependency on NR_IRQS. Make this dependency a
-> local define so that shmobile (and ARM in general) can have run-time
-> NR_IRQS setting. SH has NR_IRQS set to 512 and shmobile has NR_IRQS set to
-> 1024, so we are using the maximum.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-> ?drivers/sh/intc/balancing.c | ? ?2 +-
-> ?drivers/sh/intc/core.c ? ? ?| ? ?2 +-
-> ?drivers/sh/intc/handle.c ? ?| ? ?2 +-
-> ?drivers/sh/intc/internals.h | ? ?9 +++++++++
-> ?drivers/sh/intc/virq.c ? ? ?| ? ?2 +-
-> ?5 files changed, 13 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/sh/intc/balancing.c b/drivers/sh/intc/balancing.c
-> index cec7a96..bc78080 100644
-> --- a/drivers/sh/intc/balancing.c
-> +++ b/drivers/sh/intc/balancing.c
-> @@ -9,7 +9,7 @@
-> ?*/
-> ?#include "internals.h"
->
-> -static unsigned long dist_handle[NR_IRQS];
-> +static unsigned long dist_handle[INTC_NR_IRQS];
->
-> ?void intc_balancing_enable(unsigned int irq)
-> ?{
-> diff --git a/drivers/sh/intc/core.c b/drivers/sh/intc/core.c
-> index e53e449..2fde897 100644
-> --- a/drivers/sh/intc/core.c
-> +++ b/drivers/sh/intc/core.c
-> @@ -42,7 +42,7 @@ unsigned int nr_intc_controllers;
-> ?* - this needs to be at least 2 for 5-bit priorities on 7780
-> ?*/
-> ?static unsigned int default_prio_level = 2; ? ?/* 2 - 16 */
-> -static unsigned int intc_prio_level[NR_IRQS]; ?/* for now */
-> +static unsigned int intc_prio_level[INTC_NR_IRQS]; ? ? /* for now */
->
-> ?unsigned int intc_get_dfl_prio_level(void)
-> ?{
-> diff --git a/drivers/sh/intc/handle.c b/drivers/sh/intc/handle.c
-> index 057ce56..f461d53 100644
-> --- a/drivers/sh/intc/handle.c
-> +++ b/drivers/sh/intc/handle.c
-> @@ -13,7 +13,7 @@
-> ?#include <linux/spinlock.h>
-> ?#include "internals.h"
->
-> -static unsigned long ack_handle[NR_IRQS];
-> +static unsigned long ack_handle[INTC_NR_IRQS];
->
-> ?static intc_enum __init intc_grp_id(struct intc_desc *desc,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?intc_enum enum_id)
-> diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
-> index b0e9155..469f092 100644
-> --- a/drivers/sh/intc/internals.h
-> +++ b/drivers/sh/intc/internals.h
-> @@ -6,6 +6,15 @@
-> ?#include <linux/radix-tree.h>
-> ?#include <linux/device.h>
->
-> +#define INTC_NR_IRQS ? 1024
+Yes, if we set wdt_count value properly before request_irq, it's fine.
 
-On SH, INTC_NR_IRQS ( NR_IRQS )  is using to by arch/sh/kernel/machvec.c.
-And, this is defined by arch/sh/include/asm/irq.h.
-You need to remove or rename from these.
+Anyway, as registering the device (watchdog_register_device()) may be
+done after request_irq without any problem, moving request_irq right
+before it, not after it should be fine.
 
-> +
-> +#ifndef evt2irq
-> +#define evt2irq(evt) ? ? ? ? ? ?(((evt) >> 5) - 16)
-> +#endif
-> +#ifndef irq2evt
-> +#define irq2evt(irq) ? ? ? ? ? ?(((irq) + 16) << 5)
-> +#endif
-> +
+Thank you.
 
-These are defined in arch/arm/mach-shmobile/include/mach/irqs.h and
-arch/sh/include/asm/irq.h.
 
-I propose that linux/sh_intc.h defines these.
 
-Best regards,
-  Nobuhiro
+Cheers!
+MyungJoo.
 
 -- 
-Nobuhiro Iwamatsu
-?? iwamatsu at {nigauri.org / debian.org}
-?? GPG ID: 40AD1FA6
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab, DMC Business, Samsung Electronics
