@@ -1,87 +1,44 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 17 Jan 2012 11:28:50 -0800
+Date: Tue, 17 Jan 2012 11:32:37 -0800
 Subject: Pinmux bindings proposal
-In-Reply-To: <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
+In-Reply-To: <20120117141322.GA31687@S2101-09.ap.freescale.net>
 References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
  <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
  <20120117082334.GA31295@S2101-09.ap.freescale.net>
  <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
+ <20120117141322.GA31687@S2101-09.ap.freescale.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17801D22FA@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dong Aisheng wrote at Tuesday, January 17, 2012 2:47 AM:
-> Shawn Guo wrote at Tuesday, January 17, 2012 4:24 PM:
-> > On Mon, Jan 16, 2012 at 12:50:02PM +0000, Dong Aisheng-B29396 wrote:
-> > > Stephen Warren wrote:
-> > ...
-> > > >                         mux =
-> > > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
-> > > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>
-> > > >                                 /* Syntax example */
-> > > >                                 <&foo_pmx FOO_PMX_PG_X FOO_PMX_MUX_0>;
-> > >
-> > > I'm still think how do we construct the pinmux map for such binding.
-> > > The format you're using is:
-> > > <&pmx_controller_phandle muxable_entity_id selected_function> For
-> > > contruct pinmux map, we need to know at least 3 things for a device:
-> > > a) pinctrl device b) function name c) group name.
-> > > For a, we can get it from this binding.
-> > > But for b and c, since they are constants, how to convert to name string?
-> >
-> > I guess, for function name, it should be retrieved from the client device node,
-> > and for the group name, it should be retrieved from the node here.
+Shawn Guo wrote at Tuesday, January 17, 2012 7:13 AM:
+> On Tue, Jan 17, 2012 at 09:46:42AM +0000, Dong Aisheng-B29396 wrote:
+> ...
+> > I guess Stephen's idea is to retrieving the function name and group name
+> > From the pinctrl driver since Tagre prefers to define those things in driver
+> > Rather than in board file or soc.dts file.
+> > But it does not fit for IMX since we define it in soc.dts.
 >
-> I guess Stephen's idea is to retrieving the function name and group name
-> From the pinctrl driver since Tagre prefers to define those things in driver
-> Rather than in board file or soc.dts file.
-> But it does not fit for IMX since we define it in soc.dts.
+> Hmm, when he came up with this proposal and said it should work for
+> Tegra, I assume he plans to move those from Tegra pinctrl driver into
+> device tree.  Stephen?
 
-You can still get the data from the driver, even if the driver got the
-data from the DT instead of static tables.
+I plan to have the following:
 
-> > For above example, the function name can be picked from sdhci device node
-> > pinctr-names property I proposed,
->
-> If I understand correctly, the pinctrl-names property you proposed represents
-> The pin group state.
+tegra20.dtsi:
 
-Yes, that's my understanding.
+A regular device node for the pin controller, listing just the basic
+device tree properties: "compatible" and "regs".
 
-...
-> And in this way we're still using virtual groups.
-> It has no big difference as we did before like:
-> pinmux-groups {
->         uart4grp: group at 0 {
->                 grp-name = "uart4grp";
->                 grp-pins = <107 108>;
->                 grp-mux = <4 4>;
->         };
-> 
->         sd4grp: group at 1 {
->                 grp-name = "sd4grp";
->                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
->                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
->         };
-> };
+${board}.dts:
 
-I'd prefer not to call these virtual groups, since "group" already has
-a meaning to the pinctrl subsystem that is somewhat different. As you've
-probably noticed, I've been using the term "pre-defined/canned pin
-configuration"!
+Each device node lists its pin mux/config setup using the bindings we
+decide upon.
 
-> The real problem is do we need to support individual pin mux
-> Or still using virtual pin group?
->
-> For the way Stephen proposed, we can only support individual pin mux
-> Since IMX pins are not grouped together in HW.
+drivers/pinctrl/pinctrl-tegra20.c:
 
-I think the "mux" and "config" properties I had in my proposal should
-deal purely with raw HW entities; nothing virtual/pre-defined/canned/...
-
-You can get what you're calling "virtual groups" simply by defining a
-bunch of pinmux configuration nodes in the pin controller's device node
-and exclusively referencing those in the per-device pinctrl properties.
+Static tables listing all pins, pin groups, mux functions, and pin
+configuration options that Tegra supports.
 
 -- 
 nvpublic
