@@ -1,86 +1,304 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Tue, 17 Jan 2012 10:41:41 +0100
-Subject: [PATCH 2/2] ARM: sa1100: Refactor mcp-sa11x0 to use platform
- resources.
-In-Reply-To: <20120114092129.GO1068@n2100.arm.linux.org.uk>
-References: <1322427655-914-1-git-send-email-jochen@scram.de>
- <1322427655-914-2-git-send-email-jochen@scram.de>
- <20120114092129.GO1068@n2100.arm.linux.org.uk>
-Message-ID: <4F154255.2020605@scram.de>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Tue, 17 Jan 2012 09:46:42 +0000
+Subject: Pinmux bindings proposal
+In-Reply-To: <20120117082334.GA31295@S2101-09.ap.freescale.net>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20120117082334.GA31295@S2101-09.ap.freescale.net>
+Message-ID: <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawn.guo at linaro.org]
+> Sent: Tuesday, January 17, 2012 4:24 PM
+> To: Dong Aisheng-B29396
+> Cc: Stephen Warren; linus.walleij at stericsson.com; s.hauer at pengutronix.de;
+> rob.herring at calxeda.com; kernel at pengutronix.de; cjb at laptop.org; Simon Glass
+> (sjg at chromium.org); Dong Aisheng; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree-discuss at lists.ozlabs.org
+> Subject: Re: Pinmux bindings proposal
+> Importance: High
+> 
+> On Mon, Jan 16, 2012 at 12:50:02PM +0000, Dong Aisheng-B29396 wrote:
+> ...
+> > >                 /*
+> > >                  * The actual definition of the complete state of the
+> > >                  * pinmux as required by some driver.
+> > >                  *
+> > >                  * These can be either directly in the device node, or
+> > >                  * somewhere in tegra20.dtsi in order to provide pre-
+> > >                  * selected/common configurations. Hence, they're referred
+> > >                  * to by phandle above.
+> > >                  */
+> > >                 pmx_sdhci_active: {
+> > >                         /*
+> > >                          * Pin mux settings. Mandatory?
+> > Mandatory for what?
+> >
+> > >                          * Not mandatory if the 1:1 mentioned above is
+> > >                          * extended to 1:n.
+> > >                          *
+> > >                          * Format is <&pmx_controller_phandle
+> muxable_entity_id
+> > >                          * selected_function>.
+> > >                          *
+> > >                          * The pmx phandle is required since there may be
+> more
+> > >                          * than one pinmux controller in the system. Even if
+> > >                          * this node is inside the pinmux controller itself,
+> I
+> > >                          * think it's simpler to just always have this field
+> > >                          * present in the binding for consistency.
+> > >                          *
+> > >                          * Alternative: Format is <&pmx_controller_phandle
+> > >                          * pmx_controller_specific_data>. In this case, the
+> > >                          * pmx controller needs to define #pinmux-mux-cells,
+> > >                          * and provide the pinctrl core with a mapping
+> > >                          * function to handle the rest of the data in the
+> > >                          * property. This is how GPIOs and interrupts work.
+> > >                          * However, this will probably interact badly with
+> > >                          * wanting to parse the entire pinmux map early in
+> > >                          * boot, when perhaps the pinctrl core is
+> initialized,
+> > >                          * but the pinctrl driver itself is not.
+> > >                          */
+> > >                         mux =
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>
+> > >                                 /* Syntax example */
+> > >                                 <&foo_pmx FOO_PMX_PG_X
+> > > FOO_PMX_MUX_0>;
+> > I'm still think how do we construct the pinmux map for such binding.
+> > The format you're using is:
+> > <&pmx_controller_phandle muxable_entity_id selected_function> For
+> > contruct pinmux map, we need to know at least 3 things for a device:
+> > a) pinctrl device b) function name c) group name.
+> > For a, we can get it from this binding.
+> > But for b and c, since they are constants, how to convert to name string?
+> >
+> I guess, for function name, it should be retrieved from the client device node,
+> and for the group name, it should be retrieved from the node here.
+> 
+I guess Stephen's idea is to retrieving the function name and group name
+>From the pinctrl driver since Tagre prefers to define those things in driver
+Rather than in board file or soc.dts file.
+But it does not fit for IMX since we define it in soc.dts.
 
-On 14.01.2012 10:21, Russell King - ARM Linux wrote:
+> For above example, the function name can be picked from sdhci device node
+> pinctr-names property I proposed,
+If I understand correctly, the pinctrl-names property you proposed represents
+The pin group state.
+ 
+> and the group name can just be
+> 'pmx_sdhci_active', which is not a very nice name here and reminds me the
+> following point.
+> 
+No, I don't think it's suitable for group name since pmx_sdhci_active is not a
+group node (actually it includes many groups).
 
-> I should have spotted this patch earlier.
+> Considering the different pinctrl configurations for the same client device
+> usually share the same pinmux and only pinconf varies. 
+I have the same doubts before.
+Is there a real case that device has the different pinmux in different state?
+Stephen?
 
-Sorry for my late response as well.
+> It may worth introducing
+> another level phandle reference.  Something like the following:
+> 
+> 	pinmux_sdhci: pinmux-sdhci {
+> 		mux =
+> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
+> 	};
+> 
+> 	pinconf_sdhci_active: pinconf-sdhci-active {
+> 		config =
+> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+> 	};
+> 
+> 	pinconf_sdhci_suspend: pinconf-sdhci-suspend {
+> 		config =
+> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+> 	};
+> 
+The config makes sense to me.
+The only question is how to get group name to match with the predefined groups.
 
-> This is the obviously wrong approach - if you're having to add the same
-> code to almost every board, then you're doing something wrong.
+Besides per pin group configuration support, we may also want per pin configuration
+Support as the latest patch sent by Linus.
+http://www.spinics.net/lists/arm-kernel/msg155712.html
 
-Accessing some random SoC registers and in the assabet case even board
-specific registers from device drivers is even worse IMHO. We don't get 
-a clean solution until we have a pinmux/pinctrl device driver owning 
-these peripheral control registers. At least having the setup in the 
-board files avoids a potential race condition accessing PPDR and PPSR 
-registers from multiple drivers.
+> 	pinctrl_sdhci_active: pinctrl-sdhci-active {
+> 		pinmux = <&pinmux_sdhci>;
+> 		pinconf = <&pinconf_sdhci_active>;
+> 	};
+> 
+> 	pinctrl_sdhci_suspend: pinctrl-sdhci-suspend {
+> 		pinmux = <&pinmux_sdhci>;
+> 		pinconf = <&pinconf_sdhci_suspend>;
+> 	};
+> 
+> 	sdhci at c8000200 {
+> 		...
+> 		pinctrl = <&pinctrl_sdhci_active> <&pinctrl_sdhci_suspend>;
+> 		pinctrl-names = "active", "suspend";
+> 	};
+> 
+> This will be pretty useful for imx6 usdhc case, which will have 3 pinctrl
+> configuration for each usdhc device (imx6 has 4 usdhc devices), pinctrl-50mhz,
+> pinctrl-100mhz and pinctrl-200mhz.  All these 3 states have the exactly same
+> pinmux settings, and only varies on pinconf.
+> 
+> > >                          /*
+> > >                          * Pin configuration settings. Optional.
+> > >                          *
+> > >                          * Format is <&pmx_controller_phandle
+> muxable_entity_id
+> > >                          * configuration_option configuration_value>.
+> > >                          */
+> > >                         config =
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_SLEW_RATE 4>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_SLEW_RATE 8>;
+> > >                         /*
+> > >                          * Perhaps allow additional custom properties here
+> to
+> > >                          * express things we haven't thought of. The pinctrl
+> > >                          * drivers would be responsible for parsing them.
+> > >                          */
+> > >                 };
+> > >                 pmx_sdhci_standby: {
+> > >                         mux =
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> TEGRA_PMX_MUX_1>;
+> > >                         config =
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_TRISTATE 1>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_TRISTATE 1>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_SLEW_RATE 4>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_SLEW_RATE 8>;
+> > >                 };
+> > >         };
+> > > };
+> > >
+> > > Integer IDs for "muxable entities": Pins on IMX, pin groups on Tegra:
+> > >
+> > If "muxable entities" is pins on IMX, I'm wondering how we define the
+> > predefined Functions and groups or if we still need to do that.
+> >
+> Let's put this in the example below.
+> 
+> 	pinmux_usdhc1: pinmux-usdhc1 {
+> 		mux = <IMX6Q_PAD_SD1_DAT1 0>
+> 		      <IMX6Q_PAD_SD1_DAT2 0>
+> 		      ...
+> 	};
+> 
+Yes, I agree.
+And in this way we're still using virtual groups.
+It has no big difference as we did before like:
+pinmux-groups {
+        uart4grp: group at 0 {
+                grp-name = "uart4grp";
+                grp-pins = <107 108>;
+                grp-mux = <4 4>;
+        };
 
->
-> Not only that, but...
->
->>   static struct resource sa11x0mcp_resources[] = {
->>   	[0] = {
->>   		.start	= __PREG(Ser4MCCR0),
->> -		.end	= __PREG(Ser4MCCR0) + 0xffff,
->> +		.end	= __PREG(Ser4MCCR0) + 0x1C - 1,
->
-> Please leave this as +0xffff - we treat all devices has having 64K
-> resources on sa11x0 platforms.  (It's possible that the registers
-> repeat throughout the memory space.)
+        sd4grp: group at 1 {
+                grp-name = "sd4grp";
+                grp-pins = <170 171 180 181 182 183 184 185 186 187>;
+                grp-mux = <0 0 1 1 1 1 1 1 1 1>;
+        };
+};
 
-OK, but...
+The real problem is do we need to support individual pin mux
+Or still using virtual pin group?
+For the way Stephen proposed, we can only support individual pin mux
+Since IMX pins are not grouped together in HW.
 
->>   		.flags	= IORESOURCE_MEM,
->>   	},
->>   	[1] = {
->> +		.start	= __PREG(Ser4MCCR1),
->> +		.end	= __PREG(Ser4MCCR1) + 0x4 - 1,
->> +		.flags	= IORESOURCE_MEM,
->> +	},
+> 	pinconf_usdhc1_50mhz: pinconf-usdhc1-50mhz {
+> 		config = <IMX6Q_PAD_SD1_DAT1 IMX6Q_PAD_CONF_ALL 0x834>
+> 			 <IMX6Q_PAD_SD1_DAT2 IMX6Q_PAD_CONF_ALL 0x834>
+> 			 ...
+> 	};
+> 
+> 	pinconf_usdhc1_100mhz: pinconf-usdhc1-100mhz {
+> 		config = <IMX6Q_PAD_SD1_DAT1 IMX6Q_PAD_CONF_ALL 0x330>
+> 			 <IMX6Q_PAD_SD1_DAT2 IMX6Q_PAD_CONF_ALL 0x330>
+> 			 ...
+> 	};
+> 
+> 	pinconf_usdhc1_200mhz: pinconf-usdhc1-200mhz {
+> 		config = <IMX6Q_PAD_SD1_DAT1 IMX6Q_PAD_CONF_ALL 0x334>
+> 			 <IMX6Q_PAD_SD1_DAT2 IMX6Q_PAD_CONF_ALL 0x334>
+> 			 ...
+> 	};
+> 
+> 	pinctrl_usdhc1_50mhz: pinctrl-usdhc1-50mhz {
+> 		pinmux = <&pinmux_usdhc1>;
+> 		pinconf = <&pinconf_usdhc1_50mhz>;
+> 	};
+> 
+> 	pinctrl_usdhc1_100mhz: pinctrl-usdhc1-100mhz {
+> 		pinmux = <&pinmux_usdhc1>;
+> 		pinconf = <&pinconf_usdhc1_100mhz>;
+> 	};
+> 
+> 	pinctrl_usdhc1_200mhz: pinctrl-usdhc1-200mhz {
+> 		pinmux = <&pinmux_usdhc1>;
+> 		pinconf = <&pinconf_usdhc1_200mhz>;
+> 	};
+> 
+> 	usdhc at 02190000 { /* uSDHC1 */
+> 		...
+> 		pinctrl = <&usdhc1_50mhz>, <&usdhc1_100mhz>, <&usdhc1_200mhz>;
+> 		pinctrl-names = "usdhc1-50mhz", "usdhc1-100mhz", "usdhc1-200mhz";
+> 	};
+> 
+> In this example, we have 3 functions/states for client device usdhc1, "usdhc1-
+> 50mhz", "usdhc1-100mhz", and "usdhc1-200mhz".  The group is being defined by
+> enumerating the pins in property 'mux' of node pinmux_usdhc1.
+> 
+Yes, It's still under development by Linus.
+The last patch Linus sent still does not support state change for specific device.
+But the method is ok to me.
 
-How to treat this case then? Here one register is "borrowed" from a 
-different 64K block.
-The old driver version didn't even register access to this memory space.
+> > >     TEGRA_PMX_PG_DTA
+> > >     TEGRA_PMX_PG_DTD
+> > >
+> > > Each individual pinmux driver's bindings needs to define what each
+> > > integer ID represents.
+> > >
+> > Does it mean both pinmux driver and soc.dtsi file need define those
+> > macros if dtc Supports constants?
+> >
+> Yes, I think it does.  But we should try to work out some way letting dts and
+> linux driver include the same header file to avoid maintaining two copies of the
+> same data.
+> 
+I'm also care about the potential consistent issue.
 
-> 	void __iomem *
->
-> Note the '__iomem'.  That must stay with the cookie.  Check your code
-> with sparse.
-
-OK, will do.
-
->> +	__raw_writel(priv->mccr0, priv->mccr0_base + MCCR0);
->
-> writel?  writel_relaxed?
-
-writel_relaxed should be fine. The old version didn't use any barriers, 
-so I assume that's OK. I'll check if reorders would cause any problem.
-
->> +	size0 = res_mem0->end - res_mem0->start + 1;
->
-> resource_size() ?
-
-Jamie pointed me to this already. I'll change this.
-
->> +	priv->mccr0_base = ioremap(res_mem0->start, size0);
->> +	priv->mccr1_base = ioremap(res_mem1->start, size1);
->
-> You want to oops the kernel?  Where's the error checking?
-
-Good catch!
-
-Thanks for the review,
-Jochen
+Regards
+Dong Aisheng
