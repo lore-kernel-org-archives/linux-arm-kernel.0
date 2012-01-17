@@ -1,56 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Jan 2012 14:18:50 +0000
-Subject: [PATCH] ARM: proc-v7: remove harvard cache stuff
-In-Reply-To: <20120105094857.GA21121@arm.com>
-References: <20120103175814.GG22876@arm.com>
- <1325745462-6560-1-git-send-email-shawn.guo@linaro.org>
- <20120105094857.GA21121@arm.com>
-Message-ID: <20120117141846.GA23404@mudshark.cambridge.arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 17 Jan 2012 14:23:07 +0000
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <20120117134143.GF11475@arm.com> (Catalin Marinas's message of
+ "Tue, 17 Jan 2012 13:41:43 +0000")
+References: <WC20120116100344.4204CC@terrafix.co.uk>
+ <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
+ <20120116105949.GG16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+ <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+ <WC20120117085444.17057E@terrafix.co.uk>
+ <20120117121138.GC11475@arm.com> <4F15692D.4070100@ti.com>
+ <20120117134143.GF11475@arm.com>
+Message-ID: <yw1xhazuxvas.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2012 at 09:48:58AM +0000, Catalin Marinas wrote:
-> On Thu, Jan 05, 2012 at 06:37:42AM +0000, Shawn Guo wrote:
-> > The harvard cache related comment and code in proc-v7.S were copied
-> > from proc-v6.S by mistake, so let's remove them.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  arch/arm/mm/proc-v7.S |    7 -------
-> >  1 files changed, 0 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index e70a737..59a4077 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -271,10 +271,6 @@ ENDPROC(cpu_v7_do_resume)
-> >   *	Initialise TLB, Caches, and MMU state ready to switch the MMU
-> >   *	on.  Return in r0 the new CP15 C1 control register setting.
-> >   *
-> > - *	We automatically detect if we have a Harvard cache, and use the
-> > - *	Harvard cache control instructions insead of the unified cache
-> > - *	control instructions.
-> > - *
-> >   *	This should be able to cover all ARMv7 cores.
-> >   *
-> >   *	It is assumed that:
-> > @@ -373,9 +369,6 @@ __v7_setup:
-> >  #endif
-> >  
-> >  3:	mov	r10, #0
-> > -#ifdef HARVARD_CACHE
-> > -	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
-> > -#endif
+Catalin Marinas <catalin.marinas@arm.com> writes:
+
+> On Tue, Jan 17, 2012 at 12:27:25PM +0000, Aneesh V wrote:
 > 
-> I thought we still need to invalidate the I-cache, maybe moving it
-> higher up after the v7_flush_dcache_all call.
+>> But I thought enabling L2$ again in kernel is the cleaner solution.
+>
+> Why? It gets enabled via SCTLR.M together with L1.
 
-I agree. Although this does seem to be working without the invalidation,
-this might just be because everything tends to be shiny when we boot up.
+Not if the L2EN bit of the auxiliary control register was cleared, and
+u-boot messes with this bit.
 
-Is anybody planning to follow up on this patch? I can't see it in any of the
-trees that I'm tracking.
-
-Thanks,
-
-Will
+-- 
+M?ns Rullg?rd
+mans at mansr.com
