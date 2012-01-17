@@ -1,37 +1,81 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 17 Jan 2012 11:35:50 -0800
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <20120114011029.GC1810@S2101-09.ap.freescale.net>
-References: <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
- <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A76A@HQMAIL01.nvidia.com>
- <CAA+hA=RCmctmQJU4-k7YhzQDMi8KuyisBqOFhuMd3RV4_E=gCA@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D1FAB@HQMAIL01.nvidia.com>
- <20120114011029.GC1810@S2101-09.ap.freescale.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17801D22FB@HQMAIL01.nvidia.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 17 Jan 2012 14:39:11 -0500 (EST)
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <CAMQu2gyCcGYk0tC_g2R9+OBYCvwupcjuUkRC5JxJ7maAVTs1YA@mail.gmail.com>
+References: <20120116105949.GG16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+ <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+ <WC20120117085444.17057E@terrafix.co.uk> <20120117121138.GC11475@arm.com>
+ <4F15692D.4070100@ti.com>
+ <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+ <20120117133918.GE11475@arm.com>
+ <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+ <20120117162720.GG11475@arm.com>
+ <CAMQu2gyCcGYk0tC_g2R9+OBYCvwupcjuUkRC5JxJ7maAVTs1YA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1201171425060.2722@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote at Friday, January 13, 2012 6:11 PM:
-> On Fri, Jan 13, 2012 at 10:33:21AM -0800, Stephen Warren wrote:
-> > So of_device_alloc(), which is called by of_platform_populate() for each
-> > device, already parses basic DT content such as reg and interrupts, and
-> > converts them to Linux resources. I'd consider parsing any pinmux properties
-> > and registering them with the pinctrl subsystem to be of a similar nature,
-> > so adding some code to of_device_alloc() that calls a core pinmux function
-> > to parse the DT node seems reasonable to me.
->
-> I hardly believe that device tree maintainers would agree here.
-> Grant, Rob?
+On Tue, 17 Jan 2012, Shilimkar, Santosh wrote:
 
-I'm explicitly putting Grant and Rob on the To line here to make this
-question stand out to them.
+> On Tue, Jan 17, 2012 at 5:27 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > BTW, does the firmware make any checks on what bits it allows to be set?
+> > Some of them may have security implications (and may not even be
+> > documented).
+> >
+> > Anyway, the first step is this API provided by the secure firmware.
+> > Since such API may need to be called before the MMU is initialised,
+> > Linux would need to have knowledge of the platform type early on. Having
+> > some platform hook (asm macro) to call early on wouldn't work with the
+> > single zImage configuration. Stack space is not an issue as we already
+> > have one for ARMv7 for D-cache flushing (XIP kernels would work but they
+> > aren't that many).
+> >
+> That's true.
 
--- 
-nvpublic
+That stack is ugly and _does_ break XIP (even if there aren't that many 
+if at all on ARMv7).  Since we're already writing to RAM while setting 
+up the initial page table and therefore we did the necessary work to 
+locate it already, we could as well put a temporary stack for early 
+usage right below the page table.
+
+> >> Firmware point is actually irrelevant for OMAP since it can't be
+> >> changed once it is ROMed.
+> >>
+> >> Patching in boot-loaders isn't an option either since every customers
+> >> prefers to use there own boot-loader and then controlling this vital
+> >> bits is impossible.
+> >>
+> >> So I re-iterate that we need to have solution to this problem.
+> >
+> > I don't disagree with this, a solution is needed. In the past I was for
+> > having platform hooks in the early kernel code path but in the light of
+> > latest kernel developments (FDT, single zImage), I no longer see this as
+> > acceptable.
+> >
+> Thanks for acknowledging the problem. Not allowing such hooks for single
+> zImage doesn't seems to be right. Nobody ships kernel build for all socs,
+> and it's usage is really limited to few distro's. But that's different topic.
+
+No, I think this is right on topic.  If nobody ships a kernel for 
+multiple SOCs, this is because right now this can't be done.  But 
+distros are craving for this ability.
+
+> How about allowing platform hooks for single SOC builds. I mean having
+> this code under !single_zImage or something like that. That way we don't
+> impact the single zImage efforts and also allow socs to have all those
+> critical, vital bits enabled for the SOC specific builds.
+
+Absolutely not!  Because if we start doing that, people will get lazy 
+and no platform will ever work in a multi-SOC kernel.
+
+If your SOC require some fancy setup that is not shared by other 
+platforms then please abstract that into the bootloader, or make sure it 
+can be deferred later on.
+
+
+
+Nicolas
