@@ -1,61 +1,55 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 17 Jan 2012 21:45:35 +0100
-Subject: [PATCH v2 1/2] PM / Domains: Add OF support
-In-Reply-To: <001e01ccd4e8$d04b03a0$70e10ae0$%kim@samsung.com>
-References: <1325931055-14486-1-git-send-email-thomas.abraham@linaro.org>
- <201201082223.18603.rjw@sisk.pl>
- <001e01ccd4e8$d04b03a0$70e10ae0$%kim@samsung.com>
-Message-ID: <201201172145.35407.rjw@sisk.pl>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 17 Jan 2012 15:45:48 -0500 (EST)
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <CAMQu2gwjOuGadqsGqcpHvdH-Jhhj6cchyoZJMMsOQ20SXsKDOw@mail.gmail.com>
+References: <20120116105949.GG16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+ <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+ <WC20120117085444.17057E@terrafix.co.uk> <20120117121138.GC11475@arm.com>
+ <4F15692D.4070100@ti.com>
+ <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+ <20120117133918.GE11475@arm.com>
+ <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+ <20120117162720.GG11475@arm.com>
+ <CAMQu2gyCcGYk0tC_g2R9+OBYCvwupcjuUkRC5JxJ7maAVTs1YA@mail.gmail.com>
+ <alpine.LFD.2.02.1201171425060.2722@xanadu.home>
+ <CAMQu2gwjOuGadqsGqcpHvdH-Jhhj6cchyoZJMMsOQ20SXsKDOw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1201171536470.2722@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 17, 2012, Kukjin Kim wrote:
-> Rafael J. Wysocki wrote:
-> > 
-> > On Saturday, January 07, 2012, Thomas Abraham wrote:
-> > > A device node pointer is added to generic pm domain structure to
-> > associate
-> > > the domain with a node in the device tree. The platform code parses the
-> > > device tree to find available nodes representing the generic power
-> > domain,
-> > > instantiates the available domains and initializes them by calling
-> > > pm_genpd_init().
-> > >
-> > > Nodes representing the devices include a phandle of the power domain to
-> > > which it belongs. As these devices get instantiated, the driver code
-> > > checkes for availability of a power domain phandle, converts the phandle
-> > > to a device node and uses the new pm_genpd_of_add_device() api to
-> > > associate the device with a power domain.
-> > >
-> > > pm_genpd_of_add_device() runs through its list of registered power
-> > domains
-> > > and matches the OF node of the domain with the one specified as the
-> > > parameter. If a match is found, the device is associated with the
-> > matched
-> > > domain.
-> > >
-> > > Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> > 
-> > I can take this patch for 3.4, but your [2/2] depends on it, so I'm not
-> > sure how to handle that.  If you want me to take the other patch too,
-> > it'll need ACKs from the Exynos maintaniers.
-> > 
-> Hi Rafael,
-> 
-> Basically, looks ok to me.
-> 
-> But it would be good if [v3 2/2] patch of this series (this patch) could be
-> applied in samsung tree to avoid conflicts as it modifies many files. I
-> don't want to make a trouble when sending my tree to upstream. Of course, as
-> you said, this have a dependency with [v2 1/2]. So if you're ok, let me
-> create topic branch will have both(1/2 and 2/2) to merge in your tree.
-> 
-> How do you think?
+On Tue, 17 Jan 2012, Shilimkar, Santosh wrote:
 
-That would work for me too.
+> On Tue, Jan 17, 2012 at 8:39 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Tue, 17 Jan 2012, Shilimkar, Santosh wrote:
+> >
+> >> How about allowing platform hooks for single SOC builds. I mean having
+> >> this code under !single_zImage or something like that. That way we don't
+> >> impact the single zImage efforts and also allow socs to have all those
+> >> critical, vital bits enabled for the SOC specific builds.
+> >
+> > Absolutely not! ?Because if we start doing that, people will get lazy
+> > and no platform will ever work in a multi-SOC kernel.
+> >
+> > If your SOC require some fancy setup that is not shared by other
+> > platforms then please abstract that into the bootloader, or make sure it
+> > can be deferred later on.
+> >
+> There is nothing fancy here. It's an ARM security architecture feature which
+> OMAP implements. Have given enough reason about boot-loaders issues.
 
-Thanks,
-Rafael
+I was not convinced by those reasons. Just push harder on the bootloader 
+side.  There is _no_ reason for the bootloader not to take care of this 
+very platform specific issue.  You can even do it into a standalone 
+uImage that returns to u-Boot after it is done with its magic.
+
+> Is OMAP getting beaten up here just because it uses ARM security
+> feature and implements it's mechanics?
+
+I don't care if this is OMAP, UX500 or i.MX.  There is a line to be 
+drawn and this is just too bad if you are trying to cross it.
+
+
+Nicolas
