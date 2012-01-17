@@ -1,308 +1,118 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Tue, 17 Jan 2012 22:05:24 +0100
-Subject: [RFC PATCH v2 7/8] media: video: introduce object detection driver
- module
-In-Reply-To: <CACVXFVPqntLKoyLxY2xeya3mZx_1vh-QQQCp=N2-vC9tooKwOA@mail.gmail.com>
-References: <1323871214-25435-1-git-send-email-ming.lei@canonical.com>	<1323871214-25435-8-git-send-email-ming.lei@canonical.com>	<4EFCA06C.7050307@gmail.com>
- <CACVXFVPqntLKoyLxY2xeya3mZx_1vh-QQQCp=N2-vC9tooKwOA@mail.gmail.com>
-Message-ID: <4F15E294.2000806@gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 17 Jan 2012 22:10:51 +0100
+Subject: [PATCH v2 0/8] S3C24XX: remove global plat/s3c24??.h SoC-headers
+Message-ID: <201201172210.51953.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2012 09:13 AM, Ming Lei wrote:
->>> +
->>> +int odif_open(struct file *file)
->>> +{
->>> +     struct odif_dev *dev = video_drvdata(file);
->>> +
->>> +     kref_get(&dev->ref);
->>> +     return v4l2_fh_open(file);
->>> +}
->>
->> Individual drivers may need to perform some initialization when
->> device node is opened. So I consider taking this possibility away
->> from them not a good idea.
-> 
-> OK, it can be handled easily by introducing new callbacks(such as.
-> .open_detect and .close_detect for close) in struct odif_ops.
+The plat-samsung/s3c24??.h headers contain function declarations that are
+private to the relevant SoCs.
 
-Certainly, we can introduce plenty of new callbacks, another levels of 
-indirection that would just obfuscate things. It should rather be done 
-like v4l2-mem2mem does, where file operation handlers are implemented 
-by each driver and from their open()/close() handlers relevant init
-and release functions are called (v4l2_m2m_init/v4l2_m2m_release).
+This patchset follows the work started by Kukjin Kim for newer Samsung-SoCs
+and moves them from a global space to their SoC directories.
 
-I think we can always change the kernel interfaces once there is more 
-devices like OMAP4 FDIF. It may look easy for you when you refer to 
-just one hardware implementation with your theoretically generic module. 
-Or have you referred to other devices than OMAP4 FDIF when designing it ?
+The the only non-mach user of these files is plat-s3c24xx/cpu.c . It seemes
+to have been built to generalize the init of S3C24XX-SoCs, but in reality
+its savings are rather low and introduce ifdef-voodoo to distinguish i.e.
+between S3C2412 and S3C2416.
 
->>> +static int vidioc_g_od_result(struct file *file, void *priv,
->>> +                                     struct v4l2_od_result *f)
->>> +{
->>> +     struct odif_dev *dev = video_drvdata(file);
->>> +     unsigned long flags;
->>> +     struct v4l2_odif_result *tmp;
->>> +     struct v4l2_odif_result *fr = NULL;
->>> +     unsigned int cnt = 0;
->>> +     int ret = -EINVAL;
->>> +
->>> +     spin_lock_irqsave(&dev->lock, flags);
->>> +     list_for_each_entry(tmp,&dev->odif_dq.complete, list)
->>> +             if (tmp->frm_seq == f->frm_seq) {
->>> +                     fr = tmp;
->>> +                     list_del(&tmp->list);
->>> +                     break;
->>> +             }
->>> +     spin_unlock_irqrestore(&dev->lock, flags);
->>> +
->>> +     if (fr) {
->>> +             ret = 0;
->>> +             cnt = min(f->obj_cnt, fr->obj_cnt);
->>> +             if (cnt)
->>> +                     memcpy(f->od, fr->objs,
->>> +                             sizeof(struct v4l2_od_object) * cnt);
->>> +             f->obj_cnt = cnt;
->>> +
->>> +             free_result(fr);
->>
->> Some drivers may be designed so they do not discard the result data
->> automatically once it is read by user application. AFAICS this module
->> doesn't allow such behaviour.
->>
->> For instance, it might be required to discard the oldest results data
->> when the ring buffer gets filled in.
-> 
-> Looks like no any benefit about keeping the old result data, could you
-> give some use cases which require the old results need to be kept for
-> some time?
+All the S3C24XX SoCs already have a s3c24??.c file keeping code common
+to all cpus in the respective directory. These file can also carry the
+SoC-specific cpu-init - the relevant parts of the cpu.c code.
+cpu.c is completely removed at the end of the series.
 
-Consider scenario where one thread writes image data and multiple threads
-read the FD results. Having all data discarded on first read only one 
-thread could get the data. This is not what we want in a standard API.
+Each patch is compile-tested individually and correctnes of the
+move was tested on s3c2416 hardware - so hopefully I did not break any other
+of the touched SoCs.
 
-Also in V4L2 it is always assumed that multiple applications can read
-state of a device, and the application priority API [1] aims at
-managing the devices state modifications among multiple processes.
- ...
->>> +static int buffer_init(struct vb2_buffer *vb)
->>> +{
->>> +     struct odif_dev *dev = vb2_get_drv_priv(vb->vb2_queue);
->>> +
->>> +     /*
->>> +      * This callback is called once per buffer, after its allocation.
->>> +      *
->>> +      * Vivi does not allow changing format during streaming, but it is
->>> +      * possible to do so when streaming is paused (i.e. in streamoff state).
->>> +      * Buffers however are not freed when going into streamoff and so
->>> +      * buffer size verification has to be done in buffer_prepare, on each
->>> +      * qbuf.
->>> +      * It would be best to move verification code here to buf_init and
->>> +      * s_fmt though.
->>> +      */
->>> +     dprintk(dev, 1, "%s vaddr=%p\n", __func__,
->>> +                     vb2_plane_vaddr(vb, 0));
->>> +
->>> +     return 0;
->>> +}
->>
->> As I already mentioned this empty callback can be removed. Anyway IMO the
->> implementation of the buffer queue operations should be left to individual
->> drivers. Having them in generic module doesn't sound flexible enough.
-> 
-> IMO, the buffer queue operations can be shared for use case of
-> detecting objects from user space images, so it may be kept it in
-> generic driver.
+The series is based on linux-next of 2012-01-17.
 
-Not necessarily, sometimes device specific logic needs to be implemented
-in these callbacks. And the ioctl handlers (vidioc_*) should be just 
-pass-through for the vb2 callbacks.
 
->>
->>> +void odif_add_detection(struct odif_dev *dev,
->>> +             struct v4l2_odif_result *v4l2_fr)
->>> +{
->>> +     unsigned long flags;
->>> +     struct v4l2_odif_result *old = NULL;
->>> +     struct v4l2_odif_result *tmp;
->>> +
->>> +     spin_lock_irqsave(&dev->lock, flags);
->>> +     list_for_each_entry(tmp,&dev->odif_dq.complete, list)
->>> +             if (tmp->frm_seq == v4l2_fr->frm_seq) {
->>> +                     old = tmp;
->>> +                     list_del(&tmp->list);
->>> +                     break;
->>> +             }
->>> +     list_add_tail(&v4l2_fr->list,&dev->odif_dq.complete);
->>> +     spin_unlock_irqrestore(&dev->lock, flags);
->>> +
->>> +     if (old)
->>> +             free_result(old);
->>> +     else
->>> +             atomic_inc(&dev->odif_dq.complete_cnt);
->>> +}
->>> +EXPORT_SYMBOL_GPL(odif_add_detection);
->>> +
->>> +struct v4l2_odif_result *odif_allocate_detection(struct odif_dev *dev,
->>> +             int cnt)
->>> +{
->>> +     struct v4l2_odif_result *result = NULL;
->>> +     unsigned long flags;
->>> +
->>> +     if (atomic_read(&dev->odif_dq.complete_cnt)>=
->>> +                     result_cnt_threshold) {
->>> +             spin_lock_irqsave(&dev->lock, flags);
->>> +             result = list_entry(dev->odif_dq.complete.next,
->>> +                                     struct v4l2_odif_result, list);
->>> +             list_del(&result->list);
->>> +             spin_unlock_irqrestore(&dev->lock, flags);
->>> +
->>> +             atomic_dec(&dev->odif_dq.complete_cnt);
->>> +     }
->>> +
->>> +     if (!result)    goto allocate_result;
->>> +
->>> +     /* reuse the old one if count is matched */
->>> +     if (result->obj_cnt == cnt)
->>> +             goto out;
->>> +
->>> +     /*free the old result*/
->>> +     free_result(result);
->>> +
->>> +allocate_result:
->>> +     result = kzalloc(sizeof(*result) +
->>> +                     cnt * sizeof(struct v4l2_od_object), GFP_ATOMIC);
->>
->> I prefer not allocating memory in interrupt context like this, especially
->> as this can be avoided without significant effort and resources waste.
-> 
-> Considered that the allocated space is not very large, maybe it can be allocated
-> in interrupt context. The count of v4l2_od_object to be allocated is variant,
-> so it is not easy to reserve buffers during driver init to handle variant buffer
-> allocation.  Also this can be left for future optimization.
+changes since v1:
+the SoCs already contain files for common code, so there is no need to
+introduce an additional common.c . Also this common.c would hinder reducing
+the number of mach-directories as suggested by Kukjin Kim in the long run.
+When the code lives in SoC specific files they can happily share the same
+directory at a later time without requiring additional renames.
 
-Right. This is a policy decision that this module makes for all future drivers
-that would use it. Some hardware also allows to limit number of detected faces,
-making it easy to allocate in advance the result data buffers.
 
-...
->>> +static int odif_init_entities(struct odif_dev *odif)
->>> +{
->>> +     const u32 flags = MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_DYNAMIC;
->>> +     int ret;
->>> +     struct odif_entity *entity;
->>> +     struct media_entity *source;
->>> +     struct media_entity *sink;
->>> +
->>> +     /*entity[0] is the entity for object detection hw*/
->>> +     entity =&odif->entity[0];
->>> +     entity->num_links = 2;
->>> +     entity->num_pads = 1;
->>> +     entity->pads[0].flags = MEDIA_PAD_FL_SINK;
->>> +
->>> +     v4l2_subdev_init(&entity->subdev,&odif_subdev_ops);
->>> +     v4l2_set_subdevdata(&entity->subdev, odif);
->>> +     strlcpy(entity->subdev.name, "object detect",
->>> +                     sizeof(entity->subdev.name));
->>> +     ret = media_entity_init(&entity->subdev.entity,
->>> +             entity->num_pads, entity->pads, 1);
->>> +
->>> +     if (ret)
->>> +             goto out;
->>> +
->>> +     /*entity[1] is the video entity which sources the user space video*/
->>> +     entity =&odif->entity[1];
->>> +     entity->num_links = 1;
->>> +     entity->num_pads = 1;
->>> +     entity->pads[0].flags = MEDIA_PAD_FL_SOURCE;
->>> +
->>> +     v4l2_subdev_init(&entity->subdev,&odif_subdev_ops);
->>> +     v4l2_set_subdevdata(&entity->subdev, odif);
->>> +     strlcpy(entity->subdev.name, "user space video",
->>> +                     sizeof(entity->subdev.name));
->>> +     ret = media_entity_init(&entity->subdev.entity,
->>> +             entity->num_pads, entity->pads, 0);
->>> +
->>> +     /* create the default link */
->>> +     source =&odif->entity[1].subdev.entity;
->>> +     sink =&odif->entity[0].subdev.entity;
->>> +     sink->ops =&odif_entity_ops;
->>> +     ret = media_entity_create_link(source, 0,
->>> +                                    sink, 0, flags);
->>> +     if (ret)
->>> +             goto out;
->>> +
->>> +     /* init the default hw link*/
->>> +     if (odif->ops->set_input)
->>> +             ret = odif->ops->set_input(odif,
->>> +                     OD_INPUT_FROM_USER_SPACE,
->>> +&odif->entity[1].pads[0]);
->>> +     if (ret)
->>> +             goto out;
->>> +
->>> +     odif->input = OD_INPUT_FROM_USER_SPACE;
->>> +
->>> +     /* register the two subdevices */
->>> +     ret = v4l2_device_register_subdev(&odif->v4l2_dev,
->>> +&odif->entity[0].subdev);
->>> +     if (ret)
->>> +             goto out;
->>> +
->>> +     ret = v4l2_device_register_subdev(&odif->v4l2_dev,
->>> +&odif->entity[1].subdev);
->>
->> You're creating v4l2 subdevice but not all drivers would require it.
->> Also individual drivers will usually manage connections between the media
->> entities on their own. So IMHO this module goes a little to far on fixing
->> up driver's architecture.
->>
->> Also what are there two subdevs needed for ?
-> 
-> The two subsevs are used to describe two media entity, one of which
-> is the object detection hw, and another is the video entity which sources
-> the user space video. Without the two entities, I don't know how media
-> controller connects these into framework.
+Heiko Stuebner (8):
+  S3C24XX: Remove extern declaration of clk_msysclk
+  S3C24XX: move common S3C2443 clock definitions to clock.h
+  S3C2410: move s3c2410_baseclk_add to clock.h
+  S3C2416: move io-init to SoC specific files
+  S3C2443: move io-init to SoC specific files
+  S3C2440: move io-init to SoC specific files
+  S3C2412: move io-init to SoC specific files
+  S3C2410: move io-init to SoC specific files
 
-The video device also represents a media entity. You would just have to
-embed a media pad in the video device driver, so the first subdev can be 
-linked to it. However the truth is that some devices might need a subdev 
-instance to model FD engine, while for others it would be completely 
-irrelevant. 
+ arch/arm/mach-s3c2410/common.h               |   17 --
+ arch/arm/mach-s3c2410/mach-amlm5900.c        |    4 +-
+ arch/arm/mach-s3c2410/mach-bast.c            |    4 +-
+ arch/arm/mach-s3c2410/mach-h1940.c           |    4 +-
+ arch/arm/mach-s3c2410/mach-n30.c             |    5 +-
+ arch/arm/mach-s3c2410/mach-otom.c            |    5 +-
+ arch/arm/mach-s3c2410/mach-qt2410.c          |    4 +-
+ arch/arm/mach-s3c2410/mach-smdk2410.c        |    4 +-
+ arch/arm/mach-s3c2410/mach-tct_hammer.c      |    4 +-
+ arch/arm/mach-s3c2410/mach-vr1000.c          |    4 +-
+ arch/arm/mach-s3c2410/s3c2410.c              |   50 ++++++-
+ arch/arm/mach-s3c2410/s3c2410.h              |   28 ++++
+ arch/arm/mach-s3c2412/clock.c                |    3 +-
+ arch/arm/mach-s3c2412/mach-jive.c            |    5 +-
+ arch/arm/mach-s3c2412/mach-smdk2413.c        |    6 +-
+ arch/arm/mach-s3c2412/mach-vstms.c           |    5 +-
+ arch/arm/mach-s3c2412/pm.c                   |    2 +-
+ arch/arm/mach-s3c2412/s3c2412.c              |   49 ++++++-
+ arch/arm/mach-s3c2412/s3c2412.h              |   30 ++++
+ arch/arm/mach-s3c2416/clock.c                |    4 +-
+ arch/arm/mach-s3c2416/mach-smdk2416.c        |    6 +-
+ arch/arm/mach-s3c2416/s3c2416.c              |   40 +++++-
+ arch/arm/mach-s3c2416/s3c2416.h              |   30 ++++
+ arch/arm/mach-s3c2440/common.h               |   17 --
+ arch/arm/mach-s3c2440/dsc.c                  |    2 +-
+ arch/arm/mach-s3c2440/mach-anubis.c          |    4 +-
+ arch/arm/mach-s3c2440/mach-at2440evb.c       |    4 +-
+ arch/arm/mach-s3c2440/mach-gta02.c           |    4 +-
+ arch/arm/mach-s3c2440/mach-mini2440.c        |    4 +-
+ arch/arm/mach-s3c2440/mach-nexcoder.c        |    6 +-
+ arch/arm/mach-s3c2440/mach-osiris.c          |    4 +-
+ arch/arm/mach-s3c2440/mach-rx1950.c          |    4 +-
+ arch/arm/mach-s3c2440/mach-rx3715.c          |    4 +-
+ arch/arm/mach-s3c2440/mach-smdk2440.c        |    6 +-
+ arch/arm/mach-s3c2440/s3c2440.c              |    3 +-
+ arch/arm/mach-s3c2440/s3c2442.c              |    3 +-
+ arch/arm/mach-s3c2440/s3c244x.c              |   71 +++++++++-
+ arch/arm/mach-s3c2440/s3c244x.h              |   37 +++++
+ arch/arm/mach-s3c2443/clock.c                |    3 +-
+ arch/arm/mach-s3c2443/mach-smdk2443.c        |    6 +-
+ arch/arm/mach-s3c2443/s3c2443.c              |   40 +++++-
+ arch/arm/mach-s3c2443/s3c2443.h              |   31 ++++
+ arch/arm/plat-s3c24xx/Makefile               |    1 -
+ arch/arm/plat-s3c24xx/cpu.c                  |  207 --------------------------
+ arch/arm/plat-s3c24xx/s3c2410-clock.c        |    1 -
+ arch/arm/plat-s3c24xx/s3c2443-clock.c        |    1 -
+ arch/arm/plat-samsung/include/plat/clock.h   |   22 +++
+ arch/arm/plat-samsung/include/plat/cpu.h     |    2 -
+ arch/arm/plat-samsung/include/plat/s3c2410.h |   33 ----
+ arch/arm/plat-samsung/include/plat/s3c2412.h |   32 ----
+ arch/arm/plat-samsung/include/plat/s3c2416.h |   33 ----
+ arch/arm/plat-samsung/include/plat/s3c2443.h |   54 -------
+ arch/arm/plat-samsung/include/plat/s3c244x.h |   42 -----
+ 53 files changed, 485 insertions(+), 509 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2410/common.h
+ create mode 100644 arch/arm/mach-s3c2410/s3c2410.h
+ create mode 100644 arch/arm/mach-s3c2412/s3c2412.h
+ create mode 100644 arch/arm/mach-s3c2416/s3c2416.h
+ delete mode 100644 arch/arm/mach-s3c2440/common.h
+ create mode 100644 arch/arm/mach-s3c2440/s3c244x.h
+ create mode 100644 arch/arm/mach-s3c2443/s3c2443.h
+ delete mode 100644 arch/arm/plat-s3c24xx/cpu.c
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2410.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2412.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2416.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2443.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c244x.h
 
-...
->> I suggest you to merge this module with next patch and remove what's
->> unnecessary for OMAP4 FDIF. IMHO creating generic object detection
->> module doesn't make sense, given the complexity of hardware. We have
-> 
-> IMO, at least now there are some functions which can be implemented
-> in generic object detection module to avoid duplicated implementation in
-
-I know from experience that inflexible frameworks are worse than no frameworks. 
-And I feel we have not enough experience with the object detection devices 
-right now to come up with decent generic kernel framework. With only one 
-device using your generic OD module it just adds complexity and obfuscates 
-things.
-
-> object detection hw driver: interfaces with user space, handling object
-> detection from user space images.  We can let object detect hw driver to
-> handle the complexity of hardware by defining appropriate callbacks.
-
-I'm still not convinced. I can't see a value in having generic module
-the is used only by one driver, given diversity of nowadays media systems.
-
->> already the required building blocks in v4l2 core, what we need is
->> specification of Face Detection interface semantics, which should be
->> eventually added to the V4L DocBook.
->> The object detection ioctls need to be adjusted to support camera sensors
->> with face detection capability, I'll comment on patch 6/8 about this.
-> 
-> Expect your comments on it, :-)
-
-I finally managed to find a time to review it. Sorry about the delay.
-
-[1] http://linuxtv.org/downloads/v4l-dvb-apis/app-pri.html
-
---
-
-Regards,
-Sylwester
+-- 
+1.7.5.4
