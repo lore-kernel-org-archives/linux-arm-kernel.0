@@ -1,330 +1,158 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Jan 2012 16:48:51 +0000
-Subject: [PATCH v2 1/2] ARM: logical_cpu_map: decouple CPU mapping from SMP
-Message-ID: <1326818932-4922-1-git-send-email-will.deacon@arm.com>
+Date: Tue, 17 Jan 2012 16:50:20 +0000
+Subject: [PATCH v2] ARM: vectors: use gate_vma for vectors user mapping
+Message-ID: <1326819020-5004-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that the logical CPU mapping is useful even when !CONFIG_SMP
-for manipulation of devices like interrupt and power controllers when
-running a UP kernel on a CPU other than 0. This can happen when kexecing
-a UP image from an SMP kernel.
+The current user mapping for the vectors page is inserted as a `horrible
+hack vma' into each task via arch_setup_additional_pages. This causes
+problems with the MM subsystem and vm_normal_page, as described here:
 
-In the future, multi-cluster systems running AMP configurations will
-require something similar for mapping cluster IDs, so it makes sense to
-decouple this logic in preparation for this support.
+https://lkml.org/lkml/2012/1/14/55
 
-Acked-by: Yang Bai <hamo.by@gmail.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reported-by: Joerg Roedel <joerg.roedel@amd.com>
+Following the suggestion from Hugh in the above thread, this patch uses
+the gate_vma for the vectors user mapping, therefore consolidating
+the horrible hack VMAs into one.
+
+Cc: Nicolas Pitre <nico@fluxnic.net>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
 
-v2: Update mach-shmobile/smp-r8a7779.c as well.
+v2: Removed old arch_{exit,dup}_mmap implementations for ARM.
+    Tested on vexpress (ctca9x4), PB1176 and AB926.
 
- arch/arm/common/gic.c                |    7 ++-----
- arch/arm/include/asm/smp.h           |    6 ------
- arch/arm/include/asm/smp_plat.h      |    6 ++++++
- arch/arm/kernel/setup.c              |   14 ++++++++++++++
- arch/arm/kernel/smp.c                |   14 --------------
- arch/arm/mach-exynos/hotplug.c       |    1 +
- arch/arm/mach-exynos/platsmp.c       |    1 +
- arch/arm/mach-highbank/highbank.c    |    3 +--
- arch/arm/mach-imx/src.c              |    5 +----
- arch/arm/mach-msm/hotplug.c          |    1 +
- arch/arm/mach-msm/platsmp.c          |    1 +
- arch/arm/mach-realview/hotplug.c     |    1 +
- arch/arm/mach-shmobile/smp-r8a7779.c |    1 +
- arch/arm/mach-shmobile/smp-sh73a0.c  |    1 +
- arch/arm/mach-ux500/hotplug.c        |    1 +
- arch/arm/mach-ux500/platsmp.c        |    1 +
- arch/arm/mach-vexpress/hotplug.c     |    1 +
- arch/arm/plat-versatile/platsmp.c    |    1 +
- 18 files changed, 35 insertions(+), 31 deletions(-)
+ arch/arm/include/asm/elf.h         |    4 ---
+ arch/arm/include/asm/mmu_context.h |   29 +--------------------------
+ arch/arm/include/asm/page.h        |    2 +
+ arch/arm/kernel/process.c          |   38 ++++++++++++++++++++++++++---------
+ 4 files changed, 31 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index b2dc2dd..c47d619 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -41,6 +41,7 @@
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index 0e9ce8d..38050b1 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -130,8 +130,4 @@ struct mm_struct;
+ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
+ #define arch_randomize_brk arch_randomize_brk
  
- #include <asm/irq.h>
- #include <asm/exception.h>
-+#include <asm/smp_plat.h>
- #include <asm/mach/irq.h>
- #include <asm/hardware/gic.h>
- 
-@@ -352,11 +353,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 	unsigned int gic_irqs = gic->gic_irqs;
- 	struct irq_domain *domain = &gic->domain;
- 	void __iomem *base = gic_data_dist_base(gic);
--	u32 cpu = 0;
+-extern int vectors_user_mapping(void);
+-#define arch_setup_additional_pages(bprm, uses_interp) vectors_user_mapping()
+-#define ARCH_HAS_SETUP_ADDITIONAL_PAGES
 -
--#ifdef CONFIG_SMP
--	cpu = cpu_logical_map(smp_processor_id());
--#endif
-+	u32 cpu = cpu_logical_map(smp_processor_id());
+ #endif
+diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+index 71605d9..a0b3cac 100644
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -18,6 +18,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cachetype.h>
+ #include <asm/proc-fns.h>
++#include <asm-generic/mm_hooks.h>
  
- 	cpumask = 1 << cpu;
- 	cpumask |= cpumask << 8;
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 1e5717a..ae29293 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -71,12 +71,6 @@ extern void platform_secondary_init(unsigned int cpu);
- extern void platform_smp_prepare_cpus(unsigned int);
+ void __check_kvm_seq(struct mm_struct *mm);
  
- /*
-- * Logical CPU mapping.
-- */
--extern int __cpu_logical_map[NR_CPUS];
--#define cpu_logical_map(cpu)	__cpu_logical_map[cpu]
--
+@@ -133,32 +134,4 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ #define deactivate_mm(tsk,mm)	do { } while (0)
+ #define activate_mm(prev,next)	switch_mm(prev, next, NULL)
+ 
 -/*
-  * Initial data for bringing up a secondary CPU.
-  */
- struct secondary_data {
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index f24c1b9..558d6c8 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -43,4 +43,10 @@ static inline int cache_ops_need_broadcast(void)
- }
- #endif
- 
-+/*
-+ * Logical CPU mapping.
-+ */
-+extern int __cpu_logical_map[];
-+#define cpu_logical_map(cpu)	__cpu_logical_map[cpu]
-+
- #endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 129fbd5..2a9d81a 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -427,6 +427,20 @@ void cpu_init(void)
- 	    : "r14");
- }
- 
-+int __cpu_logical_map[NR_CPUS];
-+
-+void __init smp_setup_processor_id(void)
-+{
-+	int i;
-+	u32 cpu = is_smp() ? read_cpuid_mpidr() & 0xff : 0;
-+
-+	cpu_logical_map(0) = cpu;
-+	for (i = 1; i < NR_CPUS; ++i)
-+		cpu_logical_map(i) = i == cpu ? 0 : i;
-+
-+	printk(KERN_INFO "Booting Linux on physical CPU %d\n", cpu);
-+}
-+
- static void __init setup_processor(void)
- {
- 	struct proc_info_list *list;
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 57db122..43c8d96 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -233,20 +233,6 @@ void __ref cpu_die(void)
- }
- #endif /* CONFIG_HOTPLUG_CPU */
- 
--int __cpu_logical_map[NR_CPUS];
+- * We are inserting a "fake" vma for the user-accessible vector page so
+- * gdb and friends can get to it through ptrace and /proc/<pid>/mem.
+- * But we also want to remove it before the generic code gets to see it
+- * during process exit or the unmapping of it would  cause total havoc.
+- * (the macro is used as remove_vma() is static to mm/mmap.c)
+- */
+-#define arch_exit_mmap(mm) \
+-do { \
+-	struct vm_area_struct *high_vma = find_vma(mm, 0xffff0000); \
+-	if (high_vma) { \
+-		BUG_ON(high_vma->vm_next);  /* it should be last */ \
+-		if (high_vma->vm_prev) \
+-			high_vma->vm_prev->vm_next = NULL; \
+-		else \
+-			mm->mmap = NULL; \
+-		rb_erase(&high_vma->vm_rb, &mm->mm_rb); \
+-		mm->mmap_cache = NULL; \
+-		mm->map_count--; \
+-		remove_vma(high_vma); \
+-	} \
+-} while (0)
 -
--void __init smp_setup_processor_id(void)
+-static inline void arch_dup_mmap(struct mm_struct *oldmm,
+-				 struct mm_struct *mm)
 -{
--	int i;
--	u32 cpu = is_smp() ? read_cpuid_mpidr() & 0xff : 0;
--
--	cpu_logical_map(0) = cpu;
--	for (i = 1; i < NR_CPUS; ++i)
--		cpu_logical_map(i) = i == cpu ? 0 : i;
--
--	printk(KERN_INFO "Booting Linux on physical CPU %d\n", cpu);
 -}
 -
+ #endif
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index 97b440c..5838361 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -151,6 +151,8 @@ extern void __cpu_copy_user_highpage(struct page *to, struct page *from,
+ #define clear_page(page)	memset((void *)(page), 0, PAGE_SIZE)
+ extern void copy_page(void *to, const void *from);
+ 
++#define __HAVE_ARCH_GATE_AREA 1
++
+ #ifdef CONFIG_ARM_LPAE
+ #include <asm/pgtable-3level-types.h>
+ #else
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 971d65c..e11b523 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -526,22 +526,40 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
+ #ifdef CONFIG_MMU
  /*
-  * Called by both boot and secondaries to move global data into
-  * per-processor storage.
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index da70e7e..dd1ad55 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -16,6 +16,7 @@
- #include <linux/io.h>
+  * The vectors page is always readable from user space for the
+- * atomic helpers and the signal restart code.  Let's declare a mapping
+- * for it so it is visible through ptrace and /proc/<pid>/mem.
++ * atomic helpers and the signal restart code. Insert it into the
++ * gate_vma so that it is visible through ptrace and /proc/<pid>/mem.
+  */
++static struct vm_area_struct gate_vma;
  
- #include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
- 
- #include <mach/regs-pmu.h>
- 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 60bc45e..dc393bb 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -23,6 +23,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/gic.h>
-+#include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- #include <asm/unified.h>
- 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 804c4a5..5acbb91 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -26,6 +26,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/unified.h>
-+#include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/timer-sp.h>
-@@ -73,9 +74,7 @@ static void __init highbank_map_io(void)
- 
- void highbank_set_cpu_jump(int cpu, void *jump_addr)
+-int vectors_user_mapping(void)
++static int __init gate_vma_init(void)
  {
--#ifdef CONFIG_SMP
- 	cpu = cpu_logical_map(cpu);
--#endif
- 	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
- 	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
- 	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
-diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-index 4bde04f..c34bcc0 100644
---- a/arch/arm/mach-imx/src.c
-+++ b/arch/arm/mach-imx/src.c
-@@ -15,6 +15,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/smp.h>
-+#include <asm/smp_plat.h>
- #include <asm/unified.h>
+-	struct mm_struct *mm = current->mm;
+-	return install_special_mapping(mm, 0xffff0000, PAGE_SIZE,
+-				       VM_READ | VM_EXEC |
+-				       VM_MAYREAD | VM_MAYEXEC |
+-				       VM_ALWAYSDUMP | VM_RESERVED,
+-				       NULL);
++	gate_vma.vm_start	= 0xffff0000;
++	gate_vma.vm_end		= 0xffff0000 + PAGE_SIZE;
++	gate_vma.vm_page_prot	= PAGE_READONLY_EXEC;
++	gate_vma.vm_flags	= VM_READ | VM_EXEC |
++				  VM_MAYREAD | VM_MAYEXEC |
++				  VM_ALWAYSDUMP;
++	return 0;
++}
++arch_initcall(gate_vma_init);
++
++struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
++{
++	return &gate_vma;
++}
++
++int in_gate_area(struct mm_struct *mm, unsigned long addr)
++{
++	return (addr >= gate_vma.vm_start) && (addr < gate_vma.vm_end);
++}
++
++int in_gate_area_no_mm(unsigned long addr)
++{
++	return in_gate_area(NULL, addr);
+ }
  
- #define SRC_SCR				0x000
-@@ -25,10 +26,6 @@
- 
- static void __iomem *src_base;
- 
--#ifndef CONFIG_SMP
--#define cpu_logical_map(cpu)		0
--#endif
--
- void imx_enable_cpu(int cpu, bool enable)
+ const char *arch_vma_name(struct vm_area_struct *vma)
  {
- 	u32 mask, val;
-diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
-index 41c252d..a446fc1 100644
---- a/arch/arm/mach-msm/hotplug.c
-+++ b/arch/arm/mach-msm/hotplug.c
-@@ -11,6 +11,7 @@
- #include <linux/smp.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
- 
- extern volatile int pen_release;
- 
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 0b3e357..db0117e 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -20,6 +20,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
- #include <asm/mach-types.h>
-+#include <asm/smp_plat.h>
- 
- #include <mach/msm_iomap.h>
- 
-diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-index ac1aed2..eb55f05 100644
---- a/arch/arm/mach-realview/hotplug.c
-+++ b/arch/arm/mach-realview/hotplug.c
-@@ -13,6 +13,7 @@
- #include <linux/smp.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
- 
- extern volatile int pen_release;
- 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index cc97ef8..4fe2e9e 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -25,6 +25,7 @@
- #include <linux/delay.h>
- #include <mach/common.h>
- #include <mach/r8a7779.h>
-+#include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- #include <asm/smp_twd.h>
- #include <asm/hardware/gic.h>
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index be1ade7..0d159d6 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -23,6 +23,7 @@
- #include <linux/spinlock.h>
- #include <linux/io.h>
- #include <mach/common.h>
-+#include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- #include <asm/smp_twd.h>
- #include <asm/hardware/gic.h>
-diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
-index 572015e..c76f0f4 100644
---- a/arch/arm/mach-ux500/hotplug.c
-+++ b/arch/arm/mach-ux500/hotplug.c
-@@ -13,6 +13,7 @@
- #include <linux/smp.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
- 
- extern volatile int pen_release;
- 
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index a19e398..d2058ef 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -19,6 +19,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/gic.h>
-+#include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- #include <mach/hardware.h>
- #include <mach/setup.h>
-diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
-index 813ee08..3034a4d 100644
---- a/arch/arm/mach-vexpress/hotplug.c
-+++ b/arch/arm/mach-vexpress/hotplug.c
-@@ -13,6 +13,7 @@
- #include <linux/smp.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
- #include <asm/system.h>
- 
- extern volatile int pen_release;
-diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
-index 92f18d3..49c7db4 100644
---- a/arch/arm/plat-versatile/platsmp.c
-+++ b/arch/arm/plat-versatile/platsmp.c
-@@ -16,6 +16,7 @@
- #include <linux/smp.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
- #include <asm/hardware/gic.h>
- 
- /*
+-	return (vma->vm_start == 0xffff0000) ? "[vectors]" : NULL;
++	return (vma == &gate_vma) ? "[vectors]" : NULL;
+ }
+ #endif
 -- 
 1.7.4.1
