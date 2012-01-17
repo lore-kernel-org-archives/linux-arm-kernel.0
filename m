@@ -1,73 +1,173 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 17 Jan 2012 15:34:23 +0100
-Subject: [PATCH 4/8] mmc: mmci: Use ios_handler to save power
+Date: Tue, 17 Jan 2012 15:34:26 +0100
+Subject: [PATCH 7/8] mmc: mmci: Add constraints on alignment for SDIO
 In-Reply-To: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1326810867-5346-5-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1326810867-5346-8-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To disable a levelshifter when we are in an idle state will
-decrease current consumption. We make use of the ios_handler
-at runtime suspend and at regular suspend to accomplish this.
+From: Per Forlin <per.forlin@stericsson.com>
 
-Of course depending on the used levelshifter the decrease of
-current differs. For ST6G3244ME the value is up to ~200 uA.
+Buffers must be 4-byte aligned due to restrictions that the
+PL18x FIFO accesses must be done in a 4-byte aligned manner.
 
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
+Moreover DPSM_DMAREQCTL must be enabled for SDIO to support
+writes for non 32-byte aligned sg element lengths. In PIO
+mode any buffer length can be handled as long as the buffer
+address is 4-byte aligned.
+
 Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mmc/host/mmci.c |   19 ++++++++++++++++++-
- 1 files changed, 18 insertions(+), 1 deletions(-)
+ drivers/mmc/host/mmci.c |   51 +++++++++++++++++++++++++++++++++++++++++-----
+ drivers/mmc/host/mmci.h |    7 ++++++
+ 2 files changed, 52 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index a7c8f8f..76ce2cd 100644
+index e7b4500..94c04c3 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -1505,10 +1505,22 @@ static int mmci_save(struct amba_device *dev)
+@@ -45,6 +45,7 @@ static unsigned int fmax = 515633;
+  * struct variant_data - MMCI variant-specific quirks
+  * @clkreg: default value for MCICLOCK register
+  * @clkreg_enable: enable value for MMCICLOCK register
++ * @dma_sdio_req_ctrl: enable value for DMAREQCTL register for SDIO write
+  * @datalength_bits: number of bits in the MMCIDATALENGTH register
+  * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
+  *	      is asserted (likewise for RX)
+@@ -60,6 +61,7 @@ static unsigned int fmax = 515633;
+ struct variant_data {
+ 	unsigned int		clkreg;
+ 	unsigned int		clkreg_enable;
++	unsigned int		dma_sdio_req_ctrl;
+ 	unsigned int		datalength_bits;
+ 	unsigned int		fifosize;
+ 	unsigned int		fifohalfsize;
+@@ -102,6 +104,7 @@ static struct variant_data variant_ux500 = {
+ 	.fifohalfsize		= 8 * 4,
+ 	.clkreg			= MCI_CLK_ENABLE,
+ 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
++	.dma_sdio_req_ctrl	= MCI_ST_DPSM_DMAREQCTL,
+ 	.datalength_bits	= 24,
+ 	.sdio			= true,
+ 	.st_clkdiv		= true,
+@@ -114,6 +117,7 @@ static struct variant_data variant_ux500v2 = {
+ 	.fifohalfsize		= 8 * 4,
+ 	.clkreg			= MCI_CLK_ENABLE,
+ 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
++	.dma_sdio_req_ctrl	= MCI_ST_DPSM_DMAREQCTL,
+ 	.datalength_bits	= 24,
+ 	.sdio			= true,
+ 	.st_clkdiv		= true,
+@@ -123,6 +127,30 @@ static struct variant_data variant_ux500v2 = {
+ };
+ 
+ /*
++ * Validate mmc prerequisites
++ */
++static int mmci_validate_data(struct mmci_host *host,
++			      struct mmc_data *data)
++{
++	if (!data)
++		return 0;
++
++	if (!is_power_of_2(data->blksz)) {
++		dev_err(mmc_dev(host->mmc),
++			"unsupported block size (%d bytes)\n", data->blksz);
++		return -EINVAL;
++	}
++
++	if (data->sg->offset & 3) {
++		dev_err(mmc_dev(host->mmc),
++			"unsupported alignment (0x%x)\n", data->sg->offset);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++/*
+  * This must be called with host->lock held
+  */
+ static void mmci_write_clkreg(struct mmci_host *host, u32 clk)
+@@ -432,8 +460,12 @@ static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
+ 	if (!chan)
+ 		return -EINVAL;
+ 
+-	/* If less than or equal to the fifo size, don't bother with DMA */
+-	if (data->blksz * data->blocks <= variant->fifosize)
++	/*
++	 * If less than or equal to the fifo size, don't bother with DMA.
++	 * SDIO transfers may not be 4-byte aligned, fall back to PIO.
++	 */
++	if (data->blksz * data->blocks <= variant->fifosize ||
++	    (data->blksz * data->blocks) & 3)
+ 		return -EINVAL;
+ 
+ 	device = chan->device;
+@@ -468,6 +500,7 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
  {
- 	struct mmc_host *mmc = amba_get_drvdata(dev);
- 	unsigned long flags;
-+	struct mmc_ios ios;
-+	int ret = 0;
+ 	int ret;
+ 	struct mmc_data *data = host->data;
++	struct variant_data *variant = host->variant;
  
- 	if (mmc) {
- 		struct mmci_host *host = mmc_priv(mmc);
+ 	ret = mmci_dma_prep_data(host, host->data, NULL);
+ 	if (ret)
+@@ -482,6 +515,11 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
  
-+		/* Let the ios_handler act on a POWER_OFF to save power. */
-+		if (host->plat->ios_handler) {
-+			memcpy(&ios, &mmc->ios, sizeof(struct mmc_ios));
-+			ios.power_mode = MMC_POWER_OFF;
-+			ret = host->plat->ios_handler(mmc_dev(mmc),
-+						      &ios);
-+			if (ret)
-+				return ret;
-+		}
+ 	datactrl |= MCI_DPSM_DMAENABLE;
+ 
++	/* Some hardware versions need special flags for SDIO DMA write. */
++	if (variant->sdio && host->mmc->card && mmc_card_sdio(host->mmc->card)
++	    && (data->flags & MMC_DATA_WRITE))
++		datactrl |= variant->dma_sdio_req_ctrl;
 +
- 		spin_lock_irqsave(&host->lock, flags);
+ 	/* Trigger the DMA transfer */
+ 	writel(datactrl, host->base + MMCIDATACTRL);
  
- 		/*
-@@ -1527,7 +1539,7 @@ static int mmci_save(struct amba_device *dev)
- 		amba_vcore_disable(dev);
- 	}
+@@ -526,6 +564,9 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq,
+ 	if (!data)
+ 		return;
  
--	return 0;
-+	return ret;
- }
- 
- static int mmci_restore(struct amba_device *dev)
-@@ -1550,6 +1562,11 @@ static int mmci_restore(struct amba_device *dev)
- 		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
- 
- 		spin_unlock_irqrestore(&host->lock, flags);
++	if (mmci_validate_data(host, mrq->data))
++		return;
 +
-+		/* Restore settings done by the ios_handler. */
-+		if (host->plat->ios_handler)
-+			host->plat->ios_handler(mmc_dev(mmc),
-+						&mmc->ios);
- 	}
+ 	if (data->host_cookie) {
+ 		data->host_cookie = 0;
+ 		return;
+@@ -1036,10 +1077,8 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
  
- 	return 0;
+ 	WARN_ON(host->mrq != NULL);
+ 
+-	if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
+-		dev_err(mmc_dev(mmc), "unsupported block size (%d bytes)\n",
+-			mrq->data->blksz);
+-		mrq->cmd->error = -EINVAL;
++	mrq->cmd->error = mmci_validate_data(host, mrq->data);
++	if (mrq->cmd->error) {
+ 		mmc_request_done(mmc, mrq);
+ 		return;
+ 	}
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index d437ccf..095c01c 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -60,6 +60,13 @@
+ #define MCI_ST_DPSM_RWMOD	(1 << 10)
+ #define MCI_ST_DPSM_SDIOEN	(1 << 11)
+ /* Control register extensions in the ST Micro Ux500 versions */
++/*
++ * DMA request control is required for write
++ * if transfer size is not 32-byte aligned.
++ * DMA request control is also needed if the total
++ * transfer size is 32-byte aligned but any of the
++ * sg element lengths are not 32-byte aligned.
++ */
+ #define MCI_ST_DPSM_DMAREQCTL	(1 << 12)
+ #define MCI_ST_DPSM_DBOOTMODEEN	(1 << 13)
+ #define MCI_ST_DPSM_BUSYMODE	(1 << 14)
 -- 
 1.7.5.4
