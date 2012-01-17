@@ -1,56 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jan 2012 20:48:10 +0000
-Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
- by uBoot)?
-In-Reply-To: <CAMQu2gyjGYooWih=cK72VYEe8X_bKyOi3_eHec7cWi37CHBoJQ@mail.gmail.com>
-References: <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 17 Jan 2012 15:57:46 -0500 (EST)
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <alpine.LFD.2.02.1201171536470.2722@xanadu.home>
+References: <20120116105949.GG16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+ <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
  <WC20120117085444.17057E@terrafix.co.uk> <20120117121138.GC11475@arm.com>
  <4F15692D.4070100@ti.com>
  <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
  <20120117133918.GE11475@arm.com>
  <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
  <20120117162720.GG11475@arm.com>
- <20120117194724.GI16726@n2100.arm.linux.org.uk>
- <CAMQu2gyjGYooWih=cK72VYEe8X_bKyOi3_eHec7cWi37CHBoJQ@mail.gmail.com>
-Message-ID: <20120117204810.GJ16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyCcGYk0tC_g2R9+OBYCvwupcjuUkRC5JxJ7maAVTs1YA@mail.gmail.com>
+ <alpine.LFD.2.02.1201171425060.2722@xanadu.home>
+ <CAMQu2gwjOuGadqsGqcpHvdH-Jhhj6cchyoZJMMsOQ20SXsKDOw@mail.gmail.com>
+ <alpine.LFD.2.02.1201171536470.2722@xanadu.home>
+Message-ID: <alpine.LFD.2.02.1201171553220.2722@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 09:11:37PM +0100, Shilimkar, Santosh wrote:
-> On Tue, Jan 17, 2012 at 8:47 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Jan 17, 2012 at 04:27:21PM +0000, Catalin Marinas wrote:
-> >> Anyway, the first step is this API provided by the secure firmware.
-> >> Since such API may need to be called before the MMU is initialised,
-> >> Linux would need to have knowledge of the platform type early on. Having
-> >> some platform hook (asm macro) to call early on wouldn't work with the
-> >> single zImage configuration. Stack space is not an issue as we already
-> >> have one for ARMv7 for D-cache flushing (XIP kernels would work but they
-> >> aren't that many).
-> >
-> > It _is_ a problem. ?How much stack space would these undefined platform
-> > specific functions require? ?16 words? ?32 words? ?A page? ?Where does
-> > this memory come from? ?The .data section, or are we going to stuff it
-> > into what is supposed to be the read-only text section?
+On Tue, 17 Jan 2012, Nicolas Pitre wrote:
+
+> On Tue, 17 Jan 2012, Shilimkar, Santosh wrote:
 > 
-> Stack requirement is limited to saving and restoring the processor
-> registers. There is no additional need. If this is an issue, we can
-> also use SRAM as a stack for this operation.
+> > On Tue, Jan 17, 2012 at 8:39 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > > On Tue, 17 Jan 2012, Shilimkar, Santosh wrote:
+> > >
+> > >> How about allowing platform hooks for single SOC builds. I mean having
+> > >> this code under !single_zImage or something like that. That way we don't
+> > >> impact the single zImage efforts and also allow socs to have all those
+> > >> critical, vital bits enabled for the SOC specific builds.
+> > >
+> > > Absolutely not! ?Because if we start doing that, people will get lazy
+> > > and no platform will ever work in a multi-SOC kernel.
+> > >
+> > > If your SOC require some fancy setup that is not shared by other
+> > > platforms then please abstract that into the bootloader, or make sure it
+> > > can be deferred later on.
+> > >
+> > There is nothing fancy here. It's an ARM security architecture feature which
+> > OMAP implements. Have given enough reason about boot-loaders issues.
+> 
+> I was not convinced by those reasons. Just push harder on the bootloader 
+> side.  There is _no_ reason for the bootloader not to take care of this 
+> very platform specific issue.  You can even do it into a standalone 
+> uImage that returns to u-Boot after it is done with its magic.
 
-How do you know that's all that would be required?
+Alternatively, you may leverage all the infrastructure that was 
+implemented to support CPU offlining i.e. the creation of a 1:1 mapping 
+needed to disable the MMU and so on.  That should be possible for you to 
+just have the MMU turned off, then call the secure mode to turn on L2, 
+then restore MMU and normal operation of the kernel.  This can be 
+accomplished later during boot rather than right at the beginning.
 
-Let's look at another secure monitor API implementation in the kernel.
-MSM has one - arch/arm/mach-msm/scm.c.  This requires parameters passed
-through memory - a command buffer consisting of at least four words in
-memory, followed by a response buffer of at least three words.
 
-So where would this be placed if not on the stack?  Pick some random
-address and hope that there's some memory there?
-
-This is what I'm saying: while we may know what the requirement is for
-OMAP, that's not what it is for other SoCs.  Every SoC has different
-requirements for this, and so we have _no_ idea what so ever how much
-stack space would actually be required.  And if we don't know that, we
-have a real chance of having some implementation overflow the stack,
-thereby overwriting something (eg, maybe your DT data, maybe your
-initramfs image) which would be extremely detrimental.
+Nicolas
