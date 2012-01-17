@@ -1,31 +1,44 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Tue, 17 Jan 2012 17:36:16 +0530
-Subject: [RFC v2 PATCH 0/3] dt: device tree bindings and data for EMIF
- and DDR
-In-Reply-To: <4F1087C9.6030908@ti.com>
-References: <1324303533-17458-1-git-send-email-aneesh@ti.com>	<4EEFC23A.30201@gmail.com>	<20111219233559.GW6464@atomide.com>	<4EF0671B.7090508@ti.com>	<4EF0824A.9060208@ti.com>	<4EF096C9.1070808@ti.com>	<4F09D10B.7010807@ti.com>
- <CAOesGMjFmM=gXddvFzW+BYqOedySjPVZ6hjwsF-F40Wr9BvSLg@mail.gmail.com>
- <4F1087C9.6030908@ti.com>
-Message-ID: <4F156438.20502@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Jan 2012 12:09:55 +0000
+Subject: [PATCH] ARM: gic: refactor irq_start assignment
+Message-ID: <1326802195-11412-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+The irq_start and hwirq_base assignment code is fairly hairy and ended
+up being difficult to read following a conflict resolution for 3.2.
 
-On Saturday 14 January 2012 01:06 AM, Aneesh V wrote:
-> Hi Olof,
+This patch rearranges the code slightly to make it easier to read.
 
-<snip>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/common/gic.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
-> We wish to drop the DDR3 support because we have concluded that our
-> platforms with DDR3 memories will not scale DDR frequency due to
-> limitations in DDR3 protocol(operating frequency can vary only in a
-> small range). So, is it ok to persist with my bindings for LPDDR2
-> (fixing the comments already given by you) and drop the DDR3 part
-> from it?
-
-Ping! Forgive my impatience, but I would like to close on this at the
-earliest to continue my work on the driver.
-
-thanks,
-Aneesh
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index c47d619..ca6b5dd 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -694,13 +694,12 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	 * For primary GICs, skip over SGIs.
+ 	 * For secondary GICs, skip over PPIs, too.
+ 	 */
+-	domain->hwirq_base = 32;
+-	if (gic_nr == 0) {
+-		if ((irq_start & 31) > 0) {
+-			domain->hwirq_base = 16;
+-			if (irq_start != -1)
+-				irq_start = (irq_start & ~31) + 16;
+-		}
++	if (gic_nr == 0 && (irq_start & 31) > 0) {
++		domain->hwirq_base = 16;
++		if (irq_start != -1)
++			irq_start = (irq_start & ~31) + 16;
++	} else {
++		domain->hwirq_base = 32;
+ 	}
+ 
+ 	/*
+-- 
+1.7.4.1
