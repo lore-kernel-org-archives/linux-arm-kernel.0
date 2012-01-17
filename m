@@ -1,97 +1,173 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 17 Jan 2012 14:58:18 +0100
-Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
- uBoot)?
-In-Reply-To: <20120117133918.GE11475@arm.com>
-References: <WC20120116100344.4204CC@terrafix.co.uk>
- <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
- <20120116105949.GG16726@n2100.arm.linux.org.uk>
- <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
- <20120116131329.GA928@n2100.arm.linux.org.uk>
- <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
- <WC20120117085444.17057E@terrafix.co.uk> <20120117121138.GC11475@arm.com>
- <4F15692D.4070100@ti.com>
- <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
- <20120117133918.GE11475@arm.com>
-Message-ID: <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Jan 2012 22:13:24 +0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20120117082334.GA31295@S2101-09.ap.freescale.net>
+ <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <20120117141322.GA31687@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 2:39 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Jan 17, 2012 at 12:40:54PM +0000, Shilimkar, Santosh wrote:
->> On Tue, Jan 17, 2012 at 1:27 PM, Aneesh V <aneesh@ti.com> wrote:
->> > Hi Catalin,
->> >
->> >
->> > On Tuesday 17 January 2012 05:41 PM, Catalin Marinas wrote:
->> >>
->> >> On Tue, Jan 17, 2012 at 08:54:44AM +0000, Joe Woodward wrote:
->> >>>
->> >>> So, is the upshot of this that the kernel isn't going to be in a
->> >>> position to enable the L2/outer cache on OMAP3 (due to the need for
->> >>> hacky/unmaintainable code)?
->> >>>
->> >>> Hence the bootloader/uBoot had better leave it enabled...
->> >>
->> >> It could but the Linux decompressor needs to be aware and either flush
->> >> the L2 (more difficult as it doesn't have all the device information) or
->> >
->> > Cortex-A8 is aware of L2$ and can flush it, isn't it?
->> >
->> >> set the page table attributes to outer non-cacheable (TEX[2:0] = 0b100).
->> >
->> > If the above is right, this is not needed right?
->>
->> Well the L2 can be configured as inner or outer, so above
->> alone won't work.
->>
->> Boot-loader disabling L2 cache ( all caches) ?is still right thing
->> and that's what kernel expect.
->>
->> Since the early kernel code can't be patches for A8, may be
->> delaying L2 enabled would work.
->
-> Ah, I missed the fact that the L2 is an inner cache on OMAP3+A8. In this
-> case, I would argue to just leave it enabled since as long as the MMU is
-> off it won't be accessed. Why does U-Boot need to disable the L2 (I
-> suspect via some auxiliary control register)?
->
->> But then on A15, we are back to square one since there is no
->> control to turn ON/OFF l2 cache.
->
-> Well, it's an inner cache, it gets disabled/enabled via the SCTLR.M bit
-> as is the L1 cache. It does not need to be disabled independently.
->
->> On A15 infact there are other CP15 registers which needs to be set
->> before MMU is enabled to have best configuration.
->
-> Yes, there are, and my view is that it is up to the platform firmware to
-> set things right.
->
-Firmware is ROM'ed in SOC's and can't be altered without a new silicon spin.
-Then we get into situations where Errata A will say turn OFF/ON x bit and
-so on. Most of these bits are secure write-only registers hence ROM
-code provides few API's to alter these registers in future if needed.
+On Tue, Jan 17, 2012 at 09:46:42AM +0000, Dong Aisheng-B29396 wrote:
+...
+> I guess Stephen's idea is to retrieving the function name and group name
+> From the pinctrl driver since Tagre prefers to define those things in driver
+> Rather than in board file or soc.dts file.
+> But it does not fit for IMX since we define it in soc.dts.
+> 
+Hmm, when he came up with this proposal and said it should work for
+Tegra, I assume he plans to move those from Tegra pinctrl driver into
+device tree.  Stephen?
 
-BTW, look at the processor setup functions where we are altering these
-bits in kernel today (Diagnostic, RR policy etc) and they work on
-ARM SoC's which either don't use trustzone or kernel is in secure mode.
+...
 
-Now same thing if needs to be done for SoC's like OMAP where
-these bits are under secure control, we need to use the ROM
-secure API's and kernel don't seems to give any flexibility
-to patch that.
+> > Considering the different pinctrl configurations for the same client device
+> > usually share the same pinmux and only pinconf varies. 
+> I have the same doubts before.
+> Is there a real case that device has the different pinmux in different state?
+> Stephen?
+> 
+> > It may worth introducing
+> > another level phandle reference.  Something like the following:
+> > 
+> > 	pinmux_sdhci: pinmux-sdhci {
+> > 		mux =
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
+> > 	};
+> > 
+> > 	pinconf_sdhci_active: pinconf-sdhci-active {
+> > 		config =
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+> > 	};
+> > 
+> > 	pinconf_sdhci_suspend: pinconf-sdhci-suspend {
+> > 		config =
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+> > 	};
+> > 
+> The config makes sense to me.
+> The only question is how to get group name to match with the predefined groups.
+> 
+I still incline to say there should not be any predefined groups for
+DT case, if we choose to find the group in use only when pinmux_get()
+gets called.  Even if you insist to have a global scanning on device
+tree for all groups to create the pinmux mapping table, those predefined
+groups can only be created by your scanning code, so you should know
+how the name comes from device tree, and you should be able to recreate
+the name when you are trying to matching the name in the table you
+created before.
 
-I don't understand how __only__ these devices needs to be
-patches outside the kernel. Firmware point is actually irrelevant for
-OMAP since it can't be changed once it is ROMed.
+> Besides per pin group configuration support, we may also want per pin configuration
+> Support as the latest patch sent by Linus.
+> http://www.spinics.net/lists/arm-kernel/msg155712.html
+> 
+This binding proposal has covered both pin and group configuration,
+as the second parameter of 'config' property could be either a pin
+or group which depends the on whether the configurable entity at HW
+level is a pin or group.
 
-Patching in boot-loaders isn't an option either since every customers
-prefers to use there own boot-loader and then controlling
-this vital bits is impossible.
+...
 
-So I re-iterate that we need to have solution to this problem.
+> > > If "muxable entities" is pins on IMX, I'm wondering how we define the
+> > > predefined Functions and groups or if we still need to do that.
+> > >
+> > Let's put this in the example below.
+> > 
+> > 	pinmux_usdhc1: pinmux-usdhc1 {
+> > 		mux = <IMX6Q_PAD_SD1_DAT1 0>
+> > 		      <IMX6Q_PAD_SD1_DAT2 0>
+> > 		      ...
+> > 	};
+> > 
+> Yes, I agree.
+> And in this way we're still using virtual groups.
+> It has no big difference as we did before like:
+> pinmux-groups {
+>         uart4grp: group at 0 {
+>                 grp-name = "uart4grp";
+>                 grp-pins = <107 108>;
+>                 grp-mux = <4 4>;
+>         };
+> 
+>         sd4grp: group at 1 {
+>                 grp-name = "sd4grp";
+>                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
+>                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
+>         };
+> };
+> 
+You are right.  They are fundamentally same and just in different
+format.
 
-Regards
-Santosh
+> The real problem is do we need to support individual pin mux
+> Or still using virtual pin group?
+> For the way Stephen proposed, we can only support individual pin mux
+> Since IMX pins are not grouped together in HW.
+> 
+I do not see any problem here.  If you look at the first column of
+'mux' property of node pinmux-usdhc1, it is a group of pins for usdhc1.
+Isn't it one virtual pin group for usdhc1?
+
+> > 	pinconf_usdhc1_50mhz: pinconf-usdhc1-50mhz {
+> > 		config = <IMX6Q_PAD_SD1_DAT1 IMX6Q_PAD_CONF_ALL 0x834>
+> > 			 <IMX6Q_PAD_SD1_DAT2 IMX6Q_PAD_CONF_ALL 0x834>
+> > 			 ...
+> > 	};
+> > 
+> > 	pinconf_usdhc1_100mhz: pinconf-usdhc1-100mhz {
+> > 		config = <IMX6Q_PAD_SD1_DAT1 IMX6Q_PAD_CONF_ALL 0x330>
+> > 			 <IMX6Q_PAD_SD1_DAT2 IMX6Q_PAD_CONF_ALL 0x330>
+> > 			 ...
+> > 	};
+> > 
+> > 	pinconf_usdhc1_200mhz: pinconf-usdhc1-200mhz {
+> > 		config = <IMX6Q_PAD_SD1_DAT1 IMX6Q_PAD_CONF_ALL 0x334>
+> > 			 <IMX6Q_PAD_SD1_DAT2 IMX6Q_PAD_CONF_ALL 0x334>
+> > 			 ...
+> > 	};
+> > 
+> > 	pinctrl_usdhc1_50mhz: pinctrl-usdhc1-50mhz {
+> > 		pinmux = <&pinmux_usdhc1>;
+> > 		pinconf = <&pinconf_usdhc1_50mhz>;
+> > 	};
+> > 
+> > 	pinctrl_usdhc1_100mhz: pinctrl-usdhc1-100mhz {
+> > 		pinmux = <&pinmux_usdhc1>;
+> > 		pinconf = <&pinconf_usdhc1_100mhz>;
+> > 	};
+> > 
+> > 	pinctrl_usdhc1_200mhz: pinctrl-usdhc1-200mhz {
+> > 		pinmux = <&pinmux_usdhc1>;
+> > 		pinconf = <&pinconf_usdhc1_200mhz>;
+> > 	};
+> > 
+> > 	usdhc at 02190000 { /* uSDHC1 */
+> > 		...
+> > 		pinctrl = <&usdhc1_50mhz>, <&usdhc1_100mhz>, <&usdhc1_200mhz>;
+> > 		pinctrl-names = "usdhc1-50mhz", "usdhc1-100mhz", "usdhc1-200mhz";
+> > 	};
+> > 
+> > In this example, we have 3 functions/states for client device usdhc1, "usdhc1-
+> > 50mhz", "usdhc1-100mhz", and "usdhc1-200mhz".  The group is being defined by
+> > enumerating the pins in property 'mux' of node pinmux_usdhc1.
+> > 
+> Yes, It's still under development by Linus.
+> The last patch Linus sent still does not support state change for specific device.
+> But the method is ok to me.
+> 
+Yes, we need per device state switch.
+
+-- 
+Regards,
+Shawn
