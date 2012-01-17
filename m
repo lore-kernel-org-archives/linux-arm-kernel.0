@@ -1,173 +1,73 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 17 Jan 2012 15:34:26 +0100
-Subject: [PATCH 7/8] mmc: mmci: Add constraints on alignment for SDIO
+Date: Tue, 17 Jan 2012 15:34:27 +0100
+Subject: [PATCH 8/8] mmc: mmci: Support any block sizes for ux500v2 variant
 In-Reply-To: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1326810867-5346-8-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1326810867-5346-9-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Per Forlin <per.forlin@stericsson.com>
+For the ux500v2 variant of the PL18x block, any block sizes are
+supported. This will make it possible to decrease data overhead
+for SDIO transfers.
 
-Buffers must be 4-byte aligned due to restrictions that the
-PL18x FIFO accesses must be done in a 4-byte aligned manner.
-
-Moreover DPSM_DMAREQCTL must be enabled for SDIO to support
-writes for non 32-byte aligned sg element lengths. In PIO
-mode any buffer length can be handled as long as the buffer
-address is 4-byte aligned.
+This patch is based upon a patch from Stefan Nilsson.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Per Forlin <per.forlin@stericsson.com>
-Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mmc/host/mmci.c |   51 +++++++++++++++++++++++++++++++++++++++++-----
- drivers/mmc/host/mmci.h |    7 ++++++
- 2 files changed, 52 insertions(+), 6 deletions(-)
+ drivers/mmc/host/mmci.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index e7b4500..94c04c3 100644
+index 94c04c3..1c6c874 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -45,6 +45,7 @@ static unsigned int fmax = 515633;
-  * struct variant_data - MMCI variant-specific quirks
-  * @clkreg: default value for MCICLOCK register
-  * @clkreg_enable: enable value for MMCICLOCK register
-+ * @dma_sdio_req_ctrl: enable value for DMAREQCTL register for SDIO write
-  * @datalength_bits: number of bits in the MMCIDATALENGTH register
-  * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
-  *	      is asserted (likewise for RX)
-@@ -60,6 +61,7 @@ static unsigned int fmax = 515633;
+@@ -57,6 +57,7 @@ static unsigned int fmax = 515633;
+  * @pwrreg_powerup: power up value for MMCIPOWER register
+  * @signal_direction: input/out direction of bus signals can be indicated
+  * @pwrreg_ctrl_power: bits in MMCIPOWER register controls ext. power supply
++ * @any_blksize: true if block any sizes are supported
+  */
  struct variant_data {
  	unsigned int		clkreg;
- 	unsigned int		clkreg_enable;
-+	unsigned int		dma_sdio_req_ctrl;
- 	unsigned int		datalength_bits;
- 	unsigned int		fifosize;
- 	unsigned int		fifohalfsize;
-@@ -102,6 +104,7 @@ static struct variant_data variant_ux500 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg			= MCI_CLK_ENABLE,
- 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
-+	.dma_sdio_req_ctrl	= MCI_ST_DPSM_DMAREQCTL,
- 	.datalength_bits	= 24,
- 	.sdio			= true,
- 	.st_clkdiv		= true,
-@@ -114,6 +117,7 @@ static struct variant_data variant_ux500v2 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg			= MCI_CLK_ENABLE,
- 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
-+	.dma_sdio_req_ctrl	= MCI_ST_DPSM_DMAREQCTL,
- 	.datalength_bits	= 24,
- 	.sdio			= true,
- 	.st_clkdiv		= true,
-@@ -123,6 +127,30 @@ static struct variant_data variant_ux500v2 = {
+@@ -71,6 +72,7 @@ struct variant_data {
+ 	u32			pwrreg_powerup;
+ 	bool			signal_direction;
+ 	bool			pwrreg_ctrl_power;
++	bool			any_blksize;
+ };
+ 
+ static struct variant_data variant_arm = {
+@@ -124,6 +126,7 @@ static struct variant_data variant_ux500v2 = {
+ 	.blksz_datactrl16	= true,
+ 	.pwrreg_powerup		= MCI_PWR_ON,
+ 	.signal_direction	= true,
++	.any_blksize		= true,
  };
  
  /*
-+ * Validate mmc prerequisites
-+ */
-+static int mmci_validate_data(struct mmci_host *host,
-+			      struct mmc_data *data)
-+{
-+	if (!data)
-+		return 0;
-+
-+	if (!is_power_of_2(data->blksz)) {
-+		dev_err(mmc_dev(host->mmc),
-+			"unsupported block size (%d bytes)\n", data->blksz);
-+		return -EINVAL;
-+	}
-+
-+	if (data->sg->offset & 3) {
-+		dev_err(mmc_dev(host->mmc),
-+			"unsupported alignment (0x%x)\n", data->sg->offset);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-  * This must be called with host->lock held
-  */
- static void mmci_write_clkreg(struct mmci_host *host, u32 clk)
-@@ -432,8 +460,12 @@ static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
- 	if (!chan)
- 		return -EINVAL;
- 
--	/* If less than or equal to the fifo size, don't bother with DMA */
--	if (data->blksz * data->blocks <= variant->fifosize)
-+	/*
-+	 * If less than or equal to the fifo size, don't bother with DMA.
-+	 * SDIO transfers may not be 4-byte aligned, fall back to PIO.
-+	 */
-+	if (data->blksz * data->blocks <= variant->fifosize ||
-+	    (data->blksz * data->blocks) & 3)
- 		return -EINVAL;
- 
- 	device = chan->device;
-@@ -468,6 +500,7 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+@@ -132,10 +135,12 @@ static struct variant_data variant_ux500v2 = {
+ static int mmci_validate_data(struct mmci_host *host,
+ 			      struct mmc_data *data)
  {
- 	int ret;
- 	struct mmc_data *data = host->data;
 +	struct variant_data *variant = host->variant;
- 
- 	ret = mmci_dma_prep_data(host, host->data, NULL);
- 	if (ret)
-@@ -482,6 +515,11 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- 
- 	datactrl |= MCI_DPSM_DMAENABLE;
- 
-+	/* Some hardware versions need special flags for SDIO DMA write. */
-+	if (variant->sdio && host->mmc->card && mmc_card_sdio(host->mmc->card)
-+	    && (data->flags & MMC_DATA_WRITE))
-+		datactrl |= variant->dma_sdio_req_ctrl;
 +
- 	/* Trigger the DMA transfer */
- 	writel(datactrl, host->base + MMCIDATACTRL);
- 
-@@ -526,6 +564,9 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq,
  	if (!data)
- 		return;
+ 		return 0;
  
-+	if (mmci_validate_data(host, mrq->data))
-+		return;
-+
- 	if (data->host_cookie) {
- 		data->host_cookie = 0;
- 		return;
-@@ -1036,10 +1077,8 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+-	if (!is_power_of_2(data->blksz)) {
++	if (!is_power_of_2(data->blksz) && !variant->any_blksize) {
+ 		dev_err(mmc_dev(host->mmc),
+ 			"unsupported block size (%d bytes)\n", data->blksz);
+ 		return -EINVAL;
+@@ -669,7 +674,6 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	writel(host->size, base + MMCIDATALENGTH);
  
- 	WARN_ON(host->mrq != NULL);
+ 	blksz_bits = ffs(data->blksz) - 1;
+-	BUG_ON(1 << blksz_bits != data->blksz);
  
--	if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
--		dev_err(mmc_dev(mmc), "unsupported block size (%d bytes)\n",
--			mrq->data->blksz);
--		mrq->cmd->error = -EINVAL;
-+	mrq->cmd->error = mmci_validate_data(host, mrq->data);
-+	if (mrq->cmd->error) {
- 		mmc_request_done(mmc, mrq);
- 		return;
- 	}
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index d437ccf..095c01c 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -60,6 +60,13 @@
- #define MCI_ST_DPSM_RWMOD	(1 << 10)
- #define MCI_ST_DPSM_SDIOEN	(1 << 11)
- /* Control register extensions in the ST Micro Ux500 versions */
-+/*
-+ * DMA request control is required for write
-+ * if transfer size is not 32-byte aligned.
-+ * DMA request control is also needed if the total
-+ * transfer size is 32-byte aligned but any of the
-+ * sg element lengths are not 32-byte aligned.
-+ */
- #define MCI_ST_DPSM_DMAREQCTL	(1 << 12)
- #define MCI_ST_DPSM_DBOOTMODEEN	(1 << 13)
- #define MCI_ST_DPSM_BUSYMODE	(1 << 14)
+ 	if (variant->blksz_datactrl16)
+ 		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
 -- 
 1.7.5.4
