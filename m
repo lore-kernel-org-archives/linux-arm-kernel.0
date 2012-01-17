@@ -1,31 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jan 2012 19:47:24 +0000
-Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
- by uBoot)?
-In-Reply-To: <20120117162720.GG11475@arm.com>
-References: <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
- <20120116131329.GA928@n2100.arm.linux.org.uk>
- <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
- <WC20120117085444.17057E@terrafix.co.uk> <20120117121138.GC11475@arm.com>
- <4F15692D.4070100@ti.com>
- <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
- <20120117133918.GE11475@arm.com>
- <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
- <20120117162720.GG11475@arm.com>
-Message-ID: <20120117194724.GI16726@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 17 Jan 2012 13:48:45 -0600
+Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
+ mappings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D22FB@HQMAIL01.nvidia.com>
+References: <7FE21149F4667147B645348EC6057885075542@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF176CC743EF@HQMAIL01.nvidia.com>
+ <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC605788508AC65@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A76A@HQMAIL01.nvidia.com>
+ <CAA+hA=RCmctmQJU4-k7YhzQDMi8KuyisBqOFhuMd3RV4_E=gCA@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D1FAB@HQMAIL01.nvidia.com>
+ <20120114011029.GC1810@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D22FB@HQMAIL01.nvidia.com>
+Message-ID: <4F15D09D.3030401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 04:27:21PM +0000, Catalin Marinas wrote:
-> Anyway, the first step is this API provided by the secure firmware.
-> Since such API may need to be called before the MMU is initialised,
-> Linux would need to have knowledge of the platform type early on. Having
-> some platform hook (asm macro) to call early on wouldn't work with the
-> single zImage configuration. Stack space is not an issue as we already
-> have one for ARMv7 for D-cache flushing (XIP kernels would work but they
-> aren't that many).
+On 01/17/2012 01:35 PM, Stephen Warren wrote:
+> Shawn Guo wrote at Friday, January 13, 2012 6:11 PM:
+>> On Fri, Jan 13, 2012 at 10:33:21AM -0800, Stephen Warren wrote:
+>>> So of_device_alloc(), which is called by of_platform_populate() for each
+>>> device, already parses basic DT content such as reg and interrupts, and
+>>> converts them to Linux resources. I'd consider parsing any pinmux properties
+>>> and registering them with the pinctrl subsystem to be of a similar nature,
+>>> so adding some code to of_device_alloc() that calls a core pinmux function
+>>> to parse the DT node seems reasonable to me.
+>>
+>> I hardly believe that device tree maintainers would agree here.
+>> Grant, Rob?
+> 
+> I'm explicitly putting Grant and Rob on the To line here to make this
+> question stand out to them.
+> 
 
-It _is_ a problem.  How much stack space would these undefined platform
-specific functions require?  16 words?  32 words?  A page?  Where does
-this memory come from?  The .data section, or are we going to stuff it
-into what is supposed to be the read-only text section?
+But then the same could be argued for regulators, clocks and whatever
+else infrastructure type bindings we have. I think the distinction here
+is reg and interrupts are already standard properties of
+platform_devices. As I believe Linus W said, all the pin mux/ctrl stuff
+has to work for non-DT as well. So if the infrastructure is handling
+this for DT, how would this work in the non-DT case?
+
+There are already ways to hook into the device creation with bus notifiers.
+
+Rob
