@@ -1,48 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Jan 2012 23:00:19 +0000
-Subject: [PATCH] mx53_loco: add DA9053 PMIC support
-In-Reply-To: <1326733853-13956-2-git-send-email-paul.liu@linaro.org>
-References: <1326733853-13956-1-git-send-email-paul.liu@linaro.org>
- <1326733853-13956-2-git-send-email-paul.liu@linaro.org>
-Message-ID: <20120116230019.GF32049@n2100.arm.linux.org.uk>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Tue, 17 Jan 2012 10:54:20 +0900
+Subject: [RFC PATCH 05/10] sh: intc: remove dependency on NR_IRQS
+In-Reply-To: <1326472451-9002-6-git-send-email-robherring2@gmail.com>
+References: <1326472451-9002-1-git-send-email-robherring2@gmail.com>
+ <1326472451-9002-6-git-send-email-robherring2@gmail.com>
+Message-ID: <CABMQnVKfitZu01_sKeVoC94y3GjbfTHqFEZ8ANWF4PCqA6F-Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 01:10:53AM +0800, Ying-Chun Liu (PaulLiu) wrote:
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> index fd8b524..61dd8c9 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> @@ -23,10 +23,21 @@
->  #include <linux/delay.h>
->  #include <linux/gpio.h>
+Hi,
 
-You have this ^^^^^^^ include, which includes asm/gpio.h, and in turn
-mach/gpio.h, but...
+2012/1/14 Rob Herring <robherring2@gmail.com>:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> SH intc has a compile time dependency on NR_IRQS. Make this dependency a
+> local define so that shmobile (and ARM in general) can have run-time
+> NR_IRQS setting. SH has NR_IRQS set to 512 and shmobile has NR_IRQS set to
+> 1024, so we are using the maximum.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> ?drivers/sh/intc/balancing.c | ? ?2 +-
+> ?drivers/sh/intc/core.c ? ? ?| ? ?2 +-
+> ?drivers/sh/intc/handle.c ? ?| ? ?2 +-
+> ?drivers/sh/intc/internals.h | ? ?9 +++++++++
+> ?drivers/sh/intc/virq.c ? ? ?| ? ?2 +-
+> ?5 files changed, 13 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/sh/intc/balancing.c b/drivers/sh/intc/balancing.c
+> index cec7a96..bc78080 100644
+> --- a/drivers/sh/intc/balancing.c
+> +++ b/drivers/sh/intc/balancing.c
+> @@ -9,7 +9,7 @@
+> ?*/
+> ?#include "internals.h"
+>
+> -static unsigned long dist_handle[NR_IRQS];
+> +static unsigned long dist_handle[INTC_NR_IRQS];
+>
+> ?void intc_balancing_enable(unsigned int irq)
+> ?{
+> diff --git a/drivers/sh/intc/core.c b/drivers/sh/intc/core.c
+> index e53e449..2fde897 100644
+> --- a/drivers/sh/intc/core.c
+> +++ b/drivers/sh/intc/core.c
+> @@ -42,7 +42,7 @@ unsigned int nr_intc_controllers;
+> ?* - this needs to be at least 2 for 5-bit priorities on 7780
+> ?*/
+> ?static unsigned int default_prio_level = 2; ? ?/* 2 - 16 */
+> -static unsigned int intc_prio_level[NR_IRQS]; ?/* for now */
+> +static unsigned int intc_prio_level[INTC_NR_IRQS]; ? ? /* for now */
+>
+> ?unsigned int intc_get_dfl_prio_level(void)
+> ?{
+> diff --git a/drivers/sh/intc/handle.c b/drivers/sh/intc/handle.c
+> index 057ce56..f461d53 100644
+> --- a/drivers/sh/intc/handle.c
+> +++ b/drivers/sh/intc/handle.c
+> @@ -13,7 +13,7 @@
+> ?#include <linux/spinlock.h>
+> ?#include "internals.h"
+>
+> -static unsigned long ack_handle[NR_IRQS];
+> +static unsigned long ack_handle[INTC_NR_IRQS];
+>
+> ?static intc_enum __init intc_grp_id(struct intc_desc *desc,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?intc_enum enum_id)
+> diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
+> index b0e9155..469f092 100644
+> --- a/drivers/sh/intc/internals.h
+> +++ b/drivers/sh/intc/internals.h
+> @@ -6,6 +6,15 @@
+> ?#include <linux/radix-tree.h>
+> ?#include <linux/device.h>
+>
+> +#define INTC_NR_IRQS ? 1024
 
->  #include <linux/i2c.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/irq.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/err.h>
-> +#include <linux/regulator/machine.h>
-> +#include <linux/regulator/fixed.h>
-> +#include <linux/mfd/da9052/da9052.h>
-> +#include <linux/mfd/da9052/pdata.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
->  #include <mach/iomux-mx53.h>
-> +#include <mach/irqs.h>
-> +#include <mach/gpio.h>
+On SH, INTC_NR_IRQS ( NR_IRQS )  is using to by arch/sh/kernel/machvec.c.
+And, this is defined by arch/sh/include/asm/irq.h.
+You need to remove or rename from these.
 
-you include mach/gpio.h here?  I don't see why you need mach/irqs.h
-either.
+> +
+> +#ifndef evt2irq
+> +#define evt2irq(evt) ? ? ? ? ? ?(((evt) >> 5) - 16)
+> +#endif
+> +#ifndef irq2evt
+> +#define irq2evt(irq) ? ? ? ? ? ?(((irq) + 16) << 5)
+> +#endif
+> +
 
-That brings into this another question: you're adding 9 new linux/
-includes above.  How many of those do you _actually_ need?  Eg, I
-don't see you adding anything from linux/err.h to this file, so why
-do you need this header?
+These are defined in arch/arm/mach-shmobile/include/mach/irqs.h and
+arch/sh/include/asm/irq.h.
 
-Please don't add include files unnecessarily.
+I propose that linux/sh_intc.h defines these.
+
+Best regards,
+  Nobuhiro
+
+-- 
+Nobuhiro Iwamatsu
+?? iwamatsu at {nigauri.org / debian.org}
+?? GPG ID: 40AD1FA6
