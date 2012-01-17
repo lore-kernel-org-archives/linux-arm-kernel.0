@@ -1,44 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Jan 2012 12:09:55 +0000
-Subject: [PATCH] ARM: gic: refactor irq_start assignment
-Message-ID: <1326802195-11412-1-git-send-email-will.deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Jan 2012 12:11:38 +0000
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
+ by uBoot)?
+In-Reply-To: <WC20120117085444.17057E@terrafix.co.uk>
+References: <WC20120116100344.4204CC@terrafix.co.uk>
+ <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
+ <20120116105949.GG16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+ <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+ <WC20120117085444.17057E@terrafix.co.uk>
+Message-ID: <20120117121138.GC11475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq_start and hwirq_base assignment code is fairly hairy and ended
-up being difficult to read following a conflict resolution for 3.2.
+On Tue, Jan 17, 2012 at 08:54:44AM +0000, Joe Woodward wrote:
+> So, is the upshot of this that the kernel isn't going to be in a
+> position to enable the L2/outer cache on OMAP3 (due to the need for
+> hacky/unmaintainable code)?
+> 
+> Hence the bootloader/uBoot had better leave it enabled...
 
-This patch rearranges the code slightly to make it easier to read.
+It could but the Linux decompressor needs to be aware and either flush
+the L2 (more difficult as it doesn't have all the device information) or
+set the page table attributes to outer non-cacheable (TEX[2:0] = 0b100).
+The latter may still not work if there are stale L2 cache lines left by
+U-Boot (and that's always possible unless U-Boot also uses outer
+non-cacheable memory attributes).
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/common/gic.c |   13 ++++++-------
- 1 files changed, 6 insertions(+), 7 deletions(-)
+But I would agree with Aneesh - can we not enabled the L2 at a later
+point?
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index c47d619..ca6b5dd 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -694,13 +694,12 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	 * For primary GICs, skip over SGIs.
- 	 * For secondary GICs, skip over PPIs, too.
- 	 */
--	domain->hwirq_base = 32;
--	if (gic_nr == 0) {
--		if ((irq_start & 31) > 0) {
--			domain->hwirq_base = 16;
--			if (irq_start != -1)
--				irq_start = (irq_start & ~31) + 16;
--		}
-+	if (gic_nr == 0 && (irq_start & 31) > 0) {
-+		domain->hwirq_base = 16;
-+		if (irq_start != -1)
-+			irq_start = (irq_start & ~31) + 16;
-+	} else {
-+		domain->hwirq_base = 32;
- 	}
- 
- 	/*
 -- 
-1.7.4.1
+Catalin
