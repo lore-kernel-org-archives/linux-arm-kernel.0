@@ -1,32 +1,69 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 17 Jan 2012 22:00:26 +0200
-Subject: [GIT PULL] adding rpmsg and remoteproc to 3.3
-In-Reply-To: <CAK=WgbbZBUiQkCOd=XqT9X_KexKKPft3NB6MCPK1DXfPcqAZ2w@mail.gmail.com>
-References: <CAK=WgbbZBUiQkCOd=XqT9X_KexKKPft3NB6MCPK1DXfPcqAZ2w@mail.gmail.com>
-Message-ID: <CAK=WgbZV3PY=ujdLc=8t2F+XJiNfob1z8Tsz=ea77fPwHVxRjg@mail.gmail.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue, 17 Jan 2012 12:04:11 -0800
+Subject: [PATCH] ARM: Print BUG instead of undefined instruction on
+ BUG_ON()
+In-Reply-To: <1326733664-4095-1-git-send-email-sboyd@codeaurora.org>
+References: <1326733664-4095-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAPnjgZ2LGjMM7QwoJrf2==3th4cT+s75ebV9q+eXudF4o5E_pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2012 at 9:01 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Please pull:
+On Mon, Jan 16, 2012 at 9:07 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> The ARM kernel uses undefined instructions to implement
+> BUG/BUG_ON(). This leads to problems where people don't read one
+> line above the Oops message and see the "kernel BUG at ..."
+> message and so they wrongly assume the kernel has hit an
+> undefined instruction.
 >
-> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next-acked
+> Instead of printing:
 >
-> To get the remoteproc and rpmsg frameworks, and a few fixes that were
-> collected after the frameworks were already merged into linux-next.
+> ?Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
 >
-> (I also tried to push this as a signed tag "rpmsg-for-3.3" but
-> am not sure how successful that feat really was)
+> print
+>
+> ?Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+>
+> This should prevent people from thinking the BUG_ON was an
+> undefined instruction when it was actually intentional.
+>
+> Cc: Simon Glass <sjg@chromium.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-git log --show-signature gives me the exact same output as git log
-does (just built 1.7.9.rc1.3.gb6310 to have it), so I'm not sure about
-the signature revalidation.
+Tested on a Tegra20 system. I would like to adjust the backtrace
+output slightly so will send a patch for that at the same time, since
+we are in there.
 
-But I do see the tag and it looks sane, and being able to include a
-merge commentary is indeed nice. And I guess the signature
-revalidation isn't too important since I'm anyway using k.org.
+Acked-by: Simon Glass <sjg@chromium.org>
+Tested-by: Simon Glass <sjg@chromium.org>
 
-Please let me know if there are any issues,
-
-Thanks,
-Ohad.
+> ---
+> ?arch/arm/kernel/traps.c | ? ?5 ++++-
+> ?1 files changed, 4 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 99a5727..f84dfe6 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -266,6 +266,7 @@ void die(const char *str, struct pt_regs *regs, int err)
+> ?{
+> ? ? ? ?struct thread_info *thread = current_thread_info();
+> ? ? ? ?int ret;
+> + ? ? ? enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
+>
+> ? ? ? ?oops_enter();
+>
+> @@ -273,7 +274,9 @@ void die(const char *str, struct pt_regs *regs, int err)
+> ? ? ? ?console_verbose();
+> ? ? ? ?bust_spinlocks(1);
+> ? ? ? ?if (!user_mode(regs))
+> - ? ? ? ? ? ? ? report_bug(regs->ARM_pc, regs);
+> + ? ? ? ? ? ? ? bug_type = report_bug(regs->ARM_pc, regs);
+> + ? ? ? if (bug_type != BUG_TRAP_TYPE_NONE)
+> + ? ? ? ? ? ? ? str = "Oops - BUG";
+> ? ? ? ?ret = __die(str, err, thread, regs);
+>
+> ? ? ? ?if (regs && kexec_should_crash(thread->task))
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
