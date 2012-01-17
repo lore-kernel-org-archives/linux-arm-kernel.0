@@ -1,29 +1,28 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 17 Jan 2012 15:06:52 +0000
-Subject: [PATCH] ARM: S3C64XX: Make s3c64xx_init_uarts() static
-Message-ID: <1326812812-27194-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Tue, 17 Jan 2012 15:07:46 +0000
+Subject: [PATCH] ARM: S3C64XX: Add a SPKVDD supply for CODECs on Cragganmore
+Message-ID: <1326812866-27271-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that it's in common.c it's not used in multiple source files.
+Hook up a SPKVDD supply for CODECs that can use it.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/common.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index 4a7394d..bee7dcd 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -49,7 +49,7 @@
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 202f724..d5a7982 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -300,6 +300,7 @@ static struct platform_device littlemill_device = {
+ };
  
- /* uart registration process */
- 
--void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
-+static void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
- {
- 	s3c24xx_init_uartdevs("s3c6400-uart", s3c64xx_uart_resources, cfg, no);
- }
+ static struct regulator_consumer_supply wallvdd_consumers[] = {
++	REGULATOR_SUPPLY("SPKVDD", "1-001a"),
+ 	REGULATOR_SUPPLY("SPKVDD1", "1-001a"),
+ 	REGULATOR_SUPPLY("SPKVDD2", "1-001a"),
+ 	REGULATOR_SUPPLY("SPKVDDL", "1-001a"),
 -- 
 1.7.7.3
