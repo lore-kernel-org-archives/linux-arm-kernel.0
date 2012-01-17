@@ -1,97 +1,35 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 17 Jan 2012 16:46:14 +0800
-Subject: [PATCH 2/2] ARM: prima2: convert to common sched_clock()
- implementation
-In-Reply-To: <1326715537-14968-3-git-send-email-marc.zyngier@arm.com>
-References: <1326715537-14968-1-git-send-email-marc.zyngier@arm.com>
- <1326715537-14968-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAGsJ_4yg0zrA8B6qL91RFxE8LTyDaNZmTfAxEuK4eSFdMKtTcQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Jan 2012 09:49:18 +0100
+Subject: [PATCH 8/8] dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
+In-Reply-To: <4F140D25.1000309@st.com>
+References: <cover.1326707233.git.viresh.kumar@st.com>
+ <7c1e6fd573d5cd348b22f8363c9960fe5efcd658.1326707233.git.viresh.kumar@st.com>
+ <4F140D25.1000309@st.com>
+Message-ID: <CACRpkdbY7ZOwY6GR4t+GODYL4yAdH-PXExmwp84R+Gz2W19X7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/16 Marc Zyngier <marc.zyngier@arm.com>:
-> Prima2 has its own sched_clock() implementation, which gets in the
-> way of a single zImage. Moving to the common sched_clock framework
-> makes the code slightly cleaner (the mapping hack in sched_clock()
-> goes away...).
+On Mon, Jan 16, 2012 at 12:42 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> On 1/16/2012 3:20 PM, Viresh KUMAR wrote:
+>> + ? ? /*
+>> + ? ? ?* Fix sconfig's burst size according to dw_dmac. We need to convert
+>> + ? ? ?* them as: 1 -> 0, 2 -> 1, 4 -> 2, 8 -> 3, 16 -> 4.
+>> + ? ? ?*
+>> + ? ? ?* This can be done by findiding least significant bit set: n & (n - 1)
+>> + ? ? ?*/
+>> + ? ? sconfig->src_maxburst &= sconfig->src_maxburst - 1;
+>> + ? ? sconfig->dst_maxburst &= sconfig->dst_maxburst - 1;
 >
-> Cc: Barry Song <baohua.song@csr.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Perhaps, this looks incorrect. It will always return 0. :(
+> Can somebody suggest any inbuild function to do this, i think
+>
+> find_next_bit(sconfig->src_maxburst, sizeof(sconfig->src_maxburst), 0)
+>
+> will do it.
 
-Ack. Thanks, Marc.
+Are you looking for ffs() from <linus/bitops.h>?
 
--barry
+find-first-set (the include boils down to include/asm-generic/bitops/ffs.h
+if you want to check the implementation).
 
-> ---
-> ?arch/arm/Kconfig ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-prima2/timer.c | ? 21 +++++++--------------
-> ?2 files changed, 8 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index cb75734..a18550e 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -388,6 +388,7 @@ config ARCH_PRIMA2
-> ? ? ? ?select GENERIC_CLOCKEVENTS
-> ? ? ? ?select CLKDEV_LOOKUP
-> ? ? ? ?select GENERIC_IRQ_CHIP
-> + ? ? ? select HAVE_SCHED_CLOCK
-> ? ? ? ?select MIGHT_HAVE_CACHE_L2X0
-> ? ? ? ?select USE_OF
-> ? ? ? ?select ZONE_DMA
-> diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer.c
-> index b7a6091..0d024b1 100644
-> --- a/arch/arm/mach-prima2/timer.c
-> +++ b/arch/arm/mach-prima2/timer.c
-> @@ -18,6 +18,7 @@
-> ?#include <linux/of.h>
-> ?#include <linux/of_address.h>
-> ?#include <mach/map.h>
-> +#include <asm/sched_clock.h>
-> ?#include <asm/mach/time.h>
->
-> ?#define SIRFSOC_TIMER_COUNTER_LO ? ? ? 0x0000
-> @@ -165,21 +166,9 @@ static struct irqaction sirfsoc_timer_irq = {
-> ?};
->
-> ?/* Overwrite weak default sched_clock with more precise one */
-> -unsigned long long notrace sched_clock(void)
-> +static u32 notrace sirfsoc_read_sched_clock(void)
-> ?{
-> - ? ? ? static int is_mapped;
-> -
-> - ? ? ? /*
-> - ? ? ? ?* sched_clock is called earlier than .init of sys_timer
-> - ? ? ? ?* if we map timer memory in .init of sys_timer, system
-> - ? ? ? ?* will panic due to illegal memory access
-> - ? ? ? ?*/
-> - ? ? ? if (!is_mapped) {
-> - ? ? ? ? ? ? ? sirfsoc_of_timer_map();
-> - ? ? ? ? ? ? ? is_mapped = 1;
-> - ? ? ? }
-> -
-> - ? ? ? return sirfsoc_timer_read(NULL) * (NSEC_PER_SEC / CLOCK_TICK_RATE);
-> + ? ? ? return (u32)(sirfsoc_timer_read(NULL) & 0xffffffff);
-> ?}
->
-> ?static void __init sirfsoc_clockevent_init(void)
-> @@ -210,6 +199,8 @@ static void __init sirfsoc_timer_init(void)
-> ? ? ? ?BUG_ON(rate < CLOCK_TICK_RATE);
-> ? ? ? ?BUG_ON(rate % CLOCK_TICK_RATE);
->
-> + ? ? ? sirfsoc_of_timer_map();
-> +
-> ? ? ? ?writel_relaxed(rate / CLOCK_TICK_RATE / 2 - 1, sirfsoc_timer_base + SIRFSOC_TIMER_DIV);
-> ? ? ? ?writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_LO);
-> ? ? ? ?writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_HI);
-> @@ -217,6 +208,8 @@ static void __init sirfsoc_timer_init(void)
->
-> ? ? ? ?BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE));
->
-> + ? ? ? setup_sched_clock(sirfsoc_read_sched_clock, 32, CLOCK_TICK_RATE);
-> +
-> ? ? ? ?BUG_ON(setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq));
->
-> ? ? ? ?sirfsoc_clockevent_init();
-> --
-> 1.7.7.1
+Linus Walleij
