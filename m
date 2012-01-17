@@ -1,120 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Jan 2012 13:34:28 +0000
-Subject: [PATCH 1/2] mach-ux500: cache operations are atomic on PL310
-In-Reply-To: <20120117112741.GA14426@bnru02>
-References: <1326346663-6112-1-git-send-email-srinidhi.kasagar@stericsson.com>
- <20120113181422.GB24373@mudshark.cambridge.arm.com>
- <20120116110528.GA24824@bnru02>
- <20120116145008.GH9068@mudshark.cambridge.arm.com>
- <20120117062224.GA26832@bnru02>
- <20120117103023.GB9230@mudshark.cambridge.arm.com>
- <20120117112741.GA14426@bnru02>
-Message-ID: <20120117133428.GB11581@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Jan 2012 13:39:18 +0000
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
+ by uBoot)?
+In-Reply-To: <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+References: <WC20120116100344.4204CC@terrafix.co.uk>
+ <CAMQu2gw4H=m1QA+ucORYsO_LZR8Sj57=+jwmrkHu_7sdCzhN8g@mail.gmail.com>
+ <20120116105949.GG16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+ <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+ <WC20120117085444.17057E@terrafix.co.uk>
+ <20120117121138.GC11475@arm.com> <4F15692D.4070100@ti.com>
+ <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+Message-ID: <20120117133918.GE11475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 11:27:43AM +0000, Srinidhi KASAGAR wrote:
-> On Tue, Jan 17, 2012 at 11:30:23 +0100, Will Deacon wrote:
-> > On Tue, Jan 17, 2012 at 06:22:26AM +0000, Srinidhi KASAGAR wrote:
-> > > 
-> > > Yes, we boot with L2 enabled.
-> > 
-> > Interesting. I'm surprised you don't have problems with stale data on the
-> > D-side after the decompressor. Maybe you're lucky with the mappings being no
-> > write allocate.
+On Tue, Jan 17, 2012 at 12:40:54PM +0000, Shilimkar, Santosh wrote:
+> On Tue, Jan 17, 2012 at 1:27 PM, Aneesh V <aneesh@ti.com> wrote:
+> > Hi Catalin,
+> >
+> >
+> > On Tuesday 17 January 2012 05:41 PM, Catalin Marinas wrote:
+> >>
+> >> On Tue, Jan 17, 2012 at 08:54:44AM +0000, Joe Woodward wrote:
+> >>>
+> >>> So, is the upshot of this that the kernel isn't going to be in a
+> >>> position to enable the L2/outer cache on OMAP3 (due to the need for
+> >>> hacky/unmaintainable code)?
+> >>>
+> >>> Hence the bootloader/uBoot had better leave it enabled...
+> >>
+> >> It could but the Linux decompressor needs to be aware and either flush
+> >> the L2 (more difficult as it doesn't have all the device information) or
+> >
+> > Cortex-A8 is aware of L2$ and can flush it, isn't it?
+> >
+> >> set the page table attributes to outer non-cacheable (TEX[2:0] = 0b100).
+> >
+> > If the above is right, this is not needed right?
+>
+> Well the L2 can be configured as inner or outer, so above
+> alone won't work.
 > 
-> Actually the pre bootloader makes sure that L2 is clean before relinquishing
-> the control to kernel decompressor.
-
-I was thinking more of the decompressor populating the L2 and not flushing
-it.
-
-> From a8cf7e2f7b58c3ef860be58fa72cd0c51e2be487 Mon Sep 17 00:00:00 2001
-> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> Date: Tue, 17 Jan 2012 11:29:39 +0530
-> Subject: [PATCH] mach-ux500: Do not override outer.inv_all
+> Boot-loader disabling L2 cache ( all caches)  is still right thing
+> and that's what kernel expect.
 > 
-> Invalidating outer cache without disabling it is a big
-> nono, and so, remove the machine specific outer.inv_all
-> 
-> And at the same time it does not prevent us overriding
-> outer.disable as we do not have any such secure SMI to
-> handle the same while kexec disables the outer cache.
-> 
-> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> ---
->  arch/arm/mach-ux500/cache-l2x0.c |   48 +++++--------------------------------
->  1 files changed, 7 insertions(+), 41 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-> index 122ddde..45111c8 100644
-> --- a/arch/arm/mach-ux500/cache-l2x0.c
-> +++ b/arch/arm/mach-ux500/cache-l2x0.c
-> @@ -12,44 +12,6 @@
->  
->  static void __iomem *l2x0_base;
->  
-> -static inline void ux500_cache_wait(void __iomem *reg, unsigned long mask)
-> -{
-> -	/* wait for the operation to complete */
-> -	while (readl_relaxed(reg) & mask)
-> -		cpu_relax();
-> -}
-> -
-> -static inline void ux500_cache_sync(void)
-> -{
-> -	writel_relaxed(0, l2x0_base + L2X0_CACHE_SYNC);
-> -	ux500_cache_wait(l2x0_base + L2X0_CACHE_SYNC, 1);
-> -}
-> -
-> -/*
-> - * The L2 cache cannot be turned off in the non-secure world.
-> - * Dummy until a secure service is in place.
-> - */
-> -static void ux500_l2x0_disable(void)
-> -{
-> -}
-> -
-> -/*
-> - * This is only called when doing a kexec, just after turning off the L2
-> - * and L1 cache, and it is surrounded by a spinlock in the generic version.
-> - * However, we're not really turning off the L2 cache right now and the
-> - * PL310 does not support exclusive accesses (used to implement the spinlock).
-> - * So, the invalidation needs to be done without the spinlock.
-> - */
-> -static void ux500_l2x0_inv_all(void)
-> -{
-> -	uint32_t l2x0_way_mask = (1<<16) - 1;	/* Bitmask of active ways */
-> -
-> -	/* invalidate all ways */
-> -	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
-> -	ux500_cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
-> -	ux500_cache_sync();
-> -}
-> -
->  static int __init ux500_l2x0_unlock(void)
->  {
->  	int i;
-> @@ -85,9 +47,13 @@ static int __init ux500_l2x0_init(void)
->  	/* 64KB way size, 8 way associativity, force WA */
->  	l2x0_init(l2x0_base, 0x3e060000, 0xc0000fff);
->  
-> -	/* Override invalidate function */
-> -	outer_cache.disable = ux500_l2x0_disable;
-> -	outer_cache.inv_all = ux500_l2x0_inv_all;
-> +	/*
-> +	 * We can't disable l2 as we are in non secure mode, currently
-> +	 * this seems being called only during kexec path. So let's
+> Since the early kernel code can't be patches for A8, may be
+> delaying L2 enabled would work.
 
-s/being/to be/
+Ah, I missed the fact that the L2 is an inner cache on OMAP3+A8. In this
+case, I would argue to just leave it enabled since as long as the MMU is
+off it won't be accessed. Why does U-Boot need to disable the L2 (I
+suspect via some auxiliary control register)?
 
-> +	 * override outer.disable with nasty assignment until we have
-> +	 * some SMI service available.
-> +	 */
-> +	outer_cache.disable = NULL;
+> But then on A15, we are back to square one since there is no
+> control to turn ON/OFF l2 cache.
 
-This looks alright to me.
+Well, it's an inner cache, it gets disabled/enabled via the SCTLR.M bit
+as is the L1 cache. It does not need to be disabled independently.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+> On A15 infact there are other CP15 registers which needs to be set
+> before MMU is enabled to have best configuration.
 
-Will
+Yes, there are, and my view is that it is up to the platform firmware to
+set things right.
+
+-- 
+Catalin
