@@ -1,55 +1,102 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2012 22:40:17 -0800
-Subject: [GIT PULL] Samsung devel for v3.3
-In-Reply-To: <20120109082640.GI22134@opensource.wolfsonmicro.com>
-References: <018801ccca70$25f01260$71d03720$%kim@samsung.com>
- <CAOesGMhLE3wxM=F9OkHT-bQpsVp8Uc6eE8Uk+WN9pLuz5BRLBw@mail.gmail.com>
- <20120108204953.GA20043@sirena.org.uk>
- <CAOesGMjn5uQEWbxrJryC+jOf=3SYbAnPY4A71NUZKFBi=a0QjA@mail.gmail.com>
- <20120109082640.GI22134@opensource.wolfsonmicro.com>
-Message-ID: <CAOesGMiU+-wfxsfha7GTO3s7dHysP65gcrbJsLWhBpZNT9O+UQ@mail.gmail.com>
+Date: Mon, 16 Jan 2012 22:58:04 -0800
+Subject: [GIT PULL] arm-soc fixes for 3.3-rc1
+Message-ID: <20120117065804.GA31953@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-On Mon, Jan 9, 2012 at 12:26 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Sun, Jan 08, 2012 at 05:21:02PM -0800, Olof Johansson wrote:
->
->> Mark, Kukjin, can either of you split out the fixes in a separate branch?
->
-> Here's some of them, there were a few others I'm aware of that depended
-> on feature updates. ?Ideally we'd actually get all the changes that have
-> been in -next in.
->
-> The following changes since commit 5f0a6e2d503896062f641639dacfe5055c2f593b:
->
-> ?Linux 3.2-rc7 (2011-12-23 21:51:06 -0800)
->
-> are available in the git repository at:
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git fixes/samsung
->
-> Mark Brown (5):
-> ? ? ?ARM: SAMSUNG: Fix GPIO space reservation for S3C64xx platforms
-> ? ? ?ARM: S3C64XX: Correct reservation of GPIOs for CPU module on Cragganmore
+Once the dmaengine pull request that was sent this morning lands, the remaining
+dependencies for arm-soc pull requests should be resolved.
 
-The above two don't seem to have been in the branch that was sent by
-Kukjin, it had:
+Until then, here is a batch of fixes for -rc1.
 
-      ARM: EXYNOS: Invert VCLK polarity for framebuffer on ORIGEN
-      ARM: S3C64XX: Fix interrupt configuration for PCA935x on Cragganmore
-      ARM: S3C64XX: Fix the memory mapped GPIOs on Cragganmore
-      ARM: S3C64XX: Remove hsmmc1 from Cragganmore
-      ARM: S3C64XX: Remove unconditional power domain disables
-      ARM: SAMSUNG: Declare struct platform_device in plat/s3c64xx-spi.h
-      ARM: SAMSUNG: dma-ops.h needs mach/dma.h
-      ARM: SAMSUNG: Guard against multiple inclusion of plat/dma.h
-
-I've pulled the branch from him.
-
-Kukjin, please consider picking up the missing two patches above and
-send another pull request with those and any other needed fixes.
-
+Thanks!
 
 -Olof
+
+
+
+The following changes since commit c2bc3a316a7281f67e36b34dac2802cbe36a9128:
+
+  Merge branch 'x86/rdrand' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip (2012-01-16 18:23:09 -0800)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git arm-soc-fixes-20120116
+
+for you to fetch changes up to 090e648a20a43d71fc2d63e0d8ff8ec6822e2396:
+
+  Merge branch 'samsung-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2012-01-16 22:46:19 -0800)
+
+----------------------------------------------------------------
+
+ARM: fixes for ARM platforms
+
+Some fallout from the 3.3. merge window as well as a couple bug fixes
+for older preexisting bugs that seem valid to include at this time:
+
+* sched_clock changes broke picoxcell, fix included
+* BSYM bugs causing issues with thumb2-built kernels on SMP
+* Missing module.h include on msm.
+* A collection of bugfixes for samsung platforms that didn't make it into
+  the first pull requests.
+
+----------------------------------------------------------------
+David Brown (1):
+      ARM: msm: vreg is a module and so needs module.h
+
+Jamie Iles (1):
+      ARM: picoxcell: fix sched_clock() cleanup fallout
+
+Mark Brown (7):
+      ARM: SAMSUNG: Guard against multiple inclusion of plat/dma.h
+      ARM: SAMSUNG: dma-ops.h needs mach/dma.h
+      ARM: SAMSUNG: Declare struct platform_device in plat/s3c64xx-spi.h
+      ARM: S3C64XX: Remove unconditional power domain disables
+      ARM: S3C64XX: Remove hsmmc1 from Cragganmore
+      ARM: S3C64XX: Fix the memory mapped GPIOs on Cragganmore
+      ARM: S3C64XX: Fix interrupt configuration for PCA935x on Cragganmore
+
+Olof Johansson (4):
+      Merge branch 'picoxcell-fixes' of git://github.com/jamieiles/linux-2.6-ji into fixes
+      Merge branch 'msm-fix' of git://codeaurora.org/quic/kernel/davidb/linux-msm into fixes
+      Merge branch 'fixes-for-arm-soc' of git://sources.calxeda.com/kernel/linux into fixes
+      Merge branch 'samsung-fixes' of git://git.kernel.org/.../kgene/linux-samsung into fixes
+
+Pawel Moll (1):
+      ARM: versatile: Add missing ENDPROC to headsmp.S
+
+Rob Herring (6):
+      ARM: msm: Add missing ENDPROC to headsmp.S
+      ARM: ux500: add missing ENDPROC to headsmp.S
+      ARM: exynos: remove incorrect BSYM usage
+      ARM: imx: remove incorrect BSYM usage
+      ARM: highbank: remove incorrect BSYM usage
+      ARM: make BSYM macro assembly only
+
+Tushar Behera (1):
+      ARM: EXYNOS: Invert VCLK polarity for framebuffer on ORIGEN
+
+ arch/arm/include/asm/unified.h                   |    4 ++--
+ arch/arm/mach-exynos/headsmp.S                   |    2 ++
+ arch/arm/mach-exynos/mach-origen.c               |    3 ++-
+ arch/arm/mach-exynos/platsmp.c                   |    5 ++---
+ arch/arm/mach-highbank/highbank.c                |    3 +--
+ arch/arm/mach-imx/src.c                          |    3 +--
+ arch/arm/mach-msm/headsmp.S                      |    1 +
+ arch/arm/mach-msm/vreg.c                         |    1 +
+ arch/arm/mach-picoxcell/time.c                   |    2 +-
+ arch/arm/mach-realview/platsmp.c                 |    3 +--
+ arch/arm/mach-s3c64xx/include/mach/crag6410.h    |    1 +
+ arch/arm/mach-s3c64xx/mach-crag6410.c            |   13 +++----------
+ arch/arm/mach-s3c64xx/pm.c                       |   13 -------------
+ arch/arm/mach-ux500/headsmp.S                    |    2 ++
+ arch/arm/mach-vexpress/platsmp.c                 |    4 +---
+ arch/arm/plat-samsung/include/plat/dma-ops.h     |    1 +
+ arch/arm/plat-samsung/include/plat/dma.h         |    6 +++++-
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 ++
+ arch/arm/plat-versatile/headsmp.S                |    1 +
+ 19 files changed, 30 insertions(+), 40 deletions(-)
