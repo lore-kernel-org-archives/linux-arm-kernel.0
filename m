@@ -1,50 +1,30 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 18 Jan 2012 18:07:12 +0800
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
-References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
- <4F0B182D.7060507@us.ibm.com>
- <20120109224945.GA23090@mudshark.cambridge.arm.com>
- <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
- <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
- <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
- <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
-Message-ID: <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
+From: mmarek@suse.cz (Michal Marek)
+Date: Wed, 18 Jan 2012 11:07:58 +0100
+Subject: [PATCH 2/2] Kbuild: Use dtc's -d (dependency) option
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D2255@HQMAIL01.nvidia.com>
+References: <1326134295-15547-1-git-send-email-swarren@nvidia.com>
+ <1326134295-15547-2-git-send-email-swarren@nvidia.com>
+ <1326310587.2535.291.camel@deneb.redhat.com> <4F1206F1.5090405@suse.cz>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D2255@HQMAIL01.nvidia.com>
+Message-ID: <4F1699FE.5050005@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17.1.2012 18:20, Stephen Warren wrote:
+> Michal Marek wrote at Saturday, January 14, 2012 3:51 PM:
+>> As the C6X port has been merged in this merge window, I can't easily
+>> apply this patch to my kbuild branch and at the same time please Linus
+>> by basing the pull request on a tagged release. So I'm going to drop the
+>> arch/c6x part to keep the kbuild branch "pretty" and let either Mark or
+>> Stephen send the patch to Linus directly, once he has merged the kbuild
+>> branch. Would that work?
+> 
+> I was assuming my patches were for 3.4 rather than 3.3, since it's pretty
+> late for new features in 3.3. In that case, there wouldn't be an issue,
+> right?
 
-On Wed, Jan 18, 2012 at 5:54 PM, stephane eranian <eranian@googlemail.com>
-> Should I use Will's -next tree as the base instead of Linus'?
+OK, that was a misunderstanding then. I applied it to the kbuild branch
+for 3.3 and Linus pulled it in the meantime. It's not a terribly
+intrusive change, after all.
 
-Either one is OK. If you use linus tree as base, you need to apply the #1 and
-#2 patch manually.
-
-> Given that MARC is shutdown today, would you mind packing those patches
-> into a tarball and sending them to me directly?
-
-See attachment, which includes the patches from #3 to #6.
-
->
-> When you mention Will's -next tree, are you talking about:
-> git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-next/perf
-
-It is perf/omap4 brach, you can pick up the two patches[1][2] directly from
-the branch.
-
-
-thanks,
---
-Ming Lei
-
-[1], http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commit;h=7924a3eba0766348d6d6a56cbb9873cdbcab0d8c
-
-[2], http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commit;h=bde071f005e2dc71378aff69e86b961d8cd7922f
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: omap4_pmu.tar.gz
-Type: application/x-gzip
-Size: 7423 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120118/650d6340/attachment-0001.gz>
+Michal
