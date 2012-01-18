@@ -1,86 +1,68 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 18 Jan 2012 14:38:07 +0000
-Subject: [RFC PATCH 1/5] arm:omap1/2/3/4:Convert 32k-Sync clocksource
- driver to platform_driver
-In-Reply-To: <4F16D66F.2000602@arm.com>
-References: <1326886086-27313-1-git-send-email-hvaibhav@ti.com>
- <1326886086-27313-2-git-send-email-hvaibhav@ti.com>
- <20120118115952.GM16726@n2100.arm.linux.org.uk>
- <79CD15C6BA57404B839C016229A409A8317A9AA2@DBDE01.ent.ti.com>
- <20120118141147.GN16726@n2100.arm.linux.org.uk> <4F16D66F.2000602@arm.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317A9C39@DBDE01.ent.ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 18 Jan 2012 14:36:43 +0000
+Subject: [RFC PATCH 0/5] ARM: introducing DT topology
+Message-ID: <1326897408-11204-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2012 at 19:55:51, Marc Zyngier wrote:
-> On 18/01/12 14:11, Russell King - ARM Linux wrote:
-> > On Wed, Jan 18, 2012 at 01:34:55PM +0000, Hiremath, Vaibhav wrote:
-> >> On Wed, Jan 18, 2012 at 17:29:52, Russell King - ARM Linux wrote:
-> >>> On Wed, Jan 18, 2012 at 04:58:02PM +0530, Vaibhav Hiremath wrote:
-> >>>> Convert counter_32k clocksource driver to standard platform_driver
-> >>>> and move it drivers/clocksource/ directory.
-> >>>>
-> >>>> Also, rename it to more generic name "omap-32k.c".
-> >>>
-> >>> NAK.  sched_clock is supposed to be available early.  Platform device
-> >>> driver initialization is FAR too late.
-> >>>
-> >> Russell,
-> >>
-> >> Sched_clock is available very early during boot sequence. Initially gp-timer 
-> >> (dmtimer) will get registered as a clocksource. Please refer to the file
-> >> mach-omap2/timer.c
-> >>
-> >> 32k_sync timer (omap-32k.c) will come get registered during arch_init.
-> >>
-> >> Just FYI, the way I tested it is, I used kernel parameter 
-> >> "clocksourse=counter-32k", the switch from gp-timer to 32k timer
-> >> will happen once it gets registered.
-> > 
-> > So please delete the sched_clock code from the 32k timer stuff you've
-> > moved to a platform driver.  It will cause sched_clock to reset to zero,
-> > and that's bad news.
-> > 
-> > Only one sched_clock() should ever be registered, and that should only be
-> > registered very early at boot time.
-> 
-> The kernel will WARN if two sched_clock() are registered. I hope this
-> will be enough for people not to persist with such a thing...
-> 
-Marc,
+The introduction of multi-cluster ARM systems in SoC designs requires the kernel
+to become cluster aware, so that it can be booted on every CPU in the system
+and it can build an appropriate representation of topology levels.
 
-This code-snippet is not registering multiple sched_clock() functions,
-Here we have 2 timers
-  - gp-timer (available on all devices)
-  - 32k-sync timer (may not available on all devices, like AM33xx)
+Current code in the kernel, in particular the boot sequence, hinges upon a
+sequential mapping of MPIDR values for cpus and related interrupt
+controller CPU interfaces to logical cpu indexing. 
+This hypothesis is not valid when the concept of cluster is introduced since
+the MPIDR cannot be represented as a single index and interrupt controller
+CPU interfaces might be wired with a numbering scheme following per-SoC
+design parameters which cannot be extrapolated easily through generic functions
+by the primary CPU.
 
-So we are registering both the timers as a clocksource and kernel
-Chooses one based on kernel-parameter or rating.
->From sched_clock perspective, we have only one function exported in
-mach-omap2/timer.c, which in-turn calls omap-32k.c timer api.
+Furthermore, relying on the MPIDR to be wired according to real topology levels
+might turn out to be an unreliable solution, hence a SW representation is
+needed to override possibly incorrect MPIDR register values.
 
-Something like this,
+Through the device tree and relative bindings, the kernel is provided
+with HW values for MPIDR registers, interrupt controller CPU interfaces and
+with a topology representation of hierarchy levels and connection between cores.
 
+The device tree bindings allow to boot the Linux kernel on a multi-cluster
+system without relying on platform specific hook to identify the number of CPUs
+and interrupt controller wiring definition.
 
-unsigned long long notrace sched_clock(void)
-{
-	U32 cyc;
+The patchset has been tested against:
 
-	/* First call 32k-sync timer sched_clock() */
-	/* return 0 means, the device doesn't have 32k-sync timer available */
-	cyc = sched_clock_32k();
-	if (cyc)
-		return cyc;
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-arm-arch.git master
 
-	/* Fall back to gp-timer approach */
-}
+to boot an 8-core dual-cluster system on every possible CPU and to describe
+the relative cpu topology according to the affinity levels.
 
-So there is and will not be any warning from kernel here.
+Compile tested against linux-next, with a dependency on the following patch:
 
-Thanks,
-Vaibhav
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
-> 
-> 
+http://www.spinics.net/lists/arm-kernel/msg155873.html
+
+Documentation of new device tree bindings is provided in the corresponding
+patches and provided for discussion.
+
+Lorenzo Pieralisi (5):
+  ARM: kernel: add device tree init map function
+  ARM: kernel: add cpu logical map DT init in setup_arch
+  ARM: kernel: add logical mappings look-up
+  ARM: gic: add cpuif topology description
+  ARM: kernel: build CPU topology from DT
+
+ Documentation/devicetree/bindings/arm/cpus.txt     |   42 +++++
+ Documentation/devicetree/bindings/arm/gic.txt      |   69 ++++++++
+ Documentation/devicetree/bindings/arm/topology.txt |  167 ++++++++++++++++++++
+ arch/arm/common/gic.c                              |   94 +++++++++++-
+ arch/arm/include/asm/prom.h                        |    2 +
+ arch/arm/include/asm/smp_plat.h                    |   12 ++
+ arch/arm/kernel/devtree.c                          |   40 +++++
+ arch/arm/kernel/setup.c                            |    1 +
+ arch/arm/kernel/topology.c                         |  110 +++++++++++---
+ 9 files changed, 513 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
+
+-- 
+1.7.4.4
