@@ -1,106 +1,73 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Wed, 18 Jan 2012 09:32:40 +0000
-Subject: Pinmux bindings proposal
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D22EB@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120117082334.GA31295@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D22EB@HQMAIL01.nvidia.com>
-Message-ID: <7FE21149F4667147B645348EC6057885094F47@039-SN2MPN1-013.039d.mgd.msft.net>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 18 Jan 2012 17:33:24 +0800
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+ <20120109224945.GA23090@mudshark.cambridge.arm.com>
+ <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+ <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+Message-ID: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Warren [mailto:swarren at nvidia.com]
-....
+Hi Will and stephane,
 
-> > Considering the different pinctrl configurations for the same client
-> > device usually share the same pinmux and only pinconf varies.  It may
-> > worth introducing another level phandle reference.  Something like the
-> > following:
-> 
-> I don't think there's a need for another level of indirection. The 1:n model I
-> was talking about already handles this, I believe. See below.
-> 
-> > 	pinmux_sdhci: pinmux-sdhci {
-> > 		mux =
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
-> > 	};
-> >
-> > 	pinconf_sdhci_active: pinconf-sdhci-active {
-> > 		config =
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
-> > 	};
-> >
-> > 	pinconf_sdhci_suspend: pinconf-sdhci-suspend {
-> > 		config =
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
-> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
-> > 	};
-> 
-> Those 3 nodes make sense to me.
-> 
-> > 	pinctrl_sdhci_active: pinctrl-sdhci-active {
-> > 		pinmux = <&pinmux_sdhci>;
-> > 		pinconf = <&pinconf_sdhci_active>;
-> > 	};
-> >
-> > 	pinctrl_sdhci_suspend: pinctrl-sdhci-suspend {
-> > 		pinmux = <&pinmux_sdhci>;
-> > 		pinconf = <&pinconf_sdhci_suspend>;
-> > 	};
-> 
-> I think we can avoid those 2 nodes.
-> 
-> > 	sdhci at c8000200 {
-> > 		...
-> > 		pinctrl = <&pinctrl_sdhci_active> <&pinctrl_sdhci_suspend>;
-> > 		pinctrl-names = "active", "suspend";
-> > 	};
-> 
-> And rewrite that node as:
-> 
-> sdhci at c8000200 {
->     ...
->     pinctrl = <&pinmux_sdhci> <&pinconf_sdhci_active>
->               <&pinmux_sdhci> <&pinconf_sdhci_suspend>;
->     pinctrl-names = "active", "active", "suspend", "suspend"; };
-> 
-> The only slight disadvantage here is that the person constructing the
-> pinctrl/pinctrl-names properties needs to know to explicitly list both the
-> separate mux/config phandles for each value in pinctrl-names. Still, this seems
-> a reasonable compromise; the user is still picking from a bunch of pre-
-> defined/canned nodes, they simply need to list 2 (or n in
-> general) of them for each state.
-> 
-> > This will be pretty useful for imx6 usdhc case, which will have 3
-> > pinctrl configuration for each usdhc device (imx6 has 4 usdhc
-> > devices), pinctrl-50mhz, pinctrl-100mhz and pinctrl-200mhz.  All these
-> > 3 states have the exactly same pinmux settings, and only varies on pinconf.
-> 
-> Yes, I definitely agree there's a need for this.
-> 
-> As an aside, I wonder if the following would be any better:
-> 
-> sdhci at c8000200 {
->     ...
->     pinctrl = <&pinmux_sdhci> <&pinconf_sdhci_active>
->               <&pinmux_sdhci> <&pinconf_sdhci_suspend>;
->     /* Number of entries in pinctrl for each in pinctrl-names */
->     pinctrl-entries = <2 2>;
->     pinctrl-names = "active", "suspend"; };
-> 
-> That seems more complex though.
-> 
-This makes sense to me.
+On Wed, Jan 18, 2012 at 12:18 PM, Ming Lei <ming.lei@canonical.com> wrote:
+> Hi stephane & Will,
+>
+> On Tue, Jan 10, 2012 at 8:46 AM, stephane eranian
+> <eranian@googlemail.com> wrote:
+>> See the dmesg from my 3.2 kernel:
+>>
+>>
+>> [ ? ?0.000000] Booting Linux on physical CPU 0[ ? ?0.000000]
 
-Regards
-Dong Aisheng
+But if you test omap4 perf against -next kernel, pmu won't work because
+the commit[1] may put 'emu_sys_clkdm'  clock domain into HW_AUTO mode,
+so writing pmu register may not take effect.
+
+I have found  the similar problem on cam clock domain before[2].
+CD_EMU is very simliar with CD_CAM in the point below:
+
+	CD_EMU has no static or module wake-up dependency with any other clock
+	domain of the device.[3]
+
+So the patch[4] can make omap4 pmu work on -next tree.
+
+Shilimkar, care to comment on the patch[4]?
+
+thanks,
+--
+Ming Lei
+
+[1], commit 3c50729b3fa1cd8ca1f347e6caf1081204cf1a7c
+Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date:   Wed Jan 5 22:03:17 2011 +0530
+
+   ARM: OMAP4: PM: Initialise all the clockdomains to supported states
+
+   Initialise hardware supervised mode for all clockdomains if it's
+   supported. Initiate sleep transition for other clockdomains,
+   if they are not being used.
+
+[2], http://www.spinics.net/lists/linux-omap/msg61911.html
+
+[3], 3.6.12.3 of OMAP4 TRM
+
+[4],
+diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c
+b/arch/arm/mach-omap2/clockdomains44xx_data.c
+index 9299ac2..41d2260 100644
+--- a/arch/arm/mach-omap2/clockdomains44xx_data.c
++++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+@@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.cm_inst	  = OMAP4430_PRM_EMU_CM_INST,
+ 	.clkdm_offs	  = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
+-	.flags		  = CLKDM_CAN_HWSUP,
++	.flags		  = CLKDM_CAN_SWSUP,
+ };
+
+ static struct clockdomain l3_dma_44xx_clkdm = {
