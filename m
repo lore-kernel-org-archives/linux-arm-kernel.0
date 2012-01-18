@@ -1,40 +1,50 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 18 Jan 2012 15:24:44 +0530
-Subject: [PATCH V2 08/12] dmaengine/dw_dmac: Unmap all memory buffers
- after completion of slave transfers
-In-Reply-To: <20120118093620.GC1068@n2100.arm.linux.org.uk>
-References: <cover.1326876464.git.viresh.kumar@st.com>
- <ba53f229f3f594bfe0459b01a9ebb4d9b2c15882.1326876464.git.viresh.kumar@st.com>
- <20120118093620.GC1068@n2100.arm.linux.org.uk>
-Message-ID: <4F1696E4.9070806@st.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 18 Jan 2012 18:07:12 +0800
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+ <20120109224945.GA23090@mudshark.cambridge.arm.com>
+ <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+ <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
+Message-ID: <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/18/2012 3:06 PM, Russell King - ARM Linux wrote:
-> On Wed, Jan 18, 2012 at 02:41:55PM +0530, Viresh Kumar wrote:
-> NAK.  For reasons stated previously and subsequently ignored.
-> .
-> 
+Hi,
 
-On 1/18/2012 3:05 PM, Russell King - ARM Linux wrote:
->> > You implemented similar stuff in amba-pl08x :) .
->> > 
->> > if (!plchan->slave)
->> > 	pl08x_unmap_buffers(txd);
-> Take a look at that.  "If *NOT* slave, unmap the buffers".
+On Wed, Jan 18, 2012 at 5:54 PM, stephane eranian <eranian@googlemail.com>
+> Should I use Will's -next tree as the base instead of Linus'?
 
-[Following is picked from current implementation of dw_dmac:]
+Either one is OK. If you use linus tree as base, you need to apply the #1 and
+#2 patch manually.
 
-	if (!dwc->chan.private) {
-		struct device *parent = chan2parent(&dwc->chan);
-		if (!(txd->flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
+> Given that MARC is shutdown today, would you mind packing those patches
+> into a tarball and sending them to me directly?
 
-Sorry, I missed the most straight forward looking code. :(
-Actually, dw_dmac is also doing the same, i.e. unmapping only for
-non-slave transfers.
+See attachment, which includes the patches from #3 to #6.
 
-The same patch is still applicable, after fixing message subject and log.
-I will resend it, with message log fixed, once i get more feedbacks on V2.
+>
+> When you mention Will's -next tree, are you talking about:
+> git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-next/perf
 
--- 
-viresh
+It is perf/omap4 brach, you can pick up the two patches[1][2] directly from
+the branch.
+
+
+thanks,
+--
+Ming Lei
+
+[1], http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commit;h=7924a3eba0766348d6d6a56cbb9873cdbcab0d8c
+
+[2], http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commit;h=bde071f005e2dc71378aff69e86b961d8cd7922f
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: omap4_pmu.tar.gz
+Type: application/x-gzip
+Size: 7423 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120118/650d6340/attachment-0001.gz>
