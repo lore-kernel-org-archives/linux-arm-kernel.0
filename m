@@ -1,34 +1,584 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 17 Jan 2012 22:48:06 -0600
+Date: Tue, 17 Jan 2012 22:48:07 -0600
 Subject: [RFC PATCH v3] ARM: imx: Add basic imx6q thermal management
-Message-ID: <1326862087-17816-1-git-send-email-rob.lee@linaro.org>
+In-Reply-To: <1326862087-17816-1-git-send-email-rob.lee@linaro.org>
+References: <1326862087-17816-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <1326862087-17816-2-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on v3.2 plus recently submitted cpu_cooling functionality here:
+Adds support for temperature sensor readings, registers with common
+thermal framework, and uses the new common cpu_cooling interface.
 
-http://www.spinics.net/lists/linux-pm/msg26500.html
-
-link to v2 submission:
-
-http://www.spinics.net/lists/arm-kernel/msg155790.html
-
-Changes since v2:
-1. Fixed the various issues pointed out in v2
-2. Made other code cleanup and a bit of re-organizing
-3. Removed unecessary platform driver and device.
-
-Performed some basic testing to ensure proper cooling operating.  If
-you want to test this, full testing requires imx6q cpufreq
-implementation (not yet in v3.2) and requires an imx6q part that has
-temperature sensor calibration fuses correctly burned.
-
-Robert Lee (1):
-  ARM: imx: Add basic imx6q thermal management
-
+Signed-off-by: Robert Lee <rob.lee@linaro.org>
+---
  arch/arm/boot/dts/imx6q.dtsi    |    1 +
  drivers/thermal/Kconfig         |    6 +
  drivers/thermal/Makefile        |    1 +
  drivers/thermal/imx6q_thermal.c |  520 +++++++++++++++++++++++++++++++++++++++
  4 files changed, 528 insertions(+), 0 deletions(-)
  create mode 100644 drivers/thermal/imx6q_thermal.c
+
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 7dda599..d62b88d 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -508,6 +508,7 @@
+ 			};
+ 
+ 			ocotp at 021bc000 {
++				compatible = "fsl,imx6q-ocotp";
+ 				reg = <0x021bc000 0x4000>;
+ 			};
+ 
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 298c1cd..dd8cede 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -29,3 +29,9 @@ config CPU_THERMAL
+ 	  This will be useful for platforms using the generic thermal interface
+ 	  and not the ACPI interface.
+ 	  If you want this support, you should say Y or M here.
++
++config IMX6Q_THERMAL
++	bool "IMX6Q Thermal interface support"
++	depends on THERMAL && CPU_THERMAL
++	help
++	  Adds thermal management for IMX6Q.
+diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+index 655cbc4..e2bcffe 100644
+--- a/drivers/thermal/Makefile
++++ b/drivers/thermal/Makefile
+@@ -4,3 +4,4 @@
+ 
+ obj-$(CONFIG_THERMAL)		+= thermal_sys.o
+ obj-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
++obj-$(CONFIG_IMX6Q_THERMAL)	+= imx6q_thermal.o
+diff --git a/drivers/thermal/imx6q_thermal.c b/drivers/thermal/imx6q_thermal.c
+new file mode 100644
+index 0000000..3dbf8ae
+--- /dev/null
++++ b/drivers/thermal/imx6q_thermal.c
+@@ -0,0 +1,520 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/* i.MX6Q Thermal Implementation */
++
++#include <linux/kernel.h>
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/dmi.h>
++#include <linux/init.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/types.h>
++#include <linux/thermal.h>
++#include <linux/io.h>
++#include <linux/syscalls.h>
++#include <linux/cpufreq.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/smp.h>
++#include <linux/cpu_cooling.h>
++#include <linux/platform_device.h>
++
++/* register define of anatop */
++#define HW_ANADIG_ANA_MISC0			0x00000150
++#define HW_ANADIG_ANA_MISC0_SET			0x00000154
++#define HW_ANADIG_ANA_MISC0_CLR			0x00000158
++#define HW_ANADIG_ANA_MISC0_TOG			0x0000015c
++#define BM_ANADIG_ANA_MISC0_REFTOP_SELBIASOFF	0x00000008
++
++#define HW_ANADIG_TEMPSENSE0			0x00000180
++#define HW_ANADIG_TEMPSENSE0_SET		0x00000184
++#define HW_ANADIG_TEMPSENSE0_CLR		0x00000188
++#define HW_ANADIG_TEMPSENSE0_TOG		0x0000018c
++
++#define BP_ANADIG_TEMPSENSE0_TEMP_VALUE		8
++#define BM_ANADIG_TEMPSENSE0_TEMP_VALUE		0x000FFF00
++#define BM_ANADIG_TEMPSENSE0_FINISHED		0x00000004
++#define BM_ANADIG_TEMPSENSE0_MEASURE_TEMP	0x00000002
++#define BM_ANADIG_TEMPSENSE0_POWER_DOWN		0x00000001
++
++#define HW_ANADIG_TEMPSENSE1			0x00000190
++#define HW_ANADIG_TEMPSENSE1_SET		0x00000194
++#define HW_ANADIG_TEMPSENSE1_CLR		0x00000198
++#define BP_ANADIG_TEMPSENSE1_MEASURE_FREQ	0
++#define BM_ANADIG_TEMPSENSE1_MEASURE_FREQ	0x0000FFFF
++
++#define HW_OCOTP_ANA1				0x000004E0
++
++#define IMX6Q_THERMAL_POLLING_FREQUENCY_MS 10000
++#define IMX6Q_THERMAL_ACT_TRP_PTS 3
++/* assumption: always one critical trip point */
++#define IMX6Q_THERMAL_TOTAL_TRP_PTS (IMX6Q_THERMAL_ACT_TRP_PTS + 1)
++
++struct th_sys_trip_point {
++	u32 temp; /* in celcius */
++	enum thermal_trip_type type;
++};
++
++struct imx6q_thermal_data {
++	struct th_sys_trip_point trp_pts[IMX6Q_THERMAL_TOTAL_TRP_PTS];
++	struct freq_pctg_table freq_tab[IMX6Q_THERMAL_ACT_TRP_PTS];
++};
++
++struct imx6q_sensor_data {
++	int	c1, c2;
++	char	*name;
++	u32	pre_susp_state;
++};
++
++struct imx6q_thermal_zone {
++	struct thermal_zone_device *therm_dev;
++	struct thermal_cooling_device *cool_dev;
++	struct imx6q_sensor_data sensor_data;
++	struct imx6q_thermal_data *thermal_data;
++};
++
++/*
++ * This data defines the various trip points that will trigger action
++ * when crossed.
++ */
++static struct imx6q_thermal_data thermal_data = {
++	.trp_pts[0] = {
++		.temp	 = 85000,
++		.type	 = THERMAL_TRIP_STATE_ACTIVE,
++	},
++	.freq_tab[0] = {
++		.freq_clip_pctg[0] = 25,
++	},
++	.trp_pts[1] = {
++		.temp	 = 90000,
++		.type	 = THERMAL_TRIP_STATE_ACTIVE,
++	},
++	.freq_tab[1] = {
++		.freq_clip_pctg[0] = 65,
++	},
++	.trp_pts[2] = {
++		.temp	 = 95000,
++		.type	 = THERMAL_TRIP_STATE_ACTIVE,
++	},
++	.freq_tab[2] = {
++		.freq_clip_pctg[0] = 99,
++	},
++	.trp_pts[3] = {
++		.temp	 = 100000,
++		.type	 = THERMAL_TRIP_CRITICAL,
++	},
++};
++
++static int th_sys_get_temp(struct thermal_zone_device *thermal,
++				  unsigned long *temp);
++
++static struct imx6q_thermal_zone	*th_zone;
++static void __iomem			*anatop_base, *ocotp_base;
++
++static inline int imx6q_get_temp(int *temp, struct imx6q_sensor_data *sd)
++{
++	unsigned int n_meas;
++	unsigned int reg;
++
++	/*
++	 * For now we only using single measure.  Every time we measure
++	 * the temperature, we will power on/down the anadig module
++	 */
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
++		anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
++
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
++		anatop_base + HW_ANADIG_TEMPSENSE0_SET);
++
++	/*
++	 * According to SoC designers, it may require up to ~17us to complete
++	 * a measurement.  But we have a 'finished' status bit, so we
++	 * check it just in case the designers are liars.
++	 */
++	do
++		msleep(1);
++	while (!(readl_relaxed(anatop_base + HW_ANADIG_TEMPSENSE0)
++		& BM_ANADIG_TEMPSENSE0_FINISHED));
++
++	reg = readl_relaxed(anatop_base + HW_ANADIG_TEMPSENSE0);
++
++	n_meas = (reg & BM_ANADIG_TEMPSENSE0_TEMP_VALUE)
++			>> BP_ANADIG_TEMPSENSE0_TEMP_VALUE;
++
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
++		anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
++
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
++			anatop_base + HW_ANADIG_TEMPSENSE0_SET);
++
++	/* See imx6q_thermal_process_fuse_data for forumla derivation. */
++	*temp = sd->c2 + (sd->c1 * n_meas);
++
++	pr_debug("Temperature: %d\n", *temp / 1000);
++
++	return 0;
++}
++
++static int th_sys_get_temp(struct thermal_zone_device *thermal,
++				  unsigned long *temp)
++{
++	int tmp = 0;
++
++	struct imx6q_sensor_data *sd;
++
++	sd = &(((struct imx6q_thermal_zone *)thermal->devdata)->sensor_data);
++
++	imx6q_get_temp(&tmp, sd);
++
++	/*
++	 * The thermal framework code stores temperature in unsigned long. Also,
++	 * it has references to "millicelcius" which limits the lowest
++	 * temperature possible (compared to Kelvin).
++	 */
++	if (tmp > 0)
++		*temp = tmp;
++	else
++		*temp = 0;
++
++	return 0;
++}
++
++static int th_sys_get_mode(struct thermal_zone_device *thermal,
++			    enum thermal_device_mode *mode)
++{
++	*mode = THERMAL_DEVICE_ENABLED;
++	return 0;
++}
++
++static int th_sys_get_trip_type(struct thermal_zone_device *thermal, int trip,
++				 enum thermal_trip_type *type)
++{
++	struct imx6q_thermal_data *p;
++
++	if (trip >= IMX6Q_THERMAL_TOTAL_TRP_PTS)
++		return -EINVAL;
++
++	p = ((struct imx6q_thermal_zone *)thermal->devdata)->thermal_data;
++
++	*type = p->trp_pts[trip].type;
++
++	return 0;
++}
++
++static int th_sys_get_trip_temp(struct thermal_zone_device *thermal, int trip,
++				 unsigned long *temp)
++{
++	struct imx6q_thermal_data *p;
++
++	if (trip >= IMX6Q_THERMAL_TOTAL_TRP_PTS)
++		return -EINVAL;
++
++	p = ((struct imx6q_thermal_zone *)thermal->devdata)->thermal_data;
++
++	*temp = p->trp_pts[trip].temp;
++
++	return 0;
++}
++
++static int th_sys_get_crit_temp(struct thermal_zone_device *thermal,
++				 unsigned long *temp)
++{
++	struct imx6q_thermal_data *p;
++
++	p = ((struct imx6q_thermal_zone *)thermal->devdata)->thermal_data;
++
++	*temp = p->trp_pts[IMX6Q_THERMAL_TOTAL_TRP_PTS - 1].temp;
++
++	return 0;
++}
++
++static int th_sys_bind(struct thermal_zone_device *thermal,
++			struct thermal_cooling_device *cdev)
++{
++	int i;
++	struct thermal_cooling_device *cd;
++
++	cd = ((struct imx6q_thermal_zone *)thermal->devdata)->cool_dev;
++
++	/* if the cooling device is the one from imx6 bind it */
++	if (cdev != cd)
++		return 0;
++
++	for (i = 0; i < IMX6Q_THERMAL_ACT_TRP_PTS; i++) {
++		if (thermal_zone_bind_cooling_device(thermal, i, cdev)) {
++			pr_err("error binding cooling dev\n");
++			return -EINVAL;
++		}
++	}
++
++	return 0;
++}
++
++static int th_sys_unbind(struct thermal_zone_device *thermal,
++			  struct thermal_cooling_device *cdev)
++{
++	int i;
++
++	struct thermal_cooling_device *cd;
++
++	cd = ((struct imx6q_thermal_zone *)thermal->devdata)->cool_dev;
++
++	if (cdev != cd)
++		return 0;
++
++	for (i = 0; i < IMX6Q_THERMAL_ACT_TRP_PTS; i++) {
++		if (thermal_zone_unbind_cooling_device(thermal, i, cdev)) {
++			pr_err("error unbinding cooling dev\n");
++			return -EINVAL;
++		}
++	}
++
++	return 0;
++}
++
++static struct thermal_zone_device_ops imx6q_dev_ops = {
++	.bind = th_sys_bind,
++	.unbind = th_sys_unbind,
++	.get_temp = th_sys_get_temp,
++	.get_mode = th_sys_get_mode,
++	.get_trip_type = th_sys_get_trip_type,
++	.get_trip_temp = th_sys_get_trip_temp,
++	.get_crit_temp = th_sys_get_crit_temp,
++};
++
++static int imx6q_thermal_process_fuse_data(unsigned int fuse_data,
++		 struct imx6q_sensor_data *sd)
++{
++	int t1, t2, n1, n2;
++
++	if (fuse_data == 0 || fuse_data == 0xffffffff)
++		return -EINVAL;
++
++	/*
++	 * Fuse data layout:
++	 * [31:20] sensor value @ 25C
++	 * [19:8] sensor value of hot
++	 * [7:0] hot temperature value
++	 */
++	n1 = fuse_data >> 20;
++	n2 = (fuse_data & 0xfff00) >> 8;
++	t2 = fuse_data & 0xff;
++	t1 = 25; /* t1 always 25C */
++
++	pr_debug(" -- temperature sensor calibration data --\n");
++	pr_debug("HW_OCOTP_ANA1: %x\n", fuse_data);
++	pr_debug("n1: %d\nn2: %d\nt1: %d\nt2: %d\n", n1, n2, t1, t2);
++
++	/*
++	 * Derived from linear interpolation,
++	 * Tmeas = T2 + (Nmeas - N2) * (T1 - T2) / (N1 - N2)
++	 * We want to reduce this down to the minimum computation necessary
++	 * for each temperature read.  Also, we want Tmeas in millicelcius
++	 * and we don't want to lose precision from integer division. So...
++	 * milli_Tmeas = 1000 * T2 + 1000 * (Nmeas - N2) * (T1 - T2) / (N1 - N2)
++	 * Let constant c1 = 1000 * (T1 - T2) / (N1 - N2)
++	 * milli_Tmeas = (1000 * T2) + c1 * (Nmeas - N2)
++	 * milli_Tmeas = (1000 * T2) + (c1 * Nmeas) - (c1 * N2)
++	 * Let constant c2 = (1000 * T2) - (c1 * N2)
++	 * milli_Tmeas = c2 + (c1 * Nmeas)
++	 */
++	sd->c1 = (1000 * (t1 - t2)) / (n1 - n2);
++	sd->c2 = (1000 * t2) - (sd->c1 * n2);
++
++	pr_debug("c1: %i\n", sd->c1);
++	pr_debug("c2: %i\n", sd->c2);
++
++	return 0;
++}
++
++static int imx6q_thermal_suspend(struct device *dev,
++						pm_message_t state)
++{
++	struct thermal_zone_device *tzd;
++	struct imx6q_sensor_data *sd;
++
++	tzd = container_of(dev, struct thermal_zone_device, device);
++
++	sd = &(((struct imx6q_thermal_zone *)tzd->devdata)->sensor_data);
++
++	sd->pre_susp_state = readl_relaxed(HW_ANADIG_TEMPSENSE0);
++
++	/* stop and power down temp sensor */
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
++		anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
++
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
++		anatop_base + HW_ANADIG_TEMPSENSE0_SET);
++
++	return 0;
++}
++
++static int imx6q_thermal_resume(struct device *dev)
++{
++	struct thermal_zone_device *tzd;
++	struct imx6q_sensor_data *sd;
++
++	tzd = container_of(dev, struct thermal_zone_device, device);
++
++	sd = &(((struct imx6q_thermal_zone *)(tzd->devdata))->sensor_data);
++
++	if (!(sd->pre_susp_state & BM_ANADIG_TEMPSENSE0_POWER_DOWN))
++		writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
++			anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
++
++	if (sd->pre_susp_state & BM_ANADIG_TEMPSENSE0_MEASURE_TEMP)
++		writel_relaxed(BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
++			anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
++
++	return 0;
++}
++
++static void __exit imx6q_thermal_exit(void)
++{
++	struct device_node *np_ocotp, *np_anatop;
++
++	if (th_zone && th_zone->therm_dev)
++		thermal_zone_device_unregister(th_zone->therm_dev);
++
++	if (th_zone && th_zone->cool_dev)
++		cpufreq_cooling_unregister();
++
++	kfree(th_zone);
++
++	if (ocotp_base)	{
++		np_ocotp = of_find_compatible_node(
++				NULL, NULL, "fsl,imx6q-ocotp");
++		if (np_ocotp)
++			iounmap(np_ocotp);
++	}
++
++	if (anatop_base) {
++		np_anatop = of_find_compatible_node(
++				NULL, NULL, "fsl,imx6q-anatop");
++		if (np_anatop)
++			iounmap(np_anatop);
++	}
++
++	pr_info("i.MX6Q: Kernel Thermal management unregistered\n");
++}
++
++static int __init imx6q_thermal_init(void)
++{
++	struct device_node *np_ocotp, *np_anatop;
++	unsigned int fuse_data;
++	int ret;
++
++	np_ocotp = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
++	np_anatop = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
++
++	if (!(np_ocotp && np_anatop))
++		return -ENXIO; /* not a compatible platform */
++
++	ocotp_base = of_iomap(np_ocotp, 0);
++
++	if (!ocotp_base) {
++		pr_err("Could not retrieve ocotp-base\n");
++		ret = -ENXIO;
++		goto err_unregister;
++	}
++
++	anatop_base = of_iomap(np_anatop, 0);
++
++	if (!anatop_base) {
++		pr_err("Could not retrieve anantop-base\n");
++		ret = -ENXIO;
++		goto err_unregister;
++	}
++
++	fuse_data = readl_relaxed(ocotp_base + HW_OCOTP_ANA1);
++
++	th_zone = kzalloc(sizeof(struct imx6q_thermal_zone), GFP_KERNEL);
++
++	if (!th_zone) {
++		ret = -ENOMEM;
++		goto err_unregister;
++	}
++
++	th_zone->sensor_data.name = "imx6q-temp_sens";
++
++	ret = imx6q_thermal_process_fuse_data(fuse_data, &th_zone->sensor_data);
++
++	if (ret) {
++		pr_err("Invalid temperature calibration data.\n");
++		goto err_unregister;
++	}
++
++	/* Make sure sensor is in known good state for measurements */
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
++			anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
++
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_MEASURE_TEMP,
++			anatop_base + HW_ANADIG_TEMPSENSE0_CLR);
++
++	writel_relaxed(BM_ANADIG_TEMPSENSE1_MEASURE_FREQ,
++			anatop_base + HW_ANADIG_TEMPSENSE1_CLR);
++
++	writel_relaxed(BM_ANADIG_ANA_MISC0_REFTOP_SELBIASOFF,
++			anatop_base + HW_ANADIG_ANA_MISC0_SET);
++
++	writel_relaxed(BM_ANADIG_TEMPSENSE0_POWER_DOWN,
++			anatop_base + HW_ANADIG_TEMPSENSE0_SET);
++
++	th_zone->thermal_data = &thermal_data;
++
++	if (!th_zone->thermal_data) {
++		pr_err("Temperature sensor data not initialised\n");
++		ret = -EINVAL;
++		goto err_unregister;
++	}
++
++	th_zone->cool_dev = cpufreq_cooling_register(
++		(struct freq_pctg_table *)th_zone->thermal_data->freq_tab,
++		IMX6Q_THERMAL_ACT_TRP_PTS, cpumask_of(0));
++
++	if (IS_ERR(th_zone->cool_dev)) {
++		pr_err("Failed to register cpufreq cooling device\n");
++		ret = -EINVAL;
++		goto err_unregister;
++	}
++
++	th_zone->therm_dev = thermal_zone_device_register(
++		th_zone->sensor_data.name, IMX6Q_THERMAL_TOTAL_TRP_PTS,
++		th_zone, &imx6q_dev_ops, 0, 0, 0,
++		IMX6Q_THERMAL_POLLING_FREQUENCY_MS);
++
++	if (IS_ERR(th_zone->therm_dev)) {
++		pr_err("Failed to register thermal zone device\n");
++		ret = -EINVAL;
++		goto err_unregister;
++	}
++
++	/* In the rarest of cases, order matters here - resume goes first */
++	th_zone->therm_dev->device.class->resume = imx6q_thermal_resume;
++	th_zone->therm_dev->device.class->suspend = imx6q_thermal_suspend;
++
++	return 0;
++
++err_unregister:
++	imx6q_thermal_exit();
++	return ret;
++}
++
++module_init(imx6q_thermal_init);
++module_exit(imx6q_thermal_exit);
++
++MODULE_AUTHOR("Freescale Semiconductor");
++MODULE_DESCRIPTION("i.MX6Q SoC thermal driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:imx6q-thermal");
+-- 
+1.7.1
