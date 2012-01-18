@@ -1,36 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Jan 2012 12:47:18 +0800
-Subject: Pinmux bindings proposal
-In-Reply-To: <7FE21149F4667147B645348EC6057885093AD9@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120117082334.GA31295@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120117141322.GA31687@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC6057885093AD9@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20120118044716.GD563@S2101-09.ap.freescale.net>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Tue, 17 Jan 2012 22:48:06 -0600
+Subject: [RFC PATCH v3] ARM: imx: Add basic imx6q thermal management
+Message-ID: <1326862087-17816-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2012 at 03:44:59AM +0000, Dong Aisheng-B29396 wrote:
-...
-> > > The real problem is do we need to support individual pin mux Or still
-> > > using virtual pin group?
-> > > For the way Stephen proposed, we can only support individual pin mux
-> > > Since IMX pins are not grouped together in HW.
-> > >
-> > I do not see any problem here.  If you look at the first column of 'mux'
-> > property of node pinmux-usdhc1, it is a group of pins for usdhc1.
-> > Isn't it one virtual pin group for usdhc1?
-> > 
-> If we treat the whole pins in 'mux' property as a group,
-> There may be potential inconsistent issue since Tegra will treat each
-> One in the list of 'mux' as a group.
-> And it would be a problem for pinctrl core to parse it in a standard way.
-> 
-Based on my understanding, the 'group' given by 'mux' property may be
-a group of pin/group defined by hardware, or mixing of the two.
+Based on v3.2 plus recently submitted cpu_cooling functionality here:
 
--- 
-Regards,
-Shawn
+http://www.spinics.net/lists/linux-pm/msg26500.html
+
+link to v2 submission:
+
+http://www.spinics.net/lists/arm-kernel/msg155790.html
+
+Changes since v2:
+1. Fixed the various issues pointed out in v2
+2. Made other code cleanup and a bit of re-organizing
+3. Removed unecessary platform driver and device.
+
+Performed some basic testing to ensure proper cooling operating.  If
+you want to test this, full testing requires imx6q cpufreq
+implementation (not yet in v3.2) and requires an imx6q part that has
+temperature sensor calibration fuses correctly burned.
+
+Robert Lee (1):
+  ARM: imx: Add basic imx6q thermal management
+
+ arch/arm/boot/dts/imx6q.dtsi    |    1 +
+ drivers/thermal/Kconfig         |    6 +
+ drivers/thermal/Makefile        |    1 +
+ drivers/thermal/imx6q_thermal.c |  520 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 528 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/thermal/imx6q_thermal.c
