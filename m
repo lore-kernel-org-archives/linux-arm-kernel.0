@@ -1,98 +1,56 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 19 Jan 2012 08:53:54 +1100
-Subject: [PATCH 3/4] at91 : remove wait_for_interrupt definition
-In-Reply-To: <1326843620-13148-4-git-send-email-daniel.lezcano@linaro.org>
-References: <1326843620-13148-1-git-send-email-daniel.lezcano@linaro.org>
- <1326843620-13148-4-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <4F173F72.3050506@gmail.com>
+From: eranian@googlemail.com (stephane eranian)
+Date: Wed, 18 Jan 2012 22:58:10 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+ <20120109224945.GA23090@mudshark.cambridge.arm.com>
+ <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+ <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
+ <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
+Message-ID: <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/12 10:40, Daniel Lezcano wrote:
+Ming,
 
-> All the "wait_for_interrupt" definition are aliases to cpu_do_idle.
-> Only the rm9200 has an asm routine to switch to wfi. But the cpu_do_idle
-> for this platform has exactly the same asm routine.
-> 
-> arch/arm/mm/proc-arm920.S
-> ...
-> ENTRY(cpu_arm920_do_idle)
->         mcr     p15, 0, r0, c7, c0, 4           @ Wait for interrupt
-> ...
-> 
-> Then it is safe to invoke cpu_do_idle for this platform. As all the
-> wait_for_interrupts are definition for cpu_do_idle, let's remove it
-> and replace its invokation by cpu_do_idle.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Ok, so I used Linus' tree @
 
+It already includes patches #1 and #2. I applied 4-6.
+Recompiled but my kernel does not boot, I don't see
+anything on the serial console. Could be a broken
+.config file. Could you send me your .config for Panda?
 
-This patch looks like an improvement. Though, because you are removing
-all of the definitions of wait_for_interrupt_enable in this patch, it
-doesn't seem worth fixing the coding style of them in patch 1 of this
-series.
+Thanks.
 
-Reviewed-by: Ryan Mallon <rmallon@gmail.com>
-
-> ---
->  arch/arm/mach-at91/pm.c |    2 +-
->  arch/arm/mach-at91/pm.h |   12 ------------
->  2 files changed, 1 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index 62ad955..acf32c7 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -272,7 +272,7 @@ static int at91_pm_enter(suspend_state_t state)
->  					: /* no input */
->  					: "r0");
->  			saved_lpr = sdram_selfrefresh_enable();
-> -			wait_for_interrupt_enable();
-> +			cpu_do_idle();
->  			sdram_selfrefresh_disable(saved_lpr);
->  			break;
->  
-> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-> index 325ef76..624c99c 100644
-> --- a/arch/arm/mach-at91/pm.h
-> +++ b/arch/arm/mach-at91/pm.h
-> @@ -36,10 +36,6 @@ static inline u32 sdram_selfrefresh_enable(void)
->  #define sdram_selfrefresh_disable(saved_lpr) \
->  	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
->  
-> -#define wait_for_interrupt_enable() \
-> -	asm volatile ("mcr p15, 0, %0, c7, c0, 4" \
-> -		      : : "r" (0))
-> -
->  #elif defined(CONFIG_ARCH_AT91CAP9)
->  #include <mach/at91cap9_ddrsdr.h>
->  
-> @@ -58,9 +54,6 @@ static inline u32 sdram_selfrefresh_enable(void)
->  #define sdram_selfrefresh_disable(saved_lpr) \
->  	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr)
->  
-> -#define wait_for_interrupt_enable() \
-> -	cpu_do_idle()
-> -
->  #elif defined(CONFIG_ARCH_AT91SAM9G45)
->  #include <mach/at91sam9_ddrsdr.h>
->  
-> @@ -97,8 +90,6 @@ static inline u32 sdram_selfrefresh_enable(void)
->  		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1); \
->  	} while (0)
->  
-> -#define wait_for_interrupt_enable()		cpu_do_idle()
-> -
->  #else
->  #include <mach/at91sam9_sdramc.h>
->  
-> @@ -125,9 +116,6 @@ static inline u32 sdram_selfrefresh_enable(void)
->  #define sdram_selfrefresh_disable(saved_lpr) \
->  	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr)
->  
-> -#define wait_for_interrupt_enable() \
-> -	cpu_do_idle()
-> -
->  #endif
->  
->  #endif
+On Wed, Jan 18, 2012 at 11:07 AM, Ming Lei <ming.lei@canonical.com> wrote:
+> Hi,
+>
+> On Wed, Jan 18, 2012 at 5:54 PM, stephane eranian <eranian@googlemail.com>
+>> Should I use Will's -next tree as the base instead of Linus'?
+>
+> Either one is OK. If you use linus tree as base, you need to apply the #1 and
+> #2 patch manually.
+>
+>> Given that MARC is shutdown today, would you mind packing those patches
+>> into a tarball and sending them to me directly?
+>
+> See attachment, which includes the patches from #3 to #6.
+>
+>>
+>> When you mention Will's -next tree, are you talking about:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-next/perf
+>
+> It is perf/omap4 brach, you can pick up the two patches[1][2] directly from
+> the branch.
+>
+>
+> thanks,
+> --
+> Ming Lei
+>
+> [1], http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commit;h=7924a3eba0766348d6d6a56cbb9873cdbcab0d8c
+>
+> [2], http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commit;h=bde071f005e2dc71378aff69e86b961d8cd7922f
