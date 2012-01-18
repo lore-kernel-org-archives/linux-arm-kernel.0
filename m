@@ -1,57 +1,36 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 18 Jan 2012 12:18:46 +0800
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
-References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
- <4F0B182D.7060507@us.ibm.com>
- <20120109224945.GA23090@mudshark.cambridge.arm.com>
- <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
- <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
-Message-ID: <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 18 Jan 2012 12:47:18 +0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <7FE21149F4667147B645348EC6057885093AD9@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20120117082334.GA31295@S2101-09.ap.freescale.net>
+ <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20120117141322.GA31687@S2101-09.ap.freescale.net>
+ <7FE21149F4667147B645348EC6057885093AD9@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <20120118044716.GD563@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi stephane & Will,
+On Wed, Jan 18, 2012 at 03:44:59AM +0000, Dong Aisheng-B29396 wrote:
+...
+> > > The real problem is do we need to support individual pin mux Or still
+> > > using virtual pin group?
+> > > For the way Stephen proposed, we can only support individual pin mux
+> > > Since IMX pins are not grouped together in HW.
+> > >
+> > I do not see any problem here.  If you look at the first column of 'mux'
+> > property of node pinmux-usdhc1, it is a group of pins for usdhc1.
+> > Isn't it one virtual pin group for usdhc1?
+> > 
+> If we treat the whole pins in 'mux' property as a group,
+> There may be potential inconsistent issue since Tegra will treat each
+> One in the list of 'mux' as a group.
+> And it would be a problem for pinctrl core to parse it in a standard way.
+> 
+Based on my understanding, the 'group' given by 'mux' property may be
+a group of pin/group defined by hardware, or mixing of the two.
 
-On Tue, Jan 10, 2012 at 8:46 AM, stephane eranian
-<eranian@googlemail.com> wrote:
-> See the dmesg from my 3.2 kernel:
->
->
-> [ ? ?0.000000] Booting Linux on physical CPU 0[ ? ?0.000000]
-
-Looks no obvious failure can be found from your 'dmesg'.
-
-I have run upstream 3.2 kernel plus 6 omap4 pmu patches below and
-found perf can work well on my panda board.
-
-	0001-arm-introduce-cross-trigger-interface-helpers.patch
-	0002-arm-pmu-allow-platform-specific-irq-enable-disable-h.patch
-	0003-arm-omap4-hwmod-introduce-emu-hwmod.patch or Benoit's debugss patch[2]
-	0004-arm-omap4-create-pmu-device-via-hwmod.patch[3]
-	0005-arm-omap4-support-pmu.patch[4]
-	0006-arm-omap4-pmu-support-runtime-pm.patch[5]
-
-Could you verify the above patches on 3.2 to see if perf can work well?
-If it doesn't, I may share my u-boot and mlo for your test if you'd like to do.
-
-BTW: #1 and #2 have been in Will's -next tree.
-
-thanks,
---
-Ming Lei
-
-[1], uname -a & cat /proc/interrupts
-[root at root]#uname -a
-Linux beagleboard 3.2.0+ #480 SMP PREEMPT Wed Jan 18 11:38:33 CST 2012
-armv7l GNU/Linux
-[root at root]#cat /proc/interrupts
-           CPU0       CPU1
- 29:      29014      17353       GIC  twd
- 33:      56231          0       GIC  arm-pmu
- 34:          0      25778       GIC  arm-pmu
-
-[2], http://marc.info/?l=linux-omap&m=132162118104901&w=2
-[3],http://marc.info/?t=132227621500002&r=1&w=2
-[4],http://marc.info/?t=132227621700002&r=1&w=2
-[5],http://marc.info/?t=132227621700003&r=1&w=2
+-- 
+Regards,
+Shawn
