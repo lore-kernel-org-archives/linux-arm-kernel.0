@@ -1,418 +1,98 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 18 Jan 2012 13:52:18 -0800
-Subject: [PATCH v6 2/2] video: backlight: support s6e8ax0 panel driver
- based on MIPI DSI
-In-Reply-To: <4F162890.2020407@samsung.com>
-References: <4F162890.2020407@samsung.com>
-Message-ID: <20120118135218.40c644ec.akpm@linux-foundation.org>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 19 Jan 2012 08:53:54 +1100
+Subject: [PATCH 3/4] at91 : remove wait_for_interrupt definition
+In-Reply-To: <1326843620-13148-4-git-send-email-daniel.lezcano@linaro.org>
+References: <1326843620-13148-1-git-send-email-daniel.lezcano@linaro.org>
+ <1326843620-13148-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <4F173F72.3050506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jan 2012 11:04:00 +0900
-Donghwa Lee <dh09.lee@samsung.com> wrote:
+On 18/01/12 10:40, Daniel Lezcano wrote:
 
-> This patch is amoled panel driver based MIPI DSI interface.
-> S6E8AX0 means it may includes many other ldi controllers, for example,
-> S6E8AA0, S6E8AB0, and so on.
+> All the "wait_for_interrupt" definition are aliases to cpu_do_idle.
+> Only the rm9200 has an asm routine to switch to wfi. But the cpu_do_idle
+> for this platform has exactly the same asm routine.
 > 
-> This patch can be modified depending on each panel properites. For example,
-> second parameter of panel condition register can be changed depending on
-> ldi controller or amoled type.
+> arch/arm/mm/proc-arm920.S
+> ...
+> ENTRY(cpu_arm920_do_idle)
+>         mcr     p15, 0, r0, c7, c0, 4           @ Wait for interrupt
+> ...
+> 
+> Then it is safe to invoke cpu_do_idle for this platform. As all the
+> wait_for_interrupts are definition for cpu_do_idle, let's remove it
+> and replace its invokation by cpu_do_idle.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-I have a patch for your patch!
 
-Before:
+This patch looks like an improvement. Though, because you are removing
+all of the definitions of wait_for_interrupt_enable in this patch, it
+doesn't seem worth fixing the coding style of them in patch 1 of this
+series.
 
-akpm:/usr/src/25> size drivers/video/backlight/s6e8ax0.o
-   text    data     bss     dec     hex filename
-   4736     632       8    5376    1500 drivers/video/backlight/s6e8ax0.o
+Reviewed-by: Ryan Mallon <rmallon@gmail.com>
 
-After:
-
-akpm:/usr/src/25> size drivers/video/backlight/s6e8ax0.o  
-   text    data     bss     dec     hex filename
-   4360     632       8    5000    1388 drivers/video/backlight/s6e8ax0.o
-
---- a/drivers/video/backlight/s6e8ax0.c~video-backlight-support-s6e8ax0-panel-driver-based-on-mipi-dsi-fix
-+++ a/drivers/video/backlight/s6e8ax0.c
-@@ -105,157 +105,157 @@ out:
- 	mutex_unlock(&lcd->lock);
- }
- 
--const unsigned char s6e8ax0_22_gamma_30[] = {
-+static const unsigned char s6e8ax0_22_gamma_30[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xf5, 0x00, 0xff, 0xad, 0xaf,
- 	0xbA, 0xc3, 0xd8, 0xc5, 0x9f, 0xc6, 0x9e, 0xc1, 0xdc, 0xc0,
- 	0x00, 0x61, 0x00, 0x5a, 0x00, 0x74,
- };
- 
--const unsigned char s6e8ax0_22_gamma_50[] = {
-+static const unsigned char s6e8ax0_22_gamma_50[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xe8, 0x1f, 0xf7, 0xad, 0xc0,
- 	0xb5, 0xc4, 0xdc, 0xc4, 0x9e, 0xc6, 0x9c, 0xbb, 0xd8, 0xbb,
- 	0x00, 0x70, 0x00, 0x68, 0x00, 0x86,
- };
- 
--const unsigned char s6e8ax0_22_gamma_60[] = {
-+static const unsigned char s6e8ax0_22_gamma_60[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xde, 0x1f, 0xef, 0xad, 0xc4,
- 	0xb3, 0xc3, 0xdd, 0xc4, 0x9e, 0xc6, 0x9c, 0xbc, 0xd6, 0xba,
- 	0x00, 0x75, 0x00, 0x6e, 0x00, 0x8d,
- };
- 
--const unsigned char s6e8ax0_22_gamma_70[] = {
-+static const unsigned char s6e8ax0_22_gamma_70[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xd8, 0x1f, 0xe7, 0xaf, 0xc8,
- 	0xb4, 0xc4, 0xdd, 0xc3, 0x9d, 0xc6, 0x9c, 0xbb, 0xd6, 0xb9,
- 	0x00, 0x7a, 0x00, 0x72, 0x00, 0x93,
- };
- 
--const unsigned char s6e8ax0_22_gamma_80[] = {
-+static const unsigned char s6e8ax0_22_gamma_80[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xc9, 0x1f, 0xde, 0xae, 0xc9,
- 	0xb1, 0xc3, 0xdd, 0xc2, 0x9d, 0xc5, 0x9b, 0xbc, 0xd6, 0xbb,
- 	0x00, 0x7f, 0x00, 0x77, 0x00, 0x99,
- };
- 
--const unsigned char s6e8ax0_22_gamma_90[] = {
-+static const unsigned char s6e8ax0_22_gamma_90[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xc7, 0x1f, 0xd9, 0xb0, 0xcc,
- 	0xb2, 0xc3, 0xdc, 0xc1, 0x9c, 0xc6, 0x9c, 0xbc, 0xd4, 0xb9,
- 	0x00, 0x83, 0x00, 0x7b, 0x00, 0x9e,
- };
- 
--const unsigned char s6e8ax0_22_gamma_100[] = {
-+static const unsigned char s6e8ax0_22_gamma_100[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xbd, 0x80, 0xcd, 0xba, 0xce,
- 	0xb3, 0xc4, 0xde, 0xc3, 0x9c, 0xc4, 0x9, 0xb8, 0xd3, 0xb6,
- 	0x00, 0x88, 0x00, 0x80, 0x00, 0xa5,
- };
- 
--const unsigned char s6e8ax0_22_gamma_120[] = {
-+static const unsigned char s6e8ax0_22_gamma_120[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb9, 0x95, 0xc8, 0xb1, 0xcf,
- 	0xb2, 0xc6, 0xdf, 0xc5, 0x9b, 0xc3, 0x99, 0xb6, 0xd2, 0xb6,
- 	0x00, 0x8f, 0x00, 0x86, 0x00, 0xac,
- };
- 
--const unsigned char s6e8ax0_22_gamma_130[] = {
-+static const unsigned char s6e8ax0_22_gamma_130[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb7, 0xa0, 0xc7, 0xb1, 0xd0,
- 	0xb2, 0xc4, 0xdd, 0xc3, 0x9a, 0xc3, 0x98, 0xb6, 0xd0, 0xb4,
- 	0x00, 0x92, 0x00, 0x8a, 0x00, 0xb1,
- };
- 
--const unsigned char s6e8ax0_22_gamma_140[] = {
-+static const unsigned char s6e8ax0_22_gamma_140[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb7, 0xa0, 0xc5, 0xb2, 0xd0,
- 	0xb3, 0xc3, 0xde, 0xc3, 0x9b, 0xc2, 0x98, 0xb6, 0xd0, 0xb4,
- 	0x00, 0x95, 0x00, 0x8d, 0x00, 0xb5,
- };
- 
--const unsigned char s6e8ax0_22_gamma_150[] = {
-+static const unsigned char s6e8ax0_22_gamma_150[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb3, 0xa0, 0xc2, 0xb2, 0xd0,
- 	0xb2, 0xc1, 0xdd, 0xc2, 0x9b, 0xc2, 0x98, 0xb4, 0xcf, 0xb1,
- 	0x00, 0x99, 0x00, 0x90, 0x00, 0xba,
- };
- 
--const unsigned char s6e8ax0_22_gamma_160[] = {
-+static const unsigned char s6e8ax0_22_gamma_160[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xaf, 0xa5, 0xbf, 0xb0, 0xd0,
- 	0xb1, 0xc3, 0xde, 0xc2, 0x99, 0xc1, 0x97, 0xb4, 0xce, 0xb1,
- 	0x00, 0x9c, 0x00, 0x93, 0x00, 0xbe,
- };
- 
--const unsigned char s6e8ax0_22_gamma_170[] = {
-+static const unsigned char s6e8ax0_22_gamma_170[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xaf, 0xb5, 0xbf, 0xb1, 0xd1,
- 	0xb1, 0xc3, 0xde, 0xc3, 0x99, 0xc0, 0x96, 0xb4, 0xce, 0xb1,
- 	0x00, 0x9f, 0x00, 0x96, 0x00, 0xc2,
- };
- 
--const unsigned char s6e8ax0_22_gamma_180[] = {
-+static const unsigned char s6e8ax0_22_gamma_180[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xaf, 0xb7, 0xbe, 0xb3, 0xd2,
- 	0xb3, 0xc3, 0xde, 0xc2, 0x97, 0xbf, 0x95, 0xb4, 0xcd, 0xb1,
- 	0x00, 0xa2, 0x00, 0x99, 0x00, 0xc5,
- };
- 
--const unsigned char s6e8ax0_22_gamma_190[] = {
-+static const unsigned char s6e8ax0_22_gamma_190[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xaf, 0xb9, 0xbe, 0xb2, 0xd2,
- 	0xb2, 0xc3, 0xdd, 0xc3, 0x98, 0xbf, 0x95, 0xb2, 0xcc, 0xaf,
- 	0x00, 0xa5, 0x00, 0x9c, 0x00, 0xc9,
- };
- 
--const unsigned char s6e8ax0_22_gamma_200[] = {
-+static const unsigned char s6e8ax0_22_gamma_200[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xaf, 0xb9, 0xbc, 0xb2, 0xd2,
- 	0xb1, 0xc4, 0xdd, 0xc3, 0x97, 0xbe, 0x95, 0xb1, 0xcb, 0xae,
- 	0x00, 0xa8, 0x00, 0x9f, 0x00, 0xcd,
- };
- 
--const unsigned char s6e8ax0_22_gamma_210[] = {
-+static const unsigned char s6e8ax0_22_gamma_210[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb1, 0xc1, 0xbd, 0xb1, 0xd1,
- 	0xb1, 0xc2, 0xde, 0xc2, 0x97, 0xbe, 0x94, 0xB0, 0xc9, 0xad,
- 	0x00, 0xae, 0x00, 0xa4, 0x00, 0xd4,
- };
- 
--const unsigned char s6e8ax0_22_gamma_220[] = {
-+static const unsigned char s6e8ax0_22_gamma_220[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb1, 0xc7, 0xbd, 0xb1, 0xd1,
- 	0xb1, 0xc2, 0xdd, 0xc2, 0x97, 0xbd, 0x94, 0xb0, 0xc9, 0xad,
- 	0x00, 0xad, 0x00, 0xa2, 0x00, 0xd3,
- };
- 
--const unsigned char s6e8ax0_22_gamma_230[] = {
-+static const unsigned char s6e8ax0_22_gamma_230[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb1, 0xc3, 0xbd, 0xb2, 0xd1,
- 	0xb1, 0xc3, 0xdd, 0xc1, 0x96, 0xbd, 0x94, 0xb0, 0xc9, 0xad,
- 	0x00, 0xb0, 0x00, 0xa7, 0x00, 0xd7,
- };
- 
--const unsigned char s6e8ax0_22_gamma_240[] = {
-+static const unsigned char s6e8ax0_22_gamma_240[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb1, 0xcb, 0xbd, 0xb1, 0xd2,
- 	0xb1, 0xc3, 0xdD, 0xc2, 0x95, 0xbd, 0x93, 0xaf, 0xc8, 0xab,
- 	0x00, 0xb3, 0x00, 0xa9, 0x00, 0xdb,
- };
- 
--const unsigned char s6e8ax0_22_gamma_250[] = {
-+static const unsigned char s6e8ax0_22_gamma_250[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb3, 0xcc, 0xbe, 0xb0, 0xd2,
- 	0xb0, 0xc3, 0xdD, 0xc2, 0x94, 0xbc, 0x92, 0xae, 0xc8, 0xab,
- 	0x00, 0xb6, 0x00, 0xab, 0x00, 0xde,
- };
- 
--const unsigned char s6e8ax0_22_gamma_260[] = {
-+static const unsigned char s6e8ax0_22_gamma_260[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb3, 0xd0, 0xbe, 0xaf, 0xd1,
- 	0xaf, 0xc2, 0xdd, 0xc1, 0x96, 0xbc, 0x93, 0xaf, 0xc8, 0xac,
- 	0x00, 0xb7, 0x00, 0xad, 0x00, 0xe0,
- };
- 
--const unsigned char s6e8ax0_22_gamma_270[] = {
-+static const unsigned char s6e8ax0_22_gamma_270[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb2, 0xcF, 0xbd, 0xb0, 0xd2,
- 	0xaf, 0xc2, 0xdc, 0xc1, 0x95, 0xbd, 0x93, 0xae, 0xc6, 0xaa,
- 	0x00, 0xba, 0x00, 0xb0, 0x00, 0xe4,
- };
- 
--const unsigned char s6e8ax0_22_gamma_280[] = {
-+static const unsigned char s6e8ax0_22_gamma_280[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb2, 0xd0, 0xbd, 0xaf, 0xd0,
- 	0xad, 0xc4, 0xdd, 0xc3, 0x95, 0xbd, 0x93, 0xac, 0xc5, 0xa9,
- 	0x00, 0xbd, 0x00, 0xb2, 0x00, 0xe7,
- };
- 
--const unsigned char s6e8ax0_22_gamma_300[] = {
-+static const unsigned char s6e8ax0_22_gamma_300[] = {
- 	0xfa, 0x01, 0x60, 0x10, 0x60, 0xb5, 0xd3, 0xbd, 0xb1, 0xd2,
- 	0xb0, 0xc0, 0xdc, 0xc0, 0x94, 0xba, 0x91, 0xac, 0xc5, 0xa9,
- 	0x00, 0xc2, 0x00, 0xb7, 0x00, 0xed,
- };
- 
--const unsigned char *s6e8ax0_22_gamma_table[] = {
-+static const unsigned char *s6e8ax0_22_gamma_table[] = {
- 	s6e8ax0_22_gamma_30,
- 	s6e8ax0_22_gamma_50,
- 	s6e8ax0_22_gamma_60,
-@@ -287,7 +287,7 @@ static void s6e8ax0_panel_cond(struct s6
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
- 
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xf8, 0x3d, 0x35, 0x00, 0x00, 0x00, 0x93, 0x00, 0x3c, 0x7d,
- 		0x08, 0x27, 0x7d, 0x3f, 0x00, 0x00, 0x00, 0x20, 0x04, 0x08,
- 		0x6e, 0x00, 0x00, 0x00, 0x02, 0x08, 0x08, 0x23, 0x23, 0xc0,
-@@ -301,7 +301,7 @@ static void s6e8ax0_panel_cond(struct s6
- static void s6e8ax0_display_cond(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xf2, 0x80, 0x03, 0x0d
- 	};
- 
-@@ -323,7 +323,7 @@ static void s6e8ax0_gamma_cond(struct s6
- static void s6e8ax0_gamma_update(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xf7, 0x03
- 	};
- 
-@@ -335,7 +335,7 @@ static void s6e8ax0_gamma_update(struct 
- static void s6e8ax0_etc_cond1(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xd1, 0xfe, 0x80, 0x00, 0x01, 0x0b, 0x00, 0x00, 0x40,
- 		0x0d, 0x00, 0x00
- 	};
-@@ -347,7 +347,7 @@ static void s6e8ax0_etc_cond1(struct s6e
- static void s6e8ax0_etc_cond2(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xb6, 0x0c, 0x02, 0x03, 0x32, 0xff, 0x44, 0x44, 0xc0,
- 		0x00
- 	};
-@@ -359,7 +359,7 @@ static void s6e8ax0_etc_cond2(struct s6e
- static void s6e8ax0_etc_cond3(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xe1, 0x10, 0x1c, 0x17, 0x08, 0x1d
- 	};
- 
-@@ -370,7 +370,7 @@ static void s6e8ax0_etc_cond3(struct s6e
- static void s6e8ax0_etc_cond4(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xe2, 0xed, 0x07, 0xc3, 0x13, 0x0d, 0x03
- 	};
- 
-@@ -381,7 +381,7 @@ static void s6e8ax0_etc_cond4(struct s6e
- static void s6e8ax0_etc_cond5(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xf4, 0xcf, 0x0a, 0x12, 0x10, 0x19, 0x33, 0x02
- 	};
- 
-@@ -391,7 +391,7 @@ static void s6e8ax0_etc_cond5(struct s6e
- static void s6e8ax0_etc_cond6(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xe3, 0x40
- 	};
- 
-@@ -403,7 +403,7 @@ static void s6e8ax0_etc_cond6(struct s6e
- static void s6e8ax0_etc_cond7(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xe4, 0x00, 0x00, 0x14, 0x80, 0x00, 0x00, 0x00
- 	};
- 
-@@ -414,7 +414,7 @@ static void s6e8ax0_etc_cond7(struct s6e
- static void s6e8ax0_elvss_set(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xb1, 0x04, 0x00
- 	};
- 
-@@ -425,7 +425,7 @@ static void s6e8ax0_elvss_set(struct s6e
- static void s6e8ax0_elvss_nvm_set(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xd9, 0x5c, 0x20, 0x0c, 0x0f, 0x41, 0x00, 0x10, 0x11,
- 		0x12, 0xd1, 0x00, 0x00, 0x00, 0x00, 0x80, 0xcb, 0xed,
- 		0x64, 0xaf
-@@ -438,7 +438,7 @@ static void s6e8ax0_elvss_nvm_set(struct
- static void s6e8ax0_sleep_in(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0x10, 0x00
- 	};
- 
-@@ -450,7 +450,7 @@ static void s6e8ax0_sleep_in(struct s6e8
- static void s6e8ax0_sleep_out(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0x11, 0x00
- 	};
- 
-@@ -462,7 +462,7 @@ static void s6e8ax0_sleep_out(struct s6e
- static void s6e8ax0_display_on(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0x29, 0x00
- 	};
- 
-@@ -474,7 +474,7 @@ static void s6e8ax0_display_on(struct s6
- static void s6e8ax0_display_off(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0x28, 0x00
- 	};
- 
-@@ -486,7 +486,7 @@ static void s6e8ax0_display_off(struct s
- static void s6e8ax0_apply_level2_key(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xf0, 0x5a, 0x5a
- 	};
- 
-@@ -497,7 +497,7 @@ static void s6e8ax0_apply_level2_key(str
- static void s6e8ax0_acl_on(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xc0, 0x01
- 	};
- 
-@@ -509,7 +509,7 @@ static void s6e8ax0_acl_on(struct s6e8ax
- static void s6e8ax0_acl_off(struct s6e8ax0 *lcd)
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
--	const unsigned char data_to_send[] = {
-+	static const unsigned char data_to_send[] = {
- 		0xc0, 0x00
- 	};
- 
-@@ -523,21 +523,21 @@ static void s6e8ax0_acl_ctrl_set(struct 
- {
- 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
- 	/* Full white 50% reducing setting */
--	const unsigned char cutoff_50[] = {
-+	static const unsigned char cutoff_50[] = {
- 		0xc1, 0x47, 0x53, 0x13, 0x53, 0x00, 0x00, 0x02, 0xcf,
- 		0x00, 0x00, 0x04, 0xff,	0x00, 0x00, 0x00, 0x00, 0x00,
- 		0x01, 0x08, 0x0f, 0x16, 0x1d, 0x24, 0x2a, 0x31, 0x38,
- 		0x3f, 0x46
- 	};
- 	/* Full white 45% reducing setting */
--	const unsigned char cutoff_45[] = {
-+	static const unsigned char cutoff_45[] = {
- 		0xc1, 0x47, 0x53, 0x13, 0x53, 0x00, 0x00, 0x02, 0xcf,
- 		0x00, 0x00, 0x04, 0xff,	0x00, 0x00, 0x00, 0x00, 0x00,
- 		0x01, 0x07, 0x0d, 0x13, 0x19, 0x1f, 0x25, 0x2b, 0x31,
- 		0x37, 0x3d
- 	};
- 	/* Full white 40% reducing setting */
--	const unsigned char cutoff_40[] = {
-+	static const unsigned char cutoff_40[] = {
- 		0xc1, 0x47, 0x53, 0x13, 0x53, 0x00, 0x00, 0x02, 0xcf,
- 		0x00, 0x00, 0x04, 0xff,	0x00, 0x00, 0x00, 0x00, 0x00,
- 		0x01, 0x06, 0x0c, 0x11, 0x16, 0x1c, 0x21, 0x26, 0x2b,
-_
+> ---
+>  arch/arm/mach-at91/pm.c |    2 +-
+>  arch/arm/mach-at91/pm.h |   12 ------------
+>  2 files changed, 1 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 62ad955..acf32c7 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -272,7 +272,7 @@ static int at91_pm_enter(suspend_state_t state)
+>  					: /* no input */
+>  					: "r0");
+>  			saved_lpr = sdram_selfrefresh_enable();
+> -			wait_for_interrupt_enable();
+> +			cpu_do_idle();
+>  			sdram_selfrefresh_disable(saved_lpr);
+>  			break;
+>  
+> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+> index 325ef76..624c99c 100644
+> --- a/arch/arm/mach-at91/pm.h
+> +++ b/arch/arm/mach-at91/pm.h
+> @@ -36,10 +36,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+>  #define sdram_selfrefresh_disable(saved_lpr) \
+>  	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
+>  
+> -#define wait_for_interrupt_enable() \
+> -	asm volatile ("mcr p15, 0, %0, c7, c0, 4" \
+> -		      : : "r" (0))
+> -
+>  #elif defined(CONFIG_ARCH_AT91CAP9)
+>  #include <mach/at91cap9_ddrsdr.h>
+>  
+> @@ -58,9 +54,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+>  #define sdram_selfrefresh_disable(saved_lpr) \
+>  	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr)
+>  
+> -#define wait_for_interrupt_enable() \
+> -	cpu_do_idle()
+> -
+>  #elif defined(CONFIG_ARCH_AT91SAM9G45)
+>  #include <mach/at91sam9_ddrsdr.h>
+>  
+> @@ -97,8 +90,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+>  		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1); \
+>  	} while (0)
+>  
+> -#define wait_for_interrupt_enable()		cpu_do_idle()
+> -
+>  #else
+>  #include <mach/at91sam9_sdramc.h>
+>  
+> @@ -125,9 +116,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+>  #define sdram_selfrefresh_disable(saved_lpr) \
+>  	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr)
+>  
+> -#define wait_for_interrupt_enable() \
+> -	cpu_do_idle()
+> -
+>  #endif
+>  
+>  #endif
