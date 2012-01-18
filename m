@@ -1,81 +1,58 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 18 Jan 2012 14:41:47 +0530
-Subject: [PATCH V2 00/12] dmaengine: Pl08x and dw_dmac updates
-Message-ID: <cover.1326876464.git.viresh.kumar@st.com>
+Date: Wed, 18 Jan 2012 14:41:49 +0530
+Subject: [PATCH V2 02/12] dmaengine: Add flow controller information to
+ dma_slave_config
+In-Reply-To: <cover.1326876464.git.viresh.kumar@st.com>
+References: <cover.1326876464.git.viresh.kumar@st.com>
+Message-ID: <5f9ec59562e86536c4123f61891b95590293030f.1326876464.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod/Dan,
+Flow controller is programmable for few controllers and there are few
+intelligent peripherals like, Synopsys JPEG controller, that needs to be a flow
+controller of DMA transfers on dest side.
 
-This patchset does following:
-- Includes earlier patchset sent by Rajeev for cleanly applying this patchset
-- Adds device_fc (device flow control) field in struct DMA_SLAVE_CONFIG
-- Fixes existing users of DMAENGINE for device_fc.
-- Updates pl08x driver according to that
-- Fixes few issues/bugs in dw_dmac driver
-- Adds DMA_SLAVE_CONFIG for dw_dmac driver
-- Fixes existing users of dw_dmac driver
+For this, currently two drivers, pl08x and dw_dmac, support flow controller to
+be passed from platform to these drivers.
 
-Change History:
-Since V1:
-- used dev_get_platdata() instead of platform_get_drvdata(), as that was
-  incorrect
-- Lots of fixes in: dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
-- Additional patches:
-	- dmaengine/dw_dmac: Add 64 bit access width support for slave xfers on
-	  mem side
-	- Fix other kernel driver for device_fc and dw_dmac changes.
+Perhaps, this should be a part of struct dma_slave_config. This patch adds
+another field device_fc to this structure. User drivers must pass this as true
+if they want to be flow controller of certain transfers.
 
-Rebased-on:
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ include/linux/dmaengine.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-commit 3506c0d507144d9b0f19efd5a56d289f70611179
-Author: Tushar Behera <tushar.behera@linaro.org>
-Date:   Tue Dec 6 16:15:54 2011 +0530
-
-    DMA: PL330: Remove pm_runtime_xxx calls from pl330 probe/remove
-    
-
-Rajeev KUMAR (1):
-  dmaengine/dw_dmac: Hibernation support in dw_dmac
-
-Viresh Kumar (11):
-  dmaengine: Add flow controller information to dma_slave_config
-  dmaengine: Pass dma_slave_config .device_fc = NULL for all existing
-    users
-  dmaengine/amba-pl08x: Take flow controller info from DMA_SLAVE_CONFIG
-  dmaengine/dw_dmac: Don't use magic number for total number of
-    channels
-  dmaengine/dw_dmac: Use dev_get_platdata() instead of accessing dev
-    directly
-  dmaengine/dw_dmac: Don't handle block interrupts
-  dmaengine/dw_dmac: Unmap all memory buffers after completion of slave
-    transfers
-  dmaengine/dw_dmac: Add 64 bit access width support for slave xfers on
-    mem side
-  dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
-  dmaengine/dw_dmac: Fix dw_dmac user drivers to adapt to slave_config
-    changes
-  dmaengine/dw_dmac: Remove unused fields in struct dw_dma_slave
-
- arch/avr32/mach-at32ap/at32ap700x.c             |   13 --
- arch/avr32/mach-at32ap/include/mach/atmel-mci.h |    7 -
- drivers/dma/amba-pl08x.c                        |    4 +-
- drivers/dma/dw_dmac.c                           |  232 +++++++++++++++--------
- drivers/dma/dw_dmac_regs.h                      |   15 ++
- drivers/mmc/host/atmel-mci.c                    |   24 ++-
- drivers/mmc/host/mmci.c                         |    2 +
- drivers/mmc/host/mxcmmc.c                       |    2 +
- drivers/spi/spi-dw-mid.c                        |    3 +
- drivers/spi/spi-pl022.c                         |    2 +
- drivers/tty/serial/amba-pl011.c                 |    3 +
- drivers/usb/musb/ux500_dma.c                    |    1 +
- include/linux/amba/pl08x.h                      |    8 +-
- include/linux/dmaengine.h                       |    5 +
- include/linux/dw_dmac.h                         |   38 ----
- sound/atmel/abdac.c                             |   18 ++-
- sound/atmel/ac97c.c                             |   41 ++++-
- sound/soc/imx/imx-pcm-dma-mx2.c                 |    3 +
- 18 files changed, 255 insertions(+), 166 deletions(-)
-
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 5532bb8..dd1915f 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -25,6 +25,7 @@
+ #include <linux/uio.h>
+ #include <linux/scatterlist.h>
+ #include <linux/bitmap.h>
++#include <linux/types.h>
+ #include <asm/page.h>
+ 
+ /**
+@@ -330,6 +331,9 @@ enum dma_slave_buswidth {
+  * may or may not be applicable on memory sources.
+  * @dst_maxburst: same as src_maxburst but for destination target
+  * mutatis mutandis.
++ * @device_fc: Flow Controller Settings for ccfg register. Only valid for slave
++ * channels. Fill with 'true' if peripheral should be flow controller. Direction
++ * will be selected at Runtime.
+  *
+  * This struct is passed in as configuration data to a DMA engine
+  * in order to set up a certain channel for DMA transport at runtime.
+@@ -356,6 +360,7 @@ struct dma_slave_config {
+ 	enum dma_slave_buswidth dst_addr_width;
+ 	u32 src_maxburst;
+ 	u32 dst_maxburst;
++	bool device_fc;
+ };
+ 
+ static inline const char *dma_chan_name(struct dma_chan *chan)
 -- 
 1.7.8.110.g4cb5d
