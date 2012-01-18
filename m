@@ -1,48 +1,86 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Jan 2012 22:30:28 +0800
-Subject: Pinmux bindings proposal
-In-Reply-To: <20120118141329.GA22818@atomide.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <20120116182808.GG4223@ponder.secretlab.ca>
- <20120118141329.GA22818@atomide.com>
-Message-ID: <CAAQ0ZWTtYz3Lg7=Xz29m07j_k8yA95hn6cyk92SAJ4iGJRT_gw@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 18 Jan 2012 14:38:07 +0000
+Subject: [RFC PATCH 1/5] arm:omap1/2/3/4:Convert 32k-Sync clocksource
+ driver to platform_driver
+In-Reply-To: <4F16D66F.2000602@arm.com>
+References: <1326886086-27313-1-git-send-email-hvaibhav@ti.com>
+ <1326886086-27313-2-git-send-email-hvaibhav@ti.com>
+ <20120118115952.GM16726@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A8317A9AA2@DBDE01.ent.ti.com>
+ <20120118141147.GN16726@n2100.arm.linux.org.uk> <4F16D66F.2000602@arm.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317A9C39@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 January 2012 22:13, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Grant Likely <grant.likely@secretlab.ca> [120116 09:55]:
->> On Fri, Jan 13, 2012 at 12:39:42PM -0800, Stephen Warren wrote:
->> > ? ? ? ? ? ? ? ? pinmux =
->> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_active>
->> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_suspend>;
->> >
->> > ? ? ? ? ? ? ? ? /* 1:n example: */
->> > ? ? ? ? ? ? ? ? pinmux =
->> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_mux_a>
->> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_pincfg_a>
->> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_mux_a>
->> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_pincfg_a_suspend>;
->>
->>
->> Yeah, don't do this. ?Mixing phandle, string and cell values in a
->> property gets messy and could become troublesome to parse. ?I've
->> backed away from it in the clk binding.
->
-> Yup, that's because the string is embedded directly into the mixed
-> mode array and will likely make the following data unaligned. That
-> means it's extremely flakey to parse, and will lead into horrible
-> errors if you have typos in the .dts file.. Tried that and gave up
-> on it.
->
-> I think I've found a way to avoid using names at all, assuming we set
-> each pin as a phandle for the drivers to use :)
->
-The problem with doing that is we will have to represent each pin as a
-node in device tree.  For imx6q case, we have 197 pins.  Doing so will
-bloat the device tree.
+On Wed, Jan 18, 2012 at 19:55:51, Marc Zyngier wrote:
+> On 18/01/12 14:11, Russell King - ARM Linux wrote:
+> > On Wed, Jan 18, 2012 at 01:34:55PM +0000, Hiremath, Vaibhav wrote:
+> >> On Wed, Jan 18, 2012 at 17:29:52, Russell King - ARM Linux wrote:
+> >>> On Wed, Jan 18, 2012 at 04:58:02PM +0530, Vaibhav Hiremath wrote:
+> >>>> Convert counter_32k clocksource driver to standard platform_driver
+> >>>> and move it drivers/clocksource/ directory.
+> >>>>
+> >>>> Also, rename it to more generic name "omap-32k.c".
+> >>>
+> >>> NAK.  sched_clock is supposed to be available early.  Platform device
+> >>> driver initialization is FAR too late.
+> >>>
+> >> Russell,
+> >>
+> >> Sched_clock is available very early during boot sequence. Initially gp-timer 
+> >> (dmtimer) will get registered as a clocksource. Please refer to the file
+> >> mach-omap2/timer.c
+> >>
+> >> 32k_sync timer (omap-32k.c) will come get registered during arch_init.
+> >>
+> >> Just FYI, the way I tested it is, I used kernel parameter 
+> >> "clocksourse=counter-32k", the switch from gp-timer to 32k timer
+> >> will happen once it gets registered.
+> > 
+> > So please delete the sched_clock code from the 32k timer stuff you've
+> > moved to a platform driver.  It will cause sched_clock to reset to zero,
+> > and that's bad news.
+> > 
+> > Only one sched_clock() should ever be registered, and that should only be
+> > registered very early at boot time.
+> 
+> The kernel will WARN if two sched_clock() are registered. I hope this
+> will be enough for people not to persist with such a thing...
+> 
+Marc,
 
--- 
-Regards,
-Shawn
+This code-snippet is not registering multiple sched_clock() functions,
+Here we have 2 timers
+  - gp-timer (available on all devices)
+  - 32k-sync timer (may not available on all devices, like AM33xx)
+
+So we are registering both the timers as a clocksource and kernel
+Chooses one based on kernel-parameter or rating.
+>From sched_clock perspective, we have only one function exported in
+mach-omap2/timer.c, which in-turn calls omap-32k.c timer api.
+
+Something like this,
+
+
+unsigned long long notrace sched_clock(void)
+{
+	U32 cyc;
+
+	/* First call 32k-sync timer sched_clock() */
+	/* return 0 means, the device doesn't have 32k-sync timer available */
+	cyc = sched_clock_32k();
+	if (cyc)
+		return cyc;
+
+	/* Fall back to gp-timer approach */
+}
+
+So there is and will not be any warning from kernel here.
+
+Thanks,
+Vaibhav
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
+> 
+> 
