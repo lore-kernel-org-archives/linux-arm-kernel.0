@@ -1,56 +1,169 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 18 Jan 2012 16:10:51 +0530
-Subject: [PATCH 2/8] dmaengine: Add flow controller information to
- dma_slave_config
-In-Reply-To: <CACRpkdbwZ5h15b0gBJP6xdk5TJt+CSeNRbEB8o2vzp9FbyD9AA@mail.gmail.com>
-References: <cover.1326707233.git.viresh.kumar@st.com>
- <5f9ec59562e86536c4123f61891b95590293030f.1326707233.git.viresh.kumar@st.com>
- <CACRpkdY4QQK6wtB5aPU+FwdyyGq-owsDxMmxdwJVnkzdJTRs_Q@mail.gmail.com>
- <4F153A3A.7060902@st.com>
- <CACRpkdbwZ5h15b0gBJP6xdk5TJt+CSeNRbEB8o2vzp9FbyD9AA@mail.gmail.com>
-Message-ID: <4F16A1B3.5000409@st.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 18 Jan 2012 11:06:05 +0000
+Subject: Pinmux bindings proposal
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20120117082334.GA31295@S2101-09.ap.freescale.net>
+ <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
+Message-ID: <7FE21149F4667147B645348EC6057885095125@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/18/2012 4:06 PM, Linus Walleij wrote:
-> On Tue, Jan 17, 2012 at 10:07 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
->> On 1/17/2012 2:07 PM, Linus Walleij wrote:
+> -----Original Message-----
+> From: Stephen Warren [mailto:swarren at nvidia.com]
+> Sent: Wednesday, January 18, 2012 3:29 AM
+> To: Dong Aisheng-B29396; Shawn Guo
+> Cc: linus.walleij at stericsson.com; s.hauer at pengutronix.de;
+> rob.herring at calxeda.com; kernel at pengutronix.de; cjb at laptop.org; Simon Glass
+> (sjg at chromium.org); Dong Aisheng; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree-discuss at lists.ozlabs.org
+> Subject: RE: Pinmux bindings proposal
+> Importance: High
+> 
+> Dong Aisheng wrote at Tuesday, January 17, 2012 2:47 AM:
+> > Shawn Guo wrote at Tuesday, January 17, 2012 4:24 PM:
+> > > On Mon, Jan 16, 2012 at 12:50:02PM +0000, Dong Aisheng-B29396 wrote:
+> > > > Stephen Warren wrote:
+> > > ...
+> > > > >                         mux =
+> > > > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> TEGRA_PMX_MUX_1>
+> > > > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> TEGRA_PMX_MUX_1>
+> > > > >                                 /* Syntax example */
+> > > > >                                 <&foo_pmx FOO_PMX_PG_X
+> > > > > FOO_PMX_MUX_0>;
+> > > >
+> > > > I'm still think how do we construct the pinmux map for such binding.
+> > > > The format you're using is:
+> > > > <&pmx_controller_phandle muxable_entity_id selected_function> For
+> > > > contruct pinmux map, we need to know at least 3 things for a device:
+> > > > a) pinctrl device b) function name c) group name.
+> > > > For a, we can get it from this binding.
+> > > > But for b and c, since they are constants, how to convert to name string?
+> > >
+> > > I guess, for function name, it should be retrieved from the client
+> > > device node, and for the group name, it should be retrieved from the node
+> here.
+> >
+> > I guess Stephen's idea is to retrieving the function name and group
+> > name From the pinctrl driver since Tagre prefers to define those
+> > things in driver Rather than in board file or soc.dts file.
+> > But it does not fit for IMX since we define it in soc.dts.
+> 
+> You can still get the data from the driver, even if the driver got the data from
+> the DT instead of static tables.
+> 
+The problem is that the pinmux map parsing is earlier than parsing the pinmux data,
+And the driver still have no chance to run.
+This is using bus notifier case.
+For scanning case, the pinmux map parsing could be later than driver running.
 
-> Maybe I should say that it's supposed to transfer information from
-> the driver to the DMA engine that:
+> > > For above example, the function name can be picked from sdhci device
+> > > node pinctr-names property I proposed,
+> >
+> > If I understand correctly, the pinctrl-names property you proposed
+> > represents The pin group state.
 > 
-> 1) The driver naturally "knows", like which physical register address
->   the FIFO is in or burst width etc and the DMA engine has no
->   business knowing.
+> Yes, that's my understanding.
 > 
-> 2) That needs to change at runtime, like for example how the PL022
->  driver request 32, 16 or 8 bit wide transfers depending on bus
->  width.
+> ...
+> > And in this way we're still using virtual groups.
+> > It has no big difference as we did before like:
+> > pinmux-groups {
+> >         uart4grp: group at 0 {
+> >                 grp-name = "uart4grp";
+> >                 grp-pins = <107 108>;
+> >                 grp-mux = <4 4>;
+> >         };
+> >
+> >         sd4grp: group at 1 {
+> >                 grp-name = "sd4grp";
+> >                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
+> >                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
+> >         };
+> > };
 > 
-> I think master mode could very well be under (1). So the driver knows
-> if this hardware expects the DMA engine to drive the transaction or
-> if it's the device itself that should drive it.
+> I'd prefer not to call these virtual groups, since "group" already has a meaning
+> to the pinctrl subsystem that is somewhat different. As you've probably noticed,
+> I've been using the term "pre-defined/canned pin configuration"!
 > 
-> So I'm starting to think like you :-)
+> > The real problem is do we need to support individual pin mux Or still
+> > using virtual pin group?
+> >
+> > For the way Stephen proposed, we can only support individual pin mux
+> > Since IMX pins are not grouped together in HW.
+> 
+> I think the "mux" and "config" properties I had in my proposal should deal
+> purely with raw HW entities; nothing virtual/pre-defined/canned/...
+> 
+The question here is we defining a common model for pinctrl dt binding and
+different SoC may have different characteristics like between Tegra and IMX.
+So the proposal based on one SoC's raw HW entities should fit other SoCs.
 
-:)
+> You can get what you're calling "virtual groups" simply by defining a bunch of
+> pinmux configuration nodes in the pin controller's device node and exclusively
+> referencing those in the per-device pinctrl properties.
+>
+Yes, for the pin config I think we have done some agreement.
+Now i'm still thinking if the mux way we discussed here fits IMX.
+For example:
+> 	pinmux_sdhci: pinmux-sdhci {
+> 		mux =
+> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
+> 	};
+It may work well for Tegra.
+When pinctrl core parsing the mux proterty, it will creat each maps
+For each entry in the list.
+But for IMX like:
+> > 	pinmux_usdhc1: pinmux-usdhc1 {
+> > 		mux = <IMX6Q_PAD_SD1_DAT1 0>
+> > 		      <IMX6Q_PAD_SD1_DAT2 0>
+> > 		      ...
+> > 	};
+Each entry in the list is PIN rather than group.
+So we cannot create each map for each entry in the list except we treat the PIN as
+A group(this will cause a huge maps and predefined groups and functions).
 
->> One more thing. I missed few things in this patch:
->> - Need to update all instances of struct dma_slave_config with
->>        .device_fc = false
-> 
-> All statically defined structs contain zero == false by default
-> so it's not needed.
-> 
-> Make sure any dynamic allocations (I don't know of any!)
-> are kzalloc() though.
-> 
+A little different way I'm thinking now is cover the mux difference(pin or group)
+between Tegra and IMX in Pinctrl driver, then we may not need the second mux value
+(e.g: TEGRA_PMX_MUX_1)in the standard mux property:
+The mux property can become:
+pinmux_sdhci: pinmux-sdhci {
+	mux =
+		<&tegra_pmx TEGRA_PMX_PG_DTA_X>
+		<&tegra_pmx TEGRA_PMX_PG_DTD_Y>;
+};
+The group TEGRA_PMX_PG_DTA_X should already know it's mux value(TEGRA_PMX_MUX_1) for a specific
+Function.
 
-I already fixed these in V2.
-Most of the drivers created inside routines. They are not getting
-initialized to _zero_ , so i had to fix it.
+For IMX, it could be like:
+pinmux_sdhci: pinmux-sdhci {
+	mux =
+		<&imx_pmx &pinmux_sd1grp>;
+};
 
-There are few though, who used kzalloc. I didn't touch them.
+For cover the difference whether the pingroups are defined in drive or soc.dts file.
+The second param could be a name, like:
+pinmux_sdhci: pinmux-sdhci {
+	mux =
+		<&imx_pmx "sd1grp">;
+};
 
--- 
-viresh
+And the using is still like:
+sdhci at c8000200 {
+    ...
+    pinctrl = <&pinmux_sdhci> <&pinconf_sdhci_active>
+              <&pinmux_sdhci> <&pinconf_sdhci_suspend>;
+    /* Number of entries in pinctrl for each in pinctrl-names */
+    pinctrl-entries = <2 2>;
+    pinctrl-names = "active", "suspend"; };
+
+Another reason for this mode is that maybe some SoCs even does not have mux function for
+Each pin or group. And current pinctrl subsystem design also does not have this conception.
+
+Regards
+Dong Aisheng
