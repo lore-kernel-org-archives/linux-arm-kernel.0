@@ -1,43 +1,32 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 18 Jan 2012 16:12:39 +0000
-Subject: [RFC PATCH 0/5] ARM: introducing DT topology
-In-Reply-To: <4F16E78E.2060801@gmail.com>
-References: <1326897408-11204-1-git-send-email-lorenzo.pieralisi@arm.com>
- <4F16E78E.2060801@gmail.com>
-Message-ID: <20120118161238.GB9691@e102568-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Jan 2012 16:14:49 +0000
+Subject: [PATCH v2 0/3] Convert remaining platforms to common sched_clock()
+Message-ID: <1326903292-15794-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2012 at 03:38:54PM +0000, Rob Herring wrote:
-> On 01/18/2012 08:36 AM, Lorenzo Pieralisi wrote:
-> > The introduction of multi-cluster ARM systems in SoC designs requires the kernel
-> > to become cluster aware, so that it can be booted on every CPU in the system
-> > and it can build an appropriate representation of topology levels.
-> > 
-> > Current code in the kernel, in particular the boot sequence, hinges upon a
-> > sequential mapping of MPIDR values for cpus and related interrupt
-> > controller CPU interfaces to logical cpu indexing. 
-> > This hypothesis is not valid when the concept of cluster is introduced since
-> > the MPIDR cannot be represented as a single index and interrupt controller
-> > CPU interfaces might be wired with a numbering scheme following per-SoC
-> > design parameters which cannot be extrapolated easily through generic functions
-> > by the primary CPU.
-> > 
-> > Furthermore, relying on the MPIDR to be wired according to real topology levels
-> > might turn out to be an unreliable solution, hence a SW representation is
-> > needed to override possibly incorrect MPIDR register values.
-> > 
-> 
-> "might be" is used several times. Is this a real problem? Wouldn't a
-> more simple solution be providing properties to override the MPIDR
-> register value if it is unreliable?
+Only two platforms are left with their own sched_clock() implementation.
+This patch series converts them, leading in both cases to some cleanup.
 
-Thanks for having a look. 
-We cannot control how it is wired up, so yes, it might be a problem.
-The strict requirement is that it must be a unique identifier, and the 
-bindings I wrote provide the MPIDR through "cpu" nodes "reg" properties, 
-but those values must correspond to the real HW value, which has to be unique 
-[ie pen release], but it *might not* represent the affinity levels properly.
+The last patch makes the sched_clock framework mandatory, so people
+don't try to add another implementation.
 
-Thanks,
-Lorenzo
+* From the initial revision
+- Add a patch killing the HAVE_SCHED_CLOCK option.
+
+Marc Zyngier (3):
+  ARM: davinci: convert to common sched_clock() implementation
+  ARM: prima2: convert to common sched_clock() implementation
+  ARM: Make the sched_clock framework mandatory
+
+ arch/arm/Kconfig                |   16 ----------------
+ arch/arm/kernel/Makefile        |    3 +--
+ arch/arm/kernel/time.c          |    2 --
+ arch/arm/mach-davinci/time.c    |   24 +++++++-----------------
+ arch/arm/mach-prima2/timer.c    |   21 +++++++--------------
+ arch/arm/plat-nomadik/Kconfig   |    1 -
+ arch/arm/plat-versatile/Kconfig |    1 -
+ 7 files changed, 15 insertions(+), 53 deletions(-)
+
+-- 
+1.7.7.1
