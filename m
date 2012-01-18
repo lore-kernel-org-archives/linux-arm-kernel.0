@@ -1,52 +1,33 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 18 Jan 2012 08:47:06 +0000
-Subject: [PATCH-V5 0/3] Introducing TI's New SoC/board AM335XEVM
-In-Reply-To: <20111207211029.GL31337@atomide.com>
-References: <hvaibhav@ti.com>
- <1322808204-12878-1-git-send-email-hvaibhav@ti.com> <87y5up44bf.fsf@ti.com>
- <20111207211029.GL31337@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317A958F@DBDE01.ent.ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 18 Jan 2012 14:41:53 +0530
+Subject: [PATCH V2 06/12] dmaengine/dw_dmac: Use dev_get_platdata() instead of
+ accessing dev directly
+In-Reply-To: <cover.1326876464.git.viresh.kumar@st.com>
+References: <cover.1326876464.git.viresh.kumar@st.com>
+Message-ID: <7ee05856ef8235eeb31bea1b5ab2e898037d9ffd.1326876464.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 02:40:29, Tony Lindgren wrote:
-> * Kevin Hilman <khilman@ti.com> [111206 15:52]:
-> > <hvaibhav@ti.com> writes:
-> > 
-> > > From: Vaibhav Hiremath <hvaibhav@ti.com>
-> > >
-> > > This patch set adds support for AM335x device having
-> > > Cortex-A8 MPU.
-> > >
-> > > Official website - http://www.ti.com/product/am3359
-> > >
-> > > AM335X is treated as another OMAP3 variant, where,
-> > > along with existing cpu class OMAP34XX, new cpu class AM33XX is created
-> > > and the respective type is AM335X, which is newly added device in
-> > > the family.
-> > > This means, cpu_is_omap34xx(), cpu_is_am33xx() and
-> > > cpu_is_am335x() checks return success for AM335X.
-> > >
-> > > Also, I have validated OMAP3 boot test with this patch-series on
-> > > OMAP3EVM.
-> > 
-> > Tony, this series looks good to me.
-> > 
-> > I've also tested it on a BeagleBone, so feel free to also add:
-> > 
-> > Tested-by: Kevin Hilman <khilman@ti.com>
-> 
-> Thanks looks good to me. We still need the machine_id update to
-> apply patches 2 and 3 in this series, so applying only the first
-> patch into soc branch for now.
-> 
-Tony,
+Use already defined function dev_get_platdata() instead of accessing
+pdev->dev.data.
 
-Can you also merge this patch, as machine_id for am335x-evm is already
-updated in linus/master?
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/dma/dw_dmac.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Thanks,
-Vaibhav
-
-> Tony
-> 
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index 1577394..f3aecb3 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -1369,7 +1369,7 @@ static int __init dw_probe(struct platform_device *pdev)
+ 	int			err;
+ 	int			i;
+ 
+-	pdata = pdev->dev.platform_data;
++	pdata = dev_get_platdata(&pdev->dev);
+ 	if (!pdata || pdata->nr_channels > DW_DMA_MAX_NR_CHANNELS)
+ 		return -EINVAL;
+ 
+-- 
+1.7.8.110.g4cb5d
