@@ -1,32 +1,26 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jan 2012 09:35:59 +0000
-Subject: [PATCH 7/8] dmaengine/dw_dmac: Unmap all memory buffers after
- completion of slave transfers
-In-Reply-To: <4F153A3E.8010409@st.com>
-References: <cover.1326707233.git.viresh.kumar@st.com>
- <5e5d0fcff79b9b78e64c7424317d6b77736eca43.1326707233.git.viresh.kumar@st.com>
- <20120116105448.GT1068@n2100.arm.linux.org.uk> <4F140DB7.3060300@st.com>
- <CACRpkdY-4wWeD=3mJiChi6+4=iBMcd3kVh3h4JmDZ5ySXY3KCA@mail.gmail.com>
- <4F153A3E.8010409@st.com>
-Message-ID: <20120118093559.GB1068@n2100.arm.linux.org.uk>
+Date: Wed, 18 Jan 2012 09:36:20 +0000
+Subject: [PATCH V2 08/12] dmaengine/dw_dmac: Unmap all memory buffers
+ after completion of slave transfers
+In-Reply-To: <ba53f229f3f594bfe0459b01a9ebb4d9b2c15882.1326876464.git.viresh.kumar@st.com>
+References: <cover.1326876464.git.viresh.kumar@st.com>
+ <ba53f229f3f594bfe0459b01a9ebb4d9b2c15882.1326876464.git.viresh.kumar@st.com>
+Message-ID: <20120118093620.GC1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 02:37:10PM +0530, Viresh Kumar wrote:
-> On 1/17/2012 2:22 PM, Linus Walleij wrote:
-> > Basically the driver using the dmaengine shall map/unmap buffers
-> > used for slave transfers, not the driver.
-> > 
-> > I usually map them before setting up a transfer and unmaps them
-> > when egtting the callback from the DMA engine that the transfer is
-> > complete.
-> > 
+On Wed, Jan 18, 2012 at 02:41:55PM +0530, Viresh Kumar wrote:
+> Currently, after completion of transfer, source address or destination address
+> of only the first LLI descriptor is unmapped. And length passed for unmap is
+> total length of all descriptors in the list. Which means unmapping code assumed
+> that the memory buffers pointed to by the descriptors will be physically
+> contiguous, which might not be the case. It is possible for other drivers to
+> pass sglist to slave_sg(), in which all buffers are scattered throughout the
+> memory.
 > 
-> You implemented similar stuff in amba-pl08x :) .
-> 
-> if (!plchan->slave)
-> 	pl08x_unmap_buffers(txd);
+> This patch intends to fix this wrong expectation of dw_dmac. Now, first desc
+> will not contain total length of transfer. But individual descriptors will
+> contain their individual lengths. Finally, we will call unmap for all
+> descriptors.
 
-Take a look at that.  "If *NOT* slave, unmap the buffers".  That is in
-keeping with what I've been saying.  Slave transfers *do* *not* get
-automatic buffer unmapping.
+NAK.  For reasons stated previously and subsequently ignored.
