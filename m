@@ -1,26 +1,35 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 18 Jan 2012 14:36:44 +0000
-Subject: [RFC PATCH 1/5] ARM: kernel: add device tree init map function
+Date: Wed, 18 Jan 2012 14:36:47 +0000
+Subject: [RFC PATCH 4/5] ARM: gic: add cpuif topology description
 In-Reply-To: <1326897408-11204-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1326897408-11204-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1326897408-11204-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1326897408-11204-5-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting through a device tree, the kernel cpu logical id map can be
-initialized using device tree data passed by FW or through an embedded blob.
+In order to set up a proper logical to per-cpu interrupt controller IF
+mapping, the GIC interrupt controller device tree bindings must be enhanced
+to define the CPU IF id for all present CPUs.
+GIC CPU IF ids are needed to send interprocessor IPIs and to set affinity
+levels. Since the way CPU IF ids are wired depends on the specific
+system design, they cannot be extrapolated or probed in HW by the boot
+CPU, so a binding to define them is needed to set-up the system properly.
 
-This patch adds a function that parses device tree "cpu" nodes and
-retrieves the corresponding CPUs hardware identifiers (MPIDR).
-It sets the possible cpus and the cpu logical map values according to
-the number of CPUs defined in the device tree and respective properties.
+This patch adds a logical map of per-cpu interrupt controller identifiers.
+The newly introduced per-cpu IF map has to be initialized by the GIC
+driver so that interprocessor interrupts and affinity levels can be set
+accordingly in an SMP system, with a proper 1:1 relation between per-cpu
+IF ids and logical cpu indexes.
 
-The primary CPU is assigned cpu logical number 0 to keep the current
-convention valid.
+This patch adds a function that parses the device tree properties and
+initializes the cpu interfaces ids properly according to the latest GIC
+device tree bindings.
 
-Current bindings documentation is included in the patch:
+If CONFIG_OF is not enabled, per-cpu CPU IF mappings are defined as
+cpu_logical_map(), leaving the current functionality unchanged.
 
-Documentation/devicetree/bindings/arm/cpus.txt
+The GIC device tree bindings documentation is updated by the patch
+accordingly.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
@@ -31,33 +40,27 @@ Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt |   42 ++++++++++++++++++++++++
- arch/arm/include/asm/prom.h                    |    2 +
- arch/arm/kernel/devtree.c                      |   40 ++++++++++++++++++++++
- 3 files changed, 84 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+ Documentation/devicetree/bindings/arm/gic.txt |   69 ++++++++++++++++++
+ arch/arm/common/gic.c                         |   94 +++++++++++++++++++++++-
+ 2 files changed, 159 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-new file mode 100644
-index 0000000..28f2b8c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -0,0 +1,42 @@
-+* ARM CPUs binding description
+diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+index 9b4b82a..da2f6a8 100644
+--- a/Documentation/devicetree/bindings/arm/gic.txt
++++ b/Documentation/devicetree/bindings/arm/gic.txt
+@@ -57,3 +57,72 @@ Example:
+ 		      <0xfff10100 0x100>;
+ 	};
+ 
++* ARM Generic Interrupt Controller CPU Interfaces
 +
-+The device tree allows to describe the layout of CPUs in a system through
-+the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
-+defining properties for every cpu.
++ARM GIC device tree nodes contain subnodes representing its CPU interfaces.
 +
-+Bindings for CPU nodes follow the ePAPR standard, available from:
++The main properties required by CPU interface nodes are:
 +
-+http://devicetree.org
-+
-+For the ARM architecture every CPU node must contain the following property:
-+
-+- reg : property defining the CPU MPIDR[23:0] register bits
-+
-+Every cpu node is required to set its device_type to "cpu".
++- compatible	: "arm,gic-cpuif"
++- cpuif-id	: specifies the CPU IF HW identifier
++- cpu		: a phandle to the respective CPU node
 +
 +Example:
 +
@@ -85,85 +88,178 @@ index 0000000..28f2b8c
 +			reg = <0x101>;
 +		};
 +	};
-diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-index 6f65ca8..2ab0e07 100644
---- a/arch/arm/include/asm/prom.h
-+++ b/arch/arm/include/asm/prom.h
-@@ -18,6 +18,7 @@
- 
- extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
- extern void arm_dt_memblock_reserve(void);
-+extern void __init arm_dt_init_cpu_maps(void);
- 
- #else /* CONFIG_OF */
- 
-@@ -27,6 +28,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
- }
- 
- static inline void arm_dt_memblock_reserve(void) { }
-+static inline void arm_dt_init_cpu_maps(void) { }
- 
- #endif /* CONFIG_OF */
- #endif /* ASMARM_PROM_H */
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index bee7f9d..a4662b1 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -19,8 +19,10 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- 
-+#include <asm/cputype.h>
- #include <asm/setup.h>
- #include <asm/page.h>
-+#include <asm/smp_plat.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-@@ -61,6 +63,44 @@ void __init arm_dt_memblock_reserve(void)
- 	}
- }
- 
-+/*
-+ * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
-+ * and builds the cpu logical map array containing MPIDR values related to
-+ * logical cpus
-+ *
-+ * Updates the cpu possible mask with the number of parsed cpu nodes
-+ */
-+void __init arm_dt_init_cpu_maps(void)
-+{
-+	struct device_node *dn = NULL;
-+	int i, cpu = 1;
 +
-+	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu <= nr_cpu_ids) {
-+		const u32 *hwid;
++	intc: interrupt-controller at fff11000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <1>;
++		interrupt-controller;
++		reg = <0xfff11000 0x1000>,
++		      <0xfff10100 0x100>;
++
++			gic-cpuif at 0x0 {
++				compatible = "arm,gic-cpuif";
++				cpuif-id = <0x0>;
++				cpu = <&CPU0>;
++			};
++
++			gic-cpuif at 0x1 {
++				compatible = "arm,gic-cpuif";
++				cpuif-id = <0x1>;
++				cpu = <&CPU1>;
++			};
++
++			gic-cpuif at 0x2 {
++				compatible = "arm,gic-cpuif";
++				cpuif-id = <0x2>;
++				cpu = <&CPU2>;
++			};
++
++			gic-cpuif at 0x3 {
++				compatible = "arm,gic-cpuif";
++				cpuif-id = <0x3>;
++				cpu = <&CPU3>;
++			};
++	};
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index c47d619..4be754d 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -140,6 +140,83 @@ static inline unsigned int gic_irq(struct irq_data *d)
+ 	return d->hwirq;
+ }
+ 
++#ifdef CONFIG_OF
++static u32 gic_cpuif_logical_map[NR_CPUS];
++#define cpuif_logical_map(cpu)	gic_cpuif_logical_map[cpu]
++
++/*
++ * Create a mapping of GIC CPU IF numbers to logical cpus through the device
++ * tree. GIC CPU IF are linked to the respective cpu nodes through the "cpu"
++ * phandle.
++ */
++static void __init gic_init_if_maps(struct gic_chip_data *gic)
++{
++	struct device_node *ncpu, *gic_cpuif;
++	struct irq_domain *domain = &gic->domain;
++	int i;
++
++	if (WARN_ON(!domain || !domain->of_node))
++		return;
++
++	for_each_child_of_node(domain->of_node, gic_cpuif) {
++		const u32 *cpuif_hwid, *mpidr;
 +		int len;
 +
-+		pr_debug("  * %s...\n", dn->full_name);
++		if (!of_device_is_compatible(gic_cpuif, "arm,gic-cpuif"))
++			continue;
 +
-+		hwid = of_get_property(dn, "reg", &len);
++		pr_debug("  * %s...\n", gic_cpuif->full_name);
 +
-+		if (!hwid || len != 4) {
-+			pr_err("  * %s missing reg property\n", dn->full_name);
++		ncpu = of_parse_phandle(gic_cpuif, "cpu", 0);
++
++		if (!ncpu) {
++			pr_err("  * %s missing cpu phandle\n",
++						gic_cpuif->full_name);
 +			continue;
 +		}
 +
-+		i = (be32_to_cpup(hwid) == (read_cpuid_mpidr() & 0xffffff))
-+							? 0 : cpu++;
++		mpidr = of_get_property(ncpu, "reg", &len);
++
++		if (!mpidr || len != 4) {
++			pr_err("  * %s missing reg property\n",
++					ncpu->full_name);
++			continue;
++		}
++
++		cpuif_hwid = of_get_property(gic_cpuif, "cpuif-id", &len);
++
++		if (!cpuif_hwid || len != 4) {
++			pr_err("  * %s missing cpuif-id property\n",
++						gic_cpuif->full_name);
++			continue;
++		}
++
++		/*
++		 * Do the logical enumeration once in arm_dt_init_cpu_maps and
++		 * use it again here to avoid logical numbering mix-ups between
++		 * cpu and interrupt controller ids
++		 */
++
++		i = get_logical_index(be32_to_cpup(mpidr));
++
++		if (i < 0) {
++			pr_err("  * %s mpidr mismatch\n",
++						ncpu->full_name);
++			continue;
++		}
 +
 +		if (!i)
-+			printk(KERN_INFO "Booting Linux on CPU HWID 0x%x\n",
-+					be32_to_cpup(hwid));
++			printk(KERN_INFO "Booting Linux on GIC CPU IF 0x%x\n",
++					be32_to_cpup(cpuif_hwid));
 +
-+		cpu_logical_map(i) = be32_to_cpup(hwid);
-+
-+		set_cpu_possible(i, true);
++		cpuif_logical_map(i) = be32_to_cpup(cpuif_hwid);
 +	}
 +}
++#else
++static inline void gic_init_if_maps(struct gic_chip_data *gic) {}
++#define cpuif_logical_map(cpu)	cpu_logical_map(cpu)
++#endif
 +
- /**
-  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
-  * @dt_phys: physical address of dt blob
+ /*
+  * Routines to acknowledge, disable and enable interrupts
+  */
+@@ -245,7 +322,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 		return -EINVAL;
+ 
+ 	mask = 0xff << shift;
+-	bit = 1 << (cpu_logical_map(cpu) + shift);
++	bit = 1 << (cpuif_logical_map(cpu) + shift);
+ 
+ 	raw_spin_lock(&irq_controller_lock);
+ 	val = readl_relaxed(reg) & ~mask;
+@@ -353,7 +430,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	unsigned int gic_irqs = gic->gic_irqs;
+ 	struct irq_domain *domain = &gic->domain;
+ 	void __iomem *base = gic_data_dist_base(gic);
+-	u32 cpu = cpu_logical_map(smp_processor_id());
++	u32 cpu = cpuif_logical_map(smp_processor_id());
+ 
+ 	cpumask = 1 << cpu;
+ 	cpumask |= cpumask << 8;
+@@ -659,6 +736,14 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 
+ 	gic = &gic_data[gic_nr];
+ 	domain = &gic->domain;
++
++	/*
++	 * create the logical/physical mapping just for the
++	 * primary GIC
++	 */
++	if (gic_nr == 0)
++		gic_init_if_maps(gic);
++
+ #ifdef CONFIG_GIC_NON_BANKED
+ 	if (percpu_offset) { /* Frankein-GIC without banked registers... */
+ 		unsigned int cpu;
+@@ -673,7 +758,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 		}
+ 
+ 		for_each_possible_cpu(cpu) {
+-			unsigned long offset = percpu_offset * cpu_logical_map(cpu);
++			unsigned long offset =
++				percpu_offset * cpuif_logical_map(cpu);
+ 			*per_cpu_ptr(gic->dist_base.percpu_base, cpu) = dist_base + offset;
+ 			*per_cpu_ptr(gic->cpu_base.percpu_base, cpu) = cpu_base + offset;
+ 		}
+@@ -746,7 +832,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+-		map |= 1 << cpu_logical_map(cpu);
++		map |= 1 << cpuif_logical_map(cpu);
+ 
+ 	/*
+ 	 * Ensure that stores to Normal memory are visible to the
 -- 
 1.7.4.4
