@@ -1,169 +1,75 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Wed, 18 Jan 2012 11:06:05 +0000
-Subject: Pinmux bindings proposal
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120117082334.GA31295@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
-Message-ID: <7FE21149F4667147B645348EC6057885095125@039-SN2MPN1-013.039d.mgd.msft.net>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Wed, 18 Jan 2012 16:58:01 +0530
+Subject: [RFC PATCH 0/5] arm:omap1/2/3/4: 32k sync timer cleanup
+Message-ID: <1326886086-27313-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Warren [mailto:swarren at nvidia.com]
-> Sent: Wednesday, January 18, 2012 3:29 AM
-> To: Dong Aisheng-B29396; Shawn Guo
-> Cc: linus.walleij at stericsson.com; s.hauer at pengutronix.de;
-> rob.herring at calxeda.com; kernel at pengutronix.de; cjb at laptop.org; Simon Glass
-> (sjg at chromium.org); Dong Aisheng; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree-discuss at lists.ozlabs.org
-> Subject: RE: Pinmux bindings proposal
-> Importance: High
-> 
-> Dong Aisheng wrote at Tuesday, January 17, 2012 2:47 AM:
-> > Shawn Guo wrote at Tuesday, January 17, 2012 4:24 PM:
-> > > On Mon, Jan 16, 2012 at 12:50:02PM +0000, Dong Aisheng-B29396 wrote:
-> > > > Stephen Warren wrote:
-> > > ...
-> > > > >                         mux =
-> > > > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
-> TEGRA_PMX_MUX_1>
-> > > > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
-> TEGRA_PMX_MUX_1>
-> > > > >                                 /* Syntax example */
-> > > > >                                 <&foo_pmx FOO_PMX_PG_X
-> > > > > FOO_PMX_MUX_0>;
-> > > >
-> > > > I'm still think how do we construct the pinmux map for such binding.
-> > > > The format you're using is:
-> > > > <&pmx_controller_phandle muxable_entity_id selected_function> For
-> > > > contruct pinmux map, we need to know at least 3 things for a device:
-> > > > a) pinctrl device b) function name c) group name.
-> > > > For a, we can get it from this binding.
-> > > > But for b and c, since they are constants, how to convert to name string?
-> > >
-> > > I guess, for function name, it should be retrieved from the client
-> > > device node, and for the group name, it should be retrieved from the node
-> here.
-> >
-> > I guess Stephen's idea is to retrieving the function name and group
-> > name From the pinctrl driver since Tagre prefers to define those
-> > things in driver Rather than in board file or soc.dts file.
-> > But it does not fit for IMX since we define it in soc.dts.
-> 
-> You can still get the data from the driver, even if the driver got the data from
-> the DT instead of static tables.
-> 
-The problem is that the pinmux map parsing is earlier than parsing the pinmux data,
-And the driver still have no chance to run.
-This is using bus notifier case.
-For scanning case, the pinmux map parsing could be later than driver running.
+This patch series is built on top of older version submitted
+earlier during 2010 timeframe by 'Felipe Balbi' -
 
-> > > For above example, the function name can be picked from sdhci device
-> > > node pinctr-names property I proposed,
-> >
-> > If I understand correctly, the pinctrl-names property you proposed
-> > represents The pin group state.
-> 
-> Yes, that's my understanding.
-> 
-> ...
-> > And in this way we're still using virtual groups.
-> > It has no big difference as we did before like:
-> > pinmux-groups {
-> >         uart4grp: group at 0 {
-> >                 grp-name = "uart4grp";
-> >                 grp-pins = <107 108>;
-> >                 grp-mux = <4 4>;
-> >         };
-> >
-> >         sd4grp: group at 1 {
-> >                 grp-name = "sd4grp";
-> >                 grp-pins = <170 171 180 181 182 183 184 185 186 187>;
-> >                 grp-mux = <0 0 1 1 1 1 1 1 1 1>;
-> >         };
-> > };
-> 
-> I'd prefer not to call these virtual groups, since "group" already has a meaning
-> to the pinctrl subsystem that is somewhat different. As you've probably noticed,
-> I've been using the term "pre-defined/canned pin configuration"!
-> 
-> > The real problem is do we need to support individual pin mux Or still
-> > using virtual pin group?
-> >
-> > For the way Stephen proposed, we can only support individual pin mux
-> > Since IMX pins are not grouped together in HW.
-> 
-> I think the "mux" and "config" properties I had in my proposal should deal
-> purely with raw HW entities; nothing virtual/pre-defined/canned/...
-> 
-The question here is we defining a common model for pinctrl dt binding and
-different SoC may have different characteristics like between Tegra and IMX.
-So the proposal based on one SoC's raw HW entities should fit other SoCs.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37403.html
 
-> You can get what you're calling "virtual groups" simply by defining a bunch of
-> pinmux configuration nodes in the pin controller's device node and exclusively
-> referencing those in the per-device pinctrl properties.
->
-Yes, for the pin config I think we have done some agreement.
-Now i'm still thinking if the mux way we discussed here fits IMX.
-For example:
-> 	pinmux_sdhci: pinmux-sdhci {
-> 		mux =
-> 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
-> 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
-> 	};
-It may work well for Tegra.
-When pinctrl core parsing the mux proterty, it will creat each maps
-For each entry in the list.
-But for IMX like:
-> > 	pinmux_usdhc1: pinmux-usdhc1 {
-> > 		mux = <IMX6Q_PAD_SD1_DAT1 0>
-> > 		      <IMX6Q_PAD_SD1_DAT2 0>
-> > 		      ...
-> > 	};
-Each entry in the list is PIN rather than group.
-So we cannot create each map for each entry in the list except we treat the PIN as
-A group(this will cause a huge maps and predefined groups and functions).
+Changes from earlier submitted version:
+	- hwmod cleanup: Since 2010 there has been some changes happened
+	  in hwmod interface, migrated to the latest version.
+	- wrong hwmod info: the previous version had some issues with newly
+	  added 32k-counter hwmod data, like, base_addr,
+	  idle_st bit position. So corrected these errors.
+	- In omap-32k platform driver, replaced
+	  clocksource_register => clocksource_register_hz
+	- Merged patches into more logical grouping
 
-A little different way I'm thinking now is cover the mux difference(pin or group)
-between Tegra and IMX in Pinctrl driver, then we may not need the second mux value
-(e.g: TEGRA_PMX_MUX_1)in the standard mux property:
-The mux property can become:
-pinmux_sdhci: pinmux-sdhci {
-	mux =
-		<&tegra_pmx TEGRA_PMX_PG_DTA_X>
-		<&tegra_pmx TEGRA_PMX_PG_DTD_Y>;
-};
-The group TEGRA_PMX_PG_DTA_X should already know it's mux value(TEGRA_PMX_MUX_1) for a specific
-Function.
+NOTE: Patch series has been tested on AM37xEVM, AM3517EVM, AM335xEVM,
+      with/without kernel parameter "clocksource=".
 
-For IMX, it could be like:
-pinmux_sdhci: pinmux-sdhci {
-	mux =
-		<&imx_pmx &pinmux_sd1grp>;
-};
+The reason why I am submitting this patch-series as a RFC version is,
 
-For cover the difference whether the pingroups are defined in drive or soc.dts file.
-The second param could be a name, like:
-pinmux_sdhci: pinmux-sdhci {
-	mux =
-		<&imx_pmx "sd1grp">;
-};
+I am struggling to convince myself and find answers for -
 
-And the using is still like:
-sdhci at c8000200 {
-    ...
-    pinctrl = <&pinmux_sdhci> <&pinconf_sdhci_active>
-              <&pinmux_sdhci> <&pinconf_sdhci_suspend>;
-    /* Number of entries in pinctrl for each in pinctrl-names */
-    pinctrl-entries = <2 2>;
-    pinctrl-names = "active", "suspend"; };
+	- Do we really required platform_driver approach here?
+	- Can we simply cleaup the existing plat-omap/counter_32k.c
+	  file and add hwmod lookup to make decesion whether the
+	  module is present or not on the current device?
+	- what about existing mmio driver/api? we can avoid some
+	  code duplication here.
 
-Another reason for this mode is that maybe some SoCs even does not have mux function for
-Each pin or group. And current pinctrl subsystem design also does not have this conception.
+So I decided to start with RFC with the existing (already submitted)
+approach and get the expert peoples view on this.
+Based on feedback I will submit next version.
 
-Regards
-Dong Aisheng
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+
+Vaibhav Hiremath (5):
+  arm:omap1/2/3/4:Convert 32k-Sync clocksource driver to
+    platform_driver
+  arm:omap2/3: Add idle_st bits for ST_32KSYNC timer
+  arm:omap1/2/3/4: Add 32k counter data to hwmod database
+  arm:omap1/2/3/4: Add platform hookup code for counter-32k driver
+  arm:omap1/2/3: Change dev name for sync_32k_ick clk to
+    omap-counter-32k
+
+ arch/arm/mach-omap1/devices.c              |   24 +++
+ arch/arm/mach-omap2/clock2420_data.c       |    2 +-
+ arch/arm/mach-omap2/clock2430_data.c       |    2 +-
+ arch/arm/mach-omap2/clock3xxx_data.c       |    2 +-
+ arch/arm/mach-omap2/devices.c              |   25 ++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |   53 +++++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |   52 +++++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   51 +++++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+ arch/arm/mach-omap2/prcm-common.h          |    4 +
+ arch/arm/mach-omap2/timer.c                |   17 ---
+ arch/arm/plat-omap/Makefile                |    2 +-
+ arch/arm/plat-omap/counter_32k.c           |  154 --------------------
+ drivers/clocksource/Makefile               |    1 +
+ drivers/clocksource/omap-32k.c             |  210 ++++++++++++++++++++++++++++
+ include/linux/clocksource.h                |    1 +
+ 16 files changed, 426 insertions(+), 176 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/counter_32k.c
+ create mode 100644 drivers/clocksource/omap-32k.c
