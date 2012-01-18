@@ -1,57 +1,68 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 17 Jan 2012 17:28:05 -0700
-Subject: [RFC 13/14] irq_domain: Remove 'new' irq_domain in favour of the
- ppc one
-In-Reply-To: <1326771731.26116.29.camel@pasglop>
-References: <1326313337-24603-1-git-send-email-grant.likely@secretlab.ca>
- <1326313337-24603-14-git-send-email-grant.likely@secretlab.ca>
- <4F0DFC0F.2090005@gmail.com>
- <CACxGe6vVSO0cTgPurr6jFoo9QF_W02UaABOFYadCTQGU9dcwmg@mail.gmail.com>
- <4F0F7B60.5040701@gmail.com> <4F14E05C.30207@codeaurora.org>
- <1326771731.26116.29.camel@pasglop>
-Message-ID: <CACxGe6ufk+BUoXZBKm5Q-O1Aj1j=18fJ5KjOC-fKQMbpw4z=mw@mail.gmail.com>
+From: psandeep.s@gmail.com (sandeep patil)
+Date: Tue, 17 Jan 2012 16:46:37 -0800
+Subject: [Linaro-mm-sig] [PATCH 04/11] mm: page_alloc: introduce
+ alloc_contig_range()
+In-Reply-To: <op.v781mqwl3l0zgt@mpn-glaptop>
+References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
+ <1325162352-24709-5-git-send-email-m.szyprowski@samsung.com>
+ <CA+K6fF6A1kPUW-2Mw5+W_QaTuLfU0_m0aMYRLOg98mFKwZOhtQ@mail.gmail.com>
+ <op.v781mqwl3l0zgt@mpn-glaptop>
+Message-ID: <CA+K6fF64hjVBjx6NPspQSud2hkJQWzeXkceLAChPrO-k7eCF+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 8:42 PM, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
-> On Mon, 2012-01-16 at 18:43 -0800, Michael Bohan wrote:
+> Yeah, we are wondering ourselves about that. ?Could you try cherry-picking
+> commit ad10eb079c97e27b4d27bc755c605226ce1625de (update migrate type on pcp
+> when isolating) from git://github.com/mina86/linux-2.6.git? ?It probably
+> won't
+> apply cleanly but resolving the conflicts should not be hard (alternatively
+> you can try branch cma from the same repo but it is a work in progress at
+> the
+> moment).
+>
+
+I'll try this patch and report back ,,
+
+
+>> is set to MIGRATE_CMA instead of MIGRATE_ISOLATED.
+>
+>
+> My understanding of that situation is that the page is on pcp list in which
+> cases it's page_private is not updated. ?Draining and the first patch in
+> the series (and also the commit I've pointed to above) are designed to fix
+> that but I'm unsure why they don't work all the time.
+>
+>
+
+Will verify this if the page is found on the pcp list as well .
+
+>> I've also had a test case where it failed because (page_count() != 0)
+
+With this, when it failed the page_count()
+returned a value of 2. I am not sure why, but I will try and see If I can
+reproduce this.
+
+>
+>
+>> Have you or anyone else seen this during the CMA testing?
 >>
->> I was planning on sending these patches out, but it seems like with
->> Grant's patches, they may no longer be up to date. I was curious if any
->> thought was given to supporting configurations like this the one I
->> mentioned with the advent of these patches. I am happy to help test if
->> you can steer me in the right direction.
+>> Also, could this be because we are finding a page within (start, end)
+>> that actually belongs to a higher order Buddy block ?
 >
-> I haven't had a chance to look in detail at what Grant is doing in his
-> latest series, but the ppc domain scheme that he's basing it on has the
-> concept of sparse interrupt domains.
 >
-> For these, we use a radix tree for the reverse map (we do not rely on a
-> linear range) and we "allocate" linux IRQ numbers on-demand as we create
-> mapping for individual HW interrupts.
+> Higher order free buddy blocks are skipped in the ?if (PageBuddy(page))?
+> path of __test_page_isolated_in_pageblock(). ?Then again, now that I think
+> of it, something fishy may be happening on the edges. ?Moving the check
+> outside of __alloc_contig_migrate_range() after outer_start is calculated
+> in alloc_contig_range() could help. ?I'll take a look at it.
 
-My latest patches are primarily a direct port of the ppc code to be
-generic for all architectures, and it does pretty much what you want.
-As Ben suggests, you should look at the radix revmap code.  Use the
-irq_domain_add_tree() function for creating the irq_domain, and there
-is no need to even pre-allocate the number of hwirqs that you want to
-support.  It uses a radix tree to manage arbitrary mappings from hwirq
-number to linux numbers.
+I was going to suggest that, moving the check until after outer_start
+is calculated
+will definitely help IMO. I am sure I've seen a case where
 
-The other option is the linear map which maintains a static array with
-one entry per hwirq number.  Use irq_domain_add_linear() to create one
-and pass in the maximum number of hwirqs supported by the controller.
-It will allocate an array of irq_desc* so that irq_descs can be
-allocated dynamically.
+  page_count(page) = page->private = 0 and PageBuddy(page) was false.
 
-It is also important to note that for both these revmaps, the actual
-virq number is irrelevant.  The irq_domain is entirely responsible for
-allocation and management.  There will be no need for a 'chunk of
-virqs' assigned to an irq controller.
+I will try and reproduce this as well.
 
-BTW: Ben, if you can carve out some time, I'd appreciate a look over
-my series and make sure you're okay with it.  Once it's had some
-testing by arm and ppc folks, I want to get it into linux-next.
-
-g.
+Thanks,
+Sandeep
