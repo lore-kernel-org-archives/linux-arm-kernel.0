@@ -1,241 +1,73 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 19 Jan 2012 08:39:08 +1100
-Subject: [PATCH] ARM: protect usage of cr_alignment by #ifdef
- CONFIG_CPU_CP15
-In-Reply-To: <1326732555-17915-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1326732555-17915-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4F173BFC.1040107@gmail.com>
+Date: Thu, 19 Jan 2012 08:42:35 +1100
+Subject: [PATCH] ep93xx: fix build of vision_ep93xx.c
+In-Reply-To: <201201161305.23508.hartleys@visionengravers.com>
+References: <201201161305.23508.hartleys@visionengravers.com>
+Message-ID: <4F173CCB.2050009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/12 03:49, Uwe Kleine-K?nig wrote:
+On 17/01/12 07:05, H Hartley Sweeten wrote:
 
-> cr_alignment is defined in arch/arm/kernel/entry-armv.S. When a build
-> doesn't include this file but arch/arm/kernel/head-common.S the latter
-> intruduces an invalid reference to cr_alignment.
+> Fix build breakage due to the following commits:
 > 
-> So handle cr_alignment not being available in head-common.S and for
-> completeness only define and use cr_alignment (and cr_no_alignment) when
-> CONFIG_CPU_CP15 is enabled.
+> Commit bd5f12a24766c1f299def0a78b008d4746f528f2
+>   ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Commit 257af9f9725aa8a863b306659208a031135d59e7
+>   ARM: 7041/1: gpio-ep93xx: hookup the to_irq callback in the driver
+> 
+> The vision_ep9307 machine uses the ep93xx build-in gpios and needs to
+> include <mach/gpio-ep93xx.h> to pickup the defines.
+> 
+> The gpio_to_irq() call is now a callback to the gpio-ep93xx.c driver
+> and cannot be used as a constant initializer for the .irq member of
+> struct i2c_board_info.
+> 
+> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
 
 
-Hi Uwe,
+Hi Hartley,
 
-We have something similar to this patch for our para-virtualised Linux
-kernel (www.ok-labs.com). I agree with Russell that we need a user of
-this code in the kernel before making this change, and our own patches
-are in no danger of hitting mainline any time soon, but I would like to
-see this patch go in.
+Sorry for the delay. This looks correct to me.
 
-One minor comment below.
+Acked-by: Ryan Mallon <rmallon@gmail.com>
 
-Thanks,
-~Ryan
-
+> 
 > ---
-> Hello,
 > 
-> currently arch/arm/kernel/entry-armv.S is used unconditionally, but the
-> Cortex-M3 port in my tree doesn't need it. So this patch fixex a build
-> error only in my tree and it's not urgent to include it.
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/include/asm/system.h |    2 ++
->  arch/arm/kernel/entry-armv.S  |    4 ++++
->  arch/arm/kernel/head-common.S |    9 +++++++--
->  arch/arm/kernel/setup.c       |    8 ++++++--
->  arch/arm/mm/alignment.c       |    6 ++++++
->  arch/arm/mm/mmu.c             |    8 +++++++-
->  6 files changed, 32 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index 984014b..54c9921 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> @@ -177,6 +177,7 @@ extern unsigned int user_debug;
->  #define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
->  #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
-
-
-There is another reference in this file to cr_alignment:
-
-#if __LINUX_ARM_ARCH__ >= 4
-#define vectors_high()  (cr_alignment & CR_V)
-#else
-#define vectors_high()  (0)
-#endif
-
-In our para-virtualised kernel we hardcode the value of vectors_high()
-to 1, however this is might not be the correct thing to do universally
-if !CONFIG_CPU_CP15 && __LINUX_ARM_ARCH__ >= 4.
-
+> diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+> index 03dd401..d5fb44f 100644
+> --- a/arch/arm/mach-ep93xx/vision_ep9307.c
+> +++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+> @@ -32,6 +32,7 @@
+>  #include <mach/hardware.h>
+>  #include <mach/fb.h>
+>  #include <mach/ep93xx_spi.h>
+> +#include <mach/gpio-ep93xx.h>
 >  
-> +#ifdef CONFIG_CPU_CP15
->  extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
->  extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/map.h>
+> @@ -153,7 +154,6 @@ static struct i2c_board_info vision_i2c_info[] __initdata = {
+>  	}, {
+>  		I2C_BOARD_INFO("pca9539", 0x74),
+>  		.platform_data	= &pca953x_74_gpio_data,
+> -		.irq		= gpio_to_irq(EP93XX_GPIO_LINE_F(7)),
+>  	}, {
+>  		I2C_BOARD_INFO("pca9539", 0x75),
+>  		.platform_data	= &pca953x_75_gpio_data,
+> @@ -348,6 +348,8 @@ static void __init vision_init_machine(void)
+>  				"pca9539:74"))
+>  		pr_warn("cannot request interrupt gpio for pca9539:74\n");
 >  
-> @@ -216,6 +217,7 @@ static inline void set_copro_access(unsigned int val)
->  	  : : "r" (val) : "cc");
->  	isb();
->  }
-> +#endif
->  
->  /*
->   * switch_mm() may do a full cache flush over the context switch,
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index b145f16..7782e7d 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -315,8 +315,10 @@ __pabt_svc:
->  ENDPROC(__pabt_svc)
->  
->  	.align	5
-> +#ifdef CONFIG_CPU_CP15
->  .LCcralign:
->  	.word	cr_alignment
-> +#endif
->  #ifdef MULTI_DABORT
->  .LCprocfns:
->  	.word	processor
-> @@ -1147,12 +1149,14 @@ __vectors_end:
->  
->  	.data
->  
-> +#ifdef CONFIG_CPU_CP15
->  	.globl	cr_alignment
->  	.globl	cr_no_alignment
->  cr_alignment:
->  	.space	4
->  cr_no_alignment:
->  	.space	4
-> +#endif
->  
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
->  	.globl	handle_arch_irq
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index 854bd22..2f560c5 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -98,8 +98,9 @@ __mmap_switched:
->  	str	r9, [r4]			@ Save processor ID
->  	str	r1, [r5]			@ Save machine type
->  	str	r2, [r6]			@ Save atags pointer
-> -	bic	r4, r0, #CR_A			@ Clear 'A' bit
-> -	stmia	r7, {r0, r4}			@ Save control register values
-> +	cmp	r7, #0
-> +	bicne	r4, r0, #CR_A			@ Clear 'A' bit
-> +	stmneia	r7, {r0, r4}			@ Save control register values
->  	b	start_kernel
->  ENDPROC(__mmap_switched)
->  
-> @@ -113,7 +114,11 @@ __mmap_switched_data:
->  	.long	processor_id			@ r4
->  	.long	__machine_arch_type		@ r5
->  	.long	__atags_pointer			@ r6
-> +#ifdef CONFIG_CPU_CP15
->  	.long	cr_alignment			@ r7
-> +#else
-> +	.long	0
-> +#endif
->  	.long	init_thread_union + THREAD_START_SP @ sp
->  	.size	__mmap_switched_data, . - __mmap_switched_data
->  
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 8fc2c8f..d37a02fa 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -457,9 +457,13 @@ static void __init setup_processor(void)
->  	cpu_cache = *list->cache;
->  #endif
->  
-> -	printk("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
-> +	printk("CPU: %s [%08x] revision %d (ARMv%s)",
->  	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
-> -	       proc_arch[cpu_architecture()], cr_alignment);
-> +	       proc_arch[cpu_architecture()]);
+> +	vision_i2c_info[1].irq = gpio_to_irq(EP93XX_GPIO_LINE_F(7));
 > +
-> +#ifdef CONFIG_CPU_CP15
-> +	printk(KERN_CONT ", cr=%08lx\n", cr_alignment);
-> +#endif
->  
->  	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
->  		 list->arch_name, ENDIANNESS);
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index c335c76..56da01c 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -89,7 +89,11 @@ core_param(alignment, ai_usermode, int, 0600);
->  /* Return true if and only if the ARMv6 unaligned access model is in use. */
->  static bool cpu_is_v6_unaligned(void)
->  {
-> +#ifdef CONFIG_CPU_CP15
->  	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
-> +#else
-> +	return 0;
-> +#endif
->  }
->  
->  static int safe_usermode(int new_usermode, bool warn)
-> @@ -961,12 +965,14 @@ static int __init alignment_init(void)
->  		return -ENOMEM;
->  #endif
->  
-> +#ifdef CONFIG_CPU_CP15
->  	if (cpu_is_v6_unaligned()) {
->  		cr_alignment &= ~CR_A;
->  		cr_no_alignment &= ~CR_A;
->  		set_cr(cr_alignment);
->  		ai_usermode = safe_usermode(ai_usermode, false);
->  	}
-> +#endif
->  
->  	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
->  			"alignment exception");
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 8b8446a..d5a170a 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -106,8 +106,10 @@ static int __init early_cachepolicy(char *p)
->  	for (i = 0; i < ARRAY_SIZE(cache_policies); i++) {
->  		if (strcmp(p, cache_policies[i].policy) == 0) {
->  			cachepolicy = i;
-> +#ifdef CONFIG_CPU_CP15
->  			cr_alignment &= ~cache_policies[i].cr_mask;
->  			cr_no_alignment &= ~cache_policies[i].cr_mask;
-> +#endif
->  			break;
->  		}
->  	}
-> @@ -125,7 +127,9 @@ static int __init early_cachepolicy(char *p)
->  		cachepolicy = CPOLICY_WRITEBACK;
->  	}
->  	flush_cache_all();
-> +#ifdef CONFIG_CPU_CP15
->  	set_cr(cr_alignment);
-> +#endif
->  	return 0;
->  }
->  early_param("cachepolicy", early_cachepolicy);
-> @@ -158,6 +162,7 @@ static int __init early_ecc(char *p)
->  }
->  early_param("ecc", early_ecc);
->  
-> +#ifdef CONFIG_CPU_CP15
->  static int __init noalign_setup(char *__unused)
->  {
->  	cr_alignment &= ~CR_A;
-> @@ -166,8 +171,9 @@ static int __init noalign_setup(char *__unused)
->  	return 1;
->  }
->  __setup("noalign", noalign_setup);
-> +#endif
->  
-> -#ifndef CONFIG_SMP
-> +#if !defined(CONFIG_SMP) && defined(CONFIG_CPU_CP15)
->  void adjust_cr(unsigned long mask, unsigned long set)
->  {
->  	unsigned long flags;
+>  	ep93xx_register_i2c(&vision_i2c_gpio_data, vision_i2c_info,
+>  				ARRAY_SIZE(vision_i2c_info));
+>  	ep93xx_register_spi(&vision_spi_master, vision_spi_board_info,
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
