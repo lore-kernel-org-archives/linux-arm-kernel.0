@@ -1,150 +1,154 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 18 Jan 2012 11:24:16 -0800
+Date: Wed, 18 Jan 2012 11:42:20 -0800
 Subject: Pinmux bindings proposal
-In-Reply-To: <7FE21149F4667147B645348EC6057885093AD9@039-SN2MPN1-013.039d.mgd.msft.net>
+In-Reply-To: <7FE21149F4667147B645348EC6057885093D83@039-SN2MPN1-013.039d.mgd.msft.net>
 References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
  <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120117082334.GA31295@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120117141322.GA31687@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC6057885093AD9@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1780DAAE97@HQMAIL01.nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D22DE@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885093D83@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1780DAAEAF@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dong Aisheng wrote at Tuesday, January 17, 2012 8:45 PM:
-....
-> > > > It may worth introducing
-> > > > another level phandle reference.  Something like the following:
-> > > >
-> > > > 	pinmux_sdhci: pinmux-sdhci {
-> > > > 		mux =
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
-> > > > 	};
-> > > >
-> > > > 	pinconf_sdhci_active: pinconf-sdhci-active {
-> > > > 		config =
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
-> > > > 	};
-> > > >
-> > > > 	pinconf_sdhci_suspend: pinconf-sdhci-suspend {
-> > > > 		config =
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
-> > > > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
-> > > > 	};
-> > >
-> > > The config makes sense to me.
-> > > The only question is how to get group name to match with the predefined groups.
+Dong Aisheng wrote at Wednesday, January 18, 2012 12:24 AM:
+> Stephen Warren wrote at Wednesday, January 18, 2012 3:09 AM:
+> > Dong Aisheng wrote at Monday, January 16, 2012 5:50 AM:
+> > > Stephen Warren wrote at Saturday, January 14, 2012 4:40 AM:
+> > > > I thought a bit more about pinmux DT bindings. I came up with
+> > > > something that I like well enough, and is pretty similar to the binding that
+> > > > Dong posted recently.
+...
+> > Just to be clear, I'll repeat part of my previous response to Shawn:
 > >
-> > I still incline to say there should not be any predefined groups for DT case, if
-> > we choose to find the group in use only when pinmux_get() gets called.
+> > * Just a further explanation on my original code: I always intended that
+> > * each entry in that list was a full pinmux configuration that could include
+> > * mux and pin configuration settings. Thus, the above is more like:
+> > *
+> > * pinctrl =
+> > *     <"default" &pmx_sdhci_a>
+> > *     <"default" &pmx_sdhci_overrides>
+> > *
+> > * (overrides rather than explicit separate mux/config; the separate mux
+> > * And config were just an example use case).
+> >
+> > So that was a list where the /examples/ had two entries, one for mux and one for
+> > pin config. In general, there could be 1, 2, 3, ... entries and each could
+> > define whatever mux and config entries they wanted.
 >
-> Then we have too issue I said before:
-> 1) Inconsistent issue
-> sysfs pinmux map entry has different meaning
+> I also read your reply to Shawn's mail.
+> I guess you mean the first "default" entry may not sufficient to use, so we allow
+> customer defines extra pmx_sdhci_overrides in board.dts to use?
+> 
+> Personally I did not see big benefits for this way but introduce a bit complexity
+> and make the code not clear and not easily to understand.
+> Why not define it completely for one pinmux group?
 
-Ah.
+I have already enumeration the reasons. The most relevant one here is
+so that if you have a pre-defined pin configuration node that's 99% what
+you need, you can use that, and add any custom options on top of it
+without cut/pasting the whole thing first.
 
-When you talked about the pinmux map table being inconsistent between
-the board and device tree case, I thought your main/only concern was
-the enumeration timing issue; that with a board file, the entire map
-was available at boot yet with DT it might not be complete if we didn't
-explicitly search the whole DT for pinmux configuration nodes.
+> I think it also does not meet the current pinctrl subsystem design.
+> The group and functions are defined, customer only needs to tell what they want to
+> use. For example, in non-dt case, a pinmux map table is enough to use.
 
-However, I think you're also concerned that if we force the DT to use
-only pure HW groups (or none at all if the HW doesn't use groups), then
-that would be different from a board file which did use "virtual groups".
+Well, we can always change the pinctrl subsystem to suite everyone's needs.
 
-So I'm sure you can predict what my answer is! Don't use "virtual groups"
-in the board case /either/; if the HW doesn't do groups, don't have the
-pinctrl driver pretend that it does.
+But, I don't see what doesn't fit the existing pinctrl design, at least
+for muxing (pin config is still in flux irrespective of device tree...)
 
-As a response, you'll say that this makes life harder for authors of the
-pinmux mapping table, because then they have to list out every single
-pin's mux state instead of picking between various pre-defined configur-
-ations that would have been provided by "virtual groups". I believe you
-can solve this by providing these pre-defined configurations using macros
-instead of "virtual groups". Each macro would simply contain a bunch of
-pinmux mapping table initialization entries, and the board file author
-could simply use the relevant macros when writing their mapping table:
-
-Some SoC header:
-
-#define PMX_MAP_SDIO4_ATB_GMA_GME \
-        PINMUX_MAP("default", "pinctrl-foo", "atb", "sdio4"), \
-        PINMUX_MAP("default", "pinctrl-foo", "gma", "sdio4"), \
-        PINMUX_MAP("default", "pinctrl-foo", "gme", "sdio4")
-
-Board file:
-
-static struct pinmux_map pmx_map[] = {
-    /* Using a pre-defined configuration */
-    PMX_MAP_SDIO4_ATB_GMA_GME,
-    /* Custom stuff if needed */
-    PINMUX_MAP("default", "pinctrl-foo", "xyz", "pqrs")
-};
-
-(This kind of thing is exactly why I pushed to allow the pinmux mapping
-table to contain multiple entries for the same "name"+device combination)
-
-> 2) need to change the pinmux_maps from arrays to list for better to dynamically
-> Insert the new created pinmux map detected.
-> But this does affect the non-dt case a lot.
-
-I believe the pinctrl subsystem already supports multiple map tables to
-be registered. I do recall some discussion that there was work left to
-do here. Either way, this is purely an implementation detail that's
-almost entirely hidden with the pinctrl subsystem, and I don't think
-influences the device tree binding design at all.
+Is your issue that with board files, you'd typically register a single
+large pinmux mapping table, whereas with this proposed device tree binding,
+you end up representing a lot of separate chunks of the table in different
+places? When parsing those chunks, you can certainly aggregate them all
+into a single table to register with the pinctrl subsystem. That said,
+the pinctrl subsystem does allow you to incrementally register more and
+more table entries though, so you shouldn't actually have to convert
+everything into a single table.
 
 ...
-> > so you should know how the name comes from device tree, and you
-> > should be able to recreate the name when you are trying to matching the name in
-> > the table you created before.
-> >
-> > > Besides per pin group configuration support, we may also want per pin
-> > > configuration Support as the latest patch sent by Linus.
-> > > http://www.spinics.net/lists/arm-kernel/msg155712.html
-> >
-> > This binding proposal has covered both pin and group configuration, as the
-> > second parameter of 'config' property could be either a pin or group which
-> > depends the on whether the configurable entity at HW level is a pin or group.
+> Yes, after looking Linus's patch to support pin states, I'm thinking for pin config
+> case we may need such a property or flag to tell which config of state to use by
+> default since we support multi states.
+
+I don't think we need an explicit flag. We could either:
+
+a) Say "first entry is the default". IIRC, this is how the pinmux mapping
+table works.
+
+Or:
+
+b) The entries are named. For the system-wide pin config table that's
+in Linus's latest patch, we can simply define a specific name for the
+default, e.g. "default". When I get around to responding to Linus's
+pin config patch, I expect to make this comment.
+
+c) The entries are named. Drivers request explicit names for the
+pin mux configuration, and can do the same for any separate pin config
+requests if they aren't wrapped into a single request. Thus, it's up
+to the driver to define what the default name is. I'd pick "default"
+myself.
+
+> > b) function name: The pinmux_ops for the driver of pmx_controller_phandle needs
+> > a function to convert integer IDs such as TEGRA_PMX_MUX_1 to whatever function
+> > IDs are used by the pinctrl subsystem.
 >
-> The pinctrl driver does not know if it's group or pin.
-> We may find a way to identify it.
+> No, I guess Tegra can do this since tegra prefers to define functions and groups
+> In pinctrl driver.
+> But for IMX, we do not have these info before the imx-pinctrl driver gets run and
+> Parse the device tree.
 
-The common binding simply states that the entities identified in the
-mux and config properties are "muxable entities". It's up to the
-individual pin controller's binding to define what a "muxable entity"
-is. For HW that muxes pins, this should be a pin. For HW that muxes
-groups, this should be a group.
+The same issue exists for interrupts and GPIO, where parsing a device's
+reference to an IRQ/GPIO controller needs that controller to have been
+probed first, and the conversion function registered.
 
-Now, the pinctrl subsystem only knows about muxing whole groups. If
-the HW muxes per pin rather than per group, its pinctrl driver must
-currently define a group for each pin, containing just that pin, and
-use those groups in the mapping table. I'd originally hoped that the
-mapping table entries could refer to either pins or groups, but that's
-not what is implemented now. So, we could change that in pinctrl, or
-just create these single-pin groups within the relevant pinctrl drivers.
-That's certainly what I did for Tegra30 (which muxes per pin unlike
-Tegra20 which muxes per group).
+For interrupts, this has been solved by explicitly initializing the IRQ
+controller very early in boot.
 
-When parsing the device tree, something is going to need to convert the
-integer values in device tree to the names that the pinctrl core uses.
-This should be a function in the individual pinctrl driver. Hence, it
-can easily handle the two difference cases I mention above.
+For GPIOs, I'm don't think this has been solved; it works by accident
+in most cases.
 
-(Re: the last paragraph, I notice you raised some issues re: the order
-of pinctrl driver probe v.s. when the pinmux map can be created. I'll
-address those issues elsewhere where you raise them)
+I think the solution for GPIO and pinmux is to rely on the device probe
+deferral patches that Grant posted a while back; defer parsing of the
+pinmux properties until after the controller that contains those pin
+configuration nodes has been probed (or perhaps force it to be probed
+when its node is first encountered?)
+
+> 
+> > c) group name: This should be handled just like (b).
+> >
+> > Also you'll need to know:
+> >
+> > struct pinmux_map's .name field. This is the value in the pinctrl-names property,
+> > assuming we're switching to the following syntax:
+> >
+> >     pinctrl = <&pmx_sdhci_a_active>, <&pmx_sdhci_a_suspend>;
+> >     pinctrl-names = "default", "suspend";
+>
+> Here the pinctrl-names are representing 'state'.
+> Is pinmux_map.name field used for this?
+
+Yes.
+
+...
+> > 2) On IMX, you'd define a pin group for each individual pin, since the HW muxing
+> > is at a pin not a group level.
+>
+> Yes, this is what I'm thinking now.
+> If we decide to do that, the pin groups concepts of current pinmux subsystem
+> Seems does not fit for IMX a lot since each group is only one pin.
+> And the functions/groups would be hugh since IMX6Q has 196 pins and each pin may have
+> 7 functions.
+
+We should investigate modifying the pinctrl subsystem so that either:
+
+a) The pin mux mapping table can refer to either pins or groups, on a
+per controller basis, based on some flag in struct pinctrl_desc.
+
+b) Automatically create a group for each pin where the pinctrl driver
+asks it to do so, so the single-pin groups don't all have to be
+explicitly enumerated by the pinctrl driver, again based on some flag
+in struct pinctrl_desc.
 
 -- 
 nvpublic
