@@ -1,268 +1,288 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 18 Jan 2012 14:41:57 +0530
-Subject: [PATCH V2 10/12] dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
+Date: Wed, 18 Jan 2012 14:41:58 +0530
+Subject: [PATCH V2 11/12] dmaengine/dw_dmac: Fix dw_dmac user drivers to adapt
+ to slave_config changes
 In-Reply-To: <cover.1326876464.git.viresh.kumar@st.com>
 References: <cover.1326876464.git.viresh.kumar@st.com>
-Message-ID: <d5ac648e95ba6acfcfb42bd6aafa403915e08da2.1326876464.git.viresh.kumar@st.com>
+Message-ID: <012944d886dbe19f82c3ecedb0a2c80b24af8041.1326876464.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for DMA_SLAVE_CONFIG in dwc DMAC controller. Fields in
-struct dw_dma_slave for passing similar data are preserved in this patch untill
-all existing users are fixed.
-
-That will be handled later in this patchset.
+There are few existing user drivers of dw_dmac. They will break as soon as we
+remove unused fields from struct dw_dma_slave. This patch focuses to fix these
+user drivers to use dma_slave_config() routine.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac.c      |  119 +++++++++++++++++++++++++++++++++-----------
- drivers/dma/dw_dmac_regs.h |    3 +
- 2 files changed, 93 insertions(+), 29 deletions(-)
+ arch/avr32/mach-at32ap/at32ap700x.c             |   13 -------
+ arch/avr32/mach-at32ap/include/mach/atmel-mci.h |    7 ----
+ drivers/mmc/host/atmel-mci.c                    |   24 +++++++++----
+ sound/atmel/abdac.c                             |   18 ++++++++--
+ sound/atmel/ac97c.c                             |   41 ++++++++++++++++++----
+ 5 files changed, 63 insertions(+), 40 deletions(-)
 
-diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 44d8069..ccfb03b 100644
---- a/drivers/dma/dw_dmac.c
-+++ b/drivers/dma/dw_dmac.c
-@@ -9,6 +9,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/bitops.h>
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/dmaengine.h>
-@@ -33,19 +34,23 @@
-  * which does not support descriptor writeback.
-  */
+diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
+index 7fbf0dc..d05936b 100644
+--- a/arch/avr32/mach-at32ap/at32ap700x.c
++++ b/arch/avr32/mach-at32ap/at32ap700x.c
+@@ -1353,7 +1353,6 @@ at32_add_device_mci(unsigned int id, struct mci_platform_data *data)
+ 		goto fail;
  
--#define DWC_DEFAULT_CTLLO(private) ({				\
--		struct dw_dma_slave *__slave = (private);	\
--		int dms = __slave ? __slave->dst_master : 0;	\
--		int sms = __slave ? __slave->src_master : 1;	\
--		u8 smsize = __slave ? __slave->src_msize : DW_DMA_MSIZE_16; \
--		u8 dmsize = __slave ? __slave->dst_msize : DW_DMA_MSIZE_16; \
-+#define DWC_DEFAULT_CTLLO(_chan) ({				\
-+		struct dw_dma_slave *__slave = (_chan->private);	\
-+		struct dw_dma_chan *_dwc = to_dw_dma_chan(_chan);	\
-+		struct dma_slave_config	*_sconfig = &_dwc->dma_sconfig;	\
-+		int _dms = __slave ? __slave->dst_master : 0;	\
-+		int _sms = __slave ? __slave->src_master : 1;	\
-+		u8 _smsize = __slave ? _sconfig->src_maxburst :	\
-+			DW_DMA_MSIZE_16;			\
-+		u8 _dmsize = __slave ? _sconfig->dst_maxburst :	\
-+			DW_DMA_MSIZE_16;			\
- 								\
--		(DWC_CTLL_DST_MSIZE(dmsize)			\
--		 | DWC_CTLL_SRC_MSIZE(smsize)			\
-+		(DWC_CTLL_DST_MSIZE(_dmsize)			\
-+		 | DWC_CTLL_SRC_MSIZE(_smsize)			\
- 		 | DWC_CTLL_LLP_D_EN				\
- 		 | DWC_CTLL_LLP_S_EN				\
--		 | DWC_CTLL_DMS(dms)				\
--		 | DWC_CTLL_SMS(sms));				\
-+		 | DWC_CTLL_DMS(_dms)				\
-+		 | DWC_CTLL_SMS(_sms));				\
- 	})
- 
- /*
-@@ -664,7 +669,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 	else
- 		src_width = dst_width = 0;
- 
--	ctllo = DWC_DEFAULT_CTLLO(chan->private)
-+	ctllo = DWC_DEFAULT_CTLLO(chan)
- 			| DWC_CTLL_DST_WIDTH(dst_width)
- 			| DWC_CTLL_SRC_WIDTH(src_width)
- 			| DWC_CTLL_DST_INC
-@@ -725,6 +730,7 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- {
- 	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
- 	struct dw_dma_slave	*dws = chan->private;
-+	struct dma_slave_config	*sconfig = &dwc->dma_sconfig;
- 	struct dw_desc		*prev;
- 	struct dw_desc		*first;
- 	u32			ctllo;
-@@ -739,17 +745,20 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	if (unlikely(!dws || !sg_len))
- 		return NULL;
- 
--	reg_width = dws->reg_width;
- 	prev = first = NULL;
- 
- 	switch (direction) {
- 	case DMA_MEM_TO_DEV:
--		ctllo = (DWC_DEFAULT_CTLLO(chan->private)
-+		reg_width = __fls(sconfig->dst_addr_width);
-+		reg = sconfig->dst_addr;
-+		ctllo = (DWC_DEFAULT_CTLLO(chan)
- 				| DWC_CTLL_DST_WIDTH(reg_width)
- 				| DWC_CTLL_DST_FIX
--				| DWC_CTLL_SRC_INC
--				| DWC_CTLL_FC(dws->fc));
--		reg = dws->tx_reg;
-+				| DWC_CTLL_SRC_INC);
-+
-+		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_M2P) :
-+			DWC_CTLL_FC(DW_DMA_FC_D_M2P);
-+
- 		for_each_sg(sgl, sg, sg_len, i) {
- 			struct dw_desc	*desc;
- 			u32		len, dlen, mem;
-@@ -807,13 +816,16 @@ slave_sg_todev_fill_desc:
- 		}
- 		break;
- 	case DMA_DEV_TO_MEM:
--		ctllo = (DWC_DEFAULT_CTLLO(chan->private)
-+		reg_width = __fls(sconfig->src_addr_width);
-+		reg = sconfig->src_addr;
-+		ctllo = (DWC_DEFAULT_CTLLO(chan)
- 				| DWC_CTLL_SRC_WIDTH(reg_width)
- 				| DWC_CTLL_DST_INC
--				| DWC_CTLL_SRC_FIX
--				| DWC_CTLL_FC(dws->fc));
-+				| DWC_CTLL_SRC_FIX);
-+
-+		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_P2M) :
-+			DWC_CTLL_FC(DW_DMA_FC_D_P2M);
- 
--		reg = dws->rx_reg;
- 		for_each_sg(sgl, sg, sg_len, i) {
- 			struct dw_desc	*desc;
- 			u32		len, dlen, mem;
-@@ -889,6 +901,39 @@ err_desc_get:
- 	return NULL;
- }
- 
-+/*
-+ * Fix sconfig's burst size according to dw_dmac. We need to convert them as:
-+ * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
-+ *
-+ * NOTE: burst size 2 is not supported by controller.
-+ *
-+ * This can be done by finding least significant bit set: n & (n - 1)
-+ */
-+static inline void convert_burst(u32 *maxburst)
-+{
-+	if (*maxburst > 1)
-+		*maxburst = fls(*maxburst) - 2;
-+	else
-+		*maxburst = 0;
-+}
-+
-+static int
-+set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
-+{
-+	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
-+
-+	/* Check if it is chan is configured for slave transfers */
-+	if (!chan->private)
-+		return -EINVAL;
-+
-+	memcpy(&dwc->dma_sconfig, sconfig, sizeof(*sconfig));
-+
-+	convert_burst(&dwc->dma_sconfig.src_maxburst);
-+	convert_burst(&dwc->dma_sconfig.dst_maxburst);
-+
-+	return 0;
-+}
-+
- static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		       unsigned long arg)
- {
-@@ -938,8 +983,11 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		/* Flush all pending and queued descriptors */
- 		list_for_each_entry_safe(desc, _desc, &list, desc_node)
- 			dwc_descriptor_complete(dwc, desc, false);
--	} else
-+	} else if (cmd == DMA_SLAVE_CONFIG) {
-+		return set_runtime_config(chan, (struct dma_slave_config *)arg);
-+	} else {
- 		return -ENXIO;
-+	}
- 
- 	return 0;
- }
-@@ -1180,11 +1228,11 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
- 		enum dma_transfer_direction direction)
- {
- 	struct dw_dma_chan		*dwc = to_dw_dma_chan(chan);
-+	struct dma_slave_config		*sconfig = &dwc->dma_sconfig;
- 	struct dw_cyclic_desc		*cdesc;
- 	struct dw_cyclic_desc		*retval = NULL;
- 	struct dw_desc			*desc;
- 	struct dw_desc			*last = NULL;
--	struct dw_dma_slave		*dws = chan->private;
- 	unsigned long			was_cyclic;
- 	unsigned int			reg_width;
- 	unsigned int			periods;
-@@ -1208,7 +1256,12 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
+ 	slave->sdata.dma_dev = &dw_dmac0_device.dev;
+-	slave->sdata.reg_width = DW_DMA_SLAVE_WIDTH_32BIT;
+ 	slave->sdata.cfg_hi = (DWC_CFGH_SRC_PER(0)
+ 				| DWC_CFGH_DST_PER(1));
+ 	slave->sdata.cfg_lo &= ~(DWC_CFGL_HS_DST_POL
+@@ -2048,27 +2047,19 @@ at32_add_device_ac97c(unsigned int id, struct ac97c_platform_data *data,
+ 	/* Check if DMA slave interface for capture should be configured. */
+ 	if (flags & AC97C_CAPTURE) {
+ 		rx_dws->dma_dev = &dw_dmac0_device.dev;
+-		rx_dws->reg_width = DW_DMA_SLAVE_WIDTH_16BIT;
+ 		rx_dws->cfg_hi = DWC_CFGH_SRC_PER(3);
+ 		rx_dws->cfg_lo &= ~(DWC_CFGL_HS_DST_POL | DWC_CFGL_HS_SRC_POL);
+ 		rx_dws->src_master = 0;
+ 		rx_dws->dst_master = 1;
+-		rx_dws->src_msize = DW_DMA_MSIZE_1;
+-		rx_dws->dst_msize = DW_DMA_MSIZE_1;
+-		rx_dws->fc = DW_DMA_FC_D_P2M;
  	}
  
- 	retval = ERR_PTR(-EINVAL);
--	reg_width = dws->reg_width;
-+
-+	if (direction == DMA_MEM_TO_DEV)
-+		reg_width = __ffs(sconfig->dst_addr_width);
-+	else
-+		reg_width = __ffs(sconfig->src_addr_width);
-+
- 	periods = buf_len / period_len;
+ 	/* Check if DMA slave interface for playback should be configured. */
+ 	if (flags & AC97C_PLAYBACK) {
+ 		tx_dws->dma_dev = &dw_dmac0_device.dev;
+-		tx_dws->reg_width = DW_DMA_SLAVE_WIDTH_16BIT;
+ 		tx_dws->cfg_hi = DWC_CFGH_DST_PER(4);
+ 		tx_dws->cfg_lo &= ~(DWC_CFGL_HS_DST_POL | DWC_CFGL_HS_SRC_POL);
+ 		tx_dws->src_master = 0;
+ 		tx_dws->dst_master = 1;
+-		tx_dws->src_msize = DW_DMA_MSIZE_1;
+-		tx_dws->dst_msize = DW_DMA_MSIZE_1;
+-		tx_dws->fc = DW_DMA_FC_D_M2P;
+ 	}
  
- 	/* Check for too big/unaligned periods and unaligned DMA buffer. */
-@@ -1241,26 +1294,34 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
+ 	if (platform_device_add_data(pdev, data,
+@@ -2138,14 +2129,10 @@ at32_add_device_abdac(unsigned int id, struct atmel_abdac_pdata *data)
+ 	dws = &data->dws;
  
- 		switch (direction) {
- 		case DMA_MEM_TO_DEV:
--			desc->lli.dar = dws->tx_reg;
-+			desc->lli.dar = sconfig->dst_addr;
- 			desc->lli.sar = buf_addr + (period_len * i);
--			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan->private)
-+			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan)
- 					| DWC_CTLL_DST_WIDTH(reg_width)
- 					| DWC_CTLL_SRC_WIDTH(reg_width)
- 					| DWC_CTLL_DST_FIX
- 					| DWC_CTLL_SRC_INC
--					| DWC_CTLL_FC(dws->fc)
- 					| DWC_CTLL_INT_EN);
-+
-+			desc->lli.ctllo |= sconfig->device_fc ?
-+				DWC_CTLL_FC(DW_DMA_FC_P_M2P) :
-+				DWC_CTLL_FC(DW_DMA_FC_D_M2P);
-+
- 			break;
- 		case DMA_DEV_TO_MEM:
- 			desc->lli.dar = buf_addr + (period_len * i);
--			desc->lli.sar = dws->rx_reg;
--			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan->private)
-+			desc->lli.sar = sconfig->src_addr;
-+			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan)
- 					| DWC_CTLL_SRC_WIDTH(reg_width)
- 					| DWC_CTLL_DST_WIDTH(reg_width)
- 					| DWC_CTLL_DST_INC
- 					| DWC_CTLL_SRC_FIX
--					| DWC_CTLL_FC(dws->fc)
- 					| DWC_CTLL_INT_EN);
-+
-+			desc->lli.ctllo |= sconfig->device_fc ?
-+				DWC_CTLL_FC(DW_DMA_FC_P_P2M) :
-+				DWC_CTLL_FC(DW_DMA_FC_D_P2M);
-+
- 			break;
- 		default:
- 			break;
-diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
-index 5eef694..2005d30 100644
---- a/drivers/dma/dw_dmac_regs.h
-+++ b/drivers/dma/dw_dmac_regs.h
-@@ -153,6 +153,9 @@ struct dw_dma_chan {
- 	struct dw_cyclic_desc	*cdesc;
+ 	dws->dma_dev = &dw_dmac0_device.dev;
+-	dws->reg_width = DW_DMA_SLAVE_WIDTH_32BIT;
+ 	dws->cfg_hi = DWC_CFGH_DST_PER(2);
+ 	dws->cfg_lo &= ~(DWC_CFGL_HS_DST_POL | DWC_CFGL_HS_SRC_POL);
+ 	dws->src_master = 0;
+ 	dws->dst_master = 1;
+-	dws->src_msize = DW_DMA_MSIZE_1;
+-	dws->dst_msize = DW_DMA_MSIZE_1;
+-	dws->fc = DW_DMA_FC_D_M2P;
  
- 	unsigned int		descs_allocated;
-+
-+	/* configuration passed via DMA_SLAVE_CONFIG */
-+	struct dma_slave_config dma_sconfig;
- };
+ 	if (platform_device_add_data(pdev, data,
+ 				sizeof(struct atmel_abdac_pdata)))
+diff --git a/arch/avr32/mach-at32ap/include/mach/atmel-mci.h b/arch/avr32/mach-at32ap/include/mach/atmel-mci.h
+index a9b3896..4bba585 100644
+--- a/arch/avr32/mach-at32ap/include/mach/atmel-mci.h
++++ b/arch/avr32/mach-at32ap/include/mach/atmel-mci.h
+@@ -14,11 +14,4 @@ struct mci_dma_data {
+ #define	slave_data_ptr(s)	(&(s)->sdata)
+ #define find_slave_dev(s)	((s)->sdata.dma_dev)
  
- static inline struct dw_dma_chan_regs __iomem *
+-#define	setup_dma_addr(s, t, r)	do {		\
+-	if (s) {				\
+-		(s)->sdata.tx_reg = (t);	\
+-		(s)->sdata.rx_reg = (r);	\
+-	}					\
+-} while (0)
+-
+ #endif /* __MACH_ATMEL_MCI_H */
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index fcfe1eb..3ba865d 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -24,6 +24,7 @@
+ #include <linux/seq_file.h>
+ #include <linux/slab.h>
+ #include <linux/stat.h>
++#include <linux/types.h>
+ 
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sdio.h>
+@@ -173,6 +174,7 @@ struct atmel_mci {
+ 
+ 	struct atmel_mci_dma	dma;
+ 	struct dma_chan		*data_chan;
++	struct dma_slave_config	dma_conf;
+ 
+ 	u32			cmd_status;
+ 	u32			data_status;
+@@ -863,15 +865,16 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
+ 
+ 	if (data->flags & MMC_DATA_READ) {
+ 		direction = DMA_FROM_DEVICE;
+-		slave_dirn = DMA_DEV_TO_MEM;
++		host->dma_conf.direction = slave_dirn = DMA_DEV_TO_MEM;
+ 	} else {
+ 		direction = DMA_TO_DEVICE;
+-		slave_dirn = DMA_MEM_TO_DEV;
++		host->dma_conf.direction = slave_dirn = DMA_MEM_TO_DEV;
+ 	}
+ 
+ 	sglen = dma_map_sg(chan->device->dev, data->sg,
+ 			data->sg_len, direction);
+ 
++	dmaengine_slave_config(chan, &host->dma_conf);
+ 	desc = chan->device->device_prep_slave_sg(chan,
+ 			data->sg, sglen, slave_dirn,
+ 			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+@@ -1957,22 +1960,27 @@ static void atmci_configure_dma(struct atmel_mci *host)
+ 	if (pdata && find_slave_dev(pdata->dma_slave)) {
+ 		dma_cap_mask_t mask;
+ 
+-		setup_dma_addr(pdata->dma_slave,
+-			       host->mapbase + ATMCI_TDR,
+-			       host->mapbase + ATMCI_RDR);
+-
+ 		/* Try to grab a DMA channel */
+ 		dma_cap_zero(mask);
+ 		dma_cap_set(DMA_SLAVE, mask);
+ 		host->dma.chan =
+ 			dma_request_channel(mask, atmci_filter, pdata->dma_slave);
+ 	}
+-	if (!host->dma.chan)
++	if (!host->dma.chan) {
+ 		dev_notice(&host->pdev->dev, "DMA not available, using PIO\n");
+-	else
++	} else {
+ 		dev_info(&host->pdev->dev,
+ 					"Using %s for DMA transfers\n",
+ 					dma_chan_name(host->dma.chan));
++
++		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
++		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++		host->dma_conf.src_maxburst = 1;
++		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
++		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++		host->dma_conf.dst_maxburst = 1;
++		host->dma_conf.device_fc = false;
++	}
+ }
+ 
+ static inline unsigned int atmci_get_version(struct atmel_mci *host)
+diff --git a/sound/atmel/abdac.c b/sound/atmel/abdac.c
+index 4fa1dbd..f7c2bb0 100644
+--- a/sound/atmel/abdac.c
++++ b/sound/atmel/abdac.c
+@@ -16,6 +16,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/types.h>
+ #include <linux/io.h>
+ 
+ #include <sound/core.h>
+@@ -467,15 +468,24 @@ static int __devinit atmel_abdac_probe(struct platform_device *pdev)
+ 	snd_card_set_dev(card, &pdev->dev);
+ 
+ 	if (pdata->dws.dma_dev) {
+-		struct dw_dma_slave *dws = &pdata->dws;
+ 		dma_cap_mask_t mask;
+ 
+-		dws->tx_reg = regs->start + DAC_DATA;
+-
+ 		dma_cap_zero(mask);
+ 		dma_cap_set(DMA_SLAVE, mask);
+ 
+-		dac->dma.chan = dma_request_channel(mask, filter, dws);
++		dac->dma.chan = dma_request_channel(mask, filter, &pdata->dws);
++		if (dac->dma.chan) {
++			struct dma_slave_config dma_conf = {
++				.dst_addr = regs->start + DAC_DATA,
++				.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
++				.src_maxburst = 1,
++				.dst_maxburst = 1,
++				.direction = DMA_MEM_TO_DEV,
++				.device_fc = false,
++			};
++
++			dmaengine_slave_config(dac->dma.chan, &dma_conf);
++		}
+ 	}
+ 	if (!pdata->dws.dma_dev || !dac->dma.chan) {
+ 		dev_dbg(&pdev->dev, "DMA not available\n");
+diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
+index cd9428b..15f47e3 100644
+--- a/sound/atmel/ac97c.c
++++ b/sound/atmel/ac97c.c
+@@ -20,6 +20,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/mutex.h>
+ #include <linux/gpio.h>
++#include <linux/types.h>
+ #include <linux/io.h>
+ 
+ #include <sound/core.h>
+@@ -1010,16 +1011,28 @@ static int __devinit atmel_ac97c_probe(struct platform_device *pdev)
+ 
+ 	if (cpu_is_at32ap7000()) {
+ 		if (pdata->rx_dws.dma_dev) {
+-			struct dw_dma_slave *dws = &pdata->rx_dws;
+ 			dma_cap_mask_t mask;
+ 
+-			dws->rx_reg = regs->start + AC97C_CARHR + 2;
+-
+ 			dma_cap_zero(mask);
+ 			dma_cap_set(DMA_SLAVE, mask);
+ 
+ 			chip->dma.rx_chan = dma_request_channel(mask, filter,
+-								dws);
++								&pdata->rx_dws);
++			if (chip->dma.rx_chan) {
++				struct dma_slave_config dma_conf = {
++					.src_addr = regs->start + AC97C_CARHR +
++						2,
++					.src_addr_width =
++						DMA_SLAVE_BUSWIDTH_2_BYTES,
++					.src_maxburst = 1,
++					.dst_maxburst = 1,
++					.direction = DMA_DEV_TO_MEM,
++					.device_fc = false,
++				};
++
++				dmaengine_slave_config(chip->dma.rx_chan,
++						&dma_conf);
++			}
+ 
+ 			dev_info(&chip->pdev->dev, "using %s for DMA RX\n",
+ 				dev_name(&chip->dma.rx_chan->dev->device));
+@@ -1027,16 +1040,28 @@ static int __devinit atmel_ac97c_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		if (pdata->tx_dws.dma_dev) {
+-			struct dw_dma_slave *dws = &pdata->tx_dws;
+ 			dma_cap_mask_t mask;
+ 
+-			dws->tx_reg = regs->start + AC97C_CATHR + 2;
+-
+ 			dma_cap_zero(mask);
+ 			dma_cap_set(DMA_SLAVE, mask);
+ 
+ 			chip->dma.tx_chan = dma_request_channel(mask, filter,
+-								dws);
++								&pdata->tx_dws);
++			if (chip->dma.tx_chan) {
++				struct dma_slave_config dma_conf = {
++					.dst_addr = regs->start + AC97C_CATHR +
++						2,
++					.dst_addr_width =
++						DMA_SLAVE_BUSWIDTH_2_BYTES,
++					.src_maxburst = 1,
++					.dst_maxburst = 1,
++					.direction = DMA_MEM_TO_DEV,
++					.device_fc = false,
++				};
++
++				dmaengine_slave_config(chip->dma.tx_chan,
++						&dma_conf);
++			}
+ 
+ 			dev_info(&chip->pdev->dev, "using %s for DMA TX\n",
+ 				dev_name(&chip->dma.tx_chan->dev->device));
 -- 
 1.7.8.110.g4cb5d
