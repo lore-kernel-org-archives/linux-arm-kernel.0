@@ -1,217 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 18 Jan 2012 16:14:52 +0000
-Subject: [PATCH v2 3/3] ARM: Make the sched_clock framework mandatory
-In-Reply-To: <1326903292-15794-1-git-send-email-marc.zyngier@arm.com>
-References: <1326903292-15794-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1326903292-15794-4-git-send-email-marc.zyngier@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jan 2012 16:24:23 +0000
+Subject: [RFC PATCH 0/5] ARM: introducing DT topology
+In-Reply-To: <1326897408-11204-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1326897408-11204-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20120118162423.GK1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All sched_clock() providers have been converted to the sched_clock
-framework, which also provides a jiffy based implementation for
-the platforms that do not provide a counter.
+On Wed, Jan 18, 2012 at 02:36:43PM +0000, Lorenzo Pieralisi wrote:
+> Current code in the kernel, in particular the boot sequence, hinges upon a
+> sequential mapping of MPIDR values for cpus and related interrupt
+> controller CPU interfaces to logical cpu indexing. 
 
-It is now possible to make the sched_clock framework mandatory,
-effectively preventing new platforms to add new sched_clock()
-functions, which would be detrimental to the single zImage work.
+I don't believe it does.  What it does rely upon is having cpu_logical_map()
+correctly setup for the logical-to-hardware mapping - which, if it's
+different, should be done in smp_init_cpus(), taking note that logical
+CPU 0 is _always_ the boot CPU.  (That's a restriction caused by the
+way suspend/resume unplugs all but the lowest numbered logical online
+CPU.)
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/Kconfig                |   18 ------------------
- arch/arm/kernel/Makefile        |    3 +--
- arch/arm/kernel/time.c          |    2 --
- arch/arm/plat-nomadik/Kconfig   |    1 -
- arch/arm/plat-versatile/Kconfig |    1 -
- 5 files changed, 1 insertions(+), 24 deletions(-)
+So, with the code today, there's nothing in the code which prevents this
+from happening:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a18550e..d1fcfe0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -52,9 +52,6 @@ config MIGHT_HAVE_PCI
- config SYS_SUPPORTS_APM_EMULATION
- 	bool
- 
--config HAVE_SCHED_CLOCK
--	bool
--
- config GENERIC_GPIO
- 	bool
- 
-@@ -388,7 +385,6 @@ config ARCH_PRIMA2
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
- 	select GENERIC_IRQ_CHIP
--	select HAVE_SCHED_CLOCK
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select USE_OF
- 	select ZONE_DMA
-@@ -439,7 +435,6 @@ config ARCH_MXC
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select GENERIC_IRQ_CHIP
--	select HAVE_SCHED_CLOCK
- 	select MULTI_IRQ_HANDLER
- 	help
- 	  Support for Freescale MXC/iMX-based family of processors
-@@ -531,7 +526,6 @@ config ARCH_IXP4XX
- 	select CPU_XSCALE
- 	select GENERIC_GPIO
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_SCHED_CLOCK
- 	select MIGHT_HAVE_PCI
- 	select DMABOUNCE if PCI
- 	help
-@@ -602,7 +596,6 @@ config ARCH_MMP
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_PXA
--	select HAVE_SCHED_CLOCK
- 	select TICK_ONESHOT
- 	select PLAT_PXA
- 	select SPARSE_IRQ
-@@ -643,7 +636,6 @@ config ARCH_TEGRA
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_GPIO
- 	select HAVE_CLK
--	select HAVE_SCHED_CLOCK
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select ARCH_HAS_CPUFREQ
-@@ -660,7 +652,6 @@ config ARCH_PICOXCELL
- 	select DW_APB_TIMER
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_GPIO
--	select HAVE_SCHED_CLOCK
- 	select HAVE_TCM
- 	select NO_IOPORT
- 	select SPARSE_IRQ
-@@ -688,7 +679,6 @@ config ARCH_PXA
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_PXA
--	select HAVE_SCHED_CLOCK
- 	select TICK_ONESHOT
- 	select PLAT_PXA
- 	select SPARSE_IRQ
-@@ -756,7 +746,6 @@ config ARCH_SA1100
- 	select CPU_FREQ
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
--	select HAVE_SCHED_CLOCK
- 	select TICK_ONESHOT
- 	select ARCH_REQUIRE_GPIOLIB
- 	select HAVE_IDE
-@@ -813,7 +802,6 @@ config ARCH_S5P64X0
- 	select CLKSRC_MMIO
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_SCHED_CLOCK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C_RTC if RTC_CLASS
- 	help
-@@ -846,7 +834,6 @@ config ARCH_S5PV210
- 	select ARM_L1_CACHE_SHIFT_6
- 	select ARCH_HAS_CPUFREQ
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_SCHED_CLOCK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C_RTC if RTC_CLASS
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-@@ -889,7 +876,6 @@ config ARCH_U300
- 	depends on MMU
- 	select CLKSRC_MMIO
- 	select CPU_ARM926T
--	select HAVE_SCHED_CLOCK
- 	select HAVE_TCM
- 	select ARM_AMBA
- 	select ARM_PATCH_PHYS_VIRT
-@@ -933,7 +919,6 @@ config ARCH_DAVINCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ZONE_DMA
- 	select HAVE_IDE
--	select HAVE_SCHED_CLOCK
- 	select CLKDEV_LOOKUP
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_IRQ_CHIP
-@@ -948,7 +933,6 @@ config ARCH_OMAP
- 	select ARCH_HAS_CPUFREQ
- 	select CLKSRC_MMIO
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_SCHED_CLOCK
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	help
- 	  Support for TI's OMAP platform (OMAP1/2/3/4).
-@@ -1114,13 +1098,11 @@ config ARCH_ACORN
- config PLAT_IOP
- 	bool
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_SCHED_CLOCK
- 
- config PLAT_ORION
- 	bool
- 	select CLKSRC_MMIO
- 	select GENERIC_IRQ_CHIP
--	select HAVE_SCHED_CLOCK
- 
- config PLAT_PXA
- 	bool
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 43b740d..92098e6 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -15,7 +15,7 @@ CFLAGS_REMOVE_return_address.o = -pg
- 
- obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
- 		   process.o ptrace.o return_address.o setup.o signal.o \
--		   sys_arm.o stacktrace.o time.o traps.o
-+		   sys_arm.o stacktrace.o time.o traps.o sched_clock.o
- 
- obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += compat.o
- 
-@@ -30,7 +30,6 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
- obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
- obj-$(CONFIG_PCI)		+= bios32.o isa.o
- obj-$(CONFIG_ARM_CPU_SUSPEND)	+= sleep.o suspend.o
--obj-$(CONFIG_HAVE_SCHED_CLOCK)	+= sched_clock.o
- obj-$(CONFIG_SMP)		+= smp.o smp_tlb.o
- obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
- obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 8c57dd3..5bff288 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -149,8 +149,6 @@ void __init time_init(void)
- {
- 	system_timer = machine_desc->timer;
- 	system_timer->init();
--#ifdef CONFIG_HAVE_SCHED_CLOCK
- 	sched_clock_postinit();
--#endif
- }
- 
-diff --git a/arch/arm/plat-nomadik/Kconfig b/arch/arm/plat-nomadik/Kconfig
-index bca4914..4c48c8b 100644
---- a/arch/arm/plat-nomadik/Kconfig
-+++ b/arch/arm/plat-nomadik/Kconfig
-@@ -23,7 +23,6 @@ config HAS_MTU
- config NOMADIK_MTU_SCHED_CLOCK
- 	bool
- 	depends on HAS_MTU
--	select HAVE_SCHED_CLOCK
- 	help
- 	  Use the Multi Timer Unit as the sched_clock.
- 
-diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
-index 52353be..c6f4b96 100644
---- a/arch/arm/plat-versatile/Kconfig
-+++ b/arch/arm/plat-versatile/Kconfig
-@@ -12,6 +12,5 @@ config PLAT_VERSATILE_LEDS
- 
- config PLAT_VERSATILE_SCHED_CLOCK
- 	def_bool y if !ARCH_INTEGRATOR_AP
--	select HAVE_SCHED_CLOCK
- 
- endif
--- 
-1.7.7.1
+a) you boot on h/w CPU 1, which becomes logical CPU 0.
+b) you boot h/w CPU 3 as logical CPU 1.
+c) you boot h/w CPU 0 as logical CPU 2.
+d) you boot h/w CPU 2 as logical CPU 3.
+
+You just need to ensure that cpu_logical_map() contains the array
+{1, 3, 0, 2} instead of the default (because we _have_ to have a
+default) of {1, 0, 2, 3}.
+
+> This hypothesis is not valid when the concept of cluster is introduced since
+> the MPIDR cannot be represented as a single index and interrupt controller
+> CPU interfaces might be wired with a numbering scheme following per-SoC
+> design parameters which cannot be extrapolated easily through generic functions
+> by the primary CPU.
+
+So what you're saying is that the GIC CPU index may not be the CPU number
+given by MPIDR?
+
+> Furthermore, relying on the MPIDR to be wired according to real topology
+> levels might turn out to be an unreliable solution, hence a SW
+> representation is needed to override possibly incorrect MPIDR register
+> values.
+
+This sounds like you're saying that the contents of MPIDR might be buggy
+sometime in the future?  Do we actually know of any situations where the
+information in there is currently wrong (outside of the development lab)?
+If not, it's not something we should cater for until it's actually happened,
+and then the pain should be felt by those silly enough to allow the chip
+to go out the door.
