@@ -1,46 +1,76 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 18 Jan 2012 20:16:26 +0000
-Subject: [PATCH v2 1/3] ARM: davinci: convert to common sched_clock()
- implementation
-In-Reply-To: <4F171486.80105@arm.com>
-References: <1326903292-15794-1-git-send-email-marc.zyngier@arm.com>
- <1326903292-15794-2-git-send-email-marc.zyngier@arm.com>
- <DF0F476B391FA8409C78302C7BA518B631794A9F@DBDE01.ent.ti.com>
- <4F171486.80105@arm.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B631794B1E@DBDE01.ent.ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 18 Jan 2012 13:20:57 -0700
+Subject: Pinmux bindings proposal
+In-Reply-To: <20120118153256.GB22818@atomide.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <20120116182808.GG4223@ponder.secretlab.ca>
+ <20120118141329.GA22818@atomide.com>
+ <CAAQ0ZWTtYz3Lg7=Xz29m07j_k8yA95hn6cyk92SAJ4iGJRT_gw@mail.gmail.com>
+ <20120118153256.GB22818@atomide.com>
+Message-ID: <20120118202057.GH4223@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Thu, Jan 19, 2012 at 00:20:46, Marc Zyngier wrote:
-> On 18/01/12 18:36, Nori, Sekhar wrote:
-
-> > 
-> > I did not like the fact that the asm/ and mach/ headers
-> > are intermixed in this file so I created a patch to
-> > fix that while I was doing the common sched_clock() conversion.
-> > 
-> > http://www.spinics.net/lists/arm-kernel/msg153506.html
-> > 
-> > Can you please rebase your patch on that?
+On Wed, Jan 18, 2012 at 07:32:56AM -0800, Tony Lindgren wrote:
+> * Shawn Guo <shawn.guo@linaro.org> [120118 05:57]:
+> > On 18 January 2012 22:13, Tony Lindgren <tony@atomide.com> wrote:
+> > > Hi,
+> > >
+> > > * Grant Likely <grant.likely@secretlab.ca> [120116 09:55]:
+> > >> On Fri, Jan 13, 2012 at 12:39:42PM -0800, Stephen Warren wrote:
+> > >> > ? ? ? ? ? ? ? ? pinmux =
+> > >> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_active>
+> > >> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_suspend>;
+> > >> >
+> > >> > ? ? ? ? ? ? ? ? /* 1:n example: */
+> > >> > ? ? ? ? ? ? ? ? pinmux =
+> > >> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_mux_a>
+> > >> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_pincfg_a>
+> > >> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_mux_a>
+> > >> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_pincfg_a_suspend>;
+> > >>
+> > >>
+> > >> Yeah, don't do this. ?Mixing phandle, string and cell values in a
+> > >> property gets messy and could become troublesome to parse. ?I've
+> > >> backed away from it in the clk binding.
+> > >
+> > > Yup, that's because the string is embedded directly into the mixed
+> > > mode array and will likely make the following data unaligned. That
+> > > means it's extremely flakey to parse, and will lead into horrible
+> > > errors if you have typos in the .dts file.. Tried that and gave up
+> > > on it.
+> > >
+> > > I think I've found a way to avoid using names at all, assuming we set
+> > > each pin as a phandle for the drivers to use :)
+> > >
+> > The problem with doing that is we will have to represent each pin as a
+> > node in device tree.  For imx6q case, we have 197 pins.  Doing so will
+> > bloat the device tree.
 > 
-> Sure. I can probably merge that patch altogether in mine if you want.
-
-No, please keep it separate since its not really related to
-common sched_clock() conversion.
-
+> Sure there's some overhead. I've got it working with 220 pins, it's
+> not too bad as threre's not much string parsing involved.
 > 
-> > If you are planning to take this from outside of DaVinci tree,
-> > feel free to add my:
-> > 
-> > Acked-by: Sekhar Nori <nsekhar@ti.com>
+> I don't have all the devices mapping the pins though. The .dtb for
+> omap4 is about 25k now.
 > 
-> Thanks. Ideally, I'd like all 3 patches to be kept together, otherwise
-> we may end up with patch 3 being applied before patch 1, breaking your
-> platform.
+> If we wanted to avoid adding phandles for each pin, then we could do:
+> 
+> serial at 0x48020000 {
+> 	compatible = "ti,8250";
+> 	reg = <0x48020000 0x100>;
+> 	reg-shift = <2>;
+> 	interrupts = <106>;
+> 
+> 	/* controller, offset, value */
+> 	pins = <&mux1 0xabcd 0x10
+>                 &mux1 0xabcf 0x0>;
+> };
+> 
+> But then the .dts file becomes an unreadable matrix unless we have
+> a preprocessor..
 
-No problem, thanks!
+One node per pin does get excessive in a hurry.  I prefer the one node
+per pin controller.  Tools can be written to make writing the
+definition easier.
 
-Regards,
-Sekhar
+g.
