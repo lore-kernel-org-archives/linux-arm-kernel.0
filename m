@@ -1,61 +1,380 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Wed, 18 Jan 2012 12:43:58 +0530
-Subject: [PATCH 1/2] arm:omap2:board-generic: Add DT support for AM33xx devices
-Message-ID: <1326870839-19951-1-git-send-email-hvaibhav@ti.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 18 Jan 2012 07:24:26 +0000
+Subject: Pinmux bindings proposal
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D22DE@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D22DE@HQMAIL01.nvidia.com>
+Message-ID: <7FE21149F4667147B645348EC6057885093D83@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although we consider am33xx device under omap34xx family of devices,
-there is indeed difference between them, for example,
+> -----Original Message-----
+> From: Stephen Warren [mailto:swarren at nvidia.com]
+> Sent: Wednesday, January 18, 2012 3:09 AM
+> To: Dong Aisheng-B29396; linus.walleij at stericsson.com; s.hauer at pengutronix.de;
+> rob.herring at calxeda.com; kernel at pengutronix.de; cjb at laptop.org; Simon Glass
+> (sjg at chromium.org); Dong Aisheng; Shawn Guo (shawn.guo at linaro.org)
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree-discuss at lists.ozlabs.org
+> Subject: RE: Pinmux bindings proposal
+> Importance: High
+> 
+> Dong Aisheng wrote at Monday, January 16, 2012 5:50 AM:
+> > Stephen Warren wrote at Saturday, January 14, 2012 4:40 AM:
+> > > I thought a bit more about pinmux DT bindings. I came up with
+> > > something that I like well enough, and is pretty similar to the binding that
+> Dong posted recently.
+> > > I think it'll work for both Tegra's and IMX's needs.
+> > > Please take a look!
+> ...
+> > >                 pinmux =
+> > >                         <"default" &pmx_sdhci_active>
+> > >                         <"suspend" &pmx_sdhci_suspend>;
+> ...
+> > >                 /*
+> > >                  * Alternative: One property for each required state. But,
+> > >                  * how does pinctrl core know which properties to parse?
+> > >                  * Every property named "pinctrl*" seems a little too far-
+> > >                  * reaching. Perhaps if we used vendor-name "pinmux", that'd
+> > >                  * be OK, i.e. pinmux,default and pinmux,suspend?
+> >
+> > It we support whatever device-defined states, it's meaningless to use
+> > one property For each required state since pinctrl core does not know
+> > the property name the customer defined.
+> 
+> Yes, that's the problem. Shawn proposed copying the clock bindings which I think
+> solves all the issues; see my previous email.
+> > >                  */
+> > >                 pinmux = <&pmx_sdhci_active>;
+> > >                 pinmux-suspend <&pmx_sdhci_suspend>;
+> > >
+> > >                 /* 1:n example: */
+> > >                 pinmux = <&pmx_sdhci_mux_a &pmx_sdhci_pincfg_a>
+> >
+> > This looks ok to me since the mux and pincfg usually is 1 to 1.
+> > And if we do not have a pincfg for a pinmux we can find a way to tell
+> > the pinctl core, maybe just set pincfg phandle to 0.
+> 
+> Just to be clear, I'll repeat part of my previous response to Shawn:
+> 
+> * Just a further explanation on my original code: I always intended that
+> * each entry in that list was a full pinmux configuration that could include
+> * mux and pin configuration settings. Thus, the above is more like:
+> *
+> * pinctrl =
+> *     <"default" &pmx_sdhci_a>
+> *     <"default" &pmx_sdhci_overrides>
+> *
+> * (overrides rather than explicit separate mux/config; the separate mux
+> * And config were just an example use case).
+> 
+> So that was a list where the /examples/ had two entries, one for mux and one for
+> pin config. In general, there could be 1, 2, 3, ... entries and each could
+> define whatever mux and config entries they wanted.
+> 
+I also read your reply to Shawn's mail.
+I guess you mean the first "default" entry may not sufficient to use, so we allow
+customer defines extra pmx_sdhci_overrides in board.dts to use?
 
-      - Initial required mapping (->map_io)
-      - Early init (->init_early)
-	Here, the whole sequence/data is different than omap3,
-	For example, clock/hwmod/power/voltage data.
-      - clock event/source timer (name and instances)
+Personally I did not see big benefits for this way but introduce a bit complexity
+and make the code not clear and not easily to understand.
+Why not define it completely for one pinmux group?
 
-So, this patch adds seperate machine descriptor for AM33XX family
-of devices in board-generic.c file.
+I think it also does not meet the current pinctrl subsystem design.
+The group and functions are defined, customer only needs to tell what they want to
+Use. For example, in non-dt case, a pinmux map table is enough to use.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-CC: Benoit Cousson <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Tony Lindgren <tony@atomide.com>
----
-Tested it on AM335x-EVM, AM37xEVM and AM3517EVM.
+> > >                 pinmux-suspend = <&pmx_sdhci_mux_a
+> > > &pmx_sdhci_pincfg_a_suspend>;
+> > >
+> > >                 /*
+> > >                  * The actual definition of the complete state of the
+> > >                  * pinmux as required by some driver.
+> > >                  *
+> > >                  * These can be either directly in the device node, or
+> > >                  * somewhere in tegra20.dtsi in order to provide pre-
+> > >                  * selected/common configurations. Hence, they're referred
+> > >                  * to by phandle above.
+> > >                  */
+> > >                 pmx_sdhci_active: {
+> > >                         /*
+> > >                          * Pin mux settings. Mandatory?
+> >
+> > Mandatory for what?
+> 
+> I was thinking that each pin mux configuration node MUST specify at least some
+> mux settings. However, that may not make sense; it may be reasonable to specify
+> just pin config settings and no mux settings (in a 1:n model in the "override"
+> node).
+> 
+Yes, after looking Linus's patch to support pin states, I'm thinking for pin config
+case we may need such a property or flag to tell which config of state to use by
+default since we support multi states.
 
- arch/arm/mach-omap2/board-generic.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+> >
+> > >                          * Not mandatory if the 1:1 mentioned above is
+> > >                          * extended to 1:n.
+> > >                          *
+> > >                          * Format is <&pmx_controller_phandle
+> muxable_entity_id
+> > >                          * selected_function>.
+> > >                          *
+> > >                          * The pmx phandle is required since there may be
+> more
+> > >                          * than one pinmux controller in the system. Even if
+> > >                          * this node is inside the pinmux controller itself,
+> I
+> > >                          * think it's simpler to just always have this field
+> > >                          * present in the binding for consistency.
+> > >                          *
+> > >                          * Alternative: Format is <&pmx_controller_phandle
+> > >                          * pmx_controller_specific_data>. In this case, the
+> > >                          * pmx controller needs to define #pinmux-mux-cells,
+> > >                          * and provide the pinctrl core with a mapping
+> > >                          * function to handle the rest of the data in the
+> > >                          * property. This is how GPIOs and interrupts work.
+> > >                          * However, this will probably interact badly with
+> > >                          * wanting to parse the entire pinmux map early in
+> > >                          * boot, when perhaps the pinctrl core is
+> initialized,
+> > >                          * but the pinctrl driver itself is not.
+> > >                          */
+> > >                         mux =
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>
+> > >                                 /* Syntax example */
+> > >                                 <&foo_pmx FOO_PMX_PG_X
+> > > FOO_PMX_MUX_0>;
+> >
+> > I'm still think how do we construct the pinmux map for such binding.
+> > The format you're using is:
+> > <&pmx_controller_phandle muxable_entity_id selected_function> For
+> > contruct pinmux map, we need to know at least 3 things for a device:
+> > a) pinctrl device b) function name c) group name.
+> > For a, we can get it from this binding.
+> > But for b and c, since they are constants, how to convert to name string?
+> 
+> a) pinctrl device: We can extract this from pmx_controller_phandle; simply
+> search for a device with the same OF node, and retrieve that registered device
+> from the pinctrl subsystem. This is how GPIO and IRQ work.
+> 
+Yes, I know this.
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index f7b4b24..2faecc8 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -106,6 +106,25 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- MACHINE_END
- #endif
+> b) function name: The pinmux_ops for the driver of pmx_controller_phandle needs
+> a function to convert integer IDs such as TEGRA_PMX_MUX_1 to whatever function
+> IDs are used by the pinctrl subsystem.
+>
+No, I guess Tegra can do this since tegra prefers to define functions and groups
+In pinctrl driver.
+But for IMX, we do not have these info before the imx-pinctrl driver gets run and
+Parse the device tree.
 
-+#if defined(CONFIG_SOC_OMAPAM33XX)
-+static const char *am33xx_boards_compat[] __initdata = {
-+	"ti,am33xx",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
-+	.atag_offset	= 0x100,
-+	.reserve	= omap_reserve,
-+	.map_io		= am33xx_map_io,
-+	.init_early	= am33xx_init_early,
-+	.init_irq	= omap_init_irq,
-+	.handle_irq	= omap3_intc_handle_irq,
-+	.init_machine	= omap_generic_init,
-+	.timer		= &omap3_am33xx_timer,
-+	.dt_compat	= am33xx_boards_compat,
-+MACHINE_END
-+#endif
-+
- #if defined(CONFIG_ARCH_OMAP4)
- static const char *omap4_boards_compat[] __initdata = {
- 	"ti,omap4",
---
-1.7.0.4
+> c) group name: This should be handled just like (b).
+> 
+> Also you'll need to know:
+> 
+> struct pinmux_map's .name field. This is the value in the pinctrl-names property,
+> assuming we're switching to the following syntax:
+>
+>     pinctrl = <&pmx_sdhci_a_active>, <&pmx_sdhci_a_suspend>;
+>     pinctrl-names = "default", "suspend";
+>
+Here the pinctrl-names are representing 'state'.
+Is pinmux_map.name field used for this?
+ 
+> > >                         /*
+> > >                          * Pin configuration settings. Optional.
+> > >                          *
+> > >                          * Format is <&pmx_controller_phandle
+> muxable_entity_id
+> > >                          * configuration_option configuration_value>.
+> > >                          */
+> > >                         config =
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_SLEW_RATE 4>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_SLEW_RATE 8>;
+> > >                         /*
+> > >                          * Perhaps allow additional custom properties here
+> to
+> > >                          * express things we haven't thought of. The pinctrl
+> > >                          * drivers would be responsible for parsing them.
+> > >                          */
+> > >                 };
+> > >                 pmx_sdhci_standby: {
+> > >                         mux =
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> TEGRA_PMX_MUX_1>;
+> > >                         config =
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_TRISTATE 1>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_TRISTATE 1>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTA
+> > > TEGRA_PMX_CONF_SLEW_RATE 4>
+> > >                                 <&tegra_pmx TEGRA_PMX_PG_DTD
+> > > TEGRA_PMX_CONF_SLEW_RATE 8>;
+> > >                 };
+> > >         };
+> > > };
+> > >
+> > > Integer IDs for "muxable entities": Pins on IMX, pin groups on Tegra:
+> >
+> > If "muxable entities" is pins on IMX, I'm wondering how we define the
+> > predefined Functions and groups or if we still need to do that.
+> 
+> By "predefined", do you mean:
+> 
+> a) Does the DT need to list all the functions and groups.
+> 
+> The answer here is no in general. However, if you want to parameterize your
+> pinctrl driver's list of known functions and groups, then you can certainly do
+> this; the pinctrl binding simple doesn't force you to do this.
+> 
+> b) Does the pinctrl driver need to list all functions and groups to the pinctrl
+> core?
+> 
+> As the pinctrl subsystem APIs stand right now, the answer here is yes.
+> 
+> I don't think there's really any way around this, although depending on HW, you
+> can do things like:
+> 
+> 1) Instead of defining logical functions (SDHCI1, I2C1, ...) you could simply
+> define a function for each mux register value (func0, func1, ...)
+> 
+> 2) On IMX, you'd define a pin group for each individual pin, since the HW muxing
+> is at a pin not a group level.
+> 
+Yes, this is what I'm thinking now.
+If we decide to do that, the pin groups concepts of current pinmux subsystem
+Seems does not fit for IMX a lot since each group is only one pin.
+And the functions/groups would be hugh since IMX6Q has 196 pins and each pin may have
+7 functions.
+
+> > >     TEGRA_PMX_PG_DTA
+> > >     TEGRA_PMX_PG_DTD
+> > >
+> > > Each individual pinmux driver's bindings needs to define what each
+> > > integer ID represents.
+> >
+> > Does it mean both pinmux driver and soc.dtsi file need define those
+> > macros if dtc Supports constants?
+> 
+> Yes. As Shawn mentions later, perhaps we can find some way to define these
+> values in one place, and generate both a .dtsi file and a .h file from that
+> single list, or generate a .h file from the .dtsi file or vice- versa.
+> 
+> > > Integer IDs for the "mux functions". Note that these are the raw
+> > > values written into hardware, not any driver-defined abstraction,
+> > > and not any kind of "virtual group" that's been invented to make OEMs life
+> easier:
+> > >
+> > >     TEGRA_PMX_MUX_0
+> > >     TEGRA_PMX_MUX_1
+> > >     ...
+> > >     TEGRA_PMX_MUX_3 (for Tegra, 7 for IMX)
+> > >
+> > > Since these are the raw IDs that go into HW, there's no need to
+> > > specify each ID's meanings in the binding.
+> > >
+> > > Integer IDs for "pin config parameters":
+> > >
+> > >     TEGRA_PMX_CONF_TRISTATE
+> > >     TEGRA_PMX_CONF_DRIVE_STRENGTH
+> > >     TEGRA_PMX_CONF_SLEW_RATE
+> > >
+> > > Each individual pinmux driver's bindings needs to define what each
+> > > integer ID represents, and what the legal "value"s are for each one.
+> > >
+> > > Advantages:
+> > >
+> > > * Provides for both mux settings and "pin configuration".
+> > >
+> > > * Allows the "pinmux configuration" nodes to be part of the SoC .dtsi
+> > >   file if desired to provide pre-defined pinmux configurations to
+> > >   choose from.
+> > >
+> > > * Allows the "pinmux configuration" nodes to be part of the per-device
+> > >   node if you don't want to use pre-defined configurations.
+> > >
+> > > * When pre-defined configurations are present, if you need something
+> > >   custom, you can do it easily.
+> > >
+> > > * Can augment pre-defined configurations by listing n nodes for each
+> > >   "name"d pinmux configuration, e.g. to add one extra pin config
+> > >   value.
+> > >
+> > > * Parsing is still quite simple:
+> > >   1) Parse "pinmux" property in device node to get phandle.
+> > >   2) Parse "mux" property in the node reference by the phandle,
+> > >      splitting into a list of pmx phandle, entity, mux func.
+> > >   3) For each entry, pass entity, function to the appropriate mux
+> > >      driver. (For U-Boot, this might mean check that the phandle
+> > >      points at the expected place, and ignore the entry if not?)
+> > >  4) Mux driver simply converts "muxable entity" to the register
+> > >     address, write the "function" value straight to the register.
+> > >
+> > > Disadvantages:
+> > >
+> > > * If you're not using pre-defined configurations, you still have to dump
+> > >   all the pinmux configuration into a sub-node of the device node, and
+> > >   have a property point at it using a phandle. This is slightly more
+> > >   complex than simply putting the mux/config properties right into the
+> > >   device node. However, it additionally allows one to have multiple
+> > >   "name"d configurations (e.g. for suspend) very easily, and isn't overly
+> > >   complex, so I can live with this.
+> >
+> > I don't think the sub-node of the device node is a good place to
+> > define Custom configurations.
+> > Putting those things into device node will make its size big and also not look
+> good.
+> > Since it uses phandle, why not put it under pinctrl device node in board dts
+> file?
+> > It may also work.
+> 
+> Both you and Shawn have said you don't like allowing the pin configurations to
+> be sub-nodes of the devices. Can you expand a little more on that?
+Actually I agree to reserve the pinctrl device's phandle
+But..
+
+> I mentioned
+> some of my reasons for allowing this in my previous email, so see that for
+> reference. I guess I have a couple more points to make:
+> 
+> 1) It's optional. If everything you need can be represented in pre-
+> defined/canned pin configuration nodes under the pin controller's node, you can
+> certainly do that.
+> 
+> 2) Putting this in the device's node seems more consistent with existing
+> bindings, which put all configuration inside the device node: The IRQ binding
+> places interrupt IDs and configuration (level/edge, high/low) in the device node.
+> The GPIO binding places GPIO IDs and possible flags (e.g. inverted/not) in the
+> device node. Etc.
+> 
+Actually it's not a big issue and we do not have the mandatory requirement that
+You have to put it in somewhere since it's referenced by phandle.
+I just prefer to put it to under pinctrl device node in board.dts file to
+Concentrate manager, becase I think it's a little big and more complicated and
+not like not like IRQ and GPIO case.
+
+> 3) I don't think there will be any .dtb size difference at all between putting
+> the pin configuration in the pin controller node or the device node; the content
+> of the sub-node will be entirely identical. The same holds true for the .dts
+> files (when you consider soc.dtsi and board.dts together).
+> 
+> --
+> nvpublic
+> 
+
+Regards
+Dong Aisheng
