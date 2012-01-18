@@ -1,63 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Jan 2012 15:31:20 +0000
-Subject: [PATCH] ARM: kexec: EOI active and mask all interrupts in kexec
- crash path
-In-Reply-To: <20120118150724.GH1068@n2100.arm.linux.org.uk>
-References: <1326898885-28105-1-git-send-email-will.deacon@arm.com>
- <20120118150724.GH1068@n2100.arm.linux.org.uk>
-Message-ID: <20120118153120.GK29346@mudshark.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Jan 2012 07:32:56 -0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <CAAQ0ZWTtYz3Lg7=Xz29m07j_k8yA95hn6cyk92SAJ4iGJRT_gw@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <20120116182808.GG4223@ponder.secretlab.ca>
+ <20120118141329.GA22818@atomide.com>
+ <CAAQ0ZWTtYz3Lg7=Xz29m07j_k8yA95hn6cyk92SAJ4iGJRT_gw@mail.gmail.com>
+Message-ID: <20120118153256.GB22818@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+* Shawn Guo <shawn.guo@linaro.org> [120118 05:57]:
+> On 18 January 2012 22:13, Tony Lindgren <tony@atomide.com> wrote:
+> > Hi,
+> >
+> > * Grant Likely <grant.likely@secretlab.ca> [120116 09:55]:
+> >> On Fri, Jan 13, 2012 at 12:39:42PM -0800, Stephen Warren wrote:
+> >> > ? ? ? ? ? ? ? ? pinmux =
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_active>
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_suspend>;
+> >> >
+> >> > ? ? ? ? ? ? ? ? /* 1:n example: */
+> >> > ? ? ? ? ? ? ? ? pinmux =
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_mux_a>
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? <"default" &pmx_sdhci_pincfg_a>
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_mux_a>
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? <"suspend" &pmx_sdhci_pincfg_a_suspend>;
+> >>
+> >>
+> >> Yeah, don't do this. ?Mixing phandle, string and cell values in a
+> >> property gets messy and could become troublesome to parse. ?I've
+> >> backed away from it in the clk binding.
+> >
+> > Yup, that's because the string is embedded directly into the mixed
+> > mode array and will likely make the following data unaligned. That
+> > means it's extremely flakey to parse, and will lead into horrible
+> > errors if you have typos in the .dts file.. Tried that and gave up
+> > on it.
+> >
+> > I think I've found a way to avoid using names at all, assuming we set
+> > each pin as a phandle for the drivers to use :)
+> >
+> The problem with doing that is we will have to represent each pin as a
+> node in device tree.  For imx6q case, we have 197 pins.  Doing so will
+> bloat the device tree.
 
-On Wed, Jan 18, 2012 at 03:07:24PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 18, 2012 at 03:01:25PM +0000, Will Deacon wrote:
-> > The kexec machine crash code can be called in interrupt context via a
-> > sysrq trigger made using the magic key combination. If the irq chip
-> > dealing with the serial interrupt is using the fasteoi flow handler,
-> > then we will never EOI the interrupt because the interrupt handler will
-> > be fatal. In the case of a GIC, this results in the crash kernel not
-> > receiving interrupts on that CPU interface.
-> > 
-> > This patch adds code (based on the PowerPC implementation) to EOI any
-> > pending interrupts on the crash CPU before masking and disabling all
-> > interrupts. Secondary cores are not a problem since they are placed into
-> > a cpu_relax() loop via an IPI.
-> 
-> So, what happens if we fault in an interrupt handler, we have
-> panic_on_oops set, and we have panic configured to automatically
-> reboot after a period?
+Sure there's some overhead. I've got it working with 220 pins, it's
+not too bad as threre's not much string parsing involved.
 
-If we fault in an interrupt handler, we'll end up with the faulting CPU in
-machine_crash_shutdown, with the secondaries getting put into
-machine_crash_nonpanic_core. Then the faulting CPU will EOI the interrupt it
-was previously handling, before masking it. The interrupt may of course
-remain asserted at the distributor, but it will be masked, so it means the
-new crash kernel might receive a spurious interrupt when it unmasks it via
-request_irq.
+I don't have all the devices mapping the pins though. The .dtb for
+omap4 is about 25k now.
 
-Or have you idenfified an issue that I'm missing?
+If we wanted to avoid adding phandles for each pin, then we could do:
 
-> I think we actually want this to happen at boot to make sure that the
-> CPU interfaces are properly initialized each time the kernel is brought
-> up.
+serial at 0x48020000 {
+	compatible = "ti,8250";
+	reg = <0x48020000 0x100>;
+	reg-shift = <2>;
+	interrupts = <106>;
 
-The problem with that is working out which interrupts to EOI, on which
-CPU interfaces and in which order. The GIC manual states that EOIing an
-interrupt which hasn't been previously acked on that interface is
-UNPREDICTABLE.
+	/* controller, offset, value */
+	pins = <&mux1 0xabcd 0x10
+                &mux1 0xabcf 0x0>;
+};
 
-> > @@ -53,6 +54,28 @@ void machine_crash_nonpanic_core(void *unused)
-> >  		cpu_relax();
-> >  }
-> >  
-> > +static void machine_kexec_mask_interrupts(void) {
-> 
-> Coding style error.
+But then the .dts file becomes an unreadable matrix unless we have
+a preprocessor..
 
-Will fix.
+Regards,
 
-Cheers,
-
-Will
+Tony
