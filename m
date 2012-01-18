@@ -1,63 +1,86 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 18 Jan 2012 08:44:21 +0100
-Subject: [PATCH] ARM: mx28: Clear CLKGATE bit prior to changing DIV field
-In-Reply-To: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
-References: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20246.30805.391940.766120@ipc1.ka-ro>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 18 Jan 2012 09:43:19 +0100
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <alpine.LFD.2.02.1201171601200.2722@xanadu.home>
+References: <20120116105949.GG16726@n2100.arm.linux.org.uk>
+ <CAMQu2gyBVOyWSCT39jP6xEtoNKrUCuaj_QTD+1EVhXgVc_H2HA@mail.gmail.com>
+ <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+ <WC20120117085444.17057E@terrafix.co.uk> <20120117121138.GC11475@arm.com>
+ <4F15692D.4070100@ti.com>
+ <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+ <20120117133918.GE11475@arm.com>
+ <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+ <20120117162720.GG11475@arm.com>
+ <CAMQu2gyCcGYk0tC_g2R9+OBYCvwupcjuUkRC5JxJ7maAVTs1YA@mail.gmail.com>
+ <alpine.LFD.2.02.1201171425060.2722@xanadu.home>
+ <CAMQu2gwjOuGadqsGqcpHvdH-Jhhj6cchyoZJMMsOQ20SXsKDOw@mail.gmail.com>
+ <alpine.LFD.2.02.1201171536470.2722@xanadu.home>
+ <CAMQu2gzJHvTSbMhzwLx22PSh190Nun+x=6+NZpWJPz4p3BAMJA@mail.gmail.com>
+ <alpine.LFD.2.02.1201171601200.2722@xanadu.home>
+Message-ID: <CAMQu2gw3jmcmNU23g14n9=d+ikNvZjq7A6ePAZn+pQ2U9ce1pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Fabio Estevam writes:
-> MX28 Reference Manual states the following about the CLKGATE bit of register HW_CLKCTRL_SAIF0:
-> 
-> "The DIV field can change ONLY when this clock gate bit field is low."
-> 
-> So clear this bit prior to writing to the DIV field as required.
-> 
-> This also fixes the following error during mxs-sgtl5000 probe.
-> 
-> [    0.660000] saif0_clk_set_rate: divider writing timeout                     
-> [    0.670000] mxs-sgtl5000: probe of mxs-sgtl5000.0 failed with error -110    
-> [    0.670000] ALSA device list:                                               
-> [    0.680000]   No soundcards found.  
-> 
-> Audio is functional after this change.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mxs/clock-mx28.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index 5d68e41..f85c09d 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -475,6 +475,8 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
->  		return -EINVAL;						\
->  									\
->  	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
-> +									\
-> +	reg &= ~BM_CLKCTRL_##rs##_CLKGATE;				\
->  	reg &= ~BM_CLKCTRL_##rs##_DIV;					\
->  	reg |= div << BP_CLKCTRL_##rs##_DIV;				\
->  	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
+On Tue, Jan 17, 2012 at 10:02 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Tue, 17 Jan 2012, Shilimkar, Santosh wrote:
 >
-Now you are doing clk_enable()'s business in clk_set_rate().
-The same result could be achieved by calling clk_enable() prior to
-clk_set_rate(). clk_set_rate() could simply return an error code, if
-the clock is not enabled.
+>> On Tue, Jan 17, 2012 at 9:45 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> > On Tue, 17 Jan 2012, Shilimkar, Santosh wrote:
+>> >
+>> >> On Tue, Jan 17, 2012 at 8:39 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> >> > On Tue, 17 Jan 2012, Shilimkar, Santosh wrote:
+>> >> >
+>> >> >> How about allowing platform hooks for single SOC builds. I mean having
+>> >> >> this code under !single_zImage or something like that. That way we don't
+>> >> >> impact the single zImage efforts and also allow socs to have all those
+>> >> >> critical, vital bits enabled for the SOC specific builds.
+>> >> >
+>> >> > Absolutely not! ?Because if we start doing that, people will get lazy
+>> >> > and no platform will ever work in a multi-SOC kernel.
+>> >> >
+>> >> > If your SOC require some fancy setup that is not shared by other
+>> >> > platforms then please abstract that into the bootloader, or make sure it
+>> >> > can be deferred later on.
+>> >> >
+>> >> There is nothing fancy here. It's an ARM security architecture feature which
+>> >> OMAP implements. Have given enough reason about boot-loaders issues.
+>> >
+>> > I was not convinced by those reasons. Just push harder on the bootloader
+>> > side. ?There is _no_ reason for the bootloader not to take care of this
+>> > very platform specific issue. ?You can even do it into a standalone
+>> > uImage that returns to u-Boot after it is done with its magic.
+>> >
+>> >> Is OMAP getting beaten up here just because it uses ARM security
+>> >> feature and implements it's mechanics?
+>> >
+>> > I don't care if this is OMAP, UX500 or i.MX. ?There is a line to be
+>> > drawn and this is just too bad if you are trying to cross it.
+>> >
+>> Well I was trying to get a solution for a genuine problem.
+>> Let's take an example.
+>>
+>> #ifdef CONFIG_ARM_ERRATA_742230
+>> ? ? ? ? cmp ? ? r6, #0x22 ? ? ? ? ? ? ? ? ? ? ? @ only present up to r2p2
+>> ? ? ? ? mrcle ? p15, 0, r10, c15, c0, 1 ? ? ? ? @ read diagnostic register
+>> ? ? ? ? orrle ? r10, r10, #1 << 4 ? ? ? ? ? ? ? @ set bit #4
+>> ? ? ? ? mcrle ? p15, 0, r10, c15, c0, 1 ? ? ? ? @ write diagnostic register
+>> #endif
+>>
+>> The SoC's which doesn't have security restriction and the kernel
+>> is in secure mode, above errata is applied in it's right place. Before
+>> MMU is enabled. There are many bits like this which are patched
+>> in kernel.
+>>
+>> On OMAP, all these can't be set-up in kernel since kernel is
+>> in non-secure mode. To set such bit's we need to call some
+>> pre-defined security calls.
+>
+> Absolutely. ?Just don't do it in the early kernel boot code where it is
+> not convenient to do so.
+>
+Got it.
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Regards
+Santosh
