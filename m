@@ -1,58 +1,122 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 18 Jan 2012 17:17:46 +0000
-Subject: [RFC PATCH 4/5] ARM: gic: add cpuif topology description
-In-Reply-To: <4F16EB24.4000701@gmail.com>
+Date: Wed, 18 Jan 2012 17:50:28 +0000
+Subject: [RFC PATCH 0/5] ARM: introducing DT topology
+In-Reply-To: <20120118162423.GK1068@n2100.arm.linux.org.uk>
 References: <1326897408-11204-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1326897408-11204-5-git-send-email-lorenzo.pieralisi@arm.com>
- <4F16EB24.4000701@gmail.com>
-Message-ID: <20120118171746.GC9691@e102568-lin.cambridge.arm.com>
+ <20120118162423.GK1068@n2100.arm.linux.org.uk>
+Message-ID: <20120118175028.GD9691@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2012 at 03:54:12PM +0000, Rob Herring wrote:
-> On 01/18/2012 08:36 AM, Lorenzo Pieralisi wrote:
-> > In order to set up a proper logical to per-cpu interrupt controller IF
-> > mapping, the GIC interrupt controller device tree bindings must be enhanced
-> > to define the CPU IF id for all present CPUs.
-> > GIC CPU IF ids are needed to send interprocessor IPIs and to set affinity
-> > levels. Since the way CPU IF ids are wired depends on the specific
-> > system design, they cannot be extrapolated or probed in HW by the boot
-> > CPU, so a binding to define them is needed to set-up the system properly.
-> > 
-> > This patch adds a logical map of per-cpu interrupt controller identifiers.
-> > The newly introduced per-cpu IF map has to be initialized by the GIC
-> > driver so that interprocessor interrupts and affinity levels can be set
-> > accordingly in an SMP system, with a proper 1:1 relation between per-cpu
-> > IF ids and logical cpu indexes.
-> > 
-> > This patch adds a function that parses the device tree properties and
-> > initializes the cpu interfaces ids properly according to the latest GIC
-> > device tree bindings.
-> > 
-> > If CONFIG_OF is not enabled, per-cpu CPU IF mappings are defined as
-> > cpu_logical_map(), leaving the current functionality unchanged.
-> > 
+On Wed, Jan 18, 2012 at 04:24:23PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 18, 2012 at 02:36:43PM +0000, Lorenzo Pieralisi wrote:
+> > Current code in the kernel, in particular the boot sequence, hinges upon a
+> > sequential mapping of MPIDR values for cpus and related interrupt
+> > controller CPU interfaces to logical cpu indexing. 
 > 
-> What if CONFIG_OF is enabled, but the DTB is not updated? That needs to
-> work.
+> I don't believe it does.  What it does rely upon is having cpu_logical_map()
+> correctly setup for the logical-to-hardware mapping - which, if it's
+> different, should be done in smp_init_cpus(), taking note that logical
+> CPU 0 is _always_ the boot CPU.  (That's a restriction caused by the
+> way suspend/resume unplugs all but the lowest numbered logical online
+> CPU.)
 > 
+> So, with the code today, there's nothing in the code which prevents this
+> from happening:
+> 
+> a) you boot on h/w CPU 1, which becomes logical CPU 0.
+> b) you boot h/w CPU 3 as logical CPU 1.
+> c) you boot h/w CPU 0 as logical CPU 2.
+> d) you boot h/w CPU 2 as logical CPU 3.
+> 
+> You just need to ensure that cpu_logical_map() contains the array
+> {1, 3, 0, 2} instead of the default (because we _have_ to have a
+> default) of {1, 0, 2, 3}.
 
-That's a fair point, I have to cater for that, point taken, I will rework it.  
+I agree with you Russell, that's 100% valid on a single cluster. But on
+a multi-cluster (eg dual-cluster) the MPIDR might be wired like this:
 
-> I really don't get this. Furthermore, DT bindings are not supposed to
-> evolve. They need to be complete enough that they don't need frequent
-> updates for existing h/w. We discussed GIC bindings at length for 3+
-> months. The binding had sub nodes for cpu interfaces at one point, but
-> got rid of them. Then support for cpu interfaces at different addresses
-> was added. Those times were the time to bring-up issues like this. We
-> can't keep changing the binding.
+MPIDR[15:8] - cluster id
+MPIDR[7:0] - core id
 
-We are updating it, not changing it and we can change it if it does not 
-describe all HW features we need, I hope.
-This patch does not re-introduce GIC CPU IF addresses. It just adds a
-GIC CPU IF id which is required to associate software generated IRQs to a 
-given CPU. ARM mandates that those CPU ids should be wired sequentially,
-but it depends on design parameters, so it is important to have the capability  
-to define them through DT.
+no hyperthreading
 
+* CLUSTER 0 *
+                       MPIDR[23:16]   MPIDR[15:8]    MPIDR[7:0]
+HWCPU0: MPIDR=0x0          0x0            0x0           0x0
+HWCPU1: MPIDR=0x1          0x0            0x0           0x1 
+
+* CLUSTER 1 *
+
+HWCPU2: MPIDR=0x100        0x0            0x1           0x0               
+HWCPU3: MPIDR=0x101        0x0            0x1           0x1  
+
+MPIDR is not a sequential index anymore, that's what I am going on about. 
+
+And yes, code like cpu_resume, that relies on MPIDR[7:0] to be unique
+needs patching, since that just takes into account the first affinity
+level, which can have same values for different CPUs in the system if
+they belong to different clusters.
+
+> > This hypothesis is not valid when the concept of cluster is introduced since
+> > the MPIDR cannot be represented as a single index and interrupt controller
+> > CPU interfaces might be wired with a numbering scheme following per-SoC
+> > design parameters which cannot be extrapolated easily through generic functions
+> > by the primary CPU.
+> 
+> So what you're saying is that the GIC CPU index may not be the CPU number
+> given by MPIDR?
+>
+
+Yes, that's correct. Taking the same example as above:
+
+MPIDR[15:8] - cluster id
+MPIDR[7:0] - core id
+
+no hyperthreading
+
+* CLUSTER 0 *
+                         MPIDR[15:8]    MPIDR[7:0]  GIC-CPU-ID
+		       
+HWCPU0: MPIDR=0x0            0x0           0x0          0x0
+HWCPU1: MPIDR=0x1            0x0           0x1          0x1 
+
+* CLUSTER 1 *
+
+HWCPU2: MPIDR=0x100          0x1           0x0          0x2     
+HWCPU3: MPIDR=0x101          0x1           0x1          0x3
+
+There is just one GIC distributor shared across all clusters.
+
+> > Furthermore, relying on the MPIDR to be wired according to real topology
+> > levels might turn out to be an unreliable solution, hence a SW
+> > representation is needed to override possibly incorrect MPIDR register
+> > values.
+> 
+> This sounds like you're saying that the contents of MPIDR might be buggy
+> sometime in the future?  Do we actually know of any situations where the
+> information in there is currently wrong (outside of the development lab)?
+> If not, it's not something we should cater for until it's actually happened,
+> and then the pain should be felt by those silly enough to allow the chip
+> to go out the door.
+
+I share your view Russell. Having said that: MPIDR is IMPLEMENTATION DEFINED.
+
+There are three possibilities:
+
+1- MPIDR is not unique (there are CPUs with duplicated values) 
+2- MPIDR is unique but affinity levels do not represent hierarchy
+   properly (cluster level, core level)
+3- MPIDR is unique and affinity levels are properly set
+
+IMHO:
+
+case 1) We should not care and designers must get their act together
+case 2) We might use DT to build the topology properly and rely on
+        uniqueness to have a properly running system
+case 3) We are home and dry	
+
+Thoughts ?
+
+Thanks a lot for your feedback,
 Lorenzo
