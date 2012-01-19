@@ -1,28 +1,34 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 19 Jan 2012 15:53:38 +0800
-Subject: [PATCH resent v2 0/2] ARM/mxs : add GPMI-NAND support for imx23/imx28
-Message-ID: <1326959620-25920-1-git-send-email-b32955@freescale.com>
+Date: Thu, 19 Jan 2012 15:53:39 +0800
+Subject: [PATCH resent v2 1/2] ioport : add DEFINE_RES_DMA_SIZE_NAMED macro
+In-Reply-To: <1326959620-25920-1-git-send-email-b32955@freescale.com>
+References: <1326959620-25920-1-git-send-email-b32955@freescale.com>
+Message-ID: <1326959620-25920-2-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set has two patches:
-[1] Add a new DEFINE_RES_DMA_SIZE_NAMED macro which used by the dma resource
-    that has more then one dma source.
+Some DMA resource does have the range more then ones.
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ include/linux/ioport.h |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+index 9d57a71..9ea5de4 100644
+--- a/include/linux/ioport.h
++++ b/include/linux/ioport.h
+@@ -134,8 +134,10 @@ struct resource_list {
+ #define DEFINE_RES_IRQ(_irq)						\
+ 	DEFINE_RES_IRQ_NAMED((_irq), NULL)
  
-[2] add GPMI-NAND support for imx23/imx28
-
-Huang Shijie (2):
-  ioport : add DEFINE_RES_DMA_SIZE_NAMED macro
-  ARM: mxs: add GPMI-NAND support for imx23/imx28
-
- arch/arm/mach-mxs/clock-mx23.c                  |    1 +
- arch/arm/mach-mxs/clock-mx28.c                  |    1 +
- arch/arm/mach-mxs/devices-mx23.h                |    4 +
- arch/arm/mach-mxs/devices-mx28.h                |    4 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-gpmi-nand.c  |   79 +++++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/devices-common.h |   10 +++
- include/linux/ioport.h                          |    4 +-
- 9 files changed, 106 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nand.c
++#define DEFINE_RES_DMA_SIZE_NAMED(_dma, _size, _name)			\
++	DEFINE_RES_NAMED((_dma), (_size), (_name), IORESOURCE_DMA)
+ #define DEFINE_RES_DMA_NAMED(_dma, _name)				\
+-	DEFINE_RES_NAMED((_dma), 1, (_name), IORESOURCE_DMA)
++	DEFINE_RES_DMA_SIZE_NAMED((_dma), 1, (_name))
+ #define DEFINE_RES_DMA(_dma)						\
+ 	DEFINE_RES_DMA_NAMED((_dma), NULL)
+ 
+-- 
+1.7.0.4
