@@ -1,67 +1,60 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 19 Jan 2012 14:16:05 +0800
-Subject: [PATCH 08/10] MXS-MMC : use the new DMA flags
+Date: Thu, 19 Jan 2012 14:16:06 +0800
+Subject: [PATCH 09/10] MTD/GPMI : add a new field `gpmi_version`
 In-Reply-To: <1326953767-24155-1-git-send-email-b32955@freescale.com>
 References: <1326953767-24155-1-git-send-email-b32955@freescale.com>
-Message-ID: <1326953767-24155-9-git-send-email-b32955@freescale.com>
+Message-ID: <1326953767-24155-10-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new DMA flags while do not change any logic.
+add this field to store the GPMI verison.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mmc/host/mxs-mmc.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |    3 +++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    4 ++++
+ drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    2 ++
+ 3 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 1e18970..be8fbbc 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -305,7 +305,7 @@ static irqreturn_t mxs_mmc_irq_handler(int irq, void *dev_id)
- }
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+index 7f68042..5b73ae5 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+@@ -133,6 +133,9 @@ int gpmi_init(struct gpmi_nand_data *this)
+ 	if (ret)
+ 		goto err_out;
  
- static struct dma_async_tx_descriptor *mxs_mmc_prep_dma(
--	struct mxs_mmc_host *host, unsigned int append)
-+	struct mxs_mmc_host *host, unsigned long flags)
- {
- 	struct dma_async_tx_descriptor *desc;
- 	struct mmc_data *data = host->data;
-@@ -325,7 +325,7 @@ static struct dma_async_tx_descriptor *mxs_mmc_prep_dma(
- 	}
++	/* Read out the GPMI version */
++	this->gpmi_version = readl(r->gpmi_regs + HW_GPMI_VERSION);
++
+ 	/* Choose NAND mode. */
+ 	writel(BM_GPMI_CTRL1_GPMI_MODE, r->gpmi_regs + HW_GPMI_CTRL1_CLR);
  
- 	desc = host->dmach->device->device_prep_slave_sg(host->dmach,
--				sgl, sg_len, host->slave_dirn, append);
-+				sgl, sg_len, host->slave_dirn, flags);
- 	if (desc) {
- 		desc->callback = mxs_mmc_dma_irq_callback;
- 		desc->callback_param = host;
-@@ -358,7 +358,7 @@ static void mxs_mmc_bc(struct mxs_mmc_host *host)
- 	host->ssp_pio_words[2] = cmd1;
- 	host->dma_dir = DMA_NONE;
- 	host->slave_dirn = DMA_TRANS_NONE;
--	desc = mxs_mmc_prep_dma(host, 0);
-+	desc = mxs_mmc_prep_dma(host, MXS_DMA_F_WAIT4END);
- 	if (!desc)
- 		goto out;
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+index 1c7fdbb..5c277e3 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+@@ -132,6 +132,10 @@ struct gpmi_nand_data {
+ 	/* Flash Hardware */
+ 	struct nand_timing	timing;
  
-@@ -398,7 +398,7 @@ static void mxs_mmc_ac(struct mxs_mmc_host *host)
- 	host->ssp_pio_words[2] = cmd1;
- 	host->dma_dir = DMA_NONE;
- 	host->slave_dirn = DMA_TRANS_NONE;
--	desc = mxs_mmc_prep_dma(host, 0);
-+	desc = mxs_mmc_prep_dma(host, MXS_DMA_F_WAIT4END);
- 	if (!desc)
- 		goto out;
- 
-@@ -526,7 +526,7 @@ static void mxs_mmc_adtc(struct mxs_mmc_host *host)
- 	host->data = data;
- 	host->dma_dir = dma_data_dir;
- 	host->slave_dirn = slave_dirn;
--	desc = mxs_mmc_prep_dma(host, 1);
-+	desc = mxs_mmc_prep_dma(host, MXS_DMA_F_LASTONE);
- 	if (!desc)
- 		goto out;
- 
++	/* GPMI hardware version */
++#define GPMI_VERSION_0501	(0x05010000)
++	u32			gpmi_version;
++
+ 	/* BCH */
+ 	struct bch_geometry	bch_geometry;
+ 	struct completion	bch_done;
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
+index 8343124..f005b24 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
+@@ -169,4 +169,6 @@
+ #define HW_GPMI_DEBUG					0x000000c0
+ #define MX23_BP_GPMI_DEBUG_READY0			28
+ #define MX23_BM_GPMI_DEBUG_READY0	(1 << MX23_BP_GPMI_DEBUG_READY0)
++
++#define HW_GPMI_VERSION					0x000000d0
+ #endif
 -- 
 1.7.0.4
