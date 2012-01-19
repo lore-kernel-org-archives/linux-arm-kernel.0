@@ -1,56 +1,90 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 19 Jan 2012 13:30:52 +0000
-Subject: [RFC PATCH 1/5] arm:omap1/2/3/4:Convert 32k-Sync clocksource
- driver to platform_driver
-In-Reply-To: <20120119130926.GF22818@atomide.com>
-References: <1326886086-27313-1-git-send-email-hvaibhav@ti.com>
- <1326886086-27313-2-git-send-email-hvaibhav@ti.com>
- <20120118115952.GM16726@n2100.arm.linux.org.uk>
- <79CD15C6BA57404B839C016229A409A8317A9AA2@DBDE01.ent.ti.com>
- <20120118141147.GN16726@n2100.arm.linux.org.uk> <4F16D66F.2000602@arm.com>
- <79CD15C6BA57404B839C016229A409A8317A9C39@DBDE01.ent.ti.com>
- <4F16DB10.8060806@arm.com> <20120118145032.GO16726@n2100.arm.linux.org.uk>
- <20120119130926.GF22818@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317AB17D@DBDE01.ent.ti.com>
+From: eranian@googlemail.com (stephane eranian)
+Date: Thu, 19 Jan 2012 14:32:29 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+ <20120109224945.GA23090@mudshark.cambridge.arm.com>
+ <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+ <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
+ <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
+ <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
+ <CACVXFVOQNDRs=c8A2YC+WvYAHs5Abbz-QUEe1VJqrj2esFO11g@mail.gmail.com>
+ <CAMsRxf+e38jRcyxESLhYDZ3OL910AQdapZD9P8vWDXfUE34DAA@mail.gmail.com>
+ <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
+ <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
+ <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
+ <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
+Message-ID: <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 18:39:26, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120118 06:18]:
-> > On Wed, Jan 18, 2012 at 02:45:36PM +0000, Marc Zyngier wrote:
-> > > Can't you instead use the ARM sched_clock framework?
-> > 
-> > OMAP does, and has done for quite some time.  The problem is these
-> > patches are against an old kernel.
-> 
-> Additionally we're already handling the 32k timer or not case already
-> on omap1 as it does not exist on 1510, so there should only minimal
-> patching needed AFAIK.
-> 
+On Thu, Jan 19, 2012 at 2:26 PM, Ming Lei <ming.lei@canonical.com> wrote:
+> Hi,
+>
+> On Thu, Jan 19, 2012 at 9:14 PM, Ming Lei <ming.lei@canonical.com> wrote:
+>> On Thu, Jan 19, 2012 at 8:51 PM, stephane eranian
+>> <eranian@googlemail.com> wrote:
+>>> On Thu, Jan 19, 2012 at 1:45 PM, Ming Lei <ming.lei@canonical.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On Thu, Jan 19, 2012 at 7:34 PM, stephane eranian
+>>>> <eranian@googlemail.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> Ok some update on this.
+>>>>> With your .config file + 3.2.0 (Linus) + patch 3, 4, 5, 6, I get a kernel that
+>>>>
+>>>> You forget patch 1 and patch 2?
+>>>>
+>>> They are already in 3.2.0. Unless I am mistaken.
+>>
+>> Sorry, I just found that they have been merged to 3.2.
+>
+> After a double check, the two patches are not merged to 3.2, but have
+> been merged to the latest linus tree and can be seen in 3.3-rc1.
+>
+> Also the commit 3c50729b(ARM: OMAP4: PM: Initialise all the clockdomains
+> to supported states) has been merged to linus tree too.
+>
+> So if you just tested the latest linus tree simply, you need to apply
+> the patch[1]
+> (I have mentioned the problem in the thread.)
+>
 
-Tony,
+Changing LMO, u-boot.bin did not help. Even with perf top I get no
+interrupts.
 
-All this is handled using cpu_is_omapxxxx() checks, something like,
+My Linus tree is at commit fa1952b:
 
-int __init omap_init_clocksource_32k(void) {
-	...
+[6] 11891e1 arm: omap4: pmu: support runtime pm
+[5] 25fab8a arm: omap4: support pmu
+[4] fddef77 arm: omap4: create pmu device via hwmod
 
-	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
-	...
-	...
-	...
+fa1952b ARM: OMAP4: hwmod data: Add support for the debug modules
+ccb19d2 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+c3b5003 tg3: Fix single-vector MSI-X code
 
-	}
-}
+I think [1] had conflicts when applying it to the tree.
 
-This will not help for omap2/3+ devices.
-
-I have cleaned up the code and about to submit it, please review
-it and provide the comments.
-
-Submitting shortly...
-
-Thanks,
-Vaibhav
-> Tony
-> 
+> thanks,
+> --
+> Ming Lei
+>
+> [1],
+> diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c
+> b/arch/arm/mach-omap2/clockdomains44xx_data.c
+> index 9299ac2..41d2260 100644
+> --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
+> +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+> @@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
+> ? ? ? .prcm_partition ? = OMAP4430_PRM_PARTITION,
+> ? ? ? .cm_inst ? ? ? ? ?= OMAP4430_PRM_EMU_CM_INST,
+> ? ? ? .clkdm_offs ? ? ? = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
+> - ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_HWSUP,
+> + ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_SWSUP,
+> ?};
+>
+> ?static struct clockdomain l3_dma_44xx_clkdm = {
