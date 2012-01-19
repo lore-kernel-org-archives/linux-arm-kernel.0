@@ -1,31 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Jan 2012 15:35:11 +0800
-Subject: [PATCH 1/3] mc13xxx-core: Prepare for separate spi and i2c
- backends.
-In-Reply-To: <1326934894-29516-2-git-send-email-marc@cpdesign.com.au>
-References: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
- <1326934894-29516-2-git-send-email-marc@cpdesign.com.au>
-Message-ID: <20120119073509.GE2247@S2101-09.ap.freescale.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 19 Jan 2012 08:36:38 +0100
+Subject: [Linaro-mm-sig] [PATCH 04/11] mm: page_alloc: introduce
+ alloc_contig_range()
+In-Reply-To: <CA+K6fF6A1kPUW-2Mw5+W_QaTuLfU0_m0aMYRLOg98mFKwZOhtQ@mail.gmail.com>
+References: <1325162352-24709-1-git-send-email-m.szyprowski@samsung.com>
+ <1325162352-24709-5-git-send-email-m.szyprowski@samsung.com>
+ <CA+K6fF6A1kPUW-2Mw5+W_QaTuLfU0_m0aMYRLOg98mFKwZOhtQ@mail.gmail.com>
+Message-ID: <002901ccd67d$1465e560$3d31b020$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forgot to mention in my last reply that I recently added device tree
-probe support for mc13xxx-core which has hit the mainline, so you may
-need to rebase this series, or you will be asked by Samuel to anyway,
-I guess :)
+Hello,
 
-One nit on the subject of this patch: you may want to have prefix
-"mfd: mc13xxx-core: ..." to align with the other two patches in the
-series.
+On Tuesday, January 17, 2012 10:54 PM sandeep patil wrote:
 
--- 
-Regards,
-Shawn
-
-On Thu, Jan 19, 2012 at 12:01:32PM +1100, Marc Reilly wrote:
-> This patch abstracts the bus specific operations from the driver core.
-> Read and write handlers are introduced and generic initialization is
-> consolidated into mc13xxx_comon_init. The irq member is removed because
-> it is unused.
+> I am running a CMA test where I keep allocating from a CMA region as long
+> as the allocation fails due to lack of space.
 > 
-> Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
+> However, I am seeing failures much before I expect them to happen.
+> When the allocation fails, I see a warning coming from __alloc_contig_range(),
+> because test_pages_isolated() returned "true".
+> 
+> The new retry code does try a new range and eventually succeeds.
+
+(snipped)
+
+> From the log it looks like the warning showed up because page->private
+> is set to MIGRATE_CMA instead of MIGRATE_ISOLATED.
+
+> I've also had a test case where it failed because (page_count() != 0)
+
+This means that the page is temporarily used by someone else (like for example
+io subsystem or a driver).
+
+> Have you or anyone else seen this during the CMA testing?
+
+Yes, we observed such issues and we are also working on fixing them. However 
+we gave higher priority to get the basic CMA patches merged to mainline. Once
+this happen the above issues can be fixed incrementally.
+
+> Also, could this be because we are finding a page within (start, end)
+> that actually belongs
+> to a higher order Buddy block ?
+
+No, such pages should be correctly handled.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
