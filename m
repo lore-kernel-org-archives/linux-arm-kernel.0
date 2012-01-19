@@ -1,58 +1,69 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Thu, 19 Jan 2012 12:43:40 +0100
-Subject: [PATCH v3] ARM: support XZ compressed kernels
-In-Reply-To: <4F180128.9060005@bluegiga.com>
-References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
- <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
- <op.v4vsotxk2s3iss@ecaz> <4F180128.9060005@bluegiga.com>
-Message-ID: <op.v8bxi2yu2s3iss@ecaz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jan 2012 11:46:27 +0000
+Subject: [V3 0/6] rtc-sa1100 clean up
+In-Reply-To: <20120119113940.GV1068@n2100.arm.linux.org.uk>
+References: <1322634843-4733-1-git-send-email-jtzhou@marvell.com>
+ <20120119113940.GV1068@n2100.arm.linux.org.uk>
+Message-ID: <20120119114627.GW1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 19, 2012 at 11:39:40AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 30, 2011 at 02:34:03PM +0800, Jett.Zhou wrote:
+> > This patch set do the following things:
+> >   1) clean up sa1100-rtc for support sa1100/pxa/mmp series
+> >   2) add dummy clock for pxa arch
+> >   3) clean up clock dev for sa1100 arch and add dummy clock for sa1100
+> >   4) fix build error for sa1100 arch
+> 
+> Guys,
+> 
+> If you're modifying a driver which is shared across different architectures
+> please try to build it for those different architectures.  It helps to
+> avoid receiving reports like the below:
+> 
+> drivers/rtc/rtc-sa1100.c:42:1: warning: "RCNR" redefined
+> In file included from arch/arm/mach-sa1100/include/mach/hardware.h:73,
+>                  from drivers/rtc/rtc-sa1100.c:35:
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:877:1: warning: this is the location of the previous definition
+> drivers/rtc/rtc-sa1100.c:43:1: warning: "RTAR" redefined
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:876:1: warning: this is the location of the previous definition
+> drivers/rtc/rtc-sa1100.c:44:1: warning: "RTSR" redefined
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:879:1: warning: this is the location of the previous definition
+> drivers/rtc/rtc-sa1100.c:45:1: warning: "RTTR" redefined
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:878:1: warning: this is the location of the previous definition
+> drivers/rtc/rtc-sa1100.c:47:1: warning: "RTSR_HZE" redefined
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:891:1: warning: this is the location of the previous definition
+> drivers/rtc/rtc-sa1100.c:48:1: warning: "RTSR_ALE" redefined
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:890:1: warning: this is the location of the previous definition
+> drivers/rtc/rtc-sa1100.c:49:1: warning: "RTSR_HZ" redefined
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:889:1: warning: this is the location of the previous definition
+> drivers/rtc/rtc-sa1100.c:50:1: warning: "RTSR_AL" redefined
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:888:1: warning: this is the location of the previous definition
+> 
+> Please fix it.
 
-On Thu, 19 Jan 2012 12:40:24 +0100, Veli-Pekka Peltola  
-<veli-pekka.peltola@bluegiga.com> wrote:
+And what's more, it doesn't even work on sa1100 anymore.  So it's regressed
+during this merge window.
 
-> On 11/13/2011 12:56 PM, Imre Kaloz wrote:
->> On Sat, 12 Nov 2011 11:50:02 +0100, Linus Walleij
->> <linus.walleij@linaro.org> wrote:
->>
->>> On Mon, Nov 7, 2011 at 9:03 PM, Imre Kaloz <kaloz@openwrt.org> wrote:
->>>
->>>> Wire up support for the XZ decompressor
->>>>
->>>> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
->>>
->>> Looks useful.
->>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>>
->>> Put it in Russell's patch tracker.
->>> Linus Walleij
->>
->> A previous version was there, but Russell applied it then dropped it,
->> hence I didn't want to add it again.
->>
->> Russell, would you like me to add it there?
->>
->>
->> Imre
->
-> It has been quite silent related to this patch. What is current status?
->
-> I have been using XZ in our development kernels nine months now without  
-> any problems on AT91 platform.
->
-> Acked-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
->
-> --
-> Veli-Pekka Peltola
+Ok, this is a total bollocks change - what was added to this file
+was:
 
+#define RCNR            0x00    /* RTC Count Register */
+#define RTAR            0x04    /* RTC Alarm Register */
+#define RTSR            0x08    /* RTC Status Register */
+#define RTTR            0x0c    /* RTC Timer Trim Register */
 
-Recent changes introduced an error, but Nico helped me clean that up. Will  
-submit the final patch to the patch system this weekend.
+and the SA11x0 definitions are different:
 
-Thanks for testing :)
+#define RTAR            __REG(0x90010000)  /* RTC Alarm Reg. */
+#define RCNR            __REG(0x90010004)  /* RTC CouNt Reg. */
+#define RTTR            __REG(0x90010008)  /* RTC Trim Reg. */
+#define RTSR            __REG(0x90010010)  /* RTC Status Reg. */
 
+Notice the different register positioning in the address space.
 
-Imre
+Therefore, this driver restructuring is fatally wrong.  I'm going to
+revert this entire series in my tree so SA11x0 continues to work here,
+whether I send that to Linus depends on how quickly a fix can be
+produced, and whether Alessandro agrees.
