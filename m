@@ -1,53 +1,43 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 19 Jan 2012 17:00:56 +0000
-Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
- tile (TC1 variant)
-In-Reply-To: <1326984672.32197.68.camel@hornet.cambridge.arm.com>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>	
- <1323957761-13553-10-git-send-email-pawel.moll@arm.com>	
- <4F0C495C.4000103@citrix.com>	
- <1326979652.32197.66.camel@hornet.cambridge.arm.com>	
- <4F181BD9.20401@gmail.com>	
- <1326980594.32197.67.camel@hornet.cambridge.arm.com>	
- <4F182248.7070209@gmail.com>
- <1326984672.32197.68.camel@hornet.cambridge.arm.com>
-Message-ID: <4F184C48.2050505@citrix.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Jan 2012 09:01:01 -0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1780DAAEB8@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <CAJuYYwSNuMAcjaTNeCq=LmeP8KrvGNjcn1FP6VY0NarEhkY_aA@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1780DAAEB8@HQMAIL01.nvidia.com>
+Message-ID: <20120119170101.GH22818@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/12 14:51, Pawel Moll wrote:
-> On Thu, 2012-01-19 at 14:01 +0000, Rob Herring wrote:
->> On 01/19/2012 07:43 AM, Pawel Moll wrote:
->>> On Thu, 2012-01-19 at 13:34 +0000, Rob Herring wrote:
->>>>> You're right - the skeleton.dtsi contains "memory" mode... Funnily
->>>>> enough originally I was using that name, but then Rob Herring suggested
->>>>> changing it to @80000000, which seemed reasonable.
->>>>>
->>>>> Now I wonder - is the "memory" node special and should not contain
->>>>> "@address", or the skelton shouldn't contain the empty "memory" node...
->>>>>
->>>>
->>>> Hummm... I guess you should just use "memory" if you are using
->>>> skeleton.dtsi.
->>>
->>> Well, I don't mind _not_ using skeleton, but I had an impression the
->>> general policy was to use it?
->>
->> Either way is fine. I don't really think it buys you much.
+* Stephen Warren <swarren@nvidia.com> [120118 11:21]:
+> Thomas Abraham wrote at Wednesday, January 18, 2012 5:16 AM:
+> > On 14 January 2012 02:09, Stephen Warren <swarren@nvidia.com> wrote:
+> > > I thought a bit more about pinmux DT bindings. I came up with something
+> > > that I like well enough, and is pretty similar to the binding that Dong
+> > > posted recently. I think it'll work for both Tegra's and IMX's needs.
+> > > Please take a look!
+> ...
+> > The pinmux_get() function checks if there is an active user of the
+> > pinmux and declines requests if the pinmux has been taken. With the dt
+> > bindings that you have listed, can such a check be still enforced.
 > 
-> Ok, /include/ "skeleton.dtsi" is gone then :-)
+> I believe so.
+> 
+> I see these bindings as simply providing the data to populate the same
+> pinmux mapping table that's currently used by the pinctrl subsystem.
+> therefore, there are no changes to the operation of the pinctrl subsystem
+> (beyond a little extra code to parse the map from DT instead of receiving
+> a static table from a board file), and no changes to the way drivers
+> use the pinctrl APIs. Hence, all that error-checking will still operate
+> as-is.
 
-The problem wasn't with including skeleton.dtsi.  With
-CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
-DTB using information from the ATAGs (see atags_to_fdt()).
+FYI I have the pinmux maps dynamically created based on the driver pins
+requested in .dts file and so far don't see a need for static stables
+except to support legacy drivers. I'll update my pinmux-simple.c to
+use one phandle per controller instance and post it when I'm back home,
+so hopefully next week at some point. Sorry it's been dragging, but it's
+been looking "just few more things" to fix for a while now..
 
-If there's an ATAG giving the amount of RAM the DTB's "memory" node is
-replaced with a new one.  Since the vexpress DTBs don't have a "memory"
-node it's added and the DTB ends up with two nodes describing memory.
+Cheers,
 
-I don't expect any real production vexpress system to use this config
-options -- we're using it now when running as a guest under Xen because
-Xen doesn't (yet) support device tree and we're using ATAGs to tell the
-guest how much RAM it's been allocated.
-
-David
+Tony
