@@ -1,70 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 19 Jan 2012 00:18:53 -0200
-Subject: [PATCH] ARM: mx28: Clear CLKGATE bit prior to changing DIV field
-In-Reply-To: <20246.30805.391940.766120@ipc1.ka-ro>
-References: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
- <20246.30805.391940.766120@ipc1.ka-ro>
-Message-ID: <CAOMZO5B3qRowaQ9c_=pyykvp5x5f2nTgticV0tCcHGAYD007MQ@mail.gmail.com>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Wed, 18 Jan 2012 20:27:30 -0600
+Subject: [RFC PATCH v4] ARM: imx: Add basic imx6q thermal management
+Message-ID: <1326940051-31016-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2012 at 5:44 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+Based on v3.2 plus recently submitted cpu_cooling functionality here:
 
-> Now you are doing clk_enable()'s business in clk_set_rate().
-> The same result could be achieved by calling clk_enable() prior to
-> clk_set_rate(). clk_set_rate() could simply return an error code, if
-> the clock is not enabled.
+http://www.spinics.net/lists/linux-pm/msg26500.html
 
-Ok, understood.
+link to previous submissions:
+v3: http://www.spinics.net/lists/arm-kernel/msg155955.html
+v2: http://www.spinics.net/lists/arm-kernel/msg155790.html
+v1: http://www.spinics.net/lists/arm-kernel/msg155111.html
 
-Your suggestion below works fine:
+Changes in v4:
+1.  Removed bad suspend/resume assignment into thermal class.  After further
+examination and discussion with SoC designers, a sequence is now used 
+for making measurements that is is unaffected by system suspendresumes.  
+Temp Sensor automatically powers off in hardware during the low power mode
+caused by a system suspend.
+2.  Moved some structures from static to dynamic allocation.
+3.  Added some noise handling to temperatuer sensor readings.
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 5d68e41..c697b4a 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -809,6 +809,8 @@ int __init mx28_clocks_init(void)
- 	clk_prepare_enable(&xbus_clk);
- 	clk_prepare_enable(&emi_clk);
- 	clk_prepare_enable(&uart_clk);
-+	clk_prepare_enable(&saif0_clk);
-+	clk_prepare_enable(&saif1_clk);
+Changes in v3:
+1. Fixed the various issues pointed out in v2
+2. Made other code cleanup and a bit of re-organizing
+3. Removed unecessary platform driver and device.
 
- 	clk_set_parent(&lcdif_clk, &ref_pix_clk);
- 	clk_set_parent(&saif0_clk, &pll0_clk);
+Changes in v2:
+1. Cleaned up some style issues pointed out in v1
+2. Made various other code cleanup and re-organizing
+3. Added temperature sensor calibration
+4. Created platform driver and device to hook into pm suspend.
 
-Or also the patch below instead:
 
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -814,15 +814,6 @@ int __init mx28_clocks_init(void)
-        clk_set_parent(&saif0_clk, &pll0_clk);
-        clk_set_parent(&saif1_clk, &pll0_clk);
+Performed some basic testing to ensure proper cooling operating.  If
+you want to test this, full testing requires imx6q cpufreq
+implementation (not yet in v3.2) and requires an imx6q part that has
+temperature sensor calibration fuses correctly burned.
 
--       /*
--        * Set an initial clock rate for the saif internal logic to work
--        * properly. This is important when working in EXTMASTER mode that
--        * uses the other saif's BITCLK&LRCLK but it still needs a basic
--        * clock which should be fast enough for the internal logic.
--        */
--       clk_set_rate(&saif0_clk, 24000000);
--       clk_set_rate(&saif1_clk, 24000000);
--
-        clkdev_add_table(lookups, ARRAY_SIZE(lookups));
----
+Robert Lee (1):
+  ARM: imx: Add basic imx6q thermal management
 
-Shawn,
-
-I saw your comments about the need for clk_set_rate, so it looks like
-it is not safe to remove it.
-
-Can Lothar's suggestion be accepted?
-
-In your previous reply you seemed to prefer a solution at mxs-saif.c,
-but if we need to keep the clk_set_rate for saif, then we
-need the clk_prepare_enable for saif clk. I am a bit unsure of what
-your proposal is.
-
-Regards,
-
-Fabio Estevam
+ arch/arm/boot/dts/imx6q.dtsi    |    1 +
+ drivers/thermal/Kconfig         |    6 +
+ drivers/thermal/Makefile        |    1 +
+ drivers/thermal/imx6q_thermal.c |  540 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 548 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/thermal/imx6q_thermal.c
