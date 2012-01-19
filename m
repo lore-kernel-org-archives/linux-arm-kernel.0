@@ -1,39 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jan 2012 20:42:44 -0800
-Subject: [PATCH 0/4] ARM: tegra: Automatic UART selection for earlyprintk
-In-Reply-To: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
-References: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120119044244.GE7145@quad.lixom.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 19 Jan 2012 02:44:46 -0200
+Subject: [PATCH] ARM: mx28: Clear CLKGATE bit prior to changing DIV field
+In-Reply-To: <20120119042047.GB2247@S2101-09.ap.freescale.net>
+References: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
+ <20246.30805.391940.766120@ipc1.ka-ro>
+ <CAOMZO5B3qRowaQ9c_=pyykvp5x5f2nTgticV0tCcHGAYD007MQ@mail.gmail.com>
+ <20120119031726.GA2247@S2101-09.ap.freescale.net>
+ <CAOMZO5CeW08kb4q3UVbpQ1tfJPotoVWV9dD7ycokpEbp2a9mow@mail.gmail.com>
+ <20120119042047.GB2247@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5CtgriCCCoZ+7nr9ddSfbdwsUMqEZCbsXJS2yuPqhdEfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 03:25:16PM -0700, Stephen Warren wrote:
-> This series allows a Tegra zImage to automatically select the UART to use
-> for the zImage decompressor and early printk, based on information from
-> the bootloader. The code scans each UART, looking for one that is clocked,
-> is out of reset, and that the bootloader has written 'D' (for 'D'ebug) to
-> the scratch register.
-> 
-> At present, the ChromiumOS branch of U-Boot sets up UARTs in this way. If
-> this patch is accepted into the kernel, I'll upstream the U-Boot change to
-> mainline U-Boot.
-> 
-> This is important, since different boards use different UARTs, and it's
-> nice not to have to configure the kernel differently when switching
-> boards.
-> 
-> This patch series depends on patch "[PATCH V2] arm/tegra: Support Tegra30
-> in decompressor UART setup" for context.
-> 
-> Doug Anderson (2):
->   ARM: tegra: Introduce define DEBUG_UART_SHIFT
->   ARM: tegra: uncompress.h: Store UART address in a variable
-> 
-> Stephen Warren (2):
->   ARM: tegra: uncompress.h: Choose a UART at runtime
->   ARM: tegra: Pass uncompress.h UART selection to DEBUG_LL
+2012/1/19 Shawn Guo <shawn.guo@linaro.org>:
 
-Thanks, applied.
+> As far as I know, mxs-saif driver also has one clk_set_rate() being
+> called with the clock gated.
+
+Yes, correct. Is this a good fix?
+
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index dccfb37..c5a29a8 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -124,6 +124,8 @@ static int mxs_saif_set_clk(struct mxs_saif *saif,
+         *
+         * If MCLK is not used, we just set saif clk to 512*fs.
+         */
++       clk_prepare_enable(master_saif->clk);
++
+        if (master_saif->mclk_in_use) {
+                if (mclk % 32 == 0) {
+                        scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
+@@ -133,6 +135,7 @@ static int mxs_saif_set_clk(struct mxs_saif *saif,
+                        ret = clk_set_rate(master_saif->clk, 384 * rate);
+                } else {
+                        /* SAIF MCLK should be either 32x or 48x */
++                       clk_disable_unprepare(master_saif->clk);
+                        return -EINVAL;
+                }
+        } else {
+@@ -140,6 +143,8 @@ static int mxs_saif_set_clk(struct mxs_saif *saif,
+                scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
+        }
+
++       clk_disable_unprepare(master_saif->clk);
++
+        if (ret)
+                return ret;
 
 
--Olof
+Regards,
+
+Fabio Estevam
