@@ -1,49 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2012 15:34:05 +0000
-Subject: [PATCH 05/11] ARM: sa11x0: fix collie build error
+Date: Thu, 19 Jan 2012 15:34:26 +0000
+Subject: [PATCH 06/11] ARM: sa11x0: fix section mismatch in cpu-sa1100.c
 In-Reply-To: <20120119153149.GB1068@n2100.arm.linux.org.uk>
 References: <20120119153149.GB1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rnu05-0002pa-Tu@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rnu0Q-0002pf-BV@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-f408c985cefc (GPIO: sa1100: implement proper gpiolib gpio_to_irq conversion)
-made gpio_to_irq() a function.  This breaks collie where it's used to
-initialize some static data.  Fix that by moving the initialization to
-the init code.
-
-arch/arm/mach-sa1100/collie.c:139: error: initializer element is not constant
-arch/arm/mach-sa1100/collie.c:139: error: (near initialization for 'collie_power_resource[0].start')
-arch/arm/mach-sa1100/collie.c:140: error: initializer element is not constant
-arch/arm/mach-sa1100/collie.c:140: error: (near initialization for 'collie_power_resource[0].end')
+WARNING: arch/arm/mach-sa1100/built-in.o(.data+0x11b8): Section mismatch in reference from the variable sa1100_driver to the function .init.text:sa1100_cpu_init()
+The variable sa1100_driver references
+the function __init sa1100_cpu_init()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/collie.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-sa1100/cpu-sa1100.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index c483912..cce8763 100644
---- a/arch/arm/mach-sa1100/collie.c
-+++ b/arch/arm/mach-sa1100/collie.c
-@@ -144,8 +144,6 @@ static struct pda_power_pdata collie_power_data = {
- static struct resource collie_power_resource[] = {
- 	{
- 		.name		= "ac",
--		.start		= gpio_to_irq(COLLIE_GPIO_AC_IN),
--		.end		= gpio_to_irq(COLLIE_GPIO_AC_IN),
- 		.flags		= IORESOURCE_IRQ |
- 				  IORESOURCE_IRQ_HIGHEDGE |
- 				  IORESOURCE_IRQ_LOWEDGE,
-@@ -347,7 +345,8 @@ static void __init collie_init(void)
+diff --git a/arch/arm/mach-sa1100/cpu-sa1100.c b/arch/arm/mach-sa1100/cpu-sa1100.c
+index aaa8acf..19b2053 100644
+--- a/arch/arm/mach-sa1100/cpu-sa1100.c
++++ b/arch/arm/mach-sa1100/cpu-sa1100.c
+@@ -228,7 +228,7 @@ static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
+ 	return 0;
+ }
  
- 	GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
- 
--
-+	collie_power_resource[0].start = gpio_to_irq(COLLIE_GPIO_AC_IN);
-+	collie_power_resource[0].end = gpio_to_irq(COLLIE_GPIO_AC_IN);
- 	platform_scoop_config = &collie_pcmcia_config;
- 
- 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+-static struct cpufreq_driver sa1100_driver = {
++static struct cpufreq_driver sa1100_driver __refdata = {
+ 	.flags		= CPUFREQ_STICKY,
+ 	.verify		= sa11x0_verify_speed,
+ 	.target		= sa1100_target,
 -- 
 1.7.4.4
