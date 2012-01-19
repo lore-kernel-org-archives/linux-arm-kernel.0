@@ -1,57 +1,97 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 19 Jan 2012 14:59:59 -0800
-Subject: [PATCH RFC 2/2] OMAP : serial : Check for error in
- get_context_loss_count
-In-Reply-To: <1326377019-23688-2-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Thu, 12 Jan 2012 19:33:39 +0530")
-References: <1326377019-23688-1-git-send-email-shubhrajyoti@ti.com>
- <1326377019-23688-2-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87hazrti1c.fsf@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Jan 2012 17:04:44 -0600
+Subject: [PATCH] arm: irq: Allow for specification of no preallocated irqs
+In-Reply-To: <1327013024-22530-1-git-send-email-mbohan@codeaurora.org>
+References: <1327013024-22530-1-git-send-email-mbohan@codeaurora.org>
+Message-ID: <4F18A18C.9090302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+On 01/19/2012 04:43 PM, Michael Bohan wrote:
+> For cases with SPARSE_IRQ enabled, irqs preallocated with
+> arch_probe_nr_irqs() are already marked as allocated in the
+> allocated_irqs bitmap. As a consequence, irq chip drivers that
+> allocate irqs will feel one of two behaviors:
+> 
+> 1. An allocation will succeed with the starting irq_base one
+> more than the preallocated irqs. This will thus waste the
+> preceeding interrupt resources that were preallocated, unless a
+> legacy chip driver happens to assume ownership of these by some
+> platform definition. The GIC driver is a typical primary chip
+> driver, and abides to the allocation APIs. So this can be a
+> problem in many trivial usecases.
+> 
+> 2. An allocation will fail with < 0. This can also happen in the
+> GIC driver, which interprets this value as meaning the irq_descs
+> are already preallocated. But in Device Tree configurations, the
+> fallback irq_base is -1. This results in an invalid irq_base
+> value.
+> 
+> Looking forward, we are moving towards a world where preallocation
+> of irqs is no longer necessary. irq_domain is scoped to handle all
+> irq_desc allocations in the future. Thus, we should support
+> configurations where the platform wants to preallocate no irqs.
+> 
+> One easy way to achieve this is to allow for
+> machine_desc->nr_irqs < 0, which indicates not to preallocate any
+> interrupts.
+> 
+> Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
 
-> In serial_omap_runtime_resume in case of errors returned by
-> get_context_loss_count print a warning and do a restore.
->
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+I don't know if you saw my recent series on NR_IRQS clean-up (Make
+mach/irqs.h optional).
 
-These two patches should be combined into a single patch.
+No doubt that arch_probe_nr_irqs is doing the wrong thing on ARM, but no
+pre-allocation is not what we want either. We ultimately want
+arch_probe_nr_irqs to return NR_IRQS_LEGACY (16) to reserve IRQ0 (aka
+NO_IRQ) and legacy ISA IRQs. With my series, NR_IRQS is set to
+NR_IRQS_LEGACY for SPARSE_IRQ. You can accomplish the same thing without
+that series by setting .nr_irqs to NR_IRQS for non-DT and to
+NR_IRQS_LEGACY for DT. For platforms to work in single kernel builds,
+they will need to select SPARSE_IRQ.
 
-Also, please Cc Govindraj since he's the maintainer of this driver and
-should Ack.
-
-Thanks,
-
-Kevin
+Rob
 
 > ---
-> applies on Tony's uart branch
->
->  drivers/tty/serial/omap-serial.c |   10 ++++++++--
->  1 files changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 29fe6fd..6008612 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -1602,10 +1602,16 @@ static int serial_omap_runtime_resume(struct device *dev)
+>  arch/arm/include/asm/mach/arch.h |    2 +-
+>  arch/arm/kernel/irq.c            |   14 ++++++++++++--
+>  2 files changed, 13 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index d7692ca..cc6506a 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -22,7 +22,7 @@ struct machine_desc {
+>  	const char *const 	*dt_compat;	/* array of device tree
+>  						 * 'compatible' strings	*/
 >  
->  	if (up) {
->  		if (pdata->get_context_loss_count) {
-> -			u32 loss_cnt = pdata->get_context_loss_count(dev);
-> +			int loss_cnt = pdata->get_context_loss_count(dev);
+> -	unsigned int		nr_irqs;	/* number of IRQs */
+> +	int			nr_irqs;	/* number of IRQs */
 >  
-> -			if (up->context_loss_cnt != loss_cnt)
-> +			if (loss_cnt < 0) {
-> +				dev_err(dev,
-> +					"get_context_loss_count failed : %d\n",
-> +					loss_cnt);
->  				serial_omap_restore_context(up);
-> +			} else if (up->context_loss_cnt != loss_cnt) {
-> +				serial_omap_restore_context(up);
-> +			}
->  		}
+>  #ifdef CONFIG_ZONE_DMA
+>  	unsigned long		dma_zone_size;	/* size of DMA-able area */
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 3efd82c..f74b173 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -129,8 +129,18 @@ void __init init_IRQ(void)
+>  #ifdef CONFIG_SPARSE_IRQ
+>  int __init arch_probe_nr_irqs(void)
+>  {
+> -	nr_irqs = machine_desc->nr_irqs ? machine_desc->nr_irqs : NR_IRQS;
+> -	return nr_irqs;
+> +	/*
+> +	 * machine_desc->nr_irqs < 0 is a special case that
+> +	 * specifies not to preallocate any irq_descs.
+> +	 */
+> +	if (machine_desc->nr_irqs < 0) {
+> +		nr_irqs = 0;
+> +		return nr_irqs;
+> +	} else {
+> +		nr_irqs = machine_desc->nr_irqs ?
+> +			  machine_desc->nr_irqs : NR_IRQS;
+> +		return nr_irqs;
+> +	}
+>  }
+>  #endif
 >  
->  		/* Errata i291 */
