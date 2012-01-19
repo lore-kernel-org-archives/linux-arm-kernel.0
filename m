@@ -1,240 +1,119 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 19 Jan 2012 09:43:44 +0800
-Subject: [PATCH] ARM: mxs: add GPMI-NAND support for imx23/imx28
-Message-ID: <1326937424-19786-1-git-send-email-b32955@freescale.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Thu, 19 Jan 2012 09:52:13 +0800
+Subject: [PATCH] Skip unnecessary pte makeup when clearing it.
+In-Reply-To: <20120118102055.GV14252@pengutronix.de>
+References: <1326880345-17306-1-git-send-email-bill4carson@gmail.com>
+ <20120118102055.GV14252@pengutronix.de>
+Message-ID: <4F17774D.1040307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add GPMI-NAND support for imx23 and imx28.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/mach-mxs/clock-mx23.c                  |    1 +
- arch/arm/mach-mxs/clock-mx28.c                  |    1 +
- arch/arm/mach-mxs/devices-mx23.h                |    4 +
- arch/arm/mach-mxs/devices-mx28.h                |    4 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-gpmi-nand.c  |  109 +++++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/devices-common.h |   10 ++
- 8 files changed, 133 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nand.c
 
-diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
-index e12e112..aec3471 100644
---- a/arch/arm/mach-mxs/clock-mx23.c
-+++ b/arch/arm/mach-mxs/clock-mx23.c
-@@ -456,6 +456,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxs-pwm.3", NULL, pwm_clk)
- 	_REGISTER_CLOCK("mxs-pwm.4", NULL, pwm_clk)
- 	_REGISTER_CLOCK("imx23-fb", NULL, lcdif_clk)
-+	_REGISTER_CLOCK("imx23-gpmi-nand", NULL, gpmi_clk)
- };
- 
- static int clk_misc_init(void)
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 5d68e41..8dd7b02 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -643,6 +643,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("duart", NULL, uart_clk)
- 	_REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
- 	_REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
-+	_REGISTER_CLOCK("imx28-gpmi-nand", NULL, gpmi_clk)
- 	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
- 	_REGISTER_CLOCK("mxs-auart.1", NULL, uart_clk)
- 	_REGISTER_CLOCK("mxs-auart.2", NULL, uart_clk)
-diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
-index 3fa651d..4d1329d 100644
---- a/arch/arm/mach-mxs/devices-mx23.h
-+++ b/arch/arm/mach-mxs/devices-mx23.h
-@@ -21,6 +21,10 @@ extern const struct mxs_auart_data mx23_auart_data[] __initconst;
- #define mx23_add_auart0()		mx23_add_auart(0)
- #define mx23_add_auart1()		mx23_add_auart(1)
- 
-+extern const struct mxs_gpmi_nand_data mx23_gpmi_nand_data __initconst;
-+#define mx23_add_gpmi_nand(pdata)	\
-+	mxs_add_gpmi_nand(pdata, &mx23_gpmi_nand_data)
-+
- extern const struct mxs_mxs_mmc_data mx23_mxs_mmc_data[] __initconst;
- #define mx23_add_mxs_mmc(id, pdata) \
- 	mxs_add_mxs_mmc(&mx23_mxs_mmc_data[id], pdata)
-diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-index 4f50094..9dbeae1 100644
---- a/arch/arm/mach-mxs/devices-mx28.h
-+++ b/arch/arm/mach-mxs/devices-mx28.h
-@@ -34,6 +34,10 @@ extern const struct mxs_flexcan_data mx28_flexcan_data[] __initconst;
- #define mx28_add_flexcan0(pdata)	mx28_add_flexcan(0, pdata)
- #define mx28_add_flexcan1(pdata)	mx28_add_flexcan(1, pdata)
- 
-+extern const struct mxs_gpmi_nand_data mx28_gpmi_nand_data __initconst;
-+#define mx28_add_gpmi_nand(pdata)	\
-+	mxs_add_gpmi_nand(pdata, &mx28_gpmi_nand_data)
-+
- extern const struct mxs_mxs_i2c_data mx28_mxs_i2c_data[] __initconst;
- #define mx28_add_mxs_i2c(id)		mxs_add_mxs_i2c(&mx28_mxs_i2c_data[id])
- 
-diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
-index 18b6bf5..b8913df 100644
---- a/arch/arm/mach-mxs/devices/Kconfig
-+++ b/arch/arm/mach-mxs/devices/Kconfig
-@@ -12,6 +12,9 @@ config MXS_HAVE_PLATFORM_FLEXCAN
- 	select HAVE_CAN_FLEXCAN if CAN
- 	bool
- 
-+config MXS_HAVE_PLATFORM_GPMI_NAND
-+	bool
-+
- config MXS_HAVE_PLATFORM_MXS_I2C
- 	bool
- 
-diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-index f52e3e5..c8f5c95 100644
---- a/arch/arm/mach-mxs/devices/Makefile
-+++ b/arch/arm/mach-mxs/devices/Makefile
-@@ -3,6 +3,7 @@ obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
- obj-y += platform-dma.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
-+obj-$(CONFIG_MXS_HAVE_PLATFORM_GPMI_NAND) += platform-gpmi-nand.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_I2C) += platform-mxs-i2c.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_MMC) += platform-mxs-mmc.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_PWM) += platform-mxs-pwm.o
-diff --git a/arch/arm/mach-mxs/devices/platform-gpmi-nand.c b/arch/arm/mach-mxs/devices/platform-gpmi-nand.c
-new file mode 100644
-index 0000000..a8b74dc
---- /dev/null
-+++ b/arch/arm/mach-mxs/devices/platform-gpmi-nand.c
-@@ -0,0 +1,109 @@
-+/*
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
-+#include <asm/sizes.h>
-+#include <mach/mx23.h>
-+#include <mach/mx28.h>
-+#include <mach/devices-common.h>
-+#include <linux/dma-mapping.h>
-+
-+#ifdef CONFIG_SOC_IMX23
-+const struct mxs_gpmi_nand_data mx23_gpmi_nand_data __initconst = {
-+	.devid = "imx23-gpmi-nand",
-+	.res = {
-+		{	/* GPMI */
-+			.start = MX23_GPMI_BASE_ADDR,
-+			.end   = MX23_GPMI_BASE_ADDR + SZ_8K - 1,
-+			.name  = GPMI_NAND_GPMI_REGS_ADDR_RES_NAME,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = MX23_INT_GPMI_ATTENTION,
-+			.end   = MX23_INT_GPMI_ATTENTION,
-+			.name  = GPMI_NAND_GPMI_INTERRUPT_RES_NAME,
-+			.flags = IORESOURCE_IRQ,
-+		}, {	/* BCH */
-+			.start = MX23_BCH_BASE_ADDR,
-+			.end   = MX23_BCH_BASE_ADDR + SZ_8K - 1,
-+			.name  = GPMI_NAND_BCH_REGS_ADDR_RES_NAME,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = MX23_INT_BCH,
-+			.end   = MX23_INT_BCH,
-+			.name  = GPMI_NAND_BCH_INTERRUPT_RES_NAME,
-+			.flags = IORESOURCE_IRQ,
-+		}, {	/* DMA */
-+			.start	= MX23_DMA_GPMI0,
-+			.end	= MX23_DMA_GPMI3,
-+			.name  = GPMI_NAND_DMA_CHANNELS_RES_NAME,
-+			.flags = IORESOURCE_DMA,
-+		}, {
-+			.start = MX23_INT_GPMI_DMA,
-+			.end   = MX23_INT_GPMI_DMA,
-+			.name  = GPMI_NAND_DMA_INTERRUPT_RES_NAME,
-+			.flags = IORESOURCE_IRQ,
-+		},
-+	},
-+};
-+#endif
-+
-+#ifdef CONFIG_SOC_IMX28
-+const struct mxs_gpmi_nand_data mx28_gpmi_nand_data __initconst = {
-+	.devid = "imx28-gpmi-nand",
-+	.res = {
-+		{	/* GPMI */
-+			.start = MX28_GPMI_BASE_ADDR,
-+			.end   = MX28_GPMI_BASE_ADDR + SZ_8K - 1,
-+			.name  = GPMI_NAND_GPMI_REGS_ADDR_RES_NAME,
-+			.flags = IORESOURCE_MEM,
-+		 }, {
-+			.start = MX28_INT_GPMI,
-+			.end   = MX28_INT_GPMI,
-+			.name  = GPMI_NAND_GPMI_INTERRUPT_RES_NAME,
-+			.flags = IORESOURCE_IRQ,
-+		}, {	/* BCH */
-+			.start = MX28_BCH_BASE_ADDR,
-+			.end   = MX28_BCH_BASE_ADDR + SZ_8K - 1,
-+			.name  = GPMI_NAND_BCH_REGS_ADDR_RES_NAME,
-+			.flags = IORESOURCE_MEM,
-+		 }, {
-+			.start = MX28_INT_BCH,
-+			.end   = MX28_INT_BCH,
-+			.name  = GPMI_NAND_BCH_INTERRUPT_RES_NAME,
-+			.flags = IORESOURCE_IRQ,
-+		 }, {	/* DMA */
-+			.start	= MX28_DMA_GPMI0,
-+			.end	= MX28_DMA_GPMI7,
-+			.name	= GPMI_NAND_DMA_CHANNELS_RES_NAME,
-+			.flags	= IORESOURCE_DMA,
-+		 }, {
-+			.start = MX28_INT_GPMI_DMA,
-+			.end   = MX28_INT_GPMI_DMA,
-+			.name  = GPMI_NAND_DMA_INTERRUPT_RES_NAME,
-+			.flags = IORESOURCE_IRQ,
-+		},
-+	},
-+};
-+#endif
-+
-+struct platform_device *__init
-+mxs_add_gpmi_nand(const struct gpmi_nand_platform_data *pdata,
-+		const struct mxs_gpmi_nand_data *data)
-+{
-+	return mxs_add_platform_device_dmamask(data->devid, -1,
-+				data->res, GPMI_NAND_RES_SIZE,
-+				pdata, sizeof(*pdata), DMA_BIT_MASK(32));
-+}
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-index dc369c1..f2e3839 100644
---- a/arch/arm/mach-mxs/include/mach/devices-common.h
-+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-@@ -66,6 +66,16 @@ struct platform_device *__init mxs_add_flexcan(
- 		const struct mxs_flexcan_data *data,
- 		const struct flexcan_platform_data *pdata);
- 
-+/* gpmi-nand */
-+#include <linux/mtd/gpmi-nand.h>
-+struct mxs_gpmi_nand_data {
-+	const char *devid;
-+	const struct resource res[GPMI_NAND_RES_SIZE];
-+};
-+struct platform_device *__init
-+mxs_add_gpmi_nand(const struct gpmi_nand_platform_data *pdata,
-+		const struct mxs_gpmi_nand_data *data);
-+
- /* i2c */
- struct mxs_mxs_i2c_data {
- 	int id;
+On 2012?01?18? 18:20, Uwe Kleine-K?nig wrote:
+> On Wed, Jan 18, 2012 at 05:52:25PM +0800, bill4carson at gmail.com wrote:
+>> From: Bill Carson<bill4carson@gmail.com>
+>>
+>> If we are only about to clear a hardware pte entry, then pte makeup code is
+>> unnecessary for cpu_v7_set_pte_ext and armv6_set_pte_ext, so just skip it.
+>>
+>> Signed-off-by: Bill Carson<bill4carson@gmail.com>
+>> ---
+>>   arch/arm/mm/proc-macros.S    |   10 +++++-----
+>>   arch/arm/mm/proc-v7-2level.S |   10 +++++-----
+>>   2 files changed, 10 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+>> index 2d8ff3a..11288b3 100644
+>> --- a/arch/arm/mm/proc-macros.S
+>> +++ b/arch/arm/mm/proc-macros.S
+>> @@ -138,6 +138,10 @@
+>>   	.macro	armv6_set_pte_ext pfx
+>>   	str	r1, [r0], #2048			@ linux version
+>>
+>> +	tst	r1, #L_PTE_YOUNG
+>> +	tstne	r1, #L_PTE_PRESENT
+>> +	moveq	r3, #0
+>> +	moveq	set_pte
+>>   	bic	r3, r1, #0x000003fc
+>>   	bic	r3, r3, #PTE_TYPE_MASK
+>>   	orr	r3, r3, r2
+> I guess you want
+>
+> 	beq	set_pte
+>
+> instead of
+>
+> 	moveq	set_pte
+>
+> here?!
+>
+> Additionally this doesn't seem to be able to be compiled to thumb. I
+> don't know if it must be though.
+>
+Hi Uwe
+
+Thanks for your reply :) I compile with following thumb configuration
+build and run on hardware board show nothing wrong on my side.
+I am not aware of any other THUMB configuration, so could you give
+me more information about your concern ?
+
+iamroot at iamroot-OptiPlex-780:~/workbench/vm_zone/linux/linux-2.6$ cat 
+.config | grep THUMB
+CONFIG_ARM_THUMB=y
+CONFIG_ARM_THUMBEE=y
+CONFIG_THUMB2_KERNEL=y
+CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11=y
+CONFIG_XZ_DEC_ARMTHUMB=y
+
+
+00000028 <cpu_v7_set_pte_ext>:
+28: 6001 str r1, [r0, #0]
+2a: f011 0f02 tst.w r1, #2
+2e: bf12 itee ne
+30: f011 0f01 tstne.w r1, #1
+34: 2300 moveq r3, #0
+36: e01d beq.n 74 <cpu_v7_set_pte_ext+0x4c>
+38: f421 737c bic.w r3, r1, #1008 ; 0x3f0
+3c: f023 0303 bic.w r3, r3, #3
+40: ea43 0302 orr.w r3, r3, r2
+44: f043 0312 orr.w r3, r3, #18
+48: f011 0f10 tst.w r1, #16
+4c: bf18 it ne
+4e: f043 0340 orrne.w r3, r3, #64 ; 0x40
+52: f081 0140 eor.w r1, r1, #64 ; 0x40
+56: f011 0fc0 tst.w r1, #192 ; 0xc0
+5a: bf18 it ne
+5c: f443 7300 orrne.w r3, r3, #512 ; 0x200
+60: f411 7f80 tst.w r1, #256 ; 0x100
+64: bf18 it ne
+66: f043 0320 orrne.w r3, r3, #32
+6a: f411 7f00 tst.w r1, #512 ; 0x200
+6e: bf18 it ne
+70: f043 0301 orrne.w r3, r3, #1
+74: f500 6000 add.w r0, r0, #2048 ; 0x800
+78: 6003 str r3, [r0, #0]
+7a: ee07 0f3a mcr 15, 0, r0, cr7, cr10, {1}
+7e: 46f7 mov pc, lr
+
+
+
+>> @@ -163,11 +167,7 @@
+>>   	orrne	r3, r3, #PTE_EXT_XN
+>>
+>>   	orr	r3, r3, r2
+>> -
+>> -	tst	r1, #L_PTE_YOUNG
+>> -	tstne	r1, #L_PTE_PRESENT
+>> -	moveq	r3, #0
+>> -
+>> +set_pte:
+> Best regards
+> Uwe
+>
+
 -- 
-1.7.0.4
+I am a slow learner
+but I will keep trying to fight for my dreams!
+
+--bill
