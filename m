@@ -1,27 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jan 2012 20:21:39 -0800
-Subject: [PATCH V2] arm/tegra: Support Tegra30 in decompressor UART setup
-In-Reply-To: <1325628347-22140-1-git-send-email-swarren@nvidia.com>
-References: <1325628347-22140-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120119042139.GD7145@quad.lixom.net>
+Date: Wed, 18 Jan 2012 20:42:44 -0800
+Subject: [PATCH 0/4] ARM: tegra: Automatic UART selection for earlyprintk
+In-Reply-To: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
+References: <1325629520-23018-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20120119044244.GE7145@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2012 at 03:05:47PM -0700, Stephen Warren wrote:
-> On Tegra20, the UART clock runs at 216MHz, whereas on Tegra30 it runs at
-> 408MHz. Modify arch_decomp_setup() to detect Tegra20-vs-Tegra30 at run-
-> time, and program the correct divisor.
+On Tue, Jan 03, 2012 at 03:25:16PM -0700, Stephen Warren wrote:
+> This series allows a Tegra zImage to automatically select the UART to use
+> for the zImage decompressor and early printk, based on information from
+> the bootloader. The code scans each UART, looking for one that is clocked,
+> is out of reset, and that the bootloader has written 'D' (for 'D'ebug) to
+> the scratch register.
 > 
-> This makes uncompressor messages work correctly on Tegra30. This also
-> fixes early printk, assuming zImage is used and this setup code runs.
+> At present, the ChromiumOS branch of U-Boot sets up UARTs in this way. If
+> this patch is accepted into the kernel, I'll upstream the U-Boot change to
+> mainline U-Boot.
 > 
-> v2: Use CHIPID register to differentiate between chips, rather than a
-> GIC register. This should be more future-proof. Volatile is required
-> to prevent the compiler transforming the 32-bit apb_misc register read
-> into an 8-bit read of address 1 higher, since the HW only supports 32-
-> bit accesses, and will hang on an 8-bit access.
+> This is important, since different boards use different UARTs, and it's
+> nice not to have to configure the kernel differently when switching
+> boards.
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> This patch series depends on patch "[PATCH V2] arm/tegra: Support Tegra30
+> in decompressor UART setup" for context.
+> 
+> Doug Anderson (2):
+>   ARM: tegra: Introduce define DEBUG_UART_SHIFT
+>   ARM: tegra: uncompress.h: Store UART address in a variable
+> 
+> Stephen Warren (2):
+>   ARM: tegra: uncompress.h: Choose a UART at runtime
+>   ARM: tegra: Pass uncompress.h UART selection to DEBUG_LL
 
 Thanks, applied.
 
