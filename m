@@ -1,45 +1,59 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Thu, 19 Jan 2012 17:48:52 +0530
-Subject: [RFC v2 PATCH 1/3] dt: device tree bindings for DDR memories
-In-Reply-To: <4EF034C0.9070401@ti.com>
-References: <1324303533-17458-1-git-send-email-aneesh@ti.com>	<1324303533-17458-2-git-send-email-aneesh@ti.com>
- <CAOesGMjOybCbu1Bgxe0Te=XANVOqOPcaDOL_6c4=pVCxzu9ZnA@mail.gmail.com>
- <4EF034C0.9070401@ti.com>
-Message-ID: <4F180A2C.8060405@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jan 2012 12:23:36 +0000
+Subject: [RFC PATCH 0/5] ARM: introducing DT topology
+In-Reply-To: <20120119121832.GD9268@arm.com>
+References: <1326897408-11204-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120118162423.GK1068@n2100.arm.linux.org.uk>
+ <20120118175028.GD9691@e102568-lin.cambridge.arm.com>
+ <20120118180453.GN1068@n2100.arm.linux.org.uk>
+ <20120119121832.GD9268@arm.com>
+Message-ID: <20120119122336.GY1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Thu, Jan 19, 2012 at 12:18:32PM +0000, Catalin Marinas wrote:
+> On Wed, Jan 18, 2012 at 06:04:53PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 18, 2012 at 05:50:28PM +0000, Lorenzo Pieralisi wrote:
+> > > > This sounds like you're saying that the contents of MPIDR might be buggy
+> > > > sometime in the future?  Do we actually know of any situations where the
+> > > > information in there is currently wrong (outside of the development lab)?
+> > > > If not, it's not something we should cater for until it's actually happened,
+> > > > and then the pain should be felt by those silly enough to allow the chip
+> > > > to go out the door.
+> > > 
+> > > I share your view Russell. Having said that: MPIDR is IMPLEMENTATION DEFINED.
+> > 
+> > I'll assume you mean that it's left to the implementation to set MPIDR
+> > appropriately, and you're expecting implementations to make mistakes
+> > with it.
+> 
+> I think what Lorenzo means is that MPIDR is indeed a mandated register
+> with certain bits specified by the ARM ARM. However, the affinity bits
+> are left to the implementation. The ARM ARM makes recommendations and
+> gives some examples but they are not mandatory. An implementer is under
+> no legal obligation to follow the examples. It is not that unlikely that
+> someone in the future may use a different cluster/processor counting
+> scheme than ours. Also in the context of virtualisation, the lower
+> affinity field may be used for virtual CPUs counting).
 
-On Tuesday 20 December 2011 12:39 PM, Aneesh V wrote:
-> Hi Olof,
->
-> On Monday 19 December 2011 10:22 PM, Olof Johansson wrote:
->> Hi,
->>
->> Some comments below, but also a more general question: How much of
->> this generic data makes sense to encode in the device tree? Final
->> hardware configuration usually has to take into consideration board
->> layout/signal delays, etc, and that's not part of this binding.
+So what you're saying is that the definition of this register has become
+soo loose that it's completely useless.  Oh what a really great move.
 
-When I was looking at your comments again for fixing them, I just
-realized that I hadn't answered part of this question. In the recent
-OMAPs, memory chips are stacked on to the OMAP, hence board layout etc
-doesn't figure in the equation. The only board level details that we
-need to program the memory controller are the details about the memory
-device itself, which is what this binding is targeting.
+Your designers really need their heads bashed against a brick wall to
+knock some sense into them over stuff like this.  It's exactly this
+kind of idiotic 'infinite flexibility' that Linus had a moan about
+last year.
 
->
-> The JEDEC specifies base values for all timing parameters. But Vendors
-> can improve on these timings and provide better values. Using device
-> specific timing values therefore provides scope for optimization.
->
-> Everything that I have encoded here is needed by our driver to
-> re-configure our SDRAM controller during DVFS. In fact, I have not
-> listed all AC timing parameters in the spec in this binding, leaving
-> the rest for future users to add if they need them.
->
+What it means is that we need _more_ code to support whatever
+manufacturers come up in their scheme of things - rather than having
+a standard way to represent these details, which software can parse
+in a consistent way.
 
+Instead, we have something that's effectively mandated to be present
+but is basically useless because no software can parse it properly
+without specific information from the manufacturer, and even then
+its not guaranteed.
 
-br,
-Aneesh
+Well done ARM Ltd.  Again.
+
+Stop doing this.
