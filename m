@@ -1,202 +1,82 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Thu, 19 Jan 2012 12:01:34 +1100
-Subject: [PATCH 3/3] mfd: mc13xxx-core: Add i2c driver
-In-Reply-To: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
-References: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1326934894-29516-4-git-send-email-marc@cpdesign.com.au>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Thu, 19 Jan 2012 09:21:51 +0800
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+ <20120109224945.GA23090@mudshark.cambridge.arm.com>
+ <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+ <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
+ <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
+ <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
+Message-ID: <CACVXFVOQNDRs=c8A2YC+WvYAHs5Abbz-QUEe1VJqrj2esFO11g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for mc13xxx family ICs connected via i2c.
+Hi,
 
-Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
----
- drivers/mfd/Kconfig         |    8 +++-
- drivers/mfd/Makefile        |    1 +
- drivers/mfd/mc13xxx-i2c.c   |  120 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/mc13xxx.h |    5 ++-
- 4 files changed, 132 insertions(+), 2 deletions(-)
- create mode 100644 drivers/mfd/mc13xxx-i2c.c
+On Thu, Jan 19, 2012 at 5:58 AM, stephane eranian
+<eranian@googlemail.com> wrote:
+> Ming,
+>
+> Ok, so I used Linus' tree @
+>
+> It already includes patches #1 and #2. I applied 4-6.
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 6cf84c8..08afc84 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -515,7 +515,7 @@ config MFD_MC13783
- 
- config MFD_MC13XXX
- 	tristate "Support Freescale MC13783 or MC13892"
--	depends on SPI_MASTER
-+	depends on SPI_MASTER || I2C
- 	select MFD_CORE
- 	select MFD_MC13783
- 	help
-@@ -538,6 +538,12 @@ config MFD_MC13XXX_SPI
- 	help
- 	  Select this if your MC13xxx is connected via an SPI bus.
- 
-+config MFD_MC13XXX_I2C
-+	tristate "I2C interface"
-+	depends on I2C
-+	help
-+	  Select this if your MC13xxx is connected via an I2C bus.
-+
- endchoice
- 
- config ABX500_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 3856820..5db8b76 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -52,6 +52,7 @@ obj-$(CONFIG_TWL6040_CORE)	+= twl6040-core.o twl6040-irq.o
- 
- obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
- obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
-+obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
- 
- obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
- 
-diff --git a/drivers/mfd/mc13xxx-i2c.c b/drivers/mfd/mc13xxx-i2c.c
-new file mode 100644
-index 0000000..9965481
---- /dev/null
-+++ b/drivers/mfd/mc13xxx-i2c.c
-@@ -0,0 +1,120 @@
-+/*
-+ * Copyright 2009-2010 Creative Product Design
-+ * Marc Reilly marc at cpdesign.com.au
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/mutex.h>
-+#include <linux/mfd/core.h>
-+#include <linux/mfd/mc13xxx.h>
-+#include <linux/i2c.h>
-+
-+static int mc13xxx_i2c_reg_read(struct mc13xxx *mc13xxx, unsigned int offset,
-+		u32 *val)
-+{
-+	int ret;
-+	unsigned char buf[3] = {0, 0, 0};
-+
-+	ret = i2c_smbus_read_i2c_block_data(mc13xxx->i2cclient,
-+			offset, 3, buf);
-+	*val = buf[0] << 16 | buf[1] << 8 | buf[2];
-+
-+	return ret == 3 ? 0 : ret;
-+}
-+
-+static int mc13xxx_i2c_reg_write(struct mc13xxx *mc13xxx, unsigned int offset,
-+		u32 val)
-+{
-+	int ret;
-+	unsigned char buf[3];
-+
-+	buf[0] = (val >> 16) & 0xff;
-+	buf[1] = (val >> 8) & 0xff;
-+	buf[2] = val & 0xff;
-+
-+	ret = i2c_smbus_write_i2c_block_data(mc13xxx->i2cclient,
-+			offset, 3, buf);
-+
-+	return ret;
-+}
-+
-+static int mc13xxx_i2c_probe(struct i2c_client *client,
-+		const struct i2c_device_id *id)
-+{
-+	struct mc13xxx *mc13xxx;
-+	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
-+	int ret;
-+
-+	if (!pdata) {
-+		dev_err(&client->dev, "invalid platform data\n");
-+		return -EINVAL;
-+	}
-+
-+	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-+	if (!mc13xxx)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(&client->dev, mc13xxx);
-+	mc13xxx->dev = &client->dev;
-+	mc13xxx->i2cclient = client;
-+	mc13xxx->read_dev = mc13xxx_i2c_reg_read;
-+	mc13xxx->write_dev = mc13xxx_i2c_reg_write;
-+
-+	ret = mc13xxx_common_init(mc13xxx, pdata, client->irq);
-+
-+	if (ret == 0 && (id->driver_data != mc13xxx->ictype))
-+		dev_warn(mc13xxx->dev,
-+				"device id doesn't match auto detection!\n");
-+
-+	return ret;
-+}
-+
-+static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-+{
-+	struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
-+
-+	free_irq(client->irq, mc13xxx);
-+
-+	mfd_remove_devices(&client->dev);
-+
-+	kfree(mc13xxx);
-+
-+	return 0;
-+}
-+
-+static const struct i2c_device_id mc13xxx_i2c_idtable[] = {
-+	{"mc13892", MC13XXX_ID_MC13892},
-+	{ }
-+};
-+
-+static struct i2c_driver mc13xxx_i2c_driver = {
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "mc13xxx-i2c"
-+	},
-+	.id_table = mc13xxx_i2c_idtable,
-+	.probe = mc13xxx_i2c_probe,
-+	.remove = __devexit_p(mc13xxx_i2c_remove),
-+};
-+
-+static int __init mc13xxx_i2c_init(void)
-+{
-+	return i2c_add_driver(&mc13xxx_i2c_driver);
-+}
-+subsys_initcall(mc13xxx_i2c_init);
-+
-+static void __exit mc13xxx_i2c_exit(void)
-+{
-+	i2c_del_driver(&mc13xxx_i2c_driver);
-+}
-+module_exit(mc13xxx_i2c_exit);
-+
-+MODULE_DESCRIPTION("i2c driver for Freescale MC13XXX PMIC");
-+MODULE_AUTHOR("Marc Reilly <marc@cpdesign.com.au");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
-index abf77d3..c17fc60 100644
---- a/include/linux/mfd/mc13xxx.h
-+++ b/include/linux/mfd/mc13xxx.h
-@@ -76,7 +76,10 @@ enum mc13xxx_id {
- };
- 
- struct mc13xxx {
--	struct spi_device *spidev;
-+	union {
-+		struct spi_device *spidev;
-+		struct i2c_client *i2cclient;
-+	};
- 
- 	struct device *dev;
- 	enum mc13xxx_id ictype;
--- 
-1.7.3.4
+The patch #3 is missed?
+
+> Recompiled but my kernel does not boot, I don't see
+> anything on the serial console. Could be a broken
+
+I don't think that the patches can cause your non boot, you
+can try the linus tree kernel first, then try the patches.
+
+> .config file. Could you send me your .config for Panda?
+
+See the attachment.
+
+>
+> Thanks.
+>
+> On Wed, Jan 18, 2012 at 11:07 AM, Ming Lei <ming.lei@canonical.com> wrote:
+>> Hi,
+>>
+>> On Wed, Jan 18, 2012 at 5:54 PM, stephane eranian <eranian@googlemail.com>
+>>> Should I use Will's -next tree as the base instead of Linus'?
+>>
+>> Either one is OK. If you use linus tree as base, you need to apply the #1 and
+>> #2 patch manually.
+>>
+>>> Given that MARC is shutdown today, would you mind packing those patches
+>>> into a tarball and sending them to me directly?
+>>
+>> See attachment, which includes the patches from #3 to #6.
+>>
+>>>
+>>> When you mention Will's -next tree, are you talking about:
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-next/perf
+>>
+>> It is perf/omap4 brach, you can pick up the two patches[1][2] directly from
+>> the branch.
+>>
+>>
+>> thanks,
+>> --
+>> Ming Lei
+>>
+>> [1], http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commit;h=7924a3eba0766348d6d6a56cbb9873cdbcab0d8c
+>>
+>> [2], http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commit;h=bde071f005e2dc71378aff69e86b961d8cd7922f
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: conf.tar.gz
+Type: application/x-gzip
+Size: 16252 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120119/2a4482db/attachment-0001.gz>
