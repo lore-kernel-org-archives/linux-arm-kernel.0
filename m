@@ -1,78 +1,90 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 Jan 2012 22:25:49 +0100
-Subject: [PATCH] integrator: implement sched_clock across all boards
-Message-ID: <1327008349-8652-1-git-send-email-linus.walleij@linaro.org>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 19 Jan 2012 22:35:05 +0100
+Subject: [PATCH] Documentation/pinctrl: fix a few syntax errors in code
+ examples
+In-Reply-To: <1323383765-30742-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1323383765-30742-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1327008905-20544-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can select a sched_clock at runtime, let's implement
-it for the Integrator AP, default-select the one found in all
-other board it for all plat-versatile boards and make the right
-clock kick in at runtime.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-integrator/Kconfig         |    1 +
- arch/arm/mach-integrator/integrator_ap.c |    7 +++++++
- arch/arm/plat-versatile/Kconfig          |    2 +-
- 3 files changed, 9 insertions(+), 1 deletions(-)
+Hello,
 
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index 350e266..5a6148a 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -5,6 +5,7 @@ menu "Integrator Options"
- config ARCH_INTEGRATOR_AP
- 	bool "Support Integrator/AP and Integrator/PP2 platforms"
- 	select CLKSRC_MMIO
-+	select HAVE_SCHED_CLOCK
- 	select MIGHT_HAVE_PCI
- 	select SERIAL_AMBA_PL010
- 	select SERIAL_AMBA_PL010_CONSOLE
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 21a1d6c..4dde28b 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -42,6 +42,7 @@
- #include <asm/setup.h>
- #include <asm/param.h>		/* HZ */
- #include <asm/mach-types.h>
-+#include <asm/sched_clock.h>
+this is what's left from the patch I sent in the mail with message-id
+1323383765-30742-1-git-send-email-u.kleine-koenig at pengutronix.de after
+rebasing to current linus/master. The original submission got an ack by
+Stephen Warren that I assumed for this patch, too.
+
+Best regards
+Uwe
+
+ Documentation/pinctrl.txt |   15 +++++++--------
+ 1 files changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+index 6727b92..5324d31 100644
+--- a/Documentation/pinctrl.txt
++++ b/Documentation/pinctrl.txt
+@@ -857,42 +857,41 @@ case), we define a mapping like this:
  
- #include <mach/lm.h>
- 
-@@ -325,6 +326,11 @@ static void __init ap_init(void)
- 
- static unsigned long timer_reload;
- 
-+static u32 notrace integrator_read_sched_clock(void)
-+{
-+	return -readl((void __iomem *) TIMER2_VA_BASE + TIMER_VALUE);
-+}
-+
- static void integrator_clocksource_init(unsigned long inrate)
+ ...
  {
- 	void __iomem *base = (void __iomem *)TIMER2_VA_BASE;
-@@ -341,6 +347,7 @@ static void integrator_clocksource_init(unsigned long inrate)
+-	.name "2bit"
++	.name = "2bit"
+ 	.ctrl_dev_name = "pinctrl-foo",
+ 	.function = "mmc0",
+ 	.group = "mmc0_1_grp",
+ 	.dev_name = "foo-mmc.0",
+ },
+ {
+-	.name "4bit"
++	.name = "4bit"
+ 	.ctrl_dev_name = "pinctrl-foo",
+ 	.function = "mmc0",
+ 	.group = "mmc0_1_grp",
+ 	.dev_name = "foo-mmc.0",
+ },
+ {
+-	.name "4bit"
++	.name = "4bit"
+ 	.ctrl_dev_name = "pinctrl-foo",
+ 	.function = "mmc0",
+ 	.group = "mmc0_2_grp",
+ 	.dev_name = "foo-mmc.0",
+ },
+ {
+-	.name "8bit"
++	.name = "8bit"
+ 	.ctrl_dev_name = "pinctrl-foo",
+-	.function = "mmc0",
+ 	.group = "mmc0_1_grp",
+ 	.dev_name = "foo-mmc.0",
+ },
+ {
+-	.name "8bit"
++	.name = "8bit"
+ 	.ctrl_dev_name = "pinctrl-foo",
+ 	.function = "mmc0",
+ 	.group = "mmc0_2_grp",
+ 	.dev_name = "foo-mmc.0",
+ },
+ {
+-	.name "8bit"
++	.name = "8bit"
+ 	.ctrl_dev_name = "pinctrl-foo",
+ 	.function = "mmc0",
+ 	.group = "mmc0_3_grp",
+@@ -995,7 +994,7 @@ This is enabled by simply setting the .hog_on_boot field in the map to true,
+ like this:
  
- 	clocksource_mmio_init(base + TIMER_VALUE, "timer2",
- 			rate, 200, 16, clocksource_mmio_readl_down);
-+	setup_sched_clock(integrator_read_sched_clock, 16, rate);
- }
- 
- static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
-diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
-index 52353be..aa63f38 100644
---- a/arch/arm/plat-versatile/Kconfig
-+++ b/arch/arm/plat-versatile/Kconfig
-@@ -11,7 +11,7 @@ config PLAT_VERSATILE_LEDS
- 	depends on ARCH_REALVIEW || ARCH_VERSATILE
- 
- config PLAT_VERSATILE_SCHED_CLOCK
--	def_bool y if !ARCH_INTEGRATOR_AP
-+	def_bool y
- 	select HAVE_SCHED_CLOCK
- 
- endif
+ {
+-	.name "POWERMAP"
++	.name = "POWERMAP"
+ 	.ctrl_dev_name = "pinctrl-foo",
+ 	.function = "power_func",
+ 	.hog_on_boot = true,
 -- 
-1.7.7.5
+1.7.8.3
