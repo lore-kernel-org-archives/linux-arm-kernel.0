@@ -1,159 +1,81 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 19 Jan 2012 22:42:48 +0100
-Subject: [PATCH] pinctrl: unbreak error messages
-Message-ID: <1327009368-23624-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 19 Jan 2012 15:07:37 -0700
+Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
+ tile (TC1 variant)
+In-Reply-To: <alpine.LFD.2.02.1201191305180.19587@xanadu.home>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
+ <4F0C495C.4000103@citrix.com>
+ <1326979652.32197.66.camel@hornet.cambridge.arm.com>
+ <4F181BD9.20401@gmail.com>
+ <1326980594.32197.67.camel@hornet.cambridge.arm.com>
+ <4F182248.7070209@gmail.com>
+ <1326984672.32197.68.camel@hornet.cambridge.arm.com>
+ <4F184C48.2050505@citrix.com>
+ <1326994035.13748.7.camel@hornet.cambridge.arm.com>
+ <20120119175053.GE10404@n2100.arm.linux.org.uk>
+ <CACxGe6tWCd83qcfAv8=x3mdGNHR6xEnS=Gyq=bnWxRw22M4QXA@mail.gmail.com>
+ <alpine.LFD.2.02.1201191305180.19587@xanadu.home>
+Message-ID: <CACxGe6vBkOH1c3mOdY2qJbZ=miuU-WkxHZbJxBtsrhzwMGydcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's better to not line break error messages to allow easier grepping
-for them even when the line gets >80 chars. Additionally some minor
-reformating is done.
+On Thu, Jan 19, 2012 at 11:09 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Thu, 19 Jan 2012, Grant Likely wrote:
+>
+>> On Thu, Jan 19, 2012 at 10:50 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Jan 19, 2012 at 05:27:15PM +0000, Pawel Moll wrote:
+>> >> On Thu, 2012-01-19 at 17:00 +0000, David Vrabel wrote:
+>> >> > The problem wasn't with including skeleton.dtsi.
+>> >>
+>> >> Including as it is creates two device_type="memory" nodes, one with
+>> >> regs=<0 0>, which is definitely wrong.
+>> >>
+>> >> > With
+>> >> > CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
+>> >> > DTB using information from the ATAGs (see atags_to_fdt()).
+>> >> >
+>> >> > If there's an ATAG giving the amount of RAM the DTB's "memory" node is
+>> >> > replaced with a new one. ?Since the vexpress DTBs don't have a "memory"
+>> >> > node it's added and the DTB ends up with two nodes describing memory.
+>> >>
+>> >> The "memory at address" node name is in my opinion perfectly legal - p. 3.4
+>> >> of the DT spec says "The name component of the node name (see 2.2.1)
+>> >> shall be memory.". So the decompressor code may be wrong in looking for
+>> >> adress-less "memory" node...
+>> >
+>> > I don't think you can expect such early code to properly parse a DT tree
+>> > with a variability in how memory stuff is declared into that DT tree.
+>> >
+>> > What if you have two memory nodes specified in the DT file, and the
+>> > ATAG data contains one?
+>>
+>> Yes, just because it is technically legal doesn't make it okay. ?The
+>> pragmatic approach here is that the skeleton.dtsi file calls the node
+>> "memory", so this .dts file must do the same.
+>>
+>> > The more I look at this, the more I'm convinced that Grant's idea that
+>> > DT should entirely override ATAGs all the way to the kernel proper was
+>> > the wrong solution - at least in the kernel, if we had both available,
+>> > we could make a choice there, and have the full DT library to be able
+>> > to manipulate the DT blob.
+>>
+>> Hey! ?I was originally lobbying for the dt pointer carried by an ATAG.
+>> ?Nico conviced me otherwise. ?:-)
+>
+> Hey! ?I was originally lobbying for people to have a fully DT aware
+> bootloader if they wanted to play with DT, otherwise there is no
+> incentive for updated bootloaders. ?But someone else convinced me
+> otherwise. ?:-)
+>
+> Mixed bags always have loose ends.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/pinctrl/pinmux.c |   46 +++++++++++++++++++---------------------------
- 1 files changed, 19 insertions(+), 27 deletions(-)
+Hahaha.  Having said that though, I still strongly agree with what we
+have.  Giving the kernel only one or the other avoids any weirdness
+about which the kernel should choose when both are present.  The
+bootwrapper atag-to-dt conversion is a migration and development tool,
+and it should not do any DT manipulation must be kept to a bare
+minimum.
 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index a76a348..0b22037 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -152,8 +152,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
- 		status = 0;
- 
- 	if (status)
--		dev_err(pctldev->dev, "->request on device %s failed "
--		       "for pin %d\n",
-+		dev_err(pctldev->dev, "->request on device %s failed for pin %d\n",
- 		       pctldev->desc->name, pin);
- out_free_pin:
- 	if (status) {
-@@ -355,21 +354,20 @@ int __init pinmux_register_mappings(struct pinmux_map const *maps,
- 	/* First sanity check the new mapping */
- 	for (i = 0; i < num_maps; i++) {
- 		if (!maps[i].name) {
--			pr_err("failed to register map %d: "
--			       "no map name given\n", i);
-+			pr_err("failed to register map %d: no map name given\n",
-+					i);
- 			return -EINVAL;
- 		}
- 
- 		if (!maps[i].ctrl_dev && !maps[i].ctrl_dev_name) {
--			pr_err("failed to register map %s (%d): "
--			       "no pin control device given\n",
-+			pr_err("failed to register map %s (%d): no pin control device given\n",
- 			       maps[i].name, i);
- 			return -EINVAL;
- 		}
- 
- 		if (!maps[i].function) {
--			pr_err("failed to register map %s (%d): "
--			       "no function ID given\n", maps[i].name, i);
-+			pr_err("failed to register map %s (%d): no function ID given\n",
-+					maps[i].name, i);
- 			return -EINVAL;
- 		}
- 
-@@ -442,8 +440,7 @@ static int acquire_pins(struct pinctrl_dev *pctldev,
- 		ret = pin_request(pctldev, pins[i], func, NULL);
- 		if (ret) {
- 			dev_err(pctldev->dev,
--				"could not get pin %d for function %s "
--				"on device %s - conflicting mux mappings?\n",
-+				"could not get pin %d for function %s on device %s - conflicting mux mappings?\n",
- 				pins[i], func ? : "(undefined)",
- 				pinctrl_dev_get_name(pctldev));
- 			/* On error release all taken pins */
-@@ -473,8 +470,7 @@ static void release_pins(struct pinctrl_dev *pctldev,
- 	ret = pctlops->get_group_pins(pctldev, group_selector,
- 				      &pins, &num_pins);
- 	if (ret) {
--		dev_err(pctldev->dev, "could not get pins to release for "
--			"group selector %d\n",
-+		dev_err(pctldev->dev, "could not get pins to release for group selector %d\n",
- 			group_selector);
- 		return;
- 	}
-@@ -526,8 +522,7 @@ static int pinmux_check_pin_group(struct pinctrl_dev *pctldev,
- 		ret = pinctrl_get_group_selector(pctldev, groups[0]);
- 		if (ret < 0) {
- 			dev_err(pctldev->dev,
--				"function %s wants group %s but the pin "
--				"controller does not seem to have that group\n",
-+				"function %s wants group %s but the pin controller does not seem to have that group\n",
- 				pmxops->get_function_name(pctldev, func_selector),
- 				groups[0]);
- 			return ret;
-@@ -535,8 +530,7 @@ static int pinmux_check_pin_group(struct pinctrl_dev *pctldev,
- 
- 		if (num_groups > 1)
- 			dev_dbg(pctldev->dev,
--				"function %s support more than one group, "
--				"default-selecting first group %s (%d)\n",
-+				"function %s support more than one group, default-selecting first group %s (%d)\n",
- 				pmxops->get_function_name(pctldev, func_selector),
- 				groups[0],
- 				ret);
-@@ -628,10 +622,8 @@ static int pinmux_enable_muxmap(struct pinctrl_dev *pctldev,
- 
- 	if (pmx->pctldev && pmx->pctldev != pctldev) {
- 		dev_err(pctldev->dev,
--			"different pin control devices given for device %s, "
--			"function %s\n",
--			devname,
--			map->function);
-+			"different pin control devices given for device %s, function %s\n",
-+			devname, map->function);
- 		return -EINVAL;
- 	}
- 	pmx->dev = dev;
-@@ -695,7 +687,6 @@ static void pinmux_free_groups(struct pinmux *pmx)
-  */
- struct pinmux *pinmux_get(struct device *dev, const char *name)
- {
--
- 	struct pinmux_map const *map = NULL;
- 	struct pinctrl_dev *pctldev = NULL;
- 	const char *devname = NULL;
-@@ -745,8 +736,7 @@ struct pinmux *pinmux_get(struct device *dev, const char *name)
- 			else if (map->ctrl_dev_name)
- 				devname = map->ctrl_dev_name;
- 
--			pr_warning("could not find a pinctrl device for pinmux "
--				   "function %s, fishy, they shall all have one\n",
-+			pr_warning("could not find a pinctrl device for pinmux function %s, fishy, they shall all have one\n",
- 				   map->function);
- 			pr_warning("given pinctrl device name: %s",
- 				   devname ? devname : "UNDEFINED");
-@@ -932,8 +922,8 @@ static int pinmux_hog_map(struct pinctrl_dev *pctldev,
- 		 * without any problems, so then we can hog pinmuxes for
- 		 * all devices that just want a static pin mux at this point.
- 		 */
--		dev_err(pctldev->dev, "map %s wants to hog a non-system "
--			"pinmux, this is not going to work\n", map->name);
-+		dev_err(pctldev->dev, "map %s wants to hog a non-system pinmux, this is not going to work\n",
-+				map->name);
- 		return -EINVAL;
- 	}
- 
-@@ -1122,13 +1112,15 @@ static int pinmux_show(struct seq_file *s, void *what)
- 
- 		seq_printf(s, "device: %s function: %s (%u),",
- 			   pinctrl_dev_get_name(pmx->pctldev),
--			   pmxops->get_function_name(pctldev, pmx->func_selector),
-+			   pmxops->get_function_name(pctldev,
-+				   pmx->func_selector),
- 			   pmx->func_selector);
- 
- 		seq_printf(s, " groups: [");
- 		list_for_each_entry(grp, &pmx->groups, node) {
- 			seq_printf(s, " %s (%u)",
--				   pctlops->get_group_name(pctldev, grp->group_selector),
-+				   pctlops->get_group_name(pctldev,
-+					   grp->group_selector),
- 				   grp->group_selector);
- 		}
- 		seq_printf(s, " ]");
--- 
-1.7.8.3
+g.
