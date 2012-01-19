@@ -1,35 +1,55 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2012 14:53:13 +0000
-Subject: [PATCH] ARM: mx28: Clear CLKGATE bit prior to changing DIV field
-In-Reply-To: <20120119031726.GA2247@S2101-09.ap.freescale.net>
-References: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
- <20246.30805.391940.766120@ipc1.ka-ro>
- <CAOMZO5B3qRowaQ9c_=pyykvp5x5f2nTgticV0tCcHGAYD007MQ@mail.gmail.com>
- <20120119031726.GA2247@S2101-09.ap.freescale.net>
-Message-ID: <20120119145313.GZ1068@n2100.arm.linux.org.uk>
+Date: Thu, 19 Jan 2012 15:31:49 +0000
+Subject: [PATCH 00/11] Recently pending ARM fixes
+Message-ID: <20120119153149.GB1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 11:17:34AM +0800, Shawn Guo wrote:
-> >From power saving point of view, I'm not sure you want to keep saif
-> clock on all the time.  So if the clock is off when you try to call
-> clk_set_rate(), you may want to turn it back to off after clk_set_rate()
-> is done.
+Below is a summary of a new set of ARM fixes which I've queued up
+today (so far).  The big one is the revert of the changes to
+rtc-sa1100.c, which completely broke the driver.  Of the remainder,
+the bulk are sorting out a few section mismatch warnings.
 
-You really shouldn't expose these kinds of SoC specific oddities outside
-of the API - it makes a mockery of having an API in the first place.
+The two remaining patches fix a build error with collie and some
+RCU problems seen on SMP platforms, and two other minor patches.
 
-Can you not do:
+Most people won't have much interest in this set of fixes, except
+for the rcu patch, so I probably won't push this to Linus for a
+few days (which means the number could grow.)
 
-clk_set_rate(clk, rate)
-{
-	clk_prepare(clk);
+ arch/arm/Kconfig                  |    2 +-
+ arch/arm/kernel/setup.c           |    3 +-
+ arch/arm/kernel/smp.c             |   10 +-
+ arch/arm/mach-pxa/devices.c       |   20 ---
+ arch/arm/mach-pxa/pxa25x.c        |    2 -
+ arch/arm/mach-pxa/pxa27x.c        |    2 -
+ arch/arm/mach-pxa/pxa300.c        |    1 -
+ arch/arm/mach-pxa/pxa320.c        |    1 -
+ arch/arm/mach-pxa/pxa3xx.c        |    1 -
+ arch/arm/mach-pxa/pxa95x.c        |    1 -
+ arch/arm/mach-sa1100/clock.c      |   91 +++--------
+ arch/arm/mach-sa1100/collie.c     |    5 +-
+ arch/arm/mach-sa1100/cpu-sa1100.c |    2 +-
+ arch/arm/mach-sa1100/generic.c    |   20 ---
+ arch/arm/mach-vexpress/ct-ca9x4.c |    4 +-
+ arch/arm/mm/init.c                |    2 +-
+ drivers/rtc/Kconfig               |    2 +-
+ drivers/rtc/rtc-sa1100.c          |  295 ++++++++++++++-----------------------
+ 18 files changed, 155 insertions(+), 309 deletions(-)
 
-	reprogram_clock(clk);
+Fabio Estevam (1):
+      ARM: 7277/1: setup.c: Fix build warning by removing unneeded header file
 
-	clk_unprepare(clk);
-}
+Kees Cook (1):
+      ARM: 7279/1: standardize /proc/iomem "Kernel code" name
 
-A clk_prepare() call on an already prepared clock should have no impact
-other than incrementing the counter, which will be balanced on the other
-side by the clk_unprepare().
+Russell King (9):
+      Revert "ARM: sa1100: clean up of the clock support"
+      Revert "ARM: pxa: add dummy clock for sa1100-rtc"
+      Revert "RTC: sa1100: support sa1100, pxa and mmp soc families"
+      Revert "RTC: sa1100: remove redundant code of setting alarm"
+      ARM: sa11x0: fix collie build error
+      ARM: sa11x0: fix section mismatch in cpu-sa1100.c
+      ARM: fix a section mismatch warning with our use of memblock
+      ARM: vexpress: fix two section mismatch warnings
+      ARM: fix rcu stalls on SMP platforms
