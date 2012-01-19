@@ -1,174 +1,98 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2012 15:32:44 +0000
-Subject: [PATCH 01/11] Revert "ARM: sa1100: clean up of the clock support"
+Date: Thu, 19 Jan 2012 15:33:04 +0000
+Subject: [PATCH 02/11] Revert "ARM: pxa: add dummy clock for sa1100-rtc"
 In-Reply-To: <20120119153149.GB1068@n2100.arm.linux.org.uk>
 References: <20120119153149.GB1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rntym-0002pJ-LJ@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rntz6-0002pN-UE@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit edf3ff5bac2582b57de4e7c6569fee5d7c1c0a42.
+This reverts commit 7557c175f60d8d40baf16b22caf79beadef8f081.
 
 This revert is necessary to revert the broken "RTC: sa1100:
 support sa1100, pxa and mmp soc families" change.
 ---
- arch/arm/Kconfig             |    2 +-
- arch/arm/mach-sa1100/clock.c |   91 +++++++++++------------------------------
- 2 files changed, 26 insertions(+), 67 deletions(-)
+ arch/arm/mach-pxa/pxa25x.c |    2 --
+ arch/arm/mach-pxa/pxa27x.c |    2 --
+ arch/arm/mach-pxa/pxa300.c |    1 -
+ arch/arm/mach-pxa/pxa320.c |    1 -
+ arch/arm/mach-pxa/pxa3xx.c |    1 -
+ arch/arm/mach-pxa/pxa95x.c |    1 -
+ 6 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 24626b0..bb68e65 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -754,7 +754,7 @@ config ARCH_SA1100
- 	select ARCH_HAS_CPUFREQ
- 	select CPU_FREQ
- 	select GENERIC_CLOCKEVENTS
--	select CLKDEV_LOOKUP
-+	select HAVE_CLK
- 	select HAVE_SCHED_CLOCK
- 	select TICK_ONESHOT
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-index d6df9f6..dab3c63 100644
---- a/arch/arm/mach-sa1100/clock.c
-+++ b/arch/arm/mach-sa1100/clock.c
-@@ -11,39 +11,17 @@
- #include <linux/clk.h>
- #include <linux/spinlock.h>
- #include <linux/mutex.h>
--#include <linux/io.h>
--#include <linux/clkdev.h>
- 
- #include <mach/hardware.h>
- 
--struct clkops {
--	void			(*enable)(struct clk *);
--	void			(*disable)(struct clk *);
--	unsigned long		(*getrate)(struct clk *);
--};
--
-+/*
-+ * Very simple clock implementation - we only have one clock to deal with.
-+ */
- struct clk {
--	const struct clkops	*ops;
--	unsigned long		rate;
- 	unsigned int		enabled;
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index adf058f..91e4f6c 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -209,8 +209,6 @@ static struct clk_lookup pxa25x_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa25x_gpio11, NULL, "GPIO11_CLK"),
+ 	INIT_CLKREG(&clk_pxa25x_gpio12, NULL, "GPIO12_CLK"),
+ 	INIT_CLKREG(&clk_pxa25x_mem, "pxa2xx-pcmcia", NULL),
+-	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
+-	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
  };
  
--#define INIT_CLKREG(_clk, _devname, _conname)		\
--	{						\
--		.clk		= _clk,			\
--		.dev_id		= _devname,		\
--		.con_id		= _conname,		\
--	}
--
--#define DEFINE_CLK(_name, _ops, _rate)			\
--struct clk clk_##_name = {				\
--		.ops	= _ops,				\
--		.rate	= _rate,			\
--	}
--
--static DEFINE_SPINLOCK(clocks_lock);
--
--static void clk_gpio27_enable(struct clk *clk)
-+static void clk_gpio27_enable(void)
- {
- 	/*
- 	 * First, set up the 3.6864MHz clock on GPIO 27 for the SA-1111:
-@@ -54,22 +32,38 @@ static void clk_gpio27_enable(struct clk *clk)
- 	TUCR = TUCR_3_6864MHz;
- }
- 
--static void clk_gpio27_disable(struct clk *clk)
-+static void clk_gpio27_disable(void)
- {
- 	TUCR = 0;
- 	GPDR &= ~GPIO_32_768kHz;
- 	GAFR &= ~GPIO_32_768kHz;
- }
- 
-+static struct clk clk_gpio27;
-+
-+static DEFINE_SPINLOCK(clocks_lock);
-+
-+struct clk *clk_get(struct device *dev, const char *id)
-+{
-+	const char *devname = dev_name(dev);
-+
-+	return strcmp(devname, "sa1111.0") ? ERR_PTR(-ENOENT) : &clk_gpio27;
-+}
-+EXPORT_SYMBOL(clk_get);
-+
-+void clk_put(struct clk *clk)
-+{
-+}
-+EXPORT_SYMBOL(clk_put);
-+
- int clk_enable(struct clk *clk)
- {
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	if (clk->enabled++ == 0)
--		clk->ops->enable(clk);
-+		clk_gpio27_enable();
- 	spin_unlock_irqrestore(&clocks_lock, flags);
--
- 	return 0;
- }
- EXPORT_SYMBOL(clk_enable);
-@@ -82,48 +76,13 @@ void clk_disable(struct clk *clk)
- 
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	if (--clk->enabled == 0)
--		clk->ops->disable(clk);
-+		clk_gpio27_disable();
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
- EXPORT_SYMBOL(clk_disable);
- 
- unsigned long clk_get_rate(struct clk *clk)
- {
--	unsigned long rate;
--
--	rate = clk->rate;
--	if (clk->ops->getrate)
--		rate = clk->ops->getrate(clk);
--
--	return rate;
-+	return 3686400;
- }
- EXPORT_SYMBOL(clk_get_rate);
--
--const struct clkops clk_gpio27_ops = {
--	.enable		= clk_gpio27_enable,
--	.disable	= clk_gpio27_disable,
--};
--
--static void clk_dummy_enable(struct clk *clk) { }
--static void clk_dummy_disable(struct clk *clk) { }
--
--const struct clkops clk_dummy_ops = {
--	.enable		= clk_dummy_enable,
--	.disable	= clk_dummy_disable,
--};
--
--static DEFINE_CLK(gpio27, &clk_gpio27_ops, 3686400);
--static DEFINE_CLK(dummy, &clk_dummy_ops, 0);
--
--static struct clk_lookup sa11xx_clkregs[] = {
--	INIT_CLKREG(&clk_gpio27, "sa1111.0", NULL),
+ static struct clk_lookup pxa25x_hwuart_clkreg =
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 180bd86..aed6cbc 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -230,8 +230,6 @@ static struct clk_lookup pxa27x_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa27x_im, NULL, "IMCLK"),
+ 	INIT_CLKREG(&clk_pxa27x_memc, NULL, "MEMCLK"),
+ 	INIT_CLKREG(&clk_pxa27x_mem, "pxa2xx-pcmcia", NULL),
+-	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
 -	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
--};
--
--static int __init sa11xx_clk_init(void)
--{
--	clkdev_add_table(sa11xx_clkregs, ARRAY_SIZE(sa11xx_clkregs));
--	return 0;
--}
--
--postcore_initcall(sa11xx_clk_init);
+ };
+ 
+ #ifdef CONFIG_PM
+diff --git a/arch/arm/mach-pxa/pxa300.c b/arch/arm/mach-pxa/pxa300.c
+index 0388eda..40bb165 100644
+--- a/arch/arm/mach-pxa/pxa300.c
++++ b/arch/arm/mach-pxa/pxa300.c
+@@ -89,7 +89,6 @@ static DEFINE_PXA3_CKEN(gcu, PXA300_GCU, 0, 0);
+ static struct clk_lookup common_clkregs[] = {
+ 	INIT_CLKREG(&clk_common_nand, "pxa3xx-nand", NULL),
+ 	INIT_CLKREG(&clk_gcu, "pxa3xx-gcu", NULL),
+-	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
+ };
+ 
+ static DEFINE_PXA3_CKEN(pxa310_mmc3, MMC3, 19500000, 0);
+diff --git a/arch/arm/mach-pxa/pxa320.c b/arch/arm/mach-pxa/pxa320.c
+index d487e1f..8d614ec 100644
+--- a/arch/arm/mach-pxa/pxa320.c
++++ b/arch/arm/mach-pxa/pxa320.c
+@@ -83,7 +83,6 @@ static DEFINE_PXA3_CKEN(gcu, PXA320_GCU, 0, 0);
+ static struct clk_lookup pxa320_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa320_nand, "pxa3xx-nand", NULL),
+ 	INIT_CLKREG(&clk_gcu, "pxa3xx-gcu", NULL),
+-	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
+ };
+ 
+ static int __init pxa320_init(void)
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index f107c71..4f402af 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -67,7 +67,6 @@ static struct clk_lookup pxa3xx_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa3xx_pout, NULL, "CLK_POUT"),
+ 	/* Power I2C clock is always on */
+ 	INIT_CLKREG(&clk_dummy, "pxa3xx-pwri2c.1", NULL),
+-	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
+ 	INIT_CLKREG(&clk_pxa3xx_lcd, "pxa2xx-fb", NULL),
+ 	INIT_CLKREG(&clk_pxa3xx_camera, NULL, "CAMCLK"),
+ 	INIT_CLKREG(&clk_pxa3xx_ac97, NULL, "AC97CLK"),
+diff --git a/arch/arm/mach-pxa/pxa95x.c b/arch/arm/mach-pxa/pxa95x.c
+index fccc644..d082a58 100644
+--- a/arch/arm/mach-pxa/pxa95x.c
++++ b/arch/arm/mach-pxa/pxa95x.c
+@@ -217,7 +217,6 @@ static struct clk_lookup pxa95x_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa95x_pout, NULL, "CLK_POUT"),
+ 	/* Power I2C clock is always on */
+ 	INIT_CLKREG(&clk_dummy, "pxa3xx-pwri2c.1", NULL),
+-	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
+ 	INIT_CLKREG(&clk_pxa95x_lcd, "pxa2xx-fb", NULL),
+ 	INIT_CLKREG(&clk_pxa95x_ffuart, "pxa2xx-uart.0", NULL),
+ 	INIT_CLKREG(&clk_pxa95x_btuart, "pxa2xx-uart.1", NULL),
 -- 
 1.7.4.4
