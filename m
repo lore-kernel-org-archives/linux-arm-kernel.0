@@ -1,198 +1,149 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Thu, 19 Jan 2012 19:14:24 +0100
-Subject: [PATCH V4 4/4] CS89x0 : add CS89x0 platform device to the iMX31ADS
- board
-Message-ID: <1326996864-13616-1-git-send-email-jaccon.bastiaansen@gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 19 Jan 2012 11:16:35 -0700
+Subject: [PATCH V2] gpio: tegra: Parameterize the number of banks
+Message-ID: <1326996995-23096-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CS89x0 networking support to the iMX31ADS board by using the
-platform driver support in the CS89x0 driver.
+Tegra20's GPIO controller has 7 banks, and Tegra30's controller has 8
+banks. Allow the number of banks to be configured at run-time by the
+device tree.
 
-Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/configs/mx3_defconfig                 |    2 +
- arch/arm/mach-imx/mach-mx31ads.c               |   44 ++++++++++++++++++++++--
- arch/arm/plat-mxc/include/mach/board-mx31ads.h |   33 ------------------
- drivers/net/ethernet/cirrus/cs89x0.c           |    7 ----
- 4 files changed, 43 insertions(+), 43 deletions(-)
- delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
+This patch depends on:
+http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
+devel-stable 44986ab056076e9dc9fb9f8b4729afef7fa72616
 
-diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
-index cb0717f..5d2bc6e 100644
---- a/arch/arm/configs/mx3_defconfig
-+++ b/arch/arm/configs/mx3_defconfig
-@@ -66,6 +66,8 @@ CONFIG_NETDEVICES=y
- CONFIG_SMSC_PHY=y
- CONFIG_NET_ETHERNET=y
- CONFIG_SMSC911X=y
-+CONFIG_CS89x0=y
-+CONFIG_CS89x0_PLATFORM=y
- CONFIG_DNET=y
- # CONFIG_NETDEV_1000 is not set
- # CONFIG_NETDEV_10000 is not set
-diff --git a/arch/arm/mach-imx/mach-mx31ads.c b/arch/arm/mach-imx/mach-mx31ads.c
-index 9cc1a49..5dd4163 100644
---- a/arch/arm/mach-imx/mach-mx31ads.c
-+++ b/arch/arm/mach-imx/mach-mx31ads.c
-@@ -28,7 +28,6 @@
- #include <asm/memory.h>
- #include <asm/mach/map.h>
- #include <mach/common.h>
--#include <mach/board-mx31ads.h>
- #include <mach/iomux-mx3.h>
+This is a replacement for:
+http://patchwork.ozlabs.org/patch/134321/
+
+v2: Determine # banks by the number of interrupt properties rather than
+adding a custom property for this.
+---
+ .../devicetree/bindings/gpio/gpio_nvidia.txt       |    8 ++-
+ drivers/gpio/gpio-tegra.c                          |   42 +++++++++++++++----
+ 2 files changed, 38 insertions(+), 12 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+index d114e19..023c952 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+@@ -1,9 +1,11 @@
+-NVIDIA Tegra 2 GPIO controller
++NVIDIA Tegra GPIO controller
  
- #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
-@@ -39,6 +38,9 @@
+ Required properties:
+-- compatible : "nvidia,tegra20-gpio"
++- compatible : "nvidia,tegra<chip>-gpio"
+ - reg : Physical base address and length of the controller's registers.
+-- interrupts : The interrupt outputs from the controller.
++- interrupts : The interrupt outputs from the controller. For Tegra20,
++  there should be 7 interrupts specified, and for Tegra30, there should
++  be 8 interrupts specified.
+ - #gpio-cells : Should be two. The first cell is the pin number and the
+   second cell is used to specify optional parameters:
+   - bit 0 specifies polarity (0 for normal, 1 for inverted)
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index bc923c7..98f3980 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -77,7 +77,8 @@ struct tegra_gpio_bank {
  
- #include "devices-imx31.h"
+ static struct irq_domain irq_domain;
+ static void __iomem *regs;
+-static struct tegra_gpio_bank tegra_gpio_banks[7];
++static u32 tegra_gpio_bank_count;
++static struct tegra_gpio_bank *tegra_gpio_banks;
  
-+/* Base address of PBC controller */
-+#define PBC_BASE_ADDRESS	MX31_CS4_BASE_ADDR_VIRT
-+
- /* PBC Board interrupt status register */
- #define PBC_INTSTATUS           0x000016
- 
-@@ -62,6 +64,7 @@
- #define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
- #define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
- 
-+#define MXC_EXP_IO_BASE		MXC_BOARD_IRQ_START
- #define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
- 
- #define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
-@@ -69,6 +72,11 @@
- 
- #define MXC_MAX_EXP_IO_LINES	16
- 
-+/* CS8900 */
-+#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
-+#define CS4_CS8900_MMIO_START	0x20000
-+#define CS4_CS8900_MMIO_END	0x2FFFF
-+
- /*
-  * The serial port definition structure.
-  */
-@@ -101,11 +109,37 @@ static struct platform_device serial_device = {
- 	},
- };
- 
-+static const struct resource mx31ads_cs8900_resources[] __initconst = {
-+	{
-+		.start = MX31_CS4_BASE_ADDR + CS4_CS8900_MMIO_START,
-+		.end = MX31_CS4_BASE_ADDR + CS4_CS8900_MMIO_END,
-+		.flags = IORESOURCE_MEM
-+	},
-+	{
-+		.start = EXPIO_INT_ENET_INT,
-+		.end = EXPIO_INT_ENET_INT,
-+		.flags = IORESOURCE_IRQ
-+	}
-+};
-+
-+static const struct platform_device_info mx31ads_cs8900_devinfo __initconst = {
-+	.name = "cs89x0",
-+	.id = 0,
-+	.res = mx31ads_cs8900_resources,
-+	.num_res = ARRAY_SIZE(mx31ads_cs8900_resources),
-+};
-+
- static int __init mxc_init_extuart(void)
+ static inline void tegra_gpio_writel(u32 val, u32 reg)
  {
- 	return platform_device_register(&serial_device);
- }
+@@ -274,7 +275,7 @@ void tegra_gpio_resume(void)
  
-+static void __init mxc_init_ext_ethernet(void)
-+{
-+	platform_device_register_full(
-+		(struct platform_device_info *)&mx31ads_cs8900_devinfo);
-+}
+ 	local_irq_save(flags);
+ 
+-	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
++	for (b = 0; b < tegra_gpio_bank_count; b++) {
+ 		struct tegra_gpio_bank *bank = &tegra_gpio_banks[b];
+ 
+ 		for (p = 0; p < ARRAY_SIZE(bank->oe); p++) {
+@@ -297,7 +298,7 @@ void tegra_gpio_suspend(void)
+ 	int p;
+ 
+ 	local_irq_save(flags);
+-	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
++	for (b = 0; b < tegra_gpio_bank_count; b++) {
+ 		struct tegra_gpio_bank *bank = &tegra_gpio_banks[b];
+ 
+ 		for (p = 0; p < ARRAY_SIZE(bank->oe); p++) {
+@@ -338,23 +339,46 @@ static struct lock_class_key gpio_lock_class;
+ 
+ static int __devinit tegra_gpio_probe(struct platform_device *pdev)
+ {
++	int irq_base;
+ 	struct resource *res;
+ 	struct tegra_gpio_bank *bank;
+ 	int gpio;
+ 	int i;
+ 	int j;
+ 
+-	irq_domain.irq_base = irq_alloc_descs(-1, 0, TEGRA_NR_GPIOS, 0);
+-	if (irq_domain.irq_base < 0) {
++	for (;;) {
++		res = platform_get_resource(pdev, IORESOURCE_IRQ, tegra_gpio_bank_count);
++		if (!res)
++			break;
++		tegra_gpio_bank_count++;
++	}
++	if (!tegra_gpio_bank_count) {
++		dev_err(&pdev->dev, "Missing IRQ resource\n");
++		return -ENODEV;
++	}
 +
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -492,12 +526,15 @@ static void __init mxc_init_audio(void)
- 	mxc_iomux_setup_multiple_pins(ssi_pins, ARRAY_SIZE(ssi_pins), "ssi");
- }
++	tegra_gpio_chip.ngpio = tegra_gpio_bank_count * 32;
++
++	tegra_gpio_banks = devm_kzalloc(&pdev->dev,
++			tegra_gpio_bank_count * sizeof(*tegra_gpio_banks),
++			GFP_KERNEL);
++	if (!tegra_gpio_banks) {
++		dev_err(&pdev->dev, "Couldn't allocate bank structure\n");
++		return -ENODEV;
++	}
++
++	irq_base = irq_alloc_descs(-1, 0, tegra_gpio_chip.ngpio, 0);
++	if (irq_base < 0) {
+ 		dev_err(&pdev->dev, "Couldn't allocate IRQ numbers\n");
+ 		return -ENODEV;
+ 	}
+-	irq_domain.nr_irq = TEGRA_NR_GPIOS;
++	irq_domain.irq_base = irq_base;
++	irq_domain.nr_irq = tegra_gpio_chip.ngpio;
+ 	irq_domain.ops = &irq_domain_simple_ops;
+ 	irq_domain.of_node = pdev->dev.of_node;
+ 	irq_domain_add(&irq_domain);
  
--/* static mappings */
-+/*
-+ * static mappings, starting from the CS4 start address up to the start address
-+ * of the CS8900.
-+ */
- static struct map_desc mx31ads_io_desc[] __initdata = {
- 	{
- 		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
- 		.pfn		= __phys_to_pfn(MX31_CS4_BASE_ADDR),
--		.length		= MX31_CS4_SIZE / 2,
-+		.length		= CS4_CS8900_MMIO_START,
- 		.type		= MT_DEVICE
- 	},
- };
-@@ -522,6 +559,7 @@ static void __init mx31ads_init(void)
- 	mxc_init_imx_uart();
- 	mxc_init_i2c();
- 	mxc_init_audio();
-+	mxc_init_ext_ethernet();
- }
+-	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
++	for (i = 0; i < tegra_gpio_bank_count; i++) {
+ 		res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
+ 		if (!res) {
+ 			dev_err(&pdev->dev, "Missing IRQ resource\n");
+@@ -391,7 +415,7 @@ static int __devinit tegra_gpio_probe(struct platform_device *pdev)
  
- static void __init mx31ads_timer_init(void)
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31ads.h b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-deleted file mode 100644
-index 94b60dd..0000000
---- a/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-- */
--
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __ASM_ARCH_MXC_BOARD_MX31ADS_H__
--#define __ASM_ARCH_MXC_BOARD_MX31ADS_H__
--
--#include <mach/hardware.h>
--
--/*
-- * These symbols are used by drivers/net/cs89x0.c.
-- * This is ugly as hell, but we have to provide them until
-- * someone fixed the driver.
-- */
--
--/* Base address of PBC controller */
--#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
--/* Offsets for the PBC Controller register */
--
--/* Ethernet Controller IO base address */
--#define PBC_CS8900A_IOBASE      0x020000
--
--#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
--
--#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
--
--#endif /* __ASM_ARCH_MXC_BOARD_MX31ADS_H__ */
-diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-index f7449bd..7202ca9 100644
---- a/drivers/net/ethernet/cirrus/cs89x0.c
-+++ b/drivers/net/ethernet/cirrus/cs89x0.c
-@@ -182,13 +182,6 @@ static unsigned int cs8900_irq_map[] = {IRQ_IXDP2351_CS8900, 0, 0, 0};
- #define CS89x0_NONISA_IRQ
- static unsigned int netcard_portlist[] __used __initdata = {IXDP2X01_CS8900_VIRT_BASE, 0};
- static unsigned int cs8900_irq_map[] = {IRQ_IXDP2X01_CS8900, 0, 0, 0};
--#elif defined(CONFIG_MACH_MX31ADS)
--#define CS89x0_NONISA_IRQ
--#include <mach/board-mx31ads.h>
--static unsigned int netcard_portlist[] __used __initdata = {
--	PBC_BASE_ADDRESS + PBC_CS8900A_IOBASE + 0x300, 0
--};
--static unsigned cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
- #else
- #ifndef CONFIG_CS89x0_PLATFORM
- static unsigned int netcard_portlist[] __used __initdata =
+ 	gpiochip_add(&tegra_gpio_chip);
+ 
+-	for (gpio = 0; gpio < TEGRA_NR_GPIOS; gpio++) {
++	for (gpio = 0; gpio < tegra_gpio_chip.ngpio; gpio++) {
+ 		int irq = irq_domain_to_irq(&irq_domain, gpio);
+ 		/* No validity check; all Tegra GPIOs are valid IRQs */
+ 
+@@ -404,7 +428,7 @@ static int __devinit tegra_gpio_probe(struct platform_device *pdev)
+ 		set_irq_flags(irq, IRQF_VALID);
+ 	}
+ 
+-	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
++	for (i = 0; i < tegra_gpio_bank_count; i++) {
+ 		bank = &tegra_gpio_banks[i];
+ 
+ 		irq_set_chained_handler(bank->irq, tegra_gpio_irq_handler);
 -- 
-1.7.1
+1.7.0.4
