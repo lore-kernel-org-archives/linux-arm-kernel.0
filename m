@@ -1,42 +1,34 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 19 Jan 2012 17:31:19 +0800
-Subject: [PATCH 06/10] MXS-DMA : add more flags for MXS-DMA
-In-Reply-To: <20120119090238.GU1068@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 19 Jan 2012 10:45:13 +0100
+Subject: [PATCH 00/10] patch set about the MXS-DMA
+In-Reply-To: <20120119091034.GH2247@S2101-09.ap.freescale.net>
 References: <1326953767-24155-1-git-send-email-b32955@freescale.com>
- <1326953767-24155-7-git-send-email-b32955@freescale.com>
- <20120119090238.GU1068@n2100.arm.linux.org.uk>
-Message-ID: <4F17E2E7.2080300@freescale.com>
+ <20120119091034.GH2247@S2101-09.ap.freescale.net>
+Message-ID: <20120119094513.GB2630@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-> Err, the 'flags' argument to device_prep_slave_sg() is supposed to be
-> from the set of enum dma_ctrl_flags.  What this means is that your
-> MXS_DMA_F_APPEND is equivalent to DMA_PREP_INTERRUPT, and
-> MXS_DMA_F_WAIT4END is equivalent to DMA_CTRL_ACK.
->
-thanks a lot.
-I will reuse the dma_ctrl_flags in the next version.
-> What this does is make your drivers completely dependent on your DMA
-> engine implementation.  That's not a good idea when devices get
-> reused in different SoCs.
->
-Frankly speaking, the APBH-DMA is more coupled with the GPMI  then any 
-other modules.
-In the MX6Q, the GPMI is the ONLY user of APBH-DMA.
-You even can see the NAND_LOCK bit in the DMA command structure which is 
-only used by the GPMI
-NAND controller,.
+> > [2] patch 6 ~ patch 10: rewrite the last parameter of mxs_dma_prep_slave_sg().
+> 
+> For the sake of bitsec, at least patches #7 and #8 need to be one patch.
+> That said, if I apply the series and then check out the commit at patch
+> #7, you need to all mxs-dma client drivers, mxs-mmc, gpmi do not break.
 
+I'd say patch 6-10 should be squashed, simply. My personal preference is
+to change #9 to simply read the register when needed and do not expand
+the struct, but this is a minor thing.
 
-To Shawn & Wolfram:
-    thanks very much for your comments.
+Regards,
 
-Best Regards
-Huang Shijie
+   Wolfram
 
-> If you need to supply extra flags which aren't in the dma_ctrl_flags,
-> at least make sure that they're using different bits.  For bonus points,
-> also have your driver_check_  the DMA engine it's connected to before
-> it passes these flags.
->
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120119/89b7a925/attachment.sig>
