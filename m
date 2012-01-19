@@ -1,81 +1,81 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 19 Jan 2012 15:07:37 -0700
-Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
- tile (TC1 variant)
-In-Reply-To: <alpine.LFD.2.02.1201191305180.19587@xanadu.home>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
- <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
- <4F0C495C.4000103@citrix.com>
- <1326979652.32197.66.camel@hornet.cambridge.arm.com>
- <4F181BD9.20401@gmail.com>
- <1326980594.32197.67.camel@hornet.cambridge.arm.com>
- <4F182248.7070209@gmail.com>
- <1326984672.32197.68.camel@hornet.cambridge.arm.com>
- <4F184C48.2050505@citrix.com>
- <1326994035.13748.7.camel@hornet.cambridge.arm.com>
- <20120119175053.GE10404@n2100.arm.linux.org.uk>
- <CACxGe6tWCd83qcfAv8=x3mdGNHR6xEnS=Gyq=bnWxRw22M4QXA@mail.gmail.com>
- <alpine.LFD.2.02.1201191305180.19587@xanadu.home>
-Message-ID: <CACxGe6vBkOH1c3mOdY2qJbZ=miuU-WkxHZbJxBtsrhzwMGydcg@mail.gmail.com>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Thu, 19 Jan 2012 14:43:44 -0800
+Subject: [PATCH] arm: irq: Allow for specification of no preallocated irqs
+Message-ID: <1327013024-22530-1-git-send-email-mbohan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 11:09 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Thu, 19 Jan 2012, Grant Likely wrote:
->
->> On Thu, Jan 19, 2012 at 10:50 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Thu, Jan 19, 2012 at 05:27:15PM +0000, Pawel Moll wrote:
->> >> On Thu, 2012-01-19 at 17:00 +0000, David Vrabel wrote:
->> >> > The problem wasn't with including skeleton.dtsi.
->> >>
->> >> Including as it is creates two device_type="memory" nodes, one with
->> >> regs=<0 0>, which is definitely wrong.
->> >>
->> >> > With
->> >> > CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
->> >> > DTB using information from the ATAGs (see atags_to_fdt()).
->> >> >
->> >> > If there's an ATAG giving the amount of RAM the DTB's "memory" node is
->> >> > replaced with a new one. ?Since the vexpress DTBs don't have a "memory"
->> >> > node it's added and the DTB ends up with two nodes describing memory.
->> >>
->> >> The "memory at address" node name is in my opinion perfectly legal - p. 3.4
->> >> of the DT spec says "The name component of the node name (see 2.2.1)
->> >> shall be memory.". So the decompressor code may be wrong in looking for
->> >> adress-less "memory" node...
->> >
->> > I don't think you can expect such early code to properly parse a DT tree
->> > with a variability in how memory stuff is declared into that DT tree.
->> >
->> > What if you have two memory nodes specified in the DT file, and the
->> > ATAG data contains one?
->>
->> Yes, just because it is technically legal doesn't make it okay. ?The
->> pragmatic approach here is that the skeleton.dtsi file calls the node
->> "memory", so this .dts file must do the same.
->>
->> > The more I look at this, the more I'm convinced that Grant's idea that
->> > DT should entirely override ATAGs all the way to the kernel proper was
->> > the wrong solution - at least in the kernel, if we had both available,
->> > we could make a choice there, and have the full DT library to be able
->> > to manipulate the DT blob.
->>
->> Hey! ?I was originally lobbying for the dt pointer carried by an ATAG.
->> ?Nico conviced me otherwise. ?:-)
->
-> Hey! ?I was originally lobbying for people to have a fully DT aware
-> bootloader if they wanted to play with DT, otherwise there is no
-> incentive for updated bootloaders. ?But someone else convinced me
-> otherwise. ?:-)
->
-> Mixed bags always have loose ends.
+For cases with SPARSE_IRQ enabled, irqs preallocated with
+arch_probe_nr_irqs() are already marked as allocated in the
+allocated_irqs bitmap. As a consequence, irq chip drivers that
+allocate irqs will feel one of two behaviors:
 
-Hahaha.  Having said that though, I still strongly agree with what we
-have.  Giving the kernel only one or the other avoids any weirdness
-about which the kernel should choose when both are present.  The
-bootwrapper atag-to-dt conversion is a migration and development tool,
-and it should not do any DT manipulation must be kept to a bare
-minimum.
+1. An allocation will succeed with the starting irq_base one
+more than the preallocated irqs. This will thus waste the
+preceeding interrupt resources that were preallocated, unless a
+legacy chip driver happens to assume ownership of these by some
+platform definition. The GIC driver is a typical primary chip
+driver, and abides to the allocation APIs. So this can be a
+problem in many trivial usecases.
 
-g.
+2. An allocation will fail with < 0. This can also happen in the
+GIC driver, which interprets this value as meaning the irq_descs
+are already preallocated. But in Device Tree configurations, the
+fallback irq_base is -1. This results in an invalid irq_base
+value.
+
+Looking forward, we are moving towards a world where preallocation
+of irqs is no longer necessary. irq_domain is scoped to handle all
+irq_desc allocations in the future. Thus, we should support
+configurations where the platform wants to preallocate no irqs.
+
+One easy way to achieve this is to allow for
+machine_desc->nr_irqs < 0, which indicates not to preallocate any
+interrupts.
+
+Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
+---
+ arch/arm/include/asm/mach/arch.h |    2 +-
+ arch/arm/kernel/irq.c            |   14 ++++++++++++--
+ 2 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index d7692ca..cc6506a 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -22,7 +22,7 @@ struct machine_desc {
+ 	const char *const 	*dt_compat;	/* array of device tree
+ 						 * 'compatible' strings	*/
+ 
+-	unsigned int		nr_irqs;	/* number of IRQs */
++	int			nr_irqs;	/* number of IRQs */
+ 
+ #ifdef CONFIG_ZONE_DMA
+ 	unsigned long		dma_zone_size;	/* size of DMA-able area */
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 3efd82c..f74b173 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -129,8 +129,18 @@ void __init init_IRQ(void)
+ #ifdef CONFIG_SPARSE_IRQ
+ int __init arch_probe_nr_irqs(void)
+ {
+-	nr_irqs = machine_desc->nr_irqs ? machine_desc->nr_irqs : NR_IRQS;
+-	return nr_irqs;
++	/*
++	 * machine_desc->nr_irqs < 0 is a special case that
++	 * specifies not to preallocate any irq_descs.
++	 */
++	if (machine_desc->nr_irqs < 0) {
++		nr_irqs = 0;
++		return nr_irqs;
++	} else {
++		nr_irqs = machine_desc->nr_irqs ?
++			  machine_desc->nr_irqs : NR_IRQS;
++		return nr_irqs;
++	}
+ }
+ #endif
+ 
+-- 
+1.7.8.3
