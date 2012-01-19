@@ -1,34 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 19 Jan 2012 10:45:13 +0100
-Subject: [PATCH 00/10] patch set about the MXS-DMA
-In-Reply-To: <20120119091034.GH2247@S2101-09.ap.freescale.net>
-References: <1326953767-24155-1-git-send-email-b32955@freescale.com>
- <20120119091034.GH2247@S2101-09.ap.freescale.net>
-Message-ID: <20120119094513.GB2630@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Jan 2012 09:52:57 +0000
+Subject: [PATCH] ARM: gic: refactor irq_start assignment
+In-Reply-To: <20120118213223.GQ4223@ponder.secretlab.ca>
+References: <1326802195-11412-1-git-send-email-will.deacon@arm.com>
+ <4F159B81.9080104@gmail.com>
+ <20120117160334.GD27350@mudshark.cambridge.arm.com>
+ <20120118213223.GQ4223@ponder.secretlab.ca>
+Message-ID: <20120119095256.GA1701@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > [2] patch 6 ~ patch 10: rewrite the last parameter of mxs_dma_prep_slave_sg().
+On Wed, Jan 18, 2012 at 09:32:23PM +0000, Grant Likely wrote:
+> On Tue, Jan 17, 2012 at 04:03:34PM +0000, Will Deacon wrote:
+> > On Tue, Jan 17, 2012 at 04:02:09PM +0000, Rob Herring wrote:
+> > > 
+> > > This should probably just be rolled into Grant's irqdomain work. In any
+> > > case, it's going to conflict with it.
+> > 
+> > Ok, it's purely cosmetic so I'm fine with that. Grant - would you be able to
+> > pick this up please?
 > 
-> For the sake of bitsec, at least patches #7 and #8 need to be one patch.
-> That said, if I apply the series and then check out the commit at patch
-> #7, you need to all mxs-dma client drivers, mxs-mmc, gpmi do not break.
+> The conflict is pretty trivial and I'll handle any fixups if a
+> conflict occurs.  I'd rather not have changes unrelated to the
+> conversion in my series.
 
-I'd say patch 6-10 should be squashed, simply. My personal preference is
-to change #9 to simply read the register when needed and do not expand
-the struct, but this is a minor thing.
+Okey doke then, I'll stick to the original plan (via Russell's patch system) :)
 
-Regards,
+Thanks,
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120119/89b7a925/attachment.sig>
+Will
