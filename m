@@ -1,132 +1,108 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 Jan 2012 17:55:49 +0100
-Subject: [RFC PATCH v3 2/5] pinctrl: add dt binding support for pinmux
- mappings
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17801D230A@HQMAIL01.nvidia.com>
-References: <CAA+hA=RBqpSmntS2h+6xMQuRvSRHenmDgrYSSzMXHtOCpU+HCQ@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17761F18F8@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC605788507F698@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE39E6B@HQMAIL01.nvidia.com>
- <20120107135445.GI4790@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A6E5@HQMAIL01.nvidia.com>
- <20120112033941.GH20968@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D1DCC@HQMAIL01.nvidia.com>
- <20120113034558.GA12184@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D1F9D@HQMAIL01.nvidia.com>
- <20120114012213.GD1810@S2101-09.ap.freescale.net>
- <CACRpkdYmxQd7aaRhs+xc5nizC7OjwRzsduq-28kVTLjhTGjVZw@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D230A@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdZj9KGCoq2G2nHymUe2WxJLUVfGT4e=uCDq6kuZFNYU7Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Jan 2012 08:56:07 -0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <CAJuYYwQoh4_SnA9wmy4x+cG0w0hGukxTkODWtcSw_2QHYuDsrg@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <CAJuYYwQoh4_SnA9wmy4x+cG0w0hGukxTkODWtcSw_2QHYuDsrg@mail.gmail.com>
+Message-ID: <20120119165607.GG22818@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 8:50 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Linus Walleij wrote at Monday, January 16, 2012 9:09 AM:
+* Thomas Abraham <thomas.abraham@linaro.org> [120119 04:37]:
+> 
+> The io-pad controller (gpio/pinmux/pinconfig) can be represented in a
+> dtsi file as below. There could be multiple io-pad controllers
+> supported in the system.
 
->> As you can see none of the text above claims that the group is
->> about hardware-defined groups or anything like that.
->
-> Well, I guess that's true, but didn't we only add the concept of groups
-> to the pinctrl subsystem in order to support Tegra's HW-group-based
-> muxing?
+FYI we too have too mux controller instances on omap4. That seems to
+work just fine thanks to the "pinctrl: make it possible to add multiple maps"
+patch by Linus W.
+ 
+> pctrl0: pinctrl at 11400000 {
+>        compatible = "samsung,exynos4210-pinctrl";
+>        reg = <0x11400000 0x1000>;
+>        interrupts = <.......>;
+>        pin-banks = <....>;
+>        [... other properties TBD ...]
+>        #pinctrl-cells = <5>;
+> };
+> 
+> Each such node instantiates one instance of the pin-controller device.
+> The 'struct pinctrl_dev' should include a new member 'struct of_node'
+> to point to the corresponding pin-controller node in dt which
+> instantiated the controller. The pinctrl_register() function called
+> from drivers/pinctrl/pinctrl-xyz.c then registers the pin-controller
+> instance.
 
-The groups appeared in v6 of the very first patchset, this is
-from git log drivers/pinctrl
+Looks similar to what I have too. 
+ 
+> * Specifying the pinmux/pinconfig settings in dts files:
+> 
+> Device nodes which require specific pinmux/pinconfig settings should
+> include information about the required settings. For example, a i2c
+> controller node in dts file is listed below.
+> 
+> i2c0: i2c at 18000000 {
+>         [... other properties ...]
+>         pinctrl-active = <&pctrl0 5 0 2 3 0>,
+>                              <&pctrl0 5 1 2 3 0>;
+>         pinctrl-suspend = <&pctrl0 5 0 2 0 0>,
+>                                 <&pctrl0 5 1 2 0 0>;
+> };
 
-    ChangeLog v5->v6:
+Maybe we should have just the active/suspend/off flags in the
+same array? Otherwise we'll end up unnecessarily repeating the
+the pin information. See the pins + #pin-args example I posted,
+which is otherwise similar.
+ 
+> In the example above, the specifier of pinctrl-* is specific for
+> Samsung io-pad controllers. Its format/syntax would be mainly
+> dependent on the io-pad controller used, the above is only an example
+> for Samsung io-pad controller. In the above node, the format of the
+> pinctrl-* specifier is
+> 
+> property-name = <phandle of the pin-controller
+>                            pin bank within the pin-controller
+>                            pin number within the pin-bank
+>                            pin-mux function number
+>                            pull up/down config
+>                            drive strength config>;
 
-    - Create an abstract pin group concept that can sort pins into
-      named and enumerated groups no matter what the use of these
-      groups may be, one possible usecase is a group of pins being
-      muxed in or so. The intention is however to also use these
-      groups for other pin control activities.
-    - Make it compulsory for pinmux functions to associate with
-      at least one group, so the abstract pin group concept is used
-      to define the groups of pins affected by a pinmux function.
-      The pinmux driver interface has been altered so as to enforce
-      a function to list applicable groups per function.
-    - Provide an optional .group entry in the pinmux machine map
-      so the map can select beteween different available groups
-      to be used with a certain function.
-    - Consequent changes all over the place so that e.g. debugfs
-      present reasonable information about the world.
-    - Drop the per-pin mux (*config) function in the pinmux_ops
-      struct - I was afraid that this would start to be used for
-      things totally unrelated to muxing, we can introduce that to
-      the generic struct pinctrl_ops if needed. I want to keep
-      muxing orthogonal to other pin control subjects and not mix
-      these things up.
+Are these all just bits in one register? If so, let's say you
+have 16-bits per pin, we might be able to share the generic
+pinmux-simple.c driver I have almost ready.. 
 
-The first driver using the concept was the U300 driver.
+The format would then be
 
-> And irrespective of that, why would you want to define "virtual"
-> groups in the pinctrl driver when the whole point of the pin mux mapping
-> table allowing multiple entries for a device was to handle the mux-by-
-> pin case?
+	#pin-args <4>;
+	...
 
-In the U300 the driver define groups of pins like these:
+	/*    controller  offset on   idle off */
+	pins = <&pinctrl0 0x0030 0x15 0x15 0x7>;
+ 
+> * Using the pinmux/pinconfig specifier in device nodes to configure hardware.
+> 
+> A driver (for a device instantiated from device tree) would require
+> code to be made aware of the pinmux/pinconfig options available. The
+> typical sequence in a probe function would be as below.
+> 
+> (a) call of_get_named_gpio() to get the gpio number. In case of
+> Samsung pinctrl driver, the pinctrl driver itself provides the gpiolib
+> functionality and it attaches a gpio specifier translator with the
+> gpio_chip. This translator is capable of translating the pinctrl-* and
+> returning a gpio number.
+> 
+> (b) gpio_request() the gpio number obtained in step (a) above.
+> 
+> (c) Repeat steps (a) and (b) until all the gpios required by the
+> driver are requested. In case a request fails, give up all the
+> successfully requested gpio and return failure.
 
-static const unsigned uart0_pins[] = { 134, 135, 136, 137 };
-static const unsigned mmc0_pins[] = { 166, 167, 168, 169, 170, 171, 176, 177 };
-static const unsigned spi0_pins[] = { 420, 421, 422, 423, 424, 425 };
+Can't the driver do this to request the gpio pins that you
+can get from DT and pinmux? Even if you need to do dynamic pinmuxing
+to GPIO pins for wake-up events, you can do that from the driver
+as long as you get the GPIO number for the pin from mux code.
 
-These groups are associated with muxes.
+Regards,
 
-Then each such group is activated by reading masking and writing
-several registers, but basically they are muxed in and out
-on a per-group basis.
-
-So yes, in this case the U300 use is consistent with a 1-1
-mapping between physical handling of a group and a certain
-per-group register setting.
-
-But I also added these groups:
-
-static const unsigned emif0_pins[] = { 355, 356, 357, 362, 363, 364, 365, 366,
-        367, 368, 369, 370, 371, 376, 377, 378, 379, 380, 381, 382, 383, 384,
-        385, 386, 387, 393, 394, 395, 396, 397, 398, 406, 407, 410, 411, 412,
-        417, 418 };
-static const unsigned emif1_pins[] = { 216, 217, 219, 220, 221, 222, 227, 228,
-        229, 230, 233, 234, 235, 236, 241, 242, 243, 244, 247, 248, 249, 250,
-        253, 254, 255, 260, 261, 262, 263, 266, 267, 268, 269, 272, 273, 274,
-        275, 280, 281, 282, 283, 286, 287, 288, 289, 292, 293, 294, 297, 298,
-        304, 305, 306, 307, 308, 313, 314, 315 };
-
-It's not like I could remux the pins used by the external memory
-interface, so these groups are not used by the mux driver at
-all.
-
-They are used to give a nice overview in debugfs, and for
-blocking up these pins from other users so as not to make
-mistakes. So no relation to any registers or so.
-
-As how to use them for controllers that can support
-per-pin muxing I don't know, in the gpio-nomadik.c
-case (and I should hack on this driver!) pins are controlled
-on a per-pin basis, but the only settings that make any
-sense is to use them in certain groupings.
-
-Example: pins {0, 1} can be used for I2C, or GPIO.
-It doesn't make sense to mux in SCL on pin 0 and
-have GPIO on pin 1, do defining a group of {0, 1}
-and associate that with a mux setting for I2C is the
-sensible thing to do IMO, even though this is in
-practice achived by writing mux registers for two
-different pins.
-
-I don't know if that is what you're discussing here,
-I might have missed the point :-/
-
->> The groups
->> are just that - a group of pins, an abstract concept of a group.
->> It could be drawn i UML even... maybe I'll do that for my
->> ELC presentation :-)
->
-> I should ask: Who here is coming to Linaro Connect and/or ELC? I'm
-> Currently signed up for Linaro Connect, but not ELC. I could probably
-> add ELC if there was good reason.
-
-I'm coming to both, so see you there :-)
-
-Thanks,
-Linus Walleij
+Tony
