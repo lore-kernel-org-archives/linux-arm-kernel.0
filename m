@@ -1,90 +1,31 @@
-From: eranian@googlemail.com (stephane eranian)
-Date: Thu, 19 Jan 2012 14:32:29 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
-References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
- <4F0B182D.7060507@us.ibm.com>
- <20120109224945.GA23090@mudshark.cambridge.arm.com>
- <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
- <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
- <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
- <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
- <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
- <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
- <CACVXFVOQNDRs=c8A2YC+WvYAHs5Abbz-QUEe1VJqrj2esFO11g@mail.gmail.com>
- <CAMsRxf+e38jRcyxESLhYDZ3OL910AQdapZD9P8vWDXfUE34DAA@mail.gmail.com>
- <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
- <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
- <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
- <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
-Message-ID: <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Jan 2012 13:33:11 +0000
+Subject: [PATCH] ARM: kexec: EOI active and mask all interrupts in	kexec
+ crash path
+In-Reply-To: <20120118154809.GL29346@mudshark.cambridge.arm.com>
+References: <1326898885-28105-1-git-send-email-will.deacon@arm.com>
+ <20120118150724.GH1068@n2100.arm.linux.org.uk>
+ <20120118153120.GK29346@mudshark.cambridge.arm.com>
+ <20120118154044.GJ1068@n2100.arm.linux.org.uk>
+ <20120118154809.GL29346@mudshark.cambridge.arm.com>
+Message-ID: <20120119133311.GE1701@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 2:26 PM, Ming Lei <ming.lei@canonical.com> wrote:
-> Hi,
->
-> On Thu, Jan 19, 2012 at 9:14 PM, Ming Lei <ming.lei@canonical.com> wrote:
->> On Thu, Jan 19, 2012 at 8:51 PM, stephane eranian
->> <eranian@googlemail.com> wrote:
->>> On Thu, Jan 19, 2012 at 1:45 PM, Ming Lei <ming.lei@canonical.com> wrote:
->>>> Hi,
->>>>
->>>> On Thu, Jan 19, 2012 at 7:34 PM, stephane eranian
->>>> <eranian@googlemail.com> wrote:
->>>>> Hi,
->>>>>
->>>>> Ok some update on this.
->>>>> With your .config file + 3.2.0 (Linus) + patch 3, 4, 5, 6, I get a kernel that
->>>>
->>>> You forget patch 1 and patch 2?
->>>>
->>> They are already in 3.2.0. Unless I am mistaken.
->>
->> Sorry, I just found that they have been merged to 3.2.
->
-> After a double check, the two patches are not merged to 3.2, but have
-> been merged to the latest linus tree and can be seen in 3.3-rc1.
->
-> Also the commit 3c50729b(ARM: OMAP4: PM: Initialise all the clockdomains
-> to supported states) has been merged to linus tree too.
->
-> So if you just tested the latest linus tree simply, you need to apply
-> the patch[1]
-> (I have mentioned the problem in the thread.)
->
+On Wed, Jan 18, 2012 at 03:48:09PM +0000, Will Deacon wrote:
+> On Wed, Jan 18, 2012 at 03:40:44PM +0000, Russell King - ARM Linux wrote:
+> > 
+> > Is there no way to re-initialize the gic after an interrupt has begun
+> > to be processed, but not EOI'd ?
+> 
+> Unfortunately, I'm not aware of anything like this (I was hoping for some
+> reset functionality). I'll double check that I didn't miss anything, but it
+> seems that you can't reset the GIC state machine without manually putting it
+> all back.
 
-Changing LMO, u-boot.bin did not help. Even with perf top I get no
-interrupts.
+Ok, I re-read the docs and also spoke to some of the hardware guys and it
+seems that you can only kill of all the active interrupts from GICv2 (i.e.
+Cortex-A15 onwards). So I reckon the best way for the time being is to do
+this on the crash path.
 
-My Linus tree is at commit fa1952b:
-
-[6] 11891e1 arm: omap4: pmu: support runtime pm
-[5] 25fab8a arm: omap4: support pmu
-[4] fddef77 arm: omap4: create pmu device via hwmod
-
-fa1952b ARM: OMAP4: hwmod data: Add support for the debug modules
-ccb19d2 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
-c3b5003 tg3: Fix single-vector MSI-X code
-
-I think [1] had conflicts when applying it to the tree.
-
-> thanks,
-> --
-> Ming Lei
->
-> [1],
-> diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c
-> b/arch/arm/mach-omap2/clockdomains44xx_data.c
-> index 9299ac2..41d2260 100644
-> --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-> +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-> @@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
-> ? ? ? .prcm_partition ? = OMAP4430_PRM_PARTITION,
-> ? ? ? .cm_inst ? ? ? ? ?= OMAP4430_PRM_EMU_CM_INST,
-> ? ? ? .clkdm_offs ? ? ? = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
-> - ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_HWSUP,
-> + ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_SWSUP,
-> ?};
->
-> ?static struct clockdomain l3_dma_44xx_clkdm = {
+Will
