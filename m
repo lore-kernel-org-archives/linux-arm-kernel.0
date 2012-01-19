@@ -1,46 +1,185 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 19 Jan 2012 19:58:23 +0530
-Subject: [PATCH 2/3] ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to
- prcm-common header
+Date: Thu, 19 Jan 2012 19:58:22 +0530
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
 In-Reply-To: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
 References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1326983304-14619-3-git-send-email-hvaibhav@ti.com>
+Message-ID: <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing idle_st bit for 32k-sync timer into the prcm-common
-header file, required for hwmod data.
+OMAP device has 32k-sync timer which is currently used as a
+clocksource in the kernel (omap2plus_defconfig).
+The current implementation uses compile time selection between
+gp-timer and 32k-sync timer, which breaks multi-omap build for
+the devices like AM33xx, where 32k-sync timer is not available.
+
+So use hwmod database lookup mechanism, through which at run-time
+we can identify availability of 32k-sync timer on the device,
+else fall back to gp-timer.
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 ---
- arch/arm/mach-omap2/prcm-common.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/timer.c      |   27 +++++-------
+ arch/arm/plat-omap/counter_32k.c |   83 +++++++++++++++++++------------------
+ 2 files changed, 54 insertions(+), 56 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-index 5aa5435..29955d5 100644
---- a/arch/arm/mach-omap2/prcm-common.h
-+++ b/arch/arm/mach-omap2/prcm-common.h
-@@ -177,6 +177,8 @@
- /* PM_WKST_WKUP, CM_IDLEST_WKUP shared bits */
- #define OMAP24XX_ST_GPIOS_SHIFT				2
- #define OMAP24XX_ST_GPIOS_MASK				(1 << 2)
-+#define OMAP24XX_ST_32KSYNC_SHIFT			1
-+#define OMAP24XX_ST_32KSYNC_MASK			(1 << 1)
- #define OMAP24XX_ST_GPT1_SHIFT				0
- #define OMAP24XX_ST_GPT1_MASK				(1 << 0)
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 6eeff0e..b978b39 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -234,21 +234,6 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
+ }
  
-@@ -307,6 +309,8 @@
- #define OMAP3430_ST_SR1_MASK				(1 << 6)
- #define OMAP3430_ST_GPIO1_SHIFT				3
- #define OMAP3430_ST_GPIO1_MASK				(1 << 3)
-+#define OMAP3430_ST_32KSYNC_SHIFT			2
-+#define OMAP3430_ST_32KSYNC_MASK			(1 << 2)
- #define OMAP3430_ST_GPT12_SHIFT				1
- #define OMAP3430_ST_GPT12_MASK				(1 << 1)
- #define OMAP3430_ST_GPT1_SHIFT				0
+ /* Clocksource code */
+-
+-#ifdef CONFIG_OMAP_32K_TIMER
+-/*
+- * When 32k-timer is enabled, don't use GPTimer for clocksource
+- * instead, just leave default clocksource which uses the 32k
+- * sync counter.  See clocksource setup in plat-omap/counter_32k.c
+- */
+-
+-static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+-{
+-	omap_init_clocksource_32k();
+-}
+-
+-#else
+-
+ static struct omap_dm_timer clksrc;
+ 
+ /*
+@@ -281,6 +266,17 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+ {
+ 	int res;
+ 
++	/*
++	 * First check for availability for 32k-sync timer.
++	 *
++	 * Return non-zero, means the device doesn't have 32k-sync timer and
++	 * execution will fallback to gp-timer.
++	 */
++	res = omap_init_clocksource_32k();
++	if (!res)
++		return;
++
++	/* Fall back to gp-timer code */
+ 	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source);
+ 	BUG_ON(res);
+ 
+@@ -295,7 +291,6 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+ 		pr_err("Could not register clocksource %s\n",
+ 			clocksource_gpt.name);
+ }
+-#endif
+ 
+ #define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src,			\
+ 				clksrc_nr, clksrc_src)			\
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index 5f0f229..8504bea 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -69,52 +69,55 @@ void read_persistent_clock(struct timespec *ts)
+ 
+ int __init omap_init_clocksource_32k(void)
+ {
+-	static char err[] __initdata = KERN_ERR
+-			"%s: can't register clocksource!\n";
+-
+-	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+-		u32 pbase;
+-		unsigned long size = SZ_4K;
+-		void __iomem *base;
+-		struct clk *sync_32k_ick;
+-
+-		if (cpu_is_omap16xx()) {
+-			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
+-			size = SZ_1K;
+-		} else if (cpu_is_omap2420())
+-			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
+-		else if (cpu_is_omap2430())
+-			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
+-		else if (cpu_is_omap34xx())
+-			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
+-		else if (cpu_is_omap44xx())
+-			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
+-		else
++	u32 pbase;
++	unsigned long size = SZ_4K;
++	void __iomem *base;
++	struct clk *sync_32k_ick;
++
++	if (cpu_is_omap16xx()) {
++		pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
++		size = SZ_1K;
++	} else if (cpu_class_is_omap2()) {
++		struct omap_hwmod *oh;
++		const char *oh_name = "counter_32k";
++
++		oh = omap_hwmod_lookup(oh_name);
++		if (!oh || oh->slaves_cnt == 0) {
++			pr_err("Could not lookup %s hwmod\n", oh_name);
+ 			return -ENODEV;
++		}
++		pbase = oh->slaves[0]->addr->pa_start + 0x10;
++	} else {
++		return -ENODEV;
++	}
+ 
+-		/* For this to work we must have a static mapping in io.c for this area */
+-		base = ioremap(pbase, size);
+-		if (!base)
+-			return -ENODEV;
++	/*
++	 * For this to work we must have a static mapping in io.c
++	 * for this area
++	 */
++	base = ioremap(pbase, size);
++	if (!base)
++		return -ENODEV;
+ 
+-		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+-		if (!IS_ERR(sync_32k_ick))
+-			clk_enable(sync_32k_ick);
++	sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
++	if (!IS_ERR(sync_32k_ick))
++		clk_enable(sync_32k_ick);
+ 
+-		timer_32k_base = base;
++	timer_32k_base = base;
+ 
+-		/*
+-		 * 120000 rough estimate from the calculations in
+-		 * __clocksource_updatefreq_scale.
+-		 */
+-		clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+-				32768, NSEC_PER_SEC, 120000);
++	/*
++	 * 120000 rough estimate from the calculations in
++	 * __clocksource_updatefreq_scale.
++	 */
++	clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
++			32768, NSEC_PER_SEC, 120000);
+ 
+-		if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
+-					  clocksource_mmio_readl_up))
+-			printk(err, "32k_counter");
++	if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
++				clocksource_mmio_readl_up))
++		printk(KERN_ERR "%s: can't register clocksource!\n",
++				"32k_counter");
++
++	setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
+ 
+-		setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
+-	}
+ 	return 0;
+ }
 -- 
 1.7.0.4
