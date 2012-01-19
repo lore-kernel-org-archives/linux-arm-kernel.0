@@ -1,41 +1,53 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Thu, 19 Jan 2012 07:09:14 +0100
-Subject: imx53
-In-Reply-To: <1326925172.3468.300.camel@hp-dhlii>
-References: <4F16E7B9.7050307@dlasys.net>
- <CAOMZO5Aqws0Ow1DxHnJ4XYfAO-zsgOuLwJueRUCBt53g1kN0bQ@mail.gmail.com>
- <1326925172.3468.300.camel@hp-dhlii>
-Message-ID: <20120119060914.GX22061@pengutronix.de>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 19 Jan 2012 14:15:57 +0800
+Subject: [PATCH 00/10] patch set about the MXS-DMA
+Message-ID: <1326953767-24155-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+This patch set does two things about the MXS-DMA:
+[1] patch 1 ~ patch 5: move the mxs dma header to a more common place.
+	Beside the mx23/mx28, the APBH-DMA is also used by MX50 and MX6Q.
+	So move the mxs dma header file to a more common place, and rename
+	it to mxs-dma.h
 
-On Wed, Jan 18, 2012 at 05:19:32PM -0500, David Lynch Jr. wrote:
-> Linus's tree does not yet include numerous imx53 drivers.  While I can
-> get it to boot, there is lots of hardware that does not work. 
+[2] patch 6 ~ patch 10: rewrite the last parameter of mxs_dma_prep_slave_sg().
+	In the new GPMI version, some hardware behavior changes.
+	The WAIT4END bit should be set in the middle one of the ECC READ page DMA chain.
+	The DMA chain should be set like this:
 
-Which drivers do you need?
+          +-----+               +-----+                      +-----+
+          | cmd | ------------> | cmd | ------------------>  | cmd |
+          +-----+               +-----+                      +-----+
+                                   ^                            ^
+                                   |                            |
+                                   |                            |
+                              set WAIT4END here too        set WAIT4END here
 
-> Freescale and others are doing imx53 driver work and most drivers are
-> available somewhere, though I have not found them all in the same
-> place.
+         Please read the comment in patch "MXS-DMA : add more flags for MXS-DMA".
 
-That's the reason development for the mainline is done here on ALKML,
-with the aim to get everything into the mainline if possible.
+Huang Shijie (10):
+  MXS-DMA : move the mxs-dma.h to a more common place
+  MXS-DMA : change the header
+  MXS-MMC : change the DMA header file
+  MTD/GPMI : change the DMA header file
+  ASoc : change the DMA header file
+  MXS-DMA : add more flags for MXS-DMA
+  MXS-DMA : change the last parameter of mxs_dma_prep_slave_sg()
+  MXS-MMC : use the new DMA flags
+  MTD/GPMI : add a new field `gpmi_version`
+  MTD/GPMI : change the code for new DMA interface
 
-> Regardless, I am just looking for an appropriate reference/starting
-> point. 
-> 
-> What would be the normal route for i.MX53 work into the kernel ?
-
-Start with Linus' top-of-tree, discuss what you have found here on the
-list (before start coding), follow the coding rules and discuss the
-patches here. Don't forget to set kernel at pengutronix.de on Cc:.
-
-Robert
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ arch/arm/mach-mxs/include/mach/dma.h   |   28 ----------------
+ drivers/dma/mxs-dma.c                  |   12 ++++---
+ drivers/mmc/host/mxs-mmc.c             |   12 +++---
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   23 ++++++++++---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    6 +++-
+ drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    2 +
+ include/linux/mxs-dma.h                |   54 ++++++++++++++++++++++++++++++++
+ sound/soc/mxs/mxs-pcm.c                |    2 +-
+ sound/soc/mxs/mxs-pcm.h                |    2 +-
+ sound/soc/mxs/mxs-saif.c               |    2 +-
+ 10 files changed, 94 insertions(+), 49 deletions(-)
+ delete mode 100644 arch/arm/mach-mxs/include/mach/dma.h
+ create mode 100644 include/linux/mxs-dma.h
