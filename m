@@ -1,81 +1,83 @@
-From: mbohan@codeaurora.org (Michael Bohan)
-Date: Thu, 19 Jan 2012 14:43:44 -0800
-Subject: [PATCH] arm: irq: Allow for specification of no preallocated irqs
-Message-ID: <1327013024-22530-1-git-send-email-mbohan@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Jan 2012 16:47:13 -0600
+Subject: [PATCH] integrator: implement sched_clock across all boards
+In-Reply-To: <1327008349-8652-1-git-send-email-linus.walleij@linaro.org>
+References: <1327008349-8652-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4F189D71.40309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For cases with SPARSE_IRQ enabled, irqs preallocated with
-arch_probe_nr_irqs() are already marked as allocated in the
-allocated_irqs bitmap. As a consequence, irq chip drivers that
-allocate irqs will feel one of two behaviors:
+On 01/19/2012 03:25 PM, Linus Walleij wrote:
+> Now that we can select a sched_clock at runtime, let's implement
+> it for the Integrator AP, default-select the one found in all
+> other board it for all plat-versatile boards and make the right
+> clock kick in at runtime.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/mach-integrator/Kconfig         |    1 +
+>  arch/arm/mach-integrator/integrator_ap.c |    7 +++++++
+>  arch/arm/plat-versatile/Kconfig          |    2 +-
+>  3 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+> index 350e266..5a6148a 100644
+> --- a/arch/arm/mach-integrator/Kconfig
+> +++ b/arch/arm/mach-integrator/Kconfig
+> @@ -5,6 +5,7 @@ menu "Integrator Options"
+>  config ARCH_INTEGRATOR_AP
+>  	bool "Support Integrator/AP and Integrator/PP2 platforms"
+>  	select CLKSRC_MMIO
+> +	select HAVE_SCHED_CLOCK
 
-1. An allocation will succeed with the starting irq_base one
-more than the preallocated irqs. This will thus waste the
-preceeding interrupt resources that were preallocated, unless a
-legacy chip driver happens to assume ownership of these by some
-platform definition. The GIC driver is a typical primary chip
-driver, and abides to the allocation APIs. So this can be a
-problem in many trivial usecases.
+This can go away with Marc Z's follow-on series as HAVE_SCHED_CLOCK is
+always selected for ARM.
 
-2. An allocation will fail with < 0. This can also happen in the
-GIC driver, which interprets this value as meaning the irq_descs
-are already preallocated. But in Device Tree configurations, the
-fallback irq_base is -1. This results in an invalid irq_base
-value.
-
-Looking forward, we are moving towards a world where preallocation
-of irqs is no longer necessary. irq_domain is scoped to handle all
-irq_desc allocations in the future. Thus, we should support
-configurations where the platform wants to preallocate no irqs.
-
-One easy way to achieve this is to allow for
-machine_desc->nr_irqs < 0, which indicates not to preallocate any
-interrupts.
-
-Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
----
- arch/arm/include/asm/mach/arch.h |    2 +-
- arch/arm/kernel/irq.c            |   14 ++++++++++++--
- 2 files changed, 13 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index d7692ca..cc6506a 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -22,7 +22,7 @@ struct machine_desc {
- 	const char *const 	*dt_compat;	/* array of device tree
- 						 * 'compatible' strings	*/
- 
--	unsigned int		nr_irqs;	/* number of IRQs */
-+	int			nr_irqs;	/* number of IRQs */
- 
- #ifdef CONFIG_ZONE_DMA
- 	unsigned long		dma_zone_size;	/* size of DMA-able area */
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 3efd82c..f74b173 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -129,8 +129,18 @@ void __init init_IRQ(void)
- #ifdef CONFIG_SPARSE_IRQ
- int __init arch_probe_nr_irqs(void)
- {
--	nr_irqs = machine_desc->nr_irqs ? machine_desc->nr_irqs : NR_IRQS;
--	return nr_irqs;
-+	/*
-+	 * machine_desc->nr_irqs < 0 is a special case that
-+	 * specifies not to preallocate any irq_descs.
-+	 */
-+	if (machine_desc->nr_irqs < 0) {
-+		nr_irqs = 0;
-+		return nr_irqs;
-+	} else {
-+		nr_irqs = machine_desc->nr_irqs ?
-+			  machine_desc->nr_irqs : NR_IRQS;
-+		return nr_irqs;
-+	}
- }
- #endif
- 
--- 
-1.7.8.3
+>  	select MIGHT_HAVE_PCI
+>  	select SERIAL_AMBA_PL010
+>  	select SERIAL_AMBA_PL010_CONSOLE
+> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+> index 21a1d6c..4dde28b 100644
+> --- a/arch/arm/mach-integrator/integrator_ap.c
+> +++ b/arch/arm/mach-integrator/integrator_ap.c
+> @@ -42,6 +42,7 @@
+>  #include <asm/setup.h>
+>  #include <asm/param.h>		/* HZ */
+>  #include <asm/mach-types.h>
+> +#include <asm/sched_clock.h>
+>  
+>  #include <mach/lm.h>
+>  
+> @@ -325,6 +326,11 @@ static void __init ap_init(void)
+>  
+>  static unsigned long timer_reload;
+>  
+> +static u32 notrace integrator_read_sched_clock(void)
+> +{
+> +	return -readl((void __iomem *) TIMER2_VA_BASE + TIMER_VALUE);
+> +}
+> +
+>  static void integrator_clocksource_init(unsigned long inrate)
+>  {
+>  	void __iomem *base = (void __iomem *)TIMER2_VA_BASE;
+> @@ -341,6 +347,7 @@ static void integrator_clocksource_init(unsigned long inrate)
+>  
+>  	clocksource_mmio_init(base + TIMER_VALUE, "timer2",
+>  			rate, 200, 16, clocksource_mmio_readl_down);
+> +	setup_sched_clock(integrator_read_sched_clock, 16, rate);
+>  }
+>  
+>  static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
+> diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
+> index 52353be..aa63f38 100644
+> --- a/arch/arm/plat-versatile/Kconfig
+> +++ b/arch/arm/plat-versatile/Kconfig
+> @@ -11,7 +11,7 @@ config PLAT_VERSATILE_LEDS
+>  	depends on ARCH_REALVIEW || ARCH_VERSATILE
+>  
+>  config PLAT_VERSATILE_SCHED_CLOCK
+> -	def_bool y if !ARCH_INTEGRATOR_AP
+> +	def_bool y
+>  	select HAVE_SCHED_CLOCK
+>  
+>  endif
