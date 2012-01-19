@@ -1,104 +1,114 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 19 Jan 2012 14:16:07 +0800
-Subject: [PATCH 10/10] MTD/GPMI : change the code for new DMA interface
-In-Reply-To: <1326953767-24155-1-git-send-email-b32955@freescale.com>
-References: <1326953767-24155-1-git-send-email-b32955@freescale.com>
-Message-ID: <1326953767-24155-11-git-send-email-b32955@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Jan 2012 14:32:42 +0800
+Subject: [PATCH] ARM: mxs: add GPMI-NAND support for imx23/imx28
+In-Reply-To: <1326937424-19786-1-git-send-email-b32955@freescale.com>
+References: <1326937424-19786-1-git-send-email-b32955@freescale.com>
+Message-ID: <20120119063240.GC2247@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please read more comment in the mxs-dma.h.
+On Thu, Jan 19, 2012 at 09:43:44AM +0800, Huang Shijie wrote:
+> add GPMI-NAND support for imx23 and imx28.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/mach-mxs/clock-mx23.c                  |    1 +
+>  arch/arm/mach-mxs/clock-mx28.c                  |    1 +
+>  arch/arm/mach-mxs/devices-mx23.h                |    4 +
+>  arch/arm/mach-mxs/devices-mx28.h                |    4 +
+>  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-gpmi-nand.c  |  109 +++++++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/devices-common.h |   10 ++
+>  8 files changed, 133 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nand.c
+> 
+...
+> +#ifdef CONFIG_SOC_IMX23
+> +const struct mxs_gpmi_nand_data mx23_gpmi_nand_data __initconst = {
+> +	.devid = "imx23-gpmi-nand",
+> +	.res = {
+> +		{	/* GPMI */
+> +			.start = MX23_GPMI_BASE_ADDR,
+> +			.end   = MX23_GPMI_BASE_ADDR + SZ_8K - 1,
+> +			.name  = GPMI_NAND_GPMI_REGS_ADDR_RES_NAME,
+> +			.flags = IORESOURCE_MEM,
+> +		}, {
+> +			.start = MX23_INT_GPMI_ATTENTION,
+> +			.end   = MX23_INT_GPMI_ATTENTION,
+> +			.name  = GPMI_NAND_GPMI_INTERRUPT_RES_NAME,
+> +			.flags = IORESOURCE_IRQ,
+> +		}, {	/* BCH */
+> +			.start = MX23_BCH_BASE_ADDR,
+> +			.end   = MX23_BCH_BASE_ADDR + SZ_8K - 1,
+> +			.name  = GPMI_NAND_BCH_REGS_ADDR_RES_NAME,
+> +			.flags = IORESOURCE_MEM,
+> +		}, {
+> +			.start = MX23_INT_BCH,
+> +			.end   = MX23_INT_BCH,
+> +			.name  = GPMI_NAND_BCH_INTERRUPT_RES_NAME,
+> +			.flags = IORESOURCE_IRQ,
+> +		}, {	/* DMA */
+> +			.start	= MX23_DMA_GPMI0,
+> +			.end	= MX23_DMA_GPMI3,
+> +			.name  = GPMI_NAND_DMA_CHANNELS_RES_NAME,
+> +			.flags = IORESOURCE_DMA,
+> +		}, {
+> +			.start = MX23_INT_GPMI_DMA,
+> +			.end   = MX23_INT_GPMI_DMA,
+> +			.name  = GPMI_NAND_DMA_INTERRUPT_RES_NAME,
+> +			.flags = IORESOURCE_IRQ,
+> +		},
+> +	},
+> +};
+> +#endif
+> +
+> +#ifdef CONFIG_SOC_IMX28
+> +const struct mxs_gpmi_nand_data mx28_gpmi_nand_data __initconst = {
+> +	.devid = "imx28-gpmi-nand",
+> +	.res = {
+> +		{	/* GPMI */
+> +			.start = MX28_GPMI_BASE_ADDR,
+> +			.end   = MX28_GPMI_BASE_ADDR + SZ_8K - 1,
+> +			.name  = GPMI_NAND_GPMI_REGS_ADDR_RES_NAME,
+> +			.flags = IORESOURCE_MEM,
+> +		 }, {
+> +			.start = MX28_INT_GPMI,
+> +			.end   = MX28_INT_GPMI,
+> +			.name  = GPMI_NAND_GPMI_INTERRUPT_RES_NAME,
+> +			.flags = IORESOURCE_IRQ,
+> +		}, {	/* BCH */
+> +			.start = MX28_BCH_BASE_ADDR,
+> +			.end   = MX28_BCH_BASE_ADDR + SZ_8K - 1,
+> +			.name  = GPMI_NAND_BCH_REGS_ADDR_RES_NAME,
+> +			.flags = IORESOURCE_MEM,
+> +		 }, {
+> +			.start = MX28_INT_BCH,
+> +			.end   = MX28_INT_BCH,
+> +			.name  = GPMI_NAND_BCH_INTERRUPT_RES_NAME,
+> +			.flags = IORESOURCE_IRQ,
+> +		 }, {	/* DMA */
+> +			.start	= MX28_DMA_GPMI0,
+> +			.end	= MX28_DMA_GPMI7,
+> +			.name	= GPMI_NAND_DMA_CHANNELS_RES_NAME,
+> +			.flags	= IORESOURCE_DMA,
+> +		 }, {
+> +			.start = MX28_INT_GPMI_DMA,
+> +			.end   = MX28_INT_GPMI_DMA,
+> +			.name  = GPMI_NAND_DMA_INTERRUPT_RES_NAME,
+> +			.flags = IORESOURCE_IRQ,
+> +		},
+> +	},
 
-In the new GPMI version(0x05010000 used by MX6Q/MX50), we should
-set the WAIT4END bit in the middle one of this chain,
-which enables the BCH module and reads out the NAND page.
-If we do not do this, a DMA timeout occurs. This bug has been
-catched in the MX6Q board.
+You now can use the DEFINE_RES_* helper created by commit a0e44d4 (include/linux/ioport.h:
+new helper to define common struct resource constructs) for these
+definitions.
 
-We have changed the DMA interface to fix the bug, now use the new
-interface.
+Other than that, the patch looks good to me.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   20 ++++++++++++++------
- 1 files changed, 14 insertions(+), 6 deletions(-)
+> +};
+> +#endif
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 5b73ae5..84abd49 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -842,7 +842,7 @@ int gpmi_send_command(struct gpmi_nand_data *this)
- 	sg_init_one(sgl, this->cmd_buffer, this->command_length);
- 	dma_map_sg(this->dev, sgl, 1, DMA_TO_DEVICE);
- 	desc = channel->device->device_prep_slave_sg(channel,
--					sgl, 1, DMA_MEM_TO_DEV, 1);
-+				sgl, 1, DMA_MEM_TO_DEV, MXS_DMA_F_LASTONE);
- 	if (!desc) {
- 		pr_err("step 2 error\n");
- 		return -1;
-@@ -884,7 +884,7 @@ int gpmi_send_data(struct gpmi_nand_data *this)
- 	/* [2] send DMA request */
- 	prepare_data_dma(this, DMA_TO_DEVICE);
- 	desc = channel->device->device_prep_slave_sg(channel, &this->data_sgl,
--						1, DMA_MEM_TO_DEV, 1);
-+					1, DMA_MEM_TO_DEV, MXS_DMA_F_LASTONE);
- 	if (!desc) {
- 		pr_err("step 2 error\n");
- 		return -1;
-@@ -920,7 +920,7 @@ int gpmi_read_data(struct gpmi_nand_data *this)
- 	/* [2] : send DMA request */
- 	prepare_data_dma(this, DMA_FROM_DEVICE);
- 	desc = channel->device->device_prep_slave_sg(channel, &this->data_sgl,
--						1, DMA_DEV_TO_MEM, 1);
-+					1, DMA_DEV_TO_MEM, MXS_DMA_F_LASTONE);
- 	if (!desc) {
- 		pr_err("step 2 error\n");
- 		return -1;
-@@ -967,7 +967,8 @@ int gpmi_send_page(struct gpmi_nand_data *this,
- 
- 	desc = channel->device->device_prep_slave_sg(channel,
- 					(struct scatterlist *)pio,
--					ARRAY_SIZE(pio), DMA_TRANS_NONE, 0);
-+					ARRAY_SIZE(pio), DMA_TRANS_NONE,
-+					MXS_DMA_F_WAIT4END);
- 	if (!desc) {
- 		pr_err("step 2 error\n");
- 		return -1;
-@@ -987,6 +988,7 @@ int gpmi_read_page(struct gpmi_nand_data *this,
- 	struct dma_async_tx_descriptor *desc;
- 	struct dma_chan *channel = get_dma_chan(this);
- 	int chip = this->current_chip;
-+	unsigned long flags;
- 	u32 pio[6];
- 
- 	/* [1] Wait for the chip to report ready. */
-@@ -1029,9 +1031,14 @@ int gpmi_read_page(struct gpmi_nand_data *this,
- 	pio[3] = geo->page_size;
- 	pio[4] = payload;
- 	pio[5] = auxiliary;
-+
-+	/* If the GPMI is new version, set MXS_DMA_F_WAIT4END here. */
-+	flags = MXS_DMA_F_APPEND;
-+	if (this->gpmi_version == GPMI_VERSION_0501)
-+		flags |= MXS_DMA_F_WAIT4END;
- 	desc = channel->device->device_prep_slave_sg(channel,
- 					(struct scatterlist *)pio,
--					ARRAY_SIZE(pio), DMA_TRANS_NONE, 1);
-+					ARRAY_SIZE(pio), DMA_TRANS_NONE, flags);
- 	if (!desc) {
- 		pr_err("step 2 error\n");
- 		return -1;
-@@ -1048,9 +1055,10 @@ int gpmi_read_page(struct gpmi_nand_data *this,
- 		| BF_GPMI_CTRL0_ADDRESS(address)
- 		| BF_GPMI_CTRL0_XFER_COUNT(geo->page_size);
- 	pio[1] = 0;
-+	pio[2] = 0;
- 	desc = channel->device->device_prep_slave_sg(channel,
- 				(struct scatterlist *)pio, 2,
--				DMA_TRANS_NONE, 1);
-+				DMA_TRANS_NONE, MXS_DMA_F_LASTONE);
- 	if (!desc) {
- 		pr_err("step 3 error\n");
- 		return -1;
 -- 
-1.7.0.4
+Regards,
+Shawn
