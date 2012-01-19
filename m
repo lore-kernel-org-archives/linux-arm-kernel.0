@@ -1,48 +1,81 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 19 Jan 2012 21:14:54 +0800
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
-References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
- <4F0B182D.7060507@us.ibm.com>
- <20120109224945.GA23090@mudshark.cambridge.arm.com>
- <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
- <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
- <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
- <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
- <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
- <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
- <CACVXFVOQNDRs=c8A2YC+WvYAHs5Abbz-QUEe1VJqrj2esFO11g@mail.gmail.com>
- <CAMsRxf+e38jRcyxESLhYDZ3OL910AQdapZD9P8vWDXfUE34DAA@mail.gmail.com>
- <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
- <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
-Message-ID: <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 19 Jan 2012 13:21:06 +0000
+Subject: [PATCH v6 6/9] ARM: vexpress: Motherboard RS1 memory map support
+In-Reply-To: <4F047FE1.5030002@citrix.com>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-7-git-send-email-pawel.moll@arm.com>
+ <4F047FE1.5030002@citrix.com>
+Message-ID: <1326979266.32197.60.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 8:51 PM, stephane eranian
-<eranian@googlemail.com> wrote:
-> On Thu, Jan 19, 2012 at 1:45 PM, Ming Lei <ming.lei@canonical.com> wrote:
->> Hi,
->>
->> On Thu, Jan 19, 2012 at 7:34 PM, stephane eranian
->> <eranian@googlemail.com> wrote:
->>> Hi,
->>>
->>> Ok some update on this.
->>> With your .config file + 3.2.0 (Linus) + patch 3, 4, 5, 6, I get a kernel that
->>
->> You forget patch 1 and patch 2?
->>
-> They are already in 3.2.0. Unless I am mistaken.
+Hi,
 
-Sorry, I just found that they have been merged to 3.2.
+Sorry about loooong delay - I've been on holiday.
 
->
-> are you sure you don't have anything else applied?
+On Wed, 2012-01-04 at 16:35 +0000, David Vrabel wrote:
+> On 15/12/11 14:02, Pawel Moll wrote:
+> > This patch adds support for RS1 memory map based Versatile Express
+> > motherboard.
+> > 
+> [...]
+> > --- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
+> > +++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
+> > @@ -10,12 +10,41 @@
+> >   * published by the Free Software Foundation.
+> >   */
+> >  
+> > -#define DEBUG_LL_UART_OFFSET	0x00009000
+> > +#define DEBUG_LL_PHYS_BASE		0x10000000
+> > +#define DEBUG_LL_UART_OFFSET		0x00009000
+> > +
+> > +#define DEBUG_LL_PHYS_BASE_RS1		0x1c000000
+> > +#define DEBUG_LL_UART_OFFSET_RS1	0x00090000
+> > +
+> > +#define DEBUG_LL_VIRT_BASE		0xf8000000
+> >  
+> >  		.macro	addruart,rp,rv,tmp
+> > -		mov	\rp, #DEBUG_LL_UART_OFFSET
+> > -		orr	\rv, \rp, #0xf8000000	@ virtual base
+> > -		orr	\rp, \rp, #0x10000000	@ physical base
+> > +
+> > +		@ Check the MMU state
+> > +#if defined(CONFIG_MMU)
+> > +		mrc	p15, 0, \tmp, c1, c0	@ SCTRL
+> > +		tst	\tmp, #1		@ MMU enabled?
+> > +		moveq	\tmp, #DEBUG_LL_PHYS_BASE
+> > +		movne	\tmp, #DEBUG_LL_VIRT_BASE
+> > +#else
+> > +		mov	\tmp, #DEBUG_LL_PHYS_BASE
+> > +#endif
+> > +
+> > +		@ PL011 present in "original" place?
+> > +		orr	\tmp, \tmp, #DEBUG_LL_UART_OFFSET
+> > +		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
+> 
+> This doesn't work with CONFIG_EARLY_PRINTK=y on a system with the RS1
+> memory map.  
 
-Yes, I am sure, maybe it is caused by uboot and mlo, I will email them
-to you in private mail.
+It does for me:
 
-thanks,
---
-Ming Lei
+# zcat /proc/config.gz | grep EARLY_PRINTK
+CONFIG_EARLY_PRINTK=y
+# cat /proc/device-tree/motherboard/arm,v2m-memory-map && echo
+rs1     
+#
+
+Can you tell me what exactly is going wrong in your case? Does it hang
+without any warning? Do you get at least part of the boot log? Can you
+send me (privately probably) your kernel config?
+
+>  __create_page_tables has only mapped the single physical
+> page at 0x1c090000 and thus the test for the UART in the other memory
+> map faults.
+
+I investigated this when writing the code and I vaguely remember it was
+fine, partly by accident. I'll dig in again and let you know my
+findings.
+
+Thanks for trying this out!
+
+Pawe?
