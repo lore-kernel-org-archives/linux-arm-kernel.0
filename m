@@ -1,34 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 19 Jan 2012 08:01:44 -0600
-Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
- tile (TC1 variant)
-In-Reply-To: <1326980594.32197.67.camel@hornet.cambridge.arm.com>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
- <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
- <4F0C495C.4000103@citrix.com>
- <1326979652.32197.66.camel@hornet.cambridge.arm.com>
- <4F181BD9.20401@gmail.com>
- <1326980594.32197.67.camel@hornet.cambridge.arm.com>
-Message-ID: <4F182248.7070209@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 19 Jan 2012 12:04:10 -0200
+Subject: [PATCH] ARM: mx28: Clear CLKGATE bit prior to changing DIV field
+In-Reply-To: <7FE21149F4667147B645348EC6057885095EE2@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
+ <20246.30805.391940.766120@ipc1.ka-ro>
+ <CAOMZO5B3qRowaQ9c_=pyykvp5x5f2nTgticV0tCcHGAYD007MQ@mail.gmail.com>
+ <20120119031726.GA2247@S2101-09.ap.freescale.net>
+ <CAOMZO5CeW08kb4q3UVbpQ1tfJPotoVWV9dD7ycokpEbp2a9mow@mail.gmail.com>
+ <20120119042047.GB2247@S2101-09.ap.freescale.net>
+ <CAOMZO5CtgriCCCoZ+7nr9ddSfbdwsUMqEZCbsXJS2yuPqhdEfg@mail.gmail.com>
+ <7FE21149F4667147B645348EC6057885095EE2@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <CAOMZO5BDAZsx=iAWAu1MiiGMJxbriCVX=+txPiaBXMhVZD8=zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2012 07:43 AM, Pawel Moll wrote:
-> On Thu, 2012-01-19 at 13:34 +0000, Rob Herring wrote:
->>> You're right - the skeleton.dtsi contains "memory" mode... Funnily
->>> enough originally I was using that name, but then Rob Herring suggested
->>> changing it to @80000000, which seemed reasonable.
->>>
->>> Now I wonder - is the "memory" node special and should not contain
->>> "@address", or the skelton shouldn't contain the empty "memory" node...
->>>
->>
->> Hummm... I guess you should just use "memory" if you are using
->> skeleton.dtsi.
-> 
-> Well, I don't mind _not_ using skeleton, but I had an impression the
-> general policy was to use it?
+On 1/19/12, Dong Aisheng-B29396 <B29396@freescale.com> wrote:
 
-Either way is fine. I don't really think it buys you much.
+> The change looks ok to me.
+> If the test is ok, I will ack this patch.
 
-Rob
+Yes, audio works with this change. I submitted the patch to the alsa-devel list.
+
+Regards,
+
+Fabio Estevam
