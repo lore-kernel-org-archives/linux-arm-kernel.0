@@ -1,41 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Jan 2012 17:00:28 +0000
-Subject: [PATCH 00/11] Recently pending ARM fixes
-In-Reply-To: <20120119153149.GB1068@n2100.arm.linux.org.uk>
-References: <20120119153149.GB1068@n2100.arm.linux.org.uk>
-Message-ID: <20120119170028.GN1701@mudshark.cambridge.arm.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Thu, 19 Jan 2012 17:00:56 +0000
+Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
+ tile (TC1 variant)
+In-Reply-To: <1326984672.32197.68.camel@hornet.cambridge.arm.com>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>	
+ <1323957761-13553-10-git-send-email-pawel.moll@arm.com>	
+ <4F0C495C.4000103@citrix.com>	
+ <1326979652.32197.66.camel@hornet.cambridge.arm.com>	
+ <4F181BD9.20401@gmail.com>	
+ <1326980594.32197.67.camel@hornet.cambridge.arm.com>	
+ <4F182248.7070209@gmail.com>
+ <1326984672.32197.68.camel@hornet.cambridge.arm.com>
+Message-ID: <4F184C48.2050505@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Thu, Jan 19, 2012 at 03:31:49PM +0000, Russell King - ARM Linux wrote:
-> Below is a summary of a new set of ARM fixes which I've queued up
-> today (so far).  The big one is the revert of the changes to
-> rtc-sa1100.c, which completely broke the driver.  Of the remainder,
-> the bulk are sorting out a few section mismatch warnings.
+On 19/01/12 14:51, Pawel Moll wrote:
+> On Thu, 2012-01-19 at 14:01 +0000, Rob Herring wrote:
+>> On 01/19/2012 07:43 AM, Pawel Moll wrote:
+>>> On Thu, 2012-01-19 at 13:34 +0000, Rob Herring wrote:
+>>>>> You're right - the skeleton.dtsi contains "memory" mode... Funnily
+>>>>> enough originally I was using that name, but then Rob Herring suggested
+>>>>> changing it to @80000000, which seemed reasonable.
+>>>>>
+>>>>> Now I wonder - is the "memory" node special and should not contain
+>>>>> "@address", or the skelton shouldn't contain the empty "memory" node...
+>>>>>
+>>>>
+>>>> Hummm... I guess you should just use "memory" if you are using
+>>>> skeleton.dtsi.
+>>>
+>>> Well, I don't mind _not_ using skeleton, but I had an impression the
+>>> general policy was to use it?
+>>
+>> Either way is fine. I don't really think it buys you much.
 > 
-> The two remaining patches fix a build error with collie and some
-> RCU problems seen on SMP platforms, and two other minor patches.
-> 
-> Most people won't have much interest in this set of fixes, except
-> for the rcu patch, so I probably won't push this to Linus for a
-> few days (which means the number could grow.)
+> Ok, /include/ "skeleton.dtsi" is gone then :-)
 
-I have a few pending fixes that I plan to stick into the patch system
-tomorrow:
+The problem wasn't with including skeleton.dtsi.  With
+CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
+DTB using information from the ATAGs (see atags_to_fdt()).
 
-ARM: proc-v7.S: remove HARVARD_CACHE preprocessor guards
-ARM: cortex-a7: move proc_info out of !CONFIG_ARM_LPAE block
-ARM: vectors: use gate_vma for vectors user mapping
-ARM: logical_cpu_map: decouple CPU mapping from SMP
-ARM: hotplug: ensure that we copy the affinity mask when migrating IRQs
-ARM: cache: assume 64-byte L1 cachelines for ARMv7 CPUs
-ARM: vmlinux.lds.S: align the exception fixup table to a 4-byte boundary
-ARM: vmlinux.lds.S: do not hardcode cacheline size as 32 bytes
+If there's an ATAG giving the amount of RAM the DTB's "memory" node is
+replaced with a new one.  Since the vexpress DTBs don't have a "memory"
+node it's added and the DTB ends up with two nodes describing memory.
 
-the other bits and pieces I've been hacking on can wait until 3.4.
+I don't expect any real production vexpress system to use this config
+options -- we're using it now when running as a guest under Xen because
+Xen doesn't (yet) support device tree and we're using ATAGs to tell the
+guest how much RAM it's been allocated.
 
-Cheers,
-
-Will
+David
