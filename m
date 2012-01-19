@@ -1,36 +1,22 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Jan 2012 09:13:11 +0100
-Subject: [PATCH] ARM: protect usage of cr_alignment by #ifdef
- CONFIG_CPU_CP15
-In-Reply-To: <4F173BFC.1040107@gmail.com>
-References: <1326732555-17915-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <4F173BFC.1040107@gmail.com>
-Message-ID: <20120119081311.GD4066@pengutronix.de>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 19 Jan 2012 16:23:09 +0800
+Subject: [PATCH resent v2 1/2] ioport : add DEFINE_RES_DMA_SIZE_NAMED macro
+In-Reply-To: <20120119081427.GF2247@S2101-09.ap.freescale.net>
+References: <1326959620-25920-1-git-send-email-b32955@freescale.com>
+ <1326959620-25920-2-git-send-email-b32955@freescale.com>
+ <20120119081427.GF2247@S2101-09.ap.freescale.net>
+Message-ID: <4F17D2ED.6090502@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ryan,
+Hi Shawn:
+> I'm not sure the patch is welcomed.  You may want to just use
+> DEFINE_RES_NAMED for such cases.
+I ever wanted to use DEFINE_RES_NAMED.
+But it seems i have to change some other 
+code(/arch/arm/plat-samsung/devs.c).
 
-On Thu, Jan 19, 2012 at 08:39:08AM +1100, Ryan Mallon wrote:
-> On 17/01/12 03:49, Uwe Kleine-K?nig wrote:
-> There is another reference in this file to cr_alignment:
-> 
-> #if __LINUX_ARM_ARCH__ >= 4
-> #define vectors_high()  (cr_alignment & CR_V)
-> #else
-> #define vectors_high()  (0)
-> #endif
-> 
-> In our para-virtualised kernel we hardcode the value of vectors_high()
-> to 1, however this is might not be the correct thing to do universally
-> if !CONFIG_CPU_CP15 && __LINUX_ARM_ARCH__ >= 4.
-On Cortex-M3 the concept of high vectors doesn't exist. There is just a
-register that gets the address of the vector (that looks quite different
-on M3) and is located in the data section. Hm.
+Anyway, if someone do not like this macro. I can change it too.
 
-Best regards and thanks for the heads up,
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best Regards
+Huang Shijie
