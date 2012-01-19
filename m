@@ -1,52 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2012 17:57:14 +0000
-Subject: [PATCH] RFC: spi/sa1100: rewrite the SA1100 SPI driver
-In-Reply-To: <CACRpkdYdwKmrL6K9P05COxMVRgHECj_4CUE9COYiuFsQj5N39g@mail.gmail.com>
-References: <1326841236-25178-1-git-send-email-linus.walleij@linaro.org>
- <20120117231314.GA1068@n2100.arm.linux.org.uk>
- <CACRpkdbynmvcjOY=7_6wK3YTJHpS16Y0fU-Ka3-qw6Vt+eXy0A@mail.gmail.com>
- <20120118123037.GF1068@n2100.arm.linux.org.uk>
- <CACRpkdYdwKmrL6K9P05COxMVRgHECj_4CUE9COYiuFsQj5N39g@mail.gmail.com>
-Message-ID: <20120119175714.GF10404@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 19 Jan 2012 10:59:26 -0700
+Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
+ tile (TC1 variant)
+In-Reply-To: <20120119175053.GE10404@n2100.arm.linux.org.uk>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
+ <4F0C495C.4000103@citrix.com>
+ <1326979652.32197.66.camel@hornet.cambridge.arm.com>
+ <4F181BD9.20401@gmail.com>
+ <1326980594.32197.67.camel@hornet.cambridge.arm.com>
+ <4F182248.7070209@gmail.com>
+ <1326984672.32197.68.camel@hornet.cambridge.arm.com>
+ <4F184C48.2050505@citrix.com>
+ <1326994035.13748.7.camel@hornet.cambridge.arm.com>
+ <20120119175053.GE10404@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6tWCd83qcfAv8=x3mdGNHR6xEnS=Gyq=bnWxRw22M4QXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 06:49:25PM +0100, Linus Walleij wrote:
-> On Wed, Jan 18, 2012 at 1:30 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Jan 18, 2012 at 01:13:29PM +0100, Linus Walleij wrote:
-> 
-> >> We usually merge drivers for microwire, TI, Motorola ... etc into
-> >> drivers/spi as well. It's a good enough fit, the differences are very
-> >> small. This is how we configure mode from the PL022 driver platform data:
-> >
-> > How do you send audio data at 16-bit 2 channel 48kHz continuously with
-> > the SPI subsystem?
-> 
-> Can't say because we haven't used it for audio transfers. However
-> I am pretty convinced that it'd work because we're running a
-> 20 Mbit data link on that SPI port.
-> 
-> To get the high data rates we have an internal message queue in
-> the driver that saturates the SPI port. Sometimes we even start to
-> run parts of the driver in parallel on two cores: CPU0 is handling
-> IRQs from the driver while CPU1 is preparing messages to/from
-> the SPI subsystem.
+On Thu, Jan 19, 2012 at 10:50 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 19, 2012 at 05:27:15PM +0000, Pawel Moll wrote:
+>> On Thu, 2012-01-19 at 17:00 +0000, David Vrabel wrote:
+>> > The problem wasn't with including skeleton.dtsi.
+>>
+>> Including as it is creates two device_type="memory" nodes, one with
+>> regs=<0 0>, which is definitely wrong.
+>>
+>> > With
+>> > CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
+>> > DTB using information from the ATAGs (see atags_to_fdt()).
+>> >
+>> > If there's an ATAG giving the amount of RAM the DTB's "memory" node is
+>> > replaced with a new one. ?Since the vexpress DTBs don't have a "memory"
+>> > node it's added and the DTB ends up with two nodes describing memory.
+>>
+>> The "memory at address" node name is in my opinion perfectly legal - p. 3.4
+>> of the DT spec says "The name component of the node name (see 2.2.1)
+>> shall be memory.". So the decompressor code may be wrong in looking for
+>> adress-less "memory" node...
+>
+> I don't think you can expect such early code to properly parse a DT tree
+> with a variability in how memory stuff is declared into that DT tree.
+>
+> What if you have two memory nodes specified in the DT file, and the
+> ATAG data contains one?
 
-A SMP system, which SA1100 is not.
+Yes, just because it is technically legal doesn't make it okay.  The
+pragmatic approach here is that the skeleton.dtsi file calls the node
+"memory", so this .dts file must do the same.
 
-With audio on the SA1100, we have to keep both DMA transfer buffer
-pointers filled to ensure that audio does not suffer.  I don't see
-submitting multiple SPI transfers into the SPI subsystem would be
-able to do that without waiting for the previous transfer to stop
-completely before starting the next - and that implies the DMA
-transfer completes before starting to program up the next one.
+> The more I look at this, the more I'm convinced that Grant's idea that
+> DT should entirely override ATAGs all the way to the kernel proper was
+> the wrong solution - at least in the kernel, if we had both available,
+> we could make a choice there, and have the full DT library to be able
+> to manipulate the DT blob.
 
-What I'm saying is that SPI will want DMA activity to complete _and_
-end before it starts on the next transfer, which is going to create
-a break in the data output.
+Hey!  I was originally lobbying for the dt pointer carried by an ATAG.
+ Nico conviced me otherwise.  :-)
 
-Given that audio here just requires the SSP to be configured, and
-then everything else is just DMA, I don't see why we need to waste
-cycles fiddling with the SPI subsystem with its inherent batching
-of transfers.
+> Unfortunately, that's not so, so we're just going to have to accept
+> that on ARM it should be "memory" if we want the ATAG code to override
+> it. ?Expecting the decompressor to figure out that it needs to delete
+> DT nodes and all that I think is asking far too much.
+
++1
