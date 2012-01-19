@@ -1,36 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2012 15:34:26 +0000
-Subject: [PATCH 06/11] ARM: sa11x0: fix section mismatch in cpu-sa1100.c
+Date: Thu, 19 Jan 2012 15:34:47 +0000
+Subject: [PATCH 07/11] ARM: fix a section mismatch warning with our use of
+ memblock
 In-Reply-To: <20120119153149.GB1068@n2100.arm.linux.org.uk>
 References: <20120119153149.GB1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rnu0Q-0002pf-BV@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rnu0l-0002pj-70@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: arch/arm/mach-sa1100/built-in.o(.data+0x11b8): Section mismatch in reference from the variable sa1100_driver to the function .init.text:sa1100_cpu_init()
-The variable sa1100_driver references
-the function __init sa1100_cpu_init()
-If the reference is valid then annotate the
-variable with __init* or __refdata (see linux/init.h) or name the variable:
-*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+Commit 716a3dc2008 (ARM: Add arm_memblock_steal() to allocate memory
+away from the kernel) added a function which calls memblock_alloc().
+This causes a section conflict:
+
+WARNING: vmlinux.o(.text+0xc614): Section mismatch in reference from the function arm_memblock_steal() to the function .init.text:memblock_alloc()
+The function arm_memblock_steal() references
+the function __init memblock_alloc().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/cpu-sa1100.c |    2 +-
+ arch/arm/mm/init.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/cpu-sa1100.c b/arch/arm/mach-sa1100/cpu-sa1100.c
-index aaa8acf..19b2053 100644
---- a/arch/arm/mach-sa1100/cpu-sa1100.c
-+++ b/arch/arm/mach-sa1100/cpu-sa1100.c
-@@ -228,7 +228,7 @@ static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
- 	return 0;
- }
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 6ec1226..5dc7d12 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -310,7 +310,7 @@ static void arm_memory_present(void)
  
--static struct cpufreq_driver sa1100_driver = {
-+static struct cpufreq_driver sa1100_driver __refdata = {
- 	.flags		= CPUFREQ_STICKY,
- 	.verify		= sa11x0_verify_speed,
- 	.target		= sa1100_target,
+ static bool arm_memblock_steal_permitted = true;
+ 
+-phys_addr_t arm_memblock_steal(phys_addr_t size, phys_addr_t align)
++phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
+ {
+ 	phys_addr_t phys;
+ 
 -- 
 1.7.4.4
