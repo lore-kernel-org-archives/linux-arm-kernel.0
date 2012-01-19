@@ -1,57 +1,56 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 19 Jan 2012 13:27:32 +0000
-Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
- tile (TC1 variant)
-In-Reply-To: <4F0C495C.4000103@citrix.com>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
- <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
- <4F0C495C.4000103@citrix.com>
-Message-ID: <1326979652.32197.66.camel@hornet.cambridge.arm.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 19 Jan 2012 13:30:52 +0000
+Subject: [RFC PATCH 1/5] arm:omap1/2/3/4:Convert 32k-Sync clocksource
+ driver to platform_driver
+In-Reply-To: <20120119130926.GF22818@atomide.com>
+References: <1326886086-27313-1-git-send-email-hvaibhav@ti.com>
+ <1326886086-27313-2-git-send-email-hvaibhav@ti.com>
+ <20120118115952.GM16726@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A8317A9AA2@DBDE01.ent.ti.com>
+ <20120118141147.GN16726@n2100.arm.linux.org.uk> <4F16D66F.2000602@arm.com>
+ <79CD15C6BA57404B839C016229A409A8317A9C39@DBDE01.ent.ti.com>
+ <4F16DB10.8060806@arm.com> <20120118145032.GO16726@n2100.arm.linux.org.uk>
+ <20120119130926.GF22818@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317AB17D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-01-10 at 14:21 +0000, David Vrabel wrote:
-> On 15/12/11 14:02, Pawel Moll wrote:
-> > This patch adds Device Tree file for the CoreTile Express A15x2
-> > (V2P-CA15) with Test Chip 1.
-> 
-> This doesn't work as-is with the software model as accessing some of the
-> peripherals that aren't modeled will cause an exception.  Is it worth
-> having a device tree file suitable for the models? Or are the models too
-> configurable for this to be workable?
-
-The model as you have it doesn't exactly represent the board for a
-number of reasons, mainly because there was no hardware design when the
-model was created, so some of the solution was best-guessed by the model
-people. Anyway, current A15 model can't be considered a 1-to-1
-equivalent of the VE board. The plan is that the models will be shipped
-with their own DTSes. I'll work on that in the following months, I can
-keep you updated (and use as a beta tester ;-) if you want.
-
-> > As the chip's GIC has 160 interrupt inputs and equivalent SMM
-> > (FPGA) has GIC synthesised with 256 interrupts, NR_IRQS is
-> > increased.
+On Thu, Jan 19, 2012 at 18:39:26, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120118 06:18]:
+> > On Wed, Jan 18, 2012 at 02:45:36PM +0000, Marc Zyngier wrote:
+> > > Can't you instead use the ARM sched_clock framework?
 > > 
-> [...]
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-> [...]
-> > +	memory at 80000000 {
-> > +		device_type = "memory";
-> > +		reg = <0x80000000 0x40000000>;
-> > +	};
+> > OMAP does, and has done for quite some time.  The problem is these
+> > patches are against an old kernel.
 > 
-> If CONFIG_ARM_ATAG_DTB_COMPAT is enabled the device tree will end up
-> with two nodes describing the memory ("memory" and "memory at 80000000" in
-> this case).
+> Additionally we're already handling the 32k timer or not case already
+> on omap1 as it does not exist on 1510, so there should only minimal
+> patching needed AFAIK.
+> 
 
-You're right - the skeleton.dtsi contains "memory" mode... Funnily
-enough originally I was using that name, but then Rob Herring suggested
-changing it to @80000000, which seemed reasonable.
+Tony,
 
-Now I wonder - is the "memory" node special and should not contain
-"@address", or the skelton shouldn't contain the empty "memory" node...
+All this is handled using cpu_is_omapxxxx() checks, something like,
 
-Cheers!
+int __init omap_init_clocksource_32k(void) {
+	...
 
-Pawe?
+	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+	...
+	...
+	...
+
+	}
+}
+
+This will not help for omap2/3+ devices.
+
+I have cleaned up the code and about to submit it, please review
+it and provide the comments.
+
+Submitting shortly...
+
+Thanks,
+Vaibhav
+> Tony
+> 
