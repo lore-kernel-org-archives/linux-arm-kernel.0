@@ -1,67 +1,127 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 19 Jan 2012 10:59:26 -0700
-Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
- tile (TC1 variant)
-In-Reply-To: <20120119175053.GE10404@n2100.arm.linux.org.uk>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
- <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
- <4F0C495C.4000103@citrix.com>
- <1326979652.32197.66.camel@hornet.cambridge.arm.com>
- <4F181BD9.20401@gmail.com>
- <1326980594.32197.67.camel@hornet.cambridge.arm.com>
- <4F182248.7070209@gmail.com>
- <1326984672.32197.68.camel@hornet.cambridge.arm.com>
- <4F184C48.2050505@citrix.com>
- <1326994035.13748.7.camel@hornet.cambridge.arm.com>
- <20120119175053.GE10404@n2100.arm.linux.org.uk>
-Message-ID: <CACxGe6tWCd83qcfAv8=x3mdGNHR6xEnS=Gyq=bnWxRw22M4QXA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Jan 2012 19:05:10 +0100
+Subject: [PATCH 1/3] ARM: at91/tclib: take iomem size from resource
+In-Reply-To: <1326996312-9244-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1326996312-9244-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <a311afe3c46da62f7a1e82d2fa933e24ad4eef7e.1326995849.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 10:50 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jan 19, 2012 at 05:27:15PM +0000, Pawel Moll wrote:
->> On Thu, 2012-01-19 at 17:00 +0000, David Vrabel wrote:
->> > The problem wasn't with including skeleton.dtsi.
->>
->> Including as it is creates two device_type="memory" nodes, one with
->> regs=<0 0>, which is definitely wrong.
->>
->> > With
->> > CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
->> > DTB using information from the ATAGs (see atags_to_fdt()).
->> >
->> > If there's an ATAG giving the amount of RAM the DTB's "memory" node is
->> > replaced with a new one. ?Since the vexpress DTBs don't have a "memory"
->> > node it's added and the DTB ends up with two nodes describing memory.
->>
->> The "memory at address" node name is in my opinion perfectly legal - p. 3.4
->> of the DT spec says "The name component of the node name (see 2.2.1)
->> shall be memory.". So the decompressor code may be wrong in looking for
->> adress-less "memory" node...
->
-> I don't think you can expect such early code to properly parse a DT tree
-> with a variability in how memory stuff is declared into that DT tree.
->
-> What if you have two memory nodes specified in the DT file, and the
-> ATAG data contains one?
+Requesting iomem region and ioremaping is now done using
+the resource size specified instead of a constant value.
 
-Yes, just because it is technically legal doesn't make it okay.  The
-pragmatic approach here is that the skeleton.dtsi file calls the node
-"memory", so this .dts file must do the same.
+Each <SoC>_device.c file is modified accordingly to reflect
+actual user interface size.
 
-> The more I look at this, the more I'm convinced that Grant's idea that
-> DT should entirely override ATAGs all the way to the kernel proper was
-> the wrong solution - at least in the kernel, if we had both available,
-> we could make a choice there, and have the full DT library to be able
-> to manipulate the DT blob.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91sam9260_devices.c |    4 ++--
+ arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
+ drivers/misc/atmel_tclib.c               |   17 +++++++++--------
+ 3 files changed, 13 insertions(+), 12 deletions(-)
 
-Hey!  I was originally lobbying for the dt pointer carried by an ATAG.
- Nico conviced me otherwise.  :-)
-
-> Unfortunately, that's not so, so we're just going to have to accept
-> that on ARM it should be "memory" if we want the ATAG code to override
-> it. ?Expecting the decompressor to figure out that it needs to delete
-> DT nodes and all that I think is asking far too much.
-
-+1
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 642ccb6..ea66087 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -641,7 +641,7 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ static struct resource tcb0_resources[] = {
+ 	[0] = {
+ 		.start	= AT91SAM9260_BASE_TCB0,
+-		.end	= AT91SAM9260_BASE_TCB0 + SZ_16K - 1,
++		.end	= AT91SAM9260_BASE_TCB0 + SZ_256 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+@@ -671,7 +671,7 @@ static struct platform_device at91sam9260_tcb0_device = {
+ static struct resource tcb1_resources[] = {
+ 	[0] = {
+ 		.start	= AT91SAM9260_BASE_TCB1,
+-		.end	= AT91SAM9260_BASE_TCB1 + SZ_16K - 1,
++		.end	= AT91SAM9260_BASE_TCB1 + SZ_256 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 96e2adc..545bbe9 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -957,7 +957,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
+ static struct resource tcb0_resources[] = {
+ 	[0] = {
+ 		.start	= AT91SAM9G45_BASE_TCB0,
+-		.end	= AT91SAM9G45_BASE_TCB0 + SZ_16K - 1,
++		.end	= AT91SAM9G45_BASE_TCB0 + SZ_256 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+@@ -978,7 +978,7 @@ static struct platform_device at91sam9g45_tcb0_device = {
+ static struct resource tcb1_resources[] = {
+ 	[0] = {
+ 		.start	= AT91SAM9G45_BASE_TCB1,
+-		.end	= AT91SAM9G45_BASE_TCB1 + SZ_16K - 1,
++		.end	= AT91SAM9G45_BASE_TCB1 + SZ_256 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
+index 4bcfc37..7a6512a 100644
+--- a/drivers/misc/atmel_tclib.c
++++ b/drivers/misc/atmel_tclib.c
+@@ -9,10 +9,6 @@
+ #include <linux/slab.h>
+ #include <linux/export.h>
+ 
+-/* Number of bytes to reserve for the iomem resource */
+-#define ATMEL_TC_IOMEM_SIZE	256
+-
+-
+ /*
+  * This is a thin library to solve the problem of how to portably allocate
+  * one of the TC blocks.  For simplicity, it doesn't currently expect to
+@@ -48,6 +44,7 @@ struct atmel_tc *atmel_tc_alloc(unsigned block, const char *name)
+ 	struct atmel_tc		*tc;
+ 	struct platform_device	*pdev = NULL;
+ 	struct resource		*r;
++	size_t			size;
+ 
+ 	spin_lock(&tc_list_lock);
+ 	list_for_each_entry(tc, &tc_list, node) {
+@@ -61,11 +58,15 @@ struct atmel_tc *atmel_tc_alloc(unsigned block, const char *name)
+ 		goto fail;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	r = request_mem_region(r->start, ATMEL_TC_IOMEM_SIZE, name);
+ 	if (!r)
+ 		goto fail;
+ 
+-	tc->regs = ioremap(r->start, ATMEL_TC_IOMEM_SIZE);
++	size = resource_size(r);
++	r = request_mem_region(r->start, size, name);
++	if (!r)
++		goto fail;
++
++	tc->regs = ioremap(r->start, size);
+ 	if (!tc->regs)
+ 		goto fail_ioremap;
+ 
+@@ -76,7 +77,7 @@ out:
+ 	return tc;
+ 
+ fail_ioremap:
+-	release_mem_region(r->start, ATMEL_TC_IOMEM_SIZE);
++	release_mem_region(r->start, size);
+ fail:
+ 	tc = NULL;
+ 	goto out;
+@@ -96,7 +97,7 @@ void atmel_tc_free(struct atmel_tc *tc)
+ 	spin_lock(&tc_list_lock);
+ 	if (tc->regs) {
+ 		iounmap(tc->regs);
+-		release_mem_region(tc->iomem->start, ATMEL_TC_IOMEM_SIZE);
++		release_mem_region(tc->iomem->start, resource_size(tc->iomem));
+ 		tc->regs = NULL;
+ 		tc->iomem = NULL;
+ 	}
+-- 
+1.7.5.4
