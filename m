@@ -1,26 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jan 2012 19:48:42 -0800
-Subject: [PATCH V1] ARM: tegra: Pause DMA when reading transfer count
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A77E@HQMAIL01.nvidia.com>
-References: <1326175511-28642-1-git-send-email-ldewangan@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A77E@HQMAIL01.nvidia.com>
-Message-ID: <20120119034842.GA7145@quad.lixom.net>
+Date: Wed, 18 Jan 2012 19:52:52 -0800
+Subject: [PATCH v2] arm/tegra: add support for tegra30 interrupts
+In-Reply-To: <1325770305-21637-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1325770305-21637-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20120119035252.GB7145@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2012 at 12:48:26PM -0800, Stephen Warren wrote:
-> Laxman Dewangan wrote at Monday, January 09, 2012 11:05 PM:
-> > In order to read an accurate channel transfer count
-> > from the APB DMA engine, the DMA controller must be
-> > paused first.
-> > 
-> > Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+On Thu, Jan 05, 2012 at 03:31:45PM +0200, Peter De Schrijver wrote:
+> Tegra30 has 1 extra legacy interrupt controller. Use the GIC ITLinesNumber
+> field to determine how many interrupt controllers we have and initialize
+> appropriately. Also make room for the extra tegra30 interrupts by moving
+> the GPIO IRQ base. This shouldn't affect existing code as it determines the
+> correct IRQ number for GPIOs using TEGRA_GPIO_TO_IRQ().
 > 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 > Acked-by: Stephen Warren <swarren@nvidia.com>
 > Tested-by: Stephen Warren <swarren@nvidia.com>
-> 
-> (Audio playback on Harmony booted using device tree works fine in my
-> brief testing)
+> Acked-by: Colin Cross <ccross@android.com>
 
 Thanks, applied.
 
