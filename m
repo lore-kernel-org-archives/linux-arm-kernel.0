@@ -1,149 +1,117 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 19 Jan 2012 11:16:35 -0700
-Subject: [PATCH V2] gpio: tegra: Parameterize the number of banks
-Message-ID: <1326996995-23096-1-git-send-email-swarren@nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Jan 2012 10:20:19 -0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <CAJuYYwQB1pDu-JS5o3XPA1D8WbVcwbdtD43M4y7PeJNWeNXxQQ@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <CAJuYYwQoh4_SnA9wmy4x+cG0w0hGukxTkODWtcSw_2QHYuDsrg@mail.gmail.com>
+ <20120119165607.GG22818@atomide.com>
+ <CAJuYYwQB1pDu-JS5o3XPA1D8WbVcwbdtD43M4y7PeJNWeNXxQQ@mail.gmail.com>
+Message-ID: <20120119182019.GI22818@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra20's GPIO controller has 7 banks, and Tegra30's controller has 8
-banks. Allow the number of banks to be configured at run-time by the
-device tree.
+* Thomas Abraham <thomas.abraham@linaro.org> [120119 09:05]:
+> 
+> On 19 January 2012 22:26, Tony Lindgren <tony@atomide.com> wrote:
+> > * Thomas Abraham <thomas.abraham@linaro.org> [120119 04:37]:
+> >>
+> >> i2c0: i2c at 18000000 {
+> >> ? ? ? ? [... other properties ...]
+> >> ? ? ? ? pinctrl-active = <&pctrl0 5 0 2 3 0>,
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?<&pctrl0 5 1 2 3 0>;
+> >> ? ? ? ? pinctrl-suspend = <&pctrl0 5 0 2 0 0>,
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? <&pctrl0 5 1 2 0 0>;
+> >> };
+> >
+> > Maybe we should have just the active/suspend/off flags in the
+> > same array? Otherwise we'll end up unnecessarily repeating the
+> > the pin information. See the pins + #pin-args example I posted,
+> > which is otherwise similar.
+> 
+> Yes, I agree. That would be better.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This patch depends on:
-http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
-devel-stable 44986ab056076e9dc9fb9f8b4729afef7fa72616
+OK great.
+ 
+> >
+> >> In the example above, the specifier of pinctrl-* is specific for
+> >> Samsung io-pad controllers. Its format/syntax would be mainly
+> >> dependent on the io-pad controller used, the above is only an example
+> >> for Samsung io-pad controller. In the above node, the format of the
+> >> pinctrl-* specifier is
+> >>
+> >> property-name = <phandle of the pin-controller
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ?pin bank within the pin-controller
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ?pin number within the pin-bank
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ?pin-mux function number
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ?pull up/down config
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ?drive strength config>;
+> >
+> > Are these all just bits in one register? If so, let's say you
+> > have 16-bits per pin, we might be able to share the generic
+> > pinmux-simple.c driver I have almost ready..
+> 
+> no, these get written to different registers, one for pinmux, one for
+> pull up/down and one for drive strength. It would be helpful of your
+> pinmux-simple.c can support writes to multiple registers also.
+ 
+Hmm yeah that should be doable, and actually we have the old legacy
+omap1510 set up with three different registers per pin..
 
-This is a replacement for:
-http://patchwork.ozlabs.org/patch/134321/
+The question is: Do we want to add the on/idle/off modes for each
+pin in .dts, or do we want to have the driver set the dynamic muxing
+flags separately?
 
-v2: Determine # banks by the number of interrupt properties rather than
-adding a custom property for this.
----
- .../devicetree/bindings/gpio/gpio_nvidia.txt       |    8 ++-
- drivers/gpio/gpio-tegra.c                          |   42 +++++++++++++++----
- 2 files changed, 38 insertions(+), 12 deletions(-)
+> > The format would then be
+> >
+> > ? ? ? ?#pin-args <4>;
+> > ? ? ? ?...
+> >
+> > ? ? ? ?/* ? ?controller ?offset on ? idle off */
+> > ? ? ? ?pins = <&pinctrl0 0x0030 0x15 0x15 0x7>;
+> >
+> >> * Using the pinmux/pinconfig specifier in device nodes to configure hardware.
+> >>
+> >> A driver (for a device instantiated from device tree) would require
+> >> code to be made aware of the pinmux/pinconfig options available. The
+> >> typical sequence in a probe function would be as below.
+> >>
+> >> (a) call of_get_named_gpio() to get the gpio number. In case of
+> >> Samsung pinctrl driver, the pinctrl driver itself provides the gpiolib
+> >> functionality and it attaches a gpio specifier translator with the
+> >> gpio_chip. This translator is capable of translating the pinctrl-* and
+> >> returning a gpio number.
+> >>
+> >> (b) gpio_request() the gpio number obtained in step (a) above.
+> >>
+> >> (c) Repeat steps (a) and (b) until all the gpios required by the
+> >> driver are requested. In case a request fails, give up all the
+> >> successfully requested gpio and return failure.
+> >
+> > Can't the driver do this to request the gpio pins that you
+> > can get from DT and pinmux? Even if you need to do dynamic pinmuxing
+> > to GPIO pins for wake-up events, you can do that from the driver
+> > as long as you get the GPIO number for the pin from mux code.
+> 
+> Yes, it is the driver that finds out the gpio number from dt and
+> requests it. Maybe, I did not understand your point here.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-index d114e19..023c952 100644
---- a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-@@ -1,9 +1,11 @@
--NVIDIA Tegra 2 GPIO controller
-+NVIDIA Tegra GPIO controller
+Oh ok, sorry I misunderstood thinking you want to do all that in the
+pinmux driver..
  
- Required properties:
--- compatible : "nvidia,tegra20-gpio"
-+- compatible : "nvidia,tegra<chip>-gpio"
- - reg : Physical base address and length of the controller's registers.
--- interrupts : The interrupt outputs from the controller.
-+- interrupts : The interrupt outputs from the controller. For Tegra20,
-+  there should be 7 interrupts specified, and for Tegra30, there should
-+  be 8 interrupts specified.
- - #gpio-cells : Should be two. The first cell is the pin number and the
-   second cell is used to specify optional parameters:
-   - bit 0 specifies polarity (0 for normal, 1 for inverted)
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index bc923c7..98f3980 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -77,7 +77,8 @@ struct tegra_gpio_bank {
- 
- static struct irq_domain irq_domain;
- static void __iomem *regs;
--static struct tegra_gpio_bank tegra_gpio_banks[7];
-+static u32 tegra_gpio_bank_count;
-+static struct tegra_gpio_bank *tegra_gpio_banks;
- 
- static inline void tegra_gpio_writel(u32 val, u32 reg)
- {
-@@ -274,7 +275,7 @@ void tegra_gpio_resume(void)
- 
- 	local_irq_save(flags);
- 
--	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
-+	for (b = 0; b < tegra_gpio_bank_count; b++) {
- 		struct tegra_gpio_bank *bank = &tegra_gpio_banks[b];
- 
- 		for (p = 0; p < ARRAY_SIZE(bank->oe); p++) {
-@@ -297,7 +298,7 @@ void tegra_gpio_suspend(void)
- 	int p;
- 
- 	local_irq_save(flags);
--	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
-+	for (b = 0; b < tegra_gpio_bank_count; b++) {
- 		struct tegra_gpio_bank *bank = &tegra_gpio_banks[b];
- 
- 		for (p = 0; p < ARRAY_SIZE(bank->oe); p++) {
-@@ -338,23 +339,46 @@ static struct lock_class_key gpio_lock_class;
- 
- static int __devinit tegra_gpio_probe(struct platform_device *pdev)
- {
-+	int irq_base;
- 	struct resource *res;
- 	struct tegra_gpio_bank *bank;
- 	int gpio;
- 	int i;
- 	int j;
- 
--	irq_domain.irq_base = irq_alloc_descs(-1, 0, TEGRA_NR_GPIOS, 0);
--	if (irq_domain.irq_base < 0) {
-+	for (;;) {
-+		res = platform_get_resource(pdev, IORESOURCE_IRQ, tegra_gpio_bank_count);
-+		if (!res)
-+			break;
-+		tegra_gpio_bank_count++;
-+	}
-+	if (!tegra_gpio_bank_count) {
-+		dev_err(&pdev->dev, "Missing IRQ resource\n");
-+		return -ENODEV;
-+	}
-+
-+	tegra_gpio_chip.ngpio = tegra_gpio_bank_count * 32;
-+
-+	tegra_gpio_banks = devm_kzalloc(&pdev->dev,
-+			tegra_gpio_bank_count * sizeof(*tegra_gpio_banks),
-+			GFP_KERNEL);
-+	if (!tegra_gpio_banks) {
-+		dev_err(&pdev->dev, "Couldn't allocate bank structure\n");
-+		return -ENODEV;
-+	}
-+
-+	irq_base = irq_alloc_descs(-1, 0, tegra_gpio_chip.ngpio, 0);
-+	if (irq_base < 0) {
- 		dev_err(&pdev->dev, "Couldn't allocate IRQ numbers\n");
- 		return -ENODEV;
- 	}
--	irq_domain.nr_irq = TEGRA_NR_GPIOS;
-+	irq_domain.irq_base = irq_base;
-+	irq_domain.nr_irq = tegra_gpio_chip.ngpio;
- 	irq_domain.ops = &irq_domain_simple_ops;
- 	irq_domain.of_node = pdev->dev.of_node;
- 	irq_domain_add(&irq_domain);
- 
--	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
-+	for (i = 0; i < tegra_gpio_bank_count; i++) {
- 		res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
- 		if (!res) {
- 			dev_err(&pdev->dev, "Missing IRQ resource\n");
-@@ -391,7 +415,7 @@ static int __devinit tegra_gpio_probe(struct platform_device *pdev)
- 
- 	gpiochip_add(&tegra_gpio_chip);
- 
--	for (gpio = 0; gpio < TEGRA_NR_GPIOS; gpio++) {
-+	for (gpio = 0; gpio < tegra_gpio_chip.ngpio; gpio++) {
- 		int irq = irq_domain_to_irq(&irq_domain, gpio);
- 		/* No validity check; all Tegra GPIOs are valid IRQs */
- 
-@@ -404,7 +428,7 @@ static int __devinit tegra_gpio_probe(struct platform_device *pdev)
- 		set_irq_flags(irq, IRQF_VALID);
- 	}
- 
--	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
-+	for (i = 0; i < tegra_gpio_bank_count; i++) {
- 		bank = &tegra_gpio_banks[i];
- 
- 		irq_set_chained_handler(bank->irq, tegra_gpio_irq_handler);
--- 
-1.7.0.4
+> With the approach that I mentioned in the previous email, there are no
+> pinmux, pin groups or pin desc tables built from dt. Each device node
+> specifies what needs to configured (pinmux,pinconfig) and the code
+> using that device node uses pinctrl driver to get those
+> pinmux/pinconfig values written to the hardware registers.
+> 
+> Does the dt support for pinmux/pinconfig that you are developing build
+> the pinmux, pin groups or pin desc tables? Do drivers have to call
+> pinmux_{get/put}() or pin_config_set() functions even in dt case?
+
+Yeah the pinmux/pingroups and functions are built from the DT. Drivers
+would have to still call pinmux_get and set right now. But some of this
+could probably be automatically done using runtime PM?
+
+Cheers,
+
+Tony
