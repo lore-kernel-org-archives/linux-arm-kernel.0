@@ -1,49 +1,54 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 19 Jan 2012 08:06:28 +0100
-Subject: imx53
-In-Reply-To: <1326925172.3468.300.camel@hp-dhlii>
-References: <4F16E7B9.7050307@dlasys.net>
- <CAOMZO5Aqws0Ow1DxHnJ4XYfAO-zsgOuLwJueRUCBt53g1kN0bQ@mail.gmail.com>
- <1326925172.3468.300.camel@hp-dhlii>
-Message-ID: <4F17C0F4.3090703@de.bosch.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Jan 2012 15:22:24 +0800
+Subject: mc13xxx: add I2C support
+In-Reply-To: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
+References: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
+Message-ID: <20120119072222.GD2247@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.01.2012 23:19, David Lynch Jr. wrote:
-> Linus's tree does not yet include numerous imx53 drivers. 
-> While I can get it to boot, there is lots of hardware that does not
-> work. 
-> 
-> Freescale and others are doing imx53 driver work and most drivers are
-> available somewhere, though I have not found them all in the same place.
-> 
-> Regardless, I am just looking for an appropriate reference/starting
-> point. 
+Hi Marc,
 
-You might want to have a look to Linaro, too. E.g.
-
-http://git.linaro.org/gitweb?p=bsp/freescale/linux-linaro.git;a=shortlog;h=refs/heads/lt-3.2-imx5
-
-If I understood correctly, from Freescale point of view, the Linaro 
-Freescale landing team is responsible to mainline the Freescale work.
-
-Best regards
-
-Dirk
-
-> What would be the normal route for i.MX53 work into the kernel ?
+On Thu, Jan 19, 2012 at 12:01:31PM +1100, Marc Reilly wrote:
+> Hi,
 > 
-> I can pull that, start there, merge what I need and submit patches if no
-> one else does.  
+> This series (based on 3.2) adds I2C support for the mc13xxx family PMICs.
+> The patches are similar, but not identical to my previous patches for this [1], the
+> main difference being the way the config items are done in patch 2.
 > 
+The series looks nice.
+
+> I don't have the hardware to retest on SPI hardware, I'd appreciate if someone could 
+> double check it still works.
 > 
-> 
-> On Wed, 2012-01-18 at 17:57 -0200, Fabio Estevam wrote:
->> On Wed, Jan 18, 2012 at 1:39 PM, David H. Lynch Jr. <dhlii@dlasys.net> wrote:
->>> Where would I look for the appropriate git kernel source tree that is being
->>> used for i.MX53 development feeding the distribution kernel ?
->> You can use Linus' tree directly.
->>
->> Regards,
->>
->> Fabio Estevam
+I just gave it a spin on my imx51 babbage board where mc13892 is
+connected on spi.  The spi access works fine as before, since the part
+still gets recognized correctly.
+
+BTW, I see the following compile error.
+
+  CC      drivers/regulator/mc13892-regulator.o
+In file included from include/linux/mfd/mc13892.h:12:0,
+                 from drivers/regulator/mc13892-regulator.c:13:
+include/linux/mfd/mc13xxx.h:87:15: error: field ?lock? has incomplete type
+
+And I fixed it as below.
+
+---8<----
+diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
+index c17fc60..4ca8439 100644
+--- a/include/linux/mfd/mc13xxx.h
++++ b/include/linux/mfd/mc13xxx.h
+@@ -10,6 +10,7 @@
+ #define __LINUX_MFD_MC13XXX_H
+
+ #include <linux/interrupt.h>
++#include <linux/mutex.h>
+
+ struct mc13xxx;
+
+---->8---
+
+-- 
+Regards,
+Shawn
