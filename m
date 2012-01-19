@@ -1,90 +1,159 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 19 Jan 2012 22:35:05 +0100
-Subject: [PATCH] Documentation/pinctrl: fix a few syntax errors in code
- examples
-In-Reply-To: <1323383765-30742-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1323383765-30742-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1327008905-20544-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Thu, 19 Jan 2012 22:42:48 +0100
+Subject: [PATCH] pinctrl: unbreak error messages
+Message-ID: <1327009368-23624-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+It's better to not line break error messages to allow easier grepping
+for them even when the line gets >80 chars. Additionally some minor
+reformating is done.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-Hello,
+ drivers/pinctrl/pinmux.c |   46 +++++++++++++++++++---------------------------
+ 1 files changed, 19 insertions(+), 27 deletions(-)
 
-this is what's left from the patch I sent in the mail with message-id
-1323383765-30742-1-git-send-email-u.kleine-koenig at pengutronix.de after
-rebasing to current linus/master. The original submission got an ack by
-Stephen Warren that I assumed for this patch, too.
-
-Best regards
-Uwe
-
- Documentation/pinctrl.txt |   15 +++++++--------
- 1 files changed, 7 insertions(+), 8 deletions(-)
-
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index 6727b92..5324d31 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -857,42 +857,41 @@ case), we define a mapping like this:
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index a76a348..0b22037 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -152,8 +152,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
+ 		status = 0;
  
- ...
- {
--	.name "2bit"
-+	.name = "2bit"
- 	.ctrl_dev_name = "pinctrl-foo",
- 	.function = "mmc0",
- 	.group = "mmc0_1_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "4bit"
-+	.name = "4bit"
- 	.ctrl_dev_name = "pinctrl-foo",
- 	.function = "mmc0",
- 	.group = "mmc0_1_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "4bit"
-+	.name = "4bit"
- 	.ctrl_dev_name = "pinctrl-foo",
- 	.function = "mmc0",
- 	.group = "mmc0_2_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "8bit"
-+	.name = "8bit"
- 	.ctrl_dev_name = "pinctrl-foo",
--	.function = "mmc0",
- 	.group = "mmc0_1_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "8bit"
-+	.name = "8bit"
- 	.ctrl_dev_name = "pinctrl-foo",
- 	.function = "mmc0",
- 	.group = "mmc0_2_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "8bit"
-+	.name = "8bit"
- 	.ctrl_dev_name = "pinctrl-foo",
- 	.function = "mmc0",
- 	.group = "mmc0_3_grp",
-@@ -995,7 +994,7 @@ This is enabled by simply setting the .hog_on_boot field in the map to true,
- like this:
+ 	if (status)
+-		dev_err(pctldev->dev, "->request on device %s failed "
+-		       "for pin %d\n",
++		dev_err(pctldev->dev, "->request on device %s failed for pin %d\n",
+ 		       pctldev->desc->name, pin);
+ out_free_pin:
+ 	if (status) {
+@@ -355,21 +354,20 @@ int __init pinmux_register_mappings(struct pinmux_map const *maps,
+ 	/* First sanity check the new mapping */
+ 	for (i = 0; i < num_maps; i++) {
+ 		if (!maps[i].name) {
+-			pr_err("failed to register map %d: "
+-			       "no map name given\n", i);
++			pr_err("failed to register map %d: no map name given\n",
++					i);
+ 			return -EINVAL;
+ 		}
  
+ 		if (!maps[i].ctrl_dev && !maps[i].ctrl_dev_name) {
+-			pr_err("failed to register map %s (%d): "
+-			       "no pin control device given\n",
++			pr_err("failed to register map %s (%d): no pin control device given\n",
+ 			       maps[i].name, i);
+ 			return -EINVAL;
+ 		}
+ 
+ 		if (!maps[i].function) {
+-			pr_err("failed to register map %s (%d): "
+-			       "no function ID given\n", maps[i].name, i);
++			pr_err("failed to register map %s (%d): no function ID given\n",
++					maps[i].name, i);
+ 			return -EINVAL;
+ 		}
+ 
+@@ -442,8 +440,7 @@ static int acquire_pins(struct pinctrl_dev *pctldev,
+ 		ret = pin_request(pctldev, pins[i], func, NULL);
+ 		if (ret) {
+ 			dev_err(pctldev->dev,
+-				"could not get pin %d for function %s "
+-				"on device %s - conflicting mux mappings?\n",
++				"could not get pin %d for function %s on device %s - conflicting mux mappings?\n",
+ 				pins[i], func ? : "(undefined)",
+ 				pinctrl_dev_get_name(pctldev));
+ 			/* On error release all taken pins */
+@@ -473,8 +470,7 @@ static void release_pins(struct pinctrl_dev *pctldev,
+ 	ret = pctlops->get_group_pins(pctldev, group_selector,
+ 				      &pins, &num_pins);
+ 	if (ret) {
+-		dev_err(pctldev->dev, "could not get pins to release for "
+-			"group selector %d\n",
++		dev_err(pctldev->dev, "could not get pins to release for group selector %d\n",
+ 			group_selector);
+ 		return;
+ 	}
+@@ -526,8 +522,7 @@ static int pinmux_check_pin_group(struct pinctrl_dev *pctldev,
+ 		ret = pinctrl_get_group_selector(pctldev, groups[0]);
+ 		if (ret < 0) {
+ 			dev_err(pctldev->dev,
+-				"function %s wants group %s but the pin "
+-				"controller does not seem to have that group\n",
++				"function %s wants group %s but the pin controller does not seem to have that group\n",
+ 				pmxops->get_function_name(pctldev, func_selector),
+ 				groups[0]);
+ 			return ret;
+@@ -535,8 +530,7 @@ static int pinmux_check_pin_group(struct pinctrl_dev *pctldev,
+ 
+ 		if (num_groups > 1)
+ 			dev_dbg(pctldev->dev,
+-				"function %s support more than one group, "
+-				"default-selecting first group %s (%d)\n",
++				"function %s support more than one group, default-selecting first group %s (%d)\n",
+ 				pmxops->get_function_name(pctldev, func_selector),
+ 				groups[0],
+ 				ret);
+@@ -628,10 +622,8 @@ static int pinmux_enable_muxmap(struct pinctrl_dev *pctldev,
+ 
+ 	if (pmx->pctldev && pmx->pctldev != pctldev) {
+ 		dev_err(pctldev->dev,
+-			"different pin control devices given for device %s, "
+-			"function %s\n",
+-			devname,
+-			map->function);
++			"different pin control devices given for device %s, function %s\n",
++			devname, map->function);
+ 		return -EINVAL;
+ 	}
+ 	pmx->dev = dev;
+@@ -695,7 +687,6 @@ static void pinmux_free_groups(struct pinmux *pmx)
+  */
+ struct pinmux *pinmux_get(struct device *dev, const char *name)
  {
--	.name "POWERMAP"
-+	.name = "POWERMAP"
- 	.ctrl_dev_name = "pinctrl-foo",
- 	.function = "power_func",
- 	.hog_on_boot = true,
+-
+ 	struct pinmux_map const *map = NULL;
+ 	struct pinctrl_dev *pctldev = NULL;
+ 	const char *devname = NULL;
+@@ -745,8 +736,7 @@ struct pinmux *pinmux_get(struct device *dev, const char *name)
+ 			else if (map->ctrl_dev_name)
+ 				devname = map->ctrl_dev_name;
+ 
+-			pr_warning("could not find a pinctrl device for pinmux "
+-				   "function %s, fishy, they shall all have one\n",
++			pr_warning("could not find a pinctrl device for pinmux function %s, fishy, they shall all have one\n",
+ 				   map->function);
+ 			pr_warning("given pinctrl device name: %s",
+ 				   devname ? devname : "UNDEFINED");
+@@ -932,8 +922,8 @@ static int pinmux_hog_map(struct pinctrl_dev *pctldev,
+ 		 * without any problems, so then we can hog pinmuxes for
+ 		 * all devices that just want a static pin mux at this point.
+ 		 */
+-		dev_err(pctldev->dev, "map %s wants to hog a non-system "
+-			"pinmux, this is not going to work\n", map->name);
++		dev_err(pctldev->dev, "map %s wants to hog a non-system pinmux, this is not going to work\n",
++				map->name);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -1122,13 +1112,15 @@ static int pinmux_show(struct seq_file *s, void *what)
+ 
+ 		seq_printf(s, "device: %s function: %s (%u),",
+ 			   pinctrl_dev_get_name(pmx->pctldev),
+-			   pmxops->get_function_name(pctldev, pmx->func_selector),
++			   pmxops->get_function_name(pctldev,
++				   pmx->func_selector),
+ 			   pmx->func_selector);
+ 
+ 		seq_printf(s, " groups: [");
+ 		list_for_each_entry(grp, &pmx->groups, node) {
+ 			seq_printf(s, " %s (%u)",
+-				   pctlops->get_group_name(pctldev, grp->group_selector),
++				   pctlops->get_group_name(pctldev,
++					   grp->group_selector),
+ 				   grp->group_selector);
+ 		}
+ 		seq_printf(s, " ]");
 -- 
 1.7.8.3
