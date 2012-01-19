@@ -1,31 +1,16 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 19 Jan 2012 12:12:31 +0100
-Subject: mc13xxx: add I2C support
-In-Reply-To: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au> (Marc
- Reilly's message of "Thu, 19 Jan 2012 12:01:31 +1100")
-References: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <87lip4kktc.fsf@lebrac.rtp-net.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 19 Jan 2012 11:20:41 +0000
+Subject: [PATCH 01/10] MXS-DMA : move the mxs-dma.h to a more common place
+In-Reply-To: <20120119085856.GA2630@pengutronix.de>
+References: <1326953767-24155-1-git-send-email-b32955@freescale.com>
+ <1326953767-24155-2-git-send-email-b32955@freescale.com>
+ <20120119085856.GA2630@pengutronix.de>
+Message-ID: <20120119112041.GB29494@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Reilly <marc@cpdesign.com.au> writes:
+On Thu, Jan 19, 2012 at 09:58:56AM +0100, Wolfram Sang wrote:
 
-> Hi,
+> (collecting all the proper acks from maintainers) since the changes are
 
-Hi,
-
->
-> This series (based on 3.2) adds I2C support for the mc13xxx family PMICs.
-> The patches are similar, but not identical to my previous patches for this [1], the
-> main difference being the way the config items are done in patch 2.
->
-> I don't have the hardware to retest on SPI hardware, I'd appreciate if someone could 
-> double check it still works.
->
-> I've also got a stack of patches for the mc13xxx to follow, but should get this in
-> first.
-
-I've never looked at regmap deeply but can't it be done with regmap or is it
-just a bad idea ?
-
-Arnaud
+Which is much more likely if you send them the patches.
