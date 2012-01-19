@@ -1,57 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Jan 2012 17:10:37 +0800
-Subject: [PATCH 00/10] patch set about the MXS-DMA
-In-Reply-To: <1326953767-24155-1-git-send-email-b32955@freescale.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 19 Jan 2012 09:58:56 +0100
+Subject: [PATCH 01/10] MXS-DMA : move the mxs-dma.h to a more common place
+In-Reply-To: <1326953767-24155-2-git-send-email-b32955@freescale.com>
 References: <1326953767-24155-1-git-send-email-b32955@freescale.com>
-Message-ID: <20120119091034.GH2247@S2101-09.ap.freescale.net>
+ <1326953767-24155-2-git-send-email-b32955@freescale.com>
+Message-ID: <20120119085856.GA2630@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 02:15:57PM +0800, Huang Shijie wrote:
-> This patch set does two things about the MXS-DMA:
-> [1] patch 1 ~ patch 5: move the mxs dma header to a more common place.
-> 	Beside the mx23/mx28, the APBH-DMA is also used by MX50 and MX6Q.
-> 	So move the mxs dma header file to a more common place, and rename
-> 	it to mxs-dma.h
+On Thu, Jan 19, 2012 at 02:15:58PM +0800, Huang Shijie wrote:
+> Move the header to a more common place.
+> The DMA engine is not only used in mx23/mx28, but also used
+> in mx50/mx6q.
+> It will also be used in the future chips.
 > 
-For the sake of bitsec, these 5 patches need to be one.
+> Rename it to mxs-dma.h
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/mach-mxs/include/mach/dma.h |   28 ----------------------------
+>  include/linux/mxs-dma.h              |   28 ++++++++++++++++++++++++++++
+>  2 files changed, 28 insertions(+), 28 deletions(-)
+>  delete mode 100644 arch/arm/mach-mxs/include/mach/dma.h
+>  create mode 100644 include/linux/mxs-dma.h
 
-> [2] patch 6 ~ patch 10: rewrite the last parameter of mxs_dma_prep_slave_sg().
+Please use -M with git format-patch, so we can better see that it is a
+pure rename.
 
-For the sake of bitsec, at least patches #7 and #8 need to be one patch.
-That said, if I apply the series and then check out the commit at patch
-#7, you need to all mxs-dma client drivers, mxs-mmc, gpmi do not break.
+I'd also suggest to squash patches up to 05/10 into this one,
+(collecting all the proper acks from maintainers) since the changes are
+trivial and it will reduce dependencies and temporary build-failures.
 
-> 	In the new GPMI version, some hardware behavior changes.
-> 	The WAIT4END bit should be set in the middle one of the ECC READ page DMA chain.
-> 	The DMA chain should be set like this:
-> 
->           +-----+               +-----+                      +-----+
->           | cmd | ------------> | cmd | ------------------>  | cmd |
->           +-----+               +-----+                      +-----+
->                                    ^                            ^
->                                    |                            |
->                                    |                            |
->                               set WAIT4END here too        set WAIT4END here
-> 
->          Please read the comment in patch "MXS-DMA : add more flags for MXS-DMA".
-> 
-> Huang Shijie (10):
->   MXS-DMA : move the mxs-dma.h to a more common place
->   MXS-DMA : change the header
->   MXS-MMC : change the DMA header file
->   MTD/GPMI : change the DMA header file
->   ASoc : change the DMA header file
->   MXS-DMA : add more flags for MXS-DMA
->   MXS-DMA : change the last parameter of mxs_dma_prep_slave_sg()
->   MXS-MMC : use the new DMA flags
->   MTD/GPMI : add a new field `gpmi_version`
->   MTD/GPMI : change the code for new DMA interface
-> 
-Please try to make these subject prefix consistent with the existing
-ones in the tree.  You can get them from 'git log' output.  For example
-"mxs-dma: ..." is better than "MXS-DMA : ...".
+Regards,
+
+   Wolfram
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120119/01e643da/attachment.sig>
