@@ -1,60 +1,104 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 19 Jan 2012 14:16:06 +0800
-Subject: [PATCH 09/10] MTD/GPMI : add a new field `gpmi_version`
+Date: Thu, 19 Jan 2012 14:16:07 +0800
+Subject: [PATCH 10/10] MTD/GPMI : change the code for new DMA interface
 In-Reply-To: <1326953767-24155-1-git-send-email-b32955@freescale.com>
 References: <1326953767-24155-1-git-send-email-b32955@freescale.com>
-Message-ID: <1326953767-24155-10-git-send-email-b32955@freescale.com>
+Message-ID: <1326953767-24155-11-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add this field to store the GPMI verison.
+Please read more comment in the mxs-dma.h.
+
+In the new GPMI version(0x05010000 used by MX6Q/MX50), we should
+set the WAIT4END bit in the middle one of this chain,
+which enables the BCH module and reads out the NAND page.
+If we do not do this, a DMA timeout occurs. This bug has been
+catched in the MX6Q board.
+
+We have changed the DMA interface to fix the bug, now use the new
+interface.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |    3 +++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    4 ++++
- drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    2 ++
- 3 files changed, 9 insertions(+), 0 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   20 ++++++++++++++------
+ 1 files changed, 14 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 7f68042..5b73ae5 100644
+index 5b73ae5..84abd49 100644
 --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
 +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -133,6 +133,9 @@ int gpmi_init(struct gpmi_nand_data *this)
- 	if (ret)
- 		goto err_out;
+@@ -842,7 +842,7 @@ int gpmi_send_command(struct gpmi_nand_data *this)
+ 	sg_init_one(sgl, this->cmd_buffer, this->command_length);
+ 	dma_map_sg(this->dev, sgl, 1, DMA_TO_DEVICE);
+ 	desc = channel->device->device_prep_slave_sg(channel,
+-					sgl, 1, DMA_MEM_TO_DEV, 1);
++				sgl, 1, DMA_MEM_TO_DEV, MXS_DMA_F_LASTONE);
+ 	if (!desc) {
+ 		pr_err("step 2 error\n");
+ 		return -1;
+@@ -884,7 +884,7 @@ int gpmi_send_data(struct gpmi_nand_data *this)
+ 	/* [2] send DMA request */
+ 	prepare_data_dma(this, DMA_TO_DEVICE);
+ 	desc = channel->device->device_prep_slave_sg(channel, &this->data_sgl,
+-						1, DMA_MEM_TO_DEV, 1);
++					1, DMA_MEM_TO_DEV, MXS_DMA_F_LASTONE);
+ 	if (!desc) {
+ 		pr_err("step 2 error\n");
+ 		return -1;
+@@ -920,7 +920,7 @@ int gpmi_read_data(struct gpmi_nand_data *this)
+ 	/* [2] : send DMA request */
+ 	prepare_data_dma(this, DMA_FROM_DEVICE);
+ 	desc = channel->device->device_prep_slave_sg(channel, &this->data_sgl,
+-						1, DMA_DEV_TO_MEM, 1);
++					1, DMA_DEV_TO_MEM, MXS_DMA_F_LASTONE);
+ 	if (!desc) {
+ 		pr_err("step 2 error\n");
+ 		return -1;
+@@ -967,7 +967,8 @@ int gpmi_send_page(struct gpmi_nand_data *this,
  
-+	/* Read out the GPMI version */
-+	this->gpmi_version = readl(r->gpmi_regs + HW_GPMI_VERSION);
-+
- 	/* Choose NAND mode. */
- 	writel(BM_GPMI_CTRL1_GPMI_MODE, r->gpmi_regs + HW_GPMI_CTRL1_CLR);
+ 	desc = channel->device->device_prep_slave_sg(channel,
+ 					(struct scatterlist *)pio,
+-					ARRAY_SIZE(pio), DMA_TRANS_NONE, 0);
++					ARRAY_SIZE(pio), DMA_TRANS_NONE,
++					MXS_DMA_F_WAIT4END);
+ 	if (!desc) {
+ 		pr_err("step 2 error\n");
+ 		return -1;
+@@ -987,6 +988,7 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+ 	struct dma_async_tx_descriptor *desc;
+ 	struct dma_chan *channel = get_dma_chan(this);
+ 	int chip = this->current_chip;
++	unsigned long flags;
+ 	u32 pio[6];
  
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 1c7fdbb..5c277e3 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -132,6 +132,10 @@ struct gpmi_nand_data {
- 	/* Flash Hardware */
- 	struct nand_timing	timing;
- 
-+	/* GPMI hardware version */
-+#define GPMI_VERSION_0501	(0x05010000)
-+	u32			gpmi_version;
+ 	/* [1] Wait for the chip to report ready. */
+@@ -1029,9 +1031,14 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+ 	pio[3] = geo->page_size;
+ 	pio[4] = payload;
+ 	pio[5] = auxiliary;
 +
- 	/* BCH */
- 	struct bch_geometry	bch_geometry;
- 	struct completion	bch_done;
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
-index 8343124..f005b24 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
-@@ -169,4 +169,6 @@
- #define HW_GPMI_DEBUG					0x000000c0
- #define MX23_BP_GPMI_DEBUG_READY0			28
- #define MX23_BM_GPMI_DEBUG_READY0	(1 << MX23_BP_GPMI_DEBUG_READY0)
-+
-+#define HW_GPMI_VERSION					0x000000d0
- #endif
++	/* If the GPMI is new version, set MXS_DMA_F_WAIT4END here. */
++	flags = MXS_DMA_F_APPEND;
++	if (this->gpmi_version == GPMI_VERSION_0501)
++		flags |= MXS_DMA_F_WAIT4END;
+ 	desc = channel->device->device_prep_slave_sg(channel,
+ 					(struct scatterlist *)pio,
+-					ARRAY_SIZE(pio), DMA_TRANS_NONE, 1);
++					ARRAY_SIZE(pio), DMA_TRANS_NONE, flags);
+ 	if (!desc) {
+ 		pr_err("step 2 error\n");
+ 		return -1;
+@@ -1048,9 +1055,10 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+ 		| BF_GPMI_CTRL0_ADDRESS(address)
+ 		| BF_GPMI_CTRL0_XFER_COUNT(geo->page_size);
+ 	pio[1] = 0;
++	pio[2] = 0;
+ 	desc = channel->device->device_prep_slave_sg(channel,
+ 				(struct scatterlist *)pio, 2,
+-				DMA_TRANS_NONE, 1);
++				DMA_TRANS_NONE, MXS_DMA_F_LASTONE);
+ 	if (!desc) {
+ 		pr_err("step 3 error\n");
+ 		return -1;
 -- 
 1.7.0.4
