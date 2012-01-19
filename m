@@ -1,188 +1,52 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Thu, 19 Jan 2012 20:02:01 +0530
-Subject: [RFC v3 PATCH 3/3] arm/dts: EMIF and lpddr2 device tree data for
- OMAP4 boards
-In-Reply-To: <1326983521-373-1-git-send-email-aneesh@ti.com>
-References: <1326983521-373-1-git-send-email-aneesh@ti.com>
-Message-ID: <1326983521-373-4-git-send-email-aneesh@ti.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Thu, 19 Jan 2012 19:58:21 +0530
+Subject: [PATCH 0/3] ARM: OMAP1/2+: 32k-timer: Add hwmod lookup for 32k-timer
+Message-ID: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree data for the EMIF sdram controllers in OMAP4
-and LPDDR memory devices attached to OMAP4 boards.
+This patch series cleans up the existing 32k-sync timer implementation
+without any major code change and adds hwmod lookup for omap2+ devices,
+if lookup fails then fall back to gp-timer.
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Olof Johansson <olof@lixom.net>
-Signed-off-by: Aneesh V <aneesh@ti.com>
----
-Changes in RFC v3:
-* Fixed review comments from RFC v2
----
- arch/arm/boot/dts/elpida_ecb240abacn.dtsi |   65 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap4-panda.dts         |   13 ++++++
- arch/arm/boot/dts/omap4-sdp.dts           |   13 ++++++
- arch/arm/boot/dts/omap4.dtsi              |   19 ++++++++
- 4 files changed, 110 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/elpida_ecb240abacn.dtsi
+With this, we should be able to support multi-omap boot
+including devices with/without 32k-sync timer.
+For example, AM33xx device doesn't have 32k-sync timer available,
+which breaks multi-omap boot.
 
-diff --git a/arch/arm/boot/dts/elpida_ecb240abacn.dtsi b/arch/arm/boot/dts/elpida_ecb240abacn.dtsi
-new file mode 100644
-index 0000000..2384233
---- /dev/null
-+++ b/arch/arm/boot/dts/elpida_ecb240abacn.dtsi
-@@ -0,0 +1,65 @@
-+/*
-+ * Common devices used in different OMAP boards
-+ */
-+
-+/ {
-+	elpida_ECB240ABACN: lpddr2 {
-+		compatible 	= "Elpida,ECB240ABACN","jedec,lpddr2-s4";
-+		density		= <2048>;
-+		io-width	= <32>;
-+
-+		tRPab-min-tck	= <3>;
-+		tRCD-min-tck	= <3>;
-+		tWR-min-tck	= <3>;
-+		tRASmin-min-tck	= <3>;
-+		tRRD-min-tck	= <2>;
-+		tWTR-min-tck	= <2>;
-+		tXP-min-tck	= <2>;
-+		tRTP-min-tck	= <2>;
-+		tCKE-min-tck	= <3>;
-+		tCKESR-min-tck	= <3>;
-+		tFAW-min-tck	= <8>;
-+
-+		timings_elpida_ECB240ABACN_400mhz: lpddr2-timings at 0 {
-+			compatible 	= "jedec,lpddr2-timings";
-+			min-freq	= <10000000>;
-+			max-freq	= <400000000>;
-+			tRPab		= <21000>;
-+			tRCD		= <18000>;
-+			tWR		= <15000>;
-+			tRAS-min	= <42000>;
-+			tRRD		= <10000>;
-+			tWTR		= <7500>;
-+			tXP		= <7500>;
-+			tRTP		= <7500>;
-+			tCKESR		= <15000>;
-+			tDQSCK-max 	= <5500>;
-+			tFAW		= <50000>;
-+			tZQCS		= <90000>;
-+			tZQCL		= <360000>;
-+			tZQinit		= <1000000>;
-+			tRAS-max-ns	= <70000>;
-+		};
-+
-+		timings_elpida_ECB240ABACN_200mhz: lpddr2-timings at 1 {
-+			compatible 	= "jedec,lpddr2-timings";
-+			min-freq	= <10000000>;
-+			max-freq	= <200000000>;
-+			tRPab		= <21000>;
-+			tRCD		= <18000>;
-+			tWR		= <15000>;
-+			tRAS-min	= <42000>;
-+			tRRD		= <10000>;
-+			tWTR		= <10000>;
-+			tXP		= <7500>;
-+			tRTP		= <7500>;
-+			tCKESR		= <15000>;
-+			tDQSCK-max 	= <5500>;
-+			tFAW		= <50000>;
-+			tZQCS		= <90000>;
-+			tZQCL		= <360000>;
-+			tZQinit		= <1000000>;
-+			tRAS-max-ns	= <70000>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index c702657..9b46802 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -8,6 +8,7 @@
- /dts-v1/;
- 
- /include/ "omap4.dtsi"
-+/include/ "elpida_ecb240abacn.dtsi"
- 
- / {
- 	model = "TI OMAP4 PandaBoard";
-@@ -26,4 +27,16 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
-+
-+	ocp {
-+		emif1: emif at 0x4c000000 {
-+			cs1-used;
-+			device-handle = <&elpida_ECB240ABACN>;
-+		};
-+
-+		emif2: emif at 0x4d000000 {
-+			cs1-used;
-+			device-handle = <&elpida_ECB240ABACN>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 066e28c..896d682 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -8,6 +8,7 @@
- /dts-v1/;
- 
- /include/ "omap4.dtsi"
-+/include/ "elpida_ecb240abacn.dtsi"
- 
- / {
- 	model = "TI OMAP4 SDP board";
-@@ -26,4 +27,16 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
-+
-+	ocp {
-+		emif1: emif at 0x4c000000 {
-+			cs1-used;
-+			device-handle = <&elpida_ECB240ABACN>;
-+		};
-+
-+		emif2: emif at 0x4d000000 {
-+			cs1-used;
-+			device-handle = <&elpida_ECB240ABACN>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index e8fe75f..bd57229 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -127,5 +127,24 @@
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
- 		};
-+
-+		emif1: emif at 0x4c000000 {
-+			compatible	= "ti,emif-4d";
-+			ti,hwmods	= "emif1";
-+			phy-type	= <1>;
-+			hw-caps-read-idle-ctrl;
-+			hw-caps-ll-interface;
-+			hw-caps-temp-alert;
-+		};
-+
-+		emif2: emif at 0x4d000000 {
-+			compatible	= "ti,emif-4d";
-+			ti,hwmods	= "emif2";
-+			phy-type	= <1>;
-+			hw-caps-read-idle-ctrl;
-+			hw-caps-ll-interface;
-+			hw-caps-temp-alert;
-+		};
-+
- 	};
- };
--- 
-1.7.1
+This patch-series has been boot tested on AM37xEVM platform, it
+would be helpful if somebody help me to validate it on OMAP2
+platform.
+
+Background:
+==========
+In 2010 timeframe 'Fillipe Balbi' had submitted first version
+of 32k-sync timer cleanup patches, but it did not made its way
+to the mainline.
+
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37403.html
+
+Yesterday I had submitted the RFC version patch-series, which was
+built on top of earlier cleanup patches from 'Fillipe Balbi'.
+
+http://www.spinics.net/lists/linux-omap/msg63004.html
+
+Based on comments (Thanks to Russell, Marc and Tony) from community
+it was clear that, arch_init is not the correct way here.
+
+
+Vaibhav Hiremath (3):
+  ARM: OMAP2+: 32k-counter: Use hwmod lookup to check presence of 32k
+    timer
+  ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to prcm-common
+    header
+  ARM: OMAP2+: hwmod data: Add 32k-sync timer data to hwmod database
+
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |   53 ++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |   52 +++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   51 +++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+ arch/arm/mach-omap2/prcm-common.h          |    4 +
+ arch/arm/mach-omap2/timer.c                |   27 ++++-----
+ arch/arm/plat-omap/counter_32k.c           |   83 ++++++++++++++-------------
+ 7 files changed, 215 insertions(+), 57 deletions(-)
