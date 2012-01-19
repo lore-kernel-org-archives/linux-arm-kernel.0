@@ -1,84 +1,49 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Thu, 19 Jan 2012 08:05:21 +0100
-Subject: [PATCH v3] ARM: davinci: map default_queue to edma channels
-Message-ID: <1326956721-25158-1-git-send-email-hs@denx.de>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 19 Jan 2012 08:06:28 +0100
+Subject: imx53
+In-Reply-To: <1326925172.3468.300.camel@hp-dhlii>
+References: <4F16E7B9.7050307@dlasys.net>
+ <CAOMZO5Aqws0Ow1DxHnJ4XYfAO-zsgOuLwJueRUCBt53g1kN0bQ@mail.gmail.com>
+ <1326925172.3468.300.camel@hp-dhlii>
+Message-ID: <4F17C0F4.3090703@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Default queue is expected to be a low-priority queue.
-This way, long transfers on the default queue started
-by the codec engine will not cause audio defects.
+On 18.01.2012 23:19, David Lynch Jr. wrote:
+> Linus's tree does not yet include numerous imx53 drivers. 
+> While I can get it to boot, there is lots of hardware that does not
+> work. 
+> 
+> Freescale and others are doing imx53 driver work and most drivers are
+> available somewhere, though I have not found them all in the same place.
+> 
+> Regardless, I am just looking for an appropriate reference/starting
+> point. 
 
-Signed-off-by: Heiko Schocher <hs@denx.de>
-Signed-off-by: juha.kuikka at gmail.com
-Reported-by: juha.kuikka at gmail.com
-Acked-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
-Cc: Ido Yariv <ido@wizery.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Wolfgang Denk <wd@denx.de>
-Cc: Sergei Shtylyov <sshtylyov@mvista.com>
+You might want to have a look to Linaro, too. E.g.
 
----
-- changes for v2:
-  - add comment from Sergei Shtylyov
-    add in commit message the commit's summary in parens.
-  - add comment from Ido Yariv:
-    changed comment and commit message
-  - added Acked-by from Rajashekhara, Sudhakar
-- changes for v3:
-  - add comments from Sekhar Nori <nsekhar@ti.com>:
-    - add linux-arm-kernel at lists.infradead.org to Cc
-    - simplify and move comment to
-      arch/arm/mach-davinci/include/mach/edma.h
-    - rework commit message
-    - as the subject changed v2 can be found for example here:
-      http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2011-December/023606.html
-    - checkpatch shows:
-total: 0 errors, 0 warnings, 24 lines checked
+http://git.linaro.org/gitweb?p=bsp/freescale/linux-linaro.git;a=shortlog;h=refs/heads/lt-3.2-imx5
 
-temp/0001-ARM-davinci-map-default_queue-to-edma-channels.patch has no obvious style problems and is ready for submission.
+If I understood correctly, from Freescale point of view, the Linaro 
+Freescale landing team is responsible to mainline the Freescale work.
 
- arch/arm/mach-davinci/dma.c               |    6 +-----
- arch/arm/mach-davinci/include/mach/edma.h |    5 +++++
- 2 files changed, 6 insertions(+), 5 deletions(-)
+Best regards
 
-diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-index da90103..fd33919 100644
---- a/arch/arm/mach-davinci/dma.c
-+++ b/arch/arm/mach-davinci/dma.c
-@@ -1508,12 +1508,8 @@ static int __init edma_probe(struct platform_device *pdev)
- 			goto fail;
- 		}
- 
--		/* Everything lives on transfer controller 1 until otherwise
--		 * specified. This way, long transfers on the low priority queue
--		 * started by the codec engine will not cause audio defects.
--		 */
- 		for (i = 0; i < edma_cc[j]->num_channels; i++)
--			map_dmach_queue(j, i, EVENTQ_1);
-+			map_dmach_queue(j, i, info[j]->default_queue);
- 
- 		queue_tc_mapping = info[j]->queue_tc_mapping;
- 		queue_priority_mapping = info[j]->queue_priority_mapping;
-diff --git a/arch/arm/mach-davinci/include/mach/edma.h b/arch/arm/mach-davinci/include/mach/edma.h
-index 20c77f2..7e84c90 100644
---- a/arch/arm/mach-davinci/include/mach/edma.h
-+++ b/arch/arm/mach-davinci/include/mach/edma.h
-@@ -250,6 +250,11 @@ struct edma_soc_info {
- 	unsigned	n_slot;
- 	unsigned	n_tc;
- 	unsigned	n_cc;
-+	/*
-+	 * Default queue is expected to be a low-priority queue.
-+	 * This way, long transfers on the default queue started
-+	 * by the codec engine will not cause audio defects.
-+	 */
- 	enum dma_event_q	default_queue;
- 
- 	/* Resource reservation for other cores */
--- 
-1.7.7.5
+Dirk
+
+> What would be the normal route for i.MX53 work into the kernel ?
+> 
+> I can pull that, start there, merge what I need and submit patches if no
+> one else does.  
+> 
+> 
+> 
+> On Wed, 2012-01-18 at 17:57 -0200, Fabio Estevam wrote:
+>> On Wed, Jan 18, 2012 at 1:39 PM, David H. Lynch Jr. <dhlii@dlasys.net> wrote:
+>>> Where would I look for the appropriate git kernel source tree that is being
+>>> used for i.MX53 development feeding the distribution kernel ?
+>> You can use Linus' tree directly.
+>>
+>> Regards,
+>>
+>> Fabio Estevam
