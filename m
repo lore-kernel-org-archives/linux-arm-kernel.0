@@ -1,50 +1,78 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Fri, 20 Jan 2012 02:26:38 +0530
-Subject: [RFC v3 PATCH 1/3] dt: device tree bindings for DDR memories
-In-Reply-To: <CAOesGMikm8szKR_yyeV-4NbnknCLG3z9N_sj+zydyu+cosj-Tg@mail.gmail.com>
-References: <1326983521-373-1-git-send-email-aneesh@ti.com>	<1326983521-373-2-git-send-email-aneesh@ti.com>
- <CAOesGMikm8szKR_yyeV-4NbnknCLG3z9N_sj+zydyu+cosj-Tg@mail.gmail.com>
-Message-ID: <4F188386.3080507@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 19 Jan 2012 22:25:49 +0100
+Subject: [PATCH] integrator: implement sched_clock across all boards
+Message-ID: <1327008349-8652-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Now that we can select a sched_clock at runtime, let's implement
+it for the Integrator AP, default-select the one found in all
+other board it for all plat-versatile boards and make the right
+clock kick in at runtime.
 
-On Friday 20 January 2012 01:01 AM, Olof Johansson wrote:
-> Hi,
->
-> Sorry for the delay in responding, I know you pinged me about it yesterday.
->
-> On Thu, Jan 19, 2012 at 6:31 AM, Aneesh V<aneesh@ti.com>  wrote:
->> device tree bindings for LPDDR2 SDRAM memories compliant
->> to JESD209-2 standard.
->>
->> The 'lpddr2' binding in-turn uses another binding 'lpddr2-timings'
->> for specifying the AC timing parameters of the memory device at
->> different speed-bins.
->
-> As I just commented on the thread with Mike, I think we would be
-> better off sticking to embedding a standard JEDEC SPD structure in the
-> device tree. It's not large (128-256 bytes depending on memory type),
-> and it's clearly defined and used all over the industry.
->
-> It also has the benefit of reusing parsing code if you ever end up
-> with a system that uses DIMMs for memory, thus needing to parse the
-> SPD on said modules.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-integrator/Kconfig         |    1 +
+ arch/arm/mach-integrator/integrator_ap.c |    7 +++++++
+ arch/arm/plat-versatile/Kconfig          |    2 +-
+ 3 files changed, 9 insertions(+), 1 deletions(-)
 
-I did mention in the previous thread why SPD doesn't work for us ([1] 
-and [2]). Let me repeat the key points here.
-
-1. I couldn't find an SPD addendum for LPDDR2 from the JEDEC website.
-2. This seems to indicate that SPD is not used for LPDDR2 devices.
-3. I tried to see if I can fit the DDR3 or DDR2 SPD for our needs. But
-some of the AC timing parameters needed by our controller are not
-available in those layouts.
-
-I don't see any option other than defining a new binding for LPDDR2.
-
-br,
-Aneesh
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg61250.html
-[2] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg60473.html
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index 350e266..5a6148a 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -5,6 +5,7 @@ menu "Integrator Options"
+ config ARCH_INTEGRATOR_AP
+ 	bool "Support Integrator/AP and Integrator/PP2 platforms"
+ 	select CLKSRC_MMIO
++	select HAVE_SCHED_CLOCK
+ 	select MIGHT_HAVE_PCI
+ 	select SERIAL_AMBA_PL010
+ 	select SERIAL_AMBA_PL010_CONSOLE
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 21a1d6c..4dde28b 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -42,6 +42,7 @@
+ #include <asm/setup.h>
+ #include <asm/param.h>		/* HZ */
+ #include <asm/mach-types.h>
++#include <asm/sched_clock.h>
+ 
+ #include <mach/lm.h>
+ 
+@@ -325,6 +326,11 @@ static void __init ap_init(void)
+ 
+ static unsigned long timer_reload;
+ 
++static u32 notrace integrator_read_sched_clock(void)
++{
++	return -readl((void __iomem *) TIMER2_VA_BASE + TIMER_VALUE);
++}
++
+ static void integrator_clocksource_init(unsigned long inrate)
+ {
+ 	void __iomem *base = (void __iomem *)TIMER2_VA_BASE;
+@@ -341,6 +347,7 @@ static void integrator_clocksource_init(unsigned long inrate)
+ 
+ 	clocksource_mmio_init(base + TIMER_VALUE, "timer2",
+ 			rate, 200, 16, clocksource_mmio_readl_down);
++	setup_sched_clock(integrator_read_sched_clock, 16, rate);
+ }
+ 
+ static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
+diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
+index 52353be..aa63f38 100644
+--- a/arch/arm/plat-versatile/Kconfig
++++ b/arch/arm/plat-versatile/Kconfig
+@@ -11,7 +11,7 @@ config PLAT_VERSATILE_LEDS
+ 	depends on ARCH_REALVIEW || ARCH_VERSATILE
+ 
+ config PLAT_VERSATILE_SCHED_CLOCK
+-	def_bool y if !ARCH_INTEGRATOR_AP
++	def_bool y
+ 	select HAVE_SCHED_CLOCK
+ 
+ endif
+-- 
+1.7.7.5
