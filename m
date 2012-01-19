@@ -1,31 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Jan 2012 13:33:11 +0000
-Subject: [PATCH] ARM: kexec: EOI active and mask all interrupts in	kexec
- crash path
-In-Reply-To: <20120118154809.GL29346@mudshark.cambridge.arm.com>
-References: <1326898885-28105-1-git-send-email-will.deacon@arm.com>
- <20120118150724.GH1068@n2100.arm.linux.org.uk>
- <20120118153120.GK29346@mudshark.cambridge.arm.com>
- <20120118154044.GJ1068@n2100.arm.linux.org.uk>
- <20120118154809.GL29346@mudshark.cambridge.arm.com>
-Message-ID: <20120119133311.GE1701@mudshark.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Jan 2012 07:34:17 -0600
+Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
+ tile (TC1 variant)
+In-Reply-To: <1326979652.32197.66.camel@hornet.cambridge.arm.com>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
+ <4F0C495C.4000103@citrix.com>
+ <1326979652.32197.66.camel@hornet.cambridge.arm.com>
+Message-ID: <4F181BD9.20401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2012 at 03:48:09PM +0000, Will Deacon wrote:
-> On Wed, Jan 18, 2012 at 03:40:44PM +0000, Russell King - ARM Linux wrote:
-> > 
-> > Is there no way to re-initialize the gic after an interrupt has begun
-> > to be processed, but not EOI'd ?
+On 01/19/2012 07:27 AM, Pawel Moll wrote:
+> On Tue, 2012-01-10 at 14:21 +0000, David Vrabel wrote:
+>> On 15/12/11 14:02, Pawel Moll wrote:
+>>> This patch adds Device Tree file for the CoreTile Express A15x2
+>>> (V2P-CA15) with Test Chip 1.
+>>
+>> This doesn't work as-is with the software model as accessing some of the
+>> peripherals that aren't modeled will cause an exception.  Is it worth
+>> having a device tree file suitable for the models? Or are the models too
+>> configurable for this to be workable?
 > 
-> Unfortunately, I'm not aware of anything like this (I was hoping for some
-> reset functionality). I'll double check that I didn't miss anything, but it
-> seems that you can't reset the GIC state machine without manually putting it
-> all back.
+> The model as you have it doesn't exactly represent the board for a
+> number of reasons, mainly because there was no hardware design when the
+> model was created, so some of the solution was best-guessed by the model
+> people. Anyway, current A15 model can't be considered a 1-to-1
+> equivalent of the VE board. The plan is that the models will be shipped
+> with their own DTSes. I'll work on that in the following months, I can
+> keep you updated (and use as a beta tester ;-) if you want.
+> 
+>>> As the chip's GIC has 160 interrupt inputs and equivalent SMM
+>>> (FPGA) has GIC synthesised with 256 interrupts, NR_IRQS is
+>>> increased.
+>>>
+>> [...]
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+>> [...]
+>>> +	memory at 80000000 {
+>>> +		device_type = "memory";
+>>> +		reg = <0x80000000 0x40000000>;
+>>> +	};
+>>
+>> If CONFIG_ARM_ATAG_DTB_COMPAT is enabled the device tree will end up
+>> with two nodes describing the memory ("memory" and "memory at 80000000" in
+>> this case).
+> 
+> You're right - the skeleton.dtsi contains "memory" mode... Funnily
+> enough originally I was using that name, but then Rob Herring suggested
+> changing it to @80000000, which seemed reasonable.
+> 
+> Now I wonder - is the "memory" node special and should not contain
+> "@address", or the skelton shouldn't contain the empty "memory" node...
+> 
 
-Ok, I re-read the docs and also spoke to some of the hardware guys and it
-seems that you can only kill of all the active interrupts from GICv2 (i.e.
-Cortex-A15 onwards). So I reckon the best way for the time being is to do
-this on the crash path.
+Hummm... I guess you should just use "memory" if you are using
+skeleton.dtsi.
 
-Will
+Rob
