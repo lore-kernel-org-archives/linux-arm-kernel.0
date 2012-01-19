@@ -1,39 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jan 2012 20:18:56 -0800
-Subject: [PATCH] ARM: tegra: initialize basic system clocks
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A404@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
- <1326212538-15419-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF177EE3A404@HQMAIL01.nvidia.com>
-Message-ID: <20120119041856.GC7145@quad.lixom.net>
+Date: Wed, 18 Jan 2012 20:21:39 -0800
+Subject: [PATCH V2] arm/tegra: Support Tegra30 in decompressor UART setup
+In-Reply-To: <1325628347-22140-1-git-send-email-swarren@nvidia.com>
+References: <1325628347-22140-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20120119042139.GD7145@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2012 at 09:23:52AM -0800, Stephen Warren wrote:
-> Peter De Schrijver wrote at Tuesday, January 10, 2012 9:22 AM:
-> > Initialize basic system clocks and provide a auxdata table to allow some
-> > peripheral drivers to find their clocks.
-> ...
-> > This should fix the hang you observed when sdhci_add_host() fails.
+On Tue, Jan 03, 2012 at 03:05:47PM -0700, Stephen Warren wrote:
+> On Tegra20, the UART clock runs at 216MHz, whereas on Tegra30 it runs at
+> 408MHz. Modify arch_decomp_setup() to detect Tegra20-vs-Tegra30 at run-
+> time, and program the correct divisor.
 > 
-> Yes, it does. This plus the Tegra30 clock patch series you posted stops
-> I2C and SDHCI drivers complaining about a lack of clocks during boot,
-> which is a great step forwards, even if SDHCI doesn't yet initialize
-> successfully. Thanks.
+> This makes uncompressor messages work correctly on Tegra30. This also
+> fixes early printk, assuming zImage is used and this setup code runs.
 > 
-> This patch and the clock series:
+> v2: Use CHIPID register to differentiate between chips, rather than a
+> GIC register. This should be more future-proof. Volatile is required
+> to prevent the compiler transforming the 32-bit apb_misc register read
+> into an 8-bit read of address 1 higher, since the HW only supports 32-
+> bit accesses, and will hang on an 8-bit access.
 > 
-> Tested-by: Stephen Warren <swarren@nvidia.com>
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-Applied.
+Thanks, applied.
 
-Peter, in the future please provide at least a one-sentence description of the
-patch in the patch description. "ARM: tegra: enable tegra30 clock framework"
-had no actualy patch description body so I added a simple one. It's a trivial
-patch but it's a good habit to always have something there.
-
-
-Thanks!
 
 -Olof
