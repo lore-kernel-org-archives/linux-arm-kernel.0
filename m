@@ -1,52 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Jan 2012 12:20:49 +0800
-Subject: [PATCH] ARM: mx28: Clear CLKGATE bit prior to changing DIV field
-In-Reply-To: <CAOMZO5CeW08kb4q3UVbpQ1tfJPotoVWV9dD7ycokpEbp2a9mow@mail.gmail.com>
-References: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
- <20246.30805.391940.766120@ipc1.ka-ro>
- <CAOMZO5B3qRowaQ9c_=pyykvp5x5f2nTgticV0tCcHGAYD007MQ@mail.gmail.com>
- <20120119031726.GA2247@S2101-09.ap.freescale.net>
- <CAOMZO5CeW08kb4q3UVbpQ1tfJPotoVWV9dD7ycokpEbp2a9mow@mail.gmail.com>
-Message-ID: <20120119042047.GB2247@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 18 Jan 2012 20:18:56 -0800
+Subject: [PATCH] ARM: tegra: initialize basic system clocks
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A404@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF177EE3A286@HQMAIL01.nvidia.com>
+ <1326212538-15419-1-git-send-email-pdeschrijver@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF177EE3A404@HQMAIL01.nvidia.com>
+Message-ID: <20120119041856.GC7145@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 01:57:45AM -0200, Fabio Estevam wrote:
-> 2012/1/19 Shawn Guo <shawn.guo@linaro.org>:
+On Tue, Jan 10, 2012 at 09:23:52AM -0800, Stephen Warren wrote:
+> Peter De Schrijver wrote at Tuesday, January 10, 2012 9:22 AM:
+> > Initialize basic system clocks and provide a auxdata table to allow some
+> > peripheral drivers to find their clocks.
+> ...
+> > This should fix the hang you observed when sdhci_add_host() fails.
 > 
-> > My proposal is we need to clk_prepare_enable before clk_set_rate a clock
-> > if the clock is gated, and then clk_disable_unprepare the clock after
-> > clk_set_rate is done. ?This applies whatever codes that want to
-> > clk_set_rate a mxs clock.
+> Yes, it does. This plus the Tegra30 clock patch series you posted stops
+> I2C and SDHCI drivers complaining about a lack of clocks during boot,
+> which is a great step forwards, even if SDHCI doesn't yet initialize
+> successfully. Thanks.
 > 
-> So something like:
+> This patch and the clock series:
 > 
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -809,6 +809,8 @@ int __init mx28_clocks_init(void)
->         clk_prepare_enable(&xbus_clk);
->         clk_prepare_enable(&emi_clk);
->         clk_prepare_enable(&uart_clk);
-> +       clk_prepare_enable(&saif0_clk);
-> +       clk_prepare_enable(&saif1_clk);
-> 
->         clk_set_parent(&lcdif_clk, &ref_pix_clk);
->         clk_set_parent(&saif0_clk, &pll0_clk);
-> @@ -822,6 +824,8 @@ int __init mx28_clocks_init(void)
->          */
->         clk_set_rate(&saif0_clk, 24000000);
->         clk_set_rate(&saif1_clk, 24000000);
-> +       clk_disable_unprepare(&saif0_clk);
-> +       clk_disable_unprepare(&saif1_clk);
-> 
->         clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-> ---
-> 
-> didn't work on my tests (probe of mxs-saif fails with the same timeout message).
-> 
-As far as I know, mxs-saif driver also has one clk_set_rate() being
-called with the clock gated.
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
--- 
-Regards,
-Shawn
+Applied.
+
+Peter, in the future please provide at least a one-sentence description of the
+patch in the patch description. "ARM: tegra: enable tegra30 clock framework"
+had no actualy patch description body so I added a simple one. It's a trivial
+patch but it's a good habit to always have something there.
+
+
+Thanks!
+
+-Olof
