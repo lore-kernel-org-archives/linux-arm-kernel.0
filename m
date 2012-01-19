@@ -1,248 +1,73 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Jan 2012 19:05:11 +0100
-Subject: [PATCH 2/3] ARM: at91/tc: add device tree support to atmel_tclib
-In-Reply-To: <1326996312-9244-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1326996312-9244-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <185a4d609becfcd60bbd15b09612160cf6ea9346.1326995849.git.nicolas.ferre@atmel.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 19 Jan 2012 13:09:11 -0500 (EST)
+Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
+ tile (TC1 variant)
+In-Reply-To: <CACxGe6tWCd83qcfAv8=x3mdGNHR6xEnS=Gyq=bnWxRw22M4QXA@mail.gmail.com>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
+ <4F0C495C.4000103@citrix.com>
+ <1326979652.32197.66.camel@hornet.cambridge.arm.com>
+ <4F181BD9.20401@gmail.com>
+ <1326980594.32197.67.camel@hornet.cambridge.arm.com>
+ <4F182248.7070209@gmail.com>
+ <1326984672.32197.68.camel@hornet.cambridge.arm.com>
+ <4F184C48.2050505@citrix.com>
+ <1326994035.13748.7.camel@hornet.cambridge.arm.com>
+ <20120119175053.GE10404@n2100.arm.linux.org.uk>
+ <CACxGe6tWCd83qcfAv8=x3mdGNHR6xEnS=Gyq=bnWxRw22M4QXA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1201191305180.19587@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree support added to atmel_tclib: the generic Timer Counter
-library. This is used by the clocksource/clockevent driver tcb_clksrc.
+On Thu, 19 Jan 2012, Grant Likely wrote:
 
-The current DT enabled platforms are also modified to use it:
-- .dtsi files are modified to add Timer Counter Block entries
-- alias are created to allow identification of each block
-- clkdev lookup tables are added for clocks identification.
+> On Thu, Jan 19, 2012 at 10:50 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Jan 19, 2012 at 05:27:15PM +0000, Pawel Moll wrote:
+> >> On Thu, 2012-01-19 at 17:00 +0000, David Vrabel wrote:
+> >> > The problem wasn't with including skeleton.dtsi.
+> >>
+> >> Including as it is creates two device_type="memory" nodes, one with
+> >> regs=<0 0>, which is definitely wrong.
+> >>
+> >> > With
+> >> > CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
+> >> > DTB using information from the ATAGs (see atags_to_fdt()).
+> >> >
+> >> > If there's an ATAG giving the amount of RAM the DTB's "memory" node is
+> >> > replaced with a new one. ?Since the vexpress DTBs don't have a "memory"
+> >> > node it's added and the DTB ends up with two nodes describing memory.
+> >>
+> >> The "memory at address" node name is in my opinion perfectly legal - p. 3.4
+> >> of the DT spec says "The name component of the node name (see 2.2.1)
+> >> shall be memory.". So the decompressor code may be wrong in looking for
+> >> adress-less "memory" node...
+> >
+> > I don't think you can expect such early code to properly parse a DT tree
+> > with a variability in how memory stuff is declared into that DT tree.
+> >
+> > What if you have two memory nodes specified in the DT file, and the
+> > ATAG data contains one?
+> 
+> Yes, just because it is technically legal doesn't make it okay.  The
+> pragmatic approach here is that the skeleton.dtsi file calls the node
+> "memory", so this .dts file must do the same.
+> 
+> > The more I look at this, the more I'm convinced that Grant's idea that
+> > DT should entirely override ATAGs all the way to the kernel proper was
+> > the wrong solution - at least in the kernel, if we had both available,
+> > we could make a choice there, and have the full DT library to be able
+> > to manipulate the DT blob.
+> 
+> Hey!  I was originally lobbying for the dt pointer carried by an ATAG.
+>  Nico conviced me otherwise.  :-)
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9g20.dtsi       |   14 ++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi       |   15 +++++++++++++++
- arch/arm/mach-at91/at91sam9260.c         |    7 +++++++
- arch/arm/mach-at91/at91sam9260_devices.c |   17 +++++++++++++++++
- arch/arm/mach-at91/at91sam9g45.c         |    3 +++
- arch/arm/mach-at91/at91sam9g45_devices.c |   17 +++++++++++++++++
- drivers/misc/atmel_tclib.c               |   27 +++++++++++++++++++++++++--
- 7 files changed, 98 insertions(+), 2 deletions(-)
+Hey!  I was originally lobbying for people to have a fully DT aware 
+bootloader if they wanted to play with DT, otherwise there is no 
+incentive for updated bootloaders.  But someone else convinced me 
+otherwise.  :-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index 4cd2749..073a538 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -26,6 +26,8 @@
- 		gpio0 = &pioA;
- 		gpio1 = &pioB;
- 		gpio2 = &pioC;
-+		tcb0 = &tcb0;
-+		tcb1 = &tcb1;
- 	};
- 	cpus {
- 		cpu at 0 {
-@@ -63,6 +65,18 @@
- 				interrupts = <1 4>;
- 			};
- 
-+			tcb0: timer at fffa0000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfffa0000 0x100>;
-+				interrupts = <17 4 18 4 19 4>;
-+			};
-+
-+			tcb1: timer at fffdc000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfffdc000 0x100>;
-+				interrupts = <26 4 27 4 28 4>;
-+			};
-+
- 			pioA: gpio at fffff400 {
- 				compatible = "atmel,at91rm9200-gpio";
- 				reg = <0xfffff400 0x100>;
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 0d21c8e..9406062 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -27,6 +27,8 @@
- 		gpio2 = &pioC;
- 		gpio3 = &pioD;
- 		gpio4 = &pioE;
-+		tcb0 = &tcb0;
-+		tcb1 = &tcb1;
- 	};
- 	cpus {
- 		cpu at 0 {
-@@ -64,6 +66,19 @@
- 				interrupts = <1 4>;
- 			};
- 
-+
-+			tcb0: timer at fff7c000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfff7c000 0x100>;
-+				interrupts = <18 4>;
-+			};
-+
-+			tcb1: timer at fffd4000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfffd4000 0x100>;
-+				interrupts = <18 4>;
-+			};
-+
- 			dma: dma-controller at ffffec00 {
- 				compatible = "atmel,at91sam9g45-dma";
- 				reg = <0xffffec00 0x200>;
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index aad68b1..69b1cc1 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -208,6 +208,13 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("usart", "fffd0000.serial", &usart3_clk),
- 	CLKDEV_CON_DEV_ID("usart", "fffd4000.serial", &usart4_clk),
- 	CLKDEV_CON_DEV_ID("usart", "fffd8000.serial", &usart5_clk),
-+	/* more tc lookup table for DT entries */
-+	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
-+	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
-+	CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
-+	CLKDEV_CON_DEV_ID("t0_clk", "fffdc000.timer", &tc3_clk),
-+	CLKDEV_CON_DEV_ID("t1_clk", "fffdc000.timer", &tc4_clk),
-+	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index ea66087..39cb6f2 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -698,8 +698,25 @@ static struct platform_device at91sam9260_tcb1_device = {
- 	.num_resources	= ARRAY_SIZE(tcb1_resources),
- };
- 
-+#if defined(CONFIG_OF)
-+static struct of_device_id tcb_ids[] = {
-+	{ .compatible = "atmel,at91rm9200-tcb" },
-+	{ /*sentinel*/ }
-+};
-+#endif
-+
- static void __init at91_add_device_tc(void)
- {
-+#if defined(CONFIG_OF)
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, tcb_ids);
-+	if (np) {
-+		of_node_put(np);
-+		return;
-+	}
-+#endif
-+
- 	platform_device_register(&at91sam9260_tcb0_device);
- 	platform_device_register(&at91sam9260_tcb1_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 4895b04..0e30a75 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -230,6 +230,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("usart", "fff90000.serial", &usart1_clk),
- 	CLKDEV_CON_DEV_ID("usart", "fff94000.serial", &usart2_clk),
- 	CLKDEV_CON_DEV_ID("usart", "fff98000.serial", &usart3_clk),
-+	/* more tc lookup table for DT entries */
-+	CLKDEV_CON_DEV_ID("t0_clk", "fff7c000.timer", &tcb0_clk),
-+	CLKDEV_CON_DEV_ID("t0_clk", "fffd4000.timer", &tcb0_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 545bbe9..a0a217d 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -995,8 +995,25 @@ static struct platform_device at91sam9g45_tcb1_device = {
- 	.num_resources	= ARRAY_SIZE(tcb1_resources),
- };
- 
-+#if defined(CONFIG_OF)
-+static struct of_device_id tcb_ids[] = {
-+	{ .compatible = "atmel,at91rm9200-tcb" },
-+	{ /*sentinel*/ }
-+};
-+#endif
-+
- static void __init at91_add_device_tc(void)
- {
-+#if defined(CONFIG_OF)
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, tcb_ids);
-+	if (np) {
-+		of_node_put(np);
-+		return;
-+	}
-+#endif
-+
- 	platform_device_register(&at91sam9g45_tcb0_device);
- 	platform_device_register(&at91sam9g45_tcb1_device);
- }
-diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
-index 7a6512a..de6dea7 100644
---- a/drivers/misc/atmel_tclib.c
-+++ b/drivers/misc/atmel_tclib.c
-@@ -6,8 +6,10 @@
- #include <linux/ioport.h>
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-+#include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/export.h>
-+#include <linux/of.h>
- 
- /*
-  * This is a thin library to solve the problem of how to portably allocate
-@@ -48,7 +50,13 @@ struct atmel_tc *atmel_tc_alloc(unsigned block, const char *name)
- 
- 	spin_lock(&tc_list_lock);
- 	list_for_each_entry(tc, &tc_list, node) {
--		if (tc->pdev->id == block) {
-+		if (tc->pdev->dev.of_node) {
-+			if (of_alias_get_id(tc->pdev->dev.of_node, "tcb")
-+					== block) {
-+				pdev = tc->pdev;
-+				break;
-+			}
-+		} else if (tc->pdev->id == block) {
- 			pdev = tc->pdev;
- 			break;
- 		}
-@@ -105,6 +113,18 @@ void atmel_tc_free(struct atmel_tc *tc)
- }
- EXPORT_SYMBOL_GPL(atmel_tc_free);
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_tcb_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91rm9200-tcb",
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+
-+MODULE_DEVICE_TABLE(of, atmel_tcb_dt_ids);
-+#endif
-+
- static int __init tc_probe(struct platform_device *pdev)
- {
- 	struct atmel_tc *tc;
-@@ -154,7 +174,10 @@ static int __init tc_probe(struct platform_device *pdev)
- }
- 
- static struct platform_driver tc_driver = {
--	.driver.name	= "atmel_tcb",
-+	.driver = {
-+		.name	= "atmel_tcb",
-+		.of_match_table	= of_match_ptr(atmel_tcb_dt_ids),
-+	},
- };
- 
- static int __init tc_init(void)
--- 
-1.7.5.4
+Mixed bags always have loose ends.
+
+
+Nicolas
