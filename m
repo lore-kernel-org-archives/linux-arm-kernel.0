@@ -1,109 +1,95 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 10:02:43 +0000
-Subject: [PATCH] ARM: earlier initialization of vectors page
-Message-ID: <E1RoBIx-0005U9-Bs@rmk-PC.arm.linux.org.uk>
+Date: Fri, 20 Jan 2012 10:03:03 +0000
+Subject: [PATCH] ARM: ecard: get rid of NO_IRQ madness
+Message-ID: <E1RoBJH-0005UG-Pj@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the contents of the vectors page immediately after we
-allocate the page, but before we map it.  This avoids any possible
-aliases with other mappings which may need to be flushed after the
-page has been mapped irrespective of the cache type.
+Get rid of the NO_IRQ madness from Acorn expansion card handling code.
+Thankfully, are relatively few users of this here, and so it's easy to
+audit.
 
-We follow this later with a flush_cache_all() after all static memory
-mappings have been initialized, which ensures that this is safe from
-any cache effects.
-
-Tested-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/traps.h |    2 +-
- arch/arm/kernel/setup.c      |    1 -
- arch/arm/kernel/traps.c      |   10 ++++------
- arch/arm/mm/mmu.c            |    7 +++++--
- 4 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/kernel/ecard.c     |    6 +++---
+ drivers/scsi/arm/arxescsi.c |    2 +-
+ drivers/scsi/arm/fas216.c   |    4 ++--
+ drivers/scsi/arm/fas216.h   |    4 ----
+ 4 files changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
-index 5b29a66..f555bb3 100644
---- a/arch/arm/include/asm/traps.h
-+++ b/arch/arm/include/asm/traps.h
-@@ -46,7 +46,7 @@ static inline int in_exception_text(unsigned long ptr)
- 	return in ? : __in_irqentry_text(ptr);
- }
+diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
+index 4dd0eda..ddcda2e 100644
+--- a/arch/arm/kernel/ecard.c
++++ b/arch/arm/kernel/ecard.c
+@@ -578,7 +578,7 @@ ecard_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	for (ec = cards; ec; ec = ec->next) {
+ 		int pending;
  
--extern void __init early_trap_init(void);
-+extern void __init early_trap_init(void *);
- extern void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame);
- extern void ptrace_break(struct task_struct *tsk, struct pt_regs *regs);
+-		if (!ec->claimed || ec->irq == NO_IRQ || ec->slot_no == 8)
++		if (!ec->claimed || !ec->irq || ec->slot_no == 8)
+ 			continue;
  
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 129fbd5..9b65cb4 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -961,7 +961,6 @@ void __init setup_arch(char **cmdline_p)
- 	conswitchp = &dummy_con;
- #endif
- #endif
--	early_trap_init();
+ 		if (ec->ops && ec->ops->irqpending)
+@@ -805,8 +805,8 @@ static struct expansion_card *__init ecard_alloc_card(int type, int slot)
  
- 	if (mdesc->init_early)
- 		mdesc->init_early();
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 99a5727..be15daf 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -781,18 +781,16 @@ static void __init kuser_get_tls_init(unsigned long vectors)
- 		memcpy((void *)vectors + 0xfe0, (void *)vectors + 0xfe8, 4);
- }
+ 	ec->slot_no = slot;
+ 	ec->easi = type == ECARD_EASI;
+-	ec->irq = NO_IRQ;
+-	ec->fiq = NO_IRQ;
++	ec->irq = 0;
++	ec->fiq = 0;
+ 	ec->dma = NO_DMA;
+ 	ec->ops = &ecard_default_ops;
  
--void __init early_trap_init(void)
-+void __init early_trap_init(void *vectors_base)
- {
--#if defined(CONFIG_CPU_USE_DOMAINS)
--	unsigned long vectors = CONFIG_VECTORS_BASE;
--#else
--	unsigned long vectors = (unsigned long)vectors_page;
+diff --git a/drivers/scsi/arm/arxescsi.c b/drivers/scsi/arm/arxescsi.c
+index a750aa7..2a28b4a 100644
+--- a/drivers/scsi/arm/arxescsi.c
++++ b/drivers/scsi/arm/arxescsi.c
+@@ -305,7 +305,7 @@ arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
+ 	info->base = base;
+ 
+ 	info->info.scsi.io_base		= base + 0x2000;
+-	info->info.scsi.irq		= NO_IRQ;
++	info->info.scsi.irq		= 0;
+ 	info->info.scsi.dma		= NO_DMA;
+ 	info->info.scsi.io_shift	= 5;
+ 	info->info.ifcfg.clockrate	= 24; /* MHz */
+diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
+index e85c40b..6206a66 100644
+--- a/drivers/scsi/arm/fas216.c
++++ b/drivers/scsi/arm/fas216.c
+@@ -2176,7 +2176,7 @@ static void fas216_done(FAS216_Info *info, unsigned int result)
+ 	fn = (void (*)(FAS216_Info *, struct scsi_cmnd *, unsigned int))SCpnt->host_scribble;
+ 	fn(info, SCpnt, result);
+ 
+-	if (info->scsi.irq != NO_IRQ) {
++	if (info->scsi.irq) {
+ 		spin_lock_irqsave(&info->host_lock, flags);
+ 		if (info->scsi.phase == PHASE_IDLE)
+ 			fas216_kick(info);
+@@ -2276,7 +2276,7 @@ static int fas216_noqueue_command_lck(struct scsi_cmnd *SCpnt,
+ 	 * We should only be using this if we don't have an interrupt.
+ 	 * Provide some "incentive" to use the queueing code.
+ 	 */
+-	BUG_ON(info->scsi.irq != NO_IRQ);
++	BUG_ON(info->scsi.irq);
+ 
+ 	info->internal_done = 0;
+ 	fas216_queue_command_lck(SCpnt, fas216_internal_done);
+diff --git a/drivers/scsi/arm/fas216.h b/drivers/scsi/arm/fas216.h
+index 84b7127..df2e1b3 100644
+--- a/drivers/scsi/arm/fas216.h
++++ b/drivers/scsi/arm/fas216.h
+@@ -12,10 +12,6 @@
+ #ifndef FAS216_H
+ #define FAS216_H
+ 
+-#ifndef NO_IRQ
+-#define NO_IRQ 255
 -#endif
-+	unsigned long vectors = (unsigned long)vectors_base;
- 	extern char __stubs_start[], __stubs_end[];
- 	extern char __vectors_start[], __vectors_end[];
- 	extern char __kuser_helper_start[], __kuser_helper_end[];
- 	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
+-
+ #include <scsi/scsi_eh.h>
  
-+	vectors_page = vectors_base;
-+
- 	/*
- 	 * Copy the vectors, stubs and kuser helpers (in entry-armv.S)
- 	 * into the vector page, mapped at 0xffff0000, and ensure these
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 94c5a0c..c1263ad 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -997,11 +997,14 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
- {
- 	struct map_desc map;
- 	unsigned long addr;
-+	void *vectors;
- 
- 	/*
- 	 * Allocate the vector page early.
- 	 */
--	vectors_page = early_alloc(PAGE_SIZE);
-+	vectors = early_alloc(PAGE_SIZE);
-+
-+	early_trap_init(vectors);
- 
- 	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
- 		pmd_clear(pmd_off_k(addr));
-@@ -1041,7 +1044,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
- 	 * location (0xffff0000).  If we aren't using high-vectors, also
- 	 * create a mapping at the low-vectors virtual address.
- 	 */
--	map.pfn = __phys_to_pfn(virt_to_phys(vectors_page));
-+	map.pfn = __phys_to_pfn(virt_to_phys(vectors));
- 	map.virtual = 0xffff0000;
- 	map.length = PAGE_SIZE;
- 	map.type = MT_HIGH_VECTORS;
+ #include "queue.h"
 -- 
 1.7.4.4
