@@ -1,103 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:03:49 +0000
-Subject: [PATCH v4 02/15] ARM: local timers: introduce a new registration
- interface
+Date: Fri, 20 Jan 2012 12:04:00 +0000
+Subject: [PATCH v4 13/15] ARM: local timers: convert exynos to runtime
+ registration interface
 In-Reply-To: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
 References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1327061042-14857-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1327061042-14857-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to switch to a runtime selectable local timer,
-add a registration interface that timer drivers can use to
-register to the core.
+Convert the Exynos MCT timers to the runtime registration interface.
+Tested on Origen.
 
-local_timer_setup() and local_timer_stop() are made weak symbols
-in order not to break existing setups.
-
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/localtimer.h |   15 +++++++++++++++
- arch/arm/kernel/smp.c             |   27 +++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 0 deletions(-)
+ arch/arm/mach-exynos/mct.c |   18 ++++++++++--------
+ 1 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index 7e1b2c5..f088d63 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -15,6 +15,11 @@
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index 85b5527..edc4b94 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -21,6 +21,7 @@
+ #include <linux/percpu.h>
  
- struct clock_event_device;
+ #include <asm/hardware/gic.h>
++#include <asm/localtimer.h>
  
-+struct local_timer_ops {
-+	int  (*setup)(struct clock_event_device *);
-+	void (*stop)(struct clock_event_device *);
-+};
-+
- /*
-  * Setup a per-cpu timer, whether it be a local timer or dummy broadcast
-  */
-@@ -38,6 +43,11 @@ void local_timer_stop(struct clock_event_device *);
-  */
- int local_timer_setup(struct clock_event_device *);
+ #include <plat/cpu.h>
  
-+/*
-+ * Register a local timer driver
-+ */
-+int local_timer_register(struct local_timer_ops *);
-+
- #else
+@@ -375,7 +376,7 @@ static struct irqaction mct_tick1_event_irq = {
+ 	.handler	= exynos4_mct_tick_isr,
+ };
  
- static inline int local_timer_setup(struct clock_event_device *evt)
-@@ -48,6 +58,11 @@ static inline int local_timer_setup(struct clock_event_device *evt)
- static inline void local_timer_stop(struct clock_event_device *evt)
+-static void exynos4_mct_tick_init(struct clock_event_device *evt)
++static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
  {
- }
-+
-+static inline int local_timer_register(struct local_timer_ops *ops)
-+{
-+	return -ENXIO;
-+}
- #endif
+ 	struct mct_clock_event_device *mevt;
+ 	unsigned int cpu = smp_processor_id();
+@@ -417,17 +418,11 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
+ 	} else {
+ 		enable_percpu_irq(IRQ_MCT_LOCALTIMER, 0);
+ 	}
+-}
+-
+-/* Setup the local clock events for a CPU */
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	exynos4_mct_tick_init(evt);
  
- #endif
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 57db122..69d5f8b 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -475,6 +475,33 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
- 	clockevents_register_device(evt);
+ 	return 0;
  }
  
-+static struct local_timer_ops *lt_ops;
-+
-+#ifdef CONFIG_LOCAL_TIMERS
-+int local_timer_register(struct local_timer_ops *ops)
-+{
-+	if (lt_ops)
-+		return -EBUSY;
-+
-+	lt_ops = ops;
-+	return 0;
-+}
-+#endif
-+
-+int __cpuinit __attribute__ ((weak)) local_timer_setup(struct clock_event_device *clk)
-+{
-+	if (lt_ops)
-+		return lt_ops->setup(clk);
-+
-+	return -ENXIO;
-+}
-+
-+void __attribute__ ((weak)) local_timer_stop(struct clock_event_device *clk)
-+{
-+	if (lt_ops)
-+		lt_ops->stop(clk);
-+}
-+
- void __cpuinit percpu_timer_setup(void)
+-void local_timer_stop(struct clock_event_device *evt)
++static void exynos4_local_timer_stop(struct clock_event_device *evt)
  {
  	unsigned int cpu = smp_processor_id();
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+@@ -439,6 +434,11 @@ void local_timer_stop(struct clock_event_device *evt)
+ 	else
+ 		disable_percpu_irq(IRQ_MCT_LOCALTIMER);
+ }
++
++static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
++	.setup	= exynos4_local_timer_setup,
++	.stop	= exynos4_local_timer_stop,
++};
+ #endif /* CONFIG_LOCAL_TIMERS */
+ 
+ static void __init exynos4_timer_resources(void)
+@@ -458,6 +458,8 @@ static void __init exynos4_timer_resources(void)
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     IRQ_MCT_LOCALTIMER, err);
+ 	}
++
++	local_timer_register(&exynos4_mct_tick_ops);
+ #endif /* CONFIG_LOCAL_TIMERS */
+ }
+ 
 -- 
 1.7.7.1
