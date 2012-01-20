@@ -1,43 +1,56 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 20 Jan 2012 15:02:51 +0000
-Subject: Building of arch/arm/plat-mxc/ssi-fiq.S failed w/ THUMB2 enabled?
-In-Reply-To: <20120120115606.GL1068@n2100.arm.linux.org.uk>
-References: <CAMPhdO_4NQUFB14eecTb3N4oQJa86ojSk8FUveqg+Lye5_jY+A@mail.gmail.com>
- <20111202102418.GT26618@pengutronix.de>
- <20111202133911.GC2892@localhost.localdomain>
- <20120120115606.GL1068@n2100.arm.linux.org.uk>
-Message-ID: <20120120150251.GC2046@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 20 Jan 2012 16:45:40 +0100
+Subject: [PATCH] ARM: ux500: Initialize irq affinity
+In-Reply-To: <20120120130310.GO1068@n2100.arm.linux.org.uk>
+References: <1327064356-3603-1-git-send-email-per.xx.fransson@stericsson.com>
+ <20120120130310.GO1068@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 11:56:06AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 02, 2011 at 01:39:11PM +0000, Dave Martin wrote:
-> > Is this code still used on ARMv7 and above?  FIQ is not normally
-> > available for Linux interrupts on hardware which makes use of the
-> > TrustZone security extensions.  Plus, on modern hardware with a deep
-> > memory hierarchy, FIQ is may not be all that "fast" either, due to
-> > cache/TLB effects.
-> 
-> It's worth pointing out that people end up using FIQs for certain things
-> because the hardware requires you to do it.  So if a platform is using
-> them, they're probably not doing it out of choice, but are doing it
-> because it's a baseline requirement to get something working.
+On Fri, Jan 20, 2012 at 2:03 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 20, 2012 at 01:59:16PM +0100, Per Fransson wrote:
+>> Use irq_set_affinity() to initialize the kernel view of irq affinity
+>> when programming the GIC registers.
+>
+> Why is this necessary?
 
-Agreed -- but I'm wondering whether this code is actually non-relevant
-to newer platforms, and is only being built at all because of a
-non-relevant driver being included in mx5_defconfig, or due to some
-Kconfig anomaly.
+Necessary: we don't quite know. (Maybe should have been RFC, but
+this patch is better than being silent of it...)
 
+On the Ux500 all shared peripheral IRQs (32 thru 127) are delivered
+to CPU0 (hardwired, will not work on CPU1), I have heard that this
+is sort of what everybody does but don't know for sure. (Marc?)
 
-If this is really non-relevant to any >= v7 platform, we just need
-for fix Kconfig : this code should never ever be built into a Thumb-2
-kernel in that case.
+Currently the gic_set_affinity() in common/gic.c isn't called for any
+IRQs so they are left in their power-on state (from U-Boot or
+similar) which is essentially correct (we checked dumps of the
+registers).
 
+However when we look at the irq descriptors in e.g. crash:
 
-Unfotunately I don't have the i.MX hardware knowledge to answer that
-"if" though... it's just a hunch on my part.
+    crash> irq -s
+    IRQ NAME                 AFFINITY
+     36 Nomadik Timer Tick   0
+     43 uart-pl011           0-1
+     44 nmk-i2c              0-1
+     46 pl022                0-1
+     53 nmk-i2c              0-1
+     54 nmk-i2c              0-1
+    (... etc ...)
 
-One of the i.MX guys will have to comment on that.
+So the descriptors think the IRQs are shared except for the
+timer. Which isn't true. So this patch makes the map match
+reality.
 
-Cheers
----Dave
+> And if it is necessary, why do you think it
+> should be ux500 specific?
+
+Good question. If this is the case for all SMP gic users maybe we
+should make the code #ifdef CONFIG_SMP inside gic.c instead?
+(Sans the check for the modem IRQs, they should probably also
+be made affine to CPU0.)
+
+Yours,
+Linus Walleij
