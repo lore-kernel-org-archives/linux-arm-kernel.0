@@ -1,105 +1,95 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 Jan 2012 14:33:04 -0600
-Subject: [PATCH v2 06/13] sh: intc: unify evt2irq/irq2evt macros for sh and arm
+Date: Fri, 20 Jan 2012 14:33:05 -0600
+Subject: [PATCH v2 07/13] sh: intc: remove dependency on NR_IRQS
 In-Reply-To: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
 References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1327091591-27125-7-git-send-email-robherring2@gmail.com>
+Message-ID: <1327091591-27125-8-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move evt2irq and irq2evt macros definitions out of sh and arm includes
-into a common location.
+SH intc has a compile time dependency on NR_IRQS. Make this dependency a
+local define so that shmobile (and ARM in general) can have run-time
+NR_IRQS setting.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-shmobile/Kconfig             |    4 ++++
- arch/arm/mach-shmobile/include/mach/irqs.h |    6 ++----
- arch/sh/include/asm/irq.h                  |   11 -----------
- include/linux/sh_intc.h                    |   11 +++++++++++
- 4 files changed, 17 insertions(+), 15 deletions(-)
+ drivers/sh/intc/balancing.c |    2 +-
+ drivers/sh/intc/core.c      |    2 +-
+ drivers/sh/intc/handle.c    |    2 +-
+ drivers/sh/intc/virq.c      |    2 +-
+ include/linux/sh_intc.h     |    6 ++++++
+ 5 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 060e564..34560ca 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -100,6 +100,10 @@ config MACH_MARZEN
- 
- comment "SH-Mobile System Configuration"
- 
-+config CPU_HAS_INTEVT
-+        bool
-+	default y
-+
- menu "Memory configuration"
- 
- config MEMORY_START
-diff --git a/arch/arm/mach-shmobile/include/mach/irqs.h b/arch/arm/mach-shmobile/include/mach/irqs.h
-index dcb714f..828807d 100644
---- a/arch/arm/mach-shmobile/include/mach/irqs.h
-+++ b/arch/arm/mach-shmobile/include/mach/irqs.h
-@@ -1,15 +1,13 @@
- #ifndef __ASM_MACH_IRQS_H
- #define __ASM_MACH_IRQS_H
- 
-+#include <linux/sh_intc.h>
-+
- #define NR_IRQS         1024
- 
- /* GIC */
- #define gic_spi(nr)		((nr) + 32)
- 
--/* INTCA */
--#define evt2irq(evt)		(((evt) >> 5) - 16)
--#define irq2evt(irq)		(((irq) + 16) << 5)
--
- /* INTCS */
- #define INTCS_VECT_BASE		0x2200
- #define INTCS_VECT(n, vect)	INTC_VECT((n), INTCS_VECT_BASE + (vect))
-diff --git a/arch/sh/include/asm/irq.h b/arch/sh/include/asm/irq.h
-index 45d08b6..2a62017 100644
---- a/arch/sh/include/asm/irq.h
-+++ b/arch/sh/include/asm/irq.h
-@@ -21,17 +21,6 @@
- #define NO_IRQ_IGNORE		((unsigned int)-1)
- 
- /*
-- * Convert back and forth between INTEVT and IRQ values.
-- */
--#ifdef CONFIG_CPU_HAS_INTEVT
--#define evt2irq(evt)		(((evt) >> 5) - 16)
--#define irq2evt(irq)		(((irq) + 16) << 5)
--#else
--#define evt2irq(evt)		(evt)
--#define irq2evt(irq)		(irq)
--#endif
--
--/*
-  * Simple Mask Register Support
+diff --git a/drivers/sh/intc/balancing.c b/drivers/sh/intc/balancing.c
+index cec7a96..bc78080 100644
+--- a/drivers/sh/intc/balancing.c
++++ b/drivers/sh/intc/balancing.c
+@@ -9,7 +9,7 @@
   */
- extern void make_maskreg_irq(unsigned int irq);
+ #include "internals.h"
+ 
+-static unsigned long dist_handle[NR_IRQS];
++static unsigned long dist_handle[INTC_NR_IRQS];
+ 
+ void intc_balancing_enable(unsigned int irq)
+ {
+diff --git a/drivers/sh/intc/core.c b/drivers/sh/intc/core.c
+index e53e449..2fde897 100644
+--- a/drivers/sh/intc/core.c
++++ b/drivers/sh/intc/core.c
+@@ -42,7 +42,7 @@ unsigned int nr_intc_controllers;
+  * - this needs to be at least 2 for 5-bit priorities on 7780
+  */
+ static unsigned int default_prio_level = 2;	/* 2 - 16 */
+-static unsigned int intc_prio_level[NR_IRQS];	/* for now */
++static unsigned int intc_prio_level[INTC_NR_IRQS];	/* for now */
+ 
+ unsigned int intc_get_dfl_prio_level(void)
+ {
+diff --git a/drivers/sh/intc/handle.c b/drivers/sh/intc/handle.c
+index 057ce56..f461d53 100644
+--- a/drivers/sh/intc/handle.c
++++ b/drivers/sh/intc/handle.c
+@@ -13,7 +13,7 @@
+ #include <linux/spinlock.h>
+ #include "internals.h"
+ 
+-static unsigned long ack_handle[NR_IRQS];
++static unsigned long ack_handle[INTC_NR_IRQS];
+ 
+ static intc_enum __init intc_grp_id(struct intc_desc *desc,
+ 				    intc_enum enum_id)
+diff --git a/drivers/sh/intc/virq.c b/drivers/sh/intc/virq.c
+index c7ec49f..93cec21 100644
+--- a/drivers/sh/intc/virq.c
++++ b/drivers/sh/intc/virq.c
+@@ -17,7 +17,7 @@
+ #include <linux/export.h>
+ #include "internals.h"
+ 
+-static struct intc_map_entry intc_irq_xlate[NR_IRQS];
++static struct intc_map_entry intc_irq_xlate[INTC_NR_IRQS];
+ 
+ struct intc_virq_list {
+ 	unsigned int irq;
 diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
-index b160645..e1a2ac5 100644
+index e1a2ac5..6aed080 100644
 --- a/include/linux/sh_intc.h
 +++ b/include/linux/sh_intc.h
-@@ -3,6 +3,17 @@
+@@ -3,6 +3,12 @@
  
  #include <linux/ioport.h>
  
-+/*
-+ * Convert back and forth between INTEVT and IRQ values.
-+ */
-+#ifdef CONFIG_CPU_HAS_INTEVT
-+#define evt2irq(evt)		(((evt) >> 5) - 16)
-+#define irq2evt(irq)		(((irq) + 16) << 5)
++#ifdef CONFIG_SUPERH
++#define INTC_NR_IRQS	512
 +#else
-+#define evt2irq(evt)		(evt)
-+#define irq2evt(irq)		(irq)
++#define INTC_NR_IRQS	1024
 +#endif
 +
- typedef unsigned char intc_enum;
- 
- struct intc_vect {
+ /*
+  * Convert back and forth between INTEVT and IRQ values.
+  */
 -- 
 1.7.5.4
