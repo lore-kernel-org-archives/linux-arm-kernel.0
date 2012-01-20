@@ -1,58 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 17:11:02 +0000
-Subject: [PATCH 1/2] ARM: sa11x0: Implement autoloading of codec and
- codec pdata for mcp bus.
-In-Reply-To: <20120118152149.GI1068@n2100.arm.linux.org.uk>
-References: <1322427655-914-1-git-send-email-jochen@scram.de>
- <20120118152149.GI1068@n2100.arm.linux.org.uk>
-Message-ID: <20120120171102.GA11845@n2100.arm.linux.org.uk>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Fri, 20 Jan 2012 19:24:23 +0200
+Subject: [PATCH] ARM: OMAP: fix erroneous mmc2 clock change on mmc3 setup
+In-Reply-To: <1324168547-26569-1-git-send-email-notasas@gmail.com>
+References: <1324168547-26569-1-git-send-email-notasas@gmail.com>
+Message-ID: <CANOLnONJgEJehOiH0_0AUWnAu62K-8A_cmv4UW0v=dwoQnn62w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2012 at 03:21:49PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Nov 27, 2011 at 10:00:54PM +0100, Jochen Friedrich wrote:
-> > +	if (mid && mid->driver_data) {
-> > +		if (id != mid->driver_data) {
-> > +			printk(KERN_WARNING "%s wrong ID %04x found: %04x\n",
-> > +				mid->name, (unsigned int) mid->driver_data, id);
-> > +			goto err_disable;
-> > +		}
-> > +	} else {
-> > +		mid = &ucb1x00_id[1];
-> > +		while (mid->driver_data) {
-> > +			if (id == mid->driver_data)
-> > +				break;
-> > +			mid++;
-> > +		}
-> > +		printk(KERN_WARNING "%s ID not found: %04x\n",
-> > +			ucb1x00_id[0].name, id);
-> 
-> Why do we need this complexity when we can detect the device from its
-> ID in hardware?  This, to me, is just code for the sake of code.
-> 
-> I'm far from impressed by this patch, and had it not already gone in,
-> I'd be NAKing it.
+Hi Tony,
 
-Right, I'm even more convinced that the above is over the top.  What
-it's doing is requiring either:
+Would be nice to have this for -rc as this used to work several
+releases back when hsmmc23_before_set_reg() was checking for a
+regulator, which wasn't set for MMC3 so the function would return
+early, not causing the problem it causes now.
 
-(a) the autodetect option to be given, in which case we will match
-    using the ID from the device
-(b) use a specific option, in which case the ID must match
+On Sun, Dec 18, 2011 at 2:35 AM, Grazvydas Ignotas <notasas@gmail.com> wrote:
+> hsmmc23_before_set_reg() can set MMCSDIO2ADPCLKISEL bit, which
+> enables internal clock for MMC2. Currently this function is also called
+> by code handling MMC3, and if .internal_clock is set in platform data
+> (by default it currently is), it will set MMCSDIO2ADPCLKISEL for MMC2
+> instead of MMC3 (MMC3 doesn't have such bit so nothing actually needs to
+> be done). This breaks 2nd SD slot on pandora.
+>
+> Fix this by changing hsmmc23_before_set_reg() to only handle MMC2.
+> Note that this removes .remux() call for MMC3, but no board currently
+> needs it and it's also not called for MMC4 and MMC5.
+>
+> Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+> ---
+> applies both on mainline and hsmmc branch.
+>
+> ?arch/arm/mach-omap2/hsmmc.c | ? ?7 +++----
+> ?1 files changed, 3 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index f4a1020..d90ac08 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -171,7 +171,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+> ? ? ? ?}
+> ?}
+>
+> -static void hsmmc23_before_set_reg(struct device *dev, int slot,
+> +static void hsmmc2_before_set_reg(struct device *dev, int slot,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int power_on, int vdd)
+> ?{
+> ? ? ? ?struct omap_mmc_platform_data *mmc = dev->platform_data;
+> @@ -378,14 +378,13 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+> ? ? ? ? ? ? ? ? ? ? ? ?c->caps &= ~MMC_CAP_8_BIT_DATA;
+> ? ? ? ? ? ? ? ? ? ? ? ?c->caps |= MMC_CAP_4_BIT_DATA;
+> ? ? ? ? ? ? ? ?}
+> - ? ? ? ? ? ? ? /* FALLTHROUGH */
+> - ? ? ? case 3:
+> ? ? ? ? ? ? ? ?if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
+> ? ? ? ? ? ? ? ? ? ? ? ?/* off-chip level shifting, or none */
+> - ? ? ? ? ? ? ? ? ? ? ? mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
+> + ? ? ? ? ? ? ? ? ? ? ? mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
+> ? ? ? ? ? ? ? ? ? ? ? ?mmc->slots[0].after_set_reg = NULL;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?break;
+> + ? ? ? case 3:
+> ? ? ? ?case 4:
+> ? ? ? ?case 5:
+> ? ? ? ? ? ? ? ?mmc->slots[0].before_set_reg = NULL;
+> --
+> 1.7.0.4
+>
 
-which is absolutely silly and completely unnecessary.  If we require the
-ID to be correct from the hardware, there's absolutely no point what so
-ever passing some kind of identifier in to the driver.  It just creates
-an additional unnecessary reason for things to fail - in other words,
-the only thing it adds is _fragility_.
 
-And to prove the point that it's fragile, on the Assabet I get this:
 
-ucb1x00 ID not found: 1005
-
-and it fails to initialize - 0x1005 is a valid id for a UCB1300 device.
-
-So clearly this code hasn't even been tested either.
-
-Samuel, please revert this change.  It's broken and does more than what
-it says in the change log.
+-- 
+Gra?vydas
