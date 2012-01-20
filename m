@@ -1,74 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Jan 2012 16:08:36 +0000
-Subject: [PATCH] ARM: ux500: Initialize irq affinity
-In-Reply-To: <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
-References: <1327064356-3603-1-git-send-email-per.xx.fransson@stericsson.com>
- <20120120130310.GO1068@n2100.arm.linux.org.uk>
- <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
-Message-ID: <20120120160836.GB16531@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 20 Jan 2012 16:10:23 +0000
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform clean-up
+Message-ID: <1327075829-14346-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This patch-set satisfies 4 objectives:
+ 1. Ensures each platform device can specify a suitable parent
+ 2. Provides a bus for SoC devices as a means to export information
+ 3. Allows ux500 to make use of the new SoC bus
+ 4. Cleans up unnecessary complexity from ux500 code
 
-On Fri, Jan 20, 2012 at 03:45:40PM +0000, Linus Walleij wrote:
-> On Fri, Jan 20, 2012 at 2:03 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Jan 20, 2012 at 01:59:16PM +0100, Per Fransson wrote:
-> >> Use irq_set_affinity() to initialize the kernel view of irq affinity
-> >> when programming the GIC registers.
-> >
-> > Why is this necessary?
-> 
-> Necessary: we don't quite know. (Maybe should have been RFC, but
-> this patch is better than being silent of it...)
-> 
-> On the Ux500 all shared peripheral IRQs (32 thru 127) are delivered
-> to CPU0 (hardwired, will not work on CPU1), I have heard that this
-> is sort of what everybody does but don't know for sure. (Marc?)
-
-Oo-er, I've not heard of any platforms doing this before, but it is
-permitted by the GIC spec so we should deal with it.
-
-> Currently the gic_set_affinity() in common/gic.c isn't called for any
-> IRQs so they are left in their power-on state (from U-Boot or
-> similar) which is essentially correct (we checked dumps of the
-> registers).
-> 
-> However when we look at the irq descriptors in e.g. crash:
-> 
->     crash> irq -s
->     IRQ NAME                 AFFINITY
->      36 Nomadik Timer Tick   0
->      43 uart-pl011           0-1
->      44 nmk-i2c              0-1
->      46 pl022                0-1
->      53 nmk-i2c              0-1
->      54 nmk-i2c              0-1
->     (... etc ...)
-> 
-> So the descriptors think the IRQs are shared except for the
-> timer. Which isn't true. So this patch makes the map match
-> reality.
-
-Right. So these are SPIs that are configured statically in hardware. They
-should therefore be identifiable by writing zeros to the ICDIPTRn registers
-at the distributor and then reading back to see if any of the bits are set.
-If they are, we can create a cpumask for each interrupt and set the affinity
-to that.
-
-The next question is, is gic_dist_init the right place to do this or is it
-too early (we need to update the irq_desc)?
-
-> > And if it is necessary, why do you think it
-> > should be ux500 specific?
-> 
-> Good question. If this is the case for all SMP gic users maybe we
-> should make the code #ifdef CONFIG_SMP inside gic.c instead?
-> (Sans the check for the modem IRQs, they should probably also
-> be made affine to CPU0.)
-
-Although I think you're the only platform doing this, we should aim to
-handle it in the GIC driver at some initialisation stage.
-
-Will
+ Documentation/ABI/testing/sysfs-devices-soc    |   58 ++++++++
+ arch/arm/mach-ux500/Kconfig                    |    1 +
+ arch/arm/mach-ux500/board-mop500-sdi.c         |   31 ++--
+ arch/arm/mach-ux500/board-mop500.c             |   74 +++++++----
+ arch/arm/mach-ux500/board-mop500.h             |    8 +-
+ arch/arm/mach-ux500/board-u5500-sdi.c          |    4 +-
+ arch/arm/mach-ux500/board-u5500.c              |   27 +++--
+ arch/arm/mach-ux500/cpu-db5500.c               |   36 ++++-
+ arch/arm/mach-ux500/cpu-db8500.c               |   44 +++++-
+ arch/arm/mach-ux500/cpu.c                      |   70 ++++++++++
+ arch/arm/mach-ux500/devices-common.c           |   79 +++---------
+ arch/arm/mach-ux500/devices-common.h           |   83 ++++++-----
+ arch/arm/mach-ux500/devices-db5500.h           |  116 +++++++++-------
+ arch/arm/mach-ux500/devices-db8500.h           |  176 ++++++++++++++----------
+ arch/arm/mach-ux500/dma-db5500.c               |    3 +-
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
+ arch/arm/mach-ux500/include/mach/setup.h       |   10 +-
+ arch/arm/mach-ux500/include/mach/usb.h         |    4 +-
+ arch/arm/mach-ux500/usb.c                      |    7 +-
+ drivers/base/Kconfig                           |    3 +
+ drivers/base/Makefile                          |    1 +
+ drivers/base/soc.c                             |  175 +++++++++++++++++++++++
+ include/linux/sys_soc.h                        |   37 +++++
+ 23 files changed, 746 insertions(+), 304 deletions(-)
