@@ -1,49 +1,39 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 20 Jan 2012 11:36:07 +0100
-Subject: mc13xxx: add I2C support
-In-Reply-To: <201201201855.35971.marc@cpdesign.com.au> (Marc Reilly's message
- of "Fri, 20 Jan 2012 18:55:35 +1100")
-References: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
- <87lip4kktc.fsf@lebrac.rtp-net.org>
- <20120119112941.GC29494@sirena.org.uk>
- <201201201855.35971.marc@cpdesign.com.au>
-Message-ID: <878vl2lkyw.fsf@lebrac.rtp-net.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jan 2012 10:39:56 +0000
+Subject: [PATCH 00/19] ARM SA11x0 / PXA / SoC-common PCMCIA cleanups
+In-Reply-To: <20120120101709.GE1068@n2100.arm.linux.org.uk>
+References: <20120120101709.GE1068@n2100.arm.linux.org.uk>
+Message-ID: <20120120103956.GG1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Reilly <marc@cpdesign.com.au> writes:
+On Fri, Jan 20, 2012 at 10:17:09AM +0000, Russell King - ARM Linux wrote:
+> What follows is a series of 19 patches cleaning up the SA11xx and PXA
+> PCMCIA support, which uses the soc-common infrastructure.
+> 
+> Now that we have proper gpiolib support in the kernel for these platforms,
+> with properly implemented gpio_to_irq() functionality, we can move some
+> things that the individual platform socket drivers were doing into the
+> soc-common core.
+> 
+> This significantly reduces the code in the platform socket drivers -
+> a reduction of around 550 lines, for the net addition of about 50 lines
+> to soc-common.
+> 
+> The final set of five patches in this set contain some minor bug fixes
+> (which are really low priority) and cleanup the handling of the SA1111
+> build between PXA and SA11x0 platforms.
+> 
+> Please supply acks; I have other work which touches the header files
+> in arch/arm which would conflict, and it would help to keep it together
+> rather than have SFR carry those resolutions.
 
-> Hi,
+I should add that these changes have been tested on the Assabet (SA1110)
+and Assabet with Neponset daughter board (SA1111) platforms with a CF
+network card and a PCMCIA wireless card.
 
-Hi,
-
->
-> Thankyou all for your feedback and comments. I'll use them for a V2 but 
-> Samuel, I'd like to know if you'd like me to base them on a specific branch 
-> before I do.
->
-> Shawn, thanks for testing!
->
-> On Thursday, January 19, 2012 10:29:41 PM Mark Brown wrote:
->> On Thu, Jan 19, 2012 at 12:12:31PM +0100, Arnaud Patard wrote:
->> > I've never looked at regmap deeply but can't it be done with regmap or is
->> > it just a bad idea ?
->> 
->> Glancing quickly at the existing code it should map on reasonably well,
->> though a new format definition may be required for the 25 bit shift that
->> would be trivial.
->
-> I'm sadly unfamiliar with regmap, is it a far superior solution? does it need 
-
-The aim of regmap is to provide a solution for chip running either on
-i2c or spi, that's why I thought it would be interesting to use it
-instead of rewriting similar code.
-
-> to used now? (ie. I'm relucant to totally rework this now. Please convince me 
-> I need to if required.)
-
-I don't know. I've no strong opinion about it. Moreover, nothing
-prevents you to try to merge this version and then convert to regmap,
-say once the 25 bit shift problem noticed by Mark is fixed.
-
-Arnaud
+There are a couple of bugs in genirq which stop both the original code,
+and these updates from working correctly.  These changes in itself do
+not cause a regression as a result of that.  This is in the hands of
+the genirq people to resolve as it's a regression - this code worked
+100% with the ARM IRQ layer, which was part of the basis for genirq.
