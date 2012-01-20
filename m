@@ -1,63 +1,67 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 10:22:55 +0000
-Subject: [PATCH 17/19] PCMCIA: Add Kconfig control for building sa11xx_base.c
+Date: Fri, 20 Jan 2012 10:23:16 +0000
+Subject: [PATCH 18/19] PCMCIA: make lubbock socket driver part of sa1111_cs
 In-Reply-To: <20120120101709.GE1068@n2100.arm.linux.org.uk>
 References: <20120120101709.GE1068@n2100.arm.linux.org.uk>
-Message-ID: <E1RoBcV-0005iY-ME@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RoBcq-0005ic-3r@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sa11xx_base.c is currently built when either PCMCIA_SA1100 or
-PCMCIA_SA1111 are selected.  Let's move the logic into Kconfig.
+Lubbock is just another SA1111 socket driver, so now that Kconfig has
+better control of which files get built, we can sanitize the build
+for this.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pcmcia/Kconfig  |    5 +++++
- drivers/pcmcia/Makefile |    5 +++--
- 2 files changed, 8 insertions(+), 2 deletions(-)
+ drivers/pcmcia/Kconfig  |    5 +++--
+ drivers/pcmcia/Makefile |    3 +--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-index f9e3fb3..b7f3d29 100644
+index b7f3d29..bba3ab2 100644
 --- a/drivers/pcmcia/Kconfig
 +++ b/drivers/pcmcia/Kconfig
-@@ -183,10 +183,14 @@ config PCMCIA_BCM63XX
- config PCMCIA_SOC_COMMON
- 	tristate
+@@ -200,9 +200,9 @@ config PCMCIA_SA1100
  
-+config PCMCIA_SA11XX_BASE
-+	tristate
-+
- config PCMCIA_SA1100
- 	tristate "SA1100 support"
- 	depends on ARM && ARCH_SA1100 && PCMCIA
- 	select PCMCIA_SOC_COMMON
-+	select PCMCIA_SA11XX_BASE
- 	help
- 	  Say Y here to include support for SA11x0-based PCMCIA or CF
- 	  sockets, found on HP iPAQs, Yopy, and other StrongARM(R)/
-@@ -198,6 +202,7 @@ config PCMCIA_SA1111
+ config PCMCIA_SA1111
  	tristate "SA1111 support"
- 	depends on ARM && ARCH_SA1100 && SA1111 && PCMCIA
+-	depends on ARM && ARCH_SA1100 && SA1111 && PCMCIA
++	depends on ARM && SA1111 && PCMCIA
  	select PCMCIA_SOC_COMMON
-+	select PCMCIA_SA11XX_BASE
+-	select PCMCIA_SA11XX_BASE
++	select PCMCIA_SA11XX_BASE if ARCH_SA1100
  	help
  	  Say Y  here to include support for SA1111-based PCMCIA or CF
  	  sockets, found on the Jornada 720, Graphicsmaster and other
+@@ -218,6 +218,7 @@ config PCMCIA_PXA2XX
+ 		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2 \
+ 		    || MACH_VPAC270 || MACH_BALLOON3 || MACH_COLIBRI \
+ 		    || MACH_COLIBRI320)
++	select PCMCIA_SA1111 if ARCH_LUBBOCK && SA1111
+ 	select PCMCIA_SOC_COMMON
+ 	help
+ 	  Say Y here to include support for the PXA2xx PCMCIA controller
 diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
-index ec543a4..05136dd 100644
+index 05136dd..49d79f7 100644
 --- a/drivers/pcmcia/Makefile
 +++ b/drivers/pcmcia/Makefile
-@@ -25,8 +25,9 @@ obj-$(CONFIG_I82092)				+= i82092.o
- obj-$(CONFIG_TCIC)				+= tcic.o
- obj-$(CONFIG_PCMCIA_M8XX)			+= m8xx_pcmcia.o
- obj-$(CONFIG_PCMCIA_SOC_COMMON)			+= soc_common.o
--obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_base.o sa1100_cs.o
--obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_base.o sa1111_cs.o
-+obj-$(CONFIG_PCMCIA_SA11XX_BASE)		+= sa11xx_base.o
-+obj-$(CONFIG_PCMCIA_SA1100)			+= sa1100_cs.o
-+obj-$(CONFIG_PCMCIA_SA1111)			+= sa1111_cs.o
- obj-$(CONFIG_M32R_PCC)				+= m32r_pcc.o
- obj-$(CONFIG_M32R_CFC)				+= m32r_cfc.o
- obj-$(CONFIG_PCMCIA_BCM63XX)			+= bcm63xx_pcmcia.o
+@@ -43,6 +43,7 @@ sa1111_cs-y					+= sa1111_generic.o
+ sa1111_cs-$(CONFIG_ASSABET_NEPONSET)		+= sa1100_neponset.o
+ sa1111_cs-$(CONFIG_SA1100_BADGE4)		+= sa1100_badge4.o
+ sa1111_cs-$(CONFIG_SA1100_JORNADA720)		+= sa1100_jornada720.o
++sa1111_cs-$(CONFIG_ARCH_LUBBOCK)		+= pxa2xx_lubbock.o
+ 
+ sa1100_cs-y					+= sa1100_generic.o
+ sa1100_cs-$(CONFIG_SA1100_ASSABET)		+= sa1100_assabet.o
+@@ -53,9 +54,7 @@ sa1100_cs-$(CONFIG_SA1100_NANOENGINE)		+= sa1100_nanoengine.o
+ sa1100_cs-$(CONFIG_SA1100_SHANNON)		+= sa1100_shannon.o
+ sa1100_cs-$(CONFIG_SA1100_SIMPAD)		+= sa1100_simpad.o
+ 
+-pxa2xx_lubbock_cs-y				+= pxa2xx_lubbock.o sa1111_generic.o
+ pxa2xx_cm_x2xx_cs-y				+= pxa2xx_cm_x2xx.o pxa2xx_cm_x255.o pxa2xx_cm_x270.o
+-pxa2xx-obj-$(CONFIG_ARCH_LUBBOCK)		+= pxa2xx_lubbock_cs.o
+ pxa2xx-obj-$(CONFIG_MACH_MAINSTONE)		+= pxa2xx_mainstone.o
+ pxa2xx-obj-$(CONFIG_PXA_SHARPSL)		+= pxa2xx_sharpsl.o
+ pxa2xx-obj-$(CONFIG_MACH_ARMCORE)		+= pxa2xx_cm_x2xx_cs.o
 -- 
 1.7.4.4
