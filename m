@@ -1,82 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:05:07 +0000
-Subject: [PATCH 2/4] ARM: architected timers: Add A15 specific sched_clock
- implementation
-In-Reply-To: <1327061109-14975-1-git-send-email-marc.zyngier@arm.com>
-References: <1327061109-14975-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1327061109-14975-3-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 20 Jan 2012 12:05:05 +0000
+Subject: [PATCH 0/4] architected timer support
+Message-ID: <1327061109-14975-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide an A15 sched_clock implementation using the virtual counter,
-which is thought to be more useful than the physical one in a
-virtualised environment, as it can offset the time spent in another
-VM or the hypervisor.
+This patch series adds support for the architected timers found in
+Cortex-A7 and Cortex-A15. It adds local timer support, sched_clock,
+global timer and DT support.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/arch_timer.h |    1 +
- arch/arm/kernel/arch_timer.c      |   25 +++++++++++++++++++++++++
- 2 files changed, 26 insertions(+), 0 deletions(-)
+Tested on Cortex A15, based on v3.3-rc1 plus my local timer series
+posted earlier.
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 20de858..ca0f783 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -8,5 +8,6 @@ struct arch_timer {
- };
- 
- int arch_timer_register(struct arch_timer *);
-+int arch_timer_sched_clock_init(void);
- 
- #endif
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index f10b692..13f2185 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -22,6 +22,7 @@
- #include <asm/cputype.h>
- #include <asm/localtimer.h>
- #include <asm/arch_timer.h>
-+#include <asm/sched_clock.h>
- 
- static unsigned long arch_timer_rate;
- static int arch_timer_ppi;
-@@ -202,6 +203,18 @@ static inline cycle_t arch_counter_get_cntvct(void)
- 	return ((u64) cvalh << 32) | cvall;
- }
- 
-+static u32 notrace arch_counter_get_cntvct32(void)
-+{
-+	cycle_t cntvct = arch_counter_get_cntvct();
-+
-+	/*
-+	 * The sched_clock infrastructure only knows about counters
-+	 * with@most 32bits. Forget about the upper 24 bits for the
-+	 * time being...
-+	 */
-+	return (u32)(cntvct & (u32)~0);
-+}
-+
- static cycle_t arch_counter_read(struct clocksource *cs)
- {
- 	return arch_counter_get_cntpct();
-@@ -284,3 +297,15 @@ out_free:
- 
- 	return err;
- }
-+
-+int arch_timer_sched_clock_init(void)
-+{
-+	int err;
-+
-+	err = arch_timer_available();
-+	if (err)
-+		return err;
-+
-+	setup_sched_clock(arch_counter_get_cntvct32, 32, arch_timer_rate);
-+	return 0;
-+}
+Branch also available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git local_timers-v3.3-rc1
+
+Marc Zyngier (4):
+  ARM: local timers: Add A15 architected timer support
+  ARM: architected timers: Add A15 specific sched_clock implementation
+  ARM: architected timers: add DT support
+  ARM: architected timers: add support for UP timer
+
+ .../devicetree/bindings/arm/arch_timer.txt         |   23 ++
+ arch/arm/Kconfig                                   |    7 +
+ arch/arm/include/asm/arch_timer.h                  |   13 +
+ arch/arm/kernel/Makefile                           |    1 +
+ arch/arm/kernel/arch_timer.c                       |  359 ++++++++++++++++++++
+ 5 files changed, 403 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
+ create mode 100644 arch/arm/include/asm/arch_timer.h
+ create mode 100644 arch/arm/kernel/arch_timer.c
+
 -- 
 1.7.7.1
