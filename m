@@ -1,145 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:05:08 +0000
-Subject: [PATCH 3/4] ARM: architected timers: add DT support
-In-Reply-To: <1327061109-14975-1-git-send-email-marc.zyngier@arm.com>
-References: <1327061109-14975-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1327061109-14975-4-git-send-email-marc.zyngier@arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 20 Jan 2012 12:08:36 +0000
+Subject: mc13xxx: add I2C support
+In-Reply-To: <201201201855.35971.marc@cpdesign.com.au>
+References: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
+ <87lip4kktc.fsf@lebrac.rtp-net.org>
+ <20120119112941.GC29494@sirena.org.uk>
+ <201201201855.35971.marc@cpdesign.com.au>
+Message-ID: <20120120120836.GA18297@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add runtime DT support and documentation for the Cortex A7/A15
-architected timers.
+On Fri, Jan 20, 2012 at 06:55:35PM +1100, Marc Reilly wrote:
+> On Thursday, January 19, 2012 10:29:41 PM Mark Brown wrote:
+> > On Thu, Jan 19, 2012 at 12:12:31PM +0100, Arnaud Patard wrote:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- .../devicetree/bindings/arm/arch_timer.txt         |   23 +++++++++
- arch/arm/kernel/arch_timer.c                       |   53 +++++++++++++++++---
- 2 files changed, 69 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
+> > > I've never looked at regmap deeply but can't it be done with regmap or is
+> > > it just a bad idea ?
 
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-new file mode 100644
-index 0000000..84e93f7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -0,0 +1,23 @@
-+* ARM architected timer
-+
-+ARM Cortex-A7 and Cortex-A15 have a per-core architected timer, which
-+provides a per-cpu local timer.
-+
-+The timer is attached to a GIC to deliver its two per-processor
-+interrupts (one for the secure mode, one for the non-secure mode).
-+
-+** Timer node properties:
-+
-+- compatible : Should be "arm,armv7-timer"
-+
-+- interrupts : One or two interrupts for secure and non-secure mode
-+
-+- clock-frequency : The frequency of the main counter, in Hz. Optionnal.
-+
-+Example:
-+
-+	timer {
-+		compatible = "arm,armv7-timer"";
-+		interrupts = <1 13 0xf08 1 14 0xf08>;
-+		clock-frequency = <100000000>;
-+	};
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 13f2185..46729a2 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -17,6 +17,7 @@
- #include <linux/jiffies.h>
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
-+#include <linux/of_irq.h>
- #include <linux/io.h>
- 
- #include <asm/cputype.h>
-@@ -243,13 +244,10 @@ static struct local_timer_ops arch_timer_ops __cpuinitdata = {
- 	.stop	= arch_timer_stop,
- };
- 
--int __init arch_timer_register(struct arch_timer *at)
-+static int __init arch_timer_common_register(void)
- {
- 	int err;
- 
--	if (at->res[0].start <= 0 || !(at->res[0].flags & IORESOURCE_IRQ))
--		return -EINVAL;
--
- 	err = arch_timer_available();
- 	if (err)
- 		return err;
-@@ -260,7 +258,6 @@ int __init arch_timer_register(struct arch_timer *at)
- 
- 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
- 
--	arch_timer_ppi = at->res[0].start;
- 	err = request_percpu_irq(arch_timer_ppi, arch_timer_handler,
- 				 "arch_timer", arch_timer_evt);
- 	if (err) {
-@@ -269,8 +266,7 @@ int __init arch_timer_register(struct arch_timer *at)
- 		goto out_free;
- 	}
- 
--	if (at->res[1].start > 0 || (at->res[1].flags & IORESOURCE_IRQ)) {
--		arch_timer_ppi2 = at->res[1].start;
-+	if (arch_timer_ppi2) {
- 		err = request_percpu_irq(arch_timer_ppi2, arch_timer_handler,
- 					 "arch_timer", arch_timer_evt);
- 		if (err) {
-@@ -298,6 +294,49 @@ out_free:
- 	return err;
- }
- 
-+int __init arch_timer_register(struct arch_timer *at)
-+{
-+	if (at->res[0].start <= 0 || !(at->res[0].flags & IORESOURCE_IRQ))
-+		return -EINVAL;
-+
-+	arch_timer_ppi = at->res[0].start;
-+
-+	if (at->res[1].start > 0 || (at->res[1].flags & IORESOURCE_IRQ))
-+		arch_timer_ppi2 = at->res[1].start;
-+
-+	return arch_timer_common_register();
-+}
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id arch_timer_of_match[] __initconst = {
-+	{ .compatible	= "arm,armv7-timer",	},
-+	{},
-+};
-+
-+int __init arch_timer_of_register(void)
-+{
-+	struct device_node *np;
-+	u32 freq;
-+
-+	np = of_find_matching_node(NULL, arch_timer_of_match);
-+	if (!np) {
-+		pr_err("arch_timer: can't find DT node\n");
-+		return -ENODEV;
-+	}
-+
-+	/* Try to determine the frequency from the device tree or CNTFRQ */
-+	if (!of_property_read_u32(np, "clock-frequency", &freq))
-+		arch_timer_rate = freq;
-+
-+	arch_timer_ppi = irq_of_parse_and_map(np, 0);
-+	arch_timer_ppi2 = irq_of_parse_and_map(np, 1);
-+	pr_info("arch_timer: found %s irqs %d %d\n",
-+		np->name, arch_timer_ppi, arch_timer_ppi2);
-+
-+	return arch_timer_common_register();
-+}
-+#endif
-+
- int arch_timer_sched_clock_init(void)
- {
- 	int err;
--- 
-1.7.7.1
+> > Glancing quickly at the existing code it should map on reasonably well,
+> > though a new format definition may be required for the 25 bit shift that
+> > would be trivial.
+
+> I'm sadly unfamiliar with regmap, is it a far superior solution? does it need 
+> to used now? (ie. I'm relucant to totally rework this now. Please convince me 
+> I need to if required.)
+
+It shouldn't be a total rework - the conversion is usually just a case
+of replacing the body of the current read/write functions (and ideally
+also update_bits() if you've got a one of those) with the equivalent
+regmap calls and adding the calls to initialise and free to the probe
+functions.  This should be pretty quick and easy.
+
+The benefit of doing the simple conversion is mostly just code sharing,
+though you do also get some trace infrastructure for logging register
+writes for free.  With a tiny bit more work (saying what the highest
+register number is) you'd also get debugfs support for dumping the
+register map which is handy for development.  With another small bit of
+work (turning on a flag when registering the device and adding a
+function which says which registers the chip can change itself) you can
+get a register cache which gives a nice performance improvement on
+read/modify/write updates as it cuts out the read.  This is useful for
+things like DVFS where the regulator voltage change should be as quick
+as possible.  None of this is earth shattering but it's very easy to
+deploy once the infrastructure is shared.
+
+I doubt Samuel would insist on doing this immediately, though given that
+you're adding new bus support it'd be nice.
