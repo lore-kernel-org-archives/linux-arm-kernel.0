@@ -1,34 +1,46 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 20 Jan 2012 10:23:50 -0600
-Subject: [PATCH] ep93xx: Convert the watchdog driver into a platform
- device.
-In-Reply-To: <20120120093149.GX27296@infomag.iguana.be>
-References: <201201191701.30836.hartleys@visionengravers.com>
- <20120120093149.GX27296@infomag.iguana.be>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F9D067EB@AUSP01VMBX24.collaborationhost.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 20 Jan 2012 17:40:36 +0100
+Subject: inconvenience when hand editing DEBUG_LL in .config
+Message-ID: <20120120164036.GO4066@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 20, 2012 2:32 AM, Wim Van Sebroeck wrote:
->>  void ep93xx_restart(char mode, const char *cmd) diff --git 
->> a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h 
->> b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
->> index c4a7b84..e9271a7 100644
->> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
->> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
->> @@ -224,6 +224,7 @@
->>  #define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
->>  #define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
->>  
->> +#define EP93XX_WATCHDOG_PHYS_BASE	EP93XX_APB_PHYS(0x00140000)
->>  #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
->
-> Shouldn't this last define be removed after you added the new PHYS_BASE ?
+Hello,
 
-To make it easier on Ryan's other patches I left it for now.
+usually when I want to change a single kernel option I just open .config
+in my editor, remove the line for the config item I want to change and
+run oldconfig. For DEBUG_LL (defined in arch/arm/Kconfig.debug) this
+doesn't work as usual though.
 
-After this patch and Ryan's others are applied I will go through the defines in
-the soc.h header and figure out which ones can be removed.
+On 3.3-rc1 the following happens:
 
-Thanks,
-Hartley
+	make ARCH=arm at91rm9200_defconfig
+	sed -i /CONFIG_DEBUG_LL/d .config
+	make ARCH=arm oldconfig
+
+The last command then asks me for DEBUG_LL, after specifying 'y', the
+output looks as follows:
+
+	Verbose user fault messages (DEBUG_USER) [N/y/?] n
+	Kernel low-level debugging functions (read help!) (DEBUG_LL) [N/y/?] (NEW) y
+	  Kernel low-level debugging port
+	  > 1. No low-level debugging UART (DEBUG_LL_UART_NONE) (NEW)
+	    2. Kernel low-level debugging via EmbeddedICE DCC channel (DEBUG_ICEDCC) (NEW)
+	    3. Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10 and 9rl (AT91_DEBUG_LL_DBGU0) (NEW)
+	  choice[1-3]: 1
+	  Early printk (EARLY_PRINTK) [N/y/?] (NEW) 
+
+Note that I didn't specify the '1' for the choice even though all items
+are marked as new and oldconfig only starts at EARLY_PRINTK to ask
+again.
+
+I would have expected to be able to select AT91_DEBUG_LL_DBGU0.
+
+This is not intended, is it?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
