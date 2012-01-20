@@ -1,50 +1,85 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Fri, 20 Jan 2012 14:15:15 +0530
-Subject: [PATCH 0/5] uart updates
-In-Reply-To: <1326709360-26020-1-git-send-email-shubhrajyoti@ti.com>
-References: <1326709360-26020-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CAAL8m4x3uOgWFvaVP9BK1L6myDayf94fZqcQS5NvaLEvhwKnsQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 20 Jan 2012 09:46:33 +0100
+Subject: [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <1324426147-16735-1-git-send-email-ccross@android.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+Message-ID: <4F1929E9.7070707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2012 at 3:52 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> The patch series does the following
+On 12/21/2011 01:09 AM, Colin Cross wrote:
+> On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+> cpus cannot be independently powered down, either due to
+> sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+> power down), or due to HW bugs (on OMAP4460, a cpu powering up
+> will corrupt the gic state unless the other cpu runs a work
+> around).  Each cpu has a power state that it can enter without
+> coordinating with the other cpu (usually Wait For Interrupt, or
+> WFI), and one or more "coupled" power states that affect blocks
+> shared between the cpus (L2 cache, interrupt controller, and
+> sometimes the whole SoC).  Entering a coupled power state must
+> be tightly controlled on both cpus.
 >
-> - Make the Make the suspend/resume functions depend on
-> ? ?CONFIG_PM_SLEEP
-> - Fix the serial omap probe's error handling
-> - Make he context_loss_cnt signed so that error handling is
-> ?possible.
+> The easiest solution to implementing coupled cpu power states is
+> to hotplug all but one cpu whenever possible, usually using a
+> cpufreq governor that looks at cpu load to determine when to
+> enable the secondary cpus.  This causes problems, as hotplug is an
+> expensive operation, so the number of hotplug transitions must be
+> minimized, leading to very slow response to loads, often on the
+> order of seconds.
 >
+> This patch series implements an alternative solution, where each
+> cpu will wait in the WFI state until all cpus are ready to enter
+> a coupled state, at which point the coupled state function will
+> be called on all cpus at approximately the same time.
 >
-
-After fixing Kevin's comment's,
-
-If can add some testing updates it be nice.
-
-like :
-boot tested or any other tests done on xxx boards.
-
---
-Thanks,
-Govindraj.R
-
-
-
-> Shubhrajyoti D (5):
-> ?omap-serial :Make the suspend/resume functions depend on
-> ? ?CONFIG_PM_SLEEP.
-> ?omap-serial: make serial_omap_restore_context depend on
-> ? ?CONFIG_PM_RUNTIME
-> ?omap-serial: Fix the error handling in the omap_serial probe
-> ?ARM : OMAP : serial : Make context_loss_cnt signed
-> ?OMAP : serial : Check for error in get_context_loss_count
+> Once all cpus are ready to enter idle, they are woken by an smp
+> cross call.  At this point, there is a chance that one of the
+> cpus will find work to do, and choose not to enter suspend.  A
+> final pass is needed to guarantee that all cpus will call the
+> power state enter function at the same time.  During this pass,
+> each cpu will increment the ready counter, and continue once the
+> ready counter matches the number of online coupled cpus.  If any
+> cpu exits idle, the other cpus will decrement their counter and
+> retry.
 >
-> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?2 +-
-> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 41 ++++++++++++++++--------
-> ?2 files changed, 28 insertions(+), 15 deletions(-)
+> To use coupled cpuidle states, a cpuidle driver must:
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>     Set struct cpuidle_device.coupled_cpus to the mask of all
+>     coupled cpus, usually the same as cpu_possible_mask if all cpus
+>     are part of the same cluster.  The coupled_cpus mask must be
+>     set in the struct cpuidle_device for each cpu.
+>
+>     Set struct cpuidle_device.safe_state to a state that is not a
+>     coupled state.  This is usually WFI.
+>
+>     Set CPUIDLE_FLAG_COUPLED in struct cpuidle_state.flags for each
+>     state that affects multiple cpus.
+>
+>     Provide a struct cpuidle_state.enter function for each state
+>     that affects multiple cpus.  This function is guaranteed to be
+>     called on all cpus at approximately the same time.  The driver
+>     should ensure that the cpus all abort together if any cpu tries
+>     to abort once the function is called.
+>
+> This series was functionally tested on v3.0, but has only been
+> compile-tested on v3.2 after the removal of per-cpu state fields.
+
+Hi Colin,
+
+this patchset could be interesting to resolve in a generic way the cpu 
+dependencies.
+What is the status of this patchset ?
+
+Did you have the opportunity to measure the power consumption with and 
+without this patchset ?
+
+Thanks
+-- Daniel
+
+-- 
+  <http://www.linaro.org/>  Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:<http://www.facebook.com/pages/Linaro>  Facebook |
+<http://twitter.com/#!/linaroorg>  Twitter |
+<http://www.linaro.org/linaro-blog/>  Blog
