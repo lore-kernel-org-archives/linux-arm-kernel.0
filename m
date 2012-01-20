@@ -1,95 +1,67 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 10:03:03 +0000
-Subject: [PATCH] ARM: ecard: get rid of NO_IRQ madness
-Message-ID: <E1RoBJH-0005UG-Pj@rmk-PC.arm.linux.org.uk>
+Date: Fri, 20 Jan 2012 10:03:24 +0000
+Subject: [PATCH] ARM: SMP: use a timing out completion for cpu hotplug
+Message-ID: <E1RoBJc-0005UK-7t@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of the NO_IRQ madness from Acorn expansion card handling code.
-Thankfully, are relatively few users of this here, and so it's easy to
-audit.
+Rather than open-coding the jiffy-based wait, and polling for the
+secondary CPU to come online, use a completion instead.  This
+removes the need to poll, instead we will be notified when the
+secondary CPU has initialized.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/ecard.c     |    6 +++---
- drivers/scsi/arm/arxescsi.c |    2 +-
- drivers/scsi/arm/fas216.c   |    4 ++--
- drivers/scsi/arm/fas216.h   |    4 ----
- 4 files changed, 6 insertions(+), 10 deletions(-)
+ arch/arm/kernel/smp.c |   17 ++++++-----------
+ 1 files changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
-index 4dd0eda..ddcda2e 100644
---- a/arch/arm/kernel/ecard.c
-+++ b/arch/arm/kernel/ecard.c
-@@ -578,7 +578,7 @@ ecard_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	for (ec = cards; ec; ec = ec->next) {
- 		int pending;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 57db122..2b26dca 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -58,6 +58,8 @@ enum ipi_msg_type {
+ 	IPI_CPU_STOP,
+ };
  
--		if (!ec->claimed || ec->irq == NO_IRQ || ec->slot_no == 8)
-+		if (!ec->claimed || !ec->irq || ec->slot_no == 8)
- 			continue;
- 
- 		if (ec->ops && ec->ops->irqpending)
-@@ -805,8 +805,8 @@ static struct expansion_card *__init ecard_alloc_card(int type, int slot)
- 
- 	ec->slot_no = slot;
- 	ec->easi = type == ECARD_EASI;
--	ec->irq = NO_IRQ;
--	ec->fiq = NO_IRQ;
-+	ec->irq = 0;
-+	ec->fiq = 0;
- 	ec->dma = NO_DMA;
- 	ec->ops = &ecard_default_ops;
- 
-diff --git a/drivers/scsi/arm/arxescsi.c b/drivers/scsi/arm/arxescsi.c
-index a750aa7..2a28b4a 100644
---- a/drivers/scsi/arm/arxescsi.c
-+++ b/drivers/scsi/arm/arxescsi.c
-@@ -305,7 +305,7 @@ arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
- 	info->base = base;
- 
- 	info->info.scsi.io_base		= base + 0x2000;
--	info->info.scsi.irq		= NO_IRQ;
-+	info->info.scsi.irq		= 0;
- 	info->info.scsi.dma		= NO_DMA;
- 	info->info.scsi.io_shift	= 5;
- 	info->info.ifcfg.clockrate	= 24; /* MHz */
-diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
-index e85c40b..6206a66 100644
---- a/drivers/scsi/arm/fas216.c
-+++ b/drivers/scsi/arm/fas216.c
-@@ -2176,7 +2176,7 @@ static void fas216_done(FAS216_Info *info, unsigned int result)
- 	fn = (void (*)(FAS216_Info *, struct scsi_cmnd *, unsigned int))SCpnt->host_scribble;
- 	fn(info, SCpnt, result);
- 
--	if (info->scsi.irq != NO_IRQ) {
-+	if (info->scsi.irq) {
- 		spin_lock_irqsave(&info->host_lock, flags);
- 		if (info->scsi.phase == PHASE_IDLE)
- 			fas216_kick(info);
-@@ -2276,7 +2276,7 @@ static int fas216_noqueue_command_lck(struct scsi_cmnd *SCpnt,
- 	 * We should only be using this if we don't have an interrupt.
- 	 * Provide some "incentive" to use the queueing code.
++static DECLARE_COMPLETION(cpu_running);
++
+ int __cpuinit __cpu_up(unsigned int cpu)
+ {
+ 	struct cpuinfo_arm *ci = &per_cpu(cpu_data, cpu);
+@@ -98,20 +100,12 @@ int __cpuinit __cpu_up(unsigned int cpu)
  	 */
--	BUG_ON(info->scsi.irq != NO_IRQ);
-+	BUG_ON(info->scsi.irq);
- 
- 	info->internal_done = 0;
- 	fas216_queue_command_lck(SCpnt, fas216_internal_done);
-diff --git a/drivers/scsi/arm/fas216.h b/drivers/scsi/arm/fas216.h
-index 84b7127..df2e1b3 100644
---- a/drivers/scsi/arm/fas216.h
-+++ b/drivers/scsi/arm/fas216.h
-@@ -12,10 +12,6 @@
- #ifndef FAS216_H
- #define FAS216_H
- 
--#ifndef NO_IRQ
--#define NO_IRQ 255
--#endif
+ 	ret = boot_secondary(cpu, idle);
+ 	if (ret == 0) {
+-		unsigned long timeout;
 -
- #include <scsi/scsi_eh.h>
+ 		/*
+ 		 * CPU was successfully started, wait for it
+ 		 * to come online or time out.
+ 		 */
+-		timeout = jiffies + HZ;
+-		while (time_before(jiffies, timeout)) {
+-			if (cpu_online(cpu))
+-				break;
+-
+-			udelay(10);
+-			barrier();
+-		}
++		wait_for_completion_timeout(&cpu_running,
++						 msecs_to_jiffies(1000));
  
- #include "queue.h"
+ 		if (!cpu_online(cpu)) {
+ 			pr_crit("CPU%u: failed to come online\n", cpu);
+@@ -300,9 +294,10 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 	/*
+ 	 * OK, now it's safe to let the boot CPU continue.  Wait for
+ 	 * the CPU migration code to notice that the CPU is online
+-	 * before we continue.
++	 * before we continue - which happens after __cpu_up returns.
+ 	 */
+ 	set_cpu_online(cpu, true);
++	complete(&cpu_running);
+ 
+ 	/*
+ 	 * Setup the percpu timer for this CPU.
 -- 
 1.7.4.4
