@@ -1,52 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 19:27:50 +0000
-Subject: inconvenience when hand editing DEBUG_LL in .config
-In-Reply-To: <20120120164036.GO4066@pengutronix.de>
-References: <20120120164036.GO4066@pengutronix.de>
-Message-ID: <20120120192750.GE11845@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 20 Jan 2012 12:28:55 -0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <7FE21149F4667147B645348EC6057885095125@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20120117082334.GA31295@S2101-09.ap.freescale.net>
+ <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885095125@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB445@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 05:40:36PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> usually when I want to change a single kernel option I just open .config
-> in my editor, remove the line for the config item I want to change and
-> run oldconfig. For DEBUG_LL (defined in arch/arm/Kconfig.debug) this
-> doesn't work as usual though.
-> 
-> On 3.3-rc1 the following happens:
-> 
-> 	make ARCH=arm at91rm9200_defconfig
-> 	sed -i /CONFIG_DEBUG_LL/d .config
+Dong Aisheng wrote at Wednesday, January 18, 2012 4:06 AM:
+> Stephen Warren wrote at Wednesday, January 18, 2012 3:29 AM:
+> > Dong Aisheng wrote at Tuesday, January 17, 2012 2:47 AM:
+> > > Shawn Guo wrote at Tuesday, January 17, 2012 4:24 PM:
+> > > > On Mon, Jan 16, 2012 at 12:50:02PM +0000, Dong Aisheng-B29396 wrote:
+> > > > > Stephen Warren wrote:
+...
+> Now i'm still thinking if the mux way we discussed here fits IMX.
+> For example:
+>
+> > 	pinmux_sdhci: pinmux-sdhci {
+> > 		mux =
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+> > 			<&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
+> > 	};
+>
+> It may work well for Tegra.
+> When pinctrl core parsing the mux proterty, it will creat each maps
+> For each entry in the list.
+> But for IMX like:
+>
+> > > 	pinmux_usdhc1: pinmux-usdhc1 {
+> > > 		mux = <IMX6Q_PAD_SD1_DAT1 0>
+> > > 		      <IMX6Q_PAD_SD1_DAT2 0>
+> > > 		      ...
+> > > 	};
+>
+> Each entry in the list is PIN rather than group.
+> So we cannot create each map for each entry in the list except we treat the PIN as
+> A group(this will cause a huge maps and predefined groups and functions).
 
-Note that this deletes two entries.  Use /CONFIG_DEBUG_LL\\\>/d to delete
-just one (or get rid of two of those \ and use ' to quote it.)
+Linusw has NAKd the idea that we should not use these "virtual groups",
+i.e. he believes they're fine to use if you wish.
 
-> 	make ARCH=arm oldconfig
-> 
-> The last command then asks me for DEBUG_LL, after specifying 'y', the
-> output looks as follows:
-> 
-> 	Verbose user fault messages (DEBUG_USER) [N/y/?] n
-> 	Kernel low-level debugging functions (read help!) (DEBUG_LL) [N/y/?] (NEW) y
-> 	  Kernel low-level debugging port
-> 	  > 1. No low-level debugging UART (DEBUG_LL_UART_NONE) (NEW)
-> 	    2. Kernel low-level debugging via EmbeddedICE DCC channel (DEBUG_ICEDCC) (NEW)
-> 	    3. Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10 and 9rl (AT91_DEBUG_LL_DBGU0) (NEW)
-> 	  choice[1-3]: 1
-> 	  Early printk (EARLY_PRINTK) [N/y/?] (NEW) 
-> 
-> Note that I didn't specify the '1' for the choice even though all items
-> are marked as new and oldconfig only starts at EARLY_PRINTK to ask
-> again.
-> 
-> I would have expected to be able to select AT91_DEBUG_LL_DBGU0.
+Given that, I think what you should do is:
 
-Confirmed here.
+* Your pinctrl driver should enumerate whatever kind of groups it wishes.
 
-> This is not intended, is it?
+* Use the same sets of groups for both board-based and DT-based systems
+  (well, that's true irrespective of anything else)
 
-Nope - and if you delete all the DEBUG choice entries from your .config,
-it still defaults to the first and doesn't offer it for you to choose.
-Ditto if you delete none.
+* The mux properties above would not refer to pins, but whatever muxable
+  entities your pinctrl driver exposes.
+
+  For Tegra20, I'll use the raw HW pin groups.
+
+  For Tegra30, I'll use raw HW pins here, since each pin is individually
+  muxable. In the pinctrl driver, pin IDs and these mux group IDs will
+  be equivalent, since there will be 1 group per pin.
+
+  For IMX, you can use "virtual group" IDs in the DT properties.
+
+> A little different way I'm thinking now is cover the mux difference(pin or group)
+> between Tegra and IMX in Pinctrl driver, then we may not need the second mux value
+> (e.g: TEGRA_PMX_MUX_1)in the standard mux property:
+> The mux property can become:
+>
+> pinmux_sdhci: pinmux-sdhci {
+> 	mux =
+> 		<&tegra_pmx TEGRA_PMX_PG_DTA_X>
+> 		<&tegra_pmx TEGRA_PMX_PG_DTD_Y>;
+> };
+
+I definitely don't like putting the group ID and mux function into a
+single value; this seems redundant.
+
+However, since I'm leaning towards it being up to the individual pinctrl
+driver to convert the DT property values into the group/function values
+that the pinctrl core uses, you are free to define your binding however
+you wish.
+
+-- 
+nvpublic
