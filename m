@@ -1,132 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Jan 2012 20:41:18 +0800
-Subject: [PATCH v4 11/15] ARM: imx6q: convert to
- twd_local_timer_register() interface
-In-Reply-To: <1327061042-14857-12-git-send-email-marc.zyngier@arm.com>
-References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
- <1327061042-14857-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20120120124116.GC25917@S2101-09.ap.freescale.net>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Fri, 20 Jan 2012 18:00:04 +0530
+Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
+In-Reply-To: <1326807902.1540.116.camel@vkoul-udesk3>
+References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
+ <1326807902.1540.116.camel@vkoul-udesk3>
+Message-ID: <4F195E4C.6080805@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 12:03:58PM +0000, Marc Zyngier wrote:
-> Add support for the new smp_twd runtime registration interface
-> to the imx6q platforms, and remove the old compile-time support.
-> 
-> The imx6q DTS file is updated to match the TWD DT documentation.
-> Also present in this patch a DTS fix to the timer interrupt routing
-> (the PPI connection uses bits [15:8]) and trigger (rising edge).
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On 1/17/2012 7:15 PM, Vinod Koul wrote:
+> On Fri, 2012-01-06 at 18:17 +0530, Ravi Kumar V wrote:
+> <sorry for delayed review, was on vacation and now traveling>
+>>
+>> As our ADM Scatter-gather hardware needs
+>> -32-bit command configuration parameter
+>>   apart from
+>> -32-bit source address
+>> -32-bit destination address
+>> -16-bit length
+>>
+>> So,we have added new parameter in struct scatterlist to support xfer
+>> descriptor
+>> specific private data, and for supporting ADM Box mode DMA we added
+>> new
+>> API and data structure.
+> what do you mean by "ADM Box mode"?
+>
 
-I believe that I have acked this patch, and this patch has no change
-since v3.  So again,
+ADM Box mode is a interleaved type of DMA where data from rows of equal 
+length and equal distance(bytes) between each other are transferred to 
+similar pattern of rows.
+Each row length and distance between each row in destination pattern may 
+not be equal to source pattern.
+Distance between beginning of any two rows are always greater than row 
+length.
+Example:
+If 4 rows of 16 bytes each are arranged such that distance between 
+beginning of any two rows are 32 bytes.
+Now they can be transferred using BOX mode to destination pattern 
+arranged in 2 rows of 32 bytes each and distance between them can be any 
+lets say 128 bytes.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Source pattern:
+4 data rows starts address 0th byte.
 
-Regards,
-Shawn
+0-----16-bytes-data-----15
+16    16 bytes void     31
+32---------data---------47
+48         void         63
+64---------data---------79
+80         void         95
+96---------data--------111
 
-> ---
->  arch/arm/boot/dts/imx6q.dtsi   |    6 +++---
->  arch/arm/mach-imx/Makefile     |    1 -
->  arch/arm/mach-imx/localtimer.c |   35 -----------------------------------
->  arch/arm/mach-imx/mach-imx6q.c |    2 ++
->  4 files changed, 5 insertions(+), 39 deletions(-)
->  delete mode 100644 arch/arm/mach-imx/localtimer.c
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 263e8f3..4905f51 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -88,9 +88,9 @@
->  		ranges;
->  
->  		timer at 00a00600 {
-> -			compatible = "arm,smp-twd";
-> -			reg = <0x00a00600 0x100>;
-> -			interrupts = <1 13 0xf4>;
-> +			compatible = "arm,cortex-a9-twd-timer";
-> +			reg = <0x00a00600 0x20>;
-> +			interrupts = <1 13 0xf01>;
->  		};
->  
->  		L2: l2-cache at 00a02000 {
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index f5920c2..dd46f07 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -69,7 +69,6 @@ obj-$(CONFIG_CPU_V7) += head-v7.o
->  AFLAGS_head-v7.o :=-Wa,-march=armv7-a
->  obj-$(CONFIG_SMP) += platsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-> -obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
->  obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o
->  
->  ifeq ($(CONFIG_PM),y)
-> diff --git a/arch/arm/mach-imx/localtimer.c b/arch/arm/mach-imx/localtimer.c
-> deleted file mode 100644
-> index 3a16351..0000000
-> --- a/arch/arm/mach-imx/localtimer.c
-> +++ /dev/null
-> @@ -1,35 +0,0 @@
-> -/*
-> - * Copyright 2011 Freescale Semiconductor, Inc.
-> - * Copyright 2011 Linaro Ltd.
-> - *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> - *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> - */
-> -
-> -#include <linux/init.h>
-> -#include <linux/clockchips.h>
-> -#include <linux/of_address.h>
-> -#include <linux/of_irq.h>
-> -#include <asm/smp_twd.h>
-> -
-> -/*
-> - * Setup the local clock events for a CPU.
-> - */
-> -int __cpuinit local_timer_setup(struct clock_event_device *evt)
-> -{
-> -	struct device_node *np;
-> -
-> -	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
-> -	if (!twd_base) {
-> -		twd_base = of_iomap(np, 0);
-> -		WARN_ON(!twd_base);
-> -	}
-> -	evt->irq = irq_of_parse_and_map(np, 0);
-> -	twd_timer_setup(evt);
-> -
-> -	return 0;
-> -}
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index c257281..a2eea86 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -21,6 +21,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/phy.h>
->  #include <linux/micrel_phy.h>
-> +#include <asm/smp_twd.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/hardware/gic.h>
->  #include <asm/mach/arch.h>
-> @@ -119,6 +120,7 @@ static void __init imx6q_init_irq(void)
->  static void __init imx6q_timer_init(void)
->  {
->  	mx6q_clocks_init();
-> +	twd_local_timer_of_register();
->  }
->  
->  static struct sys_timer imx6q_timer = {
-> -- 
-> 1.7.7.1
-> 
-> 
+Transferred to destination
+Destination pattern:
+2 rows
+0----------32-bytes-data----------31
+32         96 bytes void         127
+128-------------data-------------159
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
