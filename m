@@ -1,459 +1,208 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 20 Jan 2012 16:36:36 -0500 (EST)
-Subject: [PATCH] ARM: move CP15 definitions to separate header file
-In-Reply-To: <E1RoBJw-0005UP-By@rmk-PC.arm.linux.org.uk>
-References: <E1RoBJw-0005UP-By@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1201201635560.19587@xanadu.home>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 20 Jan 2012 14:22:20 -0800
+Subject: Pinmux bindings proposal V2
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jan 2012, Russell King - ARM Linux wrote:
+Here's V2 of my pinmux binding proposal, after incorporating some feedback
+from Shawn Guo and Dong Aisheng. Main changes:
 
-> Avoid namespace conflicts with drivers over the CP15 definitions by
-> moving CP15 related prototypes and definitions to a private header
-> file.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+1) Require the "pin config" nodes the be children of the pinmux controller
+   node, rather than allowing them to alternatively be children of the
+   device node that's using them. This allows removal of the pin controller
+   phandle as the first entry in each specifier.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+2) Add explicit #pinmux-cells and #pinconfig-cells properties to the pin
+   controller, so that pin controllers can define the layout of their mux
+   and configuration specifiers.
 
-> ---
->  arch/arm/include/asm/cp15.h      |   87 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/include/asm/system.h    |   77 ---------------------------------
->  arch/arm/kernel/fiq.c            |    2 +-
->  arch/arm/kernel/head-nommu.S     |    2 +-
->  arch/arm/kernel/head.S           |    2 +-
->  arch/arm/kernel/setup.c          |    2 +-
->  arch/arm/mach-exynos/hotplug.c   |    1 +
->  arch/arm/mach-realview/hotplug.c |    1 +
->  arch/arm/mach-tegra/hotplug.c    |    1 +
->  arch/arm/mach-vexpress/hotplug.c |    2 +-
->  arch/arm/mm/alignment.c          |    2 +-
->  arch/arm/mm/cache-feroceon-l2.c  |    1 +
->  arch/arm/mm/cache-tauros2.c      |    1 +
->  arch/arm/mm/cache-xsc3l2.c       |    2 +-
->  arch/arm/mm/ioremap.c            |    1 +
->  arch/arm/mm/mmu.c                |    1 +
->  arch/arm/mm/pgd.c                |    1 +
->  arch/arm/vfp/vfpmodule.c         |    1 +
->  18 files changed, 103 insertions(+), 84 deletions(-)
->  create mode 100644 arch/arm/include/asm/cp15.h
-> 
-> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-> new file mode 100644
-> index 0000000..3dabd8dd
-> --- /dev/null
-> +++ b/arch/arm/include/asm/cp15.h
-> @@ -0,0 +1,87 @@
-> +#ifndef __ASM_ARM_CP15_H
-> +#define __ASM_ARM_CP15_H
-> +
-> +#include <asm/system.h>
-> +
-> +/*
-> + * CR1 bits (CP#15 CR1)
-> + */
-> +#define CR_M	(1 << 0)	/* MMU enable				*/
-> +#define CR_A	(1 << 1)	/* Alignment abort enable		*/
-> +#define CR_C	(1 << 2)	/* Dcache enable			*/
-> +#define CR_W	(1 << 3)	/* Write buffer enable			*/
-> +#define CR_P	(1 << 4)	/* 32-bit exception handler		*/
-> +#define CR_D	(1 << 5)	/* 32-bit data address range		*/
-> +#define CR_L	(1 << 6)	/* Implementation defined		*/
-> +#define CR_B	(1 << 7)	/* Big endian				*/
-> +#define CR_S	(1 << 8)	/* System MMU protection		*/
-> +#define CR_R	(1 << 9)	/* ROM MMU protection			*/
-> +#define CR_F	(1 << 10)	/* Implementation defined		*/
-> +#define CR_Z	(1 << 11)	/* Implementation defined		*/
-> +#define CR_I	(1 << 12)	/* Icache enable			*/
-> +#define CR_V	(1 << 13)	/* Vectors relocated to 0xffff0000	*/
-> +#define CR_RR	(1 << 14)	/* Round Robin cache replacement	*/
-> +#define CR_L4	(1 << 15)	/* LDR pc can set T bit			*/
-> +#define CR_DT	(1 << 16)
-> +#define CR_IT	(1 << 18)
-> +#define CR_ST	(1 << 19)
-> +#define CR_FI	(1 << 21)	/* Fast interrupt (lower latency mode)	*/
-> +#define CR_U	(1 << 22)	/* Unaligned access operation		*/
-> +#define CR_XP	(1 << 23)	/* Extended page tables			*/
-> +#define CR_VE	(1 << 24)	/* Vectored interrupts			*/
-> +#define CR_EE	(1 << 25)	/* Exception (Big) Endian		*/
-> +#define CR_TRE	(1 << 28)	/* TEX remap enable			*/
-> +#define CR_AFE	(1 << 29)	/* Access flag enable			*/
-> +#define CR_TE	(1 << 30)	/* Thumb exception enable		*/
-> +
-> +#ifndef __ASSEMBLY__
-> +
-> +#if __LINUX_ARM_ARCH__ >= 4
-> +#define vectors_high()	(cr_alignment & CR_V)
-> +#else
-> +#define vectors_high()	(0)
-> +#endif
-> +
-> +extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
-> +extern unsigned long cr_alignment;	/* defined in entry-armv.S */
-> +
-> +static inline unsigned int get_cr(void)
-> +{
-> +	unsigned int val;
-> +	asm("mrc p15, 0, %0, c1, c0, 0	@ get CR" : "=r" (val) : : "cc");
-> +	return val;
-> +}
-> +
-> +static inline void set_cr(unsigned int val)
-> +{
-> +	asm volatile("mcr p15, 0, %0, c1, c0, 0	@ set CR"
-> +	  : : "r" (val) : "cc");
-> +	isb();
-> +}
-> +
-> +#ifndef CONFIG_SMP
-> +extern void adjust_cr(unsigned long mask, unsigned long set);
-> +#endif
-> +
-> +#define CPACC_FULL(n)		(3 << (n * 2))
-> +#define CPACC_SVC(n)		(1 << (n * 2))
-> +#define CPACC_DISABLE(n)	(0 << (n * 2))
-> +
-> +static inline unsigned int get_copro_access(void)
-> +{
-> +	unsigned int val;
-> +	asm("mrc p15, 0, %0, c1, c0, 2 @ get copro access"
-> +	  : "=r" (val) : : "cc");
-> +	return val;
-> +}
-> +
-> +static inline void set_copro_access(unsigned int val)
-> +{
-> +	asm volatile("mcr p15, 0, %0, c1, c0, 2 @ set copro access"
-> +	  : : "r" (val) : "cc");
-> +	isb();
-> +}
-> +
-> +#endif
-> +
-> +#endif
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index e4c96cc..774c41e 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> @@ -15,37 +15,6 @@
->  #define CPU_ARCH_ARMv7		9
->  
->  /*
-> - * CR1 bits (CP#15 CR1)
-> - */
-> -#define CR_M	(1 << 0)	/* MMU enable				*/
-> -#define CR_A	(1 << 1)	/* Alignment abort enable		*/
-> -#define CR_C	(1 << 2)	/* Dcache enable			*/
-> -#define CR_W	(1 << 3)	/* Write buffer enable			*/
-> -#define CR_P	(1 << 4)	/* 32-bit exception handler		*/
-> -#define CR_D	(1 << 5)	/* 32-bit data address range		*/
-> -#define CR_L	(1 << 6)	/* Implementation defined		*/
-> -#define CR_B	(1 << 7)	/* Big endian				*/
-> -#define CR_S	(1 << 8)	/* System MMU protection		*/
-> -#define CR_R	(1 << 9)	/* ROM MMU protection			*/
-> -#define CR_F	(1 << 10)	/* Implementation defined		*/
-> -#define CR_Z	(1 << 11)	/* Implementation defined		*/
-> -#define CR_I	(1 << 12)	/* Icache enable			*/
-> -#define CR_V	(1 << 13)	/* Vectors relocated to 0xffff0000	*/
-> -#define CR_RR	(1 << 14)	/* Round Robin cache replacement	*/
-> -#define CR_L4	(1 << 15)	/* LDR pc can set T bit			*/
-> -#define CR_DT	(1 << 16)
-> -#define CR_IT	(1 << 18)
-> -#define CR_ST	(1 << 19)
-> -#define CR_FI	(1 << 21)	/* Fast interrupt (lower latency mode)	*/
-> -#define CR_U	(1 << 22)	/* Unaligned access operation		*/
-> -#define CR_XP	(1 << 23)	/* Extended page tables			*/
-> -#define CR_VE	(1 << 24)	/* Vectored interrupts			*/
-> -#define CR_EE	(1 << 25)	/* Exception (Big) Endian		*/
-> -#define CR_TRE	(1 << 28)	/* TEX remap enable			*/
-> -#define CR_AFE	(1 << 29)	/* Access flag enable			*/
-> -#define CR_TE	(1 << 30)	/* Thumb exception enable		*/
-> -
-> -/*
->   * This is used to ensure the compiler did actually allocate the register we
->   * asked it for some inline assembly sequences.  Apparently we can't trust
->   * the compiler from one version to another so a bit of paranoia won't hurt.
-> @@ -119,12 +88,6 @@ extern void (*arm_pm_restart)(char str, const char *cmd);
->  
->  extern unsigned int user_debug;
->  
-> -#if __LINUX_ARM_ARCH__ >= 4
-> -#define vectors_high()	(cr_alignment & CR_V)
-> -#else
-> -#define vectors_high()	(0)
-> -#endif
-> -
->  #if __LINUX_ARM_ARCH__ >= 7 ||		\
->  	(__LINUX_ARM_ARCH__ == 6 && defined(CONFIG_CPU_32v6K))
->  #define sev()	__asm__ __volatile__ ("sev" : : : "memory")
-> @@ -185,46 +148,6 @@ extern unsigned int user_debug;
->  #define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
->  #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
->  
-> -extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
-> -extern unsigned long cr_alignment;	/* defined in entry-armv.S */
-> -
-> -static inline unsigned int get_cr(void)
-> -{
-> -	unsigned int val;
-> -	asm("mrc p15, 0, %0, c1, c0, 0	@ get CR" : "=r" (val) : : "cc");
-> -	return val;
-> -}
-> -
-> -static inline void set_cr(unsigned int val)
-> -{
-> -	asm volatile("mcr p15, 0, %0, c1, c0, 0	@ set CR"
-> -	  : : "r" (val) : "cc");
-> -	isb();
-> -}
-> -
-> -#ifndef CONFIG_SMP
-> -extern void adjust_cr(unsigned long mask, unsigned long set);
-> -#endif
-> -
-> -#define CPACC_FULL(n)		(3 << (n * 2))
-> -#define CPACC_SVC(n)		(1 << (n * 2))
-> -#define CPACC_DISABLE(n)	(0 << (n * 2))
-> -
-> -static inline unsigned int get_copro_access(void)
-> -{
-> -	unsigned int val;
-> -	asm("mrc p15, 0, %0, c1, c0, 2 @ get copro access"
-> -	  : "=r" (val) : : "cc");
-> -	return val;
-> -}
-> -
-> -static inline void set_copro_access(unsigned int val)
-> -{
-> -	asm volatile("mcr p15, 0, %0, c1, c0, 2 @ set copro access"
-> -	  : : "r" (val) : "cc");
-> -	isb();
-> -}
-> -
->  /*
->   * switch_mm() may do a full cache flush over the context switch,
->   * so enable interrupts over the context switch to avoid high
-> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-> index 4c164ec..c32f845 100644
-> --- a/arch/arm/kernel/fiq.c
-> +++ b/arch/arm/kernel/fiq.c
-> @@ -42,9 +42,9 @@
->  #include <linux/seq_file.h>
->  
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
->  #include <asm/fiq.h>
->  #include <asm/irq.h>
-> -#include <asm/system.h>
->  #include <asm/traps.h>
->  
->  static unsigned long no_fiq_insn;
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index d46f259..278cfc1 100644
-> --- a/arch/arm/kernel/head-nommu.S
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -17,8 +17,8 @@
->  #include <asm/assembler.h>
->  #include <asm/ptrace.h>
->  #include <asm/asm-offsets.h>
-> +#include <asm/cp15.h>
->  #include <asm/thread_info.h>
-> -#include <asm/system.h>
->  
->  /*
->   * Kernel startup entry point.
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 6d57911..a2e9694 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -15,12 +15,12 @@
->  #include <linux/init.h>
->  
->  #include <asm/assembler.h>
-> +#include <asm/cp15.h>
->  #include <asm/domain.h>
->  #include <asm/ptrace.h>
->  #include <asm/asm-offsets.h>
->  #include <asm/memory.h>
->  #include <asm/thread_info.h>
-> -#include <asm/system.h>
->  #include <asm/pgtable.h>
->  
->  #ifdef CONFIG_DEBUG_LL
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 9b65cb4..e5c37fc 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -34,6 +34,7 @@
->  #include <linux/sort.h>
->  
->  #include <asm/unified.h>
-> +#include <asm/cp15.h>
->  #include <asm/cpu.h>
->  #include <asm/cputype.h>
->  #include <asm/elf.h>
-> @@ -45,7 +46,6 @@
->  #include <asm/cacheflush.h>
->  #include <asm/cachetype.h>
->  #include <asm/tlbflush.h>
-> -#include <asm/system.h>
->  
->  #include <asm/prom.h>
->  #include <asm/mach/arch.h>
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index da70e7e..c9146fa 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -16,6 +16,7 @@
->  #include <linux/io.h>
->  
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
->  
->  #include <mach/regs-pmu.h>
->  
-> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-> index ac1aed2..5e64fbf 100644
-> --- a/arch/arm/mach-realview/hotplug.c
-> +++ b/arch/arm/mach-realview/hotplug.c
-> @@ -13,6 +13,7 @@
->  #include <linux/smp.h>
->  
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
->  
->  extern volatile int pen_release;
->  
-> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-> index f329404..d8dc9dd 100644
-> --- a/arch/arm/mach-tegra/hotplug.c
-> +++ b/arch/arm/mach-tegra/hotplug.c
-> @@ -13,6 +13,7 @@
->  #include <linux/smp.h>
->  
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
->  
->  static inline void cpu_enter_lowpower(void)
->  {
-> diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
-> index 813ee08..7a05548 100644
-> --- a/arch/arm/mach-vexpress/hotplug.c
-> +++ b/arch/arm/mach-vexpress/hotplug.c
-> @@ -13,7 +13,7 @@
->  #include <linux/smp.h>
->  
->  #include <asm/cacheflush.h>
-> -#include <asm/system.h>
-> +#include <asm/cp15.h>
->  
->  extern volatile int pen_release;
->  
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index caf14dc..78459b8 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -22,7 +22,7 @@
->  #include <linux/sched.h>
->  #include <linux/uaccess.h>
->  
-> -#include <asm/system.h>
-> +#include <asm/cp15.h>
->  #include <asm/unaligned.h>
->  
->  #include "fault.h"
-> diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
-> index e0b0e7a..dd3d591 100644
-> --- a/arch/arm/mm/cache-feroceon-l2.c
-> +++ b/arch/arm/mm/cache-feroceon-l2.c
-> @@ -15,6 +15,7 @@
->  #include <linux/init.h>
->  #include <linux/highmem.h>
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
->  #include <plat/cache-feroceon-l2.h>
->  
->  /*
-> diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
-> index 5086865..1fbca05 100644
-> --- a/arch/arm/mm/cache-tauros2.c
-> +++ b/arch/arm/mm/cache-tauros2.c
-> @@ -16,6 +16,7 @@
->  
->  #include <linux/init.h>
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
->  #include <asm/hardware/cache-tauros2.h>
->  
->  
-> diff --git a/arch/arm/mm/cache-xsc3l2.c b/arch/arm/mm/cache-xsc3l2.c
-> index 5a32020..6c3edeb 100644
-> --- a/arch/arm/mm/cache-xsc3l2.c
-> +++ b/arch/arm/mm/cache-xsc3l2.c
-> @@ -18,7 +18,7 @@
->   */
->  #include <linux/init.h>
->  #include <linux/highmem.h>
-> -#include <asm/system.h>
-> +#include <asm/cp15.h>
->  #include <asm/cputype.h>
->  #include <asm/cacheflush.h>
->  
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index 80632e8..66daf17 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -26,6 +26,7 @@
->  #include <linux/vmalloc.h>
->  #include <linux/io.h>
->  
-> +#include <asm/cp15.h>
->  #include <asm/cputype.h>
->  #include <asm/cacheflush.h>
->  #include <asm/mmu_context.h>
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index c1263ad..f77f1db 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -17,6 +17,7 @@
->  #include <linux/fs.h>
->  #include <linux/vmalloc.h>
->  
-> +#include <asm/cp15.h>
->  #include <asm/cputype.h>
->  #include <asm/sections.h>
->  #include <asm/cachetype.h>
-> diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
-> index a3e78cc..0acb089 100644
-> --- a/arch/arm/mm/pgd.c
-> +++ b/arch/arm/mm/pgd.c
-> @@ -12,6 +12,7 @@
->  #include <linux/highmem.h>
->  #include <linux/slab.h>
->  
-> +#include <asm/cp15.h>
->  #include <asm/pgalloc.h>
->  #include <asm/page.h>
->  #include <asm/tlbflush.h>
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 8f3ccdd..d89068f 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -18,6 +18,7 @@
->  #include <linux/smp.h>
->  #include <linux/init.h>
->  
-> +#include <asm/cp15.h>
->  #include <asm/cputype.h>
->  #include <asm/thread_notify.h>
->  #include <asm/vfp.h>
-> -- 
-> 1.7.4.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+3) Don't document a "1:1" model; only document a "1:n" model, whereby each
+   named state for a device node can refer to multiple pin configuration
+   nodes. This allows:
+
+   a) A device to use multiple configuration nodes from a single pin
+      controller. For example, one may specify a very common subset of
+      the configuration for a particular device, and another may specify
+      a few board-specific tweaks on top of that.
+
+   b) A single device to specify configurations for multiple pin
+      controllers.
+
+TODO: I should write a real binding document for this, rather than simply
+providing a commented example.
+
+Note: I've used named constants below just to make this easier to read.
+We still don't have a solution to actually use named constants in dtc yet.
+
+tegra20.dtsi:
+
+/ {
+        /*
+         * The SoC .dtsi file will define the basic properties of each HW
+         * module; compatible, reg, interrupts, ... There's no change here
+         * relative to normal practice.
+         */
+        tegra_pmx: pinmux at 70000000 {
+                compatible = "nvidia,tegra20-pinmux";
+                reg = <0x70000014 0x10   /* Tri-state registers */
+                       0x70000080 0x20   /* Mux registers */
+                       0x700000a0 0x14   /* Pull-up/down registers */
+                       0x70000868 0xa8>; /* Pad control registers */
+                /*
+                 * Common pin control bindings specify that these properties
+                 * must exist in a pin controller. Each individual pin
+                 * controller's bindings specify the values.
+                 */
+                #pinmux-cells = <2>;
+                #pinconfig-cells = <3>;
+        };
+
+        sdhci at c8000200 {
+                compatible = "nvidia,tegra20-sdhci";
+                reg = <0xc8000200 0x200>;
+                interrupts = <0 15 0x04>;
+        };
+};
+
+tegra20.dtis or tegra-harmony.dts:
+
+/{
+        /*
+         * The pin controller node will contain child nodes that define
+         * various subsets of the overall pin state.
+         *
+         * These nodes may be defined in the SoC .dtsi file if the vendor
+         * wants to provide a set of common configurations for customers
+         * or users to pick from.
+         *
+         * These nodes may be defined in the board .dts file too; e.g. if
+         * a particular board uses a configuration that isn't in the set
+         * of provided common options, or the SoC vendor simply chose not
+         * to provide a set of common options.
+         */
+        &tegra_pmx {
+                /*
+                 * There are (may be) many of these pin configuration child
+                 * nodes. Each is referenced by phandle from device nodes.
+                 *
+                 * Below I've shown an example of an SDHCI controller. There
+                 * is a set of common settings in node pmx_sdhci. The slight
+                 * differences between active and standby states are in nodes
+                 * pmc_sdhci_active and pmx_sdhci_suspend.
+                 *
+                 * Note though the the 3-node split is just an example; you
+                 * could easily have a single node for devices that don't
+                 * need separate active/suspend state, or many more nodes
+                 * for a device with a more complex set of shared settings
+                 * or that uses more states.
+                 */
+                pmx_sdhci: pinconfig-sdhci {
+                        /*
+                         * The mux property is a list of muxable entities
+                         * and the mux function to select for it. The number
+                         * of cells in each entry is the pin controller's
+                         * #pinmux-cells property. The pin controller's
+                         * binding defines what the cells mean. The pinctrl
+                         * driver is responsible for mapping this data to
+                         * the (group, function) pair required to fill in
+                         * the pinctrl subsystem's pinmux mapping table.
+                         */
+                        mux =
+                                <TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_SDIO1>
+                                <TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_SDIO1>;
+                        /*
+                         * The config property is a list of muxable entities
+                         * and individual configuration setting. The number
+                         * of cells in each entry is the pin controller's
+                         * #pinconfig-cells property. The pin controller's
+                         * binding defines what the cells mean. The pinctrl
+                         * driver is responsible for mapping this data to
+                         * the (group, config) pair required to fill in
+                         * the pinctrl subsystem's pin configuration table.
+                         */
+                        config =
+                                <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+                                <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+                                <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+                                <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+                };
+                pmx_sdhci_active: pinconfig-sdhci-active {
+                        /*
+                         * In each of these nodes, both the mux and config
+                         * properties are optional. This node represents the
+                         * additions to pmx_sdhci that are specific to an
+                         * active state. In this case, only pin configuration
+                         * settings are different.
+                         */
+                        config =
+                                <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 0>
+                                <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 0>;
+                };
+                pmx_sdhci_standby: pinconfig-sdhci-standby {
+                        config =
+                                <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
+                                <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>;
+                };
+                /*
+                 * ... continuing from the comment in pmx_sdhci_active:
+                 *
+                 * However, one could imagine representing GPIO as a regular
+                 * pinmux function, and have a board .dts file create an
+                 * extra node to represent that, and hence containing just
+                 * a mux property:
+                 */
+                pmx_sdhci_harmony: pinconfig-sdhci-harmony {
+                        mux = <TEGRA_PMX_PIN_GPIO_PA1 TEGRA_PMX_MUX_GPIO>;
+                };
+        };
+};
+
+tegra-harmony.dts:
+
+/{
+        sdhci at c8000200 {
+                /*
+                 * Each device node contains a few properties to describe
+                 * the named pinmux states that are available to it.
+                 *
+                 * The binding for the device node specifies the state names
+                 * that must be described; common examples such as "default"
+                 * or "active" and "suspend" may be universal, but the IO
+                 * protocol that a device supports may demand that more
+                 * states be defined, such as "active-12mhz", "active-50mhz",
+                 * "suspend". Drivers request these named states e.g. using
+                 * pinctrl's pinmux_get("state_name") API.
+                 *
+                 * pinctrl-names lists the available state names.
+                 *
+                 * Unlike the common clock binding, I assume here that states
+                 * are always requested by name. If we don't like that idea,
+                 * we'd could make this property optional, and add a new API
+                 * pinmux_get(state_id) to the pinctrl subsystem.
+                 */
+                pinctrl-names = "active", "suspend";
+                /*
+                 * pinctrl-entries contains a single cell for each state name
+                 * in pinctrl-names. It defines how many entries are present
+                 * in property "pinctrl" for the given named state.
+                 *
+                 * Here, state "active" covers 2 entries (0 and 1) in pinctrl,
+                 * and state "suspend" covers 2 more entries (2 and 3) in
+                 * pinctrl.
+                 */
+                pinctrl-entries = <2 2>;
+                /*
+                 * pinctrl contains a list of phandles. Each refers to one of
+                 * the pin config nodes within the pin controller. So, to set
+                 * up state "active", nodes pmx_sdhci and pmx_sdhci_active
+                 * must both be programmed. To set up state "suspend", nodes
+                 * pmx_sdhci and pmx_sdhci_standby must be programmed.
+                 */
+                pinctrl = <&pmx_sdhci> <&pmx_sdhci_active>
+                          <&pmx_sdhci> <&pmx_sdhci_standby>;
+        };
+};
+
+-- 
+nvpublic
