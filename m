@@ -1,32 +1,106 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 20 Jan 2012 12:00:03 +0000
-Subject: Building of arch/arm/plat-mxc/ssi-fiq.S failed w/ THUMB2 enabled?
-In-Reply-To: <20120120115216.GK1068@n2100.arm.linux.org.uk>
-References: <CAMPhdO_4NQUFB14eecTb3N4oQJa86ojSk8FUveqg+Lye5_jY+A@mail.gmail.com>
- <20111202102418.GT26618@pengutronix.de>
- <20120120115216.GK1068@n2100.arm.linux.org.uk>
-Message-ID: <20120120120003.GB2046@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Jan 2012 12:03:47 +0000
+Subject: [PATCH v4 00/15] Runtime registration for local timers
+Message-ID: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 11:52:17AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 02, 2011 at 11:24:18AM +0100, Uwe Kleine-K?nig wrote:
-> > On Fri, Dec 02, 2011 at 06:01:08PM +0800, Eric Miao wrote:
-> > > Hi Dave & Sascha,
-> > > 
-> > > I checked the log of this file, found a THUMB2 related changes, yet
-> > > I'm still having the failure below, can you help do a quick check?
-> > the problem is that in Thumb most commands don't work with r8-r15
-> > because there are only three bits used to encode them. This is
-> > unfortunate as the other registers are not banked for FIQ.
-> > 
-> > The best possibility I see is to save some unbanked registers to the
-> > banked registers on entry and restore them on exception exit.
-> 
-> Or always build this as ARM code.
+This patch series switches the various local timers implementation
+(TWD, MCT, MSM timer) to be registered at runtime instead of being
+hardwired at compile time. In the process, TWD gets an OF binding that
+is used by highbank and imx6q.
 
-That should work, sure -- I prefer to keep the number of instances where
-we need to do this to a minimum if we can, though.
+Tested on EB11MP, OMAP4, Tegra and Exynos4. Based on v3.3-rc1.
 
-Cheers
----Dave
+Branch also available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git local_timers-v3.3-rc1
+
+* From v3:
+- Fix !LOCAL_TIMERS warning in smp_twd.h
+- Fix ct-ca9x twd init that was too early
+- Rebased to v3.3-rc1
+
+* From v2:
+- Fix __initdata anotations that should have been __cpuinitdata
+  (reported by David Brown and Russell King)
+- Fix interrupt trigger in DTS file for highbank and imx6q
+  (as requested by Rob Herring and Shawn Guo)
+- Move warning to twd_local_timer_of_register()
+  (as requested by Rob Herring)
+- Fix shmobile compilation fix (reported by Magnus Damm)
+- Fold local_timer_{setup,stop}() into percpu_timer_{setup,stop}()
+
+* From initial version:
+- Moved away from late_time_init, making the code even simpler
+- Added a DEFINE_TWD_LOCAL_TIMER() macro to reduce the init cluter
+- Updated TWD DT support to have separate nodes for timer and watchdog
+- Added support for the new r8a7779 shmobile that suddenly appeared
+- Fixed a tiny dts bug on imx6q
+
+Marc Zyngier (15):
+  ARM: smp_twd: make local_timer_stop a symbol instead of a #define
+  ARM: local timers: introduce a new registration interface
+  ARM: smp_twd: add runtime registration support
+  ARM: smp_twd: add device tree support
+  ARM: OMAP4: convert to twd_local_timer_register() interface
+  ARM: plat-versatile: convert to twd_local_timer_register() interface
+  ARM: tegra: convert to twd_local_timer_register() interface
+  ARM: shmobile: convert to twd_local_timer_register() interface
+  ARM: ux500: convert to twd_local_timer_register() interface
+  ARM: highbank: convert to twd_local_timer_register() interface
+  ARM: imx6q: convert to twd_local_timer_register() interface
+  ARM: smp_twd: remove old local timer interface
+  ARM: local timers: convert exynos to runtime registration interface
+  ARM: local timers: convert MSM to runtime registration interface
+  ARM: local timers: make the runtime registration interface mandatory
+
+ Documentation/devicetree/bindings/arm/twd.txt |   48 ++++++++++
+ arch/arm/boot/dts/highbank.dts                |    8 +-
+ arch/arm/boot/dts/imx6q.dtsi                  |    6 +-
+ arch/arm/include/asm/localtimer.h             |   37 ++------
+ arch/arm/include/asm/smp_twd.h                |   25 ++++-
+ arch/arm/kernel/smp.c                         |   22 ++++-
+ arch/arm/kernel/smp_twd.c                     |  123 ++++++++++++++++++++-----
+ arch/arm/mach-exynos/mct.c                    |   18 ++--
+ arch/arm/mach-highbank/Makefile               |    1 -
+ arch/arm/mach-highbank/highbank.c             |    3 +
+ arch/arm/mach-highbank/localtimer.c           |   40 --------
+ arch/arm/mach-imx/Makefile                    |    1 -
+ arch/arm/mach-imx/localtimer.c                |   35 -------
+ arch/arm/mach-imx/mach-imx6q.c                |    2 +
+ arch/arm/mach-msm/timer.c                     |   79 +++++++++-------
+ arch/arm/mach-omap2/Makefile                  |    1 -
+ arch/arm/mach-omap2/timer-mpu.c               |   39 --------
+ arch/arm/mach-omap2/timer.c                   |   22 ++++-
+ arch/arm/mach-realview/realview_eb.c          |   27 ++++-
+ arch/arm/mach-realview/realview_pb11mp.c      |   21 ++++-
+ arch/arm/mach-realview/realview_pbx.c         |   20 +++-
+ arch/arm/mach-shmobile/Makefile               |    1 -
+ arch/arm/mach-shmobile/include/mach/common.h  |    2 +
+ arch/arm/mach-shmobile/localtimer.c           |   26 -----
+ arch/arm/mach-shmobile/platsmp.c              |    1 -
+ arch/arm/mach-shmobile/smp-r8a7779.c          |    8 +-
+ arch/arm/mach-shmobile/smp-sh73a0.c           |    8 +-
+ arch/arm/mach-shmobile/timer.c                |   10 ++
+ arch/arm/mach-tegra/Makefile                  |    2 +-
+ arch/arm/mach-tegra/localtimer.c              |   26 -----
+ arch/arm/mach-tegra/timer.c                   |   22 ++++-
+ arch/arm/mach-ux500/Makefile                  |    1 -
+ arch/arm/mach-ux500/cpu.c                     |    1 -
+ arch/arm/mach-ux500/localtimer.c              |   29 ------
+ arch/arm/mach-ux500/timer.c                   |   32 +++++--
+ arch/arm/mach-vexpress/ct-ca9x4.c             |   17 +++-
+ arch/arm/plat-versatile/Makefile              |    1 -
+ arch/arm/plat-versatile/localtimer.c          |   27 ------
+ 38 files changed, 407 insertions(+), 385 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
+ delete mode 100644 arch/arm/mach-highbank/localtimer.c
+ delete mode 100644 arch/arm/mach-imx/localtimer.c
+ delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
+ delete mode 100644 arch/arm/mach-shmobile/localtimer.c
+ delete mode 100644 arch/arm/mach-tegra/localtimer.c
+ delete mode 100644 arch/arm/mach-ux500/localtimer.c
+ delete mode 100644 arch/arm/plat-versatile/localtimer.c
+
+-- 
+1.7.7.1
