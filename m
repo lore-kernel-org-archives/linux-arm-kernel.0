@@ -1,20 +1,26 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 20 Jan 2012 11:36:59 -0600
-Subject: [PATCH] ARM: move CP15 definitions to separate header file
-In-Reply-To: <E1RoBJw-0005UP-By@rmk-PC.arm.linux.org.uk>
-References: <E1RoBJw-0005UP-By@rmk-PC.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F9D06870@AUSP01VMBX24.collaborationhost.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 20 Jan 2012 09:40:45 -0800
+Subject: [PATCH v4 07/15] ARM: tegra: convert to
+ twd_local_timer_register() interface
+In-Reply-To: <1327061042-14857-8-git-send-email-marc.zyngier@arm.com>
+References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
+ <1327061042-14857-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB39F@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 20, 2012 3:04 AM, Russell King wrote:
-> Avoid namespace conflicts with drivers over the CP15 definitions by
-> moving CP15 related prototypes and definitions to a private header
-> file.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Marc Zyngier wrote at Friday, January 20, 2012 5:04 AM:
+> Add support for the new smp_twd runtime registration interface
+> to the tegra platforms, and remove the old compile-time support.
+> Tested on Harmony.
+> 
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-For EP93xx,
+For Tegra,
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+-- 
+nvpublic
