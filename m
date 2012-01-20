@@ -1,61 +1,83 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Fri, 20 Jan 2012 11:29:20 +0530
-Subject: [PATCH RFC 2/2] OMAP : serial : Check for error in
- get_context_loss_count
-In-Reply-To: <87hazrti1c.fsf@ti.com>
-References: <1326377019-23688-1-git-send-email-shubhrajyoti@ti.com>	<1326377019-23688-2-git-send-email-shubhrajyoti@ti.com>
- <87hazrti1c.fsf@ti.com>
-Message-ID: <4F1902B8.5020000@ti.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Fri, 20 Jan 2012 11:28:22 +0530
+Subject: [PATCHv2] ARM: ftrace: clear zero bit in reported IPs for Thumb-2
+In-Reply-To: <20111202124417.GA2892@localhost.localdomain>
+References: <20111202124417.GA2892@localhost.localdomain>
+Message-ID: <1327039102-17754-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 January 2012 04:29 AM, Kevin Hilman wrote:
-> Shubhrajyoti D <shubhrajyoti@ti.com> writes:
->
->> In serial_omap_runtime_resume in case of errors returned by
->> get_context_loss_count print a warning and do a restore.
->>
->> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> These two patches should be combined into a single patch.
->
-OK I will combine. I had split as the one was a serial driver and one
-for omap
-maintainer.
+The dynamic ftrace ops startup test currently fails on Thumb-2 kernels:
 
-However I agree that they should be combined.
-> Also, please Cc Govindraj since he's the maintainer of this driver and
-> should Ack.
-will do that
-> Thanks,
->
-> Kevin
->
->> ---
->> applies on Tony's uart branch
->>
->>  drivers/tty/serial/omap-serial.c |   10 ++++++++--
->>  1 files changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
->> index 29fe6fd..6008612 100644
->> --- a/drivers/tty/serial/omap-serial.c
->> +++ b/drivers/tty/serial/omap-serial.c
->> @@ -1602,10 +1602,16 @@ static int serial_omap_runtime_resume(struct device *dev)
->>  
->>  	if (up) {
->>  		if (pdata->get_context_loss_count) {
->> -			u32 loss_cnt = pdata->get_context_loss_count(dev);
->> +			int loss_cnt = pdata->get_context_loss_count(dev);
->>  
->> -			if (up->context_loss_cnt != loss_cnt)
->> +			if (loss_cnt < 0) {
->> +				dev_err(dev,
->> +					"get_context_loss_count failed : %d\n",
->> +					loss_cnt);
->>  				serial_omap_restore_context(up);
->> +			} else if (up->context_loss_cnt != loss_cnt) {
->> +				serial_omap_restore_context(up);
->> +			}
->>  		}
->>  
->>  		/* Errata i291 */
+ Testing tracer function: PASSED
+ Testing dynamic ftrace: PASSED
+ Testing dynamic ftrace ops #1: (0 0 0 0 0) FAILED!
+
+This is because while the addresses in the mcount records do not have
+the zero bit set, the IP reported by the mcount call does have it set
+(because it is copied from the LR).  This mismatch causes the ops
+filtering in ftrace_ops_list_func() to not call the relevant tracers.
+
+Fix this by clearing the zero bit before adjusting the LR for the mcount
+instruction size.  Also, combine the mov+sub into a single sub
+instruction.
+
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+v2: use bic
+
+ arch/arm/kernel/entry-common.S |   15 +++++++++------
+ 1 files changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index b2a27b6..683195c 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -149,6 +149,11 @@ ENDPROC(ret_from_fork)
+ #endif
+ #endif
+ 
++.macro mcount_adjust_addr rd, rn
++	bic	\rd, \rn, #1		@ clear the Thumb bit if present
++	sub	\rd, \rd, #MCOUNT_INSN_SIZE
++.endm
++
+ .macro __mcount suffix
+ 	mcount_enter
+ 	ldr	r0, =ftrace_trace_function
+@@ -173,8 +178,7 @@ ENDPROC(ret_from_fork)
+ 	mcount_exit
+ 
+ 1: 	mcount_get_lr	r1			@ lr of instrumented func
+-	mov	r0, lr				@ instrumented function
+-	sub	r0, r0, #MCOUNT_INSN_SIZE
++	mcount_adjust_addr	r0, lr		@ instrumented function
+ 	adr	lr, BSYM(2f)
+ 	mov	pc, r2
+ 2:	mcount_exit
+@@ -184,8 +188,7 @@ ENDPROC(ret_from_fork)
+ 	mcount_enter
+ 
+ 	mcount_get_lr	r1			@ lr of instrumented func
+-	mov	r0, lr				@ instrumented function
+-	sub	r0, r0, #MCOUNT_INSN_SIZE
++	mcount_adjust_addr	r0, lr		@ instrumented function
+ 
+ 	.globl ftrace_call\suffix
+ ftrace_call\suffix:
+@@ -205,11 +208,11 @@ ftrace_graph_call\suffix:
+ #ifdef CONFIG_DYNAMIC_FTRACE
+ 	@ called from __ftrace_caller, saved in mcount_enter
+ 	ldr	r1, [sp, #16]		@ instrumented routine (func)
++	mcount_adjust_addr	r1, r1
+ #else
+ 	@ called from __mcount, untouched in lr
+-	mov	r1, lr			@ instrumented routine (func)
++	mcount_adjust_addr	r1, lr	@ instrumented routine (func)
+ #endif
+-	sub	r1, r1, #MCOUNT_INSN_SIZE
+ 	mov	r2, fp			@ frame pointer
+ 	bl	prepare_ftrace_return
+ 	mcount_exit
+-- 
+1.7.7.3
