@@ -1,152 +1,35 @@
-From: eranian@googlemail.com (stephane eranian)
-Date: Fri, 20 Jan 2012 14:47:47 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
-References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
- <4F0B182D.7060507@us.ibm.com>
- <20120109224945.GA23090@mudshark.cambridge.arm.com>
- <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
- <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
- <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
- <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
- <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
- <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
- <CACVXFVOQNDRs=c8A2YC+WvYAHs5Abbz-QUEe1VJqrj2esFO11g@mail.gmail.com>
- <CAMsRxf+e38jRcyxESLhYDZ3OL910AQdapZD9P8vWDXfUE34DAA@mail.gmail.com>
- <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
- <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
- <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
- <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
- <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
- <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
- <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
-Message-ID: <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 20 Jan 2012 07:54:33 -0600
+Subject: [PATCH] arm: irq: Allow for specification of no preallocated irqs
+In-Reply-To: <4F18B577.8080101@codeaurora.org>
+References: <1327013024-22530-1-git-send-email-mbohan@codeaurora.org>
+ <4F18A18C.9090302@gmail.com> <4F18B577.8080101@codeaurora.org>
+Message-ID: <4F197219.4010105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Started afresh from:
+On 01/19/2012 06:29 PM, Michael Bohan wrote:
+> On 1/19/2012 3:04 PM, Rob Herring wrote:
+>> No doubt that arch_probe_nr_irqs is doing the wrong thing on ARM, but no
+>> pre-allocation is not what we want either. We ultimately want
+>> arch_probe_nr_irqs to return NR_IRQS_LEGACY (16) to reserve IRQ0 (aka
+>> NO_IRQ) and legacy ISA IRQs. With my series, NR_IRQS is set to
+>> NR_IRQS_LEGACY for SPARSE_IRQ. You can accomplish the same thing without
+>> that series by setting .nr_irqs to NR_IRQS for non-DT and to
+>> NR_IRQS_LEGACY for DT. For platforms to work in single kernel builds,
+>> they will need to select SPARSE_IRQ.
+> 
+> One issue here is that IRQ_BITMAP_BITS is defined as a function of
+> NR_IRQS. Currently, there's a hack in place that arbitrarily tacks on
+> 8196 bits to the end, giving the max virq supported as 8212 with your
+> patches. Unfortunately, the system I'm running on will require higher
+> values than that, so this actually breaks me.
+> 
+> It seems like the right solution to this problem is to have the
+> allocated_irqs bitmap expandable at runtime. Or perhaps use a different
+> data structure to begin with?
 
-90a4c0f uml: fix compile for x86-64
+I believe the correct solution is using the radix tree in irqdomain as
+Ben H suggested. Does that not work?
 
-And added 3, 4, 5, 6:
-603c316 arm: omap4: pmu: support runtime pm
-4899fbd arm: omap4: support pmu
-d737bb1 arm: omap4: create pmu device via hwmod
-4e0259e arm: omap4: hwmod: introduce emu hwmod
-
-Still no interrupts firing. I am using your .config file.
-
-My HW:
-CPU implementer	: 0x41
-CPU architecture: 7
-CPU variant	: 0x1
-CPU part	: 0xc09
-CPU revision	: 2
-
-Hardware	: OMAP4 Panda board
-Revision	: 0020
-
-There must be something I am missing here.
-
-
-
-On Thu, Jan 19, 2012 at 6:07 PM, stephane eranian
-<eranian@googlemail.com> wrote:
-> Just did a fresh clone of Linus' tree:
->
-> $ git log --oneline | fgrep 'allow platform specific'
-> e0516a6 arm: pmu: allow platform specific irq enable/disable handling
->
-> $ git log --oneline | fgrep 'cross trigger'
-> 14eec97 arm: introduce cross trigger interface helpers
->
-> Unless you were referring to a different pair of patches.
->
->
-> On Thu, Jan 19, 2012 at 2:51 PM, Ming Lei <ming.lei@canonical.com> wrote:
->> Hi,
->>
->> On Thu, Jan 19, 2012 at 9:32 PM, stephane eranian
->> <eranian@googlemail.com> wrote:
->>> On Thu, Jan 19, 2012 at 2:26 PM, Ming Lei <ming.lei@canonical.com> wrote:
->>>> Hi,
->>>>
->>>> On Thu, Jan 19, 2012 at 9:14 PM, Ming Lei <ming.lei@canonical.com> wrote:
->>>>> On Thu, Jan 19, 2012 at 8:51 PM, stephane eranian
->>>>> <eranian@googlemail.com> wrote:
->>>>>> On Thu, Jan 19, 2012 at 1:45 PM, Ming Lei <ming.lei@canonical.com> wrote:
->>>>>>> Hi,
->>>>>>>
->>>>>>> On Thu, Jan 19, 2012 at 7:34 PM, stephane eranian
->>>>>>> <eranian@googlemail.com> wrote:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> Ok some update on this.
->>>>>>>> With your .config file + 3.2.0 (Linus) + patch 3, 4, 5, 6, I get a kernel that
->>>>>>>
->>>>>>> You forget patch 1 and patch 2?
->>>>>>>
->>>>>> They are already in 3.2.0. Unless I am mistaken.
->>>>>
->>>>> Sorry, I just found that they have been merged to 3.2.
->>>>
->>>> After a double check, the two patches are not merged to 3.2, but have
->>>> been merged to the latest linus tree and can be seen in 3.3-rc1.
->>>>
->>>> Also the commit 3c50729b(ARM: OMAP4: PM: Initialise all the clockdomains
->>>> to supported states) has been merged to linus tree too.
->>>>
->>>> So if you just tested the latest linus tree simply, you need to apply
->>>> the patch[1]
->>>> (I have mentioned the problem in the thread.)
->>>>
->>>
->>> Changing LMO, u-boot.bin did not help. Even with perf top I get no
->>> interrupts.
->>>
->>> My Linus tree is at commit fa1952b:
->>>
->>> [6] 11891e1 arm: omap4: pmu: support runtime pm
->>> [5] 25fab8a arm: omap4: support pmu
->>> [4] fddef77 arm: omap4: create pmu device via hwmod
->>>
->>> fa1952b ARM: OMAP4: hwmod data: Add support for the debug modules
->>
->> Sorry, there is no commit fa1952b in linus[1] tree at all, so you are
->> not testing
->> linus tree...
->>
->> If you'd like to follow my instructions, I can help you further.
->>
->>> ccb19d2 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
->>> c3b5003 tg3: Fix single-vector MSI-X code
->>>
->>> I think [1] had conflicts when applying it to the tree.
->>
->> It is only one line(one character) change, you can do it manually.
->>
->>>
->>>> thanks,
->>>> --
->>>> Ming Lei
->>>>
->>>> [1],
->>>> diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c
->>>> b/arch/arm/mach-omap2/clockdomains44xx_data.c
->>>> index 9299ac2..41d2260 100644
->>>> --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
->>>> +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
->>>> @@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
->>>> ? ? ? .prcm_partition ? = OMAP4430_PRM_PARTITION,
->>>> ? ? ? .cm_inst ? ? ? ? ?= OMAP4430_PRM_EMU_CM_INST,
->>>> ? ? ? .clkdm_offs ? ? ? = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
->>>> - ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_HWSUP,
->>>> + ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_SWSUP,
->>>> ?};
->>>>
->>
->> [1], http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=summary
->>
->> thanks,
->> --
->> Ming Lei
+Rob
