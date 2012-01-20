@@ -1,22 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Jan 2012 09:43:02 -0800
-Subject: [PATCH] ARM: OMAP: fix erroneous mmc2 clock change on mmc3 setup
-In-Reply-To: <CANOLnONJgEJehOiH0_0AUWnAu62K-8A_cmv4UW0v=dwoQnn62w@mail.gmail.com>
-References: <1324168547-26569-1-git-send-email-notasas@gmail.com>
- <CANOLnONJgEJehOiH0_0AUWnAu62K-8A_cmv4UW0v=dwoQnn62w@mail.gmail.com>
-Message-ID: <20120120174302.GR22818@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jan 2012 17:44:57 +0000
+Subject: [PATCH] ARM: ux500: Initialize irq affinity
+In-Reply-To: <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
+References: <1327064356-3603-1-git-send-email-per.xx.fransson@stericsson.com>
+ <20120120130310.GO1068@n2100.arm.linux.org.uk>
+ <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
+Message-ID: <20120120174456.GB11845@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [120120 08:51]:
-> Hi Tony,
+On Fri, Jan 20, 2012 at 04:45:40PM +0100, Linus Walleij wrote:
+> On Fri, Jan 20, 2012 at 2:03 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Jan 20, 2012 at 01:59:16PM +0100, Per Fransson wrote:
+> >> Use irq_set_affinity() to initialize the kernel view of irq affinity
+> >> when programming the GIC registers.
+> >
+> > Why is this necessary?
 > 
-> Would be nice to have this for -rc as this used to work several
-> releases back when hsmmc23_before_set_reg() was checking for a
-> regulator, which wasn't set for MMC3 so the function would return
-> early, not causing the problem it causes now.
+> Necessary: we don't quite know. (Maybe should have been RFC, but
+> this patch is better than being silent of it...)
 
-Yeah this looks like a fix. I'll take a look next week as I'll
-be travelling.
+I'm afraid Per Fransson took the thread off the mailing lists,
+so my reply to him also wasn't public.  Here's what I said:
 
-Tony
+| The affinity starts off as "all CPUs", and the implementation is free
+| to route the IRQ to any of those CPUs.  On x86, some hardware is smart
+| enough to route the IRQ to one of a set of CPUs, choosing which CPU
+| to target in hardware.
+| 
+| We don't have that ability, and trying to do that in software proved to
+| be very problematic to get it to work satisfactorily.  Given that there
+| is a userspace daemon which helps to solve the problem, it was decided
+| that we wouldn't bother with this i the kernel.
+| 
+| So, we have to choose a CPU to route the IRQ to from the mask being
+| requested - and the requested mask may contain anything from a single CPU
+| to multiple CPUs.
+| 
+| We choose to route it to the first online CPU in the set.  That fits with
+| the model, and does not require us to report back which CPU it's currently
+| routed to.  Indeed, architectures such as x86 can't tell you which CPU
+| the next interrupt will hit.
+| 
+| So we shouldn't even try to do this on ARM.  Yes, we end up with all IRQs
+| targetting CPU0 at boot, and with the masks showing 'all CPUs' but that's
+| not a problem.  Really not a problem.
