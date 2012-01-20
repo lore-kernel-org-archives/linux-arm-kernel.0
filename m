@@ -1,240 +1,453 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 20 Jan 2012 16:29:21 -0500 (EST)
-Subject: [PATCH] ARM: add dma coherent region reporting via procfs
-In-Reply-To: <E1RoBIc-0005U3-UH@rmk-PC.arm.linux.org.uk>
-References: <E1RoBIc-0005U3-UH@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1201201628070.19587@xanadu.home>
+Date: Fri, 20 Jan 2012 16:36:36 -0500 (EST)
+Subject: [PATCH] ARM: move CP15 definitions to separate header file
+In-Reply-To: <E1RoBJw-0005UP-By@rmk-PC.arm.linux.org.uk>
+References: <E1RoBJw-0005UP-By@rmk-PC.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1201201635560.19587@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 20 Jan 2012, Russell King - ARM Linux wrote:
 
-> Add a new seqfile for reporting coherent DMA allocations.  This contains
-> the address range, size and the function which was used to allocate
-> each region, allowing these allocations to be viewed in much the same
-> way as /proc/vmallocinfo.
-> 
-> The DMA coherent region has limited space, so this allows allocation
-> failures to be viewed, as well as finding out how much space is being
-> used.
-> 
-> Make sure this file is only readable by root - same as vmallocinfo - to
-> prevent information leakage.
+> Avoid namespace conflicts with drivers over the CP15 definitions by
+> moving CP15 related prototypes and definitions to a private header
+> file.
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 
-
 > ---
->  arch/arm/mm/dma-mapping.c |   20 ++++++++----
->  arch/arm/mm/vmregion.c    |   76 ++++++++++++++++++++++++++++++++++++++++++++-
->  arch/arm/mm/vmregion.h    |    5 ++-
->  3 files changed, 92 insertions(+), 9 deletions(-)
+>  arch/arm/include/asm/cp15.h      |   87 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/system.h    |   77 ---------------------------------
+>  arch/arm/kernel/fiq.c            |    2 +-
+>  arch/arm/kernel/head-nommu.S     |    2 +-
+>  arch/arm/kernel/head.S           |    2 +-
+>  arch/arm/kernel/setup.c          |    2 +-
+>  arch/arm/mach-exynos/hotplug.c   |    1 +
+>  arch/arm/mach-realview/hotplug.c |    1 +
+>  arch/arm/mach-tegra/hotplug.c    |    1 +
+>  arch/arm/mach-vexpress/hotplug.c |    2 +-
+>  arch/arm/mm/alignment.c          |    2 +-
+>  arch/arm/mm/cache-feroceon-l2.c  |    1 +
+>  arch/arm/mm/cache-tauros2.c      |    1 +
+>  arch/arm/mm/cache-xsc3l2.c       |    2 +-
+>  arch/arm/mm/ioremap.c            |    1 +
+>  arch/arm/mm/mmu.c                |    1 +
+>  arch/arm/mm/pgd.c                |    1 +
+>  arch/arm/vfp/vfpmodule.c         |    1 +
+>  18 files changed, 103 insertions(+), 84 deletions(-)
+>  create mode 100644 arch/arm/include/asm/cp15.h
 > 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 1aa664a..db23ae4 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -214,7 +214,8 @@ static int __init consistent_init(void)
->  core_initcall(consistent_init);
->  
->  static void *
-> -__dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot)
-> +__dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
-> +	const void *caller)
->  {
->  	struct arm_vmregion *c;
->  	size_t align;
-> @@ -241,7 +242,7 @@ __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot)
->  	 * Allocate a virtual address in the consistent mapping region.
->  	 */
->  	c = arm_vmregion_alloc(&consistent_head, align, size,
-> -			    gfp & ~(__GFP_DMA | __GFP_HIGHMEM));
-> +			    gfp & ~(__GFP_DMA | __GFP_HIGHMEM), caller);
->  	if (c) {
->  		pte_t *pte;
->  		int idx = CONSISTENT_PTE_INDEX(c->vm_start);
-> @@ -320,14 +321,14 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
->  
->  #else	/* !CONFIG_MMU */
->  
-> -#define __dma_alloc_remap(page, size, gfp, prot)	page_address(page)
-> +#define __dma_alloc_remap(page, size, gfp, prot, c)	page_address(page)
->  #define __dma_free_remap(addr, size)			do { } while (0)
->  
->  #endif	/* CONFIG_MMU */
->  
->  static void *
->  __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
-> -	    pgprot_t prot)
-> +	    pgprot_t prot, const void *caller)
->  {
->  	struct page *page;
->  	void *addr;
-> @@ -349,7 +350,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
->  		return NULL;
->  
->  	if (!arch_is_coherent())
-> -		addr = __dma_alloc_remap(page, size, gfp, prot);
-> +		addr = __dma_alloc_remap(page, size, gfp, prot, caller);
->  	else
->  		addr = page_address(page);
->  
-> @@ -374,7 +375,8 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gf
->  		return memory;
->  
->  	return __dma_alloc(dev, size, handle, gfp,
-> -			   pgprot_dmacoherent(pgprot_kernel));
-> +			   pgprot_dmacoherent(pgprot_kernel),
-> +			   __builtin_return_address(0));
->  }
->  EXPORT_SYMBOL(dma_alloc_coherent);
->  
-> @@ -386,7 +388,8 @@ void *
->  dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
->  {
->  	return __dma_alloc(dev, size, handle, gfp,
-> -			   pgprot_writecombine(pgprot_kernel));
-> +			   pgprot_writecombine(pgprot_kernel),
-> +			   __builtin_return_address(0));
->  }
->  EXPORT_SYMBOL(dma_alloc_writecombine);
->  
-> @@ -723,6 +726,9 @@ EXPORT_SYMBOL(dma_set_mask);
->  
->  static int __init dma_debug_do_init(void)
->  {
-> +#ifdef CONFIG_MMU
-> +	arm_vmregion_create_proc("dma-mappings", &consistent_head);
+> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+> new file mode 100644
+> index 0000000..3dabd8dd
+> --- /dev/null
+> +++ b/arch/arm/include/asm/cp15.h
+> @@ -0,0 +1,87 @@
+> +#ifndef __ASM_ARM_CP15_H
+> +#define __ASM_ARM_CP15_H
+> +
+> +#include <asm/system.h>
+> +
+> +/*
+> + * CR1 bits (CP#15 CR1)
+> + */
+> +#define CR_M	(1 << 0)	/* MMU enable				*/
+> +#define CR_A	(1 << 1)	/* Alignment abort enable		*/
+> +#define CR_C	(1 << 2)	/* Dcache enable			*/
+> +#define CR_W	(1 << 3)	/* Write buffer enable			*/
+> +#define CR_P	(1 << 4)	/* 32-bit exception handler		*/
+> +#define CR_D	(1 << 5)	/* 32-bit data address range		*/
+> +#define CR_L	(1 << 6)	/* Implementation defined		*/
+> +#define CR_B	(1 << 7)	/* Big endian				*/
+> +#define CR_S	(1 << 8)	/* System MMU protection		*/
+> +#define CR_R	(1 << 9)	/* ROM MMU protection			*/
+> +#define CR_F	(1 << 10)	/* Implementation defined		*/
+> +#define CR_Z	(1 << 11)	/* Implementation defined		*/
+> +#define CR_I	(1 << 12)	/* Icache enable			*/
+> +#define CR_V	(1 << 13)	/* Vectors relocated to 0xffff0000	*/
+> +#define CR_RR	(1 << 14)	/* Round Robin cache replacement	*/
+> +#define CR_L4	(1 << 15)	/* LDR pc can set T bit			*/
+> +#define CR_DT	(1 << 16)
+> +#define CR_IT	(1 << 18)
+> +#define CR_ST	(1 << 19)
+> +#define CR_FI	(1 << 21)	/* Fast interrupt (lower latency mode)	*/
+> +#define CR_U	(1 << 22)	/* Unaligned access operation		*/
+> +#define CR_XP	(1 << 23)	/* Extended page tables			*/
+> +#define CR_VE	(1 << 24)	/* Vectored interrupts			*/
+> +#define CR_EE	(1 << 25)	/* Exception (Big) Endian		*/
+> +#define CR_TRE	(1 << 28)	/* TEX remap enable			*/
+> +#define CR_AFE	(1 << 29)	/* Access flag enable			*/
+> +#define CR_TE	(1 << 30)	/* Thumb exception enable		*/
+> +
+> +#ifndef __ASSEMBLY__
+> +
+> +#if __LINUX_ARM_ARCH__ >= 4
+> +#define vectors_high()	(cr_alignment & CR_V)
+> +#else
+> +#define vectors_high()	(0)
 > +#endif
->  	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
->  	return 0;
->  }
-> diff --git a/arch/arm/mm/vmregion.c b/arch/arm/mm/vmregion.c
-> index 036fdbf..a631016 100644
-> --- a/arch/arm/mm/vmregion.c
-> +++ b/arch/arm/mm/vmregion.c
-> @@ -1,5 +1,8 @@
-> +#include <linux/fs.h>
->  #include <linux/spinlock.h>
->  #include <linux/list.h>
-> +#include <linux/proc_fs.h>
-> +#include <linux/seq_file.h>
+> +
+> +extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
+> +extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+> +
+> +static inline unsigned int get_cr(void)
+> +{
+> +	unsigned int val;
+> +	asm("mrc p15, 0, %0, c1, c0, 0	@ get CR" : "=r" (val) : : "cc");
+> +	return val;
+> +}
+> +
+> +static inline void set_cr(unsigned int val)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c1, c0, 0	@ set CR"
+> +	  : : "r" (val) : "cc");
+> +	isb();
+> +}
+> +
+> +#ifndef CONFIG_SMP
+> +extern void adjust_cr(unsigned long mask, unsigned long set);
+> +#endif
+> +
+> +#define CPACC_FULL(n)		(3 << (n * 2))
+> +#define CPACC_SVC(n)		(1 << (n * 2))
+> +#define CPACC_DISABLE(n)	(0 << (n * 2))
+> +
+> +static inline unsigned int get_copro_access(void)
+> +{
+> +	unsigned int val;
+> +	asm("mrc p15, 0, %0, c1, c0, 2 @ get copro access"
+> +	  : "=r" (val) : : "cc");
+> +	return val;
+> +}
+> +
+> +static inline void set_copro_access(unsigned int val)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c1, c0, 2 @ set copro access"
+> +	  : : "r" (val) : "cc");
+> +	isb();
+> +}
+> +
+> +#endif
+> +
+> +#endif
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index e4c96cc..774c41e 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -15,37 +15,6 @@
+>  #define CPU_ARCH_ARMv7		9
+>  
+>  /*
+> - * CR1 bits (CP#15 CR1)
+> - */
+> -#define CR_M	(1 << 0)	/* MMU enable				*/
+> -#define CR_A	(1 << 1)	/* Alignment abort enable		*/
+> -#define CR_C	(1 << 2)	/* Dcache enable			*/
+> -#define CR_W	(1 << 3)	/* Write buffer enable			*/
+> -#define CR_P	(1 << 4)	/* 32-bit exception handler		*/
+> -#define CR_D	(1 << 5)	/* 32-bit data address range		*/
+> -#define CR_L	(1 << 6)	/* Implementation defined		*/
+> -#define CR_B	(1 << 7)	/* Big endian				*/
+> -#define CR_S	(1 << 8)	/* System MMU protection		*/
+> -#define CR_R	(1 << 9)	/* ROM MMU protection			*/
+> -#define CR_F	(1 << 10)	/* Implementation defined		*/
+> -#define CR_Z	(1 << 11)	/* Implementation defined		*/
+> -#define CR_I	(1 << 12)	/* Icache enable			*/
+> -#define CR_V	(1 << 13)	/* Vectors relocated to 0xffff0000	*/
+> -#define CR_RR	(1 << 14)	/* Round Robin cache replacement	*/
+> -#define CR_L4	(1 << 15)	/* LDR pc can set T bit			*/
+> -#define CR_DT	(1 << 16)
+> -#define CR_IT	(1 << 18)
+> -#define CR_ST	(1 << 19)
+> -#define CR_FI	(1 << 21)	/* Fast interrupt (lower latency mode)	*/
+> -#define CR_U	(1 << 22)	/* Unaligned access operation		*/
+> -#define CR_XP	(1 << 23)	/* Extended page tables			*/
+> -#define CR_VE	(1 << 24)	/* Vectored interrupts			*/
+> -#define CR_EE	(1 << 25)	/* Exception (Big) Endian		*/
+> -#define CR_TRE	(1 << 28)	/* TEX remap enable			*/
+> -#define CR_AFE	(1 << 29)	/* Access flag enable			*/
+> -#define CR_TE	(1 << 30)	/* Thumb exception enable		*/
+> -
+> -/*
+>   * This is used to ensure the compiler did actually allocate the register we
+>   * asked it for some inline assembly sequences.  Apparently we can't trust
+>   * the compiler from one version to another so a bit of paranoia won't hurt.
+> @@ -119,12 +88,6 @@ extern void (*arm_pm_restart)(char str, const char *cmd);
+>  
+>  extern unsigned int user_debug;
+>  
+> -#if __LINUX_ARM_ARCH__ >= 4
+> -#define vectors_high()	(cr_alignment & CR_V)
+> -#else
+> -#define vectors_high()	(0)
+> -#endif
+> -
+>  #if __LINUX_ARM_ARCH__ >= 7 ||		\
+>  	(__LINUX_ARM_ARCH__ == 6 && defined(CONFIG_CPU_32v6K))
+>  #define sev()	__asm__ __volatile__ ("sev" : : : "memory")
+> @@ -185,46 +148,6 @@ extern unsigned int user_debug;
+>  #define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
+>  #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
+>  
+> -extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
+> -extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+> -
+> -static inline unsigned int get_cr(void)
+> -{
+> -	unsigned int val;
+> -	asm("mrc p15, 0, %0, c1, c0, 0	@ get CR" : "=r" (val) : : "cc");
+> -	return val;
+> -}
+> -
+> -static inline void set_cr(unsigned int val)
+> -{
+> -	asm volatile("mcr p15, 0, %0, c1, c0, 0	@ set CR"
+> -	  : : "r" (val) : "cc");
+> -	isb();
+> -}
+> -
+> -#ifndef CONFIG_SMP
+> -extern void adjust_cr(unsigned long mask, unsigned long set);
+> -#endif
+> -
+> -#define CPACC_FULL(n)		(3 << (n * 2))
+> -#define CPACC_SVC(n)		(1 << (n * 2))
+> -#define CPACC_DISABLE(n)	(0 << (n * 2))
+> -
+> -static inline unsigned int get_copro_access(void)
+> -{
+> -	unsigned int val;
+> -	asm("mrc p15, 0, %0, c1, c0, 2 @ get copro access"
+> -	  : "=r" (val) : : "cc");
+> -	return val;
+> -}
+> -
+> -static inline void set_copro_access(unsigned int val)
+> -{
+> -	asm volatile("mcr p15, 0, %0, c1, c0, 2 @ set copro access"
+> -	  : : "r" (val) : "cc");
+> -	isb();
+> -}
+> -
+>  /*
+>   * switch_mm() may do a full cache flush over the context switch,
+>   * so enable interrupts over the context switch to avoid high
+> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+> index 4c164ec..c32f845 100644
+> --- a/arch/arm/kernel/fiq.c
+> +++ b/arch/arm/kernel/fiq.c
+> @@ -42,9 +42,9 @@
+>  #include <linux/seq_file.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+>  #include <asm/fiq.h>
+>  #include <asm/irq.h>
+> -#include <asm/system.h>
+>  #include <asm/traps.h>
+>  
+>  static unsigned long no_fiq_insn;
+> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> index d46f259..278cfc1 100644
+> --- a/arch/arm/kernel/head-nommu.S
+> +++ b/arch/arm/kernel/head-nommu.S
+> @@ -17,8 +17,8 @@
+>  #include <asm/assembler.h>
+>  #include <asm/ptrace.h>
+>  #include <asm/asm-offsets.h>
+> +#include <asm/cp15.h>
+>  #include <asm/thread_info.h>
+> -#include <asm/system.h>
+>  
+>  /*
+>   * Kernel startup entry point.
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 6d57911..a2e9694 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -15,12 +15,12 @@
+>  #include <linux/init.h>
+>  
+>  #include <asm/assembler.h>
+> +#include <asm/cp15.h>
+>  #include <asm/domain.h>
+>  #include <asm/ptrace.h>
+>  #include <asm/asm-offsets.h>
+>  #include <asm/memory.h>
+>  #include <asm/thread_info.h>
+> -#include <asm/system.h>
+>  #include <asm/pgtable.h>
+>  
+>  #ifdef CONFIG_DEBUG_LL
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 9b65cb4..e5c37fc 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -34,6 +34,7 @@
+>  #include <linux/sort.h>
+>  
+>  #include <asm/unified.h>
+> +#include <asm/cp15.h>
+>  #include <asm/cpu.h>
+>  #include <asm/cputype.h>
+>  #include <asm/elf.h>
+> @@ -45,7 +46,6 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/cachetype.h>
+>  #include <asm/tlbflush.h>
+> -#include <asm/system.h>
+>  
+>  #include <asm/prom.h>
+>  #include <asm/mach/arch.h>
+> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+> index da70e7e..c9146fa 100644
+> --- a/arch/arm/mach-exynos/hotplug.c
+> +++ b/arch/arm/mach-exynos/hotplug.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/io.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+>  
+>  #include <mach/regs-pmu.h>
+>  
+> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+> index ac1aed2..5e64fbf 100644
+> --- a/arch/arm/mach-realview/hotplug.c
+> +++ b/arch/arm/mach-realview/hotplug.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/smp.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+>  
+>  extern volatile int pen_release;
+>  
+> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+> index f329404..d8dc9dd 100644
+> --- a/arch/arm/mach-tegra/hotplug.c
+> +++ b/arch/arm/mach-tegra/hotplug.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/smp.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+>  
+>  static inline void cpu_enter_lowpower(void)
+>  {
+> diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+> index 813ee08..7a05548 100644
+> --- a/arch/arm/mach-vexpress/hotplug.c
+> +++ b/arch/arm/mach-vexpress/hotplug.c
+> @@ -13,7 +13,7 @@
+>  #include <linux/smp.h>
+>  
+>  #include <asm/cacheflush.h>
+> -#include <asm/system.h>
+> +#include <asm/cp15.h>
+>  
+>  extern volatile int pen_release;
+>  
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index caf14dc..78459b8 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -22,7 +22,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/uaccess.h>
+>  
+> -#include <asm/system.h>
+> +#include <asm/cp15.h>
+>  #include <asm/unaligned.h>
+>  
+>  #include "fault.h"
+> diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+> index e0b0e7a..dd3d591 100644
+> --- a/arch/arm/mm/cache-feroceon-l2.c
+> +++ b/arch/arm/mm/cache-feroceon-l2.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/init.h>
+>  #include <linux/highmem.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+>  #include <plat/cache-feroceon-l2.h>
+>  
+>  /*
+> diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
+> index 5086865..1fbca05 100644
+> --- a/arch/arm/mm/cache-tauros2.c
+> +++ b/arch/arm/mm/cache-tauros2.c
+> @@ -16,6 +16,7 @@
+>  
+>  #include <linux/init.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+>  #include <asm/hardware/cache-tauros2.h>
+>  
+>  
+> diff --git a/arch/arm/mm/cache-xsc3l2.c b/arch/arm/mm/cache-xsc3l2.c
+> index 5a32020..6c3edeb 100644
+> --- a/arch/arm/mm/cache-xsc3l2.c
+> +++ b/arch/arm/mm/cache-xsc3l2.c
+> @@ -18,7 +18,7 @@
+>   */
+>  #include <linux/init.h>
+>  #include <linux/highmem.h>
+> -#include <asm/system.h>
+> +#include <asm/cp15.h>
+>  #include <asm/cputype.h>
+>  #include <asm/cacheflush.h>
+>  
+> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> index 80632e8..66daf17 100644
+> --- a/arch/arm/mm/ioremap.c
+> +++ b/arch/arm/mm/ioremap.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/vmalloc.h>
+>  #include <linux/io.h>
+>  
+> +#include <asm/cp15.h>
+>  #include <asm/cputype.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/mmu_context.h>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index c1263ad..f77f1db 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/fs.h>
+>  #include <linux/vmalloc.h>
+>  
+> +#include <asm/cp15.h>
+>  #include <asm/cputype.h>
+>  #include <asm/sections.h>
+>  #include <asm/cachetype.h>
+> diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
+> index a3e78cc..0acb089 100644
+> --- a/arch/arm/mm/pgd.c
+> +++ b/arch/arm/mm/pgd.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/highmem.h>
 >  #include <linux/slab.h>
 >  
->  #include "vmregion.h"
-> @@ -36,7 +39,7 @@
+> +#include <asm/cp15.h>
+>  #include <asm/pgalloc.h>
+>  #include <asm/page.h>
+>  #include <asm/tlbflush.h>
+> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> index 8f3ccdd..d89068f 100644
+> --- a/arch/arm/vfp/vfpmodule.c
+> +++ b/arch/arm/vfp/vfpmodule.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/smp.h>
+>  #include <linux/init.h>
 >  
->  struct arm_vmregion *
->  arm_vmregion_alloc(struct arm_vmregion_head *head, size_t align,
-> -		   size_t size, gfp_t gfp)
-> +		   size_t size, gfp_t gfp, const void *caller)
->  {
->  	unsigned long start = head->vm_start, addr = head->vm_end;
->  	unsigned long flags;
-> @@ -52,6 +55,8 @@ arm_vmregion_alloc(struct arm_vmregion_head *head, size_t align,
->  	if (!new)
->  		goto out;
->  
-> +	new->caller = caller;
-> +
->  	spin_lock_irqsave(&head->vm_lock, flags);
->  
->  	addr = rounddown(addr - size, align);
-> @@ -129,3 +134,72 @@ void arm_vmregion_free(struct arm_vmregion_head *head, struct arm_vmregion *c)
->  
->  	kfree(c);
->  }
-> +
-> +#ifdef CONFIG_PROC_FS
-> +static int arm_vmregion_show(struct seq_file *m, void *p)
-> +{
-> +	struct arm_vmregion *c = list_entry(p, struct arm_vmregion, vm_list);
-> +
-> +	seq_printf(m, "0x%08lx-0x%08lx %7lu", c->vm_start, c->vm_end,
-> +		c->vm_end - c->vm_start);
-> +	if (c->caller)
-> +		seq_printf(m, " %pS", (void *)c->caller);
-> +	seq_putc(m, '\n');
-> +	return 0;
-> +}
-> +
-> +static void *arm_vmregion_start(struct seq_file *m, loff_t *pos)
-> +{
-> +	struct arm_vmregion_head *h = m->private;
-> +	spin_lock_irq(&h->vm_lock);
-> +	return seq_list_start(&h->vm_list, *pos);
-> +}
-> +
-> +static void *arm_vmregion_next(struct seq_file *m, void *p, loff_t *pos)
-> +{
-> +	struct arm_vmregion_head *h = m->private;
-> +	return seq_list_next(p, &h->vm_list, pos);
-> +}
-> +
-> +static void arm_vmregion_stop(struct seq_file *m, void *p)
-> +{
-> +	struct arm_vmregion_head *h = m->private;
-> +	spin_unlock_irq(&h->vm_lock);
-> +}
-> +
-> +static const struct seq_operations arm_vmregion_ops = {
-> +	.start	= arm_vmregion_start,
-> +	.stop	= arm_vmregion_stop,
-> +	.next	= arm_vmregion_next,
-> +	.show	= arm_vmregion_show,
-> +};
-> +
-> +static int arm_vmregion_open(struct inode *inode, struct file *file)
-> +{
-> +	struct arm_vmregion_head *h = PDE(inode)->data;
-> +	int ret = seq_open(file, &arm_vmregion_ops);
-> +	if (!ret) {
-> +		struct seq_file *m = file->private_data;
-> +		m->private = h;
-> +	}
-> +	return ret;
-> +}
-> +
-> +static const struct file_operations arm_vmregion_fops = {
-> +	.open	= arm_vmregion_open,
-> +	.read	= seq_read,
-> +	.llseek	= seq_lseek,
-> +	.release = seq_release,
-> +};
-> +
-> +int arm_vmregion_create_proc(const char *path, struct arm_vmregion_head *h)
-> +{
-> +	proc_create_data(path, S_IRUSR, NULL, &arm_vmregion_fops, h);
-> +	return 0;
-> +}
-> +#else
-> +int arm_vmregion_create_proc(const char *path, struct arm_vmregion_head *h)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> diff --git a/arch/arm/mm/vmregion.h b/arch/arm/mm/vmregion.h
-> index 15e9f04..162be66 100644
-> --- a/arch/arm/mm/vmregion.h
-> +++ b/arch/arm/mm/vmregion.h
-> @@ -19,11 +19,14 @@ struct arm_vmregion {
->  	unsigned long		vm_end;
->  	struct page		*vm_pages;
->  	int			vm_active;
-> +	const void		*caller;
->  };
->  
-> -struct arm_vmregion *arm_vmregion_alloc(struct arm_vmregion_head *, size_t, size_t, gfp_t);
-> +struct arm_vmregion *arm_vmregion_alloc(struct arm_vmregion_head *, size_t, size_t, gfp_t, const void *);
->  struct arm_vmregion *arm_vmregion_find(struct arm_vmregion_head *, unsigned long);
->  struct arm_vmregion *arm_vmregion_find_remove(struct arm_vmregion_head *, unsigned long);
->  void arm_vmregion_free(struct arm_vmregion_head *, struct arm_vmregion *);
->  
-> +int arm_vmregion_create_proc(const char *, struct arm_vmregion_head *);
-> +
->  #endif
+> +#include <asm/cp15.h>
+>  #include <asm/cputype.h>
+>  #include <asm/thread_notify.h>
+>  #include <asm/vfp.h>
 > -- 
 > 1.7.4.4
 > 
