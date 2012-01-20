@@ -1,60 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Jan 2012 20:25:39 +0800
-Subject: [PATCH 05/31] ARM: amba: mxs: convert to use amba_device_alloc
-In-Reply-To: <E1RoAhZ-0005EY-BZ@rmk-PC.arm.linux.org.uk>
-References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
- <E1RoAhZ-0005EY-BZ@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120120122535.GA25917@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jan 2012 12:14:02 +0000
+Subject: [PATCH] S3C24XX DMA resume regression fix
+In-Reply-To: <20120120114902.GB22732@build.ihdev.net>
+References: <1326462444-10567-1-git-send-email-dron0gus@gmail.com>
+ <4F11F911.7030609@ru.mvista.com> <20120120114902.GB22732@build.ihdev.net>
+Message-ID: <20120120121402.GM1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 09:24:05AM +0000, Russell King - ARM Linux wrote:
-> Convert MXS to use the new amba_device_alloc APIs.
+On Fri, Jan 20, 2012 at 06:49:02AM -0500, Sergey Lapin wrote:
+> On Sun, Jan 15, 2012 at 01:52:17AM +0400, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 13-01-2012 17:47, Gusakov Andrey wrote:
+> > 
+> > >In commit bb072c3cf21d1c9a5a2eeb5a00679ee7bf39675b suspend/resume
+> > 
+> >    Please also specify that commit's summary in parens.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mach-mxs/devices.c |    8 +++++---
->  1 files changed, 5 insertions(+), 3 deletions(-)
+> Could you please point me in direction of patch submission
+> guide where that is explained.
+
+It's something that's been asked for by Linus - and as Linus can refuse
+to pull anything he doesn't like, it's something that we'd better satisfy
+if we want patches to hit mainline.
+
+Like everything in kernel development, what's written in documentation is
+never the full story; things change through discussions on mailing lists,
+new guidelines get created, and the documents become stale.  That's the
+nature of this.
+
+Anyone is free to update the documentation, so if you think it's got a
+shortcoming, please feel free to send a documentation patch.
+
+> The commit message summary is
+> ARM / Samsung: Use struct syscore_ops for "core" power management
 > 
-> diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
-> index fe3e847..052d8dd 100644
-> --- a/arch/arm/mach-mxs/devices.c
-> +++ b/arch/arm/mach-mxs/devices.c
-> @@ -77,16 +77,18 @@ struct platform_device *__init mxs_add_platform_device_dmamask(
->  
->  int __init mxs_add_amba_device(const struct amba_device *dev)
->  {
-> -	struct amba_device *adev = kmalloc(sizeof(*adev), GFP_KERNEL);
-> +	struct amba_device *adev = amba_device_alloc(dev->init_name,
+> But that is not revert of that commit, so I don't really
+> see a point. This is bug fix which fixes resume code path.
 
-The 'dev->init_name' needs to be 'dev->dev.init_name'.  Otherwise, we
-see the compile error below.
+The point is that if you include a commit ID, then you should include
+the summary, so people reading the commit message don't have to faff
+around trying to find out what you're referring to.
 
-  CC      arch/arm/mach-mxs/devices.o
-arch/arm/mach-mxs/devices.c: In function ?mxs_add_amba_device?:
-arch/arm/mach-mxs/devices.c:80:50: error: ?const struct amba_device? has no member named ?init_name?
-
-Other than that,
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-Regards,
-Shawn
-
-> +		dev->res.start, resource_size(&dev->res));
->  
->  	if (!adev) {
->  		pr_err("%s: failed to allocate memory", __func__);
->  		return -ENOMEM;
->  	}
->  
-> -	*adev = *dev;
-> +	adev->irq[0] = dev->irq[0];
-> +	adev->irq[1] = dev->irq[1];
->  
-> -	return amba_device_register(adev, &iomem_resource);
-> +	return amba_device_add(adev, &iomem_resource);
->  }
->  
->  struct device mxs_apbh_bus = {
-> -- 
+See, for example, http://lkml.org/lkml/2010/6/1/498
