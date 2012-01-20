@@ -1,48 +1,49 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 Jan 2012 14:33:09 -0600
-Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
+Date: Fri, 20 Jan 2012 14:33:11 -0600
+Subject: [PATCH v2 13/13] ARM: picoxcell: remove mach/irqs.h
 In-Reply-To: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
 References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1327091591-27125-12-git-send-email-robherring2@gmail.com>
+Message-ID: <1327091591-27125-14-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: Jamie Iles <jamie@jamieiles.com>
 
-Make mach/irqs.h optional for SPARSE_IRQ. With this change irqs.h can be
-removed by converting platforms over to sparse irq.
+picoxcell uses SPARSE_IRQ which means we don't need a mach/irqs.h
+anymore so kill it off.
 
-This intentionally breaks platforms that enable SPARSE_IRQ.
-
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/include/asm/irq.h |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-picoxcell/include/mach/irqs.h |   20 --------------------
+ 1 files changed, 0 insertions(+), 20 deletions(-)
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/irqs.h
 
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 5a526af..35c21c3 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -1,14 +1,18 @@
- #ifndef __ASM_ARM_IRQ_H
- #define __ASM_ARM_IRQ_H
- 
-+#define NR_IRQS_LEGACY	16
-+
-+#ifndef CONFIG_SPARSE_IRQ
- #include <mach/irqs.h>
-+#else
-+#define NR_IRQS NR_IRQS_LEGACY
-+#endif
- 
- #ifndef irq_canonicalize
- #define irq_canonicalize(i)	(i)
- #endif
- 
--#define NR_IRQS_LEGACY	16
+diff --git a/arch/arm/mach-picoxcell/include/mach/irqs.h b/arch/arm/mach-picoxcell/include/mach/irqs.h
+deleted file mode 100644
+index 59eac1e..0000000
+--- a/arch/arm/mach-picoxcell/include/mach/irqs.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- * Copyright (c) 2011 Picochip Ltd., Jamie Iles
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#ifndef __MACH_IRQS_H
+-#define __MACH_IRQS_H
 -
- /*
-  * Use this value to indicate lack of interrupt
-  * capability
+-/* We dynamically allocate our irq_desc's. */
+-#define NR_IRQS				0
+-
+-#endif /* __MACH_IRQS_H */
 -- 
 1.7.5.4
