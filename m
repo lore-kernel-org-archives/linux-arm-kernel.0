@@ -1,29 +1,128 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Fri, 20 Jan 2012 10:31:49 +0100
-Subject: [PATCH] ep93xx: Convert the watchdog driver into a platform
- device.
-In-Reply-To: <201201191701.30836.hartleys@visionengravers.com>
-References: <201201191701.30836.hartleys@visionengravers.com>
-Message-ID: <20120120093149.GX27296@infomag.iguana.be>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jan 2012 09:31:51 +0000
+Subject: [PATCH 28/31] ARM: amba: u300: use common amba device initializers
+In-Reply-To: <20120120092207.GD1068@n2100.arm.linux.org.uk>
+References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
+Message-ID: <E1RoAp5-0005GA-9Z@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-u300/core.c |   85 ++++++++------------------------------------
+ 1 files changed, 16 insertions(+), 69 deletions(-)
 
-...
->  void ep93xx_restart(char mode, const char *cmd)
-> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> index c4a7b84..e9271a7 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> @@ -224,6 +224,7 @@
->  #define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
->  #define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
->  
-> +#define EP93XX_WATCHDOG_PHYS_BASE	EP93XX_APB_PHYS(0x00140000)
->  #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
-
-Shouldn't this last define be removed after you added the new PHYS_BASE ?
-
-Kind regards,
-Wim.
+diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+index ed92967..b986560 100644
+--- a/arch/arm/mach-u300/core.c
++++ b/arch/arm/mach-u300/core.c
+@@ -94,19 +94,9 @@ static struct amba_pl011_data uart0_plat_data = {
+ #endif
+ };
+ 
+-static struct amba_device uart0_device = {
+-	.dev = {
+-		.coherent_dma_mask = ~0,
+-		.init_name = "uart0", /* Slow device at 0x3000 offset */
+-		.platform_data = &uart0_plat_data,
+-	},
+-	.res = {
+-		.start = U300_UART0_BASE,
+-		.end   = U300_UART0_BASE + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	.irq = { IRQ_U300_UART0 },
+-};
++/* Slow device at 0x3000 offset */
++static AMBA_APB_DEVICE(uart0, "uart0", 0, U300_UART0_BASE,
++	{ IRQ_U300_UART0 }, &uart0_plat_data);
+ 
+ /* The U335 have an additional UART1 on the APP CPU */
+ #ifdef CONFIG_MACH_U300_BS335
+@@ -118,71 +108,28 @@ static struct amba_pl011_data uart1_plat_data = {
+ #endif
+ };
+ 
+-static struct amba_device uart1_device = {
+-	.dev = {
+-		.coherent_dma_mask = ~0,
+-		.init_name = "uart1", /* Fast device at 0x7000 offset */
+-		.platform_data = &uart1_plat_data,
+-	},
+-	.res = {
+-		.start = U300_UART1_BASE,
+-		.end   = U300_UART1_BASE + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	.irq = { IRQ_U300_UART1 },
+-};
++/* Fast device at 0x7000 offset */
++static AMBA_APB_DEVICE(uart1, "uart1", 0, U300_UART1_BASE,
++	{ IRQ_U300_UART1 }, &uart1_plat_data);
+ #endif
+ 
+-static struct amba_device pl172_device = {
+-	.dev = {
+-		.init_name = "pl172", /* AHB device at 0x4000 offset */
+-		.platform_data = NULL,
+-	},
+-	.res = {
+-		.start = U300_EMIF_CFG_BASE,
+-		.end   = U300_EMIF_CFG_BASE + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-};
++/* AHB device at 0x4000 offset */
++static AMBA_APB_DEVICE(pl172, "pl172", 0, U300_EMIF_CFG_BASE, { }, NULL);
+ 
+ 
+ /*
+  * Everything within this next ifdef deals with external devices connected to
+  * the APP SPI bus.
+  */
+-static struct amba_device pl022_device = {
+-	.dev = {
+-		.coherent_dma_mask = ~0,
+-		.init_name = "pl022", /* Fast device at 0x6000 offset */
+-	},
+-	.res = {
+-		.start = U300_SPI_BASE,
+-		.end   = U300_SPI_BASE + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	.irq = {IRQ_U300_SPI },
+-	/*
+-	 * This device has a DMA channel but the Linux driver does not use
+-	 * it currently.
+-	 */
+-};
++/* Fast device at 0x6000 offset */
++static AMBA_APB_DEVICE(pl022, "pl022", 0, U300_SPI_BASE,
++	{ IRQ_U300_SPI }, NULL);
+ 
+-static struct amba_device mmcsd_device = {
+-	.dev = {
+-		.init_name = "mmci", /* Fast device at 0x1000 offset */
+-		.platform_data = NULL, /* Added later */
+-	},
+-	.res = {
+-		.start = U300_MMCSD_BASE,
+-		.end   = U300_MMCSD_BASE + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	.irq = {IRQ_U300_MMCSD_MCIINTR0, IRQ_U300_MMCSD_MCIINTR1 },
+-	/*
+-	 * This device has a DMA channel but the Linux driver does not use
+-	 * it currently.
+-	 */
+-};
++/* Fast device at 0x1000 offset */
++#define U300_MMCSD_IRQS	{ IRQ_U300_MMCSD_MCIINTR0, IRQ_U300_MMCSD_MCIINTR1 }
++
++static AMBA_APB_DEVICE(mmcsd, "mmci", 0, U300_MMCSD_BASE,
++	U300_MMCSD_IRQS, NULL);
+ 
+ /*
+  * The order of device declaration may be important, since some devices
+-- 
+1.7.4.4
