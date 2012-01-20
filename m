@@ -1,44 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Jan 2012 02:05:28 -0800
-Subject: Pinmux bindings proposal
-In-Reply-To: <CAJuYYwQouBDP6dL0B8QOaF0_JsbR7fysySZ5ebcF4op9aTQqbQ@mail.gmail.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <CAJuYYwQoh4_SnA9wmy4x+cG0w0hGukxTkODWtcSw_2QHYuDsrg@mail.gmail.com>
- <20120119165607.GG22818@atomide.com>
- <CAJuYYwQB1pDu-JS5o3XPA1D8WbVcwbdtD43M4y7PeJNWeNXxQQ@mail.gmail.com>
- <20120119182019.GI22818@atomide.com>
- <CAJuYYwQouBDP6dL0B8QOaF0_JsbR7fysySZ5ebcF4op9aTQqbQ@mail.gmail.com>
-Message-ID: <20120120100528.GJ22818@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jan 2012 10:34:33 +0000
+Subject: [PATCH 0/5] Minor cleanups to kernel pte handling
+Message-ID: <20120120103433.GF1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thomas Abraham <thomas.abraham@linaro.org> [120119 10:05]:
-> On 19 January 2012 23:50, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> I would like to understand the need for populating the
-> pinmux/pingroups tables from dt. The question here is when we have
-> something like
-> 
-> pins = <&pinctrl0 0x0030 0x15 0x15 0x7>;
-> 
-> which specifies the values that need to be written to the hardware
-> registers, would populating pinmux/pingroup tables from dt required.
-> The SoC specific pinctrl driver can provide a way (with the help of
-> pinctrl core) to translate these values and write to corresponding
-> hardware registers. Is there any particular reason for populating the
-> pinmux/pingroups tables from dt?
+This series of five patches cleans up the pte handling for users of
+the 'TOP_PTE' - those CPUs which require special handling of cache
+aliases and the like.
 
-Hmm I see. Yes it's still needed as we only want to parse the DT once
-because it's slower unless it was one time only configuration during
-init.
+TOP_PTE() always was ugly, so this patch set gets rid of it, in favour
+of a couple of helper functions (set_top_pte() and get_top_pte()).
+set_top_pte() contains the necessary local TLB flush to ensure that
+the update will be seen by the MMU.
 
-If you only need to set pins once during the init, then we could add
-an option for freeing all or most pins after init. That's what we
-have for the current mach-omap2 mux framework as only few pins need
-to be dynamically remuxed. That will require some changes to the
-pinctrl framework though. We would need flags for each pin from DT
-for init_only/dynamic.
+We also centralize the virtual addresses used for these mappings into
+arch/arm/mm/mm.h.
 
-Regards,
+Finally, we transform pfn_pte(page_to_pfn(page), prot) to
+mk_pte(page, prot) as we don't need to open-code this operation, and
+we have this helper anyway.
 
-Tony
+ arch/arm/mm/copypage-v4mc.c   |    9 ++-------
+ arch/arm/mm/copypage-v6.c     |   20 ++++++--------------
+ arch/arm/mm/copypage-xscale.c |    9 +--------
+ arch/arm/mm/flush.c           |   14 +++++---------
+ arch/arm/mm/highmem.c         |   21 ++++++++-------------
+ arch/arm/mm/mm.h              |   26 +++++++++++++++++++++++++-
+ 6 files changed, 47 insertions(+), 52 deletions(-)
