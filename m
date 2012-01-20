@@ -1,27 +1,34 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Fri, 20 Jan 2012 18:17:26 +0530
-Subject: [PATCH v2 2/2] msm: DMAEngine: Add DMAEngine driver based on
- old MSM DMA APIs
-In-Reply-To: <1326810935.1540.162.camel@vkoul-udesk3>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1325854052-21402-3-git-send-email-kumarrav@codeaurora.org>
- <1325901569.10425.14.camel@m0nster> <1326810935.1540.162.camel@vkoul-udesk3>
-Message-ID: <4F19625E.2070103@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Jan 2012 12:48:52 +0000
+Subject: [PATCH v4 11/15] ARM: imx6q: convert to twd_local_timer_register()
+ interface
+In-Reply-To: <20120120124116.GC25917@S2101-09.ap.freescale.net>
+References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
+ <1327061042-14857-12-git-send-email-marc.zyngier@arm.com>
+ <20120120124116.GC25917@S2101-09.ap.freescale.net>
+Message-ID: <4F1962B4.7040308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/17/2012 8:05 PM, Vinod Koul wrote:
-> On Fri, 2012-01-06 at 17:59 -0800, Daniel Walker wrote:
->>> +
->>> +#define FORCED_FLUSH         0
->>> +#define GRACEFUL_FLUSH          1
+On 20/01/12 12:41, Shawn Guo wrote:
+> On Fri, Jan 20, 2012 at 12:03:58PM +0000, Marc Zyngier wrote:
+>> Add support for the new smp_twd runtime registration interface
+>> to the imx6q platforms, and remove the old compile-time support.
 >>
->> Could be an enum ..
-> Along with proper namespace...
-I will update in next patch release
->
+>> The imx6q DTS file is updated to match the TWD DT documentation.
+>> Also present in this patch a DTS fix to the timer interrupt routing
+>> (the PPI connection uses bits [15:8]) and trigger (rising edge).
+>>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> I believe that I have acked this patch, and this patch has no change
+> since v3.  So again,
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
+I must have missed it. Thanks Shawn.
 
+	M.
 -- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Jazz is not dead. It just smells funny...
