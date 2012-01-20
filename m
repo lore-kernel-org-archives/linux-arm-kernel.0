@@ -1,43 +1,51 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 20 Jan 2012 17:42:26 +0000
-Subject: [PATCH v3 0/6] ARM: Remove the __ARCH_WANT_INTERRUPTS_ON_CTXSW
- definition
-Message-ID: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
+Date: Fri, 20 Jan 2012 17:42:27 +0000
+Subject: [PATCH v3 1/6] sched: Introduce the finish_arch_post_lock_switch()
+ scheduler hook
+In-Reply-To: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
+References: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1327081352-13178-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This hook is called by the scheduler after rq->lock has been released
+and interrupts enabled. It will be used in subsequent patches on the ARM
+architecture.
 
-This is version 3 of the set of patches removing
-__ARCH_WANT_INTERRUPTS_ON_CTXSW on ARM. The series was rebased on top of
-3.3-rc1 and fixed the conflicts with the kernel/sched/ changes and the
-ARM LPAE patches. There are no functional changes from v2. I plan to
-push this to -next and get it ready for 3.4-rc1.
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Frank Rowand <frank.rowand@am.sony.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Ingo Molnar <mingo@elte.hu>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ kernel/sched/core.c  |    1 +
+ kernel/sched/sched.h |    3 +++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-Question for Peter/Ingo - how do we merge the first patch that
-introduces finish_arch_post_lock_switch? Do you pick it up or I can
-merge it via rmk (with your ack)?
-
-Thanks,
-
-Catalin
-
-
-Catalin Marinas (4):
-  sched: Introduce the finish_arch_post_lock_switch() scheduler hook
-  ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on ASID-capable CPUs
-  ARM: Remove current_mm per-cpu variable
-  ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6 CPUs
-
-Will Deacon (2):
-  ARM: Use TTBR1 instead of reserved context ID
-  ARM: Allow ASID 0 to be allocated to tasks
-
- arch/arm/include/asm/mmu_context.h |  104 +++++++++++++++++++++++++++---------
- arch/arm/include/asm/system.h      |    7 ---
- arch/arm/include/asm/thread_info.h |    1 +
- arch/arm/mm/context.c              |   63 +++++++++++-----------
- arch/arm/mm/proc-v7-2level.S       |    9 +---
- kernel/sched/core.c                |    1 +
- kernel/sched/sched.h               |    3 +
- 7 files changed, 117 insertions(+), 71 deletions(-)
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index df00cb0..f1db6d8 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -1937,6 +1937,7 @@ static void finish_task_switch(struct rq *rq, struct task_struct *prev)
+ 	local_irq_enable();
+ #endif /* __ARCH_WANT_INTERRUPTS_ON_CTXSW */
+ 	finish_lock_switch(rq, prev);
++	finish_arch_post_lock_switch();
+ 	trace_sched_stat_sleeptime(current, rq->clock);
+ 
+ 	fire_sched_in_preempt_notifiers(current);
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 98c0c26..d72483d 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -692,6 +692,9 @@ static inline int task_running(struct rq *rq, struct task_struct *p)
+ #ifndef finish_arch_switch
+ # define finish_arch_switch(prev)	do { } while (0)
+ #endif
++#ifndef finish_arch_post_lock_switch
++# define finish_arch_post_lock_switch()	do { } while (0)
++#endif
+ 
+ #ifndef __ARCH_WANT_UNLOCKED_CTXSW
+ static inline void prepare_lock_switch(struct rq *rq, struct task_struct *next)
