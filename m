@@ -1,184 +1,123 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 10:21:13 +0000
-Subject: [PATCH 12/19] PCMCIA: sa11x0: h3600: convert to use new irq/gpio
- management
+Date: Fri, 20 Jan 2012 10:21:33 +0000
+Subject: [PATCH 13/19] PCMCIA: soc_common: remove soc_pcmcia_*_irqs functions
 In-Reply-To: <20120120101709.GE1068@n2100.arm.linux.org.uk>
 References: <20120120101709.GE1068@n2100.arm.linux.org.uk>
-Message-ID: <E1RoBar-0005iD-IH@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RoBbB-0005iI-WC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert iPAQ socket driver to use the new irq/gpio management.  As
-this already uses the GPIO subsystem, these changes are localized
-to just the PCMCIA directory.
+Now that we use gpios and gpio_to_irq() etc to manage the various card
+status signals within soc_common, and all socket drivers are converted,
+these functions are no longer used.  We can now get rid of these helper
+functions.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pcmcia/sa1100_h3600.c |   95 ++++++----------------------------------
- 1 files changed, 15 insertions(+), 80 deletions(-)
+ drivers/pcmcia/soc_common.c |   63 -------------------------------------------
+ drivers/pcmcia/soc_common.h |   10 -------
+ 2 files changed, 0 insertions(+), 73 deletions(-)
 
-diff --git a/drivers/pcmcia/sa1100_h3600.c b/drivers/pcmcia/sa1100_h3600.c
-index edf8f00..410a636 100644
---- a/drivers/pcmcia/sa1100_h3600.c
-+++ b/drivers/pcmcia/sa1100_h3600.c
-@@ -19,36 +19,20 @@
+diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
+index 09a9a52..e0433f5 100644
+--- a/drivers/pcmcia/soc_common.c
++++ b/drivers/pcmcia/soc_common.c
+@@ -634,69 +634,6 @@ static struct pccard_operations soc_common_pcmcia_operations = {
+ };
  
- #include "sa1100_generic.h"
  
--static struct pcmcia_irqs irqs[] = {
--	{ .sock = 0, .str = "PCMCIA CD0" }, /* .irq will be filled later */
--	{ .sock = 1, .str = "PCMCIA CD1" }
+-int soc_pcmcia_request_irqs(struct soc_pcmcia_socket *skt,
+-			    struct pcmcia_irqs *irqs, int nr)
+-{
+-	int i, res = 0;
+-
+-	for (i = 0; i < nr; i++) {
+-		if (irqs[i].sock != skt->nr)
+-			continue;
+-		res = request_irq(irqs[i].irq, soc_common_pcmcia_interrupt,
+-				  IRQF_DISABLED, irqs[i].str, skt);
+-		if (res)
+-			break;
+-		irq_set_irq_type(irqs[i].irq, IRQ_TYPE_NONE);
+-	}
+-
+-	if (res) {
+-		printk(KERN_ERR "PCMCIA: request for IRQ%d failed (%d)\n",
+-			irqs[i].irq, res);
+-
+-		while (i--)
+-			if (irqs[i].sock == skt->nr)
+-				free_irq(irqs[i].irq, skt);
+-	}
+-	return res;
+-}
+-EXPORT_SYMBOL(soc_pcmcia_request_irqs);
+-
+-void soc_pcmcia_free_irqs(struct soc_pcmcia_socket *skt,
+-			  struct pcmcia_irqs *irqs, int nr)
+-{
+-	int i;
+-
+-	for (i = 0; i < nr; i++)
+-		if (irqs[i].sock == skt->nr)
+-			free_irq(irqs[i].irq, skt);
+-}
+-EXPORT_SYMBOL(soc_pcmcia_free_irqs);
+-
+-void soc_pcmcia_disable_irqs(struct soc_pcmcia_socket *skt,
+-			     struct pcmcia_irqs *irqs, int nr)
+-{
+-	int i;
+-
+-	for (i = 0; i < nr; i++)
+-		if (irqs[i].sock == skt->nr)
+-			irq_set_irq_type(irqs[i].irq, IRQ_TYPE_NONE);
+-}
+-EXPORT_SYMBOL(soc_pcmcia_disable_irqs);
+-
+-void soc_pcmcia_enable_irqs(struct soc_pcmcia_socket *skt,
+-			    struct pcmcia_irqs *irqs, int nr)
+-{
+-	int i;
+-
+-	for (i = 0; i < nr; i++)
+-		if (irqs[i].sock == skt->nr) {
+-			irq_set_irq_type(irqs[i].irq, IRQ_TYPE_EDGE_RISING);
+-			irq_set_irq_type(irqs[i].irq, IRQ_TYPE_EDGE_BOTH);
+-		}
+-}
+-EXPORT_SYMBOL(soc_pcmcia_enable_irqs);
+-
+-
+ static LIST_HEAD(soc_pcmcia_sockets);
+ static DEFINE_MUTEX(soc_pcmcia_sockets_lock);
+ 
+diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
+index ebdfa6c..e6fcbea 100644
+--- a/drivers/pcmcia/soc_common.h
++++ b/drivers/pcmcia/soc_common.h
+@@ -125,22 +125,12 @@ struct pcmcia_low_level {
+ };
+ 
+ 
+-struct pcmcia_irqs {
+-	int sock;
+-	int irq;
+-	const char *str;
 -};
 -
- static int h3600_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- {
- 	int err;
+ struct soc_pcmcia_timing {
+ 	unsigned short io;
+ 	unsigned short mem;
+ 	unsigned short attr;
+ };
  
- 	switch (skt->nr) {
- 	case 0:
--		err = gpio_request(H3XXX_GPIO_PCMCIA_IRQ0, "PCMCIA IRQ0");
--		if (err)
--			goto err00;
--		err = gpio_direction_input(H3XXX_GPIO_PCMCIA_IRQ0);
--		if (err)
--			goto err01;
--		skt->socket.pci_irq = gpio_to_irq(H3XXX_GPIO_PCMCIA_IRQ0);
--
--		err = gpio_request(H3XXX_GPIO_PCMCIA_CD0, "PCMCIA CD0");
--		if (err)
--			goto err01;
--		err = gpio_direction_input(H3XXX_GPIO_PCMCIA_CD0);
--		if (err)
--			goto err02;
--		irqs[0].irq = gpio_to_irq(H3XXX_GPIO_PCMCIA_CD0);
-+		skt->stat[SOC_STAT_CD].gpio = H3XXX_GPIO_PCMCIA_CD0;
-+		skt->stat[SOC_STAT_CD].name = "PCMCIA CD0";
-+		skt->stat[SOC_STAT_RDY].gpio = H3XXX_GPIO_PCMCIA_IRQ0;
-+		skt->stat[SOC_STAT_RDY].name = "PCMCIA IRQ0";
+-extern int soc_pcmcia_request_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr);
+-extern void soc_pcmcia_free_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr);
+-extern void soc_pcmcia_disable_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr);
+-extern void soc_pcmcia_enable_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr);
+ extern void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *, struct soc_pcmcia_timing *);
  
- 		err = gpio_request(H3XXX_EGPIO_OPT_NVRAM_ON, "OPT NVRAM ON");
- 		if (err)
--			goto err02;
-+			goto err01;
- 		err = gpio_direction_output(H3XXX_EGPIO_OPT_NVRAM_ON, 0);
- 		if (err)
- 			goto err03;
-@@ -70,30 +54,12 @@ static int h3600_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- 		err = gpio_direction_output(H3XXX_EGPIO_CARD_RESET, 0);
- 		if (err)
- 			goto err06;
--		err = soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
--		if (err)
--			goto err06;
- 		break;
- 	case 1:
--		err = gpio_request(H3XXX_GPIO_PCMCIA_IRQ1, "PCMCIA IRQ1");
--		if (err)
--			goto err10;
--		err = gpio_direction_input(H3XXX_GPIO_PCMCIA_IRQ1);
--		if (err)
--			goto err11;
--		skt->socket.pci_irq = gpio_to_irq(H3XXX_GPIO_PCMCIA_IRQ1);
--
--		err = gpio_request(H3XXX_GPIO_PCMCIA_CD1, "PCMCIA CD1");
--		if (err)
--			goto err11;
--		err = gpio_direction_input(H3XXX_GPIO_PCMCIA_CD1);
--		if (err)
--			goto err12;
--		irqs[1].irq = gpio_to_irq(H3XXX_GPIO_PCMCIA_CD1);
--
--		err = soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
--		if (err)
--			goto err12;
-+		skt->stat[SOC_STAT_CD].gpio = H3XXX_GPIO_PCMCIA_CD1;
-+		skt->stat[SOC_STAT_CD].name = "PCMCIA CD1";
-+		skt->stat[SOC_STAT_RDY].gpio = H3XXX_GPIO_PCMCIA_IRQ1;
-+		skt->stat[SOC_STAT_RDY].name = "PCMCIA IRQ1";
- 		break;
- 	}
- 	return 0;
-@@ -102,19 +68,12 @@ err06:	gpio_free(H3XXX_EGPIO_CARD_RESET);
- err05:	gpio_free(H3XXX_EGPIO_OPT_RESET);
- err04:	gpio_free(H3XXX_EGPIO_OPT_ON);
- err03:	gpio_free(H3XXX_EGPIO_OPT_NVRAM_ON);
--err02:	gpio_free(H3XXX_GPIO_PCMCIA_CD0);
- err01:	gpio_free(H3XXX_GPIO_PCMCIA_IRQ0);
--err00:	return err;
--
--err12:	gpio_free(H3XXX_GPIO_PCMCIA_CD0);
--err11:	gpio_free(H3XXX_GPIO_PCMCIA_IRQ0);
--err10:	return err;
-+	return err;
- }
- 
- static void h3600_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
- {
--	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
--  
- 	switch (skt->nr) {
- 	case 0:
- 		/* Disable CF bus: */
-@@ -126,12 +85,8 @@ static void h3600_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
- 		gpio_free(H3XXX_EGPIO_OPT_RESET);
- 		gpio_free(H3XXX_EGPIO_OPT_ON);
- 		gpio_free(H3XXX_EGPIO_OPT_NVRAM_ON);
--		gpio_free(H3XXX_GPIO_PCMCIA_CD0);
--		gpio_free(H3XXX_GPIO_PCMCIA_IRQ0);
- 		break;
- 	case 1:
--		gpio_free(H3XXX_GPIO_PCMCIA_CD1);
--		gpio_free(H3XXX_GPIO_PCMCIA_IRQ1);
- 		break;
- 	}
- }
-@@ -139,27 +94,11 @@ static void h3600_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
- static void
- h3600_pcmcia_socket_state(struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
- {
--	switch (skt->nr) {
--	case 0:
--		state->detect = !gpio_get_value(H3XXX_GPIO_PCMCIA_CD0);
--		state->ready = !!gpio_get_value(H3XXX_GPIO_PCMCIA_IRQ0);
--		state->bvd1 = 0;
--		state->bvd2 = 0;
--		state->wrprot = 0; /* Not available on H3600. */
--		state->vs_3v = 0;
--		state->vs_Xv = 0;
--		break;
--
--	case 1:
--		state->detect = !gpio_get_value(H3XXX_GPIO_PCMCIA_CD1);
--		state->ready = !!gpio_get_value(H3XXX_GPIO_PCMCIA_IRQ1);
--		state->bvd1 = 0;
--		state->bvd2 = 0;
--		state->wrprot = 0; /* Not available on H3600. */
--		state->vs_3v = 0;
--		state->vs_Xv = 0;
--		break;
--	}
-+	state->bvd1 = 0;
-+	state->bvd2 = 0;
-+	state->wrprot = 0; /* Not available on H3600. */
-+	state->vs_3v = 0;
-+	state->vs_Xv = 0;
- }
- 
- static int
-@@ -186,14 +125,10 @@ static void h3600_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
- 	gpio_set_value(H3XXX_EGPIO_OPT_RESET, 0);
- 
- 	msleep(10);
--
--	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
- }
- 
- static void h3600_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
- {
--	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
--
- 	/*
- 	 * FIXME:  This doesn't fit well.  We don't have the mechanism in
- 	 * the generic PCMCIA layer to deal with the idea of two sockets
+ void soc_pcmcia_init_one(struct soc_pcmcia_socket *skt,
 -- 
 1.7.4.4
