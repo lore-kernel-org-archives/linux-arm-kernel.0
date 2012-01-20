@@ -1,51 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 10:36:23 +0000
-Subject: [PATCH 5/5] ARM: pgtable: get rid of TOP_PTE()
-In-Reply-To: <20120120103433.GF1068@n2100.arm.linux.org.uk>
-References: <20120120103433.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1RoBpX-0005ok-VX@rmk-PC.arm.linux.org.uk>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 20 Jan 2012 11:36:07 +0100
+Subject: mc13xxx: add I2C support
+In-Reply-To: <201201201855.35971.marc@cpdesign.com.au> (Marc Reilly's message
+ of "Fri, 20 Jan 2012 18:55:35 +1100")
+References: <1326934894-29516-1-git-send-email-marc@cpdesign.com.au>
+ <87lip4kktc.fsf@lebrac.rtp-net.org>
+ <20120119112941.GC29494@sirena.org.uk>
+ <201201201855.35971.marc@cpdesign.com.au>
+Message-ID: <878vl2lkyw.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of the TOP_PTE() macro as we now have proper accessor functions
-instead.  No one should be directly referencing the top pte table
-anymore.
+Marc Reilly <marc@cpdesign.com.au> writes:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/mm.h |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+> Hi,
 
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index 1651d5a..27f4a61 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -3,8 +3,6 @@
- /* the upper-most page table pointer */
- extern pmd_t *top_pmd;
- 
--#define TOP_PTE(x)	pte_offset_kernel(top_pmd, x)
--
- /*
-  * 0xffff8000 to 0xffffffff is reserved for any ARM architecture
-  * specific hacks for copying pages efficiently, while 0xffff4000
-@@ -20,13 +18,15 @@ extern pmd_t *top_pmd;
- 
- static inline void set_top_pte(unsigned long va, pte_t pte)
- {
--	set_pte_ext(TOP_PTE(va), pte, 0);
-+	pte_t *ptep = pte_offset_kernel(top_pmd, va);
-+	set_pte_ext(ptep, pte, 0);
- 	local_flush_tlb_kernel_page(va);
- }
- 
- static inline pte_t get_top_pte(unsigned long va)
- {
--	return *TOP_PTE(va);
-+	pte_t *ptep = pte_offset_kernel(top_pmd, va);
-+	return *ptep;
- }
- 
- static inline pmd_t *pmd_off_k(unsigned long virt)
--- 
-1.7.4.4
+Hi,
+
+>
+> Thankyou all for your feedback and comments. I'll use them for a V2 but 
+> Samuel, I'd like to know if you'd like me to base them on a specific branch 
+> before I do.
+>
+> Shawn, thanks for testing!
+>
+> On Thursday, January 19, 2012 10:29:41 PM Mark Brown wrote:
+>> On Thu, Jan 19, 2012 at 12:12:31PM +0100, Arnaud Patard wrote:
+>> > I've never looked at regmap deeply but can't it be done with regmap or is
+>> > it just a bad idea ?
+>> 
+>> Glancing quickly at the existing code it should map on reasonably well,
+>> though a new format definition may be required for the 25 bit shift that
+>> would be trivial.
+>
+> I'm sadly unfamiliar with regmap, is it a far superior solution? does it need 
+
+The aim of regmap is to provide a solution for chip running either on
+i2c or spi, that's why I thought it would be interesting to use it
+instead of rewriting similar code.
+
+> to used now? (ie. I'm relucant to totally rework this now. Please convince me 
+> I need to if required.)
+
+I don't know. I've no strong opinion about it. Moreover, nothing
+prevents you to try to merge this version and then convert to regmap,
+say once the 25 bit shift problem noticed by Mark is fixed.
+
+Arnaud
