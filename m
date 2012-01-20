@@ -1,79 +1,35 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Fri, 20 Jan 2012 18:03:58 +0530
-Subject: [PATCH v2 1/2] dmaengine: Add support for per xfer specific
- privatedata & box dma
-In-Reply-To: <1326808388.1540.123.camel@vkoul-udesk3>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1325854052-21402-2-git-send-email-kumarrav@codeaurora.org>
- <1326808388.1540.123.camel@vkoul-udesk3>
-Message-ID: <4F195F36.60901@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jan 2012 12:39:23 +0000
+Subject: [PATCH 05/31] ARM: amba: mxs: convert to use amba_device_alloc
+In-Reply-To: <20120120122535.GA25917@S2101-09.ap.freescale.net>
+References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
+ <E1RoAhZ-0005EY-BZ@rmk-PC.arm.linux.org.uk>
+ <20120120122535.GA25917@S2101-09.ap.freescale.net>
+Message-ID: <20120120123923.GP16726@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/17/2012 7:23 PM, Vinod Koul wrote:
-> On Fri, 2012-01-06 at 18:17 +0530, Ravi Kumar V wrote:
->>
->> diff --git a/include/asm-generic/scatterlist.h b/include/asm-generic/scatterlist.h
->> index 5de0735..e66dfcb 100644
->> --- a/include/asm-generic/scatterlist.h
->> +++ b/include/asm-generic/scatterlist.h
->> @@ -14,6 +14,7 @@ struct scatterlist {
->>   #ifdef CONFIG_NEED_SG_DMA_LENGTH
->>   	unsigned int	dma_length;
->>   #endif
->> +	unsigned long	private_data;
-> what do you plan to pass here. Please keep in mind this is a generic
-> scatterlist structure, and modifying it for your purposes doesn't seem
-> to be a great one!
-> Also why can't you pass this as addition argument in your new "BOX API"?
-We are using DMA-Engine framework for both SG mode and BOX mode of our HW.
-For SG mode we are using device_prep_dma_sg API but the problem we are 
-facing is we need to pass command configuration parameter along with 
-each descriptor to our HW, we did not find any suitable API/structure in 
-framework to support this.
-So thought of adding new element in struct scatterlist.
-please can you suggest a way to pass private parameter with
-every descriptor.
->
->>   };
->>
->>   /*
->> +
->> +struct dma_box_list {
->> +	dma_addr_t dma_row_address;
->> +	unsigned int dma_row_len;
->> +	unsigned int dma_row_num;
->> +	unsigned int dma_row_offset;
->> +	unsigned long private_data;
->> +};
-> again a private data here?
-> is this some kind of interleaved pattern?
-Yes this interleaved pattern.
->> +
->>   /**
->>    * struct dma_device - info on the entity supplying DMA services
->>    * @chancnt: how many DMA channels are supported
->> @@ -497,6 +507,11 @@ struct dma_device {
->>   	struct dma_async_tx_descriptor *(*device_prep_dma_cyclic)(
->>   		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
->>   		size_t period_len, enum dma_data_direction direction);
->> +	struct dma_async_tx_descriptor *(*device_prep_dma_box)(
->> +		struct dma_chan *chan, struct dma_box_list *dst_box,
->> +		struct dma_box_list *src_box, unsigned int num_list,
->> +		unsigned long flags);
-> still not clean what kind of transfer do you want to do here
-We are doing interleaved pattern of data transfer between source and 
-destination boxs, num_list is number of box mode commands
-Please can you refer patch 0/2 I have replied explaining about box mode 
-transfer clearly.
->> +
->>   	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->>   		unsigned long arg);
->>
->
->
+On Fri, Jan 20, 2012 at 08:25:39PM +0800, Shawn Guo wrote:
+> On Fri, Jan 20, 2012 at 09:24:05AM +0000, Russell King - ARM Linux wrote:
+> > Convert MXS to use the new amba_device_alloc APIs.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/mach-mxs/devices.c |    8 +++++---
+> >  1 files changed, 5 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
+> > index fe3e847..052d8dd 100644
+> > --- a/arch/arm/mach-mxs/devices.c
+> > +++ b/arch/arm/mach-mxs/devices.c
+> > @@ -77,16 +77,18 @@ struct platform_device *__init mxs_add_platform_device_dmamask(
+> >  
+> >  int __init mxs_add_amba_device(const struct amba_device *dev)
+> >  {
+> > -	struct amba_device *adev = kmalloc(sizeof(*adev), GFP_KERNEL);
+> > +	struct amba_device *adev = amba_device_alloc(dev->init_name,
+> 
+> The 'dev->init_name' needs to be 'dev->dev.init_name'.  Otherwise, we
+> see the compile error below.
 
-
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Good catch, fixed, and ack added, thanks.
