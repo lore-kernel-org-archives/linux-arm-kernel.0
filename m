@@ -1,37 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 21 Jan 2012 00:34:07 +0100
-Subject: inconvenience when hand editing DEBUG_LL in .config
-In-Reply-To: <20120120192750.GE11845@n2100.arm.linux.org.uk>
-References: <20120120164036.GO4066@pengutronix.de>
- <20120120192750.GE11845@n2100.arm.linux.org.uk>
-Message-ID: <20120120233407.GQ4066@pengutronix.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 20 Jan 2012 15:51:21 -0800
+Subject: [PATCH v7 1/2] video: support MIPI-DSI controller driver
+In-Reply-To: <4F182ACF.8010302@ti.com>
+References: <4F17AA10.7080604@samsung.com>
+	<4F182ACF.8010302@ti.com>
+Message-ID: <20120120155121.18880dff.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 07:27:50PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 20, 2012 at 05:40:36PM +0100, Uwe Kleine-K?nig wrote:
-> > Hello,
+On Thu, 19 Jan 2012 20:08:07 +0530
+Archit <a0393947@ti.com> wrote:
+
+> On Thursday 19 January 2012 10:58 AM, Donghwa Lee wrote:
+> > Samsung S5PC210 and EXYNOS SoC platform has MIPI-DSI controller and MIPI-DSI
+> > based LCD Panel could be used with it. This patch supports MIPI-DSI driver
+> > based Samsung SoC chip.
 > > 
-> > usually when I want to change a single kernel option I just open .config
-> > in my editor, remove the line for the config item I want to change and
-> > run oldconfig. For DEBUG_LL (defined in arch/arm/Kconfig.debug) this
-> > doesn't work as usual though.
+> > LCD panel driver based MIPI-DSI should be registered to MIPI-DSI driver at
+> > machine code and LCD panel driver specific function registered to mipi_dsim_ddi
+> > structure at lcd panel init function called system init.
+> > In the MIPI-DSI driver, find lcd panel driver by using registered
+> > lcd panel name, and then initialize lcd panel driver.
 > > 
-> > On 3.3-rc1 the following happens:
-> > 
-> > 	make ARCH=arm at91rm9200_defconfig
-> > 	sed -i /CONFIG_DEBUG_LL/d .config
+> > Changes since v6:
+> > 	- remove obscure compile problems.
+> > 	- remove useless codes.
+> > 	- modify return errno codes properly
 > 
-> Note that this deletes two entries.  Use /CONFIG_DEBUG_LL\\\>/d to delete
-> just one (or get rid of two of those \ and use ' to quote it.)
-After at91rm9200_defconfig CONFIG_DEBUG_LL is not set, so
-CONFIG_DEBUG_LL_UART_NONE and the other options from that choice don't
-appear in .config and so for me only a single line is removed. But
-that's only an uninteresting detail.
+> One more comment about 'mipi_dsim.h', it would be better to put it in
+> include/video and not 'include/linux'.
 
-Best regards
-Uwe
+Yes, that is desirable.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> > ---
+> >   drivers/video/Kconfig                 |    6 +
+> >   drivers/video/Makefile                |    2 +
+> >   drivers/video/s5p_mipi_dsi.c          |  599 ++++++++++++++++++++++
+> >   drivers/video/s5p_mipi_dsi_common.c   |  896 +++++++++++++++++++++++++++++++++
+> >   drivers/video/s5p_mipi_dsi_common.h   |   46 ++
+> >   drivers/video/s5p_mipi_dsi_lowlevel.c |  617 +++++++++++++++++++++++
+> >   drivers/video/s5p_mipi_dsi_lowlevel.h |  112 ++++
+> >   drivers/video/s5p_mipi_dsi_regs.h     |  149 ++++++
+> >   include/linux/mipi_dsim.h             |  359 +++++++++++++
+> >   9 files changed, 2786 insertions(+), 0 deletions(-)
+
+or we could put it in drivers/video/.  It all depends on which other
+drivers we expect will need access to this header.
