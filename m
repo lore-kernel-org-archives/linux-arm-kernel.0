@@ -1,39 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 10:39:56 +0000
-Subject: [PATCH 00/19] ARM SA11x0 / PXA / SoC-common PCMCIA cleanups
-In-Reply-To: <20120120101709.GE1068@n2100.arm.linux.org.uk>
-References: <20120120101709.GE1068@n2100.arm.linux.org.uk>
-Message-ID: <20120120103956.GG1068@n2100.arm.linux.org.uk>
+Date: Fri, 20 Jan 2012 10:42:16 +0000
+Subject: [PATCH 1/2] MTD: sa11x0: Remove shutdown handler
+Message-ID: <E1RoBvE-0005qY-BC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 10:17:09AM +0000, Russell King - ARM Linux wrote:
-> What follows is a series of 19 patches cleaning up the SA11xx and PXA
-> PCMCIA support, which uses the soc-common infrastructure.
-> 
-> Now that we have proper gpiolib support in the kernel for these platforms,
-> with properly implemented gpio_to_irq() functionality, we can move some
-> things that the individual platform socket drivers were doing into the
-> soc-common core.
-> 
-> This significantly reduces the code in the platform socket drivers -
-> a reduction of around 550 lines, for the net addition of about 50 lines
-> to soc-common.
-> 
-> The final set of five patches in this set contain some minor bug fixes
-> (which are really low priority) and cleanup the handling of the SA1111
-> build between PXA and SA11x0 platforms.
-> 
-> Please supply acks; I have other work which touches the header files
-> in arch/arm which would conflict, and it would help to keep it together
-> rather than have SFR carry those resolutions.
+Commit c4a9f88daf ([MTD] [NOR] fix ctrl-alt-del can't reboot for
+intel flash bug) interferes with this work-around, causing MTD to
+issue this warning:
 
-I should add that these changes have been tested on the Assabet (SA1110)
-and Assabet with Neponset daughter board (SA1111) platforms with a CF
-network card and a PCMCIA wireless card.
+	Flash device refused suspend due to active operation (state 0)
 
-There are a couple of bugs in genirq which stop both the original code,
-and these updates from working correctly.  These changes in itself do
-not cause a regression as a result of that.  This is in the hands of
-the genirq people to resolve as it's a regression - this code worked
-100% with the ARM IRQ layer, which was part of the basis for genirq.
+The commit makes our work-around in the map driver unnecessary, so
+let's remove it.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/mtd/maps/sa1100-flash.c |   12 ------------
+ 1 files changed, 0 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/mtd/maps/sa1100-flash.c b/drivers/mtd/maps/sa1100-flash.c
+index 5028219..c735569 100644
+--- a/drivers/mtd/maps/sa1100-flash.c
++++ b/drivers/mtd/maps/sa1100-flash.c
+@@ -373,21 +373,9 @@ static int __exit sa1100_mtd_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static void sa1100_mtd_shutdown(struct platform_device *dev)
+-{
+-	struct sa_info *info = platform_get_drvdata(dev);
+-	if (info && mtd_suspend(info->mtd) == 0)
+-		mtd_resume(info->mtd);
+-}
+-#else
+-#define sa1100_mtd_shutdown NULL
+-#endif
+-
+ static struct platform_driver sa1100_mtd_driver = {
+ 	.probe		= sa1100_mtd_probe,
+ 	.remove		= __exit_p(sa1100_mtd_remove),
+-	.shutdown	= sa1100_mtd_shutdown,
+ 	.driver		= {
+ 		.name	= "sa1100-mtd",
+ 		.owner	= THIS_MODULE,
+-- 
+1.7.4.4
