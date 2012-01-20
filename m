@@ -1,49 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Jan 2012 11:56:04 +0800
-Subject: [PATCH] ARM: mx28: Clear CLKGATE bit prior to changing DIV field
-In-Reply-To: <20120119145313.GZ1068@n2100.arm.linux.org.uk>
-References: <1326820526-26498-1-git-send-email-fabio.estevam@freescale.com>
- <20246.30805.391940.766120@ipc1.ka-ro>
- <CAOMZO5B3qRowaQ9c_=pyykvp5x5f2nTgticV0tCcHGAYD007MQ@mail.gmail.com>
- <20120119031726.GA2247@S2101-09.ap.freescale.net>
- <20120119145313.GZ1068@n2100.arm.linux.org.uk>
-Message-ID: <20120120035600.GA26277@S2101-09.ap.freescale.net>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 20 Jan 2012 11:29:20 +0530
+Subject: [PATCH RFC 2/2] OMAP : serial : Check for error in
+ get_context_loss_count
+In-Reply-To: <87hazrti1c.fsf@ti.com>
+References: <1326377019-23688-1-git-send-email-shubhrajyoti@ti.com>	<1326377019-23688-2-git-send-email-shubhrajyoti@ti.com>
+ <87hazrti1c.fsf@ti.com>
+Message-ID: <4F1902B8.5020000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 02:53:13PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 19, 2012 at 11:17:34AM +0800, Shawn Guo wrote:
-> > >From power saving point of view, I'm not sure you want to keep saif
-> > clock on all the time.  So if the clock is off when you try to call
-> > clk_set_rate(), you may want to turn it back to off after clk_set_rate()
-> > is done.
-> 
-> You really shouldn't expose these kinds of SoC specific oddities outside
-> of the API - it makes a mockery of having an API in the first place.
-> 
-> Can you not do:
-> 
-Yes, we can do this for now, but I'm not sure how it will live when we
-migrate to common clock framework.  I actually had a brief talk with
-Mike Turquette on that.  He does not think this case is common enough
-and deserve being handled in clock framework.  He is trying to avoid
-cross calling of clock API.  I kinda agree with him that for some cases
-the client drivers may need to know the details of clock hardware at
-some level.
+On Friday 20 January 2012 04:29 AM, Kevin Hilman wrote:
+> Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+>
+>> In serial_omap_runtime_resume in case of errors returned by
+>> get_context_loss_count print a warning and do a restore.
+>>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> These two patches should be combined into a single patch.
+>
+OK I will combine. I had split as the one was a serial driver and one
+for omap
+maintainer.
 
-Regards,
-Shawn
-
-> clk_set_rate(clk, rate)
-> {
-> 	clk_prepare(clk);
-> 
-> 	reprogram_clock(clk);
-> 
-> 	clk_unprepare(clk);
-> }
-> 
-> A clk_prepare() call on an already prepared clock should have no impact
-> other than incrementing the counter, which will be balanced on the other
-> side by the clk_unprepare().
-> 
+However I agree that they should be combined.
+> Also, please Cc Govindraj since he's the maintainer of this driver and
+> should Ack.
+will do that
+> Thanks,
+>
+> Kevin
+>
+>> ---
+>> applies on Tony's uart branch
+>>
+>>  drivers/tty/serial/omap-serial.c |   10 ++++++++--
+>>  1 files changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+>> index 29fe6fd..6008612 100644
+>> --- a/drivers/tty/serial/omap-serial.c
+>> +++ b/drivers/tty/serial/omap-serial.c
+>> @@ -1602,10 +1602,16 @@ static int serial_omap_runtime_resume(struct device *dev)
+>>  
+>>  	if (up) {
+>>  		if (pdata->get_context_loss_count) {
+>> -			u32 loss_cnt = pdata->get_context_loss_count(dev);
+>> +			int loss_cnt = pdata->get_context_loss_count(dev);
+>>  
+>> -			if (up->context_loss_cnt != loss_cnt)
+>> +			if (loss_cnt < 0) {
+>> +				dev_err(dev,
+>> +					"get_context_loss_count failed : %d\n",
+>> +					loss_cnt);
+>>  				serial_omap_restore_context(up);
+>> +			} else if (up->context_loss_cnt != loss_cnt) {
+>> +				serial_omap_restore_context(up);
+>> +			}
+>>  		}
+>>  
+>>  		/* Errata i291 */
