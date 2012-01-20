@@ -1,25 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 12:24:02 +0000
-Subject: Making allyesconfig work
-In-Reply-To: <20120120120856.GC30612@arm.com>
-References: <20120120115108.GJ1068@n2100.arm.linux.org.uk>
- <20120120120856.GC30612@arm.com>
-Message-ID: <20120120122402.GN1068@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 20 Jan 2012 13:29:17 +0100
+Subject: [PATCH] mach-u300: do away with MMC config files
+In-Reply-To: <20120120110923.GI1068@n2100.arm.linux.org.uk>
+References: <1327057220-8300-1-git-send-email-linus.walleij@stericsson.com>
+ <20120120110923.GI1068@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZCQm6WcEWw3d8M2j9AikGhhX+off9pVT04Ps2hJPqkpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 12:08:56PM +0000, Catalin Marinas wrote:
-> On Fri, Jan 20, 2012 at 11:51:08AM +0000, Russell King - ARM Linux wrote:
-> > There's also the troublesome T() macro, which conflicts with a bunch
-> > of other drivers.  (I've added Catalin to the To: line for this
-> > reason.)
-> 
-> This macro is used in asm/uaccess.h and asm/futex.h, so I think it would
-> be difficult to hide it completely. But I'm happy to rename it to
-> something else (IIRC, T stands for "Translated").
+On Fri, Jan 20, 2012 at 12:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 20, 2012 at 12:00:20PM +0100, Linus Walleij wrote:
+>> ?static struct amba_device mmcsd_device = {
+>> ? ? ? .dev = {
+>> ? ? ? ? ? ? ? .init_name = "mmci", /* Fast device at 0x1000 offset */
+>> - ? ? ? ? ? ? .platform_data = NULL, /* Added later */
+>> + ? ? ? ? ? ? .platform_data = &mmcsd_platform_data,
+>
+> This will certainly conflict with the set of AMBA/Primecell patches
+> I've just posted... the equivalent change is:
+>
+> ?static AMBA_APB_DEVICE(mmcsd, "mmci", 0, U300_MMCSD_BASE,
+> - ? ? ? U300_MMCSD_IRQS, NULL);
+> + ? ? ? U300_MMCSD_IRQS, &mmcsd_platform_data);
 
-We should do something, because T() is just too risky for causing these
-kinds of conflicts.  We're not going to be able to get the driver code
-changed for this.  People will rightfully object - and it was something
-originally spotted by Al Viro in November... allegedly rude works were
-muttered (not publically) over it!
+OK I will wait for your stuff to hit -next and then rebase it and
+put it in the patch tracker for a conflict-free path to mainline.
+
+Yours,
+Linus Walleij
