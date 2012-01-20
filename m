@@ -1,66 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 09:31:31 +0000
-Subject: [PATCH 27/31] ARM: amba: lpc32xx: use common amba device initializers
-In-Reply-To: <20120120092207.GD1068@n2100.arm.linux.org.uk>
-References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
-Message-ID: <E1RoAol-0005G6-5V@rmk-PC.arm.linux.org.uk>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Fri, 20 Jan 2012 10:31:49 +0100
+Subject: [PATCH] ep93xx: Convert the watchdog driver into a platform
+ device.
+In-Reply-To: <201201191701.30836.hartleys@visionengravers.com>
+References: <201201191701.30836.hartleys@visionengravers.com>
+Message-ID: <20120120093149.GX27296@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-lpc32xx/phy3250.c |   32 ++++----------------------------
- 1 files changed, 4 insertions(+), 28 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index 025eb21..5d51c10 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -149,20 +149,8 @@ static struct clcd_board lpc32xx_clcd_data = {
- 	.remove		= lpc32xx_clcd_remove,
- };
- 
--static struct amba_device lpc32xx_clcd_device = {
--	.dev				= {
--		.coherent_dma_mask	= ~0,
--		.init_name		= "dev:clcd",
--		.platform_data		= &lpc32xx_clcd_data,
--	},
--	.res				= {
--		.start			= LPC32XX_LCD_BASE,
--		.end			= (LPC32XX_LCD_BASE + SZ_4K - 1),
--		.flags			= IORESOURCE_MEM,
--	},
--	.dma_mask			= ~0,
--	.irq				= {IRQ_LPC32XX_LCD},
--};
-+static AMBA_AHB_DEVICE(lpc32xx_clcd, "dev:clcd", 0,
-+	LPC32XX_LCD_BASE, { IRQ_LPC32XX_LCD }, &lpc32xx_clcd_data);
- 
- /*
-  * AMBA SSP (SPI)
-@@ -191,20 +179,8 @@ static struct pl022_ssp_controller lpc32xx_ssp0_data = {
- 	.enable_dma		= 0,
- };
- 
--static struct amba_device lpc32xx_ssp0_device = {
--	.dev				= {
--		.coherent_dma_mask	= ~0,
--		.init_name		= "dev:ssp0",
--		.platform_data		= &lpc32xx_ssp0_data,
--	},
--	.res				= {
--		.start			= LPC32XX_SSP0_BASE,
--		.end			= (LPC32XX_SSP0_BASE + SZ_4K - 1),
--		.flags			= IORESOURCE_MEM,
--	},
--	.dma_mask			= ~0,
--	.irq				= {IRQ_LPC32XX_SSP0},
--};
-+static AMBA_APB_DEVICE(lpc32xx_ssp0, "dev:ssp0", 0,
-+	LPC32XX_SSP0_BASE, { IRQ_LPC32XX_SSP0 }, &lpc32xx_ssp0_data);
- 
- /* AT25 driver registration */
- static int __init phy3250_spi_board_register(void)
--- 
-1.7.4.4
+...
+>  void ep93xx_restart(char mode, const char *cmd)
+> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> index c4a7b84..e9271a7 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> @@ -224,6 +224,7 @@
+>  #define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
+>  #define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
+>  
+> +#define EP93XX_WATCHDOG_PHYS_BASE	EP93XX_APB_PHYS(0x00140000)
+>  #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
+
+Shouldn't this last define be removed after you added the new PHYS_BASE ?
+
+Kind regards,
+Wim.
