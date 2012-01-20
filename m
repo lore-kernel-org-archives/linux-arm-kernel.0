@@ -1,130 +1,149 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:03:57 +0000
-Subject: [PATCH v4 10/15] ARM: highbank: convert to twd_local_timer_register()
- interface
+Date: Fri, 20 Jan 2012 12:03:50 +0000
+Subject: [PATCH v4 03/15] ARM: smp_twd: add runtime registration support
 In-Reply-To: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
 References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1327061042-14857-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1327061042-14857-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the new smp_twd runtime registration interface
-to the highbank platforms, and remove the old compile-time support.
+Add support for the new registration interface to smp_twd.
+Platforms can populate a struct twd_local_timer with MMIO
+and IRQ resources, and then call twd_local_timer_register()
+to have the timer registered with the core.
 
-The highbank DTS file is updated to match the TWD DT documentation
-and fixes the timer trigger (rising edge).
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/boot/dts/highbank.dts      |    8 +++---
- arch/arm/mach-highbank/Makefile     |    1 -
- arch/arm/mach-highbank/highbank.c   |    3 ++
- arch/arm/mach-highbank/localtimer.c |   40 -----------------------------------
- 4 files changed, 7 insertions(+), 45 deletions(-)
- delete mode 100644 arch/arm/mach-highbank/localtimer.c
+ arch/arm/include/asm/smp_twd.h |   18 +++++++++++++-
+ arch/arm/kernel/smp_twd.c      |   51 +++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 65 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index 305635b..37c0ff9 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -72,15 +72,15 @@
- 		ranges;
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index bf8449d..16c89b7 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -18,10 +18,26 @@
+ #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
+ #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
  
- 		timer at fff10600 {
--			compatible = "arm,smp-twd";
-+			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0xfff10600 0x20>;
--			interrupts = <1 13 0xf04>;
-+			interrupts = <1 13 0xf01>;
- 		};
- 
- 		watchdog at fff10620 {
--			compatible = "arm,cortex-a9-wdt";
-+			compatible = "arm,cortex-a9-twd-wdt";
- 			reg = <0xfff10620 0x20>;
--			interrupts = <1 14 0xf04>;
-+			interrupts = <1 14 0xf01>;
- 		};
- 
- 		intc: interrupt-controller at fff11000 {
-diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-index 986958a..f8437dd 100644
---- a/arch/arm/mach-highbank/Makefile
-+++ b/arch/arm/mach-highbank/Makefile
-@@ -1,6 +1,5 @@
- obj-y					:= clock.o highbank.o system.o
- obj-$(CONFIG_DEBUG_HIGHBANK_UART)	+= lluart.o
- obj-$(CONFIG_SMP)			+= platsmp.o
--obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
- obj-$(CONFIG_PM_SLEEP)			+= pm.o
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 7afbe1e..ef3e1eb 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -26,6 +26,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/smp_scu.h>
-+#include <asm/smp_twd.h>
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/timer-sp.h>
- #include <asm/hardware/gic.h>
-@@ -112,6 +113,8 @@ static void __init highbank_timer_init(void)
- 
- 	sp804_clocksource_init(timer_base + 0x20, "timer1");
- 	sp804_clockevents_init(timer_base, irq, "timer0");
++#include <linux/ioport.h>
 +
-+	twd_local_timer_of_register();
- }
+ struct clock_event_device;
  
- static struct sys_timer highbank_timer = {
-diff --git a/arch/arm/mach-highbank/localtimer.c b/arch/arm/mach-highbank/localtimer.c
-deleted file mode 100644
-index 5a00e79..0000000
---- a/arch/arm/mach-highbank/localtimer.c
-+++ /dev/null
-@@ -1,40 +0,0 @@
--/*
-- * Copyright 2010-2011 Calxeda, Inc.
-- * Based on localtimer.c, Copyright (C) 2002 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--#include <linux/init.h>
--#include <linux/clockchips.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_irq.h>
--
--#include <asm/smp_twd.h>
--
--/*
-- * Setup the local clock events for a CPU.
-- */
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	struct device_node *np;
--
--	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
--	if (!twd_base) {
--		twd_base = of_iomap(np, 0);
--		WARN_ON(!twd_base);
--	}
--	evt->irq = irq_of_parse_and_map(np, 0);
--	twd_timer_setup(evt);
--	return 0;
--}
+ extern void __iomem *twd_base;
+ 
+-void twd_timer_setup(struct clock_event_device *);
++int twd_timer_setup(struct clock_event_device *);
++
++struct twd_local_timer {
++	struct resource	res[2];
++};
++
++#define DEFINE_TWD_LOCAL_TIMER(name,base,irq)	\
++struct twd_local_timer name __initdata = {	\
++	.res	= {				\
++		DEFINE_RES_MEM(base, 0x10),	\
++		DEFINE_RES_IRQ(irq),		\
++	},					\
++};
++
++int twd_local_timer_register(struct twd_local_timer *);
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 95a0c14..f105e91 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -32,6 +32,7 @@ static struct clk *twd_clk;
+ static unsigned long twd_timer_rate;
+ 
+ static struct clock_event_device __percpu **twd_evt;
++static int twd_ppi;
+ 
+ static void twd_set_mode(enum clock_event_mode mode,
+ 			struct clock_event_device *clk)
+@@ -227,7 +228,7 @@ static struct clk *twd_get_clock(void)
+ /*
+  * Setup the local clock events for a CPU.
+  */
+-void __cpuinit twd_timer_setup(struct clock_event_device *clk)
++int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ {
+ 	struct clock_event_device **this_cpu_clk;
+ 
+@@ -237,7 +238,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 		twd_evt = alloc_percpu(struct clock_event_device *);
+ 		if (!twd_evt) {
+ 			pr_err("twd: can't allocate memory\n");
+-			return;
++			return -ENOMEM;
+ 		}
+ 
+ 		err = request_percpu_irq(clk->irq, twd_handler,
+@@ -245,7 +246,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 		if (err) {
+ 			pr_err("twd: can't register interrupt %d (%d)\n",
+ 			       clk->irq, err);
+-			return;
++			return err;
+ 		}
+ 	}
+ 
+@@ -263,6 +264,8 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
++	if (!clk->irq)
++		clk->irq = twd_ppi;
+ 
+ 	this_cpu_clk = __this_cpu_ptr(twd_evt);
+ 	*this_cpu_clk = clk;
+@@ -270,4 +273,46 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clockevents_config_and_register(clk, twd_timer_rate,
+ 					0xf, 0xffffffff);
+ 	enable_percpu_irq(clk->irq, 0);
++
++	return 0;
++}
++
++static struct local_timer_ops twd_lt_ops __cpuinitdata = {
++	.setup	= twd_timer_setup,
++	.stop	= twd_timer_stop,
++};
++
++int __init twd_local_timer_register(struct twd_local_timer *tlt)
++{
++	int err;
++
++	if (twd_base || twd_evt)
++		return -EBUSY;
++
++	twd_ppi	= tlt->res[1].start;
++
++	twd_evt = alloc_percpu(struct clock_event_device *);
++	twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
++	if (!twd_base || !twd_evt) {
++		err = -ENOMEM;
++		goto out;
++	}
++
++	err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_evt);
++	if (err) {
++		pr_err("twd: can't register interrupt %d (%d)\n", twd_ppi, err);
++		goto out;
++	}
++
++	err = local_timer_register(&twd_lt_ops);
++	if (err)
++		goto out;
++
++	return 0;
++
++out:
++	iounmap(twd_base);
++	free_percpu(twd_evt);
++	twd_base = twd_evt = NULL;
++	return err;
+ }
 -- 
 1.7.7.1
