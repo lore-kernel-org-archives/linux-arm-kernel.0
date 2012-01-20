@@ -1,106 +1,152 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 20 Jan 2012 19:01:27 +0530
-Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
-In-Reply-To: <4F195E4C.6080805@codeaurora.org>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1326807902.1540.116.camel@vkoul-udesk3>  <4F195E4C.6080805@codeaurora.org>
-Message-ID: <1327066287.517.4.camel@vkoul-udesk3>
+From: eranian@googlemail.com (stephane eranian)
+Date: Fri, 20 Jan 2012 14:47:47 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+ <20120109224945.GA23090@mudshark.cambridge.arm.com>
+ <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+ <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
+ <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
+ <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
+ <CACVXFVOQNDRs=c8A2YC+WvYAHs5Abbz-QUEe1VJqrj2esFO11g@mail.gmail.com>
+ <CAMsRxf+e38jRcyxESLhYDZ3OL910AQdapZD9P8vWDXfUE34DAA@mail.gmail.com>
+ <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
+ <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
+ <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
+ <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
+ <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
+ <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
+ <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
+Message-ID: <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-01-20 at 18:00 +0530, Ravi Kumar V wrote:
-> On 1/17/2012 7:15 PM, Vinod Koul wrote:
-> > On Fri, 2012-01-06 at 18:17 +0530, Ravi Kumar V wrote:
-> > <sorry for delayed review, was on vacation and now traveling>
-> >>
-> >> As our ADM Scatter-gather hardware needs
-> >> -32-bit command configuration parameter
-> >>   apart from
-> >> -32-bit source address
-> >> -32-bit destination address
-> >> -16-bit length
-> >>
-> >> So,we have added new parameter in struct scatterlist to support xfer
-> >> descriptor
-> >> specific private data, and for supporting ADM Box mode DMA we added
-> >> new
-> >> API and data structure.
-> > what do you mean by "ADM Box mode"?
-> >
-> 
-> ADM Box mode is a interleaved type of DMA where data from rows of equal 
-> length and equal distance(bytes) between each other are transferred to 
-> similar pattern of rows.
-> Each row length and distance between each row in destination pattern may 
-> not be equal to source pattern.
-> Distance between beginning of any two rows are always greater than row 
-> length.
-> Example:
-> If 4 rows of 16 bytes each are arranged such that distance between 
-> beginning of any two rows are 32 bytes.
-> Now they can be transferred using BOX mode to destination pattern 
-> arranged in 2 rows of 32 bytes each and distance between them can be any 
-> lets say 128 bytes.
-> 
-> Source pattern:
-> 4 data rows starts address 0th byte.
-> 
-> 0-----16-bytes-data-----15
-> 16    16 bytes void     31
-> 32---------data---------47
-> 48         void         63
-> 64---------data---------79
-> 80         void         95
-> 96---------data--------111
-> 
-> Transferred to destination
-> Destination pattern:
-> 2 rows
-> 0----------32-bytes-data----------31
-> 32         96 bytes void         127
-> 128-------------data-------------159
-> 
-Sounds like you should be using interleaved API
+Started afresh from:
 
-Please see this and read the patch history, which has nice details about
-this
+90a4c0f uml: fix compile for x86-64
 
-/**
- * struct dma_interleaved_template - Template to convey DMAC the
-transfer pattern
- *       and attributes.
- * @src_start: Bus address of source for the first chunk.
- * @dst_start: Bus address of destination for the first chunk.
- * @dir: Specifies the type of Source and Destination.
- * @src_inc: If the source address increments after reading from it.
- * @dst_inc: If the destination address increments after writing to it.
- * @src_sgl: If the 'icg' of sgl[] applies to Source (scattered read).
- *              Otherwise, source is read contiguously (icg ignored).
- *              Ignored if src_inc is false.
- * @dst_sgl: If the 'icg' of sgl[] applies to Destination (scattered write).
- *              Otherwise, destination is filled contiguously (icg ignored).
- *              Ignored if dst_inc is false.
- * @numf: Number of frames in this template.
- * @frame_size: Number of chunks in a frame i.e, size of sgl[].
- * @sgl: Array of {chunk,icg} pairs that make up a frame.
- */
-struct dma_interleaved_template {
-        dma_addr_t src_start;
-        dma_addr_t dst_start;
-        enum dma_transfer_direction dir;
-        bool src_inc;
-        bool dst_inc;
-        bool src_sgl;
-        bool dst_sgl;
-        size_t numf;
-        size_t frame_size;
-        struct data_chunk sgl[0];
-};
-using the interleaved API:
-        struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
-                struct dma_chan *chan, struct dma_interleaved_template *xt,
-                unsigned long flags);
+And added 3, 4, 5, 6:
+603c316 arm: omap4: pmu: support runtime pm
+4899fbd arm: omap4: support pmu
+d737bb1 arm: omap4: create pmu device via hwmod
+4e0259e arm: omap4: hwmod: introduce emu hwmod
+
+Still no interrupts firing. I am using your .config file.
+
+My HW:
+CPU implementer	: 0x41
+CPU architecture: 7
+CPU variant	: 0x1
+CPU part	: 0xc09
+CPU revision	: 2
+
+Hardware	: OMAP4 Panda board
+Revision	: 0020
+
+There must be something I am missing here.
 
 
--- 
-~Vinod
+
+On Thu, Jan 19, 2012 at 6:07 PM, stephane eranian
+<eranian@googlemail.com> wrote:
+> Just did a fresh clone of Linus' tree:
+>
+> $ git log --oneline | fgrep 'allow platform specific'
+> e0516a6 arm: pmu: allow platform specific irq enable/disable handling
+>
+> $ git log --oneline | fgrep 'cross trigger'
+> 14eec97 arm: introduce cross trigger interface helpers
+>
+> Unless you were referring to a different pair of patches.
+>
+>
+> On Thu, Jan 19, 2012 at 2:51 PM, Ming Lei <ming.lei@canonical.com> wrote:
+>> Hi,
+>>
+>> On Thu, Jan 19, 2012 at 9:32 PM, stephane eranian
+>> <eranian@googlemail.com> wrote:
+>>> On Thu, Jan 19, 2012 at 2:26 PM, Ming Lei <ming.lei@canonical.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On Thu, Jan 19, 2012 at 9:14 PM, Ming Lei <ming.lei@canonical.com> wrote:
+>>>>> On Thu, Jan 19, 2012 at 8:51 PM, stephane eranian
+>>>>> <eranian@googlemail.com> wrote:
+>>>>>> On Thu, Jan 19, 2012 at 1:45 PM, Ming Lei <ming.lei@canonical.com> wrote:
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> On Thu, Jan 19, 2012 at 7:34 PM, stephane eranian
+>>>>>>> <eranian@googlemail.com> wrote:
+>>>>>>>> Hi,
+>>>>>>>>
+>>>>>>>> Ok some update on this.
+>>>>>>>> With your .config file + 3.2.0 (Linus) + patch 3, 4, 5, 6, I get a kernel that
+>>>>>>>
+>>>>>>> You forget patch 1 and patch 2?
+>>>>>>>
+>>>>>> They are already in 3.2.0. Unless I am mistaken.
+>>>>>
+>>>>> Sorry, I just found that they have been merged to 3.2.
+>>>>
+>>>> After a double check, the two patches are not merged to 3.2, but have
+>>>> been merged to the latest linus tree and can be seen in 3.3-rc1.
+>>>>
+>>>> Also the commit 3c50729b(ARM: OMAP4: PM: Initialise all the clockdomains
+>>>> to supported states) has been merged to linus tree too.
+>>>>
+>>>> So if you just tested the latest linus tree simply, you need to apply
+>>>> the patch[1]
+>>>> (I have mentioned the problem in the thread.)
+>>>>
+>>>
+>>> Changing LMO, u-boot.bin did not help. Even with perf top I get no
+>>> interrupts.
+>>>
+>>> My Linus tree is at commit fa1952b:
+>>>
+>>> [6] 11891e1 arm: omap4: pmu: support runtime pm
+>>> [5] 25fab8a arm: omap4: support pmu
+>>> [4] fddef77 arm: omap4: create pmu device via hwmod
+>>>
+>>> fa1952b ARM: OMAP4: hwmod data: Add support for the debug modules
+>>
+>> Sorry, there is no commit fa1952b in linus[1] tree at all, so you are
+>> not testing
+>> linus tree...
+>>
+>> If you'd like to follow my instructions, I can help you further.
+>>
+>>> ccb19d2 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+>>> c3b5003 tg3: Fix single-vector MSI-X code
+>>>
+>>> I think [1] had conflicts when applying it to the tree.
+>>
+>> It is only one line(one character) change, you can do it manually.
+>>
+>>>
+>>>> thanks,
+>>>> --
+>>>> Ming Lei
+>>>>
+>>>> [1],
+>>>> diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c
+>>>> b/arch/arm/mach-omap2/clockdomains44xx_data.c
+>>>> index 9299ac2..41d2260 100644
+>>>> --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
+>>>> +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+>>>> @@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
+>>>> ? ? ? .prcm_partition ? = OMAP4430_PRM_PARTITION,
+>>>> ? ? ? .cm_inst ? ? ? ? ?= OMAP4430_PRM_EMU_CM_INST,
+>>>> ? ? ? .clkdm_offs ? ? ? = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
+>>>> - ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_HWSUP,
+>>>> + ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_SWSUP,
+>>>> ?};
+>>>>
+>>
+>> [1], http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=summary
+>>
+>> thanks,
+>> --
+>> Ming Lei
