@@ -1,82 +1,148 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:04:00 +0000
-Subject: [PATCH v4 13/15] ARM: local timers: convert exynos to runtime
- registration interface
+Date: Fri, 20 Jan 2012 12:03:56 +0000
+Subject: [PATCH v4 09/15] ARM: ux500: convert to twd_local_timer_register()
+ interface
 In-Reply-To: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
 References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1327061042-14857-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1327061042-14857-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the Exynos MCT timers to the runtime registration interface.
-Tested on Origen.
+Add support for the new smp_twd runtime registration interface
+to the ux500 platforms, and remove the old compile-time support.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-exynos/mct.c |   18 ++++++++++--------
- 1 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/mach-ux500/Makefile     |    1 -
+ arch/arm/mach-ux500/cpu.c        |    1 -
+ arch/arm/mach-ux500/localtimer.c |   29 -----------------------------
+ arch/arm/mach-ux500/timer.c      |   32 +++++++++++++++++++++++++-------
+ 4 files changed, 25 insertions(+), 38 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/localtimer.c
 
-diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-index 85b5527..edc4b94 100644
---- a/arch/arm/mach-exynos/mct.c
-+++ b/arch/arm/mach-exynos/mct.c
-@@ -21,6 +21,7 @@
- #include <linux/percpu.h>
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 6bd2f45..35b3894 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -15,7 +15,6 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
+ obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+-obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem-irq-db5500.o
+ obj-$(CONFIG_U5500_MBOX)	+= mbox-db5500.o
+ 
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index f418574..851308b 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -14,7 +14,6 @@
  
  #include <asm/hardware/gic.h>
-+#include <asm/localtimer.h>
+ #include <asm/mach/map.h>
+-#include <asm/localtimer.h>
  
- #include <plat/cpu.h>
- 
-@@ -375,7 +376,7 @@ static struct irqaction mct_tick1_event_irq = {
- 	.handler	= exynos4_mct_tick_isr,
- };
- 
--static void exynos4_mct_tick_init(struct clock_event_device *evt)
-+static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
- {
- 	struct mct_clock_event_device *mevt;
- 	unsigned int cpu = smp_processor_id();
-@@ -417,17 +418,11 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
- 	} else {
- 		enable_percpu_irq(IRQ_MCT_LOCALTIMER, 0);
- 	}
--}
+ #include <mach/hardware.h>
+ #include <mach/setup.h>
+diff --git a/arch/arm/mach-ux500/localtimer.c b/arch/arm/mach-ux500/localtimer.c
+deleted file mode 100644
+index 5ba1133..0000000
+--- a/arch/arm/mach-ux500/localtimer.c
++++ /dev/null
+@@ -1,29 +0,0 @@
+-/*
+- * Copyright (C) 2008-2009 ST-Ericsson
+- * Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+- *
+- * This file is heavily based on relaview platform, almost a copy.
+- *
+- * Copyright (C) 2002 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
 -
--/* Setup the local clock events for a CPU */
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
 -int __cpuinit local_timer_setup(struct clock_event_device *evt)
 -{
--	exynos4_mct_tick_init(evt);
+-	evt->irq = IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-	return 0;
+-}
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+index aea467d..cadf982 100644
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@ -8,27 +8,44 @@
+ #include <linux/errno.h>
+ #include <linux/clksrc-dbx500-prcmu.h>
  
- 	return 0;
- }
+-#include <asm/localtimer.h>
++#include <asm/smp_twd.h>
  
--void local_timer_stop(struct clock_event_device *evt)
-+static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ #include <plat/mtu.h>
+ 
+ #include <mach/setup.h>
+ #include <mach/hardware.h>
+ 
++#ifdef CONFIG_HAVE_ARM_TWD
++static DEFINE_TWD_LOCAL_TIMER(u5500_twd_local_timer,
++			      U5500_TWD_BASE, IRQ_LOCALTIMER);
++static DEFINE_TWD_LOCAL_TIMER(u8500_twd_local_timer,
++			      U8500_TWD_BASE, IRQ_LOCALTIMER);
++
++static void __init ux500_twd_init(void)
++{
++	struct twd_local_timer *twd_local_timer;
++	int err;
++
++	twd_local_timer = cpu_is_u5500() ? &u5500_twd_local_timer :
++					   &u8500_twd_local_timer;
++
++	err = twd_local_timer_register(twd_local_timer);
++	if (err)
++		pr_err("twd_local_timer_register failed %d\n", err);
++}
++#else
++#define ux500_twd_init()	do { } while(0)
++#endif
++
+ static void __init ux500_timer_init(void)
  {
- 	unsigned int cpu = smp_processor_id();
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-@@ -439,6 +434,11 @@ void local_timer_stop(struct clock_event_device *evt)
- 	else
- 		disable_percpu_irq(IRQ_MCT_LOCALTIMER);
- }
-+
-+static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
-+	.setup	= exynos4_local_timer_setup,
-+	.stop	= exynos4_local_timer_stop,
-+};
- #endif /* CONFIG_LOCAL_TIMERS */
+ 	void __iomem *prcmu_timer_base;
++	int err;
  
- static void __init exynos4_timer_resources(void)
-@@ -458,6 +458,8 @@ static void __init exynos4_timer_resources(void)
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     IRQ_MCT_LOCALTIMER, err);
- 	}
-+
-+	local_timer_register(&exynos4_mct_tick_ops);
- #endif /* CONFIG_LOCAL_TIMERS */
+ 	if (cpu_is_u5500()) {
+-#ifdef CONFIG_LOCAL_TIMERS
+-		twd_base = __io_address(U5500_TWD_BASE);
+-#endif
+ 		mtu_base = __io_address(U5500_MTU0_BASE);
+ 		prcmu_timer_base = __io_address(U5500_PRCMU_TIMER_3_BASE);
+ 	} else if (cpu_is_u8500()) {
+-#ifdef CONFIG_LOCAL_TIMERS
+-		twd_base = __io_address(U8500_TWD_BASE);
+-#endif
+ 		mtu_base = __io_address(U8500_MTU0_BASE);
+ 		prcmu_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
+ 	} else {
+@@ -54,6 +71,7 @@ static void __init ux500_timer_init(void)
+ 
+ 	nmdk_timer_init();
+ 	clksrc_dbx500_prcmu_init(prcmu_timer_base);
++	ux500_twd_init();
  }
  
+ static void ux500_timer_reset(void)
 -- 
 1.7.7.1
