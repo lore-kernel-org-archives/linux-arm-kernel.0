@@ -1,82 +1,103 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:03:48 +0000
-Subject: [PATCH v4 01/15] ARM: smp_twd: make local_timer_stop a symbol instead
- of a #define
+Date: Fri, 20 Jan 2012 12:03:49 +0000
+Subject: [PATCH v4 02/15] ARM: local timers: introduce a new registration
+ interface
 In-Reply-To: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
 References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1327061042-14857-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1327061042-14857-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_HAVE_ARM_TWD is selected, local_timer_stop is a #define,
-while all other local timers are using a real function.
+In order to switch to a runtime selectable local timer,
+add a registration interface that timer drivers can use to
+register to the core.
 
-Convert it to an alias of twd_timer_stop, as it helps converting
-all local timers to another internal API in a sane way.
+local_timer_setup() and local_timer_stop() are made weak symbols
+in order not to break existing setups.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/localtimer.h |    6 +-----
- arch/arm/include/asm/smp_twd.h    |    1 -
- arch/arm/kernel/smp_twd.c         |    7 ++++++-
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/localtimer.h |   15 +++++++++++++++
+ arch/arm/kernel/smp.c             |   27 +++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index c6a1842..7e1b2c5 100644
+index 7e1b2c5..f088d63 100644
 --- a/arch/arm/include/asm/localtimer.h
 +++ b/arch/arm/include/asm/localtimer.h
-@@ -26,17 +26,13 @@ void percpu_timer_setup(void);
+@@ -15,6 +15,11 @@
  
- #include "smp_twd.h"
+ struct clock_event_device;
  
--#define local_timer_stop(c)	twd_timer_stop((c))
--
--#else
-+#endif
- 
++struct local_timer_ops {
++	int  (*setup)(struct clock_event_device *);
++	void (*stop)(struct clock_event_device *);
++};
++
  /*
-  * Stop the local timer
+  * Setup a per-cpu timer, whether it be a local timer or dummy broadcast
   */
- void local_timer_stop(struct clock_event_device *);
- 
--#endif
--
- /*
-  * Setup a local timer interrupt for a CPU.
+@@ -38,6 +43,11 @@ void local_timer_stop(struct clock_event_device *);
   */
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index ef9ffba9..bf8449d 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -23,6 +23,5 @@ struct clock_event_device;
- extern void __iomem *twd_base;
+ int local_timer_setup(struct clock_event_device *);
  
- void twd_timer_setup(struct clock_event_device *);
--void twd_timer_stop(struct clock_event_device *);
++/*
++ * Register a local timer driver
++ */
++int local_timer_register(struct local_timer_ops *);
++
+ #else
+ 
+ static inline int local_timer_setup(struct clock_event_device *evt)
+@@ -48,6 +58,11 @@ static inline int local_timer_setup(struct clock_event_device *evt)
+ static inline void local_timer_stop(struct clock_event_device *evt)
+ {
+ }
++
++static inline int local_timer_register(struct local_timer_ops *ops)
++{
++	return -ENXIO;
++}
+ #endif
  
  #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index c8e9385..95a0c14 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -87,12 +87,17 @@ int twd_timer_ack(void)
- 	return 0;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 57db122..69d5f8b 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -475,6 +475,33 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+ 	clockevents_register_device(evt);
  }
  
--void twd_timer_stop(struct clock_event_device *clk)
-+static void twd_timer_stop(struct clock_event_device *clk)
- {
- 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
- 	disable_percpu_irq(clk->irq);
- }
- 
-+/* Temporary hack to be removed when all TWD users are converted to
-+   the new registration interface */
-+void local_timer_stop(struct clock_event_device *clk)
-+	__attribute__ ((alias ("twd_timer_stop")));
++static struct local_timer_ops *lt_ops;
 +
- #ifdef CONFIG_CPU_FREQ
- 
- /*
++#ifdef CONFIG_LOCAL_TIMERS
++int local_timer_register(struct local_timer_ops *ops)
++{
++	if (lt_ops)
++		return -EBUSY;
++
++	lt_ops = ops;
++	return 0;
++}
++#endif
++
++int __cpuinit __attribute__ ((weak)) local_timer_setup(struct clock_event_device *clk)
++{
++	if (lt_ops)
++		return lt_ops->setup(clk);
++
++	return -ENXIO;
++}
++
++void __attribute__ ((weak)) local_timer_stop(struct clock_event_device *clk)
++{
++	if (lt_ops)
++		lt_ops->stop(clk);
++}
++
+ void __cpuinit percpu_timer_setup(void)
+ {
+ 	unsigned int cpu = smp_processor_id();
 -- 
 1.7.7.1
