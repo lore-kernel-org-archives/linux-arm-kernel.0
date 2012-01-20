@@ -1,207 +1,130 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:03:51 +0000
-Subject: [PATCH v4 04/15] ARM: smp_twd: add device tree support
+Date: Fri, 20 Jan 2012 12:03:57 +0000
+Subject: [PATCH v4 10/15] ARM: highbank: convert to twd_local_timer_register()
+ interface
 In-Reply-To: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
 References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1327061042-14857-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1327061042-14857-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings to support DT discovery of the ARM Timer Watchdog
-(aka TWD). Only the timer side is converted by this patch.
+Add support for the new smp_twd runtime registration interface
+to the highbank platforms, and remove the old compile-time support.
+
+The highbank DTS file is updated to match the TWD DT documentation
+and fixes the timer trigger (rising edge).
 
 Acked-by: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/devicetree/bindings/arm/twd.txt |   48 +++++++++++++++
- arch/arm/include/asm/smp_twd.h                |    8 +++
- arch/arm/kernel/smp_twd.c                     |   77 ++++++++++++++++++++----
- 3 files changed, 120 insertions(+), 13 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
+ arch/arm/boot/dts/highbank.dts      |    8 +++---
+ arch/arm/mach-highbank/Makefile     |    1 -
+ arch/arm/mach-highbank/highbank.c   |    3 ++
+ arch/arm/mach-highbank/localtimer.c |   40 -----------------------------------
+ 4 files changed, 7 insertions(+), 45 deletions(-)
+ delete mode 100644 arch/arm/mach-highbank/localtimer.c
 
-diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
-new file mode 100644
-index 0000000..75b8610
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/twd.txt
-@@ -0,0 +1,48 @@
-+* ARM Timer Watchdog
-+
-+ARM 11MP, Cortex-A5 and Cortex-A9 are often associated with a per-core
-+Timer-Watchdog (aka TWD), which provides both a per-cpu local timer
-+and watchdog.
-+
-+The TWD is usually attached to a GIC to deliver its two per-processor
-+interrupts.
-+
-+** Timer node required properties:
-+
-+- compatible : Should be one of:
-+	"arm,cortex-a9-twd-timer"
-+	"arm,cortex-a5-twd-timer"
-+	"arm,arm11mp-twd-timer"
-+
-+- interrupts : One interrupt to each core
-+
-+- reg : Specify the base address and the size of the TWD timer
-+	register window.
-+
-+Example:
-+
-+	twd-timer at 2c000600 {
-+		compatible = "arm,arm11mp-twd-timer"";
-+		reg = <0x2c000600 0x20>;
-+		interrupts = <1 13 0xf01>;
-+	};
-+
-+** Watchdog node properties:
-+
-+- compatible : Should be one of:
-+	"arm,cortex-a9-twd-wdt"
-+	"arm,cortex-a5-twd-wdt"
-+	"arm,arm11mp-twd-wdt"
-+
-+- interrupts : One interrupt to each core
-+
-+- reg : Specify the base address and the size of the TWD watchdog
-+	register window.
-+
-+Example:
-+
-+	twd-watchdog at 2c000620 {
-+		compatible = "arm,arm11mp-twd-wdt";
-+		reg = <0x2c000620 0x20>;
-+		interrupts = <1 14 0xf01>;
-+	};
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 16c89b7..8047e6e 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -40,4 +40,12 @@ struct twd_local_timer name __initdata = {	\
+diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
+index 305635b..37c0ff9 100644
+--- a/arch/arm/boot/dts/highbank.dts
++++ b/arch/arm/boot/dts/highbank.dts
+@@ -72,15 +72,15 @@
+ 		ranges;
  
- int twd_local_timer_register(struct twd_local_timer *);
+ 		timer at fff10600 {
+-			compatible = "arm,smp-twd";
++			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xfff10600 0x20>;
+-			interrupts = <1 13 0xf04>;
++			interrupts = <1 13 0xf01>;
+ 		};
  
-+#ifdef CONFIG_HAVE_ARM_TWD
-+void twd_local_timer_of_register(void);
-+#else
-+static inline void twd_local_timer_of_register(void)
-+{
-+}
-+#endif
+ 		watchdog at fff10620 {
+-			compatible = "arm,cortex-a9-wdt";
++			compatible = "arm,cortex-a9-twd-wdt";
+ 			reg = <0xfff10620 0x20>;
+-			interrupts = <1 14 0xf04>;
++			interrupts = <1 14 0xf01>;
+ 		};
+ 
+ 		intc: interrupt-controller at fff11000 {
+diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+index 986958a..f8437dd 100644
+--- a/arch/arm/mach-highbank/Makefile
++++ b/arch/arm/mach-highbank/Makefile
+@@ -1,6 +1,5 @@
+ obj-y					:= clock.o highbank.o system.o
+ obj-$(CONFIG_DEBUG_HIGHBANK_UART)	+= lluart.o
+ obj-$(CONFIG_SMP)			+= platsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+ obj-$(CONFIG_PM_SLEEP)			+= pm.o
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 7afbe1e..ef3e1eb 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -26,6 +26,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_scu.h>
++#include <asm/smp_twd.h>
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/timer-sp.h>
+ #include <asm/hardware/gic.h>
+@@ -112,6 +113,8 @@ static void __init highbank_timer_init(void)
+ 
+ 	sp804_clocksource_init(timer_base + 0x20, "timer1");
+ 	sp804_clockevents_init(timer_base, irq, "timer0");
 +
- #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index f105e91..d2dce64 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -20,6 +20,8 @@
- #include <linux/clockchips.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
- 
- #include <asm/smp_twd.h>
- #include <asm/localtimer.h>
-@@ -282,37 +284,86 @@ static struct local_timer_ops twd_lt_ops __cpuinitdata = {
- 	.stop	= twd_timer_stop,
- };
- 
--int __init twd_local_timer_register(struct twd_local_timer *tlt)
-+static int __init twd_local_timer_common_register(void)
- {
- 	int err;
- 
--	if (twd_base || twd_evt)
--		return -EBUSY;
--
--	twd_ppi	= tlt->res[1].start;
--
- 	twd_evt = alloc_percpu(struct clock_event_device *);
--	twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
--	if (!twd_base || !twd_evt) {
-+	if (!twd_evt) {
- 		err = -ENOMEM;
--		goto out;
-+		goto out_free;
- 	}
- 
- 	err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_evt);
- 	if (err) {
- 		pr_err("twd: can't register interrupt %d (%d)\n", twd_ppi, err);
--		goto out;
-+		goto out_free;
- 	}
- 
- 	err = local_timer_register(&twd_lt_ops);
- 	if (err)
--		goto out;
-+		goto out_irq;
- 
- 	return 0;
- 
--out:
-+out_irq:
-+	free_percpu_irq(twd_ppi, twd_evt);
-+out_free:
- 	iounmap(twd_base);
-+	twd_base = NULL;
- 	free_percpu(twd_evt);
--	twd_base = twd_evt = NULL;
-+
- 	return err;
++	twd_local_timer_of_register();
  }
-+
-+int __init twd_local_timer_register(struct twd_local_timer *tlt)
-+{
-+	if (twd_base || twd_evt)
-+		return -EBUSY;
-+
-+	twd_ppi	= tlt->res[1].start;
-+
-+	twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
-+	if (!twd_base)
-+		return -ENOMEM;
-+
-+	return twd_local_timer_common_register();
-+}
-+
-+#ifdef CONFIG_OF
-+const static struct of_device_id twd_of_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a9-twd-timer",	},
-+	{ .compatible = "arm,cortex-a5-twd-timer",	},
-+	{ .compatible = "arm,arm11mp-twd-timer",	},
-+	{ },
-+};
-+
-+void __init twd_local_timer_of_register(void)
-+{
-+	struct device_node *np;
-+	int err;
-+
-+	np = of_find_matching_node(NULL, twd_of_match);
-+	if (!np) {
-+		err = -ENODEV;
-+		goto out;
-+	}
-+
-+	twd_ppi = irq_of_parse_and_map(np, 0);
-+	if (!twd_ppi) {
-+		err = -EINVAL;
-+		goto out;
-+	}
-+
-+	twd_base = of_iomap(np, 0);
-+	if (!twd_base) {
-+		err = -ENOMEM;
-+		goto out;
-+	}
-+
-+	err = twd_local_timer_common_register();
-+
-+out:
-+	WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
-+}
-+#endif
+ 
+ static struct sys_timer highbank_timer = {
+diff --git a/arch/arm/mach-highbank/localtimer.c b/arch/arm/mach-highbank/localtimer.c
+deleted file mode 100644
+index 5a00e79..0000000
+--- a/arch/arm/mach-highbank/localtimer.c
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/*
+- * Copyright 2010-2011 Calxeda, Inc.
+- * Based on localtimer.c, Copyright (C) 2002 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms and conditions of the GNU General Public License,
+- * version 2, as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#include <linux/init.h>
+-#include <linux/clockchips.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-
+-#include <asm/smp_twd.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	struct device_node *np;
+-
+-	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
+-	if (!twd_base) {
+-		twd_base = of_iomap(np, 0);
+-		WARN_ON(!twd_base);
+-	}
+-	evt->irq = irq_of_parse_and_map(np, 0);
+-	twd_timer_setup(evt);
+-	return 0;
+-}
 -- 
 1.7.7.1
