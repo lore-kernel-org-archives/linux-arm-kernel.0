@@ -1,75 +1,50 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jan 2012 09:30:30 +0000
-Subject: [PATCH 24/31] ARM: amba: ep93xx: use common amba device initializers
+Date: Fri, 20 Jan 2012 09:30:50 +0000
+Subject: [PATCH 25/31] ARM: amba: bcmring: use common amba device initializers
 In-Reply-To: <20120120092207.GD1068@n2100.arm.linux.org.uk>
 References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
-Message-ID: <E1RoAnm-0005Fu-Pc@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RoAo6-0005Fy-Tb@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ep93xx/core.c |   46 +++++-------------------------------------
- 1 files changed, 6 insertions(+), 40 deletions(-)
+ arch/arm/mach-bcmring/core.c |   23 ++---------------------
+ 1 files changed, 2 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 1a8397a..903edb0 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -279,48 +279,14 @@ static struct amba_pl010_data ep93xx_uart_data = {
- 	.set_mctrl	= ep93xx_uart_set_mctrl,
- };
+diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+index 6b67b7e..22e4e0a 100644
+--- a/arch/arm/mach-bcmring/core.c
++++ b/arch/arm/mach-bcmring/core.c
+@@ -52,27 +52,8 @@
+ #include <mach/csp/chipcHw_inline.h>
+ #include <mach/csp/tmrHw_reg.h>
  
--static struct amba_device uart1_device = {
--	.dev		= {
--		.init_name	= "apb:uart1",
--		.platform_data	= &ep93xx_uart_data,
--	},
--	.res		= {
--		.start	= EP93XX_UART1_PHYS_BASE,
--		.end	= EP93XX_UART1_PHYS_BASE + 0x0fff,
--		.flags	= IORESOURCE_MEM,
--	},
--	.irq		= { IRQ_EP93XX_UART1 },
--	.periphid	= 0x00041010,
--};
+-#define AMBA_DEVICE(name, initname, base, plat, size)       \
+-static struct amba_device name##_device = {     \
+-   .dev = {                                     \
+-      .coherent_dma_mask = ~0,                  \
+-      .init_name = initname,                    \
+-      .platform_data = plat                     \
+-   },                                           \
+-   .res = {                                     \
+-      .start = MM_ADDR_IO_##base,               \
+-		.end = MM_ADDR_IO_##base + (size) - 1,    \
+-      .flags = IORESOURCE_MEM                   \
+-   },                                           \
+-   .dma_mask = ~0,                              \
+-   .irq = {                                     \
+-      IRQ_##base                                \
+-   }                                            \
+-}
 -
--static struct amba_device uart2_device = {
--	.dev		= {
--		.init_name	= "apb:uart2",
--		.platform_data	= &ep93xx_uart_data,
--	},
--	.res		= {
--		.start	= EP93XX_UART2_PHYS_BASE,
--		.end	= EP93XX_UART2_PHYS_BASE + 0x0fff,
--		.flags	= IORESOURCE_MEM,
--	},
--	.irq		= { IRQ_EP93XX_UART2 },
--	.periphid	= 0x00041010,
--};
-+static AMBA_APB_DEVICE(uart1, "apb:uart1", 0x00041010, EP93XX_UART1_PHYS_BASE,
-+	{ IRQ_EP93XX_UART1 }, &ep93xx_uart_data);
+-
+-AMBA_DEVICE(uartA, "uarta", UARTA, NULL, SZ_4K);
+-AMBA_DEVICE(uartB, "uartb", UARTB, NULL, SZ_4K);
++static AMBA_APB_DEVICE(uartA, "uarta", MM_ADDR_IO_UARTA, { IRQ_UARTA }, NULL);
++static AMBA_APB_DEVICE(uartB, "uartb", MM_ADDR_IO_UARTB, { IRQ_UARTB }, NULL);
  
--static struct amba_device uart3_device = {
--	.dev		= {
--		.init_name	= "apb:uart3",
--		.platform_data	= &ep93xx_uart_data,
--	},
--	.res		= {
--		.start	= EP93XX_UART3_PHYS_BASE,
--		.end	= EP93XX_UART3_PHYS_BASE + 0x0fff,
--		.flags	= IORESOURCE_MEM,
--	},
--	.irq		= { IRQ_EP93XX_UART3 },
--	.periphid	= 0x00041010,
--};
-+static AMBA_APB_DEVICE(uart2, "apb:uart2", 0x00041010, EP93XX_UART2_PHYS_BASE,
-+	{ IRQ_EP93XX_UART2 }, &ep93xx_uart_data);
- 
-+static AMBA_APB_DEVICE(uart3, "apb:uart3", 0x00041010, EP93XX_UART3_PHYS_BASE,
-+	{ IRQ_EP93XX_UART3 }, &ep93xx_uart_data);
- 
- static struct resource ep93xx_rtc_resource[] = {
- 	{
+ static struct clk pll1_clk = {
+ 	.name = "PLL1",
 -- 
 1.7.4.4
