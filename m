@@ -1,106 +1,127 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:03:47 +0000
-Subject: [PATCH v4 00/15] Runtime registration for local timers
-Message-ID: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 20 Jan 2012 12:03:52 +0000
+Subject: [PATCH v4 05/15] ARM: OMAP4: convert to twd_local_timer_register()
+ interface
+In-Reply-To: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
+References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1327061042-14857-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series switches the various local timers implementation
-(TWD, MCT, MSM timer) to be registered at runtime instead of being
-hardwired at compile time. In the process, TWD gets an OF binding that
-is used by highbank and imx6q.
+Add support for the new smp_twd runtime registration interface
+to the OMAP4 platforms, and remove the old compile-time support.
+Tested on Panda.
 
-Tested on EB11MP, OMAP4, Tegra and Exynos4. Based on v3.3-rc1.
-
-Branch also available at:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git local_timers-v3.3-rc1
-
-* From v3:
-- Fix !LOCAL_TIMERS warning in smp_twd.h
-- Fix ct-ca9x twd init that was too early
-- Rebased to v3.3-rc1
-
-* From v2:
-- Fix __initdata anotations that should have been __cpuinitdata
-  (reported by David Brown and Russell King)
-- Fix interrupt trigger in DTS file for highbank and imx6q
-  (as requested by Rob Herring and Shawn Guo)
-- Move warning to twd_local_timer_of_register()
-  (as requested by Rob Herring)
-- Fix shmobile compilation fix (reported by Magnus Damm)
-- Fold local_timer_{setup,stop}() into percpu_timer_{setup,stop}()
-
-* From initial version:
-- Moved away from late_time_init, making the code even simpler
-- Added a DEFINE_TWD_LOCAL_TIMER() macro to reduce the init cluter
-- Updated TWD DT support to have separate nodes for timer and watchdog
-- Added support for the new r8a7779 shmobile that suddenly appeared
-- Fixed a tiny dts bug on imx6q
-
-Marc Zyngier (15):
-  ARM: smp_twd: make local_timer_stop a symbol instead of a #define
-  ARM: local timers: introduce a new registration interface
-  ARM: smp_twd: add runtime registration support
-  ARM: smp_twd: add device tree support
-  ARM: OMAP4: convert to twd_local_timer_register() interface
-  ARM: plat-versatile: convert to twd_local_timer_register() interface
-  ARM: tegra: convert to twd_local_timer_register() interface
-  ARM: shmobile: convert to twd_local_timer_register() interface
-  ARM: ux500: convert to twd_local_timer_register() interface
-  ARM: highbank: convert to twd_local_timer_register() interface
-  ARM: imx6q: convert to twd_local_timer_register() interface
-  ARM: smp_twd: remove old local timer interface
-  ARM: local timers: convert exynos to runtime registration interface
-  ARM: local timers: convert MSM to runtime registration interface
-  ARM: local timers: make the runtime registration interface mandatory
-
- Documentation/devicetree/bindings/arm/twd.txt |   48 ++++++++++
- arch/arm/boot/dts/highbank.dts                |    8 +-
- arch/arm/boot/dts/imx6q.dtsi                  |    6 +-
- arch/arm/include/asm/localtimer.h             |   37 ++------
- arch/arm/include/asm/smp_twd.h                |   25 ++++-
- arch/arm/kernel/smp.c                         |   22 ++++-
- arch/arm/kernel/smp_twd.c                     |  123 ++++++++++++++++++++-----
- arch/arm/mach-exynos/mct.c                    |   18 ++--
- arch/arm/mach-highbank/Makefile               |    1 -
- arch/arm/mach-highbank/highbank.c             |    3 +
- arch/arm/mach-highbank/localtimer.c           |   40 --------
- arch/arm/mach-imx/Makefile                    |    1 -
- arch/arm/mach-imx/localtimer.c                |   35 -------
- arch/arm/mach-imx/mach-imx6q.c                |    2 +
- arch/arm/mach-msm/timer.c                     |   79 +++++++++-------
- arch/arm/mach-omap2/Makefile                  |    1 -
- arch/arm/mach-omap2/timer-mpu.c               |   39 --------
- arch/arm/mach-omap2/timer.c                   |   22 ++++-
- arch/arm/mach-realview/realview_eb.c          |   27 ++++-
- arch/arm/mach-realview/realview_pb11mp.c      |   21 ++++-
- arch/arm/mach-realview/realview_pbx.c         |   20 +++-
- arch/arm/mach-shmobile/Makefile               |    1 -
- arch/arm/mach-shmobile/include/mach/common.h  |    2 +
- arch/arm/mach-shmobile/localtimer.c           |   26 -----
- arch/arm/mach-shmobile/platsmp.c              |    1 -
- arch/arm/mach-shmobile/smp-r8a7779.c          |    8 +-
- arch/arm/mach-shmobile/smp-sh73a0.c           |    8 +-
- arch/arm/mach-shmobile/timer.c                |   10 ++
- arch/arm/mach-tegra/Makefile                  |    2 +-
- arch/arm/mach-tegra/localtimer.c              |   26 -----
- arch/arm/mach-tegra/timer.c                   |   22 ++++-
- arch/arm/mach-ux500/Makefile                  |    1 -
- arch/arm/mach-ux500/cpu.c                     |    1 -
- arch/arm/mach-ux500/localtimer.c              |   29 ------
- arch/arm/mach-ux500/timer.c                   |   32 +++++--
- arch/arm/mach-vexpress/ct-ca9x4.c             |   17 +++-
- arch/arm/plat-versatile/Makefile              |    1 -
- arch/arm/plat-versatile/localtimer.c          |   27 ------
- 38 files changed, 407 insertions(+), 385 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/twd.txt
- delete mode 100644 arch/arm/mach-highbank/localtimer.c
- delete mode 100644 arch/arm/mach-imx/localtimer.c
+Cc: Tony Lindgren <tony@atomide.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-omap2/Makefile    |    1 -
+ arch/arm/mach-omap2/timer-mpu.c |   39 ---------------------------------------
+ arch/arm/mach-omap2/timer.c     |   22 +++++++++++++++++-----
+ 3 files changed, 17 insertions(+), 45 deletions(-)
  delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
- delete mode 100644 arch/arm/mach-shmobile/localtimer.c
- delete mode 100644 arch/arm/mach-tegra/localtimer.c
- delete mode 100644 arch/arm/mach-ux500/localtimer.c
- delete mode 100644 arch/arm/plat-versatile/localtimer.c
 
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index fc9b238..27ea7c2 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -23,7 +23,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+ 
+ # SMP support ONLY available for OMAP4
+ obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o \
+ 					   sleep44xx.o
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
+deleted file mode 100644
+index 31c0ac4..0000000
+--- a/arch/arm/mach-omap2/timer-mpu.c
++++ /dev/null
+@@ -1,39 +0,0 @@
+-/*
+- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
+- * own timer in it's MPU domain. These timers will be driving the
+- * linux kernel SMP tick framework when active. These timers are not
+- * part of the wake up domain.
+- *
+- * Copyright (C) 2009 Texas Instruments, Inc.
+- *
+- * Author:
+- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
+- *
+- * This file is based on arm realview smp platform file.
+- * Copyright (C) 2002 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	/* Local timers are not supprted on OMAP4430 ES1.0 */
+-	if (omap_rev() == OMAP4430_REV_ES1_0)
+-		return -ENXIO;
+-
+-	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-	return 0;
+-}
+-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 6eeff0e..d07e733 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -39,7 +39,7 @@
+ 
+ #include <asm/mach/time.h>
+ #include <plat/dmtimer.h>
+-#include <asm/localtimer.h>
++#include <asm/smp_twd.h>
+ #include <asm/sched_clock.h>
+ #include "common.h"
+ #include <plat/omap_hwmod.h>
+@@ -324,14 +324,26 @@ OMAP_SYS_TIMER(3_secure)
+ #endif
+ 
+ #ifdef CONFIG_ARCH_OMAP4
+-static void __init omap4_timer_init(void)
+-{
+ #ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
+-	BUG_ON(!twd_base);
++static DEFINE_TWD_LOCAL_TIMER(twd_local_timer,
++			      OMAP44XX_LOCAL_TWD_BASE,
++			      OMAP44XX_IRQ_LOCALTIMER);
+ #endif
++
++static void __init omap4_timer_init(void)
++{
+ 	omap2_gp_clockevent_init(1, OMAP4_CLKEV_SOURCE);
+ 	omap2_gp_clocksource_init(2, OMAP4_MPU_SOURCE);
++#ifdef CONFIG_LOCAL_TIMERS
++	/* Local timers are not supprted on OMAP4430 ES1.0 */
++	if (omap_rev() != OMAP4430_REV_ES1_0) {
++		int err;
++
++		err = twd_local_timer_register(&twd_local_timer);
++		if (err)
++			pr_err("twd_local_timer_register failed %d\n", err);
++	}
++#endif
+ }
+ OMAP_SYS_TIMER(4)
+ #endif
 -- 
 1.7.7.1
