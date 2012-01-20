@@ -1,46 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 20 Jan 2012 17:40:36 +0100
-Subject: inconvenience when hand editing DEBUG_LL in .config
-Message-ID: <20120120164036.GO4066@pengutronix.de>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 20 Jan 2012 11:39:47 -0500
+Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
+In-Reply-To: <1327075829-14346-3-git-send-email-lee.jones@linaro.org>
+References: <1327075829-14346-1-git-send-email-lee.jones@linaro.org>
+ <1327075829-14346-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120120163947.GB4900@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Jan 20, 2012 at 04:10:25PM +0000, Lee Jones wrote:
+> +struct soc_device *soc_device_register(struct soc_device_attribute *soc_dev_attr)
+> +{
+> +	struct soc_device *soc_dev;
+> +	int ret;
+> +	int i, j = 0;
+> +
+> +	soc_dev = kzalloc(sizeof(*soc_dev), GFP_KERNEL);
+> +	if (!soc_dev) {
+> +	        ret = -ENOMEM;
+> +		goto out1;
+> +	}
 
-usually when I want to change a single kernel option I just open .config
-in my editor, remove the line for the config item I want to change and
-run oldconfig. For DEBUG_LL (defined in arch/arm/Kconfig.debug) this
-doesn't work as usual though.
+<snip>
 
-On 3.3-rc1 the following happens:
+> +out1:
+> +	kfree(soc_dev_attr);
 
-	make ARCH=arm at91rm9200_defconfig
-	sed -i /CONFIG_DEBUG_LL/d .config
-	make ARCH=arm oldconfig
-
-The last command then asks me for DEBUG_LL, after specifying 'y', the
-output looks as follows:
-
-	Verbose user fault messages (DEBUG_USER) [N/y/?] n
-	Kernel low-level debugging functions (read help!) (DEBUG_LL) [N/y/?] (NEW) y
-	  Kernel low-level debugging port
-	  > 1. No low-level debugging UART (DEBUG_LL_UART_NONE) (NEW)
-	    2. Kernel low-level debugging via EmbeddedICE DCC channel (DEBUG_ICEDCC) (NEW)
-	    3. Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10 and 9rl (AT91_DEBUG_LL_DBGU0) (NEW)
-	  choice[1-3]: 1
-	  Early printk (EARLY_PRINTK) [N/y/?] (NEW) 
-
-Note that I didn't specify the '1' for the choice even though all items
-are marked as new and oldconfig only starts at EARLY_PRINTK to ask
-again.
-
-I would have expected to be able to select AT91_DEBUG_LL_DBGU0.
-
-This is not intended, is it?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+You just freed the caller's memory, are you sure you wanted to do that?
