@@ -1,73 +1,20 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 20 Jan 2012 19:24:23 +0200
-Subject: [PATCH] ARM: OMAP: fix erroneous mmc2 clock change on mmc3 setup
-In-Reply-To: <1324168547-26569-1-git-send-email-notasas@gmail.com>
-References: <1324168547-26569-1-git-send-email-notasas@gmail.com>
-Message-ID: <CANOLnONJgEJehOiH0_0AUWnAu62K-8A_cmv4UW0v=dwoQnn62w@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 20 Jan 2012 11:36:59 -0600
+Subject: [PATCH] ARM: move CP15 definitions to separate header file
+In-Reply-To: <E1RoBJw-0005UP-By@rmk-PC.arm.linux.org.uk>
+References: <E1RoBJw-0005UP-By@rmk-PC.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F9D06870@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Friday, January 20, 2012 3:04 AM, Russell King wrote:
+> Avoid namespace conflicts with drivers over the CP15 definitions by
+> moving CP15 related prototypes and definitions to a private header
+> file.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Would be nice to have this for -rc as this used to work several
-releases back when hsmmc23_before_set_reg() was checking for a
-regulator, which wasn't set for MMC3 so the function would return
-early, not causing the problem it causes now.
+For EP93xx,
 
-On Sun, Dec 18, 2011 at 2:35 AM, Grazvydas Ignotas <notasas@gmail.com> wrote:
-> hsmmc23_before_set_reg() can set MMCSDIO2ADPCLKISEL bit, which
-> enables internal clock for MMC2. Currently this function is also called
-> by code handling MMC3, and if .internal_clock is set in platform data
-> (by default it currently is), it will set MMCSDIO2ADPCLKISEL for MMC2
-> instead of MMC3 (MMC3 doesn't have such bit so nothing actually needs to
-> be done). This breaks 2nd SD slot on pandora.
->
-> Fix this by changing hsmmc23_before_set_reg() to only handle MMC2.
-> Note that this removes .remux() call for MMC3, but no board currently
-> needs it and it's also not called for MMC4 and MMC5.
->
-> Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
-> ---
-> applies both on mainline and hsmmc branch.
->
-> ?arch/arm/mach-omap2/hsmmc.c | ? ?7 +++----
-> ?1 files changed, 3 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-> index f4a1020..d90ac08 100644
-> --- a/arch/arm/mach-omap2/hsmmc.c
-> +++ b/arch/arm/mach-omap2/hsmmc.c
-> @@ -171,7 +171,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
-> ? ? ? ?}
-> ?}
->
-> -static void hsmmc23_before_set_reg(struct device *dev, int slot,
-> +static void hsmmc2_before_set_reg(struct device *dev, int slot,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int power_on, int vdd)
-> ?{
-> ? ? ? ?struct omap_mmc_platform_data *mmc = dev->platform_data;
-> @@ -378,14 +378,13 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
-> ? ? ? ? ? ? ? ? ? ? ? ?c->caps &= ~MMC_CAP_8_BIT_DATA;
-> ? ? ? ? ? ? ? ? ? ? ? ?c->caps |= MMC_CAP_4_BIT_DATA;
-> ? ? ? ? ? ? ? ?}
-> - ? ? ? ? ? ? ? /* FALLTHROUGH */
-> - ? ? ? case 3:
-> ? ? ? ? ? ? ? ?if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
-> ? ? ? ? ? ? ? ? ? ? ? ?/* off-chip level shifting, or none */
-> - ? ? ? ? ? ? ? ? ? ? ? mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
-> + ? ? ? ? ? ? ? ? ? ? ? mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
-> ? ? ? ? ? ? ? ? ? ? ? ?mmc->slots[0].after_set_reg = NULL;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?break;
-> + ? ? ? case 3:
-> ? ? ? ?case 4:
-> ? ? ? ?case 5:
-> ? ? ? ? ? ? ? ?mmc->slots[0].before_set_reg = NULL;
-> --
-> 1.7.0.4
->
-
-
-
--- 
-Gra?vydas
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
