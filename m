@@ -1,119 +1,148 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jan 2012 12:03:58 +0000
-Subject: [PATCH v4 11/15] ARM: imx6q: convert to twd_local_timer_register()
- interface
+Date: Fri, 20 Jan 2012 12:03:59 +0000
+Subject: [PATCH v4 12/15] ARM: smp_twd: remove old local timer interface
 In-Reply-To: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
 References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1327061042-14857-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1327061042-14857-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the new smp_twd runtime registration interface
-to the imx6q platforms, and remove the old compile-time support.
+Now that all users of the previous local timer interface
+have been converted to the runtime registration API, make
+this interface the only one supported for this driver.
 
-The imx6q DTS file is updated to match the TWD DT documentation.
-Also present in this patch a DTS fix to the timer interrupt routing
-(the PPI connection uses bits [15:8]) and trigger (rising edge).
-
-Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/boot/dts/imx6q.dtsi   |    6 +++---
- arch/arm/mach-imx/Makefile     |    1 -
- arch/arm/mach-imx/localtimer.c |   35 -----------------------------------
- arch/arm/mach-imx/mach-imx6q.c |    2 ++
- 4 files changed, 5 insertions(+), 39 deletions(-)
- delete mode 100644 arch/arm/mach-imx/localtimer.c
+ arch/arm/include/asm/localtimer.h |    8 --------
+ arch/arm/include/asm/smp_twd.h    |    6 ------
+ arch/arm/kernel/smp_twd.c         |   34 +++++-----------------------------
+ 3 files changed, 5 insertions(+), 43 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 263e8f3..4905f51 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -88,9 +88,9 @@
- 		ranges;
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index f088d63..955eed1 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -11,7 +11,6 @@
+ #define __ASM_ARM_LOCALTIMER_H
  
- 		timer at 00a00600 {
--			compatible = "arm,smp-twd";
--			reg = <0x00a00600 0x100>;
--			interrupts = <1 13 0xf4>;
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x00a00600 0x20>;
-+			interrupts = <1 13 0xf01>;
- 		};
+ #include <linux/errno.h>
+-#include <linux/interrupt.h>
  
- 		L2: l2-cache at 00a02000 {
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index f5920c2..dd46f07 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -69,7 +69,6 @@ obj-$(CONFIG_CPU_V7) += head-v7.o
- AFLAGS_head-v7.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SMP) += platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
--obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
- obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o
+ struct clock_event_device;
  
- ifeq ($(CONFIG_PM),y)
-diff --git a/arch/arm/mach-imx/localtimer.c b/arch/arm/mach-imx/localtimer.c
-deleted file mode 100644
-index 3a16351..0000000
---- a/arch/arm/mach-imx/localtimer.c
-+++ /dev/null
-@@ -1,35 +0,0 @@
--/*
-- * Copyright 2011 Freescale Semiconductor, Inc.
-- * Copyright 2011 Linaro Ltd.
-- *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
+@@ -26,13 +25,6 @@ struct local_timer_ops {
+ void percpu_timer_setup(void);
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
 -
--#include <linux/init.h>
--#include <linux/clockchips.h>
--#include <linux/of_address.h>
--#include <linux/of_irq.h>
--#include <asm/smp_twd.h>
+-#ifdef CONFIG_HAVE_ARM_TWD
 -
--/*
-- * Setup the local clock events for a CPU.
-- */
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	struct device_node *np;
+-#include "smp_twd.h"
 -
--	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
--	if (!twd_base) {
--		twd_base = of_iomap(np, 0);
--		WARN_ON(!twd_base);
--	}
--	evt->irq = irq_of_parse_and_map(np, 0);
--	twd_timer_setup(evt);
+-#endif
 -
--	return 0;
--}
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index c257281..a2eea86 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -21,6 +21,7 @@
- #include <linux/of_platform.h>
- #include <linux/phy.h>
- #include <linux/micrel_phy.h>
-+#include <asm/smp_twd.h>
- #include <asm/hardware/cache-l2x0.h>
+ /*
+  * Stop the local timer
+  */
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index 8047e6e..0f01f46 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -20,12 +20,6 @@
+ 
+ #include <linux/ioport.h>
+ 
+-struct clock_event_device;
+-
+-extern void __iomem *twd_base;
+-
+-int twd_timer_setup(struct clock_event_device *);
+-
+ struct twd_local_timer {
+ 	struct resource	res[2];
+ };
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index d2dce64..66808c0 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -18,7 +18,7 @@
+ #include <linux/smp.h>
+ #include <linux/jiffies.h>
+ #include <linux/clockchips.h>
+-#include <linux/irq.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+@@ -28,7 +28,7 @@
  #include <asm/hardware/gic.h>
- #include <asm/mach/arch.h>
-@@ -119,6 +120,7 @@ static void __init imx6q_init_irq(void)
- static void __init imx6q_timer_init(void)
+ 
+ /* set up by the platform code */
+-void __iomem *twd_base;
++static void __iomem *twd_base;
+ 
+ static struct clk *twd_clk;
+ static unsigned long twd_timer_rate;
+@@ -80,7 +80,7 @@ static int twd_set_next_event(unsigned long evt,
+  * If a local timer interrupt has occurred, acknowledge and return 1.
+  * Otherwise, return 0.
+  */
+-int twd_timer_ack(void)
++static int twd_timer_ack(void)
  {
- 	mx6q_clocks_init();
-+	twd_local_timer_of_register();
+ 	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
+ 		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
+@@ -96,11 +96,6 @@ static void twd_timer_stop(struct clock_event_device *clk)
+ 	disable_percpu_irq(clk->irq);
  }
  
- static struct sys_timer imx6q_timer = {
+-/* Temporary hack to be removed when all TWD users are converted to
+-   the new registration interface */
+-void local_timer_stop(struct clock_event_device *clk)
+-	__attribute__ ((alias ("twd_timer_stop")));
+-
+ #ifdef CONFIG_CPU_FREQ
+ 
+ /*
+@@ -230,28 +225,10 @@ static struct clk *twd_get_clock(void)
+ /*
+  * Setup the local clock events for a CPU.
+  */
+-int __cpuinit twd_timer_setup(struct clock_event_device *clk)
++static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ {
+ 	struct clock_event_device **this_cpu_clk;
+ 
+-	if (!twd_evt) {
+-		int err;
+-
+-		twd_evt = alloc_percpu(struct clock_event_device *);
+-		if (!twd_evt) {
+-			pr_err("twd: can't allocate memory\n");
+-			return -ENOMEM;
+-		}
+-
+-		err = request_percpu_irq(clk->irq, twd_handler,
+-					 "twd", twd_evt);
+-		if (err) {
+-			pr_err("twd: can't register interrupt %d (%d)\n",
+-			       clk->irq, err);
+-			return err;
+-		}
+-	}
+-
+ 	if (!twd_clk)
+ 		twd_clk = twd_get_clock();
+ 
+@@ -266,8 +243,7 @@ int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+-	if (!clk->irq)
+-		clk->irq = twd_ppi;
++	clk->irq = twd_ppi;
+ 
+ 	this_cpu_clk = __this_cpu_ptr(twd_evt);
+ 	*this_cpu_clk = clk;
 -- 
 1.7.7.1
