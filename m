@@ -1,50 +1,26 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 20 Jan 2012 17:48:31 -0500 (EST)
-Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
-In-Reply-To: <4F19DB35.9060707@gmail.com>
-References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
- <1327091591-27125-12-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1201201608400.19587@xanadu.home> <4F19DB35.9060707@gmail.com>
-Message-ID: <alpine.LFD.2.02.1201201744130.19587@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 21 Jan 2012 00:29:12 +0100
+Subject: [PATCH 1/3] ARM: mx3: Remove unneeded ifdef's from mm-imx3.c
+In-Reply-To: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
+References: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120120232912.GP4066@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jan 2012, Rob Herring wrote:
+On Fri, Jan 20, 2012 at 04:43:08PM -0200, Fabio Estevam wrote:
+> As we are already able to build a kernel that can run on mx31 and mx35, there
+> is no need for the ifdef's anymore, so remove them.
+They were introduced in commit 
 
-> On 01/20/2012 03:11 PM, Nicolas Pitre wrote:
-> > On Fri, 20 Jan 2012, Rob Herring wrote:
-> > 
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> Make mach/irqs.h optional for SPARSE_IRQ. With this change irqs.h can be
-> >> removed by converting platforms over to sparse irq.
-> >>
-> >> This intentionally breaks platforms that enable SPARSE_IRQ.
-> > 
-> > I don't get what you mean here.  The above seems contradictory.
-> > 
-> 
-> You're right. The intro explains things more clearly.
+	87514fc (ARM: imx/mm-imx3: conditionally compile i.MX31 and i.MX35 code)
 
-The intro won't be part of the git history, so please make sure 
-individual commit logs are sensible on their own.
+and the problem was not that we can or cannot do kernels for both mx31
+and mx35, but that we also want to do kernels for only one of them. Did
+you try to build an mx31-only kernel after your change?
 
-> This breaks platforms (at boot time) that don't select SPARSE_IRQ, but 
-> let users enable it in their config. I don't understand why sparse irq 
-> is a user visible config option. We could move HAVE_SPARSE_IRQ down to 
-> each platform that selects SPARSE_IRQ and prevent enabling, but I 
-> think allowing it to break is good encouragement for others to fix 
-> those platforms. I'm open to other ideas.
+Best regards
+Uwe
 
-SPARSE_IRQ shouldn't be a user configurable option.  There is just no 
-point for a user configuring a kernel to be able to change this.
-
-
-Nicolas
-
-
-
-
-> 
-> Rob
-> 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
