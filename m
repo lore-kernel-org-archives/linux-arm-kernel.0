@@ -1,75 +1,65 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 20 Jan 2012 18:49:14 +0100
-Subject: [GIT PULL] at91: fixes for 3.3-rc2
-Message-ID: <4F19A91A.6050706@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jan 2012 17:50:18 +0000
+Subject: [PATCH] ARM: ux500: Initialize irq affinity
+In-Reply-To: <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
+References: <1327064356-3603-1-git-send-email-per.xx.fransson@stericsson.com>
+ <20120120130310.GO1068@n2100.arm.linux.org.uk>
+ <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
+Message-ID: <20120120175018.GC11845@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Fri, Jan 20, 2012 at 04:45:40PM +0100, Linus Walleij wrote:
+> On the Ux500 all shared peripheral IRQs (32 thru 127) are delivered
+> to CPU0 (hardwired, will not work on CPU1), I have heard that this
+> is sort of what everybody does but don't know for sure. (Marc?)
 
-Here is the first batch of fixes for at91 on top of 3.3-rc1.
-In addition to usual fixes, there is:
-- one announce added to feature-removal-schedule.txt (removal of CAP9 family)
-- a fix for sam9g45 family restart: an assembly helper is needed. This fix needs a
-  proper cleanup of both CAP9 and SAM9G45 header and reset controller (rstc)
-- fixes that affect USB and AT91 code but that have already been "Acked-by" Greg: He
-  agreed that those patches should go through arm-soc:
-http://www.spinics.net/lists/linux-usb/msg55474.html
+BTW, if you can't route IRQs to a CPU, then we'll need a hook to
+refuse the affinity call.
 
-Now the usual information:
+> Currently the gic_set_affinity() in common/gic.c isn't called for any
+> IRQs so they are left in their power-on state (from U-Boot or
+> similar) which is essentially correct (we checked dumps of the
+> registers).
 
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+No they aren't.  See the gic code:
 
-  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+        cpu = cpu_logical_map(smp_processor_id());
+        cpumask = 1 << cpu;
+        cpumask |= cpumask << 8;
+        cpumask |= cpumask << 16;
 
-are available in the git repository at: 
-  git://github.com/at91linux/linux-at91.git at91-fixes
+        /*
+         * Set all global interrupts to this CPU only.
+         */
+        for (i = 32; i < gic_irqs; i += 4)
+                writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
 
-Jean-Christophe PLAGNIOL-VILLARD (7):   
-      USB: at91: fix clk_get error handling
-      ARM/USB: at91/ohci-at91: rename vbus_pin_inverted to vbus_pin_active_low
-      ARM: at91: fix cap9 ddrsdr register
-      ARM: at91: merge at91cap9_ddrsdr.h in at91sam9_ddrsdr.h
-      ARM: at91: introduce AT91_SAM9_ALT_RESET to select the at91sam9 alternative reset
-      ARM: at91: make rstc soc independent
-      ARM: at91: Fix at91sam9g45 and at91cap9 reset
+At boot, we program _all_ the GIC IRQs to point@the boot CPU as part
+of the initialization, which will be logical CPU 0.
 
-Nicolas Ferre (2):
-      ARM: at91: fix at91rm9200 soc subtype handling
-      ARM: at91: removal of CAP9 SoC family
+> However when we look at the irq descriptors in e.g. crash:
+> 
+>     crash> irq -s
+>     IRQ NAME                 AFFINITY
+>      36 Nomadik Timer Tick   0
+>      43 uart-pl011           0-1
+>      44 nmk-i2c              0-1
+>      46 pl022                0-1
+>      53 nmk-i2c              0-1
+>      54 nmk-i2c              0-1
+>     (... etc ...)
 
- Documentation/feature-removal-schedule.txt        |   14 +++
- arch/arm/mach-at91/Kconfig                        |   14 +++
- arch/arm/mach-at91/Makefile                       |   14 ++-
- arch/arm/mach-at91/at91cap9.c                     |    9 +--
- arch/arm/mach-at91/at91sam9260.c                  |    1 +
- arch/arm/mach-at91/at91sam9261.c                  |    1 +
- arch/arm/mach-at91/at91sam9263.c                  |    1 +
- arch/arm/mach-at91/at91sam9_alt_reset.S           |    7 +-
- arch/arm/mach-at91/at91sam9g45.c                  |    7 +-
- arch/arm/mach-at91/at91sam9g45_reset.S            |   40 ++++++++
- arch/arm/mach-at91/at91sam9rl.c                   |    1 +
- arch/arm/mach-at91/generic.h                      |    2 +
- arch/arm/mach-at91/include/mach/at91_rstc.h       |   18 +++-
- arch/arm/mach-at91/include/mach/at91cap9.h        |    2 +-
- arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h |  108 ---------------------
- arch/arm/mach-at91/include/mach/at91sam9260.h     |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9261.h     |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9263.h     |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |   30 ++++--
- arch/arm/mach-at91/include/mach/at91sam9g45.h     |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9rl.h      |    2 +-
- arch/arm/mach-at91/include/mach/board.h           |    2 +-
- arch/arm/mach-at91/pm.c                           |    9 +--
- arch/arm/mach-at91/pm.h                           |    8 +-
- arch/arm/mach-at91/pm_slowclock.S                 |    5 +-
- arch/arm/mach-at91/setup.c                        |   16 +++-
- drivers/usb/host/ohci-at91.c                      |   24 ++++-
- 27 files changed, 174 insertions(+), 169 deletions(-)
- create mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
- delete mode 100644 arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
+Yes, and as I said in my previous email, having the affinity mask report
+more CPUs than we set the hardware to is perfectly legal.  What you've
+pointed out above is that setting an affinity mask of _just_ CPU1 should
+be made fail on Ux500.
 
+In other words, when setting an affinity, if:
 
+	affinity & online_mask & ~invalid_cpus
 
--- 
-Nicolas Ferre
+is zero, then we should fail the request to set the affinity.
+
+But that doesn't mean that setting the affinity to ~0 (all CPUs, including
+the invalid CPUs) should be failed.
