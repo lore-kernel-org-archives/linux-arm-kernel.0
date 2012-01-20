@@ -1,19 +1,30 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 20 Jan 2012 11:58:00 -0600
-Subject: [PATCH 18/31] ARM: amba: provide common initializers for static
- amba devices
-In-Reply-To: <E1RoAlq-0005FT-1b@rmk-PC.arm.linux.org.uk>
-References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
- <E1RoAlq-0005FT-1b@rmk-PC.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3F9D06891@AUSP01VMBX24.collaborationhost.net>
+From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Fri, 20 Jan 2012 18:58:22 +0100
+Subject: [PATCH 1/3] mx31moboard: update maintainer
+In-Reply-To: <1327082304-11398-1-git-send-email-philippe.retornaz@epfl.ch>
+References: <1327082304-11398-1-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <1327082304-11398-2-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 20, 2012 2:29 AM, Russell King wrote:
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  include/linux/amba/bus.h |   33 +++++++++++++++++++++++++++++++++
->  1 files changed, 33 insertions(+), 0 deletions(-)
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+---
+ arch/arm/mach-imx/mach-mx31moboard.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
+index 9326915..f695a31 100644
+--- a/arch/arm/mach-imx/mach-mx31moboard.c
++++ b/arch/arm/mach-imx/mach-mx31moboard.c
+@@ -591,7 +591,7 @@ static void __init mx31moboard_reserve(void)
+ }
+ 
+ MACHINE_START(MX31MOBOARD, "EPFL Mobots mx31moboard")
+-	/* Maintainer: Valentin Longchamp, EPFL Mobots group */
++	/* Maintainer: Philippe Retornaz, EPFL Mobots group */
+ 	.atag_offset = 0x100,
+ 	.reserve = mx31moboard_reserve,
+ 	.map_io = mx31_map_io,
+-- 
+1.6.3.3
