@@ -1,32 +1,75 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 20 Jan 2012 21:45:15 +0300
-Subject: [PATCH v2] DaVinci: can only power up domains on DM644x
-In-Reply-To: <3E54258959B69E4282D79E01AB1F32B7265471@DFLE34.ent.ti.com>
-References: <201109151829.49256.sshtylyov@ru.mvista.com>
- <201201062140.33712.sshtylyov@ru.mvista.com>
- <201201062148.32025.sshtylyov@ru.mvista.com>
- <3E54258959B69E4282D79E01AB1F32B7265471@DFLE34.ent.ti.com>
-Message-ID: <4F19B63B.1020306@mvista.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 20 Jan 2012 18:49:14 +0100
+Subject: [GIT PULL] at91: fixes for 3.3-rc2
+Message-ID: <4F19A91A.6050706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Arnd, Olof,
 
-On 01/12/2012 03:00 PM, Karicheri, Muralidharan wrote:
+Here is the first batch of fixes for at91 on top of 3.3-rc1.
+In addition to usual fixes, there is:
+- one announce added to feature-removal-schedule.txt (removal of CAP9 family)
+- a fix for sam9g45 family restart: an assembly helper is needed. This fix needs a
+  proper cleanup of both CAP9 and SAM9G45 header and reset controller (rstc)
+- fixes that affect USB and AT91 code but that have already been "Acked-by" Greg: He
+  agreed that those patches should go through arm-soc:
+http://www.spinics.net/lists/linux-usb/msg55474.html
 
-> Sekhar & Sergei,
+Now the usual information:
 
-> This will affect the new SoCs that have capabilities to power up different domains. Why do we need this enforcement? We are working on a DaVinci variant SoC that can do power up multiple domains
+The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
 
-    Will their power-up procedure be the same as for DM644x?
+  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
 
-> (That is why I had a patch earlier to support
-> Multiple PD which is already part of the tree). So I don't want this patch to go through unless I see a reason for pushing this.
+are available in the git repository at: 
+  git://github.com/at91linux/linux-at91.git at91-fixes
 
-    Why you didn't voice your concern when Sekhar has suggested this approach?
+Jean-Christophe PLAGNIOL-VILLARD (7):   
+      USB: at91: fix clk_get error handling
+      ARM/USB: at91/ohci-at91: rename vbus_pin_inverted to vbus_pin_active_low
+      ARM: at91: fix cap9 ddrsdr register
+      ARM: at91: merge at91cap9_ddrsdr.h in at91sam9_ddrsdr.h
+      ARM: at91: introduce AT91_SAM9_ALT_RESET to select the at91sam9 alternative reset
+      ARM: at91: make rstc soc independent
+      ARM: at91: Fix at91sam9g45 and at91cap9 reset
 
-> Murali Karicheri
-> Software Design Engineer
-> email: m-karicheri2 at ti.com
+Nicolas Ferre (2):
+      ARM: at91: fix at91rm9200 soc subtype handling
+      ARM: at91: removal of CAP9 SoC family
 
-WBR, Sergei
+ Documentation/feature-removal-schedule.txt        |   14 +++
+ arch/arm/mach-at91/Kconfig                        |   14 +++
+ arch/arm/mach-at91/Makefile                       |   14 ++-
+ arch/arm/mach-at91/at91cap9.c                     |    9 +--
+ arch/arm/mach-at91/at91sam9260.c                  |    1 +
+ arch/arm/mach-at91/at91sam9261.c                  |    1 +
+ arch/arm/mach-at91/at91sam9263.c                  |    1 +
+ arch/arm/mach-at91/at91sam9_alt_reset.S           |    7 +-
+ arch/arm/mach-at91/at91sam9g45.c                  |    7 +-
+ arch/arm/mach-at91/at91sam9g45_reset.S            |   40 ++++++++
+ arch/arm/mach-at91/at91sam9rl.c                   |    1 +
+ arch/arm/mach-at91/generic.h                      |    2 +
+ arch/arm/mach-at91/include/mach/at91_rstc.h       |   18 +++-
+ arch/arm/mach-at91/include/mach/at91cap9.h        |    2 +-
+ arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h |  108 ---------------------
+ arch/arm/mach-at91/include/mach/at91sam9260.h     |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9261.h     |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9263.h     |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |   30 ++++--
+ arch/arm/mach-at91/include/mach/at91sam9g45.h     |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9rl.h      |    2 +-
+ arch/arm/mach-at91/include/mach/board.h           |    2 +-
+ arch/arm/mach-at91/pm.c                           |    9 +--
+ arch/arm/mach-at91/pm.h                           |    8 +-
+ arch/arm/mach-at91/pm_slowclock.S                 |    5 +-
+ arch/arm/mach-at91/setup.c                        |   16 +++-
+ drivers/usb/host/ohci-at91.c                      |   24 ++++-
+ 27 files changed, 174 insertions(+), 169 deletions(-)
+ create mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
+
+
+
+-- 
+Nicolas Ferre
