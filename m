@@ -1,18 +1,14 @@
 From: rubini@unipv.it (Alessandro Rubini)
-Date: Fri, 20 Jan 2012 23:33:47 +0100
-Subject: [PATCH 29/31] ARM: amba: nomadik: use common amba device
- initializers
-In-Reply-To: <E1RoApP-0005GE-D8@rmk-PC.arm.linux.org.uk>
-References: <E1RoApP-0005GE-D8@rmk-PC.arm.linux.org.uk>
+Date: Fri, 20 Jan 2012 23:33:35 +0100
+Subject: [PATCH 13/31] ARM: amba: nomadik: get rid of NO_IRQ initializers
+In-Reply-To: <E1RoAkC-0005F9-GQ@rmk-PC.arm.linux.org.uk>
+References: <E1RoAkC-0005F9-GQ@rmk-PC.arm.linux.org.uk>
  <20120120092207.GD1068@n2100.arm.linux.org.uk>
-Message-ID: <20120120223347.GA9523@mail.gnudd.com>
+Message-ID: <20120120223335.GA9479@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +static AMBA_APB_DEVICE(uart0, "uart0", 0, NOMADIK_UART0_BASE,
-> +	{ IRQ_UART0 }, NULL);
+> -	.irq = {IRQ_UART0, NO_IRQ},
+> +	.irq = {IRQ_UART0},
 
 Acked-by: Alessandro Rubini <rubini@unipv.it>
-
-thanks
-/alessandro
