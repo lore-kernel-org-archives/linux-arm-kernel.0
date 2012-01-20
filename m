@@ -1,33 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Jan 2012 20:27:44 +0800
-Subject: [PATCH 12/31] ARM: amba: mxs: get rid of NO_IRQ initializers
-In-Reply-To: <E1RoAjs-0005F5-2V@rmk-PC.arm.linux.org.uk>
-References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
- <E1RoAjs-0005F5-2V@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120120122742.GB25917@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jan 2012 12:24:02 +0000
+Subject: Making allyesconfig work
+In-Reply-To: <20120120120856.GC30612@arm.com>
+References: <20120120115108.GJ1068@n2100.arm.linux.org.uk>
+ <20120120120856.GC30612@arm.com>
+Message-ID: <20120120122402.GN1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 09:26:28AM +0000, Russell King - ARM Linux wrote:
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-> ---
->  arch/arm/mach-mxs/devices/amba-duart.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+On Fri, Jan 20, 2012 at 12:08:56PM +0000, Catalin Marinas wrote:
+> On Fri, Jan 20, 2012 at 11:51:08AM +0000, Russell King - ARM Linux wrote:
+> > There's also the troublesome T() macro, which conflicts with a bunch
+> > of other drivers.  (I've added Catalin to the To: line for this
+> > reason.)
 > 
-> diff --git a/arch/arm/mach-mxs/devices/amba-duart.c b/arch/arm/mach-mxs/devices/amba-duart.c
-> index a559db0..a5479f7 100644
-> --- a/arch/arm/mach-mxs/devices/amba-duart.c
-> +++ b/arch/arm/mach-mxs/devices/amba-duart.c
-> @@ -23,7 +23,7 @@ const struct amba_device name##_device __initconst = {		\
->  		.end = (soc ## _DUART_BASE_ADDR) + SZ_8K - 1,	\
->  		.flags = IORESOURCE_MEM,			\
->  	},							\
-> -	.irq = {soc ## _INT_DUART, NO_IRQ},			\
-> +	.irq = {soc ## _INT_DUART},				\
->  }
->  
->  #ifdef CONFIG_SOC_IMX23
-> -- 
+> This macro is used in asm/uaccess.h and asm/futex.h, so I think it would
+> be difficult to hide it completely. But I'm happy to rename it to
+> something else (IIRC, T stands for "Translated").
+
+We should do something, because T() is just too risky for causing these
+kinds of conflicts.  We're not going to be able to get the driver code
+changed for this.  People will rightfully object - and it was something
+originally spotted by Al Viro in November... allegedly rude works were
+muttered (not publically) over it!
