@@ -1,30 +1,57 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 20 Jan 2012 09:15:57 -0700
-Subject: [PATCH] arm: irq: Allow for specification of no preallocated irqs
-In-Reply-To: <4F18B577.8080101@codeaurora.org>
-References: <1327013024-22530-1-git-send-email-mbohan@codeaurora.org>
- <4F18A18C.9090302@gmail.com> <4F18B577.8080101@codeaurora.org>
-Message-ID: <20120120161557.GT4223@ponder.secretlab.ca>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 20 Jan 2012 21:47:48 +0530
+Subject: Pinmux bindings proposal
+In-Reply-To: <20120120100528.GJ22818@atomide.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <CAJuYYwQoh4_SnA9wmy4x+cG0w0hGukxTkODWtcSw_2QHYuDsrg@mail.gmail.com>
+ <20120119165607.GG22818@atomide.com>
+ <CAJuYYwQB1pDu-JS5o3XPA1D8WbVcwbdtD43M4y7PeJNWeNXxQQ@mail.gmail.com>
+ <20120119182019.GI22818@atomide.com>
+ <CAJuYYwQouBDP6dL0B8QOaF0_JsbR7fysySZ5ebcF4op9aTQqbQ@mail.gmail.com>
+ <20120120100528.GJ22818@atomide.com>
+Message-ID: <CAJuYYwQ79o5JuOQfs8rSdasVg+ei4KX7tGLuDA-yysseZya9TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 04:29:43PM -0800, Michael Bohan wrote:
-> On 1/19/2012 3:04 PM, Rob Herring wrote:
-> >No doubt that arch_probe_nr_irqs is doing the wrong thing on ARM, but no
-> >pre-allocation is not what we want either. We ultimately want
-> >arch_probe_nr_irqs to return NR_IRQS_LEGACY (16) to reserve IRQ0 (aka
-> >NO_IRQ) and legacy ISA IRQs. With my series, NR_IRQS is set to
-> >NR_IRQS_LEGACY for SPARSE_IRQ. You can accomplish the same thing without
-> >that series by setting .nr_irqs to NR_IRQS for non-DT and to
-> >NR_IRQS_LEGACY for DT. For platforms to work in single kernel builds,
-> >they will need to select SPARSE_IRQ.
-> 
-> One issue here is that IRQ_BITMAP_BITS is defined as a function of
-> NR_IRQS. Currently, there's a hack in place that arbitrarily tacks
-> on 8196 bits to the end, giving the max virq supported as 8212 with
-> your patches. Unfortunately, the system I'm running on will require
-> higher values than that, so this actually breaks me.
+On 20 January 2012 15:35, Tony Lindgren <tony@atomide.com> wrote:
+> * Thomas Abraham <thomas.abraham@linaro.org> [120119 10:05]:
+>> On 19 January 2012 23:50, Tony Lindgren <tony@atomide.com> wrote:
+>>
+>> I would like to understand the need for populating the
+>> pinmux/pingroups tables from dt. The question here is when we have
+>> something like
+>>
+>> pins = <&pinctrl0 0x0030 0x15 0x15 0x7>;
+>>
+>> which specifies the values that need to be written to the hardware
+>> registers, would populating pinmux/pingroup tables from dt required.
+>> The SoC specific pinctrl driver can provide a way (with the help of
+>> pinctrl core) to translate these values and write to corresponding
+>> hardware registers. Is there any particular reason for populating the
+>> pinmux/pingroups tables from dt?
+>
+> Hmm I see. Yes it's still needed as we only want to parse the DT once
+> because it's slower unless it was one time only configuration during
+> init.
 
-Are that many irqs actually going to be in-use at one time?  If not, then the driver should use the irq_domain radix tree reverse map anyway.
+Ok. The time spent on searching for the pin-config property can be
+reduced by having the device driver (say, i2c) keep a pointer to all
+the pinconfig properties in its node. The next time a driver needs to
+reconfigure the pins, the search time can be reduced. The time to
+parse the property values though would still be applicable. But I
+would still not opt to build pinmux/pinconfig/pindesc tables from dt.
 
-g.
+>
+> If you only need to set pins once during the init, then we could add
+> an option for freeing all or most pins after init. That's what we
+> have for the current mach-omap2 mux framework as only few pins need
+> to be dynamically remuxed. That will require some changes to the
+> pinctrl framework though. We would need flags for each pin from DT
+> for init_only/dynamic.
+>
+> Regards,
+>
+> Tony
+
+Thanks,
+Thomas.
