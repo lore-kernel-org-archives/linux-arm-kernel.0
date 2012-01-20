@@ -1,67 +1,144 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 20 Jan 2012 11:37:41 -0700
-Subject: [PATCH] arm/devicetree: don't bind devicetree-only machine_descs via
- MACH_TYPE_xxx
-Message-ID: <1327084661-21971-1-git-send-email-grant.likely@secretlab.ca>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 20 Jan 2012 16:43:10 -0200
+Subject: [PATCH 3/3] ARM: mx3: Let mx31 and mx35 enter in LPM mode in WFI
+In-Reply-To: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
+References: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1327084990-25402-3-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch ensures that a DT only machine_desc (created with DT_MACHINE_START()
-doesn't get selected by setup_machine_tags().  It also adds some documentation
-to clarify that firmware should use ~0 in r1 if booting with a DT and a valid
-machine number is not available.
+The LPM field of register CCMR is used to select the mode that the processor will run
+when it goes to WFI.
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Peter Maydell <peter.maydell@linaro.org>
+When mx31 enters in WFI mode the LPM field is at its reset value of 0,
+which configures the mx31 to enter in "wait mode".
+
+On mx35, the LPM field on mx35 is also at 0 after reset, which corresponds 
+to "run mode" instead of "wait mode".
+
+Instead of relying on the reset value of LPM to set the low power mode for
+WFI, configure mx31 and mx35 to run in "wait mode"
+
+Reported-by: Benoit Thebaudeau <benoit.thebaudeau@advansee.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- Documentation/arm/Booting                       |    4 +++-
- Documentation/devicetree/booting-without-of.txt |    3 ++-
- arch/arm/kernel/setup.c                         |    2 +-
- 3 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/Makefile              |    4 +-
+ arch/arm/mach-imx/crmregs-imx3.h        |    1 +
+ arch/arm/mach-imx/mm-imx3.c             |    4 ++-
+ arch/arm/mach-imx/pm-imx3.c             |   36 +++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h |    8 +++++++
+ 5 files changed, 50 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-imx/pm-imx3.c
 
-diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-index a341d87..7d1b4bb 100644
---- a/Documentation/arm/Booting
-+++ b/Documentation/arm/Booting
-@@ -148,7 +148,9 @@ In either case, the following conditions must be met:
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 88531b6..2dd4af6 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -8,8 +8,8 @@ obj-$(CONFIG_SOC_IMX25) += clock-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
+ obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
+ obj-$(CONFIG_SOC_IMX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
  
- - CPU register settings
-   r0 = 0,
--  r1 = machine type number discovered in (3) above.
-+  r1 = machine type number discovered in (3) above, or if booting with
-+       a dtb then this may be set to ~0 if a valid MACH_TYPE_xxx value
-+       does not exist for the machine.
-   r2 = physical address of tagged list in system RAM, or
-        physical address of device tree block (dtb) in system RAM
+-obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clock-imx31.o iomux-imx31.o ehci-imx31.o
+-obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clock-imx35.o ehci-imx35.o
++obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clock-imx31.o iomux-imx31.o ehci-imx31.o pm-imx3.o
++obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clock-imx35.o ehci-imx35.o pm-imx3.o
  
-diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
-index 7c1329d..33e2b51 100644
---- a/Documentation/devicetree/booting-without-of.txt
-+++ b/Documentation/devicetree/booting-without-of.txt
-@@ -176,7 +176,8 @@ it with special cases.
+ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clock-mx51-mx53.o ehci-imx5.o pm-imx5.o cpu_op-mx51.o
  
-                 r1 : Valid machine type number.  When using a device tree,
-                 a single machine type number will often be assigned to
--                represent a class or family of SoCs.
-+                represent a class or family of SoCs.  If a valid machine
-+                type number is not assigned, then use ~0.
+diff --git a/arch/arm/mach-imx/crmregs-imx3.h b/arch/arm/mach-imx/crmregs-imx3.h
+index d7691e2..b4d2305 100644
+--- a/arch/arm/mach-imx/crmregs-imx3.h
++++ b/arch/arm/mach-imx/crmregs-imx3.h
+@@ -77,6 +77,7 @@ MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR) : MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR))
+ #define MXC_CCM_CCMR_SSI2S_MASK                 (0x3 << 21)
+ #define MXC_CCM_CCMR_LPM_OFFSET                 14
+ #define MXC_CCM_CCMR_LPM_MASK                   (0x3 << 14)
++#define MXC_CCM_CCMR_LPM_WAIT	(cpu_is_mx35() ? (0x1 << 14) : 0)
+ #define MXC_CCM_CCMR_FIRS_OFFSET                11
+ #define MXC_CCM_CCMR_FIRS_MASK                  (0x3 << 11)
+ #define MXC_CCM_CCMR_UPE                        (1 << 9)
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 3555e0b..dda8f25 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -34,7 +34,8 @@ static void imx3_idle(void)
+ {
+ 	unsigned long reg = 0;
  
-                 r2 : physical pointer to the device-tree block
-                 (defined in chapter II) in RAM.  Device tree can be located
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 129fbd5..2b037a3 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -845,7 +845,7 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
- 			break;
- 		}
+-	if (!need_resched())
++	if (!need_resched()) {
++		mx3_cpu_lp_set(MX3_WAIT);
+ 		__asm__ __volatile__(
+ 			/* disable I and D cache */
+ 			"mrc p15, 0, %0, c1, c0, 0\n"
+@@ -58,6 +59,7 @@ static void imx3_idle(void)
+ 			"orr %0, %0, #0x00000004\n"
+ 			"mcr p15, 0, %0, c1, c0, 0\n"
+ 			: "=r" (reg));
++	}
+ 	local_irq_enable();
+ }
  
--	if (!mdesc) {
-+	if (!mdesc || nr == ~0) {
- 		early_print("\nError: unrecognized/unsupported machine ID"
- 			" (r1 = 0x%08x).\n\n", nr);
- 		dump_machine_table(); /* does not return */
+diff --git a/arch/arm/mach-imx/pm-imx3.c b/arch/arm/mach-imx/pm-imx3.c
+new file mode 100644
+index 0000000..ae216db
+--- /dev/null
++++ b/arch/arm/mach-imx/pm-imx3.c
+@@ -0,0 +1,36 @@
++/*
++ *  Copyright (C) 2012 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later@the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include <linux/io.h>
++#include <mach/common.h>
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++#include "crmregs-imx3.h"
++
++/*
++ * Set cpu low power mode before WFI instruction. This function is called
++ * mx3 because it can be used for mx31 and mx35.
++ * Currently only WAIT_MODE is supported.
++ */
++void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode)
++{
++	int reg = __raw_readl(MXC_CCM_CCMR);
++	reg &= ~MXC_CCM_CCMR_LPM_MASK;
++
++	switch (mode) {
++	case MX3_WAIT:
++		reg |= MXC_CCM_CCMR_LPM_WAIT;
++		__raw_writel(reg, MXC_CCM_CCMR);
++		break;
++	default:
++		pr_err("Unknown cpu power mode: %d\n", mode);
++		return;
++	}
++}
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 1bf0df8..06595a3 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -84,6 +84,14 @@ enum mxc_cpu_pwr_mode {
+ 	STOP_POWER_OFF,		/* STOP + SRPG */
+ };
+ 
++enum mx3_cpu_pwr_mode {
++	MX3_RUN,
++	MX3_WAIT,
++	MX3_DOZE,
++	MX3_SLEEP,
++};
++
++extern void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode);
+ extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
+ extern void imx_print_silicon_rev(const char *cpu, int srev);
+ 
 -- 
-1.7.5.4
+1.7.1
