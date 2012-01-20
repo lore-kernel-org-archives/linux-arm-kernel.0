@@ -1,29 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Jan 2012 13:33:33 +0100
-Subject: [st-ericsson] [PATCH] mach-ux500: sdi: MMC_CAP_SD_HIGHSPEED
- capability is not yet supported on Snowball
-In-Reply-To: <1327047640-15383-1-git-send-email-philippe.langlais@stericsson.com>
-References: <1327047640-15383-1-git-send-email-philippe.langlais@stericsson.com>
-Message-ID: <CACRpkdZC3mJM3aZzN2cKESDYVOU95PT6gx=U9Fci20REiNH-Og@mail.gmail.com>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Fri, 20 Jan 2012 18:03:58 +0530
+Subject: [PATCH v2 1/2] dmaengine: Add support for per xfer specific
+ privatedata & box dma
+In-Reply-To: <1326808388.1540.123.camel@vkoul-udesk3>
+References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
+ <1325854052-21402-2-git-send-email-kumarrav@codeaurora.org>
+ <1326808388.1540.123.camel@vkoul-udesk3>
+Message-ID: <4F195F36.60901@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 9:20 AM, Philippe Langlais
-<philippe.langlais@stericsson.com> wrote:
-
-> From: Philippe Langlais <philippe.langlais@linaro.org>
+On 1/17/2012 7:23 PM, Vinod Koul wrote:
+> On Fri, 2012-01-06 at 18:17 +0530, Ravi Kumar V wrote:
+>>
+>> diff --git a/include/asm-generic/scatterlist.h b/include/asm-generic/scatterlist.h
+>> index 5de0735..e66dfcb 100644
+>> --- a/include/asm-generic/scatterlist.h
+>> +++ b/include/asm-generic/scatterlist.h
+>> @@ -14,6 +14,7 @@ struct scatterlist {
+>>   #ifdef CONFIG_NEED_SG_DMA_LENGTH
+>>   	unsigned int	dma_length;
+>>   #endif
+>> +	unsigned long	private_data;
+> what do you plan to pass here. Please keep in mind this is a generic
+> scatterlist structure, and modifying it for your purposes doesn't seem
+> to be a great one!
+> Also why can't you pass this as addition argument in your new "BOX API"?
+We are using DMA-Engine framework for both SG mode and BOX mode of our HW.
+For SG mode we are using device_prep_dma_sg API but the problem we are 
+facing is we need to pass command configuration parameter along with 
+each descriptor to our HW, we did not find any suitable API/structure in 
+framework to support this.
+So thought of adding new element in struct scatterlist.
+please can you suggest a way to pass private parameter with
+every descriptor.
 >
-> MMC_CAP_SD_HIGHSPEED is not supported on Snowball board resulting on
-> initialisation errors.
+>>   };
+>>
+>>   /*
+>> +
+>> +struct dma_box_list {
+>> +	dma_addr_t dma_row_address;
+>> +	unsigned int dma_row_len;
+>> +	unsigned int dma_row_num;
+>> +	unsigned int dma_row_offset;
+>> +	unsigned long private_data;
+>> +};
+> again a private data here?
+> is this some kind of interleaved pattern?
+Yes this interleaved pattern.
+>> +
+>>   /**
+>>    * struct dma_device - info on the entity supplying DMA services
+>>    * @chancnt: how many DMA channels are supported
+>> @@ -497,6 +507,11 @@ struct dma_device {
+>>   	struct dma_async_tx_descriptor *(*device_prep_dma_cyclic)(
+>>   		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+>>   		size_t period_len, enum dma_data_direction direction);
+>> +	struct dma_async_tx_descriptor *(*device_prep_dma_box)(
+>> +		struct dma_chan *chan, struct dma_box_list *dst_box,
+>> +		struct dma_box_list *src_box, unsigned int num_list,
+>> +		unsigned long flags);
+> still not clean what kind of transfer do you want to do here
+We are doing interleaved pattern of data transfer between source and 
+destination boxs, num_list is number of box mode commands
+Please can you refer patch 0/2 I have replied explaining about box mode 
+transfer clearly.
+>> +
+>>   	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>>   		unsigned long arg);
+>>
 >
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Fredrik Soderstedt <fredrik.soderstedt@stericsson.com>
-> Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+>
 
-OK applied to ux500-fixes for the -rc:s.
 
-I have added stable at kernel.org to the CC, since this affects any
-kernel supporting Snowball.
-
-Yours,
-Linus Walleij
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
