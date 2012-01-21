@@ -1,42 +1,21 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 21 Jan 2012 21:43:14 +0100
-Subject: [PATCH 1/3] ARM: mx3: Remove unneeded ifdef's from mm-imx3.c
-In-Reply-To: <CAOMZO5CaqMm4eNMCWP9Dyb1kC84qx+zg00FyJMw0gs93Qv94Gg@mail.gmail.com>
-References: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
- <20120120232912.GP4066@pengutronix.de>
- <CAOMZO5CaqMm4eNMCWP9Dyb1kC84qx+zg00FyJMw0gs93Qv94Gg@mail.gmail.com>
-Message-ID: <20120121204314.GA14835@pengutronix.de>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Sat, 21 Jan 2012 20:46:32 +0000
+Subject: [PATCH 0/2] tty: serial: OMAP: work around broken driver, IP block
+In-Reply-To: <alpine.DEB.2.00.1201211323410.28153@utopia.booyaka.com>
+References: <20120121071934.18707.64258.stgit@dusk>
+ <20120121125522.GA19027@kroah.com>
+ <alpine.DEB.2.00.1201211323410.28153@utopia.booyaka.com>
+Message-ID: <20120121204632.17ce598e@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+> I will do it, although I do cling to the hope that others will help.
 
-On Sat, Jan 21, 2012 at 05:16:57PM -0200, Fabio Estevam wrote:
-> 2012/1/20 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> 
-> > and the problem was not that we can or cannot do kernels for both mx31
-> > and mx35, but that we also want to do kernels for only one of them. Did
-> > you try to build an mx31-only kernel after your change?
-> 
-> Ok, just tried it and it fails with:
-> 
->   LD      .tmp_vmlinux1
-> arch/arm/mach-imx/built-in.o: In function `imx35_init_early':
-> mach-mx31_3ds.c:(.init.text+0x50): undefined reference to `mxc_iomux_v3_init'
-> arch/arm/mach-imx/built-in.o: In function `imx35_soc_init':
-> mach-mx31_3ds.c:(.init.text+0x12c): undefined reference to `mx35_revision'
-> 
-> I think I can solve this build issue by merging cpu-imx31.c and
-> cpu-imx35.c into a single file:
-> cpu-imx3.c, using the same idea as in cpu-imx5.c
-... or by keeping the #ifdefs :-)
+I always work on the basis that if its had some coverage testing then the
+other folks who might have been affected should have reviewed the patch.
+They opted not to, within reason - their lookout.
 
-> Would you like me to do this?
-I don't care much and pass the question to Sascha.
+They'll only test it later when it his the tree if they don't do it
+earlier 8)
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Alan
