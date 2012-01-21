@@ -1,29 +1,37 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 21 Jan 2012 22:09:58 +0530
-Subject: [PATCH v4] ARM: Add generic instruction opcode manipulation
- helpers
-In-Reply-To: <20111222112751.GB2573@localhost>
-References: <1324305365-22514-1-git-send-email-dave.martin@linaro.org>
- <alpine.LFD.2.02.1112191201360.2907@xanadu.home>
- <20111222112751.GB2573@localhost>
-Message-ID: <CAH+eYFDSimuWrc=pfwSxgHSneJ2m+pdzLxDjZhinvwHYb3MhGw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sat, 21 Jan 2012 17:08:01 +0000
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform clean-up
+Message-ID: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 16:57, Dave Martin <dave.martin@linaro.org> wrote:
-> On Mon, Dec 19, 2011 at 12:03:32PM -0500, Nicolas Pitre wrote:
->> On Mon, 19 Dec 2011, Dave Martin wrote:
->> > v4: Rebase on top of Leif's patch which created <asm/opcodes.h>
->> > ? ? ARM: 7206/1: Add generic ARM instruction set condition code checks.
->>
->> In that case you might be able to put your patch in the patch system,
->> and then go back to add a note for Russell mentioning 7206/1 is a
->> prerequisite.
->
-> OK, I'll try and do that.
+This patch-set satisfies 4 objectives:
+ 1. Ensures each platform device can specify a suitable parent
+ 2. Provides a bus for SoC devices as a means to export information
+ 3. Allows ux500 to make use of the new SoC bus
+ 4. Cleans up unnecessary complexity from ux500 code
 
-I notice it's there now as 7278/1, but there appears to be a problem
-with it.  The patch system page shows the patch containing both the
-rebased and the earlier versions:
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7278/1
+ Documentation/ABI/testing/sysfs-devices-soc    |   58 ++++++++
+ arch/arm/mach-ux500/Kconfig                    |    1 +
+ arch/arm/mach-ux500/board-mop500-sdi.c         |   31 ++--
+ arch/arm/mach-ux500/board-mop500.c             |   74 ++++++----
+ arch/arm/mach-ux500/board-mop500.h             |    8 +-
+ arch/arm/mach-ux500/board-u5500-sdi.c          |    4 +-
+ arch/arm/mach-ux500/board-u5500.c              |   27 +++--
+ arch/arm/mach-ux500/cpu-db5500.c               |   36 ++++-
+ arch/arm/mach-ux500/cpu-db8500.c               |   44 +++++-
+ arch/arm/mach-ux500/cpu.c                      |   75 ++++++++++
+ arch/arm/mach-ux500/devices-common.c           |   79 +++--------
+ arch/arm/mach-ux500/devices-common.h           |   83 ++++++-----
+ arch/arm/mach-ux500/devices-db5500.h           |  116 +++++++++------
+ arch/arm/mach-ux500/devices-db8500.h           |  176 +++++++++++++----------
+ arch/arm/mach-ux500/dma-db5500.c               |    3 +-
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
+ arch/arm/mach-ux500/include/mach/setup.h       |   10 +-
+ arch/arm/mach-ux500/include/mach/usb.h         |    4 +-
+ arch/arm/mach-ux500/usb.c                      |    7 +-
+ drivers/base/Kconfig                           |    3 +
+ drivers/base/Makefile                          |    1 +
+ drivers/base/soc.c                             |  185 ++++++++++++++++++++++++
+ include/linux/sys_soc.h                        |   37 +++++
+ 23 files changed, 761 insertions(+), 304 deletions(-)
