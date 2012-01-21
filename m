@@ -1,93 +1,68 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Sat, 21 Jan 2012 13:39:14 +0530
-Subject: [RFC v3 PATCH 1/3] dt: device tree bindings for DDR memories
-In-Reply-To: <CAOesGMg01SvP1koV8GTJgeMATROZ0oP5BQSDqtmge_UZXvwZLQ@mail.gmail.com>
-References: <1326983521-373-1-git-send-email-aneesh@ti.com>	<1326983521-373-2-git-send-email-aneesh@ti.com>	<CAOesGMikm8szKR_yyeV-4NbnknCLG3z9N_sj+zydyu+cosj-Tg@mail.gmail.com>	<4F188386.3080507@ti.com>
- <CAOesGMg01SvP1koV8GTJgeMATROZ0oP5BQSDqtmge_UZXvwZLQ@mail.gmail.com>
-Message-ID: <4F1A72AA.8000703@ti.com>
+From: eranian@googlemail.com (stephane eranian)
+Date: Sat, 21 Jan 2012 10:16:57 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+ <20120109224945.GA23090@mudshark.cambridge.arm.com>
+ <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+ <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
+ <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
+ <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
+ <CACVXFVOQNDRs=c8A2YC+WvYAHs5Abbz-QUEe1VJqrj2esFO11g@mail.gmail.com>
+ <CAMsRxf+e38jRcyxESLhYDZ3OL910AQdapZD9P8vWDXfUE34DAA@mail.gmail.com>
+ <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
+ <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
+ <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
+ <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
+ <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
+ <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
+ <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
+ <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
+ <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
+Message-ID: <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 January 2012 12:58 PM, Olof Johansson wrote:
-> On Thu, Jan 19, 2012 at 12:56 PM, Aneesh V<aneesh@ti.com>  wrote:
->> Hi Olof,
+On Sat, Jan 21, 2012 at 4:25 AM, Ming Lei <ming.lei@canonical.com> wrote:
+> On Fri, Jan 20, 2012 at 9:47 PM, stephane eranian
+> <eranian@googlemail.com> wrote:
+>> Started afresh from:
 >>
+>> 90a4c0f uml: fix compile for x86-64
 >>
->> On Friday 20 January 2012 01:01 AM, Olof Johansson wrote:
->>>
->>> Hi,
->>>
->>> Sorry for the delay in responding, I know you pinged me about it
->>> yesterday.
->>>
->>> On Thu, Jan 19, 2012 at 6:31 AM, Aneesh V<aneesh@ti.com>    wrote:
->>>>
->>>> device tree bindings for LPDDR2 SDRAM memories compliant
->>>> to JESD209-2 standard.
->>>>
->>>> The 'lpddr2' binding in-turn uses another binding 'lpddr2-timings'
->>>> for specifying the AC timing parameters of the memory device at
->>>> different speed-bins.
->>>
->>>
->>> As I just commented on the thread with Mike, I think we would be
->>> better off sticking to embedding a standard JEDEC SPD structure in the
->>> device tree. It's not large (128-256 bytes depending on memory type),
->>> and it's clearly defined and used all over the industry.
->>>
->>> It also has the benefit of reusing parsing code if you ever end up
->>> with a system that uses DIMMs for memory, thus needing to parse the
->>> SPD on said modules.
+>> And added 3, 4, 5, 6:
+>> 603c316 arm: omap4: pmu: support runtime pm
+>> 4899fbd arm: omap4: support pmu
+>> d737bb1 arm: omap4: create pmu device via hwmod
+>> 4e0259e arm: omap4: hwmod: introduce emu hwmod
 >>
+>> Still no interrupts firing. I am using your .config file.
 >>
->> I did mention in the previous thread why SPD doesn't work for us ([1] and
->> [2]). Let me repeat the key points here.
+>> My HW:
+>> CPU implementer : 0x41
+>> CPU architecture: 7
+>> CPU variant ? ? : 0x1
+>> CPU part ? ? ? ?: 0xc09
+>> CPU revision ? ?: 2
+>>
+>> Hardware ? ? ? ?: OMAP4 Panda board
+>> Revision ? ? ? ?: 0020
+>>
+>> There must be something I am missing here.
 >
-> Ah, sorry. Missed it in the chain of replies.
+> Have you applied the patch in link[1]?
 >
->> 1. I couldn't find an SPD addendum for LPDDR2 from the JEDEC website.
->> 2. This seems to indicate that SPD is not used for LPDDR2 devices.
->
-> Bummer. I'm guessing most applications where LPDDR* is used won't be
-> suitable for modular memory, so there's not the same need for SPD.
->
->> 3. I tried to see if I can fit the DDR3 or DDR2 SPD for our needs. But
->> some of the AC timing parameters needed by our controller are not
->> available in those layouts.
->
-> Are those properties of the memory, or a combination of memory and
-> board properties? I think it still makes sense for the memories that
-> do have it to use the SPD format and extend with additional
-> properties, at least if it's only a few additional properties needed.
+You mean this:
+> [1], http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=summary
 
-They are AC timing parameters defined by the spec such as tCKESR, tFAW
-etc, nothing specific to OMAP.
-
-As for other memories, we do not intend to support any at the moment.
-In my initial version I had bindings for DDR3, because we intended to
-have DDR3 support in the driver. But we have since decided to drop DDR3
-support for the following reasons:
-
-1. According to the DDR3 spec, the operating frequency range for the
-speed-bins is limited (unlike LPDDR2). Scaling DDR frequency in this
-small range doesn't make sense for us (this may be the case for other
-platforms too).
-
-2. Unlike LPDDR2, DDR3 doesn't have a mechanism for polling the
-temperature from the device and derate timings.
-
-If DVFS and thermal handling are not relevant for DDR3, having a kernel
-driver doesn't make sense. One-time settings in the bootloader are good
-enough.
-
-So, I have made my binding only for LPDDR2 and removed DDR3 parts from
-it.
-
+It does not point to a patch but to the entire tree.
 
 >
->> I don't see any option other than defining a new binding for LPDDR2.
+> thanks,
+> --
+> Ming Lei
 >
-> Yeah, agreed.
-
-Thanks,
-Aneesh
+> [1], http://marc.info/?l=linux-arm-kernel&m=132697975416659&w=2
