@@ -1,28 +1,29 @@
-From: greg@kroah.com (Greg KH)
-Date: Sat, 21 Jan 2012 07:55:22 -0500
-Subject: [PATCH 0/2] tty: serial: OMAP: work around broken driver, IP block
-In-Reply-To: <20120121071934.18707.64258.stgit@dusk>
-References: <20120121071934.18707.64258.stgit@dusk>
-Message-ID: <20120121125522.GA19027@kroah.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi KASAGAR)
+Date: Sat, 21 Jan 2012 21:49:55 +0530
+Subject: [PATCH 07/31] ARM: amba: ux500: get rid of NO_IRQ
+In-Reply-To: <E1RoAiE-0005Eh-7i@rmk-PC.arm.linux.org.uk>
+References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
+ <E1RoAiE-0005Eh-7i@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120121161954.GA26323@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 21, 2012 at 12:27:37AM -0700, Paul Walmsley wrote:
-> [ This series is targeted for merging during v3.3-rc ]
+On Fri, Jan 20, 2012 at 10:24:46 +0100, Russell King - ARM Linux wrote:
+> irq 0 now means no irq, so get rid of this unnecessary initializer.
 > 
-> On v3.3-rc1, the OMAP serial console doesn't behave properly when
-> power management is enabled (the default with omap2plus_defconfig).
-> This seems to be due to a combination of a silicon bug in the UART IP
-> block and broken FIFO settings in the OMAP serial driver.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-ux500/devices-common.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
 > 
-> This patch series attempts to work around these problems.  The workarounds
-> are not perfect; see the patch descriptions for more details.
-> 
-> Tested on OMAP3530 BeagleBoard.  This series will need to be tested on
-> OMAP2 and OMAP4 before it is ready to merge.
+> diff --git a/arch/arm/mach-ux500/devices-common.c b/arch/arm/mach-ux500/devices-common.c
+> index e8c34fa..898a645 100644
+> --- a/arch/arm/mach-ux500/devices-common.c
+> +++ b/arch/arm/mach-ux500/devices-common.c
+> @@ -34,7 +34,6 @@ dbx500_add_amba_device(const char *name, resource_size_t base,
+>  	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>  
+>  	dev->irq[0] = irq;
+> -	dev->irq[1] = NO_IRQ;
 
-Who is going to do that testing?  When?  Why isn't it done already?
-
-I guess this means I can ignore them for now, right?
-
-greg k-h
+Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com> 
