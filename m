@@ -1,58 +1,29 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi KASAGAR)
-Date: Sat, 21 Jan 2012 21:51:58 +0530
-Subject: [PATCH 03/31] ARM: amba: ux500: convert to use amba_device_alloc
-In-Reply-To: <E1RoAgu-0005EQ-Fo@rmk-PC.arm.linux.org.uk>
-References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
- <E1RoAgu-0005EQ-Fo@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120121162157.GB26323@bnru02>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 21 Jan 2012 22:09:58 +0530
+Subject: [PATCH v4] ARM: Add generic instruction opcode manipulation
+ helpers
+In-Reply-To: <20111222112751.GB2573@localhost>
+References: <1324305365-22514-1-git-send-email-dave.martin@linaro.org>
+ <alpine.LFD.2.02.1112191201360.2907@xanadu.home>
+ <20111222112751.GB2573@localhost>
+Message-ID: <CAH+eYFDSimuWrc=pfwSxgHSneJ2m+pdzLxDjZhinvwHYb3MhGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 10:23:24 +0100, Russell King - ARM Linux wrote:
-> Convert ux500 to use the new amba_device_alloc APIs.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Thu, Dec 22, 2011 at 16:57, Dave Martin <dave.martin@linaro.org> wrote:
+> On Mon, Dec 19, 2011 at 12:03:32PM -0500, Nicolas Pitre wrote:
+>> On Mon, 19 Dec 2011, Dave Martin wrote:
+>> > v4: Rebase on top of Leif's patch which created <asm/opcodes.h>
+>> > ? ? ARM: 7206/1: Add generic ARM instruction set condition code checks.
+>>
+>> In that case you might be able to put your patch in the patch system,
+>> and then go back to add a note for Russell mentioning 7206/1 is a
+>> prerequisite.
+>
+> OK, I'll try and do that.
 
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+I notice it's there now as 7278/1, but there appears to be a problem
+with it.  The patch system page shows the patch containing both the
+rebased and the earlier versions:
 
-> ---
->  arch/arm/mach-ux500/devices-common.c |   12 +++---------
->  1 files changed, 3 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/devices-common.c b/arch/arm/mach-ux500/devices-common.c
-> index c563e54..e8c34fa 100644
-> --- a/arch/arm/mach-ux500/devices-common.c
-> +++ b/arch/arm/mach-ux500/devices-common.c
-> @@ -26,16 +26,10 @@ dbx500_add_amba_device(const char *name, resource_size_t base,
->  	struct amba_device *dev;
->  	int ret;
->  
-> -	dev = kzalloc(sizeof *dev, GFP_KERNEL);
-> +	dev = amba_device_alloc(name, base, SZ_4K);
->  	if (!dev)
->  		return ERR_PTR(-ENOMEM);
->  
-> -	dev->dev.init_name = name;
-> -
-> -	dev->res.start = base;
-> -	dev->res.end = base + SZ_4K - 1;
-> -	dev->res.flags = IORESOURCE_MEM;
-> -
->  	dev->dma_mask = DMA_BIT_MASK(32);
->  	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->  
-> @@ -46,9 +40,9 @@ dbx500_add_amba_device(const char *name, resource_size_t base,
->  
->  	dev->dev.platform_data = pdata;
->  
-> -	ret = amba_device_register(dev, &iomem_resource);
-> +	ret = amba_device_add(dev, &iomem_resource);
->  	if (ret) {
-> -		kfree(dev);
-> +		amba_device_put(dev);
->  		return ERR_PTR(ret);
->  	}
->  
-> -- 
-> 1.7.4.4
-> 
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7278/1
