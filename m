@@ -1,167 +1,111 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 21 Jan 2012 16:59:34 -0700
-Subject: [PATCH 5/8] ARM: OMAP2xxx: hwmod data: add HDQ/1-wire hwmod
+Date: Sat, 21 Jan 2012 16:59:33 -0700
+Subject: [PATCH 3/8] ARM: OMAP2+: hwmod data: add HDQ/1-wire hwmod shared data
 In-Reply-To: <20120121235333.17619.56725.stgit@dusk>
 References: <20120121235333.17619.56725.stgit@dusk>
-Message-ID: <20120121235933.17619.56181.stgit@dusk>
+Message-ID: <20120121235932.17619.51239.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the HDQ1W hwmod for all OMAP2xxx devices.
+Much of the HDQ1W integration data is common between multiple generations
+of OMAP SoCs, so rather than make several copies, we add it once into
+files which are compiled for multiple SoCs.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: NeilBrown <neilb@suse.de>
 ---
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |   41 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |   38 ++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+), 0 deletions(-)
+ .../omap_hwmod_2xxx_3xxx_interconnect_data.c       |    9 ++++++++
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |   22 ++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |    4 ++++
+ 3 files changed, 35 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index a5409ce..dad4a87 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c
+index 04637fa..cbb4ef6 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c
+@@ -171,3 +171,12 @@ struct omap_hwmod_addr_space omap2_mcbsp1_addrs[] = {
+ 	},
+ 	{ }
+ };
++
++struct omap_hwmod_addr_space omap2_hdq1w_addr_space[] = {
++	{
++		.pa_start       = 0x480b2000,
++		.pa_end         = 0x480b2fff,
++		.flags          = ADDR_TYPE_RT,
++	},
++	{ }
++};
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+index c11273d..e4cdd74 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
 @@ -2,6 +2,7 @@
-  * omap_hwmod_2420_data.c - hardware modules present on the OMAP2420 chips
+  * omap_hwmod_2xxx_3xxx_ipblock_data.c - common IP block data for OMAP2/3
   *
-  * Copyright (C) 2009-2011 Nokia Corporation
+  * Copyright (C) 2011 Nokia Corporation
 + * Copyright (C) 2012 Texas Instruments, Inc.
   * Paul Walmsley
   *
   * This program is free software; you can redistribute it and/or modify
-@@ -54,6 +55,7 @@ static struct omap_hwmod omap2420_gpio4_hwmod;
- static struct omap_hwmod omap2420_dma_system_hwmod;
- static struct omap_hwmod omap2420_mcspi1_hwmod;
- static struct omap_hwmod omap2420_mcspi2_hwmod;
-+static struct omap_hwmod omap2420_hdq1w_hwmod;
+@@ -12,6 +13,7 @@
+ #include <plat/serial.h>
+ #include <plat/dma.h>
+ #include <plat/common.h>
++#include <plat/hdq1w.h>
  
- /* L3 -> L4_CORE interface */
- static struct omap_hwmod_ocp_if omap2420_l3_main__l4_core = {
-@@ -182,6 +184,17 @@ static struct omap_hwmod_ocp_if omap2420_l4_core__i2c2 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ #include <mach/irqs.h>
+ 
+@@ -323,3 +325,23 @@ struct omap_hwmod_irq_info omap2_mcspi2_mpu_irqs[] = {
+ 	{ .irq = -1 }
  };
  
-+/* L4 CORE -> HDQ1W interface */
-+static struct omap_hwmod_ocp_if omap2420_l4_core__hdq1w = {
-+	.master		= &omap2420_l4_core_hwmod,
-+	.slave		= &omap2420_hdq1w_hwmod,
-+	.clk		= "hdq_ick",
-+	.addr		= omap2_hdq1w_addr_space,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+	.flags		= OMAP_FIREWALL_L4
++struct omap_hwmod_class_sysconfig omap2_hdq1w_sysc = {
++	.rev_offs	= 0x0,
++	.sysc_offs	= 0x14,
++	.syss_offs	= 0x18,
++	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
++			   SYSS_HAS_RESET_STATUS),
++	.sysc_fields    = &omap_hwmod_sysc_type1,
 +};
 +
-+
- /* Slave interfaces on the L4_CORE interconnect */
- static struct omap_hwmod_ocp_if *omap2420_l4_core_slaves[] = {
- 	&omap2420_l3_main__l4_core,
-@@ -1513,6 +1526,30 @@ static struct omap_hwmod omap2420_mcbsp2_hwmod = {
- 	.slaves_cnt	= ARRAY_SIZE(omap2420_mcbsp2_slaves),
- };
- 
-+/* HDQ1W/1-wire */
-+
-+static struct omap_hwmod_ocp_if *omap2420_hdq1w_slaves[] = {
-+	&omap2420_l4_core__hdq1w,
++struct omap_hwmod_class omap2_hdq1w_class = {
++	.name	= "hdq1w",
++	.sysc	= &omap2_hdq1w_sysc,
++	.reset	= &omap_hdq1w_reset,
 +};
 +
-+static struct omap_hwmod omap2420_hdq1w_hwmod = {
-+	.name		= "hdq1w",
-+	.mpu_irqs	= omap2_hdq1w_mpu_irqs,
-+	.main_clk	= "hdq_fck",
-+	.prcm		= {
-+		.omap2 = {
-+			.module_offs = CORE_MOD,
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP24XX_EN_HDQ_SHIFT,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP24XX_ST_HDQ_SHIFT,
-+		},
-+	},
-+	.slaves		= omap2420_hdq1w_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap2420_hdq1w_slaves),
-+	.class		= &omap2_hdq1w_class,
++struct omap_hwmod_irq_info omap2_hdq1w_mpu_irqs[] = {
++	{ .irq = 58, },
++	{ .irq = -1 }
 +};
 +
- static __initdata struct omap_hwmod *omap2420_hwmods[] = {
- 	&omap2420_l3_main_hwmod,
- 	&omap2420_l4_core_hwmod,
-@@ -1565,6 +1602,10 @@ static __initdata struct omap_hwmod *omap2420_hwmods[] = {
- 	/* mcspi class */
- 	&omap2420_mcspi1_hwmod,
- 	&omap2420_mcspi2_hwmod,
-+
-+	/* hdq1w class */
-+	&omap2420_hdq1w_hwmod,
-+
- 	NULL,
- };
+diff --git a/arch/arm/mach-omap2/omap_hwmod_common_data.h b/arch/arm/mach-omap2/omap_hwmod_common_data.h
+index ad5d8f0..a5fc96a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_common_data.h
++++ b/arch/arm/mach-omap2/omap_hwmod_common_data.h
+@@ -50,6 +50,7 @@ extern struct omap_hwmod_addr_space omap2430_mcspi3_addr_space[];
+ extern struct omap_hwmod_addr_space omap2_dma_system_addrs[];
+ extern struct omap_hwmod_addr_space omap2_mailbox_addrs[];
+ extern struct omap_hwmod_addr_space omap2_mcbsp1_addrs[];
++extern struct omap_hwmod_addr_space omap2_hdq1w_addr_space[];
  
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index c4f56cb..592b0b2 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -64,6 +64,7 @@ static struct omap_hwmod omap2430_mcspi2_hwmod;
- static struct omap_hwmod omap2430_mcspi3_hwmod;
- static struct omap_hwmod omap2430_mmc1_hwmod;
- static struct omap_hwmod omap2430_mmc2_hwmod;
-+static struct omap_hwmod omap2430_hdq1w_hwmod;
+ /* Common IP block data across OMAP2xxx */
+ extern struct omap_hwmod_irq_info omap2xxx_timer12_mpu_irqs[];
+@@ -94,6 +95,7 @@ extern struct omap_hwmod_irq_info omap2_gpio4_irqs[];
+ extern struct omap_hwmod_irq_info omap2_dma_system_irqs[];
+ extern struct omap_hwmod_irq_info omap2_mcspi1_mpu_irqs[];
+ extern struct omap_hwmod_irq_info omap2_mcspi2_mpu_irqs[];
++extern struct omap_hwmod_irq_info omap2_hdq1w_mpu_irqs[];
  
- /* L3 -> L4_CORE interface */
- static struct omap_hwmod_ocp_if omap2430_l3_main__l4_core = {
-@@ -291,6 +292,16 @@ static struct omap_hwmod_ocp_if omap2430_l4_core__mcspi3 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
+ /* OMAP hwmod classes - forward declarations */
+ extern struct omap_hwmod_class l3_hwmod_class;
+@@ -105,6 +107,8 @@ extern struct omap_hwmod_class omap2_dss_hwmod_class;
+ extern struct omap_hwmod_class omap2_dispc_hwmod_class;
+ extern struct omap_hwmod_class omap2_rfbi_hwmod_class;
+ extern struct omap_hwmod_class omap2_venc_hwmod_class;
++extern struct omap_hwmod_class_sysconfig omap2_hdq1w_sysc;
++extern struct omap_hwmod_class omap2_hdq1w_class;
  
-+/* L4 CORE -> HDQ1W interface */
-+static struct omap_hwmod_ocp_if omap2430_l4_core__hdq1w = {
-+	.master		= &omap2430_l4_core_hwmod,
-+	.slave		= &omap2430_hdq1w_hwmod,
-+	.clk		= "hdq_ick",
-+	.addr		= omap2_hdq1w_addr_space,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+	.flags		= OMAP_FIREWALL_L4,
-+};
-+
- /* L4 WKUP */
- static struct omap_hwmod omap2430_l4_wkup_hwmod = {
- 	.name		= "l4_wkup",
-@@ -2001,6 +2012,30 @@ static struct omap_hwmod omap2430_mmc2_hwmod = {
- 	.class		= &omap2430_mmc_class,
- };
- 
-+/* HDQ1W/1-wire */
-+
-+static struct omap_hwmod_ocp_if *omap2430_hdq1w_slaves[] = {
-+	&omap2430_l4_core__hdq1w,
-+};
-+
-+static struct omap_hwmod omap2430_hdq1w_hwmod = {
-+	.name		= "hdq1w",
-+	.mpu_irqs	= omap2_hdq1w_mpu_irqs,
-+	.main_clk	= "hdq_fck",
-+	.prcm		= {
-+		.omap2 = {
-+			.module_offs = CORE_MOD,
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP24XX_EN_HDQ_SHIFT,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP24XX_ST_HDQ_SHIFT,
-+		},
-+	},
-+	.slaves		= omap2430_hdq1w_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap2430_hdq1w_slaves),
-+	.class		= &omap2_hdq1w_class,
-+};
-+
- static __initdata struct omap_hwmod *omap2430_hwmods[] = {
- 	&omap2430_l3_main_hwmod,
- 	&omap2430_l4_core_hwmod,
-@@ -2064,6 +2099,9 @@ static __initdata struct omap_hwmod *omap2430_hwmods[] = {
- 	/* usbotg class*/
- 	&omap2430_usbhsotg_hwmod,
- 
-+	/* hdq1w class */
-+	&omap2430_hdq1w_hwmod,
-+
- 	NULL,
- };
- 
+ extern struct omap_hwmod_class omap2xxx_timer_hwmod_class;
+ extern struct omap_hwmod_class omap2xxx_wd_timer_hwmod_class;
