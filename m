@@ -1,152 +1,214 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 21 Jan 2012 13:35:59 +0900
-Subject: [PATCH 1/7] ARM: EXYNOS: use static declaration when it is not used in
- other files
-Message-ID: <010901ccd7f6$2c71e490$8555adb0$%kim@samsung.com>
+Date: Sat, 21 Jan 2012 13:36:07 +0900
+Subject: [PATCH 2/7] ARM: S3C24XX: use static declaration when it is not used
+ in other files
+Message-ID: <010a01ccd7f6$3173a190$945ae4b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/clock-exynos4210.c    |    2 +-
- arch/arm/mach-exynos/clock-exynos4212.c    |    2 +-
- arch/arm/mach-exynos/clock.c               |    2 +-
- arch/arm/mach-exynos/common.c              |    2 +-
- arch/arm/mach-exynos/dma.c                 |   12 ++++++------
- arch/arm/mach-exynos/mach-origen.c         |    2 +-
- arch/arm/mach-exynos/mach-universal_c210.c |    2 +-
- 7 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/mach-s3c2410/mach-h1940.c    |   12 ++++++------
+ arch/arm/mach-s3c2416/clock.c         |    6 ------
+ arch/arm/mach-s3c2416/mach-smdk2416.c |    8 ++++----
+ arch/arm/mach-s3c2440/mach-gta02.c    |    4 ++--
+ arch/arm/mach-s3c2440/mach-rx1950.c   |   12 ++++++------
+ arch/arm/plat-s3c24xx/s3c2443-clock.c |    2 +-
+ 6 files changed, 19 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos4210.c b/arch/arm/mach-exynos/clock-exynos4210.c
-index a5823a7..25ea400 100644
---- a/arch/arm/mach-exynos/clock-exynos4210.c
-+++ b/arch/arm/mach-exynos/clock-exynos4210.c
-@@ -115,7 +115,7 @@ static void exynos4210_clock_resume(void)
- #define exynos4210_clock_resume NULL
- #endif
- 
--struct syscore_ops exynos4210_clock_syscore_ops = {
-+static struct syscore_ops exynos4210_clock_syscore_ops = {
- 	.suspend	= exynos4210_clock_suspend,
- 	.resume		= exynos4210_clock_resume,
- };
-diff --git a/arch/arm/mach-exynos/clock-exynos4212.c b/arch/arm/mach-exynos/clock-exynos4212.c
-index 26a668b..b133f86 100644
---- a/arch/arm/mach-exynos/clock-exynos4212.c
-+++ b/arch/arm/mach-exynos/clock-exynos4212.c
-@@ -87,7 +87,7 @@ static void exynos4212_clock_resume(void)
- #define exynos4212_clock_resume NULL
- #endif
- 
--struct syscore_ops exynos4212_clock_syscore_ops = {
-+static struct syscore_ops exynos4212_clock_syscore_ops = {
- 	.suspend	= exynos4212_clock_suspend,
- 	.resume		= exynos4212_clock_resume,
- };
-diff --git a/arch/arm/mach-exynos/clock.c b/arch/arm/mach-exynos/clock.c
-index 5a8c42e..c07c6d4 100644
---- a/arch/arm/mach-exynos/clock.c
-+++ b/arch/arm/mach-exynos/clock.c
-@@ -1524,7 +1524,7 @@ static void exynos4_clock_resume(void)
- #define exynos4_clock_resume NULL
- #endif
- 
--struct syscore_ops exynos4_clock_syscore_ops = {
-+static struct syscore_ops exynos4_clock_syscore_ops = {
- 	.suspend	= exynos4_clock_suspend,
- 	.resume		= exynos4_clock_resume,
- };
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index c59e188..b7f4b59 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -673,7 +673,7 @@ static void exynos4_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
+diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
+index 41245a6..6b21ba1 100644
+--- a/arch/arm/mach-s3c2410/mach-h1940.c
++++ b/arch/arm/mach-s3c2410/mach-h1940.c
+@@ -162,7 +162,7 @@ static int h1940_gpiolib_latch_get(struct gpio_chip *chip,
+ 	return (latch_state >> (offset + 16)) & 1;
  }
  
--int __init exynos4_init_irq_eint(void)
-+static int __init exynos4_init_irq_eint(void)
+-struct gpio_chip h1940_latch_gpiochip = {
++static struct gpio_chip h1940_latch_gpiochip = {
+ 	.base			= H1940_LATCH_GPIO(0),
+ 	.owner			= THIS_MODULE,
+ 	.label			= "H1940_LATCH",
+@@ -304,7 +304,7 @@ static const struct s3c_adc_bat_thresh bat_lut_acin[] = {
+ 	{ .volt = 3841, .cur = 0, .level = 0},
+ };
+ 
+-int h1940_bat_init(void)
++static int h1940_bat_init(void)
  {
- 	int irq;
+ 	int ret;
  
-diff --git a/arch/arm/mach-exynos/dma.c b/arch/arm/mach-exynos/dma.c
-index b10fcd2..8dec3db 100644
---- a/arch/arm/mach-exynos/dma.c
-+++ b/arch/arm/mach-exynos/dma.c
-@@ -36,7 +36,7 @@
+@@ -317,17 +317,17 @@ int h1940_bat_init(void)
  
- static u64 dma_dmamask = DMA_BIT_MASK(32);
- 
--u8 pdma0_peri[] = {
-+static u8 pdma0_peri[] = {
- 	DMACH_PCM0_RX,
- 	DMACH_PCM0_TX,
- 	DMACH_PCM2_RX,
-@@ -69,12 +69,12 @@ u8 pdma0_peri[] = {
- 	DMACH_AC97_PCMOUT,
- };
- 
--struct dma_pl330_platdata exynos4_pdma0_pdata = {
-+static struct dma_pl330_platdata exynos4_pdma0_pdata = {
- 	.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
- 	.peri_id = pdma0_peri,
- };
- 
--struct amba_device exynos4_device_pdma0 = {
-+static struct amba_device exynos4_device_pdma0 = {
- 	.dev = {
- 		.init_name = "dma-pl330.0",
- 		.dma_mask = &dma_dmamask,
-@@ -90,7 +90,7 @@ struct amba_device exynos4_device_pdma0 = {
- 	.periphid = 0x00041330,
- };
- 
--u8 pdma1_peri[] = {
-+static u8 pdma1_peri[] = {
- 	DMACH_PCM0_RX,
- 	DMACH_PCM0_TX,
- 	DMACH_PCM1_RX,
-@@ -118,12 +118,12 @@ u8 pdma1_peri[] = {
- 	DMACH_SLIMBUS5_TX,
- };
- 
--struct dma_pl330_platdata exynos4_pdma1_pdata = {
-+static struct dma_pl330_platdata exynos4_pdma1_pdata = {
- 	.nr_valid_peri = ARRAY_SIZE(pdma1_peri),
- 	.peri_id = pdma1_peri,
- };
- 
--struct amba_device exynos4_device_pdma1 = {
-+static struct amba_device exynos4_device_pdma1 = {
- 	.dev = {
- 		.init_name = "dma-pl330.1",
- 		.dma_mask = &dma_dmamask,
-diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-index 0679b8a..3ec3ccf 100644
---- a/arch/arm/mach-exynos/mach-origen.c
-+++ b/arch/arm/mach-exynos/mach-origen.c
-@@ -412,7 +412,7 @@ static struct max8997_regulator_data __initdata origen_max8997_regulators[] = {
- 	{ MAX8997_BUCK7,	&max8997_buck7_data },
- };
- 
--struct max8997_platform_data __initdata origen_max8997_pdata = {
-+static struct max8997_platform_data __initdata origen_max8997_pdata = {
- 	.num_regulators = ARRAY_SIZE(origen_max8997_regulators),
- 	.regulators	= origen_max8997_regulators,
- 
-diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-index 37ac93e..29c8e18 100644
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@ -997,7 +997,7 @@ static void __init universal_map_io(void)
- 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
  }
  
--void s5p_tv_setup(void)
-+static void s5p_tv_setup(void)
+-void h1940_bat_exit(void)
++static void h1940_bat_exit(void)
  {
- 	/* direct HPD to HDMI chip */
- 	gpio_request_one(EXYNOS4_GPX3(7), GPIOF_IN, "hpd-plug");
+ 	gpio_free(H1940_LATCH_SM803_ENABLE);
+ }
+ 
+-void h1940_enable_charger(void)
++static void h1940_enable_charger(void)
+ {
+ 	gpio_set_value(H1940_LATCH_SM803_ENABLE, 1);
+ }
+ 
+-void h1940_disable_charger(void)
++static void h1940_disable_charger(void)
+ {
+ 	gpio_set_value(H1940_LATCH_SM803_ENABLE, 0);
+ }
+@@ -364,7 +364,7 @@ static struct platform_device h1940_battery = {
+ 	},
+ };
+ 
+-DEFINE_SPINLOCK(h1940_blink_spin);
++static DEFINE_SPINLOCK(h1940_blink_spin);
+ 
+ int h1940_led_blink_set(unsigned gpio, int state,
+ 	unsigned long *delay_on, unsigned long *delay_off)
+diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c2416/clock.c
+index 59f54d1..e01490d 100644
+--- a/arch/arm/mach-s3c2416/clock.c
++++ b/arch/arm/mach-s3c2416/clock.c
+@@ -132,12 +132,6 @@ static struct clk hsmmc0_clk = {
+ 	.ctrlbit	= S3C2416_HCLKCON_HSMMC0,
+ };
+ 
+-void __init_or_cpufreq s3c2416_setup_clocks(void)
+-{
+-	s3c2443_common_setup_clocks(s3c2416_get_pll);
+-}
+-
+-
+ static struct clksrc_clk *clksrcs[] __initdata = {
+ 	&hsspi_eplldiv,
+ 	&hsspi_mux,
+diff --git a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c2416/mach-smdk2416.c
+index eebe1e7..30a44f8 100644
+--- a/arch/arm/mach-s3c2416/mach-smdk2416.c
++++ b/arch/arm/mach-s3c2416/mach-smdk2416.c
+@@ -125,7 +125,7 @@ static struct s3c2410_uartcfg smdk2416_uartcfgs[] __initdata = {
+ 	}
+ };
+ 
+-void smdk2416_hsudc_gpio_init(void)
++static void smdk2416_hsudc_gpio_init(void)
+ {
+ 	s3c_gpio_setpull(S3C2410_GPH(14), S3C_GPIO_PULL_UP);
+ 	s3c_gpio_setpull(S3C2410_GPF(2), S3C_GPIO_PULL_NONE);
+@@ -133,20 +133,20 @@ void smdk2416_hsudc_gpio_init(void)
+ 	s3c2410_modify_misccr(S3C2416_MISCCR_SEL_SUSPND, 0);
+ }
+ 
+-void smdk2416_hsudc_gpio_uninit(void)
++static void smdk2416_hsudc_gpio_uninit(void)
+ {
+ 	s3c2410_modify_misccr(S3C2416_MISCCR_SEL_SUSPND, 1);
+ 	s3c_gpio_setpull(S3C2410_GPH(14), S3C_GPIO_PULL_NONE);
+ 	s3c_gpio_cfgpin(S3C2410_GPH(14), S3C_GPIO_SFN(0));
+ }
+ 
+-struct s3c24xx_hsudc_platdata smdk2416_hsudc_platdata = {
++static struct s3c24xx_hsudc_platdata smdk2416_hsudc_platdata = {
+ 	.epnum = 9,
+ 	.gpio_init = smdk2416_hsudc_gpio_init,
+ 	.gpio_uninit = smdk2416_hsudc_gpio_uninit,
+ };
+ 
+-struct s3c_fb_pd_win smdk2416_fb_win[] = {
++static struct s3c_fb_pd_win smdk2416_fb_win[] = {
+ 	[0] = {
+ 		/* think this is the same as the smdk6410 */
+ 		.win_mode	= {
+diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
+index 5859e60..7365a44 100644
+--- a/arch/arm/mach-s3c2440/mach-gta02.c
++++ b/arch/arm/mach-s3c2440/mach-gta02.c
+@@ -258,7 +258,7 @@ static struct pcf50633_bl_platform_data gta02_backlight_data = {
+ 	.ramp_time = 5,
+ };
+ 
+-struct pcf50633_platform_data gta02_pcf_pdata = {
++static struct pcf50633_platform_data gta02_pcf_pdata = {
+ 	.resumers = {
+ 		[0] =	PCF50633_INT1_USBINS |
+ 			PCF50633_INT1_USBREM |
+@@ -404,7 +404,7 @@ static struct platform_device gta02_nor_flash = {
+ };
+ 
+ 
+-struct platform_device s3c24xx_pwm_device = {
++static struct platform_device s3c24xx_pwm_device = {
+ 	.name		= "s3c24xx_pwm",
+ 	.num_resources	= 0,
+ };
+diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
+index 80077f6..4a8e2d3 100644
+--- a/arch/arm/mach-s3c2440/mach-rx1950.c
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c
+@@ -217,7 +217,7 @@ static const struct s3c_adc_bat_thresh bat_lut_acin[] = {
+ 	{ .volt = 3820, .cur = 0, .level = 0},
+ };
+ 
+-int rx1950_bat_init(void)
++static int rx1950_bat_init(void)
+ {
+ 	int ret;
+ 
+@@ -236,25 +236,25 @@ err_gpio1:
+ 	return ret;
+ }
+ 
+-void rx1950_bat_exit(void)
++static void rx1950_bat_exit(void)
+ {
+ 	gpio_free(S3C2410_GPJ(2));
+ 	gpio_free(S3C2410_GPJ(3));
+ }
+ 
+-void rx1950_enable_charger(void)
++static void rx1950_enable_charger(void)
+ {
+ 	gpio_direction_output(S3C2410_GPJ(2), 1);
+ 	gpio_direction_output(S3C2410_GPJ(3), 1);
+ }
+ 
+-void rx1950_disable_charger(void)
++static void rx1950_disable_charger(void)
+ {
+ 	gpio_direction_output(S3C2410_GPJ(2), 0);
+ 	gpio_direction_output(S3C2410_GPJ(3), 0);
+ }
+ 
+-DEFINE_SPINLOCK(rx1950_blink_spin);
++static DEFINE_SPINLOCK(rx1950_blink_spin);
+ 
+ static int rx1950_led_blink_set(unsigned gpio, int state,
+ 	unsigned long *delay_on, unsigned long *delay_off)
+@@ -382,7 +382,7 @@ static struct s3c2410fb_mach_info rx1950_lcd_cfg = {
+ 
+ static struct pwm_device *lcd_pwm;
+ 
+-void rx1950_lcd_power(int enable)
++static void rx1950_lcd_power(int enable)
+ {
+ 	int i;
+ 	static int enabled;
+diff --git a/arch/arm/plat-s3c24xx/s3c2443-clock.c b/arch/arm/plat-s3c24xx/s3c2443-clock.c
+index 95e6819..037b448 100644
+--- a/arch/arm/plat-s3c24xx/s3c2443-clock.c
++++ b/arch/arm/plat-s3c24xx/s3c2443-clock.c
+@@ -53,7 +53,7 @@ int s3c2443_clkcon_enable_s(struct clk *clk, int enable)
+  * elided as the EPLL can be either sourced by the XTAL or EXTCLK and as
+  * such directly equating the two source clocks is impossible.
+  */
+-struct clk clk_mpllref = {
++static struct clk clk_mpllref = {
+ 	.name		= "mpllref",
+ 	.parent		= &clk_xtal,
+ };
 -- 
 1.7.1
