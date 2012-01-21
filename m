@@ -1,69 +1,226 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 21 Jan 2012 07:08:56 +0530
-Subject: Pinmux bindings proposal
-In-Reply-To: <20120120175351.GL7807@atomide.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <CAJuYYwQoh4_SnA9wmy4x+cG0w0hGukxTkODWtcSw_2QHYuDsrg@mail.gmail.com>
- <20120119165607.GG22818@atomide.com>
- <CAJuYYwQB1pDu-JS5o3XPA1D8WbVcwbdtD43M4y7PeJNWeNXxQQ@mail.gmail.com>
- <20120119182019.GI22818@atomide.com>
- <CAJuYYwQouBDP6dL0B8QOaF0_JsbR7fysySZ5ebcF4op9aTQqbQ@mail.gmail.com>
- <20120120100528.GJ22818@atomide.com>
- <CAJuYYwQ79o5JuOQfs8rSdasVg+ei4KX7tGLuDA-yysseZya9TA@mail.gmail.com>
- <20120120175351.GL7807@atomide.com>
-Message-ID: <CAJuYYwS28r0xinG8xa93D5bAtZUhCFXm4-F1Q69Te4dWWTm0Yg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 20 Jan 2012 22:20:55 -0500 (EST)
+Subject: [PATCH 00/20] arch_idle() cleanup and mach/system.h removal
+In-Reply-To: <20120113140723.GW1068@n2100.arm.linux.org.uk>
+References: <1324288069-21940-1-git-send-email-nico@fluxnic.net>
+ <20120113104358.GR1068@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1201130853250.2722@xanadu.home>
+ <20120113140723.GW1068@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1201202217510.19587@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2012 23:23, Tony Lindgren <tony@atomide.com> wrote:
-> * Thomas Abraham <thomas.abraham@linaro.org> [120120 16:45]:
->> On 20 January 2012 15:35, Tony Lindgren <tony@atomide.com> wrote:
->> > * Thomas Abraham <thomas.abraham@linaro.org> [120119 10:05]:
->> >> On 19 January 2012 23:50, Tony Lindgren <tony@atomide.com> wrote:
->> >>
->> >> I would like to understand the need for populating the
->> >> pinmux/pingroups tables from dt. The question here is when we have
->> >> something like
->> >>
->> >> pins = <&pinctrl0 0x0030 0x15 0x15 0x7>;
->> >>
->> >> which specifies the values that need to be written to the hardware
->> >> registers, would populating pinmux/pingroup tables from dt required.
->> >> The SoC specific pinctrl driver can provide a way (with the help of
->> >> pinctrl core) to translate these values and write to corresponding
->> >> hardware registers. Is there any particular reason for populating the
->> >> pinmux/pingroups tables from dt?
->> >
->> > Hmm I see. Yes it's still needed as we only want to parse the DT once
->> > because it's slower unless it was one time only configuration during
->> > init.
->>
->> Ok. The time spent on searching for the pin-config property can be
->> reduced by having the device driver (say, i2c) keep a pointer to all
->> the pinconfig properties in its node. The next time a driver needs to
->> reconfigure the pins, the search time can be reduced. The time to
->> parse the property values though would still be applicable. But I
->> would still not opt to build pinmux/pinconfig/pindesc tables from dt.
->
-> Hmm that's something to consider to save memory as the node will stay
-> there. This would allow making all the pinctrl framework data __initdata
-> in some cases. You'd probably want to copy the data into the driver in
-> some pinctrl framework struct so you could still use pinctrl framework
-> functions with this data and not have to parse the node again.
+On Fri, 13 Jan 2012, Russell King - ARM Linux wrote:
 
-Is it required to use pinctrl functions when we already have the
-hardware register values for pinmux/pinconfig in the device nodes? I
-was of the opinion that we need not use pinctrl API in case of dt
-based boot.
+> On Fri, Jan 13, 2012 at 08:54:58AM -0500, Nicolas Pitre wrote:
+> > On Fri, 13 Jan 2012, Russell King - ARM Linux wrote:
+> > 
+> > > So, sending a pull request for the idle stuff in the last two days of
+> > > the merge window, for a change which is quite big, which conflicts,
+> > > which wasn't in -next before the merge window is just asking for trouble,
+> > > and I'm not going to do it.
+> > 
+> > Too bad.  Let's try to stage this early in your devel-stable branch for 
+> > next cycle then.
+> 
+> Arnd and myself just agreed this; once rc1 is out, could you please rebase
+> on that, resend the pull request, and we'll merge it into both trees.
+> 
 
->
-> For building the tables from dt, what I have currently is building
-> the tables without any specific knowledge about the pinmux functions.
-> I'm thinking that any further knowledge for debugging etc can be done
-> later on using user space tools to avoid storing the data in kernel.
->
+Here it is.
 
-Ok. I will go through your patches when you post them.
+The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
 
-Thanks,
-Thomas.
+  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/nico/linux idle
+
+for you to fetch changes up to a570067df9cc1b1821ca5255bbbe8adb67aca199:
+
+  ARM: big removal of now unused arch_idle() (2012-01-20 19:25:58 -0500)
+
+----------------------------------------------------------------
+Nicolas Pitre (23):
+      ARM: OMAP1: Fix pm_idle during suspend
+      ARM: clean up idle handlers
+      ARM: OMAP: convert idle handlers from pm_idle to arm_pm_idle
+      ARM: mach-s5pv210: use standard arch_idle()
+      ARM: mach-s5pc100: use standard arch_idle()
+      ARM: mach-s5p64x0: move idle handler from pm_idle to arm_pm_idle
+      ARM: mach-exynos: use standard arch_idle()
+      ARM: mach-at91: move special idle code out of line
+      ARM: mach-clps711x: move special idle code out of line
+      ARM: mach-ebsa110: move special idle code out of line
+      ARM: mach-gemini: move special idle code out of line
+      ARM: mach-h720x: move special idle code out of line
+      ARM: s3c24xx: move special idle code to out of line
+      ARM: plat-mxc: hook special idle handlers to arm_pm_idle
+      ARM: mach-msm: hook special idle handlers to arm_pm_idle
+      ARM: mach-ixp23xx: properly disable CPU idle call
+      ARM: mach-ixp4xx: properly disable CPU idle call
+      ARM: mach-shark: properly disable CPU idle call
+      ARM: mach-w90x900: properly disable CPU idle call
+      ARM: mach-s3c64xx: use standard arch_idle() implementation
+      ARM: mach-tegra: properly disable CPU idle call
+      ARM: substitute arch_idle()
+      ARM: big removal of now unused arch_idle()
+
+ arch/arm/include/asm/system.h                  |    1 +
+ arch/arm/kernel/process.c                      |   27 +++++++-----
+ arch/arm/mach-at91/at91cap9.c                  |    8 ++++
+ arch/arm/mach-at91/at91rm9200.c                |   10 ++++
+ arch/arm/mach-at91/at91sam9260.c               |    8 ++++
+ arch/arm/mach-at91/at91sam9261.c               |    8 ++++
+ arch/arm/mach-at91/at91sam9263.c               |    8 ++++
+ arch/arm/mach-at91/at91sam9g45.c               |    7 +++
+ arch/arm/mach-at91/at91sam9rl.c                |    8 ++++
+ arch/arm/mach-at91/at91x40.c                   |   12 +++++
+ arch/arm/mach-at91/include/mach/system.h       |   50 ----------------------
+ arch/arm/mach-bcmring/include/mach/system.h    |   28 ------------
+ arch/arm/mach-clps711x/common.c                |   16 +++++++
+ arch/arm/mach-clps711x/include/mach/system.h   |   35 ---------------
+ arch/arm/mach-cns3xxx/include/mach/system.h    |   25 -----------
+ arch/arm/mach-davinci/include/mach/system.h    |   21 ---------
+ arch/arm/mach-dove/include/mach/system.h       |   17 -------
+ arch/arm/mach-ebsa110/core.c                   |   25 +++++++++++
+ arch/arm/mach-ebsa110/include/mach/system.h    |   37 ----------------
+ arch/arm/mach-ep93xx/include/mach/system.h     |    7 ---
+ arch/arm/mach-exynos/common.c                  |   12 -----
+ arch/arm/mach-exynos/include/mach/system.h     |   20 ---------
+ arch/arm/mach-footbridge/include/mach/system.h |   13 ------
+ arch/arm/mach-gemini/Makefile                  |    2 +-
+ arch/arm/mach-gemini/idle.c                    |   29 +++++++++++++
+ arch/arm/mach-gemini/include/mach/system.h     |   14 ------
+ arch/arm/mach-gemini/irq.c                     |    4 +-
+ arch/arm/mach-h720x/common.c                   |   18 ++++++++
+ arch/arm/mach-h720x/include/mach/system.h      |   27 ------------
+ arch/arm/mach-highbank/include/mach/system.h   |   24 ----------
+ arch/arm/mach-imx/mm-imx3.c                    |   52 +++++++++++------------
+ arch/arm/mach-imx/pm-imx27.c                   |    3 +-
+ arch/arm/mach-integrator/include/mach/system.h |   33 --------------
+ arch/arm/mach-iop13xx/include/mach/system.h    |   13 ------
+ arch/arm/mach-iop32x/include/mach/system.h     |   13 ------
+ arch/arm/mach-iop33x/include/mach/system.h     |   13 ------
+ arch/arm/mach-ixp2000/include/mach/system.h    |   14 ------
+ arch/arm/mach-ixp23xx/core.c                   |    3 +
+ arch/arm/mach-ixp23xx/include/mach/system.h    |   16 -------
+ arch/arm/mach-ixp4xx/common.c                  |    6 +++
+ arch/arm/mach-ixp4xx/include/mach/system.h     |   19 --------
+ arch/arm/mach-kirkwood/include/mach/system.h   |   17 -------
+ arch/arm/mach-ks8695/include/mach/system.h     |   27 ------------
+ arch/arm/mach-lpc32xx/include/mach/system.h    |   27 ------------
+ arch/arm/mach-mmp/include/mach/system.h        |   16 -------
+ arch/arm/mach-msm/idle.S                       |   36 ----------------
+ arch/arm/mach-msm/idle.c                       |   49 +++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/system.h        |    1 -
+ arch/arm/mach-mv78xx0/include/mach/system.h    |   17 -------
+ arch/arm/mach-mx5/mm.c                         |   28 +++++-------
+ arch/arm/mach-mxs/include/mach/system.h        |   25 -----------
+ arch/arm/mach-mxs/pm.c                         |    3 +-
+ arch/arm/mach-netx/include/mach/system.h       |   28 ------------
+ arch/arm/mach-nomadik/include/mach/system.h    |   32 --------------
+ arch/arm/mach-omap1/include/mach/system.h      |    5 --
+ arch/arm/mach-omap1/pm.c                       |   19 ++-------
+ arch/arm/mach-omap2/include/mach/system.h      |    5 --
+ arch/arm/mach-omap2/pm24xx.c                   |    4 +-
+ arch/arm/mach-omap2/pm34xx.c                   |    6 +--
+ arch/arm/mach-omap2/pm44xx.c                   |    8 +--
+ arch/arm/mach-omap2/prm_common.c               |    1 -
+ arch/arm/mach-orion5x/include/mach/system.h    |   19 --------
+ arch/arm/mach-picoxcell/include/mach/system.h  |   26 -----------
+ arch/arm/mach-pnx4008/include/mach/system.h    |   29 -------------
+ arch/arm/mach-prima2/include/mach/system.h     |   17 -------
+ arch/arm/mach-pxa/include/mach/system.h        |   15 -------
+ arch/arm/mach-realview/include/mach/system.h   |   33 --------------
+ arch/arm/mach-rpc/include/mach/system.h        |   13 ------
+ arch/arm/mach-s3c2410/include/mach/system.h    |   54 ------------------------
+ arch/arm/mach-s3c2412/s3c2412.c                |    4 +-
+ arch/arm/mach-s3c2416/s3c2416.c                |    3 -
+ arch/arm/mach-s3c64xx/include/mach/system.h    |   19 --------
+ arch/arm/mach-s5p64x0/common.c                 |   15 +++----
+ arch/arm/mach-s5p64x0/include/mach/system.h    |   21 ---------
+ arch/arm/mach-s5pc100/common.c                 |   12 -----
+ arch/arm/mach-s5pc100/include/mach/system.h    |   19 --------
+ arch/arm/mach-s5pv210/common.c                 |   12 -----
+ arch/arm/mach-s5pv210/include/mach/system.h    |   21 ---------
+ arch/arm/mach-sa1100/include/mach/system.h     |    9 ----
+ arch/arm/mach-shark/core.c                     |    6 +++
+ arch/arm/mach-shark/include/mach/system.h      |   13 ------
+ arch/arm/mach-shmobile/include/mach/system.h   |    5 --
+ arch/arm/mach-spear3xx/include/mach/system.h   |   19 --------
+ arch/arm/mach-spear6xx/include/mach/system.h   |   19 --------
+ arch/arm/mach-tegra/common.c                   |    3 +-
+ arch/arm/mach-tegra/include/mach/system.h      |   28 ------------
+ arch/arm/mach-u300/include/mach/system.h       |   14 ------
+ arch/arm/mach-ux500/include/mach/system.h      |   20 ---------
+ arch/arm/mach-versatile/include/mach/system.h  |   33 --------------
+ arch/arm/mach-vexpress/include/mach/system.h   |   33 --------------
+ arch/arm/mach-vt8500/include/mach/system.h     |    5 --
+ arch/arm/mach-w90x900/dev.c                    |    1 +
+ arch/arm/mach-w90x900/include/mach/system.h    |   19 --------
+ arch/arm/mach-zynq/include/mach/system.h       |   23 ----------
+ arch/arm/plat-mxc/include/mach/system.h        |   25 -----------
+ arch/arm/plat-omap/include/plat/system.h       |   15 -------
+ arch/arm/plat-s3c24xx/cpu.c                    |   27 ++++++++++++
+ arch/arm/plat-spear/include/plat/system.h      |   26 -----------
+ 98 files changed, 326 insertions(+), 1409 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/system.h
+ delete mode 100644 arch/arm/mach-bcmring/include/mach/system.h
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/system.h
+ delete mode 100644 arch/arm/mach-cns3xxx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/system.h
+ delete mode 100644 arch/arm/mach-dove/include/mach/system.h
+ delete mode 100644 arch/arm/mach-ebsa110/include/mach/system.h
+ delete mode 100644 arch/arm/mach-ep93xx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-exynos/include/mach/system.h
+ delete mode 100644 arch/arm/mach-footbridge/include/mach/system.h
+ create mode 100644 arch/arm/mach-gemini/idle.c
+ delete mode 100644 arch/arm/mach-h720x/include/mach/system.h
+ delete mode 100644 arch/arm/mach-highbank/include/mach/system.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/system.h
+ delete mode 100644 arch/arm/mach-iop13xx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-iop32x/include/mach/system.h
+ delete mode 100644 arch/arm/mach-iop33x/include/mach/system.h
+ delete mode 100644 arch/arm/mach-ixp2000/include/mach/system.h
+ delete mode 100644 arch/arm/mach-ixp23xx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-ixp4xx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-kirkwood/include/mach/system.h
+ delete mode 100644 arch/arm/mach-ks8695/include/mach/system.h
+ delete mode 100644 arch/arm/mach-lpc32xx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-mmp/include/mach/system.h
+ delete mode 100644 arch/arm/mach-msm/idle.S
+ create mode 100644 arch/arm/mach-msm/idle.c
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/system.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/system.h
+ delete mode 100644 arch/arm/mach-netx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-nomadik/include/mach/system.h
+ delete mode 100644 arch/arm/mach-omap1/include/mach/system.h
+ delete mode 100644 arch/arm/mach-omap2/include/mach/system.h
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/system.h
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/system.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/system.h
+ delete mode 100644 arch/arm/mach-prima2/include/mach/system.h
+ delete mode 100644 arch/arm/mach-pxa/include/mach/system.h
+ delete mode 100644 arch/arm/mach-realview/include/mach/system.h
+ delete mode 100644 arch/arm/mach-rpc/include/mach/system.h
+ delete mode 100644 arch/arm/mach-s3c2410/include/mach/system.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-s5p64x0/include/mach/system.h
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/system.h
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/system.h
+ delete mode 100644 arch/arm/mach-sa1100/include/mach/system.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/system.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/system.h
+ delete mode 100644 arch/arm/mach-tegra/include/mach/system.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/system.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/system.h
+ delete mode 100644 arch/arm/mach-versatile/include/mach/system.h
+ delete mode 100644 arch/arm/mach-vexpress/include/mach/system.h
+ delete mode 100644 arch/arm/mach-w90x900/include/mach/system.h
+ delete mode 100644 arch/arm/mach-zynq/include/mach/system.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/system.h
+ delete mode 100644 arch/arm/plat-omap/include/plat/system.h
+ delete mode 100644 arch/arm/plat-spear/include/plat/system.h
