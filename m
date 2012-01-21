@@ -1,68 +1,73 @@
-From: eranian@googlemail.com (stephane eranian)
-Date: Sat, 21 Jan 2012 10:16:57 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
-References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
- <4F0B182D.7060507@us.ibm.com>
- <20120109224945.GA23090@mudshark.cambridge.arm.com>
- <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
- <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
- <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
- <CAMsRxfLtLnMiP0ZGr6rNLv-UeLUwOSJ=7do2nezOU5OkOA+MbQ@mail.gmail.com>
- <CACVXFVMbrQGi4Sg9TUPP5Bcc5kzFoX74n=ii4QrDRudbuDHOGg@mail.gmail.com>
- <CAMsRxfJmHkZw2f0A+4FsStJpXk_vrxvDduRcRGkcWpqp8a9m_w@mail.gmail.com>
- <CACVXFVOQNDRs=c8A2YC+WvYAHs5Abbz-QUEe1VJqrj2esFO11g@mail.gmail.com>
- <CAMsRxf+e38jRcyxESLhYDZ3OL910AQdapZD9P8vWDXfUE34DAA@mail.gmail.com>
- <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
- <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
- <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
- <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
- <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
- <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
- <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
- <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
- <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
-Message-ID: <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 21 Jan 2012 11:27:41 +0100
+Subject: Adding support for DoC G3 on Motorola A780, some help needed.
+In-Reply-To: <20120111014552.0dca6f3e34e2f24cf3a58f0f@studenti.unina.it>
+ (Antonio Ospite's message of "Wed, 11 Jan 2012 01:45:52 +0100")
+References: <20120111014552.0dca6f3e34e2f24cf3a58f0f@studenti.unina.it>
+Message-ID: <87y5t1z6xu.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 21, 2012 at 4:25 AM, Ming Lei <ming.lei@canonical.com> wrote:
-> On Fri, Jan 20, 2012 at 9:47 PM, stephane eranian
-> <eranian@googlemail.com> wrote:
->> Started afresh from:
->>
->> 90a4c0f uml: fix compile for x86-64
->>
->> And added 3, 4, 5, 6:
->> 603c316 arm: omap4: pmu: support runtime pm
->> 4899fbd arm: omap4: support pmu
->> d737bb1 arm: omap4: create pmu device via hwmod
->> 4e0259e arm: omap4: hwmod: introduce emu hwmod
->>
->> Still no interrupts firing. I am using your .config file.
->>
->> My HW:
->> CPU implementer : 0x41
->> CPU architecture: 7
->> CPU variant ? ? : 0x1
->> CPU part ? ? ? ?: 0xc09
->> CPU revision ? ?: 2
->>
->> Hardware ? ? ? ?: OMAP4 Panda board
->> Revision ? ? ? ?: 0020
->>
->> There must be something I am missing here.
->
-> Have you applied the patch in link[1]?
->
-You mean this:
-> [1], http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=summary
+Antonio Ospite <ospite@studenti.unina.it> writes:
 
-It does not point to a patch but to the entire tree.
+> Hi Robert, LAK folks,
+>
+> I saw that a driver for the DoC G3 NAND chip has been added to linux-3.2
+> (and write support is coming to 3.3, right?); some EZX phones like the
+> Motorola A780 and E680 supported by OpenEZX[1] are using this chip
+> AFAWK, but they also come with a NOR chip[2].
+>
+> Can you please give me some directions about adding support for the
+> docg3 to the A780? The changes will look somewhat similar to the
+> ones for the MIOA701[3], but we have the NOR too and I have some doubts.
+>
+> My questions are:
+>   - How can I find out the resource to use? I can telnet to the
+>     original firmware using linux-2.4.
+The docg3 driver relies only on IOMEM resource. The chip itself has an adressing
+space of 16 bits (ie. signals A15..A0). The normal setup with a docg3 is to tie
+it to address 0, so that it can be used as the boot device.
 
->
-> thanks,
-> --
-> Ming Lei
->
-> [1], http://marc.info/?l=linux-arm-kernel&m=132697975416659&w=2
+That's what I would try first. If it doesn't work, it has to be one of the
+static memory address space of your chip.
+
+>   - What are the __raw_writel() calls in [3] for?
+These are to setup the PXA memory controller, so that it knows that :
+ - at address 0, there is a static chip, which is asynchronous static flash
+ memory
+ - the chip is slow (ie. the OE/WE/CS signals would be based on CLKMEM/4)
+ - the chip has a 16 bits wide data bus
+
+The full explanation of the important register is in [1].
+
+>   - How are the partitions specified with the docg3 driver?
+The docg3 is SAFTL partitionned (unless somebody overwrites that). There is
+currently no support for SAFTL. All the knowledge I have is in :
+ - http://belgarath.falguerolles.org/mioa701/mioa701.html
+   => especially in docg3-saftl.html
+
+Cheers.
+
+--
+Robert
+
+[1]: Extract of the mioa701 IPL (under contruction)
+	/*
+	 * This is the configuration for nCS1/0 -> nothing / flash
+	 * configuration for nCS1: nothing
+	 * [31]    0    - RBUFF1: Slower Device
+	 * [30:28] 111  - RR1: CS deselect to CS time: (7*2*MemClk + 1) = 20 ns
+	 * [27:24] 1111 - RDN1: address to data valid in bursts: (30+1)*MemClk = 30 ns
+	 * [23:20] 1111 - RDF1: for first access: (30+2)*MemClk = 130 ns
+	 * [19]    0    - RBW1: 32 Bit bus width
+	 * [18:16] 000  - RT1: burst RAM or FLASH
+	 *
+	 * configuration for nCS0 (DocG3 Flash floor 0):
+	 * [15]    0    - RBUFF0: Slower Device
+	 * [14:12] 010  - RRR0: CS deselect to CS time: 2*(2+1)*MemClk = 20 ns
+	 * [11:08] 1101 - RDN0: Address to data valid in bursts: (20+1)*MemClk = xx ns
+	 * [07:04] 1101 - RDF0: for first access: (20-1)*MemClk = xx ns
+	 * [03]    1    - RBW0: 16 Bit bus width
+	 * [02:00] 000  - RT0: asynchronous static FLASH
+	 */
+	MSC0 = 0x7ff02dd8;
