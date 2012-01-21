@@ -1,38 +1,28 @@
-From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
-Date: Sat, 21 Jan 2012 11:50:20 +0100
-Subject: [PATCH] mach-sa1100: add missing module_init() call
-In-Reply-To: <1326998362-7630-1-git-send-email-linus.walleij@linaro.org>
-References: <1326998362-7630-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20120121105020.GA22705@Boggieman>
+From: greg@kroah.com (Greg KH)
+Date: Sat, 21 Jan 2012 07:55:22 -0500
+Subject: [PATCH 0/2] tty: serial: OMAP: work around broken driver, IP block
+In-Reply-To: <20120121071934.18707.64258.stgit@dusk>
+References: <20120121071934.18707.64258.stgit@dusk>
+Message-ID: <20120121125522.GA19027@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 07:39:22PM +0100, Linus Walleij wrote:
-> The Jornada SSP driver is supposed to be initialized by a
-> module_init() call, but it was missed at some merge point. Since
-> the driver mostly pass calls through it magically works anyway,
-> but needs to be rectified.
+On Sat, Jan 21, 2012 at 12:27:37AM -0700, Paul Walmsley wrote:
+> [ This series is targeted for merging during v3.3-rc ]
 > 
-> Cc: Kristoffer Ericson <kristoffer.ericson@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks for spotting this :)
-
-Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com> 
-
-> ---
->  arch/arm/mach-sa1100/jornada720_ssp.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+> On v3.3-rc1, the OMAP serial console doesn't behave properly when
+> power management is enabled (the default with omap2plus_defconfig).
+> This seems to be due to a combination of a silicon bug in the UART IP
+> block and broken FIFO settings in the OMAP serial driver.
 > 
-> diff --git a/arch/arm/mach-sa1100/jornada720_ssp.c b/arch/arm/mach-sa1100/jornada720_ssp.c
-> index f50b00b..b412fc0 100644
-> --- a/arch/arm/mach-sa1100/jornada720_ssp.c
-> +++ b/arch/arm/mach-sa1100/jornada720_ssp.c
-> @@ -198,3 +198,5 @@ static int __init jornada_ssp_init(void)
->  {
->  	return platform_driver_register(&jornadassp_driver);
->  }
-> +
-> +module_init(jornada_ssp_init);
-> -- 
-> 1.7.7.5
+> This patch series attempts to work around these problems.  The workarounds
+> are not perfect; see the patch descriptions for more details.
+> 
+> Tested on OMAP3530 BeagleBoard.  This series will need to be tested on
+> OMAP2 and OMAP4 before it is ready to merge.
+
+Who is going to do that testing?  When?  Why isn't it done already?
+
+I guess this means I can ignore them for now, right?
+
+greg k-h
