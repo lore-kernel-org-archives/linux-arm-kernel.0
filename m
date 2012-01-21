@@ -1,44 +1,69 @@
-From: stone13606085184@vip.163.com (risenstone)
-Date: Sat, 21 Jan 2012 14:50:20 +0800 (CST)
-Subject: RE;Computere Arm Support
-Message-ID: <636130e.c59.134ff07adb3.Coremail.stone13606085184@vip.163.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 20 Jan 2012 23:28:02 -0800
+Subject: [RFC v3 PATCH 1/3] dt: device tree bindings for DDR memories
+In-Reply-To: <4F188386.3080507@ti.com>
+References: <1326983521-373-1-git-send-email-aneesh@ti.com>
+ <1326983521-373-2-git-send-email-aneesh@ti.com>
+ <CAOesGMikm8szKR_yyeV-4NbnknCLG3z9N_sj+zydyu+cosj-Tg@mail.gmail.com>
+ <4F188386.3080507@ti.com>
+Message-ID: <CAOesGMg01SvP1koV8GTJgeMATROZ0oP5BQSDqtmge_UZXvwZLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Purchasing Manager,
- 
-My name is Teresa Zhou.
-Our company Restman Technology Corp. is a computer accessory manufacturer in China. We can provide you with The Restman Computer Arm Support?Vertical Wired and Wireless mice. These products were designed by our own Canadian ergonomics R&D design team. We are the exclusive manufacturer of these products and have obtained patents for them.
-The Restman Computer Arm Support are simple, effective, inexpensive devices that support the forearm and the elbow while using a computer keyboard and mouse. They help to reduce the risk of injuries associated with mouse use and provide better, more pleasant working experience.
- 
-If you are interested in our products, I would like to provide the price list after getting your feedback.
- 
+On Thu, Jan 19, 2012 at 12:56 PM, Aneesh V <aneesh@ti.com> wrote:
+> Hi Olof,
+>
+>
+> On Friday 20 January 2012 01:01 AM, Olof Johansson wrote:
+>>
+>> Hi,
+>>
+>> Sorry for the delay in responding, I know you pinged me about it
+>> yesterday.
+>>
+>> On Thu, Jan 19, 2012 at 6:31 AM, Aneesh V<aneesh@ti.com> ?wrote:
+>>>
+>>> device tree bindings for LPDDR2 SDRAM memories compliant
+>>> to JESD209-2 standard.
+>>>
+>>> The 'lpddr2' binding in-turn uses another binding 'lpddr2-timings'
+>>> for specifying the AC timing parameters of the memory device at
+>>> different speed-bins.
+>>
+>>
+>> As I just commented on the thread with Mike, I think we would be
+>> better off sticking to embedding a standard JEDEC SPD structure in the
+>> device tree. It's not large (128-256 bytes depending on memory type),
+>> and it's clearly defined and used all over the industry.
+>>
+>> It also has the benefit of reusing parsing code if you ever end up
+>> with a system that uses DIMMs for memory, thus needing to parse the
+>> SPD on said modules.
+>
+>
+> I did mention in the previous thread why SPD doesn't work for us ([1] and
+> [2]). Let me repeat the key points here.
 
-If you want more details, pls log in our website:http://www.restmans.com
+Ah, sorry. Missed it in the chain of replies.
 
- 
- 
-Thank you for your support.
- 
-We really hope to do business with your esteemed company.
- 
+> 1. I couldn't find an SPD addendum for LPDDR2 from the JEDEC website.
+> 2. This seems to indicate that SPD is not used for LPDDR2 devices.
 
-Xiamen Restman Industry and Trade Co., Ltd.
+Bummer. I'm guessing most applications where LPDDR* is used won't be
+suitable for modular memory, so there's not the same need for SPD.
 
-+86-592-6055757
+> 3. I tried to see if I can fit the DDR3 or DDR2 SPD for our needs. But
+> some of the AC timing parameters needed by our controller are not
+> available in those layouts.
 
-Email: teresa8699 at foxmail.com
+Are those properties of the memory, or a combination of memory and
+board properties? I think it still makes sense for the memories that
+do have it to use the SPD format and extend with additional
+properties, at least if it's only a few additional properties needed.
 
-Website: http://www.restmans.com
+> I don't see any option other than defining a new binding for LPDDR2.
 
-              http://restman.en.alibaba.com
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120121/ca4beeb0/attachment-0001.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: armrest and mouse.jpg
-Type: image/jpeg
-Size: 30886 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120121/ca4beeb0/attachment-0001.jpg>
+Yeah, agreed.
+
+
+-Olof
