@@ -1,70 +1,122 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 21 Jan 2012 16:59:28 -0700
-Subject: [PATCH 0/8] ARM: OMAP: HDQ/1-wire: update driver to use runtime PM
-Message-ID: <20120121235333.17619.56725.stgit@dusk>
+Date: Sat, 21 Jan 2012 16:59:35 -0700
+Subject: [PATCH 7/8] ARM: OMAP2+: HDQ1W: use omap_device
+In-Reply-To: <20120121235333.17619.56725.stgit@dusk>
+References: <20120121235333.17619.56725.stgit@dusk>
+Message-ID: <20120121235934.17619.61644.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ This series intended for the 3.4 merge window ]
+Convert the old-style device registration code for HDQ1W to use
+omap_device.  This will allow the driver to be converted to use PM
+runtime and to take advantage of the OMAP IP block management
+infrastructure (hwmod, PM, etc.).
 
-Update the OMAP HDQ/1-wire driver to use runtime PM.  This includes
-integration with the rest of the OMAP power management and device
-enumeration code.  And there was a bug/undocumented feature in the HDQ reset
-process that needed a workaround.
+A side benefit of this conversion is that it also makes the HDQ device
+available on OMAP2420.  The previous code only enabled it on 2430 and
+3430.
 
-Evgeniy, could you ack the change to the 1-wire driver?  Otherwise, if you
-would like to merge it, we'd probably need to split this series across two
-merge windows.
-
-The series has been boot-tested on an OMAP35xx Beagleboard, but more
-testing would certainly be welcome.  Before merging it, I intend to
-boot-test it on OMAP2 and OMAP4 boards at least, but I don't think I
-have any boards with a 1-wire chip on-board.  So if someone has an OMAP
-board with 1-wire devices, (hint hint Neil ;-) a quick test would be
-much appreciated.
-
-This series is also available via git at
-
-git://git.pwsan.com/linux-2.6
-
-in the branch
-
-hdq_hwmod_runtime_pm_devel_3.4
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: NeilBrown <neilb@suse.de>
 ---
+ arch/arm/mach-omap2/devices.c |   37 -------------------------------------
+ arch/arm/mach-omap2/hdq1w.c   |   26 ++++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 37 deletions(-)
 
-hdq_hwmod_runtime_pm_devel_3.4
-   text	   data	    bss	    dec	    hex	filename
-6596693	 679492	5590716	12866901	 c45555	vmlinux.orig
-6600917	 679740	5590716	12871373	 c466cd	vmlinux.patched
-
-Paul Walmsley (8):
-      ARM: OMAP3: clock data: add clockdomain for HDQ functional clock
-      ARM: OMAP2+: HDQ1W: add custom reset function
-      ARM: OMAP2+: hwmod data: add HDQ/1-wire hwmod shared data
-      ARM: OMAP3: hwmod data: add HDQ/1-wire hwmod
-      ARM: OMAP2xxx: hwmod data: add HDQ/1-wire hwmod
-      ARM: OMAP4: hwmod data: add HDQ/1-wire hwmod
-      ARM: OMAP2+: HDQ1W: use omap_device
-      W1: OMAP HDQ1W: use runtime PM
-
-
- arch/arm/mach-omap2/Makefile                       |    2 
- arch/arm/mach-omap2/clock3xxx_data.c               |    3 -
- arch/arm/mach-omap2/devices.c                      |   37 --------
- arch/arm/mach-omap2/hdq1w.c                        |   98 ++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   41 ++++++++
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   38 ++++++++
- .../omap_hwmod_2xxx_3xxx_interconnect_data.c       |    9 ++
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |   22 ++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   39 ++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   74 +++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |    4 +
- arch/arm/plat-omap/include/plat/hdq1w.h            |   36 +++++++
- drivers/w1/masters/omap_hdq.c                      |   78 +++-------------
- 13 files changed, 376 insertions(+), 105 deletions(-)
- create mode 100644 arch/arm/mach-omap2/hdq1w.c
- create mode 100644 arch/arm/plat-omap/include/plat/hdq1w.h
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 0b510ad0..cf68525 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -650,42 +650,6 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+ 
+ #endif
+ 
+-/*-------------------------------------------------------------------------*/
+-
+-#if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
+-#if defined(CONFIG_SOC_OMAP2430) || defined(CONFIG_SOC_OMAP3430)
+-#define OMAP_HDQ_BASE	0x480B2000
+-#endif
+-static struct resource omap_hdq_resources[] = {
+-	{
+-		.start		= OMAP_HDQ_BASE,
+-		.end		= OMAP_HDQ_BASE + 0x1C,
+-		.flags		= IORESOURCE_MEM,
+-	},
+-	{
+-		.start		= INT_24XX_HDQ_IRQ,
+-		.flags		= IORESOURCE_IRQ,
+-	},
+-};
+-static struct platform_device omap_hdq_dev = {
+-	.name = "omap_hdq",
+-	.id = 0,
+-	.dev = {
+-		.platform_data = NULL,
+-	},
+-	.num_resources	= ARRAY_SIZE(omap_hdq_resources),
+-	.resource	= omap_hdq_resources,
+-};
+-static inline void omap_hdq_init(void)
+-{
+-	(void) platform_device_register(&omap_hdq_dev);
+-}
+-#else
+-static inline void omap_hdq_init(void) {}
+-#endif
+-
+-/*---------------------------------------------------------------------------*/
+-
+ #if defined(CONFIG_VIDEO_OMAP2_VOUT) || \
+ 	defined(CONFIG_VIDEO_OMAP2_VOUT_MODULE)
+ #if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
+@@ -726,7 +690,6 @@ static int __init omap2_init_devices(void)
+ 	omap_init_mbox();
+ 	omap_init_mcspi();
+ 	omap_init_pmu();
+-	omap_hdq_init();
+ 	omap_init_sti();
+ 	omap_init_sham();
+ 	omap_init_aes();
+diff --git a/arch/arm/mach-omap2/hdq1w.c b/arch/arm/mach-omap2/hdq1w.c
+index 15849ce..c917317 100644
+--- a/arch/arm/mach-omap2/hdq1w.c
++++ b/arch/arm/mach-omap2/hdq1w.c
+@@ -22,7 +22,13 @@
+  * 02110-1301 USA
+  */
+ 
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/err.h>
++#include <linux/platform_device.h>
++
+ #include <plat/omap_hwmod.h>
++#include <plat/omap_device.h>
+ #include <plat/hdq1w.h>
+ 
+ #include "common.h"
+@@ -70,3 +76,23 @@ int omap_hdq1w_reset(struct omap_hwmod *oh)
+ 
+ 	return 0;
+ }
++
++static int __init omap_init_hdq(void)
++{
++	int id = -1;
++	struct platform_device *pdev;
++	struct omap_hwmod *oh;
++	char *oh_name = "hdq1w";
++	char *devname = "omap_hdq";
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (!oh)
++		return 0;
++
++	pdev = omap_device_build(devname, id, oh, NULL, 0, NULL, 0, 0);
++	WARN(IS_ERR(pdev), "Can't build omap_device for %s:%s.\n",
++	     devname, oh->name);
++
++	return 0;
++}
++arch_initcall(omap_init_hdq);
