@@ -1,35 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 21 Jan 2012 17:16:57 -0200
-Subject: [PATCH 1/3] ARM: mx3: Remove unneeded ifdef's from mm-imx3.c
-In-Reply-To: <20120120232912.GP4066@pengutronix.de>
-References: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
- <20120120232912.GP4066@pengutronix.de>
-Message-ID: <CAOMZO5CaqMm4eNMCWP9Dyb1kC84qx+zg00FyJMw0gs93Qv94Gg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 21 Jan 2012 13:31:34 -0700 (MST)
+Subject: [PATCH 0/2] tty: serial: OMAP: work around broken driver, IP block
+In-Reply-To: <20120121125522.GA19027@kroah.com>
+References: <20120121071934.18707.64258.stgit@dusk>
+ <20120121125522.GA19027@kroah.com>
+Message-ID: <alpine.DEB.2.00.1201211323410.28153@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Sat, 21 Jan 2012, Greg KH wrote:
 
-2012/1/20 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Sat, Jan 21, 2012 at 12:27:37AM -0700, Paul Walmsley wrote:
+> > [ This series is targeted for merging during v3.3-rc ]
+> > 
+> > On v3.3-rc1, the OMAP serial console doesn't behave properly when
+> > power management is enabled (the default with omap2plus_defconfig).
+> > This seems to be due to a combination of a silicon bug in the UART IP
+> > block and broken FIFO settings in the OMAP serial driver.
+> > 
+> > This patch series attempts to work around these problems.  The workarounds
+> > are not perfect; see the patch descriptions for more details.
+> > 
+> > Tested on OMAP3530 BeagleBoard.  This series will need to be tested on
+> > OMAP2 and OMAP4 before it is ready to merge.
+> 
+> Who is going to do that testing?
 
-> and the problem was not that we can or cannot do kernels for both mx31
-> and mx35, but that we also want to do kernels for only one of them. Did
-> you try to build an mx31-only kernel after your change?
+I will do it, although I do cling to the hope that others will help.
 
-Ok, just tried it and it fails with:
+> When?  
 
-  LD      .tmp_vmlinux1
-arch/arm/mach-imx/built-in.o: In function `imx35_init_early':
-mach-mx31_3ds.c:(.init.text+0x50): undefined reference to `mxc_iomux_v3_init'
-arch/arm/mach-imx/built-in.o: In function `imx35_soc_init':
-mach-mx31_3ds.c:(.init.text+0x12c): undefined reference to `mx35_revision'
+I'll do it within the next two or three days, unless others beat me to it.
 
-I think I can solve this build issue by merging cpu-imx31.c and
-cpu-imx35.c into a single file:
-cpu-imx3.c, using the same idea as in cpu-imx5.c
+> Why isn't it done already?
 
-Would you like me to do this?
+That's always the question about testing, isn't it?
 
-Regards,
+In fact, now that you mention it, why haven't these patches been tested 
+yet on every possible combination of OMAP SoC and console UART?  
+Unbelievable, how negligent people are.
 
-Fabio Estevam
+> I guess this means I can ignore them for now, right?
+
+Yes.  I'll follow up with a pull request (or revisions) after I've tested 
+them on some OMAP2 and OMAP4 boards.
+
+
+regards
+
+- Paul
