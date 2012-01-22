@@ -1,178 +1,83 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 21 Jan 2012 16:59:36 -0700
-Subject: [PATCH 8/8] W1: OMAP HDQ1W: use runtime PM
-In-Reply-To: <20120121235333.17619.56725.stgit@dusk>
-References: <20120121235333.17619.56725.stgit@dusk>
-Message-ID: <20120121235935.17619.42743.stgit@dusk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 22 Jan 2012 00:51:51 +0000
+Subject: [BUG] PCMCIA card inserted, five s2ram cycles, you're dead
+Message-ID: <20120122005151.GA12326@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP HDQ driver to use runtime PM.  Compile- and boot-tested,
-but not tested in actual use.
+ARM platform, a pcnet_cs CF card inserted in pcmcia_socket0's slot
+which works after each resume.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: NeilBrown <neilb@suse.de>
-Cc: Evgeniy Polyakov <zbr@ioremap.net>
----
- drivers/w1/masters/omap_hdq.c |   78 +++++++----------------------------------
- 1 files changed, 13 insertions(+), 65 deletions(-)
+The messages below are produced by:
+printk("%s: %p [%s] %u\n", __func__, dev, kobject_name(&dev->kobj), atomic_read(&dev->kobj.kref.refcount));
 
-diff --git a/drivers/w1/masters/omap_hdq.c b/drivers/w1/masters/omap_hdq.c
-index 5ef385b..63e3eda 100644
---- a/drivers/w1/masters/omap_hdq.c
-+++ b/drivers/w1/masters/omap_hdq.c
-@@ -1,7 +1,7 @@
- /*
-  * drivers/w1/masters/omap_hdq.c
-  *
-- * Copyright (C) 2007 Texas Instruments, Inc.
-+ * Copyright (C) 2007,2012 Texas Instruments, Inc.
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2. This program is licensed "as is" without any warranty of any
-@@ -14,9 +14,9 @@
- #include <linux/interrupt.h>
- #include <linux/slab.h>
- #include <linux/err.h>
--#include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/sched.h>
-+#include <linux/pm_runtime.h>
- 
- #include <asm/irq.h>
- #include <mach/hardware.h>
-@@ -61,8 +61,6 @@ struct hdq_data {
- 	/* lock status update */
- 	struct  mutex		hdq_mutex;
- 	int			hdq_usecount;
--	struct	clk		*hdq_ick;
--	struct	clk		*hdq_fck;
- 	u8			hdq_irqstatus;
- 	/* device lock */
- 	spinlock_t		hdq_spinlock;
-@@ -419,17 +417,8 @@ static int omap_hdq_get(struct hdq_data *hdq_data)
- 		hdq_data->hdq_usecount++;
- 		try_module_get(THIS_MODULE);
- 		if (1 == hdq_data->hdq_usecount) {
--			if (clk_enable(hdq_data->hdq_ick)) {
--				dev_dbg(hdq_data->dev, "Can not enable ick\n");
--				ret = -ENODEV;
--				goto clk_err;
--			}
--			if (clk_enable(hdq_data->hdq_fck)) {
--				dev_dbg(hdq_data->dev, "Can not enable fck\n");
--				clk_disable(hdq_data->hdq_ick);
--				ret = -ENODEV;
--				goto clk_err;
--			}
-+
-+			pm_runtime_get_sync(hdq_data->dev);
- 
- 			/* make sure HDQ is out of reset */
- 			if (!(hdq_reg_in(hdq_data, OMAP_HDQ_SYSSTATUS) &
-@@ -450,9 +439,6 @@ static int omap_hdq_get(struct hdq_data *hdq_data)
- 		}
- 	}
- 
--clk_err:
--	clk_put(hdq_data->hdq_ick);
--	clk_put(hdq_data->hdq_fck);
- out:
- 	mutex_unlock(&hdq_data->hdq_mutex);
- rtn:
-@@ -475,10 +461,8 @@ static int omap_hdq_put(struct hdq_data *hdq_data)
- 	} else {
- 		hdq_data->hdq_usecount--;
- 		module_put(THIS_MODULE);
--		if (0 == hdq_data->hdq_usecount) {
--			clk_disable(hdq_data->hdq_ick);
--			clk_disable(hdq_data->hdq_fck);
--		}
-+		if (0 == hdq_data->hdq_usecount)
-+			pm_runtime_put_sync(hdq_data->dev);
- 	}
- 	mutex_unlock(&hdq_data->hdq_mutex);
- 
-@@ -591,35 +575,11 @@ static int __devinit omap_hdq_probe(struct platform_device *pdev)
- 		goto err_ioremap;
- 	}
- 
--	/* get interface & functional clock objects */
--	hdq_data->hdq_ick = clk_get(&pdev->dev, "ick");
--	if (IS_ERR(hdq_data->hdq_ick)) {
--		dev_dbg(&pdev->dev, "Can't get HDQ ick clock object\n");
--		ret = PTR_ERR(hdq_data->hdq_ick);
--		goto err_ick;
--	}
--
--	hdq_data->hdq_fck = clk_get(&pdev->dev, "fck");
--	if (IS_ERR(hdq_data->hdq_fck)) {
--		dev_dbg(&pdev->dev, "Can't get HDQ fck clock object\n");
--		ret = PTR_ERR(hdq_data->hdq_fck);
--		goto err_fck;
--	}
--
- 	hdq_data->hdq_usecount = 0;
- 	mutex_init(&hdq_data->hdq_mutex);
- 
--	if (clk_enable(hdq_data->hdq_ick)) {
--		dev_dbg(&pdev->dev, "Can not enable ick\n");
--		ret = -ENODEV;
--		goto err_intfclk;
--	}
--
--	if (clk_enable(hdq_data->hdq_fck)) {
--		dev_dbg(&pdev->dev, "Can not enable fck\n");
--		ret = -ENODEV;
--		goto err_fnclk;
--	}
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
- 
- 	rev = hdq_reg_in(hdq_data, OMAP_HDQ_REVISION);
- 	dev_info(&pdev->dev, "OMAP HDQ Hardware Rev %c.%c. Driver in %s mode\n",
-@@ -641,9 +601,7 @@ static int __devinit omap_hdq_probe(struct platform_device *pdev)
- 
- 	omap_hdq_break(hdq_data);
- 
--	/* don't clock the HDQ until it is needed */
--	clk_disable(hdq_data->hdq_ick);
--	clk_disable(hdq_data->hdq_fck);
-+	pm_runtime_put_sync(&pdev->dev);
- 
- 	omap_w1_master.data = hdq_data;
- 
-@@ -655,20 +613,11 @@ static int __devinit omap_hdq_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err_w1:
- err_irq:
--	clk_disable(hdq_data->hdq_fck);
--
--err_fnclk:
--	clk_disable(hdq_data->hdq_ick);
--
--err_intfclk:
--	clk_put(hdq_data->hdq_fck);
--
--err_fck:
--	clk_put(hdq_data->hdq_ick);
-+	pm_runtime_put_sync(&pdev->dev);
-+err_w1:
-+	pm_runtime_disable(&pdev->dev);
- 
--err_ick:
- 	iounmap(hdq_data->hdq_base);
- 
- err_ioremap:
-@@ -696,8 +645,7 @@ static int omap_hdq_remove(struct platform_device *pdev)
- 	mutex_unlock(&hdq_data->hdq_mutex);
- 
- 	/* remove module dependency */
--	clk_put(hdq_data->hdq_ick);
--	clk_put(hdq_data->hdq_fck);
-+	pm_runtime_disable(&pdev->dev);
- 	free_irq(INT_24XX_HDQ_IRQ, hdq_data);
- 	platform_set_drvdata(pdev, NULL);
- 	iounmap(hdq_data->hdq_base);
+placed before get_device() in each of the stated functions in
+drivers/base/power/main.c.  As you will notice, the kref count for
+pcmcia_socket0 decrements each resume until it explodes.  I suspect
+there's a bug somewhere in the PCMCIA code, possibly here:
+
+static int pcmcia_bus_early_resume(struct pcmcia_socket *skt)
+{
+        if (!verify_cis_cache(skt)) {
+                pcmcia_put_socket(skt);
+                return 0;
+        }
+
+I've not been able to check that theory tonight.  Maybe someone who
+knows the code can suggest - if not, I'll try deleting that
+pcmcia_put_socket() call at some point tomorrow.
+
+On the 3rd suspend/resume cycle:
+
+dpm_prepare: c1a0d998 [pcmcia_socket0] 3
+dpm_suspend: c1a0d998 [pcmcia_socket0] 3
+dpm_suspend_noirq: c1a0d998 [pcmcia_socket0] 3
+dpm_resume_noirq: c1a0d998 [pcmcia_socket0] 3
+dpm_resume: c1a0d998 [pcmcia_socket0] 3
+dpm_complete: c1a0d998 [pcmcia_socket0] 2
+
+On the 4th suspend/resume cycle:
+
+dpm_prepare: c1a0d998 [pcmcia_socket0] 2
+dpm_suspend: c1a0d998 [pcmcia_socket0] 2
+dpm_suspend_noirq: c1a0d998 [pcmcia_socket0] 2
+dpm_resume_noirq: c1a0d998 [pcmcia_socket0] 2
+dpm_resume: c1a0d998 [pcmcia_socket0] 2
+dpm_complete: c1a0d998 [pcmcia_socket0] 1
+
+On the 5th suspend/resume cycle:
+
+dpm_prepare: c1a0d998 [pcmcia_socket0] 1
+dpm_suspend: c1a0d998 [pcmcia_socket0] 1
+dpm_suspend_noirq: c1a0d998 [pcmcia_socket0] 1
+dpm_resume_noirq: c1a0d998 [pcmcia_socket0] 1
+dpm_resume: c1a0d998 [pcmcia_socket0] 1
+dpm_complete: c1a0d998 [pcmcia_socket0] 0
+------------[ cut here ]------------
+WARNING: at include/linux/kref.h:41 kobject_get+0x28/0x50()
+Modules linked in: ucb1x00_core
+Backtrace: [<c0212090>] (dump_backtrace+0x0/0x110) from [<c04799dc>] (dump_stack+0x18/0x1c)
+ r7:00000000 r6:c0335374 r5:c0500312 r4:00000029
+[<c04799c4>] (dump_stack+0x0/0x1c) from [<c021cba0>] (warn_slowpath_common+0x50/0x68)
+[<c021cb50>] (warn_slowpath_common+0x0/0x68) from [<c021cbdc>] (warn_slowpath_null+0x24/0x28)
+ r8:c0adbe74 r7:c05811e0 r6:c1a19234 r5:c1a0d998 r4:c1a0d9a0
+[<c021cbb8>] (warn_slowpath_null+0x0/0x28) from [<c0335374>] (kobject_get+0x28/0x50)
+[<c033534c>] (kobject_get+0x0/0x50) from [<c03804f4>] (get_device+0x1c/0x24)
+ r4:c1a0da18
+[<c03804d8>] (get_device+0x0/0x24) from [<c0388cec>] (dpm_complete+0x5c/0x1a0)
+[<c0388c90>] (dpm_complete+0x0/0x1a0) from [<c0389cc0>] (dpm_resume_end+0x1c/0x20)
+ r8:c05a9864 r7:00000003 r6:c059ada4 r5:00000000 r4:00000010
+[<c0389ca4>] (dpm_resume_end+0x0/0x20) from [<c0245668>] (suspend_devices_and_enter+0x1ac/0x1f8)
+ r4:00000000
+[<c02454bc>] (suspend_devices_and_enter+0x0/0x1f8) from [<c02457b0>] (enter_state+0xfc/0x144)
+ r8:c0aac000 r7:c04803c0 r6:00000003 r5:00000003 r4:00000000
+[<c02456b4>] (enter_state+0x0/0x144) from [<c02446fc>] (state_store+0x9c/0x11c)
+ r5:00000003 r4:c05009ad
+[<c0244660>] (state_store+0x0/0x11c) from [<c0334da0>] (kobj_attr_store+0x28/0x2c)
+[<c0334d78>] (kobj_attr_store+0x0/0x2c) from [<c02d7848>] (sysfs_write_file+0x10c/0x144)
+[<c02d773c>] (sysfs_write_file+0x0/0x144) from [<c0289d2c>] (vfs_write+0xb8/0x144)
+[<c0289c74>] (vfs_write+0x0/0x144) from [<c0289e88>] (sys_write+0x4c/0x7c)
+ r8:c020f4a4 r7:00000004 r6:c0ae0cc0 r5:00000000 r4:00000000
+[<c0289e3c>] (sys_write+0x0/0x7c) from [<c020f300>] (ret_fast_syscall+0x0/0x2c)
+ r6:b6f09c64 r5:00000004 r4:0209a408
+---[ end trace 589b3a68dda1e5cd ]---
