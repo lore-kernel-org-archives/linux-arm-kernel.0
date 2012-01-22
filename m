@@ -1,38 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 22 Jan 2012 21:42:08 +0100
-Subject: [RFC PATCH 06/11] Cortex-M3: Add base support for Cortex-M3
-In-Reply-To: <CAHXqBFKYVOpeLxK_Fc_fcaa1ehoq2wJM1LnfEGvWnENzk4GqLw@mail.gmail.com>
-References: <20120122111230.GB14835@pengutronix.de>
- <1327230817-12855-6-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAHXqBFKYVOpeLxK_Fc_fcaa1ehoq2wJM1LnfEGvWnENzk4GqLw@mail.gmail.com>
-Message-ID: <20120122204208.GC14835@pengutronix.de>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 22 Jan 2012 16:09:39 -0500
+Subject: [PATCH] arm: fix build failure in code for mach-bcmring/dma.c
+Message-ID: <1327266579-21951-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Micha?,
+Upstream commit 99d1717dd7fecf2b10195b0d864323b952b4eba0
 
-On Sun, Jan 22, 2012 at 08:45:24PM +0100, Micha? Miros?aw wrote:
-> 2012/1/22 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > --- a/arch/arm/kernel/head-common.S
-> > +++ b/arch/arm/kernel/head-common.S
-> > @@ -100,7 +100,7 @@ __mmap_switched:
-> > ? ? ? ?str ? ? r2, [r6] ? ? ? ? ? ? ? ? ? ? ? ?@ Save atags pointer
-> > ? ? ? ?cmp ? ? r7, #0
-> > ? ? ? ?bicne ? r4, r0, #CR_A ? ? ? ? ? ? ? ? ? @ Clear 'A' bit
-> > - ? ? ? stmneia r7, {r0, r4} ? ? ? ? ? ? ? ? ? ?@ Save control register values
-> > + ? ? ? stmiane r7, {r0, r4} ? ? ? ? ? ? ? ? ? ?@ Save control register values
-> > ? ? ? ?b ? ? ? start_kernel
-> > ?ENDPROC(__mmap_switched)
-> >
-> 
-> This fixes one of previous patches, doesn't it?
-Thanks for noticing, and no, stmiane is an undefined instruction, but
-only the non-thumb build barfs on that. It seems my conflict resolution
-failed somehow :-(. I fixed it now.
+       "ARM: Add init_consistent_dma_size()"
 
-Thanks
-Uwe
+essentially did this:
 
+-#define CONSISTENT_BASE                (CONSISTENT_END - CONSISTENT_DMA_SIZE)
++unsigned long consistent_base = CONSISTENT_END - DEFAULT_CONSISTENT_DMA_SIZE;
+
+but the bcmring code was still using the old CONSISTENT_BASE
+macro.  Update it to now use the dynamic variable that reflects
+the ability to resize early at boot.  To do so involves putting
+the variable alongside of init_consistent_dma_size in dma-mapping.h
+
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+CC: Jon Medhurst <tixy@yxit.co.uk>
+CC: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index cb3b7c9..b495f95 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -212,6 +212,7 @@ int dma_mmap_writecombine(struct device *, struct vm_area_struct *,
+  */
+ extern void __init init_consistent_dma_size(unsigned long size);
+ 
++extern unsigned long consistent_base;
+ 
+ #ifdef CONFIG_DMABOUNCE
+ /*
+diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
+index 1a1a27d..4e47e20 100644
+--- a/arch/arm/mach-bcmring/dma.c
++++ b/arch/arm/mach-bcmring/dma.c
+@@ -1615,7 +1615,7 @@ DMA_MemType_t dma_mem_type(void *addr)
+ {
+ 	unsigned long addrVal = (unsigned long)addr;
+ 
+-	if (addrVal >= CONSISTENT_BASE) {
++	if (addrVal >= consistent_base) {
+ 		/* NOTE: DMA virtual memory space starts at 0xFFxxxxxx */
+ 
+ 		/* dma_alloc_xxx pages are physically and virtually contiguous */
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.7.2
