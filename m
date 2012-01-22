@@ -1,205 +1,239 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Sun, 22 Jan 2012 12:13:34 +0100
-Subject: [RFC PATCH 08/11] Cortex-M3: Add NVIC support
+Date: Sun, 22 Jan 2012 12:13:36 +0100
+Subject: [RFC PATCH 10/11] Cortex-M3: Add VFP support
 In-Reply-To: <20120122111230.GB14835@pengutronix.de>
 References: <20120122111230.GB14835@pengutronix.de>
-Message-ID: <1327230817-12855-8-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1327230817-12855-10-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Catalin Marinas <catalin.marinas@arm.com>
 
-This patch implements the NVIC (interrupt controller) support for
-Cortex-M3.
+This patch adds support for the ARMv7-M VFP extension. It uses the lazy
+state preservation mechanism available in hardware for the S0-S15
+registers. The S16-S32 registers are saved at a context switch if the
+thread being scheduled out ever used the VFP. Similarly, the S16-S31
+registers are restored if the thread being scheduled in ever used the
+VFP.
 
-[ukleinek: use a raw spinlock]
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-Actually it should be able to share much code with/use
-arch/arm/common/gic.c, but I didn't manage to get it up.
+ arch/arm/Kconfig               |    7 +++
+ arch/arm/include/asm/fpstate.h |    3 +
+ arch/arm/kernel/Makefile       |    2 +
+ arch/arm/kernel/asm-offsets.c  |    3 +
+ arch/arm/kernel/entry-header.S |   14 ++++++
+ arch/arm/kernel/vfp-m.c        |  102 ++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 131 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/kernel/vfp-m.c
 
-My problem is that I need hardware irq 13 but in gic.c hw_irq is set to
-at least 16. I guess I didn't understood something correctly and would
-be glad to get a tip who to fix that.
----
- arch/arm/common/Kconfig              |    3 +
- arch/arm/common/Makefile             |    1 +
- arch/arm/common/nvic.c               |   98 ++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/hardware/nvic.h |   34 ++++++++++++
- 4 files changed, 136 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/common/nvic.c
- create mode 100644 arch/arm/include/asm/hardware/nvic.h
-
-diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
-index 81a933e..74adbe7 100644
---- a/arch/arm/common/Kconfig
-+++ b/arch/arm/common/Kconfig
-@@ -21,6 +21,9 @@ config ARM_VIC_NR
- 	  The maximum number of VICs available in the system, for
- 	  power management.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ca9b48c..c5caeee 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2227,6 +2227,13 @@ config NEON
+ 	  Say Y to include support code for NEON, the ARMv7 Advanced SIMD
+ 	  Extension.
  
-+config ARM_NVIC
-+	bool
++config VFPM
++	bool "ARMv7-M VFP Extension support"
++	depends on CPU_V7M
++	help
++	  Say Y to include support for the ARMv7-M VFP Extension
++	  (single-precision floating point hardware).
 +
- config ICST
- 	bool
+ endmenu
  
-diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-index 6ea9b6f..102f5a2 100644
---- a/arch/arm/common/Makefile
-+++ b/arch/arm/common/Makefile
-@@ -4,6 +4,7 @@
+ menu "Userspace binary formats"
+diff --git a/arch/arm/include/asm/fpstate.h b/arch/arm/include/asm/fpstate.h
+index 3ad4c10..e18c3d9 100644
+--- a/arch/arm/include/asm/fpstate.h
++++ b/arch/arm/include/asm/fpstate.h
+@@ -43,6 +43,9 @@ struct vfp_hard_struct {
+ #ifdef CONFIG_SMP
+ 	__u32 cpu;
+ #endif
++#ifdef CONFIG_VFPM
++	__u32 clean;
++#endif
+ };
  
- obj-$(CONFIG_ARM_GIC)		+= gic.o
- obj-$(CONFIG_ARM_VIC)		+= vic.o
-+obj-$(CONFIG_ARM_NVIC)		+= nvic.o
- obj-$(CONFIG_ICST)		+= icst.o
- obj-$(CONFIG_PL330)		+= pl330.o
- obj-$(CONFIG_SA1111)		+= sa1111.o
-diff --git a/arch/arm/common/nvic.c b/arch/arm/common/nvic.c
+ union vfp_state {
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 32e96e6..66d6c92 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -81,6 +81,8 @@ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+ 
++obj-$(CONFIG_VFPM)		+= vfp-m.o
++
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+   obj-y		+= io.o
+ endif
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index e861849..10ec416 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -60,6 +60,9 @@ int main(void)
+   DEFINE(TI_TP_VALUE,		offsetof(struct thread_info, tp_value));
+   DEFINE(TI_FPSTATE,		offsetof(struct thread_info, fpstate));
+   DEFINE(TI_VFPSTATE,		offsetof(struct thread_info, vfpstate));
++#ifdef CONFIG_VFPM
++  DEFINE(TI_VFPSTATE_CLEAN,	offsetof(struct thread_info, vfpstate.hard.clean));
++#endif
+ #ifdef CONFIG_SMP
+   DEFINE(VFP_CPU,		offsetof(union vfp_state, hard.cpu));
+ #endif
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 8050d9b..cb38aff 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -72,7 +72,15 @@
+  */
+ 	.macro	v7m_exception_entry
+ 	cpsid	i
++#ifdef CONFIG_VFPM
++	get_thread_info r0
++	and	r1, lr, #1 << 4		@ VFP clean state
++	str	r1, [r0, #TI_VFPSTATE_CLEAN]
++#endif
+ 	cmp	lr, #0xfffffffd		@ check the return stack
++#ifdef CONFIG_VFPM
++	cmpne	lr, #0xffffffed
++#endif
+ 	beq	1f			@ exception on process stack
+ 	add	r12, sp, #32		@ MSP before exception
+ 	stmdb	sp!, {r4-r12, lr}	@ push unsaved registers
+@@ -90,6 +98,9 @@
+ 	.macro	v7m_exception_fast_exit
+ 	ldmia	sp!, {r4-r12, lr}	@ restore previously saved state
+ 	cmp	lr, #0xfffffffd		@ check the return stack
++#ifdef CONFIG_VFPM
++	cmpne	lr, #0xffffffed
++#endif
+ 	addeq	sp, #32			@ returning to PSP, just restore MSP
+ 	cpsie	i
+ 	bx	lr
+@@ -99,6 +110,9 @@
+ 	cpsid	i
+ 	ldr	lr, [sp, #S_EXC_LR]	@ read exception LR
+ 	cmp	lr, #0xfffffffd		@ check the return stack
++#ifdef CONFIG_VFPM
++	cmpne	lr, #0xffffffed
++#endif
+ 	beq	1f			@ returning to PSP
+ 	@ Prepare the MSP stack
+ 	ldmia	sp, {r4-r11}		@ restore previously saved state
+diff --git a/arch/arm/kernel/vfp-m.c b/arch/arm/kernel/vfp-m.c
 new file mode 100644
-index 0000000..a0d76f4
+index 0000000..0528189
 --- /dev/null
-+++ b/arch/arm/common/nvic.c
-@@ -0,0 +1,98 @@
++++ b/arch/arm/kernel/vfp-m.c
+@@ -0,0 +1,102 @@
 +/*
-+ *  linux/arch/arm/common/nvic.c
++ * arch/arm/kernel/vfp-m.c
 + *
-+ *  Copyright (C) 2008 ARM Limited, All Rights Reserved.
++ * Copyright (C) 2010 ARM Limited
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
-+ * Support for the Nested Vectored Interrupt Controller found on the
-+ * ARMv7-M CPUs (Cortex-M3)
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 + */
-+#include <linux/init.h>
++
 +#include <linux/kernel.h>
-+#include <linux/smp.h>
++#include <linux/init.h>
++#include <linux/string.h>
 +
-+#include <asm/irq.h>
-+#include <asm/io.h>
-+#include <asm/mach/irq.h>
-+#include <asm/hardware/nvic.h>
++#include <asm/thread_notify.h>
 +
-+static DEFINE_RAW_SPINLOCK(irq_controller_lock);
++static union vfp_state *last_vfp_context;
 +
-+/*
-+ * Routines to acknowledge, disable and enable interrupts
-+ *
-+ * Linux assumes that when we're done with an interrupt we need to
-+ * unmask it, in the same way we need to unmask an interrupt when
-+ * we first enable it.
-+ *
-+ * The NVIC has a separate notion of "end of interrupt" to re-enable
-+ * an interrupt after handling, in order to support hardware
-+ * prioritisation.
-+ *
-+ * We can make the NVIC behave in the way that Linux expects by making
-+ * our "acknowledge" routine disable the interrupt, then mark it as
-+ * complete.
-+ */
-+static void nvic_ack_irq(struct irq_data *d)
++static void save_vfp_context(union vfp_state *vfp)
 +{
-+	u32 mask = 1 << (d->irq % 32);
-+
-+	raw_spin_lock(&irq_controller_lock);
-+	writel(mask, NVIC_CLEAR_ENABLE + d->irq / 32 * 4);
-+	raw_spin_unlock(&irq_controller_lock);
++	/* vstmia %0!, {d8-d15} */
++	asm("	stc	p11, cr8, [%0], #16*4\n" : : "r" (vfp) : "cc");
 +}
 +
-+static void nvic_mask_irq(struct irq_data *d)
++static void load_vfp_context(union vfp_state *vfp)
 +{
-+	u32 mask = 1 << (d->irq % 32);
-+
-+	raw_spin_lock(&irq_controller_lock);
-+	writel(mask, NVIC_CLEAR_ENABLE + d->irq / 32 * 4);
-+	raw_spin_unlock(&irq_controller_lock);
++	/* vldmia %0!, {d8-d15} */
++	asm("	ldc	p11, cr8, [%0], #16*4\n" : : "r" (vfp) : "cc");
 +}
 +
-+static void nvic_unmask_irq(struct irq_data *d)
++static int vfpm_notifier(struct notifier_block *self, unsigned long cmd,
++			 void *t)
 +{
-+	u32 mask = 1 << (d->irq % 32);
++	struct thread_info *thread = t;
++	union vfp_state *vfp = &thread->vfpstate;
++	union vfp_state *old_vfp = &current_thread_info()->vfpstate;
++	u32 *fpccr = (u32 *)0xe000ef34;
 +
-+	raw_spin_lock(&irq_controller_lock);
-+	writel(mask, NVIC_SET_ENABLE + d->irq / 32 * 4);
-+	raw_spin_unlock(&irq_controller_lock);
++	switch (cmd) {
++	case THREAD_NOTIFY_FLUSH:
++		memset(vfp, 0, sizeof(*vfp));
++		vfp->hard.clean = 1;
++		/* fall through */
++
++	case THREAD_NOTIFY_EXIT:
++		if (last_vfp_context == vfp) {
++			/* disable lazy state saving */
++			*fpccr &= ~1;
++			last_vfp_context = NULL;
++		}
++		break;
++
++	case THREAD_NOTIFY_SWITCH:
++		if (!old_vfp->hard.clean) {
++			save_vfp_context(last_vfp_context);
++			last_vfp_context = old_vfp;
++		}
++		if (!vfp->hard.clean && last_vfp_context != vfp) {
++			load_vfp_context(vfp);
++			last_vfp_context = vfp;
++		}
++		break;
++	}
++
++	return NOTIFY_DONE;
 +}
 +
-+static struct irq_chip nvic_chip = {
-+	.name = "NVIC",
-+	.irq_ack = nvic_ack_irq,
-+	.irq_mask = nvic_mask_irq,
-+	.irq_unmask = nvic_unmask_irq,
++static struct notifier_block vfpm_notifier_block = {
++	.notifier_call	= vfpm_notifier,
 +};
 +
-+void __init nvic_init(void)
++static int __init vfpm_init(void)
 +{
-+	unsigned int max_irq, i;
++	u32 *cpacr = (u32 *)0xe000ed88;
++	u32 *mvfr0 = (u32 *)0xe000ef40;
++	u32 *fpccr = (u32 *)0xe000ef34;
 +
-+	max_irq = ((readl(NVIC_INTR_CTRL) & 0x1f) + 1) * 32;
++	/* check for single-precision VFP operations */
++	if ((*mvfr0 & 0xf0) != 0x20)
++		return 0;
 +
-+	/*
-+	 * Disable all interrupts
-+	 */
-+	for (i = 0; i < max_irq / 32; i++)
-+		writel(~0, NVIC_CLEAR_ENABLE + i * 4);
++	printk(KERN_INFO "ARMv7-M VFP Extension supported\n");
 +
-+	/*
-+	 * Set priority on all interrupts.
-+	 */
-+	for (i = 0; i < max_irq; i += 4)
-+		writel(0, NVIC_PRIORITY + i);
++	*cpacr |= 0xf << 20;		/* coprocessor access */
++	*fpccr |= 3 << 30;		/* automatic lazy state preservation */
 +
-+	/*
-+	 * Setup the Linux IRQ subsystem.
-+	 */
-+	for (i = 0; i < NR_IRQS; i++) {
-+		irq_set_chip_and_handler(i, &nvic_chip, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-+	}
++	elf_hwcap |= HWCAP_VFP;
++	thread_register_notifier(&vfpm_notifier_block);
++
++	return 0;
 +}
-diff --git a/arch/arm/include/asm/hardware/nvic.h b/arch/arm/include/asm/hardware/nvic.h
-new file mode 100644
-index 0000000..b7f8026
---- /dev/null
-+++ b/arch/arm/include/asm/hardware/nvic.h
-@@ -0,0 +1,34 @@
-+/*
-+ *  linux/include/asm-arm/hardware/nvic.h
-+ *
-+ *  Copyright (C) 2008 ARM Limited, All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __ASM_ARM_HARDWARE_NVIC_H
-+#define __ASM_ARM_HARDWARE_NVIC_H
 +
-+#include <linux/compiler.h>
-+
-+#define V7M_SCS				0xe000e000
-+#define NVIC_INTR_CTRL			(V7M_SCS + 0x004)
-+#define NVIC_SYSTICK_CTRL		(V7M_SCS + 0x010)
-+#define NVIC_SYSTICK_RELOAD		(V7M_SCS + 0x014)
-+#define NVIC_SYSTICK_CURRENT		(V7M_SCS + 0x018)
-+#define NVIC_SYSTICK_CALIBRATION	(V7M_SCS + 0x01c)
-+#define NVIC_SET_ENABLE			(V7M_SCS + 0x100)
-+#define NVIC_CLEAR_ENABLE		(V7M_SCS + 0x180)
-+#define NVIC_SET_PENDING		(V7M_SCS + 0x200)
-+#define NVIC_CLEAR_PENDING		(V7M_SCS + 0x280)
-+#define NVIC_ACTIVE_BIT			(V7M_SCS + 0x300)
-+#define NVIC_PRIORITY			(V7M_SCS + 0x400)
-+#define NVIC_INTR_CTRL_STATE		(V7M_SCS + 0xd04)
-+#define NVIC_SOFTWARE_INTR		(V7M_SCS + 0xf00)
-+
-+#ifndef __ASSEMBLY__
-+void nvic_init(void);
-+#endif
-+
-+#endif
++late_initcall(vfpm_init);
 -- 
 1.7.8.3
