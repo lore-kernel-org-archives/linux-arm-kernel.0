@@ -1,47 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 Jan 2012 15:27:10 +0000
-Subject: [PATCH] ARM: ux500: Initialize irq affinity
-In-Reply-To: <20120122125411.GA27821@mudshark.cambridge.arm.com>
-References: <1327064356-3603-1-git-send-email-per.xx.fransson@stericsson.com>
- <20120120130310.GO1068@n2100.arm.linux.org.uk>
- <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
- <20120120174456.GB11845@n2100.arm.linux.org.uk>
- <20120122125411.GA27821@mudshark.cambridge.arm.com>
-Message-ID: <20120122152710.GT1068@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 22 Jan 2012 09:40:27 -0600
+Subject: [PATCH 3/3] ARM: OMAP: I2C: fix compilation when !CONFIG_OF
+In-Reply-To: <20120122110232.6508.68451.stgit@dusk>
+References: <20120122105942.6508.82335.stgit@dusk>
+ <20120122110232.6508.68451.stgit@dusk>
+Message-ID: <4F1C2DEB.50209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2012 at 12:54:11PM +0000, Will Deacon wrote:
-> I think this *could* be a problem if, as in Linus's case, some interrupts
-> have a hardcoded affinity enforced by the hardware (i.e. there are sticky bits
-> in the GIC distributor CPU targets registers). If we boot on a CPU that is
-> different from the hardcoded affinity, we could end up initialising an
-> interrupt with multiple targets. I suspect this will just lead to spurious
-> interrupts at the end of the day, but there's a potential performance impact
-> too.
+On 01/22/2012 05:02 AM, Paul Walmsley wrote:
+> Commit 6145197be6cc0583fa1a2f4ec1079d366137061e ("i2c: OMAP: Add DT
+> support for i2c controller") breaks compilation when CONFIG_OF is not
+> defined:
+> 
+>   CC      drivers/i2c/busses/i2c-omap.o
+> drivers/i2c/busses/i2c-omap.c: In function 'omap_i2c_probe':
+> drivers/i2c/busses/i2c-omap.c:1021:26: error: 'omap_i2c_of_match' undeclared (first use in this function)
+> drivers/i2c/busses/i2c-omap.c:1021:26: note: each undeclared identifier is reported only once for each function it appears in
+> 
+> Fix this by avoiding of_*() functions when !CONFIG_OF.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index f713eac..1008e96 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -989,7 +989,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	struct resource		*mem, *irq, *ioarea;
+>  	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+>  	struct device_node	*node = pdev->dev.of_node;
+> -	const struct of_device_id *match;
+> +	const struct of_device_id *match = NULL;
+>  	irq_handler_t isr;
+>  	int r;
+>  
+> @@ -1018,7 +1018,9 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		goto err_release_region;
+>  	}
+>  
+> +#ifdef CONFIG_OF
+>  	match = of_match_device(omap_i2c_of_match, &pdev->dev);
+> +#endif
 
-If we boot on a CPU which is incapable of receiving interrupts from
-attached devices, we have a much larger problem than just affinity.
-We potentially can't initialize those devices until their dependent
-CPU comes online - we certainly can't start to use those devices until
-that happens.
+How about an empty function for of_match_device instead to avoid the ifdef.
 
-That's something we just don't deal with - and as far as userspace goes,
-trying to set an affinity to just the offline CPU will return an error
-code.
+Rob
 
-So, if you have interrupts which can only be serviced by a group of CPUs,
-at least one of those CPUs must remain online at all times that those
-dependent devices could produce an interrupt.
-
-I think what we want instead is for the IRQ subsystem to record on a
-per-IRQ basis which CPUs the interrupt /can/ be routed to, and if:
-
-	affinity & cpus_online & allowable_cpus
-
-becomes empty, the attempt to set the affinity is failed.  Also, a callback
-in the hotplug code to error out if
-
-	cpus_online & allowable_cpus & ~offlining_cpu
-
-would become an empty set.
+>  	if (match) {
+>  		u32 freq = 100000; /* default to 100000 Hz */
+>  
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
