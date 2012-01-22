@@ -1,29 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 22 Jan 2012 13:08:26 -0200
-Subject: [PATCH] ARM: imx: iomux-v1.h: Fix build error due to __init
- annotation
-In-Reply-To: <1325799188-24921-1-git-send-email-festevam@gmail.com>
-References: <1325799188-24921-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5B=qW1k3Rk2Eip3RJfaWu4j1O5DiPhs0htUFutnSisvmg@mail.gmail.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Sun, 22 Jan 2012 16:18:12 +0100
+Subject: possible hrtimer related problem on tegra
+Message-ID: <1539302.lfXQIS47Lr@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi,
 
-On Thu, Jan 5, 2012 at 7:33 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Fix the following build error found when building imx_v4_v5_defconfig:
->
-> ?CC ? ? ?arch/arm/mach-imx/mach-imx27ipcam.o
-> In file included from arch/arm/plat-mxc/include/mach/iomux-mx27.h:23,
-> ? ? ? ? ? ? ? ? from arch/arm/mach-imx/mach-imx27ipcam.c:22:
-> arch/arm/plat-mxc/include/mach/iomux-v1.h:99: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'imx_iomuxv1_init'
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> This applies against linux-next
+I've been plagued with random lockups starting with Linux 3.0.13 (pulled from 
+ChromeOS-3.0 tree) on a Tegra board (paz00). First symtoms are slowly losing 
+responsiveness followed by a total lockup (nothing in dmesg, no oops). Using 
+performance governor instead of ondemand, made it go away.
 
-This is still broken in linux next. Is this patch OK?
+So I started bisecting 3.0.12..3.0.13 and finially found that reverting 
+24ee8bfe (hrtimer: Fix extra wakeups from __remove_hrtimer()) fixes the 
+problem.
 
-Regards,
+As Olof mentioned on IRC it is likely that the patch does not directly causes 
+lockups but something else which was hidden before. It isn't clear to me if 
+other tegra boards (seaboard, harmony) also suffer from this.
 
-Fabio Estevam
+Any hints on this issue are appreciated.
+
+Thanks
+
+Marc
