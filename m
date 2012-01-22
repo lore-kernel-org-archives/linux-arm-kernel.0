@@ -1,24 +1,196 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 21 Jan 2012 20:47:59 -0700 (MST)
-Subject: [PATCH 6/8] ARM: OMAP4: hwmod data: add HDQ/1-wire hwmod
-In-Reply-To: <20120121235934.17619.74939.stgit@dusk>
-References: <20120121235333.17619.56725.stgit@dusk>
- <20120121235934.17619.74939.stgit@dusk>
-Message-ID: <alpine.DEB.2.00.1201212046380.26641@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 22 Jan 2012 08:51:57 +0000
+Subject: [PATCH,FIXED] PCMCIA card inserted, five s2ram cycles, you're dead
+Message-ID: <20120122085157.GR1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Last night, I wrote:
+> static int pcmcia_bus_early_resume(struct pcmcia_socket *skt)
+> {
+>         if (!verify_cis_cache(skt)) {
+>                 pcmcia_put_socket(skt);
+>                 return 0;
+>         }
+> 
+> I've not been able to check that theory tonight.  Maybe someone who
+> knows the code can suggest - if not, I'll try deleting that
+> pcmcia_put_socket() call at some point tomorrow.
 
-On Sat, 21 Jan 2012, Paul Walmsley wrote:
+Yes, this does appear to be the problem.  Tested patch below.  It looks
+like the bug has been around since July 2010 - maybe no one suspends and
+resumes with their PCMCIA (not Cardbus) card inserted.
 
-> Add the hwmod data for the HDQ/1-wire hwmod ('hdq1w').  The scripts have 
-> been updated.
+Given its age, it seems to affect many stable kernels.
 
-just a quick note, I've dropped this patch from the series.  The HDQ 
-driver does byte-width accesses, which breaks pretty badly on OMAP4.  A 
-patch to fix this will be sent separately, and once that is merged, we'll 
-deal with adding the OMAP4 data.
+Note that this is a memory-corrupting bug: not only does it cause the
+warning, but as a result of dropping the refcount to zero, it causes the
+pcmcia_socket0 device structure to be freed while it still has references,
+causing slab caches corruption.  A fatal oops quickly follows this warning
+- often even just a 'dmesg' following the warning causes the kernel to
+oops.
+
+8<====
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+Subject: [PATCH] Fix PCMCIA socket refcount decrementing on each resume
+
+While testing suspend/resume on an ARM device with PCMCIA support, and
+a CF card inserted, I found that after five suspend and resumes, the
+kernel would complain, and shortly die after with slab corruption.
+
+WARNING: at include/linux/kref.h:41 kobject_get+0x28/0x50()
+
+As the message doesn't give a clue about which kobject, and the built-in
+debugging in drivers/base/power/main.c happens too late, this was added
+right before each get_device():
+
+printk("%s: %p [%s] %u\n", __func__, dev, kobject_name(&dev->kobj), atomic_read(&dev->kobj.kref.refcount));
+
+and on the 3rd s2ram cycle, the following behaviour observed:
+
+On the 3rd suspend/resume cycle:
+
+dpm_prepare: c1a0d998 [pcmcia_socket0] 3
+dpm_suspend: c1a0d998 [pcmcia_socket0] 3
+dpm_suspend_noirq: c1a0d998 [pcmcia_socket0] 3
+dpm_resume_noirq: c1a0d998 [pcmcia_socket0] 3
+dpm_resume: c1a0d998 [pcmcia_socket0] 3
+dpm_complete: c1a0d998 [pcmcia_socket0] 2
+
+4th:
+
+dpm_prepare: c1a0d998 [pcmcia_socket0] 2
+dpm_suspend: c1a0d998 [pcmcia_socket0] 2
+dpm_suspend_noirq: c1a0d998 [pcmcia_socket0] 2
+dpm_resume_noirq: c1a0d998 [pcmcia_socket0] 2
+dpm_resume: c1a0d998 [pcmcia_socket0] 2
+dpm_complete: c1a0d998 [pcmcia_socket0] 1
+
+5th:
+
+dpm_prepare: c1a0d998 [pcmcia_socket0] 1
+dpm_suspend: c1a0d998 [pcmcia_socket0] 1
+dpm_suspend_noirq: c1a0d998 [pcmcia_socket0] 1
+dpm_resume_noirq: c1a0d998 [pcmcia_socket0] 1
+dpm_resume: c1a0d998 [pcmcia_socket0] 1
+dpm_complete: c1a0d998 [pcmcia_socket0] 0
+------------[ cut here ]------------
+WARNING: at include/linux/kref.h:41 kobject_get+0x28/0x50()
+Modules linked in: ucb1x00_core
+Backtrace:
+[<c0212090>] (dump_backtrace+0x0/0x110) from [<c04799dc>] (dump_stack+0x18/0x1c)
+[<c04799c4>] (dump_stack+0x0/0x1c) from [<c021cba0>] (warn_slowpath_common+0x50/0x68)
+[<c021cb50>] (warn_slowpath_common+0x0/0x68) from [<c021cbdc>] (warn_slowpath_null+0x24/0x28)
+[<c021cbb8>] (warn_slowpath_null+0x0/0x28) from [<c0335374>] (kobject_get+0x28/0x50)
+[<c033534c>] (kobject_get+0x0/0x50) from [<c03804f4>] (get_device+0x1c/0x24)
+[<c0388c90>] (dpm_complete+0x0/0x1a0) from [<c0389cc0>] (dpm_resume_end+0x1c/0x20)
+...
+
+Looking at commit 7b24e7988263 (pcmcia: split up central event handler),
+the following change was made to cs.c:
+
+@@ -546,8 +524,8 @@ static int socket_late_resume(struct pcmcia_socket *skt)
+                return 0;
+        }
+ #endif
+-
+-       send_event(skt, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
++       if (!(skt->state & SOCKET_CARDBUS) && (skt->callback))
++               skt->callback->early_resume(skt);
+        return 0;
+ }
 
 
-- Paul
+And the corresponding change in ds.c is from:
+
+-static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
+-{
+-       struct pcmcia_socket *s = pcmcia_get_socket(skt);
+...
+-       switch (event) {
+...
+-       case CS_EVENT_PM_RESUME:
+-               if (verify_cis_cache(skt) != 0) {
+-                       dev_dbg(&skt->dev, "cis mismatch - different card\n");
+-                       /* first, remove the card */
+-                       ds_event(skt, CS_EVENT_CARD_REMOVAL, CS_EVENT_PRI_HIGH);
+-                       mutex_lock(&s->ops_mutex);
+-                       destroy_cis_cache(skt);
+-                       kfree(skt->fake_cis);
+-                       skt->fake_cis = NULL;
+-                       s->functions = 0;
+-                       mutex_unlock(&s->ops_mutex);
+-                       /* now, add the new card */
+-                       ds_event(skt, CS_EVENT_CARD_INSERTION,
+-                                CS_EVENT_PRI_LOW);
+-               }
+-               break;
+...
+-    }
+
+-    pcmcia_put_socket(s);
+
+-    return 0;
+-} /* ds_event */
+
+to:
+
++static int pcmcia_bus_early_resume(struct pcmcia_socket *skt)
++{
++       if (!verify_cis_cache(skt)) {
++               pcmcia_put_socket(skt);
++               return 0;
++       }
+
++       dev_dbg(&skt->dev, "cis mismatch - different card\n");
+
++       /* first, remove the card */
++       pcmcia_bus_remove(skt);
++       mutex_lock(&skt->ops_mutex);
++       destroy_cis_cache(skt);
++       kfree(skt->fake_cis);
++       skt->fake_cis = NULL;
++       skt->functions = 0;
++       mutex_unlock(&skt->ops_mutex);
+
++       /* now, add the new card */
++       pcmcia_bus_add(skt);
++       return 0;
++}
+
+As can be seen, the original function called pcmcia_get_socket() and
+pcmcia_put_socket() around the guts, whereas the replacement code
+calls pcmcia_put_socket() only in one path.  This creates an imbalance
+in the refcounting.
+
+Testing with pcmcia_put_socket() put removed shows that the bug is gone:
+
+dpm_suspend: c1a10998 [pcmcia_socket0] 5
+dpm_suspend_noirq: c1a10998 [pcmcia_socket0] 5
+dpm_resume_noirq: c1a10998 [pcmcia_socket0] 5
+dpm_resume: c1a10998 [pcmcia_socket0] 5
+dpm_complete: c1a10998 [pcmcia_socket0] 5
+
+Cc: <stable@vger.kernel.org>
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+-- 
+ drivers/pcmcia/ds.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pcmcia/ds.c b/drivers/pcmcia/ds.c
+index 749c2a1..1932029 100644
+--- a/drivers/pcmcia/ds.c
++++ b/drivers/pcmcia/ds.c
+@@ -1269,10 +1269,8 @@ static int pcmcia_bus_add(struct pcmcia_socket *skt)
+ 
+ static int pcmcia_bus_early_resume(struct pcmcia_socket *skt)
+ {
+-	if (!verify_cis_cache(skt)) {
+-		pcmcia_put_socket(skt);
++	if (!verify_cis_cache(skt))
+ 		return 0;
+-	}
+ 
+ 	dev_dbg(&skt->dev, "cis mismatch - different card\n");
+ 
