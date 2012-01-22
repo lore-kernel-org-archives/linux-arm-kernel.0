@@ -1,12 +1,33 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 22 Jan 2012 14:23:20 -0500 (EST)
-Subject: [PATCH V4 1/4] CS89x0 : add platform driver support
-In-Reply-To: <1326996793-13514-1-git-send-email-jaccon.bastiaansen@gmail.com>
-References: <1326996793-13514-1-git-send-email-jaccon.bastiaansen@gmail.com>
-Message-ID: <20120122.142320.366330483991139750.davem@davemloft.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 22 Jan 2012 12:31:24 -0700
+Subject: [PATCH] Correct bad gpio naming
+In-Reply-To: <4F1C4E25.6070801@antcom.de>
+References: <4F1C4E25.6070801@antcom.de>
+Message-ID: <20120122193124.GX4223@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Jan 22, 2012 at 06:57:57PM +0100, Roland Stigge wrote:
+> One of the GPIO names in drivers/gpio/gpio-lpc32xx.c
+> was bad. Renaming gpi000 -> gpio00
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-These patches are too late for the merge window, they will have to wait
-and get applied to net-next, which I'll open up soon.
+Applied.  Careful though, this patch was corrupt (missing carriage
+return before 'static' and had to be applied by hand.
+
+g.
+
+> 
+> diff --git a/drivers/gpio/gpio-lpc32xx.c b/drivers/gpio/gpio-lpc32xx.c
+> index 5b69480..ddfacc5 100644
+> --- a/drivers/gpio/gpio-lpc32xx.c
+> +++ b/drivers/gpio/gpio-lpc32xx.c
+> @@ -96,7 +96,7 @@ static const char *gpio_p2_names[LPC32XX_GPIO_P2_MAX] = {
+>  };
+>   static const char *gpio_p3_names[LPC32XX_GPIO_P3_MAX] = {
+> -	"gpi000", "gpio01", "gpio02", "gpio03",
+> +	"gpio00", "gpio01", "gpio02", "gpio03",
+>  	"gpio04", "gpio05"
+>  };
+> 
