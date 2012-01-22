@@ -1,34 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 22 Jan 2012 12:12:30 +0100
-Subject: [RFC PATCH 00/11] Cortex-M3 support
-Message-ID: <20120122111230.GB14835@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Sun, 22 Jan 2012 12:13:31 +0100
+Subject: [RFC PATCH 05/11] ARM: provide XIP_VIRT_ADDR for no-MMU builds
+In-Reply-To: <20120122111230.GB14835@pengutronix.de>
+References: <20120122111230.GB14835@pengutronix.de>
+Message-ID: <1327230817-12855-5-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+XIP_VIRT_ADDR is needed for XIP builds and currently only defined for
+builds with CONFIG_MMU.
 
-this series is mostly a port of patches done by Catalin Marinas for
-2.6.33. It's based on 3.3-rc1. There are still a few rough edges and I'm
-sure I'm not aware of all of them as this deep architecture stuff is
-mostly news for me. Some things are noted in the respective patches, I'm
-sure you can find more.
+Also provide it for no-MMU builds to make it possible to build an XIP
+kernel for MMU-less machines. As these lack an MMU it has to be an
+identity mapping.
 
-My target machine is the EFM32 Giant Gecko by Energy Micro and my
-complete tree can be found at
+Forwarded: id:1323467451-12128-1-git-send-email-u.kleine-koenig at pengutronix.de
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/include/asm/memory.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-	git://git.pengutronix.de/git/ukl/linux.git efm32
-
-(with a gitweb being available at
-
-	http://git.pengutronix.de/?p=ukl/linux.git;a=shortlog;h=efm32
-
-).
-
-I look forward to your comments.
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index a8997d7..fcb5757 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -116,6 +116,8 @@
+ #define MODULES_END		(END_MEM)
+ #define MODULES_VADDR		(PHYS_OFFSET)
+ 
++#define XIP_VIRT_ADDR(physaddr)  (physaddr)
++
+ #endif /* !CONFIG_MMU */
+ 
+ /*
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.8.3
