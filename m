@@ -1,41 +1,66 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Sun, 22 Jan 2012 21:07:40 +0100
-Subject: [PATCH 3/3] ARM: OMAP: I2C: fix compilation when !CONFIG_OF
-In-Reply-To: <alpine.DEB.2.00.1201221250510.26641@utopia.booyaka.com>
-References: <20120122105942.6508.82335.stgit@dusk>
- <20120122110232.6508.68451.stgit@dusk>
- <20120122154544.GW4223@ponder.secretlab.ca>
- <4F1C3412.4070106@gmail.com> <4F1C406A.6040503@ti.com>
- <alpine.DEB.2.00.1201221250510.26641@utopia.booyaka.com>
-Message-ID: <20120122210740.735d8ca5@endymion.delvare>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 22 Jan 2012 13:26:23 -0700 (MST)
+Subject: [PATCH] W1: OMAP HDQ1W: use 32-bit register accesses
+Message-ID: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 22 Jan 2012 12:54:21 -0700 (MST), Paul Walmsley wrote:
-> cc Ben, Jean
 
-I'm not involved in this at all.
+HDQ/1-wire registers are 32 bits long, even if the register contents
+fit into 8 bits, so accesses must be 32-bit aligned.  Evidently the
+OMAP2/3 interconnects allowed the driver to get away with 8 bit accesses,
+but the OMAP4 puts a stop to that:
 
-Jean
+[    1.488800] Driver for 1-wire Dallas network protocol.
+[    1.495025] Bad mode in data abort handler detected
+[    1.500122] Internal error: Oops - bad mode: 0 [#1] SMP
+[    1.505615] Modules linked in:
+[    1.508819] CPU: 0    Not tainted  (3.3.0-rc1-00008-g45030e9 #992)
+[    1.515289] PC is at 0xffff0018
+[    1.518615] LR is at omap_hdq_probe+0xd4/0x2cc
 
-> 
-> On Sun, 22 Jan 2012, Cousson, Benoit wrote:
-> 
-> > http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-December/010541.html
-> > 
-> > But it looks like it was stuck in linux-omap dt branch and not pulled for 3.3.
-> > Maybe Tony can try to sent it during -rc phase.
-> > 
-> > That being said, this will be valid for OMAP2+ only and will still break OMAP1
-> > platform :-(
-> > 
-> > Tony reported that 2 days ago, and I sent the fix for it.
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg61520.html
-> 
-> Will drop patch 3 from my series.  Incidentally, it doesn't seem necessary 
-> to wait for Ben's ack after commit 
-> 046d0a37024a5b1e66ec9314e5e7feba42feb811 ("ARM: OMAP: I2C: fix compilation 
-> when !CONFIG_OF"), unless Ben disagrees with that change.
-> 
-> 
-> - Paul
+The OMAP4430 ES2 Rev X TRM does warn about this restriction in section 
+23.2.6.2 "HDQ/1-Wire Registers".
+
+Fixes the crash on OMAP4430 ES2 Pandaboard.  Tested also on OMAP34xx and 
+OMAP2420; it seems to work fine on those chips, although due to the lack 
+of boards with HDQ/1-wire devices here, a more indepth test was not 
+possible.
+
+---
+Intended for the v3.4 merge window.
+
+ drivers/w1/masters/omap_hdq.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/w1/masters/omap_hdq.c b/drivers/w1/masters/omap_hdq.c
+index 63e3eda..291897c 100644
+--- a/drivers/w1/masters/omap_hdq.c
++++ b/drivers/w1/masters/omap_hdq.c
+@@ -100,20 +100,20 @@ static struct w1_bus_master omap_w1_master = {
+ /* HDQ register I/O routines */
+ static inline u8 hdq_reg_in(struct hdq_data *hdq_data, u32 offset)
+ {
+-	return __raw_readb(hdq_data->hdq_base + offset);
++	return __raw_readl(hdq_data->hdq_base + offset);
+ }
+ 
+ static inline void hdq_reg_out(struct hdq_data *hdq_data, u32 offset, u8 val)
+ {
+-	__raw_writeb(val, hdq_data->hdq_base + offset);
++	__raw_writel(val, hdq_data->hdq_base + offset);
+ }
+ 
+ static inline u8 hdq_reg_merge(struct hdq_data *hdq_data, u32 offset,
+ 			u8 val, u8 mask)
+ {
+-	u8 new_val = (__raw_readb(hdq_data->hdq_base + offset) & ~mask)
++	u8 new_val = (__raw_readl(hdq_data->hdq_base + offset) & ~mask)
+ 			| (val & mask);
+-	__raw_writeb(new_val, hdq_data->hdq_base + offset);
++	__raw_writel(new_val, hdq_data->hdq_base + offset);
+ 
+ 	return new_val;
+ }
+-- 
+1.7.8.3
