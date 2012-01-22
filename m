@@ -1,34 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 22 Jan 2012 12:54:21 -0700 (MST)
-Subject: [PATCH 3/3] ARM: OMAP: I2C: fix compilation when !CONFIG_OF
-In-Reply-To: <4F1C406A.6040503@ti.com>
-References: <20120122105942.6508.82335.stgit@dusk>
- <20120122110232.6508.68451.stgit@dusk>
- <20120122154544.GW4223@ponder.secretlab.ca> <4F1C3412.4070106@gmail.com>
- <4F1C406A.6040503@ti.com>
-Message-ID: <alpine.DEB.2.00.1201221250510.26641@utopia.booyaka.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 22 Jan 2012 14:57:25 -0500
+Subject: [PATCH] arm: fix compile failure in mach-shmobile/board-ag5evm.c
+Message-ID: <1327262245-21049-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc Ben, Jean
+Add videodev2 header which provides V4L2_PIX_FMT_RGB565 to fix:
 
-On Sun, 22 Jan 2012, Cousson, Benoit wrote:
+arch/arm/mach-shmobile/board-ag5evm.c:274: error: 'V4L2_PIX_FMT_RGB565' undeclared here (not in a function)
 
-> http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-December/010541.html
-> 
-> But it looks like it was stuck in linux-omap dt branch and not pulled for 3.3.
-> Maybe Tony can try to sent it during -rc phase.
-> 
-> That being said, this will be valid for OMAP2+ only and will still break OMAP1
-> platform :-(
-> 
-> Tony reported that 2 days ago, and I sent the fix for it.
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg61520.html
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-Will drop patch 3 from my series.  Incidentally, it doesn't seem necessary 
-to wait for Ben's ack after commit 
-046d0a37024a5b1e66ec9314e5e7feba42feb811 ("ARM: OMAP: I2C: fix compilation 
-when !CONFIG_OF"), unless Ben disagrees with that change.
-
-
-- Paul
+diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
+index eff8a96..0ac36de 100644
+--- a/arch/arm/mach-shmobile/board-ag5evm.c
++++ b/arch/arm/mach-shmobile/board-ag5evm.c
+@@ -30,6 +30,7 @@
+ #include <linux/serial_sci.h>
+ #include <linux/smsc911x.h>
+ #include <linux/gpio.h>
++#include <linux/videodev2.h>
+ #include <linux/input.h>
+ #include <linux/input/sh_keysc.h>
+ #include <linux/mmc/host.h>
+-- 
+1.7.7.2
