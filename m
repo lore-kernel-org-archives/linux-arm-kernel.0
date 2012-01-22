@@ -1,27 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 22 Jan 2012 04:02:29 -0700
-Subject: [PATCH 0/3] ARM: OMAP: fix compilation problems with v3.3-rc1
-Message-ID: <20120122105942.6508.82335.stgit@dusk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 22 Jan 2012 12:12:30 +0100
+Subject: [RFC PATCH 00/11] Cortex-M3 support
+Message-ID: <20120122111230.GB14835@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix several compilation problems detected with a 2420-only kernel
-configuration.  This series is intended for the v3.3-rc merge window.
+Hello,
 
-These patches are available via git at git://git.pwsan.com/linux-2.6 in the
-branch "omap2420_compilation_fixes_3.3rc"
+this series is mostly a port of patches done by Catalin Marinas for
+2.6.33. It's based on 3.3-rc1. There are still a few rough edges and I'm
+sure I'm not aware of all of them as this deep architecture stuff is
+mostly news for me. Some things are noted in the respective patches, I'm
+sure you can find more.
 
-- Paul
+My target machine is the EFM32 Giant Gecko by Energy Micro and my
+complete tree can be found at
 
----
+	git://git.pengutronix.de/git/ukl/linux.git efm32
 
-Paul Walmsley (3):
-      ARM: OMAP: PRM: fix missing plat/irqs.h build breakage
-      ARM: OMAP2+: io: fix compilation breakage on 2420-only configs
-      ARM: OMAP: I2C: fix compilation when !CONFIG_OF
+(with a gitweb being available at
 
+	http://git.pengutronix.de/?p=ukl/linux.git;a=shortlog;h=efm32
 
- arch/arm/mach-omap2/io.c           |    4 +++-
- arch/arm/mach-omap2/prm2xxx_3xxx.c |    1 +
- drivers/i2c/busses/i2c-omap.c      |    4 +++-
- 3 files changed, 7 insertions(+), 2 deletions(-)
+).
+
+I look forward to your comments.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
