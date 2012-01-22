@@ -1,46 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 22 Jan 2012 12:54:11 +0000
-Subject: [PATCH] ARM: ux500: Initialize irq affinity
-In-Reply-To: <20120120174456.GB11845@n2100.arm.linux.org.uk>
-References: <1327064356-3603-1-git-send-email-per.xx.fransson@stericsson.com>
- <20120120130310.GO1068@n2100.arm.linux.org.uk>
- <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
- <20120120174456.GB11845@n2100.arm.linux.org.uk>
-Message-ID: <20120122125411.GA27821@mudshark.cambridge.arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 22 Jan 2012 07:04:10 -0700 (MST)
+Subject: [PATCH 0/2] tty: serial: OMAP: work around broken driver, IP block
+In-Reply-To: <20120121071934.18707.64258.stgit@dusk>
+References: <20120121071934.18707.64258.stgit@dusk>
+Message-ID: <alpine.DEB.2.00.1201220609290.26641@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Sat, 21 Jan 2012, Paul Walmsley wrote:
 
-On Fri, Jan 20, 2012 at 05:44:57PM +0000, Russell King - ARM Linux wrote:
-> | So, we have to choose a CPU to route the IRQ to from the mask being
-> | requested - and the requested mask may contain anything from a single CPU
-> | to multiple CPUs.
-> | 
-> | We choose to route it to the first online CPU in the set.  That fits with
-> | the model, and does not require us to report back which CPU it's currently
-> | routed to.  Indeed, architectures such as x86 can't tell you which CPU
-> | the next interrupt will hit.
-> | 
-> | So we shouldn't even try to do this on ARM.  Yes, we end up with all IRQs
-> | targetting CPU0 at boot, and with the masks showing 'all CPUs' but that's
-> | not a problem.  Really not a problem.
+> [ This series is targeted for merging during v3.3-rc ]
+> 
+> On v3.3-rc1, the OMAP serial console doesn't behave properly when
+> power management is enabled (the default with omap2plus_defconfig).
+> This seems to be due to a combination of a silicon bug in the UART IP
+> block and broken FIFO settings in the OMAP serial driver.
+> 
+> This patch series attempts to work around these problems.  The workarounds
+> are not perfect; see the patch descriptions for more details.
+> 
+> Tested on OMAP3530 BeagleBoard.  This series will need to be tested on
+> OMAP2 and OMAP4 before it is ready to merge.
 
-I think this *could* be a problem if, as in Linus's case, some interrupts
-have a hardcoded affinity enforced by the hardware (i.e. there are sticky bits
-in the GIC distributor CPU targets registers). If we boot on a CPU that is
-different from the hardcoded affinity, we could end up initialising an
-interrupt with multiple targets. I suspect this will just lead to spurious
-interrupts at the end of the day, but there's a potential performance impact
-too.
+Just did a quick test on an OMAP4430 ES2 Pandaboard and the 
+(OMAP2420-based) N800.  This series has no obvious effect on either N800 
+or OMAP4430 Pandaboard, aside from the expected increase in interrupts in 
+the non-CPUIdle case.  Probably this is due to the relative immaturity of 
+the PM code on those two chip families.
 
-So we could change gic_dist_init to ignore interrupts with sticky bits when
-setting up the targets (assuming that the hardcoded target is limited to a
-single CPU...) although we also need a way to prevent those interrupts being
-moved later on.
 
-For the time being we can just limit ux500 to booting on (physical) CPU 0
-and wait and see if anybody hardcodes their targets to point at secondary
-CPUs in the future.
-
-Will
+- Paul
