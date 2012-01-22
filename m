@@ -1,66 +1,33 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 22 Jan 2012 13:26:23 -0700 (MST)
-Subject: [PATCH] W1: OMAP HDQ1W: use 32-bit register accesses
-Message-ID: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 22 Jan 2012 15:26:30 -0500
+Subject: [PATCH] arm: fix build failure in mach-bcmring/arch.c
+Message-ID: <1327263990-8769-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Upstream commit d1fce9c115eeb93e01c01732dfe9a86cf76009cf
 
-HDQ/1-wire registers are 32 bits long, even if the register contents
-fit into 8 bits, so accesses must be 32-bit aligned.  Evidently the
-OMAP2/3 interconnects allowed the driver to get away with 8 bit accesses,
-but the OMAP4 puts a stop to that:
+    "ARM: restart: bcmring: use new restart hook"
 
-[    1.488800] Driver for 1-wire Dallas network protocol.
-[    1.495025] Bad mode in data abort handler detected
-[    1.500122] Internal error: Oops - bad mode: 0 [#1] SMP
-[    1.505615] Modules linked in:
-[    1.508819] CPU: 0    Not tainted  (3.3.0-rc1-00008-g45030e9 #992)
-[    1.515289] PC is at 0xffff0018
-[    1.518615] LR is at omap_hdq_probe+0xd4/0x2cc
+breaks building of this platform, since what used to be the
+last field of the MACHINE_START/END block didn't have a
+trailing comma.  Once another field was added below, we get:
 
-The OMAP4430 ES2 Rev X TRM does warn about this restriction in section 
-23.2.6.2 "HDQ/1-Wire Registers".
+arch/arm/mach-bcmring/arch.c:198: error: request for member 'restart' in something not a structure or union
 
-Fixes the crash on OMAP4430 ES2 Pandaboard.  Tested also on OMAP34xx and 
-OMAP2420; it seems to work fine on those chips, although due to the lack 
-of boards with HDQ/1-wire devices here, a more indepth test was not 
-possible.
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
----
-Intended for the v3.4 merge window.
-
- drivers/w1/masters/omap_hdq.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/w1/masters/omap_hdq.c b/drivers/w1/masters/omap_hdq.c
-index 63e3eda..291897c 100644
---- a/drivers/w1/masters/omap_hdq.c
-+++ b/drivers/w1/masters/omap_hdq.c
-@@ -100,20 +100,20 @@ static struct w1_bus_master omap_w1_master = {
- /* HDQ register I/O routines */
- static inline u8 hdq_reg_in(struct hdq_data *hdq_data, u32 offset)
- {
--	return __raw_readb(hdq_data->hdq_base + offset);
-+	return __raw_readl(hdq_data->hdq_base + offset);
- }
- 
- static inline void hdq_reg_out(struct hdq_data *hdq_data, u32 offset, u8 val)
- {
--	__raw_writeb(val, hdq_data->hdq_base + offset);
-+	__raw_writel(val, hdq_data->hdq_base + offset);
- }
- 
- static inline u8 hdq_reg_merge(struct hdq_data *hdq_data, u32 offset,
- 			u8 val, u8 mask)
- {
--	u8 new_val = (__raw_readb(hdq_data->hdq_base + offset) & ~mask)
-+	u8 new_val = (__raw_readl(hdq_data->hdq_base + offset) & ~mask)
- 			| (val & mask);
--	__raw_writeb(new_val, hdq_data->hdq_base + offset);
-+	__raw_writel(new_val, hdq_data->hdq_base + offset);
- 
- 	return new_val;
- }
+diff --git a/arch/arm/mach-bcmring/arch.c b/arch/arm/mach-bcmring/arch.c
+index 9e5e755..45c97b1 100644
+--- a/arch/arm/mach-bcmring/arch.c
++++ b/arch/arm/mach-bcmring/arch.c
+@@ -194,6 +194,6 @@ MACHINE_START(BCMRING, "BCMRING")
+ 	.init_early = bcmring_init_early,
+ 	.init_irq = bcmring_init_irq,
+ 	.timer = &bcmring_timer,
+-	.init_machine = bcmring_init_machine
++	.init_machine = bcmring_init_machine,
+ 	.restart = bcmring_restart,
+ MACHINE_END
 -- 
-1.7.8.3
+1.7.7.2
