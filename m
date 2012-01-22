@@ -1,32 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 22 Jan 2012 07:04:10 -0700 (MST)
-Subject: [PATCH 0/2] tty: serial: OMAP: work around broken driver, IP block
-In-Reply-To: <20120121071934.18707.64258.stgit@dusk>
-References: <20120121071934.18707.64258.stgit@dusk>
-Message-ID: <alpine.DEB.2.00.1201220609290.26641@utopia.booyaka.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 22 Jan 2012 13:08:26 -0200
+Subject: [PATCH] ARM: imx: iomux-v1.h: Fix build error due to __init
+ annotation
+In-Reply-To: <1325799188-24921-1-git-send-email-festevam@gmail.com>
+References: <1325799188-24921-1-git-send-email-festevam@gmail.com>
+Message-ID: <CAOMZO5B=qW1k3Rk2Eip3RJfaWu4j1O5DiPhs0htUFutnSisvmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 21 Jan 2012, Paul Walmsley wrote:
+Hi Sascha,
 
-> [ This series is targeted for merging during v3.3-rc ]
-> 
-> On v3.3-rc1, the OMAP serial console doesn't behave properly when
-> power management is enabled (the default with omap2plus_defconfig).
-> This seems to be due to a combination of a silicon bug in the UART IP
-> block and broken FIFO settings in the OMAP serial driver.
-> 
-> This patch series attempts to work around these problems.  The workarounds
-> are not perfect; see the patch descriptions for more details.
-> 
-> Tested on OMAP3530 BeagleBoard.  This series will need to be tested on
-> OMAP2 and OMAP4 before it is ready to merge.
+On Thu, Jan 5, 2012 at 7:33 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Fix the following build error found when building imx_v4_v5_defconfig:
+>
+> ?CC ? ? ?arch/arm/mach-imx/mach-imx27ipcam.o
+> In file included from arch/arm/plat-mxc/include/mach/iomux-mx27.h:23,
+> ? ? ? ? ? ? ? ? from arch/arm/mach-imx/mach-imx27ipcam.c:22:
+> arch/arm/plat-mxc/include/mach/iomux-v1.h:99: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'imx_iomuxv1_init'
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> This applies against linux-next
 
-Just did a quick test on an OMAP4430 ES2 Pandaboard and the 
-(OMAP2420-based) N800.  This series has no obvious effect on either N800 
-or OMAP4430 Pandaboard, aside from the expected increase in interrupts in 
-the non-CPUIdle case.  Probably this is due to the relative immaturity of 
-the PM code on those two chip families.
+This is still broken in linux next. Is this patch OK?
 
+Regards,
 
-- Paul
+Fabio Estevam
