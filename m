@@ -1,38 +1,41 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Sun, 22 Jan 2012 21:05:44 +0100
-Subject: [RFC PATCH 09/11] Cortex-M3: Allow the building of Cortex-M3
- kernel port
-In-Reply-To: <1327230817-12855-9-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20120122111230.GB14835@pengutronix.de>
- <1327230817-12855-9-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAHXqBF+z291NEEph6hcmhLoxE=D-tTO0=n8B-sfJrmFiYGU9mQ@mail.gmail.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Sun, 22 Jan 2012 21:07:40 +0100
+Subject: [PATCH 3/3] ARM: OMAP: I2C: fix compilation when !CONFIG_OF
+In-Reply-To: <alpine.DEB.2.00.1201221250510.26641@utopia.booyaka.com>
+References: <20120122105942.6508.82335.stgit@dusk>
+ <20120122110232.6508.68451.stgit@dusk>
+ <20120122154544.GW4223@ponder.secretlab.ca>
+ <4F1C3412.4070106@gmail.com> <4F1C406A.6040503@ti.com>
+ <alpine.DEB.2.00.1201221250510.26641@utopia.booyaka.com>
+Message-ID: <20120122210740.735d8ca5@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/22 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-[...]
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -13,10 +13,16 @@ CFLAGS_REMOVE_return_address.o = -pg
->
-> ?# Object file lists.
->
-> -obj-y ? ? ? ? ?:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
-> +obj-y ? ? ? ? ?:= elf.o entry-common.o irq.o opcodes.o \
-> ? ? ? ? ? ? ? ? ? process.o ptrace.o return_address.o setup.o signal.o \
-> ? ? ? ? ? ? ? ? ? sys_arm.o stacktrace.o time.o traps.o
->
-> +ifeq ($(CONFIG_CPU_V7M),y)
-> +obj-y ? ? ? ? ?+= entry-v7m.o
-> +else
-> +obj-y ? ? ? ? ?+= entry-armv.o
-> +endif
-> +
+On Sun, 22 Jan 2012 12:54:21 -0700 (MST), Paul Walmsley wrote:
+> cc Ben, Jean
 
-Maybe something shorter, like this? '-)
+I'm not involved in this at all.
 
-obj-$(CONFIG_CPU_V7M) += entry-v7m.o
-obj-$(if $(CONFIG_CPU_V7M),,y) += entry-armv.o
+Jean
 
-Best Regards,
-Micha? Miros?aw
+> 
+> On Sun, 22 Jan 2012, Cousson, Benoit wrote:
+> 
+> > http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-December/010541.html
+> > 
+> > But it looks like it was stuck in linux-omap dt branch and not pulled for 3.3.
+> > Maybe Tony can try to sent it during -rc phase.
+> > 
+> > That being said, this will be valid for OMAP2+ only and will still break OMAP1
+> > platform :-(
+> > 
+> > Tony reported that 2 days ago, and I sent the fix for it.
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg61520.html
+> 
+> Will drop patch 3 from my series.  Incidentally, it doesn't seem necessary 
+> to wait for Ben's ack after commit 
+> 046d0a37024a5b1e66ec9314e5e7feba42feb811 ("ARM: OMAP: I2C: fix compilation 
+> when !CONFIG_OF"), unless Ben disagrees with that change.
+> 
+> 
+> - Paul
