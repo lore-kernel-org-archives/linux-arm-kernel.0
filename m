@@ -1,185 +1,122 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Jan 2012 12:13:12 -0800
-Subject: Pinmux bindings proposal
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB45E@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <20120116182808.GG4223@ponder.secretlab.ca>
- <20120118141329.GA22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1780DAAEBB@HQMAIL01.nvidia.com>
- <20120119105728.GE22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1780DAB45E@HQMAIL01.nvidia.com>
-Message-ID: <20120123201304.GB4420@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Jan 2012 20:18:57 +0000
+Subject: [PATCH] arm: fix build failure in code for mach-bcmring/dma.c
+In-Reply-To: <4F1DACA7.1030501@broadcom.com>
+References: <1327266579-21951-1-git-send-email-paul.gortmaker@windriver.com>
+ <20120122211723.GB12326@n2100.arm.linux.org.uk>
+ <4F1DACA7.1030501@broadcom.com>
+Message-ID: <20120123201857.GA1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@nvidia.com> [120120 12:20]:
-> Tony wrote at Lindgren:
-> > * Stephen Warren <swarren@nvidia.com> [120118 11:29]:
-> > > Tony Lindgren wrote at Wednesday, January 18, 2012 7:13 AM:
-> > 
-> > Assuming this is describing the pins a driver is using, how
-> > about calling it pins?
-> 
-> It's not always pins.
-> 
-> For a lot of HW it is pins, you're right.
-> 
-> For Tegra20 (and IIRC some other HW), the pin mux HW actually muxes
-> groups of pins; one register field sets n (1, 2, 3, ...) pins to that
-> function at once. Hence, the entries are real physical groups.
+On Mon, Jan 23, 2012 at 10:53:27AM -0800, Jiandong Zheng wrote:
+> On 1/22/2012 1:17 PM, Russell King - ARM Linux wrote:
+>> On Sun, Jan 22, 2012 at 04:09:39PM -0500, Paul Gortmaker wrote:
+>>> Upstream commit 99d1717dd7fecf2b10195b0d864323b952b4eba0
+>>>
+>>>         "ARM: Add init_consistent_dma_size()"
+>>>
+>>> essentially did this:
+>>>
+>>> -#define CONSISTENT_BASE                (CONSISTENT_END - CONSISTENT_DMA_SIZE)
+>>> +unsigned long consistent_base = CONSISTENT_END - DEFAULT_CONSISTENT_DMA_SIZE;
+>>>
+>>> but the bcmring code was still using the old CONSISTENT_BASE
+>>> macro.  Update it to now use the dynamic variable that reflects
+>>> the ability to resize early at boot.  To do so involves putting
+>>> the variable alongside of init_consistent_dma_size in dma-mapping.h
+>>
+>> Oh god, what are the bcmring people doing with this variable?
+>>
+>> DMA_MemType_t dma_mem_type(void *addr)
+>> {
+>>          unsigned long addrVal = (unsigned long)addr;
+>>
+>>          if (addrVal>= CONSISTENT_BASE) {
+>>                  /* NOTE: DMA virtual memory space starts at 0xFFxxxxxx */
+>>
+>>                  /* dma_alloc_xxx pages are physically and virtually contiguous */
+>>
+>>                  return DMA_MEM_TYPE_DMA;
+>>          }
+>>
+> Originally VMALLOC_END was used and it was changes to CONSISTENT_BASE in  
+> 6a40b33270564d706396f1b514a988d3c by Nicolas and merged to linux-next,  
+> at a time it caused build error because CONSISTENT_BASE was no longer  
+> available in linux-next.
+>
+> Can someone knows the context comment on these changes?
+>
+>> int dma_mem_supports_dma(void *addr)
+>> {
+>>          DMA_MemType_t memType = dma_mem_type(addr);
+>>
+>>          return (memType == DMA_MEM_TYPE_DMA)
+>> #if ALLOW_MAP_OF_KMALLOC_MEMORY
+>>              || (memType == DMA_MEM_TYPE_KMALLOC)
+>> #endif
+>>              || (memType == DMA_MEM_TYPE_USER);
+>> }
+>>
+>> ...
+>>          case DMA_MEM_TYPE_DMA:
+>>                  {
+>>                          /* dma_alloc_xxx pages are physically contiguous */
+>>
+>>                          atomic_inc(&gDmaStatMemTypeCoherent);
+>>
+>>                          physAddr = (vmalloc_to_pfn(mem)<<  PAGE_SHIFT) + offset;
+>>
+>>                          dma_sync_single_for_cpu(NULL, physAddr, numBytes,
+>>                                                  memMap->dir);
+>>                          rc = dma_map_add_segment(memMap, region, mem, physAddr,
+>>                                                   numBytes);
+>>                          break;
+>>
+>> That's invalid for one thing.  Calling dma_sync_single_xxx with this
+>> made-up stuff isn't guaranteed to work - and certainly won't have the
+>> desired effect on ARM.  Not only that, but it's completely unnecessary
+>> for DMA coherent memory.
+>>
+>> So really, this code is broken.  It needs to be fixed, rather than fixing
+>> the core ARM code to allow this brokenness to persist.
+>>
+> I will take a look. As this code has been there for a while, is there  
+> something changed in, for example, DMA API I should be aware of?
 
-OK fair enough, mux instead of pins works fine for me.
- 
-> For some HW that controls the mux per pin, the SoC vendors wish the
-> pinctrl driver to expose what I call "virtual groups" of pins, e.g. all
-> the pins that are typically used together as a single I2C or SD/MMC
-> interface, as a single muxable entity (a group in pinctrl parlance).
-> In this case, the values listed here will be these group IDs
+No, it's always been a broken since the DMA API was invented:
 
-For the virtual groups, do you also want to specify them separate
-in the .dts files?
+1. You're accessing the memory via a special mapping of the pages.
+2. dma_sync_single_xxx() flush only the kernel's direct mapped pages
+   and none of the special mappings.
+3. VIVT caches alias when the same page is mapped to two or more
+   virtual addresses.
 
-IMHO we should let device tree take care of that as it already
-allows specifying the pins for each device entry. Then the
-dynamically generated group name can be nc->full_name of the
-device.
+Those are the ARM architecture reasons - but there's another:
 
-But other than that, I don't know if there's need to specify
-pingroups in the .dts files outside the device node using the
-pins?
- 
-> > That's because you might want to do all the muxing in a
-> > bootloader, but still need to tell how many pins you're using
-> > for MMC on a device. So it actually has a wider meaning than just
-> > mux.
-> 
-> I don't think that affects the name of the property:-)
+4. The kernel API requires that dma_sync_single_xxx() be used on memory
+   which has previously been mapped using dma_map_single(), but which
+   hasn't been unmapped yet with dma_unmap_single().
 
-Yes mux for the name works fine there too.
- 
-> I see your point about separate ownership of pins/groups and the actual
-> HW register programming. The pinctrl subsystem doesn't have a concept
-> of separating those two things at the moment though. I don't think its
-> unreasonable to still have to write the mux values into the device tree
-> and even reprogram them to the same value when Linux boots though. Do
-> you see a problem with that? If there is a problem, we need to fix it
-> in pinctrl too, irrespective of any device tree work.
+(Note: memory obtained from dma_alloc_coherent() etc will BUG if passed
+to dma_map_single() - only kernel direct mapped pages can be passed via
+this interface.)
 
-Yeah I think we can handle some pinmuxing cases automatically.
-But basically we need to support also the following typical cases:
+Lucky, though, memory allocated in the DMA coherent/write alloc zone will
+not be marked as cacheable, so there's no need to call dma_sync_single_xxx()
+on it.  The second lucky point is that there shouldn't be any cache lines
+in the kernel direct mapped pages associated with the remapped pages, so
+this won't have any effect other than waste CPU cycles.
 
-1. Static muxing in bootloader only and no mux entries in the .dts files
+In any case, I'm not sure why you think you need to classify the virtual
+address pointer - if you're using the APIs as per their design, you'll
+be passing into them the right addresses.  What I've been able to work
+out from my quick look at dma.c is that it's used to work out what parts
+of the DMA API to call (and apparantly buggily at that).
 
-2. Init time only muxing based on the entries in .dts files
+Moreover, from what I can see, dma.c is unused by code in the mainline
+kernel - I couldn't find any reference to dma_map_mem() or
+dma_init_mem_map() both of which seem to be pre-requisits for using
+this code.  Obviously you have drivers which use it.
 
-3. Dynamic remuxing of pins for the pins specified in the .dts files
-
-For the last one we need to do some extra work to avoid wasting memory,
-and need some pin specific flag to describe if the pin is init time only
-or dynamic.
-
-> > Also, we need to standardize on some name to use for parsing pins
-> > using of_parse_phandle_with_args, and I suggested #pin-args.
-> 
-> "cells" is the suffix that's typically used rather than "args".
-
-OK
- 
-> I certainly foresee the need for a #mux-cells and a #config-cells
-> Property so that pinctrl bindings/nodes can tell the core parser of
-> the mux/config properties how many cells to pull out for each entry.
-> 
-> In my binding proposal, I original assumed that every controller would
-> always have group,function for mux and group,param,value for config.
-> However, having #mux-cells and #config-cells is certainly a better idea.
-> 
-> > >     config =
-> > >         <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
-> > >         <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
-> > >         <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > >         <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
-> > >         <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
-> > >         <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
-> > > };
-> > 
-> > Here I don't quite understand how config is different from pins/mux
-> > above? It seems to set the driver/pull stuff, but why don't you
-> > just make #pin-args larger and have a wider pin array?
-> 
-> The idea is that "mux" lists each pin/group that the device uses, and
-> the pin mux selection for it, whereas "config" lists all the other
-> configuration values that could be applied to a pin; pull-up, pull-down,
-> tri-state, drive strength, ...
-> 
-> I suppose we could lump all those into a single property like:
-> 
-> pinctrl =
->     <MUX &tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
->     <MUX &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>
->     <CFG &tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
->     <CFG &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
->     <CFG &tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
->     <CFG &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
->     <CFG &tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
->     <CFG &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
-> 
-> (where e.g. MUX=0, CFG=1, both interpreted by the parsing code in the
-> core pinctrl subsystem)
-> 
-> However, I'd tend towards keeping them in separate properties, especially
-> since simple chips won't have any CFG (even on Tegra, 99% of the settings
-> we make are MUX not CFG) and requiring this MUX value in every mux entry
-> seems wasteful.
-> 
-> > Something like:
-> > 
-> > 	pins =
-> > 	<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1 TEGRA_PMX_CONF_TRISTATE 1
-> > 	 &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1 TEGRA_PMX_CONF_TRISTATE 1>;
-> > 
-> > and in the parent set #pin-args to 3.
-> 
-> That doesn't support setting a variable number of config values per pin/
-> group. Tegra30 has 13 define TEGRA_PMX_CONF_* values, and requiring every
-> one of those to be set for every pin/group would be a bit unwieldy,
-> especially since 99% of the time we just rely on the HW defaults, and I
-> imagine many other SoCs are the same.
-
-But aren't these 13 defines for TEGRA_PMX_CONF_* just bit offsets in some
-register?
-
-If so, why don't you just have one register to define the values? Then when
-the preprocessing of .dts files works, you can use defines there?
-
-Even if you had multiple registers per pin(group), you just need the
-phandle and value for each register?
- 
-> > > (Note that I think we've agreed to remove the first cell above, &tegra_pmx,
-> > > now by requiring such nodes exist as children of the pin controller.)
-> > 
-> > Sorry I don't quite follow, can you please maybe repost a complete
-> > .dts entry for your pin controller and one driver entry?
-> 
-> Yes, I'll try to do that very soon. The change is simple; from:
-> 
-> mux =
->     <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
->     <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
-> 
-> 
-> to:
-> 
-> mux =
->     <TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
->     <TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
-> 
-> We can do this by requiring the node that contains the mux property to
-> be a child of the pin controller node, so the phandle value is always
-> the node's parent node.
-
-Ah I see. I don't think we can leave out the phandle as that will
-not work for mixing pins from multiple pin controller instances.
-
-Regards,
-
-Tony
+What can be done to clean this up?
