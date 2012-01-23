@@ -1,22 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 23 Jan 2012 20:05:13 +0100
-Subject: [PATCH 28/31] ARM: amba: u300: use common amba device initializers
-In-Reply-To: <E1RoAp5-0005GA-9Z@rmk-PC.arm.linux.org.uk>
-References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
- <E1RoAp5-0005GA-9Z@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdbhUMqWBUod3c14rfDkOcHq8qOWNGRhihwBh7+bGkWJxA@mail.gmail.com>
+From: mm05@mail.ru (Anatoly Sivov)
+Date: Mon, 23 Jan 2012 23:20:29 +0400
+Subject: [RFC PATCH 4/7] ARM: davinci: net: davinci_emac: add OF support
+In-Reply-To: <1327308967-8092-5-git-send-email-hs@denx.de>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-5-git-send-email-hs@denx.de>
+Message-ID: <op.v8jxcfp7fzo5me@stalin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 10:31 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hello Heiko,
 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> ?arch/arm/mach-u300/core.c | ? 85 ++++++++------------------------------------
-> ?1 files changed, 16 insertions(+), 69 deletions(-)
+> +* Texas Instruments Davinci EMAC
+> +
+> +This file provides information, what the davice node
+> +for the davinci_emac interface contain.
+Please, fix the typo. (davice -> device)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks Russell,
-Linus Walleij
+BR, Anatoly
