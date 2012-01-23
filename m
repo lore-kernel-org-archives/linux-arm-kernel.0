@@ -1,67 +1,59 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Mon, 23 Jan 2012 20:45:25 +0530
-Subject: [PATCH 3/3] arm: da830: move NAND and NOR devices as aemif MFD slaves
-Message-ID: <1327331725-10559-1-git-send-email-prakash.pm@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 23 Jan 2012 13:29:53 -0200
+Subject: [PATCH] ARM: mx28: Remove duplicate OCOTP error message
+Message-ID: <1327332593-27534-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NAND and NOR device are made as aemif devices slave, hence device
-registration achieved via aemif MFD driver.
+The mxs_get_ocotp() function already prints an error message in the case of 
+a timeout, so no need to print them again in the board files.
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c |   31 +++++++++++++++++++++++--------
- 1 files changed, 23 insertions(+), 8 deletions(-)
+ arch/arm/mach-mxs/mach-m28evk.c  |    5 +----
+ arch/arm/mach-mxs/mach-mx28evk.c |    6 +-----
+ 2 files changed, 2 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 0b43554..0ad3662 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -396,14 +396,29 @@ static struct resource da830_evm_nand_resources[] = {
- 	},
- };
+diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+index 2f27582..eec1257 100644
+--- a/arch/arm/mach-mxs/mach-m28evk.c
++++ b/arch/arm/mach-mxs/mach-m28evk.c
+@@ -247,11 +247,8 @@ static int __init m28evk_fec_get_mac(void)
+ 	u32 val;
+ 	const u32 *ocotp = mxs_get_ocotp();
  
--static struct platform_device da830_evm_nand_device = {
--	.name		= "davinci_nand",
--	.id		= 1,
--	.dev		= {
--		.platform_data	= &da830_evm_nand_pdata,
-+static struct platform_device da830_evm_devices[] __initdata = {
-+	{
-+		.name		= "davinci_nand",
-+		.id		= 1,
-+		.dev		= {
-+			.platform_data	= &da830_evm_nand_pdata,
-+		},
-+		.num_resources	= ARRAY_SIZE(da830_evm_nand_resources),
-+		.resource	= da830_evm_nand_resources,
-+	},
-+};
-+
-+static struct davinci_aemif_devices da830_emif_devices = {
-+	.devices	= da830_evm_devices,
-+	.num_devices	= ARRAY_SIZE(da830_evm_devices),
-+};
-+
-+static struct platform_device davinci_emif_device = {
-+	.name	= "davinci_aemif",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &da830_emif_devices,
- 	},
--	.num_resources	= ARRAY_SIZE(da830_evm_nand_resources),
--	.resource	= da830_evm_nand_resources,
- };
+-	if (!ocotp) {
+-		pr_err("%s: timeout when reading fec mac from OCOTP\n",
+-			__func__);
++	if (!ocotp)
+ 		return -ETIMEDOUT;
+-	}
  
- static inline void da830_evm_init_nand(int mux_mode)
-@@ -422,7 +437,7 @@ static inline void da830_evm_init_nand(int mux_mode)
- 		pr_warning("da830_evm_init: emif25 mux setup failed: %d\n",
- 				ret);
+ 	/*
+ 	 * OCOTP only stores the last 4 octets for each mac address,
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index fdb0a56..f1cbf34 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -278,7 +278,7 @@ static int __init mx28evk_fec_get_mac(void)
+ 	const u32 *ocotp = mxs_get_ocotp();
  
--	ret = platform_device_register(&da830_evm_nand_device);
-+	ret = platform_device_register(&davinci_emif_device);
- 	if (ret)
- 		pr_warning("da830_evm_init: NAND device not registered.\n");
+ 	if (!ocotp)
+-		goto error;
++		return -ETIMEDOUT;
  
+ 	/*
+ 	 * OCOTP only stores the last 4 octets for each mac address,
+@@ -295,10 +295,6 @@ static int __init mx28evk_fec_get_mac(void)
+ 	}
+ 
+ 	return 0;
+-
+-error:
+-	pr_err("%s: timeout when reading fec mac from OCOTP\n", __func__);
+-	return -ETIMEDOUT;
+ }
+ 
+ /*
 -- 
 1.7.1
