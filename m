@@ -1,39 +1,27 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 23 Jan 2012 05:56:26 -0700
-Subject: [PATCH v2] spi: QUP based bus driver for Qualcomm MSM chipsets
-In-Reply-To: <20111207223757.GE3744@pengutronix.de>
-References: <y> <1321307907-31508-1-git-send-email-harinij@codeaurora.org>
- <20111207223757.GE3744@pengutronix.de>
-Message-ID: <20120123125626.GA23571@ponder.secretlab.ca>
+From: petter@neppe.no (Petter Nordby)
+Date: Mon, 23 Jan 2012 14:07:17 +0100
+Subject: [PATCH 1/1] ARM: Developed device driver for Atmel TSADC
+ controller
+In-Reply-To: <4F1D49EE.6020600@atmel.com>
+References: <n> <1327317907-2874-1-git-send-email-pettno@gmail.com>
+ <20120123113647.GX1068@n2100.arm.linux.org.uk> <4F1D49EE.6020600@atmel.com>
+Message-ID: <4F1D5B85.6050406@neppe.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 11:37:58PM +0100, Wolfram Sang wrote:
-> On Mon, Nov 14, 2011 at 02:58:27PM -0700, Harini Jayaraman wrote:
-> > This bus driver supports the QUP SPI hardware controller in the Qualcomm
-> > MSM SOCs. The Qualcomm Universal Peripheral Engine (QUP) is a general
-> > purpose data path engine with input/output FIFOs and an embedded SPI
-> > mini-core. The driver currently supports only FIFO mode.
-> > 
-> > Signed-off-by: Harini Jayaraman <harinij@codeaurora.org>
-> 
-> Wow, this driver is huge. This is a rough review only, mainly to see
-> what can go away. This will make further reviews easier.
-> 
-> > ---
-> > v2: Updated copyright information (addresses comments from Bryan Huntsman).
-> >     Files renamed.
-> > ---
-> >  drivers/spi/Kconfig                   |   10 +
-> >  drivers/spi/Makefile                  |    1 +
-> >  drivers/spi/spi-qup.c                 | 1144 +++++++++++++++++++++++++++++++++
-> >  drivers/spi/spi-qup.h                 |  436 +++++++++++++
-> >  include/linux/platform_data/msm_spi.h |   19 +
-> >  5 files changed, 1610 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/spi/spi-qup.c
-> >  create mode 100644 drivers/spi/spi-qup.h
+On 01/23/2012 12:52 PM, Nicolas Ferre wrote:
+> But as Russell suggested, this use of ADC for AT91SAM9G45 family (TSADC)
+> will be better suited for the IIO subsystem.
+> A new AT91 ADC driver designed for this IIO subsystem has been developed
+> a little time ago:
+> "[PATCH RESEND v13] AT91: Add a driver for the ADC"
+>
+> It will likely be included shortly in mainline kernel. I advice to
+> follow this development and add the support of SAM9G45 ADC to this
+> existing infrastructure.
 
-Why the separate header file?  From what I can tell, only spi-qup.c
-uses it, so the definitions should be directly in spi-qup.c.
+Thanks for pointing me in this direction. Exactly what I need.
+I'm really looking forward to getting it in mainline kernel.
 
-g.
+Best regards,
+Petter Nordby
