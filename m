@@ -1,34 +1,19 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 23 Jan 2012 07:58:51 -0800
-Subject: [PATCH v2] spi: QUP based bus driver for Qualcomm MSM chipsets
-In-Reply-To: <20120123104220.GV1068@n2100.arm.linux.org.uk>
-References: <y> <1321307907-31508-1-git-send-email-harinij@codeaurora.org>
- <20120123104220.GV1068@n2100.arm.linux.org.uk>
-Message-ID: <20120123155851.GA25417@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Jan 2012 16:03:47 +0000
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform
+ clean-up
+In-Reply-To: <201201231558.53673.arnd@arndb.de>
+References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
+ <201201231558.53673.arnd@arndb.de>
+Message-ID: <201201231603.47405.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 10:42:20AM +0000, Russell King - ARM Linux wrote:
-> Not specific to this patch, but I notice that you have in your headers:
-> 
-> In-Reply-To: <y>
-> References: <y>
-> 
-> This is rather annoying, because it means that anyone else who has the
-> same lines ends up having their messages attached to your messages as
-> part of the same thread.
-> 
-> I think you need to read the documentation for git-send-email again -
-> and check that you're using the arguments concerning message ids and
-> threading correctly.
+On Monday 23 January 2012, Arnd Bergmann wrote:
+> Greg, can you have another look? I think Lee has addressed all of
+> my comments as well as yours.
 
-More specifically, when git-send-email promps for an email address or
-a message id, realize it's not asking a yes or not question.  The
-default it prints in brackets is what you get if you press enter.  If
-you press 'y', the reply will be from 'y' as seen here.
+Nevermind, I just saw your replies from Friday, it seems you were already
+aware of it.
 
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+	Arnd
