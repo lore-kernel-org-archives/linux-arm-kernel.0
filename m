@@ -1,64 +1,76 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 23 Jan 2012 16:00:48 +0100
-Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
-In-Reply-To: <1325747509-29665-2-git-send-email-hdoyu@nvidia.com>
-References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
- <1325747509-29665-2-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20120123150048.GB6269@8bytes.org>
+From: zbr@ioremap.net (Evgeniy Polyakov)
+Date: Mon, 23 Jan 2012 18:07:53 +0300
+Subject: [PATCH] W1: OMAP HDQ1W: use 32-bit register accesses
+In-Reply-To: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
+Message-ID: <20120123150753.GA21395@ioremap.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul
 
-first, some questions about the GART on your platform.
+Patchset looks good, feel free to add my ack
 
-1) How many GARTs are usually implemented? One GART per device or is
-   there a single GART covering all devices, or a mix of both?
-2) Are devices allowed to DMA outside of the remappable range or will
-   this fail?
+On Sun, Jan 22, 2012 at 01:26:23PM -0700, Paul Walmsley (paul at pwsan.com) wrote:
+> 
+> HDQ/1-wire registers are 32 bits long, even if the register contents
+> fit into 8 bits, so accesses must be 32-bit aligned.  Evidently the
+> OMAP2/3 interconnects allowed the driver to get away with 8 bit accesses,
+> but the OMAP4 puts a stop to that:
+> 
+> [    1.488800] Driver for 1-wire Dallas network protocol.
+> [    1.495025] Bad mode in data abort handler detected
+> [    1.500122] Internal error: Oops - bad mode: 0 [#1] SMP
+> [    1.505615] Modules linked in:
+> [    1.508819] CPU: 0    Not tainted  (3.3.0-rc1-00008-g45030e9 #992)
+> [    1.515289] PC is at 0xffff0018
+> [    1.518615] LR is at omap_hdq_probe+0xd4/0x2cc
+> 
+> The OMAP4430 ES2 Rev X TRM does warn about this restriction in section 
+> 23.2.6.2 "HDQ/1-Wire Registers".
+> 
+> Fixes the crash on OMAP4430 ES2 Pandaboard.  Tested also on OMAP34xx and 
+> OMAP2420; it seems to work fine on those chips, although due to the lack 
+> of boards with HDQ/1-wire devices here, a more indepth test was not 
+> possible.
+> 
+> ---
+> Intended for the v3.4 merge window.
+> 
+>  drivers/w1/masters/omap_hdq.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/w1/masters/omap_hdq.c b/drivers/w1/masters/omap_hdq.c
+> index 63e3eda..291897c 100644
+> --- a/drivers/w1/masters/omap_hdq.c
+> +++ b/drivers/w1/masters/omap_hdq.c
+> @@ -100,20 +100,20 @@ static struct w1_bus_master omap_w1_master = {
+>  /* HDQ register I/O routines */
+>  static inline u8 hdq_reg_in(struct hdq_data *hdq_data, u32 offset)
+>  {
+> -	return __raw_readb(hdq_data->hdq_base + offset);
+> +	return __raw_readl(hdq_data->hdq_base + offset);
+>  }
+>  
+>  static inline void hdq_reg_out(struct hdq_data *hdq_data, u32 offset, u8 val)
+>  {
+> -	__raw_writeb(val, hdq_data->hdq_base + offset);
+> +	__raw_writel(val, hdq_data->hdq_base + offset);
+>  }
+>  
+>  static inline u8 hdq_reg_merge(struct hdq_data *hdq_data, u32 offset,
+>  			u8 val, u8 mask)
+>  {
+> -	u8 new_val = (__raw_readb(hdq_data->hdq_base + offset) & ~mask)
+> +	u8 new_val = (__raw_readl(hdq_data->hdq_base + offset) & ~mask)
+>  			| (val & mask);
+> -	__raw_writeb(new_val, hdq_data->hdq_base + offset);
+> +	__raw_writel(new_val, hdq_data->hdq_base + offset);
+>  
+>  	return new_val;
+>  }
+> -- 
+> 1.7.8.3
 
-Besides that I think IOMMU-API is not yet fully ready for GART-like
-drivers like this one. But I will merge it anyway to get things moving.
-But please answer or fix my objections first.
-
-On Thu, Jan 05, 2012 at 09:11:48AM +0200, Hiroshi DOYU wrote:
-> +static void gart_iommu_domain_destroy(struct iommu_domain *domain)
-> +{
-> +	struct gart_device *gart = domain->priv;
-> +
-> +	spin_lock(&gart->client_lock);
-> +	if (!list_empty(&gart->client)) {
-> +		struct gart_client *c;
-> +
-> +		list_for_each_entry(c, &gart->client, list)
-> +			dev_err(gart->dev,
-> +				"%s is still attached\n", dev_name(c->dev));
-> +	}
-> +	spin_unlock(&gart->client_lock);
-
-gart needs a NULL check. When you create a domain and immediatly destroy
-it without ever attaching a device this code will dereference a NULL
-pointer.
-As a general improvement I suggest that you introduce a gart_domain
-structure and store it in domain->priv (assigned in domain_init) instead
-of using the hardware descriptor.
-
-> +static int gart_iommu_attach_dev(struct iommu_domain *domain,
-> +				 struct device *dev)
-> +{
-> +	struct gart_device *gart;
-> +	struct gart_client *client, *c;
-> +	int err = 0;
-> +
-> +	gart = dev_get_drvdata(dev->parent);
-> +	if (!gart)
-> +		return -EINVAL;
-> +	domain->priv = gart;
-
-What happens when devices behind different GARTs are assigned to the
-same domain? domain->priv can only hold a pointer to one hardware GART.
-This can be solved by a 'struct gart_domain' holding a linked list to
-all gart_devices in this domain.
-
-
-	Joerg
+-- 
+	Evgeniy Polyakov
