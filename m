@@ -1,32 +1,31 @@
-From: sbabic@denx.de (Stefano Babic)
-Date: Mon, 23 Jan 2012 16:50:23 +0100
-Subject: [PATCH] ARM: mx28: Remove duplicate OCOTP error message
-In-Reply-To: <1327332593-27534-1-git-send-email-fabio.estevam@freescale.com>
-References: <1327332593-27534-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <4F1D81BF.6010303@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Jan 2012 15:58:53 +0000
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform
+ clean-up
+In-Reply-To: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
+References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <201201231558.53673.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/2012 16:29, Fabio Estevam wrote:
-> The mxs_get_ocotp() function already prints an error message in the case of 
-> a timeout, so no need to print them again in the board files.
+On Saturday 21 January 2012, Lee Jones wrote:
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mxs/mach-m28evk.c  |    5 +----
->  arch/arm/mach-mxs/mach-mx28evk.c |    6 +-----
->  2 files changed, 2 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
-> index 2f27582..eec1257 100644
-> --- a/arch/arm/mach-mxs/mach-m28evk.c
-> +++ b/arch/arm/mach-mxs/mach-m28evk.c
+> This patch-set satisfies 4 objectives:
+>  1. Ensures each platform device can specify a suitable parent
+>  2. Provides a bus for SoC devices as a means to export information
+>  3. Allows ux500 to make use of the new SoC bus
+>  4. Cleans up unnecessary complexity from ux500 code
 
-Acked-by: Stefano Babic <sbabic@denx.de>
+This version looks good to me, I have no further comments right now.
 
--- 
-=====================================================================
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
-=====================================================================
+Greg, can you have another look? I think Lee has addressed all of
+my comments as well as yours.
+
+Linus, does this fit with your plans for migrating to only
+device-tree based probing for ux500? I guess if this goes in
+first, you will have to make a few changes so that it keeps working
+when the devices are put into the dts.
+
+Everyone else, who is planning to use the infrastructure besides ux500?
+
+	Arnd
