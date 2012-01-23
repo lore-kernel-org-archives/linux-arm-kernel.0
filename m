@@ -1,106 +1,167 @@
 From: hs@denx.de (Heiko Schocher)
-Date: Mon, 23 Jan 2012 09:56:00 +0100
-Subject: [RFC PATCH 0/7] ARM: davinci: add support for the am1808 based
- enbw_cmc board
-Message-ID: <1327308967-8092-1-git-send-email-hs@denx.de>
+Date: Mon, 23 Jan 2012 09:56:05 +0100
+Subject: [RFC PATCH 5/7] ARM: davinci: i2c: add OF support
+In-Reply-To: <1327308967-8092-1-git-send-email-hs@denx.de>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+Message-ID: <1327308967-8092-6-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add support for the davinci am1808 based enbw_cmc board.
-
-This is thought as a RFC patchserie, as this patches
-surely have to be discussed:
-
-- ARM: davinci: configure davinci aemif chipselects through OF
-  not moved to mfd, as mentioned in this discussion:
-  http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-td7059739.html
-  instead use a phandle in the DTS, so drivers which
-  uses the davinci aemif, can call davinci_aemif_setup_timing_of()
-
-  This is just thought as an RFC ... The enbw_cmc board
-  support not really need to setup this bus timings, as
-  they are setup in U-Boot ... but I want to post this,
-  as I think, it is a nice to have, and I am not really
-  sure, if this has to be a MFD device (If so, all bus
-  interfaces for other SoCs should be converted also to
-  MFD devices) ... as an example how this can be used
-  I add this to the davinci nand controller OF support
-  patch, in this patchserie.
-
-- ARM: davinci: mux: add OF support
-  I want to get rid of the pin setup code in board code ...
-  This patch introduces a davinci_cfg_reg_of() function,
-  which davinci drivers can call, if they found a
-  "pinmux-handle", so used in the following drivers in
-  this patchserie:
-
-  drivers/net/ethernet/ti/davinci_emac
-  drivers/i2c/busses/i2c-davinci.c
-  drivers/mtd/nand/davinci_nand.c
-
-- post this board support with USB support, even though
-  USB is only working with the 10 ms "workaround", posted here:
-  http://comments.gmane.org/gmane.linux.usb.general/54505
-  I see this issue also on the AM1808 TMDXEXP1808L evalboard.
-
-- MMC and USB are not using OF support yet, ideas how to port
-  this are welcome. I need for USB and MMC board specific
-  callbacks, how to solve this with OF support?
+add of support for the davinci i2c driver.
 
 Signed-off-by: Heiko Schocher <hs@denx.de>
+Cc: davinci-linux-open-source at linux.davincidsp.com
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree-discuss at lists.ozlabs.org
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: linux-mtd at lists.infradead.org
 Cc: linux-i2c at vger.kernel.org
-Cc: netdev at vger.kernel.org
-Cc: David Woodhouse <dwmw2@infradead.org>
 Cc: Ben Dooks <ben-linux@fluff.org>
 Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
 Cc: Wolfgang Denk <wd@denx.de>
-
-Heiko Schocher (7):
-  ARM: davinci, intc: Add OF support for TI interrupt controller
-  ARM: davinci: configure davinci aemif chipselects through OF
-  ARM: davinci: mux: add OF support
-  ARM: davinci: net: davinci_emac: add OF support
-  ARM: davinci: i2c: add OF support
-  ARM: mtd: nand: davinci: add OF support for davinci nand controller
-  ARM: davinci: add support for the am1808 based enbw_cmc board
-
- .../devicetree/bindings/arm/davinci/aemif.txt      |  119 ++++++
- .../bindings/arm/davinci/davinci_emac.txt          |   46 +++
- .../devicetree/bindings/arm/davinci/i2c.txt        |   39 ++
- .../devicetree/bindings/arm/davinci/intc.txt       |   26 ++
- .../devicetree/bindings/arm/davinci/mux.txt        |   40 ++
- .../devicetree/bindings/arm/davinci/nand.txt       |   72 ++++
- arch/arm/boot/dts/enbw_cmc.dts                     |  286 +++++++++++++++
- arch/arm/configs/enbw_cmc_defconfig                |  125 +++++++
- arch/arm/mach-davinci/Kconfig                      |    8 +
- arch/arm/mach-davinci/Makefile                     |    1 +
- arch/arm/mach-davinci/aemif.c                      |   86 +++++-
- arch/arm/mach-davinci/board-enbw-cmc.c             |  384 ++++++++++++++++++++
- arch/arm/mach-davinci/cp_intc.c                    |   51 +++
- arch/arm/mach-davinci/include/mach/aemif.h         |    1 +
- arch/arm/mach-davinci/include/mach/cp_intc.h       |    1 +
- arch/arm/mach-davinci/include/mach/mux.h           |    2 +
- arch/arm/mach-davinci/include/mach/uncompress.h    |    1 +
- arch/arm/mach-davinci/mux.c                        |   73 ++++-
- drivers/i2c/busses/i2c-davinci.c                   |   43 +++
- drivers/mtd/nand/davinci_nand.c                    |   78 ++++-
- drivers/net/ethernet/ti/davinci_emac.c             |  111 ++++++-
- 21 files changed, 1588 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/aemif.txt
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+---
+ .../devicetree/bindings/arm/davinci/i2c.txt        |   39 ++++++++++++++++++
+ drivers/i2c/busses/i2c-davinci.c                   |   43 ++++++++++++++++++++
+ 2 files changed, 82 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/mux.txt
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
- create mode 100644 arch/arm/boot/dts/enbw_cmc.dts
- create mode 100644 arch/arm/configs/enbw_cmc_defconfig
- create mode 100644 arch/arm/mach-davinci/board-enbw-cmc.c
 
+diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+new file mode 100644
+index 0000000..94ec670
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+@@ -0,0 +1,39 @@
++* Texas Instruments Davinci I2C
++
++This file provides information, what the device node for the
++davinci i2c interface contain.
++
++Required properties:
++- compatible: "ti,davinci-i2c";
++- reg : Offset and length of the register set for the device
++- id: id of the controller
++
++Recommended properties :
++- interrupts : <a b> where a is the interrupt number and b is a
++  field that represents an encoding of the sense and level
++  information for the interrupt.
++- interrupt-parent : the phandle for the interrupt controller that
++  services interrupts for this device.
++- clock-frequency : desired I2C bus clock frequency in Hz.
++
++Optional properties:
++- bus-delay: bus delay in usec
++- pinmux-handle: Contains a handle to configure the pinmux settings.
++
++Example (enbw_cmc board):
++	i2c at 1c22000 {
++		compatible = "ti,davinci-i2c";
++		reg = <0x22000 0x1000>;
++		clock-frequency = <100000>;
++		interrupts = <15 2>;
++		interrupt-parent = <&intc>;
++		id = <1>;
++		pinmux-handle = <&i2c1_pins>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		dtt at 48 {
++				compatible = "national,lm75";
++				reg = <0x48>;
++			};
++	};
+diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+index a76d85f..6f59fae 100644
+--- a/drivers/i2c/busses/i2c-davinci.c
++++ b/drivers/i2c/busses/i2c-davinci.c
+@@ -38,9 +38,12 @@
+ #include <linux/slab.h>
+ #include <linux/cpufreq.h>
+ #include <linux/gpio.h>
++#include <linux/of_i2c.h>
++#include <linux/of_device.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/i2c.h>
++#include <mach/mux.h>
+ 
+ /* ----- global defines ----------------------------------------------- */
+ 
+@@ -635,6 +638,16 @@ static struct i2c_algorithm i2c_davinci_algo = {
+ 	.functionality	= i2c_davinci_func,
+ };
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id davinci_i2c_of_match[] = {
++	{.compatible = "ti,davinci-i2c", },
++	{},
++}
++MODULE_DEVICE_TABLE(of, davinci_i2c_of_match);
++#else
++#define davinci_i2c_of_match NULL
++#endif
++
+ static int davinci_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct davinci_i2c_dev *dev;
+@@ -676,7 +689,34 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	dev->irq = irq->start;
+ 	platform_set_drvdata(pdev, dev);
+ 
++	if ((dev->dev->platform_data == NULL) &&
++		(pdev->dev.of_node)) {
++		struct device_node *pinmux_np;
++		struct davinci_i2c_platform_data *pdata;
++		u32 prop;
++
++		dev->dev->platform_data = &davinci_i2c_platform_data_default;
++		pdata = &davinci_i2c_platform_data_default;
++		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
++			&prop))
++			pdata->bus_freq = prop / 1000;
++		if (!of_property_read_u32(pdev->dev.of_node, "bus-delay",
++			&prop))
++			pdata->bus_delay = prop;
++		if (!of_property_read_u32(pdev->dev.of_node, "id",
++			&prop)) {
++			pdev->id = prop;
++			pdev->dev.init_name = kzalloc(20, GFP_KERNEL);
++			sprintf((char *)pdev->dev.init_name,
++				"i2c_davinci.%d", pdev->id);
++		}
++		pinmux_np = of_parse_phandle(pdev->dev.of_node,
++				"pinmux-handle", 0);
++		if (pinmux_np)
++			davinci_cfg_reg_of(pinmux_np);
++	}
+ 	dev->clk = clk_get(&pdev->dev, NULL);
++
+ 	if (IS_ERR(dev->clk)) {
+ 		r = -ENODEV;
+ 		goto err_free_mem;
+@@ -711,6 +751,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	adap->algo = &i2c_davinci_algo;
+ 	adap->dev.parent = &pdev->dev;
+ 	adap->timeout = DAVINCI_I2C_TIMEOUT;
++	adap->dev.of_node = pdev->dev.of_node;
+ 
+ 	adap->nr = pdev->id;
+ 	r = i2c_add_numbered_adapter(adap);
+@@ -718,6 +759,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "failure adding adapter\n");
+ 		goto err_free_irq;
+ 	}
++	of_i2c_register_devices(adap);
+ 
+ 	return 0;
+ 
+@@ -809,6 +851,7 @@ static struct platform_driver davinci_i2c_driver = {
+ 		.name	= "i2c_davinci",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= davinci_i2c_pm_ops,
++		.of_match_table = davinci_i2c_of_match,
+ 	},
+ };
+ 
 -- 
 1.7.7.5
