@@ -1,34 +1,66 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 23 Jan 2012 10:15:22 +0200
-Subject: [PATCH 0/2] tty: serial: OMAP: work around broken driver, IP block
-In-Reply-To: <20120121071934.18707.64258.stgit@dusk>
-References: <20120121071934.18707.64258.stgit@dusk>
-Message-ID: <1327306522.1916.11.camel@deskari>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 23 Jan 2012 08:47:23 +0000
+Subject: [PATCH 0/3] ARM: OMAP1/2+: 32k-timer: Add hwmod lookup for
+ 32k-timer
+In-Reply-To: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317AF2D2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-01-21 at 00:27 -0700, Paul Walmsley wrote:
-> [ This series is targeted for merging during v3.3-rc ]
+On Thu, Jan 19, 2012 at 19:58:21, Hiremath, Vaibhav wrote:
+> This patch series cleans up the existing 32k-sync timer implementation
+> without any major code change and adds hwmod lookup for omap2+ devices,
+> if lookup fails then fall back to gp-timer.
 > 
-> On v3.3-rc1, the OMAP serial console doesn't behave properly when
-> power management is enabled (the default with omap2plus_defconfig).
-> This seems to be due to a combination of a silicon bug in the UART IP
-> block and broken FIFO settings in the OMAP serial driver.
+> With this, we should be able to support multi-omap boot
+> including devices with/without 32k-sync timer.
+> For example, AM33xx device doesn't have 32k-sync timer available,
+> which breaks multi-omap boot.
 > 
-> This patch series attempts to work around these problems.  The workarounds
-> are not perfect; see the patch descriptions for more details.
+> This patch-series has been boot tested on AM37xEVM platform, it
+> would be helpful if somebody help me to validate it on OMAP2
+> platform.
 > 
-> Tested on OMAP3530 BeagleBoard.  This series will need to be tested on
-> OMAP2 and OMAP4 before it is ready to merge.
+> Background:
+> ==========
+> In 2010 timeframe 'Fillipe Balbi' had submitted first version
+> of 32k-sync timer cleanup patches, but it did not made its way
+> to the mainline.
+> 
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37403.html
+> 
+> Yesterday I had submitted the RFC version patch-series, which was
+> built on top of earlier cleanup patches from 'Fillipe Balbi'.
+> 
+> http://www.spinics.net/lists/linux-omap/msg63004.html
+> 
+> Based on comments (Thanks to Russell, Marc and Tony) from community
+> it was clear that, arch_init is not the correct way here.
+> 
+> 
+> Vaibhav Hiremath (3):
+>   ARM: OMAP2+: 32k-counter: Use hwmod lookup to check presence of 32k
+>     timer
+>   ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to prcm-common
+>     header
+>   ARM: OMAP2+: hwmod data: Add 32k-sync timer data to hwmod database
+> 
 
-Thanks, this makes the console usable on my OMAP3 overo.
+Tony,
 
- Tomi
+If there are no review comments, can this be merged?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120123/8301390e/attachment.sig>
+Thanks,
+Vaibhav
+
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c |   53 ++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c |   52 +++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   51 +++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+>  arch/arm/mach-omap2/prcm-common.h          |    4 +
+>  arch/arm/mach-omap2/timer.c                |   27 ++++-----
+>  arch/arm/plat-omap/counter_32k.c           |   83 ++++++++++++++-------------
+>  7 files changed, 215 insertions(+), 57 deletions(-)
+> 
+> 
