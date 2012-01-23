@@ -1,42 +1,126 @@
-From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Mon, 23 Jan 2012 11:49:25 +0100
-Subject: [PATCH 1/1] i.MX SDMA: Fix burstsize settings
-In-Reply-To: <20120123102501.GN5446@pengutronix.de>
-References: <20120123102501.GN5446@pengutronix.de>
-Message-ID: <1327315765-20679-1-git-send-email-philippe.retornaz@epfl.ch>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Mon, 23 Jan 2012 16:41:14 +0530
+Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
+In-Reply-To: <1327066287.517.4.camel@vkoul-udesk3>
+References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
+ <1326807902.1540.116.camel@vkoul-udesk3> <4F195E4C.6080805@codeaurora.org>
+ <1327066287.517.4.camel@vkoul-udesk3>
+Message-ID: <4F1D4052.3070701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6584cb88 fixed the mxcmmc driver but forgot to fix the
-SDMA driver to handle the correct burtsize.
-This make the SD card access works again with DMA on i.MX31 boards.
+On 1/20/2012 7:01 PM, Vinod Koul wrote:
+> On Fri, 2012-01-20 at 18:00 +0530, Ravi Kumar V wrote:
+>> On 1/17/2012 7:15 PM, Vinod Koul wrote:
+>>> On Fri, 2012-01-06 at 18:17 +0530, Ravi Kumar V wrote:
+>>> <sorry for delayed review, was on vacation and now traveling>
+>>>>
+>>>> As our ADM Scatter-gather hardware needs
+>>>> -32-bit command configuration parameter
+>>>>    apart from
+>>>> -32-bit source address
+>>>> -32-bit destination address
+>>>> -16-bit length
+>>>>
+>>>> So,we have added new parameter in struct scatterlist to support xfer
+>>>> descriptor
+>>>> specific private data, and for supporting ADM Box mode DMA we added
+>>>> new
+>>>> API and data structure.
+>>> what do you mean by "ADM Box mode"?
+>>>
+>>
+>> ADM Box mode is a interleaved type of DMA where data from rows of equal
+>> length and equal distance(bytes) between each other are transferred to
+>> similar pattern of rows.
+>> Each row length and distance between each row in destination pattern may
+>> not be equal to source pattern.
+>> Distance between beginning of any two rows are always greater than row
+>> length.
+>> Example:
+>> If 4 rows of 16 bytes each are arranged such that distance between
+>> beginning of any two rows are 32 bytes.
+>> Now they can be transferred using BOX mode to destination pattern
+>> arranged in 2 rows of 32 bytes each and distance between them can be any
+>> lets say 128 bytes.
+>>
+>> Source pattern:
+>> 4 data rows starts address 0th byte.
+>>
+>> 0-----16-bytes-data-----15
+>> 16    16 bytes void     31
+>> 32---------data---------47
+>> 48         void         63
+>> 64---------data---------79
+>> 80         void         95
+>> 96---------data--------111
+>>
+>> Transferred to destination
+>> Destination pattern:
+>> 2 rows
+>> 0----------32-bytes-data----------31
+>> 32         96 bytes void         127
+>> 128-------------data-------------159
+>>
+> Sounds like you should be using interleaved API
+>
+> Please see this and read the patch history, which has nice details about
+> this
+>
+> /**
+>   * struct dma_interleaved_template - Template to convey DMAC the
+> transfer pattern
+>   *       and attributes.
+>   * @src_start: Bus address of source for the first chunk.
+>   * @dst_start: Bus address of destination for the first chunk.
+>   * @dir: Specifies the type of Source and Destination.
+>   * @src_inc: If the source address increments after reading from it.
+>   * @dst_inc: If the destination address increments after writing to it.
+>   * @src_sgl: If the 'icg' of sgl[] applies to Source (scattered read).
+>   *              Otherwise, source is read contiguously (icg ignored).
+>   *              Ignored if src_inc is false.
+>   * @dst_sgl: If the 'icg' of sgl[] applies to Destination (scattered write).
+>   *              Otherwise, destination is filled contiguously (icg ignored).
+>   *              Ignored if dst_inc is false.
+>   * @numf: Number of frames in this template.
+>   * @frame_size: Number of chunks in a frame i.e, size of sgl[].
+>   * @sgl: Array of {chunk,icg} pairs that make up a frame.
+>   */
+> struct dma_interleaved_template {
+>          dma_addr_t src_start;
+>          dma_addr_t dst_start;
+>          enum dma_transfer_direction dir;
+>          bool src_inc;
+>          bool dst_inc;
+>          bool src_sgl;
+>          bool dst_sgl;
+>          size_t numf;
+>          size_t frame_size;
+>          struct data_chunk sgl[0];
+> };
+> using the interleaved API:
+>          struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
+>                  struct dma_chan *chan, struct dma_interleaved_template *xt,
+>                  unsigned long flags);
+>
+>
 
-Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/dma/imx-sdma.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+If some changes are made in interleave API then it can support our BOX 
+mode. Here in interleaved template he is assuming destination pattern as 
+can be contiguous or same as source pattern, but in our case destination 
+pattern is different from source pattern.
+So if a new parameter destination data chunk is added in "struct 
+dma_interleaved_template" structure then it can support different 
+destination pattern.
+Also it will good if you can provide another parameter for passing 
+private data to dma driver.
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f993955..c193dac 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1095,11 +1095,13 @@ static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	case DMA_SLAVE_CONFIG:
- 		if (dmaengine_cfg->direction == DMA_FROM_DEVICE) {
- 			sdmac->per_address = dmaengine_cfg->src_addr;
--			sdmac->watermark_level = dmaengine_cfg->src_maxburst;
-+			sdmac->watermark_level = dmaengine_cfg->src_maxburst *
-+						dmaengine_cfg->src_addr_width;
- 			sdmac->word_size = dmaengine_cfg->src_addr_width;
- 		} else {
- 			sdmac->per_address = dmaengine_cfg->dst_addr;
--			sdmac->watermark_level = dmaengine_cfg->dst_maxburst;
-+			sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
-+						dmaengine_cfg->dst_addr_width;
- 			sdmac->word_size = dmaengine_cfg->dst_addr_width;
- 		}
- 		return sdma_config_channel(sdmac);
+Please can you review my other patches also where we replied to some of 
+your questions about passing private data for SG mode.
+
+Thanks
+Ravi Kumar
+
 -- 
-1.6.3.3
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
