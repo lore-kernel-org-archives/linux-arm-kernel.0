@@ -1,32 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jan 2012 16:13:56 +0000
-Subject: [GIT PULL] mxs: board support for 3.3
-In-Reply-To: <20120120073729.GD26277@S2101-09.ap.freescale.net>
-References: <20120108034408.GB19721@S2101-09.ap.freescale.net>
- <4F191431.2080600@bluegiga.com>
- <20120120073729.GD26277@S2101-09.ap.freescale.net>
-Message-ID: <201201231613.57048.arnd@arndb.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 23 Jan 2012 14:16:17 -0200
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: Fix the selection of 32 bit flash
+ support for iMX21ADS board
+Message-ID: <1327335377-30420-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 January 2012, Shawn Guo wrote:
-> On Fri, Jan 20, 2012 at 09:13:53AM +0200, Lauri Hintsala wrote:
-> > On 01/20/2012 09:20 AM, Shawn Guo wrote:
-> > >Sadly, it seems that we have to wait for the next merge window, since
-> > >I do not see it in the v3.3-rc1.
-> > 
-> > Ok, I'll add restart hooks to machine code, fix the saif issue and
-> > send new version soon. Let's try to get it to 3.4 :)
-> > 
-> Arnd, Olof,
-> 
-> Please ignore this pull request then.  We will come up with a new one
-> for 3.4 later.
+commit 1a96571d (Enable 32 bit flash support for iMX21ADS board) aimed to 
+enable 32 bit flash support, but all it did was to delete an unset option.
 
-Ok, sounds good. I'm sorry that these patches got delayed so long, but
-I wasn't aware of them until the pull request on Jan 8, and by that
-time it was certainly too late. Please just send a new pull request
-based on 3.3-rc1 in the next days and it should be no problem at all
-to get them in to 3.4.
+Fix this by enabling CONFIG_MTD_MAP_BANK_WIDTH_4 option.
 
-	Arnd
+Cc: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Jaccon,
+
+I don't have a MX21ADS board handy to test it, but I guess this was the correct
+intention of your patch, right?
+
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index a22e930..dac71c1 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -68,6 +68,7 @@ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+ CONFIG_MTD_CFI_GEOMETRY=y
+ # CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
++CONFIG_MTD_MAP_BANK_WIDTH_4=y
+ # CONFIG_MTD_CFI_I2 is not set
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_PHYSMAP=y
+-- 
+1.7.1
