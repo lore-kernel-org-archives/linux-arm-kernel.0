@@ -1,27 +1,29 @@
 From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Mon, 23 Jan 2012 16:31:00 +0400
-Subject: [PATCH 1/1] i.MX SDMA: Fix burstsize settings
-In-Reply-To: <1327315765-20679-1-git-send-email-philippe.retornaz@epfl.ch>
-References: <20120123102501.GN5446@pengutronix.de>
- <1327315765-20679-1-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <4F1D5304.3080003@ru.mvista.com>
+Date: Mon, 23 Jan 2012 16:36:29 +0400
+Subject: [PATCH] ARM: GIC: fix non-SMP builds
+In-Reply-To: <1327312291-9457-1-git-send-email-m.szyprowski@samsung.com>
+References: <1327312291-9457-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F1D544D.8030702@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 23-01-2012 14:49, Philippe R?tornaz wrote:
+On 23-01-2012 13:51, Marek Szyprowski wrote:
 
-> Commit 6584cb88 fixed the mxcmmc driver but forgot to fix the
+> This patch fixes the build break introduced by commit db0d4db22. It
 
-    Please also specify that commit's summary in parens. Russell has recently 
-again explained why it's needed.
+    Please also specify the summary of that commit. Russell has recently again 
+explained why it's needed.
 
-> SDMA driver to handle the correct burtsize.
-> This make the SD card access works again with DMA on i.MX31 boards.
+> happen only if SMP support has been disabled:
 
-> Signed-off-by: Philippe R?tornaz<philippe.retornaz@epfl.ch>
-> Tested-by: Sascha Hauer<s.hauer@pengutronix.de>
-> Acked-by: Sascha Hauer<s.hauer@pengutronix.de>
+> arch/arm/common/gic.c: In function 'gic_init_bases':
+> arch/arm/common/gic.c:679: error: implicit declaration of function 'cpu_logical_map'
+> make[1]: *** [arch/arm/common/gic.o] Error 1
+> make: *** [arch/arm/common] Error 2
+
+> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
 
 WBR, Sergei
