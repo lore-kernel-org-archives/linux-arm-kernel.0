@@ -1,100 +1,74 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 23 Jan 2012 17:48:27 -0600
-Subject: How to represent active low ARM GIC interrupts,
- enabled by external inverter?
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178CB81BA2@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF178CB81BA2@HQMAIL01.nvidia.com>
-Message-ID: <4F1DF1CB.20707@gmail.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Mon, 23 Jan 2012 17:59:33 -0600
+Subject: [RFC PATCH 6/7] ARM: mtd: nand: davinci: add OF support for
+ davinci nand controller
+In-Reply-To: <1327308967-8092-7-git-send-email-hs@denx.de>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-7-git-send-email-hs@denx.de>
+Message-ID: <4F1DF465.60206@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2012 03:18 PM, Stephen Warren wrote:
-> I'd like guidance on how to model one aspect of Tegra's interrupt
-> structure.
-> 
-> Tegra has an interrupt input pin for use by a PMU chip.
-> 
-> The PMC HW module within Tegra can optionally invert this signal, but
-> otherwise has no control over it; no interrupt status bits, no masking,
-> etc.
-> 
-> The (potentially inverted) signal is then fed into the ARM GIC, which
-> supports level high or rising edge interrupts only.
-> 
-> So my question is: How to model this.
-> 
-> I assume the best thing to do is have the PMC be an explicit irq_chip,
-> and have its .set_type op configure the inversion based on whether
-> its interrupt source requests low or high, and allow either level or
-> edge.
-> 
-> However, the irq_chip for the PMC couldn't implement any mask or shutdown
-> operation. Is it acceptable to simple provide dummy/no-op functions in
-> that case? I see that kernel/irq/dummychip.c does exactly that, but I'm
-> not sure what use-cases that file is supposed to cover.
-> 
-> That'd result in something like this for device tree:
-> 
-> / {
->     intc: interrupt-controller at 50041000 {
->         compatible = "arm,cortex-a9-gic";
->         /* reg and other properties omitted for brevity throughout */
->         interrupt-controller;
->         /* 
->          * cell 0, 1: interrupt type/ID
->          * cell 2: Linux IRQ flags
->          */
->         #interrupt-cells = <3>;
->     };
->     interrupt-parent = <&intc>;
-> 
->     pmc: interrupt-controller at 7000e400 {
->         compatible = "nvidia,tegra20-pmc";
->         interrupt-controller;
->         /* 
->          * cell 0: interrupt ID (always 0; should we omit this field?)
->          * cell 1: 0=no invert, 1=invert
->          */
->         #interrupt-cells = <2>;
->         /*
->          * Always high. Level or edge of the PMU interrupt output must be
->          * configured here. Or, should it somehow be passed through from
->          * the PMU's client's interrupt specifier?
->          */
->         interrupts = <0 88 0x04>;
->     };
-> 
->     i2c at 7000c000 {
->         compatible = "nvidia,tegra20-i2c";
-> 
->         pmu at xxx {
->             interrupt-parent = <&pmc>;
->             interrupts = <0 1>;
->         }
->     };
-> };
-> 
-> Does that look reasonable?
-> 
-> Other alternatives:
-> 
-> 1) Don't hook the PMC driver and binding into the interrupt tree, but
-> simply have a property that controls the inversion of the signal.
-> The disadvantage is that the PMU's interrupt specifier would need to
-> always specify active high even if it was really active low with inversion
-> activated in the PMC.
+On 01/23/2012 02:56 AM, Heiko Schocher wrote:
+> diff --git a/Documentation/devicetree/bindings/arm/davinci/nand.txt b/Documentation/devicetree/bindings/arm/davinci/nand.txt
+> new file mode 100644
+> index 0000000..7e8d6db
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/davinci/nand.txt
+> @@ -0,0 +1,72 @@
+> +* Texas Instruments Davinci NAND
+> +
+> +This file provides information, what the device node for the
+> +davinci nand interface contain.
+> +
+> +Required properties:
+> +- compatible: "ti,davinci-nand";
+> +- reg : contain 2 offset/length values:
+> +        - offset and length for the access window
+> +        - offset and length for accessing the aemif control registers
+> +- id: id of the controller
 
-I think i would go this route considering it's only a single interrupt
-line and probably just a couple of lines of code to set a bit if a
-property is present.
+What does "id of the controller" mean, specfically?  From this I can't
+even tell if it's a number or a string, much less how to use it
+semantically.  If it's just a "match what's in the manual" thing,
+perhaps an alias would be better here.  Or, if it's a value with a
+specific meaning (e.g. that you need to program into a register) use a
+more specific name.
 
-Rob
+> +Recommended properties :
+> +- mask_ale: mask for ale
+> +- mask_cle: mask for cle
+> +- mask_chipsel: mask for chipselect
+> +- ecc_mode: ECC mode, see NAND_ECC_* defines
+> +- ecc_bits: used ECC bits
+> +- options: nand options, defined in
+> +           include/linux/mtd/nand.h, grep for NAND_NO_AUTOINCR
+> +- bbt_options: NAND_BBT_* defines
 
-> 2) Modify the ARM GIC's driver to allow active low interrupts, and call
-> some plugin code to request any required inversion. Most platforms
-> wouldn't provide such a plugin, and hence would still disallow such
-> requests. The disadvantage here is that it complicates the cross-SoC
-> GIC driver with something that may only be useful for Tegra.
-> 
-> Thanks.
-> 
+Binding-specific properties should have a vendor prefix.  Dashes are
+preferred to underscores.
+
+Don't specify Linux internals by reference -- they could change and
+invalidate existing device trees and non-Linux code that accepts them
+(e.g. U-Boot).  If you want them to line up, copy the definition here,
+and if Linux changes, write glue code to convert.  It would probably be
+better to define specific properties for anything that must be specified
+here (neither deteted dynamically nor defined by compatible =
+"ti,davinci-nand").
+
+Do all of these properties really belong here?  I can see providing some
+information about ECC or BBT mode, if there are multiple conventions
+already in use (or that are reasonably justifiable for different
+situations), as that must agree with how the flash has already been
+programmed.  How much of the rest can vary from one "ti,davinci-nand" to
+another?  Maybe it's obvious to someone more familiar with davinci, but
+what does "mask for ale/cle/chipselect" mean?
+
+> +	nandflash at 3,0 {
+
+PowerPC's ePAPR document -- not directly relevant to ARM, but contains a
+more recently updated list of generic names than the IEEE1275
+recommended pratice -- specifies "flash@".  If you don't want to do
+that, "nand@" is used in many existing trees.  Why introduce a new name?
+
+-Scott
