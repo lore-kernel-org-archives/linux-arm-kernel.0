@@ -1,61 +1,113 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 Jan 2012 11:25:01 +0100
-Subject: [PATCH 3/3] i.MX SDMA: Fix burstsize settings
-In-Reply-To: <1327082304-11398-4-git-send-email-philippe.retornaz@epfl.ch>
-References: <1327082304-11398-1-git-send-email-philippe.retornaz@epfl.ch>
- <1327082304-11398-2-git-send-email-philippe.retornaz@epfl.ch>
- <1327082304-11398-3-git-send-email-philippe.retornaz@epfl.ch>
- <1327082304-11398-4-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20120123102501.GN5446@pengutronix.de>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 23 Jan 2012 15:55:54 +0530
+Subject: [PATCH 1/2] tty: serial: OMAP: ensure FIFO levels are set
+ correctly in non-DMA mode
+In-Reply-To: <CAAL8m4xHzdESmWy8eKwX5-Zb1z8FSRzBxF67bkf=N3JjCL9rBg@mail.gmail.com>
+References: <20120121071934.18707.64258.stgit@dusk>
+ <20120121072737.18707.77811.stgit@dusk>
+ <CAAL8m4xHzdESmWy8eKwX5-Zb1z8FSRzBxF67bkf=N3JjCL9rBg@mail.gmail.com>
+Message-ID: <CAAL8m4z4G0KUSU3072DEBAQ0XEGLmvdQkZNyAva8txaE+_XeOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 06:58:24PM +0100, Philippe R?tornaz wrote:
-> Commit 6584cb88 fixed the mxcmmc driver but forgot to fix the
-> SDMA driver to handle the correct burtsize.
-> This make the SD card access works again with DMA on i.MX31 boards.
-> 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+On Mon, Jan 23, 2012 at 3:51 PM, Govindraj <govindraj.ti@gmail.com> wrote:
+> On Sat, Jan 21, 2012 at 12:57 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>> Ensure FIFO levels are set correctly in non-DMA mode (the default).
+>> This patch will cause a receive FIFO threshold interrupt to be raised when
+>> there is at least one byte in the RX FIFO. ?It will also cause a transmit
+>> FIFO threshold interrupt when there is only one byte remaining in the TX
+>> FIFO.
+>>
+>> These changes fix the receive interrupt problem and part of the
+>> transmit interrupt problem. ?A separate set of issues must be worked
+>> around for the transmit path to have a basic level of functionality; a
+>> subsequent patch will address these.
+>>
+>> DMA operation is unaffected by this patch.
+>>
+>> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+>> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>> Cc: Govindraj Raja <govindraj.r@ti.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> ---
+>> ?drivers/tty/serial/omap-serial.c | ? 35 +++++++++++++++++++++++++++++++----
+>> ?1 files changed, 31 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+>> index d192dcb..9de7d71 100644
+>> --- a/drivers/tty/serial/omap-serial.c
+>> +++ b/drivers/tty/serial/omap-serial.c
+>> @@ -46,6 +46,18 @@
+>>
+>> ?#define DEFAULT_CLK_SPEED 48000000 /* 48Mhz*/
+>>
+>> +/* SCR register bitmasks */
+>> +#define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK ? ? ? ? ? ? ?(1 << 7)
+>> +#define OMAP_UART_SCR_TX_TRIG_GRANU1_MASK ? ? ? ? ? ? ?(1 << 6)
+>> +
+>> +/* FCR register bitmasks */
+>> +#define OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT ? ? ? ? ? ? ? 6
+>> +#define OMAP_UART_FCR_RX_FIFO_TRIG_MASK ? ? ? ? ? ? ? ? ? ? ? ?(0x3 << 6)
+>> +#define OMAP_UART_FCR_TX_FIFO_TRIG_SHIFT ? ? ? ? ? ? ? 4
+>> +
+>> +/* TLR register bitmasks */
+>> +#define OMAP_UART_TLR_TX_FIFO_TRIG_DMA_SHIFT ? ? ? ? ? 0
+>> +
+>> ?static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+>>
+>> ?/* Forward declaration of functions */
+>> @@ -694,6 +706,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+>> ? ? ? ?unsigned char efr = 0;
+>> ? ? ? ?unsigned long flags = 0;
+>> ? ? ? ?unsigned int baud, quot;
+>> + ? ? ? u32 tlr;
+>>
+>> ? ? ? ?switch (termios->c_cflag & CSIZE) {
+>> ? ? ? ?case CS5:
+>> @@ -811,14 +824,28 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+>> ? ? ? ?up->mcr = serial_in(up, UART_MCR);
+>> ? ? ? ?serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
+>> ? ? ? ?/* FIFO ENABLE, DMA MODE */
+>> - ? ? ? serial_out(up, UART_FCR, up->fcr);
+>> - ? ? ? serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+>> +
+>> + ? ? ? up->scr |= OMAP_UART_SCR_TX_TRIG_GRANU1_MASK;
+>> + ? ? ? up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
+>>
+>> ? ? ? ?if (up->use_dma) {
+>> - ? ? ? ? ? ? ? serial_out(up, UART_TI752_TLR, 0);
+>> - ? ? ? ? ? ? ? up->scr |= (UART_FCR_TRIGGER_4 | UART_FCR_TRIGGER_8);
+>
+> Any reasons for removing scr config for dma mode ?
+>
 
-Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Please ignore.. was in hurry.
 
-Please resend this patch With Cc: Vinod Koul <vinod.koul@intel.com> as
-a single patch, not part of a series.
 
-Sascha
-
-> ---
->  drivers/dma/imx-sdma.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index f993955..c193dac 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1095,11 +1095,13 @@ static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  	case DMA_SLAVE_CONFIG:
->  		if (dmaengine_cfg->direction == DMA_FROM_DEVICE) {
->  			sdmac->per_address = dmaengine_cfg->src_addr;
-> -			sdmac->watermark_level = dmaengine_cfg->src_maxburst;
-> +			sdmac->watermark_level = dmaengine_cfg->src_maxburst *
-> +						dmaengine_cfg->src_addr_width;
->  			sdmac->word_size = dmaengine_cfg->src_addr_width;
->  		} else {
->  			sdmac->per_address = dmaengine_cfg->dst_addr;
-> -			sdmac->watermark_level = dmaengine_cfg->dst_maxburst;
-> +			sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
-> +						dmaengine_cfg->dst_addr_width;
->  			sdmac->word_size = dmaengine_cfg->dst_addr_width;
->  		}
->  		return sdma_config_channel(sdmac);
-> -- 
-> 1.6.3.3
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+>> + ? ? ? ? ? ? ? tlr = 0;
+>> + ? ? ? } else {
+>> + ? ? ? ? ? ? ? up->scr &= ~OMAP_UART_SCR_TX_EMPTY;
+>> +
+>> + ? ? ? ? ? ? ? /* Set receive FIFO threshold to 1 */
+>> + ? ? ? ? ? ? ? up->fcr &= ~OMAP_UART_FCR_RX_FIFO_TRIG_MASK;
+>> + ? ? ? ? ? ? ? up->fcr |= (0x1 << OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT);
+>> +
+>> + ? ? ? ? ? ? ? /* Set TX FIFO threshold to "63" (actually 1) */
+>> + ? ? ? ? ? ? ? up->fcr |= (0x3 << OMAP_UART_FCR_TX_FIFO_TRIG_SHIFT);
+>> + ? ? ? ? ? ? ? tlr = (0xf << OMAP_UART_TLR_TX_FIFO_TRIG_DMA_SHIFT);
+>> ? ? ? ?}
+>>
+>> + ? ? ? serial_out(up, UART_TI752_TLR, tlr);
+>> + ? ? ? serial_out(up, UART_FCR, up->fcr);
+>> + ? ? ? serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+>> +
+>> ? ? ? ?serial_out(up, UART_OMAP_SCR, up->scr);
+>>
+>> ? ? ? ?serial_out(up, UART_EFR, up->efr);
+>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
