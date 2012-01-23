@@ -1,76 +1,166 @@
-From: zbr@ioremap.net (Evgeniy Polyakov)
-Date: Mon, 23 Jan 2012 18:07:53 +0300
-Subject: [PATCH] W1: OMAP HDQ1W: use 32-bit register accesses
-In-Reply-To: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
-Message-ID: <20120123150753.GA21395@ioremap.net>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Mon, 23 Jan 2012 20:22:47 +0530
+Subject: [PATCH 1/3] arm:davinci: prepare to move aemif driver to drivers/mfd
+Message-ID: <1327330367-4025-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul
+Patch moves emif header file appropriately as a part preparation to move emif
+driver from arch/arm/mach-davinci/ to drivers/mfd folder.
+There by it isolates modifications in emif interface depicting as platform code
+change.
 
-Patchset looks good, feel free to add my ack
+Patch series are based on the discussion and concerns expressed in
+davinci-linux-open-source community. Here is the link for the same:
+http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
 
-On Sun, Jan 22, 2012 at 01:26:23PM -0700, Paul Walmsley (paul at pwsan.com) wrote:
-> 
-> HDQ/1-wire registers are 32 bits long, even if the register contents
-> fit into 8 bits, so accesses must be 32-bit aligned.  Evidently the
-> OMAP2/3 interconnects allowed the driver to get away with 8 bit accesses,
-> but the OMAP4 puts a stop to that:
-> 
-> [    1.488800] Driver for 1-wire Dallas network protocol.
-> [    1.495025] Bad mode in data abort handler detected
-> [    1.500122] Internal error: Oops - bad mode: 0 [#1] SMP
-> [    1.505615] Modules linked in:
-> [    1.508819] CPU: 0    Not tainted  (3.3.0-rc1-00008-g45030e9 #992)
-> [    1.515289] PC is at 0xffff0018
-> [    1.518615] LR is at omap_hdq_probe+0xd4/0x2cc
-> 
-> The OMAP4430 ES2 Rev X TRM does warn about this restriction in section 
-> 23.2.6.2 "HDQ/1-Wire Registers".
-> 
-> Fixes the crash on OMAP4430 ES2 Pandaboard.  Tested also on OMAP34xx and 
-> OMAP2420; it seems to work fine on those chips, although due to the lack 
-> of boards with HDQ/1-wire devices here, a more indepth test was not 
-> possible.
-> 
-> ---
-> Intended for the v3.4 merge window.
-> 
->  drivers/w1/masters/omap_hdq.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/w1/masters/omap_hdq.c b/drivers/w1/masters/omap_hdq.c
-> index 63e3eda..291897c 100644
-> --- a/drivers/w1/masters/omap_hdq.c
-> +++ b/drivers/w1/masters/omap_hdq.c
-> @@ -100,20 +100,20 @@ static struct w1_bus_master omap_w1_master = {
->  /* HDQ register I/O routines */
->  static inline u8 hdq_reg_in(struct hdq_data *hdq_data, u32 offset)
->  {
-> -	return __raw_readb(hdq_data->hdq_base + offset);
-> +	return __raw_readl(hdq_data->hdq_base + offset);
->  }
->  
->  static inline void hdq_reg_out(struct hdq_data *hdq_data, u32 offset, u8 val)
->  {
-> -	__raw_writeb(val, hdq_data->hdq_base + offset);
-> +	__raw_writel(val, hdq_data->hdq_base + offset);
->  }
->  
->  static inline u8 hdq_reg_merge(struct hdq_data *hdq_data, u32 offset,
->  			u8 val, u8 mask)
->  {
-> -	u8 new_val = (__raw_readb(hdq_data->hdq_base + offset) & ~mask)
-> +	u8 new_val = (__raw_readl(hdq_data->hdq_base + offset) & ~mask)
->  			| (val & mask);
-> -	__raw_writeb(new_val, hdq_data->hdq_base + offset);
-> +	__raw_writel(new_val, hdq_data->hdq_base + offset);
->  
->  	return new_val;
->  }
-> -- 
-> 1.7.8.3
+Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+---
+ arch/arm/mach-davinci/aemif.c              |    2 +-
+ arch/arm/mach-davinci/board-da830-evm.c    |    2 +-
+ arch/arm/mach-davinci/board-da850-evm.c    |    2 +-
+ arch/arm/mach-davinci/include/mach/aemif.h |   36 ----------------------------
+ drivers/mtd/nand/davinci_nand.c            |    2 +-
+ include/linux/mfd/davinci_aemif.h          |   36 ++++++++++++++++++++++++++++
+ 6 files changed, 40 insertions(+), 40 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/aemif.h
+ create mode 100644 include/linux/mfd/davinci_aemif.h
 
+diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
+index 1ce70a9..b67c115 100644
+--- a/arch/arm/mach-davinci/aemif.c
++++ b/arch/arm/mach-davinci/aemif.c
+@@ -15,7 +15,7 @@
+ #include <linux/module.h>
+ #include <linux/time.h>
+ 
+-#include <mach/aemif.h>
++#include <linux/mfd/davinci_aemif.h>
+ 
+ /* Timing value configuration */
+ 
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index dc1afe5..0b43554 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -31,7 +31,7 @@
+ #include <mach/nand.h>
+ #include <mach/da8xx.h>
+ #include <mach/usb.h>
+-#include <mach/aemif.h>
++#include <linux/mfd/davinci_aemif.h>
+ #include <mach/spi.h>
+ 
+ #define DA830_EVM_PHY_ID		""
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 6b22b54..6dda013 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -41,7 +41,7 @@
+ #include <mach/da8xx.h>
+ #include <mach/nand.h>
+ #include <mach/mux.h>
+-#include <mach/aemif.h>
++#include <linux/mfd/davinci_aemif.h>
+ #include <mach/spi.h>
+ 
+ #define DA850_EVM_PHY_ID		"0:00"
+diff --git a/arch/arm/mach-davinci/include/mach/aemif.h b/arch/arm/mach-davinci/include/mach/aemif.h
+deleted file mode 100644
+index 05b2934..0000000
+--- a/arch/arm/mach-davinci/include/mach/aemif.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- * TI DaVinci AEMIF support
+- *
+- * Copyright 2010 (C) Texas Instruments, Inc. http://www.ti.com/
+- *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2. This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
+- */
+-#ifndef _MACH_DAVINCI_AEMIF_H
+-#define _MACH_DAVINCI_AEMIF_H
+-
+-#define NRCSR_OFFSET		0x00
+-#define AWCCR_OFFSET		0x04
+-#define A1CR_OFFSET		0x10
+-
+-#define ACR_ASIZE_MASK		0x3
+-#define ACR_EW_MASK		BIT(30)
+-#define ACR_SS_MASK		BIT(31)
+-
+-/* All timings in nanoseconds */
+-struct davinci_aemif_timing {
+-	u8	wsetup;
+-	u8	wstrobe;
+-	u8	whold;
+-
+-	u8	rsetup;
+-	u8	rstrobe;
+-	u8	rhold;
+-
+-	u8	ta;
+-};
+-
+-int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
+-					void __iomem *base, unsigned cs);
+-#endif
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index 6e56615..f19151b 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -35,7 +35,7 @@
+ #include <linux/slab.h>
+ 
+ #include <mach/nand.h>
+-#include <mach/aemif.h>
++#include <linux/mfd/davinci_aemif.h>
+ 
+ /*
+  * This is a device driver for the NAND flash controller found on the
+diff --git a/include/linux/mfd/davinci_aemif.h b/include/linux/mfd/davinci_aemif.h
+new file mode 100644
+index 0000000..05b2934
+--- /dev/null
++++ b/include/linux/mfd/davinci_aemif.h
+@@ -0,0 +1,36 @@
++/*
++ * TI DaVinci AEMIF support
++ *
++ * Copyright 2010 (C) Texas Instruments, Inc. http://www.ti.com/
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2. This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++#ifndef _MACH_DAVINCI_AEMIF_H
++#define _MACH_DAVINCI_AEMIF_H
++
++#define NRCSR_OFFSET		0x00
++#define AWCCR_OFFSET		0x04
++#define A1CR_OFFSET		0x10
++
++#define ACR_ASIZE_MASK		0x3
++#define ACR_EW_MASK		BIT(30)
++#define ACR_SS_MASK		BIT(31)
++
++/* All timings in nanoseconds */
++struct davinci_aemif_timing {
++	u8	wsetup;
++	u8	wstrobe;
++	u8	whold;
++
++	u8	rsetup;
++	u8	rstrobe;
++	u8	rhold;
++
++	u8	ta;
++};
++
++int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
++					void __iomem *base, unsigned cs);
++#endif
 -- 
-	Evgeniy Polyakov
+1.7.1
