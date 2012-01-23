@@ -1,112 +1,143 @@
-From: k.lewandowsk@samsung.com (Karol Lewandowski)
-Date: Mon, 23 Jan 2012 18:50:22 +0100
-Subject: [PATCH v2 2/2] regulator: add device tree support for max8997
-In-Reply-To: <1326353738-26864-3-git-send-email-thomas.abraham@linaro.org>
-References: <1326353738-26864-1-git-send-email-thomas.abraham@linaro.org>
- <1326353738-26864-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F1D9DDE.2070106@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Jan 2012 17:52:10 +0000
+Subject: [PATCH] ARM: realview: fix mapping of MPCore private memory region
+Message-ID: <1327341130-23332-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.01.2012 08:35, Thomas Abraham wrote:
+Since commit 0536bdf33faf (ARM: move iotable mappings within
+the vmalloc region), the RealView PB11MP cannot boot anymore.
 
-Hi!
+This is caused by the way the mappings are described on this
+platform (define replaced by hex values for clarity):
 
-> Add device tree based discovery support for max8997.
+{	/* GIC CPU interface mapping */
+        .virtual        = IO_ADDRESS(0x1F000100),
+        .pfn            = __phys_to_pfn(0x1F000100),
+        .length         = SZ_4K,
+        .type           = MT_DEVICE,
+}, {	/* GIC distributor mapping */
+        .virtual        = IO_ADDRESS(0x1F001000),
+        .pfn            = __phys_to_pfn(0x1F001000),
+        .length         = SZ_4K,
+        .type           = MT_DEVICE,
+}
 
-> +static int max8997_pmic_dt_parse_pdata(struct max8997_dev *iodev,
-> +					struct max8997_platform_data *pdata)
-> +{
-...
-> +	pdata->regulators = rdata;
-> +	for_each_child_of_node(regulators_np, reg_np) {
-> +		for (i = 0; i<  ARRAY_SIZE(regulators); i++)
-> +			if (!of_node_cmp(reg_np->name, regulators[i].name))
-> +				break;
+The first mapping ends up reserving two pages, and clashes with
+the second one, which triggers a BUG_ON in vm_area_add_early().
 
-If I read your patch correctly it would impossible to configure 
-following outputs when pmic is instantiated from DT:
+In order to solve this problem, treat the MPCore private memory
+region (containing the SCU, the GIC and the TWD) as a single region,
+as described in the TRM:
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/CACGDJJC.html
 
-     enum max8998_regulators {
-     ...
-  1    MAX8997_EN32KHZ_AP,
-  2    MAX8997_EN32KHZ_CP,
-  3    MAX8997_CHARGER_CV,
-  4    MAX8997_CHARGER_TOPOFF, /* MBCCTRL5 */
+The EB11MP is converted the same way, even if it manages to avoid
+the problem.
 
-This is due to use of embedded spaces in regulator names (which are used 
-in comparision).
+Tested on both PB11MP and EB11MP.
 
-This can be fixed with trivial patch[1].
-
-What bothers me more, are following regulators:
-
-       MAX8997_EN32KHZ_AP,
-       MAX8997_EN32KHZ_CP,
-       MAX8997_ENVICHG,
-       MAX8997_ESAFEOUT1,
-       MAX8997_ESAFEOUT2,
-
-Aren't these fixed? i.e. - is it really needed to configure these either 
-by platform data or DT at all?
-
-
-[1]
-
- From 5cfba526210bc596c7d14e33fea93648baa0a227 Mon Sep 17 00:00:00 2001
-From: Karol Lewandowski <k.lewandowsk@samsung.com>
-Date: Mon, 23 Jan 2012 17:20:25 +0100
-Subject: [PATCH] max8997: Avoid spaces in regulator names
-
-max8997-pmic instantiated from device tree uses names,
-not numerical ids to distinguish between outputs.
-
-Use names without spaces to make it possible to specify
-parameters for said regulators in DTS.
-
-Signed-off-by: Karol Lewandowski <k.lewandowsk@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-  drivers/regulator/max8997.c |    8 ++++----
-  1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-realview/include/mach/board-eb.h     |   18 ++++++++++--------
+ arch/arm/mach-realview/include/mach/board-pb11mp.h |    2 ++
+ arch/arm/mach-realview/realview_eb.c               |   11 +++--------
+ arch/arm/mach-realview/realview_pb11mp.c           |   13 ++++---------
+ 4 files changed, 19 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/regulator/max8997.c b/drivers/regulator/max8997.c
-index 053d0b7..4b572eb 100644
---- a/drivers/regulator/max8997.c
-+++ b/drivers/regulator/max8997.c
-@@ -910,13 +910,13 @@ static struct regulator_desc regulators[] = {
-         },
-         regulator_desc_buck(7),
-         {
--               .name   = "EN32KHz AP",
-+               .name   = "EN32KHz_AP",
-                 .id     = MAX8997_EN32KHZ_AP,
-                 .ops    = &max8997_fixedvolt_ops,
-                 .type   = REGULATOR_VOLTAGE,
-                 .owner  = THIS_MODULE,
-         }, {
--               .name   = "EN32KHz CP",
-+               .name   = "EN32KHz_CP",
-                 .id     = MAX8997_EN32KHZ_CP,
-                 .ops    = &max8997_fixedvolt_ops,
-                 .type   = REGULATOR_VOLTAGE,
-@@ -940,7 +940,7 @@ static struct regulator_desc regulators[] = {
-                 .type   = REGULATOR_VOLTAGE,
-                 .owner   = THIS_MODULE,
-         }, {
--               .name   = "CHARGER CV",
-+               .name   = "CHARGER_CV",
-                 .id     = MAX8997_CHARGER_CV,
-                 .ops    = &max8997_fixedstate_ops,
-                 .type   = REGULATOR_VOLTAGE,
-@@ -952,7 +952,7 @@ static struct regulator_desc regulators[] = {
-                 .type   = REGULATOR_CURRENT,
-                 .owner   = THIS_MODULE,
-         }, {
--               .name   = "CHARGER TOPOFF",
-+               .name   = "CHARGER_TOPOFF",
-                 .id     = MAX8997_CHARGER_TOPOFF,
-                 .ops    = &max8997_charger_fixedstate_ops,
-                 .type   = REGULATOR_CURRENT,
+diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/include/mach/board-eb.h
+index 794a8d9..124bce6 100644
+--- a/arch/arm/mach-realview/include/mach/board-eb.h
++++ b/arch/arm/mach-realview/include/mach/board-eb.h
+@@ -47,21 +47,23 @@
+ #define REALVIEW_EB_USB_BASE		0x4F000000	/* USB */
+ 
+ #ifdef CONFIG_REALVIEW_EB_ARM11MP_REVB
+-#define REALVIEW_EB11MP_SCU_BASE	0x10100000	/* SCU registers */
+-#define REALVIEW_EB11MP_GIC_CPU_BASE	0x10100100	/* Generic interrupt controller CPU interface */
+-#define REALVIEW_EB11MP_TWD_BASE	0x10100600
+-#define REALVIEW_EB11MP_GIC_DIST_BASE	0x10101000	/* Generic interrupt controller distributor */
++#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x1F000000
+ #define REALVIEW_EB11MP_L220_BASE	0x10102000	/* L220 registers */
+ #define REALVIEW_EB11MP_SYS_PLD_CTRL1	0xD8		/* Register offset for MPCore sysctl */
+ #else
+-#define REALVIEW_EB11MP_SCU_BASE	0x1F000000	/* SCU registers */
+-#define REALVIEW_EB11MP_GIC_CPU_BASE	0x1F000100	/* Generic interrupt controller CPU interface */
+-#define REALVIEW_EB11MP_TWD_BASE	0x1F000600
+-#define REALVIEW_EB11MP_GIC_DIST_BASE	0x1F001000	/* Generic interrupt controller distributor */
++#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x1F000000
+ #define REALVIEW_EB11MP_L220_BASE	0x1F002000	/* L220 registers */
+ #define REALVIEW_EB11MP_SYS_PLD_CTRL1	0x74		/* Register offset for MPCore sysctl */
+ #endif
+ 
++#define REALVIEW_EB11MP_PRIV_MEM_SIZE	SZ_8K
++#define REALVIEW_EB11MP_PRIV_MEM_OFF(x)	(REALVIEW_EB11MP_PRIV_MEM_BASE + (x))
++
++#define REALVIEW_EB11MP_SCU_BASE	REALVIEW_EB11MP_PRIV_MEM_OFF(0)		/* SCU registers */
++#define REALVIEW_EB11MP_GIC_CPU_BASE	REALVIEW_EB11MP_PRIV_MEM_OFF(0x0100)	/* Generic interrupt controller CPU interface */
++#define REALVIEW_EB11MP_TWD_BASE	REALVIEW_EB11MP_PRIV_MEM_OFF(0x0600)
++#define REALVIEW_EB11MP_GIC_DIST_BASE	REALVIEW_EB11MP_PRIV_MEM_OFF(0x1000)	/* Generic interrupt controller distributor */
++
+ /*
+  * Core tile identification (REALVIEW_SYS_PROCID)
+  */
+diff --git a/arch/arm/mach-realview/include/mach/board-pb11mp.h b/arch/arm/mach-realview/include/mach/board-pb11mp.h
+index 7abf918..aa2d4e0 100644
+--- a/arch/arm/mach-realview/include/mach/board-pb11mp.h
++++ b/arch/arm/mach-realview/include/mach/board-pb11mp.h
+@@ -75,6 +75,8 @@
+ /*
+  * Testchip peripheral and fpga gic regions
+  */
++#define REALVIEW_TC11MP_PRIV_MEM_BASE		0x1F000000
++#define REALVIEW_TC11MP_PRIV_MEM_SIZE		SZ_8K
+ #define REALVIEW_TC11MP_SCU_BASE		0x1F000000	/* IRQ, Test chip */
+ #define REALVIEW_TC11MP_GIC_CPU_BASE		0x1F000100	/* Test chip interrupt controller CPU interface */
+ #define REALVIEW_TC11MP_TWD_BASE		0x1F000600
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index e629621..9578145 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -91,14 +91,9 @@ static struct map_desc realview_eb_io_desc[] __initdata = {
+ 
+ static struct map_desc realview_eb11mp_io_desc[] __initdata = {
+ 	{
+-		.virtual	= IO_ADDRESS(REALVIEW_EB11MP_SCU_BASE),
+-		.pfn		= __phys_to_pfn(REALVIEW_EB11MP_SCU_BASE),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= IO_ADDRESS(REALVIEW_EB11MP_GIC_DIST_BASE),
+-		.pfn		= __phys_to_pfn(REALVIEW_EB11MP_GIC_DIST_BASE),
+-		.length		= SZ_4K,
++		.virtual	= IO_ADDRESS(REALVIEW_EB11MP_PRIV_MEM_BASE),
++		.pfn		= __phys_to_pfn(REALVIEW_EB11MP_PRIV_MEM_BASE),
++		.length		= REALVIEW_EB11MP_PRIV_MEM_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= IO_ADDRESS(REALVIEW_EB11MP_L220_BASE),
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index 127a3fd..2147335 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -64,15 +64,10 @@ static struct map_desc realview_pb11mp_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(REALVIEW_PB11MP_GIC_DIST_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= IO_ADDRESS(REALVIEW_TC11MP_GIC_CPU_BASE),
+-		.pfn		= __phys_to_pfn(REALVIEW_TC11MP_GIC_CPU_BASE),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= IO_ADDRESS(REALVIEW_TC11MP_GIC_DIST_BASE),
+-		.pfn		= __phys_to_pfn(REALVIEW_TC11MP_GIC_DIST_BASE),
+-		.length		= SZ_4K,
++	}, {	/* Maps the SCU, GIC CPU interface, TWD, GIC DIST */
++		.virtual	= IO_ADDRESS(REALVIEW_TC11MP_PRIV_MEM_BASE),
++		.pfn		= __phys_to_pfn(REALVIEW_TC11MP_PRIV_MEM_BASE),
++		.length		= REALVIEW_TC11MP_PRIV_MEM_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= IO_ADDRESS(REALVIEW_SCTL_BASE),
 -- 
-1.7.8.3
+1.7.7.1
