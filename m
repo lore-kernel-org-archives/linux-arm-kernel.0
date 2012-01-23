@@ -1,67 +1,185 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 23 Jan 2012 12:48:54 -0700 (MST)
-Subject: omap-serial RX DMA polling?
-In-Reply-To: <CAAL8m4wBuFQYkyFUwNWrUZTBWuQHggy=y3Oi=6DBHNB_rqU9tA@mail.gmail.com>
-References: <alpine.DEB.2.00.1201221718190.26641@utopia.booyaka.com>
- <CAAL8m4wcSfhjxg0Lyo-W7DQ85rikb6asRds95hwQQNTDXe2YKQ@mail.gmail.com>
- <alpine.DEB.2.00.1201230304310.29673@utopia.booyaka.com>
- <CAAL8m4wBuFQYkyFUwNWrUZTBWuQHggy=y3Oi=6DBHNB_rqU9tA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1201231228310.29673@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 23 Jan 2012 12:13:12 -0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB45E@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <20120116182808.GG4223@ponder.secretlab.ca>
+ <20120118141329.GA22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1780DAAEBB@HQMAIL01.nvidia.com>
+ <20120119105728.GE22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1780DAB45E@HQMAIL01.nvidia.com>
+Message-ID: <20120123201304.GB4420@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Jan 2012, Govindraj wrote:
+* Stephen Warren <swarren@nvidia.com> [120120 12:20]:
+> Tony wrote at Lindgren:
+> > * Stephen Warren <swarren@nvidia.com> [120118 11:29]:
+> > > Tony Lindgren wrote at Wednesday, January 18, 2012 7:13 AM:
+> > 
+> > Assuming this is describing the pins a driver is using, how
+> > about calling it pins?
+> 
+> It's not always pins.
+> 
+> For a lot of HW it is pins, you're right.
+> 
+> For Tegra20 (and IIRC some other HW), the pin mux HW actually muxes
+> groups of pins; one register field sets n (1, 2, 3, ...) pins to that
+> function at once. Hence, the entries are real physical groups.
 
-> On Mon, Jan 23, 2012 at 4:17 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> > On Mon, 23 Jan 2012, Govindraj wrote:
-> >
-> >> On Mon, Jan 23, 2012 at 6:03 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> >> >
-> >> > while trying to track down some of the serial-related PM issues in
-> >> > v3.3-rc1, I noticed that the omap-serial.c driver sets a 1 microsecond
-> >> > polling timer when DMA is enabled (uart_dma.rx_timer) (!) ?This seems
-> >> > quite broken from both the DMA and PM points of view.
-> >>
-> >> Poll rate is used for doing tty_insert_flip_string for pushing data to
-> >> user space to keep faster response to any client device over uart, some
-> >> Bt chips expect faster response when data on uart arrives and packet
-> >> should be pushed out immediately.
-> >
-> > Hmm. ?Let's say that the BT transceiver uses the fastest transmission rate
-> > supported by the OMAP UARTs -- 3,686,400 bits per second, according to
-> > Table 17-1 in the 34xx TRM vZR. ?So the RX poll timer would go off about
-> > ~2.7 times per input character[1]. ?That seems like overkill...
-> 
-> Yes correct, Looks like the poll rate is to aggressive
-> it should be calculated based on baud rate provided from user apace
-> in termios function.
-> 
-> I had a patch to do the same in termios but,
-> if you have something similar you can post out as I am currently busy with
-> some other activities and may take more time.
-> 
-> > For minimum receive latency, how about calling tty_insert_flip_string()
-> > from the RX DMA callback, and using a smaller transfer count? ?Or even
-> > better, use PIO for the receive path and set the RX FIFO threshold to 1?
-> >
-> > No poll timer should be needed in either case.
-> 
-> I remember doing similar excercise with BT + uart on zoom board
-> but performance numbers where impacted.
-> 
-> I made buffer size as 1 byte and removed polling function and got rx_callback
-> for every byte completion and pushed same to tty layer.
-> 
-> BT FTP throughput got impacted a lot.
+OK fair enough, mux instead of pins works fine for me.
+ 
+> For some HW that controls the mux per pin, the SoC vendors wish the
+> pinctrl driver to expose what I call "virtual groups" of pins, e.g. all
+> the pins that are typically used together as a single I2C or SD/MMC
+> interface, as a single muxable entity (a group in pinctrl parlance).
+> In this case, the values listed here will be these group IDs
 
-The point is that if you want tty_insert_flip_string() to be called after 
-every character is received, there seems little point in using RX DMA.  
-It should be less efficient than PIO.  And the current way that it is used 
-is pointless from a power management point of view.
+For the virtual groups, do you also want to specify them separate
+in the .dts files?
 
-In general, RX DMA would seem to be inappropriate for a latency-sensitive 
-application, unless the application can somehow communicate how many bytes 
-it's expecting so the driver can adjust its DMA transfer size.
+IMHO we should let device tree take care of that as it already
+allows specifying the pins for each device entry. Then the
+dynamically generated group name can be nc->full_name of the
+device.
 
+But other than that, I don't know if there's need to specify
+pingroups in the .dts files outside the device node using the
+pins?
+ 
+> > That's because you might want to do all the muxing in a
+> > bootloader, but still need to tell how many pins you're using
+> > for MMC on a device. So it actually has a wider meaning than just
+> > mux.
+> 
+> I don't think that affects the name of the property:-)
 
-- Paul
+Yes mux for the name works fine there too.
+ 
+> I see your point about separate ownership of pins/groups and the actual
+> HW register programming. The pinctrl subsystem doesn't have a concept
+> of separating those two things at the moment though. I don't think its
+> unreasonable to still have to write the mux values into the device tree
+> and even reprogram them to the same value when Linux boots though. Do
+> you see a problem with that? If there is a problem, we need to fix it
+> in pinctrl too, irrespective of any device tree work.
+
+Yeah I think we can handle some pinmuxing cases automatically.
+But basically we need to support also the following typical cases:
+
+1. Static muxing in bootloader only and no mux entries in the .dts files
+
+2. Init time only muxing based on the entries in .dts files
+
+3. Dynamic remuxing of pins for the pins specified in the .dts files
+
+For the last one we need to do some extra work to avoid wasting memory,
+and need some pin specific flag to describe if the pin is init time only
+or dynamic.
+
+> > Also, we need to standardize on some name to use for parsing pins
+> > using of_parse_phandle_with_args, and I suggested #pin-args.
+> 
+> "cells" is the suffix that's typically used rather than "args".
+
+OK
+ 
+> I certainly foresee the need for a #mux-cells and a #config-cells
+> Property so that pinctrl bindings/nodes can tell the core parser of
+> the mux/config properties how many cells to pull out for each entry.
+> 
+> In my binding proposal, I original assumed that every controller would
+> always have group,function for mux and group,param,value for config.
+> However, having #mux-cells and #config-cells is certainly a better idea.
+> 
+> > >     config =
+> > >         <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
+> > >         <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
+> > >         <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >         <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> > >         <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+> > >         <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+> > > };
+> > 
+> > Here I don't quite understand how config is different from pins/mux
+> > above? It seems to set the driver/pull stuff, but why don't you
+> > just make #pin-args larger and have a wider pin array?
+> 
+> The idea is that "mux" lists each pin/group that the device uses, and
+> the pin mux selection for it, whereas "config" lists all the other
+> configuration values that could be applied to a pin; pull-up, pull-down,
+> tri-state, drive strength, ...
+> 
+> I suppose we could lump all those into a single property like:
+> 
+> pinctrl =
+>     <MUX &tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+>     <MUX &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>
+>     <CFG &tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
+>     <CFG &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>
+>     <CFG &tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+>     <CFG &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+>     <CFG &tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
+>     <CFG &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
+> 
+> (where e.g. MUX=0, CFG=1, both interpreted by the parsing code in the
+> core pinctrl subsystem)
+> 
+> However, I'd tend towards keeping them in separate properties, especially
+> since simple chips won't have any CFG (even on Tegra, 99% of the settings
+> we make are MUX not CFG) and requiring this MUX value in every mux entry
+> seems wasteful.
+> 
+> > Something like:
+> > 
+> > 	pins =
+> > 	<&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1 TEGRA_PMX_CONF_TRISTATE 1
+> > 	 &tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1 TEGRA_PMX_CONF_TRISTATE 1>;
+> > 
+> > and in the parent set #pin-args to 3.
+> 
+> That doesn't support setting a variable number of config values per pin/
+> group. Tegra30 has 13 define TEGRA_PMX_CONF_* values, and requiring every
+> one of those to be set for every pin/group would be a bit unwieldy,
+> especially since 99% of the time we just rely on the HW defaults, and I
+> imagine many other SoCs are the same.
+
+But aren't these 13 defines for TEGRA_PMX_CONF_* just bit offsets in some
+register?
+
+If so, why don't you just have one register to define the values? Then when
+the preprocessing of .dts files works, you can use defines there?
+
+Even if you had multiple registers per pin(group), you just need the
+phandle and value for each register?
+ 
+> > > (Note that I think we've agreed to remove the first cell above, &tegra_pmx,
+> > > now by requiring such nodes exist as children of the pin controller.)
+> > 
+> > Sorry I don't quite follow, can you please maybe repost a complete
+> > .dts entry for your pin controller and one driver entry?
+> 
+> Yes, I'll try to do that very soon. The change is simple; from:
+> 
+> mux =
+>     <&tegra_pmx TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+>     <&tegra_pmx TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
+> 
+> 
+> to:
+> 
+> mux =
+>     <TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_1>
+>     <TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_1>;
+> 
+> We can do this by requiring the node that contains the mux property to
+> be a child of the pin controller node, so the phandle value is always
+> the node's parent node.
+
+Ah I see. I don't think we can leave out the phandle as that will
+not work for mixing pins from multiple pin controller instances.
+
+Regards,
+
+Tony
