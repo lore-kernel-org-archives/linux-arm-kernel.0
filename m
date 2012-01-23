@@ -1,42 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 23 Jan 2012 03:47:23 -0700 (MST)
-Subject: omap-serial RX DMA polling?
-In-Reply-To: <CAAL8m4wcSfhjxg0Lyo-W7DQ85rikb6asRds95hwQQNTDXe2YKQ@mail.gmail.com>
-References: <alpine.DEB.2.00.1201221718190.26641@utopia.booyaka.com>
- <CAAL8m4wcSfhjxg0Lyo-W7DQ85rikb6asRds95hwQQNTDXe2YKQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1201230304310.29673@utopia.booyaka.com>
+From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Mon, 23 Jan 2012 11:49:25 +0100
+Subject: [PATCH 1/1] i.MX SDMA: Fix burstsize settings
+In-Reply-To: <20120123102501.GN5446@pengutronix.de>
+References: <20120123102501.GN5446@pengutronix.de>
+Message-ID: <1327315765-20679-1-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Jan 2012, Govindraj wrote:
+Commit 6584cb88 fixed the mxcmmc driver but forgot to fix the
+SDMA driver to handle the correct burtsize.
+This make the SD card access works again with DMA on i.MX31 boards.
 
-> On Mon, Jan 23, 2012 at 6:03 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> >
-> > while trying to track down some of the serial-related PM issues in
-> > v3.3-rc1, I noticed that the omap-serial.c driver sets a 1 microsecond
-> > polling timer when DMA is enabled (uart_dma.rx_timer) (!) ?This seems
-> > quite broken from both the DMA and PM points of view.
-> 
-> Poll rate is used for doing tty_insert_flip_string for pushing data to 
-> user space to keep faster response to any client device over uart, some 
-> Bt chips expect faster response when data on uart arrives and packet 
-> should be pushed out immediately.
+Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/dma/imx-sdma.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-Hmm.  Let's say that the BT transceiver uses the fastest transmission rate 
-supported by the OMAP UARTs -- 3,686,400 bits per second, according to 
-Table 17-1 in the 34xx TRM vZR.  So the RX poll timer would go off about 
-~2.7 times per input character[1].  That seems like overkill...
-
-For minimum receive latency, how about calling tty_insert_flip_string() 
-from the RX DMA callback, and using a smaller transfer count?  Or even 
-better, use PIO for the receive path and set the RX FIFO threshold to 1?
-
-No poll timer should be needed in either case.
-
-
-- Paul
-
-1. At 10 line bits per character (start + byte + stop), each character 
-should take about 2.7 microseconds to transfer (the reciprocal of (3 686 
-400 line bits per second / 10 line bits per character / 1 000 000 
-microseconds per second)).
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index f993955..c193dac 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -1095,11 +1095,13 @@ static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	case DMA_SLAVE_CONFIG:
+ 		if (dmaengine_cfg->direction == DMA_FROM_DEVICE) {
+ 			sdmac->per_address = dmaengine_cfg->src_addr;
+-			sdmac->watermark_level = dmaengine_cfg->src_maxburst;
++			sdmac->watermark_level = dmaengine_cfg->src_maxburst *
++						dmaengine_cfg->src_addr_width;
+ 			sdmac->word_size = dmaengine_cfg->src_addr_width;
+ 		} else {
+ 			sdmac->per_address = dmaengine_cfg->dst_addr;
+-			sdmac->watermark_level = dmaengine_cfg->dst_maxburst;
++			sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
++						dmaengine_cfg->dst_addr_width;
+ 			sdmac->word_size = dmaengine_cfg->dst_addr_width;
+ 		}
+ 		return sdma_config_channel(sdmac);
+-- 
+1.6.3.3
