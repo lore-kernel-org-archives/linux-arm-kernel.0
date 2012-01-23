@@ -1,108 +1,93 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Jan 2012 13:00:52 -0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
-Message-ID: <20120123210052.GS22818@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 23 Jan 2012 13:18:50 -0800
+Subject: How to represent active low ARM GIC interrupts, enabled by external
+ inverter?
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB81BA2@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I'd like guidance on how to model one aspect of Tegra's interrupt
+structure.
 
-This mostly looks pretty good to me, few more comments below.
+Tegra has an interrupt input pin for use by a PMU chip.
 
-* Stephen Warren <swarren@nvidia.com> [120120 13:51]:
-> Here's V2 of my pinmux binding proposal, after incorporating some feedback
-> from Shawn Guo and Dong Aisheng. Main changes:
-> 
-> 1) Require the "pin config" nodes the be children of the pinmux controller
->    node, rather than allowing them to alternatively be children of the
->    device node that's using them. This allows removal of the pin controller
->    phandle as the first entry in each specifier.
+The PMC HW module within Tegra can optionally invert this signal, but
+otherwise has no control over it; no interrupt status bits, no masking,
+etc.
 
-If you really want to leave out the phandle for each mux entry, this would
-require supporting multiple "pin config" entries in a device driver node.
+The (potentially inverted) signal is then fed into the ARM GIC, which
+supports level high or rising edge interrupts only.
 
-That's because otherwise supporting pins from multiple pinmux controller
-instances would not work. Note that we already have two pin controller
-instances starting with omap4.
+So my question is: How to model this.
 
-...
- 
->                 pmx_sdhci_active: pinconfig-sdhci-active {
->                         /*
->                          * In each of these nodes, both the mux and config
->                          * properties are optional. This node represents the
->                          * additions to pmx_sdhci that are specific to an
->                          * active state. In this case, only pin configuration
->                          * settings are different.
->                          */
->                         config =
->                                 <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 0>
->                                 <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 0>;
->                 };
->                 pmx_sdhci_standby: pinconfig-sdhci-standby {
->                         config =
->                                 <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
->                                 <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>;
->                 };
+I assume the best thing to do is have the PMC be an explicit irq_chip,
+and have its .set_type op configure the inversion based on whether
+its interrupt source requests low or high, and allow either level or
+edge.
 
-After thinking about this a bit more, I'm now thinking that we should
-probably only describe the active state in the device tree to keep things
-simple.
+However, the irq_chip for the PMC couldn't implement any mask or shutdown
+operation. Is it acceptable to simple provide dummy/no-op functions in
+that case? I see that kernel/irq/dummychip.c does exactly that, but I'm
+not sure what use-cases that file is supposed to cover.
 
-Anything PM related could be initialized later on during the boot by the
-device driver, or even from userspace using /lib/firmware or /sys entries.
-This would cut down the device tree bloat quite a bit.
+That'd result in something like this for device tree:
 
-Setting the initial state from device tree makes sense, but I'm afraid
-the standby and off states will require driver interaction depending on
-how the user wants to configure the system.
+/ {
+    intc: interrupt-controller at 50041000 {
+        compatible = "arm,cortex-a9-gic";
+        /* reg and other properties omitted for brevity throughout */
+        interrupt-controller;
+        /* 
+         * cell 0, 1: interrupt type/ID
+         * cell 2: Linux IRQ flags
+         */
+        #interrupt-cells = <3>;
+    };
+    interrupt-parent = <&intc>;
 
-For example, allowing a device to wake up a system might be user
-configurable option, such as "Wake up on tapping the touchscreen".
+    pmc: interrupt-controller at 7000e400 {
+        compatible = "nvidia,tegra20-pmc";
+        interrupt-controller;
+        /* 
+         * cell 0: interrupt ID (always 0; should we omit this field?)
+         * cell 1: 0=no invert, 1=invert
+         */
+        #interrupt-cells = <2>;
+        /*
+         * Always high. Level or edge of the PMU interrupt output must be
+         * configured here. Or, should it somehow be passed through from
+         * the PMU's client's interrupt specifier?
+         */
+        interrupts = <0 88 0x04>;
+    };
 
-Then I'd rather not use "config" at all, and just put the value for
-initial state mux register(s) in the mux to avoid repeating the same data
-multiple time. Looks like with the mux + config/mux-config option you
-need to duplicate at least TEGRA_PMX_PG_DTA.
+    i2c at 7000c000 {
+        compatible = "nvidia,tegra20-i2c";
 
-BTW, maybe the name "config" should probably be "mux-config" instead?
+        pmu at xxx {
+            interrupt-parent = <&pmc>;
+            interrupts = <0 1>;
+        }
+    };
+};
 
->                 /*
->                  * Each device node contains a few properties to describe
->                  * the named pinmux states that are available to it.
->                  *
->                  * The binding for the device node specifies the state names
->                  * that must be described; common examples such as "default"
->                  * or "active" and "suspend" may be universal, but the IO
->                  * protocol that a device supports may demand that more
->                  * states be defined, such as "active-12mhz", "active-50mhz",
->                  * "suspend". Drivers request these named states e.g. using
->                  * pinctrl's pinmux_get("state_name") API.
->                  *
->                  * pinctrl-names lists the available state names.
->                  *
->                  * Unlike the common clock binding, I assume here that states
->                  * are always requested by name. If we don't like that idea,
->                  * we'd could make this property optional, and add a new API
->                  * pinmux_get(state_id) to the pinctrl subsystem.
->                  */
->                 pinctrl-names = "active", "suspend";
+Does that look reasonable?
 
-If we only allow describing the initial state in device tree, then we can
-leave out pinctrl-names, and assume the setting is always the initial bootup
-state desired.
+Other alternatives:
 
-So to summarize: I suggest we'll just stick to basics to get the system
-booting and devices working using device tree. In most cases the device
-drivers should be able to configure the suspend and off states in a generic
-way using pinctrl API. Everything else, like debugging, we can probably
-do with userspace tools.
+1) Don't hook the PMC driver and binding into the interrupt tree, but
+simply have a property that controls the inversion of the signal.
+The disadvantage is that the PMU's interrupt specifier would need to
+always specify active high even if it was really active low with inversion
+activated in the PMC.
 
-This would mean just using a minimal subset of your binding, probably
-very close to what you originally suggested.
+2) Modify the ARM GIC's driver to allow active low interrupts, and call
+some plugin code to request any required inversion. Most platforms
+wouldn't provide such a plugin, and hence would still disallow such
+requests. The disadvantage here is that it complicates the cross-SoC
+GIC driver with something that may only be useful for Tegra.
 
-Regards,
+Thanks.
 
-Tony
+-- 
+nvpublic
