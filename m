@@ -1,42 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Jan 2012 10:29:39 +0000
-Subject: [PATCH] ARM: GIC: fix non-SMP builds
-In-Reply-To: <003401ccd9b8$13d3a8b0$3b7afa10$%szyprowski@samsung.com>
-References: <1327312291-9457-1-git-send-email-m.szyprowski@samsung.com>
- <4F1D2F1B.2090904@arm.com>
- <003401ccd9b8$13d3a8b0$3b7afa10$%szyprowski@samsung.com>
-Message-ID: <4F1D3693.6010201@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Jan 2012 10:42:20 +0000
+Subject: [PATCH v2] spi: QUP based bus driver for Qualcomm MSM chipsets
+In-Reply-To: <1321307907-31508-1-git-send-email-harinij@codeaurora.org>
+References: <y> <1321307907-31508-1-git-send-email-harinij@codeaurora.org>
+Message-ID: <20120123104220.GV1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/12 10:16, Marek Szyprowski wrote:
-> Hello,
-> 
-> On Monday, January 23, 2012 10:58 AM Marc Zyngier wrote:
-> 
->> On 23/01/12 09:51, Marek Szyprowski wrote:
->>> This patch fixes the build break introduced by commit db0d4db22. It
->>> happen only if SMP support has been disabled:
->>>
->>> arch/arm/common/gic.c: In function 'gic_init_bases':
->>> arch/arm/common/gic.c:679: error: implicit declaration of function 'cpu_logical_map'
->>> make[1]: *** [arch/arm/common/gic.o] Error 1
->>> make: *** [arch/arm/common] Error 2
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>
->> Please have a look at Will's patches:
->> http://patchwork.ozlabs.org/patch/136504/
->>
->> which fix this problem in a far more elegant way.
-> 
-> Ok, thanks for the hint! I hope it will be merged to 3.3-rc2+ to fix the regression in
-> GIC code. If so, please ignore my patch. 
+Not specific to this patch, but I notice that you have in your headers:
 
-It just got picked up by Russell, so I'd expect to see it being merged
-upstream in a short while.
+In-Reply-To: <y>
+References: <y>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This is rather annoying, because it means that anyone else who has the
+same lines ends up having their messages attached to your messages as
+part of the same thread.
+
+I think you need to read the documentation for git-send-email again -
+and check that you're using the arguments concerning message ids and
+threading correctly.
+
+Thanks.
