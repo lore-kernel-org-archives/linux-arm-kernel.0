@@ -1,104 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 Jan 2012 10:34:20 +0100
-Subject: [PATCH V4 2/4] CS89x0 : add CS89x0 platform device to the
- iMX21ADS board
-In-Reply-To: <1326996830-13548-1-git-send-email-jaccon.bastiaansen@gmail.com>
-References: <1326996830-13548-1-git-send-email-jaccon.bastiaansen@gmail.com>
-Message-ID: <20120123093420.GL5446@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Jan 2012 09:47:59 +0000
+Subject: [PATCH v3 0/6] ARM: Remove the __ARCH_WANT_INTERRUPTS_ON_CTXSW
+ definition
+In-Reply-To: <20120123092624.GA11983@arm.com>
+References: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
+ <1327310131.2446.1.camel@twins> <20120123092624.GA11983@arm.com>
+Message-ID: <20120123094759.GU1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 07:13:50PM +0100, Jaccon Bastiaansen wrote:
-> Add CS89x0 networking support to the iMX21ADS board by using the
-> platform driver support in the CS89x0 driver.
+On Mon, Jan 23, 2012 at 09:26:24AM +0000, Catalin Marinas wrote:
+> On Mon, Jan 23, 2012 at 09:15:31AM +0000, Peter Zijlstra wrote:
+> > On Fri, 2012-01-20 at 17:42 +0000, Catalin Marinas wrote:
+> > > This is version 3 of the set of patches removing
+> > > __ARCH_WANT_INTERRUPTS_ON_CTXSW on ARM. The series was rebased on top of
+> > > 3.3-rc1 and fixed the conflicts with the kernel/sched/ changes and the
+> > > ARM LPAE patches. There are no functional changes from v2. I plan to
+> > > push this to -next and get it ready for 3.4-rc1.
+> > > 
+> > > Question for Peter/Ingo - how do we merge the first patch that
+> > > introduces finish_arch_post_lock_switch? Do you pick it up or I can
+> > > merge it via rmk (with your ack)?
+> > 
+> > I'm fine either way, I'll probably ask Ingo to pull your tree so that I
+> > can stack some other patches on top.
 > 
-> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
-> ---
->  arch/arm/configs/imx_v4_v5_defconfig |    2 ++
->  arch/arm/mach-imx/mach-mx21ads.c     |   31 ++++++++++++++++++++++++++++---
->  2 files changed, 30 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-> index 11a4192..fc0106f 100644
-> --- a/arch/arm/configs/imx_v4_v5_defconfig
-> +++ b/arch/arm/configs/imx_v4_v5_defconfig
-> @@ -81,6 +81,8 @@ CONFIG_NET_ETHERNET=y
->  CONFIG_SMC91X=y
->  CONFIG_DM9000=y
->  CONFIG_SMC911X=y
-> +CONFIG_CS89x0=y
-> +CONFIG_CS89x0_PLATFORM=y
->  # CONFIG_NETDEV_1000 is not set
->  # CONFIG_NETDEV_10000 is not set
->  # CONFIG_INPUT_MOUSEDEV is not set
-> diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-> index 25f8402..4fd37fc 100644
-> --- a/arch/arm/mach-imx/mach-mx21ads.c
-> +++ b/arch/arm/mach-imx/mach-mx21ads.c
-> @@ -37,8 +37,8 @@
->  #define MX21ADS_REG_ADDR(offset)    (void __force __iomem *) \
->  		(MX21ADS_MMIO_BASE_ADDR + (offset))
->  
-> +#define MX21ADS_CS8900A_MMIO_SIZE   0x200000
->  #define MX21ADS_CS8900A_IRQ         IRQ_GPIOE(11)
-> -#define MX21ADS_CS8900A_IOBASE_REG  MX21ADS_REG_ADDR(0x000000)
->  #define MX21ADS_ST16C255_IOBASE_REG MX21ADS_REG_ADDR(0x200000)
->  #define MX21ADS_VERSION_REG         MX21ADS_REG_ADDR(0x400000)
->  #define MX21ADS_IO_REG              MX21ADS_REG_ADDR(0x800000)
-> @@ -159,6 +159,26 @@ static struct platform_device mx21ads_nor_mtd_device = {
->  	.resource = &mx21ads_flash_resource,
->  };
->  
-> +static const struct resource mx21ads_cs8900_resources[] __initconst = {
-> +	{
-> +		.start = MX21_CS1_BASE_ADDR,
-> +		.end = MX21_CS1_BASE_ADDR +  MX21ADS_CS8900A_MMIO_SIZE - 1,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX21ADS_CS8900A_IRQ,
-> +		.end = MX21ADS_CS8900A_IRQ,
-> +		.flags = IORESOURCE_IRQ,
-> +	}
-> +};
-> +
-> +static const struct platform_device_info mx21ads_cs8900_devinfo __initconst = {
-> +	.name = "cs89x0",
-> +	.id = 0,
-> +	.res = mx21ads_cs8900_resources,
-> +	.num_res = ARRAY_SIZE(mx21ads_cs8900_resources),
-> +};
-> +
->  static const struct imxuart_platform_data uart_pdata_rts __initconst = {
->  	.flags = IMXUART_HAVE_RTSCTS,
->  };
-> @@ -254,14 +274,17 @@ mx21ads_nand_board_info __initconst = {
->  static struct map_desc mx21ads_io_desc[] __initdata = {
->  	/*
->  	 * Memory-mapped I/O on MX21ADS Base board:
-> -	 *   - CS8900A Ethernet controller
->  	 *   - ST16C2552CJ UART
->  	 *   - CPU and Base board version
->  	 *   - Base board I/O register
-> +	 *
-> +	 * Note that the CS8900 uses the first MX21ADS_CS8900A_MMIO_SIZE
-> +	 * bytes of the CS1 memory range.
->  	 */
->  	{
->  		.virtual = MX21ADS_MMIO_BASE_ADDR,
-> -		.pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR),
-> +		.pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR +
-> +					MX21ADS_CS8900A_MMIO_SIZE),
+> In which case I would need Russell's acked-by.
 
-Since you now use ioremap the cs89x0 driver this mapping is not used
-for the cs89x0 anymore, so it's strange to have references to it
-here.
-You still need the mapping though, but only for MX21ADS_IO_REG.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+That depends on knowing what CPU architectures this has been tested on,
+and whether anyone external has tested it.  It's definitely a change
+which needs some tested-by tags on it.
