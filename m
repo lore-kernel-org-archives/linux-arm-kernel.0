@@ -1,71 +1,27 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Mon, 23 Jan 2012 13:04:03 +0100
-Subject: [PATCH] GPMC: add ECC control definitions
-Message-ID: <4F1D4CB3.5080803@visionsystems.de>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Mon, 23 Jan 2012 16:31:00 +0400
+Subject: [PATCH 1/1] i.MX SDMA: Fix burstsize settings
+In-Reply-To: <1327315765-20679-1-git-send-email-philippe.retornaz@epfl.ch>
+References: <20120123102501.GN5446@pengutronix.de>
+ <1327315765-20679-1-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <4F1D5304.3080003@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
----
- arch/arm/mach-omap2/gpmc.c |   30 +++++++++++++++++++++++++-----
- 1 file changed, 25 insertions(+), 5 deletions(-)
+Hello.
 
-Index: b/arch/arm/mach-omap2/gpmc.c
-===================================================================
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -50,6 +50,19 @@
- #define GPMC_ECC_SIZE_CONFIG	0x1fc
- #define GPMC_ECC1_RESULT        0x200
- 
-+/* GPMC ECC control settings */
-+#define GPMC_ECC_CTRL_ECCCLEAR		0x100
-+#define GPMC_ECC_CTRL_ECCDISABLE	0x000
-+#define GPMC_ECC_CTRL_ECCREG1		0x001
-+#define GPMC_ECC_CTRL_ECCREG2		0x002
-+#define GPMC_ECC_CTRL_ECCREG3		0x003
-+#define GPMC_ECC_CTRL_ECCREG4		0x004
-+#define GPMC_ECC_CTRL_ECCREG5		0x005
-+#define GPMC_ECC_CTRL_ECCREG6		0x006
-+#define GPMC_ECC_CTRL_ECCREG7		0x007
-+#define GPMC_ECC_CTRL_ECCREG8		0x008
-+#define GPMC_ECC_CTRL_ECCREG9		0x009
-+
- #define GPMC_CS0_OFFSET		0x60
- #define GPMC_CS_SIZE		0x30
- 
-@@ -855,8 +868,9 @@
- 	gpmc_ecc_used = cs;
- 
- 	/* clear ecc and enable bits */
--	val = ((0x00000001<<8) | 0x00000001);
--	gpmc_write_reg(GPMC_ECC_CONTROL, val);
-+	gpmc_write_reg(GPMC_ECC_CONTROL,
-+			GPMC_ECC_CTRL_ECCCLEAR |
-+			GPMC_ECC_CTRL_ECCREG1);
- 
- 	/* program ecc and result sizes */
- 	val = ((((ecc_size >> 1) - 1) << 22) | (0x0000000F));
-@@ -864,13 +878,19 @@
- 
- 	switch (mode) {
- 	case GPMC_ECC_READ:
--		gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
-+		gpmc_write_reg(GPMC_ECC_CONTROL,
-+				GPMC_ECC_CTRL_ECCCLEAR |
-+				GPMC_ECC_CTRL_ECCREG1);
- 		break;
- 	case GPMC_ECC_READSYN:
--		 gpmc_write_reg(GPMC_ECC_CONTROL, 0x100);
-+		gpmc_write_reg(GPMC_ECC_CONTROL,
-+				GPMC_ECC_CTRL_ECCCLEAR |
-+				GPMC_ECC_CTRL_ECCDISABLE);
- 		break;
- 	case GPMC_ECC_WRITE:
--		gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
-+		gpmc_write_reg(GPMC_ECC_CONTROL,
-+				GPMC_ECC_CTRL_ECCCLEAR |
-+				GPMC_ECC_CTRL_ECCREG1);
- 		break;
- 	default:
- 		printk(KERN_INFO "Error: Unrecognized Mode[%d]!\n", mode);
+On 23-01-2012 14:49, Philippe R?tornaz wrote:
+
+> Commit 6584cb88 fixed the mxcmmc driver but forgot to fix the
+
+    Please also specify that commit's summary in parens. Russell has recently 
+again explained why it's needed.
+
+> SDMA driver to handle the correct burtsize.
+> This make the SD card access works again with DMA on i.MX31 boards.
+
+> Signed-off-by: Philippe R?tornaz<philippe.retornaz@epfl.ch>
+> Tested-by: Sascha Hauer<s.hauer@pengutronix.de>
+> Acked-by: Sascha Hauer<s.hauer@pengutronix.de>
+
+WBR, Sergei
