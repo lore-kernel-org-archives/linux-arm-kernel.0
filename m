@@ -1,89 +1,32 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 23 Jan 2012 16:43:10 +0100
-Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
-In-Reply-To: <1325747509-29665-3-git-send-email-hdoyu@nvidia.com>
-References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
- <1325747509-29665-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20120123154310.GC6269@8bytes.org>
+From: sbabic@denx.de (Stefano Babic)
+Date: Mon, 23 Jan 2012 16:50:23 +0100
+Subject: [PATCH] ARM: mx28: Remove duplicate OCOTP error message
+In-Reply-To: <1327332593-27534-1-git-send-email-fabio.estevam@freescale.com>
+References: <1327332593-27534-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <4F1D81BF.6010303@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 23/01/2012 16:29, Fabio Estevam wrote:
+> The mxs_get_ocotp() function already prints an error message in the case of 
+> a timeout, so no need to print them again in the board files.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-mxs/mach-m28evk.c  |    5 +----
+>  arch/arm/mach-mxs/mach-mx28evk.c |    6 +-----
+>  2 files changed, 2 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+> index 2f27582..eec1257 100644
+> --- a/arch/arm/mach-mxs/mach-m28evk.c
+> +++ b/arch/arm/mach-mxs/mach-m28evk.c
 
-please see my comments inline. When you fix these issues I think the
-driver is ready for merging.
+Acked-by: Stefano Babic <sbabic@denx.de>
 
-On Thu, Jan 05, 2012 at 09:11:49AM +0200, Hiroshi DOYU wrote:
-> +static int smmu_iommu_map(struct iommu_domain *domain, unsigned long iova,
-> +			  phys_addr_t pa, size_t bytes, int prot)
-> +{
-> +	struct smmu_as *as = domain->priv;
-> +	unsigned long pfn = __phys_to_pfn(pa);
-> +	unsigned long flags;
-> +
-> +	dev_dbg(as->smmu->dev, "[%d] %08lx:%08x\n", as->asid, iova, pa);
-> +
-> +	if (!pfn_valid(pfn))
-> +		return -ENOMEM;
-> +
-> +	spin_lock_irqsave(&as->lock, flags);
-> +	__smmu_iommu_map_pfn(as, iova, pfn);
-> +	spin_unlock_irqrestore(&as->lock, flags);
-> +	return 0;
-
-Why do you completly ignore the size parameter in this function (and
-in the unmap part below)?
-According to the page-sizes you export to the generic layer size can be
-4k or 4M. You need to take care of that in this function.
-
-> +static void smmu_iommu_domain_destroy(struct iommu_domain *domain)
-> +{
-> +	struct smmu_as *as = domain->priv;
-> +	struct smmu_device *smmu = as->smmu;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&as->lock, flags);
-> +
-> +	if (as->pdir_page) {
-> +		spin_lock(&smmu->lock);
-> +		smmu_write(smmu, SMMU_PTB_ASID_CUR(as->asid), SMMU_PTB_ASID);
-> +		smmu_write(smmu, SMMU_PTB_DATA_RESET_VAL, SMMU_PTB_DATA);
-> +		FLUSH_SMMU_REGS(smmu);
-> +		spin_unlock(&smmu->lock);
-> +
-> +		free_pdir(as);
-> +	}
-> +
-> +	if (!list_empty(&as->client)) {
-> +		struct smmu_client *c;
-> +
-> +		list_for_each_entry(c, &as->client, list)
-> +			dev_err(smmu->dev,
-> +				"%s is still attached\n", dev_name(c->dev));
-
-This is not an error. Just detach the devices when they are still
-attached to the domain.
-
-> +	}
-> +
-> +	spin_unlock_irqrestore(&as->lock, flags);
-> +
-> +	domain->priv = NULL;
-> +	dev_dbg(smmu->dev, "smmu_as@%p\n", as);
-> +}
-> +
-> +static int smmu_iommu_attach_dev(struct iommu_domain *domain,
-> +				 struct device *dev)
-> +{
-> +	struct smmu_as *as = domain->priv;
-> +	struct smmu_device *smmu = as->smmu;
-
-Hmm, this looks like there is a 1-1 mapping between hardware SMMU
-devices and domains. This is not consistent with IOMMU-API semantics
-where a domain can contain devices behind different SMMUs. Please fix
-that.
-
-
-Thanks,
-
-	Joerg
+-- 
+=====================================================================
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+=====================================================================
