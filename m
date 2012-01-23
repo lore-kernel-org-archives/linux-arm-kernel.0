@@ -1,58 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 23 Jan 2012 12:52:14 +0100
-Subject: [PATCH 1/1] ARM: Developed device driver for Atmel TSADC
- controller
-In-Reply-To: <20120123113647.GX1068@n2100.arm.linux.org.uk>
-References: <n> <1327317907-2874-1-git-send-email-pettno@gmail.com>
- <20120123113647.GX1068@n2100.arm.linux.org.uk>
-Message-ID: <4F1D49EE.6020600@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 23 Jan 2012 12:59:23 +0100
+Subject: Building of arch/arm/plat-mxc/ssi-fiq.S failed w/ THUMB2 enabled?
+In-Reply-To: <20120120120003.GB2046@linaro.org>
+References: <CAMPhdO_4NQUFB14eecTb3N4oQJa86ojSk8FUveqg+Lye5_jY+A@mail.gmail.com>
+ <20111202102418.GT26618@pengutronix.de>
+ <20120120115216.GK1068@n2100.arm.linux.org.uk>
+ <20120120120003.GB2046@linaro.org>
+Message-ID: <20120123115923.GP5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2012 12:36 PM, Russell King - ARM Linux :
-> On Mon, Jan 23, 2012 at 12:25:06PM +0100, Petter Nordby wrote:
->> Some Atmel AT91 devices contains a touchscreen analog to digital
->> converter. This device driver use the ADC as a multi-channel raw
->> data input device.
->>
->> Tested on AT91SAM9G45 boards.
->>
->> Signed-off-by: Petter Nordby <pettno@gmail.com>
->> ---
->>  CREDITS                                    |    4 +
+On Fri, Jan 20, 2012 at 12:00:03PM +0000, Dave Martin wrote:
+> On Fri, Jan 20, 2012 at 11:52:17AM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Dec 02, 2011 at 11:24:18AM +0100, Uwe Kleine-K?nig wrote:
+> > > On Fri, Dec 02, 2011 at 06:01:08PM +0800, Eric Miao wrote:
+> > > > Hi Dave & Sascha,
+> > > > 
+> > > > I checked the log of this file, found a THUMB2 related changes, yet
+> > > > I'm still having the failure below, can you help do a quick check?
+> > > the problem is that in Thumb most commands don't work with r8-r15
+> > > because there are only three bits used to encode them. This is
+> > > unfortunate as the other registers are not banked for FIQ.
+> > > 
+> > > The best possibility I see is to save some unbanked registers to the
+> > > banked registers on entry and restore them on exception exit.
+> > 
+> > Or always build this as ARM code.
 > 
-> Shouldn't this be in MAINTAINERS?
-> 
->>  arch/arm/configs/at91sam9g45_defconfig     |    1 +
->>  arch/arm/mach-at91/include/mach/at91_adc.h |   16 ++
->>  drivers/misc/Kconfig                       |    7 +
->>  drivers/misc/Makefile                      |    1 +
->>  drivers/misc/atmel_tsadc.c                 |  361 ++++++++++++++++++++++++++++
-> 
-> We have a proper abstraction of input devices under drivers/input which
-> includes touchscreens.  I suggest using that rather than developing
-> your own private kernel API.
+> That should work, sure -- I prefer to keep the number of instances where
+> we need to do this to a minimum if we can, though.
 
-Petter,
+I vote for compiling this in ARM mode since it's a straight forward
+solution.
 
-Be sure that I appreciate the submission of your work. Examples of code
-and new drivers are always a big strength of the Open Source community.
+Some background:
 
-But as Russell suggested, this use of ADC for AT91SAM9G45 family (TSADC)
-will be better suited for the IIO subsystem.
-A new AT91 ADC driver designed for this IIO subsystem has been developed
-a little time ago:
-"[PATCH RESEND v13] AT91: Add a driver for the ADC"
+The original reason for creating this code was that we did not have SDMA
+support at the time I wanted audio support. The FIQ code was a simple
+way to seperate audio and DMA support and to push them to mainline
+seperately. There is another reason for having this code though. The
+i.MX SSI port is quite broken in AC97 mode. Some AC97 codecs like the
+WM9712 always send data in slot 12 (IIRC it contains gpio status). The
+SSI unit always puts all valid slots into the data stream, so we end up
+having the audio rx data interleaved with the gpio status data. The FIQ
+code is used to skip the gpio status data (see /* dummy read to skip
+slot 12 */ in ssi-fiq.S).
 
-It will likely be included shortly in mainline kernel. I advice to
-follow this development and add the support of SAM9G45 ADC to this
-existing infrastructure.
+Sascha
 
-I guess that the input/touchsreen part of the TSADC is not the purpose
-of your driver:
-drivers/input/touchscreen/atmel_tsadcc.c
-will take care of this feature.
 
-Best regards,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
