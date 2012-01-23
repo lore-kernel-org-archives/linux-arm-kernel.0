@@ -1,38 +1,75 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 23 Jan 2012 19:21:53 +0530
-Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
-In-Reply-To: <4F1D4052.3070701@codeaurora.org>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1326807902.1540.116.camel@vkoul-udesk3>  <4F195E4C.6080805@codeaurora.org>
- <1327066287.517.4.camel@vkoul-udesk3>  <4F1D4052.3070701@codeaurora.org>
-Message-ID: <1327326713.517.32.camel@vkoul-udesk3>
+From: joro@8bytes.org ('Joerg Roedel')
+Date: Mon, 23 Jan 2012 15:27:06 +0100
+Subject: [PATCH v8 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
+In-Reply-To: <001001ccc625$0afa7ee0$20ef7ca0$%cho@samsung.com>
+References: <001001ccc625$0afa7ee0$20ef7ca0$%cho@samsung.com>
+Message-ID: <20120123142706.GA6269@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-01-23 at 16:41 +0530, Ravi Kumar V wrote:
-> 
-> If some changes are made in interleave API then it can support our BOX 
-> mode. Here in interleaved template he is assuming destination pattern as 
-> can be contiguous or same as source pattern, but in our case destination 
-> pattern is different from source pattern.
-> So if a new parameter destination data chunk is added in "struct 
-> dma_interleaved_template" structure then it can support different 
-> destination pattern.
-do you mean you have cases where you are doing a "memcpy" from one
-interleaved memory to another?
-Can you provide me with a scenario where this maybe helpful?
+Hi,
 
-The reason why the API was designed like this was to give ability to
-take these kind of interleaved memory and copy them to peripheral
-(constant addr) or memory (typically contagious). 
+please also get and inclue Acks from the Exynos maintainer for the next
+post.
+Since I have a compiling config for exynos now I will merge the patches
+when you have the Acks and addressed or explained the issues I pointed
+out below.
 
-In case it is just a pattern I wonder why it cannot be described in
-standard scatter gather definitions as you can split the block further
-down to copy from one respective block to somewhere else in memory.
-> Also it will good if you can provide another parameter for passing 
-> private data to dma driver.
-1. what does this parameter do?
-2. is this parameter static for a channel or it changes per transfer?
+On Thu, Dec 29, 2011 at 09:26:08PM +0900, KyongHo Cho wrote:
+> +static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
+> +{
+> +	struct exynos_iommu_domain *priv = domain->priv;
+> +	struct list_head *pos, *n;
+> +	unsigned long flags;
+> +	int i;
+> +
+> +	WARN_ON(!list_empty(&priv->clients));
 
--- 
-~Vinod
+This isn't really a problem. We allow destroying a domain with devices
+attached. So this WARN_ON is not necessary.
+
+> +static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
+> +			 phys_addr_t paddr, size_t size, int prot)
+> +{
+> +	struct exynos_iommu_domain *priv = domain->priv;
+> +	unsigned long *entry;
+> +	unsigned long flags;
+> +	int ret = -ENOMEM;
+> +
+> +	BUG_ON(priv->pgtable == NULL);
+> +
+> +	spin_lock_irqsave(&priv->pgtablelock, flags);
+> +
+> +	entry = section_entry(priv->pgtable, iova);
+> +
+> +	if (size >= SECT_SIZE) {
+> +		ret = lv1set_section(entry, paddr, size >> SECT_ORDER,
+> +					&priv->lv2entcnt[lv1ent_offset(iova)]);
+
+This looks like you are partially re-implementing behavior of generic
+code because you are mapping multiple sections at once. The generic map
+code already splits up the address range correctly, so no need to do
+this in the driver (unless there is some benefit in the hardware, like
+an IOTLB entry that can cover multiple sections or something similar).
+
+> +static size_t exynos_iommu_unmap(struct iommu_domain *domain,
+> +					       unsigned long iova, size_t size)
+> +{
+> +	struct exynos_iommu_domain *priv = domain->priv;
+> +	struct iommu_client *client;
+> +	unsigned long flags;
+> +
+> +	BUG_ON(priv->pgtable == NULL);
+> +
+> +	spin_lock_irqsave(&priv->pgtablelock, flags);
+> +
+> +	while (size != 0) {
+> +		int i, nent, order;
+> +		unsigned long *pent, *sent;
+
+Same with this while-loop. This looks like it re-implements behavior
+from the generic code.
+
+Regards,
+
+	Joerg
