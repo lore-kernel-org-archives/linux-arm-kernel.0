@@ -1,56 +1,71 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 Jan 2012 12:59:23 +0100
-Subject: Building of arch/arm/plat-mxc/ssi-fiq.S failed w/ THUMB2 enabled?
-In-Reply-To: <20120120120003.GB2046@linaro.org>
-References: <CAMPhdO_4NQUFB14eecTb3N4oQJa86ojSk8FUveqg+Lye5_jY+A@mail.gmail.com>
- <20111202102418.GT26618@pengutronix.de>
- <20120120115216.GK1068@n2100.arm.linux.org.uk>
- <20120120120003.GB2046@linaro.org>
-Message-ID: <20120123115923.GP5446@pengutronix.de>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Mon, 23 Jan 2012 13:04:03 +0100
+Subject: [PATCH] GPMC: add ECC control definitions
+Message-ID: <4F1D4CB3.5080803@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 12:00:03PM +0000, Dave Martin wrote:
-> On Fri, Jan 20, 2012 at 11:52:17AM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Dec 02, 2011 at 11:24:18AM +0100, Uwe Kleine-K?nig wrote:
-> > > On Fri, Dec 02, 2011 at 06:01:08PM +0800, Eric Miao wrote:
-> > > > Hi Dave & Sascha,
-> > > > 
-> > > > I checked the log of this file, found a THUMB2 related changes, yet
-> > > > I'm still having the failure below, can you help do a quick check?
-> > > the problem is that in Thumb most commands don't work with r8-r15
-> > > because there are only three bits used to encode them. This is
-> > > unfortunate as the other registers are not banked for FIQ.
-> > > 
-> > > The best possibility I see is to save some unbanked registers to the
-> > > banked registers on entry and restore them on exception exit.
-> > 
-> > Or always build this as ARM code.
-> 
-> That should work, sure -- I prefer to keep the number of instances where
-> we need to do this to a minimum if we can, though.
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+---
+ arch/arm/mach-omap2/gpmc.c |   30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
 
-I vote for compiling this in ARM mode since it's a straight forward
-solution.
-
-Some background:
-
-The original reason for creating this code was that we did not have SDMA
-support at the time I wanted audio support. The FIQ code was a simple
-way to seperate audio and DMA support and to push them to mainline
-seperately. There is another reason for having this code though. The
-i.MX SSI port is quite broken in AC97 mode. Some AC97 codecs like the
-WM9712 always send data in slot 12 (IIRC it contains gpio status). The
-SSI unit always puts all valid slots into the data stream, so we end up
-having the audio rx data interleaved with the gpio status data. The FIQ
-code is used to skip the gpio status data (see /* dummy read to skip
-slot 12 */ in ssi-fiq.S).
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Index: b/arch/arm/mach-omap2/gpmc.c
+===================================================================
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -50,6 +50,19 @@
+ #define GPMC_ECC_SIZE_CONFIG	0x1fc
+ #define GPMC_ECC1_RESULT        0x200
+ 
++/* GPMC ECC control settings */
++#define GPMC_ECC_CTRL_ECCCLEAR		0x100
++#define GPMC_ECC_CTRL_ECCDISABLE	0x000
++#define GPMC_ECC_CTRL_ECCREG1		0x001
++#define GPMC_ECC_CTRL_ECCREG2		0x002
++#define GPMC_ECC_CTRL_ECCREG3		0x003
++#define GPMC_ECC_CTRL_ECCREG4		0x004
++#define GPMC_ECC_CTRL_ECCREG5		0x005
++#define GPMC_ECC_CTRL_ECCREG6		0x006
++#define GPMC_ECC_CTRL_ECCREG7		0x007
++#define GPMC_ECC_CTRL_ECCREG8		0x008
++#define GPMC_ECC_CTRL_ECCREG9		0x009
++
+ #define GPMC_CS0_OFFSET		0x60
+ #define GPMC_CS_SIZE		0x30
+ 
+@@ -855,8 +868,9 @@
+ 	gpmc_ecc_used = cs;
+ 
+ 	/* clear ecc and enable bits */
+-	val = ((0x00000001<<8) | 0x00000001);
+-	gpmc_write_reg(GPMC_ECC_CONTROL, val);
++	gpmc_write_reg(GPMC_ECC_CONTROL,
++			GPMC_ECC_CTRL_ECCCLEAR |
++			GPMC_ECC_CTRL_ECCREG1);
+ 
+ 	/* program ecc and result sizes */
+ 	val = ((((ecc_size >> 1) - 1) << 22) | (0x0000000F));
+@@ -864,13 +878,19 @@
+ 
+ 	switch (mode) {
+ 	case GPMC_ECC_READ:
+-		gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
++		gpmc_write_reg(GPMC_ECC_CONTROL,
++				GPMC_ECC_CTRL_ECCCLEAR |
++				GPMC_ECC_CTRL_ECCREG1);
+ 		break;
+ 	case GPMC_ECC_READSYN:
+-		 gpmc_write_reg(GPMC_ECC_CONTROL, 0x100);
++		gpmc_write_reg(GPMC_ECC_CONTROL,
++				GPMC_ECC_CTRL_ECCCLEAR |
++				GPMC_ECC_CTRL_ECCDISABLE);
+ 		break;
+ 	case GPMC_ECC_WRITE:
+-		gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
++		gpmc_write_reg(GPMC_ECC_CONTROL,
++				GPMC_ECC_CTRL_ECCCLEAR |
++				GPMC_ECC_CTRL_ECCREG1);
+ 		break;
+ 	default:
+ 		printk(KERN_INFO "Error: Unrecognized Mode[%d]!\n", mode);
