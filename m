@@ -1,38 +1,57 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 23 Jan 2012 07:29:00 +0100
-Subject: [PATCH 0/7] at91 : pm.h cleanups
-In-Reply-To: <201201111523.57368.arnd.bergmann@linaro.org>
-References: <1326293740-15735-1-git-send-email-daniel.lezcano@linaro.org>
- <201201111523.57368.arnd.bergmann@linaro.org>
-Message-ID: <20120123062900.GP25622@game.jcrosoft.org>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 23 Jan 2012 12:18:14 +0530
+Subject: [PATCH] ARM: OMAP2+: timer: Fix crash due to wrong arg to
+ __omap_dm_timer_read_counter
+Message-ID: <1327301294-18458-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:23 Wed 11 Jan     , Arnd Bergmann wrote:
-> On Wednesday 11 January 2012, Daniel Lezcano wrote:
-> > 
-> > This patchset is the first series to cleanup some code around pm.h, pm.c and
-> > cpuidle. The next series will bring more cleanups and finally the third series
-> > will change the different functions into ops where we can export the structure
-> > definition in order to encapsulate the code and move the at91's cpuidle driver
-> > to the drivers/cpuidle directory.
-> 
-> Hi Daniel,
-> 
-> These all look like useful cleanups. You don't really have to split them
-> up into so small units, but it doesn't hurt if you do. Patch 5 seems to
-> actually fix a bug, but probably a harmless one.
-> 
-> It's not clear where you're headed though, I hope that becomes more obvious
-> in the next patches. The tricky bit that will have to be done is to turn
-> all the #ifdef checks into runtime here. You have moved the #include for the
-> memory controller into a new header, but that is not actually progress
-> on this larger problem. It would be nice to move the
-> sdram_selfrefresh_enable/disable functions into a .c file that uses
-> cpu_is_at91...() to do runtime detection, but AFAICT that won't work
-> because you have to guarantee that all the code between these is
-> in the cache, right?
-we may have much simple way move it to sram as done in slow clock
+In dmtimer_read_sched_clock(), wrong argument was getting passed to
+__omap_dm_timer_read_counter() function call; instead of "&clksrc",
+we were passing "clksrc.io_base", which results into kernel crash.
 
-Best Regards,
-J.
+To reproduce kernel crash, just disable the CONFIG_OMAP_32K_TIMER config
+option (and DEBUG_LL) and build/boot the kernel.
+This will use dmtimer as a kernel clocksource and lead to kernel
+crash during boot  -
+
+[    0.000000] OMAP clocksource: GPTIMER2 at 26000000 Hz
+[    0.000000] sched_clock: 32 bits at 26MHz, resolution 38ns, wraps every
+165191ms
+[    0.000000] Unable to handle kernel paging request at virtual address
+00030ef1
+[    0.000000] pgd = c0004000
+[    0.000000] [00030ef1] *pgd=00000000
+[    0.000000] Internal error: Oops: 5 [#1] SMP
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0    Not tainted  (3.3.0-rc1-11574-g0c76665-dirty #3)
+[    0.000000] PC is at dmtimer_read_sched_clock+0x18/0x4c
+[    0.000000] LR is at update_sched_clock+0x10/0x84
+[    0.000000] pc : [<c00243b8>]    lr : [<c0018684>]    psr: 200001d3
+[    0.000000] sp : c0641f38  ip : c0641e18  fp : 0000000a
+[    0.000000] r10: 151c3303  r9 : 00000026  r8 : 76276259
+[    0.000000] r7 : 00028547  r6 : c065ac80  r5 : 431bde82  r4 : c0655968
+[    0.000000] r3 : 00030ef1  r2 : fb032000  r1 : 00000028  r0 : 00000001
+
+
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/timer.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 18f7614..5f2873e 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -270,7 +270,7 @@ static struct clocksource clocksource_gpt = {
+ static u32 notrace dmtimer_read_sched_clock(void)
+ {
+ 	if (clksrc.reserved)
+-		return __omap_dm_timer_read_counter(clksrc.io_base, 1);
++		return __omap_dm_timer_read_counter(&clksrc, 1);
+
+ 	return 0;
+ }
+--
+1.7.0.4
