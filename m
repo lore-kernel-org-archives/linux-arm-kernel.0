@@ -1,138 +1,64 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 23 Jan 2012 12:41:49 -0200
-Subject: [PATCH] ARM: mx28evk: Simplify GPIO requests
-Message-ID: <1327329709-25545-1-git-send-email-fabio.estevam@freescale.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 23 Jan 2012 16:00:48 +0100
+Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
+In-Reply-To: <1325747509-29665-2-git-send-email-hdoyu@nvidia.com>
+References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
+ <1325747509-29665-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20120123150048.GB6269@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Requesting all the GPIOs on a single array (mx28evk_gpios[]) can make the 
-error handling of gpio_requests much simpler.
+Hi,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-This approach was suggested by Sascha Hauer:
-http://patchwork.ozlabs.org/patch/124661/
+first, some questions about the GART on your platform.
 
- arch/arm/mach-mxs/mach-mx28evk.c |   72 ++++++++-----------------------------
- 1 files changed, 16 insertions(+), 56 deletions(-)
+1) How many GARTs are usually implemented? One GART per device or is
+   there a single GART covering all devices, or a mix of both?
+2) Are devices allowed to DMA outside of the remappable range or will
+   this fail?
 
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index fdb0a56..6260ec3 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -223,7 +223,6 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
- /* fec */
- static void __init mx28evk_fec_reset(void)
- {
--	int ret;
- 	struct clk *clk;
- 
- 	/* Enable fec phy clock */
-@@ -231,32 +230,6 @@ static void __init mx28evk_fec_reset(void)
- 	if (!IS_ERR(clk))
- 		clk_prepare_enable(clk);
- 
--	/* Power up fec phy */
--	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
--	if (ret) {
--		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
--		return;
--	}
--
--	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
--	if (ret) {
--		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
--		return;
--	}
--
--	/* Reset fec phy */
--	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
--	if (ret) {
--		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
--		return;
--	}
--
--	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
--	if (ret) {
--		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
--		return;
--	}
--
- 	mdelay(1);
- 	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
- }
-@@ -417,9 +390,14 @@ static void __init mx28evk_add_regulators(void)
- static void __init mx28evk_add_regulators(void) {}
- #endif
- 
--static struct gpio mx28evk_lcd_gpios[] = {
-+static const __initconst struct gpio mx28evk_gpios[] = {
- 	{ MX28EVK_LCD_ENABLE, GPIOF_OUT_INIT_HIGH, "lcd-enable" },
- 	{ MX28EVK_BL_ENABLE, GPIOF_OUT_INIT_HIGH, "bl-enable" },
-+	{ MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT, "flexcan-switch" },
-+	{ MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc0-slot-power" },
-+	{ MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc1-slot-power" },
-+	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-phy-power" },
-+	{ MX28EVK_FEC_PHY_RESET, GPIOF_OUT_INIT_LOW, "fec-phy-reset" },
- };
- 
- static const struct mxs_saif_platform_data
-@@ -447,25 +425,19 @@ static void __init mx28evk_init(void)
- 	if (mx28evk_fec_get_mac())
- 		pr_warn("%s: failed on fec mac setup\n", __func__);
- 
-+	ret = gpio_request_array(mx28evk_gpios, ARRAY_SIZE(mx28evk_gpios));
-+
-+	if (ret)
-+		pr_err("One or more GPIOs failed to be requested: %d\n", ret);
-+
- 	mx28evk_fec_reset();
- 	mx28_add_fec(0, &mx28_fec_pdata[0]);
- 	mx28_add_fec(1, &mx28_fec_pdata[1]);
- 
--	ret = gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
--				"flexcan-switch");
--	if (ret) {
--		pr_err("failed to request gpio flexcan-switch: %d\n", ret);
--	} else {
--		mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
--		mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
--	}
-+	mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
-+	mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
- 
--	ret = gpio_request_array(mx28evk_lcd_gpios,
--				 ARRAY_SIZE(mx28evk_lcd_gpios));
--	if (ret)
--		pr_warn("failed to request gpio pins for lcd: %d\n", ret);
--	else
--		mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
-+	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
- 
- 	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
- 	mx28_add_saif(0, &mx28evk_mxs_saif_pdata[0]);
-@@ -480,20 +452,8 @@ static void __init mx28evk_init(void)
- 	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0,
- 			NULL, 0);
- 
--	/* power on mmc slot by writing 0 to the gpio */
--	ret = gpio_request_one(MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW,
--			       "mmc0-slot-power");
--	if (ret)
--		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
--	else
--		mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
--
--	ret = gpio_request_one(MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW,
--			       "mmc1-slot-power");
--	if (ret)
--		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
--	else
--		mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
-+	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
-+	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
- 
- 	mx28_add_rtc_stmp3xxx();
- 
--- 
-1.7.1
+Besides that I think IOMMU-API is not yet fully ready for GART-like
+drivers like this one. But I will merge it anyway to get things moving.
+But please answer or fix my objections first.
+
+On Thu, Jan 05, 2012 at 09:11:48AM +0200, Hiroshi DOYU wrote:
+> +static void gart_iommu_domain_destroy(struct iommu_domain *domain)
+> +{
+> +	struct gart_device *gart = domain->priv;
+> +
+> +	spin_lock(&gart->client_lock);
+> +	if (!list_empty(&gart->client)) {
+> +		struct gart_client *c;
+> +
+> +		list_for_each_entry(c, &gart->client, list)
+> +			dev_err(gart->dev,
+> +				"%s is still attached\n", dev_name(c->dev));
+> +	}
+> +	spin_unlock(&gart->client_lock);
+
+gart needs a NULL check. When you create a domain and immediatly destroy
+it without ever attaching a device this code will dereference a NULL
+pointer.
+As a general improvement I suggest that you introduce a gart_domain
+structure and store it in domain->priv (assigned in domain_init) instead
+of using the hardware descriptor.
+
+> +static int gart_iommu_attach_dev(struct iommu_domain *domain,
+> +				 struct device *dev)
+> +{
+> +	struct gart_device *gart;
+> +	struct gart_client *client, *c;
+> +	int err = 0;
+> +
+> +	gart = dev_get_drvdata(dev->parent);
+> +	if (!gart)
+> +		return -EINVAL;
+> +	domain->priv = gart;
+
+What happens when devices behind different GARTs are assigned to the
+same domain? domain->priv can only hold a pointer to one hardware GART.
+This can be solved by a 'struct gart_domain' holding a linked list to
+all gart_devices in this domain.
+
+
+	Joerg
