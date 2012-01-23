@@ -1,35 +1,51 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 23 Jan 2012 13:26:47 +0530
-Subject: [PATCH] ARM: OMAP: id: Add missing break statement in
- omap3xxx_check_revision
-Message-ID: <1327305407-19914-1-git-send-email-hvaibhav@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 23 Jan 2012 00:09:42 -0800
+Subject: possible hrtimer related problem on tegra
+In-Reply-To: <1539302.lfXQIS47Lr@ax5200p>
+References: <1539302.lfXQIS47Lr@ax5200p>
+Message-ID: <CAOesGMhaXjxzoz-OWF3V0HsdWzuxRJMaE-MSjdAFwN8+KgQLBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing break statement in the function omap3xxx_check_revision.
+Hi,
 
-The commit id 4390f5b2cb1f56 [ARM: OMAP: TI814X: Add cpu type macros
-and detection support], removed the 'break' statement from the function
-omap3xxx_check_revision(), resulting into wrong omap/cpu_revision
-initialization for AM335x devices.
+On Sun, Jan 22, 2012 at 7:18 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+> Hi,
+>
+> I've been plagued with random lockups starting with Linux 3.0.13 (pulled from
+> ChromeOS-3.0 tree) on a Tegra board (paz00). First symtoms are slowly losing
+> responsiveness followed by a total lockup (nothing in dmesg, no oops). Using
+> performance governor instead of ondemand, made it go away.
+>
+> So I started bisecting 3.0.12..3.0.13 and finially found that reverting
+> 24ee8bfe (hrtimer: Fix extra wakeups from __remove_hrtimer()) fixes the
+> problem.
+>
+> As Olof mentioned on IRC it is likely that the patch does not directly causes
+> lockups but something else which was hidden before. It isn't clear to me if
+> other tegra boards (seaboard, harmony) also suffer from this.
+>
+> Any hints on this issue are appreciated.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/id.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+You're asking on a community list about issues with a distro kernel.
+In general that is frowned upon.
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 325e12e..32cf203 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -395,6 +395,7 @@ void __init omap3xxx_check_revision(void)
- 	case 0xb944:
- 		omap_revision = AM335X_REV_ES1_0;
- 		cpu_rev = "1.0";
-+		break;
- 	case 0xb8f2:
- 		switch (rev) {
- 		case 0:
---
-1.7.0.4
+Since I'm one of the people looking after the distro kernel in
+particular though; The current 3.0 tegra branch has a handful of
+stability issues with power management/cpufreq/dvfs enabled, and we
+have chosen to (at least for now) disable those features in our
+configs. Chances are good that that patch in question is tickling a
+bug that is specific to the Chrome OS tree so without further
+investigation I don't see a reason to pull in external folks right now
+either.
+
+The other tegra maintainers don't particularly know what's in our
+distro tree either, and I wouldn't expect them to spend time on
+working on out-of-tree code that isn't their own.
+
+Best way forward is probably for you to do a local revert on the
+offending patch and to open a new issue at http://crosbug.com/ for it.
+Feel free to cc me (olofj at chromium.org) on the bug.
+
+
+-Olof
