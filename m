@@ -1,93 +1,91 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 23 Jan 2012 13:18:50 -0800
-Subject: How to represent active low ARM GIC interrupts, enabled by external
- inverter?
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB81BA2@HQMAIL01.nvidia.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 23 Jan 2012 22:18:54 +0100
+Subject: [PATCH] ARM: mx28: clock-mx28: Use a proper timeout mechanism
+In-Reply-To: <1327329667-25512-1-git-send-email-fabio.estevam@freescale.com>
+References: <1327329667-25512-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120123211854.GB14133@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'd like guidance on how to model one aspect of Tegra's interrupt
-structure.
+Hi Fabio,
 
-Tegra has an interrupt input pin for use by a PMU chip.
+On Mon, Jan 23, 2012 at 12:41:07PM -0200, Fabio Estevam wrote:
+> Introduce a function for checking the busy bits of CLKCTRL register that 
+> uses a proper timeout mechanism.
+> 
+> Remove parts of code that use busy loops and replace them with the 
+> mxs_clkctrl_timeout() function.
+> 
+> Tested on a mx28evk by performing audio playback.
+> 
+> Suggested-by: Wolfram Sang <w.sang@pengutronix.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-The PMC HW module within Tegra can optionally invert this signal, but
-otherwise has no control over it; no interrupt status bits, no masking,
-etc.
+Is there a difference in the two versions you sent?
 
-The (potentially inverted) signal is then fed into the ARM GIC, which
-supports level high or rising edge interrupts only.
+> ---
+>  arch/arm/mach-mxs/clock-mx28.c |   64 +++++++++++++---------------------------
+>  1 files changed, 21 insertions(+), 43 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 5d68e41..ad5482d 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -38,6 +38,7 @@
+>  #define DIGCTRL_BASE_ADDR	MX28_IO_ADDRESS(MX28_DIGCTL_BASE_ADDR)
+>  
+>  #define PARENT_RATE_SHIFT	8
+> +#define CLKCTRL_TIMEOUT		10	/* 10 ms = 1 jiffy */
 
-So my question is: How to model this.
+I'd remove the jiffy-part of the comment to prevent belief that the
+relationship will always be true.
 
-I assume the best thing to do is have the PMC be an explicit irq_chip,
-and have its .set_type op configure the inversion based on whether
-its interrupt source requests low or high, and allow either level or
-edge.
+>  static struct clk pll2_clk;
+>  static struct clk cpu_clk;
+> @@ -127,6 +128,20 @@ static unsigned long pll2_clk_get_rate(struct clk *clk)
+>  	return 50000000;
+>  }
+>  
+> +static int mxs_clkctrl_timeout(unsigned int reg_offset, unsigned int mask)
+> +{
+> +	unsigned long timeout = jiffies + msecs_to_jiffies(CLKCTRL_TIMEOUT);
+> +	while (readl_relaxed(CLKCTRL_BASE_ADDR + reg_offset) & mask) {
 
-However, the irq_chip for the PMC couldn't implement any mask or shutdown
-operation. Is it acceptable to simple provide dummy/no-op functions in
-that case? I see that kernel/irq/dummychip.c does exactly that, but I'm
-not sure what use-cases that file is supposed to cover.
+Hmm, this is a lot better, yet not perfect. You could be scheduled away here
+for 10ms and then you had only checked at t=0. However, I think it makes more
+sense to introduce a generic timeout-loop somehow and then convert to it
+later. This is my homework, though...
 
-That'd result in something like this for device tree:
+> +		if (time_after(jiffies, timeout)) {
+> +			pr_err("%s: divider writing timeout\n", __func__);
 
-/ {
-    intc: interrupt-controller at 50041000 {
-        compatible = "arm,cortex-a9-gic";
-        /* reg and other properties omitted for brevity throughout */
-        interrupt-controller;
-        /* 
-         * cell 0, 1: interrupt type/ID
-         * cell 2: Linux IRQ flags
-         */
-        #interrupt-cells = <3>;
-    };
-    interrupt-parent = <&intc>;
+__func__ is probably not useful here. Perhaps reg and mask?
 
-    pmc: interrupt-controller at 7000e400 {
-        compatible = "nvidia,tegra20-pmc";
-        interrupt-controller;
-        /* 
-         * cell 0: interrupt ID (always 0; should we omit this field?)
-         * cell 1: 0=no invert, 1=invert
-         */
-        #interrupt-cells = <2>;
-        /*
-         * Always high. Level or edge of the PMU interrupt output must be
-         * configured here. Or, should it somehow be passed through from
-         * the PMU's client's interrupt specifier?
-         */
-        interrupts = <0 88 0x04>;
-    };
+> +			return -ETIMEDOUT;
+> +		}
+> +
 
-    i2c at 7000c000 {
-        compatible = "nvidia,tegra20-i2c";
+Remove empty line.
 
-        pmu at xxx {
-            interrupt-parent = <&pmc>;
-            interrupts = <0 1>;
-        }
-    };
-};
+> +	}
+> +
+> +	return 0;
+> +}
+> +
 
-Does that look reasonable?
+Rest looked good from a glimpse.
 
-Other alternatives:
+Regards,
 
-1) Don't hook the PMC driver and binding into the interrupt tree, but
-simply have a property that controls the inversion of the signal.
-The disadvantage is that the PMU's interrupt specifier would need to
-always specify active high even if it was really active low with inversion
-activated in the PMC.
-
-2) Modify the ARM GIC's driver to allow active low interrupts, and call
-some plugin code to request any required inversion. Most platforms
-wouldn't provide such a plugin, and hence would still disallow such
-requests. The disadvantage here is that it complicates the cross-SoC
-GIC driver with something that may only be useful for Tegra.
-
-Thanks.
+   Wolfram
 
 -- 
-nvpublic
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120123/6bdaf43a/attachment.sig>
