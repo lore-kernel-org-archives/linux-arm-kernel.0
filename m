@@ -1,31 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jan 2012 15:58:53 +0000
-Subject: [PATCH 0/6] ux500: Export SoC information and some platform
- clean-up
-In-Reply-To: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
-References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <201201231558.53673.arnd@arndb.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 23 Jan 2012 07:58:51 -0800
+Subject: [PATCH v2] spi: QUP based bus driver for Qualcomm MSM chipsets
+In-Reply-To: <20120123104220.GV1068@n2100.arm.linux.org.uk>
+References: <y> <1321307907-31508-1-git-send-email-harinij@codeaurora.org>
+ <20120123104220.GV1068@n2100.arm.linux.org.uk>
+Message-ID: <20120123155851.GA25417@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 January 2012, Lee Jones wrote:
+On Mon, Jan 23, 2012 at 10:42:20AM +0000, Russell King - ARM Linux wrote:
+> Not specific to this patch, but I notice that you have in your headers:
 > 
-> This patch-set satisfies 4 objectives:
->  1. Ensures each platform device can specify a suitable parent
->  2. Provides a bus for SoC devices as a means to export information
->  3. Allows ux500 to make use of the new SoC bus
->  4. Cleans up unnecessary complexity from ux500 code
+> In-Reply-To: <y>
+> References: <y>
+> 
+> This is rather annoying, because it means that anyone else who has the
+> same lines ends up having their messages attached to your messages as
+> part of the same thread.
+> 
+> I think you need to read the documentation for git-send-email again -
+> and check that you're using the arguments concerning message ids and
+> threading correctly.
 
-This version looks good to me, I have no further comments right now.
+More specifically, when git-send-email promps for an email address or
+a message id, realize it's not asking a yes or not question.  The
+default it prints in brackets is what you get if you press enter.  If
+you press 'y', the reply will be from 'y' as seen here.
 
-Greg, can you have another look? I think Lee has addressed all of
-my comments as well as yours.
+David
 
-Linus, does this fit with your plans for migrating to only
-device-tree based probing for ux500? I guess if this goes in
-first, you will have to make a few changes so that it keeps working
-when the devices are put into the dts.
-
-Everyone else, who is planning to use the infrastructure besides ux500?
-
-	Arnd
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
