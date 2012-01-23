@@ -1,21 +1,27 @@
-From: zbr@ioremap.net (Evgeniy Polyakov)
-Date: Mon, 23 Jan 2012 23:36:38 +0300
-Subject: [PATCH] W1: OMAP HDQ1W: use 32-bit register accesses
-In-Reply-To: <alpine.DEB.2.00.1201231155590.29673@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
- <20120123150753.GA21395@ioremap.net>
- <alpine.DEB.2.00.1201231155590.29673@utopia.booyaka.com>
-Message-ID: <20120123203638.GA8313@ioremap.net>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Mon, 23 Jan 2012 12:37:53 -0800
+Subject: [PATCH] arm: fix build failure in code for
+ mach-bcmring/dma.c
+In-Reply-To: <20120123201857.GA1068@n2100.arm.linux.org.uk>
+References: <1327266579-21951-1-git-send-email-paul.gortmaker@windriver.com>
+ <20120122211723.GB12326@n2100.arm.linux.org.uk>
+ <4F1DACA7.1030501@broadcom.com>
+ <20120123201857.GA1068@n2100.arm.linux.org.uk>
+Message-ID: <4F1DC521.9020806@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 11:57:09AM -0700, Paul Walmsley (paul at pwsan.com) wrote:
-> http://www.spinics.net/lists/arm-kernel/msg156572.html
 
-Well, if runtime PM does its job for clock manipulation properly, then
-things should be fine. I suppose that ->probe() will fire up first and
-you say it boots and detects w1 properly, so patch looks good.
-Feel free to add my ack
+> Moreover, from what I can see, dma.c is unused by code in the mainline
+> kernel - I couldn't find any reference to dma_map_mem() or
+> dma_init_mem_map() both of which seem to be pre-requisits for using
+> this code.  Obviously you have drivers which use it.
+>
+> What can be done to clean this up?
+>
+Yes, it was used by another driver not in mainline kernel. Since that 
+driver is being rewritten and these functions are not used in mainline 
+kernel either, I will send out a patch to remove them soon.
 
--- 
-	Evgeniy Polyakov
+Thanks,
+JD
