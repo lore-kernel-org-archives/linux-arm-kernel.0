@@ -1,38 +1,33 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 23 Jan 2012 14:16:17 -0200
-Subject: [PATCH] ARM: imx_v4_v5_defconfig: Fix the selection of 32 bit flash
- support for iMX21ADS board
-Message-ID: <1327335377-30420-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Jan 2012 17:04:36 +0000
+Subject: [RESEND PATCH] arm:davinci: prepare to move aemif driver to
+ drivers/mfd
+In-Reply-To: <1327331552-9913-1-git-send-email-prakash.pm@ti.com>
+References: <1327331552-9913-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <20120123170436.GZ1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 1a96571d (Enable 32 bit flash support for iMX21ADS board) aimed to 
-enable 32 bit flash support, but all it did was to delete an unset option.
+On Mon, Jan 23, 2012 at 08:42:32PM +0530, Manjunathappa, Prakash wrote:
+> Adding: MFD maintainer and mailing list.
+> 
+>  arch/arm/mach-davinci/aemif.c              |    2 +-
+>  arch/arm/mach-davinci/board-da830-evm.c    |    2 +-
+>  arch/arm/mach-davinci/board-da850-evm.c    |    2 +-
+>  arch/arm/mach-davinci/include/mach/aemif.h |   36 ----------------------------
+>  drivers/mtd/nand/davinci_nand.c            |    2 +-
+>  include/linux/mfd/davinci_aemif.h          |   36 ++++++++++++++++++++++++++++
+>  6 files changed, 40 insertions(+), 40 deletions(-)
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/aemif.h
+>  create mode 100644 include/linux/mfd/davinci_aemif.h
 
-Fix this by enabling CONFIG_MTD_MAP_BANK_WIDTH_4 option.
+As Linus has requested on many occasions, and it's a damned good
+idea, use -M when generating diffstat - and its also a *really* good
+idea to use -M if you're submitting patches which rename files for
+review as well.
 
-Cc: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Jaccon,
-
-I don't have a MX21ADS board handy to test it, but I guess this was the correct
-intention of your patch, right?
-
- arch/arm/configs/imx_v4_v5_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index a22e930..dac71c1 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -68,6 +68,7 @@ CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
- CONFIG_MTD_CFI_GEOMETRY=y
- # CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
-+CONFIG_MTD_MAP_BANK_WIDTH_4=y
- # CONFIG_MTD_CFI_I2 is not set
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_PHYSMAP=y
--- 
-1.7.1
+Obviously arch/arm/mach-davinci/include/mach/aemif.h was moved to
+include/linux/mfd/davinci_aemif.h, but were there any changes to its
+contents?  Without -M, there only way of knowing is to compare each
+file line by line.  With -M, it'll tell us that it was renamed and
+produce a diff between the old and new location.
