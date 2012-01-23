@@ -1,36 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Jan 2012 11:36:48 +0000
-Subject: [PATCH 1/1] ARM: Developed device driver for Atmel TSADC
- controller
-In-Reply-To: <1327317907-2874-1-git-send-email-pettno@gmail.com>
-References: <n> <1327317907-2874-1-git-send-email-pettno@gmail.com>
-Message-ID: <20120123113647.GX1068@n2100.arm.linux.org.uk>
+Date: Mon, 23 Jan 2012 11:49:02 +0000
+Subject: ARM/ARM-SoC plans for v3.4 merge window
+Message-ID: <20120123114902.GY1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 12:25:06PM +0100, Petter Nordby wrote:
-> Some Atmel AT91 devices contains a touchscreen analog to digital
-> converter. This device driver use the ADC as a multi-channel raw
-> data input device.
-> 
-> Tested on AT91SAM9G45 boards.
-> 
-> Signed-off-by: Petter Nordby <pettno@gmail.com>
-> ---
->  CREDITS                                    |    4 +
+This is an outline of the plan for this cycle, up to the next merge
+window, agreed between Olof and myself.
 
-Shouldn't this be in MAINTAINERS?
+As Nicolas' idle changes weren't merged before the last merge window
+opened, we have decided that Nicolas will resubmit his changes after
+-rc1 (in other words, now) and they will be merged into both the
+arm-soc and my trees.
 
->  arch/arm/configs/at91sam9g45_defconfig     |    1 +
->  arch/arm/mach-at91/include/mach/at91_adc.h |   16 ++
->  drivers/misc/Kconfig                       |    7 +
->  drivers/misc/Makefile                      |    1 +
->  drivers/misc/atmel_tsadc.c                 |  361 ++++++++++++++++++++++++++++
+I have at least one other patch which has a high 'will cause horrible
+conficts' rating (the debug option rearrangement patch), so I'll be
+including that for the arm-soc tree as well.
 
-We have a proper abstraction of input devices under drivers/input which
-includes touchscreens.  I suggest using that rather than developing
-your own private kernel API.
+However, what this does mean is that Arnd, Olof, and myself will be
+in for up to three months of merge hell unless people take account of
+these changes.
 
-It will avoid all sorts of bugs, like using put_user() with IRQs disabled.
+Therefore, our plan is to publish this as a baseline, and we'd really
+appreciate any development submitted after that baseline has been
+established is based upon those changes and does not conflict with
+them.  That may mean you have to pull these changes into your tree
+and merge them into your development work (and fix up any conflicts
+there yourself.)
 
-Thanks.
+Once you've taken these changes into your tree, you must not rebase or
+modify them.  Changing those commits will cause all hell to break loose,
+and we'll have to refuse merging your tree (otherwise we'll be in Linus'
+sights for a roasting at gas mark 2 million.)
