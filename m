@@ -1,43 +1,38 @@
-From: T.Mehnert@eckelmann.de (Mehnert, Torsten)
-Date: Mon, 23 Jan 2012 10:14:33 +0000
-Subject: i.mx serial driver expanion (DTR/DSR, DCD, rs485)
-Message-ID: <3F263ABB4EDE344D974E1983B568077399FDA016@EX-DAG01.eckelmann.group>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 23 Jan 2012 11:16:31 +0100
+Subject: [PATCH] ARM: GIC: fix non-SMP builds
+In-Reply-To: <4F1D2F1B.2090904@arm.com>
+References: <1327312291-9457-1-git-send-email-m.szyprowski@samsung.com>
+ <4F1D2F1B.2090904@arm.com>
+Message-ID: <003401ccd9b8$13d3a8b0$3b7afa10$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hello,
 
-we are currently developing at the imx serial driver. We are planing to
-implement two new functions and want to share them with others.
+On Monday, January 23, 2012 10:58 AM Marc Zyngier wrote:
 
-Now the question: Which of our code could be interesting for mainline?
+> On 23/01/12 09:51, Marek Szyprowski wrote:
+> > This patch fixes the build break introduced by commit db0d4db22. It
+> > happen only if SMP support has been disabled:
+> >
+> > arch/arm/common/gic.c: In function 'gic_init_bases':
+> > arch/arm/common/gic.c:679: error: implicit declaration of function 'cpu_logical_map'
+> > make[1]: *** [arch/arm/common/gic.o] Error 1
+> > make: *** [arch/arm/common] Error 2
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Please have a look at Will's patches:
+> http://patchwork.ozlabs.org/patch/136504/
+> 
+> which fix this problem in a far more elegant way.
 
-1.) Set and readout DSR/DTR in DTE style, handle DCD
+Ok, thanks for the hint! I hope it will be merged to 3.3-rc2+ to fix the regression in
+GIC code. If so, please ignore my patch. 
 
-2.) handle direction handling in RS485 Master mode (like the amtel does,
-Using TIOCSRS485 and TIOCGRS485).
-
-
-have a good week start!
-
-Regards,
-Torsten
-
-Torsten Mehnert
-K?lte- und Geb?udeleittechnik (KGL)
-
-ECKELMANN AG
-Berliner Stra?e 161
-D - 65205 Wiesbaden
-
-Phone:   +49 (0) 611 / 7103 - 370
-Fax:     +49 (0) 611 / 7103 - 133
-
-e-Mail:  mailto:t.mehnert at eckelmann.de
-Web:     http://www.eckelmann.de
-
-ECKELMANN AG
-Vorstand: Dr.-Ing. Gerd Eckelmann (Vorsitzender), Dr.-Ing. Peter Cordes, Dr.-Ing. Frank-Thomas Mellert
-Vorsitzender des Aufsichtsrats: Hubertus G. Krossa
-Sitz der Gesellschaft: Wiesbaden, Berliner Str.161
-Amtsgericht Wiesbaden, HRB 12636
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
