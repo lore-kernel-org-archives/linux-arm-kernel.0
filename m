@@ -1,51 +1,88 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 23 Jan 2012 00:09:42 -0800
-Subject: possible hrtimer related problem on tegra
-In-Reply-To: <1539302.lfXQIS47Lr@ax5200p>
-References: <1539302.lfXQIS47Lr@ax5200p>
-Message-ID: <CAOesGMhaXjxzoz-OWF3V0HsdWzuxRJMaE-MSjdAFwN8+KgQLBg@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 23 Jan 2012 08:11:40 +0000
+Subject: [PATCH 1/2] arm:omap2:board-generic: Add DT support for AM33xx
+ devices
+In-Reply-To: <20120118205828.GM4223@ponder.secretlab.ca>
+References: <1326870839-19951-1-git-send-email-hvaibhav@ti.com>
+ <20120118205828.GM4223@ponder.secretlab.ca>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317AF206@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 19, 2012 at 02:28:28, Grant Likely wrote:
+> On Wed, Jan 18, 2012 at 12:43:58PM +0530, Vaibhav Hiremath wrote:
+> > Although we consider am33xx device under omap34xx family of devices,
+> > there is indeed difference between them, for example,
+> > 
+> >       - Initial required mapping (->map_io)
+> >       - Early init (->init_early)
+> > 	Here, the whole sequence/data is different than omap3,
+> > 	For example, clock/hwmod/power/voltage data.
+> >       - clock event/source timer (name and instances)
+> > 
+> > So, this patch adds seperate machine descriptor for AM33XX family
+> > of devices in board-generic.c file.
+> > 
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > CC: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > ---
+> > Tested it on AM335x-EVM, AM37xEVM and AM3517EVM.
+> > 
+> >  arch/arm/mach-omap2/board-generic.c |   19 +++++++++++++++++++
+> >  1 files changed, 19 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> > index f7b4b24..2faecc8 100644
+> > --- a/arch/arm/mach-omap2/board-generic.c
+> > +++ b/arch/arm/mach-omap2/board-generic.c
+> > @@ -106,6 +106,25 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+> >  MACHINE_END
+> >  #endif
+> > 
+> > +#if defined(CONFIG_SOC_OMAPAM33XX)
+> > +static const char *am33xx_boards_compat[] __initdata = {
+> > +	"ti,am33xx",
+> 
+> Don't forget to add the new compatible values to
+> Documentation/device-tree/bindings.
+> 
+> > +	NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+> > +	.atag_offset	= 0x100,
+> 
+> Unneeded for DT booting.
+> 
+> Otherwise, you can add:
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> 
 
-On Sun, Jan 22, 2012 at 7:18 AM, Marc Dietrich <marvin24@gmx.de> wrote:
-> Hi,
->
-> I've been plagued with random lockups starting with Linux 3.0.13 (pulled from
-> ChromeOS-3.0 tree) on a Tegra board (paz00). First symtoms are slowly losing
-> responsiveness followed by a total lockup (nothing in dmesg, no oops). Using
-> performance governor instead of ondemand, made it go away.
->
-> So I started bisecting 3.0.12..3.0.13 and finially found that reverting
-> 24ee8bfe (hrtimer: Fix extra wakeups from __remove_hrtimer()) fixes the
-> problem.
->
-> As Olof mentioned on IRC it is likely that the patch does not directly causes
-> lockups but something else which was hidden before. It isn't clear to me if
-> other tegra boards (seaboard, harmony) also suffer from this.
->
-> Any hints on this issue are appreciated.
+Benoit,
 
-You're asking on a community list about issues with a distro kernel.
-In general that is frowned upon.
+Can you please merge this patch-series for next pull request?
 
-Since I'm one of the people looking after the distro kernel in
-particular though; The current 3.0 tegra branch has a handful of
-stability issues with power management/cpufreq/dvfs enabled, and we
-have chosen to (at least for now) disable those features in our
-configs. Chances are good that that patch in question is tickling a
-bug that is specific to the Chrome OS tree so without further
-investigation I don't see a reason to pull in external folks right now
-either.
+Thanks,
+Vaibhav
 
-The other tegra maintainers don't particularly know what's in our
-distro tree either, and I wouldn't expect them to spend time on
-working on out-of-tree code that isn't their own.
-
-Best way forward is probably for you to do a local revert on the
-offending patch and to open a new issue at http://crosbug.com/ for it.
-Feel free to cc me (olofj at chromium.org) on the bug.
-
-
--Olof
+> > +	.reserve	= omap_reserve,
+> > +	.map_io		= am33xx_map_io,
+> > +	.init_early	= am33xx_init_early,
+> > +	.init_irq	= omap_init_irq,
+> > +	.handle_irq	= omap3_intc_handle_irq,
+> > +	.init_machine	= omap_generic_init,
+> > +	.timer		= &omap3_am33xx_timer,
+> > +	.dt_compat	= am33xx_boards_compat,
+> > +MACHINE_END
+> > +#endif
+> > +
+> >  #if defined(CONFIG_ARCH_OMAP4)
+> >  static const char *omap4_boards_compat[] __initdata = {
+> >  	"ti,omap4",
+> > --
+> > 1.7.0.4
+> > 
+> 
