@@ -1,75 +1,71 @@
-From: joro@8bytes.org ('Joerg Roedel')
-Date: Mon, 23 Jan 2012 15:27:06 +0100
-Subject: [PATCH v8 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
-In-Reply-To: <001001ccc625$0afa7ee0$20ef7ca0$%cho@samsung.com>
-References: <001001ccc625$0afa7ee0$20ef7ca0$%cho@samsung.com>
-Message-ID: <20120123142706.GA6269@8bytes.org>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 23 Jan 2012 20:06:57 +0530
+Subject: omap-serial RX DMA polling?
+In-Reply-To: <alpine.DEB.2.00.1201230304310.29673@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1201221718190.26641@utopia.booyaka.com>
+ <CAAL8m4wcSfhjxg0Lyo-W7DQ85rikb6asRds95hwQQNTDXe2YKQ@mail.gmail.com>
+ <alpine.DEB.2.00.1201230304310.29673@utopia.booyaka.com>
+Message-ID: <CAAL8m4wBuFQYkyFUwNWrUZTBWuQHggy=y3Oi=6DBHNB_rqU9tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 23, 2012 at 4:17 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Mon, 23 Jan 2012, Govindraj wrote:
+>
+>> On Mon, Jan 23, 2012 at 6:03 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>> >
+>> > while trying to track down some of the serial-related PM issues in
+>> > v3.3-rc1, I noticed that the omap-serial.c driver sets a 1 microsecond
+>> > polling timer when DMA is enabled (uart_dma.rx_timer) (!) ?This seems
+>> > quite broken from both the DMA and PM points of view.
+>>
+>> Poll rate is used for doing tty_insert_flip_string for pushing data to
+>> user space to keep faster response to any client device over uart, some
+>> Bt chips expect faster response when data on uart arrives and packet
+>> should be pushed out immediately.
+>
+> Hmm. ?Let's say that the BT transceiver uses the fastest transmission rate
+> supported by the OMAP UARTs -- 3,686,400 bits per second, according to
+> Table 17-1 in the 34xx TRM vZR. ?So the RX poll timer would go off about
+> ~2.7 times per input character[1]. ?That seems like overkill...
+>
 
-please also get and inclue Acks from the Exynos maintainer for the next
-post.
-Since I have a compiling config for exynos now I will merge the patches
-when you have the Acks and addressed or explained the issues I pointed
-out below.
+Yes correct, Looks like the poll rate is to aggressive
+it should be calculated based on baud rate provided from user apace
+in termios function.
 
-On Thu, Dec 29, 2011 at 09:26:08PM +0900, KyongHo Cho wrote:
-> +static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
-> +{
-> +	struct exynos_iommu_domain *priv = domain->priv;
-> +	struct list_head *pos, *n;
-> +	unsigned long flags;
-> +	int i;
-> +
-> +	WARN_ON(!list_empty(&priv->clients));
+I had a patch to do the same in termios but,
+if you have something similar you can post out as I am currently busy with
+some other activities and may take more time.
 
-This isn't really a problem. We allow destroying a domain with devices
-attached. So this WARN_ON is not necessary.
 
-> +static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
-> +			 phys_addr_t paddr, size_t size, int prot)
-> +{
-> +	struct exynos_iommu_domain *priv = domain->priv;
-> +	unsigned long *entry;
-> +	unsigned long flags;
-> +	int ret = -ENOMEM;
-> +
-> +	BUG_ON(priv->pgtable == NULL);
-> +
-> +	spin_lock_irqsave(&priv->pgtablelock, flags);
-> +
-> +	entry = section_entry(priv->pgtable, iova);
-> +
-> +	if (size >= SECT_SIZE) {
-> +		ret = lv1set_section(entry, paddr, size >> SECT_ORDER,
-> +					&priv->lv2entcnt[lv1ent_offset(iova)]);
+> For minimum receive latency, how about calling tty_insert_flip_string()
+> from the RX DMA callback, and using a smaller transfer count? ?Or even
+> better, use PIO for the receive path and set the RX FIFO threshold to 1?
+>
+> No poll timer should be needed in either case.
 
-This looks like you are partially re-implementing behavior of generic
-code because you are mapping multiple sections at once. The generic map
-code already splits up the address range correctly, so no need to do
-this in the driver (unless there is some benefit in the hardware, like
-an IOTLB entry that can cover multiple sections or something similar).
+I remember doing similar excercise with BT + uart on zoom board
+but performance numbers where impacted.
 
-> +static size_t exynos_iommu_unmap(struct iommu_domain *domain,
-> +					       unsigned long iova, size_t size)
-> +{
-> +	struct exynos_iommu_domain *priv = domain->priv;
-> +	struct iommu_client *client;
-> +	unsigned long flags;
-> +
-> +	BUG_ON(priv->pgtable == NULL);
-> +
-> +	spin_lock_irqsave(&priv->pgtablelock, flags);
-> +
-> +	while (size != 0) {
-> +		int i, nent, order;
-> +		unsigned long *pent, *sent;
+I made buffer size as 1 byte and removed polling function and got rx_callback
+for every byte completion and pushed same to tty layer.
 
-Same with this while-loop. This looks like it re-implements behavior
-from the generic code.
+BT FTP throughput got impacted a lot.
 
-Regards,
+--
+Thanks,
+Govindraj.R
 
-	Joerg
+note: I little busy currently and replies might be delayed.
+         sorry for any inconvenience.
+
+
+>
+>
+> - Paul
+>
+> 1. At 10 line bits per character (start + byte + stop), each character
+> should take about 2.7 microseconds to transfer (the reciprocal of (3 686
+> 400 line bits per second / 10 line bits per character / 1 000 000
+> microseconds per second)).
