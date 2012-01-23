@@ -1,55 +1,21 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Mon, 23 Jan 2012 21:35:12 +0100
-Subject: [RFC PATCH 5/7] ARM: davinci: i2c: add OF support
-In-Reply-To: <1327308967-8092-6-git-send-email-hs@denx.de>
-References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-6-git-send-email-hs@denx.de>
-Message-ID: <4F1DC480.4010603@gmail.com>
+From: zbr@ioremap.net (Evgeniy Polyakov)
+Date: Mon, 23 Jan 2012 23:36:38 +0300
+Subject: [PATCH] W1: OMAP HDQ1W: use 32-bit register accesses
+In-Reply-To: <alpine.DEB.2.00.1201231155590.29673@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
+ <20120123150753.GA21395@ioremap.net>
+ <alpine.DEB.2.00.1201231155590.29673@utopia.booyaka.com>
+Message-ID: <20120123203638.GA8313@ioremap.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jan 23, 2012 at 11:57:09AM -0700, Paul Walmsley (paul at pwsan.com) wrote:
+> http://www.spinics.net/lists/arm-kernel/msg156572.html
 
-On 01/23/2012 09:56 AM, Heiko Schocher wrote:
-> add of support for the davinci i2c driver.
-> 
-> Signed-off-by: Heiko Schocher<hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-i2c at vger.kernel.org
-> Cc: Ben Dooks<ben-linux@fluff.org>
-> Cc: Wolfram Sang<w.sang@pengutronix.de>
-> Cc: Grant Likely<grant.likely@secretlab.ca>
-> Cc: Sekhar Nori<nsekhar@ti.com>
-> Cc: Wolfgang Denk<wd@denx.de>
-> ---
->   .../devicetree/bindings/arm/davinci/i2c.txt        |   39 ++++++++++++++++++
->   drivers/i2c/busses/i2c-davinci.c                   |   43 ++++++++++++++++++++
->   2 files changed, 82 insertions(+), 0 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
-> new file mode 100644
-> index 0000000..94ec670
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
-> @@ -0,0 +1,39 @@
-> +* Texas Instruments Davinci I2C
-> +
-> +This file provides information, what the device node for the
-> +davinci i2c interface contain.
-> +
-> +Required properties:
-> +- compatible: "ti,davinci-i2c";
-> +- reg : Offset and length of the register set for the device
-> +- id: id of the controller
+Well, if runtime PM does its job for clock manipulation properly, then
+things should be fine. I suppose that ->probe() will fire up first and
+you say it boots and detects w1 properly, so patch looks good.
+Feel free to add my ack
 
-I was wondering whether we're supposed to use "cell-index" property name
-for such a device instance index? or doesn't it really matter and "id" is 
-fine? Such an IP instance index seems quite common so I thought it could
-be easier to follow to use standard name.
-
---
-Regards,
-Sylwester
+-- 
+	Evgeniy Polyakov
