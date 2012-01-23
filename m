@@ -1,113 +1,42 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 23 Jan 2012 15:55:54 +0530
-Subject: [PATCH 1/2] tty: serial: OMAP: ensure FIFO levels are set
- correctly in non-DMA mode
-In-Reply-To: <CAAL8m4xHzdESmWy8eKwX5-Zb1z8FSRzBxF67bkf=N3JjCL9rBg@mail.gmail.com>
-References: <20120121071934.18707.64258.stgit@dusk>
- <20120121072737.18707.77811.stgit@dusk>
- <CAAL8m4xHzdESmWy8eKwX5-Zb1z8FSRzBxF67bkf=N3JjCL9rBg@mail.gmail.com>
-Message-ID: <CAAL8m4z4G0KUSU3072DEBAQ0XEGLmvdQkZNyAva8txaE+_XeOg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Jan 2012 10:29:39 +0000
+Subject: [PATCH] ARM: GIC: fix non-SMP builds
+In-Reply-To: <003401ccd9b8$13d3a8b0$3b7afa10$%szyprowski@samsung.com>
+References: <1327312291-9457-1-git-send-email-m.szyprowski@samsung.com>
+ <4F1D2F1B.2090904@arm.com>
+ <003401ccd9b8$13d3a8b0$3b7afa10$%szyprowski@samsung.com>
+Message-ID: <4F1D3693.6010201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 3:51 PM, Govindraj <govindraj.ti@gmail.com> wrote:
-> On Sat, Jan 21, 2012 at 12:57 PM, Paul Walmsley <paul@pwsan.com> wrote:
->> Ensure FIFO levels are set correctly in non-DMA mode (the default).
->> This patch will cause a receive FIFO threshold interrupt to be raised when
->> there is at least one byte in the RX FIFO. ?It will also cause a transmit
->> FIFO threshold interrupt when there is only one byte remaining in the TX
->> FIFO.
+On 23/01/12 10:16, Marek Szyprowski wrote:
+> Hello,
+> 
+> On Monday, January 23, 2012 10:58 AM Marc Zyngier wrote:
+> 
+>> On 23/01/12 09:51, Marek Szyprowski wrote:
+>>> This patch fixes the build break introduced by commit db0d4db22. It
+>>> happen only if SMP support has been disabled:
+>>>
+>>> arch/arm/common/gic.c: In function 'gic_init_bases':
+>>> arch/arm/common/gic.c:679: error: implicit declaration of function 'cpu_logical_map'
+>>> make[1]: *** [arch/arm/common/gic.o] Error 1
+>>> make: *** [arch/arm/common] Error 2
+>>>
+>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 >>
->> These changes fix the receive interrupt problem and part of the
->> transmit interrupt problem. ?A separate set of issues must be worked
->> around for the transmit path to have a basic level of functionality; a
->> subsequent patch will address these.
+>> Please have a look at Will's patches:
+>> http://patchwork.ozlabs.org/patch/136504/
 >>
->> DMA operation is unaffected by this patch.
->>
->> Signed-off-by: Paul Walmsley <paul@pwsan.com>
->> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> Cc: Govindraj Raja <govindraj.r@ti.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> ---
->> ?drivers/tty/serial/omap-serial.c | ? 35 +++++++++++++++++++++++++++++++----
->> ?1 files changed, 31 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
->> index d192dcb..9de7d71 100644
->> --- a/drivers/tty/serial/omap-serial.c
->> +++ b/drivers/tty/serial/omap-serial.c
->> @@ -46,6 +46,18 @@
->>
->> ?#define DEFAULT_CLK_SPEED 48000000 /* 48Mhz*/
->>
->> +/* SCR register bitmasks */
->> +#define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK ? ? ? ? ? ? ?(1 << 7)
->> +#define OMAP_UART_SCR_TX_TRIG_GRANU1_MASK ? ? ? ? ? ? ?(1 << 6)
->> +
->> +/* FCR register bitmasks */
->> +#define OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT ? ? ? ? ? ? ? 6
->> +#define OMAP_UART_FCR_RX_FIFO_TRIG_MASK ? ? ? ? ? ? ? ? ? ? ? ?(0x3 << 6)
->> +#define OMAP_UART_FCR_TX_FIFO_TRIG_SHIFT ? ? ? ? ? ? ? 4
->> +
->> +/* TLR register bitmasks */
->> +#define OMAP_UART_TLR_TX_FIFO_TRIG_DMA_SHIFT ? ? ? ? ? 0
->> +
->> ?static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
->>
->> ?/* Forward declaration of functions */
->> @@ -694,6 +706,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
->> ? ? ? ?unsigned char efr = 0;
->> ? ? ? ?unsigned long flags = 0;
->> ? ? ? ?unsigned int baud, quot;
->> + ? ? ? u32 tlr;
->>
->> ? ? ? ?switch (termios->c_cflag & CSIZE) {
->> ? ? ? ?case CS5:
->> @@ -811,14 +824,28 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
->> ? ? ? ?up->mcr = serial_in(up, UART_MCR);
->> ? ? ? ?serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
->> ? ? ? ?/* FIFO ENABLE, DMA MODE */
->> - ? ? ? serial_out(up, UART_FCR, up->fcr);
->> - ? ? ? serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
->> +
->> + ? ? ? up->scr |= OMAP_UART_SCR_TX_TRIG_GRANU1_MASK;
->> + ? ? ? up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
->>
->> ? ? ? ?if (up->use_dma) {
->> - ? ? ? ? ? ? ? serial_out(up, UART_TI752_TLR, 0);
->> - ? ? ? ? ? ? ? up->scr |= (UART_FCR_TRIGGER_4 | UART_FCR_TRIGGER_8);
->
-> Any reasons for removing scr config for dma mode ?
->
+>> which fix this problem in a far more elegant way.
+> 
+> Ok, thanks for the hint! I hope it will be merged to 3.3-rc2+ to fix the regression in
+> GIC code. If so, please ignore my patch. 
 
-Please ignore.. was in hurry.
+It just got picked up by Russell, so I'd expect to see it being merged
+upstream in a short while.
 
-
->
->> + ? ? ? ? ? ? ? tlr = 0;
->> + ? ? ? } else {
->> + ? ? ? ? ? ? ? up->scr &= ~OMAP_UART_SCR_TX_EMPTY;
->> +
->> + ? ? ? ? ? ? ? /* Set receive FIFO threshold to 1 */
->> + ? ? ? ? ? ? ? up->fcr &= ~OMAP_UART_FCR_RX_FIFO_TRIG_MASK;
->> + ? ? ? ? ? ? ? up->fcr |= (0x1 << OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT);
->> +
->> + ? ? ? ? ? ? ? /* Set TX FIFO threshold to "63" (actually 1) */
->> + ? ? ? ? ? ? ? up->fcr |= (0x3 << OMAP_UART_FCR_TX_FIFO_TRIG_SHIFT);
->> + ? ? ? ? ? ? ? tlr = (0xf << OMAP_UART_TLR_TX_FIFO_TRIG_DMA_SHIFT);
->> ? ? ? ?}
->>
->> + ? ? ? serial_out(up, UART_TI752_TLR, tlr);
->> + ? ? ? serial_out(up, UART_FCR, up->fcr);
->> + ? ? ? serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
->> +
->> ? ? ? ?serial_out(up, UART_OMAP_SCR, up->scr);
->>
->> ? ? ? ?serial_out(up, UART_EFR, up->efr);
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+	M.
+-- 
+Jazz is not dead. It just smells funny...
