@@ -1,7 +1,8 @@
 From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Mon, 23 Jan 2012 20:22:47 +0530
-Subject: [PATCH 1/3] arm:davinci: prepare to move aemif driver to drivers/mfd
-Message-ID: <1327330367-4025-1-git-send-email-prakash.pm@ti.com>
+Date: Mon, 23 Jan 2012 20:42:32 +0530
+Subject: [RESEND PATCH] arm:davinci: prepare to move aemif driver to
+ drivers/mfd
+Message-ID: <1327331552-9913-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,6 +17,8 @@ http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configu
 
 Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
 ---
+Adding: MFD maintainer and mailing list.
+
  arch/arm/mach-davinci/aemif.c              |    2 +-
  arch/arm/mach-davinci/board-da830-evm.c    |    2 +-
  arch/arm/mach-davinci/board-da850-evm.c    |    2 +-
