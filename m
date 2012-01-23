@@ -1,63 +1,31 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 23 Jan 2012 16:36:21 +0100
-Subject: [PATCH] ARM: mx28: Remove duplicate OCOTP error message
-In-Reply-To: <1327332593-27534-1-git-send-email-fabio.estevam@freescale.com>
-References: <1327332593-27534-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <201201231636.21370.marek.vasut@gmail.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Mon, 23 Jan 2012 15:42:24 +0000
+Subject: [PATCH] ARM: Print debug info for SIGBUS in user faults
+Message-ID: <1327333344-26340-1-git-send-email-javi.merino@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The mxs_get_ocotp() function already prints an error message in the case of
-> a timeout, so no need to print them again in the board files.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mxs/mach-m28evk.c  |    5 +----
->  arch/arm/mach-mxs/mach-mx28evk.c |    6 +-----
->  2 files changed, 2 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-m28evk.c
-> b/arch/arm/mach-mxs/mach-m28evk.c index 2f27582..eec1257 100644
-> --- a/arch/arm/mach-mxs/mach-m28evk.c
-> +++ b/arch/arm/mach-mxs/mach-m28evk.c
-> @@ -247,11 +247,8 @@ static int __init m28evk_fec_get_mac(void)
->  	u32 val;
->  	const u32 *ocotp = mxs_get_ocotp();
-> 
-> -	if (!ocotp) {
-> -		pr_err("%s: timeout when reading fec mac from OCOTP\n",
-> -			__func__);
-> +	if (!ocotp)
->  		return -ETIMEDOUT;
-> -	}
-> 
->  	/*
->  	 * OCOTP only stores the last 4 octets for each mac address,
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c
-> b/arch/arm/mach-mxs/mach-mx28evk.c index fdb0a56..f1cbf34 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -278,7 +278,7 @@ static int __init mx28evk_fec_get_mac(void)
->  	const u32 *ocotp = mxs_get_ocotp();
-> 
->  	if (!ocotp)
-> -		goto error;
-> +		return -ETIMEDOUT;
-> 
->  	/*
->  	 * OCOTP only stores the last 4 octets for each mac address,
-> @@ -295,10 +295,6 @@ static int __init mx28evk_fec_get_mac(void)
->  	}
-> 
->  	return 0;
-> -
-> -error:
-> -	pr_err("%s: timeout when reading fec mac from OCOTP\n", __func__);
-> -	return -ETIMEDOUT;
->  }
-> 
->  /*
+Print debug information on user faults for SIGBUS if user_debug = 16
+in the kernel command line.
 
-Looks sane :-)
+Signed-off-by: Javi Merino <javi.merino@arm.com>
+---
+ arch/arm/mm/fault.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index bb7eac3..40c43a9 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -164,7 +164,8 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 	struct siginfo si;
+ 
+ #ifdef CONFIG_DEBUG_USER
+-	if (user_debug & UDBG_SEGV) {
++	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
++	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
+ 		printk(KERN_DEBUG "%s: unhandled page fault (%d) at 0x%08lx, code 0x%03x\n",
+ 		       tsk->comm, sig, addr, fsr);
+ 		show_pte(tsk->mm, addr);
+-- 
+1.7.0.4
