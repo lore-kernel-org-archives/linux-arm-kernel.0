@@ -1,42 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 23 Jan 2012 09:53:38 +0000
-Subject: [PATCH v3 0/6] ARM: Remove the __ARCH_WANT_INTERRUPTS_ON_CTXSW
- definition
-In-Reply-To: <20120123094759.GU1068@n2100.arm.linux.org.uk>
-References: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
- <1327310131.2446.1.camel@twins> <20120123092624.GA11983@arm.com>
- <20120123094759.GU1068@n2100.arm.linux.org.uk>
-Message-ID: <20120123095338.GB11983@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Jan 2012 09:57:47 +0000
+Subject: [PATCH] ARM: GIC: fix non-SMP builds
+In-Reply-To: <1327312291-9457-1-git-send-email-m.szyprowski@samsung.com>
+References: <1327312291-9457-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F1D2F1B.2090904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 09:47:59AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 23, 2012 at 09:26:24AM +0000, Catalin Marinas wrote:
-> > On Mon, Jan 23, 2012 at 09:15:31AM +0000, Peter Zijlstra wrote:
-> > > On Fri, 2012-01-20 at 17:42 +0000, Catalin Marinas wrote:
-> > > > This is version 3 of the set of patches removing
-> > > > __ARCH_WANT_INTERRUPTS_ON_CTXSW on ARM. The series was rebased on top of
-> > > > 3.3-rc1 and fixed the conflicts with the kernel/sched/ changes and the
-> > > > ARM LPAE patches. There are no functional changes from v2. I plan to
-> > > > push this to -next and get it ready for 3.4-rc1.
-> > > > 
-> > > > Question for Peter/Ingo - how do we merge the first patch that
-> > > > introduces finish_arch_post_lock_switch? Do you pick it up or I can
-> > > > merge it via rmk (with your ack)?
-> > > 
-> > > I'm fine either way, I'll probably ask Ingo to pull your tree so that I
-> > > can stack some other patches on top.
-> > 
-> > In which case I would need Russell's acked-by.
+On 23/01/12 09:51, Marek Szyprowski wrote:
+> This patch fixes the build break introduced by commit db0d4db22. It
+> happen only if SMP support has been disabled:
 > 
-> That depends on knowing what CPU architectures this has been tested on,
-> and whether anyone external has tested it.  It's definitely a change
-> which needs some tested-by tags on it.
+> arch/arm/common/gic.c: In function 'gic_init_bases':
+> arch/arm/common/gic.c:679: error: implicit declaration of function 'cpu_logical_map'
+> make[1]: *** [arch/arm/common/gic.o] Error 1
+> make: *** [arch/arm/common] Error 2
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-I agree. On my side, I tested it on:
+Please have a look at Will's patches:
+http://patchwork.ozlabs.org/patch/136504/
 
-Versatile Express + Cortex-A9 (SMP configuration, ASIDs)
-Versatile PB926 (UP configuration, no ASIDs)
+which fix this problem in a far more elegant way.
 
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
