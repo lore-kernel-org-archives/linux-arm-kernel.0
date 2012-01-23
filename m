@@ -1,66 +1,65 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 23 Jan 2012 15:30:01 +0530
-Subject: omap-serial RX DMA polling?
-In-Reply-To: <alpine.DEB.2.00.1201221718190.26641@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1201221718190.26641@utopia.booyaka.com>
-Message-ID: <CAAL8m4wcSfhjxg0Lyo-W7DQ85rikb6asRds95hwQQNTDXe2YKQ@mail.gmail.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Mon, 23 Jan 2012 11:08:24 +0100
+Subject: possible hrtimer related problem on tegra
+In-Reply-To: <CAOesGMhaXjxzoz-OWF3V0HsdWzuxRJMaE-MSjdAFwN8+KgQLBg@mail.gmail.com>
+References: <1539302.lfXQIS47Lr@ax5200p>
+ <CAOesGMhaXjxzoz-OWF3V0HsdWzuxRJMaE-MSjdAFwN8+KgQLBg@mail.gmail.com>
+Message-ID: <1429397.hdcPX4fuRz@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 6:03 AM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> Hello Govindraj
->
-> while trying to track down some of the serial-related PM issues in
-> v3.3-rc1, I noticed that the omap-serial.c driver sets a 1 microsecond
-> polling timer when DMA is enabled (uart_dma.rx_timer) (!) ?This seems
-> quite broken from both the DMA and PM points of view.
->
+Hi Olof,
 
-Poll rate is used for doing tty_insert_flip_string for pushing data to
-user space
-to keep faster response to any client device over uart, some Bt chips
-expect faster
-response when data on uart arrives and packet should be pushed out immediately.
+Am Montag, 23. Januar 2012, 00:09:42 schrieb Olof Johansson:
+> On Sun, Jan 22, 2012 at 7:18 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+> > I've been plagued with random lockups starting with Linux 3.0.13 (pulled from
+> > ChromeOS-3.0 tree) on a Tegra board (paz00). First symtoms are slowly losing
+> > responsiveness followed by a total lockup (nothing in dmesg, no oops). Using
+> > performance governor instead of ondemand, made it go away.
+> > 
+> > So I started bisecting 3.0.12..3.0.13 and finially found that reverting
+> > 24ee8bfe (hrtimer: Fix extra wakeups from __remove_hrtimer()) fixes the
+> > problem.
+> > 
+> > As Olof mentioned on IRC it is likely that the patch does not directly causes
+> > lockups but something else which was hidden before. It isn't clear to me if
+> > other tegra boards (seaboard, harmony) also suffer from this.
+> > 
+> > Any hints on this issue are appreciated.
+> 
+> You're asking on a community list about issues with a distro kernel.
+> In general that is frowned upon.
 
+I'm sorry to have this reported on a non appropriate place. I had the impression that 
+the ChromeOS kernel, and especially the timer related code, doesn't differ too much 
+from the mainline kernel (only suspend code added?).
 
-> From a DMA point of view, the DMA transfer should automatically start
-> when there is data to transfer, and stop when there is no data left, based
-> on the DMA request lines. ?So timer-driven polling should not be needed at
-> all.
->
+On the other hand, there is no other place I know of to report problems with Android 
+or ChromeOS kernels and which is reaching most of tegra kernel developers/users 
+(sorry again if readers feel that I just spammed the list). There are at least some 
+chances other users also see this issue, if it is not strictly related to the 
+ChromeOS kernel only.
 
-its for tty_insert pushing data to tty stack.
+> Since I'm one of the people looking after the distro kernel in
+> particular though; The current 3.0 tegra branch has a handful of
+> stability issues with power management/cpufreq/dvfs enabled, and we
+> have chosen to (at least for now) disable those features in our
+> configs. Chances are good that that patch in question is tickling a
+> bug that is specific to the Chrome OS tree so without further
+> investigation I don't see a reason to pull in external folks right now
+> either.
+> 
+> The other tegra maintainers don't particularly know what's in our
+> distro tree either, and I wouldn't expect them to spend time on
+> working on out-of-tree code that isn't their own.
+> 
+> Best way forward is probably for you to do a local revert on the
+> offending patch and to open a new issue at http://crosbug.com/ for it.
+> Feel free to cc me (olofj at chromium.org) on the bug.
 
+Ok, I filed a bug report: http://code.google.com/p/chromium-os/issues/detail?id=25334 
+(no idea how to add a CC).
 
-> From a PM point of view, this short timer will effectively prevent the MPU
-> from going into a low-power state whenever there is data in the FIFO.
-> This will more than erase any energy consumption or CPU efficiency
-> benefits of doing DMA. ?Interrupt-driven PIO should be much more efficient
-> than this, since at least the MPU can enter a low-power state while
-> waiting for the FIFO to fill.
->
+I'll also try to reproduce it on a mainline kernel.
 
-yes we maintain 3 secs timeout period and keep uart active in DMA case.
-since rx is asynchronous we cant afford to stop and start dma every time after
-x bytes after every rx data completion call back.
-
-
-> So basically, the broken timeout calculations used in the interrupt-driven
-> PIO mode (which set a 1 microsecond PM QoS constraint), plus the 1
-> microsecond polling timer used in DMA mode, mean that this driver is
-> pretty bad from a PM perspective.
->
-> I sent some patches to fix the interrupt-driven PIO receive part of the
-> problem, which you've probably seen. ?But I'm hoping that you can describe
-> further why the driver needs this RX DMA polling timer? ?Shouldn't it be
-> unnecessary? ?If it's truly unavoidable, then we should presumably not
-> even bother with RX DMA at all.
->
->
->
-> ?- Paul
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+Marc
