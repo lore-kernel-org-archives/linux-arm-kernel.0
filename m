@@ -1,33 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 23 Jan 2012 19:33:00 +0000
-Subject: [PATCH v2 2/2] regulator: add device tree support for max8997
-In-Reply-To: <4F1DB34C.4030103@gmail.com>
-References: <1326353738-26864-1-git-send-email-thomas.abraham@linaro.org>
- <1326353738-26864-3-git-send-email-thomas.abraham@linaro.org>
- <4F1D9DDE.2070106@samsung.com>
- <20120123182056.GA26409@opensource.wolfsonmicro.com>
- <4F1DB34C.4030103@gmail.com>
-Message-ID: <20120123193259.GC26409@opensource.wolfsonmicro.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 23 Jan 2012 12:48:54 -0700 (MST)
+Subject: omap-serial RX DMA polling?
+In-Reply-To: <CAAL8m4wBuFQYkyFUwNWrUZTBWuQHggy=y3Oi=6DBHNB_rqU9tA@mail.gmail.com>
+References: <alpine.DEB.2.00.1201221718190.26641@utopia.booyaka.com>
+ <CAAL8m4wcSfhjxg0Lyo-W7DQ85rikb6asRds95hwQQNTDXe2YKQ@mail.gmail.com>
+ <alpine.DEB.2.00.1201230304310.29673@utopia.booyaka.com>
+ <CAAL8m4wBuFQYkyFUwNWrUZTBWuQHggy=y3Oi=6DBHNB_rqU9tA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1201231228310.29673@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 08:21:48PM +0100, Karol Lewandowski wrote:
-> On 01/23/2012 07:20 PM, Mark Brown wrote:
+On Mon, 23 Jan 2012, Govindraj wrote:
 
-> >Documentation/SubmittingPatches please...
+> On Mon, Jan 23, 2012 at 4:17 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Mon, 23 Jan 2012, Govindraj wrote:
+> >
+> >> On Mon, Jan 23, 2012 at 6:03 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> >> >
+> >> > while trying to track down some of the serial-related PM issues in
+> >> > v3.3-rc1, I noticed that the omap-serial.c driver sets a 1 microsecond
+> >> > polling timer when DMA is enabled (uart_dma.rx_timer) (!) ?This seems
+> >> > quite broken from both the DMA and PM points of view.
+> >>
+> >> Poll rate is used for doing tty_insert_flip_string for pushing data to
+> >> user space to keep faster response to any client device over uart, some
+> >> Bt chips expect faster response when data on uart arrives and packet
+> >> should be pushed out immediately.
+> >
+> > Hmm. ?Let's say that the BT transceiver uses the fastest transmission rate
+> > supported by the OMAP UARTs -- 3,686,400 bits per second, according to
+> > Table 17-1 in the 34xx TRM vZR. ?So the RX poll timer would go off about
+> > ~2.7 times per input character[1]. ?That seems like overkill...
+> 
+> Yes correct, Looks like the poll rate is to aggressive
+> it should be calculated based on baud rate provided from user apace
+> in termios function.
+> 
+> I had a patch to do the same in termios but,
+> if you have something similar you can post out as I am currently busy with
+> some other activities and may take more time.
+> 
+> > For minimum receive latency, how about calling tty_insert_flip_string()
+> > from the RX DMA callback, and using a smaller transfer count? ?Or even
+> > better, use PIO for the receive path and set the RX FIFO threshold to 1?
+> >
+> > No poll timer should be needed in either case.
+> 
+> I remember doing similar excercise with BT + uart on zoom board
+> but performance numbers where impacted.
+> 
+> I made buffer size as 1 byte and removed polling function and got rx_callback
+> for every byte completion and pushed same to tty layer.
+> 
+> BT FTP throughput got impacted a lot.
 
-> I should have stated explicitly that purpose of this patch (I should
-> have called it sniplet) was to show my point only.
+The point is that if you want tty_insert_flip_string() to be called after 
+every character is received, there seems little point in using RX DMA.  
+It should be less efficient than PIO.  And the current way that it is used 
+is pointless from a power management point of view.
 
-> IMHO it's still up to debate how above problem should be solved.
+In general, RX DMA would seem to be inappropriate for a latency-sensitive 
+application, unless the application can somehow communicate how many bytes 
+it's expecting so the driver can adjust its DMA transfer size.
 
-It looks like a reasonable solution to me, and it wouldn't conflict with
-any better solution that does come along.
 
-> I'm not entirely sure that we really need things like e.g. "EN32KHz
-> AP" in DT (nor in platform data, for that matter).  I would like to
-> see Thomas' opinion first.
-
-The 32kHz crystals are a bit of an odd case, really those should be
-handled by the clock API but obviously that's stalled and has been for
-quite some time.
+- Paul
