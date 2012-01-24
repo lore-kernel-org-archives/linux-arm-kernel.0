@@ -1,37 +1,37 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 24 Jan 2012 21:13:53 +0530
-Subject: [PATCH 4/4] ARM: add jump label support
-In-Reply-To: <20111122194213.GC9581@n2100.arm.linux.org.uk>
-References: <1321888429-3519-1-git-send-email-rabin@rab.in>
- <1321888429-3519-4-git-send-email-rabin@rab.in>
- <20111122194213.GC9581@n2100.arm.linux.org.uk>
-Message-ID: <20120124154353.GA4304@debian>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 24 Jan 2012 16:59:21 +0100
+Subject: [PATCH] Correct bad gpio naming
+In-Reply-To: <4F1C4E25.6070801@antcom.de>
+References: <4F1C4E25.6070801@antcom.de>
+Message-ID: <20120124155921.GH2609@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 07:42:13PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 21, 2011 at 08:43:49PM +0530, Rabin Vincent wrote:
-> > +static inline unsigned long
-> > +arm_gen_nop(void)
-> > +{
-> > +#ifdef CONFIG_THUMB2_KERNEL
-> > +	return 0xf3af8000; /* nop.w */
-> > +#elif defined(CONFIG_CPU_32v6K)
-> > +	return 0xe320f000; /* nop */
-> > +#else
-> > +	return 0xe1a00000; /* mov r0, r0 */
+On Sun, Jan 22, 2012 at 06:57:57PM +0100, Roland Stigge wrote:
+> One of the GPIO names in drivers/gpio/gpio-lpc32xx.c
+> was bad. Renaming gpi000 -> gpio00
 > 
-> There really is no point making the distinction between the new nop
-> and the old nop instructions.  The difference between them is that the
-> new nop is a true 'no operation' whereas the old nop causes exactly
-> what the instruction says to happen - which in effect is a no-op.
-> 
-> Obviously, doing a true no-operation may require in less power, but
-> if you're using this code, you're debugging, so power usage isn't
-> really a concern.  So lets keep the code simple and just use the old
-> nop here.  It won't go away.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Is "if you're using this code, you're debugging" really correct here?
-Because the the purpose of jump labels is to reduce the overhead of
-tracepoints when they aren't activated, i.e. when you're not actively
-debugging.
+Since you are modifying LPC32xx :) Which kernel version do you run? I
+was trying to get a board up with 3.0 (not booting) and 3.3-rc1 (build
+breakage). I even thought about removing that mach, since vital parts
+seem to be missing (Net, NAND) or broken. So, I am interested if there
+are still users.
+
+CCing Kevin Wells, too: Any plans from NXP?
+
+Thanks,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/01f81aa4/attachment.sig>
