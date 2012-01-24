@@ -1,77 +1,87 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 24 Jan 2012 13:52:21 +0200
-Subject: [PATCH v4 - resend 04/13] include: platform_data: Platform data
- header for OMAP4 ASoC audio
+Date: Tue, 24 Jan 2012 13:52:24 +0200
+Subject: [PATCH v4 - resend 07/13] ASoC: twl6040: Convert MICBIAS to SUPPLY
+ widget
 In-Reply-To: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1327405950-6676-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1327405950-6676-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include file to be used with the upcoming ASoC machine driver
-for OMAP platform using ABE with twl6040 codec.
+In order to avoid breakage change the omap-abe-twl6040
+machine driver's routing.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- include/linux/platform_data/omap-abe-twl6040.h |   49 ++++++++++++++++++++++++
- 1 files changed, 49 insertions(+), 0 deletions(-)
- create mode 100644 include/linux/platform_data/omap-abe-twl6040.h
+ sound/soc/codecs/twl6040.c        |   16 ++++++++--------
+ sound/soc/omap/omap-abe-twl6040.c |   14 +++++++-------
+ 2 files changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/include/linux/platform_data/omap-abe-twl6040.h b/include/linux/platform_data/omap-abe-twl6040.h
-new file mode 100644
-index 0000000..5d298ac
---- /dev/null
-+++ b/include/linux/platform_data/omap-abe-twl6040.h
-@@ -0,0 +1,49 @@
-+/**
-+ * omap-abe-twl6040.h - ASoC machine driver OMAP4+ devices, header.
-+ *
-+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com
-+ * All rights reserved.
-+ *
-+ * Author: Peter Ujfalusi <peter.ujfalusi@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ */
-+
-+#ifndef _OMAP_ABE_TWL6040_H_
-+#define _OMAP_ABE_TWL6040_H_
-+
-+/* To select if only one channel is connected in a stereo port */
-+#define ABE_TWL6040_LEFT	(1 << 0)
-+#define ABE_TWL6040_RIGHT	(1 << 1)
-+
-+struct omap_abe_twl6040_data {
-+	char *card_name;
-+	/* Feature flags for connected audio pins */
-+	u8	has_hs;
-+	u8	has_hf;
-+	bool	has_ep;
-+	u8	has_aux;
-+	u8	has_vibra;
-+	bool	has_dmic;
-+	bool	has_hsmic;
-+	bool	has_mainmic;
-+	bool	has_submic;
-+	u8	has_afm;
-+	/* Other features */
-+	bool	jack_detection;	/* board can detect jack events */
-+	int	mclk_freq;	/* MCLK frequency speed for twl6040 */
-+};
-+
-+#endif /* _OMAP_ABE_TWL6040_H_ */
+diff --git a/sound/soc/codecs/twl6040.c b/sound/soc/codecs/twl6040.c
+index 5b9c79b..ece47ed 100644
+--- a/sound/soc/codecs/twl6040.c
++++ b/sound/soc/codecs/twl6040.c
+@@ -1125,14 +1125,14 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
+ 			TWL6040_REG_MICRCTL, 2, 0),
+ 
+ 	/* Microphone bias */
+-	SND_SOC_DAPM_MICBIAS("Headset Mic Bias",
+-			TWL6040_REG_AMICBCTL, 0, 0),
+-	SND_SOC_DAPM_MICBIAS("Main Mic Bias",
+-			TWL6040_REG_AMICBCTL, 4, 0),
+-	SND_SOC_DAPM_MICBIAS("Digital Mic1 Bias",
+-			TWL6040_REG_DMICBCTL, 0, 0),
+-	SND_SOC_DAPM_MICBIAS("Digital Mic2 Bias",
+-			TWL6040_REG_DMICBCTL, 4, 0),
++	SND_SOC_DAPM_SUPPLY("Headset Mic Bias",
++			    TWL6040_REG_AMICBCTL, 0, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("Main Mic Bias",
++			    TWL6040_REG_AMICBCTL, 4, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("Digital Mic1 Bias",
++			    TWL6040_REG_DMICBCTL, 0, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("Digital Mic2 Bias",
++			    TWL6040_REG_DMICBCTL, 4, 0, NULL, 0),
+ 
+ 	/* DACs */
+ 	SND_SOC_DAPM_DAC("HSDAC Left", "Headset Playback", SND_SOC_NOPM, 0, 0),
+diff --git a/sound/soc/omap/omap-abe-twl6040.c b/sound/soc/omap/omap-abe-twl6040.c
+index 4ee0392..3b8d571 100644
+--- a/sound/soc/omap/omap-abe-twl6040.c
++++ b/sound/soc/omap/omap-abe-twl6040.c
+@@ -123,17 +123,17 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
+ 
+ static const struct snd_soc_dapm_route audio_map[] = {
+ 	/* External Mics: MAINMIC, SUBMIC with bias*/
+-	{"MAINMIC", NULL, "Main Mic Bias"},
+-	{"SUBMIC", NULL, "Main Mic Bias"},
+-	{"Main Mic Bias", NULL, "Ext Mic"},
++	{"MAINMIC", NULL, "Ext Mic"},
++	{"SUBMIC", NULL, "Ext Mic"},
++	{"Ext Mic", NULL, "Main Mic Bias"},
+ 
+ 	/* External Speakers: HFL, HFR */
+ 	{"Ext Spk", NULL, "HFL"},
+ 	{"Ext Spk", NULL, "HFR"},
+ 
+ 	/* Headset Mic: HSMIC with bias */
+-	{"HSMIC", NULL, "Headset Mic Bias"},
+-	{"Headset Mic Bias", NULL, "Headset Mic"},
++	{"HSMIC", NULL, "Headset Mic"},
++	{"Headset Mic", NULL, "Headset Mic Bias"},
+ 
+ 	/* Headset Stereophone (Headphone): HSOL, HSOR */
+ 	{"Headset Stereophone", NULL, "HSOL"},
+@@ -182,8 +182,8 @@ static const struct snd_soc_dapm_widget dmic_dapm_widgets[] = {
+ };
+ 
+ static const struct snd_soc_dapm_route dmic_audio_map[] = {
+-	{"DMic", NULL, "Digital Mic1 Bias"},
+-	{"Digital Mic1 Bias", NULL, "Digital Mic"},
++	{"DMic", NULL, "Digital Mic"},
++	{"Digital Mic", NULL, "Digital Mic1 Bias"},
+ };
+ 
+ static int omapabe_dmic_init(struct snd_soc_pcm_runtime *rtd)
 -- 
 1.7.8.3
