@@ -1,36 +1,17 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Mon, 23 Jan 2012 16:52:11 -0800
-Subject: [PATCH] arm: fix build failure in mach-bcmring/arch.c
-In-Reply-To: <1327263990-8769-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1327263990-8769-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <4F1E00BB.9070705@broadcom.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 24 Jan 2012 09:58:26 +0900
+Subject: [PATCH] arm: fix compile failure in mach-shmobile/board-ag5evm.c
+In-Reply-To: <1327262245-21049-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1327262245-21049-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20120124005826.GB32319@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/22/2012 12:26 PM, Paul Gortmaker wrote:
-> Upstream commit d1fce9c115eeb93e01c01732dfe9a86cf76009cf
->
->      "ARM: restart: bcmring: use new restart hook"
->
-> breaks building of this platform, since what used to be the
-> last field of the MACHINE_START/END block didn't have a
-> trailing comma.  Once another field was added below, we get:
->
-> arch/arm/mach-bcmring/arch.c:198: error: request for member 'restart' in something not a structure or union
->
-> Signed-off-by: Paul Gortmaker<paul.gortmaker@windriver.com>
->
-> diff --git a/arch/arm/mach-bcmring/arch.c b/arch/arm/mach-bcmring/arch.c
-> index 9e5e755..45c97b1 100644
-> --- a/arch/arm/mach-bcmring/arch.c
-> +++ b/arch/arm/mach-bcmring/arch.c
-> @@ -194,6 +194,6 @@ MACHINE_START(BCMRING, "BCMRING")
->   	.init_early = bcmring_init_early,
->   	.init_irq = bcmring_init_irq,
->   	.timer =&bcmring_timer,
-> -	.init_machine = bcmring_init_machine
-> +	.init_machine = bcmring_init_machine,
->   	.restart = bcmring_restart,
->   MACHINE_END
-
-Acked-by: Jiandong Zheng <jdzheng@broadcom.com>
+On Sun, Jan 22, 2012 at 02:57:25PM -0500, Paul Gortmaker wrote:
+> Add videodev2 header which provides V4L2_PIX_FMT_RGB565 to fix:
+> 
+> arch/arm/mach-shmobile/board-ag5evm.c:274: error: 'V4L2_PIX_FMT_RGB565' undeclared here (not in a function)
+> 
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> 
+Applied, thanks.
