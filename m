@@ -1,45 +1,51 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 24 Jan 2012 09:47:56 -0800
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8317B0971@DBDE01.ent.ti.com>
- (Vaibhav Hiremath's message of "Tue, 24 Jan 2012 08:53:29 +0000")
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
- <87mx9ej8fp.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8317B0971@DBDE01.ent.ti.com>
-Message-ID: <877h0hj8kz.fsf@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 24 Jan 2012 19:57:27 +0100
+Subject: [PATCH] ARM: mxs: read correct values when setting up MAC
+Message-ID: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
+Currently, the MAC address from the second ethernet is generated from the
+crypto-key (and not a customer reg) because of a wrong index to the ocotp
+array.
 
-> On Tue, Jan 24, 2012 at 05:08:50, Hilman, Kevin wrote:
->> Vaibhav Hiremath <hvaibhav@ti.com> writes:
->> 
->> > OMAP device has 32k-sync timer which is currently used as a
->> > clocksource in the kernel (omap2plus_defconfig).
->> > The current implementation uses compile time selection between
->> > gp-timer and 32k-sync timer, which breaks multi-omap build for
->> > the devices like AM33xx, where 32k-sync timer is not available.
->> >
->> > So use hwmod database lookup mechanism, through which at run-time
->> > we can identify availability of 32k-sync timer on the device,
->> > else fall back to gp-timer.
->> 
->> With the runtime detection & fallback, I suggest also removing the
->> Kconfig choice between the two as well.
->> 
-> Kevin,
->
-> Actually I thought of cleaning whole 32KTIMER related code,
-> but then realized that, it would be major cleanup, since
-> it is being used in lot of places.
->
-> So let's not block this patch-series for this further cleanup.
-> I will work on cleaning up the complete 32KTIMER macro and 
-> submit the patches.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+---
 
-OK, Tony can make the call.
+This looks clearly wrong to me; probably ocotp was a u8 somewhen in the
+process? I wonder how it works for these boards. Am I missing something?
 
-Kevin
+ arch/arm/mach-mxs/mach-m28evk.c  |    2 +-
+ arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+index 2f27582..8d1459d 100644
+--- a/arch/arm/mach-mxs/mach-m28evk.c
++++ b/arch/arm/mach-mxs/mach-m28evk.c
+@@ -258,7 +258,7 @@ static int __init m28evk_fec_get_mac(void)
+ 	 * so hard-code DENX OUI (C0:E5:4E) here.
+ 	 */
+ 	for (i = 0; i < 2; i++) {
+-		val = ocotp[i * 4];
++		val = ocotp[i];
+ 		mx28_fec_pdata[i].mac[0] = 0xC0;
+ 		mx28_fec_pdata[i].mac[1] = 0xE5;
+ 		mx28_fec_pdata[i].mac[2] = 0x4E;
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index fdb0a56..df318ef 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -285,7 +285,7 @@ static int __init mx28evk_fec_get_mac(void)
+ 	 * so hard-code Freescale OUI (00:04:9f) here.
+ 	 */
+ 	for (i = 0; i < 2; i++) {
+-		val = ocotp[i * 4];
++		val = ocotp[i];
+ 		mx28_fec_pdata[i].mac[0] = 0x00;
+ 		mx28_fec_pdata[i].mac[1] = 0x04;
+ 		mx28_fec_pdata[i].mac[2] = 0x9f;
+-- 
+1.7.2.5
