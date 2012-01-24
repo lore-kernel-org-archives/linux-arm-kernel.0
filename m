@@ -1,54 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 24 Jan 2012 15:38:37 -0600
-Subject: [RFCv2 03/14] irq_domain: Make irq_domain structure match
- powerpc's irq_host
-In-Reply-To: <1327352870-14687-4-git-send-email-grant.likely@secretlab.ca>
-References: <1327352870-14687-1-git-send-email-grant.likely@secretlab.ca>
- <1327352870-14687-4-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <4F1F24DD.5030904@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 Jan 2012 22:45:48 +0100
+Subject: [PATCH] Documentation/pinctrl: fix a few syntax errors in code
+ examples
+In-Reply-To: <1327008905-20544-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1323383765-30742-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1327008905-20544-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CACRpkdauiejKKPLxXKWP+wvMVA_TOpYK1h2D=qptr-hOWWjeoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2012 03:07 PM, Grant Likely wrote:
-> Part of the series to unify the irq remapping mechanisms in the
-> kernel.  A follow up patch will copy the powerpc implementation into
-> kernel/irq/irqdomain.c, which will be a lot easier if the structures
-> are identical.
-> 
-> Where they differ, I've chose to use the powerpc names since there is
-> a lot more code using those names.
-> 
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+2012/1/19 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
->  arch/arm/common/gic.c     |   14 ++++----
->  include/linux/irqdomain.h |   84 ++++++++++++++++++++++++++++++++++-----------
->  kernel/irq/irqdomain.c    |   14 ++++----
->  3 files changed, 78 insertions(+), 34 deletions(-)
-> 
+> Hello,
+>
+> this is what's left from the patch I sent in the mail with message-id
+> 1323383765-30742-1-git-send-email-u.kleine-koenig at pengutronix.de after
+> rebasing to current linus/master. The original submission got an ack by
+> Stephen Warren that I assumed for this patch, too.
 
-snip...
+Thanks, applied it, if there are many doc fixes I will likely squash
+them however.
 
-> @@ -126,7 +126,7 @@ void irq_dispose_mapping(unsigned int irq)
->  }
->  EXPORT_SYMBOL_GPL(irq_dispose_mapping);
->  
-> -int irq_domain_simple_dt_translate(struct irq_domain *d,
-> +int irq_domain_simple_xlate(struct irq_domain *d,
->  			    struct device_node *controller,
->  			    const u32 *intspec, unsigned int intsize,
->  			    unsigned long *out_hwirq, unsigned int *out_type)
-
-This needs a declaration in irqdomain.h (as well as EXPORT?). There
-could be others as well, but this is the one I'm using for generic irq chip.
-
-Rob
-
-> @@ -181,7 +181,7 @@ EXPORT_SYMBOL_GPL(irq_domain_generate_simple);
->  
->  struct irq_domain_ops irq_domain_simple_ops = {
->  #ifdef CONFIG_OF_IRQ
-> -	.dt_translate = irq_domain_simple_dt_translate,
-> +	.xlate = irq_domain_simple_xlate,
->  #endif /* CONFIG_OF_IRQ */
->  };
->  EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
+Yours,
+Linus Walleij
