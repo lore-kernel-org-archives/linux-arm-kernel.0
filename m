@@ -1,78 +1,93 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 24 Jan 2012 13:52:26 +0200
-Subject: [PATCH v4 - resend 09/13] ASoC: omap-abe-twl6040: DAI link selection
- based on platform data
+Date: Tue, 24 Jan 2012 13:52:25 +0200
+Subject: [PATCH v4 - resend 08/13] ASoC: omap-abe-twl6040: Add complete DAPM
+ routing
 In-Reply-To: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1327405950-6676-10-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1327405950-6676-9-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can have machines without DMIC connected. In this case there is
-no need to create amother (unusable) capture PCM on the card.
-The existence of the DMIC connection can be checked via
-pdata->has_dmic.
-Select the correct dai_link structure for the card based on
-pdata->has_dmic.
+SDP4430 is a reference platform, and as such it has all possible
+audio routing implemented.
+Correct the DAPM routing to be complete.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- sound/soc/omap/omap-abe-twl6040.c |   25 ++++++++++++++++++++++---
- 1 files changed, 22 insertions(+), 3 deletions(-)
+ sound/soc/omap/omap-abe-twl6040.c |   46 ++++++++++++++++++++++--------------
+ 1 files changed, 28 insertions(+), 18 deletions(-)
 
 diff --git a/sound/soc/omap/omap-abe-twl6040.c b/sound/soc/omap/omap-abe-twl6040.c
-index d95bd82..7ad5b25 100644
+index 3b8d571..d95bd82 100644
 --- a/sound/soc/omap/omap-abe-twl6040.c
 +++ b/sound/soc/omap/omap-abe-twl6040.c
-@@ -212,7 +212,7 @@ static int omapabe_dmic_init(struct snd_soc_pcm_runtime *rtd)
- }
+@@ -113,38 +113,48 @@ static struct snd_soc_jack_pin hs_jack_pins[] = {
  
- /* Digital audio interface glue - connects codec <--> CPU */
--static struct snd_soc_dai_link sdp4430_dai[] = {
-+static struct snd_soc_dai_link twl6040_dmic_dai[] = {
- 	{
- 		.name = "TWL6040",
- 		.stream_name = "TWL6040",
-@@ -235,11 +235,22 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
- 	},
+ /* SDP4430 machine DAPM */
+ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
+-	SND_SOC_DAPM_MIC("Ext Mic", NULL),
+-	SND_SOC_DAPM_SPK("Ext Spk", NULL),
+-	SND_SOC_DAPM_MIC("Headset Mic", NULL),
++	/* Outputs */
+ 	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
+ 	SND_SOC_DAPM_SPK("Earphone Spk", NULL),
+-	SND_SOC_DAPM_INPUT("FM Stereo In"),
++	SND_SOC_DAPM_SPK("Ext Spk", NULL),
++	SND_SOC_DAPM_LINE("Line Out", NULL),
++	SND_SOC_DAPM_SPK("Vibrator", NULL),
++
++	/* Inputs */
++	SND_SOC_DAPM_MIC("Headset Mic", NULL),
++	SND_SOC_DAPM_MIC("Main Handset Mic", NULL),
++	SND_SOC_DAPM_MIC("Sub Handset Mic", NULL),
++	SND_SOC_DAPM_LINE("Line In", NULL),
  };
  
-+static struct snd_soc_dai_link twl6040_only_dai[] = {
-+	{
-+		.name = "TWL6040",
-+		.stream_name = "TWL6040",
-+		.cpu_dai_name = "omap-mcpdm",
-+		.codec_dai_name = "twl6040-legacy",
-+		.platform_name = "omap-pcm-audio",
-+		.codec_name = "twl6040-codec",
-+		.init = omapabe_twl6040_init,
-+		.ops = &omapabe_ops,
-+	},
-+};
+ static const struct snd_soc_dapm_route audio_map[] = {
+-	/* External Mics: MAINMIC, SUBMIC with bias*/
+-	{"MAINMIC", NULL, "Ext Mic"},
+-	{"SUBMIC", NULL, "Ext Mic"},
+-	{"Ext Mic", NULL, "Main Mic Bias"},
++	/* Routings for outputs */
++	{"Headset Stereophone", NULL, "HSOL"},
++	{"Headset Stereophone", NULL, "HSOR"},
 +
- /* Audio machine driver */
- static struct snd_soc_card omapabe_card = {
- 	.owner = THIS_MODULE,
--	.dai_link = sdp4430_dai,
--	.num_links = ARRAY_SIZE(sdp4430_dai),
++	{"Earphone Spk", NULL, "EP"},
  
- 	.dapm_widgets = twl6040_dapm_widgets,
- 	.num_dapm_widgets = ARRAY_SIZE(twl6040_dapm_widgets),
-@@ -267,6 +278,14 @@ static __devinit int omapabe_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+-	/* External Speakers: HFL, HFR */
+ 	{"Ext Spk", NULL, "HFL"},
+ 	{"Ext Spk", NULL, "HFR"},
  
-+	if (pdata->has_dmic) {
-+		card->dai_link = twl6040_dmic_dai;
-+		card->num_links = ARRAY_SIZE(twl6040_dmic_dai);
-+	} else {
-+		card->dai_link = twl6040_only_dai;
-+		card->num_links = ARRAY_SIZE(twl6040_only_dai);
-+	}
+-	/* Headset Mic: HSMIC with bias */
++	{"Line Out", NULL, "AUXL"},
++	{"Line Out", NULL, "AUXR"},
 +
- 	ret = snd_soc_register_card(card);
- 	if (ret)
- 		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
++	{"Vibrator", NULL, "VIBRAL"},
++	{"Vibrator", NULL, "VIBRAR"},
++
++	/* Routings for inputs */
+ 	{"HSMIC", NULL, "Headset Mic"},
+ 	{"Headset Mic", NULL, "Headset Mic Bias"},
+ 
+-	/* Headset Stereophone (Headphone): HSOL, HSOR */
+-	{"Headset Stereophone", NULL, "HSOL"},
+-	{"Headset Stereophone", NULL, "HSOR"},
++	{"MAINMIC", NULL, "Main Handset Mic"},
++	{"Main Handset Mic", NULL, "Main Mic Bias"},
+ 
+-	/* Earphone speaker */
+-	{"Earphone Spk", NULL, "EP"},
++	{"SUBMIC", NULL, "Sub Handset Mic"},
++	{"Sub Handset Mic", NULL, "Main Mic Bias"},
+ 
+-	/* Aux/FM Stereo In: AFML, AFMR */
+-	{"AFML", NULL, "FM Stereo In"},
+-	{"AFMR", NULL, "FM Stereo In"},
++	{"AFML", NULL, "Line In"},
++	{"AFMR", NULL, "Line In"},
+ };
+ 
+ static int omapabe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 -- 
 1.7.8.3
