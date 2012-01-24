@@ -1,194 +1,101 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 24 Jan 2012 14:29:37 -0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <20120124012038.GT22818@atomide.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <20120123210052.GS22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178CB81C0D@HQMAIL01.nvidia.com>
- <20120124012038.GT22818@atomide.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB81EDB@HQMAIL01.nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 Jan 2012 23:33:43 +0100
+Subject: [PATCH 1/4] pinctrl: add a driver for NVIDIA Tegra
+In-Reply-To: <1327083746-31430-1-git-send-email-swarren@nvidia.com>
+References: <1327083746-31430-1-git-send-email-swarren@nvidia.com>
+Message-ID: <CACRpkdZvakueQGYX0wyTFWmpC6wiixj2g1PTuKM4CgEzqJbmig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote at Monday, January 23, 2012 6:21 PM:
-> * Stephen Warren <swarren@nvidia.com> [120123 14:37]:
-> > Tony Lindgren wrote at Monday, January 23, 2012 2:01 PM:
-> > > This mostly looks pretty good to me, few more comments below.
-...
-> > > >                 pmx_sdhci_active: pinconfig-sdhci-active {
-> > > >                         /*
-> > > >                          * In each of these nodes, both the mux and config
-> > > >                          * properties are optional. This node represents the
-> > > >                          * additions to pmx_sdhci that are specific to an
-> > > >                          * active state. In this case, only pin configuration
-> > > >                          * settings are different.
-> > > >                          */
-> > > >                         config =
-> > > >                                 <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 0>
-> > > >                                 <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 0>;
-> > > >                 };
-> > > >                 pmx_sdhci_standby: pinconfig-sdhci-standby {
-> > > >                         config =
-> > > >                                 <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_TRISTATE 1>
-> > > >                                 <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_TRISTATE 1>;
-> > > >                 };
-> > >
-> > > After thinking about this a bit more, I'm now thinking that we should
-> > > probably only describe the active state in the device tree to keep things
-> > > simple.
-> > >
-> > > Anything PM related could be initialized later on during the boot by the
-> > > device driver, or even from userspace using /lib/firmware or /sys entries.
-> > > This would cut down the device tree bloat quite a bit.
-> >
-> > I think it makes sense to describe everything in one place. It's much
-> > easier to ensure everything is consistent and correct if you don't have
-> > to cross-check two sources of data for the same thing.
-> 
-> But we end up repeating the same bits over and over again making the device
-> tree bloated.
+On Fri, Jan 20, 2012 at 7:22 PM, Stephen Warren <swarren@nvidia.com> wrote:
 
-What exactly gets repeated; can you please show an example?
+> This adds a driver for the Tegra pinmux, and required parameterization
+> data for Tegra20 and Tegra30.
 
-Given that each named state can reference n nodes defining part of that
-state's pinmux configuration, and some of those nodes can affect the same
-pin controller, you can easily split the overall configuration into
-"stuff that's common for all states for this device" and "stuff that's
-common between these n states of the device but not these m others" and
-"stuff that's unique to this 1 state", and hence avoid repeating any
-identical information.
+Very appetizing - the only scary thing is the size. Some
+comments, if noone else yells after these are addressed I might
+just merge it (or I find more things to complain about...)
 
-> I'm suspecting that the initial state can be used to set the PM states for
-> pins. Probably most pins can have the PM configuration set from the start.
+> +static int tegra_pinconf_reg(struct tegra_pmx *pmx,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?const struct tegra_pingroup *g,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum tegra_pinconf_param param,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?s8 *bank, s16 *reg, s8 *bit, s8 *width)
 
-Can you please explain more?
+Why are the four last parameters signed?
 
-> If dynamic muxing is needed, it should be for a very limited set of pins,
-> and that can be done in the drivers.
+Or, rather as it seems to be a consequence of this:
 
-(and later, saying the same thing):
-> > > If we only allow describing the initial state in device tree, then we can
-> > > leave out pinctrl-names, and assume the setting is always the initial bootup
-> > > state desired.
-> >
-> > That's true, but people have already discussed the usefulness of having
-> > multiple named states, e.g. an SDHCI controller that needs different pin
-> > configuration (perhaps drive strength or slew rate?) depending on the
-> > clock rate of the SD interface itself.
-> 
-> Yes but those too should be doable from the device drivers using pin ctrl
-> framework calls. Usually it's just few pins that needs to change dynamically.
+> +struct tegra_pingroup {
+> + ? ? ? const char *name;
+> + ? ? ? const unsigned *pins;
+> + ? ? ? unsigned npins;
+> + ? ? ? int funcs[4];
+> + ? ? ? int func_safe;
+> + ? ? ? s16 mux_reg; ? ? ? ? ? ?/* Mux register offset */
+> + ? ? ? s8 mux_bank; ? ? ? ? ? ?/* Mux register bank */
+> + ? ? ? s8 mux_bit; ? ? ? ? ? ? /* Mux register bit */
+> + ? ? ? s16 pupd_reg; ? ? ? ? ? /* Pull-up/down register offset */
+> + ? ? ? s8 pupd_bank; ? ? ? ? ? /* Pull-up/down register bank */
+> + ? ? ? s8 pupd_bit; ? ? ? ? ? ?/* Pull-up/down register bit */
+> + ? ? ? s16 tri_reg; ? ? ? ? ? ?/* Tri-state register offset */
+> + ? ? ? s8 tri_bank; ? ? ? ? ? ?/* Tri-state register bank */
+> + ? ? ? s8 tri_bit; ? ? ? ? ? ? /* Tri-state register bit */
+> + ? ? ? s16 einput_reg; ? ? ? ? /* Enable-input register offset */
+> + ? ? ? s8 einput_bank; ? ? ? ? /* Enable-input register bank */
+> + ? ? ? s8 einput_bit; ? ? ? ? ?/* Enable-input register bit */
+> + ? ? ? s16 odrain_reg; ? ? ? ? /* Open-drain register offset */
+> + ? ? ? s8 odrain_bank; ? ? ? ? /* Open-drain register bank */
+> + ? ? ? s8 odrain_bit; ? ? ? ? ?/* Open-drain register bit */
+> + ? ? ? s16 lock_reg; ? ? ? ? ? /* Lock register offset */
+> + ? ? ? s8 lock_bank; ? ? ? ? ? /* Lock register bank */
+> + ? ? ? s8 lock_bit; ? ? ? ? ? ?/* Lock register bit */
+> + ? ? ? s16 ioreset_reg; ? ? ? ?/* IO reset register offset */
+> + ? ? ? s8 ioreset_bank; ? ? ? ?/* IO reset register bank */
+> + ? ? ? s8 ioreset_bit; ? ? ? ? /* IO reset register bit */
+> + ? ? ? s16 drv_reg; ? ? ? ? ? ?/* Drive fields register offset */
+> + ? ? ? s8 drv_bank; ? ? ? ? ? ?/* Drive fields register bank */
+> + ? ? ? s8 hsm_bit; ? ? ? ? ? ? /* High Speed Mode register bit */
+> + ? ? ? s8 schmitt_bit; ? ? ? ? /* Scmitt register bit */
+> + ? ? ? s8 lpmd_bit; ? ? ? ? ? ?/* Low Power Mode register bit */
+> + ? ? ? s8 drvdn_bit; ? ? ? ? ? /* Drive Down register bit */
+> + ? ? ? s8 drvdn_width; ? ? ? ? /* Drive Down field width */
+> + ? ? ? s8 drvup_bit; ? ? ? ? ? /* Drive Up register bit */
+> + ? ? ? s8 drvup_width; ? ? ? ? /* Drive Up field width */
+> + ? ? ? s8 slwr_bit; ? ? ? ? ? ?/* Slew Rising register bit */
+> + ? ? ? s8 slwr_width; ? ? ? ? ?/* Slew Rising field width */
+> + ? ? ? s8 slwf_bit; ? ? ? ? ? ?/* Slew Falling register bit */
+> + ? ? ? s8 slwf_width; ? ? ? ? ?/* Slew Falling field width */
+> +};
 
-Do you mean drivers explicitly requesting that a named pin/group have
-some specific parameter set to some specific value?
+Why are all of these things (reg bank bit ets) signed?
+Especially since a lot of them appear to translate into
+readl() writel() calls in the end, and these are unsigned.
 
-That would make the peripheral driver have to know specific details of
-each SoC's pin controller. This isn't an issue for one-off IP, but if
-you've got some IP block that gets re-used in 2 or 3 different SoCs each
-with a SoC-vendor-specific pin controller, then the driver is going to
-have to know those same details 3 times over, which is pretty much exactly
-what we're trying to avoid by abstracting the details out of the drivers
-and into a common binding that's handled by the pinctrl subsystem.
+Also, things named  *_bit are a bit (no pun intended) binary,
+are they containing a single bit? In that case say
 
-> > > Setting the initial state from device tree makes sense, but I'm afraid
-> > > the standby and off states will require driver interaction depending on
-> > > how the user wants to configure the system.
-> > >
-> > > For example, allowing a device to wake up a system might be user
-> > > configurable option, such as "Wake up on tapping the touchscreen".
-> >
-> > That can be supported pretty easily.
-> >
-> > The driver for a simple device can require two named states: "active"
-> > and "standby". In your more complex example, the driver can require
-> > three named states: "active", "standby", "standby-wake". During suspend,
-> > it'll simply select the appropriate of the latter two states based on
-> > user request.
-> >
-> > You can even retrofit this capability to a previously simple driver that
-> > Originally did:
-> >
-> > suspend() {
-> >     pinconf_select(dev, "suspend");
-> > }
-> >
-> > To make it do the following instead:
-> >
-> > suspend() {
-> >     if (wake)
-> >         state = "suspend-wake";
-> >     else
-> >         state = "suspend-nowake";
-> >     err = pinconf_select(dev, state);
-> >     if (err < 0)
-> >         pinconf_select(dev, "suspend";
-> > }
-> >
-> > ... which should allow old device trees to work fine, but new device
-> > trees to specify a different if they need.
-> 
-> You can do just the same from a driver with something like:
-> 
-> 	...
-> 	res = pin_config_set_for_pin(pctldev, pin, PIN_STATE_SUSPEND);
-> 	...
-> 
-> As long as the pinconf/pinmux driver knows how to set PIN_STATE_SUSPEND
-> for one entry. Note that I've avoided using pin_config_set here because
-> there really should not be any string parsing needed except during driver
-> init for doing things like this during runtime..
+u8 foo:1
 
-In order to implement pin_config_set_for_pin(), you still need some
-source of data defining what PIN_STATE_SUSPEND means. I has been suggested
-to defer that knowledge into each individual pin controller driver, but
-since this is probably board-specific in general, that means that each
-pin controller driver then needs to parse the data from device tree, so
-we end up with exactly the same data in device tree, just represented in
-a different way for each SoC vendor. To me, that's exactly what the pinctrl
-subsystem and common pinctrl DT bindings are trying to avoid.
+To mark that it's only one bit wide, or u8 foo:4 for four bits
+etc.
 
-> > > Then I'd rather not use "config" at all, and just put the value for
-> > > initial state mux register(s) in the mux to avoid repeating the same data
-> > > multiple time. Looks like with the mux + config/mux-config option you
-> > > need to duplicate at least TEGRA_PMX_PG_DTA.
-> > >
-> > > BTW, maybe the name "config" should probably be "mux-config" instead?
-> >
-> > Mux and config are two unrelated things though. Mux is the function
-> > (signal, alternate function, mission mode, ...) that is selected for
-> > the pin/group in question. Config is anything else, but explicitly not
-> > mux, such as pull-up, pull-down, tri-state, drive-strength, etc.
-> 
-> Right, but how many registers are you really writing to? In the cases
-> I've seen it's mostly just one register. In some cases it can be three
-> tree registers per mux, but only one would change during runtime
-> potentially.
+Looking from the use of them in this manner:
 
-For each pin group on Tegra20, there are 1, 2, or 3 registers that affect
-it. In most cases, each register contains fields that affect multiple pin
-groups. On Tegra30, there is 1:1 mapping between registers and pin groups.
+val &= ~(0x3 << g->mux_bit);
 
-> > > So to summarize: I suggest we'll just stick to basics to get the system
-> > > booting and devices working using device tree. In most cases the device
-> > > drivers should be able to configure the suspend and off states in a generic
-> > > way using pinctrl API. Everything else, like debugging, we can probably
-> > > do with userspace tools.
-> >
-> > But how will they configure suspend/off states in a generic way using the
-> > pinctrl API if the pinctrl API has no way of knowing how to configure the
-> > pins in suspend...
-> 
-> We can have a set of defined states that the pinmux/pinconf drivers can
-> implement. Then have functions to get/set a mux or a mux group. And then
-> the triggering could be hooked up into pm_runtime calls just like clock
-> framework calls.
+It looks like mux_bit should be
 
-Does runtime PM allow drivers to request arbitrary states, i.e. make up
-device-specific state names? I must admit I'm not at all familiar with it,
-but I'd expect it supports "active" and "inactive", whereas to support the
-SDHCI controller example that's been mentioned, it'd need to support
-"active 24MHz", "active 40MHz", "inactive" (the exact clock rates I use in
-this example may be wrong).
+u8 mux_bit:2;
 
--- 
-nvpublic
+And so on.
+
+func_safe doesn't look like an int either when I look at
+the code. It's something else, u8?
+
+Second, please move out the inline comment to kerneldoc
+above the struct.
+
+The rest is pretty straight forward I think.
+
+Yours,
+Linus Wallleij
