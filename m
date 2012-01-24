@@ -1,39 +1,30 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 24 Jan 2012 13:25:05 -0800
-Subject: [PATCH] tidspbridge: Rename module from bridgedriver to tidspbridge
-Message-ID: <1327440305.1798.28.camel@joe2Laptop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 24 Jan 2012 21:31:27 +0000
+Subject: [PATCH 0/4] Pending S3C64xx updates
+Message-ID: <20120124213127.GH1135@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tidspbridge when built as a module is named bridgedriver.
+This patch series is a collection of s3c64xx updates I've had hanging
+round in my tree for varying lengths of time that it'd be good to get
+merged.  There's no particularly relationship between them except that
+they're all for s3c64xx.
 
-bridgedriver is not a particularly good module name.
+Mark Brown (4):
+      ARM: S3C64XX: Make s3c64xx_init_uarts() static
+      ARM: S3C64XX: Define some additional always off clocks
+      ARM: S3C6410: Use device names for both I2C clocks
+      ARM: S3C64XX: Add hookup for Tomatin module on Cragganmore
 
-tidspbridge is what the source is named.  That seems
-a more appropriate module name too as it describes
-the hardware function better.
-
-Signed-off-by: Joe Perches <joe@perches.com>
----
- drivers/staging/tidspbridge/Makefile |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/tidspbridge/Makefile b/drivers/staging/tidspbridge/Makefile
-index fd6a276..8c8c92a 100644
---- a/drivers/staging/tidspbridge/Makefile
-+++ b/drivers/staging/tidspbridge/Makefile
-@@ -1,4 +1,4 @@
--obj-$(CONFIG_TIDSPBRIDGE)	+= bridgedriver.o
-+obj-$(CONFIG_TIDSPBRIDGE)	+= tidspbridge.o
- 
- libgen = gen/gh.o gen/uuidutil.o
- libcore = core/chnl_sm.o core/msg_sm.o core/io_sm.o core/tiomap3430.o \
-@@ -13,7 +13,7 @@ libdload = dynload/cload.o dynload/getsection.o dynload/reloc.o \
- 		 dynload/tramp.o
- libhw = hw/hw_mmu.o
- 
--bridgedriver-y := $(libgen) $(libservices) $(libcore) $(libpmgr) $(librmgr) \
-+tidspbridge-y := $(libgen) $(libservices) $(libcore) $(libpmgr) $(librmgr) \
- 			$(libdload) $(libhw)
- 
- #Machine dependent
+ arch/arm/mach-s3c64xx/clock.c                |  106 ++++++++++++++++++++++++++
+ arch/arm/mach-s3c64xx/common.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |   27 ++++++-
+ arch/arm/mach-s3c64xx/mach-crag6410.c        |   11 +++-
+ 4 files changed, 143 insertions(+), 3 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/09286098/attachment.sig>
