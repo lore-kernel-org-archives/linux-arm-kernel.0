@@ -1,26 +1,36 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 24 Jan 2012 12:57:21 -0800
-Subject: [PATCH V1] arm: tegra: dma: not required to move requestor when
- stopping.
-In-Reply-To: <1327392649-27605-1-git-send-email-ldewangan@nvidia.com>
-References: <1327392649-27605-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB81E5F@HQMAIL01.nvidia.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 24 Jan 2012 21:04:55 +0000
+Subject: [PATCH] ARM: S3C64XX: Fix mismerge of Littemill device in Cragganmore
+Message-ID: <1327439095-28151-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laxman Dewangan wrote at Tuesday, January 24, 2012 1:11 AM:
-> It is not require to move the requestor of dma to INVALID
-> option before stopping dma.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+The -next s3c64xx tree appears to have acquired a duplicate copy of
+the commit adding Littlemill which is already in mainline causing two
+copies of the device definition to be in the code. Either the duplicate
+should be dropped or this commit should be applied on top of it to remove
+one of the duplicates.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
-Tested-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
 
-I know that Laxman has checked with the HW engineers, and they see no
-reason to do this. I was originally worried about hung FIFOs preventing
-an in-progress DMA from completely without the removed code, but according
-to HW, that isn't a concern.
-
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index fe7f3be..d5a7982 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -299,11 +299,6 @@ static struct platform_device littlemill_device = {
+ 	.id		= -1,
+ };
+ 
+-static struct platform_device littlemill_device = {
+-	.name		= "littlemill",
+-	.id		= -1,
+-};
+-
+ static struct regulator_consumer_supply wallvdd_consumers[] = {
+ 	REGULATOR_SUPPLY("SPKVDD", "1-001a"),
+ 	REGULATOR_SUPPLY("SPKVDD1", "1-001a"),
 -- 
-nvpublic
+1.7.9.rc1
