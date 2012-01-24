@@ -1,124 +1,78 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 24 Jan 2012 13:52:23 +0200
-Subject: [PATCH v4 - resend 06/13] ASoC: omap-abe-twl6040: Convert to platform
- deriver
+Date: Tue, 24 Jan 2012 13:52:26 +0200
+Subject: [PATCH v4 - resend 09/13] ASoC: omap-abe-twl6040: DAI link selection
+ based on platform data
 In-Reply-To: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1327405950-6676-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1327405950-6676-10-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP4 ABE/TWL6040 machine driver to platform
-driver.
-For the card name use the string provided via platform data.
-The card's name for OMAP4 SDP4430 has been changed:
-SDP4430 -> OMAP4-SDP4430
+We can have machines without DMIC connected. In this case there is
+no need to create amother (unusable) capture PCM on the card.
+The existence of the DMIC connection can be checked via
+pdata->has_dmic.
+Select the correct dai_link structure for the card based on
+pdata->has_dmic.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- sound/soc/omap/omap-abe-twl6040.c |   60 ++++++++++++++++++++++---------------
- 1 files changed, 36 insertions(+), 24 deletions(-)
+ sound/soc/omap/omap-abe-twl6040.c |   25 ++++++++++++++++++++++---
+ 1 files changed, 22 insertions(+), 3 deletions(-)
 
 diff --git a/sound/soc/omap/omap-abe-twl6040.c b/sound/soc/omap/omap-abe-twl6040.c
-index 5598165..4ee0392 100644
+index d95bd82..7ad5b25 100644
 --- a/sound/soc/omap/omap-abe-twl6040.c
 +++ b/sound/soc/omap/omap-abe-twl6040.c
-@@ -23,6 +23,7 @@
- #include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/mfd/twl6040.h>
-+#include <linux/platform_data/omap-abe-twl6040.h>
- #include <linux/module.h>
+@@ -212,7 +212,7 @@ static int omapabe_dmic_init(struct snd_soc_pcm_runtime *rtd)
+ }
  
- #include <sound/core.h>
-@@ -226,7 +227,6 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
- 
- /* Audio machine driver */
- static struct snd_soc_card omapabe_card = {
--	.name = "SDP4430",
- 	.owner = THIS_MODULE,
- 	.dai_link = sdp4430_dai,
- 	.num_links = ARRAY_SIZE(sdp4430_dai),
-@@ -237,44 +237,56 @@ static struct snd_soc_card omapabe_card = {
- 	.num_dapm_routes = ARRAY_SIZE(audio_map),
+ /* Digital audio interface glue - connects codec <--> CPU */
+-static struct snd_soc_dai_link sdp4430_dai[] = {
++static struct snd_soc_dai_link twl6040_dmic_dai[] = {
+ 	{
+ 		.name = "TWL6040",
+ 		.stream_name = "TWL6040",
+@@ -235,11 +235,22 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
+ 	},
  };
  
--static struct platform_device *omapabe_snd_device;
--
--static int __init omapabe_soc_init(void)
-+static __devinit int omapabe_probe(struct platform_device *pdev)
- {
-+	struct omap_abe_twl6040_data *pdata = dev_get_platdata(&pdev->dev);
-+	struct snd_soc_card *card = &omapabe_card;
- 	int ret;
- 
--	if (!machine_is_omap_4430sdp())
--		return -ENODEV;
--	printk(KERN_INFO "SDP4430 SoC init\n");
-+	card->dev = &pdev->dev;
- 
--	omapabe_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!omapabe_snd_device) {
--		printk(KERN_ERR "Platform device allocation failed\n");
--		return -ENOMEM;
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "Missing pdata\n");
-+		return -ENODEV;
- 	}
- 
--	platform_set_drvdata(omapabe_snd_device, &omapabe_card);
-+	if (pdata->card_name) {
-+		card->name = pdata->card_name;
-+	} else {
-+		dev_err(&pdev->dev, "Card name is not provided\n");
-+		return -ENODEV;
-+	}
- 
--	ret = platform_device_add(omapabe_snd_device);
-+	ret = snd_soc_register_card(card);
- 	if (ret)
--		goto err;
--
--	return 0;
-+		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
-+			ret);
- 
--err:
--	printk(KERN_ERR "Unable to add platform device\n");
--	platform_device_put(omapabe_snd_device);
- 	return ret;
- }
--module_init(omapabe_soc_init);
- 
--static void __exit omapabe_soc_exit(void)
-+static int __devexit omapabe_remove(struct platform_device *pdev)
- {
--	platform_device_unregister(omapabe_snd_device);
-+	struct snd_soc_card *card = platform_get_drvdata(pdev);
-+
-+	snd_soc_unregister_card(card);
-+
-+	return 0;
- }
--module_exit(omapabe_soc_exit);
-+
-+static struct platform_driver omapabe_driver = {
-+	.driver = {
-+		.name = "omap-abe-twl6040",
-+		.owner = THIS_MODULE,
-+		.pm = &snd_soc_pm_ops,
++static struct snd_soc_dai_link twl6040_only_dai[] = {
++	{
++		.name = "TWL6040",
++		.stream_name = "TWL6040",
++		.cpu_dai_name = "omap-mcpdm",
++		.codec_dai_name = "twl6040-legacy",
++		.platform_name = "omap-pcm-audio",
++		.codec_name = "twl6040-codec",
++		.init = omapabe_twl6040_init,
++		.ops = &omapabe_ops,
 +	},
-+	.probe = omapabe_probe,
-+	.remove = __devexit_p(omapabe_remove),
 +};
 +
-+module_platform_driver(omapabe_driver);
+ /* Audio machine driver */
+ static struct snd_soc_card omapabe_card = {
+ 	.owner = THIS_MODULE,
+-	.dai_link = sdp4430_dai,
+-	.num_links = ARRAY_SIZE(sdp4430_dai),
  
- MODULE_AUTHOR("Misael Lopez Cruz <misael.lopez@ti.com>");
- MODULE_DESCRIPTION("ALSA SoC for OMAP boards with ABE and twl6040 codec");
- MODULE_LICENSE("GPL");
--
-+MODULE_ALIAS("platform:omap-abe-twl6040");
+ 	.dapm_widgets = twl6040_dapm_widgets,
+ 	.num_dapm_widgets = ARRAY_SIZE(twl6040_dapm_widgets),
+@@ -267,6 +278,14 @@ static __devinit int omapabe_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	if (pdata->has_dmic) {
++		card->dai_link = twl6040_dmic_dai;
++		card->num_links = ARRAY_SIZE(twl6040_dmic_dai);
++	} else {
++		card->dai_link = twl6040_only_dai;
++		card->num_links = ARRAY_SIZE(twl6040_only_dai);
++	}
++
+ 	ret = snd_soc_register_card(card);
+ 	if (ret)
+ 		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
 -- 
 1.7.8.3
