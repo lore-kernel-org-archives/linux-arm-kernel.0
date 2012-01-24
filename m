@@ -1,30 +1,31 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 24 Jan 2012 21:31:27 +0000
-Subject: [PATCH 0/4] Pending S3C64xx updates
-Message-ID: <20120124213127.GH1135@opensource.wolfsonmicro.com>
+Date: Tue, 24 Jan 2012 21:31:43 +0000
+Subject: [PATCH 1/4] ARM: S3C64XX: Make s3c64xx_init_uarts() static
+In-Reply-To: <20120124213127.GH1135@opensource.wolfsonmicro.com>
+References: <20120124213127.GH1135@opensource.wolfsonmicro.com>
+Message-ID: <1327440706-31915-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is a collection of s3c64xx updates I've had hanging
-round in my tree for varying lengths of time that it'd be good to get
-merged.  There's no particularly relationship between them except that
-they're all for s3c64xx.
+Now that it's in common.c it's not used in multiple source files.
 
-Mark Brown (4):
-      ARM: S3C64XX: Make s3c64xx_init_uarts() static
-      ARM: S3C64XX: Define some additional always off clocks
-      ARM: S3C6410: Use device names for both I2C clocks
-      ARM: S3C64XX: Add hookup for Tomatin module on Cragganmore
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/common.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
- arch/arm/mach-s3c64xx/clock.c                |  106 ++++++++++++++++++++++++++
- arch/arm/mach-s3c64xx/common.c               |    2 +-
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |   27 ++++++-
- arch/arm/mach-s3c64xx/mach-crag6410.c        |   11 +++-
- 4 files changed, 143 insertions(+), 3 deletions(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/09286098/attachment.sig>
+diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
+index 4a7394d..bee7dcd 100644
+--- a/arch/arm/mach-s3c64xx/common.c
++++ b/arch/arm/mach-s3c64xx/common.c
+@@ -49,7 +49,7 @@
+ 
+ /* uart registration process */
+ 
+-void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
++static void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ {
+ 	s3c24xx_init_uartdevs("s3c6400-uart", s3c64xx_uart_resources, cfg, no);
+ }
+-- 
+1.7.9.rc1
