@@ -1,137 +1,129 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 24 Jan 2012 21:31:44 +0000
-Subject: [PATCH 2/4] ARM: S3C64XX: Define some additional always off clocks
+Date: Tue, 24 Jan 2012 21:31:46 +0000
+Subject: [PATCH 4/4] ARM: S3C64XX: Add hookup for Tomatin module on Cragganmore
 In-Reply-To: <1327440706-31915-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20120124213127.GH1135@opensource.wolfsonmicro.com>
  <1327440706-31915-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1327440706-31915-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1327440706-31915-4-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entries to clocks_off for some additional clocks which are not
-currently used by any mainline drivers. They default on at power up
-but are never actually used so
-
-If these blocks are actually supported some of these bindings would need
-to be redone properly, for example hooking up to the muxes that use them,
-but that can be done incrementally.
+The Tomatin module carries a WM0010 audio DSP. Provide basic hookup for
+this, though additional platform data will be needed to fully integrate
+with the driver.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/clock.c |  101 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 101 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |   27 +++++++++++++++++++++++++-
+ arch/arm/mach-s3c64xx/mach-crag6410.c        |   11 +++++++++-
+ 2 files changed, 36 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index b58274f..63f2c8a 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -220,6 +220,107 @@ static struct clk init_clocks_off[] = {
- 		.parent		= &clk_h,
- 		.enable		= s3c64xx_hclk_ctrl,
- 		.ctrlbit	= S3C_CLKCON_HCLK_DMA1,
-+	}, {
-+		.name		= "3dse",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_3DSE,
-+	}, {
-+		.name		= "hclk_secur",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SECUR,
-+	}, {
-+		.name		= "sdma1",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SDMA1,
-+	}, {
-+		.name		= "sdma0",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SDMA0,
-+	}, {
-+		.name		= "hclk_jpeg",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_JPEG,
-+	}, {
-+		.name		= "camif",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_CAMIF,
-+	}, {
-+		.name		= "hclk_scaler",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SCALER,
-+	}, {
-+		.name		= "2d",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_2D,
-+	}, {
-+		.name		= "tv",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_TV,
-+	}, {
-+		.name		= "post0",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_POST0,
-+	}, {
-+		.name		= "rot",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_ROT,
-+	}, {
-+		.name		= "hclk_mfc",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_MFC,
-+	}, {
-+		.name		= "pclk_mfc",
-+		.parent		= &clk_p,
-+		.enable		= s3c64xx_pclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_PCLK_MFC,
-+	}, {
-+		.name		= "dac27",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_DAC27,
-+	}, {
-+		.name		= "tv27",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_TV27,
-+	}, {
-+		.name		= "scaler27",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_SCALER27,
-+	}, {
-+		.name		= "sclk_scaler",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_SCALER,
-+	}, {
-+		.name		= "post0_27",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_POST0_27,
-+	}, {
-+		.name		= "secur",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_SECUR,
-+	}, {
-+		.name		= "sclk_mfc",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_MFC,
-+	}, {
-+		.name		= "cam",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_CAM,
-+	}, {
-+		.name		= "sclk_jpeg",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_JPEG,
- 	},
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index cd3c97e..b4ed351 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -11,6 +11,7 @@
+ #include <linux/export.h>
+ #include <linux/interrupt.h>
+ #include <linux/i2c.h>
++#include <linux/spi/spi.h>
+ 
+ #include <linux/mfd/wm831x/irq.h>
+ #include <linux/mfd/wm831x/gpio.h>
+@@ -21,8 +22,25 @@
+ #include <sound/wm8962.h>
+ #include <sound/wm9081.h>
+ 
++#include <plat/s3c64xx-spi.h>
++
+ #include <mach/crag6410.h>
+ 
++static struct s3c64xx_spi_csinfo wm0010_spi_csinfo = {
++	.set_level = gpio_set_value,
++	.line = S3C64XX_GPC(3),
++};
++
++static struct spi_board_info wm1253_devs[] = {
++	[0] = {
++		.modalias	= "wm0010",
++		.bus_num	= 0,
++		.chip_select	= 0,
++		.mode		= SPI_MODE_0,
++		.controller_data = &wm0010_spi_csinfo,
++	},
++};
++
+ static struct wm5100_pdata wm5100_pdata = {
+ 	.ldo_ena = S3C64XX_GPN(7),
+ 	.irq_flags = IRQF_TRIGGER_HIGH,
+@@ -158,6 +176,8 @@ static __devinitdata const struct {
+ 	const char *name;
+ 	const struct i2c_board_info *i2c_devs;
+ 	int num_i2c_devs;
++	const struct spi_board_info *spi_devs;
++	int num_spi_devs;
+ } gf_mods[] = {
+ 	{ .id = 0x01, .name = "1250-EV1 Springbank" },
+ 	{ .id = 0x02, .name = "1251-EV1 Jura" },
+@@ -165,7 +185,8 @@ static __devinitdata const struct {
+ 	{ .id = 0x11, .name = "6249-EV2 Glenfarclas", },
+ 	{ .id = 0x21, .name = "1275-EV1 Mortlach" },
+ 	{ .id = 0x25, .name = "1274-EV1 Glencadam" },
+-	{ .id = 0x31, .name = "1253-EV1 Tomatin", },
++	{ .id = 0x31, .name = "1253-EV1 Tomatin",
++	  .spi_devs = wm1253_devs, .num_spi_devs = ARRAY_SIZE(wm1253_devs) },
+ 	{ .id = 0x39, .name = "1254-EV1 Dallas Dhu",
+ 	  .i2c_devs = wm1254_devs, .num_i2c_devs = ARRAY_SIZE(wm1254_devs) },
+ 	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
+@@ -197,12 +218,16 @@ static __devinit int wlf_gf_module_probe(struct i2c_client *i2c,
+ 	if (i < ARRAY_SIZE(gf_mods)) {
+ 		dev_info(&i2c->dev, "%s revision %d\n",
+ 			 gf_mods[i].name, rev + 1);
++
+ 		for (j = 0; j < gf_mods[i].num_i2c_devs; j++) {
+ 			if (!i2c_new_device(i2c->adapter,
+ 					    &(gf_mods[i].i2c_devs[j])))
+ 				dev_err(&i2c->dev,
+ 					"Failed to register dev: %d\n", ret);
+ 		}
++
++		spi_register_board_info(gf_mods[i].spi_devs,
++					gf_mods[i].num_spi_devs);
+ 	} else {
+ 		dev_warn(&i2c->dev, "Unknown module ID 0x%x revision %d\n",
+ 			 id, rev + 1);
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 5b43a57..cdbc8cb 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -581,11 +581,19 @@ static struct s3c2410_platform_i2c i2c0_pdata = {
+ 	.frequency = 400000,
  };
  
++static struct regulator_consumer_supply pvdd_1v2_consumers[] __initdata = {
++	REGULATOR_SUPPLY("DCVDD", "spi0.0"),
++	REGULATOR_SUPPLY("AVDD", "spi0.0"),
++};
++
+ static struct regulator_init_data pvdd_1v2 __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_1V2",
+-		.always_on = 1,
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 	},
++
++	.consumer_supplies = pvdd_1v2_consumers,
++	.num_consumer_supplies = ARRAY_SIZE(pvdd_1v2_consumers),
+ };
+ 
+ static struct regulator_consumer_supply pvdd_1v8_consumers[] __initdata = {
+@@ -599,6 +607,7 @@ static struct regulator_consumer_supply pvdd_1v8_consumers[] __initdata = {
+ 	REGULATOR_SUPPLY("AVDD2", "1-001a"),
+ 	REGULATOR_SUPPLY("DCVDD", "1-001a"),
+ 	REGULATOR_SUPPLY("AVDD", "1-001a"),
++	REGULATOR_SUPPLY("DBVDD", "spi0.0"),
+ };
+ 
+ static struct regulator_init_data pvdd_1v8 __initdata = {
 -- 
 1.7.9.rc1
