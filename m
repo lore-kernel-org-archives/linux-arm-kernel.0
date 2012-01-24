@@ -1,34 +1,26 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 24 Jan 2012 21:38:00 +0100
-Subject: LPC32xx status (Re: [PATCH] Correct bad gpio naming)
-In-Reply-To: <20120124192545.GB8502@pengutronix.de>
-References: <4F1C4E25.6070801@antcom.de>
- <20120124155921.GH2609@pengutronix.de> <4F1EDD15.7010704@antcom.de>
- <20120124192545.GB8502@pengutronix.de>
-Message-ID: <4F1F16A8.7010407@antcom.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 24 Jan 2012 12:57:21 -0800
+Subject: [PATCH V1] arm: tegra: dma: not required to move requestor when
+ stopping.
+In-Reply-To: <1327392649-27605-1-git-send-email-ldewangan@nvidia.com>
+References: <1327392649-27605-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB81E5F@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/12 20:25, Wolfram Sang wrote:
->> Expect the first one of the drivers to be submitted soon, I will
->> do them one by one.
+Laxman Dewangan wrote at Tuesday, January 24, 2012 1:11 AM:
+> It is not require to move the requestor of dma to INVALID
+> option before stopping dma.
 > 
-> I think the first step should be adding a generic defconfig and
-> make sure this builds and boots (I think I have a phy3250
-> somewhere, so I could test). After that new drivers would make
-> sense. IIRC clock.c was pretty broken, we needed hacks to get USB
-> working with a 2.6.35. I also see that your tree modifies it.
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 
-I see that you are already at it ;-) - for the others: On the server
-"git.antcom.de", I meant repository "linux-2.6.git", branch "work92105".
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-Unfortunately, I currently don't have a phy3250, but can check
-tomorrow with colleagues.
+I know that Laxman has checked with the HW engineers, and they see no
+reason to do this. I was originally worried about hung FIFOs preventing
+an in-progress DMA from completely without the removed code, but according
+to HW, that isn't a concern.
 
-I guess the work92105_defconfig is only useful once the drivers
-currently missing in mainline are merged. Or is there an arm specific
-tree I should update from?
-
-Thanks in advance!
-
-Roland
+-- 
+nvpublic
