@@ -1,69 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jan 2012 11:27:45 +0000
-Subject: ARM/ARM-SoC plans for v3.4 merge window
-In-Reply-To: <20120124105645.GE19798@mudshark.cambridge.arm.com>
-References: <20120123114902.GY1068@n2100.arm.linux.org.uk>
- <20120124095009.GS16726@n2100.arm.linux.org.uk>
- <20120124105645.GE19798@mudshark.cambridge.arm.com>
-Message-ID: <20120124112745.GT16726@n2100.arm.linux.org.uk>
+From: k.lewandowsk@samsung.com (Karol Lewandowski)
+Date: Tue, 24 Jan 2012 12:31:11 +0100
+Subject: [PATCH] max8997: Avoid spaces in regulator names
+Message-ID: <1327404672-5459-1-git-send-email-k.lewandowsk@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 10:56:45AM +0000, Will Deacon wrote:
-> Hi Russell,
-> 
-> On Tue, Jan 24, 2012 at 09:50:09AM +0000, Russell King - ARM Linux wrote:
-> > Right, although it's out there - but I'd like to get the AMBA changes
-> > into it which are already conflicting the Samsung development.  So I'm
-> > going to hold off officially asking for people to include the baseline
-> > until this evening.  At that point, I will shut down my 'amba' branch
-> > and transfer that over; that means I won't be accepting any further
-> > acks etc for that work.
-> > 
-> > If you haven't acked changes in the amba branch (eg, to Versatile,
-> > Realview etc) then it'll soon be too late...
-> 
-> I took a look at your amba branch, but all I can see in there is:
-> 
-> 6cfa627 ARM: 7079/1: spi: Fix builderror in spi-pl022.c
-> 1c3be36 PM: add runtime PM support to MMCI
-> 92b97f0 PM: add runtime PM support to core Primecell driver
-> 
-> which don't seem to touch Versatile or Realview. Am I looking in the wrong
-> place?
+max8997-pmic instantiated from device tree uses names, not numerical
+ids to distinguish between outputs.
 
-Erm, I don't think you're looking at the right branch - especially as
-all the commits start "ARM: amba:".  They were sent out to the mailing
-list on 20th Jan as a set of 31 patches (latest first):
+Replace spaces with underscores in said names to make it possible to
+describe these outputs as regulators in DTS.
 
-ARM: amba: samsung: use common amba device initializers
-ARM: amba: spear: use common amba device initializers
-ARM: amba: nomadik: use common amba device initializers
-ARM: amba: u300: use common amba device initializers
-ARM: amba: lpc32xx: use common amba device initializers
-ARM: amba: netx: use common amba device initializers
-ARM: amba: bcmring: use common amba device initializers
-ARM: amba: ep93xx: use common amba device initializers
-ARM: amba: omap2: use common amba device initializers
-ARM: amba: integrator: use common amba device initializers
-ARM: amba: realview: get rid of private platform amba_device initializer
-ARM: amba: versatile: get rid of private platform amba_device initializer
-ARM: amba: vexpress: get rid of private platform amba_device initializer
-ARM: amba: provide common initializers for static amba devices
-ARM: amba: make use of -1 IRQs warn
-ARM: amba: u300: get rid of NO_IRQ initializers
-ARM: amba: spear: get rid of NO_IRQ initializers
-ARM: amba: netx: get rid of NO_IRQ initializers
-ARM: amba: nomadik: get rid of NO_IRQ initializers
-ARM: amba: mxs: get rid of NO_IRQ initializers
-ARM: amba: lpc32xx: get rid of NO_IRQ initializers
-ARM: amba: integrator/realview/versatile/vexpress: get rid of NO_IRQ initializers
-ARM: amba: samsung: get rid of NO_IRQ initializers
-ARM: amba: get rid of NO_IRQ initializers
-ARM: amba: ux500: get rid of NO_IRQ
-ARM: amba: make irq 0 invalid
-ARM: amba: mxs: convert to use amba_device_alloc
-ARM: amba: integrator: convert to use amba_device_alloc
-ARM: amba: ux500: convert to use amba_device_alloc
-ARM: amba: of: convert to use amba_device_alloc
-ARM: amba: add amba_device allocation/add/put functions
+Signed-off-by: Karol Lewandowski <k.lewandowsk@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ drivers/regulator/max8997.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/regulator/max8997.c b/drivers/regulator/max8997.c
+index 053d0b7..4b572eb 100644
+--- a/drivers/regulator/max8997.c
++++ b/drivers/regulator/max8997.c
+@@ -910,13 +910,13 @@ static struct regulator_desc regulators[] = {
+ 	},
+ 	regulator_desc_buck(7),
+ 	{
+-		.name	= "EN32KHz AP",
++		.name	= "EN32KHz_AP",
+ 		.id	= MAX8997_EN32KHZ_AP,
+ 		.ops	= &max8997_fixedvolt_ops,
+ 		.type	= REGULATOR_VOLTAGE,
+ 		.owner	= THIS_MODULE,
+ 	}, {
+-		.name	= "EN32KHz CP",
++		.name	= "EN32KHz_CP",
+ 		.id	= MAX8997_EN32KHZ_CP,
+ 		.ops	= &max8997_fixedvolt_ops,
+ 		.type	= REGULATOR_VOLTAGE,
+@@ -940,7 +940,7 @@ static struct regulator_desc regulators[] = {
+ 		.type	= REGULATOR_VOLTAGE,
+ 		.owner	 = THIS_MODULE,
+ 	}, {
+-		.name	= "CHARGER CV",
++		.name	= "CHARGER_CV",
+ 		.id	= MAX8997_CHARGER_CV,
+ 		.ops	= &max8997_fixedstate_ops,
+ 		.type	= REGULATOR_VOLTAGE,
+@@ -952,7 +952,7 @@ static struct regulator_desc regulators[] = {
+ 		.type	= REGULATOR_CURRENT,
+ 		.owner	 = THIS_MODULE,
+ 	}, {
+-		.name	= "CHARGER TOPOFF",
++		.name	= "CHARGER_TOPOFF",
+ 		.id	= MAX8997_CHARGER_TOPOFF,
+ 		.ops	= &max8997_charger_fixedstate_ops,
+ 		.type	= REGULATOR_CURRENT,
+-- 
+1.7.8.3
