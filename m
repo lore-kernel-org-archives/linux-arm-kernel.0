@@ -1,260 +1,105 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 24 Jan 2012 08:36:52 -0600
-Subject: [PATCH v3 1/7] cpuidle: Add common init interface and idle
- functionality
-In-Reply-To: <1327379854-12403-2-git-send-email-rob.lee@linaro.org>
-References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
- <1327379854-12403-2-git-send-email-rob.lee@linaro.org>
-Message-ID: <4F1EC204.9020807@gmail.com>
+From: jic23@cam.ac.uk (J.I. Cameron)
+Date: 24 Jan 2012 14:39:35 +0000
+Subject: [RFC] IIO LRADC for mach-mxs
+In-Reply-To: <Prayer.1.3.4.1201241420310.5758@hermes-2.csi.cam.ac.uk>
+References: <201201241408.08083.marek.vasut@gmail.com>
+ <20120124131427.GE2609@pengutronix.de>
+ <Prayer.1.3.4.1201241420310.5758@hermes-2.csi.cam.ac.uk>
+Message-ID: <Prayer.1.3.4.1201241439350.5758@hermes-2.csi.cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2012 10:37 PM, Robert Lee wrote:
-> The patch adds some cpuidle initialization functionality commonly
-> duplicated by many platforms.
-> 
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+On Jan 24 2012, J.I. Cameron wrote:
 
-A few cosmetic comments below, but otherwise looks good.
+>On Jan 24 2012, Wolfram Sang wrote:
+>
+>>On Tue, Jan 24, 2012 at 02:08:07PM +0100, Marek Vasut wrote:
+>>> Hi guys,
+>>> 
+>>> I've been playing with a custom mxs board recently and I'd like to tinker with 
+>>> ADC. Well, apparently there was some effort but it died silently.
+>>> 
+>>> Now, there are two approaches how to go about the MXS IIO LRADC. Firstly though, 
+>>> here are some hw details:
+>>> 
+>>> 1) The ADC has 16 channels in total, some dedicated to particular function
+>>> 2) The ADC can sample only up to 8 channels at the same time
+>>> 3) The ADC delay triggers can trigger only up to 4 kinds of sampling for those 
+>>> up to 8 selected channel
+>>> 
+>>> So how should we go about this:
+>>> 
+>>> A) Implement functions, to configure and select a channel at probe-time and then 
+>>> never allow (at runtime) different channel to be selected.
+>>> 
+>>> + Channel configuration is static, passed via plat_data
+>>> + The channels don't need to be reconfigured => when data are demanded, the 
+>>> channel doesn't need to be reconfigured (if it's not configured in one of those 
+>>> 8 options) and the user doesn't need to wait for data.
+>>> - Only 8 channels can be used
+>>> 
+>>> B) Allow channel to be configured on-demand -- when it's value is requested, it 
+>>> is configured (if it's not already) for the particular function.
+>>> 
+>>> + All 16 channels can be used
+>>> - It's clunky and fragile to breakage
+>>> - It's hard to implement good channel replacement algo (replacement as on the 
+>>> delay triggers and on those 8 slots)
+>>> 
+>>> Which way do you consider better ?
+>>
+>>CCing Jonathan and the iio-list (as found in MAINTAINERS). They probably
+>>have more experience regardings those scenarios?
+>Thanks Wolfram,
+>
+>My instinct is always to make anything configurable at runtime where we can even
+>vaguely conceive of a reason it might be useful.
+>
+>Having said that, right now special function (e.g. input, hwmon directed channels)
+>are currently set up via board files (will be device tree the moment anyone has
+>a need).  I doubt there are many usecases where you'd want to change these functional
+>elements.
+>
+>For your channel replacement strategy these special function channels will be in use
+>if the client is reading form them (e.g. triggered usage). In IIO we only allow for
+>triggering a whole set of channels off a given trigger.  It's going to get really
+>ugly otherwise.  Perhaps the following will work? (I am assuming 0-8 channels can be
+>associated with any of the 4 triggers subject to the condition that the total number
+>of channels being captured is less than 8).
+>
+>Register 4 iio devices, each with all 16 channels.  Associate one with each of the
+>triggers.  Driver then maintains a count on channels enabled and refuses to enable more
+>than 8 whatever happens.  You don't have a replacement strategy, you simply refuse
+>to have too many.  We already do this for some of the devices with strange possible
+>channel sets.
+>
+>Any in kernel users (hwmon, input etc) will have to be configured to use the iio device
+>associated with the right trigger.
+>
+>Does that do the job for you?
+>
+>The reason for associating the triggers with different iio devices is that a given iio
+>device can only feed a fixed width scan to the demux unit.  Hence if we have some
+>channels triggering at one time and others at another, there is no way of handling the
+>data stream.  Whilst they are on the same hardware they are really acting as separate
+>devices that just happen to share some pins and control hardware.
+>
+>(Note I'm being useless and not pushing out the new version of in kernel IIO stuff, but
+>I should get to that at the weekend if not before - one fiddly issue with preventing
+>removal of in use devices still to work out.).
+>
+Yikes. This device is more complex than I thought.  The 'triggers' as above can also trigger each other alongside causing a set of channels to be captured.
 
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+I don't think this changes the logic behind my above answer, but it does mean you
+are going to have some trouble coming up with a control interface for the triggers.
+This may need some core changes to allow for a graph of triggers setup (it's not even
+restricted to a tree).  To illustrate.
+Trigger 1 can fire after T1 secs.  That can then start any other trigger (including
+restarting it's own count down) and/or cause channels to be sampled.  Lets say it starts
+trigger 2 and not itself.  Trigger 2 then fires after T2 seconds and starts up Triggers
+1 and 3. etc...
 
-> ---
->  drivers/cpuidle/Makefile |    2 +-
->  drivers/cpuidle/common.c |  152 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/cpuidle.h  |   24 +++++++
->  3 files changed, 177 insertions(+), 1 deletions(-)
->  create mode 100644 drivers/cpuidle/common.c
-> 
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index 5634f88..2928d93 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -2,4 +2,4 @@
->  # Makefile for cpuidle.
->  #
->  
-> -obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
-> +obj-y += cpuidle.o driver.o governor.o sysfs.o common.o governors/
-> diff --git a/drivers/cpuidle/common.c b/drivers/cpuidle/common.c
-> new file mode 100644
-> index 0000000..dafa758
-> --- /dev/null
-> +++ b/drivers/cpuidle/common.c
-> @@ -0,0 +1,152 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
+sometimes I think hardware designers go out of their way to make general purpose
+software design really really tricky...
 
-2012 now...
-
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/*
-> + * This code performs provides some commonly used cpuidle setup functionality
-> + * used by many ARM SoC platforms.  Providing this functionality here
-> + * reduces the duplication of this code for each ARM platform that uses it.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/hrtimer.h>
-> +#include <linux/err.h>
-> +#include <linux/slab.h>
-> +#include <asm/proc-fns.h>
-> +
-> +static struct cpuidle_device __percpu * common_cpuidle_devices;
-> +
-> +static int (*do_idle[CPUIDLE_STATE_MAX])(struct cpuidle_device *dev,
-> +			       struct cpuidle_driver *drv, int index);
-> +
-> +int cpuidle_def_idle(struct cpuidle_device *dev,
-> +			       struct cpuidle_driver *drv, int index)
-> +{
-> +	cpu_do_idle();
-> +	return index;
-> +}
-> +
-> +static int simple_enter(struct cpuidle_device *dev,
-> +			       struct cpuidle_driver *drv, int index)
-> +{
-> +	ktime_t time_start, time_end;
-> +
-> +	local_irq_disable();
-> +
-> +	time_start = ktime_get();
-> +
-> +	index = do_idle[index](dev, drv, index);
-> +
-> +	time_end = ktime_get();
-> +
-> +	local_irq_enable();
-> +
-> +	dev->last_residency =
-> +		(int)ktime_to_us(ktime_sub(time_end, time_start));
-> +
-> +	return index;
-> +}
-> +
-> +void common_cpuidle_devices_uninit(void)
-> +{
-> +	int cpu_id;
-> +	struct cpuidle_device *dev;
-> +
-> +	for_each_possible_cpu(cpu_id) {
-> +		dev = per_cpu_ptr(common_cpuidle_devices, cpu_id);
-> +		cpuidle_unregister_device(dev);
-> +	}
-> +
-> +	free_percpu(common_cpuidle_devices);
-> +}
-> +
-> +/**
-> + * common_cpuidle_init() - Provides some commonly used init functionality.
-> + * @pdrv		Pointer to your cpuidle_driver object.
-> + * @simple		Use the common simple_enter wrapper?
-
-remove the ?
-
-> + * @driver_data_init	Pointer to your platform function to initialize your
-> + *			platform specific driver data.  Use NULL if platform
-> + *			specific data is not needed.
-> + *
-> + * Common cpuidle init interface to provide common cpuidle functionality
-> + * used by many platforms.
-> + */
-> +int __init common_cpuidle_init(struct cpuidle_driver *pdrv, bool simple,
-> +			 void (*driver_data_init)(struct cpuidle_device *dev))
-> +{
-> +	struct cpuidle_device *dev;
-> +	struct cpuidle_driver *drv;
-> +	int i, cpu_id, ret;
-> +
-> +	if (!pdrv || pdrv->state_count > CPUIDLE_STATE_MAX) {
-> +		pr_err("%s: Invalid Input\n", __func__);
-
-Using pr_fmt rather than function name is preferred.
-
-> +		return -EINVAL;
-> +	}
-> +
-> +	drv = kmalloc(sizeof(struct cpuidle_driver), GFP_KERNEL);
-> +	if (!drv) {
-> +		pr_err("%s: no memory for cpuidle driver\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	*drv = *pdrv;
-
-Perhaps a comment so it is clear you intend this to be struct copy.
-
-> +
-> +	for (i = 0; simple && (i < drv->state_count); i++) {
-> +		do_idle[i] = drv->states[i].enter;
-> +		drv->states[i].enter = simple_enter;
-> +	}
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		pr_err("%s: Failed to register cpuidle driver\n", __func__);
-> +		goto free_drv;
-> +	}
-> +
-> +	common_cpuidle_devices = alloc_percpu(struct cpuidle_device);
-> +	if (common_cpuidle_devices == NULL) {
-> +		ret = -ENOMEM;
-> +		goto unregister_drv;
-> +	}
-> +
-> +	/* initialize state data for each cpuidle_device */
-> +	for_each_possible_cpu(cpu_id) {
-> +		dev = per_cpu_ptr(common_cpuidle_devices, cpu_id);
-> +		dev->cpu = cpu_id;
-> +		dev->state_count = drv->state_count;
-> +
-> +		if (driver_data_init)
-> +			driver_data_init(dev);
-> +
-> +		ret = cpuidle_register_device(dev);
-> +		if (ret) {
-> +			pr_err("%s: Failed to register cpu %u\n",
-> +				__func__, cpu_id);
-> +			goto uninit;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +uninit:
-> +
-> +	common_cpuidle_devices_uninit();
-> +
-> +unregister_drv:
-> +
-> +	cpuidle_unregister_driver(drv);
-> +
-> +free_drv:
-> +
-> +	kfree(drv);
-> +
-> +	return ret;
-
-Remove all the blank lines in the error handling.
-
-> +}
-> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
-> index 712abcc..2aa89db 100644
-> --- a/include/linux/cpuidle.h
-> +++ b/include/linux/cpuidle.h
-> @@ -56,6 +56,16 @@ struct cpuidle_state {
->  
->  #define CPUIDLE_DRIVER_FLAGS_MASK (0xFFFF0000)
->  
-> +/* Common ARM WFI state */
-> +#define CPUIDLE_ARM_WFI_STATE {\
-> +	.enter                  = cpuidle_def_idle,\
-> +	.exit_latency           = 2,\
-> +	.target_residency       = 1,\
-> +	.flags                  = CPUIDLE_FLAG_TIME_VALID,\
-> +	.name                   = "WFI",\
-> +	.desc                   = "ARM core clock gating (WFI)",\
-> +}
-> +
->  /**
->   * cpuidle_get_statedata - retrieves private driver state data
->   * @st_usage: the state usage statistics
-> @@ -141,6 +151,13 @@ extern void cpuidle_resume_and_unlock(void);
->  extern int cpuidle_enable_device(struct cpuidle_device *dev);
->  extern void cpuidle_disable_device(struct cpuidle_device *dev);
->  
-> +/* provide a default idle function */
-> +extern int cpuidle_def_idle(struct cpuidle_device *dev,
-> +		       struct cpuidle_driver *drv, int index);
-> +extern int common_cpuidle_init(struct cpuidle_driver *drv, bool simple,
-> +			 void (*driver_data_init)(struct cpuidle_device *dev));
-> +extern void common_cpuidle_devices_uninit(void);
-> +
->  #else
->  static inline void disable_cpuidle(void) { }
->  static inline int cpuidle_idle_call(void) { return -ENODEV; }
-> @@ -157,6 +174,13 @@ static inline void cpuidle_resume_and_unlock(void) { }
->  static inline int cpuidle_enable_device(struct cpuidle_device *dev)
->  {return -ENODEV; }
->  static inline void cpuidle_disable_device(struct cpuidle_device *dev) { }
-> +static inline int cpuidle_def_idle(struct cpuidle_device *dev,
-> +		       struct cpuidle_driver *drv, int index)
-> +{return -ENODEV; }
-> +static inline int common_cpuidle_init(struct cpuidle_driver *pdrv,
-> +	bool simple, void (*driver_data_init)(struct cpuidle_device *dev))
-> +{return -ENODEV; }
-> +static inline void common_cpuidle_devices_uninit(void) { }
->  
->  #endif
->  
+Jonathan
