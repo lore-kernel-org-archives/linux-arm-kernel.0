@@ -1,35 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 24 Jan 2012 11:38:32 +0200
-Subject: [PATCH 3/3] S3C2443: add power domain for usb phy
-In-Reply-To: <201201082159.02368.heiko@sntech.de>
-References: <201201082156.44142.heiko@sntech.de>
- <201201082159.02368.heiko@sntech.de>
-Message-ID: <20120124093831.GT27414@legolas.emea.dhcp.ti.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 24 Jan 2012 15:19:46 +0530
+Subject: [PATCH RFC 1/2] watchdog : omap_wdt : Implement
+ WDIOC_GETBOOTSTATUS for omap3+
+In-Reply-To: <20120124093318.GA2609@pengutronix.de>
+References: <1327317188-14782-1-git-send-email-shubhrajyoti@ti.com>
+ <1327317188-14782-2-git-send-email-shubhrajyoti@ti.com>
+ <B5906170F1614E41A8A28DE3B8D12143317901B9@DBDE01.ent.ti.com>
+ <CAM=Q2ctL_Z5P6=NwAWBHD2bR=xqHMCF15g6v0Ap=hJMPdgXwyQ@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D12143317902D6@DBDE01.ent.ti.com>
+ <20120124093318.GA2609@pengutronix.de>
+Message-ID: <4F1E7EBA.3090006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Jan 08, 2012 at 09:59:02PM +0100, Heiko St?bner wrote:
-> The phy-power-handling is common to S3C2443/2416/2450, so introduce a
-> s3c2443-pm-common.c to handle this for all of them.
-> 
-> This makes it possible to remove the raw write to the PWRCFG-register
-> from the s3c-hsudc driver.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-
-I believe this doesn't really depend on previous patches (??) In that
-case, it can be carried with s3c's tree:
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/17509f4c/attachment.sig>
+On Tuesday 24 January 2012 03:03 PM, Wolfram Sang wrote:
+>> Just returning the register content does not help much and looking at other
+>> implementations, like Blackfin, I am guessing this IOCTL is supposed to give
+>> a yes/no sort of result.
+> It needs to return WDIOF_* flags as defined in include/linux/watchdog.h.
+> Check also Documentation/watchdog/watchdog-api.txt for further info.
+> Yes, not all drivers follow this style, sadly.
+Yes I agree.
+> Regards,
+>
+>    Wolfram
+>
