@@ -1,71 +1,91 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 24 Jan 2012 15:46:01 +0200
-Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
-In-Reply-To: <20120124.154121.1062920821192552748.hdoyu@nvidia.com>
-References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
- <1325747509-29665-3-git-send-email-hdoyu@nvidia.com>
- <20120123154310.GC6269@8bytes.org>
- <20120124.154121.1062920821192552748.hdoyu@nvidia.com>
-Message-ID: <20120124134601.GT27414@legolas.emea.dhcp.ti.com>
+From: jic23@cam.ac.uk (J.I. Cameron)
+Date: 24 Jan 2012 14:20:31 +0000
+Subject: [RFC] IIO LRADC for mach-mxs
+In-Reply-To: <20120124131427.GE2609@pengutronix.de>
+References: <201201241408.08083.marek.vasut@gmail.com>
+ <20120124131427.GE2609@pengutronix.de>
+Message-ID: <Prayer.1.3.4.1201241420310.5758@hermes-2.csi.cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Jan 24 2012, Wolfram Sang wrote:
 
-On Tue, Jan 24, 2012 at 02:41:21PM +0100, Hiroshi Doyu wrote:
-> From: Joerg Roedel <joro@8bytes.org>
-> Subject: Re: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
-> Date: Mon, 23 Jan 2012 16:43:10 +0100
-> Message-ID: <20120123154310.GC6269@8bytes.org>
-> 
-> > > +	}
-> > > +
-> > > +	spin_unlock_irqrestore(&as->lock, flags);
-> > > +
-> > > +	domain->priv = NULL;
-> > > +	dev_dbg(smmu->dev, "smmu_as@%p\n", as);
-> > > +}
-> > > +
-> > > +static int smmu_iommu_attach_dev(struct iommu_domain *domain,
-> > > +				 struct device *dev)
-> > > +{
-> > > +	struct smmu_as *as = domain->priv;
-> > > +	struct smmu_device *smmu = as->smmu;
-> > 
-> > Hmm, this looks like there is a 1-1 mapping between hardware SMMU
-> > devices and domains. This is not consistent with IOMMU-API semantics
-> > where a domain can contain devices behind different SMMUs. Please fix
-> > that.
-> 
-> Actually I really like the concept of this "domain" now, which hides
-> the H/W hierarchy from users.
-> 
-> But in Tegra SMMU/GART case, there's a single one IOMMU device in the
-> system. Keeping a iommu device list in a domain and iterating iommu
-> device list in each iommu_ops seem to be so nice, but I'm afraid that
-> this may be a bit too much when one already knows that there's only
-> one IOMMU device in the system.
+>On Tue, Jan 24, 2012 at 02:08:07PM +0100, Marek Vasut wrote:
+>> Hi guys,
+>> 
+>> I've been playing with a custom mxs board recently and I'd like to tinker with 
+>> ADC. Well, apparently there was some effort but it died silently.
+>> 
+>> Now, there are two approaches how to go about the MXS IIO LRADC. Firstly though, 
+>> here are some hw details:
+>> 
+>> 1) The ADC has 16 channels in total, some dedicated to particular function
+>> 2) The ADC can sample only up to 8 channels at the same time
+>> 3) The ADC delay triggers can trigger only up to 4 kinds of sampling for those 
+>> up to 8 selected channel
+>> 
+>> So how should we go about this:
+>> 
+>> A) Implement functions, to configure and select a channel at probe-time and then 
+>> never allow (at runtime) different channel to be selected.
+>> 
+>> + Channel configuration is static, passed via plat_data
+>> + The channels don't need to be reconfigured => when data are demanded, the 
+>> channel doesn't need to be reconfigured (if it's not configured in one of those 
+>> 8 options) and the user doesn't need to wait for data.
+>> - Only 8 channels can be used
+>> 
+>> B) Allow channel to be configured on-demand -- when it's value is requested, it 
+>> is configured (if it's not already) for the particular function.
+>> 
+>> + All 16 channels can be used
+>> - It's clunky and fragile to breakage
+>> - It's hard to implement good channel replacement algo (replacement as on the 
+>> delay triggers and on those 8 slots)
+>> 
+>> Which way do you consider better ?
 >
-> If there's no actual problem for 1-1 mapping between IOMMU H/Ws and
-> domains, I think that it may not so bad to keep the original code(1-1)
-> for GART and SMMU. What do you think?
+>CCing Jonathan and the iio-list (as found in MAINTAINERS). They probably
+>have more experience regardings those scenarios?
+Thanks Wolfram,
 
-I think it boils down to "extensability". If you can truly/fully
-guarantee that there will *always* be a single IOMMU on all upcoming
-Tegras, then it's really overkill.
+My instinct is always to make anything configurable at runtime where we can even
+vaguely conceive of a reason it might be useful.
 
-But if there's even a remote possibility of the HW being changed and you
-end up with more IOMMUs, things start to feel necessary for the sake of
-making it easy to extend.
+Having said that, right now special function (e.g. input, hwmon directed channels)
+are currently set up via board files (will be device tree the moment anyone has
+a need).  I doubt there are many usecases where you'd want to change these functional
+elements.
 
-my 2 cents, feel free to ignore ;-)
+For your channel replacement strategy these special function channels will be in use
+if the client is reading form them (e.g. triggered usage). In IIO we only allow for
+triggering a whole set of channels off a given trigger.  It's going to get really
+ugly otherwise.  Perhaps the following will work? (I am assuming 0-8 channels can be
+associated with any of the 4 triggers subject to the condition that the total number
+of channels being captured is less than 8).
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/7a88febd/attachment.sig>
+Register 4 iio devices, each with all 16 channels.  Associate one with each of the
+triggers.  Driver then maintains a count on channels enabled and refuses to enable more
+than 8 whatever happens.  You don't have a replacement strategy, you simply refuse
+to have too many.  We already do this for some of the devices with strange possible
+channel sets.
+
+Any in kernel users (hwmon, input etc) will have to be configured to use the iio device
+associated with the right trigger.
+
+Does that do the job for you?
+
+The reason for associating the triggers with different iio devices is that a given iio
+device can only feed a fixed width scan to the demux unit.  Hence if we have some
+channels triggering at one time and others at another, there is no way of handling the
+data stream.  Whilst they are on the same hardware they are really acting as separate
+devices that just happen to share some pins and control hardware.
+
+(Note I'm being useless and not pushing out the new version of in kernel IIO stuff, but
+I should get to that at the weekend if not before - one fiddly issue with preventing
+removal of in use devices still to work out.).
+
+Jonathan 
+
+>
+>
