@@ -1,87 +1,64 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Tue, 24 Jan 2012 12:10:18 +0530
-Subject: omap-serial RX DMA polling?
-In-Reply-To: <alpine.DEB.2.00.1201231228310.29673@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1201221718190.26641@utopia.booyaka.com>
- <CAAL8m4wcSfhjxg0Lyo-W7DQ85rikb6asRds95hwQQNTDXe2YKQ@mail.gmail.com>
- <alpine.DEB.2.00.1201230304310.29673@utopia.booyaka.com>
- <CAAL8m4wBuFQYkyFUwNWrUZTBWuQHggy=y3Oi=6DBHNB_rqU9tA@mail.gmail.com>
- <alpine.DEB.2.00.1201231228310.29673@utopia.booyaka.com>
-Message-ID: <CAAL8m4zE6wD67GCeVe9BOBZ=5yrCkrXUUu26y2GAXrdiDD3R8g@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Tue, 24 Jan 2012 08:18:28 +0100
+Subject: [RFC PATCH 5/7] ARM: davinci: i2c: add OF support
+In-Reply-To: <4F1DC480.4010603@gmail.com>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-6-git-send-email-hs@denx.de> <4F1DC480.4010603@gmail.com>
+Message-ID: <4F1E5B44.4090200@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 1:18 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> On Mon, 23 Jan 2012, Govindraj wrote:
->
->> On Mon, Jan 23, 2012 at 4:17 PM, Paul Walmsley <paul@pwsan.com> wrote:
->> > On Mon, 23 Jan 2012, Govindraj wrote:
->> >
->> >> On Mon, Jan 23, 2012 at 6:03 AM, Paul Walmsley <paul@pwsan.com> wrote:
->> >> >
->> >> > while trying to track down some of the serial-related PM issues in
->> >> > v3.3-rc1, I noticed that the omap-serial.c driver sets a 1 microsecond
->> >> > polling timer when DMA is enabled (uart_dma.rx_timer) (!) ?This seems
->> >> > quite broken from both the DMA and PM points of view.
->> >>
->> >> Poll rate is used for doing tty_insert_flip_string for pushing data to
->> >> user space to keep faster response to any client device over uart, some
->> >> Bt chips expect faster response when data on uart arrives and packet
->> >> should be pushed out immediately.
->> >
->> > Hmm. ?Let's say that the BT transceiver uses the fastest transmission rate
->> > supported by the OMAP UARTs -- 3,686,400 bits per second, according to
->> > Table 17-1 in the 34xx TRM vZR. ?So the RX poll timer would go off about
->> > ~2.7 times per input character[1]. ?That seems like overkill...
->>
->> Yes correct, Looks like the poll rate is to aggressive
->> it should be calculated based on baud rate provided from user apace
->> in termios function.
->>
->> I had a patch to do the same in termios but,
->> if you have something similar you can post out as I am currently busy with
->> some other activities and may take more time.
->>
->> > For minimum receive latency, how about calling tty_insert_flip_string()
->> > from the RX DMA callback, and using a smaller transfer count? ?Or even
->> > better, use PIO for the receive path and set the RX FIFO threshold to 1?
->> >
->> > No poll timer should be needed in either case.
->>
->> I remember doing similar excercise with BT + uart on zoom board
->> but performance numbers where impacted.
->>
->> I made buffer size as 1 byte and removed polling function and got rx_callback
->> for every byte completion and pushed same to tty layer.
->>
->> BT FTP throughput got impacted a lot.
->
-> The point is that if you want tty_insert_flip_string() to be called after
-> every character is received, there seems little point in using RX DMA.
-> It should be less efficient than PIO. ?And the current way that it is used
-> is pointless from a power management point of view.
->
+Hello Sylwester,
 
-Yes, Its between power and performance, current way gives a better
-response for most devices. (specially while downloading the firmware for
-external chip initialization and other use cases)
+Sylwester Nawrocki wrote:
+> Hello,
+> 
+> On 01/23/2012 09:56 AM, Heiko Schocher wrote:
+>> add of support for the davinci i2c driver.
+>>
+>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: linux-i2c at vger.kernel.org
+>> Cc: Ben Dooks<ben-linux@fluff.org>
+>> Cc: Wolfram Sang<w.sang@pengutronix.de>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Cc: Sekhar Nori<nsekhar@ti.com>
+>> Cc: Wolfgang Denk<wd@denx.de>
+>> ---
+>>   .../devicetree/bindings/arm/davinci/i2c.txt        |   39 ++++++++++++++++++
+>>   drivers/i2c/busses/i2c-davinci.c                   |   43 ++++++++++++++++++++
+>>   2 files changed, 82 insertions(+), 0 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+>> new file mode 100644
+>> index 0000000..94ec670
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+>> @@ -0,0 +1,39 @@
+>> +* Texas Instruments Davinci I2C
+>> +
+>> +This file provides information, what the device node for the
+>> +davinci i2c interface contain.
+>> +
+>> +Required properties:
+>> +- compatible: "ti,davinci-i2c";
+>> +- reg : Offset and length of the register set for the device
+>> +- id: id of the controller
+> 
+> I was wondering whether we're supposed to use "cell-index" property name
+> for such a device instance index? or doesn't it really matter and "id" is 
+> fine? Such an IP instance index seems quite common so I thought it could
+> be easier to follow to use standard name.
 
-> In general, RX DMA would seem to be inappropriate for a latency-sensitive
-> application, unless the application can somehow communicate how many bytes
-> it's expecting so the driver can adjust its DMA transfer size.
->
+I just copied the "name" from "struct davinci_nand_pdata" ... it is
+used in the davinci_nand driver as chipselect ... maybe it is better
+I rename this to "chipselect" ?
 
-Yes I had done that long time back, gives a little edge for
-throughput(probably even PM
-but haven't checked though) but many users of driver are hesitant to
-modify their user space
-apps to pass buffer size (modify the bt stack or the gps stack) and
-sometimes even those
-stacks are unaware of incoming sizes.
-
-Many expect to work as is when hooked up to the user space stack without
-any changes.
-
---
-Thanks,
-Govindraj.R
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
