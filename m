@@ -1,47 +1,50 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 24 Jan 2012 00:09:04 -0800
-Subject: [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
- suspend is not implemented
-In-Reply-To: <1327306361-9803-3-git-send-email-shubhrajyoti@ti.com>
-References: <1327306361-9803-1-git-send-email-shubhrajyoti@ti.com>
- <1327306361-9803-3-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CAN8TOE8i-g_QTsidqDW=TRfZMQ8u93+iP8V7rr4paek=7xZ7UA@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 24 Jan 2012 13:40:49 +0530
+Subject: [PATCH V1] arm: tegra: dma: not required to move requestor when
+ stopping.
+Message-ID: <1327392649-27605-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It is not require to move the requestor of dma to INVALID
+option before stopping dma.
 
-On Mon, Jan 23, 2012 at 12:12 AM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-...
-> ?include/linux/mtd/mtd.h | ? ?6 +++---
-> ?1 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-> index 1a81fde..c717bb6 100644
-> --- a/include/linux/mtd/mtd.h
-> +++ b/include/linux/mtd/mtd.h
-> @@ -427,9 +427,9 @@ static inline int mtd_is_locked(struct mtd_info *mtd, loff_t ofs, uint64_t len)
->
-> ?static inline int mtd_suspend(struct mtd_info *mtd)
-> ?{
-> - ? ? ? if (!mtd->suspend)
-> - ? ? ? ? ? ? ? return -EOPNOTSUPP;
-> - ? ? ? return mtd->suspend(mtd);
-> + ? ? ? if (mtd->suspend)
-> + ? ? ? ? ? ? ? return mtd->suspend(mtd);
-> + ? ? ? return 0;
-> ?}
->
-> ?static inline void mtd_resume(struct mtd_info *mtd)
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/mach-tegra/dma.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-I believe this fix is already accounted for in Artem Bityutskiy's
-l2-mtd-2.6 repository as:
-
-commit 091a7fe219ee8d3e76be9e02221433af10c6f574
-mtd: fix MTD suspend
-(http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commit/091a7fe219ee8d3e76be9e02221433af10c6f574)
-
-However, the bug made it into the 3.3 merge window, so shouldn't this
-bugfix be sent upstream immediately?
-
-Brian
+diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
+index 998c55d..abea4f6 100644
+--- a/arch/arm/mach-tegra/dma.c
++++ b/arch/arm/mach-tegra/dma.c
+@@ -52,8 +52,6 @@
+ #define CSR_ONCE				(1<<27)
+ #define CSR_FLOW				(1<<21)
+ #define CSR_REQ_SEL_SHIFT			16
+-#define CSR_REQ_SEL_MASK			(0x1F<<CSR_REQ_SEL_SHIFT)
+-#define CSR_REQ_SEL_INVALID			(31<<CSR_REQ_SEL_SHIFT)
+ #define CSR_WCOUNT_SHIFT			2
+ #define CSR_WCOUNT_MASK				0xFFFC
+ 
+@@ -183,18 +181,12 @@ static void tegra_dma_stop(struct tegra_dma_channel *ch)
+ 
+ static int tegra_dma_cancel(struct tegra_dma_channel *ch)
+ {
+-	u32 csr;
+ 	unsigned long irq_flags;
+ 
+ 	spin_lock_irqsave(&ch->lock, irq_flags);
+ 	while (!list_empty(&ch->list))
+ 		list_del(ch->list.next);
+ 
+-	csr = readl(ch->addr + APB_DMA_CHAN_CSR);
+-	csr &= ~CSR_REQ_SEL_MASK;
+-	csr |= CSR_REQ_SEL_INVALID;
+-	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
+-
+ 	tegra_dma_stop(ch);
+ 
+ 	spin_unlock_irqrestore(&ch->lock, irq_flags);
+-- 
+1.7.1.1
