@@ -1,47 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jan 2012 09:50:09 +0000
-Subject: ARM/ARM-SoC plans for v3.4 merge window
-In-Reply-To: <20120123114902.GY1068@n2100.arm.linux.org.uk>
-References: <20120123114902.GY1068@n2100.arm.linux.org.uk>
-Message-ID: <20120124095009.GS16726@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Tue, 24 Jan 2012 10:50:14 +0100
+Subject: [PATCH 3/3] S3C2443: add power domain for usb phy
+In-Reply-To: <20120124093831.GT27414@legolas.emea.dhcp.ti.com>
+References: <201201082156.44142.heiko@sntech.de>
+ <201201082159.02368.heiko@sntech.de>
+ <20120124093831.GT27414@legolas.emea.dhcp.ti.com>
+Message-ID: <201201241050.14405.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 11:49:02AM +0000, Russell King - ARM Linux wrote:
-> This is an outline of the plan for this cycle, up to the next merge
-> window, agreed between Olof and myself.
-> 
-> As Nicolas' idle changes weren't merged before the last merge window
-> opened, we have decided that Nicolas will resubmit his changes after
-> -rc1 (in other words, now) and they will be merged into both the
-> arm-soc and my trees.
-> 
-> I have at least one other patch which has a high 'will cause horrible
-> conficts' rating (the debug option rearrangement patch), so I'll be
-> including that for the arm-soc tree as well.
-> 
-> However, what this does mean is that Arnd, Olof, and myself will be
-> in for up to three months of merge hell unless people take account of
-> these changes.
-> 
-> Therefore, our plan is to publish this as a baseline, and we'd really
-> appreciate any development submitted after that baseline has been
-> established is based upon those changes and does not conflict with
-> them.  That may mean you have to pull these changes into your tree
-> and merge them into your development work (and fix up any conflicts
-> there yourself.)
-> 
-> Once you've taken these changes into your tree, you must not rebase or
-> modify them.  Changing those commits will cause all hell to break loose,
-> and we'll have to refuse merging your tree (otherwise we'll be in Linus'
-> sights for a roasting at gas mark 2 million.)
+Hi Felipe,
 
-Right, although it's out there - but I'd like to get the AMBA changes
-into it which are already conflicting the Samsung development.  So I'm
-going to hold off officially asking for people to include the baseline
-until this evening.  At that point, I will shut down my 'amba' branch
-and transfer that over; that means I won't be accepting any further
-acks etc for that work.
+Am Dienstag, 24. Januar 2012, 10:38:32 schrieb Felipe Balbi:
+> Hi,
+> 
+> On Sun, Jan 08, 2012 at 09:59:02PM +0100, Heiko St?bner wrote:
+> > The phy-power-handling is common to S3C2443/2416/2450, so introduce a
+> > s3c2443-pm-common.c to handle this for all of them.
+> > 
+> > This makes it possible to remove the raw write to the PWRCFG-register
+> > from the s3c-hsudc driver.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> I believe this doesn't really depend on previous patches (??) In that
+> case, it can be carried with s3c's tree:
+it does depend on the previous patch [2/3], as the device power domain is 
+controlled through the runtime-pm subsystem whose calls were added in it.
 
-If you haven't acked changes in the amba branch (eg, to Versatile,
-Realview etc) then it'll soon be too late...
+Heiko
