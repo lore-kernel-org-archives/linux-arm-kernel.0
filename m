@@ -1,105 +1,47 @@
-From: rob.lee@linaro.org (Robert Lee)
-Date: Mon, 23 Jan 2012 22:37:34 -0600
-Subject: [PATCH v3 7/7] ARM: imx: Add imx5 cpuidle implementation
-In-Reply-To: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
-References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1327379854-12403-8-git-send-email-rob.lee@linaro.org>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 24 Jan 2012 05:02:08 +0000
+Subject: [PATCH RFC 1/2] watchdog : omap_wdt : Implement
+ WDIOC_GETBOOTSTATUS for omap3+
+In-Reply-To: <1327317188-14782-2-git-send-email-shubhrajyoti@ti.com>
+References: <1327317188-14782-1-git-send-email-shubhrajyoti@ti.com>
+ <1327317188-14782-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D12143317901B9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx5 cpuidle implementation using common cpuidle functionality.
+On Mon, Jan 23, 2012 at 16:43:07, Datta, Shubhrajyoti wrote:
+> This patch intends to implement the WDIOC_GETBOOTSTATUS ioctl
+> for the omap3 and omap4.
+> 
 
-Signed-off-by: Robert Lee <rob.lee@linaro.org>
----
- arch/arm/mach-mx5/Makefile  |    3 +-
- arch/arm/mach-mx5/cpuidle.c |   64 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mx5/cpuidle.c
+Instead of just returning the register content why not parse 
+the RSTST register value and check if it's really a watchdog
+reset or not?
 
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 0fc6080..2c348b4 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -3,8 +3,9 @@
- #
- 
- # Object file lists.
--obj-y   := cpu.o mm.o clock-mx51-mx53.o ehci.o system.o
- 
-+obj-y   := cpu.o mm.o clock-mx51-mx53.o ehci.o system.o
-+obj-$(CONFIG_CPU_IDLE) += cpuidle.o
- obj-$(CONFIG_PM) += pm-imx5.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
-diff --git a/arch/arm/mach-mx5/cpuidle.c b/arch/arm/mach-mx5/cpuidle.c
-new file mode 100644
-index 0000000..230d335
---- /dev/null
-+++ b/arch/arm/mach-mx5/cpuidle.c
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/export.h>
-+#include <linux/cpuidle.h>
-+#include <asm/proc-fns.h>
-+#include <mach/common.h>
-+
-+int imx5_enter(struct cpuidle_device *dev,
-+			struct cpuidle_driver *drv,
-+			int index)
-+{
-+	mx5_cpu_lp_set((unsigned int)dev->states_usage[index].driver_data);
-+	cpu_do_idle();
-+	return index;
-+}
-+
-+static struct cpuidle_driver imx5_cpuidle_driver __initdata = {
-+	.name	= "imx5_cpuidle",
-+	.owner	= THIS_MODULE,
-+	.states[0] = {
-+		.enter			= imx5_enter,
-+		.exit_latency		= 12, /* max latency at 160MHz */
-+		.target_residency	= 1,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "IMX WFI",
-+		.desc			= "CPU and related clocks gated",
-+	},
-+	.states[1] = {
-+		.enter			= imx5_enter,
-+		.exit_latency		= 20, /* max latency at 160MHz */
-+		.target_residency	= 1,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "IMX SRPG",
-+		.desc			= "CPU state retained,powered off",
-+	},
-+	.state_count = 2,
-+};
-+
-+/* use driver_data field to hold the mx5 idle parameter */
-+static void __init imx5_dd_init(struct cpuidle_device * dev)
-+{
-+	dev->states_usage[0].driver_data = (void *)WAIT_UNCLOCKED;
-+	dev->states_usage[1].driver_data = (void *)WAIT_UNCLOCKED_POWER_OFF;
-+}
-+
-+static int __init imx5_init_cpuidle(void)
-+{
-+	return common_cpuidle_init(&imx5_cpuidle_driver,
-+					true,
-+					imx5_dd_init);
-+}
-+late_initcall(imx5_init_cpuidle);
--- 
-1.7.1
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/watchdog/omap_wdt.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+> index 4b33e3f..5395a4c 100644
+> --- a/drivers/watchdog/omap_wdt.c
+> +++ b/drivers/watchdog/omap_wdt.c
+> @@ -229,7 +229,7 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
+>  		if (cpu_is_omap16xx())
+>  			return put_user(__raw_readw(ARM_SYSST),
+>  					(int __user *)arg);
+> -		if (cpu_is_omap24xx())
+> +		if (cpu_is_omap24xx() || cpu_is_omap34xx() || cpu_is_omap44xx())
+>  			return put_user(omap_prcm_get_reset_sources(),
+>  					(int __user *)arg);
+>  		return put_user(0, (int __user *)arg);
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
