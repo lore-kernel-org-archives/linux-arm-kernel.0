@@ -1,63 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jan 2012 11:04:11 +0000
-Subject: [PATCH] ARM: ux500: Initialize irq affinity
-In-Reply-To: <20120122152710.GT1068@n2100.arm.linux.org.uk>
-References: <1327064356-3603-1-git-send-email-per.xx.fransson@stericsson.com>
- <20120120130310.GO1068@n2100.arm.linux.org.uk>
- <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
- <20120120174456.GB11845@n2100.arm.linux.org.uk>
- <20120122125411.GA27821@mudshark.cambridge.arm.com>
- <20120122152710.GT1068@n2100.arm.linux.org.uk>
-Message-ID: <20120124110410.GF19798@mudshark.cambridge.arm.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Tue, 24 Jan 2012 12:04:44 +0100
+Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
+In-Reply-To: <20120124.115701.2179509760878976509.hdoyu@nvidia.com>
+References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
+ <1325747509-29665-3-git-send-email-hdoyu@nvidia.com>
+ <20120123154310.GC6269@8bytes.org>
+ <20120124.115701.2179509760878976509.hdoyu@nvidia.com>
+Message-ID: <20120124110444.GB19255@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2012 at 03:27:10PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Jan 22, 2012 at 12:54:11PM +0000, Will Deacon wrote:
-> > I think this *could* be a problem if, as in Linus's case, some interrupts
-> > have a hardcoded affinity enforced by the hardware (i.e. there are sticky bits
-> > in the GIC distributor CPU targets registers). If we boot on a CPU that is
-> > different from the hardcoded affinity, we could end up initialising an
-> > interrupt with multiple targets. I suspect this will just lead to spurious
-> > interrupts at the end of the day, but there's a potential performance impact
-> > too.
+On Tue, Jan 24, 2012 at 10:57:01AM +0100, Hiroshi Doyu wrote:
+> > Why do you completly ignore the size parameter in this function (and
+> > in the unmap part below)?
+> > According to the page-sizes you export to the generic layer size can be
+> > 4k or 4M. You need to take care of that in this function.
 > 
-> If we boot on a CPU which is incapable of receiving interrupts from
-> attached devices, we have a much larger problem than just affinity.
-> We potentially can't initialize those devices until their dependent
-> CPU comes online - we certainly can't start to use those devices until
-> that happens.
+> I'll drop 4MB support here once. I'll make another patch for 4MB page
+> support later.
 
-My initial reading of the GIC spec was that you would always be able to
-augment the set of targets, but taking another look this doesn't appear to
-be the case. So yes, if/when we encounter a platform doing this for a CPU
-other than the boot CPU then we'll be in trouble.
+Okay, so when you only export 4k everything should be fine.
 
-> That's something we just don't deal with - and as far as userspace goes,
-> trying to set an affinity to just the offline CPU will return an error
-> code.
-
-Although we can currently end up reporting that an interrupt is affine only
-to an offline CPU (patch 7292/1 fixes this).
-
-> So, if you have interrupts which can only be serviced by a group of CPUs,
-> at least one of those CPUs must remain online at all times that those
-> dependent devices could produce an interrupt.
+> > Hmm, this looks like there is a 1-1 mapping between hardware SMMU
+> > devices and domains. This is not consistent with IOMMU-API semantics
+> > where a domain can contain devices behind different SMMUs. Please fix
+> > that.
 > 
-> I think what we want instead is for the IRQ subsystem to record on a
-> per-IRQ basis which CPUs the interrupt /can/ be routed to, and if:
+> I'm a bit confused with the concept of "domain". I thought that
+> "domain" is equivalent to a "virtual address space". Usually a IOMMU
+> device provides a virtual address space for multiple client
+> devices. IOW, a IOMMU device provides a virtual address space, which
+> can be shared with multiple client devices.
 > 
-> 	affinity & cpus_online & allowable_cpus
+> Actually Tegra SMMU case, a single IOMMU device has 4 different
+> virtual address speace("smmu_as"). Each "smmu_as" has its own virtual
+> address space. "smmu_as[i]" has mutiple "smmu_client" devices.
 > 
-> becomes empty, the attempt to set the affinity is failed.  Also, a callback
-> in the hotplug code to error out if
+>   smmu_as[i] == domain[i]
 > 
-> 	cpus_online & allowable_cpus & ~offlining_cpu
+> I don't understand why "a domain can contain devices behind different
+> SMMUs" because those client devices belong to different virtual
+> address spaces, and they should belong to different "domains".
 > 
-> would become an empty set.
+> Could you please explain a bit more about "domain"?
 
-That looks like a good idea to me. I suggest we wait until somebody builds
-such a monster and get them to implement the solution :) (unless the ux500 is
-capable of booting on a CPU other than 0?).
+A domain is, as you said, a virtual address space for IO devices. But
+the important point is, an arbitrary number of devices can be part of a
+domain. This also means that the devices can be behind different
+hardware SMMUs. In this case your driver needs to program the page-table
+pointer into more than one SMMU to give devices behind different SMMUs
+the same address space.
 
-Will
+
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
