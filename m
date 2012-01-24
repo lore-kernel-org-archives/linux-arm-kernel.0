@@ -1,40 +1,34 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 24 Jan 2012 22:09:24 +0100
-Subject: LPC32xx status (Re: [PATCH] Correct bad gpio naming)
-In-Reply-To: <4F1F16A8.7010407@antcom.de>
-References: <4F1C4E25.6070801@antcom.de> <20120124155921.GH2609@pengutronix.de>
- <4F1EDD15.7010704@antcom.de> <20120124192545.GB8502@pengutronix.de>
- <4F1F16A8.7010407@antcom.de>
-Message-ID: <20120124210924.GD8502@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 24 Jan 2012 21:19:24 +0000
+Subject: [PATCH] ARM: S3C64XX: Use IN4 DC measurement mode on Tobermory
+Message-ID: <1327439964-28533-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The WM8962 on Tobermory has one of the IN4 inputs connected for DC
+measurement. Tell the driver it can optimise for this mode.
 
-> Unfortunately, I currently don't have a phy3250, but can check
-> tomorrow with colleagues.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
 
-Shouldn't matter that much, or? Once the core support is back and works for
-your board, others could test with their boards.
+This feature is going to be merged via ASoC in 3.4 - is it OK if I apply
+this patch to the ASoC tree too?  It's a one liner, I'd be astonished if
+it were to generate any conflicts.
 
-> I guess the work92105_defconfig is only useful once the drivers
-> currently missing in mainline are merged. Or is there an arm specific
-> tree I should update from?
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-You can keep the work92105_defconfig in your tree, but we'd need to introduce a
-lpc32xx_defconfig. That should start with a minimal (but working) config and
-can be extended once the drivers are in place.
-
-Regards,
-
-   Wolfram
-
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index 509307d..317f866 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -128,6 +128,7 @@ static struct wm8962_pdata wm8962_pdata __initdata = {
+ 		0x8000 | WM8962_GPIO_FN_DMICDAT,
+ 		WM8962_GPIO_FN_IRQ,    /* Open drain mode */
+ 	},
++	.in4_dc_measure = true,
+ };
+ 
+ static struct wm9081_pdata wm9081_pdata __initdata = {
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/17c3e0f3/attachment.sig>
+1.7.9.rc1
