@@ -1,95 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 24 Jan 2012 15:30:15 +0200
-Subject: [PATCH 3/3] S3C2443: add power domain for usb phy
-In-Reply-To: <201201241427.21939.heiko@sntech.de>
-References: <201201082156.44142.heiko@sntech.de>
- <02ff01ccda98$4c424f40$e4c6edc0$%kim@samsung.com>
- <20120124130754.GR27414@legolas.emea.dhcp.ti.com>
- <201201241427.21939.heiko@sntech.de>
-Message-ID: <20120124133013.GS27414@legolas.emea.dhcp.ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 24 Jan 2012 14:41:21 +0100
+Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
+In-Reply-To: <20120123154310.GC6269@8bytes.org>
+References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com><1325747509-29665-3-git-send-email-hdoyu@nvidia.com><20120123154310.GC6269@8bytes.org>
+Message-ID: <20120124.154121.1062920821192552748.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 02:27:21PM +0100, Heiko St?bner wrote:
-> Am Dienstag, 24. Januar 2012, 14:07:56 schrieb Felipe Balbi:
-> > Hi,
-> > 
-> > On Tue, Jan 24, 2012 at 10:01:33PM +0900, Kukjin Kim wrote:
-> > > Heiko St?bner wrote:
-> > > > Am Dienstag, 24. Januar 2012, 11:15:11 schrieb Felipe Balbi:
-> > > > > On Tue, Jan 24, 2012 at 11:13:00AM +0100, Heiko St?bner wrote:
-> > > > > > sorry for mail spam :-)
-> > > > > > 
-> > > > > > Am Dienstag, 24. Januar 2012, 10:51:31 schrieb Felipe Balbi:
-> > > > > > > On Tue, Jan 24, 2012 at 10:50:14AM +0100, Heiko St?bner wrote:
-> > > > > > > > Hi Felipe,
-> > > > > > > > 
-> > > > > > > > Am Dienstag, 24. Januar 2012, 10:38:32 schrieb Felipe Balbi:
-> > > > > > > > > Hi,
-> > > > > > > > > 
-> > > > > > > > > On Sun, Jan 08, 2012 at 09:59:02PM +0100, Heiko St?bner wrote:
-> > > > > > > > > > The phy-power-handling is common to S3C2443/2416/2450, so
-> > > > > > > > > > introduce a s3c2443-pm-common.c to handle this for all of
-> > > > > > > > > > them.
-> > > > > > > > > > 
-> > > > > > > > > > This makes it possible to remove the raw write to the
-> > > > > > > > > > PWRCFG-register from the s3c-hsudc driver.
-> > > > > > > > > > 
-> > > > > > > > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > > > > > > > 
-> > > > > > > > > I believe this doesn't really depend on previous patches (??)
-> > > > > > > > > In that
-> > > > > > > > 
-> > > > > > > > > case, it can be carried with s3c's tree:
-> > > > > > > > it does depend on the previous patch [2/3], as the device power
-> > > > > > > > domain is controlled through the runtime-pm subsystem whose
-> > > > > > > > calls were added in it.
-> > > > > > > 
-> > > > > > > then I will need proper acks to carry this patch.
-> > > > > > 
-> > > > > > another possibility would be to have patch 2 and 3 get in through
-> > > > > > the samsung tree, as the majority of the change lies on this side
-> > > > > > (i.e. introducing a new file in plat-s3c24xx)
-> > > > > 
-> > > > > yet another one, would be to defer patch 3/3 by one merge window ;-)
-> > > > 
-> > > > also fine by me ;-)
-> > > > 
-> > > > But let's see first what Kgene says.
-> > > 
-> > > Hi all,
-> > > 
-> > > Sorry for join lately on this.
-> > > 
-> > > I think we need to implement more pm domain for s3c24xx as well
-> > > usbphy. So if Felipe is ok, I'd like to handle Heiko's 2nd and 3rd
-> > > patches in my tree. Of course, I need Felipe's ack before that.
-> > > BTW, frankly, I'm not sure we can finish supporting pm domain for all
-> > > of s3c24xx for v3.4 :)
-> > 
-> > In that case, how about we take things slow ? I can carry pm-runtime
-> > patch (2/3) and by 3.5 or 3.6 you will only need to touch
-> > arch/arm/-related code.
-> > 
-> > If you guarantee that it won't make it in 3.4, I'm ok carrying
-> > pm-runtime patch as it won't break anything anyway (I suppose).
-> 
-> Seems reasonable to me. The pm-runtime patch does not break anything - it 
-> simply does nothing without either some runtime-pm functions or the power 
-> domain work.
-> 
-> So I would second that we handle the power domain stuff after Kgene got the 
-> mach directories merged for 3.4, i.e. drop the patch (3/3) for now and I will 
-> resubmit it when the time comes.
+From: Joerg Roedel <joro@8bytes.org>
+Subject: Re: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
+Date: Mon, 23 Jan 2012 16:43:10 +0100
+Message-ID: <20120123154310.GC6269@8bytes.org>
 
-sounds great to me :-) Thanks guys
+> > +	}
+> > +
+> > +	spin_unlock_irqrestore(&as->lock, flags);
+> > +
+> > +	domain->priv = NULL;
+> > +	dev_dbg(smmu->dev, "smmu_as@%p\n", as);
+> > +}
+> > +
+> > +static int smmu_iommu_attach_dev(struct iommu_domain *domain,
+> > +				 struct device *dev)
+> > +{
+> > +	struct smmu_as *as = domain->priv;
+> > +	struct smmu_device *smmu = as->smmu;
+> 
+> Hmm, this looks like there is a 1-1 mapping between hardware SMMU
+> devices and domains. This is not consistent with IOMMU-API semantics
+> where a domain can contain devices behind different SMMUs. Please fix
+> that.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/904bea41/attachment-0001.sig>
+Actually I really like the concept of this "domain" now, which hides
+the H/W hierarchy from users.
+
+But in Tegra SMMU/GART case, there's a single one IOMMU device in the
+system. Keeping a iommu device list in a domain and iterating iommu
+device list in each iommu_ops seem to be so nice, but I'm afraid that
+this may be a bit too much when one already knows that there's only
+one IOMMU device in the system.
+
+If there's no actual problem for 1-1 mapping between IOMMU H/Ws and
+domains, I think that it may not so bad to keep the original code(1-1)
+for GART and SMMU. What do you think?
