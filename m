@@ -1,104 +1,105 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Mon, 23 Jan 2012 22:37:33 -0600
-Subject: [PATCH v3 6/7] ARM: imx: Init imx5 gpc_dvfs clock for global use
+Date: Mon, 23 Jan 2012 22:37:34 -0600
+Subject: [PATCH v3 7/7] ARM: imx: Add imx5 cpuidle implementation
 In-Reply-To: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
 References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1327379854-12403-7-git-send-email-rob.lee@linaro.org>
+Message-ID: <1327379854-12403-8-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpc_dvfs clock consumes practically zero power and must be enabled
-for various low power funcitonality.  Now that a second user of this
-clock is being added (cpuidle) for mx5, it is cleanest to just enable
-this clock during clock initialization and leave it enabled.
+Add imx5 cpuidle implementation using common cpuidle functionality.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/mach-mx5/clock-mx51-mx53.c |    3 +++
- arch/arm/mach-mx5/pm-imx5.c         |   24 ++----------------------
- 2 files changed, 5 insertions(+), 22 deletions(-)
+ arch/arm/mach-mx5/Makefile  |    3 +-
+ arch/arm/mach-mx5/cpuidle.c |   64 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/cpuidle.c
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 4cb2769..12c8a2b 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1533,6 +1533,7 @@ static struct clk_lookup mx53_lookups[] = {
- 	_REGISTER_CLOCK("imx53-ahci.0", "ahci", sata_clk)
- 	_REGISTER_CLOCK("imx53-ahci.0", "ahci_phy", ahci_phy_clk)
- 	_REGISTER_CLOCK("imx53-ahci.0", "ahci_dma", ahci_dma_clk)
-+	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
- };
+diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+index 0fc6080..2c348b4 100644
+--- a/arch/arm/mach-mx5/Makefile
++++ b/arch/arm/mach-mx5/Makefile
+@@ -3,8 +3,9 @@
+ #
  
- static void clk_tree_init(void)
-@@ -1572,6 +1573,7 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ # Object file lists.
+-obj-y   := cpu.o mm.o clock-mx51-mx53.o ehci.o system.o
  
- 	clk_enable(&cpu_clk);
- 	clk_enable(&main_bus_clk);
-+	clk_enable(&gpc_dvfs_clk);
- 
- 	clk_enable(&iim_clk);
- 	imx_print_silicon_rev("i.MX51", mx51_revision());
-@@ -1615,6 +1617,7 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
- 	clk_set_parent(&uart_root_clk, &pll3_sw_clk);
- 	clk_enable(&cpu_clk);
- 	clk_enable(&main_bus_clk);
-+	clk_enable(&gpc_dvfs_clk);
- 
- 	clk_enable(&iim_clk);
- 	imx_print_silicon_rev("i.MX53", mx53_revision());
-diff --git a/arch/arm/mach-mx5/pm-imx5.c b/arch/arm/mach-mx5/pm-imx5.c
-index 98052fc..36c5b57 100644
---- a/arch/arm/mach-mx5/pm-imx5.c
-+++ b/arch/arm/mach-mx5/pm-imx5.c
-@@ -18,13 +18,6 @@
- #include <mach/hardware.h>
- #include "crm_regs.h"
- 
--static struct clk *gpc_dvfs_clk;
--
--static int mx5_suspend_prepare(void)
--{
--	return clk_enable(gpc_dvfs_clk);
--}
--
- static int mx5_suspend_enter(suspend_state_t state)
- {
- 	switch (state) {
-@@ -50,11 +43,6 @@ static int mx5_suspend_enter(suspend_state_t state)
- 	return 0;
- }
- 
--static void mx5_suspend_finish(void)
--{
--	clk_disable(gpc_dvfs_clk);
--}
--
- static int mx5_pm_valid(suspend_state_t state)
- {
- 	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-@@ -62,21 +50,13 @@ static int mx5_pm_valid(suspend_state_t state)
- 
- static const struct platform_suspend_ops mx5_suspend_ops = {
- 	.valid = mx5_pm_valid,
--	.prepare = mx5_suspend_prepare,
- 	.enter = mx5_suspend_enter,
--	.finish = mx5_suspend_finish,
- };
- 
- static int __init mx5_pm_init(void)
- {
--	if (gpc_dvfs_clk == NULL)
--		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
--
--	if (!IS_ERR(gpc_dvfs_clk)) {
--		if (cpu_is_mx51())
--			suspend_set_ops(&mx5_suspend_ops);
--	} else
--		return -EPERM;
-+	if (cpu_is_mx51())
-+		suspend_set_ops(&mx5_suspend_ops);
- 
- 	return 0;
- }
++obj-y   := cpu.o mm.o clock-mx51-mx53.o ehci.o system.o
++obj-$(CONFIG_CPU_IDLE) += cpuidle.o
+ obj-$(CONFIG_PM) += pm-imx5.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+ obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+diff --git a/arch/arm/mach-mx5/cpuidle.c b/arch/arm/mach-mx5/cpuidle.c
+new file mode 100644
+index 0000000..230d335
+--- /dev/null
++++ b/arch/arm/mach-mx5/cpuidle.c
+@@ -0,0 +1,64 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/export.h>
++#include <linux/cpuidle.h>
++#include <asm/proc-fns.h>
++#include <mach/common.h>
++
++int imx5_enter(struct cpuidle_device *dev,
++			struct cpuidle_driver *drv,
++			int index)
++{
++	mx5_cpu_lp_set((unsigned int)dev->states_usage[index].driver_data);
++	cpu_do_idle();
++	return index;
++}
++
++static struct cpuidle_driver imx5_cpuidle_driver __initdata = {
++	.name	= "imx5_cpuidle",
++	.owner	= THIS_MODULE,
++	.states[0] = {
++		.enter			= imx5_enter,
++		.exit_latency		= 12, /* max latency at 160MHz */
++		.target_residency	= 1,
++		.flags			= CPUIDLE_FLAG_TIME_VALID,
++		.name			= "IMX WFI",
++		.desc			= "CPU and related clocks gated",
++	},
++	.states[1] = {
++		.enter			= imx5_enter,
++		.exit_latency		= 20, /* max latency at 160MHz */
++		.target_residency	= 1,
++		.flags			= CPUIDLE_FLAG_TIME_VALID,
++		.name			= "IMX SRPG",
++		.desc			= "CPU state retained,powered off",
++	},
++	.state_count = 2,
++};
++
++/* use driver_data field to hold the mx5 idle parameter */
++static void __init imx5_dd_init(struct cpuidle_device * dev)
++{
++	dev->states_usage[0].driver_data = (void *)WAIT_UNCLOCKED;
++	dev->states_usage[1].driver_data = (void *)WAIT_UNCLOCKED_POWER_OFF;
++}
++
++static int __init imx5_init_cpuidle(void)
++{
++	return common_cpuidle_init(&imx5_cpuidle_driver,
++					true,
++					imx5_dd_init);
++}
++late_initcall(imx5_init_cpuidle);
 -- 
 1.7.1
