@@ -1,21 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Jan 2012 23:37:30 +0100
-Subject: [PATCH 4/4] ARM: tegra: Remove pre-pinctrl pinmux driver
-In-Reply-To: <1327083746-31430-4-git-send-email-swarren@nvidia.com>
-References: <1327083746-31430-1-git-send-email-swarren@nvidia.com>
- <1327083746-31430-4-git-send-email-swarren@nvidia.com>
-Message-ID: <CACRpkdbzBLqgKSNrBBkkQi+xRz-v=3oAu=n8YFrWhr5syrDFVg@mail.gmail.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Tue, 24 Jan 2012 16:43:05 -0600
+Subject: [PATCH v3 1/7] cpuidle: Add common init interface and idle
+ functionality
+In-Reply-To: <4F1EC204.9020807@gmail.com>
+References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
+ <1327379854-12403-2-git-send-email-rob.lee@linaro.org>
+ <4F1EC204.9020807@gmail.com>
+Message-ID: <CAMXH7KFboA936LaRM-MRR4HDngZUxT7EUX_kz6dMNyJvUgJjig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 7:22 PM, Stephen Warren <swarren@nvidia.com> wrote:
-
-> The pinctrl driver is now active and used by all boards. Remove the
-> old pinmux driver.
 >
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+> A few cosmetic comments below, but otherwise looks good.
+>
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+>
+Rob, thanks for the review.  Agree with your comments and will fix in
+the next version.
