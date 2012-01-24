@@ -1,36 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 24 Jan 2012 21:04:55 +0000
-Subject: [PATCH] ARM: S3C64XX: Fix mismerge of Littemill device in Cragganmore
-Message-ID: <1327439095-28151-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 24 Jan 2012 22:09:24 +0100
+Subject: LPC32xx status (Re: [PATCH] Correct bad gpio naming)
+In-Reply-To: <4F1F16A8.7010407@antcom.de>
+References: <4F1C4E25.6070801@antcom.de> <20120124155921.GH2609@pengutronix.de>
+ <4F1EDD15.7010704@antcom.de> <20120124192545.GB8502@pengutronix.de>
+ <4F1F16A8.7010407@antcom.de>
+Message-ID: <20120124210924.GD8502@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The -next s3c64xx tree appears to have acquired a duplicate copy of
-the commit adding Littlemill which is already in mainline causing two
-copies of the device definition to be in the code. Either the duplicate
-should be dropped or this commit should be applied on top of it to remove
-one of the duplicates.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+> Unfortunately, I currently don't have a phy3250, but can check
+> tomorrow with colleagues.
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index fe7f3be..d5a7982 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -299,11 +299,6 @@ static struct platform_device littlemill_device = {
- 	.id		= -1,
- };
- 
--static struct platform_device littlemill_device = {
--	.name		= "littlemill",
--	.id		= -1,
--};
--
- static struct regulator_consumer_supply wallvdd_consumers[] = {
- 	REGULATOR_SUPPLY("SPKVDD", "1-001a"),
- 	REGULATOR_SUPPLY("SPKVDD1", "1-001a"),
+Shouldn't matter that much, or? Once the core support is back and works for
+your board, others could test with their boards.
+
+> I guess the work92105_defconfig is only useful once the drivers
+> currently missing in mainline are merged. Or is there an arm specific
+> tree I should update from?
+
+You can keep the work92105_defconfig in your tree, but we'd need to introduce a
+lpc32xx_defconfig. That should start with a minimal (but working) config and
+can be extended once the drivers are in place.
+
+Regards,
+
+   Wolfram
+
 -- 
-1.7.9.rc1
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/17c3e0f3/attachment.sig>
