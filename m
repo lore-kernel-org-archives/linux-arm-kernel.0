@@ -1,62 +1,69 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Tue, 24 Jan 2012 12:04:44 +0100
-Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
-In-Reply-To: <20120124.115701.2179509760878976509.hdoyu@nvidia.com>
-References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com>
- <1325747509-29665-3-git-send-email-hdoyu@nvidia.com>
- <20120123154310.GC6269@8bytes.org>
- <20120124.115701.2179509760878976509.hdoyu@nvidia.com>
-Message-ID: <20120124110444.GB19255@amd.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Jan 2012 11:27:45 +0000
+Subject: ARM/ARM-SoC plans for v3.4 merge window
+In-Reply-To: <20120124105645.GE19798@mudshark.cambridge.arm.com>
+References: <20120123114902.GY1068@n2100.arm.linux.org.uk>
+ <20120124095009.GS16726@n2100.arm.linux.org.uk>
+ <20120124105645.GE19798@mudshark.cambridge.arm.com>
+Message-ID: <20120124112745.GT16726@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 10:57:01AM +0100, Hiroshi Doyu wrote:
-> > Why do you completly ignore the size parameter in this function (and
-> > in the unmap part below)?
-> > According to the page-sizes you export to the generic layer size can be
-> > 4k or 4M. You need to take care of that in this function.
+On Tue, Jan 24, 2012 at 10:56:45AM +0000, Will Deacon wrote:
+> Hi Russell,
 > 
-> I'll drop 4MB support here once. I'll make another patch for 4MB page
-> support later.
-
-Okay, so when you only export 4k everything should be fine.
-
-> > Hmm, this looks like there is a 1-1 mapping between hardware SMMU
-> > devices and domains. This is not consistent with IOMMU-API semantics
-> > where a domain can contain devices behind different SMMUs. Please fix
-> > that.
+> On Tue, Jan 24, 2012 at 09:50:09AM +0000, Russell King - ARM Linux wrote:
+> > Right, although it's out there - but I'd like to get the AMBA changes
+> > into it which are already conflicting the Samsung development.  So I'm
+> > going to hold off officially asking for people to include the baseline
+> > until this evening.  At that point, I will shut down my 'amba' branch
+> > and transfer that over; that means I won't be accepting any further
+> > acks etc for that work.
+> > 
+> > If you haven't acked changes in the amba branch (eg, to Versatile,
+> > Realview etc) then it'll soon be too late...
 > 
-> I'm a bit confused with the concept of "domain". I thought that
-> "domain" is equivalent to a "virtual address space". Usually a IOMMU
-> device provides a virtual address space for multiple client
-> devices. IOW, a IOMMU device provides a virtual address space, which
-> can be shared with multiple client devices.
+> I took a look at your amba branch, but all I can see in there is:
 > 
-> Actually Tegra SMMU case, a single IOMMU device has 4 different
-> virtual address speace("smmu_as"). Each "smmu_as" has its own virtual
-> address space. "smmu_as[i]" has mutiple "smmu_client" devices.
+> 6cfa627 ARM: 7079/1: spi: Fix builderror in spi-pl022.c
+> 1c3be36 PM: add runtime PM support to MMCI
+> 92b97f0 PM: add runtime PM support to core Primecell driver
 > 
->   smmu_as[i] == domain[i]
-> 
-> I don't understand why "a domain can contain devices behind different
-> SMMUs" because those client devices belong to different virtual
-> address spaces, and they should belong to different "domains".
-> 
-> Could you please explain a bit more about "domain"?
+> which don't seem to touch Versatile or Realview. Am I looking in the wrong
+> place?
 
-A domain is, as you said, a virtual address space for IO devices. But
-the important point is, an arbitrary number of devices can be part of a
-domain. This also means that the devices can be behind different
-hardware SMMUs. In this case your driver needs to program the page-table
-pointer into more than one SMMU to give devices behind different SMMUs
-the same address space.
+Erm, I don't think you're looking at the right branch - especially as
+all the commits start "ARM: amba:".  They were sent out to the mailing
+list on 20th Jan as a set of 31 patches (latest first):
 
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+ARM: amba: samsung: use common amba device initializers
+ARM: amba: spear: use common amba device initializers
+ARM: amba: nomadik: use common amba device initializers
+ARM: amba: u300: use common amba device initializers
+ARM: amba: lpc32xx: use common amba device initializers
+ARM: amba: netx: use common amba device initializers
+ARM: amba: bcmring: use common amba device initializers
+ARM: amba: ep93xx: use common amba device initializers
+ARM: amba: omap2: use common amba device initializers
+ARM: amba: integrator: use common amba device initializers
+ARM: amba: realview: get rid of private platform amba_device initializer
+ARM: amba: versatile: get rid of private platform amba_device initializer
+ARM: amba: vexpress: get rid of private platform amba_device initializer
+ARM: amba: provide common initializers for static amba devices
+ARM: amba: make use of -1 IRQs warn
+ARM: amba: u300: get rid of NO_IRQ initializers
+ARM: amba: spear: get rid of NO_IRQ initializers
+ARM: amba: netx: get rid of NO_IRQ initializers
+ARM: amba: nomadik: get rid of NO_IRQ initializers
+ARM: amba: mxs: get rid of NO_IRQ initializers
+ARM: amba: lpc32xx: get rid of NO_IRQ initializers
+ARM: amba: integrator/realview/versatile/vexpress: get rid of NO_IRQ initializers
+ARM: amba: samsung: get rid of NO_IRQ initializers
+ARM: amba: get rid of NO_IRQ initializers
+ARM: amba: ux500: get rid of NO_IRQ
+ARM: amba: make irq 0 invalid
+ARM: amba: mxs: convert to use amba_device_alloc
+ARM: amba: integrator: convert to use amba_device_alloc
+ARM: amba: ux500: convert to use amba_device_alloc
+ARM: amba: of: convert to use amba_device_alloc
+ARM: amba: add amba_device allocation/add/put functions
