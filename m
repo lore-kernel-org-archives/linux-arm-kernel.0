@@ -1,25 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 24 Jan 2012 01:00:49 -0700 (MST)
-Subject: [PATCH] W1: OMAP HDQ1W: use 32-bit register accesses
-In-Reply-To: <20120123203638.GA8313@ioremap.net>
-References: <alpine.DEB.2.00.1201221319270.26641@utopia.booyaka.com>
- <20120123150753.GA21395@ioremap.net>
- <alpine.DEB.2.00.1201231155590.29673@utopia.booyaka.com>
- <20120123203638.GA8313@ioremap.net>
-Message-ID: <alpine.DEB.2.00.1201240100420.29673@utopia.booyaka.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 24 Jan 2012 00:09:04 -0800
+Subject: [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
+ suspend is not implemented
+In-Reply-To: <1327306361-9803-3-git-send-email-shubhrajyoti@ti.com>
+References: <1327306361-9803-1-git-send-email-shubhrajyoti@ti.com>
+ <1327306361-9803-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <CAN8TOE8i-g_QTsidqDW=TRfZMQ8u93+iP8V7rr4paek=7xZ7UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Jan 2012, Evgeniy Polyakov wrote:
+Hi,
 
-> On Mon, Jan 23, 2012 at 11:57:09AM -0700, Paul Walmsley (paul at pwsan.com) wrote:
-> > http://www.spinics.net/lists/arm-kernel/msg156572.html
-> 
-> Well, if runtime PM does its job for clock manipulation properly, then
-> things should be fine. I suppose that ->probe() will fire up first and
-> you say it boots and detects w1 properly, so patch looks good.
-> Feel free to add my ack
+On Mon, Jan 23, 2012 at 12:12 AM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+...
+> ?include/linux/mtd/mtd.h | ? ?6 +++---
+> ?1 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
+> index 1a81fde..c717bb6 100644
+> --- a/include/linux/mtd/mtd.h
+> +++ b/include/linux/mtd/mtd.h
+> @@ -427,9 +427,9 @@ static inline int mtd_is_locked(struct mtd_info *mtd, loff_t ofs, uint64_t len)
+>
+> ?static inline int mtd_suspend(struct mtd_info *mtd)
+> ?{
+> - ? ? ? if (!mtd->suspend)
+> - ? ? ? ? ? ? ? return -EOPNOTSUPP;
+> - ? ? ? return mtd->suspend(mtd);
+> + ? ? ? if (mtd->suspend)
+> + ? ? ? ? ? ? ? return mtd->suspend(mtd);
+> + ? ? ? return 0;
+> ?}
+>
+> ?static inline void mtd_resume(struct mtd_info *mtd)
 
-Thanks Evgeniy.
+I believe this fix is already accounted for in Artem Bityutskiy's
+l2-mtd-2.6 repository as:
 
-- Paul
+commit 091a7fe219ee8d3e76be9e02221433af10c6f574
+mtd: fix MTD suspend
+(http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commit/091a7fe219ee8d3e76be9e02221433af10c6f574)
+
+However, the bug made it into the 3.3 merge window, so shouldn't this
+bugfix be sent upstream immediately?
+
+Brian
