@@ -1,43 +1,63 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 24 Jan 2012 13:52:30 +0200
-Subject: [PATCH v4 - resend 13/13] ASoC: Kconfig: OMAP4: Enable support for
- PandaBoards
-In-Reply-To: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1327405950-6676-14-git-send-email-peter.ujfalusi@ti.com>
+From: joerg.roedel@amd.com (joerg.roedel at amd.com)
+Date: Tue, 24 Jan 2012 12:57:23 +0100
+Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
+In-Reply-To: <20120124.133614.1646093482547685131.hdoyu@nvidia.com>
+References: <20120123154310.GC6269@8bytes.org>
+ <20120124.115701.2179509760878976509.hdoyu@nvidia.com>
+ <20120124110444.GB19255@amd.com>
+ <20120124.133614.1646093482547685131.hdoyu@nvidia.com>
+Message-ID: <20120124115723.GC19255@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ASoC audio support for OMAP4 based machines with
-twl6040 codec via the omap-abe-twl6040 machine driver.
+On Tue, Jan 24, 2012 at 12:36:14PM +0100, Hiroshi Doyu wrote:
+> > A domain is, as you said, a virtual address space for IO devices. But
+> > the important point is, an arbitrary number of devices can be part of a
+> > domain. This also means that the devices can be behind different
+> > hardware SMMUs. In this case your driver needs to program the page-table
+> > pointer into more than one SMMU to give devices behind different SMMUs
+> > the same address space.
+> 
+> Thank you for explaining.
+> 
+> Does the above mean that a buffer can be shared with different devices
+> which belong to different IOMMU devices(virtual address spaces)?
+> 
+> For example, assuming the following:
+> 
+> - We have "struct iommu_domain *domain1".
+> - "domain1" has iommu device "iommu_dev1" and "iommu_dev2".
+> - "iommu_dev1" has "client_dev1" and "client_dev2".
+> - "iommu_dev2" has "client_dev3" and "client_dev4".
+> 
+> "iommu_map(domain1, iova, pa, ...)" will create the following mapping
+> ___at once___:
+> 
+> - (iova)-(pa) mapping in iommu_dev1(iommmu_dev1's virtual address space)
+> - (iova)-(pa) mapping in iommu_dev2(iommmu_dev2's virtual address space)
+> 
+> Is the above correct?
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- sound/soc/omap/Kconfig |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+Yes, this is correct.
 
-diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
-index 98410b8..47b23fe 100644
---- a/sound/soc/omap/Kconfig
-+++ b/sound/soc/omap/Kconfig
-@@ -99,7 +99,7 @@ config SND_OMAP_SOC_SDP3430
- 
- config SND_OMAP_SOC_OMAP_ABE_TWL6040
- 	tristate "SoC Audio support for OMAP boards using ABE and twl6040 codec"
--	depends on TWL4030_CORE && SND_OMAP_SOC && MACH_OMAP_4430SDP
-+	depends on TWL4030_CORE && SND_OMAP_SOC && ARCH_OMAP4
- 	select SND_OMAP_SOC_DMIC
- 	select SND_OMAP_SOC_MCPDM
- 	select SND_SOC_TWL6040
-@@ -108,6 +108,8 @@ config SND_OMAP_SOC_OMAP_ABE_TWL6040
- 	  Say Y if you want to add support for SoC audio on OMAP boards using
- 	  ABE and twl6040 codec. This driver currently supports:
- 	  - SDP4430/Blaze boards
-+	  - PandaBoard (4430)
-+	  - PandaBoardES (4460)
- 
- config SND_OMAP_SOC_OMAP4_HDMI
- 	tristate "SoC Audio support for Texas Instruments OMAP4 HDMI"
+> It seems that the same (iova) is used for different virtual address
+> spaces. What kind of case is this beneficial most in?
+
+It is actually the _same_ virtual address space which is used by
+iommu_dev1 and iommu_dev2. Think of it like multiple threads of a single
+process. They also share the address space.
+This is a requirement of the iommu-api which is beneficial for
+virtualization and simplifies the usage of the api in general. The user
+does not need to care which devices can be assigned to which domain
+because of underlying hardware constraints. The goal of the iommu-api is
+to hide such contraints.
+
+
+	Joerg
+
 -- 
-1.7.8.3
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
