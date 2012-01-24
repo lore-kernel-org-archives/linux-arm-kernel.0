@@ -1,36 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jan 2012 15:06:59 +0000
-Subject: [PATCH 20/31] ARM: amba: versatile: get rid of private platform
- amba_device initializer
-In-Reply-To: <E1RoAmU-0005Fb-9y@rmk-PC.arm.linux.org.uk>
-References: <20120120092207.GD1068@n2100.arm.linux.org.uk>
- <E1RoAmU-0005Fb-9y@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120124150659.GK19798@mudshark.cambridge.arm.com>
+Date: Tue, 24 Jan 2012 15:14:34 +0000
+Subject: [PATCH v3 0/6] ARM: Remove the __ARCH_WANT_INTERRUPTS_ON_CTXSW
+ definition
+In-Reply-To: <20120123095338.GB11983@arm.com>
+References: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
+ <1327310131.2446.1.camel@twins> <20120123092624.GA11983@arm.com>
+ <20120123094759.GU1068@n2100.arm.linux.org.uk>
+ <20120123095338.GB11983@arm.com>
+Message-ID: <20120124151434.GL19798@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 09:29:10AM +0000, Russell King - ARM Linux wrote:
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mach-versatile/core.c         |   36 ++++++++++++++++----------------
->  arch/arm/mach-versatile/core.h         |   20 ++++-------------
->  arch/arm/mach-versatile/versatile_pb.c |   10 ++++----
->  3 files changed, 28 insertions(+), 38 deletions(-)
+On Mon, Jan 23, 2012 at 09:53:38AM +0000, Catalin Marinas wrote:
+> On Mon, Jan 23, 2012 at 09:47:59AM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Jan 23, 2012 at 09:26:24AM +0000, Catalin Marinas wrote:
+> > > On Mon, Jan 23, 2012 at 09:15:31AM +0000, Peter Zijlstra wrote:
+> > > > On Fri, 2012-01-20 at 17:42 +0000, Catalin Marinas wrote:
+> > > > > This is version 3 of the set of patches removing
+> > > > > __ARCH_WANT_INTERRUPTS_ON_CTXSW on ARM. The series was rebased on top of
+> > > > > 3.3-rc1 and fixed the conflicts with the kernel/sched/ changes and the
+> > > > > ARM LPAE patches. There are no functional changes from v2. I plan to
+> > > > > push this to -next and get it ready for 3.4-rc1.
+> > > > > 
+> > > > > Question for Peter/Ingo - how do we merge the first patch that
+> > > > > introduces finish_arch_post_lock_switch? Do you pick it up or I can
+> > > > > merge it via rmk (with your ack)?
+> > > > 
+> > > > I'm fine either way, I'll probably ask Ingo to pull your tree so that I
+> > > > can stack some other patches on top.
+> > > 
+> > > In which case I would need Russell's acked-by.
+> > 
+> > That depends on knowing what CPU architectures this has been tested on,
+> > and whether anyone external has tested it.  It's definitely a change
+> > which needs some tested-by tags on it.
+> 
+> I agree. On my side, I tested it on:
+> 
+> Versatile Express + Cortex-A9 (SMP configuration, ASIDs)
+> Versatile PB926 (UP configuration, no ASIDs)
 
-This seems happy enough on a Versatile AB926, although I do get spurious
-IRQs from the ethernet chip:
+For what it's worth, I've also tested this on:
 
-	eth0: spurious interrupt (mask = 0xb3)
+Realview PB1176 (UP, ASIDs)
+Cortex-A5 (SMP, ASIDs)
+Cortex-A7 (SMP, ASIDs)
 
-This doesn't seem to be the fault of this patch though; I suspect it's
-related to the recent VIC changes and removal of MULTI_IRQ_HANDLER
-(especially since the ethernet interrupts lives on the secondary
-controller).
-
-So for this patch:
-
-Tested-by: Will Deacon <will.deacon@arm.com>
-
-I'll investigate the other problem separately.
+and I haven't seen any problems with native, parallel kernel builds. I don't
+have anything prior to ARMv5 available, but at least we seem to have covered
+v5-v7.
 
 Will
