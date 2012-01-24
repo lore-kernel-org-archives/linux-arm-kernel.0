@@ -1,69 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 24 Jan 2012 14:44:25 -0800
-Subject: [PATCH 3/4] ARM: tegra: Switch to new pinctrl driver
-In-Reply-To: <CACRpkdZ_hBviswq7pXoLozC8gjzvowCBrj9yjw1xJT79b5rtwQ@mail.gmail.com>
-References: <1327083746-31430-1-git-send-email-swarren@nvidia.com>
- <1327083746-31430-3-git-send-email-swarren@nvidia.com>
- <CACRpkdZ_hBviswq7pXoLozC8gjzvowCBrj9yjw1xJT79b5rtwQ@mail.gmail.com>
-Message-ID: <CAOesGMjuewhO2H+QFQtAX+xFb5hyNn8Q65Cuup4vaXWAFvX87w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 Jan 2012 23:53:30 +0100
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform
+ clean-up
+In-Reply-To: <201201231558.53673.arnd@arndb.de>
+References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
+ <201201231558.53673.arnd@arndb.de>
+Message-ID: <CACRpkdaAJ+tr3yUWtv-eZEppiGWP92wTPMQsmcxnpBOkoB9jAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 2:36 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Jan 20, 2012 at 7:22 PM, Stephen Warren <swarren@nvidia.com> wrote:
->
->> * Rename old pinmux and new pinctrl platform driver and DT match table
->> ?entries, so the new driver gets instantiated.
->> * Re-write board-pinmux.c, so that it uses pinctrl APIs to configura the
->> ?pinmux.
->> * Re-write board-*-pinmux.c so that the pinmux configuration tables are
->> ?in pinctrl format.
->>
->> Ventana's pin mux table needed some edits on top of the basic format
->> conversion, since some mux options that were previously marked as
->> reserved are now valid in the new pinctrl driver. Attempting to use the
->> old reserved names will result in a failure. Specifically, groups lpw0,
->> lpw2, lsc1, lsck, and lsda were changed from function rsvd4 to displaya,
->> and group pta was changed from function rsvd2 to hdmi.
->>
->> All boards' pin mux tables needed some edits on top of the based format
->> conversion, since function i2c was split into i2c1 (first general I2C
->> controller) and i2cp (power I2C controller) to better align function
->> definitions with HW blocks.
->>
->> Due to the split of mux tables into pure mux and pull/tristate tables,
->> many entries in the separate Seaboard/Ventana tables could be merged
->> into the common table, since the entries differed only in the portion
->> in one of the tables, not both.
->>
->> Most pin groups allow configuration of mux, tri-state, and pull. However,
->> some don't allow pull configuration, which is instead configured by new
->> groups that only allow pull configuration. This is a reflection of the
->> true HW capabilities, which weren't fully represented by the old pinmux
->> driver. This required adding new pull table entries for those new groups,
->> and setting many other entries' pull configuration to
->> TEGRA_PINCONFIG_DONT_SET.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> ?arch/arm/mach-tegra/board-harmony-pinmux.c ? | ?362 ++++++++++++++-------
->> ?arch/arm/mach-tegra/board-paz00-pinmux.c ? ? | ?362 ++++++++++++++-------
->> ?arch/arm/mach-tegra/board-pinmux.c ? ? ? ? ? | ? 62 ++++-
->> ?arch/arm/mach-tegra/board-pinmux.h ? ? ? ? ? | ? 39 ++-
->> ?arch/arm/mach-tegra/board-seaboard-pinmux.c ?| ?442 ++++++++++++++++---------
->> ?arch/arm/mach-tegra/board-trimslice-pinmux.c | ?366 ++++++++++++++--------
->> ?arch/arm/mach-tegra/pinmux.c ? ? ? ? ? ? ? ? | ? ?6 +-
->> ?drivers/pinctrl/pinctrl-tegra.c ? ? ? ? ? ? ?| ? ?6 +-
->> ?8 files changed, 1095 insertions(+), 550 deletions(-)
->
-> Can I have Colin's or Olof's ACK on this Tegra stuff too?
-> Would feel better...
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Jan 23, 2012 at 4:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Yup, I've just been waiting on things to settle,
-bindings/implementation wise. Will look at it over the next day or two
-and get back.
+> Linus, does this fit with your plans for migrating to only
+> device-tree based probing for ux500?
 
+Well the SoC registatration (I guess in mach-*/* someplace)
+needs to be DT compliant by parsing some node too, but
+that should be some minor thing.
 
--Olof
+I'm not smart enough to tell whether DT will automagically
+arrange parenthood between struct device * nodes or if
+that needs a lot of custom code to work?
+
+> I guess if this goes in
+> first, you will have to make a few changes so that it keeps working
+> when the devices are put into the dts.
+
+Oh well, that is a bit ahead in time anyway. We need DT support
+in a plethora of drivers before we're getting anywhere on that.
+Niklas is the right one to ask I guess...
+
+> Everyone else, who is planning to use the infrastructure besides ux500?
+
+I can easily see this being used in the ARM reference designs
+(Integrator, Versatile, RealView and Versatile Express) some of them
+I can possibly patch myself even. OMAP has expressed interest
+in "some way of getting the SoC ID out", and I guess this is
+the means to that end.
+
+Yours,
+Linus Walleij
