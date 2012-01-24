@@ -1,118 +1,129 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 24 Jan 2012 03:47:29 -0700 (MST)
-Subject: omap-serial RX DMA polling?
-In-Reply-To: <20120124090021.GQ16726@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1201221718190.26641@utopia.booyaka.com>
- <CAAL8m4wcSfhjxg0Lyo-W7DQ85rikb6asRds95hwQQNTDXe2YKQ@mail.gmail.com>
- <alpine.DEB.2.00.1201230304310.29673@utopia.booyaka.com>
- <CAAL8m4wBuFQYkyFUwNWrUZTBWuQHggy=y3Oi=6DBHNB_rqU9tA@mail.gmail.com>
- <alpine.DEB.2.00.1201231228310.29673@utopia.booyaka.com>
- <CAAL8m4zE6wD67GCeVe9BOBZ=5yrCkrXUUu26y2GAXrdiDD3R8g@mail.gmail.com>
- <alpine.DEB.2.00.1201240010100.29673@utopia.booyaka.com>
- <20120124090021.GQ16726@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1201240210310.29673@utopia.booyaka.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 24 Jan 2012 11:56:53 +0100
+Subject: [PATCH V4 2/4] CS89x0 : add CS89x0 platform device to the
+ iMX21ADS board
+In-Reply-To: <CAGzjT4eODr-8yUUSLxeZQ_O1H3Fngep=rDwM_RaiT4xT6aVD-A@mail.gmail.com>
+References: <1326996830-13548-1-git-send-email-jaccon.bastiaansen@gmail.com>
+ <20120123093420.GL5446@pengutronix.de>
+ <CAGzjT4eODr-8yUUSLxeZQ_O1H3Fngep=rDwM_RaiT4xT6aVD-A@mail.gmail.com>
+Message-ID: <20120124105653.GU5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jan 2012, Russell King - ARM Linux wrote:
-
-> On Tue, Jan 24, 2012 at 12:58:57AM -0700, Paul Walmsley wrote:
+On Tue, Jan 24, 2012 at 12:34:24AM +0100, Jaccon Bastiaansen wrote:
+> Hello Sascha,
 > 
-> > In a correctly-working RX PIO path, the driver is going to receive an 
-> > interrupt the moment the data is ready to be transferred from the FIFO.  
+> 2012/1/23 Sascha Hauer <s.hauer@pengutronix.de>:
+> > On Thu, Jan 19, 2012 at 07:13:50PM +0100, Jaccon Bastiaansen wrote:
+> >> Add CS89x0 networking support to the iMX21ADS board by using the
+> >> platform driver support in the CS89x0 driver.
+> >>
+> >> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+> >> ---
+> >> ?arch/arm/configs/imx_v4_v5_defconfig | ? ?2 ++
+> >> ?arch/arm/mach-imx/mach-mx21ads.c ? ? | ? 31 ++++++++++++++++++++++++++++---
+> >> ?2 files changed, 30 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+> >> index 11a4192..fc0106f 100644
+> >> --- a/arch/arm/configs/imx_v4_v5_defconfig
+> >> +++ b/arch/arm/configs/imx_v4_v5_defconfig
+> >> @@ -81,6 +81,8 @@ CONFIG_NET_ETHERNET=y
+> >> ?CONFIG_SMC91X=y
+> >> ?CONFIG_DM9000=y
+> >> ?CONFIG_SMC911X=y
+> >> +CONFIG_CS89x0=y
+> >> +CONFIG_CS89x0_PLATFORM=y
+> >> ?# CONFIG_NETDEV_1000 is not set
+> >> ?# CONFIG_NETDEV_10000 is not set
+> >> ?# CONFIG_INPUT_MOUSEDEV is not set
+> >> diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
+> >> index 25f8402..4fd37fc 100644
+> >> --- a/arch/arm/mach-imx/mach-mx21ads.c
+> >> +++ b/arch/arm/mach-imx/mach-mx21ads.c
+> >> @@ -37,8 +37,8 @@
+> >> ?#define MX21ADS_REG_ADDR(offset) ? ?(void __force __iomem *) \
+> >> ? ? ? ? ? ? ? (MX21ADS_MMIO_BASE_ADDR + (offset))
+> >>
+> >> +#define MX21ADS_CS8900A_MMIO_SIZE ? 0x200000
+> >> ?#define MX21ADS_CS8900A_IRQ ? ? ? ? IRQ_GPIOE(11)
+> >> -#define MX21ADS_CS8900A_IOBASE_REG ?MX21ADS_REG_ADDR(0x000000)
+> >> ?#define MX21ADS_ST16C255_IOBASE_REG MX21ADS_REG_ADDR(0x200000)
+> >> ?#define MX21ADS_VERSION_REG ? ? ? ? MX21ADS_REG_ADDR(0x400000)
+> >> ?#define MX21ADS_IO_REG ? ? ? ? ? ? ?MX21ADS_REG_ADDR(0x800000)
+> >> @@ -159,6 +159,26 @@ static struct platform_device mx21ads_nor_mtd_device = {
+> >> ? ? ? .resource = &mx21ads_flash_resource,
+> >> ?};
+> >>
+> >> +static const struct resource mx21ads_cs8900_resources[] __initconst = {
+> >> + ? ? {
+> >> + ? ? ? ? ? ? .start = MX21_CS1_BASE_ADDR,
+> >> + ? ? ? ? ? ? .end = MX21_CS1_BASE_ADDR + ?MX21ADS_CS8900A_MMIO_SIZE - 1,
+> >> + ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> >> + ? ? },
+> >> + ? ? {
+> >> + ? ? ? ? ? ? .start = MX21ADS_CS8900A_IRQ,
+> >> + ? ? ? ? ? ? .end = MX21ADS_CS8900A_IRQ,
+> >> + ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
+> >> + ? ? }
+> >> +};
+> >> +
+> >> +static const struct platform_device_info mx21ads_cs8900_devinfo __initconst = {
+> >> + ? ? .name = "cs89x0",
+> >> + ? ? .id = 0,
+> >> + ? ? .res = mx21ads_cs8900_resources,
+> >> + ? ? .num_res = ARRAY_SIZE(mx21ads_cs8900_resources),
+> >> +};
+> >> +
+> >> ?static const struct imxuart_platform_data uart_pdata_rts __initconst = {
+> >> ? ? ? .flags = IMXUART_HAVE_RTSCTS,
+> >> ?};
+> >> @@ -254,14 +274,17 @@ mx21ads_nand_board_info __initconst = {
+> >> ?static struct map_desc mx21ads_io_desc[] __initdata = {
+> >> ? ? ? /*
+> >> ? ? ? ?* Memory-mapped I/O on MX21ADS Base board:
+> >> - ? ? ?* ? - CS8900A Ethernet controller
+> >> ? ? ? ?* ? - ST16C2552CJ UART
+> >> ? ? ? ?* ? - CPU and Base board version
+> >> ? ? ? ?* ? - Base board I/O register
+> >> + ? ? ?*
+> >> + ? ? ?* Note that the CS8900 uses the first MX21ADS_CS8900A_MMIO_SIZE
+> >> + ? ? ?* bytes of the CS1 memory range.
+> >> ? ? ? ?*/
+> >> ? ? ? {
+> >> ? ? ? ? ? ? ? .virtual = MX21ADS_MMIO_BASE_ADDR,
+> >> - ? ? ? ? ? ? .pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR),
+> >> + ? ? ? ? ? ? .pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR +
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MX21ADS_CS8900A_MMIO_SIZE),
+> >
+> > Since you now use ioremap the cs89x0 driver this mapping is not used
+> > for the cs89x0 anymore, so it's strange to have references to it
+> > here.
+> > You still need the mapping though, but only for MX21ADS_IO_REG.
+> >
 > 
-> That's hellishly inefficient.  
-
-If the point is to minimize the receive latency, as Govindraj described 
-earlier, then setting an RX FIFO threshold to one byte is the way to go.  
-It certainly seems preferable to the use of a DMA RX path with a 1 
-microsecond polling timer.  Ideally this would be something that the 
-serial user could tune.
-
-> Generally, what you want for transmit is to wait for the TX FIFO to
-> drain to maybe half full, and then reload it until it is completely
-> full.
-
-Interesting rule of thumb.  For OMAP there are also power management 
-considerations.  For example, if we can estimate the maximum amount of 
-time it will take for the CPU to refill the transmit FIFO, then the TX 
-FIFO threshold can be adjusted down to reduce the number of 
-wakeups/interrupts needed to transmit a buffer.
-
-In fact from a narrow PM perspective, the ideal TX FIFO threshold would 
-basically be zero: to allow the entire FIFO to drain before waking the CPU 
-back up to refill it.  There's no data loss restriction as there is with 
-the RX FIFO.  Of course, many serial users couldn't tolerate such an 
-setting and still work acceptably.  It would be nice if the driver could 
-allow serial users to override the estimate that it generates.
-
-> For the RX FIFO, you want to set the watermark such that you get a
-> decent number of bytes in there before the receive interrupt is
-> raised, but not soo many that an overrun is likely.
-
-One other constraint.  If the RX FIFO threshold is set too high, then the 
-CPU is effectively prevented from entering a deep sleep state, since the 
-CPU has to be able to wake up in time to prevent an RX overrun.  The lower 
-the RX FIFO threshold, the more time the CPU has to wake up, and the 
-deeper the sleep state the CPU can enter.
-
-> One of the point of having FIFOs is that they batch up the transmit and
-> receive activity to make it more efficient at servicing the UART.
-
-Yep.  Also, another point is to allow the servicer to enter a low power 
-state while the FIFOs fill or drain.
-
-> Setting the FIFO levels to one character virtually negates the point of 
-> having FIFOs - there is no point setting the TX FIFO to raise an 
-> interrupt when there's one character space left.  As has already been 
-> reported, this just puts the interrupt rate up, and means you waste a 
-> lot more CPU (or bus) time servicing the transmit path.
-
-In the case of this particular patchset, there was indeed a point to 
-setting the TX FIFO to 1; it was to work around a hardware bug.  As the 
-patch description stated, it's a pretty nasty penalty that is worth 
-avoiding if at all possible[*].  I'm not endorsing that as an appropriate 
-setting outside of a bug workaround.
-
-> As for RX DMA vs RX PIO, that depends on the UART (I don't know how
-> OMAPs UARTs behave.)  To sanely use RX DMA, you need the UART to raise
-> the RX timeout interrupt after characters have been offloaded by the
-> RX DMA.  Lets saying that RX FIFO is 32 bytes deep, and it's set to
-> raise the RX DMA request at 16 bytes full.  If you program the DMA
-> controller to burst 16 bytes off the RX FIFO, you'll empty it and
-> it'll never raise the RX timeout interrupt.  So you'll need to know
-> how many characters you're expecting.
->
-> If on the other hand you burst 8 bytes off the RX FIFO, you'll leave
-> 8 bytes in the FIFO.  If the UART works properly, it will raise an
-> RX timeout interrupt after N bit periods where the RX line is inactive.
+> The ST16C255 UART is the first peripheral in the CS1 memory range for
+> which this fixed mapping is now required. I could create another
+> constant (for example: MX21ADS_ST16C255_OFFSET) to indicate the offset
+> in the CS1 memory range where the mapping should start. But since that
+> would create another constant with the same value as
+> MX21ADS_CS8900A_MMIO_SIZE, I decided to use MX21ADS_CS8900A_MMIO_SIZE.
 > 
-> What that means is that during a burst of RX activity, your DMA takes
-> the strain of receiving characters, and you process those characters
-> when either the RX buffer becomes full or when there's a pause in
-> reception.  This gives good efficiency during bursts while maintaining
-> interactivity - to the same levels as that expected by RX PIO using
-> the FIFO.
+> Do you prefer to a constant with another name here?
 
-Well, Govindraj has some low-latency requirement, and no way to specify 
-how many bytes he's expecting.  So if RX DMA is going to be used, the 
-driver will still need some kind of timer to flush any bytes that could be 
-stuck in the middle of a DMA transfer.  This still seems like a case where 
-RX PIO would do a better job; no need for a timer, and immediate 
-notification when a character arrives, if the threshold is set that way.
+Ok, looking again at it I understand what you are doing here and it
+seems wrong. Instead of mapping MX21_CS1_BASE_ADDR you now map
+MX21_CS1_BASE_ADDR + MX21ADS_CS8900A_MMIO_SIZE. This means that the
+offset to MX21ADS_IO_REG is no longer 0x800000 but
+0x800000 - MX21ADS_CS8900A_MMIO_SIZE.
+Please just keep the mapping like it was before, it won't hurt.
+BTW the 8250 serial driver also ioremaps the memory if you add
+UPF_IOREMAP to the platform data.
 
-As far as the RX timeout goes, those don't seem to be delivered properly 
-when the CPU is in a low-power state.  This is probably due to the 
-previously-mentioned hardware bug, although it could be due to a driver 
-bug.  So we may be out of luck there.  We (meaning the people working on 
-OMAP) also need to figure out here what the OMAP UART RX timeout would 
-theoretically be, since it doesn't appear to be documented.
+Sascha
 
-Thanks for the comments.
-
-
-- Paul
-
-* There is another workaround for this bug under development here that
-  shouldn't require changing the TX FIFO.  If it passes testing here, then 
-  the TX FIFO of 1 shouldn't be needed.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
