@@ -1,47 +1,89 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Jan 2012 00:56:06 +0100
-Subject: [PATCH 2/4] at91 : declare header name
+Date: Wed, 25 Jan 2012 00:56:07 +0100
+Subject: [PATCH 3/4] at91 : remove wait_for_interrupt definition
 In-Reply-To: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1327449368-29917-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1327449368-29917-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the header and define the macro to prevent multiple inclusion
-like the others headers.
+All the "wait_for_interrupt" definition are aliases to cpu_do_idle.
+Only the rm9200 has an asm routine to switch to wfi. But the cpu_do_idle
+for this platform has exactly the same asm routine.
+
+arch/arm/mm/proc-arm920.S
+...
+ENTRY(cpu_arm920_do_idle)
+        mcr     p15, 0, r0, c7, c0, 4           @ Wait for interrupt
+...
+
+Then it is safe to invoke cpu_do_idle for this platform. As all the
+wait_for_interrupts are definition for cpu_do_idle, let's remove it
+and replace its invokation by cpu_do_idle.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/pm.h |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/mach-at91/pm.c |    2 +-
+ arch/arm/mach-at91/pm.h |   12 ------------
+ 2 files changed, 1 insertions(+), 13 deletions(-)
 
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 62ad955..acf32c7 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -272,7 +272,7 @@ static int at91_pm_enter(suspend_state_t state)
+ 					: /* no input */
+ 					: "r0");
+ 			saved_lpr = sdram_selfrefresh_enable();
+-			wait_for_interrupt_enable();
++			cpu_do_idle();
+ 			sdram_selfrefresh_disable(saved_lpr);
+ 			break;
+ 
 diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 92d2223..325ef76 100644
+index 325ef76..624c99c 100644
 --- a/arch/arm/mach-at91/pm.h
 +++ b/arch/arm/mach-at91/pm.h
-@@ -1,3 +1,16 @@
-+/*
-+ * AT91 Power Management
-+ *
-+ * Copyright (C) 2005 David Brownell
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#ifndef __ARCH_ARM_MACH_AT91_PM
-+#define __ARCH_ARM_MACH_AT91_PM
-+
- #ifdef CONFIG_ARCH_AT91RM9200
- #include <mach/at91rm9200_mc.h>
+@@ -36,10 +36,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+ #define sdram_selfrefresh_disable(saved_lpr) \
+ 	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
  
-@@ -116,3 +129,5 @@ static inline u32 sdram_selfrefresh_enable(void)
- 	cpu_do_idle()
+-#define wait_for_interrupt_enable() \
+-	asm volatile ("mcr p15, 0, %0, c7, c0, 4" \
+-		      : : "r" (0))
+-
+ #elif defined(CONFIG_ARCH_AT91CAP9)
+ #include <mach/at91cap9_ddrsdr.h>
+ 
+@@ -58,9 +54,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+ #define sdram_selfrefresh_disable(saved_lpr) \
+ 	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr)
+ 
+-#define wait_for_interrupt_enable() \
+-	cpu_do_idle()
+-
+ #elif defined(CONFIG_ARCH_AT91SAM9G45)
+ #include <mach/at91sam9_ddrsdr.h>
+ 
+@@ -97,8 +90,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+ 		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1); \
+ 	} while (0)
+ 
+-#define wait_for_interrupt_enable()		cpu_do_idle()
+-
+ #else
+ #include <mach/at91sam9_sdramc.h>
+ 
+@@ -125,9 +116,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+ #define sdram_selfrefresh_disable(saved_lpr) \
+ 	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr)
+ 
+-#define wait_for_interrupt_enable() \
+-	cpu_do_idle()
+-
+ #endif
  
  #endif
-+
-+#endif
 -- 
 1.7.5.4
