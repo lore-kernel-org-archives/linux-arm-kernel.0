@@ -1,29 +1,40 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Tue, 24 Jan 2012 07:14:42 +0100
-Subject: [RFC PATCH 4/7] ARM: davinci: net: davinci_emac: add OF support
-In-Reply-To: <op.v8jxcfp7fzo5me@stalin>
-References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-5-git-send-email-hs@denx.de> <op.v8jxcfp7fzo5me@stalin>
-Message-ID: <4F1E4C52.1000403@denx.de>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 24 Jan 2012 06:29:01 +0000
+Subject: [PATCH RFC 1/2] watchdog : omap_wdt : Implement
+ WDIOC_GETBOOTSTATUS for omap3+
+In-Reply-To: <CAM=Q2ctL_Z5P6=NwAWBHD2bR=xqHMCF15g6v0Ap=hJMPdgXwyQ@mail.gmail.com>
+References: <1327317188-14782-1-git-send-email-shubhrajyoti@ti.com>
+ <1327317188-14782-2-git-send-email-shubhrajyoti@ti.com>
+ <B5906170F1614E41A8A28DE3B8D12143317901B9@DBDE01.ent.ti.com>
+ <CAM=Q2ctL_Z5P6=NwAWBHD2bR=xqHMCF15g6v0Ap=hJMPdgXwyQ@mail.gmail.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D12143317902D6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Anatoly,
+Hi Shubhrajyoti,
 
-Anatoly Sivov wrote:
-> Hello Heiko,
+On Tue, Jan 24, 2012 at 11:40:43, Shubhrajyoti Datta wrote:
+> Hi Vaibhav,
 > 
->> +* Texas Instruments Davinci EMAC
->> +
->> +This file provides information, what the davice node
->> +for the davinci_emac interface contain.
-> Please, fix the typo. (davice -> device)
+> On Tue, Jan 24, 2012 at 10:32 AM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> > On Mon, Jan 23, 2012 at 16:43:07, Datta, Shubhrajyoti wrote:
+> >> This patch intends to implement the WDIOC_GETBOOTSTATUS ioctl
+> >> for the omap3 and omap4.
+> >>
+> >
+> > Instead of just returning the register content why not parse
+> > the RSTST register value and check if it's really a watchdog
+> > reset or not?
+> 
+> That is what is done for 24xx and below cpus. So I thought of extending it.
+> 
+> 
 
-Ups, thanks! Fix this in the next version, just waiting for more
-comments...
+IMO they also need to be fixed then :)
 
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Just returning the register content does not help much and looking at other
+implementations, like Blackfin, I am guessing this IOCTL is supposed to give
+a yes/no sort of result.
+
+Regards,
+Vaibhav B.
