@@ -1,41 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Jan 2012 23:00:31 +0100
-Subject: [PATCH] ARM: ux500: Initialize irq affinity
-In-Reply-To: <20120124110410.GF19798@mudshark.cambridge.arm.com>
-References: <1327064356-3603-1-git-send-email-per.xx.fransson@stericsson.com>
- <20120120130310.GO1068@n2100.arm.linux.org.uk>
- <CACRpkdYgT-Q+ZEzhjOaOb_2Pihx0-pMXo+Dc-CESDT7BAWAOqg@mail.gmail.com>
- <20120120174456.GB11845@n2100.arm.linux.org.uk>
- <20120122125411.GA27821@mudshark.cambridge.arm.com>
- <20120122152710.GT1068@n2100.arm.linux.org.uk>
- <20120124110410.GF19798@mudshark.cambridge.arm.com>
-Message-ID: <CACRpkdazORvVrfTkNzeSZRpLdGQRY=RbsQzuAVZC+SZ_jWsv8A@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 24 Jan 2012 15:08:40 -0700
+Subject: [RFCv2 03/14] irq_domain: Make irq_domain structure match
+ powerpc's irq_host
+In-Reply-To: <4F1F24DD.5030904@gmail.com>
+References: <1327352870-14687-1-git-send-email-grant.likely@secretlab.ca>
+ <1327352870-14687-4-git-send-email-grant.likely@secretlab.ca>
+ <4F1F24DD.5030904@gmail.com>
+Message-ID: <CACxGe6sO-3LHbimBGaWFY98QtK5tiK8uiDodmgO1kVQoi4jDTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 12:04 PM, Will Deacon <will.deacon@arm.com> wrote:
-> [Russell]
->> So, if you have interrupts which can only be serviced by a group of CPUs,
->> at least one of those CPUs must remain online at all times that those
->> dependent devices could produce an interrupt.
+On Tue, Jan 24, 2012 at 2:38 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 01/23/2012 03:07 PM, Grant Likely wrote:
+>> Part of the series to unify the irq remapping mechanisms in the
+>> kernel. ?A follow up patch will copy the powerpc implementation into
+>> kernel/irq/irqdomain.c, which will be a lot easier if the structures
+>> are identical.
 >>
->> I think what we want instead is for the IRQ subsystem to record on a
->> per-IRQ basis which CPUs the interrupt /can/ be routed to, and if:
+>> Where they differ, I've chose to use the powerpc names since there is
+>> a lot more code using those names.
 >>
->> ? ? ? affinity & cpus_online & allowable_cpus
+>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+>> ---
+>> ?arch/arm/common/gic.c ? ? | ? 14 ++++----
+>> ?include/linux/irqdomain.h | ? 84 ++++++++++++++++++++++++++++++++++-----------
+>> ?kernel/irq/irqdomain.c ? ?| ? 14 ++++----
+>> ?3 files changed, 78 insertions(+), 34 deletions(-)
 >>
->> becomes empty, the attempt to set the affinity is failed. ?Also, a callback
->> in the hotplug code to error out if
->>
->> ? ? ? cpus_online & allowable_cpus & ~offlining_cpu
->>
->> would become an empty set.
 >
-> That looks like a good idea to me. I suggest we wait until somebody builds
-> such a monster and get them to implement the solution :) (unless the ux500 is
-> capable of booting on a CPU other than 0?).
+> snip...
+>
+>> @@ -126,7 +126,7 @@ void irq_dispose_mapping(unsigned int irq)
+>> ?}
+>> ?EXPORT_SYMBOL_GPL(irq_dispose_mapping);
+>>
+>> -int irq_domain_simple_dt_translate(struct irq_domain *d,
+>> +int irq_domain_simple_xlate(struct irq_domain *d,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? struct device_node *controller,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *out_hwirq, unsigned int *out_type)
+>
+> This needs a declaration in irqdomain.h (as well as EXPORT?). There
+> could be others as well, but this is the one I'm using for generic irq chip.
 
-No it needs to boot on 0. So let's let this thread sleep ...
+Fine by me.  I'll add that as a follow-on patch since nothing in-tree
+currently depends on that.  It will be in the next version of the
+patch series.  Also, are you okay if I rename it to
+irq_domain_generic_xlate()?  Simple doesn't really describe it well,
+and it can be used for any interrupt controller implementing the
+binding we've settled on as recommended for new device support.
 
-Thanks,
-Linus Walleij
+g.
+
+>
+> Rob
+>
+>> @@ -181,7 +181,7 @@ EXPORT_SYMBOL_GPL(irq_domain_generate_simple);
+>>
+>> ?struct irq_domain_ops irq_domain_simple_ops = {
+>> ?#ifdef CONFIG_OF_IRQ
+>> - ? ? .dt_translate = irq_domain_simple_dt_translate,
+>> + ? ? .xlate = irq_domain_simple_xlate,
+>> ?#endif /* CONFIG_OF_IRQ */
+>> ?};
+>> ?EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
+>
+
+
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
