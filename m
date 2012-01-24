@@ -1,61 +1,66 @@
-From: k.lewandowsk@samsung.com (Karol Lewandowski)
-Date: Tue, 24 Jan 2012 12:31:11 +0100
-Subject: [PATCH] max8997: Avoid spaces in regulator names
-Message-ID: <1327404672-5459-1-git-send-email-k.lewandowsk@samsung.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 24 Jan 2012 12:36:14 +0100
+Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
+In-Reply-To: <20120124110444.GB19255@amd.com>
+References: <20120123154310.GC6269@8bytes.org><20120124.115701.2179509760878976509.hdoyu@nvidia.com><20120124110444.GB19255@amd.com>
+Message-ID: <20120124.133614.1646093482547685131.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-max8997-pmic instantiated from device tree uses names, not numerical
-ids to distinguish between outputs.
+From: Joerg Roedel <joerg.roedel@amd.com>
+Subject: Re: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
+Date: Tue, 24 Jan 2012 12:04:44 +0100
+Message-ID: <20120124110444.GB19255@amd.com>
 
-Replace spaces with underscores in said names to make it possible to
-describe these outputs as regulators in DTS.
+> > > Hmm, this looks like there is a 1-1 mapping between hardware SMMU
+> > > devices and domains. This is not consistent with IOMMU-API semantics
+> > > where a domain can contain devices behind different SMMUs. Please fix
+> > > that.
+> > 
+> > I'm a bit confused with the concept of "domain". I thought that
+> > "domain" is equivalent to a "virtual address space". Usually a IOMMU
+> > device provides a virtual address space for multiple client
+> > devices. IOW, a IOMMU device provides a virtual address space, which
+> > can be shared with multiple client devices.
+> > 
+> > Actually Tegra SMMU case, a single IOMMU device has 4 different
+> > virtual address speace("smmu_as"). Each "smmu_as" has its own virtual
+> > address space. "smmu_as[i]" has mutiple "smmu_client" devices.
+> > 
+> >   smmu_as[i] == domain[i]
+> > 
+> > I don't understand why "a domain can contain devices behind different
+> > SMMUs" because those client devices belong to different virtual
+> > address spaces, and they should belong to different "domains".
+> > 
+> > Could you please explain a bit more about "domain"?
+> 
+> A domain is, as you said, a virtual address space for IO devices. But
+> the important point is, an arbitrary number of devices can be part of a
+> domain. This also means that the devices can be behind different
+> hardware SMMUs. In this case your driver needs to program the page-table
+> pointer into more than one SMMU to give devices behind different SMMUs
+> the same address space.
 
-Signed-off-by: Karol Lewandowski <k.lewandowsk@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
----
- drivers/regulator/max8997.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+Thank you for explaining.
 
-diff --git a/drivers/regulator/max8997.c b/drivers/regulator/max8997.c
-index 053d0b7..4b572eb 100644
---- a/drivers/regulator/max8997.c
-+++ b/drivers/regulator/max8997.c
-@@ -910,13 +910,13 @@ static struct regulator_desc regulators[] = {
- 	},
- 	regulator_desc_buck(7),
- 	{
--		.name	= "EN32KHz AP",
-+		.name	= "EN32KHz_AP",
- 		.id	= MAX8997_EN32KHZ_AP,
- 		.ops	= &max8997_fixedvolt_ops,
- 		.type	= REGULATOR_VOLTAGE,
- 		.owner	= THIS_MODULE,
- 	}, {
--		.name	= "EN32KHz CP",
-+		.name	= "EN32KHz_CP",
- 		.id	= MAX8997_EN32KHZ_CP,
- 		.ops	= &max8997_fixedvolt_ops,
- 		.type	= REGULATOR_VOLTAGE,
-@@ -940,7 +940,7 @@ static struct regulator_desc regulators[] = {
- 		.type	= REGULATOR_VOLTAGE,
- 		.owner	 = THIS_MODULE,
- 	}, {
--		.name	= "CHARGER CV",
-+		.name	= "CHARGER_CV",
- 		.id	= MAX8997_CHARGER_CV,
- 		.ops	= &max8997_fixedstate_ops,
- 		.type	= REGULATOR_VOLTAGE,
-@@ -952,7 +952,7 @@ static struct regulator_desc regulators[] = {
- 		.type	= REGULATOR_CURRENT,
- 		.owner	 = THIS_MODULE,
- 	}, {
--		.name	= "CHARGER TOPOFF",
-+		.name	= "CHARGER_TOPOFF",
- 		.id	= MAX8997_CHARGER_TOPOFF,
- 		.ops	= &max8997_charger_fixedstate_ops,
- 		.type	= REGULATOR_CURRENT,
--- 
-1.7.8.3
+Does the above mean that a buffer can be shared with different devices
+which belong to different IOMMU devices(virtual address spaces)?
+
+For example, assuming the following:
+
+- We have "struct iommu_domain *domain1".
+- "domain1" has iommu device "iommu_dev1" and "iommu_dev2".
+- "iommu_dev1" has "client_dev1" and "client_dev2".
+- "iommu_dev2" has "client_dev3" and "client_dev4".
+
+"iommu_map(domain1, iova, pa, ...)" will create the following mapping
+___at once___:
+
+- (iova)-(pa) mapping in iommu_dev1(iommmu_dev1's virtual address space)
+- (iova)-(pa) mapping in iommu_dev2(iommmu_dev2's virtual address space)
+
+Is the above correct?
+
+It seems that the same (iova) is used for different virtual address
+spaces. What kind of case is this beneficial most in?
