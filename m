@@ -1,37 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 24 Jan 2012 10:25:10 +0200
-Subject: [PATCH v2] usb: gadget: Fix build error due to selection of
- USB_FSL_MPH_DR_OF by ARCH_MXC
-In-Reply-To: <1324553602-3411-1-git-send-email-fabio.estevam@freescale.com>
-References: <1324492640-25481-1-git-send-email-fabio.estevam@freescale.com>
- <1324553602-3411-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120124082507.GG27414@legolas.emea.dhcp.ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 24 Jan 2012 00:34:13 -0800
+Subject: [PATCH 1/6] ARM: tegra: Remove use of TEGRA_GPIO_TO_IRQ
+In-Reply-To: <20120104195218.GF15503@ponder.secretlab.ca>
+References: <1325702378-20863-1-git-send-email-swarren@nvidia.com>
+ <20120104195218.GF15503@ponder.secretlab.ca>
+Message-ID: <20120124083413.GA14484@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2011 at 09:33:22AM -0200, Fabio Estevam wrote:
-> USB_FSL_MPH_DR_OF is a PowerPC driver and should not be selected by ARCH_MXC.
-> 
-> Doing a 'make mx3_defconfig' and selecting i.MX6 we get:
-> 
-> CC [M]  drivers/usb/host/fsl-mph-dr-of.o
-> drivers/usb/host/fsl-mph-dr-of.c: In function 'fsl_usb2_device_register':
-> drivers/usb/host/fsl-mph-dr-of.c:97: error: 'struct pdev_archdata' has no member named 'dma_mask'
-> 
-> Fix this error by not allowing USB_FSL_MPH_DR_OF to be selected by ARCH_MXC.
+Hi,
 
-I would like to have these drivers compile on all archs, so I'm sorry
-but this cannot be applied as is.
+On Wed, Jan 04, 2012 at 12:52:18PM -0700, Grant Likely wrote:
+> On Wed, Jan 04, 2012 at 11:39:33AM -0700, Stephen Warren wrote:
+> > Replace compile-time usage of TEGRA_GPIO_TO_IRQ with run-time calls to
+> > gpio_to_irq(). This will allow the base IRQ number for the Tegra GPIO
+> > driver to be dynamically allocated in a later patch.
+> > 
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> 
+> For the whole series:
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-All of these stupid arch dependencies should vanish. Please fix this in
-another way.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120124/e48c8517/attachment.sig>
+Thanks, applied 1-6 to tegra for-3.4 (version 2 of patch 6).
+
+
+-Olof
