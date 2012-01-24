@@ -1,93 +1,53 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 24 Jan 2012 13:52:25 +0200
-Subject: [PATCH v4 - resend 08/13] ASoC: omap-abe-twl6040: Add complete DAPM
- routing
+Date: Tue, 24 Jan 2012 13:52:28 +0200
+Subject: [PATCH v4 - resend 11/13] ASoC: omap-abe-twl6040: Use provided MCLK
+ frequency from pdata
 In-Reply-To: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1327405950-6676-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1327405950-6676-12-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SDP4430 is a reference platform, and as such it has all possible
-audio routing implemented.
-Correct the DAPM routing to be complete.
+Avoid using hardwired configuration for MCLK frequency.
+Different board design might use other MCLK frequency.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- sound/soc/omap/omap-abe-twl6040.c |   46 ++++++++++++++++++++++--------------
- 1 files changed, 28 insertions(+), 18 deletions(-)
+ sound/soc/omap/omap-abe-twl6040.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
 diff --git a/sound/soc/omap/omap-abe-twl6040.c b/sound/soc/omap/omap-abe-twl6040.c
-index 3b8d571..d95bd82 100644
+index 91ea873..2e283d4 100644
 --- a/sound/soc/omap/omap-abe-twl6040.c
 +++ b/sound/soc/omap/omap-abe-twl6040.c
-@@ -113,38 +113,48 @@ static struct snd_soc_jack_pin hs_jack_pins[] = {
+@@ -45,12 +45,15 @@ static int omapabe_hw_params(struct snd_pcm_substream *substream,
+ {
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
++	struct snd_soc_codec *codec = rtd->codec;
++	struct snd_soc_card *card = codec->card;
++	struct omap_abe_twl6040_data *pdata = dev_get_platdata(card->dev);
+ 	int clk_id, freq;
+ 	int ret;
  
- /* SDP4430 machine DAPM */
- static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
--	SND_SOC_DAPM_MIC("Ext Mic", NULL),
--	SND_SOC_DAPM_SPK("Ext Spk", NULL),
--	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-+	/* Outputs */
- 	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
- 	SND_SOC_DAPM_SPK("Earphone Spk", NULL),
--	SND_SOC_DAPM_INPUT("FM Stereo In"),
-+	SND_SOC_DAPM_SPK("Ext Spk", NULL),
-+	SND_SOC_DAPM_LINE("Line Out", NULL),
-+	SND_SOC_DAPM_SPK("Vibrator", NULL),
+ 	clk_id = twl6040_get_clk_id(rtd->codec);
+ 	if (clk_id == TWL6040_SYSCLK_SEL_HPPLL)
+-		freq = 38400000;
++		freq = pdata->mclk_freq;
+ 	else if (clk_id == TWL6040_SYSCLK_SEL_LPPLL)
+ 		freq = 32768;
+ 	else
+@@ -298,6 +301,11 @@ static __devinit int omapabe_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	if (!pdata->mclk_freq) {
++		dev_err(&pdev->dev, "MCLK frequency missing\n");
++		return -ENODEV;
++	}
 +
-+	/* Inputs */
-+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-+	SND_SOC_DAPM_MIC("Main Handset Mic", NULL),
-+	SND_SOC_DAPM_MIC("Sub Handset Mic", NULL),
-+	SND_SOC_DAPM_LINE("Line In", NULL),
- };
- 
- static const struct snd_soc_dapm_route audio_map[] = {
--	/* External Mics: MAINMIC, SUBMIC with bias*/
--	{"MAINMIC", NULL, "Ext Mic"},
--	{"SUBMIC", NULL, "Ext Mic"},
--	{"Ext Mic", NULL, "Main Mic Bias"},
-+	/* Routings for outputs */
-+	{"Headset Stereophone", NULL, "HSOL"},
-+	{"Headset Stereophone", NULL, "HSOR"},
-+
-+	{"Earphone Spk", NULL, "EP"},
- 
--	/* External Speakers: HFL, HFR */
- 	{"Ext Spk", NULL, "HFL"},
- 	{"Ext Spk", NULL, "HFR"},
- 
--	/* Headset Mic: HSMIC with bias */
-+	{"Line Out", NULL, "AUXL"},
-+	{"Line Out", NULL, "AUXR"},
-+
-+	{"Vibrator", NULL, "VIBRAL"},
-+	{"Vibrator", NULL, "VIBRAR"},
-+
-+	/* Routings for inputs */
- 	{"HSMIC", NULL, "Headset Mic"},
- 	{"Headset Mic", NULL, "Headset Mic Bias"},
- 
--	/* Headset Stereophone (Headphone): HSOL, HSOR */
--	{"Headset Stereophone", NULL, "HSOL"},
--	{"Headset Stereophone", NULL, "HSOR"},
-+	{"MAINMIC", NULL, "Main Handset Mic"},
-+	{"Main Handset Mic", NULL, "Main Mic Bias"},
- 
--	/* Earphone speaker */
--	{"Earphone Spk", NULL, "EP"},
-+	{"SUBMIC", NULL, "Sub Handset Mic"},
-+	{"Sub Handset Mic", NULL, "Main Mic Bias"},
- 
--	/* Aux/FM Stereo In: AFML, AFMR */
--	{"AFML", NULL, "FM Stereo In"},
--	{"AFMR", NULL, "FM Stereo In"},
-+	{"AFML", NULL, "Line In"},
-+	{"AFMR", NULL, "Line In"},
- };
- 
- static int omapabe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
+ 	if (pdata->has_dmic) {
+ 		card->dai_link = twl6040_dmic_dai;
+ 		card->num_links = ARRAY_SIZE(twl6040_dmic_dai);
 -- 
 1.7.8.3
