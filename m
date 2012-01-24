@@ -1,87 +1,76 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 24 Jan 2012 13:52:24 +0200
-Subject: [PATCH v4 - resend 07/13] ASoC: twl6040: Convert MICBIAS to SUPPLY
- widget
+Date: Tue, 24 Jan 2012 13:52:22 +0200
+Subject: [PATCH v4 - resend 05/13] OMAP4: 4430sdp: Register platform device
+ for OMAP4 audio
 In-Reply-To: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1327405950-6676-8-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1327405950-6676-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to avoid breakage change the omap-abe-twl6040
-machine driver's routing.
+To avoid breakage in audio support with the coming change
+in ASoC machine driver (conversion to platfrom device).
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- sound/soc/codecs/twl6040.c        |   16 ++++++++--------
- sound/soc/omap/omap-abe-twl6040.c |   14 +++++++-------
- 2 files changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/mach-omap2/board-4430sdp.c |   29 +++++++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/codecs/twl6040.c b/sound/soc/codecs/twl6040.c
-index 5b9c79b..ece47ed 100644
---- a/sound/soc/codecs/twl6040.c
-+++ b/sound/soc/codecs/twl6040.c
-@@ -1125,14 +1125,14 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
- 			TWL6040_REG_MICRCTL, 2, 0),
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 39fba9d..7eaeb08 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -41,6 +41,7 @@
+ #include <video/omap-panel-nokia-dsi.h>
+ #include <video/omap-panel-picodlp.h>
+ #include <linux/wl12xx.h>
++#include <linux/platform_data/omap-abe-twl6040.h>
  
- 	/* Microphone bias */
--	SND_SOC_DAPM_MICBIAS("Headset Mic Bias",
--			TWL6040_REG_AMICBCTL, 0, 0),
--	SND_SOC_DAPM_MICBIAS("Main Mic Bias",
--			TWL6040_REG_AMICBCTL, 4, 0),
--	SND_SOC_DAPM_MICBIAS("Digital Mic1 Bias",
--			TWL6040_REG_DMICBCTL, 0, 0),
--	SND_SOC_DAPM_MICBIAS("Digital Mic2 Bias",
--			TWL6040_REG_DMICBCTL, 4, 0),
-+	SND_SOC_DAPM_SUPPLY("Headset Mic Bias",
-+			    TWL6040_REG_AMICBCTL, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_SUPPLY("Main Mic Bias",
-+			    TWL6040_REG_AMICBCTL, 4, 0, NULL, 0),
-+	SND_SOC_DAPM_SUPPLY("Digital Mic1 Bias",
-+			    TWL6040_REG_DMICBCTL, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_SUPPLY("Digital Mic2 Bias",
-+			    TWL6040_REG_DMICBCTL, 4, 0, NULL, 0),
- 
- 	/* DACs */
- 	SND_SOC_DAPM_DAC("HSDAC Left", "Headset Playback", SND_SOC_NOPM, 0, 0),
-diff --git a/sound/soc/omap/omap-abe-twl6040.c b/sound/soc/omap/omap-abe-twl6040.c
-index 4ee0392..3b8d571 100644
---- a/sound/soc/omap/omap-abe-twl6040.c
-+++ b/sound/soc/omap/omap-abe-twl6040.c
-@@ -123,17 +123,17 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
- 
- static const struct snd_soc_dapm_route audio_map[] = {
- 	/* External Mics: MAINMIC, SUBMIC with bias*/
--	{"MAINMIC", NULL, "Main Mic Bias"},
--	{"SUBMIC", NULL, "Main Mic Bias"},
--	{"Main Mic Bias", NULL, "Ext Mic"},
-+	{"MAINMIC", NULL, "Ext Mic"},
-+	{"SUBMIC", NULL, "Ext Mic"},
-+	{"Ext Mic", NULL, "Main Mic Bias"},
- 
- 	/* External Speakers: HFL, HFR */
- 	{"Ext Spk", NULL, "HFL"},
- 	{"Ext Spk", NULL, "HFR"},
- 
- 	/* Headset Mic: HSMIC with bias */
--	{"HSMIC", NULL, "Headset Mic Bias"},
--	{"Headset Mic Bias", NULL, "Headset Mic"},
-+	{"HSMIC", NULL, "Headset Mic"},
-+	{"Headset Mic", NULL, "Headset Mic Bias"},
- 
- 	/* Headset Stereophone (Headphone): HSOL, HSOR */
- 	{"Headset Stereophone", NULL, "HSOL"},
-@@ -182,8 +182,8 @@ static const struct snd_soc_dapm_widget dmic_dapm_widgets[] = {
+ #include "mux.h"
+ #include "hsmmc.h"
+@@ -377,12 +378,40 @@ static struct platform_device sdp4430_dmic_codec = {
+ 	.id	= -1,
  };
  
- static const struct snd_soc_dapm_route dmic_audio_map[] = {
--	{"DMic", NULL, "Digital Mic1 Bias"},
--	{"Digital Mic1 Bias", NULL, "Digital Mic"},
-+	{"DMic", NULL, "Digital Mic"},
-+	{"Digital Mic", NULL, "Digital Mic1 Bias"},
++static struct omap_abe_twl6040_data sdp4430_abe_audio_data = {
++	.card_name = "SDP4430",
++	.has_hs		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
++	.has_hf		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
++	.has_ep		= 1,
++	.has_aux	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
++	.has_vibra	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
++
++	.has_dmic	= 1,
++	.has_hsmic	= 1,
++	.has_mainmic	= 1,
++	.has_submic	= 1,
++	.has_afm	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
++
++	.jack_detection = 1,
++	/* MCLK input is 38.4MHz */
++	.mclk_freq	= 38400000,
++};
++
++static struct platform_device sdp4430_abe_audio = {
++	.name		= "omap-abe-twl6040",
++	.id		= -1,
++	.dev = {
++		.platform_data = &sdp4430_abe_audio_data,
++	},
++};
++
+ static struct platform_device *sdp4430_devices[] __initdata = {
+ 	&sdp4430_gpio_keys_device,
+ 	&sdp4430_leds_gpio,
+ 	&sdp4430_leds_pwm,
+ 	&sdp4430_vbat,
+ 	&sdp4430_dmic_codec,
++	&sdp4430_abe_audio,
  };
  
- static int omapabe_dmic_init(struct snd_soc_pcm_runtime *rtd)
+ static struct omap_musb_board_data musb_board_data = {
 -- 
 1.7.8.3
