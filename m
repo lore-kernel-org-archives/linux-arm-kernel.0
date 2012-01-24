@@ -1,202 +1,104 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Mon, 23 Jan 2012 22:37:32 -0600
-Subject: [PATCH v3 5/7] ARM: davinci: Modify to use new common cpuidle code.
+Date: Mon, 23 Jan 2012 22:37:33 -0600
+Subject: [PATCH v3 6/7] ARM: imx: Init imx5 gpc_dvfs clock for global use
 In-Reply-To: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
 References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1327379854-12403-6-git-send-email-rob.lee@linaro.org>
+Message-ID: <1327379854-12403-7-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make necessary changes for consolidation with new common cpuidle code.
+The gpc_dvfs clock consumes practically zero power and must be enabled
+for various low power funcitonality.  Now that a second user of this
+clock is being added (cpuidle) for mx5, it is cleanest to just enable
+this clock during clock initialization and leave it enabled.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/mach-davinci/cpuidle.c |  135 ++++++++++-----------------------------
- 1 files changed, 33 insertions(+), 102 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    3 +++
+ arch/arm/mach-mx5/pm-imx5.c         |   24 ++----------------------
+ 2 files changed, 5 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
-index a30c7c5..8cfc0be 100644
---- a/arch/arm/mach-davinci/cpuidle.c
-+++ b/arch/arm/mach-davinci/cpuidle.c
-@@ -24,98 +24,57 @@
- 
- #define DAVINCI_CPUIDLE_MAX_STATES	2
- 
--struct davinci_ops {
--	void (*enter) (u32 flags);
--	void (*exit) (u32 flags);
--	u32 flags;
--};
--
--/* fields in davinci_ops.flags */
--#define DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN	BIT(0)
--
--static struct cpuidle_driver davinci_idle_driver = {
--	.name	= "cpuidle-davinci",
--	.owner	= THIS_MODULE,
--};
--
--static DEFINE_PER_CPU(struct cpuidle_device, davinci_cpuidle_device);
-+u32 __initdata ddr_reg_mask;
- static void __iomem *ddr2_reg_base;
- 
--static void davinci_save_ddr_power(int enter, bool pdown)
-+/* idle that includes ddr low power */
-+static int davinci_idle_ddr(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv,
-+				int index)
- {
- 	u32 val;
- 
- 	val = __raw_readl(ddr2_reg_base + DDR2_SDRCR_OFFSET);
- 
--	if (enter) {
--		if (pdown)
--			val |= DDR2_SRPD_BIT;
--		else
--			val &= ~DDR2_SRPD_BIT;
--		val |= DDR2_LPMODEN_BIT;
--	} else {
--		val &= ~(DDR2_SRPD_BIT | DDR2_LPMODEN_BIT);
--	}
-+	val |= (u32)dev->states_usage[index].driver_data;
- 
- 	__raw_writel(val, ddr2_reg_base + DDR2_SDRCR_OFFSET);
--}
- 
--static void davinci_c2state_enter(u32 flags)
--{
--	davinci_save_ddr_power(1, !!(flags & DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN));
--}
-+	/* Wait for interrupt state */
-+	cpu_do_idle();
- 
--static void davinci_c2state_exit(u32 flags)
--{
--	davinci_save_ddr_power(0, !!(flags & DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN));
-+	val &= ~(DDR2_SRPD_BIT | DDR2_LPMODEN_BIT);
-+	__raw_writel(val, ddr2_reg_base + DDR2_SDRCR_OFFSET);
-+
-+	return index;
- }
- 
--static struct davinci_ops davinci_states[DAVINCI_CPUIDLE_MAX_STATES] = {
--	[1] = {
--		.enter	= davinci_c2state_enter,
--		.exit	= davinci_c2state_exit,
-+static struct cpuidle_driver davinci_idle_driver __initdata = {
-+	.name	= "cpuidle-davinci",
-+	.owner	= THIS_MODULE,
-+	.states[0] = CPUIDLE_ARM_WFI_STATE,
-+	.states[1] = {
-+		.enter			= davinci_idle_ddr,
-+		.exit_latency		= 10,
-+		.target_residency	= 100000,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "DDR SR",
-+		.desc			= "WFI and DDR Self Refresh",
- 	},
-+	.state_count = DAVINCI_CPUIDLE_MAX_STATES,
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 4cb2769..12c8a2b 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1533,6 +1533,7 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx53-ahci.0", "ahci", sata_clk)
+ 	_REGISTER_CLOCK("imx53-ahci.0", "ahci_phy", ahci_phy_clk)
+ 	_REGISTER_CLOCK("imx53-ahci.0", "ahci_dma", ahci_dma_clk)
++	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
  };
  
--/* Actual code that puts the SoC in different idle states */
--static int davinci_enter_idle(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--						int index)
-+/* use drive_data field to hold the configured ddr low power bitmask */
-+static void __init davinci_cpuidle_dd_init(struct cpuidle_device * dev)
+ static void clk_tree_init(void)
+@@ -1572,6 +1573,7 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 
+ 	clk_enable(&cpu_clk);
+ 	clk_enable(&main_bus_clk);
++	clk_enable(&gpc_dvfs_clk);
+ 
+ 	clk_enable(&iim_clk);
+ 	imx_print_silicon_rev("i.MX51", mx51_revision());
+@@ -1615,6 +1617,7 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 	clk_set_parent(&uart_root_clk, &pll3_sw_clk);
+ 	clk_enable(&cpu_clk);
+ 	clk_enable(&main_bus_clk);
++	clk_enable(&gpc_dvfs_clk);
+ 
+ 	clk_enable(&iim_clk);
+ 	imx_print_silicon_rev("i.MX53", mx53_revision());
+diff --git a/arch/arm/mach-mx5/pm-imx5.c b/arch/arm/mach-mx5/pm-imx5.c
+index 98052fc..36c5b57 100644
+--- a/arch/arm/mach-mx5/pm-imx5.c
++++ b/arch/arm/mach-mx5/pm-imx5.c
+@@ -18,13 +18,6 @@
+ #include <mach/hardware.h>
+ #include "crm_regs.h"
+ 
+-static struct clk *gpc_dvfs_clk;
+-
+-static int mx5_suspend_prepare(void)
+-{
+-	return clk_enable(gpc_dvfs_clk);
+-}
+-
+ static int mx5_suspend_enter(suspend_state_t state)
  {
--	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
--	struct davinci_ops *ops = cpuidle_get_statedata(state_usage);
--	struct timeval before, after;
--	int idle_time;
--
--	local_irq_disable();
--	do_gettimeofday(&before);
--
--	if (ops && ops->enter)
--		ops->enter(ops->flags);
--	/* Wait for interrupt state */
--	cpu_do_idle();
--	if (ops && ops->exit)
--		ops->exit(ops->flags);
--
--	do_gettimeofday(&after);
--	local_irq_enable();
--	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
--			(after.tv_usec - before.tv_usec);
--
--	dev->last_residency = idle_time;
--
--	return index;
-+	dev->states_usage[1].driver_data = (void *)ddr_reg_mask;
+ 	switch (state) {
+@@ -50,11 +43,6 @@ static int mx5_suspend_enter(suspend_state_t state)
+ 	return 0;
  }
  
- static int __init davinci_cpuidle_probe(struct platform_device *pdev)
+-static void mx5_suspend_finish(void)
+-{
+-	clk_disable(gpc_dvfs_clk);
+-}
+-
+ static int mx5_pm_valid(suspend_state_t state)
  {
- 	int ret;
--	struct cpuidle_device *device;
--	struct cpuidle_driver *driver = &davinci_idle_driver;
- 	struct davinci_cpuidle_config *pdata = pdev->dev.platform_data;
+ 	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
+@@ -62,21 +50,13 @@ static int mx5_pm_valid(suspend_state_t state)
  
--	device = &per_cpu(davinci_cpuidle_device, smp_processor_id());
+ static const struct platform_suspend_ops mx5_suspend_ops = {
+ 	.valid = mx5_pm_valid,
+-	.prepare = mx5_suspend_prepare,
+ 	.enter = mx5_suspend_enter,
+-	.finish = mx5_suspend_finish,
+ };
+ 
+ static int __init mx5_pm_init(void)
+ {
+-	if (gpc_dvfs_clk == NULL)
+-		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
 -
- 	if (!pdata) {
- 		dev_err(&pdev->dev, "cannot get platform data\n");
- 		return -ENOENT;
-@@ -123,42 +82,15 @@ static int __init davinci_cpuidle_probe(struct platform_device *pdev)
+-	if (!IS_ERR(gpc_dvfs_clk)) {
+-		if (cpu_is_mx51())
+-			suspend_set_ops(&mx5_suspend_ops);
+-	} else
+-		return -EPERM;
++	if (cpu_is_mx51())
++		suspend_set_ops(&mx5_suspend_ops);
  
- 	ddr2_reg_base = pdata->ddr2_ctlr_base;
- 
--	/* Wait for interrupt state */
--	driver->states[0].enter = davinci_enter_idle;
--	driver->states[0].exit_latency = 1;
--	driver->states[0].target_residency = 10000;
--	driver->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
--	strcpy(driver->states[0].name, "WFI");
--	strcpy(driver->states[0].desc, "Wait for interrupt");
--
--	/* Wait for interrupt and DDR self refresh state */
--	driver->states[1].enter = davinci_enter_idle;
--	driver->states[1].exit_latency = 10;
--	driver->states[1].target_residency = 10000;
--	driver->states[1].flags = CPUIDLE_FLAG_TIME_VALID;
--	strcpy(driver->states[1].name, "DDR SR");
--	strcpy(driver->states[1].desc, "WFI and DDR Self Refresh");
- 	if (pdata->ddr2_pdown)
--		davinci_states[1].flags |= DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN;
--	cpuidle_set_statedata(&device->states_usage[1], &davinci_states[1]);
-+		ddr_reg_mask = (DDR2_SRPD_BIT | DDR2_LPMODEN_BIT);
-+	else
-+		ddr_reg_mask = (DDR2_LPMODEN_BIT);
- 
--	device->state_count = DAVINCI_CPUIDLE_MAX_STATES;
--	driver->state_count = DAVINCI_CPUIDLE_MAX_STATES;
-+	ret = common_cpuidle_init(&davinci_idle_driver, true,
-+					davinci_cpuidle_dd_init);
- 
--	ret = cpuidle_register_driver(&davinci_idle_driver);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to register driver\n");
--		return ret;
--	}
--
--	ret = cpuidle_register_device(device);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to register device\n");
--		cpuidle_unregister_driver(&davinci_idle_driver);
--		return ret;
--	}
--
--	return 0;
-+	return ret;
+ 	return 0;
  }
- 
- static struct platform_driver davinci_cpuidle_driver = {
-@@ -174,4 +106,3 @@ static int __init davinci_cpuidle_init(void)
- 						davinci_cpuidle_probe);
- }
- device_initcall(davinci_cpuidle_init);
--
 -- 
 1.7.1
