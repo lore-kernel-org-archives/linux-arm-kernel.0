@@ -1,89 +1,72 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:40:55 +0000
-Subject: [PATCH 32/33] MFD: ucb1x00-assabet: add support for UCB1x00 GPIO
- switches
+Date: Wed, 25 Jan 2012 14:41:15 +0000
+Subject: [PATCH 33/33] MFD: mcp-sa11x0/assabet: move assabet reset handling
+ out of mcp-sa11x0.c
 In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
 References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rq41v-0000Zy-BZ@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rq42F-0000a2-F7@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for UCB1x00 GPIO buttons found on the Assabet platform.
-We can now trivially support these buttons as we have standardized
-gpiolib, genirq and gpio keyboard support in place for this device.
+Move the assabet specific reset handling out of mcp-sa11x0.c, into its
+board file.  This leaves the mcp code free from all board specific
+details.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mfd/ucb1x00-assabet.c |   43 +++++++++++++++++++++++++++++++++++++---
- 1 files changed, 39 insertions(+), 4 deletions(-)
+ arch/arm/mach-sa1100/assabet.c |    8 ++++++++
+ drivers/mfd/mcp-sa11x0.c       |    6 ------
+ 2 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/mfd/ucb1x00-assabet.c b/drivers/mfd/ucb1x00-assabet.c
-index b7be613..b63c075 100644
---- a/drivers/mfd/ucb1x00-assabet.c
-+++ b/drivers/mfd/ucb1x00-assabet.c
-@@ -11,9 +11,13 @@
-  */
- #include <linux/module.h>
- #include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
- #include <linux/fs.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/input.h>
-+#include <linux/platform_device.h>
- #include <linux/proc_fs.h>
--#include <linux/device.h>
- #include <linux/mfd/ucb1x00.h>
+diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+index c45402f..b5955ad 100644
+--- a/arch/arm/mach-sa1100/assabet.c
++++ b/arch/arm/mach-sa1100/assabet.c
+@@ -70,6 +70,13 @@ void ASSABET_BCR_frob(unsigned int mask, unsigned int val)
  
- #define UCB1X00_ATTR(name,input)\
-@@ -35,14 +39,45 @@ UCB1X00_ATTR(batt_temp, UCB_ADC_INP_AD2);
+ EXPORT_SYMBOL(ASSABET_BCR_frob);
  
- static int ucb1x00_assabet_add(struct ucb1x00_dev *dev)
++static void assabet_ucb1x00_reset(enum ucb1x00_reset state)
++{
++	if (state == UCB_RST_PROBE)
++		ASSABET_BCR_set(ASSABET_BCR_CODEC_RST);
++}
++
++
+ static void assabet_backlight_power(int on)
  {
--	device_create_file(&dev->ucb->dev, &dev_attr_vbatt);
--	device_create_file(&dev->ucb->dev, &dev_attr_vcharger);
--	device_create_file(&dev->ucb->dev, &dev_attr_batt_temp);
-+	struct ucb1x00 *ucb = dev->ucb;
-+	struct platform_device *pdev;
-+	struct gpio_keys_platform_data keys;
-+	static struct gpio_keys_button buttons[6];
-+	unsigned i;
-+
-+	memset(buttons, 0, sizeof(buttons));
-+	memset(&keys, 0, sizeof(keys));
-+
-+	for (i = 0; i < ARRAY_SIZE(buttons); i++) {
-+		buttons[i].code = BTN_0 + i;
-+		buttons[i].gpio = ucb->gpio.base + i;
-+		buttons[i].type = EV_KEY;
-+		buttons[i].can_disable = true;
-+	}
-+
-+	keys.buttons = buttons;
-+	keys.nbuttons = ARRAY_SIZE(buttons);
-+	keys.poll_interval = 50;
-+	keys.name = "ucb1x00";
-+
-+	pdev = platform_device_register_data(&ucb->dev, "gpio-keys", -1,
-+		&keys, sizeof(keys));
-+
-+	device_create_file(&ucb->dev, &dev_attr_vbatt);
-+	device_create_file(&ucb->dev, &dev_attr_vcharger);
-+	device_create_file(&ucb->dev, &dev_attr_batt_temp);
-+
-+	dev->priv = pdev;
- 	return 0;
- }
+ #ifndef ASSABET_PAL_VIDEO
+@@ -201,6 +208,7 @@ static struct irda_platform_data assabet_irda_data = {
+ };
  
- static void ucb1x00_assabet_remove(struct ucb1x00_dev *dev)
- {
-+	struct platform_device *pdev = dev->priv;
-+
-+	if (!IS_ERR(pdev))
-+		platform_device_unregister(pdev);
-+
- 	device_remove_file(&dev->ucb->dev, &dev_attr_batt_temp);
- 	device_remove_file(&dev->ucb->dev, &dev_attr_vcharger);
- 	device_remove_file(&dev->ucb->dev, &dev_attr_vbatt);
+ static struct ucb1x00_plat_data assabet_ucb1x00_data = {
++	.reset		= assabet_ucb1x00_reset,
+ 	.gpio_base	= -1,
+ };
+ 
+diff --git a/drivers/mfd/mcp-sa11x0.c b/drivers/mfd/mcp-sa11x0.c
+index c381436..1c0ceac 100644
+--- a/drivers/mfd/mcp-sa11x0.c
++++ b/drivers/mfd/mcp-sa11x0.c
+@@ -27,8 +27,6 @@
+ #include <asm/system.h>
+ #include <mach/mcp.h>
+ 
+-#include <mach/assabet.h>
+-
+ #define DRIVER_NAME "sa11x0-mcp"
+ 
+ struct mcp_sa11x0 {
+@@ -208,10 +206,6 @@ static int mcp_sa11x0_probe(struct platform_device *dev)
+ 
+ 	platform_set_drvdata(dev, mcp);
+ 
+-	if (machine_is_assabet()) {
+-		ASSABET_BCR_set(ASSABET_BCR_CODEC_RST);
+-	}
+-
+ 	/*
+ 	 * Initialise device.  Note that we initially
+ 	 * set the sampling rate to minimum.
 -- 
 1.7.4.4
