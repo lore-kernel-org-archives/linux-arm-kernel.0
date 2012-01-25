@@ -1,38 +1,89 @@
-From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Wed, 25 Jan 2012 20:40:12 +0100
-Subject: [PATCH 00/19] ARM SA11x0 / PXA / SoC-common PCMCIA cleanups
-In-Reply-To: <20120120101709.GE1068@n2100.arm.linux.org.uk>
-References: <20120120101709.GE1068@n2100.arm.linux.org.uk>
-Message-ID: <20120125194012.GC9192@comet.dominikbrodowski.net>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 25 Jan 2012 21:07:01 +0100
+Subject: [PATCH 1/3] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <4F2035B1.4020204@samsung.com>
+References: <1324891397-10877-1-git-send-email-sumit.semwal@ti.com>
+ <1324891397-10877-2-git-send-email-sumit.semwal@ti.com>
+ <4F2035B1.4020204@samsung.com>
+Message-ID: <20120125200701.GH3896@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
-
-On Fri, Jan 20, 2012 at 10:17:09AM +0000, Russell King - ARM Linux wrote:
-> What follows is a series of 19 patches cleaning up the SA11xx and PXA
-> PCMCIA support, which uses the soc-common infrastructure.
+On Wed, Jan 25, 2012 at 06:02:41PM +0100, Tomasz Stanislawski wrote:
+> Hi Sumit,
 > 
-> Now that we have proper gpiolib support in the kernel for these platforms,
-> with properly implemented gpio_to_irq() functionality, we can move some
-> things that the individual platform socket drivers were doing into the
-> soc-common core.
+> On 12/26/2011 10:23 AM, Sumit Semwal wrote:
+> >This is the first step in defining a dma buffer sharing mechanism.
+> >
+> >A new buffer object dma_buf is added, with operations and API to allow easy
+> >sharing of this buffer object across devices.
+> >
+> >The framework allows:
+> >- creation of a buffer object, its association with a file pointer, and
+> >    associated allocator-defined operations on that buffer. This operation is
+> >    called the 'export' operation.
+> >- different devices to 'attach' themselves to this exported buffer object, to
+> >   facilitate backing storage negotiation, using dma_buf_attach() API.
+> >- the exported buffer object to be shared with the other entity by asking for
+> >    its 'file-descriptor (fd)', and sharing the fd across.
+> >- a received fd to get the buffer object back, where it can be accessed using
+> >    the associated exporter-defined operations.
+> >- the exporter and user to share the scatterlist associated with this buffer
+> >    object using map_dma_buf and unmap_dma_buf operations.
+> >
 > 
-> This significantly reduces the code in the platform socket drivers -
-> a reduction of around 550 lines, for the net addition of about 50 lines
-> to soc-common.
+> [snip]
 > 
-> The final set of five patches in this set contain some minor bug fixes
-> (which are really low priority) and cleanup the handling of the SA1111
-> build between PXA and SA11x0 platforms.
+> >+/**
+> >+ * struct dma_buf_attachment - holds device-buffer attachment data
+> >+ * @dmabuf: buffer for this attachment.
+> >+ * @dev: device attached to the buffer.
+> >+ * @node: list of dma_buf_attachment.
+> >+ * @priv: exporter specific attachment data.
+> >+ *
+> >+ * This structure holds the attachment information between the dma_buf buffer
+> >+ * and its user device(s). The list contains one attachment struct per device
+> >+ * attached to the buffer.
+> >+ */
+> >+struct dma_buf_attachment {
+> >+	struct dma_buf *dmabuf;
+> >+	struct device *dev;
+> >+	struct list_head node;
+> >+	void *priv;
+> >+};
+> >+
+> >+#ifdef CONFIG_DMA_SHARED_BUFFER
+> >+struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+> >+							struct device *dev);
+> >+void dma_buf_detach(struct dma_buf *dmabuf,
+> >+				struct dma_buf_attachment *dmabuf_attach);
+> >+struct dma_buf *dma_buf_export(void *priv, struct dma_buf_ops *ops,
+> >+			size_t size, int flags);
+> >+int dma_buf_fd(struct dma_buf *dmabuf);
+> >+struct dma_buf *dma_buf_get(int fd);
+> >+void dma_buf_put(struct dma_buf *dmabuf);
+> >+
+> >+struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *,
+> >+					enum dma_data_direction);
+> >+void dma_buf_unmap_attachment(struct dma_buf_attachment *, struct sg_table *);
 > 
-> Please supply acks; I have other work which touches the header files
-> in arch/arm which would conflict, and it would help to keep it together
-> rather than have SFR carry those resolutions.
+> I think that you should add enum dma_data_direction as an argument
+> unmap function. It was mentioned that the dma_buf_attachment should keep
+> cached and mapped sg_table for performance reasons. The field
+> dma_buf_attachment::priv seams to be a natural place to keep this sg_table.
+> To map a buffer the exporter calls dma_map_sg. It needs dma direction
+> as an argument. The problem is that dma_unmap_sg also needs this
+> argument but dma direction is not available neither in
+> dma_buf_unmap_attachment nor in unmap callback. Therefore the exporter
+> is forced to embed returned sg_table into a bigger structure where
+> dma direction is remembered. Refer to function vb2_dc_dmabuf_ops_map
+> at
 
-Insofar as it touches generic PCMCIA stuff:
-
-Acked-by: Dominik Brodowski <linux@dominikbrodowski.net>
-
-Thanks,
-	Dominik
+Oops, makes sense. I've totally overlooked that we need to pass in the dma
+direction also for the unmap call to the dma subsystem. Sumit, can you
+stitch together that small patch?
+-Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
