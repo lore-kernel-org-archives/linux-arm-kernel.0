@@ -1,68 +1,53 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 24 Jan 2012 17:26:37 -0700
-Subject: [RFCv2 13/14] irq_domain: Remove 'new' irq_domain in favour of
- the ppc one
-In-Reply-To: <4F1F2C3A.3060607@gmail.com>
-References: <1327352870-14687-1-git-send-email-grant.likely@secretlab.ca>
- <1327352870-14687-14-git-send-email-grant.likely@secretlab.ca>
- <4F1F2C3A.3060607@gmail.com>
-Message-ID: <CACxGe6sP0p1r6u6uG5fhTf0jC85F=vX7Nj_YezQFE65caH+2Zg@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 24 Jan 2012 16:41:11 -0800
+Subject: [PATCH v3 0/7] Add common cpuidle code for consolidation.
+In-Reply-To: <20120124201749.GC1135@opensource.wolfsonmicro.com> (Mark Brown's
+ message of "Tue, 24 Jan 2012 20:17:49 +0000")
+References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
+ <871uqoj23b.fsf@ti.com>
+ <20120124201749.GC1135@opensource.wolfsonmicro.com>
+Message-ID: <87ehuohavs.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 3:10 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 01/23/2012 03:07 PM, Grant Likely wrote:
->> This patch removes the simplistic implementation of irq_domains and enables
->> the powerpc infrastructure for all irq_domain users. ?The powerpc
->> infrastructure includes support for complex mappings between Linux and
->> hardware irq numbers, and can manage allocation of irq_descs.
->>
->> This patch also converts the few users of irq_domain_add()/irq_domain_del()
->> to call irq_domain_add_legacy() instead.
->>
->> v2: Fix removal of irq_alloc_descs() call in gic driver
->>
->> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->> ---
->> ?arch/arm/common/gic.c ? ? ? ? ? ? ? | ? 85 ++++++++-----------
->> ?arch/arm/common/vic.c ? ? ? ? ? ? ? | ? 16 +---
->> ?arch/arm/include/asm/hardware/gic.h | ? ?4 +-
->> ?arch/arm/include/asm/hardware/vic.h | ? ?2 +
->> ?arch/arm/mach-exynos/common.c ? ? ? | ? ?2 +-
->> ?arch/arm/mach-versatile/core.c ? ? ?| ? ?5 +-
->> ?drivers/mfd/twl-core.c ? ? ? ? ? ? ?| ? 12 +--
->> ?include/linux/irqdomain.h ? ? ? ? ? | ? 45 +---------
->> ?kernel/irq/irqdomain.c ? ? ? ? ? ? ?| ?159 +++--------------------------------
->> ?9 files changed, 69 insertions(+), 261 deletions(-)
->>
->> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->
-> snip
->
->> @@ -716,17 +708,17 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->> ? ? ? ? ? ? ? gic_irqs = 1020;
->> ? ? ? gic->gic_irqs = gic_irqs;
->>
->> - ? ? domain->nr_irq = gic_irqs - domain->hwirq_base;
->> - ? ? domain->irq_base = irq_alloc_descs(irq_start, 16, domain->nr_irq,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?numa_node_id());
->> - ? ? if (IS_ERR_VALUE(domain->irq_base)) {
->> + ? ? irq_base = irq_alloc_descs(irq_start, 16, gic_irqs - hwirq_base,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?numa_node_id());
->> + ? ? if (IS_ERR_VALUE(irq_base)) {
->> ? ? ? ? ? ? ? WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
->> ? ? ? ? ? ? ? ? ? ?irq_start);
->> - ? ? ? ? ? ? domain->irq_base = irq_start;
->> + ? ? ? ? ? ? irq_base = irq_start;
->> ? ? ? }
->> - ? ? domain->host_data = gic;
->> - ? ? domain->ops = &gic_irq_domain_ops;
->> - ? ? irq_domain_add(domain);
->> + ? ? gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
->
-> gic_irqs is wrong here. It needs 16 or 32 subtracted off. This patch
-> will fix things:
+Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 
-Good catch, I've integrated this into my series.
+> On Tue, Jan 24, 2012 at 12:08:08PM -0800, Kevin Hilman wrote:
+>> Robert Lee <rob.lee@linaro.org> writes:
+>
+>> > Besides just code consolidation, a
+>> > default "WFI" state is now used with default parameters that different from your
+>> > original paramenters. The assumption is that if you have a WFI only idle state,
+>> > the parameters in the new default WFI are more realistic as a true WFI only
+>> > hardware state incurs minimal latency(<1us) or power penalty to enter and exit.
+>
+>> > If your platform actually performs other platform specific functionality upon
+>> > entering WFI and the default parameters do not accurately reflect the 
+>> > exit_latency and target_residency given in the common default state, please
+>> > say so.  
+>
+>> I'm not sure what you mean by "WFI only".  On OMAP, WFI is the entry
+>> point for all the idle states, with varying latencies.  The latencies
+>> are then dependent on how the states are programmed for the various
+>> power domains.  Upon WFI, the hardware then takes over puts the
+>> powerdomains to their programmed states.   
+>
+> The default state in the patches is set up with parameters for a state
+> that literally only does the WFI and has no other hardware actions taken
+> adding latencies.  I asked for this because the existing drivers for
+> most of the SoCs out there currently only support that basic idle state
+> and when doing something more complex (which most of the SoCs actually
+> can do in hardware) it's still likely to get used during bringup of the
+> feature.
+>
+> If there's varying levels of idle state then the SoC specific code would
+> need to enumerate them and their varying latencies so that the core can
+> figure out which one to enter.  This isn't a problem, it's a good thing,
+> but most SoCs haven't got so far as to need it yet.
 
-g.
+OK, makes sense now.
+
+I see now that that default is easily overridden by platform-specific
+drivers, so I don't have any problem with it.
+
+Kevin
