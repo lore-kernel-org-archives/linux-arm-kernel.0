@@ -1,38 +1,189 @@
-From: ameya.palande@ti.com (Ameya Palande)
-Date: Tue, 24 Jan 2012 17:35:15 -0800
-Subject: [PATCH] ARM: OMAP4: clock: fix mult and div mask for USB_DPLL
-In-Reply-To: <4F1E7F8A.4010805@ti.com>
-References: <4F1E7F8A.4010805@ti.com>
-Message-ID: <1327455315-19464-1-git-send-email-ameya.palande@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Jan 2012 19:50:24 -0600
+Subject: [RFC 1/2] irq_domain: Create common xlate functions that device
+ drivers can use
+In-Reply-To: <1327450719-25590-1-git-send-email-grant.likely@secretlab.ca>
+References: <1327450719-25590-1-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <4F1F5FE0.9090901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to OMAP4 TRM Table 3-1183, CM_CLKSEL_DPLL_USB register defines
-following fields for multiplication and division factors:
 
-DPLL_MULT (bits 19:8) DPLL multiplier factor (2 to 4095)
-DPLL_DIV (bits 7:0) DPLL divider factor (0 to 255)
 
-Acked-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Ameya Palande <ameya.palande@ti.com>
----
- arch/arm/mach-omap2/clock44xx_data.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+On 01/24/2012 06:18 PM, Grant Likely wrote:
+> Rather than having each interrupt controller driver creating its own barely
+> unique .xlate function for irq_domain, create a library of translators which
+> any driver can use directly.
+> 
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> ---
+> 
+> This builds on top of my irq_domain series and will be included with it when
+> I post v3.  Rob, does this serve your needs for generic irq controller DT
+> support?
+> 
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index 08e86d7..053cc15 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -953,8 +953,8 @@ static struct dpll_data dpll_usb_dd = {
- 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
- 	.autoidle_reg	= OMAP4430_CM_AUTOIDLE_DPLL_USB,
- 	.idlest_reg	= OMAP4430_CM_IDLEST_DPLL_USB,
--	.mult_mask	= OMAP4430_DPLL_MULT_MASK,
--	.div1_mask	= OMAP4430_DPLL_DIV_MASK,
-+	.mult_mask	= OMAP4430_DPLL_MULT_USB_MASK,
-+	.div1_mask	= OMAP4430_DPLL_DIV_0_7_MASK,
- 	.enable_mask	= OMAP4430_DPLL_EN_MASK,
- 	.autoidle_mask	= OMAP4430_AUTO_DPLL_MODE_MASK,
- 	.idlest_mask	= OMAP4430_ST_DPLL_CLK_MASK,
--- 
-1.7.4.1
+Yes, but comments below.
+
+> g.
+> 
+>  include/linux/irqdomain.h |   15 ++++++++++
+>  kernel/irq/irqdomain.c    |   69 +++++++++++++++++++++++++++++++++++++++-----
+>  2 files changed, 76 insertions(+), 8 deletions(-)
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index e7379a3..5e497a0 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -110,6 +110,9 @@ struct irq_domain {
+>  	void *host_data;
+>  	irq_hw_number_t inval_irq;
+>  
+> +	/* Data for common irq xlate functions */
+> +	unsigned int xlate_type;
+> +
+
+How does this get set? Do we want interrupt controllers messing with the
+domain struct directly long term?
+
+>  	/* Optional device node pointer */
+>  	struct device_node *of_node;
+>  };
+> @@ -163,6 +166,18 @@ extern unsigned int irq_linear_revmap(struct irq_domain *host,
+>  				      irq_hw_number_t hwirq);
+>  
+>  extern struct irq_domain_ops irq_domain_simple_ops;
+> +
+> +/* stock xlate functions */
+> +int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
+> +			const u32 *intspec, unsigned int intsize,
+> +			irq_hw_number_t *out_hwirq, unsigned int *out_type);
+> +int irq_domain_xlate_twocell(struct irq_domain *d, struct device_node *ctrlr,
+> +			const u32 *intspec, unsigned int intsize,
+> +			irq_hw_number_t *out_hwirq, unsigned int *out_type);
+> +int irq_domain_xlate_onetwocell(struct irq_domain *d, struct device_node *ctrlr,
+> +			const u32 *intspec, unsigned int intsize,
+> +			irq_hw_number_t *out_hwirq, unsigned int *out_type);
+> +
+>  #if defined(CONFIG_OF_IRQ)
+>  extern void irq_domain_generate_simple(const struct of_device_id *match,
+>  					u64 phys_base, unsigned int irq_start);
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index def8e7b..df80205 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -53,6 +53,7 @@ static struct irq_domain *irq_domain_alloc(struct device_node *of_node,
+>  	domain->ops = ops;
+>  	domain->host_data = host_data;
+>  	domain->of_node = of_node_get(of_node);
+> +	domain->xlate_type = IRQ_TYPE_NONE;
+>  
+>  	if (domain->ops->match == NULL)
+>  		domain->ops->match = default_irq_domain_match;
+> @@ -690,25 +691,77 @@ int irq_domain_simple_map(struct irq_domain *d, unsigned int irq,
+>  	return 0;
+>  }
+>  
+> -int irq_domain_simple_xlate(struct irq_domain *d,
+> -			    struct device_node *controller,
+> -			    const u32 *intspec, unsigned int intsize,
+> -			    unsigned long *out_hwirq, unsigned int *out_type)
+> +/**
+> + * irq_domain_xlate_onecell() - Generic xlate for direct one cell bindings
+> + *
+> + * Device Tree IRQ specifier translation function which works with one cell
+> + * bindings where the cell value maps directly to the hwirq number.
+> + */
+> +int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
+> +			     const u32 *intspec, unsigned int intsize,
+> +			     unsigned long *out_hwirq, unsigned int *out_type)
+> +{
+> +	if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
+> +		 ctrlr->full_name, intsize))
+> +		return -EINVAL;
+> +	*out_hwirq = intspec[0];
+> +	*out_type = d->xlate_type;
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(irq_domain_xlate_onecell);
+> +
+> +/**
+> + * irq_domain_xlate_twocell() - Generic xlate for direct two cell bindings
+> + *
+> + * Device Tree IRQ specifier translation function which works with two cell
+> + * bindings where the cell values map directly to the hwirq number
+> + * and linux irq flags.
+> + */
+> +int irq_domain_xlate_twocell(struct irq_domain *d, struct device_node *ctrlr,
+> +			const u32 *intspec, unsigned int intsize,
+> +			irq_hw_number_t *out_hwirq, unsigned int *out_type)
+>  {
+> -	if (d->of_node != controller)
+> +	if (WARN(intsize < 2, "Bad intspec for %s: intsize=%i < 2\n",
+> +		 ctrlr->full_name, intsize))
+> +		return -EINVAL;
+> +	if (intsize < 2)
+
+You've already checked this...
+
+>  		return -EINVAL;
+> -	if (intsize < 1)
+> +	*out_hwirq = intspec[0];
+> +	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(irq_domain_xlate_twocell);
+> +
+> +/**
+> + * irq_domain_xlate_onetwocell() - Generic xlate for one or two cell bindings
+> + *
+> + * Device Tree IRQ specifier translation function which works with either one
+> + * or two cell bindings where the cell values map directly to the hwirq number
+> + * and linux irq flags.
+> + *
+> + * Note: don't use this function unless your interrupt controller explicitly
+> + * supports both one and two cell bindings.  For the majority of controllers
+> + * the _onecell() or _twocell() variants above should be used.
+
+This comment is confusing since you turn around and use it for simple
+ops below.
+
+> + */
+> +int irq_domain_xlate_onetwocell(struct irq_domain *d,
+> +				struct device_node *ctrlr,
+> +				const u32 *intspec, unsigned int intsize,
+> +				unsigned long *out_hwirq, unsigned int *out_type)
+> +{
+> +	if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
+> +		 ctrlr->full_name, intsize))
+>  		return -EINVAL;
+
+Isn't this check redundant with the check in of_irq_map_raw:
+
+	if (ointsize != intsize)
+		return -EINVAL;
+
+The only diff in these functions is really checking the size. So I
+really don't think we need 3 versions if that can be factored out where
+you know value of #interrupt-cells.
+
+Rob
+
+>  	*out_hwirq = intspec[0];
+> -	*out_type = IRQ_TYPE_NONE;
+> +	*out_type = d->xlate_type;
+>  	if (intsize > 1)
+>  		*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(irq_domain_xlate_onetwocell);
+>  
+>  struct irq_domain_ops irq_domain_simple_ops = {
+>  	.map = irq_domain_simple_map,
+> -	.xlate = irq_domain_simple_xlate,
+> +	.xlate = irq_domain_xlate_onetwocell,
+>  };
+>  EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
+>  
