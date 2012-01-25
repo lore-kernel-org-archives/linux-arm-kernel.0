@@ -1,58 +1,77 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 25 Jan 2012 09:03:16 -0800
-Subject: [PATCH V1] ARM: tegra: dma: Support variable transfer sizes
-In-Reply-To: <1327490378-10904-1-git-send-email-ldewangan@nvidia.com>
-References: <1327490378-10904-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB8202B@HQMAIL01.nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 Jan 2012 18:06:22 +0100
+Subject: [PATCH V4 2/4] CS89x0 : add CS89x0 platform device to the
+ iMX21ADS board
+In-Reply-To: <CAGzjT4eLGYjLd3WKLaxVK-S7p+d4jndAuvdJJTvMp7ZvZrqG0A@mail.gmail.com>
+References: <1326996830-13548-1-git-send-email-jaccon.bastiaansen@gmail.com>
+ <20120123093420.GL5446@pengutronix.de>
+ <CAGzjT4eODr-8yUUSLxeZQ_O1H3Fngep=rDwM_RaiT4xT6aVD-A@mail.gmail.com>
+ <20120124105653.GU5446@pengutronix.de>
+ <CAGzjT4eLGYjLd3WKLaxVK-S7p+d4jndAuvdJJTvMp7ZvZrqG0A@mail.gmail.com>
+Message-ID: <20120125170622.GX5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laxman Dewangan wrote at Wednesday, January 25, 2012 4:20 AM:
-> Allow the transfer size to vary in each DMA request,
-> rather than assuming all requests to be the same size
-> as the first request made.
-...
-> diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
-...
-> @@ -434,6 +435,15 @@ static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
->  	writel(apb_ptr, ch->addr + APB_DMA_CHAN_APB_PTR);
->  	writel(ahb_ptr, ch->addr + APB_DMA_CHAN_AHB_PTR);
+On Tue, Jan 24, 2012 at 09:34:09PM +0100, Jaccon Bastiaansen wrote:
+> >> >
+> >> > Since you now use ioremap the cs89x0 driver this mapping is not used
+> >> > for the cs89x0 anymore, so it's strange to have references to it
+> >> > here.
+> >> > You still need the mapping though, but only for MX21ADS_IO_REG.
+> >> >
+> >>
+> >> The ST16C255 UART is the first peripheral in the CS1 memory range for
+> >> which this fixed mapping is now required. I could create another
+> >> constant (for example: MX21ADS_ST16C255_OFFSET) to indicate the offset
+> >> in the CS1 memory range where the mapping should start. But since that
+> >> would create another constant with the same value as
+> >> MX21ADS_CS8900A_MMIO_SIZE, I decided to use MX21ADS_CS8900A_MMIO_SIZE.
+> >>
+> >> Do you prefer to a constant with another name here?
+> >
+> > Ok, looking again at it I understand what you are doing here and it
+> > seems wrong. Instead of mapping MX21_CS1_BASE_ADDR you now map
+> > MX21_CS1_BASE_ADDR + MX21ADS_CS8900A_MMIO_SIZE. This means that the
+> > offset to MX21ADS_IO_REG is no longer 0x800000 but
+> > 0x800000 - MX21ADS_CS8900A_MMIO_SIZE.
+> > Please just keep the mapping like it was before, it won't hurt.
+> > BTW the 8250 serial driver also ioremaps the memory if you add
+> > UPF_IOREMAP to the platform data.
+> >
+> > Sascha
+> >
 > 
-> +	if (ch->mode & TEGRA_DMA_MODE_CONTINOUS)
-> +		ch->req_transfer_count = (req->size >> 3) - 1;
-> +	else
-> +		ch->req_transfer_count = (req->size >> 2) - 1;
+> You are right, this mapping is now wrong.
+> 
+> The reason I didn't keep the mapping as is, is because then the
+> physical pages from MX21_CS1_BASE_ADDR up to MX21_CS1_BASE_ADDR +
+> MX21ADS_CS8900A_MMIO_SIZE would be mapped twice to different virtual
+> addresses (once by this static mapping and once by the ioremap in the
+> cs89x0 driver).
 
-There are cases in the current continuous mode where HW is working on
-one buffer and the next buffer is queued in HW. Once we've written the
-new request to HW, we don't know exactly which buffer HW is operating
-on. Hence, we don't know which buffer ch->req_transfer_count refers to.
-If req->size changes, might this change cause the new req->size value
-to be used when the old buffer's final completion interrupt goes off
-and hence the old buffer's req->bytes_transferred be wrong?
+This won't hurt, you will even get the same virtual address you have in
+the static mapping returned from ioremap since this commit:
 
-Actually looking at the current continuous mode, I'm not convinced that
-it correctly handles replacing an in-progress buffer with a new buffer;
-I certainly see where handle_continuous_dma() checks for a second (SW)
-queued buffer and tells the HW to use that buffer instead, but I don't
-see where the (SW) queue management is done; where is the old req removed
-from the head of ch->list and marked complete? I assume the "out of sync"
-case is only intended to be an error condition and not part of the
-buffer switch?
+commit 576d2f2525612ecb5af029a76f21f22a3b82563d
+Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date:   Fri Sep 16 01:14:23 2011 -0400
 
-Perhaps for the current continuous mode, it'd be best to require the
-client to dequeue any existing request before queuing another, i.e. to
-fail tegra_dma_enqueue_req() if there's already something in ch->list
-in continuous mode?
+    ARM: add generic ioremap optimization by reusing static mappings
+    
+    Now that we have all the static mappings from iotable_init() located
+    in the vmalloc area, it is trivial to optimize ioremap by reusing those
+    static mappings when the requested physical area fits in one ofi them,
+    and so in a generic way for all platforms.
+    
+    Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+    Tested-by: Stephen Warren <swarren@nvidia.com>
+    Tested-by: Kevin Hilman <khilman@ti.com>
+    Tested-by: Jamie Iles <jamie@jamieiles.com>
 
-> +	csr = readl(ch->addr + APB_DMA_CHAN_CSR);
-> +	csr &= ~CSR_WCOUNT_MASK;
-> +	csr |= ch->req_transfer_count << CSR_WCOUNT_SHIFT;
-> +	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
-> +
->  	req->status = TEGRA_DMA_REQ_INFLIGHT;
->  	return;
->  }
+
 
 -- 
-nvpublic
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
