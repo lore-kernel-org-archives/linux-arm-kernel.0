@@ -1,60 +1,152 @@
-From: sbabic@denx.de (Stefano Babic)
-Date: Wed, 25 Jan 2012 15:49:25 +0100
-Subject: [PATCH] ARM: mxs: read correct values when setting up MAC
-In-Reply-To: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
-References: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <4F201675.6050308@denx.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 25 Jan 2012 15:52:21 +0100
+Subject: [PATCH v3 1/7] cpuidle: Add common init interface and idle
+ functionality
+In-Reply-To: <CAMXH7KGzMfBXKCnpj2xrJrDLA9UAC4QGvg2PgGd_AG2Ax0X1sQ@mail.gmail.com>
+References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
+ <1327379854-12403-2-git-send-email-rob.lee@linaro.org>
+ <4F1F4383.60304@linaro.org>
+ <CAMXH7KGzMfBXKCnpj2xrJrDLA9UAC4QGvg2PgGd_AG2Ax0X1sQ@mail.gmail.com>
+Message-ID: <4F201725.5030902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/2012 19:57, Wolfram Sang wrote:
-> Currently, the MAC address from the second ethernet is generated from the
-> crypto-key (and not a customer reg) because of a wrong index to the ocotp
-> array.
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> ---
-> 
+On 01/25/2012 03:38 AM, Rob Lee wrote:
+> Daniel, thanks for your review.  I think you and Mike timed sending
+> your responses :)  Comments below.
 
-Hi Wolfram,
+[ ... ]
 
-> This looks clearly wrong to me; probably ocotp was a u8 somewhen in the
-> process? I wonder how it works for these boards. Am I missing something?
+>>> +       for_each_possible_cpu(cpu_id) {
+>>> +               dev = per_cpu_ptr(common_cpuidle_devices, cpu_id);
+>>> +               cpuidle_unregister_device(dev);
+>>> +       }
+>>> +
+>>> +       free_percpu(common_cpuidle_devices);
+>>> +}
+>>
+>>
+>> If the registering sequence aborts, won't cpuidle_unregister_device leads to
+>> a kernel warning as it could be specified with a cpu which has *not* been
+>> registered yet ?
+>>
+>
+> I think you may have been looking at cpuidle_unregister_driver.  Here
+> is cpuidle_unregister_device which seems to handle a device not yet
+> registered ok:
+>
+> void cpuidle_unregister_device(struct cpuidle_device *dev)
+> {
+> 	struct device *cpu_dev = get_cpu_device((unsigned long)dev->cpu);
+> 	struct cpuidle_driver *cpuidle_driver = cpuidle_get_driver();
+>
+> 	if (dev->registered == 0)
+> 		return;
+> ...
 
-Maybe you're right, but let's check with the manual:
 
-> 
->  arch/arm/mach-mxs/mach-m28evk.c  |    2 +-
->  arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
-> index 2f27582..8d1459d 100644
-> --- a/arch/arm/mach-mxs/mach-m28evk.c
-> +++ b/arch/arm/mach-mxs/mach-m28evk.c
-> @@ -258,7 +258,7 @@ static int __init m28evk_fec_get_mac(void)
->  	 * so hard-code DENX OUI (C0:E5:4E) here.
->  	 */
->  	for (i = 0; i < 2; i++) {
-> -		val = ocotp[i * 4];
-> +		val = ocotp[i];
+Ok, it is harmless. I could have looked at that ... :)
 
-I can read that HW_OCOTP_CUST0 has the phisycal address 0x8002_C020h,
-and HW_OCOTP_CUST1 ist at 8002_C030h. So the two registers are not
-consecutive and there are some reserved fields between the two registers
-- this is the reason for the i * 4.
+>>> +
+>>> +       drv = kmalloc(sizeof(struct cpuidle_driver), GFP_KERNEL);
+>>> +       if (!drv) {
+>>> +               pr_err("%s: no memory for cpuidle driver\n", __func__);
+>>> +               return -ENOMEM;
+>>> +       }
+>>> +
+>>> +       *drv = *pdrv;
 
-HW_OCOTP_CRYPTO0 is at 8002_C060h, so it is not true that the address is
-currently read from the crypto-key. At least, this is my interpretation...
+[ ... ]
 
-Best regards,
-Stefano Babic
+>> Rob can you explain why is needed to copy this structure ?
+>>
+>
+> I made the original platform cpuidle_driver objects __initdata so I
+> need to copy over to the dynamically allocated structure.
+
+Yes, but why declare a static object to be freed and allocate a new one 
+and copy it ? Why don't just use the pdrv parameter of the function ?
+
+>> Maybe kmemdup is more adequate here.
+>>
+>> drv = kmemdup(pdrv, sizeof(*drv), GFP_KERNEL);
+>>
+>
+> Is this preferred by the community over direct structure copies?  Or
+> is there some other advantage?
+
+It does kmalloc + memcpy. And *drv = *pdrv is converted to a memcpy by 
+the compiler. So using kmemdup generates the same code as kmalloc + 
+memcpy, or kmalloc + *drv = *pdrv
+
+>>> +
+>>> +       for (i = 0; simple&&    (i<    drv->state_count); i++) {
+>>>
+>>> +               do_idle[i] = drv->states[i].enter;
+>>> +               drv->states[i].enter = simple_enter;
+>>> +       }
+>>
+>>
+>> Do we really need a 'simple' parameter ? Is there an idle enter function
+>> which does not correspond to the 'simple' scheme except omap3/4 ?
+>>
+>> Maybe I am wrong but that looks a bit hacky because we are trying to
+>> override the functions the driver had previously defined and in order to
+>> prevent to modify the cpuidle.c core and more code.
+>>
+>> I am wondering if it is possible to move the usual:
+>>
+>> [ local_irq_disable(), getnstimeofday(before), myidle,
+>> getnstimeofday(after), local_irq_enable(), dev->last_residency =
+>> after-before, return index ]
+>>
+>> to cpuidle.c/cpuidle_idle_call and wrap the
+>>         entered_state = target_state->enter(dev, drv, next_state)
+>> with these simple scheme.
+>>
+>
+> Yes, I considered the same thing and originally made a version of this
+> patch with direct changes to cpuidle_idle_call.  But I concluded that
+> since this common code's main purpose is just to consolidate code
+> duplication on *some* (but not all) cpuidle implementations, it was
+> better to create the extra simple_enter wrapper than to add additional
+> code in cpuidle_idle_call that other platforms don't need.  I'd be
+> happy to submit a version of this patch with cpuidle_idle_call changes
+> though and let the community decide.  If anyone else thinks this is a
+> good or bad idea, please give your input.
+
+[1]
+
+>> Also I am not sure local_irq_disable is needed because AFAICT the idle
+>> function is called with the local_irq_disable. For example, the intel_idle
+>> driver does not do that and assume the enter_idle function is called with
+>> the local irq disabled.
+>>
+>> Looking at the code :
+>>
+>> arch/arm/kernel/process.c : pm_idle is wrapped with local_irq_disable /
+>> local_irq_enable.
+>>
+>> arch/x86/kernel/process_32/64.c : pm_idle is called with local_irq_disable
+>> but assumes the function will enable local irq
+>>
+>> arch/ia64/kernel/process.c : the code assumes the idle function will
+>> disable/enable the local irq.
+>>
+>> etc ...
+>>
+>
+> Agree.  I considered this as well but ultimately decided to leave it
+> in.  I can remove it for the next patch version though.
+
+IMHO, we should wait for what inputs we have in [1]
+
+Thanks
+   -- Daniel
 
 -- 
-=====================================================================
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
-=====================================================================
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
