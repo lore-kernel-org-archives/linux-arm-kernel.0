@@ -1,113 +1,197 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 25 Jan 2012 17:43:16 +0000
-Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
- tile (TC1 variant)
-In-Reply-To: <4F184C48.2050505@citrix.com>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
- <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
- <4F0C495C.4000103@citrix.com>
- <1326979652.32197.66.camel@hornet.cambridge.arm.com>
- <4F181BD9.20401@gmail.com>
- <1326980594.32197.67.camel@hornet.cambridge.arm.com>
- <4F182248.7070209@gmail.com>
- <1326984672.32197.68.camel@hornet.cambridge.arm.com>
- <4F184C48.2050505@citrix.com>
-Message-ID: <1327513396.2355.28.camel@hornet.cambridge.arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 25 Jan 2012 18:53:53 +0100
+Subject: [PATCH 05/21] Revert "OMAP3+: PM: SR: add suspend/resume handlers"
+In-Reply-To: <1327504583-13408-6-git-send-email-j-pihet@ti.com>
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-6-git-send-email-j-pihet@ti.com>
+Message-ID: <4F2041B1.6060907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-01-19 at 17:00 +0000, David Vrabel wrote:
-> > Ok, /include/ "skeleton.dtsi" is gone then :-)
-> 
-> The problem wasn't with including skeleton.dtsi.  With
-> CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
-> DTB using information from the ATAGs (see atags_to_fdt()).
-> 
-> If there's an ATAG giving the amount of RAM the DTB's "memory" node is
-> replaced with a new one.  Since the vexpress DTBs don't have a "memory"
-> node it's added and the DTB ends up with two nodes describing memory.
+Salut Jean,
 
-As it turned out it was just the "skeleton.dtsi" problem after all - I
-mean the fact that there where two device_type="memory" nodes in the
-tree.
+On 1/25/2012 4:16 PM, Jean Pihet wrote:
+> From: Nishanth Menon<nm@ti.com>
+>
+> This reverts commit b6be18f0bab68ed304ebbb2d787d1c36237eda62.
 
-The decompressor's setprop()
-(arch/arm/boot/compressed/atags_to_fdt.c:12) uses libfdt's
-fdt_setprop(), which correctly ignores the "@00000000" component of the
-node name and sets the reg property as expected. So as long as there is
-exactly one "memory[@address]" node in the tree,
-CONFIG_ARM_ATAG_DTB_COMPAT is happy.
+That weird, because you revert a patch you introduced just before:
+[PATCH 03/21] OMAP3+: PM: SR: add suspend/resume handlers
 
-I will remove the /include/ from the dts files for VE (see below) in the
-v3.3-rc1 based series.
+Moreover this commit id is not relevant since it is probably only in 
+Nishanth's GIT tree.
 
-Thanks for spotting this!
+> Revert the patch so that we remove any opportunity of SR disable/enable
+> and any device_scale transitions from conflicting with suspend/resume
+> path by moving the sr enable/disable activity to the very last
+> stage(in pmxx.C). The previous patch tried to optimize suspend resume
+> time, but since device_scale opportunities are from multiple drivers
+> (other than cpufreq), hence reverting back to original approach
+>
+> Conflicts:
+>
+> 	arch/arm/mach-omap2/smartreflex.c
+>
+> Change-Id: I236b0e8259cfb371899dd0c93875739a21358e33
 
-Pawe?
+And this looks like gerrit leftover that should not be there.
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-index 02cada5..2a690f2 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -9,13 +9,15 @@
- 
- /dts-v1/;
- 
--/include/ "skeleton.dtsi"
--
- / {
- 	model = "V2P-CA15";
- 	arm,hbi = <0x237>;
- 	compatible = "arm,vexpress,v2p-ca15,tc1", "arm,vexpress,v2p-ca15", "arm,vexpress";
- 	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	chosen { };
- 
- 	aliases {
- 		serial0 = &v2m_serial0;
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index da26a13..d4c5322 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -9,13 +9,15 @@
- 
- /dts-v1/;
- 
--/include/ "skeleton.dtsi"
--
- / {
- 	model = "V2P-CA5s";
- 	arm,hbi = <0x225>;
- 	compatible = "arm,vexpress,v2p-ca5s", "arm,vexpress";
- 	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	chosen { };
- 
- 	aliases {
- 		serial0 = &v2m_serial0;
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index 84542e7..5d90ce5 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -9,13 +9,15 @@
- 
- /dts-v1/;
- 
--/include/ "skeleton.dtsi"
--
- / {
- 	model = "V2P-CA9";
- 	arm,hbi = <0x191>;
- 	compatible = "arm,vexpress,v2p-ca9", "arm,vexpress";
- 	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	chosen { };
- 
- 	aliases {
- 		serial0 = &v2m_serial0;
+I guess that path #3 and #5 should just be removed.
+
+Regards,
+Benoit
+
+
+> Signed-off-by: Nishanth Menon<nm@ti.com>
+> Signed-off-by: Jean Pihet<j-pihet@ti.com>
+> ---
+>   arch/arm/mach-omap2/smartreflex.c |   90 -------------------------------------
+>   1 files changed, 0 insertions(+), 90 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index 95fd228..7e755bb 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -24,7 +24,6 @@
+>   #include<linux/debugfs.h>
+>   #include<linux/delay.h>
+>   #include<linux/slab.h>
+> -#include<linux/pm.h>
+>   #include<linux/pm_runtime.h>
+>
+>   #include "common.h"
+> @@ -41,7 +40,6 @@ struct omap_sr {
+>   	int				ip_type;
+>   	int				nvalue_count;
+>   	bool				autocomp_active;
+> -	bool				is_suspended;
+>   	u32				clk_length;
+>   	u32				err_weight;
+>   	u32				err_minlimit;
+> @@ -687,11 +685,6 @@ void omap_sr_enable(struct voltagedomain *voltdm)
+>   	if (!sr->autocomp_active)
+>   		return;
+>
+> -	if (sr->is_suspended) {
+> -		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
+> -		return;
+> -	}
+> -
+>   	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
+>   		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+>   			"registered\n", __func__);
+> @@ -725,11 +718,6 @@ void omap_sr_disable(struct voltagedomain *voltdm)
+>   	if (!sr->autocomp_active)
+>   		return;
+>
+> -	if (sr->is_suspended) {
+> -		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
+> -		return;
+> -	}
+> -
+>   	if (!sr_class || !(sr_class->disable)) {
+>   		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+>   			"registered\n", __func__);
+> @@ -763,11 +751,6 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
+>   	if (!sr->autocomp_active)
+>   		return;
+>
+> -	if (sr->is_suspended) {
+> -		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
+> -		return;
+> -	}
+> -
+>   	if (!sr_class || !(sr_class->disable)) {
+>   		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+>   			"registered\n", __func__);
+> @@ -826,11 +809,6 @@ static int omap_sr_autocomp_store(void *data, u64 val)
+>   		return -EINVAL;
+>   	}
+>
+> -	if (sr_info->is_suspended) {
+> -		pr_warning("%s: in suspended state\n", __func__);
+> -		return -EBUSY;
+> -	}
+> -
+>   	/* control enable/disable only if there is a delta in value */
+>   	if (sr_info->autocomp_active != val) {
+>   		if (!val)
+> @@ -1033,78 +1011,10 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
+> -static int omap_sr_suspend(struct device *dev)
+> -{
+> -	struct omap_sr_data *pdata;
+> -	struct omap_sr *sr_info;
+> -
+> -	pdata = dev_get_platdata(dev);
+> -	if (!pdata) {
+> -		dev_err(dev, "%s: platform data missing\n", __func__);
+> -		return -EINVAL;
+> -	}
+> -
+> -	sr_info = _sr_lookup(pdata->voltdm);
+> -	if (IS_ERR(sr_info)) {
+> -		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
+> -		return -EINVAL;
+> -	}
+> -
+> -	if (!sr_info->autocomp_active)
+> -		return 0;
+> -
+> -	if (sr_info->is_suspended)
+> -		return 0;
+> -
+> -	omap_sr_disable_reset_volt(pdata->voltdm);
+> -	sr_info->is_suspended = true;
+> -	/* Flag the same info to the other CPUs */
+> -	smp_wmb();
+> -
+> -	return 0;
+> -}
+> -
+> -static int omap_sr_resume(struct device *dev)
+> -{
+> -	struct omap_sr_data *pdata;
+> -	struct omap_sr *sr_info;
+> -
+> -	pdata = dev_get_platdata(dev);
+> -	if (!pdata) {
+> -		dev_err(dev, "%s: platform data missing\n", __func__);
+> -		return -EINVAL;
+> -	}
+> -
+> -	sr_info = _sr_lookup(pdata->voltdm);
+> -	if (IS_ERR(sr_info)) {
+> -		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
+> -		return -EINVAL;
+> -	}
+> -
+> -	if (!sr_info->autocomp_active)
+> -		return 0;
+> -
+> -	if (!sr_info->is_suspended)
+> -		return 0;
+> -
+> -	sr_info->is_suspended = false;
+> -	/* Flag the same info to the other CPUs */
+> -	smp_wmb();
+> -	omap_sr_enable(pdata->voltdm);
+> -
+> -	return 0;
+> -}
+> -
+> -const static struct dev_pm_ops omap_sr_dev_pm_ops = {
+> -	.suspend_noirq = omap_sr_suspend,
+> -	.resume_noirq = omap_sr_resume,
+> -};
+> -
+>   static struct platform_driver smartreflex_driver = {
+>   	.remove         = omap_sr_remove,
+>   	.driver		= {
+>   		.name	= "smartreflex",
+> -		.pm	=&omap_sr_dev_pm_ops,
+>   	},
+>   };
+>
