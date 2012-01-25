@@ -1,37 +1,62 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 25 Jan 2012 18:16:59 +0000
-Subject: [PATCH] ARM: ioremap: fix boundary check when reusing static mapping
-Message-ID: <1327515419-14097-1-git-send-email-pawel.moll@arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 25 Jan 2012 19:25:26 +0100
+Subject: [PATCH 05/21] Revert "OMAP3+: PM: SR: add suspend/resume handlers"
+In-Reply-To: <CAORVsuWu-pzTWzYp2=gqqPzRJQ1eBLu=12uNyEbVSZp407WUnA@mail.gmail.com>
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-6-git-send-email-j-pihet@ti.com> <4F2041B1.6060907@ti.com>
+ <CAORVsuWu-pzTWzYp2=gqqPzRJQ1eBLu=12uNyEbVSZp407WUnA@mail.gmail.com>
+Message-ID: <4F204916.7050504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 576d2f2525612ecb5af029a76f21f22a3b82563d "ARM: add
-generic ioremap optimization by reusing static mappings" ioremap()
-is trying to reuse existing, static mapping when possible.
+On 1/25/2012 7:13 PM, Jean Pihet wrote:
+> Hi Benoit,
+>
+> On Wed, Jan 25, 2012 at 6:53 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>> Salut Jean,
+>>
+>>
+>> On 1/25/2012 4:16 PM, Jean Pihet wrote:
+>>>
+>>> From: Nishanth Menon<nm@ti.com>
+>>>
+>>> This reverts commit b6be18f0bab68ed304ebbb2d787d1c36237eda62.
+>>
+>> That weird, because you revert a patch you introduced just before:
+>> [PATCH 03/21] OMAP3+: PM: SR: add suspend/resume handlers
+> I left the 2 commits on purpose because I think the descriptions give a good
+> description on why the commits have been introduced and then later removed.
+>
+>>
+>> Moreover this commit id is not relevant since it is probably only in
+>> Nishanth's GIT tree.
+> I removed this in the next version.
+>
+>>
+>>
+>>> Revert the patch so that we remove any opportunity of SR disable/enable
+>>> and any device_scale transitions from conflicting with suspend/resume
+>>> path by moving the sr enable/disable activity to the very last
+>>> stage(in pmxx.C). The previous patch tried to optimize suspend resume
+>>> time, but since device_scale opportunities are from multiple drivers
+>>> (other than cpufreq), hence reverting back to original approach
+>>>
+>>> Conflicts:
+>>>
+>>>         arch/arm/mach-omap2/smartreflex.c
+>>>
+>>> Change-Id: I236b0e8259cfb371899dd0c93875739a21358e33
+> Removed as well. Sorry about that.
+>
+>>
+>> And this looks like gerrit leftover that should not be there.
+>>
+>> I guess that path #3 and #5 should just be removed.
+> I am ok with both options (keeping or removing the 2 commits), please
+> let me know what you prefer.
 
-The condition checking boundaries of the requested and existing
-mappings didn't take in-page offset into consideration though,
-which lead to obscure and hard to debug problems when.
+I guess that removing both is the only acceptable solution anyway. That 
+might force you to change a little bit the #4, but maybe it not even needed.
 
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/mm/ioremap.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 80632e8..ba15937 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -225,7 +225,8 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
- 			continue;
- 		if (__phys_to_pfn(area->phys_addr) > pfn ||
--		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
-+		    __pfn_to_phys(pfn) + offset + size-1 >
-+		    area->phys_addr + area->size-1)
- 			continue;
- 		/* we can drop the lock here as we know *area is static */
- 		read_unlock(&vmlist_lock);
--- 
-1.7.5.4
+Regards,
+Benoit
