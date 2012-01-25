@@ -1,64 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jan 2012 15:01:42 +0000
-Subject: [PATCH 0/6] ux500: Export SoC information and some platform
- clean-up
-In-Reply-To: <CACRpkdaAJ+tr3yUWtv-eZEppiGWP92wTPMQsmcxnpBOkoB9jAg@mail.gmail.com>
-References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
- <201201231558.53673.arnd@arndb.de>
- <CACRpkdaAJ+tr3yUWtv-eZEppiGWP92wTPMQsmcxnpBOkoB9jAg@mail.gmail.com>
-Message-ID: <201201251501.42304.arnd@arndb.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 25 Jan 2012 16:16:02 +0100
+Subject: [PATCH 00/21] OMAP3+: SR: bugfixes
+Message-ID: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 January 2012, Linus Walleij wrote:
-> On Mon, Jan 23, 2012 at 4:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > Linus, does this fit with your plans for migrating to only
-> > device-tree based probing for ux500?
-> 
-> Well the SoC registatration (I guess in mach-*/* someplace)
-> needs to be DT compliant by parsing some node too, but
-> that should be some minor thing.
-> 
-> I'm not smart enough to tell whether DT will automagically
-> arrange parenthood between struct device * nodes or if
-> that needs a lot of custom code to work?
+Integrate the latest SmartReflex bufixes from Felipe Balbi [1] and
+Nishant Menon [2].
 
-Right now, of_platform_populate takes a struct device that is
-used as the parent for all buses that get probed from the
-OF device tree. This would need to be integrated with the
-soc_dev probing in some way, either by letting
-of_platform_populate call soc_device_register internally
-and gaining an extra struct soc_device_attribute
-argument, or by calling of_platform_populate from a
-platform specific function and passing a device node
-below the soc_dev into it.
+Based on latest master branch of the mainline git tree (3.3.0-rc1) [3], commit
+f8275f9694b8adf9f3498e747ea4c3e8b984499b.
 
-> > I guess if this goes in
-> > first, you will have to make a few changes so that it keeps working
-> > when the devices are put into the dts.
-> 
-> Oh well, that is a bit ahead in time anyway. We need DT support
-> in a plethora of drivers before we're getting anywhere on that.
-> Niklas is the right one to ask I guess...
+[1] http://marc.info/?l=linux-omap&m=132134699423547&w=2
+[2] https://github.com/nmenon/linux-omap-ti-pm/commits/linux-omap-3.0
+[3] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=shortlog
 
-Are there really so many driver changes required for this? We would
-not do it for the on-chip devices at first, so it basically comes
-down to the the i2c, sdi, spi and uart devices, all of which have
-bus bindings already. The hardest thing might be the pinmux
-configuration, but you already know more about the state of that
-than I do.
 
-> > Everyone else, who is planning to use the infrastructure besides ux500?
-> 
-> I can easily see this being used in the ARM reference designs
-> (Integrator, Versatile, RealView and Versatile Express) some of them
-> I can possibly patch myself even. OMAP has expressed interest
-> in "some way of getting the SoC ID out", and I guess this is
-> the means to that end.
+Colin Cross (1):
+  ARM: omap2+: smartreflex: move smartreflex suspend to suspend_noirq
 
-Ah, good. Once these patches are merged, we can easily refer anyone
-to this infrastructure if they try to add a different way of finding
-a SoC ID.
+Felipe Balbi (4):
+  arm: omap: smartreflex: add missing platform_set_drvdata()
+  arm: omap: smartreflex: move late_initcall() closer to its argument
+  arm: omap: smartreflex: clean ups all over
+  arm: omap: smartreflex: micro-optimization for sanity check
 
-	Arnd
+Julia Lawall (1):
+  arch/arm/mach-omap2/smartreflex.c: add missing error-handling code
+
+Nishanth Menon (14):
+  OMAP3+: PM: SR: add suspend/resume handlers
+  Revert "OMAP3+: PM: SR: add suspend/resume handlers"
+  OMAP3+: Smartreflex: fix err interrupt disable sequence
+  OMAP3+: PM: SR/Class3: disable errorgen before disable VP
+  OMAP3+: Smartreflex: Add a shutdown hook
+  OMAP3+: Smartreflex: Fix status masking in ERRCONFIG register
+  OMAP3+: Smartreflex: clear ERRCONFIG_VPBOUNDINTST only on a need
+  OMAP3: hwmod: add SmartReflex IRQs
+  OMAP3+: SR: introduce class init,deinit and priv data
+  OMAP3+: SR: introduce notifiers flags
+  OMAP3+: SR: introduce notifier_control
+  OMAP3+: SR: disable spamming interrupts
+  OMAP3+: SR: introduce class private data per voltage domain
+  OMAP3430: SR: class3: restrict CPU to run on
+
+Shweta Gulati (1):
+  OMAP3+: SR Layer Cleanup [V4]
+
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   31 ++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   19 +-
+ arch/arm/mach-omap2/smartreflex-class3.c     |   16 +-
+ arch/arm/mach-omap2/smartreflex.c            |  408 ++++++++++++++++++++++----
+ arch/arm/mach-omap2/smartreflex.h            |   42 +++-
+ arch/arm/mach-omap2/sr_device.c              |   11 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 -
+ 7 files changed, 449 insertions(+), 80 deletions(-)
+
+-- 
+1.7.5.4
