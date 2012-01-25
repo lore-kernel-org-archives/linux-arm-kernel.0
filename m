@@ -1,69 +1,73 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 25 Jan 2012 13:23:00 -0600
-Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
-In-Reply-To: <alpine.LFD.2.02.1201201744130.19587@xanadu.home>
-References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
- <1327091591-27125-12-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1201201608400.19587@xanadu.home>
- <4F19DB35.9060707@gmail.com>
- <alpine.LFD.2.02.1201201744130.19587@xanadu.home>
-Message-ID: <4F205694.7090906@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 25 Jan 2012 12:30:27 -0700
+Subject: How to represent active low ARM GIC interrupts, enabled by
+ external inverter?
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178CB8204C@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF178CB81BA2@HQMAIL01.nvidia.com>
+ <4F1DF1CB.20707@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178CB8204C@HQMAIL01.nvidia.com>
+Message-ID: <CACxGe6vSvkSOPNWxP4G3SFRZLz=UsorLxqV__r5QN-HxvyJT6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2012 04:48 PM, Nicolas Pitre wrote:
-> On Fri, 20 Jan 2012, Rob Herring wrote:
-> 
->> On 01/20/2012 03:11 PM, Nicolas Pitre wrote:
->>> On Fri, 20 Jan 2012, Rob Herring wrote:
->>>
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> Make mach/irqs.h optional for SPARSE_IRQ. With this change irqs.h can be
->>>> removed by converting platforms over to sparse irq.
->>>>
->>>> This intentionally breaks platforms that enable SPARSE_IRQ.
->>>
->>> I don't get what you mean here.  The above seems contradictory.
->>>
+On Wed, Jan 25, 2012 at 10:34 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Rob Herring wrote at Monday, January 23, 2012 4:48 PM:
+>> On 01/23/2012 03:18 PM, Stephen Warren wrote:
+>> > I'd like guidance on how to model one aspect of Tegra's interrupt
+>> > structure.
+>> >
+>> > Tegra has an interrupt input pin for use by a PMU chip.
+>> >
+>> > The PMC HW module within Tegra can optionally invert this signal, but
+>> > otherwise has no control over it; no interrupt status bits, no masking,
+>> > etc.
+>> >
+>> > The (potentially inverted) signal is then fed into the ARM GIC, which
+>> > supports level high or rising edge interrupts only.
+>> >
+>> > So my question is: How to model this.
+>> >
+>> > I assume the best thing to do is have the PMC be an explicit irq_chip,
+>> > and have its .set_type op configure the inversion based on whether
+>> > its interrupt source requests low or high, and allow either level or
+>> > edge.
+>> >
+>> > However, the irq_chip for the PMC couldn't implement any mask or shutdown
+>> > operation. Is it acceptable to simple provide dummy/no-op functions in
+>> > that case? I see that kernel/irq/dummychip.c does exactly that, but I'm
+>> > not sure what use-cases that file is supposed to cover.
+>> >
+>> > That'd result in something like this for device tree:
+> ...
+>> > Other alternatives:
+>> >
+>> > 1) Don't hook the PMC driver and binding into the interrupt tree, but
+>> > simply have a property that controls the inversion of the signal.
+>> > The disadvantage is that the PMU's interrupt specifier would need to
+>> > always specify active high even if it was really active low with inversion
+>> > activated in the PMC.
 >>
->> You're right. The intro explains things more clearly.
-> 
-> The intro won't be part of the git history, so please make sure 
-> individual commit logs are sensible on their own.
+>> I think i would go this route considering it's only a single interrupt
+>> line and probably just a couple of lines of code to set a bit if a
+>> property is present.
+>
+> True, that's very easy to implement.
+>
+> One other issue I see with this approach: the PMC driver must initialize
+> before the PMU driver, so that it has reprogrammed the interrupt signal
+> inverter before the PMU driver requests and enables the interrupt. If not,
+> then the interrupt will scream as soon as the PMU driver enables it. If
+> PMC were an explicit interrupt controller, that'd feed into the deferred
+> device probing feature pretty easily to solve this. Otherwise, how would
+> we solve this? I suppose we could do something similar to the explicit
+> GIC initialization and force the PMC device to be instantiated before
+> instantiating anything else from device tree. Does that seem reasonable?
 
-Updated the commit message to this (w/o the email word wrapping):
+This probably makes the most sense.  There are always going to be core
+SoC setup that just have to be part of the early init setup before
+starting the generic driver initialization. Those things don't fit
+well into the device model. This may just be one where the right thing
+to do is make sure it is set up at or before of_irq_init() gets
+called.
 
-ARM: only include mach/irqs.h for !SPARSE_IRQ
-
-Make mach/irqs.h optional for SPARSE_IRQ. With this change irqs.h can be
-removed by converting platforms over to sparse irq.
-
-This may break platforms where SPARSE_IRQ is user selectable and is enabled.
-This is on purpose so that SPARSE_IRQ gets properly supported. SPARSE_IRQ
-should not really be a user visible option.
-
-Platforms either need to set nr_irqs in their machine desc or all irqchips
-used by a platform need to allocate their irq_descs. There cannot be a
-mixture. Once this is done, the platforms can select SPARSE_IRQ. shmobile
-does the latter, and mmp and pxa do the former.
-
->> This breaks platforms (at boot time) that don't select SPARSE_IRQ, but 
->> let users enable it in their config. I don't understand why sparse irq 
->> is a user visible config option. We could move HAVE_SPARSE_IRQ down to 
->> each platform that selects SPARSE_IRQ and prevent enabling, but I 
->> think allowing it to break is good encouragement for others to fix 
->> those platforms. I'm open to other ideas.
-> 
-> SPARSE_IRQ shouldn't be a user configurable option.  There is just no 
-> point for a user configuring a kernel to be able to change this.
-
-I agree, but I'm inclined to leave this alone for now. PPC doesn't ever
-select SPARSE_IRQ, but enables it via many defconfigs. So I think
-changing it may cause some problems.
-
-Any other comments on this series? I guess all the maintainers copied
-are happy with it as there have been no other comments. I like to get
-this into next now and send pull request to Russell or arm-soc.
-
-Rob
+g.
