@@ -1,35 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:31:26 +0000
-Subject: [PATCH 04/33] MFD: mcp-core: fix mcp_priv() to be more type safe
+Date: Wed, 25 Jan 2012 14:31:46 +0000
+Subject: [PATCH 05/33] MFD: ucb1x00-core: fix missing restore of io output
+ data on resume
 In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
 References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rq3sk-0000Xp-8c@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rq3t4-0000Xv-MA@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mcp_priv() does unexpected things when passed a void pointer.  Make it
-a typed inline function, which ensures that it works correctly in
-these cases.
+We were not restoring the UCB1x00 gpio output data on resume, resulting
+in incorrect GPIO output data after a resume.  Add the missing register
+write.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- include/linux/mfd/mcp.h |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ drivers/mfd/ucb1x00-core.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/mfd/mcp.h b/include/linux/mfd/mcp.h
-index ee496708..f88c1cc 100644
---- a/include/linux/mfd/mcp.h
-+++ b/include/linux/mfd/mcp.h
-@@ -64,6 +64,9 @@ void mcp_driver_unregister(struct mcp_driver *);
- #define mcp_get_drvdata(mcp)	dev_get_drvdata(&(mcp)->attached_device)
- #define mcp_set_drvdata(mcp,d)	dev_set_drvdata(&(mcp)->attached_device, d)
+diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
+index b281217..8ebda97 100644
+--- a/drivers/mfd/ucb1x00-core.c
++++ b/drivers/mfd/ucb1x00-core.c
+@@ -687,6 +687,7 @@ static int ucb1x00_resume(struct mcp *mcp)
+ 	struct ucb1x00 *ucb = mcp_get_drvdata(mcp);
+ 	struct ucb1x00_dev *dev;
  
--#define mcp_priv(mcp)		((void *)((mcp)+1))
-+static inline void *mcp_priv(struct mcp *mcp)
-+{
-+	return mcp + 1;
-+}
- 
- #endif
++	ucb1x00_reg_write(ucb, UCB_IO_DATA, ucb->io_out);
+ 	ucb1x00_reg_write(ucb, UCB_IO_DIR, ucb->io_dir);
+ 	mutex_lock(&ucb1x00_mutex);
+ 	list_for_each_entry(dev, &ucb->devs, dev_node) {
 -- 
 1.7.4.4
