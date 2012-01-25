@@ -1,31 +1,54 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 25 Jan 2012 10:49:42 -0800
-Subject: [PATCH 05/21] Revert "OMAP3+: PM: SR: add suspend/resume handlers"
-In-Reply-To: <4F204916.7050504@ti.com> (Benoit Cousson's message of "Wed, 25
- Jan 2012 19:25:26 +0100")
-References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
- <1327504583-13408-6-git-send-email-j-pihet@ti.com>
- <4F2041B1.6060907@ti.com>
- <CAORVsuWu-pzTWzYp2=gqqPzRJQ1eBLu=12uNyEbVSZp407WUnA@mail.gmail.com>
- <4F204916.7050504@ti.com>
-Message-ID: <87zkdbehx5.fsf@ti.com>
+From: dhlii@dlasys.net (David Lynch Jr.)
+Date: Wed, 25 Jan 2012 13:56:22 -0500
+Subject: [Fwd: Re: imx53]
+Message-ID: <1327517782.21058.49.camel@hp-dhlii>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Cousson, Benoit" <b-cousson@ti.com> writes:
+I just pulled the most recent copy of linus's tree 3.3 something. 
+It appears that significantly more i.mx53 drivers are getting into that
+source than last time I looked. 
 
-> On 1/25/2012 7:13 PM, Jean Pihet wrote:
+Now I am trying to build it for the i.MX53 QSB - the development
+platform I am using. 
 
-[...]
+Myriads of config options have changed since the 2.6.38.3 that I have
+somewhat working. Just borrowing the .config appears to be
+insufficient. 
 
->>>
->>> I guess that path #3 and #5 should just be removed.
->> I am ok with both options (keeping or removing the 2 commits), please
->> let me know what you prefer.
->
-> I guess that removing both is the only acceptable solution
-> anyway. 
+After some mucking arround that included Kconfig changes I was able to
+get CONFIG_FB_IMX set and build a kernel with it, but it does not appear
+to be getting initialized. 
 
-Yes, please remove them both.
+What do I need to do to get Linux to use this driver ?
+Has ARM 3.3 moved to device trees ?
 
-Kevin
+Is there something else I am missing ?
+
+
+ 
+
+
+
+-------- Forwarded Message --------
+> From: Fabio Estevam <festevam@gmail.com>
+> To: David H. Lynch Jr. <dhlii@dlasys.net>
+> Cc: linux-arm-kernel at lists.infradead.org
+> <linux-arm-kernel@lists.infradead.org>
+> Subject: Re: imx53
+> Date: Wed, 18 Jan 2012 17:57:48 -0200
+> 
+> On Wed, Jan 18, 2012 at 1:39 PM, David H. Lynch Jr. <dhlii@dlasys.net> wrote:
+> > Where would I look for the appropriate git kernel source tree that is being
+> > used for i.MX53 development feeding the distribution kernel ?
+> 
+> You can use Linus' tree directly.
+> 
+> Regards,
+> 
+> Fabio Estevam
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
