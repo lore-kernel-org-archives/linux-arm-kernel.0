@@ -1,78 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:39:34 +0000
-Subject: [PATCH 28/33] MFD: mcp-core: remove legacy driver suspend/resume
- methods
-In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rq40c-0000Zd-U0@rmk-PC.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 25 Jan 2012 15:39:49 +0100
+Subject: [PATCH 3/4] at91 : remove wait_for_interrupt definition
+In-Reply-To: <20120125001858.GD12326@n2100.arm.linux.org.uk>
+References: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
+ <1327449368-29917-3-git-send-email-daniel.lezcano@linaro.org>
+ <20120125001858.GD12326@n2100.arm.linux.org.uk>
+Message-ID: <4F201435.7030402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy driver suspend/resume methods are no longer used, so get rid
-of them.
+On 01/25/2012 01:18 AM, Russell King - ARM Linux wrote:
+> On Wed, Jan 25, 2012 at 12:56:07AM +0100, Daniel Lezcano wrote:
+>> All the "wait_for_interrupt" definition are aliases to cpu_do_idle.
+>> Only the rm9200 has an asm routine to switch to wfi. But the cpu_do_idle
+>> for this platform has exactly the same asm routine.
+>>
+>> arch/arm/mm/proc-arm920.S
+>> ...
+>> ENTRY(cpu_arm920_do_idle)
+>>          mcr     p15, 0, r0, c7, c0, 4           @ Wait for interrupt
+>> ...
+>>
+>> Then it is safe to invoke cpu_do_idle for this platform.
+>
+> No it is not.
+>
+> Please read Nicolas' post:
+>
+> http://lists.arm.linux.org.uk/lurker/message/20120112.144129.827ae490.en.html
+>
+> and think about what "DWB is needed before putting SDRAM into self-refresh
+> because any subsequent access to SDRAM will force it to resume from
+> self-refresh state" means.
+>
+> Consider that if you _branch_ somewhere else, you _could_ cause a cache
+> line fetch, which will have to come from SDRAM.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/mfd/mcp-core.c  |   28 ----------------------------
- include/linux/mfd/mcp.h |    2 --
- 2 files changed, 0 insertions(+), 30 deletions(-)
+Oh, right. I am not familiar with this part, thanks for the clarification.
 
-diff --git a/drivers/mfd/mcp-core.c b/drivers/mfd/mcp-core.c
-index c409d63..6acf2e0 100644
---- a/drivers/mfd/mcp-core.c
-+++ b/drivers/mfd/mcp-core.c
-@@ -47,39 +47,11 @@ static int mcp_bus_remove(struct device *dev)
- 	return 0;
- }
- 
--static int mcp_bus_suspend(struct device *dev, pm_message_t state)
--{
--	struct mcp *mcp = to_mcp(dev);
--	int ret = 0;
--
--	if (dev->driver) {
--		struct mcp_driver *drv = to_mcp_driver(dev->driver);
--
--		ret = drv->suspend(mcp, state);
--	}
--	return ret;
--}
--
--static int mcp_bus_resume(struct device *dev)
--{
--	struct mcp *mcp = to_mcp(dev);
--	int ret = 0;
--
--	if (dev->driver) {
--		struct mcp_driver *drv = to_mcp_driver(dev->driver);
--
--		ret = drv->resume(mcp);
--	}
--	return ret;
--}
--
- static struct bus_type mcp_bus_type = {
- 	.name		= "mcp",
- 	.match		= mcp_bus_match,
- 	.probe		= mcp_bus_probe,
- 	.remove		= mcp_bus_remove,
--	.suspend	= mcp_bus_suspend,
--	.resume		= mcp_bus_resume,
- };
- 
- /**
-diff --git a/include/linux/mfd/mcp.h b/include/linux/mfd/mcp.h
-index bfcdf6d..a9e8bd1 100644
---- a/include/linux/mfd/mcp.h
-+++ b/include/linux/mfd/mcp.h
-@@ -48,8 +48,6 @@ struct mcp_driver {
- 	struct device_driver drv;
- 	int (*probe)(struct mcp *);
- 	void (*remove)(struct mcp *);
--	int (*suspend)(struct mcp *, pm_message_t);
--	int (*resume)(struct mcp *);
- };
- 
- int mcp_driver_register(struct mcp_driver *);
+>  From Nicolas' post, it's pretty clear to me that the AT91RM9200 requires
+> carefully crafted assembly which can't be separated in this way to work,
+> which I mostly supplied in this mail:
+>
+> http://lists.arm.linux.org.uk/lurker/message/20120109.144443.3626e5a6.en.html
+
+Ok, this is what does the patch 4/4, it changes the self-refresh and wfi 
+into an asm routine where cpu_do_idle call is removed. Can I consider by 
+folding 3/4 and 4/4 ? So the buggy cpu_do_idle change won't appear...
+
+Thanks
+   -- Daniel
+
 -- 
-1.7.4.4
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
