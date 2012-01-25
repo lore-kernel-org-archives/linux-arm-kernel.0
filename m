@@ -1,88 +1,30 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 25 Jan 2012 08:40:20 +0100
-Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
-In-Reply-To: <20120123150048.GB6269@8bytes.org>
-References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com><1325747509-29665-2-git-send-email-hdoyu@nvidia.com><20120123150048.GB6269@8bytes.org>
-Message-ID: <20120125.094020.983282777619146490.hdoyu@nvidia.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 25 Jan 2012 10:23:01 +0200
+Subject: [PATCH v4 - resend 10/13] ASoC: omap-abe-twl6040: Configure card
+ according to platform data
+In-Reply-To: <20120124130008.GC31839@opensource.wolfsonmicro.com>
+References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
+ <1327405950-6676-11-git-send-email-peter.ujfalusi@ti.com>
+ <20120124130008.GC31839@opensource.wolfsonmicro.com>
+Message-ID: <4F1FBBE5.5080804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
-
-From: Joerg Roedel <joro@8bytes.org>
-Subject: Re: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
-Date: Mon, 23 Jan 2012 16:00:48 +0100
-Message-ID: <20120123150048.GB6269@8bytes.org>
-
-> Hi,
+On 01/24/2012 03:00 PM, Mark Brown wrote:
+> On Tue, Jan 24, 2012 at 01:52:27PM +0200, Peter Ujfalusi wrote:
+>> Disable the not connected pins on the board based on the
+>> received platform data.
+>> DO not register the jack function on boards, which does not have
+>> means to detect it (jack is always connected).
 > 
-> first, some questions about the GART on your platform.
-> 
-> 1) How many GARTs are usually implemented? One GART per device or is
->    there a single GART covering all devices, or a mix of both?
+> This should no longer be needed with the auto not connected stuff.
 
-There's a single GART in the system which takes care of all devices.
+The auto not connected checks if we have connected something in the card
+domain to the codec's input/output/micbias widgets.
+In the machine driver we start from fully wired configuration, and based
+on the received platform data we mark certain connections not connected.
+The audio nc feature would not work here. It will not mark anything nc
+since the DAPM map is complete.
 
-> 2) Are devices allowed to DMA outside of the remappable range or will
->    this fail?
-
-Fail.
-
-> 
-> Besides that I think IOMMU-API is not yet fully ready for GART-like
-> drivers like this one. But I will merge it anyway to get things moving.
-> But please answer or fix my objections first.
-> 
-> On Thu, Jan 05, 2012 at 09:11:48AM +0200, Hiroshi DOYU wrote:
-> > +static void gart_iommu_domain_destroy(struct iommu_domain *domain)
-> > +{
-> > +	struct gart_device *gart = domain->priv;
-> > +
-> > +	spin_lock(&gart->client_lock);
-> > +	if (!list_empty(&gart->client)) {
-> > +		struct gart_client *c;
-> > +
-> > +		list_for_each_entry(c, &gart->client, list)
-> > +			dev_err(gart->dev,
-> > +				"%s is still attached\n", dev_name(c->dev));
-> > +	}
-> > +	spin_unlock(&gart->client_lock);
-> 
-> gart needs a NULL check. When you create a domain and immediatly destroy
-> it without ever attaching a device this code will dereference a NULL
-> pointer.
-
-Fixed.
-
-> As a general improvement I suggest that you introduce a gart_domain
-> structure and store it in domain->priv (assigned in domain_init) instead
-> of using the hardware descriptor.
-> 
-> > +static int gart_iommu_attach_dev(struct iommu_domain *domain,
-> > +				 struct device *dev)
-> > +{
-> > +	struct gart_device *gart;
-> > +	struct gart_client *client, *c;
-> > +	int err = 0;
-> > +
-> > +	gart = dev_get_drvdata(dev->parent);
-> > +	if (!gart)
-> > +		return -EINVAL;
-> > +	domain->priv = gart;
-> 
-> What happens when devices behind different GARTs are assigned to the
-> same domain? domain->priv can only hold a pointer to one hardware GART.
-> This can be solved by a 'struct gart_domain' holding a linked list to
-> all gart_devices in this domain.
-
-As discussed in SMMU thread, I'll revisit the above multiple iommu
-device support later.
-
-Attached the update patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-IOMMU-Tegra20-Add-iommu_ops-for-GART-driver.patch
-Type: text/x-patch
-Size: 14203 bytes
-Desc: 0001-ARM-IOMMU-Tegra20-Add-iommu_ops-for-GART-driver.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120125/763fd94b/attachment.bin>
+-- 
+P?ter
