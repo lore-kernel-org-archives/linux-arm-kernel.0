@@ -1,32 +1,65 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Wed, 25 Jan 2012 21:29:49 +0300
-Subject: [PATCH 04/21] ARM: omap2+: smartreflex: move smartreflex suspend
- to suspend_noirq
-In-Reply-To: <1327504583-13408-5-git-send-email-j-pihet@ti.com>
-References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
- <1327504583-13408-5-git-send-email-j-pihet@ti.com>
-Message-ID: <4F204A1D.4090005@ru.mvista.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 25 Jan 2012 09:34:06 -0800
+Subject: How to represent active low ARM GIC interrupts, enabled by
+ external inverter?
+In-Reply-To: <4F1DF1CB.20707@gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF178CB81BA2@HQMAIL01.nvidia.com>
+ <4F1DF1CB.20707@gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB8204C@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2012 06:16 PM, Jean Pihet wrote:
+Rob Herring wrote at Monday, January 23, 2012 4:48 PM:
+> On 01/23/2012 03:18 PM, Stephen Warren wrote:
+> > I'd like guidance on how to model one aspect of Tegra's interrupt
+> > structure.
+> >
+> > Tegra has an interrupt input pin for use by a PMU chip.
+> >
+> > The PMC HW module within Tegra can optionally invert this signal, but
+> > otherwise has no control over it; no interrupt status bits, no masking,
+> > etc.
+> >
+> > The (potentially inverted) signal is then fed into the ARM GIC, which
+> > supports level high or rising edge interrupts only.
+> >
+> > So my question is: How to model this.
+> >
+> > I assume the best thing to do is have the PMC be an explicit irq_chip,
+> > and have its .set_type op configure the inversion based on whether
+> > its interrupt source requests low or high, and allow either level or
+> > edge.
+> >
+> > However, the irq_chip for the PMC couldn't implement any mask or shutdown
+> > operation. Is it acceptable to simple provide dummy/no-op functions in
+> > that case? I see that kernel/irq/dummychip.c does exactly that, but I'm
+> > not sure what use-cases that file is supposed to cover.
+> >
+> > That'd result in something like this for device tree:
+...
+> > Other alternatives:
+> >
+> > 1) Don't hook the PMC driver and binding into the interrupt tree, but
+> > simply have a property that controls the inversion of the signal.
+> > The disadvantage is that the PMU's interrupt specifier would need to
+> > always specify active high even if it was really active low with inversion
+> > activated in the PMC.
+> 
+> I think i would go this route considering it's only a single interrupt
+> line and probably just a couple of lines of code to set a bit if a
+> property is present.
 
-> From: Colin Cross<ccross@android.com>
+True, that's very easy to implement.
 
-> Running without smartreflex for any significant time (on the order
-> of seconds) is unsafe and can cause thermal runaway.  Move
-> smartreflex suspend into suspend_noirq, so it happens as late as
-> possible.  This prevents hangs that occur in a driver suspend
-> handler from running without smartreflex enabled.  It will also
-> reduce power used during suspend and resume, as the voltages will
-> be lowered.
+One other issue I see with this approach: the PMC driver must initialize
+before the PMU driver, so that it has reprogrammed the interrupt signal
+inverter before the PMU driver requests and enables the interrupt. If not,
+then the interrupt will scream as soon as the PMU driver enables it. If
+PMC were an explicit interrupt controller, that'd feed into the deferred
+device probing feature pretty easily to solve this. Otherwise, how would
+we solve this? I suppose we could do something similar to the explicit
+GIC initialization and force the PMC device to be instantiated before
+instantiating anything else from device tree. Does that seem reasonable?
 
-> May also indirectly fix imprecise external aborts seen during
-> suspend, which could be caused by calls to sr_disable racing
-> from calls to dvfs_scale and omap_sr_disable.
-
-> Change-Id: Ia3c1e707bb1022ec102f506dc3ad48906e8890da
-
-    This line has no place in the upstream commit. Please remove.
-
-WBR, Sergei
+--
+nvpublic
