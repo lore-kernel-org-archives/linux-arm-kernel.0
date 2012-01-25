@@ -1,65 +1,113 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 25 Jan 2012 09:34:06 -0800
-Subject: How to represent active low ARM GIC interrupts, enabled by
- external inverter?
-In-Reply-To: <4F1DF1CB.20707@gmail.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF178CB81BA2@HQMAIL01.nvidia.com>
- <4F1DF1CB.20707@gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB8204C@HQMAIL01.nvidia.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 25 Jan 2012 17:43:16 +0000
+Subject: [PATCH v6 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core
+ tile (TC1 variant)
+In-Reply-To: <4F184C48.2050505@citrix.com>
+References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
+ <1323957761-13553-10-git-send-email-pawel.moll@arm.com>
+ <4F0C495C.4000103@citrix.com>
+ <1326979652.32197.66.camel@hornet.cambridge.arm.com>
+ <4F181BD9.20401@gmail.com>
+ <1326980594.32197.67.camel@hornet.cambridge.arm.com>
+ <4F182248.7070209@gmail.com>
+ <1326984672.32197.68.camel@hornet.cambridge.arm.com>
+ <4F184C48.2050505@citrix.com>
+Message-ID: <1327513396.2355.28.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring wrote at Monday, January 23, 2012 4:48 PM:
-> On 01/23/2012 03:18 PM, Stephen Warren wrote:
-> > I'd like guidance on how to model one aspect of Tegra's interrupt
-> > structure.
-> >
-> > Tegra has an interrupt input pin for use by a PMU chip.
-> >
-> > The PMC HW module within Tegra can optionally invert this signal, but
-> > otherwise has no control over it; no interrupt status bits, no masking,
-> > etc.
-> >
-> > The (potentially inverted) signal is then fed into the ARM GIC, which
-> > supports level high or rising edge interrupts only.
-> >
-> > So my question is: How to model this.
-> >
-> > I assume the best thing to do is have the PMC be an explicit irq_chip,
-> > and have its .set_type op configure the inversion based on whether
-> > its interrupt source requests low or high, and allow either level or
-> > edge.
-> >
-> > However, the irq_chip for the PMC couldn't implement any mask or shutdown
-> > operation. Is it acceptable to simple provide dummy/no-op functions in
-> > that case? I see that kernel/irq/dummychip.c does exactly that, but I'm
-> > not sure what use-cases that file is supposed to cover.
-> >
-> > That'd result in something like this for device tree:
-...
-> > Other alternatives:
-> >
-> > 1) Don't hook the PMC driver and binding into the interrupt tree, but
-> > simply have a property that controls the inversion of the signal.
-> > The disadvantage is that the PMU's interrupt specifier would need to
-> > always specify active high even if it was really active low with inversion
-> > activated in the PMC.
+On Thu, 2012-01-19 at 17:00 +0000, David Vrabel wrote:
+> > Ok, /include/ "skeleton.dtsi" is gone then :-)
 > 
-> I think i would go this route considering it's only a single interrupt
-> line and probably just a couple of lines of code to set a bit if a
-> property is present.
+> The problem wasn't with including skeleton.dtsi.  With
+> CONFIG_ARM_ATAG_DTB_COMPAT the zImage decompressor modifies the appended
+> DTB using information from the ATAGs (see atags_to_fdt()).
+> 
+> If there's an ATAG giving the amount of RAM the DTB's "memory" node is
+> replaced with a new one.  Since the vexpress DTBs don't have a "memory"
+> node it's added and the DTB ends up with two nodes describing memory.
 
-True, that's very easy to implement.
+As it turned out it was just the "skeleton.dtsi" problem after all - I
+mean the fact that there where two device_type="memory" nodes in the
+tree.
 
-One other issue I see with this approach: the PMC driver must initialize
-before the PMU driver, so that it has reprogrammed the interrupt signal
-inverter before the PMU driver requests and enables the interrupt. If not,
-then the interrupt will scream as soon as the PMU driver enables it. If
-PMC were an explicit interrupt controller, that'd feed into the deferred
-device probing feature pretty easily to solve this. Otherwise, how would
-we solve this? I suppose we could do something similar to the explicit
-GIC initialization and force the PMC device to be instantiated before
-instantiating anything else from device tree. Does that seem reasonable?
+The decompressor's setprop()
+(arch/arm/boot/compressed/atags_to_fdt.c:12) uses libfdt's
+fdt_setprop(), which correctly ignores the "@00000000" component of the
+node name and sets the reg property as expected. So as long as there is
+exactly one "memory[@address]" node in the tree,
+CONFIG_ARM_ATAG_DTB_COMPAT is happy.
 
---
-nvpublic
+I will remove the /include/ from the dts files for VE (see below) in the
+v3.3-rc1 based series.
+
+Thanks for spotting this!
+
+Pawe?
+
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+index 02cada5..2a690f2 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+@@ -9,13 +9,15 @@
+ 
+ /dts-v1/;
+ 
+-/include/ "skeleton.dtsi"
+-
+ / {
+ 	model = "V2P-CA15";
+ 	arm,hbi = <0x237>;
+ 	compatible = "arm,vexpress,v2p-ca15,tc1", "arm,vexpress,v2p-ca15", "arm,vexpress";
+ 	interrupt-parent = <&gic>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	chosen { };
+ 
+ 	aliases {
+ 		serial0 = &v2m_serial0;
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index da26a13..d4c5322 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -9,13 +9,15 @@
+ 
+ /dts-v1/;
+ 
+-/include/ "skeleton.dtsi"
+-
+ / {
+ 	model = "V2P-CA5s";
+ 	arm,hbi = <0x225>;
+ 	compatible = "arm,vexpress,v2p-ca5s", "arm,vexpress";
+ 	interrupt-parent = <&gic>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	chosen { };
+ 
+ 	aliases {
+ 		serial0 = &v2m_serial0;
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 84542e7..5d90ce5 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -9,13 +9,15 @@
+ 
+ /dts-v1/;
+ 
+-/include/ "skeleton.dtsi"
+-
+ / {
+ 	model = "V2P-CA9";
+ 	arm,hbi = <0x191>;
+ 	compatible = "arm,vexpress,v2p-ca9", "arm,vexpress";
+ 	interrupt-parent = <&gic>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	chosen { };
+ 
+ 	aliases {
+ 		serial0 = &v2m_serial0;
