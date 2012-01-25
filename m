@@ -1,26 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Jan 2012 14:26:05 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP: hwmod/PRCM/OMAP2xxx fixes for 3.3
-In-Reply-To: <alpine.DEB.2.00.1201251420490.5324@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1201251420490.5324@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1201251425080.5324@utopia.booyaka.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Wed, 25 Jan 2012 15:29:01 -0600
+Subject: [PATCH 05/21] Revert "OMAP3+: PM: SR: add suspend/resume handlers"
+In-Reply-To: <87zkdbehx5.fsf@ti.com>
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-6-git-send-email-j-pihet@ti.com> <4F2041B1.6060907@ti.com>
+ <CAORVsuWu-pzTWzYp2=gqqPzRJQ1eBLu=12uNyEbVSZp407WUnA@mail.gmail.com>
+ <4F204916.7050504@ti.com> <87zkdbehx5.fsf@ti.com>
+Message-ID: <CAOMWX4eju6Zm5=DOyXkmRYjEvdnx+bGyNouEB01oG=zQPdyfyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2012, Paul Walmsley wrote:
+On Wed, Jan 25, 2012 at 12:49, Kevin Hilman <khilman@ti.com> wrote:
+> "Cousson, Benoit" <b-cousson@ti.com> writes:
+>
+>> On 1/25/2012 7:13 PM, Jean Pihet wrote:
+>
+> [...]
+>
+>>>>
+>>>> I guess that path #3 and #5 should just be removed.
+>>> I am ok with both options (keeping or removing the 2 commits), please
+>>> let me know what you prefer.
+>>
+>> I guess that removing both is the only acceptable solution
+>> anyway.
+>
+> Yes, please remove them both.
+Also, please drop Change-IDs as well.. :)
 
-> The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-> 
->   Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-> 
-> are available in the git repository at:
->   git://git.pwsan.com/linux-2.6 omap_fixes_a_3.3rc
-
-By the way, since Beno?t had already sent a fix for the OMAP1/2xxx I2C 
-build bug, I dropped my fix from this series.  So this patch is still 
-required before OMAP1/2xxx will build:
-
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg61520.html
-
-
-- Paul
+Regards,
+Nishanth Menon
