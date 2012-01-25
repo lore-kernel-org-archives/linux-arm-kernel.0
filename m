@@ -1,117 +1,96 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:36:52 +0000
-Subject: [PATCH 20/33] MFD: ucb1x00-core: use mutexes instead of semaphores
+Date: Wed, 25 Jan 2012 14:37:12 +0000
+Subject: [PATCH 21/33] MFD: ucb1x00-core: clean up device handling in probe
 In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
 References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rq3y0-0000Z7-EX@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rq3yK-0000ZB-Hi@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the ucb1x00 driver to use mutexes rather than the depreciated
-semaphores for exclusive access to the ADC.
+Clean up the device handling so we can use the struct device sanely.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mfd/ucb1x00-core.c  |   15 +++++++--------
- include/linux/mfd/ucb1x00.h |    4 ++--
- 2 files changed, 9 insertions(+), 10 deletions(-)
+ drivers/mfd/ucb1x00-core.c |   30 ++++++++++++++++--------------
+ 1 files changed, 16 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
-index c2757c1..7386f82 100644
+index 7386f82..74d9fcf 100644
 --- a/drivers/mfd/ucb1x00-core.c
 +++ b/drivers/mfd/ucb1x00-core.c
-@@ -27,7 +27,6 @@
- #include <linux/mutex.h>
- #include <linux/mfd/ucb1x00.h>
- #include <linux/gpio.h>
--#include <linux/semaphore.h>
+@@ -553,6 +553,7 @@ static int ucb1x00_probe(struct mcp *mcp)
+ 	if (!ucb)
+ 		goto err_disable;
  
- static DEFINE_MUTEX(ucb1x00_mutex);
- static LIST_HEAD(ucb1x00_drivers);
-@@ -99,7 +98,7 @@ void ucb1x00_io_write(struct ucb1x00 *ucb, unsigned int set, unsigned int clear)
-  *	ucb1x00_enable must have been called to enable the comms
-  *	before using this function.
-  *
-- *	This function does not take any semaphores or spinlocks.
-+ *	This function does not take any mutexes or spinlocks.
-  */
- unsigned int ucb1x00_io_read(struct ucb1x00 *ucb)
- {
-@@ -183,7 +182,7 @@ static int ucb1x00_gpio_direction_output(struct gpio_chip *chip, unsigned offset
-  *	Any code wishing to use the ADC converter must call this
-  *	function prior to using it.
-  *
-- *	This function takes the ADC semaphore to prevent two or more
-+ *	This function takes the ADC mutex to prevent two or more
-  *	concurrent uses, and therefore may sleep.  As a result, it
-  *	can only be called from process context, not interrupt
-  *	context.
-@@ -193,7 +192,7 @@ static int ucb1x00_gpio_direction_output(struct gpio_chip *chip, unsigned offset
-  */
- void ucb1x00_adc_enable(struct ucb1x00 *ucb)
- {
--	down(&ucb->adc_sem);
-+	mutex_lock(&ucb->adc_mutex);
- 
- 	ucb->adc_cr |= UCB_ADC_ENA;
- 
-@@ -215,7 +214,7 @@ void ucb1x00_adc_enable(struct ucb1x00 *ucb)
-  *	complete (2 frames max without sync).
-  *
-  *	If called for a synchronised ADC conversion, it may sleep
-- *	with the ADC semaphore held.
-+ *	with the ADC mutex held.
-  */
- unsigned int ucb1x00_adc_read(struct ucb1x00 *ucb, int adc_channel, int sync)
- {
-@@ -243,7 +242,7 @@ unsigned int ucb1x00_adc_read(struct ucb1x00 *ucb, int adc_channel, int sync)
-  *	ucb1x00_adc_disable - disable the ADC converter
-  *	@ucb: UCB1x00 structure describing chip
-  *
-- *	Disable the ADC converter and release the ADC semaphore.
-+ *	Disable the ADC converter and release the ADC mutex.
-  */
- void ucb1x00_adc_disable(struct ucb1x00 *ucb)
- {
-@@ -251,7 +250,7 @@ void ucb1x00_adc_disable(struct ucb1x00 *ucb)
- 	ucb1x00_reg_write(ucb, UCB_ADC_CR, ucb->adc_cr);
- 	ucb1x00_disable(ucb);
- 
--	up(&ucb->adc_sem);
-+	mutex_unlock(&ucb->adc_mutex);
- }
- 
- /*
-@@ -560,7 +559,7 @@ static int ucb1x00_probe(struct mcp *mcp)
- 
- 	spin_lock_init(&ucb->lock);
- 	spin_lock_init(&ucb->io_lock);
--	sema_init(&ucb->adc_sem, 1);
-+	mutex_init(&ucb->adc_mutex);
++	device_initialize(&ucb->dev);
+ 	ucb->dev.class = &ucb1x00_class;
+ 	ucb->dev.parent = &mcp->attached_device;
+ 	dev_set_name(&ucb->dev, "ucb1x00");
+@@ -563,11 +564,16 @@ static int ucb1x00_probe(struct mcp *mcp)
  
  	ucb->id  = id;
  	ucb->mcp = mcp;
-diff --git a/include/linux/mfd/ucb1x00.h b/include/linux/mfd/ucb1x00.h
-index fd088cc..a4b9543 100644
---- a/include/linux/mfd/ucb1x00.h
-+++ b/include/linux/mfd/ucb1x00.h
-@@ -12,7 +12,7 @@
++
++	ret = device_add(&ucb->dev);
++	if (ret)
++		goto err_dev_add;
++
+ 	ucb->irq = ucb1x00_detect_irq(ucb);
+ 	if (ucb->irq == NO_IRQ) {
+-		printk(KERN_ERR "UCB1x00: IRQ probe failed\n");
++		dev_err(&ucb->dev, "IRQ probe failed\n");
+ 		ret = -ENODEV;
+-		goto err_free;
++		goto err_no_irq;
+ 	}
  
- #include <linux/mfd/mcp.h>
- #include <linux/gpio.h>
--#include <linux/semaphore.h>
-+#include <linux/mutex.h>
+ 	ucb->gpio.base = -1;
+@@ -581,25 +587,20 @@ static int ucb1x00_probe(struct mcp *mcp)
+ 		ucb->gpio.direction_output = ucb1x00_gpio_direction_output;
+ 		ret = gpiochip_add(&ucb->gpio);
+ 		if (ret)
+-			goto err_free;
++			goto err_gpio_add;
+ 	} else
+ 		dev_info(&ucb->dev, "gpio_base not set so no gpiolib support");
  
- #define UCB_IO_DATA	0x00
- #define UCB_IO_DIR	0x01
-@@ -124,7 +124,7 @@ struct ucb1x00 {
- 	spinlock_t		lock;
- 	struct mcp		*mcp;
- 	unsigned int		irq;
--	struct semaphore	adc_sem;
-+	struct mutex		adc_mutex;
- 	spinlock_t		io_lock;
- 	u16			id;
- 	u16			io_dir;
+ 	ret = request_irq(ucb->irq, ucb1x00_irq, IRQF_TRIGGER_RISING,
+ 			  "UCB1x00", ucb);
+ 	if (ret) {
+-		printk(KERN_ERR "ucb1x00: unable to grab irq%d: %d\n",
++		dev_err(&ucb->dev, "ucb1x00: unable to grab irq%d: %d\n",
+ 			ucb->irq, ret);
+-		goto err_gpio;
++		goto err_irq;
+ 	}
+ 
+ 	mcp_set_drvdata(mcp, ucb);
+ 
+-	ret = device_register(&ucb->dev);
+-	if (ret)
+-		goto err_irq;
+-
+-
+ 	INIT_LIST_HEAD(&ucb->devs);
+ 	mutex_lock(&ucb1x00_mutex);
+ 	list_add(&ucb->node, &ucb1x00_devices);
+@@ -611,12 +612,13 @@ static int ucb1x00_probe(struct mcp *mcp)
+ 	return ret;
+ 
+  err_irq:
+-	free_irq(ucb->irq, ucb);
+- err_gpio:
+ 	if (ucb->gpio.base != -1)
+ 		temp = gpiochip_remove(&ucb->gpio);
+- err_free:
+-	kfree(ucb);
++ err_gpio_add:
++ err_no_irq:
++	device_del(&ucb->dev);
++ err_dev_add:
++	put_device(&ucb->dev);
+  err_disable:
+ 	mcp_disable(mcp);
+  out:
 -- 
 1.7.4.4
