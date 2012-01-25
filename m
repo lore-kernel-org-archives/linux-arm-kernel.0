@@ -1,33 +1,46 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 25 Jan 2012 13:11:48 +0200
-Subject: [alsa-devel] [PATCH v4 - resend 00/13] OMAP4: ASoC: Support for
- PandaBoard family
-In-Reply-To: <CAJe_Zhfn3urdXfRgAKvdW2_ECYGbNO0b2BuZnCZxrGcL4_sVSg@mail.gmail.com>
-References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
- <CAJe_Zhfn3urdXfRgAKvdW2_ECYGbNO0b2BuZnCZxrGcL4_sVSg@mail.gmail.com>
-Message-ID: <4F1FE374.1010202@ti.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 25 Jan 2012 16:49:38 +0530
+Subject: [PATCH V1] ARM: tegra: dma: Support variable transfer sizes
+Message-ID: <1327490378-10904-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2012 12:50 PM, Jassi Brar wrote:
-> Hi Peter,
->    I tried the patchset on my 4430 Panda. Playback works ok, but not Capture.
-> All is get is a hiss.
->   Is capture supposed to work ? If yes, any amixer settings that need
-> to be done?
+Allow the transfer size to vary in each DMA request,
+rather than assuming all requests to be the same size
+as the first request made.
 
-Thanks for testing the series.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/mach-tegra/dma.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-I do not have Panda on my own, but the capture depends on Panda version:
-PandaBoard (4430): You record from HSMIC
-PandaBoardES (4460): You record from AFML (line in).
-
-Can you try:
-amixer sset 'Analog Left' 'Headset Mic'
-amixer sset 'Analog Right' 'Headset Mic'
-Or
-amixer sset 'Analog Left' 'Aux/FM Left'
-amixer sset 'Analog Right' 'Aux/FM Right'
-
+diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
+index abea4f6..81a7459 100644
+--- a/arch/arm/mach-tegra/dma.c
++++ b/arch/arm/mach-tegra/dma.c
+@@ -423,6 +423,7 @@ static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
+ {
+ 	u32 apb_ptr;
+ 	u32 ahb_ptr;
++	u32 csr;
+ 
+ 	if (req->to_memory) {
+ 		apb_ptr = req->source_addr;
+@@ -434,6 +435,15 @@ static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
+ 	writel(apb_ptr, ch->addr + APB_DMA_CHAN_APB_PTR);
+ 	writel(ahb_ptr, ch->addr + APB_DMA_CHAN_AHB_PTR);
+ 
++	if (ch->mode & TEGRA_DMA_MODE_CONTINOUS)
++		ch->req_transfer_count = (req->size >> 3) - 1;
++	else
++		ch->req_transfer_count = (req->size >> 2) - 1;
++	csr = readl(ch->addr + APB_DMA_CHAN_CSR);
++	csr &= ~CSR_WCOUNT_MASK;
++	csr |= ch->req_transfer_count << CSR_WCOUNT_SHIFT;
++	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
++
+ 	req->status = TEGRA_DMA_REQ_INFLIGHT;
+ 	return;
+ }
 -- 
-P?ter
+1.7.1.1
