@@ -1,61 +1,160 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Wed, 25 Jan 2012 09:14:58 +0900
-Subject: [PATCH v7 1/2] video: support MIPI-DSI controller driver
-In-Reply-To: <20120120155121.18880dff.akpm@linux-foundation.org>
-References: <4F17AA10.7080604@samsung.com> <4F182ACF.8010302@ti.com>
- <20120120155121.18880dff.akpm@linux-foundation.org>
-Message-ID: <4F1F4982.5050000@samsung.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 24 Jan 2012 17:18:38 -0700
+Subject: [RFC 1/2] irq_domain: Create common xlate functions that device
+ drivers can use
+Message-ID: <1327450719-25590-1-git-send-email-grant.likely@secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 21 Jan 2012 08:51, Andrew Morton wrote:
+Rather than having each interrupt controller driver creating its own barely
+unique .xlate function for irq_domain, create a library of translators which
+any driver can use directly.
 
-> On Thu, 19 Jan 2012 20:08:07 +0530
-> Archit <a0393947@ti.com> wrote:
-> 
->> On Thursday 19 January 2012 10:58 AM, Donghwa Lee wrote:
->>> Samsung S5PC210 and EXYNOS SoC platform has MIPI-DSI controller and MIPI-DSI
->>> based LCD Panel could be used with it. This patch supports MIPI-DSI driver
->>> based Samsung SoC chip.
->>>
->>> LCD panel driver based MIPI-DSI should be registered to MIPI-DSI driver at
->>> machine code and LCD panel driver specific function registered to mipi_dsim_ddi
->>> structure at lcd panel init function called system init.
->>> In the MIPI-DSI driver, find lcd panel driver by using registered
->>> lcd panel name, and then initialize lcd panel driver.
->>>
->>> Changes since v6:
->>> 	- remove obscure compile problems.
->>> 	- remove useless codes.
->>> 	- modify return errno codes properly
->>
->> One more comment about 'mipi_dsim.h', it would be better to put it in
->> include/video and not 'include/linux'.
-> 
-> Yes, that is desirable.
-> 
->>> ---
->>>   drivers/video/Kconfig                 |    6 +
->>>   drivers/video/Makefile                |    2 +
->>>   drivers/video/s5p_mipi_dsi.c          |  599 ++++++++++++++++++++++
->>>   drivers/video/s5p_mipi_dsi_common.c   |  896 +++++++++++++++++++++++++++++++++
->>>   drivers/video/s5p_mipi_dsi_common.h   |   46 ++
->>>   drivers/video/s5p_mipi_dsi_lowlevel.c |  617 +++++++++++++++++++++++
->>>   drivers/video/s5p_mipi_dsi_lowlevel.h |  112 ++++
->>>   drivers/video/s5p_mipi_dsi_regs.h     |  149 ++++++
->>>   include/linux/mipi_dsim.h             |  359 +++++++++++++
->>>   9 files changed, 2786 insertions(+), 0 deletions(-)
-> 
-> or we could put it in drivers/video/.  It all depends on which other
-> drivers we expect will need access to this header.
-> 
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+---
 
-No, mipi_dsim.h file includes global interface data, callback function called by machine 
-file, platform data for mipi-dsi driver and so on. So I think it would be better to put
-in 'include/video' or 'include/linux'. 
-Of course it is much better to change name to 's5p_mipi_dsim.h'
+This builds on top of my irq_domain series and will be included with it when
+I post v3.  Rob, does this serve your needs for generic irq controller DT
+support?
 
-Thank you, 
-Donghwa Lee
+g.
 
+ include/linux/irqdomain.h |   15 ++++++++++
+ kernel/irq/irqdomain.c    |   69 +++++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 76 insertions(+), 8 deletions(-)
+
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index e7379a3..5e497a0 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -110,6 +110,9 @@ struct irq_domain {
+ 	void *host_data;
+ 	irq_hw_number_t inval_irq;
  
++	/* Data for common irq xlate functions */
++	unsigned int xlate_type;
++
+ 	/* Optional device node pointer */
+ 	struct device_node *of_node;
+ };
+@@ -163,6 +166,18 @@ extern unsigned int irq_linear_revmap(struct irq_domain *host,
+ 				      irq_hw_number_t hwirq);
+ 
+ extern struct irq_domain_ops irq_domain_simple_ops;
++
++/* stock xlate functions */
++int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type);
++int irq_domain_xlate_twocell(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type);
++int irq_domain_xlate_onetwocell(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type);
++
+ #if defined(CONFIG_OF_IRQ)
+ extern void irq_domain_generate_simple(const struct of_device_id *match,
+ 					u64 phys_base, unsigned int irq_start);
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index def8e7b..df80205 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -53,6 +53,7 @@ static struct irq_domain *irq_domain_alloc(struct device_node *of_node,
+ 	domain->ops = ops;
+ 	domain->host_data = host_data;
+ 	domain->of_node = of_node_get(of_node);
++	domain->xlate_type = IRQ_TYPE_NONE;
+ 
+ 	if (domain->ops->match == NULL)
+ 		domain->ops->match = default_irq_domain_match;
+@@ -690,25 +691,77 @@ int irq_domain_simple_map(struct irq_domain *d, unsigned int irq,
+ 	return 0;
+ }
+ 
+-int irq_domain_simple_xlate(struct irq_domain *d,
+-			    struct device_node *controller,
+-			    const u32 *intspec, unsigned int intsize,
+-			    unsigned long *out_hwirq, unsigned int *out_type)
++/**
++ * irq_domain_xlate_onecell() - Generic xlate for direct one cell bindings
++ *
++ * Device Tree IRQ specifier translation function which works with one cell
++ * bindings where the cell value maps directly to the hwirq number.
++ */
++int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
++			     const u32 *intspec, unsigned int intsize,
++			     unsigned long *out_hwirq, unsigned int *out_type)
++{
++	if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
++		 ctrlr->full_name, intsize))
++		return -EINVAL;
++	*out_hwirq = intspec[0];
++	*out_type = d->xlate_type;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(irq_domain_xlate_onecell);
++
++/**
++ * irq_domain_xlate_twocell() - Generic xlate for direct two cell bindings
++ *
++ * Device Tree IRQ specifier translation function which works with two cell
++ * bindings where the cell values map directly to the hwirq number
++ * and linux irq flags.
++ */
++int irq_domain_xlate_twocell(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type)
+ {
+-	if (d->of_node != controller)
++	if (WARN(intsize < 2, "Bad intspec for %s: intsize=%i < 2\n",
++		 ctrlr->full_name, intsize))
++		return -EINVAL;
++	if (intsize < 2)
+ 		return -EINVAL;
+-	if (intsize < 1)
++	*out_hwirq = intspec[0];
++	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(irq_domain_xlate_twocell);
++
++/**
++ * irq_domain_xlate_onetwocell() - Generic xlate for one or two cell bindings
++ *
++ * Device Tree IRQ specifier translation function which works with either one
++ * or two cell bindings where the cell values map directly to the hwirq number
++ * and linux irq flags.
++ *
++ * Note: don't use this function unless your interrupt controller explicitly
++ * supports both one and two cell bindings.  For the majority of controllers
++ * the _onecell() or _twocell() variants above should be used.
++ */
++int irq_domain_xlate_onetwocell(struct irq_domain *d,
++				struct device_node *ctrlr,
++				const u32 *intspec, unsigned int intsize,
++				unsigned long *out_hwirq, unsigned int *out_type)
++{
++	if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
++		 ctrlr->full_name, intsize))
+ 		return -EINVAL;
+ 	*out_hwirq = intspec[0];
+-	*out_type = IRQ_TYPE_NONE;
++	*out_type = d->xlate_type;
+ 	if (intsize > 1)
+ 		*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(irq_domain_xlate_onetwocell);
+ 
+ struct irq_domain_ops irq_domain_simple_ops = {
+ 	.map = irq_domain_simple_map,
+-	.xlate = irq_domain_simple_xlate,
++	.xlate = irq_domain_xlate_onetwocell,
+ };
+ EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
+ 
+-- 
+1.7.5.4
