@@ -1,122 +1,159 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:33:08 +0000
-Subject: [PATCH 09/33] MFD: mcp-sa11x0: remove DMA initializers and variables
+Date: Wed, 25 Jan 2012 14:33:28 +0000
+Subject: [PATCH 10/33] MFD: mcp-sa11x0: move setup of PPC unit out of
+ mcp-sa11x0.c
 In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
 References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rq3uO-0000YE-Br@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rq3ui-0000YI-Q2@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma_device_t variables are only ever written to by mcp-sa11x0 and
-never read.  As the old SA11x0 DMA support will be removed, remove
-these so that it no longer depends on the old SA11x0 DMA definitions.
+Patch taken from af9081ae64 (ARM: sa1100: Refactor mcp-sa11x0 to use
+platform resources.) by Jochen Friedrich <jochen@scram.de>, and
+consolidated to use a common function.
+
+Move the setup of the PPC unit out of mcp-sa11x0 into the core SA11x0
+code, and call it from each platforms initialization file.  This
+centralizes the setup of the PPC unit while not polluting the mcp-sa11x0
+driver with these details.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mfd/mcp-core.c        |    1 -
- drivers/mfd/mcp-sa11x0.c      |    5 -----
- drivers/mfd/ucb1x00-assabet.c |    3 ---
- drivers/mfd/ucb1x00-core.c    |    1 -
- drivers/mfd/ucb1x00-ts.c      |    1 -
- include/linux/mfd/mcp.h       |    6 ------
- 6 files changed, 0 insertions(+), 17 deletions(-)
+ arch/arm/mach-sa1100/assabet.c |    2 ++
+ arch/arm/mach-sa1100/cerf.c    |    1 +
+ arch/arm/mach-sa1100/collie.c  |    2 ++
+ arch/arm/mach-sa1100/generic.c |   10 ++++++++++
+ arch/arm/mach-sa1100/generic.h |    1 +
+ arch/arm/mach-sa1100/lart.c    |    1 +
+ arch/arm/mach-sa1100/shannon.c |    1 +
+ arch/arm/mach-sa1100/simpad.c  |    1 +
+ drivers/mfd/mcp-sa11x0.c       |    9 ---------
+ 9 files changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/mfd/mcp-core.c b/drivers/mfd/mcp-core.c
-index cc76431..280a4f8 100644
---- a/drivers/mfd/mcp-core.c
-+++ b/drivers/mfd/mcp-core.c
-@@ -19,7 +19,6 @@
- #include <linux/string.h>
- #include <linux/mfd/mcp.h>
+diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+index 0c4b76a..3a19145 100644
+--- a/arch/arm/mach-sa1100/assabet.c
++++ b/arch/arm/mach-sa1100/assabet.c
+@@ -231,6 +231,8 @@ static void __init assabet_init(void)
+ 	PPDR |= PPC_TXD3 | PPC_TXD1;
+ 	PPSR |= PPC_TXD3 | PPC_TXD1;
  
--#include <mach/dma.h>
- #include <asm/system.h>
++	sa11x0_ppc_configure_mcp();
++
+ 	sa1100fb_lcd_power = assabet_lcd_power;
+ 	sa1100fb_backlight_power = assabet_backlight_power;
  
+diff --git a/arch/arm/mach-sa1100/cerf.c b/arch/arm/mach-sa1100/cerf.c
+index 11bb6d0..bc11879 100644
+--- a/arch/arm/mach-sa1100/cerf.c
++++ b/arch/arm/mach-sa1100/cerf.c
+@@ -128,6 +128,7 @@ static struct mcp_plat_data cerf_mcp_data = {
  
+ static void __init cerf_init(void)
+ {
++	sa11x0_ppc_configure_mcp();
+ 	platform_add_devices(cerf_devices, ARRAY_SIZE(cerf_devices));
+ 	sa11x0_register_mtd(&cerf_flash_data, &cerf_flash_resource, 1);
+ 	sa11x0_register_mcp(&cerf_mcp_data);
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index b9060e2..efa2bc1 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -341,6 +341,8 @@ static void __init collie_init(void)
+ 
+ 	GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
+ 
++	sa11x0_ppc_configure_mcp();
++
+ 
+ 	platform_scoop_config = &collie_pcmcia_config;
+ 
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 480d2ea..1416094 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -240,6 +240,16 @@ static struct platform_device sa11x0mcp_device = {
+ 	.resource	= sa11x0mcp_resources,
+ };
+ 
++void __init sa11x0_ppc_configure_mcp(void)
++{
++	/* Setup the PPC unit for the MCP */
++	PPDR &= ~PPC_RXD4;
++	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
++	PSDR |= PPC_RXD4;
++	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
++	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
++}
++
+ void sa11x0_register_mcp(struct mcp_plat_data *data)
+ {
+ 	sa11x0_register_device(&sa11x0mcp_device, data);
+diff --git a/arch/arm/mach-sa1100/generic.h b/arch/arm/mach-sa1100/generic.h
+index 33268cf..9236ff4 100644
+--- a/arch/arm/mach-sa1100/generic.h
++++ b/arch/arm/mach-sa1100/generic.h
+@@ -39,4 +39,5 @@ struct irda_platform_data;
+ void sa11x0_register_irda(struct irda_platform_data *irda);
+ 
+ struct mcp_plat_data;
++void sa11x0_ppc_configure_mcp(void);
+ void sa11x0_register_mcp(struct mcp_plat_data *data);
+diff --git a/arch/arm/mach-sa1100/lart.c b/arch/arm/mach-sa1100/lart.c
+index af4e276..eba64b7 100644
+--- a/arch/arm/mach-sa1100/lart.c
++++ b/arch/arm/mach-sa1100/lart.c
+@@ -28,6 +28,7 @@ static struct mcp_plat_data lart_mcp_data = {
+ 
+ static void __init lart_init(void)
+ {
++	sa11x0_ppc_configure_mcp();
+ 	sa11x0_register_mcp(&lart_mcp_data);
+ }
+ 
+diff --git a/arch/arm/mach-sa1100/shannon.c b/arch/arm/mach-sa1100/shannon.c
+index 318b2b7..3efb4ac 100644
+--- a/arch/arm/mach-sa1100/shannon.c
++++ b/arch/arm/mach-sa1100/shannon.c
+@@ -59,6 +59,7 @@ static struct mcp_plat_data shannon_mcp_data = {
+ 
+ static void __init shannon_init(void)
+ {
++	sa11x0_ppc_configure_mcp();
+ 	sa11x0_register_mtd(&shannon_flash_data, &shannon_flash_resource, 1);
+ 	sa11x0_register_mcp(&shannon_mcp_data);
+ }
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index e17c04d..3aa36ec 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -376,6 +376,7 @@ static int __init simpad_init(void)
+ 
+ 	pm_power_off = simpad_power_off;
+ 
++	sa11x0_ppc_configure_mcp();
+ 	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
+ 			      ARRAY_SIZE(simpad_flash_resources));
+ 	sa11x0_register_mcp(&simpad_mcp_data);
 diff --git a/drivers/mfd/mcp-sa11x0.c b/drivers/mfd/mcp-sa11x0.c
-index 33cadc0..d2ebc64 100644
+index d2ebc64..5373a7a 100644
 --- a/drivers/mfd/mcp-sa11x0.c
 +++ b/drivers/mfd/mcp-sa11x0.c
-@@ -20,7 +20,6 @@
- #include <linux/platform_device.h>
- #include <linux/mfd/mcp.h>
+@@ -166,15 +166,6 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
+ 	}
  
--#include <mach/dma.h>
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
- #include <asm/system.h>
-@@ -158,10 +157,6 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
- 	mcp->owner		= THIS_MODULE;
- 	mcp->ops		= &mcp_sa11x0;
- 	mcp->sclk_rate		= data->sclk_rate;
--	mcp->dma_audio_rd	= DMA_Ser4MCP0Rd;
--	mcp->dma_audio_wr	= DMA_Ser4MCP0Wr;
--	mcp->dma_telco_rd	= DMA_Ser4MCP1Rd;
--	mcp->dma_telco_wr	= DMA_Ser4MCP1Wr;
- 	mcp->gpio_base		= data->gpio_base;
- 
- 	platform_set_drvdata(pdev, mcp);
-diff --git a/drivers/mfd/ucb1x00-assabet.c b/drivers/mfd/ucb1x00-assabet.c
-index cea9da6..b7be613 100644
---- a/drivers/mfd/ucb1x00-assabet.c
-+++ b/drivers/mfd/ucb1x00-assabet.c
-@@ -16,9 +16,6 @@
- #include <linux/device.h>
- #include <linux/mfd/ucb1x00.h>
- 
--#include <mach/dma.h>
+ 	/*
+-	 * Setup the PPC unit correctly.
+-	 */
+-	PPDR &= ~PPC_RXD4;
+-	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
+-	PSDR |= PPC_RXD4;
+-	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
+-	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
 -
--
- #define UCB1X00_ATTR(name,input)\
- static ssize_t name##_show(struct device *dev, struct device_attribute *attr, \
- 			   char *buf)	\
-diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
-index febc90c..f2fb420 100644
---- a/drivers/mfd/ucb1x00-core.c
-+++ b/drivers/mfd/ucb1x00-core.c
-@@ -29,7 +29,6 @@
- #include <linux/gpio.h>
- #include <linux/semaphore.h>
- 
--#include <mach/dma.h>
- #include <mach/hardware.h>
- 
- static DEFINE_MUTEX(ucb1x00_mutex);
-diff --git a/drivers/mfd/ucb1x00-ts.c b/drivers/mfd/ucb1x00-ts.c
-index 63a3cbd..ec6ffb6 100644
---- a/drivers/mfd/ucb1x00-ts.c
-+++ b/drivers/mfd/ucb1x00-ts.c
-@@ -32,7 +32,6 @@
- #include <linux/kthread.h>
- #include <linux/mfd/ucb1x00.h>
- 
--#include <mach/dma.h>
- #include <mach/collie.h>
- #include <asm/mach-types.h>
- 
-diff --git a/include/linux/mfd/mcp.h b/include/linux/mfd/mcp.h
-index 79a6b13..dfe7e51 100644
---- a/include/linux/mfd/mcp.h
-+++ b/include/linux/mfd/mcp.h
-@@ -10,8 +10,6 @@
- #ifndef MCP_H
- #define MCP_H
- 
--#include <mach/dma.h>
--
- struct mcp_ops;
- 
- struct mcp {
-@@ -21,10 +19,6 @@ struct mcp {
- 	int		use_count;
- 	unsigned int	sclk_rate;
- 	unsigned int	rw_timeout;
--	dma_device_t	dma_audio_rd;
--	dma_device_t	dma_audio_wr;
--	dma_device_t	dma_telco_rd;
--	dma_device_t	dma_telco_wr;
- 	struct device	attached_device;
- 	int		gpio_base;
- };
+-	/*
+ 	 * Initialise device.  Note that we initially
+ 	 * set the sampling rate to minimum.
+ 	 */
 -- 
 1.7.4.4
