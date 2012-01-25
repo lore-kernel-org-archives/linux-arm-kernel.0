@@ -1,39 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 25 Jan 2012 11:26:02 +0000
-Subject: [PATCH v2 2/2] regulator: add device tree support for max8997
-In-Reply-To: <4F1FD1A5.1060305@samsung.com>
-References: <1326353738-26864-1-git-send-email-thomas.abraham@linaro.org>
- <1326353738-26864-3-git-send-email-thomas.abraham@linaro.org>
- <4F1FD1A5.1060305@samsung.com>
-Message-ID: <20120125112602.GB2991@opensource.wolfsonmicro.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Jan 2012 11:32:48 +0000
+Subject: [PATCH 3/5] ARM: pgtable: consolidate set_pte_ext(TOP_PTE, ...) +
+ tlb flush
+In-Reply-To: <E1RoBot-0005oa-3W@rmk-PC.arm.linux.org.uk>
+References: <20120120103433.GF1068@n2100.arm.linux.org.uk>
+ <E1RoBot-0005oa-3W@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAHkRjk52Zo4psxCjpvzXO7b9HZFS1o-SGsv1WJ11On58By1SBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 10:55:49AM +0100, Karol Lewandowski wrote:
-> On 12.01.2012 08:35, Thomas Abraham wrote:
-> >Add device tree based discovery support for max8997.
-> 
-> >+	pdata->regulators = rdata;
-> >+	for_each_child_of_node(regulators_np, reg_np) {
-> >+		for (i = 0; i<  ARRAY_SIZE(regulators); i++)
-> >+			if (!of_node_cmp(reg_np->name, regulators[i].name))
-> >+				break;
-> >+		rdata->id = i;
-> >+		rdata->initdata = of_get_regulator_init_data(
-> >+						iodev->dev, reg_np);
+On 20 January 2012 10:35, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> A number of places establish a PTE in our top page table and
+> immediately flush the TLB. ?Rather than having this at every callsite,
+> provide an inline function for this purpose.
+...
+> +static inline void set_top_pte(unsigned long va, pte_t pte)
+> +{
+> + ? ? ? set_pte_ext(TOP_PTE(va), pte, 0);
+> + ? ? ? local_flush_tlb_kernel_page(va);
+> +}
 
-> One more thing - of_get_regulator_init_data() will set apply_uV to 1
-> so we need to reset it for BUCK6, which doesn't provide
-> set_voltage() ops, like:
+There is a difference with some of the call sites where the
+flush_tlb_kernel_page() was used instead of the local variant. The pte
+set up via set_top_pte() is indeed accessed on a single CPU and there
+are locks around that would prevent migration (with CONFIG_PREEMPT).
+So I don't see any problem with this.
 
-> 	if (rdata->initdata && regulators[i].id == MAX8997_BUCK6)
-> 		rdata->initdata->constraints.apply_uV = 0;
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-So, over in the other thready you were referring to mailing list posts
-you made in the past few moments as examples of past issues.  Please at
-least mention that there hasn't been any actual discussion when doing
-this...
-
-I don't see a problem here, if the device can't set the voltage then
-setting constraints to allow the voltage to be changed is silly and the
-user just shouldn't do that.
+-- 
+Catalin
