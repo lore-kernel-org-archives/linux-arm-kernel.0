@@ -1,163 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:40:15 +0000
-Subject: [PATCH 30/33] MFD: ucb1x00-core: add wakeup support
+Date: Wed, 25 Jan 2012 14:40:35 +0000
+Subject: [PATCH 31/33] ARM: sa11x0: add assabet ucb1x00 platform data
 In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
 References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rq41H-0000Zl-4V@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rq41b-0000Zs-7h@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add genirq wakeup support for the ucb1x00 device.  This allows an
-attached gpio_keys driver to wakeup the system.  Touchscreen is also
-possible.
-
-When there are no wakeup sources, ask the platform to assert the reset
-signal to avoid any unexpected behaviour; this also puts the reset
-signal at the right level when power is removed from the device.
+Add ucb1x00 platform data to enable GPIO support on the UCB1300 device.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mfd/ucb1x00-core.c  |   59 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/ucb1x00.h |    4 +++
- 2 files changed, 63 insertions(+), 0 deletions(-)
+ arch/arm/mach-sa1100/assabet.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
-index 400604d..70f02da 100644
---- a/drivers/mfd/ucb1x00-core.c
-+++ b/drivers/mfd/ucb1x00-core.c
-@@ -362,12 +362,32 @@ static int ucb1x00_irq_set_type(struct irq_data *data, unsigned int type)
- 	return 0;
- }
- 
-+static int ucb1x00_irq_set_wake(struct irq_data *data, unsigned int on)
-+{
-+	struct ucb1x00 *ucb = irq_data_get_irq_chip_data(data);
-+	struct ucb1x00_plat_data *pdata = ucb->mcp->attached_device.platform_data;
-+	unsigned mask = 1 << (data->irq - ucb->irq_base);
-+
-+	if (!pdata || !pdata->can_wakeup)
-+		return -EINVAL;
-+
-+	raw_spin_lock(&ucb->irq_lock);
-+	if (on)
-+		ucb->irq_wake |= mask;
-+	else
-+		ucb->irq_wake &= ~mask;
-+	raw_spin_unlock(&ucb->irq_lock);
-+
-+	return 0;
-+}
-+
- static struct irq_chip ucb1x00_irqchip = {
- 	.name = "ucb1x00",
- 	.irq_ack = ucb1x00_irq_noop,
- 	.irq_mask = ucb1x00_irq_mask,
- 	.irq_unmask = ucb1x00_irq_unmask,
- 	.irq_set_type = ucb1x00_irq_set_type,
-+	.irq_set_wake = ucb1x00_irq_set_wake,
+diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+index 3a19145..c45402f 100644
+--- a/arch/arm/mach-sa1100/assabet.c
++++ b/arch/arm/mach-sa1100/assabet.c
+@@ -15,6 +15,7 @@
+ #include <linux/errno.h>
+ #include <linux/ioport.h>
+ #include <linux/serial_core.h>
++#include <linux/mfd/ucb1x00.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/delay.h>
+@@ -199,9 +200,14 @@ static struct irda_platform_data assabet_irda_data = {
+ 	.set_speed	= assabet_irda_set_speed,
  };
  
- static int ucb1x00_add_dev(struct ucb1x00 *ucb, struct ucb1x00_driver *drv)
-@@ -565,6 +585,9 @@ static int ucb1x00_probe(struct mcp *mcp)
- 
- 	mcp_set_drvdata(mcp, ucb);
- 
-+	if (pdata)
-+		device_set_wakeup_capable(&ucb->dev, pdata->can_wakeup);
++static struct ucb1x00_plat_data assabet_ucb1x00_data = {
++	.gpio_base	= -1,
++};
 +
- 	INIT_LIST_HEAD(&ucb->devs);
- 	mutex_lock(&ucb1x00_mutex);
- 	list_add_tail(&ucb->node, &ucb1x00_devices);
-@@ -648,6 +671,7 @@ void ucb1x00_unregister_driver(struct ucb1x00_driver *drv)
- 
- static int ucb1x00_suspend(struct device *dev)
- {
-+	struct ucb1x00_plat_data *pdata = dev->platform_data;
- 	struct ucb1x00 *ucb = dev_get_drvdata(dev);
- 	struct ucb1x00_dev *udev;
- 
-@@ -657,18 +681,53 @@ static int ucb1x00_suspend(struct device *dev)
- 			udev->drv->suspend(udev);
- 	}
- 	mutex_unlock(&ucb1x00_mutex);
-+
-+	if (ucb->irq_wake) {
-+		unsigned long flags;
-+
-+		raw_spin_lock_irqsave(&ucb->irq_lock, flags);
-+		ucb1x00_enable(ucb);
-+		ucb1x00_reg_write(ucb, UCB_IE_RIS, ucb->irq_ris_enbl &
-+				  ucb->irq_wake);
-+		ucb1x00_reg_write(ucb, UCB_IE_FAL, ucb->irq_fal_enbl &
-+				  ucb->irq_wake);
-+		ucb1x00_disable(ucb);
-+		raw_spin_unlock_irqrestore(&ucb->irq_lock, flags);
-+
-+		enable_irq_wake(ucb->irq);
-+	} else if (pdata && pdata->reset)
-+		pdata->reset(UCB_RST_SUSPEND);
-+
- 	return 0;
- }
- 
- static int ucb1x00_resume(struct device *dev)
- {
-+	struct ucb1x00_plat_data *pdata = dev->platform_data;
- 	struct ucb1x00 *ucb = dev_get_drvdata(dev);
- 	struct ucb1x00_dev *udev;
- 
-+	if (!ucb->irq_wake && pdata && pdata->reset)
-+		pdata->reset(UCB_RST_RESUME);
-+
- 	ucb1x00_enable(ucb);
- 	ucb1x00_reg_write(ucb, UCB_IO_DATA, ucb->io_out);
- 	ucb1x00_reg_write(ucb, UCB_IO_DIR, ucb->io_dir);
-+
-+	if (ucb->irq_wake) {
-+		unsigned long flags;
-+
-+		raw_spin_lock_irqsave(&ucb->irq_lock, flags);
-+		ucb1x00_reg_write(ucb, UCB_IE_RIS, ucb->irq_ris_enbl &
-+				  ucb->irq_mask);
-+		ucb1x00_reg_write(ucb, UCB_IE_FAL, ucb->irq_fal_enbl &
-+				  ucb->irq_mask);
-+		raw_spin_unlock_irqrestore(&ucb->irq_lock, flags);
-+
-+		disable_irq_wake(ucb->irq);
-+	}
- 	ucb1x00_disable(ucb);
-+
- 	mutex_lock(&ucb1x00_mutex);
- 	list_for_each_entry(udev, &ucb->devs, dev_node) {
- 		if (udev->drv->resume)
-diff --git a/include/linux/mfd/ucb1x00.h b/include/linux/mfd/ucb1x00.h
-index 6fb9074..28af417 100644
---- a/include/linux/mfd/ucb1x00.h
-+++ b/include/linux/mfd/ucb1x00.h
-@@ -106,6 +106,8 @@
- 
- enum ucb1x00_reset {
- 	UCB_RST_PROBE,
-+	UCB_RST_RESUME,
-+	UCB_RST_SUSPEND,
- 	UCB_RST_REMOVE,
- 	UCB_RST_PROBE_FAIL,
- };
-@@ -114,6 +116,7 @@ struct ucb1x00_plat_data {
- 	void			(*reset)(enum ucb1x00_reset);
- 	unsigned		irq_base;
- 	int			gpio_base;
-+	unsigned		can_wakeup;
+ static struct mcp_plat_data assabet_mcp_data = {
+ 	.mccr0		= MCCR0_ADM,
+ 	.sclk_rate	= 11981000,
++	.codec_pdata	= &assabet_ucb1x00_data,
  };
  
- struct ucb1x00 {
-@@ -130,6 +133,7 @@ struct ucb1x00 {
- 	u16			irq_fal_enbl;
- 	u16			irq_ris_enbl;
- 	u16			irq_mask;
-+	u16			irq_wake;
- 	struct device		dev;
- 	struct list_head	node;
- 	struct list_head	devs;
+ static void __init assabet_init(void)
 -- 
 1.7.4.4
