@@ -1,43 +1,33 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 25 Jan 2012 18:24:28 +0200
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <4F200F64.9060203@monstr.eu>
-References: <4F1EE861.4030405@monstr.eu>
- <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
- <4F1FF870.3000105@monstr.eu>
- <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
- <4F200F64.9060203@monstr.eu>
-Message-ID: <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 25 Jan 2012 10:42:20 -0500 (EST)
+Subject: Common clock API for i.MX
+In-Reply-To: <20120125145333.GO3687@opensource.wolfsonmicro.com>
+References: <CAKGA1bkHgnJQs3_n6QtQjf-8xaPn0YnxMmE2Q=+opWcsp10zQA@mail.gmail.com>
+ <20120125084533.GD1068@n2100.arm.linux.org.uk>
+ <CAKGA1bm_rLyMB-Xr-XZQHQRVDySu9JuCoVZL=FFv9sa1y6eD1A@mail.gmail.com>
+ <20120125145333.GO3687@opensource.wolfsonmicro.com>
+Message-ID: <alpine.LFD.2.02.1201251040040.2759@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 4:19 PM, Michal Simek <monstr@monstr.eu> wrote:
-> I started with pur vanilla kernel and patches from your tree
-> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-> for-next branch
-> but then I had to moved to for-next-acked-merged because in the origin
-> one were some problems.
+On Wed, 25 Jan 2012, Mark Brown wrote:
 
-Unlike for-next-acked-merged, the other branches aren't rebased and
-therefore have merge conflicts with 3.3 material; that's intentional.
+> On Wed, Jan 25, 2012 at 07:45:15AM -0600, Matt Sealey wrote:
+> > On Wed, Jan 25, 2012 at 2:45 AM, Russell King - ARM Linux
+> 
+> > > My conclusion, therefore, is that there's very little actual interest
+> > > amongst the ARM community to move towards a common clk API.
+> 
+> > Maybe it's a chicken-egg thing; nobody wants to work on it until someone else
+> > has done some legwork? :)
+> 
+> I do think that this is a big part of the issue, the patches have been
+> floating around for ages and it's not clear when they'll manage to make
+> it in (and hence when it'll be worth moving to use them).
 
-> Do you have any kernel tree with CMA just for sure?
+Maybe because nobody is actively promoting them and pushing them 
+forward?  It is not sufficient to just post patches to a mailing list 
+and wait.
 
-Not a 3.3-based one, so I recommend you to just merge Marek's branch directly.
 
-I'll soon create a full-fledged 3.3 branch though, so you may want to
-wait a bit until I get to it.
-
-> What do you use for firmware replacing?
-> Just remove kernel module and load different one?
-
-If your driver boots the remote core on its ->probe() handler, then
-yes, you need to unbind and bind the device.
-
-One way is to unload and load the driver, but you can also use the
-bind/unbind sysfs files of your driver (echo -n device-name >
-/sys/..../{un}bind).
-
-Regards,
-Ohad.
+Nicolas
