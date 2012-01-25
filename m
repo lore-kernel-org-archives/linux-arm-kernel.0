@@ -1,34 +1,29 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Jan 2012 23:30:42 +0100
-Subject: i.mx serial driver expanion (DTR/DSR, DCD, rs485)
-In-Reply-To: <3F263ABB4EDE344D974E1983B568077399FDA016@EX-DAG01.eckelmann.group>
-References: <3F263ABB4EDE344D974E1983B568077399FDA016@EX-DAG01.eckelmann.group>
-Message-ID: <20120125223042.GE5446@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 25 Jan 2012 17:32:18 -0500 (EST)
+Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
+In-Reply-To: <20120125213206.GJ1068@n2100.arm.linux.org.uk>
+References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
+ <1327091591-27125-12-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1201201608400.19587@xanadu.home> <4F19DB35.9060707@gmail.com>
+ <20120125213206.GJ1068@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1201251727510.2759@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 10:14:33AM +0000, Mehnert, Torsten wrote:
-> Hi Sascha,
-> 
-> we are currently developing at the imx serial driver. We are planing to
-> implement two new functions and want to share them with others.
-> 
-> Now the question: Which of our code could be interesting for mainline?
-> 
-> 1.) Set and readout DSR/DTR in DTE style, handle DCD
-> 
-> 2.) handle direction handling in RS485 Master mode (like the amtel does,
-> Using TIOCSRS485 and TIOCGRS485).
+On Wed, 25 Jan 2012, Russell King - ARM Linux wrote:
 
-Both seem interesting. Feel free to post it to the relevant lists. Even
-if the the patches do not make it to mainline it's still good for other
-people when they can find it in the archives.
+> As a side-note, you may be pleased to know that I have SA11x0 stuff
+> converted to (and tested) with sparse IRQ.  That's with SA1111, the
+> UCB1x00 and Neponset expansion board for the Assabet all dynamically
+> allocating their IRQs.  The only fixed-numbered IRQs in SA11x0 in my
+> tree at the time of writing are the on-SoC IRQs, and the LoCoMo IRQs
+> (which I don't have the hardware to test for, so I'm not touching.)
 
-Sascha
+That's really cool.
+
+Not that there are many people who might still benefit from running that 
+code, but like I said this should serve as a real and relatively simple 
+example that might benefit more complex platforms.
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas
