@@ -1,56 +1,88 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 25 Jan 2012 08:39:32 +0100
-Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
-In-Reply-To: <20120124142521.GE6269@8bytes.org>
-References: <20120124.154121.1062920821192552748.hdoyu@nvidia.com><20120124134601.GT27414@legolas.emea.dhcp.ti.com><20120124142521.GE6269@8bytes.org>
-Message-ID: <20120125.093932.783007031082378997.hdoyu@nvidia.com>
+Date: Wed, 25 Jan 2012 08:40:20 +0100
+Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
+In-Reply-To: <20120123150048.GB6269@8bytes.org>
+References: <1325747509-29665-1-git-send-email-hdoyu@nvidia.com><1325747509-29665-2-git-send-email-hdoyu@nvidia.com><20120123150048.GB6269@8bytes.org>
+Message-ID: <20120125.094020.983282777619146490.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "joro@8bytes.org" <joro@8bytes.org>
-Subject: Re: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
-Date: Tue, 24 Jan 2012 15:25:21 +0100
-Message-ID: <20120124142521.GE6269@8bytes.org>
+Hi Joerg,
 
-> On Tue, Jan 24, 2012 at 03:46:01PM +0200, Felipe Balbi wrote:
-> > On Tue, Jan 24, 2012 at 02:41:21PM +0100, Hiroshi Doyu wrote:
-> > > Actually I really like the concept of this "domain" now, which hides
-> > > the H/W hierarchy from users.
-> > > 
-> > > But in Tegra SMMU/GART case, there's a single one IOMMU device in the
-> > > system. Keeping a iommu device list in a domain and iterating iommu
-> > > device list in each iommu_ops seem to be so nice, but I'm afraid that
-> > > this may be a bit too much when one already knows that there's only
-> > > one IOMMU device in the system.
-> > >
-> > > If there's no actual problem for 1-1 mapping between IOMMU H/Ws and
-> > > domains, I think that it may not so bad to keep the original code(1-1)
-> > > for GART and SMMU. What do you think?
-> > 
-> > I think it boils down to "extensability". If you can truly/fully
-> > guarantee that there will *always* be a single IOMMU on all upcoming
-> > Tegras, then it's really overkill.
-> > 
-> > But if there's even a remote possibility of the HW being changed and you
-> > end up with more IOMMUs, things start to feel necessary for the sake of
-> > making it easy to extend.
+From: Joerg Roedel <joro@8bytes.org>
+Subject: Re: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
+Date: Mon, 23 Jan 2012 16:00:48 +0100
+Message-ID: <20120123150048.GB6269@8bytes.org>
+
+> Hi,
 > 
-> Right. But I am fine with the logic as-is when there is only one SMMU in
-> the system. But please also change the IOMMU driver so that it really
-> only initializes a single SMMU. When boards pop up with more than one
-> you we notice that assumption in the code again and are reminded to
-> change it.
+> first, some questions about the GART on your platform.
+> 
+> 1) How many GARTs are usually implemented? One GART per device or is
+>    there a single GART covering all devices, or a mix of both?
+
+There's a single GART in the system which takes care of all devices.
+
+> 2) Are devices allowed to DMA outside of the remappable range or will
+>    this fail?
+
+Fail.
+
+> 
+> Besides that I think IOMMU-API is not yet fully ready for GART-like
+> drivers like this one. But I will merge it anyway to get things moving.
+> But please answer or fix my objections first.
+> 
+> On Thu, Jan 05, 2012 at 09:11:48AM +0200, Hiroshi DOYU wrote:
+> > +static void gart_iommu_domain_destroy(struct iommu_domain *domain)
+> > +{
+> > +	struct gart_device *gart = domain->priv;
+> > +
+> > +	spin_lock(&gart->client_lock);
+> > +	if (!list_empty(&gart->client)) {
+> > +		struct gart_client *c;
+> > +
+> > +		list_for_each_entry(c, &gart->client, list)
+> > +			dev_err(gart->dev,
+> > +				"%s is still attached\n", dev_name(c->dev));
+> > +	}
+> > +	spin_unlock(&gart->client_lock);
+> 
+> gart needs a NULL check. When you create a domain and immediatly destroy
+> it without ever attaching a device this code will dereference a NULL
+> pointer.
 
 Fixed.
 
-I'll revisit 4MB pagesize support and the above multiple iommu device
-support in a domain later.
+> As a general improvement I suggest that you introduce a gart_domain
+> structure and store it in domain->priv (assigned in domain_init) instead
+> of using the hardware descriptor.
+> 
+> > +static int gart_iommu_attach_dev(struct iommu_domain *domain,
+> > +				 struct device *dev)
+> > +{
+> > +	struct gart_device *gart;
+> > +	struct gart_client *client, *c;
+> > +	int err = 0;
+> > +
+> > +	gart = dev_get_drvdata(dev->parent);
+> > +	if (!gart)
+> > +		return -EINVAL;
+> > +	domain->priv = gart;
+> 
+> What happens when devices behind different GARTs are assigned to the
+> same domain? domain->priv can only hold a pointer to one hardware GART.
+> This can be solved by a 'struct gart_domain' holding a linked list to
+> all gart_devices in this domain.
+
+As discussed in SMMU thread, I'll revisit the above multiple iommu
+device support later.
 
 Attached the update patch.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0002-ARM-IOMMU-Tegra30-Add-iommu_ops-for-SMMU-driver.patch
+Name: 0001-ARM-IOMMU-Tegra20-Add-iommu_ops-for-GART-driver.patch
 Type: text/x-patch
-Size: 33838 bytes
-Desc: 0002-ARM-IOMMU-Tegra30-Add-iommu_ops-for-SMMU-driver.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120125/1aba4315/attachment-0001.bin>
+Size: 14203 bytes
+Desc: 0001-ARM-IOMMU-Tegra20-Add-iommu_ops-for-GART-driver.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120125/763fd94b/attachment.bin>
