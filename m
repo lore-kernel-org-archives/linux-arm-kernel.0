@@ -1,36 +1,45 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Wed, 25 Jan 2012 16:20:31 +0530
-Subject: [alsa-devel] [PATCH v4 - resend 00/13] OMAP4: ASoC: Support for
- PandaBoard family
-In-Reply-To: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <CAJe_Zhfn3urdXfRgAKvdW2_ECYGbNO0b2BuZnCZxrGcL4_sVSg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Jan 2012 10:56:00 +0000
+Subject: Making allyesconfig work
+In-Reply-To: <alpine.LFD.2.02.1201201742070.19587@xanadu.home>
+References: <20120120115108.GJ1068@n2100.arm.linux.org.uk>
+ <20120120120856.GC30612@arm.com>
+ <20120120122402.GN1068@n2100.arm.linux.org.uk>
+ <20120120145346.GE30612@arm.com>
+ <alpine.LFD.2.02.1201201742070.19587@xanadu.home>
+Message-ID: <CAHkRjk4yFKc6FgsYQLCNQuVO0h4nNGw+-z67Wjh6mCNqam1WBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 January 2012 17:22, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> Hello,
+On 20 January 2012 22:43, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Fri, 20 Jan 2012, Catalin Marinas wrote:
+>> On Fri, Jan 20, 2012 at 12:24:02PM +0000, Russell King - ARM Linux wrote:
+>> > On Fri, Jan 20, 2012 at 12:08:56PM +0000, Catalin Marinas wrote:
+>> > > On Fri, Jan 20, 2012 at 11:51:08AM +0000, Russell King - ARM Linux wrote:
+>> > > > There's also the troublesome T() macro, which conflicts with a bunch
+>> > > > of other drivers. ?(I've added Catalin to the To: line for this
+>> > > > reason.)
+>> > >
+>> > > This macro is used in asm/uaccess.h and asm/futex.h, so I think it would
+>> > > be difficult to hide it completely. But I'm happy to rename it to
+>> > > something else (IIRC, T stands for "Translated").
+>> >
+>> > We should do something, because T() is just too risky for causing these
+>> > kinds of conflicts.
+>>
+>> Here's a patch. For lack of inspiration, I called it TUSER (and grep'ed
+>> the kernel, there isn't other reference to such name).
 >
-> the following series will add ASoC support for PandaBoards.
-> PandaBoards have different audio routings compared to SDP4430/Blaze boards, but
-> the differences not that big to justify a new ASoC machine driver.
->
-> The v3 series did not made it to 3.3 kernel.
-> This set contains all the patches needed to enable the audio support on the
-> PandaBoard family.
-> The machine driver has been converted to a generic OMAP4 driver which can
-> support wide range of machines using OMAP4 with twl6040 codec.
->
-> I have remove the hardcoded MCLK clock frequency use in the machine driver
-> (there can be devices with different MCLK configuration). This changed
-> patch 04, 05, and 12. Since this does not affect the functionality I kept the
-> acks for these patches. Patch 11 did not existed in the v3 series.
->
-Hi Peter,
-   I tried the patchset on my 4430 Panda. Playback works ok, but not Capture.
-All is get is a hiss.
-  Is capture supposed to work ? If yes, any amixer settings that need
-to be done?
+> To be on the safe side, you could even call it ARM_TUSER.
 
-Thanks,
--Jassi
+I thought about making it longer but some asm code becomes uglier with
+so many characters.
+
+> In any case:
+>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+
+Thanks.
+
+-- 
+Catalin
