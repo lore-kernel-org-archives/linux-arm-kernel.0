@@ -1,30 +1,58 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 25 Jan 2012 23:58:17 +0100
-Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
-In-Reply-To: <alpine.LFD.2.02.1201251727510.2759@xanadu.home>
-References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
- <20120125213206.GJ1068@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1201251727510.2759@xanadu.home>
-Message-ID: <201201252358.17825.marek.vasut@gmail.com>
+From: johnstul@us.ibm.com (john stultz)
+Date: Wed, 25 Jan 2012 15:53:30 -0800
+Subject: [RFC PATCH 1/5] arm:omap1/2/3/4:Convert 32k-Sync clocksource
+ driver to platform_driver
+In-Reply-To: <1326886086-27313-2-git-send-email-hvaibhav@ti.com>
+References: <1326886086-27313-1-git-send-email-hvaibhav@ti.com>
+ <1326886086-27313-2-git-send-email-hvaibhav@ti.com>
+Message-ID: <1327535610.2141.15.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, 25 Jan 2012, Russell King - ARM Linux wrote:
-> > As a side-note, you may be pleased to know that I have SA11x0 stuff
-> > converted to (and tested) with sparse IRQ.  That's with SA1111, the
-> > UCB1x00 and Neponset expansion board for the Assabet all dynamically
-> > allocating their IRQs.  The only fixed-numbered IRQs in SA11x0 in my
-> > tree at the time of writing are the on-SoC IRQs, and the LoCoMo IRQs
-> > (which I don't have the hardware to test for, so I'm not touching.)
-> 
-> That's really cool.
-> 
-> Not that there are many people who might still benefit from running that
-> code, but like I said this should serve as a real and relatively simple
-> example that might benefit more complex platforms.
-> 
-> 
-> Nicolas
+On Wed, 2012-01-18 at 16:58 +0530, Vaibhav Hiremath wrote:
+> +/**
+> + * read_persistent_clock -  Return time from a persistent clock.
+> + *
+> + * Reads the time from a source which isn't disabled during PM, the
+> + * 32k sync timer.  Convert the cycles elapsed since last read into
+> + * nsecs and adds to a monotonically increasing timespec.
+> + */
+> +void read_persistent_clock(struct timespec *ts)
+> +{
+> +	cycles_t delta;
+> +	struct timespec *tsp;
+> +	unsigned long long nsecs;
+> +	struct omap_counter_32k_device  *omap = cs;
+> +
+> +	if (!omap) {
+> +		ts->tv_sec = 0;
+> +		ts->tv_nsec = 0;
+> +		return;
+> +	}
+> +	tsp = &omap->persistent_ts;
+> +
+> +	omap->last_cycles = omap->cycles;
+> +	omap->cycles = omap->cs.read(&omap->cs);
+> +	delta = omap->cycles - omap->last_cycles;
+> +
+> +	nsecs = clocksource_cyc2ns(delta,
+> +			omap->cs.mult, omap->cs.shift);
+> +
+> +	timespec_add_ns(tsp, nsecs);
+> +	*ts = *tsp;
+> +}
 
-Indeed, that's good going. I'm CCing a guy who might have a SA11xx board with 
-LoCoMo chip (that's old zaurus sl55xx, right?).
+Hrm. So read_persistent_clock should probably be defined once per arch.
+So I'm not sure if it makes sense to include this implementation into
+the generic drivers/clocksource directory, as if some other arch tried
+to include this clocksource (say if they had the same hardware) they
+might have collisions w/ their read_persistent_clock implementation.
+
+
+I'm all for being able to re-use clocksource drivers. But this is the
+sort of thing that makes me worry we're maybe being too aggressive in
+pushing clocksources that really are fairly arch/platform specific into
+drivers/clocksource/
+
+thanks
+-john
