@@ -1,119 +1,160 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 25 Jan 2012 13:41:20 +0100
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
-References: <4F1EE861.4030405@monstr.eu>
- <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
-Message-ID: <4F1FF870.3000105@monstr.eu>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 25 Jan 2012 14:47:27 +0200
+Subject: [PATCH 8/8] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <1323448798-18184-9-git-send-email-m.szyprowski@samsung.com>
+References: <1323448798-18184-1-git-send-email-m.szyprowski@samsung.com>
+ <1323448798-18184-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120125144727.2722b4a1fb8017dd3633d7ad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi Marek,
 
-I have also copied Arnd and Grant.
+On Fri, 9 Dec 2011 17:39:58 +0100
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
->> Hi,
->>
->> I have a question how to setup resource table to support firmware loading
->> to specific memory location.
->> I have allocated the part of ram which is at physical address 0x0
->> which coprocessor needs for rtos code.
-> 
-> Can you specify about your allocation a bit more ? size ? method of
-> allocation (CMA/external ram+ioremap/other) ?
- >
->> Currently I am using carveout with setup size but from rproc_handle_carveout
->> is __dma_alloc_buffer which is remapped by __dma_alloc_remap function to any
-> 
-> oh, so you're < ARMv6 (no CMA). you'd need to set aside some coherent
-> memory for your device then.
+> This patch add a complete implementation of DMA-mapping API for
+> devices that have IOMMU support. All DMA-mapping calls are supported.
+>
+> This patch contains some of the code kindly provided by Krishna Reddy
+> <vdumpa@nvidia.com> and Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>
+> Add initial proof of concept implementation of DMA-mapping API for
+> devices that have IOMMU support. Right now only dma_alloc_coherent,
+> dma_free_coherent and dma_mmap_coherent functions are supported.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/Kconfig                 |    8 +
+>  arch/arm/include/asm/device.h    |    3 +
+>  arch/arm/include/asm/dma-iommu.h |   36 +++
+>  arch/arm/mm/dma-mapping.c        |  637 +++++++++++++++++++++++++++++++++++++-
+>  arch/arm/mm/vmregion.h           |    2 +-
+>  5 files changed, 671 insertions(+), 15 deletions(-)
+>  create mode 100644 arch/arm/include/asm/dma-iommu.h
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 8827c9b..87416fc 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -42,6 +42,14 @@ config ARM
+>  config ARM_HAS_SG_CHAIN
+>         bool
+>
+> +config NEED_SG_DMA_LENGTH
+> +       bool
+> +
+> +config ARM_DMA_USE_IOMMU
+> +       select NEED_SG_DMA_LENGTH
+> +       select ARM_HAS_SG_CHAIN
+> +       bool
+> +
+>  config HAVE_PWM
+>         bool
+>
+> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+> index 6e2cb0e..b69c0d3 100644
+> --- a/arch/arm/include/asm/device.h
+> +++ b/arch/arm/include/asm/device.h
+> @@ -14,6 +14,9 @@ struct dev_archdata {
+>  #ifdef CONFIG_IOMMU_API
+>         void *iommu; /* private IOMMU data */
+>  #endif
+> +#ifdef CONFIG_ARM_DMA_USE_IOMMU
+> +       struct dma_iommu_mapping        *mapping;
+> +#endif
+>  };
+>
+>  struct omap_device;
+> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+> new file mode 100644
+> index 0000000..6668b41
+> --- /dev/null
+> +++ b/arch/arm/include/asm/dma-iommu.h
+> @@ -0,0 +1,36 @@
+> +#ifndef ASMARM_DMA_IOMMU_H
+> +#define ASMARM_DMA_IOMMU_H
+> +
+> +#ifdef __KERNEL__
+> +
+> +#include <linux/mm_types.h>
+> +#include <linux/scatterlist.h>
+> +#include <linux/dma-debug.h>
+> +#include <linux/kmemcheck.h>
+> +
+> +#include <asm/memory.h>
+> +
+> +struct dma_iommu_mapping {
+> +       /* iommu specific data */
+> +       struct iommu_domain     *domain;
+> +
+> +       void                    *bitmap;
+> +       size_t                  bits;
+> +       unsigned int            order;
+> +       dma_addr_t              base;
+> +
+> +       spinlock_t              lock;
+> +       struct kref             kref;
+> +};
+> +
+> +struct dma_iommu_mapping *
+> +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+> +                        int order);
+> +
+> +void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
+> +
+> +int arm_iommu_attach_device(struct device *dev,
+> +                                       struct dma_iommu_mapping *mapping);
+> +
+> +#endif /* __KERNEL__ */
+> +#endif
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 4845c09..7ac5a95 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -27,6 +27,9 @@
+>  #include <asm/sizes.h>
+>  #include <asm/mach/arch.h>
+>
+> +#include <linux/iommu.h>
+> +#include <asm/dma-iommu.h>
+> +
+>  #include "mm.h"
+>
+>  /*
+.....
+> +
+> +static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+> +               size_t size, enum dma_data_direction dir,
+> +               struct dma_attrs *attrs)
+> +{
+> +       struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+> +       dma_addr_t iova = handle & PAGE_MASK;
+> +       struct page *page = phys_to_page(iommu_iova_to_phys(mapping->domain, iova));
+> +       int offset = handle & ~PAGE_MASK;
+> +
+> +       if (!iova)
+> +               return;
+> +
+> +       if (!arch_is_coherent())
+> +               __dma_page_dev_to_cpu(page, offset, size, dir);
+> +
+> +       iommu_unmap(mapping->domain, iova, size);
 
-First of all will be the best to describe what we want to achieve.
-We have Zynq platform ARM Cortex-A9(which should be ARMv7 - 2cpus).
-cpu0 runs Linux and cpu1 will be used for real-time os. We would like to use
-remoteproc for loading any code(firmware if you like) for the cpu1 and start it.
-We haven't got hw yet but I believe that it should be possible also control cpu1 from cpu0
-like restart/shutdown/etc. I am using QEMU for developing.
+Is __free_iova() needed here as below?
 
-What I have done?
-I have created simple asm application which write char to the second unused/unprobed uart.
-Entry point for this application is at physical address 0.
-I have also added resource_table to elf to satisfy remoteproc core.
+	Modified arch/arm/mm/dma-mapping.c
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 9aa1675..66830b2 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1212,6 +1212,7 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+		__dma_page_dev_to_cpu(page, offset, size, dir);
 
-Elf file type is EXEC (Executable file)
-Entry point 0x0
-There are 2 program headers, starting at offset 52
-
-Program Headers:
-   Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
-   LOAD           0x008000 0x00000000 0x00000000 0x00208 0x00208 RWE 0x8000
-   GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RWE 0x4
-
-  Section to Segment mapping:
-   Segment Sections...
-    00     .text .resource_table
-    01
-
-
-Here is my resource table copied from sysbios-rpmsg (I didn't care about names)
-
-struct resource resources[] = {
-     { TYPE_VIRTIO_DEV,0, 0 ,0, 0,0,SZ_1M,VIRTIO_ID_RPMSG,0,0,0,0,"vdev:rpmsg"},
-     { TYPE_VRING, 0, 0x100, 0, 0, 0,VQ0_SIZE,0,0,0,0,0,"vring:sysm3->mpu"},
-     { TYPE_VRING, 1, 0x200, 0, 0, 0,VQ1_SIZE,0,0,0,0,0,"vring:mpu->sysm3"},
-     { TYPE_CARVEOUT, 0, 0x0, 0, 0, 0, SZ_1M, 0, 0,0,0,0,"IPU_MEM_TEXT"},
-     { TYPE_TRACE, 0, 0x00001234,0,0,0, 0x8000, 0,0,0,0,0,"trace:sysm3"},
-};
-
-TRACE buffer is there just to know how this can work.
-VIRTIO_DEV should be necessary value
-VRING0/VRING1 - I haven't look at it just to keep there for test.
-+ one carveout with 1MB size.
-
-Carveout is allocated by dma code and remapped to 0xffc00000.
-
-Then in zynq_rproc_kick I copy content of this 1MB carveout to 0x0 physical address
-+ start the second cpu.
-
-I have tested this and it is working.
-The main my problem is that firmware base addr must be at the beginning of address space
-or selected address but it is fixed and known.
-
-I have no problem to use mem allocators or techniques which you recommend me to ensure this limitation.
-
->> Coprocessor can directly access memory of the main cpu.
-> 
-> That's fine: remoteproc supports these cases, and does not require an IOMMU.
-
-ok. How do you handle limitations if coprocessor expect code on any address?
-
-> 
-> We also successfully tested this with davinci, which does not have an IOMMU.
-
- From my debug logs and my hacks I see that it is possible do it even in my brutal case.
-
-> 
-> Looping in Mark, who did the davinci remoteproc support, and might
-> have the code available to share. Hopefully we'd have the patches
-> posted soon, and then no-iommu platforms could just use them for
-> reference.
-
-ok. great. Will look forward for that code and recommendation because I am ARM newbie.
-
-If future I believe we will support to load firmware to Microblaze or better for us
-load firmware from Microblaze to ARM.
-
-I am also interested in suggestions about DTS binding. Have someone tried to describe it or use it?
-
-Thanks,
-Michal
-
-P.S.: Please let me know, if someone has any example running remoteproc on Qemu.
-
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+	iommu_unmap(mapping->domain, iova, size);
++       __free_iova(mapping, iova, size);
+ }
