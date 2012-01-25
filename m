@@ -1,45 +1,38 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 25 Jan 2012 16:35:47 +0100
-Subject: [PATCH] ARM: mxs: read correct values when setting up MAC
-In-Reply-To: <4F201675.6050308@denx.de>
-References: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
- <4F201675.6050308@denx.de>
-Message-ID: <20120125153547.GB8852@pengutronix.de>
+From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
+Date: Wed, 25 Jan 2012 16:45:40 +0100
+Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using mc13783
+ codec
+In-Reply-To: <201107271028.09928.philippe.retornaz@epfl.ch>
+References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+ <4E1711EA.5070209@televic.com> <201107271028.09928.philippe.retornaz@epfl.ch>
+Message-ID: <2667396.yifGumf5nD@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi
 
-> > --- a/arch/arm/mach-mxs/mach-m28evk.c
-> > +++ b/arch/arm/mach-mxs/mach-m28evk.c
-> > @@ -258,7 +258,7 @@ static int __init m28evk_fec_get_mac(void)
-> >  	 * so hard-code DENX OUI (C0:E5:4E) here.
-> >  	 */
-> >  	for (i = 0; i < 2; i++) {
-> > -		val = ocotp[i * 4];
-> > +		val = ocotp[i];
+> Le vendredi 8 juillet 2011 16:19:22, Lambrecht J?rgen a ?crit :
+> > indeed, doesn't work at all. I know it used to work on 2.6.34.
+> > We also have a fsl linux 2.6.22 were it works.
+> > I must say: when i use aplay to play a mono file, then there is no
+> > error, it just never ends, and no sound also.
+> > For a stereo file, it gives the error.
+> > Mark also that when I use madplay (v0.15.2) (or mp3play) to play a mono
+> > or stereo mp3, it allocates 3 DMA channels, but only frees one after the
+> > error.
 > 
-> I can read that HW_OCOTP_CUST0 has the phisycal address 0x8002_C020h,
-> and HW_OCOTP_CUST1 ist at 8002_C030h. So the two registers are not
-> consecutive and there are some reserved fields between the two registers
-> - this is the reason for the i * 4.
-> 
-> HW_OCOTP_CRYPTO0 is at 8002_C060h, so it is not true that the address is
-> currently read from the crypto-key. At least, this is my interpretation...
+> Did you made any progress on this ?
 
-Ah, that explains... that you probably never tested the code? What about
-this in ocotp.c?
+I have a working sound support for the mx31moboard boards available here:
+http://github.com/retornaz/linux/commits/moboard-sound
 
- 75         for (i = 0; i < OCOTP_WORD_COUNT; i++)
- 76                 ocotp_words[i] = __raw_readl(ocotp_base + OCOTP_WORD_OFFSET +
- 77                                                 i * 0x10);
+It's basically Sascha mc13783 codec driver (from his git tree) rebased on 3.2 
+and some mx31moboad specific code.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120125/63b98517/attachment.sig>
+I can playback & record sound on our board (2 channels at 16Khz) with the sdma.
+
+Sascha, do you have any plan to upstream the mc13783 codec driver ? 
+
+Thanks,
+
+Philippe
