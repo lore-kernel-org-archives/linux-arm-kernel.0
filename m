@@ -1,73 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Jan 2012 18:23:28 +0100
-Subject: Building of arch/arm/plat-mxc/ssi-fiq.S failed w/ THUMB2 enabled?
-In-Reply-To: <20120125143418.GG1068@n2100.arm.linux.org.uk>
-References: <CAMPhdO_4NQUFB14eecTb3N4oQJa86ojSk8FUveqg+Lye5_jY+A@mail.gmail.com>
- <20111202102418.GT26618@pengutronix.de>
- <20120120115216.GK1068@n2100.arm.linux.org.uk>
- <20120120120003.GB2046@linaro.org>
- <20120123115923.GP5446@pengutronix.de>
- <CAKGA1b=cQ4n9TdWY0TM7OJMuzQcvERUbcshb_d4aBJsfn1pBug@mail.gmail.com>
- <20120125143418.GG1068@n2100.arm.linux.org.uk>
-Message-ID: <20120125172328.GY5446@pengutronix.de>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Wed, 25 Jan 2012 21:29:49 +0300
+Subject: [PATCH 04/21] ARM: omap2+: smartreflex: move smartreflex suspend
+ to suspend_noirq
+In-Reply-To: <1327504583-13408-5-git-send-email-j-pihet@ti.com>
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-5-git-send-email-j-pihet@ti.com>
+Message-ID: <4F204A1D.4090005@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 02:34:18PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 25, 2012 at 08:06:03AM -0600, Matt Sealey wrote:
-> > On Mon, Jan 23, 2012 at 5:59 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > On Fri, Jan 20, 2012 at 12:00:03PM +0000, Dave Martin wrote:
-> > >> On Fri, Jan 20, 2012 at 11:52:17AM +0000, Russell King - ARM Linux wrote:
-> > >> > On Fri, Dec 02, 2011 at 11:24:18AM +0100, Uwe Kleine-K?nig wrote:
-> > >> > > On Fri, Dec 02, 2011 at 06:01:08PM +0800, Eric Miao wrote:
-> > >> > > > Hi Dave & Sascha,
-> > >> > > >
-> > >> > > > I checked the log of this file, found a THUMB2 related changes, yet
-> > >> > > > I'm still having the failure below, can you help do a quick check?
-> > >> > > the problem is that in Thumb most commands don't work with r8-r15
-> > >> > > because there are only three bits used to encode them. This is
-> > >> > > unfortunate as the other registers are not banked for FIQ.
-> > >> > >
-> > >> > > The best possibility I see is to save some unbanked registers to the
-> > >> > > banked registers on entry and restore them on exception exit.
-> > >> >
-> > >> > Or always build this as ARM code.
-> > >>
-> > >> That should work, sure -- I prefer to keep the number of instances where
-> > >> we need to do this to a minimum if we can, though.
-> > >
-> > > I vote for compiling this in ARM mode since it's a straight forward
-> > > solution.
-> > >
-> > > Some background:
-> > >
-> > > The original reason for creating this code was that we did not have SDMA
-> > > support at the time I wanted audio support. The FIQ code was a simple
-> > > way to seperate audio and DMA support and to push them to mainline
-> > > seperately. There is another reason for having this code though. The
-> > > i.MX SSI port is quite broken in AC97 mode. Some AC97 codecs like the
-> > > WM9712 always send data in slot 12 (IIRC it contains gpio status). The
-> > > SSI unit always puts all valid slots into the data stream, so we end up
-> > > having the audio rx data interleaved with the gpio status data. The FIQ
-> > > code is used to skip the gpio status data (see /* dummy read to skip
-> > > slot 12 */ in ssi-fiq.S).
-> > 
-> > Okay so let's start with the thumb-isation of that code since it's
-> > breaking thumb2 kernel builds for i.MX with
-> > SSI audio (regardless of AC97 requirement).
-> 
-> Well, there's two solutions to this:
-> 
-> - we declare that it's obsolete now that SDMA support is in place.
-> - we always build the code in ARM mode.
+On 01/25/2012 06:16 PM, Jean Pihet wrote:
 
-The latter please. As mentioned it is still necessary for AC97 mode and
-used at least on the pcm043 board.
+> From: Colin Cross<ccross@android.com>
 
-Sascha
+> Running without smartreflex for any significant time (on the order
+> of seconds) is unsafe and can cause thermal runaway.  Move
+> smartreflex suspend into suspend_noirq, so it happens as late as
+> possible.  This prevents hangs that occur in a driver suspend
+> handler from running without smartreflex enabled.  It will also
+> reduce power used during suspend and resume, as the voltages will
+> be lowered.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> May also indirectly fix imprecise external aborts seen during
+> suspend, which could be caused by calls to sr_disable racing
+> from calls to dvfs_scale and omap_sr_disable.
+
+> Change-Id: Ia3c1e707bb1022ec102f506dc3ad48906e8890da
+
+    This line has no place in the upstream commit. Please remove.
+
+WBR, Sergei
