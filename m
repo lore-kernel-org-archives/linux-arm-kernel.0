@@ -1,193 +1,109 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 24 Jan 2012 22:35:28 -0700
-Subject: [RFC 1/2] irq_domain: Create common xlate functions that device
- drivers can use
-In-Reply-To: <4F1F5FE0.9090901@gmail.com>
-References: <1327450719-25590-1-git-send-email-grant.likely@secretlab.ca>
- <4F1F5FE0.9090901@gmail.com>
-Message-ID: <CACxGe6s3R0fcBSf_YHTpXp15gtEBHRQg5-YM=cDO5UfY9cRGrQ@mail.gmail.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 25 Jan 2012 15:51:58 +0900
+Subject: [PATCH v8 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
+In-Reply-To: <20120123142706.GA6269@8bytes.org>
+References: <001001ccc625$0afa7ee0$20ef7ca0$%cho@samsung.com>
+ <20120123142706.GA6269@8bytes.org>
+Message-ID: <CAHQjnOMyoOH2cFjjGSzMvefZTQGROmQgaA8S0MmxnKGHWyQhyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 6:50 PM, Rob Herring <robherring2@gmail.com> wrote:
+Hi,
+On Mon, Jan 23, 2012 at 11:27 PM, Joerg Roedel <joro@8bytes.org> wrote:
+> Hi,
 >
+> please also get and inclue Acks from the Exynos maintainer for the next
+> post.
+> Since I have a compiling config for exynos now I will merge the patches
+> when you have the Acks and addressed or explained the issues I pointed
+> out below.
 >
-> On 01/24/2012 06:18 PM, Grant Likely wrote:
->> Rather than having each interrupt controller driver creating its own barely
->> unique .xlate function for irq_domain, create a library of translators which
->> any driver can use directly.
->>
->> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->> index e7379a3..5e497a0 100644
->> --- a/include/linux/irqdomain.h
->> +++ b/include/linux/irqdomain.h
->> @@ -110,6 +110,9 @@ struct irq_domain {
->> ? ? ? void *host_data;
->> ? ? ? irq_hw_number_t inval_irq;
->>
->> + ? ? /* Data for common irq xlate functions */
->> + ? ? unsigned int xlate_type;
->> +
->
-> How does this get set? Do we want interrupt controllers messing with the
-> domain struct directly long term?
+Thanks for review!
+I will include the Acks in the next patchset.
+I will post the next patchset with corrections by the day after tomorrow.
 
-It defaults to IRQ_TYPE_NONE in the alloc function and drivers can
-override it.  Alternately it could be made part of the
-irq_domain_add() arguments, but I'm not thrilled with adding a whole
-bunch of arguments to the function prototype.
+And sorry for late reply.
+I had holidays for the new year's day based on Lunar system.
 
->
->> ? ? ? /* Optional device node pointer */
->> ? ? ? struct device_node *of_node;
->> ?};
->> @@ -163,6 +166,18 @@ extern unsigned int irq_linear_revmap(struct irq_domain *host,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq_hw_number_t hwirq);
->>
->> ?extern struct irq_domain_ops irq_domain_simple_ops;
->> +
->> +/* stock xlate functions */
->> +int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
->> + ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
->> + ? ? ? ? ? ? ? ? ? ? irq_hw_number_t *out_hwirq, unsigned int *out_type);
->> +int irq_domain_xlate_twocell(struct irq_domain *d, struct device_node *ctrlr,
->> + ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
->> + ? ? ? ? ? ? ? ? ? ? irq_hw_number_t *out_hwirq, unsigned int *out_type);
->> +int irq_domain_xlate_onetwocell(struct irq_domain *d, struct device_node *ctrlr,
->> + ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
->> + ? ? ? ? ? ? ? ? ? ? irq_hw_number_t *out_hwirq, unsigned int *out_type);
->> +
->> ?#if defined(CONFIG_OF_IRQ)
->> ?extern void irq_domain_generate_simple(const struct of_device_id *match,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? u64 phys_base, unsigned int irq_start);
->> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->> index def8e7b..df80205 100644
->> --- a/kernel/irq/irqdomain.c
->> +++ b/kernel/irq/irqdomain.c
->> @@ -53,6 +53,7 @@ static struct irq_domain *irq_domain_alloc(struct device_node *of_node,
->> ? ? ? domain->ops = ops;
->> ? ? ? domain->host_data = host_data;
->> ? ? ? domain->of_node = of_node_get(of_node);
->> + ? ? domain->xlate_type = IRQ_TYPE_NONE;
->>
->> ? ? ? if (domain->ops->match == NULL)
->> ? ? ? ? ? ? ? domain->ops->match = default_irq_domain_match;
->> @@ -690,25 +691,77 @@ int irq_domain_simple_map(struct irq_domain *d, unsigned int irq,
->> ? ? ? return 0;
->> ?}
->>
->> -int irq_domain_simple_xlate(struct irq_domain *d,
->> - ? ? ? ? ? ? ? ? ? ? ? ? struct device_node *controller,
->> - ? ? ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
->> - ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *out_hwirq, unsigned int *out_type)
->> +/**
->> + * irq_domain_xlate_onecell() - Generic xlate for direct one cell bindings
->> + *
->> + * Device Tree IRQ specifier translation function which works with one cell
->> + * bindings where the cell value maps directly to the hwirq number.
->> + */
->> +int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?const u32 *intspec, unsigned int intsize,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long *out_hwirq, unsigned int *out_type)
+> On Thu, Dec 29, 2011 at 09:26:08PM +0900, KyongHo Cho wrote:
+>> +static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
 >> +{
->> + ? ? if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
->> + ? ? ? ? ? ? ?ctrlr->full_name, intsize))
->> + ? ? ? ? ? ? return -EINVAL;
->> + ? ? *out_hwirq = intspec[0];
->> + ? ? *out_type = d->xlate_type;
->> + ? ? return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(irq_domain_xlate_onecell);
+>> + ? ? struct exynos_iommu_domain *priv = domain->priv;
+>> + ? ? struct list_head *pos, *n;
+>> + ? ? unsigned long flags;
+>> + ? ? int i;
 >> +
->> +/**
->> + * irq_domain_xlate_twocell() - Generic xlate for direct two cell bindings
->> + *
->> + * Device Tree IRQ specifier translation function which works with two cell
->> + * bindings where the cell values map directly to the hwirq number
->> + * and linux irq flags.
->> + */
->> +int irq_domain_xlate_twocell(struct irq_domain *d, struct device_node *ctrlr,
->> + ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
->> + ? ? ? ? ? ? ? ? ? ? irq_hw_number_t *out_hwirq, unsigned int *out_type)
->> ?{
->> - ? ? if (d->of_node != controller)
->> + ? ? if (WARN(intsize < 2, "Bad intspec for %s: intsize=%i < 2\n",
->> + ? ? ? ? ? ? ?ctrlr->full_name, intsize))
->> + ? ? ? ? ? ? return -EINVAL;
->> + ? ? if (intsize < 2)
+>> + ? ? WARN_ON(!list_empty(&priv->clients));
 >
-> You've already checked this...
-
-cut-and-paste error.  Fixed.
-
+> This isn't really a problem. We allow destroying a domain with devices
+> attached. So this WARN_ON is not necessary.
 >
->> ? ? ? ? ? ? ? return -EINVAL;
->> - ? ? if (intsize < 1)
->> + ? ? *out_hwirq = intspec[0];
->> + ? ? *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
->> + ? ? return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(irq_domain_xlate_twocell);
->> +
->> +/**
->> + * irq_domain_xlate_onetwocell() - Generic xlate for one or two cell bindings
->> + *
->> + * Device Tree IRQ specifier translation function which works with either one
->> + * or two cell bindings where the cell values map directly to the hwirq number
->> + * and linux irq flags.
->> + *
->> + * Note: don't use this function unless your interrupt controller explicitly
->> + * supports both one and two cell bindings. ?For the majority of controllers
->> + * the _onecell() or _twocell() variants above should be used.
->
-> This comment is confusing since you turn around and use it for simple
-> ops below.
+OK.
+BTW, Isn't it a problem when a device driver does not know that its
+iommu domain is destroyed?
+Can we regards that it is the faulty use of iommu API?
 
-I intend to faze out the generic simple ops so that most drivers will
-explicitly use _onecell or _twocell.
-
->> + */
->> +int irq_domain_xlate_onetwocell(struct irq_domain *d,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device_node *ctrlr,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *out_hwirq, unsigned int *out_type)
+>> +static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
+>> + ? ? ? ? ? ? ? ? ? ? ?phys_addr_t paddr, size_t size, int prot)
 >> +{
->> + ? ? if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
->> + ? ? ? ? ? ? ?ctrlr->full_name, intsize))
->> ? ? ? ? ? ? ? return -EINVAL;
+>> + ? ? struct exynos_iommu_domain *priv = domain->priv;
+>> + ? ? unsigned long *entry;
+>> + ? ? unsigned long flags;
+>> + ? ? int ret = -ENOMEM;
+>> +
+>> + ? ? BUG_ON(priv->pgtable == NULL);
+>> +
+>> + ? ? spin_lock_irqsave(&priv->pgtablelock, flags);
+>> +
+>> + ? ? entry = section_entry(priv->pgtable, iova);
+>> +
+>> + ? ? if (size >= SECT_SIZE) {
+>> + ? ? ? ? ? ? ret = lv1set_section(entry, paddr, size >> SECT_ORDER,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &priv->lv2entcnt[lv1ent_offset(iova)]);
 >
-> Isn't this check redundant with the check in of_irq_map_raw:
+> This looks like you are partially re-implementing behavior of generic
+> code because you are mapping multiple sections at once. The generic map
+> code already splits up the address range correctly, so no need to do
+> this in the driver (unless there is some benefit in the hardware, like
+> an IOTLB entry that can cover multiple sections or something similar).
 >
-> ? ? ? ?if (ointsize != intsize)
-> ? ? ? ? ? ? ? ?return -EINVAL;
+Yes, I wanted to avoid repeated function call by iommu_map().
+s5p_iommu_map() maps once for the same page size since it is efficient
+and simple.
+That's why this driver initializes domain->pgsize_bitmap with 0xFFFFF000
+even though our IOMMU driver just supports 3 different page sizes
+including 4KB, 64KB and 1MB.
 
-No.  It's a different test.  The core code does indeed ensure that
-intsize matches the #interrupt-cells value defined in the device tree,
-but it does nothing to check if the #interrupt-cells value is set to
-something sane.  This test ensures that the xlate function will not
-dereference beyond the end of the intspec array.
+Do you think it is better for s5p_iommu_map() to map just one page at once?
 
-Ideally the interrupt controller driver should already verify the
-#interrupt-cells value at initialization, but I'm not going to rely on
-it when this test is so cheap.  The intent is to be really noisy about
-bad data in the device tree.
+>> +static size_t exynos_iommu_unmap(struct iommu_domain *domain,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long iova, size_t size)
+>> +{
+>> + ? ? struct exynos_iommu_domain *priv = domain->priv;
+>> + ? ? struct iommu_client *client;
+>> + ? ? unsigned long flags;
+>> +
+>> + ? ? BUG_ON(priv->pgtable == NULL);
+>> +
+>> + ? ? spin_lock_irqsave(&priv->pgtablelock, flags);
+>> +
+>> + ? ? while (size != 0) {
+>> + ? ? ? ? ? ? int i, nent, order;
+>> + ? ? ? ? ? ? unsigned long *pent, *sent;
+>
+> Same with this while-loop. This looks like it re-implements behavior
+> from the generic code.
+>
+If a region to unmap consists of tens of pages
+there is no way to avoid flushing IOTLB repeatedly.
 
-> The only diff in these functions is really checking the size. So I
-> really don't think we need 3 versions if that can be factored out where
-> you know value of #interrupt-cells.
+Out iommu driver doesn't need to flush IOTLB more than once for a
+region to unmap.
 
-There are subtleties here and #interrupt-cells is not always the
-correct thing to test.  For example, some powerpc controllers has
-#interrupt-cells = <2>, but the second cell must be ignored so the
-_onecell version is the correct function.  I originally investigated
-parameterizing a single function, but I didn't like how it ended up
-looking because it would require adding something like irq_cells_min
-and irq_cells_max to the irq_domain structure.  I think using
-variations on the function ends up being cleaner.  I may also add
-something like a ..._twocell_lookup() version that uses a lookup table
-for the type values to handle the other type of xlate common in the
-powerpc tree.
+Do you think the driver is better to unmaps just one page at once
+though flushing IOTLB repeatedly?
 
-Thanks for the quick review.
 
-g.
+Thank you.
+
+  KyongHo
