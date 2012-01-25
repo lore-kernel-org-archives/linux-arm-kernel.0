@@ -1,33 +1,23 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 25 Jan 2012 10:42:20 -0500 (EST)
-Subject: Common clock API for i.MX
-In-Reply-To: <20120125145333.GO3687@opensource.wolfsonmicro.com>
-References: <CAKGA1bkHgnJQs3_n6QtQjf-8xaPn0YnxMmE2Q=+opWcsp10zQA@mail.gmail.com>
- <20120125084533.GD1068@n2100.arm.linux.org.uk>
- <CAKGA1bm_rLyMB-Xr-XZQHQRVDySu9JuCoVZL=FFv9sa1y6eD1A@mail.gmail.com>
- <20120125145333.GO3687@opensource.wolfsonmicro.com>
-Message-ID: <alpine.LFD.2.02.1201251040040.2759@xanadu.home>
+From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
+Date: Wed, 25 Jan 2012 19:00:46 +0200
+Subject: [PATCH v3] ARM: support XZ compressed kernels
+In-Reply-To: <op.v8bxi2yu2s3iss@ecaz>
+References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
+ <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
+ <op.v4vsotxk2s3iss@ecaz> <4F180128.9060005@bluegiga.com>
+ <op.v8bxi2yu2s3iss@ecaz>
+Message-ID: <4F20353E.70809@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2012, Mark Brown wrote:
+Hi Imre,
 
-> On Wed, Jan 25, 2012 at 07:45:15AM -0600, Matt Sealey wrote:
-> > On Wed, Jan 25, 2012 at 2:45 AM, Russell King - ARM Linux
-> 
-> > > My conclusion, therefore, is that there's very little actual interest
-> > > amongst the ARM community to move towards a common clk API.
-> 
-> > Maybe it's a chicken-egg thing; nobody wants to work on it until someone else
-> > has done some legwork? :)
-> 
-> I do think that this is a big part of the issue, the patches have been
-> floating around for ages and it's not clear when they'll manage to make
-> it in (and hence when it'll be worth moving to use them).
+On 01/19/2012 01:43 PM, Imre Kaloz wrote:
+> Recent changes introduced an error, but Nico helped me clean that up.
+> Will submit the final patch to the patch system this weekend.
 
-Maybe because nobody is actively promoting them and pushing them 
-forward?  It is not sufficient to just post patches to a mailing list 
-and wait.
+Just a reminder: I was unable to find this from the patch tracking 
+system. Any updates? Can I help somehow?
 
-
-Nicolas
+--
+Veli-Pekka Peltola
