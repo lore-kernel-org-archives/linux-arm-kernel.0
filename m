@@ -1,37 +1,38 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 25 Jan 2012 20:46:18 +0100
-Subject: [PATCH] ARM: OMAP4: clock: fix mult and div mask for USB_DPLL
-In-Reply-To: <alpine.DEB.2.00.1201251204480.5324@utopia.booyaka.com>
-References: <4F1E7F8A.4010805@ti.com>
- <1327455315-19464-1-git-send-email-ameya.palande@ti.com>
- <alpine.DEB.2.00.1201251204480.5324@utopia.booyaka.com>
-Message-ID: <4F205C0A.1050502@ti.com>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Wed, 25 Jan 2012 20:40:12 +0100
+Subject: [PATCH 00/19] ARM SA11x0 / PXA / SoC-common PCMCIA cleanups
+In-Reply-To: <20120120101709.GE1068@n2100.arm.linux.org.uk>
+References: <20120120101709.GE1068@n2100.arm.linux.org.uk>
+Message-ID: <20120125194012.GC9192@comet.dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hey,
 
-On 1/25/2012 8:05 PM, Paul Walmsley wrote:
-> Hi
->
-> one important question first:
->
-> On Tue, 24 Jan 2012, Ameya Palande wrote:
->
->> According to OMAP4 TRM Table 3-1183, CM_CLKSEL_DPLL_USB register defines
->> following fields for multiplication and division factors:
->>
->> DPLL_MULT (bits 19:8) DPLL multiplier factor (2 to 4095)
->> DPLL_DIV (bits 7:0) DPLL divider factor (0 to 255)
->>
->> Acked-by: Benoit Cousson<b-cousson@ti.com>
->> Signed-off-by: Ameya Palande<ameya.palande@ti.com>
->
-> Have the scripts been updated?
+On Fri, Jan 20, 2012 at 10:17:09AM +0000, Russell King - ARM Linux wrote:
+> What follows is a series of 19 patches cleaning up the SA11xx and PXA
+> PCMCIA support, which uses the soc-common infrastructure.
+> 
+> Now that we have proper gpiolib support in the kernel for these platforms,
+> with properly implemented gpio_to_irq() functionality, we can move some
+> things that the individual platform socket drivers were doing into the
+> soc-common core.
+> 
+> This significantly reduces the code in the platform socket drivers -
+> a reduction of around 550 lines, for the net addition of about 50 lines
+> to soc-common.
+> 
+> The final set of five patches in this set contain some minor bug fixes
+> (which are really low priority) and cleanup the handling of the SA1111
+> build between PXA and SA11x0 platforms.
+> 
+> Please supply acks; I have other work which touches the header files
+> in arch/arm which would conflict, and it would help to keep it together
+> rather than have SFR carry those resolutions.
 
-No not yet. The easy fix I was thinking about is to replace this define 
-by the hexa value of the mask. I can extract directly from the max mult 
-and max div.
+Insofar as it touches generic PCMCIA stuff:
 
-Regards,
-Benoit
+Acked-by: Dominik Brodowski <linux@dominikbrodowski.net>
+
+Thanks,
+	Dominik
