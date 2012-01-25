@@ -1,47 +1,43 @@
-From: sbabic@denx.de (Stefano Babic)
-Date: Wed, 25 Jan 2012 17:12:36 +0100
-Subject: [PATCH] ARM: mxs: read correct values when setting up MAC
-In-Reply-To: <20120125153547.GB8852@pengutronix.de>
-References: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
- <4F201675.6050308@denx.de> <20120125153547.GB8852@pengutronix.de>
-Message-ID: <4F2029F4.7070601@denx.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 25 Jan 2012 18:24:28 +0200
+Subject: remoteproc: Load coprocessor code to the specific main memory
+ location
+In-Reply-To: <4F200F64.9060203@monstr.eu>
+References: <4F1EE861.4030405@monstr.eu>
+ <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
+ <4F1FF870.3000105@monstr.eu>
+ <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
+ <4F200F64.9060203@monstr.eu>
+Message-ID: <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/2012 16:35, Wolfram Sang wrote:
-> 
->>> --- a/arch/arm/mach-mxs/mach-m28evk.c +++
->>> b/arch/arm/mach-mxs/mach-m28evk.c @@ -258,7 +258,7 @@ static
->>> int __init m28evk_fec_get_mac(void) * so hard-code DENX OUI
->>> (C0:E5:4E) here. */ for (i = 0; i < 2; i++) { -		val = ocotp[i
->>> * 4]; +		val = ocotp[i];
->> 
->> I can read that HW_OCOTP_CUST0 has the phisycal address
->> 0x8002_C020h, and HW_OCOTP_CUST1 ist at 8002_C030h. So the two
->> registers are not consecutive and there are some reserved fields
->> between the two registers - this is the reason for the i * 4.
->> 
->> HW_OCOTP_CRYPTO0 is at 8002_C060h, so it is not true that the
->> address is currently read from the crypto-key. At least, this is
->> my interpretation...
-> 
-> Ah, that explains... that you probably never tested the code?
+On Wed, Jan 25, 2012 at 4:19 PM, Michal Simek <monstr@monstr.eu> wrote:
+> I started with pur vanilla kernel and patches from your tree
+> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+> for-next branch
+> but then I had to moved to for-next-acked-merged because in the origin
+> one were some problems.
 
-..and that I don't remember very well...
+Unlike for-next-acked-merged, the other branches aren't rebased and
+therefore have merge conflicts with 3.3 material; that's intentional.
 
-> What about this in ocotp.c?
-> 
-> 75         for (i = 0; i < OCOTP_WORD_COUNT; i++) 76
-> ocotp_words[i] = __raw_readl(ocotp_base + OCOTP_WORD_OFFSET + 77
-> i * 0x10);
+> Do you have any kernel tree with CMA just for sure?
 
-You are right - and thanks for fixing it !
+Not a 3.3-based one, so I recommend you to just merge Marek's branch directly.
 
-Stefano
+I'll soon create a full-fledged 3.3 branch though, so you may want to
+wait a bit until I get to it.
 
--- 
-=====================================================================
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
-=====================================================================
+> What do you use for firmware replacing?
+> Just remove kernel module and load different one?
+
+If your driver boots the remote core on its ->probe() handler, then
+yes, you need to unbind and bind the device.
+
+One way is to unload and load the driver, but you can also use the
+bind/unbind sysfs files of your driver (echo -n device-name >
+/sys/..../{un}bind).
+
+Regards,
+Ohad.
