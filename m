@@ -1,45 +1,89 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:40:35 +0000
-Subject: [PATCH 31/33] ARM: sa11x0: add assabet ucb1x00 platform data
+Date: Wed, 25 Jan 2012 14:40:55 +0000
+Subject: [PATCH 32/33] MFD: ucb1x00-assabet: add support for UCB1x00 GPIO
+ switches
 In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
 References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rq41b-0000Zs-7h@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rq41v-0000Zy-BZ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ucb1x00 platform data to enable GPIO support on the UCB1300 device.
+Add support for UCB1x00 GPIO buttons found on the Assabet platform.
+We can now trivially support these buttons as we have standardized
+gpiolib, genirq and gpio keyboard support in place for this device.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/assabet.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ drivers/mfd/ucb1x00-assabet.c |   43 +++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 39 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
-index 3a19145..c45402f 100644
---- a/arch/arm/mach-sa1100/assabet.c
-+++ b/arch/arm/mach-sa1100/assabet.c
-@@ -15,6 +15,7 @@
- #include <linux/errno.h>
- #include <linux/ioport.h>
- #include <linux/serial_core.h>
-+#include <linux/mfd/ucb1x00.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/delay.h>
-@@ -199,9 +200,14 @@ static struct irda_platform_data assabet_irda_data = {
- 	.set_speed	= assabet_irda_set_speed,
- };
+diff --git a/drivers/mfd/ucb1x00-assabet.c b/drivers/mfd/ucb1x00-assabet.c
+index b7be613..b63c075 100644
+--- a/drivers/mfd/ucb1x00-assabet.c
++++ b/drivers/mfd/ucb1x00-assabet.c
+@@ -11,9 +11,13 @@
+  */
+ #include <linux/module.h>
+ #include <linux/init.h>
++#include <linux/device.h>
++#include <linux/err.h>
+ #include <linux/fs.h>
++#include <linux/gpio_keys.h>
++#include <linux/input.h>
++#include <linux/platform_device.h>
+ #include <linux/proc_fs.h>
+-#include <linux/device.h>
+ #include <linux/mfd/ucb1x00.h>
  
-+static struct ucb1x00_plat_data assabet_ucb1x00_data = {
-+	.gpio_base	= -1,
-+};
+ #define UCB1X00_ATTR(name,input)\
+@@ -35,14 +39,45 @@ UCB1X00_ATTR(batt_temp, UCB_ADC_INP_AD2);
+ 
+ static int ucb1x00_assabet_add(struct ucb1x00_dev *dev)
+ {
+-	device_create_file(&dev->ucb->dev, &dev_attr_vbatt);
+-	device_create_file(&dev->ucb->dev, &dev_attr_vcharger);
+-	device_create_file(&dev->ucb->dev, &dev_attr_batt_temp);
++	struct ucb1x00 *ucb = dev->ucb;
++	struct platform_device *pdev;
++	struct gpio_keys_platform_data keys;
++	static struct gpio_keys_button buttons[6];
++	unsigned i;
 +
- static struct mcp_plat_data assabet_mcp_data = {
- 	.mccr0		= MCCR0_ADM,
- 	.sclk_rate	= 11981000,
-+	.codec_pdata	= &assabet_ucb1x00_data,
- };
++	memset(buttons, 0, sizeof(buttons));
++	memset(&keys, 0, sizeof(keys));
++
++	for (i = 0; i < ARRAY_SIZE(buttons); i++) {
++		buttons[i].code = BTN_0 + i;
++		buttons[i].gpio = ucb->gpio.base + i;
++		buttons[i].type = EV_KEY;
++		buttons[i].can_disable = true;
++	}
++
++	keys.buttons = buttons;
++	keys.nbuttons = ARRAY_SIZE(buttons);
++	keys.poll_interval = 50;
++	keys.name = "ucb1x00";
++
++	pdev = platform_device_register_data(&ucb->dev, "gpio-keys", -1,
++		&keys, sizeof(keys));
++
++	device_create_file(&ucb->dev, &dev_attr_vbatt);
++	device_create_file(&ucb->dev, &dev_attr_vcharger);
++	device_create_file(&ucb->dev, &dev_attr_batt_temp);
++
++	dev->priv = pdev;
+ 	return 0;
+ }
  
- static void __init assabet_init(void)
+ static void ucb1x00_assabet_remove(struct ucb1x00_dev *dev)
+ {
++	struct platform_device *pdev = dev->priv;
++
++	if (!IS_ERR(pdev))
++		platform_device_unregister(pdev);
++
+ 	device_remove_file(&dev->ucb->dev, &dev_attr_batt_temp);
+ 	device_remove_file(&dev->ucb->dev, &dev_attr_vcharger);
+ 	device_remove_file(&dev->ucb->dev, &dev_attr_vbatt);
 -- 
 1.7.4.4
