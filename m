@@ -1,51 +1,31 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 25 Jan 2012 13:37:34 -0500 (EST)
-Subject: [PATCH] ARM: ioremap: fix boundary check when reusing static
- mapping
-In-Reply-To: <1327515419-14097-1-git-send-email-pawel.moll@arm.com>
-References: <1327515419-14097-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <alpine.LFD.2.02.1201251333230.2759@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 25 Jan 2012 10:49:42 -0800
+Subject: [PATCH 05/21] Revert "OMAP3+: PM: SR: add suspend/resume handlers"
+In-Reply-To: <4F204916.7050504@ti.com> (Benoit Cousson's message of "Wed, 25
+ Jan 2012 19:25:26 +0100")
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-6-git-send-email-j-pihet@ti.com>
+ <4F2041B1.6060907@ti.com>
+ <CAORVsuWu-pzTWzYp2=gqqPzRJQ1eBLu=12uNyEbVSZp407WUnA@mail.gmail.com>
+ <4F204916.7050504@ti.com>
+Message-ID: <87zkdbehx5.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2012, Pawel Moll wrote:
+"Cousson, Benoit" <b-cousson@ti.com> writes:
 
-> Since commit 576d2f2525612ecb5af029a76f21f22a3b82563d "ARM: add
-> generic ioremap optimization by reusing static mappings" ioremap()
-> is trying to reuse existing, static mapping when possible.
-> 
-> The condition checking boundaries of the requested and existing
-> mappings didn't take in-page offset into consideration though,
-> which lead to obscure and hard to debug problems when.
+> On 1/25/2012 7:13 PM, Jean Pihet wrote:
 
-... when what?
+[...]
 
-Good catch nevertheless.
+>>>
+>>> I guess that path #3 and #5 should just be removed.
+>> I am ok with both options (keeping or removing the 2 commits), please
+>> let me know what you prefer.
+>
+> I guess that removing both is the only acceptable solution
+> anyway. 
 
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Yes, please remove them both.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> ---
->  arch/arm/mm/ioremap.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index 80632e8..ba15937 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -225,7 +225,8 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
->  		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
->  			continue;
->  		if (__phys_to_pfn(area->phys_addr) > pfn ||
-> -		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
-> +		    __pfn_to_phys(pfn) + offset + size-1 >
-> +		    area->phys_addr + area->size-1)
->  			continue;
->  		/* we can drop the lock here as we know *area is static */
->  		read_unlock(&vmlist_lock);
-> -- 
-> 1.7.5.4
-> 
-> 
+Kevin
