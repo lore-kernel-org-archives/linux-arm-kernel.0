@@ -1,29 +1,111 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 25 Jan 2012 14:48:08 +0200
-Subject: [PATCH v4 - resend 10/13] ASoC: omap-abe-twl6040: Configure card
- according to platform data
-In-Reply-To: <20120125113341.GB3687@opensource.wolfsonmicro.com>
-References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
- <1327405950-6676-11-git-send-email-peter.ujfalusi@ti.com>
- <20120124130008.GC31839@opensource.wolfsonmicro.com>
- <4F1FBBE5.5080804@ti.com> <20120125113341.GB3687@opensource.wolfsonmicro.com>
-Message-ID: <4F1FFA08.1030505@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Jan 2012 12:59:16 +0000
+Subject: [PATCH 8/8 RESEND] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <1326124161-2220-1-git-send-email-m.szyprowski@samsung.com>
+References: <1323448798-18184-9-git-send-email-m.szyprowski@samsung.com>
+ <1326124161-2220-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120125125916.GE1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2012 01:33 PM, Mark Brown wrote:
-> It'd do the right thing if you changed the code to only register the
-> board widgets and routes as required - from your reply to Jassi it looks
-> like you ought to do conditional reigstration anyway as the input paths
-> move around between board variations.
+On Mon, Jan 09, 2012 at 04:49:21PM +0100, Marek Szyprowski wrote:
+> This patch add a complete implementation of DMA-mapping API for
+> devices that have IOMMU support. All DMA-mapping calls are supported.
+> 
+> This patch contains some of the code kindly provided by Krishna Reddy
+> <vdumpa@nvidia.com> and Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> ---
+> 
+> Hello,
+> 
+> This is the corrected version of the previous patch from the "[PATCH 0/8
+> v4] ARM: DMA-mapping framework redesign" thread which can be found here:
+> http://www.spinics.net/lists/linux-mm/msg27382.html
+> 
+> Previous version had very nasty bug which causes memory trashing if
+> DMA-mapping managed to allocate pages larger than 4KiB. The problem was
+> in __iommu_alloc_buffer() function which did not check how many pages
+> has been left to allocate.
 
-I'm planning to do similar thing as an increment on top of this series.
-Most likely the DT support will have conditional registration or - like
-Tegra does - we will receive the map from DT. Not sure yet which way it
-is going to be. The Tegra implementation is already there, so I might
-just follow it.
-At the end I want to have some consistency between the resulting sound
-cards (w/ DT, w/o DT).
+This patch seems to be incomplete.
 
--- 
-P?ter
+If the standard DMA API is used (the one which exists in current kernels)
+and NEED_SG_DMA_LENGTH is enabled, then where do we set the DMA length
+in the scatterlist?
+
+> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+> new file mode 100644
+> index 0000000..6668b41
+> --- /dev/null
+> +++ b/arch/arm/include/asm/dma-iommu.h
+> @@ -0,0 +1,36 @@
+> +#ifndef ASMARM_DMA_IOMMU_H
+> +#define ASMARM_DMA_IOMMU_H
+> +
+> +#ifdef __KERNEL__
+> +
+> +#include <linux/mm_types.h>
+> +#include <linux/scatterlist.h>
+> +#include <linux/dma-debug.h>
+> +#include <linux/kmemcheck.h>
+> +
+> +#include <asm/memory.h>
+
+I can't see anything in here which needs asm/memory.h - if files which
+include this need it, please include it in there so we can see why it's
+needed.
+
+> +
+> +struct dma_iommu_mapping {
+> +	/* iommu specific data */
+> +	struct iommu_domain	*domain;
+> +
+> +	void			*bitmap;
+> +	size_t			bits;
+> +	unsigned int		order;
+> +	dma_addr_t		base;
+> +
+> +	spinlock_t		lock;
+> +	struct kref		kref;
+> +};
+> +
+> +struct dma_iommu_mapping *
+> +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+> +			 int order);
+> +
+> +void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
+> +
+> +int arm_iommu_attach_device(struct device *dev,
+> +					struct dma_iommu_mapping *mapping);
+> +
+> +#endif /* __KERNEL__ */
+> +#endif
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 4845c09..2287b01 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -27,6 +27,9 @@
+>  #include <asm/sizes.h>
+>  #include <asm/mach/arch.h>
+>  
+> +#include <linux/iommu.h>
+
+linux/ includes should be grouped together.
+
+> diff --git a/arch/arm/mm/vmregion.h b/arch/arm/mm/vmregion.h
+> index 15e9f04..6bbc402 100644
+> --- a/arch/arm/mm/vmregion.h
+> +++ b/arch/arm/mm/vmregion.h
+> @@ -17,7 +17,7 @@ struct arm_vmregion {
+>  	struct list_head	vm_list;
+>  	unsigned long		vm_start;
+>  	unsigned long		vm_end;
+> -	struct page		*vm_pages;
+> +	void			*priv;
+
+I want to think about that - I may wish to export the vm_pages via
+the new dma-mappings file to provide additional information.
