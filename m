@@ -1,88 +1,73 @@
 From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 25 Jan 2012 15:55:54 +0530
-Subject: [PATCH v2 1/3] arm:davinci: prepare to move aemif driver to
- drivers/mfd
-Message-ID: <1327487156-10238-1-git-send-email-prakash.pm@ti.com>
+Date: Wed, 25 Jan 2012 15:55:56 +0530
+Subject: [PATCH v2 3/3] arm: da830: move NAND and NOR devices as aemif MFD
+ slaves
+In-Reply-To: <1327487156-10238-1-git-send-email-prakash.pm@ti.com>
+References: <1327487156-10238-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <1327487156-10238-3-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch moves emif header file appropriately as a part preparation to move emif
-driver from arch/arm/mach-davinci/ to drivers/mfd folder.
-There by it isolates modifications in emif interface depicting as platform code
-change.
-
-Patch series are based on the discussion and concerns expressed in
-davinci-linux-open-source community. Here is the link for the same:
-http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
+NAND and NOR device are made as aemif devices slave, hence device
+registration achieved via aemif MFD driver.
 
 Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
 ---
 Since v1:
 Patch is generated using -M option.
 
- arch/arm/mach-davinci/aemif.c                      |    2 +-
- arch/arm/mach-davinci/board-da830-evm.c            |    2 +-
- arch/arm/mach-davinci/board-da850-evm.c            |    2 +-
- drivers/mtd/nand/davinci_nand.c                    |    2 +-
- .../aemif.h => include/linux/mfd/davinci_aemif.h   |    0
- 5 files changed, 4 insertions(+), 4 deletions(-)
- rename arch/arm/mach-davinci/include/mach/aemif.h => include/linux/mfd/davinci_aemif.h (100%)
+ arch/arm/mach-davinci/board-da830-evm.c |   31 +++++++++++++++++++++++--------
+ 1 files changed, 23 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
-index 1ce70a9..b67c115 100644
---- a/arch/arm/mach-davinci/aemif.c
-+++ b/arch/arm/mach-davinci/aemif.c
-@@ -15,7 +15,7 @@
- #include <linux/module.h>
- #include <linux/time.h>
- 
--#include <mach/aemif.h>
-+#include <linux/mfd/davinci_aemif.h>
- 
- /* Timing value configuration */
- 
 diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index dc1afe5..0b43554 100644
+index 0b43554..0ad3662 100644
 --- a/arch/arm/mach-davinci/board-da830-evm.c
 +++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -31,7 +31,7 @@
- #include <mach/nand.h>
- #include <mach/da8xx.h>
- #include <mach/usb.h>
--#include <mach/aemif.h>
-+#include <linux/mfd/davinci_aemif.h>
- #include <mach/spi.h>
+@@ -396,14 +396,29 @@ static struct resource da830_evm_nand_resources[] = {
+ 	},
+ };
  
- #define DA830_EVM_PHY_ID		""
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 6b22b54..6dda013 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -41,7 +41,7 @@
- #include <mach/da8xx.h>
- #include <mach/nand.h>
- #include <mach/mux.h>
--#include <mach/aemif.h>
-+#include <linux/mfd/davinci_aemif.h>
- #include <mach/spi.h>
+-static struct platform_device da830_evm_nand_device = {
+-	.name		= "davinci_nand",
+-	.id		= 1,
+-	.dev		= {
+-		.platform_data	= &da830_evm_nand_pdata,
++static struct platform_device da830_evm_devices[] __initdata = {
++	{
++		.name		= "davinci_nand",
++		.id		= 1,
++		.dev		= {
++			.platform_data	= &da830_evm_nand_pdata,
++		},
++		.num_resources	= ARRAY_SIZE(da830_evm_nand_resources),
++		.resource	= da830_evm_nand_resources,
++	},
++};
++
++static struct davinci_aemif_devices da830_emif_devices = {
++	.devices	= da830_evm_devices,
++	.num_devices	= ARRAY_SIZE(da830_evm_devices),
++};
++
++static struct platform_device davinci_emif_device = {
++	.name	= "davinci_aemif",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &da830_emif_devices,
+ 	},
+-	.num_resources	= ARRAY_SIZE(da830_evm_nand_resources),
+-	.resource	= da830_evm_nand_resources,
+ };
  
- #define DA850_EVM_PHY_ID		"0:00"
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index 6e56615..f19151b 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -35,7 +35,7 @@
- #include <linux/slab.h>
+ static inline void da830_evm_init_nand(int mux_mode)
+@@ -422,7 +437,7 @@ static inline void da830_evm_init_nand(int mux_mode)
+ 		pr_warning("da830_evm_init: emif25 mux setup failed: %d\n",
+ 				ret);
  
- #include <mach/nand.h>
--#include <mach/aemif.h>
-+#include <linux/mfd/davinci_aemif.h>
+-	ret = platform_device_register(&da830_evm_nand_device);
++	ret = platform_device_register(&davinci_emif_device);
+ 	if (ret)
+ 		pr_warning("da830_evm_init: NAND device not registered.\n");
  
- /*
-  * This is a device driver for the NAND flash controller found on the
-diff --git a/arch/arm/mach-davinci/include/mach/aemif.h b/include/linux/mfd/davinci_aemif.h
-similarity index 100%
-rename from arch/arm/mach-davinci/include/mach/aemif.h
-rename to include/linux/mfd/davinci_aemif.h
 -- 
 1.7.1
