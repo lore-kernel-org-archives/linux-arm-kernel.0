@@ -1,109 +1,136 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 25 Jan 2012 15:51:58 +0900
-Subject: [PATCH v8 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
-In-Reply-To: <20120123142706.GA6269@8bytes.org>
-References: <001001ccc625$0afa7ee0$20ef7ca0$%cho@samsung.com>
- <20120123142706.GA6269@8bytes.org>
-Message-ID: <CAHQjnOMyoOH2cFjjGSzMvefZTQGROmQgaA8S0MmxnKGHWyQhyA@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Wed, 25 Jan 2012 08:09:34 +0100
+Subject: [RFC PATCH 6/7] ARM: mtd: nand: davinci: add OF support for
+ davinci nand controller
+In-Reply-To: <4F1F0A3E.40805@freescale.com>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-7-git-send-email-hs@denx.de> <4F1DF465.60206@freescale.com>
+ <4F1E5C82.60108@denx.de> <4F1F0A3E.40805@freescale.com>
+Message-ID: <4F1FAAAE.2060007@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Mon, Jan 23, 2012 at 11:27 PM, Joerg Roedel <joro@8bytes.org> wrote:
-> Hi,
->
-> please also get and inclue Acks from the Exynos maintainer for the next
-> post.
-> Since I have a compiling config for exynos now I will merge the patches
-> when you have the Acks and addressed or explained the issues I pointed
-> out below.
->
-Thanks for review!
-I will include the Acks in the next patchset.
-I will post the next patchset with corrections by the day after tomorrow.
+Hello Scott,
 
-And sorry for late reply.
-I had holidays for the new year's day based on Lunar system.
+Scott Wood wrote:
+> On 01/24/2012 01:23 AM, Heiko Schocher wrote:
+>> Hello Scott,
+>>
+>> Scott Wood wrote:
+>>> On 01/23/2012 02:56 AM, Heiko Schocher wrote:
+>>>> diff --git a/Documentation/devicetree/bindings/arm/davinci/nand.txt b/Documentation/devicetree/bindings/arm/davinci/nand.txt
+>>>> new file mode 100644
+>>>> index 0000000..7e8d6db
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/arm/davinci/nand.txt
+>>>> @@ -0,0 +1,72 @@
+>>>> +* Texas Instruments Davinci NAND
+>>>> +
+>>>> +This file provides information, what the device node for the
+>>>> +davinci nand interface contain.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: "ti,davinci-nand";
+>>>> +- reg : contain 2 offset/length values:
+>>>> +        - offset and length for the access window
+>>>> +        - offset and length for accessing the aemif control registers
+>>>> +- id: id of the controller
+>>> What does "id of the controller" mean, specfically?  From this I can't
+>>> even tell if it's a number or a string, much less how to use it
+>>> semantically.  If it's just a "match what's in the manual" thing,
+>>> perhaps an alias would be better here.  Or, if it's a value with a
+>>> specific meaning (e.g. that you need to program into a register) use a
+>>> more specific name.
+>> Ok, fix this. Id means here, which chipselect the controller uses.
+>> Maybe it is better to rename it to "chipselect" ?
+> 
+> Yes, or better "ti,chipselect" or "ti,davinci-chipselect".
 
-> On Thu, Dec 29, 2011 at 09:26:08PM +0900, KyongHo Cho wrote:
->> +static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
->> +{
->> + ? ? struct exynos_iommu_domain *priv = domain->priv;
->> + ? ? struct list_head *pos, *n;
->> + ? ? unsigned long flags;
->> + ? ? int i;
->> +
->> + ? ? WARN_ON(!list_empty(&priv->clients));
->
-> This isn't really a problem. We allow destroying a domain with devices
-> attached. So this WARN_ON is not necessary.
->
-OK.
-BTW, Isn't it a problem when a device driver does not know that its
-iommu domain is destroyed?
-Can we regards that it is the faulty use of iommu API?
+Ok. fixed this to "ti,davinci-chipselect"
 
->> +static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
->> + ? ? ? ? ? ? ? ? ? ? ?phys_addr_t paddr, size_t size, int prot)
->> +{
->> + ? ? struct exynos_iommu_domain *priv = domain->priv;
->> + ? ? unsigned long *entry;
->> + ? ? unsigned long flags;
->> + ? ? int ret = -ENOMEM;
->> +
->> + ? ? BUG_ON(priv->pgtable == NULL);
->> +
->> + ? ? spin_lock_irqsave(&priv->pgtablelock, flags);
->> +
->> + ? ? entry = section_entry(priv->pgtable, iova);
->> +
->> + ? ? if (size >= SECT_SIZE) {
->> + ? ? ? ? ? ? ret = lv1set_section(entry, paddr, size >> SECT_ORDER,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &priv->lv2entcnt[lv1ent_offset(iova)]);
->
-> This looks like you are partially re-implementing behavior of generic
-> code because you are mapping multiple sections at once. The generic map
-> code already splits up the address range correctly, so no need to do
-> this in the driver (unless there is some benefit in the hardware, like
-> an IOTLB entry that can cover multiple sections or something similar).
->
-Yes, I wanted to avoid repeated function call by iommu_map().
-s5p_iommu_map() maps once for the same page size since it is efficient
-and simple.
-That's why this driver initializes domain->pgsize_bitmap with 0xFFFFF000
-even though our IOMMU driver just supports 3 different page sizes
-including 4KB, 64KB and 1MB.
+>>>> +Recommended properties :
+>>>> +- mask_ale: mask for ale
+>>>> +- mask_cle: mask for cle
+>>>> +- mask_chipsel: mask for chipselect
+>>>> +- ecc_mode: ECC mode, see NAND_ECC_* defines
+>>>> +- ecc_bits: used ECC bits
+>>>> +- options: nand options, defined in
+>>>> +           include/linux/mtd/nand.h, grep for NAND_NO_AUTOINCR
+>>>> +- bbt_options: NAND_BBT_* defines
+>>> Binding-specific properties should have a vendor prefix.  Dashes are
+>>> preferred to underscores.
+>> You think something like that:
+>>
+>> davinci-mask-ale
+>> davinci-mask-cle
+>> ...
+> 
+> "ti,davinci-mask-ale", etc.
 
-Do you think it is better for s5p_iommu_map() to map just one page at once?
+Ok, fixed.
 
->> +static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long iova, size_t size)
->> +{
->> + ? ? struct exynos_iommu_domain *priv = domain->priv;
->> + ? ? struct iommu_client *client;
->> + ? ? unsigned long flags;
->> +
->> + ? ? BUG_ON(priv->pgtable == NULL);
->> +
->> + ? ? spin_lock_irqsave(&priv->pgtablelock, flags);
->> +
->> + ? ? while (size != 0) {
->> + ? ? ? ? ? ? int i, nent, order;
->> + ? ? ? ? ? ? unsigned long *pent, *sent;
->
-> Same with this while-loop. This looks like it re-implements behavior
-> from the generic code.
->
-If a region to unmap consists of tens of pages
-there is no way to avoid flushing IOTLB repeatedly.
+>>> Don't specify Linux internals by reference -- they could change and
+>>> invalidate existing device trees and non-Linux code that accepts them
+>>> (e.g. U-Boot).  If you want them to line up, copy the definition here,
+>>> and if Linux changes, write glue code to convert.  It would probably be
+>>> better to define specific properties for anything that must be specified
+>>> here (neither deteted dynamically nor defined by compatible =
+>>> "ti,davinci-nand").
+>> Ok, I add the defines here, and add also a comment in the dts.
+> 
+> Which options actually need to come from the device tree?
 
-Out iommu driver doesn't need to flush IOTLB more than once for a
-region to unmap.
+I found the following used options:
 
-Do you think the driver is better to unmaps just one page at once
-though flushing IOTLB repeatedly?
+ecc_mode:
+NAND_ECC_NONE
+NAND_ECC_SOFT
+NAND_ECC_HW
+NAND_ECC_HW_SYNDROME
 
+bbt_options:
+NAND_BBT_USE_FLASH
 
-Thank you.
+ecc_bits:
+1
+4
 
-  KyongHo
+options:
+NAND_BUSWIDTH_16
+
+>>> Do all of these properties really belong here?  I can see providing some
+>> I think so, because this values come from existing platform code
+>> (grep for struct davinci_nand_pdata)
+> 
+> The standards are a bit stricter for the device tree, since it's a more
+> stable interface across components -- at least that's how we've used it
+> on a lot of powerpc targets.  I'm not sure if that's the intent here,
+> but I have seen U-Boot patches for ARM hardware using them as well.
+
+Ok, so, should I introduce instead properties for the above
+needed parameters? (As this are not davinci specific parameters,
+are there somewhere such definitions for them?)
+
+>> Comment in arch/arm/mach-davinci/include/mach/nand.h says for
+>> mask_ale and mask_cle:
+>>
+>> /* NOTE:  boards don't need to use these address bits
+>>  * for ALE/CLE unless they support booting from NAND.
+>>  * They're used unless platform data overrides them.
+>>  */
+>>
+>> It is used for addressing the ALE/CLE Signals through the address,
+>> used on the arch/arm/mach-davinci/board-dm646x-evm.c and
+>> arch/arm/mach-davinci/board-tnetv107x-evm.c board ... so I think,
+>> this should be also be setupable through OF ...
+> 
+> OK, if it's board logic that does the decoding, and the compatible is
+> not board-specific, they belong here.
+
+Ok.
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
