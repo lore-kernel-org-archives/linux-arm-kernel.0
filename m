@@ -1,105 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:44:39 +0000
-Subject: Common clock API for i.MX
-In-Reply-To: <CAKGA1bm_rLyMB-Xr-XZQHQRVDySu9JuCoVZL=FFv9sa1y6eD1A@mail.gmail.com>
-References: <CAKGA1bkHgnJQs3_n6QtQjf-8xaPn0YnxMmE2Q=+opWcsp10zQA@mail.gmail.com>
- <20120125084533.GD1068@n2100.arm.linux.org.uk>
- <CAKGA1bm_rLyMB-Xr-XZQHQRVDySu9JuCoVZL=FFv9sa1y6eD1A@mail.gmail.com>
-Message-ID: <20120125144439.GH1068@n2100.arm.linux.org.uk>
+From: sbabic@denx.de (Stefano Babic)
+Date: Wed, 25 Jan 2012 15:49:25 +0100
+Subject: [PATCH] ARM: mxs: read correct values when setting up MAC
+In-Reply-To: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
+References: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <4F201675.6050308@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 07:45:15AM -0600, Matt Sealey wrote:
-> On Wed, Jan 25, 2012 at 2:45 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Jan 24, 2012 at 07:54:08PM -0600, Matt Sealey wrote:
-> >> Hi Arnd/RMK/Sascha,
-> >>
-> >> We're trying to bring up a good batch of drivers here for MX51 and
-> >> EfikaMX systems and noticed that the released 3.2 kernel doesn't
-> >> include the common clock stuff that all the other platforms seem to be
-> >> using.
-> >
-> > As far as I know, it still isn't ready (if it was, surely it would've
-> > been merged?)
-> >
-> > Grepping for clk_prepare() it looks like very few people have converted
-> > over to this - it's just the AMBA stuff, a few bits of OMAP and MXS.
-> > So even if the common clock stuff comes in, almost nothing will be able
-> > to use it:
-> >
-> > arch/arm/common/sa1111.c
-> > arch/arm/common/timer-sp.c
-> > arch/arm/mach-omap2/clock2xxx.c
-> > arch/arm/mach-omap2/clock.h
-> > arch/arm/mach-omap2/prcm.c
-> > arch/arm/mach-omap2/clock2430_data.c
-> > arch/arm/mach-omap2/clock2xxx.h
-> > arch/arm/mach-omap2/clock2420_data.c
-> > arch/arm/mach-mxs/clock-mx23.c
-> > arch/arm/mach-mxs/clock.c
-> > arch/arm/mach-mxs/timer.c
-> > arch/arm/mach-mxs/system.c
-> > arch/arm/mach-mxs/clock-mx28.c
-> > arch/arm/mach-mxs/mach-mx28evk.c
-> > arch/arm/kernel/smp_twd.c
-> > drivers/gpio/gpio-pxa.c
-> > drivers/tty/serial/amba-pl011.c
-> > drivers/tty/serial/mxs-auart.c
-> > drivers/tty/serial/amba-pl010.c
-> > drivers/amba/bus.c
-> > drivers/net/ethernet/freescale/fec.c
-> > drivers/net/can/flexcan.c
-> > drivers/video/omap2/dss/dsi.c
-> > drivers/video/amba-clcd.c
-> > drivers/video/mxsfb.c
-> > drivers/staging/tidspbridge/include/dspbridge/clk.h
-> > drivers/staging/tidspbridge/core/dsp-clock.c
-> > drivers/spi/spi-pl022.c
-> > drivers/mmc/host/mmci.c
-> > drivers/mmc/host/mxs-mmc.c
-> > drivers/dma/mxs-dma.c
-> > drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> >
-> > My conclusion, therefore, is that there's very little actual interest
-> > amongst the ARM community to move towards a common clk API.
+On 24/01/2012 19:57, Wolfram Sang wrote:
+> Currently, the MAC address from the second ethernet is generated from the
+> crypto-key (and not a customer reg) because of a wrong index to the ocotp
+> array.
 > 
-> Maybe it's a chicken-egg thing; nobody wants to work on it until someone else
-> has done some legwork? :)
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> ---
+> 
 
-That was the precise problem which clk_prepare() was meant to solve.
-Precisely nothing was happening in terms of mainline with all the
-discussions going around in circles.
+Hi Wolfram,
 
-We managed to settle on how to solve the problem where some platforms
-want different characteristics from clk_enable(), and nothing happened.
-The discussion kept going around in circles.
+> This looks clearly wrong to me; probably ocotp was a u8 somewhen in the
+> process? I wonder how it works for these boards. Am I missing something?
 
-The whole point of getting clk_prepare() in early was to avoid a big-bang
-day where everything had to be converted in one big step when a platform
-decides to use the common API.
+Maybe you're right, but let's check with the manual:
 
-We know _definitely_ that a common API is going to need clk_prepare(),
-which is why I invested time into kicking that off.  Given the lack of
-uptake of it, I don't know why I bothered - I don't even know why I
-bothered getting involved in the totally useless discussions first time
-around.  It's just been a complete and utter waste of my time.
+> 
+>  arch/arm/mach-mxs/mach-m28evk.c  |    2 +-
+>  arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+> index 2f27582..8d1459d 100644
+> --- a/arch/arm/mach-mxs/mach-m28evk.c
+> +++ b/arch/arm/mach-mxs/mach-m28evk.c
+> @@ -258,7 +258,7 @@ static int __init m28evk_fec_get_mac(void)
+>  	 * so hard-code DENX OUI (C0:E5:4E) here.
+>  	 */
+>  	for (i = 0; i < 2; i++) {
+> -		val = ocotp[i * 4];
+> +		val = ocotp[i];
 
-Like many things in the ARM community, trying to motivate people is an
-impossibility.  It can be seen time and time again.  Like the restart
-changes.
+I can read that HW_OCOTP_CUST0 has the phisycal address 0x8002_C020h,
+and HW_OCOTP_CUST1 ist at 8002_C030h. So the two registers are not
+consecutive and there are some reserved fields between the two registers
+- this is the reason for the i * 4.
 
-It's times like this I don't know why I bother.  That's why I've been
-hacking on the old SA11x0 platforms since Christmas.  At least I don't
-have to deal with trying to get concensus between arguing factions
-which _never_ makes progress even when there's agreement.  I don't have
-to bother with kicking people to get them to update their own hairy code.
-With obsolete hardware there _aren't_ any factions to kick together to
-agree.
+HW_OCOTP_CRYPTO0 is at 8002_C060h, so it is not true that the address is
+currently read from the crypto-key. At least, this is my interpretation...
 
-As I said, I've lost interest in the common clk API.  Totally.  Completely.
-I really don't care so long as it doesn't create difficulties for me and
-the platforms I care about.  That's all I'm going to care about over the
-common clk API in future.  Not whether it solves other peoples problems.
-Call me selfish, but I think it's one of the times I'm justified to be
-given how much work I've tried to put in to that area.
+Best regards,
+Stefano Babic
+
+-- 
+=====================================================================
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+=====================================================================
