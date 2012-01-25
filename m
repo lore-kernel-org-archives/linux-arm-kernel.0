@@ -1,72 +1,105 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jan 2012 14:41:15 +0000
-Subject: [PATCH 33/33] MFD: mcp-sa11x0/assabet: move assabet reset handling
- out of mcp-sa11x0.c
-In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <E1Rq42F-0000a2-F7@rmk-PC.arm.linux.org.uk>
+Date: Wed, 25 Jan 2012 14:44:39 +0000
+Subject: Common clock API for i.MX
+In-Reply-To: <CAKGA1bm_rLyMB-Xr-XZQHQRVDySu9JuCoVZL=FFv9sa1y6eD1A@mail.gmail.com>
+References: <CAKGA1bkHgnJQs3_n6QtQjf-8xaPn0YnxMmE2Q=+opWcsp10zQA@mail.gmail.com>
+ <20120125084533.GD1068@n2100.arm.linux.org.uk>
+ <CAKGA1bm_rLyMB-Xr-XZQHQRVDySu9JuCoVZL=FFv9sa1y6eD1A@mail.gmail.com>
+Message-ID: <20120125144439.GH1068@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the assabet specific reset handling out of mcp-sa11x0.c, into its
-board file.  This leaves the mcp code free from all board specific
-details.
+On Wed, Jan 25, 2012 at 07:45:15AM -0600, Matt Sealey wrote:
+> On Wed, Jan 25, 2012 at 2:45 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Jan 24, 2012 at 07:54:08PM -0600, Matt Sealey wrote:
+> >> Hi Arnd/RMK/Sascha,
+> >>
+> >> We're trying to bring up a good batch of drivers here for MX51 and
+> >> EfikaMX systems and noticed that the released 3.2 kernel doesn't
+> >> include the common clock stuff that all the other platforms seem to be
+> >> using.
+> >
+> > As far as I know, it still isn't ready (if it was, surely it would've
+> > been merged?)
+> >
+> > Grepping for clk_prepare() it looks like very few people have converted
+> > over to this - it's just the AMBA stuff, a few bits of OMAP and MXS.
+> > So even if the common clock stuff comes in, almost nothing will be able
+> > to use it:
+> >
+> > arch/arm/common/sa1111.c
+> > arch/arm/common/timer-sp.c
+> > arch/arm/mach-omap2/clock2xxx.c
+> > arch/arm/mach-omap2/clock.h
+> > arch/arm/mach-omap2/prcm.c
+> > arch/arm/mach-omap2/clock2430_data.c
+> > arch/arm/mach-omap2/clock2xxx.h
+> > arch/arm/mach-omap2/clock2420_data.c
+> > arch/arm/mach-mxs/clock-mx23.c
+> > arch/arm/mach-mxs/clock.c
+> > arch/arm/mach-mxs/timer.c
+> > arch/arm/mach-mxs/system.c
+> > arch/arm/mach-mxs/clock-mx28.c
+> > arch/arm/mach-mxs/mach-mx28evk.c
+> > arch/arm/kernel/smp_twd.c
+> > drivers/gpio/gpio-pxa.c
+> > drivers/tty/serial/amba-pl011.c
+> > drivers/tty/serial/mxs-auart.c
+> > drivers/tty/serial/amba-pl010.c
+> > drivers/amba/bus.c
+> > drivers/net/ethernet/freescale/fec.c
+> > drivers/net/can/flexcan.c
+> > drivers/video/omap2/dss/dsi.c
+> > drivers/video/amba-clcd.c
+> > drivers/video/mxsfb.c
+> > drivers/staging/tidspbridge/include/dspbridge/clk.h
+> > drivers/staging/tidspbridge/core/dsp-clock.c
+> > drivers/spi/spi-pl022.c
+> > drivers/mmc/host/mmci.c
+> > drivers/mmc/host/mxs-mmc.c
+> > drivers/dma/mxs-dma.c
+> > drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> >
+> > My conclusion, therefore, is that there's very little actual interest
+> > amongst the ARM community to move towards a common clk API.
+> 
+> Maybe it's a chicken-egg thing; nobody wants to work on it until someone else
+> has done some legwork? :)
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-sa1100/assabet.c |    8 ++++++++
- drivers/mfd/mcp-sa11x0.c       |    6 ------
- 2 files changed, 8 insertions(+), 6 deletions(-)
+That was the precise problem which clk_prepare() was meant to solve.
+Precisely nothing was happening in terms of mainline with all the
+discussions going around in circles.
 
-diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
-index c45402f..b5955ad 100644
---- a/arch/arm/mach-sa1100/assabet.c
-+++ b/arch/arm/mach-sa1100/assabet.c
-@@ -70,6 +70,13 @@ void ASSABET_BCR_frob(unsigned int mask, unsigned int val)
- 
- EXPORT_SYMBOL(ASSABET_BCR_frob);
- 
-+static void assabet_ucb1x00_reset(enum ucb1x00_reset state)
-+{
-+	if (state == UCB_RST_PROBE)
-+		ASSABET_BCR_set(ASSABET_BCR_CODEC_RST);
-+}
-+
-+
- static void assabet_backlight_power(int on)
- {
- #ifndef ASSABET_PAL_VIDEO
-@@ -201,6 +208,7 @@ static struct irda_platform_data assabet_irda_data = {
- };
- 
- static struct ucb1x00_plat_data assabet_ucb1x00_data = {
-+	.reset		= assabet_ucb1x00_reset,
- 	.gpio_base	= -1,
- };
- 
-diff --git a/drivers/mfd/mcp-sa11x0.c b/drivers/mfd/mcp-sa11x0.c
-index c381436..1c0ceac 100644
---- a/drivers/mfd/mcp-sa11x0.c
-+++ b/drivers/mfd/mcp-sa11x0.c
-@@ -27,8 +27,6 @@
- #include <asm/system.h>
- #include <mach/mcp.h>
- 
--#include <mach/assabet.h>
--
- #define DRIVER_NAME "sa11x0-mcp"
- 
- struct mcp_sa11x0 {
-@@ -208,10 +206,6 @@ static int mcp_sa11x0_probe(struct platform_device *dev)
- 
- 	platform_set_drvdata(dev, mcp);
- 
--	if (machine_is_assabet()) {
--		ASSABET_BCR_set(ASSABET_BCR_CODEC_RST);
--	}
--
- 	/*
- 	 * Initialise device.  Note that we initially
- 	 * set the sampling rate to minimum.
--- 
-1.7.4.4
+We managed to settle on how to solve the problem where some platforms
+want different characteristics from clk_enable(), and nothing happened.
+The discussion kept going around in circles.
+
+The whole point of getting clk_prepare() in early was to avoid a big-bang
+day where everything had to be converted in one big step when a platform
+decides to use the common API.
+
+We know _definitely_ that a common API is going to need clk_prepare(),
+which is why I invested time into kicking that off.  Given the lack of
+uptake of it, I don't know why I bothered - I don't even know why I
+bothered getting involved in the totally useless discussions first time
+around.  It's just been a complete and utter waste of my time.
+
+Like many things in the ARM community, trying to motivate people is an
+impossibility.  It can be seen time and time again.  Like the restart
+changes.
+
+It's times like this I don't know why I bother.  That's why I've been
+hacking on the old SA11x0 platforms since Christmas.  At least I don't
+have to deal with trying to get concensus between arguing factions
+which _never_ makes progress even when there's agreement.  I don't have
+to bother with kicking people to get them to update their own hairy code.
+With obsolete hardware there _aren't_ any factions to kick together to
+agree.
+
+As I said, I've lost interest in the common clk API.  Totally.  Completely.
+I really don't care so long as it doesn't create difficulties for me and
+the platforms I care about.  That's all I'm going to care about over the
+common clk API in future.  Not whether it solves other peoples problems.
+Call me selfish, but I think it's one of the times I'm justified to be
+given how much work I've tried to put in to that area.
