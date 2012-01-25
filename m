@@ -1,197 +1,92 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 25 Jan 2012 18:53:53 +0100
-Subject: [PATCH 05/21] Revert "OMAP3+: PM: SR: add suspend/resume handlers"
-In-Reply-To: <1327504583-13408-6-git-send-email-j-pihet@ti.com>
-References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
- <1327504583-13408-6-git-send-email-j-pihet@ti.com>
-Message-ID: <4F2041B1.6060907@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 25 Jan 2012 10:59:25 -0700
+Subject: [RFC 1/2] irq_domain: Create common xlate functions that device
+ drivers can use
+In-Reply-To: <CACxGe6s3R0fcBSf_YHTpXp15gtEBHRQg5-YM=cDO5UfY9cRGrQ@mail.gmail.com>
+References: <1327450719-25590-1-git-send-email-grant.likely@secretlab.ca>
+ <4F1F5FE0.9090901@gmail.com>
+ <CACxGe6s3R0fcBSf_YHTpXp15gtEBHRQg5-YM=cDO5UfY9cRGrQ@mail.gmail.com>
+Message-ID: <CACxGe6tgGqQSThzVVEzwOdtYkjKHT1uQhZBOkCTwkutyKXDCAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Jean,
+On Tue, Jan 24, 2012 at 10:35 PM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Tue, Jan 24, 2012 at 6:50 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>
+>>
+>> On 01/24/2012 06:18 PM, Grant Likely wrote:
+>>> Rather than having each interrupt controller driver creating its own barely
+>>> unique .xlate function for irq_domain, create a library of translators which
+>>> any driver can use directly.
+>>>
+>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>>> index e7379a3..5e497a0 100644
+>>> --- a/include/linux/irqdomain.h
+>>> +++ b/include/linux/irqdomain.h
+>>> @@ -110,6 +110,9 @@ struct irq_domain {
+>>> ? ? ? void *host_data;
+>>> ? ? ? irq_hw_number_t inval_irq;
+>>>
+>>> + ? ? /* Data for common irq xlate functions */
+>>> + ? ? unsigned int xlate_type;
+>>> +
+>>
+>> How does this get set? Do we want interrupt controllers messing with the
+>> domain struct directly long term?
+>
+> It defaults to IRQ_TYPE_NONE in the alloc function and drivers can
+> override it. ?Alternately it could be made part of the
+> irq_domain_add() arguments, but I'm not thrilled with adding a whole
+> bunch of arguments to the function prototype.
 
-On 1/25/2012 4:16 PM, Jean Pihet wrote:
-> From: Nishanth Menon<nm@ti.com>
->
-> This reverts commit b6be18f0bab68ed304ebbb2d787d1c36237eda62.
+Do you like this better (built on top of this patch)?
 
-That weird, because you revert a patch you introduced just before:
-[PATCH 03/21] OMAP3+: PM: SR: add suspend/resume handlers
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index ef2b1fe..7856c04 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -701,12 +701,10 @@ int irq_domain_xlate_onecell(struct irq_domain
+*d, struct device_node *ctrlr,
+ 			     const u32 *intspec, unsigned int intsize,
+ 			     unsigned long *out_hwirq, unsigned int *out_type)
+ {
+-	if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
+-		 ctrlr->full_name, intsize))
++	if (WARN_ON(intsize < 1))
+ 		return -EINVAL;
+-	*out_hwirq = intspec[0];
+-	*out_type = d->xlate_type;
+-	return 0;
++	return irq_domain_xlate_onetwocell(d, ctrlr, intspec, 1,
++					   out_hwirq, out_type);
+ }
+ EXPORT_SYMBOL_GPL(irq_domain_xlate_onecell);
 
-Moreover this commit id is not relevant since it is probably only in 
-Nishanth's GIT tree.
+@@ -721,12 +719,10 @@ int irq_domain_xlate_twocell(struct irq_domain
+*d, struct device_node *ctrlr,
+ 			const u32 *intspec, unsigned int intsize,
+ 			irq_hw_number_t *out_hwirq, unsigned int *out_type)
+ {
+-	if (WARN(intsize < 2, "Bad intspec for %s: intsize=%i < 2\n",
+-		 ctrlr->full_name, intsize))
++	if (WARN_ON(intsize < 2))
+ 		return -EINVAL;
+-	*out_hwirq = intspec[0];
+-	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+-	return 0;
++	return irq_domain_xlate_onetwocell(d, ctrlr, intspec, intsize,
++					   out_hwirq, out_type);
+ }
+ EXPORT_SYMBOL_GPL(irq_domain_xlate_twocell);
 
-> Revert the patch so that we remove any opportunity of SR disable/enable
-> and any device_scale transitions from conflicting with suspend/resume
-> path by moving the sr enable/disable activity to the very last
-> stage(in pmxx.C). The previous patch tried to optimize suspend resume
-> time, but since device_scale opportunities are from multiple drivers
-> (other than cpufreq), hence reverting back to original approach
->
-> Conflicts:
->
-> 	arch/arm/mach-omap2/smartreflex.c
->
-> Change-Id: I236b0e8259cfb371899dd0c93875739a21358e33
-
-And this looks like gerrit leftover that should not be there.
-
-I guess that path #3 and #5 should just be removed.
-
-Regards,
-Benoit
-
-
-> Signed-off-by: Nishanth Menon<nm@ti.com>
-> Signed-off-by: Jean Pihet<j-pihet@ti.com>
-> ---
->   arch/arm/mach-omap2/smartreflex.c |   90 -------------------------------------
->   1 files changed, 0 insertions(+), 90 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 95fd228..7e755bb 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -24,7 +24,6 @@
->   #include<linux/debugfs.h>
->   #include<linux/delay.h>
->   #include<linux/slab.h>
-> -#include<linux/pm.h>
->   #include<linux/pm_runtime.h>
->
->   #include "common.h"
-> @@ -41,7 +40,6 @@ struct omap_sr {
->   	int				ip_type;
->   	int				nvalue_count;
->   	bool				autocomp_active;
-> -	bool				is_suspended;
->   	u32				clk_length;
->   	u32				err_weight;
->   	u32				err_minlimit;
-> @@ -687,11 +685,6 @@ void omap_sr_enable(struct voltagedomain *voltdm)
->   	if (!sr->autocomp_active)
->   		return;
->
-> -	if (sr->is_suspended) {
-> -		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
-> -		return;
-> -	}
-> -
->   	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
->   		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
->   			"registered\n", __func__);
-> @@ -725,11 +718,6 @@ void omap_sr_disable(struct voltagedomain *voltdm)
->   	if (!sr->autocomp_active)
->   		return;
->
-> -	if (sr->is_suspended) {
-> -		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
-> -		return;
-> -	}
-> -
->   	if (!sr_class || !(sr_class->disable)) {
->   		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
->   			"registered\n", __func__);
-> @@ -763,11 +751,6 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
->   	if (!sr->autocomp_active)
->   		return;
->
-> -	if (sr->is_suspended) {
-> -		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
-> -		return;
-> -	}
-> -
->   	if (!sr_class || !(sr_class->disable)) {
->   		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
->   			"registered\n", __func__);
-> @@ -826,11 +809,6 @@ static int omap_sr_autocomp_store(void *data, u64 val)
->   		return -EINVAL;
->   	}
->
-> -	if (sr_info->is_suspended) {
-> -		pr_warning("%s: in suspended state\n", __func__);
-> -		return -EBUSY;
-> -	}
-> -
->   	/* control enable/disable only if there is a delta in value */
->   	if (sr_info->autocomp_active != val) {
->   		if (!val)
-> @@ -1033,78 +1011,10 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> -static int omap_sr_suspend(struct device *dev)
-> -{
-> -	struct omap_sr_data *pdata;
-> -	struct omap_sr *sr_info;
-> -
-> -	pdata = dev_get_platdata(dev);
-> -	if (!pdata) {
-> -		dev_err(dev, "%s: platform data missing\n", __func__);
-> -		return -EINVAL;
-> -	}
-> -
-> -	sr_info = _sr_lookup(pdata->voltdm);
-> -	if (IS_ERR(sr_info)) {
-> -		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
-> -		return -EINVAL;
-> -	}
-> -
-> -	if (!sr_info->autocomp_active)
-> -		return 0;
-> -
-> -	if (sr_info->is_suspended)
-> -		return 0;
-> -
-> -	omap_sr_disable_reset_volt(pdata->voltdm);
-> -	sr_info->is_suspended = true;
-> -	/* Flag the same info to the other CPUs */
-> -	smp_wmb();
-> -
-> -	return 0;
-> -}
-> -
-> -static int omap_sr_resume(struct device *dev)
-> -{
-> -	struct omap_sr_data *pdata;
-> -	struct omap_sr *sr_info;
-> -
-> -	pdata = dev_get_platdata(dev);
-> -	if (!pdata) {
-> -		dev_err(dev, "%s: platform data missing\n", __func__);
-> -		return -EINVAL;
-> -	}
-> -
-> -	sr_info = _sr_lookup(pdata->voltdm);
-> -	if (IS_ERR(sr_info)) {
-> -		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
-> -		return -EINVAL;
-> -	}
-> -
-> -	if (!sr_info->autocomp_active)
-> -		return 0;
-> -
-> -	if (!sr_info->is_suspended)
-> -		return 0;
-> -
-> -	sr_info->is_suspended = false;
-> -	/* Flag the same info to the other CPUs */
-> -	smp_wmb();
-> -	omap_sr_enable(pdata->voltdm);
-> -
-> -	return 0;
-> -}
-> -
-> -const static struct dev_pm_ops omap_sr_dev_pm_ops = {
-> -	.suspend_noirq = omap_sr_suspend,
-> -	.resume_noirq = omap_sr_resume,
-> -};
-> -
->   static struct platform_driver smartreflex_driver = {
->   	.remove         = omap_sr_remove,
->   	.driver		= {
->   		.name	= "smartreflex",
-> -		.pm	=&omap_sr_dev_pm_ops,
->   	},
->   };
->
+@@ -746,8 +742,7 @@ int irq_domain_xlate_onetwocell(struct irq_domain *d,
+ 				const u32 *intspec, unsigned int intsize,
+ 				unsigned long *out_hwirq, unsigned int *out_type)
+ {
+-	if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
+-		 ctrlr->full_name, intsize))
++	if (WARN_ON(intsize < 1))
+ 		return -EINVAL;
+ 	*out_hwirq = intspec[0];
+ 	*out_type = d->xlate_type;
