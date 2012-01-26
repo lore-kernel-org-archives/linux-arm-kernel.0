@@ -1,157 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Jan 2012 20:19:40 +0800
-Subject: [PATCH] ARM: mx28evk: Simplify GPIO requests
-In-Reply-To: <1327329709-25545-1-git-send-email-fabio.estevam@freescale.com>
-References: <1327329709-25545-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120126121938.GB3523@S2101-09.ap.freescale.net>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu, 26 Jan 2012 13:13:24 +0100
+Subject: [PATCH v3] ARM: support XZ compressed kernels
+In-Reply-To: <4F20353E.70809@bluegiga.com>
+References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
+ <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
+ <op.v4vsotxk2s3iss@ecaz> <4F180128.9060005@bluegiga.com>
+ <op.v8bxi2yu2s3iss@ecaz> <4F20353E.70809@bluegiga.com>
+Message-ID: <op.v8oxkmlr2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 12:41:49PM -0200, Fabio Estevam wrote:
-> Requesting all the GPIOs on a single array (mx28evk_gpios[]) can make the 
-> error handling of gpio_requests much simpler.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, 25 Jan 2012 18:00:46 +0100, Veli-Pekka Peltola  
+<veli-pekka.peltola@bluegiga.com> wrote:
 
-Looks good.  A couple trivial comments below though.
+Hi,
 
-> ---
-> This approach was suggested by Sascha Hauer:
-> http://patchwork.ozlabs.org/patch/124661/
-> 
->  arch/arm/mach-mxs/mach-mx28evk.c |   72 ++++++++-----------------------------
->  1 files changed, 16 insertions(+), 56 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index fdb0a56..6260ec3 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -223,7 +223,6 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
->  /* fec */
->  static void __init mx28evk_fec_reset(void)
->  {
-> -	int ret;
->  	struct clk *clk;
->  
->  	/* Enable fec phy clock */
-> @@ -231,32 +230,6 @@ static void __init mx28evk_fec_reset(void)
->  	if (!IS_ERR(clk))
->  		clk_prepare_enable(clk);
->  
-> -	/* Power up fec phy */
-> -	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
-> -	if (ret) {
-> -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
-> -		return;
-> -	}
-> -
-> -	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
-> -	if (ret) {
-> -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
-> -		return;
-> -	}
-> -
-> -	/* Reset fec phy */
-> -	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
-> -	if (ret) {
-> -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
-> -		return;
-> -	}
-> -
-> -	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
-> -	if (ret) {
-> -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
-> -		return;
-> -	}
-> -
->  	mdelay(1);
+> On 01/19/2012 01:43 PM, Imre Kaloz wrote:
+>> Recent changes introduced an error, but Nico helped me clean that up.
+>> Will submit the final patch to the patch system this weekend.
+>
+> Just a reminder: I was unable to find this from the patch tracking  
+> system. Any updates? Can I help somehow?
 
-This delay is supposed to be in the middle of the two calls here.  As
-we are moving around the first call, can you give it a test to see if
-the mdelay is still mandatory?  I would remove it if it's not necessary.
+It has been added as patch 7001/2 [1]. Let's hope Russell could send it  
+upstream soon, given it's not intrusive and floats around for months now :)
 
->  	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
->  }
-> @@ -417,9 +390,14 @@ static void __init mx28evk_add_regulators(void)
->  static void __init mx28evk_add_regulators(void) {}
->  #endif
->  
-> -static struct gpio mx28evk_lcd_gpios[] = {
-> +static const __initconst struct gpio mx28evk_gpios[] = {
 
-Put __initconst after mx28evk_gpios[], please.
+Imre
 
->  	{ MX28EVK_LCD_ENABLE, GPIOF_OUT_INIT_HIGH, "lcd-enable" },
->  	{ MX28EVK_BL_ENABLE, GPIOF_OUT_INIT_HIGH, "bl-enable" },
-> +	{ MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT, "flexcan-switch" },
-> +	{ MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc0-slot-power" },
-> +	{ MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc1-slot-power" },
-> +	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-phy-power" },
-> +	{ MX28EVK_FEC_PHY_RESET, GPIOF_OUT_INIT_LOW, "fec-phy-reset" },
->  };
->  
->  static const struct mxs_saif_platform_data
-> @@ -447,25 +425,19 @@ static void __init mx28evk_init(void)
->  	if (mx28evk_fec_get_mac())
->  		pr_warn("%s: failed on fec mac setup\n", __func__);
->  
-> +	ret = gpio_request_array(mx28evk_gpios, ARRAY_SIZE(mx28evk_gpios));
-> +
-Unnecessary blank line.
-
-Regards,
-Shawn
-
-> +	if (ret)
-> +		pr_err("One or more GPIOs failed to be requested: %d\n", ret);
-> +
->  	mx28evk_fec_reset();
->  	mx28_add_fec(0, &mx28_fec_pdata[0]);
->  	mx28_add_fec(1, &mx28_fec_pdata[1]);
->  
-> -	ret = gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
-> -				"flexcan-switch");
-> -	if (ret) {
-> -		pr_err("failed to request gpio flexcan-switch: %d\n", ret);
-> -	} else {
-> -		mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
-> -		mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
-> -	}
-> +	mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
-> +	mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
->  
-> -	ret = gpio_request_array(mx28evk_lcd_gpios,
-> -				 ARRAY_SIZE(mx28evk_lcd_gpios));
-> -	if (ret)
-> -		pr_warn("failed to request gpio pins for lcd: %d\n", ret);
-> -	else
-> -		mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
-> +	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
->  
->  	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
->  	mx28_add_saif(0, &mx28evk_mxs_saif_pdata[0]);
-> @@ -480,20 +452,8 @@ static void __init mx28evk_init(void)
->  	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0,
->  			NULL, 0);
->  
-> -	/* power on mmc slot by writing 0 to the gpio */
-> -	ret = gpio_request_one(MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW,
-> -			       "mmc0-slot-power");
-> -	if (ret)
-> -		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
-> -	else
-> -		mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
-> -
-> -	ret = gpio_request_one(MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW,
-> -			       "mmc1-slot-power");
-> -	if (ret)
-> -		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
-> -	else
-> -		mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
-> +	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
-> +	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
->  
->  	mx28_add_rtc_stmp3xxx();
->  
-> -- 
-> 1.7.1
+[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7001/2
