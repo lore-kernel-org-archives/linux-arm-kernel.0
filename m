@@ -1,16 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 26 Jan 2012 19:11:34 +0000
-Subject: [PATCH v1 3/3] ARM: tegra: cpuidle driver for tegra
-In-Reply-To: <1327594923-21822-4-git-send-email-pdeschrijver@nvidia.com>
-References: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
- <1327594923-21822-4-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20120126191134.GA23484@sirena.org.uk>
+From: gregkh@suse.de (Greg KH)
+Date: Thu, 26 Jan 2012 11:16:04 -0800
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+Message-ID: <20120126191604.GA15516@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 06:22:03PM +0200, Peter De Schrijver wrote:
-> CPUidle driver for tegra. In this version only LP3 (clockgating) is supported.
+On Wed, Jan 25, 2012 at 09:31:53PM -0700, Paul Walmsley wrote:
+> On Wed, 25 Jan 2012, Greg KH wrote:
+> 
+> > On Wed, Jan 25, 2012 at 08:02:09PM -0700, Paul Walmsley wrote:
+> > > On Tue, 24 Jan 2012, gregkh at suse.de wrote:
+> > > > 
+> > > > This is a note to let you know that I've just added the patch titled
+> > > > 
+> > > >     tty: serial: OMAP: ensure FIFO levels are set correctly in non-DMA
+> > > > 
+> > > > to my tty git tree which can be found at
+> > > >     git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
+> > > > in the tty-linus branch.
+> > > 
+> > > If it's not too late, I was wondering if you could drop this patch and the 
+> > > subsequent one ("tty: serial: OMAP: transmit FIFO threshold interrupts 
+> > > don't wake the"), in favor of the second version of this series that was 
+> > > just posted at
+> > > 
+> > >    http://marc.info/?l=linux-arm-kernel&m=132754676814391&w=2
+> > > 
+> > > If it is too late, we'll deal with it in 3.4.
+> > 
+> > What is wrong with the patches that I applied?
+> 
+> A new workaround is used that reduces the number of interrupts to normal.  
+> The commit messages are improved since we have a better idea of what was 
+> wrong.  There is also a new patch (patch 3) for a power management 
+> regression in the driver.
+>  
+> > How about a fix-up patch on top of what I have applied instead of whole 
+> > new ones?
+> 
+> That's fine, if that's your preference.  It will be several patches, 
+> though.  And about 75% of the previous series would be reverted, since a 
+> different workaround would be used.
+> 
+> Let me know if that is indeed what you'd like.
 
-Are you aware of the work Rob Lee is doing on providing a common library
-for the ARM generic bits of cpuidle?  I really must convert the s3c64xx
-work I did on that over some time...
+Ok, I've just reverted both of these patches for now, please send new
+ones when you have them.
+
+thanks,
+
+greg k-h
