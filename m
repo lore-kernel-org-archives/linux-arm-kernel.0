@@ -1,36 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jan 2012 20:33:50 +0000
-Subject: at91: pm.h cleanup (was: [PATCH 1/4] at91 : coding style fixes)
-In-Reply-To: <4F217CCD.5000104@atmel.com>
-References: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
- <4F217CCD.5000104@atmel.com>
-Message-ID: <20120126203350.GD11941@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 26 Jan 2012 12:40:06 -0800
+Subject: [PATCH v1 7/8] ARM: tegra: support for Tegra30 CPU powerdomains
+In-Reply-To: <1327597641-7519-8-git-send-email-pdeschrijver@nvidia.com>
+References: <1327597641-7519-1-git-send-email-pdeschrijver@nvidia.com>
+ <1327597641-7519-8-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB8247C@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 05:18:21PM +0100, Nicolas Ferre wrote:
-> Daniel,
-> 
-> I have rebased your patch series on top of:
-> 
-> - at91 late device/board patches that are planned for 3.3
-> - at91-fixes branch (should go also in 3.3)
-> * rmk/for-next branch (with a merge conflict resolved)
-> * the removal of CAP9 SoC family
-> 
-> You can find the resulting code in our git tree:
-> 
-> git://github.com/at91linux/linux-at91.git at91-pm_cleanup
-> 
-> I hope that I will be able to send this branch to arm-soc soon with a
-> minimum of future rebase (when the two first series cited above will be
-> in Linus' tree actually).
+Peter De Schrijver wrote at Thursday, January 26, 2012 10:07 AM:
+> Secondary CPU powerdomains can be powergated on Tegra30. Add the necessary
+> functions to do this. This will be used to boot the secondary CPUs later on.
 
-No you won't, not if you're including rmk/for-next in it.
+> diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
 
-Take a moment to think about that: rmk/for-next is NOT a topic branch.
-It is purely a branch published for the sake of SFR.  It gets torn down
-and regenerated regularly.  You can't base work off it.  It's all explained
-here:
+> -int __init tegra_powergate_init(void)
+...
+> +int  __init tegra_powergate_init(void)
 
-	http://www.arm.linux.org.uk/developer/git-arm.php
+You added an extra space there; probably not really worth fixing unless
+you repost for some other reason.
+
+-- 
+nvpublic
