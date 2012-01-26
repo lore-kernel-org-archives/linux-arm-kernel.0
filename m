@@ -1,55 +1,36 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 26 Jan 2012 14:33:48 -0600
-Subject: [RFC PATCH 6/7] ARM: mtd: nand: davinci: add OF support for
- davinci nand controller
-In-Reply-To: <4F1FAAAE.2060007@denx.de>
-References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-7-git-send-email-hs@denx.de> <4F1DF465.60206@freescale.com>
- <4F1E5C82.60108@denx.de> <4F1F0A3E.40805@freescale.com>
- <4F1FAAAE.2060007@denx.de>
-Message-ID: <4F21B8AC.40002@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Jan 2012 20:33:50 +0000
+Subject: at91: pm.h cleanup (was: [PATCH 1/4] at91 : coding style fixes)
+In-Reply-To: <4F217CCD.5000104@atmel.com>
+References: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F217CCD.5000104@atmel.com>
+Message-ID: <20120126203350.GD11941@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2012 01:09 AM, Heiko Schocher wrote:
-> Scott Wood wrote:
-> I found the following used options:
+On Thu, Jan 26, 2012 at 05:18:21PM +0100, Nicolas Ferre wrote:
+> Daniel,
 > 
-> ecc_mode:
-> NAND_ECC_NONE
-> NAND_ECC_SOFT
-> NAND_ECC_HW
-> NAND_ECC_HW_SYNDROME
+> I have rebased your patch series on top of:
 > 
-> bbt_options:
-> NAND_BBT_USE_FLASH
+> - at91 late device/board patches that are planned for 3.3
+> - at91-fixes branch (should go also in 3.3)
+> * rmk/for-next branch (with a merge conflict resolved)
+> * the removal of CAP9 SoC family
 > 
-> ecc_bits:
-> 1
-> 4
+> You can find the resulting code in our git tree:
 > 
-> options:
-> NAND_BUSWIDTH_16
+> git://github.com/at91linux/linux-at91.git at91-pm_cleanup
 > 
->>>> Do all of these properties really belong here?  I can see providing some
->>> I think so, because this values come from existing platform code
->>> (grep for struct davinci_nand_pdata)
->>
->> The standards are a bit stricter for the device tree, since it's a more
->> stable interface across components -- at least that's how we've used it
->> on a lot of powerpc targets.  I'm not sure if that's the intent here,
->> but I have seen U-Boot patches for ARM hardware using them as well.
-> 
-> Ok, so, should I introduce instead properties for the above
-> needed parameters? 
+> I hope that I will be able to send this branch to arm-soc soon with a
+> minimum of future rebase (when the two first series cited above will be
+> in Linus' tree actually).
 
-Yes.
+No you won't, not if you're including rmk/for-next in it.
 
-> (As this are not davinci specific parameters, are there somewhere such definitions for them?)
+Take a moment to think about that: rmk/for-next is NOT a topic branch.
+It is purely a branch published for the sake of SFR.  It gets torn down
+and regenerated regularly.  You can't base work off it.  It's all explained
+here:
 
-It's controller-specific which options are changeable, and whether
-there's a better source of information.  Most controllers don't seem to
-need this.  I'd keep the definitions davinci specific for now.  If
-there's enough of a common need, a common definition could be considered.
-
--Scott
+	http://www.arm.linux.org.uk/developer/git-arm.php
