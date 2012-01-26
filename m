@@ -1,151 +1,149 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2012 09:09:26 +0100
-Subject: [PATCH 8/8 RESEND] ARM: dma-mapping: add support for IOMMU	mapper
-In-Reply-To: <20120125125916.GE1068@n2100.arm.linux.org.uk>
-References: <1323448798-18184-9-git-send-email-m.szyprowski@samsung.com>
- <1326124161-2220-1-git-send-email-m.szyprowski@samsung.com>
- <20120125125916.GE1068@n2100.arm.linux.org.uk>
-Message-ID: <007a01ccdc01$d2028400$76078c00$%szyprowski@samsung.com>
+Date: Thu, 26 Jan 2012 10:00:45 +0100
+Subject: [PATCH 03/15] mm: compaction: introduce isolate_migratepages_range().
+In-Reply-To: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1327568457-27734-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Michal Nazarewicz <mina86@mina86.com>
 
-On Wednesday, January 25, 2012 1:59 PM Russell King - ARM Linux wrote:
+This commit introduces isolate_migratepages_range() function which
+extracts functionality from isolate_migratepages() so that it can be
+used on arbitrary PFN ranges.
 
-> On Mon, Jan 09, 2012 at 04:49:21PM +0100, Marek Szyprowski wrote:
-> > This patch add a complete implementation of DMA-mapping API for
-> > devices that have IOMMU support. All DMA-mapping calls are supported.
-> >
-> > This patch contains some of the code kindly provided by Krishna Reddy
-> > <vdumpa@nvidia.com> and Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >
-> > ---
-> >
-> > Hello,
-> >
-> > This is the corrected version of the previous patch from the "[PATCH 0/8
-> > v4] ARM: DMA-mapping framework redesign" thread which can be found here:
-> > http://www.spinics.net/lists/linux-mm/msg27382.html
-> >
-> > Previous version had very nasty bug which causes memory trashing if
-> > DMA-mapping managed to allocate pages larger than 4KiB. The problem was
-> > in __iommu_alloc_buffer() function which did not check how many pages
-> > has been left to allocate.
-> 
-> This patch seems to be incomplete.
-> 
-> If the standard DMA API is used (the one which exists in current kernels)
-> and NEED_SG_DMA_LENGTH is enabled, then where do we set the DMA length
-> in the scatterlist?
+isolate_migratepages() function is implemented as a simple wrapper
+around isolate_migratepages_range().
 
-Standard DMA API is also updated to work correctly with NEED_SG_DMA_LENGTH,
-please notice the following chunk:
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ mm/compaction.c |   77 +++++++++++++++++++++++++++++++++++++++---------------
+ 1 files changed, 55 insertions(+), 22 deletions(-)
 
------
-@@ -644,6 +659,9 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist 
-*sg, int nents,
-        int i, j;
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 71a58f6..a42bbdd 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -250,31 +250,34 @@ typedef enum {
+ 	ISOLATE_SUCCESS,	/* Pages isolated, migrate */
+ } isolate_migrate_t;
  
-        for_each_sg(sg, s, nents, i) {
-+#ifdef CONFIG_NEED_SG_DMA_LENGTH
-+               s->dma_length = s->length;
-+#endif
-                s->dma_address = ops->map_page(dev, sg_page(s), s->offset,
-                                                s->length, dir, attrs);
-                if (dma_mapping_error(dev, s->dma_address))
------
-(http://www.spinics.net/lists/arm-kernel/msg154889.html for the reference)
-
-> > diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
-> > new file mode 100644
-> > index 0000000..6668b41
-> > --- /dev/null
-> > +++ b/arch/arm/include/asm/dma-iommu.h
-> > @@ -0,0 +1,36 @@
-> > +#ifndef ASMARM_DMA_IOMMU_H
-> > +#define ASMARM_DMA_IOMMU_H
-> > +
-> > +#ifdef __KERNEL__
-> > +
-> > +#include <linux/mm_types.h>
-> > +#include <linux/scatterlist.h>
-> > +#include <linux/dma-debug.h>
-> > +#include <linux/kmemcheck.h>
-> > +
-> > +#include <asm/memory.h>
-> 
-> I can't see anything in here which needs asm/memory.h - if files which
-> include this need it, please include it in there so we can see why it's
-> needed.
-
-Ok, I will fix this issue.
-
-> 
-> > +
-> > +struct dma_iommu_mapping {
-> > +	/* iommu specific data */
-> > +	struct iommu_domain	*domain;
-> > +
-> > +	void			*bitmap;
-> > +	size_t			bits;
-> > +	unsigned int		order;
-> > +	dma_addr_t		base;
-> > +
-> > +	spinlock_t		lock;
-> > +	struct kref		kref;
-> > +};
-> > +
-> > +struct dma_iommu_mapping *
-> > +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
-> > +			 int order);
-> > +
-> > +void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
-> > +
-> > +int arm_iommu_attach_device(struct device *dev,
-> > +					struct dma_iommu_mapping *mapping);
-> > +
-> > +#endif /* __KERNEL__ */
-> > +#endif
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index 4845c09..2287b01 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -27,6 +27,9 @@
-> >  #include <asm/sizes.h>
-> >  #include <asm/mach/arch.h>
-> >
-> > +#include <linux/iommu.h>
-> 
-> linux/ includes should be grouped together.
-
-Ok, I will fix this.
-
-> 
-> > diff --git a/arch/arm/mm/vmregion.h b/arch/arm/mm/vmregion.h
-> > index 15e9f04..6bbc402 100644
-> > --- a/arch/arm/mm/vmregion.h
-> > +++ b/arch/arm/mm/vmregion.h
-> > @@ -17,7 +17,7 @@ struct arm_vmregion {
-> >  	struct list_head	vm_list;
-> >  	unsigned long		vm_start;
-> >  	unsigned long		vm_end;
-> > -	struct page		*vm_pages;
-> > +	void			*priv;
-> 
-> I want to think about that - I may wish to export the vm_pages via
-> the new dma-mappings file to provide additional information.
-
-For IOMMU case I need to store a page array for each allocated buffer.
-
-I haven't analyzed it yet, but maybe it would be possible to use standard 
-vmalloc style entries and avoid creating separate arm_vmregion for coherent 
-allocations?
-
-Best regards
+-/*
+- * Isolate all pages that can be migrated from the block pointed to by
+- * the migrate scanner within compact_control.
++/**
++ * isolate_migratepages_range() - isolate all migrate-able pages in range.
++ * @zone:	Zone pages are in.
++ * @cc:		Compaction control structure.
++ * @low_pfn:	The first PFN of the range.
++ * @end_pfn:	The one-past-the-last PFN of the range.
++ *
++ * Isolate all pages that can be migrated from the range specified by
++ * [low_pfn, end_pfn).  Returns zero if there is a fatal signal
++ * pending), otherwise PFN of the first page that was not scanned
++ * (which may be both less, equal to or more then end_pfn).
++ *
++ * Assumes that cc->migratepages is empty and cc->nr_migratepages is
++ * zero.
++ *
++ * Apart from cc->migratepages and cc->nr_migratetypes this function
++ * does not modify any cc's fields, in particular it does not modify
++ * (or read for that matter) cc->migrate_pfn.
+  */
+-static isolate_migrate_t isolate_migratepages(struct zone *zone,
+-					struct compact_control *cc)
++static unsigned long
++isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
++			   unsigned long low_pfn, unsigned long end_pfn)
+ {
+-	unsigned long low_pfn, end_pfn;
+ 	unsigned long last_pageblock_nr = 0, pageblock_nr;
+ 	unsigned long nr_scanned = 0, nr_isolated = 0;
+ 	struct list_head *migratelist = &cc->migratepages;
+ 	isolate_mode_t mode = ISOLATE_ACTIVE|ISOLATE_INACTIVE;
+ 
+-	/* Do not scan outside zone boundaries */
+-	low_pfn = max(cc->migrate_pfn, zone->zone_start_pfn);
+-
+-	/* Only scan within a pageblock boundary */
+-	end_pfn = ALIGN(low_pfn + pageblock_nr_pages, pageblock_nr_pages);
+-
+-	/* Do not cross the free scanner or scan within a memory hole */
+-	if (end_pfn > cc->free_pfn || !pfn_valid(low_pfn)) {
+-		cc->migrate_pfn = end_pfn;
+-		return ISOLATE_NONE;
+-	}
+-
+ 	/*
+ 	 * Ensure that there are not too many pages isolated from the LRU
+ 	 * list by either parallel reclaimers or compaction. If there are,
+@@ -283,12 +286,12 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
+ 	while (unlikely(too_many_isolated(zone))) {
+ 		/* async migration should just abort */
+ 		if (!cc->sync)
+-			return ISOLATE_ABORT;
++			return 0;
+ 
+ 		congestion_wait(BLK_RW_ASYNC, HZ/10);
+ 
+ 		if (fatal_signal_pending(current))
+-			return ISOLATE_ABORT;
++			return 0;
+ 	}
+ 
+ 	/* Time to isolate some pages for migration */
+@@ -313,7 +316,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
+ 		} else if (!locked)
+ 			spin_lock_irq(&zone->lru_lock);
+ 
+-		if (!pfn_valid_within(low_pfn))
++		if (!pfn_valid(low_pfn))
+ 			continue;
+ 		nr_scanned++;
+ 
+@@ -374,10 +377,40 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
+ 	acct_isolated(zone, cc);
+ 
+ 	spin_unlock_irq(&zone->lru_lock);
+-	cc->migrate_pfn = low_pfn;
+ 
+ 	trace_mm_compaction_isolate_migratepages(nr_scanned, nr_isolated);
+ 
++	return low_pfn;
++}
++
++/*
++ * Isolate all pages that can be migrated from the block pointed to by
++ * the migrate scanner within compact_control.
++ */
++static isolate_migrate_t isolate_migratepages(struct zone *zone,
++					struct compact_control *cc)
++{
++	unsigned long low_pfn, end_pfn;
++
++	/* Do not scan outside zone boundaries */
++	low_pfn = max(cc->migrate_pfn, zone->zone_start_pfn);
++
++	/* Only scan within a pageblock boundary */
++	end_pfn = ALIGN(low_pfn + pageblock_nr_pages, pageblock_nr_pages);
++
++	/* Do not cross the free scanner or scan within a memory hole */
++	if (end_pfn > cc->free_pfn || !pfn_valid(low_pfn)) {
++		cc->migrate_pfn = end_pfn;
++		return ISOLATE_NONE;
++	}
++
++	/* Perform the isolation */
++	low_pfn = isolate_migratepages_range(zone, cc, low_pfn, end_pfn);
++	if (!low_pfn)
++		return ISOLATE_ABORT;
++
++	cc->migrate_pfn = low_pfn;
++
+ 	return ISOLATE_SUCCESS;
+ }
+ 
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.1.569.g6f426
