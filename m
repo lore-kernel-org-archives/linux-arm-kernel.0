@@ -1,56 +1,52 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2012 16:48:29 +0100
-Subject: [PATCHv19 00/15] Contiguous Memory Allocator
-In-Reply-To: <201201261531.40551.arnd@arndb.de>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <201201261531.40551.arnd@arndb.de>
-Message-ID: <009f01ccdc41$f30a5f70$d91f1e50$%szyprowski@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 26 Jan 2012 17:52:59 +0200
+Subject: [PATCH v7 2/2] video: backlight: support s6e8ax0 panel driver
+ based on MIPI DSI
+In-Reply-To: <4F17AA14.8030100@samsung.com>
+References: <4F17AA14.8030100@samsung.com>
+Message-ID: <1327593179.2843.5.camel@lappy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Thursday, January 26, 2012 4:32 PM Arnd Bergmann wrote:
-
-> On Thursday 26 January 2012, Marek Szyprowski wrote:
-> > Welcome everyone!
-> >
-> > Yes, that's true. This is yet another release of the Contiguous Memory
-> > Allocator patches. This version mainly includes code cleanups requested
-> > by Mel Gorman and a few minor bug fixes.
+On Thu, 2012-01-19 at 14:28 +0900, Donghwa Lee wrote:
+> This patch is amoled panel driver based MIPI DSI interface.
+> S6E8AX0 means it may includes many other ldi controllers, for example,
+> S6E8AA0, S6E8AB0, and so on.
 > 
-> Hi Marek,
+> This patch can be modified depending on each panel properites. For example,
+> second parameter of panel condition register can be changed depending on
+> ldi controller or amoled type.
 > 
-> Thanks for keeping up this work! I really hope it works out for the
-> next merge window.
+> Changes since v6:
+> 	- change data type from const to static const
 > 
-> > TODO (optional):
-> > - implement support for contiguous memory areas placed in HIGHMEM zone
-> > - resolve issue with movable pages with pending io operations
-> 
-> Can you clarify these? I believe the contiguous memory areas in highmem
-> is something that should really be after the existing code is merged
-> into the upstream kernel and should better not be listed as TODO here.
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/video/backlight/Kconfig   |    7 +
+>  drivers/video/backlight/Makefile  |    1 +
+>  drivers/video/backlight/s6e8ax0.c |  898 +++++++++++++++++++++++++++++++++++++
+>  drivers/video/backlight/s6e8ax0.h |   21 +
+>  4 files changed, 927 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/video/backlight/s6e8ax0.c
+>  create mode 100644 drivers/video/backlight/s6e8ax0.h
 
-Ok, I will remove it from the TODO list. Core memory management is very 
-little dependence on HIGHMEM, it is more about DMA-mapping framework to 
-be aware that there might be no lowmem mappings for the allocated pages.
-This can be easily added once the initial version got merged.
- 
-> I haven't followed the last two releases so closely. It seems that
-> in v17 the movable pages with pending i/o was still a major problem
-> but in v18 you added a solution. Is that right? What is still left
-> to be done here then?
+Why is this in backlight directory? It's a panel driver, not a backlight
+driver.
 
-Since v18 the failed allocation is retried in a bit different place in 
-the contiguous memory area what heavily increased overall reliability.
+And the driver is s5p specific, wouldn't a directory like
+drivers/video/s5p/, where both the s5p DSI driver from the previous
+patch and this panel driver could be?
 
-This can be improved by making cma a bit more aware about pending io 
-operations, but I want to leave this after the initial merge.
+ Tomi
 
-I think that there are no major issues left to be resolved now.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120126/73d361ca/attachment.sig>
