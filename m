@@ -1,13 +1,13 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 26 Jan 2012 18:22:02 +0200
-Subject: [PATCH v1 2/3] ARM: tegra: assembler code for LP3
+Date: Thu, 26 Jan 2012 18:22:03 +0200
+Subject: [PATCH v1 3/3] ARM: tegra: cpuidle driver for tegra
 In-Reply-To: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1327594923-21822-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1327594923-21822-4-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure the flow controller for clockgating and enter WFI
+CPUidle driver for tegra. In this version only LP3 (clockgating) is supported.
 
 Based on work by:
 
@@ -16,24 +16,41 @@ Gary King <gking@nvidia.com>
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- arch/arm/mach-tegra/sleep.S |   91 +++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 91 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/sleep.S
+ arch/arm/mach-tegra/Makefile  |    2 +
+ arch/arm/mach-tegra/cpuidle.c |  107 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 109 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/cpuidle.c
 
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index b78bda8..c06c280 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -6,6 +6,8 @@ obj-y                                   += irq.o
+ obj-y                                   += clock.o
+ obj-y                                   += timer.o
+ obj-y					+= fuse.o
++obj-y					+= cpuidle.o
++obj-y					+= sleep.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= powergate.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
 new file mode 100644
-index 0000000..8f9fde1
+index 0000000..d83a8c0
 --- /dev/null
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -0,0 +1,91 @@
++++ b/arch/arm/mach-tegra/cpuidle.c
+@@ -0,0 +1,107 @@
 +/*
-+ * arch/arm/mach-tegra/sleep.S
++ * arch/arm/mach-tegra/cpuidle.c
 + *
-+ * Copyright (c) 2010-2011, NVIDIA Corporation.
-+ * Copyright (c) 2011, Google, Inc.
++ * CPU idle driver for Tegra CPUs
 + *
++ * Copyright (c) 2010-2012, NVIDIA Corporation.
++ * Copyright (c) 2011 Google, Inc.
 + * Author: Colin Cross <ccross@android.com>
 + *         Gary King <gking@nvidia.com>
++ *
++ * Rework for 3.3 by Peter De Schrijver <pdeschrijver@nvidia.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -44,78 +61,91 @@ index 0000000..8f9fde1
 + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
 + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 + * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 + */
 +
-+#include <linux/linkage.h>
-+#include <mach/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/cpu.h>
++#include <linux/cpuidle.h>
++#include <linux/hrtimer.h>
++
 +#include <mach/iomap.h>
 +
-+#include "flowctrl.h"
++extern void tegra_cpu_wfi(void);
 +
-+#define TEGRA_FLOW_CTRL_VIRT (TEGRA_FLOW_CTRL_BASE - IO_PPSB_PHYS \
-+					+ IO_PPSB_VIRT)
++static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
++				struct cpuidle_driver *drv, int index);
 +
-+/* returns the offset of the flow controller halt register for a cpu */
-+.macro cpu_to_halt_reg rd, rcpu
-+	cmp	\rcpu, #0
-+	subne	\rd, \rcpu, #1
-+	movne	\rd, \rd, lsl #3
-+	addne	\rd, \rd, #0x14
-+	moveq	\rd, #0
-+.endm
++struct cpuidle_driver tegra_idle_driver = {
++	.name = "tegra_idle",
++	.owner = THIS_MODULE,
++	.state_count = 1,
++	.states = {
++		[0] = {
++			.enter			= tegra_idle_enter_lp3,
++			.exit_latency		= 10,
++			.target_residency	= 10,
++			.power_usage		= 600,
++			.flags			= CPUIDLE_FLAG_TIME_VALID,
++			.name			= "LP3",
++			.desc			= "CPU flow-controlled",
++		},
++	},
++};
 +
-+/* returns the offset of the flow controller csr register for a cpu */
-+.macro cpu_to_csr_reg rd, rcpu
-+	cmp	\rcpu, #0
-+	subne	\rd, \rcpu, #1
-+	movne	\rd, \rd, lsl #3
-+	addne	\rd, \rd, #0x18
-+	moveq	\rd, #8
-+.endm
++static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
 +
-+/* returns the ID of the current processor */
-+.macro cpu_id, rd
-+	mrc	p15, 0, \rd, c0, c0, 5
-+	and	\rd, \rd, #0xF
-+.endm
++static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
++	struct cpuidle_driver *drv, int index)
++{
++	ktime_t enter, exit;
++	s64 us;
 +
-+/* loads a 32-bit value into a register without a data access */
-+.macro mov32, reg, val
-+	movw	\reg, #:lower16:\val
-+	movt	\reg, #:upper16:\val
-+.endm
++	local_irq_disable();
++	local_fiq_disable();
 +
-+/*
-+ * tegra_cpu_wfi
-+ *
-+ * puts current CPU in clock-gated wfi using the flow controller
-+ *
-+ * corrupts r0-r3
-+ * must be called with MMU on
-+ */
++	enter = ktime_get();
 +
-+ENTRY(tegra_cpu_wfi)
-+	cpu_id	r0
-+	cpu_to_halt_reg r1, r0
-+	cpu_to_csr_reg r2, r0
-+	mov32	r0, TEGRA_FLOW_CTRL_VIRT
-+	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-+	str	r3, [r0, r2]	@ clear event & interrupt status
-+	mov	r3, #FLOW_CTRL_WAIT_FOR_INTERRUPT | FLOW_CTRL_JTAG_RESUME
-+	str	r3, [r0, r1]	@ put flow controller in wait irq mode
-+	dsb
-+	wfi
-+	mov	r3, #0
-+	str	r3, [r0, r1]	@ clear flow controller halt status
-+	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-+	str	r3, [r0, r2]	@ clear event & interrupt status
-+	dsb
-+	mov	pc, lr
-+ENDPROC(tegra_cpu_wfi)
++	tegra_cpu_wfi();
 +
++	exit = ktime_sub(ktime_get(), enter);
++	us = ktime_to_us(exit);
++
++	local_fiq_enable();
++	local_irq_enable();
++
++	dev->last_residency = us;
++
++	return index;
++}
++
++static int __init tegra_cpuidle_init(void)
++{
++	int ret;
++	unsigned int cpu;
++	struct cpuidle_device *dev;
++	struct cpuidle_driver *drv = &tegra_idle_driver;
++
++	ret = cpuidle_register_driver(&tegra_idle_driver);
++	if (ret) {
++		pr_err("CPUidle driver registration failed\n");
++		return ret;
++	}
++
++	for_each_possible_cpu(cpu) {
++		dev = &per_cpu(tegra_idle_device, cpu);
++		dev->cpu = cpu;
++
++		dev->state_count = drv->state_count;
++		ret = cpuidle_register_device(dev);
++		if (ret) {
++			pr_err("CPU%u: CPUidle device registration failed\n",
++				cpu);
++			return ret;
++		}
++	}
++	return 0;
++}
++device_initcall(tegra_cpuidle_init);
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
