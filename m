@@ -1,79 +1,92 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2012 10:00:53 +0100
-Subject: [PATCH 11/15] mm: trigger page reclaim in alloc_contig_range() to
- stabilize watermarks
+Date: Thu, 26 Jan 2012 10:00:57 +0100
+Subject: [PATCH 15/15] ARM: Samsung: use CMA for 2 memory banks for s5p-mfc
+ device
 In-Reply-To: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
 References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1327568457-27734-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1327568457-27734-16-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-alloc_contig_range() performs memory allocation so it also should keep
-track on keeping the correct level of memory watermarks. This commit adds
-a call to *_slowpath style reclaim to grab enough pages to make sure that
-the final collection of contiguous pages from freelists will not starve
-the system.
+Replace custom memory bank initialization using memblock_reserve and
+dma_declare_coherent with a single call to CMA's dma_declare_contiguous.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-CC: Michal Nazarewicz <mina86@mina86.com>
 ---
- mm/page_alloc.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 36 insertions(+), 0 deletions(-)
+ arch/arm/plat-s5p/dev-mfc.c |   51 ++++++-------------------------------------
+ 1 files changed, 7 insertions(+), 44 deletions(-)
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index e35d06b..05eaa82 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -5613,6 +5613,34 @@ static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
- 	return ret;
+diff --git a/arch/arm/plat-s5p/dev-mfc.c b/arch/arm/plat-s5p/dev-mfc.c
+index a30d36b..fcb8400 100644
+--- a/arch/arm/plat-s5p/dev-mfc.c
++++ b/arch/arm/plat-s5p/dev-mfc.c
+@@ -14,6 +14,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
++#include <linux/dma-contiguous.h>
+ #include <linux/memblock.h>
+ #include <linux/ioport.h>
+ 
+@@ -22,52 +23,14 @@
+ #include <plat/irqs.h>
+ #include <plat/mfc.h>
+ 
+-struct s5p_mfc_reserved_mem {
+-	phys_addr_t	base;
+-	unsigned long	size;
+-	struct device	*dev;
+-};
+-
+-static struct s5p_mfc_reserved_mem s5p_mfc_mem[2] __initdata;
+-
+ void __init s5p_mfc_reserve_mem(phys_addr_t rbase, unsigned int rsize,
+ 				phys_addr_t lbase, unsigned int lsize)
+ {
+-	int i;
+-
+-	s5p_mfc_mem[0].dev = &s5p_device_mfc_r.dev;
+-	s5p_mfc_mem[0].base = rbase;
+-	s5p_mfc_mem[0].size = rsize;
+-
+-	s5p_mfc_mem[1].dev = &s5p_device_mfc_l.dev;
+-	s5p_mfc_mem[1].base = lbase;
+-	s5p_mfc_mem[1].size = lsize;
+-
+-	for (i = 0; i < ARRAY_SIZE(s5p_mfc_mem); i++) {
+-		struct s5p_mfc_reserved_mem *area = &s5p_mfc_mem[i];
+-		if (memblock_remove(area->base, area->size)) {
+-			printk(KERN_ERR "Failed to reserve memory for MFC device (%ld bytes at 0x%08lx)\n",
+-			       area->size, (unsigned long) area->base);
+-			area->base = 0;
+-		}
+-	}
+-}
+-
+-static int __init s5p_mfc_memory_init(void)
+-{
+-	int i;
+-
+-	for (i = 0; i < ARRAY_SIZE(s5p_mfc_mem); i++) {
+-		struct s5p_mfc_reserved_mem *area = &s5p_mfc_mem[i];
+-		if (!area->base)
+-			continue;
++	if (dma_declare_contiguous(&s5p_device_mfc_r.dev, rsize, rbase, 0))
++		printk(KERN_ERR "Failed to reserve memory for MFC device (%u bytes at 0x%08lx)\n",
++		       rsize, (unsigned long) rbase);
+ 
+-		if (dma_declare_coherent_memory(area->dev, area->base,
+-				area->base, area->size,
+-				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0)
+-			printk(KERN_ERR "Failed to declare coherent memory for MFC device (%ld bytes at 0x%08lx)\n",
+-			       area->size, (unsigned long) area->base);
+-	}
+-	return 0;
++	if (dma_declare_contiguous(&s5p_device_mfc_l.dev, lsize, lbase, 0))
++		printk(KERN_ERR "Failed to reserve memory for MFC device (%u bytes at 0x%08lx)\n",
++		       rsize, (unsigned long) rbase);
  }
- 
-+/*
-+ * Trigger memory pressure bump to reclaim some pages in order to be able to
-+ * allocate 'count' pages in single page units. Does similar work as
-+ *__alloc_pages_slowpath() function.
-+ */
-+static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
-+{
-+	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
-+	struct zonelist *zonelist = node_zonelist(0, gfp_mask);
-+	int did_some_progress = 0;
-+	int order = 1;
-+	unsigned long watermark;
-+
-+	/* Obey watermarks as if the page was being allocated */
-+	watermark = low_wmark_pages(zone) + count;
-+	while (!zone_watermark_ok(zone, 0, watermark, 0, 0)) {
-+		wake_all_kswapd(order, zonelist, high_zoneidx, zone_idx(zone));
-+
-+		did_some_progress = __perform_reclaim(gfp_mask, order, zonelist,
-+						      NULL);
-+		if (!did_some_progress) {
-+			/* Exhausted what can be done so it's blamo time */
-+			out_of_memory(zonelist, gfp_mask, order, NULL);
-+		}
-+	}
-+	return count;
-+}
-+
- /**
-  * alloc_contig_range() -- tries to allocate given range of pages
-  * @start:	start PFN to allocate
-@@ -5707,6 +5735,14 @@ int alloc_contig_range(unsigned long start, unsigned long end,
- 		goto done;
- 	}
- 
-+	/*
-+	 * Reclaim enough pages to make sure that contiguous allocation
-+	 * will not starve the system.
-+	 */
-+	__reclaim_pages(page_zone(pfn_to_page(outer_start)),
-+		        GFP_HIGHUSER_MOVABLE, end-start);
-+
-+	/* Grab isolated pages from freelists. */
- 	outer_end = isolate_freepages_range(outer_start, end);
- 	if (!outer_end) {
- 		ret = -EBUSY;
+-device_initcall(s5p_mfc_memory_init);
 -- 
 1.7.1.569.g6f426
