@@ -1,53 +1,51 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Jan 2012 21:31:53 -0700 (MST)
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120126042155.GA3185@suse.de>
-References: <13274430881471@kroah.org>
- <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
- <20120126042155.GA3185@suse.de>
-Message-ID: <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+From: sumit.semwal@ti.com (Semwal, Sumit)
+Date: Thu, 26 Jan 2012 11:05:30 +0530
+Subject: [PATCH 1/3] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <20120125200701.GH3896@phenom.ffwll.local>
+References: <1324891397-10877-1-git-send-email-sumit.semwal@ti.com>
+ <1324891397-10877-2-git-send-email-sumit.semwal@ti.com>
+ <4F2035B1.4020204@samsung.com>
+ <20120125200701.GH3896@phenom.ffwll.local>
+Message-ID: <CAB2ybb_5Co38kpahe5PmO5b_uevr0=_3ODnwD1Xy9V0HQ7mPwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2012, Greg KH wrote:
+On Thu, Jan 26, 2012 at 1:37 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Wed, Jan 25, 2012 at 06:02:41PM +0100, Tomasz Stanislawski wrote:
+>> Hi Sumit,
+>>
+>> On 12/26/2011 10:23 AM, Sumit Semwal wrote:
+>> >This is the first step in defining a dma buffer sharing mechanism.
+>> >
+>> [snip]
+>>
+>> >+struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *,
+>> >+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum dma_data_direction);
+>> >+void dma_buf_unmap_attachment(struct dma_buf_attachment *, struct sg_table *);
+>>
+>> I think that you should add enum dma_data_direction as an argument
+>> unmap function. It was mentioned that the dma_buf_attachment should keep
+>> cached and mapped sg_table for performance reasons. The field
+>> dma_buf_attachment::priv seams to be a natural place to keep this sg_table.
+>> To map a buffer the exporter calls dma_map_sg. It needs dma direction
+>> as an argument. The problem is that dma_unmap_sg also needs this
+>> argument but dma direction is not available neither in
+>> dma_buf_unmap_attachment nor in unmap callback. Therefore the exporter
+>> is forced to embed returned sg_table into a bigger structure where
+>> dma direction is remembered. Refer to function vb2_dc_dmabuf_ops_map
+>> at
+>
+> Oops, makes sense. I've totally overlooked that we need to pass in the dma
+> direction also for the unmap call to the dma subsystem. Sumit, can you
+> stitch together that small patch?
 
-> On Wed, Jan 25, 2012 at 08:02:09PM -0700, Paul Walmsley wrote:
-> > On Tue, 24 Jan 2012, gregkh at suse.de wrote:
-> > > 
-> > > This is a note to let you know that I've just added the patch titled
-> > > 
-> > >     tty: serial: OMAP: ensure FIFO levels are set correctly in non-DMA
-> > > 
-> > > to my tty git tree which can be found at
-> > >     git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
-> > > in the tty-linus branch.
-> > 
-> > If it's not too late, I was wondering if you could drop this patch and the 
-> > subsequent one ("tty: serial: OMAP: transmit FIFO threshold interrupts 
-> > don't wake the"), in favor of the second version of this series that was 
-> > just posted at
-> > 
-> >    http://marc.info/?l=linux-arm-kernel&m=132754676814391&w=2
-> > 
-> > If it is too late, we'll deal with it in 3.4.
-> 
-> What is wrong with the patches that I applied?
+Right, of course. I will do that by tomorrow; it is a bank holiday
+today here in India, so.
 
-A new workaround is used that reduces the number of interrupts to normal.  
-The commit messages are improved since we have a better idea of what was 
-wrong.  There is also a new patch (patch 3) for a power management 
-regression in the driver.
- 
-> How about a fix-up patch on top of what I have applied instead of whole 
-> new ones?
-
-That's fine, if that's your preference.  It will be several patches, 
-though.  And about 75% of the previous series would be reverted, since a 
-different workaround would be used.
-
-Let me know if that is indeed what you'd like.
-
-regards
-
-- Paul
+regards,
+~Sumit.
+> -Daniel
+> --
+> Daniel Vetter
+> Mail: daniel at ffwll.ch
+> Mobile: +41 (0)79 365 57 48
