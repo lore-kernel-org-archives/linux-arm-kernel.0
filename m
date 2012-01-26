@@ -1,32 +1,30 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Jan 2012 12:58:59 +0100
-Subject: [GIT PULL] i.MX fixes for -rc
-Message-ID: <20120126115859.GI5446@pengutronix.de>
+Date: Thu, 26 Jan 2012 13:02:33 +0100
+Subject: [PATCH 3/3] ARM: mx3: Let mx31 and mx35 enter in LPM mode in WFI
+In-Reply-To: <1327084990-25402-3-git-send-email-fabio.estevam@freescale.com>
+References: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
+ <1327084990-25402-3-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120126120233.GJ5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Fri, Jan 20, 2012 at 04:43:10PM -0200, Fabio Estevam wrote:
+> The LPM field of register CCMR is used to select the mode that the processor will run
+> when it goes to WFI.
+> 
+> When mx31 enters in WFI mode the LPM field is at its reset value of 0,
+> which configures the mx31 to enter in "wait mode".
+> 
+> On mx35, the LPM field on mx35 is also at 0 after reset, which corresponds 
+> to "run mode" instead of "wait mode".
+> 
+> Instead of relying on the reset value of LPM to set the low power mode for
+> WFI, configure mx31 and mx35 to run in "wait mode"
 
-Please pull the following i.MX fixes for -rc.
+Do you consider this for -rc?
 
 Sascha
 
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-
-  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes
-
-Fabio Estevam (1):
-      ARM: imx: iomux-v1.h: Fix build error due to __init annotation
-
-Julia Lawall (1):
-      arch/arm/mach-imx/mach-mx53_ard.c: add missing iounmap
-
- arch/arm/mach-mx5/board-mx53_ard.c        |    4 +++-
- arch/arm/plat-mxc/include/mach/iomux-v1.h |    2 +-
- 2 files changed, 4 insertions(+), 2 deletions(-)
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
