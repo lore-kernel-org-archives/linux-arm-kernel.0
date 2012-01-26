@@ -1,28 +1,67 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Thu, 26 Jan 2012 15:33:05 +0400
-Subject: [PATCH 17/21] OMAP3430: SR: class3: restrict CPU to run on
-In-Reply-To: <1327504583-13408-18-git-send-email-j-pihet@ti.com>
-References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
- <1327504583-13408-18-git-send-email-j-pihet@ti.com>
-Message-ID: <4F2139F1.6060908@ru.mvista.com>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Thu, 26 Jan 2012 12:58:13 +0100
+Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
+In-Reply-To: <20120125.094020.983282777619146490.hdoyu@nvidia.com>
+References: <20120123150048.GB6269@8bytes.org>
+ <20120125.094020.983282777619146490.hdoyu@nvidia.com>
+Message-ID: <20120126115813.GF6269@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Jan 25, 2012 at 08:40:20AM +0100, Hiroshi Doyu wrote:
+> From: Hiroshi DOYU <hdoyu@nvidia.com>
+> Date: Wed, 16 Nov 2011 17:36:37 +0200
+> Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
+> 
+> Tegra 20 IOMMU H/W, GART (Graphics Address Relocation Table). This
+> patch implements struct iommu_ops for GART for the upper IOMMU API.
+> 
+> This H/W module supports only single virtual address space(domain),
+> and manages a single level 1-to-1 mapping H/W translation page table.
 
-On 25-01-2012 19:16, Jean Pihet wrote:
+Thanks. Applied with a few minor changes and fixes. Please see below.
 
-> From: Nishanth Menon<nm@ti.com>
+> +config TEGRA_IOMMU_GART
+> +	bool "Tegra GART IOMMU Support"
+> +	depends on ARCH_TEGRA_2x_SOC
+> +	default y
 
-> Use SmartReflex AVS Class3 initialization only for OMAP343x family of
-> processors.
+I removed 'default y'. New drivers shouldn't be selected by default.
 
-> Change-Id: I660326bf265541ba4e0feb52853ff6cb9b293aed
+> +static int gart_iommu_map(struct iommu_domain *domain, unsigned long iova,
+> +			  phys_addr_t pa, size_t bytes, int prot)
+> +{
+> +	struct gart_device *gart = domain->priv;
+> +	unsigned long flags;
+> +	unsigned long pfn;
+> +
+> +	if (!gart_iova_range_valid(gart, iova, bytes))
+> +		return -EINVAL;
+> +
+> +	spin_lock_irqsave(&gart->pte_lock, flags);
+> +	pfn = __phys_to_pfn(pa);
+> +	if (!pfn_valid(pfn)) {
+> +		dev_err(gart->dev, "Invalid page: %08x\n", pa);
+> +		spin_unlock(&gart->pte_lock);
 
-    All patchjes from Nishanth Menon seem to contain this line. Please remove 
-it...
+Changed this to spin_unlock_irqrestore().
 
-> Signed-off-by: Nishanth Menon<nm@ti.com>
-> Signed-off-by: Jean Pihet<j-pihet@ti.com>
+> +		return -EINVAL;
+> +	}
+> +	gart_set_pte(gart, iova, GART_PTE(pfn));
+> +	FLUSH_GART_REGS(gart);
+> +	spin_unlock_irqrestore(&gart->pte_lock, flags);
+> +	return 0;
+> +}
+> +
+> +static size_t gart_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+> +			       size_t bytes)
+> +{
+> +	struct gart_device *gart = domain->priv;
+> +	unsigned long flags;
+> +
+> +	if (!gart_iova_range_valid(gart, iova, bytes))
+> +		return -EINVAL;
 
-WBR, Sergei
+Return 0 here instead of -EINVAL. Size_t is unsigned and the unmap path
+returns 0 on failure.
