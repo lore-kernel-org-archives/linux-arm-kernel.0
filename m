@@ -1,327 +1,328 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jan 2012 21:23:19 +0000
-Subject: ARM/ARM-SoC plans for v3.4 merge window
-In-Reply-To: <20120124095009.GS16726@n2100.arm.linux.org.uk>
-References: <20120123114902.GY1068@n2100.arm.linux.org.uk>
- <20120124095009.GS16726@n2100.arm.linux.org.uk>
-Message-ID: <20120126212319.GE11941@n2100.arm.linux.org.uk>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Thu, 26 Jan 2012 21:29:12 +0000
+Subject: [RFC] IIO LRADC for mach-mxs
+In-Reply-To: <201201261130.01130.marek.vasut@gmail.com>
+References: <201201241408.08083.marek.vasut@gmail.com>
+ <201201260149.02030.marek.vasut@gmail.com>
+ <7c6e4600-164a-4f3f-a701-defa3e57884b@email.android.com>
+ <201201261130.01130.marek.vasut@gmail.com>
+Message-ID: <4F21C5A8.8010407@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 09:50:09AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 23, 2012 at 11:49:02AM +0000, Russell King - ARM Linux wrote:
-> > This is an outline of the plan for this cycle, up to the next merge
-> > window, agreed between Olof and myself.
-> > 
-> > As Nicolas' idle changes weren't merged before the last merge window
-> > opened, we have decided that Nicolas will resubmit his changes after
-> > -rc1 (in other words, now) and they will be merged into both the
-> > arm-soc and my trees.
-> > 
-> > I have at least one other patch which has a high 'will cause horrible
-> > conficts' rating (the debug option rearrangement patch), so I'll be
-> > including that for the arm-soc tree as well.
-> > 
-> > However, what this does mean is that Arnd, Olof, and myself will be
-> > in for up to three months of merge hell unless people take account of
-> > these changes.
-> > 
-> > Therefore, our plan is to publish this as a baseline, and we'd really
-> > appreciate any development submitted after that baseline has been
-> > established is based upon those changes and does not conflict with
-> > them.  That may mean you have to pull these changes into your tree
-> > and merge them into your development work (and fix up any conflicts
-> > there yourself.)
-> > 
-> > Once you've taken these changes into your tree, you must not rebase or
-> > modify them.  Changing those commits will cause all hell to break loose,
-> > and we'll have to refuse merging your tree (otherwise we'll be in Linus'
-> > sights for a roasting at gas mark 2 million.)
+On 01/26/2012 10:30 AM, Marek Vasut wrote:
+>> Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>> On Jan 24 2012, J.I. Cameron wrote:
+>>>>> On Jan 24 2012, Wolfram Sang wrote:
+>>>>>> On Tue, Jan 24, 2012 at 02:08:07PM +0100, Marek Vasut wrote:
+>>>>>>> Hi guys,
+>>>>>>>
+>>>>>>> I've been playing with a custom mxs board recently and I'd like
+>>>
+>>> to
+>>>
+>>>>>>> tinker with ADC. Well, apparently there was some effort but it
+>>>
+>>> died
+>>>
+>>>>>>> silently.
+>>>>>>>
+>>>>>>> Now, there are two approaches how to go about the MXS IIO LRADC.
+>>>>>>> Firstly though, here are some hw details:
+>>>>>>>
+>>>>>>> 1) The ADC has 16 channels in total, some dedicated to particular
+>>>>>>> function 2) The ADC can sample only up to 8 channels at the same
+>>>
+>>> time
+>>>
+>>>>>>> 3) The ADC delay triggers can trigger only up to 4 kinds of
+>>>
+>>> sampling
+>>>
+>>>>>>> for those up to 8 selected channel
+>>>>>>>
+>>>>>>> So how should we go about this:
+>>>>>>>
+>>>>>>> A) Implement functions, to configure and select a channel at
+>>>
+>>> probe-time
+>>>
+>>>>>>> and then never allow (at runtime) different channel to be
+>>>
+>>> selected.
+>>>
+>>>>>>> + Channel configuration is static, passed via plat_data
+>>>>>>> + The channels don't need to be reconfigured => when data are
+>>>
+>>> demanded,
+>>>
+>>>>>>> the channel doesn't need to be reconfigured (if it's not
+>>>
+>>> configured in
+>>>
+>>>>>>> one of those 8 options) and the user doesn't need to wait for
+>>>
+>>> data.
+>>>
+>>>>>>> - Only 8 channels can be used
+>>>>>>>
+>>>>>>> B) Allow channel to be configured on-demand -- when it's value is
+>>>>>>> requested, it is configured (if it's not already) for the
+>>>
+>>> particular
+>>>
+>>>>>>> function.
+>>>>>>>
+>>>>>>> + All 16 channels can be used
+>>>>>>> - It's clunky and fragile to breakage
+>>>>>>> - It's hard to implement good channel replacement algo
+>>>
+>>> (replacement as
+>>>
+>>>>>>> on the delay triggers and on those 8 slots)
+>>>>>>>
+>>>>>>> Which way do you consider better ?
+>>>>>>
+>>>>>> CCing Jonathan and the iio-list (as found in MAINTAINERS). They
+>>>
+>>> probably
+>>>
+>>>>>> have more experience regardings those scenarios?
+>>>>>
+>>>>> Thanks Wolfram,
+>>>>>
+>>>>> My instinct is always to make anything configurable at runtime where
+>>>
+>>> we
+>>>
+>>>>> can even vaguely conceive of a reason it might be useful.
+>>>>>
+>>>>> Having said that, right now special function (e.g. input, hwmon
+>>>
+>>> directed
+>>>
+>>>>> channels) are currently set up via board files (will be device tree
+>>>
+>>> the
+>>>
+>>>>> moment anyone has a need).  I doubt there are many usecases where
+>>>
+>>> you'd
+>>>
+>>>>> want to change these functional elements.
+>>>>>
+>>>>> For your channel replacement strategy these special function
+>>>
+>>> channels will
+>>>
+>>>>> be in use if the client is reading form them (e.g. triggered usage).
+>>>
+>>> In
+>>>
+>>>>> IIO we only allow for triggering a whole set of channels off a given
+>>>>> trigger.  It's going to get really ugly otherwise.  Perhaps the
+>>>
+>>> following
+>>>
+>>>>> will work? (I am assuming 0-8 channels can be associated with any of
+>>>
+>>> the
+>>>
+>>>>> 4 triggers subject to the condition that the total number of
+>>>
+>>> channels
+>>>
+>>>>> being captured is less than 8).
+>>>>>
+>>>>> Register 4 iio devices, each with all 16 channels.  Associate one
+>>>
+>>> with
+>>>
+>>>>> each of the triggers.  Driver then maintains a count on channels
+>>>
+>>> enabled
+>>>
+>>>>> and refuses to enable more than 8 whatever happens.  You don't have
+>>>
+>>> a
+>>>
+>>>>> replacement strategy, you simply refuse to have too many.  We
+>>>
+>>> already do
+>>>
+>>>>> this for some of the devices with strange possible channel sets.
+>>>>>
+>>>>> Any in kernel users (hwmon, input etc) will have to be configured to
+>>>
+>>> use
+>>>
+>>>>> the iio device associated with the right trigger.
+>>>>>
+>>>>> Does that do the job for you?
+>>>>>
+>>>>> The reason for associating the triggers with different iio devices
+>>>
+>>> is that
+>>>
+>>>>> a given iio device can only feed a fixed width scan to the demux
+>>>
+>>> unit.
+>>>
+>>>>> Hence if we have some channels triggering at one time and others at
+>>>>> another, there is no way of handling the data stream.  Whilst they
+>>>
+>>> are on
+>>>
+>>>>> the same hardware they are really acting as separate devices that
+>>>
+>>> just
+>>>
+>>>>> happen to share some pins and control hardware.
+>>>>>
+>>>>> (Note I'm being useless and not pushing out the new version of in
+>>>
+>>> kernel
+>>>
+>>>>> IIO stuff, but I should get to that at the weekend if not before -
+>>>
+>>> one
+>>>
+>>>>> fiddly issue with preventing removal of in use devices still to work
+>>>>> out.).
+>>>>
+>>>> Yikes. This device is more complex than I thought.  The 'triggers' as
+>>>
+>>> above
+>>>
+>>>> can also trigger each other alongside causing a set of channels to be
+>>>> captured.
+>>>>
+>>>> I don't think this changes the logic behind my above answer, but it
+>>>
+>>> does
+>>>
+>>>> mean you are going to have some trouble coming up with a control
+>>>
+>>> interface
+>>>
+>>>> for the triggers. This may need some core changes to allow for a
+>>>
+>>> graph of
+>>>
+>>>> triggers setup (it's not even restricted to a tree).  To illustrate.
+>>>> Trigger 1 can fire after T1 secs.  That can then start any other
+>>>
+>>> trigger
+>>>
+>>>> (including restarting it's own count down) and/or cause channels to
+>>>
+>>> be
+>>>
+>>>> sampled.  Lets say it starts trigger 2 and not itself.  Trigger 2
+>>>
+>>> then
+>>>
+>>>> fires after T2 seconds and starts up Triggers 1 and 3. etc...
+>>>>
+>>>> sometimes I think hardware designers go out of their way to make
+>>>
+>>> general
+>>>
+>>>> purpose software design really really tricky...
+>>>
+>>> Hi Jonathan,
+>>>
+>>> let's not overcomplicate things. Let's do it like this:
+>>>
+>>> 1) Register 4 IIO devices
+>>> 2) Each device has one delay trigger
+>>> 3) Each delay trigger can be reconfigured only if it is not used by any
+>>> channel
+>>> (meaning that on that particular IIO, no channel is opened)
+>>> 4) We well allow only 8 channels in total
+>>> 5) Each IIO will have to have attributes -- how many samples it should
+>>> do, how
+>>> long between them
+>>>
+>>> Are there some utils to test the IIO? Other than sysfs, which won't
+>>> allow me to
+>>> try continuous sampling of multiple channels.
+>>>
+>>> M
+>>
+>> Yes. See the documentation directory. Your plan sounds sensible.
 > 
-> Right, although it's out there - but I'd like to get the AMBA changes
-> into it which are already conflicting the Samsung development.  So I'm
-> going to hold off officially asking for people to include the baseline
-> until this evening.  At that point, I will shut down my 'amba' branch
-> and transfer that over; that means I won't be accepting any further
-> acks etc for that work.
+> All right. Also, what did you mean by wiring touchscreen and such? I assume I'd 
+> rather think about it in the design too, but how should I go about it? 
+There are two elements to this.  Pull devices (hwmon type - basicallyl
+polled from userspace) and push device (off trigger).
+
+The connection infrastructure is the same either way.  A version was
+reasonably widely reviewed but picked up some last minute comments that
+I have addressed in my dev tree but not pushed out more publically
+(small issue with order of module removal causing seg faults I need to
+chase down).
+
+Anyhow, discussion wise...
+
+https://lkml.org/lkml/2011/10/20/103
+http://www.spinics.net/lists/linux-iio/msg03930.html
+
+Code wise, if you want to see the latest I just tend to hide my dev
+trees under odd names on kernel.org currentlly see.
+http://git.kernel.org/?p=linux/kernel/git/jic23/iio.git;a=shortlog;h=refs/heads/inkern-staging3
+
+To outline briefly the current form (after working on Greg KHs
+comments). (pretty similar to regulators).
+
+In board file (or device tree - not implemented yet) platform data
+describing the consumers of channels on a given iio device is
+provided as an array of
+
+struct iio_map {
+	const char *adc_channel_label;
+	struct device *consumer_dev;
+	const char *consumer_dev_name;
+	const char *consumer_channel;
+};
+
+The driver then passes and a pointer to the associate iio_device
+to the core.
+
+Lets take the more complex triggered capture case.
+
+A consumer asks the iio_core for all iio_maps that match it (can request
+individual ones of course).
+
+This causes a new buffer to be inserted into a list that are fed
+by a demux unit into which data goes directly from the chip.
+This buffer is alongside any 'iio' buffers that are using the same
+part (and may contain some of the same channels).
+
+It simply calls a callback function provided by the consumer passing
+in a block of data matching one set of channels as requested by the
+consumer.
+
+Example in the tree mentioned above is a half written iio->input
+bridge.   We had some brief discussions a while back about how to
+handle the extra weirdness that touchscreen adcs use and didn't
+reach any firm conclusions IIRC.
+
+I'd imagine you'll need to expand some elements of this to support
+your usecase.  For starters there is no inkernel control of trigger
+parameters at the moment.
+
+All comments welcome.  I'll hopefully get a few mins to get the
+pull interface stuff out shortly then we can start hammering the
+push interface bit and for real fun how to combine the two.
+
+Jonathan
+
+
+
+> Let the 
+> iio driver be a composite device that in turn registers another (input) device? 
+> Or simply put the touchscreen driver input drivers/input/ and export some calls 
+> from the IIO driver to allow the touchscreen driver somehow bind with it?
 > 
-> If you haven't acked changes in the amba branch (eg, to Versatile,
-> Realview etc) then it'll soon be too late...
-
-And we're now there.  So...
-
-Arnd, Olaf,
-
-Please incorporate the latest ARM (for-armsoc branch) changes, which can be found at:
-
-        git://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git for-armsoc
-
-with SHA1 dcf81c1af839b77b44404453ecae6e5ac5a75f05.
-
-This will update the following files:
-
- arch/arm/Kconfig.debug                            |  156 ++++++++++----------
- arch/arm/include/asm/system.h                     |    1 +
- arch/arm/kernel/process.c                         |   27 ++--
- arch/arm/mach-at91/at91cap9.c                     |    8 +
- arch/arm/mach-at91/at91rm9200.c                   |   10 ++
- arch/arm/mach-at91/at91sam9260.c                  |    8 +
- arch/arm/mach-at91/at91sam9261.c                  |    8 +
- arch/arm/mach-at91/at91sam9263.c                  |    8 +
- arch/arm/mach-at91/at91sam9g45.c                  |    7 +
- arch/arm/mach-at91/at91sam9rl.c                   |    8 +
- arch/arm/mach-at91/at91x40.c                      |   12 ++
- arch/arm/mach-at91/include/mach/system.h          |   50 -------
- arch/arm/mach-bcmring/core.c                      |   23 +---
- arch/arm/mach-bcmring/include/mach/system.h       |   28 ----
- arch/arm/mach-clps711x/common.c                   |   16 ++
- arch/arm/mach-clps711x/include/mach/system.h      |   35 -----
- arch/arm/mach-cns3xxx/include/mach/system.h       |   25 ----
- arch/arm/mach-davinci/include/mach/system.h       |   21 ---
- arch/arm/mach-dove/include/mach/system.h          |   17 ---
- arch/arm/mach-ebsa110/core.c                      |   25 ++++
- arch/arm/mach-ebsa110/include/mach/system.h       |   37 -----
- arch/arm/mach-ep93xx/core.c                       |   46 +------
- arch/arm/mach-ep93xx/include/mach/system.h        |    7 -
- arch/arm/mach-exynos/common.c                     |   12 --
- arch/arm/mach-exynos/dma.c                        |   38 +-----
- arch/arm/mach-exynos/include/mach/system.h        |   20 ---
- arch/arm/mach-footbridge/include/mach/system.h    |   13 --
- arch/arm/mach-gemini/Makefile                     |    2 +-
- arch/arm/mach-gemini/idle.c                       |   29 ++++
- arch/arm/mach-gemini/include/mach/system.h        |   14 --
- arch/arm/mach-gemini/irq.c                        |    4 +-
- arch/arm/mach-h720x/common.c                      |   18 +++
- arch/arm/mach-h720x/include/mach/system.h         |   27 ----
- arch/arm/mach-highbank/include/mach/system.h      |   24 ---
- arch/arm/mach-imx/mm-imx3.c                       |   52 ++++----
- arch/arm/mach-imx/pm-imx27.c                      |    3 +-
- arch/arm/mach-integrator/core.c                   |   70 ++--------
- arch/arm/mach-integrator/impd1.c                  |    9 +-
- arch/arm/mach-integrator/include/mach/system.h    |   33 -----
- arch/arm/mach-integrator/integrator_cp.c          |   49 ++------
- arch/arm/mach-iop13xx/include/mach/system.h       |   13 --
- arch/arm/mach-iop32x/include/mach/system.h        |   13 --
- arch/arm/mach-iop33x/include/mach/system.h        |   13 --
- arch/arm/mach-ixp2000/include/mach/system.h       |   14 --
- arch/arm/mach-ixp23xx/core.c                      |    3 +
- arch/arm/mach-ixp23xx/include/mach/system.h       |   16 --
- arch/arm/mach-ixp4xx/common.c                     |    6 +
- arch/arm/mach-ixp4xx/include/mach/system.h        |   19 ---
- arch/arm/mach-kirkwood/include/mach/system.h      |   17 ---
- arch/arm/mach-ks8695/include/mach/system.h        |   27 ----
- arch/arm/mach-lpc32xx/include/mach/system.h       |   27 ----
- arch/arm/mach-lpc32xx/phy3250.c                   |   32 +----
- arch/arm/mach-mmp/include/mach/system.h           |   16 --
- arch/arm/mach-msm/idle.S                          |   36 -----
- arch/arm/mach-msm/idle.c                          |   49 +++++++
- arch/arm/mach-msm/include/mach/system.h           |    1 -
- arch/arm/mach-mv78xx0/include/mach/system.h       |   17 ---
- arch/arm/mach-mx5/mm.c                            |   28 ++---
- arch/arm/mach-mxs/devices.c                       |    8 +-
- arch/arm/mach-mxs/devices/amba-duart.c            |    2 +-
- arch/arm/mach-mxs/include/mach/system.h           |   25 ----
- arch/arm/mach-mxs/pm.c                            |    3 +-
- arch/arm/mach-netx/fb.c                           |   13 +--
- arch/arm/mach-netx/include/mach/system.h          |   28 ----
- arch/arm/mach-nomadik/board-nhk8815.c             |   17 +--
- arch/arm/mach-nomadik/cpu-8815.c                  |    9 +-
- arch/arm/mach-nomadik/include/mach/system.h       |   32 -----
- arch/arm/mach-omap1/include/mach/system.h         |    5 -
- arch/arm/mach-omap1/pm.c                          |   19 +--
- arch/arm/mach-omap2/emu.c                         |   26 +---
- arch/arm/mach-omap2/include/mach/system.h         |    5 -
- arch/arm/mach-omap2/pm24xx.c                      |    4 +-
- arch/arm/mach-omap2/pm34xx.c                      |    6 +-
- arch/arm/mach-omap2/pm44xx.c                      |    8 +-
- arch/arm/mach-omap2/prm_common.c                  |    1 -
- arch/arm/mach-orion5x/include/mach/system.h       |   19 ---
- arch/arm/mach-picoxcell/include/mach/system.h     |   26 ----
- arch/arm/mach-pnx4008/include/mach/system.h       |   29 ----
- arch/arm/mach-prima2/include/mach/system.h        |   17 ---
- arch/arm/mach-pxa/include/mach/system.h           |   15 --
- arch/arm/mach-realview/core.h                     |   20 +--
- arch/arm/mach-realview/include/mach/irqs-pb1176.h |    2 +-
- arch/arm/mach-realview/include/mach/system.h      |   33 -----
- arch/arm/mach-realview/realview_eb.c              |   78 +++++-----
- arch/arm/mach-realview/realview_pb1176.c          |   78 +++++-----
- arch/arm/mach-realview/realview_pb11mp.c          |   78 +++++-----
- arch/arm/mach-realview/realview_pba8.c            |   78 +++++-----
- arch/arm/mach-realview/realview_pbx.c             |   78 +++++-----
- arch/arm/mach-rpc/include/mach/system.h           |   13 --
- arch/arm/mach-s3c2410/include/mach/system.h       |   54 -------
- arch/arm/mach-s3c2412/s3c2412.c                   |    4 +-
- arch/arm/mach-s3c2416/s3c2416.c                   |    3 -
- arch/arm/mach-s3c64xx/include/mach/system.h       |   19 ---
- arch/arm/mach-s5p64x0/common.c                    |   15 +--
- arch/arm/mach-s5p64x0/dma.c                       |   22 +---
- arch/arm/mach-s5p64x0/include/mach/system.h       |   21 ---
- arch/arm/mach-s5pc100/common.c                    |   12 --
- arch/arm/mach-s5pc100/dma.c                       |   38 +-----
- arch/arm/mach-s5pc100/include/mach/system.h       |   19 ---
- arch/arm/mach-s5pv210/common.c                    |   12 --
- arch/arm/mach-s5pv210/dma.c                       |   38 +-----
- arch/arm/mach-s5pv210/include/mach/system.h       |   21 ---
- arch/arm/mach-sa1100/include/mach/system.h        |    9 --
- arch/arm/mach-shark/core.c                        |    6 +
- arch/arm/mach-shark/include/mach/system.h         |   13 --
- arch/arm/mach-shmobile/include/mach/system.h      |    5 -
- arch/arm/mach-spear3xx/include/mach/system.h      |   19 ---
- arch/arm/mach-spear3xx/spear300.c                 |   14 +--
- arch/arm/mach-spear3xx/spear3xx.c                 |   27 +---
- arch/arm/mach-spear6xx/include/mach/system.h      |   19 ---
- arch/arm/mach-spear6xx/spear6xx.c                 |   10 +-
- arch/arm/mach-tegra/common.c                      |    3 +-
- arch/arm/mach-tegra/include/mach/system.h         |   28 ----
- arch/arm/mach-u300/core.c                         |   85 ++---------
- arch/arm/mach-u300/include/mach/system.h          |   14 --
- arch/arm/mach-ux500/devices-common.c              |   13 +--
- arch/arm/mach-ux500/include/mach/system.h         |   20 ---
- arch/arm/mach-versatile/core.c                    |   70 +++++-----
- arch/arm/mach-versatile/core.h                    |   20 +--
- arch/arm/mach-versatile/include/mach/system.h     |   33 -----
- arch/arm/mach-versatile/versatile_pb.c            |   18 ++--
- arch/arm/mach-vexpress/core.h                     |   17 ---
- arch/arm/mach-vexpress/ct-ca9x4.c                 |    8 +-
- arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |    2 +-
- arch/arm/mach-vexpress/include/mach/system.h      |   33 -----
- arch/arm/mach-vexpress/v2m.c                      |   20 ++--
- arch/arm/mach-vt8500/include/mach/system.h        |    5 -
- arch/arm/mach-w90x900/dev.c                       |    1 +
- arch/arm/mach-w90x900/include/mach/system.h       |   19 ---
- arch/arm/mach-zynq/include/mach/system.h          |   23 ---
- arch/arm/plat-mxc/include/mach/system.h           |   25 ----
- arch/arm/plat-omap/include/plat/system.h          |   15 --
- arch/arm/plat-s3c24xx/cpu.c                       |   27 ++++
- arch/arm/plat-spear/include/plat/system.h         |   26 ----
- drivers/amba/bus.c                                |  105 +++++++++++----
- drivers/mmc/host/mmci.c                           |    2 +-
- drivers/of/platform.c                             |    6 +-
- include/linux/amba/bus.h                          |   36 +++++
- 138 files changed, 893 insertions(+), 2303 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/system.h
- delete mode 100644 arch/arm/mach-bcmring/include/mach/system.h
- delete mode 100644 arch/arm/mach-clps711x/include/mach/system.h
- delete mode 100644 arch/arm/mach-cns3xxx/include/mach/system.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/system.h
- delete mode 100644 arch/arm/mach-dove/include/mach/system.h
- delete mode 100644 arch/arm/mach-ebsa110/include/mach/system.h
- delete mode 100644 arch/arm/mach-ep93xx/include/mach/system.h
- delete mode 100644 arch/arm/mach-exynos/include/mach/system.h
- delete mode 100644 arch/arm/mach-footbridge/include/mach/system.h
- create mode 100644 arch/arm/mach-gemini/idle.c
- delete mode 100644 arch/arm/mach-h720x/include/mach/system.h
- delete mode 100644 arch/arm/mach-highbank/include/mach/system.h
- delete mode 100644 arch/arm/mach-integrator/include/mach/system.h
- delete mode 100644 arch/arm/mach-iop13xx/include/mach/system.h
- delete mode 100644 arch/arm/mach-iop32x/include/mach/system.h
- delete mode 100644 arch/arm/mach-iop33x/include/mach/system.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/system.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/system.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/system.h
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/system.h
- delete mode 100644 arch/arm/mach-ks8695/include/mach/system.h
- delete mode 100644 arch/arm/mach-lpc32xx/include/mach/system.h
- delete mode 100644 arch/arm/mach-mmp/include/mach/system.h
- delete mode 100644 arch/arm/mach-msm/idle.S
- create mode 100644 arch/arm/mach-msm/idle.c
- delete mode 100644 arch/arm/mach-mv78xx0/include/mach/system.h
- delete mode 100644 arch/arm/mach-mxs/include/mach/system.h
- delete mode 100644 arch/arm/mach-netx/include/mach/system.h
- delete mode 100644 arch/arm/mach-nomadik/include/mach/system.h
- delete mode 100644 arch/arm/mach-omap1/include/mach/system.h
- delete mode 100644 arch/arm/mach-omap2/include/mach/system.h
- delete mode 100644 arch/arm/mach-orion5x/include/mach/system.h
- delete mode 100644 arch/arm/mach-picoxcell/include/mach/system.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/system.h
- delete mode 100644 arch/arm/mach-prima2/include/mach/system.h
- delete mode 100644 arch/arm/mach-pxa/include/mach/system.h
- delete mode 100644 arch/arm/mach-realview/include/mach/system.h
- delete mode 100644 arch/arm/mach-rpc/include/mach/system.h
- delete mode 100644 arch/arm/mach-s3c2410/include/mach/system.h
- delete mode 100644 arch/arm/mach-s3c64xx/include/mach/system.h
- delete mode 100644 arch/arm/mach-s5p64x0/include/mach/system.h
- delete mode 100644 arch/arm/mach-s5pc100/include/mach/system.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/system.h
- delete mode 100644 arch/arm/mach-sa1100/include/mach/system.h
- delete mode 100644 arch/arm/mach-shark/include/mach/system.h
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/system.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/system.h
- delete mode 100644 arch/arm/mach-tegra/include/mach/system.h
- delete mode 100644 arch/arm/mach-u300/include/mach/system.h
- delete mode 100644 arch/arm/mach-ux500/include/mach/system.h
- delete mode 100644 arch/arm/mach-versatile/include/mach/system.h
- delete mode 100644 arch/arm/mach-vexpress/include/mach/system.h
- delete mode 100644 arch/arm/mach-w90x900/include/mach/system.h
- delete mode 100644 arch/arm/mach-zynq/include/mach/system.h
- delete mode 100644 arch/arm/plat-mxc/include/mach/system.h
- delete mode 100644 arch/arm/plat-omap/include/plat/system.h
- delete mode 100644 arch/arm/plat-spear/include/plat/system.h
-
-through these changes:
-
-Nicolas Pitre (23):
-      ARM: OMAP1: Fix pm_idle during suspend
-      ARM: clean up idle handlers
-      ARM: OMAP: convert idle handlers from pm_idle to arm_pm_idle
-      ARM: mach-s5pv210: use standard arch_idle()
-      ARM: mach-s5pc100: use standard arch_idle()
-      ARM: mach-s5p64x0: move idle handler from pm_idle to arm_pm_idle
-      ARM: mach-exynos: use standard arch_idle()
-      ARM: mach-at91: move special idle code out of line
-      ARM: mach-clps711x: move special idle code out of line
-      ARM: mach-ebsa110: move special idle code out of line
-      ARM: mach-gemini: move special idle code out of line
-      ARM: mach-h720x: move special idle code out of line
-      ARM: s3c24xx: move special idle code to out of line
-      ARM: plat-mxc: hook special idle handlers to arm_pm_idle
-      ARM: mach-msm: hook special idle handlers to arm_pm_idle
-      ARM: mach-ixp23xx: properly disable CPU idle call
-      ARM: mach-ixp4xx: properly disable CPU idle call
-      ARM: mach-shark: properly disable CPU idle call
-      ARM: mach-w90x900: properly disable CPU idle call
-      ARM: mach-s3c64xx: use standard arch_idle() implementation
-      ARM: mach-tegra: properly disable CPU idle call
-      ARM: substitute arch_idle()
-      ARM: big removal of now unused arch_idle()
-
-Russell King (34):
-      ARM: debug: arrange Kconfig options more logically
-      Merge branches 'debug' and 'idle' into for-armsoc
-      ARM: amba: add amba_device allocation/add/put functions
-      ARM: amba: of: convert to use amba_device_alloc
-      ARM: amba: ux500: convert to use amba_device_alloc
-      ARM: amba: integrator: convert to use amba_device_alloc
-      ARM: amba: mxs: convert to use amba_device_alloc
-      ARM: amba: make irq 0 invalid
-      ARM: amba: ux500: get rid of NO_IRQ
-      ARM: amba: get rid of NO_IRQ initializers
-      ARM: amba: samsung: get rid of NO_IRQ initializers
-      ARM: amba: integrator/realview/versatile/vexpress: get rid of NO_IRQ initializers
-      ARM: amba: lpc32xx: get rid of NO_IRQ initializers
-      ARM: amba: mxs: get rid of NO_IRQ initializers
-      ARM: amba: nomadik: get rid of NO_IRQ initializers
-      ARM: amba: netx: get rid of NO_IRQ initializers
-      ARM: amba: spear: get rid of NO_IRQ initializers
-      ARM: amba: u300: get rid of NO_IRQ initializers
-      ARM: amba: make use of -1 IRQs warn
-      ARM: amba: provide common initializers for static amba devices
-      ARM: amba: vexpress: get rid of private platform amba_device initializer
-      ARM: amba: versatile: get rid of private platform amba_device initializer
-      ARM: amba: realview: get rid of private platform amba_device initializer
-      ARM: amba: integrator: use common amba device initializers
-      ARM: amba: omap2: use common amba device initializers
-      ARM: amba: ep93xx: use common amba device initializers
-      ARM: amba: bcmring: use common amba device initializers
-      ARM: amba: netx: use common amba device initializers
-      ARM: amba: lpc32xx: use common amba device initializers
-      ARM: amba: u300: use common amba device initializers
-      ARM: amba: nomadik: use common amba device initializers
-      ARM: amba: spear: use common amba device initializers
-      ARM: amba: samsung: use common amba device initializers
-      Merge branch 'amba' into for-armsoc
-
-Will Deacon (1):
-      ARM: 7300/1: realview: fix definition of GPIO0 interrupt on PB1176 to match TRM
-
-Thanks.
+> M
