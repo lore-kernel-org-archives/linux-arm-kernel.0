@@ -1,46 +1,113 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Jan 2012 09:51:23 -0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <20120126093610.GD2287@S2101-09.ap.freescale.net>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <20120123210052.GS22818@atomide.com>
- <20120126093610.GD2287@S2101-09.ap.freescale.net>
-Message-ID: <20120126175122.GX22818@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 26 Jan 2012 11:15:39 -0700
+Subject: [RFC 1/2] irq_domain: Create common xlate functions that device
+ drivers can use
+In-Reply-To: <4F216819.7030106@gmail.com>
+References: <1327450719-25590-1-git-send-email-grant.likely@secretlab.ca>
+ <4F1F5FE0.9090901@gmail.com>
+ <CACxGe6s3R0fcBSf_YHTpXp15gtEBHRQg5-YM=cDO5UfY9cRGrQ@mail.gmail.com>
+ <CACxGe6tgGqQSThzVVEzwOdtYkjKHT1uQhZBOkCTwkutyKXDCAg@mail.gmail.com>
+ <4F216819.7030106@gmail.com>
+Message-ID: <CACxGe6tseS77b9SGC2OkWUx-GcrVG3P6ziAnCQ2DvY-AdApJ6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 26, 2012 at 7:50 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 01/25/2012 11:59 AM, Grant Likely wrote:
+>> On Tue, Jan 24, 2012 at 10:35 PM, Grant Likely
+>> <grant.likely@secretlab.ca> wrote:
+>>> On Tue, Jan 24, 2012 at 6:50 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>>>
+>>>>
+>>>> On 01/24/2012 06:18 PM, Grant Likely wrote:
+>>>>> Rather than having each interrupt controller driver creating its own barely
+>>>>> unique .xlate function for irq_domain, create a library of translators which
+>>>>> any driver can use directly.
+>>>>>
+>>>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>>>>> index e7379a3..5e497a0 100644
+>>>>> --- a/include/linux/irqdomain.h
+>>>>> +++ b/include/linux/irqdomain.h
+>>>>> @@ -110,6 +110,9 @@ struct irq_domain {
+>>>>> ? ? ? void *host_data;
+>>>>> ? ? ? irq_hw_number_t inval_irq;
+>>>>>
+>>>>> + ? ? /* Data for common irq xlate functions */
+>>>>> + ? ? unsigned int xlate_type;
+>>>>> +
+>>>>
+>>>> How does this get set? Do we want interrupt controllers messing with the
+>>>> domain struct directly long term?
+>>>
+>>> It defaults to IRQ_TYPE_NONE in the alloc function and drivers can
+>>> override it. ?Alternately it could be made part of the
+>>> irq_domain_add() arguments, but I'm not thrilled with adding a whole
+>>> bunch of arguments to the function prototype.
+>>
+>> Do you like this better (built on top of this patch)?
+>
+> Yes, I think it's better.
 
-* Shawn Guo <shawn.guo@linaro.org> [120126 00:53]:
-> 
-> On Mon, Jan 23, 2012 at 01:00:52PM -0800, Tony Lindgren wrote:
-> ...
-> > So to summarize: I suggest we'll just stick to basics to get the system
-> > booting and devices working using device tree. In most cases the device
-> > drivers should be able to configure the suspend and off states in a generic
-> > way using pinctrl API. Everything else, like debugging, we can probably
-> > do with userspace tools.
-> > 
-> > This would mean just using a minimal subset of your binding, probably
-> > very close to what you originally suggested.
-> > 
-> IMHO, as a generic device tree binding, it should be able to cope with
-> different use cases.  It's really free for you to use the minimal
-> subset of the binding as your need, but we should not make the binding
-> design just be that minimal subset to force that everyone else can
-> only use the minimal subset.
+I've changed my mind on this after looking at the generated code.
+These functions are so simple that it actually is larger (both in
+source and object size) to call out to a common function.  I've gone
+back to each _xlate_*() function open coding the two assignments.
 
-The main issue I have is that the example posted in this thread repeats
-the same registers five times for one driver entry alone in the device
-tree data. The repeated registers are TEGRA_PMX_PG_DTA and TEGRA_PMX_PG_DTD
-in the example.
+g.
 
-The alternative values are something that the pinmux/pinconf driver can
-set based on state changes communicated from the driver using these pins.
+>
+>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>> index ef2b1fe..7856c04 100644
+>> --- a/kernel/irq/irqdomain.c
+>> +++ b/kernel/irq/irqdomain.c
+>> @@ -701,12 +701,10 @@ int irq_domain_xlate_onecell(struct irq_domain
+>> *d, struct device_node *ctrlr,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ?const u32 *intspec, unsigned int intsize,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long *out_hwirq, unsigned int *out_type)
+>> ?{
+>> - ? ? if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
+>> - ? ? ? ? ? ? ?ctrlr->full_name, intsize))
+>> + ? ? if (WARN_ON(intsize < 1))
+>> ? ? ? ? ? ? ? return -EINVAL;
+>> - ? ? *out_hwirq = intspec[0];
+>> - ? ? *out_type = d->xlate_type;
+>> - ? ? return 0;
+>> + ? ? return irq_domain_xlate_onetwocell(d, ctrlr, intspec, 1,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?out_hwirq, out_type);
+>> ?}
+>> ?EXPORT_SYMBOL_GPL(irq_domain_xlate_onecell);
+>>
+>> @@ -721,12 +719,10 @@ int irq_domain_xlate_twocell(struct irq_domain
+>> *d, struct device_node *ctrlr,
+>> ? ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
+>> ? ? ? ? ? ? ? ? ? ? ? irq_hw_number_t *out_hwirq, unsigned int *out_type)
+>> ?{
+>> - ? ? if (WARN(intsize < 2, "Bad intspec for %s: intsize=%i < 2\n",
+>> - ? ? ? ? ? ? ?ctrlr->full_name, intsize))
+>> + ? ? if (WARN_ON(intsize < 2))
+>> ? ? ? ? ? ? ? return -EINVAL;
+>> - ? ? *out_hwirq = intspec[0];
+>> - ? ? *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+>> - ? ? return 0;
+>> + ? ? return irq_domain_xlate_onetwocell(d, ctrlr, intspec, intsize,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?out_hwirq, out_type);
+>> ?}
+>> ?EXPORT_SYMBOL_GPL(irq_domain_xlate_twocell);
+>>
+>> @@ -746,8 +742,7 @@ int irq_domain_xlate_onetwocell(struct irq_domain *d,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const u32 *intspec, unsigned int intsize,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *out_hwirq, unsigned int *out_type)
+>> ?{
+>> - ? ? if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
+>> - ? ? ? ? ? ? ?ctrlr->full_name, intsize))
+>> + ? ? if (WARN_ON(intsize < 1))
+>> ? ? ? ? ? ? ? return -EINVAL;
+>> ? ? ? *out_hwirq = intspec[0];
+>> ? ? ? *out_type = d->xlate_type;
+>
 
-That's why I think these alternative states should not be listed in the
-device tree.
 
-Regards,
 
-Tony
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
