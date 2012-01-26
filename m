@@ -1,37 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jan 2012 20:26:30 +0000
-Subject: [PATCH v3] ARM: support XZ compressed kernels
-In-Reply-To: <4F20353E.70809@bluegiga.com>
-References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
- <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
- <op.v4vsotxk2s3iss@ecaz> <4F180128.9060005@bluegiga.com>
- <op.v8bxi2yu2s3iss@ecaz> <4F20353E.70809@bluegiga.com>
-Message-ID: <20120126202630.GB11941@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 26 Jan 2012 12:25:53 -0800
+Subject: [PATCH v1 3/8] ARM: tegra: rework Tegra secondary CPU core bringup
+In-Reply-To: <1327597641-7519-4-git-send-email-pdeschrijver@nvidia.com>
+References: <1327597641-7519-1-git-send-email-pdeschrijver@nvidia.com>
+ <1327597641-7519-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB8246B@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 07:00:46PM +0200, Veli-Pekka Peltola wrote:
-> Hi Imre,
->
-> On 01/19/2012 01:43 PM, Imre Kaloz wrote:
->> Recent changes introduced an error, but Nico helped me clean that up.
->> Will submit the final patch to the patch system this weekend.
->
-> Just a reminder: I was unable to find this from the patch tracking  
-> system. Any updates? Can I help somehow?
+Peter De Schrijver wrote at Thursday, January 26, 2012 10:07 AM:
+> Prepare the Tegra secondary CPU core bringup code for other Tegra variants.
+> The reset handler is also generalized to allow for future introduction of
+> powersaving modes which turn off the CPU cores.
 
-Well, this is where things got to last time around:
+> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
 
-http://lists.arm.linux.org.uk/lurker/message/20110722.200731.32f090d9.en.html
+>  ENTRY(tegra_secondary_startup)
+...
+> +	enable_coresight r0
 
-and then everything stopped.  No further feedback, nothing.  So I've
-been totally ignoring XZ stuff because I've been believing that the
-issue hasn't been fixed.
+> +ENTRY(__tegra_cpu_reset_handler)
+> +
+> +#if DEBUG_CPU_RESET_HANDLER
+> +	enable_coresight r0
+> +	b	.
+> +#endif
 
-It seems that it has now been fixed, back in July.  Nice to have been
-told about that development, etc.
+I'm not sure why the macro call enable_coresight is ifdef'd in one place
+but not the other... Should just the instruction "b ." be inside the
+ifdef?
 
-So yes, as the problem has been resolved, we can now move forward on
-it.  I'm not sure it's -rc material though, so I'll queue it for the
-next merge window.  We've waited six months already since the 'fix'
-went in, so plainly another three won't hurt one bit.
+> diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+
+> +static void tegra_cpu_reset_handler_enable(void)
+
+> +	/*
+> +	 * Prevent further modifications to the physical reset vector.
+> +	 *  NOTE: Has no effect on chips prior to Tegra30.
+> +	 */
+> +	reg = readl(sb_ctrl);
+> +	reg |= 2;
+> +	writel(reg, sb_ctrl);
+> +	wmb();
+
+Should we skip that on Tegra20 then?
+
+> +void __init tegra_cpu_reset_handler_init(void)
+> +{
+> +	unsigned long *cpu_reset_data_start, *cpu_reset_data_end;
+
+Those variables are unused.
+
+-- 
+nvpublic
