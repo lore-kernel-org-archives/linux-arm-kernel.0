@@ -1,24 +1,75 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 26 Jan 2012 16:38:28 +0100
-Subject: [PATCHv19 00/15] Contiguous Memory Allocator
-In-Reply-To: <201201261531.40551.arnd@arndb.de>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <201201261531.40551.arnd@arndb.de>
-Message-ID: <op.v8o62ey93l0zgt@mpn-glaptop>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 26 Jan 2012 17:45:57 +0200
+Subject: [PATCH v7 1/2] video: support MIPI-DSI controller driver
+In-Reply-To: <4F1F4982.5050000@samsung.com>
+References: <4F17AA10.7080604@samsung.com> <4F182ACF.8010302@ti.com>
+ <20120120155121.18880dff.akpm@linux-foundation.org>
+ <4F1F4982.5050000@samsung.com>
+Message-ID: <1327592757.2843.1.camel@lappy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jan 2012 16:31:40 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
-> I haven't followed the last two releases so closely. It seems that
-> in v17 the movable pages with pending i/o was still a major problem
-> but in v18 you added a solution. Is that right? What is still left
-> to be done here then?
+Hi,
 
-In the current version, when allocation fails because of a page with
-pending I/O, CMA automatically tries allocation in another region.
+On Wed, 2012-01-25 at 09:14 +0900, Donghwa Lee wrote:
+> On Sat, 21 Jan 2012 08:51, Andrew Morton wrote:
+> 
+> > On Thu, 19 Jan 2012 20:08:07 +0530
+> > Archit <a0393947@ti.com> wrote:
+> > 
+> >> On Thursday 19 January 2012 10:58 AM, Donghwa Lee wrote:
+> >>> Samsung S5PC210 and EXYNOS SoC platform has MIPI-DSI controller and MIPI-DSI
+> >>> based LCD Panel could be used with it. This patch supports MIPI-DSI driver
+> >>> based Samsung SoC chip.
+> >>>
+> >>> LCD panel driver based MIPI-DSI should be registered to MIPI-DSI driver at
+> >>> machine code and LCD panel driver specific function registered to mipi_dsim_ddi
+> >>> structure at lcd panel init function called system init.
+> >>> In the MIPI-DSI driver, find lcd panel driver by using registered
+> >>> lcd panel name, and then initialize lcd panel driver.
+> >>>
+> >>> Changes since v6:
+> >>> 	- remove obscure compile problems.
+> >>> 	- remove useless codes.
+> >>> 	- modify return errno codes properly
+> >>
+> >> One more comment about 'mipi_dsim.h', it would be better to put it in
+> >> include/video and not 'include/linux'.
+> > 
+> > Yes, that is desirable.
+> > 
+> >>> ---
+> >>>   drivers/video/Kconfig                 |    6 +
+> >>>   drivers/video/Makefile                |    2 +
+> >>>   drivers/video/s5p_mipi_dsi.c          |  599 ++++++++++++++++++++++
+> >>>   drivers/video/s5p_mipi_dsi_common.c   |  896 +++++++++++++++++++++++++++++++++
+> >>>   drivers/video/s5p_mipi_dsi_common.h   |   46 ++
+> >>>   drivers/video/s5p_mipi_dsi_lowlevel.c |  617 +++++++++++++++++++++++
+> >>>   drivers/video/s5p_mipi_dsi_lowlevel.h |  112 ++++
+> >>>   drivers/video/s5p_mipi_dsi_regs.h     |  149 ++++++
+> >>>   include/linux/mipi_dsim.h             |  359 +++++++++++++
+> >>>   9 files changed, 2786 insertions(+), 0 deletions(-)
+> > 
+> > or we could put it in drivers/video/.  It all depends on which other
+> > drivers we expect will need access to this header.
+> > 
+> 
+> No, mipi_dsim.h file includes global interface data, callback function called by machine 
+> file, platform data for mipi-dsi driver and so on. So I think it would be better to put
+> in 'include/video' or 'include/linux'. 
+> Of course it is much better to change name to 's5p_mipi_dsim.h'
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+The header file looks like a platform specific header, so I agree that
+it should start with s5p.
+
+I think we should finally start working on a common DSI framework =).
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120126/e0aef4af/attachment.sig>
