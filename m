@@ -1,118 +1,214 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 26 Jan 2012 18:12:33 +0100
-Subject: [PATCH 2/6] ARM: at91/at91sam9x5: PMC header file
+Date: Thu, 26 Jan 2012 18:12:34 +0100
+Subject: [PATCH 3/6] ARM: at91/at91sam9x5: clock management for at91sam9x5
+ chip family
 In-Reply-To: <1327597957-32662-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1327597957-32662-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <9cd1962fd21bcde4dc14ebc7114702015861eaa6.1327596859.git.nicolas.ferre@atmel.com>
+Message-ID: <ed361827f58fb20a3e281717a3573a027d4ce928.1327596859.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add at91sam9x5 chips family support in PMC header file:
-Alternate prescaler location and CSS lenght for PCKR is added.
-The new Peripheral Control Register management is added.
-Protection mode register is modified to complete its management.
+Several changes to PMC have to be managed for adding this support:
+- alternate prescaler location for both MCKR and PCKR
+- alternate CSS length for PCKR
+- added cpu_is_at91sam9x5() to functional switches
+- manage UTMI bias like sam9g45 chip family
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/mach-at91/include/mach/at91_pmc.h |   60 ++++++++++++++++++++++------
- 1 files changed, 48 insertions(+), 12 deletions(-)
+ arch/arm/mach-at91/clock.c |   83 ++++++++++++++++++++++++++++++++++----------
+ 1 files changed, 64 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
-index dbdd6ae..f9fdbbe 100644
---- a/arch/arm/mach-at91/include/mach/at91_pmc.h
-+++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
-@@ -45,9 +45,13 @@
- #define		AT91_PMC_BIASCOUNT	(0xf << 28)		/* UTMI BIAS Start-up Time */
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index aa04e22..a5291e0 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -48,24 +48,37 @@
+  * Chips have some kind of clocks : group them by functionality
+  */
+ #define cpu_has_utmi()		(  cpu_is_at91sam9rl() \
+-				|| cpu_is_at91sam9g45())
++				|| cpu_is_at91sam9g45() \
++				|| cpu_is_at91sam9x5())
  
- #define	AT91_CKGR_MOR		(AT91_PMC + 0x20)	/* Main Oscillator Register [not on SAM9RL] */
--#define		AT91_PMC_MOSCEN		(1    << 0)		/* Main Oscillator Enable */
--#define		AT91_PMC_OSCBYPASS	(1    << 1)		/* Oscillator Bypass [SAM9x] */
--#define		AT91_PMC_OSCOUNT	(0xff << 8)		/* Main Oscillator Start-up Time */
-+#define		AT91_PMC_MOSCEN		(1    <<  0)		/* Main Oscillator Enable */
-+#define		AT91_PMC_OSCBYPASS	(1    <<  1)		/* Oscillator Bypass */
-+#define		AT91_PMC_MOSCRCEN	(1    <<  3)		/* Main On-Chip RC Oscillator Enable [some SAM9] */
-+#define		AT91_PMC_OSCOUNT	(0xff <<  8)		/* Main Oscillator Start-up Time */
-+#define		AT91_PMC_KEY		(0x37 << 16)		/* MOR Writing Key */
-+#define		AT91_PMC_MOSCSEL	(1    << 24)		/* Main Oscillator Selection [some SAM9] */
-+#define		AT91_PMC_CFDEN		(1    << 25)		/* Clock Failure Detector Enable [some SAM9] */
+ #define cpu_has_800M_plla()	(  cpu_is_at91sam9g20() \
+-				|| cpu_is_at91sam9g45())
++				|| cpu_is_at91sam9g45() \
++				|| cpu_is_at91sam9x5())
  
- #define	AT91_CKGR_MCFR		(AT91_PMC + 0x24)	/* Main Clock Frequency Register */
- #define		AT91_PMC_MAINF		(0xffff <<  0)		/* Main Clock Frequency */
-@@ -72,14 +76,24 @@
- #define			AT91_PMC_CSS_PLLA		(2 << 0)
- #define			AT91_PMC_CSS_PLLB		(3 << 0)
- #define			AT91_PMC_CSS_UPLL		(3 << 0)	/* [some SAM9 only] */
--#define		AT91_PMC_PRES		(7 <<  2)		/* Master Clock Prescaler */
--#define			AT91_PMC_PRES_1			(0 << 2)
--#define			AT91_PMC_PRES_2			(1 << 2)
--#define			AT91_PMC_PRES_4			(2 << 2)
--#define			AT91_PMC_PRES_8			(3 << 2)
--#define			AT91_PMC_PRES_16		(4 << 2)
--#define			AT91_PMC_PRES_32		(5 << 2)
--#define			AT91_PMC_PRES_64		(6 << 2)
-+#define		PMC_PRES_OFFSET		2
-+#define		AT91_PMC_PRES		(7 <<  PMC_PRES_OFFSET)		/* Master Clock Prescaler */
-+#define			AT91_PMC_PRES_1			(0 << PMC_PRES_OFFSET)
-+#define			AT91_PMC_PRES_2			(1 << PMC_PRES_OFFSET)
-+#define			AT91_PMC_PRES_4			(2 << PMC_PRES_OFFSET)
-+#define			AT91_PMC_PRES_8			(3 << PMC_PRES_OFFSET)
-+#define			AT91_PMC_PRES_16		(4 << PMC_PRES_OFFSET)
-+#define			AT91_PMC_PRES_32		(5 << PMC_PRES_OFFSET)
-+#define			AT91_PMC_PRES_64		(6 << PMC_PRES_OFFSET)
-+#define		PMC_ALT_PRES_OFFSET	4
-+#define		AT91_PMC_ALT_PRES	(7 <<  PMC_ALT_PRES_OFFSET)		/* Master Clock Prescaler [alternate location] */
-+#define			AT91_PMC_ALT_PRES_1		(0 << PMC_ALT_PRES_OFFSET)
-+#define			AT91_PMC_ALT_PRES_2		(1 << PMC_ALT_PRES_OFFSET)
-+#define			AT91_PMC_ALT_PRES_4		(2 << PMC_ALT_PRES_OFFSET)
-+#define			AT91_PMC_ALT_PRES_8		(3 << PMC_ALT_PRES_OFFSET)
-+#define			AT91_PMC_ALT_PRES_16		(4 << PMC_ALT_PRES_OFFSET)
-+#define			AT91_PMC_ALT_PRES_32		(5 << PMC_ALT_PRES_OFFSET)
-+#define			AT91_PMC_ALT_PRES_64		(6 << PMC_ALT_PRES_OFFSET)
- #define		AT91_PMC_MDIV		(3 <<  8)		/* Master Clock Division */
- #define			AT91RM9200_PMC_MDIV_1		(0 << 8)	/* [AT91RM9200 only] */
- #define			AT91RM9200_PMC_MDIV_2		(1 << 8)
-@@ -103,7 +117,14 @@
- #define			AT91_PMC_USBS_UPLL		(1 << 0)
- #define		AT91_PMC_OHCIUSBDIV	(0xF <<  8)		/* Divider for USB OHCI Clock */
+ #define cpu_has_300M_plla()	(cpu_is_at91sam9g10())
  
-+#define	AT91_PMC_SMD		(AT91_PMC + 0x3c)	/* Soft Modem Clock Register [some SAM9 only] */
-+#define		AT91_PMC_SMDS		(0x1  <<  0)		/* SMD input clock selection */
-+#define		AT91_PMC_SMD_DIV	(0x1f <<  8)		/* SMD input clock divider */
-+#define		AT91_PMC_SMDDIV(n)	(((n) <<  8) & AT91_PMC_SMD_DIV)
+ #define cpu_has_pllb()		(!(cpu_is_at91sam9rl() \
+-				|| cpu_is_at91sam9g45()))
++				|| cpu_is_at91sam9g45() \
++				|| cpu_is_at91sam9x5()))
+ 
+-#define cpu_has_upll()		(cpu_is_at91sam9g45())
++#define cpu_has_upll()		(cpu_is_at91sam9g45() \
++				|| cpu_is_at91sam9x5())
+ 
+ /* USB host HS & FS */
+ #define cpu_has_uhp()		(!cpu_is_at91sam9rl())
+ 
+ /* USB device FS only */
+ #define cpu_has_udpfs()		(!(cpu_is_at91sam9rl() \
+-				|| cpu_is_at91sam9g45()))
++				|| cpu_is_at91sam9g45() \
++				|| cpu_is_at91sam9x5()))
 +
- #define	AT91_PMC_PCKR(n)	(AT91_PMC + 0x40 + ((n) * 4))	/* Programmable Clock 0-N Registers */
-+#define		AT91_PMC_ALT_PCKR_CSS	(0x7 <<  0)		/* Programmable Clock Source Selection [alternate length] */
-+#define			AT91_PMC_CSS_MASTER		(4 << 0)	/* [some SAM9 only] */
- #define		AT91_PMC_CSSMCK		(0x1 <<  8)		/* CSS or Master Clock Selection */
- #define			AT91_PMC_CSSMCK_CSS		(0 << 8)
- #define			AT91_PMC_CSSMCK_MCK		(1 << 8)
-@@ -120,10 +141,25 @@
- #define		AT91_PMC_PCK1RDY	(1 <<  9)		/* Programmable Clock 1 */
- #define		AT91_PMC_PCK2RDY	(1 << 10)		/* Programmable Clock 2 */
- #define		AT91_PMC_PCK3RDY	(1 << 11)		/* Programmable Clock 3 */
-+#define		AT91_PMC_MOSCSELS	(1 << 16)		/* Main Oscillator Selection [some SAM9] */
-+#define		AT91_PMC_MOSCRCS	(1 << 17)		/* Main On-Chip RC [some SAM9] */
-+#define		AT91_PMC_CFDEV		(1 << 18)		/* Clock Failure Detector Event [some SAM9] */
- #define	AT91_PMC_IMR		(AT91_PMC + 0x6c)	/* Interrupt Mask Register */
- 
- #define AT91_PMC_PROT		(AT91_PMC + 0xe4)	/* Write Protect Mode Register [some SAM9] */
--#define		AT91_PMC_PROTKEY	0x504d4301	/* Activation Code */
-+#define		AT91_PMC_WPEN		(0x1  <<  0)		/* Write Protect Enable */
-+#define		AT91_PMC_WPKEY		(0xffffff << 8)		/* Write Protect Key */
-+#define		AT91_PMC_PROTKEY	(0x504d43 << 8)		/* Activation Code */
++#define cpu_has_plladiv2()	(cpu_is_at91sam9g45() \
++				|| cpu_is_at91sam9x5())
 +
-+#define AT91_PMC_WPSR		(AT91_PMC + 0xe8)	/* Write Protect Status Register [some SAM9] */
-+#define		AT91_PMC_WPVS		(0x1  <<  0)		/* Write Protect Violation Status */
-+#define		AT91_PMC_WPVSRC		(0xffff  <<  8)		/* Write Protect Violation Source */
++#define cpu_has_mdiv3()		(cpu_is_at91sam9g45() \
++				|| cpu_is_at91sam9x5())
++
++#define cpu_has_alt_prescaler()	(cpu_is_at91sam9x5())
  
-+#define AT91_PMC_PCR		(AT91_PMC + 0x10c)	/* Peripheral Control Register [some SAM9] */
-+#define		AT91_PMC_PCR_PID	(0x3f  <<  0)		/* Peripheral ID */
-+#define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command */
-+#define		AT91_PMC_PCR_DIV	(0x3  <<  16)		/* Divisor Value */
-+#define		AT91_PMC_PCRDIV(n)	(((n) <<  16) & AT91_PMC_PCR_DIV)
-+#define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
+ static LIST_HEAD(clocks);
+ static DEFINE_SPINLOCK(clk_lock);
+@@ -138,13 +151,6 @@ static void pmc_uckr_mode(struct clk *clk, int is_on)
+ {
+ 	unsigned int uckr = at91_sys_read(AT91_CKGR_UCKR);
  
- #endif
+-	if (cpu_is_at91sam9g45()) {
+-		if (is_on)
+-			uckr |= AT91_PMC_BIASEN;
+-		else
+-			uckr &= ~AT91_PMC_BIASEN;
+-	}
+-
+ 	if (is_on) {
+ 		is_on = AT91_PMC_LOCKU;
+ 		at91_sys_write(AT91_CKGR_UCKR, uckr | clk->pmc_mask);
+@@ -209,11 +215,24 @@ static struct clk __init *at91_css_to_clk(unsigned long css)
+ 				return &utmi_clk;
+ 			else if (cpu_has_pllb())
+ 				return &pllb;
++			break;
++		/* alternate PMC: can use master clock */
++		case AT91_PMC_CSS_MASTER:
++			return &mck;
+ 	}
+ 
+ 	return NULL;
+ }
+ 
++static int pmc_prescaler_divider(u32 reg)
++{
++	if (cpu_has_alt_prescaler()) {
++		return 1 << ((reg & AT91_PMC_ALT_PRES) >> PMC_ALT_PRES_OFFSET);
++	} else {
++		return 1 << ((reg & AT91_PMC_PRES) >> PMC_PRES_OFFSET);
++	}
++}
++
+ static void __clk_enable(struct clk *clk)
+ {
+ 	if (clk->parent)
+@@ -315,12 +334,22 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ {
+ 	unsigned long	flags;
+ 	unsigned	prescale;
++	unsigned long	prescale_offset, css_mask;
+ 	unsigned long	actual;
+ 
+ 	if (!clk_is_programmable(clk))
+ 		return -EINVAL;
+ 	if (clk->users)
+ 		return -EBUSY;
++
++	if (cpu_has_alt_prescaler()) {
++		prescale_offset = PMC_ALT_PRES_OFFSET;
++		css_mask = AT91_PMC_ALT_PCKR_CSS;
++	} else {
++		prescale_offset = PMC_PRES_OFFSET;
++		css_mask = AT91_PMC_CSS;
++	}
++
+ 	spin_lock_irqsave(&clk_lock, flags);
+ 
+ 	actual = clk->parent->rate_hz;
+@@ -329,8 +358,8 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 			u32	pckr;
+ 
+ 			pckr = at91_sys_read(AT91_PMC_PCKR(clk->id));
+-			pckr &= AT91_PMC_CSS;	/* clock selection */
+-			pckr |= prescale << 2;
++			pckr &= css_mask;	/* keep clock selection */
++			pckr |= prescale << prescale_offset;
+ 			at91_sys_write(AT91_PMC_PCKR(clk->id), pckr);
+ 			clk->rate_hz = actual;
+ 			break;
+@@ -377,11 +406,17 @@ static void __init init_programmable_clock(struct clk *clk)
+ {
+ 	struct clk	*parent;
+ 	u32		pckr;
++	unsigned int	css_mask;
++
++	if (cpu_has_alt_prescaler())
++		css_mask = AT91_PMC_ALT_PCKR_CSS;
++	else
++		css_mask = AT91_PMC_CSS;
+ 
+ 	pckr = at91_sys_read(AT91_PMC_PCKR(clk->id));
+-	parent = at91_css_to_clk(pckr & AT91_PMC_CSS);
++	parent = at91_css_to_clk(pckr & css_mask);
+ 	clk->parent = parent;
+-	clk->rate_hz = parent->rate_hz / (1 << ((pckr & AT91_PMC_PRES) >> 2));
++	clk->rate_hz = parent->rate_hz / pmc_prescaler_divider(pckr);
+ }
+ 
+ #endif	/* CONFIG_AT91_PROGRAMMABLE_CLOCKS */
+@@ -663,7 +698,7 @@ int __init at91_clock_init(unsigned long main_clock)
+ 	if (pll_overclock)
+ 		pr_info("Clocks: PLLA overclocked, %ld MHz\n", plla.rate_hz / 1000000);
+ 
+-	if (cpu_is_at91sam9g45()) {
++	if (cpu_has_plladiv2()) {
+ 		mckr = at91_sys_read(AT91_PMC_MCKR);
+ 		plla.rate_hz /= (1 << ((mckr & AT91_PMC_PLLADIV2) >> 12));	/* plla divisor by 2 */
+ 	}
+@@ -685,6 +720,10 @@ int __init at91_clock_init(unsigned long main_clock)
+ 		 * (obtain the USB High Speed 480 MHz when input is 12 MHz)
+ 		 */
+ 		utmi_clk.rate_hz = 40 * utmi_clk.parent->rate_hz;
++
++		/* UTMI bias and PLL are managed at the same time */
++		if (cpu_has_upll())
++			utmi_clk.pmc_mask |= AT91_PMC_BIASEN;
+ 	}
+ 
+ 	/*
+@@ -703,7 +742,7 @@ int __init at91_clock_init(unsigned long main_clock)
+ 	mckr = at91_sys_read(AT91_PMC_MCKR);
+ 	mck.parent = at91_css_to_clk(mckr & AT91_PMC_CSS);
+ 	freq = mck.parent->rate_hz;
+-	freq /= (1 << ((mckr & AT91_PMC_PRES) >> 2));				/* prescale */
++	freq /= pmc_prescaler_divider(mckr);					/* prescale */
+ 	if (cpu_is_at91rm9200()) {
+ 		mck.rate_hz = freq / (1 + ((mckr & AT91_PMC_MDIV) >> 8));	/* mdiv */
+ 	} else if (cpu_is_at91sam9g20()) {
+@@ -711,13 +750,19 @@ int __init at91_clock_init(unsigned long main_clock)
+ 			freq / ((mckr & AT91_PMC_MDIV) >> 7) : freq;	/* mdiv ; (x >> 7) = ((x >> 8) * 2) */
+ 		if (mckr & AT91_PMC_PDIV)
+ 			freq /= 2;		/* processor clock division */
+-	} else if (cpu_is_at91sam9g45()) {
++	} else if (cpu_has_mdiv3()) {
+ 		mck.rate_hz = (mckr & AT91_PMC_MDIV) == AT91SAM9_PMC_MDIV_3 ?
+ 			freq / 3 : freq / (1 << ((mckr & AT91_PMC_MDIV) >> 8));	/* mdiv */
+ 	} else {
+ 		mck.rate_hz = freq / (1 << ((mckr & AT91_PMC_MDIV) >> 8));		/* mdiv */
+ 	}
+ 
++	if (cpu_has_alt_prescaler()) {
++		/* Programmable clocks can use MCK */
++		mck.type |= CLK_TYPE_PRIMARY;
++		mck.id = 4;
++	}
++
+ 	/* Register the PMC's standard clocks */
+ 	for (i = 0; i < ARRAY_SIZE(standard_pmc_clocks); i++)
+ 		at91_clk_add(standard_pmc_clocks[i]);
 -- 
 1.7.5.4
