@@ -1,74 +1,96 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 26 Jan 2012 16:45:56 +0200
-Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
-In-Reply-To: <20120126115813.GF6269@8bytes.org>
-References: <20120123150048.GB6269@8bytes.org>
- <20120125.094020.983282777619146490.hdoyu@nvidia.com>
- <20120126115813.GF6269@8bytes.org>
-Message-ID: <20120126164556.75e2d38d09821fc1e0ff05d6@nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 26 Jan 2012 08:50:01 -0600
+Subject: [RFC 1/2] irq_domain: Create common xlate functions that device
+ drivers can use
+In-Reply-To: <CACxGe6tgGqQSThzVVEzwOdtYkjKHT1uQhZBOkCTwkutyKXDCAg@mail.gmail.com>
+References: <1327450719-25590-1-git-send-email-grant.likely@secretlab.ca>
+ <4F1F5FE0.9090901@gmail.com>
+ <CACxGe6s3R0fcBSf_YHTpXp15gtEBHRQg5-YM=cDO5UfY9cRGrQ@mail.gmail.com>
+ <CACxGe6tgGqQSThzVVEzwOdtYkjKHT1uQhZBOkCTwkutyKXDCAg@mail.gmail.com>
+Message-ID: <4F216819.7030106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jan 2012 12:58:13 +0100
-"joro at 8bytes.org" <joro@8bytes.org> wrote:
+On 01/25/2012 11:59 AM, Grant Likely wrote:
+> On Tue, Jan 24, 2012 at 10:35 PM, Grant Likely
+> <grant.likely@secretlab.ca> wrote:
+>> On Tue, Jan 24, 2012 at 6:50 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>>
+>>>
+>>> On 01/24/2012 06:18 PM, Grant Likely wrote:
+>>>> Rather than having each interrupt controller driver creating its own barely
+>>>> unique .xlate function for irq_domain, create a library of translators which
+>>>> any driver can use directly.
+>>>>
+>>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>>>> index e7379a3..5e497a0 100644
+>>>> --- a/include/linux/irqdomain.h
+>>>> +++ b/include/linux/irqdomain.h
+>>>> @@ -110,6 +110,9 @@ struct irq_domain {
+>>>>       void *host_data;
+>>>>       irq_hw_number_t inval_irq;
+>>>>
+>>>> +     /* Data for common irq xlate functions */
+>>>> +     unsigned int xlate_type;
+>>>> +
+>>>
+>>> How does this get set? Do we want interrupt controllers messing with the
+>>> domain struct directly long term?
+>>
+>> It defaults to IRQ_TYPE_NONE in the alloc function and drivers can
+>> override it.  Alternately it could be made part of the
+>> irq_domain_add() arguments, but I'm not thrilled with adding a whole
+>> bunch of arguments to the function prototype.
+> 
+> Do you like this better (built on top of this patch)?
 
-> On Wed, Jan 25, 2012 at 08:40:20AM +0100, Hiroshi Doyu wrote:
-> > From: Hiroshi DOYU <hdoyu@nvidia.com>
-> > Date: Wed, 16 Nov 2011 17:36:37 +0200
-> > Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
-> > 
-> > Tegra 20 IOMMU H/W, GART (Graphics Address Relocation Table). This
-> > patch implements struct iommu_ops for GART for the upper IOMMU API.
-> > 
-> > This H/W module supports only single virtual address space(domain),
-> > and manages a single level 1-to-1 mapping H/W translation page table.
-> 
-> Thanks. Applied with a few minor changes and fixes. Please see below.
+Yes, I think it's better.
 
-All fixes are valid. Thanks.
-
-> > +config TEGRA_IOMMU_GART
-> > +	bool "Tegra GART IOMMU Support"
-> > +	depends on ARCH_TEGRA_2x_SOC
-> > +	default y
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index ef2b1fe..7856c04 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -701,12 +701,10 @@ int irq_domain_xlate_onecell(struct irq_domain
+> *d, struct device_node *ctrlr,
+>  			     const u32 *intspec, unsigned int intsize,
+>  			     unsigned long *out_hwirq, unsigned int *out_type)
+>  {
+> -	if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
+> -		 ctrlr->full_name, intsize))
+> +	if (WARN_ON(intsize < 1))
+>  		return -EINVAL;
+> -	*out_hwirq = intspec[0];
+> -	*out_type = d->xlate_type;
+> -	return 0;
+> +	return irq_domain_xlate_onetwocell(d, ctrlr, intspec, 1,
+> +					   out_hwirq, out_type);
+>  }
+>  EXPORT_SYMBOL_GPL(irq_domain_xlate_onecell);
 > 
-> I removed 'default y'. New drivers shouldn't be selected by default.
+> @@ -721,12 +719,10 @@ int irq_domain_xlate_twocell(struct irq_domain
+> *d, struct device_node *ctrlr,
+>  			const u32 *intspec, unsigned int intsize,
+>  			irq_hw_number_t *out_hwirq, unsigned int *out_type)
+>  {
+> -	if (WARN(intsize < 2, "Bad intspec for %s: intsize=%i < 2\n",
+> -		 ctrlr->full_name, intsize))
+> +	if (WARN_ON(intsize < 2))
+>  		return -EINVAL;
+> -	*out_hwirq = intspec[0];
+> -	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+> -	return 0;
+> +	return irq_domain_xlate_onetwocell(d, ctrlr, intspec, intsize,
+> +					   out_hwirq, out_type);
+>  }
+>  EXPORT_SYMBOL_GPL(irq_domain_xlate_twocell);
 > 
-> > +static int gart_iommu_map(struct iommu_domain *domain, unsigned long iova,
-> > +			  phys_addr_t pa, size_t bytes, int prot)
-> > +{
-> > +	struct gart_device *gart = domain->priv;
-> > +	unsigned long flags;
-> > +	unsigned long pfn;
-> > +
-> > +	if (!gart_iova_range_valid(gart, iova, bytes))
-> > +		return -EINVAL;
-> > +
-> > +	spin_lock_irqsave(&gart->pte_lock, flags);
-> > +	pfn = __phys_to_pfn(pa);
-> > +	if (!pfn_valid(pfn)) {
-> > +		dev_err(gart->dev, "Invalid page: %08x\n", pa);
-> > +		spin_unlock(&gart->pte_lock);
-> 
-> Changed this to spin_unlock_irqrestore().
-> 
-> > +		return -EINVAL;
-> > +	}
-> > +	gart_set_pte(gart, iova, GART_PTE(pfn));
-> > +	FLUSH_GART_REGS(gart);
-> > +	spin_unlock_irqrestore(&gart->pte_lock, flags);
-> > +	return 0;
-> > +}
-> > +
-> > +static size_t gart_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
-> > +			       size_t bytes)
-> > +{
-> > +	struct gart_device *gart = domain->priv;
-> > +	unsigned long flags;
-> > +
-> > +	if (!gart_iova_range_valid(gart, iova, bytes))
-> > +		return -EINVAL;
-> 
-> Return 0 here instead of -EINVAL. Size_t is unsigned and the unmap path
-> returns 0 on failure.
-> 
+> @@ -746,8 +742,7 @@ int irq_domain_xlate_onetwocell(struct irq_domain *d,
+>  				const u32 *intspec, unsigned int intsize,
+>  				unsigned long *out_hwirq, unsigned int *out_type)
+>  {
+> -	if (WARN(intsize < 1, "Bad intspec for %s: intsize=%i < 1\n",
+> -		 ctrlr->full_name, intsize))
+> +	if (WARN_ON(intsize < 1))
+>  		return -EINVAL;
+>  	*out_hwirq = intspec[0];
+>  	*out_type = d->xlate_type;
