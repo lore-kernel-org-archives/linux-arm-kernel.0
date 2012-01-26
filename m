@@ -1,40 +1,69 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 26 Jan 2012 19:07:05 +0200
-Subject: [PATCH v1 0/8] Support for secondary cores on Tegra30
-Message-ID: <1327597641-7519-1-git-send-email-pdeschrijver@nvidia.com>
+Date: Thu, 26 Jan 2012 19:07:06 +0200
+Subject: [PATCH v1 1/8] ARM: tegra: introduce support for reading chipid
+In-Reply-To: <1327597641-7519-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1327597641-7519-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1327597641-7519-2-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement bringing up secondary cores on Tegra30. This involves unpowergating
-the appropriate domains enabling the CPU clocks and releasing the reset lines.
+Introduce a function to read the Tegra chipid. This will be used by the SMP
+code to distinguish between Tegra variants.
 
-Peter De Schrijver (8):
-  ARM: tegra: introduce support for reading chipid
-  ARM: tegra: functions to access the flowcontroller
-  ARM: tegra: rework Tegra secondary CPU core bringup
-  ARM: tegra: prepare powergate.c for multiple variants
-  ARM: tegra: export tegra_powergate_is_powered()
-  ARM: tegra: add support for Tegra30 powerdomains
-  ARM: tegra: support for Tegra30 CPU powerdomains
-  ARM: tegra: support for secondary cores on Tegra30
+---
 
- arch/arm/mach-tegra/Makefile                 |    2 +
- arch/arm/mach-tegra/chipid.h                 |   38 +++++
- arch/arm/mach-tegra/common.c                 |    3 +
- arch/arm/mach-tegra/flowctrl.c               |   62 ++++++++
- arch/arm/mach-tegra/flowctrl.h               |    5 +
- arch/arm/mach-tegra/headsmp.S                |  192 ++++++++++++++++++++++++-
- arch/arm/mach-tegra/include/mach/iomap.h     |    3 +
- arch/arm/mach-tegra/include/mach/powergate.h |   15 ++-
- arch/arm/mach-tegra/platsmp.c                |  139 +++++++++++++------
- arch/arm/mach-tegra/powergate.c              |   53 +++++++-
- arch/arm/mach-tegra/reset.c                  |   82 +++++++++++
- arch/arm/mach-tegra/reset.h                  |   50 +++++++
- 12 files changed, 588 insertions(+), 56 deletions(-)
+Should this be merged with the fuse reading code even though this is a
+hardwired register, not a fuse based register?
+
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/chipid.h |   38 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 38 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/mach-tegra/chipid.h
- create mode 100644 arch/arm/mach-tegra/flowctrl.c
- create mode 100644 arch/arm/mach-tegra/reset.c
- create mode 100644 arch/arm/mach-tegra/reset.h
 
+diff --git a/arch/arm/mach-tegra/chipid.h b/arch/arm/mach-tegra/chipid.h
+new file mode 100644
+index 0000000..beb6a66
+--- /dev/null
++++ b/arch/arm/mach-tegra/chipid.h
+@@ -0,0 +1,38 @@
++/*
++ * arch/arm/mach-tegra/chipid.h
++ *
++ * Copyright (c) 2010-2012, NVIDIA Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __MACH_TEGRA_CHIPID_H
++#define __MACH_TEGRA_CHIPID_H
++
++#define APB_MISC_GP_HIDREV	0x804
++
++#define	TEGRA20			0x20
++#define	TEGRA30			0x30
++
++#ifndef __ASSEMBLY__
++
++#include <asm/io.h>
++
++static inline u32 tegra_get_chipid(void)
++{
++	return readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) +
++				APB_MISC_GP_HIDREV) >> 8 & 0xff;
++}
++
++#endif
++#endif
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
