@@ -1,29 +1,25 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 26 Jan 2012 13:49:00 -0800
-Subject: [PATCH v1 0/3] Add support for LP3
-In-Reply-To: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAMbhsRQips51u_hB0-xMdFsSPCCxsehXiiSVx0D5KZxQRwTT0A@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 26 Jan 2012 17:49:51 -0500 (EST)
+Subject: [PATCH V5 1/4] CS89x0 : add platform driver support
+In-Reply-To: <1327610775-26893-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1327610775-26893-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <20120126.174951.1458396120409651458.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 8:22 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> Introduce support for LP3 (CPU core clockgating) for Tegra20 and Tegra30.
->
-> Peter De Schrijver (3):
-> ?ARM: tegra: definitions for flow controller
-> ?ARM: tegra: assembler code for LP3
-> ?ARM: tegra: cpuidle driver for tegra
->
-> ?arch/arm/mach-tegra/Makefile ? | ? ?2 +
-> ?arch/arm/mach-tegra/cpuidle.c ?| ?107 ++++++++++++++++++++++++++++++++++++++++
-> ?arch/arm/mach-tegra/flowctrl.h | ? 37 ++++++++++++++
-> ?arch/arm/mach-tegra/sleep.S ? ?| ? 91 ++++++++++++++++++++++++++++++++++
-> ?4 files changed, 237 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-tegra/cpuidle.c
-> ?create mode 100644 arch/arm/mach-tegra/flowctrl.h
-> ?create mode 100644 arch/arm/mach-tegra/sleep.S
+From: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+Date: Thu, 26 Jan 2012 21:46:15 +0100
 
-For the series,
-Acked-by: Colin Cross <ccross@android.com>
+> The CS89x0 ethernet controller is used on a number of evaluation
+> boards, such as the MX31ADS. The current driver has memory address and
+> IRQ settings for each board on which this controller is used. Driver
+> updates are therefore required to support other boards that also use
+> the CS89x0. To avoid these driver updates, a better mechanism
+> (platform driver support) is added to communicate the board dependent
+> settings to the driver.
+> 
+> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+
+I'm fine with this going via one of the ARM trees:
+
+Acked-by: David S. Miller <davem@davemloft.net>
