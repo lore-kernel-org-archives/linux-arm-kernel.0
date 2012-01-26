@@ -1,37 +1,36 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Jan 2012 20:00:51 -0700 (MST)
-Subject: 3.3-rc1 console lag (was: Re: [PATCH v8 00/20] OMAP2+: UART:
- Runtime adaptation + cleanup)
-In-Reply-To: <CAB-zwWg4RS4J1YCcbfMWjLSCcV=oHqk9vaUKKKr0WjnTEuOmxQ@mail.gmail.com>
-References: <CAB-zwWg4RS4J1YCcbfMWjLSCcV=oHqk9vaUKKKr0WjnTEuOmxQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1201252000410.11174@utopia.booyaka.com>
+Date: Wed, 25 Jan 2012 20:02:09 -0700 (MST)
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <13274430881471@kroah.org>
+References: <13274430881471@kroah.org>
+Message-ID: <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2012, Ramirez Luna, Omar wrote:
+cc lists
 
-> Hi,
+Hi Greg
+
+On Tue, 24 Jan 2012, gregkh at suse.de wrote:
 > 
-> On Fri, Nov 11, 2011 at 3:57 AM, Govindraj.R <govindraj.raja@ti.com> wrote:
-> > Converting uart driver to adapt to pm runtime API's.
-> > Code re-org + cleanup.
-> > Moving some functionality from serial.c to omap-serial.c
-> ...
-> >
-> > Ensure CONFIG_OMAP_PRM is set while testing irq_chaining with uart.
-> > And for pm_qos usage ensure CONFIG_CPU_IDLE is selected other wise
-> > console might be sluggish.
+> This is a note to let you know that I've just added the patch titled
 > 
-> There is console lag for omap2plus_defconfig given that
-> CONFIG_CPU_IDLE is not enabled. Is the intention to force CPU_IDLE
-> into the defconfig or find an alternative for the new pm_qos when cpu
-> idle is disabled.
+>     tty: serial: OMAP: ensure FIFO levels are set correctly in non-DMA
 > 
-> Seen on beagle-xm and 3.3-rc1.
+> to my tty git tree which can be found at
+>     git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
+> in the tty-linus branch.
 
-Try this
+If it's not too late, I was wondering if you could drop this patch and the 
+subsequent one ("tty: serial: OMAP: transmit FIFO threshold interrupts 
+don't wake the"), in favor of the second version of this series that was 
+just posted at
 
-http://marc.info/?l=linux-arm-kernel&m=132754676814391&w=2
+   http://marc.info/?l=linux-arm-kernel&m=132754676814391&w=2
 
+If it is too late, we'll deal with it in 3.4.
+
+thanks,
 
 - Paul
