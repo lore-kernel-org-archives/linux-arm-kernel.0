@@ -1,41 +1,37 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 26 Jan 2012 21:30:16 +0100
-Subject: [PATCH 00/33] Restore SA11x0 MCP/UCB drivers to a working state
-In-Reply-To: <20120125211427.GI1068@n2100.arm.linux.org.uk>
-References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
- <20120125145420.GC2054@sirena.org.uk>
- <20120125211427.GI1068@n2100.arm.linux.org.uk>
-Message-ID: <20120126203016.GB2305@sortiz-mobl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Jan 2012 20:26:30 +0000
+Subject: [PATCH v3] ARM: support XZ compressed kernels
+In-Reply-To: <4F20353E.70809@bluegiga.com>
+References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
+ <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
+ <op.v4vsotxk2s3iss@ecaz> <4F180128.9060005@bluegiga.com>
+ <op.v8bxi2yu2s3iss@ecaz> <4F20353E.70809@bluegiga.com>
+Message-ID: <20120126202630.GB11941@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 09:14:27PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 25, 2012 at 02:54:20PM +0000, Mark Brown wrote:
-> > On Wed, Jan 25, 2012 at 02:30:00PM +0000, Russell King - ARM Linux wrote:
-> > > On Fri, Jan 20, 2012 at 06:04:56PM +0000, Russell King - ARM Linux wrote:
-> > 
-> > > > The following patch set restores the SA11x0 MCP and UCB1x00 drivers back
-> > > > to a working state, as tested on the Assabet.
-> > 
-> > > I've not heard anything back from anyone, so I'm going to assume that's
-> > > silent approval.
-> > 
-> > FWIW Samuel tends to review patches every few weeks to every month, it's
-> > not unusual for several weeks to patch before things get looked at.
-> 
-> That's not going to be much use - by that time we'll be at -rc4 or so,
-> which means that reverting the rather large changes becomes much more
-> of an eye-brow raising request than it would do at -rc1 time.  We're
-> already at the theoretical dawn of -rc2, one week after -rc1.
-> 
-> So, I think the only thing I can do is push the fixes upstream myself
-> and hope that Samuel doesn't have an issue with it 
-No, I'm fine with it. I currently won't have time to build a proper pull
-request for this one, so please go ahead and push it to Linus.
+On Wed, Jan 25, 2012 at 07:00:46PM +0200, Veli-Pekka Peltola wrote:
+> Hi Imre,
+>
+> On 01/19/2012 01:43 PM, Imre Kaloz wrote:
+>> Recent changes introduced an error, but Nico helped me clean that up.
+>> Will submit the final patch to the patch system this weekend.
+>
+> Just a reminder: I was unable to find this from the patch tracking  
+> system. Any updates? Can I help somehow?
 
-Cheers,
-Samuel.
+Well, this is where things got to last time around:
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+http://lists.arm.linux.org.uk/lurker/message/20110722.200731.32f090d9.en.html
+
+and then everything stopped.  No further feedback, nothing.  So I've
+been totally ignoring XZ stuff because I've been believing that the
+issue hasn't been fixed.
+
+It seems that it has now been fixed, back in July.  Nice to have been
+told about that development, etc.
+
+So yes, as the problem has been resolved, we can now move forward on
+it.  I'm not sure it's -rc material though, so I'll queue it for the
+next merge window.  We've waited six months already since the 'fix'
+went in, so plainly another three won't hurt one bit.
