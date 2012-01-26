@@ -1,43 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jan 2012 20:31:18 +0000
-Subject: [PATCH] Added phy3250_defconfig
-In-Reply-To: <1327592865-16859-1-git-send-email-stigge@antcom.de>
-References: <1327592865-16859-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120126203118.GC11941@n2100.arm.linux.org.uk>
+From: scottwood@freescale.com (Scott Wood)
+Date: Thu, 26 Jan 2012 14:33:48 -0600
+Subject: [RFC PATCH 6/7] ARM: mtd: nand: davinci: add OF support for
+ davinci nand controller
+In-Reply-To: <4F1FAAAE.2060007@denx.de>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-7-git-send-email-hs@denx.de> <4F1DF465.60206@freescale.com>
+ <4F1E5C82.60108@denx.de> <4F1F0A3E.40805@freescale.com>
+ <4F1FAAAE.2060007@denx.de>
+Message-ID: <4F21B8AC.40002@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 04:47:45PM +0100, Roland Stigge wrote:
-> diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
-> index 369b152..6b9b3e0 100644
-> --- a/arch/arm/mach-lpc32xx/common.c
-> +++ b/arch/arm/mach-lpc32xx/common.c
-> @@ -164,7 +164,7 @@ int clk_is_sysclk_mainosc(void)
->  /*
->   * System reset via the watchdog timer
->   */
-> -static void lpc32xx_watchdog_reset(void)
-> +void lpc32xx_watchdog_reset(void)
+On 01/25/2012 01:09 AM, Heiko Schocher wrote:
+> Scott Wood wrote:
+> I found the following used options:
+> 
+> ecc_mode:
+> NAND_ECC_NONE
+> NAND_ECC_SOFT
+> NAND_ECC_HW
+> NAND_ECC_HW_SYNDROME
+> 
+> bbt_options:
+> NAND_BBT_USE_FLASH
+> 
+> ecc_bits:
+> 1
+> 4
+> 
+> options:
+> NAND_BUSWIDTH_16
+> 
+>>>> Do all of these properties really belong here?  I can see providing some
+>>> I think so, because this values come from existing platform code
+>>> (grep for struct davinci_nand_pdata)
+>>
+>> The standards are a bit stricter for the device tree, since it's a more
+>> stable interface across components -- at least that's how we've used it
+>> on a lot of powerpc targets.  I'm not sure if that's the intent here,
+>> but I have seen U-Boot patches for ARM hardware using them as well.
+> 
+> Ok, so, should I introduce instead properties for the above
+> needed parameters? 
 
-That's a build fix, and so should be a separate patch from other changes.
+Yes.
 
->  {
->  	/* Make sure WDT clocks are enabled */
->  	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
-> diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-> index bfee5b4..f4ea653 100644
-> --- a/arch/arm/mach-lpc32xx/phy3250.c
-> +++ b/arch/arm/mach-lpc32xx/phy3250.c
-> @@ -381,7 +381,7 @@ static int __init lpc32xx_display_uid(void)
->  }
->  arch_initcall(lpc32xx_display_uid);
->  
-> -MACHINE_START(PHY3250, "Phytec 3250 board with the LPC3250 Microcontroller")
-> +MACHINE_START(LPC3XXX, "Phytec 3250 board with the LPC3250 Microcontroller")
+> (As this are not davinci specific parameters, are there somewhere such definitions for them?)
 
-This looks wrong.  Please explain this change; the ID is supposed to be
-the board number, not related to the SoC.  As this is for the phytec 3250
-board, the original looks more correct to me.
+It's controller-specific which options are changeable, and whether
+there's a better source of information.  Most controllers don't seem to
+need this.  I'd keep the definitions davinci specific for now.  If
+there's enough of a common need, a common definition could be considered.
 
-Plus, changing this potentially breaks working setups which are using the
-PHY3250 ID.
+-Scott
