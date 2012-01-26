@@ -1,31 +1,34 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 26 Jan 2012 10:35:42 +0000
-Subject: [PATCH] ARM: ioremap: fix boundary check when reusing static
- mapping
-In-Reply-To: <alpine.LFD.2.02.1201251333230.2759@xanadu.home>
-References: <1327515419-14097-1-git-send-email-pawel.moll@arm.com>
- <alpine.LFD.2.02.1201251333230.2759@xanadu.home>
-Message-ID: <1327574142.2355.30.camel@hornet.cambridge.arm.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Thu, 26 Jan 2012 11:43:06 +0100
+Subject: [PATCH] ARM: mxc: add missing include
+Message-ID: <20120126104306.GE20173@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-01-25 at 18:37 +0000, Nicolas Pitre wrote:
-> On Wed, 25 Jan 2012, Pawel Moll wrote:
-> 
-> > Since commit 576d2f2525612ecb5af029a76f21f22a3b82563d "ARM: add
-> > generic ioremap optimization by reusing static mappings" ioremap()
-> > is trying to reuse existing, static mapping when possible.
-> > 
-> > The condition checking boundaries of the requested and existing
-> > mappings didn't take in-page offset into consideration though,
-> > which lead to obscure and hard to debug problems when.
-> 
-> ... when what?
+Without this include, we get the following error when building
+imx_v4_v5_defconfig:
 
-Apparently I was hungry and ate the second half of the sentence ;-)
+In file included from arch/arm/plat-mxc/include/mach/iomux-mx27.h:23:0,
+                 from arch/arm/mach-imx/mach-imx27ipcam.c:22:
+arch/arm/plat-mxc/include/mach/iomux-v1.h:99:19: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'imx_iomuxv1_init'
 
-... when requested mapping crosses end of the static one.
+Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
+---
+ arch/arm/plat-mxc/include/mach/iomux-v1.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Cheers!
-
-Pawe?
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-v1.h b/arch/arm/plat-mxc/include/mach/iomux-v1.h
+index 6fa8a70..d9a7787 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-v1.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-v1.h
+@@ -19,6 +19,8 @@
+ #ifndef __MACH_IOMUX_V1_H__
+ #define __MACH_IOMUX_V1_H__
+ 
++#include <linux/init.h>
++
+ /*
+ *  GPIO Module and I/O Multiplexer
+ *  x = 0..3 for reg_A, reg_B, reg_C, reg_D
+-- 
+1.7.8.3
