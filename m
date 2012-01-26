@@ -1,39 +1,42 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 26 Jan 2012 08:09:29 +0100
-Subject: [Fwd: Re: imx53]
-In-Reply-To: <1327517782.21058.49.camel@hp-dhlii>
-References: <1327517782.21058.49.camel@hp-dhlii>
-Message-ID: <4F20FC29.2060500@de.bosch.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 26 Jan 2012 08:31:57 +0100
+Subject: [PATCH 05/21] Revert "OMAP3+: PM: SR: add suspend/resume handlers"
+In-Reply-To: <CAOMWX4eju6Zm5=DOyXkmRYjEvdnx+bGyNouEB01oG=zQPdyfyQ@mail.gmail.com>
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-6-git-send-email-j-pihet@ti.com>
+ <4F2041B1.6060907@ti.com>
+ <CAORVsuWu-pzTWzYp2=gqqPzRJQ1eBLu=12uNyEbVSZp407WUnA@mail.gmail.com>
+ <4F204916.7050504@ti.com> <87zkdbehx5.fsf@ti.com>
+ <CAOMWX4eju6Zm5=DOyXkmRYjEvdnx+bGyNouEB01oG=zQPdyfyQ@mail.gmail.com>
+Message-ID: <CAORVsuUXnA1vQSPDAr6U6T29cHjizpR=N18UtawJRBYU_zDXBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.01.2012 19:56, David Lynch Jr. wrote:
-> I just pulled the most recent copy of linus's tree 3.3 something. 
-> It appears that significantly more i.mx53 drivers are getting into that
-> source than last time I looked. 
-> 
-> Now I am trying to build it for the i.MX53 QSB - the development
-> platform I am using. 
-> 
-> Myriads of config options have changed since the 2.6.38.3 that I have
-> somewhat working. Just borrowing the .config appears to be
-> insufficient. 
-> 
-> After some mucking arround that included Kconfig changes I was able to
-> get CONFIG_FB_IMX set and build a kernel with it, but it does not appear
-> to be getting initialized. 
-> 
-> What do I need to do to get Linux to use this driver ?
-> Has ARM 3.3 moved to device trees ?
+Hi Nishant,
 
-Yes, I think so.
+On Wed, Jan 25, 2012 at 10:29 PM, Menon, Nishanth <nm@ti.com> wrote:
+> On Wed, Jan 25, 2012 at 12:49, Kevin Hilman <khilman@ti.com> wrote:
+>> "Cousson, Benoit" <b-cousson@ti.com> writes:
+>>
+>>> On 1/25/2012 7:13 PM, Jean Pihet wrote:
+>>
+>> [...]
+>>
+>>>>>
+>>>>> I guess that path #3 and #5 should just be removed.
+>>>> I am ok with both options (keeping or removing the 2 commits), please
+>>>> let me know what you prefer.
+>>>
+>>> I guess that removing both is the only acceptable solution
+>>> anyway.
+>>
+>> Yes, please remove them both.
+> Also, please drop Change-IDs as well.. :)
+Done in the next revision!
 
-If you are new to this, one option would be to start with a recent 
-Linaro i.MX53 Loco build (binary distribution). This could be a good 
-option to get an idea how U-Boot, device tree and the kernel work 
-together. In the next step you could replace the parts you are 
-interested in by your own versions, then. E.g. the kernel.
+Thanks for looking!
+Jean
 
-Best regards
-
-Dirk
+>
+> Regards,
+> Nishanth Menon
