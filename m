@@ -1,35 +1,35 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Thu, 26 Jan 2012 15:59:16 +0100
-Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
-In-Reply-To: <20120125.093932.783007031082378997.hdoyu@nvidia.com>
-References: <20120124142521.GE6269@8bytes.org>
- <20120125.093932.783007031082378997.hdoyu@nvidia.com>
-Message-ID: <20120126145915.GG6269@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 26 Jan 2012 15:20:43 +0000
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform
+ clean-up
+In-Reply-To: <4F2038E8.8090209@linaro.org>
+References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
+ <201201251501.42304.arnd@arndb.de> <4F2038E8.8090209@linaro.org>
+Message-ID: <201201261520.43176.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 08:39:32AM +0100, Hiroshi Doyu wrote:
-> From: Hiroshi DOYU <hdoyu@nvidia.com>
-> Date: Thu, 17 Nov 2011 07:31:31 +0200
-> Subject: [PATCH 2/2] ARM: IOMMU: Tegra30: Add iommu_ops for SMMU driver
+On Wednesday 25 January 2012, Lee Jones wrote:
+> >>> Everyone else, who is planning to use the infrastructure besides ux500?
+> >>
+> >> I can easily see this being used in the ARM reference designs
+> >> (Integrator, Versatile, RealView and Versatile Express) some of them
+> >> I can possibly patch myself even. OMAP has expressed interest
+> >> in "some way of getting the SoC ID out", and I guess this is
+> >> the means to that end.
+> > 
+> > Ah, good. Once these patches are merged, we can easily refer anyone
+> > to this infrastructure if they try to add a different way of finding
+> > a SoC ID.
 > 
-> Tegra 30 IOMMU H/W, SMMU (System Memory Management Unit). This patch
-> implements struct iommu_ops for SMMU for the upper IOMMU API.
-> 
-> This H/W module supports multiple virtual address spaces(domain x4),
-> and manages 2 level H/W translation pagetable.
-> 
-> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> ---
->  arch/arm/mach-tegra/include/mach/smmu.h |   63 ++
->  drivers/iommu/Kconfig                   |   11 +
->  drivers/iommu/Makefile                  |    1 +
->  drivers/iommu/tegra-smmu.c              | 1034 +++++++++++++++++++++++++++++++
->  4 files changed, 1109 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-tegra/include/mach/smmu.h
->  create mode 100644 drivers/iommu/tegra-smmu.c
+> Okay, so this sounds promising. Which route are the patches likely to
+> take? Will they go up through your SoC tree Arnd?
 
-Removed 'default y' and applied to arm/tegra as well. Thanks.
+That's probably the best way. Of course you need to have Acks
+from Greg (for the bus) and Linus Walleij (for the ux500 stuff)
+before I can merge them. Linus can decide whether he wants to
+submit them to me through a pull request from his ux500 tree
+(with Signed-off-by) or whether I should apply them myself
+(with Ack).
 
-
-	Joerg
+	Arnd
