@@ -1,25 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Jan 2012 14:20:05 +0800
-Subject: Common clock API for i.MX
-In-Reply-To: <20120125084533.GD1068@n2100.arm.linux.org.uk>
-References: <CAKGA1bkHgnJQs3_n6QtQjf-8xaPn0YnxMmE2Q=+opWcsp10zQA@mail.gmail.com>
- <20120125084533.GD1068@n2100.arm.linux.org.uk>
-Message-ID: <20120126062004.GB2287@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jan 2012 07:16:26 +0100
+Subject: [RFC PATCH 01/11] ARM: only show modules in the memory layout for
+ MODULES=y
+In-Reply-To: <1327230817-12855-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20120122111230.GB14835@pengutronix.de>
+ <1327230817-12855-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CACRpkdZKFvTKKPgcHsGVvq+HuZcTtc=azormi0MJ=je8CT=Yww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 08:45:33AM +0000, Russell King - ARM Linux wrote:
-> Grepping for clk_prepare() it looks like very few people have converted
-> over to this - it's just the AMBA stuff, a few bits of OMAP and MXS.
+2012/1/22 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
 
-Sascha queued up some of IMX clk_prepare() bits from Richard Zhao on
-branch below.
+> This line is irritating and wrong when modules are not supported, so
+> don't show it then.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/imx-features
+Pretty straight-forward....
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Sascha, what's the plan of mainlining them?  I thought you could have
-sent them during 3.3 merge window.  But you did not.
-
--- 
-Regards,
-Shawn
+Yours,
+Linus Walleij
