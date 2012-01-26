@@ -1,55 +1,95 @@
-From: dhlii@dlasys.net (David Lynch Jr.)
-Date: Thu, 26 Jan 2012 09:04:05 -0500
-Subject: [Fwd: Re: imx53]
-In-Reply-To: <4F20FC29.2060500@de.bosch.com>
-References: <1327517782.21058.49.camel@hp-dhlii>
- <4F20FC29.2060500@de.bosch.com>
-Message-ID: <1327586645.8900.19.camel@hp-dhlii>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 Jan 2012 22:17:25 +0800
+Subject: [PATCH] ARM: mx28evk: Simplify GPIO requests
+In-Reply-To: <20257.19440.497133.535581@ipc1.ka-ro>
+References: <1327329709-25545-1-git-send-email-fabio.estevam@freescale.com>
+ <20120126121938.GB3523@S2101-09.ap.freescale.net>
+ <20257.19440.497133.535581@ipc1.ka-ro>
+Message-ID: <20120126141722.GA18552@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thu, 2012-01-26 at 08:09 +0100, Dirk Behme wrote:
-> On 25.01.2012 19:56, David Lynch Jr. wrote:
-> > I just pulled the most recent copy of linus's tree 3.3 something. 
-> > It appears that significantly more i.mx53 drivers are getting into that
-> > source than last time I looked. 
-> > 
-> > Now I am trying to build it for the i.MX53 QSB - the development
-> > platform I am using. 
-> > 
-> > Myriads of config options have changed since the 2.6.38.3 that I have
-> > somewhat working. Just borrowing the .config appears to be
-> > insufficient. 
-> > 
-> > After some mucking arround that included Kconfig changes I was able to
-> > get CONFIG_FB_IMX set and build a kernel with it, but it does not appear
-> > to be getting initialized. 
-> > 
-> > What do I need to do to get Linux to use this driver ?
-> > Has ARM 3.3 moved to device trees ?
+On Thu, Jan 26, 2012 at 01:49:52PM +0100, Lothar Wa?mann wrote:
+> Hi,
 > 
-> Yes, I think so.
+> Shawn Guo writes:
+> > On Mon, Jan 23, 2012 at 12:41:49PM -0200, Fabio Estevam wrote:
+> > > Requesting all the GPIOs on a single array (mx28evk_gpios[]) can make the 
+> > > error handling of gpio_requests much simpler.
+> > > 
+> > > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Looks good.  A couple trivial comments below though.
+> > 
+> > > ---
+> > > This approach was suggested by Sascha Hauer:
+> > > http://patchwork.ozlabs.org/patch/124661/
+> > > 
+> > >  arch/arm/mach-mxs/mach-mx28evk.c |   72 ++++++++-----------------------------
+> > >  1 files changed, 16 insertions(+), 56 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> > > index fdb0a56..6260ec3 100644
+> > > --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> > > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> > > @@ -223,7 +223,6 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
+> > >  /* fec */
+> > >  static void __init mx28evk_fec_reset(void)
+> > >  {
+> > > -	int ret;
+> > >  	struct clk *clk;
+> > >  
+> > >  	/* Enable fec phy clock */
+> > > @@ -231,32 +230,6 @@ static void __init mx28evk_fec_reset(void)
+> > >  	if (!IS_ERR(clk))
+> > >  		clk_prepare_enable(clk);
+> > >  
+> > > -	/* Power up fec phy */
+> > > -	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
+> > > -	if (ret) {
+> > > -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
+> > > -		return;
+> > > -	}
+> > > -
+> > > -	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
+> > > -	if (ret) {
+> > > -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
+> > > -		return;
+> > > -	}
+> > > -
+> > > -	/* Reset fec phy */
+> > > -	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
+> > > -	if (ret) {
+> > > -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
+> > > -		return;
+> > > -	}
+> > > -
+> > > -	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
+> > > -	if (ret) {
+> > > -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
+> > > -		return;
+> > > -	}
+> > > -
+> > >  	mdelay(1);
+> > 
+> > This delay is supposed to be in the middle of the two calls here.  As
+> > we are moving around the first call, can you give it a test to see if
+> > the mdelay is still mandatory?  I would remove it if it's not necessary.
+> > 
+> "Empirical Programming Part One"? The HW will have some timing
+> requirements that need to be fullfilled. That cannot be done by
+> 'giving it a test' but by reading the appropriate datasheet and
+> implementing the code accordingly.
 > 
-> If you are new to this, one option would be to start with a recent 
-> Linaro i.MX53 Loco build (binary distribution). This could be a good 
-> option to get an idea how U-Boot, device tree and the kernel work 
-> together. In the next step you could replace the parts you are 
-> interested in by your own versions, then. E.g. the kernel.
+I was thinking that the period of code execution between
+gpio_request_array() and this point may have fulfilled the timing
+requirement of LAN8720 reset (100us minimum).  But you are right,
+this mdelay should not be removed simply by a testing.
 
-I am new to dealing with the i.MX53.
-I have done alot of work with various PowerPC's, as well as OMAP ARM's.
-I contributed to getting Xilinx support into the kernel.org source.
-I have been playing around with a variety of vendor and consultant trees
-including the Linaro  ones. 
+But the way that the patch moves thing around leaves this mdelay
+a little unreadable to me.  I would like see an explicit call of
+gpio_set_value(MX28EVK_FEC_PHY_RESET, 0) before the mdelay.
 
-I am familiar with u-boot, device tree. I was not familiar with the
-state of device trees and ARM in current kernels. 
-
-Once I know what I am starting from I can deal with whatever state the
-current kernel is in. I would prefer to work there, I would hope that in
-six months or so this should be sorted out. Maybe I can help.  
-
-thank You
- 
+-- 
+Regards,
+Shawn
