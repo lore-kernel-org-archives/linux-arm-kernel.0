@@ -1,26 +1,34 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 26 Jan 2012 10:33:40 -0800
-Subject: [PATCH v1 0/3] Add support for LP3
-In-Reply-To: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178CB823CD@HQMAIL01.nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Jan 2012 20:02:50 +0100
+Subject: Common clock API for i.MX
+In-Reply-To: <20120126062004.GB2287@S2101-09.ap.freescale.net>
+References: <CAKGA1bkHgnJQs3_n6QtQjf-8xaPn0YnxMmE2Q=+opWcsp10zQA@mail.gmail.com>
+ <20120125084533.GD1068@n2100.arm.linux.org.uk>
+ <20120126062004.GB2287@S2101-09.ap.freescale.net>
+Message-ID: <20120126190250.GP5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Thursday, January 26, 2012 9:22 AM:
-> Introduce support for LP3 (CPU core clockgating) for Tegra20 and Tegra30.
+On Thu, Jan 26, 2012 at 02:20:05PM +0800, Shawn Guo wrote:
+> On Wed, Jan 25, 2012 at 08:45:33AM +0000, Russell King - ARM Linux wrote:
+> > Grepping for clk_prepare() it looks like very few people have converted
+> > over to this - it's just the AMBA stuff, a few bits of OMAP and MXS.
+> 
+> Sascha queued up some of IMX clk_prepare() bits from Richard Zhao on
+> branch below.
+> 
+> http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/imx-features
+> 
+> Sascha, what's the plan of mainlining them?  I thought you could have
+> sent them during 3.3 merge window.  But you did not.
 
-The series,
+Grmpf. Seems I have missed the patches. My bad. I will see if they
+still merge and send a pull request tomorrow.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
-
-(although I'm not very familiar with cpuidle, so a review from e.g.
-Colin would be great too)
-
-Tested-by: Stephen Warren <swarren@nvidia.com>
-
-(On Harmony, observed /sys/devices/system/cpu/cpu*/cpuidle/state0/usage
-incrementing over time. Tested audio playback as well)
+Sascha
 
 -- 
-nvpublic
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
