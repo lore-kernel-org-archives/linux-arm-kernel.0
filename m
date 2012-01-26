@@ -1,50 +1,35 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 26 Jan 2012 10:58:25 +0100
-Subject: [Linaro-mm-sig] [PATCH 1/3] dma-buf: Introduce dma buffer sharing
- mechanism
-In-Reply-To: <CAB2ybb98BT8L569G_728x1ZXdFNaQCDZzW2+kB0ZNeFak5_g+Q@mail.gmail.com>
-References: <1324891397-10877-1-git-send-email-sumit.semwal@ti.com>
- <201201201423.46858.laurent.pinchart@ideasonboard.com>
- <CAB2ybb98BT8L569G_728x1ZXdFNaQCDZzW2+kB0ZNeFak5_g+Q@mail.gmail.com>
-Message-ID: <201201261058.27098.laurent.pinchart@ideasonboard.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 26 Jan 2012 12:06:07 +0200
+Subject: [GIT PULL] OMAP: minor PM cleanups for v3.3
+In-Reply-To: <20111209205455.GW31337@atomide.com>
+References: <87pqfxhc2v.fsf@ti.com> <20111209205455.GW31337@atomide.com>
+Message-ID: <CADMYwHxDH8xDW8ZqQQfH-jz7hHtwQC6Xd0ejuVHND2EimgcrPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sumit,
+Hi Tony,
 
-On Wednesday 25 January 2012 14:56:52 Semwal, Sumit wrote:
-> On Fri, Jan 20, 2012 at 6:53 PM, Laurent Pinchart wrote:
-> > Hi Summit,
-> > 
-> > Sorry for the late review. I know that this code is now in mainline, but
-> > I still have a couple of comments. I'll send patches if you agree with
-> > them.
-> 
-> Hi Laurent,
-> 
-> Thanks for your review; apologies for being late in replying - I was
-> OoO for last couple of days.
+On Fri, Dec 9, 2011 at 10:54 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Kevin Hilman <khilman@ti.com> [111209 09:15]:
+>> Tony,
+>>
+>> Please pull the following minor PM cleanups for v3.3.
+>
+> Thanks pulling into cleanup branch.
 
-No worries.
+It looks like this pull request from Kevin didn't make it to mainline.
 
-[snip]
+I can spot Kevin's "ARM: OMAP2+: PM: only register TWL with voltage
+layer when device is present" in Linus' tree, but not the other 3
+patches that this pull request contained (one of them was "ARM: OMAP:
+omap_device: Expose omap_device_{alloc, delete, register}", which I
+was just looking for).
 
-> Let me know if you'd send patches for these, or should I just go ahead and
-> correct.
+Here's the original request:
 
-I'll send patches.
+http://patchwork.ozlabs.org/patch/130439/
 
-Another small comment. The map_dma_buf operation is defined as
+Am I missing anything ?
 
-        struct sg_table * (*map_dma_buf)(struct dma_buf_attachment *,
-                                                enum dma_data_direction);
-
-If we want to let exporters cache the sg_table we should return a const struct 
-sg_table *. unmap_dma_buf will then take a const pointer as well, which would 
-need to be cast to a non-const pointer internally. What's your opinion on that 
-?
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Ohad.
