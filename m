@@ -1,95 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Jan 2012 22:17:25 +0800
-Subject: [PATCH] ARM: mx28evk: Simplify GPIO requests
-In-Reply-To: <20257.19440.497133.535581@ipc1.ka-ro>
-References: <1327329709-25545-1-git-send-email-fabio.estevam@freescale.com>
- <20120126121938.GB3523@S2101-09.ap.freescale.net>
- <20257.19440.497133.535581@ipc1.ka-ro>
-Message-ID: <20120126141722.GA18552@S2101-09.ap.freescale.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 26 Jan 2012 16:45:56 +0200
+Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
+In-Reply-To: <20120126115813.GF6269@8bytes.org>
+References: <20120123150048.GB6269@8bytes.org>
+ <20120125.094020.983282777619146490.hdoyu@nvidia.com>
+ <20120126115813.GF6269@8bytes.org>
+Message-ID: <20120126164556.75e2d38d09821fc1e0ff05d6@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 01:49:52PM +0100, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Shawn Guo writes:
-> > On Mon, Jan 23, 2012 at 12:41:49PM -0200, Fabio Estevam wrote:
-> > > Requesting all the GPIOs on a single array (mx28evk_gpios[]) can make the 
-> > > error handling of gpio_requests much simpler.
-> > > 
-> > > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Looks good.  A couple trivial comments below though.
-> > 
-> > > ---
-> > > This approach was suggested by Sascha Hauer:
-> > > http://patchwork.ozlabs.org/patch/124661/
-> > > 
-> > >  arch/arm/mach-mxs/mach-mx28evk.c |   72 ++++++++-----------------------------
-> > >  1 files changed, 16 insertions(+), 56 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> > > index fdb0a56..6260ec3 100644
-> > > --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> > > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> > > @@ -223,7 +223,6 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
-> > >  /* fec */
-> > >  static void __init mx28evk_fec_reset(void)
-> > >  {
-> > > -	int ret;
-> > >  	struct clk *clk;
-> > >  
-> > >  	/* Enable fec phy clock */
-> > > @@ -231,32 +230,6 @@ static void __init mx28evk_fec_reset(void)
-> > >  	if (!IS_ERR(clk))
-> > >  		clk_prepare_enable(clk);
-> > >  
-> > > -	/* Power up fec phy */
-> > > -	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
-> > > -	if (ret) {
-> > > -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
-> > > -		return;
-> > > -	}
-> > > -
-> > > -	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
-> > > -	if (ret) {
-> > > -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
-> > > -		return;
-> > > -	}
-> > > -
-> > > -	/* Reset fec phy */
-> > > -	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
-> > > -	if (ret) {
-> > > -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
-> > > -		return;
-> > > -	}
-> > > -
-> > > -	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
-> > > -	if (ret) {
-> > > -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
-> > > -		return;
-> > > -	}
-> > > -
-> > >  	mdelay(1);
-> > 
-> > This delay is supposed to be in the middle of the two calls here.  As
-> > we are moving around the first call, can you give it a test to see if
-> > the mdelay is still mandatory?  I would remove it if it's not necessary.
-> > 
-> "Empirical Programming Part One"? The HW will have some timing
-> requirements that need to be fullfilled. That cannot be done by
-> 'giving it a test' but by reading the appropriate datasheet and
-> implementing the code accordingly.
-> 
-I was thinking that the period of code execution between
-gpio_request_array() and this point may have fulfilled the timing
-requirement of LAN8720 reset (100us minimum).  But you are right,
-this mdelay should not be removed simply by a testing.
+On Thu, 26 Jan 2012 12:58:13 +0100
+"joro at 8bytes.org" <joro@8bytes.org> wrote:
 
-But the way that the patch moves thing around leaves this mdelay
-a little unreadable to me.  I would like see an explicit call of
-gpio_set_value(MX28EVK_FEC_PHY_RESET, 0) before the mdelay.
+> On Wed, Jan 25, 2012 at 08:40:20AM +0100, Hiroshi Doyu wrote:
+> > From: Hiroshi DOYU <hdoyu@nvidia.com>
+> > Date: Wed, 16 Nov 2011 17:36:37 +0200
+> > Subject: [PATCH 1/2] ARM: IOMMU: Tegra20: Add iommu_ops for GART driver
+> > 
+> > Tegra 20 IOMMU H/W, GART (Graphics Address Relocation Table). This
+> > patch implements struct iommu_ops for GART for the upper IOMMU API.
+> > 
+> > This H/W module supports only single virtual address space(domain),
+> > and manages a single level 1-to-1 mapping H/W translation page table.
+> 
+> Thanks. Applied with a few minor changes and fixes. Please see below.
 
--- 
-Regards,
-Shawn
+All fixes are valid. Thanks.
+
+> > +config TEGRA_IOMMU_GART
+> > +	bool "Tegra GART IOMMU Support"
+> > +	depends on ARCH_TEGRA_2x_SOC
+> > +	default y
+> 
+> I removed 'default y'. New drivers shouldn't be selected by default.
+> 
+> > +static int gart_iommu_map(struct iommu_domain *domain, unsigned long iova,
+> > +			  phys_addr_t pa, size_t bytes, int prot)
+> > +{
+> > +	struct gart_device *gart = domain->priv;
+> > +	unsigned long flags;
+> > +	unsigned long pfn;
+> > +
+> > +	if (!gart_iova_range_valid(gart, iova, bytes))
+> > +		return -EINVAL;
+> > +
+> > +	spin_lock_irqsave(&gart->pte_lock, flags);
+> > +	pfn = __phys_to_pfn(pa);
+> > +	if (!pfn_valid(pfn)) {
+> > +		dev_err(gart->dev, "Invalid page: %08x\n", pa);
+> > +		spin_unlock(&gart->pte_lock);
+> 
+> Changed this to spin_unlock_irqrestore().
+> 
+> > +		return -EINVAL;
+> > +	}
+> > +	gart_set_pte(gart, iova, GART_PTE(pfn));
+> > +	FLUSH_GART_REGS(gart);
+> > +	spin_unlock_irqrestore(&gart->pte_lock, flags);
+> > +	return 0;
+> > +}
+> > +
+> > +static size_t gart_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+> > +			       size_t bytes)
+> > +{
+> > +	struct gart_device *gart = domain->priv;
+> > +	unsigned long flags;
+> > +
+> > +	if (!gart_iova_range_valid(gart, iova, bytes))
+> > +		return -EINVAL;
+> 
+> Return 0 here instead of -EINVAL. Size_t is unsigned and the unmap path
+> returns 0 on failure.
+> 
