@@ -1,34 +1,44 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 26 Jan 2012 19:07:06 +0200
-Subject: [PATCH v1 1/8] ARM: tegra: introduce support for reading chipid
+Date: Thu, 26 Jan 2012 19:07:07 +0200
+Subject: [PATCH v1 2/8] ARM: tegra: functions to access the flowcontroller
 In-Reply-To: <1327597641-7519-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1327597641-7519-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1327597641-7519-2-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1327597641-7519-3-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a function to read the Tegra chipid. This will be used by the SMP
-code to distinguish between Tegra variants.
-
----
-
-Should this be merged with the fuse reading code even though this is a
-hardwired register, not a fuse based register?
+Introduce some functions to write to the flowcontroller registers.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- arch/arm/mach-tegra/chipid.h |   38 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 38 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/chipid.h
+ arch/arm/mach-tegra/Makefile   |    1 +
+ arch/arm/mach-tegra/flowctrl.c |   62 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/flowctrl.h |    5 +++
+ 3 files changed, 68 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/flowctrl.c
 
-diff --git a/arch/arm/mach-tegra/chipid.h b/arch/arm/mach-tegra/chipid.h
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index b78bda8..60c286e 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -6,6 +6,7 @@ obj-y                                   += irq.o
+ obj-y                                   += clock.o
+ obj-y                                   += timer.o
+ obj-y					+= fuse.o
++obj-y					+= flowctrl.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= powergate.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
 new file mode 100644
-index 0000000..beb6a66
+index 0000000..fef66a7
 --- /dev/null
-+++ b/arch/arm/mach-tegra/chipid.h
-@@ -0,0 +1,38 @@
++++ b/arch/arm/mach-tegra/flowctrl.c
+@@ -0,0 +1,62 @@
 +/*
-+ * arch/arm/mach-tegra/chipid.h
++ * arch/arm/mach-tegra/flowctrl.c
++ *
++ * functions and macros to control the flowcontroller
 + *
 + * Copyright (c) 2010-2012, NVIDIA Corporation. All rights reserved.
 + *
@@ -45,25 +55,61 @@ index 0000000..beb6a66
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __MACH_TEGRA_CHIPID_H
-+#define __MACH_TEGRA_CHIPID_H
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/io.h>
 +
-+#define APB_MISC_GP_HIDREV	0x804
++#include <mach/iomap.h>
 +
-+#define	TEGRA20			0x20
-+#define	TEGRA30			0x30
++#include "flowctrl.h"
 +
-+#ifndef __ASSEMBLY__
++u8 flowctrl_offset_halt_cpu[] = {
++	FLOW_CTRL_HALT_CPU0_EVENTS,
++	FLOW_CTRL_HALT_CPU1_EVENTS,
++	FLOW_CTRL_HALT_CPU1_EVENTS + 8,
++	FLOW_CTRL_HALT_CPU1_EVENTS + 16,
++};
 +
-+#include <asm/io.h>
++u8 flowctrl_offset_cpu_csr[] = {
++	FLOW_CTRL_CPU0_CSR,
++	FLOW_CTRL_CPU1_CSR,
++	FLOW_CTRL_CPU1_CSR + 8,
++	FLOW_CTRL_CPU1_CSR + 16,
++};
 +
-+static inline u32 tegra_get_chipid(void)
++static void flowctrl_update(u8 offset, u32 value)
 +{
-+	return readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) +
-+				APB_MISC_GP_HIDREV) >> 8 & 0xff;
++	void __iomem *addr = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + offset;
++
++	writel(value, addr);
++
++	/* ensure the update has reached the flow controller */
++	wmb();
++	readl_relaxed(addr);
 +}
 +
++void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value)
++{
++	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
++}
++
++void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value)
++{
++	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
++}
+diff --git a/arch/arm/mach-tegra/flowctrl.h b/arch/arm/mach-tegra/flowctrl.h
+index 74c6efb..1942817 100644
+--- a/arch/arm/mach-tegra/flowctrl.h
++++ b/arch/arm/mach-tegra/flowctrl.h
+@@ -34,4 +34,9 @@
+ #define FLOW_CTRL_HALT_CPU1_EVENTS	0x14
+ #define FLOW_CTRL_CPU1_CSR		0x18
+ 
++#ifndef __ASSEMBLY__
++void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value);
++void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value);
 +#endif
-+#endif
++
+ #endif
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
