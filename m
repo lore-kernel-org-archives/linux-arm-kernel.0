@@ -1,32 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 26 Jan 2012 17:18:21 +0100
-Subject: at91: pm.h cleanup (was: [PATCH 1/4] at91 : coding style fixes)
-In-Reply-To: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <4F217CCD.5000104@atmel.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 26 Jan 2012 18:22:00 +0200
+Subject: [PATCH v1 0/3] Add support for LP3
+Message-ID: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+Introduce support for LP3 (CPU core clockgating) for Tegra20 and Tegra30.
 
-I have rebased your patch series on top of:
+Peter De Schrijver (3):
+  ARM: tegra: definitions for flow controller
+  ARM: tegra: assembler code for LP3
+  ARM: tegra: cpuidle driver for tegra
 
-- at91 late device/board patches that are planned for 3.3
-- at91-fixes branch (should go also in 3.3)
-* rmk/for-next branch (with a merge conflict resolved)
-* the removal of CAP9 SoC family
+ arch/arm/mach-tegra/Makefile   |    2 +
+ arch/arm/mach-tegra/cpuidle.c  |  107 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/flowctrl.h |   37 ++++++++++++++
+ arch/arm/mach-tegra/sleep.S    |   91 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 237 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/cpuidle.c
+ create mode 100644 arch/arm/mach-tegra/flowctrl.h
+ create mode 100644 arch/arm/mach-tegra/sleep.S
 
-You can find the resulting code in our git tree:
-
-git://github.com/at91linux/linux-at91.git at91-pm_cleanup
-
-I hope that I will be able to send this branch to arm-soc soon with a
-minimum of future rebase (when the two first series cited above will be
-in Linus' tree actually).
-
-FYI, the four patch series that will be the base of all our 3.4 work is
-also stored in a branch: at91-3.4-base
-
-Thanks, best regards,
 -- 
-Nicolas Ferre
+1.7.7.rc0.72.g4b5ea.dirty
