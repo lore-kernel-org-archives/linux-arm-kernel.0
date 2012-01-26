@@ -1,68 +1,51 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 26 Jan 2012 21:49:06 +0100
-Subject: [PATCH] Added phy3250_defconfig
-In-Reply-To: <4F217994.2080906@antcom.de>
-References: <1327592865-16859-1-git-send-email-stigge@antcom.de>
- <4F217994.2080906@antcom.de>
-Message-ID: <20120126204906.GB2600@pengutronix.de>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu, 26 Jan 2012 21:51:20 +0100
+Subject: [PATCH v3] ARM: support XZ compressed kernels
+In-Reply-To: <20120126202630.GB11941@n2100.arm.linux.org.uk>
+References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
+ <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
+ <op.v4vsotxk2s3iss@ecaz> <4F180128.9060005@bluegiga.com>
+ <op.v8bxi2yu2s3iss@ecaz> <4F20353E.70809@bluegiga.com>
+ <20120126202630.GB11941@n2100.arm.linux.org.uk>
+Message-ID: <op.v8pljuvl2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roland,
+Hi Russell,
 
-> We recently discussed that the first step for better LPC32XX integration
-> would be a respective defconfig file.
+On Thu, 26 Jan 2012 21:26:30 +0100, Russell King - ARM Linux  
+<linux@arm.linux.org.uk> wrote:
 
-Yes. Thanks for doing this.
+>> Just a reminder: I was unable to find this from the patch tracking
+>> system. Any updates? Can I help somehow?
+>
+> Well, this is where things got to last time around:
+>
+> http://lists.arm.linux.org.uk/lurker/message/20110722.200731.32f090d9.en.html
+>
+> and then everything stopped.  No further feedback, nothing.  So I've
+> been totally ignoring XZ stuff because I've been believing that the
+> issue hasn't been fixed.
+>
+> It seems that it has now been fixed, back in July.  Nice to have been
+> told about that development, etc.
 
-> 
-> With this patch (for Linux 3.3.0-rc1), I'm providing a phy3250_defconfig
-> that especially supports the reference design by PHYTEC. This is because
-> every supported board (including the PHY board) will have hardware
-> specific parameters that don't map very good to a reasonably general
-> lpc32xx_defconfig. Please tell me what you think about that.
+As far as I know in the private mails that part has been cleared up with  
+Lasse - you were CC'd all the time.
 
-I'd really like to see a lpc32xx_defconfig. We managed to have a
-mxs_defconfig and are working to merge other imx defconfigs, too, for
-example. If something prevents a lpc32xx_defconfig, we should probably
-take a look and try to fix it.
+> So yes, as the problem has been resolved, we can now move forward on
+> it.  I'm not sure it's -rc material though, so I'll queue it for the
+> next merge window.  We've waited six months already since the 'fix'
+> went in, so plainly another three won't hurt one bit.
 
-Also, please use 'make save_defconfig' to shrink the size like all other
-defconfigs have done.
+When I've noticed v2 didn't get upstream without that change, I did a v3,  
+and got no response for that from you [1]. Than the string.c related  
+changes broke that, hence this (v4) version. If possible, please try to  
+get this into 3.3, as I think there's no chance it could break anything.
 
-> Some further notes:
-> 
-> * I added LPC3XXX to mach-types because the bootloader on my PHY3250
-> board identifies as machine type no. 736.
 
-Then the bootloader is wrong :) The board has 2511.
+Imre
 
-> * This is a minimal patch that makes lpc32xx compile and boot. I will
-> submit further drivers for LPC32xx building upon that.
 
-Those should be seperate. First the fixes, then the defconfig.
-
-> * OHCI HCD is currently broken, disabled for now (already have a newer
-> one working, will submit later)
-
-That's OK.
-
-> * The previously discussed update for clock.c will also follow in a
-> separate patch (currently compiles with several warnings).
-
-If not too much work, would be great to have this in the series as well.
-
-Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120126/6ae64300/attachment.sig>
+[1]  
+http://lists.arm.linux.org.uk/lurker/message/20111107.200336.feeeb3c5.en.html
