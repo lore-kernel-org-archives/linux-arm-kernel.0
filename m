@@ -1,32 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Jan 2012 17:36:11 +0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <20120123210052.GS22818@atomide.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <20120123210052.GS22818@atomide.com>
-Message-ID: <20120126093610.GD2287@S2101-09.ap.freescale.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 26 Jan 2012 10:58:25 +0100
+Subject: [Linaro-mm-sig] [PATCH 1/3] dma-buf: Introduce dma buffer sharing
+ mechanism
+In-Reply-To: <CAB2ybb98BT8L569G_728x1ZXdFNaQCDZzW2+kB0ZNeFak5_g+Q@mail.gmail.com>
+References: <1324891397-10877-1-git-send-email-sumit.semwal@ti.com>
+ <201201201423.46858.laurent.pinchart@ideasonboard.com>
+ <CAB2ybb98BT8L569G_728x1ZXdFNaQCDZzW2+kB0ZNeFak5_g+Q@mail.gmail.com>
+Message-ID: <201201261058.27098.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Sumit,
 
-On Mon, Jan 23, 2012 at 01:00:52PM -0800, Tony Lindgren wrote:
-...
-> So to summarize: I suggest we'll just stick to basics to get the system
-> booting and devices working using device tree. In most cases the device
-> drivers should be able to configure the suspend and off states in a generic
-> way using pinctrl API. Everything else, like debugging, we can probably
-> do with userspace tools.
+On Wednesday 25 January 2012 14:56:52 Semwal, Sumit wrote:
+> On Fri, Jan 20, 2012 at 6:53 PM, Laurent Pinchart wrote:
+> > Hi Summit,
+> > 
+> > Sorry for the late review. I know that this code is now in mainline, but
+> > I still have a couple of comments. I'll send patches if you agree with
+> > them.
 > 
-> This would mean just using a minimal subset of your binding, probably
-> very close to what you originally suggested.
+> Hi Laurent,
 > 
-IMHO, as a generic device tree binding, it should be able to cope with
-different use cases.  It's really free for you to use the minimal
-subset of the binding as your need, but we should not make the binding
-design just be that minimal subset to force that everyone else can
-only use the minimal subset.
+> Thanks for your review; apologies for being late in replying - I was
+> OoO for last couple of days.
+
+No worries.
+
+[snip]
+
+> Let me know if you'd send patches for these, or should I just go ahead and
+> correct.
+
+I'll send patches.
+
+Another small comment. The map_dma_buf operation is defined as
+
+        struct sg_table * (*map_dma_buf)(struct dma_buf_attachment *,
+                                                enum dma_data_direction);
+
+If we want to let exporters cache the sg_table we should return a const struct 
+sg_table *. unmap_dma_buf will then take a const pointer as well, which would 
+need to be cast to a non-const pointer internally. What's your opinion on that 
+?
 
 -- 
 Regards,
-Shawn
+
+Laurent Pinchart
