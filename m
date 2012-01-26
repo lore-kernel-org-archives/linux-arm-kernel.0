@@ -1,42 +1,172 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 26 Jan 2012 08:31:57 +0100
-Subject: [PATCH 05/21] Revert "OMAP3+: PM: SR: add suspend/resume handlers"
-In-Reply-To: <CAOMWX4eju6Zm5=DOyXkmRYjEvdnx+bGyNouEB01oG=zQPdyfyQ@mail.gmail.com>
-References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
- <1327504583-13408-6-git-send-email-j-pihet@ti.com>
- <4F2041B1.6060907@ti.com>
- <CAORVsuWu-pzTWzYp2=gqqPzRJQ1eBLu=12uNyEbVSZp407WUnA@mail.gmail.com>
- <4F204916.7050504@ti.com> <87zkdbehx5.fsf@ti.com>
- <CAOMWX4eju6Zm5=DOyXkmRYjEvdnx+bGyNouEB01oG=zQPdyfyQ@mail.gmail.com>
-Message-ID: <CAORVsuUXnA1vQSPDAr6U6T29cHjizpR=N18UtawJRBYU_zDXBw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 26 Jan 2012 08:46:05 +0100
+Subject: [PATCH 8/8] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <20120125144727.2722b4a1fb8017dd3633d7ad@nvidia.com>
+References: <1323448798-18184-1-git-send-email-m.szyprowski@samsung.com>
+ <1323448798-18184-9-git-send-email-m.szyprowski@samsung.com>
+ <20120125144727.2722b4a1fb8017dd3633d7ad@nvidia.com>
+Message-ID: <007401ccdbfe$8f024ad0$ad06e070$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishant,
+Hello,
 
-On Wed, Jan 25, 2012 at 10:29 PM, Menon, Nishanth <nm@ti.com> wrote:
-> On Wed, Jan 25, 2012 at 12:49, Kevin Hilman <khilman@ti.com> wrote:
->> "Cousson, Benoit" <b-cousson@ti.com> writes:
->>
->>> On 1/25/2012 7:13 PM, Jean Pihet wrote:
->>
->> [...]
->>
->>>>>
->>>>> I guess that path #3 and #5 should just be removed.
->>>> I am ok with both options (keeping or removing the 2 commits), please
->>>> let me know what you prefer.
->>>
->>> I guess that removing both is the only acceptable solution
->>> anyway.
->>
->> Yes, please remove them both.
-> Also, please drop Change-IDs as well.. :)
-Done in the next revision!
+On Wednesday, January 25, 2012 1:47 PM Hiroshi Doyu wrote:
 
-Thanks for looking!
-Jean
+> Hi Marek,
+> 
+> On Fri, 9 Dec 2011 17:39:58 +0100
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> 
+> > This patch add a complete implementation of DMA-mapping API for
+> > devices that have IOMMU support. All DMA-mapping calls are supported.
+> >
+> > This patch contains some of the code kindly provided by Krishna Reddy
+> > <vdumpa@nvidia.com> and Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >
+> > Add initial proof of concept implementation of DMA-mapping API for
+> > devices that have IOMMU support. Right now only dma_alloc_coherent,
+> > dma_free_coherent and dma_mmap_coherent functions are supported.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/Kconfig                 |    8 +
+> >  arch/arm/include/asm/device.h    |    3 +
+> >  arch/arm/include/asm/dma-iommu.h |   36 +++
+> >  arch/arm/mm/dma-mapping.c        |  637 +++++++++++++++++++++++++++++++++++++-
+> >  arch/arm/mm/vmregion.h           |    2 +-
+> >  5 files changed, 671 insertions(+), 15 deletions(-)
+> >  create mode 100644 arch/arm/include/asm/dma-iommu.h
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 8827c9b..87416fc 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -42,6 +42,14 @@ config ARM
+> >  config ARM_HAS_SG_CHAIN
+> >         bool
+> >
+> > +config NEED_SG_DMA_LENGTH
+> > +       bool
+> > +
+> > +config ARM_DMA_USE_IOMMU
+> > +       select NEED_SG_DMA_LENGTH
+> > +       select ARM_HAS_SG_CHAIN
+> > +       bool
+> > +
+> >  config HAVE_PWM
+> >         bool
+> >
+> > diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+> > index 6e2cb0e..b69c0d3 100644
+> > --- a/arch/arm/include/asm/device.h
+> > +++ b/arch/arm/include/asm/device.h
+> > @@ -14,6 +14,9 @@ struct dev_archdata {
+> >  #ifdef CONFIG_IOMMU_API
+> >         void *iommu; /* private IOMMU data */
+> >  #endif
+> > +#ifdef CONFIG_ARM_DMA_USE_IOMMU
+> > +       struct dma_iommu_mapping        *mapping;
+> > +#endif
+> >  };
+> >
+> >  struct omap_device;
+> > diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+> > new file mode 100644
+> > index 0000000..6668b41
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/dma-iommu.h
+> > @@ -0,0 +1,36 @@
+> > +#ifndef ASMARM_DMA_IOMMU_H
+> > +#define ASMARM_DMA_IOMMU_H
+> > +
+> > +#ifdef __KERNEL__
+> > +
+> > +#include <linux/mm_types.h>
+> > +#include <linux/scatterlist.h>
+> > +#include <linux/dma-debug.h>
+> > +#include <linux/kmemcheck.h>
+> > +
+> > +#include <asm/memory.h>
+> > +
+> > +struct dma_iommu_mapping {
+> > +       /* iommu specific data */
+> > +       struct iommu_domain     *domain;
+> > +
+> > +       void                    *bitmap;
+> > +       size_t                  bits;
+> > +       unsigned int            order;
+> > +       dma_addr_t              base;
+> > +
+> > +       spinlock_t              lock;
+> > +       struct kref             kref;
+> > +};
+> > +
+> > +struct dma_iommu_mapping *
+> > +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+> > +                        int order);
+> > +
+> > +void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
+> > +
+> > +int arm_iommu_attach_device(struct device *dev,
+> > +                                       struct dma_iommu_mapping *mapping);
+> > +
+> > +#endif /* __KERNEL__ */
+> > +#endif
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index 4845c09..7ac5a95 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -27,6 +27,9 @@
+> >  #include <asm/sizes.h>
+> >  #include <asm/mach/arch.h>
+> >
+> > +#include <linux/iommu.h>
+> > +#include <asm/dma-iommu.h>
+> > +
+> >  #include "mm.h"
+> >
+> >  /*
+> .....
+> > +
+> > +static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+> > +               size_t size, enum dma_data_direction dir,
+> > +               struct dma_attrs *attrs)
+> > +{
+> > +       struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+> > +       dma_addr_t iova = handle & PAGE_MASK;
+> > +       struct page *page = phys_to_page(iommu_iova_to_phys(mapping->domain, iova));
+> > +       int offset = handle & ~PAGE_MASK;
+> > +
+> > +       if (!iova)
+> > +               return;
+> > +
+> > +       if (!arch_is_coherent())
+> > +               __dma_page_dev_to_cpu(page, offset, size, dir);
+> > +
+> > +       iommu_unmap(mapping->domain, iova, size);
+> 
+> Is __free_iova() needed here as below?
+> 
+> 	Modified arch/arm/mm/dma-mapping.c
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 9aa1675..66830b2 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1212,6 +1212,7 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+> 		__dma_page_dev_to_cpu(page, offset, size, dir);
+> 
+> 	iommu_unmap(mapping->domain, iova, size);
+> +       __free_iova(mapping, iova, size);
+>  }
 
->
-> Regards,
-> Nishanth Menon
+Right, thanks for finding this bug!
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
