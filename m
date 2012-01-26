@@ -1,38 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jan 2012 20:08:02 +0000
-Subject: [PATCH 3/5] ARM: pgtable: consolidate set_pte_ext(TOP_PTE,
- ...) + tlb flush
-In-Reply-To: <CAHkRjk52Zo4psxCjpvzXO7b9HZFS1o-SGsv1WJ11On58By1SBw@mail.gmail.com>
-References: <20120120103433.GF1068@n2100.arm.linux.org.uk>
- <E1RoBot-0005oa-3W@rmk-PC.arm.linux.org.uk>
- <CAHkRjk52Zo4psxCjpvzXO7b9HZFS1o-SGsv1WJ11On58By1SBw@mail.gmail.com>
-Message-ID: <20120126200802.GA11941@n2100.arm.linux.org.uk>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 26 Jan 2012 21:30:16 +0100
+Subject: [PATCH 00/33] Restore SA11x0 MCP/UCB drivers to a working state
+In-Reply-To: <20120125211427.GI1068@n2100.arm.linux.org.uk>
+References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
+ <20120125145420.GC2054@sirena.org.uk>
+ <20120125211427.GI1068@n2100.arm.linux.org.uk>
+Message-ID: <20120126203016.GB2305@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 11:32:48AM +0000, Catalin Marinas wrote:
-> On 20 January 2012 10:35, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > A number of places establish a PTE in our top page table and
-> > immediately flush the TLB. ?Rather than having this at every callsite,
-> > provide an inline function for this purpose.
-> ...
-> > +static inline void set_top_pte(unsigned long va, pte_t pte)
-> > +{
-> > + ? ? ? set_pte_ext(TOP_PTE(va), pte, 0);
-> > + ? ? ? local_flush_tlb_kernel_page(va);
-> > +}
+On Wed, Jan 25, 2012 at 09:14:27PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 25, 2012 at 02:54:20PM +0000, Mark Brown wrote:
+> > On Wed, Jan 25, 2012 at 02:30:00PM +0000, Russell King - ARM Linux wrote:
+> > > On Fri, Jan 20, 2012 at 06:04:56PM +0000, Russell King - ARM Linux wrote:
+> > 
+> > > > The following patch set restores the SA11x0 MCP and UCB1x00 drivers back
+> > > > to a working state, as tested on the Assabet.
+> > 
+> > > I've not heard anything back from anyone, so I'm going to assume that's
+> > > silent approval.
+> > 
+> > FWIW Samuel tends to review patches every few weeks to every month, it's
+> > not unusual for several weeks to patch before things get looked at.
 > 
-> There is a difference with some of the call sites where the
-> flush_tlb_kernel_page() was used instead of the local variant. The pte
-> set up via set_top_pte() is indeed accessed on a single CPU and there
-> are locks around that would prevent migration (with CONFIG_PREEMPT).
-> So I don't see any problem with this.
-
-That was indeed part of the intention.  I've added a note to the
-description to that effect.
-
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> That's not going to be much use - by that time we'll be at -rc4 or so,
+> which means that reverting the rather large changes becomes much more
+> of an eye-brow raising request than it would do at -rc1 time.  We're
+> already at the theoretical dawn of -rc2, one week after -rc1.
 > 
-> -- 
-> Catalin
+> So, I think the only thing I can do is push the fixes upstream myself
+> and hope that Samuel doesn't have an issue with it 
+No, I'm fine with it. I currently won't have time to build a proper pull
+request for this one, so please go ahead and push it to Linus.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
