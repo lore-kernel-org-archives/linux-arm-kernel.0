@@ -1,79 +1,140 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 27 Jan 2012 15:51:09 +0100
-Subject: [Linaro-mm-sig] [PATCH 12/15] drivers: add Contiguous Memory
- Allocator
-In-Reply-To: <CAO8GWqnQg-W=TEc+CUc8hs=GrdCa9XCCWcedQx34cqURhNwNwA@mail.gmail.com>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
- <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
- <00de01ccdce1$e7c8a360$b759ea20$%szyprowski@samsung.com>
- <CAO8GWqnQg-W=TEc+CUc8hs=GrdCa9XCCWcedQx34cqURhNwNwA@mail.gmail.com>
-Message-ID: <010301ccdd03$1ad15ab0$50741010$%szyprowski@samsung.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 27 Jan 2012 12:52:32 -0200
+Subject: [PATCH v2] ARM: mx28evk: Simplify GPIO requests
+In-Reply-To: <1327329709-25545-1-git-send-email-fabio.estevam@freescale.com>
+References: <1327329709-25545-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1327675952-11443-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Requesting all the GPIOs on a single array (mx28evk_gpios[]) can make the 
+error handling of gpio_requests much simpler.
 
-On Friday, January 27, 2012 3:28 PM Clark, Rob wrote:
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Removed empty line
+- Leave gpio_set_value(MX28EVK_FEC_PHY_RESET, 0) prior to the delay line in fec_reset
+- Put __initconst after mx28evk_gpios[]
+ arch/arm/mach-mxs/mach-mx28evk.c |   71 ++++++++------------------------------
+ 1 files changed, 15 insertions(+), 56 deletions(-)
 
-> 2012/1/27 Marek Szyprowski <m.szyprowski@samsung.com>:
-> > Hi Ohad,
-> >
-> > On Friday, January 27, 2012 10:44 AM Ohad Ben-Cohen wrote:
-> >
-> >> With v19, I can't seem to allocate big regions anymore (e.g. 101MiB).
-> >> In particular, this seems to fail:
-> >>
-> >> On Thu, Jan 26, 2012 at 11:00 AM, Marek Szyprowski
-> >> <m.szyprowski@samsung.com> wrote:
-> >> > +static int cma_activate_area(unsigned long base_pfn, unsigned long count)
-> >> > +{
-> >> > + ? ? ? unsigned long pfn = base_pfn;
-> >> > + ? ? ? unsigned i = count >> pageblock_order;
-> >> > + ? ? ? struct zone *zone;
-> >> > +
-> >> > + ? ? ? WARN_ON_ONCE(!pfn_valid(pfn));
-> >> > + ? ? ? zone = page_zone(pfn_to_page(pfn));
-> >> > +
-> >> > + ? ? ? do {
-> >> > + ? ? ? ? ? ? ? unsigned j;
-> >> > + ? ? ? ? ? ? ? base_pfn = pfn;
-> >> > + ? ? ? ? ? ? ? for (j = pageblock_nr_pages; j; --j, pfn++) {
-> >> > + ? ? ? ? ? ? ? ? ? ? ? WARN_ON_ONCE(!pfn_valid(pfn));
-> >> > + ? ? ? ? ? ? ? ? ? ? ? if (page_zone(pfn_to_page(pfn)) != zone)
-> >> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
-> >>
-> >> The above WARN_ON_ONCE is triggered, and then the conditional is
-> >> asserted (page_zone() retuns a "Movable" zone, whereas zone is
-> >> "Normal") and the function fails.
-> >>
-> >> This happens to me on OMAP4 with your 3.3-rc1-cma-v19 branch (and a
-> >> bunch of remoteproc/rpmsg patches).
-> >>
-> >> Do big allocations work for you ?
-> >
-> > I've tested it with 256MiB on Exynos4 platform. Could you check if the
-> > problem also appears on 3.2-cma-v19 branch (I've uploaded it a few hours
-> > ago) and 3.2-cma-v18? Both are available on our public repo:
-> > git://git.infradead.org/users/kmpark/linux-samsung/
-> >
-> > The above code has not been changed since v16, so I'm really surprised
-> > that it causes problems. Maybe the memory configuration or layout has
-> > been changed in 3.3-rc1 for OMAP4?
-> 
-> is highmem still an issue?  I remember hitting this WARN_ON_ONCE() but
-> went away after I switched to a 2g/2g vm split (which avoids highmem)
-
-No, it shouldn't be an issue. I've tested CMA v19 on a system with 1GiB of
-the memory and general purpose (global) cma region was allocated correctly
-at the end of low memory. For device private regions you should take care 
-of correct placement by yourself, so maybe this is an issue in this case?
-
-Ohad, could you tell a bit more about your issue? Does this 'large region'
-is a device private region (declared with dma_declare_contiguous()) or is it
-a global one (defined in Kconfig or cma= kernel boot parameter)? 
-
-Best regards
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index fdb0a56..dad053d 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -223,7 +223,6 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
+ /* fec */
+ static void __init mx28evk_fec_reset(void)
+ {
+-	int ret;
+ 	struct clk *clk;
+ 
+ 	/* Enable fec phy clock */
+@@ -231,32 +230,7 @@ static void __init mx28evk_fec_reset(void)
+ 	if (!IS_ERR(clk))
+ 		clk_prepare_enable(clk);
+ 
+-	/* Power up fec phy */
+-	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
+-	if (ret) {
+-		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
+-		return;
+-	}
+-
+-	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
+-	if (ret) {
+-		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
+-		return;
+-	}
+-
+-	/* Reset fec phy */
+-	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
+-	if (ret) {
+-		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
+-		return;
+-	}
+-
+-	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
+-	if (ret) {
+-		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
+-		return;
+-	}
+-
++	gpio_set_value(MX28EVK_FEC_PHY_RESET, 0);
+ 	mdelay(1);
+ 	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
+ }
+@@ -417,9 +391,14 @@ static void __init mx28evk_add_regulators(void)
+ static void __init mx28evk_add_regulators(void) {}
+ #endif
+ 
+-static struct gpio mx28evk_lcd_gpios[] = {
++static const struct gpio mx28evk_gpios[] __initconst = {
+ 	{ MX28EVK_LCD_ENABLE, GPIOF_OUT_INIT_HIGH, "lcd-enable" },
+ 	{ MX28EVK_BL_ENABLE, GPIOF_OUT_INIT_HIGH, "bl-enable" },
++	{ MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT, "flexcan-switch" },
++	{ MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc0-slot-power" },
++	{ MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc1-slot-power" },
++	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-phy-power" },
++	{ MX28EVK_FEC_PHY_RESET, GPIOF_DIR_OUT, "fec-phy-reset" },
+ };
+ 
+ static const struct mxs_saif_platform_data
+@@ -447,25 +426,17 @@ static void __init mx28evk_init(void)
+ 	if (mx28evk_fec_get_mac())
+ 		pr_warn("%s: failed on fec mac setup\n", __func__);
+ 
++	ret = gpio_request_array(mx28evk_gpios, ARRAY_SIZE(mx28evk_gpios));
++	if (ret)
++		pr_err("One or more GPIOs failed to be requested: %d\n", ret);
+ 	mx28evk_fec_reset();
+ 	mx28_add_fec(0, &mx28_fec_pdata[0]);
+ 	mx28_add_fec(1, &mx28_fec_pdata[1]);
+ 
+-	ret = gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
+-				"flexcan-switch");
+-	if (ret) {
+-		pr_err("failed to request gpio flexcan-switch: %d\n", ret);
+-	} else {
+-		mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
+-		mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
+-	}
++	mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
++	mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
+ 
+-	ret = gpio_request_array(mx28evk_lcd_gpios,
+-				 ARRAY_SIZE(mx28evk_lcd_gpios));
+-	if (ret)
+-		pr_warn("failed to request gpio pins for lcd: %d\n", ret);
+-	else
+-		mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
++	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
+ 
+ 	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
+ 	mx28_add_saif(0, &mx28evk_mxs_saif_pdata[0]);
+@@ -480,20 +451,8 @@ static void __init mx28evk_init(void)
+ 	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0,
+ 			NULL, 0);
+ 
+-	/* power on mmc slot by writing 0 to the gpio */
+-	ret = gpio_request_one(MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW,
+-			       "mmc0-slot-power");
+-	if (ret)
+-		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
+-	else
+-		mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
+-
+-	ret = gpio_request_one(MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW,
+-			       "mmc1-slot-power");
+-	if (ret)
+-		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
+-	else
+-		mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
++	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
++	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
+ 
+ 	mx28_add_rtc_stmp3xxx();
+ 
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.1
