@@ -1,84 +1,70 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 27 Jan 2012 12:06:51 +0900
-Subject: [PATCH v7 1/2] video: support MIPI-DSI controller driver
-In-Reply-To: <1327592757.2843.1.camel@lappy>
-References: <4F17AA10.7080604@samsung.com> <4F182ACF.8010302@ti.com>
- <20120120155121.18880dff.akpm@linux-foundation.org>
- <4F1F4982.5050000@samsung.com> <1327592757.2843.1.camel@lappy>
-Message-ID: <006c01ccdca0$b77ecb80$267c6280$%han@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 27 Jan 2012 13:53:51 +0900
+Subject: [PATCH V1] ARM: EXYNOS: Adds Samsung TRATS board support
+In-Reply-To: <000f01ccc5de$df5987e0$9e0c97a0$%kim@samsung.com>
+References: <1324966676-5714-1-git-send-email-riverful.kim@samsung.com>
+ <028701ccc5da$31491fc0$93db5f40$%kim@samsung.com>
+ <000f01ccc5de$df5987e0$9e0c97a0$%kim@samsung.com>
+Message-ID: <019e01ccdcaf$aa0518b0$fe0f4a10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Tomi.
-
-> -----Original Message-----
-> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-owner at vger.kernel.org] On Behalf Of Tomi
-> Valkeinen
-> Sent: Friday, January 27, 2012 12:46 AM
-> To: Donghwa Lee
-> Cc: Andrew Morton; Archit; linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Florian
-> Tobias Schandinat; rpurdie at linux.intel.com; inki.dae at samsung.com; kyungmin.park at samsung.com
-> Subject: Re: [PATCH v7 1/2] video: support MIPI-DSI controller driver
+HeungJun, Kim wrote:
 > 
-> Hi,
+> Hi Kukjin Kim,
 > 
-> On Wed, 2012-01-25 at 09:14 +0900, Donghwa Lee wrote:
-> > On Sat, 21 Jan 2012 08:51, Andrew Morton wrote:
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-
+> > bounces at lists.infradead.org] On Behalf Of Kukjin Kim
+> > Sent: Thursday, December 29, 2011 12:30 PM
+> > To: 'HeungJun, Kim'
+> > Cc: kyungmin.park at samsung.com; linux-samsung-soc at vger.kernel.org; linux-
+> arm-
+> > kernel at lists.infradead.org
+> > Subject: RE: [PATCH V1] ARM: EXYNOS: Adds Samsung TRATS board support
 > >
-> > > On Thu, 19 Jan 2012 20:08:07 +0530
-> > > Archit <a0393947@ti.com> wrote:
+> > HeungJun, Kim wrote:
 > > >
-> > >> On Thursday 19 January 2012 10:58 AM, Donghwa Lee wrote:
-> > >>> Samsung S5PC210 and EXYNOS SoC platform has MIPI-DSI controller and MIPI-DSI
-> > >>> based LCD Panel could be used with it. This patch supports MIPI-DSI driver
-> > >>> based Samsung SoC chip.
-> > >>>
-> > >>> LCD panel driver based MIPI-DSI should be registered to MIPI-DSI driver at
-> > >>> machine code and LCD panel driver specific function registered to mipi_dsim_ddi
-> > >>> structure at lcd panel init function called system init.
-> > >>> In the MIPI-DSI driver, find lcd panel driver by using registered
-> > >>> lcd panel name, and then initialize lcd panel driver.
-> > >>>
-> > >>> Changes since v6:
-> > >>> 	- remove obscure compile problems.
-> > >>> 	- remove useless codes.
-> > >>> 	- modify return errno codes properly
-> > >>
-> > >> One more comment about 'mipi_dsim.h', it would be better to put it in
-> > >> include/video and not 'include/linux'.
+> > > This patch adds Samsung Mobile TRATS board support.
 > > >
-> > > Yes, that is desirable.
+> > > The changes against V0:
+> > >   1) Modify Makefile & boardfile name: from "board-trats.c" to "mach-
+> > > trats.c"
+> > >   2) Fix name of mmc's fixed regulator: remove "inverted"
+> > >   3) Fix directory name on GPL comments: from "exynos4" to "exynos"
 > > >
-> > >>> ---
-> > >>>   drivers/video/Kconfig                 |    6 +
-> > >>>   drivers/video/Makefile                |    2 +
-> > >>>   drivers/video/s5p_mipi_dsi.c          |  599 ++++++++++++++++++++++
-> > >>>   drivers/video/s5p_mipi_dsi_common.c   |  896 +++++++++++++++++++++++++++++++++
-> > >>>   drivers/video/s5p_mipi_dsi_common.h   |   46 ++
-> > >>>   drivers/video/s5p_mipi_dsi_lowlevel.c |  617 +++++++++++++++++++++++
-> > >>>   drivers/video/s5p_mipi_dsi_lowlevel.h |  112 ++++
-> > >>>   drivers/video/s5p_mipi_dsi_regs.h     |  149 ++++++
-> > >>>   include/linux/mipi_dsim.h             |  359 +++++++++++++
-> > >>>   9 files changed, 2786 insertions(+), 0 deletions(-)
+> > > Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > ---
+> > >  arch/arm/mach-exynos/Kconfig      |   11 ++
+> > >  arch/arm/mach-exynos/Makefile     |    1 +
+> > >  arch/arm/mach-exynos/mach-trats.c |  340
+> > > +++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 352 insertions(+), 0 deletions(-)
+> > >  create mode 100644 arch/arm/mach-exynos/mach-trats.c
 > > >
-> > > or we could put it in drivers/video/.  It all depends on which other
-> > > drivers we expect will need access to this header.
-> > >
+> > Hi HeungJun,
 > >
-> > No, mipi_dsim.h file includes global interface data, callback function called by machine
-> > file, platform data for mipi-dsi driver and so on. So I think it would be better to put
-> > in 'include/video' or 'include/linux'.
-> > Of course it is much better to change name to 's5p_mipi_dsim.h'
+> > Thanks for your re-submit.
+> >
+> > Hmm, maybe this is v2 not v1?
+> >
+> > Anyway, as I said, this conflicts with other ARM consolidation works. So
+> > please wait until after the merge window for this patch.
+> >
+> > Happy New Year.
+> This probably my mistake. v2 is right.
+> And it's no problem to be merge next windows. I'll wait.
 > 
-> The header file looks like a platform specific header, so I agree that
-> it should start with s5p.
+> Happy new year, too!
 > 
-> I think we should finally start working on a common DSI framework =).
+Hi, could you please re-work this based on v3.3-rc1?
 
-I agree with you in your opinion.
-The common DSI framework would be useful.
+Thanks.
 
-Thank you.
-
-> 
->  Tomi
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
