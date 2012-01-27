@@ -1,46 +1,17 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 27 Jan 2012 11:44:05 +0200
-Subject: [Linaro-mm-sig] [PATCH 12/15] drivers: add Contiguous Memory
- Allocator
-In-Reply-To: <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Fri, 27 Jan 2012 10:46:29 +0100
+Subject: [PATCH 00/33] Restore SA11x0 MCP/UCB drivers to a working state
+In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
+References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
+Message-ID: <4F227275.40702@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 25.01.2012 15:30, Russell King - ARM Linux wrote:
 
-With v19, I can't seem to allocate big regions anymore (e.g. 101MiB).
-In particular, this seems to fail:
+> I've not heard anything back from anyone, so I'm going to assume that's
+> silent approval.
 
-On Thu, Jan 26, 2012 at 11:00 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> +static int cma_activate_area(unsigned long base_pfn, unsigned long count)
-> +{
-> + ? ? ? unsigned long pfn = base_pfn;
-> + ? ? ? unsigned i = count >> pageblock_order;
-> + ? ? ? struct zone *zone;
-> +
-> + ? ? ? WARN_ON_ONCE(!pfn_valid(pfn));
-> + ? ? ? zone = page_zone(pfn_to_page(pfn));
-> +
-> + ? ? ? do {
-> + ? ? ? ? ? ? ? unsigned j;
-> + ? ? ? ? ? ? ? base_pfn = pfn;
-> + ? ? ? ? ? ? ? for (j = pageblock_nr_pages; j; --j, pfn++) {
-> + ? ? ? ? ? ? ? ? ? ? ? WARN_ON_ONCE(!pfn_valid(pfn));
-> + ? ? ? ? ? ? ? ? ? ? ? if (page_zone(pfn_to_page(pfn)) != zone)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+Sorry, I just had a busy week...
 
-The above WARN_ON_ONCE is triggered, and then the conditional is
-asserted (page_zone() retuns a "Movable" zone, whereas zone is
-"Normal") and the function fails.
-
-This happens to me on OMAP4 with your 3.3-rc1-cma-v19 branch (and a
-bunch of remoteproc/rpmsg patches).
-
-Do big allocations work for you ?
-
-Thanks,
-Ohad.
+FWIW: Acked-by: Jochen Friedrich <jochen@scram.de>
