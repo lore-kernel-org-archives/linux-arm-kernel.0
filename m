@@ -1,46 +1,63 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Jan 2012 16:25:43 -0800
-Subject: [PATCH] ARM: OMAP: id: Add missing break statement in
- omap3xxx_check_revision
-In-Reply-To: <1327305407-19914-1-git-send-email-hvaibhav@ti.com>
-References: <1327305407-19914-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120127002543.GG29812@atomide.com>
+Date: Thu, 26 Jan 2012 16:37:05 -0800
+Subject: [PATCH 15/15] arch/arm/mach-omap2/smartreflex.c: add missing
+ iounmap
+In-Reply-To: <1326362117-29371-15-git-send-email-Julia.Lawall@lip6.fr>
+References: <1326362117-29371-15-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20120127003704.GH29812@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120122 23:26]:
-> Add missing break statement in the function omap3xxx_check_revision.
+* Julia Lawall <Julia.Lawall@lip6.fr> [120112 01:23]:
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
 > 
-> The commit id 4390f5b2cb1f56 [ARM: OMAP: TI814X: Add cpu type macros
-> and detection support], removed the 'break' statement from the function
-> omap3xxx_check_revision(), resulting into wrong omap/cpu_revision
-> initialization for AM335x devices.
+> Add missing iounmap in error handling code, in a case where the function
+> already preforms iounmap on some other execution path.
 
-Looks like this is already fixed, can you please verify with
-v3.3-rc1?
+Thanks I'll apply this into omap fixes branch.
 
 Regards,
 
 Tony
  
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/id.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> A simplified version of the semantic match that finds this problem is as
+> follows: (http://coccinelle.lip6.fr/)
 > 
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 325e12e..32cf203 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -395,6 +395,7 @@ void __init omap3xxx_check_revision(void)
->  	case 0xb944:
->  		omap_revision = AM335X_REV_ES1_0;
->  		cpu_rev = "1.0";
-> +		break;
->  	case 0xb8f2:
->  		switch (rev) {
->  		case 0:
-> --
-> 1.7.0.4
+> // <smpl>
+> @@
+> expression e;
+> statement S,S1;
+> int ret;
+> @@
+> e = \(ioremap\|ioremap_nocache\)(...)
+> ... when != iounmap(e)
+> if (<+...e...+>) S
+> ... when any
+>     when != iounmap(e)
+> *if (...)
+>    { ... when != iounmap(e)
+>      return ...; }
+> ... when any
+> iounmap(e);
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> ---
+>  arch/arm/mach-omap2/smartreflex.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index 9dd9345..7e755bb 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -897,7 +897,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+>  		ret = sr_late_init(sr_info);
+>  		if (ret) {
+>  			pr_warning("%s: Error in SR late init\n", __func__);
+> -			return ret;
+> +			goto err_iounmap;
+>  		}
+>  	}
+>  
 > 
