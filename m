@@ -1,34 +1,97 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 26 Jan 2012 21:43:12 -0500 (EST)
-Subject: [PATCH v3] ARM: support XZ compressed kernels
-In-Reply-To: <op.v8pljuvl2s3iss@ecaz>
-References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
- <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
- <op.v4vsotxk2s3iss@ecaz> <4F180128.9060005@bluegiga.com>
- <op.v8bxi2yu2s3iss@ecaz> <4F20353E.70809@bluegiga.com>
- <20120126202630.GB11941@n2100.arm.linux.org.uk> <op.v8pljuvl2s3iss@ecaz>
-Message-ID: <alpine.LFD.2.02.1201262139410.2759@xanadu.home>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 27 Jan 2012 12:00:54 +0900
+Subject: [PATCH v7 2/2] video: backlight: support s6e8ax0 panel driver
+ based on MIPI DSI
+In-Reply-To: <001901ccdc98$755d4bd0$6017e370$%dae@samsung.com>
+References: <4F17AA14.8030100@samsung.com> <1327593179.2843.5.camel@lappy>
+ <001901ccdc98$755d4bd0$6017e370$%dae@samsung.com>
+Message-ID: <006801ccdc9f$e28b42f0$a7a1c8d0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jan 2012, Imre Kaloz wrote:
-
-> Hi Russell,
+Hi, Inki Dae.
+> -----Original Message-----
+> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-owner at vger.kernel.org] On Behalf Of Inki
+> Dae
+> Sent: Friday, January 27, 2012 11:08 AM
+> To: 'Tomi Valkeinen'; 'Donghwa Lee'
+> Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; 'Florian Tobias Schandinat';
+> 'Andrew Morton'; rpurdie at linux.intel.com; kyungmin.park at samsung.com
+> Subject: RE: [PATCH v7 2/2] video: backlight: support s6e8ax0 panel driver based on MIPI DSI
 > 
-> On Thu, 26 Jan 2012 21:26:30 +0100, Russell King - ARM Linux
-> > So yes, as the problem has been resolved, we can now move forward on
-> > it.  I'm not sure it's -rc material though, so I'll queue it for the
-> > next merge window.  We've waited six months already since the 'fix'
-> > went in, so plainly another three won't hurt one bit.
+> Hi, Tomi.
 > 
-> When I've noticed v2 didn't get upstream without that change, I did a v3, and
-> got no response for that from you [1]. Than the string.c related changes broke
-> that, hence this (v4) version. If possible, please try to get this into 3.3,
-> as I think there's no chance it could break anything.
+> Below is my comments.
+> 
+> > -----Original Message-----
+> > From: Tomi Valkeinen [mailto:tomi.valkeinen at ti.com]
+> > Sent: Friday, January 27, 2012 12:53 AM
+> > To: Donghwa Lee
+> > Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > Florian Tobias Schandinat; Andrew Morton; rpurdie at linux.intel.com;
+> > inki.dae at samsung.com; kyungmin.park at samsung.com
+> > Subject: Re: [PATCH v7 2/2] video: backlight: support s6e8ax0 panel driver
+> > based on MIPI DSI
+> >
+> > Hi,
+> >
+> > On Thu, 2012-01-19 at 14:28 +0900, Donghwa Lee wrote:
+> > > This patch is amoled panel driver based MIPI DSI interface.
+> > > S6E8AX0 means it may includes many other ldi controllers, for example,
+> > > S6E8AA0, S6E8AB0, and so on.
+> > >
+> > > This patch can be modified depending on each panel properites. For
+> > > example, second parameter of panel condition register can be changed
+> > > depending on ldi controller or amoled type.
+> > >
+> > > Changes since v6:
+> > > 	- change data type from const to static const
+> > >
+> > > Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> > > Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > ---
+> > >  drivers/video/backlight/Kconfig   |    7 +
+> > >  drivers/video/backlight/Makefile  |    1 +
+> > >  drivers/video/backlight/s6e8ax0.c |  898
+> > +++++++++++++++++++++++++++++++++++++
+> > >  drivers/video/backlight/s6e8ax0.h |   21 +
+> > >  4 files changed, 927 insertions(+), 0 deletions(-)  create mode
+> > > 100644 drivers/video/backlight/s6e8ax0.c  create mode 100644
+> > > drivers/video/backlight/s6e8ax0.h
+> >
+> > Why is this in backlight directory? It's a panel driver, not a backlight
+> > driver.
+> >
+> 
+> Yes, right. this backlight driver is specific to our mipi dsi driver because this uses the interface
+> of mipi dsi driver to send some commands to real lcd panel.
+> 
+> > And the driver is s5p specific, wouldn't a directory like
+> > drivers/video/s5p/, where both the s5p DSI driver from the previous patch
+> > and this panel driver could be?
+> >
+> 
+> Ok, we will create new directory, "exynos" instead of "s5p" because our SoC chip doesn't use such
+> prefix(s5p, and s3c) anymore. and also as you mentioned, we should working on a common DSI framework.
+> do you have any plan for this?
 
-That doesn't matter if this may or may not break anything.  The merge 
-window for v3.3 is over, and only bug fixes are acceptable now 
-until the next merge window opens.
+I think so. New directory, "exynos" is necessary.
+The "exynos" directory can include IPs such as MIPI, which are related to FB stack
+and are used for exynos SoC series.
 
+However, s3c-fb.c will remain in "drivers/video" directory, because s3c-fb.c can be
+used for s3c24xx, s5p64xx SoC series as well as exynos series.
 
-Nicolas
+Thank you.
+> 
+> Thanks,
+> Inki Dae.
+> 
+> >  Tomi
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
