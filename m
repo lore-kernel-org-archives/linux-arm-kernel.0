@@ -1,69 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jan 2012 16:24:01 +0000
-Subject: [PATCH 2/4] ARM: vfp: fix ptrace regset modification race
+Date: Fri, 27 Jan 2012 16:24:00 +0000
+Subject: [PATCH 1/4] ARM: vfp: flush thread hwstate before restoring context
+ from sigframe
 In-Reply-To: <1327681443-16627-1-git-send-email-will.deacon@arm.com>
 References: <1327681443-16627-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1327681443-16627-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1327681443-16627-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Martin <dave.martin@linaro.org>
+Following execution of a signal handler, we currently restore the VFP
+context from the ucontext in the signal frame. This involves copying
+from the user stack into the current thread's vfp_hard_struct and then
+flushing the new data out to the hardware registers.
 
-In a preemptible kernel, vfp_set() can be preempted, causing the
-hardware VFP context to be switched while the thread vfp state is
-being read and modified.  This leads to a race condition which can
-cause the thread vfp state to become corrupted if lazy VFP context
-save occurs due to preemption in between the time thread->vfpstate
-is read and the time the modified state is written back.
+This is problematic when using a preemptible kernel because we could be
+context switched whilst updating the vfp_hard_struct. If the current
+thread has made use of VFP since the last context switch, the VFP
+notifier will copy from the hardware registers into the vfp_hard_struct,
+overwriting any data that had been partially copied by the signal code.
 
-This may occur if preemption occurs during the execution of a
-ptrace() call which modifies the VFP register state of a thread.
-Such instances should be very rare in most realistic scenarios --
-none has been reported, so far as I am aware.  Only uniprocessor
-systems should be affected, since VFP context save is not currently
-lazy in SMP kernels.
+Disabling preemption across copy_from_user calls is a terrible idea, so
+instead we move the VFP thread flush *before* we update the
+vfp_hard_struct. Since the flushing is performed lazily, this has the
+effect of disabling VFP and clearing the CPU's VFP state pointer,
+therefore preventing the thread from being updated with stale data on
+the next context switch.
 
-The problem was introduced by my earlier patch migrating to use
-regsets to implement ptrace.
-
-This patch does a vfp_sync_hwstate() before reading
-thread->vfpstate, to make sure that the thread's VFP state is not
-live in the hardware registers while the registers are modified.
-
-Thanks to Will Deacon for spotting this.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Tested-by: Peter Maydell <peter.maydell@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/ptrace.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/kernel/signal.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index e1d5e19..d001be4 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -699,10 +699,13 @@ static int vfp_set(struct task_struct *target,
- {
- 	int ret;
- 	struct thread_info *thread = task_thread_info(target);
--	struct vfp_hard_struct new_vfp = thread->vfpstate.hard;
-+	struct vfp_hard_struct new_vfp;
- 	const size_t user_fpregs_offset = offsetof(struct user_vfp, fpregs);
- 	const size_t user_fpscr_offset = offsetof(struct user_vfp, fpscr);
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 0340224..9e617bd 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -227,6 +227,8 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+ 	if (magic != VFP_MAGIC || size != VFP_STORAGE_SIZE)
+ 		return -EINVAL;
  
-+	vfp_sync_hwstate(thread);
-+	new_vfp = thread->vfpstate.hard;
++	vfp_flush_hwstate(thread);
 +
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
- 				  &new_vfp.fpregs,
- 				  user_fpregs_offset,
-@@ -723,7 +726,6 @@ static int vfp_set(struct task_struct *target,
- 	if (ret)
- 		return ret;
+ 	/*
+ 	 * Copy the floating point registers. There can be unused
+ 	 * registers see asm/hwcap.h for details.
+@@ -251,9 +253,6 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+ 	__get_user_error(h->fpinst, &frame->ufp_exc.fpinst, err);
+ 	__get_user_error(h->fpinst2, &frame->ufp_exc.fpinst2, err);
  
--	vfp_sync_hwstate(thread);
- 	thread->vfpstate.hard = new_vfp;
- 	vfp_flush_hwstate(thread);
+-	if (!err)
+-		vfp_flush_hwstate(thread);
+-
+ 	return err ? -EFAULT : 0;
+ }
  
 -- 
 1.7.4.1
