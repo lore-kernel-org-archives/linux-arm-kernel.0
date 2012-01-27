@@ -1,58 +1,48 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 27 Jan 2012 08:58:47 -0800
-Subject: Pinmux bindings proposal
-In-Reply-To: <CACRpkdae58AYCYzwx8ysSDr_i0UHBfCujm2Fmnb+hx7825Lm4w@mail.gmail.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120117082334.GA31295@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885095125@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF1780DAB445@HQMAIL01.nvidia.com>
- <CACRpkdae58AYCYzwx8ysSDr_i0UHBfCujm2Fmnb+hx7825Lm4w@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E123E3C@HQMAIL01.nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jan 2012 16:59:41 +0000
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
+References: <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
+ <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
+ <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
+ <20120127121311.GB2347@mudshark.cambridge.arm.com>
+ <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
+ <20120127132826.GD2347@mudshark.cambridge.arm.com>
+ <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
+ <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
+ <20120127155454.GH2347@mudshark.cambridge.arm.com>
+ <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
+Message-ID: <20120127165941.GK2347@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Friday, January 27, 2012 5:01 AM:
-> On Fri, Jan 20, 2012 at 9:28 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> > Dong Aisheng wrote at Wednesday, January 18, 2012 4:06 AM:
-> >>
-> >> Each entry in the list is PIN rather than group.
-> >> So we cannot create each map for each entry in the list except we treat the PIN as
-> >> A group(this will cause a huge maps and predefined groups and functions).
+On Fri, Jan 27, 2012 at 03:57:25PM +0000, stephane eranian wrote:
+> On Fri, Jan 27, 2012 at 4:54 PM, Will Deacon <will.deacon@arm.com> wrote:
 > >
-> > Linusw has NAKd the idea that we should not use these "virtual groups",
-> > i.e. he believes they're fine to use if you wish.
+> > Ok. Note that on ARM the PMU generates a standard IRQ (i.e. not an NMI) so
+> > you may miss samples if they occur during critical kernel sections (and if
+> > you look at a profile, spin_unlock_irqrestore will be quite high).
+> >
+> But I am only running a user space noploop. So it spends 99% in user space, no
+> critical section.
+
+and your result is almost 99% of the way there :)
+
+There are also potential overheads from the PMU interrupts themselves, since
+there is a latency between overflow and taking the interrupt and then
+between there are actually reading the counter (they continue to count after
+overflow).
+
+That said, if you see any bugs in the code please do shout!
+
+> > A7 and A15 have the ability to filter counters based on privilege level, so
+> > you can get more accurate userspace counts there.
 > 
-> Interesting double inversion here: I NACK to NOT use groups
-> this way...
+> Ok, that's better. Need to update libpfm4 for A15 with priv levels then!
 
-I don't think that's true.
+How do you handle that in libpfm4? On ARM, the event encodings remain the same,
+you just need to set some extra bits to determine which levels are included or
+excluded (you can do this with the perf tool by using the :{u,k,h} suffix on an
+event description).
 
-If you did that, you would be /forcing/ people to use virtual pin groups,
-which means that the Tegra driver I proposed wouldn't be acceptable
-since it only defines groups that actually exist in HW.
-
-> The groups are not "virtual" if they share some physical
-> property. Such as being used by the same device.
-
-No, that's not what a virtual group is (I'm the person who came up
-with that term, and really the only person using it, so I get to decide
-what I mean by it!) I suppose you can mean something different, but that's
-just going to be ridiculously confusing.
-
-In HW, there are individual register fields. Each one of these affects
-often a single pin, but on some chips n pins at a time. A physical
-group would be precisely those groups of pins which the actual HW
-registers affect. A virtual group is a SW group that ends up affecting
-more than one of those physical groups, since when a virtual groups is
-programmed, the pinctrl driver goes and programs n register fields and
-hence affects n physical groups.
-
-And those registers and either physical or virtual groups don't have to
-be anything to do with muxing. On Tegra, there are certainly groups that
-only affect e.g. drive strength and not mux selection.
-
--- 
-nvpublic
+Will
