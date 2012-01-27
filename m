@@ -1,113 +1,91 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Jan 2012 10:10:04 -0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E123E62@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <CAPnjgZ3Xhebn1x1A-Vdy78DWbDd=cp0AK6tL-R1SRzS4GdF97g@mail.gmail.com>
- <20120127022111.GK29812@atomide.com>
- <CAPnjgZ2EkvTMsOkWyf4pfwRpvcvYs=WaKy5Gi8fdkAUQmvt=ig@mail.gmail.com>
- <20120127173732.GJ13504@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178E123E62@HQMAIL01.nvidia.com>
-Message-ID: <20120127181004.GA9339@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 27 Jan 2012 10:13:45 -0800
+Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4F22DEF2.5000807@ti.com>
+References: <4F22DEF2.5000807@ti.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E123E7A@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@nvidia.com> [120127 09:21]:
-> Tony Lindgren wrote at Friday, January 27, 2012 10:38 AM:
-> ...
-> > So how about let's do separate static and dynamic bindings,
-> > something like this:
-> > 
-> > 	/*
-> > 	 * Static init time only mux where
-> > 	 * we only specify phandle to driver
-> > 	 * and, offset of the mux, and the value.
-> > 	 * These pins are discarded after init.
-> > 	 *
-> > 	 * Format:	  mux_ctrl      offset value
-> > 	 */
-> > 	pinctrl-static = <&pmx_driver1  0x0020 0x1245
-> > 			   &pmx_driver2 0x0022 0x6578>;
+Cousson, Benoit wrote at Friday, January 27, 2012 10:29 AM:
+> Add some basic helpers to retrieve a DMA controller device_node
+> and the DMA request line number.
 > 
-> So those are direct register writes? That sounds pretty scary, and a
-> royal pain to author the device tree.
+> For legacy reason another API will export the DMA request number
+> into a Linux resource of type IORESOURCE_DMA.
+> This API is usable only on system with an unique DMA controller.
 
-Driver specific, either registers or enumeration. It could also
-it could be also generic defines, something along the lines of
-PMX_MUX_FUNCTION_1 | PMX_MUX_GPIO_INPUT.
- 
-> If we do go with this, I think we'd need a mask for each register write
-> too, so you can leave certain bits unaffected; there's no reason to
-> believe in general that each pin has a dedicated register only for that
-> pin, or even that only pinmux/config data is in the register.
+This binding looks reasonable to me; it's pretty much exactly what I
+was expecting the custom Tegra I2S binding might evolve into. A couple
+comments inline...
 
-I'm currently using "pinmux-simple,function-mask", but yeah sounds like
-it should be a generic mask name.
- 
-> This also makes it difficult to extract semantic information from the
-> DT. How can the pinctrl subsystem know which pins are in use and which
-> aren't here? This is relevant if some module loads later and attempts
-> to claim some pins - are they already in use by another driver or not?
+> diff --git a/Documentation/devicetree/bindings/dma/dma.txt
 
-We could just have one spinlock for all the discarded pins instead of
-having a single spinlock for each discarded pin?
- 
-> Now individual pinctrl drivers could interpret those register values
-> and know that this means pin/group "x" is programmed to mux value "y",
-> but does that mean pin "x" is actually /used/, or just that the init
-> table had to program value "y" because the default for that pin is "z"
-> which conflicted in HW with some other mux setting that the board
-> needed (e.g. muxing signal "y" to some other pin).
-> 
-> (Put another way, this binding completely bypasses the pinctrl subsystem;
-> is that OK?)
+> +* DMA client
+> +
+> +Client drivers should specify the DMA request numbers using a phandle to
+> +the controller + the DMA request number on that controller.
+> +
+> +Required properties:
+> +    - dma-request: List of pair phandle + dma-request per line
+> +    - dma-request-names: list of strings in the same order as the dma-request
+> +      in the dma-request property.
 
-Well I was thinking we should still register the pins, and have pinctrl
-fwk set those values, then discard those pins but still keep them as
-locked.
- 
-> > 	/*
-> > 	 * Dynamic mux where the mux is kept around after
-> > 	 * init and multiple states can be defined for
-> > 	 * a mux as a subnode of the pinmux controller.
-> > 	 *
-> > 	 * Format:	   mux_phandle   initial state
-> > 	 */
-> > 	pinctrl-dynamic = <&pmx_sdhci    PMX_STATE_ENABLED
-> > 			   &pmx_ehci_xcv PMX_STATE_ENABLED>;
-> > 
-> > This would make pinctrl-static binding follow the same
-> > standard as GPIO binding and can be parsed easily with
-> > of_parse_phandle_with_args.
-> > 
-> > Then for pinctrl-dynamic we can make a custom parser,
-> > and the binding can follow the more readable format as
-> > Simon posted.
-> 
-> I don't think there's any point in having 2 separate bindings; it's been
-> hard enough to come up with /one/ binding! If we do go for raw register
-> writes for the static stuff, we should just do the same for the dynamic
-> stuff too.
+I think property dma-request-names should be optional; some drives will
+simply request by index and hence the property won't be needed. Same as
+the common clock binding.
 
-But then we need to waste a register for the static/dynamic flag for
-each mux.. Or make the tree deeper.
- 
-> In fact, given this would all bypass the pinctrl subsystem entirely,
-> perhaps lets not even define a standard format for pinctrl-static or
-> pinctrl-dynamic, and just have each pin controller driver parse tables
-> inside its own node, in a format specific to that pin controller's
-> binding. I already had that working for the static case back in last
-> August and would love to just apply those patches and be done with this.
+> diff --git a/drivers/of/dma.c b/drivers/of/dma.c
 
-Hmm I don't think it would by pass it, we just need to let pinctrl
-fwk deal with the init time only pins too.
+> +int of_get_dma_request(struct device_node *np, int index,
+> +		       struct device_node **ctrl_np)
+> +{
+> +	int ret = -EINVAL;
+> +	struct of_phandle_args dma_spec;
+> +
+> +	ret = of_parse_phandle_with_args(np, "dma-request", "#dma-cells",
+> +					 index, &dma_spec);
+> +	if (ret) {
+> +		pr_debug("%s: can't parse dma property\n", __func__);
+> +		goto err0;
+> +	}
+> +
+> +	if (dma_spec.args_count > 0)
+> +		ret = dma_spec.args[0];
 
-For the dynamic pins, note that PMX_STATE_* defines would be one of the
-standard states supported by the pinctrl fwk. Then of course where
-pmx_sdhci binding is implemented, you could have either hardware specific
-register values, enumeration or generic defines depending on how the
-pinctrl driver is implemented.
+Doesn't that force #dma-cells > 0? What about a DMA controller that only
+supports a single DMA request, in which case you might want #dma-cells==0?
 
-Regards,
+Having an of_xlate for the controller would be useful here in general:
 
-Tony 
+Is a single int really enough here?
+
+Some DMA controllers have N channels that can be used for arbitrary
+things. You may need to specify the DMA request once when allocating the
+channel, or maybe individual for each transfer if it can vary. Other
+controllers may need a special channel ID for each type of request. There
+are probably more cases I haven't thought of.
+
+So in general, I think this API should return some kind of cookie that's
+meaningful to the DMA controller, and this should be provided back to
+the DMA controller with every API that might need it; channel allocation,
+DMA transfer request, etc.
+
+I suppose a controller may be able to represent that cookie in a single
+int, but perhaps not, e.g. if a binding needs #dma-cells=4 for some
+reason. Perhaps returning a void* here would be better, coupled with
+of_put_dma_request() to allow the controller to free it if required?
+
+That'd allow individual controller bindings to specify e.g. HW FIFO
+width, wrap, FIFO levels for HW flow control, ...
+(I vaguely recall that dmaengine addresses some of this already, but
+unfortunately I'm not very familiar with it yet)
+
+> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+
+> +#ifdef CONFIG_OF_GPIO
+
+CONFIG_OF_DMA
+
+-- 
+nvpublic
