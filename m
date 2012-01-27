@@ -1,17 +1,40 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Fri, 27 Jan 2012 10:46:29 +0100
-Subject: [PATCH 00/33] Restore SA11x0 MCP/UCB drivers to a working state
-In-Reply-To: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-References: <20120125143000.GF1068@n2100.arm.linux.org.uk>
-Message-ID: <4F227275.40702@scram.de>
+From: k.lewandowsk@samsung.com (Karol Lewandowski)
+Date: Fri, 27 Jan 2012 10:58:08 +0100
+Subject: [PATCH v2 2/2] regulator: add device tree support for max8997
+In-Reply-To: <20120126161744.GB19703@opensource.wolfsonmicro.com>
+References: <1326353738-26864-1-git-send-email-thomas.abraham@linaro.org>
+ <1326353738-26864-3-git-send-email-thomas.abraham@linaro.org>
+ <4F1FD1A5.1060305@samsung.com>
+ <20120125112602.GB2991@opensource.wolfsonmicro.com>
+ <4F1FEF55.8030604@samsung.com>
+ <20120125133254.GJ3687@opensource.wolfsonmicro.com>
+ <4F217100.6020105@samsung.com>
+ <20120126161744.GB19703@opensource.wolfsonmicro.com>
+Message-ID: <4F227530.3050708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.01.2012 15:30, Russell King - ARM Linux wrote:
+>> On 25.01.2012 12:22, Mark Brown wrote:
+>>> The big problem there seems like specifying voltages in the first
+>>> place, if we know what device it is we should already know what's
+>>> going on.
+>
+>> Driver which handles said regulator might know what's going on, but
+>> that might not be case for its consumers.  Should we limit ability to
+>> query given parameter just because its value is hardcoded in hardware?
+>
+> I'm sorry, this makes no sense.  Setting a value in the constraints is
+> not going to have any impact on the value reported by the driver, it
+> never has.
 
-> I've not heard anything back from anyone, so I'm going to assume that's
-> silent approval.
+... with the exception of fixed regulator, that is. This is from where I 
+got my flawed understanding.
 
-Sorry, I just had a busy week...
+Looking at other drivers I see that's indeed special case not practiced 
+elsewhere.
 
-FWIW: Acked-by: Jochen Friedrich <jochen@scram.de>
+Thanks for explaining this.
+
+Regards,
+-- 
+Karol Lewandowski | Samsung Poland R&D Center | Linux/Platform
