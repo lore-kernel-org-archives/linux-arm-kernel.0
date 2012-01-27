@@ -1,25 +1,47 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 27 Jan 2012 10:33:56 +0900
-Subject: [PATCH] ARM: S3C64XX: Fix mismerge of Littemill device in
- Cragganmore
-In-Reply-To: <1327439095-28151-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1327439095-28151-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <016701ccdc93$bc1e3020$345a9060$%kim@samsung.com>
+Date: Fri, 27 Jan 2012 10:34:10 +0900
+Subject: [PATCH 0/6] ARM: SAMSUNG: Board updates and minor fixes
+In-Reply-To: <1327501407-1927-1-git-send-email-s.nawrocki@samsung.com>
+References: <1327501407-1927-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <016901ccdc93$c79a8e80$56cfab80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Sylwester Nawrocki wrote:
 > 
-> The -next s3c64xx tree appears to have acquired a duplicate copy of
-> the commit adding Littlemill which is already in mainline causing two
-> copies of the device definition to be in the code. Either the duplicate
-> should be dropped or this commit should be applied on top of it to remove
-> one of the duplicates.
+> The following patch series adds S5K6AAFX sensor support on Nuri and
+> UNIVERSAL_C210 boards. It also includes minor correction for the I2C
+> controller setup and the M-5MOLS sensor.
 > 
+> 
+> Sylwester Nawrocki (6):
+>   ARM: SAMSUNG: Increase virtual framebuffer size on Universal C210 board
+>   ARM: SAMSUNG: Add support for S5K6AAFX image sensor on Universal C210
+> board
+>   ARM: SAMSUNG: Add support for S5K6AAFX camera on Nuri board
+>   ARM: SAMSUNG: Correct framebuffer window size on Nuri board
+>   ARM: SAMSUNG: Correct M-5MOLS sensor clock frequency on Nuri board
+>   ARM: SAMSUNG: Fix platform data setup for I2C adapter 0
+> 
+>  arch/arm/mach-exynos/Kconfig               |    2 +
+>  arch/arm/mach-exynos/mach-nuri.c           |   73
+++++++++++++++++++++++++--
+>  arch/arm/mach-exynos/mach-universal_c210.c |   78
+> ++++++++++++++++++++++++++--
+>  arch/arm/plat-samsung/devs.c               |    4 +-
+>  4 files changed, 147 insertions(+), 10 deletions(-)
+> 
+> --
+> 1.7.8.3
 
-Mark, maybe the duplication commit has been fixed now -next. I can't find it
-now. So I think, we can drop this. If any other problems, please kindly let
-me know.
+OK, looks good to me, will apply in my v3.3-samsung-fixes-2 for 6/6 and
+next/board-samsung for others.
+
+And I'm not sure some board updates are for fix now so if required, please
+let me know.
+
+Plus, I looked at some wrong alignment(tab and white space?) in your
+patches, so if you don't mind, let me fix it when I apply.
 
 Thanks.
 
@@ -28,29 +50,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |    5 -----
->  1 files changed, 0 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410.c
-> index fe7f3be..d5a7982 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -299,11 +299,6 @@ static struct platform_device littlemill_device = {
->  	.id		= -1,
->  };
-> 
-> -static struct platform_device littlemill_device = {
-> -	.name		= "littlemill",
-> -	.id		= -1,
-> -};
-> -
->  static struct regulator_consumer_supply wallvdd_consumers[] = {
->  	REGULATOR_SUPPLY("SPKVDD", "1-001a"),
->  	REGULATOR_SUPPLY("SPKVDD1", "1-001a"),
-> --
-> 1.7.9.rc1
