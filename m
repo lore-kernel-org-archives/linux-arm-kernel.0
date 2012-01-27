@@ -1,29 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 27 Jan 2012 00:15:37 -0800
-Subject: [PATCH v1 1/3] ARM: tegra: definitions for flow controller
-In-Reply-To: <CAOesGMghrFvCzyTaLfeF5RB77UUxpzEQj+j5Ega_uzL1SdbrOg@mail.gmail.com>
-References: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
- <1327594923-21822-2-git-send-email-pdeschrijver@nvidia.com>
- <CAOesGMghrFvCzyTaLfeF5RB77UUxpzEQj+j5Ega_uzL1SdbrOg@mail.gmail.com>
-Message-ID: <CAOesGMhaNybgVvLwT28MNjquRn6K55vRZPOiOyp1Ospg4_-uug@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 27 Jan 2012 17:15:49 +0900
+Subject: [PATCH] ARM: EXYNOS: Fix
+ "warning: initialization from incompatible pointer type"
+In-Reply-To: <1325984332-32146-1-git-send-email-jhbird.choi@samsung.com>
+References: <1325984332-32146-1-git-send-email-jhbird.choi@samsung.com>
+Message-ID: <01b301ccdccb$e0caca40$a2605ec0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 6:17 PM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
->
-> On Thu, Jan 26, 2012 at 8:22 AM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
->> Introduce some definitions for the tegra flow contoller. This will be
->> used by the code which controls entering and leaving LP3.
->>
->> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
->
-> Do you expect to use these defines anywhere else than in the sleep.S
-> in the near future? If not, please just move them over to that file.
+jhbird.choi at samsung.com wrote:
+> 
+> From: Jonghwan Choi <jhbird.choi@samsung.com>
+> 
+> Fix the wrong function prototype.
+> 
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index c4f792d..db33f47 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -205,7 +205,7 @@ static void exynos4_pm_prepare(void)
+> 
+>  }
+> 
+> -static int exynos4_pm_add(struct device *dev)
+> +static int exynos4_pm_add(struct device *dev, struct subsys_interface *sif)
+>  {
+>  	pm_cpu_prep = exynos4_pm_prepare;
+>  	pm_cpu_sleep = exynos4_cpu_suspend;
+> --
+> 1.7.1
 
-I just looked at the Tegra30 secondary cores patch series, it's used there.
+Applied.
+Thanks.
 
-Please ignore.
-
--Olof
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
