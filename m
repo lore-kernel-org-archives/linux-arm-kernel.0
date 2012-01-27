@@ -1,7 +1,7 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jan 2012 15:54:54 +0000
+From: eranian@googlemail.com (stephane eranian)
+Date: Fri, 27 Jan 2012 16:57:25 +0100
 Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
+In-Reply-To: <20120127155454.GH2347@mudshark.cambridge.arm.com>
 References: <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
  <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
  <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
@@ -12,48 +12,58 @@ References: <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
  <20120127132826.GD2347@mudshark.cambridge.arm.com>
  <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
  <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
-Message-ID: <20120127155454.GH2347@mudshark.cambridge.arm.com>
+ <20120127155454.GH2347@mudshark.cambridge.arm.com>
+Message-ID: <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 03:45:53PM +0000, stephane eranian wrote:
-> Hi,
+On Fri, Jan 27, 2012 at 4:54 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jan 27, 2012 at 03:45:53PM +0000, stephane eranian wrote:
+>> Hi,
+>
+> Hi Stephane,
+>
+>> Ok, with the one-line patch [1], this works much better now.
+>> No more wrap around a 4 billion cycles.
+>
+> Hurrah! Thanks Mans and Ming Lei for helping with this. Unfortunately, I
+> remember Santosh had objections to this patch so that needs to be resolved.
+>
+Yes, this needs to be resolved ASAP.
 
-Hi Stephane,
+>> Sampling is okay, though I noticed it tends to not get the
+>> correct number of samples for a controlled run:
+>>
+>> $ perf record -e cycles -c 1009213 noploop 10
+>> noploop for 10 seconds
+>>
+>> $ perf report -D | tail -20
+>> cycles stats:
+>> ? ? ? ? ? ?TOTAL events: ? ? ? 9938
+>> ? ? ? ? ? ? MMAP events: ? ? ? ? 13
+>> ? ? ? ? ? ? COMM events: ? ? ? ? ?2
+>> ? ? ? ? ? ? EXIT events: ? ? ? ? ?2
+>> ? ? ? ? THROTTLE events: ? ? ? ? 12
+>> ? ? ? UNTHROTTLE events: ? ? ? ? 12
+>> ? ? ? ? ? SAMPLE events: ? ? ? 9897
+>>
+>> Should not get throttled samples. Should get abour 10k samples
+>> but only seeing 9897. The max_rate limit is way higher
+>> than what I set the period (1000 samples/sec). But then,
+>> is 3.2.0 throttling is broken. I posted a patch to fix that
+>> yesterday. I will try with my patch applied as well.
+>
+> Ok. Note that on ARM the PMU generates a standard IRQ (i.e. not an NMI) so
+> you may miss samples if they occur during critical kernel sections (and if
+> you look at a profile, spin_unlock_irqrestore will be quite high).
+>
+But I am only running a user space noploop. So it spends 99% in user space, no
+critical section.
 
-> Ok, with the one-line patch [1], this works much better now.
-> No more wrap around a 4 billion cycles.
+> A7 and A15 have the ability to filter counters based on privilege level, so
+> you can get more accurate userspace counts there.
 
-Hurrah! Thanks Mans and Ming Lei for helping with this. Unfortunately, I
-remember Santosh had objections to this patch so that needs to be resolved.
+Ok, that's better. Need to update libpfm4 for A15 with priv levels then!
 
-> Sampling is okay, though I noticed it tends to not get the
-> correct number of samples for a controlled run:
-> 
-> $ perf record -e cycles -c 1009213 noploop 10
-> noploop for 10 seconds
-> 
-> $ perf report -D | tail -20
-> cycles stats:
->            TOTAL events:       9938
->             MMAP events:         13
->             COMM events:          2
->             EXIT events:          2
->         THROTTLE events:         12
->       UNTHROTTLE events:         12
->           SAMPLE events:       9897
-> 
-> Should not get throttled samples. Should get abour 10k samples
-> but only seeing 9897. The max_rate limit is way higher
-> than what I set the period (1000 samples/sec). But then,
-> is 3.2.0 throttling is broken. I posted a patch to fix that
-> yesterday. I will try with my patch applied as well.
-
-Ok. Note that on ARM the PMU generates a standard IRQ (i.e. not an NMI) so
-you may miss samples if they occur during critical kernel sections (and if
-you look at a profile, spin_unlock_irqrestore will be quite high).
-
-A7 and A15 have the ability to filter counters based on privilege level, so
-you can get more accurate userspace counts there.
-
-Will
+>
+> Will
