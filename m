@@ -1,57 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Jan 2012 16:04:14 +0000
-Subject: [PATCH] ARM: realview: fix unconnected interrupts on EB11MP
-Message-ID: <1327680254-24313-1-git-send-email-marc.zyngier@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 27 Jan 2012 08:08:37 -0800
+Subject: [PATCH v4 14/15] ARM: local timers: convert MSM to runtime
+ registration interface
+In-Reply-To: <1327061042-14857-15-git-send-email-marc.zyngier@arm.com>
+References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
+ <1327061042-14857-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4F22CC05.6040709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 2eac58d (ARM: amba: make use of -1 IRQs warn), we're
-able to detect the use of value -1 to indicate the lack of interrupt
-line.
+On 01/20/12 04:04, Marc Zyngier wrote:
+> Convert the MSM timers to the runtime registration interface.
+>
+>
 
-The RealView EB, when used with the 11MPCore tile, has a number of
-devices without interrupts, and uses the value -1 to indicate this.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Change that value to 0 to conform to the new behaviour.
+> Tested-by: David Brown <davidb@codeaurora.org>
+> Acked-by: David Brown <davidb@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/mach-msm/timer.c |   79 +++++++++++++++++++++++++--------------------
+>  1 files changed, 44 insertions(+), 35 deletions(-)
+>
+> diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+> index 11d0d8f..75f4be4 100644
+> --- a/arch/arm/mach-msm/timer.c
+> +++ b/arch/arm/mach-msm/timer.c
+>
+[snip]
+> +
+> +static struct local_timer_ops msm_local_timer_ops __cpuinitdata = {
+> +	.setup	= msm_local_timer_setup,
+> +	.stop	= msm_local_timer_stop,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-realview/include/mach/irqs-eb.h |   23 +++++++++++++----------
- 1 files changed, 13 insertions(+), 10 deletions(-)
+Would this be a good time to rename these to start/stop? setup sounds
+like it's done once, but its actually done every cpu up from what I recall.
 
-diff --git a/arch/arm/mach-realview/include/mach/irqs-eb.h b/arch/arm/mach-realview/include/mach/irqs-eb.h
-index 204d537..d6b5073 100644
---- a/arch/arm/mach-realview/include/mach/irqs-eb.h
-+++ b/arch/arm/mach-realview/include/mach/irqs-eb.h
-@@ -96,16 +96,19 @@
- #define IRQ_EB11MP_L220_SLAVE	(IRQ_EB_GIC_START + 30)
- #define IRQ_EB11MP_L220_DECODE	(IRQ_EB_GIC_START + 31)
- 
--#define IRQ_EB11MP_UART2	-1
--#define IRQ_EB11MP_UART3	-1
--#define IRQ_EB11MP_CLCD		-1
--#define IRQ_EB11MP_DMA		-1
--#define IRQ_EB11MP_WDOG		-1
--#define IRQ_EB11MP_GPIO0	-1
--#define IRQ_EB11MP_GPIO1	-1
--#define IRQ_EB11MP_GPIO2	-1
--#define IRQ_EB11MP_SCI		-1
--#define IRQ_EB11MP_SSP		-1
-+/*
-+ * The 11MPcore tile leaves the following unconnected.
-+ */
-+#define IRQ_EB11MP_UART2	0
-+#define IRQ_EB11MP_UART3	0
-+#define IRQ_EB11MP_CLCD		0
-+#define IRQ_EB11MP_DMA		0
-+#define IRQ_EB11MP_WDOG		0
-+#define IRQ_EB11MP_GPIO0	0
-+#define IRQ_EB11MP_GPIO1	0
-+#define IRQ_EB11MP_GPIO2	0
-+#define IRQ_EB11MP_SCI		0
-+#define IRQ_EB11MP_SSP		0
- 
- #define NR_GIC_EB11MP		2
- 
+> +};
+> +#endif /* CONFIG_LOCAL_TIMERS */
+> +
+>  static void __init msm_timer_init(void)
+>  {
+>  	struct clock_event_device *ce = &msm_clockevent;
+> @@ -173,8 +212,12 @@ static void __init msm_timer_init(void)
+>  		*__this_cpu_ptr(msm_evt.percpu_evt) = ce;
+>  		res = request_percpu_irq(ce->irq, msm_timer_interrupt,
+>  					 ce->name, msm_evt.percpu_evt);
+> -		if (!res)
+> +		if (!res) {
+>  			enable_percpu_irq(ce->irq, 0);
+> +#ifdef CONFIG_LOCAL_TIMERS
+> +			local_timer_register(&msm_local_timer_ops);
+> +#endif
+> +		}
+
+It's unfortunate we can't avoid this ifdef here. O well.
+
 -- 
-1.7.7.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
