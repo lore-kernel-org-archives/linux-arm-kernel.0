@@ -1,32 +1,24 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 27 Jan 2012 16:56:07 +0200
-Subject: [Linaro-mm-sig] [PATCH 12/15] drivers: add Contiguous Memory
- Allocator
-In-Reply-To: <00de01ccdce1$e7c8a360$b759ea20$%szyprowski@samsung.com>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
- <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
- <00de01ccdce1$e7c8a360$b759ea20$%szyprowski@samsung.com>
-Message-ID: <CAK=WgbY+TgjWcaKcEV-c6cQPN9qbjcmNzjEsTXXCjKoOZhO7FQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 27 Jan 2012 12:56:31 -0200
+Subject: [PATCH] ARM: mx28: clock-mx28: Use a proper timeout mechanism
+In-Reply-To: <20120126122805.GC3523@S2101-09.ap.freescale.net>
+References: <1327329667-25512-1-git-send-email-fabio.estevam@freescale.com>
+ <20120126122805.GC3523@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5DxPnCz1nYaCOvBPSiqwEj=QgrqfmkN9DtJP7AACYMFuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/27 Marek Szyprowski <m.szyprowski@samsung.com>:
-> I've tested it with 256MiB on Exynos4 platform. Could you check if the
-> problem also appears on 3.2-cma-v19 branch (I've uploaded it a few hours
-> ago)
+On 1/26/12, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Exactly what I needed, thanks :)
+> Name it mxs_clkctrl_divider_timeout to be more precise?
 
-Both v18 and v19 seem to work fine with 3.2.
+I kept the original name because if I use the name you suggested I
+would have to break several lines for keeping them within 80 columns.
 
-> The above code has not been changed since v16, so I'm really surprised
-> that it causes problems. Maybe the memory configuration or layout has
-> been changed in 3.3-rc1 for OMAP4?
+As this functions is called within several macros, it would not be
+very readable after breaking  the lines.
 
-Not sure what the culprit is, but it is only triggered with 3.3-rc1.
 
-I'll tell you if I find anything.
+Regards,
 
-Thanks!
-Ohad.
+Fabio Estevam
