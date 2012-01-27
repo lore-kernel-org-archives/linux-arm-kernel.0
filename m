@@ -1,36 +1,28 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 27 Jan 2012 11:19:33 +0000
-Subject: [PATCH v2 2/2] regulator: add device tree support for max8997
-In-Reply-To: <4F227530.3050708@samsung.com>
-References: <1326353738-26864-1-git-send-email-thomas.abraham@linaro.org>
- <1326353738-26864-3-git-send-email-thomas.abraham@linaro.org>
- <4F1FD1A5.1060305@samsung.com>
- <20120125112602.GB2991@opensource.wolfsonmicro.com>
- <4F1FEF55.8030604@samsung.com>
- <20120125133254.GJ3687@opensource.wolfsonmicro.com>
- <4F217100.6020105@samsung.com>
- <20120126161744.GB19703@opensource.wolfsonmicro.com>
- <4F227530.3050708@samsung.com>
-Message-ID: <20120127111932.GC32008@opensource.wolfsonmicro.com>
+Date: Fri, 27 Jan 2012 11:27:51 +0000
+Subject: [PATCH 0/4] Pending S3C64xx updates
+In-Reply-To: <016501ccdc93$ae158190$0a4084b0$%kim@samsung.com>
+References: <20120124213127.GH1135@opensource.wolfsonmicro.com>
+ <016501ccdc93$ae158190$0a4084b0$%kim@samsung.com>
+Message-ID: <20120127112751.GF32008@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 10:58:08AM +0100, Karol Lewandowski wrote:
-> >>On 25.01.2012 12:22, Mark Brown wrote:
+On Fri, Jan 27, 2012 at 10:33:24AM +0900, Kukjin Kim wrote:
+> Mark Brown wrote:
 
-> >I'm sorry, this makes no sense.  Setting a value in the constraints is
-> >not going to have any impact on the value reported by the driver, it
-> >never has.
+> >       ARM: S3C64XX: Define some additional always off clocks
 
-> ... with the exception of fixed regulator, that is. This is from
-> where I got my flawed understanding.
+> Hmm, I know there were discussions about this with Tomasz Figa and I was
+> waiting for his submitting. But now this looks ok to me so will apply this.
 
-Note also that this only happens for device tree - with platform data
-there's separate platform data for the voltage.
+The discussion there was around there being other out of tree drivers
+that might at some point want to use these clocks - I don't think there
+was any doubt that for current mainline this change makes sense.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120127/c097b06d/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120127/c826a4b5/attachment.sig>
