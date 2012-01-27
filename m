@@ -1,69 +1,57 @@
-From: eranian@googlemail.com (stephane eranian)
-Date: Fri, 27 Jan 2012 16:57:25 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120127155454.GH2347@mudshark.cambridge.arm.com>
-References: <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
- <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
- <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
- <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
- <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
- <20120127121311.GB2347@mudshark.cambridge.arm.com>
- <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
- <20120127132826.GD2347@mudshark.cambridge.arm.com>
- <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
- <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
- <20120127155454.GH2347@mudshark.cambridge.arm.com>
-Message-ID: <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Jan 2012 16:04:14 +0000
+Subject: [PATCH] ARM: realview: fix unconnected interrupts on EB11MP
+Message-ID: <1327680254-24313-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 4:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jan 27, 2012 at 03:45:53PM +0000, stephane eranian wrote:
->> Hi,
->
-> Hi Stephane,
->
->> Ok, with the one-line patch [1], this works much better now.
->> No more wrap around a 4 billion cycles.
->
-> Hurrah! Thanks Mans and Ming Lei for helping with this. Unfortunately, I
-> remember Santosh had objections to this patch so that needs to be resolved.
->
-Yes, this needs to be resolved ASAP.
+Since commit 2eac58d (ARM: amba: make use of -1 IRQs warn), we're
+able to detect the use of value -1 to indicate the lack of interrupt
+line.
 
->> Sampling is okay, though I noticed it tends to not get the
->> correct number of samples for a controlled run:
->>
->> $ perf record -e cycles -c 1009213 noploop 10
->> noploop for 10 seconds
->>
->> $ perf report -D | tail -20
->> cycles stats:
->> ? ? ? ? ? ?TOTAL events: ? ? ? 9938
->> ? ? ? ? ? ? MMAP events: ? ? ? ? 13
->> ? ? ? ? ? ? COMM events: ? ? ? ? ?2
->> ? ? ? ? ? ? EXIT events: ? ? ? ? ?2
->> ? ? ? ? THROTTLE events: ? ? ? ? 12
->> ? ? ? UNTHROTTLE events: ? ? ? ? 12
->> ? ? ? ? ? SAMPLE events: ? ? ? 9897
->>
->> Should not get throttled samples. Should get abour 10k samples
->> but only seeing 9897. The max_rate limit is way higher
->> than what I set the period (1000 samples/sec). But then,
->> is 3.2.0 throttling is broken. I posted a patch to fix that
->> yesterday. I will try with my patch applied as well.
->
-> Ok. Note that on ARM the PMU generates a standard IRQ (i.e. not an NMI) so
-> you may miss samples if they occur during critical kernel sections (and if
-> you look at a profile, spin_unlock_irqrestore will be quite high).
->
-But I am only running a user space noploop. So it spends 99% in user space, no
-critical section.
+The RealView EB, when used with the 11MPCore tile, has a number of
+devices without interrupts, and uses the value -1 to indicate this.
 
-> A7 and A15 have the ability to filter counters based on privilege level, so
-> you can get more accurate userspace counts there.
+Change that value to 0 to conform to the new behaviour.
 
-Ok, that's better. Need to update libpfm4 for A15 with priv levels then!
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-realview/include/mach/irqs-eb.h |   23 +++++++++++++----------
+ 1 files changed, 13 insertions(+), 10 deletions(-)
 
->
-> Will
+diff --git a/arch/arm/mach-realview/include/mach/irqs-eb.h b/arch/arm/mach-realview/include/mach/irqs-eb.h
+index 204d537..d6b5073 100644
+--- a/arch/arm/mach-realview/include/mach/irqs-eb.h
++++ b/arch/arm/mach-realview/include/mach/irqs-eb.h
+@@ -96,16 +96,19 @@
+ #define IRQ_EB11MP_L220_SLAVE	(IRQ_EB_GIC_START + 30)
+ #define IRQ_EB11MP_L220_DECODE	(IRQ_EB_GIC_START + 31)
+ 
+-#define IRQ_EB11MP_UART2	-1
+-#define IRQ_EB11MP_UART3	-1
+-#define IRQ_EB11MP_CLCD		-1
+-#define IRQ_EB11MP_DMA		-1
+-#define IRQ_EB11MP_WDOG		-1
+-#define IRQ_EB11MP_GPIO0	-1
+-#define IRQ_EB11MP_GPIO1	-1
+-#define IRQ_EB11MP_GPIO2	-1
+-#define IRQ_EB11MP_SCI		-1
+-#define IRQ_EB11MP_SSP		-1
++/*
++ * The 11MPcore tile leaves the following unconnected.
++ */
++#define IRQ_EB11MP_UART2	0
++#define IRQ_EB11MP_UART3	0
++#define IRQ_EB11MP_CLCD		0
++#define IRQ_EB11MP_DMA		0
++#define IRQ_EB11MP_WDOG		0
++#define IRQ_EB11MP_GPIO0	0
++#define IRQ_EB11MP_GPIO1	0
++#define IRQ_EB11MP_GPIO2	0
++#define IRQ_EB11MP_SCI		0
++#define IRQ_EB11MP_SSP		0
+ 
+ #define NR_GIC_EB11MP		2
+ 
+-- 
+1.7.7.1
