@@ -1,63 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Jan 2012 16:37:05 -0800
-Subject: [PATCH 15/15] arch/arm/mach-omap2/smartreflex.c: add missing
- iounmap
-In-Reply-To: <1326362117-29371-15-git-send-email-Julia.Lawall@lip6.fr>
-References: <1326362117-29371-15-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20120127003704.GH29812@atomide.com>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 26 Jan 2012 16:56:35 -0800
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform
+ clean-up
+In-Reply-To: <201201261520.43176.arnd@arndb.de>
+References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
+ <201201251501.42304.arnd@arndb.de> <4F2038E8.8090209@linaro.org>
+ <201201261520.43176.arnd@arndb.de>
+Message-ID: <20120127005635.GA32478@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Julia Lawall <Julia.Lawall@lip6.fr> [120112 01:23]:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
+On Thu, Jan 26, 2012 at 03:20:43PM +0000, Arnd Bergmann wrote:
+> On Wednesday 25 January 2012, Lee Jones wrote:
+> > >>> Everyone else, who is planning to use the infrastructure besides ux500?
+> > >>
+> > >> I can easily see this being used in the ARM reference designs
+> > >> (Integrator, Versatile, RealView and Versatile Express) some of them
+> > >> I can possibly patch myself even. OMAP has expressed interest
+> > >> in "some way of getting the SoC ID out", and I guess this is
+> > >> the means to that end.
+> > > 
+> > > Ah, good. Once these patches are merged, we can easily refer anyone
+> > > to this infrastructure if they try to add a different way of finding
+> > > a SoC ID.
+> > 
+> > Okay, so this sounds promising. Which route are the patches likely to
+> > take? Will they go up through your SoC tree Arnd?
 > 
-> Add missing iounmap in error handling code, in a case where the function
-> already preforms iounmap on some other execution path.
+> That's probably the best way. Of course you need to have Acks
+> from Greg (for the bus) and Linus Walleij (for the ux500 stuff)
+> before I can merge them. Linus can decide whether he wants to
+> submit them to me through a pull request from his ux500 tree
+> (with Signed-off-by) or whether I should apply them myself
+> (with Ack).
 
-Thanks I'll apply this into omap fixes branch.
-
-Regards,
-
-Tony
- 
-> A simplified version of the semantic match that finds this problem is as
-> follows: (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @@
-> expression e;
-> statement S,S1;
-> int ret;
-> @@
-> e = \(ioremap\|ioremap_nocache\)(...)
-> ... when != iounmap(e)
-> if (<+...e...+>) S
-> ... when any
->     when != iounmap(e)
-> *if (...)
->    { ... when != iounmap(e)
->      return ...; }
-> ... when any
-> iounmap(e);
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> ---
->  arch/arm/mach-omap2/smartreflex.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 9dd9345..7e755bb 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -897,7 +897,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
->  		ret = sr_late_init(sr_info);
->  		if (ret) {
->  			pr_warning("%s: Error in SR late init\n", __func__);
-> -			return ret;
-> +			goto err_iounmap;
->  		}
->  	}
->  
-> 
+I'll try to review these again tomorrow...
