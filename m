@@ -1,7 +1,7 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Jan 2012 09:05:45 -0800
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 27 Jan 2012 09:36:08 -0800
 Subject: Pinmux bindings proposal V2
-In-Reply-To: <20120127065752.GB32740@S2101-09.ap.freescale.net>
+In-Reply-To: <20120127020832.GJ29812@atomide.com>
 References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
  <20120123210052.GS22818@atomide.com>
  <74CDBE0F657A3D45AFBB94109FB122FF178CB81C0D@HQMAIL01.nvidia.com>
@@ -10,68 +10,35 @@ References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
  <20120125000407.GU22818@atomide.com>
  <74CDBE0F657A3D45AFBB94109FB122FF178CB82433@HQMAIL01.nvidia.com>
  <20120127020832.GJ29812@atomide.com>
- <20120127065752.GB32740@S2101-09.ap.freescale.net>
-Message-ID: <20120127170545.GH13504@atomide.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E123E57@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Tony Lindgren wrote at Thursday, January 26, 2012 7:09 PM:
+...
+> I don't think we should try to pass the different possible states from
+> device tree. The pinmux/pinconf driver should know how to deal with that,
 
-* Shawn Guo <shawn.guo@linaro.org> [120126 22:15]:
-> On Thu, Jan 26, 2012 at 06:08:33PM -0800, Tony Lindgren wrote:
-> > * Stephen Warren <swarren@nvidia.com> [120126 11:03]:
-> ...
-> > > Second, as I mentioned before, while some of the states are certainly
-> > > PM-related, I don't think all will be, e.g. the case of running an SD
-> > > controller at different clock rates to the SD card, and needing to
-> > > set different pin parameters based on the clock rate. Is runtime PM
-> > > intended cover that kind of thing? The idea here is that the common
-> > > pinctrl binding can allow the driver to require different named states
-> > > for those different clock rate cases.
-> > 
-> > For the PM related states, those should be Linux generic. For rate
-> > setting sounds like that's really something you should set up as clocks
-> > in the Tegra wrapper driver for SDHCI?
-> > 
-> That's right.
-> 
-> > Ideally the SDHCI driver would be completely arch independent, and
-> > then the SoC specific wrapper driver would know how to communicate to
-> > the pinmux/pinconf framwork or clock framework what it needs using
-> > Linux generic APIs.
-> 
-> But that wrapper driver should not be bothered to call pinmux/pinconf
-> APIs on pin basis to change the pinctrl configuration.  The elegant
-> way would be something like the following in case that it switches
-> the bus frequency from 50 MHz to 100 MHz.
-> 
-> 	pmx = pinmux_get(dev, "esdhc_50mhz");
-> 	...
-> 	pinmux_put(pmx);
-> 	pmx = pinmux_get(dev, "esdhc_100mhz");
-> 	...
-> 
-> The specific mux and config settings of states esdhc_50mhz and
-> esdhc_100mhz would be retrieved from device tree.
+Somehow, the pinctrl driver needs to know how to implement each state. In 
+general, I believe this will be board-specific.
 
-Yes whatever mux names can be used, same as with clock framework
-for clock names. But that means you'll have to constantly get/put
-the mux which is not efficient.
+Do you disagree with this assertion?
 
-Wouldn't it be cleaner to just clk_get esdhc_clk during init, then
-do clk_set_rate on it to toggle the rates?
- 
-> > So I'd rather stay out of random named states for
-> > the pins coming from device tree; If we still need them, they should
-> > be common bindings rather than things like "xyz_clock_hack".
-> > 
-> The binding defines the syntax, and I do not see the necessity to
-> force the particular state name, which is really pinctrl client
-> device specific.
+If the data is board-specific, I don't see how it can be represented
+anywhere but the device tree.
 
-Do you have some other custom pin state example other than the
-clock rate change example above?
+> and the driver using the mux should be able to communicate what it wants
+> to the pinmux/pinconf driver. If people really want to be able to pass
+> alternative mux states from device tree, they should be standard bindings
+> for things like active/idle/suspend/off.
 
-Regards,
+As I've mentioned before, people have asked for driver-specific states to
+handle the case where e.g. drive strength must be adjusted based on clock
+rates of the interface. Again, I believe that's board-specific data since
+the actual values to use may be derived during board calibration, not
+SoC design.
 
-Tony
+Do you disagree that this data may be board specific?
+
+--
+nvpublic
