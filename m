@@ -1,43 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jan 2012 23:49:40 -0800
-Subject: [GIT PULL] ux500 fixes for v3.3
-In-Reply-To: <1327509408-3234-1-git-send-email-linus.walleij@linaro.org>
-References: <1327509408-3234-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAOesGMhoNGkFxrPH7OuyHzpcg9Z8FTaGcYJ+4XLPGOfe7WpYiw@mail.gmail.com>
+Date: Thu, 26 Jan 2012 23:49:56 -0800
+Subject: [GIT PULL] i.MX fixes for -rc
+In-Reply-To: <20120126115859.GI5446@pengutronix.de>
+References: <20120126115859.GI5446@pengutronix.de>
+Message-ID: <CAOesGMiPztpAeD6HZfHg86PBG=emCSNNVnOTc422DpKLcRknQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Jan 25, 2012 at 8:36 AM, Linus Walleij <linus@df.lth.se> wrote:
+On Thu, Jan 26, 2012 at 3:58 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > Hi Arnd, Olof,
 >
-> These are some fixes for ux500 that would be nice to have
-> for the 3.3-rc:s through ARM SoC.
+> Please pull the following i.MX fixes for -rc.
+>
+> Sascha
 >
 > The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
 >
 > ?Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
 >
 > are available in the git repository at:
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git fixes-for-arm-soc
+> ?git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes
 >
-> Philippe Langlais (2):
-> ? ? ?mach-ux500: musb: now musb is always in OTG mode
-> ? ? ?mach-ux500: no MMC_CAP_SD_HIGHSPEED on Snowball
+> Fabio Estevam (1):
+> ? ? ?ARM: imx: iomux-v1.h: Fix build error due to __init annotation
 >
-> Srinidhi KASAGAR (1):
-> ? ? ?mach-ux500: enable ARM errata 764369
->
-> srinidhi kasagar (1):
-> ? ? ?mach-ux500: do not override outer.inv_all
-
+> Julia Lawall (1):
+> ? ? ?arch/arm/mach-imx/mach-mx53_ard.c: add missing iounmap
 
 Thanks, pulled.
-
-BTW, in the future please migrate to using the common prefix format instead:
-
-ARM: ux500: <...>
 
 
 -Olof
