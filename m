@@ -1,68 +1,181 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 27 Jan 2012 05:32:01 +0000
-Subject: [PATCH] ARM: OMAP: id: Add missing break statement in
- omap3xxx_check_revision
-In-Reply-To: <20120127002543.GG29812@atomide.com>
-References: <1327305407-19914-1-git-send-email-hvaibhav@ti.com>
- <20120127002543.GG29812@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317B530C@DBDE01.ent.ti.com>
+From: nalajala.murali@gmail.com (Murali N)
+Date: Fri, 27 Jan 2012 11:28:47 +0530
+Subject: [PATCH v1 8/8] ARM: tegra: support for secondary cores on Tegra30
+In-Reply-To: <1327597641-7519-9-git-send-email-pdeschrijver@nvidia.com>
+References: <1327597641-7519-1-git-send-email-pdeschrijver@nvidia.com>
+ <1327597641-7519-9-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <CAF0Txbpy-oeTkdotDVcoFUu50F7OLvxv_1PKwwxVb_UBmfnOmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 05:55:43, Tony Lindgren wrote:
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120122 23:26]:
-> > Add missing break statement in the function omap3xxx_check_revision.
-> > 
-> > The commit id 4390f5b2cb1f56 [ARM: OMAP: TI814X: Add cpu type macros
-> > and detection support], removed the 'break' statement from the function
-> > omap3xxx_check_revision(), resulting into wrong omap/cpu_revision
-> > initialization for AM335x devices.
-> 
-> Looks like this is already fixed, can you please verify with
-> v3.3-rc1?
-> 
-Tony,
+On Thu, Jan 26, 2012 at 10:37 PM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+>
+> Add support for bringing up secondary cores on Tegra30. On Tegra30 secondary
+> CPU cores are powergated, so we need to turn on the domains before we can bring
+> the CPU cores online. Bringing secondary cores online happens early during the
+> ssytem boot, so we call powergating initialization from platform early_init
 
-I just looked at your linux-omap/master branch and 'break' statement is missing. So this patch is still required.
+small spelling correction "system"
 
-I can still see,
+> function.
+>
+> Based on work by:
+>
+> Scott Williams <scwilliams@nvidia.com>
+> Colin Cross <ccross@android.com>
+> Alex Frid <afrid@nvidia.com>
+>
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+> ?arch/arm/mach-tegra/headsmp.S | ? 32 +++++++++++++++++++++++++
+> ?arch/arm/mach-tegra/platsmp.c | ? 52 ++++++++++++++++++++++++++++++++++++++++-
+> ?2 files changed, 83 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+> index bb13e22..925c4a0 100644
+> --- a/arch/arm/mach-tegra/headsmp.S
+> +++ b/arch/arm/mach-tegra/headsmp.S
+> @@ -188,6 +188,38 @@ __die:
+> ? ? ? ?str ? ? r1, [r7, #0x340] ? ? ? ? ? ? ? ?@ CLK_RST_CPU_CMPLX_SET
+> ?#endif
+> ?1:
+> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> + ? ? ? mov32 ? r6, TEGRA_FLOW_CTRL_BASE
+> +
+> + ? ? ? cmp ? ? r10, #0
+> + ? ? ? moveq ? r1, #FLOW_CTRL_HALT_CPU0_EVENTS
+> + ? ? ? moveq ? r2, #FLOW_CTRL_CPU0_CSR
+> + ? ? ? movne ? r1, r10, lsl #3
+> + ? ? ? addne ? r2, r1, #(FLOW_CTRL_CPU1_CSR-8)
+> + ? ? ? addne ? r1, r1, #(FLOW_CTRL_HALT_CPU1_EVENTS-8)
+> +
+> + ? ? ? /* Clear CPU "event" and "interrupt" flags and power gate
+> + ? ? ? ? ?it when halting but not before it is in the "WFI" state. */
+> + ? ? ? ldr ? ? r0, [r6, +r2]
+> + ? ? ? orr ? ? r0, r0, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+> + ? ? ? orr ? ? r0, r0, #FLOW_CTRL_CSR_ENABLE
+> + ? ? ? str ? ? r0, [r6, +r2]
+> +
+> + ? ? ? /* Unconditionally halt this CPU */
+> + ? ? ? mov ? ? r0, #FLOW_CTRL_WAITEVENT
+> + ? ? ? str ? ? r0, [r6, +r1]
+> + ? ? ? ldr ? ? r0, [r6, +r1] ? ? ? ? ? ? ? ? ? @ memory barrier
+> +
+> + ? ? ? dsb
+> + ? ? ? isb
+> + ? ? ? wfi ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ CPU should be power gated here
+> +
+> + ? ? ? /* If the CPU didn't power gate above just kill it's clock. */
+> +
+> + ? ? ? mov ? ? r0, r11, lsl #8
+> + ? ? ? str ? ? r0, [r7, #348] ? ? ? ? ? ? ? ? ?@ CLK_CPU_CMPLX_SET
+> +#endif
+> +
+> ? ? ? ?/* If the CPU still isn't dead, just spin here. */
+> ? ? ? ?b ? ? ? .
+> ?ENDPROC(__tegra_cpu_reset_handler)
+> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> index fa1178d..672a751 100644
+> --- a/arch/arm/mach-tegra/platsmp.c
+> +++ b/arch/arm/mach-tegra/platsmp.c
+> @@ -24,7 +24,9 @@
+> ?#include <asm/mach-types.h>
+> ?#include <asm/smp_scu.h>
+>
+> +#include <mach/clk.h>
+> ?#include <mach/iomap.h>
+> +#include <mach/powergate.h>
+>
+> ?#include "chipid.h"
+> ?#include "flowctrl.h"
+> @@ -42,6 +44,8 @@ static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
+> ? ? ? ?(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x340)
+> ?#define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
+> ? ? ? ?(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
+> +#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR \
+> + ? ? ? (IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x34c)
+>
+> ?#define CPU_CLOCK(cpu) (0x1<<(8+cpu))
+> ?#define CPU_RESET(cpu) (0x1111ul<<(cpu))
+> @@ -73,11 +77,54 @@ static int tegra20_power_up_cpu(unsigned int cpu)
+> ? ? ? ?return 0;
+> ?}
+>
+> +static int tegra30_power_up_cpu(unsigned int cpu)
+> +{
+> + ? ? ? u32 reg;
+> + ? ? ? int ret, pwrgateid;
+> + ? ? ? unsigned long timeout;
+> +
+> + ? ? ? pwrgateid = tegra_cpu_powergate_id(cpu);
+> + ? ? ? if (pwrgateid < 0)
+> + ? ? ? ? ? ? ? return pwrgateid;
+> +
+> + ? ? ? /* If this is the first boot, toggle powergates directly. */
+> + ? ? ? if (!tegra_powergate_is_powered(pwrgateid)) {
+> + ? ? ? ? ? ? ? ret = tegra_powergate_power_on(pwrgateid);
+> + ? ? ? ? ? ? ? if (ret)
+> + ? ? ? ? ? ? ? ? ? ? ? return ret;
+> +
+> + ? ? ? ? ? ? ? /* Wait for the power to come up. */
+> + ? ? ? ? ? ? ? timeout = jiffies + 10*HZ;
+> + ? ? ? ? ? ? ? do {
+> + ? ? ? ? ? ? ? ? ? ? ? if (tegra_powergate_is_powered(pwrgateid))
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto remove_clamps;
+> + ? ? ? ? ? ? ? ? ? ? ? udelay(10);
+> + ? ? ? ? ? ? ? } while (time_before(jiffies, timeout));
+> + ? ? ? ? ? ? ? return -ETIMEDOUT;
+> + ? ? ? }
+> +
+> +remove_clamps:
+> + ? ? ? /* CPU partition is powered. Enable the CPU clock. */
+> + ? ? ? writel(CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
+> + ? ? ? reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
+> + ? ? ? udelay(10);
+> +
+> + ? ? ? /* Remove I/O clamps. */
+> + ? ? ? ret = tegra_powergate_remove_clamping(pwrgateid);
+> + ? ? ? udelay(10);
+> +
+> + ? ? ? /* Clear flow controller CSR. */
+> + ? ? ? flowctrl_write_cpu_csr(cpu, 0);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> ?int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+> ?{
+> ? ? ? ?int status;
+>
+> - ? ? ? /* Force the CPU into reset. The CPU must remain in reset when the
+> + ? ? ? /*
+> + ? ? ? ?* Force the CPU into reset. The CPU must remain in reset when the
+> ? ? ? ? * flow controller state is cleared (which will cause the flow
+> ? ? ? ? * controller to stop driving reset if the CPU has been power-gated
+> ? ? ? ? * via the flow controller). This will have no effect on first boot
+> @@ -98,6 +145,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+> ? ? ? ?case TEGRA20:
+> ? ? ? ? ? ? ? ?status = tegra20_power_up_cpu(cpu);
+> ? ? ? ? ? ? ? ?break;
+> + ? ? ? case TEGRA30:
+> + ? ? ? ? ? ? ? status = tegra30_power_up_cpu(cpu);
+> + ? ? ? ? ? ? ? break;
+> ? ? ? ?default:
+> ? ? ? ? ? ? ? ?status = -EINVAL;
+> ? ? ? ? ? ? ? ?break;
+> --
+> 1.7.7.rc0.72.g4b5ea.dirty
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-394                 }
-395                 break;
-396         case 0xb944:
-397                 omap_revision = AM335X_REV_ES1_0;
-398                 cpu_rev = "1.0";
-399         case 0xb8f2:
-400                 switch (rev) {
 
 
-Thanks,
-Vaibhav
 
-
-> Regards,
-> 
-> Tony
->  
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/mach-omap2/id.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> > index 325e12e..32cf203 100644
-> > --- a/arch/arm/mach-omap2/id.c
-> > +++ b/arch/arm/mach-omap2/id.c
-> > @@ -395,6 +395,7 @@ void __init omap3xxx_check_revision(void)
-> >  	case 0xb944:
-> >  		omap_revision = AM335X_REV_ES1_0;
-> >  		cpu_rev = "1.0";
-> > +		break;
-> >  	case 0xb8f2:
-> >  		switch (rev) {
-> >  		case 0:
-> > --
-> > 1.7.0.4
-> > 
-> 
+--
+Regards,
+Murali N
