@@ -1,52 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jan 2012 13:56:46 +0000
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <yw1xwr8dmf56.fsf@unicorn.mansr.com>
-References: <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
- <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
- <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
- <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
- <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
- <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
- <20120127121311.GB2347@mudshark.cambridge.arm.com>
- <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
- <20120127132826.GD2347@mudshark.cambridge.arm.com>
- <yw1xwr8dmf56.fsf@unicorn.mansr.com>
-Message-ID: <20120127135646.GE2347@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Jan 2012 15:00:35 +0100
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform
+ clean-up
+In-Reply-To: <201201261520.43176.arnd@arndb.de>
+References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
+ <201201251501.42304.arnd@arndb.de> <4F2038E8.8090209@linaro.org>
+ <201201261520.43176.arnd@arndb.de>
+Message-ID: <CACRpkdaN1DZx8m4UEb2g+JF5MGaTP7908r--zhGzr2bxTATR0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 01:47:01PM +0000, M?ns Rullg?rd wrote:
-> Will Deacon <will.deacon@arm.com> writes:
-> 
-> > Mans,
-> >
-> > On Fri, Jan 27, 2012 at 12:56:35PM +0000, M?ns Rullg?rd wrote:
-> >> Will Deacon <will.deacon@arm.com> writes:
-> >> > Did this lead anywhere in the end? It seems as though Ming Lei has a working
-> >> > setup but Stephane is unable to replicate it, despite applying the necessary
-> >> > patches and trying an updated bootloader.
-> >> 
-> >> With the patches listed above plus the one in [1], I get PMU interrupts.
-> >> However, unless I restrict the profiled process to one CPU
-> >> (taskset 1 perf record ...), I get a panic in armpmu_event_update() with
-> >> the 'event' argument being null when called from armv7pmu_handle_irq().
-> >> 
-> >> [1] http://article.gmane.org/gmane.linux.ports.arm.omap/69696
-> >
-> > Great, thanks for trying this out. Which version of the kernel were you
-> > using? I fixed a bunch of NULL pointer derefs. during the 3.2 window, but if
-> > you were using an -rc kernel you have have hit one of them.
-> 
-> This was with the Linaro tilt-3.2 kernel from
-> git://git.linaro.org/landing-teams/working/ti/kernel.git, commit
-> 73e2c294444f209d281f7cd10b52b53b087e74f1.  Maybe one of the many patches
-> it has on top of 3.2 is to blame.
+On Thu, Jan 26, 2012 at 4:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 25 January 2012, Lee Jones wrote:
+>> Okay, so this sounds promising. Which route are the patches likely to
+>> take? Will they go up through your SoC tree Arnd?
+>
+> That's probably the best way. Of course you need to have Acks
+> from Greg (for the bus) and Linus Walleij (for the ux500 stuff)
 
-Perhaps, or (more likely) the interrupt affinity for the CTI isn't working
-properly and the interrupt is always delivered to CPU0. I'll keep this in
-mind in case we get any more reports like this.
+Lee, you have my ACK on the Ux500 parts. The bus part I leave
+for Greg to deal with...
 
-Cheers,
-
-Will
+Yours,
+Linus Walleij
