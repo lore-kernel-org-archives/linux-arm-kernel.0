@@ -1,52 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 27 Jan 2012 17:15:32 +0900
-Subject: [PATCH 0/2] S3C24XX: remove some spi left overs
-In-Reply-To: <201201082222.11305.heiko@sntech.de>
-References: <201201082222.11305.heiko@sntech.de>
-Message-ID: <01b201ccdccb$d6923680$83b6a380$%kim@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 27 Jan 2012 00:15:37 -0800
+Subject: [PATCH v1 1/3] ARM: tegra: definitions for flow controller
+In-Reply-To: <CAOesGMghrFvCzyTaLfeF5RB77UUxpzEQj+j5Ega_uzL1SdbrOg@mail.gmail.com>
+References: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
+ <1327594923-21822-2-git-send-email-pdeschrijver@nvidia.com>
+ <CAOesGMghrFvCzyTaLfeF5RB77UUxpzEQj+j5Ega_uzL1SdbrOg@mail.gmail.com>
+Message-ID: <CAOesGMhaNybgVvLwT28MNjquRn6K55vRZPOiOyp1Ospg4_-uug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> This series removes unused setup-code of the s3c24xx spi driver.
-> 
-> It has no current in kernel users and also no development activity trying
-> to change this. I also checked the upstream git of the only board including
-> the spi.h file (the gta02 at http://git.openmoko.org). The setup calls
-> are also not used there.
-> 
-> I recall a thread some time back talking about removing the spi-s3c24xx
-> driver altogether, but as current linux-next still carries the driver
-> I'm not sure what became of it. So this series does the next smaller thing.
-> 
-> 
-> Heiko Stuebner (2):
->   S3C24XX: remove unused spi gpio setup functions
->   S3C24XX: move spi-s3c24xx platdata out of mach
-> 
->  arch/arm/mach-s3c2410/include/mach/spi.h     |   38 --------------------------
->  arch/arm/mach-s3c2440/mach-gta02.c           |    2 +-
->  arch/arm/plat-s3c24xx/Kconfig                |   20 -------------
->  arch/arm/plat-s3c24xx/Makefile               |    6 ----
->  arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c |   36 ------------------------
->  arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c   |   38 --------------------------
->  arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c    |   36 ------------------------
->  drivers/spi/spi-s3c24xx.c                    |    2 +-
->  8 files changed, 2 insertions(+), 176 deletions(-)
->  delete mode 100644 arch/arm/mach-s3c2410/include/mach/spi.h
->  delete mode 100644 arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c
->  delete mode 100644 arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c
->  delete mode 100644 arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c
-> 
-> --
-> 1.7.2.3
+On Thu, Jan 26, 2012 at 6:17 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Thu, Jan 26, 2012 at 8:22 AM, Peter De Schrijver
+> <pdeschrijver@nvidia.com> wrote:
+>> Introduce some definitions for the tegra flow contoller. This will be
+>> used by the code which controls entering and leaving LP3.
+>>
+>> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+>
+> Do you expect to use these defines anywhere else than in the sleep.S
+> in the near future? If not, please just move them over to that file.
 
-Looks good :)
-Applied in my cleanup-s3c24xx, thanks.
+I just looked at the Tegra30 secondary cores patch series, it's used there.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Please ignore.
+
+-Olof
