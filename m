@@ -1,60 +1,42 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 27 Jan 2012 11:53:29 +0100
-Subject: [Linaro-mm-sig] [PATCH 12/15] drivers: add Contiguous Memory
- Allocator
-In-Reply-To: <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
- <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
-Message-ID: <00de01ccdce1$e7c8a360$b759ea20$%szyprowski@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Jan 2012 12:10:24 +0100
+Subject: [GIT PULL] i.MX fixes for -rc
+Message-ID: <20120127111024.GB5446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi Olof, Arnd,
 
-On Friday, January 27, 2012 10:44 AM Ohad Ben-Cohen wrote:
+Another round of small fixes for -rc, please pull
 
-> With v19, I can't seem to allocate big regions anymore (e.g. 101MiB).
-> In particular, this seems to fail:
-> 
-> On Thu, Jan 26, 2012 at 11:00 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> > +static int cma_activate_area(unsigned long base_pfn, unsigned long count)
-> > +{
-> > + ? ? ? unsigned long pfn = base_pfn;
-> > + ? ? ? unsigned i = count >> pageblock_order;
-> > + ? ? ? struct zone *zone;
-> > +
-> > + ? ? ? WARN_ON_ONCE(!pfn_valid(pfn));
-> > + ? ? ? zone = page_zone(pfn_to_page(pfn));
-> > +
-> > + ? ? ? do {
-> > + ? ? ? ? ? ? ? unsigned j;
-> > + ? ? ? ? ? ? ? base_pfn = pfn;
-> > + ? ? ? ? ? ? ? for (j = pageblock_nr_pages; j; --j, pfn++) {
-> > + ? ? ? ? ? ? ? ? ? ? ? WARN_ON_ONCE(!pfn_valid(pfn));
-> > + ? ? ? ? ? ? ? ? ? ? ? if (page_zone(pfn_to_page(pfn)) != zone)
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
-> 
-> The above WARN_ON_ONCE is triggered, and then the conditional is
-> asserted (page_zone() retuns a "Movable" zone, whereas zone is
-> "Normal") and the function fails.
-> 
-> This happens to me on OMAP4 with your 3.3-rc1-cma-v19 branch (and a
-> bunch of remoteproc/rpmsg patches).
-> 
-> Do big allocations work for you ?
+Sascha
 
-I've tested it with 256MiB on Exynos4 platform. Could you check if the
-problem also appears on 3.2-cma-v19 branch (I've uploaded it a few hours
-ago) and 3.2-cma-v18? Both are available on our public repo:
-git://git.infradead.org/users/kmpark/linux-samsung/
+The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
 
-The above code has not been changed since v16, so I'm really surprised 
-that it causes problems. Maybe the memory configuration or layout has 
-been changed in 3.3-rc1 for OMAP4?
+  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
 
-Best regards
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes
+
+Fabio Estevam (3):
+      ARM: mx3: Let mx31 and mx35 share the same CCM header file
+      ARM: mx3: Let mx31 and mx35 enter in LPM mode in WFI
+      ARM: imx_v4_v5_defconfig: Fix the selection of 32 bit flash support for iMX21ADS board
+
+ arch/arm/configs/imx_v4_v5_defconfig               |    1 +
+ arch/arm/mach-imx/Makefile                         |    4 +-
+ arch/arm/mach-imx/clock-imx31.c                    |    2 +-
+ arch/arm/mach-imx/clock-imx35.c                    |  166 +++++++++-----------
+ .../mach-imx/{crmregs-imx31.h => crmregs-imx3.h}   |   16 ++-
+ arch/arm/mach-imx/mach-armadillo5x0.c              |    2 +-
+ arch/arm/mach-imx/mm-imx3.c                        |    4 +-
+ arch/arm/mach-imx/pm-imx3.c                        |   36 +++++
+ arch/arm/plat-mxc/include/mach/common.h            |    8 +
+ 9 files changed, 142 insertions(+), 97 deletions(-)
+ rename arch/arm/mach-imx/{crmregs-imx31.h => crmregs-imx3.h} (93%)
+ create mode 100644 arch/arm/mach-imx/pm-imx3.c
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
