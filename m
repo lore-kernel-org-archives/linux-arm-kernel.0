@@ -1,44 +1,68 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 27 Jan 2012 14:20:00 +0900
-Subject: [PATCH] ARM: S3C64XX: Add a SPKVDD supply for CODECs on
- Cragganmore
-In-Reply-To: <1326812866-27271-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1326812866-27271-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <01a101ccdcb3$510376e0$f30a64a0$%kim@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 27 Jan 2012 05:32:01 +0000
+Subject: [PATCH] ARM: OMAP: id: Add missing break statement in
+ omap3xxx_check_revision
+In-Reply-To: <20120127002543.GG29812@atomide.com>
+References: <1327305407-19914-1-git-send-email-hvaibhav@ti.com>
+ <20120127002543.GG29812@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317B530C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+On Fri, Jan 27, 2012 at 05:55:43, Tony Lindgren wrote:
+> * Vaibhav Hiremath <hvaibhav@ti.com> [120122 23:26]:
+> > Add missing break statement in the function omap3xxx_check_revision.
+> > 
+> > The commit id 4390f5b2cb1f56 [ARM: OMAP: TI814X: Add cpu type macros
+> > and detection support], removed the 'break' statement from the function
+> > omap3xxx_check_revision(), resulting into wrong omap/cpu_revision
+> > initialization for AM335x devices.
 > 
-> Hook up a SPKVDD supply for CODECs that can use it.
+> Looks like this is already fixed, can you please verify with
+> v3.3-rc1?
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410.c
-> index 202f724..d5a7982 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -300,6 +300,7 @@ static struct platform_device littlemill_device = {
->  };
-> 
->  static struct regulator_consumer_supply wallvdd_consumers[] = {
-> +	REGULATOR_SUPPLY("SPKVDD", "1-001a"),
->  	REGULATOR_SUPPLY("SPKVDD1", "1-001a"),
->  	REGULATOR_SUPPLY("SPKVDD2", "1-001a"),
->  	REGULATOR_SUPPLY("SPKVDDL", "1-001a"),
-> --
-> 1.7.7.3
+Tony,
 
-OK, will apply.
+I just looked at your linux-omap/master branch and 'break' statement is missing. So this patch is still required.
 
-Thanks.
+I can still see,
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+394                 }
+395                 break;
+396         case 0xb944:
+397                 omap_revision = AM335X_REV_ES1_0;
+398                 cpu_rev = "1.0";
+399         case 0xb8f2:
+400                 switch (rev) {
+
+
+Thanks,
+Vaibhav
+
+
+> Regards,
+> 
+> Tony
+>  
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap2/id.c |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> > index 325e12e..32cf203 100644
+> > --- a/arch/arm/mach-omap2/id.c
+> > +++ b/arch/arm/mach-omap2/id.c
+> > @@ -395,6 +395,7 @@ void __init omap3xxx_check_revision(void)
+> >  	case 0xb944:
+> >  		omap_revision = AM335X_REV_ES1_0;
+> >  		cpu_rev = "1.0";
+> > +		break;
+> >  	case 0xb8f2:
+> >  		switch (rev) {
+> >  		case 0:
+> > --
+> > 1.7.0.4
+> > 
+> 
