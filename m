@@ -1,86 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Jan 2012 14:11:43 +0100
-Subject: Pinmux bindings proposal
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB45E@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <20120116182808.GG4223@ponder.secretlab.ca>
- <20120118141329.GA22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1780DAAEBB@HQMAIL01.nvidia.com>
- <20120119105728.GE22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1780DAB45E@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdaRePot9qt-z3Chk-GHqHDfyu07ojKfGA2HEXxvjKn=Vg@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 27 Jan 2012 13:19:42 +0000
+Subject: DaVinci unbanked GPIO IRQs broken
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317926BB@DBDE01.ent.ti.com>
+References: <70E876B0EA86DD4BAF101844BC814DFE0BF403DA89@Cloud.RL.local>
+ <DF0F476B391FA8409C78302C7BA518B6317926BB@DBDE01.ent.ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317A6E2B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 9:50 PM, Stephen Warren <swarren@nvidia.com> wrote:
+Hi Jon,
 
-> For Tegra20 (and IIRC some other HW), the pin mux HW actually muxes
-> groups of pins; one register field sets n (1, 2, 3, ...) pins to that
-> function at once. Hence, the entries are real physical groups.
+On Tue, Jan 17, 2012 at 15:32:23, Nori, Sekhar wrote:
 
-Maybe I am getting things wrong, but I've read:
+> I was able to reproduce this on the EVM using v2.6.38 (works)
+> and v3.2 + my patch (doesn't work). I just started poking some
+> registers to see what is happening. Will keep you updated
+> on any progress.
+> 
 
-http://en.wiktionary.org/wiki/real
-http://en.wiktionary.org/wiki/virtual
+Following patch fixes the issue of interrupt handler not getting
+called. I tested it using GPIO3 on DM365. On applying this, I
+see a constant rate of 4-5 interrupts per second on that line.
+Yet to figure out what is triggering those. Anyway I will wait for
+you to test this after you are back before sending this to Grant.
 
-And now I am trying to address this from my understanding of
-"real" as defined in clause 1:
+Thanks,
+Sekhar
 
-"1. That has physical existence.
-    No one has ever seen a real unicorn."
+------8<---------
+From: Sekhar Nori <nsekhar@ti.com>
+Date: Fri, 27 Jan 2012 00:31:54 +0530
+Subject: [PATCH] gpio/davinci: fix enabling of unbanked GPIO IRQs
 
-And "virtual" as defined in clause 3:
+Unbanked GPIO IRQ handling code made a copy of just
+the irq_chip structure for GPIO IRQ lines which caused
+problems after the generic IRQ chip conversion because
+there was no valid irq_chip_type structure with the
+right "regs" populated. irq_gc_mask_set_bit() was
+therefore accessing random addresses.
 
-"3. Of something that is simulated in a computer or on-line.
-    The virtual world of his computer game allowed character interaction."
+Fix it by making a copy of irq_chip_type structure
+instead. This will ensure sane register offsets.
 
-Please tell me if I have the wrong definitions in my
-head, I am not trying to play smart, I just want to understand
-why this rubs me the wrong way. So:
+Reported-by: Jon Povey <Jon.Povey@racelogic.co.uk>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ drivers/gpio/gpio-davinci.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-On the Nomadik GPIO controller (not yet migrated to the pin
-control subsystem, mea culpa) pins 0,1,2,3 can be used for UART0.
-
-These four pins can also be used for GPIO, and two other
-functions.
-
-Does that make the group UART0 = {0,1,2,3} a virtual group
-in sense (3) of the wiktionary article, i.e. "simulated in a
-computer"?
-
-To me: no, not at all.
-
-Because it is a very real physical property of these pins that
-UART0 can *only* appear on these 4 pins, not 4 other pins.
-It is clear from the data sheet.
-
-And even if they could appear on other pins, the number of
-such appearances would be limited by physical factors, and
-UART0_1 = {0,1,2,3} vs UART0_2 = {4,5,6,7} wouldn't
-make it virtual. This is also a physical property, not simulated or virtual.
-
-The *only* case where I could *maybe* accept the "virtual"
-terminology would be for a phone-exchange type of
-pinmux, where say this UART could appear on any 4 pins,
-arbitrarily chosen. Still this is not fully virtual since it is
-a physical fact that the UART group has to have 4 pins,
-not 1, not 17.
-
-Notice that I don't involve the use of that group on a
-specific board in this argument, since the *silicon* limits the
-muxable properties of this group, and it is a very real
-group of pins.
-
-This is why I think it is a bad idea to try to define pins as
-being in a "real" or "virtual" group like this, where the only
-criteria for that terminology is whether each pin has its own
-control register or not.
-
-I'm all happy with "Tegra type groups" and "Tegra type pins"
-or "groups with separate control registers" or "pins with
-separate control registers" which tells us what it really is,
-"real" or "virtual" does not fit our discussion here the way
-I see it.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index a6777e5..3d00016 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -386,7 +386,7 @@ static int __init davinci_gpio_irq_setup(void)
+ 	 * IRQ mux conflicts; gpio_irq_type_unbanked() is only for GPIOs.
+ 	 */
+ 	if (soc_info->gpio_unbanked) {
+-		static struct irq_chip gpio_irqchip_unbanked;
++		static struct irq_chip_type gpio_unbanked;
+ 
+ 		/* pass "bank 0" GPIO IRQs to AINTC */
+ 		chips[0].chip.to_irq = gpio_to_irq_unbanked;
+@@ -394,9 +394,10 @@ static int __init davinci_gpio_irq_setup(void)
+ 
+ 		/* AINTC handles mask/unmask; GPIO handles triggering */
+ 		irq = bank_irq;
+-		gpio_irqchip_unbanked = *irq_get_chip(irq);
+-		gpio_irqchip_unbanked.name = "GPIO-AINTC";
+-		gpio_irqchip_unbanked.irq_set_type = gpio_irq_type_unbanked;
++		gpio_unbanked = *container_of(irq_get_chip(irq),
++					      struct irq_chip_type, chip);
++		gpio_unbanked.chip.name = "GPIO-AINTC";
++		gpio_unbanked.chip.irq_set_type = gpio_irq_type_unbanked;
+ 
+ 		/* default trigger: both edges */
+ 		g = gpio2regs(0);
+@@ -405,7 +406,7 @@ static int __init davinci_gpio_irq_setup(void)
+ 
+ 		/* set the direct IRQs up to use that irqchip */
+ 		for (gpio = 0; gpio < soc_info->gpio_unbanked; gpio++, irq++) {
+-			irq_set_chip(irq, &gpio_irqchip_unbanked);
++			irq_set_chip(irq, &gpio_unbanked.chip);
+ 			irq_set_handler_data(irq, &chips[gpio / 32]);
+ 			irq_set_status_flags(irq, IRQ_TYPE_EDGE_BOTH);
+ 		}
