@@ -1,24 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 27 Jan 2012 12:56:31 -0200
-Subject: [PATCH] ARM: mx28: clock-mx28: Use a proper timeout mechanism
-In-Reply-To: <20120126122805.GC3523@S2101-09.ap.freescale.net>
-References: <1327329667-25512-1-git-send-email-fabio.estevam@freescale.com>
- <20120126122805.GC3523@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5DxPnCz1nYaCOvBPSiqwEj=QgrqfmkN9DtJP7AACYMFuw@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 27 Jan 2012 16:59:11 +0200
+Subject: [Linaro-mm-sig] [PATCH 12/15] drivers: add Contiguous Memory
+ Allocator
+In-Reply-To: <010301ccdd03$1ad15ab0$50741010$%szyprowski@samsung.com>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
+ <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
+ <00de01ccdce1$e7c8a360$b759ea20$%szyprowski@samsung.com>
+ <CAO8GWqnQg-W=TEc+CUc8hs=GrdCa9XCCWcedQx34cqURhNwNwA@mail.gmail.com>
+ <010301ccdd03$1ad15ab0$50741010$%szyprowski@samsung.com>
+Message-ID: <CAK=WgbZWHBKNQwcoY9OiXXH-r1n3XxB=ZODZJN-3vZopU2yhJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/26/12, Shawn Guo <shawn.guo@linaro.org> wrote:
+2012/1/27 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Ohad, could you tell a bit more about your issue?
 
-> Name it mxs_clkctrl_divider_timeout to be more precise?
+Sure, feel free to ask.
 
-I kept the original name because if I use the name you suggested I
-would have to break several lines for keeping them within 80 columns.
+> Does this 'large region'
+> is a device private region (declared with dma_declare_contiguous())
 
-As this functions is called within several macros, it would not be
-very readable after breaking  the lines.
+Yes, it is.
 
+See omap_rproc_reserve_cma() in:
 
-Regards,
+http://git.kernel.org/?p=linux/kernel/git/ohad/remoteproc.git;a=commitdiff;h=dab6a2584550a629746fa1dea2be8ffbe1910277
 
-Fabio Estevam
+Thanks,
+Ohad.
