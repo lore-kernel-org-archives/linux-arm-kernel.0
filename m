@@ -1,51 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Jan 2012 13:00:35 +0100
-Subject: Pinmux bindings proposal
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB445@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
- <20120117082334.GA31295@S2101-09.ap.freescale.net>
- <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
- <7FE21149F4667147B645348EC6057885095125@039-SN2MPN1-013.039d.mgd.msft.net>
- <74CDBE0F657A3D45AFBB94109FB122FF1780DAB445@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdae58AYCYzwx8ysSDr_i0UHBfCujm2Fmnb+hx7825Lm4w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jan 2012 12:13:11 +0000
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
+References: <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
+ <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
+ <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
+ <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
+ <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
+ <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
+ <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
+ <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
+ <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
+ <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
+Message-ID: <20120127121311.GB2347@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 9:28 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Dong Aisheng wrote at Wednesday, January 18, 2012 4:06 AM:
->>
->> Each entry in the list is PIN rather than group.
->> So we cannot create each map for each entry in the list except we treat the PIN as
->> A group(this will cause a huge maps and predefined groups and functions).
->
-> Linusw has NAKd the idea that we should not use these "virtual groups",
-> i.e. he believes they're fine to use if you wish.
+Hi guys,
 
-Interesting double inversion here: I NACK to NOT use groups
-this way...
+On Sat, Jan 21, 2012 at 09:16:57AM +0000, stephane eranian wrote:
+> On Sat, Jan 21, 2012 at 4:25 AM, Ming Lei <ming.lei@canonical.com> wrote:
+> > On Fri, Jan 20, 2012 at 9:47 PM, stephane eranian
+> > <eranian@googlemail.com> wrote:
+> >> Started afresh from:
+> >>
+> >> 90a4c0f uml: fix compile for x86-64
+> >>
+> >> And added 3, 4, 5, 6:
+> >> 603c316 arm: omap4: pmu: support runtime pm
+> >> 4899fbd arm: omap4: support pmu
+> >> d737bb1 arm: omap4: create pmu device via hwmod
+> >> 4e0259e arm: omap4: hwmod: introduce emu hwmod
+> >>
+> >> Still no interrupts firing. I am using your .config file.
+> >>
+> >> My HW:
+> >> CPU implementer : 0x41
+> >> CPU architecture: 7
+> >> CPU variant ? ? : 0x1
+> >> CPU part ? ? ? ?: 0xc09
+> >> CPU revision ? ?: 2
+> >>
+> >> Hardware ? ? ? ?: OMAP4 Panda board
+> >> Revision ? ? ? ?: 0020
+> >>
+> >> There must be something I am missing here.
 
-The groups are not "virtual" if they share some physical
-property. Such as being used by the same device.
+Did this lead anywhere in the end? It seems as though Ming Lei has a working
+setup but Stephane is unable to replicate it, despite applying the necessary
+patches and trying an updated bootloader.
 
-The subsystem has callbacks to list, name and get the
-pins belonging to a group. What defines a group is up
-to the driver, it better be something that makes sense
-else the driver will likely become hard to maintain.
+Drastic suggestion: Stephane, could you try a kernel *binary* from Ming Lei?
+If that works then you're probably just missing a patch. If it doesn't, then
+there must be something different between your boards.
 
-If and only if you enable the *OPTIONAL* pinmux part
-of the pin control subsystem, there is something
-called pinmuxes, these have pins associated with them,
-and by design they have to present the pins associated
-with them by naming one or more groups.
-
-It is possible that the pinmux should be able to
-contain single pins as well, Tony indicated something
-like that to me. Currently you would have to use a
-group with 1 pin in it to associate a single pin with
-a pinmux, maybe this is not so elegant, it can be
-fixed,
-
-Yours,
-Linus Walleij
+Will
