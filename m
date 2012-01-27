@@ -1,73 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Jan 2012 09:37:32 -0800
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 27 Jan 2012 09:38:47 -0800
 Subject: Pinmux bindings proposal V2
-In-Reply-To: <CAPnjgZ2EkvTMsOkWyf4pfwRpvcvYs=WaKy5Gi8fdkAUQmvt=ig@mail.gmail.com>
+In-Reply-To: <20120127022111.GK29812@atomide.com>
 References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
  <CAPnjgZ3Xhebn1x1A-Vdy78DWbDd=cp0AK6tL-R1SRzS4GdF97g@mail.gmail.com>
  <20120127022111.GK29812@atomide.com>
- <CAPnjgZ2EkvTMsOkWyf4pfwRpvcvYs=WaKy5Gi8fdkAUQmvt=ig@mail.gmail.com>
-Message-ID: <20120127173732.GJ13504@atomide.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E123E59@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Simon Glass <sjg@chromium.org> [120127 07:12]:
-> 
-> On Thu, Jan 26, 2012 at 6:21 PM, Tony Lindgren <tony@atomide.com> wrote:
+Tony Lindgren wrote at Thursday, January 26, 2012 7:21 PM:
+> * Simon Glass <sjg@chromium.org> [120126 09:11]:
 > >
-> > Maybe we need two bindings: A minimal subset of what Stephen is suggesting
-> > that can handle 95% of the muxes with minimal overhead, then what you're
-> > suggesting for the few muxes that need multiple states?
+> > On Fri, Jan 20, 2012 at 2:22 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> >
+> > 1. It doesn't seem to make full use of the device tree format. For example,
+> >
+> >    <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
+> >
+> > would be better as something like
+> >
+> >     drive-strength = <5>;
+> >
+> > if we could arrange it. It also reduces the need for these
+> > TEGRA_PMX_CONF_DRIVE_STRENGTH defines.
 > 
-> Perhaps that would work, it certainly deals nicely with making the
-> rare cases less ugly if indeed they are rare. Of course a single
-> binding that is not too ugly and still reasonably efficient would be
-> best.
-> 
-> I will have a think about this a bit more and see if anything leaps
-> out. It's quite an interesting problem...
+> I agree. This is something that most pinmux/pinconf drivers need to
+> implement, so it's best done in a generic way.
 
-Just to try to recap what has come up so far:
+Yet:
 
-1. We need to avoid bloating things for basic cases to initialize
-   several hundred pins.
+* Some controllers don't have a "drive strength" property
+* Others have a single "drive strength" property
+* Others configure drive strength separately for driving a signal high
+or low.
 
-2. Some muxes need to define multiple states.
+Hence, representing this in a generic fashion doesn't seem possible to
+me, except through (key, value) pairs where the individual drivers or
+bindings define what the keys are.
 
-3. We need to pass a flag for each mux to know whether or
-   not it can be freed after init.
-
-So how about let's do separate static and dynamic bindings,
-something like this:
-
-	/*
-	 * Static init time only mux where
-	 * we only specify phandle to driver
-	 * and, offset of the mux, and the value.
-	 * These pins are discarded after init.
-	 *
-	 * Format:	  mux_ctrl      offset value
-	 */
-	pinctrl-static = <&pmx_driver1  0x0020 0x1245
-			   &pmx_driver2 0x0022 0x6578>;
-
-	/*
-	 * Dynamic mux where the mux is kept around after
-	 * init and multiple states can be defined for
-	 * a mux as a subnode of the pinmux controller.
-	 *
-	 * Format:	   mux_phandle   initial state
-	 */ 
-	pinctrl-dynamic = <&pmx_sdhci    PMX_STATE_ENABLED
-			   &pmx_ehci_xcv PMX_STATE_ENABLED>;
-
-This would make pinctrl-static binding follow the same
-standard as GPIO binding and can be parsed easily with
-of_parse_phandle_with_args.
-
-Then for pinctrl-dynamic we can make a custom parser,
-and the binding can follow the more readable format as
-Simon posted.
-
-Regards,
-
-Tony
+-- 
+nvpublic
