@@ -1,57 +1,64 @@
-From: eranian@googlemail.com (stephane eranian)
-Date: Fri, 27 Jan 2012 18:16:47 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120127171009.GL2347@mudshark.cambridge.arm.com>
-References: <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
- <20120127121311.GB2347@mudshark.cambridge.arm.com>
- <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
- <20120127132826.GD2347@mudshark.cambridge.arm.com>
- <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
- <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
- <20120127155454.GH2347@mudshark.cambridge.arm.com>
- <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
- <20120127165941.GK2347@mudshark.cambridge.arm.com>
- <CAMsRxf+iv06zOCMzhYONeLaf6RvOLp38T53mR--8ESHvCXMeFQ@mail.gmail.com>
- <20120127171009.GL2347@mudshark.cambridge.arm.com>
-Message-ID: <CAMsRxfJufRMrcfGZp53ALOdEFLk+YDMvQMrHw-jR9tQ8ThE+-Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 27 Jan 2012 09:16:53 -0800
+Subject: Pinmux bindings proposal V2
+In-Reply-To: <20120127071944.GC32740@S2101-09.ap.freescale.net>
+References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
+ <20120123210052.GS22818@atomide.com>
+ <20120126093610.GD2287@S2101-09.ap.freescale.net>
+ <20120126175122.GX22818@atomide.com>
+ <20120127071944.GC32740@S2101-09.ap.freescale.net>
+Message-ID: <20120127171653.GI13504@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 6:10 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jan 27, 2012 at 05:03:28PM +0000, stephane eranian wrote:
->> On Fri, Jan 27, 2012 at 5:59 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > That said, if you see any bugs in the code please do shout!
->> >
->> I suspect there is something wrong, we shouldn't hit the max_rate_limit.
->> You may have bursts of interrupts (samples). I'll check on that this week-end.
->
-> Ok, thanks. Keep in mind that you probably have variable rate clocks, which
-> will affect the cycle counter frequency.
->
-I assume it does not vary the clock if the workload is steady and just burning
-cycles, e.g.: for(;;);
+* Shawn Guo <shawn.guo@linaro.org> [120126 22:37]:
+> On Thu, Jan 26, 2012 at 09:51:23AM -0800, Tony Lindgren wrote:
+> > Hi,
+> > 
+> > * Shawn Guo <shawn.guo@linaro.org> [120126 00:53]:
+> > > 
+> > > On Mon, Jan 23, 2012 at 01:00:52PM -0800, Tony Lindgren wrote:
+> > > ...
+> > > > So to summarize: I suggest we'll just stick to basics to get the system
+> > > > booting and devices working using device tree. In most cases the device
+> > > > drivers should be able to configure the suspend and off states in a generic
+> > > > way using pinctrl API. Everything else, like debugging, we can probably
+> > > > do with userspace tools.
+> > > > 
+> > > > This would mean just using a minimal subset of your binding, probably
+> > > > very close to what you originally suggested.
+> > > > 
+> > > IMHO, as a generic device tree binding, it should be able to cope with
+> > > different use cases.  It's really free for you to use the minimal
+> > > subset of the binding as your need, but we should not make the binding
+> > > design just be that minimal subset to force that everyone else can
+> > > only use the minimal subset.
+> > 
+> > The main issue I have is that the example posted in this thread repeats
+> > the same registers five times for one driver entry alone in the device
+> > tree data. The repeated registers are TEGRA_PMX_PG_DTA and TEGRA_PMX_PG_DTD
+> > in the example.
+> > 
+> > The alternative values are something that the pinmux/pinconf driver can
+> > set based on state changes communicated from the driver using these pins.
+> 
+> I'm against the idea that requires client device drivers call pinctrl
+> APIs on pin basis.  They do not even know or care about the pins that
+> they are using.  That's all pinctrl driver's business.  All client
+> driver needs to do when it wants to change pinctrl setup should just
+> be calling pinmux/pinconf_get/put[enable/disable](dev, "state").
 
->> >> > A7 and A15 have the ability to filter counters based on privilege level, so
->> >> > you can get more accurate userspace counts there.
->> >>
->> >> Ok, that's better. Need to update libpfm4 for A15 with priv levels then!
->> >
->> > How do you handle that in libpfm4? On ARM, the event encodings remain the same,
->> > you just need to set some extra bits to determine which levels are included or
->> > excluded (you can do this with the perf tool by using the :{u,k,h} suffix on an
->> > event description).
->> >
->> It depends what you call the encoding? If the priv level can be encoded in the
->> attr->config field, then that's easy. If it needs to be set somewhere else, then
->> we need to figure out how you encode it in the attr struct. Either in some other
->> bits in attr->config or use attr->config1, for instance. You tell me.
->
-> The way it's done with perf is to set the exclude{user,kernel,hv} fields in
-> the attr. The ARM perf backend then translates these into the relevant bits
-> which get orred into the config_base before hitting the hardware.
->
-Well, that's also how we do it with libpfm4 on X86. This is because
-with perf_events,
-the exclude_* fields have priority over what you set in the attr->config field.
+That should work fine too. As long as the states are generic, such as
+PMX_STATE_ENABLED, PMX_STATE_IDLE, PMX_STATE_SUSPEND, PMX_STATE_OFF
+and so on. You really don't want to change states with some string
+names if you need to toggle something every time your enter and exit
+idle. And it should be possible to set it on per pin or pingroup basis.
+For wake-up events you typically just toggle one pin for the device,
+such as serial rx line.
 
-> Will
+I guess the analog we should follow here is clk_get and clk_set_rate,
+except we would have pinconf_set_state with predefined states.
+
+Regards,
+
+Tony
