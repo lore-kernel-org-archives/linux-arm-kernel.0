@@ -1,66 +1,25 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 27 Jan 2012 12:56:35 +0000
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120127121311.GB2347@mudshark.cambridge.arm.com> (Will Deacon's
- message of "Fri, 27 Jan 2012 12:13:11 +0000")
-References: <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
- <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
- <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
- <CACVXFVNfc8fKe=6LVruj387-vQ85WHL7tAgZUT=9h6AQUM0X0Q@mail.gmail.com>
- <CAMsRxfLcO0eM8mkKUZcR8X6SG-MMRFasRK7hQCT-3-NuKN_+1g@mail.gmail.com>
- <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
- <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
- <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
- <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
- <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
- <20120127121311.GB2347@mudshark.cambridge.arm.com>
-Message-ID: <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 27 Jan 2012 14:04:45 +0100
+Subject: [PATCH] LPC32XX build fix
+Message-ID: <1327669485-15322-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
+This patch fixes a GCC compile error ("static declaration follows non-static
+declaration") for LPC32XX's watchdog, removing the extern declaration since
+it's not called externally.
 
-> Hi guys,
->
-> On Sat, Jan 21, 2012 at 09:16:57AM +0000, stephane eranian wrote:
->> On Sat, Jan 21, 2012 at 4:25 AM, Ming Lei <ming.lei@canonical.com> wrote:
->> > On Fri, Jan 20, 2012 at 9:47 PM, stephane eranian
->> > <eranian@googlemail.com> wrote:
->> >> Started afresh from:
->> >>
->> >> 90a4c0f uml: fix compile for x86-64
->> >>
->> >> And added 3, 4, 5, 6:
->> >> 603c316 arm: omap4: pmu: support runtime pm
->> >> 4899fbd arm: omap4: support pmu
->> >> d737bb1 arm: omap4: create pmu device via hwmod
->> >> 4e0259e arm: omap4: hwmod: introduce emu hwmod
->> >>
->> >> Still no interrupts firing. I am using your .config file.
->> >>
->> >> My HW:
->> >> CPU implementer : 0x41
->> >> CPU architecture: 7
->> >> CPU variant ? ? : 0x1
->> >> CPU part ? ? ? ?: 0xc09
->> >> CPU revision ? ?: 2
->> >>
->> >> Hardware ? ? ? ?: OMAP4 Panda board
->> >> Revision ? ? ? ?: 0020
->> >>
->> >> There must be something I am missing here.
->
-> Did this lead anywhere in the end? It seems as though Ming Lei has a working
-> setup but Stephane is unable to replicate it, despite applying the necessary
-> patches and trying an updated bootloader.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-With the patches listed above plus the one in [1], I get PMU interrupts.
-However, unless I restrict the profiled process to one CPU
-(taskset 1 perf record ...), I get a panic in armpmu_event_update() with
-the 'event' argument being null when called from armv7pmu_handle_irq().
-
-[1] http://article.gmane.org/gmane.linux.ports.arm.omap/69696
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+index 4b4e700..75640bfb 100644
+--- a/arch/arm/mach-lpc32xx/common.h
++++ b/arch/arm/mach-lpc32xx/common.h
+@@ -65,7 +65,6 @@ extern u32 clk_get_pclk_div(void);
+  */
+ extern void lpc32xx_get_uid(u32 devid[4]);
+ 
+-extern void lpc32xx_watchdog_reset(void);
+ extern u32 lpc32xx_return_iram_size(void);
+ 
+ /*
