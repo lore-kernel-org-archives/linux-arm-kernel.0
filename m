@@ -1,46 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 27 Jan 2012 13:37:01 -0500 (EST)
-Subject: [PATCH] ARM: kuser: consistently use usr_ret for returning from
- helpers
-In-Reply-To: <1327678432-15345-1-git-send-email-will.deacon@arm.com>
-References: <1327678432-15345-1-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1201271335590.2759@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 27 Jan 2012 11:02:39 -0800
+Subject: [GIT PULL] OMAP PM EMU fix for v3.3
+In-Reply-To: <AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com>
+References: <87liw8agk4.fsf@ti.com>
+ <AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com>
+Message-ID: <20120127190239.GC9339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jan 2012, Will Deacon wrote:
+Hi,
 
-> __kuser_cmpxchg64 has a return path using bx lr to get back to the caller.
-> This is actually ok since the code in question is predicated on
-> CONFIG_CPU_32v6K, but for the sake of consistency using the usr_ret
-> macro is probably better.
-
-Indeed.
-
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> ---
->  arch/arm/kernel/entry-armv.S |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+* Madhusudhan.Gowda at elektrobit.com <Madhusudhan.Gowda@elektrobit.com> [120127 10:25]:
+> Hi Tony,
 > 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 3a456c6..be16a48 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -790,7 +790,7 @@ __kuser_cmpxchg64:				@ 0xffff0f60
->  	smp_dmb	arm
->  	rsbs	r0, r3, #0			@ set returned val and C flag
->  	ldmfd	sp!, {r4, r5, r6, r7}
-> -	bx	lr
-> +	usr_ret	lr
->  
->  #elif !defined(CONFIG_SMP)
->  
-> -- 
-> 1.7.4.1
+> Please pull the PM EMU off mode fix for v3.3
+
+It's best that Kevin queues this as it affects PM. Or it
+at least needs an ack from Kevin.
+
+Regards,
+
+Tony
+ 
+> Thanks
+> Gowda
+> 
+> The following changes since commit
+> 1c6ece3c23e58d0dbc687407d606f3560ded582a:
+> 
+>   Merge branch 'omap_fixes_a_3.3rc' of git://git.pwsan.com/linux-2.6
+> (2012-01-26 16:48:37 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/elektrobit/linux.git linux-omap-emu-fix
+> 
+> Madhusudhan Gowda (1):
+>       ARM: OMAP3 PM:Save and restore EMU context across MPU OFF
+> 
+>  arch/arm/mach-omap2/cm2xxx_3xxx.c |   16 ++++++++++++----
+>  arch/arm/mach-omap2/cm2xxx_3xxx.h |    2 ++
+>  arch/arm/mach-omap2/pm34xx.c      |    8 ++++++++
+>  3 files changed, 22 insertions(+), 4 deletions(-)
+> 
+> 
+> ----------------------------------------------------------------
+> Please note: This e-mail may contain confidential information
+> intended solely for the addressee. If you have received this
+> e-mail in error, please do not disclose it to anyone, notify
+> the sender promptly, and delete the message from your system.
+> Thank you.
 > 
