@@ -1,97 +1,84 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 27 Jan 2012 12:00:54 +0900
-Subject: [PATCH v7 2/2] video: backlight: support s6e8ax0 panel driver
- based on MIPI DSI
-In-Reply-To: <001901ccdc98$755d4bd0$6017e370$%dae@samsung.com>
-References: <4F17AA14.8030100@samsung.com> <1327593179.2843.5.camel@lappy>
- <001901ccdc98$755d4bd0$6017e370$%dae@samsung.com>
-Message-ID: <006801ccdc9f$e28b42f0$a7a1c8d0$%han@samsung.com>
+Date: Fri, 27 Jan 2012 12:06:51 +0900
+Subject: [PATCH v7 1/2] video: support MIPI-DSI controller driver
+In-Reply-To: <1327592757.2843.1.camel@lappy>
+References: <4F17AA10.7080604@samsung.com> <4F182ACF.8010302@ti.com>
+ <20120120155121.18880dff.akpm@linux-foundation.org>
+ <4F1F4982.5050000@samsung.com> <1327592757.2843.1.camel@lappy>
+Message-ID: <006c01ccdca0$b77ecb80$267c6280$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Inki Dae.
+Hi, Tomi.
+
 > -----Original Message-----
-> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-owner at vger.kernel.org] On Behalf Of Inki
-> Dae
-> Sent: Friday, January 27, 2012 11:08 AM
-> To: 'Tomi Valkeinen'; 'Donghwa Lee'
-> Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; 'Florian Tobias Schandinat';
-> 'Andrew Morton'; rpurdie at linux.intel.com; kyungmin.park at samsung.com
-> Subject: RE: [PATCH v7 2/2] video: backlight: support s6e8ax0 panel driver based on MIPI DSI
+> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-owner at vger.kernel.org] On Behalf Of Tomi
+> Valkeinen
+> Sent: Friday, January 27, 2012 12:46 AM
+> To: Donghwa Lee
+> Cc: Andrew Morton; Archit; linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Florian
+> Tobias Schandinat; rpurdie at linux.intel.com; inki.dae at samsung.com; kyungmin.park at samsung.com
+> Subject: Re: [PATCH v7 1/2] video: support MIPI-DSI controller driver
 > 
-> Hi, Tomi.
+> Hi,
 > 
-> Below is my comments.
-> 
-> > -----Original Message-----
-> > From: Tomi Valkeinen [mailto:tomi.valkeinen at ti.com]
-> > Sent: Friday, January 27, 2012 12:53 AM
-> > To: Donghwa Lee
-> > Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > Florian Tobias Schandinat; Andrew Morton; rpurdie at linux.intel.com;
-> > inki.dae at samsung.com; kyungmin.park at samsung.com
-> > Subject: Re: [PATCH v7 2/2] video: backlight: support s6e8ax0 panel driver
-> > based on MIPI DSI
+> On Wed, 2012-01-25 at 09:14 +0900, Donghwa Lee wrote:
+> > On Sat, 21 Jan 2012 08:51, Andrew Morton wrote:
 > >
-> > Hi,
-> >
-> > On Thu, 2012-01-19 at 14:28 +0900, Donghwa Lee wrote:
-> > > This patch is amoled panel driver based MIPI DSI interface.
-> > > S6E8AX0 means it may includes many other ldi controllers, for example,
-> > > S6E8AA0, S6E8AB0, and so on.
+> > > On Thu, 19 Jan 2012 20:08:07 +0530
+> > > Archit <a0393947@ti.com> wrote:
 > > >
-> > > This patch can be modified depending on each panel properites. For
-> > > example, second parameter of panel condition register can be changed
-> > > depending on ldi controller or amoled type.
+> > >> On Thursday 19 January 2012 10:58 AM, Donghwa Lee wrote:
+> > >>> Samsung S5PC210 and EXYNOS SoC platform has MIPI-DSI controller and MIPI-DSI
+> > >>> based LCD Panel could be used with it. This patch supports MIPI-DSI driver
+> > >>> based Samsung SoC chip.
+> > >>>
+> > >>> LCD panel driver based MIPI-DSI should be registered to MIPI-DSI driver at
+> > >>> machine code and LCD panel driver specific function registered to mipi_dsim_ddi
+> > >>> structure at lcd panel init function called system init.
+> > >>> In the MIPI-DSI driver, find lcd panel driver by using registered
+> > >>> lcd panel name, and then initialize lcd panel driver.
+> > >>>
+> > >>> Changes since v6:
+> > >>> 	- remove obscure compile problems.
+> > >>> 	- remove useless codes.
+> > >>> 	- modify return errno codes properly
+> > >>
+> > >> One more comment about 'mipi_dsim.h', it would be better to put it in
+> > >> include/video and not 'include/linux'.
 > > >
-> > > Changes since v6:
-> > > 	- change data type from const to static const
+> > > Yes, that is desirable.
 > > >
-> > > Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-> > > Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > ---
-> > >  drivers/video/backlight/Kconfig   |    7 +
-> > >  drivers/video/backlight/Makefile  |    1 +
-> > >  drivers/video/backlight/s6e8ax0.c |  898
-> > +++++++++++++++++++++++++++++++++++++
-> > >  drivers/video/backlight/s6e8ax0.h |   21 +
-> > >  4 files changed, 927 insertions(+), 0 deletions(-)  create mode
-> > > 100644 drivers/video/backlight/s6e8ax0.c  create mode 100644
-> > > drivers/video/backlight/s6e8ax0.h
+> > >>> ---
+> > >>>   drivers/video/Kconfig                 |    6 +
+> > >>>   drivers/video/Makefile                |    2 +
+> > >>>   drivers/video/s5p_mipi_dsi.c          |  599 ++++++++++++++++++++++
+> > >>>   drivers/video/s5p_mipi_dsi_common.c   |  896 +++++++++++++++++++++++++++++++++
+> > >>>   drivers/video/s5p_mipi_dsi_common.h   |   46 ++
+> > >>>   drivers/video/s5p_mipi_dsi_lowlevel.c |  617 +++++++++++++++++++++++
+> > >>>   drivers/video/s5p_mipi_dsi_lowlevel.h |  112 ++++
+> > >>>   drivers/video/s5p_mipi_dsi_regs.h     |  149 ++++++
+> > >>>   include/linux/mipi_dsim.h             |  359 +++++++++++++
+> > >>>   9 files changed, 2786 insertions(+), 0 deletions(-)
+> > >
+> > > or we could put it in drivers/video/.  It all depends on which other
+> > > drivers we expect will need access to this header.
+> > >
 > >
-> > Why is this in backlight directory? It's a panel driver, not a backlight
-> > driver.
-> >
+> > No, mipi_dsim.h file includes global interface data, callback function called by machine
+> > file, platform data for mipi-dsi driver and so on. So I think it would be better to put
+> > in 'include/video' or 'include/linux'.
+> > Of course it is much better to change name to 's5p_mipi_dsim.h'
 > 
-> Yes, right. this backlight driver is specific to our mipi dsi driver because this uses the interface
-> of mipi dsi driver to send some commands to real lcd panel.
+> The header file looks like a platform specific header, so I agree that
+> it should start with s5p.
 > 
-> > And the driver is s5p specific, wouldn't a directory like
-> > drivers/video/s5p/, where both the s5p DSI driver from the previous patch
-> > and this panel driver could be?
-> >
-> 
-> Ok, we will create new directory, "exynos" instead of "s5p" because our SoC chip doesn't use such
-> prefix(s5p, and s3c) anymore. and also as you mentioned, we should working on a common DSI framework.
-> do you have any plan for this?
+> I think we should finally start working on a common DSI framework =).
 
-I think so. New directory, "exynos" is necessary.
-The "exynos" directory can include IPs such as MIPI, which are related to FB stack
-and are used for exynos SoC series.
-
-However, s3c-fb.c will remain in "drivers/video" directory, because s3c-fb.c can be
-used for s3c24xx, s5p64xx SoC series as well as exynos series.
+I agree with you in your opinion.
+The common DSI framework would be useful.
 
 Thank you.
+
 > 
-> Thanks,
-> Inki Dae.
-> 
-> >  Tomi
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  Tomi
