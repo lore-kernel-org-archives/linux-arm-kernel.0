@@ -1,40 +1,62 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 27 Jan 2012 17:26:17 +0000
-Subject: [GIT PULL] DaVinci fixes for v3.3-rc
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6317A70FB@DBDE01.ent.ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 27 Jan 2012 18:27:50 +0100
+Subject: [RFC PATCH 0/2] Generic DMA bindings helpers for Device Tree
+Message-ID: <4F22DE96.7090605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+Hi All,
 
-Can you please pull these DaVinci fixes for the next v3.3-rc?
-Both the patches have not been stable tagged. The fix by me
-is a v3.3 regression. The fix by Bas van den Berg is not critical
-enough to get into stable kernels.
+Here is a first RFC to introduce a generic binding for DMA
+controller and DMA request along with a couple of basic helpers
+functions.
+
+The support is very limited since the a lot of DMA controllers in
+ARM SoCs are far for being adapted to dmaengine. At least this is
+the case for OMAP.
+
+It is thus a little bit harder to handle that the same way GPIO is
+doing thanks to the gpiolib and provide a dmaengine pointer to the
+user.
+
+For the moment the API is just returning the DMA controller device_node
+to the driver + the DMA request number.
+
+I added as well for legacy purpose the dma to resource API, because
+it is still widely us in ARM SoC in general.
+
+I found at least two custom DMA bindings that could be replaced by a
+generic one for my point of view.
+
+    commit bf55499e6ee927e047feed85349365481289bd75 
+    Stephen Warren <swarren@nvidia.com>
+    ASoC: Tegra I2S: Add device tree binding
+
+    commit 93ed55441245a39e3935f5cf1af3e22febcce905
+    Thomas Abraham <thomas.abraham@linaro.org>
+    DMA: PL330: Add device tree support
+
+
+That generic DMA support is indeed pretty basic for the moment, but I
+think it can still help a couple of platforms.
+
+Comments are welcome.
 
 Thanks,
-Sekhar
+Benoit
 
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-  Linus Torvalds (1):
-        Linux 3.3-rc1
 
-are available in the git repository at:
+Benoit Cousson (2):
+  of: Add generic device tree DMA helpers
+  arm/dts: OMAP4: Add dma-controller and dma-request for I2C
 
-  git://gitorious.org/linux-davinci/linux-davinci.git fixes
-
-Bas van den Berg (1):
-      ARM: davinci: DA850: remove non-existing pll1_sysclk4-7 clocks
-
-Sekhar Nori (1):
-      ARM: davinci: update mdio bus name
-
- arch/arm/mach-davinci/board-da850-evm.c     |    2 +-
- arch/arm/mach-davinci/board-dm365-evm.c     |    2 +-
- arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
- arch/arm/mach-davinci/board-dm646x-evm.c    |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c |    2 +-
- arch/arm/mach-davinci/board-sffsdr.c        |    2 +-
- arch/arm/mach-davinci/da850.c               |   32 ---------------------------
- 8 files changed, 7 insertions(+), 39 deletions(-)
+ Documentation/devicetree/bindings/dma/dma.txt |   44 +++++++++
+ arch/arm/boot/dts/omap4.dtsi                  |   15 +++
+ drivers/of/Kconfig                            |    5 +
+ drivers/of/Makefile                           |    1 +
+ drivers/of/dma.c                              |  130 +++++++++++++++++++++++++
+ include/linux/of_dma.h                        |   49 +++++++++
+ 6 files changed, 244 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/dma.txt
+ create mode 100644 drivers/of/dma.c
+ create mode 100644 include/linux/of_dma.h
