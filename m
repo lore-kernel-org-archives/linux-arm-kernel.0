@@ -1,88 +1,63 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Fri, 27 Jan 2012 07:40:00 +0100
-Subject: [RFC PATCH 6/7] ARM: mtd: nand: davinci: add OF support for
- davinci nand controller
-In-Reply-To: <4F21B8AC.40002@freescale.com>
-References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-7-git-send-email-hs@denx.de> <4F1DF465.60206@freescale.com>
- <4F1E5C82.60108@denx.de> <4F1F0A3E.40805@freescale.com>
- <4F1FAAAE.2060007@denx.de> <4F21B8AC.40002@freescale.com>
-Message-ID: <4F2246C0.6020905@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Jan 2012 14:57:54 +0800
+Subject: Pinmux bindings proposal V2
+In-Reply-To: <20120127020832.GJ29812@atomide.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
+ <20120123210052.GS22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178CB81C0D@HQMAIL01.nvidia.com>
+ <20120124012038.GT22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178CB81EDB@HQMAIL01.nvidia.com>
+ <20120125000407.GU22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178CB82433@HQMAIL01.nvidia.com>
+ <20120127020832.GJ29812@atomide.com>
+Message-ID: <20120127065752.GB32740@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Scott,
-
-Scott Wood wrote:
-> On 01/25/2012 01:09 AM, Heiko Schocher wrote:
->> Scott Wood wrote:
->> I found the following used options:
->>
->> ecc_mode:
->> NAND_ECC_NONE
->> NAND_ECC_SOFT
->> NAND_ECC_HW
->> NAND_ECC_HW_SYNDROME
->>
->> bbt_options:
->> NAND_BBT_USE_FLASH
->>
->> ecc_bits:
->> 1
->> 4
->>
->> options:
->> NAND_BUSWIDTH_16
->>
->>>>> Do all of these properties really belong here?  I can see providing some
->>>> I think so, because this values come from existing platform code
->>>> (grep for struct davinci_nand_pdata)
->>> The standards are a bit stricter for the device tree, since it's a more
->>> stable interface across components -- at least that's how we've used it
->>> on a lot of powerpc targets.  I'm not sure if that's the intent here,
->>> but I have seen U-Boot patches for ARM hardware using them as well.
->> Ok, so, should I introduce instead properties for the above
->> needed parameters? 
+On Thu, Jan 26, 2012 at 06:08:33PM -0800, Tony Lindgren wrote:
+> * Stephen Warren <swarren@nvidia.com> [120126 11:03]:
+...
+> > Second, as I mentioned before, while some of the states are certainly
+> > PM-related, I don't think all will be, e.g. the case of running an SD
+> > controller at different clock rates to the SD card, and needing to
+> > set different pin parameters based on the clock rate. Is runtime PM
+> > intended cover that kind of thing? The idea here is that the common
+> > pinctrl binding can allow the driver to require different named states
+> > for those different clock rate cases.
 > 
-> Yes.
-
-Ok, I change this.
-
->> (As this are not davinci specific parameters, are there somewhere such definitions for them?)
+> For the PM related states, those should be Linux generic. For rate
+> setting sounds like that's really something you should set up as clocks
+> in the Tegra wrapper driver for SDHCI?
 > 
-> It's controller-specific which options are changeable, and whether
-> there's a better source of information.  Most controllers don't seem to
-> need this.  I'd keep the definitions davinci specific for now.  If
-> there's enough of a common need, a common definition could be considered.
+That's right.
 
-Ok, a proposal for the properties names and values:
+> Ideally the SDHCI driver would be completely arch independent, and
+> then the SoC specific wrapper driver would know how to communicate to
+> the pinmux/pinconf framwork or clock framework what it needs using
+> Linux generic APIs.
 
->> ecc_mode:
->> NAND_ECC_NONE
->> NAND_ECC_SOFT
->> NAND_ECC_HW
->> NAND_ECC_HW_SYNDROME
+But that wrapper driver should not be bothered to call pinmux/pinconf
+APIs on pin basis to change the pinctrl configuration.  The elegant
+way would be something like the following in case that it switches
+the bus frequency from 50 MHz to 100 MHz.
 
-"ti,davinci-nand-ecc-mode" = "none", "soft", "hw" or "hw_syndrome"
+	pmx = pinmux_get(dev, "esdhc_50mhz");
+	...
+	pinmux_put(pmx);
+	pmx = pinmux_get(dev, "esdhc_100mhz");
+	...
 
->> bbt_options:
->> NAND_BBT_USE_FLASH
+The specific mux and config settings of states esdhc_50mhz and
+esdhc_100mhz would be retrieved from device tree.
 
-"ti,davinci-nand-bbt-options" = "use_flash"
+> So I'd rather stay out of random named states for
+> the pins coming from device tree; If we still need them, they should
+> be common bindings rather than things like "xyz_clock_hack".
+> 
+The binding defines the syntax, and I do not see the necessity to
+force the particular state name, which is really pinctrl client
+device specific.
 
->> ecc_bits:
->> 1
->> 4
-
-"ti,davinci-nand-ecc-bits" = "1" or "4"
-
->> options:
->> NAND_BUSWIDTH_16
-
-"ti,davinci-nand-options" = "buswidth-16"
-
-bye,
-Heiko
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Regards,
+Shawn
