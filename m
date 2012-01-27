@@ -1,132 +1,95 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 27 Jan 2012 10:40:08 +0100
-Subject: [PATCH v2 2/2] S3C24XX: move spi-s3c24xx platdata out of mach
-In-Reply-To: <01b201ccdccb$d6923680$83b6a380$%kim@samsung.com>
-References: <201201082222.11305.heiko@sntech.de>
- <01b201ccdccb$d6923680$83b6a380$%kim@samsung.com>
-Message-ID: <201201271040.08945.heiko@sntech.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 27 Jan 2012 10:43:18 +0100
+Subject: at91: pm.h cleanup
+In-Reply-To: <20120126233414.GF11941@n2100.arm.linux.org.uk>
+References: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F217CCD.5000104@atmel.com> <20120126203350.GD11941@n2100.arm.linux.org.uk>
+ <20120126233414.GF11941@n2100.arm.linux.org.uk>
+Message-ID: <4F2271B6.9070006@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-spi.h now only contains the definition of the platform data structure
-for the driver in spi-s3c24xx.c . Therefore it does not need to stay
-in include/mach but can instead live in linux/spi/s3c24xx.h .
+On 01/27/2012 12:34 AM, Russell King - ARM Linux :
+> On Thu, Jan 26, 2012 at 08:33:50PM +0000, Russell King - ARM Linux wrote:
+>> On Thu, Jan 26, 2012 at 05:18:21PM +0100, Nicolas Ferre wrote:
+>>> Daniel,
+>>>
+>>> I have rebased your patch series on top of:
+>>>
+>>> - at91 late device/board patches that are planned for 3.3
+>>> - at91-fixes branch (should go also in 3.3)
+>>> * rmk/for-next branch (with a merge conflict resolved)
+>>> * the removal of CAP9 SoC family
+>>>
+>>> You can find the resulting code in our git tree:
+>>>
+>>> git://github.com/at91linux/linux-at91.git at91-pm_cleanup
+>>>
+>>> I hope that I will be able to send this branch to arm-soc soon with a
+>>> minimum of future rebase (when the two first series cited above will be
+>>> in Linus' tree actually).
+>>
+>> No you won't, not if you're including rmk/for-next in it.
+>>
+>> Take a moment to think about that: rmk/for-next is NOT a topic branch.
+>> It is purely a branch published for the sake of SFR.  It gets torn down
+>> and regenerated regularly.  You can't base work off it.  It's all explained
+>> here:
+>>
+>> 	http://www.arm.linux.org.uk/developer/git-arm.php
+> 
+> As a follow-up to this, your action has put in jeopardy two things:
+> 
+> 1. The ability for me to publish patches in my git tree for people to be
+>    able to test large patch sets.
+> 
+> 2. The ability to publish patches which are ready for mainline but have
+>    not yet had all the acks etc received.
+> 
+> The official position on the publication of git commits is that once
+> they're published, they can't be changed - with the exception of the
+> linux-next tree.
+> 
+> What that means is that if I followed that rule, I would not publish very
+> many changes until the last minute for the simple reason that people in
+> the ARM community absolutely suck to the back teeth giving acks and so
+> forth to large patch sets.  Example: had I followed that guidance, the
+> restart changes would not have gone in during the last merge window.
+> 
+> So, either *EVERYONE* understands how I run my tree and they DO NOT
+> EVER include any branch into their own tree without FIRST TALKING TO
+> ME, or I withdraw my tree from public access.  It's that simple.  It's
+> not something ANYONE can make a mistake over.  You make a mistake and
+> it causes BIG PROBLEMS.
+> 
+> SFR _has_ noticed and _is_ complaining about this.  It's only time
+> before it gets noticed elsewhere.
+> 
+> So, I've withdrawn the highly unstable devel-3.3 branch from public
+> view as of NOW.  I'm going to remove anything in for-next which isn't
+> 100% ready.  That includes the mach-types update, because I intend
+> to redo it at some later time.
+> 
+> Congratulations.  And thanks for causing this situation through your
+> lack of due dilligence.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-Sorry for messing up, but it seems I forgot to readd the moved spi header
-in the original submission of the second patch, which I noticed just now.
-As your cleanup-s3c24xx branch is not pushed out yet, could you please
-replace it with this one, which adds the forgotten file.
+Russell,
 
- arch/arm/mach-s3c2410/include/mach/spi.h |   27 ---------------------------
- arch/arm/mach-s3c2440/mach-gta02.c       |    2 +-
- drivers/spi/spi-s3c24xx.c                |    2 +-
- include/linux/spi/s3c24xx.h              |   26 ++++++++++++++++++++++++++
- 4 files changed, 28 insertions(+), 29 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/include/mach/spi.h
- create mode 100644 include/linux/spi/s3c24xx.h
+So many problems on my shoulders!
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/spi.h b/arch/arm/mach-s3c2410/include/mach/spi.h
-deleted file mode 100644
-index 2a686c0..0000000
---- a/arch/arm/mach-s3c2410/include/mach/spi.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/spi.h
-- *
-- * Copyright (c) 2006 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C2410 - SPI Controller platform_device info
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_SPI_H
--#define __ASM_ARCH_SPI_H __FILE__
--
--struct s3c2410_spi_info {
--	int			 pin_cs;	/* simple gpio cs */
--	unsigned int		 num_cs;	/* total chipselects */
--	int			 bus_num;       /* bus number to use. */
--
--	unsigned int		 use_fiq:1;	/* use fiq */
--
--	void (*gpio_setup)(struct s3c2410_spi_info *spi, int enable);
--	void (*set_cs)(struct s3c2410_spi_info *spi, int cs, int pol);
--};
--
--#endif /* __ASM_ARCH_SPI_H */
-diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
-index 5859e60..cf270f5 100644
---- a/arch/arm/mach-s3c2440/mach-gta02.c
-+++ b/arch/arm/mach-s3c2440/mach-gta02.c
-@@ -38,6 +38,7 @@
- #include <linux/platform_device.h>
- #include <linux/serial_core.h>
- #include <linux/spi/spi.h>
-+#include <linux/spi/s3c24xx.h>
- 
- #include <linux/mmc/host.h>
- 
-@@ -73,7 +74,6 @@
- #include <mach/regs-gpioj.h>
- #include <mach/fb.h>
- 
--#include <mach/spi.h>
- #include <plat/usb-control.h>
- #include <mach/regs-mem.h>
- #include <mach/hardware.h>
-diff --git a/drivers/spi/spi-s3c24xx.c b/drivers/spi/spi-s3c24xx.c
-index fc06453..8ee7d79 100644
---- a/drivers/spi/spi-s3c24xx.c
-+++ b/drivers/spi/spi-s3c24xx.c
-@@ -24,10 +24,10 @@
- 
- #include <linux/spi/spi.h>
- #include <linux/spi/spi_bitbang.h>
-+#include <linux/spi/s3c24xx.h>
- #include <linux/module.h>
- 
- #include <plat/regs-spi.h>
--#include <mach/spi.h>
- 
- #include <plat/fiq.h>
- #include <asm/fiq.h>
-diff --git a/include/linux/spi/s3c24xx.h b/include/linux/spi/s3c24xx.h
-new file mode 100644
-index 0000000..c23b923
---- /dev/null
-+++ b/include/linux/spi/s3c24xx.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright (c) 2006 Simtec Electronics
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *
-+ * S3C2410 - SPI Controller platform_device info
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __LINUX_SPI_S3C24XX_H
-+#define __LINUX_SPI_S3C24XX_H __FILE__
-+
-+struct s3c2410_spi_info {
-+	int			 pin_cs;	/* simple gpio cs */
-+	unsigned int		 num_cs;	/* total chipselects */
-+	int			 bus_num;       /* bus number to use. */
-+
-+	unsigned int		 use_fiq:1;	/* use fiq */
-+
-+	void (*gpio_setup)(struct s3c2410_spi_info *spi, int enable);
-+	void (*set_cs)(struct s3c2410_spi_info *spi, int cs, int pol);
-+};
-+
-+#endif /* __LINUX_SPI_S3C24XX_H */
+I was just trying to anticipate the git branch that you are putting in
+place for 3.4 development (your have now published one with "for-armsoc"
+if I am following correctly the plans).
+
+I was mentioning in my email that this at91-pm_cleanup branch may be
+rebased and I *never* thought of making a pull request out of it.
+
+My mistake was to push it to our at91-next which ends up being included
+in linux-next. Yes it was dumb and I will ask Stephen to remove the
+at91-next branch from his pull list.
+AT91 will rely on arm-soc to get exposure in linux-next which is simpler
+and less prone to errors.
+
+Best regards,
 -- 
-1.7.5.4
+Nicolas Ferre
