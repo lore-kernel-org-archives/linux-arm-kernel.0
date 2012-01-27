@@ -1,37 +1,33 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 26 Jan 2012 16:56:35 -0800
-Subject: [PATCH 0/6] ux500: Export SoC information and some platform
- clean-up
-In-Reply-To: <201201261520.43176.arnd@arndb.de>
-References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
- <201201251501.42304.arnd@arndb.de> <4F2038E8.8090209@linaro.org>
- <201201261520.43176.arnd@arndb.de>
-Message-ID: <20120127005635.GA32478@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Jan 2012 17:09:37 -0800
+Subject: [GIT PULL] ARM: OMAP: hwmod/PRCM/OMAP2xxx fixes for 3.3
+In-Reply-To: <alpine.DEB.2.00.1201251425080.5324@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1201251420490.5324@utopia.booyaka.com>
+ <alpine.DEB.2.00.1201251425080.5324@utopia.booyaka.com>
+Message-ID: <20120127010937.GI29812@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 03:20:43PM +0000, Arnd Bergmann wrote:
-> On Wednesday 25 January 2012, Lee Jones wrote:
-> > >>> Everyone else, who is planning to use the infrastructure besides ux500?
-> > >>
-> > >> I can easily see this being used in the ARM reference designs
-> > >> (Integrator, Versatile, RealView and Versatile Express) some of them
-> > >> I can possibly patch myself even. OMAP has expressed interest
-> > >> in "some way of getting the SoC ID out", and I guess this is
-> > >> the means to that end.
-> > > 
-> > > Ah, good. Once these patches are merged, we can easily refer anyone
-> > > to this infrastructure if they try to add a different way of finding
-> > > a SoC ID.
-> > 
-> > Okay, so this sounds promising. Which route are the patches likely to
-> > take? Will they go up through your SoC tree Arnd?
+* Paul Walmsley <paul@pwsan.com> [120125 12:55]:
+> On Wed, 25 Jan 2012, Paul Walmsley wrote:
 > 
-> That's probably the best way. Of course you need to have Acks
-> from Greg (for the bus) and Linus Walleij (for the ux500 stuff)
-> before I can merge them. Linus can decide whether he wants to
-> submit them to me through a pull request from his ux500 tree
-> (with Signed-off-by) or whether I should apply them myself
-> (with Ack).
+> > The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+> > 
+> >   Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+> > 
+> > are available in the git repository at:
+> >   git://git.pwsan.com/linux-2.6 omap_fixes_a_3.3rc
 
-I'll try to review these again tomorrow...
+Thanks pulled into fixes.
+ 
+> By the way, since Beno?t had already sent a fix for the OMAP1/2xxx I2C 
+> build bug, I dropped my fix from this series.  So this patch is still 
+> required before OMAP1/2xxx will build:
+> 
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg61520.html
+
+Yes I have that already in fixes.
+
+Regards,
+
+Tony
