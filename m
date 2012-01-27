@@ -1,79 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 27 Jan 2012 11:28:07 +0100
-Subject: [PATCH] ARM: at91: USB AT91 gadget registration for module
-Message-ID: <1327660087-20864-1-git-send-email-nicolas.ferre@atmel.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 27 Jan 2012 11:53:29 +0100
+Subject: [Linaro-mm-sig] [PATCH 12/15] drivers: add Contiguous Memory
+ Allocator
+In-Reply-To: <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
+ <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
+Message-ID: <00de01ccdce1$e7c8a360$b759ea20$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Registration of at91_udc as a module will enable SoC
-related code.
+Hi Ohad,
 
-Fix following an idea from Karel Znamenacek.
+On Friday, January 27, 2012 10:44 AM Ohad Ben-Cohen wrote:
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org>
----
-Karel,
+> With v19, I can't seem to allocate big regions anymore (e.g. 101MiB).
+> In particular, this seems to fail:
+> 
+> On Thu, Jan 26, 2012 at 11:00 AM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > +static int cma_activate_area(unsigned long base_pfn, unsigned long count)
+> > +{
+> > + ? ? ? unsigned long pfn = base_pfn;
+> > + ? ? ? unsigned i = count >> pageblock_order;
+> > + ? ? ? struct zone *zone;
+> > +
+> > + ? ? ? WARN_ON_ONCE(!pfn_valid(pfn));
+> > + ? ? ? zone = page_zone(pfn_to_page(pfn));
+> > +
+> > + ? ? ? do {
+> > + ? ? ? ? ? ? ? unsigned j;
+> > + ? ? ? ? ? ? ? base_pfn = pfn;
+> > + ? ? ? ? ? ? ? for (j = pageblock_nr_pages; j; --j, pfn++) {
+> > + ? ? ? ? ? ? ? ? ? ? ? WARN_ON_ONCE(!pfn_valid(pfn));
+> > + ? ? ? ? ? ? ? ? ? ? ? if (page_zone(pfn_to_page(pfn)) != zone)
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+> 
+> The above WARN_ON_ONCE is triggered, and then the conditional is
+> asserted (page_zone() retuns a "Movable" zone, whereas zone is
+> "Normal") and the function fails.
+> 
+> This happens to me on OMAP4 with your 3.3-rc1-cma-v19 branch (and a
+> bunch of remoteproc/rpmsg patches).
+> 
+> Do big allocations work for you ?
 
-Do you want to add your "Acked-by" line?
+I've tested it with 256MiB on Exynos4 platform. Could you check if the
+problem also appears on 3.2-cma-v19 branch (I've uploaded it a few hours
+ago) and 3.2-cma-v18? Both are available on our public repo:
+git://git.infradead.org/users/kmpark/linux-samsung/
 
- arch/arm/mach-at91/at91rm9200_devices.c  |    2 +-
- arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
- arch/arm/mach-at91/at91sam9261_devices.c |    2 +-
- arch/arm/mach-at91/at91sam9263_devices.c |    2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+The above code has not been changed since v16, so I'm really surprised 
+that it causes problems. Maybe the memory configuration or layout has 
+been changed in 3.3-rc1 for OMAP4?
 
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 18bacec..97676bd 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -83,7 +83,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
-  *  USB Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#ifdef CONFIG_USB_AT91
-+#if defined(CONFIG_USB_AT91) || defined(CONFIG_USB_AT91_MODULE)
- static struct at91_udc_data udc_data;
- 
- static struct resource udc_resources[] = {
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 642ccb6..f1a1bb45 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -84,7 +84,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
-  *  USB Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#ifdef CONFIG_USB_AT91
-+#if defined(CONFIG_USB_AT91) || defined(CONFIG_USB_AT91_MODULE)
- static struct at91_udc_data udc_data;
- 
- static struct resource udc_resources[] = {
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index fc59cbd..1e28bed 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -87,7 +87,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
-  *  USB Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#ifdef CONFIG_USB_AT91
-+#if defined(CONFIG_USB_AT91) || defined(CONFIG_USB_AT91_MODULE)
- static struct at91_udc_data udc_data;
- 
- static struct resource udc_resources[] = {
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 7b46b27..618013d 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -92,7 +92,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
-  *  USB Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#ifdef CONFIG_USB_AT91
-+#if defined(CONFIG_USB_AT91) || defined(CONFIG_USB_AT91_MODULE)
- static struct at91_udc_data udc_data;
- 
- static struct resource udc_resources[] = {
+Best regards
 -- 
-1.7.5.4
+Marek Szyprowski
+Samsung Poland R&D Center
