@@ -1,164 +1,86 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 27 Jan 2012 14:05:30 +0100
-Subject: [PATCH] Added lpc32xx_defconfig
-Message-ID: <1327669530-15385-1-git-send-email-stigge@antcom.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Jan 2012 14:11:43 +0100
+Subject: Pinmux bindings proposal
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB45E@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <20120116182808.GG4223@ponder.secretlab.ca>
+ <20120118141329.GA22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1780DAAEBB@HQMAIL01.nvidia.com>
+ <20120119105728.GE22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1780DAB45E@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdaRePot9qt-z3Chk-GHqHDfyu07ojKfGA2HEXxvjKn=Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a working defconfig for the LPC32XX architecture. It is a
-general default configuration for the PHY3250 reference board and others
-based on LPC32XX.
+On Fri, Jan 20, 2012 at 9:50 PM, Stephen Warren <swarren@nvidia.com> wrote:
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+> For Tegra20 (and IIRC some other HW), the pin mux HW actually muxes
+> groups of pins; one register field sets n (1, 2, 3, ...) pins to that
+> function at once. Hence, the entries are real physical groups.
 
-diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
-new file mode 100644
-index 0000000..fb20881
---- /dev/null
-+++ b/arch/arm/configs/lpc32xx_defconfig
-@@ -0,0 +1,145 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_SYSFS_DEPRECATED=y
-+CONFIG_SYSFS_DEPRECATED_V2=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
-+CONFIG_SLAB=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_ARCH_LPC32XX=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="console=ttyS0,115200n81 root=/dev/ram0"
-+CONFIG_CPU_IDLE=y
-+CONFIG_FPE_NWFPE=y
-+CONFIG_VFP=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_BINFMT_AOUT=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_FW_LOADER is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_MUSEUM_IDS=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_CRYPTOLOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=1
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_MISC_DEVICES=y
-+CONFIG_EEPROM_AT25=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_NETDEVICES=y
-+CONFIG_MII=y
-+CONFIG_PHYLIB=y
-+CONFIG_SMSC_PHY=y
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_LPC32XX=y
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_PNX=y
-+CONFIG_SPI=y
-+CONFIG_SPI_PL022=y
-+CONFIG_GPIO_SYSFS=y
-+# CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_PNX4008_WATCHDOG=y
-+CONFIG_FB=y
-+CONFIG_FB_ARMCLCD=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SEQUENCER=y
-+CONFIG_SND_MIXER_OSS=y
-+CONFIG_SND_PCM_OSS=y
-+CONFIG_SND_SEQUENCER_OSS=y
-+CONFIG_SND_DYNAMIC_MINORS=y
-+# CONFIG_SND_VERBOSE_PROCFS is not set
-+# CONFIG_SND_DRIVERS is not set
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+CONFIG_SND_SOC=y
-+# CONFIG_HID_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_LIBUSUAL=y
-+CONFIG_MMC=y
-+# CONFIG_MMC_BLOCK_BOUNCE is not set
-+CONFIG_MMC_ARMMMCI=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-+CONFIG_RTC_DRV_LPC32XX=y
-+CONFIG_EXT2_FS=y
-+CONFIG_AUTOFS4_FS=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_JFFS2_FS_WBUF_VERIFY=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ASCII=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_UTF8=y
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_PREEMPT is not set
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_FTRACE is not set
-+# CONFIG_ARM_UNWIND is not set
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_CRYPTO_ANSI_CPRNG=y
-+# CONFIG_CRYPTO_HW is not set
-+CONFIG_CRC_CCITT=y
+Maybe I am getting things wrong, but I've read:
+
+http://en.wiktionary.org/wiki/real
+http://en.wiktionary.org/wiki/virtual
+
+And now I am trying to address this from my understanding of
+"real" as defined in clause 1:
+
+"1. That has physical existence.
+    No one has ever seen a real unicorn."
+
+And "virtual" as defined in clause 3:
+
+"3. Of something that is simulated in a computer or on-line.
+    The virtual world of his computer game allowed character interaction."
+
+Please tell me if I have the wrong definitions in my
+head, I am not trying to play smart, I just want to understand
+why this rubs me the wrong way. So:
+
+On the Nomadik GPIO controller (not yet migrated to the pin
+control subsystem, mea culpa) pins 0,1,2,3 can be used for UART0.
+
+These four pins can also be used for GPIO, and two other
+functions.
+
+Does that make the group UART0 = {0,1,2,3} a virtual group
+in sense (3) of the wiktionary article, i.e. "simulated in a
+computer"?
+
+To me: no, not at all.
+
+Because it is a very real physical property of these pins that
+UART0 can *only* appear on these 4 pins, not 4 other pins.
+It is clear from the data sheet.
+
+And even if they could appear on other pins, the number of
+such appearances would be limited by physical factors, and
+UART0_1 = {0,1,2,3} vs UART0_2 = {4,5,6,7} wouldn't
+make it virtual. This is also a physical property, not simulated or virtual.
+
+The *only* case where I could *maybe* accept the "virtual"
+terminology would be for a phone-exchange type of
+pinmux, where say this UART could appear on any 4 pins,
+arbitrarily chosen. Still this is not fully virtual since it is
+a physical fact that the UART group has to have 4 pins,
+not 1, not 17.
+
+Notice that I don't involve the use of that group on a
+specific board in this argument, since the *silicon* limits the
+muxable properties of this group, and it is a very real
+group of pins.
+
+This is why I think it is a bad idea to try to define pins as
+being in a "real" or "virtual" group like this, where the only
+criteria for that terminology is whether each pin has its own
+control register or not.
+
+I'm all happy with "Tegra type groups" and "Tegra type pins"
+or "groups with separate control registers" or "pins with
+separate control registers" which tells us what it really is,
+"real" or "virtual" does not fit our discussion here the way
+I see it.
+
+Yours,
+Linus Walleij
