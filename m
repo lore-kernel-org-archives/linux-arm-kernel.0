@@ -1,56 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Jan 2012 09:42:32 -0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E123E57@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <20120123210052.GS22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178CB81C0D@HQMAIL01.nvidia.com>
- <20120124012038.GT22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178CB81EDB@HQMAIL01.nvidia.com>
- <20120125000407.GU22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178CB82433@HQMAIL01.nvidia.com>
- <20120127020832.GJ29812@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178E123E57@HQMAIL01.nvidia.com>
-Message-ID: <20120127174232.GK13504@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jan 2012 17:46:45 +0000
+Subject: [PATCH 4/4] ARM: vfp: clear fpscr length and stride bits on
+ return from sig handler
+In-Reply-To: <1327681443-16627-5-git-send-email-will.deacon@arm.com>
+References: <1327681443-16627-1-git-send-email-will.deacon@arm.com>
+ <1327681443-16627-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20120127174645.GB20466@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@nvidia.com> [120127 09:05]:
-> Tony Lindgren wrote at Thursday, January 26, 2012 7:09 PM:
-> ...
-> > I don't think we should try to pass the different possible states from
-> > device tree. The pinmux/pinconf driver should know how to deal with that,
+On Fri, Jan 27, 2012 at 04:24:03PM +0000, Will Deacon wrote:
+> The ARM PCS mandates that the length and stride bits of the fpscr are
+> cleared on entry to and return from a public interface.
 > 
-> Somehow, the pinctrl driver needs to know how to implement each state. In 
-> general, I believe this will be board-specific.
+> This patch ensures that the VFP context restored from a signal frame
+> is made to adhere to this specification.
 > 
-> Do you disagree with this assertion?
+> Reported-by: Peter Maydell <peter.maydell@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/kernel/signal.c |   10 ++++++++--
+>  1 files changed, 8 insertions(+), 2 deletions(-)
 > 
-> If the data is board-specific, I don't see how it can be represented
-> anywhere but the device tree.
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 9e617bd..274b8fc 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -216,7 +216,7 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+>  	struct vfp_hard_struct *h = &thread->vfpstate.hard;
+>  	unsigned long magic;
+>  	unsigned long size;
+> -	unsigned long fpexc;
+> +	unsigned long fpexc, fpscr;
+>  	int err = 0;
+>  
+>  	__get_user_error(magic, &frame->magic, err);
+> @@ -238,7 +238,13 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+>  	/*
+>  	 * Copy the status and control register.
+>  	 */
+> -	__get_user_error(h->fpscr, &frame->ufp.fpscr, err);
+> +	__get_user_error(fpscr, &frame->ufp.fpscr, err);
+> +
+> +	/*
+> +	 * As per the PCS, clear the length and stride bits.
+> +	 */
+> +	fpscr &= ~(FPSCR_LENGTH_MASK | FPSCR_STRIDE_MASK);
+> +	h->fpscr = fpscr;
+>  
+>  	/*
+>  	 * Sanitise and restore the exception registers.
 
-Agreed, for board specific things device tree is the place to put it.
- 
-> > and the driver using the mux should be able to communicate what it wants
-> > to the pinmux/pinconf driver. If people really want to be able to pass
-> > alternative mux states from device tree, they should be standard bindings
-> > for things like active/idle/suspend/off.
-> 
-> As I've mentioned before, people have asked for driver-specific states to
-> handle the case where e.g. drive strength must be adjusted based on clock
-> rates of the interface. Again, I believe that's board-specific data since
-> the actual values to use may be derived during board calibration, not
-> SoC design.
-> 
-> Do you disagree that this data may be board specific?
+Actually, this isn't quite right. We need to clear the bits in *hardware*
+before the signal handler to be PCS compliant from its point-of-view. Since
+the handler is asynchronous with respect to the interrupted function, there
+is no function boundary on the return path to worry about.
 
-Right, but for the dynamic mux cases I've seen the alternative states
-are usually specific to the driver using the mux. That's why I'm
-suspicious of the board specific custom alternative states :)
+I'll have a crack at fixing this for v2, but if it's too complicated I'm
+tempted to leave this as-is and drop the patch altogether.
 
-Anyways, do you think the pinctrl-static + pinctrl-dynamic binding
-I just posted as a reply to Simon's email would work for you?
-
-Regards,
-
-Tony
+Will
