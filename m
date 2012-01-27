@@ -1,76 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Jan 2012 17:12:24 +0000
-Subject: [PATCH v4 14/15] ARM: local timers: convert MSM to runtime
- registration interface
-In-Reply-To: <4F22CC05.6040709@codeaurora.org>
-References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
- <1327061042-14857-15-git-send-email-marc.zyngier@arm.com>
- <4F22CC05.6040709@codeaurora.org>
-Message-ID: <4F22DAF8.30303@arm.com>
+From: eranian@googlemail.com (stephane eranian)
+Date: Fri, 27 Jan 2012 18:16:47 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <20120127171009.GL2347@mudshark.cambridge.arm.com>
+References: <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
+ <20120127121311.GB2347@mudshark.cambridge.arm.com>
+ <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
+ <20120127132826.GD2347@mudshark.cambridge.arm.com>
+ <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
+ <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
+ <20120127155454.GH2347@mudshark.cambridge.arm.com>
+ <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
+ <20120127165941.GK2347@mudshark.cambridge.arm.com>
+ <CAMsRxf+iv06zOCMzhYONeLaf6RvOLp38T53mR--8ESHvCXMeFQ@mail.gmail.com>
+ <20120127171009.GL2347@mudshark.cambridge.arm.com>
+Message-ID: <CAMsRxfJufRMrcfGZp53ALOdEFLk+YDMvQMrHw-jR9tQ8ThE+-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/12 16:08, Stephen Boyd wrote:
-> On 01/20/12 04:04, Marc Zyngier wrote:
->> Convert the MSM timers to the runtime registration interface.
->>
->>
-> 
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+On Fri, Jan 27, 2012 at 6:10 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jan 27, 2012 at 05:03:28PM +0000, stephane eranian wrote:
+>> On Fri, Jan 27, 2012 at 5:59 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > That said, if you see any bugs in the code please do shout!
+>> >
+>> I suspect there is something wrong, we shouldn't hit the max_rate_limit.
+>> You may have bursts of interrupts (samples). I'll check on that this week-end.
+>
+> Ok, thanks. Keep in mind that you probably have variable rate clocks, which
+> will affect the cycle counter frequency.
+>
+I assume it does not vary the clock if the workload is steady and just burning
+cycles, e.g.: for(;;);
 
-Thanks Stephen.
+>> >> > A7 and A15 have the ability to filter counters based on privilege level, so
+>> >> > you can get more accurate userspace counts there.
+>> >>
+>> >> Ok, that's better. Need to update libpfm4 for A15 with priv levels then!
+>> >
+>> > How do you handle that in libpfm4? On ARM, the event encodings remain the same,
+>> > you just need to set some extra bits to determine which levels are included or
+>> > excluded (you can do this with the perf tool by using the :{u,k,h} suffix on an
+>> > event description).
+>> >
+>> It depends what you call the encoding? If the priv level can be encoded in the
+>> attr->config field, then that's easy. If it needs to be set somewhere else, then
+>> we need to figure out how you encode it in the attr struct. Either in some other
+>> bits in attr->config or use attr->config1, for instance. You tell me.
+>
+> The way it's done with perf is to set the exclude{user,kernel,hv} fields in
+> the attr. The ARM perf backend then translates these into the relevant bits
+> which get orred into the config_base before hitting the hardware.
+>
+Well, that's also how we do it with libpfm4 on X86. This is because
+with perf_events,
+the exclude_* fields have priority over what you set in the attr->config field.
 
->> Tested-by: David Brown <davidb@codeaurora.org>
->> Acked-by: David Brown <davidb@codeaurora.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/mach-msm/timer.c |   79 +++++++++++++++++++++++++--------------------
->>  1 files changed, 44 insertions(+), 35 deletions(-)
->>
->> diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
->> index 11d0d8f..75f4be4 100644
->> --- a/arch/arm/mach-msm/timer.c
->> +++ b/arch/arm/mach-msm/timer.c
->>
-> [snip]
->> +
->> +static struct local_timer_ops msm_local_timer_ops __cpuinitdata = {
->> +	.setup	= msm_local_timer_setup,
->> +	.stop	= msm_local_timer_stop,
-> 
-> Would this be a good time to rename these to start/stop? setup sounds
-> like it's done once, but its actually done every cpu up from what I recall.
-
-I thought about that. But you could also argue that next_event() is also
-a kind of start for the timer. Actually, if I was to change anything
-about the naming, I'd turn stop to teardown.
-
-And not changing the naming makes the patch series smaller and more
-easily verified.
-
->> +};
->> +#endif /* CONFIG_LOCAL_TIMERS */
->> +
->>  static void __init msm_timer_init(void)
->>  {
->>  	struct clock_event_device *ce = &msm_clockevent;
->> @@ -173,8 +212,12 @@ static void __init msm_timer_init(void)
->>  		*__this_cpu_ptr(msm_evt.percpu_evt) = ce;
->>  		res = request_percpu_irq(ce->irq, msm_timer_interrupt,
->>  					 ce->name, msm_evt.percpu_evt);
->> -		if (!res)
->> +		if (!res) {
->>  			enable_percpu_irq(ce->irq, 0);
->> +#ifdef CONFIG_LOCAL_TIMERS
->> +			local_timer_register(&msm_local_timer_ops);
->> +#endif
->> +		}
-> 
-> It's unfortunate we can't avoid this ifdef here. O well.
-> 
-
-I tried. It's actually uglier without the ifdef...
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Will
