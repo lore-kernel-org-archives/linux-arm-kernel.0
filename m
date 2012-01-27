@@ -1,41 +1,71 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 27 Jan 2012 23:32:11 +0100
-Subject: [PATCH] Fix LPC32XX's clock.c
-In-Reply-To: <1327673868-19741-1-git-send-email-stigge@antcom.de>
-References: <1327673868-19741-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120127223211.GA27425@pengutronix.de>
+From: s-guiriec@ti.com (Guiriec, Sebastien)
+Date: Fri, 27 Jan 2012 23:51:39 +0100
+Subject: [alsa-devel] [PATCH v4 - resend 00/13] OMAP4: ASoC: Support for
+ PandaBoard family
+In-Reply-To: <CAJe_Zhfn3urdXfRgAKvdW2_ECYGbNO0b2BuZnCZxrGcL4_sVSg@mail.gmail.com>
+References: <1327405950-6676-1-git-send-email-peter.ujfalusi@ti.com>
+ <CAJe_Zhfn3urdXfRgAKvdW2_ECYGbNO0b2BuZnCZxrGcL4_sVSg@mail.gmail.com>
+Message-ID: <CAAURCh7u=3KLNKfK_YYkVJ_i8azQ=oV0ugVxYvi=thhoLdGEJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 03:17:48PM +0100, Roland Stigge wrote:
-> * Forward-ported LPC32XX's clock.c from git.lpclinux.com
-> * Added MLC NAND and ADC clock
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+On 01/25/2012 11:50 AM, Jassi Brar wrote:
+> On 24 January 2012 17:22, Peter Ujfalusi<peter.ujfalusi@ti.com>  wrote:
+>> Hello,
+>>
+>> the following series will add ASoC support for PandaBoards.
+>> PandaBoards have different audio routings compared to SDP4430/Blaze boards, but
+>> the differences not that big to justify a new ASoC machine driver.
+>>
+>> The v3 series did not made it to 3.3 kernel.
+>> This set contains all the patches needed to enable the audio support on the
+>> PandaBoard family.
+>> The machine driver has been converted to a generic OMAP4 driver which can
+>> support wide range of machines using OMAP4 with twl6040 codec.
+>>
+>> I have remove the hardcoded MCLK clock frequency use in the machine driver
+>> (there can be devices with different MCLK configuration). This changed
+>> patch 04, 05, and 12. Since this does not affect the functionality I kept the
+>> acks for these patches. Patch 11 did not existed in the v3 series.
+>>
+> Hi Peter,
+>     I tried the patchset on my 4430 Panda. Playback works ok, but not Capture.
+> All is get is a hiss.
+>    Is capture supposed to work ? If yes, any amixer settings that need
+> to be done?
 
-This needs to be split up further to make reviewing easier, I'd say. From a
-glimpse, I'd guess:
+Hi Jassi,
 
-- locking changes
-- usb fixes
-- adding MLC NAND
-- adding ADC
+With the next update the PandaBoard 4430 is working fine.
+cpu_is_omap4430() macro is not define. We should use cpu_is_omap443x()
+macro in order to select correctly PandaBoard and not PandaBoardES
+board. Due to this error the heaset Mic pin is not enable so record is not
+working (use for Panda 4430 recording).
 
-I dunno, maybe the NXP git has the incremental changes? You should really CC
-Kevin Wells on your patches. Maybe he will wake up again, at least with some
-additional informaition.
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-
+omap2/board-omap4panda.c
+index 5f27387..6a397e9 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -580,7 +580,7 @@ void omap4_panda_display_init(void)
 
-Regards,
-
-   Wolfram
-
+ static void omap4_panda_init_rev(void)
+ {
+-	if (cpu_is_omap4430()) {
++	if (cpu_is_omap443x()) {
+ 		/* PandaBoard 4430 */
+ 		/* ASoC audio configuration */
+ 		panda_abe_audio_data.card_name = "PandaBoard";
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120127/3a0f9939/attachment.sig>
+1.7.4.1
+
+
+Sebastien.
+
+>
+> Thanks,
+> -Jassi
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
