@@ -1,58 +1,49 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 27 Jan 2012 17:15:01 +0900
-Subject: [PATCH] arm: Fix missing api-change from subsys_interface change
-In-Reply-To: <201201270910.34247.heiko@sntech.de>
-References: <201201121430.49448.heiko@sntech.de>
- <20120112160605.GA10831@suse.de>
- <033301ccd18f$64ac8c60$2e05a520$%kim@samsung.com>
- <201201270910.34247.heiko@sntech.de>
-Message-ID: <01b101ccdccb$c41b0a40$4c511ec0$%kim@samsung.com>
+Date: Fri, 27 Jan 2012 17:15:32 +0900
+Subject: [PATCH 0/2] S3C24XX: remove some spi left overs
+In-Reply-To: <201201082222.11305.heiko@sntech.de>
+References: <201201082222.11305.heiko@sntech.de>
+Message-ID: <01b201ccdccb$d6923680$83b6a380$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Heiko St?bner wrote:
 > 
-> Am Freitag, 13. Januar 2012, 02:05:08 schrieb Kukjin Kim:
-> > Greg KH wrote:
-> > > On Thu, Jan 12, 2012 at 02:30:48PM +0100, Heiko St?bner wrote:
-> > > > Commit 4a858cfc9a (arm: convert sysdev_class to a regular subsystem)
-> > > > converted the samsung sysdevs into subsys_interface instances.
-> > > >
-> > > > While the original add-function only had a (struct sys_device *)
-> > > > parameter, the dev_add from subsys_interface needs
-> > > >
-> > > > 	(struct device *, struct subsys_interface *)
-> > > >
-> > > > leading to "initialized from incompatible pointer type" warnings.
-> > > >
-> > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > > ---
-> > > > The patch applies cleanly against the current driver-core git,
-> > > > hopefully it's the right tree.
-> > >
-> > > Thanks for fixing this up, sorry for getting it wrong.
-> > >
-> > > This should be done against the Samsung arm git tree, and go in through
-> > > that one.  The driver-core git tree is equal to Linus's tree of a few
-> > > days ago, there are no driver-core patches in it at the moment.
-> > >
-> > > Kukjin, can you take these?
-> >
-> > Sure, let me pick this up in my fixes.
+> This series removes unused setup-code of the s3c24xx spi driver.
 > 
-> Hi Kgene,
+> It has no current in kernel users and also no development activity trying
+> to change this. I also checked the upstream git of the only board including
+> the spi.h file (the gta02 at http://git.openmoko.org). The setup calls
+> are also not used there.
 > 
-> ping :-)
+> I recall a thread some time back talking about removing the spi-s3c24xx
+> driver altogether, but as current linux-next still carries the driver
+> I'm not sure what became of it. So this series does the next smaller thing.
 > 
-> I checked the hopefully correct branch v3.3-samsung-fixes and the patch is not
-> in there.
 > 
-Hi,
+> Heiko Stuebner (2):
+>   S3C24XX: remove unused spi gpio setup functions
+>   S3C24XX: move spi-s3c24xx platdata out of mach
+> 
+>  arch/arm/mach-s3c2410/include/mach/spi.h     |   38 --------------------------
+>  arch/arm/mach-s3c2440/mach-gta02.c           |    2 +-
+>  arch/arm/plat-s3c24xx/Kconfig                |   20 -------------
+>  arch/arm/plat-s3c24xx/Makefile               |    6 ----
+>  arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c |   36 ------------------------
+>  arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c   |   38 --------------------------
+>  arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c    |   36 ------------------------
+>  drivers/spi/spi-s3c24xx.c                    |    2 +-
+>  8 files changed, 2 insertions(+), 176 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c2410/include/mach/spi.h
+>  delete mode 100644 arch/arm/plat-s3c24xx/spi-bus0-gpe11_12_13.c
+>  delete mode 100644 arch/arm/plat-s3c24xx/spi-bus1-gpd8_9_10.c
+>  delete mode 100644 arch/arm/plat-s3c24xx/spi-bus1-gpg5_6_7.c
+> 
+> --
+> 1.7.2.3
 
-I already applied it in my local tree, v3.3-samsung-fixes-2 but not pushed yet :)
-Will be sent in this weekend.
-
-Thanks.
+Looks good :)
+Applied in my cleanup-s3c24xx, thanks.
 
 Best regards,
 Kgene.
