@@ -1,52 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 27 Jan 2012 10:34:10 +0900
-Subject: [PATCH 0/6] ARM: SAMSUNG: Board updates and minor fixes
-In-Reply-To: <1327501407-1927-1-git-send-email-s.nawrocki@samsung.com>
-References: <1327501407-1927-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <016901ccdc93$c79a8e80$56cfab80$%kim@samsung.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Fri, 27 Jan 2012 10:42:57 +0900
+Subject: [PATCH v7 1/2] video: support MIPI-DSI controller driver
+In-Reply-To: <1327592757.2843.1.camel@lappy>
+References: <4F17AA10.7080604@samsung.com> <4F182ACF.8010302@ti.com>
+ <20120120155121.18880dff.akpm@linux-foundation.org>
+ <4F1F4982.5050000@samsung.com> <1327592757.2843.1.camel@lappy>
+Message-ID: <4F220121.5000106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> The following patch series adds S5K6AAFX sensor support on Nuri and
-> UNIVERSAL_C210 boards. It also includes minor correction for the I2C
-> controller setup and the M-5MOLS sensor.
-> 
-> 
-> Sylwester Nawrocki (6):
->   ARM: SAMSUNG: Increase virtual framebuffer size on Universal C210 board
->   ARM: SAMSUNG: Add support for S5K6AAFX image sensor on Universal C210
-> board
->   ARM: SAMSUNG: Add support for S5K6AAFX camera on Nuri board
->   ARM: SAMSUNG: Correct framebuffer window size on Nuri board
->   ARM: SAMSUNG: Correct M-5MOLS sensor clock frequency on Nuri board
->   ARM: SAMSUNG: Fix platform data setup for I2C adapter 0
-> 
->  arch/arm/mach-exynos/Kconfig               |    2 +
->  arch/arm/mach-exynos/mach-nuri.c           |   73
-++++++++++++++++++++++++--
->  arch/arm/mach-exynos/mach-universal_c210.c |   78
-> ++++++++++++++++++++++++++--
->  arch/arm/plat-samsung/devs.c               |    4 +-
->  4 files changed, 147 insertions(+), 10 deletions(-)
-> 
-> --
-> 1.7.8.3
+2012? 01? 27? 00:45, Tomi Valkeinen ? ?:
 
-OK, looks good to me, will apply in my v3.3-samsung-fixes-2 for 6/6 and
-next/board-samsung for others.
+> Hi,
+> 
+> On Wed, 2012-01-25 at 09:14 +0900, Donghwa Lee wrote:
+>> On Sat, 21 Jan 2012 08:51, Andrew Morton wrote:
+>>
+>>> On Thu, 19 Jan 2012 20:08:07 +0530
+>>> Archit <a0393947@ti.com> wrote:
+>>>
+>>>> On Thursday 19 January 2012 10:58 AM, Donghwa Lee wrote:
+>>>>> Samsung S5PC210 and EXYNOS SoC platform has MIPI-DSI controller and MIPI-DSI
+>>>>> based LCD Panel could be used with it. This patch supports MIPI-DSI driver
+>>>>> based Samsung SoC chip.
+>>>>>
+>>>>> LCD panel driver based MIPI-DSI should be registered to MIPI-DSI driver at
+>>>>> machine code and LCD panel driver specific function registered to mipi_dsim_ddi
+>>>>> structure at lcd panel init function called system init.
+>>>>> In the MIPI-DSI driver, find lcd panel driver by using registered
+>>>>> lcd panel name, and then initialize lcd panel driver.
+>>>>>
+>>>>> Changes since v6:
+>>>>> 	- remove obscure compile problems.
+>>>>> 	- remove useless codes.
+>>>>> 	- modify return errno codes properly
+>>>>
+>>>> One more comment about 'mipi_dsim.h', it would be better to put it in
+>>>> include/video and not 'include/linux'.
+>>>
+>>> Yes, that is desirable.
+>>>
+>>>>> ---
+>>>>>   drivers/video/Kconfig                 |    6 +
+>>>>>   drivers/video/Makefile                |    2 +
+>>>>>   drivers/video/s5p_mipi_dsi.c          |  599 ++++++++++++++++++++++
+>>>>>   drivers/video/s5p_mipi_dsi_common.c   |  896 +++++++++++++++++++++++++++++++++
+>>>>>   drivers/video/s5p_mipi_dsi_common.h   |   46 ++
+>>>>>   drivers/video/s5p_mipi_dsi_lowlevel.c |  617 +++++++++++++++++++++++
+>>>>>   drivers/video/s5p_mipi_dsi_lowlevel.h |  112 ++++
+>>>>>   drivers/video/s5p_mipi_dsi_regs.h     |  149 ++++++
+>>>>>   include/linux/mipi_dsim.h             |  359 +++++++++++++
+>>>>>   9 files changed, 2786 insertions(+), 0 deletions(-)
+>>>
+>>> or we could put it in drivers/video/.  It all depends on which other
+>>> drivers we expect will need access to this header.
+>>>
+>>
+>> No, mipi_dsim.h file includes global interface data, callback function called by machine 
+>> file, platform data for mipi-dsi driver and so on. So I think it would be better to put
+>> in 'include/video' or 'include/linux'. 
+>> Of course it is much better to change name to 's5p_mipi_dsim.h'
+> 
+> The header file looks like a platform specific header, so I agree that
+> it should start with s5p.
+> 
+> I think we should finally start working on a common DSI framework =).
+> 
+>  Tomi
+> 
 
-And I'm not sure some board updates are for fix now so if required, please
-let me know.
 
-Plus, I looked at some wrong alignment(tab and white space?) in your
-patches, so if you don't mind, let me fix it when I apply.
+Yes, I agree with you. I will resend next version patch set changed file name 
+from 'mipi_dsim.h' to 's5p_mipi_dsim.h'
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thank you,
+Donghwa Lee
