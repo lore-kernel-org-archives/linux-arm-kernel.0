@@ -1,7 +1,8 @@
-From: eranian@googlemail.com (stephane eranian)
-Date: Fri, 27 Jan 2012 13:45:11 +0100
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 27 Jan 2012 12:56:35 +0000
 Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120127121311.GB2347@mudshark.cambridge.arm.com>
+In-Reply-To: <20120127121311.GB2347@mudshark.cambridge.arm.com> (Will Deacon's
+ message of "Fri, 27 Jan 2012 12:13:11 +0000")
 References: <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
  <CAMsRxfJ2VrfFZevkxoZzSD5fZn1CErF68y0ny+MZi5r___ERJA@mail.gmail.com>
  <CACVXFVNixEUKmDf2iYtdJVThkYg3UeZEurbFhrod5NZhDyKRpw@mail.gmail.com>
@@ -13,11 +14,12 @@ References: <CACVXFVPnhSy_DbdK+ro8G78QjL2s6fBBq1Dvq-pmxJ20qA-ymA@mail.gmail.com>
  <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
  <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
  <20120127121311.GB2347@mudshark.cambridge.arm.com>
-Message-ID: <CAMsRxfLN26dFsTpB49aEjK9Mhap7=pQjJbWk3+SzGwiK-ZGHYg@mail.gmail.com>
+Message-ID: <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 1:13 PM, Will Deacon <will.deacon@arm.com> wrote:
+Will Deacon <will.deacon@arm.com> writes:
+
 > Hi guys,
 >
 > On Sat, Jan 21, 2012 at 09:16:57AM +0000, stephane eranian wrote:
@@ -51,11 +53,14 @@ On Fri, Jan 27, 2012 at 1:13 PM, Will Deacon <will.deacon@arm.com> wrote:
 > Did this lead anywhere in the end? It seems as though Ming Lei has a working
 > setup but Stephane is unable to replicate it, despite applying the necessary
 > patches and trying an updated bootloader.
->
-> Drastic suggestion: Stephane, could you try a kernel *binary* from Ming Lei?
-> If that works then you're probably just missing a patch. If it doesn't, then
-> there must be something different between your boards.
->
-Sure, send me the binary+initrd and I can try it out.
 
-> Will
+With the patches listed above plus the one in [1], I get PMU interrupts.
+However, unless I restrict the profiled process to one CPU
+(taskset 1 perf record ...), I get a panic in armpmu_event_update() with
+the 'event' argument being null when called from armv7pmu_handle_irq().
+
+[1] http://article.gmane.org/gmane.linux.ports.arm.omap/69696
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
