@@ -1,78 +1,353 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 Jan 2012 14:36:18 -0700
-Subject: [PATCH v3 24/25] irq_domain: remove "hint" when allocating irq numbers
-In-Reply-To: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <1327700179-17454-25-git-send-email-grant.likely@secretlab.ca>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 27 Jan 2012 22:44:33 +0100
+Subject: [RFC] IIO LRADC for mach-mxs
+In-Reply-To: <4F21C5A8.8010407@kernel.org>
+References: <201201241408.08083.marek.vasut@gmail.com>
+ <201201261130.01130.marek.vasut@gmail.com> <4F21C5A8.8010407@kernel.org>
+Message-ID: <201201272244.34136.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'hint' used to try and line up irq numbers with hw irq numbers is
-rather a hack and not very useful.  Now that /proc/interrupts also outputs
-the hwirq number, it is even less useful to keep around the 'hint' heuristic.
+> On 01/26/2012 10:30 AM, Marek Vasut wrote:
+> >> Marek Vasut <marek.vasut@gmail.com> wrote:
+> >>>> On Jan 24 2012, J.I. Cameron wrote:
+> >>>>> On Jan 24 2012, Wolfram Sang wrote:
+> >>>>>> On Tue, Jan 24, 2012 at 02:08:07PM +0100, Marek Vasut wrote:
+> >>>>>>> Hi guys,
+> >>>>>>> 
+> >>>>>>> I've been playing with a custom mxs board recently and I'd like
+> >>> 
+> >>> to
+> >>> 
+> >>>>>>> tinker with ADC. Well, apparently there was some effort but it
+> >>> 
+> >>> died
+> >>> 
+> >>>>>>> silently.
+> >>>>>>> 
+> >>>>>>> Now, there are two approaches how to go about the MXS IIO LRADC.
+> >>>>>>> Firstly though, here are some hw details:
+> >>>>>>> 
+> >>>>>>> 1) The ADC has 16 channels in total, some dedicated to particular
+> >>>>>>> function 2) The ADC can sample only up to 8 channels at the same
+> >>> 
+> >>> time
+> >>> 
+> >>>>>>> 3) The ADC delay triggers can trigger only up to 4 kinds of
+> >>> 
+> >>> sampling
+> >>> 
+> >>>>>>> for those up to 8 selected channel
+> >>>>>>> 
+> >>>>>>> So how should we go about this:
+> >>>>>>> 
+> >>>>>>> A) Implement functions, to configure and select a channel at
+> >>> 
+> >>> probe-time
+> >>> 
+> >>>>>>> and then never allow (at runtime) different channel to be
+> >>> 
+> >>> selected.
+> >>> 
+> >>>>>>> + Channel configuration is static, passed via plat_data
+> >>>>>>> + The channels don't need to be reconfigured => when data are
+> >>> 
+> >>> demanded,
+> >>> 
+> >>>>>>> the channel doesn't need to be reconfigured (if it's not
+> >>> 
+> >>> configured in
+> >>> 
+> >>>>>>> one of those 8 options) and the user doesn't need to wait for
+> >>> 
+> >>> data.
+> >>> 
+> >>>>>>> - Only 8 channels can be used
+> >>>>>>> 
+> >>>>>>> B) Allow channel to be configured on-demand -- when it's value is
+> >>>>>>> requested, it is configured (if it's not already) for the
+> >>> 
+> >>> particular
+> >>> 
+> >>>>>>> function.
+> >>>>>>> 
+> >>>>>>> + All 16 channels can be used
+> >>>>>>> - It's clunky and fragile to breakage
+> >>>>>>> - It's hard to implement good channel replacement algo
+> >>> 
+> >>> (replacement as
+> >>> 
+> >>>>>>> on the delay triggers and on those 8 slots)
+> >>>>>>> 
+> >>>>>>> Which way do you consider better ?
+> >>>>>> 
+> >>>>>> CCing Jonathan and the iio-list (as found in MAINTAINERS). They
+> >>> 
+> >>> probably
+> >>> 
+> >>>>>> have more experience regardings those scenarios?
+> >>>>> 
+> >>>>> Thanks Wolfram,
+> >>>>> 
+> >>>>> My instinct is always to make anything configurable at runtime where
+> >>> 
+> >>> we
+> >>> 
+> >>>>> can even vaguely conceive of a reason it might be useful.
+> >>>>> 
+> >>>>> Having said that, right now special function (e.g. input, hwmon
+> >>> 
+> >>> directed
+> >>> 
+> >>>>> channels) are currently set up via board files (will be device tree
+> >>> 
+> >>> the
+> >>> 
+> >>>>> moment anyone has a need).  I doubt there are many usecases where
+> >>> 
+> >>> you'd
+> >>> 
+> >>>>> want to change these functional elements.
+> >>>>> 
+> >>>>> For your channel replacement strategy these special function
+> >>> 
+> >>> channels will
+> >>> 
+> >>>>> be in use if the client is reading form them (e.g. triggered usage).
+> >>> 
+> >>> In
+> >>> 
+> >>>>> IIO we only allow for triggering a whole set of channels off a given
+> >>>>> trigger.  It's going to get really ugly otherwise.  Perhaps the
+> >>> 
+> >>> following
+> >>> 
+> >>>>> will work? (I am assuming 0-8 channels can be associated with any of
+> >>> 
+> >>> the
+> >>> 
+> >>>>> 4 triggers subject to the condition that the total number of
+> >>> 
+> >>> channels
+> >>> 
+> >>>>> being captured is less than 8).
+> >>>>> 
+> >>>>> Register 4 iio devices, each with all 16 channels.  Associate one
+> >>> 
+> >>> with
+> >>> 
+> >>>>> each of the triggers.  Driver then maintains a count on channels
+> >>> 
+> >>> enabled
+> >>> 
+> >>>>> and refuses to enable more than 8 whatever happens.  You don't have
+> >>> 
+> >>> a
+> >>> 
+> >>>>> replacement strategy, you simply refuse to have too many.  We
+> >>> 
+> >>> already do
+> >>> 
+> >>>>> this for some of the devices with strange possible channel sets.
+> >>>>> 
+> >>>>> Any in kernel users (hwmon, input etc) will have to be configured to
+> >>> 
+> >>> use
+> >>> 
+> >>>>> the iio device associated with the right trigger.
+> >>>>> 
+> >>>>> Does that do the job for you?
+> >>>>> 
+> >>>>> The reason for associating the triggers with different iio devices
+> >>> 
+> >>> is that
+> >>> 
+> >>>>> a given iio device can only feed a fixed width scan to the demux
+> >>> 
+> >>> unit.
+> >>> 
+> >>>>> Hence if we have some channels triggering at one time and others at
+> >>>>> another, there is no way of handling the data stream.  Whilst they
+> >>> 
+> >>> are on
+> >>> 
+> >>>>> the same hardware they are really acting as separate devices that
+> >>> 
+> >>> just
+> >>> 
+> >>>>> happen to share some pins and control hardware.
+> >>>>> 
+> >>>>> (Note I'm being useless and not pushing out the new version of in
+> >>> 
+> >>> kernel
+> >>> 
+> >>>>> IIO stuff, but I should get to that at the weekend if not before -
+> >>> 
+> >>> one
+> >>> 
+> >>>>> fiddly issue with preventing removal of in use devices still to work
+> >>>>> out.).
+> >>>> 
+> >>>> Yikes. This device is more complex than I thought.  The 'triggers' as
+> >>> 
+> >>> above
+> >>> 
+> >>>> can also trigger each other alongside causing a set of channels to be
+> >>>> captured.
+> >>>> 
+> >>>> I don't think this changes the logic behind my above answer, but it
+> >>> 
+> >>> does
+> >>> 
+> >>>> mean you are going to have some trouble coming up with a control
+> >>> 
+> >>> interface
+> >>> 
+> >>>> for the triggers. This may need some core changes to allow for a
+> >>> 
+> >>> graph of
+> >>> 
+> >>>> triggers setup (it's not even restricted to a tree).  To illustrate.
+> >>>> Trigger 1 can fire after T1 secs.  That can then start any other
+> >>> 
+> >>> trigger
+> >>> 
+> >>>> (including restarting it's own count down) and/or cause channels to
+> >>> 
+> >>> be
+> >>> 
+> >>>> sampled.  Lets say it starts trigger 2 and not itself.  Trigger 2
+> >>> 
+> >>> then
+> >>> 
+> >>>> fires after T2 seconds and starts up Triggers 1 and 3. etc...
+> >>>> 
+> >>>> sometimes I think hardware designers go out of their way to make
+> >>> 
+> >>> general
+> >>> 
+> >>>> purpose software design really really tricky...
+> >>> 
+> >>> Hi Jonathan,
+> >>> 
+> >>> let's not overcomplicate things. Let's do it like this:
+> >>> 
+> >>> 1) Register 4 IIO devices
+> >>> 2) Each device has one delay trigger
+> >>> 3) Each delay trigger can be reconfigured only if it is not used by any
+> >>> channel
+> >>> (meaning that on that particular IIO, no channel is opened)
+> >>> 4) We well allow only 8 channels in total
+> >>> 5) Each IIO will have to have attributes -- how many samples it should
+> >>> do, how
+> >>> long between them
+> >>> 
+> >>> Are there some utils to test the IIO? Other than sysfs, which won't
+> >>> allow me to
+> >>> try continuous sampling of multiple channels.
+> >>> 
+> >>> M
+> >> 
+> >> Yes. See the documentation directory. Your plan sounds sensible.
+> > 
+> > All right. Also, what did you mean by wiring touchscreen and such? I
+> > assume I'd rather think about it in the design too, but how should I go
+> > about it?
+> 
+> There are two elements to this.  Pull devices (hwmon type - basicallyl
+> polled from userspace) and push device (off trigger).
+> 
+> The connection infrastructure is the same either way.  A version was
+> reasonably widely reviewed but picked up some last minute comments that
+> I have addressed in my dev tree but not pushed out more publically
+> (small issue with order of module removal causing seg faults I need to
+> chase down).
+> 
+> Anyhow, discussion wise...
+> 
+> https://lkml.org/lkml/2011/10/20/103
+> http://www.spinics.net/lists/linux-iio/msg03930.html
+> 
+> Code wise, if you want to see the latest I just tend to hide my dev
+> trees under odd names on kernel.org currentlly see.
+> http://git.kernel.org/?p=linux/kernel/git/jic23/iio.git;a=shortlog;h=refs/h
+> eads/inkern-staging3
+> 
+> To outline briefly the current form (after working on Greg KHs
+> comments). (pretty similar to regulators).
+> 
+> In board file (or device tree - not implemented yet) platform data
+> describing the consumers of channels on a given iio device is
+> provided as an array of
+> 
+> struct iio_map {
+> 	const char *adc_channel_label;
+> 	struct device *consumer_dev;
+> 	const char *consumer_dev_name;
+> 	const char *consumer_channel;
+> };
+> 
+> The driver then passes and a pointer to the associate iio_device
+> to the core.
+> 
+> Lets take the more complex triggered capture case.
+> 
+> A consumer asks the iio_core for all iio_maps that match it (can request
+> individual ones of course).
+> 
+> This causes a new buffer to be inserted into a list that are fed
+> by a demux unit into which data goes directly from the chip.
+> This buffer is alongside any 'iio' buffers that are using the same
+> part (and may contain some of the same channels).
+> 
+> It simply calls a callback function provided by the consumer passing
+> in a block of data matching one set of channels as requested by the
+> consumer.
+> 
+> Example in the tree mentioned above is a half written iio->input
+> bridge.   We had some brief discussions a while back about how to
+> handle the extra weirdness that touchscreen adcs use and didn't
+> reach any firm conclusions IIRC.
+> 
+> I'd imagine you'll need to expand some elements of this to support
+> your usecase.  For starters there is no inkernel control of trigger
+> parameters at the moment.
+> 
+> All comments welcome.  I'll hopefully get a few mins to get the
+> pull interface stuff out shortly then we can start hammering the
+> push interface bit and for real fun how to combine the two.
 
-This patch removes it.
+Jonathan ... I'm getting seriously lost in this stuff. Basically:
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Milton Miller <miltonm@bga.com>
----
- kernel/irq/irqdomain.c |   18 ++++--------------
- 1 files changed, 4 insertions(+), 14 deletions(-)
+1) Are there any userland utilities at all to test the IIO ? If so, where?
+2) I can't do anything if I don't understand how whole this IIO works at all 
+and/or how to use it with my hardware.
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index bf181ef..5b4fc4d 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -339,7 +339,7 @@ unsigned int irq_create_direct_mapping(struct irq_domain *domain)
- unsigned int irq_create_mapping(struct irq_domain *domain,
- 				irq_hw_number_t hwirq)
- {
--	unsigned int virq, hint;
-+	unsigned int virq;
- 
- 	pr_debug("irq: irq_create_mapping(0x%p, 0x%lx)\n", domain, hwirq);
- 
-@@ -366,10 +366,7 @@ unsigned int irq_create_mapping(struct irq_domain *domain,
- 		return irq_domain_legacy_revmap(domain, hwirq);
- 
- 	/* Allocate a virtual interrupt number */
--	hint = hwirq % irq_virq_count;
--	virq = irq_alloc_desc_from(hint, 0);
--	if (!virq)
--		virq = irq_alloc_desc(0);
-+	virq = irq_alloc_desc(0);
- 	if (!virq) {
- 		pr_debug("irq: -> virq allocation failed\n");
- 		return 0;
-@@ -490,7 +487,6 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
- 			      irq_hw_number_t hwirq)
- {
- 	unsigned int i;
--	unsigned int hint = hwirq % irq_virq_count;
- 
- 	/* Look for default domain if nececssary */
- 	if (domain == NULL)
-@@ -503,17 +499,11 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
- 		return irq_domain_legacy_revmap(domain, hwirq);
- 
- 	/* Slow path does a linear search of the map */
--	if (hint < NUM_ISA_INTERRUPTS)
--		hint = NUM_ISA_INTERRUPTS;
--	i = hint;
--	do {
-+	for (i = 0; i < irq_virq_count; i++)  {
- 		struct irq_data *data = irq_get_irq_data(i);
- 		if (data && (data->domain == domain) && (data->hwirq == hwirq))
- 			return i;
--		i++;
--		if (i >= irq_virq_count)
--			i = NUM_ISA_INTERRUPTS;
--	} while(i != hint);
-+	}
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(irq_find_mapping);
--- 
-1.7.5.4
+So I'm still trying to wrap my head around this.
+
+Considering my hardware can do the oversampling (sum of 1 - 32 samples 12bit 
+samples), where the end of sampling causes an interrupt. I need to add 
+attributes to each of those four IIO devices I created to control this 
+oversampling (setting how many times it should be oversampled and what's the 
+delay inbetween the sampling?)
+
+Or that's what that "trigger" stuff is for ?
+
+Further question:
+3) If I want to sample two channels continuously, is there any tool that'll 
+allow me to do it ? Or do I need to write such tool? (This is complementary to 
+question #1).
+
+Thanks
+
+M
+> 
+> Jonathan
+> 
+> > Let the
+> > iio driver be a composite device that in turn registers another (input)
+> > device? Or simply put the touchscreen driver input drivers/input/ and
+> > export some calls from the IIO driver to allow the touchscreen driver
+> > somehow bind with it?
+> > 
+> > M
