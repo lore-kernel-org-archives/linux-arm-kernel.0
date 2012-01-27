@@ -1,72 +1,58 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 27 Jan 2012 17:29:56 +0100
-Subject: [PATCH 2/2] LPC32XX: Add output reading to GPO P3
-Message-ID: <1327681796-2445-1-git-send-email-stigge@antcom.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 27 Jan 2012 08:58:47 -0800
+Subject: Pinmux bindings proposal
+In-Reply-To: <CACRpkdae58AYCYzwx8ysSDr_i0UHBfCujm2Fmnb+hx7825Lm4w@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17801D202F@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885091DEA@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20120117082334.GA31295@S2101-09.ap.freescale.net>
+ <7FE21149F4667147B645348EC6057885092D56@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF17801D22F5@HQMAIL01.nvidia.com>
+ <7FE21149F4667147B645348EC6057885095125@039-SN2MPN1-013.039d.mgd.msft.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF1780DAB445@HQMAIL01.nvidia.com>
+ <CACRpkdae58AYCYzwx8ysSDr_i0UHBfCujm2Fmnb+hx7825Lm4w@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E123E3C@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip offers the function to detect the current state of output of the GPO
-P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
-sysfs
+Linus Walleij wrote at Friday, January 27, 2012 5:01 AM:
+> On Fri, Jan 20, 2012 at 9:28 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> > Dong Aisheng wrote at Wednesday, January 18, 2012 4:06 AM:
+> >>
+> >> Each entry in the list is PIN rather than group.
+> >> So we cannot create each map for each entry in the list except we treat the PIN as
+> >> A group(this will cause a huge maps and predefined groups and functions).
+> >
+> > Linusw has NAKd the idea that we should not use these "virtual groups",
+> > i.e. he believes they're fine to use if you wish.
+> 
+> Interesting double inversion here: I NACK to NOT use groups
+> this way...
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+I don't think that's true.
 
-diff --git a/drivers/gpio/gpio-lpc32xx.c b/drivers/gpio/gpio-lpc32xx.c
-index 21b65e5..9bd59cf 100644
---- a/drivers/gpio/gpio-lpc32xx.c
-+++ b/drivers/gpio/gpio-lpc32xx.c
-@@ -62,9 +62,11 @@
- #define GPIO3_PIN_IN_SEL(x, y)		(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
- #define GPIO3_PIN5_IN_SEL(x)		(((x) >> 24) & 1)
- #define GPI3_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
-+#define GPO3_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
- 
- struct gpio_regs {
- 	void __iomem *inp_state;
-+	void __iomem *outp_state;
- 	void __iomem *outp_set;
- 	void __iomem *outp_clr;
- 	void __iomem *dir_set;
-@@ -145,6 +147,7 @@ static struct gpio_regs gpio_grp_regs_p2 = {
- 
- static struct gpio_regs gpio_grp_regs_p3 = {
- 	.inp_state	= LPC32XX_GPIO_P3_INP_STATE,
-+	.outp_state	= LPC32XX_GPIO_P3_OUTP_STATE,
- 	.outp_set	= LPC32XX_GPIO_P3_OUTP_SET,
- 	.outp_clr	= LPC32XX_GPIO_P3_OUTP_CLR,
- 	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
-@@ -240,6 +243,12 @@ static int __get_gpi_state_p3(struct lpc32xx_gpio_chip *group,
- 	return GPI3_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state), pin);
- }
- 
-+static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
-+	unsigned pin)
-+{
-+	return GPO3_PIN_IN_SEL(__raw_readl(group->gpio_grp->outp_state), pin);
-+}
-+
- /*
-  * GENERIC_GPIO primitives.
-  */
-@@ -340,6 +349,13 @@ static void lpc32xx_gpo_set_value(struct gpio_chip *chip, unsigned pin,
- 	__set_gpo_level_p3(group, pin, value);
- }
- 
-+static int lpc32xx_gpo_get_value(struct gpio_chip *chip, unsigned pin)
-+{
-+	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
-+
-+	return __get_gpo_state_p3(group, pin);
-+}
-+
- static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
- {
- 	if (pin < chip->ngpio)
-@@ -427,6 +443,7 @@ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 			.label			= "gpo_p3",
- 			.direction_output	= lpc32xx_gpio_dir_out_always,
- 			.set			= lpc32xx_gpo_set_value,
-+			.get			= lpc32xx_gpo_get_value,
- 			.request		= lpc32xx_gpio_request,
- 			.base			= LPC32XX_GPO_P3_GRP,
- 			.ngpio			= LPC32XX_GPO_P3_MAX,
+If you did that, you would be /forcing/ people to use virtual pin groups,
+which means that the Tegra driver I proposed wouldn't be acceptable
+since it only defines groups that actually exist in HW.
+
+> The groups are not "virtual" if they share some physical
+> property. Such as being used by the same device.
+
+No, that's not what a virtual group is (I'm the person who came up
+with that term, and really the only person using it, so I get to decide
+what I mean by it!) I suppose you can mean something different, but that's
+just going to be ridiculously confusing.
+
+In HW, there are individual register fields. Each one of these affects
+often a single pin, but on some chips n pins at a time. A physical
+group would be precisely those groups of pins which the actual HW
+registers affect. A virtual group is a SW group that ends up affecting
+more than one of those physical groups, since when a virtual groups is
+programmed, the pinctrl driver goes and programs n register fields and
+hence affects n physical groups.
+
+And those registers and either physical or virtual groups don't have to
+be anything to do with muxing. On Tegra, there are certainly groups that
+only affect e.g. drive strength and not mux selection.
+
+-- 
+nvpublic
