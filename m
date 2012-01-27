@@ -1,128 +1,138 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 27 Jan 2012 21:36:05 +0100
-Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E123E7A@HQMAIL01.nvidia.com>
-References: <4F22DEF2.5000807@ti.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178E123E7A@HQMAIL01.nvidia.com>
-Message-ID: <4F230AB5.1050607@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 27 Jan 2012 14:35:54 -0700
+Subject: [PATCH v3 00/25] irq_domain generalization and refinement
+Message-ID: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/27/2012 7:13 PM, Stephen Warren wrote:
-> Cousson, Benoit wrote at Friday, January 27, 2012 10:29 AM:
->> Add some basic helpers to retrieve a DMA controller device_node
->> and the DMA request line number.
->>
->> For legacy reason another API will export the DMA request number
->> into a Linux resource of type IORESOURCE_DMA.
->> This API is usable only on system with an unique DMA controller.
->
-> This binding looks reasonable to me; it's pretty much exactly what I
-> was expecting the custom Tegra I2S binding might evolve into. A couple
-> comments inline...
+Hey everyone,
 
-Well, that does not surprise me since this is your Tegra I2S binding 
-that made me think that it should be time to define that generic DMA 
-binding we've been waiting for a while :-)
+This patch series is ready for much wider consumption now.  I'd like
+to get it into linux-next ASAP because there will be ARM board support
+depending on it.  I'll wait a few days before I ask Stephen to pull
+this in.
 
->> diff --git a/Documentation/devicetree/bindings/dma/dma.txt
->
->> +* DMA client
->> +
->> +Client drivers should specify the DMA request numbers using a phandle to
->> +the controller + the DMA request number on that controller.
->> +
->> +Required properties:
->> +    - dma-request: List of pair phandle + dma-request per line
->> +    - dma-request-names: list of strings in the same order as the dma-request
->> +      in the dma-request property.
->
-> I think property dma-request-names should be optional; some drives will
-> simply request by index and hence the property won't be needed. Same as
-> the common clock binding.
+Stephen/Milton/Ben, any testing you can help with here would be
+appreciated since you've got access to a wider variety of Power
+machines than I do.
 
-Yes, indeed, and it is optional in the code. I wrongly added that in the 
-"required" paragraph. I'll fix that.
+Thomas, I think it makes sense to maintain this in a separate branch
+from other irq changes until the next merge window.  If you prefer,
+I'm happy to maintain this branch until then.
 
->> diff --git a/drivers/of/dma.c b/drivers/of/dma.c
->
->> +int of_get_dma_request(struct device_node *np, int index,
->> +		       struct device_node **ctrl_np)
->> +{
->> +	int ret = -EINVAL;
->> +	struct of_phandle_args dma_spec;
->> +
->> +	ret = of_parse_phandle_with_args(np, "dma-request", "#dma-cells",
->> +					 index,&dma_spec);
->> +	if (ret) {
->> +		pr_debug("%s: can't parse dma property\n", __func__);
->> +		goto err0;
->> +	}
->> +
->> +	if (dma_spec.args_count>  0)
->> +		ret = dma_spec.args[0];
->
-> Doesn't that force #dma-cells>  0? What about a DMA controller that only
-> supports a single DMA request, in which case you might want #dma-cells==0?
+Cheers,
+g.
 
-OK, if such DMA controller exist, it will make sense.
+The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
 
-> Having an of_xlate for the controller would be useful here in general:
->
-> Is a single int really enough here?
->
-> Some DMA controllers have N channels that can be used for arbitrary
-> things. You may need to specify the DMA request once when allocating the
-> channel, or maybe individual for each transfer if it can vary. Other
-> controllers may need a special channel ID for each type of request. There
-> are probably more cases I haven't thought of.
+  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
 
-In my naive view of the DMA controller the channel is something that 
-will be handled and allocated by the DMA controller upon driver request. 
-So this is not something that is necessarily HW related, and thus should 
-not be described in DT.
-But, maybe I'm missing your point.
+are available in the git repository at:
+  git://git.secretlab.ca/git/linux-2.6 irqdomain/next
 
-> So in general, I think this API should return some kind of cookie that's
-> meaningful to the DMA controller, and this should be provided back to
-> the DMA controller with every API that might need it; channel allocation,
-> DMA transfer request, etc.
+Grant Likely (24):
+      irq_domain: add documentation and MAINTAINERS entry.
+      dt: Make irqdomain less verbose
+      irq_domain: Make irq_domain structure match powerpc's irq_host
+      irq_domain: convert microblaze from irq_host to irq_domain
+      irq_domain/powerpc: Use common irq_domain structure instead of irq_host
+      irq_domain/powerpc: eliminate irq_map; use irq_alloc_desc() instead
+      irq_domain/powerpc: Eliminate virq_is_host()
+      irq_domain: Move irq_domain code from powerpc to kernel/irq
+      irqdomain: remove NO_IRQ from irq domain code
+      irq_domain: Remove references to old irq_host names
+      irq_domain: Replace irq_alloc_host() with revmap-specific initializers
+      irq_domain: Add support for base irq and hwirq in legacy mappings
+      irq_domain: Remove 'new' irq_domain in favour of the ppc one
+      irq_domain: Remove irq_domain_add_simple()
+      irq_domain: Create common xlate functions that device drivers can use
+      irq_domain: constify irq_domain_ops
+      irq_domain/c6x: constify irq_domain structures
+      irq_domain/c6x: Use library of xlate functions
+      irq_domain/powerpc: constify irq_domain_ops
+      irqdomain/powerpc: Replace custom xlate functions with library functions
+      irq_domain/x86: Convert x86 (embedded) to use common irq_domain
+      irq_domain: Include hwirq number in /proc/interrupts
+      irq_domain: remove "hint" when allocating irq numbers
+      irq_domain: mostly eliminate slow-path revmap lookups
 
-Forgive my ignorance, but the only DMA controller I've been using for a 
-while is the OMAP2+ SDMA, hence this simplistic API that fit perfectly 
-the OMAP need.
+Mark Salter (1):
+      irq_domain/c6x: Convert c6x to use generic irq_domain support.
 
-So I guess that having an xlate function like GPIO and IRQ will make 
-sense if we have to handle these kind of variants.
-
-> I suppose a controller may be able to represent that cookie in a single
-> int, but perhaps not, e.g. if a binding needs #dma-cells=4 for some
-> reason. Perhaps returning a void* here would be better, coupled with
-> of_put_dma_request() to allow the controller to free it if required?
->
-> That'd allow individual controller bindings to specify e.g. HW FIFO
-> width, wrap, FIFO levels for HW flow control, ...
-> (I vaguely recall that dmaengine addresses some of this already, but
-> unfortunately I'm not very familiar with it yet)
-
-Me neither, but do we have to handle all this parameters in DT? I guess 
-that most of the configuration will still be under driver responsibility 
-for the channel. The DMA controller itself can clearly defined a bunch 
-of parameters to expose its capabilities, but again so far I do not have 
-any clue about all these fancy DMA controller variants. Some flexibility 
-will clearly be needed, but how far should we go?
-
-The goal of that RFC was to start gathering some feedback to understand 
-the requirements for the DMA bindings, so at least I have a couple of 
-new ones now :-).
-
->> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
->
->> +#ifdef CONFIG_OF_GPIO
->
-> CONFIG_OF_DMA
-
-Oops, some leftover from the of_gpio.h copy-paste.
-
-Thanks for the good feedback,
-Benoit
+ Documentation/IRQ-domain.txt                     |  113 +++
+ MAINTAINERS                                      |    9 +
+ arch/arm/common/gic.c                            |   95 ++--
+ arch/arm/common/vic.c                            |   16 +-
+ arch/arm/include/asm/hardware/gic.h              |    4 +-
+ arch/arm/include/asm/hardware/vic.h              |    2 +
+ arch/arm/mach-exynos/common.c                    |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c                   |    3 +-
+ arch/arm/mach-msm/board-msm8x60.c                |    8 +-
+ arch/arm/mach-mx5/imx51-dt.c                     |    4 +-
+ arch/arm/mach-mx5/imx53-dt.c                     |    4 +-
+ arch/arm/mach-omap2/board-generic.c              |    2 +-
+ arch/arm/mach-prima2/irq.c                       |    2 +-
+ arch/arm/mach-versatile/core.c                   |    5 +-
+ arch/c6x/Kconfig                                 |    1 +
+ arch/c6x/include/asm/irq.h                       |  245 +-------
+ arch/c6x/kernel/irq.c                            |  612 +----------------
+ arch/c6x/platforms/megamod-pic.c                 |   25 +-
+ arch/microblaze/include/asm/irq.h                |    4 +-
+ arch/microblaze/kernel/irq.c                     |    2 +-
+ arch/microblaze/kernel/setup.c                   |    2 -
+ arch/powerpc/Kconfig                             |    1 +
+ arch/powerpc/include/asm/ehv_pic.h               |    2 +-
+ arch/powerpc/include/asm/i8259.h                 |    2 +-
+ arch/powerpc/include/asm/irq.h                   |  247 +-------
+ arch/powerpc/include/asm/mpic.h                  |    2 +-
+ arch/powerpc/include/asm/xics.h                  |    2 +-
+ arch/powerpc/kernel/irq.c                        |  617 +----------------
+ arch/powerpc/platforms/512x/mpc5121_ads_cpld.c   |   12 +-
+ arch/powerpc/platforms/52xx/media5200.c          |   15 +-
+ arch/powerpc/platforms/52xx/mpc52xx_gpt.c        |   16 +-
+ arch/powerpc/platforms/52xx/mpc52xx_pic.c        |   12 +-
+ arch/powerpc/platforms/82xx/pq2ads-pci-pic.c     |   14 +-
+ arch/powerpc/platforms/85xx/socrates_fpga_pic.c  |   15 +-
+ arch/powerpc/platforms/86xx/gef_pic.c            |   15 +-
+ arch/powerpc/platforms/cell/axon_msi.c           |   29 +-
+ arch/powerpc/platforms/cell/beat_interrupt.c     |   16 +-
+ arch/powerpc/platforms/cell/interrupt.c          |   16 +-
+ arch/powerpc/platforms/cell/spider-pic.c         |   14 +-
+ arch/powerpc/platforms/embedded6xx/flipper-pic.c |   30 +-
+ arch/powerpc/platforms/embedded6xx/hlwd-pic.c    |   35 +-
+ arch/powerpc/platforms/iseries/irq.c             |   11 +-
+ arch/powerpc/platforms/powermac/pic.c            |   26 +-
+ arch/powerpc/platforms/powermac/smp.c            |    9 +-
+ arch/powerpc/platforms/ps3/interrupt.c           |   11 +-
+ arch/powerpc/platforms/wsp/opb_pic.c             |   26 +-
+ arch/powerpc/sysdev/cpm1.c                       |    9 +-
+ arch/powerpc/sysdev/cpm2_pic.c                   |   23 +-
+ arch/powerpc/sysdev/ehv_pic.c                    |   14 +-
+ arch/powerpc/sysdev/fsl_msi.c                    |   10 +-
+ arch/powerpc/sysdev/fsl_msi.h                    |    2 +-
+ arch/powerpc/sysdev/i8259.c                      |   15 +-
+ arch/powerpc/sysdev/ipic.c                       |   31 +-
+ arch/powerpc/sysdev/ipic.h                       |    2 +-
+ arch/powerpc/sysdev/mpc8xx_pic.c                 |   11 +-
+ arch/powerpc/sysdev/mpic.c                       |   17 +-
+ arch/powerpc/sysdev/mpic_msi.c                   |    2 +-
+ arch/powerpc/sysdev/mv64x60_pic.c                |   11 +-
+ arch/powerpc/sysdev/qe_lib/qe_ic.c               |   26 +-
+ arch/powerpc/sysdev/qe_lib/qe_ic.h               |    2 +-
+ arch/powerpc/sysdev/tsi108_pci.c                 |   22 +-
+ arch/powerpc/sysdev/uic.c                        |   26 +-
+ arch/powerpc/sysdev/xics/xics-common.c           |   28 +-
+ arch/powerpc/sysdev/xilinx_intc.c                |   19 +-
+ arch/x86/Kconfig                                 |    2 +
+ arch/x86/include/asm/irq_controller.h            |   12 -
+ arch/x86/include/asm/prom.h                      |   10 -
+ arch/x86/kernel/devicetree.c                     |  101 +--
+ drivers/gpio/gpio-mpc8xxx.c                      |   30 +-
+ drivers/mfd/twl-core.c                           |   12 +-
+ drivers/net/phy/mdio-gpio.c                      |    4 +-
+ include/linux/irqdomain.h                        |  190 ++++--
+ kernel/irq/irqdomain.c                           |  816 +++++++++++++++++++---
+ kernel/irq/proc.c                                |    3 +
+ 74 files changed, 1334 insertions(+), 2471 deletions(-)
+ create mode 100644 Documentation/IRQ-domain.txt
+ delete mode 100644 arch/x86/include/asm/irq_controller.h
