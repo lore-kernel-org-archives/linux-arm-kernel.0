@@ -1,226 +1,266 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 28 Jan 2012 19:05:22 +0530
-Subject: [PATCHv2 3/6] ARM: extract out insn generation code from ftrace
+Date: Sat, 28 Jan 2012 19:05:23 +0530
+Subject: [PATCHv2 4/6] ARM: extract out code patch function from kprobes
 In-Reply-To: <1327757725-10114-1-git-send-email-rabin@rab.in>
 References: <1327757725-10114-1-git-send-email-rabin@rab.in>
-Message-ID: <1327757725-10114-4-git-send-email-rabin@rab.in>
+Message-ID: <1327757725-10114-5-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extract out the instruction generation code so that it can be used
-for jump labels too.
+Extract out the code patching code from kprobes so that it can be used
+from the jump label code.  Additionally, the separated code:
 
+ - Uses the IS_ENABLED() macros instead of the #ifdefs for THUMB2
+   support
+
+ - Unifies the two separate functions in kprobes, providing one function
+   that uses stop_machine() internally, and one that can be called from
+   stop_machine() directly
+
+ - Patches the text on all CPUs only on processors requiring software
+   broadcasting of cache operations
+
+Cc: Jon Medhurst <tixy@yxit.co.uk>
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/kernel/Makefile |    5 ++-
- arch/arm/kernel/ftrace.c |   61 +++-------------------------------------------
- arch/arm/kernel/insn.c   |   61 ++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/insn.h   |   19 ++++++++++++++
- 4 files changed, 87 insertions(+), 59 deletions(-)
- create mode 100644 arch/arm/kernel/insn.c
- create mode 100644 arch/arm/kernel/insn.h
+ arch/arm/kernel/Makefile  |    3 +-
+ arch/arm/kernel/kprobes.c |   86 ++++++++++++--------------------------------
+ arch/arm/kernel/patch.c   |   73 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/patch.h   |    7 ++++
+ 4 files changed, 106 insertions(+), 63 deletions(-)
+ create mode 100644 arch/arm/kernel/patch.c
+ create mode 100644 arch/arm/kernel/patch.h
 
 diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 43b740d..dd3d5f1 100644
+index dd3d5f1..8c63ee8 100644
 --- a/arch/arm/kernel/Makefile
 +++ b/arch/arm/kernel/Makefile
-@@ -7,6 +7,7 @@ AFLAGS_head.o        := -DTEXT_OFFSET=$(TEXT_OFFSET)
- 
+@@ -8,6 +8,7 @@ AFLAGS_head.o        := -DTEXT_OFFSET=$(TEXT_OFFSET)
  ifdef CONFIG_FUNCTION_TRACER
  CFLAGS_REMOVE_ftrace.o = -pg
-+CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_insn.o = -pg
++CFLAGS_REMOVE_patch.o = -pg
  endif
  
  CFLAGS_REMOVE_return_address.o = -pg
-@@ -34,8 +35,8 @@ obj-$(CONFIG_HAVE_SCHED_CLOCK)	+= sched_clock.o
- obj-$(CONFIG_SMP)		+= smp.o smp_tlb.o
- obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
- obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
--obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
--obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o
-+obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o insn.o
-+obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
+@@ -38,7 +39,7 @@ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
+ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o insn.o
+ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
  obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
- obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-common.o
+-obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-common.o
++obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-common.o patch.o
  ifdef CONFIG_THUMB2_KERNEL
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 72a381a..858c63f 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -19,6 +19,8 @@
- #include <asm/opcodes.h>
- #include <asm/ftrace.h>
+ obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o
+ else
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+index 129c116..ab1869d 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/kernel/kprobes.c
+@@ -29,6 +29,7 @@
+ #include <asm/cacheflush.h>
  
-+#include "insn.h"
-+
- #ifdef CONFIG_THUMB2_KERNEL
- #define	NOP		0xf85deb04	/* pop.w {lr} */
- #else
-@@ -61,64 +63,9 @@ static unsigned long adjust_address(struct dyn_ftrace *rec, unsigned long addr)
+ #include "kprobes.h"
++#include "patch.h"
+ 
+ #define MIN_STACK_SIZE(addr) 				\
+ 	min((unsigned long)MAX_STACK_SIZE,		\
+@@ -103,57 +104,33 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ 	return 0;
  }
- #endif
  
 -#ifdef CONFIG_THUMB2_KERNEL
--static unsigned long ftrace_gen_branch(unsigned long pc, unsigned long addr,
--				       bool link)
+-
+-/*
+- * For a 32-bit Thumb breakpoint spanning two memory words we need to take
+- * special precautions to insert the breakpoint atomically, especially on SMP
+- * systems. This is achieved by calling this arming function using stop_machine.
+- */
+-static int __kprobes set_t32_breakpoint(void *addr)
 -{
--	unsigned long s, j1, j2, i1, i2, imm10, imm11;
--	unsigned long first, second;
--	long offset;
--
--	offset = (long)addr - (long)(pc + 4);
--	if (offset < -16777216 || offset > 16777214) {
--		WARN_ON_ONCE(1);
--		return 0;
--	}
--
--	s	= (offset >> 24) & 0x1;
--	i1	= (offset >> 23) & 0x1;
--	i2	= (offset >> 22) & 0x1;
--	imm10	= (offset >> 12) & 0x3ff;
--	imm11	= (offset >>  1) & 0x7ff;
--
--	j1 = (!i1) ^ s;
--	j2 = (!i2) ^ s;
--
--	first = 0xf000 | (s << 10) | imm10;
--	second = 0x9000 | (j1 << 13) | (j2 << 11) | imm11;
--	if (link)
--		second |= 1 << 14;
--
--	return __opcode_thumb32_compose(first, second);
+-	((u16 *)addr)[0] = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION >> 16;
+-	((u16 *)addr)[1] = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION & 0xffff;
+-	flush_insns(addr, 2*sizeof(u16));
+-	return 0;
 -}
--#else
--static unsigned long ftrace_gen_branch(unsigned long pc, unsigned long addr,
--				       bool link)
--{
--	unsigned long opcode = 0xea000000;
--	long offset;
 -
--	if (link)
--		opcode |= 1 << 24;
--
--	offset = (long)addr - (long)(pc + 8);
--	if (unlikely(offset < -33554432 || offset > 33554428)) {
--		/* Can't generate branches that far (from ARM ARM). Ftrace
--		 * doesn't generate branches outside of kernel text.
--		 */
--		WARN_ON_ONCE(1);
--		return 0;
--	}
--
--	offset = (offset >> 2) & 0x00ffffff;
--
--	return opcode | offset;
--}
--#endif
--
- static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
+ void __kprobes arch_arm_kprobe(struct kprobe *p)
  {
--	return ftrace_gen_branch(pc, addr, true);
-+	return arm_gen_branch_link(pc, addr);
+-	uintptr_t addr = (uintptr_t)p->addr & ~1; /* Remove any Thumb flag */
+-
+-	if (!is_wide_instruction(p->opcode)) {
+-		*(u16 *)addr = KPROBE_THUMB16_BREAKPOINT_INSTRUCTION;
+-		flush_insns(addr, sizeof(u16));
+-	} else if (addr & 2) {
+-		/* A 32-bit instruction spanning two words needs special care */
+-		stop_machine(set_t32_breakpoint, (void *)addr, &cpu_online_map);
++	unsigned int brkp;
++	void *addr;
++
++	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
++		/* Remove any Thumb flag */
++		addr = (void *)((uintptr_t)p->addr & ~1);
++
++		if (is_wide_instruction(p->opcode))
++			brkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
++		else
++			brkp = KPROBE_THUMB16_BREAKPOINT_INSTRUCTION;
+ 	} else {
+-		/* Word aligned 32-bit instruction can be written atomically */
+-		u32 bkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
+-#ifndef __ARMEB__ /* Swap halfwords for little-endian */
+-		bkp = (bkp >> 16) | (bkp << 16);
+-#endif
+-		*(u32 *)addr = bkp;
+-		flush_insns(addr, sizeof(u32));
+-	}
+-}
++		kprobe_opcode_t insn = p->opcode;
+ 
+-#else /* !CONFIG_THUMB2_KERNEL */
++		addr = p->addr;
++		brkp = KPROBE_ARM_BREAKPOINT_INSTRUCTION;
+ 
+-void __kprobes arch_arm_kprobe(struct kprobe *p)
+-{
+-	kprobe_opcode_t insn = p->opcode;
+-	kprobe_opcode_t brkp = KPROBE_ARM_BREAKPOINT_INSTRUCTION;
+-	if (insn >= 0xe0000000)
+-		brkp |= 0xe0000000;  /* Unconditional instruction */
+-	else
+-		brkp |= insn & 0xf0000000;  /* Copy condition from insn */
+-	*p->addr = brkp;
+-	flush_insns(p->addr, sizeof(p->addr[0]));
+-}
++		if (insn >= 0xe0000000)
++			brkp |= 0xe0000000;  /* Unconditional instruction */
++		else
++			brkp |= insn & 0xf0000000;  /* Copy condition from insn */
++	}
+ 
+-#endif /* !CONFIG_THUMB2_KERNEL */
++	patch_text(addr, brkp);
++}
+ 
+ /*
+  * The actual disarming is done here on each CPU and synchronized using
+@@ -166,25 +143,10 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
+ int __kprobes __arch_disarm_kprobe(void *p)
+ {
+ 	struct kprobe *kp = p;
+-#ifdef CONFIG_THUMB2_KERNEL
+-	u16 *addr = (u16 *)((uintptr_t)kp->addr & ~1);
+-	kprobe_opcode_t insn = kp->opcode;
+-	unsigned int len;
++	void *addr = (void *)((uintptr_t)kp->addr & ~1);
+ 
+-	if (is_wide_instruction(insn)) {
+-		((u16 *)addr)[0] = insn>>16;
+-		((u16 *)addr)[1] = insn;
+-		len = 2*sizeof(u16);
+-	} else {
+-		((u16 *)addr)[0] = insn;
+-		len = sizeof(u16);
+-	}
+-	flush_insns(addr, len);
++	__patch_text(addr, kp->opcode);
+ 
+-#else /* !CONFIG_THUMB2_KERNEL */
+-	*kp->addr = kp->opcode;
+-	flush_insns(kp->addr, sizeof(kp->addr[0]));
+-#endif
+ 	return 0;
  }
  
- static int ftrace_modify_code(unsigned long pc, unsigned long old,
-@@ -258,7 +205,7 @@ static int __ftrace_modify_caller(unsigned long *callsite,
- {
- 	unsigned long caller_fn = (unsigned long) func;
- 	unsigned long pc = (unsigned long) callsite;
--	unsigned long branch = ftrace_gen_branch(pc, caller_fn, false);
-+	unsigned long branch = arm_gen_branch(pc, caller_fn);
- 	unsigned long nop = 0xe1a00000;	/* mov r0, r0 */
- 	unsigned long old = enable ? nop : branch;
- 	unsigned long new = enable ? branch : nop;
-diff --git a/arch/arm/kernel/insn.c b/arch/arm/kernel/insn.c
+diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
 new file mode 100644
-index 0000000..ab312e5
+index 0000000..30eff23
 --- /dev/null
-+++ b/arch/arm/kernel/insn.c
-@@ -0,0 +1,61 @@
++++ b/arch/arm/kernel/patch.c
+@@ -0,0 +1,73 @@
 +#include <linux/kernel.h>
++#include <linux/kprobes.h>
++#include <linux/stop_machine.h>
++
++#include <asm/cacheflush.h>
++#include <asm/smp_plat.h>
 +#include <asm/opcodes.h>
 +
-+static unsigned long
-+__arm_gen_branch_thumb2(unsigned long pc, unsigned long addr, bool link)
-+{
-+	unsigned long s, j1, j2, i1, i2, imm10, imm11;
-+	unsigned long first, second;
-+	long offset;
++#include "patch.h"
 +
-+	offset = (long)addr - (long)(pc + 4);
-+	if (offset < -16777216 || offset > 16777214) {
-+		WARN_ON_ONCE(1);
-+		return 0;
++struct patch {
++	void *addr;
++	unsigned int insn;
++};
++
++void __kprobes __patch_text(void *addr, unsigned int insn)
++{
++	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
++	int size;
++
++	if (thumb2 && __opcode_is_thumb16(insn)) {
++		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
++		size = sizeof(u16);
++	} else if (thumb2 && ((uintptr_t)addr & 2)) {
++		u16 *addrh = addr;
++
++		addrh[0] = __opcode_thumb32_first(insn);
++		addrh[1] = __opcode_thumb32_second(insn);
++
++		size = sizeof(u32);
++	} else {
++		if (thumb2)
++			insn = __opcode_to_mem_thumb32(insn);
++		else
++			insn = __opcode_to_mem_arm(insn);
++
++		*(u32 *)addr = insn;
++		size = sizeof(u32);
 +	}
 +
-+	s	= (offset >> 24) & 0x1;
-+	i1	= (offset >> 23) & 0x1;
-+	i2	= (offset >> 22) & 0x1;
-+	imm10	= (offset >> 12) & 0x3ff;
-+	imm11	= (offset >>  1) & 0x7ff;
-+
-+	j1 = (!i1) ^ s;
-+	j2 = (!i2) ^ s;
-+
-+	first = 0xf000 | (s << 10) | imm10;
-+	second = 0x9000 | (j1 << 13) | (j2 << 11) | imm11;
-+	if (link)
-+		second |= 1 << 14;
-+
-+	return __opcode_thumb32_compose(first, second);
++	flush_icache_range((uintptr_t)(addr),
++			   (uintptr_t)(addr) + size);
 +}
 +
-+static unsigned long
-+__arm_gen_branch_arm(unsigned long pc, unsigned long addr, bool link)
++static int __kprobes patch_text_stop_machine(void *data)
 +{
-+	unsigned long opcode = 0xea000000;
-+	long offset;
++	struct patch *patch = data;
 +
-+	if (link)
-+		opcode |= 1 << 24;
++	__patch_text(patch->addr, patch->insn);
 +
-+	offset = (long)addr - (long)(pc + 8);
-+	if (unlikely(offset < -33554432 || offset > 33554428)) {
-+		WARN_ON_ONCE(1);
-+		return 0;
++	return 0;
++}
++
++void __kprobes patch_text(void *addr, unsigned int insn)
++{
++	struct patch patch = {
++		.addr = addr,
++		.insn = insn,
++	};
++
++	if (cache_ops_need_broadcast()) {
++		stop_machine(patch_text_stop_machine, &patch, cpu_online_mask);
++	} else {
++		bool straddles_word = IS_ENABLED(CONFIG_THUMB2_KERNEL)
++				      && __opcode_is_thumb32(insn)
++				      && ((uintptr_t)addr & 2);
++
++		if (straddles_word)
++			stop_machine(patch_text_stop_machine, &patch, NULL);
++		else
++			__patch_text(addr, insn);
 +	}
-+
-+	offset = (offset >> 2) & 0x00ffffff;
-+
-+	return opcode | offset;
 +}
-+
-+unsigned long
-+__arm_gen_branch(unsigned long pc, unsigned long addr, bool link)
-+{
-+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
-+		return __arm_gen_branch_thumb2(pc, addr, link);
-+	else
-+		return __arm_gen_branch_arm(pc, addr, link);
-+}
-diff --git a/arch/arm/kernel/insn.h b/arch/arm/kernel/insn.h
+diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
 new file mode 100644
-index 0000000..994d60f
+index 0000000..b4731f2
 --- /dev/null
-+++ b/arch/arm/kernel/insn.h
-@@ -0,0 +1,19 @@
-+#ifndef __ASM_ARM_INSN_H
-+#define __ASM_ARM_INSN_H
++++ b/arch/arm/kernel/patch.h
+@@ -0,0 +1,7 @@
++#ifndef _ARM_KERNEL_PATCH_H
++#define _ARM_KERNEL_PATCH_H
 +
-+unsigned long
-+__arm_gen_branch(unsigned long pc, unsigned long addr, bool link);
-+
-+static inline unsigned long
-+arm_gen_branch(unsigned long pc, unsigned long addr)
-+{
-+	return __arm_gen_branch(pc, addr, false);
-+}
-+
-+static inline unsigned long
-+arm_gen_branch_link(unsigned long pc, unsigned long addr)
-+{
-+	return __arm_gen_branch(pc, addr, true);
-+}
++void patch_text(void *addr, unsigned int insn);
++void __patch_text(void *addr, unsigned int insn);
 +
 +#endif
 -- 
