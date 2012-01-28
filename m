@@ -1,27 +1,88 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 28 Jan 2012 08:01:32 +0100
-Subject: [PATCH 3/3] ARM: at91/tc/clocksource: Add 32 bit variant to
- Timer Counter
-In-Reply-To: <d1105b63fce5787a4717ca92ad35397923078e99.1326995849.git.nicolas.ferre@atmel.com>
-References: <a311afe3c46da62f7a1e82d2fa933e24ad4eef7e.1326995849.git.nicolas.ferre@atmel.com>
- <d1105b63fce5787a4717ca92ad35397923078e99.1326995849.git.nicolas.ferre@atmel.com>
-Message-ID: <20120128070132.GC705@game.jcrosoft.org>
+From: Madhusudhan.Gowda@elektrobit.com (Madhusudhan.Gowda at elektrobit.com)
+Date: Sat, 28 Jan 2012 09:58:14 +0200
+Subject: [GIT PULL] OMAP PM EMU fix for v3.3
+In-Reply-To: <20120127190239.GC9339@atomide.com>
+References: <87liw8agk4.fsf@ti.com>
+ <AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com>
+ <20120127190239.GC9339@atomide.com>
+Message-ID: <AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:05 Thu 19 Jan     , Nicolas Ferre wrote:
-> Some SoC have a 32 bit variant of Timer Counter Blocks. We do not
-> need the chaining of two 16 bit counters anymore for them.
-> 
-> The SoC nature is deduced from the device tree "compatible" string.
-> For non-device-tree configurations, backward compatibility is maintained
-> by using the default 16 bit counter configuration.
-> 
-> This patch addresses both the atmel_tclib and its user: tcb_clksrc
-> clocksource.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Thanks Tony
 
-Best Regards,
-J.
+Hi Kevin 
+Please do the needful and pull the same.
+
+Best Regards
+Gowda
+
+
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org
+[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Tony
+Lindgren
+Sent: 27 January 2012 21:03
+To: Gowda Madhusudhan
+Cc: Kevin Hilman; linux-omap at vger.kernel.org;
+linux-arm-kernel at lists.infradead.org
+Subject: Re: [GIT PULL] OMAP PM EMU fix for v3.3
+
+Hi,
+
+* Madhusudhan.Gowda at elektrobit.com <Madhusudhan.Gowda@elektrobit.com>
+[120127 10:25]:
+> Hi Tony,
+> 
+> Please pull the PM EMU off mode fix for v3.3
+
+It's best that Kevin queues this as it affects PM. Or it at least needs
+an ack from Kevin.
+
+Regards,
+
+Tony
+ 
+> Thanks
+> Gowda
+> 
+> The following changes since commit
+> 1c6ece3c23e58d0dbc687407d606f3560ded582a:
+> 
+>   Merge branch 'omap_fixes_a_3.3rc' of git://git.pwsan.com/linux-2.6
+> (2012-01-26 16:48:37 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/elektrobit/linux.git linux-omap-emu-fix
+> 
+> Madhusudhan Gowda (1):
+>       ARM: OMAP3 PM:Save and restore EMU context across MPU OFF
+> 
+>  arch/arm/mach-omap2/cm2xxx_3xxx.c |   16 ++++++++++++----
+>  arch/arm/mach-omap2/cm2xxx_3xxx.h |    2 ++
+>  arch/arm/mach-omap2/pm34xx.c      |    8 ++++++++
+>  3 files changed, 22 insertions(+), 4 deletions(-)
+> 
+> 
+> ----------------------------------------------------------------
+> Please note: This e-mail may contain confidential information intended
+
+> solely for the addressee. If you have received this e-mail in error, 
+> please do not disclose it to anyone, notify the sender promptly, and 
+> delete the message from your system.
+> Thank you.
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+----------------------------------------------------------------
+Please note: This e-mail may contain confidential information
+intended solely for the addressee. If you have received this
+e-mail in error, please do not disclose it to anyone, notify
+the sender promptly, and delete the message from your system.
+Thank you.
