@@ -1,201 +1,87 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 28 Jan 2012 13:05:45 -0700
-Subject: [FOR 3.4 PATCH 4/6] of/mtd/nand: add generic bindings and helpers
-In-Reply-To: <1327727444-23908-4-git-send-email-plagnioj@jcrosoft.com>
-References: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
- <1327727444-23908-4-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20120128200545.GH2501@ponder.secretlab.ca>
+Date: Sat, 28 Jan 2012 11:12:36 -0700
+Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4F230AB5.1050607@ti.com>
+References: <4F22DEF2.5000807@ti.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178E123E7A@HQMAIL01.nvidia.com>
+ <4F230AB5.1050607@ti.com>
+Message-ID: <20120128181236.GD2501@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 28, 2012 at 06:10:42AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> - nand-ecc-mode : String, operation mode of the NAND ecc mode.
->   Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
->   "soft_bch".
-> - nand-bus-width : 8 or 16 bus width if not present 8
-> - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
+On Fri, Jan 27, 2012 at 09:36:05PM +0100, Cousson, Benoit wrote:
+> On 1/27/2012 7:13 PM, Stephen Warren wrote:
+> >Cousson, Benoit wrote at Friday, January 27, 2012 10:29 AM:
+> >>diff --git a/drivers/of/dma.c b/drivers/of/dma.c
+> >
+> >>+int of_get_dma_request(struct device_node *np, int index,
+> >>+		       struct device_node **ctrl_np)
+> >>+{
+> >>+	int ret = -EINVAL;
+> >>+	struct of_phandle_args dma_spec;
+> >>+
+> >>+	ret = of_parse_phandle_with_args(np, "dma-request", "#dma-cells",
+> >>+					 index,&dma_spec);
+> >>+	if (ret) {
+> >>+		pr_debug("%s: can't parse dma property\n", __func__);
+> >>+		goto err0;
+> >>+	}
+> >>+
+> >>+	if (dma_spec.args_count>  0)
+> >>+		ret = dma_spec.args[0];
+> >
+> >Doesn't that force #dma-cells>  0? What about a DMA controller that only
+> >supports a single DMA request, in which case you might want #dma-cells==0?
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-mtd at lists.infradead.org
+> OK, if such DMA controller exist, it will make sense.
+> 
+> >Having an of_xlate for the controller would be useful here in general:
+> >
+> >Is a single int really enough here?
+> >
+> >Some DMA controllers have N channels that can be used for arbitrary
+> >things. You may need to specify the DMA request once when allocating the
+> >channel, or maybe individual for each transfer if it can vary. Other
+> >controllers may need a special channel ID for each type of request. There
+> >are probably more cases I haven't thought of.
+> 
+> In my naive view of the DMA controller the channel is something that
+> will be handled and allocated by the DMA controller upon driver
+> request. So this is not something that is necessarily HW related,
+> and thus should not be described in DT.
+> But, maybe I'm missing your point.
 
-Fine by me.
+The binding for each dma controller gets to decide the format and size
+of the dma spec (just like for irq and gpio specs).  The data in the
+spec is opaque to the DMA users, and only has meaning after code with
+knowledge of the specific dma controller binding .xlates it into
+something useful.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+So for OMAP, the binding may trivially map, but other DMA controllers
+may require flags or other configuration encoded into the DMA spec.
+The generic binding must take that into account.
 
-> ---
->  Documentation/devicetree/bindings/mtd/nand.txt |    7 ++
->  drivers/of/Kconfig                             |    4 +
->  drivers/of/Makefile                            |    1 +
->  drivers/of/of_mtd.c                            |   90 ++++++++++++++++++++++++
->  include/linux/of_mtd.h                         |   19 +++++
->  5 files changed, 121 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/nand.txt
->  create mode 100644 drivers/of/of_mtd.c
->  create mode 100644 include/linux/of_mtd.h
+> >I suppose a controller may be able to represent that cookie in a single
+> >int, but perhaps not, e.g. if a binding needs #dma-cells=4 for some
+> >reason. Perhaps returning a void* here would be better, coupled with
+> >of_put_dma_request() to allow the controller to free it if required?
+> >
+> >That'd allow individual controller bindings to specify e.g. HW FIFO
+> >width, wrap, FIFO levels for HW flow control, ...
+> >(I vaguely recall that dmaengine addresses some of this already, but
+> >unfortunately I'm not very familiar with it yet)
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
-> new file mode 100644
-> index 0000000..03855c8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
-> @@ -0,0 +1,7 @@
-> +* MTD generic binding
-> +
-> +- nand-ecc-mode : String, operation mode of the NAND ecc mode.
-> +  Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
-> +  "soft_bch".
-> +- nand-bus-width : 8 or 16 bus width if not present 8
-> +- nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index 268163d..fa666a9 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -90,4 +90,8 @@ config OF_PCI_IRQ
->  	help
->  	  OpenFirmware PCI IRQ routing helpers
->  
-> +config OF_MTD
-> +	depends on MTD
-> +	def_bool y
-> +
->  endmenu # OF
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index a73f5a5..8c4980a 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -12,3 +12,4 @@ obj-$(CONFIG_OF_SELFTEST) += selftest.o
->  obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
->  obj-$(CONFIG_OF_PCI)	+= of_pci.o
->  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
-> +obj-$(CONFIG_OF_NET)	+= of_mtd.o
-> diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
-> new file mode 100644
-> index 0000000..199bf58
-> --- /dev/null
-> +++ b/drivers/of/of_mtd.c
-> @@ -0,0 +1,90 @@
-> +/*
-> + * Copyright 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> + *
-> + * OF helpers for mtd.
-> + *
-> + * This file is released under the GPLv2
-> + *
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/of_mtd.h>
-> +#include <linux/mtd/nand.h>
-> +#include <linux/export.h>
-> +
-> +/**
-> + * It maps 'enum nand_ecc_modes_t' found in include/linux/mtd/nand.h
-> + * into the device tree binding of 'phy-mode', so that Ethernet
-> + * device driver can get phy interface from device tree.
-> + */
-> +static const char *nand_ecc_modes[] = {
-> +	[NAND_ECC_NONE]		= "none",
-> +	[NAND_ECC_SOFT]		= "soft",
-> +	[NAND_ECC_HW]		= "hw",
-> +	[NAND_ECC_HW_SYNDROME]	= "hw_syndrome",
-> +	[NAND_ECC_HW_OOB_FIRST]	= "hw_oob_first",
-> +	[NAND_ECC_SOFT_BCH]	= "soft_bch",
-> +};
-> +
-> +/**
-> + * of_get_nand_ecc_mode - Get nand ecc mode for given device_node
-> + * @np:	Pointer to the given device_node
-> + *
-> + * The function gets ecc mode string from property 'nand-ecc-mode',
-> + * and return its index in nand_ecc_modes table, or errno in error case.
-> + */
-> +const int of_get_nand_ecc_mode(struct device_node *np)
-> +{
-> +	const char *pm;
-> +	int err, i;
-> +
-> +	err = of_property_read_string(np, "nand-ecc-mode", &pm);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(nand_ecc_modes); i++)
-> +		if (!strcasecmp(pm, nand_ecc_modes[i]))
-> +			return i;
-> +
-> +	return -ENODEV;
-> +}
-> +EXPORT_SYMBOL_GPL(of_get_nand_ecc_mode);
-> +
-> +/**
-> + * of_get_nand_bus_width - Get nand bus witdh for given device_node
-> + * @np:	Pointer to the given device_node
-> + *
-> + * return bus width option, or errno in error case.
-> + */
-> +int of_get_nand_bus_width(struct device_node *np)
-> +{
-> +	u32 val;
-> +
-> +	if (of_property_read_u32(np, "nand-bus-width", &val))
-> +		return 8;
-> +
-> +	switch(val) {
-> +	case 8:
-> +	case 16:
-> +		return val;
-> +	default:
-> +		return -EIO;
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(of_get_nand_bus_width);
-> +
-> +/**
-> + * of_get_nand_on_flash_bbt - Get nand on flash bbt for given device_node
-> + * @np:	Pointer to the given device_node
-> + *
-> + * return true if 1 false other wise
-> + */
-> +bool of_get_nand_on_flash_bbt(struct device_node *np)
-> +{
-> +	u32 val;
-> +
-> +	if (of_property_read_u32(np, "nand-on-flash-bbt", &val))
-> +		return false;
-> +
-> +	return val ? true : false;
-> +}
-> +EXPORT_SYMBOL_GPL(of_get_nand_on_flash_bbt);
-> diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
-> new file mode 100644
-> index 0000000..bae1b60
-> --- /dev/null
-> +++ b/include/linux/of_mtd.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * Copyright 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> + *
-> + * OF helpers for mtd.
-> + *
-> + * This file is released under the GPLv2
-> + */
-> +
-> +#ifndef __LINUX_OF_MTD_H
-> +#define __LINUX_OF_NET_H
-> +
-> +#ifdef CONFIG_OF_MTD
-> +#include <linux/of.h>
-> +extern const int of_get_nand_ecc_mode(struct device_node *np);
-> +int of_get_nand_bus_width(struct device_node *np);
-> +bool of_get_nand_on_flash_bbt(struct device_node *np);
-> +#endif
-> +
-> +#endif /* __LINUX_OF_MTD_H */
-> -- 
-> 1.7.7
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Me neither, but do we have to handle all this parameters in DT? I
+> guess that most of the configuration will still be under driver
+> responsibility for the channel. The DMA controller itself can
+> clearly defined a bunch of parameters to expose its capabilities,
+> but again so far I do not have any clue about all these fancy DMA
+> controller variants. Some flexibility will clearly be needed, but
+> how far should we go?
+
+It goes as far as the binding author deems is appropriate.  For your
+case it sounds like 1 cell is sufficient, so go with that.  Just don't
+restrict other binding authors from encoding more (or less) data.
+Especially when it is trivial to allow #dma-cells != 1.
+
+g.
