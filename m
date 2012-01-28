@@ -1,45 +1,48 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 28 Jan 2012 11:29:47 -0700
-Subject: [PATCH 2/3] ARM: at91/tc: add device tree support to atmel_tclib
-In-Reply-To: <185a4d609becfcd60bbd15b09612160cf6ea9346.1326995849.git.nicolas.ferre@atmel.com>
+Date: Sat, 28 Jan 2012 11:31:01 -0700
+Subject: [PATCH 3/3] ARM: at91/tc/clocksource: Add 32 bit variant to
+ Timer Counter
+In-Reply-To: <d1105b63fce5787a4717ca92ad35397923078e99.1326995849.git.nicolas.ferre@atmel.com>
 References: <a311afe3c46da62f7a1e82d2fa933e24ad4eef7e.1326995849.git.nicolas.ferre@atmel.com>
- <185a4d609becfcd60bbd15b09612160cf6ea9346.1326995849.git.nicolas.ferre@atmel.com>
-Message-ID: <20120128182947.GA4053@ponder.secretlab.ca>
+ <d1105b63fce5787a4717ca92ad35397923078e99.1326995849.git.nicolas.ferre@atmel.com>
+Message-ID: <20120128183101.GE2501@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 07:05:11PM +0100, Nicolas Ferre wrote:
-> Device tree support added to atmel_tclib: the generic Timer Counter
-> library. This is used by the clocksource/clockevent driver tcb_clksrc.
+On Thu, Jan 19, 2012 at 07:05:12PM +0100, Nicolas Ferre wrote:
+> Some SoC have a 32 bit variant of Timer Counter Blocks. We do not
+> need the chaining of two 16 bit counters anymore for them.
 > 
-> The current DT enabled platforms are also modified to use it:
-> - .dtsi files are modified to add Timer Counter Block entries
-> - alias are created to allow identification of each block
-> - clkdev lookup tables are added for clocks identification.
+> The SoC nature is deduced from the device tree "compatible" string.
+> For non-device-tree configurations, backward compatibility is maintained
+> by using the default 16 bit counter configuration.
+> 
+> This patch addresses both the atmel_tclib and its user: tcb_clksrc
+> clocksource.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-...
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 545bbe9..a0a217d 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -995,8 +995,25 @@ static struct platform_device at91sam9g45_tcb1_device = {
->  	.num_resources	= ARRAY_SIZE(tcb1_resources),
->  };
->  
-> +#if defined(CONFIG_OF)
-> +static struct of_device_id tcb_ids[] = {
-> +	{ .compatible = "atmel,at91rm9200-tcb" },
-> +	{ /*sentinel*/ }
-> +};
-> +#endif
-> +
 
-Where is the documentation for this new binding?  Every new binding must
-be documented in Documentation/devicetree/bindings, even if it is just a
-short file listing all the trivial (only reg and irq) bindings used by
-atmel devices.
+Looks reasonable to me.  One comment below, but otherwise:
 
-Otherwise this looks fine and you can add my Acked-by:
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+>  static const struct of_device_id atmel_tcb_dt_ids[] = {
+>  	{
+>  		.compatible = "atmel,at91rm9200-tcb",
+> +		.data = &tcb_rm9200_config,
+> +	}, {
+> +		.compatible = "atmel,at91sam9x5-tcb",
+> +		.data = &tcb_sam9x5_config,
+>  	}, {
+>  		/* sentinel */
+>  	}
+
+Using wildcards ('x') in compatible values is strongly discouraged.
+Use specific device names instead.  You never know when a vendor may
+introduce another part number that fits with the wildcard, but isn't
+actually compatible.
+
+Use the exact device name(s) and newer devices can claim compatibility
+with the old in the .dts file.
 
 g.
