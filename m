@@ -1,46 +1,51 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 28 Jan 2012 11:41:50 +0100
-Subject: [PATCH] Fix LPC32XX's clock.c
-In-Reply-To: <20120127223211.GA27425@pengutronix.de>
-References: <1327673868-19741-1-git-send-email-stigge@antcom.de>
- <20120127223211.GA27425@pengutronix.de>
-Message-ID: <4F23D0EE.8000103@antcom.de>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 28 Jan 2012 19:05:19 +0530
+Subject: [PATCHv2 0/6] ARM: jump label support
+Message-ID: <1327757725-10114-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/12 23:32, Wolfram Sang wrote:
->> [clock.c]
-> This needs to be split up further to make reviewing easier, I'd
-> say. From a glimpse, I'd guess:
-> 
-> - locking changes - usb fixes - adding MLC NAND - adding ADC
+v2:
+ - Use helper macros from Dave Martin's "ARM: Add generic instruction opcode
+   manipulation helpers"
+   http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7278/1
 
-OK, will separate things out. Can move over the changes for ADC and
-MLC NAND to the respected driver integration patches (following).
+ - Add compiler bug detection so the option is not visible on unsupported
+   compilers
 
-> I dunno, maybe the NXP git has the incremental changes? You should
-> really CC Kevin Wells on your patches. Maybe he will wake up again,
-> at least with some additional informaition.
+ - patch.c: use uintptr_t, h for half-word, call cache_ops_need_broadcast()
+   only once
 
-Yes, I'm also re-forwarding all my integration patches to Kevin Wells
-and his colleagues at NXP who also committed to git.lpclinux.com in
-the past.
+ - Split ftrace.c patch into two
 
-The patches have different sources, all collected together now:
+ - Remove nop instruction; use mov r0, r0 instead
 
-* http://git.lpclinux.com/ (Kevin Wells et. al., NXP), repositories:
-  - linux-2.6.27.8-lpc32xx.git
-  - linux-2.6.34-lpc32xx.git
-  - linux-2.6.39.2-lpc.git
-* http://git.antcom.de/ (my repos)
-  - linux-2.6, branch work92105
+Rabin Vincent (6):
+  ARM: ftrace: remove useless memory checks
+  ARM: ftrace: use canonical Thumb-2 wide instruction format
+  ARM: extract out insn generation code from ftrace
+  ARM: extract out code patch function from kprobes
+  jump label: detect %c support for ARM
+  ARM: add jump label support
 
-I basically collected the most recent versions and fixes from the
-other different sources together and forward-ported to latest Linux
-mainline. (Currently works really well for the WORK Microwave devices
-based on LPC3250.) You can find many incremental changes in the above
-repositories hopefully clearing things up.
+ arch/arm/Kconfig                  |    1 +
+ arch/arm/include/asm/jump_label.h |   41 +++++++++++++++++
+ arch/arm/kernel/Makefile          |    9 +++-
+ arch/arm/kernel/ftrace.c          |   90 +++++++++---------------------------
+ arch/arm/kernel/insn.c            |   61 +++++++++++++++++++++++++
+ arch/arm/kernel/insn.h            |   29 ++++++++++++
+ arch/arm/kernel/jump_label.c      |   35 ++++++++++++++
+ arch/arm/kernel/kprobes.c         |   86 ++++++++++-------------------------
+ arch/arm/kernel/patch.c           |   73 ++++++++++++++++++++++++++++++
+ arch/arm/kernel/patch.h           |    7 +++
+ scripts/gcc-goto.sh               |   18 +++++++-
+ 11 files changed, 317 insertions(+), 133 deletions(-)
+ create mode 100644 arch/arm/include/asm/jump_label.h
+ create mode 100644 arch/arm/kernel/insn.c
+ create mode 100644 arch/arm/kernel/insn.h
+ create mode 100644 arch/arm/kernel/jump_label.c
+ create mode 100644 arch/arm/kernel/patch.c
+ create mode 100644 arch/arm/kernel/patch.h
 
-Thanks in advance,
-
-Roland
+-- 
+1.7.8.3
