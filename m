@@ -1,158 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 28 Jan 2012 12:38:26 -0600
-Subject: [PATCH v3 00/25] irq_domain generalization and refinement
-In-Reply-To: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <4F2440A2.5080601@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sat, 28 Jan 2012 20:57:14 +0200
+Subject: [Linaro-mm-sig] [PATCH 12/15] drivers: add Contiguous Memory
+ Allocator
+In-Reply-To: <010501ccdd06$b9844f20$2c8ced60$%szyprowski@samsung.com>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
+ <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
+ <00de01ccdce1$e7c8a360$b759ea20$%szyprowski@samsung.com>
+ <CAO8GWqnQg-W=TEc+CUc8hs=GrdCa9XCCWcedQx34cqURhNwNwA@mail.gmail.com>
+ <010301ccdd03$1ad15ab0$50741010$%szyprowski@samsung.com>
+ <CAK=WgbZWHBKNQwcoY9OiXXH-r1n3XxB=ZODZJN-3vZopU2yhJA@mail.gmail.com>
+ <010501ccdd06$b9844f20$2c8ced60$%szyprowski@samsung.com>
+Message-ID: <CAK=WgbY3L7u0AC1c=iNvoMXX+LSJoz1W-xb=S6gmhqcse5CKaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2012 03:35 PM, Grant Likely wrote:
-> Hey everyone,
-> 
-> This patch series is ready for much wider consumption now.  I'd like
-> to get it into linux-next ASAP because there will be ARM board support
-> depending on it.  I'll wait a few days before I ask Stephen to pull
-> this in.
-> 
-> Stephen/Milton/Ben, any testing you can help with here would be
-> appreciated since you've got access to a wider variety of Power
-> machines than I do.
-> 
-> Thomas, I think it makes sense to maintain this in a separate branch
-> from other irq changes until the next merge window.  If you prefer,
-> I'm happy to maintain this branch until then.
-> 
+Hi Marek,
 
-I picked up your irqdomain/next branch and it doesn't compile:
+On Fri, Jan 27, 2012 at 5:17 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> There have been some vmalloc layout changes merged to v3.3-rc1.
 
-  CC      kernel/irq/irqdomain.o
-kernel/irq/irqdomain.c: In function ?irq_create_mapping?:
-kernel/irq/irqdomain.c:403:47: error: ?irq? undeclared (first use in
-this function)
-kernel/irq/irqdomain.c:403:47: note: each undeclared identifier is
-reported only once for each function it app
+That was dead-on, thanks a lot!
 
-Rob
+I did then bump into a different allocation failure which happened
+because dma_alloc_from_contiguous() computes 'mask' before capping the
+'align' argument.
 
-> Cheers,
-> g.
-> 
-> The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-> 
->   Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-> 
-> are available in the git repository at:
->   git://git.secretlab.ca/git/linux-2.6 irqdomain/next
-> 
-> Grant Likely (24):
->       irq_domain: add documentation and MAINTAINERS entry.
->       dt: Make irqdomain less verbose
->       irq_domain: Make irq_domain structure match powerpc's irq_host
->       irq_domain: convert microblaze from irq_host to irq_domain
->       irq_domain/powerpc: Use common irq_domain structure instead of irq_host
->       irq_domain/powerpc: eliminate irq_map; use irq_alloc_desc() instead
->       irq_domain/powerpc: Eliminate virq_is_host()
->       irq_domain: Move irq_domain code from powerpc to kernel/irq
->       irqdomain: remove NO_IRQ from irq domain code
->       irq_domain: Remove references to old irq_host names
->       irq_domain: Replace irq_alloc_host() with revmap-specific initializers
->       irq_domain: Add support for base irq and hwirq in legacy mappings
->       irq_domain: Remove 'new' irq_domain in favour of the ppc one
->       irq_domain: Remove irq_domain_add_simple()
->       irq_domain: Create common xlate functions that device drivers can use
->       irq_domain: constify irq_domain_ops
->       irq_domain/c6x: constify irq_domain structures
->       irq_domain/c6x: Use library of xlate functions
->       irq_domain/powerpc: constify irq_domain_ops
->       irqdomain/powerpc: Replace custom xlate functions with library functions
->       irq_domain/x86: Convert x86 (embedded) to use common irq_domain
->       irq_domain: Include hwirq number in /proc/interrupts
->       irq_domain: remove "hint" when allocating irq numbers
->       irq_domain: mostly eliminate slow-path revmap lookups
-> 
-> Mark Salter (1):
->       irq_domain/c6x: Convert c6x to use generic irq_domain support.
-> 
->  Documentation/IRQ-domain.txt                     |  113 +++
->  MAINTAINERS                                      |    9 +
->  arch/arm/common/gic.c                            |   95 ++--
->  arch/arm/common/vic.c                            |   16 +-
->  arch/arm/include/asm/hardware/gic.h              |    4 +-
->  arch/arm/include/asm/hardware/vic.h              |    2 +
->  arch/arm/mach-exynos/common.c                    |    2 +-
->  arch/arm/mach-imx/mach-imx6q.c                   |    3 +-
->  arch/arm/mach-msm/board-msm8x60.c                |    8 +-
->  arch/arm/mach-mx5/imx51-dt.c                     |    4 +-
->  arch/arm/mach-mx5/imx53-dt.c                     |    4 +-
->  arch/arm/mach-omap2/board-generic.c              |    2 +-
->  arch/arm/mach-prima2/irq.c                       |    2 +-
->  arch/arm/mach-versatile/core.c                   |    5 +-
->  arch/c6x/Kconfig                                 |    1 +
->  arch/c6x/include/asm/irq.h                       |  245 +-------
->  arch/c6x/kernel/irq.c                            |  612 +----------------
->  arch/c6x/platforms/megamod-pic.c                 |   25 +-
->  arch/microblaze/include/asm/irq.h                |    4 +-
->  arch/microblaze/kernel/irq.c                     |    2 +-
->  arch/microblaze/kernel/setup.c                   |    2 -
->  arch/powerpc/Kconfig                             |    1 +
->  arch/powerpc/include/asm/ehv_pic.h               |    2 +-
->  arch/powerpc/include/asm/i8259.h                 |    2 +-
->  arch/powerpc/include/asm/irq.h                   |  247 +-------
->  arch/powerpc/include/asm/mpic.h                  |    2 +-
->  arch/powerpc/include/asm/xics.h                  |    2 +-
->  arch/powerpc/kernel/irq.c                        |  617 +----------------
->  arch/powerpc/platforms/512x/mpc5121_ads_cpld.c   |   12 +-
->  arch/powerpc/platforms/52xx/media5200.c          |   15 +-
->  arch/powerpc/platforms/52xx/mpc52xx_gpt.c        |   16 +-
->  arch/powerpc/platforms/52xx/mpc52xx_pic.c        |   12 +-
->  arch/powerpc/platforms/82xx/pq2ads-pci-pic.c     |   14 +-
->  arch/powerpc/platforms/85xx/socrates_fpga_pic.c  |   15 +-
->  arch/powerpc/platforms/86xx/gef_pic.c            |   15 +-
->  arch/powerpc/platforms/cell/axon_msi.c           |   29 +-
->  arch/powerpc/platforms/cell/beat_interrupt.c     |   16 +-
->  arch/powerpc/platforms/cell/interrupt.c          |   16 +-
->  arch/powerpc/platforms/cell/spider-pic.c         |   14 +-
->  arch/powerpc/platforms/embedded6xx/flipper-pic.c |   30 +-
->  arch/powerpc/platforms/embedded6xx/hlwd-pic.c    |   35 +-
->  arch/powerpc/platforms/iseries/irq.c             |   11 +-
->  arch/powerpc/platforms/powermac/pic.c            |   26 +-
->  arch/powerpc/platforms/powermac/smp.c            |    9 +-
->  arch/powerpc/platforms/ps3/interrupt.c           |   11 +-
->  arch/powerpc/platforms/wsp/opb_pic.c             |   26 +-
->  arch/powerpc/sysdev/cpm1.c                       |    9 +-
->  arch/powerpc/sysdev/cpm2_pic.c                   |   23 +-
->  arch/powerpc/sysdev/ehv_pic.c                    |   14 +-
->  arch/powerpc/sysdev/fsl_msi.c                    |   10 +-
->  arch/powerpc/sysdev/fsl_msi.h                    |    2 +-
->  arch/powerpc/sysdev/i8259.c                      |   15 +-
->  arch/powerpc/sysdev/ipic.c                       |   31 +-
->  arch/powerpc/sysdev/ipic.h                       |    2 +-
->  arch/powerpc/sysdev/mpc8xx_pic.c                 |   11 +-
->  arch/powerpc/sysdev/mpic.c                       |   17 +-
->  arch/powerpc/sysdev/mpic_msi.c                   |    2 +-
->  arch/powerpc/sysdev/mv64x60_pic.c                |   11 +-
->  arch/powerpc/sysdev/qe_lib/qe_ic.c               |   26 +-
->  arch/powerpc/sysdev/qe_lib/qe_ic.h               |    2 +-
->  arch/powerpc/sysdev/tsi108_pci.c                 |   22 +-
->  arch/powerpc/sysdev/uic.c                        |   26 +-
->  arch/powerpc/sysdev/xics/xics-common.c           |   28 +-
->  arch/powerpc/sysdev/xilinx_intc.c                |   19 +-
->  arch/x86/Kconfig                                 |    2 +
->  arch/x86/include/asm/irq_controller.h            |   12 -
->  arch/x86/include/asm/prom.h                      |   10 -
->  arch/x86/kernel/devicetree.c                     |  101 +--
->  drivers/gpio/gpio-mpc8xxx.c                      |   30 +-
->  drivers/mfd/twl-core.c                           |   12 +-
->  drivers/net/phy/mdio-gpio.c                      |    4 +-
->  include/linux/irqdomain.h                        |  190 ++++--
->  kernel/irq/irqdomain.c                           |  816 +++++++++++++++++++---
->  kernel/irq/proc.c                                |    3 +
->  74 files changed, 1334 insertions(+), 2471 deletions(-)
->  create mode 100644 Documentation/IRQ-domain.txt
->  delete mode 100644 arch/x86/include/asm/irq_controller.h
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+The early 'mask' computation was added in v18 (and therefore exists in
+v19 too) and I was actually testing v17 previously, so I didn't notice
+it before.
+
+You may want to squash something like this:
+
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index f41e699..8455cb7 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -319,8 +319,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, i
+                                       unsigned int align)
+ {
+        struct cma *cma = dev_get_cma_area(dev);
+-       unsigned long pfn, pageno, start = 0;
+-       unsigned long mask = (1 << align) - 1;
++       unsigned long mask, pfn, pageno, start = 0;
+        int ret;
+
+        if (!cma || !cma->count)
+@@ -329,6 +328,8 @@ struct page *dma_alloc_from_contiguous(struct device *dev, i
+        if (align > CONFIG_CMA_ALIGNMENT)
+                align = CONFIG_CMA_ALIGNMENT;
+
++       mask = (1 << align) - 1;
++
+        pr_debug("%s(cma %p, count %d, align %d)\n", __func__, (void *)cma,
+                 count, align);
+
+Thanks,
+Ohad.
