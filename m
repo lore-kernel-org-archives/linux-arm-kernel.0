@@ -1,20 +1,23 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 28 Jan 2012 07:53:21 +0100
-Subject: [PATCH] ARM: at91: USB AT91 gadget registration for module
-In-Reply-To: <1327660087-20864-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1327660087-20864-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20120128065321.GA705@game.jcrosoft.org>
+Date: Sat, 28 Jan 2012 08:01:10 +0100
+Subject: [PATCH 1/3] ARM: at91/tclib: take iomem size from resource
+In-Reply-To: <a311afe3c46da62f7a1e82d2fa933e24ad4eef7e.1326995849.git.nicolas.ferre@atmel.com>
+References: <1326996312-9244-1-git-send-email-nicolas.ferre@atmel.com>
+ <a311afe3c46da62f7a1e82d2fa933e24ad4eef7e.1326995849.git.nicolas.ferre@atmel.com>
+Message-ID: <20120128070110.GB705@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:28 Fri 27 Jan     , Nicolas Ferre wrote:
-> Registration of at91_udc as a module will enable SoC
-> related code.
+On 19:05 Thu 19 Jan     , Nicolas Ferre wrote:
+> Requesting iomem region and ioremaping is now done using
+> the resource size specified instead of a constant value.
 > 
-> Fix following an idea from Karel Znamenacek.
+> Each <SoC>_device.c file is modified accordingly to reflect
+> actual user interface size.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: stable <stable@vger.kernel.org>
+this is a fix shoud go for 3.3
+
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
 Best Regards,
