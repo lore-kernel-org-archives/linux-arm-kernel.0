@@ -1,47 +1,37 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 28 Jan 2012 22:58:35 +0800
-Subject: tegra3 vSMP cpu hotplug and LP=>G & G=>LP switch
-Message-ID: <CAGsJ_4y1t7Hp5RwUms1r04max98-edeDhag4o520jYJ3T+7t-g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Jan 2012 16:00:11 +0000
+Subject: [PATCH] Fix LPC32XX's clock.c
+In-Reply-To: <1327673868-19741-1-git-send-email-stigge@antcom.de>
+References: <1327673868-19741-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120128160011.GA15455@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi guys,
-As tegra3 is using vSMP (Variable Symmetric Multiprocessing) arch,
-there are 4 high-performance(G) cores and one low-power(LP) core. At
-runtime, both cpu dynamic hotplug and dynamic LP/G swith are used in a
-real tegra3 product as a DVFS way to save power. kernel log in EeePad:
-*cpu dynamic hotplug*
-<4>[104626.426957] CPU1: Booted secondary processor
-<7>[104627.427412] tegra CPU: force EDP limit 720000 kHz
-<4>[104627.427670] CPU2: Booted secondary processor
-<4>[104628.537005] stop_machine_cpu_stop cpu=0
-<4>[104628.537017] stop_machine_cpu_stop cpu=2
-<4>[104628.537059] stop_machine_cpu_stop cpu=1
-<4>[104628.537702] __stop_cpus: wait_for_completion_timeout+
-<4>[104628.537810] __stop_cpus: smp=0 done.executed=1 done.ret =0-
-<5>[104628.537960] CPU1: clean shutdown
-<4>[104630.537092] stop_machine_cpu_stop cpu=0
-<4>[104630.537172] stop_machine_cpu_stop cpu=2
-<4>[104630.537739] __stop_cpus: wait_for_completion_timeout+
-<4>[104630.538060] __stop_cpus: smp=0 done.executed=1 done.ret =0-
-<5>[104630.538203] CPU2: clean shutdown
-<4>[104631.306984] tegra_watchdog_touch
+On Fri, Jan 27, 2012 at 03:17:48PM +0100, Roland Stigge wrote:
+> @@ -382,30 +388,62 @@ static u32 local_clk_usbpll_setup(struct clk_pll_setup *pHCLKPllSetup)
+>  static int local_usbpll_enable(struct clk *clk, int enable)
+>  {
+>  	u32 reg;
+> -	int ret = -ENODEV;
+> -	unsigned long timeout = 1 + msecs_to_jiffies(10);
+> +	int ret = 0;
+> +	unsigned long timeout = jiffies + msecs_to_jiffies(20);
 
-*G<->LP switch*
-<3>[104666.799152] LP=>G: prolog 22 us, switch 2129 us, epilog 24 us,
-total 2175 us
-<3>[104667.807273] G=>LP: prolog 18 us, switch 157 us, epilog 25 us,
-total 200 us
-<4>[104671.407008] tegra_watchdog_touch
-<4>[104671.408816] nct1008_get_temp: ret temp=35C
-<3>[104671.939060] LP=>G: prolog 17 us, switch 2127 us, epilog 22 us,
-total 2166 us
-<3>[104672.938091] G=>LP: prolog 18 us, switch 156 us, epilog 24 us,
-total 198 us
+...
 
-Related codes don't exist in both http://nv-tegra.nvidia.com/gitweb
-and kernel org, any people know the address to locate these kernel
-source codes?
+> -		/* Wait for PLL lock */
+> -		while ((timeout > jiffies) & (ret == -ENODEV)) {
+> +		/*
+> +		 * Enable PLL
+> +		 */
+> +		reg |= LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP;
+> +		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
+> +
+> +		/*
+> +		 * Wait for PLL to lock
+> +		 */
+> +		while ((timeout > jiffies) && (ret == -ENODEV)) {
 
-Thanks
-barry
+This is buggy - it's waiting to go wrong when jiffies wraps.  You really
+want to use time_before() or time_after() to make these comparisons, which
+are safe against wrap-around.
