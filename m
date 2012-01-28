@@ -1,188 +1,275 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 28 Jan 2012 06:10:42 +0100
-Subject: [FOR 3.4 PATCH 4/6] of/mtd/nand: add generic bindings and helpers
+Date: Sat, 28 Jan 2012 06:10:44 +0100
+Subject: [FOR 3.4 PATCH 6/6] ARM: at91: board-dt nand switch to DT
 In-Reply-To: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
 References: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1327727444-23908-4-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1327727444-23908-6-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- nand-ecc-mode : String, operation mode of the NAND ecc mode.
-  Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
-  "soft_bch".
-- nand-bus-width : 8 or 16 bus width if not present 8
-- nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
+remove the C nand devices registration
+
+until we have the pinmux support let the bootloader initialise the pin
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-mtd at lists.infradead.org
 ---
- Documentation/devicetree/bindings/mtd/nand.txt |    7 ++
- drivers/of/Kconfig                             |    4 +
- drivers/of/Makefile                            |    1 +
- drivers/of/of_mtd.c                            |   90 ++++++++++++++++++++++++
- include/linux/of_mtd.h                         |   19 +++++
- 5 files changed, 121 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/nand.txt
- create mode 100644 drivers/of/of_mtd.c
- create mode 100644 include/linux/of_mtd.h
+ arch/arm/boot/dts/at91sam9g20.dtsi     |   17 ++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi     |   15 +++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |   27 ++++++++++++++++-
+ arch/arm/boot/dts/usb_a9g20.dts        |   46 +++++++++++++++++++++++++++-
+ arch/arm/mach-at91/board-dt.c          |   52 --------------------------------
+ 5 files changed, 103 insertions(+), 54 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
-new file mode 100644
-index 0000000..03855c8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/nand.txt
-@@ -0,0 +1,7 @@
-+* MTD generic binding
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 557b91f..dfbd4fb 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -178,6 +178,23 @@
+ 				interrupts = <20>;
+ 				status = "disabled";
+ 			};
 +
-+- nand-ecc-mode : String, operation mode of the NAND ecc mode.
-+  Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
-+  "soft_bch".
-+- nand-bus-width : 8 or 16 bus width if not present 8
-+- nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index 268163d..fa666a9 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -90,4 +90,8 @@ config OF_PCI_IRQ
- 	help
- 	  OpenFirmware PCI IRQ routing helpers
++			nand0: nand at 40000000 {
++				compatible = "atmel,at91rm9200-nand";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x40000000 0x10000000
++				       0xffffe800 0x200
++				      >;
++				atmel,nand-addr-offset = <21>;
++				atmel,nand-cmd-offset = <22>;
++				gpios = <&pioC 13 0
++					 &pioC 14 0
++					 0
++					>;
++				status = "disabled";
++			};
++
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 179ea52..be88fc5 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -178,6 +178,21 @@
+ 				interrupts = <22>;
+ 				status = "disabled";
+ 			};
++
++			nand0: nand at 40000000 {
++				compatible = "atmel,at91rm9200-nand";
++				reg = <0x40000000 0x10000000
++				       0xffffe200 0x200
++				      >;
++				atmel,nand-addr-offset = <21>;
++				atmel,nand-cmd-offset = <22>;
++				gpios = <&pioC 8 0
++					 &pioC 14 0
++					 0
++					>;
++				status = "disabled";
++			};
++
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index e538da8..30d9cd7 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "atmel,at91sam9m10g45ek", "atmel,at91sam9g45", "atmel,at91sam9";
  
-+config OF_MTD
-+	depends on MTD
-+	def_bool y
+ 	chosen {
+-		bootargs = "mem=64M console=ttyS0,115200 mtdparts=atmel_nand:4M(bootstrap/uboot/kernel)ro,60M(rootfs),-(data) root=/dev/mtdblock1 rw rootfstype=jffs2";
++		bootargs = "mem=64M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=jffs2";
+ 	};
+ 
+ 	memory at 70000000 {
+@@ -36,6 +36,31 @@
+ 				status = "okay";
+ 			};
+ 
++			nand0: nand at 40000000 {
++				nand-bus-width = <8>;
++				nand-ecc-mode = "soft";
++				nand-on-flash-bbt = <1>;
++				status = "okay";
 +
- endmenu # OF
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index a73f5a5..8c4980a 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -12,3 +12,4 @@ obj-$(CONFIG_OF_SELFTEST) += selftest.o
- obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
- obj-$(CONFIG_OF_PCI)	+= of_pci.o
- obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
-+obj-$(CONFIG_OF_NET)	+= of_mtd.o
-diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
-new file mode 100644
-index 0000000..199bf58
---- /dev/null
-+++ b/drivers/of/of_mtd.c
-@@ -0,0 +1,90 @@
-+/*
-+ * Copyright 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * OF helpers for mtd.
-+ *
-+ * This file is released under the GPLv2
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/of_mtd.h>
-+#include <linux/mtd/nand.h>
-+#include <linux/export.h>
++				boot at 0 {
++					label = "bootstrap/uboot/kernel";
++					reg = <0x0 0x400000>;
++				};
 +
-+/**
-+ * It maps 'enum nand_ecc_modes_t' found in include/linux/mtd/nand.h
-+ * into the device tree binding of 'phy-mode', so that Ethernet
-+ * device driver can get phy interface from device tree.
-+ */
-+static const char *nand_ecc_modes[] = {
-+	[NAND_ECC_NONE]		= "none",
-+	[NAND_ECC_SOFT]		= "soft",
-+	[NAND_ECC_HW]		= "hw",
-+	[NAND_ECC_HW_SYNDROME]	= "hw_syndrome",
-+	[NAND_ECC_HW_OOB_FIRST]	= "hw_oob_first",
-+	[NAND_ECC_SOFT_BCH]	= "soft_bch",
-+};
++				rootfs at 400000 {
++					label = "rootfs";
++					reg = <0x400000 0x3C00000>;
++				};
 +
-+/**
-+ * of_get_nand_ecc_mode - Get nand ecc mode for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * The function gets ecc mode string from property 'nand-ecc-mode',
-+ * and return its index in nand_ecc_modes table, or errno in error case.
-+ */
-+const int of_get_nand_ecc_mode(struct device_node *np)
-+{
-+	const char *pm;
-+	int err, i;
++				data at 4000000 {
++					label = "data";
++					reg = <0x4000000 0xC000000>;
++				};
 +
-+	err = of_property_read_string(np, "nand-ecc-mode", &pm);
-+	if (err < 0)
-+		return err;
++			};
++		};
++	};
 +
-+	for (i = 0; i < ARRAY_SIZE(nand_ecc_modes); i++)
-+		if (!strcasecmp(pm, nand_ecc_modes[i]))
-+			return i;
+ 			usb0: ohci at 00700000 {
+ 				status = "okay";
+ 				num-ports = <2>;
+diff --git a/arch/arm/boot/dts/usb_a9g20.dts b/arch/arm/boot/dts/usb_a9g20.dts
+index 073afe4e..cf0fda2 100644
+--- a/arch/arm/boot/dts/usb_a9g20.dts
++++ b/arch/arm/boot/dts/usb_a9g20.dts
+@@ -13,7 +13,7 @@
+ 	compatible = "calao,usb-a9g20", "atmel,at91sam9g20", "atmel,at91sam9";
+ 
+ 	chosen {
+-		bootargs = "mem=64M console=ttyS0,115200 mtdparts=atmel_nand:128k(at91bootstrap),256k(barebox)ro,128k(bareboxenv),128k(bareboxenv2),4M(kernel),120M(rootfs),-(data) root=/dev/mtdblock5 rw rootfstype=ubifs";
++		bootargs = "mem=64M console=ttyS0,115200 root=/dev/mtdblock5 rw rootfstype=ubifs";
+ 	};
+ 
+ 	memory at 20000000 {
+@@ -35,6 +35,50 @@
+ 				num-ports = <2>;
+ 				status = "okay";
+ 			};
 +
-+	return -ENODEV;
-+}
-+EXPORT_SYMBOL_GPL(of_get_nand_ecc_mode);
++			nand0: nand at 40000000 {
++				nand-bus-width = <8>;
++				nand-ecc-mode = "soft";
++				nand-on-flash-bbt = <1>;
++				status = "okay";
 +
-+/**
-+ * of_get_nand_bus_width - Get nand bus witdh for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * return bus width option, or errno in error case.
-+ */
-+int of_get_nand_bus_width(struct device_node *np)
-+{
-+	u32 val;
++				at91bootstrap at 0 {
++					label = "at91bootstrap";
++					reg = <0x0 0x20000>;
++				};
 +
-+	if (of_property_read_u32(np, "nand-bus-width", &val))
-+		return 8;
++				barebox at 20000 {
++					label = "barebox";
++					reg = <0x20000 0x40000>;
++				};
 +
-+	switch(val) {
-+	case 8:
-+	case 16:
-+		return val;
-+	default:
-+		return -EIO;
-+	}
-+}
-+EXPORT_SYMBOL_GPL(of_get_nand_bus_width);
++				bareboxenv at 60000 {
++					label = "bareboxenv";
++					reg = <0x60000 0x20000>;
++				};
 +
-+/**
-+ * of_get_nand_on_flash_bbt - Get nand on flash bbt for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * return true if 1 false other wise
-+ */
-+bool of_get_nand_on_flash_bbt(struct device_node *np)
-+{
-+	u32 val;
++				bareboxenv2 at 80000 {
++					label = "bareboxenv2";
++					reg = <0x80000 0x20000>;
++				};
 +
-+	if (of_property_read_u32(np, "nand-on-flash-bbt", &val))
-+		return false;
++				kernel at a0000 {
++					label = "kernel";
++					reg = <0xa0000 0x400000>;
++				};
 +
-+	return val ? true : false;
-+}
-+EXPORT_SYMBOL_GPL(of_get_nand_on_flash_bbt);
-diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
-new file mode 100644
-index 0000000..bae1b60
---- /dev/null
-+++ b/include/linux/of_mtd.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * OF helpers for mtd.
-+ *
-+ * This file is released under the GPLv2
-+ */
++				rootfs at 4a0000 {
++					label = "rootfs";
++					reg = <0x4a0000 0x7800000>;
++				};
 +
-+#ifndef __LINUX_OF_MTD_H
-+#define __LINUX_OF_NET_H
++				data at 7ca0000 {
++					label = "data";
++					reg = <0x7ca0000 0x8360000>;
++				};
 +
-+#ifdef CONFIG_OF_MTD
-+#include <linux/of.h>
-+extern const int of_get_nand_ecc_mode(struct device_node *np);
-+int of_get_nand_bus_width(struct device_node *np);
-+bool of_get_nand_on_flash_bbt(struct device_node *np);
-+#endif
++			};
 +
-+#endif /* __LINUX_OF_MTD_H */
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+index a42cad8..6aaec27 100644
+--- a/arch/arm/mach-at91/board-dt.c
++++ b/arch/arm/mach-at91/board-dt.c
+@@ -19,10 +19,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ 
+-#include <mach/hardware.h>
+ #include <mach/board.h>
+-#include <mach/system_rev.h>
+-#include <mach/at91sam9_smc.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/irq.h>
+@@ -30,10 +27,8 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+ 
+-#include "sam9_smc.h"
+ #include "generic.h"
+ 
+-
+ static void __init ek_init_early(void)
+ {
+ 	/* Initialize processor: 12.000 MHz crystal */
+@@ -46,50 +41,6 @@ static void __init ek_init_early(void)
+ 	at91_set_serial_console(0);
+ }
+ 
+-/* det_pin is not connected */
+-static struct atmel_nand_data __initdata ek_nand_data = {
+-	.ale		= 21,
+-	.cle		= 22,
+-	.det_pin	= -EINVAL,
+-	.rdy_pin	= AT91_PIN_PC8,
+-	.enable_pin	= AT91_PIN_PC14,
+-	.ecc_mode	= NAND_ECC_SOFT,
+-	.on_flash_bbt	= 1,
+-};
+-
+-static struct sam9_smc_config __initdata ek_nand_smc_config = {
+-	.ncs_read_setup		= 0,
+-	.nrd_setup		= 2,
+-	.ncs_write_setup	= 0,
+-	.nwe_setup		= 2,
+-
+-	.ncs_read_pulse		= 4,
+-	.nrd_pulse		= 4,
+-	.ncs_write_pulse	= 4,
+-	.nwe_pulse		= 4,
+-
+-	.read_cycle		= 7,
+-	.write_cycle		= 7,
+-
+-	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE | AT91_SMC_EXNWMODE_DISABLE,
+-	.tdf_cycles		= 3,
+-};
+-
+-static void __init ek_add_device_nand(void)
+-{
+-	ek_nand_data.bus_width_16 = board_have_nand_16bit();
+-	/* setup bus-width (8 or 16) */
+-	if (ek_nand_data.bus_width_16)
+-		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
+-	else
+-		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+-
+-	/* configure chip-select 3 (NAND) */
+-	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+-
+-	at91_add_device_nand(&ek_nand_data);
+-}
+-
+ static const struct of_device_id aic_of_match[] __initconst = {
+ 	{ .compatible = "atmel,at91rm9200-aic", },
+ 	{},
+@@ -104,9 +55,6 @@ static void __init at91_dt_init_irq(void)
+ static void __init at91_dt_device_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-
+-	/* NAND */
+-	ek_add_device_nand();
+ }
+ 
+ static const char *at91_dt_board_compat[] __initdata = {
 -- 
 1.7.7
