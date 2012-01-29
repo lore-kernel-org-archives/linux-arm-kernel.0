@@ -1,41 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 29 Jan 2012 20:51:46 +0000
-Subject: [PATCHv19 00/15] Contiguous Memory Allocator
-In-Reply-To: <20120127162624.40cba14e.akpm@linux-foundation.org>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <201201261531.40551.arnd@arndb.de>
- <20120127162624.40cba14e.akpm@linux-foundation.org>
-Message-ID: <201201292051.46297.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 29 Jan 2012 14:30:20 -0800
+Subject: [PATCH 3/3] ARM: mx3: Let mx31 and mx35 enter in LPM mode in WFI
+In-Reply-To: <1327084990-25402-3-git-send-email-fabio.estevam@freescale.com>
+References: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
+ <1327084990-25402-3-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <CAOesGMhiSB2G7ffD7BLDVrqgQCLg5t+YU+=JZt6xfk4SFTjnpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 January 2012, Andrew Morton wrote:
-> These patches don't seem to have as many acked-bys and reviewed-bys as
-> I'd expect.  Given the scope and duration of this, it would be useful
-> to gather these up.  But please ensure they are real ones - people
-> sometimes like to ack things without showing much sign of having
-> actually read them.
+Hi,
 
-I reviewed early versions of this patch set and had a lot of comments on the
-interfaces that were exposed to device drivers and platform maintainers.
+Sorry for the late comment, I just saw this patch as I got the pull
+request from Sascha (I'll comment on that too), but the below sticks
+out:
 
-All of the comments were addressed back then and I gave an Acked-by.
-I assume that it was dropped in subsequent versions because the
-implementation changed significantly since, but I'm still happy with the
-way this looks to the user, in particular that it is practically invisible
-because all users just go through the dma mapping API instead of the
-horrors that were used in the original patches.
 
->From an ARM architecture perspective, we have come to the point (some
-versions ago) where we actually require the CMA patchset for correctness,
-even on IOMMU based systems because it avoids some nasty corner cases
-with pages that are both in the linear kernel mapping and in an
-uncached mapping for DMA: We know that the code we are using in mainline
-is broken on ARMv6 and later and that CMA fixes that problem.
+On Fri, Jan 20, 2012 at 10:43 AM, Fabio Estevam
+<fabio.estevam@freescale.com> wrote:
 
-I'm not the right person to judge the memory management code changes,
-others need to comment on that. Aside from that:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> diff --git a/arch/arm/mach-imx/crmregs-imx3.h b/arch/arm/mach-imx/crmregs-imx3.h
+> index d7691e2..b4d2305 100644
+> --- a/arch/arm/mach-imx/crmregs-imx3.h
+> +++ b/arch/arm/mach-imx/crmregs-imx3.h
+> @@ -77,6 +77,7 @@ MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR) : MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR))
+> ?#define MXC_CCM_CCMR_SSI2S_MASK ? ? ? ? ? ? ? ? (0x3 << 21)
+> ?#define MXC_CCM_CCMR_LPM_OFFSET ? ? ? ? ? ? ? ? 14
+> ?#define MXC_CCM_CCMR_LPM_MASK ? ? ? ? ? ? ? ? ? (0x3 << 14)
+> +#define MXC_CCM_CCMR_LPM_WAIT ?(cpu_is_mx35() ? (0x1 << 14) : 0)
+> ?#define MXC_CCM_CCMR_FIRS_OFFSET ? ? ? ? ? ? ? ?11
+> ?#define MXC_CCM_CCMR_FIRS_MASK ? ? ? ? ? ? ? ? ?(0x3 << 11)
+> ?#define MXC_CCM_CCMR_UPE ? ? ? ? ? ? ? ? ? ? ? ?(1 << 9)
 
-	Arnd
+This isn't a great idea -- constants like these should be static
+values. Since this is only used in one location, please just do a
+runtime check and either mask in the value or not.
+
+
+
+Thanks,
+
+-Olof
