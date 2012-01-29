@@ -1,40 +1,58 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Mon, 30 Jan 2012 09:51:04 +1100
-Subject: [PATCH 4/4] input: mc13xxx_ts: intersperse delays between ts samples
-In-Reply-To: <1327877464-23526-1-git-send-email-marc@cpdesign.com.au>
-References: <1327877464-23526-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1327877464-23526-5-git-send-email-marc@cpdesign.com.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 29 Jan 2012 14:52:31 -0800
+Subject: tegra3 vSMP cpu hotplug and LP=>G & G=>LP switch
+In-Reply-To: <CAGsJ_4y1t7Hp5RwUms1r04max98-edeDhag4o520jYJ3T+7t-g@mail.gmail.com>
+References: <CAGsJ_4y1t7Hp5RwUms1r04max98-edeDhag4o520jYJ3T+7t-g@mail.gmail.com>
+Message-ID: <CAOesGMiXxWuTva4D-keYeMD6LjFbrt9xtd8fjy_8gwDkf_ENbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mc13xxx ICs have the ability to add a small delay in between each
-sample taken in a set of TS samples. This allows time for the ts to be
-biased correctly, and improved accuracy of raw readings.
+On Sat, Jan 28, 2012 at 6:58 AM, Barry Song <21cnbao@gmail.com> wrote:
+> hi guys,
+> As tegra3 is using vSMP (Variable Symmetric Multiprocessing) arch,
+> there are 4 high-performance(G) cores and one low-power(LP) core. At
+> runtime, both cpu dynamic hotplug and dynamic LP/G swith are used in a
+> real tegra3 product as a DVFS way to save power. kernel log in EeePad:
+> *cpu dynamic hotplug*
+> <4>[104626.426957] CPU1: Booted secondary processor
+> <7>[104627.427412] tegra CPU: force EDP limit 720000 kHz
+> <4>[104627.427670] CPU2: Booted secondary processor
+> <4>[104628.537005] stop_machine_cpu_stop cpu=0
+> <4>[104628.537017] stop_machine_cpu_stop cpu=2
+> <4>[104628.537059] stop_machine_cpu_stop cpu=1
+> <4>[104628.537702] __stop_cpus: wait_for_completion_timeout+
+> <4>[104628.537810] __stop_cpus: smp=0 done.executed=1 done.ret =0-
+> <5>[104628.537960] CPU1: clean shutdown
+> <4>[104630.537092] stop_machine_cpu_stop cpu=0
+> <4>[104630.537172] stop_machine_cpu_stop cpu=2
+> <4>[104630.537739] __stop_cpus: wait_for_completion_timeout+
+> <4>[104630.538060] __stop_cpus: smp=0 done.executed=1 done.ret =0-
+> <5>[104630.538203] CPU2: clean shutdown
+> <4>[104631.306984] tegra_watchdog_touch
+>
+> *G<->LP switch*
+> <3>[104666.799152] LP=>G: prolog 22 us, switch 2129 us, epilog 24 us,
+> total 2175 us
+> <3>[104667.807273] G=>LP: prolog 18 us, switch 157 us, epilog 25 us,
+> total 200 us
+> <4>[104671.407008] tegra_watchdog_touch
+> <4>[104671.408816] nct1008_get_temp: ret temp=35C
+> <3>[104671.939060] LP=>G: prolog 17 us, switch 2127 us, epilog 22 us,
+> total 2166 us
+> <3>[104672.938091] G=>LP: prolog 18 us, switch 156 us, epilog 24 us,
+> total 198 us
+>
+> Related codes don't exist in both http://nv-tegra.nvidia.com/gitweb
+> and kernel org, any people know the address to locate these kernel
+> source codes?
 
-Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
----
- drivers/input/touchscreen/mc13xxx_ts.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/input/touchscreen/mc13xxx_ts.c b/drivers/input/touchscreen/mc13xxx_ts.c
-index 8924d66..f46e49d 100644
---- a/drivers/input/touchscreen/mc13xxx_ts.c
-+++ b/drivers/input/touchscreen/mc13xxx_ts.c
-@@ -197,9 +197,13 @@ static void mc13xxx_ts_work(struct work_struct *work)
- 		container_of(work, struct mc13xxx_ts_priv, work.work);
- 	unsigned int mode = MC13XXX_ADC_MODE_TS;
- 	unsigned int channel = 12;
-+	u32 adc1_mask = MC13XXX_ADC1_ATOX | MC13XXX_ADC1_ATO_MASK;
-+	u32 adc1_val = MC13XXX_ADC1_ATOX | (3 << MC13XXX_ADC1_ATO_SHIFT);
- 
--	if (mc13xxx_adc_do_conversion(priv->mc13xxx,
--				mode, channel, priv->sample) == 0) {
-+	if (mc13xxx_adc_do_conversion_ex(priv->mc13xxx,
-+				mode, channel, priv->sample,
-+				0, 0,
-+				adc1_mask, adc1_val) == 0) {
- 		mc13xxx_ts_report_sample(priv);
- 	} else {
- 		dev_warn(&priv->idev->dev, "bad conversion");
--- 
-1.7.3.4
+You need to contact the manufacturer of the device to get the exact
+sources (I expect).
+
+That being said, from a quick glance I found code that prints out
+those messages on the freshest branch (named rel-14r7) at
+nv-tegra.nvidia.com's linux-2.6 repo.
+
+
+-Olof
