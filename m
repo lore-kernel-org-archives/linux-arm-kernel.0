@@ -1,21 +1,21 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2012 14:43:21 -0800
-Subject: [GIT PULL] omap fixes for v3.3-rc1
-In-Reply-To: <20120127181619.GB9339@atomide.com>
-References: <20120127181619.GB9339@atomide.com>
-Message-ID: <CAOesGMjvRQo0SrEno0NPiTEAjT8J861VA6jhNMe3H9XWSBba0w@mail.gmail.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Mon, 30 Jan 2012 09:51:00 +1100
+Subject: mc13892 touchscreen support
+Message-ID: <1327877464-23526-1-git-send-email-marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 10:16 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Arnd & Olof,
->
-> Please pull omap fixes from:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
+Hi,
 
+This patch series adds touchscreen support for the mc13892 to the
+mc13873 driver. The driver is renamed to mc13xxx_ts to reflect this.
 
-Pulled, thanks!
+The first 3 patches apply cleanly to v3.2.
 
+The fourth patch allows setting the ATO and ATOX registers with each
+conversion. It requires another series I just posted [1].
 
--Olof
+Cheers,
+Marc
+
+[1] http://lists.arm.linux.org.uk/lurker/message/20120129.223322.722b7424.en.html
