@@ -1,48 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2012 14:39:37 -0800
-Subject: [GIT PULL] DaVinci fixes for v3.3-rc
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317A70FB@DBDE01.ent.ti.com>
-References: <DF0F476B391FA8409C78302C7BA518B6317A70FB@DBDE01.ent.ti.com>
-Message-ID: <CAOesGMgkkO1B7fk6gDYvh+N32rtzJuPB34Hyz=nQ2OimXU1azw@mail.gmail.com>
+Date: Sun, 29 Jan 2012 14:43:21 -0800
+Subject: [GIT PULL] omap fixes for v3.3-rc1
+In-Reply-To: <20120127181619.GB9339@atomide.com>
+References: <20120127181619.GB9339@atomide.com>
+Message-ID: <CAOesGMjvRQo0SrEno0NPiTEAjT8J861VA6jhNMe3H9XWSBba0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jan 27, 2012 at 9:26 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
-> Hi Olof, Arnd,
+On Fri, Jan 27, 2012 at 10:16 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi Arnd & Olof,
 >
-> Can you please pull these DaVinci fixes for the next v3.3-rc?
-> Both the patches have not been stable tagged. The fix by me
-> is a v3.3 regression. The fix by Bas van den Berg is not critical
-> enough to get into stable kernels.
+> Please pull omap fixes from:
 >
-> Thanks,
-> Sekhar
->
-> The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-> ?Linus Torvalds (1):
-> ? ? ? ?Linux 3.3-rc1
->
-> are available in the git repository at:
->
-> ?git://gitorious.org/linux-davinci/linux-davinci.git fixes
->
-> Bas van den Berg (1):
-> ? ? ?ARM: davinci: DA850: remove non-existing pll1_sysclk4-7 clocks
->
-> Sekhar Nori (1):
-> ? ? ?ARM: davinci: update mdio bus name
-
-Looks like the clock removal is almost crossing over into cleanup
-territory not a fix. In the future please help us out by briefly
-motivate why it's a fix (for something that is broken) and not a
-cleanup if it's not obvious from reading it -- noncritical fixes are
-usually saved for the next merge window instead.
-
-With that said; I've pulled the branch.
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
 
 
-Thanks!
+Pulled, thanks!
+
 
 -Olof
