@@ -1,43 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2012 14:30:20 -0800
-Subject: [PATCH 3/3] ARM: mx3: Let mx31 and mx35 enter in LPM mode in WFI
-In-Reply-To: <1327084990-25402-3-git-send-email-fabio.estevam@freescale.com>
-References: <1327084990-25402-1-git-send-email-fabio.estevam@freescale.com>
- <1327084990-25402-3-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <CAOesGMhiSB2G7ffD7BLDVrqgQCLg5t+YU+=JZt6xfk4SFTjnpg@mail.gmail.com>
+Date: Sun, 29 Jan 2012 14:32:46 -0800
+Subject: [GIT PULL] i.MX fixes for -rc
+In-Reply-To: <20120127111024.GB5446@pengutronix.de>
+References: <20120127111024.GB5446@pengutronix.de>
+Message-ID: <CAOesGMj4k3NcXMh3WtegJgejdDK1QntDnyudD6Ky8Ou6mN3cBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Sorry for the late comment, I just saw this patch as I got the pull
-request from Sascha (I'll comment on that too), but the below sticks
-out:
+On Fri, Jan 27, 2012 at 3:10 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+
+> Fabio Estevam (3):
+> ? ? ?ARM: mx3: Let mx31 and mx35 share the same CCM header file
+> ? ? ?ARM: mx3: Let mx31 and mx35 enter in LPM mode in WFI
+> ? ? ?ARM: imx_v4_v5_defconfig: Fix the selection of 32 bit flash support for iMX21ADS board
+
+The first two don't seem like fixes to me from a quick glance at them
+-- one is a cleanup, the other is a feature. If they are fixes, please
+help us out by motivating why they should go in during -rc instead of
+in the next merge window. Thanks!
 
 
-On Fri, Jan 20, 2012 at 10:43 AM, Fabio Estevam
-<fabio.estevam@freescale.com> wrote:
+Also, see separate comment on the second patch (replied in that thread).
 
 
-> diff --git a/arch/arm/mach-imx/crmregs-imx3.h b/arch/arm/mach-imx/crmregs-imx3.h
-> index d7691e2..b4d2305 100644
-> --- a/arch/arm/mach-imx/crmregs-imx3.h
-> +++ b/arch/arm/mach-imx/crmregs-imx3.h
-> @@ -77,6 +77,7 @@ MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR) : MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR))
-> ?#define MXC_CCM_CCMR_SSI2S_MASK ? ? ? ? ? ? ? ? (0x3 << 21)
-> ?#define MXC_CCM_CCMR_LPM_OFFSET ? ? ? ? ? ? ? ? 14
-> ?#define MXC_CCM_CCMR_LPM_MASK ? ? ? ? ? ? ? ? ? (0x3 << 14)
-> +#define MXC_CCM_CCMR_LPM_WAIT ?(cpu_is_mx35() ? (0x1 << 14) : 0)
-> ?#define MXC_CCM_CCMR_FIRS_OFFSET ? ? ? ? ? ? ? ?11
-> ?#define MXC_CCM_CCMR_FIRS_MASK ? ? ? ? ? ? ? ? ?(0x3 << 11)
-> ?#define MXC_CCM_CCMR_UPE ? ? ? ? ? ? ? ? ? ? ? ?(1 << 9)
-
-This isn't a great idea -- constants like these should be static
-values. Since this is only used in one location, please just do a
-runtime check and either mask in the value or not.
-
-
-
-Thanks,
+Regards,
 
 -Olof
