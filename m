@@ -1,55 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 29 Jan 2012 13:14:11 +0000
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 29 Jan 2012 14:22:17 +0100
 Subject: [PATCH] ARM: ioremap: fix boundary check when reusing static
  mapping
-In-Reply-To: <CAGhQ9VxzFZ32P08RPx8us4fE8xO3prXpM-fdWcsWWjWub4eC=w@mail.gmail.com>
+In-Reply-To: <20120129131411.GC15455@n2100.arm.linux.org.uk>
 References: <1327515419-14097-1-git-send-email-pawel.moll@arm.com>
  <alpine.LFD.2.02.1201251333230.2759@xanadu.home>
  <1327574142.2355.30.camel@hornet.cambridge.arm.com>
  <CAGhQ9Vzx9K3qvkEFv-YVsUAdMF4SC0t2dvuYaqfj2QtibBem7g@mail.gmail.com>
  <20120129001136.GB15455@n2100.arm.linux.org.uk>
  <CAGhQ9VxzFZ32P08RPx8us4fE8xO3prXpM-fdWcsWWjWub4eC=w@mail.gmail.com>
-Message-ID: <20120129131411.GC15455@n2100.arm.linux.org.uk>
+ <20120129131411.GC15455@n2100.arm.linux.org.uk>
+Message-ID: <CAGhQ9VwKoVz36EQJ1c2yTTY7NZjsJ9O-nQk-mTWW5nY4pZdMTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2012 at 02:10:34PM +0100, Joachim Eastwood wrote:
-> On Sun, Jan 29, 2012 at 1:11 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sat, Jan 28, 2012 at 11:55:19PM +0100, Joachim Eastwood wrote:
-> >> "ARM: 7304/1: ioremap: fix boundary check when reusing static mapping"
-> >> Commit: 3c424f359898aff48c3d5bed608ac706f8a528c3 in Linus master
-> >>
-> >> Breaks booting on my custom AT91RM9200 board.
-> >> There isn't any error messages or anything that indicates what goes
-> >> wrong it just stops after; Uncompressing Linux... done, booting the
-> >> kernel.
-> >
-> > Your best way of finding out what's going on is to enable:
-> >
-> > DEBUG_KERNEL
-> > DEBUG_LL
-> > EARLY_PRINTK
-> >
-> > and select the appropriate kernel low-level debugging port. ?That should
-> > show you what's going on.
-> 
-> Sadly, it doesn't make a difference. Still no output.
+On Sun, Jan 29, 2012 at 2:14 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jan 29, 2012 at 02:10:34PM +0100, Joachim Eastwood wrote:
+>> On Sun, Jan 29, 2012 at 1:11 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Sat, Jan 28, 2012 at 11:55:19PM +0100, Joachim Eastwood wrote:
+>> >> "ARM: 7304/1: ioremap: fix boundary check when reusing static mapping"
+>> >> Commit: 3c424f359898aff48c3d5bed608ac706f8a528c3 in Linus master
+>> >>
+>> >> Breaks booting on my custom AT91RM9200 board.
+>> >> There isn't any error messages or anything that indicates what goes
+>> >> wrong it just stops after; Uncompressing Linux... done, booting the
+>> >> kernel.
+>> >
+>> > Your best way of finding out what's going on is to enable:
+>> >
+>> > DEBUG_KERNEL
+>> > DEBUG_LL
+>> > EARLY_PRINTK
+>> >
+>> > and select the appropriate kernel low-level debugging port. ?That should
+>> > show you what's going on.
+>>
+>> Sadly, it doesn't make a difference. Still no output.
+>
+> Sorry, I missed that you also need 'earlyprintk' or something like that
+> on the command line. ?Alternatively, use the following patch, which IMHO
+> is a lot less error prone:
 
-Sorry, I missed that you also need 'earlyprintk' or something like that
-on the command line.  Alternatively, use the following patch, which IMHO
-is a lot less error prone:
+<snip patch>
 
-diff --git a/kernel/printk.c b/kernel/printk.c
-index b51b156..611e495 100644
---- a/kernel/printk.c
-+++ b/kernel/printk.c
-@@ -875,7 +875,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
- 	/* Emit the output into the temporary buffer */
- 	printed_len += vscnprintf(printk_buf + printed_len,
- 				  sizeof(printk_buf) - printed_len, fmt, args);
--
-+{ extern void printascii(const char *); printascii(printk_buf); }
- 	p = printk_buf;
- 
- 	/* Read log level and handle special printk prefix */
+The patch did the job. Thanks.
+
+Here is output:
+Uncompressing Linux... done, booting the kernel.
+<6>Booting Linux on physical CPU 0
+<5>Linux version 3.3.0-rc1-mpa+ (subcon at archspace) (gcc version 4.3.3
+(GCC) ) #179 PREEMPT Sun Jan 29 14:18:29 CET 2012
+CPU: ARM920T [41129200] revision 0 (ARMv4T), cr=c0007177
+CPU: VIVT data cache, VIVT instruction cache
+Machine: Phontech MPA 1600
+Memory policy: ECC disabled, Data cache writeback
+<6>AT91: Detected soc type: at91rm9200
+<6>AT91: Detected soc subtype: Unknown
+<6>AT91: sram at 0x200000 of 0x4000 mapped at 0xfef74000
+<7>On node 0 totalpages: 16384
+<7>free_area_init_node: node 0, pgdat c02c4e3c, node_mem_map c02d6000
+<7>  Normal zone: 128 pages used for memmap
+<7>  Normal zone: 0 pages reserved
+<7>  Normal zone: 16256 pages, LIFO batch:3
+<6>AT91: filled in soc subtype: at91rm9200 PQFP
+Clocks: CPU 179 MHz, master 59 MHz, main 18.432 MHz
+<6>gpiochip_add: registered GPIOs 0 to 31 on device: pioA
+<6>gpiochip_add: registered GPIOs 32 to 63 on device: pioB
+<6>gpiochip_add: registered GPIOs 64 to 95 on device: pioC
+<1>Unable to handle kernel paging request at virtual address fed73444
+<1>pgd = c0004000
+<1>[fed73444] *pgd=00000000
+<0>Internal error: Oops: 805 [#1] PREEMPT
+<d>Modules linked in:
+CPU: 0    Not tainted  (3.3.0-rc1-mpa+ #179)
+PC is at at91_set_A_periph+0x50/0x78
+LR is at at91_register_uart+0x54/0x1e8
+pc : [<c0010bf0>]    lr : [<c0293528>]    psr: 600000d3
+sp : c02abf50  ip : fed73400  fp : c02abf5c
+r10: 80000200  r9 : c0258fe4  r8 : c02bc594
+r7 : c02a34b4  r6 : c02ae848  r5 : 00000000  r4 : 00000000
+r3 : 00000060  r2 : 40000000  r1 : 00000000  r0 : 0000001e
+Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+Control: c000717f  Table: 20004000  DAC: 00000017
+<0>Process swapper (pid: 0, stack limit = 0xc02aa270)
+<0>Stack: (0xc02abf50 to 0xc02ac000)
+<0>bf40:                                     c02abf74 c02abf60 c0293528 c0010bb0
+<0>bf60: c0356220 c02cc5a0 c02abf84 c02abf78 c0293b34 c02934e4 c02abfc4 c02abf88
+<0>bf80: c02901a4 c0293b18 c0121c3c c0007177 41129200 c02a433c c02abfb4 00000001
+<0>bfa0: c02ac010 c02a4b40 c02ae7dc 20004000 41129200 202a3480 c02abff4 c02abfc8
+<0>bfc0: c028d624 c028fb4c 00000000 00000000 00000000 c02a473c c0007175 c02ac010
+<0>bfe0: c02a4b40 c02ae7dc 00000000 c02abff8 20008040 c028d5c0 00000000 00000000
+Backtrace:
+[<c0010ba0>] (at91_set_A_periph+0x0/0x78) from [<c0293528>]
+(at91_register_uart+0x54/0x1e8)
+[<c02934d4>] (at91_register_uart+0x0/0x1e8) from [<c0293b34>]
+(mpa1600_init_early+0x2c/0x4c)
+ r5:c02cc5a0 r4:c0356220
+[<c0293b08>] (mpa1600_init_early+0x0/0x4c) from [<c02901a4>]
+(setup_arch+0x668/0x76c)
+[<c028fb3c>] (setup_arch+0x0/0x76c) from [<c028d624>] (start_kernel+0x74/0x318)
+[<c028d5b0>] (start_kernel+0x0/0x318) from [<20008040>] (0x20008040)
+ r7:c02ae7dc r6:c02a4b40 r5:c02ac010 r4:c0007175
+<0>Code: e1a02312 e3510000 13a03064 03a03060 (e58c2044)
+<4>---[ end trace 1b75b31a2719ed1c ]---
+<0>Kernel panic - not syncing: Attempted to kill the idle task!
+
+regards
+Joachim Eastwood
