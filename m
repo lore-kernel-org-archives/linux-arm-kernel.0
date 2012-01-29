@@ -1,90 +1,114 @@
-From: gxt@pku.edu.cn (Guan Xuetao)
-Date: Sun, 29 Jan 2012 11:15:00 +0800
-Subject: [PATCH] davinci/unicore: Remove MISC_DEVICES selection
-In-Reply-To: <1327695009-20525-1-git-send-email-festevam@gmail.com>
-References: <1327695009-20525-1-git-send-email-festevam@gmail.com>
-Message-ID: <1327806900.2364.32.camel@epip-laptop>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 29 Jan 2012 12:47:27 +0800
+Subject: [PATCH v3 2/7] ARM: exynos: Modify to use new common cpuidle code.
+In-Reply-To: <1327379854-12403-3-git-send-email-rob.lee@linaro.org>
+References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
+ <1327379854-12403-3-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAGsJ_4yNhjXvg0qb+3PVu9BV2bYiFR07EJj_HxPkEo8W_omj3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-01-27 at 18:10 -0200, Fabio Estevam wrote:
-> Since commit 7c5763b8 (drivers: misc: Remove MISC_DEVICES config option)
-> MISC_DEVICES symbol is no longer present, so remove its selection
+2012/1/24 Robert Lee <rob.lee@linaro.org>:
+> Make necessary changes for consolidation with new common cpuidle code.
+>
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
 
-For UniCore32, we selected MISC_DEVICES only for selecting EEPROM_AT24.
+Reviewed-by: Barry Song <Baohua.Song@csr.com>
 
-Thanks.
-
-Acked-by: Guan Xuetao <gxt@mprc.pku.edu.cn>
-
-
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/mach-davinci/Kconfig |    6 ------
->  arch/unicore32/Kconfig        |    1 -
->  2 files changed, 0 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-> index 32d837d..0e5f0a1 100644
-> --- a/arch/arm/mach-davinci/Kconfig
-> +++ b/arch/arm/mach-davinci/Kconfig
-> @@ -61,7 +61,6 @@ config MACH_DAVINCI_EVM
->  	bool "TI DM644x EVM"
->  	default ARCH_DAVINCI_DM644x
->  	depends on ARCH_DAVINCI_DM644x
-> -	select MISC_DEVICES
->  	select EEPROM_AT24
->  	select I2C
->  	help
-> @@ -71,7 +70,6 @@ config MACH_DAVINCI_EVM
->  config MACH_SFFSDR
->  	bool "Lyrtech SFFSDR"
->  	depends on ARCH_DAVINCI_DM644x
-> -	select MISC_DEVICES
->  	select EEPROM_AT24
->  	select I2C
->  	help
-> @@ -105,7 +103,6 @@ config MACH_DAVINCI_DM6467_EVM
->  	default ARCH_DAVINCI_DM646x
->  	depends on ARCH_DAVINCI_DM646x
->  	select MACH_DAVINCI_DM6467TEVM
-> -	select MISC_DEVICES
->  	select EEPROM_AT24
->  	select I2C
->  	help
-> @@ -119,7 +116,6 @@ config MACH_DAVINCI_DM365_EVM
->  	bool "TI DM365 EVM"
->  	default ARCH_DAVINCI_DM365
->  	depends on ARCH_DAVINCI_DM365
-> -	select MISC_DEVICES
->  	select EEPROM_AT24
->  	select I2C
->  	help
-> @@ -131,7 +127,6 @@ config MACH_DAVINCI_DA830_EVM
->  	default ARCH_DAVINCI_DA830
->  	depends on ARCH_DAVINCI_DA830
->  	select GPIO_PCF857X
-> -	select MISC_DEVICES
->  	select EEPROM_AT24
->  	select I2C
->  	help
-> @@ -218,7 +213,6 @@ config MACH_TNETV107X
->  config MACH_MITYOMAPL138
->  	bool "Critical Link MityDSP-L138/MityARM-1808 SoM"
->  	depends on ARCH_DAVINCI_DA850
-> -	select MISC_DEVICES
->  	select EEPROM_AT24
->  	select I2C
->  	help
-> diff --git a/arch/unicore32/Kconfig b/arch/unicore32/Kconfig
-> index eeb8054..7c4224a 100644
-> --- a/arch/unicore32/Kconfig
-> +++ b/arch/unicore32/Kconfig
-> @@ -242,7 +242,6 @@ config I2C_BATTERY_BQ27200
->  config I2C_EEPROM_AT24
->  	tristate "I2C EEPROMs AT24 support"
->  	select I2C_PUV3
-> -	select MISC_DEVICES
->  	select EEPROM_AT24
->  
->  config LCD_BACKLIGHT
+> ?arch/arm/mach-exynos/cpuidle.c | ? 73 +++------------------------------------
+> ?1 files changed, 6 insertions(+), 67 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index 4ebb382..baa1178 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -13,80 +13,19 @@
+> ?#include <linux/cpuidle.h>
+> ?#include <linux/io.h>
+> ?#include <linux/export.h>
+> -#include <linux/time.h>
+> -
+> ?#include <asm/proc-fns.h>
+>
+> -static int exynos4_enter_idle(struct cpuidle_device *dev,
+> - ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index);
+> -
+> -static struct cpuidle_state exynos4_cpuidle_set[] = {
+> - ? ? ? [0] = {
+> - ? ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= exynos4_enter_idle,
+> - ? ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 1,
+> - ? ? ? ? ? ? ? .target_residency ? ? ? = 100000,
+> - ? ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "IDLE",
+> - ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "ARM clock gating(WFI)",
+> - ? ? ? },
+> -};
+> -
+> -static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+> -
+> -static struct cpuidle_driver exynos4_idle_driver = {
+> +static struct cpuidle_driver exynos4_idle_driver __initdata = {
+> ? ? ? ?.name ? ? ? ? ? = "exynos4_idle",
+> ? ? ? ?.owner ? ? ? ? ?= THIS_MODULE,
+> + ? ? ? .states[0] ? ? ?= CPUIDLE_ARM_WFI_STATE,
+> + ? ? ? .state_count ? ?= 1,
+> ?};
+>
+> -static int exynos4_enter_idle(struct cpuidle_device *dev,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
+> -{
+> - ? ? ? struct timeval before, after;
+> - ? ? ? int idle_time;
+> -
+> - ? ? ? local_irq_disable();
+> - ? ? ? do_gettimeofday(&before);
+> -
+> - ? ? ? cpu_do_idle();
+> -
+> - ? ? ? do_gettimeofday(&after);
+> - ? ? ? local_irq_enable();
+> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+> - ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
+> -
+> - ? ? ? dev->last_residency = idle_time;
+> - ? ? ? return index;
+> -}
+> -
+> ?static int __init exynos4_init_cpuidle(void)
+> ?{
+> - ? ? ? int i, max_cpuidle_state, cpu_id;
+> - ? ? ? struct cpuidle_device *device;
+> - ? ? ? struct cpuidle_driver *drv = &exynos4_idle_driver;
+> -
+> - ? ? ? /* Setup cpuidle driver */
+> - ? ? ? drv->state_count = (sizeof(exynos4_cpuidle_set) /
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(struct cpuidle_state));
+> - ? ? ? max_cpuidle_state = drv->state_count;
+> - ? ? ? for (i = 0; i < max_cpuidle_state; i++) {
+> - ? ? ? ? ? ? ? memcpy(&drv->states[i], &exynos4_cpuidle_set[i],
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sizeof(struct cpuidle_state));
+> - ? ? ? }
+> - ? ? ? cpuidle_register_driver(&exynos4_idle_driver);
+> -
+> - ? ? ? for_each_cpu(cpu_id, cpu_online_mask) {
+> - ? ? ? ? ? ? ? device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+> - ? ? ? ? ? ? ? device->cpu = cpu_id;
+> -
+> - ? ? ? ? ? ? ? device->state_count = drv->state_count;
+> -
+> - ? ? ? ? ? ? ? if (cpuidle_register_device(device)) {
+> - ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "CPUidle register device failed\n,");
+> - ? ? ? ? ? ? ? ? ? ? ? return -EIO;
+> - ? ? ? ? ? ? ? }
+> - ? ? ? }
+> - ? ? ? return 0;
+> + ? ? ? return common_cpuidle_init(&exynos4_idle_driver,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? true,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? NULL);
+> ?}
+> ?device_initcall(exynos4_init_cpuidle);
+> --
+> 1.7.1
