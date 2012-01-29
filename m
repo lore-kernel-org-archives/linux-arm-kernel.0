@@ -1,29 +1,28 @@
-From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
-Date: Sun, 29 Jan 2012 20:01:38 +0100
-Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using mc13783
- codec
-In-Reply-To: <CAOMZO5CRmvwCy_qE81PauZ6jmPN7S3N3pky01V0OmWBLCJ5JyA@mail.gmail.com>
-References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
- <2667396.yifGumf5nD@laptop>
- <CAOMZO5CRmvwCy_qE81PauZ6jmPN7S3N3pky01V0OmWBLCJ5JyA@mail.gmail.com>
-Message-ID: <2851519.TkeCdfD43W@laptop>
+From: anca.emanuel@gmail.com (Anca Emanuel)
+Date: Sun, 29 Jan 2012 22:32:11 +0200
+Subject: [PATCHv19 00/15] Contiguous Memory Allocator
+In-Reply-To: <CAN_cFWMPNRx75GC0d0Z5CZC0dPH=wv1YVuA+7j4pfFh9ww9bgg@mail.gmail.com>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <201201261531.40551.arnd@arndb.de>
+ <20120127162624.40cba14e.akpm@linux-foundation.org>
+ <CAN_cFWMPNRx75GC0d0Z5CZC0dPH=wv1YVuA+7j4pfFh9ww9bgg@mail.gmail.com>
+Message-ID: <CAJL_dMtSArpbKXA3xGdsBH=j0L8m_SnpK=WPX+s5DqdU0OaJhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+>> Also there is the supreme tag: "Tested-by:.". ?Ohad (at least) has been
+>> testing the code. ?Let's mention that.
+>>
+>
+> fyi Marek, I've been testing CMA as well, both in context of Ohad's
+> rpmsg driver and my omapdrm driver (and combination of the two).. ?so
+> you can add:
+>
+> Tested-by: Rob Clark <rob.clark@linaro.org>
+>
+> And there are some others from linaro that have written a test driver,
+> and various stress test scripts using the test driver. ?I guess that
+> could also count for some additional Tested-by's.
 
-Le samedi 28 janvier 2012 18:57:45 Fabio Estevam a ?crit :
-> On Wed, Jan 25, 2012 at 1:45 PM, Philippe R?tornaz
-> 
-> <philippe.retornaz@epfl.ch> wrote:
-(...)
-> > Sascha, do you have any plan to upstream the mc13783 codec driver ?
-> 
-> In case Sascha doesn't have plans to upstream mc13783, is this
-> something you could do?
-
-It's an option, but I cannot work full-time on it so it would not be fast.
-
-Thanks,
-
-Philippe
+Convince them to report with Tested-by tag.
+This is a first step for them to face the open source.
