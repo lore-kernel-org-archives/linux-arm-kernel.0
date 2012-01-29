@@ -1,35 +1,60 @@
 From: marc@cpdesign.com.au (Marc Reilly)
-Date: Mon, 30 Jan 2012 09:33:23 +1100
-Subject: [PATCH 1/6] mfd: mc13xxx-core: ADC conv: ack existing pending irqs
- before requesting
+Date: Mon, 30 Jan 2012 09:33:24 +1100
+Subject: [PATCH 2/6] mfd: mc13xxx-core: ADC conv: wait_for_completion returns
+ a long
 In-Reply-To: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
 References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1327876408-22528-2-git-send-email-marc@cpdesign.com.au>
+Message-ID: <1327876408-22528-3-git-send-email-marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This acks any existing pending ADCDONE irqs before requesting one for the
-new conversion, rather than after.
+Use the correct return type for wait_for_completion, as long may be
+larger than int.
 
 Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
 ---
- drivers/mfd/mc13xxx-core.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/mfd/mc13xxx-core.c |   14 +++++++++-----
+ 1 files changed, 9 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index 1fd265d..8cb83ef 100644
+index 8cb83ef..afff892 100644
 --- a/drivers/mfd/mc13xxx-core.c
 +++ b/drivers/mfd/mc13xxx-core.c
-@@ -561,9 +561,9 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
- 	}
- 
- 	dev_dbg(mc13xxx->dev, "%s: request irq\n", __func__);
-+	mc13xxx_irq_ack(mc13xxx, MC13XXX_IRQ_ADCDONE);
- 	mc13xxx_irq_request(mc13xxx, MC13XXX_IRQ_ADCDONE,
+@@ -513,6 +513,7 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ {
+ 	u32 adc0, adc1, old_adc0;
+ 	int i, ret;
++	long timeout;
+ 	struct mc13xxx_adcdone_data adcdone_data = {
+ 		.mc13xxx = mc13xxx,
+ 	};
+@@ -566,20 +567,23 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
  			mc13xxx_handler_adcdone, __func__, &adcdone_data);
--	mc13xxx_irq_ack(mc13xxx, MC13XXX_IRQ_ADCDONE);
  
  	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC0, adc0);
- 	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
+-	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
++	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
+ 
+ 	mc13xxx_unlock(mc13xxx);
+ 
+-	ret = wait_for_completion_interruptible_timeout(&adcdone_data.done, HZ);
++	timeout = wait_for_completion_interruptible_timeout(&adcdone_data.done, HZ);
+ 
+-	if (!ret)
++	if (timeout <= 0) {
++		dev_warn(mc13xxx->dev,
++				"timed out waiting for ADC completion\n");
+ 		ret = -ETIMEDOUT;
++	}
+ 
+ 	mc13xxx_lock(mc13xxx);
+ 
+ 	mc13xxx_irq_free(mc13xxx, MC13XXX_IRQ_ADCDONE, &adcdone_data);
+ 
+-	if (ret > 0)
++	if (!ret)
+ 		for (i = 0; i < 4; ++i) {
+ 			ret = mc13xxx_reg_read(mc13xxx,
+ 					MC13XXX_ADC2, &sample[i]);
 -- 
 1.7.3.4
