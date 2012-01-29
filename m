@@ -1,124 +1,63 @@
-From: eranian@googlemail.com (stephane eranian)
-Date: Sun, 29 Jan 2012 18:36:11 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfJufRMrcfGZp53ALOdEFLk+YDMvQMrHw-jR9tQ8ThE+-Q@mail.gmail.com>
-References: <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
- <20120127121311.GB2347@mudshark.cambridge.arm.com>
- <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
- <20120127132826.GD2347@mudshark.cambridge.arm.com>
- <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
- <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
- <20120127155454.GH2347@mudshark.cambridge.arm.com>
- <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
- <20120127165941.GK2347@mudshark.cambridge.arm.com>
- <CAMsRxf+iv06zOCMzhYONeLaf6RvOLp38T53mR--8ESHvCXMeFQ@mail.gmail.com>
- <20120127171009.GL2347@mudshark.cambridge.arm.com>
- <CAMsRxfJufRMrcfGZp53ALOdEFLk+YDMvQMrHw-jR9tQ8ThE+-Q@mail.gmail.com>
-Message-ID: <CAMsRxfK5tv1DZmHH4F0BT+zVUboESiMmCkatO2NLHp03=e51fQ@mail.gmail.com>
+From: rob.clark@linaro.org (Rob Clark)
+Date: Sun, 29 Jan 2012 12:09:03 -0600
+Subject: [PATCHv19 00/15] Contiguous Memory Allocator
+In-Reply-To: <20120127162624.40cba14e.akpm@linux-foundation.org>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <201201261531.40551.arnd@arndb.de>
+ <20120127162624.40cba14e.akpm@linux-foundation.org>
+Message-ID: <CAN_cFWMPNRx75GC0d0Z5CZC0dPH=wv1YVuA+7j4pfFh9ww9bgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Ok, so I did a few more tests and there is a serious issue when sampling
-in frequency mode (the default). I noticed wrong number of samples, so
-I investigated this some more and instrumented the perf_event kernel code.
-I found some erratic timer ticks causing broken period adjustments.
-
-In fact, the problem is visible using top.
-I am running a noploop program on CPU0 and nothing else besides top.
-The noploop program  does: for(;;);. That is 100% user. On a 2-way
-system otherwise idle, I expect top to return 50% user 50% idle.
-
-Top with the commit:
-
-top - 16:19:21 up 5 min,  1 user,  load average: 0.23, 0.15, 0.07
-Tasks:  70 total,   2 running,  68 sleeping,   0 stopped,   0 zombie
-Cpu(s): 31.1%us,  2.0%sy,  0.0%ni, 66.2%id,  0.0%wa,  0.0%hi,  0.7%si,  0.0%st
-            ^^^^^^^^ That's WRONG
-
-Mem:    940292k total,    74984k used,   865308k free,     8020k buffers
-Swap:   524240k total,        0k used,   524240k free,    37420k cached
-
-  PID USER      PR  NI  VIRT  RES  SHR S %CPU %MEM    TIME+  COMMAND
- 3770 eranian   20   0   644  160  128 R   99  0.0   0:14.21 noploop
- 3771 eranian   20   0  2184 1052  804 R    2  0.1   0:00.32 top
-    1 root      20   0  2564 1528  952 S    0  0.2   0:01.26 init
-
-
-I removed that one liner patch from Ming. The one fiddling with the
-clockdomains:
-
---- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-@@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
-        .prcm_partition   = OMAP4430_PRM_PARTITION,
-        .cm_inst          = OMAP4430_PRM_EMU_CM_INST,
-        .clkdm_offs       = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
--       .flags            = CLKDM_CAN_HWSUP,
-+       .flags            = CLKDM_CAN_SWSUP,
-
-
-When I rerun, the test, it now work:
-
-top - 16:02:51 up 15 min,  1 user,  load average: 1.02, 0.46, 0.21
-Tasks:  70 total,   2 running,  68 sleeping,   0 stopped,   0 zombie
-Cpu(s): 47.2%us,  1.0%sy,  0.0%ni, 50.8%id,  0.0%wa,  0.0%hi,  1.0%si,  0.0%st
-           ^^^^^^^^ close enough (in it stabilize somehow around 49%
-which is good)
-
-Mem:    940292k total,    75288k used,   865004k free,     8004k buffers
-Swap:   524240k total,        0k used,   524240k free,    37408k cached
-
-  PID USER      PR  NI  VIRT  RES  SHR S %CPU %MEM    TIME+  COMMAND
- 3771 eranian   20   0   644  160  128 R  100  0.0   0:34.44 noploop
-
-Although the patch fixes PMU interrupts, it breaks the timer tick logic somehow.
-The perf problem is related to timer tick.
-
-I am hoping that the tradeoff is not:
-     PMU interrupts but broken timer ticks
-vs.
-    No PMU interrupts but working timer ticks
-
-
-On Fri, Jan 27, 2012 at 6:16 PM, stephane eranian
-<eranian@googlemail.com> wrote:
-> On Fri, Jan 27, 2012 at 6:10 PM, Will Deacon <will.deacon@arm.com> wrote:
->> On Fri, Jan 27, 2012 at 05:03:28PM +0000, stephane eranian wrote:
->>> On Fri, Jan 27, 2012 at 5:59 PM, Will Deacon <will.deacon@arm.com> wrote:
->>> > That said, if you see any bugs in the code please do shout!
->>> >
->>> I suspect there is something wrong, we shouldn't hit the max_rate_limit.
->>> You may have bursts of interrupts (samples). I'll check on that this week-end.
->>
->> Ok, thanks. Keep in mind that you probably have variable rate clocks, which
->> will affect the cycle counter frequency.
->>
-> I assume it does not vary the clock if the workload is steady and just burning
-> cycles, e.g.: for(;;);
+On Fri, Jan 27, 2012 at 6:26 PM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Thu, 26 Jan 2012 15:31:40 +0000
+> Arnd Bergmann <arnd@arndb.de> wrote:
 >
->>> >> > A7 and A15 have the ability to filter counters based on privilege level, so
->>> >> > you can get more accurate userspace counts there.
->>> >>
->>> >> Ok, that's better. Need to update libpfm4 for A15 with priv levels then!
->>> >
->>> > How do you handle that in libpfm4? On ARM, the event encodings remain the same,
->>> > you just need to set some extra bits to determine which levels are included or
->>> > excluded (you can do this with the perf tool by using the :{u,k,h} suffix on an
->>> > event description).
->>> >
->>> It depends what you call the encoding? If the priv level can be encoded in the
->>> attr->config field, then that's easy. If it needs to be set somewhere else, then
->>> we need to figure out how you encode it in the attr struct. Either in some other
->>> bits in attr->config or use attr->config1, for instance. You tell me.
+>> On Thursday 26 January 2012, Marek Szyprowski wrote:
+>> > Welcome everyone!
+>> >
+>> > Yes, that's true. This is yet another release of the Contiguous Memory
+>> > Allocator patches. This version mainly includes code cleanups requested
+>> > by Mel Gorman and a few minor bug fixes.
 >>
->> The way it's done with perf is to set the exclude{user,kernel,hv} fields in
->> the attr. The ARM perf backend then translates these into the relevant bits
->> which get orred into the config_base before hitting the hardware.
+>> Hi Marek,
 >>
-> Well, that's also how we do it with libpfm4 on X86. This is because
-> with perf_events,
-> the exclude_* fields have priority over what you set in the attr->config field.
+>> Thanks for keeping up this work! I really hope it works out for the
+>> next merge window.
 >
->> Will
+> Someone please tell me when it's time to start paying attention
+> again ;)
+>
+> These patches don't seem to have as many acked-bys and reviewed-bys as
+> I'd expect. ?Given the scope and duration of this, it would be useful
+> to gather these up. ?But please ensure they are real ones - people
+> sometimes like to ack things without showing much sign of having
+> actually read them.
+>
+> Also there is the supreme tag: "Tested-by:.". ?Ohad (at least) has been
+> testing the code. ?Let's mention that.
+>
+
+fyi Marek, I've been testing CMA as well, both in context of Ohad's
+rpmsg driver and my omapdrm driver (and combination of the two)..  so
+you can add:
+
+Tested-by: Rob Clark <rob.clark@linaro.org>
+
+And there are some others from linaro that have written a test driver,
+and various stress test scripts using the test driver.  I guess that
+could also count for some additional Tested-by's.
+
+BR,
+-R
+
+> The patches do seem to have been going round in ever-decreasing circles
+> lately and I think we have decided to merge them (yes?) so we may as well
+> get on and do that and sort out remaining issues in-tree.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
