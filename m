@@ -1,30 +1,23 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2012 14:32:46 -0800
-Subject: [GIT PULL] i.MX fixes for -rc
-In-Reply-To: <20120127111024.GB5446@pengutronix.de>
-References: <20120127111024.GB5446@pengutronix.de>
-Message-ID: <CAOesGMj4k3NcXMh3WtegJgejdDK1QntDnyudD6Ky8Ou6mN3cBg@mail.gmail.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Mon, 30 Jan 2012 09:33:22 +1100
+Subject: mfd: mc13xxx adc fixes and enhancements
+Message-ID: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series provides some small fixes to the mc13xxx adc conversion funtion to
+make it more robust. Readout of single channel conversions is fixed so that the
+read out order corresponds to the sampling order (Critical for dedicated 
+battery reading).
 
-On Fri, Jan 27, 2012 at 3:10 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+A new conversion function is introduced which allows the caller to enable the
+dedicated readings and other adc functionality by providing a mask/ value pair
+for the adc0,1 registers.
 
-> Fabio Estevam (3):
-> ? ? ?ARM: mx3: Let mx31 and mx35 share the same CCM header file
-> ? ? ?ARM: mx3: Let mx31 and mx35 enter in LPM mode in WFI
-> ? ? ?ARM: imx_v4_v5_defconfig: Fix the selection of 32 bit flash support for iMX21ADS board
+These patches apply onto my 'add I2C support' series [1].
+(I think only the first patch is required)
 
-The first two don't seem like fixes to me from a quick glance at them
--- one is a cleanup, the other is a feature. If they are fixes, please
-help us out by motivating why they should go in during -rc instead of
-in the next merge window. Thanks!
+Cheers,
+Marc
 
-
-Also, see separate comment on the second patch (replied in that thread).
-
-
-Regards,
-
--Olof
+[1] http://lists.arm.linux.org.uk/lurker/message/20120119.010131.616dd8a6.en.html
