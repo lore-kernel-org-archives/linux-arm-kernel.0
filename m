@@ -1,116 +1,130 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 30 Jan 2012 16:27:49 +0100
-Subject: [PATCH 1/3] of_spi: add generic binding support to specify ncs gpio
- in the slave
-Message-ID: <1327937271-23668-1-git-send-email-plagnioj@jcrosoft.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 30 Jan 2012 16:41:22 +0100
+Subject: [PATCH 02/15] mm: page_alloc: update migrate type of pages on pcp
+ when isolating
+In-Reply-To: <20120130111522.GE25268@csn.ul.ie>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-3-git-send-email-m.szyprowski@samsung.com>
+ <20120130111522.GE25268@csn.ul.ie>
+Message-ID: <op.v8wlu8ws3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow to use gpio for chip select with no modification in the
-driver binding
+On Mon, 30 Jan 2012 12:15:22 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
 
-When use the ncs-gpio, the gpio number will be passed via the controller_data
-and the number of chip select will automatically increased.
+> On Thu, Jan 26, 2012 at 10:00:44AM +0100, Marek Szyprowski wrote:
+>> From: Michal Nazarewicz <mina86@mina86.com>
+>> @@ -139,3 +139,27 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn)
+>>  	spin_unlock_irqrestore(&zone->lock, flags);
+>>  	return ret ? 0 : -EBUSY;
+>>  }
+>> +
+>> +/* must hold zone->lock */
+>> +void update_pcp_isolate_block(unsigned long pfn)
+>> +{
+>> +	unsigned long end_pfn = pfn + pageblock_nr_pages;
+>> +	struct page *page;
+>> +
+>> +	while (pfn < end_pfn) {
+>> +		if (!pfn_valid_within(pfn)) {
+>> +			++pfn;
+>> +			continue;
+>> +		}
+>> +
 
-When a spi master have only gpio chip select and is probe via dt check the
-number of chip select only when adding slave.
+On Mon, 30 Jan 2012 12:15:22 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
+> There is a potential problem here that you need to be aware of.
+> set_pageblock_migratetype() is called from start_isolate_page_range().
+> I do not think there is a guarantee that pfn + pageblock_nr_pages is
+> not in a different block of MAX_ORDER_NR_PAGES. If that is right then
+> your options are to add a check like this;
+>
+> if ((pfn & (MAX_ORDER_NR_PAGES - 1)) == 0 && !pfn_valid(pfn))
+> 	break;
+>
+> or else ensure that end_pfn is always MAX_ORDER_NR_PAGES aligned and in
+> the same block as pfn and relying on the caller to have called
+> pfn_valid.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: spi-devel-general at lists.sourceforge.net
----
- Documentation/devicetree/bindings/spi/spi-bus.txt |    9 ++++++-
- drivers/of/of_spi.c                               |   27 ++++++++++++++------
- drivers/spi/spi.c                                 |    2 +-
- 3 files changed, 28 insertions(+), 10 deletions(-)
+	pfn = round_down(pfn, pageblock_nr_pages);
+	end_pfn = pfn + pageblock_nr_pages;
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
-index e782add..1dccf35 100644
---- a/Documentation/devicetree/bindings/spi/spi-bus.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
-@@ -21,9 +21,16 @@ assumption that board specific platform code will be used to manage
- chip selects.  Individual drivers can define additional properties to
- support describing the chip select layout.
- 
-+If a gpio a specified to the SPI slave and no hardware chip select is present
-+the reg property #address-cells and #size-cells are not needed.
-+
-+When use the ncs-gpio the gpio number will be passed via the controller_data
-+and the number of chip select will automatically increased.
-+
- SPI slave nodes must be children of the SPI master node and can
- contain the following properties.
--- reg             - (required) chip select address of device.
-+- reg             - (required if no ncs-gpio) chip select address of device.
-+- ncs-gpio        - (required if no reg) chip select gpio of device.
- - compatible      - (required) name of SPI device following generic names
-     		recommended practice
- - spi-max-frequency - (required) Maximum SPI clocking speed of device in Hz
-diff --git a/drivers/of/of_spi.c b/drivers/of/of_spi.c
-index 6dbc074..0d41407 100644
---- a/drivers/of/of_spi.c
-+++ b/drivers/of/of_spi.c
-@@ -12,6 +12,7 @@
- #include <linux/spi/spi.h>
- #include <linux/of_irq.h>
- #include <linux/of_spi.h>
-+#include <linux/of_gpio.h>
- 
- /**
-  * of_register_spi_devices - Register child devices onto the SPI bus
-@@ -27,6 +28,7 @@ void of_register_spi_devices(struct spi_master *master)
- 	const __be32 *prop;
- 	int rc;
- 	int len;
-+	int ncs_pin;
- 
- 	if (!master->dev.of_node)
- 		return;
-@@ -50,15 +52,24 @@ void of_register_spi_devices(struct spi_master *master)
- 			continue;
- 		}
- 
--		/* Device address */
--		prop = of_get_property(nc, "reg", &len);
--		if (!prop || len < sizeof(*prop)) {
--			dev_err(&master->dev, "%s has no 'reg' property\n",
--				nc->full_name);
--			spi_dev_put(spi);
--			continue;
-+		/* ncs gpio */
-+		ncs_pin = of_get_named_gpio(nc, "ncs-gpio", 0);
-+
-+		if (gpio_is_valid(ncs_pin)) {
-+			spi->controller_data = (void *)ncs_pin;
-+			spi->chip_select = master->num_chipselect;
-+			master->num_chipselect++;
-+		} else {
-+			/* Device address */
-+			prop = of_get_property(nc, "reg", &len);
-+			if (!prop || len < sizeof(*prop)) {
-+				dev_err(&master->dev, "%s has no 'reg' property\n",
-+					nc->full_name);
-+				spi_dev_put(spi);
-+				continue;
-+			}
-+			spi->chip_select = be32_to_cpup(prop);
- 		}
--		spi->chip_select = be32_to_cpup(prop);
- 
- 		/* Mode (clock phase/polarity/etc.) */
- 		if (of_find_property(nc, "spi-cpha", NULL))
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index b2ccdea..ccd1a6f 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -595,7 +595,7 @@ int spi_register_master(struct spi_master *master)
- 	/* even if it's just one always-selected device, there must
- 	 * be at least one chipselect
- 	 */
--	if (master->num_chipselect == 0)
-+	if (!master->dev.of_node && master->num_chipselect == 0)
- 		return -EINVAL;
- 
- 	/* convention:  dynamically assigned bus IDs count down from the max */
+should do the trick as well, right?  move_freepages_block() seem to be
+doing the same thing.
+
+>> +		page = pfn_to_page(pfn);
+>> +		if (PageBuddy(page)) {
+>> +			pfn += 1 << page_order(page);
+>> +		} else if (page_count(page) == 0) {
+>> +			set_page_private(page, MIGRATE_ISOLATE);
+>> +			++pfn;
+>
+> This is dangerous for two reasons. If the page_count is 0, it could
+> be because the page is in the process of being freed and is not
+> necessarily on the per-cpu lists yet and you cannot be sure if the
+> contents of page->private are important. Second, there is nothing to
+> prevent another CPU allocating this page from its per-cpu list while
+> the private field is getting updated from here which might lead to
+> some interesting races.
+>
+> I recognise that what you are trying to do is respond to Gilad's
+> request that you really check if an IPI here is necessary. I think what
+> you need to do is check if a page with a count of 0 is encountered
+> and if it is, then a draining of the per-cpu lists is necessary. To
+> address Gilad's concerns, be sure to only this this once per attempt at
+> CMA rather than for every page encountered with a count of 0 to avoid a
+> storm of IPIs.
+
+It's actually more then that.
+
+This is the same issue that I first fixed with a change to free_pcppages_bulk()
+function[1].  At the time of positing, you said you'd like me to try and find
+a different solution which would not involve paying the price of calling
+get_pageblock_migratetype().  Later I also realised that this solution is
+not enough.
+
+[1] http://article.gmane.org/gmane.linux.kernel.mm/70314
+
+My next attempt was to run drain PCP list while holding zone->lock[2], but that
+quickly proven to be broken approach when Marek started testing it on an SMP
+system.
+
+[2] http://article.gmane.org/gmane.linux.kernel.mm/72016
+
+This patch is yet another attempt of solving this old issue.  Even though it has
+a potential race condition we came to conclusion that the actual chances of
+causing any problems are slim.  Various stress tests did not, in fact, show
+the race to be an issue.
+
+The problem is that if a page is on a PCP list, and it's underlaying pageblocks'
+migrate type is changed to MIGRATE_ISOLATE, the page (i) will still remain on PCP
+list and thus someone can allocate it, and (ii) when removed from PCP list, the
+page will be put on freelist of migrate type it had prior to change.
+
+(i) is actually not such a big issue since the next thing that happens after
+isolation is migration so all the pages will get freed.  (ii) is actual problem
+and if [1] is not an acceptable solution I really don't have a good fix for that.
+
+One things that comes to mind is calling drain_all_pages() prior to acquiring
+zone->lock in set_migratetype_isolate().  This is however prone to races since
+after the drain and before the zone->lock is acquired, pages might get moved
+back to PCP list.
+
+Draining PCP list after acquiring zone->lock is not possible because
+smp_call_function_many() cannot be called with interrupts disabled, and changing
+spin_lock_irqsave() to spin_lock() followed by local_irq_save() causes a dead
+lock (that's what [2] attempted to do).
+
+Any suggestions are welcome!
+
+>> +		} else {
+>> +			++pfn;
+>> +		}
+>> +	}
+>> +}
+
 -- 
-1.7.7
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
