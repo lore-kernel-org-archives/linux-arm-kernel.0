@@ -1,125 +1,63 @@
-From: eranian@googlemail.com (stephane eranian)
-Date: Mon, 30 Jan 2012 21:45:44 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120130191443.GB27764@mudshark.cambridge.arm.com>
-References: <CAMsRxfK5tv1DZmHH4F0BT+zVUboESiMmCkatO2NLHp03=e51fQ@mail.gmail.com>
- <CACVXFVMgDpaYeaU+0LGirYzNfJb8k0wFfL=+UU5qAwYfXgWLMQ@mail.gmail.com>
- <CAMsRxfJq1-tSQH4bv0BeNWXV9aysi9AUvywkh3e9SaamMDfZ0Q@mail.gmail.com>
- <CAMsRxf+okps60OxQnPkqHck8pWHrkPnT6boo603pC2XEbFYoRQ@mail.gmail.com>
- <CACVXFVMDXO3DDj0mGh=+uDYfCoS_Ck1STVK0=UXjiAbtJTa=hA@mail.gmail.com>
- <CAMsRxfLqvPN_k7vuC3qzBjwX2ihBdPxZvmSCPZ3frWgptWXQGA@mail.gmail.com>
- <yw1xsjixgolb.fsf@unicorn.mansr.com>
- <CAMsRxfJLsnBnKBrEXOSOWUTbgfeZtVZ6nR8jt388=baL5Mn22Q@mail.gmail.com>
- <20120130172438.GC17814@mudshark.cambridge.arm.com>
- <CAMsRxfLc-wxx9pELJSdV2DmzGHpVmWOg7SAs=jm-s=5jaNh4HQ@mail.gmail.com>
- <20120130191443.GB27764@mudshark.cambridge.arm.com>
-Message-ID: <CAMsRxfK5Ynpp7AOVeuA-t05qjGUAgibkOV6scEJVHOJwdXENCg@mail.gmail.com>
+From: rm@romanrm.ru (Roman Mamedov)
+Date: Tue, 31 Jan 2012 02:44:29 +0600
+Subject: [2.6.37 -> 2.6.38 regression] "mv64xxx: I2C bus locked, block:
+ 1, time_left: 0" every few seconds
+In-Reply-To: <20120108004502.GA20549@ericsson.com>
+References: <20120101042401.4bef017e@natsu>
+ <20120101073255.GA2402@elie.hsd1.il.comcast.net>
+ <20120108004502.GA20549@ericsson.com>
+Message-ID: <20120131024429.2affbd1c@natsu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 8:14 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jan 30, 2012 at 05:45:19PM +0000, stephane eranian wrote:
->> There you go, no attachment, not sure the omap list
->> supports this.
->
-> Cheers Stephane.
->
->> There is something quite interesting to observe.
->>
->> While I run perf record -e cycles -F 100 noploop 10, I watch
->> /proc/interrupts. The number of interrupts is way lower than
->> expected. Therefore the number of samples is way too low:
->>
->> $ perf record -e cycles -F 100 noploop 10
->> $ perf report -D | tail -20
->> cycles stats:
->> ? ? ? ? ? ?TOTAL events: ? ? ? ?535
->> ? ? ? ? ? ? MMAP events: ? ? ? ? 11
->> ? ? ? ? ? ? COMM events: ? ? ? ? ?2
->> ? ? ? ? ? ? EXIT events: ? ? ? ? ?2
->> ? ? ? ? ? SAMPLE events: ? ? ? ?520
->>
->> The delta in /proc/interrupts on CPU1 is 520 interrupts.
->
-> Yes, that is about half of what you'd expect. Running on my A9 platform
-> (vexpress) I get:
->
-> $ perf record -e cycles -F 100 noploop 10
-> $ perf report -D | tail -20
-> cycles stats:
-> ? ? ? ? ? TOTAL events: ? ? ? 1007
-> ? ? ? ? ? ?MMAP events: ? ? ? ? 18
-> ? ? ? ? ? ?COMM events: ? ? ? ? ?2
-> ? ? ? ? ? ?EXIT events: ? ? ? ? ?2
-> ? ? ? ? ?SAMPLE events: ? ? ? ?985
->
->> So looks like the frequency adjustment which is hooked off of the
->> timer tick is either not called at each timer tick, the timer ticks are
->> not at regular interval, or the math is wrong.
->
-> My hunch is that that the interval is probably varying, but I don't know much
-> about OMAP4 and its clocks.
->
-Glad you tested this. At least, it seems the generic perf_event code
-is allright.
-I agree with you, something is fishy with the clocks. Just out of
-curiosity, what is
-the HZ value for your board? On my Panda it's 128Hz.
+On Sat, 7 Jan 2012 16:45:02 -0800
+Guenter Roeck <guenter.roeck@ericsson.com> wrote:
 
->> If I go with the fixed period mode:
->> $ perf stat -e cycles noploop 10
->> noploop for 10 seconds
->> ?Performance counter stats for 'noploop 10':
->> ? ? ? ?10079156960 cycles ? ? ? ? ? ? ? ? ? ?# ? ?0.000 GHz
->> ? ? ? 10.004547117 seconds time elapsed
->>
->> That means, if I want 100 samples/sec: = 10079156960/(10*100)=10079157
->> $ perf record -e cycles -c 10079157 noploop 10
->> $ perf report -D | tail -20
->> cycles stats:
->> ? ? ? ? ? ?TOTAL events: ? ? ? 1003
->> ? ? ? ? ? ? MMAP events: ? ? ? ? 11
->> ? ? ? ? ? ? COMM events: ? ? ? ? ?2
->> ? ? ? ? ? ? EXIT events: ? ? ? ? ?2
->> ? ? ? ? THROTTLE events: ? ? ? ? ?1
->> ? ? ? UNTHROTTLE events: ? ? ? ? ?1
->> ? ? ? ? ? SAMPLE events: ? ? ? ?986
->>
->> Now, we're getting the right answer!
->
-> Just to confirm, for me:
->
-> $ perf stat -e cycles ./noploop 10
-> noploop for 10 seconds
->
-> ?Performance counter stats for './noploop 10':
->
-> ? ? ? ?4001163930 cycles ? ? ? ? ? ? ? ? ? ?# ? ?0.000 GHz
->
-> ? ? ?10.006534024 seconds time elapsed
->
-> $ perf record -e cycles -c 4001163 ./noploop 10
-> $ perf report -D | tail -20
-> ?Aggregated stats:
-> ? ? ? ? ? TOTAL events: ? ? ? 1020
-> ? ? ? ? ? ?MMAP events: ? ? ? ? 18
-> ? ? ? ? ? ?COMM events: ? ? ? ? ?2
-> ? ? ? ? ? ?EXIT events: ? ? ? ? ?2
-> ? ? ? ? ?SAMPLE events: ? ? ? ?998
-> cycles stats:
-> ? ? ? ? ? TOTAL events: ? ? ? 1020
-> ? ? ? ? ? ?MMAP events: ? ? ? ? 18
-> ? ? ? ? ? ?COMM events: ? ? ? ? ?2
-> ? ? ? ? ? ?EXIT events: ? ? ? ? ?2
-> ? ? ? ? ?SAMPLE events: ? ? ? ?998
->
-> which is close enough :)
->
->> We need to elucidate what's going on in perf_event_task_tick().
->> I have tried with my throttling fix and it did not help. We are
->> not subject to throttling with such a low rate.
->
-> Ok. I would start by looking at the clock ticks if I were you, since this
-> seems to be alright on my board.
->
-> Will
+> >  - Michael Ott reported with Debian kernel 2.6.38-3 (which is closely
+> >    based on stable v2.6.38.2):
+> > 
+> > 	syslog tell me every few seconds:
+> > 	i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+> > 
+> >  - Manuel Roeder reported the same and found that upstream v2.6.38
+> >    triggers the problem and v2.6.37.6 does not.
+> > 
+> >  - Roman Mamedov finds the bug present in Debian 3.1.6-1 (which
+> >    is closely based on stable v3.1.6) and Debian 2.6.37-2 (based on
+> >    stable v2.6.37.2) but not Debian 2.6.37-1 (based on mainline
+> >    v2.6.37).
+> > 
+> > The regression range described above seems a little inconsistent to
+> > me, so maybe there's something more going on.
+> > 
+> Points to commit eda6bee6c7e67b5bd17bdbced0926f5687f686d5 (i2c-mv64xxx: send repeated START
+> between messages in xfer). Maybe you can back it out and see if it makes a difference.
+
+Hello,
+
+I have just confirmed that the problem still occurs in the current
+3.2.2, and is indeed solved by rolling-back the referred commit.
+
+Should be noted that beside the "I2C bus locked" messages in dmesg, the described problem
+manifested itself in the inability to read the temperature sensor value or adjust the fan
+speed on the D-Link DNS-323. On all problematic kernels the built-in fan of DNS-323 does not
+rotate and this risks overheating the device and disks installed in it.
+
+Thanks.
+
+-- 
+With respect,
+Roman
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"Stallman had a printer,
+with code he could not see.
+So he began to tinker,
+and set the software free."
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/959fd43a/attachment.sig>
