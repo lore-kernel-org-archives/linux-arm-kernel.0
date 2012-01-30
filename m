@@ -1,28 +1,26 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 30 Jan 2012 16:43:49 +0100
-Subject: [PATCHv19 00/15] Contiguous Memory Allocator
-In-Reply-To: <20120130132512.GO25268@csn.ul.ie>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <201201261531.40551.arnd@arndb.de>
- <20120127162624.40cba14e.akpm@linux-foundation.org>
- <20120130132512.GO25268@csn.ul.ie>
-Message-ID: <op.v8wlzbc53l0zgt@mpn-glaptop>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 30 Jan 2012 13:59:50 -0200
+Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using mc13783
+ codec
+In-Reply-To: <2851519.TkeCdfD43W@laptop>
+References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+ <2667396.yifGumf5nD@laptop>
+ <CAOMZO5CRmvwCy_qE81PauZ6jmPN7S3N3pky01V0OmWBLCJ5JyA@mail.gmail.com>
+ <2851519.TkeCdfD43W@laptop>
+Message-ID: <CAOMZO5Ae5CsiYFwUTU05W64bj+64cqwzbSgBN2U2u38a=xd0nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2012 14:25:12 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> I reviewed the core MM changes and I've acked most of them so the
-> next release should have a few acks where you expect them. I did not
-> add a reviewed-by because I did not build and test the thing.
+On 1/29/12, Philippe R?tornaz <philippe.retornaz@epfl.ch> wrote:
 
-Thanks!
+>> In case Sascha doesn't have plans to upstream mc13783, is this
+>> something you could do?
+>
+> It's an option, but I cannot work full-time on it so it would not be fast.
 
-I've either replied to your comments or applied suggested changes.
-If anyone cares, not-tested changes are available at
-	git://github.com/mina86/linux-2.6.git cma
+Ok, please Cc me when you submit these patches as I would like to test
+them on mx27/mx31pdk.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+Thanks,
+
+Fabio Estevam
