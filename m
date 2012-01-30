@@ -1,187 +1,57 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 30 Jan 2012 17:02:05 +0100
-Subject: [PATCH v2 6/7] LPC32xx: clock.c: USB PLL fix
-In-Reply-To: <1327939327-7799-1-git-send-email-stigge@antcom.de>
-References: <1327939327-7799-1-git-send-email-stigge@antcom.de>
-Message-ID: <1327939327-7799-6-git-send-email-stigge@antcom.de>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 30 Jan 2012 16:08:32 +0000
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMsRxfLqvPN_k7vuC3qzBjwX2ihBdPxZvmSCPZ3frWgptWXQGA@mail.gmail.com>
+ (stephane eranian's message of "Mon, 30 Jan 2012 17:02:06 +0100")
+References: <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
+ <20120127121311.GB2347@mudshark.cambridge.arm.com>
+ <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
+ <20120127132826.GD2347@mudshark.cambridge.arm.com>
+ <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
+ <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
+ <20120127155454.GH2347@mudshark.cambridge.arm.com>
+ <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
+ <20120127165941.GK2347@mudshark.cambridge.arm.com>
+ <CAMsRxf+iv06zOCMzhYONeLaf6RvOLp38T53mR--8ESHvCXMeFQ@mail.gmail.com>
+ <20120127171009.GL2347@mudshark.cambridge.arm.com>
+ <CAMsRxfJufRMrcfGZp53ALOdEFLk+YDMvQMrHw-jR9tQ8ThE+-Q@mail.gmail.com>
+ <CAMsRxfK5tv1DZmHH4F0BT+zVUboESiMmCkatO2NLHp03=e51fQ@mail.gmail.com>
+ <CACVXFVMgDpaYeaU+0LGirYzNfJb8k0wFfL=+UU5qAwYfXgWLMQ@mail.gmail.com>
+ <CAMsRxfJq1-tSQH4bv0BeNWXV9aysi9AUvywkh3e9SaamMDfZ0Q@mail.gmail.com>
+ <CAMsRxf+okps60OxQnPkqHck8pWHrkPnT6boo603pC2XEbFYoRQ@mail.gmail.com>
+ <CACVXFVMDXO3DDj0mGh=+uDYfCoS_Ck1STVK0=UXjiAbtJTa=hA@mail.gmail.com>
+ <CAMsRxfLqvPN_k7vuC3qzBjwX2ihBdPxZvmSCPZ3frWgptWXQGA@mail.gmail.com>
+Message-ID: <yw1xsjixgolb.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes and updates the USB PLL handling. With the old driver version,
-the USB clock was sometimes not started correctly. The update reflects the
-driver changes in this regard from Kevin Wells.
+stephane eranian <eranian@googlemail.com> writes:
 
-See also git.lpclinux.com
+> Same result for me on CPU1:
+>
+> top - 16:20:24 up  1:45,  1 user,  load average: 0.29, 0.08, 0.07
+> Tasks:  70 total,   2 running,  68 sleeping,   0 stopped,   0 zombie
+> Cpu(s): 30.7%us,  2.7%sy,  0.0%ni, 66.7%id,  0.0%wa,  0.0%hi,  0.0%si,  0.0%st
+> Mem:    940232k total,   228984k used,   711248k free,    82244k buffers
+> Swap:   524240k total,        0k used,   524240k free,    91400k cached
+>
+>   PID USER      PR  NI  VIRT  RES  SHR S %CPU %MEM    TIME+  P COMMAND
+>  3968 eranian   20   0   644  160  128 R  100  0.0   0:21.98 1 noploop
+>  3969 eranian   20   0  2184 1056  804 R    3  0.1   0:00.53 0 top
+>    82 root      20   0     0    0    0 S    1  0.0   0:01.35 0
+> kworker/0:1
+>
+> With 3.3.0-rc1, if I revert the clockdomain patch, I get the same result.
+> So it must be coming from somewhere else, as you suggested.
+>
+> If the processor was spending time processing interrupts, then this would be
+> accounted for in as sys time. But that's not what I observe here. It's either
+> idle or user. That line, leads me to believe that the processor can only run
+> my program for 30% of the time. The rest is spent idling even though my
+> program is non-blocking. How could that be possible? Power-saving?
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+In top, press 1 to see the statistics for the CPUs separately.
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index f64c9a1..6dd2c30 100644
---- a/arch/arm/mach-lpc32xx/clock.c
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -87,6 +87,7 @@
- #include <linux/list.h>
- #include <linux/errno.h>
- #include <linux/device.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/amba/bus.h>
-@@ -98,6 +99,8 @@
- #include "clock.h"
- #include "common.h"
- 
-+static int usb_pll_enable, usb_pll_valid;
-+
- static struct clk clk_armpll;
- static struct clk clk_usbpll;
- static DEFINE_MUTEX(clkm_lock);
-@@ -383,30 +386,62 @@ static u32 local_clk_usbpll_setup(struct clk_pll_setup *pHCLKPllSetup)
- static int local_usbpll_enable(struct clk *clk, int enable)
- {
- 	u32 reg;
--	int ret = -ENODEV;
--	unsigned long timeout = jiffies + msecs_to_jiffies(10);
-+	int ret = 0;
-+	unsigned long timeout = jiffies + msecs_to_jiffies(20);
- 
- 	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
- 
--	if (enable == 0) {
--		reg &= ~(LPC32XX_CLKPWR_USBCTRL_CLK_EN1 |
--			LPC32XX_CLKPWR_USBCTRL_CLK_EN2);
--		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
--	} else if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP) {
-+	__raw_writel(reg & ~(LPC32XX_CLKPWR_USBCTRL_CLK_EN2 |
-+		LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP),
-+		LPC32XX_CLKPWR_USB_CTRL);
-+	__raw_writel(reg & ~LPC32XX_CLKPWR_USBCTRL_CLK_EN1,
-+		LPC32XX_CLKPWR_USB_CTRL);
-+
-+	if (enable && usb_pll_valid && usb_pll_enable) {
-+		ret = -ENODEV;
-+		/*
-+		 * If the PLL rate has been previously set, then the rate
-+		 * in the PLL register is valid and can be enabled here.
-+		 * Otherwise, it needs to be enabled as part of setrate.
-+		 */
-+
-+		/*
-+		 * Gate clock into PLL
-+		 */
- 		reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN1;
- 		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
- 
--		/* Wait for PLL lock */
-+		/*
-+		 * Enable PLL
-+		 */
-+		reg |= LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP;
-+		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
-+
-+		/*
-+		 * Wait for PLL to lock
-+		 */
- 		while (time_before(jiffies, timeout) && (ret == -ENODEV)) {
- 			reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
- 			if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_STS)
- 				ret = 0;
-+			else
-+				udelay(10);
- 		}
- 
-+		/*
-+		 * Gate clock from PLL if PLL is locked
-+		 */
- 		if (ret == 0) {
--			reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN2;
--			__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
-+			__raw_writel(reg | LPC32XX_CLKPWR_USBCTRL_CLK_EN2,
-+				LPC32XX_CLKPWR_USB_CTRL);
-+		} else {
-+			__raw_writel(reg & ~(LPC32XX_CLKPWR_USBCTRL_CLK_EN1 |
-+				LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP),
-+				LPC32XX_CLKPWR_USB_CTRL);
- 		}
-+	} else if ((enable == 0) && usb_pll_valid  && usb_pll_enable) {
-+		usb_pll_valid = 0;
-+		usb_pll_enable = 0;
- 	}
- 
- 	return ret;
-@@ -424,7 +459,7 @@ static unsigned long local_usbpll_round_rate(struct clk *clk,
- 	 */
- 	rate = rate * 1000;
- 
--	clkin = clk->parent->rate;
-+	clkin = clk->get_rate(clk);
- 	usbdiv = (__raw_readl(LPC32XX_CLKPWR_USBCLK_PDIV) &
- 		LPC32XX_CLKPWR_USBPDIV_PLL_MASK) + 1;
- 	clkin = clkin / usbdiv;
-@@ -438,7 +473,8 @@ static unsigned long local_usbpll_round_rate(struct clk *clk,
- 
- static int local_usbpll_set_rate(struct clk *clk, unsigned long rate)
- {
--	u32 clkin, reg, usbdiv;
-+	int ret = -ENODEV;
-+	u32 clkin, usbdiv;
- 	struct clk_pll_setup pllsetup;
- 
- 	/*
-@@ -447,7 +483,7 @@ static int local_usbpll_set_rate(struct clk *clk, unsigned long rate)
- 	 */
- 	rate = rate * 1000;
- 
--	clkin = clk->get_rate(clk);
-+	clkin = clk->get_rate(clk->parent);
- 	usbdiv = (__raw_readl(LPC32XX_CLKPWR_USBCLK_PDIV) &
- 		LPC32XX_CLKPWR_USBPDIV_PLL_MASK) + 1;
- 	clkin = clkin / usbdiv;
-@@ -456,22 +492,25 @@ static int local_usbpll_set_rate(struct clk *clk, unsigned long rate)
- 	if (local_clk_find_pll_cfg(clkin, rate, &pllsetup) == 0)
- 		return -EINVAL;
- 
-+	/*
-+	 * Disable PLL clocks during PLL change
-+	 */
- 	local_usbpll_enable(clk, 0);
--
--	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
--	reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN1;
--	__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
--
--	pllsetup.analog_on = 1;
-+	pllsetup.analog_on = 0;
- 	local_clk_usbpll_setup(&pllsetup);
- 
--	clk->rate = clk_check_pll_setup(clkin, &pllsetup);
-+	/*
-+	 * Start USB PLL and check PLL status
-+	 */
- 
--	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
--	reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN2;
--	__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
-+	usb_pll_valid = 1;
-+	usb_pll_enable = 1;
- 
--	return 0;
-+	ret = local_usbpll_enable(clk, 1);
-+	if (ret >= 0)
-+		clk->rate = clk_check_pll_setup(clkin, &pllsetup);
-+
-+	return ret;
- }
- 
- static struct clk clk_usbpll = {
-@@ -731,6 +770,10 @@ static int mmc_onoff_enable(struct clk *clk, int enable)
- 	if (enable != 0)
- 		tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_EN;
- 
-+	/* Start clock at highest rate */
-+	if (!(tmp & LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(0xF)))
-+		tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(1);
-+
- 	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
- 
- 	return 0;
+-- 
+M?ns Rullg?rd
+mans at mansr.com
