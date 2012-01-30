@@ -1,158 +1,115 @@
 From: bill4carson@gmail.com (bill4carson at gmail.com)
-Date: Mon, 30 Jan 2012 15:57:14 +0800
-Subject: [PATCH 3/7] Introduce set_hugepte_ext api for huge page hardware page
- table setup
+Date: Mon, 30 Jan 2012 15:57:15 +0800
+Subject: [PATCH 4/7] Store huge page linux pte in mm_struct
 In-Reply-To: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
 References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
-Message-ID: <1327910238-18704-4-git-send-email-bill4carson@gmail.com>
+Message-ID: <1327910238-18704-5-git-send-email-bill4carson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bill Carson <bill4carson@gmail.com>
 
-All hugetlb arm high level hooks eventually call this api using set_hugepte_at
+One easy way to store huge page linux pte is mm_struct instead of thread_info
+that's because when parent task with huge page VMA calls fork, parent huge page
+pagetable entries are copied into child pagetable. This is done in
+
+int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
+			    struct vm_area_struct *vma)
+
+We cannot derive child's thread_info just using struct mm_struct *dst.
+if we have struct mm_struct **dst, then it's easy to find the corresponding
+task_struct as well as thread_info, but we only get struct mm_struct *dst.
+It's possible to find the desired task_struct by iterating the global task list
+by comparing task_struct->mm with dst.
+So mm_struct is used for huge page linux pte for faster lookup and efficient.
 
 Signed-off-by: Bill Carson <bill4carson@gmail.com>
 ---
- arch/arm/include/asm/glue-proc.h |    3 +
- arch/arm/include/asm/proc-fns.h  |    3 +
- arch/arm/mm/proc-v7-2level.S     |   96 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 102 insertions(+), 0 deletions(-)
+ arch/arm/mm/pgd.c        |   28 ++++++++++++++++++++++++++++
+ include/linux/mm_types.h |   11 +++++++++++
+ 2 files changed, 39 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
-index e2be7f1..2bbd452 100644
---- a/arch/arm/include/asm/glue-proc.h
-+++ b/arch/arm/include/asm/glue-proc.h
-@@ -256,6 +256,9 @@
- #define cpu_dcache_clean_area		__glue(CPU_NAME,_dcache_clean_area)
- #define cpu_do_switch_mm		__glue(CPU_NAME,_switch_mm)
- #define cpu_set_pte_ext			__glue(CPU_NAME,_set_pte_ext)
-+#ifdef CONFIG_ARM_HUGETLB_SUPPORT
-+#define cpu_set_hugepte_ext		__glue(CPU_NAME,_set_hugepte_ext)
-+#endif
- #define cpu_suspend_size		__glue(CPU_NAME,_suspend_size)
- #define cpu_do_suspend			__glue(CPU_NAME,_do_suspend)
- #define cpu_do_resume			__glue(CPU_NAME,_do_resume)
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index f3628fb..75bd755 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -87,6 +87,9 @@ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
- extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
- #else
- extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
-+#ifdef CONFIG_ARM_HUGETLB_SUPPORT
-+extern void cpu_set_hugepte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
-+#endif
- #endif
- extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
- 
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index 3a4b3e7..7aee5b5 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -111,6 +111,102 @@ ENTRY(cpu_v7_set_pte_ext)
- 	mov	pc, lr
- ENDPROC(cpu_v7_set_pte_ext)
+diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
+index a3e78cc..b04a69a 100644
+--- a/arch/arm/mm/pgd.c
++++ b/arch/arm/mm/pgd.c
+@@ -91,6 +91,14 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
+ 		pte_unmap(new_pte);
+ 	}
  
 +#ifdef CONFIG_ARM_HUGETLB_SUPPORT
-+ENTRY(cpu_v7_set_hugepte_ext)
-+set_hugepage:
-+	@mask out AP[2:0] TEX[2:0] in first level section descriptor
-+	bic	r3, r1, #0x0000fc00
-+	@clear NX/IMP
-+	bic	r3, r3,#0x210
++	/* reset the hugepage linux pte pointer
++	 * for new mm_struct when we do the fork
++	 */
++	mm->huge_2m_pte[HUGE_2M_PTE_1ST_ARRAY] = 0;
++	mm->huge_2m_pte[HUGE_2M_PTE_2ND_ARRAY] = 0;
++	mm->huge_16m_pte   = 0;
++#endif
+ 	return new_pgd;
+ 
+ no_pte:
+@@ -103,6 +111,25 @@ no_pgd:
+ 	return NULL;
+ }
+ 
++#ifdef CONFIG_ARM_HUGETLB_SUPPORT
++static void free_huge_linuxpte(struct mm_struct *mm)
++{
++	pte_t **huge_linuxpte = &mm->huge_2m_pte[0];
++	int i;
 +
-+	@clear BIT1:0
-+	bic	r3, r3, #PMD_TYPE_MASK
++	for (i = 0; i < HUGE_2M_PTE_SIZE; i++)
++		if (huge_linuxpte[i] != 0)
++			free_page((unsigned long)huge_linuxpte[i]);
 +
-+	@set extension bit
-+	orr	r3, r3, #PMD_SECT_nG @HUGEPAGE always non-global
-+
-+	@set SECT mapping,1M section or 16M supersection
-+	orr	r3, r3, #PMD_SECT_AP_WRITE
-+	orr	r3, r3, #PMD_TYPE_SECT
-+
-+	@BIT18 1: 16M supersection 0: 1M section
-+	bic	r3, r3, #PMD_SECT_SUPER
-+
-+	@ shared bit
-+	tst	r1,#L_PTE_SHARED
-+	orrne	r3,r3,#PMD_SECT_S
-+
-+	@ shared device ?
-+	tst	r1, #1 << 4
-+	orrne	r3, r3, #PMD_SECT_TEX(1)
-+
-+	eor	r1, r1,  #L_PTE_DIRTY
-+	tst	r1, #L_PTE_RDONLY | L_PTE_DIRTY
-+	orrne	r3, r3, #PMD_SECT_APX
-+
-+	tst	r1, #L_PTE_USER
-+	orrne	r3, r3, #PMD_SECT_AP_READ
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+	tstne	r3, #PMD_SECT_APX
-+	bicne	r3, r3, #PMD_SECT_APX | PMD_SECT_AP_WRITE
++	if (mm->huge_16m_pte != NULL)
++		kfree(mm->huge_16m_pte);
++}
++#else
++static void free_huge_linuxpte(struct mm_struct *mm)
++{
++}
 +#endif
 +
-+	@set domain
-+	bic 	r3, r3, #(0xf << 5)
-+	orr	r3, r3, #PMD_DOMAIN(0x1)
-+
-+	@ for supersection mapping
-+	@ clear domain setting and extend addr
-+	@ set BIT18 to denote supersection
-+	ldr 	r2,=L_PTE_HPAGE_2M
-+	tst	r1,r2
-+	bne	page_2M
-+
-+	@ if not 2M huge page, then it's 16M
-+page_16M:
-+	ldr	r2, =((0xf << 5) | (0xf << 20))
-+	bic	r3, r3, r2
-+	orr	r3, r3, #PMD_SECT_SUPER
-+
-+page_2M:
-+	tst	r1, #L_PTE_XN
-+	orrne	r3, r3, #PMD_SECT_XN
-+
-+	tst	r1, #L_PTE_YOUNG
-+	tstne	r1, #L_PTE_PRESENT
-+	moveq	r3, #0
-+
-+	ldr     r2,=L_PTE_HPAGE_2M
-+	tst	r1, r2
-+	bne     setpte_2M
-+
-+	@ set 16M huge page
-+setpte_16M:
-+	.rept 15
-+ 	str r3, [r0]
-+	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+	add	r0, r0, #4
-+	.endr
-+	b	out
-+
-+	@ set 2M huge page
-+setpte_2M:
-+	@ 1st 1MB mapping
-+ 	str r3, [r0]
-+	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+	@ 2st 1MB mapping
-+	cmp	r3,#0
-+	movne	r2,#0x100000
-+	addne	r3, r3, r2
-+	add	r0, r0, #4
-+out:
-+ 	str r3, [r0]
-+	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+	mov pc, lr
-+#endif /*COFNIG_ARM_HUGETLB_SUPPORT*/
-+
-+ENDPROC(cpu_v7_set_hugepte_ext)
-+
+ void pgd_free(struct mm_struct *mm, pgd_t *pgd_base)
+ {
+ 	pgd_t *pgd;
+@@ -135,6 +162,7 @@ no_pud:
+ 	pgd_clear(pgd);
+ 	pud_free(mm, pud);
+ no_pgd:
++	free_huge_linuxpte(mm);
+ #ifdef CONFIG_ARM_LPAE
  	/*
- 	 * Memory region attributes with SCTLR.TRE=1
- 	 *
+ 	 * Free modules/pkmap or identity pmd tables.
+diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+index 3cc3062..88f76e6 100644
+--- a/include/linux/mm_types.h
++++ b/include/linux/mm_types.h
+@@ -23,6 +23,11 @@
+ struct address_space;
+ 
+ #define USE_SPLIT_PTLOCKS	(NR_CPUS >= CONFIG_SPLIT_PTLOCK_CPUS)
++#ifdef CONFIG_ARM_HUGETLB_SUPPORT
++#define HUGE_2M_PTE_SIZE      2
++#define HUGE_2M_PTE_1ST_ARRAY 0
++#define HUGE_2M_PTE_2ND_ARRAY 1
++#endif
+ 
+ /*
+  * Each physical page in the system has a struct page associated with
+@@ -388,6 +393,12 @@ struct mm_struct {
+ #ifdef CONFIG_CPUMASK_OFFSTACK
+ 	struct cpumask cpumask_allocation;
+ #endif
++
++#ifdef CONFIG_ARM_HUGETLB_SUPPORT
++	/* we place hugepage linux pte at mm_struct  */
++	pte_t *huge_2m_pte[HUGE_2M_PTE_SIZE];
++	pte_t *huge_16m_pte;
++#endif
+ };
+ 
+ static inline void mm_init_cpumask(struct mm_struct *mm)
 -- 
 1.7.1
