@@ -1,56 +1,69 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 30 Jan 2012 13:22:59 +0100
-Subject: [PATCH] fix starting of transfers in i.MX dma drivers
-In-Reply-To: <1327914764.1527.15.camel@vkoul-udesk3>
-References: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
- <1327914764.1527.15.camel@vkoul-udesk3>
-Message-ID: <CACKLOr3tx0Kc8rZzx5sp91wCmDcjOB0byW0c7KrWT7VF1g2NyQ@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 30 Jan 2012 13:24:13 +0100
+Subject: [PATCH] mtd/gpmi : add BBT support
+In-Reply-To: <4F267F21.1030204@freescale.com>
+References: <1327898174-13656-1-git-send-email-b32955@freescale.com>
+ <20120130104428.GB15596@pengutronix.de> <4F267F21.1030204@freescale.com>
+Message-ID: <201201301324.13962.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 January 2012 10:12, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Mon, 2012-01-09 at 10:32 +0100, Sascha Hauer wrote:
->> This moves the start of transfers from tx_submit to issue_pending
->> for the i.MX dma drivers as requested by Vinoud here:
->>
->> https://lkml.org/lkml/2012/1/7/23
->>
->> This requires the users (mxcmmc and i.MX sound) to be fixed first.
->> So Chris, Mark, given your Ack I would suggest to send this via
->> Vinouds DMA tree.
->>
->> Sascha
->>
->> Sascha Hauer (4):
->> ? ? ? mmc: mxcmmc: add missing dma_async_issue_pending
->> ? ? ? ASoC: i.MX: Add missing dma_async_issue_pending
->> ? ? ? dma: imx-dma: start transfer in issue_pending
->> ? ? ? dma: imx-sdma: start transfer in issue_pending
->>
->> ?drivers/dma/imx-dma.c ? ? ? ? ? | ? ?9 ++++-----
->> ?drivers/dma/imx-sdma.c ? ? ? ? ?| ? 11 +++++------
->> ?drivers/mmc/host/mxcmmc.c ? ? ? | ? ?1 +
->> ?sound/soc/imx/imx-pcm-dma-mx2.c | ? ?1 +
->> ?4 files changed, 11 insertions(+), 11 deletions(-)
->
-> Thanks applied all.
->
-> Fixed change log in 3 & 4, as Russell pointed out
->
-> Got a conflict in 4, pls see that fix is right.
+> >> The bootloader usually is burned on /dev/mtd0, while the BBT is placed
+> >> at the end
+> >> of the NAND chip.
+> >> 
+> >> I tested the NAND boot mode too.
+> >> 
+> >> What's your concern?
+> > 
+> > Bootloaders may also need to write to NAND. So, they need to share the
+> 
+> Do you mean the uboot may write something to the NAND?
 
-Hi Vinod,
-could you please tell me where has this been merged?
+Yes it can, mainline for certain and ... surprisingly even the one provided by 
+freescale ;-)
 
-I can't see it at git://git.infradead.org/users/vkoul/slave-dma.git
+> Could you show me some more detail cases?
 
-Thank you.
+Type "help" in the command prompt and look for "nand" ;-)
+> 
+> > same bad block information with the kernel. Currently, I am not aware of
+> > a bootloader for mxs which support BBT without OOB. Unless this has
+> > changed meanwhile, we shouldn't make this default, because they can't
+> 
+> The NAND_BBT_NO_OOB makes the BBT written to the NAND with the ECC enabled.
+> 
+> > share the same information then. To be on the safe side regardings
 
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+The mainline incarnation of this should be able to work with the BBT just fine. 
+You can give it a go, mx28evk (the freescale kit) is supported.
+> 
+> The kobs-ng which burns the bootloader to the NAND will also burn the
+> whole BBT
+> to the NAND too.
+> 
+> So I think the bootloader and the kernel share the same BBT information.
+> 
+> But if the bootloader can make some block bad, the BBT information
+> becomes different.
+> Does the bootloader have the feature to make some block bad?
+
+Sure
+
+M
+> 
+> 
+> Br
+> Huang Shijie
+> 
+> > regressions, we shouldn't make this default as well, come to think of
+> > it.
+> > 
+> > Regards,
+> > 
+> >    Wolfram
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
