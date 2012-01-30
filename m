@@ -1,51 +1,71 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Jan 2012 08:33:39 +0100
-Subject: [PATCH 1/4] input: mc13783_ts: rename to mc13xxx_ts
-In-Reply-To: <CAOMZO5C4CfUXWZqSn+0g_gi6wEmv7L+mKhfggcV8evdUJEtVhg@mail.gmail.com>
-References: <1327877464-23526-1-git-send-email-marc@cpdesign.com.au>
- <1327877464-23526-2-git-send-email-marc@cpdesign.com.au>
- <CAOMZO5C4CfUXWZqSn+0g_gi6wEmv7L+mKhfggcV8evdUJEtVhg@mail.gmail.com>
-Message-ID: <20120130073339.GI6305@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 30 Jan 2012 08:43:55 +0100
+Subject: [Linaro-mm-sig] [PATCH 12/15] drivers: add Contiguous Memory
+ Allocator
+In-Reply-To: <CAK=WgbY3L7u0AC1c=iNvoMXX+LSJoz1W-xb=S6gmhqcse5CKaA@mail.gmail.com>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-13-git-send-email-m.szyprowski@samsung.com>
+ <CADMYwHw1B4RNV_9BqAg_M70da=g69Z3kyo5Cr6izCMwJ9LAtvA@mail.gmail.com>
+ <00de01ccdce1$e7c8a360$b759ea20$%szyprowski@samsung.com>
+ <CAO8GWqnQg-W=TEc+CUc8hs=GrdCa9XCCWcedQx34cqURhNwNwA@mail.gmail.com>
+ <010301ccdd03$1ad15ab0$50741010$%szyprowski@samsung.com>
+ <CAK=WgbZWHBKNQwcoY9OiXXH-r1n3XxB=ZODZJN-3vZopU2yhJA@mail.gmail.com>
+ <010501ccdd06$b9844f20$2c8ced60$%szyprowski@samsung.com>
+ <CAK=WgbY3L7u0AC1c=iNvoMXX+LSJoz1W-xb=S6gmhqcse5CKaA@mail.gmail.com>
+Message-ID: <014101ccdf22$eb610d30$c2232790$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Mon, Jan 30, 2012 at 12:52:59AM -0200, Fabio Estevam wrote:
-> On Sun, Jan 29, 2012 at 8:51 PM, Marc Reilly <marc@cpdesign.com.au> wrote:
-> > Start moving this driver towards support for both mc13892 and mc13783.
-> >
-> > This patch simply renames mc13783 specific identifiers to the generic
-> > mc13xxx. A platform_device_id table is also added so that the driver
-> > is still created correctly for the mc13783 only.
-> >
-> > Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
-> > ---
-> > ?drivers/input/touchscreen/Kconfig ? ? ?| ? ?8 +-
-> > ?drivers/input/touchscreen/Makefile ? ? | ? ?2 +-
-> > ?drivers/input/touchscreen/mc13783_ts.c | ?259 -------------------------------
-> > ?drivers/input/touchscreen/mc13xxx_ts.c | ?267 ++++++++++++++++++++++++++++++++
-> > ?4 files changed, 272 insertions(+), 264 deletions(-)
-> > ?delete mode 100644 drivers/input/touchscreen/mc13783_ts.c
-> > ?create mode 100644 drivers/input/touchscreen/mc13xxx_ts.c
-> 
-> For the rename, it is better to do:
-> git mv  drivers/input/touchscreen/mc13783_ts.c
-> drivers/input/touchscreen/mc13xxx_ts.c
-> 
-> git commit -a
-> 
-> and then git format -M -1 , as it will detect the rename.
-git format-patch -M will detect the rename independently of how the
-commit was created. Using git mv doesn't result in adding any special
-metadata to the commit, it's just mv $old $new; git rm $old; git add
-$new.
+On Saturday, January 28, 2012 7:57 PM Ohad Ben-Cohen wrote:
 
-But +1 on using -M (or not renaming the driver).
+> On Fri, Jan 27, 2012 at 5:17 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > There have been some vmalloc layout changes merged to v3.3-rc1.
+> 
+> That was dead-on, thanks a lot!
+
+Did you managed to fix this issue?
+
+> 
+> I did then bump into a different allocation failure which happened
+> because dma_alloc_from_contiguous() computes 'mask' before capping the
+> 'align' argument.
+> 
+> The early 'mask' computation was added in v18 (and therefore exists in
+> v19 too) and I was actually testing v17 previously, so I didn't notice
+> it before.
+
+Right, thanks for spotting it, I will squash it to the next release.
+
+> You may want to squash something like this:
+> 
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index f41e699..8455cb7 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -319,8 +319,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, i
+>                                        unsigned int align)
+>  {
+>         struct cma *cma = dev_get_cma_area(dev);
+> -       unsigned long pfn, pageno, start = 0;
+> -       unsigned long mask = (1 << align) - 1;
+> +       unsigned long mask, pfn, pageno, start = 0;
+>         int ret;
+> 
+>         if (!cma || !cma->count)
+> @@ -329,6 +328,8 @@ struct page *dma_alloc_from_contiguous(struct device *dev, i
+>         if (align > CONFIG_CMA_ALIGNMENT)
+>                 align = CONFIG_CMA_ALIGNMENT;
+> 
+> +       mask = (1 << align) - 1;
+> +
+>         pr_debug("%s(cma %p, count %d, align %d)\n", __func__, (void *)cma,
+>                  count, align);
+> 
 
 Best regards
-Uwe
-
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Marek Szyprowski
+Samsung Poland R&D Center
