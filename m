@@ -1,145 +1,102 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 30 Jan 2012 13:59:48 -0800
-Subject: [PATCH] ARM: OMAP2+: clock: cleanup CPUfreq leftovers
-Message-ID: <1327960788-28905-1-git-send-email-khilman@ti.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Tue, 31 Jan 2012 08:40:55 +1100
+Subject: [PATCH 2/6] mfd: mc13xxx-core: ADC conv: wait_for_completion
+ returns a long
+In-Reply-To: <20120130072453.GG6305@pengutronix.de>
+References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
+ <1327876408-22528-3-git-send-email-marc@cpdesign.com.au>
+ <20120130072453.GG6305@pengutronix.de>
+Message-ID: <201201310840.55707.marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have OPP layer, and OMAP CPUfreq driver is using it, we no
-longer need/use the clock framework code for filling up CPUfreq
-tables.  Remove it.
+Hi Uwe,
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Paul, now that the CPUfreq driver is in mainline (v3.3), this can be safely
-removed.
+Thanks for reviewing.
 
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   80 --------------------------
- arch/arm/mach-omap2/clock.c                  |    5 --
- arch/arm/mach-omap2/clock.h                  |    8 ---
- 3 files changed, 0 insertions(+), 93 deletions(-)
+On Monday, January 30, 2012 06:24:53 PM Uwe Kleine-K?nig wrote:
+> On Mon, Jan 30, 2012 at 09:33:24AM +1100, Marc Reilly wrote:
+> > Use the correct return type for wait_for_completion, as long may be
+> > larger than int.
+> 
+> That's a theoretical problem only because the return value should be in
+> the range -ESOMETHING ... HZ which fits into an int.
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-index 39f9d5a..9a13e07 100644
---- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-@@ -164,83 +164,3 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
+It _should_ be ok, but I propose that it is generally better practice to match 
+up the types. 
+
+
+> > @@ -566,20 +567,23 @@ int mc13xxx_adc_do_conversion(struct mc13xxx
+> > *mc13xxx, unsigned int mode,
+> > 
+> >  			mc13xxx_handler_adcdone, __func__, &adcdone_data);
+> >  	
+> >  	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC0, adc0);
+> > 
+> > -	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
+> > +	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
+> 
+> Is this change intended? I guess without it you get a warning that ret
+> is used uninitialized, 
+
+This was intended, ret is then either 0 after a successful write to start the 
+conversion off, or negative from a write error (or non-completion below).
+
+
+> but if mc13xxx_reg_write fails you should IMHO
+> return at once.
+
+I guess there should be a lot more checking for failure in other places too. 
+You are right about returning at once.
+
+
+> 
+> >  	mc13xxx_unlock(mc13xxx);
+> > 
+> > -	ret = wait_for_completion_interruptible_timeout(&adcdone_data.done,
+> > HZ); +	timeout =
+> > wait_for_completion_interruptible_timeout(&adcdone_data.done, HZ);
+> > 
+> > -	if (!ret)
+> > +	if (timeout <= 0) {
+> > +		dev_warn(mc13xxx->dev,
+> > +				"timed out waiting for ADC completion\n");
+> > 
+> >  		ret = -ETIMEDOUT;
+> > 
+> > +	}
+> 
+> I think this is wrong. wait_for_completion_interruptible_timeout returns
+> -ERESTARTSYS if it was interrupted. That's not a timeout and
+> -ERESTARTSYS should be propagated then. !ret is the correct test for
+> timeout.
+
+It took me a little while to get your point here, and I guess I missed that in 
+my original understanding of the code, (which may be more of a reflection on 
+me :) )
  
- 	return 0;
- }
--
--#ifdef CONFIG_CPU_FREQ
--/*
-- * Walk PRCM rate table and fillout cpufreq freq_table
-- * XXX This should be replaced by an OPP layer in the near future
-- */
--static struct cpufreq_frequency_table *freq_table;
--
--void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
--{
--	const struct prcm_config *prcm;
--	int i = 0;
--	int tbl_sz = 0;
--
--	if (!cpu_is_omap24xx())
--		return;
--
--	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
--		if (!(prcm->flags & cpu_mask))
--			continue;
--		if (prcm->xtal_speed != sclk->rate)
--			continue;
--
--		/* don't put bypass rates in table */
--		if (prcm->dpll_speed == prcm->xtal_speed)
--			continue;
--
--		tbl_sz++;
--	}
--
--	/*
--	 * XXX Ensure that we're doing what CPUFreq expects for this error
--	 * case and the following one
--	 */
--	if (tbl_sz == 0) {
--		pr_warning("%s: no matching entries in rate_table\n",
--			   __func__);
--		return;
--	}
--
--	/* Include the CPUFREQ_TABLE_END terminator entry */
--	tbl_sz++;
--
--	freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) * tbl_sz,
--			     GFP_ATOMIC);
--	if (!freq_table) {
--		pr_err("%s: could not kzalloc frequency table\n", __func__);
--		return;
--	}
--
--	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
--		if (!(prcm->flags & cpu_mask))
--			continue;
--		if (prcm->xtal_speed != sclk->rate)
--			continue;
--
--		/* don't put bypass rates in table */
--		if (prcm->dpll_speed == prcm->xtal_speed)
--			continue;
--
--		freq_table[i].index = i;
--		freq_table[i].frequency = prcm->mpu_speed / 1000;
--		i++;
--	}
--
--	freq_table[i].index = i;
--	freq_table[i].frequency = CPUFREQ_TABLE_END;
--
--	*table = &freq_table[0];
--}
--
--void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
--{
--	if (!cpu_is_omap24xx())
--		return;
--
--	kfree(freq_table);
--}
--
--#endif
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index f57ed5b..d9f4931 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -536,10 +536,5 @@ struct clk_functions omap2_clk_functions = {
- 	.clk_set_rate		= omap2_clk_set_rate,
- 	.clk_set_parent		= omap2_clk_set_parent,
- 	.clk_disable_unused	= omap2_clk_disable_unused,
--#ifdef CONFIG_CPU_FREQ
--	/* These will be removed when the OPP code is integrated */
--	.clk_init_cpufreq_table	= omap2_clk_init_cpufreq_table,
--	.clk_exit_cpufreq_table	= omap2_clk_exit_cpufreq_table,
--#endif
- };
- 
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index b8c2a68..a1bb23a 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -146,14 +146,6 @@ extern const struct clksel_rate gpt_sys_rates[];
- extern const struct clksel_rate gfx_l3_rates[];
- extern const struct clksel_rate dsp_ick_rates[];
- 
--#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_CPU_FREQ)
--extern void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
--extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
--#else
--#define omap2_clk_init_cpufreq_table	0
--#define omap2_clk_exit_cpufreq_table	0
--#endif
--
- extern const struct clkops clkops_omap2_iclk_dflt_wait;
- extern const struct clkops clkops_omap2_iclk_dflt;
- extern const struct clkops clkops_omap2_iclk_idle_only;
--- 
-1.7.8.2
+I still think the way it was before is subtle, and would prefer something more 
+explicit, perhaps:
+
+if (timeout == 0)
+	ret = -ETIMEDOUT;
+else if (timeout < 0)
+	ret = timeout;
+
+
+> 
+> >  	mc13xxx_lock(mc13xxx);
+> >  	
+> >  	mc13xxx_irq_free(mc13xxx, MC13XXX_IRQ_ADCDONE, &adcdone_data);
+> > 
+> > -	if (ret > 0)
+> > +	if (!ret)
+> 
+> This is wrong, too, isn't it?
+
+This is right I think. ret is return code from the mc13xxx_* call, so 0 is 
+success.
+
+
+Cheers,
+Marc
