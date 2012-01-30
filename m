@@ -1,33 +1,68 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Mon, 30 Jan 2012 16:08:12 +0800
-Subject: [PATCH 1/1] net: fec: correct phy_name buffer length when init
- phy_name
-Message-ID: <1327910892-11251-1-git-send-email-richard.zhao@linaro.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 30 Jan 2012 13:45:15 +0530
+Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
+In-Reply-To: <4F1FFF7E.3000802@codeaurora.org>
+References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
+ <1326807902.1540.116.camel@vkoul-udesk3> <4F195E4C.6080805@codeaurora.org>
+ <1327066287.517.4.camel@vkoul-udesk3> <4F1D4052.3070701@codeaurora.org>
+ <1327326713.517.32.camel@vkoul-udesk3> <4F1FFF7E.3000802@codeaurora.org>
+Message-ID: <1327911315.1527.8.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the bug that we got wrong phy_name on imx6q sabrelite board.
-snprintf used wrong length of phy_name.
-phy_name length is MII_BUS_ID_SIZE + 3 rather not MII_BUS_ID_SIZE.
-I change it to sizeof(phy_name).
+On Wed, 2012-01-25 at 18:41 +0530, Ravi Kumar V wrote:
+> On 1/23/2012 7:21 PM, Vinod Koul wrote:
+> > On Mon, 2012-01-23 at 16:41 +0530, Ravi Kumar V wrote:
+> >>
+> >> If some changes are made in interleave API then it can support our BOX
+> >> mode. Here in interleaved template he is assuming destination pattern as
+> >> can be contiguous or same as source pattern, but in our case destination
+> >> pattern is different from source pattern.
+> >> So if a new parameter destination data chunk is added in "struct
+> >> dma_interleaved_template" structure then it can support different
+> >> destination pattern.
+> > do you mean you have cases where you are doing a "memcpy" from one
+> > interleaved memory to another?
+> > Can you provide me with a scenario where this maybe helpful?
+> 
+> Presently we are transferring data from interleaved memory tho 
+> contagious memory and vice-verse.
+> We can use the interleaved API for present scenario, but it will 
+> restrict the HW capability of transferring data from one interleaved 
+> pattern to other interleaved pattern.
+That's interesting capability.
+My question still unanswered is whats the real work usage of this
+capability. Helps to understand what this would be used for and
+providing optimal solution
+> 
+> >
+> > The reason why the API was designed like this was to give ability to
+> > take these kind of interleaved memory and copy them to peripheral
+> > (constant addr) or memory (typically contagious).
+> >
+> > In case it is just a pattern I wonder why it cannot be described in
+> > standard scatter gather definitions as you can split the block further
+> > down to copy from one respective block to somewhere else in memory.
+> 
+> We can use scatter gather but it will be extra burden on software to 
+> create those many SG list unlike in box mode just a single command 
+> serves the purpose.
+> 
+> >> Also it will good if you can provide another parameter for passing
+> >> private data to dma driver.
+> > 1. what does this parameter do?
+> 
+> Private parameter in our case will be command configuration parameter 
+> where we are passing information to HW like endianness, synchronization 
+> & acknowledge mechanism between DMA HW and peripherals running with 
+> different clock than DMA.
+This is a separate discussion. We had similar talk on need to pass
+controller/subsystem specific parameters [1] sometime back during RIO
+patches. Alexandre has posted a new RFC [2] which should be extended to
+whatever API you finally end up using
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- drivers/net/ethernet/freescale/fec.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+[1]: https://lkml.org/lkml/2011/10/24/275 
+[2]: https://lkml.org/lkml/2012/1/26/405
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 7b25e9c..1c7aad8 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -990,7 +990,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
- 		phy_id = 0;
- 	}
- 
--	snprintf(phy_name, MII_BUS_ID_SIZE, PHY_ID_FMT, mdio_bus_id, phy_id);
-+	snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
- 	phy_dev = phy_connect(ndev, phy_name, &fec_enet_adjust_link, 0,
- 			      fep->phy_interface);
- 	if (IS_ERR(phy_dev)) {
 -- 
-1.7.5.4
+~Vinod
