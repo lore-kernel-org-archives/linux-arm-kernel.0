@@ -1,29 +1,71 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 30 Jan 2012 14:19:13 +0100
-Subject: [PATCH] mtd/gpmi : add BBT support
-In-Reply-To: <201201301324.13962.marek.vasut@gmail.com>
-References: <1327898174-13656-1-git-send-email-b32955@freescale.com>
- <20120130104428.GB15596@pengutronix.de>
- <4F267F21.1030204@freescale.com>
- <201201301324.13962.marek.vasut@gmail.com>
-Message-ID: <20120130131913.GE15596@pengutronix.de>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 30 Jan 2012 13:25:12 +0000
+Subject: [PATCHv19 00/15] Contiguous Memory Allocator
+In-Reply-To: <20120127162624.40cba14e.akpm@linux-foundation.org>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <201201261531.40551.arnd@arndb.de>
+ <20120127162624.40cba14e.akpm@linux-foundation.org>
+Message-ID: <20120130132512.GO25268@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 27, 2012 at 04:26:24PM -0800, Andrew Morton wrote:
+> On Thu, 26 Jan 2012 15:31:40 +0000
+> Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > On Thursday 26 January 2012, Marek Szyprowski wrote:
+> > > Welcome everyone!
+> > > 
+> > > Yes, that's true. This is yet another release of the Contiguous Memory
+> > > Allocator patches. This version mainly includes code cleanups requested
+> > > by Mel Gorman and a few minor bug fixes.
+> > 
+> > Hi Marek,
+> > 
+> > Thanks for keeping up this work! I really hope it works out for the
+> > next merge window.
+> 
+> Someone please tell me when it's time to start paying attention
+> again ;)
+> 
+> These patches don't seem to have as many acked-bys and reviewed-bys as
+> I'd expect. 
 
-> The mainline incarnation of this should be able to work with the BBT just fine. 
-> You can give it a go, mx28evk (the freescale kit) is supported.
+I reviewed the core MM changes and I've acked most of them so the
+next release should have a few acks where you expect them. I did not
+add a reviewed-by because I did not build and test the thing.
 
-Did you test? I can't find any NO_OOB option in the code. Not that you
-lose the BBTs...
+For me, Patch 2 is the only one that must be fixed prior to merging
+as it can interfere with pages on a remote per-cpu list which is
+dangerous. I know your suggestion will be to delete the per-cpu lists
+and be done with it but I am a bit away from doing that just yet.
+
+Patch 8 could do with a bit more care too but it is not a
+potential hand grenade like patch 2 and could be fixed as part of
+a follow-up. Even if you don't see an ack from me there, it should not
+be treated as a show stopper.
+
+I highlighted some issues on how CMA interacts with reclaim but I
+think this is a problem specific to CMA and should not prevent it being
+merged. I just wanted to be sure that the CMA people were aware of the
+potential issues so they will recognise the class of bug if it occurs.
+
+> Given the scope and duration of this, it would be useful
+> to gather these up.  But please ensure they are real ones - people
+> sometimes like to ack things without showing much sign of having
+> actually read them.
+> 
+
+FWIW, the acks I put on the core MM changes are real acks :)
+
+> The patches do seem to have been going round in ever-decreasing circles
+> lately and I think we have decided to merge them (yes?) so we may as well
+> get on and do that and sort out remaining issues in-tree.
+> 
+
+I'm a lot happier with the core MM patches than I was when I reviewed
+this first around last September or October.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/f91c6ea1/attachment.sig>
+Mel Gorman
+SUSE Labs
