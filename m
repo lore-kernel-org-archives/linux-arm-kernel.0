@@ -1,68 +1,101 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 30 Jan 2012 13:45:15 +0530
-Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
-In-Reply-To: <4F1FFF7E.3000802@codeaurora.org>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1326807902.1540.116.camel@vkoul-udesk3> <4F195E4C.6080805@codeaurora.org>
- <1327066287.517.4.camel@vkoul-udesk3> <4F1D4052.3070701@codeaurora.org>
- <1327326713.517.32.camel@vkoul-udesk3> <4F1FFF7E.3000802@codeaurora.org>
-Message-ID: <1327911315.1527.8.camel@vkoul-udesk3>
+From: bill4carson@gmail.com (bill4carson)
+Date: Mon, 30 Jan 2012 16:29:47 +0800
+Subject: [PATCH] Skip unnecessary pte makeup when clearing it.
+In-Reply-To: <20120130075806.GJ6305@pengutronix.de>
+References: <1327888071-3162-1-git-send-email-bill4carson@gmail.com>
+ <1327888071-3162-2-git-send-email-bill4carson@gmail.com>
+ <20120130075806.GJ6305@pengutronix.de>
+Message-ID: <4F2654FB.60403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-01-25 at 18:41 +0530, Ravi Kumar V wrote:
-> On 1/23/2012 7:21 PM, Vinod Koul wrote:
-> > On Mon, 2012-01-23 at 16:41 +0530, Ravi Kumar V wrote:
-> >>
-> >> If some changes are made in interleave API then it can support our BOX
-> >> mode. Here in interleaved template he is assuming destination pattern as
-> >> can be contiguous or same as source pattern, but in our case destination
-> >> pattern is different from source pattern.
-> >> So if a new parameter destination data chunk is added in "struct
-> >> dma_interleaved_template" structure then it can support different
-> >> destination pattern.
-> > do you mean you have cases where you are doing a "memcpy" from one
-> > interleaved memory to another?
-> > Can you provide me with a scenario where this maybe helpful?
-> 
-> Presently we are transferring data from interleaved memory tho 
-> contagious memory and vice-verse.
-> We can use the interleaved API for present scenario, but it will 
-> restrict the HW capability of transferring data from one interleaved 
-> pattern to other interleaved pattern.
-That's interesting capability.
-My question still unanswered is whats the real work usage of this
-capability. Helps to understand what this would be used for and
-providing optimal solution
-> 
-> >
-> > The reason why the API was designed like this was to give ability to
-> > take these kind of interleaved memory and copy them to peripheral
-> > (constant addr) or memory (typically contagious).
-> >
-> > In case it is just a pattern I wonder why it cannot be described in
-> > standard scatter gather definitions as you can split the block further
-> > down to copy from one respective block to somewhere else in memory.
-> 
-> We can use scatter gather but it will be extra burden on software to 
-> create those many SG list unlike in box mode just a single command 
-> serves the purpose.
-> 
-> >> Also it will good if you can provide another parameter for passing
-> >> private data to dma driver.
-> > 1. what does this parameter do?
-> 
-> Private parameter in our case will be command configuration parameter 
-> where we are passing information to HW like endianness, synchronization 
-> & acknowledge mechanism between DMA HW and peripherals running with 
-> different clock than DMA.
-This is a separate discussion. We had similar talk on need to pass
-controller/subsystem specific parameters [1] sometime back during RIO
-patches. Alexandre has posted a new RFC [2] which should be extended to
-whatever API you finally end up using
 
-[1]: https://lkml.org/lkml/2011/10/24/275 
-[2]: https://lkml.org/lkml/2012/1/26/405
+
+On 2012?01?30? 15:58, Uwe Kleine-K?nig wrote:
+> On Mon, Jan 30, 2012 at 09:47:51AM +0800, bill4carson at gmail.com wrote:
+>> From: Bill Carson<bill4carson@gmail.com>
+>>
+>> If we are only about to clear a hardware pte entry, then pte makeup code is
+>> unnecessary for cpu_v7_set_pte_ext and armv6_set_pte_ext, so just skip it.
+>>
+>> Signed-off-by: Bill Carson<bill4carson@gmail.com>
+>> ---
+>>   arch/arm/mm/proc-macros.S    |   10 +++++-----
+>>   arch/arm/mm/proc-v7-2level.S |   10 +++++-----
+>>   2 files changed, 10 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+>> index 2d8ff3a..907b524 100644
+>> --- a/arch/arm/mm/proc-macros.S
+>> +++ b/arch/arm/mm/proc-macros.S
+>> @@ -138,6 +138,10 @@
+>>   	.macro	armv6_set_pte_ext pfx
+>>   	str	r1, [r0], #2048			@ linux version
+>>
+>> +	tst	r1, #L_PTE_YOUNG
+>> +	tstne	r1, #L_PTE_PRESENT
+>> +	moveq	r3, #0
+>> +	beq	1f
+>>   	bic	r3, r1, #0x000003fc
+>>   	bic	r3, r3, #PTE_TYPE_MASK
+>>   	orr	r3, r3, r2
+>> @@ -163,11 +167,7 @@
+>>   	orrne	r3, r3, #PTE_EXT_XN
+>>
+>>   	orr	r3, r3, r2
+>> -
+>> -	tst	r1, #L_PTE_YOUNG
+>> -	tstne	r1, #L_PTE_PRESENT
+>> -	moveq	r3, #0
+>> -
+>> +1:
+>>   	str	r3, [r0]
+>>   	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+>>   	.endm
+>> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+>> index 3a4b3e7..869bebc 100644
+>> --- a/arch/arm/mm/proc-v7-2level.S
+>> +++ b/arch/arm/mm/proc-v7-2level.S
+>> @@ -76,6 +76,10 @@ ENTRY(cpu_v7_set_pte_ext)
+>>   #ifdef CONFIG_MMU
+>>   	str	r1, [r0]			@ linux version
+>>
+>> +	tst	r1, #L_PTE_YOUNG
+>> +	tstne	r1, #L_PTE_PRESENT
+>> +	moveq	r3, #0
+>> +	beq		1f
+> This double tab looks wrong. Other than that I think the patch is OK.
+> Note I don't have a clue about ptes but your changes are a logical nop.
+>
+Thanks for your feedback :)
+
+I will fix that double tab soon, as for "your changes are a logical nop"
+it does not change any code substantially, changing the sequence does
+not help when setup an page mapping, but it take a short path when clearing
+an existing pte, thus gives better performance.
+
+> Best regards
+> Uwe
+>
+>>   	bic	r3, r1, #0x000003f0
+>>   	bic	r3, r3, #PTE_TYPE_MASK
+>>   	orr	r3, r3, r2
+>> @@ -98,11 +102,7 @@ ENTRY(cpu_v7_set_pte_ext)
+>>
+>>   	tst	r1, #L_PTE_XN
+>>   	orrne	r3, r3, #PTE_EXT_XN
+>> -
+>> -	tst	r1, #L_PTE_YOUNG
+>> -	tstne	r1, #L_PTE_PRESENT
+>> -	moveq	r3, #0
+>> -
+>> +1:
+>>    ARM(	str	r3, [r0, #2048]! )
+>>    THUMB(	add	r0, r0, #2048 )
+>>    THUMB(	str	r3, [r0] )
 
 -- 
-~Vinod
+I am a slow learner
+but I will keep trying to fight for my dreams!
+
+--bill
