@@ -1,27 +1,80 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 30 Jan 2012 17:02:04 +0100
-Subject: [PATCH v2 5/7] LPC32xx: clock.c: warning fix
+Date: Mon, 30 Jan 2012 17:02:03 +0100
+Subject: [PATCH v2 4/7] LPC32xx: clock.c: MMC update
 In-Reply-To: <1327939327-7799-1-git-send-email-stigge@antcom.de>
 References: <1327939327-7799-1-git-send-email-stigge@antcom.de>
-Message-ID: <1327939327-7799-5-git-send-email-stigge@antcom.de>
+Message-ID: <1327939327-7799-4-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the debug warning on local_clk_disable() as done in Kevin
-Wells' driver update
+This patch updates MMC clocking in clock.c:
+* No manual MMC clock enable/disable on MMC register access necessary
+  (it's the MMC IP clock, not the MMC CLK signal rate)  
+* Added comments
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index 229bec5..01e9aba 100644
+index 17709ca..229bec5 100644
 --- a/arch/arm/mach-lpc32xx/clock.c
 +++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -903,8 +903,6 @@ static inline void clk_unlock(void)
+@@ -738,14 +738,9 @@ static int mmc_onoff_enable(struct clk *clk, int enable)
  
- static void local_clk_disable(struct clk *clk)
+ static unsigned long mmc_get_rate(struct clk *clk)
  {
--	WARN_ON(clk->usecount == 0);
+-	u32 div, rate, oldclk;
++	u32 div, rate;
+ 
+-	/* The MMC clock must be on when accessing an MMC register */
+-	oldclk = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
+-	__raw_writel(oldclk | LPC32XX_CLKPWR_MSCARD_SDCARD_EN,
+-		LPC32XX_CLKPWR_MS_CTRL);
+ 	div = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
+-	__raw_writel(oldclk, LPC32XX_CLKPWR_MS_CTRL);
+ 
+ 	/* Get the parent clock rate */
+ 	rate = clk->parent->get_rate(clk->parent);
+@@ -773,32 +768,36 @@ static unsigned long mmc_round_rate(struct clk *clk, unsigned long rate)
+ 	if (div > 0xf)
+ 		div = 0xf;
+ 
++	/*
++	 * The divider is forced to 1 to keep the SD clock granularity
++	 * good. Using a non-0 divider will limit the SD card clock rates
++	 * the SD driver can generate. Remove it if your feeling crazy.
++	 */
++	div = 1;
++
+ 	return prate / div;
+ }
+ 
+ static int mmc_set_rate(struct clk *clk, unsigned long rate)
+ {
+-	u32 oldclk, tmp;
++	u32 tmp;
+ 	unsigned long prate, div, crate = mmc_round_rate(clk, rate);
+ 
+ 	prate = clk->parent->get_rate(clk->parent);
+ 
+ 	div = prate / crate;
+ 
+-	/* The MMC clock must be on when accessing an MMC register */
+-	oldclk = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
+-	__raw_writel(oldclk | LPC32XX_CLKPWR_MSCARD_SDCARD_EN,
+-		LPC32XX_CLKPWR_MS_CTRL);
+ 	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL) &
+ 		~LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(0xf);
+ 	tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(div);
+ 	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
+ 
+-	__raw_writel(oldclk, LPC32XX_CLKPWR_MS_CTRL);
 -
- 	/* Don't attempt to disable clock if it has no users */
- 	if (clk->usecount > 0) {
- 		clk->usecount--;
+ 	return 0;
+ }
+ 
++/*
++ * This is the MMC IP clock, not the MMC CLK signal rate!
++ */
+ static struct clk clk_mmc = {
+ 	.parent		= &clk_armpll,
+ 	.set_rate	= mmc_set_rate,
