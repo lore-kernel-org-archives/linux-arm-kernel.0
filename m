@@ -1,35 +1,43 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Mon, 30 Jan 2012 18:50:38 +0900
-Subject: [PATCH] MAINTAINERS: add entry for exynos display drivers
- video/driver/exynos/*
-In-Reply-To: <4F262DB6.7060104@samsung.com>
-References: <4F262DB6.7060104@samsung.com>
-Message-ID: <4F2667EE.2090902@samsung.com>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Mon, 30 Jan 2012 10:51:11 +0100
+Subject: [PATCH 6/6] mmc: sdhci-s3c: Add device tree support
+In-Reply-To: <1320266163-15292-7-git-send-email-thomas.abraham@linaro.org>
+References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
+ <1320266163-15292-7-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <201201301051.22396.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I'd like to add Inki Dae, Donghwa Lee and Kyungmin Park as maintainers
-who developers for exynos display drivers for video/driver/exynos/*
+Am Mittwoch, 2. November 2011, 21:36:03 schrieb Thomas Abraham:
+
+Hi Thomas,
+
+in patch 1/6:
+> +static struct platform_device_id sdhci_s3c_driver_ids[] = {
+> +       {
+> +               .name           = "s3c-sdhci",
+> +               .driver_data    = (kernel_ulong_t)NULL,
+> +       },
+> +       {
+> +               .name           = "exynos4-sdhci",
+> +               .driver_data    = EXYNOS4_SDHCI_DRV_DATA,
+> +       },
+> +};
+> +MODULE_DEVICE_TABLE(platform, sdhci_s3c_driver_ids);
 
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2a90101..0ffdc9f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2335,6 +2335,15 @@ S:	Supported
- F:	drivers/gpu/drm/exynos
- F:	include/drm/exynos*
- 
-+EXYNOS DISPLAY DRIVERS
-+M:	Inki Dae <inki.dae@samsung.com>
-+M:	Donghwa Lee <dh09.lee@samsung.com>
-+M:	Kyungmin Park <kyungmin.park@samsung.com>
-+L:	linux-fbdev at vger.kernel.org
-+S:	Maintained
-+F:	drivers/video/exynos/*
-+F:	include/video/exynos*
-+
- DSCC4 DRIVER
- M:	Francois Romieu <romieu@fr.zoreil.com>
- L:	netdev at vger.kernel.org
+and in patch 6/6:
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id sdhci_s3c_dt_match[] = {
+> +	{ .compatible = "samsung,s3c6410-sdhci", },
+> +	{ .compatible = "samsung,exynos4210-sdhci",
+> +		.data = &exynos4_sdhci_drv_data },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+
+wouldn't it be better to keep the naming consistent between of and non-of?
+I.e. s3c-sdhci vs. s3c6410-sdhci. Since the driver is used for all S3C SoCs 
+containing hsmmc controllers I think s3c-sdhci would be preferable here.
+
+Heiko
