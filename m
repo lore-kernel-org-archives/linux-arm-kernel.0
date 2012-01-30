@@ -1,102 +1,102 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Tue, 31 Jan 2012 08:40:55 +1100
-Subject: [PATCH 2/6] mfd: mc13xxx-core: ADC conv: wait_for_completion
- returns a long
-In-Reply-To: <20120130072453.GG6305@pengutronix.de>
-References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
- <1327876408-22528-3-git-send-email-marc@cpdesign.com.au>
- <20120130072453.GG6305@pengutronix.de>
-Message-ID: <201201310840.55707.marc@cpdesign.com.au>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 30 Jan 2012 23:58:25 +0100
+Subject: [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
+ suspend is not implemented
+In-Reply-To: <1327923953.2487.13.camel@sauron.fi.intel.com>
+References: <1327306361-9803-1-git-send-email-shubhrajyoti@ti.com>
+ <20120124090630.GR16726@n2100.arm.linux.org.uk>
+ <1327923953.2487.13.camel@sauron.fi.intel.com>
+Message-ID: <201201302358.26152.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-Thanks for reviewing.
-
-On Monday, January 30, 2012 06:24:53 PM Uwe Kleine-K?nig wrote:
-> On Mon, Jan 30, 2012 at 09:33:24AM +1100, Marc Reilly wrote:
-> > Use the correct return type for wait_for_completion, as long may be
-> > larger than int.
+On Monday, January 30, 2012, Artem Bityutskiy wrote:
+> On Tue, 2012-01-24 at 09:06 +0000, Russell King - ARM Linux wrote:
+> > > However, the bug made it into the 3.3 merge window, so shouldn't this
+> > > bugfix be sent upstream immediately?
+> > 
+> > David is the MTD maintainer, and Artem just helps out.  I believe Artem
+> > is waiting for David to finish travelling before asking David (last seen
+> > at Hong Kong airport) to pull these fixes.  David in turn will pass them
+> > onto Linus.  Plus, Linus only started adding to -rc1 yesterday, so its a
+> > little early to expect this to be fixed.
 > 
-> That's a theoretical problem only because the return value should be in
-> the range -ESOMETHING ... HZ which fits into an int.
-
-It _should_ be ok, but I propose that it is generally better practice to match 
-up the types. 
-
-
-> > @@ -566,20 +567,23 @@ int mc13xxx_adc_do_conversion(struct mc13xxx
-> > *mc13xxx, unsigned int mode,
-> > 
-> >  			mc13xxx_handler_adcdone, __func__, &adcdone_data);
-> >  	
-> >  	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC0, adc0);
-> > 
-> > -	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
-> > +	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
+> Hi,
 > 
-> Is this change intended? I guess without it you get a warning that ret
-> is used uninitialized, 
-
-This was intended, ret is then either 0 after a successful write to start the 
-conversion off, or negative from a write error (or non-completion below).
-
-
-> but if mc13xxx_reg_write fails you should IMHO
-> return at once.
-
-I guess there should be a lot more checking for failure in other places too. 
-You are right about returning at once.
-
-
+> here is the latest version of the fix.
 > 
-> >  	mc13xxx_unlock(mc13xxx);
-> > 
-> > -	ret = wait_for_completion_interruptible_timeout(&adcdone_data.done,
-> > HZ); +	timeout =
-> > wait_for_completion_interruptible_timeout(&adcdone_data.done, HZ);
-> > 
-> > -	if (!ret)
-> > +	if (timeout <= 0) {
-> > +		dev_warn(mc13xxx->dev,
-> > +				"timed out waiting for ADC completion\n");
-> > 
-> >  		ret = -ETIMEDOUT;
-> > 
-> > +	}
+> http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commit/283d43b9ce2952535aa89c0195085e2a1b7e5fce
 > 
-> I think this is wrong. wait_for_completion_interruptible_timeout returns
-> -ERESTARTSYS if it was interrupted. That's not a timeout and
-> -ERESTARTSYS should be propagated then. !ret is the correct test for
-> timeout.
-
-It took me a little while to get your point here, and I guess I missed that in 
-my original understanding of the code, (which may be more of a reflection on 
-me :) )
- 
-I still think the way it was before is subtle, and would prefer something more 
-explicit, perhaps:
-
-if (timeout == 0)
-	ret = -ETIMEDOUT;
-else if (timeout < 0)
-	ret = timeout;
-
-
+> Also attached.
 > 
-> >  	mc13xxx_lock(mc13xxx);
-> >  	
-> >  	mc13xxx_irq_free(mc13xxx, MC13XXX_IRQ_ADCDONE, &adcdone_data);
-> > 
-> > -	if (ret > 0)
-> > +	if (!ret)
+> From 283d43b9ce2952535aa89c0195085e2a1b7e5fce Mon Sep 17 00:00:00 2001
+> From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+> Date: Mon, 16 Jan 2012 11:07:16 +0200
+> Subject: [PATCH] mtd: fix MTD suspend
 > 
-> This is wrong, too, isn't it?
+> Commits 3fe4bae88460869a8e553397cd9057a4ee7ca341 and
+> 079c985e7a6f4ce60f931cebfdd5ee3c3 broke MTD suspend in 2 ways:
+> 
+> 1. When the '->suspend' method is not present, we return -EOPNOTSUPP,
+> but
+>    the callers of 'mtd_suspend()' expects 0 instead.
+> 2. Checking of the 'mtd' parameter against NULL has been incorrectly
+> removed
+>    in 'mtd_cls_suspend()'.
+> 
+> This patch fixes the breakages. This has been found, analyzed, reported
+> and tested by Rafael J. Wysocki <rjw@sisk.pl>.
+> 
+> Note, this patch is not needed in the stable tree because it causes a
+> regression introduced during the v3.3 merge window.
+> 
+> Reported-by: Rafael J. Wysocki <rjw@sisk.pl>
+> Tested-by: Rafael J. Wysocki <rjw@sisk.pl>
+> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
 
-This is right I think. ret is return code from the mc13xxx_* call, so 0 is 
-success.
+Thanks, but is anyone actually going to push it to Linus any time soon?
+
+If not, then I can do that through the linux-pm tree.  I'll be sending
+at least one more pull request with fixes for v3.3.
+
+Thanks,
+Rafael
 
 
-Cheers,
-Marc
+> ---
+>  drivers/mtd/mtdcore.c   |    2 +-
+>  include/linux/mtd/mtd.h |    4 +---
+>  2 files changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
+> index b265188..de96865 100644
+> --- a/drivers/mtd/mtdcore.c
+> +++ b/drivers/mtd/mtdcore.c
+> @@ -119,7 +119,7 @@ static int mtd_cls_suspend(struct device *dev,
+> pm_message_t state)
+>  {
+>  	struct mtd_info *mtd = dev_get_drvdata(dev);
+>  
+> -	return mtd_suspend(mtd);
+> +	return mtd ? mtd_suspend(mtd) : 0;
+>  }
+>  
+>  static int mtd_cls_resume(struct device *dev)
+> diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
+> index 1a81fde..d8c7aad 100644
+> --- a/include/linux/mtd/mtd.h
+> +++ b/include/linux/mtd/mtd.h
+> @@ -427,9 +427,7 @@ static inline int mtd_is_locked(struct mtd_info
+> *mtd, loff_t ofs, uint64_t len)
+>  
+>  static inline int mtd_suspend(struct mtd_info *mtd)
+>  {
+> -	if (!mtd->suspend)
+> -		return -EOPNOTSUPP;
+> -	return mtd->suspend(mtd);
+> +	return mtd->suspend ? mtd->suspend(mtd) : 0;
+>  }
+>  
+>  static inline void mtd_resume(struct mtd_info *mtd)
+> 
