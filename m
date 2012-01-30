@@ -1,47 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 30 Jan 2012 02:43:17 -0700
-Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
- pwrdm_clear_all_prev_pwrst()
-In-Reply-To: <20120130093931.11027.31048.stgit@dusk>
-References: <20120130093931.11027.31048.stgit@dusk>
-Message-ID: <20120130094312.11027.31050.stgit@dusk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 30 Jan 2012 11:08:19 +0100
+Subject: ARM/ARM-SoC plans for v3.4 merge window
+In-Reply-To: <CAOesGMh45HSb4mRMc7q53xhmj_kMFvdVJhNnY7cY6gHi=_KynQ@mail.gmail.com>
+References: <20120123114902.GY1068@n2100.arm.linux.org.uk>
+ <20120124095009.GS16726@n2100.arm.linux.org.uk>
+ <20120126212319.GE11941@n2100.arm.linux.org.uk>
+ <CAOesGMh45HSb4mRMc7q53xhmj_kMFvdVJhNnY7cY6gHi=_KynQ@mail.gmail.com>
+Message-ID: <4F266C13.5080302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove some superfluous calls to pwrdm_clear_all_prev_pwrst().
-pwrdm_pre_transition(), which appears a few lines after these calls,
-invokes pwrdm_clear_all_prev_pwrst() on each powerdomain -- there's no
-need to do it twice.
+On 01/29/2012 12:57 AM, Olof Johansson :
+> Hi,
+> 
+> 
+> On Thu, Jan 26, 2012 at 1:23 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> 
+> 
+>> And we're now there.  So...
+>>
+>> Arnd, Olaf,
+>>
+>> Please incorporate the latest ARM (for-armsoc branch) changes, which can be found at:
+>>
+>>        git://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git for-armsoc
+>>
+>> with SHA1 dcf81c1af839b77b44404453ecae6e5ac5a75f05.
+> 
+> Thanks. I have added this as depends/rmk/for-armsoc in the arm-soc repo.
+> 
+> Any next/ branch we start will have this as the base of said branch,
+> so any vendor branches must either already be developed against this
+> stable branch, or merge on top of this with minimal conflicts.
 
-N.B.: some of us have observed that accesses to the previous
-powerstate registers seem to be quite slow.  Although the writes
-removed by this patch should be buffered by the write buffer, there is
-a read to a PRM register immediately afterwards.  That will block the
-OMAP3 MPU until all of those writes complete.  So this patch should
-result in a minor performance improvement during idle entry.
+Ok, great.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+I just let you know that there is a conflict between the current Linus'
+tree (with recently updated at91 fixes) and this rmk/for-armsoc branch.
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index fc69875..463eb6c 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -290,11 +290,6 @@ void omap_sram_idle(void)
- 	int core_prev_state, per_prev_state;
- 	u32 sdrc_pwr = 0;
- 
--	pwrdm_clear_all_prev_pwrst(mpu_pwrdm);
--	pwrdm_clear_all_prev_pwrst(neon_pwrdm);
--	pwrdm_clear_all_prev_pwrst(core_pwrdm);
--	pwrdm_clear_all_prev_pwrst(per_pwrdm);
--
- 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
- 	switch (mpu_next_state) {
- 	case PWRDM_POWER_ON:
+I can give you the resolution of this conflict easily but I would like
+to know which way I execute the merge:
+
+I use this rmk/for-armsoc as a baseline and merge the fixes already in
+Linus' tree on top of it or the other way around?
+
+Maybe it is preferable that I wait for 3.3-rc2 and merge rmk/for-armsoc
+on top of it. This result can be the base of our AT91 work for 3.4
+preparation.
+
+Your thought?
+
+Best regards,
+-- 
+Nicolas Ferre
