@@ -1,27 +1,49 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Mon, 30 Jan 2012 12:12:50 +0000
-Subject: [PATCH 07/15] mm: page_alloc: change fallbacks array handling
-In-Reply-To: <1327568457-27734-8-git-send-email-m.szyprowski@samsung.com>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <1327568457-27734-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120130121250.GK25268@csn.ul.ie>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 30 Jan 2012 17:47:40 +0530
+Subject: [PATCH 2/2] ARM: OMAP2+: PM: clean up omap_set_pwrdm_state()
+In-Reply-To: <20120130094317.11027.82072.stgit@dusk>
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094317.11027.82072.stgit@dusk>
+Message-ID: <CAMQu2gwsj6h0FqfY74jrA9ZVbjV650SLEUticQRiB+dSOWgNsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 10:00:49AM +0100, Marek Szyprowski wrote:
-> From: Michal Nazarewicz <mina86@mina86.com>
-> 
-> This commit adds a row for MIGRATE_ISOLATE type to the fallbacks array
-> which was missing from it.  It also, changes the array traversal logic
-> a little making MIGRATE_RESERVE an end marker.  The letter change,
-> removes the implicit MIGRATE_UNMOVABLE from the end of each row which
-> was read by __rmqueue_fallback() function.
-> 
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+On Mon, Jan 30, 2012 at 3:13 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Clean up a few different parts of omap_set_pwrdm_state():
+>
+> - Remove a superfluous call to pwrdm_state_switch(). ?Not needed
+> ?unless LOWPOWERSTATECHANGE is used, because the state switch code is
+> ?called by either clkdm_sleep() or clkdm_allow_idle().
+>
+Indeed
 
-Acked-by: Mel Gorman <mel@csn.ul.ie>
+> - Add code to wait for the power state transition in the OMAP4+ low
+> ?power state change. ?This is speculative, so I would particularly
+> ?appreciate feedback on this part.
+>
+> - Remove a superfluous call to pwrdm_read_pwrst().
+>
+> - Update variable names to be more meaningful (hopefully) and precise.
+>
+> - Fix an error path bug that would not place the clockdomain back into
+> ?hardware-supervised idle or sleep mode if the power state could not
+> ?be programmed.
+>
+> The documentation for this function still needs major improvements;
+> that's left for a later patch.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> ---
 
--- 
-Mel Gorman
-SUSE Labs
+All the changes look fine to me from OMAP4
+perspective. Would be good if Tero can try out this
+patch and test CORE RET on OMAP4.
+
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Regards
+santosh
