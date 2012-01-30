@@ -1,41 +1,32 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 30 Jan 2012 11:44:28 +0100
-Subject: [PATCH] mtd/gpmi : add BBT support
-In-Reply-To: <4F2671C3.6000809@freescale.com>
-References: <1327898174-13656-1-git-send-email-b32955@freescale.com>
- <20120130094610.GA15596@pengutronix.de>
- <4F2671C3.6000809@freescale.com>
-Message-ID: <20120130104428.GB15596@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 30 Jan 2012 16:24:28 +0530
+Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
+ pwrdm_clear_all_prev_pwrst()
+In-Reply-To: <20120130094312.11027.31050.stgit@dusk>
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094312.11027.31050.stgit@dusk>
+Message-ID: <CAMQu2gz+Wp-2cJEYnzbJKQGewA9BW_S=KUP5R5Gmf0W2z324kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The bootloader usually is burned on /dev/mtd0, while the BBT is placed
-> at the end
-> of the NAND chip.
-> 
-> I tested the NAND boot mode too.
-> 
-> What's your concern?
-
-Bootloaders may also need to write to NAND. So, they need to share the
-same bad block information with the kernel. Currently, I am not aware of
-a bootloader for mxs which support BBT without OOB. Unless this has
-changed meanwhile, we shouldn't make this default, because they can't
-share the same information then. To be on the safe side regardings
-regressions, we shouldn't make this default as well, come to think of
-it.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/6d726d4e/attachment.sig>
+On Mon, Jan 30, 2012 at 3:13 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Remove some superfluous calls to pwrdm_clear_all_prev_pwrst().
+> pwrdm_pre_transition(), which appears a few lines after these calls,
+> invokes pwrdm_clear_all_prev_pwrst() on each powerdomain -- there's no
+> need to do it twice.
+>
+> N.B.: some of us have observed that accesses to the previous
+> powerstate registers seem to be quite slow. ?Although the writes
+> removed by this patch should be buffered by the write buffer, there is
+> a read to a PRM register immediately afterwards. ?That will block the
+> OMAP3 MPU until all of those writes complete. ?So this patch should
+> result in a minor performance improvement during idle entry.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> ---
+Nice clean-up
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
