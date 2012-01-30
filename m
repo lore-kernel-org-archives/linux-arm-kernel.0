@@ -1,56 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 30 Jan 2012 16:36:08 -0700 (MST)
-Subject: [PATCH 0/7] ARM: OMAP2+: hwmod/timer: first set of cleanups for
- 3.4
-In-Reply-To: <87ty3cpyuk.fsf@ti.com>
-References: <20120130101251.10450.58423.stgit@dusk> <87ty3cpyuk.fsf@ti.com>
-Message-ID: <alpine.DEB.2.00.1201301635010.17726@utopia.booyaka.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Mon, 30 Jan 2012 23:42:25 +0000 (GMT)
+Subject: [PATCH v2] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
+Message-ID: <1327966945.92405.YahooMailClassic@web29001.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2012, Kevin Hilman wrote:
+The hx4700 platform has 70 board gpios: 64 ASIC3 gpios numbered 192..255, and
+8 EGPIO gpios numbered 256..263 (plus a 9th which is not used).
+Thus the new CONFIG_ARCH_NR_GPIO config option must be set to 264.
 
-> Paul Walmsley <paul@pwsan.com> writes:
-> 
-> > This series does some cleanup and documentation on the OMAP hwmod code
-> > (and a bit of the OMAP4 data) and timer code. It is the first
-> > prerequisite series to removing a big chunk of hwmod data -- that will
-> > be done in a later series.
-> >
-> > Boot-tested on an OMAP35xx BeagleBoard and OMAP44xx ES2 Pandaboard.
-> >
-> > This series is also available via git from git://git.pwsan.com/linux-2.6 in
-> > the branch "hwmod_code_cleanup_3.4".
-> 
-> FYI... I tested this branch on my 4430ES2.1/Panda and got an infinite
-> loop of L3 errors.
-> 
-> I haven't debugged which patch causes the problem, but thought you'd
-> like to know.   I did notice that that booting v3.3-rc1, I see
-> 
-> [    0.309478] omap_hwmod: ipu: failed to hardreset
-> 
-> but booting your branch I see a few more reset failures:
-> 
-> [    0.308532] omap_hwmod: dsp: failed to hardreset
-> [    0.328979] omap_hwmod: dsp: failed to hardreset
-> [    0.358001] omap_hwmod: ipu: failed to hardreset
-> [    0.378448] omap_hwmod: ipu: failed to hardreset
-> [    0.398895] omap_hwmod: ipu: failed to hardreset
-> [    0.427520] omap_hwmod: iva: failed to hardreset
-> [    0.447967] omap_hwmod: iva: failed to hardreset
-> 
-> There's a full boot log below.
-> 
-> I noticed you tested on Panda too, but one difference between our setups
-> is probably that I'm not using u-boot.  Instead, I'm booting over USB
-> using the usbboot tool written by Brian Swetland:
-> git://github.com/swetland/omap4boot.git.   It could be that the
-> different bootloaders are leaving the other IPs in different states.
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+---
 
-Thanks for the test and the report.  I'll take a look at the situation.  
-Your assumption about bootloaders is correct.  I wonder if Brian's 
-bootloader leaves things enabled.
+V2:
+Use new CONFIG_ARCH_NR_GPIO config option instead of modifying PXA_GPIO_IRQ_BASE
+and PXA_GPIO_IRQ_NUM #defines.
+Rebased to linux-3.3-rc1.
 
-
-- Paul
+diff -ru clean-3.3-rc1/arch/arm/Kconfig linux-3.3-rc1/arch/arm/Kconfig
+--- clean-3.3-rc1/arch/arm/Kconfig	2012-01-19 23:04:48.000000000 +0000
++++ linux-3.3-rc1/arch/arm/Kconfig	2012-01-30 17:11:35.897518763 +0000
+@@ -1580,6 +1580,7 @@
+ 	int
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+ 	default 350 if ARCH_U8500
++	default 264 if MACH_H4700
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
