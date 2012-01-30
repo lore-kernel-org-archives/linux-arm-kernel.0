@@ -1,69 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jan 2012 11:24:53 +0000
-Subject: [PATCH v2 2/4] ARM: vfp: fix ptrace regset modification race
-In-Reply-To: <1327922695-16121-1-git-send-email-will.deacon@arm.com>
-References: <1327922695-16121-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1327922695-16121-3-git-send-email-will.deacon@arm.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 30 Jan 2012 19:29:37 +0800
+Subject: [PATCH] mtd/gpmi : add BBT support
+In-Reply-To: <20120130104428.GB15596@pengutronix.de>
+References: <1327898174-13656-1-git-send-email-b32955@freescale.com>
+ <20120130094610.GA15596@pengutronix.de> <4F2671C3.6000809@freescale.com>
+ <20120130104428.GB15596@pengutronix.de>
+Message-ID: <4F267F21.1030204@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Martin <dave.martin@linaro.org>
 
-In a preemptible kernel, vfp_set() can be preempted, causing the
-hardware VFP context to be switched while the thread vfp state is
-being read and modified.  This leads to a race condition which can
-cause the thread vfp state to become corrupted if lazy VFP context
-save occurs due to preemption in between the time thread->vfpstate
-is read and the time the modified state is written back.
+>> The bootloader usually is burned on /dev/mtd0, while the BBT is placed
+>> at the end
+>> of the NAND chip.
+>>
+>> I tested the NAND boot mode too.
+>>
+>> What's your concern?
+> Bootloaders may also need to write to NAND. So, they need to share the
+Do you mean the uboot may write something to the NAND?
+Could you show me some more detail cases?
 
-This may occur if preemption occurs during the execution of a
-ptrace() call which modifies the VFP register state of a thread.
-Such instances should be very rare in most realistic scenarios --
-none has been reported, so far as I am aware.  Only uniprocessor
-systems should be affected, since VFP context save is not currently
-lazy in SMP kernels.
+> same bad block information with the kernel. Currently, I am not aware of
+> a bootloader for mxs which support BBT without OOB. Unless this has
+> changed meanwhile, we shouldn't make this default, because they can't
+The NAND_BBT_NO_OOB makes the BBT written to the NAND with the ECC enabled.
+> share the same information then. To be on the safe side regardings
+The kobs-ng which burns the bootloader to the NAND will also burn the
+whole BBT
+to the NAND too.
 
-The problem was introduced by my earlier patch migrating to use
-regsets to implement ptrace.
+So I think the bootloader and the kernel share the same BBT information.
 
-This patch does a vfp_sync_hwstate() before reading
-thread->vfpstate, to make sure that the thread's VFP state is not
-live in the hardware registers while the registers are modified.
+But if the bootloader can make some block bad, the BBT information
+becomes different.
+Does the bootloader have the feature to make some block bad?
 
-Thanks to Will Deacon for spotting this.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/ptrace.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+Br
+Huang Shijie
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index e1d5e19..d001be4 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -699,10 +699,13 @@ static int vfp_set(struct task_struct *target,
- {
- 	int ret;
- 	struct thread_info *thread = task_thread_info(target);
--	struct vfp_hard_struct new_vfp = thread->vfpstate.hard;
-+	struct vfp_hard_struct new_vfp;
- 	const size_t user_fpregs_offset = offsetof(struct user_vfp, fpregs);
- 	const size_t user_fpscr_offset = offsetof(struct user_vfp, fpscr);
- 
-+	vfp_sync_hwstate(thread);
-+	new_vfp = thread->vfpstate.hard;
-+
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
- 				  &new_vfp.fpregs,
- 				  user_fpregs_offset,
-@@ -723,7 +726,6 @@ static int vfp_set(struct task_struct *target,
- 	if (ret)
- 		return ret;
- 
--	vfp_sync_hwstate(thread);
- 	thread->vfpstate.hard = new_vfp;
- 	vfp_flush_hwstate(thread);
- 
--- 
-1.7.4.1
+
+
+
+> regressions, we shouldn't make this default as well, come to think of
+> it.
+>
+> Regards,
+>
+>    Wolfram
+>
