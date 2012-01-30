@@ -1,74 +1,81 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 30 Jan 2012 16:49:05 +0000
-Subject: [PATCH 4/4] ARM: vfp: clear fpscr length and stride bits on
- return from sig handler
-In-Reply-To: <1327681443-16627-5-git-send-email-will.deacon@arm.com>
-References: <1327681443-16627-1-git-send-email-will.deacon@arm.com>
- <1327681443-16627-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20120130164905.GB2248@linaro.org>
+Date: Mon, 30 Jan 2012 16:54:22 +0000
+Subject: [PATCHv2 2/6] ARM: ftrace: use canonical Thumb-2 wide
+ instruction format
+In-Reply-To: <1327757725-10114-3-git-send-email-rabin@rab.in>
+References: <1327757725-10114-1-git-send-email-rabin@rab.in>
+ <1327757725-10114-3-git-send-email-rabin@rab.in>
+Message-ID: <20120130165421.GC2248@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 04:24:03PM +0000, Will Deacon wrote:
-> The ARM PCS mandates that the length and stride bits of the fpscr are
-> cleared on entry to and return from a public interface.
+On Sat, Jan 28, 2012 at 07:05:21PM +0530, Rabin Vincent wrote:
+> As commit 592201a9f15 (ARM: Thumb-2: Support Thumb-2 in undefined
+> instruction handler) says:
+> 
+>     32-bit Thumb instructions are specified in the form:
+>         ((first_half << 16 ) | second_half)
+>     which matches the layout used by the ARM ARM.
+> 
+> Convert the ftrace code to use the same format to avoid the usage of
+> different formats in kernel code.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-That means we need to reset that state on _entry_ to the signal handler,
-since the interrupted thread is interrupted at an arbitrarily location
-which need not be a public interface, whereas the signal handler entry
-point definitely is a public interface.
+Acked-by: Dave Martin <dave.martin@linaro.org>
 
-On exit from the signal handler, surely we must restore the interrupted
-thread's state for these bits, not reset them to zero?  The interrupted
-thread could be in the middle of something which makes assumptions about
-what these bits are set to.
-
-
-This is rather analogous to the handling of the CPSR.E bit.
+I haven't tried it out, but the use of the opcode helpers looks correct.
 
 Cheers
 ---Dave
 
-> 
-> This patch ensures that the VFP context restored from a signal frame
-> is made to adhere to this specification.
-> 
-> Reported-by: Peter Maydell <peter.maydell@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm/kernel/signal.c |   10 ++++++++--
->  1 files changed, 8 insertions(+), 2 deletions(-)
+>  arch/arm/kernel/ftrace.c |   13 +++++++++++--
+>  1 files changed, 11 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index 9e617bd..274b8fc 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -216,7 +216,7 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
->  	struct vfp_hard_struct *h = &thread->vfpstate.hard;
->  	unsigned long magic;
->  	unsigned long size;
-> -	unsigned long fpexc;
-> +	unsigned long fpexc, fpscr;
->  	int err = 0;
+> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+> index e9488ad..72a381a 100644
+> --- a/arch/arm/kernel/ftrace.c
+> +++ b/arch/arm/kernel/ftrace.c
+> @@ -16,10 +16,11 @@
+>  #include <linux/uaccess.h>
 >  
->  	__get_user_error(magic, &frame->magic, err);
-> @@ -238,7 +238,13 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
->  	/*
->  	 * Copy the status and control register.
->  	 */
-> -	__get_user_error(h->fpscr, &frame->ufp.fpscr, err);
-> +	__get_user_error(fpscr, &frame->ufp.fpscr, err);
+>  #include <asm/cacheflush.h>
+> +#include <asm/opcodes.h>
+>  #include <asm/ftrace.h>
+>  
+>  #ifdef CONFIG_THUMB2_KERNEL
+> -#define	NOP		0xeb04f85d	/* pop.w {lr} */
+> +#define	NOP		0xf85deb04	/* pop.w {lr} */
+>  #else
+>  #define	NOP		0xe8bd4000	/* pop {lr} */
+>  #endif
+> @@ -88,7 +89,7 @@ static unsigned long ftrace_gen_branch(unsigned long pc, unsigned long addr,
+>  	if (link)
+>  		second |= 1 << 14;
+>  
+> -	return (second << 16) | first;
+> +	return __opcode_thumb32_compose(first, second);
+>  }
+>  #else
+>  static unsigned long ftrace_gen_branch(unsigned long pc, unsigned long addr,
+> @@ -125,6 +126,14 @@ static int ftrace_modify_code(unsigned long pc, unsigned long old,
+>  {
+>  	unsigned long replaced;
+>  
+> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+> +		old = __opcode_to_mem_thumb32(old);
+> +		new = __opcode_to_mem_thumb32(new);
+> +	} else {
+> +		old = __opcode_to_mem_arm(old);
+> +		new = __opcode_to_mem_arm(new);
+> +	}
 > +
-> +	/*
-> +	 * As per the PCS, clear the length and stride bits.
-> +	 */
-> +	fpscr &= ~(FPSCR_LENGTH_MASK | FPSCR_STRIDE_MASK);
-> +	h->fpscr = fpscr;
->  
->  	/*
->  	 * Sanitise and restore the exception registers.
+>  	if (old) {
+>  		if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
+>  			return -EFAULT;
 > -- 
-> 1.7.4.1
+> 1.7.8.3
 > 
 > 
 > _______________________________________________
