@@ -1,246 +1,89 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 30 Jan 2012 13:32:52 -0700
-Subject: [RFC PATCH 7/7] ARM: davinci: add support for the am1808 based
- enbw_cmc board
-In-Reply-To: <1327308967-8092-8-git-send-email-hs@denx.de>
-References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-8-git-send-email-hs@denx.de>
-Message-ID: <20120130203252.GX28397@ponder.secretlab.ca>
+Date: Mon, 30 Jan 2012 12:58:42 -0700
+Subject: [PATCH v3 22/25] irq_domain/x86: Convert x86 (embedded) to use
+ common irq_domain
+In-Reply-To: <20120128164405.GA20763@linutronix.de>
+References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
+ <1327700179-17454-23-git-send-email-grant.likely@secretlab.ca>
+ <20120128164405.GA20763@linutronix.de>
+Message-ID: <20120130195842.GT28397@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 09:56:07AM +0100, Heiko Schocher wrote:
-> - AM1808 based board
-> - 64 MiB DDR ram
-> - 2 MiB Nor flash
-> - 128 MiB NAND flash
-> - use internal RTC
-> - I2C support
-> - hwmon lm75 support
-> - UBI/UBIFS support
-> - MMC support
-> - USB OTG support
+On Sat, Jan 28, 2012 at 05:44:05PM +0100, Sebastian Andrzej Siewior wrote:
+> * Grant Likely | 2012-01-27 14:36:16 [-0700]:
 > 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: linux-mtd at lists.infradead.org
-> Cc: linux-i2c at vger.kernel.org
-> Cc: netdev at vger.kernel.org
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Wolfgang Denk <wd@denx.de>
+> >This patch removes the x86-specific definition of irq_domain and replaces
+> >it with the common implementation.
 > 
-> ---
-> - post this board support with USB support, even though
->   USB is only working with the 10 ms "workaround", posted here:
->   http://comments.gmane.org/gmane.linux.usb.general/54505
->   I see this issue also on the AM1808 TMDXEXP1808L evalboard.
-> - MMC and USB are not using OF support yet, ideas how to port
->   this are welcome. I need for USB and MMC boards board
->   specific callbacks, how to solve this with OF support?
+> I pulled your devicetree/next tree. After this patch I get:
 > 
->  arch/arm/boot/dts/enbw_cmc.dts                  |  286 +++++++++++++++++
->  arch/arm/configs/enbw_cmc_defconfig             |  125 ++++++++
->  arch/arm/mach-davinci/Kconfig                   |    8 +
->  arch/arm/mach-davinci/Makefile                  |    1 +
->  arch/arm/mach-davinci/board-enbw-cmc.c          |  384 +++++++++++++++++++++++
->  arch/arm/mach-davinci/include/mach/uncompress.h |    1 +
->  6 files changed, 805 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/enbw_cmc.dts
->  create mode 100644 arch/arm/configs/enbw_cmc_defconfig
->  create mode 100644 arch/arm/mach-davinci/board-enbw-cmc.c
+> |Hierarchical RCU implementation.
+> |NR_IRQS:2304 nr_irqs:256 16
+> |------------[ cut here ]------------
+> |WARNING: at /home/bigeasy/work/shiva/git/linux-2.6-tip/kernel/irq/irqdomain.c:114 irq_domain_add_legacy+0x75/0x150()
+> |Modules linked in:
+> |Pid: 0, comm: swapper/0 Not tainted 3.3.0-rc1+ #65
+> |Call Trace:
+> | [<c15044e0>] ? printk+0x18/0x1a
+> | [<c102cdbd>] warn_slowpath_common+0x6d/0xa0
+> | [<c1095575>] ? irq_domain_add_legacy+0x75/0x150
+> | [<c1095575>] ? irq_domain_add_legacy+0x75/0x150
+> | [<c102ce0d>] warn_slowpath_null+0x1d/0x20
+> | [<c1095575>] irq_domain_add_legacy+0x75/0x150
+> | [<c1714824>] x86_add_irq_domains+0x96/0xd6
+> | [<c1708df2>] init_IRQ+0x8/0x33
+> | [<c170557f>] start_kernel+0x191/0x2e1
+> | [<c170517f>] ? loglevel+0x2b/0x2b
+> | [<c1705081>] i386_start_kernel+0x81/0x86
+> |---[ end trace 4eaa2a86a8e2da22 ]---
+> |------------[ cut here ]------------
+> |kernel BUG at /home/bigeasy/work/shiva/git/linux-2.6-tip/arch/x86/kernel/devicetree.c:367!
 > 
-> diff --git a/arch/arm/boot/dts/enbw_cmc.dts b/arch/arm/boot/dts/enbw_cmc.dts
-> new file mode 100644
-> index 0000000..e5995ce
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/enbw_cmc.dts
-> @@ -0,0 +1,286 @@
-> +/*
-> + * Device Tree for the EnBW CMC plattform
-> + *
-> + * Copyright 2011 DENX Software Engineering GmbH
-> + * Heiko Schocher <hs@denx.de>
-> + *
-> + * This program is free software; you can redistribute  it and/or modify it
-> + * under  the terms of  the GNU General  Public License as published by the
-> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> + * option) any later version.
-> + */
-> +/dts-v1/;
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "EnBW CMC";
-> +	compatible = "enbw,cmc";
-> +
-> +	aliases {
-> +		ethernet0 = &eth0;
-> +	};
-> +
-> +	arm {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0xfffee000 0x00020000>;
-> +		intc: interrupt-controller at 1 {
-> +			compatible = "ti,davinci-intc";
-> +			interrupt-controller;
-> +			#interrupt-cells = <1>;
-> +			ti,intc-size = <101>;
-> +			reg = <0x0 0x2000>;
-> +		};
-> +	};
-> +	soc at 1c00000 {
-> +		compatible = "ti,da8xx";
+> The warning is comming from this piece in irq_domain_add_legacy()
+> |for (i = 0; i < size; i++) {
+> |                 int irq = first_irq + i;
+> |                 struct irq_data *irq_data = irq_get_irq_data(irq);
+> | 
+> |                 if (WARN_ON(!irq_data || irq_data->domain)) {
+> 
+> irq_data is NULL here.
+> 
+> |                         mutex_unlock(&irq_domain_mutex);
+> |                         of_node_put(domain->of_node);
+> |                         kfree(domain);
+> |                         return NULL;
+> |                 }
+> |         }
+> | 
+> 
+> This is not always the case. arch_early_irq_init() in [0] sets up the
+> first 16 entries. The reminaing few (there is a toal of 24 irqs for
+> first ioapic and a second ioapic) are not initialized. This happens
+> later via ->xlate, ioapic_xlate() => io_apic_setup_irq_pin() =>
+> alloc_irq_and_cfg_at() calls irq_set_chip_data() on demand.
+> 
+> [0] arch/x86/kernel/apic/io_apic.c
 
-As previously mentioned, using wildcard ('x') characters in compatible
-properties is bad practice.  Always be specific and use the compatible
-list to make sure the correct driver gets bound (assuming the device
-is 100% register level compatible with the older one).
+Ugh.  This isn't easy.  The legacy mapping really needs all the
+irq_desc structures to be allocated.  You could call irq_alloc_descs()
+before calling irq_domain_add_legacy(), but that causes all the
+irq_descs to be allocated (regardless of whether they are used), and
+it will break io_apic_setup_irq_pin() which also wants to call
+irq_alloc_desc().
 
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x0 0x01c00000 0x400000>;
-> +
-> +		serial0: serial at 1c42000 {
-> +			cell-index = <2>;
+Ideally irq_domain support would be rolled directly into ioapic.
+That's more work though, and a greater change of breaking x86 on
+non-embedded.  Looking at the ioapic code, it seems to me that it
+could be simplified quite a bit by switching to irq_domain instead of
+using the custom irq_cfg linked list.  Faster too since it could use
+the irq_data->hwirq to go from linux irq to the hw irq number.  It
+doesn't look like it would be even that hard, but of course the devil
+is in the details and I don't have sufficient time right now to dig
+into the guts of the ioapic.  Maybe after connect, but it would help
+if you can find time to look at it.
 
-As previously mentioned, don't use cell index.  If you *really* need
-to assign a number to a device, then use a property in the /aliases
-node and make sure pdev->id does *not* get modified.
+If integrated into the ioapic code, then the irq_domain linear map is
+probably the type of irq_domain to use.
 
-> +			compatible = "ns16550a";
-
-Should include a string for the specific device.  Something like:
-
-	compatible = "ti,da800", "ns16550a";
-
-> diff --git a/arch/arm/mach-davinci/board-enbw-cmc.c b/arch/arm/mach-davinci/board-enbw-cmc.c
-> new file mode 100644
-> index 0000000..4473c4a
-> --- /dev/null
-> +++ b/arch/arm/mach-davinci/board-enbw-cmc.c
-> @@ -0,0 +1,384 @@
-> +/*
-> + * EnBW Communication Module Compact board
-> + * Copyright 2011 DENX Software Engineering GmbH
-> + * Author: Heiko Schocher <hs@denx.de>
-> + *
-> + * based on:
-> + * TI DA850/OMAP-L138 EVM board
-> + *
-> + * Copyright (C) 2009 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * Derived from: arch/arm/mach-davinci/board-da850-evm.c
-> + * Original Copyrights follow:
-> + *
-> + * 2007, 2009 (c) MontaVista Software, Inc. This file is licensed under
-> + * the terms of the GNU General Public License version 2. This program
-> + * is licensed "as is" without any warranty of any kind, whether express
-> + * or implied.
-> + */
-> +#include <linux/console.h>
-> +#include <linux/gpio.h>
-> +#include <linux/gpio_keys.h>
-> +#include <linux/i2c.h>
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/nand.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/mtd/physmap.h>
-> +#include <linux/of.h>
-> +#include <linux/of_net.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/phy.h>
-> +#include <linux/phy_fixed.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/spi/spi.h>
-> +#include <linux/spi/flash.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <mach/aemif.h>
-> +#include <mach/cp_intc.h>
-> +#include <mach/da8xx.h>
-> +#include <mach/mux.h>
-> +#include <mach/nand.h>
-> +#include <mach/spi.h>
-> +
-> +#define ENBW_CMC_MMCSD_CD_PIN          GPIO_TO_PIN(3, 13)
-> +
-> +/*
-> + * USB1 VBUS is controlled by GPIO7[12], over-current is reported on GPIO7[8].
-> + */
-> +#define DA850_USB_VBUS_PIN	GPIO_TO_PIN(7, 12)
-> +#define ON_BD_USB_OVC		GPIO_TO_PIN(7, 8)
-> +
-> +#if defined(CONFIG_USB_OHCI_HCD)
-> +static irqreturn_t enbw_cmc_usb_ocic_irq(int irq, void *dev_id);
-> +static da8xx_ocic_handler_t enbw_cmc_usb_ocic_handler;
-> +
-> +static int enbw_cmc_usb_set_power(unsigned port, int on)
-> +{
-> +	gpio_set_value(DA850_USB_VBUS_PIN, on);
-> +	return 0;
-> +}
-> +
-> +static int enbw_cmc_usb_get_power(unsigned port)
-> +{
-> +	return gpio_get_value(DA850_USB_VBUS_PIN);
-> +}
-> +
-> +static int enbw_cmc_usb_get_oci(unsigned port)
-> +{
-> +	return !gpio_get_value(ON_BD_USB_OVC);
-> +}
-> +
-> +static irqreturn_t enbw_cmc_usb_ocic_irq(int, void *);
-> +
-> +static int enbw_cmc_usb_ocic_notify(da8xx_ocic_handler_t handler)
-> +{
-> +	int irq         = gpio_to_irq(ON_BD_USB_OVC);
-> +	int error       = 0;
-> +
-> +	if (handler != NULL) {
-> +		enbw_cmc_usb_ocic_handler = handler;
-> +
-> +		error = request_irq(irq, enbw_cmc_usb_ocic_irq,
-> +					IRQF_DISABLED | IRQF_TRIGGER_RISING |
-> +					IRQF_TRIGGER_FALLING,
-> +					"OHCI over-current indicator", NULL);
-> +		if (error)
-> +			pr_err("%s: could not request IRQ to watch "
-> +				"over-current indicator changes\n", __func__);
-> +	} else {
-> +		free_irq(irq, NULL);
-> +	}
-> +	return error;
-> +}
-> +
-> +static struct da8xx_ohci_root_hub enbw_cmc_usb11_pdata = {
-> +	.set_power      = enbw_cmc_usb_set_power,
-> +	.get_power      = enbw_cmc_usb_get_power,
-> +	.get_oci        = enbw_cmc_usb_get_oci,
-> +	.ocic_notify    = enbw_cmc_usb_ocic_notify,
-> +	.potpgt         = (10 + 1) / 2,  /* 10 ms max */
-> +};
-> +
-> +static irqreturn_t enbw_cmc_usb_ocic_irq(int irq, void *dev_id)
-> +{
-> +	enbw_cmc_usb_ocic_handler(&enbw_cmc_usb11_pdata, 1);
-> +	return IRQ_HANDLED;
-> +}
-> +#endif
-> +
-> +#if defined(CONFIG_OF)
-> +static __init void enbw_cmc_usb_init(void)
-
-All the focus is on DT now.  How about making CONFIG_OF required for
-this board?  Also, this is just another board file.  The focus should
-be on creating a generic board support file for DT platforms.
+g.
