@@ -1,47 +1,52 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 30 Jan 2012 17:32:02 +0000
-Subject: [PATCH v6 6/9] ARM: vexpress: Motherboard RS1 memory map support
-In-Reply-To: <1327672960.24701.55.camel@hornet.cambridge.arm.com>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
- <1323957761-13553-7-git-send-email-pawel.moll@arm.com>
- <4F047FE1.5030002@citrix.com>
- <1326979266.32197.60.camel@hornet.cambridge.arm.com>
- <4F184900.8050901@citrix.com>
- <1327672960.24701.55.camel@hornet.cambridge.arm.com>
-Message-ID: <20120130173202.GG2248@linaro.org>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 30 Jan 2012 11:34:21 -0600
+Subject: [PATCH] tidspbridge: Rename module from bridgedriver to
+ tidspbridge
+In-Reply-To: <1327440305.1798.28.camel@joe2Laptop>
+References: <1327440305.1798.28.camel@joe2Laptop>
+Message-ID: <CAB-zwWjWkxpmT2dXDV++okCKZaebVz4O8-L4OgabMEzdEu4eGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 02:02:40PM +0000, Pawel Moll wrote:
-> On Thu, 2012-01-19 at 16:46 +0000, David Vrabel wrote:
-> > >>  __create_page_tables has only mapped the single physical
-> > >> page at 0x1c090000 and thus the test for the UART in the other memory
-> > >> map faults.
-> 
-> I got to the bottom of the problem... The mapping created by the
-> DEBUG_LL code in __create_page_tables is actually a section (1MB) so
-> covers both possible accesses (0xf8009000 and 0xf8090000). The
-> difference between model and hardware is that "real" RS1 VE has a DAP
-> ROM located between 0xf8000000 and 0xf800ffff so the 0xf8009000 succeeds
-> (returning some irrelevant data), while model is "empty" in that space,
-> so it faults.
-> 
-> Anyway, I have an idea how to solve (or rather work around) the problem
-> and will get if working on models in the next version of the series.
-> I'll send you a modified version of the relevant patch before that so
-> you can test it.
-> 
-> Thanks for your time!
+On Tue, Jan 24, 2012 at 3:25 PM, Joe Perches <joe@perches.com> wrote:
+> tidspbridge when built as a module is named bridgedriver.
+>
+> bridgedriver is not a particularly good module name.
+>
+> tidspbridge is what the source is named. ?That seems
+> a more appropriate module name too as it describes
+> the hardware function better.
+>
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+> ?drivers/staging/tidspbridge/Makefile | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/staging/tidspbridge/Makefile b/drivers/staging/tidspbridge/Makefile
+> index fd6a276..8c8c92a 100644
+> --- a/drivers/staging/tidspbridge/Makefile
+> +++ b/drivers/staging/tidspbridge/Makefile
+> @@ -1,4 +1,4 @@
+> -obj-$(CONFIG_TIDSPBRIDGE) ? ? ?+= bridgedriver.o
+> +obj-$(CONFIG_TIDSPBRIDGE) ? ? ?+= tidspbridge.o
+>
+> ?libgen = gen/gh.o gen/uuidutil.o
+> ?libcore = core/chnl_sm.o core/msg_sm.o core/io_sm.o core/tiomap3430.o \
+> @@ -13,7 +13,7 @@ libdload = dynload/cload.o dynload/getsection.o dynload/reloc.o \
+> ? ? ? ? ? ? ? ? dynload/tramp.o
+> ?libhw = hw/hw_mmu.o
+>
+> -bridgedriver-y := $(libgen) $(libservices) $(libcore) $(libpmgr) $(librmgr) \
+> +tidspbridge-y := $(libgen) $(libservices) $(libcore) $(libpmgr) $(librmgr) \
+> ? ? ? ? ? ? ? ? ? ? ? ?$(libdload) $(libhw)
+>
+> ?#Machine dependent
+>
+>
 
-I would be interested in that too.
+Sound good to me, and unless there is an objection, it also gives
+plenty of time for the change to be noticed.
 
-However, I would still prefer the explicit debug UART selection route,
-since we already have to do that for many boards and I'm not sure how
-much I trust the memory maps of future tiles and models to "evolve"
-relative to what currently exists.  Are you sure it won't change again?
+Regards,
 
-If we rely on lucky arrangement of slaves on the bus in order to have
-a workaround, sooner or later our luck is liable to run out.
-
-Cheers
----Dave
+Omar
