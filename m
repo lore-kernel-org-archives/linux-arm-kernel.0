@@ -1,23 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 30 Jan 2012 11:27:59 +0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E123E62@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <CAPnjgZ3Xhebn1x1A-Vdy78DWbDd=cp0AK6tL-R1SRzS4GdF97g@mail.gmail.com>
- <20120127022111.GK29812@atomide.com>
- <CAPnjgZ2EkvTMsOkWyf4pfwRpvcvYs=WaKy5Gi8fdkAUQmvt=ig@mail.gmail.com>
- <20120127173732.GJ13504@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178E123E62@HQMAIL01.nvidia.com>
-Message-ID: <20120130032757.GE10470@S2101-09.ap.freescale.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 30 Jan 2012 05:15:29 +0100
+Subject: [PATCH 1/1] of_mmc_spi: fix little endian support
+Message-ID: <1327896929-16274-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 09:51:58AM -0800, Stephen Warren wrote:
-> I don't think there's any point in having 2 separate bindings; it's been
-> hard enough to come up with /one/ binding!
+the voltage_ranges is supposed to switch from big endian to little endian
 
-+1
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: linux-mmc at vger.kernel.org
+---
+ drivers/mmc/host/of_mmc_spi.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
+index ab66f24..ede2c64 100644
+--- a/drivers/mmc/host/of_mmc_spi.c
++++ b/drivers/mmc/host/of_mmc_spi.c
+@@ -109,12 +109,13 @@ struct mmc_spi_platform_data *mmc_spi_get_pdata(struct spi_device *spi)
+ 		goto err_ocr;
+ 	}
+ 
++
+ 	for (i = 0; i < num_ranges; i++) {
+ 		const int j = i * 2;
+ 		u32 mask;
+ 
+-		mask = mmc_vddrange_to_ocrmask(voltage_ranges[j],
+-					       voltage_ranges[j + 1]);
++		mask = mmc_vddrange_to_ocrmask(be32_to_cpu(voltage_ranges[j]),
++					       be32_to_cpu(voltage_ranges[j + 1]));
+ 		if (!mask) {
+ 			ret = -EINVAL;
+ 			dev_err(dev, "OF: voltage-range #%d is invalid\n", i);
 -- 
-Regards,
-Shawn
+1.7.7
