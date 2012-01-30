@@ -1,34 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Jan 2012 09:07:14 +0100
-Subject: mfd: mc13xxx adc fixes and enhancements
-In-Reply-To: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
-References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <20120130080714.GK6305@pengutronix.de>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Mon, 30 Jan 2012 16:08:12 +0800
+Subject: [PATCH 1/1] net: fec: correct phy_name buffer length when init
+ phy_name
+Message-ID: <1327910892-11251-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Fix the bug that we got wrong phy_name on imx6q sabrelite board.
+snprintf used wrong length of phy_name.
+phy_name length is MII_BUS_ID_SIZE + 3 rather not MII_BUS_ID_SIZE.
+I change it to sizeof(phy_name).
 
-On Mon, Jan 30, 2012 at 09:33:22AM +1100, Marc Reilly wrote:
-> This series provides some small fixes to the mc13xxx adc conversion funtion to
-> make it more robust. Readout of single channel conversions is fixed so that the
-> read out order corresponds to the sampling order (Critical for dedicated 
-> battery reading).
-> 
-> A new conversion function is introduced which allows the caller to enable the
-> dedicated readings and other adc functionality by providing a mask/ value pair
-> for the adc0,1 registers.
-> 
-> These patches apply onto my 'add I2C support' series [1].
-> (I think only the first patch is required)
-I wonder if Robin van der Gracht (added to Cc:) can say something to
-this series as he seems to have used the adc recently.
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+---
+ drivers/net/ethernet/freescale/fec.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-@Robin: tell me if I should bounce you the series.
-
-Best regards
-Uwe
-
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 7b25e9c..1c7aad8 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -990,7 +990,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
+ 		phy_id = 0;
+ 	}
+ 
+-	snprintf(phy_name, MII_BUS_ID_SIZE, PHY_ID_FMT, mdio_bus_id, phy_id);
++	snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
+ 	phy_dev = phy_connect(ndev, phy_name, &fec_enet_adjust_link, 0,
+ 			      fep->phy_interface);
+ 	if (IS_ERR(phy_dev)) {
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.5.4
