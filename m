@@ -1,38 +1,39 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 30 Jan 2012 14:40:31 +0400
-Subject: [PATCH v2 3/3] arm: da830: move NAND and NOR devices as aemif
- MFD slaves
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3175BD35@DBDE01.ent.ti.com>
-References: <1327487156-10238-1-git-send-email-prakash.pm@ti.com>
- <1327487156-10238-3-git-send-email-prakash.pm@ti.com>
- <4F2016F4.2080302@mvista.com>
- <A73F36158E33644199EB82C5EC81C7BC3175BD35@DBDE01.ent.ti.com>
-Message-ID: <4F26739F.2070305@mvista.com>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Mon, 30 Jan 2012 11:44:28 +0100
+Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
+In-Reply-To: <201201252358.17825.marek.vasut@gmail.com>
+References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
+ <20120125213206.GJ1068@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1201251727510.2759@xanadu.home>
+ <201201252358.17825.marek.vasut@gmail.com>
+Message-ID: <20120130104428.GA16841@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi!
+> > > As a side-note, you may be pleased to know that I have SA11x0 stuff
+> > > converted to (and tested) with sparse IRQ.  That's with SA1111, the
+> > > UCB1x00 and Neponset expansion board for the Assabet all dynamically
+> > > allocating their IRQs.  The only fixed-numbered IRQs in SA11x0 in my
+> > > tree at the time of writing are the on-SoC IRQs, and the LoCoMo IRQs
+> > > (which I don't have the hardware to test for, so I'm not touching.)
+> > 
+> > That's really cool.
+> > 
+> > Not that there are many people who might still benefit from running that
+> > code, but like I said this should serve as a real and relatively simple
+> > example that might benefit more complex platforms.
+> > 
+> > 
+> > Nicolas
+> 
+> Indeed, that's good going. I'm CCing a guy who might have a SA11xx board with 
+> LoCoMo chip (that's old zaurus sl55xx, right?).
 
-On 30-01-2012 10:58, Manjunathappa, Prakash wrote:
+I think I still do have old zaurus in some box somewhere (I stopped playing
+with it once I got the newer one). And I think that Pavel Machek (CC) has one
+too (I think that he wanted to give away to anybody who is wishing to maintain
+the particular kernel parts and I think that in the end nobody took it).
 
->>> NAND and NOR device are made as aemif devices slave, hence device
->>> registration achieved via aemif MFD driver.
-
->>> Signed-off-by: Manjunathappa, Prakash<prakash.pm@ti.com>
->>> ---
->>> Since v1:
->>> Patch is generated using -M option.
-
->>>    arch/arm/mach-davinci/board-da830-evm.c |   31 +++++++++++++++++++++++--------
->>>    1 files changed, 23 insertions(+), 8 deletions(-)
-
->>      Why only this file? Don't other board files have NAND/NOR devices?
-
-> Yes I thought of sending board-da850 changes in separate patch. Should I have to send those changes also in this patch?
-
-    There's also board-dm*.c files. I'd done them all in the same patch.
-
-> Thanks,
-> Prakash
-
-WBR, Sergei
+-- 
+metan
