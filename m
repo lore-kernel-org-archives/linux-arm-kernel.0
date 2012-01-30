@@ -1,38 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 30 Jan 2012 05:15:29 +0100
-Subject: [PATCH 1/1] of_mmc_spi: fix little endian support
-Message-ID: <1327896929-16274-1-git-send-email-plagnioj@jcrosoft.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 30 Jan 2012 12:36:14 +0800
+Subject: [PATCH] mtd/gpmi : add BBT support
+Message-ID: <1327898174-13656-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the voltage_ranges is supposed to switch from big endian to little endian
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: linux-mmc at vger.kernel.org
+add the BBT support to the gpmi nand driver.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mmc/host/of_mmc_spi.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
-index ab66f24..ede2c64 100644
---- a/drivers/mmc/host/of_mmc_spi.c
-+++ b/drivers/mmc/host/of_mmc_spi.c
-@@ -109,12 +109,13 @@ struct mmc_spi_platform_data *mmc_spi_get_pdata(struct spi_device *spi)
- 		goto err_ocr;
- 	}
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 493ec2f..4fbb341 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1493,6 +1493,7 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
+ 	chip->ecc.mode		= NAND_ECC_HW;
+ 	chip->ecc.size		= 1;
+ 	chip->ecc.layout	= &gpmi_hw_ecclayout;
++	chip->bbt_options	= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
  
-+
- 	for (i = 0; i < num_ranges; i++) {
- 		const int j = i * 2;
- 		u32 mask;
- 
--		mask = mmc_vddrange_to_ocrmask(voltage_ranges[j],
--					       voltage_ranges[j + 1]);
-+		mask = mmc_vddrange_to_ocrmask(be32_to_cpu(voltage_ranges[j]),
-+					       be32_to_cpu(voltage_ranges[j + 1]));
- 		if (!mask) {
- 			ret = -EINVAL;
- 			dev_err(dev, "OF: voltage-range #%d is invalid\n", i);
+ 	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
+ 	this->bch_geometry.payload_size = 1024;
 -- 
-1.7.7
+1.7.0.4
