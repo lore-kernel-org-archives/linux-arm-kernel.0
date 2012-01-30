@@ -1,27 +1,30 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 30 Jan 2012 12:36:14 +0800
-Subject: [PATCH] mtd/gpmi : add BBT support
-Message-ID: <1327898174-13656-1-git-send-email-b32955@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 29 Jan 2012 20:45:17 -0800
+Subject: [PATCH] ARM: bcmring: remove unused DMA map code
+In-Reply-To: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D3D12CE3@SJEXCHCCR02.corp.ad.broadcom.com>
+References: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D3D12CE3@SJEXCHCCR02.corp.ad.broadcom.com>
+Message-ID: <CAOesGMhhh2bsC+sAZyyBOZw8Lgk1sR7e=ZB+RcnNJG-qDqiwtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add the BBT support to the gpmi nand driver.
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Hi,
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 493ec2f..4fbb341 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1493,6 +1493,7 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
- 	chip->ecc.mode		= NAND_ECC_HW;
- 	chip->ecc.size		= 1;
- 	chip->ecc.layout	= &gpmi_hw_ecclayout;
-+	chip->bbt_options	= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
- 
- 	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
- 	this->bch_geometry.payload_size = 1024;
--- 
-1.7.0.4
+On Tue, Jan 24, 2012 at 1:18 PM, JD (Jiandong) Zheng
+<jdzheng@broadcom.com> wrote:
+> Remove BCMRING DMA map code which is no longer used.
+>
+> This also fixes a build error with dma.c introduced by
+> 6a40b33270564d706396f1b514a988d3c.
+
+What is this patch based on? It doesn't apply on top of 3.3-rc1, nor
+v3.2, 3.1, 3.0 or current linux-next.
+
+Also, that SHA doesn't exist in the mainline tree, nor in linux-next.
+
+Please make sure that patches you submit as a maintainer apply cleanly
+on top of the tree you want them included in.
+
+
+Thanks,
+
+-Olof
