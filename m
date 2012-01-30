@@ -1,92 +1,294 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 30 Jan 2012 17:26:55 +0000
-Subject: [PATCH v6 6/9] ARM: vexpress: Motherboard RS1 memory map support
-In-Reply-To: <1326979266.32197.60.camel@hornet.cambridge.arm.com>
-References: <1323957761-13553-1-git-send-email-pawel.moll@arm.com>
- <1323957761-13553-7-git-send-email-pawel.moll@arm.com>
- <4F047FE1.5030002@citrix.com>
- <1326979266.32197.60.camel@hornet.cambridge.arm.com>
-Message-ID: <20120130172655.GF2248@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 30 Jan 2012 11:31:38 -0600
+Subject: [PATCH v3 1/2] irq: add irq_domain support to generic-chip
+In-Reply-To: <1327944699-29882-1-git-send-email-robherring2@gmail.com>
+References: <1327944699-29882-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1327944699-29882-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2012 at 01:21:06PM +0000, Pawel Moll wrote:
-> Hi,
-> 
-> Sorry about loooong delay - I've been on holiday.
-> 
-> On Wed, 2012-01-04 at 16:35 +0000, David Vrabel wrote:
-> > On 15/12/11 14:02, Pawel Moll wrote:
-> > > This patch adds support for RS1 memory map based Versatile Express
-> > > motherboard.
-> > > 
-> > [...]
-> > > --- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
-> > > +++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-> > > @@ -10,12 +10,41 @@
-> > >   * published by the Free Software Foundation.
-> > >   */
-> > >  
-> > > -#define DEBUG_LL_UART_OFFSET	0x00009000
-> > > +#define DEBUG_LL_PHYS_BASE		0x10000000
-> > > +#define DEBUG_LL_UART_OFFSET		0x00009000
-> > > +
-> > > +#define DEBUG_LL_PHYS_BASE_RS1		0x1c000000
-> > > +#define DEBUG_LL_UART_OFFSET_RS1	0x00090000
-> > > +
-> > > +#define DEBUG_LL_VIRT_BASE		0xf8000000
-> > >  
-> > >  		.macro	addruart,rp,rv,tmp
-> > > -		mov	\rp, #DEBUG_LL_UART_OFFSET
-> > > -		orr	\rv, \rp, #0xf8000000	@ virtual base
-> > > -		orr	\rp, \rp, #0x10000000	@ physical base
-> > > +
-> > > +		@ Check the MMU state
-> > > +#if defined(CONFIG_MMU)
-> > > +		mrc	p15, 0, \tmp, c1, c0	@ SCTRL
-> > > +		tst	\tmp, #1		@ MMU enabled?
-> > > +		moveq	\tmp, #DEBUG_LL_PHYS_BASE
-> > > +		movne	\tmp, #DEBUG_LL_VIRT_BASE
-> > > +#else
-> > > +		mov	\tmp, #DEBUG_LL_PHYS_BASE
-> > > +#endif
-> > > +
-> > > +		@ PL011 present in "original" place?
-> > > +		orr	\tmp, \tmp, #DEBUG_LL_UART_OFFSET
-> > > +		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
-> > 
-> > This doesn't work with CONFIG_EARLY_PRINTK=y on a system with the RS1
-> > memory map.  
-> 
-> It does for me:
-> 
-> # zcat /proc/config.gz | grep EARLY_PRINTK
-> CONFIG_EARLY_PRINTK=y
-> # cat /proc/device-tree/motherboard/arm,v2m-memory-map && echo
-> rs1     
-> #
-> 
-> Can you tell me what exactly is going wrong in your case? Does it hang
-> without any warning? Do you get at least part of the boot log? Can you
-> send me (privately probably) your kernel config?
+From: Rob Herring <rob.herring@calxeda.com>
 
-I had to disable this when running on the ARM fast model with your vexpress
-DT series.  I didn't debug into exactly why I had to disable it, but I
-think I was getting aborts when the kernel was probing for nonexistent
-legacy memory map location of the UART.  I don't know whether this will
-affect real hardware though... and maybe I was hitting the problem due
-to something else.
+Add irq domain support to irq generic-chip. This enables users of
+generic-chip to support dynamic irq assignment needed for DT interrupt
+binding.
 
-Anyway unless I've misunderstood something, AMBA devices are only really
-probable if there is some real bus slave at the probed address, which is
-free from nasty side-effects.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+---
+ include/linux/irq.h       |   10 +++
+ kernel/irq/generic-chip.c |  134 ++++++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 129 insertions(+), 15 deletions(-)
 
-Really we should have a way for getting this info from the device tree,
-yada yada.  (Repeating myself here, I know)
-
-In the meantime, I don't see a practical alternative to adding distinct
-lowlevel debug UART selection options for the two memory maps ...?
-
-
-Cheers
----Dave
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index bff29c5..482d198 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -665,6 +665,10 @@ struct irq_chip_generic {
+ 	void __iomem		*reg_base;
+ 	unsigned int		irq_base;
+ 	unsigned int		irq_cnt;
++	struct irq_domain	*domain;
++	unsigned int		flags;
++	unsigned int		irq_set;
++	unsigned int		irq_clr;
+ 	u32			mask_cache;
+ 	u32			type_cache;
+ 	u32			polarity_cache;
+@@ -707,6 +711,12 @@ irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
+ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
+ 			    enum irq_gc_flags flags, unsigned int clr,
+ 			    unsigned int set);
++
++struct device_node;
++void irq_setup_generic_chip_domain(struct irq_chip_generic *gc,
++			    struct device_node *node, u32 msk,
++			    enum irq_gc_flags flags, unsigned int clr,
++			    unsigned int set);
+ int irq_setup_alt_chip(struct irq_data *d, unsigned int type);
+ void irq_remove_generic_chip(struct irq_chip_generic *gc, u32 msk,
+ 			     unsigned int clr, unsigned int set);
+diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+index c89295a..2519663 100644
+--- a/kernel/irq/generic-chip.c
++++ b/kernel/irq/generic-chip.c
+@@ -5,6 +5,7 @@
+  */
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/slab.h>
+ #include <linux/export.h>
+ #include <linux/interrupt.h>
+@@ -39,7 +40,7 @@ void irq_gc_noop(struct irq_data *d)
+ void irq_gc_mask_disable_reg(struct irq_data *d)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = 1 << (d->irq - gc->irq_base);
++	u32 mask = 1 << d->hwirq;
+ 
+ 	irq_gc_lock(gc);
+ 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->disable);
+@@ -57,7 +58,7 @@ void irq_gc_mask_disable_reg(struct irq_data *d)
+ void irq_gc_mask_set_bit(struct irq_data *d)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = 1 << (d->irq - gc->irq_base);
++	u32 mask = 1 << d->hwirq;
+ 
+ 	irq_gc_lock(gc);
+ 	gc->mask_cache |= mask;
+@@ -75,7 +76,7 @@ void irq_gc_mask_set_bit(struct irq_data *d)
+ void irq_gc_mask_clr_bit(struct irq_data *d)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = 1 << (d->irq - gc->irq_base);
++	u32 mask = 1 << d->hwirq;
+ 
+ 	irq_gc_lock(gc);
+ 	gc->mask_cache &= ~mask;
+@@ -93,7 +94,7 @@ void irq_gc_mask_clr_bit(struct irq_data *d)
+ void irq_gc_unmask_enable_reg(struct irq_data *d)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = 1 << (d->irq - gc->irq_base);
++	u32 mask = 1 << d->hwirq;
+ 
+ 	irq_gc_lock(gc);
+ 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->enable);
+@@ -108,7 +109,7 @@ void irq_gc_unmask_enable_reg(struct irq_data *d)
+ void irq_gc_ack_set_bit(struct irq_data *d)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = 1 << (d->irq - gc->irq_base);
++	u32 mask = 1 << d->hwirq;
+ 
+ 	irq_gc_lock(gc);
+ 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
+@@ -122,7 +123,7 @@ void irq_gc_ack_set_bit(struct irq_data *d)
+ void irq_gc_ack_clr_bit(struct irq_data *d)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = ~(1 << (d->irq - gc->irq_base));
++	u32 mask = ~(1 << d->hwirq);
+ 
+ 	irq_gc_lock(gc);
+ 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
+@@ -136,7 +137,7 @@ void irq_gc_ack_clr_bit(struct irq_data *d)
+ void irq_gc_mask_disable_reg_and_ack(struct irq_data *d)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = 1 << (d->irq - gc->irq_base);
++	u32 mask = 1 << d->hwirq;
+ 
+ 	irq_gc_lock(gc);
+ 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->mask);
+@@ -151,7 +152,7 @@ void irq_gc_mask_disable_reg_and_ack(struct irq_data *d)
+ void irq_gc_eoi(struct irq_data *d)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = 1 << (d->irq - gc->irq_base);
++	u32 mask = 1 << d->hwirq;
+ 
+ 	irq_gc_lock(gc);
+ 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->eoi);
+@@ -169,7 +170,7 @@ void irq_gc_eoi(struct irq_data *d)
+ int irq_gc_set_wake(struct irq_data *d, unsigned int on)
+ {
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = 1 << (d->irq - gc->irq_base);
++	u32 mask = 1 << d->hwirq;
+ 
+ 	if (!(mask & gc->wake_enabled))
+ 		return -EINVAL;
+@@ -257,11 +258,99 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
+ 		irq_set_chip_and_handler(i, &ct->chip, ct->handler);
+ 		irq_set_chip_data(i, gc);
+ 		irq_modify_status(i, clr, set);
++		irq_get_irq_data(i)->hwirq = i - gc->irq_base;
+ 	}
+ 	gc->irq_cnt = i - gc->irq_base;
+ }
+ EXPORT_SYMBOL_GPL(irq_setup_generic_chip);
+ 
++#ifdef CONFIG_IRQ_DOMAIN
++static int irq_gc_irq_domain_match(struct irq_domain *d, struct device_node *np)
++{
++	struct irq_chip_generic *gc;
++
++	if (d->of_node != NULL && d->of_node == np) {
++		list_for_each_entry(gc, &gc_list, list) {
++			if ((gc == d->host_data) && (d == gc->domain))
++				return 1;
++		}
++	}
++	return 0;
++}
++
++static int irq_gc_irq_domain_map(struct irq_domain *d, unsigned int irq,
++				 irq_hw_number_t hw)
++{
++	struct irq_chip_generic *gc = d->host_data;
++	struct irq_chip_type *ct = gc->chip_types;
++
++	if (gc->flags & IRQ_GC_INIT_NESTED_LOCK)
++		irq_set_lockdep_class(irq, &irq_nested_lock_class);
++
++	irq_set_chip_and_handler(irq, &ct->chip, ct->handler);
++	irq_set_chip_data(irq, gc);
++	irq_modify_status(irq, gc->irq_clr, gc->irq_set);
++
++	return 0;
++}
++
++static struct irq_domain_ops irq_gc_irq_domain_ops = {
++	.match = irq_gc_irq_domain_match,
++	.map = irq_gc_irq_domain_map,
++	.xlate = irq_domain_xlate_onetwocell,
++};
++
++/*
++ * irq_setup_generic_chip_domain - Setup a range of interrupts with a generic chip and domain
++ * @gc:		Generic irq chip holding all data
++ * @node:	Device tree node pointer for domain
++ * @msk:	Bitmask holding the irqs to initialize relative to gc->irq_base
++ * @flags:	Flags for initialization
++ * @clr:	IRQ_* bits to clear
++ * @set:	IRQ_* bits to set
++ *
++ * Set up max. 32 interrupts starting from gc->irq_base using an irq domain.
++ * Note, this initializes all interrupts to the primary irq_chip_type and its
++ * associated handler.
++ */
++void irq_setup_generic_chip_domain(struct irq_chip_generic *gc,
++			    struct device_node *node, u32 msk,
++			    enum irq_gc_flags flags, unsigned int clr,
++			    unsigned int set)
++{
++	struct irq_chip_type *ct = gc->chip_types;
++
++	if (!node) {
++		irq_setup_generic_chip(gc, msk, flags, clr, set);
++		return;
++	}
++
++	raw_spin_lock(&gc_lock);
++	list_add_tail(&gc->list, &gc_list);
++	raw_spin_unlock(&gc_lock);
++
++	/* Init mask cache ? */
++	if (flags & IRQ_GC_INIT_MASK_CACHE)
++		gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
++
++	gc->flags = flags;
++	gc->irq_clr = clr;
++	gc->irq_set = set;
++
++	/* Users of domains should not use irq_base */
++	if ((int)gc->irq_base > 0)
++		gc->domain = irq_domain_add_legacy(node, fls(msk),
++						   gc->irq_base, 0,
++						   &irq_gc_irq_domain_ops, gc);
++	else {
++		gc->irq_base = 0;
++		gc->domain = irq_domain_add_linear(node, fls(msk),
++						   &irq_gc_irq_domain_ops, gc);
++	}
++}
++EXPORT_SYMBOL_GPL(irq_setup_generic_chip_domain);
++#endif
++
+ /**
+  * irq_setup_alt_chip - Switch to alternative chip
+  * @d:		irq_data for this interrupt
+@@ -325,8 +414,13 @@ static int irq_gc_suspend(void)
+ 	list_for_each_entry(gc, &gc_list, list) {
+ 		struct irq_chip_type *ct = gc->chip_types;
+ 
+-		if (ct->chip.irq_suspend)
+-			ct->chip.irq_suspend(irq_get_irq_data(gc->irq_base));
++		if (ct->chip.irq_suspend) {
++			int i;
++			int irq = gc->irq_base;
++			for (i = 0; !irq && i < 32; i++)
++				irq = irq_find_mapping(gc->domain, i);
++			ct->chip.irq_suspend(irq_get_irq_data(irq));
++		}
+ 	}
+ 	return 0;
+ }
+@@ -338,8 +432,13 @@ static void irq_gc_resume(void)
+ 	list_for_each_entry(gc, &gc_list, list) {
+ 		struct irq_chip_type *ct = gc->chip_types;
+ 
+-		if (ct->chip.irq_resume)
+-			ct->chip.irq_resume(irq_get_irq_data(gc->irq_base));
++		if (ct->chip.irq_resume) {
++			int i;
++			int irq = gc->irq_base;
++			for (i = 0; !irq && i < 32; i++)
++				irq = irq_find_mapping(gc->domain, i);
++			ct->chip.irq_resume(irq_get_irq_data(irq));
++		}
+ 	}
+ }
+ #else
+@@ -354,8 +453,13 @@ static void irq_gc_shutdown(void)
+ 	list_for_each_entry(gc, &gc_list, list) {
+ 		struct irq_chip_type *ct = gc->chip_types;
+ 
+-		if (ct->chip.irq_pm_shutdown)
+-			ct->chip.irq_pm_shutdown(irq_get_irq_data(gc->irq_base));
++		if (ct->chip.irq_pm_shutdown) {
++			int i;
++			int irq = gc->irq_base;
++			for (i = 0; !irq && i < 32; i++)
++				irq = irq_find_mapping(gc->domain, i);
++			ct->chip.irq_pm_shutdown(irq_get_irq_data(irq));
++		}
+ 	}
+ }
+ 
+-- 
+1.7.5.4
