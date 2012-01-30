@@ -1,90 +1,38 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Mon, 30 Jan 2012 13:23:50 +0530
-Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
-In-Reply-To: <4F1FFF7E.3000802@codeaurora.org>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1326807902.1540.116.camel@vkoul-udesk3> <4F195E4C.6080805@codeaurora.org>
- <1327066287.517.4.camel@vkoul-udesk3> <4F1D4052.3070701@codeaurora.org>
- <1327326713.517.32.camel@vkoul-udesk3> <4F1FFF7E.3000802@codeaurora.org>
-Message-ID: <4F264C8E.5030007@codeaurora.org>
+From: bill4carson@gmail.com (bill4carson at gmail.com)
+Date: Mon, 30 Jan 2012 15:57:11 +0800
+Subject: [RFC] ARM hugetlb support
+Message-ID: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/25/2012 6:41 PM, Ravi Kumar V wrote:
-> On 1/23/2012 7:21 PM, Vinod Koul wrote:
->> On Mon, 2012-01-23 at 16:41 +0530, Ravi Kumar V wrote:
->>>
->>> If some changes are made in interleave API then it can support our BOX
->>> mode. Here in interleaved template he is assuming destination pattern as
->>> can be contiguous or same as source pattern, but in our case destination
->>> pattern is different from source pattern.
->>> So if a new parameter destination data chunk is added in "struct
->>> dma_interleaved_template" structure then it can support different
->>> destination pattern.
->> do you mean you have cases where you are doing a "memcpy" from one
->> interleaved memory to another?
->> Can you provide me with a scenario where this maybe helpful?
->
-> Presently we are transferring data from interleaved memory tho
-> contagious memory and vice-verse.
-> We can use the interleaved API for present scenario, but it will
-> restrict the HW capability of transferring data from one interleaved
-> pattern to other interleaved pattern.
->
->>
->> The reason why the API was designed like this was to give ability to
->> take these kind of interleaved memory and copy them to peripheral
->> (constant addr) or memory (typically contagious).
->>
->> In case it is just a pattern I wonder why it cannot be described in
->> standard scatter gather definitions as you can split the block further
->> down to copy from one respective block to somewhere else in memory.
->
-> We can use scatter gather but it will be extra burden on software to
-> create those many SG list unlike in box mode just a single command
-> serves the purpose.
->
->>> Also it will good if you can provide another parameter for passing
->>> private data to dma driver.
->> 1. what does this parameter do?
->
-> Private parameter in our case will be command configuration parameter
-> where we are passing information to HW like endianness, synchronization
-> & acknowledge mechanism between DMA HW and peripherals running with
-> different clock than DMA.
->
->> 2. is this parameter static for a channel or it changes per transfer?
->>
-> This parameter changes per each transfer.
->
-> We can see these possibilities to implement our DMA driver but still
-> have to add new parameter in "scatterlist" & "interleaved template" for
-> supporting per transfer private data like our command configuration
-> parameter.
->
-> 1.We have to add new parameter "struct data_chunk" in
-> "interleaved_template" for supporting different destination pattern.
-> It helps a lot for implementing our total HW capability.
->
-> 2.We have to use present API's for box mode.
-> --scatter gather API for different interleaved source & destination
-> patterns.
-> --interleaved API for interleaved source pattern to destination
-> contiguous pattern/vice-verse.
-> It causes some extra burden on our software to create sglist.
->
-> 3.Implement New API for BOX mode.
->
-> I feel if we can go with first option then it helps a lot.
->
-> Please can you suggest a better way to solve our problem.
->
-> Thanks,
-> Ravi Kumar
->
 
-Please can you suggest best way.
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Hi All
+
+
+This patch aims to support huge page for ARM. For now, 2MB(two 1MB page)/16MB
+huge page are supported, Versatile Express Cortex-A9x4 tile is used as test 
+board. Verifications are running with libhugetlbfs and ltp.
+
+Any suggestions would be welcome.
+
+
+Signed-off-by: Bill Carson <bill4carson@gmail.com>
+---
+ arch/arm/Kconfig                      |   29 ++++
+ arch/arm/include/asm/glue-proc.h      |    3 +
+ arch/arm/include/asm/hugetlb.h        |  240 +++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/page.h           |   15 ++
+ arch/arm/include/asm/pgtable-2level.h |    8 +
+ arch/arm/include/asm/pgtable.h        |   28 ++++
+ arch/arm/include/asm/proc-fns.h       |    3 +
+ arch/arm/mm/Makefile                  |    1 +
+ arch/arm/mm/dma-mapping.c             |    3 -
+ arch/arm/mm/fault.c                   |   15 ++
+ arch/arm/mm/hugetlb.c                 |  187 +++++++++++++++++++++++++
+ arch/arm/mm/pgd.c                     |   28 ++++
+ arch/arm/mm/proc-v7-2level.S          |   96 +++++++++++++
+ include/linux/mm_types.h              |   11 ++
+ 14 files changed, 664 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb.h
+ create mode 100644 arch/arm/mm/hugetlb.c
