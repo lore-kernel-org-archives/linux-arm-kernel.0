@@ -1,57 +1,171 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Mon, 30 Jan 2012 16:08:32 +0000
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfLqvPN_k7vuC3qzBjwX2ihBdPxZvmSCPZ3frWgptWXQGA@mail.gmail.com>
- (stephane eranian's message of "Mon, 30 Jan 2012 17:02:06 +0100")
-References: <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
- <20120127121311.GB2347@mudshark.cambridge.arm.com>
- <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
- <20120127132826.GD2347@mudshark.cambridge.arm.com>
- <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
- <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
- <20120127155454.GH2347@mudshark.cambridge.arm.com>
- <CAMsRxfK-SFEyP5+jyXDyWSQPJ2KO_1YQM_yZdtwV0NJu+idqHA@mail.gmail.com>
- <20120127165941.GK2347@mudshark.cambridge.arm.com>
- <CAMsRxf+iv06zOCMzhYONeLaf6RvOLp38T53mR--8ESHvCXMeFQ@mail.gmail.com>
- <20120127171009.GL2347@mudshark.cambridge.arm.com>
- <CAMsRxfJufRMrcfGZp53ALOdEFLk+YDMvQMrHw-jR9tQ8ThE+-Q@mail.gmail.com>
- <CAMsRxfK5tv1DZmHH4F0BT+zVUboESiMmCkatO2NLHp03=e51fQ@mail.gmail.com>
- <CACVXFVMgDpaYeaU+0LGirYzNfJb8k0wFfL=+UU5qAwYfXgWLMQ@mail.gmail.com>
- <CAMsRxfJq1-tSQH4bv0BeNWXV9aysi9AUvywkh3e9SaamMDfZ0Q@mail.gmail.com>
- <CAMsRxf+okps60OxQnPkqHck8pWHrkPnT6boo603pC2XEbFYoRQ@mail.gmail.com>
- <CACVXFVMDXO3DDj0mGh=+uDYfCoS_Ck1STVK0=UXjiAbtJTa=hA@mail.gmail.com>
- <CAMsRxfLqvPN_k7vuC3qzBjwX2ihBdPxZvmSCPZ3frWgptWXQGA@mail.gmail.com>
-Message-ID: <yw1xsjixgolb.fsf@unicorn.mansr.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 30 Jan 2012 16:14:47 +0000
+Subject: [PATCH 02/15] mm: page_alloc: update migrate type of pages on
+ pcp when isolating
+In-Reply-To: <op.v8wlu8ws3l0zgt@mpn-glaptop>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-3-git-send-email-m.szyprowski@samsung.com>
+ <20120130111522.GE25268@csn.ul.ie> <op.v8wlu8ws3l0zgt@mpn-glaptop>
+Message-ID: <20120130161447.GU25268@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-stephane eranian <eranian@googlemail.com> writes:
+On Mon, Jan 30, 2012 at 04:41:22PM +0100, Michal Nazarewicz wrote:
+> On Mon, 30 Jan 2012 12:15:22 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
+> 
+> >On Thu, Jan 26, 2012 at 10:00:44AM +0100, Marek Szyprowski wrote:
+> >>From: Michal Nazarewicz <mina86@mina86.com>
+> >>@@ -139,3 +139,27 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn)
+> >> 	spin_unlock_irqrestore(&zone->lock, flags);
+> >> 	return ret ? 0 : -EBUSY;
+> >> }
+> >>+
+> >>+/* must hold zone->lock */
+> >>+void update_pcp_isolate_block(unsigned long pfn)
+> >>+{
+> >>+	unsigned long end_pfn = pfn + pageblock_nr_pages;
+> >>+	struct page *page;
+> >>+
+> >>+	while (pfn < end_pfn) {
+> >>+		if (!pfn_valid_within(pfn)) {
+> >>+			++pfn;
+> >>+			continue;
+> >>+		}
+> >>+
+> 
+> On Mon, 30 Jan 2012 12:15:22 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
+> >There is a potential problem here that you need to be aware of.
+> >set_pageblock_migratetype() is called from start_isolate_page_range().
+> >I do not think there is a guarantee that pfn + pageblock_nr_pages is
+> >not in a different block of MAX_ORDER_NR_PAGES. If that is right then
+> >your options are to add a check like this;
+> >
+> >if ((pfn & (MAX_ORDER_NR_PAGES - 1)) == 0 && !pfn_valid(pfn))
+> >	break;
+> >
+> >or else ensure that end_pfn is always MAX_ORDER_NR_PAGES aligned and in
+> >the same block as pfn and relying on the caller to have called
+> >pfn_valid.
+> 
+> 	pfn = round_down(pfn, pageblock_nr_pages);
+> 	end_pfn = pfn + pageblock_nr_pages;
+> 
+> should do the trick as well, right?  move_freepages_block() seem to be
+> doing the same thing.
+> 
 
-> Same result for me on CPU1:
->
-> top - 16:20:24 up  1:45,  1 user,  load average: 0.29, 0.08, 0.07
-> Tasks:  70 total,   2 running,  68 sleeping,   0 stopped,   0 zombie
-> Cpu(s): 30.7%us,  2.7%sy,  0.0%ni, 66.7%id,  0.0%wa,  0.0%hi,  0.0%si,  0.0%st
-> Mem:    940232k total,   228984k used,   711248k free,    82244k buffers
-> Swap:   524240k total,        0k used,   524240k free,    91400k cached
->
->   PID USER      PR  NI  VIRT  RES  SHR S %CPU %MEM    TIME+  P COMMAND
->  3968 eranian   20   0   644  160  128 R  100  0.0   0:21.98 1 noploop
->  3969 eranian   20   0  2184 1056  804 R    3  0.1   0:00.53 0 top
->    82 root      20   0     0    0    0 S    1  0.0   0:01.35 0
-> kworker/0:1
->
-> With 3.3.0-rc1, if I revert the clockdomain patch, I get the same result.
-> So it must be coming from somewhere else, as you suggested.
->
-> If the processor was spending time processing interrupts, then this would be
-> accounted for in as sys time. But that's not what I observe here. It's either
-> idle or user. That line, leads me to believe that the processor can only run
-> my program for 30% of the time. The rest is spent idling even though my
-> program is non-blocking. How could that be possible? Power-saving?
+That would also do it the trick.
 
-In top, press 1 to see the statistics for the CPUs separately.
+> >>+		page = pfn_to_page(pfn);
+> >>+		if (PageBuddy(page)) {
+> >>+			pfn += 1 << page_order(page);
+> >>+		} else if (page_count(page) == 0) {
+> >>+			set_page_private(page, MIGRATE_ISOLATE);
+> >>+			++pfn;
+> >
+> >This is dangerous for two reasons. If the page_count is 0, it could
+> >be because the page is in the process of being freed and is not
+> >necessarily on the per-cpu lists yet and you cannot be sure if the
+> >contents of page->private are important. Second, there is nothing to
+> >prevent another CPU allocating this page from its per-cpu list while
+> >the private field is getting updated from here which might lead to
+> >some interesting races.
+> >
+> >I recognise that what you are trying to do is respond to Gilad's
+> >request that you really check if an IPI here is necessary. I think what
+> >you need to do is check if a page with a count of 0 is encountered
+> >and if it is, then a draining of the per-cpu lists is necessary. To
+> >address Gilad's concerns, be sure to only this this once per attempt at
+> >CMA rather than for every page encountered with a count of 0 to avoid a
+> >storm of IPIs.
+> 
+> It's actually more then that.
+> 
+> This is the same issue that I first fixed with a change to free_pcppages_bulk()
+> function[1].  At the time of positing, you said you'd like me to try and find
+> a different solution which would not involve paying the price of calling
+> get_pageblock_migratetype().  Later I also realised that this solution is
+> not enough.
+> 
+> [1] http://article.gmane.org/gmane.linux.kernel.mm/70314
+> 
+
+Yes. I had forgotten the history but looking at that patch again,
+I would reach the conclusion that this was adding a new call to
+get_pageblock_migratetype() in the bulk free path. That would affect
+everybody whether they were using CMA or not.
+
+> My next attempt was to run drain PCP list while holding zone->lock[2], but that
+> quickly proven to be broken approach when Marek started testing it on an SMP
+> system.
+> 
+> [2] http://article.gmane.org/gmane.linux.kernel.mm/72016
+> 
+> This patch is yet another attempt of solving this old issue.  Even though it has
+> a potential race condition we came to conclusion that the actual chances of
+> causing any problems are slim.  Various stress tests did not, in fact, show
+> the race to be an issue.
+> 
+
+It is a really small race. To cause a problem CPU 1 must find a page
+with count 0, CPU 2 must then allocate the page and set page->private
+before CPU 1 overwrites that value but it's there.
+
+> The problem is that if a page is on a PCP list, and it's underlaying pageblocks'
+> migrate type is changed to MIGRATE_ISOLATE, the page (i) will still remain on PCP
+> list and thus someone can allocate it, and (ii) when removed from PCP list, the
+> page will be put on freelist of migrate type it had prior to change.
+> 
+> (i) is actually not such a big issue since the next thing that happens after
+> isolation is migration so all the pages will get freed.  (ii) is actual problem
+> and if [1] is not an acceptable solution I really don't have a good fix for that.
+> 
+> One things that comes to mind is calling drain_all_pages() prior to acquiring
+> zone->lock in set_migratetype_isolate().  This is however prone to races since
+> after the drain and before the zone->lock is acquired, pages might get moved
+> back to PCP list.
+> 
+> Draining PCP list after acquiring zone->lock is not possible because
+> smp_call_function_many() cannot be called with interrupts disabled, and changing
+> spin_lock_irqsave() to spin_lock() followed by local_irq_save() causes a dead
+> lock (that's what [2] attempted to do).
+> 
+> Any suggestions are welcome!
+> 
+
+[1] is still not preferred as I'd still like to keep the impact
+of CMA to the normal paths to be as close to 0 as possible. In
+update_pcp_isolate_block() how about something like this?
+
+if (page_count(page) == 0) {
+	spin_unlock_irqrestore(zone->lock, flags);
+	drain_all_pages()
+	spin_lock_irqsave(zone->lock, flags);
+	if (PageBuddy(page)) {
+		order = page_order(page);
+		list_del(&page->lru);
+		list_add_tail(&page->lru, &zone->free_area[order].free_list[MIGRATE_ISOLATE]);
+		set_page_private(page, MIGRATE_ISOLATE);
+	}
+}
+
+If the page is !PageBuddy, it does not matter as alloc_contig_range()
+is just about to migrate it.
+
+
+> >>+		} else {
+> >>+			++pfn;
+> >>+		}
+> >>+	}
+> >>+}
+> 
+> -- 
+> Best regards,                                         _     _
+> .o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+> ..o | Computer Science,  Micha?? ???mina86??? Nazarewicz    (o o)
+> ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+> 
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+Mel Gorman
+SUSE Labs
