@@ -1,87 +1,83 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 30 Jan 2012 17:00:06 +0000
-Subject: [PATCHv2 4/6] ARM: extract out code patch function from kprobes
-In-Reply-To: <1327757725-10114-5-git-send-email-rabin@rab.in>
-References: <1327757725-10114-1-git-send-email-rabin@rab.in>
- <1327757725-10114-5-git-send-email-rabin@rab.in>
-Message-ID: <20120130170006.GD2248@linaro.org>
+Date: Mon, 30 Jan 2012 17:07:03 +0000
+Subject: [PATCH v2 4/4] ARM: vfp: clear fpscr length and stride bits on
+ entry to sig handler
+In-Reply-To: <1327922695-16121-5-git-send-email-will.deacon@arm.com>
+References: <1327922695-16121-1-git-send-email-will.deacon@arm.com>
+ <1327922695-16121-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20120130170703.GE2248@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 28, 2012 at 07:05:23PM +0530, Rabin Vincent wrote:
-> Extract out the code patching code from kprobes so that it can be used
-> from the jump label code.  Additionally, the separated code:
+On Mon, Jan 30, 2012 at 11:24:55AM +0000, Will Deacon wrote:
+> The ARM PCS mandates that the length and stride bits of the fpscr are
+> cleared on entry to and return from a public interface. Although signal
+> handlers run asynchronously with respect to the interrupted function,
+> the handler itself expects to run as though it has been called like a
+> normal function.
 > 
->  - Uses the IS_ENABLED() macros instead of the #ifdefs for THUMB2
->    support
-> 
->  - Unifies the two separate functions in kprobes, providing one function
->    that uses stop_machine() internally, and one that can be called from
->    stop_machine() directly
-> 
->  - Patches the text on all CPUs only on processors requiring software
->    broadcasting of cache operations
-> 
-> Cc: Jon Medhurst <tixy@yxit.co.uk>
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm/kernel/Makefile  |    3 +-
->  arch/arm/kernel/kprobes.c |   86 ++++++++++++--------------------------------
->  arch/arm/kernel/patch.c   |   73 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/patch.h   |    7 ++++
->  4 files changed, 106 insertions(+), 63 deletions(-)
->  create mode 100644 arch/arm/kernel/patch.c
->  create mode 100644 arch/arm/kernel/patch.h
+> This patch updates the state mirroring the VFP hardware before entry to
+> a signal handler so that it adheres to the PCS. Furthermore, we disable
+> VFP to ensure that we trap on any floating point operation performed by
+> the signal handler and synchronise the hardware appropriately. A check
+> is inserted after the signal handler to avoid redundant flushing if VFP
+> was not used.
 
-[...]
+Hmmm, that looks more like it.  I've not tried this out, but it looks
+sensible.
 
-> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-> new file mode 100644
-> index 0000000..30eff23
-> --- /dev/null
-> +++ b/arch/arm/kernel/patch.c
-> @@ -0,0 +1,73 @@
-
-[...]
-
-> +void __kprobes __patch_text(void *addr, unsigned int insn)
-> +{
-> +	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-> +	int size;
-> +
-> +	if (thumb2 && __opcode_is_thumb16(insn)) {
-> +		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
-> +		size = sizeof(u16);
-> +	} else if (thumb2 && ((uintptr_t)addr & 2)) {
-> +		u16 *addrh = addr;
-> +
-> +		addrh[0] = __opcode_thumb32_first(insn);
-> +		addrh[1] = __opcode_thumb32_second(insn);
-
-It looks like we never convert to memory byte order in this case.
-
-If not, should this be as follows?
-
-	addrh[0] = __opcode_to_mem_thumb16(__opcode_thumb32_first(insn));
-	addrh[1] = __opcode_to_mem_thumb16(__opcode_thumb32_second(insn));
-
-> +
-> +		size = sizeof(u32);
-> +	} else {
-> +		if (thumb2)
-> +			insn = __opcode_to_mem_thumb32(insn);
-> +		else
-> +			insn = __opcode_to_mem_arm(insn);
-> +
-> +		*(u32 *)addr = insn;
-> +		size = sizeof(u32);
-> +	}
-> +
-> +	flush_icache_range((uintptr_t)(addr),
-> +			   (uintptr_t)(addr) + size);
-> +}
-
-[...]
+Ignore my stale comments on your previous post.
 
 Cheers
 ---Dave
+
+> 
+> Reported-by: Peter Maydell <peter.maydell@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/kernel/signal.c |   17 ++++++++++++++++-
+>  1 files changed, 16 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 9e617bd..3de59a0 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -207,6 +207,20 @@ static int preserve_vfp_context(struct vfp_sigframe __user *frame)
+>  	__put_user_error(h->fpinst, &frame->ufp_exc.fpinst, err);
+>  	__put_user_error(h->fpinst2, &frame->ufp_exc.fpinst2, err);
+>  
+> +	vfp_flush_hwstate(thread);
+> +
+> +	/*
+> +	 * As per the PCS, clear the length and stride bits before entry
+> +	 * to the signal handler.
+> +	 */
+> +	h->fpscr &= ~(FPSCR_LENGTH_MASK | FPSCR_STRIDE_MASK);
+> +
+> +	/*
+> +	 * Disable VFP so that we can detect if it was used by the
+> +	 * signal handler.
+> +	 */
+> +	h->fpexc &= ~FPEXC_EN;
+> +
+>  	return err ? -EFAULT : 0;
+>  }
+>  
+> @@ -227,7 +241,8 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+>  	if (magic != VFP_MAGIC || size != VFP_STORAGE_SIZE)
+>  		return -EINVAL;
+>  
+> -	vfp_flush_hwstate(thread);
+> +	if (h->fpexc & FPEXC_EN)
+> +		vfp_flush_hwstate(thread);
+>  
+>  	/*
+>  	 * Copy the floating point registers. There can be unused
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
