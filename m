@@ -1,30 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2012 20:45:17 -0800
-Subject: [PATCH] ARM: bcmring: remove unused DMA map code
-In-Reply-To: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D3D12CE3@SJEXCHCCR02.corp.ad.broadcom.com>
-References: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D3D12CE3@SJEXCHCCR02.corp.ad.broadcom.com>
-Message-ID: <CAOesGMhhh2bsC+sAZyyBOZw8Lgk1sR7e=ZB+RcnNJG-qDqiwtg@mail.gmail.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Mon, 30 Jan 2012 05:12:11 +0000
+Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
+ remove unsupported 15bit modes
+In-Reply-To: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
+References: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <4F2626AB.2040300@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/13/2011 02:52 PM, Peter Korsgaard wrote:
+> Allow framebuffer to be configured in 16bit mode when panel is wired in
+> (the default) BGR configuration, and don't claim to support 15bit input
+> modes, which the LCD controller cannot handle.
+> 
+> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 
-On Tue, Jan 24, 2012 at 1:18 PM, JD (Jiandong) Zheng
-<jdzheng@broadcom.com> wrote:
-> Remove BCMRING DMA map code which is no longer used.
->
-> This also fixes a build error with dma.c introduced by
-> 6a40b33270564d706396f1b514a988d3c.
-
-What is this patch based on? It doesn't apply on top of 3.3-rc1, nor
-v3.2, 3.1, 3.0 or current linux-next.
-
-Also, that SHA doesn't exist in the mainline tree, nor in linux-next.
-
-Please make sure that patches you submit as a maintainer apply cleanly
-on top of the tree you want them included in.
+Applied.
 
 
 Thanks,
 
--Olof
+Florian Tobias Schandinat
+
+> ---
+>  drivers/video/atmel_lcdfb.c |   12 +++---------
+>  1 files changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+> index 7ca3eaf..143f6d9 100644
+> --- a/drivers/video/atmel_lcdfb.c
+> +++ b/drivers/video/atmel_lcdfb.c
+> @@ -418,24 +418,18 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
+>  		var->red.length = var->green.length = var->blue.length
+>  			= var->bits_per_pixel;
+>  		break;
+> -	case 15:
+>  	case 16:
+>  		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
+>  			/* RGB:565 mode */
+>  			var->red.offset = 11;
+>  			var->blue.offset = 0;
+> -			var->green.length = 6;
+> -		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
+> -			var->red.offset = 10;
+> -			var->blue.offset = 0;
+> -			var->green.length = 5;
+>  		} else {
+> -			/* BGR:555 mode */
+> +			/* BGR:565 mode */
+>  			var->red.offset = 0;
+> -			var->blue.offset = 10;
+> -			var->green.length = 5;
+> +			var->blue.offset = 11;
+>  		}
+>  		var->green.offset = 5;
+> +		var->green.length = 6;
+>  		var->red.length = var->blue.length = 5;
+>  		break;
+>  	case 32:
