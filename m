@@ -1,78 +1,239 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Jan 2012 08:24:53 +0100
-Subject: [PATCH 2/6] mfd: mc13xxx-core: ADC conv: wait_for_completion
- returns a long
-In-Reply-To: <1327876408-22528-3-git-send-email-marc@cpdesign.com.au>
-References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
- <1327876408-22528-3-git-send-email-marc@cpdesign.com.au>
-Message-ID: <20120130072453.GG6305@pengutronix.de>
+From: b39297@freescale.com (Wu Guoxing)
+Date: Mon, 30 Jan 2012 14:31:20 +0800
+Subject: [PATCH v7] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
+Message-ID: <1327905080-23623-1-git-send-email-b39297@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 09:33:24AM +1100, Marc Reilly wrote:
-> Use the correct return type for wait_for_completion, as long may be
-> larger than int.
-That's a theoretical problem only because the return value should be in
-the range -ESOMETHING ... HZ which fits into an int.
+From: wu guoxing <b39297@freescale.com>
 
-> Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
-> ---
->  drivers/mfd/mc13xxx-core.c |   14 +++++++++-----
->  1 files changed, 9 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> index 8cb83ef..afff892 100644
-> --- a/drivers/mfd/mc13xxx-core.c
-> +++ b/drivers/mfd/mc13xxx-core.c
-> @@ -513,6 +513,7 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
->  {
->  	u32 adc0, adc1, old_adc0;
->  	int i, ret;
-> +	long timeout;
->  	struct mc13xxx_adcdone_data adcdone_data = {
->  		.mc13xxx = mc13xxx,
->  	};
-> @@ -566,20 +567,23 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
->  			mc13xxx_handler_adcdone, __func__, &adcdone_data);
->  
->  	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC0, adc0);
-> -	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
-> +	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
-Is this change intended? I guess without it you get a warning that ret
-is used uninitialized, but if mc13xxx_reg_write fails you should IMHO
-return at once.
- 
->  	mc13xxx_unlock(mc13xxx);
->  
-> -	ret = wait_for_completion_interruptible_timeout(&adcdone_data.done, HZ);
-> +	timeout = wait_for_completion_interruptible_timeout(&adcdone_data.done, HZ);
->  
-> -	if (!ret)
-> +	if (timeout <= 0) {
-> +		dev_warn(mc13xxx->dev,
-> +				"timed out waiting for ADC completion\n");
->  		ret = -ETIMEDOUT;
-> +	}
-I think this is wrong. wait_for_completion_interruptible_timeout returns
--ERESTARTSYS if it was interrupted. That's not a timeout and
--ERESTARTSYS should be propagated then. !ret is the correct test for
-timeout.
->  
->  	mc13xxx_lock(mc13xxx);
->  
->  	mc13xxx_irq_free(mc13xxx, MC13XXX_IRQ_ADCDONE, &adcdone_data);
->  
-> -	if (ret > 0)
-> +	if (!ret)
-This is wrong, too, isn't it?
+we only use the gpio function of mc9s08dz60 mcu chip, so just
+add the gpio driver, as this mcu will never be used in other board.
 
->  		for (i = 0; i < 4; ++i) {
->  			ret = mc13xxx_reg_read(mc13xxx,
->  					MC13XXX_ADC2, &sample[i]);
+Signed-off-by: Wu Guoxing <b39297@freescale.com>
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+changes since v6:
+	1. use module_i2c_driver()
+	2. some style changes.
+changes since v5:
+	1. do not set i2c client data to NULL in probe&remove as i2c core will handle it.
+	2. return error code to i2c core in remove function as i2c-core will depend on it to
+	set i2c client data to NULL.
 
-Best regards
-Uwe
+changes since v4:
+ 	1. set i2c client data to NULL only when gpiochip_remove success.
 
+changes since v3:
+ 	1. set i2c client data before gpiochip_add
+ 	2. return error value in mc9s08dz60_direction_output
+
+Changes since v1:
+ 	1. add can_sleep = 1
+ 	2. removed some useless return checks and local variable
+ 	3. removed the static variable for i2c client.
+ 	4. make init&exit function static
+
+ drivers/gpio/Kconfig           |    6 ++
+ drivers/gpio/Makefile          |    1 +
+ drivers/gpio/gpio-mc9s08dz60.c |  161 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 168 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
+
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index d0c4118..a301400 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -489,4 +489,10 @@ config GPIO_TPS65910
+ 	help
+ 	  Select this option to enable GPIO driver for the TPS65910
+ 	  chip family.
++
++config GPIO_MC9S08DZ60
++	bool "MX35 3DS BOARD MC9S08DZ60 GPIO functions"
++	depends on I2C && MACH_MX35_3DS
++	help
++	  Select this to enable the MC9S08DZ60 GPIO driver
+ endif
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index fa10df6..8863a7f 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -26,6 +26,7 @@ obj-$(CONFIG_GPIO_MAX7300)	+= gpio-max7300.o
+ obj-$(CONFIG_GPIO_MAX7301)	+= gpio-max7301.o
+ obj-$(CONFIG_GPIO_MAX732X)	+= gpio-max732x.o
+ obj-$(CONFIG_GPIO_MC33880)	+= gpio-mc33880.o
++obj-$(CONFIG_GPIO_MC9S08DZ60)	+= gpio-mc9s08dz60.o
+ obj-$(CONFIG_GPIO_MCP23S08)	+= gpio-mcp23s08.o
+ obj-$(CONFIG_GPIO_ML_IOH)	+= gpio-ml-ioh.o
+ obj-$(CONFIG_GPIO_MPC5200)	+= gpio-mpc5200.o
+diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c
+new file mode 100644
+index 0000000..2738cc4
+--- /dev/null
++++ b/drivers/gpio/gpio-mc9s08dz60.c
+@@ -0,0 +1,161 @@
++/*
++ * Copyright 2009-2012 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * Author: Wu Guoxing <b39297@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/i2c.h>
++#include <linux/gpio.h>
++
++#define GPIO_GROUP_NUM 2
++#define GPIO_NUM_PER_GROUP 8
++#define GPIO_NUM (GPIO_GROUP_NUM*GPIO_NUM_PER_GROUP)
++
++struct mc9s08dz60 {
++	struct i2c_client *client;
++	struct gpio_chip chip;
++};
++
++static inline struct mc9s08dz60 *to_mc9s08dz60(struct gpio_chip *gc)
++{
++	return container_of(gc, struct mc9s08dz60, chip);
++}
++
++
++static void mc9s_gpio_to_reg_and_bit(int offset, u8 *reg, u8 *bit)
++{
++	*reg = 0x20 + offset / GPIO_NUM_PER_GROUP;
++	*bit = offset % GPIO_NUM_PER_GROUP;
++}
++
++static int mc9s08dz60_get_value(struct gpio_chip *gc, unsigned offset)
++{
++	u8 reg, bit;
++	s32 value;
++	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
++
++	mc9s_gpio_to_reg_and_bit(offset, &reg, &bit);
++	value = i2c_smbus_read_byte_data(mc9s->client, reg);
++
++	return (value >= 0) ? (value >> bit) & 0x1 : 0;
++}
++
++static int mc9s08dz60_set(struct mc9s08dz60 *mc9s, unsigned offset, int val)
++{
++	u8 reg, bit;
++	s32 value;
++
++	mc9s_gpio_to_reg_and_bit(offset, &reg, &bit);
++	value = i2c_smbus_read_byte_data(mc9s->client, reg);
++	if (value >= 0) {
++		if (val)
++			value |= 1 << bit;
++		else
++			value &= ~(1 << bit);
++
++		return i2c_smbus_write_byte_data(mc9s->client, reg, value);
++	} else
++		return value;
++
++}
++
++
++static void mc9s08dz60_set_value(struct gpio_chip *gc, unsigned offset, int val)
++{
++	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
++
++	mc9s08dz60_set(mc9s, offset, val);
++}
++
++static int mc9s08dz60_direction_output(struct gpio_chip *gc,
++				       unsigned offset, int val)
++{
++	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
++
++	return mc9s08dz60_set(mc9s, offset, val);
++}
++
++static int mc9s08dz60_probe(struct i2c_client *client,
++			    const struct i2c_device_id *id)
++{
++	int ret = 0;
++	struct mc9s08dz60 *mc9s;
++
++	mc9s = kzalloc(sizeof(*mc9s), GFP_KERNEL);
++	if (!mc9s)
++		return -ENOMEM;
++
++	mc9s->chip.label = client->name;
++	mc9s->chip.base = -1;
++	mc9s->chip.dev = &client->dev;
++	mc9s->chip.owner = THIS_MODULE;
++	mc9s->chip.ngpio = GPIO_NUM;
++	mc9s->chip.can_sleep = 1;
++	mc9s->chip.get = mc9s08dz60_get_value;
++	mc9s->chip.set = mc9s08dz60_set_value;
++	mc9s->chip.direction_output = mc9s08dz60_direction_output;
++	mc9s->client = client;
++	i2c_set_clientdata(client, mc9s);
++
++	ret = gpiochip_add(&mc9s->chip);
++	if (ret)
++		goto error;
++
++	return 0;
++
++ error:
++	kfree(mc9s);
++	return ret;
++}
++
++static int mc9s08dz60_remove(struct i2c_client *client)
++{
++	struct mc9s08dz60 *mc9s;
++	int ret;
++
++	mc9s = i2c_get_clientdata(client);
++
++	ret = gpiochip_remove(&mc9s->chip);
++	if (!ret)
++		kfree(mc9s);
++
++	return ret;
++
++}
++
++static const struct i2c_device_id mc9s08dz60_id[] = {
++	{"mc9s08dz60", 0},
++	{},
++};
++
++MODULE_DEVICE_TABLE(i2c, mc9s08dz60_id);
++
++static struct i2c_driver mc9s08dz60_i2c_driver = {
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = "mc9s08dz60",
++	},
++	.probe = mc9s08dz60_probe,
++	.remove = mc9s08dz60_remove,
++	.id_table = mc9s08dz60_id,
++};
++
++module_i2c_driver(mc9s08dz60_i2c_driver);
++
++MODULE_AUTHOR("Freescale Semiconductor, Inc. "
++		"Wu Guoxing <b39297@freescale.com>");
++MODULE_DESCRIPTION("mc9s08dz60 gpio function on mx35 3ds board");
++MODULE_LICENSE("GPL v2");
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.1
