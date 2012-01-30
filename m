@@ -1,111 +1,135 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 30 Jan 2012 13:45:53 +0200
-Subject: [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
- suspend is not implemented
-In-Reply-To: <20120124090630.GR16726@n2100.arm.linux.org.uk>
-References: <1327306361-9803-1-git-send-email-shubhrajyoti@ti.com>
- <1327306361-9803-3-git-send-email-shubhrajyoti@ti.com>
- <CAN8TOE8i-g_QTsidqDW=TRfZMQ8u93+iP8V7rr4paek=7xZ7UA@mail.gmail.com>
- <20120124090630.GR16726@n2100.arm.linux.org.uk>
-Message-ID: <1327923953.2487.13.camel@sauron.fi.intel.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 30 Jan 2012 11:48:20 +0000
+Subject: [PATCH 04/15] mm: compaction: introduce isolate_freepages_range()
+In-Reply-To: <1327568457-27734-5-git-send-email-m.szyprowski@samsung.com>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120130114820.GG25268@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-01-24 at 09:06 +0000, Russell King - ARM Linux wrote:
-> > However, the bug made it into the 3.3 merge window, so shouldn't this
-> > bugfix be sent upstream immediately?
+On Thu, Jan 26, 2012 at 10:00:46AM +0100, Marek Szyprowski wrote:
+> From: Michal Nazarewicz <mina86@mina86.com>
 > 
-> David is the MTD maintainer, and Artem just helps out.  I believe Artem
-> is waiting for David to finish travelling before asking David (last seen
-> at Hong Kong airport) to pull these fixes.  David in turn will pass them
-> onto Linus.  Plus, Linus only started adding to -rc1 yesterday, so its a
-> little early to expect this to be fixed.
+> This commit introduces isolate_freepages_range() function which
+> generalises isolate_freepages_block() so that it can be used on
+> arbitrary PFN ranges.
+> 
+> isolate_freepages_block() is left with only minor changes.
+> 
 
-Hi,
+The minor changes to isolate_freepages_block() look fine in
+terms of how current compaction works. I have a minor comment on
+isolate_freepages_range() but it is up to you whether to address them
+or not. Whether you alter isolate_freepages_range() or not;
 
-here is the latest version of the fix.
+Acked-by: Mel Gorman <mel@csn.ul.ie>
 
-http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commit/283d43b9ce2952535aa89c0195085e2a1b7e5fce
+> <SNIP>
+> @@ -105,6 +109,80 @@ static unsigned long isolate_freepages_block(struct zone *zone,
+>  	return total_isolated;
+>  }
+>  
+> +/**
+> + * isolate_freepages_range() - isolate free pages.
+> + * @start_pfn: The first PFN to start isolating.
+> + * @end_pfn:   The one-past-last PFN.
+> + *
+> + * Non-free pages, invalid PFNs, or zone boundaries within the
+> + * [start_pfn, end_pfn) range are considered errors, cause function to
+> + * undo its actions and return zero.
+> + *
+> + * Otherwise, function returns one-past-the-last PFN of isolated page
+> + * (which may be greater then end_pfn if end fell in a middle of
+> + * a free page).
+> + */
+> +static unsigned long
+> +isolate_freepages_range(unsigned long start_pfn, unsigned long end_pfn)
+> +{
+> +	unsigned long isolated, pfn, block_end_pfn, flags;
+> +	struct zone *zone = NULL;
+> +	LIST_HEAD(freelist);
+> +	struct page *page;
+> +
+> +	for (pfn = start_pfn; pfn < end_pfn; pfn += isolated) {
+> +		if (!pfn_valid(pfn))
+> +			break;
+> +
+> +		if (!zone)
+> +			zone = page_zone(pfn_to_page(pfn));
+> +		else if (zone != page_zone(pfn_to_page(pfn)))
+> +			break;
+> +
 
-Also attached.
+So what you are checking for here is if you straddle zones.
+You could just initialise zone outside of the for loop. You can
+then check outside the loop if end_pfn is in a different zone to
+start_pfn. If it is, either adjust end_pfn accordingly or bail the
+entire operation avoiding the need for release_freepages() later. This
+will be a little cheaper.
 
->From 283d43b9ce2952535aa89c0195085e2a1b7e5fce Mon Sep 17 00:00:00 2001
-From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Date: Mon, 16 Jan 2012 11:07:16 +0200
-Subject: [PATCH] mtd: fix MTD suspend
+> +		/*
+> +		 * On subsequent iterations round_down() is actually not
+> +		 * needed, but we keep it that we not to complicate the code.
+> +		 */
+> +		block_end_pfn = round_down(pfn, pageblock_nr_pages)
+> +			+ pageblock_nr_pages;
 
-Commits 3fe4bae88460869a8e553397cd9057a4ee7ca341 and
-079c985e7a6f4ce60f931cebfdd5ee3c3 broke MTD suspend in 2 ways:
+Seems a little more involved than it needs to be. Something like
+this might suit and be a bit nicer?
 
-1. When the '->suspend' method is not present, we return -EOPNOTSUPP,
-but
-   the callers of 'mtd_suspend()' expects 0 instead.
-2. Checking of the 'mtd' parameter against NULL has been incorrectly
-removed
-   in 'mtd_cls_suspend()'.
+block_end_pfn = ALIGN(pfn+1, pageblock_nr_pages);
 
-This patch fixes the breakages. This has been found, analyzed, reported
-and tested by Rafael J. Wysocki <rjw@sisk.pl>.
+> +		block_end_pfn = min(block_end_pfn, end_pfn);
+> +
+> +		spin_lock_irqsave(&zone->lock, flags);
+> +		isolated = isolate_freepages_block(pfn, block_end_pfn,
+> +						   &freelist, true);
+> +		spin_unlock_irqrestore(&zone->lock, flags);
+> +
+> +		/*
+> +		 * In strict mode, isolate_freepages_block() returns 0 if
+> +		 * there are any holes in the block (ie. invalid PFNs or
+> +		 * non-free pages).
+> +		 */
+> +		if (!isolated)
+> +			break;
+> +
+> +		/*
+> +		 * If we managed to isolate pages, it is always (1 << n) *
+> +		 * pageblock_nr_pages for some non-negative n.  (Max order
+> +		 * page may span two pageblocks).
+> +		 */
+> +	}
+> +
+> +	/* split_free_page does not map the pages */
+> +	list_for_each_entry(page, &freelist, lru) {
+> +		arch_alloc_page(page, 0);
+> +		kernel_map_pages(page, 1, 1);
+> +	}
+> +
 
-Note, this patch is not needed in the stable tree because it causes a
-regression introduced during the v3.3 merge window.
+This block is copied in two places - isolate_freepages and
+isolate_freepages_range() so sharing a common helper would be nice. I
+suspect you didn't because it would interfere with existing code more
+than was strictly necessary which I complained about previously as
+it made review harder. If that was your thinking, then just create
+this helper in a separate patch. It's not critical though.
 
-Reported-by: Rafael J. Wysocki <rjw@sisk.pl>
-Tested-by: Rafael J. Wysocki <rjw@sisk.pl>
-Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
----
- drivers/mtd/mtdcore.c   |    2 +-
- include/linux/mtd/mtd.h |    4 +---
- 2 files changed, 2 insertions(+), 4 deletions(-)
+> +	if (pfn < end_pfn) {
+> +		/* Loop terminated early, cleanup. */
+> +		release_freepages(&freelist);
+> +		return 0;
+> +	}
+> +
+> +	/* We don't use freelists for anything. */
+> +	return pfn;
+> +}
+> +
+>  /* Returns true if the page is within a block suitable for migration to */
+>  static bool suitable_migration_target(struct page *page)
+>  {
 
-diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
-index b265188..de96865 100644
---- a/drivers/mtd/mtdcore.c
-+++ b/drivers/mtd/mtdcore.c
-@@ -119,7 +119,7 @@ static int mtd_cls_suspend(struct device *dev,
-pm_message_t state)
- {
- 	struct mtd_info *mtd = dev_get_drvdata(dev);
- 
--	return mtd_suspend(mtd);
-+	return mtd ? mtd_suspend(mtd) : 0;
- }
- 
- static int mtd_cls_resume(struct device *dev)
-diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-index 1a81fde..d8c7aad 100644
---- a/include/linux/mtd/mtd.h
-+++ b/include/linux/mtd/mtd.h
-@@ -427,9 +427,7 @@ static inline int mtd_is_locked(struct mtd_info
-*mtd, loff_t ofs, uint64_t len)
- 
- static inline int mtd_suspend(struct mtd_info *mtd)
- {
--	if (!mtd->suspend)
--		return -EOPNOTSUPP;
--	return mtd->suspend(mtd);
-+	return mtd->suspend ? mtd->suspend(mtd) : 0;
- }
- 
- static inline void mtd_resume(struct mtd_info *mtd)
 -- 
-1.7.7.6
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mtd-fix-MTD-suspend.patch
-Type: text/x-patch
-Size: 2094 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/70d913c5/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/70d913c5/attachment.sig>
+Mel Gorman
+SUSE Labs
