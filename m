@@ -1,78 +1,112 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 30 Jan 2012 08:49:45 +0000
-Subject: [RFC PATCH 1/5] arm:omap1/2/3/4:Convert 32k-Sync clocksource
- driver to platform_driver
-In-Reply-To: <1327535610.2141.15.camel@localhost>
-References: <1326886086-27313-1-git-send-email-hvaibhav@ti.com>
- <1326886086-27313-2-git-send-email-hvaibhav@ti.com>
- <1327535610.2141.15.camel@localhost>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317B7306@DBDE01.ent.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 30 Jan 2012 10:01:51 +0100
+Subject: [PATCH] at_hdmac: bugfix for enabling channel irq
+In-Reply-To: <4F159394.7040409@atmel.com>
+References: <201201171023.q0HANwSE024485@gatekeeper.vosshq.de>
+ <4F159394.7040409@atmel.com>
+Message-ID: <4F265C7F.4070500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 05:23:30, john stultz wrote:
-> On Wed, 2012-01-18 at 16:58 +0530, Vaibhav Hiremath wrote:
-> > +/**
-> > + * read_persistent_clock -  Return time from a persistent clock.
-> > + *
-> > + * Reads the time from a source which isn't disabled during PM, the
-> > + * 32k sync timer.  Convert the cycles elapsed since last read into
-> > + * nsecs and adds to a monotonically increasing timespec.
-> > + */
-> > +void read_persistent_clock(struct timespec *ts)
-> > +{
-> > +	cycles_t delta;
-> > +	struct timespec *tsp;
-> > +	unsigned long long nsecs;
-> > +	struct omap_counter_32k_device  *omap = cs;
-> > +
-> > +	if (!omap) {
-> > +		ts->tv_sec = 0;
-> > +		ts->tv_nsec = 0;
-> > +		return;
-> > +	}
-> > +	tsp = &omap->persistent_ts;
-> > +
-> > +	omap->last_cycles = omap->cycles;
-> > +	omap->cycles = omap->cs.read(&omap->cs);
-> > +	delta = omap->cycles - omap->last_cycles;
-> > +
-> > +	nsecs = clocksource_cyc2ns(delta,
-> > +			omap->cs.mult, omap->cs.shift);
-> > +
-> > +	timespec_add_ns(tsp, nsecs);
-> > +	*ts = *tsp;
-> > +}
+On 01/17/2012 04:28 PM, Nicolas Ferre :
+> On 01/17/2012 10:28 AM, Nikolaus Voss :
+>> commit 463894705e4089d0ff69e7d877312d496ac70e5b deleted redundant
+>> chan_id and chancnt initialization in dma drivers as this is done
+>> in dma_async_device_register().
+>>
+>> However, atc_enable_irq() relied on chan_id set before registering
+>> the device, what left only channel 0 functional for this driver.
+>>
+>> This patch introduces atc_enable/disable_chan_irq() as a variant
+>> of atc_enable/disable_irq() with the channel as explicit argument.
+>>
+>> Signed-off-by: Nikolaus Voss <n.voss@weinmann.de>
 > 
-> Hrm. So read_persistent_clock should probably be defined once per arch.
-> So I'm not sure if it makes sense to include this implementation into
-> the generic drivers/clocksource directory, as if some other arch tried
-> to include this clocksource (say if they had the same hardware) they
-> might have collisions w/ their read_persistent_clock implementation.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: stable <stable@vger.kernel.org>
 > 
-> 
-> I'm all for being able to re-use clocksource drivers. But this is the
-> sort of thing that makes me worry we're maybe being too aggressive in
-> pushing clocksources that really are fairly arch/platform specific into
-> drivers/clocksource/
-> 
-
-John,
-
-Sorry for delayed response and thanks for your comments.
-
-Just FYI, we had already aligned on the list that, this is not going
-to work, and after discussion I have already submitted newer version
-of the omap timer cleanup code -
-
-http://marc.info/?l=linux-omap&m=132730863303625&w=2
+> Vinod, can you please queue it in a "fixes" branch for 3.3. The stable
+> tag is needed to address errors in 3.2 kernel series.
 
 
-Thanks,
-Vaibhav
+Vinod, ping?
 
-> thanks
-> -john
+
+> Nikolaus, thanks for your fix.
+> 
+> Best regards,
+> 
+>> ---
+>>  drivers/dma/at_hdmac.c      |    4 ++--
+>>  drivers/dma/at_hdmac_regs.h |   17 ++++++++---------
+>>  2 files changed, 10 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+>> index fcfa0a8..a60adbf 100644
+>> --- a/drivers/dma/at_hdmac.c
+>> +++ b/drivers/dma/at_hdmac.c
+>> @@ -1286,7 +1286,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>>  
+>>  		tasklet_init(&atchan->tasklet, atc_tasklet,
+>>  				(unsigned long)atchan);
+>> -		atc_enable_irq(atchan);
+>> +		atc_enable_chan_irq(atdma, i);
+>>  	}
+>>  
+>>  	/* set base routines */
+>> @@ -1353,7 +1353,7 @@ static int __exit at_dma_remove(struct platform_device *pdev)
+>>  		struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+>>  
+>>  		/* Disable interrupts */
+>> -		atc_disable_irq(atchan);
+>> +		atc_disable_chan_irq(atdma, chan->chan_id);
+>>  		tasklet_disable(&atchan->tasklet);
+>>  
+>>  		tasklet_kill(&atchan->tasklet);
+>> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+>> index aa4c9ae..5aa82b4 100644
+>> --- a/drivers/dma/at_hdmac_regs.h
+>> +++ b/drivers/dma/at_hdmac_regs.h
+>> @@ -326,28 +326,27 @@ static void atc_dump_lli(struct at_dma_chan *atchan, struct at_lli *lli)
+>>  }
+>>  
+>>  
+>> -static void atc_setup_irq(struct at_dma_chan *atchan, int on)
+>> +static void atc_setup_irq(struct at_dma *atdma, int chan_id, int on)
+>>  {
+>> -	struct at_dma	*atdma = to_at_dma(atchan->chan_common.device);
+>> -	u32		ebci;
+>> +	u32 ebci;
+>>  
+>>  	/* enable interrupts on buffer transfer completion & error */
+>> -	ebci =    AT_DMA_BTC(atchan->chan_common.chan_id)
+>> -		| AT_DMA_ERR(atchan->chan_common.chan_id);
+>> +	ebci =    AT_DMA_BTC(chan_id)
+>> +		| AT_DMA_ERR(chan_id);
+>>  	if (on)
+>>  		dma_writel(atdma, EBCIER, ebci);
+>>  	else
+>>  		dma_writel(atdma, EBCIDR, ebci);
+>>  }
+>>  
+>> -static inline void atc_enable_irq(struct at_dma_chan *atchan)
+>> +static void atc_enable_chan_irq(struct at_dma *atdma, int chan_id)
+>>  {
+>> -	atc_setup_irq(atchan, 1);
+>> +	atc_setup_irq(atdma, chan_id, 1);
+>>  }
+>>  
+>> -static inline void atc_disable_irq(struct at_dma_chan *atchan)
+>> +static void atc_disable_chan_irq(struct at_dma *atdma, int chan_id)
+>>  {
+>> -	atc_setup_irq(atchan, 0);
+>> +	atc_setup_irq(atdma, chan_id, 0);
+>>  }
+>>  
+>>  
 > 
 > 
-> 
+
+
+-- 
+Nicolas Ferre
