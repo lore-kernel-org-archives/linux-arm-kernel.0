@@ -1,52 +1,70 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Mon, 30 Jan 2012 14:52:30 +0000
-Subject: [PATCH 08/15] mm: mmzone: MIGRATE_CMA migration type added
-In-Reply-To: <op.v8wepotk3l0zgt@mpn-glaptop>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <1327568457-27734-9-git-send-email-m.szyprowski@samsung.com>
- <20120130123542.GL25268@csn.ul.ie> <op.v8wepotk3l0zgt@mpn-glaptop>
-Message-ID: <20120130145230.GQ25268@csn.ul.ie>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 30 Jan 2012 08:01:32 -0700
+Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
+In-Reply-To: <4F205694.7090906@gmail.com>
+References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
+ <1327091591-27125-12-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1201201608400.19587@xanadu.home>
+ <4F19DB35.9060707@gmail.com>
+ <alpine.LFD.2.02.1201201744130.19587@xanadu.home>
+ <4F205694.7090906@gmail.com>
+Message-ID: <20120130150132.GJ28397@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 02:06:50PM +0100, Michal Nazarewicz wrote:
-> >>@@ -1017,11 +1049,14 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
-> >> 			rmv_page_order(page);
+On Wed, Jan 25, 2012 at 01:23:00PM -0600, Rob Herring wrote:
+> On 01/20/2012 04:48 PM, Nicolas Pitre wrote:
+> > On Fri, 20 Jan 2012, Rob Herring wrote:
+> > 
+> >> On 01/20/2012 03:11 PM, Nicolas Pitre wrote:
+> >>> On Fri, 20 Jan 2012, Rob Herring wrote:
+> >>>
+> >>>> From: Rob Herring <rob.herring@calxeda.com>
+> >>>>
+> >>>> Make mach/irqs.h optional for SPARSE_IRQ. With this change irqs.h can be
+> >>>> removed by converting platforms over to sparse irq.
+> >>>>
+> >>>> This intentionally breaks platforms that enable SPARSE_IRQ.
+> >>>
+> >>> I don't get what you mean here.  The above seems contradictory.
+> >>>
 > >>
-> >> 			/* Take ownership for orders >= pageblock_order */
-> >>-			if (current_order >= pageblock_order)
-> >>+			if (current_order >= pageblock_order &&
-> >>+			    !is_pageblock_cma(page))
-> >> 				change_pageblock_range(page, current_order,
-> >> 							start_migratetype);
-> >>
-> >>-			expand(zone, page, order, current_order, area, migratetype);
-> >>+			expand(zone, page, order, current_order, area,
-> >>+			       is_migrate_cma(start_migratetype)
-> >>+			     ? start_migratetype : migratetype);
-> >>
-> >
-> >What is this check meant to be doing?
-> >
-> >start_migratetype is determined by allocflags_to_migratetype() and
-> >that never will be MIGRATE_CMA so is_migrate_cma(start_migratetype)
-> >should always be false.
+> >> You're right. The intro explains things more clearly.
+> > 
+> > The intro won't be part of the git history, so please make sure 
+> > individual commit logs are sensible on their own.
 > 
-> Right, thanks!  This should be the other way around, ie.:
+> Updated the commit message to this (w/o the email word wrapping):
 > 
-> +			expand(zone, page, order, current_order, area,
-> +			       is_migrate_cma(migratetype)
-> +			     ? migratetype : start_migratetype);
+> ARM: only include mach/irqs.h for !SPARSE_IRQ
 > 
-> I'll fix this and the calls to is_pageblock_cma().
+> Make mach/irqs.h optional for SPARSE_IRQ. With this change irqs.h can be
+> removed by converting platforms over to sparse irq.
 > 
+> This may break platforms where SPARSE_IRQ is user selectable and is enabled.
+> This is on purpose so that SPARSE_IRQ gets properly supported. SPARSE_IRQ
+> should not really be a user visible option.
+> 
+> Platforms either need to set nr_irqs in their machine desc or all irqchips
+> used by a platform need to allocate their irq_descs. There cannot be a
+> mixture. Once this is done, the platforms can select SPARSE_IRQ. shmobile
+> does the latter, and mmp and pxa do the former.
+> 
+> >> This breaks platforms (at boot time) that don't select SPARSE_IRQ, but 
+> >> let users enable it in their config. I don't understand why sparse irq 
+> >> is a user visible config option. We could move HAVE_SPARSE_IRQ down to 
+> >> each platform that selects SPARSE_IRQ and prevent enabling, but I 
+> >> think allowing it to break is good encouragement for others to fix 
+> >> those platforms. I'm open to other ideas.
+> > 
+> > SPARSE_IRQ shouldn't be a user configurable option.  There is just no 
+> > point for a user configuring a kernel to be able to change this.
+> 
+> I agree, but I'm inclined to leave this alone for now. PPC doesn't ever
+> select SPARSE_IRQ, but enables it via many defconfigs. So I think
+> changing it may cause some problems.
 
-That makes a lot more sense. Thanks.
+I think ppc can probably be moved to always enable SPARSE_IRQ since every
+ppc machine goes through irq_domain anyway.
 
-I have a vague recollection that there was a problem with finding
-unmovable pages in MIGRATE_CMA regions. This might have been part of
-the problem.
-
--- 
-Mel Gorman
-SUSE Labs
+g.
