@@ -1,54 +1,107 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 30 Jan 2012 12:01:14 -0700
-Subject: [PATCH 6/6] mmc: sdhci-s3c: Add device tree support
-In-Reply-To: <201201301051.22396.heiko@sntech.de>
-References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
- <1320266163-15292-7-git-send-email-thomas.abraham@linaro.org>
- <201201301051.22396.heiko@sntech.de>
-Message-ID: <20120130190114.GR28397@ponder.secretlab.ca>
+Date: Mon, 30 Jan 2012 13:13:07 -0700
+Subject: [RFC PATCH 5/7] ARM: davinci: i2c: add OF support
+In-Reply-To: <4F1E7F36.50505@samsung.com>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-6-git-send-email-hs@denx.de>
+ <4F1DC480.4010603@gmail.com> <4F1E5B44.4090200@denx.de>
+ <4F1E7F36.50505@samsung.com>
+Message-ID: <20120130201307.GV28397@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 10:51:11AM +0100, Heiko St?bner wrote:
-> Am Mittwoch, 2. November 2011, 21:36:03 schrieb Thomas Abraham:
+On Tue, Jan 24, 2012 at 10:51:50AM +0100, Sylwester Nawrocki wrote:
+> Hello Heiko,
 > 
-> Hi Thomas,
+> On 01/24/2012 08:18 AM, Heiko Schocher wrote:
+> >> On 01/23/2012 09:56 AM, Heiko Schocher wrote:
+> >>> add of support for the davinci i2c driver.
+> >>>
+> >>> Signed-off-by: Heiko Schocher<hs@denx.de>
+> >>> Cc: davinci-linux-open-source at linux.davincidsp.com
+> >>> Cc: linux-arm-kernel at lists.infradead.org
+> >>> Cc: devicetree-discuss at lists.ozlabs.org
+> >>> Cc: linux-i2c at vger.kernel.org
+> >>> Cc: Ben Dooks<ben-linux@fluff.org>
+> >>> Cc: Wolfram Sang<w.sang@pengutronix.de>
+> >>> Cc: Grant Likely<grant.likely@secretlab.ca>
+> >>> Cc: Sekhar Nori<nsekhar@ti.com>
+> >>> Cc: Wolfgang Denk<wd@denx.de>
+> >>> ---
+> >>>   .../devicetree/bindings/arm/davinci/i2c.txt        |   39 ++++++++++++++++++
+> >>>   drivers/i2c/busses/i2c-davinci.c                   |   43 ++++++++++++++++++++
+> >>>   2 files changed, 82 insertions(+), 0 deletions(-)
+> >>>   create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+> >>> new file mode 100644
+> >>> index 0000000..94ec670
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+> >>> @@ -0,0 +1,39 @@
+> >>> +* Texas Instruments Davinci I2C
+> >>> +
+> >>> +This file provides information, what the device node for the
+> >>> +davinci i2c interface contain.
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible: "ti,davinci-i2c";
+> >>> +- reg : Offset and length of the register set for the device
+> >>> +- id: id of the controller
+> >>
+> >> I was wondering whether we're supposed to use "cell-index" property name
+> >> for such a device instance index? or doesn't it really matter and "id" is 
+> >> fine? Such an IP instance index seems quite common so I thought it could
+> >> be easier to follow to use standard name.
+> > 
+> > I just copied the "name" from "struct davinci_nand_pdata" ... it is
+> > used in the davinci_nand driver as chipselect ... maybe it is better
+> > I rename this to "chipselect" ?
 > 
-> in patch 1/6:
-> > +static struct platform_device_id sdhci_s3c_driver_ids[] = {
-> > +       {
-> > +               .name           = "s3c-sdhci",
-> > +               .driver_data    = (kernel_ulong_t)NULL,
-> > +       },
-> > +       {
-> > +               .name           = "exynos4-sdhci",
-> > +               .driver_data    = EXYNOS4_SDHCI_DRV_DATA,
-> > +       },
-> > +};
-> > +MODULE_DEVICE_TABLE(platform, sdhci_s3c_driver_ids);
+> From what I can see the 'id' property is used to determine I2C adapter
+> number. In that case 'id' seems more correct than "chipselect". Are you
+> sure there is a chip select functionality in I2C controller ?
 > 
-> 
-> and in patch 6/6:
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id sdhci_s3c_dt_match[] = {
-> > +	{ .compatible = "samsung,s3c6410-sdhci", },
-> > +	{ .compatible = "samsung,exynos4210-sdhci",
-> > +		.data = &exynos4_sdhci_drv_data },
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
-> 
-> wouldn't it be better to keep the naming consistent between of and non-of?
-> I.e. s3c-sdhci vs. s3c6410-sdhci. Since the driver is used for all S3C SoCs 
-> containing hsmmc controllers I think s3c-sdhci would be preferable here.
+> It seems that your id is just an index of I2C controller in hardware.
+> I would personally just use cell-index for that, but I'm not a dt expert,
+> someone nay correct me.
 
-History has shown that future devices aren't always compatible with earlier
-ones.  Compatible strings are expected to be specific to an exact device to
-reduce the possibility of new hardware breaking assumptions.
+The whole 'cell-index' or 'id' thing is a BadIdea(tm).  Don't use it, and tell
+others not to do it when you see it.  There are some legacy uses in powerpc,
+but those were written before I and others knew better.
 
-Instead, new hardware can either claim compatibility with older
-compatible strings (the compatible property in the DT is a list), or
-can have the new string added to the match table in the driver;
-whichever option makes the most sense.
+The *only* situation where cell-index is acceptable is when the driver
+absolutely must know which hardware instance it is driving because it
+needs to calculate offsets in a shared register or something, and even
+then it should not be used to set the pdev->id field. That situation
+does not look to be the case here.
+
+If you're using the DT, then let the core code dynamically assign the
+i2c adapter number.
+
+> Moreover you seem to overwrite platform device name and id,
+> 
+> 		if (!of_property_read_u32(pdev->dev.of_node, "id",
+> +			&prop)) {
+> +			pdev->id = prop;
+> +			pdev->dev.init_name = kzalloc(20, GFP_KERNEL);
+> +			sprintf((char *)pdev->dev.init_name,
+> +				"i2c_davinci.%d", pdev->id);
+> 
+> I'm not sure if it is a good practice.
+
+No, it is not good practice.  At this point the device is already
+registered.  Changing the value of pdev->id will cause problems in the
+core code because the /sysfs files will have already been created.
+
+> If you want to pre-define platform
+> device name (likely for the clock API to work), it might be more appropriate
+> to use OF_DEV_AUXDATA in the machine code, until there are clock bindings
+> available.
+
+Yes, use OF_DEV_AUXDATA, but *only* if you need it for hooking up
+clocks, regulators, or similar.  Don't use it just because you want
+the device to have a different name for cosmetic reasons.  The need
+for AUXDATA should go away once the DT clock binding code is merged.
 
 g.
