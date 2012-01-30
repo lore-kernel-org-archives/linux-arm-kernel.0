@@ -1,21 +1,19 @@
 From: lost.distance@yahoo.com (Paul Parsons)
-Date: Mon, 30 Jan 2012 23:42:25 +0000 (GMT)
-Subject: [PATCH v2] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
-Message-ID: <1327966945.92405.YahooMailClassic@web29001.mail.ird.yahoo.com>
+Date: Mon, 30 Jan 2012 23:50:49 +0000 (GMT)
+Subject: [PATCH v3] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
+Message-ID: <1327967449.72659.YahooMailClassic@web29002.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hx4700 platform has 70 board gpios: 64 ASIC3 gpios numbered 192..255, and
+The hx4700 platform has 72 board gpios: 64 ASIC3 gpios numbered 192..255, and
 8 EGPIO gpios numbered 256..263 (plus a 9th which is not used).
 Thus the new CONFIG_ARCH_NR_GPIO config option must be set to 264.
 
 Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 ---
 
-V2:
-Use new CONFIG_ARCH_NR_GPIO config option instead of modifying PXA_GPIO_IRQ_BASE
-and PXA_GPIO_IRQ_NUM #defines.
-Rebased to linux-3.3-rc1.
+V3:
+Description change: 64 ASIC3 gpios + 8 EGPIO gpios = 72 board gpios, not 70.
 
 diff -ru clean-3.3-rc1/arch/arm/Kconfig linux-3.3-rc1/arch/arm/Kconfig
 --- clean-3.3-rc1/arch/arm/Kconfig	2012-01-19 23:04:48.000000000 +0000
