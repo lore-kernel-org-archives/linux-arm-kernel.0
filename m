@@ -1,39 +1,41 @@
-From: metan@ucw.cz (Cyril Hrubis)
+From: w.sang@pengutronix.de (Wolfram Sang)
 Date: Mon, 30 Jan 2012 11:44:28 +0100
-Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
-In-Reply-To: <201201252358.17825.marek.vasut@gmail.com>
-References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
- <20120125213206.GJ1068@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1201251727510.2759@xanadu.home>
- <201201252358.17825.marek.vasut@gmail.com>
-Message-ID: <20120130104428.GA16841@atrey.karlin.mff.cuni.cz>
+Subject: [PATCH] mtd/gpmi : add BBT support
+In-Reply-To: <4F2671C3.6000809@freescale.com>
+References: <1327898174-13656-1-git-send-email-b32955@freescale.com>
+ <20120130094610.GA15596@pengutronix.de>
+ <4F2671C3.6000809@freescale.com>
+Message-ID: <20120130104428.GB15596@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> > > As a side-note, you may be pleased to know that I have SA11x0 stuff
-> > > converted to (and tested) with sparse IRQ.  That's with SA1111, the
-> > > UCB1x00 and Neponset expansion board for the Assabet all dynamically
-> > > allocating their IRQs.  The only fixed-numbered IRQs in SA11x0 in my
-> > > tree at the time of writing are the on-SoC IRQs, and the LoCoMo IRQs
-> > > (which I don't have the hardware to test for, so I'm not touching.)
-> > 
-> > That's really cool.
-> > 
-> > Not that there are many people who might still benefit from running that
-> > code, but like I said this should serve as a real and relatively simple
-> > example that might benefit more complex platforms.
-> > 
-> > 
-> > Nicolas
+> The bootloader usually is burned on /dev/mtd0, while the BBT is placed
+> at the end
+> of the NAND chip.
 > 
-> Indeed, that's good going. I'm CCing a guy who might have a SA11xx board with 
-> LoCoMo chip (that's old zaurus sl55xx, right?).
+> I tested the NAND boot mode too.
+> 
+> What's your concern?
 
-I think I still do have old zaurus in some box somewhere (I stopped playing
-with it once I got the newer one). And I think that Pavel Machek (CC) has one
-too (I think that he wanted to give away to anybody who is wishing to maintain
-the particular kernel parts and I think that in the end nobody took it).
+Bootloaders may also need to write to NAND. So, they need to share the
+same bad block information with the kernel. Currently, I am not aware of
+a bootloader for mxs which support BBT without OOB. Unless this has
+changed meanwhile, we shouldn't make this default, because they can't
+share the same information then. To be on the safe side regardings
+regressions, we shouldn't make this default as well, come to think of
+it.
+
+Regards,
+
+   Wolfram
 
 -- 
-metan
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/6d726d4e/attachment.sig>
