@@ -1,107 +1,281 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 30 Jan 2012 13:13:07 -0700
-Subject: [RFC PATCH 5/7] ARM: davinci: i2c: add OF support
-In-Reply-To: <4F1E7F36.50505@samsung.com>
+Date: Mon, 30 Jan 2012 13:22:08 -0700
+Subject: [RFC PATCH 4/7] ARM: davinci: net: davinci_emac: add OF support
+In-Reply-To: <1327308967-8092-5-git-send-email-hs@denx.de>
 References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-6-git-send-email-hs@denx.de>
- <4F1DC480.4010603@gmail.com> <4F1E5B44.4090200@denx.de>
- <4F1E7F36.50505@samsung.com>
-Message-ID: <20120130201307.GV28397@ponder.secretlab.ca>
+ <1327308967-8092-5-git-send-email-hs@denx.de>
+Message-ID: <20120130202208.GW28397@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 10:51:50AM +0100, Sylwester Nawrocki wrote:
-> Hello Heiko,
+On Mon, Jan 23, 2012 at 09:56:04AM +0100, Heiko Schocher wrote:
+> add of support for the davinci_emac driver.
 > 
-> On 01/24/2012 08:18 AM, Heiko Schocher wrote:
-> >> On 01/23/2012 09:56 AM, Heiko Schocher wrote:
-> >>> add of support for the davinci i2c driver.
-> >>>
-> >>> Signed-off-by: Heiko Schocher<hs@denx.de>
-> >>> Cc: davinci-linux-open-source at linux.davincidsp.com
-> >>> Cc: linux-arm-kernel at lists.infradead.org
-> >>> Cc: devicetree-discuss at lists.ozlabs.org
-> >>> Cc: linux-i2c at vger.kernel.org
-> >>> Cc: Ben Dooks<ben-linux@fluff.org>
-> >>> Cc: Wolfram Sang<w.sang@pengutronix.de>
-> >>> Cc: Grant Likely<grant.likely@secretlab.ca>
-> >>> Cc: Sekhar Nori<nsekhar@ti.com>
-> >>> Cc: Wolfgang Denk<wd@denx.de>
-> >>> ---
-> >>>   .../devicetree/bindings/arm/davinci/i2c.txt        |   39 ++++++++++++++++++
-> >>>   drivers/i2c/busses/i2c-davinci.c                   |   43 ++++++++++++++++++++
-> >>>   2 files changed, 82 insertions(+), 0 deletions(-)
-> >>>   create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
-> >>> new file mode 100644
-> >>> index 0000000..94ec670
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
-> >>> @@ -0,0 +1,39 @@
-> >>> +* Texas Instruments Davinci I2C
-> >>> +
-> >>> +This file provides information, what the device node for the
-> >>> +davinci i2c interface contain.
-> >>> +
-> >>> +Required properties:
-> >>> +- compatible: "ti,davinci-i2c";
-> >>> +- reg : Offset and length of the register set for the device
-> >>> +- id: id of the controller
-> >>
-> >> I was wondering whether we're supposed to use "cell-index" property name
-> >> for such a device instance index? or doesn't it really matter and "id" is 
-> >> fine? Such an IP instance index seems quite common so I thought it could
-> >> be easier to follow to use standard name.
-> > 
-> > I just copied the "name" from "struct davinci_nand_pdata" ... it is
-> > used in the davinci_nand driver as chipselect ... maybe it is better
-> > I rename this to "chipselect" ?
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: netdev at vger.kernel.org
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> ---
+>  .../bindings/arm/davinci/davinci_emac.txt          |   46 ++++++++
+>  drivers/net/ethernet/ti/davinci_emac.c             |  111 +++++++++++++++++++-
+>  2 files changed, 156 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
 > 
-> From what I can see the 'id' property is used to determine I2C adapter
-> number. In that case 'id' seems more correct than "chipselect". Are you
-> sure there is a chip select functionality in I2C controller ?
-> 
-> It seems that your id is just an index of I2C controller in hardware.
-> I would personally just use cell-index for that, but I'm not a dt expert,
-> someone nay correct me.
+> diff --git a/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+> new file mode 100644
+> index 0000000..4e5dc8d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+> @@ -0,0 +1,46 @@
+> +* Texas Instruments Davinci EMAC
+> +
+> +This file provides information, what the davice node
+> +for the davinci_emac interface contain.
+> +
+> +Required properties:
+> +- compatible: "ti,davinci-emac";
+> +- reg: Offset and length of the register set for the device
+> +- ctrl_reg_offset: offset to control register
+> +- ctrl_mod_reg_offset: offset to control module register
+> +- ctrl_ram_offset: offset to control module ram
 
-The whole 'cell-index' or 'id' thing is a BadIdea(tm).  Don't use it, and tell
-others not to do it when you see it.  There are some legacy uses in powerpc,
-but those were written before I and others knew better.
+Should these be explicit properties, or can they be discerned from the
+compatible string (which should include the hardware version; see
+below).
 
-The *only* situation where cell-index is acceptable is when the driver
-absolutely must know which hardware instance it is driving because it
-needs to calculate offsets in a shared register or something, and even
-then it should not be used to set the pdev->id field. That situation
-does not look to be the case here.
+Also, any custom properties that are specific to a binding really
+should include a vendor prefix ('ti,') to avoid namespace collisions
+with common bindings.
 
-If you're using the DT, then let the core code dynamically assign the
-i2c adapter number.
+> +- hw_ram_addr: hardware ram addr
 
-> Moreover you seem to overwrite platform device name and id,
-> 
-> 		if (!of_property_read_u32(pdev->dev.of_node, "id",
-> +			&prop)) {
-> +			pdev->id = prop;
-> +			pdev->dev.init_name = kzalloc(20, GFP_KERNEL);
-> +			sprintf((char *)pdev->dev.init_name,
-> +				"i2c_davinci.%d", pdev->id);
-> 
-> I'm not sure if it is a good practice.
+Can this be added as a second tuple in the reg property?
 
-No, it is not good practice.  At this point the device is already
-registered.  Changing the value of pdev->id will cause problems in the
-core code because the /sysfs files will have already been created.
+> +- ctrl_ram_size: size of control module ram
+> +- version: 1 (EMAC_VERSION_1 for DM644x)
+> +           2 (EMAC_VERSION_2 for DM646x)
 
-> If you want to pre-define platform
-> device name (likely for the clock API to work), it might be more appropriate
-> to use OF_DEV_AUXDATA in the machine code, until there are clock bindings
-> available.
+Don't use a version property.  Encode it into the compatible property.  ie:
 
-Yes, use OF_DEV_AUXDATA, but *only* if you need it for hooking up
-clocks, regulators, or similar.  Don't use it just because you want
-the device to have a different name for cosmetic reasons.  The need
-for AUXDATA should go away once the DT clock binding code is merged.
+compatible = "ti,davinci-dm6440-emac"; or
+compatible = "ti,davinci-dm6460-emac";
+
+You'll also note that I did not use a 'x' as a wildcard.  It is always
+safer to be explicit about the part number.  And have newer parts
+claim compatibility with older ones like so:
+
+compatible = "ti,davinci-dm6443-emac", "ti,davinci-dm6440-emac"; (I am
+obviously making up numbers here.  Fill in appropriate numbers for
+your device.
+
+
+> +- phy-handle: Contains a phandle to an Ethernet PHY.
+> +              if not, davinci_emac driver defaults to 100/FULL
+> +- interrupts: interrupt mapping for the davinci emac interrupts sources:
+> +              4 sources: <Receive Threshold Interrupt
+> +			  Receive Interrupt
+> +			  Transmit Interrupt
+> +			  Miscellaneous Interrupt>
+> +- pinmux-handle: Contains a handle to configure the pinmux settings.
+> +
+> +Optional properties:
+> +- local-mac-address : 6 bytes, mac address
+> +
+> +Example (enbw_cmc board):
+> +	eth0: emac at 1e20000 {
+> +		compatible = "ti,davinci-emac";
+> +		reg = <0x220000 0x4000>;
+> +		ctrl_reg_offset = <0x3000>;
+> +		ctrl_mod_reg_offset = <0x2000>;
+> +		ctrl_ram_offset = <0>;
+> +		hw_ram_addr = <0>;
+> +		ctrl_ram_size = <0x2000>;
+> +		version = <1>;
+> +		local-mac-address = [ 00 00 00 00 00 00 ];
+> +		interrupts = <33
+> +				34
+> +				35
+> +				36
+> +				>;
+> +		interrupt-parent = <&intc>;
+> +		pinmux-handle = <&emac_pins>;
+> +	};
+> diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+> index 794ac30..cad7a96 100644
+> --- a/drivers/net/ethernet/ti/davinci_emac.c
+> +++ b/drivers/net/ethernet/ti/davinci_emac.c
+> @@ -58,6 +58,12 @@
+>  #include <linux/io.h>
+>  #include <linux/uaccess.h>
+>  #include <linux/davinci_emac.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_net.h>
+> +
+> +#include <mach/mux.h>
+>  
+>  #include <asm/irq.h>
+>  #include <asm/page.h>
+> @@ -339,6 +345,9 @@ struct emac_priv {
+>  	u32 rx_addr_type;
+>  	atomic_t cur_tx;
+>  	const char *phy_id;
+> +#ifdef CONFIG_OF
+> +	struct device_node *phy_node;
+> +#endif
+>  	struct phy_device *phydev;
+>  	spinlock_t lock;
+>  	/*platform specific members*/
+> @@ -1582,6 +1591,7 @@ static int emac_dev_open(struct net_device *ndev)
+>  	cpdma_ctlr_start(priv->dma);
+>  
+>  	priv->phydev = NULL;
+> +
+>  	/* use the first phy on the bus if pdata did not give us a phy id */
+>  	if (!priv->phy_id) {
+>  		struct device *phy;
+> @@ -1759,6 +1769,104 @@ static const struct net_device_ops emac_netdev_ops = {
+>  #endif
+>  };
+>  
+> +#ifdef CONFIG_OF
+> +static struct emac_platform_data
+> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
+> +	struct emac_priv *priv)
+> +{
+> +	struct device_node *np;
+> +	struct device_node *pinmux_np;
+> +	struct emac_platform_data *pdata = NULL;
+> +	const u8 *mac_addr;
+> +	u32 data;
+> +	int ret;
+> +	struct resource temp_res;
+> +	int irq;
+> +	int index = 0;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "ti,davinci-emac");
+> +	if (!np)
+> +		goto nodata;
+> +
+> +	pdata = pdev->dev.platform_data;
+> +	if (!pdata) {
+> +		pdata = kzalloc(sizeof(struct emac_platform_data), GFP_KERNEL);
+
+devm_kzalloc()
+
+> +		if (!pdata)
+> +			goto nodata;
+> +	}
+> +
+> +	mac_addr = of_get_mac_address(np);
+> +	if (mac_addr)
+> +		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
+> +
+> +	ret = of_property_read_u32(np, "ctrl_reg_offset", &data);
+> +	if (!ret)
+> +		pdata->ctrl_reg_offset = data;
+> +
+> +	ret = of_property_read_u32(np, "ctrl_mod_reg_offset", &data);
+> +	if (!ret)
+> +		pdata->ctrl_mod_reg_offset = data;
+> +
+> +	ret = of_property_read_u32(np, "ctrl_ram_offset", &data);
+> +	if (!ret)
+> +		pdata->ctrl_ram_offset = data;
+> +
+> +	ret = of_property_read_u32(np, "hw_ram_addr", &data);
+> +	if (!ret)
+> +		pdata->hw_ram_addr = data;
+> +
+> +	ret = of_property_read_u32(np, "ctrl_ram_size", &data);
+> +	if (!ret)
+> +		pdata->ctrl_ram_size = data;
+> +
+> +	ret = of_property_read_u32(np, "rmii_en", &data);
+> +	if (!ret)
+> +		pdata->rmii_en = data;
+> +
+> +	ret = of_property_read_u32(np, "version", &data);
+> +	if (!ret)
+> +		pdata->version = data;
+> +
+> +	ret = of_property_read_u32(np, "no_bd_ram", &data);
+> +	if (!ret)
+> +		pdata->ctrl_mod_reg_offset = data;
+
+Not all these properties are mentioned in the documentation.
+
+> +
+> +	priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
+> +	if (!priv->phy_node)
+> +		pdata->phy_id = "";
+> +
+> +	if (!of_address_to_resource(np, 0, &temp_res))
+> +		memcpy(&pdev->resource[0], &temp_res, sizeof(struct resource));
+
+Don't use of_address_to_resource.  The platform device resource table
+will already be populated by the core code so you don't need to call
+it here.  Besides, it is illegal for drivers to overwrite the
+pdev->resource[] table.
+
+> +
+> +	index = 0;
+> +	while (index < 4) {
+> +		irq = irq_of_parse_and_map(np, index);
+> +		if (irq > 0) {
+> +			temp_res.start = irq;
+> +			temp_res.end = irq;
+> +			temp_res.flags = IORESOURCE_IRQ;
+> +			memcpy(&pdev->resource[index + 1], &temp_res,
+> +				sizeof(struct resource));
+
+Same here, the core code will have already populated the irqs into the
+resource table for you.
+
+> +		}
+> +		index++;
+> +	}
+> +
+> +	pinmux_np = of_parse_phandle(np, "pinmux-handle", 0);
+> +	if (pinmux_np)
+> +		davinci_cfg_reg_of(pinmux_np);
+> +
+> +	pdev->dev.platform_data = pdata;
+> +nodata:
+> +	return  pdata;
+> +}
+> +#else
+> +static struct emac_platform_data
+> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
+> +	struct emac_priv *priv)
+> +{
+> +	return  pdev->dev.platform_data;
+> +}
+> +#endif
+>  /**
+>   * davinci_emac_probe: EMAC device probe
+>   * @pdev: The DaVinci EMAC device that we are removing
+> @@ -1802,7 +1910,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+>  
+>  	spin_lock_init(&priv->lock);
+>  
+> -	pdata = pdev->dev.platform_data;
+> +	pdata = davinci_emac_of_get_pdata(pdev, priv);
+>  	if (!pdata) {
+>  		dev_err(&pdev->dev, "no platform data\n");
+>  		rc = -ENODEV;
+> @@ -1811,6 +1919,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+>  
+>  	/* MAC addr and PHY mask , RMII enable info from platform_data */
+>  	memcpy(priv->mac_addr, pdata->mac_addr, 6);
+> +
+
+Nit: There are a few instances of unrelated whitespace changes in this
+patch.
 
 g.
