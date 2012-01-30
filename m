@@ -1,37 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jan 2012 11:24:51 +0000
-Subject: [PATCH v2 0/4] Various VFP fixes
-Message-ID: <1327922695-16121-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 30 Jan 2012 11:24:52 +0000
+Subject: [PATCH v2 1/4] ARM: vfp: flush thread hwstate before restoring
+ context from sigframe
+In-Reply-To: <1327922695-16121-1-git-send-email-will.deacon@arm.com>
+References: <1327922695-16121-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1327922695-16121-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Following execution of a signal handler, we currently restore the VFP
+context from the ucontext in the signal frame. This involves copying
+from the user stack into the current thread's vfp_hard_struct and then
+flushing the new data out to the hardware registers.
 
-This is version two of the patches I posted on Friday:
+This is problematic when using a preemptible kernel because we could be
+context switched whilst updating the vfp_hard_struct. If the current
+thread has made use of VFP since the last context switch, the VFP
+notifier will copy from the hardware registers into the vfp_hard_struct,
+overwriting any data that had been partially copied by the signal code.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082168.html
+Disabling preemption across copy_from_user calls is a terrible idea, so
+instead we move the VFP thread flush *before* we update the
+vfp_hard_struct. Since the flushing is performed lazily, this has the
+effect of disabling VFP and clearing the CPU's VFP state pointer,
+therefore preventing the thread from being updated with stale data on
+the next context switch.
 
-The only changes are that patch 4 is no longer insane and the whole
-series has had an extra weekend's worth of testing.
+Tested-by: Peter Maydell <peter.maydell@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/signal.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-Feedback welcome.
-
-Will
-
-Cc: Dave Martin <dave.martin@linaro.org>
-Cc: Peter Maydell <peter.maydell@linaro.org>
-
-Dave Martin (1):
-  ARM: vfp: fix ptrace regset modification race
-
-Will Deacon (3):
-  ARM: vfp: flush thread hwstate before restoring context from sigframe
-  ARM: vfp: flush thread hwstate before copying ptrace registers
-  ARM: vfp: clear fpscr length and stride bits on entry to sig handler
-
- arch/arm/kernel/ptrace.c |    8 +++++---
- arch/arm/kernel/signal.c |   20 +++++++++++++++++---
- 2 files changed, 22 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 0340224..9e617bd 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -227,6 +227,8 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+ 	if (magic != VFP_MAGIC || size != VFP_STORAGE_SIZE)
+ 		return -EINVAL;
+ 
++	vfp_flush_hwstate(thread);
++
+ 	/*
+ 	 * Copy the floating point registers. There can be unused
+ 	 * registers see asm/hwcap.h for details.
+@@ -251,9 +253,6 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+ 	__get_user_error(h->fpinst, &frame->ufp_exc.fpinst, err);
+ 	__get_user_error(h->fpinst2, &frame->ufp_exc.fpinst2, err);
+ 
+-	if (!err)
+-		vfp_flush_hwstate(thread);
+-
+ 	return err ? -EFAULT : 0;
+ }
+ 
 -- 
 1.7.4.1
