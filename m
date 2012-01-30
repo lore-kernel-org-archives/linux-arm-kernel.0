@@ -1,101 +1,84 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Mon, 30 Jan 2012 16:29:47 +0800
-Subject: [PATCH] Skip unnecessary pte makeup when clearing it.
-In-Reply-To: <20120130075806.GJ6305@pengutronix.de>
-References: <1327888071-3162-1-git-send-email-bill4carson@gmail.com>
- <1327888071-3162-2-git-send-email-bill4carson@gmail.com>
- <20120130075806.GJ6305@pengutronix.de>
-Message-ID: <4F2654FB.60403@gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 30 Jan 2012 08:30:40 +0000
+Subject: [PATCH] ARM: OMAP: id: Add missing break statement in
+ omap3xxx_check_revision
+In-Reply-To: <79CD15C6BA57404B839C016229A409A8317B530C@DBDE01.ent.ti.com>
+References: <1327305407-19914-1-git-send-email-hvaibhav@ti.com>
+ <20120127002543.GG29812@atomide.com>
+ <79CD15C6BA57404B839C016229A409A8317B530C@DBDE01.ent.ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317B7282@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 27, 2012 at 11:02:01, Hiremath, Vaibhav wrote:
+> On Fri, Jan 27, 2012 at 05:55:43, Tony Lindgren wrote:
+> > * Vaibhav Hiremath <hvaibhav@ti.com> [120122 23:26]:
+> > > Add missing break statement in the function omap3xxx_check_revision.
+> > > 
+> > > The commit id 4390f5b2cb1f56 [ARM: OMAP: TI814X: Add cpu type macros
+> > > and detection support], removed the 'break' statement from the function
+> > > omap3xxx_check_revision(), resulting into wrong omap/cpu_revision
+> > > initialization for AM335x devices.
+> > 
+> > Looks like this is already fixed, can you please verify with
+> > v3.3-rc1?
+> > 
+> Tony,
+> 
+> I just looked at your linux-omap/master branch and 'break' statement is missing. So this patch is still required.
+> 
+> I can still see,
+> 
+> 394                 }
+> 395                 break;
+> 396         case 0xb944:
+> 397                 omap_revision = AM335X_REV_ES1_0;
+> 398                 cpu_rev = "1.0";
+> 399         case 0xb8f2:
+> 400                 switch (rev) {
+> 
+> 
+Tony,
 
+Can this be merged? I can still see "break" statement missing in the latest
+linux-omap/master branch.
 
-On 2012?01?30? 15:58, Uwe Kleine-K?nig wrote:
-> On Mon, Jan 30, 2012 at 09:47:51AM +0800, bill4carson at gmail.com wrote:
->> From: Bill Carson<bill4carson@gmail.com>
->>
->> If we are only about to clear a hardware pte entry, then pte makeup code is
->> unnecessary for cpu_v7_set_pte_ext and armv6_set_pte_ext, so just skip it.
->>
->> Signed-off-by: Bill Carson<bill4carson@gmail.com>
->> ---
->>   arch/arm/mm/proc-macros.S    |   10 +++++-----
->>   arch/arm/mm/proc-v7-2level.S |   10 +++++-----
->>   2 files changed, 10 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
->> index 2d8ff3a..907b524 100644
->> --- a/arch/arm/mm/proc-macros.S
->> +++ b/arch/arm/mm/proc-macros.S
->> @@ -138,6 +138,10 @@
->>   	.macro	armv6_set_pte_ext pfx
->>   	str	r1, [r0], #2048			@ linux version
->>
->> +	tst	r1, #L_PTE_YOUNG
->> +	tstne	r1, #L_PTE_PRESENT
->> +	moveq	r3, #0
->> +	beq	1f
->>   	bic	r3, r1, #0x000003fc
->>   	bic	r3, r3, #PTE_TYPE_MASK
->>   	orr	r3, r3, r2
->> @@ -163,11 +167,7 @@
->>   	orrne	r3, r3, #PTE_EXT_XN
->>
->>   	orr	r3, r3, r2
->> -
->> -	tst	r1, #L_PTE_YOUNG
->> -	tstne	r1, #L_PTE_PRESENT
->> -	moveq	r3, #0
->> -
->> +1:
->>   	str	r3, [r0]
->>   	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
->>   	.endm
->> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
->> index 3a4b3e7..869bebc 100644
->> --- a/arch/arm/mm/proc-v7-2level.S
->> +++ b/arch/arm/mm/proc-v7-2level.S
->> @@ -76,6 +76,10 @@ ENTRY(cpu_v7_set_pte_ext)
->>   #ifdef CONFIG_MMU
->>   	str	r1, [r0]			@ linux version
->>
->> +	tst	r1, #L_PTE_YOUNG
->> +	tstne	r1, #L_PTE_PRESENT
->> +	moveq	r3, #0
->> +	beq		1f
-> This double tab looks wrong. Other than that I think the patch is OK.
-> Note I don't have a clue about ptes but your changes are a logical nop.
->
-Thanks for your feedback :)
+Thanks,
+Vaibhav
 
-I will fix that double tab soon, as for "your changes are a logical nop"
-it does not change any code substantially, changing the sequence does
-not help when setup an page mapping, but it take a short path when clearing
-an existing pte, thus gives better performance.
-
-> Best regards
-> Uwe
->
->>   	bic	r3, r1, #0x000003f0
->>   	bic	r3, r3, #PTE_TYPE_MASK
->>   	orr	r3, r3, r2
->> @@ -98,11 +102,7 @@ ENTRY(cpu_v7_set_pte_ext)
->>
->>   	tst	r1, #L_PTE_XN
->>   	orrne	r3, r3, #PTE_EXT_XN
->> -
->> -	tst	r1, #L_PTE_YOUNG
->> -	tstne	r1, #L_PTE_PRESENT
->> -	moveq	r3, #0
->> -
->> +1:
->>    ARM(	str	r3, [r0, #2048]! )
->>    THUMB(	add	r0, r0, #2048 )
->>    THUMB(	str	r3, [r0] )
-
--- 
-I am a slow learner
-but I will keep trying to fight for my dreams!
-
---bill
+> Thanks,
+> Vaibhav
+> 
+> 
+> > Regards,
+> > 
+> > Tony
+> >  
+> > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > > Cc: Tony Lindgren <tony@atomide.com>
+> > > ---
+> > >  arch/arm/mach-omap2/id.c |    1 +
+> > >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> > > index 325e12e..32cf203 100644
+> > > --- a/arch/arm/mach-omap2/id.c
+> > > +++ b/arch/arm/mach-omap2/id.c
+> > > @@ -395,6 +395,7 @@ void __init omap3xxx_check_revision(void)
+> > >  	case 0xb944:
+> > >  		omap_revision = AM335X_REV_ES1_0;
+> > >  		cpu_rev = "1.0";
+> > > +		break;
+> > >  	case 0xb8f2:
+> > >  		switch (rev) {
+> > >  		case 0:
+> > > --
+> > > 1.7.0.4
+> > > 
+> > 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
