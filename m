@@ -1,40 +1,69 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jan 2012 11:24:54 +0000
-Subject: [PATCH v2 3/4] ARM: vfp: flush thread hwstate before copying ptrace
- registers
+Date: Mon, 30 Jan 2012 11:24:53 +0000
+Subject: [PATCH v2 2/4] ARM: vfp: fix ptrace regset modification race
 In-Reply-To: <1327922695-16121-1-git-send-email-will.deacon@arm.com>
 References: <1327922695-16121-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1327922695-16121-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1327922695-16121-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are context switched whilst copying into a thread's
-vfp_hard_struct then the partial copy may be corrupted by the VFP
-context switching code (see "ARM: vfp: flush thread hwstate before
-restoring context from sigframe").
+From: Dave Martin <dave.martin@linaro.org>
 
-This patch updates the ptrace VFP set code so that the thread state is
-flushed before the copy, therefore disabling VFP and preventing
-corruption from occurring.
+In a preemptible kernel, vfp_set() can be preempted, causing the
+hardware VFP context to be switched while the thread vfp state is
+being read and modified.  This leads to a race condition which can
+cause the thread vfp state to become corrupted if lazy VFP context
+save occurs due to preemption in between the time thread->vfpstate
+is read and the time the modified state is written back.
 
+This may occur if preemption occurs during the execution of a
+ptrace() call which modifies the VFP register state of a thread.
+Such instances should be very rare in most realistic scenarios --
+none has been reported, so far as I am aware.  Only uniprocessor
+systems should be affected, since VFP context save is not currently
+lazy in SMP kernels.
+
+The problem was introduced by my earlier patch migrating to use
+regsets to implement ptrace.
+
+This patch does a vfp_sync_hwstate() before reading
+thread->vfpstate, to make sure that the thread's VFP state is not
+live in the hardware registers while the registers are modified.
+
+Thanks to Will Deacon for spotting this.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/ptrace.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/kernel/ptrace.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index d001be4..e33870f 100644
+index e1d5e19..d001be4 100644
 --- a/arch/arm/kernel/ptrace.c
 +++ b/arch/arm/kernel/ptrace.c
-@@ -726,8 +726,8 @@ static int vfp_set(struct task_struct *target,
+@@ -699,10 +699,13 @@ static int vfp_set(struct task_struct *target,
+ {
+ 	int ret;
+ 	struct thread_info *thread = task_thread_info(target);
+-	struct vfp_hard_struct new_vfp = thread->vfpstate.hard;
++	struct vfp_hard_struct new_vfp;
+ 	const size_t user_fpregs_offset = offsetof(struct user_vfp, fpregs);
+ 	const size_t user_fpscr_offset = offsetof(struct user_vfp, fpscr);
+ 
++	vfp_sync_hwstate(thread);
++	new_vfp = thread->vfpstate.hard;
++
+ 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+ 				  &new_vfp.fpregs,
+ 				  user_fpregs_offset,
+@@ -723,7 +726,6 @@ static int vfp_set(struct task_struct *target,
  	if (ret)
  		return ret;
  
--	thread->vfpstate.hard = new_vfp;
+-	vfp_sync_hwstate(thread);
+ 	thread->vfpstate.hard = new_vfp;
  	vfp_flush_hwstate(thread);
-+	thread->vfpstate.hard = new_vfp;
  
- 	return 0;
- }
 -- 
 1.7.4.1
