@@ -1,23 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 30 Jan 2012 13:08:23 +0100
-Subject: [PATCH v7] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-In-Reply-To: <1327905080-23623-1-git-send-email-b39297@freescale.com>
-References: <1327905080-23623-1-git-send-email-b39297@freescale.com>
-Message-ID: <20120130120823.GH705@game.jcrosoft.org>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 30 Jan 2012 12:12:50 +0000
+Subject: [PATCH 07/15] mm: page_alloc: change fallbacks array handling
+In-Reply-To: <1327568457-27734-8-git-send-email-m.szyprowski@samsung.com>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120130121250.GK25268@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:31 Mon 30 Jan     , Wu Guoxing wrote:
-> From: wu guoxing <b39297@freescale.com>
+On Thu, Jan 26, 2012 at 10:00:49AM +0100, Marek Szyprowski wrote:
+> From: Michal Nazarewicz <mina86@mina86.com>
 > 
-> we only use the gpio function of mc9s08dz60 mcu chip, so just
-> add the gpio driver, as this mcu will never be used in other board.
+> This commit adds a row for MIGRATE_ISOLATE type to the fallbacks array
+> which was missing from it.  It also, changes the array traversal logic
+> a little making MIGRATE_RESERVE an end marker.  The letter change,
+> removes the implicit MIGRATE_UNMOVABLE from the end of each row which
+> was read by __rmqueue_fallback() function.
 > 
-> Signed-off-by: Wu Guoxing <b39297@freescale.com>
-> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
-please add the of bindings directly
+> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Best Regards,
-J.
+Acked-by: Mel Gorman <mel@csn.ul.ie>
+
+-- 
+Mel Gorman
+SUSE Labs
