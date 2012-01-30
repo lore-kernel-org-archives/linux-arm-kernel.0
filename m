@@ -1,55 +1,73 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 30 Jan 2012 19:51:06 +0200
-Subject: [PATCH] tidspbridge: Rename module from bridgedriver to
- tidspbridge
-In-Reply-To: <CAB-zwWjWkxpmT2dXDV++okCKZaebVz4O8-L4OgabMEzdEu4eGA@mail.gmail.com>
-References: <1327440305.1798.28.camel@joe2Laptop>
- <CAB-zwWjWkxpmT2dXDV++okCKZaebVz4O8-L4OgabMEzdEu4eGA@mail.gmail.com>
-Message-ID: <CAMP44s3atm_WYrGAVcRQLKoMzu9PpR4y5GLRw=o1CF0EZvCBfA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Jan 2012 17:58:24 +0000
+Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
+In-Reply-To: <20120128010534.GA20581@kroah.com>
+References: <1327165687-4223-1-git-send-email-lee.jones@linaro.org>
+ <1327165687-4223-3-git-send-email-lee.jones@linaro.org>
+ <20120128010534.GA20581@kroah.com>
+Message-ID: <201201301758.24531.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 7:34 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
-> On Tue, Jan 24, 2012 at 3:25 PM, Joe Perches <joe@perches.com> wrote:
->> tidspbridge when built as a module is named bridgedriver.
->>
->> bridgedriver is not a particularly good module name.
->>
->> tidspbridge is what the source is named. ?That seems
->> a more appropriate module name too as it describes
->> the hardware function better.
->>
->> Signed-off-by: Joe Perches <joe@perches.com>
->> ---
->> ?drivers/staging/tidspbridge/Makefile | ? ?4 ++--
->> ?1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/staging/tidspbridge/Makefile b/drivers/staging/tidspbridge/Makefile
->> index fd6a276..8c8c92a 100644
->> --- a/drivers/staging/tidspbridge/Makefile
->> +++ b/drivers/staging/tidspbridge/Makefile
->> @@ -1,4 +1,4 @@
->> -obj-$(CONFIG_TIDSPBRIDGE) ? ? ?+= bridgedriver.o
->> +obj-$(CONFIG_TIDSPBRIDGE) ? ? ?+= tidspbridge.o
->>
->> ?libgen = gen/gh.o gen/uuidutil.o
->> ?libcore = core/chnl_sm.o core/msg_sm.o core/io_sm.o core/tiomap3430.o \
->> @@ -13,7 +13,7 @@ libdload = dynload/cload.o dynload/getsection.o dynload/reloc.o \
->> ? ? ? ? ? ? ? ? dynload/tramp.o
->> ?libhw = hw/hw_mmu.o
->>
->> -bridgedriver-y := $(libgen) $(libservices) $(libcore) $(libpmgr) $(librmgr) \
->> +tidspbridge-y := $(libgen) $(libservices) $(libcore) $(libpmgr) $(librmgr) \
->> ? ? ? ? ? ? ? ? ? ? ? ?$(libdload) $(libhw)
->>
->> ?#Machine dependent
->>
->>
->
-> Sound good to me, and unless there is an objection, it also gives
-> plenty of time for the change to be noticed.
+On Saturday 28 January 2012, Greg KH wrote:
+> On Sat, Jan 21, 2012 at 05:08:03PM +0000, Lee Jones wrote:
+> > diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+> > index 7be9f79..9aa618a 100644
+> > --- a/drivers/base/Kconfig
+> > +++ b/drivers/base/Kconfig
+> > @@ -176,6 +176,9 @@ config GENERIC_CPU_DEVICES
+> >  	bool
+> >  	default n
+> >  
+> > +config SOC_BUS
+> > +	bool
+> 
+> That's nice, but you do need some kind of help text here, right?
 
-Yeah, I agree. I also have thought on doing this.
+Wouldn't hurt, but most silent options have no help text, because that
+would never be visible in the kconfig tools, only in the source code.
 
--- 
-Felipe Contreras
+> > +
+> > +static struct ida soc_ida;
+> > +static spinlock_t soc_lock;
+> > +
+> > +static ssize_t soc_info_get(struct device *dev,
+> > +			    struct device_attribute *attr,
+> > +			    char *buf);
+> > +
+> 
+> Why not put the whole function here, well a few lines lower, so no
+> forward declaration is needed, saving a few extra lines.
+
+You made the same comment in a previous review round and then agreed
+that it's correct after all. A small comment why the forward declaration
+is required here would probably be appropriate here, otherwise the
+next person reading this would have the same thought.
+
+> > +
+> > +static mode_t soc_attribute_mode(struct kobject *kobj,
+> > +                                 struct attribute *attr,
+> > +                                 int index)
+> > +{
+> > +	struct device *dev = container_of(kobj, struct device, kobj);
+> > +	struct soc_device *soc_dev = container_of(dev, struct soc_device, dev);
+> > +
+> > +	if ((attr == &dev_attr_machine.attr)
+> > +	    && (soc_dev->attr->machine != NULL))
+> > +		return attr->mode;
+> > +	if ((attr == &dev_attr_family.attr)
+> > +	    && (soc_dev->attr->family != NULL))
+> > +		return attr->mode;
+> > +	if ((attr == &dev_attr_revision.attr)
+> > +	    && (soc_dev->attr->revision != NULL))
+> > +		return attr->mode;
+> > +	if ((attr == &dev_attr_soc_id.attr)
+> > +	    && (soc_dev->attr->soc_id != NULL))
+> > +	        return attr->mode;
+> > +
+
+FWIW, the function compares the attribute pointers, so it needs to
+see their delarations, while the attribute definition requires the
+declaration of the function to be visible.
+
+	Arnd
