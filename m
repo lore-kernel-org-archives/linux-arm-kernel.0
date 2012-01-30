@@ -1,49 +1,56 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 30 Jan 2012 17:47:40 +0530
-Subject: [PATCH 2/2] ARM: OMAP2+: PM: clean up omap_set_pwrdm_state()
-In-Reply-To: <20120130094317.11027.82072.stgit@dusk>
-References: <20120130093931.11027.31048.stgit@dusk>
- <20120130094317.11027.82072.stgit@dusk>
-Message-ID: <CAMQu2gwsj6h0FqfY74jrA9ZVbjV650SLEUticQRiB+dSOWgNsQ@mail.gmail.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 30 Jan 2012 13:22:59 +0100
+Subject: [PATCH] fix starting of transfers in i.MX dma drivers
+In-Reply-To: <1327914764.1527.15.camel@vkoul-udesk3>
+References: <1326101570-3716-1-git-send-email-s.hauer@pengutronix.de>
+ <1327914764.1527.15.camel@vkoul-udesk3>
+Message-ID: <CACKLOr3tx0Kc8rZzx5sp91wCmDcjOB0byW0c7KrWT7VF1g2NyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 3:13 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Clean up a few different parts of omap_set_pwrdm_state():
+On 30 January 2012 10:12, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Mon, 2012-01-09 at 10:32 +0100, Sascha Hauer wrote:
+>> This moves the start of transfers from tx_submit to issue_pending
+>> for the i.MX dma drivers as requested by Vinoud here:
+>>
+>> https://lkml.org/lkml/2012/1/7/23
+>>
+>> This requires the users (mxcmmc and i.MX sound) to be fixed first.
+>> So Chris, Mark, given your Ack I would suggest to send this via
+>> Vinouds DMA tree.
+>>
+>> Sascha
+>>
+>> Sascha Hauer (4):
+>> ? ? ? mmc: mxcmmc: add missing dma_async_issue_pending
+>> ? ? ? ASoC: i.MX: Add missing dma_async_issue_pending
+>> ? ? ? dma: imx-dma: start transfer in issue_pending
+>> ? ? ? dma: imx-sdma: start transfer in issue_pending
+>>
+>> ?drivers/dma/imx-dma.c ? ? ? ? ? | ? ?9 ++++-----
+>> ?drivers/dma/imx-sdma.c ? ? ? ? ?| ? 11 +++++------
+>> ?drivers/mmc/host/mxcmmc.c ? ? ? | ? ?1 +
+>> ?sound/soc/imx/imx-pcm-dma-mx2.c | ? ?1 +
+>> ?4 files changed, 11 insertions(+), 11 deletions(-)
 >
-> - Remove a superfluous call to pwrdm_state_switch(). ?Not needed
-> ?unless LOWPOWERSTATECHANGE is used, because the state switch code is
-> ?called by either clkdm_sleep() or clkdm_allow_idle().
+> Thanks applied all.
 >
-Indeed
+> Fixed change log in 3 & 4, as Russell pointed out
+>
+> Got a conflict in 4, pls see that fix is right.
 
-> - Add code to wait for the power state transition in the OMAP4+ low
-> ?power state change. ?This is speculative, so I would particularly
-> ?appreciate feedback on this part.
->
-> - Remove a superfluous call to pwrdm_read_pwrst().
->
-> - Update variable names to be more meaningful (hopefully) and precise.
->
-> - Fix an error path bug that would not place the clockdomain back into
-> ?hardware-supervised idle or sleep mode if the power state could not
-> ?be programmed.
->
-> The documentation for this function still needs major improvements;
-> that's left for a later patch.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> ---
+Hi Vinod,
+could you please tell me where has this been merged?
 
-All the changes look fine to me from OMAP4
-perspective. Would be good if Tero can try out this
-patch and test CORE RET on OMAP4.
+I can't see it at git://git.infradead.org/users/vkoul/slave-dma.git
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Thank you.
 
-Regards
-santosh
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
