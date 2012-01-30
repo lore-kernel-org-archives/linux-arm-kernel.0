@@ -1,33 +1,26 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Mon, 30 Jan 2012 11:04:05 -0800
-Subject: [PATCH] ARM: bcmring: remove unused DMA map code
-In-Reply-To: <CAOesGMhhh2bsC+sAZyyBOZw8Lgk1sR7e=ZB+RcnNJG-qDqiwtg@mail.gmail.com>
-References: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D3D12CE3@SJEXCHCCR02.corp.ad.broadcom.com>
- <CAOesGMhhh2bsC+sAZyyBOZw8Lgk1sR7e=ZB+RcnNJG-qDqiwtg@mail.gmail.com>
-Message-ID: <4F26E9A5.5010301@broadcom.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 30 Jan 2012 11:13:34 -0800
+Subject: [PATCH v2 0/3] tty: serial: OMAP: work around broken IP block,
+ driver
+In-Reply-To: <20120126024903.31613.24730.stgit@dusk> (Paul Walmsley's message
+ of "Wed, 25 Jan 2012 19:50:32 -0700")
+References: <20120126024903.31613.24730.stgit@dusk>
+Message-ID: <87ty3drokh.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> What is this patch based on? It doesn't apply on top of 3.3-rc1, nor
-> v3.2, 3.1, 3.0 or current linux-next.
->
-It is against v3.3-rc1. I attached the patch file now in case the email 
-system (outlook) messed up the format like line ending.
+Paul Walmsley <paul@pwsan.com> writes:
 
-> Also, that SHA doesn't exist in the mainline tree, nor in linux-next.
-Updated in attached patch file
+> [ This series is targeted for merging during v3.3-rc ]
+>
+> Hi
+>
+> Here's an updated version of OMAP serial bugfix series against v3.3-rc1.
+> This revision has:
 
->
-> Please make sure that patches you submit as a maintainer apply cleanly
-> on top of the tree you want them included in.
->
->
-> Thanks,
->
-> -Olof
->
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
 
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: 0001-ARM-bcmring-remove-unused-DMA-map-code.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/61eb2b1f/attachment-0001.ksh>
+Tested on 3430/n900, 3530/Overo and 4430/Panda
+
+Kevin
