@@ -1,37 +1,47 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 30 Jan 2012 14:12:05 +0100
-Subject: [PATCH] mtd/gpmi : add BBT support
-In-Reply-To: <201201301327.41298.marek.vasut@gmail.com>
-References: <1327898174-13656-1-git-send-email-b32955@freescale.com>
- <4F267F21.1030204@freescale.com>
- <20120130114131.GC15596@pengutronix.de>
- <201201301327.41298.marek.vasut@gmail.com>
-Message-ID: <20120130131205.GD15596@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 30 Jan 2012 06:14:30 -0700
+Subject: [PATCH 1/1] of_mmc_spi: fix little endian support
+In-Reply-To: <1327896929-16274-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1327896929-16274-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20120130131430.GA28397@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > U-Boot has NAND support in mainline, for barebox it is work-in-progress.
+On Mon, Jan 30, 2012 at 05:15:29AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> the voltage_ranges is supposed to switch from big endian to little endian
 > 
-> Why don't you rather start hacking on u-boot instead of chasing behind it all 
-> the time ;-)
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: linux-mmc at vger.kernel.org
 
-"chasing all the time behind it" is plain wrong, you should know that. I
-also fed back the DMA fix I found. Besides, this is off-topic.
+Applied, thanks.
 
-> > Did it always do that? Or is a newer version needed?
+g.
+
+> ---
+>  drivers/mmc/host/of_mmc_spi.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
 > 
-> I can't comment on this one, I never used it. I rather got NAND working 
-> properly.
-
-Me neither. But if so, we have another regression candidate.
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/c92e28fb/attachment.sig>
+> diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
+> index ab66f24..ede2c64 100644
+> --- a/drivers/mmc/host/of_mmc_spi.c
+> +++ b/drivers/mmc/host/of_mmc_spi.c
+> @@ -109,12 +109,13 @@ struct mmc_spi_platform_data *mmc_spi_get_pdata(struct spi_device *spi)
+>  		goto err_ocr;
+>  	}
+>  
+> +
+>  	for (i = 0; i < num_ranges; i++) {
+>  		const int j = i * 2;
+>  		u32 mask;
+>  
+> -		mask = mmc_vddrange_to_ocrmask(voltage_ranges[j],
+> -					       voltage_ranges[j + 1]);
+> +		mask = mmc_vddrange_to_ocrmask(be32_to_cpu(voltage_ranges[j]),
+> +					       be32_to_cpu(voltage_ranges[j + 1]));
+>  		if (!mask) {
+>  			ret = -EINVAL;
+>  			dev_err(dev, "OF: voltage-range #%d is invalid\n", i);
+> -- 
+> 1.7.7
+> 
