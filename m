@@ -1,78 +1,77 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 30 Jan 2012 10:33:04 -0600
-Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
-In-Reply-To: <20120130150132.GJ28397@ponder.secretlab.ca>
-References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
- <1327091591-27125-12-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1201201608400.19587@xanadu.home>
- <4F19DB35.9060707@gmail.com>
- <alpine.LFD.2.02.1201201744130.19587@xanadu.home>
- <4F205694.7090906@gmail.com> <20120130150132.GJ28397@ponder.secretlab.ca>
-Message-ID: <4F26C640.8050705@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 30 Jan 2012 16:49:05 +0000
+Subject: [PATCH 4/4] ARM: vfp: clear fpscr length and stride bits on
+ return from sig handler
+In-Reply-To: <1327681443-16627-5-git-send-email-will.deacon@arm.com>
+References: <1327681443-16627-1-git-send-email-will.deacon@arm.com>
+ <1327681443-16627-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20120130164905.GB2248@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2012 09:01 AM, Grant Likely wrote:
-> On Wed, Jan 25, 2012 at 01:23:00PM -0600, Rob Herring wrote:
->> On 01/20/2012 04:48 PM, Nicolas Pitre wrote:
->>> On Fri, 20 Jan 2012, Rob Herring wrote:
->>>
->>>> On 01/20/2012 03:11 PM, Nicolas Pitre wrote:
->>>>> On Fri, 20 Jan 2012, Rob Herring wrote:
->>>>>
->>>>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>>>
->>>>>> Make mach/irqs.h optional for SPARSE_IRQ. With this change irqs.h can be
->>>>>> removed by converting platforms over to sparse irq.
->>>>>>
->>>>>> This intentionally breaks platforms that enable SPARSE_IRQ.
->>>>>
->>>>> I don't get what you mean here.  The above seems contradictory.
->>>>>
->>>>
->>>> You're right. The intro explains things more clearly.
->>>
->>> The intro won't be part of the git history, so please make sure 
->>> individual commit logs are sensible on their own.
->>
->> Updated the commit message to this (w/o the email word wrapping):
->>
->> ARM: only include mach/irqs.h for !SPARSE_IRQ
->>
->> Make mach/irqs.h optional for SPARSE_IRQ. With this change irqs.h can be
->> removed by converting platforms over to sparse irq.
->>
->> This may break platforms where SPARSE_IRQ is user selectable and is enabled.
->> This is on purpose so that SPARSE_IRQ gets properly supported. SPARSE_IRQ
->> should not really be a user visible option.
->>
->> Platforms either need to set nr_irqs in their machine desc or all irqchips
->> used by a platform need to allocate their irq_descs. There cannot be a
->> mixture. Once this is done, the platforms can select SPARSE_IRQ. shmobile
->> does the latter, and mmp and pxa do the former.
->>
->>>> This breaks platforms (at boot time) that don't select SPARSE_IRQ, but 
->>>> let users enable it in their config. I don't understand why sparse irq 
->>>> is a user visible config option. We could move HAVE_SPARSE_IRQ down to 
->>>> each platform that selects SPARSE_IRQ and prevent enabling, but I 
->>>> think allowing it to break is good encouragement for others to fix 
->>>> those platforms. I'm open to other ideas.
->>>
->>> SPARSE_IRQ shouldn't be a user configurable option.  There is just no 
->>> point for a user configuring a kernel to be able to change this.
->>
->> I agree, but I'm inclined to leave this alone for now. PPC doesn't ever
->> select SPARSE_IRQ, but enables it via many defconfigs. So I think
->> changing it may cause some problems.
+On Fri, Jan 27, 2012 at 04:24:03PM +0000, Will Deacon wrote:
+> The ARM PCS mandates that the length and stride bits of the fpscr are
+> cleared on entry to and return from a public interface.
+
+That means we need to reset that state on _entry_ to the signal handler,
+since the interrupted thread is interrupted at an arbitrarily location
+which need not be a public interface, whereas the signal handler entry
+point definitely is a public interface.
+
+On exit from the signal handler, surely we must restore the interrupted
+thread's state for these bits, not reset them to zero?  The interrupted
+thread could be in the middle of something which makes assumptions about
+what these bits are set to.
+
+
+This is rather analogous to the handling of the CPSR.E bit.
+
+Cheers
+---Dave
+
 > 
-> I think ppc can probably be moved to always enable SPARSE_IRQ since every
-> ppc machine goes through irq_domain anyway.
-
-May be so, but only ~80 of ~100 ppc defconfigs enable SPARSE_IRQ. I'll
-leave it to someone more familiar with ppc to change it.
-
-I implemented Russell's suggestion:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/081920.html
-
-Rob
+> This patch ensures that the VFP context restored from a signal frame
+> is made to adhere to this specification.
+> 
+> Reported-by: Peter Maydell <peter.maydell@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/kernel/signal.c |   10 ++++++++--
+>  1 files changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 9e617bd..274b8fc 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -216,7 +216,7 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+>  	struct vfp_hard_struct *h = &thread->vfpstate.hard;
+>  	unsigned long magic;
+>  	unsigned long size;
+> -	unsigned long fpexc;
+> +	unsigned long fpexc, fpscr;
+>  	int err = 0;
+>  
+>  	__get_user_error(magic, &frame->magic, err);
+> @@ -238,7 +238,13 @@ static int restore_vfp_context(struct vfp_sigframe __user *frame)
+>  	/*
+>  	 * Copy the status and control register.
+>  	 */
+> -	__get_user_error(h->fpscr, &frame->ufp.fpscr, err);
+> +	__get_user_error(fpscr, &frame->ufp.fpscr, err);
+> +
+> +	/*
+> +	 * As per the PCS, clear the length and stride bits.
+> +	 */
+> +	fpscr &= ~(FPSCR_LENGTH_MASK | FPSCR_STRIDE_MASK);
+> +	h->fpscr = fpscr;
+>  
+>  	/*
+>  	 * Sanitise and restore the exception registers.
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
