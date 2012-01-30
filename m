@@ -1,197 +1,246 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 30 Jan 2012 13:04:36 -0700
-Subject: [RFC PATCH 5/7] ARM: davinci: i2c: add OF support
-In-Reply-To: <1327308967-8092-6-git-send-email-hs@denx.de>
+Date: Mon, 30 Jan 2012 13:32:52 -0700
+Subject: [RFC PATCH 7/7] ARM: davinci: add support for the am1808 based
+ enbw_cmc board
+In-Reply-To: <1327308967-8092-8-git-send-email-hs@denx.de>
 References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-6-git-send-email-hs@denx.de>
-Message-ID: <20120130200436.GU28397@ponder.secretlab.ca>
+ <1327308967-8092-8-git-send-email-hs@denx.de>
+Message-ID: <20120130203252.GX28397@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 09:56:05AM +0100, Heiko Schocher wrote:
-> add of support for the davinci i2c driver.
+On Mon, Jan 23, 2012 at 09:56:07AM +0100, Heiko Schocher wrote:
+> - AM1808 based board
+> - 64 MiB DDR ram
+> - 2 MiB Nor flash
+> - 128 MiB NAND flash
+> - use internal RTC
+> - I2C support
+> - hwmon lm75 support
+> - UBI/UBIFS support
+> - MMC support
+> - USB OTG support
 > 
 > Signed-off-by: Heiko Schocher <hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-mtd at lists.infradead.org
 > Cc: linux-i2c at vger.kernel.org
+> Cc: netdev at vger.kernel.org
+> Cc: David Woodhouse <dwmw2@infradead.org>
 > Cc: Ben Dooks <ben-linux@fluff.org>
 > Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
 > Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
 > Cc: Wolfgang Denk <wd@denx.de>
-
-Hi Heiko,
-
-comments below.
-
+> 
 > ---
->  .../devicetree/bindings/arm/davinci/i2c.txt        |   39 ++++++++++++++++++
->  drivers/i2c/busses/i2c-davinci.c                   |   43 ++++++++++++++++++++
->  2 files changed, 82 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
+> - post this board support with USB support, even though
+>   USB is only working with the 10 ms "workaround", posted here:
+>   http://comments.gmane.org/gmane.linux.usb.general/54505
+>   I see this issue also on the AM1808 TMDXEXP1808L evalboard.
+> - MMC and USB are not using OF support yet, ideas how to port
+>   this are welcome. I need for USB and MMC boards board
+>   specific callbacks, how to solve this with OF support?
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+>  arch/arm/boot/dts/enbw_cmc.dts                  |  286 +++++++++++++++++
+>  arch/arm/configs/enbw_cmc_defconfig             |  125 ++++++++
+>  arch/arm/mach-davinci/Kconfig                   |    8 +
+>  arch/arm/mach-davinci/Makefile                  |    1 +
+>  arch/arm/mach-davinci/board-enbw-cmc.c          |  384 +++++++++++++++++++++++
+>  arch/arm/mach-davinci/include/mach/uncompress.h |    1 +
+>  6 files changed, 805 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/enbw_cmc.dts
+>  create mode 100644 arch/arm/configs/enbw_cmc_defconfig
+>  create mode 100644 arch/arm/mach-davinci/board-enbw-cmc.c
+> 
+> diff --git a/arch/arm/boot/dts/enbw_cmc.dts b/arch/arm/boot/dts/enbw_cmc.dts
 > new file mode 100644
-> index 0000000..94ec670
+> index 0000000..e5995ce
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
-> @@ -0,0 +1,39 @@
-> +* Texas Instruments Davinci I2C
+> +++ b/arch/arm/boot/dts/enbw_cmc.dts
+> @@ -0,0 +1,286 @@
+> +/*
+> + * Device Tree for the EnBW CMC plattform
+> + *
+> + * Copyright 2011 DENX Software Engineering GmbH
+> + * Heiko Schocher <hs@denx.de>
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + */
+> +/dts-v1/;
+> +/include/ "skeleton.dtsi"
 > +
-> +This file provides information, what the device node for the
-> +davinci i2c interface contain.
+> +/ {
+> +	model = "EnBW CMC";
+> +	compatible = "enbw,cmc";
 > +
-> +Required properties:
-> +- compatible: "ti,davinci-i2c";
-> +- reg : Offset and length of the register set for the device
-> +- id: id of the controller
-
-Don't use an 'id' property.  i2c bus numbers should be dynamically
-assigned when using the device tree.
-
-> +
-> +Recommended properties :
-> +- interrupts : <a b> where a is the interrupt number and b is a
-> +  field that represents an encoding of the sense and level
-> +  information for the interrupt.
-
-This is inaccurate.  It is entirely defined by the interrupt
-controller.  All you need to say here is that this is a standard
-interrupts property.
-
-> +- interrupt-parent : the phandle for the interrupt controller that
-> +  services interrupts for this device.
-
-Don't even mention this one.  It can often be inherited from a parent
-node.
-
-> +- clock-frequency : desired I2C bus clock frequency in Hz.
-> +
-> +Optional properties:
-> +- bus-delay: bus delay in usec
-> +- pinmux-handle: Contains a handle to configure the pinmux settings.
-> +
-> +Example (enbw_cmc board):
-> +	i2c at 1c22000 {
-> +		compatible = "ti,davinci-i2c";
-> +		reg = <0x22000 0x1000>;
-> +		clock-frequency = <100000>;
-> +		interrupts = <15 2>;
-> +		interrupt-parent = <&intc>;
-> +		id = <1>;
-> +		pinmux-handle = <&i2c1_pins>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		dtt at 48 {
-> +				compatible = "national,lm75";
-> +				reg = <0x48>;
-> +			};
+> +	aliases {
+> +		ethernet0 = &eth0;
 > +	};
-> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-> index a76d85f..6f59fae 100644
-> --- a/drivers/i2c/busses/i2c-davinci.c
-> +++ b/drivers/i2c/busses/i2c-davinci.c
-> @@ -38,9 +38,12 @@
->  #include <linux/slab.h>
->  #include <linux/cpufreq.h>
->  #include <linux/gpio.h>
-> +#include <linux/of_i2c.h>
-> +#include <linux/of_device.h>
->  
->  #include <mach/hardware.h>
->  #include <mach/i2c.h>
+> +
+> +	arm {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0xfffee000 0x00020000>;
+> +		intc: interrupt-controller at 1 {
+> +			compatible = "ti,davinci-intc";
+> +			interrupt-controller;
+> +			#interrupt-cells = <1>;
+> +			ti,intc-size = <101>;
+> +			reg = <0x0 0x2000>;
+> +		};
+> +	};
+> +	soc at 1c00000 {
+> +		compatible = "ti,da8xx";
+
+As previously mentioned, using wildcard ('x') characters in compatible
+properties is bad practice.  Always be specific and use the compatible
+list to make sure the correct driver gets bound (assuming the device
+is 100% register level compatible with the older one).
+
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0x0 0x01c00000 0x400000>;
+> +
+> +		serial0: serial at 1c42000 {
+> +			cell-index = <2>;
+
+As previously mentioned, don't use cell index.  If you *really* need
+to assign a number to a device, then use a property in the /aliases
+node and make sure pdev->id does *not* get modified.
+
+> +			compatible = "ns16550a";
+
+Should include a string for the specific device.  Something like:
+
+	compatible = "ti,da800", "ns16550a";
+
+> diff --git a/arch/arm/mach-davinci/board-enbw-cmc.c b/arch/arm/mach-davinci/board-enbw-cmc.c
+> new file mode 100644
+> index 0000000..4473c4a
+> --- /dev/null
+> +++ b/arch/arm/mach-davinci/board-enbw-cmc.c
+> @@ -0,0 +1,384 @@
+> +/*
+> + * EnBW Communication Module Compact board
+> + * Copyright 2011 DENX Software Engineering GmbH
+> + * Author: Heiko Schocher <hs@denx.de>
+> + *
+> + * based on:
+> + * TI DA850/OMAP-L138 EVM board
+> + *
+> + * Copyright (C) 2009 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * Derived from: arch/arm/mach-davinci/board-da850-evm.c
+> + * Original Copyrights follow:
+> + *
+> + * 2007, 2009 (c) MontaVista Software, Inc. This file is licensed under
+> + * the terms of the GNU General Public License version 2. This program
+> + * is licensed "as is" without any warranty of any kind, whether express
+> + * or implied.
+> + */
+> +#include <linux/console.h>
+> +#include <linux/gpio.h>
+> +#include <linux/gpio_keys.h>
+> +#include <linux/i2c.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/mtd/nand.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/of.h>
+> +#include <linux/of_net.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/phy.h>
+> +#include <linux/phy_fixed.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/spi/flash.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <mach/aemif.h>
+> +#include <mach/cp_intc.h>
+> +#include <mach/da8xx.h>
 > +#include <mach/mux.h>
->  
->  /* ----- global defines ----------------------------------------------- */
->  
-> @@ -635,6 +638,16 @@ static struct i2c_algorithm i2c_davinci_algo = {
->  	.functionality	= i2c_davinci_func,
->  };
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id davinci_i2c_of_match[] = {
-> +	{.compatible = "ti,davinci-i2c", },
-> +	{},
+> +#include <mach/nand.h>
+> +#include <mach/spi.h>
+> +
+> +#define ENBW_CMC_MMCSD_CD_PIN          GPIO_TO_PIN(3, 13)
+> +
+> +/*
+> + * USB1 VBUS is controlled by GPIO7[12], over-current is reported on GPIO7[8].
+> + */
+> +#define DA850_USB_VBUS_PIN	GPIO_TO_PIN(7, 12)
+> +#define ON_BD_USB_OVC		GPIO_TO_PIN(7, 8)
+> +
+> +#if defined(CONFIG_USB_OHCI_HCD)
+> +static irqreturn_t enbw_cmc_usb_ocic_irq(int irq, void *dev_id);
+> +static da8xx_ocic_handler_t enbw_cmc_usb_ocic_handler;
+> +
+> +static int enbw_cmc_usb_set_power(unsigned port, int on)
+> +{
+> +	gpio_set_value(DA850_USB_VBUS_PIN, on);
+> +	return 0;
 > +}
-> +MODULE_DEVICE_TABLE(of, davinci_i2c_of_match);
-> +#else
-> +#define davinci_i2c_of_match NULL
+> +
+> +static int enbw_cmc_usb_get_power(unsigned port)
+> +{
+> +	return gpio_get_value(DA850_USB_VBUS_PIN);
+> +}
+> +
+> +static int enbw_cmc_usb_get_oci(unsigned port)
+> +{
+> +	return !gpio_get_value(ON_BD_USB_OVC);
+> +}
+> +
+> +static irqreturn_t enbw_cmc_usb_ocic_irq(int, void *);
+> +
+> +static int enbw_cmc_usb_ocic_notify(da8xx_ocic_handler_t handler)
+> +{
+> +	int irq         = gpio_to_irq(ON_BD_USB_OVC);
+> +	int error       = 0;
+> +
+> +	if (handler != NULL) {
+> +		enbw_cmc_usb_ocic_handler = handler;
+> +
+> +		error = request_irq(irq, enbw_cmc_usb_ocic_irq,
+> +					IRQF_DISABLED | IRQF_TRIGGER_RISING |
+> +					IRQF_TRIGGER_FALLING,
+> +					"OHCI over-current indicator", NULL);
+> +		if (error)
+> +			pr_err("%s: could not request IRQ to watch "
+> +				"over-current indicator changes\n", __func__);
+> +	} else {
+> +		free_irq(irq, NULL);
+> +	}
+> +	return error;
+> +}
+> +
+> +static struct da8xx_ohci_root_hub enbw_cmc_usb11_pdata = {
+> +	.set_power      = enbw_cmc_usb_set_power,
+> +	.get_power      = enbw_cmc_usb_get_power,
+> +	.get_oci        = enbw_cmc_usb_get_oci,
+> +	.ocic_notify    = enbw_cmc_usb_ocic_notify,
+> +	.potpgt         = (10 + 1) / 2,  /* 10 ms max */
+> +};
+> +
+> +static irqreturn_t enbw_cmc_usb_ocic_irq(int irq, void *dev_id)
+> +{
+> +	enbw_cmc_usb_ocic_handler(&enbw_cmc_usb11_pdata, 1);
+> +	return IRQ_HANDLED;
+> +}
 > +#endif
-
-The #else clause can be dropped if you use the of_match_ptr() macro
-when referencing it.
-
 > +
->  static int davinci_i2c_probe(struct platform_device *pdev)
->  {
->  	struct davinci_i2c_dev *dev;
-> @@ -676,7 +689,34 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->  	dev->irq = irq->start;
->  	platform_set_drvdata(pdev, dev);
->  
-> +	if ((dev->dev->platform_data == NULL) &&
-> +		(pdev->dev.of_node)) {
-> +		struct device_node *pinmux_np;
-> +		struct davinci_i2c_platform_data *pdata;
-> +		u32 prop;
-> +
-> +		dev->dev->platform_data = &davinci_i2c_platform_data_default;
+> +#if defined(CONFIG_OF)
+> +static __init void enbw_cmc_usb_init(void)
 
-Don't do this.  What if a davinci part shows up with two i2c busses?
-Use devm_kzalloc() instead.
-
-> +		pdata = &davinci_i2c_platform_data_default;
-> +		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
-> +			&prop))
-> +			pdata->bus_freq = prop / 1000;
-> +		if (!of_property_read_u32(pdev->dev.of_node, "bus-delay",
-> +			&prop))
-> +			pdata->bus_delay = prop;
-> +		if (!of_property_read_u32(pdev->dev.of_node, "id",
-> +			&prop)) {
-> +			pdev->id = prop;
-> +			pdev->dev.init_name = kzalloc(20, GFP_KERNEL);
-> +			sprintf((char *)pdev->dev.init_name,
-> +				"i2c_davinci.%d", pdev->id);
-
-Blech!  Drop this.  Leave the core code to set the device name.
-
-
->  	dev->clk = clk_get(&pdev->dev, NULL);
-> +
->  	if (IS_ERR(dev->clk)) {
-
-Nit: unrelated whitespace change
-
->  		r = -ENODEV;
->  		goto err_free_mem;
-> @@ -711,6 +751,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->  	adap->algo = &i2c_davinci_algo;
->  	adap->dev.parent = &pdev->dev;
->  	adap->timeout = DAVINCI_I2C_TIMEOUT;
-> +	adap->dev.of_node = pdev->dev.of_node;
->  
->  	adap->nr = pdev->id;
->  	r = i2c_add_numbered_adapter(adap);
-> @@ -718,6 +759,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->  		dev_err(&pdev->dev, "failure adding adapter\n");
->  		goto err_free_irq;
->  	}
-> +	of_i2c_register_devices(adap);
->  
->  	return 0;
->  
-> @@ -809,6 +851,7 @@ static struct platform_driver davinci_i2c_driver = {
->  		.name	= "i2c_davinci",
->  		.owner	= THIS_MODULE,
->  		.pm	= davinci_i2c_pm_ops,
-> +		.of_match_table = davinci_i2c_of_match,
->  	},
->  };
->  
-> -- 
-> 1.7.7.5
-> 
+All the focus is on DT now.  How about making CONFIG_OF required for
+this board?  Also, this is just another board file.  The focus should
+be on creating a generic board support file for DT platforms.
