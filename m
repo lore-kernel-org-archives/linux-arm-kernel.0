@@ -1,52 +1,111 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 30 Jan 2012 12:41:31 +0100
-Subject: [PATCH] mtd/gpmi : add BBT support
-In-Reply-To: <4F267F21.1030204@freescale.com>
-References: <1327898174-13656-1-git-send-email-b32955@freescale.com>
- <20120130094610.GA15596@pengutronix.de>
- <4F2671C3.6000809@freescale.com>
- <20120130104428.GB15596@pengutronix.de>
- <4F267F21.1030204@freescale.com>
-Message-ID: <20120130114131.GC15596@pengutronix.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 30 Jan 2012 13:45:53 +0200
+Subject: [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
+ suspend is not implemented
+In-Reply-To: <20120124090630.GR16726@n2100.arm.linux.org.uk>
+References: <1327306361-9803-1-git-send-email-shubhrajyoti@ti.com>
+ <1327306361-9803-3-git-send-email-shubhrajyoti@ti.com>
+ <CAN8TOE8i-g_QTsidqDW=TRfZMQ8u93+iP8V7rr4paek=7xZ7UA@mail.gmail.com>
+ <20120124090630.GR16726@n2100.arm.linux.org.uk>
+Message-ID: <1327923953.2487.13.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CCing Marek, he can say more about the U-Boot side probably...
+On Tue, 2012-01-24 at 09:06 +0000, Russell King - ARM Linux wrote:
+> > However, the bug made it into the 3.3 merge window, so shouldn't this
+> > bugfix be sent upstream immediately?
+> 
+> David is the MTD maintainer, and Artem just helps out.  I believe Artem
+> is waiting for David to finish travelling before asking David (last seen
+> at Hong Kong airport) to pull these fixes.  David in turn will pass them
+> onto Linus.  Plus, Linus only started adding to -rc1 yesterday, so its a
+> little early to expect this to be fixed.
 
-> > Bootloaders may also need to write to NAND. So, they need to share the
-> Do you mean the uboot may write something to the NAND?
-> Could you show me some more detail cases?
+Hi,
 
-U-Boot has NAND support in mainline, for barebox it is work-in-progress.
-Both can and do write to NAND (kernel, rootfs), because both have
-established procedures to do so (and maybe don't want to rely on
-third-party tools like kobs-ng).
+here is the latest version of the fix.
 
-> > share the same information then. To be on the safe side regardings
-> The kobs-ng which burns the bootloader to the NAND will also burn the
-> whole BBT
-> to the NAND too.
+http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commit/283d43b9ce2952535aa89c0195085e2a1b7e5fce
 
-Did it always do that? Or is a newer version needed?
+Also attached.
 
-> But if the bootloader can make some block bad, the BBT information
-> becomes different.
-> Does the bootloader have the feature to make some block bad?
+>From 283d43b9ce2952535aa89c0195085e2a1b7e5fce Mon Sep 17 00:00:00 2001
+From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+Date: Mon, 16 Jan 2012 11:07:16 +0200
+Subject: [PATCH] mtd: fix MTD suspend
 
-Sure. If you are able to write NAND, you should be able to mark blocks
-bad, too :)
+Commits 3fe4bae88460869a8e553397cd9057a4ee7ca341 and
+079c985e7a6f4ce60f931cebfdd5ee3c3 broke MTD suspend in 2 ways:
 
-Thanks,
+1. When the '->suspend' method is not present, we return -EOPNOTSUPP,
+but
+   the callers of 'mtd_suspend()' expects 0 instead.
+2. Checking of the 'mtd' parameter against NULL has been incorrectly
+removed
+   in 'mtd_cls_suspend()'.
 
-   Wolfram
+This patch fixes the breakages. This has been found, analyzed, reported
+and tested by Rafael J. Wysocki <rjw@sisk.pl>.
+
+Note, this patch is not needed in the stable tree because it causes a
+regression introduced during the v3.3 merge window.
+
+Reported-by: Rafael J. Wysocki <rjw@sisk.pl>
+Tested-by: Rafael J. Wysocki <rjw@sisk.pl>
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+---
+ drivers/mtd/mtdcore.c   |    2 +-
+ include/linux/mtd/mtd.h |    4 +---
+ 2 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
+index b265188..de96865 100644
+--- a/drivers/mtd/mtdcore.c
++++ b/drivers/mtd/mtdcore.c
+@@ -119,7 +119,7 @@ static int mtd_cls_suspend(struct device *dev,
+pm_message_t state)
+ {
+ 	struct mtd_info *mtd = dev_get_drvdata(dev);
+ 
+-	return mtd_suspend(mtd);
++	return mtd ? mtd_suspend(mtd) : 0;
+ }
+ 
+ static int mtd_cls_resume(struct device *dev)
+diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
+index 1a81fde..d8c7aad 100644
+--- a/include/linux/mtd/mtd.h
++++ b/include/linux/mtd/mtd.h
+@@ -427,9 +427,7 @@ static inline int mtd_is_locked(struct mtd_info
+*mtd, loff_t ofs, uint64_t len)
+ 
+ static inline int mtd_suspend(struct mtd_info *mtd)
+ {
+-	if (!mtd->suspend)
+-		return -EOPNOTSUPP;
+-	return mtd->suspend(mtd);
++	return mtd->suspend ? mtd->suspend(mtd) : 0;
+ }
+ 
+ static inline void mtd_resume(struct mtd_info *mtd)
+-- 
+1.7.7.6
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mtd-fix-MTD-suspend.patch
+Type: text/x-patch
+Size: 2094 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/70d913c5/attachment.bin>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/99632de8/attachment.sig>
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120130/70d913c5/attachment.sig>
