@@ -1,38 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2012 23:09:28 +0000
-Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <20120128180602.GC2501@ponder.secretlab.ca>
-References: <4F22DEF2.5000807@ti.com>
- <20120128180602.GC2501@ponder.secretlab.ca>
-Message-ID: <20120131230928.GA8394@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 31 Jan 2012 15:58:16 -0800
+Subject: [PATCH v2 00/19] ARM: OMAP3+: SmartReflex: bugfixes
+In-Reply-To: <87fwevleiv.fsf@ti.com>
+References: <1328003912-11709-1-git-send-email-j-pihet@ti.com>
+ <20120131170830.GJ9339@atomide.com>
+ <CAN5iSWo9+P=tC5Uq_bZ+Js_QPpGTn=Q6f5ecgiehRvT2E5+Diw@mail.gmail.com>
+ <20120131172008.GK9339@atomide.com>
+ <CAORVsuWELB2rt3Vs-5oHFyXCRDUPXSpqOJo26cH+_i3Y0hdraQ@mail.gmail.com>
+ <20120131173344.GL9339@atomide.com> <87fwevleiv.fsf@ti.com>
+Message-ID: <20120131235816.GM9339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 28, 2012 at 11:06:02AM -0700, Grant Likely wrote:
-> This makes the assumption that dma specifiers will only ever be 1
-> cell.  I think to be generally useful, the full dma specifier needs to
-> be either handed to the dma controller to get a cookie or passed back
-> to the caller in its entirety.
+* Kevin Hilman <khilman@ti.com> [120131 13:28]:
+> Tony Lindgren <tony@atomide.com> writes:
+> 
+> > * Jean Pihet <jean.pihet@newoldbits.com> [120131 08:53]:
+> >> On Tue, Jan 31, 2012 at 6:20 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > * Pihet-XID, Jean <j-pihet@ti.com> [120131 08:44]:
+> >> >> Hi Tony,
+> >> >>
+> >> >> On Tue, Jan 31, 2012 at 6:08 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> >> > * Jean Pihet <jean.pihet@newoldbits.com> [120131 01:28]:
+> >> >> >> Integrate the latest SmartReflex bufixes from Felipe Balbi [1] and
+> >> >> >> Nishant Menon [2], plus misc bugfixes.
+> >> >> >
+> >> >> > We should move this to live under drivers somewhere. So
+> >> >> Yes that is the plan, eventually.
+> >> >>
+> >> >> > I'd like to see just minimal cleanup in the current location,
+> >> >> > then move it to drivers before further patching.
+> >> >> >
+> >> >> > Is this the minimal cleanup needed before doing that, or
+> >> >> > what's your plan regarding moving it to drivers?
+> >> >> I would like to clean-up a few things and integrate well known
+> >> >> bugfixes before the actual move to drivers/. Doing the opposite
+> >> >> generates a rather big patch set (45+ patches to start with).
+> >> >>
+> >> >> What do you think?
+> >> >
+> >> > OK fine with me. So would the next patch after this series move
+> >> > it to drivers then?
+> >> The move to drivers requires some preparation in order to isolate the
+> >> SR code from the other OMAP PM code. A patch set containing ~20
+> >> patches is needed for that, the very last one being the actual move
+> >> between directories.
+> >> 
+> >> Is that Ok to you?
+> >
+> > OK, let's plan on putting all the smartreflex stuff into a separate
+> > branch then. If some changes are needed to the PM code, those should
+> > probably be applied first into Kevin's PM branch.
+> 
+> Tony, I'll queue up this series (after I get to reviewing them) as well
+> as the changes needed to the PM core code.  After that we'll be ready to
+> move.
 
-More to the point, who says that the DMA specifier is even an integer?
-When people are using DMA engines, it (probably) isn't an integer at
-all.  Several platforms I know of use strings for this.
+OK thanks.
 
-Some platforms can even select between two or more DMA engines for
-handling the same peripheral - I believe Samsung do this depending
-on their individual workloads.
-
-However, the opaque DMA engine API for requesting a channel doesn't
-lend itself well to DT, as the match data and match function are
-entirely left to the individual DMA engine driver and/or platform
-itself.
-
-As far as creating another linear number space for DMA stuff, I'd
-really suggest against that - you're going to need some additional
-code in place to manage that numberspace.  If you at least use a two-
-paid cookie, eg 'dma controller phandle + request signal' then that
-makes all the stuff we're starting to see with the IRQ subsystem,
-IRQ domains etc become completely unnecessary.
-
-I guess what I'm saying is ignore the flat number space, and go
-straight to some kind of 'dma domains' solution from the start.
+Tony
