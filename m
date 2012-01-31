@@ -1,27 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2012 17:59:05 +0000
-Subject: reboot/suspend regression: hx4700 freezes under linux-3.3-rc1
-In-Reply-To: <1328030890.46053.YahooMailClassic@web29001.mail.ird.yahoo.com>
-References: <1328030890.46053.YahooMailClassic@web29001.mail.ird.yahoo.com>
-Message-ID: <20120131175905.GA8338@n2100.arm.linux.org.uk>
+Date: Tue, 31 Jan 2012 18:03:47 +0000
+Subject: [PATCH] ARM: smp: allow get the core count from L2 control on A15
+In-Reply-To: <04be01cce011$6b3b3550$41b19ff0$%kim@samsung.com>
+References: <04be01cce011$6b3b3550$41b19ff0$%kim@samsung.com>
+Message-ID: <20120131180347.GB8338@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 05:28:10PM +0000, Paul Parsons wrote:
-> Both reboot (via reboot(RB_AUTOBOOT)) and suspend (via apm --suspend)
-> freeze my hx4700 under linux-3.3-rc1. They both worked under linux-3.2.
-> 
-> I presume that at least the reboot freeze is related to the restart
-> changes back in November. Can anyone suggest anything obvious I
-> should check? If not I'll attempt to get console output on to the
-> screen, which may or may not help.
+On Tue, Jan 31, 2012 at 09:11:10PM +0900, Kukjin Kim wrote:
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 57db122..be4d31d 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -233,6 +233,22 @@ void __ref cpu_die(void)
+>  }
+>  #endif /* CONFIG_HOTPLUG_CPU */
+>  
+> +/*
+> + * Get the number of CPU cores from the L2 control register on A15
+> + */
+> +unsigned long a15_get_core_count(void)
+> +{
+> +	unsigned long val;
+> +
+> +	/* Read L2 control register */
+> +	asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r"(val));
+> +
+> +	/* [25:24] of L2 control register means core count - 1 */
+> +	val = ((val >> 24) & 0x3) + 1;
+> +
+> +	return val;
+> +}
+> +
 
-I'd also suggest trying to bisect them to find out exactly which
-commit caused the problem.
+This is *definitely* the wrong place for this.  Do we have the reading
+of the number of cores from the SCU in smp.c ?  No.  Do we want to litter
+smp.c with each architecture revisions own way of reading this information?
+No.
 
-You should be able to just do a bisect between v3.2-rc1 and
-f88b8979d26615ce68772cebc85c3b556571afca
-ARM: restart: remove the now empty arch_reset()
-
-However, you might need 28f9a9294a37ddbc1d821782afc8754eed4bce4e
-applied to be able to build.
+Keep this kind of crap out of the main smp.c file please.  It contains
+zero CPU and platform specifics and should stay that way.
