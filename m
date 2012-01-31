@@ -1,131 +1,357 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 31 Jan 2012 13:46:58 -0600
-Subject: [PULL] ARM mach/irqs.h cleanup for 3.4
-Message-ID: <4F284532.90303@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 31 Jan 2012 13:08:17 -0700
+Subject: [PATCH v3 6/6] mmc: sdhci-s3c: Add device tree support
+In-Reply-To: <1328032576-9269-7-git-send-email-thomas.abraham@linaro.org>
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <1328032576-9269-7-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20120131200817.GB22611@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Tue, Jan 31, 2012 at 11:26:16PM +0530, Thomas Abraham wrote:
+> Add device tree based discovery support for Samsung's sdhci controller
+> 
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  .../devicetree/bindings/mmc/samsung-sdhci.txt      |   70 +++++++++
+>  drivers/mmc/host/sdhci-s3c.c                       |  148 +++++++++++++++++++-
+>  2 files changed, 212 insertions(+), 6 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
 
-Can you please pull mach/irqs.h clean-up for 3.4. I've gotten little to
-no response from the affected platform maintainers. It's primarily
-superh and shmobile that have any significant changes though.
+Looks okay to me on brief review.
 
-Rob
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-
-  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-
-are available in the git repository at:
-  git://sources.calxeda.com/kernel/linux.git sparse_irq
-
-Jamie Iles (1):
-      ARM: picoxcell: remove mach/irqs.h
-
-Rob Herring (13):
-      irq: make SPARSE_IRQ an optionally hidden option
-      sound: pxa2xx-ac97: include mach/irqs.h directly
-      gpio: pxa: explicitly include mach/irqs.h
-      ARM: remove mc146818rtc.h from time.c
-      ARM: mc146818rtc: remove unnecessary include of mach/irqs.h
-      ARM: it8152: explicitly include mach/irqs.h
-      sh: intc: unify evt2irq/irq2evt macros for sh and arm
-      sh: intc: remove dependency on NR_IRQS
-      ARM: mmp: remove NR_IRQS
-      ARM: pxa: remove NR_IRQS
-      ARM: shmobile: remove NR_IRQS
-      ARM: only include mach/irqs.h for !SPARSE_IRQ
-      ARM: highbank: select SPARSE_IRQ and remove irqs.h
-
- arch/arm/Kconfig                            |    2 +-
- arch/arm/include/asm/hardware/it8152.h      |    3 +++
- arch/arm/include/asm/irq.h                  |    8 ++++++--
- arch/arm/include/asm/mc146818rtc.h          |    4 +++-
- arch/arm/kernel/time.c                      |    2 --
- arch/arm/mach-highbank/highbank.c           |    1 -
- arch/arm/mach-highbank/include/mach/irqs.h  |    6 ------
- arch/arm/mach-mmp/aspenite.c                |    5 +++--
- arch/arm/mach-mmp/avengers_lite.c           |    1 +
- arch/arm/mach-mmp/brownstone.c              |    4 ++--
- arch/arm/mach-mmp/flint.c                   |    3 ++-
- arch/arm/mach-mmp/gplugd.c                  |    2 +-
- arch/arm/mach-mmp/include/mach/irqs.h       |    3 +--
- arch/arm/mach-mmp/irq-mmp2.c                |    1 +
- arch/arm/mach-mmp/jasper.c                  |    5 +++--
- arch/arm/mach-mmp/tavorevb.c                |    1 +
- arch/arm/mach-mmp/teton_bga.c               |    3 ++-
- arch/arm/mach-mmp/ttc_dkb.c                 |    4 ++--
- arch/arm/mach-picoxcell/include/mach/irqs.h |   20 --------------------
- arch/arm/mach-pxa/capc7117.c                |    1 +
- arch/arm/mach-pxa/cm-x300.c                 |    1 +
- arch/arm/mach-pxa/colibri-pxa270.c          |    2 ++
- arch/arm/mach-pxa/colibri-pxa300.c          |    1 +
- arch/arm/mach-pxa/colibri-pxa320.c          |    1 +
- arch/arm/mach-pxa/corgi.c                   |    3 +++
- arch/arm/mach-pxa/csb726.c                  |    1 +
- arch/arm/mach-pxa/devices.c                 |    1 +
- arch/arm/mach-pxa/em-x270.c                 |    2 ++
- arch/arm/mach-pxa/gumstix.c                 |    1 +
- arch/arm/mach-pxa/h5000.c                   |    1 +
- arch/arm/mach-pxa/himalaya.c                |    1 +
- arch/arm/mach-pxa/icontrol.c                |    1 +
- arch/arm/mach-pxa/idp.c                     |    1 +
- arch/arm/mach-pxa/include/mach/irqs.h       |    2 +-
- arch/arm/mach-pxa/mioa701.c                 |    1 +
- arch/arm/mach-pxa/mp900.c                   |    1 +
- arch/arm/mach-pxa/palmld.c                  |    1 +
- arch/arm/mach-pxa/palmt5.c                  |    1 +
- arch/arm/mach-pxa/palmtc.c                  |    1 +
- arch/arm/mach-pxa/palmte2.c                 |    1 +
- arch/arm/mach-pxa/palmtreo.c                |    2 ++
- arch/arm/mach-pxa/palmtx.c                  |    1 +
- arch/arm/mach-pxa/palmz72.c                 |    1 +
- arch/arm/mach-pxa/pxa3xx.c                  |    1 +
- arch/arm/mach-pxa/raumfeld.c                |    3 +++
- arch/arm/mach-pxa/saar.c                    |    1 +
- arch/arm/mach-pxa/spitz.c                   |    3 +++
- arch/arm/mach-pxa/stargate2.c               |    1 +
- arch/arm/mach-pxa/tavorevb.c                |    1 +
- arch/arm/mach-pxa/time.c                    |    1 +
- arch/arm/mach-pxa/trizeps4.c                |    2 ++
- arch/arm/mach-pxa/viper.c                   |    1 +
- arch/arm/mach-pxa/vpac270.c                 |    1 +
- arch/arm/mach-pxa/xcep.c                    |    1 +
- arch/arm/mach-pxa/z2.c                      |    1 +
- arch/arm/mach-shmobile/Kconfig              |    4 ++++
- arch/arm/mach-shmobile/board-ag5evm.c       |    1 +
- arch/arm/mach-shmobile/board-bonito.c       |    1 +
- arch/arm/mach-shmobile/board-g3evm.c        |    1 +
- arch/arm/mach-shmobile/board-g4evm.c        |    1 +
- arch/arm/mach-shmobile/board-kota2.c        |    1 +
- arch/arm/mach-shmobile/board-mackerel.c     |    1 +
- arch/arm/mach-shmobile/board-marzen.c       |    1 +
- arch/arm/mach-shmobile/include/mach/irqs.h  |    6 +-----
- arch/arm/mach-shmobile/intc-r8a7740.c       |    1 +
- arch/arm/mach-shmobile/intc-sh7367.c        |    1 +
- arch/arm/mach-shmobile/intc-sh7372.c        |    1 +
- arch/arm/mach-shmobile/intc-sh7377.c        |    1 +
- arch/arm/mach-shmobile/intc-sh73a0.c        |    1 +
- arch/arm/mach-shmobile/setup-r8a7740.c      |    1 +
- arch/arm/mach-shmobile/setup-r8a7779.c      |    1 +
- arch/arm/mach-shmobile/setup-sh7367.c       |    1 +
- arch/arm/mach-shmobile/setup-sh7372.c       |    1 +
- arch/arm/mach-shmobile/setup-sh7377.c       |    1 +
- arch/arm/mach-shmobile/setup-sh73a0.c       |    1 +
- arch/c6x/Kconfig                            |    2 +-
- arch/powerpc/Kconfig                        |    2 +-
- arch/sh/Kconfig                             |    2 +-
- arch/sh/include/asm/irq.h                   |   11 -----------
- arch/x86/Kconfig                            |    1 -
- drivers/gpio/gpio-pxa.c                     |    2 ++
- drivers/sh/intc/balancing.c                 |    2 +-
- drivers/sh/intc/core.c                      |    2 +-
- drivers/sh/intc/handle.c                    |    2 +-
- drivers/sh/intc/virq.c                      |    2 +-
- include/linux/sh_intc.h                     |   17 +++++++++++++++++
- kernel/irq/Kconfig                          |    5 ++---
- sound/arm/pxa2xx-ac97-lib.c                 |    2 +-
- 88 files changed, 130 insertions(+), 75 deletions(-)
- delete mode 100644 arch/arm/mach-highbank/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-picoxcell/include/mach/irqs.h
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/samsung-sdhci.txt b/Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
+> new file mode 100644
+> index 0000000..8cbdd29
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
+> @@ -0,0 +1,70 @@
+> +* Samsung's SDHCI Controller device tree bindings
+> +
+> +Samsung's SDHCI controller is used as a connectivity interface with external
+> +MMC, SD and eMMC storage mediums.
+> +
+> +Required SoC Specific Properties:
+> +- compatible: should be one of the following
+> +  - "samsung,s3c6410-sdhci": For controllers compatible with s3c6410 sdhci
+> +    controller.
+> +  - "samsung,exynos4210-sdhci": For controller compatible with Exynos4 sdhci
+> +    controller.
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- interrupts: The interrupt number to the cpu. The interrupt specifier format
+> +  depends on the interrupt controller.
+> +
+> +
+> +Required Board Specific Properties:
+> +- gpios: Should specify the gpios used for clock, command and data lines. The
+> +  gpio specifier format depends on the gpio controller. Note: There is no
+> +  particular order in which the gpio's have to be listed.
+> +
+> +
+> +Optional Board Specific Properties:
+> +- samsung,sdhci-bus-width: Number of data lines connected to the controller.
+> +  Note: This excludes the clock,command and card detect lines. If this property
+> +  is not specified, default value is 1.
+> +
+> +- samsung,cd-gpio-invert: If 'samsung,sdhci-cd-gpio' card detect method is
+> +  selected, this property can be optionally specified to invert the value of
+> +  external card detect gpio line.
+> +
+> +- One of the following properties for card detect type.
+> +  - samsung,sdhci-cd-internal: Card detect line from the card slot  is
+> +    connected to the card detect pad of the sdhci controller. A gpio is
+> +    used for this connection (with possible pin function settings).
+> +  - samsung,sdhci-cd-gpio: A gpio line (with possible pin function settings)
+> +    is used a card detect line. This gpio line is not connected to card detect
+> +    pad of the sdhci controller.
+> +  - samsung,sdhci-cd-none: There is no card detect line. Polling is used to
+> +    detect the presence of the card. (DEFAULT, if no card detect property
+> +    is specified).
+> +  - samsung,sdhci-cd-permanent: There is no card detect line. The card is
+> +    permanently connected to the sdhci controller.
+> +
+> +- gpio-cd: The gpio to be used as card detect line for
+> +  'samsung,sdhci-cd-internal' or 'samsung,sdhci-cd-gpio' card detection method.
+> +  The gpio specifier format depends on the gpio controller.
+> +
+> +Example:
+> +	sdhci at 12530000 {
+> +		compatible = "samsung,exynos4210-sdhci";
+> +		reg = <0x12530000 0x100>;
+> +		interrupts = <139>;
+> +		samsung,sdhci-bus-width = <4>;
+> +		samsung,sdhci-cd-internal;
+> +		gpio-cd = <&gpk2 2 2 3 3>;
+> +		gpios = <&gpk2 0 2 0 3>,  /* clock line */
+> +			<&gpk2 1 2 0 3>,  /* command line */
+> +			<&gpk2 3 2 3 3>,  /* data line 0 */
+> +			<&gpk2 4 2 3 3>,  /* data line 1 */
+> +			<&gpk2 5 2 3 3>,  /* data line 2 */
+> +			<&gpk2 6 2 3 3>;  /* data line 3 */
+> +	};
+> +
+> +	Note: This example shows both SoC specific and board specific properties
+> +	in a single device node. The properties can be actually be seperated
+> +	into SoC specific node and board specific node.
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 1760ba8..6159542 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -20,6 +20,8 @@
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+>  
+>  #include <linux/mmc/host.h>
+>  
+> @@ -29,6 +31,8 @@
+>  #include "sdhci.h"
+>  
+>  #define MAX_BUS_CLK	(4)
+> +/* Number of gpio's used is max data bus width + command and clock lines */
+> +#define NUM_GPIOS(x)	(x + 2)
+>  
+>  /**
+>   * struct sdhci_s3c - S3C SDHCI instance
+> @@ -37,6 +41,7 @@
+>   * @ioarea: The resource created when we claimed the IO area.
+>   * @pdata: The platform data for this controller.
+>   * @cur_clk: The index of the current bus clock.
+> + * @gpios: List of gpio numbers parsed from device tree.
+>   * @clk_io: The clock for the internal bus interface.
+>   * @clk_bus: The clocks that are available for the SD/MMC bus clock.
+>   */
+> @@ -48,6 +53,7 @@ struct sdhci_s3c {
+>  	unsigned int		cur_clk;
+>  	int			ext_cd_irq;
+>  	int			ext_cd_gpio;
+> +	int			*gpios;
+>  
+>  	struct clk		*clk_io;
+>  	struct clk		*clk_bus[MAX_BUS_CLK];
+> @@ -415,9 +421,110 @@ static void sdhci_s3c_setup_card_detect_gpio(struct sdhci_s3c *sc)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static int __devinit sdhci_s3c_parse_dt(struct device *dev,
+> +		struct sdhci_host *host, struct s3c_sdhci_platdata *pdata)
+> +{
+> +	struct device_node *node = dev->of_node;
+> +	struct sdhci_s3c *ourhost = to_s3c(host);
+> +	u32 max_width;
+> +	int gpio, cnt, ret;
+> +
+> +	/* if the bus-width property is not specified, assume width as 1 */
+> +	if (of_property_read_u32(node, "samsung,sdhci-bus-width",
+> +				&max_width))
+> +		max_width = 1;
+> +	pdata->max_width = max_width;
+> +
+> +	ourhost->gpios = devm_kzalloc(dev, NUM_GPIOS(pdata->max_width) *
+> +				sizeof(int), GFP_KERNEL);
+> +	if (!ourhost->gpios)
+> +		return -ENOMEM;
+> +
+> +	/* get the card detection method */
+> +	if (of_get_property(node, "samsung,sdhci-cd-internal", NULL))
+> +		pdata->cd_type = S3C_SDHCI_CD_INTERNAL;
+> +	else if (of_get_property(node, "samsung,sdhci-cd-gpio", NULL))
+> +		pdata->cd_type = S3C_SDHCI_CD_GPIO;
+> +	else if (of_get_property(node, "samsung,sdhci-cd-none", NULL))
+> +		pdata->cd_type = S3C_SDHCI_CD_NONE;
+> +	else if (of_get_property(node, "samsung,sdhci-cd-permanent", NULL))
+> +		pdata->cd_type = S3C_SDHCI_CD_PERMANENT;
+> +	else
+> +		pdata->cd_type = S3C_SDHCI_CD_NONE;
+> +
+> +	/* get the gpio used for card detection */
+> +	if (pdata->cd_type == S3C_SDHCI_CD_GPIO ||
+> +			pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+> +		gpio = of_get_named_gpio(node, "gpio-cd", 0);
+> +		if (!gpio_is_valid(gpio)) {
+> +			dev_err(dev, "invalid card detect gpio specified\n");
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +	if (pdata->cd_type == S3C_SDHCI_CD_GPIO) {
+> +		pdata->ext_cd_gpio = gpio;
+> +		ourhost->ext_cd_gpio = -1; /* invalid gpio number */
+> +		if (of_get_property(node, "samsung,cd-gpio-invert", NULL))
+> +			pdata->ext_cd_gpio_invert = 1;
+> +	} else if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+> +		ret = gpio_request(gpio, "sdhci-cd");
+> +		if (ret) {
+> +			dev_err(dev, "card detect gpio request failed\n");
+> +			return -EINVAL;
+> +		}
+> +		ourhost->ext_cd_gpio = gpio;
+> +	}
+> +
+> +	/* get the gpios for command, clock and data lines */
+> +	for (cnt = 0; cnt < NUM_GPIOS(pdata->max_width); cnt++) {
+> +		gpio = of_get_gpio(node, cnt);
+> +		if (!gpio_is_valid(gpio)) {
+> +			dev_err(dev, "invalid gpio[%d]\n", cnt);
+> +			goto err_free_dt_cd_gpio;
+> +		}
+> +		ourhost->gpios[cnt] = gpio;
+> +	}
+> +
+> +	for (cnt = 0; cnt < NUM_GPIOS(pdata->max_width); cnt++) {
+> +		ret = gpio_request(ourhost->gpios[cnt], "sdhci-gpio");
+> +		if (ret) {
+> +			dev_err(dev, "gpio[%d] request failed\n", cnt);
+> +			goto err_free_dt_gpios;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +
+> + err_free_dt_gpios:
+> +	while (--cnt >= 0)
+> +		gpio_free(ourhost->gpios[cnt]);
+> + err_free_dt_cd_gpio:
+> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL)
+> +		gpio_free(ourhost->ext_cd_gpio);
+> +	return -EINVAL;
+> +}
+> +#else
+> +static int __devinit sdhci_s3c_parse_dt(struct device *dev,
+> +		struct sdhci_host *host, struct s3c_sdhci_platdata *pdata)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif
+> +
+> +static const struct of_device_id sdhci_s3c_dt_match[];
+> +
+>  static inline struct sdhci_s3c_drv_data *sdhci_s3c_get_driver_data(
+>  			struct platform_device *pdev)
+>  {
+> +#ifdef CONFIG_OF
+> +	if (pdev->dev.of_node) {
+> +		const struct of_device_id *match;
+> +		match = of_match_node(sdhci_s3c_dt_match, pdev->dev.of_node);
+> +		return (struct sdhci_s3c_drv_data *)match->data;
+> +	}
+> +#endif
+>  	return (struct sdhci_s3c_drv_data *)
+>  			platform_get_device_id(pdev)->driver_data;
+>  }
+> @@ -432,7 +539,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  	struct resource *res;
+>  	int ret, irq, ptr, clks;
+>  
+> -	if (!pdev->dev.platform_data) {
+> +	if (!pdev->dev.platform_data && !pdev->dev.of_node) {
+>  		dev_err(dev, "no device data specified\n");
+>  		return -ENOENT;
+>  	}
+> @@ -454,21 +561,28 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  		dev_err(dev, "sdhci_alloc_host() failed\n");
+>  		return PTR_ERR(host);
+>  	}
+> +	sc = sdhci_priv(host);
+>  
+>  	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+>  	if (!pdata) {
+>  		ret = -ENOMEM;
+> -		goto err_io_clk;
+> +		goto err_pdata;
+> +	}
+> +
+> +	if (pdev->dev.of_node) {
+> +		ret = sdhci_s3c_parse_dt(&pdev->dev, host, pdata);
+> +		if (ret)
+> +			goto err_pdata;
+> +	} else {
+> +		memcpy(pdata, pdev->dev.platform_data, sizeof(*pdata));
+> +		sc->ext_cd_gpio = -1; /* invalid gpio number */
+>  	}
+> -	memcpy(pdata, pdev->dev.platform_data, sizeof(*pdata));
+>  
+>  	drv_data = sdhci_s3c_get_driver_data(pdev);
+> -	sc = sdhci_priv(host);
+>  
+>  	sc->host = host;
+>  	sc->pdev = pdev;
+>  	sc->pdata = pdata;
+> -	sc->ext_cd_gpio = -1; /* invalid gpio number */
+>  
+>  	platform_set_drvdata(pdev, host);
+>  
+> @@ -637,6 +751,12 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  	clk_put(sc->clk_io);
+>  
+>   err_io_clk:
+> +	for (ptr = 0; ptr < NUM_GPIOS(sc->pdata->max_width); ptr++)
+> +		gpio_free(sc->gpios[ptr]);
+> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL)
+> +		gpio_free(sc->ext_cd_gpio);
+> +
+> + err_pdata:
+>  	sdhci_free_host(host);
+>  
+>  	return ret;
+> @@ -644,9 +764,9 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  
+>  static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  {
+> -	struct s3c_sdhci_platdata *pdata = pdev->dev.platform_data;
+>  	struct sdhci_host *host =  platform_get_drvdata(pdev);
+>  	struct sdhci_s3c *sc = sdhci_priv(host);
+> +	struct s3c_sdhci_platdata *pdata = sc->pdata;
+>  	int ptr;
+>  
+>  	if (pdata->cd_type == S3C_SDHCI_CD_EXTERNAL && pdata->ext_cd_cleanup)
+> @@ -673,6 +793,11 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  	release_resource(sc->ioarea);
+>  	kfree(sc->ioarea);
+>  
+> +	if (pdev->dev.of_node) {
+> +		for (ptr = 0; ptr < NUM_GPIOS(sc->pdata->max_width); ptr++)
+> +			gpio_free(sc->gpios[ptr]);
+> +	}
+> +
+>  	sdhci_free_host(host);
+>  	platform_set_drvdata(pdev, NULL);
+>  
+> @@ -727,6 +852,16 @@ static struct platform_device_id sdhci_s3c_driver_ids[] = {
+>  };
+>  MODULE_DEVICE_TABLE(platform, sdhci_s3c_driver_ids);
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id sdhci_s3c_dt_match[] = {
+> +	{ .compatible = "samsung,s3c6410-sdhci", },
+> +	{ .compatible = "samsung,exynos4210-sdhci",
+> +		.data = &exynos4_sdhci_drv_data },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+> +#endif
+> +
+>  static struct platform_driver sdhci_s3c_driver = {
+>  	.probe		= sdhci_s3c_probe,
+>  	.remove		= __devexit_p(sdhci_s3c_remove),
+> @@ -734,6 +869,7 @@ static struct platform_driver sdhci_s3c_driver = {
+>  	.driver		= {
+>  		.owner	= THIS_MODULE,
+>  		.name	= "s3c-sdhci",
+> +		.of_match_table = of_match_ptr(sdhci_s3c_dt_match),
+>  		.pm	= SDHCI_S3C_PMOPS,
+>  	},
+>  };
+> -- 
+> 1.6.6.rc2
+> 
