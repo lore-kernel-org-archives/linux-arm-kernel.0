@@ -1,26 +1,43 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Mon, 30 Jan 2012 21:02:06 -0600
-Subject: [PATCH v3 0/7] Add common cpuidle code for consolidation.
-In-Reply-To: <20120129153459.GF15455@n2100.arm.linux.org.uk>
-References: <1327379854-12403-1-git-send-email-rob.lee@linaro.org>
- <871uqoj23b.fsf@ti.com>
- <CAMXH7KGeVtvW7ciHrDuK_a6b396RUXnU4eWb26nNMSk1jsDkyw@mail.gmail.com>
- <87fwf3ehi3.fsf@ti.com>
- <20120129153459.GF15455@n2100.arm.linux.org.uk>
-Message-ID: <CAMXH7KF69QJ-WprR3i4dDxWKQSvDxwLx=Os-NqG+H1p12yM0uw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 31 Jan 2012 11:20:24 +0800
+Subject: [PATCH] ARM: devicetree: Add .dtb files to
+ arch/arm/boot/.gitignore
+In-Reply-To: <1327945574-7977-1-git-send-email-dave.martin@linaro.org>
+References: <1327945574-7977-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20120131032022.GC24681@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2012 at 2:08 PM, Kevin Hilman <khilman@ti.com> wrote:
-> I noticed that the generic code uses ktime_get() for measuring time.  On
-> OMAP, we use getnstimeofday() because I while back I remember having
-> problems with the interaction of CPUidle state measurements and system
-> suspend.  Any idle activity during system suspend/resume ktime_get()
-> will WARN() because the timekeeping system has been suspended.
->
+On Mon, Jan 30, 2012 at 05:46:14PM +0000, Dave Martin wrote:
+> Compiled device tree blobs shouldn't be committed in the kernel
+> tree, so ideally git should ignore them.
+> 
+> This patch will enable ignoring of any .dtb files which appear in
+> arch/arm/boot/
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-It seems that all the time keeping functions including
-getnstimeofday() now have the "WARN_ON(timekeeping_suspended)" or
-WARN_ON_ONCE. ?So I'd like to stick with ktime_get unless I'm missing
-something about the suspend warning or unless there is some other
-reason why getnstieofday() is preferred.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+I added my ack tag on the same patch below, but it died in the end?
+
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/144097
+
+Regards,
+Shawn
+
+> ---
+>  arch/arm/boot/.gitignore |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/.gitignore b/arch/arm/boot/.gitignore
+> index ce1c5ff..3c79f85 100644
+> --- a/arch/arm/boot/.gitignore
+> +++ b/arch/arm/boot/.gitignore
+> @@ -3,3 +3,4 @@ zImage
+>  xipImage
+>  bootpImage
+>  uImage
+> +*.dtb
+> -- 
+> 1.7.4.1
