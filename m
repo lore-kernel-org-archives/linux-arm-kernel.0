@@ -1,87 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 31 Jan 2012 23:21:28 +0900
-Subject: [PATCH] ARM: smp: allow get the core count from L2 control on A15
-In-Reply-To: <20120131141313.GA31004@mudshark.cambridge.arm.com>
-References: <04be01cce011$6b3b3550$41b19ff0$%kim@samsung.com>
- <20120131141313.GA31004@mudshark.cambridge.arm.com>
-Message-ID: <4F27F8E8.1030703@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 31 Jan 2012 15:21:55 +0100
+Subject: [PATCH] ARM: mxs: read correct values when setting up MAC
+In-Reply-To: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
+References: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20120131142155.GQ2471@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/12 23:13, Will Deacon wrote:
-> Hi Kukjin,
->
-> On Tue, Jan 31, 2012 at 12:11:10PM +0000, Kukjin Kim wrote:
->>
->> Actually, the number of A15 CPU core gets from L2 control
->> register not SCU configuration.
->>
->> Suggested-by: Changhwan Youn<chaos.youn@samsung.com>
->> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
->> Cc: Russell King<rmk+kernel@arm.linux.org.uk>
->> ---
->
-> NAK.
->
->> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
->> index 1e5717a..b67084f 100644
->> --- a/arch/arm/include/asm/smp.h
->> +++ b/arch/arm/include/asm/smp.h
->> @@ -71,6 +71,11 @@ extern void platform_secondary_init(unsigned int cpu);
->>   extern void platform_smp_prepare_cpus(unsigned int);
->>
->>   /*
->> + * Get the number of CPU cores from the L2 control register on A15
->> + */
->> +extern unsigned long a15_get_core_count(void);
->> +
->> +/*
->>    * Logical CPU mapping.
->>    */
->>   extern int __cpu_logical_map[NR_CPUS];
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->> index 57db122..be4d31d 100644
->> --- a/arch/arm/kernel/smp.c
->> +++ b/arch/arm/kernel/smp.c
->> @@ -233,6 +233,22 @@ void __ref cpu_die(void)
->>   }
->>   #endif /* CONFIG_HOTPLUG_CPU */
->>
->> +/*
->> + * Get the number of CPU cores from the L2 control register on A15
->> + */
->> +unsigned long a15_get_core_count(void)
->> +{
->> +	unsigned long val;
->> +
->> +	/* Read L2 control register */
->> +	asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r"(val));
->> +
->> +	/* [25:24] of L2 control register means core count - 1 */
->> +	val = ((val>>  24)&  0x3) + 1;
->> +
->> +	return val;
->> +}
->
-> This doesn't belong in smp.c but, more importantly, this doesn't work for
-> multi-cluster configurations at all. Since all A15 implementations will be
-> on new platforms, the code will be device-tree only and so we should use
+On Tue, Jan 24, 2012 at 07:57:27PM +0100, Wolfram Sang wrote:
+> Currently, the MAC address from the second ethernet is generated from the
+> crypto-key (and not a customer reg) because of a wrong index to the ocotp
+> array.
+> 
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> ---
 
-Why not? As I know, current arm kernel ARMv7 arch can support A15 
-without device-tree. And you know, the core number should be counted by 
-L2 control register. no?
+Ping.
 
-> that to determine the CPU topology as, unfortunately, there is no architected
-> way of doing this.
->
-> I believe Lorenzo posted some patches which you could look at.
->
-OK, Would be better.
+> 
+> This looks clearly wrong to me; probably ocotp was a u8 somewhen in the
+> process? I wonder how it works for these boards. Am I missing something?
+> 
+>  arch/arm/mach-mxs/mach-m28evk.c  |    2 +-
+>  arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+> index 2f27582..8d1459d 100644
+> --- a/arch/arm/mach-mxs/mach-m28evk.c
+> +++ b/arch/arm/mach-mxs/mach-m28evk.c
+> @@ -258,7 +258,7 @@ static int __init m28evk_fec_get_mac(void)
+>  	 * so hard-code DENX OUI (C0:E5:4E) here.
+>  	 */
+>  	for (i = 0; i < 2; i++) {
+> -		val = ocotp[i * 4];
+> +		val = ocotp[i];
+>  		mx28_fec_pdata[i].mac[0] = 0xC0;
+>  		mx28_fec_pdata[i].mac[1] = 0xE5;
+>  		mx28_fec_pdata[i].mac[2] = 0x4E;
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> index fdb0a56..df318ef 100644
+> --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> @@ -285,7 +285,7 @@ static int __init mx28evk_fec_get_mac(void)
+>  	 * so hard-code Freescale OUI (00:04:9f) here.
+>  	 */
+>  	for (i = 0; i < 2; i++) {
+> -		val = ocotp[i * 4];
+> +		val = ocotp[i];
+>  		mx28_fec_pdata[i].mac[0] = 0x00;
+>  		mx28_fec_pdata[i].mac[1] = 0x04;
+>  		mx28_fec_pdata[i].mac[2] = 0x9f;
+> -- 
+> 1.7.2.5
+> 
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/57fff6c3/attachment.sig>
