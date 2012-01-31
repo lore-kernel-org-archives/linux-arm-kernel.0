@@ -1,62 +1,61 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Tue, 31 Jan 2012 10:08:06 +1100
-Subject: [PATCH 1/6] mfd: mc13xxx-core: ADC conv: ack existing pending
- irqs before requesting
-In-Reply-To: <20120130071502.GF6305@pengutronix.de>
-References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
- <1327876408-22528-2-git-send-email-marc@cpdesign.com.au>
- <20120130071502.GF6305@pengutronix.de>
-Message-ID: <201201311008.06719.marc@cpdesign.com.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 31 Jan 2012 01:10:25 +0100
+Subject: [GIT PULL] plat-nomadik timers for next
+Message-ID: <1327968625-2322-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 30, 2012 06:15:02 PM Uwe Kleine-K?nig wrote:
-> On Mon, Jan 30, 2012 at 09:33:23AM +1100, Marc Reilly wrote:
-> > This acks any existing pending ADCDONE irqs before requesting one for the
-> > new conversion, rather than after.
-> > 
-> > Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
-> > ---
-> > 
-> >  drivers/mfd/mc13xxx-core.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> > index 1fd265d..8cb83ef 100644
-> > --- a/drivers/mfd/mc13xxx-core.c
-> > +++ b/drivers/mfd/mc13xxx-core.c
-> > @@ -561,9 +561,9 @@ int mc13xxx_adc_do_conversion(struct mc13xxx
-> > *mc13xxx, unsigned int mode,
-> > 
-> >  	}
-> >  	
-> >  	dev_dbg(mc13xxx->dev, "%s: request irq\n", __func__);
-> > 
-> > +	mc13xxx_irq_ack(mc13xxx, MC13XXX_IRQ_ADCDONE);
-> > 
-> >  	mc13xxx_irq_request(mc13xxx, MC13XXX_IRQ_ADCDONE,
-> >  	
-> >  			mc13xxx_handler_adcdone, __func__, &adcdone_data);
-> > 
-> > -	mc13xxx_irq_ack(mc13xxx, MC13XXX_IRQ_ADCDONE);
-> > 
-> >  	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC0, adc0);
-> >  	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
-> 
-> hmm, I wonder if the irq should be acked if it's not requested. The code
-> doesn't do error checking, but consider mc13xxx_irq_request fails
-> because the irq is already requested by someone else. Then acking before
-> requesting is wrong, isn't it?
 
-I see your point.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-> Maybe irq_request should ack the irq or
-> maybe better introduce a function mc13xxx_irq_request_and_ack that acks
-> only if the request part is OK?
+Hi Arnd, Olof,
 
-I'd say that just acking in mc13xxx_irq_request is good enough. Ack happens 
-after the request, before unmasking. Do you see any specific need for handling 
-a pre-existing interrupt?
+This is stuff for -next, i.e. not -rc:s, unless you find a
+reason for.
 
-Cheers,
-Marc
+It consists of Nomadik timer cleanups and modernization
+which makes this timer code look proper. All has been
+reviewed on LAKML and now needs to rotate in -next.
+
+Yours,
+Linus Walleij
+
+
+The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+
+  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-timers
+
+Linus Walleij (3):
+      ARM: plat-nomadik: get rid of global mtu base pointer
+      ARM: plat-nomadik: handle clocking properly
+      ARM: plat-nomadik: modernize MTU timer
+
+ arch/arm/mach-nomadik/board-nhk8815.c      |    7 +----
+ arch/arm/mach-nomadik/include/mach/setup.h |   19 ----------------
+ arch/arm/mach-ux500/include/mach/setup.h   |    3 --
+ arch/arm/mach-ux500/timer.c                |    7 +++--
+ arch/arm/plat-nomadik/include/plat/mtu.h   |    4 +--
+ arch/arm/plat-nomadik/timer.c              |   33 ++++++---------------------
+ 6 files changed, 15 insertions(+), 58 deletions(-)
+ delete mode 100644 arch/arm/mach-nomadik/include/mach/setup.h
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+
+iQIcBAEBAgAGBQJPJzEMAAoJEEEQszewGV1zkEgQALdo2HDa+CDa1vL51/nRUJMX
+hjBtSBmYpKh9j8D7hlLLZIcETGR+8mzSZGEjhuPE1eYQcYr+Xlb1xy0LTpMyjd4n
+TCt1x2fI16JXbcLJXeToRm+5IsmqkldVZCYzdRKVCFbNsuNg6ZynYj6rv6WY0Wi9
+EZROAGR2z1DFMIUtq4UE85FT9q/JhyZDHA4xdJ1TS9O7P34CQGzNrok1EnLwf1A6
+EdDS7v9jsOhDZAyc2D6b9fNzlRvK03r+qhd5DV6/x8FPq2IVRn98WrZO39PDbHrt
+rVuT/VW1gE57bK9o//sGt8F/38t8O05pfJyck4wE7jfsrd+YPjdaKVWSPKiW+Jr6
+jndk2h1jyMU076UqmMhu87yeMWLsuUHMzwJrHtTFV/50jDdwnWu9u8lhANz8995b
+9oQSYo8uwXQcH1HIl/jvXLlhsuUFpqchS1uq08egOlp9JYYhFhlPOmhKXxDNYwJz
+l0vDwXeE+F9C+aH+vVvMRwGwKmCKOrfKw0nctDv2ymwnCW6z0Xcu8mfJzPkwzLzU
+6/SYVyEM1FGkR5k68SS+mCAPe+CgHSWhnvIRv4Yy97rJ446EhDosgqOk2qQOkloK
+LhzBXvULdlF1O+BLR8IQJ2oqGGskhhzRcxXeamjPDjw4xuMbN4OeAROU7QTmkbyF
+ci67lAxXCaVKpHniSRNv
+=v9KI
+-----END PGP SIGNATURE-----
