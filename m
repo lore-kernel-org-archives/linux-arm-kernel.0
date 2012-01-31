@@ -1,64 +1,84 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 31 Jan 2012 00:27:57 -0700 (MST)
-Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
- pwrdm_clear_all_prev_pwrst()
-In-Reply-To: <CAMQu2gyACq7RFyfnyNddDg7xRbHTTqsgXwMq6Ng4WfLxaatvAw@mail.gmail.com>
-References: <20120130093931.11027.31048.stgit@dusk>
- <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
- <CAMQu2gxyY50Bno_R2v1x98-ND47CrVpZBq+wA3POXz2+7E7eEw@mail.gmail.com>
- <alpine.DEB.2.00.1201302359320.10061@utopia.booyaka.com>
- <CAMQu2gyACq7RFyfnyNddDg7xRbHTTqsgXwMq6Ng4WfLxaatvAw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1201310024510.10061@utopia.booyaka.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Tue, 31 Jan 2012 08:31:26 +0100
+Subject: [RFC PATCH 5/7] ARM: davinci: i2c: add OF support
+In-Reply-To: <20120130201307.GV28397@ponder.secretlab.ca>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-6-git-send-email-hs@denx.de> <4F1DC480.4010603@gmail.com>
+ <4F1E5B44.4090200@denx.de> <4F1E7F36.50505@samsung.com>
+ <20120130201307.GV28397@ponder.secretlab.ca>
+Message-ID: <4F2798CE.1090804@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Jan 2012, Shilimkar, Santosh wrote:
+Hello Grant,
 
-> On Tue, Jan 31, 2012 at 12:45 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> > On Tue, 31 Jan 2012, Shilimkar, Santosh wrote:
-> >
-> >> In this code the need is to clear only CPU and MPUPD, and hence they are
-> >> explicitly cleared since the pre/post transition calls can be moved to PM_DEBUG
-> >> in production kernels.
-> >>
-> >> But as you stated in current mainline kernel they are superfluous since the
-> >> pre/post calls are not under PM debug. So I am ok either way
-> >
-> > We're using the PM counters for the context restore skip optimization now
-> > in pwrdm_get_context_loss_count(), so they've suddenly become needed even
-> > when PM_DEBUG=n. ?But those counters are only needed when there are
-> > devices in the CPU* powerdomains to track that can lose logic context. ?I
-> > don't think that's the case on OMAP4, but you would probably know better
-> > than I.
-> >
-> Good point so the pre/post calls are must then. We should kill those extra calls
-> form OMAP4 code then.
+Grant Likely wrote:
+> On Tue, Jan 24, 2012 at 10:51:50AM +0100, Sylwester Nawrocki wrote:
+>> Hello Heiko,
+>>
+>> On 01/24/2012 08:18 AM, Heiko Schocher wrote:
+>>>> On 01/23/2012 09:56 AM, Heiko Schocher wrote:
+>>>>> add of support for the davinci i2c driver.
+>>>>>
+>>>>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>>>>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>>>> Cc: linux-i2c at vger.kernel.org
+>>>>> Cc: Ben Dooks<ben-linux@fluff.org>
+>>>>> Cc: Wolfram Sang<w.sang@pengutronix.de>
+>>>>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>>>>> Cc: Sekhar Nori<nsekhar@ti.com>
+>>>>> Cc: Wolfgang Denk<wd@denx.de>
+>>>>> ---
+>>>>>   .../devicetree/bindings/arm/davinci/i2c.txt        |   39 ++++++++++++++++++
+>>>>>   drivers/i2c/busses/i2c-davinci.c                   |   43 ++++++++++++++++++++
+>>>>>   2 files changed, 82 insertions(+), 0 deletions(-)
+>>>>>   create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
+[...]
+>> Moreover you seem to overwrite platform device name and id,
+>>
+>> 		if (!of_property_read_u32(pdev->dev.of_node, "id",
+>> +			&prop)) {
+>> +			pdev->id = prop;
+>> +			pdev->dev.init_name = kzalloc(20, GFP_KERNEL);
+>> +			sprintf((char *)pdev->dev.init_name,
+>> +				"i2c_davinci.%d", pdev->id);
+>>
+>> I'm not sure if it is a good practice.
+> 
+> No, it is not good practice.  At this point the device is already
+> registered.  Changing the value of pdev->id will cause problems in the
+> core code because the /sysfs files will have already been created.
+> 
+>> If you want to pre-define platform
+>> device name (likely for the clock API to work), it might be more appropriate
+>> to use OF_DEV_AUXDATA in the machine code, until there are clock bindings
+>> available.
+> 
+> Yes, use OF_DEV_AUXDATA, but *only* if you need it for hooking up
+> clocks, regulators, or similar.  Don't use it just because you want
+> the device to have a different name for cosmetic reasons.  The need
+> for AUXDATA should go away once the DT clock binding code is merged.
 
-I wonder if we should track how many hwmods are present in a powerdomain?  
-We could check that counter to determine if we could skip the access.
+I now use OF_DEV_AUXDATA in board code, "id" nor "cell-index" used:
 
-> > Another aspect is that previous powerstate accesses for the CPU*
-> > powerdomains would theoretically go to the MPU local PRM rather than the
-> > system PRCM. ?So they may actually return quickly. ?Haven't tested this.
-> >
-> You are correct. They do.
+struct of_dev_auxdata enbw_cmc_auxdata_lookup[] __initdata = {
+        OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+        OF_DEV_AUXDATA("ti,davinci-i2c", 0x01e28000, "i2c_davinci.2", NULL),
+        {}
+};
 
-Cool.
+This is needed for hooking up clocks, see:
+arch/arm/mach-davinci/da850.c
+static struct clk_lookup da850_clks
+[...]
+        CLK("i2c_davinci.1",    NULL,           &i2c0_clk),
+[...]
+        CLK("i2c_davinci.2",    NULL,           &i2c1_clk),
 
-> > The MPUSS powerdomain might be another case, though. ?There are a bunch of
-> > devices in there: the local timers, APB debug devices, etc. ?We probably
-> > have to worry about restoring context for some of those at some point.
-> >
-> MPUSS PD is at the global PRCM level but that one doesn't take time either.
-> You need few more cycles to reach there.
-> IIRC, other power domains use to take time because of the wait_transition
-> calls we had. Mostly it was because of the BUGs you fixed. When get some
-> time I will profile these calls and see if we still have that issue.
-
-That would be interesting.  I was guessing that the previous powerstate 
-registers in the global PRCM might be located in some clockdomain that was 
-clocked at sys_clk or the 32KiHZ clock.  But if it's really just due to 
-the wait_transition(), that might be something we can optimize...
-
-
-- Paul
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
