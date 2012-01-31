@@ -1,65 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 31 Jan 2012 23:40:41 +0900
-Subject: [PATCH] ARM: smp: allow get the core count from L2 control on A15
-In-Reply-To: <20120131143247.GB31004@mudshark.cambridge.arm.com>
-References: <04be01cce011$6b3b3550$41b19ff0$%kim@samsung.com>
- <20120131141313.GA31004@mudshark.cambridge.arm.com>
- <4F27F8E8.1030703@samsung.com>
- <20120131143247.GB31004@mudshark.cambridge.arm.com>
-Message-ID: <4F27FD69.7060207@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 Jan 2012 14:40:38 +0000
+Subject: Oops in guest after ioremap() on ARMv7
+In-Reply-To: <1326994510.17599.97.camel@zakaz.uk.xensource.com>
+References: <4EF31DA7.9030407@citrix.com> <20111222144937.GE20635@arm.com>
+ <4EF35CFF.3050200@citrix.com> <20111222181356.GI20635@arm.com>
+ <4EF37802.30300@citrix.com> <1324641625.7877.161.camel@zakaz.uk.xensource.com>
+ <20120103165027.GD22876@arm.com>
+ <1326994510.17599.97.camel@zakaz.uk.xensource.com>
+Message-ID: <CAHkRjk68rw2TKnitc7M+R1FCpwrGkqFHwd4YmS78mveR9uO_2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/12 23:32, Will Deacon wrote:
-> On Tue, Jan 31, 2012 at 02:21:28PM +0000, Kukjin Kim wrote:
->> On 01/31/12 23:13, Will Deacon wrote:
->>>
->>> This doesn't belong in smp.c but, more importantly, this doesn't work for
->>> multi-cluster configurations at all. Since all A15 implementations will be
->>> on new platforms, the code will be device-tree only and so we should use
+On 19 January 2012 17:35, Ian Campbell <Ian.Campbell@citrix.com> wrote:
+> On Tue, 2012-01-03 at 16:50 +0000, Catalin Marinas wrote:
+>> On Fri, Dec 23, 2011 at 12:00:25PM +0000, Ian Campbell wrote:
+>> > At the moment we build the entire p2m before we ever load the VTTBR or
+>> > enable stage-2 translations in the HCR. Is that sufficient or do we also
+>> > need to flush something?
 >>
->> Why not? As I know, current arm kernel ARMv7 arch can support A15
->> without device-tree. And you know, the core number should be counted by
->> L2 control register. no?
+>> If the model does not correctly implement cacheable page table walks for
+>> either stage 1 or stage 2 translation (though ID_MMFR3[23:20] indicate
+>> that it should), the hypervisor would need to clean the D-cache to the
+>> point of unification (not necessary to go to the point of coherency)
+>> before any of the state 2 translation tables are used.
 >
-> I'll answer these in order:
-
-Hmm, let
+> I added a copy of Linux's v7_flush_dcache_all after building the p2m but
+> just before loading the VTTBR and it didn't help.
 >
-> 1.) The code doesn't belong in smp.c because it's specific to the A15
-
-Yes, agree. So I just commented in my patch, I'm not sure where it 
-should be added at.
-
-> 2.) The architecture code may well support A15, but since there are no
->      platforms in mainline that support A15 yet, then all new platforms will
->      need to be DT-based. That means we can rely on the DT to provide this
->      information.
-
-Well, I will submit EXYNOS5 which has two A15 cores today and I don't 
-know why it should be supported only with DT, EXYNOS5 DT supporting will 
-be submitted though.
-
-> 3.) The L2 control register only tells you how many cores are hanging off
->      that particular L2. This will be wrong for multi-cluster systems since
->      it will only identify a subset of the cores.
-
-OK, let me check it.
-
+> I turned off cacheability in VTCR and that didn't help either.
 >
->>> I believe Lorenzo posted some patches which you could look at.
->>>
->> OK, Would be better.
+> Then I turned off cacheability in the Linux TTBR{0,1} (by frobbing both
+> TTB_FLAGS_UP and TTB_FLAGS_SMP to use FOO_NC everywhere) and this _did_
+> make a difference -- the kernel now boots.
 >
-> Yes, I think it's the only way to solve this problem without adding an
-> architected method for enumerating the CPU topology.
+> I then tested just that change by itself and it seems to have done the
+> trick.
 >
-I'm not sure it is the only way...
+> Does that indicate a model bug?
 
-Thanks.
+It is possible. The scenario I'm thinking of is that with cacheable
+PTWs enabled in TTBR, the model wrongly decides to use the
+intermediate physical address (IPA) to look up the caches and gets the
+wrong information.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I'll take this to the model guys but most likely they'll ask for an
+image to load and just run. Could you provide such simple image
+(minimal filesystem)? I'm not familiar with Xen and building it.
+
+(I'll first ask the model guys, maybe they can spot the error easily
+without additional debugging).
+
+-- 
+Catalin
