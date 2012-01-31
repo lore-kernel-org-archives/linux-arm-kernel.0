@@ -1,35 +1,15 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 31 Jan 2012 09:37:54 +0530
-Subject: [PATCH V2 08/12] dmaengine/dw_dmac: Unmap all memory buffers
- after completion of slave transfers
-In-Reply-To: <1327982312.1527.61.camel@vkoul-udesk3>
-References: <cover.1326876464.git.viresh.kumar@st.com>
- <ba53f229f3f594bfe0459b01a9ebb4d9b2c15882.1326876464.git.viresh.kumar@st.com>
- <20120118093620.GC1068@n2100.arm.linux.org.uk> <4F1696E4.9070806@st.com>
- <1327982312.1527.61.camel@vkoul-udesk3>
-Message-ID: <4F27691A.5010503@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 31 Jan 2012 13:49:22 +0900
+Subject: [PATCH 0/3] ARM: EXYNOS: cleanup clock part
+Message-ID: <1327985365-7070-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/31/2012 9:28 AM, Vinod Koul wrote:
->> > 	if (!dwc->chan.private) {
->> > 		struct device *parent = chan2parent(&dwc->chan);
->> > 		if (!(txd->flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
->> > 
->> > Sorry, I missed the most straight forward looking code. :(
->> > Actually, dw_dmac is also doing the same, i.e. unmapping only for
->> > non-slave transfers.
->> > 
->> > The same patch is still applicable, after fixing message subject and log.
->> > I will resend it, with message log fixed, once i get more feedbacks on V2.
->> > 
-> But this patch seems to unmap for *all* descriptors, so you need to fix
-> that as well, apart from the ones stated above.
+Basically, this patch changes the clock.c in mach-exynos/ to
+clock-exynos4.c at the same directory and this is neeed to
+support for new EXYNOS SoC, and the prefix of the clk register
+from S5P_ to EXYNOS4_ to use it clearly.
 
-What do you mean by *all* here? All type of transfers ?
-If that's the question, then the answer is NO.
-
-I am unmapping all descriptors of current transfer only for non-slave transfers.
-
--- 
-viresh
+[PATCH 1/3] ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
+[PATCH 2/3] [CPUFREQ] EXYNOS4210: update the name of EXYNOS clock
+[PATCH 3/3] PM / devfreq: update the name of EXYNOS clock register
