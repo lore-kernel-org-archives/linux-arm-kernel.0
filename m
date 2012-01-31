@@ -1,51 +1,43 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  1 Feb 2012 00:39:13 +0900
-Subject: [PATCH 8/9] ARM: EXYNOS: temporary add map definitions for uart
+Date: Wed,  1 Feb 2012 00:39:14 +0900
+Subject: [PATCH 9/9] ARM: EXYNOS: temporary fixup regarding get_core_count()
 In-Reply-To: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
 References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1328024354-4277-9-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1328024354-4277-10-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/map.h |   13 +++++++++++--
- 1 files changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/mach-exynos/platsmp.c |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index f88acaf..300ed7e 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -167,9 +167,10 @@
- #define S3C_PA_IIC5			EXYNOS4_PA_IIC(5)
- #define S3C_PA_IIC6			EXYNOS4_PA_IIC(6)
- #define S3C_PA_IIC7			EXYNOS4_PA_IIC(7)
-+
- #define S3C_PA_RTC			EXYNOS4_PA_RTC
- #define S3C_PA_WDT			EXYNOS4_PA_WATCHDOG
--#define S3C_PA_UART			EXYNOS4_PA_UART
-+
- #define S3C_PA_SPI0			EXYNOS4_PA_SPI0
- #define S3C_PA_SPI1			EXYNOS4_PA_SPI1
- #define S3C_PA_SPI2			EXYNOS4_PA_SPI2
-@@ -198,9 +199,17 @@
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 683aec7..dfb4630 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -165,7 +165,10 @@ void __init smp_init_cpus(void)
+ 	void __iomem *scu_base = scu_base_addr();
+ 	unsigned int i, ncores;
  
- /* Compatibility UART */
+-	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
++	if (soc_is_exynos5250())
++		ncores = 2;
++	else
++		ncores = scu_base ? scu_get_core_count(scu_base) : 1;
  
-+#ifdef CONFIG_ARCH_EXYNOS4
-+#define S3C_PA_UART			EXYNOS4_PA_UART
-+#endif
-+
-+#ifdef CONFIG_ARCH_EXYNOS5
-+#define S3C_PA_UART			EXYNOS5_PA_UART
-+#endif
-+
- #define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
+ 	/* sanity check */
+ 	if (ncores > nr_cpu_ids) {
+@@ -182,8 +185,8 @@ void __init smp_init_cpus(void)
  
--#define S5P_PA_UART(x)			(EXYNOS4_PA_UART + ((x) * S3C_UART_OFFSET))
-+#define S5P_PA_UART(x)			(S3C_PA_UART + ((x) * S3C_UART_OFFSET))
- #define S5P_PA_UART0			S5P_PA_UART(0)
- #define S5P_PA_UART1			S5P_PA_UART(1)
- #define S5P_PA_UART2			S5P_PA_UART(2)
+ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-
+-	scu_enable(scu_base_addr());
++	if (!soc_is_exynos5250())
++		scu_enable(scu_base_addr());
+ 
+ 	/*
+ 	 * Write the address of secondary startup into the
 -- 
 1.7.4.4
