@@ -1,85 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 31 Jan 2012 15:10:37 +0900
-Subject: [GIT PULL] Samsung fixes-2 for v3.3
-Message-ID: <041f01ccdfdf$0cb76b70$26264250$%kim@samsung.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 31 Jan 2012 07:13:38 +0100
+Subject: [PATCH 6/6] mmc: sdhci-s3c: Add device tree support
+In-Reply-To: <20120130190114.GR28397@ponder.secretlab.ca>
+References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
+ <201201301051.22396.heiko@sntech.de>
+ <20120130190114.GR28397@ponder.secretlab.ca>
+Message-ID: <201201310713.39553.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Am Montag 30 Januar 2012, 20:01:14 schrieb Grant Likely:
+> On Mon, Jan 30, 2012 at 10:51:11AM +0100, Heiko St?bner wrote:
+> > Am Mittwoch, 2. November 2011, 21:36:03 schrieb Thomas Abraham:
+> > 
+> > Hi Thomas,
+> > 
+> > in patch 1/6:
+> > > +static struct platform_device_id sdhci_s3c_driver_ids[] = {
+> > > +       {
+> > > +               .name           = "s3c-sdhci",
+> > > +               .driver_data    = (kernel_ulong_t)NULL,
+> > > +       },
+> > > +       {
+> > > +               .name           = "exynos4-sdhci",
+> > > +               .driver_data    = EXYNOS4_SDHCI_DRV_DATA,
+> > > +       },
+> > > +};
+> > > +MODULE_DEVICE_TABLE(platform, sdhci_s3c_driver_ids);
+> > 
+> > and in patch 6/6:
+> > > +#ifdef CONFIG_OF
+> > > +static const struct of_device_id sdhci_s3c_dt_match[] = {
+> > > +	{ .compatible = "samsung,s3c6410-sdhci", },
+> > > +	{ .compatible = "samsung,exynos4210-sdhci",
+> > > +		.data = &exynos4_sdhci_drv_data },
+> > > +	{},
+> > > +};
+> > > +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+> > 
+> > wouldn't it be better to keep the naming consistent between of and
+> > non-of? I.e. s3c-sdhci vs. s3c6410-sdhci. Since the driver is used for
+> > all S3C SoCs containing hsmmc controllers I think s3c-sdhci would be
+> > preferable here.
+> 
+> History has shown that future devices aren't always compatible with earlier
+> ones.  Compatible strings are expected to be specific to an exact device to
+> reduce the possibility of new hardware breaking assumptions.
+> 
+> Instead, new hardware can either claim compatibility with older
+> compatible strings (the compatible property in the DT is a list), or
+> can have the new string added to the match table in the driver;
+> whichever option makes the most sense.
+ah, ok. Thanks for the explanation and I will keep that in mind.
 
-Please pull 2nd Samsung fixes for v3.3, from following:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v3.3-samsung-fixes-2
-
-If any problems, please kindly let me know.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-
-  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v3.3-samsung-fixes-2
-
-Heiko Stuebner (1):
-      ARM: SAMSUNG: Fix missing api-change from subsys_interface change
-
-Jonghwan Choi (1):
-      ARM: EXYNOS: Fix "warning: initialization from incompatible pointer type"
-
-Kukjin Kim (2):
-      ARM: EXYNOS: Remove build warning without enabling PM
-      ARM: S5PV210: Fix the name of exynos4_clk_hdmiphy_ctrl() for S5PV210
-
-Marek Szyprowski (1):
-      ARM: EXYNOS: fix non-SMP builds for EXYNOS4
-
-Mark Brown (2):
-      ARM: S3C64XX: Make s3c64xx_init_uarts() static
-      ARM: S3C6410: Use device names for both I2C clocks
-
-Sylwester Nawrocki (3):
-      ARM: SAMSUNG: Fix platform data setup for I2C adapter 0
-      ARM: EXYNOS: Correct framebuffer window size on Nuri board
-      ARM: EXYNOS: Correct M-5MOLS sensor clock frequency on Universal C210 board
-
- arch/arm/mach-exynos/clock-exynos4210.c      |    2 ++
- arch/arm/mach-exynos/clock-exynos4212.c      |    2 ++
- arch/arm/mach-exynos/clock.c                 |    2 ++
- arch/arm/mach-exynos/mach-nuri.c             |    8 ++++----
- arch/arm/mach-exynos/mach-universal_c210.c   |    2 +-
- arch/arm/mach-exynos/pm.c                    |    4 +++-
- arch/arm/mach-s3c2410/cpu-freq.c             |    8 +++++---
- arch/arm/mach-s3c2410/dma.c                  |    5 +++--
- arch/arm/mach-s3c2410/pll.c                  |    2 +-
- arch/arm/mach-s3c2410/pm.c                   |    2 +-
- arch/arm/mach-s3c2412/cpu-freq.c             |    3 ++-
- arch/arm/mach-s3c2412/dma.c                  |    3 ++-
- arch/arm/mach-s3c2412/irq.c                  |    2 +-
- arch/arm/mach-s3c2412/pm.c                   |    2 +-
- arch/arm/mach-s3c2416/irq.c                  |    3 ++-
- arch/arm/mach-s3c2416/pm.c                   |    2 +-
- arch/arm/mach-s3c2440/clock.c                |    2 +-
- arch/arm/mach-s3c2440/dma.c                  |    3 ++-
- arch/arm/mach-s3c2440/irq.c                  |    2 +-
- arch/arm/mach-s3c2440/s3c2440-cpufreq.c      |    3 ++-
- arch/arm/mach-s3c2440/s3c2440-pll-12000000.c |    2 +-
- arch/arm/mach-s3c2440/s3c2440-pll-16934400.c |    3 ++-
- arch/arm/mach-s3c2440/s3c2442.c              |    2 +-
- arch/arm/mach-s3c2440/s3c244x-clock.c        |    2 +-
- arch/arm/mach-s3c2440/s3c244x-irq.c          |    2 +-
- arch/arm/mach-s3c2443/dma.c                  |    3 ++-
- arch/arm/mach-s3c2443/irq.c                  |    3 ++-
- arch/arm/mach-s3c64xx/clock.c                |    5 +++++
- arch/arm/mach-s3c64xx/common.c               |    2 +-
- arch/arm/mach-s5p64x0/pm.c                   |    2 +-
- arch/arm/mach-s5pv210/clock.c                |    4 ++--
- arch/arm/mach-s5pv210/pm.c                   |    2 +-
- arch/arm/plat-samsung/devs.c                 |    4 +++-
- 33 files changed, 62 insertions(+), 36 deletions(-)
+Heiko
