@@ -1,132 +1,72 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 31 Jan 2012 18:52:42 +0200
-Subject: [PATCH 2/2] remoteproc: s/big switch/lookup table/
-In-Reply-To: <1328028762-28352-1-git-send-email-ohad@wizery.com>
-References: <1328028762-28352-1-git-send-email-ohad@wizery.com>
-Message-ID: <1328028762-28352-2-git-send-email-ohad@wizery.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 31 Jan 2012 09:05:11 -0800
+Subject: Reg pinmux driver for OMAP based SoC- AM335X
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93176CAC6@DBDE01.ent.ti.com>
+References: <20120125000407.GU22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178CB82433@HQMAIL01.nvidia.com>
+ <20120127020832.GJ29812@atomide.com>
+ <20120127065752.GB32740@S2101-09.ap.freescale.net>
+ <20120127170545.GH13504@atomide.com>
+ <20120130015607.GA10470@S2101-09.ap.freescale.net>
+ <20120130172042.GE9339@atomide.com>
+ <20120131013215.GB24681@S2101-09.ap.freescale.net>
+ <20120131022906.GH9339@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93176CAC6@DBDE01.ent.ti.com>
+Message-ID: <20120131170511.GI9339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A lookup table would be easier to extend, and the resulting
-code is a bit cleaner.
+Hi,
 
-Reported-by: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- drivers/remoteproc/remoteproc_core.c |   45 +++++++++++++++++----------------
- include/linux/remoteproc.h           |    7 +++++
- 2 files changed, 30 insertions(+), 22 deletions(-)
+* Mohammed, Afzal <afzal@ti.com> [120131 06:04]:
+> Hi Tony,
+> 
+> I am working on implementing pincontrol driver for AM335X SoC (OMAP34XX family).
+> 
+> Is there any specific plan you have in mind w.r.t incorporating
+> pincontrol driver for OMAP family of SoC's. There was an initial patch
+> for OMAP4 pin control driver, but it seems you were in favour of a
+> DT based approach. As per my understanding after going through few threads
+> (lot more remaining) is that pincontrol driver can be either a DT based
+> or non-DT based (either way we are going out of platform folders), and
+> it seems you prefer a DT based approach (have seen mentioning about
+> pinmux-simple.c).
 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 567a3c5..94473bd 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -64,6 +64,8 @@ static DEFINE_KLIST(rprocs, klist_rproc_get, klist_rproc_put);
+With at least omaps, there are few good reasons to go for a common
+DT only driver:
+
+1. We already have about 6k lines of mux data and seem to be
+   adding several thousands of lines of mux data each year.
+
+2. The driver does not need this data, it just needs to know how
+   to operate certain kind of mux registers. The data is mostly
+   handy for developers for debugging, and that can be done via
+   debugfs and userspace tools.
  
- typedef int (*rproc_handle_resources_t)(struct rproc *rproc,
- 				struct fw_resource *rsc, int len);
-+typedef int (*rproc_handle_resource_t)(struct rproc *rproc,
-+				struct fw_resource *rsc);
- 
- /*
-  * This is the IOMMU fault handler we register with the IOMMU API
-@@ -658,44 +660,43 @@ free_mapping:
- 	return ret;
- }
- 
-+/*
-+ * A lookup table for resource handlers. Always keep in sync with
-+ * enum fw_resource_type.
-+ */
-+static rproc_handle_resource_t rproc_handle_rsc[] = {
-+	rproc_handle_carveout,	/* RSC_CARVEOUT */
-+	rproc_handle_devmem,	/* RSC_DEVMEM */
-+	rproc_handle_trace,	/* RSC_TRACE */
-+	rproc_handle_vring,	/* RSC_VRING */
-+	NULL, /* RSC_VIRTIO_DEV is handled early upon registration */
-+};
-+
- /* handle firmware resource entries before booting the remote processor */
- static int
- rproc_handle_boot_rsc(struct rproc *rproc, struct fw_resource *rsc, int len)
- {
- 	struct device *dev = rproc->dev;
-+	rproc_handle_resource_t handler;
- 	int ret = 0;
- 
--	while (len >= sizeof(*rsc)) {
-+	for (; len >= sizeof(*rsc); rsc++, len -= sizeof(*rsc)) {
- 		dev_dbg(dev, "rsc: type %d, da 0x%llx, pa 0x%llx, len 0x%x, "
- 			"id %d, name %s, flags %x\n", rsc->type, rsc->da,
- 			rsc->pa, rsc->len, rsc->id, rsc->name, rsc->flags);
- 
--		switch (rsc->type) {
--		case RSC_CARVEOUT:
--			ret = rproc_handle_carveout(rproc, rsc);
--			break;
--		case RSC_DEVMEM:
--			ret = rproc_handle_devmem(rproc, rsc);
--			break;
--		case RSC_TRACE:
--			ret = rproc_handle_trace(rproc, rsc);
--			break;
--		case RSC_VRING:
--			ret = rproc_handle_vring(rproc, rsc);
--			break;
--		case RSC_VIRTIO_DEV:
--			/* this one is handled early upon registration */
--			break;
--		default:
-+		if (rsc->type >= RSC_LAST) {
- 			dev_warn(dev, "unsupported resource %d\n", rsc->type);
--			break;
-+			continue;
- 		}
- 
-+		handler = rproc_handle_rsc[rsc->type];
-+		if (!handler)
-+			continue;
-+
-+		ret = handler(rproc, rsc);
- 		if (ret)
- 			break;
--
--		rsc++;
--		len -= sizeof(*rsc);
- 	}
- 
- 	return ret;
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index b52f784..2544d2e 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -103,6 +103,7 @@ struct fw_resource {
-  *		    the virtio device features, 'pa' holds the virtio guest
-  *		    features, 'len' holds the virtio status, and 'flags' holds
-  *		    the virtio id (currently only VIRTIO_ID_RPMSG is supported).
-+ * @RSC_LAST:       just keep this one at the end
-  *
-  * Most of the resource entries share the basic idea of address/length
-  * negotiation with the host: the firmware usually asks (on behalf of the
-@@ -115,6 +116,11 @@ struct fw_resource {
-  * will contain the expected device addresses (today we actually only support
-  * this scheme, as there aren't yet any use cases for dynamically allocated
-  * device addresses).
-+ *
-+ * Please note that these values are used as indices to the
-+ * rproc_handle_rsc lookup table, so please keep the two synchronized.
-+ * @RSC_LAST is used to check the validity of an index before the lookup table
-+ * is accessed, so please update it as needed too.
-  */
- enum fw_resource_type {
- 	RSC_CARVEOUT	= 0,
-@@ -122,6 +128,7 @@ enum fw_resource_type {
- 	RSC_TRACE	= 2,
- 	RSC_VRING	= 3,
- 	RSC_VIRTIO_DEV	= 4,
-+	RSC_LAST	= 5,
- };
- 
- /**
--- 
-1.7.5.4
+> Tegra pincontrol driver posted recently, seems to use DT to distinguish only
+> the SoC type, with all the pincontrol information for SoC present in Kernel.
+> 
+> I would be thankful if you can give me some pointers on how to proceed for
+> AM335X pincontrol driver and/or any work in progress for OMAP pincontrol driver.
+
+The plan is to deprecate the existing arch/arm/*omap*/*mux* code,
+and cut it down to minimum. And then add DT only mux support that should
+work for at least omap2+. That should work for am335x too.
+
+There's currently some discussion going on regarding the pinmux device
+tree binding and how dynamic mux states should be handled. But I'd
+assume we'll have basic support available very soon.
+
+The driver I'm working leaves all the data out of kernel, and the driver
+just knows how to handle a pinmux register instances. Then debugging
+tools can be done in userspace via debugfs to display more detailed
+SoC specific information.
+
+So it might be worth waiting just a little bit longer. If you have
+resources to spend on the pinmuxing, then creating some userspace tool
+to display SoC specific information would be nice :) For the userspace
+tool, we can use the data in arch/arm/mach-omap2/mux*2*.[ch].
+
+Regards,
+
+Tony
