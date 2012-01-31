@@ -1,41 +1,72 @@
-From: daniel.lezcano@free.fr (Daniel Lezcano)
-Date: Tue, 31 Jan 2012 15:13:04 +0100
-Subject: [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <4F200BE2.2070301@free.fr>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <4F1929E9.7070707@linaro.org>
- <CAMbhsRTbVqV6p0py9NGZrpFPf2yvp-B0dr+o-m7qbdja_-Lfzw@mail.gmail.com>
- <4F200BE2.2070301@free.fr>
-Message-ID: <4F27F6F0.7010508@free.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 31 Jan 2012 14:13:13 +0000
+Subject: [PATCH] ARM: smp: allow get the core count from L2 control on A15
+In-Reply-To: <04be01cce011$6b3b3550$41b19ff0$%kim@samsung.com>
+References: <04be01cce011$6b3b3550$41b19ff0$%kim@samsung.com>
+Message-ID: <20120131141313.GA31004@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2012 03:04 PM, Daniel Lezcano wrote:
-> On 01/20/2012 09:40 PM, Colin Cross wrote:
->> On Fri, Jan 20, 2012 at 12:46 AM, Daniel Lezcano
->> <daniel.lezcano@linaro.org>  wrote:
->>> Hi Colin,
->>>
->>> this patchset could be interesting to resolve in a generic way the cpu
->>> dependencies.
->>> What is the status of this patchset ?
->> I can't do much with it right now, because I don't have any devices
->> that can do SMP idle with a v3.2 kernel.  I've started working on an
->> updated version that avoids the spinlock, but it might be a while
->> before I can test and post it.  I'm mostly looking for feedback on the
->> approach taken in this patch, and whether it will be useful for other
->> SoCs besides Tegra and OMAP4.
->
-> Hi Colin,
->
-> I will be happy to test your patchset. Do you have a pointer to a more 
-> recent kernel ?
+Hi Kukjin,
 
-Hi Colin,
+On Tue, Jan 31, 2012 at 12:11:10PM +0000, Kukjin Kim wrote:
+> 
+> Actually, the number of A15 CPU core gets from L2 control
+> register not SCU configuration.
+> 
+> Suggested-by: Changhwan Youn <chaos.youn@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
 
-sorry for bothering you. I am working on a cpuidle driver for an ARM SMP 
-board, I will be really happy to test your patchset and look how it fits 
-with the cpuidle driver.
+NAK.
 
-Thanks
-   -- Daniel
+> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+> index 1e5717a..b67084f 100644
+> --- a/arch/arm/include/asm/smp.h
+> +++ b/arch/arm/include/asm/smp.h
+> @@ -71,6 +71,11 @@ extern void platform_secondary_init(unsigned int cpu);
+>  extern void platform_smp_prepare_cpus(unsigned int);
+>  
+>  /*
+> + * Get the number of CPU cores from the L2 control register on A15
+> + */
+> +extern unsigned long a15_get_core_count(void);
+> +
+> +/*
+>   * Logical CPU mapping.
+>   */
+>  extern int __cpu_logical_map[NR_CPUS];
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 57db122..be4d31d 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -233,6 +233,22 @@ void __ref cpu_die(void)
+>  }
+>  #endif /* CONFIG_HOTPLUG_CPU */
+>  
+> +/*
+> + * Get the number of CPU cores from the L2 control register on A15
+> + */
+> +unsigned long a15_get_core_count(void)
+> +{
+> +	unsigned long val;
+> +
+> +	/* Read L2 control register */
+> +	asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r"(val));
+> +
+> +	/* [25:24] of L2 control register means core count - 1 */
+> +	val = ((val >> 24) & 0x3) + 1;
+> +
+> +	return val;
+> +}
+
+This doesn't belong in smp.c but, more importantly, this doesn't work for
+multi-cluster configurations at all. Since all A15 implementations will be
+on new platforms, the code will be device-tree only and so we should use
+that to determine the CPU topology as, unfortunately, there is no architected
+way of doing this.
+
+I believe Lorenzo posted some patches which you could look at.
+
+Will
