@@ -1,37 +1,59 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 31 Jan 2012 13:08:52 -0700
-Subject: [PATCH 2/2] remoteproc: s/big switch/lookup table/
-In-Reply-To: <4F282BB2.6080604@fastmail.fm>
+Date: Tue, 31 Jan 2012 13:09:45 -0700
+Subject: [PATCH 1/2] remoteproc: bail out if firmware has different
+ endianess
+In-Reply-To: <1328028762-28352-1-git-send-email-ohad@wizery.com>
 References: <1328028762-28352-1-git-send-email-ohad@wizery.com>
- <1328028762-28352-2-git-send-email-ohad@wizery.com>
- <4F282BB2.6080604@fastmail.fm>
-Message-ID: <20120131200852.GC22611@ponder.secretlab.ca>
+Message-ID: <20120131200945.GD22611@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 05:58:10PM +0000, Jack Stone wrote:
-> On 31/01/12 16:52, Ohad Ben-Cohen wrote:
-> > +/*
-> > + * A lookup table for resource handlers. Always keep in sync with
-> > + * enum fw_resource_type.
-> > + */
-> > +static rproc_handle_resource_t rproc_handle_rsc[] = {
-> > +	rproc_handle_carveout,	/* RSC_CARVEOUT */
-> > +	rproc_handle_devmem,	/* RSC_DEVMEM */
-> > +	rproc_handle_trace,	/* RSC_TRACE */
-> > +	rproc_handle_vring,	/* RSC_VRING */
-> > +	NULL, /* RSC_VIRTIO_DEV is handled early upon registration */
-> > +};
-> > +
+On Tue, Jan 31, 2012 at 06:52:41PM +0200, Ohad Ben-Cohen wrote:
+> At this point we don't support remote processors that have
+> a different endianess than the host.
 > 
-> You could change this to
+> Look out for these unsupported scenarios, and bail out if
+> encountered.
 > 
-> [RSC_CARVEOUT] = rproc_handle_carveout,
-> 
-> Then you would be safe against renumbering and would only need to worry
-> about addition (which your RSC_LAST check copes with).
+> Reported-by: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Mark Grosen <mgrosen@ti.com>
 
-Yes, that is the right thing to do.  Then the compiler can catch ordering
-issues for you.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-g.
+> ---
+>  drivers/remoteproc/remoteproc_core.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index 6212b82..567a3c5 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/elf.h>
+>  #include <linux/virtio_ids.h>
+>  #include <linux/virtio_ring.h>
+> +#include <asm/byteorder.h>
+>  
+>  #include "remoteproc_internal.h"
+>  
+> @@ -851,6 +852,16 @@ static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
+>  
+>  	ehdr = (struct elf32_hdr *)fw->data;
+>  
+> +	/* We assume the firmware has the same endianess as the host */
+> +# ifdef __LITTLE_ENDIAN
+> +	if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
+> +# else /* BIG ENDIAN */
+> +	if (ehdr->e_ident[EI_DATA] != ELFDATA2MSB) {
+> +# endif
+> +		dev_err(dev, "Unsupported firmware endianess\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	if (fw->size < ehdr->e_shoff + sizeof(struct elf32_shdr)) {
+>  		dev_err(dev, "Image is too small\n");
+>  		return -EINVAL;
+> -- 
+> 1.7.5.4
+> 
