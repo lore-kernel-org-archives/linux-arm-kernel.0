@@ -1,29 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 30 Jan 2012 20:53:44 -0800
-Subject: [PATCH v3 00/25] irq_domain generalization and refinement
-In-Reply-To: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <20120131045344.GA27609@quad.lixom.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 31 Jan 2012 10:42:55 +0530
+Subject: [PATCH V2 08/12] dmaengine/dw_dmac: Unmap all memory buffers
+ after completion of slave transfers
+In-Reply-To: <4F27691A.5010503@st.com>
+References: <cover.1326876464.git.viresh.kumar@st.com>
+ <ba53f229f3f594bfe0459b01a9ebb4d9b2c15882.1326876464.git.viresh.kumar@st.com>
+ <20120118093620.GC1068@n2100.arm.linux.org.uk> <4F1696E4.9070806@st.com>
+ <1327982312.1527.61.camel@vkoul-udesk3>  <4F27691A.5010503@st.com>
+Message-ID: <1327986775.1527.63.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 02:35:54PM -0700, Grant Likely wrote:
-> Hey everyone,
+On Tue, 2012-01-31 at 09:37 +0530, Viresh Kumar wrote:
+> On 1/31/2012 9:28 AM, Vinod Koul wrote:
+> >> > 	if (!dwc->chan.private) {
+> >> > 		struct device *parent = chan2parent(&dwc->chan);
+> >> > 		if (!(txd->flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
+> >> > 
+> >> > Sorry, I missed the most straight forward looking code. :(
+> >> > Actually, dw_dmac is also doing the same, i.e. unmapping only for
+> >> > non-slave transfers.
+> >> > 
+> >> > The same patch is still applicable, after fixing message subject and log.
+> >> > I will resend it, with message log fixed, once i get more feedbacks on V2.
+> >> > 
+> > But this patch seems to unmap for *all* descriptors, so you need to fix
+> > that as well, apart from the ones stated above.
 > 
-> This patch series is ready for much wider consumption now.  I'd like
-> to get it into linux-next ASAP because there will be ARM board support
-> depending on it.  I'll wait a few days before I ask Stephen to pull
-> this in.
+> What do you mean by *all* here? All type of transfers ?
+> If that's the question, then the answer is NO.
 > 
-> Stephen/Milton/Ben, any testing you can help with here would be
-> appreciated since you've got access to a wider variety of Power
-> machines than I do.
+> I am unmapping all descriptors of current transfer only for non-slave transfers.
+Yes missed that
 
-This series has been:
+Btw, can you also fix the driver not to use chan->private?
 
-Tested-by: Olof Johansson <olof@lixom.net>
-
-On powerpc/pasemi (it's the only one I still have easy access to).
-
-
--Olof
+-- 
+~Vinod
