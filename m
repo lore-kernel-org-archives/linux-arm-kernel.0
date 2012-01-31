@@ -1,93 +1,86 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jan 2012 20:45:03 +0800
-Subject: [PATCH v3 14/25] irq_domain: Remove irq_domain_add_simple()
-In-Reply-To: <1327700179-17454-15-git-send-email-grant.likely@secretlab.ca>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-15-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <20120131124500.GA28571@S2101-09.ap.freescale.net>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Tue, 31 Jan 2012 12:35:09 +0000 (GMT)
+Subject: mfp/gpio regression: pxa_last_gpio used before initialized
+Message-ID: <1328013309.53711.YahooMailClassic@web29009.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 02:36:08PM -0700, Grant Likely wrote:
-> irq_domain_add_simple() was a stop-gap measure until complete irq_domain
-> support was complete.  This patch removes the irq_domain_add_simple()
-> interface.
-> 
-> v2: Updated to pass in host_data pointer on irq_domain allocation.
-> 
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Milton Miller <miltonm@bga.com>
-> ---
->  arch/arm/mach-imx/mach-imx6q.c      |    3 ++-
->  arch/arm/mach-msm/board-msm8x60.c   |    8 ++------
->  arch/arm/mach-mx5/imx51-dt.c        |    4 ++--
->  arch/arm/mach-mx5/imx53-dt.c        |    4 ++--
->  arch/arm/mach-omap2/board-generic.c |    2 +-
->  arch/arm/mach-prima2/irq.c          |    2 +-
->  drivers/mfd/twl-core.c              |    2 +-
->  include/linux/irqdomain.h           |    1 -
->  kernel/irq/irqdomain.c              |   10 ++--------
->  9 files changed, 13 insertions(+), 23 deletions(-)
-> 
-...
-> --- a/arch/arm/mach-mx5/imx51-dt.c
-> +++ b/arch/arm/mach-mx5/imx51-dt.c
-> @@ -47,7 +47,7 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
->  static int __init imx51_tzic_add_irq_domain(struct device_node *np,
->  				struct device_node *interrupt_parent)
->  {
-> -	irq_domain_add_simple(np, 0);
-> +	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
->  	return 0;
->  }
->  
-> @@ -57,7 +57,7 @@ static int __init imx51_gpio_add_irq_domain(struct device_node *np,
->  	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
->  
->  	gpio_irq_base -= 32;
-> -	irq_domain_add_simple(np, gpio_irq_base);
-> +	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
+pxa27x_mfp_init() uses pxa_last_gpio when initializing gpio_desc[].
+pxa_gpio_probe() initializes pxa_last_gpio to pxa_gpio_nums().
 
-The tzic on imx5 gets 128 irq lines rather than 32 here.  The current
-code will make any hwirq that is > 32 hit the WARN_ON below in
-irq_domain_legacy_revmap().
+Unfortunately on my hx4700 running 3.3.0-rc1, pxa27x_mfp_init() is called before pxa_gpio_probe(), resulting in the following:
 
-	WARN_ON(hwirq < first_hwirq || hwirq >= first_hwirq + size)
+__mfp_validate: GPIO20 is invalid pin
+__mfp_validate: GPIO21 is invalid pin
+__mfp_validate: GPIO15 is invalid pin
+__mfp_validate: GPIO78 is invalid pin
+__mfp_validate: GPIO79 is invalid pin
+__mfp_validate: GPIO80 is invalid pin
+__mfp_validate: GPIO33 is invalid pin
+__mfp_validate: GPIO48 is invalid pin
+__mfp_validate: GPIO49 is invalid pin
+__mfp_validate: GPIO50 is invalid pin
+__mfp_validate: GPIO51 is invalid pin
+__mfp_validate: GPIO54 is invalid pin
+__mfp_validate: GPIO55 is invalid pin
+__mfp_validate: GPIO56 is invalid pin
+__mfp_validate: GPIO57 is invalid pin
+__mfp_validate: GPIO85 is invalid pin
+__mfp_validate: GPIO104 is invalid pin
+__mfp_validate: GPIO117 is invalid pin
+__mfp_validate: GPIO118 is invalid pin
+__mfp_validate: GPIO34 is invalid pin
+__mfp_validate: GPIO35 is invalid pin
+__mfp_validate: GPIO36 is invalid pin
+__mfp_validate: GPIO37 is invalid pin
+__mfp_validate: GPIO38 is invalid pin
+__mfp_validate: GPIO39 is invalid pin
+__mfp_validate: GPIO40 is invalid pin
+__mfp_validate: GPIO41 is invalid pin
+__mfp_validate: GPIO42 is invalid pin
+__mfp_validate: GPIO43 is invalid pin
+__mfp_validate: GPIO44 is invalid pin
+__mfp_validate: GPIO45 is invalid pin
+__mfp_validate: GPIO17 is invalid pin
+__mfp_validate: GPIO28 is invalid pin
+__mfp_validate: GPIO29 is invalid pin
+__mfp_validate: GPIO30 is invalid pin
+__mfp_validate: GPIO31 is invalid pin
+__mfp_validate: GPIO113 is invalid pin
+__mfp_validate: GPIO23 is invalid pin
+__mfp_validate: GPIO24 is invalid pin
+__mfp_validate: GPIO25 is invalid pin
+__mfp_validate: GPIO26 is invalid pin
+__mfp_validate: GPIO19 is invalid pin
+__mfp_validate: GPIO86 is invalid pin
+__mfp_validate: GPIO87 is invalid pin
+__mfp_validate: GPIO88 is invalid pin
+__mfp_validate: GPIO72 is invalid pin
+__mfp_validate: GPIO96 is invalid pin
+__mfp_validate: GPIO12 is invalid pin
+__mfp_validate: GPIO13 is invalid pin
+__mfp_validate: GPIO14 is invalid pin
+__mfp_validate: GPIO10 is invalid pin
+__mfp_validate: GPIO13 is invalid pin
+__mfp_validate: GPIO107 is invalid pin
+__mfp_validate: GPIO108 is invalid pin
+__mfp_validate: GPIO58 is invalid pin
+__mfp_validate: GPIO66 is invalid pin
+__mfp_validate: GPIO61 is invalid pin
+__mfp_validate: GPIO71 is invalid pin
+__mfp_validate: GPIO81 is invalid pin
+__mfp_validate: GPIO116 is invalid pin
 
-The first_hwirq is 0 and size is 32 in this case.
+A temporary workaround is to statically initialize pxa_last_gpio to the correct value (120 in the case of pxa270):
 
-Changing 32 to 128 seems fixing the problem.
-
->  
->  	return 0;
->  }
-> diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
-> index 05ebb3e..89de5d4 100644
-> --- a/arch/arm/mach-mx5/imx53-dt.c
-> +++ b/arch/arm/mach-mx5/imx53-dt.c
-> @@ -51,7 +51,7 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
->  static int __init imx53_tzic_add_irq_domain(struct device_node *np,
->  				struct device_node *interrupt_parent)
->  {
-> -	irq_domain_add_simple(np, 0);
-> +	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
-
-Ditto
-
-Regards,
-Shawn
-
->  	return 0;
->  }
->  
-> @@ -61,7 +61,7 @@ static int __init imx53_gpio_add_irq_domain(struct device_node *np,
->  	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
->  
->  	gpio_irq_base -= 32;
-> -	irq_domain_add_simple(np, gpio_irq_base);
-> +	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
->  
->  	return 0;
->  }
+--- clean-3.3-rc1/drivers/gpio/gpio-pxa.c	2012-01-19 23:04:48.000000000 +0000
++++ linux-3.3-rc1/drivers/gpio/gpio-pxa.c	2012-01-31 12:28:30.760602224 +0000
+@@ -52,7 +52,7 @@
+ 
+ #define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+ 
+-int pxa_last_gpio;
++int pxa_last_gpio = 120;
+ 
+ struct pxa_gpio_chip {
+ 	struct gpio_chip chip;
