@@ -1,41 +1,113 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 31 Jan 2012 18:40:38 +0200
-Subject: [PATCH v2 0/8] Add tegra30 support for secondary cores
-Message-ID: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+Date: Tue, 31 Jan 2012 18:40:39 +0200
+Subject: [PATCH v2 1/8] ARM: tegra: export the chipid
+In-Reply-To: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1328028051-24271-2-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces support for secondary cores on tegra30. It also
-introduces some functions for the flowcontroller and adds basic support for
-tegra30 powerdomains.
+Export a variable containing the Tegra chipid. This will be used by the SMP
+code to distinguish between Tegra variants. Also initialize the Tegra chipid
+on Tegra30.
 
-Peter De Schrijver (8):
-  ARM: tegra: export the chipid
-  ARM: tegra: functions to access the flowcontroller
-  ARM: tegra: rework Tegra secondary CPU core bringup
-  ARM: tegra: prepare powergate.c for multiple variants
-  ARM: tegra: export tegra_powergate_is_powered()
-  ARM: tegra: add support for Tegra30 powerdomains
-  ARM: tegra: support for Tegra30 CPU powerdomains
-  ARM: tegra: support for secondary cores on Tegra30
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/common.c |    1 +
+ arch/arm/mach-tegra/fuse.c   |   18 +++++++++++-------
+ arch/arm/mach-tegra/fuse.h   |    4 ++++
+ 3 files changed, 16 insertions(+), 7 deletions(-)
 
- arch/arm/mach-tegra/Makefile                 |    2 +
- arch/arm/mach-tegra/common.c                 |    4 +
- arch/arm/mach-tegra/flowctrl.c               |   62 ++++++++
- arch/arm/mach-tegra/flowctrl.h               |    5 +
- arch/arm/mach-tegra/fuse.c                   |   18 ++-
- arch/arm/mach-tegra/fuse.h                   |    4 +
- arch/arm/mach-tegra/headsmp.S                |  192 ++++++++++++++++++++++++-
- arch/arm/mach-tegra/include/mach/iomap.h     |    3 +
- arch/arm/mach-tegra/include/mach/powergate.h |   15 ++-
- arch/arm/mach-tegra/platsmp.c                |  139 +++++++++++++------
- arch/arm/mach-tegra/powergate.c              |   53 +++++++-
- arch/arm/mach-tegra/reset.c                  |   84 +++++++++++
- arch/arm/mach-tegra/reset.h                  |   50 +++++++
- 13 files changed, 568 insertions(+), 63 deletions(-)
- create mode 100644 arch/arm/mach-tegra/flowctrl.c
- create mode 100644 arch/arm/mach-tegra/reset.c
- create mode 100644 arch/arm/mach-tegra/reset.h
-
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 1b1dee0..51dcbdff 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -122,6 +122,7 @@ void __init tegra20_init_early(void)
+ #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+ void __init tegra30_init_early(void)
+ {
++	tegra_init_fuse();
+ 	tegra30_init_clocks();
+ 	tegra_init_cache(0x441, 0x551);
+ }
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index adfa429..3298880 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -34,6 +34,7 @@
+ int tegra_sku_id;
+ int tegra_cpu_process_id;
+ int tegra_core_process_id;
++int tegra_chip_id;
+ enum tegra_revision tegra_revision;
+ 
+ /* The BCT to use at boot is specified by board straps that can be read
+@@ -66,12 +67,9 @@ static inline bool get_spare_fuse(int bit)
+ 	return tegra_fuse_readl(FUSE_SPARE_BIT + bit * 4);
+ }
+ 
+-static enum tegra_revision tegra_get_revision(void)
++static enum tegra_revision tegra_get_revision(u32 id)
+ {
+-	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
+-	u32 id = readl(chip_id);
+ 	u32 minor_rev = (id >> 16) & 0xf;
+-	u32 chipid = (id >> 8) & 0xff;
+ 
+ 	switch (minor_rev) {
+ 	case 1:
+@@ -79,7 +77,8 @@ static enum tegra_revision tegra_get_revision(void)
+ 	case 2:
+ 		return TEGRA_REVISION_A02;
+ 	case 3:
+-		if (chipid == 0x20 && (get_spare_fuse(18) || get_spare_fuse(19)))
++		if (tegra_chip_id == TEGRA20 &&
++			(get_spare_fuse(18) || get_spare_fuse(19)))
+ 			return TEGRA_REVISION_A03p;
+ 		else
+ 			return TEGRA_REVISION_A03;
+@@ -92,6 +91,8 @@ static enum tegra_revision tegra_get_revision(void)
+ 
+ void tegra_init_fuse(void)
+ {
++	u32 id;
++
+ 	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
+ 	reg |= 1 << 28;
+ 	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
+@@ -108,10 +109,13 @@ void tegra_init_fuse(void)
+ 	reg = tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
+ 	tegra_bct_strapping = (reg & RAM_ID_MASK) >> RAM_CODE_SHIFT;
+ 
+-	tegra_revision = tegra_get_revision();
++	id = readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
++	tegra_chip_id = (id >> 8) & 0xff;
++
++	tegra_revision = tegra_get_revision(id);
+ 
+ 	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
+-		tegra_revision_name[tegra_get_revision()],
++		tegra_revision_name[tegra_revision],
+ 		tegra_sku_id, tegra_cpu_process_id,
+ 		tegra_core_process_id);
+ }
+diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
+index d65d2ab..d2107b2 100644
+--- a/arch/arm/mach-tegra/fuse.h
++++ b/arch/arm/mach-tegra/fuse.h
+@@ -35,9 +35,13 @@ enum tegra_revision {
+ #define SKU_ID_AP25E	27
+ #define SKU_ID_T25E	28
+ 
++#define TEGRA20		0x20
++#define TEGRA30		0x30
++
+ extern int tegra_sku_id;
+ extern int tegra_cpu_process_id;
+ extern int tegra_core_process_id;
++extern int tegra_chip_id;
+ extern enum tegra_revision tegra_revision;
+ 
+ extern int tegra_bct_strapping;
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
