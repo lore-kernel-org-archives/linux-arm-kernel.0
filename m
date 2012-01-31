@@ -1,33 +1,40 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 31 Jan 2012 17:13:45 +0100
-Subject: [PATCH] arm: lpc32xx: phy3250: add rtc & touch device
-Message-ID: <1328026425-8177-1-git-send-email-w.sang@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 31 Jan 2012 09:14:18 -0700
+Subject: [PATCH] LPC32XX build fix
+In-Reply-To: <1327669485-15322-1-git-send-email-stigge@antcom.de>
+References: <1327669485-15322-1-git-send-email-stigge@antcom.de>
+Message-ID: <CACxGe6sDyz5n=eDmDnUJjtiaYCN409pA=34pJKhM7FvcKvAqaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Roland Stigge <stigge@antcom.de>
-Cc: Kevin Wells <kevin.wells@nxp.com>
----
+On Fri, Jan 27, 2012 at 6:04 AM, Roland Stigge <stigge@antcom.de> wrote:
+> This patch fixes a GCC compile error ("static declaration follows non-static
+> declaration") for LPC32XX's watchdog, removing the extern declaration since
+> it's not called externally.
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>
+> diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+> index 4b4e700..75640bfb 100644
+> --- a/arch/arm/mach-lpc32xx/common.h
+> +++ b/arch/arm/mach-lpc32xx/common.h
 
-Tested after applying Roland's series, but should be appliable even
-without it.
+No need to CC me on patches like this.  I'm not in any way involved
+with lpc32xx maintainership.
 
- arch/arm/mach-lpc32xx/phy3250.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+g.
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index b429d18..905d0c9 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -298,6 +298,8 @@ static struct platform_device lpc32xx_net_device = {
- };
- 
- static struct platform_device *phy3250_devs[] __initdata = {
-+	&lpc32xx_rtc_device,
-+	&lpc32xx_tsc_device,
- 	&lpc32xx_i2c0_device,
- 	&lpc32xx_i2c1_device,
- 	&lpc32xx_i2c2_device,
+> @@ -65,7 +65,6 @@ extern u32 clk_get_pclk_div(void);
+> ?*/
+> ?extern void lpc32xx_get_uid(u32 devid[4]);
+>
+> -extern void lpc32xx_watchdog_reset(void);
+> ?extern u32 lpc32xx_return_iram_size(void);
+>
+> ?/*
+
+
+
 -- 
-1.7.8.3
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
