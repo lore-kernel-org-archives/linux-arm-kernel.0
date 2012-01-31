@@ -1,31 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2012 09:58:11 +0000
-Subject: [PATCH 2/7] Add various hugetlb page table fix
-In-Reply-To: <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
-Message-ID: <20120131095811.GB889@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 31 Jan 2012 10:58:13 +0100
+Subject: [PATCH v2 00/19] ARM: OMAP3+: SmartReflex: bugfixes
+Message-ID: <1328003912-11709-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 03:57:13PM +0800, bill4carson at gmail.com wrote:
-> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-> index 2317a71..062c93c 100644
-> --- a/arch/arm/include/asm/pgtable-2level.h
-> +++ b/arch/arm/include/asm/pgtable-2level.h
-> @@ -123,6 +123,11 @@
->  #define L_PTE_USER		(_AT(pteval_t, 1) << 8)
->  #define L_PTE_XN		(_AT(pteval_t, 1) << 9)
->  #define L_PTE_SHARED		(_AT(pteval_t, 1) << 10)	/* shared(v6), coherent(xsc3) */
-> +#ifdef CONFIG_ARM_HUGETLB_SUPPORT
-> +#define L_PTE_HUGEPAGE	(_AT(pteval_t, 1) << 11) /* mark hugepage */
-> +#define L_PTE_HPAGE_2M  (_AT(pteval_t, 1) << 12) /* only when HUGEPAGE set */
-> +#define L_PTE_HPAGE_16M (_AT(pteval_t, 1) << 13) /* only when HUGEPAGE set */
-> +#endif
+Integrate the latest SmartReflex bufixes from Felipe Balbi [1] and
+Nishant Menon [2], plus misc bugfixes.
 
-(1) How does this work when normal pages can have bit 11 set if they're an
-odd PFN?
+Based on latest master branch of the mainline git tree (3.3.0-rc1) [3], commit
+27ba234c8dfe86c96675d4ef275d1d3c1f5f7053.
 
-(2) How do we even get to PTE level when a 2 or 16MB section doesn't have
-a pte table (as the L1 entry is used for the section or supersection
-mapping) ?
+[1] http://marc.info/?l=linux-omap&m=132134699423547&w=2
+[2] https://github.com/nmenon/linux-omap-ti-pm/commits/linux-omap-3.0
+[3] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=shortlog
+
+Revision history:
+. v2:
+  fixed the use of debugfs_create_* API
+  minor fixes after comments on l-o ML: commits title, removed unneeded
+   fields in descriptions
+  removed the unneeded patches about the suspend/resume handlers
+
+. v1:
+  initial commits
+
+
+Felipe Balbi (4):
+  ARM: OMAP3+: SmartReflex: add missing platform_set_drvdata()
+  ARM: OMAP3+: SmartReflex: move late_initcall() closer to its argument
+  ARM: OMAP3+: SmartReflex: misc cleanups
+  ARM: OMAP3+: SmartReflex: micro-optimization for sanity check
+
+Jean Pihet (1):
+  ARM: OMAP3+: SmartReflex: fix the use of debugfs_create_* API
+
+Julia Lawall (1):
+  ARM: OMAP3+: SmartReflex: add missing error-handling code
+
+Nishanth Menon (12):
+  ARM: OMAP3+: SmartReflex: fix err interrupt disable sequence
+  ARM: OMAP3+: SmartReflex Class3: disable errorgen before disable VP
+  ARM: OMAP3+: SmartReflex: Add a shutdown hook
+  ARM: OMAP3+: SmartReflex: Fix status masking in ERRCONFIG register
+  ARM: OMAP3+: SmartReflex: clear ERRCONFIG_VPBOUNDINTST only on a need
+  ARM: OMAP3+: hwmod: add SmartReflex IRQs
+  ARM: OMAP3+: SmartReflex: introduce class init, deinit and priv data
+  ARM: OMAP3+: SmartReflex: introduce notifiers flags
+  ARM: OMAP3+: SmartReflex: introduce notifier_control
+  ARM: OMAP3+: SmartReflex: disable spamming interrupts
+  ARM: OMAP3+: SmartReflex: introduce class private data per voltage
+    domain
+  ARM: OMAP3+: SmartReflex Class3: restrict CPU to run on
+
+Shweta Gulati (1):
+  ARM: OMAP3+: SmartReflex: Layer Cleanup [V4]
+
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   31 ++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   19 +-
+ arch/arm/mach-omap2/smartreflex-class3.c     |   16 +-
+ arch/arm/mach-omap2/smartreflex.c            |  418 ++++++++++++++++++++++----
+ arch/arm/mach-omap2/smartreflex.h            |   42 +++-
+ arch/arm/mach-omap2/sr_device.c              |   11 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 -
+ 7 files changed, 454 insertions(+), 85 deletions(-)
+
+-- 
+1.7.5.4
