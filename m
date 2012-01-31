@@ -1,76 +1,73 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 31 Jan 2012 14:53:05 +0900
-Subject: [PATCH v2 1/2] PM / Domains: Add OF support
-In-Reply-To: <201201172145.35407.rjw@sisk.pl>
-References: <1325931055-14486-1-git-send-email-thomas.abraham@linaro.org>
- <201201082223.18603.rjw@sisk.pl>
- <001e01ccd4e8$d04b03a0$70e10ae0$%kim@samsung.com>
- <201201172145.35407.rjw@sisk.pl>
-Message-ID: <041e01ccdfdc$9a4257a0$cec706e0$%kim@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 30 Jan 2012 21:59:06 -0800
+Subject: [GIT PULL] DaVinci fixes for v3.3-rc
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317A99AD@DBDE01.ent.ti.com>
+References: <DF0F476B391FA8409C78302C7BA518B6317A70FB@DBDE01.ent.ti.com>
+ <CAOesGMgkkO1B7fk6gDYvh+N32rtzJuPB34Hyz=nQ2OimXU1azw@mail.gmail.com>
+ <DF0F476B391FA8409C78302C7BA518B6317A99AD@DBDE01.ent.ti.com>
+Message-ID: <CAOesGMhyOp88DchMuVnGqyiXYUNbitJOFfLb7NjLPgszYq2m7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki wrote:
-> 
-> On Tuesday, January 17, 2012, Kukjin Kim wrote:
-> > Rafael J. Wysocki wrote:
-> > >
-> > > On Saturday, January 07, 2012, Thomas Abraham wrote:
-> > > > A device node pointer is added to generic pm domain structure to
-> > > associate
-> > > > the domain with a node in the device tree. The platform code parses the
-> > > > device tree to find available nodes representing the generic power
-> > > domain,
-> > > > instantiates the available domains and initializes them by calling
-> > > > pm_genpd_init().
-> > > >
-> > > > Nodes representing the devices include a phandle of the power domain to
-> > > > which it belongs. As these devices get instantiated, the driver code
-> > > > checkes for availability of a power domain phandle, converts the phandle
-> > > > to a device node and uses the new pm_genpd_of_add_device() api to
-> > > > associate the device with a power domain.
-> > > >
-> > > > pm_genpd_of_add_device() runs through its list of registered power
-> > > domains
-> > > > and matches the OF node of the domain with the one specified as the
-> > > > parameter. If a match is found, the device is associated with the
-> > > matched
-> > > > domain.
-> > > >
-> > > > Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> > > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> > >
-> > > I can take this patch for 3.4, but your [2/2] depends on it, so I'm not
-> > > sure how to handle that.  If you want me to take the other patch too,
-> > > it'll need ACKs from the Exynos maintaniers.
-> > >
-> > Hi Rafael,
-> >
-> > Basically, looks ok to me.
-> >
-> > But it would be good if [v3 2/2] patch of this series (this patch) could be
-> > applied in samsung tree to avoid conflicts as it modifies many files. I
-> > don't want to make a trouble when sending my tree to upstream. Of course, as
-> > you said, this have a dependency with [v2 1/2]. So if you're ok, let me
-> > create topic branch will have both(1/2 and 2/2) to merge in your tree.
-> >
-> > How do you think?
-> 
-> That would work for me too.
-> 
-Hi Rafael,
+Hi,
 
-I created topic branch for you with your ack.
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v3.4-for-rafael
+On Mon, Jan 30, 2012 at 9:16 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> Hi Olof,
+>
+> On Mon, Jan 30, 2012 at 04:09:37, Olof Johansson wrote:
+>> Hi,
+>>
+>> On Fri, Jan 27, 2012 at 9:26 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+>> > Hi Olof, Arnd,
+>> >
+>> > Can you please pull these DaVinci fixes for the next v3.3-rc?
+>> > Both the patches have not been stable tagged. The fix by me
+>> > is a v3.3 regression. The fix by Bas van den Berg is not critical
+>> > enough to get into stable kernels.
+>> >
+>> > Thanks,
+>> > Sekhar
+>> >
+>> > The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+>> > ?Linus Torvalds (1):
+>> > ? ? ? ?Linux 3.3-rc1
+>> >
+>> > are available in the git repository at:
+>> >
+>> > ?git://gitorious.org/linux-davinci/linux-davinci.git fixes
+>> >
+>> > Bas van den Berg (1):
+>> > ? ? ?ARM: davinci: DA850: remove non-existing pll1_sysclk4-7 clocks
+>> >
+>> > Sekhar Nori (1):
+>> > ? ? ?ARM: davinci: update mdio bus name
+>>
+>> Looks like the clock removal is almost crossing over into cleanup
+>> territory not a fix. In the future please help us out by briefly
+>> motivate why it's a fix (for something that is broken) and not a
+>> cleanup if it's not obvious from reading it -- noncritical fixes are
+>> usually saved for the next merge window instead.
+>
+> I categorized it as a fix since the path removes clocks which don't
+> exist in hardware. Accessing such clocks will cause undefined behavior.
+>
+> The patch description does say that the clocks don't exist in hardware.
+> Code without the patch is definitely outside the specification.
+>
+> In this regard, what could have been done better in the patch description?
 
-Please merge that in your tree and if any problems, please kindly let me know.
+A brief note as to why this should be cleaned up in time for 3.3
+instead of wait for the 3.4 merge window (i.e. explain what breaks
+with using the kernel if this isn't picked up).
 
-Thanks.
+If the definitions are wrong, and there are no in-tree users of them,
+it's less critical to get an urgent fix in -- especially if the broken
+code wasn't added in this merge window. Later in the -rc release cycle
+this becomes more important, since technically only regressions and
+critical bugfixes are supposed to go in then.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Anyway, I am splitting hairs here. The fix was good to go in, and I'm
+not looking to argue over it. :)
+
+
+-Olof
