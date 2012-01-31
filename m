@@ -1,53 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jan 2012 16:48:30 +0800
-Subject: [PATCH] ARM: imx: update imx_v6_v7_defconfig
-Message-ID: <1327999710-29841-1-git-send-email-shawn.guo@linaro.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 31 Jan 2012 14:07:28 +0530
+Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
+ pwrdm_clear_all_prev_pwrst()
+In-Reply-To: <alpine.DEB.2.00.1201310044310.10061@utopia.booyaka.com>
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
+ <CAMQu2gxyY50Bno_R2v1x98-ND47CrVpZBq+wA3POXz2+7E7eEw@mail.gmail.com>
+ <alpine.DEB.2.00.1201302359320.10061@utopia.booyaka.com>
+ <CAMQu2gyACq7RFyfnyNddDg7xRbHTTqsgXwMq6Ng4WfLxaatvAw@mail.gmail.com>
+ <alpine.DEB.2.00.1201310024510.10061@utopia.booyaka.com>
+ <CAMQu2gyLgmbeqVevTbGazO3A+AkYPsPeWp9mp0eD_EwXs3SZ0w@mail.gmail.com>
+ <alpine.DEB.2.00.1201310044310.10061@utopia.booyaka.com>
+Message-ID: <CAMQu2gw7Wa=4+v4mYr=735WMWBhNwnXM8jq1nuz5dv+e1-v-sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds CONFIG_BLK_DEV_INITRD and runs savedefconfig.  The resulted
-can boot Linaro rootfs out of box.
+On Tue, Jan 31, 2012 at 1:19 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Tue, 31 Jan 2012, Shilimkar, Santosh wrote:
+>
+>> A week back I was discussing with Benoit and Tony about having some
+>> infrastructure like "unused clocks" so that we can shutdown those
+>> modules, and if possible some power domains. That way they get
+>> removed at one single place and they the power domain calls
+>> need not iterate over the once which are no longer needed.
+>
+> Sure, if you have some ideas, that sounds promising. ?I'd assume the main
+> performance issues would be related to global PRCM register reads, rather
+> than raw CPU cycles. ?So that's probably where it would make sense to
+> focus the effort.
+>
+I fully agree that PRCM register read time is the main issue.
+Would discuss this with Benoit and Rajendra bit more on what we
+can be done.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/configs/imx_v6_v7_defconfig |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+> We should also be able to optimize out a fair number of the powerdomain
+> register reads if we cache them in the struct powerdomain. ?The current
+> powerstate and next powerstate seem to be hit a lot, and those should both
+> be cacheable. ?Will probably do some of this as part of the functional
+> powerstate code.
+>
+PD register caching seems to be a good optimization.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 3a4fb2e..fa236a2 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -5,6 +5,7 @@ CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=18
- CONFIG_CGROUPS=y
- CONFIG_RELAY=y
-+CONFIG_BLK_DEV_INITRD=y
- CONFIG_EXPERT=y
- # CONFIG_SLUB_DEBUG is not set
- # CONFIG_COMPAT_BRK is not set
-@@ -12,7 +13,6 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_MODULE_SRCVERSION_ALL=y
--# CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_MXC=y
- CONFIG_MACH_MX31LILLY=y
-@@ -26,7 +26,6 @@ CONFIG_MACH_ARMADILLO5X0=y
- CONFIG_MACH_KZM_ARM11_01=y
- CONFIG_MACH_PCM043=y
- CONFIG_MACH_MX35_3DS=y
--CONFIG_MACH_EUKREA_CPUIMX35=y
- CONFIG_MACH_VPR200=y
- CONFIG_MACH_IMX51_DT=y
- CONFIG_MACH_MX51_3DS=y
-@@ -83,7 +82,6 @@ CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
- # CONFIG_NET_VENDOR_CHELSIO is not set
- # CONFIG_NET_VENDOR_FARADAY is not set
--CONFIG_FEC=y
- # CONFIG_NET_VENDOR_INTEL is not set
- # CONFIG_NET_VENDOR_MARVELL is not set
- # CONFIG_NET_VENDOR_MICREL is not set
--- 
-1.7.5.4
+Regards
+Santosh
