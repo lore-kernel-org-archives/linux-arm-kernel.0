@@ -1,28 +1,126 @@
-From: k.lewandowsk@samsung.com (Karol Lewandowski)
-Date: Tue, 31 Jan 2012 17:41:52 +0100
-Subject: [PATCH v2] ARM: Exynos4: Add cpu-offset property in gic device
- tree node
-In-Reply-To: <1328023789-4672-1-git-send-email-thomas.abraham@linaro.org>
-References: <1328023789-4672-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F2819D0.7090002@samsung.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 31 Jan 2012 18:40:42 +0200
+Subject: [PATCH v2 4/8] ARM: tegra: prepare powergate.c for multiple variants
+In-Reply-To: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1328028051-24271-5-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.01.2012 16:29, Thomas Abraham wrote:
-> Commit db0d4db22a78 ('ARM: gic: allow GIC to support non-banked setups)
-> requires a cpu-offset property to be specified for non-banked gic
-> controllers, which is the case for Exynos4.
->
-> Reported-by: Karol Lewandowski<k.lewandowski@samsung.com>
+Prepare the powergating code for other Tegra variants which have a different
+number of powerdomains.
 
-( Minor note - my email address lacks 'i' at the end, i.e. it's
-   k.lewandowsk@ :)
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/include/mach/powergate.h |    1 -
+ arch/arm/mach-tegra/powergate.c              |   33 +++++++++++++++++++++----
+ 2 files changed, 27 insertions(+), 7 deletions(-)
 
-> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
-> ---
-> This patch solves the issue of boot failure with SMP enabled kernel for
-> Exynos4 device tree enabled machine.
-
-Tested-by: Karol Lewandowski <k.lewandowsk@samsung.com>
-
-Thanks!
+diff --git a/arch/arm/mach-tegra/include/mach/powergate.h b/arch/arm/mach-tegra/include/mach/powergate.h
+index 39c396d..36846dc 100644
+--- a/arch/arm/mach-tegra/include/mach/powergate.h
++++ b/arch/arm/mach-tegra/include/mach/powergate.h
+@@ -27,7 +27,6 @@
+ #define TEGRA_POWERGATE_VDEC	4
+ #define TEGRA_POWERGATE_L2	5
+ #define TEGRA_POWERGATE_MPE	6
+-#define TEGRA_NUM_POWERGATE	7
+ 
+ int tegra_powergate_power_on(int id);
+ int tegra_powergate_power_off(int id);
+diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
+index 9483064..9b828f2 100644
+--- a/arch/arm/mach-tegra/powergate.c
++++ b/arch/arm/mach-tegra/powergate.c
+@@ -31,6 +31,8 @@
+ #include <mach/iomap.h>
+ #include <mach/powergate.h>
+ 
++#include "fuse.h"
++
+ #define PWRGATE_TOGGLE		0x30
+ #define  PWRGATE_TOGGLE_START	(1 << 8)
+ 
+@@ -38,6 +40,8 @@
+ 
+ #define PWRGATE_STATUS		0x38
+ 
++static int tegra_num_powerdomains;
++
+ static DEFINE_SPINLOCK(tegra_powergate_lock);
+ 
+ static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+@@ -75,7 +79,7 @@ static int tegra_powergate_set(int id, bool new_state)
+ 
+ int tegra_powergate_power_on(int id)
+ {
+-	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
++	if (id < 0 || id >= tegra_num_powerdomains)
+ 		return -EINVAL;
+ 
+ 	return tegra_powergate_set(id, true);
+@@ -83,17 +87,18 @@ int tegra_powergate_power_on(int id)
+ 
+ int tegra_powergate_power_off(int id)
+ {
+-	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
++	if (id < 0 || id >= tegra_num_powerdomains)
+ 		return -EINVAL;
+ 
+ 	return tegra_powergate_set(id, false);
+ }
+ 
+-static bool tegra_powergate_is_powered(int id)
++static int tegra_powergate_is_powered(int id)
+ {
+ 	u32 status;
+ 
+-	WARN_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
++	if (id < 0 || id >= tegra_num_powerdomains)
++		return -EINVAL;
+ 
+ 	status = pmc_read(PWRGATE_STATUS) & (1 << id);
+ 	return !!status;
+@@ -103,7 +108,7 @@ int tegra_powergate_remove_clamping(int id)
+ {
+ 	u32 mask;
+ 
+-	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
++	if (id < 0 || id >= tegra_num_powerdomains)
+ 		return -EINVAL;
+ 
+ 	/*
+@@ -156,6 +161,22 @@ err_power:
+ 	return ret;
+ }
+ 
++int __init tegra_powergate_init(void)
++{
++	switch (tegra_chip_id) {
++	case TEGRA20:
++		tegra_num_powerdomains = 7;
++		break;
++	default:
++		/* Unknown Tegra variant. Disable powergating */
++		tegra_num_powerdomains = 0;
++		break;
++	}
++
++	return 0;
++}
++arch_initcall(tegra_powergate_init);
++
+ #ifdef CONFIG_DEBUG_FS
+ 
+ static const char * const powergate_name[] = {
+@@ -175,7 +196,7 @@ static int powergate_show(struct seq_file *s, void *data)
+ 	seq_printf(s, " powergate powered\n");
+ 	seq_printf(s, "------------------\n");
+ 
+-	for (i = 0; i < TEGRA_NUM_POWERGATE; i++)
++	for (i = 0; i < tegra_num_powerdomains; i++)
+ 		seq_printf(s, " %9s %7s\n", powergate_name[i],
+ 			tegra_powergate_is_powered(i) ? "yes" : "no");
+ 	return 0;
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
