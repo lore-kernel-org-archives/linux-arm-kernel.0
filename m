@@ -1,48 +1,35 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 31 Jan 2012 09:19:52 +0100
-Subject: [PATCH 0/7] ARM: OMAP2+: hwmod/timer: first set of cleanups for
- 3.4
-In-Reply-To: <alpine.DEB.2.00.1201310111300.10061@utopia.booyaka.com>
-References: <20120130101251.10450.58423.stgit@dusk> <87ty3cpyuk.fsf@ti.com>
- <4F27A0B0.50704@ti.com>
- <alpine.DEB.2.00.1201310111300.10061@utopia.booyaka.com>
-Message-ID: <4F27A428.3020803@ti.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 31 Jan 2012 08:23:14 +0000
+Subject: [PATCHv2 0/6] ARM: jump label support
+In-Reply-To: <1327757725-10114-1-git-send-email-rabin@rab.in>
+References: <1327757725-10114-1-git-send-email-rabin@rab.in>
+Message-ID: <1327998194.13821.12.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/31/2012 9:14 AM, Paul Walmsley wrote:
-> Hi
->
-> On Tue, 31 Jan 2012, Cousson, Benoit wrote:
->
->> Thanks to the L3 log error:
->> [    0.838439] L3 custom error: MASTER:DucatiM3 TARGET:GPMC
->>
->> I guess that I understand why I was not releasing the hardreset at boot time
->> before:-)
->>
->> DSP and CortexM3 cannot be released from reset until someone loaded a firmware
->> in memory. Otherwise they will start executing some random instructions that
->> in this case are trying to access an area that is not accessible.
->>
->> We have to let the driver handle the hardreset because it is mainly used for
->> processors.
->
-> Currently we're not asserting hardreset in the hwmod code during _reset().
+On Sat, 2012-01-28 at 19:05 +0530, Rabin Vincent wrote:
+> v2:
+>  - Use helper macros from Dave Martin's "ARM: Add generic instruction opcode
+>    manipulation helpers"
+>    http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7278/1
 
-Ooops, you're right we were talking about asserting the reset not 
-de-asserting it.
+This patch is broken, it contains two diff listings for
+arch/arm/include/asm/opcodes.h
 
-> I had that patch in the series at some point, but took it out before
-> posting it.  So maybe that might resolve this particular issue.  Also
-> sounds like we should make sure that we keep the processor IPs in
-> hardreset until some driver explicitly releases it; we'll need to make
-> sure the code does that too.
+The second one looks more correct as the diff accounts for commit
+0c9030deaf59d444 (ARM: 7206/1: Add generic ARM instruction set condition
+code checks). However, when opcodes.h is included in assembler files it
+produces error as it #includes C headers.
 
-So maybe in that case, this is because the reset line is already 
-de-asserted by the fast boot and by enabling the clock we start 
-executing some random code in the CortexM3... but this is still weird 
-that this error was not happening before.
+Moving the #ifndef __ASSEMBLY__ to above the #includes makes things
+compile cleanly...
 
-Regards,
-Benoit
++#ifndef __ASSEMBLY__
+ #include <linux/types.h>
+ #include <linux/swab.h>
+
+-#ifndef __ASSEMBLY__
+
+
+-- 
+Tixy
