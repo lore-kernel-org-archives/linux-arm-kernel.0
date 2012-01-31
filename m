@@ -1,37 +1,50 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 31 Jan 2012 11:34:01 +0100
-Subject: [PATCH v2 6/7] LPC32xx: clock.c: USB PLL fix
-In-Reply-To: <1327939327-7799-6-git-send-email-stigge@antcom.de>
-References: <1327939327-7799-1-git-send-email-stigge@antcom.de>
- <1327939327-7799-6-git-send-email-stigge@antcom.de>
-Message-ID: <20120131103401.GJ2471@pengutronix.de>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 31 Jan 2012 18:38:23 +0800
+Subject: [PATCH v2] mtd/gpmi : add BBT support to gpmi nand driver
+Message-ID: <1328006303-26844-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 05:02:05PM +0100, Roland Stigge wrote:
-> This patch fixes and updates the USB PLL handling. With the old driver version,
-> the USB clock was sometimes not started correctly. The update reflects the
-> driver changes in this regard from Kevin Wells.
-> 
-> See also git.lpclinux.com
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+Add a new field to gpmi_nand_platform_data{}.
+Make the BBT support to board specific.
 
-I remember we needed that fix back then as well, so I am tempted to ack
-it. However, I'd like to test it but USB is currently not available. Do
-you happen to have a USB fixing commit just to test (can be hackish)?
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 ++
+ include/linux/mtd/gpmi-nand.h          |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-Thanks,
-
-   Wolfram
-
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 493ec2f..4d369df 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1493,6 +1493,8 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
+ 	chip->ecc.mode		= NAND_ECC_HW;
+ 	chip->ecc.size		= 1;
+ 	chip->ecc.layout	= &gpmi_hw_ecclayout;
++	if (pdata->enable_bbt)
++		chip->bbt_options = NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+ 
+ 	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
+ 	this->bch_geometry.payload_size = 1024;
+diff --git a/include/linux/mtd/gpmi-nand.h b/include/linux/mtd/gpmi-nand.h
+index 69b6dbf..12078c9 100644
+--- a/include/linux/mtd/gpmi-nand.h
++++ b/include/linux/mtd/gpmi-nand.h
+@@ -51,6 +51,7 @@
+  * @partitions:              An optional pointer to an array of partition
+  *                           descriptions.
+  * @partition_count:         The number of elements in the partitions array.
++ * @enable_bbt:              Enable the BBT or not.
+  */
+ struct gpmi_nand_platform_data {
+ 	/* SoC hardware information. */
+@@ -64,5 +65,6 @@ struct gpmi_nand_platform_data {
+ 	/* Medium information. */
+ 	struct		mtd_partition *partitions;
+ 	unsigned	partition_count;
++	int		enable_bbt;
+ };
+ #endif
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/98fc752a/attachment.sig>
+1.7.0.4
