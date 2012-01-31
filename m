@@ -1,35 +1,59 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 31 Jan 2012 10:58:31 +0100
-Subject: [PATCH 18/19] ARM: OMAP3+: SmartReflex: micro-optimization for sanity
- check
+Date: Tue, 31 Jan 2012 10:58:32 +0100
+Subject: [PATCH 19/19] ARM: OMAP3+: SmartReflex: fix the use of
+ debugfs_create_* API
 In-Reply-To: <1328003912-11709-1-git-send-email-j-pihet@ti.com>
 References: <1328003912-11709-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1328003912-11709-19-git-send-email-j-pihet@ti.com>
+Message-ID: <1328003912-11709-20-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+The debugfs_create_* API returns a NULL ptr in case of problem.
+Fix the smartreflex code to take this into account.
 
-val && (val != 1) == val > 1
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index c2e3d6b..2fe882f 100644
+index 2fe882f..a9afaf7 100644
 --- a/arch/arm/mach-omap2/smartreflex.c
 +++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -1065,7 +1065,7 @@ static int omap_sr_autocomp_store(void *data, u64 val)
+@@ -1169,7 +1169,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 	if (!sr_dbg_dir) {
+ 		sr_dbg_dir = debugfs_create_dir("smartreflex", NULL);
+ 		if (!sr_dbg_dir) {
+-			ret = PTR_ERR(sr_dbg_dir);
++			ret = -ENOMEM;
+ 			pr_err("%s:sr debugfs dir creation failed(%d)\n",
+ 				__func__, ret);
+ 			goto err_iounmap;
+@@ -1185,10 +1185,10 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 	}
+ 	sr_info->dbg_dir = debugfs_create_dir(name, sr_dbg_dir);
+ 	kfree(name);
+-	if (IS_ERR(sr_info->dbg_dir)) {
++	if (!sr_info->dbg_dir) {
+ 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory\n",
+ 			__func__);
+-		ret = PTR_ERR(sr_info->dbg_dir);
++		ret = -ENOMEM;
+ 		goto err_iounmap;
  	}
  
- 	/* Sanity check */
--	if (val && (val != 1)) {
-+	if (val > 1) {
- 		pr_warning("%s: Invalid argument %lld\n", __func__, val);
- 		return -EINVAL;
+@@ -1202,10 +1202,10 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 			&sr_info->err_minlimit);
+ 
+ 	nvalue_dir = debugfs_create_dir("nvalue", sr_info->dbg_dir);
+-	if (IS_ERR(nvalue_dir)) {
++	if (!nvalue_dir) {
+ 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory"
+ 			"for n-values\n", __func__);
+-		ret = PTR_ERR(nvalue_dir);
++		ret = -ENOMEM;
+ 		goto err_debugfs;
  	}
+ 
 -- 
 1.7.5.4
