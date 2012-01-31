@@ -1,32 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2012 10:10:00 +0000
-Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
- by uBoot)?
-In-Reply-To: <CAHkRjk6KQXR1kt8VTPC3GOaHUusKikxXHR=Mge8akaVL2ipvaw@mail.gmail.com>
-References: <20120117133918.GE11475@arm.com>
- <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
- <WC20120120085711.330803@terrafix.co.uk> <20120127173029.GA3281@arm.com>
- <4F277A6E.9070107@ti.com>
- <CAHkRjk7z2QYbU09BRfAWmChw5xj9taCarWfnttWveyqtadiEOg@mail.gmail.com>
- <CAMQu2gxr5ZkH4AE_7QNptxx7onQMGaj+qhUF+DSw9MnkCqCRog@mail.gmail.com>
- <CAHkRjk7Fh=OUk8K=bJa8xzPqMvT6P6gjT+kqAA0DeVfrF0sUNg@mail.gmail.com>
- <CAMQu2gwDJ=aezNAUD3YmGHQ6fBxkxgUonYkQYPH8WBeNvZCKMQ@mail.gmail.com>
- <CAHkRjk6KQXR1kt8VTPC3GOaHUusKikxXHR=Mge8akaVL2ipvaw@mail.gmail.com>
-Message-ID: <20120131101000.GA1275@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 31 Jan 2012 11:22:49 +0100
+Subject: [PATCH v2 1/7] LPC32xx: clock.c: Missing header file
+In-Reply-To: <4F26D9DC.2000008@ru.mvista.com>
+References: <1327939327-7799-1-git-send-email-stigge@antcom.de>
+ <4F26D9DC.2000008@ru.mvista.com>
+Message-ID: <20120131102249.GF2471@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 09:53:25AM +0000, Catalin Marinas wrote:
-> Maybe we could factor out the CPU-specific settings from proc-v*.S
-> into a separate arch/arm/boot/preload directory. We keep proc-v*.S
-> entirely generic and the implementation-defined bits setting in the
-> preload code. You could have an option to link the preload with the
-> kernel but we could recommend that people run this code from
-> boot-loader before invoking the kernel.
+On Mon, Jan 30, 2012 at 08:56:44PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 01/30/2012 07:02 PM, Roland Stigge wrote:
+> 
+> >This patch fixes the compiler warnings regarding the EXPORT_SYMBOL usage
+> 
+> >Signed-off-by: Roland Stigge<stigge@antcom.de>
+> 
+> >diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+> >index 1e02751..8e79313 100644
+> >--- a/arch/arm/mach-lpc32xx/clock.c
+> >+++ b/arch/arm/mach-lpc32xx/clock.c
+> >@@ -82,6 +82,7 @@
+> >   *   will also impact the individual peripheral rates.
+> >   */
+> >
+> >+#include<linux/module.h>
+> 
+>    Shouldn't <linux/export.h> be included instead nowadays?
 
-You've seen the resistance from uboot to stuff we do with the kernel,
-this will be no different.  There's also quite a number of boot loaders
-out there which aren't capable of running a binary, returning and then
-loading and running the kernel.
+Ack.
 
-Plus, of course, it's far from friendly towards TFTP setups.
+@Roland: Nice series, thanks for splitting things up.
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/4e4f30cc/attachment.sig>
