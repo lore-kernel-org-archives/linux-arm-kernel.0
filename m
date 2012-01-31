@@ -1,35 +1,53 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 31 Jan 2012 08:23:14 +0000
-Subject: [PATCHv2 0/6] ARM: jump label support
-In-Reply-To: <1327757725-10114-1-git-send-email-rabin@rab.in>
-References: <1327757725-10114-1-git-send-email-rabin@rab.in>
-Message-ID: <1327998194.13821.12.camel@computer2.home>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 31 Jan 2012 16:48:30 +0800
+Subject: [PATCH] ARM: imx: update imx_v6_v7_defconfig
+Message-ID: <1327999710-29841-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-01-28 at 19:05 +0530, Rabin Vincent wrote:
-> v2:
->  - Use helper macros from Dave Martin's "ARM: Add generic instruction opcode
->    manipulation helpers"
->    http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7278/1
+It adds CONFIG_BLK_DEV_INITRD and runs savedefconfig.  The resulted
+can boot Linaro rootfs out of box.
 
-This patch is broken, it contains two diff listings for
-arch/arm/include/asm/opcodes.h
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/configs/imx_v6_v7_defconfig |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-The second one looks more correct as the diff accounts for commit
-0c9030deaf59d444 (ARM: 7206/1: Add generic ARM instruction set condition
-code checks). However, when opcodes.h is included in assembler files it
-produces error as it #includes C headers.
-
-Moving the #ifndef __ASSEMBLY__ to above the #includes makes things
-compile cleanly...
-
-+#ifndef __ASSEMBLY__
- #include <linux/types.h>
- #include <linux/swab.h>
-
--#ifndef __ASSEMBLY__
-
-
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 3a4fb2e..fa236a2 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -5,6 +5,7 @@ CONFIG_SYSVIPC=y
+ CONFIG_LOG_BUF_SHIFT=18
+ CONFIG_CGROUPS=y
+ CONFIG_RELAY=y
++CONFIG_BLK_DEV_INITRD=y
+ CONFIG_EXPERT=y
+ # CONFIG_SLUB_DEBUG is not set
+ # CONFIG_COMPAT_BRK is not set
+@@ -12,7 +13,6 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODVERSIONS=y
+ CONFIG_MODULE_SRCVERSION_ALL=y
+-# CONFIG_LBDAF is not set
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_ARCH_MXC=y
+ CONFIG_MACH_MX31LILLY=y
+@@ -26,7 +26,6 @@ CONFIG_MACH_ARMADILLO5X0=y
+ CONFIG_MACH_KZM_ARM11_01=y
+ CONFIG_MACH_PCM043=y
+ CONFIG_MACH_MX35_3DS=y
+-CONFIG_MACH_EUKREA_CPUIMX35=y
+ CONFIG_MACH_VPR200=y
+ CONFIG_MACH_IMX51_DT=y
+ CONFIG_MACH_MX51_3DS=y
+@@ -83,7 +82,6 @@ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_BROADCOM is not set
+ # CONFIG_NET_VENDOR_CHELSIO is not set
+ # CONFIG_NET_VENDOR_FARADAY is not set
+-CONFIG_FEC=y
+ # CONFIG_NET_VENDOR_INTEL is not set
+ # CONFIG_NET_VENDOR_MARVELL is not set
+ # CONFIG_NET_VENDOR_MICREL is not set
 -- 
-Tixy
+1.7.5.4
