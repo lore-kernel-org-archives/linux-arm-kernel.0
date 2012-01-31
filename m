@@ -1,34 +1,85 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  1 Feb 2012 00:39:05 +0900
-Subject: [PATCH 0/9] ARM: EXYNOS: add support EXYNOS5 SoC
-Message-ID: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+Date: Wed,  1 Feb 2012 00:39:06 +0900
+Subject: [PATCH 1/9] ARM: EXYNOS: use exynos_init_uarts() instead of
+ exynos4_init_uarts()
+In-Reply-To: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1328024354-4277-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support EXYNOS5250 SoC which has two A15 cores
-can be used on mobile devices.
+Since exynos4_init_uarts() can be used for EXYNOS5 SoCs,
+this patch changes the name of function to exynos_init_uarts().
 
-This patches are including temporary commits which are about
-regarding map, interrupt and get_core_count() and they will be
-fixed next time.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos/common.c |    8 ++++----
+ arch/arm/mach-exynos/common.h |    8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-And the EXYNOS5 can support single zImage with EXYNOS4 SoCs
-when EXYNOS5 DT is supported.
-
-NOTE:
-- This patches depend on following
-  ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
-  ARM: SAMSUNG: allow the configuration of KERNEL HZ in plat-samsung
-  serial: samsung: Add support for EXYNOS4212 and EXYNOS4412
-
-- EXYNOS5 DT will be supported together next time.
-
-[PATCH 1/9] ARM: EXYNOS: use exynos_init_uarts() instead of
-[PATCH 2/9] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
-[PATCH 3/9] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
-[PATCH 4/9] ARM: EXYNOS: add support for ARCH_EXYNOS5 and EXYNOS5250
-[PATCH 5/9] ARM: EXYNOS: add board file for SMDK5250
-[PATCH 6/9] serial: samsung: Add support for EXYNOS5250
-[PATCH 7/9] ARM: EXYNOS: temporary add interrupt definitions
-[PATCH 8/9] ARM: EXYNOS: temporary add map definitions for uart
-[PATCH 9/9] ARM: EXYNOS: temporary fixup regarding get_core_count()
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index c59e188..a168533 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -56,7 +56,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idmask		= EXYNOS4_CPU_MASK,
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+-		.init_uarts	= exynos4_init_uarts,
++		.init_uarts	= exynos_init_uarts,
+ 		.init		= exynos_init,
+ 		.name		= name_exynos4210,
+ 	}, {
+@@ -64,7 +64,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idmask		= EXYNOS4_CPU_MASK,
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+-		.init_uarts	= exynos4_init_uarts,
++		.init_uarts	= exynos_init_uarts,
+ 		.init		= exynos_init,
+ 		.name		= name_exynos4212,
+ 	}, {
+@@ -72,7 +72,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idmask		= EXYNOS4_CPU_MASK,
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+-		.init_uarts	= exynos4_init_uarts,
++		.init_uarts	= exynos_init_uarts,
+ 		.init		= exynos_init,
+ 		.name		= name_exynos4412,
+ 	},
+@@ -476,7 +476,7 @@ int __init exynos_init(void)
+ 
+ /* uart registration process */
+ 
+-void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
++void __init exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ {
+ 	struct s3c2410_uartcfg *tcfg = cfg;
+ 	u32 ucnt;
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 8c1efe6..2d79aba 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -36,15 +36,15 @@ extern struct sys_timer exynos4_timer;
+ 
+ #ifdef CONFIG_ARCH_EXYNOS
+ extern  int exynos_init(void);
++extern void exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+ extern void exynos4_map_io(void);
+ extern void exynos4_init_clocks(int xtal);
+-extern void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+ 
+ #else
+-#define exynos4_init_clocks NULL
+-#define exynos4_init_uarts NULL
+-#define exynos4_map_io NULL
+ #define exynos_init NULL
++#define exynos_init_uarts NULL
++#define exynos4_map_io NULL
++#define exynos4_init_clocks NULL
+ #endif
+ 
+ #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+-- 
+1.7.4.4
