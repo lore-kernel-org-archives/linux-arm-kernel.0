@@ -1,52 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Feb 2012 20:54:14 -0800
-Subject: [PATCH 7/8] ARM: OMAP: Remove plat/io.h by moving it into
- mach/io.h
-In-Reply-To: <4F4EF2C4.2060605@gmail.com>
-References: <20120224182246.GL18185@atomide.com> <4F4AFCC7.3020509@gmail.com>
- <20120229014719.GK18901@atomide.com> <4F4EBBDF.9090806@gmail.com>
- <20120301001140.GA18438@n2100.arm.linux.org.uk>
- <20120301003939.GU18901@atomide.com>
- <20120301010348.GV18901@atomide.com> <4F4EEE30.9080109@gmail.com>
- <20120301034613.GW18901@atomide.com> <4F4EF2C4.2060605@gmail.com>
-Message-ID: <20120301045414.GX18901@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed,  1 Feb 2012 00:39:05 +0900
+Subject: [PATCH 0/9] ARM: EXYNOS: add support EXYNOS5 SoC
+Message-ID: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [120229 19:22]:
-> On 02/29/2012 09:46 PM, Tony Lindgren wrote:
-> > * Rob Herring <robherring2@gmail.com> [120229 19:02]:
-> >> On 02/29/2012 07:03 PM, Tony Lindgren wrote:
-> >>>
-> >>> Rob, I assume you'll apply this into your branch?
-> >>>
-> >>
-> >> Yes
-> > 
-> > OK
-> >  
-> >>> --- a/arch/arm/plat-omap/include/plat/sdrc.h
-> >>> +++ b/arch/arm/plat-omap/include/plat/sdrc.h
-> >>> @@ -16,8 +16,6 @@
-> >>>   * published by the Free Software Foundation.
-> >>>   */
-> >>>  
-> >>> -#include <mach/io.h>
-> >>> -
-> >>
-> >> I added iomap.h here as there are macros in the header from it.
-> > 
-> > Hmm, did you get some compile error? I though all code
-> > using sdrc.h already has iomap.h included. This file
-> > should eventually be local to mach-omap2.
-> > 
-> 
-> No, just examined the file. If it compiles, either way is fine with me.
+This patch adds support EXYNOS5250 SoC which has two A15 cores
+can be used on mobile devices.
 
-OK let's leave it out then as it simplifies further clean up.
-I tested it with omap1_defconfig and omap2plus_defconfig,
-will also run some randconfigs with it.
+This patches are including temporary commits which are about
+regarding map, interrupt and get_core_count() and they will be
+fixed next time.
 
-Regards,
+And the EXYNOS5 can support single zImage with EXYNOS4 SoCs
+when EXYNOS5 DT is supported.
 
-Tony
+NOTE:
+- This patches depend on following
+  ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
+  ARM: SAMSUNG: allow the configuration of KERNEL HZ in plat-samsung
+  serial: samsung: Add support for EXYNOS4212 and EXYNOS4412
+
+- EXYNOS5 DT will be supported together next time.
+
+[PATCH 1/9] ARM: EXYNOS: use exynos_init_uarts() instead of
+[PATCH 2/9] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
+[PATCH 3/9] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
+[PATCH 4/9] ARM: EXYNOS: add support for ARCH_EXYNOS5 and EXYNOS5250
+[PATCH 5/9] ARM: EXYNOS: add board file for SMDK5250
+[PATCH 6/9] serial: samsung: Add support for EXYNOS5250
+[PATCH 7/9] ARM: EXYNOS: temporary add interrupt definitions
+[PATCH 8/9] ARM: EXYNOS: temporary add map definitions for uart
+[PATCH 9/9] ARM: EXYNOS: temporary fixup regarding get_core_count()
