@@ -1,35 +1,29 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 31 Jan 2012 11:51:18 +0100
-Subject: [PATCH v2] mtd/gpmi : add BBT support to gpmi nand driver
-In-Reply-To: <1328006303-26844-1-git-send-email-b32955@freescale.com>
-References: <1328006303-26844-1-git-send-email-b32955@freescale.com>
-Message-ID: <20120131105118.GK2471@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 31 Jan 2012 08:53:29 -0200
+Subject: [GIT PULL] i.MX fixes for -rc
+In-Reply-To: <20120131085637.GM1990@pengutronix.de>
+References: <20120127111024.GB5446@pengutronix.de>
+ <CAOesGMj4k3NcXMh3WtegJgejdDK1QntDnyudD6Ky8Ou6mN3cBg@mail.gmail.com>
+ <20120131085637.GM1990@pengutronix.de>
+Message-ID: <CAOMZO5ARnTLrO_+5q+tU501Y2qL5xh8SOM74KU8T9A_+2vCJFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 06:38:23PM +0800, Huang Shijie wrote:
-> Add a new field to gpmi_nand_platform_data{}.
-> Make the BBT support to board specific.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+On Tue, Jan 31, 2012 at 6:56 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-Much better :)
+>
+> I understood that the second patch is a bugfix and that it depends on
+> the first one. Fabio, can you comment on this?
 
-> @@ -64,5 +65,6 @@ struct gpmi_nand_platform_data {
->  	/* Medium information. */
->  	struct		mtd_partition *partitions;
->  	unsigned	partition_count;
-> +	int		enable_bbt;
+Yes, this is correct.
 
-Bitfield? (check imx for example)
+The bugfix that my patch addresses is the fact that mx35 is not
+entering LPM (low power mode) in WFI.
+It is using the same behaviour of mx31 and this is not correct for
+mx35 due to the different LPM field.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/372991b5/attachment.sig>
+I saw Olof?s feedback about the patch and will address it soon.
+
+Thanks,
+
+Fabio Estevam
