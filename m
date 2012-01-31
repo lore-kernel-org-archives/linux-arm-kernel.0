@@ -1,158 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jan 2012 23:06:30 +0800
-Subject: [PATCH v3 1/2] irq: add irq_domain support to generic-chip
-In-Reply-To: <4F27FB7D.9030003@gmail.com>
-References: <1327944699-29882-1-git-send-email-robherring2@gmail.com>
- <1327944699-29882-2-git-send-email-robherring2@gmail.com>
- <CAAQ0ZWSVgcv2+jD9C=4-JFyuAZEr+DYL=BO=4kmYn1t=AAXn_A@mail.gmail.com>
- <4F27FB7D.9030003@gmail.com>
-Message-ID: <20120131150627.GB26436@S2101-09.ap.freescale.net>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 31 Jan 2012 20:24:35 +0530
+Subject: [PATCH] ARM: Exynos4: Add cpu-offset property in gic device tree
+ node
+In-Reply-To: <4F280023.8070003@samsung.com>
+References: <1328021425-4233-1-git-send-email-thomas.abraham@linaro.org>
+ <4F280023.8070003@samsung.com>
+Message-ID: <CAJuYYwTzut3+GwKBs8JUWjq3Mw3gTTsm0qxzmvjL=RiwKGwQ8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 08:32:29AM -0600, Rob Herring wrote:
-> On 01/31/2012 08:13 AM, Shawn Guo wrote:
-> > On Mon, Jan 30, 2012 at 11:31:38AM -0600, Rob Herring wrote:
-> > ...
-> >> +#ifdef CONFIG_IRQ_DOMAIN
-> >> +static int irq_gc_irq_domain_match(struct irq_domain *d, struct device_node *np)
-> >> +{
-> >> +	struct irq_chip_generic *gc;
-> >> +
-> >> +	if (d->of_node != NULL && d->of_node == np) {
-> >> +		list_for_each_entry(gc, &gc_list, list) {
-> >> +			if ((gc == d->host_data) && (d == gc->domain))
-> >> +				return 1;
-> >> +		}
-> >> +	}
-> > 
-> > IIRC, we talked about this a little bit, but I'm still unsure how this
-> > works for imx5 tzic case, where we have the same one tzic device_node
-> > for 4 irqdomains representing 128 irq lines.  It seems to me the match
-> > function here will always find the first irqdomain of the 4 for any
-> > of those 128 tzic irqs.
-> > 
-> > The following is my code change against your branch for testing.  Am I
-> > missing anything?
-> 
-> The irq domain code is a bit different now, so it's matching differently
-> than before. See the match function. The host_data ptr for a domain is
-> set to the gc ptr. I then check that the gc->domain matches the domain
-> passed in. So the fact that 4 domains point to 1 device_node doesn't matter.
-> 
-I do not quite follow on that.  The gc->domain always matches the
-domain passed in anyway for those 4 pairs of domain/gc.  That said,
-the condition is all true for any of those 4 tzic domains.
+On 31 January 2012 20:22, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 01/31/12 23:50, Thomas Abraham wrote:
+>>
+>> Commit 'ARM: gic: allow GIC to support non-banked setups'
+>> (db0d4db22a78d31c)
+>
+>
+> I think, following format is more general.
+> commit id ("subject")
+>
+> Please see, below.
+> http://lkml.org/lkml/2010/6/1/498
 
-	if ((gc == d->host_data) && (d == gc->domain))
+Thanks for the pointer Mr. Kim. I will resubmit with that change.
 
-It does not help on identifying the correct domain from those 4 with
-given device_node, which is exactly same for those 4 domains.
-
-> > 
-> > 8<---
-> > diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-> > index e1b5edf..45abf11 100644
-> > --- a/arch/arm/mach-imx/imx51-dt.c
-> > +++ b/arch/arm/mach-imx/imx51-dt.c
-> > @@ -44,13 +44,6 @@ static const struct of_dev_auxdata
-> > imx51_auxdata_lookup[] __initconst = {
-> >         { /* sentinel */ }
-> >  };
-> > 
-> > -static int __init imx51_tzic_add_irq_domain(struct device_node *np,
-> > -                               struct device_node *interrupt_parent)
-> > -{
-> > -       irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
-> > -       return 0;
-> > -}
-> > -
-> >  static int __init imx51_gpio_add_irq_domain(struct device_node *np,
-> >                                 struct device_node *interrupt_parent)
-> >  {
-> > @@ -63,7 +56,6 @@ static int __init imx51_gpio_add_irq_domain(struct
-> > device_node *np,
-> >  }
-> > 
-> >  static const struct of_device_id imx51_irq_match[] __initconst = {
-> > -       { .compatible = "fsl,imx51-tzic", .data = imx51_tzic_add_irq_domain, },
-> >         { .compatible = "fsl,imx51-gpio", .data = imx51_gpio_add_irq_domain, },
-> >         { /* sentinel */ }
-> >  };
-> > 
-> > diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-> > index 98308ec..ffb615d 100644
-> > --- a/arch/arm/plat-mxc/tzic.c
-> > +++ b/arch/arm/plat-mxc/tzic.c
-> > @@ -122,7 +122,9 @@ static __init void tzic_init_gc(unsigned int irq_start)
-> >         ct->regs.disable = TZIC_ENCLEAR0(idx);
-> >         ct->regs.enable = TZIC_ENSET0(idx);
-> > 
-> > -       irq_setup_generic_chip(gc, IRQ_MSK(32), 0, IRQ_NOREQUEST, 0);
-> > +       irq_setup_generic_chip_domain(gc,
-> > +               of_find_compatible_node(NULL, NULL, "fsl,tzic"),
-> > +               IRQ_MSK(32), 0, IRQ_NOREQUEST, 0);
-> 
-> Looks right, but I wouldn't lookup the node ptr every time.
-> 
-Yeah, will avoid it in the final patch.
-
-> >  }
-> > 
-> >  asmlinkage void __exception_irq_entry tzic_handle_irq(struct pt_regs *regs)
-> > --->8
-> > 
-> >> +	return 0;
-> >> +}
-> >> +
-> > ...
-> >> +void irq_setup_generic_chip_domain(struct irq_chip_generic *gc,
-> >> +			    struct device_node *node, u32 msk,
-> >> +			    enum irq_gc_flags flags, unsigned int clr,
-> >> +			    unsigned int set)
-> >> +{
-> >> +	struct irq_chip_type *ct = gc->chip_types;
-> >> +
-> >> +	if (!node) {
-> >> +		irq_setup_generic_chip(gc, msk, flags, clr, set);
-> >> +		return;
-> >> +	}
-> >> +
-> >> +	raw_spin_lock(&gc_lock);
-> >> +	list_add_tail(&gc->list, &gc_list);
-> >> +	raw_spin_unlock(&gc_lock);
-> >> +
-> >> +	/* Init mask cache ? */
-> >> +	if (flags & IRQ_GC_INIT_MASK_CACHE)
-> >> +		gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
-> >> +
-> >> +	gc->flags = flags;
-> >> +	gc->irq_clr = clr;
-> >> +	gc->irq_set = set;
-> >> +
-> >> +	/* Users of domains should not use irq_base */
-> >> +	if ((int)gc->irq_base > 0)
-> >> +		gc->domain = irq_domain_add_legacy(node, fls(msk),
-> >> +						   gc->irq_base, 0,
-> >> +						   &irq_gc_irq_domain_ops, gc);
-> >> +	else {
-> >> +		gc->irq_base = 0;
-> >> +		gc->domain = irq_domain_add_linear(node, fls(msk),
-> >> +						   &irq_gc_irq_domain_ops, gc);
-> >> +	}
-> > 
-> > We have 4 generic_chips for tzic with irq_base as 0, 32, 64, 96.  In
-> > this case, we end up with having the first domain as the linear, and
-> > the other 3 as the legacy?
-> 
-> Umm, yes. So it should be '>= 0' instead until we stop using IRQ0. I
-> could base it on NULL node ptr instead...
-> 
-> For the DT case, you want irq_base to be -1.
-> 
-Unless we have to, I would keep the same tzic code for dt and non-dt
-to save #ifdef CONFIG_OF.
-
--- 
 Regards,
-Shawn
+Thomas.
+
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+>> requires a cpu-offset property to be specified for non-banked gic
+>> controllers,
+>> which is the case for Exynos4.
+>>
+>> Reported-by: Karol Lewandowski<k.lewandowski@samsung.com>
+>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+>> ---
+>> This patch solves the issue of boot failure with SMP enabled kernel for
+>> Exynos4 device tree enabled machine.
+>>
+>> ?arch/arm/boot/dts/exynos4210.dtsi | ? ?1 +
+>> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+>> b/arch/arm/boot/dts/exynos4210.dtsi
+>> index 63d7578..a1dd2ee 100644
+>> --- a/arch/arm/boot/dts/exynos4210.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+>> @@ -29,6 +29,7 @@
+>> ? ? ? ? ? ? ? ?compatible = "arm,cortex-a9-gic";
+>> ? ? ? ? ? ? ? ?#interrupt-cells =<3>;
+>> ? ? ? ? ? ? ? ?interrupt-controller;
+>> + ? ? ? ? ? ? ? cpu-offset =<0x8000>;
+>> ? ? ? ? ? ? ? ?reg =<0x10490000 0x1000>,<0x10480000 0x100>;
+>> ? ? ? ?};
+>>
+>
