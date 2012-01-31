@@ -1,23 +1,56 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 31 Jan 2012 10:49:49 +0530
-Subject: [PATCH V2 08/12] dmaengine/dw_dmac: Unmap all memory buffers
- after completion of slave transfers
-In-Reply-To: <1327986775.1527.63.camel@vkoul-udesk3>
-References: <cover.1326876464.git.viresh.kumar@st.com>
- <ba53f229f3f594bfe0459b01a9ebb4d9b2c15882.1326876464.git.viresh.kumar@st.com>
- <20120118093620.GC1068@n2100.arm.linux.org.uk> <4F1696E4.9070806@st.com>
- <1327982312.1527.61.camel@vkoul-udesk3> <4F27691A.5010503@st.com>
- <1327986775.1527.63.camel@vkoul-udesk3>
-Message-ID: <4F2779F5.3000701@st.com>
+From: aneesh@ti.com (Aneesh V)
+Date: Tue, 31 Jan 2012 10:51:50 +0530
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled
+ by uBoot)?
+In-Reply-To: <20120127173029.GA3281@arm.com>
+References: <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+ <WC20120117085444.17057E@terrafix.co.uk> <20120117121138.GC11475@arm.com>
+ <4F15692D.4070100@ti.com>
+ <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+ <20120117133918.GE11475@arm.com>
+ <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+ <WC20120120085711.330803@terrafix.co.uk> <20120127173029.GA3281@arm.com>
+Message-ID: <4F277A6E.9070107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/31/2012 10:42 AM, Vinod Koul wrote:
-> Btw, can you also fix the driver not to use chan->private?
+Hi Catalin,
 
-Ya sure, but i am not in sync with the issue. :(
-Why do we need to remove code dependency on chan->private, something
-dmaengine specific has changed?
+On Friday 27 January 2012 11:00 PM, Catalin Marinas wrote:
+> On Fri, Jan 20, 2012 at 08:57:11AM +0000, Joe Woodward wrote:
+>>> So I re-iterate that we need to have solution to this problem.
+>>
+>> ... I don't want to be a pain, but it seems to me that this dicussion
+>> didn't reach a full conclussion?
+>
+> Probably not, because it depends on many variables. See below my take on
+> this.
+>
+>> I think it was left with the open options being:
+>> 1) Leave the L2/outer cache enabled in the bootloader (not ideal and
+>> may cause problems with future devices)
+>
+> This depends on whether the L2 is inner or outer:
+>
+> L2 inner - leave it enabled in the boot loader
+> L2 outer - leave it disabled in the boot loader
+>
+>> 2) Turn the L2/outer cache on for OMAP3 later in the kernel boot when
+>> the device is known
+>
+> Same as above:
+>
+> L2 inner - don't do anything, it gets used when SCTLR.M is enabled
+> L2 outer - enabled at boot time via the platform code (later, after MMU
+> 	was enabled).
+>
 
--- 
-viresh
+What is the reasoning behind this recommendation? Why the distinction
+between L2 being inner or outer. I don't see anything to this effect in
+the Cortex-A8 TRM? In fact the only recommendation I could find(section
+8.3) is asking to set L2EN to 1 before setting C bit to 1 irrespective
+of inner/outer?
+
+br,
+Aneesh
