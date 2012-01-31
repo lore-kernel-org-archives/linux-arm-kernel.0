@@ -1,153 +1,233 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 31 Jan 2012 20:20:44 +0900
-Subject: [PATCH v2 2/2] S3C24XX: move spi-s3c24xx platdata out of mach
-In-Reply-To: <201201271040.08945.heiko@sntech.de>
-References: <201201082222.11305.heiko@sntech.de>
- <01b201ccdccb$d6923680$83b6a380$%kim@samsung.com>
- <201201271040.08945.heiko@sntech.de>
-Message-ID: <04a101cce00a$5fcee0b0$1f6ca210$%kim@samsung.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Tue, 31 Jan 2012 12:27:11 +0100
+Subject: [RFC PATCH 4/7] ARM: davinci: net: davinci_emac: add OF support
+In-Reply-To: <20120130202208.GW28397@ponder.secretlab.ca>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-5-git-send-email-hs@denx.de>
+ <20120130202208.GW28397@ponder.secretlab.ca>
+Message-ID: <4F27D00F.4040807@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> spi.h now only contains the definition of the platform data structure
-> for the driver in spi-s3c24xx.c . Therefore it does not need to stay
-> in include/mach but can instead live in linux/spi/s3c24xx.h .
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> Sorry for messing up, but it seems I forgot to readd the moved spi header
-> in the original submission of the second patch, which I noticed just now.
-> As your cleanup-s3c24xx branch is not pushed out yet, could you please
-> replace it with this one, which adds the forgotten file.
-> 
-OK, I replaced with this. And I'm not sure Grant is ok on this.
+Hello Grant,
 
-Grant, this looks ok to me and I'd like to apply this in samsung tree.
-So if any problem to send this via samsung tree, please let me know.
+Grant Likely wrote:
+> On Mon, Jan 23, 2012 at 09:56:04AM +0100, Heiko Schocher wrote:
+>> add of support for the davinci_emac driver.
+>>
+>> Signed-off-by: Heiko Schocher <hs@denx.de>
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: netdev at vger.kernel.org
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Wolfgang Denk <wd@denx.de>
+>> ---
+>>  .../bindings/arm/davinci/davinci_emac.txt          |   46 ++++++++
+>>  drivers/net/ethernet/ti/davinci_emac.c             |  111 +++++++++++++++++++-
+>>  2 files changed, 156 insertions(+), 1 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+>> new file mode 100644
+>> index 0000000..4e5dc8d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+>> @@ -0,0 +1,46 @@
+>> +* Texas Instruments Davinci EMAC
+>> +
+>> +This file provides information, what the davice node
+>> +for the davinci_emac interface contain.
+>> +
+>> +Required properties:
+>> +- compatible: "ti,davinci-emac";
+>> +- reg: Offset and length of the register set for the device
+>> +- ctrl_reg_offset: offset to control register
+>> +- ctrl_mod_reg_offset: offset to control module register
+>> +- ctrl_ram_offset: offset to control module ram
+> 
+> Should these be explicit properties, or can they be discerned from the
+> compatible string (which should include the hardware version; see
+> below).
 
-Thanks.
+Hmm.. I do not know all davinci SoCs ... maybe someone from TI
+could answer this? But I think, we could discern this from
+the compatible string. I prepare this for v2. Maybe it is Ok,
+if I do this only for my hardwareversion and others add this,
+if needed? (maybe the better approach, as I can code it, but
+have no hw for testing it ... so it maybe is buggy)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Also, any custom properties that are specific to a binding really
+> should include a vendor prefix ('ti,') to avoid namespace collisions
+> with common bindings.
 
->  arch/arm/mach-s3c2410/include/mach/spi.h |   27
---------------------------
-> -
->  arch/arm/mach-s3c2440/mach-gta02.c       |    2 +-
->  drivers/spi/spi-s3c24xx.c                |    2 +-
->  include/linux/spi/s3c24xx.h              |   26
-++++++++++++++++++++++++++
->  4 files changed, 28 insertions(+), 29 deletions(-)
->  delete mode 100644 arch/arm/mach-s3c2410/include/mach/spi.h
->  create mode 100644 include/linux/spi/s3c24xx.h
+Yep, is "ti,davinci-" ok? Also I should use dashes instead
+underscores, right?
+
+>> +- hw_ram_addr: hardware ram addr
 > 
-> diff --git a/arch/arm/mach-s3c2410/include/mach/spi.h b/arch/arm/mach-
-> s3c2410/include/mach/spi.h
-> deleted file mode 100644
-> index 2a686c0..0000000
-> --- a/arch/arm/mach-s3c2410/include/mach/spi.h
-> +++ /dev/null
-> @@ -1,27 +0,0 @@
-> -/* arch/arm/mach-s3c2410/include/mach/spi.h
-> - *
-> - * Copyright (c) 2006 Simtec Electronics
-> - *	Ben Dooks <ben@simtec.co.uk>
-> - *
-> - * S3C2410 - SPI Controller platform_device info
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> -*/
-> -
-> -#ifndef __ASM_ARCH_SPI_H
-> -#define __ASM_ARCH_SPI_H __FILE__
-> -
-> -struct s3c2410_spi_info {
-> -	int			 pin_cs;	/* simple gpio cs */
-> -	unsigned int		 num_cs;	/* total chipselects */
-> -	int			 bus_num;       /* bus number to use. */
-> -
-> -	unsigned int		 use_fiq:1;	/* use fiq */
-> -
-> -	void (*gpio_setup)(struct s3c2410_spi_info *spi, int enable);
-> -	void (*set_cs)(struct s3c2410_spi_info *spi, int cs, int pol);
-> -};
-> -
-> -#endif /* __ASM_ARCH_SPI_H */
-> diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-
-> s3c2440/mach-gta02.c
-> index 5859e60..cf270f5 100644
-> --- a/arch/arm/mach-s3c2440/mach-gta02.c
-> +++ b/arch/arm/mach-s3c2440/mach-gta02.c
-> @@ -38,6 +38,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/serial_core.h>
->  #include <linux/spi/spi.h>
-> +#include <linux/spi/s3c24xx.h>
+> Can this be added as a second tuple in the reg property?
+
+No, if I know this right, this is used for DMA, and also could be RAM.
+
+>> +- ctrl_ram_size: size of control module ram
+>> +- version: 1 (EMAC_VERSION_1 for DM644x)
+>> +           2 (EMAC_VERSION_2 for DM646x)
 > 
->  #include <linux/mmc/host.h>
+> Don't use a version property.  Encode it into the compatible property.  ie:
 > 
-> @@ -73,7 +74,6 @@
->  #include <mach/regs-gpioj.h>
->  #include <mach/fb.h>
+> compatible = "ti,davinci-dm6440-emac"; or
+> compatible = "ti,davinci-dm6460-emac";
 > 
-> -#include <mach/spi.h>
->  #include <plat/usb-control.h>
->  #include <mach/regs-mem.h>
->  #include <mach/hardware.h>
-> diff --git a/drivers/spi/spi-s3c24xx.c b/drivers/spi/spi-s3c24xx.c
-> index fc06453..8ee7d79 100644
-> --- a/drivers/spi/spi-s3c24xx.c
-> +++ b/drivers/spi/spi-s3c24xx.c
-> @@ -24,10 +24,10 @@
+> You'll also note that I did not use a 'x' as a wildcard.  It is always
+> safer to be explicit about the part number.  And have newer parts
+> claim compatibility with older ones like so:
 > 
->  #include <linux/spi/spi.h>
->  #include <linux/spi/spi_bitbang.h>
-> +#include <linux/spi/s3c24xx.h>
->  #include <linux/module.h>
+> compatible = "ti,davinci-dm6443-emac", "ti,davinci-dm6440-emac"; (I am
+> obviously making up numbers here.  Fill in appropriate numbers for
+> your device.
+
+Ok.
+
+[...]
+>> diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+>> index 794ac30..cad7a96 100644
+>> --- a/drivers/net/ethernet/ti/davinci_emac.c
+>> +++ b/drivers/net/ethernet/ti/davinci_emac.c
+>> @@ -58,6 +58,12 @@
+[...]
+>> +	pdata = pdev->dev.platform_data;
+>> +	if (!pdata) {
+>> +		pdata = kzalloc(sizeof(struct emac_platform_data), GFP_KERNEL);
 > 
->  #include <plat/regs-spi.h>
-> -#include <mach/spi.h>
+> devm_kzalloc()
+
+fixed.
+
+>> +		if (!pdata)
+>> +			goto nodata;
+>> +	}
+>> +
+>> +	mac_addr = of_get_mac_address(np);
+>> +	if (mac_addr)
+>> +		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
+>> +
+>> +	ret = of_property_read_u32(np, "ctrl_reg_offset", &data);
+>> +	if (!ret)
+>> +		pdata->ctrl_reg_offset = data;
+>> +
+>> +	ret = of_property_read_u32(np, "ctrl_mod_reg_offset", &data);
+>> +	if (!ret)
+>> +		pdata->ctrl_mod_reg_offset = data;
+>> +
+>> +	ret = of_property_read_u32(np, "ctrl_ram_offset", &data);
+>> +	if (!ret)
+>> +		pdata->ctrl_ram_offset = data;
+>> +
+>> +	ret = of_property_read_u32(np, "hw_ram_addr", &data);
+>> +	if (!ret)
+>> +		pdata->hw_ram_addr = data;
+>> +
+>> +	ret = of_property_read_u32(np, "ctrl_ram_size", &data);
+>> +	if (!ret)
+>> +		pdata->ctrl_ram_size = data;
+>> +
+>> +	ret = of_property_read_u32(np, "rmii_en", &data);
+>> +	if (!ret)
+>> +		pdata->rmii_en = data;
+>> +
+>> +	ret = of_property_read_u32(np, "version", &data);
+>> +	if (!ret)
+>> +		pdata->version = data;
+>> +
+>> +	ret = of_property_read_u32(np, "no_bd_ram", &data);
+>> +	if (!ret)
+>> +		pdata->ctrl_mod_reg_offset = data;
 > 
->  #include <plat/fiq.h>
->  #include <asm/fiq.h>
-> diff --git a/include/linux/spi/s3c24xx.h b/include/linux/spi/s3c24xx.h
-> new file mode 100644
-> index 0000000..c23b923
-> --- /dev/null
-> +++ b/include/linux/spi/s3c24xx.h
-> @@ -0,0 +1,26 @@
-> +/*
-> + * Copyright (c) 2006 Simtec Electronics
-> + *	Ben Dooks <ben@simtec.co.uk>
-> + *
-> + * S3C2410 - SPI Controller platform_device info
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __LINUX_SPI_S3C24XX_H
-> +#define __LINUX_SPI_S3C24XX_H __FILE__
-> +
-> +struct s3c2410_spi_info {
-> +	int			 pin_cs;	/* simple gpio cs */
-> +	unsigned int		 num_cs;	/* total chipselects */
-> +	int			 bus_num;       /* bus number to use. */
-> +
-> +	unsigned int		 use_fiq:1;	/* use fiq */
-> +
-> +	void (*gpio_setup)(struct s3c2410_spi_info *spi, int enable);
-> +	void (*set_cs)(struct s3c2410_spi_info *spi, int cs, int pol);
-> +};
-> +
-> +#endif /* __LINUX_SPI_S3C24XX_H */
-> --
-> 1.7.5.4
+> Not all these properties are mentioned in the documentation.
+
+fixed.
+
+>> +
+>> +	priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
+>> +	if (!priv->phy_node)
+>> +		pdata->phy_id = "";
+>> +
+>> +	if (!of_address_to_resource(np, 0, &temp_res))
+>> +		memcpy(&pdev->resource[0], &temp_res, sizeof(struct resource));
+> 
+> Don't use of_address_to_resource.  The platform device resource table
+> will already be populated by the core code so you don't need to call
+> it here.  Besides, it is illegal for drivers to overwrite the
+> pdev->resource[] table.
+
+fix this.
+
+>> +
+>> +	index = 0;
+>> +	while (index < 4) {
+>> +		irq = irq_of_parse_and_map(np, index);
+>> +		if (irq > 0) {
+>> +			temp_res.start = irq;
+>> +			temp_res.end = irq;
+>> +			temp_res.flags = IORESOURCE_IRQ;
+>> +			memcpy(&pdev->resource[index + 1], &temp_res,
+>> +				sizeof(struct resource));
+> 
+> Same here, the core code will have already populated the irqs into the
+> resource table for you.
+
+and this. Currently it don't work after this fix, searching
+for the reason ...
+
+>> +		}
+>> +		index++;
+>> +	}
+>> +
+>> +	pinmux_np = of_parse_phandle(np, "pinmux-handle", 0);
+>> +	if (pinmux_np)
+>> +		davinci_cfg_reg_of(pinmux_np);
+>> +
+>> +	pdev->dev.platform_data = pdata;
+>> +nodata:
+>> +	return  pdata;
+>> +}
+>> +#else
+>> +static struct emac_platform_data
+>> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
+>> +	struct emac_priv *priv)
+>> +{
+>> +	return  pdev->dev.platform_data;
+>> +}
+>> +#endif
+>>  /**
+>>   * davinci_emac_probe: EMAC device probe
+>>   * @pdev: The DaVinci EMAC device that we are removing
+>> @@ -1802,7 +1910,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+>>  
+>>  	spin_lock_init(&priv->lock);
+>>  
+>> -	pdata = pdev->dev.platform_data;
+>> +	pdata = davinci_emac_of_get_pdata(pdev, priv);
+>>  	if (!pdata) {
+>>  		dev_err(&pdev->dev, "no platform data\n");
+>>  		rc = -ENODEV;
+>> @@ -1811,6 +1919,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+>>  
+>>  	/* MAC addr and PHY mask , RMII enable info from platform_data */
+>>  	memcpy(priv->mac_addr, pdata->mac_addr, 6);
+>> +
+> 
+> Nit: There are a few instances of unrelated whitespace changes in this
+> patch.
+
+fixed.
+
+Thanks for the review!
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
