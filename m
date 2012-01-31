@@ -1,115 +1,28 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 31 Jan 2012 18:40:40 +0200
-Subject: [PATCH v2 2/8] ARM: tegra: functions to access the flowcontroller
-In-Reply-To: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1328028051-24271-3-git-send-email-pdeschrijver@nvidia.com>
+From: k.lewandowsk@samsung.com (Karol Lewandowski)
+Date: Tue, 31 Jan 2012 17:41:52 +0100
+Subject: [PATCH v2] ARM: Exynos4: Add cpu-offset property in gic device
+ tree node
+In-Reply-To: <1328023789-4672-1-git-send-email-thomas.abraham@linaro.org>
+References: <1328023789-4672-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4F2819D0.7090002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce some functions to write to the flowcontroller registers.
+On 31.01.2012 16:29, Thomas Abraham wrote:
+> Commit db0d4db22a78 ('ARM: gic: allow GIC to support non-banked setups)
+> requires a cpu-offset property to be specified for non-banked gic
+> controllers, which is the case for Exynos4.
+>
+> Reported-by: Karol Lewandowski<k.lewandowski@samsung.com>
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/mach-tegra/Makefile   |    1 +
- arch/arm/mach-tegra/flowctrl.c |   62 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/flowctrl.h |    5 +++
- 3 files changed, 68 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/flowctrl.c
+( Minor note - my email address lacks 'i' at the end, i.e. it's
+   k.lewandowsk@ :)
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index b78bda8..60c286e 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -6,6 +6,7 @@ obj-y                                   += irq.o
- obj-y                                   += clock.o
- obj-y                                   += timer.o
- obj-y					+= fuse.o
-+obj-y					+= flowctrl.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= powergate.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
-diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
-new file mode 100644
-index 0000000..fef66a7
---- /dev/null
-+++ b/arch/arm/mach-tegra/flowctrl.c
-@@ -0,0 +1,62 @@
-+/*
-+ * arch/arm/mach-tegra/flowctrl.c
-+ *
-+ * functions and macros to control the flowcontroller
-+ *
-+ * Copyright (c) 2010-2012, NVIDIA Corporation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+
-+#include <mach/iomap.h>
-+
-+#include "flowctrl.h"
-+
-+u8 flowctrl_offset_halt_cpu[] = {
-+	FLOW_CTRL_HALT_CPU0_EVENTS,
-+	FLOW_CTRL_HALT_CPU1_EVENTS,
-+	FLOW_CTRL_HALT_CPU1_EVENTS + 8,
-+	FLOW_CTRL_HALT_CPU1_EVENTS + 16,
-+};
-+
-+u8 flowctrl_offset_cpu_csr[] = {
-+	FLOW_CTRL_CPU0_CSR,
-+	FLOW_CTRL_CPU1_CSR,
-+	FLOW_CTRL_CPU1_CSR + 8,
-+	FLOW_CTRL_CPU1_CSR + 16,
-+};
-+
-+static void flowctrl_update(u8 offset, u32 value)
-+{
-+	void __iomem *addr = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + offset;
-+
-+	writel(value, addr);
-+
-+	/* ensure the update has reached the flow controller */
-+	wmb();
-+	readl_relaxed(addr);
-+}
-+
-+void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value)
-+{
-+	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
-+}
-+
-+void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value)
-+{
-+	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
-+}
-diff --git a/arch/arm/mach-tegra/flowctrl.h b/arch/arm/mach-tegra/flowctrl.h
-index 74c6efb..1942817 100644
---- a/arch/arm/mach-tegra/flowctrl.h
-+++ b/arch/arm/mach-tegra/flowctrl.h
-@@ -34,4 +34,9 @@
- #define FLOW_CTRL_HALT_CPU1_EVENTS	0x14
- #define FLOW_CTRL_CPU1_CSR		0x18
- 
-+#ifndef __ASSEMBLY__
-+void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value);
-+void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value);
-+#endif
-+
- #endif
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+> ---
+> This patch solves the issue of boot failure with SMP enabled kernel for
+> Exynos4 device tree enabled machine.
+
+Tested-by: Karol Lewandowski <k.lewandowsk@samsung.com>
+
+Thanks!
