@@ -1,73 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 31 Jan 2012 07:15:26 -0600
-Subject: [PATCH v3 14/25] irq_domain: Remove irq_domain_add_simple()
-In-Reply-To: <20120131124500.GA28571@S2101-09.ap.freescale.net>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-15-git-send-email-grant.likely@secretlab.ca>
- <20120131124500.GA28571@S2101-09.ap.freescale.net>
-Message-ID: <4F27E96E.9010204@gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 31 Jan 2012 14:39:48 +0100
+Subject: [PATCH 07/21] OMAP3+: PM: SR/Class3: disable errorgen before
+ disable VP
+In-Reply-To: <4F27D264.9050203@ru.mvista.com>
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-8-git-send-email-j-pihet@ti.com>
+ <4F213860.9050600@ru.mvista.com>
+ <CAORVsuUNM8bpwyjbG2GcwfiUEf7A54ODC4tfhZNinUhQTE3g5w@mail.gmail.com>
+ <4F27D264.9050203@ru.mvista.com>
+Message-ID: <CAORVsuWrO49aUi7iab=qzxPOjaxkOwFa6bTtdRedK+pX-59t8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+Sergei,
 
-On 01/31/2012 06:45 AM, Shawn Guo wrote:
-> On Fri, Jan 27, 2012 at 02:36:08PM -0700, Grant Likely wrote:
->> irq_domain_add_simple() was a stop-gap measure until complete irq_domain
->> support was complete.  This patch removes the irq_domain_add_simple()
->> interface.
->>
->> v2: Updated to pass in host_data pointer on irq_domain allocation.
->>
->> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Milton Miller <miltonm@bga.com>
->> ---
->>  arch/arm/mach-imx/mach-imx6q.c      |    3 ++-
->>  arch/arm/mach-msm/board-msm8x60.c   |    8 ++------
->>  arch/arm/mach-mx5/imx51-dt.c        |    4 ++--
->>  arch/arm/mach-mx5/imx53-dt.c        |    4 ++--
->>  arch/arm/mach-omap2/board-generic.c |    2 +-
->>  arch/arm/mach-prima2/irq.c          |    2 +-
->>  drivers/mfd/twl-core.c              |    2 +-
->>  include/linux/irqdomain.h           |    1 -
->>  kernel/irq/irqdomain.c              |   10 ++--------
->>  9 files changed, 13 insertions(+), 23 deletions(-)
->>
-> ...
->> --- a/arch/arm/mach-mx5/imx51-dt.c
->> +++ b/arch/arm/mach-mx5/imx51-dt.c
->> @@ -47,7 +47,7 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
->>  static int __init imx51_tzic_add_irq_domain(struct device_node *np,
->>  				struct device_node *interrupt_parent)
->>  {
->> -	irq_domain_add_simple(np, 0);
->> +	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
->>  	return 0;
->>  }
->>  
->> @@ -57,7 +57,7 @@ static int __init imx51_gpio_add_irq_domain(struct device_node *np,
->>  	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
->>  
->>  	gpio_irq_base -= 32;
->> -	irq_domain_add_simple(np, gpio_irq_base);
->> +	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
-> 
-> The tzic on imx5 gets 128 irq lines rather than 32 here.  The current
-> code will make any hwirq that is > 32 hit the WARN_ON below in
-> irq_domain_legacy_revmap().
+On Tue, Jan 31, 2012 at 12:37 PM, Sergei Shtylyov
+<sshtylyov@ru.mvista.com> wrote:
+> Hello.
+>
+>
+> On 31-01-2012 14:06, Jean Pihet wrote:
+>
+>> ...
+>
+>
+>>>> +int sr_disable_errgen(struct voltagedomain *voltdm)
+>>>> +{
+>>>> + ? ? ? u32 errconfig_offs, vpboundint_en;
+>>>> + ? ? ? u32 vpboundint_st;
+>>>> + ? ? ? struct omap_sr *sr = _sr_lookup(voltdm);
+>>>> +
+>>>> + ? ? ? if (IS_ERR(sr)) {
+>>>> + ? ? ? ? ? ? ? pr_warning("%s: omap_sr struct for sr_%s not found\n",
+>>>> + ? ? ? ? ? ? ? ? ? ? ? __func__, voltdm->name);
+>>>> + ? ? ? ? ? ? ? return -EINVAL;
+>>>
+>>>
+>>>
+>>> ? Not PTR_ERR(sr)?
+>
+>
+>> _sr_lookup returns a return code using ERR_PTR so the return value
+>> should be checked for errors using IS_ERR. Please note that _sr_lookup
+>> checks for NULL parameter internally.
+>
+>
+> ? That's clear. I was asking don't you want to return PTR_ERR(sr) instead of
+> -EINVAL.
+Oh yes you are correct, that is a good catch. Sorry for my misunderstanding.
 
-But this is the gpio controller code? Really this should be 4 domains,
-but this temp fix is probably fine until you use my generic irq chip
-support.
+I caught the same problem at a few other places and I have a patch
+ready for the error handling code. To be submitted asap.
 
-Rob
+>
+> WBR, Sergei
 
-> 
-> 	WARN_ON(hwirq < first_hwirq || hwirq >= first_hwirq + size)
-> 
-> The first_hwirq is 0 and size is 32 in this case.
-> 
-> Changing 32 to 128 seems fixing the problem.
-> 
+Thanks!
+Jean
