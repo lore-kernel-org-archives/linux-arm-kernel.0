@@ -1,85 +1,61 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  1 Feb 2012 00:39:06 +0900
-Subject: [PATCH 1/9] ARM: EXYNOS: use exynos_init_uarts() instead of
- exynos4_init_uarts()
+Date: Wed,  1 Feb 2012 00:39:08 +0900
+Subject: [PATCH 3/9] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
 In-Reply-To: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
 References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1328024354-4277-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1328024354-4277-4-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since exynos4_init_uarts() can be used for EXYNOS5 SoCs,
-this patch changes the name of function to exynos_init_uarts().
-
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/common.c |    8 ++++----
- arch/arm/mach-exynos/common.h |    8 ++++----
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/mach-exynos/Makefile     |    2 +-
+ arch/arm/mach-exynos/setup-i2c0.c |   13 +++++++++----
+ 2 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index c59e188..a168533 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -56,7 +56,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
--		.init_uarts	= exynos4_init_uarts,
-+		.init_uarts	= exynos_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4210,
- 	}, {
-@@ -64,7 +64,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
--		.init_uarts	= exynos4_init_uarts,
-+		.init_uarts	= exynos_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4212,
- 	}, {
-@@ -72,7 +72,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
--		.init_uarts	= exynos4_init_uarts,
-+		.init_uarts	= exynos_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4412,
- 	},
-@@ -476,7 +476,7 @@ int __init exynos_init(void)
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 995e7cc..2117f02 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -52,7 +52,7 @@ obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
+ obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
+ obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
  
- /* uart registration process */
+-obj-$(CONFIG_ARCH_EXYNOS4)		+= setup-i2c0.o
++obj-$(CONFIG_ARCH_EXYNOS)		+= setup-i2c0.o
+ obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
+ obj-$(CONFIG_EXYNOS4_SETUP_FIMD0)	+= setup-fimd0.o
+ obj-$(CONFIG_EXYNOS4_SETUP_I2C1)	+= setup-i2c1.o
+diff --git a/arch/arm/mach-exynos/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
+index d395bd1..3244f3e 100644
+--- a/arch/arm/mach-exynos/setup-i2c0.c
++++ b/arch/arm/mach-exynos/setup-i2c0.c
+@@ -1,7 +1,7 @@
+ /*
+- * linux/arch/arm/mach-exynos4/setup-i2c0.c
++ * linux/arch/arm/mach-exynos/setup-i2c0.c
+  *
+- * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
++ * Copyright (c) 2009-2012 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+  *
+  * I2C0 GPIO configuration.
+@@ -18,9 +18,14 @@ struct platform_device; /* don't need the contents */
+ #include <linux/gpio.h>
+ #include <plat/iic.h>
+ #include <plat/gpio-cfg.h>
++#include <plat/cpu.h>
  
--void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
-+void __init exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ void s3c_i2c0_cfg_gpio(struct platform_device *dev)
  {
- 	struct s3c2410_uartcfg *tcfg = cfg;
- 	u32 ucnt;
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 8c1efe6..2d79aba 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -36,15 +36,15 @@ extern struct sys_timer exynos4_timer;
- 
- #ifdef CONFIG_ARCH_EXYNOS
- extern  int exynos_init(void);
-+extern void exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- extern void exynos4_map_io(void);
- extern void exynos4_init_clocks(int xtal);
--extern void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- 
- #else
--#define exynos4_init_clocks NULL
--#define exynos4_init_uarts NULL
--#define exynos4_map_io NULL
- #define exynos_init NULL
-+#define exynos_init_uarts NULL
-+#define exynos4_map_io NULL
-+#define exynos4_init_clocks NULL
- #endif
- 
- #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+-	s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
++	if (soc_is_exynos5250())
++		;
++		/* will be implemented with gpio function */
++	else
++		s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
++				      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+ }
 -- 
 1.7.4.4
