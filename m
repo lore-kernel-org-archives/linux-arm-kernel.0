@@ -1,45 +1,40 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 31 Jan 2012 10:58:27 +0100
-Subject: [PATCH 14/19] ARM: OMAP3+: SmartReflex Class3: restrict CPU to run on
+Date: Tue, 31 Jan 2012 10:58:29 +0100
+Subject: [PATCH 16/19] ARM: OMAP3+: SmartReflex: move late_initcall() closer
+ to its argument
 In-Reply-To: <1328003912-11709-1-git-send-email-j-pihet@ti.com>
 References: <1328003912-11709-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1328003912-11709-15-git-send-email-j-pihet@ti.com>
+Message-ID: <1328003912-11709-17-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+From: Felipe Balbi <balbi@ti.com>
 
-Use SmartReflex AVS Class3 initialization only for OMAP343x family of
-processors.
+no functional changes, trivial patch.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex-class3.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
-index 9dcda93..735937a 100644
---- a/arch/arm/mach-omap2/smartreflex-class3.c
-+++ b/arch/arm/mach-omap2/smartreflex-class3.c
-@@ -11,6 +11,7 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index eacf4b3..c86880d 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -1291,12 +1291,12 @@ static int __init sr_init(void)
  
-+#include <plat/cpu.h>
- #include "smartreflex.h"
- 
- static int sr_class3_enable(struct voltagedomain *voltdm,
-@@ -58,6 +59,10 @@ static struct omap_sr_class_data class3_data = {
- /* Smartreflex Class3 init API to be called from board file */
- static int __init sr_class3_init(void)
- {
-+	/* Enable this class only for OMAP343x */
-+	if (!cpu_is_omap343x())
-+		return -EINVAL;
-+
- 	pr_info("SmartReflex Class3 initialized\n");
- 	return sr_register_class(&class3_data);
+ 	return 0;
  }
++late_initcall(sr_init);
+ 
+ static void __exit sr_exit(void)
+ {
+ 	platform_driver_unregister(&smartreflex_driver);
+ }
+-late_initcall(sr_init);
+ module_exit(sr_exit);
+ 
+ MODULE_DESCRIPTION("OMAP Smartreflex Driver");
 -- 
 1.7.5.4
