@@ -1,115 +1,50 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 31 Jan 2012 11:09:40 +0000
-Subject: [PATCH v5] ARM: Add generic instruction opcode manipulation helpers
-Message-ID: <1328008180-28542-1-git-send-email-dave.martin@linaro.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 31 Jan 2012 19:11:56 +0800
+Subject: [PATCH v3] mtd/gpmi : add BBT support to gpmi nand driver
+Message-ID: <1328008316-27258-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some endianness-agnostic helpers to convert machine
-instructions between canonical integer form and in-memory
-representation.
+Add a new field to gpmi_nand_platform_data{}.
+Make the BBT support to board specific.
 
-A canonical integer form for representing instructions is also
-formalised here.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
-Changes since v1:
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 ++
+ include/linux/mtd/gpmi-nand.h          |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-v5: Avoid inclusion of C headers or definition of the __opcode_*
-    macros when opcodes.h is included in assembler files.  Since
-    the __opcode_* macros rely on C declarations, they are not
-    directly usable in assembler anyway.
-
-v4: Rebase on top of Leif's patch which created <asm/opcodes.h>
-    ARM: 7206/1: Add generic ARM instruction set condition code checks.
-
-    No functional changes.
-
-v3: Fix some stupid errors:
-
-  * remove bogus extra (x) in __opcode_to_mem_arm
-  * fix use of nonexistent "thumb_opcode" argument in
-        __opcode_thumb32_{first,second} which causes these
-        macros to be broken.
-
-v2: Remove unnecessary typedef for arm_opcode_t.
-
-    The general "everything is a word" concept works just fine here --
-    we don't need a typedef, and people will probably not use it
-    anyway.
-
- arch/arm/include/asm/opcodes.h |   59 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-index c0efdd6..19c48de 100644
---- a/arch/arm/include/asm/opcodes.h
-+++ b/arch/arm/include/asm/opcodes.h
-@@ -17,4 +17,63 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
- #define ARM_OPCODE_CONDTEST_PASS   1
- #define ARM_OPCODE_CONDTEST_UNCOND 2
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 493ec2f..4d369df 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1493,6 +1493,8 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
+ 	chip->ecc.mode		= NAND_ECC_HW;
+ 	chip->ecc.size		= 1;
+ 	chip->ecc.layout	= &gpmi_hw_ecclayout;
++	if (pdata->enable_bbt)
++		chip->bbt_options = NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
  
-+
-+/*
-+ * Opcode byteswap helpers
-+ *
-+ * These macros help with converting instructions between a canonical integer
-+ * format and in-memory representation, in an endianness-agnostic manner.
-+ *
-+ * __mem_to_opcode_*() convert from in-memory representation to canonical form.
-+ * __opcode_to_mem_*() convert from canonical form to in-memory representation.
-+ *
-+ *
-+ * Canonical instruction representation:
-+ *
-+ *	ARM:		0xKKLLMMNN
-+ *	Thumb 16-bit:	0x0000KKLL, where KK < 0xE8
-+ *	Thumb 32-bit:	0xKKLLMMNN, where KK >= 0xE8
-+ *
-+ * There is no way to distinguish an ARM instruction in canonical representation
-+ * from a Thumb instruction (just as these cannot be distinguished in memory).
-+ * Where this distinction is important, it needs to be tracked separately.
-+ *
-+ * Note that values in the range 0x0000E800..0xE7FFFFFF intentionally do not
-+ * represent any valid Thumb-2 instruction.  For this range,
-+ * __opcode_is_thumb32() and __opcode_is_thumb16() will both be false.
-+ */
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/types.h>
-+#include <linux/swab.h>
-+
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+#define __opcode_to_mem_arm(x) swab32(x)
-+#define __opcode_to_mem_thumb16(x) swab16(x)
-+#define __opcode_to_mem_thumb32(x) swahb32(x)
-+#else
-+#define __opcode_to_mem_arm(x) ((u32)(x))
-+#define __opcode_to_mem_thumb16(x) ((u16)(x))
-+#define __opcode_to_mem_thumb32(x) swahw32(x)
-+#endif
-+
-+#define __mem_to_opcode_arm(x) __opcode_to_mem_arm(x)
-+#define __mem_to_opcode_thumb16(x) __opcode_to_mem_thumb16(x)
-+#define __mem_to_opcode_thumb32(x) __opcode_to_mem_thumb32(x)
-+
-+/* Operations specific to Thumb opcodes */
-+
-+/* Instruction size checks: */
-+#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
-+#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
-+
-+/* Operations to construct or split 32-bit Thumb instructions: */
-+#define __opcode_thumb32_first(x) ((u16)((x) >> 16))
-+#define __opcode_thumb32_second(x) ((u16)(x))
-+#define __opcode_thumb32_compose(first, second) \
-+	(((u32)(u16)(first) << 16) | (u32)(u16)(second))
-+
-+#endif /* __ASSEMBLY__ */
-+
- #endif /* __ASM_ARM_OPCODES_H */
+ 	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
+ 	this->bch_geometry.payload_size = 1024;
+diff --git a/include/linux/mtd/gpmi-nand.h b/include/linux/mtd/gpmi-nand.h
+index 69b6dbf..04ab366 100644
+--- a/include/linux/mtd/gpmi-nand.h
++++ b/include/linux/mtd/gpmi-nand.h
+@@ -51,6 +51,7 @@
+  * @partitions:              An optional pointer to an array of partition
+  *                           descriptions.
+  * @partition_count:         The number of elements in the partitions array.
++ * @enable_bbt:              Enable the BBT or not.
+  */
+ struct gpmi_nand_platform_data {
+ 	/* SoC hardware information. */
+@@ -64,5 +65,6 @@ struct gpmi_nand_platform_data {
+ 	/* Medium information. */
+ 	struct		mtd_partition *partitions;
+ 	unsigned	partition_count;
++	unsigned int	enable_bbt:1;
+ };
+ #endif
 -- 
-1.7.4.1
+1.7.0.4
