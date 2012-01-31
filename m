@@ -1,110 +1,128 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Tue, 31 Jan 2012 11:49:52 +0100
-Subject: [PATCH v3] dmaengine: Add support for MEMCPY for imx-dma.
-In-Reply-To: <1328006840-7345-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1328006840-7345-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <CACKLOr0_k2WW_qG4fRLORWTbZBjZVY=CGns2A2asGOvNub2vvw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 31 Jan 2012 16:21:01 +0530
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <20120131095606.GA889@n2100.arm.linux.org.uk>
+References: <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+ <20120117133918.GE11475@arm.com>
+ <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+ <WC20120120085711.330803@terrafix.co.uk> <20120127173029.GA3281@arm.com>
+ <4F277A6E.9070107@ti.com>
+ <CAHkRjk7z2QYbU09BRfAWmChw5xj9taCarWfnttWveyqtadiEOg@mail.gmail.com>
+ <CAMQu2gxr5ZkH4AE_7QNptxx7onQMGaj+qhUF+DSw9MnkCqCRog@mail.gmail.com>
+ <CAHkRjk7Fh=OUk8K=bJa8xzPqMvT6P6gjT+kqAA0DeVfrF0sUNg@mail.gmail.com>
+ <CAMQu2gwDJ=aezNAUD3YmGHQ6fBxkxgUonYkQYPH8WBeNvZCKMQ@mail.gmail.com>
+ <20120131095606.GA889@n2100.arm.linux.org.uk>
+Message-ID: <CAMQu2gwG_JwPMzV0v2hedvDz=HHq0SNbbH+Zapyd8fJt47kjGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2012 11:47, Javier Martin <javier.martin@vista-silicon.com> wrote:
-> MEMCPY transfers allow DMA copies from memory to
-> memory. This patch has been tested with dmatest
-> device driver.
+On Tue, Jan 31, 2012 at 3:26 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 31, 2012 at 02:35:51PM +0530, Shilimkar, Santosh wrote:
+>> On Tue, Jan 31, 2012 at 2:24 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > Not if you write the code sequence in such a way that it also switches
+>> > the C bit to 0 and back to 1. I think Nicolas suggested that the
+>> > platform code could go through the power management code. But I think
+>> > with some carefully coded asm code and cache flushing you could set
+>> > L2EN without a full MMU reset.
+>>
+>> That would need identity mapping and also correct cache flushing
+>> as you said above. L2 enabled for A8 is fine but not sure about the
+>> A15 where L2 is enabled with C bit. Then there are some settings for
+>> ACTLR, L2ACCTRL and L2PFR which needs to be setup before
+>> MMU is ebabled.
+>>
+>> And then the errata's on A9, needing setting up dignostic register,
+>> changing cache policy etc
+>> Hopefully we don't get hit by those issues/erratas
+>> in the window from initial MMU setup to this new sequence code.
+>>
+>> Will this approach be ok for other cases I mentioned ?
 >
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
-> ?drivers/dma/imx-dma.c | ? 36 +++++++++++++++++++++++++++++++++++-
-> ?1 files changed, 35 insertions(+), 1 deletions(-)
+> Santosh,
 >
-> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-> index 3296a73..9aa6e85 100644
-> --- a/drivers/dma/imx-dma.c
-> +++ b/drivers/dma/imx-dma.c
-> @@ -196,7 +196,8 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
-> ? ? ? ?struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-> ? ? ? ?struct imx_dma_data *data = chan->private;
+> It is very clear to me from the discussions, and the discussions I've
+> had with folk in ARM, that everyone thinks that the idea of putting
+> a platform specific hook in the early bring up code is insane.
 >
-> - ? ? ? imxdmac->dma_request = data->dma_request;
-> + ? ? ? if (data != NULL)
-> + ? ? ? ? ? ? ? imxdmac->dma_request = data->dma_request;
+> Everyone seems to think that the place it is to be solved is either
+> in the boot loader or with a wrapper around the kernel.
 >
-> ? ? ? ?dma_async_tx_descriptor_init(&imxdmac->desc, chan);
-> ? ? ? ?imxdmac->desc.tx_submit = imxdma_tx_submit;
-> @@ -328,6 +329,36 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
-> ? ? ? ?return &imxdmac->desc;
-> ?}
+> One of my points that I brought up against it was the limited environment,
+> and the lack of stack at that point. ?Let's look at what you're
+> proposing to do (thanks for the patch):
 >
-> +static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
-> + ? ? ? struct dma_chan *chan, dma_addr_t dest,
-> + ? ? ? dma_addr_t src, size_t len, unsigned long flags)
-> +{
-> + ? ? ? struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-> + ? ? ? struct imxdma_engine *imxdma = imxdmac->imxdma;
-> + ? ? ? int ret;
-> +
-> + ? ? ? dev_dbg(imxdma->dev, "%s channel: %d src=0x%x dst=0x%x len=%d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? __func__, imxdmac->channel, src, dest, len);
-> +
-> + ? ? ? if (imxdmac->status == DMA_IN_PROGRESS)
-> + ? ? ? ? ? ? ? return NULL;
-> + ? ? ? imxdmac->status = DMA_IN_PROGRESS;
-> +
-> + ? ? ? ret = imx_dma_config_channel(imxdmac->imxdma_channel,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0, 0);
-> + ? ? ? if (ret)
-> + ? ? ? ? ? ? ? return NULL;
-> +
-> + ? ? ? ret = imx_dma_setup_single(imxdmac->imxdma_channel, src, len,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dest, DMA_MODE_WRITE);
-> + ? ? ? if (ret)
-> + ? ? ? ? ? ? ? return NULL;
-> +
-> + ? ? ? return &imxdmac->desc;
-> +}
-> +
-> ?static void imxdma_issue_pending(struct dma_chan *chan)
-> ?{
-> ? ? ? ?struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-> @@ -349,6 +380,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+> Your secure hook:
+> ? ? ? ?stmia ? r12, {r1-r11, r13-r14}
 >
-> ? ? ? ?dma_cap_set(DMA_SLAVE, imxdma->dma_device.cap_mask);
-> ? ? ? ?dma_cap_set(DMA_CYCLIC, imxdma->dma_device.cap_mask);
-> + ? ? ? dma_cap_set(DMA_MEMCPY, imxdma->dma_device.cap_mask);
+> The stack you're writing to:
 >
-> ? ? ? ?/* Initialize channel parameters */
-> ? ? ? ?for (i = 0; i < MAX_DMA_CHANNELS; i++) {
-> @@ -382,11 +414,13 @@ static int __init imxdma_probe(struct platform_device *pdev)
-> ? ? ? ?imxdma->dma_device.device_tx_status = imxdma_tx_status;
-> ? ? ? ?imxdma->dma_device.device_prep_slave_sg = imxdma_prep_slave_sg;
-> ? ? ? ?imxdma->dma_device.device_prep_dma_cyclic = imxdma_prep_dma_cyclic;
-> + ? ? ? imxdma->dma_device.device_prep_dma_memcpy = imxdma_prep_dma_memcpy;
-> ? ? ? ?imxdma->dma_device.device_control = imxdma_control;
-> ? ? ? ?imxdma->dma_device.device_issue_pending = imxdma_issue_pending;
+> ? ? ? ?.align ?2
+> __v7_setup_stack:
+> ? ? ? ?.space ?4 * 11 ? ? ? ? ? ? ? ? ? ? ? ? ?@ 11 registers
 >
-> ? ? ? ?platform_set_drvdata(pdev, imxdma);
+> And it's layout in the kernel image:
 >
-> + ? ? ? imxdma->dma_device.copy_align = 2; /* 2^2 = 4 bytes alignment */
-> ? ? ? ?imxdma->dma_device.dev->dma_parms = &imxdma->dma_parms;
-> ? ? ? ?dma_set_max_seg_size(imxdma->dma_device.dev, 0xffffff);
+> c02ee75c <__v7_setup_stack>:
+> ? ? ? ?...
+> c02ee788: ? ? ? 00000c08 ? ? ? ?.word ? 0x00000c08
+> c02ee78c: ? ? ? 00000c09 ? ? ? ?.word ? 0x00000c09
+> c02ee790: ? ? ? ff0a81a8 ? ? ? ?.word ? 0xff0a81a8
+> c02ee794: ? ? ? 40e040e0 ? ? ? ?.word ? 0x40e040e0
 >
-> --
-> 1.7.0.4
+> c02ee798 <gic_secondary_init>:
+> c02ee798: ? ? ? e1a0c00d ? ? ? ?mov ? ? ip, sp
+> ...
 >
+> You're lucky that what you're _only_ overwriting is the two Cortex ID
+> values which have already been used, and not the following words, which
+> are the control register masks and the GIC initialization function.
+>
+> Thank you for proving my point about why platform code can't be allowed
+> to get its grubby hands that early in the kernel boot - you are making
+> it more fragile by doing this stuff, because you haven't taken the time
+> to properly analyse the code before you've modified it. ?As such, you
+> will see more silent boot failures.
+>
+> So, as many people have said, we're not going to go down the route of
+> allowing platforms to hook into this code. ?There's plenty of other
+> solutions to this problem in different parts of the system that would
+> be more than adequate, and would benefit everyone not just the kernel.
+>
+Sure. The marco has missed those details. Thanks for the
+useful information. At least I can fix the stack size for internal
+use.
 
-Hi Vinod,
-now that you have merged Sascha's latest patches you can apply this
-patch which has been tested against the latest commit of your 'next'
-branch ( ba7932334fbede4bb6a4ff4e635391ca7833203f).
+> You're making bones about whether there's a window if you do it later
+> in the kernel. ?You already have a window of opportunity for things to
+> have gone wrong and that's the zImage decompressor, which runs with
+> caches on. ?So if you've managed to get to your existing code in the
+> v7 setup function, then you've already proven that it's fine.
+>
+I see your point.
 
-Thank you.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+> Your continued resistance to every alternative suggestion but your
+> (broken) hook is getting extremely frustrating. ?Please try some of
+> these other approaches which are being proposed. ?Thanks.
+
+I was just trying to get more information about the alternatives and
+trying to bring out possible issues. I know for sure that boot-loader is
+not an option since we have had many instances where it has not worked.
+
+I also understand that patching early common code is going to be tricky
+and of-course against the single zImage.
+
+So the option mentioned by Nicolas and Catalin about 1:1 mapping
+and configuring the registers in platform specific code was looking
+a way forward. So was asking more questions about whether this can
+work in all cases. Specifically for A15. As per Catalin's email, it is
+best to handle those cases before MMU is enabled with
+boot-monitor or pre-load code.
+
+I am not against trying option. Just trying to understand what is the
+best option we have.
+
+Regards
+santosh
