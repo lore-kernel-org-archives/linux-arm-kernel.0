@@ -1,37 +1,24 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 31 Jan 2012 11:22:49 +0100
-Subject: [PATCH v2 1/7] LPC32xx: clock.c: Missing header file
-In-Reply-To: <4F26D9DC.2000008@ru.mvista.com>
+Date: Tue, 31 Jan 2012 11:24:50 +0100
+Subject: [PATCH v2 2/7] LPC32xx: clock.c: jiffies wrapping
+In-Reply-To: <1327939327-7799-2-git-send-email-stigge@antcom.de>
 References: <1327939327-7799-1-git-send-email-stigge@antcom.de>
- <4F26D9DC.2000008@ru.mvista.com>
-Message-ID: <20120131102249.GF2471@pengutronix.de>
+ <1327939327-7799-2-git-send-email-stigge@antcom.de>
+Message-ID: <20120131102450.GG2471@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 08:56:44PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Mon, Jan 30, 2012 at 05:02:01PM +0100, Roland Stigge wrote:
+> This patch fixes the jiffies wrapping bug in clock.c.
 > 
-> On 01/30/2012 07:02 PM, Roland Stigge wrote:
+> It corrects the timeout computation based on jiffies, uses time_before() for
+> correct wrapping handling and replaces a binary "&" which should really be a
+> logical "&&" in a truth expression.
 > 
-> >This patch fixes the compiler warnings regarding the EXPORT_SYMBOL usage
-> 
-> >Signed-off-by: Roland Stigge<stigge@antcom.de>
-> 
-> >diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-> >index 1e02751..8e79313 100644
-> >--- a/arch/arm/mach-lpc32xx/clock.c
-> >+++ b/arch/arm/mach-lpc32xx/clock.c
-> >@@ -82,6 +82,7 @@
-> >   *   will also impact the individual peripheral rates.
-> >   */
-> >
-> >+#include<linux/module.h>
-> 
->    Shouldn't <linux/export.h> be included instead nowadays?
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Ack.
-
-@Roland: Nice series, thanks for splitting things up.
+Acked-by: Wolfram Sang <w.sang@pengutronix.de> 
+Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 
 -- 
 Pengutronix e.K.                           | Wolfram Sang                |
@@ -42,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/4e4f30cc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/a40c1742/attachment.sig>
