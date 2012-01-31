@@ -1,66 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2012 22:50:45 +0000
-Subject: [PATCH v2 3/8] ARM: tegra: rework Tegra secondary CPU core bringup
-In-Reply-To: <1328028051-24271-4-git-send-email-pdeschrijver@nvidia.com>
-References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
- <1328028051-24271-4-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20120131225045.GE8338@n2100.arm.linux.org.uk>
+Date: Tue, 31 Jan 2012 23:09:28 +0000
+Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <20120128180602.GC2501@ponder.secretlab.ca>
+References: <4F22DEF2.5000807@ti.com>
+ <20120128180602.GC2501@ponder.secretlab.ca>
+Message-ID: <20120131230928.GA8394@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 06:40:41PM +0200, Peter De Schrijver wrote:
-> +ENTRY(__tegra_cpu_reset_handler_start)
-> +
-> +/*
-> + * __tegra_cpu_reset_handler:
-> + *
-> + * Common handler for all CPU reset events.
-> + *
-> + * Register usage within the reset handler:
-> + *
-> + *      R7  = CPU present (to the OS) mask
-> + *      R8  = CPU in LP1 state mask
-> + *      R9  = CPU in LP2 state mask
-> + *      R10 = CPU number
-> + *      R11 = CPU mask
-> + *      R12 = pointer to reset handler data
-> + *
-> + * NOTE: This code is copied to IRAM. All code and data accesses
-> + *       must be position-independent.
-> + */
-> +
-> +	.align L1_CACHE_SHIFT
-> +ENTRY(__tegra_cpu_reset_handler)
-> +
-> +#if DEBUG_CPU_RESET_HANDLER
-> +	enable_coresight r0
-> +	b	.
-> +#endif
-> +	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
-> +	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
-> +	and	r5, r0, #0x00f00000		@ variant
-> +	and	r6, r0, #0x0000000f		@ revision
-> +	orr	r6, r6, r5, lsr #20-4		@ combine variant and revision
-> +#ifdef CONFIG_ARM_ERRATA_743622
-> +	teq	r6, #0x20			@ present in r2p0
-> +	teqne	r6, #0x21			@ present in r2p1
-> +	teqne	r6, #0x22			@ present in r2p2
-> +	teqne	r6, #0x27			@ present in r2p7
-> +	teqne	r6, #0x29			@ present in r2p9
+On Sat, Jan 28, 2012 at 11:06:02AM -0700, Grant Likely wrote:
+> This makes the assumption that dma specifiers will only ever be 1
+> cell.  I think to be generally useful, the full dma specifier needs to
+> be either handed to the dma controller to get a cookie or passed back
+> to the caller in its entirety.
 
-Okay, so we have this errata in proc-v7.S, but only for p0..p2.  If
-it's also p7 and p9, then it shows that the errata in the kernel aren't
-being actively maintained, and brings into question their worth.
+More to the point, who says that the DMA specifier is even an integer?
+When people are using DMA engines, it (probably) isn't an integer at
+all.  Several platforms I know of use strings for this.
 
-Plus, of course, we don't want platforms re-implementing the errata
-in their own code if we're already implementing it somewhere in the
-kernel.  So, that's something which needs to be thought about.
+Some platforms can even select between two or more DMA engines for
+handling the same peripheral - I believe Samsung do this depending
+on their individual workloads.
 
-That's something that needs considering along side the whole 'what
-to do about errata when running in non-secure mode' problem which
-OMAP suffers from.
+However, the opaque DMA engine API for requesting a channel doesn't
+lend itself well to DT, as the match data and match function are
+entirely left to the individual DMA engine driver and/or platform
+itself.
 
-> +	mrceq	p15, 0, r10, c15, c0, 1		@ read diagnostic register
-> +	orreq	r10, r10, #1 << 6		@ set bit #6
-> +	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
-> +#endif
+As far as creating another linear number space for DMA stuff, I'd
+really suggest against that - you're going to need some additional
+code in place to manage that numberspace.  If you at least use a two-
+paid cookie, eg 'dma controller phandle + request signal' then that
+makes all the stuff we're starting to see with the IRQ subsystem,
+IRQ domains etc become completely unnecessary.
+
+I guess what I'm saying is ignore the flat number space, and go
+straight to some kind of 'dma domains' solution from the start.
