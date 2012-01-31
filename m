@@ -1,54 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 Jan 2012 14:40:38 +0000
-Subject: Oops in guest after ioremap() on ARMv7
-In-Reply-To: <1326994510.17599.97.camel@zakaz.uk.xensource.com>
-References: <4EF31DA7.9030407@citrix.com> <20111222144937.GE20635@arm.com>
- <4EF35CFF.3050200@citrix.com> <20111222181356.GI20635@arm.com>
- <4EF37802.30300@citrix.com> <1324641625.7877.161.camel@zakaz.uk.xensource.com>
- <20120103165027.GD22876@arm.com>
- <1326994510.17599.97.camel@zakaz.uk.xensource.com>
-Message-ID: <CAHkRjk68rw2TKnitc7M+R1FCpwrGkqFHwd4YmS78mveR9uO_2Q@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 31 Jan 2012 08:44:19 -0600
+Subject: [PATCH v3 2/2] gpio: pl061: enable interrupts with DT style
+ binding
+In-Reply-To: <20120131143609.GA26436@S2101-09.ap.freescale.net>
+References: <1327944699-29882-1-git-send-email-robherring2@gmail.com>
+ <1327944699-29882-3-git-send-email-robherring2@gmail.com>
+ <20120131143609.GA26436@S2101-09.ap.freescale.net>
+Message-ID: <4F27FE43.7090503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 January 2012 17:35, Ian Campbell <Ian.Campbell@citrix.com> wrote:
-> On Tue, 2012-01-03 at 16:50 +0000, Catalin Marinas wrote:
->> On Fri, Dec 23, 2011 at 12:00:25PM +0000, Ian Campbell wrote:
->> > At the moment we build the entire p2m before we ever load the VTTBR or
->> > enable stage-2 translations in the HCR. Is that sufficient or do we also
->> > need to flush something?
->>
->> If the model does not correctly implement cacheable page table walks for
->> either stage 1 or stage 2 translation (though ID_MMFR3[23:20] indicate
->> that it should), the hypervisor would need to clean the D-cache to the
->> point of unification (not necessary to go to the point of coherency)
->> before any of the state 2 translation tables are used.
->
-> I added a copy of Linux's v7_flush_dcache_all after building the p2m but
-> just before loading the VTTBR and it didn't help.
->
-> I turned off cacheability in VTCR and that didn't help either.
->
-> Then I turned off cacheability in the Linux TTBR{0,1} (by frobbing both
-> TTB_FLAGS_UP and TTB_FLAGS_SMP to use FOO_NC everywhere) and this _did_
-> make a difference -- the kernel now boots.
->
-> I then tested just that change by itself and it seems to have done the
-> trick.
->
-> Does that indicate a model bug?
+On 01/31/2012 08:36 AM, Shawn Guo wrote:
+> On Mon, Jan 30, 2012 at 11:31:39AM -0600, Rob Herring wrote:
+> ...
+>> -static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
+>> +static void __init pl061_init_gc(struct pl061_gpio *chip,
+>> +				 struct device_node *node, int irq_base)
+>>  {
+>>  	struct irq_chip_type *ct;
+>>  
+>> @@ -212,15 +212,17 @@ static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
+>>  	ct->chip.irq_set_wake = irq_gc_set_wake;
+>>  	ct->regs.mask = GPIOIE;
+>>  
+>> -	irq_setup_generic_chip(chip->irq_gc, IRQ_MSK(PL061_GPIO_NR),
+>> -			       IRQ_GC_INIT_NESTED_LOCK, IRQ_NOREQUEST, 0);
+>> +	irq_setup_generic_chip_domain(chip->irq_gc, node,
+>> +				      IRQ_MSK(PL061_GPIO_NR),
+>> +				      IRQ_GC_INIT_NESTED_LOCK,
+>> +				      IRQ_NOREQUEST, 0);
+>>  }
+> 
+> The function irq_setup_generic_chip_domain() is wrapped by
+> #ifdef CONFIG_IRQ_DOMAIN in patch #1.  Is it true that pl061 driver
+> will never work with !IRQ_DOMAIN case?
 
-It is possible. The scenario I'm thinking of is that with cacheable
-PTWs enabled in TTBR, the model wrongly decides to use the
-intermediate physical address (IPA) to look up the caches and gets the
-wrong information.
+You're right unless Grant thinks IRQ_DOMAIN should always be enabled for
+ARM? Otherwise, I'll add something like this for !IRQ_DOMAIN:
 
-I'll take this to the model guys but most likely they'll ask for an
-image to load and just run. Could you provide such simple image
-(minimal filesystem)? I'm not familiar with Xen and building it.
+static inline void irq_setup_generic_chip_domain(
+			   struct irq_chip_generic *gc,
+                           struct device_node *node, u32 msk,
+                           enum irq_gc_flags flags, unsigned int clr,
+                           unsigned int set)
+{
+	irq_setup_generic_chip(gc, msk, flags, clr, set);
+}
 
-(I'll first ask the model guys, maybe they can spot the error easily
-without additional debugging).
-
--- 
-Catalin
+Rob
