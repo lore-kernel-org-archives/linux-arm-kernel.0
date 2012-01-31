@@ -1,44 +1,72 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 31 Jan 2012 11:52:56 +0000
-Subject: [PATCH] ARM: devicetree: Add .dtb files to
- arch/arm/boot/.gitignore
-In-Reply-To: <20120131114659.GE2085@linaro.org>
-References: <1327945574-7977-1-git-send-email-dave.martin@linaro.org>
- <20120131032022.GC24681@S2101-09.ap.freescale.net>
- <20120131114659.GE2085@linaro.org>
-Message-ID: <20120131115256.GG2085@linaro.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 31 Jan 2012 13:10:07 +0100
+Subject: [PATCH v3] mtd/gpmi : add BBT support to gpmi nand driver
+In-Reply-To: <1328008316-27258-1-git-send-email-b32955@freescale.com>
+References: <1328008316-27258-1-git-send-email-b32955@freescale.com>
+Message-ID: <20120131121007.GO2471@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 11:46:59AM +0000, Dave Martin wrote:
-> On Tue, Jan 31, 2012 at 11:20:24AM +0800, Shawn Guo wrote:
-> > On Mon, Jan 30, 2012 at 05:46:14PM +0000, Dave Martin wrote:
-> > > Compiled device tree blobs shouldn't be committed in the kernel
-> > > tree, so ideally git should ignore them.
-> > > 
-> > > This patch will enable ignoring of any .dtb files which appear in
-> > > arch/arm/boot/
-> > > 
-> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > 
-> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > I added my ack tag on the same patch below, but it died in the end?
-> > 
-> > http://comments.gmane.org/gmane.linux.ports.arm.kernel/144097
+On Tue, Jan 31, 2012 at 07:11:56PM +0800, Huang Shijie wrote:
+> Add a new field to gpmi_nand_platform_data{}.
+> Make the BBT support to board specific.
 > 
-> I don't mind too much which patch goes in -- do we care about whether
-> other .dtb files can be included in the kernel?
-> 
-> 
-> I would suggest that it is just plain wrong for _binary_ devicetree
-> blobs to appear in the kernel tree, since there is a readily usable
-> source form for the same thing (this isn't firmware)
-> 
-> Do we think that the '.dtb' filename extension might get used foro
-> something else?
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 
-Never mind, it looks like Grant merged my patch anyway.
+Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Cheers
----Dave
+I'd think you won't be able to mark blocks bad, though. Will send a
+patch in a minute. Please test.
+
+> ---
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 ++
+>  include/linux/mtd/gpmi-nand.h          |    2 ++
+>  2 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> index 493ec2f..4d369df 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> @@ -1493,6 +1493,8 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
+>  	chip->ecc.mode		= NAND_ECC_HW;
+>  	chip->ecc.size		= 1;
+>  	chip->ecc.layout	= &gpmi_hw_ecclayout;
+> +	if (pdata->enable_bbt)
+> +		chip->bbt_options = NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+>  
+>  	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
+>  	this->bch_geometry.payload_size = 1024;
+> diff --git a/include/linux/mtd/gpmi-nand.h b/include/linux/mtd/gpmi-nand.h
+> index 69b6dbf..04ab366 100644
+> --- a/include/linux/mtd/gpmi-nand.h
+> +++ b/include/linux/mtd/gpmi-nand.h
+> @@ -51,6 +51,7 @@
+>   * @partitions:              An optional pointer to an array of partition
+>   *                           descriptions.
+>   * @partition_count:         The number of elements in the partitions array.
+> + * @enable_bbt:              Enable the BBT or not.
+>   */
+>  struct gpmi_nand_platform_data {
+>  	/* SoC hardware information. */
+> @@ -64,5 +65,6 @@ struct gpmi_nand_platform_data {
+>  	/* Medium information. */
+>  	struct		mtd_partition *partitions;
+>  	unsigned	partition_count;
+> +	unsigned int	enable_bbt:1;
+>  };
+>  #endif
+> -- 
+> 1.7.0.4
+> 
+> 
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/437474bc/attachment.sig>
