@@ -1,41 +1,60 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Tue, 31 Jan 2012 15:37:08 +0400
-Subject: [PATCH 07/21] OMAP3+: PM: SR/Class3: disable errorgen before
- disable VP
-In-Reply-To: <CAORVsuUNM8bpwyjbG2GcwfiUEf7A54ODC4tfhZNinUhQTE3g5w@mail.gmail.com>
-References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
- <1327504583-13408-8-git-send-email-j-pihet@ti.com>
- <4F213860.9050600@ru.mvista.com>
- <CAORVsuUNM8bpwyjbG2GcwfiUEf7A54ODC4tfhZNinUhQTE3g5w@mail.gmail.com>
-Message-ID: <4F27D264.9050203@ru.mvista.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 31 Jan 2012 11:46:59 +0000
+Subject: [PATCH] ARM: devicetree: Add .dtb files to
+ arch/arm/boot/.gitignore
+In-Reply-To: <20120131032022.GC24681@S2101-09.ap.freescale.net>
+References: <1327945574-7977-1-git-send-email-dave.martin@linaro.org>
+ <20120131032022.GC24681@S2101-09.ap.freescale.net>
+Message-ID: <20120131114659.GE2085@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jan 31, 2012 at 11:20:24AM +0800, Shawn Guo wrote:
+> On Mon, Jan 30, 2012 at 05:46:14PM +0000, Dave Martin wrote:
+> > Compiled device tree blobs shouldn't be committed in the kernel
+> > tree, so ideally git should ignore them.
+> > 
+> > This patch will enable ignoring of any .dtb files which appear in
+> > arch/arm/boot/
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> I added my ack tag on the same patch below, but it died in the end?
+> 
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/144097
 
-On 31-01-2012 14:06, Jean Pihet wrote:
+I don't mind too much which patch goes in -- do we care about whether
+other .dtb files can be included in the kernel?
 
-> ...
 
->>> +int sr_disable_errgen(struct voltagedomain *voltdm)
->>> +{
->>> +       u32 errconfig_offs, vpboundint_en;
->>> +       u32 vpboundint_st;
->>> +       struct omap_sr *sr = _sr_lookup(voltdm);
->>> +
->>> +       if (IS_ERR(sr)) {
->>> +               pr_warning("%s: omap_sr struct for sr_%s not found\n",
->>> +                       __func__, voltdm->name);
->>> +               return -EINVAL;
->>
->>
->>    Not PTR_ERR(sr)?
+I would suggest that it is just plain wrong for _binary_ devicetree
+blobs to appear in the kernel tree, since there is a readily usable
+source form for the same thing (this isn't firmware)
 
-> _sr_lookup returns a return code using ERR_PTR so the return value
-> should be checked for errors using IS_ERR. Please note that _sr_lookup
-> checks for NULL parameter internally.
+Do we think that the '.dtb' filename extension might get used foro
+something else?
 
-    That's clear. I was asking don't you want to return PTR_ERR(sr) instead of 
--EINVAL.
+Cheers
+---Dave
 
-WBR, Sergei
+> 
+> Regards,
+> Shawn
+> 
+> > ---
+> >  arch/arm/boot/.gitignore |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/.gitignore b/arch/arm/boot/.gitignore
+> > index ce1c5ff..3c79f85 100644
+> > --- a/arch/arm/boot/.gitignore
+> > +++ b/arch/arm/boot/.gitignore
+> > @@ -3,3 +3,4 @@ zImage
+> >  xipImage
+> >  bootpImage
+> >  uImage
+> > +*.dtb
+> > -- 
+> > 1.7.4.1
