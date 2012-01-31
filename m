@@ -1,72 +1,47 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 31 Jan 2012 13:10:07 +0100
-Subject: [PATCH v3] mtd/gpmi : add BBT support to gpmi nand driver
-In-Reply-To: <1328008316-27258-1-git-send-email-b32955@freescale.com>
-References: <1328008316-27258-1-git-send-email-b32955@freescale.com>
-Message-ID: <20120131121007.GO2471@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 Jan 2012 12:10:12 +0000
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <20120131101000.GA1275@n2100.arm.linux.org.uk>
+References: <20120117133918.GE11475@arm.com>
+ <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+ <WC20120120085711.330803@terrafix.co.uk> <20120127173029.GA3281@arm.com>
+ <4F277A6E.9070107@ti.com>
+ <CAHkRjk7z2QYbU09BRfAWmChw5xj9taCarWfnttWveyqtadiEOg@mail.gmail.com>
+ <CAMQu2gxr5ZkH4AE_7QNptxx7onQMGaj+qhUF+DSw9MnkCqCRog@mail.gmail.com>
+ <CAHkRjk7Fh=OUk8K=bJa8xzPqMvT6P6gjT+kqAA0DeVfrF0sUNg@mail.gmail.com>
+ <CAMQu2gwDJ=aezNAUD3YmGHQ6fBxkxgUonYkQYPH8WBeNvZCKMQ@mail.gmail.com>
+ <CAHkRjk6KQXR1kt8VTPC3GOaHUusKikxXHR=Mge8akaVL2ipvaw@mail.gmail.com>
+ <20120131101000.GA1275@n2100.arm.linux.org.uk>
+Message-ID: <CAHkRjk7_giYNk5djA_kevxo0YqvGJBwJydQXvtMy7AKmWv8XEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 07:11:56PM +0800, Huang Shijie wrote:
-> Add a new field to gpmi_nand_platform_data{}.
-> Make the BBT support to board specific.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+On 31 January 2012 10:10, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 31, 2012 at 09:53:25AM +0000, Catalin Marinas wrote:
+>> Maybe we could factor out the CPU-specific settings from proc-v*.S
+>> into a separate arch/arm/boot/preload directory. We keep proc-v*.S
+>> entirely generic and the implementation-defined bits setting in the
+>> preload code. You could have an option to link the preload with the
+>> kernel but we could recommend that people run this code from
+>> boot-loader before invoking the kernel.
+>
+> You've seen the resistance from uboot to stuff we do with the kernel,
+> this will be no different. ?There's also quite a number of boot loaders
+> out there which aren't capable of running a binary, returning and then
+> loading and running the kernel.
+>
+> Plus, of course, it's far from friendly towards TFTP setups.
 
-Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
-
-I'd think you won't be able to mark blocks bad, though. Will send a
-patch in a minute. Please test.
-
-> ---
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 ++
->  include/linux/mtd/gpmi-nand.h          |    2 ++
->  2 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> index 493ec2f..4d369df 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -1493,6 +1493,8 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
->  	chip->ecc.mode		= NAND_ECC_HW;
->  	chip->ecc.size		= 1;
->  	chip->ecc.layout	= &gpmi_hw_ecclayout;
-> +	if (pdata->enable_bbt)
-> +		chip->bbt_options = NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
->  
->  	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
->  	this->bch_geometry.payload_size = 1024;
-> diff --git a/include/linux/mtd/gpmi-nand.h b/include/linux/mtd/gpmi-nand.h
-> index 69b6dbf..04ab366 100644
-> --- a/include/linux/mtd/gpmi-nand.h
-> +++ b/include/linux/mtd/gpmi-nand.h
-> @@ -51,6 +51,7 @@
->   * @partitions:              An optional pointer to an array of partition
->   *                           descriptions.
->   * @partition_count:         The number of elements in the partitions array.
-> + * @enable_bbt:              Enable the BBT or not.
->   */
->  struct gpmi_nand_platform_data {
->  	/* SoC hardware information. */
-> @@ -64,5 +65,6 @@ struct gpmi_nand_platform_data {
->  	/* Medium information. */
->  	struct		mtd_partition *partitions;
->  	unsigned	partition_count;
-> +	unsigned int	enable_bbt:1;
->  };
->  #endif
-> -- 
-> 1.7.0.4
-> 
-> 
+For platforms that can't/don't want to modify the boot loader, they
+could wrap (prepend) the kernel image with the preload code and they
+just use that to kexec a distro generic kernel. I know it can go to
+3-4 stages boot process on some platforms but you have the advantage
+of a generic kernel image. If SoC vendors don't like the lengthier
+boot process, they have the option of modifying the boot loader and
+include the preload code that the kernel provides (or find a way to
+load it together with the kernel at boot-time).
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120131/437474bc/attachment.sig>
+Catalin
