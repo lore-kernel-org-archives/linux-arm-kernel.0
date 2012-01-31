@@ -1,44 +1,43 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 30 Jan 2012 16:14:23 -0800
-Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
- pwrdm_clear_all_prev_pwrst()
-In-Reply-To: <20120130094312.11027.31050.stgit@dusk> (Paul Walmsley's message
- of "Mon, 30 Jan 2012 02:43:17 -0700")
-References: <20120130093931.11027.31048.stgit@dusk>
- <20120130094312.11027.31050.stgit@dusk>
-Message-ID: <878vkopw2o.fsf@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 31 Jan 2012 09:07:11 +0800
+Subject: Pinmux bindings proposal V2
+In-Reply-To: <20120130174323.GF9339@atomide.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
+ <20120123210052.GS22818@atomide.com>
+ <20120126093610.GD2287@S2101-09.ap.freescale.net>
+ <20120126175122.GX22818@atomide.com>
+ <20120127071944.GC32740@S2101-09.ap.freescale.net>
+ <20120127171653.GI13504@atomide.com>
+ <20120130021041.GB10470@S2101-09.ap.freescale.net>
+ <20120130174323.GF9339@atomide.com>
+Message-ID: <20120131010708.GA24681@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+On Mon, Jan 30, 2012 at 09:43:23AM -0800, Tony Lindgren wrote:
+> * Shawn Guo <shawn.guo@linaro.org> [120129 17:27]:
+> > On Fri, Jan 27, 2012 at 09:16:53AM -0800, Tony Lindgren wrote:
+> > ...
+> > > I guess the analog we should follow here is clk_get and clk_set_rate,
+> > > except we would have pinconf_set_state with predefined states.
+> > > 
+> > It seems working for cases that we only change pinconf but never pinmux
+> > for different configuration states.  But how would that work for cases
+> > that require mux change for different configuration states?
+> 
+> I don't see why we should not allow changing the mux state with pinconf
+> too, after all it's the mux/pin that's locked, not the functionality of
+> the pin.
+> 
+My point is I do not see how we can use the current pinmux APIs design
+to change mux in the way how clk_get and clk_set_rate work.  Or you
+have a pinmux APIs reconstruction on your mind?
 
-> Remove some superfluous calls to pwrdm_clear_all_prev_pwrst().
-> pwrdm_pre_transition(), which appears a few lines after these calls,
-> invokes pwrdm_clear_all_prev_pwrst() on each powerdomain -- there's no
-> need to do it twice.
+Regards,
+Shawn
 
-It looks like these two for OMAP4 are surpurfluous since the immediately
-follow a call to pwrdm_pre_transition() as well.
-
-Santosh/Rajendra, please confirm/ack.
-
-Kevin
-
-
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index 1d5d010..bbabe1d 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -263,12 +263,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
- 	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
- 	 */
- 	mpuss_clear_prev_logic_pwrst();
--	pwrdm_clear_all_prev_pwrst(mpuss_pd);
- 	if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) &&
- 		(pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF))
- 		save_state = 2;
- 
--	clear_cpu_prev_pwrst(cpu);
- 	cpu_clear_prev_logic_pwrst(cpu);
- 	set_cpu_next_pwrst(cpu, power_state);
- 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap4_cpu_resume));
+> An example of this would be remuxing a shared UART line between rx and
+> tx. Those kind of cases could be defined as PMX_DIRECTION_INPUT and
+> PMX_DIRECTION_OUTPUT so driver could call Linux generic functions for
+> those if implemented.
+> 
