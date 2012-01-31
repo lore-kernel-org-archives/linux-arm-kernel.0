@@ -1,27 +1,26 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jan 2012 23:21:45 +0800
-Subject: [PATCH] ARM: mxs: read correct values when setting up MAC
-In-Reply-To: <20120131142155.GQ2471@pengutronix.de>
-References: <1327431447-5031-1-git-send-email-w.sang@pengutronix.de>
- <20120131142155.GQ2471@pengutronix.de>
-Message-ID: <20120131152143.GC26436@S2101-09.ap.freescale.net>
+Date: Tue, 31 Jan 2012 23:28:29 +0800
+Subject: [PATCH v3] ARM: mxs: Use a proper timeout mechanism
+In-Reply-To: <1327675469-11342-1-git-send-email-fabio.estevam@freescale.com>
+References: <1327329667-25512-1-git-send-email-fabio.estevam@freescale.com>
+ <1327675469-11342-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120131152826.GD26436@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 03:21:55PM +0100, Wolfram Sang wrote:
-> On Tue, Jan 24, 2012 at 07:57:27PM +0100, Wolfram Sang wrote:
-> > Currently, the MAC address from the second ethernet is generated from the
-> > crypto-key (and not a customer reg) because of a wrong index to the ocotp
-> > array.
-> > 
-> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Stefano Babic <sbabic@denx.de>
-> > ---
+On Fri, Jan 27, 2012 at 12:44:29PM -0200, Fabio Estevam wrote:
+> Introduce a function for checking the busy bits of CLKCTRL register that 
+> uses a proper timeout mechanism.
 > 
-> Ping.
+> Remove parts of code that use busy loops and replace them with the 
+> mxs_clkctrl_timeout() function.
 > 
-Just applied, thanks.
+> Tested on a mx28evk by performing audio playback.
+> 
+> Suggested-by: Wolfram Sang <w.sang@pengutronix.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Applied, thanks.
 
 -- 
 Regards,
