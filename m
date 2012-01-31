@@ -1,151 +1,80 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jan 2012 23:31:00 +0800
-Subject: [PATCH v2] ARM: mx28evk: Simplify GPIO requests
-In-Reply-To: <1327675952-11443-1-git-send-email-fabio.estevam@freescale.com>
-References: <1327329709-25545-1-git-send-email-fabio.estevam@freescale.com>
- <1327675952-11443-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120131153057.GE26436@S2101-09.ap.freescale.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 31 Jan 2012 15:20:11 +0000
+Subject: [PATCH] ARM: smp: allow get the core count from L2 control on A15
+In-Reply-To: <4F27FD69.7060207@samsung.com>
+References: <04be01cce011$6b3b3550$41b19ff0$%kim@samsung.com>
+ <20120131141313.GA31004@mudshark.cambridge.arm.com>
+ <4F27F8E8.1030703@samsung.com>
+ <20120131143247.GB31004@mudshark.cambridge.arm.com>
+ <4F27FD69.7060207@samsung.com>
+Message-ID: <20120131152011.GC10299@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2012 at 12:52:32PM -0200, Fabio Estevam wrote:
-> Requesting all the GPIOs on a single array (mx28evk_gpios[]) can make the 
-> error handling of gpio_requests much simpler.
+On Tue, Jan 31, 2012 at 02:40:41PM +0000, Kukjin Kim wrote:
+> On 01/31/12 23:32, Will Deacon wrote:
+> > On Tue, Jan 31, 2012 at 02:21:28PM +0000, Kukjin Kim wrote:
+> >> On 01/31/12 23:13, Will Deacon wrote:
+> >>>
+> >>> This doesn't belong in smp.c but, more importantly, this doesn't work for
+> >>> multi-cluster configurations at all. Since all A15 implementations will be
+> >>> on new platforms, the code will be device-tree only and so we should use
+> >>
+> >> Why not? As I know, current arm kernel ARMv7 arch can support A15
+> >> without device-tree. And you know, the core number should be counted by
+> >> L2 control register. no?
+> >
+> > I'll answer these in order:
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-Applied with one makeup blank line below added.  Thanks.
-
-> ---
-> Changes since v1:
-> - Removed empty line
-> - Leave gpio_set_value(MX28EVK_FEC_PHY_RESET, 0) prior to the delay line in fec_reset
-> - Put __initconst after mx28evk_gpios[]
->  arch/arm/mach-mxs/mach-mx28evk.c |   71 ++++++++------------------------------
->  1 files changed, 15 insertions(+), 56 deletions(-)
+> Hmm, let
+> >
+> > 1.) The code doesn't belong in smp.c because it's specific to the A15
 > 
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index fdb0a56..dad053d 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -223,7 +223,6 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
->  /* fec */
->  static void __init mx28evk_fec_reset(void)
->  {
-> -	int ret;
->  	struct clk *clk;
->  
->  	/* Enable fec phy clock */
-> @@ -231,32 +230,7 @@ static void __init mx28evk_fec_reset(void)
->  	if (!IS_ERR(clk))
->  		clk_prepare_enable(clk);
->  
-> -	/* Power up fec phy */
-> -	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
-> -	if (ret) {
-> -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
-> -		return;
-> -	}
-> -
-> -	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
-> -	if (ret) {
-> -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
-> -		return;
-> -	}
-> -
-> -	/* Reset fec phy */
-> -	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
-> -	if (ret) {
-> -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
-> -		return;
-> -	}
-> -
-> -	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
-> -	if (ret) {
-> -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
-> -		return;
-> -	}
-> -
-> +	gpio_set_value(MX28EVK_FEC_PHY_RESET, 0);
->  	mdelay(1);
->  	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
->  }
-> @@ -417,9 +391,14 @@ static void __init mx28evk_add_regulators(void)
->  static void __init mx28evk_add_regulators(void) {}
->  #endif
->  
-> -static struct gpio mx28evk_lcd_gpios[] = {
-> +static const struct gpio mx28evk_gpios[] __initconst = {
->  	{ MX28EVK_LCD_ENABLE, GPIOF_OUT_INIT_HIGH, "lcd-enable" },
->  	{ MX28EVK_BL_ENABLE, GPIOF_OUT_INIT_HIGH, "bl-enable" },
-> +	{ MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT, "flexcan-switch" },
-> +	{ MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc0-slot-power" },
-> +	{ MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc1-slot-power" },
-> +	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-phy-power" },
-> +	{ MX28EVK_FEC_PHY_RESET, GPIOF_DIR_OUT, "fec-phy-reset" },
->  };
->  
->  static const struct mxs_saif_platform_data
-> @@ -447,25 +426,17 @@ static void __init mx28evk_init(void)
->  	if (mx28evk_fec_get_mac())
->  		pr_warn("%s: failed on fec mac setup\n", __func__);
->  
-> +	ret = gpio_request_array(mx28evk_gpios, ARRAY_SIZE(mx28evk_gpios));
-> +	if (ret)
-> +		pr_err("One or more GPIOs failed to be requested: %d\n", ret);
+> Yes, agree. So I just commented in my patch, I'm not sure where it 
+> should be added at.
 
-Here, I added one blank line.
+I do not think it should be added at all. And if you add it at least add
+it to your BSP code (not in smp.c), because it works for a single cluster A15 
+configuration, it does not for other A15 based systems. 
+I think Will's comment was pretty clear about this.
 
-Regards,
-Shawn
+> > 2.) The architecture code may well support A15, but since there are no
+> >      platforms in mainline that support A15 yet, then all new platforms will
+> >      need to be DT-based. That means we can rely on the DT to provide this
+> >      information.
+> 
+> Well, I will submit EXYNOS5 which has two A15 cores today and I don't 
+> know why it should be supported only with DT, EXYNOS5 DT supporting will 
+> be submitted though.
+> 
 
->  	mx28evk_fec_reset();
->  	mx28_add_fec(0, &mx28_fec_pdata[0]);
->  	mx28_add_fec(1, &mx28_fec_pdata[1]);
->  
-> -	ret = gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
-> -				"flexcan-switch");
-> -	if (ret) {
-> -		pr_err("failed to request gpio flexcan-switch: %d\n", ret);
-> -	} else {
-> -		mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
-> -		mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
-> -	}
-> +	mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
-> +	mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
->  
-> -	ret = gpio_request_array(mx28evk_lcd_gpios,
-> -				 ARRAY_SIZE(mx28evk_lcd_gpios));
-> -	if (ret)
-> -		pr_warn("failed to request gpio pins for lcd: %d\n", ret);
-> -	else
-> -		mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
-> +	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
->  
->  	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
->  	mx28_add_saif(0, &mx28evk_mxs_saif_pdata[0]);
-> @@ -480,20 +451,8 @@ static void __init mx28evk_init(void)
->  	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0,
->  			NULL, 0);
->  
-> -	/* power on mmc slot by writing 0 to the gpio */
-> -	ret = gpio_request_one(MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW,
-> -			       "mmc0-slot-power");
-> -	if (ret)
-> -		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
-> -	else
-> -		mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
-> -
-> -	ret = gpio_request_one(MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW,
-> -			       "mmc1-slot-power");
-> -	if (ret)
-> -		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
-> -	else
-> -		mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
-> +	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
-> +	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
->  
->  	mx28_add_rtc_stmp3xxx();
->  
-> -- 
-> 1.7.1
+See above.
+
+> > 3.) The L2 control register only tells you how many cores are hanging off
+> >      that particular L2. This will be wrong for multi-cluster systems since
+> >      it will only identify a subset of the cores.
+> 
+> OK, let me check it.
+
+Check it and you will notice that it does not work for multi-cluster SMP
+systems.
+
+> >
+> >>> I believe Lorenzo posted some patches which you could look at.
+> >>>
+> >> OK, Would be better.
+> >
+> > Yes, I think it's the only way to solve this problem without adding an
+> > architected method for enumerating the CPU topology.
+> >
+> I'm not sure it is the only way...
+
+We are not stating that it is the only way to do it. We are saying it is the
+only way to do it in a generic way without relying on a per platform hook (if 
+it exists).
+If it does not and we rely on this patch, we end up booting only one cluster out
+of the possible ones, which is awesome.
+
+I am against adding this code for the aforementioned reasons.
+
+Lorenzo
