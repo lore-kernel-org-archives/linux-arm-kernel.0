@@ -1,159 +1,235 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  1 Feb 2012 00:57:15 +0900
-Subject: [PATCH 1/3] ARM: EXYNOS: Enable MDMA driver
+Date: Wed,  1 Feb 2012 00:57:16 +0900
+Subject: [PATCH 2/3] ARM: EXYNOS: Support DMA for EXYNOS4X12 SoC
 In-Reply-To: <1328025437-5396-1-git-send-email-kgene.kim@samsung.com>
 References: <1328025437-5396-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1328025437-5396-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1328025437-5396-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boojin Kim <boojin.kim@samsung.com>
 
-This patch adds MDMA platform data and enables
-MDMA for DMA memcpy operation for EXYNOS SoCs.
-
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/clock-exynos4.c           |    9 ++++++
- arch/arm/mach-exynos/dma.c                     |   35 ++++++++++++++++++++++++
- arch/arm/mach-exynos/include/mach/irqs.h       |    2 +
- arch/arm/mach-exynos/include/mach/map.h        |    3 +-
- arch/arm/plat-samsung/include/plat/dma-pl330.h |    8 +++++
- 5 files changed, 56 insertions(+), 1 deletions(-)
+ arch/arm/mach-exynos/Kconfig                   |    4 +
+ arch/arm/mach-exynos/clock-exynos4.c           |    2 +-
+ arch/arm/mach-exynos/dma.c                     |   95 ++++++++++++++++++++++--
+ arch/arm/plat-samsung/include/plat/dma-pl330.h |    8 ++
+ 4 files changed, 100 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 89b8e17..0d8677e 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -47,6 +47,7 @@ config SOC_EXYNOS4212
+ 	bool "SAMSUNG EXYNOS4212"
+ 	default y
+ 	depends on ARCH_EXYNOS4
++	select SAMSUNG_DMADEV
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
+ 	help
+@@ -56,6 +57,7 @@ config SOC_EXYNOS4412
+ 	bool "SAMSUNG EXYNOS4412"
+ 	default y
+ 	depends on ARCH_EXYNOS4
++	select SAMSUNG_DMADEV
+ 	help
+ 	  Enable EXYNOS4412 SoC support
+ 
+@@ -346,6 +348,7 @@ config MACH_SMDK4212
+ 	select SAMSUNG_DEV_BACKLIGHT
+ 	select SAMSUNG_DEV_KEYPAD
+ 	select SAMSUNG_DEV_PWM
++	select EXYNOS4_DEV_DMA
+ 	select EXYNOS4_SETUP_I2C1
+ 	select EXYNOS4_SETUP_I2C3
+ 	select EXYNOS4_SETUP_I2C7
+@@ -360,6 +363,7 @@ config MACH_SMDK4412
+ 	bool "SMDK4412"
+ 	select SOC_EXYNOS4412
+ 	select MACH_SMDK4212
++	select EXYNOS4_DEV_DMA
+ 	help
+ 	  Machine support for Samsung SMDK4412
+ endif
 diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-index 411b366b..ffcc46b 100644
+index ffcc46b..a1f118e 100644
 --- a/arch/arm/mach-exynos/clock-exynos4.c
 +++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -783,6 +783,13 @@ static struct clk exynos4_clk_pdma1 = {
+@@ -783,7 +783,7 @@ static struct clk exynos4_clk_pdma1 = {
  	.ctrlbit	= (1 << 1),
  };
  
-+static struct clk exynos4_clk_mdma1 = {
-+	.name		= "dma",
-+	.devname	= "dma-pl330.2",
-+	.enable		= exynos4_clk_ip_image_ctrl,
-+	.ctrlbit	= ((1 << 8) | (1 << 5) | (1 << 2)),
-+};
-+
- struct clk *exynos4_clkset_group_list[] = {
- 	[0] = &clk_ext_xtal_mux,
- 	[1] = &clk_xusbxti,
-@@ -1301,6 +1308,7 @@ static struct clksrc_clk *exynos4_sysclks[] = {
- static struct clk *exynos4_clk_cdev[] = {
- 	&exynos4_clk_pdma0,
- 	&exynos4_clk_pdma1,
-+	&exynos4_clk_mdma,
- };
- 
- static struct clksrc_clk *exynos4_clksrc_cdev[] = {
-@@ -1329,6 +1337,7 @@ static struct clk_lookup exynos4_clk_lookup[] = {
- 	CLKDEV_INIT("s3c-sdhci.3", "mmc_busclk.2", &exynos4_clk_sclk_mmc3.clk),
- 	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos4_clk_pdma0),
- 	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos4_clk_pdma1),
-+	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos4_clk_mdma),
- 	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk0", &exynos4_clk_sclk_spi0.clk),
- 	CLKDEV_INIT("s3c64xx-spi.1", "spi_busclk0", &exynos4_clk_sclk_spi1.clk),
- 	CLKDEV_INIT("s3c64xx-spi.2", "spi_busclk0", &exynos4_clk_sclk_spi2.clk),
+-static struct clk exynos4_clk_mdma1 = {
++static struct clk exynos4_clk_mdma = {
+ 	.name		= "dma",
+ 	.devname	= "dma-pl330.2",
+ 	.enable		= exynos4_clk_ip_image_ctrl,
 diff --git a/arch/arm/mach-exynos/dma.c b/arch/arm/mach-exynos/dma.c
-index b10fcd2..e89329e 100644
+index e89329e..ce645ba 100644
 --- a/arch/arm/mach-exynos/dma.c
 +++ b/arch/arm/mach-exynos/dma.c
-@@ -139,6 +139,38 @@ struct amba_device exynos4_device_pdma1 = {
+@@ -29,6 +29,7 @@
+ #include <asm/irq.h>
+ #include <plat/devs.h>
+ #include <plat/irqs.h>
++#include <plat/cpu.h>
+ 
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+@@ -36,7 +37,7 @@
+ 
+ static u64 dma_dmamask = DMA_BIT_MASK(32);
+ 
+-u8 pdma0_peri[] = {
++u8 exynos4210_pdma0_peri[] = {
+ 	DMACH_PCM0_RX,
+ 	DMACH_PCM0_TX,
+ 	DMACH_PCM2_RX,
+@@ -69,11 +70,43 @@ u8 pdma0_peri[] = {
+ 	DMACH_AC97_PCMOUT,
+ };
+ 
+-struct dma_pl330_platdata exynos4_pdma0_pdata = {
+-	.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
+-	.peri_id = pdma0_peri,
++u8 exynos4212_pdma0_peri[] = {
++	DMACH_PCM0_RX,
++	DMACH_PCM0_TX,
++	DMACH_PCM2_RX,
++	DMACH_PCM2_TX,
++	DMACH_MIPI_HSI0,
++	DMACH_MIPI_HSI1,
++	DMACH_SPI0_RX,
++	DMACH_SPI0_TX,
++	DMACH_SPI2_RX,
++	DMACH_SPI2_TX,
++	DMACH_I2S0S_TX,
++	DMACH_I2S0_RX,
++	DMACH_I2S0_TX,
++	DMACH_I2S2_RX,
++	DMACH_I2S2_TX,
++	DMACH_UART0_RX,
++	DMACH_UART0_TX,
++	DMACH_UART2_RX,
++	DMACH_UART2_TX,
++	DMACH_UART4_RX,
++	DMACH_UART4_TX,
++	DMACH_SLIMBUS0_RX,
++	DMACH_SLIMBUS0_TX,
++	DMACH_SLIMBUS2_RX,
++	DMACH_SLIMBUS2_TX,
++	DMACH_SLIMBUS4_RX,
++	DMACH_SLIMBUS4_TX,
++	DMACH_AC97_MICIN,
++	DMACH_AC97_PCMIN,
++	DMACH_AC97_PCMOUT,
++	DMACH_MIPI_HSI4,
++	DMACH_MIPI_HSI5,
+ };
+ 
++struct dma_pl330_platdata exynos4_pdma0_pdata;
++
+ struct amba_device exynos4_device_pdma0 = {
+ 	.dev = {
+ 		.init_name = "dma-pl330.0",
+@@ -90,7 +123,7 @@ struct amba_device exynos4_device_pdma0 = {
  	.periphid = 0x00041330,
  };
  
-+u8 mdma_peri[] = {
-+	DMACH_MTOM_0,
-+	DMACH_MTOM_1,
-+	DMACH_MTOM_2,
-+	DMACH_MTOM_3,
-+	DMACH_MTOM_4,
-+	DMACH_MTOM_5,
-+	DMACH_MTOM_6,
-+	DMACH_MTOM_7,
-+};
+-u8 pdma1_peri[] = {
++u8 exynos4210_pdma1_peri[] = {
+ 	DMACH_PCM0_RX,
+ 	DMACH_PCM0_TX,
+ 	DMACH_PCM1_RX,
+@@ -118,11 +151,41 @@ u8 pdma1_peri[] = {
+ 	DMACH_SLIMBUS5_TX,
+ };
+ 
+-struct dma_pl330_platdata exynos4_pdma1_pdata = {
+-	.nr_valid_peri = ARRAY_SIZE(pdma1_peri),
+-	.peri_id = pdma1_peri,
++u8 exynos4212_pdma1_peri[] = {
++	DMACH_PCM0_RX,
++	DMACH_PCM0_TX,
++	DMACH_PCM1_RX,
++	DMACH_PCM1_TX,
++	DMACH_MIPI_HSI2,
++	DMACH_MIPI_HSI3,
++	DMACH_SPI1_RX,
++	DMACH_SPI1_TX,
++	DMACH_I2S0S_TX,
++	DMACH_I2S0_RX,
++	DMACH_I2S0_TX,
++	DMACH_I2S1_RX,
++	DMACH_I2S1_TX,
++	DMACH_UART0_RX,
++	DMACH_UART0_TX,
++	DMACH_UART1_RX,
++	DMACH_UART1_TX,
++	DMACH_UART3_RX,
++	DMACH_UART3_TX,
++	DMACH_SLIMBUS1_RX,
++	DMACH_SLIMBUS1_TX,
++	DMACH_SLIMBUS3_RX,
++	DMACH_SLIMBUS3_TX,
++	DMACH_SLIMBUS5_RX,
++	DMACH_SLIMBUS5_TX,
++	DMACH_SLIMBUS0AUX_RX,
++	DMACH_SLIMBUS0AUX_TX,
++	DMACH_SPDIF,
++	DMACH_MIPI_HSI6,
++	DMACH_MIPI_HSI7,
+ };
+ 
++struct dma_pl330_platdata exynos4_pdma1_pdata;
 +
-+struct dma_pl330_platdata exynos4_mdma_pdata = {
-+	.nr_valid_peri = ARRAY_SIZE(mdma_peri),
-+	.peri_id = mdma_peri,
-+};
-+
-+struct amba_device exynos4_device_mdma = {
-+	.dev = {
-+		.init_name = "dma-pl330.2",
-+		.dma_mask = &dma_dmamask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &exynos4_mdma_pdata,
-+	},
-+	.res = {
-+		.start = EXYNOS4_PA_MDMA1,
-+		.end = EXYNOS4_PA_MDMA1 + SZ_4K,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	.irq = {IRQ_MDMA1, NO_IRQ},
-+	.periphid = 0x00041330,
-+};
-+
- static int __init exynos4_dma_init(void)
- {
+ struct amba_device exynos4_device_pdma1 = {
+ 	.dev = {
+ 		.init_name = "dma-pl330.1",
+@@ -176,6 +239,22 @@ static int __init exynos4_dma_init(void)
  	if (of_have_populated_dt())
-@@ -152,6 +184,9 @@ static int __init exynos4_dma_init(void)
- 	dma_cap_set(DMA_CYCLIC, exynos4_pdma1_pdata.cap_mask);
- 	amba_device_register(&exynos4_device_pdma1, &iomem_resource);
+ 		return 0;
  
-+	dma_cap_set(DMA_MEMCPY, exynos4_mdma_pdata.cap_mask);
-+	amba_device_register(&exynos4_device_mdma, &iomem_resource);
++	if (soc_is_exynos4210()) {
++		exynos4_pdma0_pdata.nr_valid_peri =
++			ARRAY_SIZE(exynos4210_pdma0_peri);
++		exynos4_pdma0_pdata.peri_id = exynos4210_pdma0_peri;
++		exynos4_pdma1_pdata.nr_valid_peri =
++			ARRAY_SIZE(exynos4210_pdma1_peri);
++		exynos4_pdma1_pdata.peri_id = exynos4210_pdma1_peri;
++	} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
++		exynos4_pdma0_pdata.nr_valid_peri =
++			ARRAY_SIZE(exynos4212_pdma0_peri);
++		exynos4_pdma0_pdata.peri_id = exynos4212_pdma0_peri;
++		exynos4_pdma1_pdata.nr_valid_peri =
++			ARRAY_SIZE(exynos4212_pdma1_peri);
++		exynos4_pdma1_pdata.peri_id = exynos4212_pdma1_peri;
++	}
 +
- 	return 0;
- }
- arch_initcall(exynos4_dma_init);
-diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-index acf998f..874e224 100644
---- a/arch/arm/mach-exynos/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos/include/mach/irqs.h
-@@ -45,6 +45,8 @@
- #define IRQ_EINT15		IRQ_SPI(31)
- #define IRQ_EINT16_31		IRQ_SPI(32)
- 
-+#define IRQ_MDMA0		IRQ_SPI(33)
-+#define IRQ_MDMA1		IRQ_SPI(34)
- #define IRQ_PDMA0		IRQ_SPI(35)
- #define IRQ_PDMA1		IRQ_SPI(36)
- #define IRQ_TIMER0_VIC		IRQ_SPI(37)
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index b157eb4..0691ca8 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -80,7 +80,8 @@
- #define EXYNOS4_PA_TWD			0x10500600
- #define EXYNOS4_PA_L2CC			0x10502000
- 
--#define EXYNOS4_PA_MDMA			0x10810000
-+#define EXYNOS4_PA_MDMA0		0x10810000
-+#define EXYNOS4_PA_MDMA1		0x12840000
- #define EXYNOS4_PA_PDMA0		0x12680000
- #define EXYNOS4_PA_PDMA1		0x12690000
- 
+ 	dma_cap_set(DMA_SLAVE, exynos4_pdma0_pdata.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, exynos4_pdma0_pdata.cap_mask);
+ 	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
 diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-index c5eaad5..ecf23a8 100644
+index ecf23a8..0670f37 100644
 --- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
 +++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
 @@ -82,6 +82,14 @@ enum dma_ch {
  	DMACH_SLIMBUS4_TX,
  	DMACH_SLIMBUS5_RX,
  	DMACH_SLIMBUS5_TX,
-+	DMACH_MTOM_0,
-+	DMACH_MTOM_1,
-+	DMACH_MTOM_2,
-+	DMACH_MTOM_3,
-+	DMACH_MTOM_4,
-+	DMACH_MTOM_5,
-+	DMACH_MTOM_6,
-+	DMACH_MTOM_7,
- 	/* END Marker, also used to denote a reserved channel */
- 	DMACH_MAX,
- };
++	DMACH_MIPI_HSI0,
++	DMACH_MIPI_HSI1,
++	DMACH_MIPI_HSI2,
++	DMACH_MIPI_HSI3,
++	DMACH_MIPI_HSI4,
++	DMACH_MIPI_HSI5,
++	DMACH_MIPI_HSI6,
++	DMACH_MIPI_HSI7,
+ 	DMACH_MTOM_0,
+ 	DMACH_MTOM_1,
+ 	DMACH_MTOM_2,
 -- 
 1.7.4.4
