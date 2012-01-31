@@ -1,43 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jan 2012 11:20:24 +0800
-Subject: [PATCH] ARM: devicetree: Add .dtb files to
- arch/arm/boot/.gitignore
-In-Reply-To: <1327945574-7977-1-git-send-email-dave.martin@linaro.org>
-References: <1327945574-7977-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20120131032022.GC24681@S2101-09.ap.freescale.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 31 Jan 2012 09:05:15 +0530
+Subject: [PATCH v2 0/6] imx-sdma: patches when I enable imx6q sabrelite
+ audio
+In-Reply-To: <20120113031349.GH2414@b20223-02.ap.freescale.net>
+References: <1326424201-20056-1-git-send-email-richard.zhao@linaro.org>
+ <20120113031349.GH2414@b20223-02.ap.freescale.net>
+Message-ID: <1327980915.1527.56.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 05:46:14PM +0000, Dave Martin wrote:
-> Compiled device tree blobs shouldn't be committed in the kernel
-> tree, so ideally git should ignore them.
+On Fri, 2012-01-13 at 11:13 +0800, Richard Zhao wrote:
+> Changes in v2:
+>  - convert to use bit ops
 > 
-> This patch will enable ignoring of any .dtb files which appear in
-> arch/arm/boot/
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > [PATCH v2 1/6] dma/imx-sdma: let sdma_run_channel call
+> > [PATCH v2 2/6] dma/imx-sdma: use readl_relaxed/writel_relaxed and
+> > [PATCH v2 3/6] dma/imx-sdma: call sdma_set_channel_priority after
+> > [PATCH v2 4/6] dma/imx-sdma: move clk_enable out of
+> > [PATCH v2 5/6] dma/imx-sdma: use num_events to validate event_id0
+> > [PATCH v2 6/6] dma/imx-sdma: convernt to use bit ops
+> > 
+> > Thanks
+> > Richard
+> > 
+Thanks Applied all, with a typo fix in 4 in change log
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-I added my ack tag on the same patch below, but it died in the end?
-
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/144097
-
-Regards,
-Shawn
-
-> ---
->  arch/arm/boot/.gitignore |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/.gitignore b/arch/arm/boot/.gitignore
-> index ce1c5ff..3c79f85 100644
-> --- a/arch/arm/boot/.gitignore
-> +++ b/arch/arm/boot/.gitignore
-> @@ -3,3 +3,4 @@ zImage
->  xipImage
->  bootpImage
->  uImage
-> +*.dtb
-> -- 
-> 1.7.4.1
+-- 
+~Vinod
