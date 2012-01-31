@@ -1,25 +1,41 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 31 Jan 2012 12:37:33 +0100
-Subject: [PATCH] mtd/gpmi : add BBT support
-In-Reply-To: <20120131092412.GA2471@pengutronix.de>
-References: <1327898174-13656-1-git-send-email-b32955@freescale.com>
- <4F27AA98.2090602@freescale.com> <20120131092412.GA2471@pengutronix.de>
-Message-ID: <201201311237.33997.marek.vasut@gmail.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Tue, 31 Jan 2012 15:37:08 +0400
+Subject: [PATCH 07/21] OMAP3+: PM: SR/Class3: disable errorgen before
+ disable VP
+In-Reply-To: <CAORVsuUNM8bpwyjbG2GcwfiUEf7A54ODC4tfhZNinUhQTE3g5w@mail.gmail.com>
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-8-git-send-email-j-pihet@ti.com>
+ <4F213860.9050600@ru.mvista.com>
+ <CAORVsuUNM8bpwyjbG2GcwfiUEf7A54ODC4tfhZNinUhQTE3g5w@mail.gmail.com>
+Message-ID: <4F27D264.9050203@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > What's about to add a module_param() to enable/disable the BBT for GPMI?
-> > What's your suggestion?
-> 
-> I'd make it board specific rather than a module parameter like most
-> other drivers seem to do.
-> 
-> Thanks,
-> 
->    Wolfram
+Hello.
 
-Actually it's not board specific. You can run various bootloaders or various 
-bootstrap tools on any of those boards. Though pdata seems ok for the default 
-case, maybe we should have a simple way to override this?
+On 31-01-2012 14:06, Jean Pihet wrote:
 
-M
+> ...
+
+>>> +int sr_disable_errgen(struct voltagedomain *voltdm)
+>>> +{
+>>> +       u32 errconfig_offs, vpboundint_en;
+>>> +       u32 vpboundint_st;
+>>> +       struct omap_sr *sr = _sr_lookup(voltdm);
+>>> +
+>>> +       if (IS_ERR(sr)) {
+>>> +               pr_warning("%s: omap_sr struct for sr_%s not found\n",
+>>> +                       __func__, voltdm->name);
+>>> +               return -EINVAL;
+>>
+>>
+>>    Not PTR_ERR(sr)?
+
+> _sr_lookup returns a return code using ERR_PTR so the return value
+> should be checked for errors using IS_ERR. Please note that _sr_lookup
+> checks for NULL parameter internally.
+
+    That's clear. I was asking don't you want to return PTR_ERR(sr) instead of 
+-EINVAL.
+
+WBR, Sergei
