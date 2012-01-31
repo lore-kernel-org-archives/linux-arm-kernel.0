@@ -1,48 +1,64 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 31 Jan 2012 09:23:04 +0530
-Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
- pwrdm_clear_all_prev_pwrst()
-In-Reply-To: <878vkopw2o.fsf@ti.com>
-References: <20120130093931.11027.31048.stgit@dusk>	<20120130094312.11027.31050.stgit@dusk>
- <878vkopw2o.fsf@ti.com>
-Message-ID: <4F2765A0.1020804@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 31 Jan 2012 09:24:42 +0530
+Subject: [PATCH V2 02/12] dmaengine: Add flow controller information to
+ dma_slave_config
+In-Reply-To: <5f9ec59562e86536c4123f61891b95590293030f.1326876464.git.viresh.kumar@st.com>
+References: <cover.1326876464.git.viresh.kumar@st.com>
+ <5f9ec59562e86536c4123f61891b95590293030f.1326876464.git.viresh.kumar@st.com>
+Message-ID: <1327982082.1527.60.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 31 January 2012 05:44 AM, Kevin Hilman wrote:
-> Paul Walmsley<paul@pwsan.com>  writes:
->
->> Remove some superfluous calls to pwrdm_clear_all_prev_pwrst().
->> pwrdm_pre_transition(), which appears a few lines after these calls,
->> invokes pwrdm_clear_all_prev_pwrst() on each powerdomain -- there's no
->> need to do it twice.
->
-> It looks like these two for OMAP4 are surpurfluous since the immediately
-> follow a call to pwrdm_pre_transition() as well.
->
-> Santosh/Rajendra, please confirm/ack.
+On Wed, 2012-01-18 at 14:41 +0530, Viresh Kumar wrote:
+> Flow controller is programmable for few controllers and there are few
+> intelligent peripherals like, Synopsys JPEG controller, that needs to be a flow
+> controller of DMA transfers on dest side.
+> 
+> For this, currently two drivers, pl08x and dw_dmac, support flow controller to
+> be passed from platform to these drivers.
+> 
+> Perhaps, this should be a part of struct dma_slave_config. This patch adds
+> another field device_fc to this structure. User drivers must pass this as true
+> if they want to be flow controller of certain transfers.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  include/linux/dmaengine.h |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 5532bb8..dd1915f 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -25,6 +25,7 @@
+>  #include <linux/uio.h>
+>  #include <linux/scatterlist.h>
+>  #include <linux/bitmap.h>
+> +#include <linux/types.h>
+>  #include <asm/page.h>
+>  
+>  /**
+> @@ -330,6 +331,9 @@ enum dma_slave_buswidth {
+>   * may or may not be applicable on memory sources.
+>   * @dst_maxburst: same as src_maxburst but for destination target
+>   * mutatis mutandis.
+> + * @device_fc: Flow Controller Settings for ccfg register. Only valid for slave
+ccfg maybe true for your controller, not others...
 
-I agree, looks like they should be removed.
-Acked-by: Rajendra Nayak <rnayak@ti.com>
+> + * channels. Fill with 'true' if peripheral should be flow controller. Direction
+> + * will be selected at Runtime.
+>   *
+>   * This struct is passed in as configuration data to a DMA engine
+>   * in order to set up a certain channel for DMA transport at runtime.
+> @@ -356,6 +360,7 @@ struct dma_slave_config {
+>  	enum dma_slave_buswidth dst_addr_width;
+>  	u32 src_maxburst;
+>  	u32 dst_maxburst;
+> +	bool device_fc;
+>  };
+>  
+>  static inline const char *dma_chan_name(struct dma_chan *chan)
 
->
-> Kevin
->
->
-> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> index 1d5d010..bbabe1d 100644
-> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> @@ -263,12 +263,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->   	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
->   	 */
->   	mpuss_clear_prev_logic_pwrst();
-> -	pwrdm_clear_all_prev_pwrst(mpuss_pd);
->   	if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET)&&
->   		(pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF))
->   		save_state = 2;
->
-> -	clear_cpu_prev_pwrst(cpu);
->   	cpu_clear_prev_logic_pwrst(cpu);
->   	set_cpu_next_pwrst(cpu, power_state);
->   	set_cpu_wakeup_addr(cpu, virt_to_phys(omap4_cpu_resume));
+
+-- 
+~Vinod
