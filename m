@@ -1,33 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2012 10:01:54 +0000
-Subject: [PATCH 4/7] Store huge page linux pte in mm_struct
-In-Reply-To: <1327910238-18704-5-git-send-email-bill4carson@gmail.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-5-git-send-email-bill4carson@gmail.com>
-Message-ID: <20120131100154.GC889@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 31 Jan 2012 11:06:50 +0100
+Subject: [PATCH 07/21] OMAP3+: PM: SR/Class3: disable errorgen before
+ disable VP
+In-Reply-To: <4F213860.9050600@ru.mvista.com>
+References: <1327504583-13408-1-git-send-email-j-pihet@ti.com>
+ <1327504583-13408-8-git-send-email-j-pihet@ti.com>
+ <4F213860.9050600@ru.mvista.com>
+Message-ID: <CAORVsuUNM8bpwyjbG2GcwfiUEf7A54ODC4tfhZNinUhQTE3g5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 03:57:15PM +0800, bill4carson at gmail.com wrote:
-> From: Bill Carson <bill4carson@gmail.com>
-> 
-> One easy way to store huge page linux pte is mm_struct instead of thread_info
-> that's because when parent task with huge page VMA calls fork, parent huge page
-> pagetable entries are copied into child pagetable. This is done in
-> 
-> int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
-> 			    struct vm_area_struct *vma)
-> 
-> We cannot derive child's thread_info just using struct mm_struct *dst.
-> if we have struct mm_struct **dst, then it's easy to find the corresponding
-> task_struct as well as thread_info, but we only get struct mm_struct *dst.
-> It's possible to find the desired task_struct by iterating the global task list
-> by comparing task_struct->mm with dst.
-> So mm_struct is used for huge page linux pte for faster lookup and efficient.
+Sergei,
 
-I really do not understand this description, and it doesn't seem to tie
-up with the code.  What problem are you trying to solve here?
+On Thu, Jan 26, 2012 at 12:26 PM, Sergei Shtylyov
+<sshtylyov@ru.mvista.com> wrote:
+> Hello.
+>
+>
+> On 25-01-2012 19:16, Jean Pihet wrote:
+...
 
-Note that a mm_struct can be shared between multiple task_structs, so
-if your thinking is that something in the mm_struct or page table needs
-to know about a task_struct, you're ideas are wrong.
+>> Change-Id: Id0145adacfa63d7652a29859ad6c95cc2ac61cc8
+> ? Please remove this line.
+Done!
+
+...
+
+>> +int sr_disable_errgen(struct voltagedomain *voltdm)
+>> +{
+>> + ? ? ? u32 errconfig_offs, vpboundint_en;
+>> + ? ? ? u32 vpboundint_st;
+>> + ? ? ? struct omap_sr *sr = _sr_lookup(voltdm);
+>> +
+>> + ? ? ? if (IS_ERR(sr)) {
+>> + ? ? ? ? ? ? ? pr_warning("%s: omap_sr struct for sr_%s not found\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? __func__, voltdm->name);
+>> + ? ? ? ? ? ? ? return -EINVAL;
+>
+>
+> ? Not PTR_ERR(sr)?
+_sr_lookup returns a return code using ERR_PTR so the return value
+should be checked for errors using IS_ERR. Please note that _sr_lookup
+checks for NULL parameter internally.
+
+BTW in the next revision of patches (just submitted) there is an
+additional patch [19/19] that fixes a few problems related to the use
+of err.h macros.
+
+>
+> WBR, Sergei
+
+Regards,
+Jean
