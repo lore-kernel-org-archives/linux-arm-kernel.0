@@ -1,63 +1,44 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 31 Jan 2012 09:24:42 +0530
-Subject: [PATCH V2 02/12] dmaengine: Add flow controller information to
- dma_slave_config
-In-Reply-To: <5f9ec59562e86536c4123f61891b95590293030f.1326876464.git.viresh.kumar@st.com>
+Date: Tue, 31 Jan 2012 09:28:32 +0530
+Subject: [PATCH V2 08/12] dmaengine/dw_dmac: Unmap all memory buffers
+ after completion of slave transfers
+In-Reply-To: <4F1696E4.9070806@st.com>
 References: <cover.1326876464.git.viresh.kumar@st.com>
- <5f9ec59562e86536c4123f61891b95590293030f.1326876464.git.viresh.kumar@st.com>
-Message-ID: <1327982082.1527.60.camel@vkoul-udesk3>
+ <ba53f229f3f594bfe0459b01a9ebb4d9b2c15882.1326876464.git.viresh.kumar@st.com>
+ <20120118093620.GC1068@n2100.arm.linux.org.uk>  <4F1696E4.9070806@st.com>
+Message-ID: <1327982312.1527.61.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-01-18 at 14:41 +0530, Viresh Kumar wrote:
-> Flow controller is programmable for few controllers and there are few
-> intelligent peripherals like, Synopsys JPEG controller, that needs to be a flow
-> controller of DMA transfers on dest side.
+On Wed, 2012-01-18 at 15:24 +0530, Viresh Kumar wrote:
+> On 1/18/2012 3:06 PM, Russell King - ARM Linux wrote:
+> > On Wed, Jan 18, 2012 at 02:41:55PM +0530, Viresh Kumar wrote:
+> > NAK.  For reasons stated previously and subsequently ignored.
+> > .
+> > 
 > 
-> For this, currently two drivers, pl08x and dw_dmac, support flow controller to
-> be passed from platform to these drivers.
+> On 1/18/2012 3:05 PM, Russell King - ARM Linux wrote:
+> >> > You implemented similar stuff in amba-pl08x :) .
+> >> > 
+> >> > if (!plchan->slave)
+> >> > 	pl08x_unmap_buffers(txd);
+> > Take a look at that.  "If *NOT* slave, unmap the buffers".
 > 
-> Perhaps, this should be a part of struct dma_slave_config. This patch adds
-> another field device_fc to this structure. User drivers must pass this as true
-> if they want to be flow controller of certain transfers.
+> [Following is picked from current implementation of dw_dmac:]
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  include/linux/dmaengine.h |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
+> 	if (!dwc->chan.private) {
+> 		struct device *parent = chan2parent(&dwc->chan);
+> 		if (!(txd->flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
 > 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index 5532bb8..dd1915f 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -25,6 +25,7 @@
->  #include <linux/uio.h>
->  #include <linux/scatterlist.h>
->  #include <linux/bitmap.h>
-> +#include <linux/types.h>
->  #include <asm/page.h>
->  
->  /**
-> @@ -330,6 +331,9 @@ enum dma_slave_buswidth {
->   * may or may not be applicable on memory sources.
->   * @dst_maxburst: same as src_maxburst but for destination target
->   * mutatis mutandis.
-> + * @device_fc: Flow Controller Settings for ccfg register. Only valid for slave
-ccfg maybe true for your controller, not others...
-
-> + * channels. Fill with 'true' if peripheral should be flow controller. Direction
-> + * will be selected at Runtime.
->   *
->   * This struct is passed in as configuration data to a DMA engine
->   * in order to set up a certain channel for DMA transport at runtime.
-> @@ -356,6 +360,7 @@ struct dma_slave_config {
->  	enum dma_slave_buswidth dst_addr_width;
->  	u32 src_maxburst;
->  	u32 dst_maxburst;
-> +	bool device_fc;
->  };
->  
->  static inline const char *dma_chan_name(struct dma_chan *chan)
+> Sorry, I missed the most straight forward looking code. :(
+> Actually, dw_dmac is also doing the same, i.e. unmapping only for
+> non-slave transfers.
+> 
+> The same patch is still applicable, after fixing message subject and log.
+> I will resend it, with message log fixed, once i get more feedbacks on V2.
+> 
+But this patch seems to unmap for *all* descriptors, so you need to fix
+that as well, apart from the ones stated above.
 
 
 -- 
