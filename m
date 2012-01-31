@@ -1,161 +1,51 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 31 Jan 2012 18:40:46 +0200
-Subject: [PATCH v2 8/8] ARM: tegra: support for secondary cores on Tegra30
-In-Reply-To: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1328028051-24271-9-git-send-email-pdeschrijver@nvidia.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 31 Jan 2012 18:52:41 +0200
+Subject: [PATCH 1/2] remoteproc: bail out if firmware has different endianess
+Message-ID: <1328028762-28352-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for bringing up secondary cores on Tegra30. On Tegra30 secondary
-CPU cores are powergated, so we need to turn on the domains before we can bring
-the CPU cores online. Bringing secondary cores online happens early during the
-sytem boot, so we call powergating initialization from platform early_init
-function.
+At this point we don't support remote processors that have
+a different endianess than the host.
 
-Based on work by:
+Look out for these unsupported scenarios, and bail out if
+encountered.
 
-Scott Williams <scwilliams@nvidia.com>
-Colin Cross <ccross@android.com>
-Alex Frid <afrid@nvidia.com>
-
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Reported-by: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Cc: Mark Grosen <mgrosen@ti.com>
 ---
- arch/arm/mach-tegra/headsmp.S |   32 +++++++++++++++++++++++++
- arch/arm/mach-tegra/platsmp.c |   52 ++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 83 insertions(+), 1 deletions(-)
+ drivers/remoteproc/remoteproc_core.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-index bb13e22..925c4a0 100644
---- a/arch/arm/mach-tegra/headsmp.S
-+++ b/arch/arm/mach-tegra/headsmp.S
-@@ -188,6 +188,38 @@ __die:
- 	str	r1, [r7, #0x340]		@ CLK_RST_CPU_CMPLX_SET
- #endif
- 1:
-+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+	mov32	r6, TEGRA_FLOW_CTRL_BASE
-+
-+	cmp	r10, #0
-+	moveq	r1, #FLOW_CTRL_HALT_CPU0_EVENTS
-+	moveq	r2, #FLOW_CTRL_CPU0_CSR
-+	movne	r1, r10, lsl #3
-+	addne	r2, r1, #(FLOW_CTRL_CPU1_CSR-8)
-+	addne	r1, r1, #(FLOW_CTRL_HALT_CPU1_EVENTS-8)
-+
-+	/* Clear CPU "event" and "interrupt" flags and power gate
-+	   it when halting but not before it is in the "WFI" state. */
-+	ldr	r0, [r6, +r2]
-+	orr	r0, r0, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-+	orr	r0, r0, #FLOW_CTRL_CSR_ENABLE
-+	str	r0, [r6, +r2]
-+
-+	/* Unconditionally halt this CPU */
-+	mov	r0, #FLOW_CTRL_WAITEVENT
-+	str	r0, [r6, +r1]
-+	ldr	r0, [r6, +r1]			@ memory barrier
-+
-+	dsb
-+	isb
-+	wfi					@ CPU should be power gated here
-+
-+	/* If the CPU didn't power gate above just kill it's clock. */
-+
-+	mov	r0, r11, lsl #8
-+	str	r0, [r7, #348]			@ CLK_CPU_CMPLX_SET
-+#endif
-+
- 	/* If the CPU still isn't dead, just spin here. */
- 	b	.
- ENDPROC(__tegra_cpu_reset_handler)
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 79a241a..1fe3f58 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -24,7 +24,9 @@
- #include <asm/mach-types.h>
- #include <asm/smp_scu.h>
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index 6212b82..567a3c5 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -39,6 +39,7 @@
+ #include <linux/elf.h>
+ #include <linux/virtio_ids.h>
+ #include <linux/virtio_ring.h>
++#include <asm/byteorder.h>
  
-+#include <mach/clk.h>
- #include <mach/iomap.h>
-+#include <mach/powergate.h>
+ #include "remoteproc_internal.h"
  
- #include "fuse.h"
- #include "flowctrl.h"
-@@ -42,6 +44,8 @@ static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
- 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x340)
- #define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
- 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
-+#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR \
-+	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x34c)
+@@ -851,6 +852,16 @@ static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
  
- #define CPU_CLOCK(cpu)	(0x1<<(8+cpu))
- #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
-@@ -73,11 +77,54 @@ static int tegra20_power_up_cpu(unsigned int cpu)
- 	return 0;
- }
+ 	ehdr = (struct elf32_hdr *)fw->data;
  
-+static int tegra30_power_up_cpu(unsigned int cpu)
-+{
-+	u32 reg;
-+	int ret, pwrgateid;
-+	unsigned long timeout;
-+
-+	pwrgateid = tegra_cpu_powergate_id(cpu);
-+	if (pwrgateid < 0)
-+		return pwrgateid;
-+
-+	/* If this is the first boot, toggle powergates directly. */
-+	if (!tegra_powergate_is_powered(pwrgateid)) {
-+		ret = tegra_powergate_power_on(pwrgateid);
-+		if (ret)
-+			return ret;
-+
-+		/* Wait for the power to come up. */
-+		timeout = jiffies + 10*HZ;
-+		do {
-+			if (tegra_powergate_is_powered(pwrgateid))
-+				goto remove_clamps;
-+			udelay(10);
-+		} while (time_before(jiffies, timeout));
-+		return -ETIMEDOUT;
++	/* We assume the firmware has the same endianess as the host */
++# ifdef __LITTLE_ENDIAN
++	if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
++# else /* BIG ENDIAN */
++	if (ehdr->e_ident[EI_DATA] != ELFDATA2MSB) {
++# endif
++		dev_err(dev, "Unsupported firmware endianess\n");
++		return -EINVAL;
 +	}
 +
-+remove_clamps:
-+	/* CPU partition is powered. Enable the CPU clock. */
-+	writel(CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
-+	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
-+	udelay(10);
-+
-+	/* Remove I/O clamps. */
-+	ret = tegra_powergate_remove_clamping(pwrgateid);
-+	udelay(10);
-+
-+	/* Clear flow controller CSR. */
-+	flowctrl_write_cpu_csr(cpu, 0);
-+
-+	return 0;
-+}
-+
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	int status;
- 
--	/* Force the CPU into reset. The CPU must remain in reset when the
-+	/*
-+	 * Force the CPU into reset. The CPU must remain in reset when the
- 	 * flow controller state is cleared (which will cause the flow
- 	 * controller to stop driving reset if the CPU has been power-gated
- 	 * via the flow controller). This will have no effect on first boot
-@@ -98,6 +145,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	case TEGRA20:
- 		status = tegra20_power_up_cpu(cpu);
- 		break;
-+	case TEGRA30:
-+		status = tegra30_power_up_cpu(cpu);
-+		break;
- 	default:
- 		status = -EINVAL;
- 		break;
+ 	if (fw->size < ehdr->e_shoff + sizeof(struct elf32_shdr)) {
+ 		dev_err(dev, "Image is too small\n");
+ 		return -EINVAL;
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+1.7.5.4
