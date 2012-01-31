@@ -1,71 +1,115 @@
-From: armlinux@emagii.com (ARM Linux)
-Date: Tue, 31 Jan 2012 12:08:41 +0100
-Subject: [PATCH 3/3] ARM: at91/tc/clocksource: Add 32 bit variant to Timer
- Counter
-In-Reply-To: <20120128183101.GE2501@ponder.secretlab.ca>
-References: <a311afe3c46da62f7a1e82d2fa933e24ad4eef7e.1326995849.git.nicolas.ferre@atmel.com>
- <d1105b63fce5787a4717ca92ad35397923078e99.1326995849.git.nicolas.ferre@atmel.com>
- <20120128183101.GE2501@ponder.secretlab.ca>
-Message-ID: <4F27CBB9.3030409@emagii.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 31 Jan 2012 11:09:40 +0000
+Subject: [PATCH v5] ARM: Add generic instruction opcode manipulation helpers
+Message-ID: <1328008180-28542-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012-01-28 19:31, Grant Likely skrev:
-> On Thu, Jan 19, 2012 at 07:05:12PM +0100, Nicolas Ferre wrote:
->> Some SoC have a 32 bit variant of Timer Counter Blocks. We do not
->> need the chaining of two 16 bit counters anymore for them.
->>
->> The SoC nature is deduced from the device tree "compatible" string.
->> For non-device-tree configurations, backward compatibility is maintained
->> by using the default 16 bit counter configuration.
->>
->> This patch addresses both the atmel_tclib and its user: tcb_clksrc
->> clocksource.
->>
->> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-> Looks reasonable to me.  One comment below, but otherwise:
->
-> Acked-by: Grant Likely<grant.likely@secretlab.ca>
->
->>   static const struct of_device_id atmel_tcb_dt_ids[] = {
->>   	{
->>   		.compatible = "atmel,at91rm9200-tcb",
->> +		.data =&tcb_rm9200_config,
->> +	}, {
->> +		.compatible = "atmel,at91sam9x5-tcb",
->> +		.data =&tcb_sam9x5_config,
->>   	}, {
->>   		/* sentinel */
->>   	}
-> Using wildcards ('x') in compatible values is strongly discouraged.
-> Use specific device names instead.  You never know when a vendor may
-> introduce another part number that fits with the wildcard, but isn't
-> actually compatible.
-The SAM9x5 is a family of chips based on the same silicon.
-* SAM9G15
-* SAM9G25
-* SAM9G35
-* SAM9X25
-* SAM9X35
+This patch adds some endianness-agnostic helpers to convert machine
+instructions between canonical integer form and in-memory
+representation.
 
-I don't think 'x' is a wildcard, it is part of the name of the family.
+A canonical integer form for representing instructions is also
+formalised here.
 
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+---
+Changes since v1:
 
-There is another chip
-* AT91SAM9G45
-which is not a sam9x5 chip, even if it would fit, if the 'x' was a wildcard.
+v5: Avoid inclusion of C headers or definition of the __opcode_*
+    macros when opcodes.h is included in assembler files.  Since
+    the __opcode_* macros rely on C declarations, they are not
+    directly usable in assembler anyway.
 
-BR
-ulf at emagii.com
+v4: Rebase on top of Leif's patch which created <asm/opcodes.h>
+    ARM: 7206/1: Add generic ARM instruction set condition code checks.
 
+    No functional changes.
 
-> Use the exact device name(s) and newer devices can claim compatibility
-> with the old in the .dts file.
->
-> g.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+v3: Fix some stupid errors:
+
+  * remove bogus extra (x) in __opcode_to_mem_arm
+  * fix use of nonexistent "thumb_opcode" argument in
+        __opcode_thumb32_{first,second} which causes these
+        macros to be broken.
+
+v2: Remove unnecessary typedef for arm_opcode_t.
+
+    The general "everything is a word" concept works just fine here --
+    we don't need a typedef, and people will probably not use it
+    anyway.
+
+ arch/arm/include/asm/opcodes.h |   59 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 59 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+index c0efdd6..19c48de 100644
+--- a/arch/arm/include/asm/opcodes.h
++++ b/arch/arm/include/asm/opcodes.h
+@@ -17,4 +17,63 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+ #define ARM_OPCODE_CONDTEST_PASS   1
+ #define ARM_OPCODE_CONDTEST_UNCOND 2
+ 
++
++/*
++ * Opcode byteswap helpers
++ *
++ * These macros help with converting instructions between a canonical integer
++ * format and in-memory representation, in an endianness-agnostic manner.
++ *
++ * __mem_to_opcode_*() convert from in-memory representation to canonical form.
++ * __opcode_to_mem_*() convert from canonical form to in-memory representation.
++ *
++ *
++ * Canonical instruction representation:
++ *
++ *	ARM:		0xKKLLMMNN
++ *	Thumb 16-bit:	0x0000KKLL, where KK < 0xE8
++ *	Thumb 32-bit:	0xKKLLMMNN, where KK >= 0xE8
++ *
++ * There is no way to distinguish an ARM instruction in canonical representation
++ * from a Thumb instruction (just as these cannot be distinguished in memory).
++ * Where this distinction is important, it needs to be tracked separately.
++ *
++ * Note that values in the range 0x0000E800..0xE7FFFFFF intentionally do not
++ * represent any valid Thumb-2 instruction.  For this range,
++ * __opcode_is_thumb32() and __opcode_is_thumb16() will both be false.
++ */
++
++#ifndef __ASSEMBLY__
++
++#include <linux/types.h>
++#include <linux/swab.h>
++
++#ifdef CONFIG_CPU_ENDIAN_BE8
++#define __opcode_to_mem_arm(x) swab32(x)
++#define __opcode_to_mem_thumb16(x) swab16(x)
++#define __opcode_to_mem_thumb32(x) swahb32(x)
++#else
++#define __opcode_to_mem_arm(x) ((u32)(x))
++#define __opcode_to_mem_thumb16(x) ((u16)(x))
++#define __opcode_to_mem_thumb32(x) swahw32(x)
++#endif
++
++#define __mem_to_opcode_arm(x) __opcode_to_mem_arm(x)
++#define __mem_to_opcode_thumb16(x) __opcode_to_mem_thumb16(x)
++#define __mem_to_opcode_thumb32(x) __opcode_to_mem_thumb32(x)
++
++/* Operations specific to Thumb opcodes */
++
++/* Instruction size checks: */
++#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
++#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
++
++/* Operations to construct or split 32-bit Thumb instructions: */
++#define __opcode_thumb32_first(x) ((u16)((x) >> 16))
++#define __opcode_thumb32_second(x) ((u16)(x))
++#define __opcode_thumb32_compose(first, second) \
++	(((u32)(u16)(first) << 16) | (u32)(u16)(second))
++
++#endif /* __ASSEMBLY__ */
++
+ #endif /* __ASM_ARM_OPCODES_H */
+-- 
+1.7.4.1
