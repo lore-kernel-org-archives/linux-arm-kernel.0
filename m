@@ -1,30 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jan 2012 15:38:10 +0800
-Subject: [PATCH] ARM: imx5: generate dtbs for imx5 boards
-Message-ID: <1327995490-10322-1-git-send-email-shawn.guo@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 31 Jan 2012 00:27:57 -0700 (MST)
+Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
+ pwrdm_clear_all_prev_pwrst()
+In-Reply-To: <CAMQu2gyACq7RFyfnyNddDg7xRbHTTqsgXwMq6Ng4WfLxaatvAw@mail.gmail.com>
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
+ <CAMQu2gxyY50Bno_R2v1x98-ND47CrVpZBq+wA3POXz2+7E7eEw@mail.gmail.com>
+ <alpine.DEB.2.00.1201302359320.10061@utopia.booyaka.com>
+ <CAMQu2gyACq7RFyfnyNddDg7xRbHTTqsgXwMq6Ng4WfLxaatvAw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1201310024510.10061@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It helps to generate device tree blobs for imx5 boards with command
-'make ARCH=arm dtbs'.
+On Tue, 31 Jan 2012, Shilimkar, Santosh wrote:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/Makefile.boot |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+> On Tue, Jan 31, 2012 at 12:45 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Tue, 31 Jan 2012, Shilimkar, Santosh wrote:
+> >
+> >> In this code the need is to clear only CPU and MPUPD, and hence they are
+> >> explicitly cleared since the pre/post transition calls can be moved to PM_DEBUG
+> >> in production kernels.
+> >>
+> >> But as you stated in current mainline kernel they are superfluous since the
+> >> pre/post calls are not under PM debug. So I am ok either way
+> >
+> > We're using the PM counters for the context restore skip optimization now
+> > in pwrdm_get_context_loss_count(), so they've suddenly become needed even
+> > when PM_DEBUG=n. ?But those counters are only needed when there are
+> > devices in the CPU* powerdomains to track that can lose logic context. ?I
+> > don't think that's the case on OMAP4, but you would probably know better
+> > than I.
+> >
+> Good point so the pre/post calls are must then. We should kill those extra calls
+> form OMAP4 code then.
 
-diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-index 6dfdbcc..3851d8a 100644
---- a/arch/arm/mach-imx/Makefile.boot
-+++ b/arch/arm/mach-imx/Makefile.boot
-@@ -38,5 +38,8 @@ zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
- params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
- initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
- 
-+dtb-$(CONFIG_MACH_IMX51_DT) += imx51-babbage.dtb
-+dtb-$(CONFIG_MACH_IMX53_DT) += imx53-ard.dtb imx53-evk.dtb \
-+			       imx53-qsb.dtb imx53-smd.dtb
- dtb-$(CONFIG_SOC_IMX6Q)	+= imx6q-arm2.dtb \
- 			   imx6q-sabrelite.dtb
--- 
-1.7.5.4
+I wonder if we should track how many hwmods are present in a powerdomain?  
+We could check that counter to determine if we could skip the access.
+
+> > Another aspect is that previous powerstate accesses for the CPU*
+> > powerdomains would theoretically go to the MPU local PRM rather than the
+> > system PRCM. ?So they may actually return quickly. ?Haven't tested this.
+> >
+> You are correct. They do.
+
+Cool.
+
+> > The MPUSS powerdomain might be another case, though. ?There are a bunch of
+> > devices in there: the local timers, APB debug devices, etc. ?We probably
+> > have to worry about restoring context for some of those at some point.
+> >
+> MPUSS PD is at the global PRCM level but that one doesn't take time either.
+> You need few more cycles to reach there.
+> IIRC, other power domains use to take time because of the wait_transition
+> calls we had. Mostly it was because of the BUGs you fixed. When get some
+> time I will profile these calls and see if we still have that issue.
+
+That would be interesting.  I was guessing that the previous powerstate 
+registers in the global PRCM might be located in some clockdomain that was 
+clocked at sys_clk or the 32KiHZ clock.  But if it's really just due to 
+the wait_transition(), that might be something we can optimize...
+
+
+- Paul
