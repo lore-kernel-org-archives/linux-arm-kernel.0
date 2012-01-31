@@ -1,25 +1,76 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 31 Jan 2012 11:10:43 +0530
-Subject: [PATCH V2 08/12] dmaengine/dw_dmac: Unmap all memory buffers
- after completion of slave transfers
-In-Reply-To: <1327988176.1527.66.camel@vkoul-udesk3>
-References: <cover.1326876464.git.viresh.kumar@st.com>
- <ba53f229f3f594bfe0459b01a9ebb4d9b2c15882.1326876464.git.viresh.kumar@st.com>
- <20120118093620.GC1068@n2100.arm.linux.org.uk> <4F1696E4.9070806@st.com>
- <1327982312.1527.61.camel@vkoul-udesk3> <4F27691A.5010503@st.com>
- <1327986775.1527.63.camel@vkoul-udesk3> <4F2779F5.3000701@st.com>
- <1327988176.1527.66.camel@vkoul-udesk3>
-Message-ID: <4F277EDB.2020405@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 31 Jan 2012 14:53:05 +0900
+Subject: [PATCH v2 1/2] PM / Domains: Add OF support
+In-Reply-To: <201201172145.35407.rjw@sisk.pl>
+References: <1325931055-14486-1-git-send-email-thomas.abraham@linaro.org>
+ <201201082223.18603.rjw@sisk.pl>
+ <001e01ccd4e8$d04b03a0$70e10ae0$%kim@samsung.com>
+ <201201172145.35407.rjw@sisk.pl>
+Message-ID: <041e01ccdfdc$9a4257a0$cec706e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/31/2012 11:06 AM, Vinod Koul wrote:
-> its deprecated :)
-> You should be using dma_slave_config instead to pass the required
-> parameters
+Rafael J. Wysocki wrote:
+> 
+> On Tuesday, January 17, 2012, Kukjin Kim wrote:
+> > Rafael J. Wysocki wrote:
+> > >
+> > > On Saturday, January 07, 2012, Thomas Abraham wrote:
+> > > > A device node pointer is added to generic pm domain structure to
+> > > associate
+> > > > the domain with a node in the device tree. The platform code parses the
+> > > > device tree to find available nodes representing the generic power
+> > > domain,
+> > > > instantiates the available domains and initializes them by calling
+> > > > pm_genpd_init().
+> > > >
+> > > > Nodes representing the devices include a phandle of the power domain to
+> > > > which it belongs. As these devices get instantiated, the driver code
+> > > > checkes for availability of a power domain phandle, converts the phandle
+> > > > to a device node and uses the new pm_genpd_of_add_device() api to
+> > > > associate the device with a power domain.
+> > > >
+> > > > pm_genpd_of_add_device() runs through its list of registered power
+> > > domains
+> > > > and matches the OF node of the domain with the one specified as the
+> > > > parameter. If a match is found, the device is associated with the
+> > > matched
+> > > > domain.
+> > > >
+> > > > Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> > > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> > >
+> > > I can take this patch for 3.4, but your [2/2] depends on it, so I'm not
+> > > sure how to handle that.  If you want me to take the other patch too,
+> > > it'll need ACKs from the Exynos maintaniers.
+> > >
+> > Hi Rafael,
+> >
+> > Basically, looks ok to me.
+> >
+> > But it would be good if [v3 2/2] patch of this series (this patch) could be
+> > applied in samsung tree to avoid conflicts as it modifies many files. I
+> > don't want to make a trouble when sending my tree to upstream. Of course, as
+> > you said, this have a dependency with [v2 1/2]. So if you're ok, let me
+> > create topic branch will have both(1/2 and 2/2) to merge in your tree.
+> >
+> > How do you think?
+> 
+> That would work for me too.
+> 
+Hi Rafael,
 
-Aah, i knew it. Silly question.
-I have this in my todo list, will do it as soon as i get some spare time.
+I created topic branch for you with your ack.
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v3.4-for-rafael
 
--- 
-viresh
+Please merge that in your tree and if any problems, please kindly let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
