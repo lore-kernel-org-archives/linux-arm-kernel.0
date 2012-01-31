@@ -1,50 +1,103 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 31 Jan 2012 19:11:56 +0800
-Subject: [PATCH v3] mtd/gpmi : add BBT support to gpmi nand driver
-Message-ID: <1328008316-27258-1-git-send-email-b32955@freescale.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 31 Jan 2012 12:07:12 +0100
+Subject: [PATCH 1/3] of_spi: add generic binding support to specify ncs
+ gpio in the slave
+In-Reply-To: <20120130185458.GO28397@ponder.secretlab.ca>
+References: <1327937271-23668-1-git-send-email-plagnioj@jcrosoft.com>
+ <20120130185458.GO28397@ponder.secretlab.ca>
+Message-ID: <20120131110712.GI705@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new field to gpmi_nand_platform_data{}.
-Make the BBT support to board specific.
+On 11:54 Mon 30 Jan     , Grant Likely wrote:
+> On Mon, Jan 30, 2012 at 04:27:49PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > This will allow to use gpio for chip select with no modification in the
+> > driver binding
+> > 
+> > When use the ncs-gpio, the gpio number will be passed via the controller_data
+> > and the number of chip select will automatically increased.
+> > 
+> > When a spi master have only gpio chip select and is probe via dt check the
+> > number of chip select only when adding slave.
+> > 
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > Cc: spi-devel-general at lists.sourceforge.net
+> > ---
+> >  Documentation/devicetree/bindings/spi/spi-bus.txt |    9 ++++++-
+> >  drivers/of/of_spi.c                               |   27 ++++++++++++++------
+> >  drivers/spi/spi.c                                 |    2 +-
+> >  3 files changed, 28 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
+> > index e782add..1dccf35 100644
+> > --- a/Documentation/devicetree/bindings/spi/spi-bus.txt
+> > +++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
+> > @@ -21,9 +21,16 @@ assumption that board specific platform code will be used to manage
+> >  chip selects.  Individual drivers can define additional properties to
+> >  support describing the chip select layout.
+> >  
+> > +If a gpio a specified to the SPI slave and no hardware chip select is present
+> > +the reg property #address-cells and #size-cells are not needed.
+> > +
+> > +When use the ncs-gpio the gpio number will be passed via the controller_data
+> > +and the number of chip select will automatically increased.
+> > +
+> >  SPI slave nodes must be children of the SPI master node and can
+> >  contain the following properties.
+> > -- reg             - (required) chip select address of device.
+> > +- reg             - (required if no ncs-gpio) chip select address of device.
+> > +- ncs-gpio        - (required if no reg) chip select gpio of device.
+> 
+> There is already precedence for using gpios for chip selects.  The slave device
+> nodes remain as they are and it is the responsibility of the spi bus node
+> to have a gpios property with a list of SS gpios.  The order of the gpios
+> property should match the 'reg' address numbering of the child node.
+> 
+> I don't like the idea of having multiple bindings for the slave address of
+> the spi device (reg or ncs-gpio)
+> 
+> What I want to see is generic SS helper code that spi bus drivers
+> default to and correctly implement parsing of chip select gpios.
+> 
+> I'm not going to apply this patch.
+I do not want to see any of managment in the driver, I want a generic way to
+specify only gpio cs and hw and gpio cs
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 ++
- include/linux/mtd/gpmi-nand.h          |    2 ++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+spi1: spi at fffcc000 {
+	ncs-gpios = <&pioB 3 0>;
+	status = "okay";
+	mmc-slot at 0 {
+		reg = <0>;
+		compatible = "mmc-spi-slot";
+		gpios = <&pioC 4 0   /* CD */
+			>;
+		voltage-ranges = <3200 3400>;
+		spi-max-frequency = <20000000>;
+	};
+};
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 493ec2f..4d369df 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1493,6 +1493,8 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
- 	chip->ecc.mode		= NAND_ECC_HW;
- 	chip->ecc.size		= 1;
- 	chip->ecc.layout	= &gpmi_hw_ecclayout;
-+	if (pdata->enable_bbt)
-+		chip->bbt_options = NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
- 
- 	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
- 	this->bch_geometry.payload_size = 1024;
-diff --git a/include/linux/mtd/gpmi-nand.h b/include/linux/mtd/gpmi-nand.h
-index 69b6dbf..04ab366 100644
---- a/include/linux/mtd/gpmi-nand.h
-+++ b/include/linux/mtd/gpmi-nand.h
-@@ -51,6 +51,7 @@
-  * @partitions:              An optional pointer to an array of partition
-  *                           descriptions.
-  * @partition_count:         The number of elements in the partitions array.
-+ * @enable_bbt:              Enable the BBT or not.
-  */
- struct gpmi_nand_platform_data {
- 	/* SoC hardware information. */
-@@ -64,5 +65,6 @@ struct gpmi_nand_platform_data {
- 	/* Medium information. */
- 	struct		mtd_partition *partitions;
- 	unsigned	partition_count;
-+	unsigned int	enable_bbt:1;
- };
- #endif
--- 
-1.7.0.4
+as on atmel spi we have no HW spi the cs is 0
+if there is 3 hw cs the reg will be 3
+
+we have 4 hw chipselect 3 enabled and one gpio chipselect
+
+spi1: spi at fffcc000 {
+	ncs-hw = < 0 1 1 1>;
+	ncs-gpios = <&pioB 3 0>;
+	status = "okay";
+	mmc-slot at 0 {
+		reg = <3>;
+		compatible = "mmc-spi-slot";
+		gpios = <&pioC 4 0   /* CD */
+			>;
+		voltage-ranges = <3200 3400>;
+		spi-max-frequency = <20000000>;
+	};
+};
+
+the idea is to pass the ncs_pin in the spi_device so the driver just have
+to check if the chipselect is hw or gpio and then use it the right way
+
+Best Regards,
+J.
