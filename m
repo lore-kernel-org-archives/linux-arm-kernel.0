@@ -1,126 +1,69 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Tue, 31 Jan 2012 18:22:20 +0000
-Subject: [PATCH v5] ARM: Add generic instruction opcode manipulation
- helpers
-In-Reply-To: <1328008180-28542-1-git-send-email-dave.martin@linaro.org>
-References: <1328008180-28542-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1328034140.2464.3.camel@computer2.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 31 Jan 2012 13:27:01 -0500 (EST)
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <CAMQu2gwG_JwPMzV0v2hedvDz=HHq0SNbbH+Zapyd8fJt47kjGQ@mail.gmail.com>
+References: <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+ <20120117133918.GE11475@arm.com>
+ <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+ <WC20120120085711.330803@terrafix.co.uk> <20120127173029.GA3281@arm.com>
+ <4F277A6E.9070107@ti.com>
+ <CAHkRjk7z2QYbU09BRfAWmChw5xj9taCarWfnttWveyqtadiEOg@mail.gmail.com>
+ <CAMQu2gxr5ZkH4AE_7QNptxx7onQMGaj+qhUF+DSw9MnkCqCRog@mail.gmail.com>
+ <CAHkRjk7Fh=OUk8K=bJa8xzPqMvT6P6gjT+kqAA0DeVfrF0sUNg@mail.gmail.com>
+ <CAMQu2gwDJ=aezNAUD3YmGHQ6fBxkxgUonYkQYPH8WBeNvZCKMQ@mail.gmail.com>
+ <20120131095606.GA889@n2100.arm.linux.org.uk>
+ <CAMQu2gwG_JwPMzV0v2hedvDz=HHq0SNbbH+Zapyd8fJt47kjGQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1201311315420.2759@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-01-31 at 11:09 +0000, Dave Martin wrote:
-> This patch adds some endianness-agnostic helpers to convert machine
-> instructions between canonical integer form and in-memory
-> representation.
+On Tue, 31 Jan 2012, Shilimkar, Santosh wrote:
+
+> On Tue, Jan 31, 2012 at 3:26 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > So, as many people have said, we're not going to go down the route of
+> > allowing platforms to hook into this code. ?There's plenty of other
+> > solutions to this problem in different parts of the system that would
+> > be more than adequate, and would benefit everyone not just the kernel.
+> >
+> Sure. The marco has missed those details. Thanks for the
+> useful information. At least I can fix the stack size for internal
+> use.
+
+If you intend to ignore our advises and continue with the quick and 
+dirty solution for your internal tree, then at least don't brag on a 
+public list about it.
+
+> > Your continued resistance to every alternative suggestion but your
+> > (broken) hook is getting extremely frustrating. ?Please try some of
+> > these other approaches which are being proposed. ?Thanks.
 > 
-> A canonical integer form for representing instructions is also
-> formalised here.
+> I was just trying to get more information about the alternatives and
+> trying to bring out possible issues. I know for sure that boot-loader is
+> not an option since we have had many instances where it has not worked.
 > 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+> I also understand that patching early common code is going to be tricky
+> and of-course against the single zImage.
+> 
+> So the option mentioned by Nicolas and Catalin about 1:1 mapping
+> and configuring the registers in platform specific code was looking
+> a way forward. So was asking more questions about whether this can
+> work in all cases. Specifically for A15.
+
+So far this is apparently your best option.  And luckily the code to 
+create a 1:1 mapping, turn off MMU, then turn MMU back on and tear down 
+the 1:1 mapping already exists.  All you need to do is to insert the 
+cache workaround activation in the middle of that instead of shutting 
+the CPU down.
+
+> As per Catalin's email, it is best to handle those cases before MMU is 
+> enabled with boot-monitor or pre-load code.
+
+These days bootloaders are turning the MMU on for themselves, so you'll 
+need pre-load code for the bootloader already.  Either that, or the 
+issue is not necessarily _that_ critical in which case you can afford to 
+enable your workaround a bit later during the kernel boot.
 
 
-I can confirm this version applies and builds cleanly against
-linux-next. And works with Rabin 's jump label support patches.
-
--- 
-Tixy
-
-
-> ---
-> Changes since v1:
-> 
-> v5: Avoid inclusion of C headers or definition of the __opcode_*
->     macros when opcodes.h is included in assembler files.  Since
->     the __opcode_* macros rely on C declarations, they are not
->     directly usable in assembler anyway.
-> 
-> v4: Rebase on top of Leif's patch which created <asm/opcodes.h>
->     ARM: 7206/1: Add generic ARM instruction set condition code checks.
-> 
->     No functional changes.
-> 
-> v3: Fix some stupid errors:
-> 
->   * remove bogus extra (x) in __opcode_to_mem_arm
->   * fix use of nonexistent "thumb_opcode" argument in
->         __opcode_thumb32_{first,second} which causes these
->         macros to be broken.
-> 
-> v2: Remove unnecessary typedef for arm_opcode_t.
-> 
->     The general "everything is a word" concept works just fine here --
->     we don't need a typedef, and people will probably not use it
->     anyway.
-> 
->  arch/arm/include/asm/opcodes.h |   59 ++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 59 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-> index c0efdd6..19c48de 100644
-> --- a/arch/arm/include/asm/opcodes.h
-> +++ b/arch/arm/include/asm/opcodes.h
-> @@ -17,4 +17,63 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
->  #define ARM_OPCODE_CONDTEST_PASS   1
->  #define ARM_OPCODE_CONDTEST_UNCOND 2
->  
-> +
-> +/*
-> + * Opcode byteswap helpers
-> + *
-> + * These macros help with converting instructions between a canonical integer
-> + * format and in-memory representation, in an endianness-agnostic manner.
-> + *
-> + * __mem_to_opcode_*() convert from in-memory representation to canonical form.
-> + * __opcode_to_mem_*() convert from canonical form to in-memory representation.
-> + *
-> + *
-> + * Canonical instruction representation:
-> + *
-> + *	ARM:		0xKKLLMMNN
-> + *	Thumb 16-bit:	0x0000KKLL, where KK < 0xE8
-> + *	Thumb 32-bit:	0xKKLLMMNN, where KK >= 0xE8
-> + *
-> + * There is no way to distinguish an ARM instruction in canonical representation
-> + * from a Thumb instruction (just as these cannot be distinguished in memory).
-> + * Where this distinction is important, it needs to be tracked separately.
-> + *
-> + * Note that values in the range 0x0000E800..0xE7FFFFFF intentionally do not
-> + * represent any valid Thumb-2 instruction.  For this range,
-> + * __opcode_is_thumb32() and __opcode_is_thumb16() will both be false.
-> + */
-> +
-> +#ifndef __ASSEMBLY__
-> +
-> +#include <linux/types.h>
-> +#include <linux/swab.h>
-> +
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +#define __opcode_to_mem_arm(x) swab32(x)
-> +#define __opcode_to_mem_thumb16(x) swab16(x)
-> +#define __opcode_to_mem_thumb32(x) swahb32(x)
-> +#else
-> +#define __opcode_to_mem_arm(x) ((u32)(x))
-> +#define __opcode_to_mem_thumb16(x) ((u16)(x))
-> +#define __opcode_to_mem_thumb32(x) swahw32(x)
-> +#endif
-> +
-> +#define __mem_to_opcode_arm(x) __opcode_to_mem_arm(x)
-> +#define __mem_to_opcode_thumb16(x) __opcode_to_mem_thumb16(x)
-> +#define __mem_to_opcode_thumb32(x) __opcode_to_mem_thumb32(x)
-> +
-> +/* Operations specific to Thumb opcodes */
-> +
-> +/* Instruction size checks: */
-> +#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
-> +#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
-> +
-> +/* Operations to construct or split 32-bit Thumb instructions: */
-> +#define __opcode_thumb32_first(x) ((u16)((x) >> 16))
-> +#define __opcode_thumb32_second(x) ((u16)(x))
-> +#define __opcode_thumb32_compose(first, second) \
-> +	(((u32)(u16)(first) << 16) | (u32)(u16)(second))
-> +
-> +#endif /* __ASSEMBLY__ */
-> +
->  #endif /* __ASM_ARM_OPCODES_H */
+Nicolas
