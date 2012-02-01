@@ -1,73 +1,176 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 31 Jan 2012 21:00:10 -0600
-Subject: [RFC PATCH v4 0/4] Consolidate cpuidle timekeeping and irq enabling
-Message-ID: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+Date: Tue, 31 Jan 2012 21:00:11 -0600
+Subject: [RFC PATCH v4 1/4] cpuidle: Add time keeping and irq enabling
+In-Reply-To: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <1328065215-28108-2-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series moves the timekeeping and irq enabling from the platform
-code to the core cpuidle driver.  Also, the platform irq disabling was removed
-as it appears that all calls into cpuidle_call_idle will have already called
-local_irq_disable().
+Make necessary changes to add implement time keepign and irq enabling
+in the core cpuidle code.  This will allow the remove of these
+functionalities from the platform cpuidle implementations.
 
-To save reviewers time, only a few platforms which required the most changes
-are included in this version.  If these changes are approved, the next version
-will include the remaining platform code which should require minimal changes.
+Signed-off-by: Robert Lee <rob.lee@linaro.org>
+---
+ drivers/cpuidle/cpuidle.c |   75 +++++++++++++++++++++++++++++++++++---------
+ include/linux/cpuidle.h   |   26 ++++++++++-----
+ 2 files changed, 76 insertions(+), 25 deletions(-)
 
-For those who have followed the previous patch versions, as you know, the
-previous version of this patch series added some helper functionality which
-used a wrapper function to remove the time keeping and irq enabling/disabling
-from the platform code.  There was also initialization helper functionality 
-which has now been removed from this version.  If the basic implementation
-in this version is approved, then a separate patch submission effort can be
-made to focus on consolidation of initialziation functionality.
-
-Based on 3.3-rc1
-
-v3 submission can be found here:
-http://www.spinics.net/lists/arm-kernel/msg156751.html
-Changes since v3:
-* Removed drivers/cpuidle/common.c
-** Removed the initialization helper functions
-** Removed the wrapper used to consolidate time keeping and irq enable/disable
-* Add time keeping and local_irq_disable handling in cpuidle_call_idle().
-* Made necessary modifications to a few platforms that required the most changes
-** Note on omap3: changed structure of omap3_idle_drvdata and added 
-   per_next_state and per_saved_state vars to accomodate new framework.
-
-v2 submission can be found here:
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/144199
-
-Changes since v2:
-* Made various code organization and style changes as suggested in v1 review.
-* Removed at91 use of common code.  A separate effort is underway to clean
-at91 code and the author has offered to convert to common interface as part
-of those changes (if this common interface is accepted in time).
-* Made platform cpuidle_driver objects __initdata and dynamically added one
-persistent instance of this object in common code.
-* Removed imx5 pm usage of gpc_dvfs clock as it is no longer needed after
-being enabled during clock initialization.
-* Re-organized patches.
-
-v1 submission can be found here:
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/142791
-
-Changes since v1:
-* Common interface moved to drivers/cpuidle and made non arch-specific.
-* Made various fixes and suggested additions to the common cpuidle
-code from v1 review.
-* Added callback for filling in driver_data field as needed.
-* Modified the various platforms with these changes.
-
-Robert Lee (4):
-  cpuidle: Add time keeping and irq enabling
-  ARM: omap: Remove cpuidle timekeeping and irq enable/disable
-  acpi: Remove cpuidle timekeeping and irq enable/disable
-  x86: Remove cpuidle timekeeping and irq enable/disable
-
- arch/arm/mach-omap2/cpuidle34xx.c |   96 ++++++++----------
- drivers/acpi/processor_idle.c     |  203 ++++++++++++++++++++++---------------
- drivers/cpuidle/cpuidle.c         |   75 +++++++++++---
- drivers/idle/intel_idle.c         |  110 ++++++++++++++------
- include/linux/cpuidle.h           |   26 +++--
- 5 files changed, 317 insertions(+), 193 deletions(-)
+diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+index 59f4261..8ea0fc3 100644
+--- a/drivers/cpuidle/cpuidle.c
++++ b/drivers/cpuidle/cpuidle.c
+@@ -57,14 +57,18 @@ static int __cpuidle_register_device(struct cpuidle_device *dev);
+  * cpuidle_idle_call - the main idle loop
+  *
+  * NOTE: no locks or semaphores should be used here
++ * NOTE: Should only be called from a local irq disabled context
+  * return non-zero on failure
++ *
+  */
+ int cpuidle_idle_call(void)
+ {
+ 	struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
+ 	struct cpuidle_driver *drv = cpuidle_get_driver();
+ 	struct cpuidle_state *target_state;
+-	int next_state, entered_state;
++	int idx, ret = 0;
++	ktime_t	t1, t2;
++	s64 diff;
+ 
+ 	if (off)
+ 		return -ENODEV;
+@@ -86,37 +90,76 @@ int cpuidle_idle_call(void)
+ #endif
+ 
+ 	/* ask the governor for the next state */
+-	next_state = cpuidle_curr_governor->select(drv, dev);
++	idx = cpuidle_curr_governor->select(drv, dev);
++
++	target_state = &drv->states[idx];
++
++	/*
++	 * Check with the device to see if it can enter this state or if another
++	 * state should be used.
++	 */
++	if (target_state->pre_enter) {
++		idx = target_state->
++			pre_enter(dev, drv, idx);
++	}
++
++	if (idx < 0) {
++		local_irq_enable();
++		return idx;
++	}
++
+ 	if (need_resched()) {
+ 		local_irq_enable();
+-		return 0;
++		return -EBUSY;
+ 	}
+ 
+-	target_state = &drv->states[next_state];
++	target_state = &drv->states[idx];
+ 
+-	trace_power_start(POWER_CSTATE, next_state, dev->cpu);
+-	trace_cpu_idle(next_state, dev->cpu);
++	if ((target_state->flags & CPUIDLE_FLAG_TIME_VALID))
++		t1 = ktime_get();
+ 
+-	entered_state = target_state->enter(dev, drv, next_state);
++	trace_power_start(POWER_CSTATE, idx, dev->cpu);
++	trace_cpu_idle(idx, dev->cpu);
++
++	idx = target_state->enter(dev, drv, idx);
+ 
+ 	trace_power_end(dev->cpu);
+ 	trace_cpu_idle(PWR_EVENT_EXIT, dev->cpu);
+ 
+-	if (entered_state >= 0) {
+-		/* Update cpuidle counters */
+-		/* This can be moved to within driver enter routine
+-		 * but that results in multiple copies of same code.
+-		 */
+-		dev->states_usage[entered_state].time +=
++	if (idx < 0) {
++		local_irq_enable();
++		return idx;
++	}
++
++	if (likely(target_state->flags & drv->states[idx].flags &
++		CPUIDLE_FLAG_TIME_VALID))
++		t2 = ktime_get();
++
++	local_irq_enable();
++
++	if (target_state->post_enter)
++		target_state->post_enter(dev, drv, idx);
++
++	if (likely(target_state->flags & drv->states[idx].flags &
++		CPUIDLE_FLAG_TIME_VALID)) {
++
++		diff = ktime_to_us(ktime_sub(t2, t1));
++		if (diff > INT_MAX)
++			diff = INT_MAX;
++
++		dev->last_residency = (int) diff;
++
++		dev->states_usage[idx].time +=
+ 				(unsigned long long)dev->last_residency;
+-		dev->states_usage[entered_state].usage++;
+ 	}
+ 
++	dev->states_usage[idx].usage++;
++
+ 	/* give the governor an opportunity to reflect on the outcome */
+ 	if (cpuidle_curr_governor->reflect)
+-		cpuidle_curr_governor->reflect(dev, entered_state);
++		cpuidle_curr_governor->reflect(dev, idx);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ /**
+diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+index 712abcc..8154f60 100644
+--- a/include/linux/cpuidle.h
++++ b/include/linux/cpuidle.h
+@@ -38,17 +38,25 @@ struct cpuidle_state_usage {
+ };
+ 
+ struct cpuidle_state {
+-	char		name[CPUIDLE_NAME_LEN];
+-	char		desc[CPUIDLE_DESC_LEN];
++	char			name[CPUIDLE_NAME_LEN];
++	char			desc[CPUIDLE_DESC_LEN];
++
++	unsigned int		flags;
++	unsigned int		exit_latency; /* in US */
++	unsigned int		power_usage; /* in mW */
++	unsigned int		target_residency; /* in US */
++
++	int (*pre_enter)	(struct cpuidle_device *dev,
++				struct cpuidle_driver *drv,
++				int index);
+ 
+-	unsigned int	flags;
+-	unsigned int	exit_latency; /* in US */
+-	unsigned int	power_usage; /* in mW */
+-	unsigned int	target_residency; /* in US */
++	int (*enter)		(struct cpuidle_device *dev,
++				struct cpuidle_driver *drv,
++				int index);
+ 
+-	int (*enter)	(struct cpuidle_device *dev,
+-			struct cpuidle_driver *drv,
+-			int index);
++	int (*post_enter)	(struct cpuidle_device *dev,
++				struct cpuidle_driver *drv,
++				int index);
+ };
+ 
+ /* Idle State Flags */
+-- 
+1.7.1
