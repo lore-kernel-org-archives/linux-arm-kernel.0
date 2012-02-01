@@ -1,52 +1,38 @@
-From: sbabic@denx.de (Stefano Babic)
-Date: Wed, 01 Feb 2012 11:51:16 +0100
-Subject: [PATCH V2] mt_ventoux: support for TeeJet Mt.Ventoux board
-In-Reply-To: <1325027377-13484-1-git-send-email-yanok@emcraft.com>
-References: <1324940912-18164-3-git-send-email-yanok@emcraft.com>
- <1325027377-13484-1-git-send-email-yanok@emcraft.com>
-Message-ID: <4F291924.50702@denx.de>
+From: xiyou.wangcong@gmail.com (Cong Wang)
+Date: Wed, 01 Feb 2012 18:51:33 +0800
+Subject: In many cases softlockup can not be reported after disabling
+ IRQ for long time
+In-Reply-To: <CAOwKts_dTvc4LiCZUXN9oYzty1pkDEn_VQwPKY=EoVzk0n6tFA@mail.gmail.com>
+References: <CAOwKts8zS1rYA+Y4k-vb8YAaR=aFd1BwryhhWWnWLQyrYrNqyA@mail.gmail.com>
+ <20120131154748.GA5650@redhat.com>
+ <CAOwKts_dTvc4LiCZUXN9oYzty1pkDEn_VQwPKY=EoVzk0n6tFA@mail.gmail.com>
+Message-ID: <4F291935.2030205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/12/2011 00:09, Ilya Yanok wrote:
-> This patch adds support for TeeJet Mt.Ventoux board based on TAM3517
-> SOM. Supported devices:
->  - Serial
->  - Ethernet
->  - NAND
->  - USB host
->  - LCD
->  - Touchscreen
->  - CAN controller
->  - ADC128S converter
-> 
-> Signed-off-by: Ilya Yanok <yanok@emcraft.com>
-> ---
-> 
-> Changes from V1:
-> 
->  - Fixed indentation (use tabs not spaces)
->  - Fixed over 80 characters lines
->  - Added #if defined(CONFIG_SENSORS_ADCXX_MODULE) to allow adcxx to be a
->    module.
->  - Fixes for compilation with CONFIG_TOUCHSCREEN_ADS7846!=y
->   - Added defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
->   - Moved call to omap_ads7846_init to separate small function
->   - Register fixed regulator used for touchscreen only if the driver is
->     enabled
->  - Changed board name (MT_VENTOUX -> Mt.Ventoux)
+(Please don't top-reply.)
 
-Hi Tony,
+On 02/01/2012 10:18 AM, TAO HU wrote:
+> Hi, Don
+>
+> Thanks for your feedback!
+>
+> Unfortunately, the hardlockup depends on NMI which is not available on
+> ARM (Cortex-A9) per my understanding.
+> Our system uses OMAP4430. Any more suggestions?
 
-can I ask you about the status of these patches ? I have not seen open
-comments, do you think they can be merged in your tree ?
+When there is no NMI, touch_nmi_watchdog() actually touches softlockup 
+watchdog:
 
-Thanks,
-Stefano Babic
+#if defined(ARCH_HAS_NMI_WATCHDOG) || defined(CONFIG_HARDLOCKUP_DETECTOR)
+#include <asm/nmi.h>
+extern void touch_nmi_watchdog(void);
+#else
+static inline void touch_nmi_watchdog(void)
+{
+         touch_softlockup_watchdog();
+}
+#endif
 
--- 
-=====================================================================
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
-=====================================================================
+so you need to check if other places calling touch_nmi_watchdog() 
+especially on ARM.
