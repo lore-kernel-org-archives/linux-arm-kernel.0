@@ -1,67 +1,40 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed,  1 Feb 2012 09:49:41 +0100
-Subject: [PATCH 02/20] ARM: OMAP3+: SmartReflex: add missing error-handling
- code
+Date: Wed,  1 Feb 2012 09:49:42 +0100
+Subject: [PATCH 03/20] ARM: OMAP3+: SmartReflex: fix err interrupt disable
+ sequence
 In-Reply-To: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
 References: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1328086199-28486-3-git-send-email-j-pihet@ti.com>
+Message-ID: <1328086199-28486-4-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+From: Nishanth Menon <nm@ti.com>
 
-At this point, the ioremap has taken place, so the error handling code at
-the label err_iounmap should be used rather than returning directly.
+sr_modify_mask takes mask, value as parameters, the usage
+currently is value, mask which is wrong, as a result
+vpboundint_st which was supposed to have been disabled,
+does not get disabled.
 
-The semantic match that finds this problem is as follows:
-(http://coccinelle.lip6.fr/)
-
-// <smpl>
-@r@
-identifier x;
-@@
-
-kfree(x)
-
-@@
-identifier r.x;
-expression E1!=0,E2,E3,E4;
-statement S;
-@@
-
-(
-if (<+...x...+>) S
-|
-if (...) { ... when != kfree(x)
-               when != if (...) { ... kfree(x); ... }
-               when != x = E3
-* return E1;
-}
-... when != x = E2
-if (...) { ... when != x = E4
- kfree(x); ... return ...; }
-)
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-Acked-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 9dd9345..7e755bb 100644
+index 7e755bb..ee224df 100644
 --- a/arch/arm/mach-omap2/smartreflex.c
 +++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -897,7 +897,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		ret = sr_late_init(sr_info);
- 		if (ret) {
- 			pr_warning("%s: Error in SR late init\n", __func__);
--			return ret;
-+			goto err_iounmap;
- 		}
- 	}
+@@ -447,8 +447,8 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
+ 		sr_errconfig);
  
+ 	/* Enabling the interrupts if the ERROR module is used */
+-	sr_modify_reg(sr, errconfig_offs,
+-		vpboundint_en, (vpboundint_en | vpboundint_st));
++	sr_modify_reg(sr, errconfig_offs, (vpboundint_en | vpboundint_st),
++		      vpboundint_en);
+ 
+ 	return 0;
+ }
 -- 
 1.7.5.4
