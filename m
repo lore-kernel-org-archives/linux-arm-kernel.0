@@ -1,60 +1,366 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  1 Feb 2012 16:59:35 +0000
-Subject: [PATCH v2 4/4] ARM: architected timers: add support for UP timer
+Date: Wed,  1 Feb 2012 16:59:32 +0000
+Subject: [PATCH v2 1/4] ARM: local timers: Add A15 architected timer support
 In-Reply-To: <1328115575-24866-1-git-send-email-marc.zyngier@arm.com>
 References: <1328115575-24866-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1328115575-24866-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1328115575-24866-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_LOCAL_TIMERS is not defined, let the architected timer
-driver register a single clock_event_device that is used as a
-global timer.
+Add support for the A15 generic timer and clocksource.
+As the timer generates interrupts on a different PPI depending
+on the execution mode (normal or secure), it is possible to
+register two different PPIs.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/arch_timer.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
+ arch/arm/Kconfig                  |    7 +
+ arch/arm/include/asm/arch_timer.h |   12 ++
+ arch/arm/kernel/Makefile          |    1 +
+ arch/arm/kernel/arch_timer.c      |  286 +++++++++++++++++++++++++++++++++++++
+ 4 files changed, 306 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/arch_timer.h
+ create mode 100644 arch/arm/kernel/arch_timer.c
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 24626b0..acf2813 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1522,6 +1522,13 @@ config HAVE_ARM_SCU
+ 	help
+ 	  This option enables support for the ARM system coherency unit
+ 
++config ARM_ARCH_TIMER
++	bool "Architected timer support"
++	depends on CPU_V7
++	select TICK_ONESHOT
++	help
++	  This option enables support for the ARM architected timer
++
+ config HAVE_ARM_TWD
+ 	bool
+ 	depends on SMP
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+new file mode 100644
+index 0000000..20de858
+--- /dev/null
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -0,0 +1,12 @@
++#ifndef __ASMARM_ARCH_TIMER_H
++#define __ASMARM_ARCH_TIMER_H
++
++#include <linux/ioport.h>
++
++struct arch_timer {
++	struct resource	res[2];
++};
++
++int arch_timer_register(struct arch_timer *);
++
++#endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 43b740d..518cea4 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -34,6 +34,7 @@ obj-$(CONFIG_HAVE_SCHED_CLOCK)	+= sched_clock.o
+ obj-$(CONFIG_SMP)		+= smp.o smp_tlb.o
+ obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
+ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
++obj-$(CONFIG_ARM_ARCH_TIMER)	+= arch_timer.o
+ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
+ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o
+ obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
 diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 6cb7d39..a6a3aee 100644
---- a/arch/arm/kernel/arch_timer.c
+new file mode 100644
+index 0000000..680cf1e
+--- /dev/null
 +++ b/arch/arm/kernel/arch_timer.c
-@@ -229,6 +229,7 @@ static struct clocksource clocksource_counter = {
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-+#ifdef CONFIG_LOCAL_TIMERS
- static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
- {
- 	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
-@@ -243,6 +244,9 @@ static struct local_timer_ops arch_timer_ops __cpuinitdata = {
- 	.setup	= arch_timer_setup,
- 	.stop	= arch_timer_stop,
- };
-+#else
-+static struct clock_event_device arch_timer_global_evt;
-+#endif
- 
- static int __init arch_timer_common_register(void)
- {
-@@ -277,7 +281,16 @@ static int __init arch_timer_common_register(void)
- 		}
- 	}
- 
--	err = local_timer_register(&arch_timer_ops);
-+#ifdef CONFIG_LOCAL_TIMERS
-+	if (is_smp())
-+		err = local_timer_register(&arch_timer_ops);
-+	else
-+#endif
-+	{
-+		arch_timer_global_evt.cpumask = cpumask_of(0);
-+		err = arch_timer_setup(&arch_timer_global_evt);
+@@ -0,0 +1,286 @@
++/*
++ *  linux/arch/arm/kernel/arch_timer.c
++ *
++ *  Copyright (C) 2011 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/smp.h>
++#include <linux/cpu.h>
++#include <linux/jiffies.h>
++#include <linux/clockchips.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++
++#include <asm/cputype.h>
++#include <asm/localtimer.h>
++#include <asm/arch_timer.h>
++
++static unsigned long arch_timer_rate;
++static int arch_timer_ppi;
++static int arch_timer_ppi2;
++
++static struct clock_event_device __percpu **arch_timer_evt;
++
++/*
++ * Architected system timer support.
++ */
++
++#define ARCH_TIMER_CTRL_ENABLE		(1 << 0)
++#define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
++
++#define ARCH_TIMER_REG_CTRL		0
++#define ARCH_TIMER_REG_FREQ		1
++#define ARCH_TIMER_REG_TVAL		2
++
++static void arch_timer_reg_write(int reg, u32 val)
++{
++	switch (reg) {
++	case ARCH_TIMER_REG_CTRL:
++		asm volatile("mcr p15, 0, %0, c14, c2, 1" : : "r" (val));
++		break;
++	case ARCH_TIMER_REG_TVAL:
++		asm volatile("mcr p15, 0, %0, c14, c2, 0" : : "r" (val));
++		break;
 +	}
 +
- 	if (err)
- 		goto out_free_irq;
- 
++	isb();
++}
++
++static u32 arch_timer_reg_read(int reg)
++{
++	u32 val;
++
++	switch (reg) {
++	case ARCH_TIMER_REG_CTRL:
++		asm volatile("mrc p15, 0, %0, c14, c2, 1" : "=r" (val));
++		break;
++	case ARCH_TIMER_REG_FREQ:
++		asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
++		break;
++	case ARCH_TIMER_REG_TVAL:
++		asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
++		break;
++	default:
++		BUG();
++	}
++
++	return val;
++}
++
++static irqreturn_t arch_timer_handler(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
++	unsigned long ctrl;
++
++	ctrl = arch_timer_reg_read(ARCH_TIMER_REG_CTRL);
++	if (ctrl & 0x4) {
++		ctrl |= ARCH_TIMER_CTRL_IT_MASK;
++		arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
++		evt->event_handler(evt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
++static void arch_timer_disable(void)
++{
++	unsigned long ctrl;
++
++	ctrl = arch_timer_reg_read(ARCH_TIMER_REG_CTRL);
++	ctrl &= ~ARCH_TIMER_CTRL_ENABLE;
++	arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
++}
++
++static void arch_timer_set_mode(enum clock_event_mode mode,
++				struct clock_event_device *clk)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++		arch_timer_disable();
++		break;
++	default:
++		break;
++	}
++}
++
++static int arch_timer_set_next_event(unsigned long evt,
++				     struct clock_event_device *unused)
++{
++	unsigned long ctrl;
++
++	ctrl = arch_timer_reg_read(ARCH_TIMER_REG_CTRL);
++	ctrl |= ARCH_TIMER_CTRL_ENABLE;
++	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
++
++	arch_timer_reg_write(ARCH_TIMER_REG_TVAL, evt);
++	arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
++
++	return 0;
++}
++
++static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
++{
++	/* Be safe... */
++	arch_timer_disable();
++
++	clk->features = CLOCK_EVT_FEAT_ONESHOT;
++	clk->name = "arch_sys_timer";
++	clk->rating = 450;
++	clk->set_mode = arch_timer_set_mode;
++	clk->set_next_event = arch_timer_set_next_event;
++	clk->irq = arch_timer_ppi;
++
++	clockevents_config_and_register(clk, arch_timer_rate,
++					0xf, 0x7fffffff);
++
++	*__this_cpu_ptr(arch_timer_evt) = clk;
++
++	enable_percpu_irq(clk->irq, 0);
++	if (arch_timer_ppi2)
++		enable_percpu_irq(arch_timer_ppi2, 0);
++
++	return 0;
++}
++
++/* Is the optional system timer available? */
++static int local_timer_is_architected(void)
++{
++	return (cpu_architecture() >= CPU_ARCH_ARMv7) &&
++	       ((read_cpuid_ext(CPUID_EXT_PFR1) >> 16) & 0xf) == 1;
++}
++
++static int arch_timer_available(void)
++{
++	unsigned long freq;
++
++	if (!local_timer_is_architected())
++		return -ENXIO;
++
++	if (arch_timer_rate == 0) {
++		arch_timer_reg_write(ARCH_TIMER_REG_CTRL, 0);
++		freq = arch_timer_reg_read(ARCH_TIMER_REG_FREQ);
++
++		/* Check the timer frequency. */
++		if (freq == 0) {
++			pr_warn("Architected timer frequency not available\n");
++			return -EINVAL;
++		}
++
++		arch_timer_rate = freq;
++		pr_info("Architected local timer running at %lu.%02luMHz.\n",
++			arch_timer_rate / 1000000, (arch_timer_rate / 10000) % 100);
++	}
++
++	return 0;
++}
++
++static inline cycle_t arch_counter_get_cntpct(void)
++{
++	u32 cvall, cvalh;
++
++	asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
++
++	return ((u64) cvalh << 32) | cvall;
++}
++
++static inline cycle_t arch_counter_get_cntvct(void)
++{
++	u32 cvall, cvalh;
++
++	asm volatile("mrrc p15, 1, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
++
++	return ((u64) cvalh << 32) | cvall;
++}
++
++static cycle_t arch_counter_read(struct clocksource *cs)
++{
++	return arch_counter_get_cntpct();
++}
++
++static struct clocksource clocksource_counter = {
++	.name	= "arch_sys_counter",
++	.rating	= 400,
++	.read	= arch_counter_read,
++	.mask	= CLOCKSOURCE_MASK(56),
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
++{
++	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
++		 clk->irq, smp_processor_id());
++	disable_percpu_irq(clk->irq);
++	if (arch_timer_ppi2)
++		disable_percpu_irq(arch_timer_ppi2);
++	arch_timer_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
++}
++
++static struct local_timer_ops arch_timer_ops __cpuinitdata = {
++	.setup	= arch_timer_setup,
++	.stop	= arch_timer_stop,
++};
++
++int __init arch_timer_register(struct arch_timer *at)
++{
++	int err;
++
++	if (at->res[0].start <= 0 || !(at->res[0].flags & IORESOURCE_IRQ))
++		return -EINVAL;
++
++	err = arch_timer_available();
++	if (err)
++		return err;
++
++	arch_timer_evt = alloc_percpu(struct clock_event_device *);
++	if (!arch_timer_evt)
++		return -ENOMEM;
++
++	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
++
++	arch_timer_ppi = at->res[0].start;
++	err = request_percpu_irq(arch_timer_ppi, arch_timer_handler,
++				 "arch_timer", arch_timer_evt);
++	if (err) {
++		pr_err("arch_timer: can't register interrupt %d (%d)\n",
++		       arch_timer_ppi, err);
++		goto out_free;
++	}
++
++	if (at->res[1].start > 0 || (at->res[1].flags & IORESOURCE_IRQ)) {
++		arch_timer_ppi2 = at->res[1].start;
++		err = request_percpu_irq(arch_timer_ppi2, arch_timer_handler,
++					 "arch_timer", arch_timer_evt);
++		if (err) {
++			pr_err("arch_timer: can't register interrupt %d (%d)\n",
++			       arch_timer_ppi2, err);
++			arch_timer_ppi2 = 0;
++			goto out_free_irq;
++		}
++	}
++
++	err = local_timer_register(&arch_timer_ops);
++	if (err)
++		goto out_free_irq;
++
++	return 0;
++
++out_free_irq:
++	free_percpu_irq(arch_timer_ppi, arch_timer_evt);
++	if (arch_timer_ppi2)
++		free_percpu_irq(arch_timer_ppi2, arch_timer_evt);
++	
++out_free:
++	free_percpu(arch_timer_evt);
++
++	return err;
++}
 -- 
 1.7.7.1
