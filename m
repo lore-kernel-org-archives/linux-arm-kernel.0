@@ -1,112 +1,164 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 1 Feb 2012 16:12:28 +0530
-Subject: [PATCH V3 12/12] dmaengine/dw_dmac: Remove unused fields in struct
- dw_dma_slave
+Date: Wed, 1 Feb 2012 16:12:24 +0530
+Subject: [PATCH V3 08/12] dmaengine/dw_dmac: Unmap all memory buffers after
+ completion of non-slave transfers
 In-Reply-To: <cover.1328091915.git.viresh.kumar@st.com>
 References: <cover.1328091915.git.viresh.kumar@st.com>
-Message-ID: <f57422b805e32b65ae3c399d5479391680c8c623.1328091915.git.viresh.kumar@st.com>
+Message-ID: <c098ca5959c947b3634555bc7bf4a8b3af82a2ae.1328091915.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently, after completion of transfer, source address or destination address
+of only the first LLI descriptor is unmapped. And length passed for unmap is
+total length of all descriptors in the list. Which means unmapping code assumed
+that the memory buffers pointed to by the descriptors will be physically
+contiguous, which might not be the case.
+
+This patch intends to fix this wrong expectation of dw_dmac. Now, first desc
+will not contain total length of transfer. But individual descriptors will
+contain their individual lengths. Finally, we will call unmap for all
+descriptors.
+
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac_regs.h |   12 ++++++++++++
- include/linux/dw_dmac.h    |   38 --------------------------------------
- 2 files changed, 12 insertions(+), 38 deletions(-)
+ drivers/dma/dw_dmac.c |   49 +++++++++++++++++++++++++++++++------------------
+ 1 files changed, 31 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
-index 2005d30..eec0481 100644
---- a/drivers/dma/dw_dmac_regs.h
-+++ b/drivers/dma/dw_dmac_regs.h
-@@ -13,6 +13,18 @@
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index 5d7b199..49d477c 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -231,6 +231,14 @@ static void dwc_dostart(struct dw_dma_chan *dwc, struct dw_desc *first)
  
- #define DW_DMA_MAX_NR_CHANNELS	8
+ /*----------------------------------------------------------------------*/
  
-+/* flow controller */
-+enum dw_dma_fc {
-+	DW_DMA_FC_D_M2M,
-+	DW_DMA_FC_D_M2P,
-+	DW_DMA_FC_D_P2M,
-+	DW_DMA_FC_D_P2P,
-+	DW_DMA_FC_P_P2M,
-+	DW_DMA_FC_SP_P2P,
-+	DW_DMA_FC_P_M2P,
-+	DW_DMA_FC_DP_P2P,
-+};
++#define dw_dmac_unmap(utype, _desc, _child, _buf, _dir)			\
++do {									\
++	list_for_each_entry(_child, &_desc->tx_list, desc_node)		\
++		dma_unmap_##utype(parent, _child->lli._buf,		\
++				_child->len, _dir);			\
++	dma_unmap_##utype(parent, _desc->lli._buf, _desc->len, _dir);	\
++} while (0)
 +
- /*
-  * Redefine this macro to handle differences between 32- and 64-bit
-  * addressing, big vs. little endian, etc.
-diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
-index f2c64f9..2412e02 100644
---- a/include/linux/dw_dmac.h
-+++ b/include/linux/dw_dmac.h
-@@ -31,18 +31,6 @@ struct dw_dma_platform_data {
- 	unsigned char	chan_priority;
- };
+ static void
+ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
+ 		bool callback_required)
+@@ -264,19 +272,19 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
+ 		struct device *parent = chan2parent(&dwc->chan);
+ 		if (!(txd->flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
+ 			if (txd->flags & DMA_COMPL_DEST_UNMAP_SINGLE)
+-				dma_unmap_single(parent, desc->lli.dar,
+-						desc->len, DMA_FROM_DEVICE);
++				dw_dmac_unmap(single, desc, child, dar,
++						DMA_FROM_DEVICE);
+ 			else
+-				dma_unmap_page(parent, desc->lli.dar,
+-						desc->len, DMA_FROM_DEVICE);
++				dw_dmac_unmap(page, desc, child, dar,
++						DMA_FROM_DEVICE);
+ 		}
+ 		if (!(txd->flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
+ 			if (txd->flags & DMA_COMPL_SRC_UNMAP_SINGLE)
+-				dma_unmap_single(parent, desc->lli.sar,
+-						desc->len, DMA_TO_DEVICE);
++				dw_dmac_unmap(single, desc, child, sar,
++						DMA_TO_DEVICE);
+ 			else
+-				dma_unmap_page(parent, desc->lli.sar,
+-						desc->len, DMA_TO_DEVICE);
++				dw_dmac_unmap(page, desc, child, sar,
++						DMA_TO_DEVICE);
+ 		}
+ 	}
  
--/**
-- * enum dw_dma_slave_width - DMA slave register access width.
-- * @DMA_SLAVE_WIDTH_8BIT: Do 8-bit slave register accesses
-- * @DMA_SLAVE_WIDTH_16BIT: Do 16-bit slave register accesses
-- * @DMA_SLAVE_WIDTH_32BIT: Do 32-bit slave register accesses
-- */
--enum dw_dma_slave_width {
--	DW_DMA_SLAVE_WIDTH_8BIT,
--	DW_DMA_SLAVE_WIDTH_16BIT,
--	DW_DMA_SLAVE_WIDTH_32BIT,
--};
+@@ -676,6 +684,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 		desc->lli.dar = dest + offset;
+ 		desc->lli.ctllo = ctllo;
+ 		desc->lli.ctlhi = xfer_count;
++		desc->len = xfer_count << src_width;
+ 
+ 		if (!first) {
+ 			first = desc;
+@@ -701,7 +710,6 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 			DMA_TO_DEVICE);
+ 
+ 	first->txd.flags = flags;
+-	first->len = len;
+ 
+ 	return &first->txd;
+ 
+@@ -725,7 +733,6 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	unsigned int		mem_width;
+ 	unsigned int		i;
+ 	struct scatterlist	*sg;
+-	size_t			total_len = 0;
+ 
+ 	dev_vdbg(chan2dev(chan), "prep_dma_slave\n");
+ 
+@@ -774,6 +781,7 @@ slave_sg_todev_fill_desc:
+ 			}
+ 
+ 			desc->lli.ctlhi = dlen >> mem_width;
++			desc->len = dlen;
+ 
+ 			if (!first) {
+ 				first = desc;
+@@ -787,7 +795,6 @@ slave_sg_todev_fill_desc:
+ 						&first->tx_list);
+ 			}
+ 			prev = desc;
+-			total_len += dlen;
+ 
+ 			if (len)
+ 				goto slave_sg_todev_fill_desc;
+@@ -831,6 +838,7 @@ slave_sg_fromdev_fill_desc:
+ 				len = 0;
+ 			}
+ 			desc->lli.ctlhi = dlen >> reg_width;
++			desc->len = dlen;
+ 
+ 			if (!first) {
+ 				first = desc;
+@@ -844,7 +852,6 @@ slave_sg_fromdev_fill_desc:
+ 						&first->tx_list);
+ 			}
+ 			prev = desc;
+-			total_len += dlen;
+ 
+ 			if (len)
+ 				goto slave_sg_fromdev_fill_desc;
+@@ -863,8 +870,6 @@ slave_sg_fromdev_fill_desc:
+ 			prev->txd.phys, sizeof(prev->lli),
+ 			DMA_TO_DEVICE);
+ 
+-	first->len = total_len;
 -
- /* bursts size */
- enum dw_dma_msize {
- 	DW_DMA_MSIZE_1,
-@@ -55,47 +43,21 @@ enum dw_dma_msize {
- 	DW_DMA_MSIZE_256,
- };
+ 	return &first->txd;
  
--/* flow controller */
--enum dw_dma_fc {
--	DW_DMA_FC_D_M2M,
--	DW_DMA_FC_D_M2P,
--	DW_DMA_FC_D_P2M,
--	DW_DMA_FC_D_P2P,
--	DW_DMA_FC_P_P2M,
--	DW_DMA_FC_SP_P2P,
--	DW_DMA_FC_P_M2P,
--	DW_DMA_FC_DP_P2P,
--};
--
- /**
-  * struct dw_dma_slave - Controller-specific information about a slave
-  *
-  * @dma_dev: required DMA master device
-- * @tx_reg: physical address of data register used for
-- *	memory-to-peripheral transfers
-- * @rx_reg: physical address of data register used for
-- *	peripheral-to-memory transfers
-- * @reg_width: peripheral register width
-  * @cfg_hi: Platform-specific initializer for the CFG_HI register
-  * @cfg_lo: Platform-specific initializer for the CFG_LO register
-  * @src_master: src master for transfers on allocated channel.
-  * @dst_master: dest master for transfers on allocated channel.
-- * @src_msize: src burst size.
-- * @dst_msize: dest burst size.
-- * @fc: flow controller for DMA transfer
-  */
- struct dw_dma_slave {
- 	struct device		*dma_dev;
--	dma_addr_t		tx_reg;
--	dma_addr_t		rx_reg;
--	enum dw_dma_slave_width	reg_width;
- 	u32			cfg_hi;
- 	u32			cfg_lo;
- 	u8			src_master;
- 	u8			dst_master;
--	u8			src_msize;
--	u8			dst_msize;
--	u8			fc;
- };
+ err_desc_get:
+@@ -950,11 +955,19 @@ dwc_tx_status(struct dma_chan *chan,
+ 		ret = dma_async_is_complete(cookie, last_complete, last_used);
+ 	}
  
- /* Platform-configurable bits in CFG_HI */
+-	if (ret != DMA_SUCCESS)
+-		dma_set_tx_state(txstate, last_complete, last_used,
+-				dwc_first_active(dwc)->len);
+-	else
++	if (ret != DMA_SUCCESS) {
++		struct dw_desc *desc, *child;
++		unsigned int len;
++
++		desc = dwc_first_active(dwc);
++		len = desc->len;
++		list_for_each_entry(child, &desc->tx_list, desc_node)
++			len += child->len;
++
++		dma_set_tx_state(txstate, last_complete, last_used, len);
++	} else {
+ 		dma_set_tx_state(txstate, last_complete, last_used, 0);
++	}
+ 
+ 	if (dwc->paused)
+ 		return DMA_PAUSED;
 -- 
 1.7.8.110.g4cb5d
