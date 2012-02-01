@@ -1,36 +1,83 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 1 Feb 2012 00:16:18 -0800
+Date: Wed, 1 Feb 2012 00:20:11 -0800
 Subject: [PATCH 3/4] ARM: tegra: Switch to new pinctrl driver
-In-Reply-To: <CACRpkdayNsOFkOwLZNO_pJnNmM=NmSZhkJtAwkHxQvHovdF0uw@mail.gmail.com>
+In-Reply-To: <CACRpkdZ_hBviswq7pXoLozC8gjzvowCBrj9yjw1xJT79b5rtwQ@mail.gmail.com>
 References: <1327083746-31430-1-git-send-email-swarren@nvidia.com>
  <1327083746-31430-3-git-send-email-swarren@nvidia.com>
  <CACRpkdZ_hBviswq7pXoLozC8gjzvowCBrj9yjw1xJT79b5rtwQ@mail.gmail.com>
- <CAOesGMjuewhO2H+QFQtAX+xFb5hyNn8Q65Cuup4vaXWAFvX87w@mail.gmail.com>
- <CACRpkdayNsOFkOwLZNO_pJnNmM=NmSZhkJtAwkHxQvHovdF0uw@mail.gmail.com>
-Message-ID: <20120201081618.GJ7399@quad.lixom.net>
+Message-ID: <20120201082011.GK7399@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2012 at 12:13:06AM +0100, Linus Walleij wrote:
-> On Tue, Jan 24, 2012 at 11:44 PM, Olof Johansson <olof@lixom.net> wrote:
+On Tue, Jan 24, 2012 at 11:36:51PM +0100, Linus Walleij wrote:
+> On Fri, Jan 20, 2012 at 7:22 PM, Stephen Warren <swarren@nvidia.com> wrote:
 > 
-> > Yup, I've just been waiting on things to settle,
-> > bindings/implementation wise. Will look at it over the next day or two
-> > and get back.
+> > * Rename old pinmux and new pinctrl platform driver and DT match table
+> > ?entries, so the new driver gets instantiated.
+> > * Re-write board-pinmux.c, so that it uses pinctrl APIs to configura the
+> > ?pinmux.
+> > * Re-write board-*-pinmux.c so that the pinmux configuration tables are
+> > ?in pinctrl format.
+> >
+> > Ventana's pin mux table needed some edits on top of the basic format
+> > conversion, since some mux options that were previously marked as
+> > reserved are now valid in the new pinctrl driver. Attempting to use the
+> > old reserved names will result in a failure. Specifically, groups lpw0,
+> > lpw2, lsc1, lsck, and lsda were changed from function rsvd4 to displaya,
+> > and group pta was changed from function rsvd2 to hdmi.
+> >
+> > All boards' pin mux tables needed some edits on top of the based format
+> > conversion, since function i2c was split into i2c1 (first general I2C
+> > controller) and i2cp (power I2C controller) to better align function
+> > definitions with HW blocks.
+> >
+> > Due to the split of mux tables into pure mux and pull/tristate tables,
+> > many entries in the separate Seaboard/Ventana tables could be merged
+> > into the common table, since the entries differed only in the portion
+> > in one of the tables, not both.
+> >
+> > Most pin groups allow configuration of mux, tri-state, and pull. However,
+> > some don't allow pull configuration, which is instead configured by new
+> > groups that only allow pull configuration. This is a reflection of the
+> > true HW capabilities, which weren't fully represented by the old pinmux
+> > driver. This required adding new pull table entries for those new groups,
+> > and setting many other entries' pull configuration to
+> > TEGRA_PINCONFIG_DONT_SET.
+> >
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > ---
+> > ?arch/arm/mach-tegra/board-harmony-pinmux.c ? | ?362 ++++++++++++++-------
+> > ?arch/arm/mach-tegra/board-paz00-pinmux.c ? ? | ?362 ++++++++++++++-------
+> > ?arch/arm/mach-tegra/board-pinmux.c ? ? ? ? ? | ? 62 ++++-
+> > ?arch/arm/mach-tegra/board-pinmux.h ? ? ? ? ? | ? 39 ++-
+> > ?arch/arm/mach-tegra/board-seaboard-pinmux.c ?| ?442 ++++++++++++++++---------
+> > ?arch/arm/mach-tegra/board-trimslice-pinmux.c | ?366 ++++++++++++++--------
+> > ?arch/arm/mach-tegra/pinmux.c ? ? ? ? ? ? ? ? | ? ?6 +-
+> > ?drivers/pinctrl/pinctrl-tegra.c ? ? ? ? ? ? ?| ? ?6 +-
+> > ?8 files changed, 1095 insertions(+), 550 deletions(-)
 > 
-> The only bindings you need to look into for this patch set should be
-> for the driver itself, the other muxmap bindings discussion I would
-> *very* much like to keep orthogonal to the review of this driver.
+> Can I have Colin's or Olof's ACK on this Tegra stuff too?
+> Would feel better...
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yup, it's more that I grouped the discussions together mentally and passed on
-all of them for a while. :)
+This series is:
 
-> I'm pretty scared of how device tree bindings seem to suck in
-> every discussion like a black hole and then explode in a myriad
-> fragmented discussions like a supernova :-P
+Acked-by: Olof Johansson <olof@lixom.net>
 
-Yeah, welcome to the ugly side of device trees. Some things are easier and
-nicer to do there. Some things... are not.
+This should go in through the pinctrl tree, but we have at least one patch
+already that depends on it (for cardhu pinmux tables). Since cardhu is still
+a quite active board, I expect we might see more patches this merge window,
+etc. So I'd like to take that patch (that is not part of this series) through
+linux-tegra to reduce conflicts.
+
+To facilitate that, can you land this series in a stable branch in
+your tree that you promise not to rebase between now and upstream
+submission? That would take care of the dependencies quite nicely,
+since we can pull that in as a prereq on the cardhu patch that way.
+
+But all h*ll breaks loose if you rebase that branch... So we need a
+strong agreement on that.
 
 
 -Olof
