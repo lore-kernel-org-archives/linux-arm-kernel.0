@@ -1,49 +1,50 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 1 Feb 2012 11:00:05 +0000
-Subject: Reg pinmux driver for OMAP based SoC- AM335X
-In-Reply-To: <20120131170511.GI9339@atomide.com>
-References: <20120125000407.GU22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178CB82433@HQMAIL01.nvidia.com>
- <20120127020832.GJ29812@atomide.com>
- <20120127065752.GB32740@S2101-09.ap.freescale.net>
- <20120127170545.GH13504@atomide.com>
- <20120130015607.GA10470@S2101-09.ap.freescale.net>
- <20120130172042.GE9339@atomide.com>
- <20120131013215.GB24681@S2101-09.ap.freescale.net>
- <20120131022906.GH9339@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93176CAC6@DBDE01.ent.ti.com>
- <20120131170511.GI9339@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93176D1F3@DBDE01.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Feb 2012 11:08:36 +0000
+Subject: [PATCH v2 3/8] ARM: tegra: rework Tegra secondary CPU core bringup
+In-Reply-To: <20120131225045.GE8338@n2100.arm.linux.org.uk>
+References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+ <1328028051-24271-4-git-send-email-pdeschrijver@nvidia.com>
+ <20120131225045.GE8338@n2100.arm.linux.org.uk>
+Message-ID: <20120201110836.GB3058@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Tue, Jan 31, 2012 at 22:35:11, Tony Lindgren wrote:
-> The plan is to deprecate the existing arch/arm/*omap*/*mux* code,
-> and cut it down to minimum. And then add DT only mux support that should
-> work for at least omap2+. That should work for am335x too.
+On Tue, Jan 31, 2012 at 10:50:45PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 31, 2012 at 06:40:41PM +0200, Peter De Schrijver wrote:
+> > +#ifdef CONFIG_ARM_ERRATA_743622
+> > +	teq	r6, #0x20			@ present in r2p0
+> > +	teqne	r6, #0x21			@ present in r2p1
+> > +	teqne	r6, #0x22			@ present in r2p2
+> > +	teqne	r6, #0x27			@ present in r2p7
+> > +	teqne	r6, #0x29			@ present in r2p9
 > 
-> There's currently some discussion going on regarding the pinmux device
-> tree binding and how dynamic mux states should be handled. But I'd
-> assume we'll have basic support available very soon.
-> 
-> The driver I'm working leaves all the data out of kernel, and the driver
-> just knows how to handle a pinmux register instances. Then debugging
-> tools can be done in userspace via debugfs to display more detailed
-> SoC specific information.
-> 
-> So it might be worth waiting just a little bit longer. If you have
-> resources to spend on the pinmuxing, then creating some userspace tool
-> to display SoC specific information would be nice :) For the userspace
-> tool, we can use the data in arch/arm/mach-omap2/mux*2*.[ch].
+> Okay, so we have this errata in proc-v7.S, but only for p0..p2.  If
+> it's also p7 and p9, then it shows that the errata in the kernel aren't
+> being actively maintained, and brings into question their worth.
 
-Thank you for the detailed reply.
+It looks like the errata document has been updated since I wrote the
+workaround in proc-v7.S (and new r2p* versions of the A9 have been
+released). The new document states that r2p* are affected, so we should
+update the workaround.
 
-I will wait for it and willing to help you in its testing.
+> Plus, of course, we don't want platforms re-implementing the errata
+> in their own code if we're already implementing it somewhere in the
+> kernel.  So, that's something which needs to be thought about.
 
-I have been tasked on getting AM335X supported well in mainline,
-and will move to other aspects of it while waiting.
+Indeed, that could become extremely confusing, especially when they start
+doing different things.
 
-Regards
-Afzal
+> That's something that needs considering along side the whole 'what
+> to do about errata when running in non-secure mode' problem which
+> OMAP suffers from.
+
+My view is that the workarounds in the kernel are a good way to highlight
+which errata we consider to be important from Linux's point-of-view and also
+how to avoid them in practice. It's not always possible to apply them in the
+kernel at runtime (due to security constraints) but I think it's important
+to show what Linux expects.
+
+I'll go back through the errata document and check if any others have been
+updated besides this one.
+
+Will
