@@ -1,91 +1,52 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed,  1 Feb 2012 09:49:59 +0100
-Subject: [PATCH 20/20] ARM: OMAP3+: SmartReflex: fix error handling
-In-Reply-To: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
-References: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1328086199-28486-21-git-send-email-j-pihet@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 1 Feb 2012 00:53:12 -0800
+Subject: [PATCH 3/9] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
+In-Reply-To: <1328024354-4277-4-git-send-email-kgene.kim@samsung.com>
+References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+ <1328024354-4277-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAOesGMg3xS7o1+F1ZmZvg1=oy59F+7QnSYWkJ9kTacCDu35aOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the code to correctly use IS_ERR and PTR_ERR on the return
-values pointers
+Hi,
 
-Reported-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/smartreflex.c |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+On Tue, Jan 31, 2012 at 7:39 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 96a97c1..205531b 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -536,7 +536,7 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
- 	if (IS_ERR(sr)) {
- 		pr_warning("%s: omap_sr struct for sr_%s not found\n",
- 			__func__, voltdm->name);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 
- 	if (!sr->clk_length)
-@@ -604,7 +604,7 @@ int sr_disable_errgen(struct voltagedomain *voltdm)
- 	if (IS_ERR(sr)) {
- 		pr_warning("%s: omap_sr struct for sr_%s not found\n",
- 			__func__, voltdm->name);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 
- 	switch (sr->ip_type) {
-@@ -655,7 +655,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
- 	if (IS_ERR(sr)) {
- 		pr_warning("%s: omap_sr struct for sr_%s not found\n",
- 			__func__, voltdm->name);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 
- 	if (!sr->clk_length)
-@@ -741,7 +741,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
- 	if (IS_ERR(sr)) {
- 		pr_warning("%s: omap_sr struct for sr_%s not found\n",
- 			__func__, voltdm->name);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 
- 	volt_data = omap_voltage_get_voltdata(sr->voltdm, volt);
-@@ -749,7 +749,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
- 	if (IS_ERR(volt_data)) {
- 		dev_warn(&sr->pdev->dev, "%s: Unable to get voltage table"
- 			"for nominal voltage %ld\n", __func__, volt);
--		return -ENODATA;
-+		return PTR_ERR(volt_data);
- 	}
- 
- 	nvalue_reciprocal = sr_retrieve_nvalue(sr, volt_data->sr_efuse_offs);
-@@ -839,10 +839,10 @@ int sr_notifier_control(struct voltagedomain *voltdm, bool enable)
- 	struct omap_sr *sr = _sr_lookup(voltdm);
- 	u32 value = 0;
- 
--	if (!sr) {
-+	if (IS_ERR(sr)) {
- 		pr_warning("%s: sr corresponding to domain not found\n",
- 				__func__);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 	if (!sr->autocomp_active)
- 		return -EINVAL;
-@@ -1258,7 +1258,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
- 	if (IS_ERR(sr_info)) {
- 		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
- 			__func__);
--		return -EINVAL;
-+		return PTR_ERR(sr_info);
- 	}
- 
- 	if (sr_info->autocomp_active)
--- 
-1.7.5.4
+A brief patch description, please.
+
+> diff --git a/arch/arm/mach-exynos/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
+> index d395bd1..3244f3e 100644
+> --- a/arch/arm/mach-exynos/setup-i2c0.c
+> +++ b/arch/arm/mach-exynos/setup-i2c0.c
+> @@ -1,7 +1,7 @@
+> ?/*
+> - * linux/arch/arm/mach-exynos4/setup-i2c0.c
+> + * linux/arch/arm/mach-exynos/setup-i2c0.c
+
+The file name fills very little purpose in files like these. Consider
+removing them at some point.
+
+> @@ -18,9 +18,14 @@ struct platform_device; /* don't need the contents */
+> ?#include <linux/gpio.h>
+> ?#include <plat/iic.h>
+> ?#include <plat/gpio-cfg.h>
+> +#include <plat/cpu.h>
+>
+> ?void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+> ?{
+> - ? ? ? s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+> + ? ? ? if (soc_is_exynos5250())
+> + ? ? ? ? ? ? ? ;
+> + ? ? ? ? ? ? ? /* will be implemented with gpio function */
+> + ? ? ? else
+> + ? ? ? ? ? ? ? s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+> ?}
+
+The above is pretty awkward. It's cleaner to return and avoid the else
+side of the statement (move the comment accordingly, of course).
+
+
+-Olof
