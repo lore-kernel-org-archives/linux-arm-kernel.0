@@ -1,65 +1,21 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed,  1 Feb 2012 09:49:45 +0100
-Subject: [PATCH 06/20] ARM: OMAP3+: SmartReflex: Fix status masking in
- ERRCONFIG register
-In-Reply-To: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
-References: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1328086199-28486-7-git-send-email-j-pihet@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 1 Feb 2012 00:50:23 -0800
+Subject: [PATCH 5/9] ARM: EXYNOS: add board file for SMDK5250
+In-Reply-To: <CAH9JG2UZ9HxXsvmTh8Gqf5EpzS2sLSH_v8TWjKeBL8z7hR++Mg@mail.gmail.com>
+References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+ <1328024354-4277-6-git-send-email-kgene.kim@samsung.com>
+ <CAH9JG2UZ9HxXsvmTh8Gqf5EpzS2sLSH_v8TWjKeBL8z7hR++Mg@mail.gmail.com>
+Message-ID: <CAOesGMgNdDdzsSBtopu7hu0xavFDSBnw0TW1MrN25C7FO+j8AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+Hi,
 
-ERRCONFIG register has status bits that were intended not to
-be destroyed by bad modification. We cleanup and simplify the
-handling the status in the modify path.
+On Tue, Jan 31, 2012 at 8:20 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+> As I remember only DT based board file is acceptable for mainline?
 
-Reported-by: Vincent Bour <v-bour@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/smartreflex.c |   21 ++++++++-------------
- 1 files changed, 8 insertions(+), 13 deletions(-)
+For a new SoC family like 5250 it would be much preferred to only add
+device-tree enabled boards.
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index f384c19..ba6ad09 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -74,10 +74,6 @@ static inline void sr_modify_reg(struct omap_sr *sr, unsigned offset, u32 mask,
- 					u32 value)
- {
- 	u32 reg_val;
--	u32 errconfig_offs = 0, errconfig_mask = 0;
--
--	reg_val = __raw_readl(sr->base + offset);
--	reg_val &= ~mask;
- 
- 	/*
- 	 * Smartreflex error config register is special as it contains
-@@ -88,16 +84,15 @@ static inline void sr_modify_reg(struct omap_sr *sr, unsigned offset, u32 mask,
- 	 * if they are currently set, but does allow the caller to write
- 	 * those bits.
- 	 */
--	if (sr->ip_type == SR_TYPE_V1) {
--		errconfig_offs = ERRCONFIG_V1;
--		errconfig_mask = ERRCONFIG_STATUS_V1_MASK;
--	} else if (sr->ip_type == SR_TYPE_V2) {
--		errconfig_offs = ERRCONFIG_V2;
--		errconfig_mask = ERRCONFIG_VPBOUNDINTST_V2;
--	}
-+	if (sr->ip_type == SR_TYPE_V1 && offset == ERRCONFIG_V1)
-+		mask |= ERRCONFIG_STATUS_V1_MASK;
-+	else if (sr->ip_type == SR_TYPE_V2 && offset == ERRCONFIG_V2)
-+		mask |= ERRCONFIG_VPBOUNDINTST_V2;
-+
-+	reg_val = __raw_readl(sr->base + offset);
-+	reg_val &= ~mask;
- 
--	if (offset == errconfig_offs)
--		reg_val &= ~errconfig_mask;
-+	value &= mask;
- 
- 	reg_val |= value;
- 
--- 
-1.7.5.4
+
+-Olof
