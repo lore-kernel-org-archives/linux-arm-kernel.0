@@ -1,38 +1,33 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 1 Feb 2012 16:12:17 +0530
-Subject: [PATCH V3 01/12] dmaengine/dw_dmac: Hibernation support in dw_dmac
+Date: Wed, 1 Feb 2012 16:12:21 +0530
+Subject: [PATCH V3 05/12] dmaengine/dw_dmac: Don't use magic number for total
+ number of channels
 In-Reply-To: <cover.1328091915.git.viresh.kumar@st.com>
 References: <cover.1328091915.git.viresh.kumar@st.com>
-Message-ID: <91f435464b40009113ddc3d2287f10d81e498654.1328091915.git.viresh.kumar@st.com>
+Message-ID: <42b0936c114afb25ae50b34ecd3302ef86ea4190.1328091915.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajeev KUMAR <rajeev-dlh.kumar@st.com>
+Total number of channels is passed in pdata->nr_channels variable, thus we must
+not use magic number '7' for total number of channels.
 
-The suspend and resume implementation is through dev_pm_ops in dmac. So
-in order to support hibernation, freeze, thaw, restore and poweroff
-features are required.
-
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-Acked-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/dma/dw_dmac.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 9b592b0..3a3d7ed 100644
+index 3a3d7ed..1577394 100644
 --- a/drivers/dma/dw_dmac.c
 +++ b/drivers/dma/dw_dmac.c
-@@ -1562,6 +1562,10 @@ static int dw_resume_noirq(struct device *dev)
- static const struct dev_pm_ops dw_dev_pm_ops = {
- 	.suspend_noirq = dw_suspend_noirq,
- 	.resume_noirq = dw_resume_noirq,
-+	.freeze_noirq = dw_suspend_noirq,
-+	.thaw_noirq = dw_resume_noirq,
-+	.restore_noirq = dw_resume_noirq,
-+	.poweroff_noirq = dw_suspend_noirq,
- };
+@@ -1432,7 +1432,7 @@ static int __init dw_probe(struct platform_device *pdev)
  
- static struct platform_driver dw_driver = {
+ 		/* 7 is highest priority & 0 is lowest. */
+ 		if (pdata->chan_priority == CHAN_PRIORITY_ASCENDING)
+-			dwc->priority = 7 - i;
++			dwc->priority = pdata->nr_channels - i - 1;
+ 		else
+ 			dwc->priority = i;
+ 
 -- 
 1.7.8.110.g4cb5d
