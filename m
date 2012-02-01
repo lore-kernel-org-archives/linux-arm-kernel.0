@@ -1,45 +1,38 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Wed, 01 Feb 2012 14:38:59 +0530
-Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
-In-Reply-To: <1328086017.1610.13.camel@vkoul-udesk3>
-References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
- <1326807902.1540.116.camel@vkoul-udesk3> <4F195E4C.6080805@codeaurora.org>
- <1327066287.517.4.camel@vkoul-udesk3> <4F1D4052.3070701@codeaurora.org>
- <1327326713.517.32.camel@vkoul-udesk3> <4F1FFF7E.3000802@codeaurora.org>
- <1327911315.1527.8.camel@vkoul-udesk3> <4F278341.4020600@codeaurora.org>
- <1327990151.1527.80.camel@vkoul-udesk3> <4F28D8A2.9050605@codeaurora.org>
- <1328084998.1610.11.camel@vkoul-udesk3> <4F28F9D5.6020801@codeaurora.org>
- <1328086017.1610.13.camel@vkoul-udesk3>
-Message-ID: <4F29012B.50202@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  1 Feb 2012 09:23:40 +0000
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform clean-up
+Message-ID: <1328088226-29594-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/2012 2:16 PM, Vinod Koul wrote:
-> On Wed, 2012-02-01 at 14:07 +0530, Ravi Kumar V wrote:
->> Our hardware supports single transfer mode,scatter gather mode&  box
->> mode.
->>
->> we are using these dmaengine API's for our HW
->> device_prep_memcpy() for single mode.
->> device_prep_dma_sg() for sg mode.
->> device_prep_interleaved_dma() for box mode.
->>
->> We need to pass command configuration parameter to all of the above
->> three modes and it can be possible if extra context parameter is added
->> into these API's
-> but again, is this static fr channel for each transfer. Would you be
-> able to derive these for non box modes?
->
+This patch-set satisfies 4 objectives:
+ 1. Ensures each platform device can specify a suitable parent
+ 2. Provides a bus for SoC devices as a means to export information
+ 3. Allows ux500 to make use of the new SoC bus
+ 4. Cleans up unnecessary complexity from ux500 code
 
-Command configuration parameter has this information which is used be our HW
-1.Device Id for Synchronization & acknowledgment with slow clock devices.
-2.Endian type.
-3.Blocking/unblocking channel after/before transfer.
-
-Command configuration parameter should be passed in all the three modes 
-and per transfer so this parameter is dynamic keep changing for each 
-transfer.
-
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+---
+ Documentation/ABI/testing/sysfs-devices-soc    |   58 ++++++++
+ arch/arm/mach-ux500/Kconfig                    |    1 +
+ arch/arm/mach-ux500/board-mop500-sdi.c         |   31 ++--
+ arch/arm/mach-ux500/board-mop500.c             |   74 ++++++----
+ arch/arm/mach-ux500/board-mop500.h             |    8 +-
+ arch/arm/mach-ux500/board-u5500-sdi.c          |    4 +-
+ arch/arm/mach-ux500/board-u5500.c              |   27 ++--
+ arch/arm/mach-ux500/cpu-db5500.c               |   36 ++++-
+ arch/arm/mach-ux500/cpu-db8500.c               |   44 +++++-
+ arch/arm/mach-ux500/cpu.c                      |   75 ++++++++++
+ arch/arm/mach-ux500/devices-common.c           |   79 ++--------
+ arch/arm/mach-ux500/devices-common.h           |   83 ++++++-----
+ arch/arm/mach-ux500/devices-db5500.h           |  116 +++++++++------
+ arch/arm/mach-ux500/devices-db8500.h           |  176 +++++++++++++----------
+ arch/arm/mach-ux500/dma-db5500.c               |    3 +-
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
+ arch/arm/mach-ux500/include/mach/setup.h       |   10 +-
+ arch/arm/mach-ux500/include/mach/usb.h         |    4 +-
+ arch/arm/mach-ux500/usb.c                      |    7 +-
+ drivers/base/Kconfig                           |    3 +
+ drivers/base/Makefile                          |    1 +
+ drivers/base/soc.c                             |  186 ++++++++++++++++++++++++
+ include/linux/syssoc.h                         |   74 ++++++++++
+ 23 files changed, 799 insertions(+), 304 deletions(-)
