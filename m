@@ -1,36 +1,71 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 1 Feb 2012 12:10:10 +0200
-Subject: [PATCH v2 0/8] Add tegra30 support for secondary cores
-In-Reply-To: <20120201083334.GM7399@quad.lixom.net>
-References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
- <20120201083334.GM7399@quad.lixom.net>
-Message-ID: <20120201101010.GN24948@tbergstrom-lnx.Nvidia.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 01 Feb 2012 14:20:13 +0400
+Subject: [RFC PATCH 7/7] ARM: davinci: add support for the am1808 based
+ enbw_cmc board
+In-Reply-To: <4F27E6E0.1050608@denx.de>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-8-git-send-email-hs@denx.de>
+ <20120130203252.GX28397@ponder.secretlab.ca> <4F27E6E0.1050608@denx.de>
+Message-ID: <4F2911DD.6010405@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2012 at 09:33:34AM +0100, Olof Johansson wrote:
-> Hi,
-> 
-> On Tue, Jan 31, 2012 at 06:40:38PM +0200, Peter De Schrijver wrote:
-> > This patchset introduces support for secondary cores on tegra30. It also
-> > introduces some functions for the flowcontroller and adds basic support for
-> > tegra30 powerdomains.
-> 
-> It would be very useful to get a quick recap of what has changed since
-> previous versions in the cover email, if not detailed in the individual
-> patches (which it doesn't seem to be).
-> 
+Hello.
 
-Oops. I forgot about that. 
+On 31-01-2012 17:04, Heiko Schocher wrote:
 
-Here it is:
+>> On Mon, Jan 23, 2012 at 09:56:07AM +0100, Heiko Schocher wrote:
+>>> - AM1808 based board
+>>> - 64 MiB DDR ram
+>>> - 2 MiB Nor flash
+>>> - 128 MiB NAND flash
+>>> - use internal RTC
+>>> - I2C support
+>>> - hwmon lm75 support
+>>> - UBI/UBIFS support
+>>> - MMC support
+>>> - USB OTG support
 
-Changes in v2:
+>>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>>> Cc: linux-mtd at lists.infradead.org
+>>> Cc: linux-i2c at vger.kernel.org
+>>> Cc: netdev at vger.kernel.org
+>>> Cc: David Woodhouse<dwmw2@infradead.org>
+>>> Cc: Ben Dooks<ben-linux@fluff.org>
+>>> Cc: Wolfram Sang<w.sang@pengutronix.de>
+>>> Cc: Sekhar Nori<nsekhar@ti.com>
+>>> Cc: Kevin Hilman<khilman@ti.com>
+>>> Cc: Wolfgang Denk<wd@denx.de>
 
-* moved chip id reading to fuse.c and cleanup code
-* don't set bit 1 of SB_CTRL on Tegra20
-* removed unused variables in tegra_cpu_reset_handler_init()
+>>> ---
+>>> - post this board support with USB support, even though
+>>>    USB is only working with the 10 ms "workaround", posted here:
+>>>    http://comments.gmane.org/gmane.linux.usb.general/54505
+>>>    I see this issue also on the AM1808 TMDXEXP1808L evalboard.
+>>> - MMC and USB are not using OF support yet, ideas how to port
+>>>    this are welcome. I need for USB and MMC boards board
+>>>    specific callbacks, how to solve this with OF support?
 
-Cheers,
+[...]
 
-Peter.
+>>> diff --git a/arch/arm/boot/dts/enbw_cmc.dts b/arch/arm/boot/dts/enbw_cmc.dts
+>>> new file mode 100644
+>>> index 0000000..e5995ce
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/enbw_cmc.dts
+[...]
+
+>>> +			compatible = "ns16550a";
+
+>> Should include a string for the specific device.  Something like:
+
+>> 	compatible = "ti,da800", "ns16550a";
+
+> added.
+
+    Note that there's no DA800 chip, only DA828, DA830, and DA850 AFAIK.
+
+WBR, Sergei
