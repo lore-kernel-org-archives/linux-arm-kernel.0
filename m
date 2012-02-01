@@ -1,48 +1,74 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 1 Feb 2012 10:52:29 -0500
-Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
-In-Reply-To: <1328088226-29594-3-git-send-email-lee.jones@linaro.org>
-References: <1328088226-29594-1-git-send-email-lee.jones@linaro.org>
- <1328088226-29594-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACb=_tQ7M0DpfZ0FX+yA-pG_7hEyN_DQPBNM+BStaXrV5GQaMA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 1 Feb 2012 16:54:04 +0100
+Subject: [GIT PULL] cs89x0 platform support
+In-Reply-To: <20120201150909.GB2203@S2101-09.ap.freescale.net>
+References: <20120201134415.GU1990@pengutronix.de>
+ <20120201150909.GB2203@S2101-09.ap.freescale.net>
+Message-ID: <20120201155404.GW1990@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Wed, Feb 01, 2012 at 11:09:13PM +0800, Shawn Guo wrote:
+> On Wed, Feb 01, 2012 at 02:44:15PM +0100, Sascha Hauer wrote:
+> > Hi Olof,
+> > 
+> > Please pull the following for next. It contains cs89x0 platform
+> > support. David has acked the base patch and is fine with this
+> > patch going via the Arm tree.
+> > 
+> > Sascha
+> > 
+> > The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+> > 
+> >   Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+> > 
+> > are available in the git repository at:
+> >   git://git.pengutronix.de/git/imx/linux-2.6.git features/cs89x0
+> > 
+> > Jaccon Bastiaansen (4):
+> >       CS89x0 : add platform driver support
+> >       CS89x0 : add CS89x0 platform device to the iMX21ADS board
+> >       CS89x0 : remove QQ2440 board support from the CS89x0 driver
+> >       CS89x0 : add CS89x0 platform device to the iMX31ADS board
+> > 
+> >  arch/arm/configs/imx_v4_v5_defconfig           |    2 +
+> >  arch/arm/configs/mx3_defconfig                 |    2 +
+> 
+> The mx3_defconfig has been deleted from mainline.  We may need to
+> rebase the series to 3.3-rc2.  Otherwise, we will eventually have
+> conflict?
 
-I'm not able to give this a full testing, but it looks good to me,  I
-have one really minor nit, but I'll look forward to integrating this
-into picoxcell as soon as I get chance!
+Oops, yes. Just did that.
 
-Jamie
+Sascha
 
-On 1 February 2012 04:23, Lee Jones <lee.jones@linaro.org> wrote:
-> diff --git a/drivers/base/soc.c b/drivers/base/soc.c
-> new file mode 100644
-> index 0000000..29abf6d
-> --- /dev/null
-> +++ b/drivers/base/soc.c
-> @@ -0,0 +1,186 @@
-> +/*
-> + * Copyright (C) ST-Ericsson SA 2011
-> + *
-> + * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
-> + * License terms: ?GNU General Public License (GPL), version 2
-> + */
-> +
-> +#include <linux/sysfs.h>
-> +#include <linux/module.h>
-> +#include <linux/init.h>
-> +#include <linux/stat.h>
-> +#include <linux/slab.h>
-> +#include <linux/idr.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/sys_soc.h>
-> +#include <linux/err.h>
-> +
-> +static struct ida soc_ida;
-> +static spinlock_t soc_lock;
+The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
 
-Use DEFINE_IDR() and DEFINE_SPINLOCK() rather than initialising them at runtime?
+  Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
 
-Jamie
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git features/cs89x0
+
+Jaccon Bastiaansen (4):
+      CS89x0 : add platform driver support
+      CS89x0 : add CS89x0 platform device to the iMX21ADS board
+      CS89x0 : remove QQ2440 board support from the CS89x0 driver
+      CS89x0 : add CS89x0 platform device to the iMX31ADS board
+
+ arch/arm/configs/imx_v4_v5_defconfig           |    2 +
+ arch/arm/configs/imx_v6_v7_defconfig           |    4 +-
+ arch/arm/mach-imx/mach-mx21ads.c               |   16 +++-
+ arch/arm/mach-imx/mach-mx31ads.c               |   35 +++++-
+ arch/arm/plat-mxc/include/mach/board-mx31ads.h |   33 ------
+ drivers/net/Space.c                            |    2 +
+ drivers/net/ethernet/cirrus/Kconfig            |   19 ++--
+ drivers/net/ethernet/cirrus/cs89x0.c           |  148 +++++++++++++++++++----
+ 8 files changed, 186 insertions(+), 73 deletions(-)
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
