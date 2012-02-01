@@ -1,77 +1,100 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Wed, 01 Feb 2012 11:10:21 +0800
-Subject: [PATCH 2/7] Add various hugetlb page table fix
-In-Reply-To: <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
- <20120131095811.GB889@n2100.arm.linux.org.uk>
- <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
-Message-ID: <4F28AD1D.1000106@gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 1 Feb 2012 12:57:48 +0900
+Subject: [PATCH 1/9] ARM: EXYNOS: use exynos_init_uarts() instead of
+ exynos4_init_uarts()
+In-Reply-To: <1328024354-4277-2-git-send-email-kgene.kim@samsung.com>
+References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+ <1328024354-4277-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAH9JG2VQBA3PFOm-gcP=igetQyCHs+Qc_zWJgGNLuMpq948yVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2012?01?31? 20:25, Catalin Marinas wrote:
-> On 31 January 2012 09:58, Russell King - ARM Linux
-> <linux@arm.linux.org.uk>  wrote:
->> On Mon, Jan 30, 2012 at 03:57:13PM +0800, bill4carson at gmail.com wrote:
->>> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
->>> index 2317a71..062c93c 100644
->>> --- a/arch/arm/include/asm/pgtable-2level.h
->>> +++ b/arch/arm/include/asm/pgtable-2level.h
->>> @@ -123,6 +123,11 @@
->>>   #define L_PTE_USER           (_AT(pteval_t, 1)<<  8)
->>>   #define L_PTE_XN             (_AT(pteval_t, 1)<<  9)
->>>   #define L_PTE_SHARED         (_AT(pteval_t, 1)<<  10)        /* shared(v6), coherent(xsc3) */
->>> +#ifdef CONFIG_ARM_HUGETLB_SUPPORT
->>> +#define L_PTE_HUGEPAGE       (_AT(pteval_t, 1)<<  11) /* mark hugepage */
->>> +#define L_PTE_HPAGE_2M  (_AT(pteval_t, 1)<<  12) /* only when HUGEPAGE set */
->>> +#define L_PTE_HPAGE_16M (_AT(pteval_t, 1)<<  13) /* only when HUGEPAGE set */
->>> +#endif
->> (1) How does this work when normal pages can have bit 11 set if they're an
->> odd PFN?
-> Isn't that bit 12?
+On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Since exynos4_init_uarts() can be used for EXYNOS5 SoCs,
+> this patch changes the name of function to exynos_init_uarts().
 >
->> (2) How do we even get to PTE level when a 2 or 16MB section doesn't have
->> a pte table (as the L1 entry is used for the section or supersection
->> mapping) ?
-> We don't, that's why I think we don't even need this bit defined.
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.c |    8 ++++----
+>  arch/arm/mach-exynos/common.h |    8 ++++----
+>  2 files changed, 8 insertions(+), 8 deletions(-)
 >
-First, thanks for Russel/Catalin to take time review this patch:)
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index c59e188..a168533 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -56,7 +56,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+>  		.idmask		= EXYNOS4_CPU_MASK,
+>  		.map_io		= exynos4_map_io,
+>  		.init_clocks	= exynos4_init_clocks,
+> -		.init_uarts	= exynos4_init_uarts,
+> +		.init_uarts	= exynos_init_uarts,
+>  		.init		= exynos_init,
+>  		.name		= name_exynos4210,
+>  	}, {
+> @@ -64,7 +64,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+>  		.idmask		= EXYNOS4_CPU_MASK,
+>  		.map_io		= exynos4_map_io,
+>  		.init_clocks	= exynos4_init_clocks,
+> -		.init_uarts	= exynos4_init_uarts,
+> +		.init_uarts	= exynos_init_uarts,
+>  		.init		= exynos_init,
+>  		.name		= name_exynos4212,
+>  	}, {
+> @@ -72,7 +72,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+>  		.idmask		= EXYNOS4_CPU_MASK,
+>  		.map_io		= exynos4_map_io,
+>  		.init_clocks	= exynos4_init_clocks,
+> -		.init_uarts	= exynos4_init_uarts,
+> +		.init_uarts	= exynos_init_uarts,
+>  		.init		= exynos_init,
+>  		.name		= name_exynos4412,
+>  	},
+> @@ -476,7 +476,7 @@ int __init exynos_init(void)
+>
+>  /* uart registration process */
+>
+> -void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+> +void __init exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+>  {
+>  	struct s3c2410_uartcfg *tcfg = cfg;
+>  	u32 ucnt;
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index 8c1efe6..2d79aba 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -36,15 +36,15 @@ extern struct sys_timer exynos4_timer;
+>
+>  #ifdef CONFIG_ARCH_EXYNOS
+>  extern  int exynos_init(void);
+> +extern void exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+>  extern void exynos4_map_io(void);
+>  extern void exynos4_init_clocks(int xtal);
+> -extern void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
 
+Are there any cases build without CONFIG_ARCH_EXYNOS?
+I think it's always defined CONFIG_ARCH_EXYNOS.
 
-a:
-By pte used in here, I mean linux pte. linux pte is needed by generic mm 
-layer
-whether this mapping is 4K, 1MB or 16MB.
-
-
-b:
-Why L_PTE_HUGEPAGE is needed?
-
-hugetlb subsystem will call pte_page to derive the corresponding page 
-struct from
-a given pte, and pte_pfn is used first to convert pte into a page frame 
-number.
-This is where need to be careful. Normal page based pte upper [31:12] 
-bits is pfn,
-huge page(1MB) based pte upper[31:20] is pfn, so one bit MUST 
-distinguish normal
-page based pte with huge page based pte.
-
-This one bit will *only* be BIT11, one last unused PTE flag within 
-normal page.
-that's why L_PTE_HUGEPAGE is defined.
-
-If L_PTE_HUGEPAGE is set, then BIT19:12 is enough to be used to mark 
-this pte is 1MB
-or 16MB huge page.
-
-
-
--- 
-I am a slow learner
-but I will keep trying to fight for my dreams!
-
---bill
+Thank you,
+Kyungmin Park
+>
+>  #else
+> -#define exynos4_init_clocks NULL
+> -#define exynos4_init_uarts NULL
+> -#define exynos4_map_io NULL
+>  #define exynos_init NULL
+> +#define exynos_init_uarts NULL
+> +#define exynos4_map_io NULL
+> +#define exynos4_init_clocks NULL
+>  #endif
+>
+>  #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+> --
+> 1.7.4.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
