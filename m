@@ -1,72 +1,63 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Wed, 01 Feb 2012 13:45:49 +0800
-Subject: [PATCH 4/7] Store huge page linux pte in mm_struct
-In-Reply-To: <20120131100154.GC889@n2100.arm.linux.org.uk>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-5-git-send-email-bill4carson@gmail.com>
- <20120131100154.GC889@n2100.arm.linux.org.uk>
-Message-ID: <4F28D18D.1040402@gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 1 Feb 2012 14:53:39 +0900
+Subject: [PATCH 8/9] ARM: EXYNOS: temporary add map definitions for uart
+In-Reply-To: <1328024354-4277-9-git-send-email-kgene.kim@samsung.com>
+References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+ <1328024354-4277-9-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAH9JG2VU-rLQ=fQT5Jx5kPcHSLOiEcTVdFaQjsWnxA=Yr6i0Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2012?01?31? 18:01, Russell King - ARM Linux wrote:
-> On Mon, Jan 30, 2012 at 03:57:15PM +0800, bill4carson at gmail.com wrote:
->> From: Bill Carson<bill4carson@gmail.com>
->>
->> One easy way to store huge page linux pte is mm_struct instead of thread_info
->> that's because when parent task with huge page VMA calls fork, parent huge page
->> pagetable entries are copied into child pagetable. This is done in
->>
->> int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
->> 			    struct vm_area_struct *vma)
->>
->> We cannot derive child's thread_info just using struct mm_struct *dst.
->> if we have struct mm_struct **dst, then it's easy to find the corresponding
->> task_struct as well as thread_info, but we only get struct mm_struct *dst.
->> It's possible to find the desired task_struct by iterating the global task list
->> by comparing task_struct->mm with dst.
->> So mm_struct is used for huge page linux pte for faster lookup and efficient.
-> I really do not understand this description, and it doesn't seem to tie
-> up with the code.  What problem are you trying to solve here?
+On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-exynos/include/mach/map.h |   13 +++++++++++--
+>  1 files changed, 11 insertions(+), 2 deletions(-)
 >
-> Note that a mm_struct can be shared between multiple task_structs, so
-> if your thinking is that something in the mm_struct or page table needs
-> to know about a task_struct, you're ideas are wrong.
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h
+> b/arch/arm/mach-exynos/include/mach/map.h
+> index f88acaf..300ed7e 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -167,9 +167,10 @@
+>  #define S3C_PA_IIC5			EXYNOS4_PA_IIC(5)
+>  #define S3C_PA_IIC6			EXYNOS4_PA_IIC(6)
+>  #define S3C_PA_IIC7			EXYNOS4_PA_IIC(7)
+> +
+>  #define S3C_PA_RTC			EXYNOS4_PA_RTC
+>  #define S3C_PA_WDT			EXYNOS4_PA_WATCHDOG
+> -#define S3C_PA_UART			EXYNOS4_PA_UART
+> +
+>  #define S3C_PA_SPI0			EXYNOS4_PA_SPI0
+>  #define S3C_PA_SPI1			EXYNOS4_PA_SPI1
+>  #define S3C_PA_SPI2			EXYNOS4_PA_SPI2
+> @@ -198,9 +199,17 @@
 >
-Normal page based pte has hardware version and linux version, these two 
-kinds of
-ptes occupy half of 4K page, and each of two pmd level entry pointer to 
-this half 4K
-page.
-
-For huge page, mappings only exist in pmd level from hardware 
-perspective, however
-mm subsystem also needs to know the linux version *pte* of this huge 
-page based
-mapping, problems is where to store these huge page linux pte?
-
-A:
-Store huge page linux pte in mm_struct
-
-B:
-Store huge page linux pte in mm_context_t suggested by Catalin.
-This is almost like option A, while it's nice to modify arm code only
-and take small effort to make it happen.
-
-C:
-Modify pgd_alloc to allocate 2048 pgd_t entries plus two void pointers
-Use these two additional pointers to store huge page linux pte.
-It's feasible, but I don't know whether this is a good idea.
-
-Russelll and Catalin:
-
-Could you please give your advice on this?
-
-
--- 
-I am a slow learner
-but I will keep trying to fight for my dreams!
-
---bill
+>  /* Compatibility UART */
+>
+> +#ifdef CONFIG_ARCH_EXYNOS4
+> +#define S3C_PA_UART			EXYNOS4_PA_UART
+> +#endif
+> +
+> +#ifdef CONFIG_ARCH_EXYNOS5
+> +#define S3C_PA_UART			EXYNOS5_PA_UART
+> +#endif
+If it selects the both ARCH_EXYNOS4 and ARCH_EXYNOS5, how to handle
+this one? I think it's time to clean up these macro magic.
+> +
+>  #define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
+>
+> -#define S5P_PA_UART(x)			(EXYNOS4_PA_UART + ((x) * S3C_UART_OFFSET))
+> +#define S5P_PA_UART(x)			(S3C_PA_UART + ((x) * S3C_UART_OFFSET))
+>  #define S5P_PA_UART0			S5P_PA_UART(0)
+>  #define S5P_PA_UART1			S5P_PA_UART(1)
+>  #define S5P_PA_UART2			S5P_PA_UART(2)
+> --
+> 1.7.4.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
