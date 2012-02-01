@@ -1,71 +1,55 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 01 Feb 2012 14:20:13 +0400
-Subject: [RFC PATCH 7/7] ARM: davinci: add support for the am1808 based
- enbw_cmc board
-In-Reply-To: <4F27E6E0.1050608@denx.de>
-References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-8-git-send-email-hs@denx.de>
- <20120130203252.GX28397@ponder.secretlab.ca> <4F27E6E0.1050608@denx.de>
-Message-ID: <4F2911DD.6010405@mvista.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 1 Feb 2012 11:50:30 +0100
+Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <20120131230928.GA8394@n2100.arm.linux.org.uk>
+References: <4F22DEF2.5000807@ti.com>
+ <20120128180602.GC2501@ponder.secretlab.ca>
+ <20120131230928.GA8394@n2100.arm.linux.org.uk>
+Message-ID: <4F2918F6.9040100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Russell,
 
-On 31-01-2012 17:04, Heiko Schocher wrote:
+On 2/1/2012 12:09 AM, Russell King - ARM Linux wrote:
+> On Sat, Jan 28, 2012 at 11:06:02AM -0700, Grant Likely wrote:
+>> This makes the assumption that dma specifiers will only ever be 1
+>> cell.  I think to be generally useful, the full dma specifier needs to
+>> be either handed to the dma controller to get a cookie or passed back
+>> to the caller in its entirety.
+>
+> More to the point, who says that the DMA specifier is even an integer?
+> When people are using DMA engines, it (probably) isn't an integer at
+> all.  Several platforms I know of use strings for this.
+>
+> Some platforms can even select between two or more DMA engines for
+> handling the same peripheral - I believe Samsung do this depending
+> on their individual workloads.
+>
+> However, the opaque DMA engine API for requesting a channel doesn't
+> lend itself well to DT, as the match data and match function are
+> entirely left to the individual DMA engine driver and/or platform
+> itself.
+>
+> As far as creating another linear number space for DMA stuff, I'd
+> really suggest against that - you're going to need some additional
+> code in place to manage that numberspace.  If you at least use a two-
+> paid cookie, eg 'dma controller phandle + request signal' then that
+> makes all the stuff we're starting to see with the IRQ subsystem,
+> IRQ domains etc become completely unnecessary.
+>
+> I guess what I'm saying is ignore the flat number space, and go
+> straight to some kind of 'dma domains' solution from the start.
 
->> On Mon, Jan 23, 2012 at 09:56:07AM +0100, Heiko Schocher wrote:
->>> - AM1808 based board
->>> - 64 MiB DDR ram
->>> - 2 MiB Nor flash
->>> - 128 MiB NAND flash
->>> - use internal RTC
->>> - I2C support
->>> - hwmon lm75 support
->>> - UBI/UBIFS support
->>> - MMC support
->>> - USB OTG support
+Fully agree, and this is exactly the idea of this DMA binding: First 
+argument is always a DMA controller phandle and then you can add 0, 1 or 
+more cells to define extra specifiers dependent of the DMA controller 
+driver expectation. The one cell Grant was referring was just the extra 
+specifier that is needed for a simple DMA engine like the SDMA we have 
+inside OMAP. But the whole idea is to have a flexible enough mechanism 
+to allow any kind of specifier.
 
->>> Signed-off-by: Heiko Schocher<hs@denx.de>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: devicetree-discuss at lists.ozlabs.org
->>> Cc: davinci-linux-open-source at linux.davincidsp.com
->>> Cc: linux-mtd at lists.infradead.org
->>> Cc: linux-i2c at vger.kernel.org
->>> Cc: netdev at vger.kernel.org
->>> Cc: David Woodhouse<dwmw2@infradead.org>
->>> Cc: Ben Dooks<ben-linux@fluff.org>
->>> Cc: Wolfram Sang<w.sang@pengutronix.de>
->>> Cc: Sekhar Nori<nsekhar@ti.com>
->>> Cc: Kevin Hilman<khilman@ti.com>
->>> Cc: Wolfgang Denk<wd@denx.de>
+No more global linear number space like for IRQ!
 
->>> ---
->>> - post this board support with USB support, even though
->>>    USB is only working with the 10 ms "workaround", posted here:
->>>    http://comments.gmane.org/gmane.linux.usb.general/54505
->>>    I see this issue also on the AM1808 TMDXEXP1808L evalboard.
->>> - MMC and USB are not using OF support yet, ideas how to port
->>>    this are welcome. I need for USB and MMC boards board
->>>    specific callbacks, how to solve this with OF support?
-
-[...]
-
->>> diff --git a/arch/arm/boot/dts/enbw_cmc.dts b/arch/arm/boot/dts/enbw_cmc.dts
->>> new file mode 100644
->>> index 0000000..e5995ce
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/enbw_cmc.dts
-[...]
-
->>> +			compatible = "ns16550a";
-
->> Should include a string for the specific device.  Something like:
-
->> 	compatible = "ti,da800", "ns16550a";
-
-> added.
-
-    Note that there's no DA800 chip, only DA828, DA830, and DA850 AFAIK.
-
-WBR, Sergei
+Regards,
+Benoit
