@@ -1,24 +1,36 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 01 Feb 2012 09:37:39 -0800
-Subject: [PATCH] ARM: OMAP2+: PM debug: fix the use of debugfs_create_* API
-In-Reply-To: <1328085451-23225-1-git-send-email-j-pihet@ti.com> (Jean Pihet's
- message of "Wed, 1 Feb 2012 09:37:31 +0100")
-References: <1328008819-1110-1-git-send-email-j-pihet@ti.com>
- <1328085451-23225-1-git-send-email-j-pihet@ti.com>
-Message-ID: <87k446fo9o.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 1 Feb 2012 09:37:36 -0800
+Subject: [PATCH] pinctrl: delete raw device pointers in pinmux maps
+In-Reply-To: <1328117053-27807-1-git-send-email-linus.walleij@stericsson.com>
+References: <1328117053-27807-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E12470D@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
+Linus Walleij wrote at Wednesday, February 01, 2012 10:24 AM:
+> After discussion with Mark Brown in an unrelated thread about
+> ADC lookups, it came to my knowledge that the ability to pass
+> a struct device * in the regulator consumers is just a
+> historical artifact, and not really recommended. Since there
+> are no in-kernel users of these pointers, we just kill them
+> right now, before someone starts to use them.
+> 
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-> Check the return code pointer value from debugfs_create_dir for error
-> or NULL.
-> Also added an additional check to prevent the creation of a 'suspend'
-> entry at the debugfs root in case a power domain directory cannot be
-> created.
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+I didn't review the code, but just wanted to note that
+Documentation/pinctrl.txt needs some updates too, e.g. "Pinmux
+board/machine configuration" says:
 
-Thanks, queing for v3.4.
+> As you can see we may have several pin controllers on the system and thus
+> we need to specify which one of them that contain the functions we wish
+> to map. The map can also use struct device * directly, so there is no
+> inherent need to use strings to specify .dev_name or .ctrl_dev_name, these
+> are for the situation where you do not have a handle to the struct device *,
+> for example if they are not yet instantiated or cumbersome to obtain.
 
-Kevin
+I'm fine with that being a separate patch if you want, or squashing
+together two separate patches.
+
+-- 
+nvpublic
