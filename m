@@ -1,21 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Feb 2012 16:55:54 +0000
-Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
-In-Reply-To: <CACb=_tQ7M0DpfZ0FX+yA-pG_7hEyN_DQPBNM+BStaXrV5GQaMA@mail.gmail.com>
-References: <1328088226-29594-1-git-send-email-lee.jones@linaro.org>
- <1328088226-29594-3-git-send-email-lee.jones@linaro.org>
- <CACb=_tQ7M0DpfZ0FX+yA-pG_7hEyN_DQPBNM+BStaXrV5GQaMA@mail.gmail.com>
-Message-ID: <201202011655.54733.arnd@arndb.de>
+Date: Wed, 1 Feb 2012 16:57:36 +0000
+Subject: Adding remoteproc/rpmsg to linux-next
+In-Reply-To: <CAK=WgbZK_fS_rPWZ9pNARia3sp4+jL5GmR0UmyE59WZSObfWEQ@mail.gmail.com>
+References: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
+ <201112221522.21146.arnd@arndb.de>
+ <CAK=WgbZK_fS_rPWZ9pNARia3sp4+jL5GmR0UmyE59WZSObfWEQ@mail.gmail.com>
+Message-ID: <201202011657.36998.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 February 2012, Jamie Iles wrote:
-> > +static struct ida soc_ida;
-> > +static spinlock_t soc_lock;
+On Wednesday 01 February 2012, Ohad Ben-Cohen wrote:
+> On Thu, Dec 22, 2011 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > If you think you need more Acks or if there are other
+> > reasons to have it go through arm-soc, please tell me and I'll try harder
+> > to find the time for a proper review.
 > 
-> Use DEFINE_IDR() and DEFINE_SPINLOCK() rather than initialising them at runtime?
-> 
+> Any chance you could carve out some time for reviewing remoteproc and
+> rpmsg [1] ?
 
-Good point! "static DEFINE_{IDR,SPINLOCK}()" even, in case that wasn't clear.
+I will.
+ 
+> I hope we could either get your Acks on the patches or even have it go
+> through arm-soc for 3.4.
+
+Yes, I think it's best to have it merged through arm-soc, in case Linus
+is more likely to take it from there than pull from your tree.
 
 	Arnd
