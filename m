@@ -1,44 +1,50 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Wed, 01 Feb 2012 07:40:24 +0100
-Subject: [PATCH v3] ARM: davinci: map default_queue to edma channels
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317970CE@DBDE01.ent.ti.com>
-References: <1326956721-25158-1-git-send-email-hs@denx.de>
- <DF0F476B391FA8409C78302C7BA518B6317970CE@DBDE01.ent.ti.com>
-Message-ID: <4F28DE58.3040902@denx.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 1 Feb 2012 06:53:30 +0000
+Subject: [PATCH-V5 0/3] Introducing TI's New SoC/board AM335XEVM
+In-Reply-To: <20111208171854.GB31337@atomide.com>
+References: <hvaibhav@ti.com>
+ <1322808204-12878-1-git-send-email-hvaibhav@ti.com> <87y5up44bf.fsf@ti.com>
+ <20111207211029.GL31337@atomide.com>
+ <79CD15C6BA57404B839C016229A409A8050F6D@DBDE01.ent.ti.com>
+ <20111208171854.GB31337@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317BB191@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nori,
-
-Nori, Sekhar wrote:
-> Hi Heiko,
+On Thu, Dec 08, 2011 at 22:48:54, Tony Lindgren wrote:
+> Russell,
 > 
-> On Thu, Jan 19, 2012 at 12:35:21, Heiko Schocher wrote:
->> Default queue is expected to be a low-priority queue.
->> This way, long transfers on the default queue started
->> by the codec engine will not cause audio defects.
->>
->> Signed-off-by: Heiko Schocher <hs@denx.de>
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [111208 05:14]:
+> > > From: Tony Lindgren [mailto:tony at atomide.com]
+> > > * Kevin Hilman <khilman@ti.com> [111206 15:52]:
+> > > >
+> > > > I've also tested it on a BeagleBone, so feel free to also add:
+> > > >
+> > > > Tested-by: Kevin Hilman <khilman@ti.com>
+> > > 
+> > > Thanks looks good to me. We still need the machine_id update to
+> > > apply patches 2 and 3 in this series, so applying only the first
+> > > patch into soc branch for now.
+> > 
+> > Tony,
+> > 
+> > Should I ping Russell for this? The machine-id patch is already registered
+> > and present at
+> > 
+> > http://www.arm.linux.org.uk/developer/machines/download.php
 > 
->> Signed-off-by: juha.kuikka at gmail.com
->> Reported-by: juha.kuikka at gmail.com
+> Care to push the machine_id updates into devel-stable?
 > 
-> Sign-off should include real name, so I changed these
-> two lines to:
+Tony,
+
+Can you merge patches 2 & 3 from this series,
+as mach-id for AM335xEVM is already available in Mainline
+(linus/master or linux-omap/master)?
+
+Thanks,
+Vaibhav
+
+> Regards,
 > 
->     Signed-off-by: Juha Kuikka <juha.kuikka@gmail.com>
->     Reported-by: Juha Kuikka <juha.kuikka@gmail.com>
-
-Thanks!
-
-> before applying. Let me know if anyone has objections.
-
-I saw no objections, so can this patch go in now?
-
-Thanks!
-
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+> Tony
+> 
