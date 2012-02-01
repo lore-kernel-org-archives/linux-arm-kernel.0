@@ -1,164 +1,268 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 1 Feb 2012 16:12:24 +0530
-Subject: [PATCH V3 08/12] dmaengine/dw_dmac: Unmap all memory buffers after
- completion of non-slave transfers
+Date: Wed, 1 Feb 2012 16:12:26 +0530
+Subject: [PATCH V3 10/12] dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
 In-Reply-To: <cover.1328091915.git.viresh.kumar@st.com>
 References: <cover.1328091915.git.viresh.kumar@st.com>
-Message-ID: <c098ca5959c947b3634555bc7bf4a8b3af82a2ae.1328091915.git.viresh.kumar@st.com>
+Message-ID: <3671d82ede6627489b4eb6ebec19dd7a46ae256f.1328091915.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, after completion of transfer, source address or destination address
-of only the first LLI descriptor is unmapped. And length passed for unmap is
-total length of all descriptors in the list. Which means unmapping code assumed
-that the memory buffers pointed to by the descriptors will be physically
-contiguous, which might not be the case.
+This patch adds support for DMA_SLAVE_CONFIG in dwc DMAC controller. Fields in
+struct dw_dma_slave for passing similar data are preserved in this patch untill
+all existing users are fixed.
 
-This patch intends to fix this wrong expectation of dw_dmac. Now, first desc
-will not contain total length of transfer. But individual descriptors will
-contain their individual lengths. Finally, we will call unmap for all
-descriptors.
+That will be handled later in this patchset.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac.c |   49 +++++++++++++++++++++++++++++++------------------
- 1 files changed, 31 insertions(+), 18 deletions(-)
+ drivers/dma/dw_dmac.c      |  119 +++++++++++++++++++++++++++++++++-----------
+ drivers/dma/dw_dmac_regs.h |    3 +
+ 2 files changed, 93 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 5d7b199..49d477c 100644
+index 44d8069..ccfb03b 100644
 --- a/drivers/dma/dw_dmac.c
 +++ b/drivers/dma/dw_dmac.c
-@@ -231,6 +231,14 @@ static void dwc_dostart(struct dw_dma_chan *dwc, struct dw_desc *first)
+@@ -9,6 +9,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++#include <linux/bitops.h>
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/dmaengine.h>
+@@ -33,19 +34,23 @@
+  * which does not support descriptor writeback.
+  */
  
- /*----------------------------------------------------------------------*/
+-#define DWC_DEFAULT_CTLLO(private) ({				\
+-		struct dw_dma_slave *__slave = (private);	\
+-		int dms = __slave ? __slave->dst_master : 0;	\
+-		int sms = __slave ? __slave->src_master : 1;	\
+-		u8 smsize = __slave ? __slave->src_msize : DW_DMA_MSIZE_16; \
+-		u8 dmsize = __slave ? __slave->dst_msize : DW_DMA_MSIZE_16; \
++#define DWC_DEFAULT_CTLLO(_chan) ({				\
++		struct dw_dma_slave *__slave = (_chan->private);	\
++		struct dw_dma_chan *_dwc = to_dw_dma_chan(_chan);	\
++		struct dma_slave_config	*_sconfig = &_dwc->dma_sconfig;	\
++		int _dms = __slave ? __slave->dst_master : 0;	\
++		int _sms = __slave ? __slave->src_master : 1;	\
++		u8 _smsize = __slave ? _sconfig->src_maxburst :	\
++			DW_DMA_MSIZE_16;			\
++		u8 _dmsize = __slave ? _sconfig->dst_maxburst :	\
++			DW_DMA_MSIZE_16;			\
+ 								\
+-		(DWC_CTLL_DST_MSIZE(dmsize)			\
+-		 | DWC_CTLL_SRC_MSIZE(smsize)			\
++		(DWC_CTLL_DST_MSIZE(_dmsize)			\
++		 | DWC_CTLL_SRC_MSIZE(_smsize)			\
+ 		 | DWC_CTLL_LLP_D_EN				\
+ 		 | DWC_CTLL_LLP_S_EN				\
+-		 | DWC_CTLL_DMS(dms)				\
+-		 | DWC_CTLL_SMS(sms));				\
++		 | DWC_CTLL_DMS(_dms)				\
++		 | DWC_CTLL_SMS(_sms));				\
+ 	})
  
-+#define dw_dmac_unmap(utype, _desc, _child, _buf, _dir)			\
-+do {									\
-+	list_for_each_entry(_child, &_desc->tx_list, desc_node)		\
-+		dma_unmap_##utype(parent, _child->lli._buf,		\
-+				_child->len, _dir);			\
-+	dma_unmap_##utype(parent, _desc->lli._buf, _desc->len, _dir);	\
-+} while (0)
+ /*
+@@ -664,7 +669,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 	else
+ 		src_width = dst_width = 0;
+ 
+-	ctllo = DWC_DEFAULT_CTLLO(chan->private)
++	ctllo = DWC_DEFAULT_CTLLO(chan)
+ 			| DWC_CTLL_DST_WIDTH(dst_width)
+ 			| DWC_CTLL_SRC_WIDTH(src_width)
+ 			| DWC_CTLL_DST_INC
+@@ -725,6 +730,7 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ {
+ 	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
+ 	struct dw_dma_slave	*dws = chan->private;
++	struct dma_slave_config	*sconfig = &dwc->dma_sconfig;
+ 	struct dw_desc		*prev;
+ 	struct dw_desc		*first;
+ 	u32			ctllo;
+@@ -739,17 +745,20 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	if (unlikely(!dws || !sg_len))
+ 		return NULL;
+ 
+-	reg_width = dws->reg_width;
+ 	prev = first = NULL;
+ 
+ 	switch (direction) {
+ 	case DMA_MEM_TO_DEV:
+-		ctllo = (DWC_DEFAULT_CTLLO(chan->private)
++		reg_width = __fls(sconfig->dst_addr_width);
++		reg = sconfig->dst_addr;
++		ctllo = (DWC_DEFAULT_CTLLO(chan)
+ 				| DWC_CTLL_DST_WIDTH(reg_width)
+ 				| DWC_CTLL_DST_FIX
+-				| DWC_CTLL_SRC_INC
+-				| DWC_CTLL_FC(dws->fc));
+-		reg = dws->tx_reg;
++				| DWC_CTLL_SRC_INC);
 +
- static void
- dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
- 		bool callback_required)
-@@ -264,19 +272,19 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
- 		struct device *parent = chan2parent(&dwc->chan);
- 		if (!(txd->flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
- 			if (txd->flags & DMA_COMPL_DEST_UNMAP_SINGLE)
--				dma_unmap_single(parent, desc->lli.dar,
--						desc->len, DMA_FROM_DEVICE);
-+				dw_dmac_unmap(single, desc, child, dar,
-+						DMA_FROM_DEVICE);
- 			else
--				dma_unmap_page(parent, desc->lli.dar,
--						desc->len, DMA_FROM_DEVICE);
-+				dw_dmac_unmap(page, desc, child, dar,
-+						DMA_FROM_DEVICE);
++		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_M2P) :
++			DWC_CTLL_FC(DW_DMA_FC_D_M2P);
++
+ 		for_each_sg(sgl, sg, sg_len, i) {
+ 			struct dw_desc	*desc;
+ 			u32		len, dlen, mem;
+@@ -807,13 +816,16 @@ slave_sg_todev_fill_desc:
  		}
- 		if (!(txd->flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
- 			if (txd->flags & DMA_COMPL_SRC_UNMAP_SINGLE)
--				dma_unmap_single(parent, desc->lli.sar,
--						desc->len, DMA_TO_DEVICE);
-+				dw_dmac_unmap(single, desc, child, sar,
-+						DMA_TO_DEVICE);
- 			else
--				dma_unmap_page(parent, desc->lli.sar,
--						desc->len, DMA_TO_DEVICE);
-+				dw_dmac_unmap(page, desc, child, sar,
-+						DMA_TO_DEVICE);
- 		}
- 	}
- 
-@@ -676,6 +684,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 		desc->lli.dar = dest + offset;
- 		desc->lli.ctllo = ctllo;
- 		desc->lli.ctlhi = xfer_count;
-+		desc->len = xfer_count << src_width;
- 
- 		if (!first) {
- 			first = desc;
-@@ -701,7 +710,6 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 			DMA_TO_DEVICE);
- 
- 	first->txd.flags = flags;
--	first->len = len;
- 
- 	return &first->txd;
- 
-@@ -725,7 +733,6 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	unsigned int		mem_width;
- 	unsigned int		i;
- 	struct scatterlist	*sg;
--	size_t			total_len = 0;
- 
- 	dev_vdbg(chan2dev(chan), "prep_dma_slave\n");
- 
-@@ -774,6 +781,7 @@ slave_sg_todev_fill_desc:
- 			}
- 
- 			desc->lli.ctlhi = dlen >> mem_width;
-+			desc->len = dlen;
- 
- 			if (!first) {
- 				first = desc;
-@@ -787,7 +795,6 @@ slave_sg_todev_fill_desc:
- 						&first->tx_list);
- 			}
- 			prev = desc;
--			total_len += dlen;
- 
- 			if (len)
- 				goto slave_sg_todev_fill_desc;
-@@ -831,6 +838,7 @@ slave_sg_fromdev_fill_desc:
- 				len = 0;
- 			}
- 			desc->lli.ctlhi = dlen >> reg_width;
-+			desc->len = dlen;
- 
- 			if (!first) {
- 				first = desc;
-@@ -844,7 +852,6 @@ slave_sg_fromdev_fill_desc:
- 						&first->tx_list);
- 			}
- 			prev = desc;
--			total_len += dlen;
- 
- 			if (len)
- 				goto slave_sg_fromdev_fill_desc;
-@@ -863,8 +870,6 @@ slave_sg_fromdev_fill_desc:
- 			prev->txd.phys, sizeof(prev->lli),
- 			DMA_TO_DEVICE);
- 
--	first->len = total_len;
--
- 	return &first->txd;
- 
- err_desc_get:
-@@ -950,11 +955,19 @@ dwc_tx_status(struct dma_chan *chan,
- 		ret = dma_async_is_complete(cookie, last_complete, last_used);
- 	}
- 
--	if (ret != DMA_SUCCESS)
--		dma_set_tx_state(txstate, last_complete, last_used,
--				dwc_first_active(dwc)->len);
--	else
-+	if (ret != DMA_SUCCESS) {
-+		struct dw_desc *desc, *child;
-+		unsigned int len;
+ 		break;
+ 	case DMA_DEV_TO_MEM:
+-		ctllo = (DWC_DEFAULT_CTLLO(chan->private)
++		reg_width = __fls(sconfig->src_addr_width);
++		reg = sconfig->src_addr;
++		ctllo = (DWC_DEFAULT_CTLLO(chan)
+ 				| DWC_CTLL_SRC_WIDTH(reg_width)
+ 				| DWC_CTLL_DST_INC
+-				| DWC_CTLL_SRC_FIX
+-				| DWC_CTLL_FC(dws->fc));
++				| DWC_CTLL_SRC_FIX);
 +
-+		desc = dwc_first_active(dwc);
-+		len = desc->len;
-+		list_for_each_entry(child, &desc->tx_list, desc_node)
-+			len += child->len;
++		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_P2M) :
++			DWC_CTLL_FC(DW_DMA_FC_D_P2M);
+ 
+-		reg = dws->rx_reg;
+ 		for_each_sg(sgl, sg, sg_len, i) {
+ 			struct dw_desc	*desc;
+ 			u32		len, dlen, mem;
+@@ -889,6 +901,39 @@ err_desc_get:
+ 	return NULL;
+ }
+ 
++/*
++ * Fix sconfig's burst size according to dw_dmac. We need to convert them as:
++ * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
++ *
++ * NOTE: burst size 2 is not supported by controller.
++ *
++ * This can be done by finding least significant bit set: n & (n - 1)
++ */
++static inline void convert_burst(u32 *maxburst)
++{
++	if (*maxburst > 1)
++		*maxburst = fls(*maxburst) - 2;
++	else
++		*maxburst = 0;
++}
 +
-+		dma_set_tx_state(txstate, last_complete, last_used, len);
++static int
++set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
++{
++	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
++
++	/* Check if it is chan is configured for slave transfers */
++	if (!chan->private)
++		return -EINVAL;
++
++	memcpy(&dwc->dma_sconfig, sconfig, sizeof(*sconfig));
++
++	convert_burst(&dwc->dma_sconfig.src_maxburst);
++	convert_burst(&dwc->dma_sconfig.dst_maxburst);
++
++	return 0;
++}
++
+ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		       unsigned long arg)
+ {
+@@ -938,8 +983,11 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		/* Flush all pending and queued descriptors */
+ 		list_for_each_entry_safe(desc, _desc, &list, desc_node)
+ 			dwc_descriptor_complete(dwc, desc, false);
+-	} else
++	} else if (cmd == DMA_SLAVE_CONFIG) {
++		return set_runtime_config(chan, (struct dma_slave_config *)arg);
 +	} else {
- 		dma_set_tx_state(txstate, last_complete, last_used, 0);
+ 		return -ENXIO;
 +	}
  
- 	if (dwc->paused)
- 		return DMA_PAUSED;
+ 	return 0;
+ }
+@@ -1180,11 +1228,11 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
+ 		enum dma_transfer_direction direction)
+ {
+ 	struct dw_dma_chan		*dwc = to_dw_dma_chan(chan);
++	struct dma_slave_config		*sconfig = &dwc->dma_sconfig;
+ 	struct dw_cyclic_desc		*cdesc;
+ 	struct dw_cyclic_desc		*retval = NULL;
+ 	struct dw_desc			*desc;
+ 	struct dw_desc			*last = NULL;
+-	struct dw_dma_slave		*dws = chan->private;
+ 	unsigned long			was_cyclic;
+ 	unsigned int			reg_width;
+ 	unsigned int			periods;
+@@ -1208,7 +1256,12 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
+ 	}
+ 
+ 	retval = ERR_PTR(-EINVAL);
+-	reg_width = dws->reg_width;
++
++	if (direction == DMA_MEM_TO_DEV)
++		reg_width = __ffs(sconfig->dst_addr_width);
++	else
++		reg_width = __ffs(sconfig->src_addr_width);
++
+ 	periods = buf_len / period_len;
+ 
+ 	/* Check for too big/unaligned periods and unaligned DMA buffer. */
+@@ -1241,26 +1294,34 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
+ 
+ 		switch (direction) {
+ 		case DMA_MEM_TO_DEV:
+-			desc->lli.dar = dws->tx_reg;
++			desc->lli.dar = sconfig->dst_addr;
+ 			desc->lli.sar = buf_addr + (period_len * i);
+-			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan->private)
++			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan)
+ 					| DWC_CTLL_DST_WIDTH(reg_width)
+ 					| DWC_CTLL_SRC_WIDTH(reg_width)
+ 					| DWC_CTLL_DST_FIX
+ 					| DWC_CTLL_SRC_INC
+-					| DWC_CTLL_FC(dws->fc)
+ 					| DWC_CTLL_INT_EN);
++
++			desc->lli.ctllo |= sconfig->device_fc ?
++				DWC_CTLL_FC(DW_DMA_FC_P_M2P) :
++				DWC_CTLL_FC(DW_DMA_FC_D_M2P);
++
+ 			break;
+ 		case DMA_DEV_TO_MEM:
+ 			desc->lli.dar = buf_addr + (period_len * i);
+-			desc->lli.sar = dws->rx_reg;
+-			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan->private)
++			desc->lli.sar = sconfig->src_addr;
++			desc->lli.ctllo = (DWC_DEFAULT_CTLLO(chan)
+ 					| DWC_CTLL_SRC_WIDTH(reg_width)
+ 					| DWC_CTLL_DST_WIDTH(reg_width)
+ 					| DWC_CTLL_DST_INC
+ 					| DWC_CTLL_SRC_FIX
+-					| DWC_CTLL_FC(dws->fc)
+ 					| DWC_CTLL_INT_EN);
++
++			desc->lli.ctllo |= sconfig->device_fc ?
++				DWC_CTLL_FC(DW_DMA_FC_P_P2M) :
++				DWC_CTLL_FC(DW_DMA_FC_D_P2M);
++
+ 			break;
+ 		default:
+ 			break;
+diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
+index 5eef694..2005d30 100644
+--- a/drivers/dma/dw_dmac_regs.h
++++ b/drivers/dma/dw_dmac_regs.h
+@@ -153,6 +153,9 @@ struct dw_dma_chan {
+ 	struct dw_cyclic_desc	*cdesc;
+ 
+ 	unsigned int		descs_allocated;
++
++	/* configuration passed via DMA_SLAVE_CONFIG */
++	struct dma_slave_config dma_sconfig;
+ };
+ 
+ static inline struct dw_dma_chan_regs __iomem *
 -- 
 1.7.8.110.g4cb5d
