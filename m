@@ -1,67 +1,77 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 01 Feb 2012 08:21:41 +0530
-Subject: [PATCH 1/3] ARM: EXYNOS: Enable MDMA driver
-In-Reply-To: <1328025437-5396-2-git-send-email-kgene.kim@samsung.com>
-References: <1328025437-5396-1-git-send-email-kgene.kim@samsung.com>
- <1328025437-5396-2-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4F28A8BD.9000601@linaro.org>
+From: bill4carson@gmail.com (bill4carson)
+Date: Wed, 01 Feb 2012 11:10:21 +0800
+Subject: [PATCH 2/7] Add various hugetlb page table fix
+In-Reply-To: <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
+References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
+ <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
+ <20120131095811.GB889@n2100.arm.linux.org.uk>
+ <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
+Message-ID: <4F28AD1D.1000106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2012 09:27 PM, Kukjin Kim wrote:
-> From: Boojin Kim <boojin.kim@samsung.com>
-> 
-> This patch adds MDMA platform data and enables
-> MDMA for DMA memcpy operation for EXYNOS SoCs.
-> 
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-exynos/clock-exynos4.c           |    9 ++++++
->  arch/arm/mach-exynos/dma.c                     |   35 ++++++++++++++++++++++++
->  arch/arm/mach-exynos/include/mach/irqs.h       |    2 +
->  arch/arm/mach-exynos/include/mach/map.h        |    3 +-
->  arch/arm/plat-samsung/include/plat/dma-pl330.h |    8 +++++
->  5 files changed, 56 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-> index 411b366b..ffcc46b 100644
-> --- a/arch/arm/mach-exynos/clock-exynos4.c
-> +++ b/arch/arm/mach-exynos/clock-exynos4.c
-> @@ -783,6 +783,13 @@ static struct clk exynos4_clk_pdma1 = {
->  	.ctrlbit	= (1 << 1),
->  };
->  
-> +static struct clk exynos4_clk_mdma1 = {
 
-exynos4_clk_mdma ?
 
-> +	.name		= "dma",
-> +	.devname	= "dma-pl330.2",
-> +	.enable		= exynos4_clk_ip_image_ctrl,
-> +	.ctrlbit	= ((1 << 8) | (1 << 5) | (1 << 2)),
-> +};
-> +
->  struct clk *exynos4_clkset_group_list[] = {
->  	[0] = &clk_ext_xtal_mux,
->  	[1] = &clk_xusbxti,
-> @@ -1301,6 +1308,7 @@ static struct clksrc_clk *exynos4_sysclks[] = {
->  static struct clk *exynos4_clk_cdev[] = {
->  	&exynos4_clk_pdma0,
->  	&exynos4_clk_pdma1,
-> +	&exynos4_clk_mdma,
->  };
->  
->  static struct clksrc_clk *exynos4_clksrc_cdev[] = {
-> @@ -1329,6 +1337,7 @@ static struct clk_lookup exynos4_clk_lookup[] = {
->  	CLKDEV_INIT("s3c-sdhci.3", "mmc_busclk.2", &exynos4_clk_sclk_mmc3.clk),
->  	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos4_clk_pdma0),
->  	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos4_clk_pdma1),
-> +	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos4_clk_mdma),
->  	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk0", &exynos4_clk_sclk_spi0.clk),
->  	CLKDEV_INIT("s3c64xx-spi.1", "spi_busclk0", &exynos4_clk_sclk_spi1.clk),
->  	CLKDEV_INIT("s3c64xx-spi.2", "spi_busclk0", &exynos4_clk_sclk_spi2.clk),
+On 2012?01?31? 20:25, Catalin Marinas wrote:
+> On 31 January 2012 09:58, Russell King - ARM Linux
+> <linux@arm.linux.org.uk>  wrote:
+>> On Mon, Jan 30, 2012 at 03:57:13PM +0800, bill4carson at gmail.com wrote:
+>>> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+>>> index 2317a71..062c93c 100644
+>>> --- a/arch/arm/include/asm/pgtable-2level.h
+>>> +++ b/arch/arm/include/asm/pgtable-2level.h
+>>> @@ -123,6 +123,11 @@
+>>>   #define L_PTE_USER           (_AT(pteval_t, 1)<<  8)
+>>>   #define L_PTE_XN             (_AT(pteval_t, 1)<<  9)
+>>>   #define L_PTE_SHARED         (_AT(pteval_t, 1)<<  10)        /* shared(v6), coherent(xsc3) */
+>>> +#ifdef CONFIG_ARM_HUGETLB_SUPPORT
+>>> +#define L_PTE_HUGEPAGE       (_AT(pteval_t, 1)<<  11) /* mark hugepage */
+>>> +#define L_PTE_HPAGE_2M  (_AT(pteval_t, 1)<<  12) /* only when HUGEPAGE set */
+>>> +#define L_PTE_HPAGE_16M (_AT(pteval_t, 1)<<  13) /* only when HUGEPAGE set */
+>>> +#endif
+>> (1) How does this work when normal pages can have bit 11 set if they're an
+>> odd PFN?
+> Isn't that bit 12?
+>
+>> (2) How do we even get to PTE level when a 2 or 16MB section doesn't have
+>> a pte table (as the L1 entry is used for the section or supersection
+>> mapping) ?
+> We don't, that's why I think we don't even need this bit defined.
+>
+First, thanks for Russel/Catalin to take time review this patch:)
+
+
+a:
+By pte used in here, I mean linux pte. linux pte is needed by generic mm 
+layer
+whether this mapping is 4K, 1MB or 16MB.
+
+
+b:
+Why L_PTE_HUGEPAGE is needed?
+
+hugetlb subsystem will call pte_page to derive the corresponding page 
+struct from
+a given pte, and pte_pfn is used first to convert pte into a page frame 
+number.
+This is where need to be careful. Normal page based pte upper [31:12] 
+bits is pfn,
+huge page(1MB) based pte upper[31:20] is pfn, so one bit MUST 
+distinguish normal
+page based pte with huge page based pte.
+
+This one bit will *only* be BIT11, one last unused PTE flag within 
+normal page.
+that's why L_PTE_HUGEPAGE is defined.
+
+If L_PTE_HUGEPAGE is set, then BIT19:12 is enough to be used to mark 
+this pte is 1MB
+or 16MB huge page.
+
 
 
 -- 
-Tushar Behera
+I am a slow learner
+but I will keep trying to fight for my dreams!
+
+--bill
