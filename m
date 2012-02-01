@@ -1,52 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  1 Feb 2012 13:52:34 +0000
-Subject: [PATCH 2/2] ARM: errata: fix PL310 erratum #753970 workaround
- selection
+Date: Wed,  1 Feb 2012 13:52:33 +0000
+Subject: [PATCH 1/2] ARM: errata: update workaround for A9 erratum #743622
 In-Reply-To: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
 References: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1328104354-7553-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1328104354-7553-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fa0ce403 ("ARM: 7162/1: errata: tidy up Kconfig options for PL310
-errata workarounds") introduced a consistent naming scheme for errata
-workarounds, but forgot to update the platforms selecting workarounds
-using the old names.
+Erratum #743622 affects all r2 variants of the Cortex-A9 processor, so
+ensure that the workaround is applied regardless of the revision.
 
-This patch updates ux500 and vexpress to select the appropriate PL310
-errata workarounds.
-
+Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-ux500/Kconfig    |    2 +-
- arch/arm/mach-vexpress/Kconfig |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig      |    2 +-
+ arch/arm/mm/proc-v7.S |    4 +---
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index a3e0c86..9c8a9e7 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -5,7 +5,7 @@ config UX500_SOC_COMMON
- 	default y
- 	select ARM_GIC
- 	select HAS_MTU
--	select ARM_ERRATA_753970
-+	select PL310_ERRATA_753970
- 	select ARM_ERRATA_754322
- 
- menu "Ux500 SoC"
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 9b3d0fb..88c3ba1 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -7,7 +7,7 @@ config ARCH_VEXPRESS_CA9X4
- 	select ARM_GIC
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_751472
--	select ARM_ERRATA_753970
-+	select PL310_ERRATA_753970
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 24626b0..5133128 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1282,7 +1282,7 @@ config ARM_ERRATA_743622
+ 	depends on CPU_V7
+ 	help
+ 	  This option enables the workaround for the 743622 Cortex-A9
+-	  (r2p0..r2p2) erratum. Under very rare conditions, a faulty
++	  (r2p*) erratum. Under very rare conditions, a faulty
+ 	  optimisation in the Cortex-A9 Store Buffer may lead to data
+ 	  corruption. This workaround sets a specific bit in the diagnostic
+ 	  register of the Cortex-A9 which disables the Store Buffer
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 7e9b5bf..a4d5a76 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -234,9 +234,7 @@ __v7_setup:
+ 	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+ #endif
+ #ifdef CONFIG_ARM_ERRATA_743622
+-	teq	r6, #0x20			@ present in r2p0
+-	teqne	r6, #0x21			@ present in r2p1
+-	teqne	r6, #0x22			@ present in r2p2
++	teq	r5, #0x00200000			@ only present in r2p*
+ 	mrceq	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+ 	orreq	r10, r10, #1 << 6		@ set bit #6
+ 	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
 -- 
 1.7.4.1
