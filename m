@@ -1,46 +1,84 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 1 Feb 2012 11:03:56 +0100
-Subject: [PATCH v2 11/13] ARM: only include mach/irqs.h for !SPARSE_IRQ
-In-Reply-To: <20120130104428.GA16841@atrey.karlin.mff.cuni.cz>
-References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
- <20120125213206.GJ1068@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1201251727510.2759@xanadu.home>
- <201201252358.17825.marek.vasut@gmail.com>
- <20120130104428.GA16841@atrey.karlin.mff.cuni.cz>
-Message-ID: <20120201100356.GA31865@elf.ucw.cz>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 1 Feb 2012 10:04:55 +0000
+Subject: Reg pinmux driver for OMAP based SoC- AM335X
+In-Reply-To: <20120131170511.GI9339@atomide.com>
+References: <20120125000407.GU22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178CB82433@HQMAIL01.nvidia.com>
+ <20120127020832.GJ29812@atomide.com>
+ <20120127065752.GB32740@S2101-09.ap.freescale.net>
+ <20120127170545.GH13504@atomide.com>
+ <20120130015607.GA10470@S2101-09.ap.freescale.net>
+ <20120130172042.GE9339@atomide.com>
+ <20120131013215.GB24681@S2101-09.ap.freescale.net>
+ <20120131022906.GH9339@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93176CAC6@DBDE01.ent.ti.com>
+ <20120131170511.GI9339@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317BB650@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2012-01-30 11:44:28, Cyril Hrubis wrote:
-> Hi!
-> > > > As a side-note, you may be pleased to know that I have SA11x0 stuff
-> > > > converted to (and tested) with sparse IRQ.  That's with SA1111, the
-> > > > UCB1x00 and Neponset expansion board for the Assabet all dynamically
-> > > > allocating their IRQs.  The only fixed-numbered IRQs in SA11x0 in my
-> > > > tree at the time of writing are the on-SoC IRQs, and the LoCoMo IRQs
-> > > > (which I don't have the hardware to test for, so I'm not touching.)
-> > > 
-> > > That's really cool.
-> > > 
-> > > Not that there are many people who might still benefit from running that
-> > > code, but like I said this should serve as a real and relatively simple
-> > > example that might benefit more complex platforms.
-> > > 
-> > > 
-> > > Nicolas
-> > 
-> > Indeed, that's good going. I'm CCing a guy who might have a SA11xx board with 
-> > LoCoMo chip (that's old zaurus sl55xx, right?).
+On Tue, Jan 31, 2012 at 22:35:11, Tony Lindgren wrote:
+> Hi,
 > 
-> I think I still do have old zaurus in some box somewhere (I stopped playing
-> with it once I got the newer one). And I think that Pavel Machek (CC) has one
-> too (I think that he wanted to give away to anybody who is wishing to maintain
-> the particular kernel parts and I think that in the end nobody took it).
+> * Mohammed, Afzal <afzal@ti.com> [120131 06:04]:
+> > Hi Tony,
+> > 
+> > I am working on implementing pincontrol driver for AM335X SoC (OMAP34XX family).
+> > 
+> > Is there any specific plan you have in mind w.r.t incorporating
+> > pincontrol driver for OMAP family of SoC's. There was an initial patch
+> > for OMAP4 pin control driver, but it seems you were in favour of a
+> > DT based approach. As per my understanding after going through few threads
+> > (lot more remaining) is that pincontrol driver can be either a DT based
+> > or non-DT based (either way we are going out of platform folders), and
+> > it seems you prefer a DT based approach (have seen mentioning about
+> > pinmux-simple.c).
+> 
+> With at least omaps, there are few good reasons to go for a common
+> DT only driver:
+> 
+> 1. We already have about 6k lines of mux data and seem to be
+>    adding several thousands of lines of mux data each year.
+> 
+> 2. The driver does not need this data, it just needs to know how
+>    to operate certain kind of mux registers. The data is mostly
+>    handy for developers for debugging, and that can be done via
+>    debugfs and userspace tools.
+>  
+> > Tegra pincontrol driver posted recently, seems to use DT to distinguish only
+> > the SoC type, with all the pincontrol information for SoC present in Kernel.
+> > 
+> > I would be thankful if you can give me some pointers on how to proceed for
+> > AM335X pincontrol driver and/or any work in progress for OMAP pincontrol driver.
+> 
+> The plan is to deprecate the existing arch/arm/*omap*/*mux* code,
+> and cut it down to minimum. And then add DT only mux support that should
+> work for at least omap2+. That should work for am335x too.
+> 
+> There's currently some discussion going on regarding the pinmux device
+> tree binding and how dynamic mux states should be handled. But I'd
+> assume we'll have basic support available very soon.
+> 
+> The driver I'm working leaves all the data out of kernel, and the driver
+> just knows how to handle a pinmux register instances. 
 
-Yep, I still have old collie (sl5500) machine. I don't really use
-it...
+Tony,
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Is this hosted or accessible somewhere? Just for reference...
+
+Thanks,
+Vaibhav
+
+> Then debugging
+> tools can be done in userspace via debugfs to display more detailed
+> SoC specific information.
+> 
+> So it might be worth waiting just a little bit longer. If you have
+> resources to spend on the pinmuxing, then creating some userspace tool
+> to display SoC specific information would be nice :) For the userspace
+> tool, we can use the data in arch/arm/mach-omap2/mux*2*.[ch].
+> 
+> Regards,
+> 
+> Tony
+> 
