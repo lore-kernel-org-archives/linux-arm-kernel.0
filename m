@@ -1,35 +1,49 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 1 Feb 2012 09:54:28 +0100
-Subject: [PATCH v2 00/19] ARM: OMAP3+: SmartReflex: bugfixes
-In-Reply-To: <20120131235816.GM9339@atomide.com>
-References: <1328003912-11709-1-git-send-email-j-pihet@ti.com>
- <20120131170830.GJ9339@atomide.com>
- <CAN5iSWo9+P=tC5Uq_bZ+Js_QPpGTn=Q6f5ecgiehRvT2E5+Diw@mail.gmail.com>
- <20120131172008.GK9339@atomide.com>
- <CAORVsuWELB2rt3Vs-5oHFyXCRDUPXSpqOJo26cH+_i3Y0hdraQ@mail.gmail.com>
- <20120131173344.GL9339@atomide.com> <87fwevleiv.fsf@ti.com>
- <20120131235816.GM9339@atomide.com>
-Message-ID: <CAORVsuX1VOz=3SZQM_WB_bMuDW-aY-f8aAH4Pqb_rqQ9v=NgjA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed,  1 Feb 2012 09:54:56 +0100
+Subject: [PATCH] ARM: head-nommu.S: use long distance encoding for branch
+ instruction
+Message-ID: <1328086496-31184-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2012 at 12:58 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Kevin Hilman <khilman@ti.com> [120131 13:28]:
-...
->> >
->> > OK, let's plan on putting all the smartreflex stuff into a separate
->> > branch then. If some changes are needed to the PM code, those should
->> > probably be applied first into Kevin's PM branch.
->>
->> Tony, I'll queue up this series (after I get to reviewing them) as well
->> as the changes needed to the PM core code. ?After that we'll be ready to
->> move.
->
-> OK thanks.
->
-> Tony
+This fixes a linker error when the kernel image gets bigger than approx.
+1 MiB.
 
-I just submitted v3 of the patch set.
+This is done analogous to the change to head.S in commit
 
-Thanks!
-Jean
+	a75e524 (ARM: 6504/1: Thumb-2: Fix long-distance conditional branches in head.S for Thumb-2.)
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
+
+compared to a75e524 I didn't put the it instruction into THUMB(). I
+think this is OK? If so I can follow up with a patch that removes these
+THUMB()s from head.S, too.
+
+And I wonder if it's correct that head-nommu.S doesn't check the machine
+type.
+
+I don't see a need to get this in before the next merge window.
+
+Best regards
+Uwe
+
+
+ arch/arm/kernel/head-nommu.S |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index d46f259..1aca35d 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -51,6 +51,7 @@ ENTRY(stext)
+ #endif
+ 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
+ 	movs	r10, r5				@ invalid processor (r5=0)?
++	it	eq
+ 	beq	__error_p				@ yes, error 'p'
+ 
+ 	adr	lr, BSYM(__after_proc_init)	@ return (PIC) address
+-- 
+1.7.8.3
