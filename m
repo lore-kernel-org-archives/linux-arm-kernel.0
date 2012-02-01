@@ -1,51 +1,32 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 31 Jan 2012 17:07:02 -0700
-Subject: [PATCH v3 2/2] gpio: pl061: enable interrupts with DT style
- binding
-In-Reply-To: <4F27FE43.7090503@gmail.com>
-References: <1327944699-29882-1-git-send-email-robherring2@gmail.com>
- <1327944699-29882-3-git-send-email-robherring2@gmail.com>
- <20120131143609.GA26436@S2101-09.ap.freescale.net>
- <4F27FE43.7090503@gmail.com>
-Message-ID: <20120201000702.GL22611@ponder.secretlab.ca>
+Date: Tue, 31 Jan 2012 17:07:42 -0700
+Subject: [PATCH v3 00/25] irq_domain generalization and refinement
+In-Reply-To: <20120131045344.GA27609@quad.lixom.net>
+References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
+ <20120131045344.GA27609@quad.lixom.net>
+Message-ID: <20120201000742.GM22611@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 08:44:19AM -0600, Rob Herring wrote:
-> On 01/31/2012 08:36 AM, Shawn Guo wrote:
-> > On Mon, Jan 30, 2012 at 11:31:39AM -0600, Rob Herring wrote:
-> > ...
-> >> -static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
-> >> +static void __init pl061_init_gc(struct pl061_gpio *chip,
-> >> +				 struct device_node *node, int irq_base)
-> >>  {
-> >>  	struct irq_chip_type *ct;
-> >>  
-> >> @@ -212,15 +212,17 @@ static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
-> >>  	ct->chip.irq_set_wake = irq_gc_set_wake;
-> >>  	ct->regs.mask = GPIOIE;
-> >>  
-> >> -	irq_setup_generic_chip(chip->irq_gc, IRQ_MSK(PL061_GPIO_NR),
-> >> -			       IRQ_GC_INIT_NESTED_LOCK, IRQ_NOREQUEST, 0);
-> >> +	irq_setup_generic_chip_domain(chip->irq_gc, node,
-> >> +				      IRQ_MSK(PL061_GPIO_NR),
-> >> +				      IRQ_GC_INIT_NESTED_LOCK,
-> >> +				      IRQ_NOREQUEST, 0);
-> >>  }
+On Mon, Jan 30, 2012 at 08:53:44PM -0800, Olof Johansson wrote:
+> On Fri, Jan 27, 2012 at 02:35:54PM -0700, Grant Likely wrote:
+> > Hey everyone,
 > > 
-> > The function irq_setup_generic_chip_domain() is wrapped by
-> > #ifdef CONFIG_IRQ_DOMAIN in patch #1.  Is it true that pl061 driver
-> > will never work with !IRQ_DOMAIN case?
+> > This patch series is ready for much wider consumption now.  I'd like
+> > to get it into linux-next ASAP because there will be ARM board support
+> > depending on it.  I'll wait a few days before I ask Stephen to pull
+> > this in.
+> > 
+> > Stephen/Milton/Ben, any testing you can help with here would be
+> > appreciated since you've got access to a wider variety of Power
+> > machines than I do.
 > 
-> You're right unless Grant thinks IRQ_DOMAIN should always be enabled for
-> ARM? Otherwise, I'll add something like this for !IRQ_DOMAIN:
+> This series has been:
+> 
+> Tested-by: Olof Johansson <olof@lixom.net>
+> 
+> On powerpc/pasemi (it's the only one I still have easy access to).
 
-I think always having IRQ_DOMAIN on are is where we want to get to; or at least
-have platforms that use it depend on it or select it.  I don't want to see
-interrupt controllers both use irq_domain and also their own open-coded
-translation mechanism.  That's just a fail.
-
-If irq_domain isn't acceptable to be enabled all the time, then it needs to be
-refactored until it is.
+Excellent, thanks Olof!
 
 g.
