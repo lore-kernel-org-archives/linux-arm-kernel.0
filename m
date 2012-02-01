@@ -1,10 +1,10 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 31 Jan 2012 21:00:12 -0600
-Subject: [RFC PATCH v4 2/4] ARM: omap: Remove cpuidle timekeeping and irq
+Date: Tue, 31 Jan 2012 21:00:13 -0600
+Subject: [RFC PATCH v4 3/4] acpi: Remove cpuidle timekeeping and irq
  enable/disable
 In-Reply-To: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
 References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1328065215-28108-3-git-send-email-rob.lee@linaro.org>
+Message-ID: <1328065215-28108-4-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,194 +15,356 @@ idle functions as needed by the cpuidle core driver changes.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   96 ++++++++++++++++--------------------
- 1 files changed, 43 insertions(+), 53 deletions(-)
+ drivers/acpi/processor_idle.c |  203 ++++++++++++++++++++++++-----------------
+ 1 files changed, 119 insertions(+), 84 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 464cffd..9ecded5 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -69,7 +69,14 @@ struct omap3_idle_statedata {
- 	u32 core_state;
- 	u8 valid;
- };
--struct omap3_idle_statedata omap3_idle_data[OMAP3_NUM_STATES];
-+
-+struct omap3_idle_drvdata {
-+	struct omap3_idle_statedata state_data[OMAP3_NUM_STATES];
-+	u32 per_saved_state;
-+	u32 per_next_state;
-+};
-+
-+static struct omap3_idle_drvdata omap3_idle_data;
- 
- struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
- 
-@@ -100,23 +107,20 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv,
- 				int index)
- {
--	struct omap3_idle_statedata *cx =
--			cpuidle_get_statedata(&dev->states_usage[index]);
--	struct timespec ts_preidle, ts_postidle, ts_idle;
--	u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
--	int idle_time;
-+	struct omap3_idle_drvdata *dd = dev->states_usage[index].driver_data
- 
--	/* Used to keep track of the total time in idle */
--	getnstimeofday(&ts_preidle);
-+	u32 mpu_state = dd->state_data[index].mpu_state;
-+	u32 core_state = dd->state_data[index].core_state;
- 
--	local_irq_disable();
- 	local_fiq_disable();
- 
- 	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
- 	pwrdm_set_next_pwrst(core_pd, core_state);
- 
--	if (omap_irq_pending() || need_resched())
--		goto return_sleep_time;
-+	if (omap_irq_pending() || need_resched()) {
-+		index = -EBUSY;
-+		goto leave;
-+	}
- 
- 	/* Deny idle for C1 */
- 	if (index == 0) {
-@@ -147,18 +151,12 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
- 		pwrdm_for_each_clkdm(core_pd, _cpuidle_allow_idle);
+diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
+index 0e8e2de..7182b7e 100644
+--- a/drivers/acpi/processor_idle.c
++++ b/drivers/acpi/processor_idle.c
+@@ -139,7 +139,6 @@ static void acpi_safe_halt(void)
+ 	smp_mb();
+ 	if (!need_resched()) {
+ 		safe_halt();
+-		local_irq_disable();
  	}
- 
--return_sleep_time:
--	getnstimeofday(&ts_postidle);
--	ts_idle = timespec_sub(ts_postidle, ts_preidle);
--
--	local_irq_enable();
-+leave:
- 	local_fiq_enable();
- 
--	idle_time = ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * \
--								USEC_PER_SEC;
--
--	/* Update cpuidle counters */
--	dev->last_residency = idle_time;
-+	/* Restore original PER state if it was modified */
-+	if (dd->per_next_state != dd->per_saved_state)
-+		pwrdm_set_next_pwrst(per_pd, dd->per_saved_state);
- 
- 	return index;
+ 	current_thread_info()->status |= TS_POLLING;
  }
-@@ -180,9 +178,10 @@ static int next_valid_state(struct cpuidle_device *dev,
- 			struct cpuidle_driver *drv,
- 				int index)
- {
--	struct cpuidle_state_usage *curr_usage = &dev->states_usage[index];
- 	struct cpuidle_state *curr = &drv->states[index];
--	struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr_usage);
-+	struct omap3_idle_drvdata *dd = dev->states_usage[index].driver_data;
-+	struct omap3_idle_statedata *cx = &dd->state_data[index];
-+
- 	u32 mpu_deepest_state = PWRDM_POWER_RET;
- 	u32 core_deepest_state = PWRDM_POWER_RET;
- 	int next_index = -1;
-@@ -223,7 +222,8 @@ static int next_valid_state(struct cpuidle_device *dev,
- 		 */
- 		idx--;
- 		for (; idx >= 0; idx--) {
--			cx = cpuidle_get_statedata(&dev->states_usage[idx]);
-+			dd = dev->states_usage[idx].driver_data;
-+			cx = &dd->state_data[idx];
- 			if ((cx->valid) &&
- 			    (cx->mpu_state >= mpu_deepest_state) &&
- 			    (cx->core_state >= core_deepest_state)) {
-@@ -255,8 +255,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 			       int index)
- {
- 	int new_state_idx;
--	u32 core_next_state, per_next_state = 0, per_saved_state = 0, cam_state;
--	struct omap3_idle_statedata *cx;
-+	u32 core_next_state, cam_state;
-+	struct omap3_idle_drvdata *dd = dev->states_usage[index].driver_data;
-+	struct omap3_idle_statedata *cx = &dd->state_data[index];
- 	int ret;
- 
- 	/*
-@@ -264,10 +265,8 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 	 * CAM does not have wakeup capability in OMAP3.
- 	 */
- 	cam_state = pwrdm_read_pwrst(cam_pd);
--	if (cam_state == PWRDM_POWER_ON) {
--		new_state_idx = drv->safe_state_index;
--		goto select_state;
--	}
-+	if (cam_state == PWRDM_POWER_ON)
-+		return drv->safe_state_index;
- 
- 	/*
- 	 * FIXME: we currently manage device-specific idle states
-@@ -281,27 +280,20 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 	 * Prevent PER off if CORE is not in retention or off as this
- 	 * would disable PER wakeups completely.
- 	 */
--	cx = cpuidle_get_statedata(&dev->states_usage[index]);
- 	core_next_state = cx->core_state;
--	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
--	if ((per_next_state == PWRDM_POWER_OFF) &&
--	    (core_next_state > PWRDM_POWER_RET))
--		per_next_state = PWRDM_POWER_RET;
--
--	/* Are we changing PER target state? */
--	if (per_next_state != per_saved_state)
--		pwrdm_set_next_pwrst(per_pd, per_next_state);
- 
--	new_state_idx = next_valid_state(dev, drv, index);
-+	dd->per_next_state = dd->per_saved_state =
-+			pwrdm_read_next_pwrst(per_pd);
- 
--select_state:
--	ret = omap3_enter_idle(dev, drv, new_state_idx);
-+	if ((dd->per_next_state == PWRDM_POWER_OFF) &&
-+	    (core_next_state > PWRDM_POWER_RET))
-+		dd->per_next_state = PWRDM_POWER_RET;
- 
--	/* Restore original PER state if it was modified */
--	if (per_next_state != per_saved_state)
--		pwrdm_set_next_pwrst(per_pd, per_saved_state);
-+	/* Are we changing PER target state? */
-+	if (dd->per_next_state != dd->per_saved_state)
-+		pwrdm_set_next_pwrst(per_pd, dd->per_next_state);
- 
--	return ret;
-+	return next_valid_state(dev, drv, index);
- }
- 
- DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
-@@ -337,7 +329,8 @@ static inline void _fill_cstate(struct cpuidle_driver *drv,
- 	state->exit_latency	= cpuidle_params_table[idx].exit_latency;
- 	state->target_residency	= cpuidle_params_table[idx].target_residency;
- 	state->flags		= CPUIDLE_FLAG_TIME_VALID;
--	state->enter		= omap3_enter_idle_bm;
-+	state->pre_enter	= omap3_enter_idle_bm;
-+	state->enter		= omap3_enter_idle;
- 	sprintf(state->name, "C%d", idx + 1);
- 	strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
- 
-@@ -348,13 +341,10 @@ static inline struct omap3_idle_statedata *_fill_cstate_usage(
- 					struct cpuidle_device *dev,
- 					int idx)
- {
--	struct omap3_idle_statedata *cx = &omap3_idle_data[idx];
--	struct cpuidle_state_usage *state_usage = &dev->states_usage[idx];
--
--	cx->valid		= cpuidle_params_table[idx].valid;
--	cpuidle_set_statedata(state_usage, cx);
-+	omap3_idle_data.state_data[idx].valid = cpuidle_params_table[idx].valid;
-+	cpuidle_set_statedata(&dev->states_usage[idx], &omap3_idle_data);
- 
--	return cx;
-+	return &omap3_idle_data.state_data[idx];
+@@ -730,70 +729,74 @@ static inline void acpi_idle_do_entry(struct acpi_processor_cx *cx)
  }
  
  /**
+- * acpi_idle_enter_c1 - enters an ACPI C1 state-type
++ * acpi_idle_pre_enter_c1 - prepares an ACPI C1 state-type
+  * @dev: the target CPU
+  * @drv: cpuidle driver containing cpuidle state info
+  * @index: index of target state
+- *
+- * This is equivalent to the HALT instruction.
+  */
+-static int acpi_idle_enter_c1(struct cpuidle_device *dev,
++static int acpi_idle_pre_enter_c1(struct cpuidle_device *dev,
+ 		struct cpuidle_driver *drv, int index)
+ {
+-	ktime_t  kt1, kt2;
+-	s64 idle_time;
+-	struct acpi_processor *pr;
+-	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
+-	struct acpi_processor_cx *cx = cpuidle_get_statedata(state_usage);
+-
+-	pr = __this_cpu_read(processors);
+-	dev->last_residency = 0;
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++	struct acpi_processor *pr = __this_cpu_read(processors);
+ 
+ 	if (unlikely(!pr))
+ 		return -EINVAL;
+ 
+-	local_irq_disable();
+-
+ 	lapic_timer_state_broadcast(pr, cx, 1);
+-	kt1 = ktime_get_real();
++
++	return index;
++}
++
++/**
++ * acpi_idle_enter_c1 - enters an ACPI C1 state-type
++ * @dev: the target CPU
++ * @drv: cpuidle driver containing cpuidle state info
++ * @index: index of target state
++ *
++ * This is equivalent to the HALT instruction.
++ */
++static int acpi_idle_enter_c1(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int index)
++{
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++
+ 	acpi_idle_do_entry(cx);
+-	kt2 = ktime_get_real();
+-	idle_time =  ktime_to_us(ktime_sub(kt2, kt1));
+ 
+-	/* Update device last_residency*/
+-	dev->last_residency = (int)idle_time;
++	return index;
++}
++/**
++ * acpi_idle_enter_c1 - post ACPI C1 state-type cleanup
++ * @dev: the target CPU
++ * @drv: cpuidle driver containing cpuidle state info
++ * @index: index of target state
++ */
++static int acpi_idle_post_enter_c1(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int index)
++{
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++	struct acpi_processor *pr = __this_cpu_read(processors);
+ 
+-	local_irq_enable();
+-	cx->usage++;
+ 	lapic_timer_state_broadcast(pr, cx, 0);
+ 
+-	return index;
++	return 0;
+ }
+ 
+ /**
+- * acpi_idle_enter_simple - enters an ACPI state without BM handling
++ * acpi_idle_preenter_simple - prepare an ACPI state without BM handling
+  * @dev: the target CPU
+  * @drv: cpuidle driver with cpuidle state information
+  * @index: the index of suggested state
+  */
+-static int acpi_idle_enter_simple(struct cpuidle_device *dev,
++static int acpi_idle_pre_enter_simple(struct cpuidle_device *dev,
+ 		struct cpuidle_driver *drv, int index)
+ {
+-	struct acpi_processor *pr;
+-	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
+-	struct acpi_processor_cx *cx = cpuidle_get_statedata(state_usage);
+-	ktime_t  kt1, kt2;
+-	s64 idle_time_ns;
+-	s64 idle_time;
+-
+-	pr = __this_cpu_read(processors);
+-	dev->last_residency = 0;
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++	struct acpi_processor *pr = __this_cpu_read(processors);
+ 
+ 	if (unlikely(!pr))
+ 		return -EINVAL;
+ 
+-	local_irq_disable();
+-
+ 	if (cx->entry_method != ACPI_CSTATE_FFH) {
+ 		current_thread_info()->status &= ~TS_POLLING;
+ 		/*
+@@ -804,7 +807,6 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
+ 
+ 		if (unlikely(need_resched())) {
+ 			current_thread_info()->status |= TS_POLLING;
+-			local_irq_enable();
+ 			return -EINVAL;
+ 		}
+ 	}
+@@ -818,56 +820,65 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
+ 	if (cx->type == ACPI_STATE_C3)
+ 		ACPI_FLUSH_CPU_CACHE();
+ 
+-	kt1 = ktime_get_real();
+ 	/* Tell the scheduler that we are going deep-idle: */
+ 	sched_clock_idle_sleep_event();
++
++	return index;
++}
++
++/**
++ * acpi_idle_enter_simple - enters an ACPI state without BM handling
++ * @dev: the target CPU
++ * @drv: cpuidle driver with cpuidle state information
++ * @index: the index of suggested state
++ */
++static int acpi_idle_enter_simple(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int index)
++{
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++
+ 	acpi_idle_do_entry(cx);
+-	kt2 = ktime_get_real();
+-	idle_time_ns = ktime_to_ns(ktime_sub(kt2, kt1));
+-	idle_time = idle_time_ns;
+-	do_div(idle_time, NSEC_PER_USEC);
+ 
+-	/* Update device last_residency*/
+-	dev->last_residency = (int)idle_time;
++	sched_clock_idle_wakeup_event(0);
+ 
+-	/* Tell the scheduler how much we idled: */
+-	sched_clock_idle_wakeup_event(idle_time_ns);
++	return index;
++}
++
++
++/**
++ * acpi_idle_post_enter_simple - ACPI state without BM handling cleanup
++ * @dev: the target CPU
++ * @drv: cpuidle driver with cpuidle state information
++ * @index: the index of suggested state
++ */
++static int acpi_idle_post_enter_simple(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int index)
++{
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++	struct acpi_processor *pr = __this_cpu_read(processors);
+ 
+-	local_irq_enable();
+ 	if (cx->entry_method != ACPI_CSTATE_FFH)
+ 		current_thread_info()->status |= TS_POLLING;
+ 
+-	cx->usage++;
+-
+ 	lapic_timer_state_broadcast(pr, cx, 0);
+-	cx->time += idle_time;
+-	return index;
++
++	return 0;
+ }
+ 
+ static int c3_cpu_count;
+ static DEFINE_RAW_SPINLOCK(c3_lock);
+ 
+ /**
+- * acpi_idle_enter_bm - enters C3 with proper BM handling
++ * acpi_idle_pre_enter_bm - runs checks and prepares for C3
+  * @dev: the target CPU
+  * @drv: cpuidle driver containing state data
+  * @index: the index of suggested state
+- *
+- * If BM is detected, the deepest non-C3 idle state is entered instead.
+  */
+-static int acpi_idle_enter_bm(struct cpuidle_device *dev,
++static int acpi_idle_pre_enter_bm(struct cpuidle_device *dev,
+ 		struct cpuidle_driver *drv, int index)
+ {
+-	struct acpi_processor *pr;
+-	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
+-	struct acpi_processor_cx *cx = cpuidle_get_statedata(state_usage);
+-	ktime_t  kt1, kt2;
+-	s64 idle_time_ns;
+-	s64 idle_time;
+-
+-
+-	pr = __this_cpu_read(processors);
+-	dev->last_residency = 0;
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++	struct acpi_processor *pr = __this_cpu_read(processors);
+ 
+ 	if (unlikely(!pr))
+ 		return -EINVAL;
+@@ -877,15 +888,11 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
+ 			return drv->states[drv->safe_state_index].enter(dev,
+ 						drv, drv->safe_state_index);
+ 		} else {
+-			local_irq_disable();
+ 			acpi_safe_halt();
+-			local_irq_enable();
+ 			return -EINVAL;
+ 		}
+ 	}
+ 
+-	local_irq_disable();
+-
+ 	if (cx->entry_method != ACPI_CSTATE_FFH) {
+ 		current_thread_info()->status &= ~TS_POLLING;
+ 		/*
+@@ -896,7 +903,6 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
+ 
+ 		if (unlikely(need_resched())) {
+ 			current_thread_info()->status |= TS_POLLING;
+-			local_irq_enable();
+ 			return -EINVAL;
+ 		}
+ 	}
+@@ -911,7 +917,22 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
+ 	 */
+ 	lapic_timer_state_broadcast(pr, cx, 1);
+ 
+-	kt1 = ktime_get_real();
++	return index;
++}
++
++/**
++ * acpi_idle_enter_bm - enters C3 with proper BM handling
++ * @dev: the target CPU
++ * @drv: cpuidle driver containing state data
++ * @index: the index of suggested state
++ *
++ * If BM is detected, the deepest non-C3 idle state is entered instead.
++ */
++static int acpi_idle_enter_bm(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int index)
++{
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++	struct acpi_processor *pr = __this_cpu_read(processors);
+ 	/*
+ 	 * disable bus master
+ 	 * bm_check implies we need ARB_DIS
+@@ -942,26 +963,30 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
+ 		c3_cpu_count--;
+ 		raw_spin_unlock(&c3_lock);
+ 	}
+-	kt2 = ktime_get_real();
+-	idle_time_ns = ktime_to_ns(ktime_sub(kt2, kt1));
+-	idle_time = idle_time_ns;
+-	do_div(idle_time, NSEC_PER_USEC);
+ 
+-	/* Update device last_residency*/
+-	dev->last_residency = (int)idle_time;
++	sched_clock_idle_wakeup_event(0);
+ 
+-	/* Tell the scheduler how much we idled: */
+-	sched_clock_idle_wakeup_event(idle_time_ns);
++	return index;
++}
++
++/**
++ * acpi_idle_post_enter_bm - cleanup after exiting C3
++ * @dev: the target CPU
++ * @drv: cpuidle driver containing state data
++ * @index: the index of suggested state
++ */
++static int acpi_idle_post_enter_bm(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int index)
++{
++	struct acpi_processor_cx *cx = dev->states_usage[index].driver_data;
++	struct acpi_processor *pr = __this_cpu_read(processors);
+ 
+-	local_irq_enable();
+ 	if (cx->entry_method != ACPI_CSTATE_FFH)
+ 		current_thread_info()->status |= TS_POLLING;
+ 
+-	cx->usage++;
+-
+ 	lapic_timer_state_broadcast(pr, cx, 0);
+-	cx->time += idle_time;
+-	return index;
++
++	return 0;
+ }
+ 
+ struct cpuidle_driver acpi_idle_driver = {
+@@ -1076,21 +1101,31 @@ static int acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
+ 			if (cx->entry_method == ACPI_CSTATE_FFH)
+ 				state->flags |= CPUIDLE_FLAG_TIME_VALID;
+ 
++			state->pre_enter = acpi_idle_pre_enter_c1;
+ 			state->enter = acpi_idle_enter_c1;
++			state->enter = acpi_idle_post_enter_c1;
+ 			drv->safe_state_index = count;
+ 			break;
+ 
+ 			case ACPI_STATE_C2:
+ 			state->flags |= CPUIDLE_FLAG_TIME_VALID;
++			state->pre_enter = acpi_idle_pre_enter_simple;
+ 			state->enter = acpi_idle_enter_simple;
++			state->post_enter = acpi_idle_post_enter_simple;
+ 			drv->safe_state_index = count;
+ 			break;
+ 
+ 			case ACPI_STATE_C3:
+ 			state->flags |= CPUIDLE_FLAG_TIME_VALID;
++			state->pre_enter = pr->flags.bm_check ?
++					acpi_idle_pre_enter_bm :
++					acpi_idle_pre_enter_simple;
+ 			state->enter = pr->flags.bm_check ?
+ 					acpi_idle_enter_bm :
+ 					acpi_idle_enter_simple;
++			state->post_enter = pr->flags.bm_check ?
++					acpi_idle_post_enter_bm :
++					acpi_idle_post_enter_simple;
+ 			break;
+ 		}
+ 
 -- 
 1.7.1
