@@ -1,84 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 1 Feb 2012 10:04:55 +0000
-Subject: Reg pinmux driver for OMAP based SoC- AM335X
-In-Reply-To: <20120131170511.GI9339@atomide.com>
-References: <20120125000407.GU22818@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178CB82433@HQMAIL01.nvidia.com>
- <20120127020832.GJ29812@atomide.com>
- <20120127065752.GB32740@S2101-09.ap.freescale.net>
- <20120127170545.GH13504@atomide.com>
- <20120130015607.GA10470@S2101-09.ap.freescale.net>
- <20120130172042.GE9339@atomide.com>
- <20120131013215.GB24681@S2101-09.ap.freescale.net>
- <20120131022906.GH9339@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93176CAC6@DBDE01.ent.ti.com>
- <20120131170511.GI9339@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317BB650@DBDE01.ent.ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 1 Feb 2012 12:10:10 +0200
+Subject: [PATCH v2 0/8] Add tegra30 support for secondary cores
+In-Reply-To: <20120201083334.GM7399@quad.lixom.net>
+References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+ <20120201083334.GM7399@quad.lixom.net>
+Message-ID: <20120201101010.GN24948@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 22:35:11, Tony Lindgren wrote:
+On Wed, Feb 01, 2012 at 09:33:34AM +0100, Olof Johansson wrote:
 > Hi,
 > 
-> * Mohammed, Afzal <afzal@ti.com> [120131 06:04]:
-> > Hi Tony,
-> > 
-> > I am working on implementing pincontrol driver for AM335X SoC (OMAP34XX family).
-> > 
-> > Is there any specific plan you have in mind w.r.t incorporating
-> > pincontrol driver for OMAP family of SoC's. There was an initial patch
-> > for OMAP4 pin control driver, but it seems you were in favour of a
-> > DT based approach. As per my understanding after going through few threads
-> > (lot more remaining) is that pincontrol driver can be either a DT based
-> > or non-DT based (either way we are going out of platform folders), and
-> > it seems you prefer a DT based approach (have seen mentioning about
-> > pinmux-simple.c).
+> On Tue, Jan 31, 2012 at 06:40:38PM +0200, Peter De Schrijver wrote:
+> > This patchset introduces support for secondary cores on tegra30. It also
+> > introduces some functions for the flowcontroller and adds basic support for
+> > tegra30 powerdomains.
 > 
-> With at least omaps, there are few good reasons to go for a common
-> DT only driver:
+> It would be very useful to get a quick recap of what has changed since
+> previous versions in the cover email, if not detailed in the individual
+> patches (which it doesn't seem to be).
 > 
-> 1. We already have about 6k lines of mux data and seem to be
->    adding several thousands of lines of mux data each year.
-> 
-> 2. The driver does not need this data, it just needs to know how
->    to operate certain kind of mux registers. The data is mostly
->    handy for developers for debugging, and that can be done via
->    debugfs and userspace tools.
->  
-> > Tegra pincontrol driver posted recently, seems to use DT to distinguish only
-> > the SoC type, with all the pincontrol information for SoC present in Kernel.
-> > 
-> > I would be thankful if you can give me some pointers on how to proceed for
-> > AM335X pincontrol driver and/or any work in progress for OMAP pincontrol driver.
-> 
-> The plan is to deprecate the existing arch/arm/*omap*/*mux* code,
-> and cut it down to minimum. And then add DT only mux support that should
-> work for at least omap2+. That should work for am335x too.
-> 
-> There's currently some discussion going on regarding the pinmux device
-> tree binding and how dynamic mux states should be handled. But I'd
-> assume we'll have basic support available very soon.
-> 
-> The driver I'm working leaves all the data out of kernel, and the driver
-> just knows how to handle a pinmux register instances. 
 
-Tony,
+Oops. I forgot about that. 
 
-Is this hosted or accessible somewhere? Just for reference...
+Here it is:
 
-Thanks,
-Vaibhav
+Changes in v2:
 
-> Then debugging
-> tools can be done in userspace via debugfs to display more detailed
-> SoC specific information.
-> 
-> So it might be worth waiting just a little bit longer. If you have
-> resources to spend on the pinmuxing, then creating some userspace tool
-> to display SoC specific information would be nice :) For the userspace
-> tool, we can use the data in arch/arm/mach-omap2/mux*2*.[ch].
-> 
-> Regards,
-> 
-> Tony
-> 
+* moved chip id reading to fuse.c and cleanup code
+* don't set bit 1 of SB_CTRL on Tegra20
+* removed unused variables in tegra_cpu_reset_handler_init()
+
+Cheers,
+
+Peter.
