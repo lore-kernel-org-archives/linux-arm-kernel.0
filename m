@@ -1,173 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  1 Feb 2012 09:23:46 +0000
-Subject: [PATCH 6/6] mach-ux500: remove intermediary add_platform_device*
- functions
-In-Reply-To: <1328088226-29594-1-git-send-email-lee.jones@linaro.org>
-References: <1328088226-29594-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1328088226-29594-7-git-send-email-lee.jones@linaro.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 1 Feb 2012 10:34:39 +0100
+Subject: [PATCH] ARM: ux500: ioremap differences for DB9540
+Message-ID: <1328088879-28962-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are no longer required since a 'parent' pointer is now
-passed to each registering device.
+From: Michel Jaouen <michel.jaouen@stericsson.com>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+The DB9540 ASIC has bigger PRCMU and PRCMU TCDM memories,
+so create a separate mapping table for these.
+
+Signed-off-by: Michel Jaouen <michel.jaouen@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/devices-common.c |   53 ----------------------------------
- arch/arm/mach-ux500/devices-common.h |   46 ++++++++++++++++-------------
- arch/arm/mach-ux500/devices-db8500.h |   10 ++++--
- 3 files changed, 33 insertions(+), 76 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |   18 +++++++++++++++++-
+ 1 files changed, 17 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/devices-common.c b/arch/arm/mach-ux500/devices-common.c
-index 96effbd..c3bc094 100644
---- a/arch/arm/mach-ux500/devices-common.c
-+++ b/arch/arm/mach-ux500/devices-common.c
-@@ -59,59 +59,6 @@ dbx500_add_amba_device(struct device *parent, const char *name,
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index c6ceea3..b04acaf 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -48,12 +48,23 @@ static struct map_desc u8500_common_io_desc[] __initdata = {
+ 	__IO_DEV_DESC(U8500_CLKRST5_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_CLKRST6_BASE, SZ_4K),
+ 
+-	__IO_DEV_DESC(U8500_PRCMU_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO0_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO1_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO2_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO3_BASE, SZ_4K),
++};
++
++/* U8500 IO map specific description */
++static struct map_desc u8500_io_desc[] __initdata = {
++	__IO_DEV_DESC(U8500_PRCMU_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_PRCMU_TCDM_BASE, SZ_4K),
++
++};
++
++/* U9540 IO map specific description */
++static struct map_desc u9540_io_desc[] __initdata = {
++	__IO_DEV_DESC(U8500_PRCMU_BASE, SZ_4K + SZ_8K),
++	__IO_DEV_DESC(U8500_PRCMU_TCDM_BASE, SZ_4K + SZ_8K),
+ };
+ 
+ void __init u8500_map_io(void)
+@@ -67,6 +78,11 @@ void __init u8500_map_io(void)
+ 
+ 	iotable_init(u8500_common_io_desc, ARRAY_SIZE(u8500_common_io_desc));
+ 
++	if (cpu_is_u9540())
++		iotable_init(u9540_io_desc, ARRAY_SIZE(u9540_io_desc));
++	else
++		iotable_init(u8500_io_desc, ARRAY_SIZE(u8500_io_desc));
++
+ 	_PRCMU_BASE = __io_address(U8500_PRCMU_BASE);
  }
  
- static struct platform_device *
--dbx500_add_platform_device(const char *name, int id, void *pdata,
--			   struct resource *res, int resnum)
--{
--	struct platform_device *dev;
--	int ret;
--
--	dev = platform_device_alloc(name, id);
--	if (!dev)
--		return ERR_PTR(-ENOMEM);
--
--	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
--	dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
--
--	ret = platform_device_add_resources(dev, res, resnum);
--	if (ret)
--		goto out_free;
--
--	dev->dev.platform_data = pdata;
--
--	ret = platform_device_add(dev);
--	if (ret)
--		goto out_free;
--
--	return dev;
--
--out_free:
--	platform_device_put(dev);
--	return ERR_PTR(ret);
--}
--
--struct platform_device *
--dbx500_add_platform_device_4k1irq(const char *name, int id,
--				  resource_size_t base,
--				  int irq, void *pdata)
--{
--	struct resource resources[] = {
--		[0] = {
--			.start	= base,
--			.end	= base + SZ_4K - 1,
--			.flags	= IORESOURCE_MEM,
--		},
--		[1] = {
--			.start	= irq,
--			.end	= irq,
--			.flags	= IORESOURCE_IRQ,
--		}
--	};
--
--	return dbx500_add_platform_device(name, id, pdata, resources,
--					  ARRAY_SIZE(resources));
--}
--
--static struct platform_device *
- dbx500_add_gpio(struct device *parent, int id, resource_size_t addr, int irq,
- 		struct nmk_gpio_platform_data *pdata)
- {
-diff --git a/arch/arm/mach-ux500/devices-common.h b/arch/arm/mach-ux500/devices-common.h
-index f8adff8..39c74ec 100644
---- a/arch/arm/mach-ux500/devices-common.h
-+++ b/arch/arm/mach-ux500/devices-common.h
-@@ -8,14 +8,15 @@
- #ifndef __DEVICES_COMMON_H
- #define __DEVICES_COMMON_H
- 
--extern struct amba_device *
--dbx500_add_amba_device(struct device *parent, const char *name, resource_size_t base,
--		       int irq, void *pdata, unsigned int periphid);
-+#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/sys_soc.h>
-+#include <plat/i2c.h>
- 
--extern struct platform_device *
--dbx500_add_platform_device_4k1irq(const char *name, int id,
--				  resource_size_t base,
--				  int irq, void *pdata);
-+extern struct amba_device *
-+dbx500_add_amba_device(struct device *parent, const char *name,
-+		       resource_size_t base, int irq, void *pdata,
-+		       unsigned int periphid);
- 
- struct spi_master_cntlr;
- 
-@@ -60,20 +61,25 @@ struct nmk_i2c_controller;
- 
- static inline struct platform_device *
- dbx500_add_i2c(struct device *parent, int id, resource_size_t base, int irq,
--	       struct nmk_i2c_controller *pdata)
--{
--	return dbx500_add_platform_device_4k1irq("nmk-i2c", id, base, irq,
--						 pdata);
--}
--
--struct msp_i2s_platform_data;
--
--static inline struct platform_device *
--dbx500_add_msp_i2s(int id, resource_size_t base, int irq,
--		   struct msp_i2s_platform_data *pdata)
-+	       struct nmk_i2c_controller *data)
- {
--	return dbx500_add_platform_device_4k1irq("MSP_I2S", id, base, irq,
--						 pdata);
-+	struct resource res[] = {
-+		DEFINE_RES_MEM(base, SZ_4K),
-+		DEFINE_RES_IRQ(irq),
-+	};
-+
-+	struct platform_device_info pdevinfo = {
-+		.parent = parent,
-+		.name = "nmk-i2c",
-+		.id = id,
-+		.res = res,
-+		.num_res = ARRAY_SIZE(res),
-+		.data = data,
-+		.size_data = sizeof(*data),
-+		.dma_mask = DMA_BIT_MASK(32),
-+	};
-+
-+	return platform_device_register_full(&pdevinfo);
- }
- 
- static inline struct amba_device *
-diff --git a/arch/arm/mach-ux500/devices-db8500.h b/arch/arm/mach-ux500/devices-db8500.h
-index 9bd08ad..9fd93e9 100644
---- a/arch/arm/mach-ux500/devices-db8500.h
-+++ b/arch/arm/mach-ux500/devices-db8500.h
-@@ -18,9 +18,13 @@ db8500_add_ske_keypad(struct device *parent,
- 		      struct ske_keypad_platform_data *pdata,
- 		      size_t size)
- {
--	return dbx500_add_platform_device_4k1irq("nmk-ske-keypad", -1,
--						 U8500_SKE_BASE,
--						 IRQ_DB8500_KB, pdata);
-+	struct resource resources[] = {
-+		DEFINE_RES_MEM(U8500_SKE_BASE, SZ_4K),
-+		DEFINE_RES_IRQ(IRQ_DB8500_KB),
-+	};
-+
-+	return platform_device_register_resndata(parent, "nmk-ske-keypad", -1,
-+						 resources, 2, pdata, size);
- }
- 
- static inline struct amba_device *
 -- 
-1.7.5.4
+1.7.8
