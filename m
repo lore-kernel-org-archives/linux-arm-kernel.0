@@ -1,35 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 01 Feb 2012 12:34:29 +0100
-Subject: cpu_relax in busy loops question
-Message-ID: <4F292345.8070800@linaro.org>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Wed, 01 Feb 2012 17:07:30 +0530
+Subject: [PATCH V5 1/5] ARM: exynos: Add support AFTR mode on EXYNOS4210
+In-Reply-To: <1325737525-12869-2-git-send-email-amit.kachhap@linaro.org>
+References: <1325737525-12869-1-git-send-email-amit.kachhap@linaro.org>
+ <1325737525-12869-2-git-send-email-amit.kachhap@linaro.org>
+Message-ID: <4F2923FA.8080301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Amit,
 
-Hi Linus,
+On 01/05/2012 09:55 AM, Amit Daniel Kachhap wrote:
+> This patch adds support AFTR(ARM OFF TOP RUNNING) mode in
+> cpuidle driver. L2 cache keeps their data in this mode.
+> This patch ports the code to the latest interfaces to
+> save/restore CPU state inclusive of CPU PM notifiers, l2
+> resume and cpu_suspend/resume.
+> 
+> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+> ---
+>  arch/arm/mach-exynos/cpuidle.c          |  149 ++++++++++++++++++++++++++++++-
+>  arch/arm/mach-exynos/include/mach/pmu.h |    2 +
+>  2 files changed, 148 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
 
-While looking at the drivers/mfd/db8500-prcmu.c file I noticed:
+-- snip --
 
+> +static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv,
+> +				int index)
+> +{
 
-  595         /* Grab the HW semaphore. */
-  596         while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
-  597                 cpu_relax();
+-- snip --
 
+> +
+> +	scu_enable(S5P_VA_SCU);
 
-I was wondering why is cpu_relax needed here as readl does a memory 
-barrier ? I thought the cpu_relax function was related to the x86 to 
-consume less power with an optimization of the "rep nop" loops or/and do 
-a memory barrier.
+#ifdef CONFIG_SMP
+	scu_enable(S5P_VA_SCU);
+#endif
 
-Should a busy-loop be always with cpu_relax ?
-
-Thanks
-   -- Daniel
+This is required when compiling without SMP support.
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Tushar Behera
