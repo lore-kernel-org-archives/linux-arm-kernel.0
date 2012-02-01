@@ -1,37 +1,74 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 01 Feb 2012 09:47:33 +0100
-Subject: [PATCHv19 00/15] Contiguous Memory Allocator
-In-Reply-To: <CA+M3ks7h1t6DbPSAhPN6LJ5Dw84hSukfWG16avh2eZL+o4caJg@mail.gmail.com>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <201201261531.40551.arnd@arndb.de>
- <20120127162624.40cba14e.akpm@linux-foundation.org>
- <20120130132512.GO25268@csn.ul.ie> <op.v8wlzbc53l0zgt@mpn-glaptop>
- <CA+M3ks7h1t6DbPSAhPN6LJ5Dw84hSukfWG16avh2eZL+o4caJg@mail.gmail.com>
-Message-ID: <000201cce0be$240a88e0$6c1f9aa0$%szyprowski@samsung.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed,  1 Feb 2012 09:49:39 +0100
+Subject: [PATCH v3 00/20] ARM: OMAP3+: SmartReflex: bugfixes
+Message-ID: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Integrate the latest SmartReflex bufixes from Felipe Balbi [1] and
+Nishant Menon [2], plus misc bugfixes.
 
-On Tuesday, January 31, 2012 6:17 PM Benjamin Gaignard wrote:
+Based on latest master branch of the mainline git tree (3.3.0-rc1) [3], commit
+27ba234c8dfe86c96675d4ef275d1d3c1f5f7053.
 
-> I have rebase Linaro CMA test driver to be compatible with CMA v19, it now use
-> dma-mapping API instead of v17 CMA API.
-> A kernel for snowball with CMA v19 and test driver is available here: 
-> http://git.linaro.org/gitweb?p=people/bgaignard/linux-snowball-test-cma-v19.git;a=summary
->
-> From this kernel build, I have execute CMA lava (the linaro automatic test tool) 
-> test, the same than we are running since v16, the test is OK.
-> With previous versions of CMA some the test has found issues when the memory was 
-> filled with reclaimables pages, but with v19 this issue is no more present.
-> Test logs are here:  https://validation.linaro.org/lava-server/scheduler/job/10841
->
-> so you can add:
-> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+[1] http://marc.info/?l=linux-omap&m=132134699423547&w=2
+[2] https://github.com/nmenon/linux-omap-ti-pm/commits/linux-omap-3.0
+[3] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=shortlog
 
-Thanks for Your contribution!
 
-Best regards
+Revision history:
+. v3:
+  fixed the error handling code
+
+. v2:
+  fixed the use of debugfs_create_* API
+  minor fixes after comments on l-o ML: commits title, removed unneeded
+   fields in descriptions
+  removed the unneeded patches about the suspend/resume handlers
+
+. v1:
+  initial commits
+
+
+Felipe Balbi (4):
+  ARM: OMAP3+: SmartReflex: add missing platform_set_drvdata()
+  ARM: OMAP3+: SmartReflex: move late_initcall() closer to its argument
+  ARM: OMAP3+: SmartReflex: misc cleanups
+  ARM: OMAP3+: SmartReflex: micro-optimization for sanity check
+
+Jean Pihet (2):
+  ARM: OMAP3+: SmartReflex: fix the use of debugfs_create_* API
+  ARM: OMAP3+: SmartReflex: fix error handling
+
+Julia Lawall (1):
+  ARM: OMAP3+: SmartReflex: add missing error-handling code
+
+Nishanth Menon (12):
+  ARM: OMAP3+: SmartReflex: fix err interrupt disable sequence
+  ARM: OMAP3+: SmartReflex Class3: disable errorgen before disable VP
+  ARM: OMAP3+: SmartReflex: Add a shutdown hook
+  ARM: OMAP3+: SmartReflex: Fix status masking in ERRCONFIG register
+  ARM: OMAP3+: SmartReflex: clear ERRCONFIG_VPBOUNDINTST only on a need
+  ARM: OMAP3+: hwmod: add SmartReflex IRQs
+  ARM: OMAP3+: SmartReflex: introduce class init, deinit and priv data
+  ARM: OMAP3+: SmartReflex: introduce notifiers flags
+  ARM: OMAP3+: SmartReflex: introduce notifier_control
+  ARM: OMAP3+: SmartReflex: disable spamming interrupts
+  ARM: OMAP3+: SmartReflex: introduce class private data per voltage
+    domain
+  ARM: OMAP3+: SmartReflex Class3: restrict CPU to run on
+
+Shweta Gulati (1):
+  ARM: OMAP3+: SmartReflex: Layer Cleanup [V4]
+
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   31 ++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   19 +-
+ arch/arm/mach-omap2/smartreflex-class3.c     |   16 +-
+ arch/arm/mach-omap2/smartreflex.c            |  424 +++++++++++++++++++++----
+ arch/arm/mach-omap2/smartreflex.h            |   42 +++-
+ arch/arm/mach-omap2/sr_device.c              |   11 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 -
+ 7 files changed, 457 insertions(+), 88 deletions(-)
+
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.5.4
