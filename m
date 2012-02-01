@@ -1,43 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 1 Feb 2012 14:44:15 +0100
-Subject: [GIT PULL] cs89x0 platform support
-Message-ID: <20120201134415.GU1990@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  1 Feb 2012 13:52:34 +0000
+Subject: [PATCH 2/2] ARM: errata: fix PL310 erratum #753970 workaround
+ selection
+In-Reply-To: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
+References: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1328104354-7553-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Commit fa0ce403 ("ARM: 7162/1: errata: tidy up Kconfig options for PL310
+errata workarounds") introduced a consistent naming scheme for errata
+workarounds, but forgot to update the platforms selecting workarounds
+using the old names.
 
-Please pull the following for next. It contains cs89x0 platform
-support. David has acked the base patch and is fine with this
-patch going via the Arm tree.
+This patch updates ux500 and vexpress to select the appropriate PL310
+errata workarounds.
 
-Sascha
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-ux500/Kconfig    |    2 +-
+ arch/arm/mach-vexpress/Kconfig |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-
-  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git features/cs89x0
-
-Jaccon Bastiaansen (4):
-      CS89x0 : add platform driver support
-      CS89x0 : add CS89x0 platform device to the iMX21ADS board
-      CS89x0 : remove QQ2440 board support from the CS89x0 driver
-      CS89x0 : add CS89x0 platform device to the iMX31ADS board
-
- arch/arm/configs/imx_v4_v5_defconfig           |    2 +
- arch/arm/configs/mx3_defconfig                 |    2 +
- arch/arm/mach-imx/mach-mx21ads.c               |   16 +++-
- arch/arm/mach-imx/mach-mx31ads.c               |   35 +++++-
- arch/arm/plat-mxc/include/mach/board-mx31ads.h |   33 ------
- drivers/net/Space.c                            |    2 +
- drivers/net/ethernet/cirrus/Kconfig            |   19 ++--
- drivers/net/ethernet/cirrus/cs89x0.c           |  148 +++++++++++++++++++----
- 8 files changed, 186 insertions(+), 71 deletions(-)
- delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index a3e0c86..9c8a9e7 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -5,7 +5,7 @@ config UX500_SOC_COMMON
+ 	default y
+ 	select ARM_GIC
+ 	select HAS_MTU
+-	select ARM_ERRATA_753970
++	select PL310_ERRATA_753970
+ 	select ARM_ERRATA_754322
+ 
+ menu "Ux500 SoC"
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 9b3d0fb..88c3ba1 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -7,7 +7,7 @@ config ARCH_VEXPRESS_CA9X4
+ 	select ARM_GIC
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_751472
+-	select ARM_ERRATA_753970
++	select PL310_ERRATA_753970
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.4.1
