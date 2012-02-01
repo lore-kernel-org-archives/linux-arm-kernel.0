@@ -1,49 +1,57 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 1 Feb 2012 09:34:15 +0100
-Subject: [PATCH] ARM: OMAP3+: PM debug: fix the use of debugfs_create_* API
-In-Reply-To: <87ehufojh1.fsf@ti.com>
-References: <1328008819-1110-1-git-send-email-j-pihet@ti.com>
- <87ehufojh1.fsf@ti.com>
-Message-ID: <CAORVsuWbRDFGGgs2hg3-9cz-Pd16B97QRU-5c4QQ4C6S_uLRog@mail.gmail.com>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Wed, 01 Feb 2012 14:07:41 +0530
+Subject: [PATCH v2 0/2] Add Qualcomm MSM ADM DMAEngine driver
+In-Reply-To: <1328084998.1610.11.camel@vkoul-udesk3>
+References: <1325854052-21402-1-git-send-email-kumarrav@codeaurora.org>
+ <1326807902.1540.116.camel@vkoul-udesk3> <4F195E4C.6080805@codeaurora.org>
+ <1327066287.517.4.camel@vkoul-udesk3> <4F1D4052.3070701@codeaurora.org>
+ <1327326713.517.32.camel@vkoul-udesk3> <4F1FFF7E.3000802@codeaurora.org>
+ <1327911315.1527.8.camel@vkoul-udesk3> <4F278341.4020600@codeaurora.org>
+ <1327990151.1527.80.camel@vkoul-udesk3> <4F28D8A2.9050605@codeaurora.org>
+ <1328084998.1610.11.camel@vkoul-udesk3>
+Message-ID: <4F28F9D5.6020801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
-
-On Tue, Jan 31, 2012 at 6:44 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Jean Pihet <jean.pihet@newoldbits.com> writes:
->
->> The debugfs_create_* API returns a NULL ptr in case of problem.
->> Fix the PM debug code to take this into account.
+On 2/1/2012 1:59 PM, Vinod Koul wrote:
+> On Wed, 2012-02-01 at 11:46 +0530, Ravi Kumar V wrote:
+>> On 1/31/2012 11:39 AM, Vinod Koul wrote:
+>>> On Tue, 2012-01-31 at 11:29 +0530, Ravi Kumar V wrote:
+>>>>> [1]: https://lkml.org/lkml/2011/10/24/275
+>>>>> [2]: https://lkml.org/lkml/2012/1/26/405
+>>>>>
+>>>>
+>>>> Yes if we follow the above RFC and add extra context parameter also
+>>>> in
+>>>> device_prep_dma_sg()&   device_prep_interleaved_dma() then it supports
+>>>> our hardware and our work will be completed.
+>>>>
+>>>> can we follow above RFC and implement our driver.
+>>>> Is above RFC finalized and included in mainline?
+>>> Alexandre will post an updated one soon, but the idea is same
+>>>
 >>
->> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->> ---
->> ?arch/arm/mach-omap2/pm-debug.c | ? ?4 ++--
->> ?1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
->> index 4411163..e5bf367 100644
->> --- a/arch/arm/mach-omap2/pm-debug.c
->> +++ b/arch/arm/mach-omap2/pm-debug.c
->> @@ -264,8 +264,8 @@ static int __init pm_dbg_init(void)
->> ? ? ? ? ? ? ? return 0;
->>
->> ? ? ? d = debugfs_create_dir("pm_debug", NULL);
->> - ? ? if (IS_ERR(d))
->> - ? ? ? ? ? ? return PTR_ERR(d);
->> + ? ? if (!d)
+>> Can we add extra parameter context to device_prep_dma_sg()&
+>> device_prep_interleaved_dma() API's and implement our driver.
+> So what one are you going to use...
 >
-> I think this should be IS_ERR_OR_NULL() because this function can also
-> return ERR_PTR(-ENODEV). ?(Yes, only when debugfs is not enabled, but
-> it's still more correct.)
-That makes sense, even if the PM debug code is enclosed by #ifdef
-CONFIG_DEBUG_FS.
-I have a new version of the patch, it also fixes another potential
-problem with debugfs.
+>> From the description sounds like you need interleaved API but with
+> changes to make it interleaved in both src and dtsn, right?her
+> Then why prep_dma_sg?
+>
+>
 
-Thanks,
-Jean
+Our hardware supports single transfer mode,scatter gather mode & box mode.
 
->
-> Kevin
->
+we are using these dmaengine API's for our HW
+device_prep_memcpy() for single mode.
+device_prep_dma_sg() for sg mode.
+device_prep_interleaved_dma() for box mode.
+
+We need to pass command configuration parameter to all of the above 
+three modes and it can be possible if extra context parameter is added 
+into these API's
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
