@@ -1,27 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 31 Jan 2012 23:35:23 -0800
-Subject: [PATCH v1 0/3] Add support for LP3
-In-Reply-To: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1327594923-21822-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20120201073523.GF7399@quad.lixom.net>
+Date: Tue, 31 Jan 2012 23:39:26 -0800
+Subject: [PATCH] ARM: tegra: Add pinmux board file for Cardhu
+In-Reply-To: <1327511715-27350-1-git-send-email-swarren@nvidia.com>
+References: <1327511715-27350-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20120201073926.GG7399@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2012 at 06:22:00PM +0200, Peter De Schrijver wrote:
-> Introduce support for LP3 (CPU core clockgating) for Tegra20 and Tegra30.
+On Wed, Jan 25, 2012 at 10:15:15AM -0700, Stephen Warren wrote:
+> For now, this just sets up the pinmux and GPIOs required for the SD
+> card slot.
 > 
-> Peter De Schrijver (3):
->   ARM: tegra: definitions for flow controller
->   ARM: tegra: assembler code for LP3
->   ARM: tegra: cpuidle driver for tegra
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Tested-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+> This will hopefully be replaced by the pinmux DT binding in the near
+> future, but until that happens, Tegra30 pinmux functionality needs to
+> be exposed somehow to unblock getting drivers tested on Tegra30.
 > 
->  arch/arm/mach-tegra/Makefile   |    2 +
->  arch/arm/mach-tegra/cpuidle.c  |  107 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-tegra/flowctrl.h |   37 ++++++++++++++
->  arch/arm/mach-tegra/sleep.S    |   91 ++++++++++++++++++++++++++++++++++
->  4 files changed, 237 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-tegra/cpuidle.c
->  create mode 100644 arch/arm/mach-tegra/flowctrl.h
->  create mode 100644 arch/arm/mach-tegra/sleep.S
+> This of course depends on my recently posted patches that implement a
+> pinctrl subsystem driver for Tegra.
+> 
+> (Peter said: Boot tested on Cardhu, MMC still doesn't work but that might
+> have another rootcause...)
 
 Thanks, applied.
+
+
+-Olof
