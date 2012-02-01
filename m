@@ -1,27 +1,27 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 01 Feb 2012 11:26:18 -0500 (EST)
-Subject: [PATCH 0/2] Errata workaround updates
-In-Reply-To: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
-References: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1202011123420.2759@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 1 Feb 2012 17:27:18 +0000
+Subject: [PATCH] pinctrl: delete raw device pointers in pinmux maps
+In-Reply-To: <1328117053-27807-1-git-send-email-linus.walleij@stericsson.com>
+References: <1328117053-27807-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120201172717.GG17170@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Feb 2012, Will Deacon wrote:
-
-> Hello,
+On Wed, Feb 01, 2012 at 06:24:13PM +0100, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> After Russell pointed out that we weren't applying an erratum workaround
-> in all cases that it was required:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082730.html
-> 
-> I went back through the documents for PL310 and Cortex-A9 to check that
-> what we have in Linux matches the latest workarounds.
+> After discussion with Mark Brown in an unrelated thread about
+> ADC lookups, it came to my knowledge that the ability to pass
+> a struct device * in the regulator consumers is just a
+> historical artifact, and not really recommended. Since there
+> are no in-kernel users of these pointers, we just kill them
+> right now, before someone starts to use them.
 
-Ideally, you should not limit the workaround only to those revisions 
-known to be broken but to any revision.  Only when a particular revision 
-is known to be fixed then should it be disabled.
-
-
-Nicolas
+Reviwed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120201/6f896644/attachment.sig>
