@@ -1,40 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  1 Feb 2012 14:03:10 +0000
-Subject: [PATCH v3 0/2] Remaining VFP fixes
-Message-ID: <1328104992-8016-1-git-send-email-will.deacon@arm.com>
+Date: Wed,  1 Feb 2012 14:03:12 +0000
+Subject: [PATCH v3 2/2] ARM: vfp: clear fpscr length and stride bits on entry
+ to sig handler
+In-Reply-To: <1328104992-8016-1-git-send-email-will.deacon@arm.com>
+References: <1328104992-8016-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1328104992-8016-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The ARM PCS mandates that the length and stride bits of the fpscr are
+cleared on entry to and return from a public interface. Although signal
+handlers run asynchronously with respect to the interrupted function,
+the handler itself expects to run as though it has been called like a
+normal function.
 
-This is v3 of the patches originally posted here:
+This patch updates the state mirroring the VFP hardware before entry to
+a signal handler so that it adheres to the PCS. Furthermore, we disable
+VFP to ensure that we trap on any floating point operation performed by
+the signal handler and synchronise the hardware appropriately. A check
+is inserted after the signal handler to avoid redundant flushing if VFP
+was not used.
 
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082168.html
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082383.html
+Reported-by: Peter Maydell <peter.maydell@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/vfp/vfpmodule.c |   22 +++++++++++++++++++++-
+ 1 files changed, 21 insertions(+), 1 deletions(-)
 
-Patches 1-3 from v2 of the series are now in the patch system, so this
-posting is a rework of what was previously patch 4/4.
-
-The main change is that the VFP save/restore code is now moved out of
-signal.c and into vfpmodule.c, since that is where the low-level
-knowledge belongs.
-
-I tested the changes with the `risu' tool for 24 hours on my (A9)
-vexpress without any issues.
-
-Cheers,
-
-Will
-
-
-Will Deacon (2):
-  ARM: vfp: move user vfp state save/restore code out of signal.c
-  ARM: vfp: clear fpscr length and stride bits on entry to sig handler
-
- arch/arm/include/asm/thread_info.h |    7 +++
- arch/arm/kernel/signal.c           |   57 ++-------------------
- arch/arm/vfp/vfpmodule.c           |   99 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 111 insertions(+), 52 deletions(-)
-
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 3e35e35..49cf328 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -562,6 +562,21 @@ int vfp_preserve_user_hwstate(struct user_vfp __user *ufp,
+ 
+ 	if (err)
+ 		return -EFAULT;
++
++	/* Ensure that VFP is disabled. */
++	vfp_flush_hwstate(thread);
++
++	/*
++	 * As per the PCS, clear the length and stride bits before entry
++	 * to the signal handler.
++	 */
++	hwstate->fpscr &= ~(FPSCR_LENGTH_MASK | FPSCR_STRIDE_MASK);
++
++	/*
++	 * Disable VFP in the hwstate so that we can detect if it was
++	 * used by the signal handler.
++	 */
++	hwstate->fpexc &= ~FPEXC_EN;
+ 	return 0;
+ }
+ 
+@@ -574,7 +589,12 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
+ 	unsigned long fpexc;
+ 	int err = 0;
+ 
+-	vfp_flush_hwstate(thread);
++	/*
++	 * If VFP has been used, then disable it to avoid corrupting
++	 * the new thread state.
++	 */
++	if (hwstate->fpexc & FPEXC_EN)
++		vfp_flush_hwstate(thread);
+ 
+ 	/*
+ 	 * Copy the floating point registers. There can be unused
 -- 
 1.7.4.1
