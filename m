@@ -1,31 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 1 Feb 2012 21:11:55 +0100
-Subject: [PATCH 3/4] ARM: tegra: Switch to new pinctrl driver
-In-Reply-To: <20120201082011.GK7399@quad.lixom.net>
-References: <1327083746-31430-1-git-send-email-swarren@nvidia.com>
- <1327083746-31430-3-git-send-email-swarren@nvidia.com>
- <CACRpkdZ_hBviswq7pXoLozC8gjzvowCBrj9yjw1xJT79b5rtwQ@mail.gmail.com>
- <20120201082011.GK7399@quad.lixom.net>
-Message-ID: <CACRpkdZ76PamNGOuhuqNvMx9k6hRR2MD2L7sJnv7nU_A45Yypg@mail.gmail.com>
+Date: Wed, 1 Feb 2012 21:17:12 +0100
+Subject: cpu_relax in busy loops question
+In-Reply-To: <4F292345.8070800@linaro.org>
+References: <4F292345.8070800@linaro.org>
+Message-ID: <CACRpkdZfdx9tDgp8HfVSdEFXdvpsPDiWdpg2iyFYesgpBjsqyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2012 at 9:20 AM, Olof Johansson <olof@lixom.net> wrote:
+On Wed, Feb 1, 2012 at 12:34 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+>
+> Hi Linus,
+>
+> While looking at the drivers/mfd/db8500-prcmu.c file I noticed:
+>
+>
+> ?595 ? ? ? ? /* Grab the HW semaphore. */
+> ?596 ? ? ? ? while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
+> ?597 ? ? ? ? ? ? ? ? cpu_relax();
+>
+>
+> I was wondering why is cpu_relax needed here as readl does a memory barrier
+> ? I thought the cpu_relax function was related to the x86 to consume less
+> power with an optimization of the "rep nop" loops or/and do a memory
+> barrier.
+>
+> Should a busy-loop be always with cpu_relax ?
 
-> This series is:
-> Acked-by: Olof Johansson <olof@lixom.net>
+Last time we discussed it ar LAKML I think we came to the conclusion
+that while cpu_relax() has very little semantic meaning on ARM, it
+is still nice to have from a readability and maintenance point of view,
+since it is pretty clear what we're trying to do.
 
-OK that's great!
+But I will stand corrected...
 
-> can you land this series in a stable branch in
-> your tree that you promise not to rebase between now and upstream
-> submission?
-
-I thinkso, I rebased to some fixes from -rc2 today but no need to
-do that again, there is one bug fix which may end up in both
-mainline and my tree but whatever, git will cope.
-
-However I am waiting for Stephen to do some fixes and arrive
-at a final version first.
-
+Yours,
 Linus Walleij
