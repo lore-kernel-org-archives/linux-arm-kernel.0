@@ -1,31 +1,34 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Thu, 01 Dec 2011 12:58:59 +1030
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <20111130231306.GD30031@redhat.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
- <20111129151958.GA31789@redhat.com>
- <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
- <20111130145004.GD21413@redhat.com>
- <CAK=WgbY59n9N_-2_TZ9wNBNcTMV1DCrz65e-Ae=xamcg6A0dOA@mail.gmail.com>
- <20111130231306.GD30031@redhat.com>
-Message-ID: <87zkfdrpn8.fsf@rustcorp.com.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 31 Jan 2012 23:09:18 -0800
+Subject: [PATCH V1] arm: tegra: dma: not required to move requestor when
+ stopping.
+In-Reply-To: <4F27CA58.2020809@nvidia.com>
+References: <1327392649-27605-1-git-send-email-ldewangan@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178CB81E5F@HQMAIL01.nvidia.com>
+ <4F27CA58.2020809@nvidia.com>
+Message-ID: <20120201070918.GA7399@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Dec 2011 01:13:07 +0200, "Michael S. Tsirkin" <mst@redhat.com> wrote:
-> For x86, stores into memory are ordered. So I think that yes, smp_XXX
-> can be selected at compile time.
-> 
-> So let's forget the virtio strangeness for a minute,
+On Tue, Jan 31, 2012 at 04:32:48PM +0530, Laxman Dewangan wrote:
+> On Wednesday 25 January 2012 02:27 AM, Stephen Warren wrote:
+> >Laxman Dewangan wrote at Tuesday, January 24, 2012 1:11 AM:
+> >>It is not require to move the requestor of dma to INVALID
+> >>option before stopping dma.
+> >>
+> >>Signed-off-by: Laxman Dewangan<ldewangan@nvidia.com>
+> >Acked-by: Stephen Warren<swarren@nvidia.com>
+> >Tested-by: Stephen Warren<swarren@nvidia.com>
+> >
+> >I know that Laxman has checked with the HW engineers, and they see no
+> >reason to do this. I was originally worried about hung FIFOs preventing
+> >an in-progress DMA from completely without the removed code, but according
+> >to HW, that isn't a concern.
+> >
+> Olaf,
+> Can it be applied if it is OK to you?
 
-Hmm, we got away with light barriers because we knew we were not
-*really* talking to a device.  But now with virtio-mmio, turns out we
-are :)
+Yep, applied.
 
-I'm really tempted to revert d57ed95 for 3.2, and we can revisit this
-optimization later if it proves worthwhile.
 
-Thoughts?
-Rusty. 
+-Olof
