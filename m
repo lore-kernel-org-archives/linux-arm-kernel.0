@@ -1,51 +1,46 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Sun,  1 Jan 2012 11:30:06 +0800
-Subject: [PATCH] dma/imx-sdma: save irq flags when use spin_lock in
- sdma_tx_submit
-Message-ID: <1325388606-20732-1-git-send-email-richard.zhao@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 1 Feb 2012 13:46:54 +0800
+Subject: [PATCH] irq_domain: fix the irq number of imx5 tzic
+In-Reply-To: <1327700179-17454-15-git-send-email-grant.likely@secretlab.ca>
+References: <1327700179-17454-15-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <1328075214-25700-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haitao Zhang <minipanda@linuxrobot.org>
+The tzic controller found on imx51 and imx53 gets 128 irq lines rather
+than 32.
 
-mx53_loco: fix deadlock report from sdma_tx_submit() during boot
-
-BugLink: http://bugs.launchpad.net/bugs/878701
-
-Adjust to use spin_lock_irqsave()/spin_unlock_irqresotre(), so to
-make it safe when called from interrupt context.
-
-Signed-off-by: Haitao Zhang <haitao.zhang@linaro.org>
-Signed-off-by: Eric Miao <eric.miao@linaro.org>
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/dma/imx-sdma.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-mx5/imx51-dt.c |    2 +-
+ arch/arm/mach-mx5/imx53-dt.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f993955..2b7a88b 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -832,17 +832,18 @@ static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
- 
- static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
+diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
+index e1b5edf..1e03ef4 100644
+--- a/arch/arm/mach-mx5/imx51-dt.c
++++ b/arch/arm/mach-mx5/imx51-dt.c
+@@ -47,7 +47,7 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
+ static int __init imx51_tzic_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
  {
-+	unsigned long flags;
- 	struct sdma_channel *sdmac = to_sdma_chan(tx->chan);
- 	struct sdma_engine *sdma = sdmac->sdma;
- 	dma_cookie_t cookie;
- 
--	spin_lock_irq(&sdmac->lock);
-+	spin_lock_irqsave(&sdmac->lock, flags);
- 
- 	cookie = sdma_assign_cookie(sdmac);
- 
- 	sdma_enable_channel(sdma, sdmac->channel);
- 
--	spin_unlock_irq(&sdmac->lock);
-+	spin_unlock_irqrestore(&sdmac->lock, flags);
- 
- 	return cookie;
+-	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
++	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
+ 	return 0;
  }
+ 
+diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
+index 89de5d4..fd5be0f 100644
+--- a/arch/arm/mach-mx5/imx53-dt.c
++++ b/arch/arm/mach-mx5/imx53-dt.c
+@@ -51,7 +51,7 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
+ static int __init imx53_tzic_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+-	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
++	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
+ 	return 0;
+ }
+ 
 -- 
 1.7.4.1
