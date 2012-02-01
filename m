@@ -1,42 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 1 Feb 2012 13:49:32 -0800
-Subject: [PATCH 3/4] ARM: tegra: Switch to new pinctrl driver
-In-Reply-To: <CACRpkdZ76PamNGOuhuqNvMx9k6hRR2MD2L7sJnv7nU_A45Yypg@mail.gmail.com>
-References: <1327083746-31430-1-git-send-email-swarren@nvidia.com>
- <1327083746-31430-3-git-send-email-swarren@nvidia.com>
- <CACRpkdZ_hBviswq7pXoLozC8gjzvowCBrj9yjw1xJT79b5rtwQ@mail.gmail.com>
- <20120201082011.GK7399@quad.lixom.net>
- <CACRpkdZ76PamNGOuhuqNvMx9k6hRR2MD2L7sJnv7nU_A45Yypg@mail.gmail.com>
-Message-ID: <CAOesGMjrj-+kpj9YL+_fAP_91VZEyuCc8prkSHgut8-0xES9Nw@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed,  1 Feb 2012 16:29:57 -0700
+Subject: [PATCH V2 2/2] ARM: dt: Add SD controller configuration to Tegra
+ Cardhu
+In-Reply-To: <1328138997-25665-1-git-send-email-swarren@nvidia.com>
+References: <1328138997-25665-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1328138997-25665-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2012 at 12:11 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Feb 1, 2012 at 9:20 AM, Olof Johansson <olof@lixom.net> wrote:
->
->> This series is:
->> Acked-by: Olof Johansson <olof@lixom.net>
->
-> OK that's great!
->
->> can you land this series in a stable branch in
->> your tree that you promise not to rebase between now and upstream
->> submission?
->
-> I thinkso, I rebased to some fixes from -rc2 today but no need to
-> do that again, there is one bug fix which may end up in both
-> mainline and my tree but whatever, git will cope.
+Cardhu uses Tegra's SD ports as follows:
+SDMMC1: User SD slot, with GPIOs for power, CD, and WP.
+SDMMC2: Not used
+SDMMC3: WiFi (currently disabled pending future investigation)
+SDMMC4: Internal eMMC
 
-Ok, yeah that should be fine. Alternatively, applying only these
-patches on a separate branch that you pull into your main for-3.4
-branch means that if you have to rebase the rest of for-3.4 you can
-get away with it as long as you yet again only pull in this branch
-instead of include it in the rebase.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-cardhu.dts |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
-> However I am waiting for Stephen to do some fixes and arrive
-> at a final version first.
-
-Sounds good.
-
-
--Olof
+diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
+index 70c41fc..7326350 100644
+--- a/arch/arm/boot/dts/tegra-cardhu.dts
++++ b/arch/arm/boot/dts/tegra-cardhu.dts
+@@ -33,4 +33,22 @@
+ 	i2c at 7000d000 {
+ 		clock-frequency = <100000>;
+ 	};
++
++	sdhci at 78000000 {
++		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
++		wp-gpios = <&gpio 155 0>; /* gpio PT3 */
++		power-gpios = <&gpio 31 0>; /* gpio PD7 */
++	};
++
++	sdhci at 78000200 {
++		status = "disable";
++	};
++
++	sdhci at 78000400 {
++		status = "disable";
++	};
++
++	sdhci at 78000400 {
++		support-8bit;
++	};
+ };
+-- 
+1.7.0.4
