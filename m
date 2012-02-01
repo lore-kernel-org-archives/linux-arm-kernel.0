@@ -1,49 +1,73 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 31 Jan 2012 17:08:48 -0700
-Subject: [PATCH v3 14/25] irq_domain: Remove irq_domain_add_simple()
-In-Reply-To: <20120131135821.GA24804@S2100-06.ap.freescale.net>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-15-git-send-email-grant.likely@secretlab.ca>
- <20120131124500.GA28571@S2101-09.ap.freescale.net>
- <4F27E96E.9010204@gmail.com>
- <20120131135821.GA24804@S2100-06.ap.freescale.net>
-Message-ID: <20120201000848.GN22611@ponder.secretlab.ca>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Tue, 31 Jan 2012 21:00:10 -0600
+Subject: [RFC PATCH v4 0/4] Consolidate cpuidle timekeeping and irq enabling
+Message-ID: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 09:58:22PM +0800, Shawn Guo wrote:
-> On Tue, Jan 31, 2012 at 07:15:26AM -0600, Rob Herring wrote:
-> ...
-> > >> --- a/arch/arm/mach-mx5/imx51-dt.c
-> > >> +++ b/arch/arm/mach-mx5/imx51-dt.c
-> > >> @@ -47,7 +47,7 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
-> > >>  static int __init imx51_tzic_add_irq_domain(struct device_node *np,
-> > >>  				struct device_node *interrupt_parent)
-> > >>  {
-> > >> -	irq_domain_add_simple(np, 0);
-> > >> +	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
-> > >>  	return 0;
-> > >>  }
-> > >>  
-> > >> @@ -57,7 +57,7 @@ static int __init imx51_gpio_add_irq_domain(struct device_node *np,
-> > >>  	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
-> > >>  
-> > >>  	gpio_irq_base -= 32;
-> > >> -	irq_domain_add_simple(np, gpio_irq_base);
-> > >> +	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
-> > > 
-> > > The tzic on imx5 gets 128 irq lines rather than 32 here.  The current
-> > > code will make any hwirq that is > 32 hit the WARN_ON below in
-> > > irq_domain_legacy_revmap().
-> > 
-> > But this is the gpio controller code? Really this should be 4 domains,
-> > but this temp fix is probably fine until you use my generic irq chip
-> > support.
-> > 
-> Sorry.  The comment was put at the wrong place.  It should be against
-> imx51_tzic_add_irq_domain() just above.
+This patch series moves the timekeeping and irq enabling from the platform
+code to the core cpuidle driver.  Also, the platform irq disabling was removed
+as it appears that all calls into cpuidle_call_idle will have already called
+local_irq_disable().
 
-I didn't know how large the bank was, so I just assumed 32.  If it should
-be 128 then I'll change it.  Please confirm (or reply with a fixup patch)
+To save reviewers time, only a few platforms which required the most changes
+are included in this version.  If these changes are approved, the next version
+will include the remaining platform code which should require minimal changes.
 
-g.
+For those who have followed the previous patch versions, as you know, the
+previous version of this patch series added some helper functionality which
+used a wrapper function to remove the time keeping and irq enabling/disabling
+from the platform code.  There was also initialization helper functionality 
+which has now been removed from this version.  If the basic implementation
+in this version is approved, then a separate patch submission effort can be
+made to focus on consolidation of initialziation functionality.
+
+Based on 3.3-rc1
+
+v3 submission can be found here:
+http://www.spinics.net/lists/arm-kernel/msg156751.html
+Changes since v3:
+* Removed drivers/cpuidle/common.c
+** Removed the initialization helper functions
+** Removed the wrapper used to consolidate time keeping and irq enable/disable
+* Add time keeping and local_irq_disable handling in cpuidle_call_idle().
+* Made necessary modifications to a few platforms that required the most changes
+** Note on omap3: changed structure of omap3_idle_drvdata and added 
+   per_next_state and per_saved_state vars to accomodate new framework.
+
+v2 submission can be found here:
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/144199
+
+Changes since v2:
+* Made various code organization and style changes as suggested in v1 review.
+* Removed at91 use of common code.  A separate effort is underway to clean
+at91 code and the author has offered to convert to common interface as part
+of those changes (if this common interface is accepted in time).
+* Made platform cpuidle_driver objects __initdata and dynamically added one
+persistent instance of this object in common code.
+* Removed imx5 pm usage of gpc_dvfs clock as it is no longer needed after
+being enabled during clock initialization.
+* Re-organized patches.
+
+v1 submission can be found here:
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/142791
+
+Changes since v1:
+* Common interface moved to drivers/cpuidle and made non arch-specific.
+* Made various fixes and suggested additions to the common cpuidle
+code from v1 review.
+* Added callback for filling in driver_data field as needed.
+* Modified the various platforms with these changes.
+
+Robert Lee (4):
+  cpuidle: Add time keeping and irq enabling
+  ARM: omap: Remove cpuidle timekeeping and irq enable/disable
+  acpi: Remove cpuidle timekeeping and irq enable/disable
+  x86: Remove cpuidle timekeeping and irq enable/disable
+
+ arch/arm/mach-omap2/cpuidle34xx.c |   96 ++++++++----------
+ drivers/acpi/processor_idle.c     |  203 ++++++++++++++++++++++---------------
+ drivers/cpuidle/cpuidle.c         |   75 +++++++++++---
+ drivers/idle/intel_idle.c         |  110 ++++++++++++++------
+ include/linux/cpuidle.h           |   26 +++--
+ 5 files changed, 317 insertions(+), 193 deletions(-)
