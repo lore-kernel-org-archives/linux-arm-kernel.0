@@ -1,29 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Feb 2012 16:57:36 +0000
-Subject: Adding remoteproc/rpmsg to linux-next
-In-Reply-To: <CAK=WgbZK_fS_rPWZ9pNARia3sp4+jL5GmR0UmyE59WZSObfWEQ@mail.gmail.com>
-References: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
- <201112221522.21146.arnd@arndb.de>
- <CAK=WgbZK_fS_rPWZ9pNARia3sp4+jL5GmR0UmyE59WZSObfWEQ@mail.gmail.com>
-Message-ID: <201202011657.36998.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  1 Feb 2012 16:59:31 +0000
+Subject: [PATCH v2 0/4] A7/A15 architected timer support
+Message-ID: <1328115575-24866-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 February 2012, Ohad Ben-Cohen wrote:
-> On Thu, Dec 22, 2011 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > If you think you need more Acks or if there are other
-> > reasons to have it go through arm-soc, please tell me and I'll try harder
-> > to find the time for a proper review.
-> 
-> Any chance you could carve out some time for reviewing remoteproc and
-> rpmsg [1] ?
+This patch series adds support for the architected timers found in
+Cortex-A7 and Cortex-A15. It adds local timer support, sched_clock,
+global timer and DT support.
 
-I will.
- 
-> I hope we could either get your Acks on the patches or even have it go
-> through arm-soc for 3.4.
+Tested on Cortex A15, based on Russell's for-armsoc branch plus my
+local timer series.
 
-Yes, I think it's best to have it merged through arm-soc, in case Linus
-is more likely to take it from there than pull from your tree.
+Branch also available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git arch_timers-for-rmk
 
-	Arnd
+* From the initial revision:
+- Fixed global timer registration when an SMP kernel is running on UP
+  with LOCAL_TIMERS enabled.
+
+Marc Zyngier (4):
+  ARM: local timers: Add A15 architected timer support
+  ARM: architected timers: Add A15 specific sched_clock implementation
+  ARM: architected timers: add DT support
+  ARM: architected timers: add support for UP timer
+
+ .../devicetree/bindings/arm/arch_timer.txt         |   23 ++
+ arch/arm/Kconfig                                   |    7 +
+ arch/arm/include/asm/arch_timer.h                  |   13 +
+ arch/arm/kernel/Makefile                           |    1 +
+ arch/arm/kernel/arch_timer.c                       |  363 ++++++++++++++++++++
+ 5 files changed, 407 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
+ create mode 100644 arch/arm/include/asm/arch_timer.h
+ create mode 100644 arch/arm/kernel/arch_timer.c
+
+-- 
+1.7.7.1
