@@ -1,52 +1,33 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 1 Feb 2012 15:59:02 +0000 (GMT)
-Subject: reboot/suspend regression: hx4700 freezes under linux-3.3-rc1
-In-Reply-To: <20120131175905.GA8338@n2100.arm.linux.org.uk>
-Message-ID: <1328111942.20825.YahooMailClassic@web29005.mail.ird.yahoo.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Feb 2012 16:33:06 +0000
+Subject: [PATCH 0/2] Errata workaround updates
+In-Reply-To: <alpine.LFD.2.02.1202011123420.2759@xanadu.home>
+References: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1202011123420.2759@xanadu.home>
+Message-ID: <20120201163306.GI3058@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Tue, 31/1/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Tue, Jan 31, 2012 at 05:28:10PM
-> +0000, Paul Parsons wrote:
-> > Both reboot (via reboot(RB_AUTOBOOT)) and suspend (via
-> apm --suspend)
-> > freeze my hx4700 under linux-3.3-rc1. They both worked
-> under linux-3.2.
-> > 
-> > I presume that at least the reboot freeze is related to
-> the restart
-> > changes back in November. Can anyone suggest anything
-> obvious I
-> > should check? If not I'll attempt to get console output
-> on to the
-> > screen, which may or may not help.
+On Wed, Feb 01, 2012 at 04:26:18PM +0000, Nicolas Pitre wrote:
+> On Wed, 1 Feb 2012, Will Deacon wrote:
 > 
-> I'd also suggest trying to bisect them to find out exactly
-> which
-> commit caused the problem.
+> > Hello,
+> > 
+> > After Russell pointed out that we weren't applying an erratum workaround
+> > in all cases that it was required:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082730.html
+> > 
+> > I went back through the documents for PL310 and Cortex-A9 to check that
+> > what we have in Linux matches the latest workarounds.
+> 
+> Ideally, you should not limit the workaround only to those revisions 
+> known to be broken but to any revision.  Only when a particular revision 
+> is known to be fixed then should it be disabled.
 
-OK, I found the reboot bug:
+For the general case I'd be inclined to agree, but when it involves poking
+undocumented diagnostic registers I get scared and would rather only do it
+when we know it's safe (since it could easily cause more problems on other
+versions of the CPU).
 
-register_syscore_ops(&pxa_gpio_syscore_ops);
-
-is called in two different places. This corrupts syscore_ops_list and
-causes syscore_shutdown() to enter an infinite loop.
-
-The fix is to remove the extra call added since 3.2:
-
---- clean-3.3-rc1/drivers/gpio/gpio-pxa.c	2012-01-19 23:04:48.000000000 +0000
-+++ linux-3.3-rc1/drivers/gpio/gpio-pxa.c	2012-02-01 15:37:39.060989857 +0000
-@@ -606,10 +606,3 @@
- 	.suspend	= pxa_gpio_suspend,
- 	.resume		= pxa_gpio_resume,
- };
--
--static int __init pxa_gpio_sysinit(void)
--{
--	register_syscore_ops(&pxa_gpio_syscore_ops);
--	return 0;
--}
--postcore_initcall(pxa_gpio_sysinit);
-
-The suspend bug is alas unrelated.
+Will
