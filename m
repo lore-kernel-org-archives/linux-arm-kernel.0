@@ -1,66 +1,49 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 1 Feb 2012 22:35:34 +0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
-Message-ID: <20120201143530.GA2203@S2101-09.ap.freescale.net>
+Date: Wed, 1 Feb 2012 23:09:13 +0800
+Subject: [GIT PULL] cs89x0 platform support
+In-Reply-To: <20120201134415.GU1990@pengutronix.de>
+References: <20120201134415.GU1990@pengutronix.de>
+Message-ID: <20120201150909.GB2203@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Wed, Feb 01, 2012 at 02:44:15PM +0100, Sascha Hauer wrote:
+> Hi Olof,
+> 
+> Please pull the following for next. It contains cs89x0 platform
+> support. David has acked the base patch and is fine with this
+> patch going via the Arm tree.
+> 
+> Sascha
+> 
+> The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+> 
+>   Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+> 
+> are available in the git repository at:
+>   git://git.pengutronix.de/git/imx/linux-2.6.git features/cs89x0
+> 
+> Jaccon Bastiaansen (4):
+>       CS89x0 : add platform driver support
+>       CS89x0 : add CS89x0 platform device to the iMX21ADS board
+>       CS89x0 : remove QQ2440 board support from the CS89x0 driver
+>       CS89x0 : add CS89x0 platform device to the iMX31ADS board
+> 
+>  arch/arm/configs/imx_v4_v5_defconfig           |    2 +
+>  arch/arm/configs/mx3_defconfig                 |    2 +
 
-I had a talk with Dong about this binding, and we think that it should
-work well for imx if we have a couple of small pieces added.
-
-On Fri, Jan 20, 2012 at 02:22:20PM -0800, Stephen Warren wrote:
-...
->                 pmx_sdhci: pinconfig-sdhci {
->                         /*
->                          * The mux property is a list of muxable entities
->                          * and the mux function to select for it. The number
->                          * of cells in each entry is the pin controller's
->                          * #pinmux-cells property. The pin controller's
->                          * binding defines what the cells mean. The pinctrl
->                          * driver is responsible for mapping this data to
->                          * the (group, function) pair required to fill in
->                          * the pinctrl subsystem's pinmux mapping table.
->                          */
->                         mux =
->                                 <TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_SDIO1>
->                                 <TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_SDIO1>;
-
-We need a property like 'mux-unit' whose value can be either 'pin' or
-'pingroup' to reflect something you mentioned as muxable entity.
-
-The reason behind this is the DT logic inside pinctrl core needs to
-know how the pinmux_map should be constructed from device tree.  In
-tegra case, the 'mux-unit' is 'pingroup', the core should construct
-pinmux_map entry for each row/element of 'mux'.  In imx case, the
-'mux-unit' will be 'pin', and we would expect core construct only
-one pinmux_map entry there, with all the pins listed in 'mux' composing
-the group that pinmux_map needs.
-
-And in case of 'mux-unit' is 'pin', we would need one more property
-'mux-name' to present the group name.  Then we have all the pieces to
-construct pinmux_map for cases like imx, where we do not define all
-those functions, groups in pinctrl driver at all.
+The mx3_defconfig has been deleted from mainline.  We may need to
+rebase the series to 3.3-rc2.  Otherwise, we will eventually have
+conflict?
 
 Regards,
 Shawn
 
->                         /*
->                          * The config property is a list of muxable entities
->                          * and individual configuration setting. The number
->                          * of cells in each entry is the pin controller's
->                          * #pinconfig-cells property. The pin controller's
->                          * binding defines what the cells mean. The pinctrl
->                          * driver is responsible for mapping this data to
->                          * the (group, config) pair required to fill in
->                          * the pinctrl subsystem's pin configuration table.
->                          */
->                         config =
->                                 <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
->                                 <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_DRIVE_STRENGTH 5>
->                                 <TEGRA_PMX_PG_DTA TEGRA_PMX_CONF_SLEW_RATE 4>
->                                 <TEGRA_PMX_PG_DTD TEGRA_PMX_CONF_SLEW_RATE 8>;
->                 };
+>  arch/arm/mach-imx/mach-mx21ads.c               |   16 +++-
+>  arch/arm/mach-imx/mach-mx31ads.c               |   35 +++++-
+>  arch/arm/plat-mxc/include/mach/board-mx31ads.h |   33 ------
+>  drivers/net/Space.c                            |    2 +
+>  drivers/net/ethernet/cirrus/Kconfig            |   19 ++--
+>  drivers/net/ethernet/cirrus/cs89x0.c           |  148 +++++++++++++++++++----
+>  8 files changed, 186 insertions(+), 71 deletions(-)
+>  delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
