@@ -1,52 +1,57 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Wed, 01 Feb 2012 09:56:50 +0800
-Subject: [RFC] ARM hugetlb support
-In-Reply-To: <CAHkRjk6xZy3Nsy=R05664RM0Sw071rkXmV2g9ySwqiS_BrBLrw@mail.gmail.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <CAHkRjk6xZy3Nsy=R05664RM0Sw071rkXmV2g9ySwqiS_BrBLrw@mail.gmail.com>
-Message-ID: <4F289BE2.9020404@gmail.com>
+From: tghk48@motorola.com (TAO HU)
+Date: Wed, 1 Feb 2012 10:18:09 +0800
+Subject: In many cases softlockup can not be reported after disabling IRQ
+ for long time
+In-Reply-To: <20120131154748.GA5650@redhat.com>
+References: <CAOwKts8zS1rYA+Y4k-vb8YAaR=aFd1BwryhhWWnWLQyrYrNqyA@mail.gmail.com>
+ <20120131154748.GA5650@redhat.com>
+Message-ID: <CAOwKts_dTvc4LiCZUXN9oYzty1pkDEn_VQwPKY=EoVzk0n6tFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Don
 
+Thanks for your feedback!
 
-On 2012?01?31? 17:29, Catalin Marinas wrote:
-> Hi,
+Unfortunately, the hardlockup depends on NMI which is not available on
+ARM (Cortex-A9) per my understanding.
+Our system uses OMAP4430. Any more suggestions?
+
+On Tue, Jan 31, 2012 at 11:47 PM, Don Zickus <dzickus@redhat.com> wrote:
+> On Tue, Jan 31, 2012 at 03:28:09PM +0800, TAO HU wrote:
+>> Resend with a new subject
+>>
+>> On Wed, Jan 25, 2012 at 4:24 PM, TAO HU <tghk48@motorola.com> wrote:
+>> > Hi, All
+>> >
+>> > While playing kernel 3.0.8 with below test code, it does NOT report
+>> > any softlockup with 60%~70% chances.
+>> > NOTE: the softlockup timeout is set to 10 seconds (i.e.
+>> > watchdog_thresh=5) in my test.
+>> > ... ...
+>> > preempt_disable();
+>> > local_irq_disable();
+>> > for (i = 0; i < 20; i++)
+>> > ? ? ? mdelay(1000);
+>> > local_irq_enable();
+>> > preempt_enable();
+>> > ... ...
+>> >
+>> > However, if I remove local_irq_disable()/local_irq_enable() it will
+>> > report softlockup with no problem.
+>> > I believe it is due to that after local_irq_enable()
+>> > touch_softlockup_watchdog() is called prior softlockup timer.
 >
-> On 30 January 2012 07:57,<bill4carson@gmail.com>  wrote:
->> This patch aims to support huge page for ARM. For now, 2MB(two 1MB page)/16MB
->> huge page are supported, Versatile Express Cortex-A9x4 tile is used as test
->> board. Verifications are running with libhugetlbfs and ltp.
-> I haven't reviewed your patches yet but just a few thoughts. Do you
-> have a clear case where 16MB super-sections is needed? Do you have
-> memory beyond 4G that can only be accessed with super-sections? This
-> is an optional feature and not all processors have it.
-The initial support only focus on ARMv7 based processor like cortex A9, 
-basically that's
-what I got in my hand, one Versatile Express Cortex-A9x4 tile board.
-
-> It also doesn't
-> help much with the TLB hit rate since the micro-TLB most likely only
-> support 1MB sections.
+> Hi Hu,
 >
-I am afraid I can't agree with you on this.
-Truly there is no specific statement about whether micro-TLB support 
-16MB super-sections,
-but main-TLB actually helps the hit rate, and main-TLB support all page 
-size mapping.
-
-
-> BTW, I have a (simpler) implementation of hugetlbfs with 2MB sections
-> but for LPAE only:
+> Honestly, you should be getting hardlockup warnings if you are disabling
+> interrupts. ?Do you see anything in the console output?
 >
-> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=shortlog;h=refs/heads/hugetlb
->
-Thanks for your information, I will study your code carefully :)
+> Cheers,
+> Don
 
 
 
 -- 
-I am a slow learner
-but I will keep trying to fight for my dreams!
-
---bill
+Best Regards
+Hu Tao
