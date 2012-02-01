@@ -1,50 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Feb 2012 11:08:36 +0000
-Subject: [PATCH v2 3/8] ARM: tegra: rework Tegra secondary CPU core bringup
-In-Reply-To: <20120131225045.GE8338@n2100.arm.linux.org.uk>
-References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
- <1328028051-24271-4-git-send-email-pdeschrijver@nvidia.com>
- <20120131225045.GE8338@n2100.arm.linux.org.uk>
-Message-ID: <20120201110836.GB3058@mudshark.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 01 Feb 2012 12:34:29 +0100
+Subject: cpu_relax in busy loops question
+Message-ID: <4F292345.8070800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 10:50:45PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 31, 2012 at 06:40:41PM +0200, Peter De Schrijver wrote:
-> > +#ifdef CONFIG_ARM_ERRATA_743622
-> > +	teq	r6, #0x20			@ present in r2p0
-> > +	teqne	r6, #0x21			@ present in r2p1
-> > +	teqne	r6, #0x22			@ present in r2p2
-> > +	teqne	r6, #0x27			@ present in r2p7
-> > +	teqne	r6, #0x29			@ present in r2p9
-> 
-> Okay, so we have this errata in proc-v7.S, but only for p0..p2.  If
-> it's also p7 and p9, then it shows that the errata in the kernel aren't
-> being actively maintained, and brings into question their worth.
 
-It looks like the errata document has been updated since I wrote the
-workaround in proc-v7.S (and new r2p* versions of the A9 have been
-released). The new document states that r2p* are affected, so we should
-update the workaround.
+Hi Linus,
 
-> Plus, of course, we don't want platforms re-implementing the errata
-> in their own code if we're already implementing it somewhere in the
-> kernel.  So, that's something which needs to be thought about.
+While looking at the drivers/mfd/db8500-prcmu.c file I noticed:
 
-Indeed, that could become extremely confusing, especially when they start
-doing different things.
 
-> That's something that needs considering along side the whole 'what
-> to do about errata when running in non-secure mode' problem which
-> OMAP suffers from.
+  595         /* Grab the HW semaphore. */
+  596         while ((readl(PRCM_SEM) & PRCM_SEM_PRCM_SEM) != 0)
+  597                 cpu_relax();
 
-My view is that the workarounds in the kernel are a good way to highlight
-which errata we consider to be important from Linux's point-of-view and also
-how to avoid them in practice. It's not always possible to apply them in the
-kernel at runtime (due to security constraints) but I think it's important
-to show what Linux expects.
 
-I'll go back through the errata document and check if any others have been
-updated besides this one.
+I was wondering why is cpu_relax needed here as readl does a memory 
+barrier ? I thought the cpu_relax function was related to the x86 to 
+consume less power with an optimization of the "rep nop" loops or/and do 
+a memory barrier.
 
-Will
+Should a busy-loop be always with cpu_relax ?
+
+Thanks
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
