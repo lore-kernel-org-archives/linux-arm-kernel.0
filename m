@@ -1,33 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Feb 2012 16:33:06 +0000
-Subject: [PATCH 0/2] Errata workaround updates
-In-Reply-To: <alpine.LFD.2.02.1202011123420.2759@xanadu.home>
-References: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1202011123420.2759@xanadu.home>
-Message-ID: <20120201163306.GI3058@mudshark.cambridge.arm.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 1 Feb 2012 17:35:06 +0100
+Subject: [PATCH 3/3] S3C2443: add power domain for usb phy
+In-Reply-To: <02ff01ccda98$4c424f40$e4c6edc0$%kim@samsung.com>
+References: <201201082156.44142.heiko@sntech.de>
+ <201201241131.01437.heiko@sntech.de>
+ <02ff01ccda98$4c424f40$e4c6edc0$%kim@samsung.com>
+Message-ID: <201202011735.06641.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2012 at 04:26:18PM +0000, Nicolas Pitre wrote:
-> On Wed, 1 Feb 2012, Will Deacon wrote:
-> 
-> > Hello,
-> > 
-> > After Russell pointed out that we weren't applying an erratum workaround
-> > in all cases that it was required:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082730.html
-> > 
-> > I went back through the documents for PL310 and Cortex-A9 to check that
-> > what we have in Linux matches the latest workarounds.
-> 
-> Ideally, you should not limit the workaround only to those revisions 
-> known to be broken but to any revision.  Only when a particular revision 
-> is known to be fixed then should it be disabled.
+Hi Kgene,
 
-For the general case I'd be inclined to agree, but when it involves poking
-undocumented diagnostic registers I get scared and would rather only do it
-when we know it's safe (since it could easily cause more problems on other
-versions of the CPU).
+Am Dienstag 24 Januar 2012, 14:01:33 schrieb Kukjin Kim:
+> Because as I said, I'm doing merge s3c24xx directories and it's almost done.
+any news of this or can I help in some way?
 
-Will
+I'm asking because I would like to put stuff on top of your merge (for example 
+support for spi-s3c64xx for the S3C2416) for 3.4 .
+
+
+Thanks
+Heiko
