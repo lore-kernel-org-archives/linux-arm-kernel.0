@@ -1,43 +1,39 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 1 Feb 2012 15:55:22 +0200
-Subject: [PATCH 0/2] ARM: OMAP2+: PM: miscellaneous powerdomain-related
- improvements
-In-Reply-To: <871uqgswy8.fsf@ti.com>
-References: <20120130093931.11027.31048.stgit@dusk>  <871uqgswy8.fsf@ti.com>
-Message-ID: <1328104522.4102.123.camel@sokoban>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 1 Feb 2012 19:29:18 +0530
+Subject: [PATCH 0/2] Errata workaround updates
+In-Reply-To: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
+References: <1328104354-7553-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAMQu2gzErEi_=yBeD-4X6Cf8Kq27nkB94Rkx6q7DG+Pxn9iU3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-01-30 at 13:27 -0800, Kevin Hilman wrote:
-> Paul Walmsley <paul@pwsan.com> writes:
-> 
-> > This series optimizes some of the powerdomain-related code in
-> > arch/arm/mach-omap2/pm*, and fixes a bug or two.  These were noticed while
-> > working on the functional powerstate code.
-> >
-> > Rajendra and Santosh, if you have a spare moment, could you please
-> > peek at the OMAP4 LOWPOWERSTATECHANGE part of the second patch?  It
-> > makes sense to me in theory, but you both would probably know better
-> > than I :-)
-> >
-> > Kevin, want to take this series (assuming folks are happy with it) ?
-> 
-> Yes, I'll take this and add the Ack from Santosh.  Thanks for the nice
-> cleanup.   
-> 
-> Will submit after seeing a Tested-by from someone who can test with CORE
-> retention/off on OMAP4 (hint, hint,  Tero :)
+Will,
 
-The patches appear to behave nicely on omap4, there are still a couple
-of quirks in the basic omap4 support though. l3init pd state is not
-updated properly once we wake-up from device-off (it remains active for
-a short while during wake-up before switching to idle with hwauto), and
-cpu1 pwrdm state is not updated properly during hotplug, but these are
-minor issues and should be fixed elsewhere.
-
-You can add:
-
-Tested-by: Tero Kristo <t-kristo@ti.com>
-
-> 
-> Kevin
+On Wed, Feb 1, 2012 at 7:22 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hello,
+>
+> After Russell pointed out that we weren't applying an erratum workaround
+> in all cases that it was required:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082730.html
+>
+> I went back through the documents for PL310 and Cortex-A9 to check that
+> what we have in Linux matches the latest workarounds. The only other
+> issue I found was that the PL310 workaround we have for #727915 (added
+> by Santosh in 2839e06c ("ARM: 6795/1: l2x0: Errata fix for flush by Way
+> operation can cause data corrupti") will work only on r3p0, leaving r2p0
+> broken. If anybody has an r2p0 version of the PL310, they may like to
+> augment the workaround.
+>
+> While I was at it, I fixed a couple of Kconfig select statements that
+> needed updating to identify the correct workaround config option.
+>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+> Will Deacon (2):
+> ?ARM: errata: update workaround for A9 erratum #743622
+> ?ARM: errata: fix PL310 erratum #753970 workaround selection
+>
+The patches look fine to me.
+Here is my ack if you need one.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
