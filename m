@@ -1,59 +1,49 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 1 Feb 2012 16:12:18 +0530
-Subject: [PATCH V3 02/12] dmaengine: Add flow controller information to
- dma_slave_config
-In-Reply-To: <cover.1328091915.git.viresh.kumar@st.com>
-References: <cover.1328091915.git.viresh.kumar@st.com>
-Message-ID: <f43bb2248168c025402c897f0c67fae19b5404e8.1328091915.git.viresh.kumar@st.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 1 Feb 2012 11:00:05 +0000
+Subject: Reg pinmux driver for OMAP based SoC- AM335X
+In-Reply-To: <20120131170511.GI9339@atomide.com>
+References: <20120125000407.GU22818@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178CB82433@HQMAIL01.nvidia.com>
+ <20120127020832.GJ29812@atomide.com>
+ <20120127065752.GB32740@S2101-09.ap.freescale.net>
+ <20120127170545.GH13504@atomide.com>
+ <20120130015607.GA10470@S2101-09.ap.freescale.net>
+ <20120130172042.GE9339@atomide.com>
+ <20120131013215.GB24681@S2101-09.ap.freescale.net>
+ <20120131022906.GH9339@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93176CAC6@DBDE01.ent.ti.com>
+ <20120131170511.GI9339@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93176D1F3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Flow controller is programmable for few controllers and there are few
-intelligent peripherals like, Synopsys JPEG controller, that needs to be a flow
-controller of DMA transfers on dest side.
+Hi Tony,
 
-For this, currently two drivers, pl08x and dw_dmac, support flow controller to
-be passed from platform to these drivers.
+On Tue, Jan 31, 2012 at 22:35:11, Tony Lindgren wrote:
+> The plan is to deprecate the existing arch/arm/*omap*/*mux* code,
+> and cut it down to minimum. And then add DT only mux support that should
+> work for at least omap2+. That should work for am335x too.
+> 
+> There's currently some discussion going on regarding the pinmux device
+> tree binding and how dynamic mux states should be handled. But I'd
+> assume we'll have basic support available very soon.
+> 
+> The driver I'm working leaves all the data out of kernel, and the driver
+> just knows how to handle a pinmux register instances. Then debugging
+> tools can be done in userspace via debugfs to display more detailed
+> SoC specific information.
+> 
+> So it might be worth waiting just a little bit longer. If you have
+> resources to spend on the pinmuxing, then creating some userspace tool
+> to display SoC specific information would be nice :) For the userspace
+> tool, we can use the data in arch/arm/mach-omap2/mux*2*.[ch].
 
-Perhaps, this should be a part of struct dma_slave_config. This patch adds
-another field device_fc to this structure. User drivers must pass this as true
-if they want to be flow controller of certain transfers.
+Thank you for the detailed reply.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- include/linux/dmaengine.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+I will wait for it and willing to help you in its testing.
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 5532bb8..edfaac9 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -25,6 +25,7 @@
- #include <linux/uio.h>
- #include <linux/scatterlist.h>
- #include <linux/bitmap.h>
-+#include <linux/types.h>
- #include <asm/page.h>
- 
- /**
-@@ -330,6 +331,9 @@ enum dma_slave_buswidth {
-  * may or may not be applicable on memory sources.
-  * @dst_maxburst: same as src_maxburst but for destination target
-  * mutatis mutandis.
-+ * @device_fc: Flow Controller Settings. Only valid for slave channels. Fill
-+ * with 'true' if peripheral should be flow controller. Direction will be
-+ * selected at Runtime.
-  *
-  * This struct is passed in as configuration data to a DMA engine
-  * in order to set up a certain channel for DMA transport at runtime.
-@@ -356,6 +360,7 @@ struct dma_slave_config {
- 	enum dma_slave_buswidth dst_addr_width;
- 	u32 src_maxburst;
- 	u32 dst_maxburst;
-+	bool device_fc;
- };
- 
- static inline const char *dma_chan_name(struct dma_chan *chan)
--- 
-1.7.8.110.g4cb5d
+I have been tasked on getting AM335X supported well in mainline,
+and will move to other aspects of it while waiting.
+
+Regards
+Afzal
