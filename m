@@ -1,43 +1,44 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 2 Feb 2012 10:04:12 -0800
-Subject: [PATCH v2 8/8] ARM: tegra: support for secondary cores on Tegra30
-In-Reply-To: <1328028051-24271-9-git-send-email-pdeschrijver@nvidia.com>
-References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
- <1328028051-24271-9-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E124AA5@HQMAIL01.nvidia.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 02 Feb 2012 10:14:53 -0800
+Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
+ pwrdm_clear_all_prev_pwrst()
+In-Reply-To: <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com> (Paul
+ Walmsley's message of "Wed, 1 Feb 2012 12:27:14 -0700 (MST)")
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
+ <87mx93ok5y.fsf@ti.com>
+ <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
+Message-ID: <878vkldrvm.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Tuesday, January 31, 2012 9:41 AM:
-> Add support for bringing up secondary cores on Tegra30. On Tegra30 secondary
-> CPU cores are powergated, so we need to turn on the domains before we can bring
-> the CPU cores online. Bringing secondary cores online happens early during the
-> sytem boot, so we call powergating initialization from platform early_init
-> function.
-> 
-> Based on work by:
-> 
-> Scott Williams <scwilliams@nvidia.com>
-> Colin Cross <ccross@android.com>
-> Alex Frid <afrid@nvidia.com>
-> 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Paul Walmsley <paul@pwsan.com> writes:
 
-The series,
+> On Tue, 31 Jan 2012, Kevin Hilman wrote:
+>
+>> Kevin Hilman <khilman@ti.com> writes:
+>> 
+>> > Paul Walmsley <paul@pwsan.com> writes:
+>> >
+>> >> Remove some superfluous calls to pwrdm_clear_all_prev_pwrst().
+>> >> pwrdm_pre_transition(), which appears a few lines after these calls,
+>> >> invokes pwrdm_clear_all_prev_pwrst() on each powerdomain -- there's no
+>> >> need to do it twice.
+>> >
+>> > It looks like these two for OMAP4 are surpurfluous since the immediately
+>> > follow a call to pwrdm_pre_transition() as well.
+>> >
+>> > Santosh/Rajendra, please confirm/ack.
+>> 
+>> So after the discussion, do you want to fold this into the original
+>> patch, or do you want a separate patch?
+>
+> Your changes make sense to me.  I am fine with you adding them into the 
+> original patch and adding some credit for you into the commit message.  
+> Or you can create a separate patch.
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
+OK, I'll fold it in.
 
-This time, since I now have the SD card working, I managed to test real
-user-space processes running on all 4 cores.
+Thanks,
 
-Note, patch 3 shouldn't compile due to a typo in a .size directive. It
-does for me, so I could test this! But, it didn't for Olof. Aside from
-that (which perhaps Olof would fixup during patch application?),
-
-Acked-by: Stephen Warren <swarren@nvidia.com>
-
-I also have a query on patch 3 about enabling coresight, but that's more
-for my education than something that'd block patch application.
-
--- 
-nvpublic
+Kevin
