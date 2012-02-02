@@ -1,48 +1,37 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 02 Feb 2012 14:04:36 +0530
-Subject: [PATCH 1/1 v2] i.MX SDMA: Fix burstsize settings
-In-Reply-To: <1327411321-30017-1-git-send-email-philippe.retornaz@epfl.ch>
-References: <4F1D5304.3080003@ru.mvista.com>
- <1327411321-30017-1-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <1328171676.26182.0.camel@vkoul-udesk3>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 2 Feb 2012 16:55:23 +0800
+Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
+In-Reply-To: <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
+References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
+ <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120202085521.GB9773@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-01-24 at 14:22 +0100, Philippe R?tornaz wrote:
-> Commit 6584cb88 (ARM i.MX dma: Fix burstsize settings) fixed
-> the mxcmmc driver but forgot to fix the SDMA driver to handle the
-> correct burtsize.
-> This make the SD card access works again with DMA on i.MX31 boards.
-> 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-Applied thanks
+On Thu, Feb 02, 2012 at 10:12:05AM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 > ---
->  drivers/dma/imx-sdma.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
+>  arch/arm/mach-imx/mach-mx31ads.c      |   10 ++++++++++
+>  arch/arm/plat-mxc/include/mach/mx31.h |    1 +
+>  2 files changed, 11 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index f993955..c193dac 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1095,11 +1095,13 @@ static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  	case DMA_SLAVE_CONFIG:
->  		if (dmaengine_cfg->direction == DMA_FROM_DEVICE) {
->  			sdmac->per_address = dmaengine_cfg->src_addr;
-> -			sdmac->watermark_level = dmaengine_cfg->src_maxburst;
-> +			sdmac->watermark_level = dmaengine_cfg->src_maxburst *
-> +						dmaengine_cfg->src_addr_width;
->  			sdmac->word_size = dmaengine_cfg->src_addr_width;
->  		} else {
->  			sdmac->per_address = dmaengine_cfg->dst_addr;
-> -			sdmac->watermark_level = dmaengine_cfg->dst_maxburst;
-> +			sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
-> +						dmaengine_cfg->dst_addr_width;
->  			sdmac->word_size = dmaengine_cfg->dst_addr_width;
->  		}
->  		return sdma_config_channel(sdmac);
+Hmm, let's see who are actually using mxc_audmux_v2_configure_port().
 
+$ git grep -n mxc_audmux_v2_configure_port arch/arm/
+arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:246:     mxc_audmux_v2_configure_port(0,
+arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:254:     mxc_audmux_v2_configure_port(4,
+arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:257:     mxc_audmux_v2_configure_port(0,
+arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:265:     mxc_audmux_v2_configure_port(3,
+arch/arm/mach-imx/mach-pcm043.c:365:    mxc_audmux_v2_configure_port(3,
+arch/arm/mach-imx/mach-pcm043.c:371:    mxc_audmux_v2_configure_port(0,
+
+$ git grep -n mxc_audmux_v2_configure_port sound/soc/imx/
+sound/soc/imx/wm1133-ev1.c:277: mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0, ptcr, pdcr);
+sound/soc/imx/wm1133-ev1.c:281: mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT5_SSI_PINS_5, ptcr, pdcr);
+
+I guess audmux device needs to be added for all these users.  And for
+sake of bisect, it should be added as part of patch #5.
 
 -- 
-~Vinod
+Regards,
+Shawn
