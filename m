@@ -1,53 +1,87 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Feb 2012 13:32:08 +0000
-Subject: [RFC 7/7] MFD: TWL6040: Add regulator support for VIO, V2V1
- supplies
-In-Reply-To: <4F2A8D11.9010705@ti.com>
-References: <1328185019-29575-1-git-send-email-peter.ujfalusi@ti.com>
- <1328185019-29575-8-git-send-email-peter.ujfalusi@ti.com>
- <20120202125250.GJ7428@opensource.wolfsonmicro.com>
- <4F2A8D11.9010705@ti.com>
-Message-ID: <20120202133207.GN7428@opensource.wolfsonmicro.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 2 Feb 2012 14:33:35 +0100
+Subject: [PATCH] ARM: ux500: Add audio-regulators
+Message-ID: <1328189615-14358-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 03:18:09PM +0200, Peter Ujfalusi wrote:
-> On 02/02/2012 02:52 PM, Mark Brown wrote:
+From: Ola Lilja <ola.o.lilja@stericsson.com>
 
-> > Looks like you want regulator_bulk_get() here.  Or (better yet though
-> > it'd be a potential issue for merge via MFD and the benefits aren't that
-> > exciting since you still need to disable) devm_regulator_bulk_get().
+Add regulators Vaud, Vamic1, Vamic2 and Vdmic
+used by audio.
 
-> I need separate control for the two power source since we can hit
-> different power levels depending on which is powered/not powered:
-> power down: vio, v2v1 is OFF
-> deep sleep: vio is ON, v2v1 is OFF
-> sleep/power on: vio, v2v1 is ON
+Signed-off-by: Ola Lilja <ola.o.lilja@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-regulators.c |   28 +++++++++++++++++++++++++
+ 1 files changed, 28 insertions(+), 0 deletions(-)
 
-> And we have certain sequence to move between power states.
-
-That's not a problem for using the bulk get - the array is part of the
-API so you can use regulator_bulk_get() and still look at individual
-supplies within the array later on when enabling and disabling them.
-
-> >> +	ret = regulator_enable(twl6040->vio);
-> >> +	if (ret != 0) {
-> >> +		dev_err(&client->dev, "Failed to enable VIO: %d\n", ret);
-> >> +		goto power_err;
-> >> +	}
-> >> +	ret = regulator_enable(twl6040->v2v1);
-> >> +	if (ret != 0) {
-> >> +		dev_err(&client->dev, "Failed to enable V2V1: %d\n", ret);
-> >> +		regulator_disable(twl6040->vio);
-
-> I disable the vio here, if the v2v1 enable fails.
-
-Oh, that's quite confusing when mixed in with the goto/unwind - it'd be
-clearer to have the extra lable to jump to.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/f817d7b4/attachment.sig>
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 2735d03..52426a4 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -74,6 +74,26 @@ static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
+ 	REGULATOR_SUPPLY("vddadc", "ab8500-gpadc.0"),
+ };
+ 
++static struct regulator_consumer_supply ab8500_vaud_consumers[] = {
++	/* AB8500 audio-codec main supply */
++	REGULATOR_SUPPLY("vaud", "ab8500-codec.0"),
++};
++
++static struct regulator_consumer_supply ab8500_vamic1_consumers[] = {
++	/* AB8500 audio-codec Mic1 supply */
++	REGULATOR_SUPPLY("vamic1", "ab8500-codec.0"),
++};
++
++static struct regulator_consumer_supply ab8500_vamic2_consumers[] = {
++	/* AB8500 audio-codec Mic2 supply */
++	REGULATOR_SUPPLY("vamic2", "ab8500-codec.0"),
++};
++
++static struct regulator_consumer_supply ab8500_vdmic_consumers[] = {
++	/* AB8500 audio-codec DMic supply */
++	REGULATOR_SUPPLY("vdmic", "ab8500-codec.0"),
++};
++
+ static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
+ 	/* SoC core supply, no device */
+ 	REGULATOR_SUPPLY("v-intcore", NULL),
+@@ -323,6 +343,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.name = "V-AUD",
+ 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaud_consumers),
++		.consumer_supplies = ab8500_vaud_consumers,
+ 	},
+ 	/* supply for v-anamic1 VAMic1-LDO */
+ 	[AB8500_LDO_ANAMIC1] = {
+@@ -330,6 +352,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.name = "V-AMIC1",
+ 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vamic1_consumers),
++		.consumer_supplies = ab8500_vamic1_consumers,
+ 	},
+ 	/* supply for v-amic2, VAMIC2 LDO, reuse constants for AMIC1 */
+ 	[AB8500_LDO_ANAMIC2] = {
+@@ -337,6 +361,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.name = "V-AMIC2",
+ 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vamic2_consumers),
++		.consumer_supplies = ab8500_vamic2_consumers,
+ 	},
+ 	/* supply for v-dmic, VDMIC LDO */
+ 	[AB8500_LDO_DMIC] = {
+@@ -344,6 +370,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.name = "V-DMIC",
+ 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vdmic_consumers),
++		.consumer_supplies = ab8500_vdmic_consumers,
+ 	},
+ 	/* supply for v-intcore12, VINTCORE12 LDO */
+ 	[AB8500_LDO_INTCORE] = {
+-- 
+1.7.8
