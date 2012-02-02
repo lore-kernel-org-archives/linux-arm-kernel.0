@@ -1,52 +1,124 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 2 Feb 2012 21:45:50 +0200
-Subject: [PATCH v9 01/25] gpio/omap: remove dependency on gpio_bank_count
-In-Reply-To: <20120202191630.GT15343@ponder.secretlab.ca>
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <1328203851-20435-2-git-send-email-tarun.kanti@ti.com>
- <20120202184106.GC29215@legolas.emea.dhcp.ti.com>
- <20120202191630.GT15343@ponder.secretlab.ca>
-Message-ID: <20120202194545.GA29351@legolas.emea.dhcp.ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 2 Feb 2012 12:47:47 -0700
+Subject: [PATCH] of_gpio: add support of of_gpio_named_count to be able
+ to count named gpio
+In-Reply-To: <1328196001-22154-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1328196001-22154-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20120202194747.GW15343@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 12:16:30PM -0700, Grant Likely wrote:
-> On Thu, Feb 02, 2012 at 08:41:07PM +0200, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Thu, Feb 02, 2012 at 11:00:27PM +0530, Tarun Kanti DebBarma wrote:
-> > > diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> > > index 0b05629..6ea7390 100644
-> > > --- a/drivers/gpio/gpio-omap.c
-> > > +++ b/drivers/gpio/gpio-omap.c
-> > > @@ -28,7 +28,10 @@
-> > >  #include <asm/gpio.h>
-> > >  #include <asm/mach/irq.h>
-> > >  
-> > > +static LIST_HEAD(omap_gpio_list);
-> > 
-> > I guess it's now too late because patch is acked and everything, but I
-> > think if you make the driver handle one bank alone and just instantiate
-> > it multiple times (omap_gpio.0, omap_gpio.1, omap_gpio.3, etc) driver
-> > would be faaaaaar simpler.
+On Thu, Feb 02, 2012 at 04:20:01PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+
+Applied, thanks.
+
+g.
+
+> ---
+>  drivers/of/gpio.c       |    9 +++++----
+>  include/linux/of_gpio.h |   27 +++++++++++++++++++++++++--
+>  2 files changed, 30 insertions(+), 6 deletions(-)
 > 
-> Is there any shared state between the banks?  On my very cursory glance it
-> looked like banks still have some interaction between them.  If not, then
-> yes I agree that multiple instances would be better.
-
-A quick glance at the TRM shows that banks have separate address spaces
-and IRQ lines. I think it's done this way because we can handoff one (or
-more) bank to other cores on the SoC, so they need to be pretty
-independent.
-
-I could be missing something though.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/6eb340d8/attachment-0001.sig>
+> diff --git a/drivers/of/gpio.c b/drivers/of/gpio.c
+> index 7e62d15..e034b38 100644
+> --- a/drivers/of/gpio.c
+> +++ b/drivers/of/gpio.c
+> @@ -78,8 +78,9 @@ err0:
+>  EXPORT_SYMBOL(of_get_named_gpio_flags);
+>  
+>  /**
+> - * of_gpio_count - Count GPIOs for a device
+> + * of_gpio_named_count - Count GPIOs for a device
+>   * @np:		device node to count GPIOs for
+> + * @propname:	property name containing gpio specifier(s)
+>   *
+>   * The function returns the count of GPIOs specified for a node.
+>   *
+> @@ -93,14 +94,14 @@ EXPORT_SYMBOL(of_get_named_gpio_flags);
+>   * defines four GPIOs (so this function will return 4), two of which
+>   * are not specified.
+>   */
+> -unsigned int of_gpio_count(struct device_node *np)
+> +unsigned int of_gpio_named_count(struct device_node *np, const char* propname)
+>  {
+>  	unsigned int cnt = 0;
+>  
+>  	do {
+>  		int ret;
+>  
+> -		ret = of_parse_phandle_with_args(np, "gpios", "#gpio-cells",
+> +		ret = of_parse_phandle_with_args(np, propname, "#gpio-cells",
+>  						 cnt, NULL);
+>  		/* A hole in the gpios = <> counts anyway. */
+>  		if (ret < 0 && ret != -EEXIST)
+> @@ -109,7 +110,7 @@ unsigned int of_gpio_count(struct device_node *np)
+>  
+>  	return cnt;
+>  }
+> -EXPORT_SYMBOL(of_gpio_count);
+> +EXPORT_SYMBOL(of_gpio_named_count);
+>  
+>  /**
+>   * of_gpio_simple_xlate - translate gpio_spec to the GPIO number and flags
+> diff --git a/include/linux/of_gpio.h b/include/linux/of_gpio.h
+> index e4e2058..1b3628d 100644
+> --- a/include/linux/of_gpio.h
+> +++ b/include/linux/of_gpio.h
+> @@ -53,7 +53,8 @@ static inline struct of_mm_gpio_chip *to_of_mm_gpio_chip(struct gpio_chip *gc)
+>  extern int of_get_named_gpio_flags(struct device_node *np,
+>  		const char *list_name, int index, enum of_gpio_flags *flags);
+>  
+> -extern unsigned int of_gpio_count(struct device_node *np);
+> +extern unsigned int of_gpio_named_count(struct device_node *np,
+> +					const char* propname);
+>  
+>  extern int of_mm_gpiochip_add(struct device_node *np,
+>  			      struct of_mm_gpio_chip *mm_gc);
+> @@ -74,7 +75,8 @@ static inline int of_get_named_gpio_flags(struct device_node *np,
+>  	return -ENOSYS;
+>  }
+>  
+> -static inline unsigned int of_gpio_count(struct device_node *np)
+> +static inline unsigned int of_gpio_named_count(struct device_node *np,
+> +					const char* propname)
+>  {
+>  	return 0;
+>  }
+> @@ -92,6 +94,27 @@ static inline void of_gpiochip_remove(struct gpio_chip *gc) { }
+>  #endif /* CONFIG_OF_GPIO */
+>  
+>  /**
+> + * of_gpio_count - Count GPIOs for a device
+> + * @np:		device node to count GPIOs for
+> + *
+> + * The function returns the count of GPIOs specified for a node.
+> + *
+> + * Note that the empty GPIO specifiers counts too. For example,
+> + *
+> + * gpios = <0
+> + *          &pio1 1 2
+> + *          0
+> + *          &pio2 3 4>;
+> + *
+> + * defines four GPIOs (so this function will return 4), two of which
+> + * are not specified.
+> + */
+> +static inline unsigned int of_gpio_count(struct device_node *np)
+> +{
+> +	return of_gpio_named_count(np, "gpios");
+> +}
+> +
+> +/**
+>   * of_get_gpio_flags() - Get a GPIO number and flags to use with GPIO API
+>   * @np:		device node to get GPIO from
+>   * @index:	index of the GPIO
+> -- 
+> 1.7.7
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
