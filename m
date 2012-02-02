@@ -1,44 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Feb 2012 20:44:11 +0000
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
-References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20120202204411.GB14129@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 2 Feb 2012 21:48:13 +0100
+Subject: [PATCH v9 01/25] gpio/omap: remove dependency on gpio_bank_count
+In-Reply-To: <20120202194545.GA29351@legolas.emea.dhcp.ti.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <1328203851-20435-2-git-send-email-tarun.kanti@ti.com>
+ <20120202184106.GC29215@legolas.emea.dhcp.ti.com>
+ <20120202191630.GT15343@ponder.secretlab.ca>
+ <20120202194545.GA29351@legolas.emea.dhcp.ti.com>
+Message-ID: <4F2AF68D.1000505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
-> armv7's flush_cache_all() flushes caches via set/way. To
-> determine the cache attributes (line size, number of sets,
-> etc.) the assembly first writes the CSSELR register to select a
-> cache level and then reads the CCSIDR register. The CSSELR register
-> is banked per-cpu and is used to determine which cache level CCSIDR
-> reads. If the task is migrated between when the CSSELR is written and
-> the CCSIDR is read the CCSIDR value may be for an unexpected cache
-> level (for example L1 instead of L2) and incorrect cache flushing
-> could occur.
-> 
-> Disable preemption across the write and read so that the correct
-> cache attributes are read and used for the cache flushing
-> routine. This fixes a problem we see in scm_call() when
-> flush_cache_all() is called from preemptible context and
-> sometimes the L2 cache is not properly flushed out.
+On 2/2/2012 8:45 PM, Felipe Balbi wrote:
+> On Thu, Feb 02, 2012 at 12:16:30PM -0700, Grant Likely wrote:
+>> On Thu, Feb 02, 2012 at 08:41:07PM +0200, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>> On Thu, Feb 02, 2012 at 11:00:27PM +0530, Tarun Kanti DebBarma wrote:
+>>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>>> index 0b05629..6ea7390 100644
+>>>> --- a/drivers/gpio/gpio-omap.c
+>>>> +++ b/drivers/gpio/gpio-omap.c
+>>>> @@ -28,7 +28,10 @@
+>>>>   #include<asm/gpio.h>
+>>>>   #include<asm/mach/irq.h>
+>>>>
+>>>> +static LIST_HEAD(omap_gpio_list);
+>>>
+>>> I guess it's now too late because patch is acked and everything, but I
+>>> think if you make the driver handle one bank alone and just instantiate
+>>> it multiple times (omap_gpio.0, omap_gpio.1, omap_gpio.3, etc) driver
+>>> would be faaaaaar simpler.
+>>
+>> Is there any shared state between the banks?  On my very cursory glance it
+>> looked like banks still have some interaction between them.  If not, then
+>> yes I agree that multiple instances would be better.
+>
+> A quick glance at the TRM shows that banks have separate address spaces
+> and IRQ lines. I think it's done this way because we can handoff one (or
+> more) bank to other cores on the SoC, so they need to be pretty
+> independent.
+>
+> I could be missing something though.
 
-This isn't going to work for two reasons:
+In fact the driver already handled the 6 GPIOS banks as individual devices:
 
-(1) (and the VFP code suffers from this) after we re-enable preemption,
-    we really should check for a pending preemption event in every case.
+[    0.185638] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
+[    0.185882] OMAP GPIO hardware version 0.1
+[    0.186767] gpiochip_add: registered GPIOs 32 to 63 on device: gpio
+[    0.187744] gpiochip_add: registered GPIOs 64 to 95 on device: gpio
+[    0.188751] gpiochip_add: registered GPIOs 96 to 127 on device: gpio
+[    0.189819] gpiochip_add: registered GPIOs 128 to 159 on device: gpio
+[    0.190917] gpiochip_add: registered GPIOs 160 to 191 on device: gpio
 
-(2) v7_flush_dcache_all() is called from __v7_setup() using a very small
-    private stack.  This doesn't have a thread info structure at the
-    bottom.
+That list is only used to iterate over all the instances during CPU idle:
 
-So, if we need to disable preemption here, we need to find a different
-solution to it.
+void omap2_gpio_prepare_for_idle(int pwr_mode)
+{
+	struct gpio_bank *bank;
 
-> Should we move get_thread_info into assembler.h? It seems odd
-> to include entry-header.S but I saw that vfp was doing the same.
+	list_for_each_entry(bank, &omap_gpio_list, node) {
+		if (!bank->mod_usage || !bank->loses_context)
+			continue;
 
-Probably yes, and probably also have preempt_disable and preempt_enable
-assembler macros.  That's going to get rather icky if we have to
-explicitly call the scheduler though (to solve (1)).
+		bank->power_mode = pwr_mode;
+
+		pm_runtime_put_sync_suspend(bank->dev);
+	}
+}
+
+void omap2_gpio_resume_after_idle(void)
+{
+	struct gpio_bank *bank;
+
+	list_for_each_entry(bank, &omap_gpio_list, node) {
+		if (!bank->mod_usage || !bank->loses_context)
+			continue;
+
+		pm_runtime_get_sync(bank->dev);
+	}
+}
+
+
+I don't know if there is some reason to not use driver_for_each_device.
+
+
+Kevin,
+
+Do we have any constraint inside omap_sram_idle to not use the device 
+iterator?
+
+
+Regards,
+Benoit
