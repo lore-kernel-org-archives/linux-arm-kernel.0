@@ -1,25 +1,24 @@
 From: axel.lin@gmail.com (Axel Lin)
-Date: Thu, 2 Feb 2012 09:55:05 +0800
-Subject: [PATCH v2] pxa/hx4700: add platform device and I2C info for
- AK4641 codec
-In-Reply-To: <CAN1soZxzWgiX7m6meLAS8bRpg5JNF5YRu8XXpUSmwzRJoBBP6w@mail.gmail.com>
-References: <1325217971.4022.1.camel@phoenix>
- <1325338529.24725.YahooMailClassic@web29008.mail.ird.yahoo.com>
- <CAN1soZxzWgiX7m6meLAS8bRpg5JNF5YRu8XXpUSmwzRJoBBP6w@mail.gmail.com>
-Message-ID: <CAF+7xWmzdG9NBp4xLroUTJ43=xx=HQiOnadfWFc5zWBLnVG_Jg@mail.gmail.com>
+Date: Thu, 2 Feb 2012 09:59:28 +0800
+Subject: [PATCH RESEND] ARM: pxa: fix error handling in
+ pxa2xx_drv_pcmcia_probe
+In-Reply-To: <CAN1soZyatf2u4fVk-=U_Sz4wcVwP7qFaiZK4CR3rosbXeQObvA@mail.gmail.com>
+References: <1324974344.2351.5.camel@phoenix>
+ <CAMPhdO_QL3ahf4+F70Bg7FHKq5mrbbofN_BTz8dpcBLea9BNAw@mail.gmail.com>
+ <25B60CDC2F704E4E9D88FFD52780CB4C05EC64DBD3@SC-VEXCH1.marvell.com>
+ <CAMPhdO8=L1KGmn_OihoMmMWNDahZ5+3u7M+BNuT3FcSfExHm1w@mail.gmail.com>
+ <CAN1soZyatf2u4fVk-=U_Sz4wcVwP7qFaiZK4CR3rosbXeQObvA@mail.gmail.com>
+Message-ID: <CAF+7xW=VmaOATC1-J3u=s7pjuK-xefo+5zzZ3GpqVot7JJOfDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/1/4 Haojian Zhuang <haojian.zhuang@gmail.com>:
-> On Sat, Dec 31, 2011 at 9:35 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
->> Works for me on linux-3.2-rc7.
 >>
->> Tested-by: Paul Parsons <lost.distance@yahoo.com>
+>> If it fails, it will jump to err1 anyway. The check there is redundant.
 >>
-> Applied.
+> Applied
+
 Hi Haojian,
 This patch is not (yet) upstream.
-Not in Linus' tree. and not in linux-next tree.
 Could you help to check it again.
 
 Thanks,
