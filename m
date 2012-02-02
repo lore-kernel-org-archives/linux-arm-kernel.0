@@ -1,29 +1,31 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 2 Feb 2012 22:02:15 +0800
-Subject: [PATCH v2 8/9] ASoC: imx: add dt support for audmux-v2
-In-Reply-To: <20120202121020.GD7428@opensource.wolfsonmicro.com>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-9-git-send-email-richard.zhao@linaro.org>
- <20120202121020.GD7428@opensource.wolfsonmicro.com>
-Message-ID: <20120202140212.GC3015@richard-laptop>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 2 Feb 2012 19:33:53 +0530
+Subject: [PATCH 0/2] ARM: OMAP: Couple of misc fixes for 3.3
+Message-ID: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 12:10:20PM +0000, Mark Brown wrote:
-> On Thu, Feb 02, 2012 at 10:12:07AM +0800, Richard Zhao wrote:
-> 
-> > +Required properties:
-> > +- compatible : "fsl,imx31-audmux".
-> > +
-> > +Example:
-> > +
-> > +audmux at 021d8000 {
-> > +	compatible = "fsl,imx6q-audmux", "fsl,imx31-audmux";
-> > +	reg = <0x021d8000 0x4000>;
-> 
-> It's kind of obvious what it is but you should really document the reg
-> property for completeness.
-Right.
+Patches are tested on OMAP4430 SDP.
 
-Thanks
-Richard
+The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+
+  Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
+
+Rajendra Nayak (1):
+  ARM: OMAP: Get rid of reset for system timer
+
+Santosh Shilimkar (1):
+  ARM: OMAP4: Move the barrier memboclk_steal() as part of reserve
+    callback
+
+ arch/arm/mach-omap2/Kconfig                   |    4 ++--
+ arch/arm/mach-omap2/common.h                  |    1 +
+ arch/arm/mach-omap2/io.c                      |    1 +
+ arch/arm/mach-omap2/omap4-common.c            |   25 ++++++++++++++++---------
+ arch/arm/mach-omap2/timer.c                   |    1 -
+ arch/arm/plat-omap/common.c                   |    1 +
+ arch/arm/plat-omap/include/plat/omap-secure.h |    6 ++++++
+ 7 files changed, 27 insertions(+), 12 deletions(-)
+
+-- 
+1.7.4.1
