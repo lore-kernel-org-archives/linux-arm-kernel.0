@@ -1,159 +1,113 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Thu, 2 Feb 2012 11:35:54 -0600
-Subject: [RFC PATCH v4 2/4] ARM: omap: Remove cpuidle timekeeping and irq
- enable/disable
-In-Reply-To: <CAORVsuXLPjc7X+D1jVP1KyjgUWZhtUnA3F-iz-d-DqtHRmLShA@mail.gmail.com>
-References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
- <1328065215-28108-3-git-send-email-rob.lee@linaro.org>
- <CAORVsuXLPjc7X+D1jVP1KyjgUWZhtUnA3F-iz-d-DqtHRmLShA@mail.gmail.com>
-Message-ID: <CAMXH7KEURU-TETr21fU_xrdETxgiscYG4PaVcDbhevojzuQUeg@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 2 Feb 2012 09:43:37 -0800
+Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
+In-Reply-To: <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
+References: <20120202004253.GA10946@linux.vnet.ibm.com>
+ <1328143404-11038-1-git-send-email-paulmck@linux.vnet.ibm.com>
+ <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
+ <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
+ <20120202044439.GD2435@linux.vnet.ibm.com>
+ <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
+Message-ID: <20120202174337.GS2518@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2012 at 10:21 AM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> Rob,
->
-> On Wed, Feb 1, 2012 at 4:00 AM, Robert Lee <rob.lee@linaro.org> wrote:
->> Now that the core cpuidle driver keeps time and handles irq enabling,
->> remove this functionality. ?Also, remove irq disabling as all paths to
->> cpuidle_idle_call already call local_irq_disable. ?Also, restructure
->> idle functions as needed by the cpuidle core driver changes.
->>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->> ---
->> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 96 ++++++++++++++++--------------------
->> ?1 files changed, 43 insertions(+), 53 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
->> index 464cffd..9ecded5 100644
->> --- a/arch/arm/mach-omap2/cpuidle34xx.c
->> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> ...
->
->> @@ -100,23 +107,20 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index)
->> ?{
->> - ? ? ? struct omap3_idle_statedata *cx =
->> - ? ? ? ? ? ? ? ? ? ? ? cpuidle_get_statedata(&dev->states_usage[index]);
->> - ? ? ? struct timespec ts_preidle, ts_postidle, ts_idle;
->> - ? ? ? u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
->> - ? ? ? int idle_time;
->> + ? ? ? struct omap3_idle_drvdata *dd = dev->states_usage[index].driver_data
-> A build error is triggered by the missing ";".
+On Thu, Feb 02, 2012 at 12:13:00PM -0500, Nicolas Pitre wrote:
+> On Wed, 1 Feb 2012, Paul E. McKenney wrote:
+> 
+> > On Wed, Feb 01, 2012 at 10:49:22PM -0500, Nicolas Pitre wrote:
+> > > On Wed, 1 Feb 2012, Paul E. McKenney wrote:
+> > > 
+> > > > From: "Paul E. McKenney" <paul.mckenney@linaro.org>
+> > > > 
+> > > > The idle loop is a quiscent state for RCU, which means that RCU ignores
+> > > > CPUs that have told RCU that they are idle via rcu_idle_enter().
+> > > > There are nevertheless quite a few places where idle CPUs use RCU, most
+> > > > commonly indirectly via tracing.  This patch fixes these problems for ARM.
+> > > > 
+> > > > Many of these bugs have been in the kernel for quite some time, but
+> > > > Frederic's recent change now gives warnings.
+> > > > 
+> > > > This patch takes the straightforward approach of pushing the
+> > > > rcu_idle_enter()/rcu_idle_exit() pair further down into the core of the
+> > > > idle loop.
+> > > 
+> > > NAK.
+> > > 
+> > > 1) This is going to conflict with a patch series I've pushed to RMK 
+> > >    already.  You can see its result in linux-next.
+> > > 
+> > > 2) The purpose of (1) is to do precisely the very opposite i.e. move as 
+> > >    much common knowledge as possible up the idle call paths and leave 
+> > >    the platform specific quirks as bare as possible, if any.
+> > > 
+> > > So I'd much prefer if this change was constrained to be inside 
+> > > cpu_idle(), or at least in its close vicinity.
+> > 
+> > OK.  Then the tracing in the inner idle loop needs to go.  Other
+> > restructuring might be required as well. 
+> 
+> Let me expand a bit more on the "if any" in my #2 above.  Most ARM 
+> sub-architectures don't have any special idle drivers and they simply 
+> rely on the default cpu_do_idle call.  What this proposed patch is doing 
+> is to move the rcu_idle_enter()/rcu_idle_exit() pair down into the few 
+> subarchs with an existing cpu-idle callback.  This means in practice 
+> that rcu_idle_enter()/rcu_idle_exit() wouldn't be called at all anymore 
+> on most ARM targets.  Is that appropriate?
 
-Argh, last minute change and I didn't build afterward.
+Now that you put it that way, it does seem to have severe disadvantages.
+Good thing I tagged the patches as RFC.  ;-)
 
->
-> ...
->
->> @@ -147,18 +151,12 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
->> ? ? ? ? ? ? ? ?pwrdm_for_each_clkdm(core_pd, _cpuidle_allow_idle);
->> ? ? ? ?}
->>
->> -return_sleep_time:
->> - ? ? ? getnstimeofday(&ts_postidle);
->> - ? ? ? ts_idle = timespec_sub(ts_postidle, ts_preidle);
->> -
->> - ? ? ? local_irq_enable();
->> +leave:
->> ? ? ? ?local_fiq_enable();
->>
->> - ? ? ? idle_time = ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * \
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? USEC_PER_SEC;
->> -
->> - ? ? ? /* Update cpuidle counters */
->> - ? ? ? dev->last_residency = idle_time;
->> + ? ? ? /* Restore original PER state if it was modified */
->> + ? ? ? if (dd->per_next_state != dd->per_saved_state)
->> + ? ? ? ? ? ? ? pwrdm_set_next_pwrst(per_pd, dd->per_saved_state);
-> This code is not necessarily balanced with the PER state change in
-> omap3_enter_idle_bm (cf. "/* Are we changing PER target state? */"
-> here below), since in the core cpuidle code there is no guarantee that
-> the calls to pre_enter and enter callbacks are balanced.
-> In general I fear that splitting the code in two functions introduces
-> a risk of programming non-coherent settings in the PRCM.
+Annoying, that.  I was hoping to get this fixed on an arch-by-arch basis.
+Looks like it might have to be a global change requiring global agreement. :-(
 
-Agree, in general it does introduce that new risk.  For the platform
-code changes, I tried to keep the code paths the same as before.  I
-see now where I created a problem though:
+> > The long and short of it is that you absolutely cannot use RCU between 
+> > the time you invoke rcu_idle_enter() and the time you invoke 
+> > rcu_idle_exit().  The ARM idle code currently does just that and 
+> > therefore must change.
+> > 
+> > Whatever change you choose that causes the code to meet that constraint
+> > is met is fine by me.
+> > 
+> > But that constraint absolutely must be met.
+> 
+> I would have to know more about what the rcu_idle_*() calls imply before 
+> suggesting an alternative.
 
-...
-	if (target_state->pre_enter) {
-		idx = target_state->
-			pre_enter(dev, drv, idx);
-	}
+After a call to rcu_idle_enter(), RCU ignores the CPU completely until the
+next call to rcu_idle_exit().  This means that in the interval between
+rcu_idle_enter() and rcu_idle_exit(), you can say rcu_read_lock() all
+you want, but your data structures will get absolutely no RCU protection.
+This will result in random memory corruption, and for all I know might
+already be resultin in random memory corruption.  So a fix is required.
 
-	if (idx < 0) {
-		local_irq_enable();
-		return idx;
-	}
+So why does RCU need to ignore idle CPUs?  Because otherwise, RCU needs
+to periodically wake them up to check their status.  Waking them up
+periodically defeats CONFIG_NO_HZ's attempts to conserve power.  Avoiding
+waking them up and avoiding ignoring them extended RCU grace periods,
+eventually OOMing the systems.
 
-	if (need_resched()) {
-		local_irq_enable();
-		return -EBUSY;
-	}
+Why this new imposition?  It is not new.  It has always been illegal to
+use RCU in the idle loop from the beginning.  But people happily ignored
+that restriction, partly because it is not always immediately obvious
+what is using RCU.  Event tracing does, but unless you know that...
 
-...
+So we added diagnostics to check for illegal uses of RCU in the idle
+loop, and also separated rcu_idle_enter() and rcu_idle_exit() from
+tick_nohz_stop_sched_tick(), so that things like idle notifiers can work.
+The diagnostics promptly located all sorts of problems, including these.
 
-The only way the core cpuidle pre_enter can get called without enter
-without enter is if the omap3 next_valid_state() returned a negative
-value.  If this ever happened in the existing omap3 code, it would
-cause it to break anyway.  But, this particular need_resched() call
-could cause an exit that results in difference behavior than before.
-One solution to that is just to move the need_resched check before the
-pre_enter call.
+The two options I see are:
 
->
-> ...
->
->> @@ -255,8 +255,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
->> ?{
->> ? ? ? ?int new_state_idx;
->> - ? ? ? u32 core_next_state, per_next_state = 0, per_saved_state = 0, cam_state;
->> - ? ? ? struct omap3_idle_statedata *cx;
->> + ? ? ? u32 core_next_state, cam_state;
->> + ? ? ? struct omap3_idle_drvdata *dd = dev->states_usage[index].driver_data;
->> + ? ? ? struct omap3_idle_statedata *cx = &dd->state_data[index];
->> ? ? ? ?int ret;
-> The build throws a few warnings about unused variables:
->
-> arch/arm/mach-omap2/cpuidle34xx.c: In function 'omap3_enter_idle_bm':
-> arch/arm/mach-omap2/cpuidle34xx.c:261: warning: unused variable 'ret'
-> arch/arm/mach-omap2/cpuidle34xx.c:257: warning: unused variable 'new_state_idx'
->
-> ...
->
+1.	Rip tracing out of the inner idle loops and everything that
+	they invoke.
 
-Got it, not sure why I missed this.
+2.	Push rcu_idle_enter() and rcu_idle_exit() further down into
+	the idle loops.  As you say, -all- of them.
 
->>
->> ?DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
->> @@ -337,7 +329,8 @@ static inline void _fill_cstate(struct cpuidle_driver *drv,
->> ? ? ? ?state->exit_latency ? ? = cpuidle_params_table[idx].exit_latency;
->> ? ? ? ?state->target_residency = cpuidle_params_table[idx].target_residency;
->> ? ? ? ?state->flags ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID;
->> - ? ? ? state->enter ? ? ? ? ? ?= omap3_enter_idle_bm;
->> + ? ? ? state->pre_enter ? ? ? ?= omap3_enter_idle_bm;
->> + ? ? ? state->enter ? ? ? ? ? ?= omap3_enter_idle;
->> ? ? ? ?sprintf(state->name, "C%d", idx + 1);
->> ? ? ? ?strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
->>
-> ...
->
-> Also the line at 373 is not needed anymore in omap3_idle_init, since
-> the enter callback is filled in in the _fill_cstate function:
-> ? ? ? ?/* C1 . MPU WFI + Core active */
-> ? ? ? ?_fill_cstate(drv, 0, "MPU ON + CORE ON");
-> ? ? ? ?(&drv->states[0])->enter = omap3_enter_idle; ? ? ? ? ? ? <==
-> not needed anymore
-> ? ? ? ?drv->safe_state_index = 0;
->
-> More testing on OMAP3 is needed. Let me come back with the results asap.
->
+My patch set was an attempt at #2, but clearly a very poorly conceived
+attempt.  But I had to start somewhere.
 
-Understand and thanks for reviewing.
+Other ideas?
 
-> Regards,
-> Jean
+							Thanx, Paul
