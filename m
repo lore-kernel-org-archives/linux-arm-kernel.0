@@ -1,90 +1,75 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 2 Feb 2012 23:00:43 +0100
-Subject: [PATCH v9 01/25] gpio/omap: remove dependency on gpio_bank_count
-In-Reply-To: <20120202215350.GB22888@legolas.emea.dhcp.ti.com>
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <1328203851-20435-2-git-send-email-tarun.kanti@ti.com>
- <20120202184106.GC29215@legolas.emea.dhcp.ti.com>
- <20120202191630.GT15343@ponder.secretlab.ca>
- <20120202194545.GA29351@legolas.emea.dhcp.ti.com> <4F2AF68D.1000505@ti.com>
- <20120202214907.GA22888@legolas.emea.dhcp.ti.com>
- <20120202215350.GB22888@legolas.emea.dhcp.ti.com>
-Message-ID: <4F2B078B.1040709@ti.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Thu, 2 Feb 2012 16:00:37 -0600
+Subject: i.MX SDMA questions
+Message-ID: <CAKGA1bnyY4pd4Ptw3X=e2j_E2gpS4kRZeu+1efjhSw9=2qffkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/2/2012 10:53 PM, Felipe Balbi wrote:
-> Hi again,
->
-> On Thu, Feb 02, 2012 at 11:49:08PM +0200, Felipe Balbi wrote:
->>> In fact the driver already handled the 6 GPIOS banks as individual devices:
->>>
->>> [    0.185638] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
->>> [    0.185882] OMAP GPIO hardware version 0.1
->>> [    0.186767] gpiochip_add: registered GPIOs 32 to 63 on device: gpio
->>> [    0.187744] gpiochip_add: registered GPIOs 64 to 95 on device: gpio
->>> [    0.188751] gpiochip_add: registered GPIOs 96 to 127 on device: gpio
->>> [    0.189819] gpiochip_add: registered GPIOs 128 to 159 on device: gpio
->>> [    0.190917] gpiochip_add: registered GPIOs 160 to 191 on device: gpio
->>
->> yeah, but you can get all of that for free from driver core. Just add
->> one platform_device for each bank and make the omap-gpio.c only
->> understand one bank. No tricks.
->>
->> What I'm trying to say is to remove the Bank array or list_head and make
->> probe() get called 6 times by creating 6 omap_gpio platform_devices.
->>
->>  From probe you cann gpiochip_add() once and only once.
-> 		^^^^
-> 		 call
->
-> I actually just took the time to go over the driver and that's what it
-> does. So the list_head is only there fo the nasty cpuidle stuff below:
+I guess Sascha would be best to answer these but if anyone has any
+experience here it would be much appreciated;
 
-Yes, that was my point :-)
+We're trying to bring up UDMA support for MX5 PATA and in doing so
+we've found some small differences between the old Freescale driver
+and the new dmaengine implementation, but some things which are
+basically the same from a high level point of view. What we're
+currently mulling over is basically how channels are allocated and
+mapped and what the relevance is to the dma request numbers in
+arch/arm/plat-mxc/include/mach/mx51.h actually play a role.
 
->>> That list is only used to iterate over all the instances during CPU idle:
->>>
->>> void omap2_gpio_prepare_for_idle(int pwr_mode)
->>> {
->>> 	struct gpio_bank *bank;
->>>
->>> 	list_for_each_entry(bank,&omap_gpio_list, node) {
->>> 		if (!bank->mod_usage || !bank->loses_context)
->>> 			continue;
->>>
->>> 		bank->power_mode = pwr_mode;
->>>
->>> 		pm_runtime_put_sync_suspend(bank->dev);
->>> 	}
->>> }
->>>
->>> void omap2_gpio_resume_after_idle(void)
->>> {
->>> 	struct gpio_bank *bank;
->>>
->>> 	list_for_each_entry(bank,&omap_gpio_list, node) {
->>> 		if (!bank->mod_usage || !bank->loses_context)
->>> 			continue;
->>>
->>> 		pm_runtime_get_sync(bank->dev);
->>> 	}
->>> }
->>
->> that's the thing which is unnecessary, actually :-)
->>
->> Why do we even have this omap2_gpio_resume_after_idle() ? Can't the gpio
->> driver handle its own PM or listen to cpuidle notificaitons for that ?
->>
->> I would like to understand why do we need this hack for pm runtime.
->> Can't you just use ->prepare() and ->complete() from dev_pm_ops ?
->
-> This question remains. Why do we need those funtions ?
+With so few users of the API on MX5 it's hard to find "correct"
+operation as they all have subtle differences in when and where they
+do their DMA. My only references right now are the SSI driver (which
+is annoyingly abstract in it's DMA usage), the FSL/Linaro SPDIF driver
+(which is cleaner but seems to be incomplete after setup, and doesn't
+actually use any dma in the codec or fabric, which makes it all the
+more confusing) and the drivers from MX3 which use the same dmaengine
+(SD controller etc.).
 
-These functions are called from the CPUIdle path so outside the scope of 
-the GPIO driver. These are part of a bunch of nasty PM hacks we are 
-doing in the CPU idle loop. We are in the process of getting rid of most 
-of them, but it looks like some are still needed.
+With regards to the original Freescale ATA driver it seems to allocate
+two channels, one for receive and one for transmit - looking at the
+SSI driver, it also grabs two channels, one for receive and one for
+transmit. There are THREE dma request ids in the mx51.h include (rx,
+tx and tx_end) which I am not sure what they are meant to map to (the
+only things with similar names are fifo alarms). Since ATA is a
+dynamic channel allocation, and the script code is picked by setting
+the peripheral_type and the direction is mapped by slave_config
+fields, do we actually need two DMA channels, or can we reuse the same
+one and change the slave config (I note that the SSI driver does not,
+but I kind of assume this is because there are two FIFOs, and a
+possibility of playing and recording audio at the same time, but on
+ATA there is only one and accesses are implicitly consecutive?)
 
-Regards,
-Benoit
+So here are the big questions;
+
+Does the ATA driver need to know those 3 MX51_DMA_REQ_ATA_*
+assignments, and what are they used for anyway apart from stuffing
+into the request structure? Are these just SDMA events fired when
+peripherals have a FIFO alarm as I assume (and what is #define
+MX51_DMA_REQ_GPU 15? That's not in the manual, on MX51 it's IOMUX GPIO
+1_5 and on MX53 it's the SPDIF TX DMA request :) If we are manhandling
+the DMA (libata setup/start/status/stop) do we need to do something
+about these events?
+
+Do we need two or just one channel if we can change the slave config
+to change direction?
+
+There are a couple of tweaks we may need to make to sdma channel setup
+for ATA (FSL's driver turns off interrupts after every buffer
+descriptor specifically for ATA) besides, but the platform data
+required - or not required as the case may be - and the actual
+specific steps to get a channel (or more than one, and reasons for
+using more than one) are seemingly a mystery from that point of view.
+Some drivers just request a channel, others get platform data from
+those MX51_DMA_REQ values and use them in the DMA request and we can't
+tell whether this is required since all the channels besides IRAM
+usage are dynamic?
+
+Goal after pata_dma is somehow implement DMA_MEMCPY cap and find
+places to use it since I think it's fairly easy to add, but finding
+users for asynchronous memcpy is going to be a difficult one (although
+enabling NET_DMA would be cool). Are we ready for that kind of feature
+on i.MX?
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
