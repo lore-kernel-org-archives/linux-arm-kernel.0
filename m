@@ -1,45 +1,80 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 2 Feb 2012 19:53:11 +0000
-Subject: [PATCH v3] ARM: davinci: map default_queue to edma channels
-In-Reply-To: <4F28DE58.3040902@denx.de>
-References: <1326956721-25158-1-git-send-email-hs@denx.de>
- <DF0F476B391FA8409C78302C7BA518B6317970CE@DBDE01.ent.ti.com>
- <4F28DE58.3040902@denx.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6317AE7C6@DBDE01.ent.ti.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 02 Feb 2012 20:53:25 +0100
+Subject: [PATCH 02/15] mm: page_alloc: update migrate type of pages on pcp
+ when isolating
+In-Reply-To: <20120202124729.GA5796@csn.ul.ie>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-3-git-send-email-m.szyprowski@samsung.com>
+ <20120130111522.GE25268@csn.ul.ie> <op.v8wlu8ws3l0zgt@mpn-glaptop>
+ <20120130161447.GU25268@csn.ul.ie>
+ <022e01cce034$bc6cf440$3546dcc0$%szyprowski@samsung.com>
+ <20120202124729.GA5796@csn.ul.ie>
+Message-ID: <op.v82hjbd13l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+> On Tue, Jan 31, 2012 at 05:23:59PM +0100, Marek Szyprowski wrote:
+>> Pages, which have incorrect migrate type on free finally
+>> causes pageblock migration type change from MIGRATE_CMA to MIGRATE_MOVABLE.
 
-On Wed, Feb 01, 2012 at 12:10:24, Heiko Schocher wrote:
-> Hello Nori,
-> 
-> Nori, Sekhar wrote:
-> > Hi Heiko,
-> > 
-> > On Thu, Jan 19, 2012 at 12:35:21, Heiko Schocher wrote:
-> >> Default queue is expected to be a low-priority queue.
-> >> This way, long transfers on the default queue started
-> >> by the codec engine will not cause audio defects.
-> >>
-> >> Signed-off-by: Heiko Schocher <hs@denx.de>
-> > 
-> >> Signed-off-by: juha.kuikka at gmail.com
-> >> Reported-by: juha.kuikka at gmail.com
-> > 
-> > Sign-off should include real name, so I changed these
-> > two lines to:
-> > 
-> >     Signed-off-by: Juha Kuikka <juha.kuikka@gmail.com>
-> >     Reported-by: Juha Kuikka <juha.kuikka@gmail.com>
-> 
-> Thanks!
-> 
-> > before applying. Let me know if anyone has objections.
-> 
-> I saw no objections, so can this patch go in now?
+On Thu, 02 Feb 2012 13:47:29 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
+> I'm not quite seeing this. In free_hot_cold_page(), the pageblock
+> type is checked so the page private should be set to MIGRATE_CMA or
+> MIGRATE_ISOLATE for the CMA area. It's not clear how this can change a
+> pageblock to MIGRATE_MOVABLE in error.
 
-Queuing this for v3.4. Thanks for the reminder.
+Here's what I think may happen:
 
-Regards,
-Sekhar
+When drain_all_pages() is called, __free_one_page() is called for each page on
+pcp list with migrate type deducted from page_private() which is MIGRATE_CMA.
+This result in the page being put on MIGRATE_CMA freelist even though its
+pageblock's migrate type is MIGRATE_ISOLATE.
+
+When allocation happens and pcp list is empty, rmqueue_bulk() will get executed
+with migratetype argument set to MIGRATE_MOVABLE.  It calls __rmqueue() to grab
+some pages and because the page described above is on MIGRATE_CMA freelist it
+may be returned back to rmqueue_bulk().
+
+But, pageblock's migrate type is not MIGRATE_CMA but MIGRATE_ISOLATE, so the
+following code:
+
+#ifdef CONFIG_CMA
+		if (is_pageblock_cma(page))
+			set_page_private(page, MIGRATE_CMA);
+		else
+#endif
+			set_page_private(page, migratetype);
+
+will set it's private to MIGRATE_MOVABLE and in the end the page lands back
+on MIGRATE_MOVABLE pcp list but this time with page_private == MIGRATE_MOVABLE
+and not MIGRATE_CMA.
+
+One more drain_all_pages() (which may happen since alloc_contig_range() calls
+set_migratetype_isolate() for each block) and next __rmqueue_fallback() may
+convert the whole pageblock to MIGRATE_MOVABLE.
+
+I know, this sounds crazy and improbable, but I couldn't find an easier path
+to destruction.  As you pointed, once the page is allocated, free_hot_cold_page()
+will do the right thing by reading pageblock's migrate type.
+
+Marek is currently experimenting with various patches including the following
+change:
+
+#ifdef CONFIG_CMA
+                 int mt = get_pageblock_migratetype(page);
+                 if (is_migrate_cma(mt) || mt == MIGRATE_ISOLATE)
+                         set_page_private(page, mt);
+                 else
+#endif
+                         set_page_private(page, migratetype);
+
+As a matter of fact, if __rmqueue() was changed to return migrate type of the
+freelist it took page from, we could avoid this get_pageblock_migratetype() all
+together.  For now, however, I'd rather not go that way just yet -- I'll be happy
+to dig into it once CMA gets merged.
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
