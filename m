@@ -1,161 +1,54 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 2 Feb 2012 10:12:04 +0800
-Subject: [PATCH v2 5/9] ARM: mxc: convert audmux-v2 to a platform driver
+Date: Thu, 2 Feb 2012 10:12:05 +0800
+Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
 In-Reply-To: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
 References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1328148728-32258-6-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Plaform driver is more flexible and easy to add DT support.
-
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/plat-mxc/audmux-v2.c |  102 ++++++++++++++++++++++++++++++----------
- 1 files changed, 76 insertions(+), 26 deletions(-)
+ arch/arm/mach-imx/mach-mx31ads.c      |   10 ++++++++++
+ arch/arm/plat-mxc/include/mach/mx31.h |    1 +
+ 2 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
-index 8cced35..d53c029 100644
---- a/arch/arm/plat-mxc/audmux-v2.c
-+++ b/arch/arm/plat-mxc/audmux-v2.c
-@@ -24,6 +24,9 @@
- #include <mach/audmux.h>
- #include <mach/hardware.h>
- 
-+#define DRIVER_NAME "audmux-v2"
-+
-+struct resource *audmux_res;
- static struct clk *audmux_clk;
- static void __iomem *audmux_base;
- 
-@@ -140,7 +143,7 @@ static const struct file_operations audmux_debugfs_fops = {
- 	.llseek = default_llseek,
+diff --git a/arch/arm/mach-imx/mach-mx31ads.c b/arch/arm/mach-imx/mach-mx31ads.c
+index 4917aab..bb69e71 100644
+--- a/arch/arm/mach-imx/mach-mx31ads.c
++++ b/arch/arm/mach-imx/mach-mx31ads.c
+@@ -486,10 +486,20 @@ static unsigned int ssi_pins[] = {
+ 	MX31_PIN_STXD5__STXD5,
  };
  
--static void audmux_debugfs_init(void)
-+static void __init audmux_debugfs_init(void)
- {
- 	int i;
- 	char buf[20];
-@@ -159,10 +162,18 @@ static void audmux_debugfs_init(void)
- 				   i);
- 	}
- }
-+
-+static void __exit audmux_debugfs_remove(void)
-+{
-+	debugfs_remove_recursive(audmux_debugfs_root);
-+}
- #else
- static inline void audmux_debugfs_init(void)
- {
- }
-+static void audmux_debugfs_remove(void)
-+{
-+}
- #endif
- 
- int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
-@@ -184,36 +195,75 @@ int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
- }
- EXPORT_SYMBOL_GPL(mxc_audmux_v2_configure_port);
- 
--static int mxc_audmux_v2_init(void)
-+static int __init mxc_audmux_v2_probe(struct platform_device *pdev)
- {
--	int ret;
--	if (cpu_is_mx51()) {
--		audmux_base = MX51_IO_ADDRESS(MX51_AUDMUX_BASE_ADDR);
--	} else if (cpu_is_mx31()) {
--		audmux_base = MX31_IO_ADDRESS(MX31_AUDMUX_BASE_ADDR);
--	} else if (cpu_is_mx35()) {
--		audmux_clk = clk_get(NULL, "audmux");
--		if (IS_ERR(audmux_clk)) {
--			ret = PTR_ERR(audmux_clk);
--			printk(KERN_ERR "%s: cannot get clock: %d\n", __func__,
--					ret);
--			return ret;
--		}
--		audmux_base = MX35_IO_ADDRESS(MX35_AUDMUX_BASE_ADDR);
--	} else if (cpu_is_mx25()) {
--		audmux_clk = clk_get(NULL, "audmux");
--		if (IS_ERR(audmux_clk)) {
--			ret = PTR_ERR(audmux_clk);
--			printk(KERN_ERR "%s: cannot get clock: %d\n", __func__,
--					ret);
--			return ret;
--		}
--		audmux_base = MX25_IO_ADDRESS(MX25_AUDMUX_BASE_ADDR);
-+	struct resource *res;
-+	resource_size_t res_size;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "can't get device resources\n");
-+		return -ENOENT;
-+	}
-+
-+	res_size = resource_size(res);
-+
-+	if (!request_mem_region(res->start, res_size, DRIVER_NAME)) {
-+		dev_err(&pdev->dev, "request_mem_region failed\n");
-+		return -EBUSY;
-+	}
-+
-+	audmux_base = ioremap(res->start, res_size);
-+
-+	if (!audmux_base) {
-+		dev_err(&pdev->dev, "ioremap failed\n");
-+		release_mem_region(res->start, resource_size(res));
-+		return -EIO;
-+	}
-+
-+	audmux_clk = clk_get(&pdev->dev, "audmux");
-+	if (IS_ERR(audmux_clk)) {
-+		dev_warn(&pdev->dev, "cannot get clock: %ld\n",
-+				PTR_ERR(audmux_clk));
-+		audmux_clk = NULL;
- 	}
- 
- 	audmux_debugfs_init();
-+	audmux_res = res;
- 
- 	return 0;
- }
- 
--postcore_initcall(mxc_audmux_v2_init);
-+static int __exit mxc_audmux_v2_remove(struct platform_device *pdev)
-+{
-+	audmux_debugfs_remove();
-+	clk_put(audmux_clk);
-+	iounmap(audmux_base);
-+	release_mem_region(audmux_res->start, resource_size(audmux_res));
-+
-+	return 0;
-+}
-+
-+static struct platform_driver mxc_audmux_v2_driver = {
-+	.remove		= __exit_p(mxc_audmux_v2_remove),
-+	.driver	= {
-+		.name	= DRIVER_NAME,
-+		.owner	= THIS_MODULE,
-+	}
++static const struct resource audmux_res[] __initconst = {
++	{
++		.start = MX31_AUDMUX_BASE_ADDR,
++		.end = MX31_AUDMUX_SIZE,
++		.flags = IORESOURCE_MEM,
++	},
 +};
 +
-+static int __init mxc_audmux_v2_init(void)
-+{
-+	return platform_driver_probe(&mxc_audmux_v2_driver,
-+					mxc_audmux_v2_probe);
-+}
-+subsys_initcall(mxc_audmux_v2_init);
-+
-+static void __exit mxc_audmux_v2_exit(void)
-+{
-+	platform_driver_unregister(&mxc_audmux_v2_driver);
-+}
-+module_exit(mxc_audmux_v2_exit);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:" DRIVER_NAME);
+ static void __init mxc_init_audio(void)
+ {
+ 	imx31_add_imx_ssi(0, NULL);
+ 	mxc_iomux_setup_multiple_pins(ssi_pins, ARRAY_SIZE(ssi_pins), "ssi");
++	imx_add_platform_device("audmux-v2", 0,
++				audmux_res, ARRAY_SIZE(audmux_res), NULL, 0);
+ }
+ 
+ /* static mappings */
+diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
+index e27619e..8a3d5ef 100644
+--- a/arch/arm/plat-mxc/include/mach/mx31.h
++++ b/arch/arm/plat-mxc/include/mach/mx31.h
+@@ -66,6 +66,7 @@
+ #define MX31_RNGA_BASE_ADDR			(MX31_AIPS2_BASE_ADDR + 0xb0000)
+ #define MX31_IPU_CTRL_BASE_ADDR			(MX31_AIPS2_BASE_ADDR + 0xc0000)
+ #define MX31_AUDMUX_BASE_ADDR			(MX31_AIPS2_BASE_ADDR + 0xc4000)
++#define MX31_AUDMUX_SIZE			(SZ_16K)
+ #define MX31_MPEG4_ENC_BASE_ADDR		(MX31_AIPS2_BASE_ADDR + 0xc8000)
+ #define MX31_GPIO1_BASE_ADDR			(MX31_AIPS2_BASE_ADDR + 0xcc000)
+ #define MX31_GPIO2_BASE_ADDR			(MX31_AIPS2_BASE_ADDR + 0xd0000)
 -- 
 1.7.5.4
