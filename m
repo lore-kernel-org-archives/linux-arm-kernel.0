@@ -1,64 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 Feb 2012 22:43:46 +0800
-Subject: [PATCH V2 1/4] pinctrl: add a driver for NVIDIA Tegra
-In-Reply-To: <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
-References: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
- <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
-Message-ID: <20120202144344.GI9773@S2101-09.ap.freescale.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 Feb 2012 14:32:03 +0000
+Subject: OMAP3 L2/outer cache enabled in kernel (after being disabled by
+ uBoot)?
+In-Reply-To: <alpine.LFD.2.02.1201311253460.2759@xanadu.home>
+References: <20120116131329.GA928@n2100.arm.linux.org.uk>
+ <CAMQu2gzPGrbBd4_SOM0TFfGH_Y+XYzoh2XjsoPgpzU10tFOpYQ@mail.gmail.com>
+ <WC20120117085444.17057E@terrafix.co.uk> <20120117121138.GC11475@arm.com>
+ <4F15692D.4070100@ti.com>
+ <CAMQu2gyft96O61Toja-h-MPpzFTQ8dpJWauw3o6qcPQBXEC_6A@mail.gmail.com>
+ <20120117133918.GE11475@arm.com>
+ <CAMQu2gwANxCe-ou_qv29ueLixodoHv9i6VyfvDi2rjEOvhttqA@mail.gmail.com>
+ <WC20120120085711.330803@terrafix.co.uk> <20120127173029.GA3281@arm.com>
+ <4F277A6E.9070107@ti.com>
+ <CAHkRjk7z2QYbU09BRfAWmChw5xj9taCarWfnttWveyqtadiEOg@mail.gmail.com>
+ <CAMQu2gxr5ZkH4AE_7QNptxx7onQMGaj+qhUF+DSw9MnkCqCRog@mail.gmail.com>
+ <CAHkRjk7Fh=OUk8K=bJa8xzPqMvT6P6gjT+kqAA0DeVfrF0sUNg@mail.gmail.com>
+ <CAMQu2gwDJ=aezNAUD3YmGHQ6fBxkxgUonYkQYPH8WBeNvZCKMQ@mail.gmail.com>
+ <CAHkRjk6KQXR1kt8VTPC3GOaHUusKikxXHR=Mge8akaVL2ipvaw@mail.gmail.com>
+ <alpine.LFD.2.02.1201311253460.2759@xanadu.home>
+Message-ID: <CAHkRjk690R951NUDC_erNsBtbmtrM-nPjY2gR=Tf-sW4qXX7ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 02:26:54PM +0100, Linus Walleij wrote:
-> On Wed, Feb 1, 2012 at 10:04 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> 
-> > This adds a driver for the Tegra pinmux, and required parameterization
-> > data for Tegra20 and Tegra30.
-> 
-> OK so I've applied this monster patch and the three others,
-> 
-> the diffstat looks like so:
-> 
-> git diff --stat v3.3-rc2..HEAD
->  arch/arm/mach-tegra/Kconfig                       |    4 +
->  arch/arm/mach-tegra/Makefile                      |    3 -
->  arch/arm/mach-tegra/board-harmony-pinmux.c        |  362 ++-
->  arch/arm/mach-tegra/board-paz00-pinmux.c          |  362 ++-
->  arch/arm/mach-tegra/board-pinmux.c                |   62 +-
->  arch/arm/mach-tegra/board-pinmux.h                |   39 +-
->  arch/arm/mach-tegra/board-seaboard-pinmux.c       |  442 ++-
->  arch/arm/mach-tegra/board-trimslice-pinmux.c      |  366 ++-
->  arch/arm/mach-tegra/include/mach/pinconf-tegra.h  |   63 +
->  arch/arm/mach-tegra/include/mach/pinmux-tegra20.h |  184 -
->  arch/arm/mach-tegra/include/mach/pinmux-tegra30.h |  320 --
->  arch/arm/mach-tegra/include/mach/pinmux.h         |  302 --
->  arch/arm/mach-tegra/pinmux-tegra20-tables.c       |  244 --
->  arch/arm/mach-tegra/pinmux-tegra30-tables.c       |  376 ---
->  arch/arm/mach-tegra/pinmux.c                      |  987 ------
->  drivers/pinctrl/Kconfig                           |   15 +
->  drivers/pinctrl/Makefile                          |    3 +
->  drivers/pinctrl/pinctrl-tegra.c                   |  559 +++
->  drivers/pinctrl/pinctrl-tegra.h                   |  163 +
->  drivers/pinctrl/pinctrl-tegra20.c                 | 2860 ++++++++++++++++
->  drivers/pinctrl/pinctrl-tegra30.c                 | 3726 +++++++++++++++++++++
->  21 files changed, 8482 insertions(+), 2960 deletions(-)
-> 
-> It's still pretty big, adding some 6000 lines in sum total, but you've made
-> your case for having all information about the hardware in the driver
-> quite clear so I've not got much more to say. Short story: the driver knows
-> all about what the hardware can do, and the platform data or device
-> tree will decide how these capabilities are employed on a certain
-> system.
-> 
-> What is nice is to have this out of the ARM tree and under pinctrl
-> subsystem control.
-> 
-Heh, omap and imx have a much big SoC family than tegra.  Imaging what
-if omap and imx do the same thing here, probably will move Linus'
-attention from arch/arm/ to drivers/pinctrl :)
+(sorry, I'm slow at replying, attending some internal ARM conference)
 
-Fortunately, it seems omap and imx will try to get those huge data out
-of the driver/kernel.
+On 31 January 2012 18:09, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Tue, 31 Jan 2012, Catalin Marinas wrote:
+>> Maybe we could factor out the CPU-specific settings from proc-v*.S
+>> into a separate arch/arm/boot/preload directory. We keep proc-v*.S
+>> entirely generic and the implementation-defined bits setting in the
+>> preload code. You could have an option to link the preload with the
+>> kernel but we could recommend that people run this code from
+>> boot-loader before invoking the kernel. This code would be dependent
+>> on platform and chosen at build-time. But the actual kernel image
+>> would be generic.
+>
+> I'd recommend against that. ?Again, the reason is not technical but
+> rather has to do with the tendency to laziness of human beings. ?So
+> please let's not go there or it'll become the de facto standard.
+...
+> The whole idea behind having a generic kernel is all about
+> distributions. ?If a generic kernel has to be distributed with a
+> platform specific pre-kernel blob then we've gained nothing.
+
+The problem we have with a generic kernel in this context (e.g. errata
+bits) is that even though we use a read-check-write sequence for
+setting various bits during __v*_setup, as long as the boot loader did
+not set them the kernel will try a write access and fail. So with the
+current scenario, there is no way for an OMAP platform to run a
+generic kernel in non-secure mode (with all errata workarounds
+enabled) without modifying the boot loader.
+
+> Same goes
+> for the DTB. ?Those platform specific blobs must be distributed _with_
+> the hardware and _not_ with the software distribution. ?Having the dts
+> files in the kernel right now is only a convenience for the transition
+> to device tree.
+
+We could do the same and move the bit enabling to separate repository :).
+
+An alternative would be to also move those bits setting at a later
+time in the kernel booting (and re-disabling/enabling the MMU) as we
+don't have an easy way of figuring out whether the kernel is running
+in secure or non-secure mode.
 
 -- 
-Regards,
-Shawn
+Catalin
