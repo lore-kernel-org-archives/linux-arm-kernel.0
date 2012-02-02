@@ -1,55 +1,65 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 1 Feb 2012 21:58:44 -0700
-Subject: [PATCH] irq_domain: fix the irq number of imx5 tzic
-In-Reply-To: <1328075214-25700-1-git-send-email-shawn.guo@linaro.org>
-References: <1327700179-17454-15-git-send-email-grant.likely@secretlab.ca>
- <1328075214-25700-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120202045844.GK15343@ponder.secretlab.ca>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 2 Feb 2012 12:43:20 +0530
+Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
+ pwrdm_clear_all_prev_pwrst()
+In-Reply-To: <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094312.11027.31050.stgit@dusk>
+ <878vkopw2o.fsf@ti.com> <87mx93ok5y.fsf@ti.com>
+ <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
+Message-ID: <CAMQu2gzVt3K6cuZcbvfNZegimyXz8F4N__A6vDBSyL4QfSnbTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2012 at 01:46:54PM +0800, Shawn Guo wrote:
-> The tzic controller found on imx51 and imx53 gets 128 irq lines rather
-> than 32.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Thu, Feb 2, 2012 at 12:57 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Tue, 31 Jan 2012, Kevin Hilman wrote:
+>
+>> Kevin Hilman <khilman@ti.com> writes:
+>>
+>> > Paul Walmsley <paul@pwsan.com> writes:
+>> >
+>> >> Remove some superfluous calls to pwrdm_clear_all_prev_pwrst().
+>> >> pwrdm_pre_transition(), which appears a few lines after these calls,
+>> >> invokes pwrdm_clear_all_prev_pwrst() on each powerdomain -- there's no
+>> >> need to do it twice.
+>> >
+>> > It looks like these two for OMAP4 are surpurfluous since the immediately
+>> > follow a call to pwrdm_pre_transition() as well.
+>> >
+>> > Santosh/Rajendra, please confirm/ack.
+>>
+>> So after the discussion, do you want to fold this into the original
+>> patch, or do you want a separate patch?
+>
+> Your changes make sense to me. ?I am fine with you adding them into the
+> original patch and adding some credit for you into the commit message.
+> Or you can create a separate patch.
+>
+> N.B., I haven't looked at this file before. ?There are a few other things
+> that don't look right that hopefully someone can take the initiative to
+> fix. ?For example, those calls to mpuss_clear_prev_logic_pwrst() and
+> cpu_clear_prev_logic_pwrst() should be removed as well. ?That should be
+> done by pwrdm_clear_all_prev_pwrst() in mach-omap2/powerdomain44xx.c.
+> Currently it's not, so that needs to be patched.
+>
+We(rajendra and myself) discussed this some time back with Benoit and we agreed
+that for CPU and MPU power domains which are needed very early in the PM power
+up sequence, we can do direct APIs..
+These calls were in critical path and the PD API's proposed for context clear
+and logic clear were use to iterate over all power domains.
+It is only recently we got clear context etc some reasonable form
+even though it still iterates over all hwmod etc which is really overhead.
+Also you need to create 'pdev' etc for context-loss kind of APIs and
+we all thought that that makes things un-ncessary complicated and
+lengthy.
 
-Applied, thanks.
 
-g.
+> Also all of the open-coded powerdomain register accesses in
+> omap-mpuss-lowpower.c should be removed - those should all go through
+> pwrdm_*() functions...
+>
+ I will have another look at the code with your recent power domain clean-ups
+and see what all can be moved to generic APIs.
 
-> ---
->  arch/arm/mach-mx5/imx51-dt.c |    2 +-
->  arch/arm/mach-mx5/imx53-dt.c |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
-> index e1b5edf..1e03ef4 100644
-> --- a/arch/arm/mach-mx5/imx51-dt.c
-> +++ b/arch/arm/mach-mx5/imx51-dt.c
-> @@ -47,7 +47,7 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
->  static int __init imx51_tzic_add_irq_domain(struct device_node *np,
->  				struct device_node *interrupt_parent)
->  {
-> -	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
-> +	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
->  	return 0;
->  }
->  
-> diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
-> index 89de5d4..fd5be0f 100644
-> --- a/arch/arm/mach-mx5/imx53-dt.c
-> +++ b/arch/arm/mach-mx5/imx53-dt.c
-> @@ -51,7 +51,7 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
->  static int __init imx53_tzic_add_irq_domain(struct device_node *np,
->  				struct device_node *interrupt_parent)
->  {
-> -	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
-> +	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
->  	return 0;
->  }
->  
-> -- 
-> 1.7.4.1
-> 
-> 
+Regards
+Santosh
