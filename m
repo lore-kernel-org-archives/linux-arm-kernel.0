@@ -1,37 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Feb 2012 13:46:08 +0000
-Subject: [PATCH 1/4] Remove Telechips ARM subarch from MAINTAINERS
-In-Reply-To: <20120202104541.GB1643@atrey.karlin.mff.cuni.cz>
-References: <20111222211948.GA1201@local>
- <20120103170824.GA2914@n2100.arm.linux.org.uk>
- <20120202104541.GB1643@atrey.karlin.mff.cuni.cz>
-Message-ID: <201202021346.08740.arnd@arndb.de>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 2 Feb 2012 21:58:07 +0800
+Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
+In-Reply-To: <20120202130901.GE9773@S2101-09.ap.freescale.net>
+References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
+ <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
+ <20120202085521.GB9773@S2101-09.ap.freescale.net>
+ <20120202091132.GD9773@S2101-09.ap.freescale.net>
+ <20120202092427.GB32403@b20223-02.ap.freescale.net>
+ <20120202130901.GE9773@S2101-09.ap.freescale.net>
+Message-ID: <20120202135805.GB3015@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 February 2012, Pavel Machek wrote:
-> > On Thu, Dec 22, 2011 at 10:22:40PM +0100, Hans J. Koch wrote:
-> > > 
-> > > The AMR subarchitecture for Telechips SoCs is completely removed,
-> > 
-> > Apart from this spelling mistake, the rest look fine.  Do you want to
-> > send me a pull request with that fixed?
+On Thu, Feb 02, 2012 at 09:09:03PM +0800, Shawn Guo wrote:
+> On Thu, Feb 02, 2012 at 05:24:28PM +0800, Richard Zhao wrote:
+> > On Thu, Feb 02, 2012 at 05:11:34PM +0800, Shawn Guo wrote:
+> > > On Thu, Feb 02, 2012 at 04:55:23PM +0800, Shawn Guo wrote:
+> > > > On Thu, Feb 02, 2012 at 10:12:05AM +0800, Richard Zhao wrote:
+> > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > > > ---
+> > > > >  arch/arm/mach-imx/mach-mx31ads.c      |   10 ++++++++++
+> > > > >  arch/arm/plat-mxc/include/mach/mx31.h |    1 +
+> > > > >  2 files changed, 11 insertions(+), 0 deletions(-)
+> > > > > 
+> > > > Hmm, let's see who are actually using mxc_audmux_v2_configure_port().
+> > > > 
+> > > > $ git grep -n mxc_audmux_v2_configure_port arch/arm/
+> > > > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:246:     mxc_audmux_v2_configure_port(0,
+> > > > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:254:     mxc_audmux_v2_configure_port(4,
+> > > > arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:257:     mxc_audmux_v2_configure_port(0,
+> > > > arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:265:     mxc_audmux_v2_configure_port(3,
+> > > > arch/arm/mach-imx/mach-pcm043.c:365:    mxc_audmux_v2_configure_port(3,
+> > > > arch/arm/mach-imx/mach-pcm043.c:371:    mxc_audmux_v2_configure_port(0,
+> > I didn't grep arch/arm. where is pc043 asoc machine file?
 > 
-> Normally features are removed using feature-removal-schedule.txt. No
-> maintainer is not a reason to remove it like this.
-
-Code that doesn't build and hasn't worked for a long time is enough
-reason IMHO. Note that the tcc platform was for the old arm926 based
-tcc8000, not the newer ARM11 based tcc89xx/91xx/92xx/93xx or even the
-Cortex-A8 based tcc88xx.
-
-Telechips themselves seem to have given up on the ARM9 based products
-(see [1]) and there is practically no code reuse between what was there
-in v3.2 and what would have to get added to support the newer producs.
-
-Is there any particular reason why you are interested in keeping
-the code around? 
-
-	Arnd
-
-[1] https://www.telechips.com/technical_support/kor/opensource/opensource_list.asp
+> It seems to be sound/soc/imx/phycore-ac97.c.
+You see, we're not famaliar with the boards.
+> 
+> > > > 
+> > > As we are moving audmux into sound/soc/imx, it makes less sense to
+> > > still keep these calls in board files.
+> > It don't corrupt git bisect. We don't have to include it in this patch.
+> 
+> It's logically part of this series.
+I don't know much about the above boards and I can not test either. I think I
+have to leave it to other volunteers. I mainly focus on audmux itself.
+> 
+> > >  Instead, I prefer to call it
+> > > from machine driver like what wm1133-ev1 does below.
+> > Maybe pass the info as asoc machine driver pdata.
+> 
+> Sounds good.
+> 
+> > >  Or we can simply
+> > > make the it a audmux-self call with 3 parameters it needs retrieved
+> > > from platform_data or device tree, so that machine driver does not
+> > > even bother with the call.  Makes sense?
+> > audux configuration may change after initial set. For example, it may use
+> > one configuration for audio playback, but use another when you connect a
+> > BT audio device.
+> 
+> Right.  I forgot this point.
+> 
+> -- 
+> Regards,
+> Shawn
