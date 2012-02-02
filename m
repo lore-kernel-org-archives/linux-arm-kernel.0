@@ -1,77 +1,116 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 1 Feb 2012 21:52:07 -0700
-Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4F285C7B.102@ti.com>
-References: <4F22DEF2.5000807@ti.com>
- <20120128180602.GC2501@ponder.secretlab.ca> <4F285C7B.102@ti.com>
-Message-ID: <20120202045207.GH15343@ponder.secretlab.ca>
+Date: Wed, 1 Feb 2012 21:54:59 -0700
+Subject: [RFC PATCH 1/7] ARM: davinci, intc: Add OF support for TI
+ interrupt controller
+In-Reply-To: <1327308967-8092-2-git-send-email-hs@denx.de>
+References: <1327308967-8092-1-git-send-email-hs@denx.de>
+ <1327308967-8092-2-git-send-email-hs@denx.de>
+Message-ID: <20120202045459.GI15343@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 10:26:19PM +0100, Cousson, Benoit wrote:
-> Hi Grant,
+On Mon, Jan 23, 2012 at 09:56:01AM +0100, Heiko Schocher wrote:
+> Add a function to initialize the davinci interrupt controller (INTC)
+> using a device tree node.
 > 
-> On 1/28/2012 7:06 PM, Grant Likely wrote:
-> >On Fri, Jan 27, 2012 at 06:29:22PM +0100, Cousson, Benoit wrote:
-> >>+EXPORT_SYMBOL_GPL(of_dma_to_resource);
-> >
-> >How do you see this function being used?  I ask because I don't want
-> >to add it to the DT device registration code (of_platform_populate()).
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> ---
+>  .../devicetree/bindings/arm/davinci/intc.txt       |   26 ++++++++++
+>  arch/arm/mach-davinci/cp_intc.c                    |   51 ++++++++++++++++++++
+>  arch/arm/mach-davinci/include/mach/cp_intc.h       |    1 +
+>  3 files changed, 78 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
 > 
-> Yep, that was the plan :-)
-> 
-> >I actually want to reduce the amount of work being done at device
-> >registration time and push resolving irqs out to the device drivers.
-> >The reason for this is so that drivers can resolve irqs supplied by
-> >other device drivers once I've got deferred probe merged.
-> 
-> That make senses, but that will break all the drivers that are
-> expecting IRQ and DMA resources to be already there at probe time.
-> These drivers are still relying on the good old
-> platform_get_resource() API.
-> That will add some extra effort to the drivers migration to DT:-(
+> diff --git a/Documentation/devicetree/bindings/arm/davinci/intc.txt b/Documentation/devicetree/bindings/arm/davinci/intc.txt
+> new file mode 100644
+> index 0000000..dac2f69
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/davinci/intc.txt
+> @@ -0,0 +1,26 @@
+> +* TI Davinci Interrupt Controller
+> +
+> +davinci are using a TI interrupt controller that can support several
+> +configurable number of interrupts.
+> +
+> +Main node required properties:
+> +
+> +- compatible : should be:
+> +	"ti,davinci-intc"
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The type shall be a <u32> and the value shall be 1.
+> +
+> +  The cell contains the interrupt number in the range [0-128].
+> +- ti,intc-size: Number of interrupts handled by the interrupt controller.
+> +- reg: physical base address and size of the intc registers map.
+> +
+> +Example:
+> +
+> +	intc: interrupt-controller at 1 {
+> +		compatible = "ti,davinci-intc";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		ti,intc-size = <101>;
+> +		reg = <0xfffee000 0x2000>;
+> +	};
+> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
+> index f83152d..2c6e2e4 100644
+> --- a/arch/arm/mach-davinci/cp_intc.c
+> +++ b/arch/arm/mach-davinci/cp_intc.c
+> @@ -11,7 +11,11 @@
+>  
+>  #include <linux/init.h>
+>  #include <linux/irq.h>
+> +#include <linux/irqdomain.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  
+>  #include <mach/common.h>
+>  #include <mach/cp_intc.h>
+> @@ -175,3 +179,50 @@ void __init cp_intc_init(void)
+>  	/* Enable global interrupt */
+>  	cp_intc_write(1, CP_INTC_GLOBAL_ENABLE);
+>  }
+> +
+> +#ifdef CONFIG_OF
+> +int __init dv_intc_of_init(struct device_node *node, struct device_node *parent)
+> +{
+> +	struct resource res;
+> +	u32 nr_irqs;
+> +
+> +	if (WARN_ON(!node))
+> +		return -ENODEV;
+> +
+> +	if (of_address_to_resource(node, 0, &res)) {
+> +		WARN(1, "unable to get intc registers\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	davinci_soc_info.intc_base = res.start;
+> +	if (WARN_ON(!davinci_soc_info.intc_base))
+> +		return -EINVAL;
+> +
+> +	if (of_property_read_u32(node, "ti,intc-size", &nr_irqs)) {
+> +		WARN(1, "unable to get intc-size\n");
+> +		return -EINVAL;
+> +	}
+> +	davinci_soc_info.intc_irq_num = nr_irqs;
+> +	davinci_soc_info.intc_type = DAVINCI_INTC_TYPE_CP_INTC;
+> +
+> +	cp_intc_init();
+> +	irq_domain_add_simple(node, 0);
 
-They will be broken anyway because there isn't any way for the core
-code to decode DMA properties.  There isn't a consistent way that
-drivers use DMA resources or any complete data about what dma engine
-those resources refer to.  Unlike irqs, there is no global DMA channel
-number space available to driver, which makes it really hard to
-generically populate DMA channels into the resource table.
-
-It really is much better to resolve it at .probe() time where the
-driver can get unambiguous information.  Plus, as I mentioned, it
-plays better with deferred probe.
-
-> >This isn't currently possible because a lot of drivers parse the
-> >resources table directly.  Those users first need to be migrated to
-> >use the platform_get_irq*() APIs.
-> 
-> But even in that case, the device should still have the resources
-> populated before probe. I'm not sure I fully understand what you
-> mean here.
-
-Ah, but once it is in an API, hooks can be implemented in the
-platform_get_*() APIs to resolve relevant things at call time instead
-of at device registration time.
-
-> >DMAs have the same issue, so it is important that device drivers
-> >resolve the dma specifier at .probe() time so that it can use dma
-> >channels supplied by a dma device driver.
-> >
-> >I suspect having a common of_parse_named_phandle_with_args() will
-> >useful when needing to resolve named dma resources from device
-> >drivers.
-> 
-> So it looks like you really have a plan to deprecate all the
-> platform_get_resource APIs usage from driver? At least for DMA and
-> IRQ?
-
-I definitely would like to be rid of (or refactor) the DMA get APIs
-from drivers because I don't think they provide enough information
-about how DMA channels are hooked up (as described above).
-
-However, I actually prefer the platform_get_ API for irqs over
-accessing the resource table directly. I can hook into it if/when I
-change irqs to be resolved at .probe time.
+Take a look at the irq_domain patches that will be (probably) merged
+in v3.4.  Instead of calling irq_domain_add_simple(), you should
+migrate the whole interrupt controller to natively use an irq_domain
+for hwirq <--> irq mapping.
 
 g.
