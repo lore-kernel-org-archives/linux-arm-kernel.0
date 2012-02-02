@@ -1,76 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 02 Feb 2012 17:39:17 -0600
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 2 Feb 2012 15:51:28 -0800
 Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
-In-Reply-To: <1328223819.5882.133.camel@gandalf.stny.rr.com>
-References: <20120202004253.GA10946@linux.vnet.ibm.com>
- <1328143404-11038-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
+In-Reply-To: <20120202232736.GL2518@linux.vnet.ibm.com>
+References: <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
  <20120202044439.GD2435@linux.vnet.ibm.com>
  <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
  <20120202174337.GS2518@linux.vnet.ibm.com>
  <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
  <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
- <4F2B1307.5010207@gmail.com> <1328223819.5882.133.camel@gandalf.stny.rr.com>
-Message-ID: <4F2B1EA5.2040607@gmail.com>
+ <4F2B1307.5010207@gmail.com>
+ <1328223819.5882.133.camel@gandalf.stny.rr.com>
+ <20120202232736.GL2518@linux.vnet.ibm.com>
+Message-ID: <20120202235128.GA21031@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2012 05:03 PM, Steven Rostedt wrote:
-> On Thu, 2012-02-02 at 16:49 -0600, Rob Herring wrote:
->> On 02/02/2012 04:20 PM, Kevin Hilman wrote:
->>> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> writes:
->>>
->>> [...]
->>>
->>>>>> The two options I see are:
->>>>>>
->>>>>> 1.	Rip tracing out of the inner idle loops and everything that
->>>>>> 	they invoke.
->>>>>
->>>>> What I suggested above.  But as I said I know sh*t about that tracing 
->>>>> implementation so that's an easy suggestion for me to make.
->>>>
->>>> Works for me as well.  ;-)
->>>
->>> While I must admit not having a better suggestion, I for one would vote
->>> strongly against removing tracing from the idle path.
->>>
->>> Being a PM developer and maintainer, much of the code I work on and
->>> maintain happens to be run in the bowels of the idle path.  Not having
->>> the ability to trace this code would be a major step backwards IMO.
->>
->> How is it a step backwards if it is already broken. Obviously you
->> haven't actually used any tracing here because it doesn't work right
->> with things as is.
->>
->> What exactly do you want to trace at this level. By the point you are in
->> this code, the path is somewhat known and problems you have are likely
->> h/w issues. If you are trying to go thru a very precise sequence of
->> saving cpu state and flushing caches, you don't want calls out to
->> tracing code that could very easily change the behavior.
->>
->> It would be nice to understand a real example of how to hit this
->> problem. Why type of tracing? Are there other known examples?
+On Thu, Feb 02, 2012 at 03:27:36PM -0800, Paul E. McKenney wrote:
+> On Thu, Feb 02, 2012 at 06:03:39PM -0500, Steven Rostedt wrote:
 > 
-> Well, these are the tracepoints in question:
+> [ . . . ]
 > 
-> trace_power_start(), trace_cpu_idle(), and trace_power_end()
+> > Anyway, one answer is (and I was talking with Paul about this on IRC) is
+> > that we can create a special "TRACE_EVENT_IDLE()" that will explicitly
+> > call "rcu_idle_exit/enter()" as it expects to be called with it off.
+> > 
+> > This should solve most issues I believe.
 > 
-> But this is only used by powertop, and I'm sure nobody would mind if you
-> rip these tracepoints out, causing powertop to no longer work. (that's
-> why we have 4 bytes per tracepoint wasting space in every trace event).
+> You OK with something like RCU_NONIDLE() rather than RCU_EVENT_IDLE()?
+> I have this funny feeling that tracing won't be the only thing using
+> RCU from idle.  :-/
 > 
-> Anyway, one answer is (and I was talking with Paul about this on IRC) is
-> that we can create a special "TRACE_EVENT_IDLE()" that will explicitly
-> call "rcu_idle_exit/enter()" as it expects to be called with it off.
-> 
-> This should solve most issues I believe.
+> Something like this, perhaps?
 
-Seems like these could all be placed common cpuidle code. If you're not
-using cpuidle, then you probably aren't doing much in the default idle
-code. You would still need the wrappers within the cpuidle code or push
-rcu_idle_exit/enter down into a common default idle (which I think we
-now have with Nico's clean-up).
+Or perhaps with the trailing "while (0)" included:
 
-Rob
+	#define RCU_NONIDLE(a) \
+		do { \
+			rcu_idle_exit(); \
+			do { a; } while (0); \
+			rcu_idle_enter(); \
+		} while (0)
+
+							Thanx, Paul
