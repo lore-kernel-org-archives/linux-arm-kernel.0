@@ -1,23 +1,31 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 2 Feb 2012 11:45:41 +0100
-Subject: [PATCH 1/4] Remove Telechips ARM subarch from MAINTAINERS
-In-Reply-To: <20120103170824.GA2914@n2100.arm.linux.org.uk>
-References: <20111222211948.GA1201@local> <20111222212240.GB1201@local>
- <20120103170824.GA2914@n2100.arm.linux.org.uk>
-Message-ID: <20120202104541.GB1643@atrey.karlin.mff.cuni.cz>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 2 Feb 2012 09:24:57 -0200
+Subject: [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
+In-Reply-To: <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
+References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
+ <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
+Message-ID: <CAOMZO5CxZgcO1JUZiFFJzWwLao1g7Y1_VNbsuiJOW+PH2B+FNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Dec 22, 2011 at 10:22:40PM +0100, Hans J. Koch wrote:
-> > 
-> > The AMR subarchitecture for Telechips SoCs is completely removed,
-> 
-> Apart from this spelling mistake, the rest look fine.  Do you want to
-> send me a pull request with that fixed?
+Hi Richard,
 
-Normally features are removed using feature-removal-schedule.txt. No
-maintainer is not a reason to remove it like this.
+On Thu, Feb 2, 2012 at 12:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+> ?arch/arm/boot/dts/imx6q-sabrelite.dts | ? 12 ++++++++++++
+> ?1 files changed, 12 insertions(+), 0 deletions(-)
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I would like to test your audio support patch on mx6sabrelite, but the
+missing sound/soc/imx-sgtl5000.c does not allow me to do it.
+
+I think you would better introduce sound/soc/imx-sgtl5000.c first (on
+separate patch series) so that people could test this patch without
+using the imx-sgtl5000.c implementation from the Linaro kernel.
+
+Without imx-sgtl5000.c in place, this patch only introduces dead code
+at the moment.
+
+Regards,
+
+Fabio Estevam
