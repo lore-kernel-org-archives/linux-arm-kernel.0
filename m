@@ -1,44 +1,176 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 02 Feb 2012 10:14:53 -0800
-Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
- pwrdm_clear_all_prev_pwrst()
-In-Reply-To: <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com> (Paul
- Walmsley's message of "Wed, 1 Feb 2012 12:27:14 -0700 (MST)")
-References: <20120130093931.11027.31048.stgit@dusk>
- <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
- <87mx93ok5y.fsf@ti.com>
- <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
-Message-ID: <878vkldrvm.fsf@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 2 Feb 2012 10:17:48 -0800
+Subject: [PATCH v2 8/8] ARM: tegra: support for secondary cores on Tegra30
+In-Reply-To: <1328028051-24271-9-git-send-email-pdeschrijver@nvidia.com>
+References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+ <1328028051-24271-9-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <CAMbhsRQf0fKbRA5cFvW=uArqPPDw-273zFHLVZAoTb_7qKxu=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
-
-> On Tue, 31 Jan 2012, Kevin Hilman wrote:
+On Tue, Jan 31, 2012 at 8:40 AM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> Add support for bringing up secondary cores on Tegra30. On Tegra30 secondary
+> CPU cores are powergated, so we need to turn on the domains before we can bring
+> the CPU cores online. Bringing secondary cores online happens early during the
+> sytem boot, so we call powergating initialization from platform early_init
+> function.
 >
->> Kevin Hilman <khilman@ti.com> writes:
->> 
->> > Paul Walmsley <paul@pwsan.com> writes:
->> >
->> >> Remove some superfluous calls to pwrdm_clear_all_prev_pwrst().
->> >> pwrdm_pre_transition(), which appears a few lines after these calls,
->> >> invokes pwrdm_clear_all_prev_pwrst() on each powerdomain -- there's no
->> >> need to do it twice.
->> >
->> > It looks like these two for OMAP4 are surpurfluous since the immediately
->> > follow a call to pwrdm_pre_transition() as well.
->> >
->> > Santosh/Rajendra, please confirm/ack.
->> 
->> So after the discussion, do you want to fold this into the original
->> patch, or do you want a separate patch?
+> Based on work by:
 >
-> Your changes make sense to me.  I am fine with you adding them into the 
-> original patch and adding some credit for you into the commit message.  
-> Or you can create a separate patch.
+> Scott Williams <scwilliams@nvidia.com>
+> Colin Cross <ccross@android.com>
+> Alex Frid <afrid@nvidia.com>
+>
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+> ?arch/arm/mach-tegra/headsmp.S | ? 32 +++++++++++++++++++++++++
+> ?arch/arm/mach-tegra/platsmp.c | ? 52 ++++++++++++++++++++++++++++++++++++++++-
+> ?2 files changed, 83 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+> index bb13e22..925c4a0 100644
+> --- a/arch/arm/mach-tegra/headsmp.S
+> +++ b/arch/arm/mach-tegra/headsmp.S
+> @@ -188,6 +188,38 @@ __die:
+> ? ? ? ?str ? ? r1, [r7, #0x340] ? ? ? ? ? ? ? ?@ CLK_RST_CPU_CMPLX_SET
+> ?#endif
+> ?1:
+> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> + ? ? ? mov32 ? r6, TEGRA_FLOW_CTRL_BASE
+> +
+> + ? ? ? cmp ? ? r10, #0
+> + ? ? ? moveq ? r1, #FLOW_CTRL_HALT_CPU0_EVENTS
+> + ? ? ? moveq ? r2, #FLOW_CTRL_CPU0_CSR
+> + ? ? ? movne ? r1, r10, lsl #3
+> + ? ? ? addne ? r2, r1, #(FLOW_CTRL_CPU1_CSR-8)
+> + ? ? ? addne ? r1, r1, #(FLOW_CTRL_HALT_CPU1_EVENTS-8)
+> +
+> + ? ? ? /* Clear CPU "event" and "interrupt" flags and power gate
+> + ? ? ? ? ?it when halting but not before it is in the "WFI" state. */
+> + ? ? ? ldr ? ? r0, [r6, +r2]
+> + ? ? ? orr ? ? r0, r0, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+> + ? ? ? orr ? ? r0, r0, #FLOW_CTRL_CSR_ENABLE
+> + ? ? ? str ? ? r0, [r6, +r2]
+> +
+> + ? ? ? /* Unconditionally halt this CPU */
+> + ? ? ? mov ? ? r0, #FLOW_CTRL_WAITEVENT
+> + ? ? ? str ? ? r0, [r6, +r1]
+> + ? ? ? ldr ? ? r0, [r6, +r1] ? ? ? ? ? ? ? ? ? @ memory barrier
+> +
+> + ? ? ? dsb
+> + ? ? ? isb
+> + ? ? ? wfi ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ CPU should be power gated here
+> +
+> + ? ? ? /* If the CPU didn't power gate above just kill it's clock. */
+> +
+> + ? ? ? mov ? ? r0, r11, lsl #8
+> + ? ? ? str ? ? r0, [r7, #348] ? ? ? ? ? ? ? ? ?@ CLK_CPU_CMPLX_SET
+> +#endif
+> +
+> ? ? ? ?/* If the CPU still isn't dead, just spin here. */
+> ? ? ? ?b ? ? ? .
+> ?ENDPROC(__tegra_cpu_reset_handler)
+> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> index 79a241a..1fe3f58 100644
+> --- a/arch/arm/mach-tegra/platsmp.c
+> +++ b/arch/arm/mach-tegra/platsmp.c
+> @@ -24,7 +24,9 @@
+> ?#include <asm/mach-types.h>
+> ?#include <asm/smp_scu.h>
+>
+> +#include <mach/clk.h>
+> ?#include <mach/iomap.h>
+> +#include <mach/powergate.h>
+>
+> ?#include "fuse.h"
+> ?#include "flowctrl.h"
+> @@ -42,6 +44,8 @@ static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
+> ? ? ? ?(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x340)
+> ?#define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
+> ? ? ? ?(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
+> +#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR \
+> + ? ? ? (IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x34c)
+>
+> ?#define CPU_CLOCK(cpu) (0x1<<(8+cpu))
+> ?#define CPU_RESET(cpu) (0x1111ul<<(cpu))
+> @@ -73,11 +77,54 @@ static int tegra20_power_up_cpu(unsigned int cpu)
+> ? ? ? ?return 0;
+> ?}
+>
+> +static int tegra30_power_up_cpu(unsigned int cpu)
+> +{
+> + ? ? ? u32 reg;
+> + ? ? ? int ret, pwrgateid;
+> + ? ? ? unsigned long timeout;
+> +
+> + ? ? ? pwrgateid = tegra_cpu_powergate_id(cpu);
+> + ? ? ? if (pwrgateid < 0)
+> + ? ? ? ? ? ? ? return pwrgateid;
+> +
+> + ? ? ? /* If this is the first boot, toggle powergates directly. */
+> + ? ? ? if (!tegra_powergate_is_powered(pwrgateid)) {
+> + ? ? ? ? ? ? ? ret = tegra_powergate_power_on(pwrgateid);
+> + ? ? ? ? ? ? ? if (ret)
+> + ? ? ? ? ? ? ? ? ? ? ? return ret;
+> +
+> + ? ? ? ? ? ? ? /* Wait for the power to come up. */
+> + ? ? ? ? ? ? ? timeout = jiffies + 10*HZ;
+> + ? ? ? ? ? ? ? do {
+> + ? ? ? ? ? ? ? ? ? ? ? if (tegra_powergate_is_powered(pwrgateid))
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto remove_clamps;
+> + ? ? ? ? ? ? ? ? ? ? ? udelay(10);
+> + ? ? ? ? ? ? ? } while (time_before(jiffies, timeout));
+> + ? ? ? ? ? ? ? return -ETIMEDOUT;
+> + ? ? ? }
 
-OK, I'll fold it in.
+This loop + goto seems convoluted.  Why not untangle it:
+                timeout = jiffies + 10*HZ;
+  ? ? ?         while (tegra_powergate_is_powered(pwrgateid)) {
+          ? ? ?   ? ? ? if (time_after(jiffies, timeout))
+  ? ? ?           ? ? ?   ? ? ? return -ETIMEDOUT;
+          ? ? ?   ? ? ? udelay(10);
+  ? ? ?         }
 
-Thanks,
+> +
+> +remove_clamps:
+> + ? ? ? /* CPU partition is powered. Enable the CPU clock. */
+> + ? ? ? writel(CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
+> + ? ? ? reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
+> + ? ? ? udelay(10);
+> +
+> + ? ? ? /* Remove I/O clamps. */
+> + ? ? ? ret = tegra_powergate_remove_clamping(pwrgateid);
+> + ? ? ? udelay(10);
+> +
+> + ? ? ? /* Clear flow controller CSR. */
+> + ? ? ? flowctrl_write_cpu_csr(cpu, 0);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> ?int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+> ?{
+> ? ? ? ?int status;
+>
+> - ? ? ? /* Force the CPU into reset. The CPU must remain in reset when the
+> + ? ? ? /*
+> + ? ? ? ?* Force the CPU into reset. The CPU must remain in reset when the
+> ? ? ? ? * flow controller state is cleared (which will cause the flow
+> ? ? ? ? * controller to stop driving reset if the CPU has been power-gated
+> ? ? ? ? * via the flow controller). This will have no effect on first boot
+> @@ -98,6 +145,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+> ? ? ? ?case TEGRA20:
+> ? ? ? ? ? ? ? ?status = tegra20_power_up_cpu(cpu);
+> ? ? ? ? ? ? ? ?break;
+> + ? ? ? case TEGRA30:
+> + ? ? ? ? ? ? ? status = tegra30_power_up_cpu(cpu);
+> + ? ? ? ? ? ? ? break;
+> ? ? ? ?default:
+> ? ? ? ? ? ? ? ?status = -EINVAL;
+> ? ? ? ? ? ? ? ?break;
+> --
+> 1.7.7.rc0.72.g4b5ea.dirty
+>
 
-Kevin
+Other than that, Acked-by: Colin Cross <ccross@android.com>
