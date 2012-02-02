@@ -1,37 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 2 Feb 2012 20:41:07 +0200
-Subject: [PATCH v9 01/25] gpio/omap: remove dependency on gpio_bank_count
-In-Reply-To: <1328203851-20435-2-git-send-email-tarun.kanti@ti.com>
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <1328203851-20435-2-git-send-email-tarun.kanti@ti.com>
-Message-ID: <20120202184106.GC29215@legolas.emea.dhcp.ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 2 Feb 2012 10:43:13 -0800
+Subject: [PATCH] pinctrl: pin configuration states
+In-Reply-To: <CACRpkdZAofVVQ5_b_R2FUWy5AfWOge1NOuO61q7vFiLB4wUizQ@mail.gmail.com>
+References: <1326725496-28928-1-git-send-email-linus.walleij@stericsson.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1780DAB15E@HQMAIL01.nvidia.com>
+ <CACRpkdZAofVVQ5_b_R2FUWy5AfWOge1NOuO61q7vFiLB4wUizQ@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E124AD2@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Linus Walleij wrote at Wednesday, February 01, 2012 12:29 PM:
+> On Thu, Jan 19, 2012 at 8:03 PM, Stephen Warren <swarren@nvidia.com> wrote:
+...
+> >> + ? ? /*
+> >> + ? ? ?* Make a copy of the config state array - string pointers will end up
+> > ...
+> >> + ? ? pinconf_states = tmp;
+> >> + ? ? pinconf_states_num += num_states;
+> >
+> > We need to allow multiple tables to be registered, for all the same
+> > reasons we do for the pinmux mapping table. This implementation only
+> > keeps the most recently registered table.
+> 
+> ? beats me.
+> 
+> Please check the code for how I realloc the tmp variable (in the v2
+> patch set), I cannot spot the problem. It was designed to allow exactly
+> multiple calls to add tables piece by piece.
 
-On Thu, Feb 02, 2012 at 11:00:27PM +0530, Tarun Kanti DebBarma wrote:
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 0b05629..6ea7390 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -28,7 +28,10 @@
->  #include <asm/gpio.h>
->  #include <asm/mach/irq.h>
->  
-> +static LIST_HEAD(omap_gpio_list);
+Sorry, I must have been asleep when I wrote that...
 
-I guess it's now too late because patch is acked and everything, but I
-think if you make the driver handle one bank alone and just instantiate
-it multiple times (omap_gpio.0, omap_gpio.1, omap_gpio.3, etc) driver
-would be faaaaaar simpler.
+I was expecting the implementation to copy each table separately and
+store them in a list (since this would allow easy dynamic removel of the
+entries too), hence when I saw the assignment to a single global, I
+assumed it was just over-writing it; I guess I didn't even look at the
+realloc above or noticed that it was assigning "tmp" not just the caller-
+supplied parameter:-(
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/280dd775/attachment.sig>
+nvpublic
