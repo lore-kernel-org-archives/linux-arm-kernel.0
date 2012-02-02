@@ -1,197 +1,28 @@
-From: wellsk40@gmail.com (Kevin Wells)
-Date: Thu, 2 Feb 2012 14:53:15 -0800
-Subject: [PATCH] ARM: LPC32xx: ADC support
-In-Reply-To: <1328194978-20064-1-git-send-email-stigge@antcom.de>
-References: <1328194978-20064-1-git-send-email-stigge@antcom.de>
-Message-ID: <CADEiroq7=c6gqc-nT3V_HHDWhExfWw=hFY4XVz+-7UYd4Zze4w@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 3 Feb 2012 00:01:50 +0100
+Subject: [PATCH v2 6/7] LPC32xx: clock.c: USB PLL fix
+In-Reply-To: <4F2AE1F0.2070200@antcom.de>
+References: <1327939327-7799-1-git-send-email-stigge@antcom.de>
+ <1327939327-7799-6-git-send-email-stigge@antcom.de>
+ <20120131103401.GJ2471@pengutronix.de> <4F293DAF.4050402@antcom.de>
+ <20120202164920.GC3219@pengutronix.de> <4F2AE1F0.2070200@antcom.de>
+Message-ID: <20120202230150.GA22458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2012 at 7:02 AM,  <stigge@antcom.de> wrote:
-> This patch adds a 3-channel ADC driver for the LPC32xx ARM SoC
->
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
->
-> diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-> index c269ef5..9cda6fa 100644
-> --- a/arch/arm/mach-lpc32xx/clock.c
-> +++ b/arch/arm/mach-lpc32xx/clock.c
-> @@ -760,6 +760,36 @@ static struct clk clk_tsc = {
-> ? ? ? ?.get_rate ? ? ? = local_return_parent_rate,
-> ?};
->
-> +static int adc_onoff_enable(struct clk *clk, int enable)
-> +{
-> + ? ? ? u32 tmp;
-> +
-> + ? ? ? /* Use PERIPH_CLOCK */
-> + ? ? ? tmp = __raw_readl(LPC32XX_CLKPWR_ADC_CLK_CTRL_1);
-> + ? ? ? tmp |= LPC32XX_CLKPWR_ADCCTRL1_PCLK_SEL;
-> + ? ? ? /*
-> + ? ? ? ?* Set clock divider so that we have equal to or less than
-> + ? ? ? ?* 4.5MHz clock at ADC
-> + ? ? ? ?*/
-> + ? ? ? tmp |= clk->get_rate(clk) / 4500000 + 1;
-> + ? ? ? __raw_writel(tmp, LPC32XX_CLKPWR_ADC_CLK_CTRL_1);
 
-For this clock, also set clk->rate = (actual rate of the ADC input clock).
-Something like clk->rate = clk->get_rate(clk->parent) / (computed divider)
-If the clk->rate stays at 0, the clk_get_rate() function for the ADC will
-return 13Mhz instead of around 4.5MHz.
+> I'd then first repost the GPIO fixes I posted previously and then look
+> after USB if that's fine for you. :-)
 
-(I know the driver doesn't use clk_get_rate(), but this might save some
-debugging later if it ever does).
+Totally fine with me, it's all up to you :)
 
-> +
-> + ? ? ? if (enable == 0)
-> + ? ? ? ? ? ? ? __raw_writel(0, clk->enable_reg);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? __raw_writel(clk->enable_mask, clk->enable_reg);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-
-...
-...
-
-> +config LPC32XX_ADC
-> + ? ? ? tristate "NXP LPC32XX ADC"
-> + ? ? ? depends on ARCH_LPC32XX && !TOUCHSCREEN_LPC32XX
-> + ? ? ? help
-> + ? ? ? ? Say yes here to build support for the integrated ADC inside the
-> + ? ? ? ? LPC32XX SoC. Note that this feature uses the same hardware as the
-> + ? ? ? ? touchscreen driver, so you can only select one of the two drivers
-> + ? ? ? ? (lpc32xx_adc or lpc32xx_ts). Provides direct access via sysfs.
-
-I like how clean this driver is. Thanks for taking the time to write and submit
-this.
-
-> +
-> ?endmenu
-> diff --git a/drivers/staging/iio/adc/Makefile b/drivers/staging/iio/adc/Makefile
-> index ceee7f3..f83ab95 100644
-> --- a/drivers/staging/iio/adc/Makefile
-> +++ b/drivers/staging/iio/adc/Makefile
-> @@ -37,3 +37,4 @@ obj-$(CONFIG_AD7192) += ad7192.o
-
-...
-...
-
-> + ? ? ? platform_set_drvdata(pdev, info);
-> +
-> + ? ? ? device_init_wakeup(&pdev->dev, 1);
-
-I don't think you need this for this driver.
-
-> + ? ? ? init_completion(&info->completion);
-> +
-> + ? ? ? printk(KERN_INFO "LPC32XX ADC driver loaded, IRQ %d\n", info->irq);
-
-dev_info instead of printk
-
-> +
-> + ? ? ? return 0;
-> +
-> +errout6:
-> + ? ? ? clk_disable(info->clk);
-> + ? ? ? clk_put(info->clk);
-> +errout5:
-> + ? ? ? iio_device_unregister(info->dev);
-> +errout4:
-> + ? ? ? iounmap(info->adc_base);
-> +errout3:
-> + ? ? ? iio_free_device(info->dev);
-> +errout1:
-> + ? ? ? return retval;
-> +}
-> +
-> +static int __devexit lpc32xx_adc_remove(struct platform_device *pdev)
-> +{
-> + ? ? ? struct lpc32xx_adc_info *info = platform_get_drvdata(pdev);
-> +
-> + ? ? ? free_irq(info->irq, info->dev);
-> + ? ? ? platform_set_drvdata(pdev, NULL);
-> + ? ? ? clk_disable(info->clk);
-> + ? ? ? clk_put(info->clk);
-> + ? ? ? iio_device_unregister(info->dev);
-> + ? ? ? iio_free_device(info->dev);
-> + ? ? ? iounmap(info->adc_base);
-> + ? ? ? kfree(info);
-
-This may be ok. Needs a sanity check only.
-kfree() is used in remove() but not used in probe() failure path. Might be
-missing in probe() or not needed here.
-
-> +
-> + ? ? ? printk(KERN_INFO "LPC32XX ADC driver unloaded\n");
-
-dev_info()
-
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +#if defined(CONFIG_SUSPEND)
-> +static int lpc32xx_adc_suspend(struct device *dev)
-> +{
-> + ? ? ? struct lpc32xx_adc_info *info = dev_get_drvdata(dev);
-> +
-> + ? ? ? clk_disable(info->clk);
-
-The ADC block doesn't have to remain clocked when it's not being used.
-You might just encapsulate the main ADC read code with clock enable/disable
-and remove the suspend code and enable/disable code in probe/remove.
-This should save a little power when the ADC is idle.
-
-> + ? ? ? return 0;
-> +}
-> +
-> +static int lpc32xx_adc_resume(struct device *dev)
-> +{
-> + ? ? ? struct lpc32xx_adc_info *info = dev_get_drvdata(dev);
-> +
-> + ? ? ? clk_enable(info->clk);
-> + ? ? ? return 0;
-> +}
-> +
-> +static const struct dev_pm_ops lpc32xx_adc_pm_ops = {
-> + ? ? ? .suspend ? ? ? ?= lpc32xx_adc_suspend,
-> + ? ? ? .resume ? ? ? ? = lpc32xx_adc_resume,
-> +};
-> +#define LPC32XX_ADC_PM_OPS (&lpc32xx_adc_pm_ops)
-> +#else
-> +#define LPC32XX_ADC_PM_OPS NULL
-> +#endif
-> +
-> +static struct platform_driver lpc32xx_adc_driver = {
-> + ? ? ? .probe ? ? ? ? ?= lpc32xx_adc_probe,
-> + ? ? ? .remove ? ? ? ? = __devexit_p(lpc32xx_adc_remove),
-> + ? ? ? .driver ? ? ? ? = {
-> + ? ? ? ? ? ? ? .name ? = MOD_NAME,
-> + ? ? ? ? ? ? ? .owner ?= THIS_MODULE,
-> + ? ? ? ? ? ? ? .pm ? ? = LPC32XX_ADC_PM_OPS,
-> + ? ? ? },
-> +};
-> +
-> +static int __init lpc32xx_adc_init(void)
-> +{
-> + ? ? ? return platform_driver_register(&lpc32xx_adc_driver);
-> +}
-> +
-> +static void __exit lpc32xx_adc_exit(void)
-> +{
-> + ? ? ? platform_driver_unregister(&lpc32xx_adc_driver);
-> +}
-> +
-> +module_init(lpc32xx_adc_init);
-> +module_exit(lpc32xx_adc_exit);
-> +
-> +MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
-> +MODULE_DESCRIPTION("LPC32XX ADC driver");
-> +MODULE_LICENSE("GPL");
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120203/b573329d/attachment.sig>
