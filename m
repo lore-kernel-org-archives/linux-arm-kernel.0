@@ -1,41 +1,64 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Feb 2012 14:19:04 +0000
-Subject: [RFC 7/7] MFD: TWL6040: Add regulator support for VIO, V2V1
- supplies
-In-Reply-To: <4F2A96B8.2030004@ti.com>
-References: <1328185019-29575-1-git-send-email-peter.ujfalusi@ti.com>
- <1328185019-29575-8-git-send-email-peter.ujfalusi@ti.com>
- <20120202125250.GJ7428@opensource.wolfsonmicro.com>
- <4F2A8D11.9010705@ti.com>
- <20120202133207.GN7428@opensource.wolfsonmicro.com>
- <4F2A96B8.2030004@ti.com>
-Message-ID: <20120202141904.GC22048@opensource.wolfsonmicro.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 2 Feb 2012 22:43:46 +0800
+Subject: [PATCH V2 1/4] pinctrl: add a driver for NVIDIA Tegra
+In-Reply-To: <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
+References: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
+ <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
+Message-ID: <20120202144344.GI9773@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 03:59:20PM +0200, Peter Ujfalusi wrote:
-> On 02/02/2012 03:32 PM, Mark Brown wrote:
-> > That's not a problem for using the bulk get - the array is part of the
-> > API so you can use regulator_bulk_get() and still look at individual
-> > supplies within the array later on when enabling and disabling them.
+On Thu, Feb 02, 2012 at 02:26:54PM +0100, Linus Walleij wrote:
+> On Wed, Feb 1, 2012 at 10:04 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> 
+> > This adds a driver for the Tegra pinmux, and required parameterization
+> > data for Tegra20 and Tegra30.
+> 
+> OK so I've applied this monster patch and the three others,
+> 
+> the diffstat looks like so:
+> 
+> git diff --stat v3.3-rc2..HEAD
+>  arch/arm/mach-tegra/Kconfig                       |    4 +
+>  arch/arm/mach-tegra/Makefile                      |    3 -
+>  arch/arm/mach-tegra/board-harmony-pinmux.c        |  362 ++-
+>  arch/arm/mach-tegra/board-paz00-pinmux.c          |  362 ++-
+>  arch/arm/mach-tegra/board-pinmux.c                |   62 +-
+>  arch/arm/mach-tegra/board-pinmux.h                |   39 +-
+>  arch/arm/mach-tegra/board-seaboard-pinmux.c       |  442 ++-
+>  arch/arm/mach-tegra/board-trimslice-pinmux.c      |  366 ++-
+>  arch/arm/mach-tegra/include/mach/pinconf-tegra.h  |   63 +
+>  arch/arm/mach-tegra/include/mach/pinmux-tegra20.h |  184 -
+>  arch/arm/mach-tegra/include/mach/pinmux-tegra30.h |  320 --
+>  arch/arm/mach-tegra/include/mach/pinmux.h         |  302 --
+>  arch/arm/mach-tegra/pinmux-tegra20-tables.c       |  244 --
+>  arch/arm/mach-tegra/pinmux-tegra30-tables.c       |  376 ---
+>  arch/arm/mach-tegra/pinmux.c                      |  987 ------
+>  drivers/pinctrl/Kconfig                           |   15 +
+>  drivers/pinctrl/Makefile                          |    3 +
+>  drivers/pinctrl/pinctrl-tegra.c                   |  559 +++
+>  drivers/pinctrl/pinctrl-tegra.h                   |  163 +
+>  drivers/pinctrl/pinctrl-tegra20.c                 | 2860 ++++++++++++++++
+>  drivers/pinctrl/pinctrl-tegra30.c                 | 3726 +++++++++++++++++++++
+>  21 files changed, 8482 insertions(+), 2960 deletions(-)
+> 
+> It's still pretty big, adding some 6000 lines in sum total, but you've made
+> your case for having all information about the hardware in the driver
+> quite clear so I've not got much more to say. Short story: the driver knows
+> all about what the hardware can do, and the platform data or device
+> tree will decide how these capabilities are employed on a certain
+> system.
+> 
+> What is nice is to have this out of the ARM tree and under pinctrl
+> subsystem control.
+> 
+Heh, omap and imx have a much big SoC family than tegra.  Imaging what
+if omap and imx do the same thing here, probably will move Linus'
+attention from arch/arm/ to drivers/pinctrl :)
 
-> For some reason I have associated the use of regulator_bulk_get with the
-> use of regulator_bulk_enable/disable. It did not even crossed my mind
-> that I can still use regulator_enable on the individual regulators.
+Fortunately, it seems omap and imx will try to get those huge data out
+of the driver/kernel.
 
-They do normally end up going together since a very large proportion of
-devices need all their supplies on when active but don't care about
-sequencing so you end up with a common pattern.  It's not required,
-though.
-
-> Will convert the regulator_get/put to bulk operations. It will make the
-> code a bit cleaner.
-
-Good stuff.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/73519ed4/attachment-0001.sig>
+-- 
+Regards,
+Shawn
