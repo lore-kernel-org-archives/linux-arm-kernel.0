@@ -1,38 +1,37 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 2 Feb 2012 21:49:09 +0800
-Subject: [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <CAOMZO5CxZgcO1JUZiFFJzWwLao1g7Y1_VNbsuiJOW+PH2B+FNQ@mail.gmail.com>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
- <CAOMZO5CxZgcO1JUZiFFJzWwLao1g7Y1_VNbsuiJOW+PH2B+FNQ@mail.gmail.com>
-Message-ID: <20120202134907.GA3015@richard-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Feb 2012 13:46:08 +0000
+Subject: [PATCH 1/4] Remove Telechips ARM subarch from MAINTAINERS
+In-Reply-To: <20120202104541.GB1643@atrey.karlin.mff.cuni.cz>
+References: <20111222211948.GA1201@local>
+ <20120103170824.GA2914@n2100.arm.linux.org.uk>
+ <20120202104541.GB1643@atrey.karlin.mff.cuni.cz>
+Message-ID: <201202021346.08740.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 09:24:57AM -0200, Fabio Estevam wrote:
-> Hi Richard,
+On Thursday 02 February 2012, Pavel Machek wrote:
+> > On Thu, Dec 22, 2011 at 10:22:40PM +0100, Hans J. Koch wrote:
+> > > 
+> > > The AMR subarchitecture for Telechips SoCs is completely removed,
+> > 
+> > Apart from this spelling mistake, the rest look fine.  Do you want to
+> > send me a pull request with that fixed?
 > 
-> On Thu, Feb 2, 2012 at 12:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> > ?arch/arm/boot/dts/imx6q-sabrelite.dts | ? 12 ++++++++++++
-> > ?1 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> I would like to test your audio support patch on mx6sabrelite, but the
-> missing sound/soc/imx-sgtl5000.c does not allow me to do it.
-I have a test branch. I'll push to my linaro git  on git.linaro.org tomorrow.
-> 
-> I think you would better introduce sound/soc/imx-sgtl5000.c first (on
-> separate patch series) so that people could test this patch without
-> using the imx-sgtl5000.c implementation from the Linaro kernel.
-> 
-> Without imx-sgtl5000.c in place, this patch only introduces dead code
-> at the moment.
-Each patch make sense too without sgtl5000. 
+> Normally features are removed using feature-removal-schedule.txt. No
+> maintainer is not a reason to remove it like this.
 
-Thanks
-Richard
-> 
-> Regards,
-> 
-> Fabio Estevam
+Code that doesn't build and hasn't worked for a long time is enough
+reason IMHO. Note that the tcc platform was for the old arm926 based
+tcc8000, not the newer ARM11 based tcc89xx/91xx/92xx/93xx or even the
+Cortex-A8 based tcc88xx.
+
+Telechips themselves seem to have given up on the ARM9 based products
+(see [1]) and there is practically no code reuse between what was there
+in v3.2 and what would have to get added to support the newer producs.
+
+Is there any particular reason why you are interested in keeping
+the code around? 
+
+	Arnd
+
+[1] https://www.telechips.com/technical_support/kor/opensource/opensource_list.asp
