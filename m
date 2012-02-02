@@ -1,176 +1,67 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 2 Feb 2012 10:17:48 -0800
-Subject: [PATCH v2 8/8] ARM: tegra: support for secondary cores on Tegra30
-In-Reply-To: <1328028051-24271-9-git-send-email-pdeschrijver@nvidia.com>
-References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
- <1328028051-24271-9-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAMbhsRQf0fKbRA5cFvW=uArqPPDw-273zFHLVZAoTb_7qKxu=w@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 2 Feb 2012 11:22:14 -0700
+Subject: [PATCH 1/2] ARM: EXYNOS: add support GPIO for EXYNOS5250
+In-Reply-To: <4F2817FA.5020407@samsung.com>
+References: <1328025040-4751-1-git-send-email-kgene.kim@samsung.com>
+ <1328025040-4751-2-git-send-email-kgene.kim@samsung.com>
+ <4F2817FA.5020407@samsung.com>
+Message-ID: <20120202182214.GN15343@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2012 at 8:40 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> Add support for bringing up secondary cores on Tegra30. On Tegra30 secondary
-> CPU cores are powergated, so we need to turn on the domains before we can bring
-> the CPU cores online. Bringing secondary cores online happens early during the
-> sytem boot, so we call powergating initialization from platform early_init
-> function.
->
-> Based on work by:
->
-> Scott Williams <scwilliams@nvidia.com>
-> Colin Cross <ccross@android.com>
-> Alex Frid <afrid@nvidia.com>
->
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
-> ?arch/arm/mach-tegra/headsmp.S | ? 32 +++++++++++++++++++++++++
-> ?arch/arm/mach-tegra/platsmp.c | ? 52 ++++++++++++++++++++++++++++++++++++++++-
-> ?2 files changed, 83 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-> index bb13e22..925c4a0 100644
-> --- a/arch/arm/mach-tegra/headsmp.S
-> +++ b/arch/arm/mach-tegra/headsmp.S
-> @@ -188,6 +188,38 @@ __die:
-> ? ? ? ?str ? ? r1, [r7, #0x340] ? ? ? ? ? ? ? ?@ CLK_RST_CPU_CMPLX_SET
-> ?#endif
-> ?1:
-> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> + ? ? ? mov32 ? r6, TEGRA_FLOW_CTRL_BASE
-> +
-> + ? ? ? cmp ? ? r10, #0
-> + ? ? ? moveq ? r1, #FLOW_CTRL_HALT_CPU0_EVENTS
-> + ? ? ? moveq ? r2, #FLOW_CTRL_CPU0_CSR
-> + ? ? ? movne ? r1, r10, lsl #3
-> + ? ? ? addne ? r2, r1, #(FLOW_CTRL_CPU1_CSR-8)
-> + ? ? ? addne ? r1, r1, #(FLOW_CTRL_HALT_CPU1_EVENTS-8)
-> +
-> + ? ? ? /* Clear CPU "event" and "interrupt" flags and power gate
-> + ? ? ? ? ?it when halting but not before it is in the "WFI" state. */
-> + ? ? ? ldr ? ? r0, [r6, +r2]
-> + ? ? ? orr ? ? r0, r0, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-> + ? ? ? orr ? ? r0, r0, #FLOW_CTRL_CSR_ENABLE
-> + ? ? ? str ? ? r0, [r6, +r2]
-> +
-> + ? ? ? /* Unconditionally halt this CPU */
-> + ? ? ? mov ? ? r0, #FLOW_CTRL_WAITEVENT
-> + ? ? ? str ? ? r0, [r6, +r1]
-> + ? ? ? ldr ? ? r0, [r6, +r1] ? ? ? ? ? ? ? ? ? @ memory barrier
-> +
-> + ? ? ? dsb
-> + ? ? ? isb
-> + ? ? ? wfi ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ CPU should be power gated here
-> +
-> + ? ? ? /* If the CPU didn't power gate above just kill it's clock. */
-> +
-> + ? ? ? mov ? ? r0, r11, lsl #8
-> + ? ? ? str ? ? r0, [r7, #348] ? ? ? ? ? ? ? ? ?@ CLK_CPU_CMPLX_SET
-> +#endif
-> +
-> ? ? ? ?/* If the CPU still isn't dead, just spin here. */
-> ? ? ? ?b ? ? ? .
-> ?ENDPROC(__tegra_cpu_reset_handler)
-> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> index 79a241a..1fe3f58 100644
-> --- a/arch/arm/mach-tegra/platsmp.c
-> +++ b/arch/arm/mach-tegra/platsmp.c
-> @@ -24,7 +24,9 @@
-> ?#include <asm/mach-types.h>
-> ?#include <asm/smp_scu.h>
->
-> +#include <mach/clk.h>
-> ?#include <mach/iomap.h>
-> +#include <mach/powergate.h>
->
-> ?#include "fuse.h"
-> ?#include "flowctrl.h"
-> @@ -42,6 +44,8 @@ static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
-> ? ? ? ?(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x340)
-> ?#define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
-> ? ? ? ?(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
-> +#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR \
-> + ? ? ? (IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x34c)
->
-> ?#define CPU_CLOCK(cpu) (0x1<<(8+cpu))
-> ?#define CPU_RESET(cpu) (0x1111ul<<(cpu))
-> @@ -73,11 +77,54 @@ static int tegra20_power_up_cpu(unsigned int cpu)
-> ? ? ? ?return 0;
-> ?}
->
-> +static int tegra30_power_up_cpu(unsigned int cpu)
-> +{
-> + ? ? ? u32 reg;
-> + ? ? ? int ret, pwrgateid;
-> + ? ? ? unsigned long timeout;
-> +
-> + ? ? ? pwrgateid = tegra_cpu_powergate_id(cpu);
-> + ? ? ? if (pwrgateid < 0)
-> + ? ? ? ? ? ? ? return pwrgateid;
-> +
-> + ? ? ? /* If this is the first boot, toggle powergates directly. */
-> + ? ? ? if (!tegra_powergate_is_powered(pwrgateid)) {
-> + ? ? ? ? ? ? ? ret = tegra_powergate_power_on(pwrgateid);
-> + ? ? ? ? ? ? ? if (ret)
-> + ? ? ? ? ? ? ? ? ? ? ? return ret;
-> +
-> + ? ? ? ? ? ? ? /* Wait for the power to come up. */
-> + ? ? ? ? ? ? ? timeout = jiffies + 10*HZ;
-> + ? ? ? ? ? ? ? do {
-> + ? ? ? ? ? ? ? ? ? ? ? if (tegra_powergate_is_powered(pwrgateid))
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto remove_clamps;
-> + ? ? ? ? ? ? ? ? ? ? ? udelay(10);
-> + ? ? ? ? ? ? ? } while (time_before(jiffies, timeout));
-> + ? ? ? ? ? ? ? return -ETIMEDOUT;
-> + ? ? ? }
+On Tue, Jan 31, 2012 at 05:34:02PM +0100, Sylwester Nawrocki wrote:
+> Hi Kukjin,
+> 
+> I have few comments below...
+> 
+> On 01/31/2012 04:50 PM, Kukjin Kim wrote:
+> > From: Sangsu Park <sangsu4u.park@samsung.com>
+> > 
+> > This patch adds follwing.
+> 
+> s/follwing/following.
+> 
+> nit: AFAIK it's a good habit not to start a commit description
+> with "This patch.."
+> 
 
-This loop + goto seems convoluted.  Why not untangle it:
-                timeout = jiffies + 10*HZ;
-  ? ? ?         while (tegra_powergate_is_powered(pwrgateid)) {
-          ? ? ?   ? ? ? if (time_after(jiffies, timeout))
-  ? ? ?           ? ? ?   ? ? ? return -ETIMEDOUT;
-          ? ? ?   ? ? ? udelay(10);
-  ? ? ?         }
+"This patch..." descriptions are just fine.  I write a lot of patches that
+way, but I do expect description of not just what a patch does, but why the
+patch is necessary.
 
-> +
-> +remove_clamps:
-> + ? ? ? /* CPU partition is powered. Enable the CPU clock. */
-> + ? ? ? writel(CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
-> + ? ? ? reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
-> + ? ? ? udelay(10);
-> +
-> + ? ? ? /* Remove I/O clamps. */
-> + ? ? ? ret = tegra_powergate_remove_clamping(pwrgateid);
-> + ? ? ? udelay(10);
-> +
-> + ? ? ? /* Clear flow controller CSR. */
-> + ? ? ? flowctrl_write_cpu_csr(cpu, 0);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> ?int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-> ?{
-> ? ? ? ?int status;
->
-> - ? ? ? /* Force the CPU into reset. The CPU must remain in reset when the
-> + ? ? ? /*
-> + ? ? ? ?* Force the CPU into reset. The CPU must remain in reset when the
-> ? ? ? ? * flow controller state is cleared (which will cause the flow
-> ? ? ? ? * controller to stop driving reset if the CPU has been power-gated
-> ? ? ? ? * via the flow controller). This will have no effect on first boot
-> @@ -98,6 +145,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-> ? ? ? ?case TEGRA20:
-> ? ? ? ? ? ? ? ?status = tegra20_power_up_cpu(cpu);
-> ? ? ? ? ? ? ? ?break;
-> + ? ? ? case TEGRA30:
-> + ? ? ? ? ? ? ? status = tegra30_power_up_cpu(cpu);
-> + ? ? ? ? ? ? ? break;
-> ? ? ? ?default:
-> ? ? ? ? ? ? ? ?status = -EINVAL;
-> ? ? ? ? ? ? ? ?break;
-> --
-> 1.7.7.rc0.72.g4b5ea.dirty
->
+> > -/* EXYNOS4 GPIO number definitions */
+> > +/* GPIO number definitions */
+> >  #define EXYNOS4_GPA0(_nr)	(EXYNOS4_GPIO_A0_START + (_nr))
+> >  #define EXYNOS4_GPA1(_nr)	(EXYNOS4_GPIO_A1_START + (_nr))
+> >  #define EXYNOS4_GPB(_nr)	(EXYNOS4_GPIO_B_START + (_nr))
+> > @@ -140,10 +139,138 @@ enum s5p_gpio_number {
+> >  
+> >  /* the end of the EXYNOS4 specific gpios */
+> >  #define EXYNOS4_GPIO_END	(EXYNOS4_GPZ(EXYNOS4_GPIO_Z_NR) + 1)
+> > -#define S3C_GPIO_END		EXYNOS4_GPIO_END
+> >  
+> > -/* define the number of gpios we need to the one after the GPZ() range */
+> > -#define ARCH_NR_GPIOS		(EXYNOS4_GPZ(EXYNOS4_GPIO_Z_NR) +	\
+> > -				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
+> > +/* EXYNOS5 serise */
+> > +/* GPIO bank sizes */
+> > +#define EXYNOS5_GPIO_A0_NR	(8)
+> 
+> nit: It's been always a mystery to me, what are the parentheses around the
+> numbers helpful for ? IMHO even if there is more things like this in
+> the file it might be better to skip extra parentheses here.
 
-Other than that, Acked-by: Colin Cross <ccross@android.com>
+It protects against the preprocessor combining a macro with other code in
+unpredictable ways.  For example:
+
+#define SIZE  10 + 20
+int i = SIZE * 5;
+
+Without the parenthesis the result of i is 110, when the programmer would
+expect 150.
+
+For single integers like these, the parenthesis aren't actually necessary, but
+I given that for every other #define it is good practice, I don't object to
+seeing them on single integers also.
+
+g.
