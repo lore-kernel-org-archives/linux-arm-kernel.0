@@ -1,190 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 2 Feb 2012 22:23:53 +0100
-Subject: [PATCH v3 1/7] ARM: LPC32xx: Added lpc32xx_defconfig
-In-Reply-To: <1328210388-21296-1-git-send-email-stigge@antcom.de>
-References: <1328210388-21296-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120202212353.GA15298@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 02 Feb 2012 16:38:02 -0500 (EST)
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <20120202204411.GB14129@n2100.arm.linux.org.uk>
+References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
+ <20120202204411.GB14129@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 08:19:42PM +0100, stigge at antcom.de wrote:
-> This patch adds a working defconfig for the LPC32XX architecture. It is a
-> general default configuration for the PHY3250 reference board and others
-> based on LPC32XX.
+On Thu, 2 Feb 2012, Russell King - ARM Linux wrote:
+
+> On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
+> > Should we move get_thread_info into assembler.h? It seems odd
+> > to include entry-header.S but I saw that vfp was doing the same.
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+> Probably yes, and probably also have preempt_disable and preempt_enable
+> assembler macros.  That's going to get rather icky if we have to
+> explicitly call the scheduler though (to solve (1)).
 
-Well, I said I will create a branch, but this series looks pretty much
-appliable as is to me (except maybe that the defconfig patch should come
-last).
+What about a pair of helpers written in C instead?
 
-Arnd, Olof: Can you pick it up, or do you need some more preparation?
+v7_flush_dcache_all() could be renamed, and a wrapper function called 
+v7_flush_dcache_all() would call the preemption disable helper, call the 
+former v7_flush_dcache_all code, then call the preemption enable helper.
 
-Thanks,
+Then __v7_setup() could still call the core cache flush code without 
+issues.
 
-   Wolfram
 
-> 
-> diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
-> new file mode 100644
-> index 0000000..fb20881
-> --- /dev/null
-> +++ b/arch/arm/configs/lpc32xx_defconfig
-> @@ -0,0 +1,145 @@
-> +CONFIG_EXPERIMENTAL=y
-> +CONFIG_SYSVIPC=y
-> +CONFIG_IKCONFIG=y
-> +CONFIG_IKCONFIG_PROC=y
-> +CONFIG_LOG_BUF_SHIFT=14
-> +CONFIG_SYSFS_DEPRECATED=y
-> +CONFIG_SYSFS_DEPRECATED_V2=y
-> +CONFIG_BLK_DEV_INITRD=y
-> +CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-> +CONFIG_SYSCTL_SYSCALL=y
-> +CONFIG_EMBEDDED=y
-> +CONFIG_SLAB=y
-> +CONFIG_MODULES=y
-> +CONFIG_MODULE_UNLOAD=y
-> +# CONFIG_BLK_DEV_BSG is not set
-> +CONFIG_PARTITION_ADVANCED=y
-> +CONFIG_ARCH_LPC32XX=y
-> +CONFIG_NO_HZ=y
-> +CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_PREEMPT=y
-> +CONFIG_AEABI=y
-> +CONFIG_ZBOOT_ROM_TEXT=0x0
-> +CONFIG_ZBOOT_ROM_BSS=0x0
-> +CONFIG_CMDLINE="console=ttyS0,115200n81 root=/dev/ram0"
-> +CONFIG_CPU_IDLE=y
-> +CONFIG_FPE_NWFPE=y
-> +CONFIG_VFP=y
-> +# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-> +CONFIG_BINFMT_AOUT=y
-> +CONFIG_NET=y
-> +CONFIG_PACKET=y
-> +CONFIG_UNIX=y
-> +CONFIG_INET=y
-> +CONFIG_IP_MULTICAST=y
-> +CONFIG_IP_PNP=y
-> +CONFIG_IP_PNP_DHCP=y
-> +CONFIG_IP_PNP_BOOTP=y
-> +# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-> +# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-> +# CONFIG_INET_XFRM_MODE_BEET is not set
-> +# CONFIG_INET_LRO is not set
-> +# CONFIG_INET_DIAG is not set
-> +# CONFIG_IPV6 is not set
-> +# CONFIG_WIRELESS is not set
-> +CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> +# CONFIG_FW_LOADER is not set
-> +CONFIG_MTD=y
-> +CONFIG_MTD_CMDLINE_PARTS=y
-> +CONFIG_MTD_CHAR=y
-> +CONFIG_MTD_BLOCK=y
-> +CONFIG_MTD_NAND=y
-> +CONFIG_MTD_NAND_MUSEUM_IDS=y
-> +CONFIG_BLK_DEV_LOOP=y
-> +CONFIG_BLK_DEV_CRYPTOLOOP=y
-> +CONFIG_BLK_DEV_RAM=y
-> +CONFIG_BLK_DEV_RAM_COUNT=1
-> +CONFIG_BLK_DEV_RAM_SIZE=16384
-> +CONFIG_MISC_DEVICES=y
-> +CONFIG_EEPROM_AT25=y
-> +CONFIG_SCSI=y
-> +CONFIG_BLK_DEV_SD=y
-> +CONFIG_NETDEVICES=y
-> +CONFIG_MII=y
-> +CONFIG_PHYLIB=y
-> +CONFIG_SMSC_PHY=y
-> +# CONFIG_WLAN is not set
-> +# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-> +CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
-> +CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
-> +CONFIG_INPUT_EVDEV=y
-> +# CONFIG_INPUT_MOUSE is not set
-> +CONFIG_INPUT_TOUCHSCREEN=y
-> +CONFIG_TOUCHSCREEN_LPC32XX=y
-> +# CONFIG_LEGACY_PTYS is not set
-> +CONFIG_SERIAL_8250=y
-> +CONFIG_SERIAL_8250_CONSOLE=y
-> +# CONFIG_HW_RANDOM is not set
-> +CONFIG_I2C=y
-> +CONFIG_I2C_CHARDEV=y
-> +CONFIG_I2C_PNX=y
-> +CONFIG_SPI=y
-> +CONFIG_SPI_PL022=y
-> +CONFIG_GPIO_SYSFS=y
-> +# CONFIG_HWMON is not set
-> +CONFIG_WATCHDOG=y
-> +CONFIG_PNX4008_WATCHDOG=y
-> +CONFIG_FB=y
-> +CONFIG_FB_ARMCLCD=y
-> +CONFIG_FRAMEBUFFER_CONSOLE=y
-> +CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-> +CONFIG_LOGO=y
-> +# CONFIG_LOGO_LINUX_MONO is not set
-> +# CONFIG_LOGO_LINUX_VGA16 is not set
-> +CONFIG_SOUND=y
-> +CONFIG_SND=y
-> +CONFIG_SND_SEQUENCER=y
-> +CONFIG_SND_MIXER_OSS=y
-> +CONFIG_SND_PCM_OSS=y
-> +CONFIG_SND_SEQUENCER_OSS=y
-> +CONFIG_SND_DYNAMIC_MINORS=y
-> +# CONFIG_SND_VERBOSE_PROCFS is not set
-> +# CONFIG_SND_DRIVERS is not set
-> +# CONFIG_SND_ARM is not set
-> +# CONFIG_SND_SPI is not set
-> +CONFIG_SND_SOC=y
-> +# CONFIG_HID_SUPPORT is not set
-> +CONFIG_USB=y
-> +CONFIG_USB_STORAGE=y
-> +CONFIG_USB_LIBUSUAL=y
-> +CONFIG_MMC=y
-> +# CONFIG_MMC_BLOCK_BOUNCE is not set
-> +CONFIG_MMC_ARMMMCI=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-> +CONFIG_RTC_CLASS=y
-> +CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-> +CONFIG_RTC_DRV_LPC32XX=y
-> +CONFIG_EXT2_FS=y
-> +CONFIG_AUTOFS4_FS=y
-> +CONFIG_MSDOS_FS=y
-> +CONFIG_VFAT_FS=y
-> +CONFIG_TMPFS=y
-> +CONFIG_JFFS2_FS=y
-> +CONFIG_JFFS2_FS_WBUF_VERIFY=y
-> +CONFIG_CRAMFS=y
-> +CONFIG_NFS_FS=y
-> +CONFIG_NFS_V3=y
-> +CONFIG_ROOT_NFS=y
-> +CONFIG_NLS_CODEPAGE_437=y
-> +CONFIG_NLS_ASCII=y
-> +CONFIG_NLS_ISO8859_1=y
-> +CONFIG_NLS_UTF8=y
-> +# CONFIG_SCHED_DEBUG is not set
-> +# CONFIG_DEBUG_PREEMPT is not set
-> +CONFIG_DEBUG_INFO=y
-> +# CONFIG_FTRACE is not set
-> +# CONFIG_ARM_UNWIND is not set
-> +CONFIG_DEBUG_LL=y
-> +CONFIG_EARLY_PRINTK=y
-> +CONFIG_CRYPTO_ANSI_CPRNG=y
-> +# CONFIG_CRYPTO_HW is not set
-> +CONFIG_CRC_CCITT=y
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/4b895623/attachment.sig>
+Nicolas
