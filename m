@@ -1,84 +1,57 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 2 Feb 2012 12:59:25 -0700 (MST)
-Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
- pwrdm_clear_all_prev_pwrst()
-In-Reply-To: <CAMQu2gxuQVYNvo8VeGrmZGo3tqCydhVaOz1VXjeAgrL8Opm8nA@mail.gmail.com>
-References: <20120130093931.11027.31048.stgit@dusk>
- <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
- <87mx93ok5y.fsf@ti.com>
- <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
- <CAMQu2gzVt3K6cuZcbvfNZegimyXz8F4N__A6vDBSyL4QfSnbTw@mail.gmail.com>
- <alpine.DEB.2.00.1202020041220.10541@utopia.booyaka.com>
- <CAMQu2gw5uU4kXRWtuUuYAAUcrTJvS_nQhJ42-_hEmHM2NO8ZZg@mail.gmail.com>
- <alpine.DEB.2.00.1202020302400.586@utopia.booyaka.com>
- <CAMQu2gxQHyoH-AC4ut2EGVs6wBvAJqUJ8tzXUm2hH_gZqMGE6w@mail.gmail.com>
- <CAMQu2gxuQVYNvo8VeGrmZGo3tqCydhVaOz1VXjeAgrL8Opm8nA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1202021258350.586@utopia.booyaka.com>
+Date: Thu, 2 Feb 2012 13:03:01 -0700 (MST)
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh
+Hi Greg,
 
-On Thu, 2 Feb 2012, Shilimkar, Santosh wrote:
+On Thu, 26 Jan 2012, Paul Walmsley wrote:
 
-> On Thu, Feb 2, 2012 at 3:47 PM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
-> > On Thu, Feb 2, 2012 at 3:35 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> >> On Thu, 2 Feb 2012, Shilimkar, Santosh wrote:
-> >>
-> >>> Yes, we do have issue with below APIs for OMAP4 and onwards design
-> >>> because of the PRCM change.
-> >>>
-> >>> pwrdm_clear_all_prev_pwrst
-> >>> pwrdm_*_mem_*
-> >>>
-> >>> There use to be a single power state and memory state register till OMAP3
-> >>> at power domain level which can give you the logic and memory last test
-> >>> which is needed for OSWR.
-> >>>
-> >>> On OMAP4, we have registers per modules and it becomes difficult to model
-> >>> this difference in APIs. Initially we tried to fix that with [1] and
-> >>> then later realized
-> >>> that's not going to work on OMAP4 + devices because of mentioned issue.
-> >>
-> >> If the registers are per-module, it seems like the best place for those
-> >> would be the hwmod layer. ?Do you think that makes sense? ?So, something
-> >> like omap_hwmod_clear_all_prev_pwrst(), etc.? ?Seems like that should be
-> >> pretty efficient.
-> >>
-> > But all these are power domain registers after all. Rajendra did one version of
-> > " pwrdm_clear_all_prev_pwrst" ?API and inside used hwmod. But then there he
-> > has iterate over all the modules belongs to that power domain.
-> >
-> > And if you use hwmod or omap_device kind of API, then ?you need to
-> > build those devices in init or some where.
-> >
-> > All of that was not looking so elegant and hence the other path was chosen.
-> > The mess is, the registers are still part of power domains though they
-> > are specific
-> > to module. And Fundamentally power domain is stil the central entity
-> > decides the fate of all the modules within that PD, in terms of context
-> > loss/ret etc.
-> >
-> I looked at the MPUSS file. There are 3 functions which access
-> power domain registers directly.
+> On Thu, 26 Jan 2012, Greg KH wrote:
 > 
-> - mpuss_clear_prev_logic_pwrst
-> - cpu_clear_prev_logic_pwrst
-> - omap4_mpuss_read_prev_context_state
+> > Ok, I've just reverted both of these patches for now, please send new
+> > ones when you have them.
 > 
-> All of these functions access the context registers which
-> we don't have support today at power domian APIs for
-> mentioned issue. This file is using power domain APIs
-> in all possible scenario's except the OSWR scenario
-> which needs the context register accesses.
+> Thanks.  A pull request is at the bottom of this message.  The patches 
+> are also available from the mailing list archives here:
 > 
-> if the context clear and read can be handled part of
-> PD APIs, then we can certainly kill this functions.
+> http://marc.info/?l=linux-arm-kernel&m=132754676014389&w=2
+> http://marc.info/?l=linux-arm-kernel&m=132754677914395&w=2
+> http://marc.info/?l=linux-arm-kernel&m=132754676014388&w=2
 
-That sounds great.  Maybe we can add powerdomain functions for these 
-purposes that take both a powerdomain pointer and a hwmod pointer.  That 
-should hopefully work.
+Any comments on these? 
+
+
+- Paul
+
+> - Paul
+> 
+> The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+> 
+>   Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+> 
+> are available in the git repository at:
+>   git://git.pwsan.com/linux-2.6 omap_serial_fixes_3.3rc
+> 
+> Paul Walmsley (3):
+>       tty: serial: OMAP: use a 1-byte RX FIFO threshold in PIO mode
+>       tty: serial: OMAP: block idle while the UART is transferring data in PIO mode
+>       tty: serial: OMAP: wakeup latency constraint is in microseconds, not milliseconds
+> 
+>  arch/arm/mach-omap2/serial.c     |    8 ++++----
+>  drivers/tty/serial/omap-serial.c |   30 +++++++++++++++++++++++++-----
+>  2 files changed, 29 insertions(+), 9 deletions(-)
+> 
 
 
 - Paul
