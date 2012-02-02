@@ -1,38 +1,38 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 2 Feb 2012 21:36:51 +0100
-Subject: [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
- suspend is not implemented
-In-Reply-To: <20120202202113.GA17309@n2100.arm.linux.org.uk>
-References: <1327306361-9803-1-git-send-email-shubhrajyoti@ti.com>
- <201202021940.26552.rjw@sisk.pl>
- <20120202202113.GA17309@n2100.arm.linux.org.uk>
-Message-ID: <201202022136.51867.rjw@sisk.pl>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 2 Feb 2012 12:22:39 -0800
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+Message-ID: <20120202202239.GA15590@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 02, 2012, Russell King - ARM Linux wrote:
-> On Thu, Feb 02, 2012 at 07:40:26PM +0100, Rafael J. Wysocki wrote:
-> > On Thursday, February 02, 2012, Artem Bityutskiy wrote:
-> > > On Mon, 2012-01-30 at 23:58 +0100, Rafael J. Wysocki wrote:
-> > > > Thanks, but is anyone actually going to push it to Linus any time soon?
-> > > 
-> > > I agree, but I am not the maintainer so cannot answer. David Woodhouse
-> > > is aware of this, but I do not know when he gonna send the pull request.
-> > 
-> > Well, the problem is being reported by more and more people, so I'd
-> > like to push the fix quickly.
-> > 
-> > David, please let me know if you don't want me to include the $subject patch
-> > into the next PM fixes pull request.  If I don't hear from you, I'll push it
-> > next week for -rc4.
+On Thu, Feb 02, 2012 at 01:03:01PM -0700, Paul Walmsley wrote:
+> Hi Greg,
 > 
-> I too have it in my tree as a patch which Artem sent me, as it's rather
-> fundamental to not oopsing the kernel when you suspend/resume on any ARM
-> platform.
+> On Thu, 26 Jan 2012, Paul Walmsley wrote:
+> 
+> > On Thu, 26 Jan 2012, Greg KH wrote:
+> > 
+> > > Ok, I've just reverted both of these patches for now, please send new
+> > > ones when you have them.
+> > 
+> > Thanks.  A pull request is at the bottom of this message.  The patches 
+> > are also available from the mailing list archives here:
+> > 
+> > http://marc.info/?l=linux-arm-kernel&m=132754676014389&w=2
+> > http://marc.info/?l=linux-arm-kernel&m=132754677914395&w=2
+> > http://marc.info/?l=linux-arm-kernel&m=132754676014388&w=2
+> 
+> Any comments on these? 
 
-It actually affects everyone using MTD and suspend (not only ARM) and that's
-why I thought I'd take it, but I'm fine with any other resolution as long as
-the patch goes to Linus before 3.3-final.
+They are in my to-apply queue, I'm getting to them...
 
-Thanks,
-Rafael
+greg k-h
