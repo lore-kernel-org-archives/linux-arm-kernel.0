@@ -1,32 +1,58 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 2 Feb 2012 22:41:18 +0800
-Subject: [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <CAOMZO5CuPDhU6zUyhE1jA0SDTjv1XDMCkNoQ_0nH82poGYOaqA@mail.gmail.com>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
- <CAOMZO5CxZgcO1JUZiFFJzWwLao1g7Y1_VNbsuiJOW+PH2B+FNQ@mail.gmail.com>
- <20120202134907.GA3015@richard-laptop>
- <CAOMZO5CuPDhU6zUyhE1jA0SDTjv1XDMCkNoQ_0nH82poGYOaqA@mail.gmail.com>
-Message-ID: <20120202144116.GA3278@richard-laptop>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 2 Feb 2012 15:43:28 +0100
+Subject: [PATCH v3] mtd/gpmi : add BBT support to gpmi nand driver
+In-Reply-To: <Pine.LNX.4.64.1202021441330.554@lnxricardw.se.axis.com>
+References: <1328008316-27258-1-git-send-email-b32955@freescale.com>
+ <20120131121007.GO2471@pengutronix.de>
+ <1328183611.28171.170.camel@sauron.fi.intel.com>
+ <20266.36804.844286.216383@ipc1.ka-ro>
+ <Pine.LNX.4.64.1202021441330.554@lnxricardw.se.axis.com>
+Message-ID: <20266.41232.670348.59659@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 12:15:52PM -0200, Fabio Estevam wrote:
-> On 2/2/12, Richard Zhao <richard.zhao@linaro.org> wrote:
+Hi,
+
+Ricard Wanderlof writes:
 > 
-> >> Without imx-sgtl5000.c in place, this patch only introduces dead code
-> >> at the moment.
-> > Each patch make sense too without sgtl5000.
+> On Thu, 2 Feb 2012, Lothar Wa?mann wrote:
 > 
-> Well, as this patch goal is to provide audio support to mx6sabrelite,
-> we need imx-sgtl5000 in place to test it, right?
-My goal seem less important here. You see I'm adding more and more things
-into the patch series, which is out of my goal. The maintainers only
-consider right patch go to right git.
->  How can we know that
-> don't get a kernel oops or something?
-patch pass building is possible go to upstream too.
+> > Hi,
 > 
-> Regards,
+> > IMO it's just silly trying to write anything, even a bad block marker,to 
+> > a known bad block in NAND flash.
+> >
+> > The bad block markers in particular bytes in the OOB area are providedby 
+> > the manufacturer to identify "Factory Bad Blocks". That and no more! I 
+> > don't know why everybody is trying to interpret them as a general bad 
+> > block indicator.
 > 
-> Fabio Estevam
+> Why not? It's just another byte within the block.
+> 
+But on a block that is known to have failed erasure or programming you
+cannot rely on being able to program anything reliably. Thus it is
+vain to try storing the info that the block is bad within that block
+itself.
+
+> The Flash chip reports an error on a write or erase operation if the 
+> operation does not complete successfully within certain time constraints, 
+> which are grounds for marking a block as unusable, i.e. bad, but usually 
+> the block is worn out long before the on-chip write/erase algorithms 
+> report errors. Hence a block should really be marked 'bad' while it still 
+> is 'good', in a sense.
+> 
+How do you know that a worn out block will still retain the 'This
+block is bad' information?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
