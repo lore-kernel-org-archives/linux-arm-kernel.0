@@ -1,31 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 2 Feb 2012 09:24:57 -0200
-Subject: [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
-Message-ID: <CAOMZO5CxZgcO1JUZiFFJzWwLao1g7Y1_VNbsuiJOW+PH2B+FNQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 2 Feb 2012 16:55:43 +0530
+Subject: [PATCH 0/2] ARM: OMAP2+: PM: code consolidation for 3.4
+In-Reply-To: <20120202093600.12509.35052.stgit@dusk>
+References: <20120202093600.12509.35052.stgit@dusk>
+Message-ID: <CAMQu2gyKEFHAXYyhv=a6NW-AMsDHkBy+bYmhQ5ryJCQK_d_RBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Thu, Feb 2, 2012 at 3:08 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi
+>
+> This series consolidates some duplicated PM code across OMAP2, 3, and 4.
+> This saves both binary kernel image size, and lines of source. ?These
+> functions are just the low-hanging fruit; it looks to me like there's even
+> more consolidation that could be done.
+>
+> Suspend + UART wakeup was tested on OMAP44xx BeagleBoard. ?On the
+> OMAP35xx Beagleboard here, v3.3-rc2 doesn't seem to wake up from
+> suspend correctly with or without these patches, so I've only boot-tested
+> them on that platform.
+>
+Thanks for patches. Tried them on OMAP4 SDP and suspend
+is fine on it.
 
-On Thu, Feb 2, 2012 at 12:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
-> ?arch/arm/boot/dts/imx6q-sabrelite.dts | ? 12 ++++++++++++
-> ?1 files changed, 12 insertions(+), 0 deletions(-)
+On the consolidation front, I found that OMAP4/OMAP5
+can almost share most of the PRCM code.
+Actually it's too early to talk about OMAP5 patches, which are not even posted
+yet but just thought of mentioning that on this relevant thread.
 
-I would like to test your audio support patch on mx6sabrelite, but the
-missing sound/soc/imx-sgtl5000.c does not allow me to do it.
+I can send you a git link to have early preview on those changes, if you
+would like to have a look at it.
 
-I think you would better introduce sound/soc/imx-sgtl5000.c first (on
-separate patch series) so that people could test this patch without
-using the imx-sgtl5000.c implementation from the Linaro kernel.
-
-Without imx-sgtl5000.c in place, this patch only introduces dead code
-at the moment.
-
-Regards,
-
-Fabio Estevam
+Regards
+Santosh
