@@ -1,60 +1,62 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Feb 2012 12:52:50 +0000
-Subject: [RFC 7/7] MFD: TWL6040: Add regulator support for VIO, V2V1
- supplies
-In-Reply-To: <1328185019-29575-8-git-send-email-peter.ujfalusi@ti.com>
-References: <1328185019-29575-1-git-send-email-peter.ujfalusi@ti.com>
- <1328185019-29575-8-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120202125250.GJ7428@opensource.wolfsonmicro.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 2 Feb 2012 21:09:03 +0800
+Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
+In-Reply-To: <20120202092427.GB32403@b20223-02.ap.freescale.net>
+References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
+ <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
+ <20120202085521.GB9773@S2101-09.ap.freescale.net>
+ <20120202091132.GD9773@S2101-09.ap.freescale.net>
+ <20120202092427.GB32403@b20223-02.ap.freescale.net>
+Message-ID: <20120202130901.GE9773@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 02:16:59PM +0200, Peter Ujfalusi wrote:
+On Thu, Feb 02, 2012 at 05:24:28PM +0800, Richard Zhao wrote:
+> On Thu, Feb 02, 2012 at 05:11:34PM +0800, Shawn Guo wrote:
+> > On Thu, Feb 02, 2012 at 04:55:23PM +0800, Shawn Guo wrote:
+> > > On Thu, Feb 02, 2012 at 10:12:05AM +0800, Richard Zhao wrote:
+> > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > > ---
+> > > >  arch/arm/mach-imx/mach-mx31ads.c      |   10 ++++++++++
+> > > >  arch/arm/plat-mxc/include/mach/mx31.h |    1 +
+> > > >  2 files changed, 11 insertions(+), 0 deletions(-)
+> > > > 
+> > > Hmm, let's see who are actually using mxc_audmux_v2_configure_port().
+> > > 
+> > > $ git grep -n mxc_audmux_v2_configure_port arch/arm/
+> > > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:246:     mxc_audmux_v2_configure_port(0,
+> > > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:254:     mxc_audmux_v2_configure_port(4,
+> > > arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:257:     mxc_audmux_v2_configure_port(0,
+> > > arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:265:     mxc_audmux_v2_configure_port(3,
+> > > arch/arm/mach-imx/mach-pcm043.c:365:    mxc_audmux_v2_configure_port(3,
+> > > arch/arm/mach-imx/mach-pcm043.c:371:    mxc_audmux_v2_configure_port(0,
+> I didn't grep arch/arm. where is pc043 asoc machine file?
 
-> +	twl6040->vio = regulator_get(&client->dev, "vio");
-> +	if (IS_ERR(twl6040->vio)) {
-> +		ret = PTR_ERR(twl6040->vio);
-> +		dev_err(&client->dev, "Failed to request VIO supply: %d\n",
-> +			ret);
-> +		goto regulator_get_err;
-> +	}
-> +	twl6040->v2v1 = regulator_get(&client->dev, "v2v1");
-> +	if (IS_ERR(twl6040->v2v1)) {
-> +		ret = PTR_ERR(twl6040->v2v1);
-> +		dev_err(&client->dev, "Failed to request V2V1 supply: %d\n",
-> +			ret);
-> +		regulator_put(twl6040->vio);
-> +		goto regulator_get_err;
-> +	}
+It seems to be sound/soc/imx/phycore-ac97.c.
 
-Looks like you want regulator_bulk_get() here.  Or (better yet though
-it'd be a potential issue for merge via MFD and the benefits aren't that
-exciting since you still need to disable) devm_regulator_bulk_get().
+> > > 
+> > As we are moving audmux into sound/soc/imx, it makes less sense to
+> > still keep these calls in board files.
+> It don't corrupt git bisect. We don't have to include it in this patch.
 
-> +	ret = regulator_enable(twl6040->vio);
-> +	if (ret != 0) {
-> +		dev_err(&client->dev, "Failed to enable VIO: %d\n", ret);
-> +		goto power_err;
-> +	}
-> +	ret = regulator_enable(twl6040->v2v1);
-> +	if (ret != 0) {
-> +		dev_err(&client->dev, "Failed to enable V2V1: %d\n", ret);
-> +		regulator_disable(twl6040->vio);
-> +		goto power_err;
-> +	}
+It's logically part of this series.
 
-Similarly regulator_bulk_enable() here, and it'll fix...
+> >  Instead, I prefer to call it
+> > from machine driver like what wm1133-ev1 does below.
+> Maybe pass the info as asoc machine driver pdata.
 
->  gpio1_err:
-> +	regulator_disable(twl6040->v2v1);
-> +	regulator_disable(twl6040->vio);
+Sounds good.
 
-...the fact that if you fail to enable the v2.1 regulator you don't
-disable vio.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/42b9ecc2/attachment.sig>
+> >  Or we can simply
+> > make the it a audmux-self call with 3 parameters it needs retrieved
+> > from platform_data or device tree, so that machine driver does not
+> > even bother with the call.  Makes sense?
+> audux configuration may change after initial set. For example, it may use
+> one configuration for audio playback, but use another when you connect a
+> BT audio device.
+
+Right.  I forgot this point.
+
+-- 
+Regards,
+Shawn
