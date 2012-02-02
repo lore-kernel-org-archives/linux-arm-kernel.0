@@ -1,91 +1,67 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 2 Feb 2012 10:12:06 +0800
-Subject: [PATCH v2 7/9] ARM: mxc: move audmux-v2 to sound/soc/imx
+Date: Thu, 2 Feb 2012 10:12:07 +0800
+Subject: [PATCH v2 8/9] ASoC: imx: add dt support for audmux-v2
 In-Reply-To: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
 References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1328148728-32258-8-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1328148728-32258-9-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's for clean up code under arch/arm.
-
-audmux.h is shared with audmux-v1, leave it under mach/.
-
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/plat-mxc/Kconfig                        |    3 ---
- arch/arm/plat-mxc/Makefile                       |    1 -
- sound/soc/imx/Kconfig                            |    4 ++++
- sound/soc/imx/Makefile                           |    2 ++
- {arch/arm/plat-mxc => sound/soc/imx}/audmux-v2.c |    0
- 5 files changed, 6 insertions(+), 4 deletions(-)
- rename {arch/arm/plat-mxc => sound/soc/imx}/audmux-v2.c (100%)
+ .../bindings/sound/soc/imx/audmux-v2.txt           |   11 +++++++++++
+ sound/soc/imx/audmux-v2.c                          |    8 ++++++++
+ 2 files changed, 19 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/soc/imx/audmux-v2.txt
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index dcebb12..9e47d9c 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -91,9 +91,6 @@ config ARCH_MXC_IOMUX_V3
- config ARCH_MXC_AUDMUX_V1
- 	bool
- 
--config ARCH_MXC_AUDMUX_V2
--	bool
--
- config IRAM_ALLOC
- 	bool
- 	select GENERIC_ALLOCATOR
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 076db84f..0cd5d8a 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -15,7 +15,6 @@ obj-$(CONFIG_MXC_PWM)  += pwm.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
- obj-$(CONFIG_MXC_USE_EPIT) += epit.o
- obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
--obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
- obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
- ifdef CONFIG_SND_IMX_SOC
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index 7383917..f9eb436 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -17,10 +17,14 @@ config SND_MXC_SOC_FIQ
- config SND_MXC_SOC_MX2
- 	tristate
- 
-+config SND_MXC_SOC_AUDMUXV2
-+	tristate
+diff --git a/Documentation/devicetree/bindings/sound/soc/imx/audmux-v2.txt b/Documentation/devicetree/bindings/sound/soc/imx/audmux-v2.txt
+new file mode 100644
+index 0000000..b8ec5aa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/soc/imx/audmux-v2.txt
+@@ -0,0 +1,11 @@
++* Freescale audmux device for imx3, imx5, imx6 etc.
 +
- config SND_MXC_SOC_WM1133_EV1
- 	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
- 	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
- 	select SND_SOC_WM8350
-+	select SND_MXC_SOC_AUDMUXV2
- 	select SND_MXC_SOC_FIQ
- 	help
- 	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
-diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
-index d6d609b..703ab5e 100644
---- a/sound/soc/imx/Makefile
-+++ b/sound/soc/imx/Makefile
-@@ -2,10 +2,12 @@
- snd-soc-imx-objs := imx-ssi.o
- snd-soc-imx-fiq-objs := imx-pcm-fiq.o
- snd-soc-imx-mx2-objs := imx-pcm-dma-mx2.o
-+snd-soc-imx-audmuxv2-objs := audmux-v2.o
++Required properties:
++- compatible : "fsl,imx31-audmux".
++
++Example:
++
++audmux at 021d8000 {
++	compatible = "fsl,imx6q-audmux", "fsl,imx31-audmux";
++	reg = <0x021d8000 0x4000>;
++};
+diff --git a/sound/soc/imx/audmux-v2.c b/sound/soc/imx/audmux-v2.c
+index d53c029..af42fca 100644
+--- a/sound/soc/imx/audmux-v2.c
++++ b/sound/soc/imx/audmux-v2.c
+@@ -20,7 +20,9 @@
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ #include <linux/debugfs.h>
++#include <linux/platform_device.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
+ #include <mach/audmux.h>
+ #include <mach/hardware.h>
  
- obj-$(CONFIG_SND_IMX_SOC) += snd-soc-imx.o
- obj-$(CONFIG_SND_MXC_SOC_FIQ) += snd-soc-imx-fiq.o
- obj-$(CONFIG_SND_MXC_SOC_MX2) += snd-soc-imx-mx2.o
-+obj-$(CONFIG_SND_MXC_SOC_AUDMUXV2) += snd-soc-imx-audmuxv2.o
+@@ -244,11 +246,17 @@ static int __exit mxc_audmux_v2_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- # i.MX Machine Support
- snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
-diff --git a/arch/arm/plat-mxc/audmux-v2.c b/sound/soc/imx/audmux-v2.c
-similarity index 100%
-rename from arch/arm/plat-mxc/audmux-v2.c
-rename to sound/soc/imx/audmux-v2.c
++static const struct of_device_id audmux_v2_dt_ids[] = {
++	{ .compatible = "fsl,imx31-audmux", },
++	{ /* sentinel */ }
++};
++
+ static struct platform_driver mxc_audmux_v2_driver = {
+ 	.remove		= __exit_p(mxc_audmux_v2_remove),
+ 	.driver	= {
+ 		.name	= DRIVER_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = audmux_v2_dt_ids,
+ 	}
+ };
+ 
 -- 
 1.7.5.4
