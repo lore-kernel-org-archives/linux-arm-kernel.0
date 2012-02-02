@@ -1,47 +1,84 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Thu, 2 Feb 2012 20:56:54 +0100
-Subject: [PATCH 1/4] Remove Telechips ARM subarch from MAINTAINERS
-In-Reply-To: <201202021346.08740.arnd@arndb.de>
-References: <20111222211948.GA1201@local>
- <20120103170824.GA2914@n2100.arm.linux.org.uk>
- <20120202104541.GB1643@atrey.karlin.mff.cuni.cz>
- <201202021346.08740.arnd@arndb.de>
-Message-ID: <20120202195653.GA5558@local>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 2 Feb 2012 12:59:25 -0700 (MST)
+Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
+ pwrdm_clear_all_prev_pwrst()
+In-Reply-To: <CAMQu2gxuQVYNvo8VeGrmZGo3tqCydhVaOz1VXjeAgrL8Opm8nA@mail.gmail.com>
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
+ <87mx93ok5y.fsf@ti.com>
+ <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
+ <CAMQu2gzVt3K6cuZcbvfNZegimyXz8F4N__A6vDBSyL4QfSnbTw@mail.gmail.com>
+ <alpine.DEB.2.00.1202020041220.10541@utopia.booyaka.com>
+ <CAMQu2gw5uU4kXRWtuUuYAAUcrTJvS_nQhJ42-_hEmHM2NO8ZZg@mail.gmail.com>
+ <alpine.DEB.2.00.1202020302400.586@utopia.booyaka.com>
+ <CAMQu2gxQHyoH-AC4ut2EGVs6wBvAJqUJ8tzXUm2hH_gZqMGE6w@mail.gmail.com>
+ <CAMQu2gxuQVYNvo8VeGrmZGo3tqCydhVaOz1VXjeAgrL8Opm8nA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1202021258350.586@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 01:46:08PM +0000, Arnd Bergmann wrote:
+Hi Santosh
+
+On Thu, 2 Feb 2012, Shilimkar, Santosh wrote:
+
+> On Thu, Feb 2, 2012 at 3:47 PM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+> > On Thu, Feb 2, 2012 at 3:35 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> >> On Thu, 2 Feb 2012, Shilimkar, Santosh wrote:
+> >>
+> >>> Yes, we do have issue with below APIs for OMAP4 and onwards design
+> >>> because of the PRCM change.
+> >>>
+> >>> pwrdm_clear_all_prev_pwrst
+> >>> pwrdm_*_mem_*
+> >>>
+> >>> There use to be a single power state and memory state register till OMAP3
+> >>> at power domain level which can give you the logic and memory last test
+> >>> which is needed for OSWR.
+> >>>
+> >>> On OMAP4, we have registers per modules and it becomes difficult to model
+> >>> this difference in APIs. Initially we tried to fix that with [1] and
+> >>> then later realized
+> >>> that's not going to work on OMAP4 + devices because of mentioned issue.
+> >>
+> >> If the registers are per-module, it seems like the best place for those
+> >> would be the hwmod layer. ?Do you think that makes sense? ?So, something
+> >> like omap_hwmod_clear_all_prev_pwrst(), etc.? ?Seems like that should be
+> >> pretty efficient.
+> >>
+> > But all these are power domain registers after all. Rajendra did one version of
+> > " pwrdm_clear_all_prev_pwrst" ?API and inside used hwmod. But then there he
+> > has iterate over all the modules belongs to that power domain.
+> >
+> > And if you use hwmod or omap_device kind of API, then ?you need to
+> > build those devices in init or some where.
+> >
+> > All of that was not looking so elegant and hence the other path was chosen.
+> > The mess is, the registers are still part of power domains though they
+> > are specific
+> > to module. And Fundamentally power domain is stil the central entity
+> > decides the fate of all the modules within that PD, in terms of context
+> > loss/ret etc.
+> >
+> I looked at the MPUSS file. There are 3 functions which access
+> power domain registers directly.
 > 
-> Telechips themselves seem to have given up on the ARM9 based products
+> - mpuss_clear_prev_logic_pwrst
+> - cpu_clear_prev_logic_pwrst
+> - omap4_mpuss_read_prev_context_state
+> 
+> All of these functions access the context registers which
+> we don't have support today at power domian APIs for
+> mentioned issue. This file is using power domain APIs
+> in all possible scenario's except the OSWR scenario
+> which needs the context register accesses.
+> 
+> if the context clear and read can be handled part of
+> PD APIs, then we can certainly kill this functions.
 
-That is not true. The TCC8000 is in production and available, also
-derivatives like TCC8001.
+That sounds great.  Maybe we can add powerdomain functions for these 
+purposes that take both a powerdomain pointer and a hwmod pointer.  That 
+should hopefully work.
 
-The main problem is that Telechips is not interested in markets where
-SoCs are sold separately. Instead, they sell complete solutions.
-If you want a new DAB car radio, they'll sell you the PCB layout,
-operating system, drivers, and complete software according to your
-specification. They'll even organise manufacturing of the device,
-and you'll get the completely working PCB in the end. You never have
-to write software yourself, let alone kernel code.
 
-That is why few people have ever heard of Telechips. Since these
-SoCs are available now for everybody, it seemed a good idea to bring
-that stuff to mainline.
-
-But without ANY contribution (not even questions) from ANYBODY,
-no open source project will fly.
-
-That's why I refused to keep the Telechips subarch up-to-date
-when Russell, correctly, asked me to do so. That was on the
-ARM kernel mailing list, but noone shouted, hey, I'll do it!
-
-Consequently, I removed my stuff after talking to Thomas and Harry,
-who might have been still interested.
-
-If I hadn't removed it myself, Russell would have kicked it out
-sooner or later anyway. Which is the correct thing to do for code
-that nobody is interested in.
-
-Thanks,
-Hans
+- Paul
