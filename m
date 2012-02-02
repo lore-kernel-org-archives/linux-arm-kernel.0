@@ -1,67 +1,37 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 2 Feb 2012 23:00:46 +0530
-Subject: [PATCH v9 20/25] gpio/omap: fix incorrect access of debounce module
+Date: Thu, 2 Feb 2012 23:00:39 +0530
+Subject: [PATCH v9 13/25] gpio/omap: remove unnecessary bit-masking for read
+ access
 In-Reply-To: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
 References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1328203851-20435-21-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1328203851-20435-14-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable debounce clock before writing/reading debounce registers.
-Disable the clock at the end so that it is synchronized with the
-pm_runtime_get/put_sync calls.
+Remove un-necessary bit masking. Since the register are 4 byte aligned
+and readl would work as is. The 'enabled' mask is already taking care
+to mask for bank width.
 
-Enable debounce clock per module. This call is mandatory because
-in omap_gpio_request() when *_runtime_get_sync() is called,
-_gpio_dbck_enable() within runtime callbck fails to turn on dbck
- because dbck_enable_mask used within _gpio_dbck_enable() is still
-not initialized at that point. Therefore we have to enable dbck here.
-
+Signed-off-by: Charulatha V <charu@ti.com>
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-omap.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 0ea3dc9..7515382 100644
+index 485b6b2..38beccc 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -203,22 +203,30 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
+@@ -576,9 +576,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		enabled = _get_gpio_irqbank_mask(bank);
+ 		isr_saved = isr = __raw_readl(isr_reg) & enabled;
  
- 	l = GPIO_BIT(bank, gpio);
+-		if (cpu_is_omap15xx() && (bank->method == METHOD_MPUIO))
+-			isr &= 0x0000ffff;
+-
+ 		if (bank->level_mask)
+ 			level_mask = bank->level_mask & enabled;
  
-+	clk_enable(bank->dbck);
- 	reg = bank->base + bank->regs->debounce;
- 	__raw_writel(debounce, reg);
- 
- 	reg = bank->base + bank->regs->debounce_en;
- 	val = __raw_readl(reg);
- 
--	if (debounce) {
-+	if (debounce)
- 		val |= l;
--		clk_enable(bank->dbck);
--	} else {
-+	else
- 		val &= ~l;
--		clk_disable(bank->dbck);
--	}
- 	bank->dbck_enable_mask = val;
- 
- 	__raw_writel(val, reg);
-+	clk_disable(bank->dbck);
-+	/*
-+	 * Enable debounce clock per module.
-+	 * This call is mandatory because in omap_gpio_request() when
-+	 * *_runtime_get_sync() is called,  _gpio_dbck_enable() within
-+	 * runtime callbck fails to turn on dbck because dbck_enable_mask
-+	 * used within _gpio_dbck_enable() is still not initialized at
-+	 * that point. Therefore we have to enable dbck here.
-+	 */
-+	_gpio_dbck_enable(bank);
- }
- 
- static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
 -- 
 1.7.0.4
