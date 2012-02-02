@@ -1,49 +1,55 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 1 Feb 2012 21:56:29 -0700
-Subject: [PATCH] arm/dts: OMAP3: Add omap3evm and am335xevm support
-In-Reply-To: <1328077620-22411-1-git-send-email-hvaibhav@ti.com>
-References: <1328077620-22411-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120202045629.GJ15343@ponder.secretlab.ca>
+Date: Wed, 1 Feb 2012 21:58:44 -0700
+Subject: [PATCH] irq_domain: fix the irq number of imx5 tzic
+In-Reply-To: <1328075214-25700-1-git-send-email-shawn.guo@linaro.org>
+References: <1327700179-17454-15-git-send-email-grant.likely@secretlab.ca>
+ <1328075214-25700-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120202045844.GK15343@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2012 at 11:57:00AM +0530, Vaibhav Hiremath wrote:
-> TI's OMAP3EVM and AM335xEVM are software development boards
-> available for OMAP35x(AM/DM37x) and AM335x devices respectively;
-> and these devices are considered under omap3 family.
+On Wed, Feb 01, 2012 at 01:46:54PM +0800, Shawn Guo wrote:
+> The tzic controller found on imx51 and imx53 gets 128 irq lines rather
+> than 32.
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
 Applied, thanks.
 
 g.
 
 > ---
->  .../devicetree/bindings/arm/omap/omap.txt          |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
+>  arch/arm/mach-mx5/imx51-dt.c |    2 +-
+>  arch/arm/mach-mx5/imx53-dt.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> index dbdab40..ce78498 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -41,3 +41,9 @@ Boards:
+> diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
+> index e1b5edf..1e03ef4 100644
+> --- a/arch/arm/mach-mx5/imx51-dt.c
+> +++ b/arch/arm/mach-mx5/imx51-dt.c
+> @@ -47,7 +47,7 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
+>  static int __init imx51_tzic_add_irq_domain(struct device_node *np,
+>  				struct device_node *interrupt_parent)
+>  {
+> -	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
+> +	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
+>  	return 0;
+>  }
+>  
+> diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
+> index 89de5d4..fd5be0f 100644
+> --- a/arch/arm/mach-mx5/imx53-dt.c
+> +++ b/arch/arm/mach-mx5/imx53-dt.c
+> @@ -51,7 +51,7 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
+>  static int __init imx53_tzic_add_irq_domain(struct device_node *np,
+>  				struct device_node *interrupt_parent)
+>  {
+> -	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
+> +	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.7.4.1
 > 
->  - OMAP4 PandaBoard : Low cost community board
->    compatible = "ti,omap4-panda", "ti,omap4430"
-> +
-> +- OMAP3 EVM : Software Developement Board for OMAP35x, AM/DM37x
-> +  compatible = "ti,omap3-evm", "ti,omap3"
-> +
-> +- AM335X EVM : Software Developement Board for AM335x
-> +  compatible = "ti,am335x-evm", "ti,am33xx", "ti,omap3"
-> --
-> 1.7.0.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
