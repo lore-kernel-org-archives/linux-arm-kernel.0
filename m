@@ -1,25 +1,26 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Thu, 2 Feb 2012 09:59:28 +0800
-Subject: [PATCH RESEND] ARM: pxa: fix error handling in
- pxa2xx_drv_pcmcia_probe
-In-Reply-To: <CAN1soZyatf2u4fVk-=U_Sz4wcVwP7qFaiZK4CR3rosbXeQObvA@mail.gmail.com>
-References: <1324974344.2351.5.camel@phoenix>
- <CAMPhdO_QL3ahf4+F70Bg7FHKq5mrbbofN_BTz8dpcBLea9BNAw@mail.gmail.com>
- <25B60CDC2F704E4E9D88FFD52780CB4C05EC64DBD3@SC-VEXCH1.marvell.com>
- <CAMPhdO8=L1KGmn_OihoMmMWNDahZ5+3u7M+BNuT3FcSfExHm1w@mail.gmail.com>
- <CAN1soZyatf2u4fVk-=U_Sz4wcVwP7qFaiZK4CR3rosbXeQObvA@mail.gmail.com>
-Message-ID: <CAF+7xW=VmaOATC1-J3u=s7pjuK-xefo+5zzZ3GpqVot7JJOfDA@mail.gmail.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 2 Feb 2012 10:11:59 +0800
+Subject: [PATCH v2 0/9] imx patches when I enable imx6q sabrelite audio
+Message-ID: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> If it fails, it will jump to err1 anyway. The check there is redundant.
->>
-> Applied
+Changes in v2:
 
-Hi Haojian,
-This patch is not (yet) upstream.
-Could you help to check it again.
+ - change dt peroperty/label to lower case as much as possible
+   keep XXX-supply property upper case.
+ - convert audmux-v2 to platform device driver
+ - move audmux-v2 driver to sound/soc/imx
 
-Thanks,
-Axel
+[PATCH v2 1/9] ARM: mxc: make imx_dma_is_general_purpose more
+[PATCH v2 2/9] ARM: imx6q: add cko1 clock
+[PATCH v2 3/9] ARM: dts: imx6q-sabrelite: add 2p5v and 3p3v
+[PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
+[PATCH v2 5/9] ARM: mxc: convert audmux-v2 to a platform driver
+[PATCH v2 6/9] ARM: mx31ads: add audmux device
+[PATCH v2 7/9] ARM: mxc: move audmux-v2 to sound/soc/imx
+[PATCH v2 8/9] ASoC: imx: add dt support for audmux-v2
+[PATCH v2 9/9] ARM: imx6q-sabrelite: add audmux support
+
+Thanks
+Richard
