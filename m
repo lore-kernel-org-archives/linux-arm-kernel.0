@@ -1,103 +1,82 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 Feb 2012 17:02:50 +0800
-Subject: [PATCH v2 7/9] ARM: mxc: move audmux-v2 to sound/soc/imx
-In-Reply-To: <1328148728-32258-8-git-send-email-richard.zhao@linaro.org>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-8-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20120202090248.GC9773@S2101-09.ap.freescale.net>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 2 Feb 2012 09:54:08 +0100
+Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <20120202084539.GC1275@n2100.arm.linux.org.uk>
+References: <4F22DEF2.5000807@ti.com>
+ <20120128180602.GC2501@ponder.secretlab.ca>
+ <20120131230928.GA8394@n2100.arm.linux.org.uk> <4F2918F6.9040100@ti.com>
+ <20120202084539.GC1275@n2100.arm.linux.org.uk>
+Message-ID: <4F2A4F30.1030706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 10:12:06AM +0800, Richard Zhao wrote:
-> It's for clean up code under arch/arm.
+On 2/2/2012 9:45 AM, Russell King - ARM Linux wrote:
+> On Wed, Feb 01, 2012 at 11:50:30AM +0100, Cousson, Benoit wrote:
+>> Hi Russell,
+>>
+>> On 2/1/2012 12:09 AM, Russell King - ARM Linux wrote:
+>>> On Sat, Jan 28, 2012 at 11:06:02AM -0700, Grant Likely wrote:
+>>>> This makes the assumption that dma specifiers will only ever be 1
+>>>> cell.  I think to be generally useful, the full dma specifier needs to
+>>>> be either handed to the dma controller to get a cookie or passed back
+>>>> to the caller in its entirety.
+>>>
+>>> More to the point, who says that the DMA specifier is even an integer?
+>>> When people are using DMA engines, it (probably) isn't an integer at
+>>> all.  Several platforms I know of use strings for this.
+>>>
+>>> Some platforms can even select between two or more DMA engines for
+>>> handling the same peripheral - I believe Samsung do this depending
+>>> on their individual workloads.
+>>>
+>>> However, the opaque DMA engine API for requesting a channel doesn't
+>>> lend itself well to DT, as the match data and match function are
+>>> entirely left to the individual DMA engine driver and/or platform
+>>> itself.
+>>>
+>>> As far as creating another linear number space for DMA stuff, I'd
+>>> really suggest against that - you're going to need some additional
+>>> code in place to manage that numberspace.  If you at least use a two-
+>>> paid cookie, eg 'dma controller phandle + request signal' then that
+>>> makes all the stuff we're starting to see with the IRQ subsystem,
+>>> IRQ domains etc become completely unnecessary.
+>>>
+>>> I guess what I'm saying is ignore the flat number space, and go
+>>> straight to some kind of 'dma domains' solution from the start.
+>>
+>> Fully agree, and this is exactly the idea of this DMA binding: First
+>> argument is always a DMA controller phandle and then you can add 0, 1 or
+>> more cells to define extra specifiers dependent of the DMA controller
+>> driver expectation. The one cell Grant was referring was just the extra
+>> specifier that is needed for a simple DMA engine like the SDMA we have
+>> inside OMAP. But the whole idea is to have a flexible enough mechanism
+>> to allow any kind of specifier.
+>>
+>> No more global linear number space like for IRQ!
 > 
-> audmux.h is shared with audmux-v1, leave it under mach/.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  arch/arm/plat-mxc/Kconfig                        |    3 ---
->  arch/arm/plat-mxc/Makefile                       |    1 -
->  sound/soc/imx/Kconfig                            |    4 ++++
->  sound/soc/imx/Makefile                           |    2 ++
->  {arch/arm/plat-mxc => sound/soc/imx}/audmux-v2.c |    0
->  5 files changed, 6 insertions(+), 4 deletions(-)
->  rename {arch/arm/plat-mxc => sound/soc/imx}/audmux-v2.c (100%)
-> 
-> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> index dcebb12..9e47d9c 100644
-> --- a/arch/arm/plat-mxc/Kconfig
-> +++ b/arch/arm/plat-mxc/Kconfig
-> @@ -91,9 +91,6 @@ config ARCH_MXC_IOMUX_V3
->  config ARCH_MXC_AUDMUX_V1
->  	bool
->  
-> -config ARCH_MXC_AUDMUX_V2
-> -	bool
-> -
+> How does this work when you're stuffing a number into a struct resource
+> as a plain DMA number?  That looks very much like a linear number space,
+> as you don't have a way to associate that number with anything else.
 
-There are 4 more occurrences of the symbol to be removed together.
+As explained in the kernel doc header and in the changelog, that one is for legacy purpose only.
 
-arch/arm/mach-imx/Kconfig:58:   select ARCH_MXC_AUDMUX_V2
-arch/arm/mach-imx/Kconfig:75:   select ARCH_MXC_AUDMUX_V2
-arch/arm/mach-imx/Kconfig:83:   select ARCH_MXC_AUDMUX_V2
-arch/arm/mach-imx/Kconfig:92:   select ARCH_MXC_AUDMUX_V2
++/**
++ * of_dma_to_resource - Decode a node's DMA and return it as a resource
++ * @dev: pointer to device tree node
++ * @index: zero-based index of the DMA request
++ * @r: pointer to resource structure to return result into.
++ *
++ * Using a resource to export a DMA request number to a driver should
++ * be used only for legacy purpose and on system when only one DMA controller
++ * is present.
++ * The proper and only scalable way is to use the native of_get_dma_request API
++ * in order retrieve both the DMA controller device node and the DMA request
++ * line for that controller.
++ */
+
+There is indeed no way to put information about DMA controller and DMA line in the resource structure except if we start hacking the start and end attributes. But I'm not sure anyone will want to do that.
+
+The only way to take benefit of the extra information DT can provide is to use the of_get_dma_request API.
 
 Regards,
-Shawn
-
->  config IRAM_ALLOC
->  	bool
->  	select GENERIC_ALLOCATOR
-> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-> index 076db84f..0cd5d8a 100644
-> --- a/arch/arm/plat-mxc/Makefile
-> +++ b/arch/arm/plat-mxc/Makefile
-> @@ -15,7 +15,6 @@ obj-$(CONFIG_MXC_PWM)  += pwm.o
->  obj-$(CONFIG_MXC_ULPI) += ulpi.o
->  obj-$(CONFIG_MXC_USE_EPIT) += epit.o
->  obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
-> -obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
->  obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
->  obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
->  ifdef CONFIG_SND_IMX_SOC
-> diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-> index 7383917..f9eb436 100644
-> --- a/sound/soc/imx/Kconfig
-> +++ b/sound/soc/imx/Kconfig
-> @@ -17,10 +17,14 @@ config SND_MXC_SOC_FIQ
->  config SND_MXC_SOC_MX2
->  	tristate
->  
-> +config SND_MXC_SOC_AUDMUXV2
-> +	tristate
-> +
->  config SND_MXC_SOC_WM1133_EV1
->  	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
->  	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
->  	select SND_SOC_WM8350
-> +	select SND_MXC_SOC_AUDMUXV2
->  	select SND_MXC_SOC_FIQ
->  	help
->  	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
-> diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
-> index d6d609b..703ab5e 100644
-> --- a/sound/soc/imx/Makefile
-> +++ b/sound/soc/imx/Makefile
-> @@ -2,10 +2,12 @@
->  snd-soc-imx-objs := imx-ssi.o
->  snd-soc-imx-fiq-objs := imx-pcm-fiq.o
->  snd-soc-imx-mx2-objs := imx-pcm-dma-mx2.o
-> +snd-soc-imx-audmuxv2-objs := audmux-v2.o
->  
->  obj-$(CONFIG_SND_IMX_SOC) += snd-soc-imx.o
->  obj-$(CONFIG_SND_MXC_SOC_FIQ) += snd-soc-imx-fiq.o
->  obj-$(CONFIG_SND_MXC_SOC_MX2) += snd-soc-imx-mx2.o
-> +obj-$(CONFIG_SND_MXC_SOC_AUDMUXV2) += snd-soc-imx-audmuxv2.o
->  
->  # i.MX Machine Support
->  snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
-> diff --git a/arch/arm/plat-mxc/audmux-v2.c b/sound/soc/imx/audmux-v2.c
-> similarity index 100%
-> rename from arch/arm/plat-mxc/audmux-v2.c
-> rename to sound/soc/imx/audmux-v2.c
-> -- 
+Benoit
