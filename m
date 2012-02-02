@@ -1,23 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 02 Feb 2012 11:15:38 -0800
-Subject: [PATCH 07/20] ARM: OMAP3+: SmartReflex: clear
- ERRCONFIG_VPBOUNDINTST only on a need
-In-Reply-To: <1328086199-28486-8-git-send-email-j-pihet@ti.com> (Jean Pihet's
- message of "Wed, 1 Feb 2012 09:49:46 +0100")
-References: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
- <1328086199-28486-8-git-send-email-j-pihet@ti.com>
-Message-ID: <87d39xcahx.fsf@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 2 Feb 2012 12:16:30 -0700
+Subject: [PATCH v9 01/25] gpio/omap: remove dependency on gpio_bank_count
+In-Reply-To: <20120202184106.GC29215@legolas.emea.dhcp.ti.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <1328203851-20435-2-git-send-email-tarun.kanti@ti.com>
+ <20120202184106.GC29215@legolas.emea.dhcp.ti.com>
+Message-ID: <20120202191630.GT15343@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
+On Thu, Feb 02, 2012 at 08:41:07PM +0200, Felipe Balbi wrote:
+> Hi,
+> 
+> On Thu, Feb 02, 2012 at 11:00:27PM +0530, Tarun Kanti DebBarma wrote:
+> > diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> > index 0b05629..6ea7390 100644
+> > --- a/drivers/gpio/gpio-omap.c
+> > +++ b/drivers/gpio/gpio-omap.c
+> > @@ -28,7 +28,10 @@
+> >  #include <asm/gpio.h>
+> >  #include <asm/mach/irq.h>
+> >  
+> > +static LIST_HEAD(omap_gpio_list);
+> 
+> I guess it's now too late because patch is acked and everything, but I
+> think if you make the driver handle one bank alone and just instantiate
+> it multiple times (omap_gpio.0, omap_gpio.1, omap_gpio.3, etc) driver
+> would be faaaaaar simpler.
 
-> From: Nishanth Menon <nm@ti.com>
->
-> MIME-Version: 1.0
-> Content-Type: text/plain; charset=UTF-8
-> Content-Transfer-Encoding: 8bit
+Is there any shared state between the banks?  On my very cursory glance it
+looked like banks still have some interaction between them.  If not, then
+yes I agree that multiple instances would be better.
 
-minor: this doesn't belong in the changelog.  I will remove it locally.
-
-Kevin
+g.
