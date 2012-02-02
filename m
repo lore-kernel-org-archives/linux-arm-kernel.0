@@ -1,31 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Feb 2012 12:09:01 +0000
-Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
-In-Reply-To: <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
+Date: Thu, 2 Feb 2012 12:10:20 +0000
+Subject: [PATCH v2 8/9] ASoC: imx: add dt support for audmux-v2
+In-Reply-To: <1328148728-32258-9-git-send-email-richard.zhao@linaro.org>
 References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20120202120900.GC7428@opensource.wolfsonmicro.com>
+ <1328148728-32258-9-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120202121020.GD7428@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 10:12:05AM +0800, Richard Zhao wrote:
+On Thu, Feb 02, 2012 at 10:12:07AM +0800, Richard Zhao wrote:
 
->  static void __init mxc_init_audio(void)
->  {
->  	imx31_add_imx_ssi(0, NULL);
->  	mxc_iomux_setup_multiple_pins(ssi_pins, ARRAY_SIZE(ssi_pins), "ssi");
-> +	imx_add_platform_device("audmux-v2", 0,
-> +				audmux_res, ARRAY_SIZE(audmux_res), NULL, 0);
+> +Required properties:
+> +- compatible : "fsl,imx31-audmux".
+> +
+> +Example:
+> +
+> +audmux at 021d8000 {
+> +	compatible = "fsl,imx6q-audmux", "fsl,imx31-audmux";
+> +	reg = <0x021d8000 0x4000>;
 
-Since the audmux is a part of the SoC silicon shouldn't the SoC just
-register the device without individual boards having to do anything
-(possibly conditional on ASoC being selected in Kconfig or something)?
-It's going to be connected in exactly the same fashion on any system
-using the SoC.
+It's kind of obvious what it is but you should really document the reg
+property for completeness.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/18cd0d76/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/e5bf6556/attachment.sig>
