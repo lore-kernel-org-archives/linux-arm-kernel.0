@@ -1,85 +1,90 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 2 Feb 2012 16:22:29 +0800
-Subject: [PATCH v2 9/9] ARM: imx6q-sabrelite: add audmux support
-In-Reply-To: <20120202082807.GA3653@S2101-09.ap.freescale.net>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-10-git-send-email-richard.zhao@linaro.org>
- <20120202082807.GA3653@S2101-09.ap.freescale.net>
-Message-ID: <20120202082228.GA32403@b20223-02.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 2 Feb 2012 01:33:38 -0700 (MST)
+Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
+ pwrdm_clear_all_prev_pwrst()
+In-Reply-To: <CAMQu2gzVt3K6cuZcbvfNZegimyXz8F4N__A6vDBSyL4QfSnbTw@mail.gmail.com>
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
+ <87mx93ok5y.fsf@ti.com>
+ <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
+ <CAMQu2gzVt3K6cuZcbvfNZegimyXz8F4N__A6vDBSyL4QfSnbTw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1202020041220.10541@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 04:30:24PM +0800, Shawn Guo wrote:
-> On Thu, Feb 02, 2012 at 10:12:08AM +0800, Richard Zhao wrote:
-> > - enable audmux in dts
-> > - enable audmux in Kconfig
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
-> >  arch/arm/boot/dts/imx6q.dtsi          |    2 ++
-> >  arch/arm/mach-imx/Kconfig             |    1 +
-> >  3 files changed, 7 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > index 3a9d32c..5cd6698 100644
-> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > @@ -41,6 +41,10 @@
-> >  				status = "okay";
-> >  			};
-> >  
-> > +			audmux at 021d8000 {
-> > +				status = "okay";
-> > +			};
-> > +
-> >  			uart2: uart at 021e8000 {
-> >  				status = "okay";
-> >  			};
-> > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> > index 263e8f3..b0ae495 100644
-> > --- a/arch/arm/boot/dts/imx6q.dtsi
-> > +++ b/arch/arm/boot/dts/imx6q.dtsi
-> > @@ -527,7 +527,9 @@
-> >  			};
-> >  
-> >  			audmux at 021d8000 {
-> > +				compatible = "fsl,imx6q-audmux", "fsl,imx31-audmux";
-> >  				reg = <0x021d8000 0x4000>;
-> > +				status = "disabled";
-> >  			};
-> >  
-> >  			mipi at 021dc000 { /* MIPI-CSI */
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index 4defb97..1aec9c1 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -835,6 +835,7 @@ comment "i.MX6 family:"
-> >  config SOC_IMX6Q
-> >  	bool "i.MX6 Quad support"
-> >  	select ARM_CPU_SUSPEND if PM
-> > +	select ARCH_MXC_AUDMUX_V2
-> 
-> The ARCH_MXC_AUDMUX_V2 has been removed by patch #7.  Why do you select
-> it here?
-I forgot to remove it when rebase. I can be removed.
+Hi
 
-Thanks
-Richard
-> 
-> Regards,
-> Shawn
-> 
-> >  	select ARM_GIC
-> >  	select CPU_V7
-> >  	select HAVE_ARM_SCU
-> > -- 
-> > 1.7.5.4
-> > 
-> > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+On Thu, 2 Feb 2012, Shilimkar, Santosh wrote:
+
+> On Thu, Feb 2, 2012 at 12:57 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> > N.B., I haven't looked at this file before. ?There are a few other things
+> > that don't look right that hopefully someone can take the initiative to
+> > fix. ?For example, those calls to mpuss_clear_prev_logic_pwrst() and
+> > cpu_clear_prev_logic_pwrst() should be removed as well. ?That should be
+> > done by pwrdm_clear_all_prev_pwrst() in mach-omap2/powerdomain44xx.c.
+> > Currently it's not, so that needs to be patched.
+> >
+> We(rajendra and myself) discussed this some time back with Benoit and we agreed
+> that for CPU and MPU power domains which are needed very early in the PM power
+> up sequence, we can do direct APIs..
+
+Looking at the call sites, don't these calls occur quite late in boot, 
+after everything is initialized?  I see calls from a late_initcall() and a 
+suspend entry function.  Am I missing something?
+
+> These calls were in critical path and the PD API's proposed for context clear
+> and logic clear were use to iterate over all power domains.
+
+The code iterates over all powerdomains anyway a few lines above those 
+calls, right?
+
+If the code only needs to iterate over a subset, let's discuss what you 
+need and a different iterator can be implemented in the powerdomain code.
+
+> It is only recently we got clear context etc some reasonable form
+> even though it still iterates over all hwmod etc which is really overhead.
+
+Which mainline PM calls iterate over all hwmods?
+
+> Also you need to create 'pdev' etc for context-loss kind of APIs and
+> we all thought that that makes things un-ncessary complicated and
+> lengthy.
+
+Could you point out the code that you are referring to?  I seem to be 
+missing it :-(
+
+If the existing powerdomain API is missing something you need, there's no 
+problem to add it.  It makes things easier to debug and more portable in 
+the long term if there is a clean, standard interface.  Another hope is 
+that more of the PM code can be shared.
+
+In terms of performance, it seems pretty unlikely that one would be able 
+to measure a meaningful performance difference, unless we are missing an 
+API call that was needed?  As we were discussing before, device reads are 
+likely to dominate the profile.
+
+Flipping through the code, I see that code is getting duplicated again.  
+We now have three identical copies of clkdms_setup().  The OMAP4 
+pwrdms_setup() is doing string comparisons to skip powerdomains -- that's 
+also pretty fragile; that should be controlled through powerdomain flags 
+or some similar mechanism.  Once that's fixed, it looks to me like that 
+function could be shared with the OMAP34xx pwrdms_setup()?  Looks like we 
+could also share omap{3,4}_pm_suspend() and omap{2,3,4}_pm_{begin,end}?
+
+It would be good if we can keep working towards making as much of this 
+code as common as possible.  If already-tested code can be reused, that 
+should cut down on bugs and maintainer workload.  Also, we can avoid 
+adding unnecessary lines of diff; we are trying to cut that down too..
+
+> > Also all of the open-coded powerdomain register accesses in
+> > omap-mpuss-lowpower.c should be removed - those should all go through
+> > pwrdm_*() functions...
+> >
+>  I will have another look at the code with your recent power domain 
+> clean-ups and see what all can be moved to generic APIs.
+
+That would be great!
+
+
+- Paul
