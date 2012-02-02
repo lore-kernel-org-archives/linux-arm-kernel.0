@@ -1,35 +1,29 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 2 Feb 2012 16:55:43 +0530
-Subject: [PATCH 0/2] ARM: OMAP2+: PM: code consolidation for 3.4
-In-Reply-To: <20120202093600.12509.35052.stgit@dusk>
-References: <20120202093600.12509.35052.stgit@dusk>
-Message-ID: <CAMQu2gyKEFHAXYyhv=a6NW-AMsDHkBy+bYmhQ5ryJCQK_d_RBA@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 02 Feb 2012 13:43:42 +0200
+Subject: [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
+ suspend is not implemented
+In-Reply-To: <201201302358.26152.rjw@sisk.pl>
+References: <1327306361-9803-1-git-send-email-shubhrajyoti@ti.com>
+ <20120124090630.GR16726@n2100.arm.linux.org.uk>
+ <1327923953.2487.13.camel@sauron.fi.intel.com>
+ <201201302358.26152.rjw@sisk.pl>
+Message-ID: <1328183022.28171.165.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2012 at 3:08 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi
->
-> This series consolidates some duplicated PM code across OMAP2, 3, and 4.
-> This saves both binary kernel image size, and lines of source. ?These
-> functions are just the low-hanging fruit; it looks to me like there's even
-> more consolidation that could be done.
->
-> Suspend + UART wakeup was tested on OMAP44xx BeagleBoard. ?On the
-> OMAP35xx Beagleboard here, v3.3-rc2 doesn't seem to wake up from
-> suspend correctly with or without these patches, so I've only boot-tested
-> them on that platform.
->
-Thanks for patches. Tried them on OMAP4 SDP and suspend
-is fine on it.
+On Mon, 2012-01-30 at 23:58 +0100, Rafael J. Wysocki wrote:
+> Thanks, but is anyone actually going to push it to Linus any time soon?
 
-On the consolidation front, I found that OMAP4/OMAP5
-can almost share most of the PRCM code.
-Actually it's too early to talk about OMAP5 patches, which are not even posted
-yet but just thought of mentioning that on this relevant thread.
+I agree, but I am not the maintainer so cannot answer. David Woodhouse
+is aware of this, but I do not know when he gonna send the pull request.
 
-I can send you a git link to have early preview on those changes, if you
-would like to have a look at it.
-
-Regards
-Santosh
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/ffee2351/attachment.sig>
