@@ -1,10 +1,10 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 Feb 2012 16:30:24 +0800
+Date: Thu, 2 Feb 2012 16:32:27 +0800
 Subject: [PATCH v2 9/9] ARM: imx6q-sabrelite: add audmux support
 In-Reply-To: <1328148728-32258-10-git-send-email-richard.zhao@linaro.org>
 References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
  <1328148728-32258-10-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20120202082807.GA3653@S2101-09.ap.freescale.net>
+Message-ID: <20120202083224.GA9773@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -58,7 +58,7 @@ On Thu, Feb 02, 2012 at 10:12:08AM +0800, Richard Zhao wrote:
 >  	select ARM_CPU_SUSPEND if PM
 > +	select ARCH_MXC_AUDMUX_V2
 
-The ARCH_MXC_AUDMUX_V2 has been removed by patch #7.  Why do you select
+The symbol has been removed by patch #7.  Why do you need to select
 it here?
 
 Regards,
@@ -68,6 +68,3 @@ Shawn
 >  	select CPU_V7
 >  	select HAVE_ARM_SCU
 > -- 
-> 1.7.5.4
-> 
-> 
