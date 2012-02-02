@@ -1,44 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Feb 2012 14:38:44 +0000
-Subject: [RFC] ARM hugetlb support
-In-Reply-To: <4F289BE2.9020404@gmail.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <CAHkRjk6xZy3Nsy=R05664RM0Sw071rkXmV2g9ySwqiS_BrBLrw@mail.gmail.com>
- <4F289BE2.9020404@gmail.com>
-Message-ID: <CAHkRjk49uGqFpdUZu0hYbHx3jHO9e0qv6OFN-NpwZPg-nnzfcQ@mail.gmail.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 2 Feb 2012 22:41:18 +0800
+Subject: [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
+In-Reply-To: <CAOMZO5CuPDhU6zUyhE1jA0SDTjv1XDMCkNoQ_0nH82poGYOaqA@mail.gmail.com>
+References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
+ <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
+ <CAOMZO5CxZgcO1JUZiFFJzWwLao1g7Y1_VNbsuiJOW+PH2B+FNQ@mail.gmail.com>
+ <20120202134907.GA3015@richard-laptop>
+ <CAOMZO5CuPDhU6zUyhE1jA0SDTjv1XDMCkNoQ_0nH82poGYOaqA@mail.gmail.com>
+Message-ID: <20120202144116.GA3278@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2012 01:56, bill4carson <bill4carson@gmail.com> wrote:
-> On 2012?01?31? 17:29, Catalin Marinas wrote:
->> It also doesn't
->> help much with the TLB hit rate since the micro-TLB most likely only
->> support 1MB sections.
->
-> I am afraid I can't agree with you on this.
-> Truly there is no specific statement about whether micro-TLB support 16MB
-> super-sections,
-> but main-TLB actually helps the hit rate, and main-TLB support all page size
-> mapping.
-
-The feedback over time was that 16MB didn't help much in terms of TLB
-misses compared to 1MB but that was for standard usage. I guess the
-hugetlbfs has specific scenarios that may benefit.
-
-Anyway, could you make the 2MB/16MB huge page size configurable at
-boot time (command line option like on other architectures)? And also
-check the ID_MMFR0[31:28] for whether supersections are supported.
-
->> BTW, I have a (simpler) implementation of hugetlbfs with 2MB sections
->> but for LPAE only:
->>
->>
->> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=shortlog;h=refs/heads/hugetlb
->>
-> Thanks for your information, I will study your code carefully :)
-
-Most of the simplicity comes from the fact that LPAE doesn't need a
-separate Linux PTE table.
-
--- 
-Catalin
+On Thu, Feb 02, 2012 at 12:15:52PM -0200, Fabio Estevam wrote:
+> On 2/2/12, Richard Zhao <richard.zhao@linaro.org> wrote:
+> 
+> >> Without imx-sgtl5000.c in place, this patch only introduces dead code
+> >> at the moment.
+> > Each patch make sense too without sgtl5000.
+> 
+> Well, as this patch goal is to provide audio support to mx6sabrelite,
+> we need imx-sgtl5000 in place to test it, right?
+My goal seem less important here. You see I'm adding more and more things
+into the patch series, which is out of my goal. The maintainers only
+consider right patch go to right git.
+>  How can we know that
+> don't get a kernel oops or something?
+patch pass building is possible go to upstream too.
+> 
+> Regards,
+> 
+> Fabio Estevam
