@@ -1,25 +1,21 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 1 Feb 2012 15:37:47 -0800
-Subject: [PATCH v2] pinctrl: delete raw device pointers in pinmux maps
-In-Reply-To: <1328121721-3438-1-git-send-email-linus.walleij@stericsson.com>
-References: <1328121721-3438-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178E124918@HQMAIL01.nvidia.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 1 Feb 2012 17:05:16 -0700
+Subject: [PATCH] gpio: samsung: adapt to changes in gpio specifier
+ translator function declaration
+In-Reply-To: <1328101352-22274-1-git-send-email-thomas.abraham@linaro.org>
+References: <1328101352-22274-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20120202000516.GA15343@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Wednesday, February 01, 2012 11:42 AM:
-> After discussion with Mark Brown in an unrelated thread about
-> ADC lookups, it came to my knowledge that the ability to pass
-> a struct device * in the regulator consumers is just a
-> historical artifact, and not really recommended. Since there
-> are no in-kernel users of these pointers, we just kill them
-> right now, before someone starts to use them.
+On Wed, Feb 01, 2012 at 06:32:32PM +0530, Thomas Abraham wrote:
+> Commit 15c9a0acc3f7 (of: create of_phandle_args to simplify return of phandle
+> parsing data) modifies the parameter list of of_xlate function pointer declaration
+> in gpio_chip. Adapt the gpio specifier translate function for this change.
 > 
-> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Reported-by: Tushar Behera <tushar.behera@linaro.org>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-Documentation,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Applied, thanks.
 
--- 
-nvpublic
+g.
