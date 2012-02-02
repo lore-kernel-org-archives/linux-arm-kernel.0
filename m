@@ -1,62 +1,39 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 2 Feb 2012 10:12:08 +0800
-Subject: [PATCH v2 9/9] ARM: imx6q-sabrelite: add audmux support
+Date: Thu, 2 Feb 2012 10:12:03 +0800
+Subject: [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
 In-Reply-To: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
 References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1328148728-32258-10-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- enable audmux in dts
-- enable audmux in Kconfig
-
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
- arch/arm/boot/dts/imx6q.dtsi          |    2 ++
- arch/arm/mach-imx/Kconfig             |    1 +
- 3 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 3a9d32c..5cd6698 100644
+index cdc2ad6..3a9d32c 100644
 --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
 +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -41,6 +41,10 @@
- 				status = "okay";
- 			};
- 
-+			audmux at 021d8000 {
-+				status = "okay";
-+			};
-+
+@@ -44,6 +44,18 @@
  			uart2: uart at 021e8000 {
  				status = "okay";
  			};
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 263e8f3..b0ae495 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -527,7 +527,9 @@
- 			};
++
++			i2c at 021a0000 { /* I2C1 */
++				status = "okay";
++				clock-frequency = <100000>;
++
++				codec: sgtl5000 at 0a {
++					compatible = "fsl,sgtl5000";
++					reg = <0x0a>;
++					VDDA-supply = <&reg_2p5v>;
++					VDDIO-supply = <&reg_3p3v>;
++				};
++			};
+ 		};
+ 	};
  
- 			audmux at 021d8000 {
-+				compatible = "fsl,imx6q-audmux", "fsl,imx31-audmux";
- 				reg = <0x021d8000 0x4000>;
-+				status = "disabled";
- 			};
- 
- 			mipi at 021dc000 { /* MIPI-CSI */
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 4defb97..1aec9c1 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -835,6 +835,7 @@ comment "i.MX6 family:"
- config SOC_IMX6Q
- 	bool "i.MX6 Quad support"
- 	select ARM_CPU_SUSPEND if PM
-+	select ARCH_MXC_AUDMUX_V2
- 	select ARM_GIC
- 	select CPU_V7
- 	select HAVE_ARM_SCU
 -- 
 1.7.5.4
