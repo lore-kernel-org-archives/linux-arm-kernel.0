@@ -1,126 +1,77 @@
 From: stigge@antcom.de (stigge at antcom.de)
-Date: Thu,  2 Feb 2012 20:19:48 +0100
-Subject: [PATCH v3 7/7] ARM: LPC32xx: clock.c: Fix mutex lock issues
+Date: Thu,  2 Feb 2012 20:19:45 +0100
+Subject: [PATCH v3 4/7] ARM: LPC32xx: clock.c: jiffies wrapping
 In-Reply-To: <1328210388-21296-1-git-send-email-stigge@antcom.de>
 References: <1328210388-21296-1-git-send-email-stigge@antcom.de>
-Message-ID: <1328210388-21296-7-git-send-email-stigge@antcom.de>
+Message-ID: <1328210388-21296-4-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the mutex issue in clock.c, as done in Kevin Wells' original
-driver update:
+This patch fixes the jiffies wrapping bug in clock.c.
 
-In some cases, the clock drivers could grab a mutex twice in an improper
-context. This patch changes the mutex mechanism to a simple irq lock/unlock
-mechanism and removes un-needed locks from some functions.
-
-(See also git.lpclinux.com)
+It corrects the timeout computation based on jiffies, uses time_before() for
+correct wrapping handling and replaces a binary "&" which should really be a
+logical "&&" in a truth expression.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de> 
 Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 
 diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index 0606a63..0e01bf4 100644
+index 8e79313..f64c9a1 100644
 --- a/arch/arm/mach-lpc32xx/clock.c
 +++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -98,9 +98,10 @@
- #include "clock.h"
- #include "common.h"
- 
-+static DEFINE_SPINLOCK(global_clkregs_lock);
-+
- static struct clk clk_armpll;
- static struct clk clk_usbpll;
--static DEFINE_MUTEX(clkm_lock);
- 
- /*
-  * Post divider values for PLLs based on selected register value
-@@ -892,16 +893,6 @@ static struct clk clk_lcd = {
- 	.enable_mask	= LPC32XX_CLKPWR_LCDCTRL_CLK_EN,
- };
- 
--static inline void clk_lock(void)
--{
--	mutex_lock(&clkm_lock);
--}
--
--static inline void clk_unlock(void)
--{
--	mutex_unlock(&clkm_lock);
--}
--
- static void local_clk_disable(struct clk *clk)
+@@ -128,7 +128,7 @@ static struct clk osc_32KHz = {
+ static int local_pll397_enable(struct clk *clk, int enable)
  {
- 	/* Don't attempt to disable clock if it has no users */
-@@ -946,10 +937,11 @@ static int local_clk_enable(struct clk *clk)
- int clk_enable(struct clk *clk)
+ 	u32 reg;
+-	unsigned long timeout = 1 + msecs_to_jiffies(10);
++	unsigned long timeout = jiffies + msecs_to_jiffies(10);
+ 
+ 	reg = __raw_readl(LPC32XX_CLKPWR_PLL397_CTRL);
+ 
+@@ -143,7 +143,7 @@ static int local_pll397_enable(struct clk *clk, int enable)
+ 		/* Wait for PLL397 lock */
+ 		while (((__raw_readl(LPC32XX_CLKPWR_PLL397_CTRL) &
+ 			LPC32XX_CLKPWR_SYSCTRL_PLL397_STS) == 0) &&
+-			(timeout > jiffies))
++			time_before(jiffies, timeout))
+ 			cpu_relax();
+ 
+ 		if ((__raw_readl(LPC32XX_CLKPWR_PLL397_CTRL) &
+@@ -157,7 +157,7 @@ static int local_pll397_enable(struct clk *clk, int enable)
+ static int local_oscmain_enable(struct clk *clk, int enable)
  {
- 	int ret;
-+	unsigned long flags;
+ 	u32 reg;
+-	unsigned long timeout = 1 + msecs_to_jiffies(10);
++	unsigned long timeout = jiffies + msecs_to_jiffies(10);
  
--	clk_lock();
-+	spin_lock_irqsave(&global_clkregs_lock, flags);
- 	ret = local_clk_enable(clk);
--	clk_unlock();
-+	spin_unlock_irqrestore(&global_clkregs_lock, flags);
+ 	reg = __raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL);
  
- 	return ret;
- }
-@@ -960,9 +952,11 @@ EXPORT_SYMBOL(clk_enable);
-  */
- void clk_disable(struct clk *clk)
+@@ -172,7 +172,7 @@ static int local_oscmain_enable(struct clk *clk, int enable)
+ 		/* Wait for main oscillator to start */
+ 		while (((__raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL) &
+ 			LPC32XX_CLKPWR_MOSC_DISABLE) != 0) &&
+-			(timeout > jiffies))
++			time_before(jiffies, timeout))
+ 			cpu_relax();
+ 
+ 		if ((__raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL) &
+@@ -384,7 +384,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
  {
--	clk_lock();
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&global_clkregs_lock, flags);
- 	local_clk_disable(clk);
--	clk_unlock();
-+	spin_unlock_irqrestore(&global_clkregs_lock, flags);
- }
- EXPORT_SYMBOL(clk_disable);
+ 	u32 reg;
+ 	int ret = -ENODEV;
+-	unsigned long timeout = 1 + msecs_to_jiffies(10);
++	unsigned long timeout = jiffies + msecs_to_jiffies(10);
  
-@@ -971,13 +965,7 @@ EXPORT_SYMBOL(clk_disable);
-  */
- unsigned long clk_get_rate(struct clk *clk)
- {
--	unsigned long rate;
--
--	clk_lock();
--	rate = clk->get_rate(clk);
--	clk_unlock();
--
--	return rate;
-+	return clk->get_rate(clk);
- }
- EXPORT_SYMBOL(clk_get_rate);
+ 	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
  
-@@ -993,11 +981,8 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 	 * the actual rate set as part of the peripheral dividers
- 	 * instead of high level clock control
- 	 */
--	if (clk->set_rate) {
--		clk_lock();
-+	if (clk->set_rate)
- 		ret = clk->set_rate(clk, rate);
--		clk_unlock();
--	}
+@@ -397,7 +397,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
+ 		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
  
- 	return ret;
- }
-@@ -1008,15 +993,11 @@ EXPORT_SYMBOL(clk_set_rate);
-  */
- long clk_round_rate(struct clk *clk, unsigned long rate)
- {
--	clk_lock();
--
- 	if (clk->round_rate)
- 		rate = clk->round_rate(clk, rate);
- 	else
- 		rate = clk->get_rate(clk);
- 
--	clk_unlock();
--
- 	return rate;
- }
- EXPORT_SYMBOL(clk_round_rate);
+ 		/* Wait for PLL lock */
+-		while ((timeout > jiffies) & (ret == -ENODEV)) {
++		while (time_before(jiffies, timeout) && (ret == -ENODEV)) {
+ 			reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
+ 			if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_STS)
+ 				ret = 0;
