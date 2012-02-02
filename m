@@ -1,37 +1,42 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 01 Feb 2012 20:48:00 -0600
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 01 Feb 2012 22:49:22 -0500 (EST)
 Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
 In-Reply-To: <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
 References: <20120202004253.GA10946@linux.vnet.ibm.com>
  <1328143404-11038-1-git-send-email-paulmck@linux.vnet.ibm.com>
  <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
-Message-ID: <4F29F960.6010700@gmail.com>
+Message-ID: <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+On Wed, 1 Feb 2012, Paul E. McKenney wrote:
 
-On 02/01/2012 06:43 PM, Paul E. McKenney wrote:
 > From: "Paul E. McKenney" <paul.mckenney@linaro.org>
 > 
 > The idle loop is a quiscent state for RCU, which means that RCU ignores
 > CPUs that have told RCU that they are idle via rcu_idle_enter().
 > There are nevertheless quite a few places where idle CPUs use RCU, most
 > commonly indirectly via tracing.  This patch fixes these problems for ARM.
-
-Do you have some specific examples of actual problems? It's not possible
-to restrict tracing at this low level?
-
-This really seems like the wrong direction as we are trying to pull
-common pieces up out of platform specific code.
-
+> 
 > Many of these bugs have been in the kernel for quite some time, but
 > Frederic's recent change now gives warnings.
 > 
 > This patch takes the straightforward approach of pushing the
 > rcu_idle_enter()/rcu_idle_exit() pair further down into the core of the
 > idle loop.
-> 
+
+NAK.
+
+1) This is going to conflict with a patch series I've pushed to RMK 
+   already.  You can see its result in linux-next.
+
+2) The purpose of (1) is to do precisely the very opposite i.e. move as 
+   much common knowledge as possible up the idle call paths and leave 
+   the platform specific quirks as bare as possible, if any.
+
+So I'd much prefer if this change was constrained to be inside 
+cpu_idle(), or at least in its close vicinity.
+
 > Signed-off-by: Paul E. McKenney <paul.mckenney@linaro.org>
 > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 > Cc: Russell King <linux@arm.linux.org.uk>
@@ -85,13 +90,6 @@ common pieces up out of platform specific code.
 >  arch/arm/mach-shmobile/pm-sh7372.c |    8 ++++++++
 >  23 files changed, 78 insertions(+), 2 deletions(-)
 > 
-
-This is clearly not all platforms and you're missing some cpuidle
-drivers like omap. Some platform's idle code don't need this?
-
-I'd guess this conflicts with Nico's idle clean-up which is in Russell's
-for-next branch now.
-
 > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
 > index 971d65c..8241df7 100644
 > --- a/arch/arm/kernel/process.c
@@ -101,12 +99,6 @@ for-next branch now.
 >  	while (1) {
 >  		tick_nohz_idle_enter();
 > -		rcu_idle_enter();
-
-In some cases with the clean-up, there is no platform specific idle
-code, so rcu_idle_enter would never be called.
-
-Rob
-
 >  		leds_event(led_idle_start);
 >  		while (!need_resched()) {
 >  #ifdef CONFIG_HOTPLUG_CPU
@@ -681,3 +673,6 @@ Rob
 >  	return 0;
 >  }
 >  
+> -- 
+> 1.7.8
+> 
