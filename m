@@ -1,21 +1,37 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 02 Feb 2012 13:43:42 +0200
-Subject: [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
- suspend is not implemented
-In-Reply-To: <201201302358.26152.rjw@sisk.pl>
-References: <1327306361-9803-1-git-send-email-shubhrajyoti@ti.com>
- <20120124090630.GR16726@n2100.arm.linux.org.uk>
- <1327923953.2487.13.camel@sauron.fi.intel.com>
- <201201302358.26152.rjw@sisk.pl>
-Message-ID: <1328183022.28171.165.camel@sauron.fi.intel.com>
+From: artem.bityutskiy@intel.com (Bityutskiy, Artem)
+Date: Thu, 2 Feb 2012 11:51:25 +0000
+Subject: [PATCH v3] mtd/gpmi : add BBT support to gpmi nand driver
+In-Reply-To: <20120131121007.GO2471@pengutronix.de>
+References: <1328008316-27258-1-git-send-email-b32955@freescale.com>
+ <20120131121007.GO2471@pengutronix.de>
+Message-ID: <1328183611.28171.170.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-01-30 at 23:58 +0100, Rafael J. Wysocki wrote:
-> Thanks, but is anyone actually going to push it to Linus any time soon?
+On Tue, 2012-01-31 at 13:10 +0100, Wolfram Sang wrote:
+> On Tue, Jan 31, 2012 at 07:11:56PM +0800, Huang Shijie wrote:
+> > Add a new field to gpmi_nand_platform_data{}.
+> > Make the BBT support to board specific.
+> > 
+> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> 
+> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+> 
+> I'd think you won't be able to mark blocks bad, though. Will send a
+> patch in a minute. Please test.
 
-I agree, but I am not the maintainer so cannot answer. David Woodhouse
-is aware of this, but I do not know when he gonna send the pull request.
+Sorry, I have not read this and the previous related long threads, but
+from the few first e-mails I got the impression that you are not aware
+of the patch from Brian Norris where he modifies MTD BBT code so that it
+will by default write bad block markers _both_ to the BBT and to OOB. It
+sounds like you should hold on with this patch and wait when Brian's
+patch gets in. Then you probably may just use the first version of this
+patch.
+
+The patch I referred to:
+http://patchwork.ozlabs.org/patch/137154/
+
+HTH.
 
 -- 
 Best Regards,
@@ -26,4 +42,15 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/ffee2351/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/04619b00/attachment-0001.sig>
+-------------- next part --------------
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
