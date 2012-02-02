@@ -1,41 +1,37 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 2 Feb 2012 15:27:36 -0800
-Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
-In-Reply-To: <1328223819.5882.133.camel@gandalf.stny.rr.com>
-References: <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
- <20120202044439.GD2435@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
- <20120202174337.GS2518@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
- <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
- <4F2B1307.5010207@gmail.com>
- <1328223819.5882.133.camel@gandalf.stny.rr.com>
-Message-ID: <20120202232736.GL2518@linux.vnet.ibm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 02 Feb 2012 15:36:49 -0800
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
+References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
+ <20120202204411.GB14129@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
+Message-ID: <4F2B1E11.1040000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 06:03:39PM -0500, Steven Rostedt wrote:
+On 02/02/12 13:38, Nicolas Pitre wrote:
+> On Thu, 2 Feb 2012, Russell King - ARM Linux wrote
+>> On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
+>>> Should we move get_thread_info into assembler.h? It seems odd
+>>> to include entry-header.S but I saw that vfp was doing the same.
+>> Probably yes, and probably also have preempt_disable and preempt_enable
+>> assembler macros.  That's going to get rather icky if we have to
+>> explicitly call the scheduler though (to solve (1)).
+> What about a pair of helpers written in C instead?
+>
+> v7_flush_dcache_all() could be renamed, and a wrapper function called 
+> v7_flush_dcache_all() would call the preemption disable helper, call the 
+> former v7_flush_dcache_all code, then call the preemption enable helper.
+>
+> Then __v7_setup() could still call the core cache flush code without 
+> issues.
 
-[ . . . ]
+I tried to put the preemption disable/enable right around the place
+where it was needed. With this approach we would disable preemption
+during the entire cache flush. I'm not sure if we want to make this
+function worse for performance, do we? It certainly sounds easier than
+writing all the preempt macros in assembly though.
 
-> Anyway, one answer is (and I was talking with Paul about this on IRC) is
-> that we can create a special "TRACE_EVENT_IDLE()" that will explicitly
-> call "rcu_idle_exit/enter()" as it expects to be called with it off.
-> 
-> This should solve most issues I believe.
-
-You OK with something like RCU_NONIDLE() rather than RCU_EVENT_IDLE()?
-I have this funny feeling that tracing won't be the only thing using
-RCU from idle.  :-/
-
-Something like this, perhaps?
-
-	#define RCU_NONIDLE(a) \
-		do { \
-			rcu_idle_exit(); \
-			do { a; } while (0); \
-			rcu_idle_enter(); \
-		}
-
-							Thanx, Paul
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
