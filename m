@@ -1,77 +1,110 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 2 Feb 2012 15:23:57 +0000
-Subject: [PATCH-V2] arm/dts: omap3-evm: Add i2c and twl4030 support
-In-Reply-To: <1328077568-22043-1-git-send-email-hvaibhav@ti.com>
-References: <1328077568-22043-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317BD828@DBDE01.ent.ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu,  2 Feb 2012 16:20:01 +0100
+Subject: [PATCH] of_gpio: add support of of_gpio_named_count to be able to
+ count named gpio
+Message-ID: <1328196001-22154-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2012 at 11:56:08, Hiremath, Vaibhav wrote:
-> Add support for TWL4030, which is interfaced on i2c1 bus.
-> Also add clock frequencies for other i2c instances(2 & 3)
-> required for client-device exist on OMAP3EVM board.
-> 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
-> Changes from V1:
-> 	- As per comment from Benoit, changed hex representation
-> 	  from uppercase to lowercase.
-> 
->  arch/arm/boot/dts/omap3-evm.dts |   28 ++++++++++++++++++++++++++++
->  1 files changed, 28 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
-> index 2eee16e..f349ee9 100644
-> --- a/arch/arm/boot/dts/omap3-evm.dts
-> +++ b/arch/arm/boot/dts/omap3-evm.dts
-> @@ -18,3 +18,31 @@
->  		reg = <0x80000000 0x10000000>; /* 256 MB */
->  	};
->  };
-> +
-> +&i2c1 {
-> +	clock-frequency = <2600000>;
-> +
-> +	twl: twl at 48 {
-> +		reg = <0x48>;
-> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +		interrupt-parent = <&intc>;
-> +	};
-> +};
-> +
-> +/include/ "twl4030.dtsi"
-> +
-> +&i2c2 {
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <400000>;
-> +
-> +	/*
-> +	 * TVP5146 Video decoder-in for analog input support.
-> +	 */
-> +	tvp5146 at 5c {
-> +		compatible = "ti,tvp5146m2";
-> +		reg = <0x5c>;
-> +	};
-> +};
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+---
+ drivers/of/gpio.c       |    9 +++++----
+ include/linux/of_gpio.h |   27 +++++++++++++++++++++++++--
+ 2 files changed, 30 insertions(+), 6 deletions(-)
 
-Grant,
-
-Can you ack this patch and below patch as well, so that
-Benoit can queue it in his tree?
-
-arm/dts: Add support for TI AM3517/05 EVM board
-
-Thanks,
-Vaibhav
-
-> --
-> 1.7.0.4
-> 
-> 
+diff --git a/drivers/of/gpio.c b/drivers/of/gpio.c
+index 7e62d15..e034b38 100644
+--- a/drivers/of/gpio.c
++++ b/drivers/of/gpio.c
+@@ -78,8 +78,9 @@ err0:
+ EXPORT_SYMBOL(of_get_named_gpio_flags);
+ 
+ /**
+- * of_gpio_count - Count GPIOs for a device
++ * of_gpio_named_count - Count GPIOs for a device
+  * @np:		device node to count GPIOs for
++ * @propname:	property name containing gpio specifier(s)
+  *
+  * The function returns the count of GPIOs specified for a node.
+  *
+@@ -93,14 +94,14 @@ EXPORT_SYMBOL(of_get_named_gpio_flags);
+  * defines four GPIOs (so this function will return 4), two of which
+  * are not specified.
+  */
+-unsigned int of_gpio_count(struct device_node *np)
++unsigned int of_gpio_named_count(struct device_node *np, const char* propname)
+ {
+ 	unsigned int cnt = 0;
+ 
+ 	do {
+ 		int ret;
+ 
+-		ret = of_parse_phandle_with_args(np, "gpios", "#gpio-cells",
++		ret = of_parse_phandle_with_args(np, propname, "#gpio-cells",
+ 						 cnt, NULL);
+ 		/* A hole in the gpios = <> counts anyway. */
+ 		if (ret < 0 && ret != -EEXIST)
+@@ -109,7 +110,7 @@ unsigned int of_gpio_count(struct device_node *np)
+ 
+ 	return cnt;
+ }
+-EXPORT_SYMBOL(of_gpio_count);
++EXPORT_SYMBOL(of_gpio_named_count);
+ 
+ /**
+  * of_gpio_simple_xlate - translate gpio_spec to the GPIO number and flags
+diff --git a/include/linux/of_gpio.h b/include/linux/of_gpio.h
+index e4e2058..1b3628d 100644
+--- a/include/linux/of_gpio.h
++++ b/include/linux/of_gpio.h
+@@ -53,7 +53,8 @@ static inline struct of_mm_gpio_chip *to_of_mm_gpio_chip(struct gpio_chip *gc)
+ extern int of_get_named_gpio_flags(struct device_node *np,
+ 		const char *list_name, int index, enum of_gpio_flags *flags);
+ 
+-extern unsigned int of_gpio_count(struct device_node *np);
++extern unsigned int of_gpio_named_count(struct device_node *np,
++					const char* propname);
+ 
+ extern int of_mm_gpiochip_add(struct device_node *np,
+ 			      struct of_mm_gpio_chip *mm_gc);
+@@ -74,7 +75,8 @@ static inline int of_get_named_gpio_flags(struct device_node *np,
+ 	return -ENOSYS;
+ }
+ 
+-static inline unsigned int of_gpio_count(struct device_node *np)
++static inline unsigned int of_gpio_named_count(struct device_node *np,
++					const char* propname)
+ {
+ 	return 0;
+ }
+@@ -92,6 +94,27 @@ static inline void of_gpiochip_remove(struct gpio_chip *gc) { }
+ #endif /* CONFIG_OF_GPIO */
+ 
+ /**
++ * of_gpio_count - Count GPIOs for a device
++ * @np:		device node to count GPIOs for
++ *
++ * The function returns the count of GPIOs specified for a node.
++ *
++ * Note that the empty GPIO specifiers counts too. For example,
++ *
++ * gpios = <0
++ *          &pio1 1 2
++ *          0
++ *          &pio2 3 4>;
++ *
++ * defines four GPIOs (so this function will return 4), two of which
++ * are not specified.
++ */
++static inline unsigned int of_gpio_count(struct device_node *np)
++{
++	return of_gpio_named_count(np, "gpios");
++}
++
++/**
+  * of_get_gpio_flags() - Get a GPIO number and flags to use with GPIO API
+  * @np:		device node to get GPIO from
+  * @index:	index of the GPIO
+-- 
+1.7.7
