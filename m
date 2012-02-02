@@ -1,30 +1,159 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Feb 2012 17:32:12 +0000
-Subject: [alsa-devel] [RFC PATCH] ARM ASoC: add sound driver for
- imx27pdk using mc13783 codec
-In-Reply-To: <2851519.TkeCdfD43W@laptop>
-References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
- <2667396.yifGumf5nD@laptop>
- <CAOMZO5CRmvwCy_qE81PauZ6jmPN7S3N3pky01V0OmWBLCJ5JyA@mail.gmail.com>
- <2851519.TkeCdfD43W@laptop>
-Message-ID: <20120202173212.GA1785@sirena.org.uk>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Thu, 2 Feb 2012 11:35:54 -0600
+Subject: [RFC PATCH v4 2/4] ARM: omap: Remove cpuidle timekeeping and irq
+ enable/disable
+In-Reply-To: <CAORVsuXLPjc7X+D1jVP1KyjgUWZhtUnA3F-iz-d-DqtHRmLShA@mail.gmail.com>
+References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+ <1328065215-28108-3-git-send-email-rob.lee@linaro.org>
+ <CAORVsuXLPjc7X+D1jVP1KyjgUWZhtUnA3F-iz-d-DqtHRmLShA@mail.gmail.com>
+Message-ID: <CAMXH7KEURU-TETr21fU_xrdETxgiscYG4PaVcDbhevojzuQUeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2012 at 08:01:38PM +0100, Philippe R?tornaz wrote:
-> Le samedi 28 janvier 2012 18:57:45 Fabio Estevam a ?crit :
-> > On Wed, Jan 25, 2012 at 1:45 PM, Philippe R?tornaz
+On Thu, Feb 2, 2012 at 10:21 AM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Rob,
+>
+> On Wed, Feb 1, 2012 at 4:00 AM, Robert Lee <rob.lee@linaro.org> wrote:
+>> Now that the core cpuidle driver keeps time and handles irq enabling,
+>> remove this functionality. ?Also, remove irq disabling as all paths to
+>> cpuidle_idle_call already call local_irq_disable. ?Also, restructure
+>> idle functions as needed by the cpuidle core driver changes.
+>>
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>> ---
+>> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 96 ++++++++++++++++--------------------
+>> ?1 files changed, 43 insertions(+), 53 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+>> index 464cffd..9ecded5 100644
+>> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+> ...
+>
+>> @@ -100,23 +107,20 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index)
+>> ?{
+>> - ? ? ? struct omap3_idle_statedata *cx =
+>> - ? ? ? ? ? ? ? ? ? ? ? cpuidle_get_statedata(&dev->states_usage[index]);
+>> - ? ? ? struct timespec ts_preidle, ts_postidle, ts_idle;
+>> - ? ? ? u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
+>> - ? ? ? int idle_time;
+>> + ? ? ? struct omap3_idle_drvdata *dd = dev->states_usage[index].driver_data
+> A build error is triggered by the missing ";".
 
-> > > Sascha, do you have any plan to upstream the mc13783 codec driver ?
+Argh, last minute change and I didn't build afterward.
 
-> > In case Sascha doesn't have plans to upstream mc13783, is this
-> > something you could do?
+>
+> ...
+>
+>> @@ -147,18 +151,12 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
+>> ? ? ? ? ? ? ? ?pwrdm_for_each_clkdm(core_pd, _cpuidle_allow_idle);
+>> ? ? ? ?}
+>>
+>> -return_sleep_time:
+>> - ? ? ? getnstimeofday(&ts_postidle);
+>> - ? ? ? ts_idle = timespec_sub(ts_postidle, ts_preidle);
+>> -
+>> - ? ? ? local_irq_enable();
+>> +leave:
+>> ? ? ? ?local_fiq_enable();
+>>
+>> - ? ? ? idle_time = ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * \
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? USEC_PER_SEC;
+>> -
+>> - ? ? ? /* Update cpuidle counters */
+>> - ? ? ? dev->last_residency = idle_time;
+>> + ? ? ? /* Restore original PER state if it was modified */
+>> + ? ? ? if (dd->per_next_state != dd->per_saved_state)
+>> + ? ? ? ? ? ? ? pwrdm_set_next_pwrst(per_pd, dd->per_saved_state);
+> This code is not necessarily balanced with the PER state change in
+> omap3_enter_idle_bm (cf. "/* Are we changing PER target state? */"
+> here below), since in the core cpuidle code there is no guarantee that
+> the calls to pre_enter and enter callbacks are balanced.
+> In general I fear that splitting the code in two functions introduces
+> a risk of programming non-coherent settings in the PRCM.
 
-> It's an option, but I cannot work full-time on it so it would not be fast.
+Agree, in general it does introduce that new risk.  For the platform
+code changes, I tried to keep the code paths the same as before.  I
+see now where I created a problem though:
 
-First step would be to post it :)
+...
+	if (target_state->pre_enter) {
+		idx = target_state->
+			pre_enter(dev, drv, idx);
+	}
 
-A useful approach might be to strip the driver down to the bare minimum
-(for example just getting DAC to headphone working, possibly at a fixed
-sample rate) and then build out functionality incrementally.  That would
-make it easier for different people to contribute bits they need.
+	if (idx < 0) {
+		local_irq_enable();
+		return idx;
+	}
+
+	if (need_resched()) {
+		local_irq_enable();
+		return -EBUSY;
+	}
+
+...
+
+The only way the core cpuidle pre_enter can get called without enter
+without enter is if the omap3 next_valid_state() returned a negative
+value.  If this ever happened in the existing omap3 code, it would
+cause it to break anyway.  But, this particular need_resched() call
+could cause an exit that results in difference behavior than before.
+One solution to that is just to move the need_resched check before the
+pre_enter call.
+
+>
+> ...
+>
+>> @@ -255,8 +255,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
+>> ?{
+>> ? ? ? ?int new_state_idx;
+>> - ? ? ? u32 core_next_state, per_next_state = 0, per_saved_state = 0, cam_state;
+>> - ? ? ? struct omap3_idle_statedata *cx;
+>> + ? ? ? u32 core_next_state, cam_state;
+>> + ? ? ? struct omap3_idle_drvdata *dd = dev->states_usage[index].driver_data;
+>> + ? ? ? struct omap3_idle_statedata *cx = &dd->state_data[index];
+>> ? ? ? ?int ret;
+> The build throws a few warnings about unused variables:
+>
+> arch/arm/mach-omap2/cpuidle34xx.c: In function 'omap3_enter_idle_bm':
+> arch/arm/mach-omap2/cpuidle34xx.c:261: warning: unused variable 'ret'
+> arch/arm/mach-omap2/cpuidle34xx.c:257: warning: unused variable 'new_state_idx'
+>
+> ...
+>
+
+Got it, not sure why I missed this.
+
+>>
+>> ?DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+>> @@ -337,7 +329,8 @@ static inline void _fill_cstate(struct cpuidle_driver *drv,
+>> ? ? ? ?state->exit_latency ? ? = cpuidle_params_table[idx].exit_latency;
+>> ? ? ? ?state->target_residency = cpuidle_params_table[idx].target_residency;
+>> ? ? ? ?state->flags ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID;
+>> - ? ? ? state->enter ? ? ? ? ? ?= omap3_enter_idle_bm;
+>> + ? ? ? state->pre_enter ? ? ? ?= omap3_enter_idle_bm;
+>> + ? ? ? state->enter ? ? ? ? ? ?= omap3_enter_idle;
+>> ? ? ? ?sprintf(state->name, "C%d", idx + 1);
+>> ? ? ? ?strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
+>>
+> ...
+>
+> Also the line at 373 is not needed anymore in omap3_idle_init, since
+> the enter callback is filled in in the _fill_cstate function:
+> ? ? ? ?/* C1 . MPU WFI + Core active */
+> ? ? ? ?_fill_cstate(drv, 0, "MPU ON + CORE ON");
+> ? ? ? ?(&drv->states[0])->enter = omap3_enter_idle; ? ? ? ? ? ? <==
+> not needed anymore
+> ? ? ? ?drv->safe_state_index = 0;
+>
+> More testing on OMAP3 is needed. Let me come back with the results asap.
+>
+
+Understand and thanks for reviewing.
+
+> Regards,
+> Jean
