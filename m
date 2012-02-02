@@ -1,90 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 2 Feb 2012 01:33:38 -0700 (MST)
-Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
- pwrdm_clear_all_prev_pwrst()
-In-Reply-To: <CAMQu2gzVt3K6cuZcbvfNZegimyXz8F4N__A6vDBSyL4QfSnbTw@mail.gmail.com>
-References: <20120130093931.11027.31048.stgit@dusk>
- <20120130094312.11027.31050.stgit@dusk> <878vkopw2o.fsf@ti.com>
- <87mx93ok5y.fsf@ti.com>
- <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
- <CAMQu2gzVt3K6cuZcbvfNZegimyXz8F4N__A6vDBSyL4QfSnbTw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1202020041220.10541@utopia.booyaka.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 02 Feb 2012 14:04:36 +0530
+Subject: [PATCH 1/1 v2] i.MX SDMA: Fix burstsize settings
+In-Reply-To: <1327411321-30017-1-git-send-email-philippe.retornaz@epfl.ch>
+References: <4F1D5304.3080003@ru.mvista.com>
+ <1327411321-30017-1-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <1328171676.26182.0.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Thu, 2 Feb 2012, Shilimkar, Santosh wrote:
-
-> On Thu, Feb 2, 2012 at 12:57 AM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> > N.B., I haven't looked at this file before. ?There are a few other things
-> > that don't look right that hopefully someone can take the initiative to
-> > fix. ?For example, those calls to mpuss_clear_prev_logic_pwrst() and
-> > cpu_clear_prev_logic_pwrst() should be removed as well. ?That should be
-> > done by pwrdm_clear_all_prev_pwrst() in mach-omap2/powerdomain44xx.c.
-> > Currently it's not, so that needs to be patched.
-> >
-> We(rajendra and myself) discussed this some time back with Benoit and we agreed
-> that for CPU and MPU power domains which are needed very early in the PM power
-> up sequence, we can do direct APIs..
-
-Looking at the call sites, don't these calls occur quite late in boot, 
-after everything is initialized?  I see calls from a late_initcall() and a 
-suspend entry function.  Am I missing something?
-
-> These calls were in critical path and the PD API's proposed for context clear
-> and logic clear were use to iterate over all power domains.
-
-The code iterates over all powerdomains anyway a few lines above those 
-calls, right?
-
-If the code only needs to iterate over a subset, let's discuss what you 
-need and a different iterator can be implemented in the powerdomain code.
-
-> It is only recently we got clear context etc some reasonable form
-> even though it still iterates over all hwmod etc which is really overhead.
-
-Which mainline PM calls iterate over all hwmods?
-
-> Also you need to create 'pdev' etc for context-loss kind of APIs and
-> we all thought that that makes things un-ncessary complicated and
-> lengthy.
-
-Could you point out the code that you are referring to?  I seem to be 
-missing it :-(
-
-If the existing powerdomain API is missing something you need, there's no 
-problem to add it.  It makes things easier to debug and more portable in 
-the long term if there is a clean, standard interface.  Another hope is 
-that more of the PM code can be shared.
-
-In terms of performance, it seems pretty unlikely that one would be able 
-to measure a meaningful performance difference, unless we are missing an 
-API call that was needed?  As we were discussing before, device reads are 
-likely to dominate the profile.
-
-Flipping through the code, I see that code is getting duplicated again.  
-We now have three identical copies of clkdms_setup().  The OMAP4 
-pwrdms_setup() is doing string comparisons to skip powerdomains -- that's 
-also pretty fragile; that should be controlled through powerdomain flags 
-or some similar mechanism.  Once that's fixed, it looks to me like that 
-function could be shared with the OMAP34xx pwrdms_setup()?  Looks like we 
-could also share omap{3,4}_pm_suspend() and omap{2,3,4}_pm_{begin,end}?
-
-It would be good if we can keep working towards making as much of this 
-code as common as possible.  If already-tested code can be reused, that 
-should cut down on bugs and maintainer workload.  Also, we can avoid 
-adding unnecessary lines of diff; we are trying to cut that down too..
-
-> > Also all of the open-coded powerdomain register accesses in
-> > omap-mpuss-lowpower.c should be removed - those should all go through
-> > pwrdm_*() functions...
-> >
->  I will have another look at the code with your recent power domain 
-> clean-ups and see what all can be moved to generic APIs.
-
-That would be great!
+On Tue, 2012-01-24 at 14:22 +0100, Philippe R?tornaz wrote:
+> Commit 6584cb88 (ARM i.MX dma: Fix burstsize settings) fixed
+> the mxcmmc driver but forgot to fix the SDMA driver to handle the
+> correct burtsize.
+> This make the SD card access works again with DMA on i.MX31 boards.
+> 
+> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Applied thanks
+> ---
+>  drivers/dma/imx-sdma.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index f993955..c193dac 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -1095,11 +1095,13 @@ static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>  	case DMA_SLAVE_CONFIG:
+>  		if (dmaengine_cfg->direction == DMA_FROM_DEVICE) {
+>  			sdmac->per_address = dmaengine_cfg->src_addr;
+> -			sdmac->watermark_level = dmaengine_cfg->src_maxburst;
+> +			sdmac->watermark_level = dmaengine_cfg->src_maxburst *
+> +						dmaengine_cfg->src_addr_width;
+>  			sdmac->word_size = dmaengine_cfg->src_addr_width;
+>  		} else {
+>  			sdmac->per_address = dmaengine_cfg->dst_addr;
+> -			sdmac->watermark_level = dmaengine_cfg->dst_maxburst;
+> +			sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
+> +						dmaengine_cfg->dst_addr_width;
+>  			sdmac->word_size = dmaengine_cfg->dst_addr_width;
+>  		}
+>  		return sdma_config_channel(sdmac);
 
 
-- Paul
+-- 
+~Vinod
