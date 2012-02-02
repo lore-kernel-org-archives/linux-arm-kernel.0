@@ -1,25 +1,55 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 2 Feb 2012 12:15:52 -0200
-Subject: [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
-In-Reply-To: <20120202134907.GA3015@richard-laptop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 2 Feb 2012 14:16:36 +0000
+Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
+In-Reply-To: <20120202141124.GG9773@S2101-09.ap.freescale.net>
 References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-5-git-send-email-richard.zhao@linaro.org>
- <CAOMZO5CxZgcO1JUZiFFJzWwLao1g7Y1_VNbsuiJOW+PH2B+FNQ@mail.gmail.com>
- <20120202134907.GA3015@richard-laptop>
-Message-ID: <CAOMZO5CuPDhU6zUyhE1jA0SDTjv1XDMCkNoQ_0nH82poGYOaqA@mail.gmail.com>
+ <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
+ <20120202120900.GC7428@opensource.wolfsonmicro.com>
+ <20120202131716.GF9773@S2101-09.ap.freescale.net>
+ <20120202132618.GL7428@opensource.wolfsonmicro.com>
+ <20120202141124.GG9773@S2101-09.ap.freescale.net>
+Message-ID: <20120202141636.GB22048@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/2/12, Richard Zhao <richard.zhao@linaro.org> wrote:
+On Thu, Feb 02, 2012 at 10:11:26PM +0800, Shawn Guo wrote:
+> On Thu, Feb 02, 2012 at 01:26:18PM +0000, Mark Brown wrote:
 
->> Without imx-sgtl5000.c in place, this patch only introduces dead code
->> at the moment.
-> Each patch make sense too without sgtl5000.
+> > That's why I'm saying perhaps make it conditional on having ASoC built
+> > (or even on having the AUDMUX driver built).
 
-Well, as this patch goal is to provide audio support to mx6sabrelite,
-we need imx-sgtl5000 in place to test it, right? How can we know that
-don't get a kernel oops or something?
+> Do you mean by having the below in some place like function
+> imx31_soc_init()?
 
-Regards,
+> #ifdef CONFIG_SND_MXC_SOC_AUDMUXV2
+> 	imx_add_platform_device("audmux-v2", 0,
+> 		audmux_res, ARRAY_SIZE(audmux_res), NULL, 0);
+> #endif
 
-Fabio Estevam
+Yes (you need to check for module too, there's a macro for that the name
+of which escapes me right now).
+
+> I do not think it's nice and consistent to the way that imx
+> sub-architecture adds platform device.
+
+Well, the i.MX thus far has had relatively few of these always present
+type devices - it makes sense to make things conditional for devices
+with external signals but for things entirely within the SoC the above
+is less work.
+
+> Furthermore, when a DT based board boots here, the code is broken.
+> Explicitly adding the device by individual board as needed can easily
+> align with DT based boards.  By default, the audmux node in <soc>.dtsi
+> file has status = "disabled", and any board that needs audmux device
+> only need to overwrite status property of audmux node as 'okay' in its
+> <board>.dts.  Then DT core will add the audmux device when the board
+> boots.
+
+That seems like more work than is needed for boards, same issue applies.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/21058621/attachment.sig>
