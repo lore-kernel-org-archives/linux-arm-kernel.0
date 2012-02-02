@@ -1,67 +1,64 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 2 Feb 2012 17:24:28 +0800
-Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
-In-Reply-To: <20120202091132.GD9773@S2101-09.ap.freescale.net>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
- <20120202085521.GB9773@S2101-09.ap.freescale.net>
- <20120202091132.GD9773@S2101-09.ap.freescale.net>
-Message-ID: <20120202092427.GB32403@b20223-02.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 2 Feb 2012 09:34:53 +0000
+Subject: [PATCH] arm/dts: OMAP3: Add omap3evm and am335xevm support
+In-Reply-To: <20120202045629.GJ15343@ponder.secretlab.ca>
+References: <1328077620-22411-1-git-send-email-hvaibhav@ti.com>
+ <20120202045629.GJ15343@ponder.secretlab.ca>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317BCD98@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 05:11:34PM +0800, Shawn Guo wrote:
-> On Thu, Feb 02, 2012 at 04:55:23PM +0800, Shawn Guo wrote:
-> > On Thu, Feb 02, 2012 at 10:12:05AM +0800, Richard Zhao wrote:
-> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > ---
-> > >  arch/arm/mach-imx/mach-mx31ads.c      |   10 ++++++++++
-> > >  arch/arm/plat-mxc/include/mach/mx31.h |    1 +
-> > >  2 files changed, 11 insertions(+), 0 deletions(-)
-> > > 
-> > Hmm, let's see who are actually using mxc_audmux_v2_configure_port().
+On Thu, Feb 02, 2012 at 10:26:29, Grant Likely wrote:
+> On Wed, Feb 01, 2012 at 11:57:00AM +0530, Vaibhav Hiremath wrote:
+> > TI's OMAP3EVM and AM335xEVM are software development boards
+> > available for OMAP35x(AM/DM37x) and AM335x devices respectively;
+> > and these devices are considered under omap3 family.
 > > 
-> > $ git grep -n mxc_audmux_v2_configure_port arch/arm/
-> > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:246:     mxc_audmux_v2_configure_port(0,
-> > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:254:     mxc_audmux_v2_configure_port(4,
-> > arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:257:     mxc_audmux_v2_configure_port(0,
-> > arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:265:     mxc_audmux_v2_configure_port(3,
-> > arch/arm/mach-imx/mach-pcm043.c:365:    mxc_audmux_v2_configure_port(3,
-> > arch/arm/mach-imx/mach-pcm043.c:371:    mxc_audmux_v2_configure_port(0,
-I didn't grep arch/arm. where is pc043 asoc machine file?
-> > 
-> As we are moving audmux into sound/soc/imx, it makes less sense to
-> still keep these calls in board files.
-It don't corrupt git bisect. We don't have to include it in this patch.
->  Instead, I prefer to call it
-> from machine driver like what wm1133-ev1 does below.
-Maybe pass the info as asoc machine driver pdata.
->  Or we can simply
-> make the it a audmux-self call with 3 parameters it needs retrieved
-> from platform_data or device tree, so that machine driver does not
-> even bother with the call.  Makes sense?
-audux configuration may change after initial set. For example, it may use
-one configuration for audio playback, but use another when you connect a
-BT audio device.
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Tony Lindgren <tony@atomide.com>
 > 
-> Regards,
-> Shawn
+> Applied, thanks.
 > 
-> > $ git grep -n mxc_audmux_v2_configure_port sound/soc/imx/
-> > sound/soc/imx/wm1133-ev1.c:277: mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0, ptcr, pdcr);
-> > sound/soc/imx/wm1133-ev1.c:281: mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT5_SSI_PINS_5, ptcr, pdcr);
-It's imx31ads board.
-> > 
-> > I guess audmux device needs to be added for all these users.  And for
-> > sake of bisect, it should be added as part of patch #5.
-Yes.
 
-Thanks
-Richard
-> > 
+Benoit and/or Grant,
+
+Can you also pull-in/merge all other patches which I had submitted recently?
+
+arm/dts: omap3-evm: Add i2c and twl4030 support
+arm/dts: Add support for TI AM3517/05 EVM board
+arm:omap2:board-generic: Add DT support for AM33xx devices
+arm/dts: Add support for TI AM335x EVM board
+
+Thanks,
+Vaibhav
+> g.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > ---
+> >  .../devicetree/bindings/arm/omap/omap.txt          |    6 ++++++
+> >  1 files changed, 6 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> > index dbdab40..ce78498 100644
+> > --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> > +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> > @@ -41,3 +41,9 @@ Boards:
+> > 
+> >  - OMAP4 PandaBoard : Low cost community board
+> >    compatible = "ti,omap4-panda", "ti,omap4430"
+> > +
+> > +- OMAP3 EVM : Software Developement Board for OMAP35x, AM/DM37x
+> > +  compatible = "ti,omap3-evm", "ti,omap3"
+> > +
+> > +- AM335X EVM : Software Developement Board for AM335x
+> > +  compatible = "ti,am335x-evm", "ti,am33xx", "ti,omap3"
+> > --
+> > 1.7.0.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
