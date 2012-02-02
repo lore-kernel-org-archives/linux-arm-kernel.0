@@ -1,28 +1,36 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 3 Feb 2012 00:01:50 +0100
-Subject: [PATCH v2 6/7] LPC32xx: clock.c: USB PLL fix
-In-Reply-To: <4F2AE1F0.2070200@antcom.de>
-References: <1327939327-7799-1-git-send-email-stigge@antcom.de>
- <1327939327-7799-6-git-send-email-stigge@antcom.de>
- <20120131103401.GJ2471@pengutronix.de> <4F293DAF.4050402@antcom.de>
- <20120202164920.GC3219@pengutronix.de> <4F2AE1F0.2070200@antcom.de>
-Message-ID: <20120202230150.GA22458@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Feb 2012 15:03:17 -0800
+Subject: [PATCH v2] pinctrl: pin configuration states
+In-Reply-To: <1328124889-9780-1-git-send-email-linus.walleij@stericsson.com>
+References: <1328124889-9780-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120202230317.GA1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> I'd then first repost the GPIO fixes I posted previously and then look
-> after USB if that's fine for you. :-)
+* Linus Walleij <linus.walleij@stericsson.com> [120201 11:04]:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This introduce a pin configuration state structure and activation
+> functions similar to the pinmux map. It basically names a few
+> states and define the custom configuration values to be applied to
+> groups and pins alike when switching to a certain state.
+...
 
-Totally fine with me, it's all up to you :)
+> +For simple systems that just configure the pins on boot and then forget about
+> +them, the first configuration table may be sufficient. However some systems
+> +may need to switch configuration states at runtime, and in that case the
+> +system may want to ground both pins by simply calling:
+> +
+> +ret = pinconf_activate_state("pinctrl-foo", "idle");
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120203/b573329d/attachment.sig>
+For dynamic changing of pin states during runtime we should not change
+the states based on string parsing. This is because some of these pins
+may need to be changed every time when entering and exiting idle.
+
+Or did I miss something after a quick glance of this?
+
+Regards,
+
+Tony
