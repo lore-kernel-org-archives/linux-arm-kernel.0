@@ -1,60 +1,53 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 2 Feb 2012 14:29:40 +0100
-Subject: [PATCH v3] mtd/gpmi : add BBT support to gpmi nand driver
-In-Reply-To: <1328183611.28171.170.camel@sauron.fi.intel.com>
-References: <1328008316-27258-1-git-send-email-b32955@freescale.com>
- <20120131121007.GO2471@pengutronix.de>
- <1328183611.28171.170.camel@sauron.fi.intel.com>
-Message-ID: <20266.36804.844286.216383@ipc1.ka-ro>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 2 Feb 2012 13:32:08 +0000
+Subject: [RFC 7/7] MFD: TWL6040: Add regulator support for VIO, V2V1
+ supplies
+In-Reply-To: <4F2A8D11.9010705@ti.com>
+References: <1328185019-29575-1-git-send-email-peter.ujfalusi@ti.com>
+ <1328185019-29575-8-git-send-email-peter.ujfalusi@ti.com>
+ <20120202125250.GJ7428@opensource.wolfsonmicro.com>
+ <4F2A8D11.9010705@ti.com>
+Message-ID: <20120202133207.GN7428@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 02, 2012 at 03:18:09PM +0200, Peter Ujfalusi wrote:
+> On 02/02/2012 02:52 PM, Mark Brown wrote:
 
-Bityutskiy, Artem writes:
-> On Tue, 2012-01-31 at 13:10 +0100, Wolfram Sang wrote:
-> > On Tue, Jan 31, 2012 at 07:11:56PM +0800, Huang Shijie wrote:
-> > > Add a new field to gpmi_nand_platform_data{}.
-> > > Make the BBT support to board specific.
-> > > 
-> > > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > 
-> > Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
-> > 
-> > I'd think you won't be able to mark blocks bad, though. Will send a
-> > patch in a minute. Please test.
-> 
-> Sorry, I have not read this and the previous related long threads, but
-> from the few first e-mails I got the impression that you are not aware
-> of the patch from Brian Norris where he modifies MTD BBT code so that it
-> will by default write bad block markers _both_ to the BBT and to OOB. It
-> sounds like you should hold on with this patch and wait when Brian's
-> patch gets in. Then you probably may just use the first version of this
-> patch.
-> 
-IMO it's just silly trying to write anything, even a bad block marker,
-to a known bad block in NAND flash.
+> > Looks like you want regulator_bulk_get() here.  Or (better yet though
+> > it'd be a potential issue for merge via MFD and the benefits aren't that
+> > exciting since you still need to disable) devm_regulator_bulk_get().
 
-The bad block markers in particular bytes in the OOB area are provided
-by the manufacturer to identify "Factory Bad Blocks". That and no
-more!
-I don't know why everybody is trying to interpret them as a general
-bad block indicator.
+> I need separate control for the two power source since we can hit
+> different power levels depending on which is powered/not powered:
+> power down: vio, v2v1 is OFF
+> deep sleep: vio is ON, v2v1 is OFF
+> sleep/power on: vio, v2v1 is ON
 
-To keep track of bad blocks you need at least one good block that can
-be reliably written and read (AKA flash based BBT). The only function
-of the "Bad Block Markers" is to provide an initial list of blocks
-that should be listed in the BBT.
+> And we have certain sequence to move between power states.
 
+That's not a problem for using the bulk get - the array is part of the
+API so you can use regulator_bulk_get() and still look at individual
+supplies within the array later on when enabling and disabling them.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+> >> +	ret = regulator_enable(twl6040->vio);
+> >> +	if (ret != 0) {
+> >> +		dev_err(&client->dev, "Failed to enable VIO: %d\n", ret);
+> >> +		goto power_err;
+> >> +	}
+> >> +	ret = regulator_enable(twl6040->v2v1);
+> >> +	if (ret != 0) {
+> >> +		dev_err(&client->dev, "Failed to enable V2V1: %d\n", ret);
+> >> +		regulator_disable(twl6040->vio);
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> I disable the vio here, if the v2v1 enable fails.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Oh, that's quite confusing when mixed in with the goto/unwind - it'd be
+clearer to have the extra lable to jump to.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/f817d7b4/attachment.sig>
