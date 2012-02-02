@@ -1,33 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Feb 2012 13:26:18 +0000
-Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
-In-Reply-To: <20120202131716.GF9773@S2101-09.ap.freescale.net>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
- <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
- <20120202120900.GC7428@opensource.wolfsonmicro.com>
- <20120202131716.GF9773@S2101-09.ap.freescale.net>
-Message-ID: <20120202132618.GL7428@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 2 Feb 2012 14:26:54 +0100
+Subject: [PATCH V2 1/4] pinctrl: add a driver for NVIDIA Tegra
+In-Reply-To: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
+References: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
+Message-ID: <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 09:17:18PM +0800, Shawn Guo wrote:
-> On Thu, Feb 02, 2012 at 12:09:01PM +0000, Mark Brown wrote:
+On Wed, Feb 1, 2012 at 10:04 PM, Stephen Warren <swarren@nvidia.com> wrote:
 
-> > Since the audmux is a part of the SoC silicon shouldn't the SoC just
-> > register the device without individual boards having to do anything
-> > (possibly conditional on ASoC being selected in Kconfig or something)?
-> > It's going to be connected in exactly the same fashion on any system
-> > using the SoC.
+> This adds a driver for the Tegra pinmux, and required parameterization
+> data for Tegra20 and Tegra30.
 
-> Hmm, we are trying to save adding the device for those boards which do
-> not route any audmux pins out at all.
+OK so I've applied this monster patch and the three others,
 
-That's why I'm saying perhaps make it conditional on having ASoC built
-(or even on having the AUDMUX driver built).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/c5e5f132/attachment-0001.sig>
+the diffstat looks like so:
+
+git diff --stat v3.3-rc2..HEAD
+ arch/arm/mach-tegra/Kconfig                       |    4 +
+ arch/arm/mach-tegra/Makefile                      |    3 -
+ arch/arm/mach-tegra/board-harmony-pinmux.c        |  362 ++-
+ arch/arm/mach-tegra/board-paz00-pinmux.c          |  362 ++-
+ arch/arm/mach-tegra/board-pinmux.c                |   62 +-
+ arch/arm/mach-tegra/board-pinmux.h                |   39 +-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c       |  442 ++-
+ arch/arm/mach-tegra/board-trimslice-pinmux.c      |  366 ++-
+ arch/arm/mach-tegra/include/mach/pinconf-tegra.h  |   63 +
+ arch/arm/mach-tegra/include/mach/pinmux-tegra20.h |  184 -
+ arch/arm/mach-tegra/include/mach/pinmux-tegra30.h |  320 --
+ arch/arm/mach-tegra/include/mach/pinmux.h         |  302 --
+ arch/arm/mach-tegra/pinmux-tegra20-tables.c       |  244 --
+ arch/arm/mach-tegra/pinmux-tegra30-tables.c       |  376 ---
+ arch/arm/mach-tegra/pinmux.c                      |  987 ------
+ drivers/pinctrl/Kconfig                           |   15 +
+ drivers/pinctrl/Makefile                          |    3 +
+ drivers/pinctrl/pinctrl-tegra.c                   |  559 +++
+ drivers/pinctrl/pinctrl-tegra.h                   |  163 +
+ drivers/pinctrl/pinctrl-tegra20.c                 | 2860 ++++++++++++++++
+ drivers/pinctrl/pinctrl-tegra30.c                 | 3726 +++++++++++++++++++++
+ 21 files changed, 8482 insertions(+), 2960 deletions(-)
+
+It's still pretty big, adding some 6000 lines in sum total, but you've made
+your case for having all information about the hardware in the driver
+quite clear so I've not got much more to say. Short story: the driver knows
+all about what the hardware can do, and the platform data or device
+tree will decide how these capabilities are employed on a certain
+system.
+
+What is nice is to have this out of the ARM tree and under pinctrl
+subsystem control.
+
+Olof, Arnd: please verify that this is a direction you accept for the Tegra.
+(Olof has already ACK:ed it, mainly thinking about Arnd.)
+
+I've created a separate branch named pinctrl-tegra-for-next for this
+series and merged it into my devel and for-next branches and pushed.
+As suggested by Olof devel and for-next may be rebased but the
+tegra branch will stay intact (fixes on top is OK).
+
+Olof: I've published the pinctrl-tegra-for-next branch based on v3.3-rc2
+here:
+git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
+pinctrl-tegra-for-next
+
+Yours,
+Linus Walleij
