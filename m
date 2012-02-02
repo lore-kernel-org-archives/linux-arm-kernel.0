@@ -1,67 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 Feb 2012 14:26:54 +0100
-Subject: [PATCH V2 1/4] pinctrl: add a driver for NVIDIA Tegra
-In-Reply-To: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
-References: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
-Message-ID: <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 2 Feb 2012 13:27:50 +0000
+Subject: [RFC 2/7] MFD: twl6040: Convert to i2c driver, and separate it
+ from twl core
+In-Reply-To: <4F2A8912.4070701@ti.com>
+References: <1328185019-29575-1-git-send-email-peter.ujfalusi@ti.com>
+ <1328185019-29575-3-git-send-email-peter.ujfalusi@ti.com>
+ <20120202124828.GI7428@opensource.wolfsonmicro.com>
+ <4F2A8912.4070701@ti.com>
+Message-ID: <20120202132750.GM7428@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2012 at 10:04 PM, Stephen Warren <swarren@nvidia.com> wrote:
+On Thu, Feb 02, 2012 at 03:01:06PM +0200, Peter Ujfalusi wrote:
+> On 02/02/2012 02:48 PM, Mark Brown wrote:
 
-> This adds a driver for the Tegra pinmux, and required parameterization
-> data for Tegra20 and Tegra30.
+> > The calling convention here seems a bit weird too, you've got value then
+> > register but normally we have register then value for I2C/SPI devices.
 
-OK so I've applied this monster patch and the three others,
+> I have based these part on the twl-core's implementation. I should not
+> have done that, I know.. Let's see how it will look like with regmap.
 
-the diffstat looks like so:
+Yeah, like I say...
 
-git diff --stat v3.3-rc2..HEAD
- arch/arm/mach-tegra/Kconfig                       |    4 +
- arch/arm/mach-tegra/Makefile                      |    3 -
- arch/arm/mach-tegra/board-harmony-pinmux.c        |  362 ++-
- arch/arm/mach-tegra/board-paz00-pinmux.c          |  362 ++-
- arch/arm/mach-tegra/board-pinmux.c                |   62 +-
- arch/arm/mach-tegra/board-pinmux.h                |   39 +-
- arch/arm/mach-tegra/board-seaboard-pinmux.c       |  442 ++-
- arch/arm/mach-tegra/board-trimslice-pinmux.c      |  366 ++-
- arch/arm/mach-tegra/include/mach/pinconf-tegra.h  |   63 +
- arch/arm/mach-tegra/include/mach/pinmux-tegra20.h |  184 -
- arch/arm/mach-tegra/include/mach/pinmux-tegra30.h |  320 --
- arch/arm/mach-tegra/include/mach/pinmux.h         |  302 --
- arch/arm/mach-tegra/pinmux-tegra20-tables.c       |  244 --
- arch/arm/mach-tegra/pinmux-tegra30-tables.c       |  376 ---
- arch/arm/mach-tegra/pinmux.c                      |  987 ------
- drivers/pinctrl/Kconfig                           |   15 +
- drivers/pinctrl/Makefile                          |    3 +
- drivers/pinctrl/pinctrl-tegra.c                   |  559 +++
- drivers/pinctrl/pinctrl-tegra.h                   |  163 +
- drivers/pinctrl/pinctrl-tegra20.c                 | 2860 ++++++++++++++++
- drivers/pinctrl/pinctrl-tegra30.c                 | 3726 +++++++++++++++++++++
- 21 files changed, 8482 insertions(+), 2960 deletions(-)
+> > Except when we don't :(
 
-It's still pretty big, adding some 6000 lines in sum total, but you've made
-your case for having all information about the hardware in the driver
-quite clear so I've not got much more to say. Short story: the driver knows
-all about what the hardware can do, and the platform data or device
-tree will decide how these capabilities are employed on a certain
-system.
-
-What is nice is to have this out of the ARM tree and under pinctrl
-subsystem control.
-
-Olof, Arnd: please verify that this is a direction you accept for the Tegra.
-(Olof has already ACK:ed it, mainly thinking about Arnd.)
-
-I've created a separate branch named pinctrl-tegra-for-next for this
-series and merged it into my devel and for-next branches and pushed.
-As suggested by Olof devel and for-next may be rebased but the
-tegra branch will stay intact (fixes on top is OK).
-
-Olof: I've published the pinctrl-tegra-for-next branch based on v3.3-rc2
-here:
-git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
-pinctrl-tegra-for-next
-
-Yours,
-Linus Walleij
+...it's not like we've been consistent so far.  I'm not that fussed
+either way, I probably wouldn't have mentioned it if I hadn't otherwise
+been commenting.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/f81919fa/attachment.sig>
