@@ -1,198 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Feb 2012 12:15:23 +0000
-Subject: [PATCH V3 08/12] dmaengine/dw_dmac: Unmap all memory buffers
- after completion of non-slave transfers
-In-Reply-To: <c098ca5959c947b3634555bc7bf4a8b3af82a2ae.1328091915.git.viresh.kumar@st.com>
-References: <cover.1328091915.git.viresh.kumar@st.com>
- <c098ca5959c947b3634555bc7bf4a8b3af82a2ae.1328091915.git.viresh.kumar@st.com>
-Message-ID: <20120202121523.GG889@n2100.arm.linux.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu,  2 Feb 2012 14:16:52 +0200
+Subject: [RFC 0/7] MFD: twl6040: Conversion to i2c driver
+Message-ID: <1328185019-29575-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2012 at 04:12:24PM +0530, Viresh Kumar wrote:
-> Currently, after completion of transfer, source address or destination address
-> of only the first LLI descriptor is unmapped. And length passed for unmap is
-> total length of all descriptors in the list. Which means unmapping code assumed
-> that the memory buffers pointed to by the descriptors will be physically
-> contiguous, which might not be the case.
-> 
-> This patch intends to fix this wrong expectation of dw_dmac. Now, first desc
-> will not contain total length of transfer. But individual descriptors will
-> contain their individual lengths. Finally, we will call unmap for all
-> descriptors.
+Hello,
 
-I'm still unconvinced that this is anywhere close to correct.
+This series will convert the twl6040 MFD driver to an i2c driver.
+Compared to older twl4030/5030/TPS the twl6040 is a standalone audio IC. It is
+better if the twl6040-core (and all of it's child devices) does not depend on
+the twl-core since it has nothing to with it.
 
-Look.  DMA engines only automatically unmap when they're being used by the
-async_tx stuff for memcpy's, and RAID computation offload, and the like.
-These work with individual single buffers, not scatterlists.  These will
-not be fragmented.
+With this conversion the dependency on twl can be dropped from the twl6040
+driver stack (core, vibra, audio).
 
-If the caller mapped it with a single or page mapping, then the DMA engine
-ABSOLUTELY MUST unmap it with the equivalent unmapping function _with the
-same arguments_ which were used to map it - and certainly not doing it
-piece meal on multiple small bits of the buffer.  The whole buffer entirely
-in one go.  Even if the DMA engine driver decides internally to split the
-buffer into smaller chunks.
+Between the first and second patch the audio will not probe on OMAP4, but I felt
+it is better this way at least for the first RFC series to not have too big
+change within one patch. The two patch can be squashed together later if no
+objections.
 
-The DMA API demands that the following will always be satisfied:
+Regards,
+Peter
+---
+Peter Ujfalusi (7):
+  MFD: twl-core: Detach twl6040 from the pmic mfd driver
+  MFD: twl6040: Convert to i2c driver, and separate it from twl core
+  ASoC: twl6040: Remove dependency on twl4030 from Kconfig
+  OMAP: 4430sdp: Correct fixed regulator device ID
+  OMAP: sdp4430: Add fixed regulator for twl6040 needs
+  OMAP: omap4panda: Add fixed regulator for twl6040 needs
+  MFD: TWL6040: Add regulator support for VIO, V2V1 supplies
 
-	dma = dma_map_single(dev, addr, len, dir);
+ arch/arm/mach-omap2/board-4430sdp.c    |   77 +++++++++++++--
+ arch/arm/mach-omap2/board-generic.c    |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c |   75 +++++++++++++--
+ arch/arm/mach-omap2/twl-common.c       |   37 ++++++-
+ arch/arm/mach-omap2/twl-common.h       |   10 +-
+ drivers/input/misc/Kconfig             |    1 -
+ drivers/input/misc/twl6040-vibra.c     |    4 +-
+ drivers/mfd/Kconfig                    |    2 +-
+ drivers/mfd/twl-core.c                 |   58 +++++++-----
+ drivers/mfd/twl6040-core.c             |  165 ++++++++++++++++++++++++++------
+ include/linux/i2c/twl.h                |   12 ---
+ include/linux/mfd/twl6040.h            |   27 +++++
+ sound/soc/codecs/Kconfig               |    2 +-
+ sound/soc/codecs/twl6040.c             |    3 +-
+ 14 files changed, 375 insertions(+), 100 deletions(-)
 
-	dma_unmap_single(dev, dma, len, dir);
-
-where those arguments passed into dma_unmap_single() are those which were
-passed into/outof dma_map_single() _totally_ _unmodified_.
-
-The same is true for dma_map_page()..dma_unmap_page().
-
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/dma/dw_dmac.c |   49 +++++++++++++++++++++++++++++++------------------
->  1 files changed, 31 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-> index 5d7b199..49d477c 100644
-> --- a/drivers/dma/dw_dmac.c
-> +++ b/drivers/dma/dw_dmac.c
-> @@ -231,6 +231,14 @@ static void dwc_dostart(struct dw_dma_chan *dwc, struct dw_desc *first)
->  
->  /*----------------------------------------------------------------------*/
->  
-> +#define dw_dmac_unmap(utype, _desc, _child, _buf, _dir)			\
-> +do {									\
-> +	list_for_each_entry(_child, &_desc->tx_list, desc_node)		\
-> +		dma_unmap_##utype(parent, _child->lli._buf,		\
-> +				_child->len, _dir);			\
-> +	dma_unmap_##utype(parent, _desc->lli._buf, _desc->len, _dir);	\
-> +} while (0)
-> +
->  static void
->  dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
->  		bool callback_required)
-> @@ -264,19 +272,19 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
->  		struct device *parent = chan2parent(&dwc->chan);
->  		if (!(txd->flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
->  			if (txd->flags & DMA_COMPL_DEST_UNMAP_SINGLE)
-> -				dma_unmap_single(parent, desc->lli.dar,
-> -						desc->len, DMA_FROM_DEVICE);
-> +				dw_dmac_unmap(single, desc, child, dar,
-> +						DMA_FROM_DEVICE);
->  			else
-> -				dma_unmap_page(parent, desc->lli.dar,
-> -						desc->len, DMA_FROM_DEVICE);
-> +				dw_dmac_unmap(page, desc, child, dar,
-> +						DMA_FROM_DEVICE);
->  		}
->  		if (!(txd->flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
->  			if (txd->flags & DMA_COMPL_SRC_UNMAP_SINGLE)
-> -				dma_unmap_single(parent, desc->lli.sar,
-> -						desc->len, DMA_TO_DEVICE);
-> +				dw_dmac_unmap(single, desc, child, sar,
-> +						DMA_TO_DEVICE);
->  			else
-> -				dma_unmap_page(parent, desc->lli.sar,
-> -						desc->len, DMA_TO_DEVICE);
-> +				dw_dmac_unmap(page, desc, child, sar,
-> +						DMA_TO_DEVICE);
->  		}
->  	}
->  
-> @@ -676,6 +684,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
->  		desc->lli.dar = dest + offset;
->  		desc->lli.ctllo = ctllo;
->  		desc->lli.ctlhi = xfer_count;
-> +		desc->len = xfer_count << src_width;
->  
->  		if (!first) {
->  			first = desc;
-> @@ -701,7 +710,6 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
->  			DMA_TO_DEVICE);
->  
->  	first->txd.flags = flags;
-> -	first->len = len;
->  
->  	return &first->txd;
->  
-> @@ -725,7 +733,6 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->  	unsigned int		mem_width;
->  	unsigned int		i;
->  	struct scatterlist	*sg;
-> -	size_t			total_len = 0;
->  
->  	dev_vdbg(chan2dev(chan), "prep_dma_slave\n");
->  
-> @@ -774,6 +781,7 @@ slave_sg_todev_fill_desc:
->  			}
->  
->  			desc->lli.ctlhi = dlen >> mem_width;
-> +			desc->len = dlen;
->  
->  			if (!first) {
->  				first = desc;
-> @@ -787,7 +795,6 @@ slave_sg_todev_fill_desc:
->  						&first->tx_list);
->  			}
->  			prev = desc;
-> -			total_len += dlen;
->  
->  			if (len)
->  				goto slave_sg_todev_fill_desc;
-> @@ -831,6 +838,7 @@ slave_sg_fromdev_fill_desc:
->  				len = 0;
->  			}
->  			desc->lli.ctlhi = dlen >> reg_width;
-> +			desc->len = dlen;
->  
->  			if (!first) {
->  				first = desc;
-> @@ -844,7 +852,6 @@ slave_sg_fromdev_fill_desc:
->  						&first->tx_list);
->  			}
->  			prev = desc;
-> -			total_len += dlen;
->  
->  			if (len)
->  				goto slave_sg_fromdev_fill_desc;
-> @@ -863,8 +870,6 @@ slave_sg_fromdev_fill_desc:
->  			prev->txd.phys, sizeof(prev->lli),
->  			DMA_TO_DEVICE);
->  
-> -	first->len = total_len;
-> -
->  	return &first->txd;
->  
->  err_desc_get:
-> @@ -950,11 +955,19 @@ dwc_tx_status(struct dma_chan *chan,
->  		ret = dma_async_is_complete(cookie, last_complete, last_used);
->  	}
->  
-> -	if (ret != DMA_SUCCESS)
-> -		dma_set_tx_state(txstate, last_complete, last_used,
-> -				dwc_first_active(dwc)->len);
-> -	else
-> +	if (ret != DMA_SUCCESS) {
-> +		struct dw_desc *desc, *child;
-> +		unsigned int len;
-> +
-> +		desc = dwc_first_active(dwc);
-> +		len = desc->len;
-> +		list_for_each_entry(child, &desc->tx_list, desc_node)
-> +			len += child->len;
-> +
-> +		dma_set_tx_state(txstate, last_complete, last_used, len);
-> +	} else {
->  		dma_set_tx_state(txstate, last_complete, last_used, 0);
-> +	}
->  
->  	if (dwc->paused)
->  		return DMA_PAUSED;
-> -- 
-> 1.7.8.110.g4cb5d
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+1.7.8.4
