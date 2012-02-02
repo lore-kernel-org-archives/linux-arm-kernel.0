@@ -1,81 +1,68 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu,  2 Feb 2012 12:24:19 -0700
-Subject: [PATCH] ARM: dt: Explicitly configure all serial ports on Tegra Cardhu
-Message-ID: <1328210659-16869-1-git-send-email-swarren@nvidia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu,  2 Feb 2012 11:24:46 -0800
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+Message-ID: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ports are used as follows:
-UART1/A: Routed to debug dongle
-UART2/B: GPS
-UART3/C: Bluetooth
-UART4/D: Routed to debug dongle
-UART5/E: Not connected
+armv7's flush_cache_all() flushes caches via set/way. To
+determine the cache attributes (line size, number of sets,
+etc.) the assembly first writes the CSSELR register to select a
+cache level and then reads the CCSIDR register. The CSSELR register
+is banked per-cpu and is used to determine which cache level CCSIDR
+reads. If the task is migrated between when the CSSELR is written and
+the CCSIDR is read the CCSIDR value may be for an unexpected cache
+level (for example L1 instead of L2) and incorrect cache flushing
+could occur.
 
-The debug dongle has jumpers to connect either UART1/A or UART4/D to
-the DB-9 connector. UART1/A is typically used on Cardhu, and is the option
-we assume here.
+Disable preemption across the write and read so that the correct
+cache attributes are read and used for the cache flushing
+routine. This fixes a problem we see in scm_call() when
+flush_cache_all() is called from preemptible context and
+sometimes the L2 cache is not properly flushed out.
 
-For now, only enable UART1/A, and explicitly disable all other ports.
-
-The explicit disable prevents the message "of_serial 70006040.serial:
-no clock-frequency property set" being printed during boot.
-
-Enabling the other ports requires their clocks to be enabled, or accesses
-to the registers will hang. At present, this requires adding entries into
-board-dt-tegra30.c's tegra_dt_clk_init_table[]. Lets punt on that and wait
-for the common clock bindings to set this all up, although that will also
-requiring adding clock support to 8250.c.
-
-While we're at it, fix board-dt-tegra30.c to enable the correct clock for
-the debug UART. We got away with this before, because the bootloader already
-enabled it.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/boot/dts/tegra-cardhu.dts     |   16 ++++++++++++++++
- arch/arm/mach-tegra/board-dt-tegra30.c |    2 +-
- 2 files changed, 17 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
-index 7326350..ac3fb75 100644
---- a/arch/arm/boot/dts/tegra-cardhu.dts
-+++ b/arch/arm/boot/dts/tegra-cardhu.dts
-@@ -14,6 +14,22 @@
- 		clock-frequency = < 408000000 >;
- 	};
+Should we move get_thread_info into assembler.h? It seems odd
+to include entry-header.S but I saw that vfp was doing the same.
+
+ arch/arm/mm/cache-v7.S |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 07c4bc8..a033858 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -16,6 +16,7 @@
+ #include <asm/unwind.h>
  
-+	serial at 70006040 {
-+		status = "disable";
-+	};
-+
-+	serial at 70006200 {
-+		status = "disable";
-+	};
-+
-+	serial at 70006300 {
-+		status = "disable";
-+	};
-+
-+	serial at 70006400 {
-+		status = "disable";
-+	};
-+
- 	i2c at 7000c000 {
- 		clock-frequency = <100000>;
- 	};
-diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
-index 918cbbf..731a231 100644
---- a/arch/arm/mach-tegra/board-dt-tegra30.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra30.c
-@@ -60,7 +60,7 @@ struct of_dev_auxdata tegra30_auxdata_lookup[] __initdata = {
+ #include "proc-macros.S"
++#include "../kernel/entry-header.S"
  
- static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
- 	/* name		parent		rate		enabled */
--	{ "uartd",	"pll_p",	408000000,	true },
-+	{ "uarta",	"pll_p",	408000000,	true },
- 	{ NULL,		NULL,		0,		0},
- };
- 
+ /*
+  *	v7_flush_icache_all()
+@@ -54,9 +55,19 @@ loop1:
+ 	and	r1, r1, #7			@ mask of the bits for current cache only
+ 	cmp	r1, #2				@ see what cache we have at this level
+ 	blt	skip				@ skip if no cache, or just i-cache
++#ifdef CONFIG_PREEMPT
++	get_thread_info r9
++	ldr	r11, [r9, #TI_PREEMPT]		@ get preempt count
++	add	r11, r11, #1			@ increment it
++	str	r11, [r9, #TI_PREEMPT]
++#endif
+ 	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
+ 	isb					@ isb to sych the new cssr&csidr
+ 	mrc	p15, 1, r1, c0, c0, 0		@ read the new csidr
++#ifdef CONFIG_PREEMPT
++	sub	r11, r11, #1			@ decrement preempt count
++	str	r11, [r9, #TI_PREEMPT]
++#endif
+ 	and	r2, r1, #7			@ extract the length of the cache lines
+ 	add	r2, r2, #4			@ add 4 (line length offset)
+ 	ldr	r4, =0x3ff
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
