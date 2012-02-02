@@ -1,110 +1,77 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  2 Feb 2012 16:20:01 +0100
-Subject: [PATCH] of_gpio: add support of of_gpio_named_count to be able to
- count named gpio
-Message-ID: <1328196001-22154-1-git-send-email-plagnioj@jcrosoft.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 2 Feb 2012 20:54:08 +0530
+Subject: [PATCH 1/2] ARM: OMAP3: PM: remove superfluous calls to
+ pwrdm_clear_all_prev_pwrst()
+In-Reply-To: <CAMQu2gxQHyoH-AC4ut2EGVs6wBvAJqUJ8tzXUm2hH_gZqMGE6w@mail.gmail.com>
+References: <20120130093931.11027.31048.stgit@dusk>
+ <20120130094312.11027.31050.stgit@dusk>
+ <878vkopw2o.fsf@ti.com> <87mx93ok5y.fsf@ti.com>
+ <alpine.DEB.2.00.1202011218190.10541@utopia.booyaka.com>
+ <CAMQu2gzVt3K6cuZcbvfNZegimyXz8F4N__A6vDBSyL4QfSnbTw@mail.gmail.com>
+ <alpine.DEB.2.00.1202020041220.10541@utopia.booyaka.com>
+ <CAMQu2gw5uU4kXRWtuUuYAAUcrTJvS_nQhJ42-_hEmHM2NO8ZZg@mail.gmail.com>
+ <alpine.DEB.2.00.1202020302400.586@utopia.booyaka.com>
+ <CAMQu2gxQHyoH-AC4ut2EGVs6wBvAJqUJ8tzXUm2hH_gZqMGE6w@mail.gmail.com>
+Message-ID: <CAMQu2gxuQVYNvo8VeGrmZGo3tqCydhVaOz1VXjeAgrL8Opm8nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: devicetree-discuss at lists.ozlabs.org
----
- drivers/of/gpio.c       |    9 +++++----
- include/linux/of_gpio.h |   27 +++++++++++++++++++++++++--
- 2 files changed, 30 insertions(+), 6 deletions(-)
+Paul,
 
-diff --git a/drivers/of/gpio.c b/drivers/of/gpio.c
-index 7e62d15..e034b38 100644
---- a/drivers/of/gpio.c
-+++ b/drivers/of/gpio.c
-@@ -78,8 +78,9 @@ err0:
- EXPORT_SYMBOL(of_get_named_gpio_flags);
- 
- /**
-- * of_gpio_count - Count GPIOs for a device
-+ * of_gpio_named_count - Count GPIOs for a device
-  * @np:		device node to count GPIOs for
-+ * @propname:	property name containing gpio specifier(s)
-  *
-  * The function returns the count of GPIOs specified for a node.
-  *
-@@ -93,14 +94,14 @@ EXPORT_SYMBOL(of_get_named_gpio_flags);
-  * defines four GPIOs (so this function will return 4), two of which
-  * are not specified.
-  */
--unsigned int of_gpio_count(struct device_node *np)
-+unsigned int of_gpio_named_count(struct device_node *np, const char* propname)
- {
- 	unsigned int cnt = 0;
- 
- 	do {
- 		int ret;
- 
--		ret = of_parse_phandle_with_args(np, "gpios", "#gpio-cells",
-+		ret = of_parse_phandle_with_args(np, propname, "#gpio-cells",
- 						 cnt, NULL);
- 		/* A hole in the gpios = <> counts anyway. */
- 		if (ret < 0 && ret != -EEXIST)
-@@ -109,7 +110,7 @@ unsigned int of_gpio_count(struct device_node *np)
- 
- 	return cnt;
- }
--EXPORT_SYMBOL(of_gpio_count);
-+EXPORT_SYMBOL(of_gpio_named_count);
- 
- /**
-  * of_gpio_simple_xlate - translate gpio_spec to the GPIO number and flags
-diff --git a/include/linux/of_gpio.h b/include/linux/of_gpio.h
-index e4e2058..1b3628d 100644
---- a/include/linux/of_gpio.h
-+++ b/include/linux/of_gpio.h
-@@ -53,7 +53,8 @@ static inline struct of_mm_gpio_chip *to_of_mm_gpio_chip(struct gpio_chip *gc)
- extern int of_get_named_gpio_flags(struct device_node *np,
- 		const char *list_name, int index, enum of_gpio_flags *flags);
- 
--extern unsigned int of_gpio_count(struct device_node *np);
-+extern unsigned int of_gpio_named_count(struct device_node *np,
-+					const char* propname);
- 
- extern int of_mm_gpiochip_add(struct device_node *np,
- 			      struct of_mm_gpio_chip *mm_gc);
-@@ -74,7 +75,8 @@ static inline int of_get_named_gpio_flags(struct device_node *np,
- 	return -ENOSYS;
- }
- 
--static inline unsigned int of_gpio_count(struct device_node *np)
-+static inline unsigned int of_gpio_named_count(struct device_node *np,
-+					const char* propname)
- {
- 	return 0;
- }
-@@ -92,6 +94,27 @@ static inline void of_gpiochip_remove(struct gpio_chip *gc) { }
- #endif /* CONFIG_OF_GPIO */
- 
- /**
-+ * of_gpio_count - Count GPIOs for a device
-+ * @np:		device node to count GPIOs for
-+ *
-+ * The function returns the count of GPIOs specified for a node.
-+ *
-+ * Note that the empty GPIO specifiers counts too. For example,
-+ *
-+ * gpios = <0
-+ *          &pio1 1 2
-+ *          0
-+ *          &pio2 3 4>;
-+ *
-+ * defines four GPIOs (so this function will return 4), two of which
-+ * are not specified.
-+ */
-+static inline unsigned int of_gpio_count(struct device_node *np)
-+{
-+	return of_gpio_named_count(np, "gpios");
-+}
-+
-+/**
-  * of_get_gpio_flags() - Get a GPIO number and flags to use with GPIO API
-  * @np:		device node to get GPIO from
-  * @index:	index of the GPIO
--- 
-1.7.7
+On Thu, Feb 2, 2012 at 3:47 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+> On Thu, Feb 2, 2012 at 3:35 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>> On Thu, 2 Feb 2012, Shilimkar, Santosh wrote:
+>>
+>>> Yes, we do have issue with below APIs for OMAP4 and onwards design
+>>> because of the PRCM change.
+>>>
+>>> pwrdm_clear_all_prev_pwrst
+>>> pwrdm_*_mem_*
+>>>
+>>> There use to be a single power state and memory state register till OMAP3
+>>> at power domain level which can give you the logic and memory last test
+>>> which is needed for OSWR.
+>>>
+>>> On OMAP4, we have registers per modules and it becomes difficult to model
+>>> this difference in APIs. Initially we tried to fix that with [1] and
+>>> then later realized
+>>> that's not going to work on OMAP4 + devices because of mentioned issue.
+>>
+>> If the registers are per-module, it seems like the best place for those
+>> would be the hwmod layer. ?Do you think that makes sense? ?So, something
+>> like omap_hwmod_clear_all_prev_pwrst(), etc.? ?Seems like that should be
+>> pretty efficient.
+>>
+> But all these are power domain registers after all. Rajendra did one version of
+> " pwrdm_clear_all_prev_pwrst" ?API and inside used hwmod. But then there he
+> has iterate over all the modules belongs to that power domain.
+>
+> And if you use hwmod or omap_device kind of API, then ?you need to
+> build those devices in init or some where.
+>
+> All of that was not looking so elegant and hence the other path was chosen.
+> The mess is, the registers are still part of power domains though they
+> are specific
+> to module. And Fundamentally power domain is stil the central entity
+> decides the fate of all the modules within that PD, in terms of context
+> loss/ret etc.
+>
+I looked at the MPUSS file. There are 3 functions which access
+power domain registers directly.
+
+- mpuss_clear_prev_logic_pwrst
+- cpu_clear_prev_logic_pwrst
+- omap4_mpuss_read_prev_context_state
+
+All of these functions access the context registers which
+we don't have support today at power domian APIs for
+mentioned issue. This file is using power domain APIs
+in all possible scenario's except the OSWR scenario
+which needs the context register accesses.
+
+if the context clear and read can be handled part of
+PD APIs, then we can certainly kill this functions.
+
+Regards
+santosh
