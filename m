@@ -1,30 +1,81 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 02 Feb 2012 11:23:09 -0800
-Subject: [PATCH v3 00/20] ARM: OMAP3+: SmartReflex: bugfixes
-In-Reply-To: <1328086199-28486-1-git-send-email-j-pihet@ti.com> (Jean Pihet's
- message of "Wed, 1 Feb 2012 09:49:39 +0100")
-References: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
-Message-ID: <871uqdca5e.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu,  2 Feb 2012 12:24:19 -0700
+Subject: [PATCH] ARM: dt: Explicitly configure all serial ports on Tegra Cardhu
+Message-ID: <1328210659-16869-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
+The ports are used as follows:
+UART1/A: Routed to debug dongle
+UART2/B: GPS
+UART3/C: Bluetooth
+UART4/D: Routed to debug dongle
+UART5/E: Not connected
 
-> Integrate the latest SmartReflex bufixes from Felipe Balbi [1] and
-> Nishant Menon [2], plus misc bugfixes.
->
-> Based on latest master branch of the mainline git tree (3.3.0-rc1) [3], commit
-> 27ba234c8dfe86c96675d4ef275d1d3c1f5f7053.
->
-> [1] http://marc.info/?l=linux-omap&m=132134699423547&w=2
-> [2] https://github.com/nmenon/linux-omap-ti-pm/commits/linux-omap-3.0
-> [3] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=shortlog
+The debug dongle has jumpers to connect either UART1/A or UART4/D to
+the DB-9 connector. UART1/A is typically used on Cardhu, and is the option
+we assume here.
 
-Can you break this series up further?
+For now, only enable UART1/A, and explicitly disable all other ports.
 
-There is lots of stuff in this series that does not qualify as a fix or
-a cleanup.  (specifically, all the ones starting with "introduce...").
+The explicit disable prevents the message "of_serial 70006040.serial:
+no clock-frequency property set" being printed during boot.
 
-We need to keep fixes and cleanups separate from new features.
+Enabling the other ports requires their clocks to be enabled, or accesses
+to the registers will hang. At present, this requires adding entries into
+board-dt-tegra30.c's tegra_dt_clk_init_table[]. Lets punt on that and wait
+for the common clock bindings to set this all up, although that will also
+requiring adding clock support to 8250.c.
 
-Kevin
+While we're at it, fix board-dt-tegra30.c to enable the correct clock for
+the debug UART. We got away with this before, because the bootloader already
+enabled it.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-cardhu.dts     |   16 ++++++++++++++++
+ arch/arm/mach-tegra/board-dt-tegra30.c |    2 +-
+ 2 files changed, 17 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
+index 7326350..ac3fb75 100644
+--- a/arch/arm/boot/dts/tegra-cardhu.dts
++++ b/arch/arm/boot/dts/tegra-cardhu.dts
+@@ -14,6 +14,22 @@
+ 		clock-frequency = < 408000000 >;
+ 	};
+ 
++	serial at 70006040 {
++		status = "disable";
++	};
++
++	serial at 70006200 {
++		status = "disable";
++	};
++
++	serial at 70006300 {
++		status = "disable";
++	};
++
++	serial at 70006400 {
++		status = "disable";
++	};
++
+ 	i2c at 7000c000 {
+ 		clock-frequency = <100000>;
+ 	};
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index 918cbbf..731a231 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -60,7 +60,7 @@ struct of_dev_auxdata tegra30_auxdata_lookup[] __initdata = {
+ 
+ static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
+ 	/* name		parent		rate		enabled */
+-	{ "uartd",	"pll_p",	408000000,	true },
++	{ "uarta",	"pll_p",	408000000,	true },
+ 	{ NULL,		NULL,		0,		0},
+ };
+ 
+-- 
+1.7.0.4
