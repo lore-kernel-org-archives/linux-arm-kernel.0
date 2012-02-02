@@ -1,33 +1,33 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 2 Feb 2012 17:41:14 +0100
-Subject: [PATCH] ARM: LPC32xx: Support for OHCI HCD
-In-Reply-To: <1328103028-20547-1-git-send-email-stigge@antcom.de>
-References: <1328103028-20547-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120202164114.GB3219@pengutronix.de>
+Date: Thu, 2 Feb 2012 17:49:20 +0100
+Subject: [PATCH v2 6/7] LPC32xx: clock.c: USB PLL fix
+In-Reply-To: <4F293DAF.4050402@antcom.de>
+References: <1327939327-7799-1-git-send-email-stigge@antcom.de>
+ <1327939327-7799-6-git-send-email-stigge@antcom.de>
+ <20120131103401.GJ2471@pengutronix.de> <4F293DAF.4050402@antcom.de>
+Message-ID: <20120202164920.GC3219@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2012 at 02:30:28PM +0100, stigge at antcom.de wrote:
-> This patch adds OHCI support to the LPC32xx ARM platform
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+Hi,
 
-Okay, I asked for a patch to test USB, so thanks. It did not work for me,
-sadly, so there seems to be more work needed in that area.
+> Thanks for reviewing my patches! I collected (and applied) all your
+> suggestions and will re-post the series as a patch update for applying
+> to the mainline tree.
 
-Yet, even formally, this patch is not ready for mainline. It touches
-various subsystems in one patch (arch, usb), uses too much #ifdef and
-also misses important mailing lists (usb).
+Yes, please repost this series with the updates. And without USB & MMC
+updates. Those updates should be in later series, when we actually add
+support for these devices.
 
-May I ask if you read Documentation/development-process and/or
-Documentation/SubmittingPatches? If not, please do so.
+> What do you think about mainline-integrating it?
 
-I'd suggest to work in smaller steps. Get LPC32xx build again and fix
-the elementary clock issues. Then, get USB to work (for example). Then,
-get the network driver accepted (for example). Also consider, that those
-drivers have not just been forgotten to be posted. They usually had
-issues which need to be fixed before mainlining. So, one task at a time
-will help to keep focused, I think.
+See my comment there.
+
+First step, I'd suggest: After you repost this series, I'll create a
+branch with the relevant patches (defconfig, buildfixes, clock fixes)
+and send a pull-request to Arnd/Olof. You can decide which issue you
+want to tackle next. I'd think MMC or USB are more of the lower hanging
+fruits, but I leave that to you.
 
 Regards,
 
@@ -42,4 +42,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/00be6712/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120202/d3f03d5f/attachment.sig>
