@@ -1,61 +1,28 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 02 Feb 2012 15:01:06 +0200
-Subject: [RFC 2/7] MFD: twl6040: Convert to i2c driver, and separate it
- from twl core
-In-Reply-To: <20120202124828.GI7428@opensource.wolfsonmicro.com>
+Date: Thu, 02 Feb 2012 15:03:56 +0200
+Subject: [RFC 5/7] OMAP: sdp4430: Add fixed regulator for twl6040 needs
+In-Reply-To: <20120202124025.GF7428@opensource.wolfsonmicro.com>
 References: <1328185019-29575-1-git-send-email-peter.ujfalusi@ti.com>
- <1328185019-29575-3-git-send-email-peter.ujfalusi@ti.com>
- <20120202124828.GI7428@opensource.wolfsonmicro.com>
-Message-ID: <4F2A8912.4070701@ti.com>
+ <1328185019-29575-6-git-send-email-peter.ujfalusi@ti.com>
+ <20120202124025.GF7428@opensource.wolfsonmicro.com>
+Message-ID: <4F2A89BC.6090303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2012 02:48 PM, Mark Brown wrote:
-> On Thu, Feb 02, 2012 at 02:16:54PM +0200, Peter Ujfalusi wrote:
+On 02/02/2012 02:40 PM, Mark Brown wrote:
+> On Thu, Feb 02, 2012 at 02:16:57PM +0200, Peter Ujfalusi wrote:
+>> The twl6040 VIO power is connected to SMPS V1V8, the
+>> V2V1 power is coming from SMPS V2V1 of twl6030.
+>> These are fixed, always on regulators.
+>> Create fixed voltage regulators for these supplies.
 > 
->> +static int twl6040_i2c_read(struct i2c_client *i2c, u8 *value, u8 reg)
->> +{
->> +	struct i2c_msg msg[2];
->> +	int ret;
-> 
-> May as well convert to regmap while you're at it, saves some code and
-> will get you access to the regmap features - you have to make updates in
-> all the relevant places anyway.  We should be pushing to remove use of
-> the ASoC level code for register cache and whatnot to cut down on code
-> duplication (especially for MFDs where it has a few issues interacting
-> with the MFD) and this seems like a good opportunity.
+> Shouldn't the PMIC be creating the relevant fixed voltage regulators?
+> It's a bit clearer given that the supplies actually come from the PMIC
+> and it would cut down a bit on the boilerplate in boards (though much
+> less so with device tree, sadly).
 
-True.
-I have done the bulk of this set back in June, 2011 and thought that I
-will do the move to regmap as increment, but you are right. I'm anyway
-touching the relevant places, so why not do it properly?
-I'll take the regmap into use for  v2.
+Yes these are coming from twl6030, so it might be better to create the
+fixed regulators in the PMIC driver. I'll take a look.
 
-> The calling convention here seems a bit weird too, you've got value then
-> register but normally we have register then value for I2C/SPI devices.
-
-I have based these part on the twl-core's implementation. I should not
-have done that, I know.. Let's see how it will look like with regmap.
-
-> Except when we don't :(
-> 
->> -module_platform_driver(twl6040_driver);
->> +static int __devinit twl6040_init(void)
->> +{
->> +	return i2c_add_driver(&twl6040_driver);
->> +}
->> +module_init(twl6040_init);
->> +
->> +static void __devexit twl6040_exit(void)
->> +{
->> +	i2c_del_driver(&twl6040_driver);
->> +}
->> +
->> +module_exit(twl6040_exit);
-> 
-> There's module_i2c_driver() in mainline as of the last merge window.
-
-Oh, good to know. Thanks
-
--- 
+Thanks,
 P?ter
