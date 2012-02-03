@@ -1,54 +1,97 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Fri, 03 Feb 2012 15:15:45 +0400
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <alpine.LFD.2.02.1202022202470.2759@xanadu.home>
-References: <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.02.1202022110080.2759@xanadu.home>
- <4F2B4873.5030808@codeaurora.org>
- <alpine.LFD.2.02.1202022202470.2759@xanadu.home>
-Message-ID: <4F2BC1E1.2080702@ru.mvista.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Fri, 3 Feb 2012 11:27:03 +0000
+Subject: [PATCH 02/15] mm: page_alloc: update migrate type of pages on
+ pcp when isolating
+In-Reply-To: <op.v82hjbd13l0zgt@mpn-glaptop>
+References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
+ <1327568457-27734-3-git-send-email-m.szyprowski@samsung.com>
+ <20120130111522.GE25268@csn.ul.ie> <op.v8wlu8ws3l0zgt@mpn-glaptop>
+ <20120130161447.GU25268@csn.ul.ie>
+ <022e01cce034$bc6cf440$3546dcc0$%szyprowski@samsung.com>
+ <20120202124729.GA5796@csn.ul.ie> <op.v82hjbd13l0zgt@mpn-glaptop>
+Message-ID: <20120203112703.GB5796@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Feb 02, 2012 at 08:53:25PM +0100, Michal Nazarewicz wrote:
+> >On Tue, Jan 31, 2012 at 05:23:59PM +0100, Marek Szyprowski wrote:
+> >>Pages, which have incorrect migrate type on free finally
+> >>causes pageblock migration type change from MIGRATE_CMA to MIGRATE_MOVABLE.
+> 
+> On Thu, 02 Feb 2012 13:47:29 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
+> >I'm not quite seeing this. In free_hot_cold_page(), the pageblock
+> >type is checked so the page private should be set to MIGRATE_CMA or
+> >MIGRATE_ISOLATE for the CMA area. It's not clear how this can change a
+> >pageblock to MIGRATE_MOVABLE in error.
+> 
+> Here's what I think may happen:
+> 
+> When drain_all_pages() is called, __free_one_page() is called for each page on
+> pcp list with migrate type deducted from page_private() which is MIGRATE_CMA.
+> This result in the page being put on MIGRATE_CMA freelist even though its
+> pageblock's migrate type is MIGRATE_ISOLATE.
+> 
 
-On 03-02-2012 7:04, Nicolas Pitre wrote:
+Ok, although it will only be allocated for MIGRATE_CMA-compatible
+requests so it is not a disaster.
 
->>>>> If you simply disable/restore IRQs around the critical region then you
->>>>> don't have to worry about __v7_setup.  Plus this will allow for
->>>>> v7_flush_dcache_all to still be callable from atomic context.
->>>> Ok. Here's a patch. I still need to test it. I'll send another patch
->>>> series to cleanup the get_thread_info stuff (there's two of them?).
->>>>
->>>>   arch/arm/mm/cache-v7.S |    6 ++++++
->>>>   1 files changed, 6 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
->>>> index 07c4bc8..654a5fc 100644
->>>> --- a/arch/arm/mm/cache-v7.S
->>>> +++ b/arch/arm/mm/cache-v7.S
->>>> @@ -54,9 +54,15 @@ loop1:
->>>>   	and	r1, r1, #7			@ mask of the bits for current cache only
->>>>   	cmp	r1, #2				@ see what cache we have at this level
->>>>   	blt	skip				@ skip if no cache, or just i-cache
->>>> +#ifdef CONFIG_PREEMPT
->>>> +	save_and_disable_irqs r9		@ make cssr&csidr read atomic
->>>> +#endif
->>>>   	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
->>>>   	isb					@ isb to sych the new cssr&csidr
->>>>   	mrc	p15, 1, r1, c0, c0, 0		@ read the new csidr
->>>> +#ifdef CONFIG_PREEMPT
->>>> +	restore_irqs r9
->>>> +#endif
+> When allocation happens and pcp list is empty, rmqueue_bulk() will get executed
+> with migratetype argument set to MIGRATE_MOVABLE.  It calls __rmqueue() to grab
+> some pages and because the page described above is on MIGRATE_CMA freelist it
+> may be returned back to rmqueue_bulk().
+> 
 
->>> I'd suggest using restore_irqs_notrace instead.  The IRQ-off period is
->>> so small that there is no point tracing it.
+This will allocate the page from a pageblock we are trying to isolate
+pages from, but only for a movable page that can still be migrated. It
+does mean that CMA is doing more work than it should of course and
+the problem also impacts memory hot-remove. It's worse for memory
+hot-remove because potentially an UNMOVABLE page was allocated from
+a MIGRATE_ISOLATE pageblock.
 
->> Thanks. I'll make sure to do that before uploading to the patch tracker.
+> But, pageblock's migrate type is not MIGRATE_CMA but MIGRATE_ISOLATE, so the
+> following code:
+> 
+> #ifdef CONFIG_CMA
+> 		if (is_pageblock_cma(page))
+> 			set_page_private(page, MIGRATE_CMA);
+> 		else
+> #endif
+> 			set_page_private(page, migratetype);
+> 
+> will set it's private to MIGRATE_MOVABLE and in the end the page lands back
+> on MIGRATE_MOVABLE pcp list but this time with page_private == MIGRATE_MOVABLE
+> and not MIGRATE_CMA.
+> 
+> One more drain_all_pages() (which may happen since alloc_contig_range() calls
+> set_migratetype_isolate() for each block) and next __rmqueue_fallback() may
+> convert the whole pageblock to MIGRATE_MOVABLE.
+> 
+> I know, this sounds crazy and improbable, but I couldn't find an easier path
+> to destruction.  As you pointed, once the page is allocated, free_hot_cold_page()
+> will do the right thing by reading pageblock's migrate type.
+> 
 
-> Might be worth flagging this for the stable kernels as well
-> (CC: stable at kernel.org).
+Ok, it's crazy but the problem is there.
 
-    The new address is stable at vger.kernel.org as Greg KH wrote.
+> Marek is currently experimenting with various patches including the following
+> change:
+> 
+> #ifdef CONFIG_CMA
+>                 int mt = get_pageblock_migratetype(page);
+>                 if (is_migrate_cma(mt) || mt == MIGRATE_ISOLATE)
+>                         set_page_private(page, mt);
+>                 else
+> #endif
+>                         set_page_private(page, migratetype);
+> 
+> As a matter of fact, if __rmqueue() was changed to return migrate type of the
+> freelist it took page from, we could avoid this get_pageblock_migratetype() all
+> together.  For now, however, I'd rather not go that way just yet -- I'll be happy
+> to dig into it once CMA gets merged.
+> 
 
-WBR, Sergei
+Ok, thanks for persisting with this.
+
+-- 
+Mel Gorman
+SUSE Labs
