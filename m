@@ -1,94 +1,87 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 Feb 2012 22:44:48 +0100
-Subject: [PATCH V2 1/4] pinctrl: add a driver for NVIDIA Tegra
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E124DB9@HQMAIL01.nvidia.com>
-References: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
- <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
- <201202021533.14650.arnd@arndb.de>
- <CACRpkdbMPrvN80cLyVLUNvTjx4ZV4iLeHcJaJyM_qvTHHAfWww@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178E124DB9@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdbOjNTGJ1F9OsoJuA4ymh5=AMAGAWK-gUcsLbEB+PSENg@mail.gmail.com>
+From: neilb@suse.de (NeilBrown)
+Date: Sat, 4 Feb 2012 08:59:40 +1100
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1202031255330.27947@utopia.booyaka.com>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <alpine.DEB.2.00.1202031255330.27947@utopia.booyaka.com>
+Message-ID: <20120204085940.2de44594@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2012 at 6:50 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Linus Walleij wrote at Friday, February 03, 2012 7:57 AM:
->> Which is actually bad enough for me to have second thoughts on
->> this.
->>
->> So I'm taking this branch off from -next until we resolve this.
->
-> Seriously? That's lame.
+On Fri, 3 Feb 2012 13:10:28 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
 
-I'm not saying I won't add it back in when we've discussed
-this some more.
+> One other comment..
+> 
+> On Fri, 3 Feb 2012, NeilBrown wrote:
+> 
+> > On Thu, 2 Feb 2012 22:45:53 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
+> > 
+> > > On Fri, 3 Feb 2012, NeilBrown wrote:
+> > > 
+> > > > I can remove this effect with:
+> > > > 
+> > > > diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> > > > index f809041..c7ef760 100644
+> > > > --- a/drivers/tty/serial/omap-serial.c
+> > > > +++ b/drivers/tty/serial/omap-serial.c
+> > > > @@ -440,7 +440,8 @@ static unsigned int serial_omap_tx_empty(struct uart_port *port)
+> > > >  	spin_lock_irqsave(&up->port.lock, flags);
+> > > >  	ret = serial_in(up, UART_LSR) & UART_LSR_TEMT ? TIOCSER_TEMT : 0;
+> > > >  	spin_unlock_irqrestore(&up->port.lock, flags);
+> > > > -	pm_runtime_put(&up->pdev->dev);
+> > > > +	pm_runtime_mark_last_busy(&up->pdev->dev);
+> > > > +	pm_runtime_put_autosuspend(&up->pdev->dev);
+> > > >  	return ret;
+> > > >  }
+> 
+> It's a little surprising that this helps.  The pm_runtime_get*() and 
+> _put*() in serial_omap_tx_empty() are just intended to ensure that the 
+> UART's clocks are running for that LSR register read.
+> 
+> Considering your theory that the UART clocks are being cut while there's 
+> still data in the FIFO, you might consider removing this code at the end 
+> of transmit_chars():
+> 
+> 	if (uart_circ_empty(xmit))
+> 		serial_omap_stop_tx(&up->port);
 
-Several involved people are going to meet in person next week to
-discuss this, so let's see what kind of conclusions we can come to.
+I read the code and chickened out of just removing that.
+serial_omap_stop_tx seem to do 2 things:
+ 1/ tell the uart to stop sending interrupts when the tx fifo is empty
+ 2/ set forceidle (really smartidle) on the uart.
 
-Try to see it from my point of view: when I presented the pinctrl
-subsystem to Torvalds it was with the promise that this would
-shrink the stuff stacking up in arch/arm/*, naturally I am afraid
-of breaking that promise.
+I didn't feel comfortable removing '1' as I thought it might generate an
+interrupt storm .. maybe not.
+Instead I just removed '2'.  In fact I replaced the 'set_forceidle' call with
+'set_noidle'.  So the uart should never report that it was idle.
 
-If the end result is that none of the pinctrl stuff gets pulled for
-the next merge window, it will hit us all. For that reason I am
-requesting more consensus.
+I did this with my other patch removed so pm_runtime_put() was still being
+called.
 
-What speaks for it, even though it adds a few thousand lines,
-is that the added lines are functionality growth, so after this
-the T20 and T30 pin muxing is *complete*, and the versions
-that used to live up in arch/arm were *incomplete* which
-is nice.
+Result:  I still get corruption.
+So having the UART say "no, I'm not idle" does *not* stop the clock
+being turned off when we use omap_hwmod_idle() to turn off the clocks.
 
-What we need to figure out is if we really must have all these
-lines of code. And I must have something I can write in
-my pull request that justifies it. So I want help with that.
+When we turn off a clock, if that is the last clock in the clock-domain, we
+also turn off the clock-domain (I think).
+Could it be that the clock-domain doesn't do any handshaking with modules,
+and so turns off the clocks even though they are being used?
 
->> (A) open-coded in the driver or
->> (B) provided as data in the device tree
->
-> There's really no need for everyone to do the same thing here; it's an
-> issue that's completely isolated within the individual drivers, and has
-> no effect outside of them, other than kernel size in a multi-SoC kernel.
->
-> The main issue with (B) is that it slows down boot time measurably by
-> requiring a ton of data to be parsed from it, which entails a bunch of
-> string handling. And then, you end up with exactly the same data as if
-> you'd just bundled it into the kernel in the first place.
-
-That is for a tailored image for one system. If you compile in a few
-dozen platforms as is the goal of the single uImage. In which case
-we only end up with the stuff from one device tree and a few slim
-drivers with no data in them. (As observed by Arnd.)
-
-But I think we could say that if one is preparing a multi-platform
-kernel, one should also take the hit of using an initramfs and as
-much modules as possible.
-
->> nVidia Tegra have opted for the former, Texas OMAP for the latter.
->> The in-kernel drivers also do like Tegra. However they
->> are smaller due to less combinatorics.
->
-> Well, I think not so much because the SoCs don't have the same number of
-> combinations, but that the drivers don't support all the HW's options.
-
-Yes that's true, we certainly have these different ideas as to
-whether the driver shall present all possible options or just
-the subset used by current kernel board files. Maybe I should
-implement all of U300's pin control just to get an idea of how
-much it really is, for comparison.
-
-> Rather, it might be interesting to pursue building the pinctrl drivers
-> as modules, but somehow binding them into the kernel image itself, and
-> allowing them to be unloaded (like __init functions and __initdata) once
-> we know they aren't used. That's somewhat similar to an initramfs, but
-> avoids the need to package everything into a filesystem and explicitly
-> load it before it can be used.
-
-That is a pretty interesting approach if it could be made to work, but
-since the sectioning is done at compile-time I think the currently
-endorsed mechanism is using modules and initramfs:es for this.
-
-Yours,
-Linus Walleij
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120204/73feba82/attachment.sig>
