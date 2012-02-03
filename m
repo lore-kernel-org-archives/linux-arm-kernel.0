@@ -1,56 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:54:54 +0000
-Subject: [PATCH 01/20] ARM: sa1111: fix memory request/grant setup on PM events
+Date: Fri, 03 Feb 2012 19:55:14 +0000
+Subject: [PATCH 02/20] ARM: sa1111: fix PWM state on suspend
 In-Reply-To: <20120203195419.GH14129@n2100.arm.linux.org.uk>
 References: <20120203195419.GH14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtPDi-00043Y-D8@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtPE2-00043c-H6@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We weren't re-enabling the memory request/grant signals on resume,
-causing DMA devices on the sa1111 to fail.
+We should not write to the SA1111 registers after setting the SLEEP
+bit.  Moreover, the manual says that the PWM registers should be
+disabled before we enter sleep.  So, move the clearing of these
+registers earlier in the suspend sequence.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/common/sa1111.c |   12 +++++++++++-
- 1 files changed, 11 insertions(+), 1 deletions(-)
+ arch/arm/common/sa1111.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 61691cd..c7bed30 100644
+index c7bed30..f0d9faa 100644
 --- a/arch/arm/common/sa1111.c
 +++ b/arch/arm/common/sa1111.c
-@@ -87,7 +87,8 @@
- #define IRQ_S0_BVD1_STSCHG	(53)
- #define IRQ_S1_BVD1_STSCHG	(54)
+@@ -905,6 +905,9 @@ static int sa1111_suspend(struct platform_device *dev, pm_message_t state)
+ 	save->skpwm0   = sa1111_readl(base + SA1111_SKPWM0);
+ 	save->skpwm1   = sa1111_readl(base + SA1111_SKPWM1);
  
--extern void __init sa1110_mb_enable(void);
-+extern void sa1110_mb_enable(void);
-+extern void sa1110_mb_disable(void);
- 
- /*
-  * We keep the following data for the overall SA1111.  Note that the
-@@ -926,6 +927,10 @@ static int sa1111_suspend(struct platform_device *dev, pm_message_t state)
- 
- 	spin_unlock_irqrestore(&sachip->lock, flags);
- 
-+#ifdef CONFIG_ARCH_SA1100
-+	sa1110_mb_disable();
-+#endif
++	sa1111_writel(0, sachip->base + SA1111_SKPWM0);
++	sa1111_writel(0, sachip->base + SA1111_SKPWM1);
 +
- 	return 0;
- }
- 
-@@ -966,6 +971,11 @@ static int sa1111_resume(struct platform_device *dev)
+ 	base = sachip->base + SA1111_INTC;
+ 	save->intpol0  = sa1111_readl(base + SA1111_INTPOL0);
+ 	save->intpol1  = sa1111_readl(base + SA1111_INTPOL1);
+@@ -920,8 +923,6 @@ static int sa1111_suspend(struct platform_device *dev, pm_message_t state)
  	 */
- 	sa1111_wake(sachip);
+ 	val = sa1111_readl(sachip->base + SA1111_SKCR);
+ 	sa1111_writel(val | SKCR_SLEEP, sachip->base + SA1111_SKCR);
+-	sa1111_writel(0, sachip->base + SA1111_SKPWM0);
+-	sa1111_writel(0, sachip->base + SA1111_SKPWM1);
  
-+#ifdef CONFIG_ARCH_SA1100
-+	/* Enable the memory bus request/grant signals */
-+	sa1110_mb_enable();
-+#endif
-+
- 	/*
- 	 * Only lock for write ops. Also, sa1111_wake must be called with
- 	 * released spinlock!
+ 	clk_disable(sachip->clk);
+ 
 -- 
 1.7.4.4
