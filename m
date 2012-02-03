@@ -1,39 +1,42 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 03 Feb 2012 12:55:05 -0800
-Subject: [PATCH 1/2] pinmux: Export pinmux_register_mappings for pinmux modules
-In-Reply-To: <20120203205049.4089.74610.stgit@kaulin.local>
-References: <20120203205049.4089.74610.stgit@kaulin.local>
-Message-ID: <20120203205505.4089.67339.stgit@kaulin.local>
+Date: Fri, 03 Feb 2012 12:54:58 -0800
+Subject: [PATCH 0/2] Initial DT only generic pinctrl-simple driver
+Message-ID: <20120203205049.4089.74610.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With devidce tree based pinmux drivers we may not have
-static pinmux mappings as they can be dynamically created
-based on the device tree entries.
+Hi all,
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Here's finally something that mostly works for omap2/3/4, this
+is now using a minimal subset of the mux bindings posted earlier
+by Stephen Warren.
+
+No support for alternative modes at this point, bunch of features
+missing.. And the map allocation is copying things unnecessarily
+right now. But basically this is what I promised to post few
+weeks ago as pinmux-simple.
+
+Hmm, how should we mark the pinmux hogs in .dts?
+
+Regards,
+
+Tony
+
 ---
- drivers/pinctrl/pinmux.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 7c3193f..140d207 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -338,7 +338,7 @@ EXPORT_SYMBOL_GPL(pinmux_gpio_direction_output);
-  * passed into this function will be owned by the pinmux core and cannot be
-  * freed.
-  */
--int __init pinmux_register_mappings(struct pinmux_map const *maps,
-+int pinmux_register_mappings(struct pinmux_map const *maps,
- 				    unsigned num_maps)
- {
- 	void *tmp_maps;
-@@ -402,6 +402,7 @@ int __init pinmux_register_mappings(struct pinmux_map const *maps,
- 	pinmux_maps_num += num_maps;
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(pinmux_register_mappings);
- 
- /**
-  * acquire_pins() - acquire all the pins for a certain function on a pinmux
+Tony Lindgren (2):
+      pinmux: Export pinmux_register_mappings for pinmux modules
+      pinctrl: Add simple pinmux driver using device tree data
+
+
+ .../devicetree/bindings/pinmux/pinctrl-simple.txt  |   62 +
+ drivers/pinctrl/Kconfig                            |    6 
+ drivers/pinctrl/Makefile                           |    1 
+ drivers/pinctrl/pinctrl-simple.c                   | 1286 ++++++++++++++++++++
+ drivers/pinctrl/pinmux.c                           |    3 
+ 5 files changed, 1357 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinmux/pinctrl-simple.txt
+ create mode 100644 drivers/pinctrl/pinctrl-simple.c
+
+-- 
+Signature
