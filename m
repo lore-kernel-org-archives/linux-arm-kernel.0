@@ -1,106 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 3 Feb 2012 09:58:54 -0800
-Subject: [PATCH V2 1/4] pinctrl: add a driver for NVIDIA Tegra
-In-Reply-To: <CACRpkdbMPrvN80cLyVLUNvTjx4ZV4iLeHcJaJyM_qvTHHAfWww@mail.gmail.com>
-References: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
- <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
- <201202021533.14650.arnd@arndb.de>
- <CACRpkdbMPrvN80cLyVLUNvTjx4ZV4iLeHcJaJyM_qvTHHAfWww@mail.gmail.com>
-Message-ID: <20120203175854.GC1426@atomide.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sat, 4 Feb 2012 02:13:54 +0800
+Subject: Pinmux bindings proposal V2
+In-Reply-To: <20120203173205.GB1426@atomide.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
+ <20120201143530.GA2203@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF178E124AC5@HQMAIL01.nvidia.com>
+ <CAA+hA=RpkP-FFAr8wqVPjSKEMvO_sRHmOK_9nUYfuW=ps0O_=Q@mail.gmail.com>
+ <20120203173205.GB1426@atomide.com>
+Message-ID: <CAA+hA=QFB7x0yv65LMuLx1exmiUAuB98D+9Fyyk9oeVu+7F2QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Feb 4, 2012 at 1:32 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Dong Aisheng <dongas86@gmail.com> [120202 11:36]:
+>>
+>> Actually i think i'd rather do not use config property, then i could
+>> be more compact:
+>> (anyway it's another issue and is flexible to be controlled by #pinmux-cells)
+>> pinctrl_usdhc4: pinconfig-usdhc4 {
+>> ? ? ? ? /* 0: pin 1: group */
+>> ? ? ? ? mux-entity = <0>;
+>> ? ? ? ? func-name = "usdhc4func";
+>> ? ? ? ? grp-name = "usdhc4grp";
+>
+> The func-name and grp-name should be optional here.
+> This mux entry is already the group, and can be used as
+> the group name.
+For the case i discussed here, the mux entry is PIN.
+(the mux-entity value is 0).
+we introduce this value here for treating all pins is one group.
+When do map parsing, only one pinmux map will be created.
+So we need a grp-name.
+And we also need a func-name here for construct pinmux map.
 
-* Linus Walleij <linus.walleij@linaro.org> [120203 06:26]:
-> On Thu, Feb 2, 2012 at 4:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I guess if we could move the per-board pinmux data into dts files,
-> > that would mean we could actually get rid of the per-board source
-> > files in tegra, right?
-> 
-> If you mean these:
-> 
->  arch/arm/mach-tegra/board-harmony-pinmux.c        |  362 ++-
->  arch/arm/mach-tegra/board-paz00-pinmux.c          |  362 ++-
->  arch/arm/mach-tegra/board-pinmux.c                |   62 +-
->  arch/arm/mach-tegra/board-pinmux.h                |   39 +-
->  arch/arm/mach-tegra/board-seaboard-pinmux.c       |  442 ++-
->  arch/arm/mach-tegra/board-trimslice-pinmux.c      |  366 ++-
-> 
-> Then the answer is yes.
-> 
-> But not if you mean these:
-> 
->  drivers/pinctrl/pinctrl-tegra20.c                 | 2860 ++++++++++++++++
->  drivers/pinctrl/pinctrl-tegra30.c                 | 3726 +++++++++++++++++++++
-> 
-> Because the large number of lines come from SoC
-> properties rather than board properties.
-> 
-> The big issue here is whether SoC hardware block
-> properties (such as the pins and their names, and their
-> groups) should be:
-> 
-> (A) open-coded in the driver or
-> (B) provided as data in the device tree
-> 
-> nVidia Tegra have opted for the former, Texas OMAP for the latter.
-> The in-kernel drivers also do like Tegra. However they
-> are smaller due to less combinatorics.
-> 
-> This means that the Tegra driver gets (quite a bit) bigger and
-> the OMAP driver (quite a bit) smaller.
+> And the function name can be generated
+> dynamically in most cases. I'm currently using np->full_name
+> of the driver claiming these pins as the function name.
+>
+Why i did not use np->name as function name is because the np->name
+can be different
+while actually these nodes may represent the same function but just
+different pins, so the function name should be same.
 
-Well I think both A and B should be supported, and also
-support a combination of A and B in the same driver if
-needed.
+>> ? ? ? ? mux =
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_CMD ?0 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_CLK ?0 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT0 1 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT1 1 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT2 1 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT3 1 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT4 1 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT5 1 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT6 1 MX6Q_USDHC_PAD_CTRL>
+>> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT7 1 MX6Q_USDHC_PAD_CTRL>;
+>> };
+>
+> For listing basic pins this format works fine for me. It seems
+> to have low overhead for parsing. And the width of the array
+> can be driver specific.
+>
+> Looks like it's the binding for altenative states that's still a
+> bit open..
+>
+Yes, it does not have states support.
 
-For doing DT only pinmux driver, my observations so far are:
+> So how about let's first standardize on the mux format above?
+>
+I'm afraid it may be hard for us to standardize the mux format for a
+standard binding in pinctrl core due to  hw difference.
+I'm think the new way which i sent in this thread after the mail you replied.
+You can refer to them to see if it's reasonable for you too.
 
-1. Most of the pinmux data in the drivers is only needed for
-   debugging and actually not needed in the driver at all.
-
-   The pinmux driver can get away without knowing what the
-   settings are, it just needs to know where the registers
-   are and how they should set based on the board specific
-   .dts configuration.
-
-2. Knowing how the pinmux registers are set is crucial for
-   debugging. But this all can be done with userspace tools
-   using pinctrl debugfs entries. So again the pinmux driver
-   just needs to know just "how many, what type of registers,
-   and where they are".
-
-3. The board specific pinmux configuration for groups and values
-   can be passed from .dts files without passing any strings
-   in most cases. Once we have preprocessor working, the .dts
-   mux configuration should be quite readable.
-
-> > Will it be possible to eventually put the pinmux driver into a loadable
-> > module?
-> 
-> Tony had made it possible to have pinctrl drivers as modules,
-> but some systems may need their pin control up before
-> they even bring up the filesystem :-(
-
-For development work loadable modules are much nicer to work with ;)
-
-Loadable modules also automatically cut away the SoC specific
-spaghetti calls as things need to work in a standard way limited
-to EXPORT_SYMBOL.
-
-So in general, from sanity checking point of view, we should
-probably require that anything under drivers at least builds
-as a loadable module.
-
-> Booting from initramfs and switchroot can solve the above
-> but will slow down boot I believe, and ARM systems
-> usually don't like that.
-
-Yeah I guess for now most people would want to build it in.
-Then when ARM distros will be able to use the common zImage,
-most people will probably switch to initramfs based boot.
-
-Regards,
-
-Tony
+Regards
+Dong Aisheng
