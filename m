@@ -1,87 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:16:12 +0000
-Subject: [PATCH 2/3] ARM: sa11x0: fix sleep entry
+Date: Fri, 03 Feb 2012 19:16:32 +0000
+Subject: [PATCH 3/3] ARM: sa11x0: fix section mismatch warnings
 In-Reply-To: <20120203191528.GE14129@n2100.arm.linux.org.uk>
 References: <20120203191528.GE14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtOcG-0005gL-DC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtOca-0005gP-HG@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes, we get stuck while trying to enter sleep.  This seems
-to occur if we do not have udelay() in the instruction cache. Avoid
-this by requesting a short delay prior to modifying the SDRAM timings.
+Neponset calls sa1110_mb_disable() from __devinit code, but
+sa1110_mb_disable() is marked __init, and so causes a section
+mismatch warning.
+
+As sa1110_mb_enable() and sa1110_mb_disable() need to be callable
+from suspend/resume paths as well, they must not be marked __init
+or __devinit.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/sleep.S |   37 ++++++++++++++++++++++---------------
- 1 files changed, 22 insertions(+), 15 deletions(-)
+ arch/arm/common/sa1111.c       |    2 +-
+ arch/arm/mach-sa1100/generic.c |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/sleep.S b/arch/arm/mach-sa1100/sleep.S
-index e822331..30cc672 100644
---- a/arch/arm/mach-sa1100/sleep.S
-+++ b/arch/arm/mach-sa1100/sleep.S
-@@ -26,27 +26,36 @@
-  *
-  * Causes sa11x0 to enter sleep state
-  *
-+ * Must be aligned to a cacheline.
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index 61691cd..bf508a7 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -87,7 +87,7 @@
+ #define IRQ_S0_BVD1_STSCHG	(53)
+ #define IRQ_S1_BVD1_STSCHG	(54)
+ 
+-extern void __init sa1110_mb_enable(void);
++extern void sa1110_mb_enable(void);
+ 
+ /*
+  * We keep the following data for the overall SA1111.  Note that the
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index bb10ee2..0e356bb 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -428,7 +428,7 @@ void __init sa1100_map_io(void)
+  * the MBGNT signal false to ensure the SA1111 doesn't own the
+  * SDRAM bus.
   */
--
-+	.balign	32
- ENTRY(sa1100_finish_suspend)
- 	@ disable clock switching
- 	mcr	p15, 0, r1, c15, c2, 2
+-void __init sa1110_mb_disable(void)
++void sa1110_mb_disable(void)
+ {
+ 	unsigned long flags;
  
--        @ Adjust memory timing before lowering CPU clock
--	@ Clock speed adjustment without changing memory timing makes
--	@ CPU hang in some cases
--        ldr     r0, =MDREFR
--        ldr     r1, [r0]
--        orr     r1, r1, #MDREFR_K1DB2
--        str     r1, [r0]
-+	ldr	r6, =MDREFR
-+	ldr	r4, [r6]
-+	orr     r4, r4, #MDREFR_K1DB2
-+	ldr	r5, =PPCR
-+
-+	@ Pre-load __udelay into the I-cache
-+	mov	r0, #1
-+	bl	__udelay
-+	mov	r0, r0
-+
-+	@ The following must all exist in a single cache line to
-+	@ avoid accessing memory until this sequence is complete,
-+	@ otherwise we occasionally hang.
-+
-+	@ Adjust memory timing before lowering CPU clock
-+	str     r4, [r6]
+@@ -447,7 +447,7 @@ void __init sa1110_mb_disable(void)
+  * If the system is going to use the SA-1111 DMA engines, set up
+  * the memory bus request/grant pins.
+  */
+-void __devinit sa1110_mb_enable(void)
++void sa1110_mb_enable(void)
+ {
+ 	unsigned long flags;
  
- 	@ delay 90us and set CPU PLL to lowest speed
- 	@ fixes resume problem on high speed SA1110
- 	mov	r0, #90
- 	bl	__udelay
--	ldr	r0, =PPCR
- 	mov	r1, #0
--	str	r1, [r0]
-+	str	r1, [r5]
- 	mov	r0, #90
- 	bl	__udelay
- 
-@@ -85,12 +94,10 @@ ENTRY(sa1100_finish_suspend)
- 	bic	r5, r5, #FMsk(MSC_RT)
- 	bic	r5, r5, #FMsk(MSC_RT)<<16
- 
--	ldr	r6, =MDREFR
--
- 	ldr	r7, [r6]
--bic	r7, r7, #0x0000FF00
--bic	r7, r7, #0x000000F0
--orr	r8, r7, #MDREFR_SLFRSH
-+	bic	r7, r7, #0x0000FF00
-+	bic	r7, r7, #0x000000F0
-+	orr	r8, r7, #MDREFR_SLFRSH
- 
- 	ldr	r9, =MDCNFG
- 	ldr	r10, [r9]
 -- 
 1.7.4.4
