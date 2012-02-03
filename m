@@ -1,113 +1,61 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 2 Feb 2012 17:19:28 -0800
-Subject: [linux-pm] [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <20120201180705.GA20936@e102568-lin.cambridge.arm.com>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <4F1929E9.7070707@linaro.org>
- <CAMbhsRTbVqV6p0py9NGZrpFPf2yvp-B0dr+o-m7qbdja_-Lfzw@mail.gmail.com>
- <CAKfTPtAsO8z_8AnR8zSGZ9cm_7orDNxB3r09JAFk+2jdezUVmQ@mail.gmail.com>
- <CAMbhsRQYVXTZ2pX4mBrM6=SyGTqn_GY8xsW4rt_e21zerEzctA@mail.gmail.com>
- <CAKfTPtB3Kcy41H9g9u3u81kEHJeypi=GvOfOjcpdztzqN991nA@mail.gmail.com>
- <20120201145934.GA20421@e102568-lin.cambridge.arm.com>
- <CAMbhsRTFzc8aGsSGUs2==4FiqBb7zOit4cO=6U698k+RCE+kqQ@mail.gmail.com>
- <20120201180705.GA20936@e102568-lin.cambridge.arm.com>
-Message-ID: <CAMbhsRSBqyTaCBMjJL-izMK=HSVwY6yQQqPyg0enddo2vymyxA@mail.gmail.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Fri, 03 Feb 2012 09:41:18 +0800
+Subject: [RFC] ARM hugetlb support
+In-Reply-To: <CAHkRjk49uGqFpdUZu0hYbHx3jHO9e0qv6OFN-NpwZPg-nnzfcQ@mail.gmail.com>
+References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
+ <CAHkRjk6xZy3Nsy=R05664RM0Sw071rkXmV2g9ySwqiS_BrBLrw@mail.gmail.com>
+ <4F289BE2.9020404@gmail.com>
+ <CAHkRjk49uGqFpdUZu0hYbHx3jHO9e0qv6OFN-NpwZPg-nnzfcQ@mail.gmail.com>
+Message-ID: <4F2B3B3E.6080807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2012 at 10:07 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Feb 01, 2012 at 05:30:15PM +0000, Colin Cross wrote:
->> On Wed, Feb 1, 2012 at 6:59 AM, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->> > On Wed, Feb 01, 2012 at 12:13:26PM +0000, Vincent Guittot wrote:
->> >
->> > [...]
->> >
->> >> >> In your patch, you put in safe state (WFI for most of platform) the
->> >> >> cpus that become idle and these cpus are woken up each time a new cpu
->> >> >> of the cluster becomes idle. Then, the cluster state is chosen and the
->> >> >> cpus enter the selected C-state. On ux500, we are using another
->> >> >> behavior for synchronizing ?the cpus. The cpus are prepared to enter
->> >> >> the c-state that has been chosen by the governor and the last cpu,
->> >> >> that enters idle, chooses the final cluster state (according to cpus'
->> >> >> C-state). The main advantage of this solution is that you don't need
->> >> >> to wake other cpus to enter the C-state of a cluster. This can be
->> >> >> quite worth full when tasks mainly run on one cpu. Have you also think
->> >> >> about such behavior when developing the coupled cpuidle driver ? It
->> >> >> could be interesting to add such behavior.
->> >> >
->> >> > Waking up the cpus that are in the safe state is not done just to
->> >> > choose the target state, it's done to allow the cpus to take
->> >> > themselves to the target low power state. ?On ux500, are you saying
->> >> > you take the cpus directly from the safe state to a lower power state
->> >> > without ever going back to the active state? ?I once implemented Tegra
->> >>
->> >> yes it is
->> >
->> > But if there is a single power rail for the entire cluster, when a CPU
->> > is "prepared" for shutdown this means that you have to save the context and
->> > clean L1, maybe for nothing since if other CPUs are up and running the
->> > CPU going idle can just enter a simple standby wfi (clock-gated but power on).
->> >
->> > With Colin's approach, context is saved and L1 cleaned only when it is
->> > almost certain the cluster is powered off (so the CPUs).
->> >
->> > It is a trade-off, I am not saying one approach is better than the
->> > other; we just have to make sure that preparing the CPU for "possible" shutdown
->> > is better than sending IPIs to take CPUs out of wfi and synchronize
->> > them (this happens if and only if CPUs enter coupled C-states).
->> >
->> > As usual this will depend on use cases (and silicon implementations :) )
->> >
->> > It is definitely worth benchmarking them.
->> >
->>
->> I'm less worried about performance, and more worried about race
->> conditions. ?How do you deal with the following situation:
->> CPU0 goes to WFI, and saves its state
->> CPU1 goes idle, and selects a deep idle state that powers down CPU0
->> CPU1 saves is state, and is about to trigger the power down
->> CPU0 gets an interrupt, restores its state, and modifies state (maybe
->> takes a spinlock during boot)
->> CPU1 cuts the power to CPU0
->>
->> On OMAP4, the race is handled in hardware. ?When CPU1 tries to cut the
->> power to the blocks shared by CPU0 the hardware will ignore the
->> request if CPU0 is not in WFI. ?On Tegra2, there is no hardware
->> support and I had to handle it with a spinlock implemented in scratch
->> registers because CPU0 is out of coherency when it starts booting and
->> ldrex/strex don't work. ?I'm not convinced my implementation is
->> correct, and I'd be curious to see any other implementations.
+
+
+On 2012?02?02? 22:38, Catalin Marinas wrote:
+> On 1 February 2012 01:56, bill4carson<bill4carson@gmail.com>  wrote:
+>> On 2012?01?31? 17:29, Catalin Marinas wrote:
+>>> It also doesn't
+>>> help much with the TLB hit rate since the micro-TLB most likely only
+>>> support 1MB sections.
+>> I am afraid I can't agree with you on this.
+>> Truly there is no specific statement about whether micro-TLB support 16MB
+>> super-sections,
+>> but main-TLB actually helps the hit rate, and main-TLB support all page size
+>> mapping.
+> The feedback over time was that 16MB didn't help much in terms of TLB
+> misses compared to 1MB but that was for standard usage. I guess the
+> hugetlbfs has specific scenarios that may benefit.
 >
-> That's a problem you solved with coupled C-states (ie your example in
-> the cover letter), where the primary waits for other CPUs to be reset
-> before issuing the power down command, right ? At that point in time
-> secondaries cannot wake up (?) and if wfi (ie power down) aborts you just
-> take the secondaries out of reset and restart executing simultaneously,
-> correct ? It mirrors the suspend behaviour, which is easier to deal with
-> than completely random idle paths.
+> Anyway, could you make the 2MB/16MB huge page size configurable at
+> boot time (command line option like on other architectures)?
+Actually, only X86 supports multiple page size configuration at boot 
+time, other architectures
+will has fixed huge page size once build.
 
-Yes, anything that supports hotplug and suspend should support coupled
-cpuidle states fairly easily.  The only thing required that is not
-already used by hotplug/suspend is the ability to save and restore
-context on cpu1, but most implementations end up doing that already.
+I'm not sure it's a MUST to support multiple page size at boot time,  
+but I'm sure this will make
+marco "pte_pfn" much more complicated.
 
-> It is true that this should be managed by the PM HW; if HW is not
-> capable of managing these situations things get nasty as you highlighted.
-
-Yes - on some platforms, the HW is not designed to handle it.  On
-others, it is designed to, but due to HW bugs it cannot be used.
-
-> And it is also true ldrex/strex on cacheable memory might not be available in
-> those early warm-boot stages. I came up with a locking algorithm on
-> strongly ordered memory to deal with that, but I am still not sure it is
-> something we really really need.
-
-I did the same, but with device memory.
-
-> I will test coupled C-state code ASAP, and come back with feedback.
+> And also
+> check the ID_MMFR0[31:28] for whether supersections are supported.
 >
-> Thanks,
-> Lorenzo
+Thanks for your tips :)
+
+
+>>> BTW, I have a (simpler) implementation of hugetlbfs with 2MB sections
+>>> but for LPAE only:
+>>>
+>>>
+>>> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=shortlog;h=refs/heads/hugetlb
+>>>
+>> Thanks for your information, I will study your code carefully :)
+> Most of the simplicity comes from the fact that LPAE doesn't need a
+> separate Linux PTE table.
 >
+
+-- 
+I am a slow learner
+but I will keep trying to fight for my dreams!
+
+--bill
