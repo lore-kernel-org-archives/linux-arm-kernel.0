@@ -1,50 +1,93 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 3 Feb 2012 14:04:45 -0700 (MST)
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120204074427.5091fef5@notabene.brown>
-References: <13274430881471@kroah.org>
- <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
- <20120126042155.GA3185@suse.de>
- <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
- <20120126191604.GA15516@suse.de>
- <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
- <20120204074427.5091fef5@notabene.brown>
-Message-ID: <alpine.DEB.2.00.1202031347590.27947@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 3 Feb 2012 13:05:45 -0800
+Subject: Pinmux bindings proposal V2
+In-Reply-To: <CAA+hA=QFB7x0yv65LMuLx1exmiUAuB98D+9Fyyk9oeVu+7F2QQ@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
+ <20120201143530.GA2203@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF178E124AC5@HQMAIL01.nvidia.com>
+ <CAA+hA=RpkP-FFAr8wqVPjSKEMvO_sRHmOK_9nUYfuW=ps0O_=Q@mail.gmail.com>
+ <20120203173205.GB1426@atomide.com>
+ <CAA+hA=QFB7x0yv65LMuLx1exmiUAuB98D+9Fyyk9oeVu+7F2QQ@mail.gmail.com>
+Message-ID: <20120203210545.GE1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 Feb 2012, NeilBrown wrote:
+* Dong Aisheng <dongas86@gmail.com> [120203 09:42]:
+> On Sat, Feb 4, 2012 at 1:32 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Dong Aisheng <dongas86@gmail.com> [120202 11:36]:
+> >>
+> >> Actually i think i'd rather do not use config property, then i could
+> >> be more compact:
+> >> (anyway it's another issue and is flexible to be controlled by #pinmux-cells)
+> >> pinctrl_usdhc4: pinconfig-usdhc4 {
+> >> ? ? ? ? /* 0: pin 1: group */
+> >> ? ? ? ? mux-entity = <0>;
+> >> ? ? ? ? func-name = "usdhc4func";
+> >> ? ? ? ? grp-name = "usdhc4grp";
+> >
+> > The func-name and grp-name should be optional here.
+> > This mux entry is already the group, and can be used as
+> > the group name.
+> For the case i discussed here, the mux entry is PIN.
+> (the mux-entity value is 0).
+> we introduce this value here for treating all pins is one group.
+> When do map parsing, only one pinmux map will be created.
+> So we need a grp-name.
+> And we also need a func-name here for construct pinmux map.
 
-> On Fri, 3 Feb 2012 12:42:22 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
+Sounds like a similar setup I have, I do not need any func-name
+or grp-name though.. The group name is already unique with
+pinconfig-usdhc4 in your example?
+ 
+> > And the function name can be generated
+> > dynamically in most cases. I'm currently using np->full_name
+> > of the driver claiming these pins as the function name.
 >
-> > Case 1 is expected and is almost certainly not a bug.  As Neil mentioned 
-> > it should be bps-rate dependent.  It occurs when the first character 
-> > transmitted to the OMAP wakes the chip up via I/O ring/chain wakeup.
-> > I/O ring/chain wakeup is driven by a 32KiHz clock and is therefore 
-> > relatively high-latency.  So this could easily cause the first character 
-> > or first few characters to be lost or corrupted, depending on the exact 
-> > sequence of events, the low power state that the chip was in, etc.
-> 
-> A 32KiHz cycles every 30mSec.
-> At 115200 bps, there is one bit every 8.7 microseconds.
-> 
-> When I type "return" - which looks like 0101100001111... on the wire,
-> I see '0xC3' which looks like 011000011111... on the wire.
-> So we lost exactly 2 bits, or a delay around 17 microseconds.
-> 
-> I find it hard to reconcile that delay with the cause being a 32KiHZ clock.
+> Why i did not use np->name as function name is because the np->name
+> can be different
+> while actually these nodes may represent the same function but just
+> different pins, so the function name should be same.
 
-If you're not disabling the HF clock oscillator via the AUTOEXTCLKMODE 
-bits, the wakeup logic may be getting clocked by the sys_clk, which is 
-quite a bit faster.  That might explain the corruption patterns you're 
-seeing.
+I used a function name based on the group name initially
+(pinconfig-usdhc4 in your example), then renamed it to the
+np->full_name of the device requesting the mux when the
+mux was found ;)
 
+> >> ? ? ? ? mux =
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_CMD ?0 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_CLK ?0 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT0 1 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT1 1 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT2 1 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT3 1 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT4 1 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT5 1 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT6 1 MX6Q_USDHC_PAD_CTRL>
+> >> ? ? ? ? ? ? ? ? <MX6Q_SD4_DAT7 1 MX6Q_USDHC_PAD_CTRL>;
+> >> };
+> >
+> > For listing basic pins this format works fine for me. It seems
+> > to have low overhead for parsing. And the width of the array
+> > can be driver specific.
+> >
+> > Looks like it's the binding for altenative states that's still a
+> > bit open..
+> >
+> Yes, it does not have states support.
+> 
+> > So how about let's first standardize on the mux format above?
+> >
+> I'm afraid it may be hard for us to standardize the mux format for a
+> standard binding in pinctrl core due to  hw difference.
 
-- Paul
+Yes the width would have to be hardare specific for the array.
+
+> I'm think the new way which i sent in this thread after the mail you replied.
+> You can refer to them to see if it's reasonable for you too.
+
+Hmm, sorry now I'm confused. Got a link for that mail as so
+many have been posted?
+
+Regards,
+
+Tony
