@@ -1,73 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 20:10:33 +0000
-Subject: [PATCH 5/5] USB: sa1111: add hcd .reset method
-In-Reply-To: <20120203200406.GI14129@n2100.arm.linux.org.uk>
-References: <20120203200406.GI14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtPSr-00048k-6G@rmk-PC.arm.linux.org.uk>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 3 Feb 2012 12:23:34 -0800
+Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
+In-Reply-To: <1328299375.5882.204.camel@gandalf.stny.rr.com>
+References: <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
+ <4F2B1307.5010207@gmail.com>
+ <1328223819.5882.133.camel@gandalf.stny.rr.com>
+ <20120202232736.GL2518@linux.vnet.ibm.com>
+ <1328237131.5882.135.camel@gandalf.stny.rr.com>
+ <20120203060458.GF2380@linux.vnet.ibm.com>
+ <1328295309.5882.178.camel@gandalf.stny.rr.com>
+ <20120203194005.GK2382@linux.vnet.ibm.com>
+ <1328299375.5882.204.camel@gandalf.stny.rr.com>
+Message-ID: <20120203202334.GM2382@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the .reset method to the HCD, and update the .start method
-accordingly for this change.
+On Fri, Feb 03, 2012 at 03:02:55PM -0500, Steven Rostedt wrote:
+> On Fri, 2012-02-03 at 11:40 -0800, Paul E. McKenney wrote:
+> 
+> > So the idea is that if you have a trace event that is to be used in idle,
+> > you use TRACE_EVENT_IDLE() rather than TRACE_EVENT() to declare that
+> > trace event?  That would work for me, and might make for fewer changes
+> > for the architecture guys.  Also, this should address the code-size
+> > concerns we discussed yesterday.
+> > 
+> > So sounds good!
+> > 
+> > Is a DEFINE_EVENT_IDLE() also needed?  Or prehaps a
+> > DECLARE_EVENT_CLASS_IDLE()?  My guess is "yes" for at least one of the
+> > two based on include/trace/events/power.h.
+> 
+> I'll have to take a look. I may even find a better way to do this too.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/usb/host/ohci-sa1111.c |   20 +++++++++++---------
- 1 files changed, 11 insertions(+), 9 deletions(-)
+Better is always better.  ;-)
 
-diff --git a/drivers/usb/host/ohci-sa1111.c b/drivers/usb/host/ohci-sa1111.c
-index 95c3f0f..e1004fb 100644
---- a/drivers/usb/host/ohci-sa1111.c
-+++ b/drivers/usb/host/ohci-sa1111.c
-@@ -55,22 +55,25 @@ static void dump_hci_status(struct usb_hcd *hcd, const char *label)
- }
- #endif
- 
-+static int ohci_sa1111_reset(struct usb_hcd *hcd)
-+{
-+	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
-+
-+	ohci_hcd_init(ohci);
-+	return ohci_init(ohci);
-+}
-+
- static int __devinit ohci_sa1111_start(struct usb_hcd *hcd)
- {
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
- 	int ret;
- 
--	ret = ohci_init(ohci);
--	if (ret < 0)
--		return ret;
--
- 	ret = ohci_run(ohci);
- 	if (ret < 0) {
--		err("can't start %s", hcd->self.bus_name);
-+		ohci_err(ohci, "can't start\n");
- 		ohci_stop(hcd);
--		return ret;
- 	}
--	return 0;
-+	return ret;
- }
- 
- static const struct hc_driver ohci_sa1111_hc_driver = {
-@@ -87,6 +90,7 @@ static const struct hc_driver ohci_sa1111_hc_driver = {
- 	/*
- 	 * basic lifecycle operations
- 	 */
-+	.reset =		ohci_sa1111_reset,
- 	.start =		ohci_sa1111_start,
- 	.stop =			ohci_stop,
- 	.shutdown =		ohci_shutdown,
-@@ -200,8 +204,6 @@ static int ohci_hcd_sa1111_probe(struct sa1111_dev *dev)
- 	if (ret)
- 		goto err2;
- 
--	ohci_hcd_init(hcd_to_ohci(hcd));
--
- 	ret = usb_add_hcd(hcd, dev->irq[1], 0);
- 	if (ret == 0)
- 		return ret;
--- 
-1.7.4.4
+> > I will keep RCU_NONIDLE() for at least a little while (reworking comments
+> > to point out TRACE_EVENT_IDLE() and friends) in case there turn out to
+> > be non-tracepoint uses of RCU in the idle loop.
+> 
+> OK, I'll take a crack at this next Monday.
+
+Sounds good!
+
+I plan to push my stack to -next later today, but will yank my cpuidle
+commit as soon as your approach is available.  They do not conflict
+because the rcu_idle_enter()s nest.
+
+							Thanx, Paul
