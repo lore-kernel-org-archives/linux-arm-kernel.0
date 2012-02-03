@@ -1,50 +1,33 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 3 Feb 2012 14:32:14 +0100
-Subject: [PATCH 1/1] arm: vfp: Raising SIGFPE on invalid floating point
- operation
-In-Reply-To: <1328258184-23082-1-git-send-email-consul.kautuk@gmail.com>
-References: <1328258184-23082-1-git-send-email-consul.kautuk@gmail.com>
-Message-ID: <20267.57822.537801.969721@pilspetsen.it.uu.se>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 Feb 2012 22:02:41 +0800
+Subject: Pinmux bindings proposal V2
+In-Reply-To: <CAA+hA=RpkP-FFAr8wqVPjSKEMvO_sRHmOK_9nUYfuW=ps0O_=Q@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
+ <20120201143530.GA2203@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF178E124AC5@HQMAIL01.nvidia.com>
+ <CAA+hA=RpkP-FFAr8wqVPjSKEMvO_sRHmOK_9nUYfuW=ps0O_=Q@mail.gmail.com>
+Message-ID: <20120203140238.GC12915@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kautuk Consul writes:
- > There is a lot of ARM/VFP hardware which does not invoke the
- > undefined instruction exception handler (i.e. __und_usr) at all
- > even in case of an invalid floating point operation in usermode.
- > For example, 100.0 divided by 0.0 will not lead to the undefined
- > instruction exception being called by the processor although the
- > hardware does reliably set the DZC bit in the FPSCR.
+On Fri, Feb 03, 2012 at 04:07:23AM +0800, Dong Aisheng wrote:
+...
+> However If IMX uses the data model i described above, the binding is
+> then a little different from tegra. that means we may need to change
+> to  let each soc's pinctrl driver do real pinmux map parsing (maybe
+> add a callback in pinctrl.ops) based on their soc specific pinctrl
+> configuration node like pmx_usdhc4 above instread of let pinctrl core
+> do a standard pinmux map parsing which is our target we discussed so
+> long for.
+> 
+Yeah, this seems a reasonable alternative to me.  Pushing the pinmux_map
+construction down to individual pinctrl driver, who can interpret 'mux'
+property best, will relieve the pinctrl core from understanding the
+property for different cases, so that we can even save the property
+'mux-unit' I asked for.  And doing so somehow aligns with non-dt case,
+where the pinmux_map is constructed by individual pinctrl driver too
+(with help from PINMUX_MAP_* macros in board file).
 
-There is hardware that pretends to support FP exceptions but
-fails to actually do so?  That's awful.  What manufacturers
-and CPU models are affected?
-
- > Currently, the usermode code will simply proceed to execute without
- > the SIGFPE signal being raised on that process thus limiting the
- > developer's knowledge of what really went wrong in his code logic.
- > 
- > This patch enables the kernel to raise the SIGFPE signal when the
- > faulting thread next calls schedule() in any of the following ways:
- > - When the thread is interrupted by IRQ
- > - When the thread calls a system call
- > - When the thread encounters exception
- > 
- > Although the SIGFPE is not delivered at the exact faulting instruction,
- > this patch at least allows the system to handle FPU exception scenarios
- > in a more generic "Linux/Unix" manner.
-
-No, a SIGFPE delivered at the wrong point in time with the wrong
-context in its sigframe is MUCH worse than not getting a SIGFPE
-at all.  (And likewise for all other trap signals, SEGV, ILL, etc.)
-
-I do agree that the application developer must be informed about
-the breakage, but a fake SIGFPE is not appropriate.  Options:
-
-1. a rate-limited printk KERN_WARN that application X tried to
-receive FP exceptions but hardware Y failed to do so
-
-2. a tunable knob somehwere that optionally kills the application
-in the above case
-
-/Mikael
+-- 
+Regards,
+Shawn
