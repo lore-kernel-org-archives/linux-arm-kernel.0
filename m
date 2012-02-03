@@ -1,8 +1,8 @@
 From: neilb@suse.de (NeilBrown)
-Date: Sat, 4 Feb 2012 08:59:40 +1100
+Date: Sat, 4 Feb 2012 09:10:48 +1100
 Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
  in non-DMA" added to tty tree
-In-Reply-To: <alpine.DEB.2.00.1202031255330.27947@utopia.booyaka.com>
+In-Reply-To: <alpine.DEB.2.00.1202031432080.27947@utopia.booyaka.com>
 References: <13274430881471@kroah.org>
  <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
  <20120126042155.GA3185@suse.de>
@@ -13,75 +13,67 @@ References: <13274430881471@kroah.org>
  <20120203150708.386951d2@notabene.brown>
  <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
  <20120203205401.5ddf241d@notabene.brown>
- <alpine.DEB.2.00.1202031255330.27947@utopia.booyaka.com>
-Message-ID: <20120204085940.2de44594@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <20120203231113.25ae2d3a@notabene.brown>
+ <alpine.DEB.2.00.1202031243270.27947@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202031432080.27947@utopia.booyaka.com>
+Message-ID: <20120204091048.00c7e027@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Feb 2012 13:10:28 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
+On Fri, 3 Feb 2012 14:42:09 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
 
-> One other comment..
+> One correction on this part...
 > 
-> On Fri, 3 Feb 2012, NeilBrown wrote:
+> On Fri, 3 Feb 2012, Paul Walmsley wrote:
 > 
-> > On Thu, 2 Feb 2012 22:45:53 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
+> > On Fri, 3 Feb 2012, NeilBrown wrote:
 > > 
-> > > On Fri, 3 Feb 2012, NeilBrown wrote:
+> > > My theory is that there is a delay between the falling RX line waking the
+> > > system up, and the CPU enabling the UART - whether enabling the clocks or
+> > > doing a full config, I am not sure - though I think the former.
 > > > 
-> > > > I can remove this effect with:
-> > > > 
-> > > > diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> > > > index f809041..c7ef760 100644
-> > > > --- a/drivers/tty/serial/omap-serial.c
-> > > > +++ b/drivers/tty/serial/omap-serial.c
-> > > > @@ -440,7 +440,8 @@ static unsigned int serial_omap_tx_empty(struct uart_port *port)
-> > > >  	spin_lock_irqsave(&up->port.lock, flags);
-> > > >  	ret = serial_in(up, UART_LSR) & UART_LSR_TEMT ? TIOCSER_TEMT : 0;
-> > > >  	spin_unlock_irqrestore(&up->port.lock, flags);
-> > > > -	pm_runtime_put(&up->pdev->dev);
-> > > > +	pm_runtime_mark_last_busy(&up->pdev->dev);
-> > > > +	pm_runtime_put_autosuspend(&up->pdev->dev);
-> > > >  	return ret;
-> > > >  }
+> > > Maybe if we could enable the UART clocks immediately after returning from the
+> > > WFI instruction we could avoid the corruption....
+> > 
+> > The PRCM should be re-enabling the UART's functional clock itself, with no 
+> > kernel involvement.  The sequence should go something like this 
+> > (simplified):
+> > 
+> > 1. I/O wakeup occurs
+> > 
+> > 2. CORE & PER powerdomains are awakened
+> > 
+> > 3. The UART notices an event on its input lines and deasserts its idle-ack
 > 
-> It's a little surprising that this helps.  The pm_runtime_get*() and 
-> _put*() in serial_omap_tx_empty() are just intended to ensure that the 
-> UART's clocks are running for that LSR register read.
+> It just occurred to me that, supposedly, the only UART input line that is 
+> attached to the SWAKEUP signal is CTS.  So the UART may not in fact be 
+> able to deassert its idle-ack autonomously at this point.
+
+How does that relate to the RX_CTS_WU_EN bit which enables an interrupt on 
+    "a falling edge of pins RX, nCTS, or nDSR"
+
+This seems to be a "wakeup interrupt", bit it isn't clear what it wakes us.
+
 > 
-> Considering your theory that the UART clocks are being cut while there's 
-> still data in the FIFO, you might consider removing this code at the end 
-> of transmit_chars():
-> 
-> 	if (uart_circ_empty(xmit))
-> 		serial_omap_stop_tx(&up->port);
+> So you might want to give your clock re-enable after WFI idea a shot!  It 
+> would be interesting if it helps.
 
-I read the code and chickened out of just removing that.
-serial_omap_stop_tx seem to do 2 things:
- 1/ tell the uart to stop sending interrupts when the tx fifo is empty
- 2/ set forceidle (really smartidle) on the uart.
+Might be a bit beyond me at the moment :-(
 
-I didn't feel comfortable removing '1' as I thought it might generate an
-interrupt storm .. maybe not.
-Instead I just removed '2'.  In fact I replaced the 'set_forceidle' call with
-'set_noidle'.  So the uart should never report that it was idle.
-
-I did this with my other patch removed so pm_runtime_put() was still being
-called.
-
-Result:  I still get corruption.
-So having the UART say "no, I'm not idle" does *not* stop the clock
-being turned off when we use omap_hwmod_idle() to turn off the clocks.
-
-When we turn off a clock, if that is the last clock in the clock-domain, we
-also turn off the clock-domain (I think).
-Could it be that the clock-domain doesn't do any handshaking with modules,
-and so turns off the clocks even though they are being used?
-
+Thanks,
 NeilBrown
+
+> 
+> I regret the oversight, 
+> 
+> 
+> - Paul
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 828 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120204/73feba82/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120204/773388a0/attachment.sig>
