@@ -1,49 +1,28 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 3 Feb 2012 12:23:34 -0800
-Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
-In-Reply-To: <1328299375.5882.204.camel@gandalf.stny.rr.com>
-References: <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
- <4F2B1307.5010207@gmail.com>
- <1328223819.5882.133.camel@gandalf.stny.rr.com>
- <20120202232736.GL2518@linux.vnet.ibm.com>
- <1328237131.5882.135.camel@gandalf.stny.rr.com>
- <20120203060458.GF2380@linux.vnet.ibm.com>
- <1328295309.5882.178.camel@gandalf.stny.rr.com>
- <20120203194005.GK2382@linux.vnet.ibm.com>
- <1328299375.5882.204.camel@gandalf.stny.rr.com>
-Message-ID: <20120203202334.GM2382@linux.vnet.ibm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 3 Feb 2012 12:32:28 -0800
+Subject: [PATCH 1/5] USB: sa1111: sparse and checkpatch cleanups
+In-Reply-To: <E1RtPRY-00048Q-MI@rmk-PC.arm.linux.org.uk>
+References: <20120203200406.GI14129@n2100.arm.linux.org.uk>
+ <E1RtPRY-00048Q-MI@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120203203228.GA23778@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 03:02:55PM -0500, Steven Rostedt wrote:
-> On Fri, 2012-02-03 at 11:40 -0800, Paul E. McKenney wrote:
+On Fri, Feb 03, 2012 at 08:09:12PM +0000, Russell King - ARM Linux wrote:
+> Clean up the ohci-sa1111 driver formatting to be more compliant with
+> current standards, and add 'static' to various function definitions
+> to avoid sparse complaints about undeclared functions.  Remove the
+> unnecessary local declaration of 'usb_disabled', which can be found
+> instead in linux/usb.h.
 > 
-> > So the idea is that if you have a trace event that is to be used in idle,
-> > you use TRACE_EVENT_IDLE() rather than TRACE_EVENT() to declare that
-> > trace event?  That would work for me, and might make for fewer changes
-> > for the architecture guys.  Also, this should address the code-size
-> > concerns we discussed yesterday.
-> > 
-> > So sounds good!
-> > 
-> > Is a DEFINE_EVENT_IDLE() also needed?  Or prehaps a
-> > DECLARE_EVENT_CLASS_IDLE()?  My guess is "yes" for at least one of the
-> > two based on include/trace/events/power.h.
-> 
-> I'll have to take a look. I may even find a better way to do this too.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Better is always better.  ;-)
+Do you want me to take these 5 patches through the USB tree?  Or are you
+going to take them through an ARM tree?
 
-> > I will keep RCU_NONIDLE() for at least a little while (reworking comments
-> > to point out TRACE_EVENT_IDLE() and friends) in case there turn out to
-> > be non-tracepoint uses of RCU in the idle loop.
-> 
-> OK, I'll take a crack at this next Monday.
+Either is fine with me, if ARM, feel free to add:
+	Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Sounds good!
+to them.
 
-I plan to push my stack to -next later today, but will yank my cpuidle
-commit as soon as your approach is available.  They do not conflict
-because the rcu_idle_enter()s nest.
-
-							Thanx, Paul
+greg k-h
