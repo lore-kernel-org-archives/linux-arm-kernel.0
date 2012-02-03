@@ -1,44 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Feb 2012 10:35:18 +0100
-Subject: [PATCH] Skip unnecessary pte makeup when clearing it.
-In-Reply-To: <4F2B903E.5070609@gmail.com>
-References: <1327912567-18966-1-git-send-email-bill4carson@gmail.com>
- <1327912567-18966-2-git-send-email-bill4carson@gmail.com>
- <20120203065432.GG25594@pengutronix.de>
- <4F2B903E.5070609@gmail.com>
-Message-ID: <20120203093518.GH25594@pengutronix.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 3 Feb 2012 10:43:02 +0100
+Subject: [dmaengine] [Q] jiffies value does not increase in dma_sync_wait()
+In-Reply-To: <20120203092456.GJ889@n2100.arm.linux.org.uk>
+References: <CACKLOr26BuTh8Qr8pFHoTJoyCW9ty4-Kg-YRisXmN3=spzY6_Q@mail.gmail.com>
+ <20120203091038.GI889@n2100.arm.linux.org.uk>
+ <CACKLOr3_nsWy7z3QQejFbmgJJ78Nhv8J6fHFe=WjeAtghoCa5w@mail.gmail.com>
+ <20120203092456.GJ889@n2100.arm.linux.org.uk>
+Message-ID: <CACKLOr0sDkaEFFCaby6H1h3hofxJdDbr4LXaFMebGWZ-46EwiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 03:43:58PM +0800, bill4carson wrote:
-> 
-> 
-> On 2012?02?03? 14:54, Uwe Kleine-K?nig wrote:
-> >Hello,
-> >
-> >On Mon, Jan 30, 2012 at 04:36:07PM +0800, bill4carson at gmail.com wrote:
-> >>From: Bill Carson<bill4carson@gmail.com>
-> >>
-> >>If we are only about to clear a hardware pte entry, then pte makeup code is
-> >>unnecessary for cpu_v7_set_pte_ext and armv6_set_pte_ext, so just skip it.
-> >>
-> >>Signed-off-by: Bill Carson<bill4carson@gmail.com>
-> >I havn't tested and I don't know if the patch brings any advantages like
-> >increased speed. But AFAICT it doesn't change the behaviour of
-> >armv6_set_pte_ext and cpu_v7_set_pte_ext.
-> >
-> Hi, Uwe
-> 
-> I'm sorry I didn't state the purpose of this patch clearly.
-> As a matter of fact, it does change the behavior of set_pte_ext :)
-Depends on what you call behaviour (and it's not the 'u' you dropped
-that makes a difference :-). I meant that the side effects don't change.
-It's only that they are accomplished in a different (probably more
-effective) way.
+On 3 February 2012 10:24, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Feb 03, 2012 at 10:22:00AM +0100, javier Martin wrote:
+>> Hi Russell,
+>>
+>> On 3 February 2012 10:10, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Feb 03, 2012 at 09:37:48AM +0100, javier Martin wrote:
+>> >> I've introduced a couple of printk() to check why this timeout is not
+>> >> triggered and I've found that the value of jiffies does not increase
+>> >> between loop iterations (i. e. it's like time didn't advance).
+>> >>
+>> >> Does anyobody know what reasons could make jiffies not being updated?
+>> >
+>> > Are interrupts disabled?
+>>
+>> Apparently not but, how could I check it for sure? Is
+>> "irqs_disabled()" suitable for that purpose?
+>
+> Yes.
 
-Best regards
-Uwe
+"irqs_disabled()" returns 0 in every iteration of the loop. So I guess
+this means IRQs are properly enabled, but jiffies keeps being fixed.
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
