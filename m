@@ -1,37 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Feb 2012 09:04:07 +0000
-Subject: [PATCH 1/4] Remove Telechips ARM subarch from MAINTAINERS
-In-Reply-To: <20120202195653.GA5558@local>
-References: <20111222211948.GA1201@local> <201202021346.08740.arnd@arndb.de>
- <20120202195653.GA5558@local>
-Message-ID: <201202030904.07822.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2012 09:05:59 +0000
+Subject: [PATCH v4 1/2] pxa/hx4700: Add PCMCIA/CF support
+In-Reply-To: <1328229586.3847.YahooMailClassic@web29018.mail.ird.yahoo.com>
+References: <1328229586.3847.YahooMailClassic@web29018.mail.ird.yahoo.com>
+Message-ID: <20120203090559.GH889@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 February 2012, Hans J. Koch wrote:
-> 
-> On Thu, Feb 02, 2012 at 01:46:08PM +0000, Arnd Bergmann wrote:
-> > 
-> > Telechips themselves seem to have given up on the ARM9 based products
-> 
-> That is not true. The TCC8000 is in production and available, also
-> derivatives like TCC8001.
-> 
-> The main problem is that Telechips is not interested in markets where
-> SoCs are sold separately. Instead, they sell complete solutions.
-> If you want a new DAB car radio, they'll sell you the PCB layout,
-> operating system, drivers, and complete software according to your
-> specification. They'll even organise manufacturing of the device,
-> and you'll get the completely working PCB in the end. You never have
-> to write software yourself, let alone kernel code.
+On Fri, Feb 03, 2012 at 12:39:46AM +0000, Paul Parsons wrote:
+> +static int hw_init(struct soc_pcmcia_socket *skt)
+> +{
+> +	int ret;
+> +
+> +	ret = gpio_request_array(gpios, ARRAY_SIZE(gpios));
+> +	if (ret)
+> +		goto out;
+> +
+> +	irq_set_irq_type(gpio_to_irq(GPIOD4_CF_nCD), IRQ_TYPE_EDGE_BOTH);
 
-Ok, thanks for the info. Well, it also seems that Telechips is not
-particularly interested in contributing to upstream either, and
-according to what I've found in discussions were quite reluctant
-event to provide source code where they were required to.
+You shouldn't need to set the IRQ type for this.
 
-They did provide the 2.6.29 and 2.6.35 kernel sources for their
-newer SoCs in the end, but I could not find anything for their ARMv5
-parts, or any newer sources if they have any. 
+> +
+> +	skt->stat[SOC_STAT_CD].gpio = GPIOD4_CF_nCD;
+> +	skt->stat[SOC_STAT_CD].name = "PCMCIA CD";
+> +	skt->stat[SOC_STAT_RDY].gpio = GPIO60_HX4700_CF_RNB;
+> +	skt->stat[SOC_STAT_RDY].name = "PCMCIA Ready";
+> +
+> +out:
+> +	return ret;
+> +}
+...
+> +static void socket_state(struct soc_pcmcia_socket *skt,
+> +	struct pcmcia_state *state)
+> +{
+> +	state->detect = (gpio_get_value(GPIOD4_CF_nCD) == 0);
+> +	state->ready = (gpio_get_value(GPIO60_HX4700_CF_RNB) != 0);
 
-	Arnd
+soc_common reads these for you before calling your socket_state
+function.
+
+> +	state->bvd1 = 1;
+> +	state->bvd2 = 1;
+
+If you don't have the BVD signals, soc_common now defaults these to '1'.
+
+> +	state->wrprot = 0;
+
+You don't need to set this - soc_common sets this to zero.
+
+> +	state->vs_3v = 1;
+> +	state->vs_Xv = 0;
+
+But you will need these two.
+
+> +}
+...
+> +static int __init hx4700_pcmcia_init(void)
+> +{
+> +	struct platform_device *pdev;
+> +	int ret;
+> +
+> +	if (!machine_is_h4700())
+> +		return -ENODEV;
+> +
+> +	pdev = platform_device_alloc("pxa2xx-pcmcia", -1);
+> +	if (!pdev)
+> +		return -ENOMEM;
+> +
+> +	ret = platform_device_add_data(pdev,
+> +		&hx4700_pcmcia_ops, sizeof(hx4700_pcmcia_ops));
+> +	if (ret)
+> +		goto out;
+> +
+> +	ret = platform_device_add(pdev);
+> +	if (ret)
+> +		goto out;
+
+	pdev = platform_device_register_data(NULL, "pxa2xx-pcmcia", -1,
+		&hx4700_pcmcia_ops, sizeof(hx4700_pcmcia_ops));
+	if (IS_ERR(pdev))
+		return PTR_ERR(pdev);
+
+> +
+> +	hx4700_pcmcia_device = pdev;
+> +	return 0;
+> +
+> +out:
+> +	platform_device_put(pdev);
+> +	return ret;
+> +}
