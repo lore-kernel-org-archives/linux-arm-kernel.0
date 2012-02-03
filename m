@@ -1,27 +1,20 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 3 Feb 2012 17:13:55 +0530
-Subject: [PATCH-V3 2/3] ARM: OMAP4: prminst: Add boot time __init function for
- prminst
+Date: Fri, 3 Feb 2012 17:13:56 +0530
+Subject: [PATCH-V3 3/3] ARM: OMAP: am33xx: Hook-up am33xx support to existing
+ prm code
 In-Reply-To: <1328269436-18668-1-git-send-email-hvaibhav@ti.com>
 References: <1328269436-18668-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1328269436-18668-3-git-send-email-hvaibhav@ti.com>
+Message-ID: <1328269436-18668-4-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM33xx PRM module is closer to OMAP4 PRM module, and
-in order to reuse prminst api's we have to address
-some of the differences like, base addresses and partitions.
-Unlike OMAP4 PRM, AM33xx doesn't have any partitions and
-maintains single partition.
+Reuse existing omap4 prminst code for am33xx device,
+add separate prm base table for am33xx device and initialize
+it during __init for future use.
 
-So, in order to reuse the existing OMAP4 prminst code
-for AM33xx this patch adds,
-
-  - Boot time __init function, to initialize _prm_bases
-    based on cpu_is_xxx
-  - Instead of maintaining phy addr for PRM partition
-    in _prm_bases[] table and then changing it to virt addr,
-    directly maintain respective virt addr.
+Also, since cpu_is_omap34xx() check is true for am33xx family of
+devices, we must change the order of cpu_is_xxxx check, so first
+check for cpu_is_am33xx() to follow right execution path.
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Cc: Kevin Hilman <khilman@ti.com>
@@ -30,100 +23,153 @@ CC: Tony Lindgren <tony@atomide.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/io.c          |    2 ++
- arch/arm/mach-omap2/prminst44xx.c |   26 ++++++++++++++++++--------
- arch/arm/mach-omap2/prminst44xx.h |    2 +-
- 3 files changed, 21 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/io.c          |    1 +
+ arch/arm/mach-omap2/omap_hwmod.c  |   44 ++++++++++++++++++++++++++-----------
+ arch/arm/mach-omap2/prcm44xx.h    |    2 +
+ arch/arm/mach-omap2/prminst44xx.c |    9 +++++++
+ 4 files changed, 43 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 2daaec1..aa33cfb 100644
+index aa33cfb..df94693 100644
 --- a/arch/arm/mach-omap2/io.c
 +++ b/arch/arm/mach-omap2/io.c
-@@ -39,6 +39,7 @@
- #include <plat/omap-pm.h>
- #include "voltage.h"
- #include "powerdomain.h"
-+#include "prminst44xx.h"
-
- #include "clockdomain.h"
- #include <plat/omap_hwmod.h>
-@@ -486,6 +487,7 @@ void __init omap4430_init_early(void)
- 	omap4xxx_check_features();
+@@ -475,6 +475,7 @@ void __init am33xx_init_early(void)
+ {
+ 	omap2_set_globals_am33xx();
  	omap_common_init_early();
- 	omap44xx_voltagedomains_init();
 +	omap44xx_prminst_init();
- 	omap44xx_powerdomains_init();
- 	omap44xx_clockdomains_init();
- 	omap44xx_hwmod_init();
+ 	omap3xxx_clk_init();
+ }
+ #endif
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e91c4a0..0fb5287 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1289,14 +1289,20 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-		return omap2_prm_assert_hardreset(oh->prcm.omap2.module_offs,
+-						  ohri.rst_shift);
+-	else if (cpu_is_omap44xx())
++	/*
++	 * In order to use omap4 prm code for am33xx family of devices,
++	 * first check cpu_is_am33xx here.
++	 *
++	 * Note: cpu_is_omap34xx is true for am33xx device as well.
++	 */
++	if (cpu_is_omap44xx() || cpu_is_am33xx())
+ 		return omap4_prminst_assert_hardreset(ohri.rst_shift,
+ 				  oh->clkdm->pwrdm.ptr->prcm_partition,
+ 				  oh->clkdm->pwrdm.ptr->prcm_offs,
+ 				  oh->prcm.omap4.rstctrl_offs);
++	else if (cpu_is_omap24xx() || cpu_is_omap34xx())
++		return omap2_prm_assert_hardreset(oh->prcm.omap2.module_offs,
++						  ohri.rst_shift);
+ 	else
+ 		return -EINVAL;
+ }
+@@ -1323,11 +1329,13 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+-		ret = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
+-						   ohri.rst_shift,
+-						   ohri.st_shift);
+-	} else if (cpu_is_omap44xx()) {
++	/*
++	 * In order to use omap4 prm code for am33xx family of devices,
++	 * first check cpu_is_am33xx here.
++	 *
++	 * Note: cpu_is_omap34xx is true for am33xx device as well.
++	 */
++	if (cpu_is_omap44xx() || cpu_is_am33xx()) {
+ 		if (ohri.st_shift)
+ 			pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4 does not support st_shift\n",
+ 			       oh->name, name);
+@@ -1335,6 +1343,10 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ 				  oh->clkdm->pwrdm.ptr->prcm_partition,
+ 				  oh->clkdm->pwrdm.ptr->prcm_offs,
+ 				  oh->prcm.omap4.rstctrl_offs);
++	} else if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
++		ret = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
++						   ohri.rst_shift,
++						   ohri.st_shift);
+ 	} else {
+ 		return -EINVAL;
+ 	}
+@@ -1365,14 +1377,20 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+-		return omap2_prm_is_hardreset_asserted(oh->prcm.omap2.module_offs,
+-						       ohri.st_shift);
+-	} else if (cpu_is_omap44xx()) {
++	/*
++	 * In order to use omap4 prm code for am33xx family of devices,
++	 * first check cpu_is_am33xx here.
++	 *
++	 * Note: cpu_is_omap34xx is true for am33xx device as well.
++	 */
++	if (cpu_is_omap44xx() || cpu_is_am33xx()) {
+ 		return omap4_prminst_is_hardreset_asserted(ohri.rst_shift,
+ 				  oh->clkdm->pwrdm.ptr->prcm_partition,
+ 				  oh->clkdm->pwrdm.ptr->prcm_offs,
+ 				  oh->prcm.omap4.rstctrl_offs);
++	} else if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
++		return omap2_prm_is_hardreset_asserted(oh->prcm.omap2.module_offs,
++						       ohri.st_shift);
+ 	} else {
+ 		return -EINVAL;
+ 	}
+diff --git a/arch/arm/mach-omap2/prcm44xx.h b/arch/arm/mach-omap2/prcm44xx.h
+index 7334ffb..02e5a8b 100644
+--- a/arch/arm/mach-omap2/prcm44xx.h
++++ b/arch/arm/mach-omap2/prcm44xx.h
+@@ -31,6 +31,8 @@
+ #define OMAP4430_CM2_PARTITION			3
+ #define OMAP4430_SCRM_PARTITION			4
+ #define OMAP4430_PRCM_MPU_PARTITION		5
++/* AM33XX PRCM is closer to OMAP4, so try to reuse all API's */
++#define AM33XX_PRM_PARTITION			1
+
+ /*
+  * OMAP4_MAX_PRCM_PARTITIONS: set to the highest value of the PRCM partition
 diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
-index f6de5bc..68e13bd 100644
+index 68e13bd..5fd13b4 100644
 --- a/arch/arm/mach-omap2/prminst44xx.c
 +++ b/arch/arm/mach-omap2/prminst44xx.c
-@@ -24,32 +24,34 @@
- #include "prcm44xx.h"
- #include "prcm_mpu44xx.h"
+@@ -19,6 +19,7 @@
+ #include "common.h"
 
--static u32 _prm_bases[OMAP4_MAX_PRCM_PARTITIONS] = {
-+static u32 **_prm_bases;
-+static u32 max_prm_partitions;
-+
-+static u32 *omap44xx_prm_bases[] = {
- 	[OMAP4430_INVALID_PRCM_PARTITION]	= 0,
--	[OMAP4430_PRM_PARTITION]		= OMAP4430_PRM_BASE,
-+	[OMAP4430_PRM_PARTITION]		= OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
- 	[OMAP4430_CM1_PARTITION]		= 0,
- 	[OMAP4430_CM2_PARTITION]		= 0,
- 	[OMAP4430_SCRM_PARTITION]		= 0,
--	[OMAP4430_PRCM_MPU_PARTITION]		= OMAP4430_PRCM_MPU_BASE,
-+	[OMAP4430_PRCM_MPU_PARTITION]		= OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE),
+ #include "prm44xx.h"
++#include "prm33xx.h"
+ #include "prminst44xx.h"
+ #include "prm-regbits-44xx.h"
+ #include "prcm44xx.h"
+@@ -36,6 +37,11 @@ static u32 *omap44xx_prm_bases[] = {
+ 	[OMAP4430_PRCM_MPU_PARTITION]		= OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE),
  };
 
++static u32 *am33xx_prm_bases[] = {
++	[OMAP4430_INVALID_PRCM_PARTITION]	= 0,
++	[AM33XX_PRM_PARTITION]			= AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRM_BASE),
++};
++
  /* Read a register in a PRM instance */
  u32 omap4_prminst_read_inst_reg(u8 part, s16 inst, u16 idx)
  {
--	BUG_ON(part >= OMAP4_MAX_PRCM_PARTITIONS ||
-+	BUG_ON(part >= max_prm_partitions ||
- 	       part == OMAP4430_INVALID_PRCM_PARTITION ||
- 	       !_prm_bases[part]);
--	return __raw_readl(OMAP2_L4_IO_ADDRESS(_prm_bases[part] + inst +
--					       idx));
-+	return __raw_readl(_prm_bases[part] + ((inst + idx)/sizeof(u32)));
+@@ -182,5 +188,8 @@ void __init omap44xx_prminst_init(void)
+ 	if (cpu_is_omap44xx()) {
+ 		_prm_bases = omap44xx_prm_bases;
+ 		max_prm_partitions = ARRAY_SIZE(omap44xx_prm_bases);
++	} else if (cpu_is_am33xx()) {
++		_prm_bases = am33xx_prm_bases;
++		max_prm_partitions = ARRAY_SIZE(am33xx_prm_bases);
+ 	}
  }
-
- /* Write into a register in a PRM instance */
- void omap4_prminst_write_inst_reg(u32 val, u8 part, s16 inst, u16 idx)
- {
--	BUG_ON(part >= OMAP4_MAX_PRCM_PARTITIONS ||
-+	BUG_ON(part >= max_prm_partitions ||
- 	       part == OMAP4430_INVALID_PRCM_PARTITION ||
- 	       !_prm_bases[part]);
--	__raw_writel(val, OMAP2_L4_IO_ADDRESS(_prm_bases[part] + inst + idx));
-+	__raw_writel(val, _prm_bases[part] + ((inst + idx)/sizeof(u32)));
- }
-
- /* Read-modify-write a register in PRM. Caller must lock */
-@@ -174,3 +176,11 @@ void omap4_prminst_global_warm_sw_reset(void)
- 				    OMAP4430_PRM_DEVICE_INST,
- 				    OMAP4_PRM_RSTCTRL_OFFSET);
- }
-+
-+void __init omap44xx_prminst_init(void)
-+{
-+	if (cpu_is_omap44xx()) {
-+		_prm_bases = omap44xx_prm_bases;
-+		max_prm_partitions = ARRAY_SIZE(omap44xx_prm_bases);
-+	}
-+}
-diff --git a/arch/arm/mach-omap2/prminst44xx.h b/arch/arm/mach-omap2/prminst44xx.h
-index 46f2efb..9a44c68 100644
---- a/arch/arm/mach-omap2/prminst44xx.h
-+++ b/arch/arm/mach-omap2/prminst44xx.h
-@@ -29,5 +29,5 @@ extern int omap4_prminst_assert_hardreset(u8 shift, u8 part, s16 inst,
- 					  u16 rstctrl_offs);
- extern int omap4_prminst_deassert_hardreset(u8 shift, u8 part, s16 inst,
- 					    u16 rstctrl_offs);
--
-+extern void __init omap44xx_prminst_init(void);
- #endif
 --
 1.7.0.4
