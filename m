@@ -1,87 +1,44 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 03 Feb 2012 10:31:50 +0100
-Subject: [PATCH 02/15] mm: page_alloc: update migrate type of pages on pcp
- when isolating
-In-Reply-To: <op.v82hjbd13l0zgt@mpn-glaptop>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <1327568457-27734-3-git-send-email-m.szyprowski@samsung.com>
- <20120130111522.GE25268@csn.ul.ie> <op.v8wlu8ws3l0zgt@mpn-glaptop>
- <20120130161447.GU25268@csn.ul.ie>
- <022e01cce034$bc6cf440$3546dcc0$%szyprowski@samsung.com>
- <20120202124729.GA5796@csn.ul.ie> <op.v82hjbd13l0zgt@mpn-glaptop>
-Message-ID: <008101cce256$a85e29f0$f91a7dd0$%szyprowski@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 3 Feb 2012 10:35:18 +0100
+Subject: [PATCH] Skip unnecessary pte makeup when clearing it.
+In-Reply-To: <4F2B903E.5070609@gmail.com>
+References: <1327912567-18966-1-git-send-email-bill4carson@gmail.com>
+ <1327912567-18966-2-git-send-email-bill4carson@gmail.com>
+ <20120203065432.GG25594@pengutronix.de>
+ <4F2B903E.5070609@gmail.com>
+Message-ID: <20120203093518.GH25594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thursday, February 02, 2012 8:53 PM Micha? Nazarewicz wrote:
-
-> > On Tue, Jan 31, 2012 at 05:23:59PM +0100, Marek Szyprowski wrote:
-> >> Pages, which have incorrect migrate type on free finally
-> >> causes pageblock migration type change from MIGRATE_CMA to MIGRATE_MOVABLE.
+On Fri, Feb 03, 2012 at 03:43:58PM +0800, bill4carson wrote:
 > 
-> On Thu, 02 Feb 2012 13:47:29 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> > I'm not quite seeing this. In free_hot_cold_page(), the pageblock
-> > type is checked so the page private should be set to MIGRATE_CMA or
-> > MIGRATE_ISOLATE for the CMA area. It's not clear how this can change a
-> > pageblock to MIGRATE_MOVABLE in error.
 > 
-> Here's what I think may happen:
+> On 2012?02?03? 14:54, Uwe Kleine-K?nig wrote:
+> >Hello,
+> >
+> >On Mon, Jan 30, 2012 at 04:36:07PM +0800, bill4carson at gmail.com wrote:
+> >>From: Bill Carson<bill4carson@gmail.com>
+> >>
+> >>If we are only about to clear a hardware pte entry, then pte makeup code is
+> >>unnecessary for cpu_v7_set_pte_ext and armv6_set_pte_ext, so just skip it.
+> >>
+> >>Signed-off-by: Bill Carson<bill4carson@gmail.com>
+> >I havn't tested and I don't know if the patch brings any advantages like
+> >increased speed. But AFAICT it doesn't change the behaviour of
+> >armv6_set_pte_ext and cpu_v7_set_pte_ext.
+> >
+> Hi, Uwe
 > 
-> When drain_all_pages() is called, __free_one_page() is called for each page on
-> pcp list with migrate type deducted from page_private() which is MIGRATE_CMA.
-> This result in the page being put on MIGRATE_CMA freelist even though its
-> pageblock's migrate type is MIGRATE_ISOLATE.
-> 
-> When allocation happens and pcp list is empty, rmqueue_bulk() will get executed
-> with migratetype argument set to MIGRATE_MOVABLE.  It calls __rmqueue() to grab
-> some pages and because the page described above is on MIGRATE_CMA freelist it
-> may be returned back to rmqueue_bulk().
-> 
-> But, pageblock's migrate type is not MIGRATE_CMA but MIGRATE_ISOLATE, so the
-> following code:
-> 
-> #ifdef CONFIG_CMA
-> 		if (is_pageblock_cma(page))
-> 			set_page_private(page, MIGRATE_CMA);
-> 		else
-> #endif
-> 			set_page_private(page, migratetype);
-> 
-> will set it's private to MIGRATE_MOVABLE and in the end the page lands back
-> on MIGRATE_MOVABLE pcp list but this time with page_private == MIGRATE_MOVABLE
-> and not MIGRATE_CMA.
-> 
-> One more drain_all_pages() (which may happen since alloc_contig_range() calls
-> set_migratetype_isolate() for each block) and next __rmqueue_fallback() may
-> convert the whole pageblock to MIGRATE_MOVABLE.
-> 
-> I know, this sounds crazy and improbable, but I couldn't find an easier path
-> to destruction.  As you pointed, once the page is allocated, free_hot_cold_page()
-> will do the right thing by reading pageblock's migrate type.
-> 
-> Marek is currently experimenting with various patches including the following
-> change:
-> 
-> #ifdef CONFIG_CMA
->                  int mt = get_pageblock_migratetype(page);
->                  if (is_migrate_cma(mt) || mt == MIGRATE_ISOLATE)
->                          set_page_private(page, mt);
->                  else
-> #endif
->                          set_page_private(page, migratetype);
-> 
-> As a matter of fact, if __rmqueue() was changed to return migrate type of the
-> freelist it took page from, we could avoid this get_pageblock_migratetype() all
-> together.  For now, however, I'd rather not go that way just yet -- I'll be happy
-> to dig into it once CMA gets merged.
-
-After this and some other changes I'm unable to reproduce that issue. I did a whole
-night tests and it still works fine, so it looks that it has been finally solved.
-I will post v20 patchset soon :)
+> I'm sorry I didn't state the purpose of this patch clearly.
+> As a matter of fact, it does change the behavior of set_pte_ext :)
+Depends on what you call behaviour (and it's not the 'u' you dropped
+that makes a difference :-). I meant that the side effects don't change.
+It's only that they are accomplished in a different (probably more
+effective) way.
 
 Best regards
+Uwe
+
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
