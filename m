@@ -1,76 +1,58 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 3 Feb 2012 11:26:55 -0800
-Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
-In-Reply-To: <87ty37689a.fsf@ti.com>
-References: <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
- <20120202044439.GD2435@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
- <20120202174337.GS2518@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
- <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
- <20120202230326.GJ2518@linux.vnet.ibm.com> <87ty37689a.fsf@ti.com>
-Message-ID: <20120203192655.GJ2382@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2012 19:30:59 +0000
+Subject: [PATCH 00/17] SA11x0 cleanups (mainly assabet/neponset)
+Message-ID: <20120203193059.GF14129@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 11:12:49AM -0800, Kevin Hilman wrote:
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> writes:
-> 
-> > On Thu, Feb 02, 2012 at 02:20:26PM -0800, Kevin Hilman wrote:
-> >> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> writes:
-> >> 
-> >> [...]
-> >> 
-> >> >> > The two options I see are:
-> >> >> > 
-> >> >> > 1.	Rip tracing out of the inner idle loops and everything that
-> >> >> > 	they invoke.
-> >> >> 
-> >> >> What I suggested above.  But as I said I know sh*t about that tracing 
-> >> >> implementation so that's an easy suggestion for me to make.
-> >> >
-> >> > Works for me as well.  ;-)
-> >> 
-> >> While I must admit not having a better suggestion, I for one would vote
-> >> strongly against removing tracing from the idle path.
-> >> 
-> >> Being a PM developer and maintainer, much of the code I work on and
-> >> maintain happens to be run in the bowels of the idle path.  Not having
-> >> the ability to trace this code would be a major step backwards IMO.
-> >
-> > OK...
-> >
-> > What if the tracing code between the rcu_idle_enter() and the
-> > rcu_idle_exit() had to be enclosed in a wrapper?  For example,
-> > the tracing in cpuidle_idle_call() might appear as follows:
-> >
-> > 	RCU_NONIDLE(
-> > 		trace_power_start(POWER_CSTATE, next_state, dev->cpu);
-> > 		trace_cpu_idle(next_state, dev->cpu);
-> > 	);
-> >
-> > 	entered_state = target_state->enter(dev, drv, next_state);
-> >
-> > 	RCU_NONIDLE(
-> > 		trace_power_end(dev->cpu);
-> > 		trace_cpu_idle(PWR_EVENT_EXIT, dev->cpu);
-> > 	);
-> >
-> > The RCU_NONIDLE() macro would do rcu_idle_exit(), execute its
-> > argument, then do rcu_idle_enter().  (Credit to Steven Rostedt
-> > for suggesting this.)  Given the possibility of code invoked both
-> > from idle and not-idle, I have some changes to rcu to allow nesting
-> > of rcu_idle_enter() and rcu_idle_exit().
-> >
-> > Would that work for you?
-> 
-> Yes, that should work.
-> 
-> And I defintely have examples of code paths that use tracepoints in both
-> idle and non-idle context (power domains, clocks, etc.) so the changes
-> to allow nesting will be needed.
+This is a series of cleanups and improvements to the SA11x0 code, in
+particular the Assabet, and Assabet with the Neponset daughter board.
 
-OK, good to know that my paranoia is still functioning correctly.  ;-)
+The main SA11x0 change is to switch to using the DEFINE_RES_xxx() for
+resources, which obviously reduces the lines of code quite a bit.
 
-							Thanx, Paul
+The Assabet-only changes reduce power consumption of the board, and
+illustrate why pins left as inputs when they're supposed to be outputs
+are bad news - while it's undriven, it floats and increases the power
+consumption by a measurable amount.
+
+Neponset wise, there's fixes in here to restore it to fully working
+state (rather than just being buildable.)  Unfortunately, genirq had
+seriously broken the Neponset interrupt support code by genirq having
+some 'improved checks' added without auditing the genirq users.
+
+Neponset also gets ready for sparse IRQ support, meaning that its
+interrupt numbers are no longer statically fixed.  We also move the
+registration of the neponset device to assabet, which helps reduce
+the knowledge spread of whether the board is fitted.
+
+The random places which the NCR_0 board register is written are turned
+into a function call instead, so that the NCR_0 register access can be
+centralized and properly protected against concurrent access for this
+platform.
+
+Since neponset becomes mostly self-contained, most of the boards CPLD
+register definitions are moved to the board file rather than exposing
+them in the board header file.  That then paves the way to get rid of
+its static mapping for its own registers, using ioremap() instead.
+
+ arch/arm/mach-sa1100/assabet.c               |   39 ++-
+ arch/arm/mach-sa1100/badge4.c                |   19 +-
+ arch/arm/mach-sa1100/cerf.c                  |   13 +-
+ arch/arm/mach-sa1100/collie.c                |   24 +-
+ arch/arm/mach-sa1100/generic.c               |   93 +----
+ arch/arm/mach-sa1100/h3xxx.c                 |   13 +-
+ arch/arm/mach-sa1100/hackkit.c               |    7 +-
+ arch/arm/mach-sa1100/include/mach/irqs.h     |    8 -
+ arch/arm/mach-sa1100/include/mach/neponset.h |   52 +---
+ arch/arm/mach-sa1100/irq.c                   |    7 +-
+ arch/arm/mach-sa1100/jornada720.c            |   31 +--
+ arch/arm/mach-sa1100/nanoengine.c            |   11 +-
+ arch/arm/mach-sa1100/neponset.c              |  534 +++++++++++++++-----------
+ arch/arm/mach-sa1100/pci-nanoengine.c        |    8 +-
+ arch/arm/mach-sa1100/pleb.c                  |   24 +-
+ arch/arm/mach-sa1100/shannon.c               |    7 +-
+ arch/arm/mach-sa1100/simpad.c                |   11 +-
+ drivers/net/ethernet/smsc/smc91x.c           |    2 +-
+ drivers/pcmcia/sa1100_neponset.c             |    7 +-
+ 19 files changed, 402 insertions(+), 508 deletions(-)
