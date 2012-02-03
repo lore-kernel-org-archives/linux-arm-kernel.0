@@ -1,40 +1,106 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 03 Feb 2012 09:54:07 -0800
-Subject: [PATCH 1/2] ARM: OMAP: Get rid of reset for system timer
-In-Reply-To: <CAMQu2gy2jDWszUAMDCfgyXsLNWUAb6phWpOP=7geFXTkc30S_g@mail.gmail.com>
- (Santosh Shilimkar's message of "Fri, 3 Feb 2012 12:45:09 +0530")
-References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
- <1328191435-18652-2-git-send-email-santosh.shilimkar@ti.com>
- <87obthcc57.fsf@ti.com>
- <CAMQu2gy2jDWszUAMDCfgyXsLNWUAb6phWpOP=7geFXTkc30S_g@mail.gmail.com>
-Message-ID: <877h03ajls.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 3 Feb 2012 09:58:54 -0800
+Subject: [PATCH V2 1/4] pinctrl: add a driver for NVIDIA Tegra
+In-Reply-To: <CACRpkdbMPrvN80cLyVLUNvTjx4ZV4iLeHcJaJyM_qvTHHAfWww@mail.gmail.com>
+References: <1328130290-17607-1-git-send-email-swarren@nvidia.com>
+ <CACRpkda+KCutSFgPwH2Xvd14h0OCrArFGXAidp3n_ZgG28KB5g@mail.gmail.com>
+ <201202021533.14650.arnd@arndb.de>
+ <CACRpkdbMPrvN80cLyVLUNvTjx4ZV4iLeHcJaJyM_qvTHHAfWww@mail.gmail.com>
+Message-ID: <20120203175854.GC1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+Hi,
 
-> On Fri, Feb 3, 2012 at 12:10 AM, Kevin Hilman <khilman@ti.com> wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->>> From: Rajendra Nayak <rnayak@ti.com>
->>>
->>> hwmod setup already does a reset and sets the OCP sysconfig
->>> registers appropriately. Avoid doing a reset again and overriding
->>> the OCP sysconfig settings in the system timer init code.
->>
->> That is true for OMAP4, but have you verified if this is indeed a
->> duplicate reset on ?OMAP2/3?
->>
-> Yes. It is duplicate for OMAP2 and OMAP3 devices as well.
-> Actually this should have been fixed when the driver was
-> hwmod converted but some how got missed. We noticed
-> an issue on OMAP5, when timer interrupts stopped firing when
-> always on clock domain was allowed to idle. This was because
-> this reset was clearing the correctly set sysc value by hwmod.
->
-> The patch is also tested on ZOOM3 ( OMAP3630)
-> and OMAP2430SDP.
+* Linus Walleij <linus.walleij@linaro.org> [120203 06:26]:
+> On Thu, Feb 2, 2012 at 4:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > I guess if we could move the per-board pinmux data into dts files,
+> > that would mean we could actually get rid of the per-board source
+> > files in tegra, right?
+> 
+> If you mean these:
+> 
+>  arch/arm/mach-tegra/board-harmony-pinmux.c        |  362 ++-
+>  arch/arm/mach-tegra/board-paz00-pinmux.c          |  362 ++-
+>  arch/arm/mach-tegra/board-pinmux.c                |   62 +-
+>  arch/arm/mach-tegra/board-pinmux.h                |   39 +-
+>  arch/arm/mach-tegra/board-seaboard-pinmux.c       |  442 ++-
+>  arch/arm/mach-tegra/board-trimslice-pinmux.c      |  366 ++-
+> 
+> Then the answer is yes.
+> 
+> But not if you mean these:
+> 
+>  drivers/pinctrl/pinctrl-tegra20.c                 | 2860 ++++++++++++++++
+>  drivers/pinctrl/pinctrl-tegra30.c                 | 3726 +++++++++++++++++++++
+> 
+> Because the large number of lines come from SoC
+> properties rather than board properties.
+> 
+> The big issue here is whether SoC hardware block
+> properties (such as the pins and their names, and their
+> groups) should be:
+> 
+> (A) open-coded in the driver or
+> (B) provided as data in the device tree
+> 
+> nVidia Tegra have opted for the former, Texas OMAP for the latter.
+> The in-kernel drivers also do like Tegra. However they
+> are smaller due to less combinatorics.
+> 
+> This means that the Tegra driver gets (quite a bit) bigger and
+> the OMAP driver (quite a bit) smaller.
 
-Great, thanks for testing on OMAP2/3.
+Well I think both A and B should be supported, and also
+support a combination of A and B in the same driver if
+needed.
 
-Kevin
+For doing DT only pinmux driver, my observations so far are:
+
+1. Most of the pinmux data in the drivers is only needed for
+   debugging and actually not needed in the driver at all.
+
+   The pinmux driver can get away without knowing what the
+   settings are, it just needs to know where the registers
+   are and how they should set based on the board specific
+   .dts configuration.
+
+2. Knowing how the pinmux registers are set is crucial for
+   debugging. But this all can be done with userspace tools
+   using pinctrl debugfs entries. So again the pinmux driver
+   just needs to know just "how many, what type of registers,
+   and where they are".
+
+3. The board specific pinmux configuration for groups and values
+   can be passed from .dts files without passing any strings
+   in most cases. Once we have preprocessor working, the .dts
+   mux configuration should be quite readable.
+
+> > Will it be possible to eventually put the pinmux driver into a loadable
+> > module?
+> 
+> Tony had made it possible to have pinctrl drivers as modules,
+> but some systems may need their pin control up before
+> they even bring up the filesystem :-(
+
+For development work loadable modules are much nicer to work with ;)
+
+Loadable modules also automatically cut away the SoC specific
+spaghetti calls as things need to work in a standard way limited
+to EXPORT_SYMBOL.
+
+So in general, from sanity checking point of view, we should
+probably require that anything under drivers at least builds
+as a loadable module.
+
+> Booting from initramfs and switchroot can solve the above
+> but will slow down boot I believe, and ARM systems
+> usually don't like that.
+
+Yeah I guess for now most people would want to build it in.
+Then when ARM distros will be able to use the common zImage,
+most people will probably switch to initramfs based boot.
+
+Regards,
+
+Tony
