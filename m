@@ -1,105 +1,315 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 03 Feb 2012 14:36:27 -0500
-Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
-In-Reply-To: <87k4437oaq.fsf@ti.com>
-References: <20120202004253.GA10946@linux.vnet.ibm.com>
- <1328143404-11038-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
- <20120202044439.GD2435@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
- <20120202174337.GS2518@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
- <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
- <4F2B1307.5010207@gmail.com> <87k4437oaq.fsf@ti.com>
-Message-ID: <1328297787.5882.203.camel@gandalf.stny.rr.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 03 Feb 2012 19:36:32 +0000
+Subject: [PATCH 16/17] ARM: sa11x0: neponset: move register definitions to
+ neponset.c
+In-Reply-To: <20120203193059.GF14129@n2100.arm.linux.org.uk>
+References: <20120203193059.GF14129@n2100.arm.linux.org.uk>
+Message-ID: <E1RtOvw-0001Ca-N4@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-02-03 at 10:41 -0800, Kevin Hilman wrote:
+Move the board specific neponset register definitions to the board
+file, rather than mach/neponset.h.  However, as the NCR_0 register
+definitions are used by some drivers, leave these behind.
 
-> > How is it a step backwards if it is already broken. 
-> 
-> Well, I didn't know it was broken. ;) And, as Paul mentioned, this has
-> been broken for a long time. Apparently it's been working well enough
-> for nobody to notice until recently.
-> 
-> > Obviously you haven't actually used any tracing here because it
-> > doesn't work right with things as is.
-> 
-> It's been working well enough for me to debug several idle path problems
-> with tracing.  Admittedly, this has been primarily on UP systems, but
-> I've recently started using the tracing on SMP as well.  (however, due
-> to "coupled" low-power states on OMAP, large parts of the idle path are
-> effectively UP since one CPU0 has to wait for CPU1 to hit a low-power
-> state before it can.)
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-sa1100/include/mach/neponset.h |   48 -----------
+ arch/arm/mach-sa1100/neponset.c              |  114 ++++++++++++++++++++-----
+ 2 files changed, 91 insertions(+), 71 deletions(-)
 
-It's used by all users of powertop, and we haven't heard about a bug
-yet. This doesn't mean that the bug doesn't exist. The race is extremely
-hard to hit. It's one of those "good bugs". You know, the kind that you
-don't really have to worry about because you are more likely to win the
-lottery, become President of the United States, and find a cure for
-cancer (all those together, not just one) than the chance of hitting
-this bug. But it's a bug regardless and should, unfortunately, be fixed.
-
-But here's the explanation of the bug:
-
-As Paul has stated, when rcu_idle_enter() is in effect, the calls to
-rcu_read_lock_* are ignored. Thus we can pretend they don't exist.
-
-The code in question is the __DO_TRACE() in include/linux/tracepoint.h:
-
-		rcu_read_lock_sched_notrace();				\
-		it_func_ptr = rcu_dereference_sched((tp)->funcs);	\
-		if (it_func_ptr) {					\
-			do {						\
-				it_func = (it_func_ptr)->func;		\
-				__data = (it_func_ptr)->data;		\
-				((void(*)(proto))(it_func))(args);	\
-			} while ((++it_func_ptr)->func);		\
-		}							\
-		rcu_read_unlock_sched_notrace();	
-
-As stated above, the rcu_read_(un)lock_sched_notrace() are worthless
-when in rcu_idle_enter().
-
-They protect the referencing of tp->funcs, which is an array of all
-funcs that are attached to this tracepoint.
-
-Now we need to look at kernel/tracepoint.c:
-
-The protection is needed against a simultaneous insertion or deletion of
-a tracepoint hook. This happens when a user enables or disables tracing.
-
-Note, this race is even made harder to hit, because due to the static
-branch that controls whether this gets called, will be off if no
-tracepoints are attached. So the race can only happen after at least one
-tracepoint is active.
-
-But if two probes are are added to this tracepoint, then we can hit the
-race. And it is possible to trigger with only one probe on removal.
-
-When adding or removing a tracepoint, the array (the one that
-it_func_ptr points to) is updated by allocating a new array, copying the
-old array plus or minus the tracpoint being added or removed, setting
-the tp->funcs to the new array, and then it calls call_rcu_sched() to
-free it.
-
-Now for the bug to hit, something had to be coming in or out of idle,
-and jumping to this code. Between the time it got the it_func_ptr to the
-time it accessed any of that pointer's data in the loop, the tp->func
-had to be updated to the new array, and then all CPUs would have passed
-a schedule point (except the rcu_idle CPUs).
-
-On uniprocessor, this is not an issue, but on SMP, it is possible that
-with two CPUs the first being in rcu_idle may be ignored, and the second
-would have been adding the tracepoint and then going directly to freeing
-the code. But as tracepoints are very low weight, it is most likely that
-the tracepoints will finish before the first could even free the memory.
-
-But the chance does exist. As the chance of me winning the lottery,
-becoming President of the United States, and curing cancer also exists!
-
-;-)
-
--- Steve
+diff --git a/arch/arm/mach-sa1100/include/mach/neponset.h b/arch/arm/mach-sa1100/include/mach/neponset.h
+index 6032216..5516a52 100644
+--- a/arch/arm/mach-sa1100/include/mach/neponset.h
++++ b/arch/arm/mach-sa1100/include/mach/neponset.h
+@@ -15,54 +15,6 @@
+ /*
+  * Neponset definitions: 
+  */
+-
+-#define NEPONSET_CPLD_BASE      (0x10000000)
+-#define Nep_p2v( x )            ((x) - NEPONSET_CPLD_BASE + 0xf3000000)
+-#define Nep_v2p( x )            ((x) - 0xf3000000 + NEPONSET_CPLD_BASE)
+-
+-#define _IRR                    0x10000024      /* Interrupt Reason Register */
+-#define _AUD_CTL                0x100000c0      /* Audio controls (RW)       */
+-#define _MDM_CTL_0              0x100000b0      /* Modem control 0 (RW)      */
+-#define _MDM_CTL_1              0x100000b4      /* Modem control 1 (RW)      */
+-#define _NCR_0	                0x100000a0      /* Control Register (RW)     */
+-#define _KP_X_OUT               0x10000090      /* Keypad row write (RW)     */
+-#define _KP_Y_IN                0x10000080      /* Keypad column read (RO)   */
+-#define _SWPK                   0x10000020      /* Switch pack (RO)          */
+-#define _WHOAMI                 0x10000000      /* System ID Register (RO)   */
+-
+-#define _LEDS                   0x10000010      /* LEDs [31:0] (WO)          */
+-
+-#define IRR                     (*((volatile u_char *) Nep_p2v(_IRR)))
+-#define AUD_CTL                 (*((volatile u_char *) Nep_p2v(_AUD_CTL)))
+-#define MDM_CTL_0               (*((volatile u_char *) Nep_p2v(_MDM_CTL_0)))
+-#define MDM_CTL_1               (*((volatile u_char *) Nep_p2v(_MDM_CTL_1)))
+-#define NCR_0			(*((volatile u_char *) Nep_p2v(_NCR_0)))
+-#define KP_X_OUT                (*((volatile u_char *) Nep_p2v(_KP_X_OUT)))
+-#define KP_Y_IN                 (*((volatile u_char *) Nep_p2v(_KP_Y_IN)))
+-#define SWPK                    (*((volatile u_char *) Nep_p2v(_SWPK)))
+-#define WHOAMI                  (*((volatile u_char *) Nep_p2v(_WHOAMI)))
+-
+-#define LEDS                    (*((volatile Word   *) Nep_p2v(_LEDS)))
+-
+-#define IRR_ETHERNET		(1<<0)
+-#define IRR_USAR		(1<<1)
+-#define IRR_SA1111		(1<<2)
+-
+-#define AUD_SEL_1341            (1<<0)
+-#define AUD_MUTE_1341           (1<<1)
+-
+-#define MDM_CTL0_RTS1		(1 << 0)
+-#define MDM_CTL0_DTR1		(1 << 1)
+-#define MDM_CTL0_RTS2		(1 << 2)
+-#define MDM_CTL0_DTR2		(1 << 3)
+-
+-#define MDM_CTL1_CTS1		(1 << 0)
+-#define MDM_CTL1_DSR1		(1 << 1)
+-#define MDM_CTL1_DCD1		(1 << 2)
+-#define MDM_CTL1_CTS2		(1 << 3)
+-#define MDM_CTL1_DSR2		(1 << 4)
+-#define MDM_CTL1_DCD2		(1 << 5)
+-
+ #define NCR_GP01_OFF		(1<<0)
+ #define NCR_TP_PWR_EN		(1<<1)
+ #define NCR_MS_PWR_EN		(1<<2)
+diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
+index 2a9e1e2..3c0d4b8 100644
+--- a/arch/arm/mach-sa1100/neponset.c
++++ b/arch/arm/mach-sa1100/neponset.c
+@@ -27,9 +27,40 @@
+ #define NEP_IRQ_SA1111	2
+ #define NEP_IRQ_NR	3
+ 
++#define WHOAMI		0x00
++#define LEDS		0x10
++#define SWPK		0x20
++#define IRR		0x24
++#define KP_Y_IN		0x80
++#define KP_X_OUT	0x90
++#define NCR_0		0xa0
++#define MDM_CTL_0	0xb0
++#define MDM_CTL_1	0xb4
++#define AUD_CTL		0xc0
++
++#define IRR_ETHERNET	(1 << 0)
++#define IRR_USAR	(1 << 1)
++#define IRR_SA1111	(1 << 2)
++
++#define MDM_CTL0_RTS1	(1 << 0)
++#define MDM_CTL0_DTR1	(1 << 1)
++#define MDM_CTL0_RTS2	(1 << 2)
++#define MDM_CTL0_DTR2	(1 << 3)
++
++#define MDM_CTL1_CTS1	(1 << 0)
++#define MDM_CTL1_DSR1	(1 << 1)
++#define MDM_CTL1_DCD1	(1 << 2)
++#define MDM_CTL1_CTS2	(1 << 3)
++#define MDM_CTL1_DSR2	(1 << 4)
++#define MDM_CTL1_DCD2	(1 << 5)
++
++#define AUD_SEL_1341	(1 << 0)
++#define AUD_MUTE_1341	(1 << 1)
++
+ extern void sa1110_mb_disable(void);
+ 
+ struct neponset_drvdata {
++	void __iomem *base;
+ 	struct platform_device *sa1111;
+ 	struct platform_device *smc91x;
+ 	unsigned irq_base;
+@@ -39,19 +70,34 @@ struct neponset_drvdata {
+ #endif
+ };
+ 
++static void __iomem *nep_base;
++
+ void neponset_ncr_frob(unsigned int mask, unsigned int val)
+ {
+-	unsigned long flags;
+-
+-	local_irq_save(flags);
+-	NCR_0 = (NCR_0 & ~mask) | val;
+-	local_irq_restore(flags);
++	void __iomem *base = nep_base;
++
++	if (base) {
++		unsigned long flags;
++		unsigned v;
++
++		local_irq_save(flags);
++		v = readb_relaxed(base + NCR_0);
++		writeb_relaxed((v & ~mask) | val, base + NCR_0);
++		local_irq_restore(flags);
++	} else {
++		WARN(1, "nep_base unset\n");
++	}
+ }
+ 
+ static void neponset_set_mctrl(struct uart_port *port, u_int mctrl)
+ {
+-	u_int mdm_ctl0 = MDM_CTL_0;
++	void __iomem *base = nep_base;
++	u_int mdm_ctl0;
++
++	if (!base)
++		return;
+ 
++	mdm_ctl0 = readb_relaxed(base + MDM_CTL_0);
+ 	if (port->mapbase == _Ser1UTCR0) {
+ 		if (mctrl & TIOCM_RTS)
+ 			mdm_ctl0 &= ~MDM_CTL0_RTS2;
+@@ -74,14 +120,19 @@ static void neponset_set_mctrl(struct uart_port *port, u_int mctrl)
+ 			mdm_ctl0 |= MDM_CTL0_DTR1;
+ 	}
+ 
+-	MDM_CTL_0 = mdm_ctl0;
++	writeb_relaxed(mdm_ctl0, base + MDM_CTL_0);
+ }
+ 
+ static u_int neponset_get_mctrl(struct uart_port *port)
+ {
++	void __iomem *base = nep_base;
+ 	u_int ret = TIOCM_CD | TIOCM_CTS | TIOCM_DSR;
+-	u_int mdm_ctl1 = MDM_CTL_1;
++	u_int mdm_ctl1;
+ 
++	if (!base)
++		return ret;
++
++	mdm_ctl1 = readb_relaxed(base + MDM_CTL_1);
+ 	if (port->mapbase == _Ser1UTCR0) {
+ 		if (mdm_ctl1 & MDM_CTL1_DCD2)
+ 			ret &= ~TIOCM_CD;
+@@ -128,7 +179,8 @@ static void neponset_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		 * active IRQ bits high.  Note: there is a typo in the
+ 		 * Neponset user's guide for the SA1111 IRR level.
+ 		 */
+-		irr = IRR ^ (IRR_ETHERNET | IRR_USAR);
++		irr = readb_relaxed(d->base + IRR);
++		irr ^= IRR_ETHERNET | IRR_USAR;
+ 
+ 		if ((irr & (IRR_ETHERNET | IRR_USAR | IRR_SA1111)) == 0)
+ 			break;
+@@ -182,7 +234,7 @@ static struct sa1111_platform_data sa1111_info = {
+ static int __devinit neponset_probe(struct platform_device *dev)
+ {
+ 	struct neponset_drvdata *d;
+-	struct resource *sa1111_res, *smc91x_res;
++	struct resource *nep_res, *sa1111_res, *smc91x_res;
+ 	struct resource sa1111_resources[] = {
+ 		DEFINE_RES_MEM(0x40000000, SZ_8K),
+ 		{ .flags = IORESOURCE_IRQ },
+@@ -213,30 +265,40 @@ static int __devinit neponset_probe(struct platform_device *dev)
+ 	};
+ 	int ret, irq;
+ 
++	if (nep_base)
++		return -EBUSY;
++
+ 	irq = ret = platform_get_irq(dev, 0);
+ 	if (ret < 0)
+ 		goto err_alloc;
+ 
++	nep_res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+ 	smc91x_res = platform_get_resource(dev, IORESOURCE_MEM, 1);
+ 	sa1111_res = platform_get_resource(dev, IORESOURCE_MEM, 2);
+-	if (!smc91x_res || !sa1111_res) {
++	if (!nep_res || !smc91x_res || !sa1111_res) {
+ 		ret = -ENXIO;
+ 		goto err_alloc;
+ 	}
+ 
+-	if (WHOAMI != 0x11) {
+-		dev_warn(&dev->dev, "Neponset board detected, but wrong ID: %02x\n",
+-			 WHOAMI);
+-		ret = -ENODEV;
+-		goto err_alloc;
+-	}
+-
+ 	d = kzalloc(sizeof(*d), GFP_KERNEL);
+ 	if (!d) {
+ 		ret = -ENOMEM;
+ 		goto err_alloc;
+ 	}
+ 
++	d->base = ioremap(nep_res->start, SZ_4K);
++	if (!d->base) {
++		ret = -ENOMEM;
++		goto err_ioremap;
++	}
++
++	if (readb_relaxed(d->base + WHOAMI) != 0x11) {
++		dev_warn(&dev->dev, "Neponset board detected, but wrong ID: %02x\n",
++			 readb_relaxed(d->base + WHOAMI));
++		ret = -ENODEV;
++		goto err_id;
++	}
++
+ 	ret = irq_alloc_descs(-1, IRQ_BOARD_START, NEP_IRQ_NR, -1);
+ 	if (ret <= 0) {
+ 		dev_err(&dev->dev, "unable to allocate %u irqs: %d\n",
+@@ -270,6 +332,7 @@ static int __devinit neponset_probe(struct platform_device *dev)
+ 
+ 	dev_info(&dev->dev, "Neponset daughter board, providing IRQ%u-%u\n",
+ 		 d->irq_base, d->irq_base + NEP_IRQ_NR - 1);
++	nep_base = d->base;
+ 
+ 	sa1100_register_uart_fns(&neponset_port_fns);
+ 
+@@ -277,7 +340,7 @@ static int __devinit neponset_probe(struct platform_device *dev)
+ 	sa1110_mb_disable();
+ 
+ 	/* Disable GPIO 0/1 drivers so the buttons work on the Assabet */
+-	NCR_0 = NCR_GP01_OFF;
++	writeb_relaxed(NCR_GP01_OFF, d->base + NCR_0);
+ 
+ 	sa1111_resources[0].parent = sa1111_res;
+ 	sa1111_resources[1].start = d->irq_base + NEP_IRQ_SA1111;
+@@ -295,6 +358,9 @@ static int __devinit neponset_probe(struct platform_device *dev)
+ 	return 0;
+ 
+  err_irq_alloc:
++ err_id:
++	iounmap(d->base);
++ err_ioremap:
+ 	kfree(d);
+  err_alloc:
+ 	return ret;
+@@ -311,6 +377,8 @@ static int __devexit neponset_remove(struct platform_device *dev)
+ 		platform_device_unregister(d->smc91x);
+ 	irq_set_chained_handler(irq, NULL);
+ 	irq_free_descs(d->irq_base, NEP_IRQ_NR);
++	nep_base = NULL;
++	iounmap(d->base);
+ 	kfree(d);
+ 
+ 	return 0;
+@@ -321,8 +389,8 @@ static int neponset_suspend(struct device *dev)
+ {
+ 	struct neponset_drvdata *d = dev_get_drvdata(dev);
+ 
+-	d->ncr0 = NCR_0;
+-	d->mdm_ctl_0 = MDM_CTL_0;
++	d->ncr0 = readb_relaxed(d->base + NCR_0);
++	d->mdm_ctl_0 = readb_relaxed(d->base + MDM_CTL_0);
+ 
+ 	return 0;
+ }
+@@ -331,8 +399,8 @@ static int neponset_resume(struct device *dev)
+ {
+ 	struct neponset_drvdata *d = dev_get_drvdata(dev);
+ 
+-	NCR_0 = d->ncr0;
+-	MDM_CTL_0 = d->mdm_ctl_0;
++	writeb_relaxed(d->ncr0, d->base + NCR_0);
++	writeb_relaxed(d->mdm_ctl_0, d->base + MDM_CTL_0);
+ 
+ 	return 0;
+ }
+-- 
+1.7.4.4
