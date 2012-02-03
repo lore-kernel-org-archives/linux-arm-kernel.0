@@ -1,68 +1,87 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:35:32 +0000
-Subject: [PATCH 13/17] ARM: sa11x0: neponset: place smc91x and sa1111
- resources in neponset device
+Date: Fri, 03 Feb 2012 19:35:52 +0000
+Subject: [PATCH 14/17] ARM: sa11x0: neponset: suspend/resume in _noirq state
 In-Reply-To: <20120203193059.GF14129@n2100.arm.linux.org.uk>
 References: <20120203193059.GF14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtOuy-0001CO-AV@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtOvI-0001CS-EM@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Complete the neponset device resources by covering the children's
-memory resources in the parent neponset device.
+Suspend and resume in the _noirq state, so that we're saving the
+state of the modem control signals as late as possible, and restoring
+them as early as possible.  There's nothing to do in thaw/poweroff
+methods as we've already saved the necessary state.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/neponset.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/mach-sa1100/neponset.c |   24 +++++++++++++++---------
+ 1 files changed, 15 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
-index f4d5871..2451a38 100644
+index 2451a38..59223ba 100644
 --- a/arch/arm/mach-sa1100/neponset.c
 +++ b/arch/arm/mach-sa1100/neponset.c
-@@ -179,6 +179,7 @@ static struct sa1111_platform_data sa1111_info = {
- static int __devinit neponset_probe(struct platform_device *dev)
+@@ -8,6 +8,7 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/pm.h>
+ #include <linux/serial_core.h>
+ #include <linux/slab.h>
+ 
+@@ -303,10 +304,10 @@ static int __devexit neponset_remove(struct platform_device *dev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static int neponset_suspend(struct platform_device *dev, pm_message_t state)
++#ifdef CONFIG_PM_SLEEP
++static int neponset_suspend(struct device *dev)
  {
- 	struct neponset_drvdata *d;
-+	struct resource *sa1111_res, *smc91x_res;
- 	struct resource sa1111_resources[] = {
- 		DEFINE_RES_MEM(0x40000000, SZ_8K),
- 		{ .flags = IORESOURCE_IRQ },
-@@ -213,6 +214,13 @@ static int __devinit neponset_probe(struct platform_device *dev)
- 	if (ret < 0)
- 		goto err_alloc;
+-	struct neponset_drvdata *d = platform_get_drvdata(dev);
++	struct neponset_drvdata *d = dev_get_drvdata(dev);
  
-+	smc91x_res = platform_get_resource(dev, IORESOURCE_MEM, 1);
-+	sa1111_res = platform_get_resource(dev, IORESOURCE_MEM, 2);
-+	if (!smc91x_res || !sa1111_res) {
-+		ret = -ENXIO;
-+		goto err_alloc;
-+	}
-+
- 	d = kzalloc(sizeof(*d), GFP_KERNEL);
- 	if (!d) {
- 		ret = -ENOMEM;
-@@ -258,10 +266,13 @@ static int __devinit neponset_probe(struct platform_device *dev)
- 	/* Disable GPIO 0/1 drivers so the buttons work on the Assabet */
- 	NCR_0 = NCR_GP01_OFF;
+ 	d->ncr0 = NCR_0;
+ 	d->mdm_ctl_0 = MDM_CTL_0;
+@@ -314,9 +315,9 @@ static int neponset_suspend(struct platform_device *dev, pm_message_t state)
+ 	return 0;
+ }
  
-+	sa1111_resources[0].parent = sa1111_res;
- 	sa1111_resources[1].start = d->irq_base + NEP_IRQ_SA1111;
- 	sa1111_resources[1].end = d->irq_base + NEP_IRQ_SA1111;
- 	d->sa1111 = platform_device_register_full(&sa1111_devinfo);
+-static int neponset_resume(struct platform_device *dev)
++static int neponset_resume(struct device *dev)
+ {
+-	struct neponset_drvdata *d = platform_get_drvdata(dev);
++	struct neponset_drvdata *d = dev_get_drvdata(dev);
  
-+	smc91x_resources[0].parent = smc91x_res;
-+	smc91x_resources[1].parent = smc91x_res;
- 	smc91x_resources[2].start = d->irq_base + NEP_IRQ_SMC91X;
- 	smc91x_resources[2].end = d->irq_base + NEP_IRQ_SMC91X;
- 	d->smc91x = platform_device_register_full(&smc91x_devinfo);
-@@ -331,6 +342,8 @@ static struct platform_driver neponset_device_driver = {
+ 	NCR_0 = d->ncr0;
+ 	MDM_CTL_0 = d->mdm_ctl_0;
+@@ -324,19 +325,24 @@ static int neponset_resume(struct platform_device *dev)
+ 	return 0;
+ }
  
- static struct resource neponset_resources[] = {
- 	DEFINE_RES_MEM(0x10000000, 0x08000000),
-+	DEFINE_RES_MEM(0x18000000, 0x04000000),
-+	DEFINE_RES_MEM(0x40000000, SZ_8K),
- 	DEFINE_RES_IRQ(IRQ_GPIO25),
++static const struct dev_pm_ops neponset_pm_ops = {
++	.suspend_noirq = neponset_suspend,
++	.resume_noirq = neponset_resume,
++	.freeze_noirq = neponset_suspend,
++	.restore_noirq = neponset_resume,
++};
++#define PM_OPS &neponset_pm_ops
+ #else
+-#define neponset_suspend NULL
+-#define neponset_resume  NULL
++#define PM_OPS NULL
+ #endif
+ 
+ static struct platform_driver neponset_device_driver = {
+ 	.probe		= neponset_probe,
+ 	.remove		= __devexit_p(neponset_remove),
+-	.suspend	= neponset_suspend,
+-	.resume		= neponset_resume,
+ 	.driver		= {
+ 		.name	= "neponset",
+ 		.owner	= THIS_MODULE,
++		.pm	= PM_OPS,
+ 	},
  };
  
 -- 
