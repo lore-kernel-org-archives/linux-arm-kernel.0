@@ -1,70 +1,66 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Fri, 3 Feb 2012 23:17:53 +0100 (CET)
-Subject: [PATCH] [trivial] media: Fix typo in mixer_drv.c and
- hdmi_drv.c
-In-Reply-To: <CAH9JG2USF-FYX0SL-y0Gby8oNvA=sFBV7uyvP+4oaa1nxRU5qA@mail.gmail.com>
-References: <1327841453-1674-1-git-send-email-standby24x7@gmail.com>
- <CAH9JG2USF-FYX0SL-y0Gby8oNvA=sFBV7uyvP+4oaa1nxRU5qA@mail.gmail.com>
-Message-ID: <alpine.LNX.2.00.1202032317420.25026@pobox.suse.cz>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 3 Feb 2012 15:30:54 -0700 (MST)
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <20120204091048.00c7e027@notabene.brown>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <20120203231113.25ae2d3a@notabene.brown>
+ <alpine.DEB.2.00.1202031243270.27947@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202031432080.27947@utopia.booyaka.com>
+ <20120204091048.00c7e027@notabene.brown>
+Message-ID: <alpine.DEB.2.00.1202031528200.27947@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2012, Kyungmin Park wrote:
+On Sat, 4 Feb 2012, NeilBrown wrote:
 
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> On Fri, 3 Feb 2012 14:42:09 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
+> 
+> > On Fri, 3 Feb 2012, Paul Walmsley wrote:
+> > 
+> > > On Fri, 3 Feb 2012, NeilBrown wrote:
+> > > 
+> > > > My theory is that there is a delay between the falling RX line waking the
+> > > > system up, and the CPU enabling the UART - whether enabling the clocks or
+> > > > doing a full config, I am not sure - though I think the former.
+> > > > 
+> > > > Maybe if we could enable the UART clocks immediately after returning from the
+> > > > WFI instruction we could avoid the corruption....
+> > > 
+> > > The PRCM should be re-enabling the UART's functional clock itself, with no 
+> > > kernel involvement.  The sequence should go something like this 
+> > > (simplified):
+> > > 
+> > > 1. I/O wakeup occurs
+> > > 
+> > > 2. CORE & PER powerdomains are awakened
+> > > 
+> > > 3. The UART notices an event on its input lines and deasserts its idle-ack
+> > 
+> > It just occurred to me that, supposedly, the only UART input line that is 
+> > attached to the SWAKEUP signal is CTS.  So the UART may not in fact be 
+> > able to deassert its idle-ack autonomously at this point.
+> 
+> How does that relate to the RX_CTS_WU_EN bit which enables an interrupt on 
+>     "a falling edge of pins RX, nCTS, or nDSR"
 
-Applied, thanks.
+That's the bit I'm talking about :-)  Maybe it might work appropriately, 
+then, if it also tests RX.  Section 19.3.2.3 "Wake-up Request" only 
+mentions the CTS lines.  Flip a coin ;-)
 
-> > Correct typo "sucessful" to "successful" in
-> > drivers/media/video/s5p-tv/mixer_drv.c
-> > drivers/media/video/s5p-tv/hdmi_drv.c
-> >
-> > Signed-off-by: Masanari Iida <standby24x7@gmail.com>
-> > ---
-> >  drivers/media/video/s5p-tv/hdmi_drv.c  |    4 ++--
-> >  drivers/media/video/s5p-tv/mixer_drv.c |    2 +-
-> >  2 files changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/media/video/s5p-tv/hdmi_drv.c
-> > b/drivers/media/video/s5p-tv/hdmi_drv.c
-> > index 8b41a04..3e0dd09 100644
-> > --- a/drivers/media/video/s5p-tv/hdmi_drv.c
-> > +++ b/drivers/media/video/s5p-tv/hdmi_drv.c
-> > @@ -962,7 +962,7 @@ static int __devinit hdmi_probe(struct platform_device
-> > *pdev)
-> >  	/* storing subdev for call that have only access to struct device */
-> >  	dev_set_drvdata(dev, sd);
-> >
-> > -	dev_info(dev, "probe sucessful\n");
-> > +	dev_info(dev, "probe successful\n");
-> >
-> >  	return 0;
-> >
-> > @@ -1000,7 +1000,7 @@ static int __devexit hdmi_remove(struct
-> > platform_device *pdev)
-> >  	iounmap(hdmi_dev->regs);
-> >  	hdmi_resources_cleanup(hdmi_dev);
-> >  	kfree(hdmi_dev);
-> > -	dev_info(dev, "remove sucessful\n");
-> > +	dev_info(dev, "remove successful\n");
-> >
-> >  	return 0;
-> >  }
-> > diff --git a/drivers/media/video/s5p-tv/mixer_drv.c
-> > b/drivers/media/video/s5p-tv/mixer_drv.c
-> > index 0064309..a2c0c25 100644
-> > --- a/drivers/media/video/s5p-tv/mixer_drv.c
-> > +++ b/drivers/media/video/s5p-tv/mixer_drv.c
-> > @@ -444,7 +444,7 @@ static int __devexit mxr_remove(struct platform_device
-> > *pdev)
-> >
-> >  	kfree(mdev);
-> >
-> > -	dev_info(dev, "remove sucessful\n");
-> > +	dev_info(dev, "remove successful\n");
-> >  	return 0;
-> >  }
+> This seems to be a "wakeup interrupt", bit it isn't clear what it wakes us.
 
--- 
-Jiri Kosina
-SUSE Labs
+The UART.  It should send an SWAKEUP to the PRCM and bring the UART out of 
+idle-ack.
+
+- Paul
