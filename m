@@ -1,57 +1,73 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 3 Feb 2012 13:10:28 -0700 (MST)
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120203205401.5ddf241d@notabene.brown>
-References: <13274430881471@kroah.org>
- <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
- <20120126042155.GA3185@suse.de>
- <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
- <20120126191604.GA15516@suse.de>
- <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
-Message-ID: <alpine.DEB.2.00.1202031255330.27947@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 03 Feb 2012 20:10:33 +0000
+Subject: [PATCH 5/5] USB: sa1111: add hcd .reset method
+In-Reply-To: <20120203200406.GI14129@n2100.arm.linux.org.uk>
+References: <20120203200406.GI14129@n2100.arm.linux.org.uk>
+Message-ID: <E1RtPSr-00048k-6G@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One other comment..
+Add the .reset method to the HCD, and update the .start method
+accordingly for this change.
 
-On Fri, 3 Feb 2012, NeilBrown wrote:
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/usb/host/ohci-sa1111.c |   20 +++++++++++---------
+ 1 files changed, 11 insertions(+), 9 deletions(-)
 
-> On Thu, 2 Feb 2012 22:45:53 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
-> 
-> > On Fri, 3 Feb 2012, NeilBrown wrote:
-> > 
-> > > I can remove this effect with:
-> > > 
-> > > diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> > > index f809041..c7ef760 100644
-> > > --- a/drivers/tty/serial/omap-serial.c
-> > > +++ b/drivers/tty/serial/omap-serial.c
-> > > @@ -440,7 +440,8 @@ static unsigned int serial_omap_tx_empty(struct uart_port *port)
-> > >  	spin_lock_irqsave(&up->port.lock, flags);
-> > >  	ret = serial_in(up, UART_LSR) & UART_LSR_TEMT ? TIOCSER_TEMT : 0;
-> > >  	spin_unlock_irqrestore(&up->port.lock, flags);
-> > > -	pm_runtime_put(&up->pdev->dev);
-> > > +	pm_runtime_mark_last_busy(&up->pdev->dev);
-> > > +	pm_runtime_put_autosuspend(&up->pdev->dev);
-> > >  	return ret;
-> > >  }
-
-It's a little surprising that this helps.  The pm_runtime_get*() and 
-_put*() in serial_omap_tx_empty() are just intended to ensure that the 
-UART's clocks are running for that LSR register read.
-
-Considering your theory that the UART clocks are being cut while there's 
-still data in the FIFO, you might consider removing this code at the end 
-of transmit_chars():
-
-	if (uart_circ_empty(xmit))
-		serial_omap_stop_tx(&up->port);
-
-
-
-- Paul
+diff --git a/drivers/usb/host/ohci-sa1111.c b/drivers/usb/host/ohci-sa1111.c
+index 95c3f0f..e1004fb 100644
+--- a/drivers/usb/host/ohci-sa1111.c
++++ b/drivers/usb/host/ohci-sa1111.c
+@@ -55,22 +55,25 @@ static void dump_hci_status(struct usb_hcd *hcd, const char *label)
+ }
+ #endif
+ 
++static int ohci_sa1111_reset(struct usb_hcd *hcd)
++{
++	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
++
++	ohci_hcd_init(ohci);
++	return ohci_init(ohci);
++}
++
+ static int __devinit ohci_sa1111_start(struct usb_hcd *hcd)
+ {
+ 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+ 	int ret;
+ 
+-	ret = ohci_init(ohci);
+-	if (ret < 0)
+-		return ret;
+-
+ 	ret = ohci_run(ohci);
+ 	if (ret < 0) {
+-		err("can't start %s", hcd->self.bus_name);
++		ohci_err(ohci, "can't start\n");
+ 		ohci_stop(hcd);
+-		return ret;
+ 	}
+-	return 0;
++	return ret;
+ }
+ 
+ static const struct hc_driver ohci_sa1111_hc_driver = {
+@@ -87,6 +90,7 @@ static const struct hc_driver ohci_sa1111_hc_driver = {
+ 	/*
+ 	 * basic lifecycle operations
+ 	 */
++	.reset =		ohci_sa1111_reset,
+ 	.start =		ohci_sa1111_start,
+ 	.stop =			ohci_stop,
+ 	.shutdown =		ohci_shutdown,
+@@ -200,8 +204,6 @@ static int ohci_hcd_sa1111_probe(struct sa1111_dev *dev)
+ 	if (ret)
+ 		goto err2;
+ 
+-	ohci_hcd_init(hcd_to_ohci(hcd));
+-
+ 	ret = usb_add_hcd(hcd, dev->irq[1], 0);
+ 	if (ret == 0)
+ 		return ret;
+-- 
+1.7.4.4
