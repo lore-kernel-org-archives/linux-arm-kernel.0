@@ -1,66 +1,60 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 3 Feb 2012 15:30:54 -0700 (MST)
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120204091048.00c7e027@notabene.brown>
-References: <13274430881471@kroah.org>
- <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
- <20120126042155.GA3185@suse.de>
- <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
- <20120126191604.GA15516@suse.de>
- <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <20120203231113.25ae2d3a@notabene.brown>
- <alpine.DEB.2.00.1202031243270.27947@utopia.booyaka.com>
- <alpine.DEB.2.00.1202031432080.27947@utopia.booyaka.com>
- <20120204091048.00c7e027@notabene.brown>
-Message-ID: <alpine.DEB.2.00.1202031528200.27947@utopia.booyaka.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri,  3 Feb 2012 16:35:09 -0600
+Subject: [PATCH v4 1/4] ARM: kconfig: always select IRQ_DOMAIN
+In-Reply-To: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
+References: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1328308512-22594-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 Feb 2012, NeilBrown wrote:
+From: Rob Herring <rob.herring@calxeda.com>
 
-> On Fri, 3 Feb 2012 14:42:09 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
-> 
-> > On Fri, 3 Feb 2012, Paul Walmsley wrote:
-> > 
-> > > On Fri, 3 Feb 2012, NeilBrown wrote:
-> > > 
-> > > > My theory is that there is a delay between the falling RX line waking the
-> > > > system up, and the CPU enabling the UART - whether enabling the clocks or
-> > > > doing a full config, I am not sure - though I think the former.
-> > > > 
-> > > > Maybe if we could enable the UART clocks immediately after returning from the
-> > > > WFI instruction we could avoid the corruption....
-> > > 
-> > > The PRCM should be re-enabling the UART's functional clock itself, with no 
-> > > kernel involvement.  The sequence should go something like this 
-> > > (simplified):
-> > > 
-> > > 1. I/O wakeup occurs
-> > > 
-> > > 2. CORE & PER powerdomains are awakened
-> > > 
-> > > 3. The UART notices an event on its input lines and deasserts its idle-ack
-> > 
-> > It just occurred to me that, supposedly, the only UART input line that is 
-> > attached to the SWAKEUP signal is CTS.  So the UART may not in fact be 
-> > able to deassert its idle-ack autonomously at this point.
-> 
-> How does that relate to the RX_CTS_WU_EN bit which enables an interrupt on 
->     "a falling edge of pins RX, nCTS, or nDSR"
+irqdomains should ultimately be needed for all platforms, so enable it
+unconditionally for ARM.
 
-That's the bit I'm talking about :-)  Maybe it might work appropriately, 
-then, if it also tests RX.  Section 19.3.2.3 "Wake-up Request" only 
-mentions the CTS lines.  Flip a coin ;-)
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/Kconfig        |    2 +-
+ arch/arm/common/Kconfig |    2 --
+ 2 files changed, 1 insertions(+), 3 deletions(-)
 
-> This seems to be a "wakeup interrupt", bit it isn't clear what it wakes us.
-
-The UART.  It should send an SWAKEUP to the PRCM and bring the UART out of 
-idle-ack.
-
-- Paul
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 24626b0..b21b396 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -32,6 +32,7 @@ config ARM
+ 	select GENERIC_IRQ_SHOW
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select GENERIC_PCI_IOMAP
++	select IRQ_DOMAIN
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+@@ -1862,7 +1863,6 @@ config USE_OF
+ 	bool "Flattened Device Tree support"
+ 	select OF
+ 	select OF_EARLY_FLATTREE
+-	select IRQ_DOMAIN
+ 	help
+ 	  Include support for flattened device tree machine descriptions.
+ 
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 81a933e..2d3fc0c 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -1,5 +1,4 @@
+ config ARM_GIC
+-	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
+ 	bool
+ 
+@@ -7,7 +6,6 @@ config GIC_NON_BANKED
+ 	bool
+ 
+ config ARM_VIC
+-	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
+ 	bool
+ 
+-- 
+1.7.5.4
