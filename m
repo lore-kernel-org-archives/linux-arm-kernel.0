@@ -1,120 +1,227 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  3 Feb 2012 13:07:29 +0100
-Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
-Message-ID: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Fri, 3 Feb 2012 12:09:18 +0000
+Subject: [PATCH v9 00/25] gpio/omap: driver cleanup and fixes
+In-Reply-To: <CAC83ZvLoYVofH9oKXw92i-=DbP2i3NfZjLGSJwk1j0JvXcFZVQ@mail.gmail.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C3317A5DF7@DBDE01.ent.ti.com>
+ <CAC83ZvLoYVofH9oKXw92i-=DbP2i3NfZjLGSJwk1j0JvXcFZVQ@mail.gmail.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C3317A60AD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows to decouple and recouple the gic from the PRCMU.
-This is needed to put the A9 core in retention mode with the cpuidle
-driver.
+Hi,
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/mfd/db8500-prcmu.c       |   42 ++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/db8500-prcmu.h |    2 +
- include/linux/mfd/dbx500-prcmu.h |   16 ++++++++++++++
- 3 files changed, 60 insertions(+), 0 deletions(-)
+On Fri, Feb 03, 2012 at 15:29:49, DebBarma, Tarun Kanti wrote:
+> On Fri, Feb 3, 2012 at 2:51 PM, Hebbar, Gururaja
+> <gururaja.hebbar@ti.com> wrote:
+> 
+> 
+> 	Tarun,
+> 	
+> 	I am interested in testing these patches on AM335x. Do you have
+> a tree with these
+> 	patches applied so that I can pull.
+> 	
+> 
+> You can find the series here:-
+> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-oma
+> p-dev for_3.4/gpio_cleanup_fixes_v9
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index af8e0ef..c708431 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -528,6 +528,10 @@ static const char *hwacc_ret_regulator_name[NUM_HW_ACC] = {
- 
- #define PRCMU_PLLDSI_LOCKP_LOCKED	0x3
- 
-+#define PRCMU_A9_MASK_REQ               0x00000328
-+#define PRCMU_A9_MASK_REQ_MASK          0x00000001
-+#define PRCMU_A9_MASK_ACK               0x0000032C
-+
- static struct {
- 	u8 project_number;
- 	u8 api_version;
-@@ -787,6 +791,44 @@ int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
- 	return 0;
- }
- 
-+/*
-+ * prcmu_gic_mask - apply the mask to the mask request
-+ * register. This mask has the bits [1-31] reserved and
-+ * the request applies to the bit 0 of this register.
-+ */
-+static inline void prcmu_gic_mask(u32 mask)
-+{
-+	u32 val = readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
-+	writel((val & ~PRCMU_A9_MASK_REQ_MASK) | mask,
-+	       _PRCMU_BASE + PRCMU_A9_MASK_REQ);
-+}
-+
-+/*
-+ * db8500_prcmu_gic_disable - This function decouple the gic
-+ * from the prcmu.
-+ */
-+void db8500_prcmu_gic_disable(void)
-+{
-+	prcmu_gic_mask(PRCMU_A9_MASK_REQ_MASK);
-+
-+	/* Wait for gic mask register update */
-+	while (!(readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ) &
-+		 PRCMU_A9_MASK_REQ_MASK))
-+		cpu_relax();
-+
-+	/* Wait a few cycles for the gic mask completion */
-+	udelay(1);
-+}
-+
-+/*
-+ * db8500_prcmu_gic_enable - This function recouple the gic
-+ * with the prcmu.
-+ */
-+void db8500_prcmu_gic_enable(void)
-+{
-+	prcmu_gic_mask(0);
-+}
-+
- /* This function should only be called while mb0_transfer.lock is held. */
- static void config_wakeups(void)
- {
-diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
-index 60d27f7..4a1032c 100644
---- a/include/linux/mfd/db8500-prcmu.h
-+++ b/include/linux/mfd/db8500-prcmu.h
-@@ -536,6 +536,8 @@ int prcmu_load_a9wdog(u8 id, u32 val);
- 
- void db8500_prcmu_system_reset(u16 reset_code);
- int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
-+void db8500_prcmu_gic_disable(void);
-+void db8500_prcmu_gic_enable(void);
- void db8500_prcmu_enable_wakeups(u32 wakeups);
- int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state);
- int db8500_prcmu_request_clock(u8 clock, bool enable);
-diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
-index bac942f..a5fee69 100644
---- a/include/linux/mfd/dbx500-prcmu.h
-+++ b/include/linux/mfd/dbx500-prcmu.h
-@@ -237,6 +237,22 @@ static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
- 			keep_ap_pll);
- }
- 
-+static inline void prcmu_gic_disable(void)
-+{
-+	if (machine_is_u5500())
-+		return;
-+	else
-+		return db8500_prcmu_gic_disable();
-+}
-+
-+static inline void prcmu_gic_enable(void)
-+{
-+	if (machine_is_u5500())
-+		return;
-+	else
-+		return db8500_prcmu_gic_enable();
-+}
-+
- static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
- {
- 	if (machine_is_u5500())
--- 
-1.7.5.4
+I am unable to download from this repo. The Gitorious web page fails to show
+the tree and gives 500 error
+
+downloading using https protocol fails with below error.
+
+ghebbar at linux-psp-server:~/projects/linux-gits/gitorious-omap$ git remote add omap-gpio2 https://git.gitorious.org/omap-sw-develoment/linux-omap-dev.git
+
+ghebbar at linux-psp-server:~/projects/linux-gits/gitorious-omap$ git fetch omap-gpio2
+
+error: Unable to get pack index https://git.gitorious.org/omap-sw-develoment/linux-omap-dev.git/objects/pack/pack-a461f67f3067aa122c09f38cf55346152c9fafb8.idx
+
+error: Unable to get pack index https://git.gitorious.org/omap-sw-develoment/linux-omap-dev.git/objects/pack/pack-a66a5d34b6388e1b0c6b49fe4a029cbf755b17c7.idx
+
+error: Unable to get pack index https://git.gitorious.org/omap-sw-develoment/linux-omap-dev.git/objects/pack/pack-952401733bd66c72bc947b54ad5a04ca8edfff2a.idx
+
+error: Unable to get pack index https://git.gitorious.org/omap-sw-develoment/linux-omap-dev.git/objects/pack/pack-1f38918dfb5427f9b79b88d7c6cda15e85c2ad92.idx
+
+error: Unable to get pack file https://git.gitorious.org/omap-sw-develoment/linux-omap-dev.git/objects/pack/pack-2e39094e5e34e6ce642fc2513727a2025b23f8c7.pack
+GnuTLS recv error (-9): A TLS packet with unexpected length was received.
+error: Unable to find f5af8c1f05d8a1e27ca910285da3fee28eb5acce under https://git.gitorious.org/omap-sw-develoment/linux-omap-dev.git
+Cannot obtain needed object f5af8c1f05d8a1e27ca910285da3fee28eb5acce
+while processing commit 7e0e6be8759e6423a4f97b4bbc5e9fec0e5cfde3.
+error: Fetch failed.
+ghebbar at linux-psp-server:~/projects/linux-gits/gitorious-omap$ git fetch omap-gpio2
+error: Unable to get pack index https://git.gitorious.org/omap-sw-develoment/linux-omap-dev.git/objects/pack/pack-a461f67f3067aa122c09f38cf55346152c9fafb8.idx
+
+error: wrong index v2 file size in .git/objects/pack/pack-952401733bd66c72bc947b54ad5a04ca8edfff2a.idx
+error: .git/objects/pack/pack-2e39094e5e34e6ce642fc2513727a2025b23f8c7.pack SHA1 checksum mismatch
+error: inflate: data stream error (invalid distance too far back)
+
+
+is there any issue with the repo.
+
+> --
+> Tarun
+>  
+> 
+> 
+> 
+> 	On Thu, Feb 02, 2012 at 23:00:26, DebBarma, Tarun Kanti wrote:
+> 	> The following changes since commit
+> 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+> 	>   Linus Torvalds (1):
+> 	>         Linux 3.3-rc2
+> 	>
+> 	> are available in the git repository at:
+> 	>
+> http://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-om
+> ap-dev
+> <http://gitorious.org/%7Etarunkanti/omap-sw-develoment/tarunkantis-linux
+> -omap-dev> 
+> 	> Branch: for_3.4/gpio_cleanup_fixes_v9
+> 	>
+> 	> This series is continuation of cleanup of OMAP GPIO driver and
+> fixes.
+> 	> The cleanup include getting rid of cpu_is_* checks wherever
+> possible,
+> 	> use of gpio_bank list instead of static array, use of unique
+> platform
+> 	> specific value associated data member to OMAP platforms to
+> avoid
+> 	> cpu_is_* checks. The series also include PM runtime support.
+> 	>
+> 	> Power Tests
+> 	> a) OMAP3430SDP
+> 	> - Modify board-3430sdp.c file to have multiple GPIO modules
+> active
+> 	>   with debounce timeout enabled.
+> 	> - Enable CPU-Idle
+> 	> - Enable UART timeouts
+> 	> - Enable offmode
+> 	> - echo mem > /sys/power/state
+> 	> - Verify retention and offmode count increment
+> 	>
+> 	>   Used following patches to avoid exception during system
+> suspend:-
+> 	>   [PATCH RFC 1/2] mtd : Prevent the NULL pointer access
+> 	>   [PATCH RFC 2/2] mtd : Make the mtd_suspend return 0 if the
+> suspend is not implemented
+> 	>
+> 	> # echo mem > /sys/power/state
+> 	> [   47.128021] PM: Syncing filesystems ... done.
+> 	> [   47.144104] Freezing user space processes ... (elapsed 0.01
+> seconds) done.
+> 	> [   47.168243] Freezing remaining freezable tasks ... (elapsed
+> 0.02 seconds) don
+> e.
+> 	> [   47.205139] Unable to handle kernel NULL pointer
+> dereference at virtual addre
+> ss 000000a0
+> 	> [   47.213317] pgd = deaac000
+> 	> [   47.216033] [000000a0] *pgd=9e932831, *pte=00000000,
+> *ppte=00000000
+> 	> [   47.222381] Internal error: Oops: 17 [#1] SMP
+> 	> [   47.226745] Modules linked in:
+> 	> [   47.229827] CPU: 0    Not tainted
+> (3.3.0-rc2-00031-g12c5c5c #235)
+> 	> [   47.236022] PC is at mtd_cls_suspend+0x8/0x20
+> 	> [   47.240386] LR is at mtd_cls_suspend+0x8/0x20
+> 	> [   47.244750] pc : [<c02e78f8>]    lr : [<c02e78f8>]    psr:
+> a0000013
+> 	> [   47.244750] sp : dea1fe60  ip : 22222222  fp : c0ee7d40
+> 	> [   47.256256] r10: c0ee7cf0  r9 : 00000000  r8 : c02e78f0
+> 	> [   47.261474] r7 : 00000000  r6 : 00000000  r5 : 00000002  r4
+> : dea45800
+> 	> [   47.268005] r3 : deb4cac0  r2 : 00000000  r1 : 00000002  r0
+> : 00000000
+> 	> [   47.274536] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA
+> ARM  Segment user
+> 	> [   47.281677] Control: 10c5387d  Table: 9eaac019  DAC:
+> 00000015
+> 	> [   47.287445] Process sh (pid: 1177, stack limit =
+> 0xdea1e2f8)
+> 	> [   47.293090] Stack: (0xdea1fe60 to 0xdea20000)
+> 	> [...]
+> 	>
+> 	> b) ZOOM3
+> 	> - Enable CPU-Idle
+> 	> - Enable UART timeout
+> 	> - echo mem > /sys/power/state
+> 	> - Wakeup system using serial keyboard
+> 	> - Verify retention count increment
+> 	>
+> 	> Functional Tests
+> 	> - Done on OMAP2430, OMAP3430SDP, ZOOM3, OMAP4430
+> 	>
+> 	> Bootup Test
+> 	> - Done on OMAP1710
+> 	>   Used following patch to fix OMAP1 build error:-
+> 	>   [PATCH] i2c: OMAP: Fix OMAP1 build error
+> 	>
+> 	
+> 	
+> 	[..]
+> 	[..]
+> 	
+> 
+> 	> Charulatha V (8):
+> 	>   gpio/omap: remove dependency on gpio_bank_count
+> 	>   gpio/omap: use flag to identify wakeup domain
+> 	>   gpio/omap: make gpio_context part of gpio_bank structure
+> 	>   gpio/omap: make non-wakeup GPIO part of pdata
+> 	>   gpio/omap: avoid cpu checks during module ena/disable
+> 	>   gpio/omap: use pinctrl offset instead of macro
+> 	>   gpio/omap: remove bank->method & METHOD_* macros
+> 	>   gpio/omap: fix bankwidth for OMAP7xx MPUIO
+> 	>
+> 	> Nishanth Menon (4):
+> 	>   gpio/omap: save and restore debounce registers
+> 	>   gpio/omap: enable irq at the end of all configuration in
+> restore
+> 	>   gpio/omap: restore OE only after setting the output level
+> 	>   gpio/omap: handle set_dataout reg capable IP on restore
+> 	>
+> 	> Tarun Kanti DebBarma (13):
+> 	>   gpio/omap: handle save/restore context in GPIO driver
+> 	>   gpio/omap: further cleanup using wkup_en register
+> 	>   gpio/omap: use level/edge detect reg offsets
+> 	>   gpio/omap: remove hardcoded offsets in context save/restore
+> 	>   gpio/omap: cleanup set_gpio_triggering function
+> 	>   gpio/omap: cleanup omap_gpio_mod_init function
+> 	>   gpio/omap: remove unnecessary bit-masking for read access
+> 	>   gpio/omap: use pm-runtime framework
+> 	>   gpio/omap: optimize suspend and resume functions
+> 	>   gpio/omap: cleanup prepare_for_idle and resume_after_idle
+> 	>   gpio/omap: fix debounce clock handling
+> 	>   gpio/omap: fix incorrect access of debounce module
+> 	>   gpio/omap: remove omap_gpio_save_context overhead
+> 	>
+> 	>  arch/arm/mach-omap1/gpio15xx.c         |    7 +-
+> 	>  arch/arm/mach-omap1/gpio16xx.c         |   47 ++-
+> 	>  arch/arm/mach-omap1/gpio7xx.c          |   14 +-
+> 	>  arch/arm/mach-omap2/gpio.c             |   36 +-
+> 	>  arch/arm/mach-omap2/pm34xx.c           |   14 -
+> 	>  arch/arm/plat-omap/include/plat/gpio.h |   29 +-
+> 	>  drivers/gpio/gpio-omap.c               | 1099
+> +++++++++++++-------------------
+> 	>  7 files changed, 549 insertions(+), 697 deletions(-)
+> 	>
+> 	>
+> 	
+> 	> _______________________________________________
+> 	> linux-arm-kernel mailing list
+> 	> linux-arm-kernel at lists.infradead.org
+> 	> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 	>
+> 	
+> 	
+> 	Regards,
+> 	Gururaja
+> 	
+> 
+> 
+> 
+
+
+Regards, 
+Gururaja
