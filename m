@@ -1,31 +1,23 @@
-From: vlad@emcraft.com (Vladimir K)
-Date: Fri, 03 Feb 2012 19:12:04 +0300
-Subject: insmod problem on ARM with more than 16MB of RAM?
-In-Reply-To: <20111222204515.GQ2577@n2100.arm.linux.org.uk>
-References: <20111222204515.GQ2577@n2100.arm.linux.org.uk>
-Message-ID: <4F2C0754.4070504@emcraft.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2012 16:13:43 +0000
+Subject: [PATCH 02/13] ARM: SAMSUNG: allow the configuration of KERNEL
+ HZ in plat-samsung
+In-Reply-To: <016f01ccdc95$30279500$9076bf00$%kim@samsung.com>
+References: <016f01ccdc95$30279500$9076bf00$%kim@samsung.com>
+Message-ID: <20120203161343.GN889@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> So for MMU platforms, we just ensure that modules are always placed
-> within reach of the kernel text.  For nommu platforms, modules are
-> a bitch - and TBH given the virtually non-existent activity/interest
-> from the nommu sector, it's something I'm willing to spend the grand
-> total of zero time to solve this _really_ _hard_ problem.
+On Fri, Jan 27, 2012 at 10:44:20AM +0900, Kukjin Kim wrote:
+> 
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Wouldn't just adding a -mlong-calls to CFLAGS_MODULE
-resolve the problem?
+This patch really needs some kind of explanation.  It's far from obvious
+from the casual reader why moving from a fixed value of 200Hz for the
+kernel tick rate to a range from 32 to 1024 would be legal.
 
-Something along the lines of:
+If 100Hz was possible before, and that's the architecture default, why
+was 200Hz chosen instead?
 
-ifeq ($(CONFIG_MODULES),y)
-CFLAGS_MODULE    += -mlong-calls
-endif
-
-in arch/arm/Makefile.
-
-This this change, modules work fine for me on a 32MBytes RAM
-Cortex-M3 configuration.
-
-Regards,
-Vladimir Khusainov
+And is 99Hz and 101Hz allowable?
