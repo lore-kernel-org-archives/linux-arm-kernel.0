@@ -1,35 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  3 Feb 2012 11:16:18 +0000
-Subject: [PATCH] ARM: Fix proc_info table alignment
-Message-ID: <1328267778-29835-1-git-send-email-marc.zyngier@arm.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Fri, 03 Feb 2012 15:15:45 +0400
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <alpine.LFD.2.02.1202022202470.2759@xanadu.home>
+References: <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
+ <alpine.LFD.2.02.1202022110080.2759@xanadu.home>
+ <4F2B4873.5030808@codeaurora.org>
+ <alpine.LFD.2.02.1202022202470.2759@xanadu.home>
+Message-ID: <4F2BC1E1.2080702@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With an admittedly exotic choice of configuration options
-(CC_OPTIMIZE_FOR_SIZE, THUMB2, some other size-minimizing ones)
-and compiler, the proc_info table can end up being misaligned,
-and the kernel being unbootable (Error: unrecognized/unsupported
-processor variant).
+Hello.
 
-Forcing the alignement to 4 bytes in the linker script fixes the
-issue.
+On 03-02-2012 7:04, Nicolas Pitre wrote:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/vmlinux.lds.S |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+>>>>> If you simply disable/restore IRQs around the critical region then you
+>>>>> don't have to worry about __v7_setup.  Plus this will allow for
+>>>>> v7_flush_dcache_all to still be callable from atomic context.
+>>>> Ok. Here's a patch. I still need to test it. I'll send another patch
+>>>> series to cleanup the get_thread_info stuff (there's two of them?).
+>>>>
+>>>>   arch/arm/mm/cache-v7.S |    6 ++++++
+>>>>   1 files changed, 6 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+>>>> index 07c4bc8..654a5fc 100644
+>>>> --- a/arch/arm/mm/cache-v7.S
+>>>> +++ b/arch/arm/mm/cache-v7.S
+>>>> @@ -54,9 +54,15 @@ loop1:
+>>>>   	and	r1, r1, #7			@ mask of the bits for current cache only
+>>>>   	cmp	r1, #2				@ see what cache we have at this level
+>>>>   	blt	skip				@ skip if no cache, or just i-cache
+>>>> +#ifdef CONFIG_PREEMPT
+>>>> +	save_and_disable_irqs r9		@ make cssr&csidr read atomic
+>>>> +#endif
+>>>>   	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
+>>>>   	isb					@ isb to sych the new cssr&csidr
+>>>>   	mrc	p15, 1, r1, c0, c0, 0		@ read the new csidr
+>>>> +#ifdef CONFIG_PREEMPT
+>>>> +	restore_irqs r9
+>>>> +#endif
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 1e19691..43a31fb 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -10,6 +10,7 @@
- #include <asm/page.h>
- 	
- #define PROC_INFO							\
-+	. = ALIGN(4);							\
- 	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
- 	*(.proc.info.init)						\
- 	VMLINUX_SYMBOL(__proc_info_end) = .;
--- 
-1.7.7.1
+>>> I'd suggest using restore_irqs_notrace instead.  The IRQ-off period is
+>>> so small that there is no point tracing it.
+
+>> Thanks. I'll make sure to do that before uploading to the patch tracker.
+
+> Might be worth flagging this for the stable kernels as well
+> (CC: stable at kernel.org).
+
+    The new address is stable at vger.kernel.org as Greg KH wrote.
+
+WBR, Sergei
