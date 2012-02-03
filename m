@@ -1,43 +1,61 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 3 Feb 2012 13:42:13 +0200
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly in
- non-DMA" added to tty tree
-In-Reply-To: <20120203205401.5ddf241d@notabene.brown>
-References: <13274430881471@kroah.org>
- <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
- <20120126042155.GA3185@suse.de>
- <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
- <20120126191604.GA15516@suse.de>
- <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
-Message-ID: <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 3 Feb 2012 17:13:53 +0530
+Subject: [PATCH-V3 0/3] ARM: OMAP4: Remove hardcoded reg-offs for PWRSTCTRL &
+ PWRSTST
+Message-ID: <1328269436-18668-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2012 at 11:54 AM, NeilBrown <neilb@suse.de> wrote:
-> On Thu, 2 Feb 2012 22:45:53 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
->> On Fri, 3 Feb 2012, NeilBrown wrote:
->>
->> > then CPUIDLE enters lower states and I think it uses less power but I
->> > sometimes lose the first char I type (that is known) but also I sometimes get
->> > corruption on output.
->>
->> I don't see any output corruption on 35xx BeagleBoard, either with or
->> without these patches. ?So this is presumably a 37xx-centric problem, and
->> unrelated to these patches, I would guess.
->
-> Maybe it is 37xx specific. ?I think this is a DM3730.
+This patch series removes the existing hard-coded way of providing
+offset to omap4_prminst_xxx API's and instead use offsets
+provided in powerdomainsxxxx_data.
+Also, hook up AM33XX device support to existing omap4 PRM code.
 
-Not sure if it's the same problem but with 3530 on 3.2 with
-sleep_timeout set, I usually get first char dropped (as expected) but
-sometimes I get corrupted char instead too. Corrupt char seems to
-almost always happen if I set cpufreq to powersave, on performace it's
-almost always ok, so maybe it's some timing problem,
+Background:
+==========
+PRM module in AM33XX is closer to OMAP4 PRM module, so it complete
+sense to reuse all the code from existing OMAP4 implementation.
+Having said that, there is a catch here with respect to AM33XX device,
+
+The register offset in PRM module is not consistent
+across (crazy IP integration), for example,
+
+PRM_XXX         PWRSTCTRL PWRSTST RSTCTRL RSTST
+===============================================
+PRM_PER_MOD:    0x0C,     0x08,   0x00,   0x04
+PRM_WKUP_MOD:   0x04,     0x08,   0x00,   0x0C
+PRM_MPU_MOD:    0x00,     0x04,   0x08,   NA
+PRM_DEVICE_MOD: NA,       NA,     0x00,   0x08
+
+So in order to reuse the existing OMAP4 code, we have to add
+seperate entry for register offsets, especially
+PWRSTCTRL & PWRSTST.
+
+NOTE: Boot tested on AM335x EVM and AM37xEVM
+
+Changes from V2:
+	- As per Kevin's comment, created separate prm_base table
+	  for am33xx and added __init function for prminst to
+	  initialize prm_base table during boot time.
+	- Minor comment from Kevin, to add extra line in patch 1/3
+Changes from V1:
+ 	- As per Kevin's comment, patch is split into logical
+	  commits for ease of review.
+  	- Added specific comment for cpu_is_xxx check order
+	  change.
 
 
+Vaibhav Hiremath (3):
+  ARM: OMAP4: Remove hardcoded reg-offs for PWRSTCTRL & PWRSTST
+  ARM: OMAP4: prminst: Add boot time __init function for prminst
+  ARM: OMAP: am33xx: Hook-up am33xx support to existing prm code
 
--- 
-Gra?vydas
+ arch/arm/mach-omap2/io.c                    |    3 ++
+ arch/arm/mach-omap2/omap_hwmod.c            |   44 +++++++++++++++++++--------
+ arch/arm/mach-omap2/powerdomain.h           |    4 ++
+ arch/arm/mach-omap2/powerdomain44xx.c       |   24 +++++++-------
+ arch/arm/mach-omap2/powerdomains44xx_data.c |    9 +++++
+ arch/arm/mach-omap2/prcm44xx.h              |    2 +
+ arch/arm/mach-omap2/prminst44xx.c           |   35 ++++++++++++++++-----
+ arch/arm/mach-omap2/prminst44xx.h           |    2 +-
+ 8 files changed, 89 insertions(+), 34 deletions(-)
