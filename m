@@ -1,130 +1,140 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:34:11 +0000
-Subject: [PATCH 09/17] ARM: sa11x0: neponset: save and restore MDM_CTL_0
+Date: Fri, 03 Feb 2012 19:34:31 +0000
+Subject: [PATCH 10/17] ARM: sa11x0: neponset: dynamically create neponset
+ child devices
 In-Reply-To: <20120203193059.GF14129@n2100.arm.linux.org.uk>
 References: <20120203193059.GF14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtOtf-0001C6-4N@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtOtz-0001CC-Ht@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save and restore the modem output control register across a suspend/
-resume, as well as the NCR register.  Place these in a locally
-allocated data structure rather than needing a new static variable.
+Use platform_device_register_full() to dynamically create the various
+neponset child platform devices, and place them below the neponset
+device itself to ensure proper PM ordering and device structure.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/neponset.c |   53 ++++++++++++++++++++++++++++++--------
- 1 files changed, 42 insertions(+), 11 deletions(-)
+ arch/arm/mach-sa1100/neponset.c |   56 +++++++++++++++++++-------------------
+ 1 files changed, 28 insertions(+), 28 deletions(-)
 
 diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
-index 1beaa0e..6f0aa91 100644
+index 6f0aa91..164bc98 100644
 --- a/arch/arm/mach-sa1100/neponset.c
 +++ b/arch/arm/mach-sa1100/neponset.c
-@@ -1,12 +1,13 @@
+@@ -1,6 +1,7 @@
  /*
   * linux/arch/arm/mach-sa1100/neponset.c
-- *
   */
++#include <linux/err.h>
  #include <linux/init.h>
  #include <linux/ioport.h>
  #include <linux/kernel.h>
-+#include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/serial_core.h>
-+#include <linux/slab.h>
- 
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -20,6 +21,13 @@
- #include <mach/assabet.h>
+@@ -22,6 +23,8 @@
  #include <mach/neponset.h>
  
-+struct neponset_drvdata {
-+#ifdef CONFIG_PM_SLEEP
-+	u32 ncr0;
-+	u32 mdm_ctl_0;
-+#endif
-+};
-+
- void neponset_ncr_frob(unsigned int mask, unsigned int val)
- {
- 	unsigned long flags;
-@@ -200,6 +208,15 @@ static struct platform_device smc91x_device = {
+ struct neponset_drvdata {
++	struct platform_device *sa1111;
++	struct platform_device *smc91x;
+ #ifdef CONFIG_PM_SLEEP
+ 	u32 ncr0;
+ 	u32 mdm_ctl_0;
+@@ -178,20 +181,6 @@ static struct sa1111_platform_data sa1111_info = {
+ 	.irq_base	= IRQ_BOARD_END,
+ };
  
+-static u64 sa1111_dmamask = 0xffffffffUL;
+-
+-static struct platform_device sa1111_device = {
+-	.name		= "sa1111",
+-	.id		= 0,
+-	.dev		= {
+-		.dma_mask = &sa1111_dmamask,
+-		.coherent_dma_mask = 0xffffffff,
+-		.platform_data = &sa1111_info,
+-	},
+-	.num_resources	= ARRAY_SIZE(sa1111_resources),
+-	.resource	= sa1111_resources,
+-};
+-
+ static struct resource smc91x_resources[] = {
+ 	[0] = DEFINE_RES_MEM_NAMED(SA1100_CS3_PHYS, 0x02000000, "smc91x-regs"),
+ 	[1] = DEFINE_RES_IRQ(IRQ_NEPONSET_SMC9196),
+@@ -199,16 +188,26 @@ static struct resource smc91x_resources[] = {
+ 			0x02000000, "smc91x-attrib"),
+ };
+ 
+-static struct platform_device smc91x_device = {
+-	.name		= "smc91x",
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(smc91x_resources),
+-	.resource	= smc91x_resources,
+-};
+-
  static int __devinit neponset_probe(struct platform_device *dev)
  {
-+	struct neponset_drvdata *d;
-+	int ret;
-+
-+	d = kzalloc(sizeof(*d), GFP_KERNEL);
-+	if (!d) {
-+		ret = -ENOMEM;
-+		goto err_alloc;
-+	}
-+
- 	sa1100_register_uart_fns(&neponset_port_fns);
+ 	struct neponset_drvdata *d;
++	struct platform_device_info sa1111_devinfo = {
++		.parent = &dev->dev,
++		.name = "sa1111",
++		.id = 0,
++		.res = sa1111_resources,
++		.num_res = ARRAY_SIZE(sa1111_resources),
++		.data = &sa1111_info,
++		.size_data = sizeof(sa1111_info),
++		.dma_mask = 0xffffffffUL,
++	};
++	struct platform_device_info smc91x_devinfo = {
++		.parent = &dev->dev,
++		.name = "smc91x",
++		.id = 0,
++		.res = smc91x_resources,
++		.num_res = ARRAY_SIZE(smc91x_resources),
++	};
+ 	int ret;
  
- 	/*
-@@ -234,29 +251,42 @@ static int __devinit neponset_probe(struct platform_device *dev)
+ 	d = kzalloc(sizeof(*d), GFP_KERNEL);
+@@ -251,6 +250,9 @@ static int __devinit neponset_probe(struct platform_device *dev)
  	 */
  	NCR_0 = NCR_GP01_OFF;
  
-+	platform_set_drvdata(dev, d);
++	d->sa1111 = platform_device_register_full(&sa1111_devinfo);
++	d->smc91x = platform_device_register_full(&smc91x_devinfo);
 +
+ 	platform_set_drvdata(dev, d);
+ 
  	return 0;
-+
-+ err_alloc:
-+	return ret;
- }
- 
--#ifdef CONFIG_PM
-+static int __devexit neponset_remove(struct platform_device *dev)
-+{
-+	struct neponset_drvdata *d = platform_get_drvdata(dev);
- 
--/*
-- * LDM power management.
-- */
--static unsigned int neponset_saved_state;
-+	irq_set_chained_handler(IRQ_GPIO25, NULL);
-+
-+	kfree(d);
-+
-+	return 0;
-+}
- 
-+#ifdef CONFIG_PM
- static int neponset_suspend(struct platform_device *dev, pm_message_t state)
+@@ -263,6 +265,10 @@ static int __devexit neponset_remove(struct platform_device *dev)
  {
--	/*
--	 * Save state.
--	 */
--	neponset_saved_state = NCR_0;
-+	struct neponset_drvdata *d = platform_get_drvdata(dev);
-+
-+	d->ncr0 = NCR_0;
-+	d->mdm_ctl_0 = MDM_CTL_0;
+ 	struct neponset_drvdata *d = platform_get_drvdata(dev);
  
- 	return 0;
++	if (!IS_ERR(d->sa1111))
++		platform_device_unregister(d->sa1111);
++	if (!IS_ERR(d->smc91x))
++		platform_device_unregister(d->smc91x);
+ 	irq_set_chained_handler(IRQ_GPIO25, NULL);
+ 
+ 	kfree(d);
+@@ -318,12 +324,6 @@ static struct platform_device neponset_device = {
+ 	.resource	= neponset_resources,
+ };
+ 
+-static struct platform_device *devices[] __initdata = {
+-	&neponset_device,
+-	&sa1111_device,
+-	&smc91x_device,
+-};
+-
+ extern void sa1110_mb_disable(void);
+ 
+ static int __init neponset_init(void)
+@@ -354,7 +354,7 @@ static int __init neponset_init(void)
+ 		return -ENODEV;
+ 	}
+ 
+-	return platform_add_devices(devices, ARRAY_SIZE(devices));
++	return platform_device_register(&neponset_device);
  }
  
- static int neponset_resume(struct platform_device *dev)
- {
--	NCR_0 = neponset_saved_state;
-+	struct neponset_drvdata *d = platform_get_drvdata(dev);
-+
-+	NCR_0 = d->ncr0;
-+	MDM_CTL_0 = d->mdm_ctl_0;
- 
- 	return 0;
- }
-@@ -268,6 +298,7 @@ static int neponset_resume(struct platform_device *dev)
- 
- static struct platform_driver neponset_device_driver = {
- 	.probe		= neponset_probe,
-+	.remove		= __devexit_p(neponset_remove),
- 	.suspend	= neponset_suspend,
- 	.resume		= neponset_resume,
- 	.driver		= {
+ subsys_initcall(neponset_init);
 -- 
 1.7.4.4
