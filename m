@@ -1,51 +1,52 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 02 Feb 2012 21:45:31 -0500
-Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
-In-Reply-To: <20120202232736.GL2518@linux.vnet.ibm.com>
-References: <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
- <20120202044439.GD2435@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
- <20120202174337.GS2518@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
- <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
- <4F2B1307.5010207@gmail.com>
- <1328223819.5882.133.camel@gandalf.stny.rr.com>
- <20120202232736.GL2518@linux.vnet.ibm.com>
-Message-ID: <1328237131.5882.135.camel@gandalf.stny.rr.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 02 Feb 2012 22:04:04 -0500 (EST)
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <4F2B4873.5030808@codeaurora.org>
+References: <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
+ <alpine.LFD.2.02.1202022110080.2759@xanadu.home>
+ <4F2B4873.5030808@codeaurora.org>
+Message-ID: <alpine.LFD.2.02.1202022202470.2759@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-02-02 at 15:27 -0800, Paul E. McKenney wrote:
-> On Thu, Feb 02, 2012 at 06:03:39PM -0500, Steven Rostedt wrote:
-> 
-> [ . . . ]
-> 
-> > Anyway, one answer is (and I was talking with Paul about this on IRC) is
-> > that we can create a special "TRACE_EVENT_IDLE()" that will explicitly
-> > call "rcu_idle_exit/enter()" as it expects to be called with it off.
-> > 
-> > This should solve most issues I believe.
-> 
-> You OK with something like RCU_NONIDLE() rather than RCU_EVENT_IDLE()?
-> I have this funny feeling that tracing won't be the only thing using
-> RCU from idle.  :-/
-> 
-> Something like this, perhaps?
-> 
-> 	#define RCU_NONIDLE(a) \
-> 		do { \
-> 			rcu_idle_exit(); \
-> 			do { a; } while (0); \
-> 			rcu_idle_enter(); \
-> 		}
-> 
+On Thu, 2 Feb 2012, Stephen Boyd wrote:
 
-I'm fine with this. But what is the overhead for doing such a thing.
-Remember, to encapsulate a tracepoint means that you will be doing that
-work everytime regardless if the tracepoint is ever activated or not. Or
-even worse, not even compiled into the kernel.
+> On 02/02/12 18:35, Nicolas Pitre wrote:
+> > On Thu, 2 Feb 2012, Stephen Boyd wrote:
+> >> On 02/02/12 17:18, Nicolas Pitre wrote:
+> >>> If you simply disable/restore IRQs around the critical region then you 
+> >>> don't have to worry about __v7_setup.  Plus this will allow for 
+> >>> v7_flush_dcache_all to still be callable from atomic context.
+> >> Ok. Here's a patch. I still need to test it. I'll send another patch
+> >> series to cleanup the get_thread_info stuff (there's two of them?).
+> >>
+> >>  arch/arm/mm/cache-v7.S |    6 ++++++
+> >>  1 files changed, 6 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> >> index 07c4bc8..654a5fc 100644
+> >> --- a/arch/arm/mm/cache-v7.S
+> >> +++ b/arch/arm/mm/cache-v7.S
+> >> @@ -54,9 +54,15 @@ loop1:
+> >>  	and	r1, r1, #7			@ mask of the bits for current cache only
+> >>  	cmp	r1, #2				@ see what cache we have at this level
+> >>  	blt	skip				@ skip if no cache, or just i-cache
+> >> +#ifdef CONFIG_PREEMPT
+> >> +	save_and_disable_irqs r9		@ make cssr&csidr read atomic
+> >> +#endif
+> >>  	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
+> >>  	isb					@ isb to sych the new cssr&csidr
+> >>  	mrc	p15, 1, r1, c0, c0, 0		@ read the new csidr
+> >> +#ifdef CONFIG_PREEMPT
+> >> +	restore_irqs r9
+> >> +#endif
+> > I'd suggest using restore_irqs_notrace instead.  The IRQ-off period is 
+> > so small that there is no point tracing it.
+> 
+> Thanks. I'll make sure to do that before uploading to the patch tracker.
 
-Now this is entering and exiting idle, so maybe it's not that critical?
+Might be worth flagging this for the stable kernels as well
+(CC: stable at kernel.org).
 
--- Steve
+
+Nicolas
