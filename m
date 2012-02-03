@@ -1,33 +1,40 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 03 Feb 2012 09:51:31 -0800
-Subject: [PATCH v9 00/25] gpio/omap: driver cleanup and fixes
-In-Reply-To: <20120202194258.GU15343@ponder.secretlab.ca> (Grant Likely's
- message of "Thu, 2 Feb 2012 12:42:58 -0700")
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <20120202194258.GU15343@ponder.secretlab.ca>
-Message-ID: <87d39vajq4.fsf@ti.com>
+Date: Fri, 03 Feb 2012 09:54:07 -0800
+Subject: [PATCH 1/2] ARM: OMAP: Get rid of reset for system timer
+In-Reply-To: <CAMQu2gy2jDWszUAMDCfgyXsLNWUAb6phWpOP=7geFXTkc30S_g@mail.gmail.com>
+ (Santosh Shilimkar's message of "Fri, 3 Feb 2012 12:45:09 +0530")
+References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
+ <1328191435-18652-2-git-send-email-santosh.shilimkar@ti.com>
+ <87obthcc57.fsf@ti.com>
+ <CAMQu2gy2jDWszUAMDCfgyXsLNWUAb6phWpOP=7geFXTkc30S_g@mail.gmail.com>
+Message-ID: <877h03ajls.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely <grant.likely@secretlab.ca> writes:
+"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 
-> On Thu, Feb 02, 2012 at 11:00:26PM +0530, Tarun Kanti DebBarma wrote:
->> The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
->>   Linus Torvalds (1):
->>         Linux 3.3-rc2
->> 
->> are available in the git repository at:
->> http://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev
->> Branch: for_3.4/gpio_cleanup_fixes_v9
+> On Fri, Feb 3, 2012 at 12:10 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>
+>>> From: Rajendra Nayak <rnayak@ti.com>
+>>>
+>>> hwmod setup already does a reset and sets the OCP sysconfig
+>>> registers appropriately. Avoid doing a reset again and overriding
+>>> the OCP sysconfig settings in the system timer init code.
+>>
+>> That is true for OMAP4, but have you verified if this is indeed a
+>> duplicate reset on ?OMAP2/3?
+>>
+> Yes. It is duplicate for OMAP2 and OMAP3 devices as well.
+> Actually this should have been fixed when the driver was
+> hwmod converted but some how got missed. We noticed
+> an issue on OMAP5, when timer interrupts stopped firing when
+> always on clock domain was allowed to idle. This was because
+> this reset was clearing the correctly set sysc value by hwmod.
 >
-> Bad git url.  I had to replace 'http:' with 'git:'.
->
-> I've merged this series into my gpio/next branch.  It should show up in
-> linux-next in a couple of days.
+> The patch is also tested on ZOOM3 ( OMAP3630)
+> and OMAP2430SDP.
 
-Grant, this series isn't quite ready for merge, and shouldn't be
-considered a pull request.
-
-I still need to give it a once over and some final testing.
+Great, thanks for testing on OMAP2/3.
 
 Kevin
