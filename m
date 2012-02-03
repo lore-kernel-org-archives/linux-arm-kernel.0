@@ -1,30 +1,78 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 3 Feb 2012 11:58:06 +0000
-Subject: [alsa-devel] [RFC PATCH] ARM ASoC: add sound driver for imx27pdk
- using mc13783 codec
-In-Reply-To: <1635894.OLo8mNMWim@laptop>
-References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
- <2851519.TkeCdfD43W@laptop> <20120202173212.GA1785@sirena.org.uk>
- <1635894.OLo8mNMWim@laptop>
-Message-ID: <20120203115806.GI3151@opensource.wolfsonmicro.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Feb 2012 11:58:50 +0000
+Subject: [PATCH v3 2/2] ARM: vfp: clear fpscr length and stride bits on
+ entry to sig handler
+In-Reply-To: <20120203111209.GA2098@linaro.org>
+References: <1328104992-8016-1-git-send-email-will.deacon@arm.com>
+ <1328104992-8016-3-git-send-email-will.deacon@arm.com>
+ <20120203111209.GA2098@linaro.org>
+Message-ID: <20120203115850.GD15431@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 08:45:10AM +0100, Philippe R?tornaz wrote:
-> Le jeudi 2 f?vrier 2012 17:32:12 Mark Brown a ?crit :
+Hi Dave,
 
-> > First step would be to post it :)
+Thanks for looking at this.
 
-> Well, that was the whole point to post a link to a git tree containing the 
-> patches. But if you think I should post the patches directly on the mailing 
-> list I can do it.
+On Fri, Feb 03, 2012 at 11:12:09AM +0000, Dave Martin wrote:
+> On Wed, Feb 01, 2012 at 02:03:12PM +0000, Will Deacon wrote:
+> > diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> > index 3e35e35..49cf328 100644
+> > --- a/arch/arm/vfp/vfpmodule.c
+> > +++ b/arch/arm/vfp/vfpmodule.c
+> > @@ -562,6 +562,21 @@ int vfp_preserve_user_hwstate(struct user_vfp __user *ufp,
+> >  
+> >  	if (err)
+> >  		return -EFAULT;
+> > +
+> > +	/* Ensure that VFP is disabled. */
+> > +	vfp_flush_hwstate(thread);
+> > +
+> > +	/*
+> > +	 * As per the PCS, clear the length and stride bits before entry
+> > +	 * to the signal handler.
+> > +	 */
+> > +	hwstate->fpscr &= ~(FPSCR_LENGTH_MASK | FPSCR_STRIDE_MASK);
+> > +
+> > +	/*
+> > +	 * Disable VFP in the hwstate so that we can detect if it was
+> > +	 * used by the signal handler.
+> > +	 */
+> > +	hwstate->fpexc &= ~FPEXC_EN;
+> >  	return 0;
+> >  }
+> 
+> ^ 
+> These additions are nothing to do with preserving the VFP state.
+> Instead, they set up a clean signal frame, under the assumption that the
+> interrupted thread's state has already been preserved.
+> 
+> Would this be more cleanly factored out as a separate function,
+> something like vfp_setup_sigframe(), so:
+> 
+> setup_sigframe() {
+> 	/* ... */
+> 
+> 	vfp_preserve_user_hwstate();
+> 	vfp_setup_sigframe();
+> }
+> 
+> ...?
 
-The entire kernel code review process is based on patches posted to
-mailing lists.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120203/9a52f826/attachment-0001.sig>
+The whole reason for moving this code out of signal.c was to avoid polluting
+that file with VFP-related code. I don't want to turn the problem on its
+head and end up with signal-related code in vfpmodule.c (so yes, I'll fix those
+comments :). setup_sigframe certainly sounds out of place here.
+
+> Alternatively, if this is an abstraction too far, and the "preserve" and
+> "setup sigframe" actions will never make sense independently of each
+> other, you could just rename the function to something clearer, like
+> vfp_user_preserve_setup_sigframe().
+
+Indeed, this comes down to my inability to think of a decent function name.
+I'd like to avoid the _sigframe bit, so I'll have a think about some better
+terminology. I could try running a competition.
+
+Expect a v4 when inspiration strikes.
+
+Will
