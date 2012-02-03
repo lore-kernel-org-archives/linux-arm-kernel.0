@@ -1,31 +1,31 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 3 Feb 2012 13:34:55 +0530
-Subject: [RFC/PATCH] arm: omap3: pm: do not clear power states twice
-In-Reply-To: <1328254094-13978-1-git-send-email-balbi@ti.com>
-References: <1328254094-13978-1-git-send-email-balbi@ti.com>
-Message-ID: <CAMQu2gwtXyLzPNk2_4O+EAWyZaQs+wY_cK4pm_=yJj6ARXnhAw@mail.gmail.com>
+From: ki0351.kim@samsung.com (=?ks_c_5601-1987?B?seiw5sDP?=)
+Date: Fri, 03 Feb 2012 17:06:09 +0900
+Subject: [PATCH] serial: samsung: Add support 4M baudrate for samsung serial
+Message-ID: <001b01cce24a$b01cb370$10561a50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2012 at 12:58 PM, Felipe Balbi <balbi@ti.com> wrote:
-> The way the code is written, pwrdm_pre_transion()
-> calls _pwrdm_pre_transition_cb() (for each powerdomain)
-> which, in turn, calls pwrdm_clear_all_prev_pwrst().
->
-> It looks unnecessary to clear all previous power
-> states twice, so drop the initial set.
->
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->
-> Hasn't been tested yet. Compile tested only. It looks
-> like we can safely remove those calls, but I would
-> like to hear from the PM folks first :-)
->
-Bit late :)
+At getting the baudrate, the max baudrate parameter value
+is changed to 4M.
+So samsung serial can support upto 4M baudrate.
 
-Paul already cleaned this up.
-http://www.spinics.net/lists/linux-omap/msg63602.html
+Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
+---
+ drivers/tty/serial/samsung.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Regards
-santosh
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index a6abe0c..513096d 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -701,7 +701,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
+ 	 * Ask the core to calculate the divisor for us.
+ 	 */
+ 
+-	baud = uart_get_baud_rate(port, termios, old, 0, 115200*8);
++	baud = uart_get_baud_rate(port, termios, old, 0, 4000000);
+ 	quot = s3c24xx_serial_getclk(ourport, baud, &clk, &clk_sel);
+ 	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
+ 		quot = port->custom_divisor;
+-- 
+1.7.1
