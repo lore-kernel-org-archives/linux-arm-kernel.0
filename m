@@ -1,62 +1,85 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 20:00:17 +0000
-Subject: [PATCH 17/20] ARM: sa1111: only setup DMA for DMA capable devices
+Date: Fri, 03 Feb 2012 20:00:37 +0000
+Subject: [PATCH 18/20] ARM: sa1111: cleanup sub-device registration and
+ unregistration
 In-Reply-To: <20120203195419.GH14129@n2100.arm.linux.org.uk>
 References: <20120203195419.GH14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtPIv-00044m-M3@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtPJF-00044q-Py@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's pointless registering the PS/2 interfaces with the dmabounce code
-when there's no DMA support for these in hardware, so only setup the
-DMA masks for two subdevices which support DMA - the OHCI and SAC.
+Move the releasing of resources out of the release function - this
+allows a cleaner and more conventional arrangement of the registration
+failure paths and a saner unregistration process for these devices.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/common/sa1111.c |    9 ++++++---
- 1 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/common/sa1111.c |   27 ++++++++++++++++-----------
+ 1 files changed, 16 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 7b4351b..d78499f 100644
+index d78499f..8d86338 100644
 --- a/arch/arm/common/sa1111.c
 +++ b/arch/arm/common/sa1111.c
-@@ -121,6 +121,7 @@ static struct sa1111 *g_sa1111;
- struct sa1111_dev_info {
- 	unsigned long	offset;
- 	unsigned long	skpcr_mask;
-+	bool		dma;
- 	unsigned int	devid;
- 	unsigned int	irq[6];
- };
-@@ -129,6 +130,7 @@ static struct sa1111_dev_info sa1111_devices[] = {
- 	{
- 		.offset		= SA1111_USB,
- 		.skpcr_mask	= SKPCR_UCLKEN,
-+		.dma		= true,
- 		.devid		= SA1111_DEVID_USB,
- 		.irq = {
- 			IRQ_USBPWR,
-@@ -142,6 +144,7 @@ static struct sa1111_dev_info sa1111_devices[] = {
- 	{
- 		.offset		= 0x0600,
- 		.skpcr_mask	= SKPCR_I2SCLKEN | SKPCR_L3CLKEN,
-+		.dma		= true,
- 		.devid		= SA1111_DEVID_SAC,
- 		.irq = {
- 			AUDXMTDMADONEA,
-@@ -641,10 +644,10 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
- 		dev->irq[i] = sachip->irq_base + info->irq[i];
+@@ -610,7 +610,6 @@ static void sa1111_dev_release(struct device *_dev)
+ {
+ 	struct sa1111_dev *dev = SA1111_DEV(_dev);
  
- 	/*
--	 * If the parent device has a DMA mask associated with it,
--	 * propagate it down to the children.
-+	 * If the parent device has a DMA mask associated with it, and
-+	 * this child supports DMA, propagate it down to the children.
- 	 */
--	if (sachip->dev->dma_mask) {
-+	if (info->dma && sachip->dev->dma_mask) {
- 		dev->dma_mask = *sachip->dev->dma_mask;
- 		dev->dev.dma_mask = &dev->dma_mask;
- 		dev->dev.coherent_dma_mask = sachip->dev->coherent_dma_mask;
+-	release_resource(&dev->res);
+ 	kfree(dev);
+ }
+ 
+@@ -625,9 +624,10 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
+ 	dev = kzalloc(sizeof(struct sa1111_dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		ret = -ENOMEM;
+-		goto out;
++		goto err_alloc;
+ 	}
+ 
++	device_initialize(&dev->dev);
+ 	dev_set_name(&dev->dev, "%4.4lx", info->offset);
+ 	dev->devid	 = info->devid;
+ 	dev->dev.parent  = sachip->dev;
+@@ -657,17 +657,19 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
+ 	if (ret) {
+ 		printk("SA1111: failed to allocate resource for %s\n",
+ 			dev->res.name);
+-		dev_set_name(&dev->dev, NULL);
+-		kfree(dev);
+-		goto out;
++		goto err_resource;
+ 	}
+ 
+-	ret = device_register(&dev->dev);
+-	if (ret) {
+-		release_resource(&dev->res);
+-		kfree(dev);
+-	}
++	ret = device_add(&dev->dev);
++	if (ret)
++		goto err_add;
++	return 0;
+ 
++ err_add:
++	release_resource(&dev->res);
++ err_resource:
++	put_device(&dev->dev);
++ err_alloc:
+ 	return ret;
+ }
+ 
+@@ -813,7 +815,10 @@ __sa1111_probe(struct device *me, struct resource *mem, int irq)
+ 
+ static int sa1111_remove_one(struct device *dev, void *data)
+ {
+-	device_unregister(dev);
++	struct sa1111_dev *sadev = SA1111_DEV(dev);
++	device_del(&sadev->dev);
++	release_resource(&sadev->res);
++	put_device(&sadev->dev);
+ 	return 0;
+ }
+ 
 -- 
 1.7.4.4
