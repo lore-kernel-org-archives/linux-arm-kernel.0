@@ -1,73 +1,52 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Fri, 3 Feb 2012 00:40:42 +0000 (GMT)
-Subject: [PATCH v4 2/2] pxa/hx4700: Add PCMCIA/CF support
-Message-ID: <1328229642.56350.YahooMailClassic@web29016.mail.ird.yahoo.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 02 Feb 2012 16:49:05 -0800
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <20120203003633.GD14129@n2100.arm.linux.org.uk>
+References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
+ <20120202204411.GB14129@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
+ <4F2B1E11.1040000@codeaurora.org>
+ <20120203003633.GD14129@n2100.arm.linux.org.uk>
+Message-ID: <4F2B2F01.20601@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCMCIA/CF support for the HP iPAQ hx4700. Underlying support is provided by
-the pcmcia/pxa2xx_hx4700 platform_device implementation which hooks into the
-existing pxa2xx-pcmcia driver.
+On 02/02/12 16:36, Russell King - ARM Linux wrote:
+> On Thu, Feb 02, 2012 at 03:36:49PM -0800, Stephen Boyd wrote:
+>> On 02/02/12 13:38, Nicolas Pitre wrote:
+>>> On Thu, 2 Feb 2012, Russell King - ARM Linux wrote
+>>>> On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
+>>>>> Should we move get_thread_info into assembler.h? It seems odd
+>>>>> to include entry-header.S but I saw that vfp was doing the same.
+>>>> Probably yes, and probably also have preempt_disable and preempt_enable
+>>>> assembler macros.  That's going to get rather icky if we have to
+>>>> explicitly call the scheduler though (to solve (1)).
+>>> What about a pair of helpers written in C instead?
+>>>
+>>> v7_flush_dcache_all() could be renamed, and a wrapper function called 
+>>> v7_flush_dcache_all() would call the preemption disable helper, call the 
+>>> former v7_flush_dcache_all code, then call the preemption enable helper.
+>>>
+>>> Then __v7_setup() could still call the core cache flush code without 
+>>> issues.
+>> I tried to put the preemption disable/enable right around the place
+>> where it was needed. With this approach we would disable preemption
+>> during the entire cache flush. I'm not sure if we want to make this
+>> function worse for performance, do we? It certainly sounds easier than
+>> writing all the preempt macros in assembly though.
+> Err, why do you think it's a big task?
+>
+> preempt disable is a case of incrementing the thread preempt count, while
+> preempt enable is a case of decrementing it, testing for zero, if zero,
+> then checking whether TIF_NEED_RESCHED is set and calling a function.
+>
+> If that's too much, then the simple method in assembly to quickly disable
+> preemption over a very few set of instructions is using mrs/msr and cpsid i.
+> That'll be far cheaper than fiddling about with preempt counters or
+> messing about with veneers in C code.
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
+I'll try the macros. So far it isn't bad, just the __v7_setup to resolve.
 
-V4:
-Rebased to linux-3.3-rc2.
-
-diff -uprN clean-3.3-rc2/arch/arm/mach-pxa/hx4700.c linux-3.3-rc2/arch/arm/mach-pxa/hx4700.c
---- clean-3.3-rc2/arch/arm/mach-pxa/hx4700.c	2012-01-31 21:31:54.000000000 +0000
-+++ linux-3.3-rc2/arch/arm/mach-pxa/hx4700.c	2012-02-02 23:24:27.616217305 +0000
-@@ -225,7 +225,6 @@ static u16 asic3_gpio_config[] = {
- 	ASIC3_GPIOC0_LED0,		/* red */
- 	ASIC3_GPIOC1_LED1,		/* green */
- 	ASIC3_GPIOC2_LED2,		/* blue */
--	ASIC3_GPIOC4_CF_nCD,
- 	ASIC3_GPIOC5_nCIOW,
- 	ASIC3_GPIOC6_nCIOR,
- 	ASIC3_GPIOC7_nPCE_1,
-@@ -239,6 +238,7 @@ static u16 asic3_gpio_config[] = {
- 	ASIC3_GPIOC15_nPIOR,
- 
- 	/* GPIOD: input GPIOs, CF */
-+	ASIC3_GPIOD4_CF_nCD,
- 	ASIC3_GPIOD11_nCIOIS16,
- 	ASIC3_GPIOD12_nCWAIT,
- 	ASIC3_GPIOD15_nPIOW,
-@@ -765,17 +765,6 @@ static struct i2c_board_info __initdata
- };
- 
- /*
-- * PCMCIA
-- */
--
--static struct platform_device pcmcia = {
--	.name = "hx4700-pcmcia",
--	.dev  = {
--		.parent = &asic3.dev,
--	},
--};
--
--/*
-  * Platform devices
-  */
- 
-@@ -790,7 +779,6 @@ static struct platform_device *devices[]
- 	&gpio_vbus,
- 	&power_supply,
- 	&strataflash,
--	&pcmcia,
- };
- 
- static struct gpio global_gpios[] = {
-diff -uprN clean-3.3-rc2/include/linux/mfd/asic3.h linux-3.3-rc2/include/linux/mfd/asic3.h
---- clean-3.3-rc2/include/linux/mfd/asic3.h	2012-01-31 21:31:54.000000000 +0000
-+++ linux-3.3-rc2/include/linux/mfd/asic3.h	2012-02-02 23:24:27.616217305 +0000
-@@ -138,6 +138,7 @@ struct asic3_platform_data {
- #define ASIC3_GPIOC13_nPWAIT		ASIC3_CONFIG_GPIO(45, 1, 1, 0)
- #define ASIC3_GPIOC14_nPIOIS16		ASIC3_CONFIG_GPIO(46, 1, 1, 0)
- #define ASIC3_GPIOC15_nPIOR		ASIC3_CONFIG_GPIO(47, 1, 0, 0)
-+#define ASIC3_GPIOD4_CF_nCD		ASIC3_CONFIG_GPIO(52, 1, 0, 0)
- #define ASIC3_GPIOD11_nCIOIS16		ASIC3_CONFIG_GPIO(59, 1, 0, 0)
- #define ASIC3_GPIOD12_nCWAIT		ASIC3_CONFIG_GPIO(60, 1, 0, 0)
- #define ASIC3_GPIOD15_nPIOW		ASIC3_CONFIG_GPIO(63, 1, 0, 0)
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
