@@ -1,112 +1,59 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 3 Feb 2012 15:48:09 +0100
-Subject: [PATCH v3 13/25] irq_domain: Remove 'new' irq_domain in favour
- of the ppc one
-In-Reply-To: <1327700179-17454-14-git-send-email-grant.likely@secretlab.ca>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-14-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <4F2BF3A9.8030200@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 03 Feb 2012 15:54:10 +0100
+Subject: [GIT PULL] at91: at91sam9x5 family basic support
+Message-ID: <4F2BF512.4020602@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+Hi,
 
-I finally had the time to rebase most of the OMAP3 and OMAP4 DT patches 
-on your latest irq_domain series and found a couple of minors 
-regressions that breaks OMAP3 boot.
+Here is the pull request for inclusion of at91sam9x5 family basic support.
+I add the cover letter of the patch series that I sent some time ago:
 
-On 1/27/2012 10:36 PM, Grant Likely wrote:
+The at91sam9x5 family is an ARM926 based SoC family from Atmel.
+five different products are available: sam9g15, sam9g25, sam9g35 sam9x25 and sam9x35.
+Evaluation Kits are composed of a CPU Module and a carrier board (with optional screen).
+The use of the Device Tree is reducing the amount of code needed for an AT91 based SoC: sam9x5 are the first AT91 SoC that only rely on DT for their hardware configuration.
 
-[...]
+This pull request goes on top of the at91-3.4-base branch.
 
-> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-> index e04e04dd..aab236f 100644
-> --- a/drivers/mfd/twl-core.c
-> +++ b/drivers/mfd/twl-core.c
-> @@ -263,8 +263,6 @@ struct twl_client {
->
->   static struct twl_client twl_modules[TWL_NUM_SLAVES];
->
-> -static struct irq_domain domain;
-> -
->   /* mapping the module id to slave id and base address */
->   struct twl_mapping {
->   	unsigned char sid;	/* Slave ID */
-> @@ -1225,14 +1223,8 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
->
->   	pdata->irq_base = status;
->   	pdata->irq_end = pdata->irq_base + nr_irqs;
-> -
-> -	domain.irq_base = pdata->irq_base;
-> -	domain.nr_irq = nr_irqs;
-> -#ifdef CONFIG_OF_IRQ
-> -	domain.of_node = of_node_get(node);
-> -	domain.ops =&irq_domain_simple_ops;
-> -#endif
-> -	irq_domain_add(&domain);
-> +	irq_domain_add_legacy(node, nr_irqs, pdata->irq_base, 0,
-> +			&irq_domain_simple_ops);
+The following changes since commit 9918ceafd4a9e013572e03983f528017c29bb1cb:
 
-This commit cannot build due to the missing last parameter.
+  ARM: at91: code removal of CAP9 SoC (2012-02-03 13:33:05 +0100)
 
-And in fact you fixed that in the next commit (#14), but the will break 
-git bisect and anyway that fix does not really belong to this commit.
+are available in the git repository at:
+  git://github.com/at91linux/linux-at91.git at91-3.4-base+9x5
 
-[PATCH v3 14/25] irq_domain: Remove irq_domain_add_simple()
+Dan Liang (2):
+      ARM: at91/at91sam9x5: overall definition
+      ARM: at91/at91sam9x5: SoC basic support
 
-  	irq_domain_add_legacy(node, nr_irqs, pdata->irq_base, 0,
--			      &irq_domain_simple_ops);
-+			      &irq_domain_simple_ops, NULL);
+Nicolas Ferre (4):
+      ARM: at91/at91sam9x5: PMC header file
+      ARM: at91/at91sam9x5: clock management for at91sam9x5 chip family
+      ARM: at91/at91sam9x5: Configuration and Makefile
+      ARM: at91/at91sam9x5: Device tree definition files
 
+ arch/arm/boot/dts/at91sam9g25ek.dts                |   37 ++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |  172 +++++++++
+ arch/arm/boot/dts/at91sam9x5cm.dtsi                |   14 +
+ arch/arm/mach-at91/Kconfig                         |    9 +
+ arch/arm/mach-at91/Makefile                        |    1 +
+ arch/arm/mach-at91/at91sam9x5.c                    |  373 ++++++++++++++++++++
+ arch/arm/mach-at91/board-dt.c                      |    1 +
+ arch/arm/mach-at91/clock.c                         |   83 ++++-
+ arch/arm/mach-at91/include/mach/at91_pmc.h         |   60 +++-
+ arch/arm/mach-at91/include/mach/at91sam9x5.h       |   80 +++++
+ .../arm/mach-at91/include/mach/at91sam9x5_matrix.h |   53 +++
+ arch/arm/mach-at91/include/mach/hardware.h         |    2 +
+ 12 files changed, 854 insertions(+), 31 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9g25ek.dts
+ create mode 100644 arch/arm/boot/dts/at91sam9x5.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9x5cm.dtsi
+ create mode 100644 arch/arm/mach-at91/at91sam9x5.c
+ create mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5_matrix.h
 
-Moreover, it looks like this new irq_domain code is checking the number 
-of hwirq and is not as lazy as the previous one :-)
-
-Because of that and because of the wrong number of IRQs I put for the 
-twl4030 :-(, it does not handle properly the children of the twl4030 now 
-and print a big warning at boot time due to the following check.
-
-   WARN_ON(hwirq < first_hwirq || hwirq >= first_hwirq + size)
-
-In fact 8 was just the number for the core functionality, but that chip 
-does have some other interrupts for sub function like GPIOs and power 
-events.
-
-With the following fix, it works fine.
-
-Regards,
-Benoit
-
-
----
- From 12781619d2ab8d6d724acabc6873954f0f9f4347 Mon Sep 17 00:00:00 2001
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Fri, 3 Feb 2012 14:58:17 +0100
-Subject: [PATCH] mfd: twl-core.c: Fix the number of interrupts managed 
-by twl4030
-
-TWL4030 does handle 3 different interrupts ranges: 8 for the core, 8 for 
-the power events and 18 for the GPIOs.
-
-Change the total number of interrupts managed by TWL4030 from 8 to 34.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
----
-  drivers/mfd/twl-core.c |    2 +-
-  1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index e63b408..66f9bff 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -149,7 +149,7 @@
-
-  #define TWL_MODULE_LAST TWL4030_MODULE_LAST
-
--#define TWL4030_NR_IRQS    8
-+#define TWL4030_NR_IRQS    34 /* core:8, power:8, gpio: 18 */
-  #define TWL6030_NR_IRQS    20
-
-  /* Base Address defns for twl4030_map[] */
+Thanks, best regards,
 -- 
-1.7.0.4
+Nicolas Ferre
