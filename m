@@ -1,52 +1,24 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 02 Feb 2012 16:49:05 -0800
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <20120203003633.GD14129@n2100.arm.linux.org.uk>
-References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
- <20120202204411.GB14129@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
- <4F2B1E11.1040000@codeaurora.org>
- <20120203003633.GD14129@n2100.arm.linux.org.uk>
-Message-ID: <4F2B2F01.20601@codeaurora.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 3 Feb 2012 08:52:54 +0800
+Subject: [PATCH v2 2/2] ARM: mx3: Let mx31 and mx35 enter in LPM mode in
+ WFI
+In-Reply-To: <1328220152-3037-2-git-send-email-festevam@gmail.com>
+References: <1328220152-3037-1-git-send-email-festevam@gmail.com>
+ <1328220152-3037-2-git-send-email-festevam@gmail.com>
+Message-ID: <20120203005253.GD32403@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/12 16:36, Russell King - ARM Linux wrote:
-> On Thu, Feb 02, 2012 at 03:36:49PM -0800, Stephen Boyd wrote:
->> On 02/02/12 13:38, Nicolas Pitre wrote:
->>> On Thu, 2 Feb 2012, Russell King - ARM Linux wrote
->>>> On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
->>>>> Should we move get_thread_info into assembler.h? It seems odd
->>>>> to include entry-header.S but I saw that vfp was doing the same.
->>>> Probably yes, and probably also have preempt_disable and preempt_enable
->>>> assembler macros.  That's going to get rather icky if we have to
->>>> explicitly call the scheduler though (to solve (1)).
->>> What about a pair of helpers written in C instead?
->>>
->>> v7_flush_dcache_all() could be renamed, and a wrapper function called 
->>> v7_flush_dcache_all() would call the preemption disable helper, call the 
->>> former v7_flush_dcache_all code, then call the preemption enable helper.
->>>
->>> Then __v7_setup() could still call the core cache flush code without 
->>> issues.
->> I tried to put the preemption disable/enable right around the place
->> where it was needed. With this approach we would disable preemption
->> during the entire cache flush. I'm not sure if we want to make this
->> function worse for performance, do we? It certainly sounds easier than
->> writing all the preempt macros in assembly though.
-> Err, why do you think it's a big task?
->
-> preempt disable is a case of incrementing the thread preempt count, while
-> preempt enable is a case of decrementing it, testing for zero, if zero,
-> then checking whether TIF_NEED_RESCHED is set and calling a function.
->
-> If that's too much, then the simple method in assembly to quickly disable
-> preemption over a very few set of instructions is using mrs/msr and cpsid i.
-> That'll be far cheaper than fiddling about with preempt counters or
-> messing about with veneers in C code.
+> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+> index 8404ee7..5f66791 100644
+> --- a/arch/arm/mach-imx/mm-imx3.c
+> +++ b/arch/arm/mach-imx/mm-imx3.c
+> @@ -34,6 +34,7 @@ static void imx3_idle(void)
+>  {
+>  	unsigned long reg = 0;
+>  
+> +	mx3_cpu_lp_set(MX3_WAIT);
+Isn't it supposed to use cpuidle to level the idle state?
 
-I'll try the macros. So far it isn't bad, just the __v7_setup to resolve.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks
+Richard
