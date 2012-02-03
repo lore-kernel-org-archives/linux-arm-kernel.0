@@ -1,220 +1,156 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:58:57 +0000
-Subject: [PATCH 13/20] ARM: sa1111: move PS/2 interface register definitions
- to sa1111p2.c
+Date: Fri, 03 Feb 2012 19:59:17 +0000
+Subject: [PATCH 14/20] ARM: sa1111: move PCMCIA interface register
+ definitions to sa1111_generic.c
 In-Reply-To: <20120203195419.GH14129@n2100.arm.linux.org.uk>
 References: <20120203195419.GH14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtPHd-00044V-6t@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtPHx-00044Z-Ak@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the PS/2 interface register definitions into the driver, rather
-than keeping them in a common location.
+Move the PCMCIA interface register definitions into the driver, rather
+than keeping them in a common place.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/hardware/sa1111.h |   39 +-----------------------
- drivers/input/serio/sa1111ps2.c        |   52 ++++++++++++++++++++++----------
- 2 files changed, 37 insertions(+), 54 deletions(-)
+ arch/arm/include/asm/hardware/sa1111.h |   45 +------------------------------
+ drivers/pcmcia/sa1111_generic.c        |   44 +++++++++++++++++++++++++++---
+ 2 files changed, 41 insertions(+), 48 deletions(-)
 
 diff --git a/arch/arm/include/asm/hardware/sa1111.h b/arch/arm/include/asm/hardware/sa1111.h
-index 5ba2e13..dc15bf8 100644
+index dc15bf8..29e3e56 100644
 --- a/arch/arm/include/asm/hardware/sa1111.h
 +++ b/arch/arm/include/asm/hardware/sa1111.h
-@@ -409,48 +409,11 @@
- #define SA1111_WAKEPOL0		0x0034
- #define SA1111_WAKEPOL1		0x0038
- 
--/*
-- * PS/2 Trackpad and Mouse Interfaces
-- *
-- * Registers
-- *    PS2CR		Control Register
-- *    PS2STAT		Status Register
-- *    PS2DATA		Transmit/Receive Data register
-- *    PS2CLKDIV		Clock Division Register
-- *    PS2PRECNT		Clock Precount Register
-- *    PS2TEST1		Test register 1
-- *    PS2TEST2		Test register 2
-- *    PS2TEST3		Test register 3
-- *    PS2TEST4		Test register 4
-- */
--
-+/* PS/2 Trackpad and Mouse Interfaces */
+@@ -413,50 +413,9 @@
  #define SA1111_KBD		0x0a00
  #define SA1111_MSE		0x0c00
  
- /*
-- * These are offsets from the above bases.
+-/*
+- * PCMCIA Interface
+- *
+- * Registers
+- *    PCSR	Status Register
+- *    PCCR	Control Register
+- *    PCSSR	Sleep State Register
 - */
--#define SA1111_PS2CR		0x0000
--#define SA1111_PS2STAT		0x0004
--#define SA1111_PS2DATA		0x0008
--#define SA1111_PS2CLKDIV	0x000c
--#define SA1111_PS2PRECNT	0x0010
--
--#define PS2CR_ENA		0x08
--#define PS2CR_FKD		0x02
--#define PS2CR_FKC		0x01
--
--#define PS2STAT_STP		0x0100
--#define PS2STAT_TXE		0x0080
--#define PS2STAT_TXB		0x0040
--#define PS2STAT_RXF		0x0020
--#define PS2STAT_RXB		0x0010
--#define PS2STAT_ENA		0x0008
--#define PS2STAT_RXP		0x0004
--#define PS2STAT_KBD		0x0002
--#define PS2STAT_KBC		0x0001
++/* PCMCIA Interface */
++#define SA1111_PCMCIA		0x1600
+ 
+-#define SA1111_PCMCIA	0x1600
 -
 -/*
-  * PCMCIA Interface
-  *
-  * Registers
-diff --git a/drivers/input/serio/sa1111ps2.c b/drivers/input/serio/sa1111ps2.c
-index ad7d23b..5ebabe3 100644
---- a/drivers/input/serio/sa1111ps2.c
-+++ b/drivers/input/serio/sa1111ps2.c
-@@ -24,6 +24,26 @@
+- * These are offsets from the above base.
+- */
+-#define SA1111_PCCR	0x0000
+-#define SA1111_PCSSR	0x0004
+-#define SA1111_PCSR	0x0008
+-
+-#define PCSR_S0_READY	(1<<0)
+-#define PCSR_S1_READY	(1<<1)
+-#define PCSR_S0_DETECT	(1<<2)
+-#define PCSR_S1_DETECT	(1<<3)
+-#define PCSR_S0_VS1	(1<<4)
+-#define PCSR_S0_VS2	(1<<5)
+-#define PCSR_S1_VS1	(1<<6)
+-#define PCSR_S1_VS2	(1<<7)
+-#define PCSR_S0_WP	(1<<8)
+-#define PCSR_S1_WP	(1<<9)
+-#define PCSR_S0_BVD1	(1<<10)
+-#define PCSR_S0_BVD2	(1<<11)
+-#define PCSR_S1_BVD1	(1<<12)
+-#define PCSR_S1_BVD2	(1<<13)
+-
+-#define PCCR_S0_RST	(1<<0)
+-#define PCCR_S1_RST	(1<<1)
+-#define PCCR_S0_FLT	(1<<2)
+-#define PCCR_S1_FLT	(1<<3)
+-#define PCCR_S0_PWAITEN	(1<<4)
+-#define PCCR_S1_PWAITEN	(1<<5)
+-#define PCCR_S0_PSE	(1<<6)
+-#define PCCR_S1_PSE	(1<<7)
+-
+-#define PCSSR_S0_SLEEP	(1<<0)
+-#define PCSSR_S1_SLEEP	(1<<1)
  
- #include <asm/hardware/sa1111.h>
  
-+#define PS2CR		0x0000
-+#define PS2STAT		0x0004
-+#define PS2DATA		0x0008
-+#define PS2CLKDIV	0x000c
-+#define PS2PRECNT	0x0010
+ 
+diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
+index 0735c3e..33568e1 100644
+--- a/drivers/pcmcia/sa1111_generic.c
++++ b/drivers/pcmcia/sa1111_generic.c
+@@ -22,6 +22,40 @@
+ 
+ #include "sa1111_generic.h"
+ 
++/*
++ * These are offsets from the above base.
++ */
++#define PCCR	0x0000
++#define PCSSR	0x0004
++#define PCSR	0x0008
 +
-+#define PS2CR_ENA	0x08
-+#define PS2CR_FKD	0x02
-+#define PS2CR_FKC	0x01
++#define PCSR_S0_READY	(1<<0)
++#define PCSR_S1_READY	(1<<1)
++#define PCSR_S0_DETECT	(1<<2)
++#define PCSR_S1_DETECT	(1<<3)
++#define PCSR_S0_VS1	(1<<4)
++#define PCSR_S0_VS2	(1<<5)
++#define PCSR_S1_VS1	(1<<6)
++#define PCSR_S1_VS2	(1<<7)
++#define PCSR_S0_WP	(1<<8)
++#define PCSR_S1_WP	(1<<9)
++#define PCSR_S0_BVD1	(1<<10)
++#define PCSR_S0_BVD2	(1<<11)
++#define PCSR_S1_BVD1	(1<<12)
++#define PCSR_S1_BVD2	(1<<13)
 +
-+#define PS2STAT_STP	0x0100
-+#define PS2STAT_TXE	0x0080
-+#define PS2STAT_TXB	0x0040
-+#define PS2STAT_RXF	0x0020
-+#define PS2STAT_RXB	0x0010
-+#define PS2STAT_ENA	0x0008
-+#define PS2STAT_RXP	0x0004
-+#define PS2STAT_KBD	0x0002
-+#define PS2STAT_KBC	0x0001
++#define PCCR_S0_RST	(1<<0)
++#define PCCR_S1_RST	(1<<1)
++#define PCCR_S0_FLT	(1<<2)
++#define PCCR_S1_FLT	(1<<3)
++#define PCCR_S0_PWAITEN	(1<<4)
++#define PCCR_S1_PWAITEN	(1<<5)
++#define PCCR_S0_PSE	(1<<6)
++#define PCCR_S1_PSE	(1<<7)
 +
- struct ps2if {
- 	struct serio		*io;
- 	struct sa1111_dev	*dev;
-@@ -45,22 +65,22 @@ static irqreturn_t ps2_rxint(int irq, void *dev_id)
- 	struct ps2if *ps2if = dev_id;
- 	unsigned int scancode, flag, status;
++#define PCSSR_S0_SLEEP	(1<<0)
++#define PCSSR_S1_SLEEP	(1<<1)
++
+ #define IDX_IRQ_S0_READY_NINT	(0)
+ #define IDX_IRQ_S0_CD_VALID	(1)
+ #define IDX_IRQ_S0_BVD1_STSCHG	(2)
+@@ -49,7 +83,7 @@ static void sa1111_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
+ void sa1111_pcmcia_socket_state(struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
+ {
+ 	struct sa1111_pcmcia_socket *s = to_skt(skt);
+-	unsigned long status = sa1111_readl(s->dev->mapbase + SA1111_PCSR);
++	unsigned long status = sa1111_readl(s->dev->mapbase + PCSR);
  
--	status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
-+	status = sa1111_readl(ps2if->base + PS2STAT);
- 	while (status & PS2STAT_RXF) {
- 		if (status & PS2STAT_STP)
--			sa1111_writel(PS2STAT_STP, ps2if->base + SA1111_PS2STAT);
-+			sa1111_writel(PS2STAT_STP, ps2if->base + PS2STAT);
+ 	switch (skt->nr) {
+ 	case 0:
+@@ -105,10 +139,10 @@ int sa1111_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_s
+ 		pccr_set_mask |= PCCR_S0_FLT|PCCR_S1_FLT;
  
- 		flag = (status & PS2STAT_STP ? SERIO_FRAME : 0) |
- 		       (status & PS2STAT_RXP ? 0 : SERIO_PARITY);
+ 	local_irq_save(flags);
+-	val = sa1111_readl(s->dev->mapbase + SA1111_PCCR);
++	val = sa1111_readl(s->dev->mapbase + PCCR);
+ 	val &= ~pccr_skt_mask;
+ 	val |= pccr_set_mask & pccr_skt_mask;
+-	sa1111_writel(val, s->dev->mapbase + SA1111_PCCR);
++	sa1111_writel(val, s->dev->mapbase + PCCR);
+ 	local_irq_restore(flags);
  
--		scancode = sa1111_readl(ps2if->base + SA1111_PS2DATA) & 0xff;
-+		scancode = sa1111_readl(ps2if->base + PS2DATA) & 0xff;
- 
- 		if (hweight8(scancode) & 1)
- 			flag ^= SERIO_PARITY;
- 
- 		serio_interrupt(ps2if->io, scancode, flag);
- 
--		status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
-+		status = sa1111_readl(ps2if->base + PS2STAT);
-         }
- 
-         return IRQ_HANDLED;
-@@ -75,12 +95,12 @@ static irqreturn_t ps2_txint(int irq, void *dev_id)
- 	unsigned int status;
- 
- 	spin_lock(&ps2if->lock);
--	status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
-+	status = sa1111_readl(ps2if->base + PS2STAT);
- 	if (ps2if->head == ps2if->tail) {
- 		disable_irq_nosync(irq);
- 		/* done */
- 	} else if (status & PS2STAT_TXE) {
--		sa1111_writel(ps2if->buf[ps2if->tail], ps2if->base + SA1111_PS2DATA);
-+		sa1111_writel(ps2if->buf[ps2if->tail], ps2if->base + PS2DATA);
- 		ps2if->tail = (ps2if->tail + 1) & (sizeof(ps2if->buf) - 1);
- 	}
- 	spin_unlock(&ps2if->lock);
-@@ -103,8 +123,8 @@ static int ps2_write(struct serio *io, unsigned char val)
- 	/*
- 	 * If the TX register is empty, we can go straight out.
- 	 */
--	if (sa1111_readl(ps2if->base + SA1111_PS2STAT) & PS2STAT_TXE) {
--		sa1111_writel(val, ps2if->base + SA1111_PS2DATA);
-+	if (sa1111_readl(ps2if->base + PS2STAT) & PS2STAT_TXE) {
-+		sa1111_writel(val, ps2if->base + PS2DATA);
- 	} else {
- 		if (ps2if->head == ps2if->tail)
- 			enable_irq(ps2if->dev->irq[1]);
-@@ -151,7 +171,7 @@ static int ps2_open(struct serio *io)
- 
- 	enable_irq_wake(ps2if->dev->irq[0]);
- 
--	sa1111_writel(PS2CR_ENA, ps2if->base + SA1111_PS2CR);
-+	sa1111_writel(PS2CR_ENA, ps2if->base + PS2CR);
  	return 0;
- }
- 
-@@ -159,7 +179,7 @@ static void ps2_close(struct serio *io)
- {
- 	struct ps2if *ps2if = io->port_data;
- 
--	sa1111_writel(0, ps2if->base + SA1111_PS2CR);
-+	sa1111_writel(0, ps2if->base + PS2CR);
- 
- 	disable_irq_wake(ps2if->dev->irq[0]);
- 
-@@ -179,7 +199,7 @@ static void __devinit ps2_clear_input(struct ps2if *ps2if)
- 	int maxread = 100;
- 
- 	while (maxread--) {
--		if ((sa1111_readl(ps2if->base + SA1111_PS2DATA) & 0xff) == 0xff)
-+		if ((sa1111_readl(ps2if->base + PS2DATA) & 0xff) == 0xff)
- 			break;
- 	}
- }
-@@ -189,11 +209,11 @@ static unsigned int __devinit ps2_test_one(struct ps2if *ps2if,
- {
- 	unsigned int val;
- 
--	sa1111_writel(PS2CR_ENA | mask, ps2if->base + SA1111_PS2CR);
-+	sa1111_writel(PS2CR_ENA | mask, ps2if->base + PS2CR);
- 
- 	udelay(2);
- 
--	val = sa1111_readl(ps2if->base + SA1111_PS2STAT);
-+	val = sa1111_readl(ps2if->base + PS2STAT);
- 	return val & (PS2STAT_KBC | PS2STAT_KBD);
- }
- 
-@@ -224,7 +244,7 @@ static int __devinit ps2_test(struct ps2if *ps2if)
- 		ret = -ENODEV;
- 	}
- 
--	sa1111_writel(0, ps2if->base + SA1111_PS2CR);
-+	sa1111_writel(0, ps2if->base + PS2CR);
- 
- 	return ret;
- }
-@@ -278,8 +298,8 @@ static int __devinit ps2_probe(struct sa1111_dev *dev)
- 	sa1111_enable_device(ps2if->dev);
- 
- 	/* Incoming clock is 8MHz */
--	sa1111_writel(0, ps2if->base + SA1111_PS2CLKDIV);
--	sa1111_writel(127, ps2if->base + SA1111_PS2PRECNT);
-+	sa1111_writel(0, ps2if->base + PS2CLKDIV);
-+	sa1111_writel(127, ps2if->base + PS2PRECNT);
- 
+@@ -187,8 +221,8 @@ static int pcmcia_probe(struct sa1111_dev *dev)
  	/*
- 	 * Flush any pending input.
+ 	 * Initialise the suspend state.
+ 	 */
+-	sa1111_writel(PCSSR_S0_SLEEP | PCSSR_S1_SLEEP, base + SA1111_PCSSR);
+-	sa1111_writel(PCCR_S0_FLT | PCCR_S1_FLT, base + SA1111_PCCR);
++	sa1111_writel(PCSSR_S0_SLEEP | PCSSR_S1_SLEEP, base + PCSSR);
++	sa1111_writel(PCCR_S0_FLT | PCCR_S1_FLT, base + PCCR);
+ 
+ #ifdef CONFIG_SA1100_BADGE4
+ 	pcmcia_badge4_init(&dev->dev);
 -- 
 1.7.4.4
