@@ -1,54 +1,111 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 03 Feb 2012 15:43:43 -0500 (EST)
-Subject: [PATCH 00/17] SA11x0 cleanups (mainly assabet/neponset)
-In-Reply-To: <20120203193059.GF14129@n2100.arm.linux.org.uk>
-References: <20120203193059.GF14129@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1202031533030.2759@xanadu.home>
+From: neilb@suse.de (NeilBrown)
+Date: Sat, 4 Feb 2012 07:44:27 +1100
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+Message-ID: <20120204074427.5091fef5@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Feb 2012, Russell King - ARM Linux wrote:
+On Fri, 3 Feb 2012 12:42:22 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
 
-> This is a series of cleanups and improvements to the SA11x0 code, in
-> particular the Assabet, and Assabet with the Neponset daughter board.
+> On Fri, 3 Feb 2012, Grazvydas Ignotas wrote:
 > 
-> The main SA11x0 change is to switch to using the DEFINE_RES_xxx() for
-> resources, which obviously reduces the lines of code quite a bit.
+> > On Fri, Feb 3, 2012 at 11:54 AM, NeilBrown <neilb@suse.de> wrote:
+> > > On Thu, 2 Feb 2012 22:45:53 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
+> > >> On Fri, 3 Feb 2012, NeilBrown wrote:
+> > >>
+> > >> > then CPUIDLE enters lower states and I think it uses less power but I
+> > >> > sometimes lose the first char I type (that is known) but also I sometimes get
+> > >> > corruption on output.
+> > >>
+> > >> I don't see any output corruption on 35xx BeagleBoard, either with or
+> > >> without these patches. ?So this is presumably a 37xx-centric problem, and
+> > >> unrelated to these patches, I would guess.
+> > >
+> > > Maybe it is 37xx specific. ?I think this is a DM3730.
+> > 
+> > Not sure if it's the same problem but with 3530 on 3.2 with
+> > sleep_timeout set, I usually get first char dropped (as expected) but
+> > sometimes I get corrupted char instead too. Corrupt char seems to
+> > almost always happen if I set cpufreq to powersave, on performace it's
+> > almost always ok, so maybe it's some timing problem,
 > 
-> The Assabet-only changes reduce power consumption of the board, and
-> illustrate why pins left as inputs when they're supposed to be outputs
-> are bad news - while it's undriven, it floats and increases the power
-> consumption by a measurable amount.
+> OK so let's distinguish between two corruption situations:
 > 
-> Neponset wise, there's fixes in here to restore it to fully working
-> state (rather than just being buildable.)  Unfortunately, genirq had
-> seriously broken the Neponset interrupt support code by genirq having
-> some 'improved checks' added without auditing the genirq users.
+> 1. The first character transmitted to the OMAP UART in a serial console 
+> when the UART powerdomain is in a non-functional, low power state (e.g., 
+> RET or below) is corrupted.  This is not actually output corruption, this 
+> is input corruption.
 > 
-> Neponset also gets ready for sparse IRQ support, meaning that its
-> interrupt numbers are no longer statically fixed.  We also move the
-> registration of the neponset device to assabet, which helps reduce
-> the knowledge spread of whether the board is fitted.
+> 2. Characters are corrupted while the OMAP UART is transmitting data, but 
+> there has been no recent data sent to the OMAP.
 > 
-> The random places which the NCR_0 board register is written are turned
-> into a function call instead, so that the NCR_0 register access can be
-> centralized and properly protected against concurrent access for this
-> platform.
-> 
-> Since neponset becomes mostly self-contained, most of the boards CPLD
-> register definitions are moved to the board file rather than exposing
-> them in the board header file.  That then paves the way to get rid of
-> its static mapping for its own registers, using ioremap() instead.
+> Case 1 is expected and is almost certainly not a bug.  As Neil mentioned 
+> it should be bps-rate dependent.  It occurs when the first character 
+> transmitted to the OMAP wakes the chip up via I/O ring/chain wakeup.
+> I/O ring/chain wakeup is driven by a 32KiHz clock and is therefore 
+> relatively high-latency.  So this could easily cause the first character 
+> or first few characters to be lost or corrupted, depending on the exact 
+> sequence of events, the low power state that the chip was in, etc.
 
-I've quickly looked through this series and this all looks sensible.
+A 32KiHz cycles every 30mSec.
+At 115200 bps, there is one bit every 8.7 microseconds.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+When I type "return" - which looks like 0101100001111... on the wire,
+I see '0xC3' which looks like 011000011111... on the wire.
+So we lost exactly 2 bits, or a delay around 17 microseconds.
 
-My knowledge of the SA1111 chip was never extensive, and the little I 
-had did fade away at this point.  So it might not be relevant for me to 
-give any comment on the other series.  Except that I thought that DMA 
-was terminally broken on that chip, hence I'm surprized to see OHCI 
-support for it.
+I find it hard to reconcile that delay with the cause being a 32KiHZ clock.
 
+If the first char I type is a space (0x20 or 0000001001111111) then
+the character received is 0x90 (0000010011111) which is exactly 1 bit missing,
+so an 8 or 9 usec delay.
+If the first char I type is 'o' (0x6f, or 0111101101111111) then the character
+received is 0xfb (01101111111111) which misses 5 bits.
+I think it misses the first bit, then waits for a start bit (0), then takes
+the next 8 bits.
 
-Nicolas
+At 230400 bps, I always lose at least 2 bits.
+At 460800 bps, I seem lose at least 3 bits.
+(above there, nothing works at all ... could be my USB/serial cable at fault).
+
+So it looks a lot like a delay which is a small number of microseconds.
+Could be the wake-up latency in the I/O ring/chain, but doesn't look like the
+32 KiHz clock :-)
+
+> 
+> Case 2 is not expected.  That is likely a bug somewhere.  Neil, this is 
+> what I understood that you are experiencing.  Is that correct?
+
+Correct.
+
+Thanks,
+NeilBrown
+
+> 
+> Gra?vydas, are you seeing case 1 or 2 (or something completely different 
+> ;-) ?
+> 
+> 
+> - Paul
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120204/4c79c062/attachment.sig>
