@@ -1,106 +1,44 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 3 Feb 2012 11:40:05 -0800
-Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
-In-Reply-To: <1328295309.5882.178.camel@gandalf.stny.rr.com>
-References: <20120202174337.GS2518@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
- <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
- <4F2B1307.5010207@gmail.com>
- <1328223819.5882.133.camel@gandalf.stny.rr.com>
- <20120202232736.GL2518@linux.vnet.ibm.com>
- <1328237131.5882.135.camel@gandalf.stny.rr.com>
- <20120203060458.GF2380@linux.vnet.ibm.com>
- <1328295309.5882.178.camel@gandalf.stny.rr.com>
-Message-ID: <20120203194005.GK2382@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2012 19:40:51 +0000
+Subject: [PATCH v4 1/2] pxa/hx4700: Add PCMCIA/CF support
+In-Reply-To: <1328297727.57229.YahooMailClassic@web29009.mail.ird.yahoo.com>
+References: <20120203090559.GH889@n2100.arm.linux.org.uk>
+ <1328297727.57229.YahooMailClassic@web29009.mail.ird.yahoo.com>
+Message-ID: <20120203194051.GG14129@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 01:55:09PM -0500, Steven Rostedt wrote:
-> On Thu, 2012-02-02 at 22:04 -0800, Paul E. McKenney wrote:
-> > On Thu, Feb 02, 2012 at 09:45:31PM -0500, Steven Rostedt wrote:
-> 
-> > It is an atomic instruction or two, plus some memory barriers.  Entering
-> > idle is more heavyweight for RCU_FAST_NO_HZ.  But as you say, it is
-> > entering and exiting idle.
+On Fri, Feb 03, 2012 at 07:35:27PM +0000, Paul Parsons wrote:
+> --- On Fri, 3/2/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > irq_set_irq_type(gpio_to_irq(GPIOD4_CF_nCD),
+> > IRQ_TYPE_EDGE_BOTH);
 > > 
-> > But should I make an empty definition of RCU_NONIDLE() for some #define
-> > or another?
-> > 
-> > 	#ifdef CONFIG_YOU_TELL_ME
-> > 	#define RCU_NONIDLE(a) \
-> > 		do { \
-> > 			rcu_idle_exit(); \
-> > 			do { a; } while (0); \
-> > 			rcu_idle_enter(); \
-> > 		} while (0)
-> > 	#else /* #ifdef CONFIG_YOU_TELL_ME */
-> > 	#define RCU_NONIDLE(a) do { } while (0);
-> > 	#endif /* #else #ifdef CONFIG_YOU_TELL_ME */
-> > 
-> > Or is event tracing unconditional these days?
+> > You shouldn't need to set the IRQ type for this.
 > 
-> I don't like it. As it binds the RCU_NONIDLE to tracepoints only without
-> any annotation that they are bound. Still doesn't help when tracepoints
-> are configured but not enabled.
-> 
-> I have no problem in making a special TRACE_EVENT_IDLE() that does this
-> inside the jump label. Basically what we have today is:
-> 
-> 
-> 	if (static_branch(tracepoint_key)) {
-> 		rcu_read_lock_sched_notrace();
-> 		for (all attached tracepoints) {
-> 			[...]
-> 		}
-> 		rcu_read_unlock_sched_notrace();
-> 	}
-> 
-> Ideally we want the enter/exit idle inside that static_branch()
-> condition:
-> 
-> 	if (static_branch(tracepoint_key)) {
-> 		rcu_idle_exit();
-> 		rcu_read_lock_sched_notrace();
-> 		for (all attached tracepoints) {
-> 			[...]
-> 		}
-> 		rcu_read_unlock_sched_notrace();
-> 		rcu_idle_enter();
-> 	}
-> 
-> The static_branch() is the jump label code when it's a nop when disabled
-> and a jump to the tracing code when enabled:
-> 
-> 	nop; /* or jmp 2f */  <<--- jump label
-> 1:	[ normal code ]
-> 	ret;
-> 
-> 2:	[trace code]
-> 	jmp 1b
-> 
-> 
-> The jump label when disabled is just a nop that ignores the trace code
-> (although current gcc has a bug that it currently doesn't do it this
-> elegantly). When tracing is enabled the nop is converted to a jump to
-> the tracing code. This makes tracepoints very light weight in hot paths.
-> 
-> Ideally, we want the exit/enter rcu idle with in the [trace code], which
-> makes it not used when not needed.
+> If I don't set the IRQ type then it doesn't get set before the interrupt
+> is unmasked in request_irq(). On the hx4700 the default IRQ type is level
+> triggered low level detect, which is exactly the signal present on the
+> (active low) CF card detect GPIO at boot. Consequently the interrupt
+> handler is called repeatedly, resulting in some breakage.
 
-So the idea is that if you have a trace event that is to be used in idle,
-you use TRACE_EVENT_IDLE() rather than TRACE_EVENT() to declare that
-trace event?  That would work for me, and might make for fewer changes
-for the architecture guys.  Also, this should address the code-size
-concerns we discussed yesterday.
+That's rather unfortunate.
 
-So sounds good!
+> I can fix this by setting the IRQ type elsewhere in the hx4700 platform
+> beforehand. But wouldn't it be better for soc_pcmcia_hw_init() (or
+> whatever) to set the IRQ type before it calls request_irq() ?
 
-Is a DEFINE_EVENT_IDLE() also needed?  Or prehaps a
-DECLARE_EVENT_CLASS_IDLE()?  My guess is "yes" for at least one of the
-two based on include/trace/events/power.h.
+The big problem I have against this is: what if request_irq() returns
+-EBUSY because someone else is using the interrupt?  Having the core
+call irq_set_irq_type() on these IRQs before it's claimed it would be
+asking for trouble.  request_irq() is the resource allocation function
+for interrupts - as part of its operation, it ensures exclusivity to
+the interrupt.
 
-I will keep RCU_NONIDLE() for at least a little while (reworking comments
-to point out TRACE_EVENT_IDLE() and friends) in case there turn out to
-be non-tracepoint uses of RCU in the idle loop.
+It's unfortunate that genirq got rid of my 'request an interrupt but
+don't enable it' facility which we had in the ARM IRQ code...
 
-							Thanx, Paul
+I think we'll just have to live with it where you've placed it, but
+please ensure that you add a comment about _why_ it's needed.  In
+years to come, the reason you've put it there will have been forgotten
+and it's the kind of thing which will get easily broken without such
+a comment.
