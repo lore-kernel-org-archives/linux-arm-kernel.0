@@ -1,88 +1,99 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:57:35 +0000
-Subject: [PATCH 09/20] ARM: sa11x0: badge4: move board specific ohci
- initialization to badge4.c
+Date: Fri, 03 Feb 2012 19:57:56 +0000
+Subject: [PATCH 10/20] ARM: sa1111: change devid to be a bitmask
 In-Reply-To: <20120203195419.GH14129@n2100.arm.linux.org.uk>
 References: <20120203195419.GH14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtPGJ-000446-VO@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtPGe-00044A-DX@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the handling of the 5v supply into badge4.c, removing this board
-specific detail from the sa1111 ohci driver.
+Change the sa1111 device id to be a bitmask.  This allows us to
+specify the actual device, while allowing a single driver to bind
+to both PS2 devices.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/badge4.c  |   15 +++++++++++++++
- drivers/usb/host/ohci-sa1111.c |   14 --------------
- 2 files changed, 15 insertions(+), 14 deletions(-)
+ arch/arm/common/sa1111.c               |   12 ++++++------
+ arch/arm/include/asm/hardware/sa1111.h |   20 +++++++++++---------
+ 2 files changed, 17 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
-index b07a2c0..d8492499 100644
---- a/arch/arm/mach-sa1100/badge4.c
-+++ b/arch/arm/mach-sa1100/badge4.c
-@@ -51,8 +51,23 @@ static struct resource sa1111_resources[] = {
- 	},
- };
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index 1366e82..4bdf1bb 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -158,7 +158,7 @@ static struct sa1111_dev_info sa1111_devices[] = {
+ 	{
+ 		.offset		= SA1111_KBD,
+ 		.skpcr_mask	= SKPCR_PTCLKEN,
+-		.devid		= SA1111_DEVID_PS2,
++		.devid		= SA1111_DEVID_PS2_KBD,
+ 		.irq = {
+ 			IRQ_TPRXINT,
+ 			IRQ_TPTXINT
+@@ -167,7 +167,7 @@ static struct sa1111_dev_info sa1111_devices[] = {
+ 	{
+ 		.offset		= SA1111_MSE,
+ 		.skpcr_mask	= SKPCR_PMCLKEN,
+-		.devid		= SA1111_DEVID_PS2,
++		.devid		= SA1111_DEVID_PS2_MSE,
+ 		.irq = {
+ 			IRQ_MSRXINT,
+ 			IRQ_MSTXINT
+@@ -835,12 +835,12 @@ __sa1111_probe(struct device *me, struct resource *mem, int irq)
+ 	has_devs = ~0;
+ 	if (machine_is_assabet() || machine_is_jornada720() ||
+ 	    machine_is_badge4())
+-		has_devs &= ~(1 << 4);
++		has_devs &= ~SA1111_DEVID_PS2_MSE;
+ 	else
+-		has_devs &= ~(1 << 1);
++		has_devs &= ~SA1111_DEVID_SAC;
  
-+static int badge4_sa1111_enable(void *data, unsigned devid)
-+{
-+	if (devid == SA1111_DEVID_USB)
-+		badge4_set_5V(BADGE4_5V_USB, 1);
-+	return 0;
-+}
-+
-+static void badge4_sa1111_disable(void *data, unsigned devid)
-+{
-+	if (devid == SA1111_DEVID_USB)
-+		badge4_set_5V(BADGE4_5V_USB, 0);
-+}
-+
- static struct sa1111_platform_data sa1111_info = {
- 	.irq_base	= IRQ_BOARD_END,
-+	.enable		= badge4_sa1111_enable,
-+	.disable	= badge4_sa1111_disable,
- };
+ 	for (i = 0; i < ARRAY_SIZE(sa1111_devices); i++)
+-		if (has_devs & (1 << i))
++		if (sa1111_devices[i].devid & has_devs)
+ 			sa1111_init_one_child(sachip, mem, &sa1111_devices[i]);
  
- static u64 sa1111_dmamask = 0xffffffffUL;
-diff --git a/drivers/usb/host/ohci-sa1111.c b/drivers/usb/host/ohci-sa1111.c
-index f61f4f9..4830008 100644
---- a/drivers/usb/host/ohci-sa1111.c
-+++ b/drivers/usb/host/ohci-sa1111.c
-@@ -16,7 +16,6 @@
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
- #include <mach/assabet.h>
--#include <mach/badge4.h>
- #include <asm/hardware/sa1111.h>
+ 	return 0;
+@@ -1335,7 +1335,7 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
+ 	struct sa1111_dev *dev = SA1111_DEV(_dev);
+ 	struct sa1111_driver *drv = SA1111_DRV(_drv);
  
- #ifndef CONFIG_SA1111
-@@ -35,12 +34,6 @@ static int sa1111_start_hc(struct sa1111_dev *dev)
- 	printk(KERN_DEBUG "%s: starting SA-1111 OHCI USB Controller\n",
- 	       __FILE__);
- 
--#ifdef CONFIG_SA1100_BADGE4
--	if (machine_is_badge4()) {
--		badge4_set_5V(BADGE4_5V_USB, 1);
--	}
--#endif
--
- 	if (machine_is_xp860() ||
- 	    machine_has_neponset() ||
- 	    machine_is_pfs168() ||
-@@ -84,13 +77,6 @@ static void sa1111_stop_hc(struct sa1111_dev *dev)
- 	 * Stop the USB clock.
- 	 */
- 	sa1111_disable_device(dev);
--
--#ifdef CONFIG_SA1100_BADGE4
--	if (machine_is_badge4()) {
--		/* Disable power to the USB bus */
--		badge4_set_5V(BADGE4_5V_USB, 0);
--	}
--#endif
+-	return dev->devid == drv->devid;
++	return dev->devid & drv->devid;
  }
  
+ static int sa1111_bus_suspend(struct device *dev, pm_message_t state)
+diff --git a/arch/arm/include/asm/hardware/sa1111.h b/arch/arm/include/asm/hardware/sa1111.h
+index d54d781..37ad29d 100644
+--- a/arch/arm/include/asm/hardware/sa1111.h
++++ b/arch/arm/include/asm/hardware/sa1111.h
+@@ -516,15 +516,17 @@
  
+ extern struct bus_type sa1111_bus_type;
+ 
+-#define SA1111_DEVID_SBI	0
+-#define SA1111_DEVID_SK		1
+-#define SA1111_DEVID_USB	2
+-#define SA1111_DEVID_SAC	3
+-#define SA1111_DEVID_SSP	4
+-#define SA1111_DEVID_PS2	5
+-#define SA1111_DEVID_GPIO	6
+-#define SA1111_DEVID_INT	7
+-#define SA1111_DEVID_PCMCIA	8
++#define SA1111_DEVID_SBI	(1 << 0)
++#define SA1111_DEVID_SK		(1 << 1)
++#define SA1111_DEVID_USB	(1 << 2)
++#define SA1111_DEVID_SAC	(1 << 3)
++#define SA1111_DEVID_SSP	(1 << 4)
++#define SA1111_DEVID_PS2	(3 << 5)
++#define SA1111_DEVID_PS2_KBD	(1 << 5)
++#define SA1111_DEVID_PS2_MSE	(1 << 6)
++#define SA1111_DEVID_GPIO	(1 << 7)
++#define SA1111_DEVID_INT	(1 << 8)
++#define SA1111_DEVID_PCMCIA	(1 << 9)
+ 
+ struct sa1111_dev {
+ 	struct device	dev;
 -- 
 1.7.4.4
