@@ -1,44 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Feb 2012 20:53:46 +0000
-Subject: [PATCH 00/17] SA11x0 cleanups (mainly assabet/neponset)
-In-Reply-To: <alpine.LFD.2.02.1202031533030.2759@xanadu.home>
-References: <20120203193059.GF14129@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1202031533030.2759@xanadu.home>
-Message-ID: <20120203205346.GL14129@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 03 Feb 2012 12:55:05 -0800
+Subject: [PATCH 1/2] pinmux: Export pinmux_register_mappings for pinmux modules
+In-Reply-To: <20120203205049.4089.74610.stgit@kaulin.local>
+References: <20120203205049.4089.74610.stgit@kaulin.local>
+Message-ID: <20120203205505.4089.67339.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 03:43:43PM -0500, Nicolas Pitre wrote:
-> I've quickly looked through this series and this all looks sensible.
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+With devidce tree based pinmux drivers we may not have
+static pinmux mappings as they can be dynamically created
+based on the device tree entries.
 
-Thanks.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/pinctrl/pinmux.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-> My knowledge of the SA1111 chip was never extensive, and the little I 
-> had did fade away at this point.  So it might not be relevant for me to 
-> give any comment on the other series.  Except that I thought that DMA 
-> was terminally broken on that chip, hence I'm surprized to see OHCI 
-> support for it.
-
-It is rather badly broken, but the hack to move the kernel 1MB into
-SDRAM and dmabounce continues to do their jobs, making it work.
-
-And let's also not forget that the errata documentation was (probably)
-one of the worst - I have this comment from years back in the code...
-
-/*
- * Don't believe the specs!  Take them, throw them outside.  Leave them
- * there for a week.  Spit on them.  Walk on them.  Stamp on them.
- * Pour gasoline over them and finally burn them.  Now think about coding.
- *  - The October 1999 errata (278260-007) says its bit 13, 1 to enable.
- *  - The Feb 2001 errata (278260-010) says that the previous errata
- *    (278260-009) is wrong, and its bit actually 12, fixed in spec
- *    278242-003.
- *  - The SA1111 manual (278242) says bit 12, but 0 to enable.
- *  - Reality is bit 13, 1 to enable.
- *      -- rmk
- */
-#define SKCR_OE_EN      (1<<13)
-
-In those days, we had specifications on paper!
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index 7c3193f..140d207 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -338,7 +338,7 @@ EXPORT_SYMBOL_GPL(pinmux_gpio_direction_output);
+  * passed into this function will be owned by the pinmux core and cannot be
+  * freed.
+  */
+-int __init pinmux_register_mappings(struct pinmux_map const *maps,
++int pinmux_register_mappings(struct pinmux_map const *maps,
+ 				    unsigned num_maps)
+ {
+ 	void *tmp_maps;
+@@ -402,6 +402,7 @@ int __init pinmux_register_mappings(struct pinmux_map const *maps,
+ 	pinmux_maps_num += num_maps;
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(pinmux_register_mappings);
+ 
+ /**
+  * acquire_pins() - acquire all the pins for a certain function on a pinmux
