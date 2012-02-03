@@ -1,503 +1,486 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 03 Feb 2012 13:18:48 +0100
-Subject: [PATCH 05/15] mm: compaction: export some of the functions
-In-Reply-To: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
-References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1328271538-14502-6-git-send-email-m.szyprowski@samsung.com>
+Date: Fri, 03 Feb 2012 13:18:43 +0100
+Subject: [PATCHv20 00/15] Contiguous Memory Allocator
+Message-ID: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Nazarewicz <mina86@mina86.com>
+Welcome everyone again!
 
-This commit exports some of the functions from compaction.c file
-outside of it adding their declaration into internal.h header
-file so that other mm related code can use them.
+This is yet another quick update on Contiguous Memory Allocator patches.
+This version includes another set of code cleanups requested by Mel
+Gorman and a few minor bug fixes. I really hope that this version will
+be accepted for merging and future development will be handled by
+incremental patches.
 
-This forced compaction.c to always be compiled (as opposed to being
-compiled only if CONFIG_COMPACTION is defined) but as to avoid
-introducing code that user did not ask for, part of the compaction.c
-is now wrapped in on #ifdef.
+ARM integration code has not been changed since v16. It provides
+implementation of the ideas that has been discussed during Linaro Sprint
+meeting in Cambourne, August 2011. Here are the details:
 
-Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Mel Gorman <mel@csn.ul.ie>
-Tested-by: Rob Clark <rob.clark@linaro.org>
-Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- mm/Makefile     |    3 +-
- mm/compaction.c |  328 ++++++++++++++++++++++++++-----------------------------
- mm/internal.h   |   33 ++++++
- 3 files changed, 191 insertions(+), 173 deletions(-)
+  This version provides a solution for complete integration of CMA to
+  DMA mapping subsystem on ARM architecture. The issue caused by double
+  dma pages mapping and possible aliasing in coherent memory mapping has
+  been finally resolved, both for GFP_ATOMIC case (allocations comes from
+  coherent memory pool) and non-GFP_ATOMIC case (allocations comes from
+  CMA managed areas).
 
-diff --git a/mm/Makefile b/mm/Makefile
-index 50ec00e..8aada89 100644
---- a/mm/Makefile
-+++ b/mm/Makefile
-@@ -13,7 +13,7 @@ obj-y			:= filemap.o mempool.o oom_kill.o fadvise.o \
- 			   readahead.o swap.o truncate.o vmscan.o shmem.o \
- 			   prio_tree.o util.o mmzone.o vmstat.o backing-dev.o \
- 			   page_isolation.o mm_init.o mmu_context.o percpu.o \
--			   $(mmu-y)
-+			   compaction.o $(mmu-y)
- obj-y += init-mm.o
- 
- ifdef CONFIG_NO_BOOTMEM
-@@ -32,7 +32,6 @@ obj-$(CONFIG_NUMA) 	+= mempolicy.o
- obj-$(CONFIG_SPARSEMEM)	+= sparse.o
- obj-$(CONFIG_SPARSEMEM_VMEMMAP) += sparse-vmemmap.o
- obj-$(CONFIG_SLOB) += slob.o
--obj-$(CONFIG_COMPACTION) += compaction.o
- obj-$(CONFIG_MMU_NOTIFIER) += mmu_notifier.o
- obj-$(CONFIG_KSM) += ksm.o
- obj-$(CONFIG_PAGE_POISONING) += debug-pagealloc.o
-diff --git a/mm/compaction.c b/mm/compaction.c
-index 9fef891..d5174c4 100644
---- a/mm/compaction.c
-+++ b/mm/compaction.c
-@@ -16,30 +16,11 @@
- #include <linux/sysfs.h>
- #include "internal.h"
- 
-+#if defined CONFIG_COMPACTION || defined CONFIG_CMA
-+
- #define CREATE_TRACE_POINTS
- #include <trace/events/compaction.h>
- 
--/*
-- * compact_control is used to track pages being migrated and the free pages
-- * they are being migrated to during memory compaction. The free_pfn starts
-- * at the end of a zone and migrate_pfn begins at the start. Movable pages
-- * are moved to the end of a zone during a compaction run and the run
-- * completes when free_pfn <= migrate_pfn
-- */
--struct compact_control {
--	struct list_head freepages;	/* List of free pages to migrate to */
--	struct list_head migratepages;	/* List of pages being migrated */
--	unsigned long nr_freepages;	/* Number of isolated free pages */
--	unsigned long nr_migratepages;	/* Number of pages to migrate */
--	unsigned long free_pfn;		/* isolate_freepages search base */
--	unsigned long migrate_pfn;	/* isolate_migratepages search base */
--	bool sync;			/* Synchronous migration */
--
--	unsigned int order;		/* order a direct compactor needs */
--	int migratetype;		/* MOVABLE, RECLAIMABLE etc */
--	struct zone *zone;
--};
--
- static unsigned long release_freepages(struct list_head *freelist)
- {
- 	struct page *page, *next;
-@@ -54,6 +35,16 @@ static unsigned long release_freepages(struct list_head *freelist)
- 	return count;
- }
- 
-+static void map_pages(struct list_head *list)
-+{
-+	struct page *page;
-+
-+	list_for_each_entry(page, list, lru) {
-+		arch_alloc_page(page, 0);
-+		kernel_map_pages(page, 1, 1);
-+	}
-+}
-+
- /*
-  * Isolate free pages onto a private freelist. Caller must hold zone->lock.
-  * If @strict is true, will abort returning 0 on any invalid PFNs or non-free
-@@ -122,7 +113,7 @@ static unsigned long isolate_freepages_block(unsigned long blockpfn,
-  * (which may be greater then end_pfn if end fell in a middle of
-  * a free page).
-  */
--static unsigned long
-+unsigned long
- isolate_freepages_range(unsigned long start_pfn, unsigned long end_pfn)
- {
- 	unsigned long isolated, pfn, block_end_pfn, flags;
-@@ -176,127 +167,6 @@ isolate_freepages_range(unsigned long start_pfn, unsigned long end_pfn)
- 	return pfn;
- }
- 
--/* Returns true if the page is within a block suitable for migration to */
--static bool suitable_migration_target(struct page *page)
--{
--
--	int migratetype = get_pageblock_migratetype(page);
--
--	/* Don't interfere with memory hot-remove or the min_free_kbytes blocks */
--	if (migratetype == MIGRATE_ISOLATE || migratetype == MIGRATE_RESERVE)
--		return false;
--
--	/* If the page is a large free page, then allow migration */
--	if (PageBuddy(page) && page_order(page) >= pageblock_order)
--		return true;
--
--	/* If the block is MIGRATE_MOVABLE, allow migration */
--	if (migratetype == MIGRATE_MOVABLE)
--		return true;
--
--	/* Otherwise skip the block */
--	return false;
--}
--
--static void map_pages(struct list_head *list)
--{
--	struct page *page;
--
--	list_for_each_entry(page, list, lru) {
--		arch_alloc_page(page, 0);
--		kernel_map_pages(page, 1, 1);
--	}
--}
--
--/*
-- * Based on information in the current compact_control, find blocks
-- * suitable for isolating free pages from and then isolate them.
-- */
--static void isolate_freepages(struct zone *zone,
--				struct compact_control *cc)
--{
--	struct page *page;
--	unsigned long high_pfn, low_pfn, pfn, zone_end_pfn, end_pfn;
--	unsigned long flags;
--	int nr_freepages = cc->nr_freepages;
--	struct list_head *freelist = &cc->freepages;
--
--	/*
--	 * Initialise the free scanner. The starting point is where we last
--	 * scanned from (or the end of the zone if starting). The low point
--	 * is the end of the pageblock the migration scanner is using.
--	 */
--	pfn = cc->free_pfn;
--	low_pfn = cc->migrate_pfn + pageblock_nr_pages;
--
--	/*
--	 * Take care that if the migration scanner is at the end of the zone
--	 * that the free scanner does not accidentally move to the next zone
--	 * in the next isolation cycle.
--	 */
--	high_pfn = min(low_pfn, pfn);
--
--	zone_end_pfn = zone->zone_start_pfn + zone->spanned_pages;
--
--	/*
--	 * Isolate free pages until enough are available to migrate the
--	 * pages on cc->migratepages. We stop searching if the migrate
--	 * and free page scanners meet or enough free pages are isolated.
--	 */
--	for (; pfn > low_pfn && cc->nr_migratepages > nr_freepages;
--					pfn -= pageblock_nr_pages) {
--		unsigned long isolated;
--
--		if (!pfn_valid(pfn))
--			continue;
--
--		/*
--		 * Check for overlapping nodes/zones. It's possible on some
--		 * configurations to have a setup like
--		 * node0 node1 node0
--		 * i.e. it's possible that all pages within a zones range of
--		 * pages do not belong to a single zone.
--		 */
--		page = pfn_to_page(pfn);
--		if (page_zone(page) != zone)
--			continue;
--
--		/* Check the block is suitable for migration */
--		if (!suitable_migration_target(page))
--			continue;
--
--		/*
--		 * Found a block suitable for isolating free pages from. Now
--		 * we disabled interrupts, double check things are ok and
--		 * isolate the pages. This is to minimise the time IRQs
--		 * are disabled
--		 */
--		isolated = 0;
--		spin_lock_irqsave(&zone->lock, flags);
--		if (suitable_migration_target(page)) {
--			end_pfn = min(pfn + pageblock_nr_pages, zone_end_pfn);
--			isolated = isolate_freepages_block(pfn, end_pfn,
--							   freelist, false);
--			nr_freepages += isolated;
--		}
--		spin_unlock_irqrestore(&zone->lock, flags);
--
--		/*
--		 * Record the highest PFN we isolated pages from. When next
--		 * looking for free pages, the search will restart here as
--		 * page migration may have returned some pages to the allocator
--		 */
--		if (isolated)
--			high_pfn = max(high_pfn, pfn);
--	}
--
--	/* split_free_page does not map the pages */
--	map_pages(freelist);
--
--	cc->free_pfn = high_pfn;
--	cc->nr_freepages = nr_freepages;
--}
--
- /* Update the number of anon and file isolated pages in the zone */
- static void acct_isolated(struct zone *zone, struct compact_control *cc)
- {
-@@ -325,13 +195,6 @@ static bool too_many_isolated(struct zone *zone)
- 	return isolated > (inactive + active) / 2;
- }
- 
--/* possible outcome of isolate_migratepages */
--typedef enum {
--	ISOLATE_ABORT,		/* Abort compaction now */
--	ISOLATE_NONE,		/* No pages isolated, continue scanning */
--	ISOLATE_SUCCESS,	/* Pages isolated, migrate */
--} isolate_migrate_t;
--
- /**
-  * isolate_migratepages_range() - isolate all migrate-able pages in range.
-  * @zone:	Zone pages are in.
-@@ -351,7 +214,7 @@ typedef enum {
-  * does not modify any cc's fields, in particular it does not modify
-  * (or read for that matter) cc->migrate_pfn.
-  */
--static unsigned long
-+unsigned long
- isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
- 			   unsigned long low_pfn, unsigned long end_pfn)
- {
-@@ -465,35 +328,118 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
- 	return low_pfn;
- }
- 
-+#endif /* CONFIG_COMPACTION || CONFIG_CMA */
-+#ifdef CONFIG_COMPACTION
-+
-+/* Returns true if the page is within a block suitable for migration to */
-+static bool suitable_migration_target(struct page *page)
-+{
-+
-+	int migratetype = get_pageblock_migratetype(page);
-+
-+	/* Don't interfere with memory hot-remove or the min_free_kbytes blocks */
-+	if (migratetype == MIGRATE_ISOLATE || migratetype == MIGRATE_RESERVE)
-+		return false;
-+
-+	/* If the page is a large free page, then allow migration */
-+	if (PageBuddy(page) && page_order(page) >= pageblock_order)
-+		return true;
-+
-+	/* If the block is MIGRATE_MOVABLE, allow migration */
-+	if (migratetype == MIGRATE_MOVABLE)
-+		return true;
-+
-+	/* Otherwise skip the block */
-+	return false;
-+}
-+
- /*
-- * Isolate all pages that can be migrated from the block pointed to by
-- * the migrate scanner within compact_control.
-+ * Based on information in the current compact_control, find blocks
-+ * suitable for isolating free pages from and then isolate them.
-  */
--static isolate_migrate_t isolate_migratepages(struct zone *zone,
--					struct compact_control *cc)
-+static void isolate_freepages(struct zone *zone,
-+				struct compact_control *cc)
- {
--	unsigned long low_pfn, end_pfn;
-+	struct page *page;
-+	unsigned long high_pfn, low_pfn, pfn, zone_end_pfn, end_pfn;
-+	unsigned long flags;
-+	int nr_freepages = cc->nr_freepages;
-+	struct list_head *freelist = &cc->freepages;
- 
--	/* Do not scan outside zone boundaries */
--	low_pfn = max(cc->migrate_pfn, zone->zone_start_pfn);
-+	/*
-+	 * Initialise the free scanner. The starting point is where we last
-+	 * scanned from (or the end of the zone if starting). The low point
-+	 * is the end of the pageblock the migration scanner is using.
-+	 */
-+	pfn = cc->free_pfn;
-+	low_pfn = cc->migrate_pfn + pageblock_nr_pages;
- 
--	/* Only scan within a pageblock boundary */
--	end_pfn = ALIGN(low_pfn + pageblock_nr_pages, pageblock_nr_pages);
-+	/*
-+	 * Take care that if the migration scanner is at the end of the zone
-+	 * that the free scanner does not accidentally move to the next zone
-+	 * in the next isolation cycle.
-+	 */
-+	high_pfn = min(low_pfn, pfn);
- 
--	/* Do not cross the free scanner or scan within a memory hole */
--	if (end_pfn > cc->free_pfn || !pfn_valid(low_pfn)) {
--		cc->migrate_pfn = end_pfn;
--		return ISOLATE_NONE;
--	}
-+	zone_end_pfn = zone->zone_start_pfn + zone->spanned_pages;
- 
--	/* Perform the isolation */
--	low_pfn = isolate_migratepages_range(zone, cc, low_pfn, end_pfn);
--	if (!low_pfn)
--		return ISOLATE_ABORT;
-+	/*
-+	 * Isolate free pages until enough are available to migrate the
-+	 * pages on cc->migratepages. We stop searching if the migrate
-+	 * and free page scanners meet or enough free pages are isolated.
-+	 */
-+	for (; pfn > low_pfn && cc->nr_migratepages > nr_freepages;
-+					pfn -= pageblock_nr_pages) {
-+		unsigned long isolated;
- 
--	cc->migrate_pfn = low_pfn;
-+		if (!pfn_valid(pfn))
-+			continue;
- 
--	return ISOLATE_SUCCESS;
-+		/*
-+		 * Check for overlapping nodes/zones. It's possible on some
-+		 * configurations to have a setup like
-+		 * node0 node1 node0
-+		 * i.e. it's possible that all pages within a zones range of
-+		 * pages do not belong to a single zone.
-+		 */
-+		page = pfn_to_page(pfn);
-+		if (page_zone(page) != zone)
-+			continue;
-+
-+		/* Check the block is suitable for migration */
-+		if (!suitable_migration_target(page))
-+			continue;
-+
-+		/*
-+		 * Found a block suitable for isolating free pages from. Now
-+		 * we disabled interrupts, double check things are ok and
-+		 * isolate the pages. This is to minimise the time IRQs
-+		 * are disabled
-+		 */
-+		isolated = 0;
-+		spin_lock_irqsave(&zone->lock, flags);
-+		if (suitable_migration_target(page)) {
-+			end_pfn = min(pfn + pageblock_nr_pages, zone_end_pfn);
-+			isolated = isolate_freepages_block(pfn, end_pfn,
-+							   freelist, false);
-+			nr_freepages += isolated;
-+		}
-+		spin_unlock_irqrestore(&zone->lock, flags);
-+
-+		/*
-+		 * Record the highest PFN we isolated pages from. When next
-+		 * looking for free pages, the search will restart here as
-+		 * page migration may have returned some pages to the allocator
-+		 */
-+		if (isolated)
-+			high_pfn = max(high_pfn, pfn);
-+	}
-+
-+	/* split_free_page does not map the pages */
-+	map_pages(freelist);
-+
-+	cc->free_pfn = high_pfn;
-+	cc->nr_freepages = nr_freepages;
- }
- 
- /*
-@@ -542,6 +488,44 @@ static void update_nr_listpages(struct compact_control *cc)
- 	cc->nr_freepages = nr_freepages;
- }
- 
-+/* possible outcome of isolate_migratepages */
-+typedef enum {
-+	ISOLATE_ABORT,		/* Abort compaction now */
-+	ISOLATE_NONE,		/* No pages isolated, continue scanning */
-+	ISOLATE_SUCCESS,	/* Pages isolated, migrate */
-+} isolate_migrate_t;
-+
-+/*
-+ * Isolate all pages that can be migrated from the block pointed to by
-+ * the migrate scanner within compact_control.
-+ */
-+static isolate_migrate_t isolate_migratepages(struct zone *zone,
-+					struct compact_control *cc)
-+{
-+	unsigned long low_pfn, end_pfn;
-+
-+	/* Do not scan outside zone boundaries */
-+	low_pfn = max(cc->migrate_pfn, zone->zone_start_pfn);
-+
-+	/* Only scan within a pageblock boundary */
-+	end_pfn = ALIGN(low_pfn + pageblock_nr_pages, pageblock_nr_pages);
-+
-+	/* Do not cross the free scanner or scan within a memory hole */
-+	if (end_pfn > cc->free_pfn || !pfn_valid(low_pfn)) {
-+		cc->migrate_pfn = end_pfn;
-+		return ISOLATE_NONE;
-+	}
-+
-+	/* Perform the isolation */
-+	low_pfn = isolate_migratepages_range(zone, cc, low_pfn, end_pfn);
-+	if (!low_pfn)
-+		return ISOLATE_ABORT;
-+
-+	cc->migrate_pfn = low_pfn;
-+
-+	return ISOLATE_SUCCESS;
-+}
-+
- static int compact_finished(struct zone *zone,
- 			    struct compact_control *cc)
- {
-@@ -859,3 +843,5 @@ void compaction_unregister_node(struct node *node)
- 	return device_remove_file(&node->dev, &dev_attr_compact);
- }
- #endif /* CONFIG_SYSFS && CONFIG_NUMA */
-+
-+#endif /* CONFIG_COMPACTION */
-diff --git a/mm/internal.h b/mm/internal.h
-index 2189af4..55e7eed 100644
---- a/mm/internal.h
-+++ b/mm/internal.h
-@@ -100,6 +100,39 @@ extern void prep_compound_page(struct page *page, unsigned long order);
- extern bool is_free_buddy_page(struct page *page);
- #endif
- 
-+#if defined CONFIG_COMPACTION || defined CONFIG_CMA
-+
-+/*
-+ * in mm/compaction.c
-+ */
-+/*
-+ * compact_control is used to track pages being migrated and the free pages
-+ * they are being migrated to during memory compaction. The free_pfn starts
-+ * at the end of a zone and migrate_pfn begins at the start. Movable pages
-+ * are moved to the end of a zone during a compaction run and the run
-+ * completes when free_pfn <= migrate_pfn
-+ */
-+struct compact_control {
-+	struct list_head freepages;	/* List of free pages to migrate to */
-+	struct list_head migratepages;	/* List of pages being migrated */
-+	unsigned long nr_freepages;	/* Number of isolated free pages */
-+	unsigned long nr_migratepages;	/* Number of pages to migrate */
-+	unsigned long free_pfn;		/* isolate_freepages search base */
-+	unsigned long migrate_pfn;	/* isolate_migratepages search base */
-+	bool sync;			/* Synchronous migration */
-+
-+	unsigned int order;		/* order a direct compactor needs */
-+	int migratetype;		/* MOVABLE, RECLAIMABLE etc */
-+	struct zone *zone;
-+};
-+
-+unsigned long
-+isolate_freepages_range(unsigned long start_pfn, unsigned long end_pfn);
-+unsigned long
-+isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
-+			   unsigned long low_pfn, unsigned long end_pfn);
-+
-+#endif
- 
- /*
-  * function for dealing with page's order in buddy system.
+  For coherent, nommu, ARMv4 and ARMv5 systems the current DMA-mapping
+  implementation has been kept.
+
+  For ARMv6+ systems, CMA has been enabled and a special pool of coherent
+  memory for atomic allocations has been created. The size of this pool
+  defaults to DEFAULT_CONSISTEN_DMA_SIZE/8, but can be changed with
+  coherent_pool kernel parameter (if really required).
+
+  All atomic allocations are served from this pool. I've did a little
+  simplification here, because there is no separate pool for writecombine
+  memory - such requests are also served from coherent pool. I don't
+  think that such simplification is a problem here - I found no driver
+  that use dma_alloc_writecombine with GFP_ATOMIC flags.
+
+  All non-atomic allocation are served from CMA area. Kernel mappings are
+  updated to reflect required memory attributes changes. This is possible
+  because during early boot, all CMA area are remapped with 4KiB pages in
+  kernel low-memory.
+
+  This version have been tested on Samsung S5PC110 based Goni machine and
+  Exynos4 UniversalC210 board with various V4L2 multimedia drivers.
+
+  Coherent atomic allocations has been tested by manually enabling the dma
+  bounce for the s3c-sdhci device.
+
+All patches are prepared on top of Linux Kernel v3.3-rc2.
+
+A few words for these who see CMA for the first time:
+
+   The Contiguous Memory Allocator (CMA) makes it possible for device
+   drivers to allocate big contiguous chunks of memory after the system
+   has booted. 
+
+   The main difference from the similar frameworks is the fact that CMA
+   allows to transparently reuse memory region reserved for the big
+   chunk allocation as a system memory, so no memory is wasted when no
+   big chunk is allocated. Once the alloc request is issued, the
+   framework will migrate system pages to create a required big chunk of
+   physically contiguous memory.
+
+   For more information you can refer to nice LWN articles: 
+   http://lwn.net/Articles/447405/ and http://lwn.net/Articles/450286/
+   as well as links to previous versions of the CMA framework.
+
+   The CMA framework has been initially developed by Michal Nazarewicz
+   at Samsung Poland R&D Center. Since version 9, I've taken over the
+   development, because Michal has left the company. Since version v17
+   Michal is working again on CMA patches and the current version is
+   the result of our joint open-source effort.
+
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
+
+Links to previous versions of the patchset:
+v19: <http://www.spinics.net/lists/linux-mm/msg29145.html>
+v18: <http://www.spinics.net/lists/linux-mm/msg28125.html>
+v17: <http://www.spinics.net/lists/arm-kernel/msg148499.html>
+v16: <http://www.spinics.net/lists/linux-mm/msg25066.html>
+v15: <http://www.spinics.net/lists/linux-mm/msg23365.html>
+v14: <http://www.spinics.net/lists/linux-media/msg36536.html>
+v13: (internal, intentionally not released)
+v12: <http://www.spinics.net/lists/linux-media/msg35674.html>
+v11: <http://www.spinics.net/lists/linux-mm/msg21868.html>
+v10: <http://www.spinics.net/lists/linux-mm/msg20761.html>
+ v9: <http://article.gmane.org/gmane.linux.kernel.mm/60787>
+ v8: <http://article.gmane.org/gmane.linux.kernel.mm/56855>
+ v7: <http://article.gmane.org/gmane.linux.kernel.mm/55626>
+ v6: <http://article.gmane.org/gmane.linux.kernel.mm/55626>
+ v5: (intentionally left out as CMA v5 was identical to CMA v4)
+ v4: <http://article.gmane.org/gmane.linux.kernel.mm/52010>
+ v3: <http://article.gmane.org/gmane.linux.kernel.mm/51573>
+ v2: <http://article.gmane.org/gmane.linux.kernel.mm/50986>
+ v1: <http://article.gmane.org/gmane.linux.kernel.mm/50669>
+
+
+Changelog:
+
+v20:
+    1. Addressed even more comments from Mel Gorman and added his Acked-by tag
+       on most of the core memory management patches.
+
+    2. Squashed a few minor fixes here and there (corrected alignment calculation
+       for region limit, added adjusting low watermark level on reclaim, fixed
+       return value of __alloc_contig_migrate_range function)
+
+    3. Removed problematic "mm: page_alloc: update migrate type of pages on pcp
+       when isolating" patch and sligtly altered MIGRATE_CMA type handling what
+       solved the problem
+
+    4. Rebased onto v3.3-rc2
+
+v19:
+    1. Addressed another set of comments and suggestions from Mel Gorman, mainly
+       related to breaking patches into smaller, single-feature related chunks
+       and rewriting already existing functions in memory compaction code.
+
+    2. Reworked completely page reclaim code, removed it from split_free_page()
+       and introduce direct call from alloc_contig_range().
+
+    3. Merged a fix from Mans Rullgard for correct cma area limit alignment.
+
+    4. Replaced broken "mm: page_alloc: set_migratetype_isolate: drain PCP prior
+       to isolating" patch with "mm: page_alloc: update migrate type of pages on
+       pcp when isolating" which is another attempt to solve this issue without
+       touching free_pcppages_bulk().
+
+    5. Rebased onto v3.3-rc1
+
+v18:
+    1. Addressed comments and suggestions from Mel Gorman related to changes
+       in memory compaction code, most important points:
+	- removed "mm: page_alloc: handle MIGRATE_ISOLATE in free_pcppages_bulk()"
+	  and moved all the logic to set_migratetype_isolate - see
+	  "mm: page_alloc: set_migratetype_isolate: drain PCP prior to isolating"
+	  patch
+	- code in "mm: compaction: introduce isolate_{free,migrate}pages_range()"
+	  patch have been simplified and improved
+	- removed "mm: mmzone: introduce zone_pfn_same_memmap()" patch
+
+    2. Fixed crash on initialization if HIGHMEM is available on ARM platforms
+
+    3. Fixed problems with allocation of contiguous memory if all free pages
+       are occupied by page cache and reclaim is required.
+
+    4. Added a workaround for temporary migration failures (now CMA tries
+       to allocate different memory block in such case), what heavily increased
+       reliability of the CMA.
+
+    5. Minor cleanup here and there.
+
+    6. Rebased onto v3.2-rc7 kernel tree.
+
+v17:
+    1. Replaced whole CMA core memory migration code to the new one kindly
+       provided by Michal Nazarewicz. The new code is based on memory
+       compaction framework not the memory hotplug, like it was before. This
+       change has been suggested by Mel Godman.
+
+    2. Addressed most of the comments from Andrew Morton and Mel Gorman in
+       the rest of the CMA code.
+
+    3. Fixed broken initialization on ARM systems with DMA zone enabled.
+
+    4. Rebased onto v3.2-rc2 kernel.
+
+v16:
+    1. merged a fixup from Michal Nazarewicz to address comments from Dave
+       Hansen about checking if pfns belong to the same memory zone
+
+    2. merged a fix from Michal Nazarewicz for incorrect handling of pages
+       which belong to page block that is in MIGRATE_ISOLATE state, in very
+       rare cases the migrate type of page block might have been changed
+       from MIGRATE_CMA to MIGRATE_MOVABLE because of this bug
+
+    3. moved some common code to include/asm-generic
+
+    4. added support for x86 DMA-mapping framework for pci-dma hardware,
+       CMA can be now even more widely tested on KVM/QEMU and a lot of common
+       x86 boxes
+
+    5. rebased onto next-20111005 kernel tree, which includes changes in ARM
+       DMA-mapping subsystem (CONSISTENT_DMA_SIZE removal)
+
+    6. removed patch for CMA s5p-fimc device private regions (served only as
+       example) and provided the one that matches real life case - s5p-mfc
+       device
+
+v15:
+    1. fixed calculation of the total memory after activating CMA area (was
+       broken from v12)
+
+    2. more code cleanup in drivers/base/dma-contiguous.c
+
+    3. added address limit for default CMA area
+
+    4. rewrote ARM DMA integration:
+	- removed "ARM: DMA: steal memory for DMA coherent mappings" patch
+	- kept current DMA mapping implementation for coherent, nommu and
+	  ARMv4/ARMv5 systems
+	- enabled CMA for all ARMv6+ systems
+	- added separate, small pool for coherent atomic allocations, defaults
+	  to CONSISTENT_DMA_SIZE/8, but can be changed with kernel parameter
+	  coherent_pool=[size]
+
+v14:
+    1. Merged with "ARM: DMA: steal memory for DMA coherent mappings" 
+       patch, added support for GFP_ATOMIC allocations.
+
+    2. Added checks for NULL device pointer
+
+v13: (internal, intentionally not released)
+
+v12:
+    1. Fixed 2 nasty bugs in dma-contiguous allocator:
+       - alignment argument was not passed correctly
+       - range for dma_release_from_contiguous was not checked correctly
+
+    2. Added support for architecture specfic dma_contiguous_early_fixup()
+       function
+
+    3. CMA and DMA-mapping integration for ARM architechture has been
+       rewritten to take care of the memory aliasing issue that might
+       happen for newer ARM CPUs (mapping of the same pages with different
+       cache attributes is forbidden). TODO: add support for GFP_ATOMIC
+       allocations basing on the "ARM: DMA: steal memory for DMA coherent
+       mappings" patch and implement support for contiguous memory areas
+       that are placed in HIGHMEM zone
+
+v11:
+    1. Removed genalloc usage and replaced it with direct calls to
+       bitmap_* functions, dropped patches that are not needed
+       anymore (genalloc extensions)
+
+    2. Moved all contiguous area management code from mm/cma.c
+       to drivers/base/dma-contiguous.c
+
+    3. Renamed cm_alloc/free to dma_alloc/release_from_contiguous
+
+    4. Introduced global, system wide (default) contiguous area
+       configured with kernel config and kernel cmdline parameters
+
+    5. Simplified initialization to just one function:
+       dma_declare_contiguous()
+
+    6. Added example of device private memory contiguous area
+
+v10:
+    1. Rebased onto 3.0-rc2 and resolved all conflicts
+
+    2. Simplified CMA to be just a pure memory allocator, for use
+       with platfrom/bus specific subsystems, like dma-mapping.
+       Removed all device specific functions are calls.
+
+    3. Integrated with ARM DMA-mapping subsystem.
+
+    4. Code cleanup here and there.
+
+    5. Removed private context support.
+
+v9: 1. Rebased onto 2.6.39-rc1 and resolved all conflicts
+
+    2. Fixed a bunch of nasty bugs that happened when the allocation
+       failed (mainly kernel oops due to NULL ptr dereference).
+
+    3. Introduced testing code: cma-regions compatibility layer and
+       videobuf2-cma memory allocator module.
+
+v8: 1. The alloc_contig_range() function has now been separated from
+       CMA and put in page_allocator.c.  This function tries to
+       migrate all LRU pages in specified range and then allocate the
+       range using alloc_contig_freed_pages().
+
+    2. Support for MIGRATE_CMA has been separated from the CMA code.
+       I have not tested if CMA works with ZONE_MOVABLE but I see no
+       reasons why it shouldn't.
+
+    3. I have added a @private argument when creating CMA contexts so
+       that one can reserve memory and not share it with the rest of
+       the system.  This way, CMA acts only as allocation algorithm.
+
+v7: 1. A lot of functionality that handled driver->allocator_context
+       mapping has been removed from the patchset.  This is not to say
+       that this code is not needed, it's just not worth posting
+       everything in one patchset.
+
+       Currently, CMA is "just" an allocator.  It uses it's own
+       migratetype (MIGRATE_CMA) for defining ranges of pageblokcs
+       which behave just like ZONE_MOVABLE but dispite the latter can
+       be put in arbitrary places.
+
+    2. The migration code that was introduced in the previous version
+       actually started working.
+
+
+v6: 1. Most importantly, v6 introduces support for memory migration.
+       The implementation is not yet complete though.
+
+       Migration support means that when CMA is not using memory
+       reserved for it, page allocator can allocate pages from it.
+       When CMA wants to use the memory, the pages have to be moved
+       and/or evicted as to make room for CMA.
+
+       To make it possible it must be guaranteed that only movable and
+       reclaimable pages are allocated in CMA controlled regions.
+       This is done by introducing a MIGRATE_CMA migrate type that
+       guarantees exactly that.
+
+       Some of the migration code is "borrowed" from Kamezawa
+       Hiroyuki's alloc_contig_pages() implementation.  The main
+       difference is that thanks to MIGRATE_CMA migrate type CMA
+       assumes that memory controlled by CMA are is always movable or
+       reclaimable so that it makes allocation decisions regardless of
+       the whether some pages are actually allocated and migrates them
+       if needed.
+
+       The most interesting patches from the patchset that implement
+       the functionality are:
+
+         09/13: mm: alloc_contig_free_pages() added
+         10/13: mm: MIGRATE_CMA migration type added
+         11/13: mm: MIGRATE_CMA isolation functions added
+         12/13: mm: cma: Migration support added [wip]
+
+       Currently, kernel panics in some situations which I am trying
+       to investigate.
+
+    2. cma_pin() and cma_unpin() functions has been added (after
+       a conversation with Johan Mossberg).  The idea is that whenever
+       hardware does not use the memory (no transaction is on) the
+       chunk can be moved around.  This would allow defragmentation to
+       be implemented if desired.  No defragmentation algorithm is
+       provided at this time.
+
+    3. Sysfs support has been replaced with debugfs.  I always felt
+       unsure about the sysfs interface and when Greg KH pointed it
+       out I finally got to rewrite it to debugfs.
+
+
+v5: (intentionally left out as CMA v5 was identical to CMA v4)
+
+
+v4: 1. The "asterisk" flag has been removed in favour of requiring
+       that platform will provide a "*=<regions>" rule in the map
+       attribute.
+
+    2. The terminology has been changed slightly renaming "kind" to
+       "type" of memory.  In the previous revisions, the documentation
+       indicated that device drivers define memory kinds and now,
+
+v3: 1. The command line parameters have been removed (and moved to
+       a separate patch, the fourth one).  As a consequence, the
+       cma_set_defaults() function has been changed -- it no longer
+       accepts a string with list of regions but an array of regions.
+
+    2. The "asterisk" attribute has been removed.  Now, each region
+       has an "asterisk" flag which lets one specify whether this
+       region should by considered "asterisk" region.
+
+    3. SysFS support has been moved to a separate patch (the third one
+       in the series) and now also includes list of regions.
+
+v2: 1. The "cma_map" command line have been removed.  In exchange,
+       a SysFS entry has been created under kernel/mm/contiguous.
+
+       The intended way of specifying the attributes is
+       a cma_set_defaults() function called by platform initialisation
+       code.  "regions" attribute (the string specified by "cma"
+       command line parameter) can be overwritten with command line
+       parameter; the other attributes can be changed during run-time
+       using the SysFS entries.
+
+    2. The behaviour of the "map" attribute has been modified
+       slightly.  Currently, if no rule matches given device it is
+       assigned regions specified by the "asterisk" attribute.  It is
+       by default built from the region names given in "regions"
+       attribute.
+
+    3. Devices can register private regions as well as regions that
+       can be shared but are not reserved using standard CMA
+       mechanisms.  A private region has no name and can be accessed
+       only by devices that have the pointer to it.
+
+    4. The way allocators are registered has changed.  Currently,
+       a cma_allocator_register() function is used for that purpose.
+       Moreover, allocators are attached to regions the first time
+       memory is registered from the region or when allocator is
+       registered which means that allocators can be dynamic modules
+       that are loaded after the kernel booted (of course, it won't be
+       possible to allocate a chunk of memory from a region if
+       allocator is not loaded).
+
+    5. Index of new functions:
+
+    +static inline dma_addr_t __must_check
+    +cma_alloc_from(const char *regions, size_t size,
+    +               dma_addr_t alignment)
+
+    +static inline int
+    +cma_info_about(struct cma_info *info, const const char *regions)
+
+    +int __must_check cma_region_register(struct cma_region *reg);
+
+    +dma_addr_t __must_check
+    +cma_alloc_from_region(struct cma_region *reg,
+    +                      size_t size, dma_addr_t alignment);
+
+    +static inline dma_addr_t __must_check
+    +cma_alloc_from(const char *regions,
+    +               size_t size, dma_addr_t alignment);
+
+    +int cma_allocator_register(struct cma_allocator *alloc);
+
+
+Patches in this patchset:
+
+Marek Szyprowski (6):
+  mm: extract reclaim code from __alloc_pages_direct_reclaim()
+  mm: trigger page reclaim in alloc_contig_range() to stabilize
+    watermarks
+  drivers: add Contiguous Memory Allocator
+  X86: integrate CMA with DMA-mapping subsystem
+  ARM: integrate CMA with DMA-mapping subsystem
+  ARM: Samsung: use CMA for 2 memory banks for s5p-mfc device
+
+Michal Nazarewicz (9):
+  mm: page_alloc: remove trailing whitespace
+  mm: compaction: introduce isolate_migratepages_range().
+  mm: compaction: introduce map_pages()
+  mm: compaction: introduce isolate_freepages_range()
+  mm: compaction: export some of the functions
+  mm: page_alloc: introduce alloc_contig_range()
+  mm: page_alloc: change fallbacks array handling
+  mm: mmzone: MIGRATE_CMA migration type added
+  mm: page_isolation: MIGRATE_CMA isolation functions added
+
+ Documentation/kernel-parameters.txt   |    9 +
+ arch/Kconfig                          |    3 +
+ arch/arm/Kconfig                      |    2 +
+ arch/arm/include/asm/dma-contiguous.h |   16 ++
+ arch/arm/include/asm/mach/map.h       |    1 +
+ arch/arm/kernel/setup.c               |    9 +-
+ arch/arm/mm/dma-mapping.c             |  368 ++++++++++++++++++++++++------
+ arch/arm/mm/init.c                    |   22 ++-
+ arch/arm/mm/mm.h                      |    3 +
+ arch/arm/mm/mmu.c                     |   31 ++-
+ arch/arm/plat-s5p/dev-mfc.c           |   51 +----
+ arch/x86/Kconfig                      |    1 +
+ arch/x86/include/asm/dma-contiguous.h |   13 +
+ arch/x86/include/asm/dma-mapping.h    |    4 +
+ arch/x86/kernel/pci-dma.c             |   18 ++-
+ arch/x86/kernel/pci-nommu.c           |    8 +-
+ arch/x86/kernel/setup.c               |    2 +
+ drivers/base/Kconfig                  |   89 +++++++
+ drivers/base/Makefile                 |    1 +
+ drivers/base/dma-contiguous.c         |  405 ++++++++++++++++++++++++++++++++
+ include/asm-generic/dma-contiguous.h  |   27 ++
+ include/linux/device.h                |    4 +
+ include/linux/dma-contiguous.h        |  110 +++++++++
+ include/linux/gfp.h                   |   12 +
+ include/linux/mmzone.h                |   38 +++-
+ include/linux/page-isolation.h        |   18 +-
+ mm/Kconfig                            |    2 +-
+ mm/Makefile                           |    3 +-
+ mm/compaction.c                       |  418 +++++++++++++++++++++------------
+ mm/internal.h                         |   33 +++
+ mm/memory-failure.c                   |    2 +-
+ mm/memory_hotplug.c                   |    6 +-
+ mm/page_alloc.c                       |  377 ++++++++++++++++++++++++++---
+ mm/page_isolation.c                   |   15 +-
+ mm/vmstat.c                           |    3 +
+ 35 files changed, 1757 insertions(+), 367 deletions(-)
+ create mode 100644 arch/arm/include/asm/dma-contiguous.h
+ create mode 100644 arch/x86/include/asm/dma-contiguous.h
+ create mode 100644 drivers/base/dma-contiguous.c
+ create mode 100644 include/asm-generic/dma-contiguous.h
+ create mode 100644 include/linux/dma-contiguous.h
+
 -- 
 1.7.1.569.g6f426
