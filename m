@@ -1,205 +1,100 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 3 Feb 2012 17:13:54 +0530
-Subject: [PATCH-V3 1/3] ARM: OMAP4: Remove hardcoded reg-offs for PWRSTCTRL &
- PWRSTST
-In-Reply-To: <1328269436-18668-1-git-send-email-hvaibhav@ti.com>
-References: <1328269436-18668-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1328269436-18668-2-git-send-email-hvaibhav@ti.com>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Fri, 3 Feb 2012 17:20:19 +0530
+Subject: [PATCH 1/1] ARM: OMAP3+: dpll: Configure autoidle mode only if its
+ supported
+Message-ID: <1328269819-10025-1-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the existing hard-coded way of providing
-offset to omap4_prminst_xxx API's and instead use offsets
-provided in powerdomainsxxxx_data.
+The current DPLL code enables and disables autoidle features
+without checking whether the autoidle register is available.
+Fix this by putting a check for the existence of the autoidle
+register in the DPLL data.
 
-Very much required for the new device AM33XX, where,
+With such a check in place, for DPLLs which do not support this
+feature, simply skipping the autoidle_reg entry in the DPLL data
+is sufficient.
 
-PRM module in AM33XX is closer to OMAP4 PRM module, so it makes
-complete sense to reuse all the code from existing OMAP4 implementation.
-Having said that, there is a catch here with respect to AM33XX device,
-
-The register offset in PRM module is not consistent
-across (crazy IP integration), for example,
-
-PRM_XXX         PWRSTCTRL PWRSTST RSTCTRL RSTST
-===============================================
-PRM_PER_MOD:    0x0C,     0x08,   0x00,   0x04
-PRM_WKUP_MOD:   0x04,     0x08,   0x00,   0x0C
-PRM_MPU_MOD:    0x00,     0x04,   0x08,   NA
-PRM_DEVICE_MOD: NA,       NA,     0x00,   0x08
-
-So in order to reuse the existing OMAP4 code, we have to add
-seperate entry for register offsets, especially
-PWRSTCTRL & PWRSTST.
-
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-
-Merge to "Remove-hardcoded-reg-offs-for-PWRSTCT"
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.h           |    4 ++++
- arch/arm/mach-omap2/powerdomain44xx.c       |   24 ++++++++++++------------
- arch/arm/mach-omap2/powerdomains44xx_data.c |    9 +++++++++
- 3 files changed, 25 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/dpll3xxx.c |   23 ++++++++++++++++++-----
+ 1 files changed, 18 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 0d72a8a..9ebb872 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -92,6 +92,8 @@ struct powerdomain;
-  * @pwrdm_clkdms: Clockdomains in this powerdomain
-  * @node: list_head linking all powerdomains
-  * @voltdm_node: list_head linking all powerdomains in a voltagedomain
-+ * @pwrstctrl_offs: XXX_PWRSTCTRL reg offset from prcm_offs
-+ * @pwrstst_offs: XXX_PWRSTST reg offset from prcm_offs
-  * @state:
-  * @state_counter:
-  * @timer:
-@@ -121,6 +123,8 @@ struct powerdomain {
- 	unsigned ret_logic_off_counter;
- 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index 57c4c7c..bf0db5d 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -142,7 +142,8 @@ static int _omap3_noncore_dpll_lock(struct clk *clk)
 
-+	u8 pwrstctrl_offs;
-+	u8 pwrstst_offs;
- #ifdef CONFIG_PM_DEBUG
- 	s64 timer;
- 	s64 state_timer[PWRDM_MAX_PWRSTS];
-diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
-index a7880af..b088540 100644
---- a/arch/arm/mach-omap2/powerdomain44xx.c
-+++ b/arch/arm/mach-omap2/powerdomain44xx.c
-@@ -28,7 +28,7 @@ static int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 	omap4_prminst_rmw_inst_reg_bits(OMAP_POWERSTATE_MASK,
- 					(pwrst << OMAP_POWERSTATE_SHIFT),
- 					pwrdm->prcm_partition,
--					pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
-+					pwrdm->prcm_offs, pwrdm->pwrstctrl_offs);
- 	return 0;
+ 	ai = omap3_dpll_autoidle_read(clk);
+
+-	omap3_dpll_deny_idle(clk);
++	if (ai)
++		omap3_dpll_deny_idle(clk);
+
+ 	_omap3_dpll_write_clken(clk, DPLL_LOCKED);
+
+@@ -186,8 +187,6 @@ static int _omap3_noncore_dpll_bypass(struct clk *clk)
+
+ 	if (ai)
+ 		omap3_dpll_allow_idle(clk);
+-	else
+-		omap3_dpll_deny_idle(clk);
+
+ 	return r;
  }
+@@ -216,8 +215,6 @@ static int _omap3_noncore_dpll_stop(struct clk *clk)
 
-@@ -37,7 +37,7 @@ static int omap4_pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
- 	u32 v;
-
- 	v = omap4_prminst_read_inst_reg(pwrdm->prcm_partition, pwrdm->prcm_offs,
--					OMAP4_PM_PWSTCTRL);
-+					pwrdm->pwrstctrl_offs);
- 	v &= OMAP_POWERSTATE_MASK;
- 	v >>= OMAP_POWERSTATE_SHIFT;
-
-@@ -49,7 +49,7 @@ static int omap4_pwrdm_read_pwrst(struct powerdomain *pwrdm)
- 	u32 v;
-
- 	v = omap4_prminst_read_inst_reg(pwrdm->prcm_partition, pwrdm->prcm_offs,
--					OMAP4_PM_PWSTST);
-+					pwrdm->pwrstst_offs);
- 	v &= OMAP_POWERSTATEST_MASK;
- 	v >>= OMAP_POWERSTATEST_SHIFT;
-
-@@ -61,7 +61,7 @@ static int omap4_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- 	u32 v;
-
- 	v = omap4_prminst_read_inst_reg(pwrdm->prcm_partition, pwrdm->prcm_offs,
--					OMAP4_PM_PWSTST);
-+					pwrdm->pwrstst_offs);
- 	v &= OMAP4430_LASTPOWERSTATEENTERED_MASK;
- 	v >>= OMAP4430_LASTPOWERSTATEENTERED_SHIFT;
-
-@@ -73,7 +73,7 @@ static int omap4_pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
- 	omap4_prminst_rmw_inst_reg_bits(OMAP4430_LOWPOWERSTATECHANGE_MASK,
- 					(1 << OMAP4430_LOWPOWERSTATECHANGE_SHIFT),
- 					pwrdm->prcm_partition,
--					pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
-+					pwrdm->prcm_offs, pwrdm->pwrstctrl_offs);
- 	return 0;
- }
-
-@@ -82,7 +82,7 @@ static int omap4_pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
- 	omap4_prminst_rmw_inst_reg_bits(OMAP4430_LASTPOWERSTATEENTERED_MASK,
- 					OMAP4430_LASTPOWERSTATEENTERED_MASK,
- 					pwrdm->prcm_partition,
--					pwrdm->prcm_offs, OMAP4_PM_PWSTST);
-+					pwrdm->prcm_offs, pwrdm->pwrstst_offs);
- 	return 0;
- }
-
-@@ -93,7 +93,7 @@ static int omap4_pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
- 	v = pwrst << __ffs(OMAP4430_LOGICRETSTATE_MASK);
- 	omap4_prminst_rmw_inst_reg_bits(OMAP4430_LOGICRETSTATE_MASK, v,
- 					pwrdm->prcm_partition, pwrdm->prcm_offs,
--					OMAP4_PM_PWSTCTRL);
-+					pwrdm->pwrstctrl_offs);
+ 	if (ai)
+ 		omap3_dpll_allow_idle(clk);
+-	else
+-		omap3_dpll_deny_idle(clk);
 
  	return 0;
  }
-@@ -107,7 +107,7 @@ static int omap4_pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank,
+@@ -520,6 +517,9 @@ u32 omap3_dpll_autoidle_read(struct clk *clk)
 
- 	omap4_prminst_rmw_inst_reg_bits(m, (pwrst << __ffs(m)),
- 					pwrdm->prcm_partition, pwrdm->prcm_offs,
--					OMAP4_PM_PWSTCTRL);
-+					pwrdm->pwrstctrl_offs);
+ 	dd = clk->dpll_data;
 
- 	return 0;
- }
-@@ -131,7 +131,7 @@ static int omap4_pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
- 	u32 v;
-
- 	v = omap4_prminst_read_inst_reg(pwrdm->prcm_partition, pwrdm->prcm_offs,
--					OMAP4_PM_PWSTST);
-+					pwrdm->pwrstst_offs);
- 	v &= OMAP4430_LOGICSTATEST_MASK;
- 	v >>= OMAP4430_LOGICSTATEST_SHIFT;
-
-@@ -157,7 +157,7 @@ static int omap4_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
- 	m = omap2_pwrdm_get_mem_bank_stst_mask(bank);
-
- 	v = omap4_prminst_read_inst_reg(pwrdm->prcm_partition, pwrdm->prcm_offs,
--					OMAP4_PM_PWSTST);
-+					pwrdm->pwrstst_offs);
- 	v &= m;
- 	v >>= __ffs(m);
-
-@@ -171,7 +171,7 @@ static int omap4_pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
- 	m = omap2_pwrdm_get_mem_bank_retst_mask(bank);
-
- 	v = omap4_prminst_read_inst_reg(pwrdm->prcm_partition, pwrdm->prcm_offs,
--					OMAP4_PM_PWSTCTRL);
-+					pwrdm->pwrstctrl_offs);
- 	v &= m;
- 	v >>= __ffs(m);
-
-@@ -191,7 +191,7 @@ static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
- 	/* XXX Is this udelay() value meaningful? */
- 	while ((omap4_prminst_read_inst_reg(pwrdm->prcm_partition,
- 					    pwrdm->prcm_offs,
--					    OMAP4_PM_PWSTST) &
-+					    pwrdm->pwrstst_offs) &
- 		OMAP_INTRANSITION_MASK) &&
- 	       (c++ < PWRDM_TRANSITION_BAILOUT))
- 		udelay(1);
-diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
-index 704664c..7cf8dcd 100644
---- a/arch/arm/mach-omap2/powerdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
-@@ -352,7 +352,16 @@ static struct powerdomain *powerdomains_omap44xx[] __initdata = {
-
- void __init omap44xx_powerdomains_init(void)
- {
-+	int i;
++	if (!dd->autoidle_reg)
++		return -EINVAL;
 +
- 	pwrdm_register_platform_funcs(&omap4_pwrdm_operations);
-+	/* Initialise PRM reg offs to default value */
-+	for (i = 0; powerdomains_omap44xx[i] != NULL; i++) {
-+		struct powerdomain *pwrdm = powerdomains_omap44xx[i];
-+
-+		pwrdm->pwrstctrl_offs = OMAP4_PM_PWSTCTRL;
-+		pwrdm->pwrstst_offs = OMAP4_PM_PWSTST;
+ 	v = __raw_readl(dd->autoidle_reg);
+ 	v &= dd->autoidle_mask;
+ 	v >>= __ffs(dd->autoidle_mask);
+@@ -546,6 +546,12 @@ void omap3_dpll_allow_idle(struct clk *clk)
+
+ 	dd = clk->dpll_data;
+
++	if (!dd->autoidle_reg) {
++		pr_debug("clock: DPLL %s: autoidle not supported\n",
++			clk->name);
++		return;
 +	}
- 	pwrdm_register_pwrdms(powerdomains_omap44xx);
- 	pwrdm_complete_init();
++
+ 	/*
+ 	 * REVISIT: CORE DPLL can optionally enter low-power bypass
+ 	 * by writing 0x5 instead of 0x1.  Add some mechanism to
+@@ -555,6 +561,7 @@ void omap3_dpll_allow_idle(struct clk *clk)
+ 	v &= ~dd->autoidle_mask;
+ 	v |= DPLL_AUTOIDLE_LOW_POWER_STOP << __ffs(dd->autoidle_mask);
+ 	__raw_writel(v, dd->autoidle_reg);
++
  }
+
+ /**
+@@ -573,6 +580,12 @@ void omap3_dpll_deny_idle(struct clk *clk)
+
+ 	dd = clk->dpll_data;
+
++	if (!dd->autoidle_reg) {
++		pr_debug("clock: DPLL %s: autoidle not supported\n",
++			clk->name);
++		return;
++	}
++
+ 	v = __raw_readl(dd->autoidle_reg);
+ 	v &= ~dd->autoidle_mask;
+ 	v |= DPLL_AUTOIDLE_DISABLE << __ffs(dd->autoidle_mask);
 --
 1.7.0.4
