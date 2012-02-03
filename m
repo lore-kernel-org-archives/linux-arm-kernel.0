@@ -1,86 +1,46 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  3 Feb 2012 16:35:11 -0600
-Subject: [PATCH v4 3/4] ARM: imx: add irq domain support to tzic
-In-Reply-To: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
-References: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1328308512-22594-4-git-send-email-robherring2@gmail.com>
+Date: Fri,  3 Feb 2012 16:35:08 -0600
+Subject: [PATCH v4 0/4] generic irq chip domain support
+Message-ID: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Add irq domain support to tzic. This is needed to enable DT.
+This series adds irq domain support for generic irq chip and updates
+pl061 gpio and imx tzic to use it.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/plat-mxc/tzic.c |   23 ++++++++++-------------
- 1 files changed, 10 insertions(+), 13 deletions(-)
+Once again, this is has been significantly re-worked from the previous
+version. It's simply not possible to add domain support in a transparent
+way. So now a wrapper function is added to setup a domain and alloc and
+setup N gen irq chips.
 
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-index 98308ec..25c10bb 100644
---- a/arch/arm/plat-mxc/tzic.c
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -77,7 +77,7 @@ static int tzic_set_irq_fiq(unsigned int irq, unsigned int type)
- static void tzic_irq_suspend(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	int idx = gc->irq_base >> 5;
-+	int idx = d->hwirq / 32;
- 
- 	__raw_writel(gc->wake_active, tzic_base + TZIC_WAKEUP0(idx));
- }
-@@ -85,7 +85,7 @@ static void tzic_irq_suspend(struct irq_data *d)
- static void tzic_irq_resume(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	int idx = gc->irq_base >> 5;
-+	int idx = d->hwirq / 32;
- 
- 	__raw_writel(__raw_readl(tzic_base + TZIC_ENSET0(idx)),
- 		     tzic_base + TZIC_WAKEUP0(idx));
-@@ -102,18 +102,13 @@ static struct mxc_extra_irq tzic_extra_irq = {
- #endif
- };
- 
--static __init void tzic_init_gc(unsigned int irq_start)
-+static __init void tzic_init_gc(struct irq_chip_generic *gc)
- {
--	struct irq_chip_generic *gc;
--	struct irq_chip_type *ct;
--	int idx = irq_start >> 5;
-+	struct irq_chip_type *ct = gc->chip_types;
-+	int idx = gc->hwirq_base / 32;
- 
--	gc = irq_alloc_generic_chip("tzic", 1, irq_start, tzic_base,
--				    handle_level_irq);
--	gc->private = &tzic_extra_irq;
- 	gc->wake_enabled = IRQ_MSK(32);
- 
--	ct = gc->chip_types;
- 	ct->chip.irq_mask = irq_gc_mask_disable_reg;
- 	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
- 	ct->chip.irq_set_wake = irq_gc_set_wake;
-@@ -122,7 +117,7 @@ static __init void tzic_init_gc(unsigned int irq_start)
- 	ct->regs.disable = TZIC_ENCLEAR0(idx);
- 	ct->regs.enable = TZIC_ENSET0(idx);
- 
--	irq_setup_generic_chip(gc, IRQ_MSK(32), 0, IRQ_NOREQUEST, 0);
-+	return 0;
- }
- 
- asmlinkage void __exception_irq_entry tzic_handle_irq(struct pt_regs *regs)
-@@ -175,8 +170,10 @@ void __init tzic_init_irq(void __iomem *irqbase)
- 
- 	/* all IRQ no FIQ Warning :: No selection */
- 
--	for (i = 0; i < TZIC_NUM_IRQS; i += 32)
--		tzic_init_gc(i);
-+	irq_setup_generic_chip_domain("tzic", NULL, 1, 0, tzic_base,
-+				      handle_level_irq, TZIC_NUM_IRQS, 0,
-+				      IRQ_NOREQUEST, 0,
-+				      tzic_init_gc, &tzic_extra_irq);
- 
- #ifdef CONFIG_FIQ
- 	/* Initialize FIQ */
+There was some discussion about supporting multiple banks of less than 32
+irqs per bank. Looking at all users of generic irq chip, this doesn't
+appear to be needed. All users are either a single generic irq chip per
+node or have 32 irqs per bank. Both are supported by this patch series.
+If bank masking is needed, it can be added later.
+
+This is based on Grant Likely's irq domain work and is available here:
+
+git://sources.calxeda.com/kernel/linux.git pl061-domain-v4
+
+Rob
+
+Rob Herring (4):
+  ARM: kconfig: always select IRQ_DOMAIN
+  irq: add irq_domain support to generic-chip
+  ARM: imx: add irq domain support to tzic
+  gpio: pl061: enable interrupts with DT style binding
+
+ .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/common/Kconfig                            |    2 -
+ arch/arm/plat-mxc/tzic.c                           |   23 ++--
+ drivers/gpio/gpio-pl061.c                          |   48 +++---
+ include/linux/irq.h                                |   15 ++
+ kernel/irq/generic-chip.c                          |  154 +++++++++++++++++---
+ 7 files changed, 198 insertions(+), 61 deletions(-)
+
 -- 
 1.7.5.4
