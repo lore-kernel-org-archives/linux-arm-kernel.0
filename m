@@ -1,44 +1,46 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 2 Feb 2012 15:51:28 -0800
-Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
-In-Reply-To: <20120202232736.GL2518@linux.vnet.ibm.com>
-References: <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
- <20120202044439.GD2435@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
- <20120202174337.GS2518@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
- <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
- <4F2B1307.5010207@gmail.com>
- <1328223819.5882.133.camel@gandalf.stny.rr.com>
- <20120202232736.GL2518@linux.vnet.ibm.com>
-Message-ID: <20120202235128.GA21031@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2012 00:36:33 +0000
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <4F2B1E11.1040000@codeaurora.org>
+References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
+ <20120202204411.GB14129@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
+ <4F2B1E11.1040000@codeaurora.org>
+Message-ID: <20120203003633.GD14129@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 03:27:36PM -0800, Paul E. McKenney wrote:
-> On Thu, Feb 02, 2012 at 06:03:39PM -0500, Steven Rostedt wrote:
+On Thu, Feb 02, 2012 at 03:36:49PM -0800, Stephen Boyd wrote:
+> On 02/02/12 13:38, Nicolas Pitre wrote:
+> > On Thu, 2 Feb 2012, Russell King - ARM Linux wrote
+> >> On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
+> >>> Should we move get_thread_info into assembler.h? It seems odd
+> >>> to include entry-header.S but I saw that vfp was doing the same.
+> >> Probably yes, and probably also have preempt_disable and preempt_enable
+> >> assembler macros.  That's going to get rather icky if we have to
+> >> explicitly call the scheduler though (to solve (1)).
+> > What about a pair of helpers written in C instead?
+> >
+> > v7_flush_dcache_all() could be renamed, and a wrapper function called 
+> > v7_flush_dcache_all() would call the preemption disable helper, call the 
+> > former v7_flush_dcache_all code, then call the preemption enable helper.
+> >
+> > Then __v7_setup() could still call the core cache flush code without 
+> > issues.
 > 
-> [ . . . ]
-> 
-> > Anyway, one answer is (and I was talking with Paul about this on IRC) is
-> > that we can create a special "TRACE_EVENT_IDLE()" that will explicitly
-> > call "rcu_idle_exit/enter()" as it expects to be called with it off.
-> > 
-> > This should solve most issues I believe.
-> 
-> You OK with something like RCU_NONIDLE() rather than RCU_EVENT_IDLE()?
-> I have this funny feeling that tracing won't be the only thing using
-> RCU from idle.  :-/
-> 
-> Something like this, perhaps?
+> I tried to put the preemption disable/enable right around the place
+> where it was needed. With this approach we would disable preemption
+> during the entire cache flush. I'm not sure if we want to make this
+> function worse for performance, do we? It certainly sounds easier than
+> writing all the preempt macros in assembly though.
 
-Or perhaps with the trailing "while (0)" included:
+Err, why do you think it's a big task?
 
-	#define RCU_NONIDLE(a) \
-		do { \
-			rcu_idle_exit(); \
-			do { a; } while (0); \
-			rcu_idle_enter(); \
-		} while (0)
+preempt disable is a case of incrementing the thread preempt count, while
+preempt enable is a case of decrementing it, testing for zero, if zero,
+then checking whether TIF_NEED_RESCHED is set and calling a function.
 
-							Thanx, Paul
+If that's too much, then the simple method in assembly to quickly disable
+preemption over a very few set of instructions is using mrs/msr and cpsid i.
+That'll be far cheaper than fiddling about with preempt counters or
+messing about with veneers in C code.
