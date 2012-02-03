@@ -1,36 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 3 Feb 2012 12:54:18 -0700 (MST)
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120203122053.GF1275@n2100.arm.linux.org.uk>
-References: <13274430881471@kroah.org>
- <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
- <20120126042155.GA3185@suse.de>
- <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
- <20120126191604.GA15516@suse.de>
- <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <CAAL8m4ztuB-kJvLGd=8PqPCLFcvPW9AQcdcFQ+e03vDT240vog@mail.gmail.com>
- <20120203230720.28666cc6@notabene.brown>
- <20120203122053.GF1275@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1202031249590.27947@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2012 19:54:20 +0000
+Subject: [PATCH 00/20] SA1111 cleanups
+Message-ID: <20120203195419.GH14129@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Feb 2012, Russell King - ARM Linux wrote:
+Another patch series - this time it's SA1111's turn for some attention.
+This has been broken, but more recently than Neponset, by a half cooked
+change to the IRQ support.
 
-> If there's an on-going transmission, why is the runtime PM count zero,
-> meaning that the UART can sleep at the point where serial_omap_tx_empty()
-> is being called - and obviously there's still characters in the FIFO?
+The first two patches are trivial fixes for problems I noticed with the
+Neponset board.
 
-In the case of OMAP, that's the point of the idle protocol.  If there's 
-data left in the TX FIFO, the UART should prevent the rest of the chip 
-from cutting its clocks until the TX FIFO is drained.  Even if the MPU has 
-requested that the UART clocks be cut.
+Most of the patches speak for themselves.  It's worth noting that the
+final patch in this series (which removes the static mapping for the
+SA1111) conflicts with the patches in the SA1100 series posted before
+this.  The conflict resolution leaves neponset without any mapio hooks
+at all.
 
-Of course, there may well be a bug that prevents this from working the 
-way it was intended.
+Obviously, posting this stuff as patch series doesn't lend itself to
+providing a conflict resolution in patch form that people can apply with
+GNU patch, so that's left out.
 
-
-- Paul
+ arch/arm/common/sa1111.c               |  281 +++++++++++++++++++++-----------
+ arch/arm/include/asm/hardware/sa1111.h |  156 +++---------------
+ arch/arm/mach-pxa/lubbock.c            |    1 +
+ arch/arm/mach-sa1100/badge4.c          |   21 ++-
+ arch/arm/mach-sa1100/jornada720.c      |    6 +-
+ arch/arm/mach-sa1100/neponset.c        |    6 +-
+ drivers/input/serio/sa1111ps2.c        |   59 +++++--
+ drivers/pcmcia/sa1111_generic.c        |   55 ++++++-
+ drivers/usb/host/ohci-sa1111.c         |   61 +++++---
+ 9 files changed, 355 insertions(+), 291 deletions(-)
