@@ -1,52 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 02 Feb 2012 22:04:04 -0500 (EST)
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <4F2B4873.5030808@codeaurora.org>
-References: <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.02.1202022110080.2759@xanadu.home>
- <4F2B4873.5030808@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1202022202470.2759@xanadu.home>
+From: consul.kautuk@gmail.com (Kautuk Consul)
+Date: Fri,  3 Feb 2012 09:26:57 +0530
+Subject: [PATCH 1/1] arm/vfp: vfp_pm_suspend: Use local variable instead of
+ rereading from register
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1328241417-27043-1-git-send-email-consul.kautuk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Feb 2012, Stephen Boyd wrote:
+The fpexc variable already stores the value in the FPEXC register.
 
-> On 02/02/12 18:35, Nicolas Pitre wrote:
-> > On Thu, 2 Feb 2012, Stephen Boyd wrote:
-> >> On 02/02/12 17:18, Nicolas Pitre wrote:
-> >>> If you simply disable/restore IRQs around the critical region then you 
-> >>> don't have to worry about __v7_setup.  Plus this will allow for 
-> >>> v7_flush_dcache_all to still be callable from atomic context.
-> >> Ok. Here's a patch. I still need to test it. I'll send another patch
-> >> series to cleanup the get_thread_info stuff (there's two of them?).
-> >>
-> >>  arch/arm/mm/cache-v7.S |    6 ++++++
-> >>  1 files changed, 6 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> >> index 07c4bc8..654a5fc 100644
-> >> --- a/arch/arm/mm/cache-v7.S
-> >> +++ b/arch/arm/mm/cache-v7.S
-> >> @@ -54,9 +54,15 @@ loop1:
-> >>  	and	r1, r1, #7			@ mask of the bits for current cache only
-> >>  	cmp	r1, #2				@ see what cache we have at this level
-> >>  	blt	skip				@ skip if no cache, or just i-cache
-> >> +#ifdef CONFIG_PREEMPT
-> >> +	save_and_disable_irqs r9		@ make cssr&csidr read atomic
-> >> +#endif
-> >>  	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
-> >>  	isb					@ isb to sych the new cssr&csidr
-> >>  	mrc	p15, 1, r1, c0, c0, 0		@ read the new csidr
-> >> +#ifdef CONFIG_PREEMPT
-> >> +	restore_irqs r9
-> >> +#endif
-> > I'd suggest using restore_irqs_notrace instead.  The IRQ-off period is 
-> > so small that there is no point tracing it.
-> 
-> Thanks. I'll make sure to do that before uploading to the patch tracker.
+Use this instead of reading the value again from the register.
 
-Might be worth flagging this for the stable kernels as well
-(CC: stable at kernel.org).
+Signed-off-by: Kautuk Consul <consul.kautuk@gmail.com>
+---
+ arch/arm/vfp/vfpmodule.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-
-Nicolas
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 8f3ccdd..71cd21a 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -448,7 +448,7 @@ static int vfp_pm_suspend(void)
+ 		vfp_save_state(&ti->vfpstate, fpexc);
+ 
+ 		/* disable, just in case */
+-		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
++		fmxr(FPEXC, fpexc & ~FPEXC_EN);
+ 	}
+ 
+ 	/* clear any information we had about last context state */
+-- 
+1.7.6
