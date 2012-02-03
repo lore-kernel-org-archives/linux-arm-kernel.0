@@ -1,47 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 Feb 2012 23:17:48 +0100
-Subject: [PATCH v2] pinctrl: pin configuration states
-In-Reply-To: <20120202230317.GA1426@atomide.com>
-References: <1328124889-9780-1-git-send-email-linus.walleij@stericsson.com>
- <20120202230317.GA1426@atomide.com>
-Message-ID: <CACRpkdYEjdX+nNb=fhU3ANFeJwMguEsbGC7Rsqq7g2F-tmE4Sw@mail.gmail.com>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Fri, 3 Feb 2012 23:17:53 +0100 (CET)
+Subject: [PATCH] [trivial] media: Fix typo in mixer_drv.c and
+ hdmi_drv.c
+In-Reply-To: <CAH9JG2USF-FYX0SL-y0Gby8oNvA=sFBV7uyvP+4oaa1nxRU5qA@mail.gmail.com>
+References: <1327841453-1674-1-git-send-email-standby24x7@gmail.com>
+ <CAH9JG2USF-FYX0SL-y0Gby8oNvA=sFBV7uyvP+4oaa1nxRU5qA@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1202032317420.25026@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2012 at 12:03 AM, Tony Lindgren <tony@atomide.com> wrote:
-> [Me]
->> +For simple systems that just configure the pins on boot and then forget about
->> +them, the first configuration table may be sufficient. However some systems
->> +may need to switch configuration states at runtime, and in that case the
->> +system may want to ground both pins by simply calling:
->> +
->> +ret = pinconf_activate_state("pinctrl-foo", "idle");
->
-> For dynamic changing of pin states during runtime we should not change
-> the states based on string parsing. This is because some of these pins
-> may need to be changed every time when entering and exiting idle.
+On Mon, 30 Jan 2012, Kyungmin Park wrote:
 
-So pinmuxes get a handle back using a get/put pair, and
-have enable/disable semantics as well.
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-I avoided this for pin config since it would mean that you have
-to keep some opaque cookie around, like we currently do with
-pinmux. And pin config states are simpler in that you simply
-move from one state to the other, no bookkeeping is involved.
+Applied, thanks.
 
-I never took into consideration that it may be a performance
-issue to do that string parsing and you have a point there.
+> > Correct typo "sucessful" to "successful" in
+> > drivers/media/video/s5p-tv/mixer_drv.c
+> > drivers/media/video/s5p-tv/hdmi_drv.c
+> >
+> > Signed-off-by: Masanari Iida <standby24x7@gmail.com>
+> > ---
+> >  drivers/media/video/s5p-tv/hdmi_drv.c  |    4 ++--
+> >  drivers/media/video/s5p-tv/mixer_drv.c |    2 +-
+> >  2 files changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/media/video/s5p-tv/hdmi_drv.c
+> > b/drivers/media/video/s5p-tv/hdmi_drv.c
+> > index 8b41a04..3e0dd09 100644
+> > --- a/drivers/media/video/s5p-tv/hdmi_drv.c
+> > +++ b/drivers/media/video/s5p-tv/hdmi_drv.c
+> > @@ -962,7 +962,7 @@ static int __devinit hdmi_probe(struct platform_device
+> > *pdev)
+> >  	/* storing subdev for call that have only access to struct device */
+> >  	dev_set_drvdata(dev, sd);
+> >
+> > -	dev_info(dev, "probe sucessful\n");
+> > +	dev_info(dev, "probe successful\n");
+> >
+> >  	return 0;
+> >
+> > @@ -1000,7 +1000,7 @@ static int __devexit hdmi_remove(struct
+> > platform_device *pdev)
+> >  	iounmap(hdmi_dev->regs);
+> >  	hdmi_resources_cleanup(hdmi_dev);
+> >  	kfree(hdmi_dev);
+> > -	dev_info(dev, "remove sucessful\n");
+> > +	dev_info(dev, "remove successful\n");
+> >
+> >  	return 0;
+> >  }
+> > diff --git a/drivers/media/video/s5p-tv/mixer_drv.c
+> > b/drivers/media/video/s5p-tv/mixer_drv.c
+> > index 0064309..a2c0c25 100644
+> > --- a/drivers/media/video/s5p-tv/mixer_drv.c
+> > +++ b/drivers/media/video/s5p-tv/mixer_drv.c
+> > @@ -444,7 +444,7 @@ static int __devexit mxr_remove(struct platform_device
+> > *pdev)
+> >
+> >  	kfree(mdev);
+> >
+> > -	dev_info(dev, "remove sucessful\n");
+> > +	dev_info(dev, "remove successful\n");
+> >  	return 0;
+> >  }
 
-So would you prefer something like:
-
-astat = pinconf_get_state("pinctrl-foo", "idle");
-istat = pinconf_get_state("pinctrl-foo", "idle");
-
-pinconf_activate_state(astat);
-pinconf_activate_state(istat);
-...
-
-If this is what people want I can sure do it like that instead.
-
-Yours,
-linus Walleij
+-- 
+Jiri Kosina
+SUSE Labs
