@@ -1,99 +1,105 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:57:56 +0000
-Subject: [PATCH 10/20] ARM: sa1111: change devid to be a bitmask
+Date: Fri, 03 Feb 2012 19:58:16 +0000
+Subject: [PATCH 11/20] ARM: sa1111: provide a generic way to prevent devices
+ from registering
 In-Reply-To: <20120203195419.GH14129@n2100.arm.linux.org.uk>
 References: <20120203195419.GH14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtPGe-00044A-DX@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtPGy-00044F-Gy@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the sa1111 device id to be a bitmask.  This allows us to
-specify the actual device, while allowing a single driver to bind
-to both PS2 devices.
+Some platforms don't want certain devices to be registered, because,
+eg, the interface is not wired.  Provide a way for platforms to
+prevent various devices from being registered via a devid bitmask in
+the platform data.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/common/sa1111.c               |   12 ++++++------
- arch/arm/include/asm/hardware/sa1111.h |   20 +++++++++++---------
- 2 files changed, 17 insertions(+), 15 deletions(-)
+ arch/arm/common/sa1111.c               |    7 ++-----
+ arch/arm/include/asm/hardware/sa1111.h |    1 +
+ arch/arm/mach-pxa/lubbock.c            |    1 +
+ arch/arm/mach-sa1100/badge4.c          |    1 +
+ arch/arm/mach-sa1100/jornada720.c      |    1 +
+ arch/arm/mach-sa1100/neponset.c        |    1 +
+ 6 files changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 1366e82..4bdf1bb 100644
+index 4bdf1bb..17694cf 100644
 --- a/arch/arm/common/sa1111.c
 +++ b/arch/arm/common/sa1111.c
-@@ -158,7 +158,7 @@ static struct sa1111_dev_info sa1111_devices[] = {
- 	{
- 		.offset		= SA1111_KBD,
- 		.skpcr_mask	= SKPCR_PTCLKEN,
--		.devid		= SA1111_DEVID_PS2,
-+		.devid		= SA1111_DEVID_PS2_KBD,
- 		.irq = {
- 			IRQ_TPRXINT,
- 			IRQ_TPTXINT
-@@ -167,7 +167,7 @@ static struct sa1111_dev_info sa1111_devices[] = {
- 	{
- 		.offset		= SA1111_MSE,
- 		.skpcr_mask	= SKPCR_PMCLKEN,
--		.devid		= SA1111_DEVID_PS2,
-+		.devid		= SA1111_DEVID_PS2_MSE,
- 		.irq = {
- 			IRQ_MSRXINT,
- 			IRQ_MSTXINT
-@@ -835,12 +835,12 @@ __sa1111_probe(struct device *me, struct resource *mem, int irq)
+@@ -833,11 +833,8 @@ __sa1111_probe(struct device *me, struct resource *mem, int irq)
+ 	g_sa1111 = sachip;
+ 
  	has_devs = ~0;
- 	if (machine_is_assabet() || machine_is_jornada720() ||
- 	    machine_is_badge4())
--		has_devs &= ~(1 << 4);
-+		has_devs &= ~SA1111_DEVID_PS2_MSE;
- 	else
--		has_devs &= ~(1 << 1);
-+		has_devs &= ~SA1111_DEVID_SAC;
+-	if (machine_is_assabet() || machine_is_jornada720() ||
+-	    machine_is_badge4())
+-		has_devs &= ~SA1111_DEVID_PS2_MSE;
+-	else
+-		has_devs &= ~SA1111_DEVID_SAC;
++	if (pd)
++		has_devs &= ~pd->disable_devs;
  
  	for (i = 0; i < ARRAY_SIZE(sa1111_devices); i++)
--		if (has_devs & (1 << i))
-+		if (sa1111_devices[i].devid & has_devs)
- 			sa1111_init_one_child(sachip, mem, &sa1111_devices[i]);
- 
- 	return 0;
-@@ -1335,7 +1335,7 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
- 	struct sa1111_dev *dev = SA1111_DEV(_dev);
- 	struct sa1111_driver *drv = SA1111_DRV(_drv);
- 
--	return dev->devid == drv->devid;
-+	return dev->devid & drv->devid;
- }
- 
- static int sa1111_bus_suspend(struct device *dev, pm_message_t state)
+ 		if (sa1111_devices[i].devid & has_devs)
 diff --git a/arch/arm/include/asm/hardware/sa1111.h b/arch/arm/include/asm/hardware/sa1111.h
-index d54d781..37ad29d 100644
+index 37ad29d..74afe20 100644
 --- a/arch/arm/include/asm/hardware/sa1111.h
 +++ b/arch/arm/include/asm/hardware/sa1111.h
-@@ -516,15 +516,17 @@
+@@ -584,6 +584,7 @@ void sa1111_set_sleep_io(struct sa1111_dev *sadev, unsigned int bits, unsigned i
  
- extern struct bus_type sa1111_bus_type;
+ struct sa1111_platform_data {
+ 	int	irq_base;	/* base for cascaded on-chip IRQs */
++	unsigned disable_devs;
+ 	void	*data;
+ 	int	(*enable)(void *, unsigned);
+ 	void	(*disable)(void *, unsigned);
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index 6ebd276..6bb3f47 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -223,6 +223,7 @@ static struct resource sa1111_resources[] = {
  
--#define SA1111_DEVID_SBI	0
--#define SA1111_DEVID_SK		1
--#define SA1111_DEVID_USB	2
--#define SA1111_DEVID_SAC	3
--#define SA1111_DEVID_SSP	4
--#define SA1111_DEVID_PS2	5
--#define SA1111_DEVID_GPIO	6
--#define SA1111_DEVID_INT	7
--#define SA1111_DEVID_PCMCIA	8
-+#define SA1111_DEVID_SBI	(1 << 0)
-+#define SA1111_DEVID_SK		(1 << 1)
-+#define SA1111_DEVID_USB	(1 << 2)
-+#define SA1111_DEVID_SAC	(1 << 3)
-+#define SA1111_DEVID_SSP	(1 << 4)
-+#define SA1111_DEVID_PS2	(3 << 5)
-+#define SA1111_DEVID_PS2_KBD	(1 << 5)
-+#define SA1111_DEVID_PS2_MSE	(1 << 6)
-+#define SA1111_DEVID_GPIO	(1 << 7)
-+#define SA1111_DEVID_INT	(1 << 8)
-+#define SA1111_DEVID_PCMCIA	(1 << 9)
+ static struct sa1111_platform_data sa1111_info = {
+ 	.irq_base	= LUBBOCK_SA1111_IRQ_BASE,
++	.disable_devs	= SA1111_DEVID_SAC,
+ };
  
- struct sa1111_dev {
- 	struct device	dev;
+ static struct platform_device sa1111_device = {
+diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
+index d8492499..8fb80f0 100644
+--- a/arch/arm/mach-sa1100/badge4.c
++++ b/arch/arm/mach-sa1100/badge4.c
+@@ -66,6 +66,7 @@ static void badge4_sa1111_disable(void *data, unsigned devid)
+ 
+ static struct sa1111_platform_data sa1111_info = {
+ 	.irq_base	= IRQ_BOARD_END,
++	.disable_devs	= SA1111_DEVID_PS2_MSE,
+ 	.enable		= badge4_sa1111_enable,
+ 	.disable	= badge4_sa1111_disable,
+ };
+diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+index ee121d6..dcd6d02 100644
+--- a/arch/arm/mach-sa1100/jornada720.c
++++ b/arch/arm/mach-sa1100/jornada720.c
+@@ -211,6 +211,7 @@ static struct resource sa1111_resources[] = {
+ 
+ static struct sa1111_platform_data sa1111_info = {
+ 	.irq_base	= IRQ_BOARD_END,
++	.disable_devs	= SA1111_DEVID_PS2_MSE,
+ };
+ 
+ static u64 sa1111_dmamask = 0xffffffffUL;
+diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
+index b4fa53a..b40a719 100644
+--- a/arch/arm/mach-sa1100/neponset.c
++++ b/arch/arm/mach-sa1100/neponset.c
+@@ -242,6 +242,7 @@ static struct resource sa1111_resources[] = {
+ 
+ static struct sa1111_platform_data sa1111_info = {
+ 	.irq_base	= IRQ_BOARD_END,
++	.disable_devs	= SA1111_DEVID_PS2_MSE,
+ };
+ 
+ static u64 sa1111_dmamask = 0xffffffffUL;
 -- 
 1.7.4.4
