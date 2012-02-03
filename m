@@ -1,60 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:16:32 +0000
-Subject: [PATCH 3/3] ARM: sa11x0: fix section mismatch warnings
-In-Reply-To: <20120203191528.GE14129@n2100.arm.linux.org.uk>
-References: <20120203191528.GE14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtOca-0005gP-HG@rmk-PC.arm.linux.org.uk>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 3 Feb 2012 11:26:18 -0800
+Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
+In-Reply-To: <87k4437oaq.fsf@ti.com>
+References: <1328143404-11038-2-git-send-email-paulmck@linux.vnet.ibm.com>
+ <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
+ <20120202044439.GD2435@linux.vnet.ibm.com>
+ <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
+ <20120202174337.GS2518@linux.vnet.ibm.com>
+ <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
+ <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
+ <4F2B1307.5010207@gmail.com> <87k4437oaq.fsf@ti.com>
+Message-ID: <20120203192618.GI2382@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neponset calls sa1110_mb_disable() from __devinit code, but
-sa1110_mb_disable() is marked __init, and so causes a section
-mismatch warning.
+On Fri, Feb 03, 2012 at 10:41:01AM -0800, Kevin Hilman wrote:
+> Rob Herring <robherring2@gmail.com> writes:
+> 
+> > On 02/02/2012 04:20 PM, Kevin Hilman wrote:
+> >> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> writes:
+> >> 
+> >> [...]
+> >> 
+> >>>>> The two options I see are:
+> >>>>>
+> >>>>> 1.	Rip tracing out of the inner idle loops and everything that
+> >>>>> 	they invoke.
+> >>>>
+> >>>> What I suggested above.  But as I said I know sh*t about that tracing 
+> >>>> implementation so that's an easy suggestion for me to make.
+> >>>
+> >>> Works for me as well.  ;-)
+> >> 
+> >> While I must admit not having a better suggestion, I for one would vote
+> >> strongly against removing tracing from the idle path.
+> >> 
+> >> Being a PM developer and maintainer, much of the code I work on and
+> >> maintain happens to be run in the bowels of the idle path.  Not having
+> >> the ability to trace this code would be a major step backwards IMO.
+> >
+> > How is it a step backwards if it is already broken. 
+> 
+> Well, I didn't know it was broken. ;) And, as Paul mentioned, this has
+> been broken for a long time. Apparently it's been working well enough
+> for nobody to notice until recently.
 
-As sa1110_mb_enable() and sa1110_mb_disable() need to be callable
-from suspend/resume paths as well, they must not be marked __init
-or __devinit.
+Yep.  The probability is quite low, but the consequences are dire.
+We might well have hit it occasionally -- it would be a random
+inexplicable crash.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/common/sa1111.c       |    2 +-
- arch/arm/mach-sa1100/generic.c |    4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+							Thanx, Paul
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 61691cd..bf508a7 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -87,7 +87,7 @@
- #define IRQ_S0_BVD1_STSCHG	(53)
- #define IRQ_S1_BVD1_STSCHG	(54)
- 
--extern void __init sa1110_mb_enable(void);
-+extern void sa1110_mb_enable(void);
- 
- /*
-  * We keep the following data for the overall SA1111.  Note that the
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index bb10ee2..0e356bb 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -428,7 +428,7 @@ void __init sa1100_map_io(void)
-  * the MBGNT signal false to ensure the SA1111 doesn't own the
-  * SDRAM bus.
-  */
--void __init sa1110_mb_disable(void)
-+void sa1110_mb_disable(void)
- {
- 	unsigned long flags;
- 
-@@ -447,7 +447,7 @@ void __init sa1110_mb_disable(void)
-  * If the system is going to use the SA-1111 DMA engines, set up
-  * the memory bus request/grant pins.
-  */
--void __devinit sa1110_mb_enable(void)
-+void sa1110_mb_enable(void)
- {
- 	unsigned long flags;
- 
--- 
-1.7.4.4
+> > Obviously you haven't actually used any tracing here because it
+> > doesn't work right with things as is.
+> 
+> It's been working well enough for me to debug several idle path problems
+> with tracing.  Admittedly, this has been primarily on UP systems, but
+> I've recently started using the tracing on SMP as well.  (however, due
+> to "coupled" low-power states on OMAP, large parts of the idle path are
+> effectively UP since one CPU0 has to wait for CPU1 to hit a low-power
+> state before it can.)
+> 
+> > What exactly do you want to trace at this level. By the point you are in
+> > this code, the path is somewhat known and problems you have are likely
+> > h/w issues. 
+> 
+> Not really. 
+> 
+> There is still quite a bit of software between the decision to enter
+> idle and the hardware taking over.  On OMAP for example, we have power
+> domains, clock domains and clocks that are managed during idle, and
+> these layers contain tracepoints.
+> 
+> Add to that the runtime PM management of some devices that are coupled
+> to the CPU (because they share a power domain, etc).  Runtime PM
+> contains tracepoints.
+> 
+> Add to that possible voltage scaling during idle using regulators.
+> Regulator framework has tracepoints.
+> 
+> That can lead to quite a bit of tracing info *after* the decision to
+> enter idle.
+> 
+> > If you are trying to go thru a very precise sequence of
+> > saving cpu state and flushing caches, you don't want calls out to
+> > tracing code that could very easily change the behavior.
+> 
+> I'm more worried about the power domain and voltage domain transitions
+> (or lack thereof) when trying to debug why a particular low-power state
+> was not hit.
+> 
+> Kevin
+> 
