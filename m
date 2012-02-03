@@ -1,51 +1,44 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 3 Feb 2012 12:47:29 -0800
-Subject: [PATCH 1/5] USB: sa1111: sparse and checkpatch cleanups
-In-Reply-To: <20120203203810.GK14129@n2100.arm.linux.org.uk>
-References: <20120203200406.GI14129@n2100.arm.linux.org.uk>
- <E1RtPRY-00048Q-MI@rmk-PC.arm.linux.org.uk>
- <20120203203228.GA23778@kroah.com>
- <20120203203810.GK14129@n2100.arm.linux.org.uk>
-Message-ID: <20120203204729.GA757@kroah.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2012 20:53:46 +0000
+Subject: [PATCH 00/17] SA11x0 cleanups (mainly assabet/neponset)
+In-Reply-To: <alpine.LFD.2.02.1202031533030.2759@xanadu.home>
+References: <20120203193059.GF14129@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1202031533030.2759@xanadu.home>
+Message-ID: <20120203205346.GL14129@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 08:38:10PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 03, 2012 at 12:32:28PM -0800, Greg KH wrote:
-> > On Fri, Feb 03, 2012 at 08:09:12PM +0000, Russell King - ARM Linux wrote:
-> > > Clean up the ohci-sa1111 driver formatting to be more compliant with
-> > > current standards, and add 'static' to various function definitions
-> > > to avoid sparse complaints about undeclared functions.  Remove the
-> > > unnecessary local declaration of 'usb_disabled', which can be found
-> > > instead in linux/usb.h.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > Do you want me to take these 5 patches through the USB tree?  Or are you
-> > going to take them through an ARM tree?
+On Fri, Feb 03, 2012 at 03:43:43PM -0500, Nicolas Pitre wrote:
+> I've quickly looked through this series and this all looks sensible.
 > 
-> I forgot to send the introduction to linux-usb, so you've probably missed
-> the comment that they depend on some previous patches.
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Yeah, I missed that :)
+Thanks.
 
-If these depend on other patches, feel free to take them in your tree
-then.
+> My knowledge of the SA1111 chip was never extensive, and the little I 
+> had did fade away at this point.  So it might not be relevant for me to 
+> give any comment on the other series.  Except that I thought that DMA 
+> was terminally broken on that chip, hence I'm surprized to see OHCI 
+> support for it.
 
-> > Either is fine with me, if ARM, feel free to add:
-> > 	Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > 
-> > to them.
-> 
-> There was one question mark I had over a patch - that was the addition
-> of the .reset method in the hc_driver for sa1111 stuff.  This seems to
-> only get called once during initial driver bring-up.  Comments I found
-> in the code suggest that it was used more often in the past.  Is that
-> something that's going away?
+It is rather badly broken, but the hack to move the kernel 1MB into
+SDRAM and dmabounce continues to do their jobs, making it work.
 
-I don't think so, but Alan (on linux-usb@) would be the best to answer
-that one.
+And let's also not forget that the errata documentation was (probably)
+one of the worst - I have this comment from years back in the code...
 
-thanks,
+/*
+ * Don't believe the specs!  Take them, throw them outside.  Leave them
+ * there for a week.  Spit on them.  Walk on them.  Stamp on them.
+ * Pour gasoline over them and finally burn them.  Now think about coding.
+ *  - The October 1999 errata (278260-007) says its bit 13, 1 to enable.
+ *  - The Feb 2001 errata (278260-010) says that the previous errata
+ *    (278260-009) is wrong, and its bit actually 12, fixed in spec
+ *    278242-003.
+ *  - The SA1111 manual (278242) says bit 12, but 0 to enable.
+ *  - Reality is bit 13, 1 to enable.
+ *      -- rmk
+ */
+#define SKCR_OE_EN      (1<<13)
 
-greg k-h
+In those days, we had specifications on paper!
