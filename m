@@ -1,52 +1,56 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 3 Feb 2012 22:21:11 +0100
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <201202032221.11686.marek.vasut@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 3 Feb 2012 14:42:09 -0700 (MST)
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1202031243270.27947@utopia.booyaka.com>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <20120203231113.25ae2d3a@notabene.brown>
+ <alpine.DEB.2.00.1202031243270.27947@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1202031432080.27947@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi lists:
-> 
-> Tony Lin has submitted Freescale mx28 USB Patch at August
-> (See: http://www.spinics.net/lists/linux-usb/msg50201.html), but it hasn't
-> been accepted. I would like to re-submit mx28 usb patches, before that, I
-> would like get some suggestion from you. I think your suggestion will also
-> be benefit for coming mx53, mx50 and mx6q's submission.
-> 
-> All Recently Freescale SoC's USB controller are the same, they are mx23,
-> mx25, mx28, mx31, mx35, mx37, mx50, mx51, mx53, and mx6.
-> But, the transceiver is different between them
-> mx23, mx28, mx6 (Transceiver A)
-> mx25 mx31, mx35,mx37, mx50, mx51, mx53 (Transceiver B)
-> 
-> Current upstream platform information:
-> mx23 mx28 ==> mxs platfrom
-> others (including mx6) ==> mxc platform
-> 
-> Current upstream USB information:
-> mx25, mx3x, mx51: ehci-mxc.c (host), fsl_mxc_udc.c(device, main functions
-> are at fsl_udc_core.c)
-> 
-> My plan of submitting mx28 (mx53,mx50, mx6 later if possible):
-> 1. Replace cpu_is_mxxx() with struct platform_device_id for ehci-mxc.c and
-> fsl_mxc_udc.c 2. Using ehci-mxc.c and fsl_mxc_udc.c for mx28 upstreaming.
-> For Step 2, I have concern that whether mxs platform users will be confused
-> of their usb driver named xxx_mxc, not xxx_mxs?
-> If mxs maintainers think it will cause confusion, I would like to change
-> names to ehci-imx.c and fsl_imx_udc.c for all recent Freescale SoC's (from
-> mx23 to mx6), is it suitable? 3. Create transceiver driver for mx28, and
-> it will also be used for mx6.
-> 
-> Best regards,
-> Peter Chen
-> 
-> MAD Linux BSP Team
-> Freescale Semiconductor Ltd.
+One correction on this part...
 
-Hi,
+On Fri, 3 Feb 2012, Paul Walmsley wrote:
 
-any updates on the MXS USB Host front?
+> On Fri, 3 Feb 2012, NeilBrown wrote:
+> 
+> > My theory is that there is a delay between the falling RX line waking the
+> > system up, and the CPU enabling the UART - whether enabling the clocks or
+> > doing a full config, I am not sure - though I think the former.
+> > 
+> > Maybe if we could enable the UART clocks immediately after returning from the
+> > WFI instruction we could avoid the corruption....
+> 
+> The PRCM should be re-enabling the UART's functional clock itself, with no 
+> kernel involvement.  The sequence should go something like this 
+> (simplified):
+> 
+> 1. I/O wakeup occurs
+> 
+> 2. CORE & PER powerdomains are awakened
+> 
+> 3. The UART notices an event on its input lines and deasserts its idle-ack
 
-M
+It just occurred to me that, supposedly, the only UART input line that is 
+attached to the SWAKEUP signal is CTS.  So the UART may not in fact be 
+able to deassert its idle-ack autonomously at this point.
+
+So you might want to give your clock re-enable after WFI idea a shot!  It 
+would be interesting if it helps.
+
+I regret the oversight, 
+
+
+- Paul
