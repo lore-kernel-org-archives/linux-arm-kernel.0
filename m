@@ -1,74 +1,87 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Feb 2012 19:15:52 +0000
-Subject: [PATCH 1/3] ARM: sa11x0: fix off-by-one resource sizes
+Date: Fri, 03 Feb 2012 19:16:12 +0000
+Subject: [PATCH 2/3] ARM: sa11x0: fix sleep entry
 In-Reply-To: <20120203191528.GE14129@n2100.arm.linux.org.uk>
 References: <20120203191528.GE14129@n2100.arm.linux.org.uk>
-Message-ID: <E1RtObw-0005gH-78@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RtOcG-0005gL-DC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hackkit defined its flash memory resource to be 32M + 1 byte.
-Jornada defined the Epson video controller resources to be one byte
-larger than they should be, and mis-mapped the SA-1111 companion
-chip one byte smaller than it should be.
-
-Fix these.
+Sometimes, we get stuck while trying to enter sleep.  This seems
+to occur if we do not have udelay() in the instruction cache. Avoid
+this by requesting a short delay prior to modifying the SDRAM timings.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/hackkit.c    |    2 +-
- arch/arm/mach-sa1100/jornada720.c |    8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-sa1100/sleep.S |   37 ++++++++++++++++++++++---------------
+ 1 files changed, 22 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/hackkit.c b/arch/arm/mach-sa1100/hackkit.c
-index c01bb36..9092b3a 100644
---- a/arch/arm/mach-sa1100/hackkit.c
-+++ b/arch/arm/mach-sa1100/hackkit.c
-@@ -181,7 +181,7 @@ static struct flash_platform_data hackkit_flash_data = {
+diff --git a/arch/arm/mach-sa1100/sleep.S b/arch/arm/mach-sa1100/sleep.S
+index e822331..30cc672 100644
+--- a/arch/arm/mach-sa1100/sleep.S
++++ b/arch/arm/mach-sa1100/sleep.S
+@@ -26,27 +26,36 @@
+  *
+  * Causes sa11x0 to enter sleep state
+  *
++ * Must be aligned to a cacheline.
+  */
+-
++	.balign	32
+ ENTRY(sa1100_finish_suspend)
+ 	@ disable clock switching
+ 	mcr	p15, 0, r1, c15, c2, 2
  
- static struct resource hackkit_flash_resource = {
- 	.start		= SA1100_CS0_PHYS,
--	.end		= SA1100_CS0_PHYS + SZ_32M,
-+	.end		= SA1100_CS0_PHYS + SZ_32M - 1,
- 	.flags		= IORESOURCE_MEM,
- };
+-        @ Adjust memory timing before lowering CPU clock
+-	@ Clock speed adjustment without changing memory timing makes
+-	@ CPU hang in some cases
+-        ldr     r0, =MDREFR
+-        ldr     r1, [r0]
+-        orr     r1, r1, #MDREFR_K1DB2
+-        str     r1, [r0]
++	ldr	r6, =MDREFR
++	ldr	r4, [r6]
++	orr     r4, r4, #MDREFR_K1DB2
++	ldr	r5, =PPCR
++
++	@ Pre-load __udelay into the I-cache
++	mov	r0, #1
++	bl	__udelay
++	mov	r0, r0
++
++	@ The following must all exist in a single cache line to
++	@ avoid accessing memory until this sequence is complete,
++	@ otherwise we occasionally hang.
++
++	@ Adjust memory timing before lowering CPU clock
++	str     r4, [r6]
  
-diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
-index ee121d6..5393b06 100644
---- a/arch/arm/mach-sa1100/jornada720.c
-+++ b/arch/arm/mach-sa1100/jornada720.c
-@@ -46,7 +46,7 @@
+ 	@ delay 90us and set CPU PLL to lowest speed
+ 	@ fixes resume problem on high speed SA1110
+ 	mov	r0, #90
+ 	bl	__udelay
+-	ldr	r0, =PPCR
+ 	mov	r1, #0
+-	str	r1, [r0]
++	str	r1, [r5]
+ 	mov	r0, #90
+ 	bl	__udelay
  
- /* memory space (line 52 of HP's doc) */
- #define SA1111REGSTART	0x40000000
--#define SA1111REGLEN	0x00001fff
-+#define SA1111REGLEN	0x00002000
- #define EPSONREGSTART	0x48000000
- #define EPSONREGLEN	0x00100000
- #define EPSONFBSTART	0x48200000
-@@ -176,12 +176,12 @@ static struct s1d13xxxfb_pdata s1d13xxxfb_data = {
- static struct resource s1d13xxxfb_resources[] = {
- 	[0] = {
- 		.start	= EPSONFBSTART,
--		.end	= EPSONFBSTART + EPSONFBLEN,
-+		.end	= EPSONFBSTART + EPSONFBLEN - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
- 		.start	= EPSONREGSTART,
--		.end	= EPSONREGSTART + EPSONREGLEN,
-+		.end	= EPSONREGSTART + EPSONREGLEN - 1,
- 		.flags	= IORESOURCE_MEM,
- 	}
- };
-@@ -199,7 +199,7 @@ static struct platform_device s1d13xxxfb_device = {
- static struct resource sa1111_resources[] = {
- 	[0] = {
- 		.start		= SA1111REGSTART,
--		.end		= SA1111REGSTART + SA1111REGLEN,
-+		.end		= SA1111REGSTART + SA1111REGLEN - 1,
- 		.flags		= IORESOURCE_MEM,
- 	},
- 	[1] = {
+@@ -85,12 +94,10 @@ ENTRY(sa1100_finish_suspend)
+ 	bic	r5, r5, #FMsk(MSC_RT)
+ 	bic	r5, r5, #FMsk(MSC_RT)<<16
+ 
+-	ldr	r6, =MDREFR
+-
+ 	ldr	r7, [r6]
+-bic	r7, r7, #0x0000FF00
+-bic	r7, r7, #0x000000F0
+-orr	r8, r7, #MDREFR_SLFRSH
++	bic	r7, r7, #0x0000FF00
++	bic	r7, r7, #0x000000F0
++	orr	r8, r7, #MDREFR_SLFRSH
+ 
+ 	ldr	r9, =MDCNFG
+ 	ldr	r10, [r9]
 -- 
 1.7.4.4
