@@ -1,97 +1,24 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Fri, 3 Feb 2012 11:27:03 +0000
-Subject: [PATCH 02/15] mm: page_alloc: update migrate type of pages on
- pcp when isolating
-In-Reply-To: <op.v82hjbd13l0zgt@mpn-glaptop>
-References: <1327568457-27734-1-git-send-email-m.szyprowski@samsung.com>
- <1327568457-27734-3-git-send-email-m.szyprowski@samsung.com>
- <20120130111522.GE25268@csn.ul.ie> <op.v8wlu8ws3l0zgt@mpn-glaptop>
- <20120130161447.GU25268@csn.ul.ie>
- <022e01cce034$bc6cf440$3546dcc0$%szyprowski@samsung.com>
- <20120202124729.GA5796@csn.ul.ie> <op.v82hjbd13l0zgt@mpn-glaptop>
-Message-ID: <20120203112703.GB5796@csn.ul.ie>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 3 Feb 2012 11:27:58 +0000
+Subject: [PATCH] Skip unnecessary pte makeup when clearing it.
+In-Reply-To: <1327912567-18966-2-git-send-email-bill4carson@gmail.com>
+References: <1327912567-18966-1-git-send-email-bill4carson@gmail.com>
+ <1327912567-18966-2-git-send-email-bill4carson@gmail.com>
+Message-ID: <20120203112758.GA14008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 08:53:25PM +0100, Michal Nazarewicz wrote:
-> >On Tue, Jan 31, 2012 at 05:23:59PM +0100, Marek Szyprowski wrote:
-> >>Pages, which have incorrect migrate type on free finally
-> >>causes pageblock migration type change from MIGRATE_CMA to MIGRATE_MOVABLE.
+On Mon, Jan 30, 2012 at 08:36:07AM +0000, bill4carson at gmail.com wrote:
+> From: Bill Carson <bill4carson@gmail.com>
 > 
-> On Thu, 02 Feb 2012 13:47:29 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> >I'm not quite seeing this. In free_hot_cold_page(), the pageblock
-> >type is checked so the page private should be set to MIGRATE_CMA or
-> >MIGRATE_ISOLATE for the CMA area. It's not clear how this can change a
-> >pageblock to MIGRATE_MOVABLE in error.
+> If we are only about to clear a hardware pte entry, then pte makeup code is
+> unnecessary for cpu_v7_set_pte_ext and armv6_set_pte_ext, so just skip it.
 > 
-> Here's what I think may happen:
-> 
-> When drain_all_pages() is called, __free_one_page() is called for each page on
-> pcp list with migrate type deducted from page_private() which is MIGRATE_CMA.
-> This result in the page being put on MIGRATE_CMA freelist even though its
-> pageblock's migrate type is MIGRATE_ISOLATE.
-> 
+> Signed-off-by: Bill Carson <bill4carson@gmail.com>
 
-Ok, although it will only be allocated for MIGRATE_CMA-compatible
-requests so it is not a disaster.
+I'll give similar answer to Uwe - the patch looks fine but I haven't
+tested or run any benchmarks to tell whether it's worth.
 
-> When allocation happens and pcp list is empty, rmqueue_bulk() will get executed
-> with migratetype argument set to MIGRATE_MOVABLE.  It calls __rmqueue() to grab
-> some pages and because the page described above is on MIGRATE_CMA freelist it
-> may be returned back to rmqueue_bulk().
-> 
+Anyway,
 
-This will allocate the page from a pageblock we are trying to isolate
-pages from, but only for a movable page that can still be migrated. It
-does mean that CMA is doing more work than it should of course and
-the problem also impacts memory hot-remove. It's worse for memory
-hot-remove because potentially an UNMOVABLE page was allocated from
-a MIGRATE_ISOLATE pageblock.
-
-> But, pageblock's migrate type is not MIGRATE_CMA but MIGRATE_ISOLATE, so the
-> following code:
-> 
-> #ifdef CONFIG_CMA
-> 		if (is_pageblock_cma(page))
-> 			set_page_private(page, MIGRATE_CMA);
-> 		else
-> #endif
-> 			set_page_private(page, migratetype);
-> 
-> will set it's private to MIGRATE_MOVABLE and in the end the page lands back
-> on MIGRATE_MOVABLE pcp list but this time with page_private == MIGRATE_MOVABLE
-> and not MIGRATE_CMA.
-> 
-> One more drain_all_pages() (which may happen since alloc_contig_range() calls
-> set_migratetype_isolate() for each block) and next __rmqueue_fallback() may
-> convert the whole pageblock to MIGRATE_MOVABLE.
-> 
-> I know, this sounds crazy and improbable, but I couldn't find an easier path
-> to destruction.  As you pointed, once the page is allocated, free_hot_cold_page()
-> will do the right thing by reading pageblock's migrate type.
-> 
-
-Ok, it's crazy but the problem is there.
-
-> Marek is currently experimenting with various patches including the following
-> change:
-> 
-> #ifdef CONFIG_CMA
->                 int mt = get_pageblock_migratetype(page);
->                 if (is_migrate_cma(mt) || mt == MIGRATE_ISOLATE)
->                         set_page_private(page, mt);
->                 else
-> #endif
->                         set_page_private(page, migratetype);
-> 
-> As a matter of fact, if __rmqueue() was changed to return migrate type of the
-> freelist it took page from, we could avoid this get_pageblock_migratetype() all
-> together.  For now, however, I'd rather not go that way just yet -- I'll be happy
-> to dig into it once CMA gets merged.
-> 
-
-Ok, thanks for persisting with this.
-
--- 
-Mel Gorman
-SUSE Labs
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
