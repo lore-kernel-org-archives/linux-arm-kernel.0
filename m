@@ -1,102 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 3 Feb 2012 16:46:04 +0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E124AC5@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <20120201143530.GA2203@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF178E124AC5@HQMAIL01.nvidia.com>
-Message-ID: <20120203084600.GA12508@S2101-09.ap.freescale.net>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 3 Feb 2012 09:37:48 +0100
+Subject: [dmaengine] [Q] jiffies value does not increase in dma_sync_wait()
+Message-ID: <CACKLOr26BuTh8Qr8pFHoTJoyCW9ty4-Kg-YRisXmN3=spzY6_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 10:36:54AM -0800, Stephen Warren wrote:
-> Shawn Guo wrote at Wednesday, February 01, 2012 7:36 AM:
-> ...
-> > I had a talk with Dong about this binding, and we think that it should
-> > work well for imx if we have a couple of small pieces added.
-> > 
-> > On Fri, Jan 20, 2012 at 02:22:20PM -0800, Stephen Warren wrote:
-> > ...
-> > >                 pmx_sdhci: pinconfig-sdhci {
-> > >                         /*
-> > >                          * The mux property is a list of muxable entities
-> > >                          * and the mux function to select for it. The number
-> > >                          * of cells in each entry is the pin controller's
-> > >                          * #pinmux-cells property. The pin controller's
-> > >                          * binding defines what the cells mean. The pinctrl
-> > >                          * driver is responsible for mapping this data to
-> > >                          * the (group, function) pair required to fill in
-> > >                          * the pinctrl subsystem's pinmux mapping table.
-> > >                          */
-> > >                         mux =
-> > >                                 <TEGRA_PMX_PG_DTA TEGRA_PMX_MUX_SDIO1>
-> > >                                 <TEGRA_PMX_PG_DTD TEGRA_PMX_MUX_SDIO1>;
-> > 
-> > We need a property like 'mux-unit' whose value can be either 'pin' or
-> > 'pingroup' to reflect something you mentioned as muxable entity.
-> 
-> I'm not sure I agree; see below.
-> 
-> > The reason behind this is the DT logic inside pinctrl core needs to
-> > know how the pinmux_map should be constructed from device tree.
-> 
-> As a general statement, yes.
-> 
-> > In tegra case, the 'mux-unit' is 'pingroup', the core should construct
-> > pinmux_map entry for each row/element of 'mux'.
-> 
-> Yes.
-> 
-> > In imx case, the 'mux-unit' will be 'pin',
-> 
-> OK.
-> 
-> Just a note: Tegra30 also has per-pin muxability. Only Tegra20 muxes pins
-> in groups. (although Tegra30 does some if its pin configuration in groups)
-> 
-> > and we would expect core construct only
-> > one pinmux_map entry there, with all the pins listed in 'mux' composing
-> > the group that pinmux_map needs.
-> 
-> This is where I disagree.
-> 
-So what I read is you disagree how pinctrl core uses property 'mux-unit'
-not the property itself.
+Hi,
+I have a Visstrim_M10 board, based on i.MX27, and I'm developing a
+v4l2 driver for deinterlacing video frames.
 
-> If the pinmux_map should only contain a single entry, wouldn't the DT
-> mux property only contain a single entry?
-> 
-So you are saying we should have a pinmux_map for each entry in the
-mux property?  I disagree with that.  For imx usdhc example, we have
-10 entries in mux property representing 10 pins and their mux values.
-What we need is one pinmux_map rather than 10 for just one client
-device.
+Whenever I start a new dma transfer I call the function
+"dma_wait_for_async_tx()" which internally ends up calling
+"dma_sync_wait()":
 
-> The reason being that if there's a single entry in the pinmux_map, the
-> group name used in that entry must be a group that's supported directly
-> by the pinctrl driver (that's just the way pinctrl works). As such, why
-> not just write the device tree in terms of those groups?
-> 
-> The only way I can see this not being true is if your pinctrl driver is
-> also parsing these mux properties, and dynamically creating the groups
-> that it exposes based on the list of pins in the mux property.
+http://lxr.linux.no/#linux+v3.2.2/drivers/dma/dmaengine.c#L255
 
-Yes, that's exactly what we are trying to do for imx.
+In this function, there is a "do while" loop, which checks for dma
+completion, with a timeout. However, when the system is too loaded
+this function enters this "do while" loop and never gets out of it,
+blocking the system.
 
-> However,
-> that seems like the wrong approach;
+I've introduced a couple of printk() to check why this timeout is not
+triggered and I've found that the value of jiffies does not increase
+between loop iterations (i. e. it's like time didn't advance).
 
-Where does it go wrong exactly?
+Does anyobody know what reasons could make jiffies not being updated?
 
-> If you're dynamically defining groups
-> in DT, I'd expect separate explicit driver-specific properties/nodes to
-> define those groups, such that the pinctrl core's processing of the mux
-> property to be identical in all cases.
-> 
-It's not imx specific.  It's generally useful for any soc that has pin
-as the muxable entity.  I think it should be the common part of this
-binding and implemented in pinctrl core DT support. 
-
+Regards.
 -- 
-Regards,
-Shawn
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
