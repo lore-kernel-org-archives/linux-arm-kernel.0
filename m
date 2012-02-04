@@ -1,149 +1,63 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 4 Feb 2012 11:33:36 +0000
-Subject: [PATCH] irq: make SPARSE_IRQ an optionally hidden option
-In-Reply-To: <1327546727-31681-1-git-send-email-robherring2@gmail.com>
-References: <1327546727-31681-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120204113336.GS889@n2100.arm.linux.org.uk>
+Date: Sat, 4 Feb 2012 12:22:46 +0000
+Subject: In many cases softlockup can not be reported after disabling
+ IRQ for long time
+In-Reply-To: <CAOwKts--CDpmiMunfYKrYsnWovmQhAC7Vp0P-9MeNVy6vx-Wvw@mail.gmail.com>
+References: <CAOwKts8zS1rYA+Y4k-vb8YAaR=aFd1BwryhhWWnWLQyrYrNqyA@mail.gmail.com>
+ <20120131154748.GA5650@redhat.com>
+ <CAOwKts_dTvc4LiCZUXN9oYzty1pkDEn_VQwPKY=EoVzk0n6tFA@mail.gmail.com>
+ <20120201145802.GF5650@redhat.com>
+ <CAOwKts8S0EkUGcP3rYqZe+HdvyXD0+SR1f_3xWpu5FprKWuGhQ@mail.gmail.com>
+ <20120202084350.GB1275@n2100.arm.linux.org.uk>
+ <CAOwKts--CDpmiMunfYKrYsnWovmQhAC7Vp0P-9MeNVy6vx-Wvw@mail.gmail.com>
+Message-ID: <20120204122246.GG1275@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So that everyone who received this patch knows...
+On Thu, Feb 02, 2012 at 10:05:22PM +0800, TAO HU wrote:
+> I don't know it's already been discussed.
+> Appreciate if you could point out existing discussion thread.
+> 
+> I agree it is impossible to detect "timeout" when using jiffies which
+> relies on timer.
+> 
+> For timestamp, softlockup (watchdog) use cpu_clock() whcih eventually calls
+> sched_clock().
+> And sched_clock() is implemented to read out the value of a 32K
+> timer/counter on OMAP4430.
+> That means the timestamp will be still updated while the IRQ is disabled.
 
-I've just pulled Rob's series, which includes this patch, into a stable
-branch in my tree and it is my intention to send this during the 3.4
-merge window.  This means that there is a patch in my tree which touches
-other architectures' Kconfig files.
+Yes, and it'll take 131072 seconds to wrap.
 
-If there's any objections, please let me know asap.
+> So when IRQ is re-enabled, softlockup code will be able to read a "fresh"
+> timestamp which can be used to
+> detect the timeout.
+> 
+> 
+> static unsigned long get_timestamp(int this_cpu)
+> {
+> return cpu_clock(this_cpu) >> 30LL; /* 2^30 ~= 10^9 */
+> }
+> 
+> unsigned long long __attribute__((weak)) sched_clock(void)
+> {
+> return (unsigned long long)(jiffies - INITIAL_JIFFIES)
+> * (NSEC_PER_SEC / HZ);
+> }
+> 
+> #ifndef CONFIG_OMAP_MPU_TIMER
+> unsigned long long notrace sched_clock(void)
+> {
+> return _omap_32k_sched_clock();
+> }
+> #else
+> unsigned long long notrace omap_32k_sched_clock(void)
+> {
+> return _omap_32k_sched_clock();
+> }
+> #endif
 
-Thanks.
+I guess someone needs to do some tracing to see what's going on, and
+get a feel for the order in which things happen.  (Or add some printks.)
 
-On Wed, Jan 25, 2012 at 08:58:47PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> On ARM, we don't want SPARSE_IRQ to be a user visible option. Make
-> SPARSE_IRQ visible based on MAY_HAVE_SPARSE_IRQ instead of depending
-> on HAVE_SPARSE_IRQ.
-> 
-> With this, SPARSE_IRQ is not visible on C6X and ARM.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-c6x-dev at linux-c6x.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-sh at vger.kernel.org
-> ---
-> 
-> This is part of an irq include consolidation series for ARM:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg156492.html
-> 
-> Rob
-> 
->  arch/arm/Kconfig     |    1 -
->  arch/c6x/Kconfig     |    2 +-
->  arch/powerpc/Kconfig |    2 +-
->  arch/sh/Kconfig      |    2 +-
->  arch/x86/Kconfig     |    1 -
->  kernel/irq/Kconfig   |    5 ++---
->  6 files changed, 5 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 24626b0..30e7840 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -28,7 +28,6 @@ config ARM
->  	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
->  	select HAVE_C_RECORDMCOUNT
->  	select HAVE_GENERIC_HARDIRQS
-> -	select HAVE_SPARSE_IRQ
->  	select GENERIC_IRQ_SHOW
->  	select CPU_PM if (SUSPEND || CPU_IDLE)
->  	select GENERIC_PCI_IOMAP
-> diff --git a/arch/c6x/Kconfig b/arch/c6x/Kconfig
-> index 26e67f0..2f58c61 100644
-> --- a/arch/c6x/Kconfig
-> +++ b/arch/c6x/Kconfig
-> @@ -11,7 +11,7 @@ config TMS320C6X
->  	select HAVE_DMA_API_DEBUG
->  	select HAVE_GENERIC_HARDIRQS
->  	select HAVE_MEMBLOCK
-> -	select HAVE_SPARSE_IRQ
-> +	select SPARSE_IRQ
->  	select OF
->  	select OF_EARLY_FLATTREE
->  
-> diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-> index 1919634..06c1cf0 100644
-> --- a/arch/powerpc/Kconfig
-> +++ b/arch/powerpc/Kconfig
-> @@ -133,7 +133,7 @@ config PPC
->  	select HAVE_REGS_AND_STACK_ACCESS_API
->  	select HAVE_HW_BREAKPOINT if PERF_EVENTS && PPC_BOOK3S_64
->  	select HAVE_GENERIC_HARDIRQS
-> -	select HAVE_SPARSE_IRQ
-> +	select MAY_HAVE_SPARSE_IRQ
->  	select IRQ_PER_CPU
->  	select GENERIC_IRQ_SHOW
->  	select GENERIC_IRQ_SHOW_LEVEL
-> diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-> index 3c8db65..21b82a8 100644
-> --- a/arch/sh/Kconfig
-> +++ b/arch/sh/Kconfig
-> @@ -22,7 +22,7 @@ config SUPERH
->  	select HAVE_SYSCALL_TRACEPOINTS
->  	select HAVE_REGS_AND_STACK_ACCESS_API
->  	select HAVE_GENERIC_HARDIRQS
-> -	select HAVE_SPARSE_IRQ
-> +	select MAY_HAVE_SPARSE_IRQ
->  	select IRQ_FORCED_THREADING
->  	select RTC_LIB
->  	select GENERIC_ATOMIC64
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index 864cc6e..fb2da44 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -69,7 +69,6 @@ config X86
->  	select HAVE_ARCH_JUMP_LABEL
->  	select HAVE_TEXT_POKE_SMP
->  	select HAVE_GENERIC_HARDIRQS
-> -	select HAVE_SPARSE_IRQ
->  	select SPARSE_IRQ
->  	select GENERIC_FIND_FIRST_BIT
->  	select GENERIC_IRQ_PROBE
-> diff --git a/kernel/irq/Kconfig b/kernel/irq/Kconfig
-> index 5a38bf4..1f2dece 100644
-> --- a/kernel/irq/Kconfig
-> +++ b/kernel/irq/Kconfig
-> @@ -13,7 +13,7 @@ config GENERIC_HARDIRQS
->  # Options selectable by the architecture code
->  
->  # Make sparse irq Kconfig switch below available
-> -config HAVE_SPARSE_IRQ
-> +config MAY_HAVE_SPARSE_IRQ
->         bool
->  
->  # Enable the generic irq autoprobe mechanism
-> @@ -61,8 +61,7 @@ config IRQ_FORCED_THREADING
->         bool
->  
->  config SPARSE_IRQ
-> -	bool "Support sparse irq numbering"
-> -	depends on HAVE_SPARSE_IRQ
-> +	bool "Support sparse irq numbering" if MAY_HAVE_SPARSE_IRQ
->  	---help---
->  
->  	  Sparse irq numbering is useful for distro kernels that want
-> -- 
-> 1.7.5.4
-> 
+Is there a ready-prepared bit of code I can try?
