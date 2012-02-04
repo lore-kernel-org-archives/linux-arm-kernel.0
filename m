@@ -1,118 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 4 Feb 2012 12:05:24 -0800
-Subject: [GIT PULL] arm-soc fixes for 3.3-rc
-Message-ID: <CAOesGMjUL6fg9ReSSVb6Ofy6PWzbLo-bxC7Ut0_x1Sv+4bNkog@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 4 Feb 2012 20:07:44 +0000
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1202041211150.9453@utopia.booyaka.com>
+References: <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+ <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
+ <20120204163931.GH1275@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202040943450.9453@utopia.booyaka.com>
+ <20120204170114.GJ1275@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202041005270.9453@utopia.booyaka.com>
+ <20120204174715.GK1275@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202041211150.9453@utopia.booyaka.com>
+Message-ID: <20120204200743.GC17309@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sat, Feb 04, 2012 at 12:24:07PM -0700, Paul Walmsley wrote:
+> On Sat, 4 Feb 2012, Russell King - ARM Linux wrote:
+> 
+> > On Sat, Feb 04, 2012 at 10:22:27AM -0700, Paul Walmsley wrote:
+> > > No, that is not an example of a protocol with a retry.  That is an example 
+> > > of a protocol that has no provision for reliable data delivery.  Sending a 
+> > > new data string one second later is not a retry.
+> > > 
+> > > In such situations, the system integrator would just use the UART in the 
+> > > default (lossless) mode.  And if they don't, they'll have to deal with the 
+> > > consequences that they chose.  Those of us who ship battery-powered Linux 
+> > > devices are indeed capable of making this choice.
+> > 
+> > Okay, lets see.  You're making a battery powered Linux device.  It has
+> > a standard RS232 serial port available, and you allow users to load
+> > 'apps' onto it.
+> > 
+> > Do you run the serial ports in lossless mode?
+> 
+> Not every serial port is available to arbitrary 'apps.'.  Not every 
+> battery-powered Linux device allows users to run arbitrary 'apps.'
+> 
+> On devices that do allow users to load arbitrary 'apps,' and that allow 
+> those 'apps' to have direct access to the serial ports, I personally 
+> believe that system integrators should not change the default OMAP serial 
+> setting, which is to run the serial ports in lossless mode.
+> 
+> Here is another example.  Suppose someone builds a GPS receiver with an 
+> OMAP that is capable of sending NMEA position sentences, once per second, 
+> to a remotely connected serial device.  No receive traffic is expected on 
+> that port.
+> 
+> The position you seem to be advocating is that the mainline Linux kernel 
+> should not support any ability to allow the system integrator to 
+> affirmatively instruct the SoC to enter device idle between those position 
+> sentences.  This will cause the SoC to consume energy to losslessly 
+> handle an incoming serial character that will never come.  Is that really 
+> what you're advocating?
 
-
-The following changes since commit deb9b4ce97cbbf61a150f317badbeb7531aab276:
-
-  Merge branch 'fixes' of git://git.linaro.org/people/rmk/linux-arm
-(2012-01-28 13:27:10 -0800)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes-for-linus
-
-for you to fetch changes up to ca43784daa7a400407d851799ac69d3de2b2ab4e:
-
-  ARM: bcmring: fix build failure in mach-bcmring/arch.c (2012-02-04
-11:38:20 -0800)
-
-----------------------------------------------------------------
-arm-soc fixes for 3.3-rc
-
-* A series of OMAP regression fixes for merge window fallout
-* Two patches for Davinci, one removes some misdefined clocks, the other
-  is a regression fix for merge window fallout
-* Two patches that makes Broadcom bcmring build again (and removes a
-  bunch of unused code in the process)
-
-----------------------------------------------------------------
-Bas van den Berg (1):
-      ARM: davinci: DA850: remove non-existing pll1_sysclk4-7 clocks
-
-Cousson, Benoit (1):
-      i2c: OMAP: Fix OMAP1 build error
-
-Felipe Contreras (2):
-      ARM: OMAP2: fix omap3 touchbook kconfig warning
-      ARM: OMAP2: fix regulator warnings
-
-Grazvydas Ignotas (2):
-      ARM: OMAP: fix erroneous mmc2 clock change on mmc3 setup
-      ARM: OMAP: fix MMC2 loopback clock handling
-
-Ilya Yanok (1):
-      ARM: OMAP3: hwmod data: register dss hwmods after dss_core
-
-JD Zheng (1):
-      ARM: bcmring: remove unused DMA map code
-
-Julia Lawall (2):
-      ARM: OMAP2+: arch/arm/mach-omap2/devices.c: introduce missing kfree
-      ARM: OMAP2+: arch/arm/mach-omap2/smartreflex.c: add missing iounmap
-
-Olof Johansson (2):
-      Merge branch 'fixes' of
-git://gitorious.org/linux-davinci/linux-davinci into fixes
-      Merge branch 'fixes' of
-git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Paul Gortmaker (1):
-      ARM: bcmring: fix build failure in mach-bcmring/arch.c
-
-Paul Walmsley (2):
-      ARM: OMAP2+: io: fix compilation breakage on 2420-only configs
-      ARM: OMAP2/3: PRM: fix missing plat/irqs.h build breakage
-
-Peter Ujfalusi (1):
-      ARM: OMAP4: hwmod data: Add names for DMIC memory address space
-
-Sekhar Nori (1):
-      ARM: davinci: update mdio bus name
-
-Tomi Valkeinen (2):
-      ARM: OMAP2+: hwmod data: split omap2/3 dispc hwmod class
-      ARM: OMAP3: hwmod data: add SYSC_HAS_ENAWAKEUP for dispc
-
-Tony Lindgren (1):
-      Merge branch 'omap_fixes_a_3.3rc' of
-git://git.pwsan.com/linux-2.6 into fixes
-
-Vaibhav Hiremath (1):
-      ARM: OMAP2+: timer: Fix crash due to wrong arg to
-__omap_dm_timer_read_counter
-
-Yegor Yefremov (1):
-      ARM: OMAP2+: GPMC: fix device size setup
-
- arch/arm/mach-bcmring/arch.c                       |    2 +-
- arch/arm/mach-bcmring/dma.c                        |  812 --------------------
- arch/arm/mach-bcmring/include/mach/dma.h           |  196 -----
- arch/arm/mach-davinci/board-da850-evm.c            |    2 +-
- arch/arm/mach-davinci/board-dm365-evm.c            |    2 +-
- arch/arm/mach-davinci/board-dm644x-evm.c           |    2 +-
- arch/arm/mach-davinci/board-dm646x-evm.c           |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c          |    2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c        |    2 +-
- arch/arm/mach-davinci/board-sffsdr.c               |    2 +-
- arch/arm/mach-davinci/da850.c                      |   32 -
- arch/arm/mach-omap2/Kconfig                        |   11 +-
- arch/arm/mach-omap2/devices.c                      |    1 +
- arch/arm/mach-omap2/gpmc.c                         |    6 +
- arch/arm/mach-omap2/hsmmc.c                        |   16 +-
- arch/arm/mach-omap2/io.c                           |    4 +-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |   21 -
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   22 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   54 ++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2 +
- arch/arm/mach-omap2/prm2xxx_3xxx.c                 |    1 +
- arch/arm/mach-omap2/smartreflex.c                  |    2 +-
- arch/arm/mach-omap2/timer.c                        |    2 +-
- drivers/i2c/busses/i2c-omap.c                      |    2 +-
- 24 files changed, 106 insertions(+), 1094 deletions(-)
+Stop procrastinating.  Please answer my question.  Then I'll answer yours.
