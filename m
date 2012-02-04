@@ -1,31 +1,32 @@
-From: dhillf@gmail.com (Hillf Danton)
-Date: Sat, 4 Feb 2012 17:09:02 +0800
-Subject: [PATCH 08/15] mm: mmzone: MIGRATE_CMA migration type added
-In-Reply-To: <op.v830ygma3l0zgt@mpn-glaptop>
-References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
- <1328271538-14502-9-git-send-email-m.szyprowski@samsung.com>
- <CAJd=RBByc_wLEJTK66J4eY03CWnCoCRiwAeEYjXCZ5xEZhp3ag@mail.gmail.com>
- <op.v830ygma3l0zgt@mpn-glaptop>
-Message-ID: <CAJd=RBD765rmiCDiCz87Vf8vf8Wp-AiW=gZ3Nw5LjTPw70ZO7g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 4 Feb 2012 09:37:44 +0000
+Subject: [PATCH 00/13] sa1100fb cleanups
+Message-ID: <20120204093744.GQ889@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/2/3 Michal Nazarewicz <mina86@mina86.com>:
->>> +static inline bool migrate_async_suitable(int migratetype)
->
-> On Fri, 03 Feb 2012 15:19:54 +0100, Hillf Danton <dhillf@gmail.com> wrote:
->>
->> Just nitpick, since the helper is not directly related to what async
->> means,
->> how about migrate_suitable(int migrate_type) ?
->
->
-> I feel current name is better suited since it says that it's OK to scan this
-> block if it's an asynchronous compaction run.
->
+Here's another bunch of SA11x0 stuff - its framebuffer driver.  This
+set of patches fixes some section mismatch warnings, moves the board
+configuration out to the board files, converts the Shannon stuff to
+use gpiolib rather than poking at GPDR/GPSR/GPCR directly.
 
-The input is the migrate type of page considered, and the async is only one
-of the modes that compaction should be carried out. Plus the helper is
-also used in other cases where async is entirely not concerned.
+The function hooks for LCD and backlight power control are moved into
+the platform data passed from the board, eliminating the global function
+pointers.
 
-That said, the naming is not clear, if not misleading.
+This series will conflict with the previous series (in the case of
+Assabet, the conflict is quite large) so I'd prefer to keep this in my
+tree for the next merge window.
+
+ arch/arm/mach-sa1100/assabet.c              |  130 ++++++--
+ arch/arm/mach-sa1100/collie.c               |   17 +
+ arch/arm/mach-sa1100/generic.c              |   14 +-
+ arch/arm/mach-sa1100/generic.h              |    6 +-
+ arch/arm/mach-sa1100/h3100.c                |   23 ++-
+ arch/arm/mach-sa1100/h3600.c                |   32 ++-
+ arch/arm/mach-sa1100/include/mach/shannon.h |    2 +-
+ arch/arm/mach-sa1100/lart.c                 |   79 +++++
+ arch/arm/mach-sa1100/shannon.c              |   17 +
+ drivers/video/sa1100fb.c                    |  433 +++++++--------------------
+ drivers/video/sa1100fb.h                    |   67 +----
+ include/video/sa1100fb.h                    |   63 ++++
