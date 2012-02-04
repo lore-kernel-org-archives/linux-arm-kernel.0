@@ -1,8 +1,8 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 3 Feb 2012 19:39:01 -0700 (MST)
+From: neilb@suse.de (NeilBrown)
+Date: Sat, 4 Feb 2012 14:09:23 +1100
 Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
  in non-DMA" added to tty tree
-In-Reply-To: <EF62F09C0797D947AD4180A1043C0DF73493107B@DLEE10.ent.ti.com>
+In-Reply-To: <alpine.DEB.2.00.1202031900460.9453@utopia.booyaka.com>
 References: <13274430881471@kroah.org>
  <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
  <20120126042155.GA3185@suse.de>
@@ -13,67 +13,59 @@ References: <13274430881471@kroah.org>
  <20120203150708.386951d2@notabene.brown>
  <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
  <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <20120203231113.25ae2d3a@notabene.brown>
- <EF62F09C0797D947AD4180A1043C0DF73492FFC3@DLEE10.ent.ti.com>
- <alpine.DEB.2.00.1202031731500.27947@utopia.booyaka.com>
- <EF62F09C0797D947AD4180A1043C0DF73493107B@DLEE10.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1202031913101.9453@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202031255330.27947@utopia.booyaka.com>
+ <20120204085940.2de44594@notabene.brown>
+ <alpine.DEB.2.00.1202031532540.27947@utopia.booyaka.com>
+ <20120204110131.7378b8fe@notabene.brown>
+ <alpine.DEB.2.00.1202031900460.9453@utopia.booyaka.com>
+Message-ID: <20120204140923.063706c8@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 Feb 2012, Woodruff, Richard wrote:
+On Fri, 3 Feb 2012 19:06:19 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
 
-> There have been errata over time in this area. Several I hit were 
-> updated at 3630 time. UART did get IER2 but I don't recall all details 
-> for UART.  Probably that is not being used.
-
-Govindraj sent an RFC patch a few days ago to add IER2, which is good, but 
-we're still awaiting the followup patch for it.
-
-> > From: Paul Walmsley [mailto:paul at pwsan.com]
-> > Sent: Friday, February 03, 2012 7:00 PM
+> Hi Neil
 > 
-> > What's particularly remarkable is that it looks like the UARTs will
-> > idle-ack while their transmit FIFOs have data in them (!)
+> On Sat, 4 Feb 2012, NeilBrown wrote:
 > 
-> Generally a module can ACK its ICLK if it is not used internally. The 
-> FCLK can push data out with out ICLK and is controlled separately always 
-> (omap4 changed encoding, to optional clock). This allows interconnect to 
-> idle during tx to save power. 
+> > Guess what happens if I set autosuspend_delay_ms to 0?
+> > Massive transmit problems.  Driver can hardly get anything out before the
+> > UART's fclk is cut...
+> 
+> Just reproduced this on 35xx BeagleBoard.  Looks like the UART is indeed 
+> going idle while the TX FIFO has bytes in it.
 
-Yep, that's a good point.  Unfortunately the PER has a hardware sleep 
-dependency with the CORE_L3 clockdomain on OMAP3... so I'm not sure how 
-much power we'd be able to save.  Perhaps some: it appears that the UART3 
-functional clock comes from the CORE_L4 clockdomain.  So it might be worth 
-implementing some extra intelligence here.  The kernel code is disabling 
-both the ICLK and the FCLK simultaneously, so that may not be optimal in 
-this situation.
+That makes me happy :-)
 
-In the short-term, on the kernel side, we should just keep the PM runtime 
-count non-zero when the UART is transmitting.  Since we can get an 
-interrupt when the TX is done, or close to being done anyway, we can just 
-disable the clocks at that point.  Not ideal, but should work.
+> 
+> Here's a patch that helps.  It seems to work down to an 
+> autosuspend_delay_ms of 1 ms.  Without it, the best I can get is 8 ms.
+> 
+> Of course, ideally it should work fine at autosuspend_delay_ms = 0, so 
+> likely there's some other infelicity that we're currently missing.
+> 
+> Neil, care to give this a test and confirm it on your setup?
 
-> The trick is to ensure all module wakeup plumbing is enabled so a 
-> functional tx irq will flow.  Audits last showed several drivers missing 
-> steps (omap specific). Some drivers seemed to rely on static 
-> dependencies or coincident neighbor activity to allow their functional 
-> interrupt to flow... to many interdependent custom details... and yes 
-> some errata.
+Yes, that seems to make the output corruption go away.
 
-Yeah.  I think we've got an acceptable workaround for the missing TX 
-wakeup problem.  And we've got a somewhat unpleasant workaround for the 
-missing RX timeout wakeup problem.   Now we just need to put together a 
-strategy for the idle-during-TX problem...
+Even with small autosuspend_delay_ms down to 0 it doesn't corrupt output,
+but as the first input byte is corrupted, I cannot really type with those
+setting (so I ssh to gain control again).
 
-> Anyway, even with all SOC specific wake bits you may lose the character 
-> with latency of restart. Point I was raising was external chip hook can 
-> not be neglected as its part of equation.
+The patch disables the IDLEMODE_SMART setting that happens on runtime
+suspend/resume so that the IDLEMODE_NO setting stays in force.
 
-Indeed.
+So it clearly isn't "stopping the clocks" that is the problem - as I first
+imagined - but rather the SIDLE handshake isn't doing what we think it should
+do.
 
-Thanks for the info -- it's always nice to see your posts on the lists --
+Thanks,
+NeilBrown
 
-
-- Paul
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120204/23e3a5c8/attachment.sig>
