@@ -1,99 +1,117 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 4 Feb 2012 22:20:04 +0800
-Subject: [PATCH v4 3/4] ARM: imx: add irq domain support to tzic
-In-Reply-To: <1328308512-22594-4-git-send-email-robherring2@gmail.com>
-References: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
- <1328308512-22594-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20120204142001.GB19899@S2101-09.ap.freescale.net>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Sat, 4 Feb 2012 06:21:23 -0800
+Subject: [PATCH RFC idle 2/3] arm: Avoid invoking RCU when CPU is idle
+In-Reply-To: <1328297787.5882.203.camel@gandalf.stny.rr.com>
+References: <alpine.LFD.2.02.1202012234050.2759@xanadu.home>
+ <20120202044439.GD2435@linux.vnet.ibm.com>
+ <alpine.LFD.2.02.1202021159560.2759@xanadu.home>
+ <20120202174337.GS2518@linux.vnet.ibm.com>
+ <alpine.LFD.2.02.1202021257340.2759@xanadu.home>
+ <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
+ <4F2B1307.5010207@gmail.com> <87k4437oaq.fsf@ti.com>
+ <1328297787.5882.203.camel@gandalf.stny.rr.com>
+Message-ID: <20120204142123.GA14901@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 04:35:11PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Fri, Feb 03, 2012 at 02:36:27PM -0500, Steven Rostedt wrote:
+> On Fri, 2012-02-03 at 10:41 -0800, Kevin Hilman wrote:
 > 
-> Add irq domain support to tzic. This is needed to enable DT.
+> > > How is it a step backwards if it is already broken. 
+> > 
+> > Well, I didn't know it was broken. ;) And, as Paul mentioned, this has
+> > been broken for a long time. Apparently it's been working well enough
+> > for nobody to notice until recently.
+> > 
+> > > Obviously you haven't actually used any tracing here because it
+> > > doesn't work right with things as is.
+> > 
+> > It's been working well enough for me to debug several idle path problems
+> > with tracing.  Admittedly, this has been primarily on UP systems, but
+> > I've recently started using the tracing on SMP as well.  (however, due
+> > to "coupled" low-power states on OMAP, large parts of the idle path are
+> > effectively UP since one CPU0 has to wait for CPU1 to hit a low-power
+> > state before it can.)
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/plat-mxc/tzic.c |   23 ++++++++++-------------
->  1 files changed, 10 insertions(+), 13 deletions(-)
+> It's used by all users of powertop, and we haven't heard about a bug
+> yet. This doesn't mean that the bug doesn't exist. The race is extremely
+> hard to hit. It's one of those "good bugs". You know, the kind that you
+> don't really have to worry about because you are more likely to win the
+> lottery, become President of the United States, and find a cure for
+> cancer (all those together, not just one) than the chance of hitting
+> this bug. But it's a bug regardless and should, unfortunately, be fixed.
 > 
+> But here's the explanation of the bug:
+> 
+> As Paul has stated, when rcu_idle_enter() is in effect, the calls to
+> rcu_read_lock_* are ignored. Thus we can pretend they don't exist.
+> 
+> The code in question is the __DO_TRACE() in include/linux/tracepoint.h:
+> 
+> 		rcu_read_lock_sched_notrace();				\
+> 		it_func_ptr = rcu_dereference_sched((tp)->funcs);	\
+> 		if (it_func_ptr) {					\
+> 			do {						\
+> 				it_func = (it_func_ptr)->func;		\
+> 				__data = (it_func_ptr)->data;		\
+> 				((void(*)(proto))(it_func))(args);	\
+> 			} while ((++it_func_ptr)->func);		\
+> 		}							\
+> 		rcu_read_unlock_sched_notrace();	
+> 
+> As stated above, the rcu_read_(un)lock_sched_notrace() are worthless
+> when in rcu_idle_enter().
+> 
+> They protect the referencing of tp->funcs, which is an array of all
+> funcs that are attached to this tracepoint.
+> 
+> Now we need to look at kernel/tracepoint.c:
+> 
+> The protection is needed against a simultaneous insertion or deletion of
+> a tracepoint hook. This happens when a user enables or disables tracing.
+> 
+> Note, this race is even made harder to hit, because due to the static
+> branch that controls whether this gets called, will be off if no
+> tracepoints are attached. So the race can only happen after at least one
+> tracepoint is active.
 
-  CC      arch/arm/plat-mxc/tzic.o
-arch/arm/plat-mxc/tzic.c: In function ?tzic_irq_resume?:
-arch/arm/plat-mxc/tzic.c:87:27: warning: unused variable ?gc? [-Wunused-variable]
-arch/arm/plat-mxc/tzic.c: In function ?tzic_init_gc?:
-arch/arm/plat-mxc/tzic.c:120:2: warning: ?return? with a value, in function returning void [enabled by default]
+I agree that this race is hard to hit when running Linux on bare metal.
 
-Regards,
-Shawn
+But consider a Linux kernel running as a guest OS.  Then the host might
+preempt the guest in the middle of a tracepoint.  Then from the guest OS's
+viewpoint, that VCPU has just stopped, possibly for a very long time --
+easily long enough for all the other VCPUs to pass through quiescent
+states.  And the guest OS is ignoring that VCPU, so a too-short grace
+period could easily happen in this scenario.
 
-> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-> index 98308ec..25c10bb 100644
-> --- a/arch/arm/plat-mxc/tzic.c
-> +++ b/arch/arm/plat-mxc/tzic.c
-> @@ -77,7 +77,7 @@ static int tzic_set_irq_fiq(unsigned int irq, unsigned int type)
->  static void tzic_irq_suspend(struct irq_data *d)
->  {
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> -	int idx = gc->irq_base >> 5;
-> +	int idx = d->hwirq / 32;
->  
->  	__raw_writel(gc->wake_active, tzic_base + TZIC_WAKEUP0(idx));
->  }
-> @@ -85,7 +85,7 @@ static void tzic_irq_suspend(struct irq_data *d)
->  static void tzic_irq_resume(struct irq_data *d)
->  {
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> -	int idx = gc->irq_base >> 5;
-> +	int idx = d->hwirq / 32;
->  
->  	__raw_writel(__raw_readl(tzic_base + TZIC_ENSET0(idx)),
->  		     tzic_base + TZIC_WAKEUP0(idx));
-> @@ -102,18 +102,13 @@ static struct mxc_extra_irq tzic_extra_irq = {
->  #endif
->  };
->  
-> -static __init void tzic_init_gc(unsigned int irq_start)
-> +static __init void tzic_init_gc(struct irq_chip_generic *gc)
->  {
-> -	struct irq_chip_generic *gc;
-> -	struct irq_chip_type *ct;
-> -	int idx = irq_start >> 5;
-> +	struct irq_chip_type *ct = gc->chip_types;
-> +	int idx = gc->hwirq_base / 32;
->  
-> -	gc = irq_alloc_generic_chip("tzic", 1, irq_start, tzic_base,
-> -				    handle_level_irq);
-> -	gc->private = &tzic_extra_irq;
->  	gc->wake_enabled = IRQ_MSK(32);
->  
-> -	ct = gc->chip_types;
->  	ct->chip.irq_mask = irq_gc_mask_disable_reg;
->  	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
->  	ct->chip.irq_set_wake = irq_gc_set_wake;
-> @@ -122,7 +117,7 @@ static __init void tzic_init_gc(unsigned int irq_start)
->  	ct->regs.disable = TZIC_ENCLEAR0(idx);
->  	ct->regs.enable = TZIC_ENSET0(idx);
->  
-> -	irq_setup_generic_chip(gc, IRQ_MSK(32), 0, IRQ_NOREQUEST, 0);
-> +	return 0;
->  }
->  
->  asmlinkage void __exception_irq_entry tzic_handle_irq(struct pt_regs *regs)
-> @@ -175,8 +170,10 @@ void __init tzic_init_irq(void __iomem *irqbase)
->  
->  	/* all IRQ no FIQ Warning :: No selection */
->  
-> -	for (i = 0; i < TZIC_NUM_IRQS; i += 32)
-> -		tzic_init_gc(i);
-> +	irq_setup_generic_chip_domain("tzic", NULL, 1, 0, tzic_base,
-> +				      handle_level_irq, TZIC_NUM_IRQS, 0,
-> +				      IRQ_NOREQUEST, 0,
-> +				      tzic_init_gc, &tzic_extra_irq);
->  
->  #ifdef CONFIG_FIQ
->  	/* Initialize FIQ */
-> -- 
-> 1.7.5.4
+							Thanx, Paul
+
+> But if two probes are are added to this tracepoint, then we can hit the
+> race. And it is possible to trigger with only one probe on removal.
+> 
+> When adding or removing a tracepoint, the array (the one that
+> it_func_ptr points to) is updated by allocating a new array, copying the
+> old array plus or minus the tracpoint being added or removed, setting
+> the tp->funcs to the new array, and then it calls call_rcu_sched() to
+> free it.
+> 
+> Now for the bug to hit, something had to be coming in or out of idle,
+> and jumping to this code. Between the time it got the it_func_ptr to the
+> time it accessed any of that pointer's data in the loop, the tp->func
+> had to be updated to the new array, and then all CPUs would have passed
+> a schedule point (except the rcu_idle CPUs).
+> 
+> On uniprocessor, this is not an issue, but on SMP, it is possible that
+> with two CPUs the first being in rcu_idle may be ignored, and the second
+> would have been adding the tracepoint and then going directly to freeing
+> the code. But as tracepoints are very low weight, it is most likely that
+> the tracepoints will finish before the first could even free the memory.
+> 
+> But the chance does exist. As the chance of me winning the lottery,
+> becoming President of the United States, and curing cancer also exists!
+> 
+> ;-)
+> 
+> -- Steve
+> 
 > 
