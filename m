@@ -1,358 +1,105 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 3 Feb 2012 16:47:17 -0700
-Subject: [PATCH v4 2/4] irq: add irq_domain support to generic-chip
-In-Reply-To: <1328308512-22594-3-git-send-email-robherring2@gmail.com>
-References: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
- <1328308512-22594-3-git-send-email-robherring2@gmail.com>
-Message-ID: <CACxGe6u9KjMF0vLWebL0y-J4GqbqzP4HPx6w49pPOjJ51aqooQ@mail.gmail.com>
+From: neilb@suse.de (NeilBrown)
+Date: Sat, 4 Feb 2012 11:01:31 +1100
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1202031532540.27947@utopia.booyaka.com>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <alpine.DEB.2.00.1202031255330.27947@utopia.booyaka.com>
+ <20120204085940.2de44594@notabene.brown>
+ <alpine.DEB.2.00.1202031532540.27947@utopia.booyaka.com>
+Message-ID: <20120204110131.7378b8fe@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2012 at 3:35 PM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Add irq domain support to irq generic-chip. This enables users of
-> generic-chip to support dynamic irq assignment needed for DT interrupt
-> binding.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> ---
-> ?include/linux/irq.h ? ? ? | ? 15 +++++
-> ?kernel/irq/generic-chip.c | ?154 ++++++++++++++++++++++++++++++++++++++-------
-> ?2 files changed, 147 insertions(+), 22 deletions(-)
->
-> diff --git a/include/linux/irq.h b/include/linux/irq.h
-> index bff29c5..d721abc 100644
-> --- a/include/linux/irq.h
-> +++ b/include/linux/irq.h
-> @@ -664,7 +664,12 @@ struct irq_chip_generic {
-> ? ? ? ?raw_spinlock_t ? ? ? ? ?lock;
-> ? ? ? ?void __iomem ? ? ? ? ? ?*reg_base;
-> ? ? ? ?unsigned int ? ? ? ? ? ?irq_base;
-> + ? ? ? unsigned int ? ? ? ? ? ?hwirq_base;
-> ? ? ? ?unsigned int ? ? ? ? ? ?irq_cnt;
-> + ? ? ? struct irq_domain ? ? ? *domain;
-> + ? ? ? unsigned int ? ? ? ? ? ?flags;
-> + ? ? ? unsigned int ? ? ? ? ? ?irq_set;
-> + ? ? ? unsigned int ? ? ? ? ? ?irq_clr;
-> ? ? ? ?u32 ? ? ? ? ? ? ? ? ? ? mask_cache;
-> ? ? ? ?u32 ? ? ? ? ? ? ? ? ? ? type_cache;
-> ? ? ? ?u32 ? ? ? ? ? ? ? ? ? ? polarity_cache;
-> @@ -707,6 +712,16 @@ irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
-> ?void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum irq_gc_flags flags, unsigned int clr,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int set);
-> +
-> +struct device_node;
-> +int irq_setup_generic_chip_domain(const char *name, struct device_node *node,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int num_ct, unsigned int irq_base,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void __iomem *reg_base,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq_flow_handler_t handler, u32 hwirq_cnt,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum irq_gc_flags flags,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int clr, unsigned int set,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void (*gc_init_cb)(struct irq_chip_generic *),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *private);
-> ?int irq_setup_alt_chip(struct irq_data *d, unsigned int type);
-> ?void irq_remove_generic_chip(struct irq_chip_generic *gc, u32 msk,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int clr, unsigned int set);
-> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-> index c89295a..ffbe6fe 100644
-> --- a/kernel/irq/generic-chip.c
-> +++ b/kernel/irq/generic-chip.c
-> @@ -5,6 +5,7 @@
-> ?*/
-> ?#include <linux/io.h>
-> ?#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
-> ?#include <linux/slab.h>
-> ?#include <linux/export.h>
-> ?#include <linux/interrupt.h>
-> @@ -39,7 +40,7 @@ void irq_gc_noop(struct irq_data *d)
-> ?void irq_gc_mask_disable_reg(struct irq_data *d)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = 1 << (d->irq - gc->irq_base);
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
+On Fri, 3 Feb 2012 16:02:42 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
 
-Shouldn't this be: 1 << (d->hwirq & 32)?  The way it is written will
-result in mask == 0 for all hwirq >= 32.
+> On Sat, 4 Feb 2012, NeilBrown wrote:
+> 
+> > On Fri, 3 Feb 2012 13:10:28 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
+> > 
+> > > Considering your theory that the UART clocks are being cut while there's 
+> > > still data in the FIFO, you might consider removing this code at the end 
+> > > of transmit_chars():
+> > > 
+> > > 	if (uart_circ_empty(xmit))
+> > > 		serial_omap_stop_tx(&up->port);
+> > 
+> > I read the code and chickened out of just removing that.
+> > serial_omap_stop_tx seem to do 2 things:
+> >  1/ tell the uart to stop sending interrupts when the tx fifo is empty
+> >  2/ set forceidle (really smartidle) on the uart.
+> > 
+> > I didn't feel comfortable removing '1' as I thought it might generate an
+> > interrupt storm .. maybe not.
+> 
+> Might be worth a try.  In theory, since the current UART driver sets the 
+> TX_EMPTY flag in the SCR register, the UART should only raise a TX 
+> interrupt when the FIFO + shift register are totally empty.  So hopefully 
+> you should only get one extra interrupt per TTY transmit operation.
+> 
+> > Instead I just removed '2'.  In fact I replaced the 'set_forceidle' call with
+> > 'set_noidle'.  So the uart should never report that it was idle.
+> > 
+> > I did this with my other patch removed so pm_runtime_put() was still being
+> > called.
+> > 
+> > Result:  I still get corruption.
+> > So having the UART say "no, I'm not idle" does *not* stop the clock
+> > being turned off when we use omap_hwmod_idle() to turn off the clocks.
+> 
+> Hmm that's doubtful.  If that's really so, then we should be seeing 
+> massive UART transmit problems.  I'd expect that the driver wouldn't be 
+> able to get any transmit buffers out the door at all before the UART's 
+> fclk is cut.
 
-> ? ? ? ?irq_gc_lock(gc);
-> ? ? ? ?irq_reg_writel(mask, gc->reg_base + cur_regs(d)->disable);
-> @@ -57,7 +58,7 @@ void irq_gc_mask_disable_reg(struct irq_data *d)
-> ?void irq_gc_mask_set_bit(struct irq_data *d)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = 1 << (d->irq - gc->irq_base);
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
->
-> ? ? ? ?irq_gc_lock(gc);
-> ? ? ? ?gc->mask_cache |= mask;
-> @@ -75,7 +76,7 @@ void irq_gc_mask_set_bit(struct irq_data *d)
-> ?void irq_gc_mask_clr_bit(struct irq_data *d)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = 1 << (d->irq - gc->irq_base);
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
->
-> ? ? ? ?irq_gc_lock(gc);
-> ? ? ? ?gc->mask_cache &= ~mask;
-> @@ -93,7 +94,7 @@ void irq_gc_mask_clr_bit(struct irq_data *d)
-> ?void irq_gc_unmask_enable_reg(struct irq_data *d)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = 1 << (d->irq - gc->irq_base);
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
->
-> ? ? ? ?irq_gc_lock(gc);
-> ? ? ? ?irq_reg_writel(mask, gc->reg_base + cur_regs(d)->enable);
-> @@ -108,7 +109,7 @@ void irq_gc_unmask_enable_reg(struct irq_data *d)
-> ?void irq_gc_ack_set_bit(struct irq_data *d)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = 1 << (d->irq - gc->irq_base);
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
->
-> ? ? ? ?irq_gc_lock(gc);
-> ? ? ? ?irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
-> @@ -122,10 +123,10 @@ void irq_gc_ack_set_bit(struct irq_data *d)
-> ?void irq_gc_ack_clr_bit(struct irq_data *d)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = ~(1 << (d->irq - gc->irq_base));
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
->
-> ? ? ? ?irq_gc_lock(gc);
-> - ? ? ? irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
-> + ? ? ? irq_reg_writel(~mask, gc->reg_base + cur_regs(d)->ack);
-> ? ? ? ?irq_gc_unlock(gc);
-> ?}
->
-> @@ -136,7 +137,7 @@ void irq_gc_ack_clr_bit(struct irq_data *d)
-> ?void irq_gc_mask_disable_reg_and_ack(struct irq_data *d)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = 1 << (d->irq - gc->irq_base);
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
->
-> ? ? ? ?irq_gc_lock(gc);
-> ? ? ? ?irq_reg_writel(mask, gc->reg_base + cur_regs(d)->mask);
-> @@ -151,7 +152,7 @@ void irq_gc_mask_disable_reg_and_ack(struct irq_data *d)
-> ?void irq_gc_eoi(struct irq_data *d)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = 1 << (d->irq - gc->irq_base);
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
->
-> ? ? ? ?irq_gc_lock(gc);
-> ? ? ? ?irq_reg_writel(mask, gc->reg_base + cur_regs(d)->eoi);
-> @@ -169,7 +170,7 @@ void irq_gc_eoi(struct irq_data *d)
-> ?int irq_gc_set_wake(struct irq_data *d, unsigned int on)
-> ?{
-> ? ? ? ?struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> - ? ? ? u32 mask = 1 << (d->irq - gc->irq_base);
-> + ? ? ? u32 mask = (1 << d->hwirq) % 32;
->
-> ? ? ? ?if (!(mask & gc->wake_enabled))
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> @@ -220,6 +221,18 @@ EXPORT_SYMBOL_GPL(irq_alloc_generic_chip);
-> ?*/
-> ?static struct lock_class_key irq_nested_lock_class;
->
-> +static void irq_gc_setup_irq(struct irq_chip_generic *gc, int irq)
-> +{
-> + ? ? ? struct irq_chip_type *ct = gc->chip_types;
-> +
-> + ? ? ? if (gc->flags & IRQ_GC_INIT_NESTED_LOCK)
-> + ? ? ? ? ? ? ? irq_set_lockdep_class(irq, &irq_nested_lock_class);
-> +
-> + ? ? ? irq_set_chip_and_handler(irq, &ct->chip, ct->handler);
-> + ? ? ? irq_set_chip_data(irq, gc);
-> + ? ? ? irq_modify_status(irq, gc->irq_clr, gc->irq_set);
-> +}
-> +
-> ?/**
-> ?* irq_setup_generic_chip - Setup a range of interrupts with a generic chip
-> ?* @gc: ? ? ? ? ? ? ? ?Generic irq chip holding all data
-> @@ -247,21 +260,115 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
-> ? ? ? ?if (flags & IRQ_GC_INIT_MASK_CACHE)
-> ? ? ? ? ? ? ? ?gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
->
-> + ? ? ? gc->flags = flags;
-> + ? ? ? gc->irq_clr = clr;
-> + ? ? ? gc->irq_set = set;
-> +
-> ? ? ? ?for (i = gc->irq_base; msk; msk >>= 1, i++) {
-> ? ? ? ? ? ? ? ?if (!(msk & 0x01))
-> ? ? ? ? ? ? ? ? ? ? ? ?continue;
->
-> - ? ? ? ? ? ? ? if (flags & IRQ_GC_INIT_NESTED_LOCK)
-> - ? ? ? ? ? ? ? ? ? ? ? irq_set_lockdep_class(i, &irq_nested_lock_class);
-> -
-> - ? ? ? ? ? ? ? irq_set_chip_and_handler(i, &ct->chip, ct->handler);
-> - ? ? ? ? ? ? ? irq_set_chip_data(i, gc);
-> - ? ? ? ? ? ? ? irq_modify_status(i, clr, set);
-> + ? ? ? ? ? ? ? irq_gc_setup_irq(gc, i);
-> + ? ? ? ? ? ? ? irq_get_irq_data(i)->hwirq = i - gc->irq_base;
-> ? ? ? ?}
-> ? ? ? ?gc->irq_cnt = i - gc->irq_base;
-> ?}
-> ?EXPORT_SYMBOL_GPL(irq_setup_generic_chip);
->
-> +#ifdef CONFIG_IRQ_DOMAIN
-> +static int irq_gc_irq_domain_map(struct irq_domain *d, unsigned int irq,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?irq_hw_number_t hw)
-> +{
-> + ? ? ? struct irq_chip_generic **gc_array = d->host_data;
-> + ? ? ? struct irq_chip_generic *gc = gc_array[hw / 32];
-> +
-> + ? ? ? /* We need a valid irq number for suspend/resume functions */
-> + ? ? ? if ((int)gc->irq_base == -1)
-> + ? ? ? ? ? ? ? gc->irq_base = irq;
-> + ? ? ? irq_gc_setup_irq(gc, irq);
-> + ? ? ? return 0;
-> +}
-> +
-> +static struct irq_domain_ops irq_gc_irq_domain_ops = {
-> + ? ? ? .map = irq_gc_irq_domain_map,
-> + ? ? ? .xlate = irq_domain_xlate_onetwocell,
-
-Can we hard-enforce _xlate_twocell here?  Are there any users using
-just one cell?  Alternately, can we make the caller specify if one or
-two cells are expected?
-
-The irq_domain_ops structure should be const.
-
-> +};
-> +
-> +/*
-> + * irq_setup_generic_chip_domain - Setup a domain and N generic chips
-> + * @name: ? ? ?Name of the irq chip
-> + * @node: ? ? ?Device tree node pointer for domain
-> + * @num_ct: ? ?Number of irq_chip_type instances associated with this
-> + * @irq_base: ?Interrupt base nr for this chip
-> + * @reg_base: ?Register base address (virtual)
-> + * @handler: ? Default flow handler associated with this chip
-> + * @hwirq_cnt: Number of hw irqs for the domain
-> + * @flags: ? ? Flags for initialization
-> + * @clr: ? ? ? IRQ_* bits to clear
-> + * @set: ? ? ? IRQ_* bits to set
-> + * @gc_init_cb: ? ? ? ?Init callback function called for each generic irq chip created
-> + * @private ? ?Ptr to caller private data
-> + *
-> + * Set up an irq domain and N banks of 32 interrupts starting from gc->irq_base.
-> + * Note, this initializes all interrupts to the primary irq_chip_type and its
-> + * associated handler.
-> + */
-> +int irq_setup_generic_chip_domain(const char *name, struct device_node *node,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int num_ct, unsigned int irq_base,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void __iomem *reg_base,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq_flow_handler_t handler, u32 hwirq_cnt,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum irq_gc_flags flags, unsigned int clr,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int set,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void (*gc_init_cb)(struct irq_chip_generic *),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *private)
-> +{
-> + ? ? ? int ret, i;
-> + ? ? ? u32 msk = 0;
-> + ? ? ? struct irq_chip_generic **gc;
-> + ? ? ? struct irq_domain *d;
-> + ? ? ? int num_gc = (hwirq_cnt + 31) / 32;
-
-Use the ALIGN() macro.
-
-> +
-> + ? ? ? gc = kzalloc(num_gc * sizeof(struct irq_chip_generic *), GFP_KERNEL);
-> + ? ? ? if (!gc)
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> +
-> + ? ? ? if (node)
-> + ? ? ? ? ? ? ? d = irq_domain_add_linear(node, hwirq_cnt, &irq_gc_irq_domain_ops, gc);
-> + ? ? ? else {
-> + ? ? ? ? ? ? ? msk = IRQ_MSK(32);
-> + ? ? ? ? ? ? ? d = irq_domain_add_legacy(node, hwirq_cnt, irq_base, 0,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &irq_gc_irq_domain_ops, gc);
-> + ? ? ? }
-> +
-> + ? ? ? for (i = 0; i < num_gc; i++) {
-> + ? ? ? ? ? ? ? gc[i] = irq_alloc_generic_chip(name, num_ct, irq_base,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?reg_base, handler);
-> + ? ? ? ? ? ? ? if (!gc[i]) {
-> + ? ? ? ? ? ? ? ? ? ? ? ret = -ENOMEM;
-> + ? ? ? ? ? ? ? ? ? ? ? goto err;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? gc[i]->hwirq_base = i * 32;
-> + ? ? ? ? ? ? ? gc[i]->domain = d;
-> + ? ? ? ? ? ? ? gc[i]->private = private;
-> +
-> + ? ? ? ? ? ? ? gc_init_cb(gc[i]);
-> +
-> + ? ? ? ? ? ? ? irq_setup_generic_chip(gc[i], msk, flags, clr, set);
-> +
-> + ? ? ? ? ? ? ? irq_base += node ? 0 : 32;
-> + ? ? ? }
-> +
-> + ? ? ? return 0;
-> +
-> + err:
-> + ? ? ? for ( ; i >= 0; i--)
-> + ? ? ? ? ? ? ? kfree(gc[i]);
-> + ? ? ? kfree(gc);
-> + ? ? ? return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(irq_setup_generic_chip_domain);
-> +#endif
-> +
-> ?/**
-> ?* irq_setup_alt_chip - Switch to alternative chip
-> ?* @d: ? ? ? ? irq_data for this interrupt
-> @@ -324,9 +431,10 @@ static int irq_gc_suspend(void)
->
-> ? ? ? ?list_for_each_entry(gc, &gc_list, list) {
-> ? ? ? ? ? ? ? ?struct irq_chip_type *ct = gc->chip_types;
-> + ? ? ? ? ? ? ? struct irq_data *data = irq_get_irq_data(gc->irq_base);
->
-> - ? ? ? ? ? ? ? if (ct->chip.irq_suspend)
-> - ? ? ? ? ? ? ? ? ? ? ? ct->chip.irq_suspend(irq_get_irq_data(gc->irq_base));
-> + ? ? ? ? ? ? ? if (ct->chip.irq_suspend && data)
-> + ? ? ? ? ? ? ? ? ? ? ? ct->chip.irq_suspend(data);
-> ? ? ? ?}
-> ? ? ? ?return 0;
-> ?}
-> @@ -337,9 +445,10 @@ static void irq_gc_resume(void)
->
-> ? ? ? ?list_for_each_entry(gc, &gc_list, list) {
-> ? ? ? ? ? ? ? ?struct irq_chip_type *ct = gc->chip_types;
-> + ? ? ? ? ? ? ? struct irq_data *data = irq_get_irq_data(gc->irq_base);
->
-> - ? ? ? ? ? ? ? if (ct->chip.irq_resume)
-> - ? ? ? ? ? ? ? ? ? ? ? ct->chip.irq_resume(irq_get_irq_data(gc->irq_base));
-> + ? ? ? ? ? ? ? if (ct->chip.irq_resume && data)
-> + ? ? ? ? ? ? ? ? ? ? ? ct->chip.irq_resume(data);
-> ? ? ? ?}
-> ?}
-> ?#else
-> @@ -353,9 +462,10 @@ static void irq_gc_shutdown(void)
->
-> ? ? ? ?list_for_each_entry(gc, &gc_list, list) {
-> ? ? ? ? ? ? ? ?struct irq_chip_type *ct = gc->chip_types;
-> + ? ? ? ? ? ? ? struct irq_data *data = irq_get_irq_data(gc->irq_base);
->
-> - ? ? ? ? ? ? ? if (ct->chip.irq_pm_shutdown)
-> - ? ? ? ? ? ? ? ? ? ? ? ct->chip.irq_pm_shutdown(irq_get_irq_data(gc->irq_base));
-> + ? ? ? ? ? ? ? if (ct->chip.irq_pm_shutdown && data)
-> + ? ? ? ? ? ? ? ? ? ? ? ct->chip.irq_pm_shutdown(data);
-> ? ? ? ?}
-> ?}
->
-> --
-> 1.7.5.4
->
+Guess what happens if I set autosuspend_delay_ms to 0?
+Massive transmit problems.  Driver can hardly get anything out before the
+UART's fclk is cut...
 
 
+> 
+> What's probably happening in this case is that the hwmod code is rewriting 
+> the UART SIDLEMODE bits in the hwmod code's _idle() function.  This gets 
+> called as part of the PM runtime suspend operation.  So it's bypassing 
+> your debugging hack :-)  The hwmod code expects to control the SYSCONFIG 
+> register bits itself, and the current way that the UART driver messes with 
+> the SYSCONFIG bits is a total hack that that hwmod code is not expecting.  
+> You could try disabling that behavior in _idle_sysc() by adding a hack to 
+> skip it if it's the UART3 hwmod.
+> 
+> > When we turn off a clock, if that is the last clock in the clock-domain, we
+> > also turn off the clock-domain (I think).
+> 
+> That's only true if the clockdomain is programmed to use 
+> software-supervised idle.  CORE & PER should both be programmed to 
+> hardware-supervised idle by mach-omap2/pm34xx.c.  In that case, we let the 
+> PRCM put the clockdomain to sleep by itself.
+> 
+> > Could it be that the clock-domain doesn't do any handshaking with modules,
+> > and so turns off the clocks even though they are being used?
+> 
+> Probably not -- I'd think that hardware-supervised idle wouldn't work at 
+> all if that were true.
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Thanks for those hints.  Next time I dive into the code/doco they might help
+me understand a bit more.
+
+Thanks,
+NeilBrown
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120204/f757a1ca/attachment.sig>
