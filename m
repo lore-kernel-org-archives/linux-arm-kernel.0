@@ -1,34 +1,40 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 5 Feb 2012 00:55:18 +0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <20120203210545.GE1426@atomide.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <20120201143530.GA2203@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF178E124AC5@HQMAIL01.nvidia.com>
- <CAA+hA=RpkP-FFAr8wqVPjSKEMvO_sRHmOK_9nUYfuW=ps0O_=Q@mail.gmail.com>
- <20120203173205.GB1426@atomide.com>
- <CAA+hA=QFB7x0yv65LMuLx1exmiUAuB98D+9Fyyk9oeVu+7F2QQ@mail.gmail.com>
- <20120203210545.GE1426@atomide.com>
-Message-ID: <CAA+hA=ThTuGnedNk_KnYLpquZ7EG+b6yU+GSoiS8qiWUB=_0fw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 4 Feb 2012 09:55:49 -0700 (MST)
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1202040943450.9453@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+ <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
+ <20120204163931.GH1275@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202040943450.9453@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1202040952250.9453@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 4, 2012 at 5:05 AM, Tony Lindgren <tony@atomide.com> wrote:
-....
->> I'm think the new way which i sent in this thread after the mail you replied.
->> You can refer to them to see if it's reasonable for you too.
->
-> Hmm, sorry now I'm confused. Got a link for that mail as so
-> many have been posted?
->
-Pls see:
-https://lkml.org/lkml/2012/2/3/276
+On Sat, 4 Feb 2012, Paul Walmsley wrote:
 
-For a simple example, you can refer to.
-https://lkml.org/lkml/2012/2/2/405
+> The default behavior needs to be what you state: to not lose characters.  
+> And indeed that is what it is in v3.3: the UART will not enter idle when 
+> the PM runtime autosuspend timeout is -1.  
 
-Shawn and me will attend Linaro connect meeting on Feb 6th.
-If you also attend, we may discuss it together with Linus and Stephen.
+One technical correction on this section -- rather, the CORE* clockdomains 
+will not be allowed to go idle when the PM runtime autosuspend timeout is 
+-1.  And that is what causes the character loss.  The rest of the E-mail 
+stands.
 
-Regards
-Dong Aisheng
+The question of whether the UART should be allowed to enter idle is a 
+different one, since the current driver is not properly working in this 
+regard, which is why we're not getting RX timeout events, etc.  We should 
+be able to have the proper RX timeout behavior, and therefore use normal 
+FIFO thresholds, by fixing some of the bugs in the existing driver.
+
+
+- Paul
