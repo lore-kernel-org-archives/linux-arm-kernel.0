@@ -1,55 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 4 Feb 2012 12:37:06 -0700 (MST)
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120204175528.GL1275@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
- <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
- <alpine.DEB.2.00.1202040928320.9453@utopia.booyaka.com>
- <20120204165736.GI1275@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1202041029520.9453@utopia.booyaka.com>
- <20120204175528.GL1275@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1202041224170.9453@utopia.booyaka.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 04 Feb 2012 15:00:14 -0500 (EST)
+Subject: [PATCHv2] [ARM][Orion] Fix Orion5x GPIO regression
+In-Reply-To: <1328362326-10832-1-git-send-email-andrew@lunn.ch>
+References: <1328362326-10832-1-git-send-email-andrew@lunn.ch>
+Message-ID: <alpine.LFD.2.02.1202041456550.2759@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 Feb 2012, Russell King - ARM Linux wrote:
+On Sat, 4 Feb 2012, Andrew Lunn wrote:
 
-> On Sat, Feb 04, 2012 at 10:32:16AM -0700, Paul Walmsley wrote:
-> > On Sat, 4 Feb 2012, Russell King - ARM Linux wrote:
-> > 
-> > > [detailed discussion of framing errors]
-> > 
-> > Thanks for the detailed description.  If the driver is in fact discarding 
-> > characters with framing errors -- which I have not personally verified -- 
-> > then taking further action there is pointless.
+> Patchset "ARM: orion: Refactor the MPP code common in the orion
+> platform" broke at least Orion5x based platforms. These platforms have
+> pins configured as GPIO when the selector is not 0x0. However the
+> common code assumes the selector is always 0x0 for a GPIO lines. It
+> then ignores the GPIO bits in the MPP definitions, resulting in that
+> Orion5x machines cannot correctly configure there GPIO lines.
 > 
-> Paul, I know you don't particularly like me getting involved with OMAP
-> issues, but tough.  You don't seem to understand some of these issues so
-> you're going to get more explanation.
+> The Fix removes the assumption that the selector is always 0x0.
+> In order that none GPIO configurations are correctly blocked,
+> Kirkwood and mv78xx0 MPP definitions are corrected to only set the
+> GPIO bits for GPIO configurations.
+> 
+> This second version does not contain any whitespace changes.
 
-Hehe.  Oh, hurt me again with more explanation, please ;-)  I can't take 
-it ;-)  I happen to enjoy many of your technical explanations.  Doesn't 
-necessarily mean that we're always in agreement, though.
-
-As for the part about not wanting you involved with OMAP, that's an 
-interesting perspective, considering I mentioned to you at ELC-E last year 
-my appreciation of your technical review on the lists.  And you'll 
-probably note, if you care to review the lists, that many of my E-mail 
-responses express gratitude for your comments... including the one you 
-quoted.
-
-Of course the snarky, personal bits can be unnecessarily irritating, but 
-anyone who's in this line of work just has to deal with them, it seems.
-
-So if you want to believe otherwise, there's nothing I can do to control 
-that.  But you should represent this as your personal perspective, and 
-not as someone else's, e.g., mine.
+The patch doesn't apply to v3.3-rc2.  Changes to  
+arch/arm/mach-kirkwood/mpp.h are rejected, meaning the whole 160 lines.  
+Could you have a look please?
 
 
-- Paul
+Nicolas
