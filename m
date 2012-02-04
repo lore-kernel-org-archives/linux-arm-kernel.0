@@ -1,60 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 4 Feb 2012 12:24:07 -0700 (MST)
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120204174715.GK1275@n2100.arm.linux.org.uk>
-References: <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
- <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
- <20120204163931.GH1275@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1202040943450.9453@utopia.booyaka.com>
- <20120204170114.GJ1275@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1202041005270.9453@utopia.booyaka.com>
- <20120204174715.GK1275@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1202041211150.9453@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 4 Feb 2012 11:30:32 -0800
+Subject: [PATCH] arm: fix build failure in mach-bcmring/arch.c
+In-Reply-To: <4F1E00BB.9070705@broadcom.com>
+References: <1327263990-8769-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F1E00BB.9070705@broadcom.com>
+Message-ID: <CAOesGMj9nRAXLwn+B7W_A4eOwwZJBHLiyHUKhC+T1ty4To5D7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 Feb 2012, Russell King - ARM Linux wrote:
+On Mon, Jan 23, 2012 at 4:52 PM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
+> On 1/22/2012 12:26 PM, Paul Gortmaker wrote:
+>>
+>> Upstream commit d1fce9c115eeb93e01c01732dfe9a86cf76009cf
+>>
+>> ? ? "ARM: restart: bcmring: use new restart hook"
+>>
+>> breaks building of this platform, since what used to be the
+>> last field of the MACHINE_START/END block didn't have a
+>> trailing comma. ?Once another field was added below, we get:
+>>
+>> arch/arm/mach-bcmring/arch.c:198: error: request for member 'restart' in
+>> something not a structure or union
+>>
+>> Signed-off-by: Paul Gortmaker<paul.gortmaker@windriver.com>
+>>
+>> diff --git a/arch/arm/mach-bcmring/arch.c b/arch/arm/mach-bcmring/arch.c
+>> index 9e5e755..45c97b1 100644
+>> --- a/arch/arm/mach-bcmring/arch.c
+>> +++ b/arch/arm/mach-bcmring/arch.c
+>> @@ -194,6 +194,6 @@ MACHINE_START(BCMRING, "BCMRING")
+>> ? ? ? ?.init_early = bcmring_init_early,
+>> ? ? ? ?.init_irq = bcmring_init_irq,
+>> ? ? ? ?.timer =&bcmring_timer,
+>> - ? ? ? .init_machine = bcmring_init_machine
+>> + ? ? ? .init_machine = bcmring_init_machine,
+>> ? ? ? ?.restart = bcmring_restart,
+>> ?MACHINE_END
+>
+>
+> Acked-by: Jiandong Zheng <jdzheng@broadcom.com>
 
-> On Sat, Feb 04, 2012 at 10:22:27AM -0700, Paul Walmsley wrote:
-> > No, that is not an example of a protocol with a retry.  That is an example 
-> > of a protocol that has no provision for reliable data delivery.  Sending a 
-> > new data string one second later is not a retry.
-> > 
-> > In such situations, the system integrator would just use the UART in the 
-> > default (lossless) mode.  And if they don't, they'll have to deal with the 
-> > consequences that they chose.  Those of us who ship battery-powered Linux 
-> > devices are indeed capable of making this choice.
-> 
-> Okay, lets see.  You're making a battery powered Linux device.  It has
-> a standard RS232 serial port available, and you allow users to load
-> 'apps' onto it.
-> 
-> Do you run the serial ports in lossless mode?
-
-Not every serial port is available to arbitrary 'apps.'.  Not every 
-battery-powered Linux device allows users to run arbitrary 'apps.'
-
-On devices that do allow users to load arbitrary 'apps,' and that allow 
-those 'apps' to have direct access to the serial ports, I personally 
-believe that system integrators should not change the default OMAP serial 
-setting, which is to run the serial ports in lossless mode.
-
-Here is another example.  Suppose someone builds a GPS receiver with an 
-OMAP that is capable of sending NMEA position sentences, once per second, 
-to a remotely connected serial device.  No receive traffic is expected on 
-that port.
-
-The position you seem to be advocating is that the mainline Linux kernel 
-should not support any ability to allow the system integrator to 
-affirmatively instruct the SoC to enter device idle between those position 
-sentences.  This will cause the SoC to consume energy to losslessly 
-handle an incoming serial character that will never come.  Is that really 
-what you're advocating?
+Thanks, applied to arm-soc fixes for -rc.
 
 
-- Paul
+-Olof
