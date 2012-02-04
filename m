@@ -1,40 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 4 Feb 2012 18:00:16 +0000
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
-References: <alpine.LFD.2.02.1202022016480.2759@xanadu.home>
- <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20120204180016.GB30910@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 4 Feb 2012 10:59:22 -0800
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <20120204174715.GK1275@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+ <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
+ <20120204163931.GH1275@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202040943450.9453@utopia.booyaka.com>
+ <20120204170114.GJ1275@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202041005270.9453@utopia.booyaka.com>
+ <20120204174715.GK1275@n2100.arm.linux.org.uk>
+Message-ID: <20120204185922.GK20333@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 02:03:49AM +0000, Stephen Boyd wrote:
-> armv7's flush_cache_all() flushes caches via set/way. To
-> determine the cache attributes (line size, number of sets,
-> etc.) the assembly first writes the CSSELR register to select a
-> cache level and then reads the CCSIDR register. The CSSELR register
-> is banked per-cpu and is used to determine which cache level CCSIDR
-> reads. If the task is migrated between when the CSSELR is written and
-> the CCSIDR is read the CCSIDR value may be for an unexpected cache
-> level (for example L1 instead of L2) and incorrect cache flushing
-> could occur.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120204 09:16]:
+> On Sat, Feb 04, 2012 at 10:22:27AM -0700, Paul Walmsley wrote:
+> > No, that is not an example of a protocol with a retry.  That is an example 
+> > of a protocol that has no provision for reliable data delivery.  Sending a 
+> > new data string one second later is not a retry.
+> > 
+> > In such situations, the system integrator would just use the UART in the 
+> > default (lossless) mode.  And if they don't, they'll have to deal with the 
+> > consequences that they chose.  Those of us who ship battery-powered Linux 
+> > devices are indeed capable of making this choice.
 > 
-> Disable interrupts across the write and read so that the correct
-> cache attributes are read and used for the cache flushing
-> routine. We disable interrupts instead of disabling preemption
-> because the critical section is only 3 instructions and we want
-> to call v7_dcache_flush_all from __v7_setup which doesn't have a
-> full kernel stack with a struct thread_info.
+> Okay, lets see.  You're making a battery powered Linux device.  It has
+> a standard RS232 serial port available, and you allow users to load
+> 'apps' onto it.
 > 
-> This fixes a problem we see in scm_call() when flush_cache_all()
-> is called from preemptible context and sometimes the L2 cache is
-> not properly flushed out.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Do you run the serial ports in lossless mode?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+The default should always be the lossless mode. If the clocks for the
+serial port are cut off based on a timer, the timer should be port
+specific, and default to 0.
 
--- 
-Catalin
+Then if some app using the port wants to intentionall enable automatic
+disabling of the clocks, it can still do it.
+
+Regards,
+
+Tony
