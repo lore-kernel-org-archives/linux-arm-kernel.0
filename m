@@ -1,137 +1,165 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 04 Feb 2012 09:39:46 +0000
-Subject: [PATCH 05/13] FB: sa1100: combine RGB bitfield overrides into
- sa1100fb_mach_info
+Date: Sat, 04 Feb 2012 09:40:07 +0000
+Subject: [PATCH 06/13] FB: sa1100: move machine inf structures to
+ <video/sa1100fb.h>
 In-Reply-To: <20120204093744.GQ889@n2100.arm.linux.org.uk>
 References: <20120204093744.GQ889@n2100.arm.linux.org.uk>
-Message-ID: <E1Rtc5y-0000ad-Pa@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Rtc6J-0000ah-76@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the sa1100fb_mach_info structure to carry the RGB bitfield
-overrides, rather than requiring them to be separately initialized
-in sa1100fb_get_machine_info().
+Move the LCD data structures to an include file which can be shared
+with the board code in arch/arm/mach-sa1100.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/video/sa1100fb.c |   21 ++++++++++++++-------
- drivers/video/sa1100fb.h |   22 ++++++++++------------
- 2 files changed, 24 insertions(+), 19 deletions(-)
+ drivers/video/sa1100fb.c |    6 ++++-
+ drivers/video/sa1100fb.h |   42 --------------------------------
+ include/video/sa1100fb.h |   59 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 64 insertions(+), 43 deletions(-)
+ create mode 100644 include/video/sa1100fb.h
 
 diff --git a/drivers/video/sa1100fb.c b/drivers/video/sa1100fb.c
-index ecd7cd4..a905e20 100644
+index a905e20..8f5557a 100644
 --- a/drivers/video/sa1100fb.c
 +++ b/drivers/video/sa1100fb.c
-@@ -252,6 +252,13 @@ static struct sa1100fb_mach_info pal_info __devinitdata = {
- #endif
+@@ -178,6 +178,8 @@
+ #include <linux/mutex.h>
+ #include <linux/io.h>
  
- #ifdef CONFIG_SA1100_H3600
-+static const struct sa1100fb_rgb h3600_rgb_16 = {
-+	.red	= { .offset = 12, .length = 4, },
-+	.green	= { .offset = 7,  .length = 4, },
-+	.blue	= { .offset = 1,  .length = 4, },
-+	.transp	= { .offset = 0,  .length = 0, },
-+};
++#include <video/sa1100fb.h>
 +
- static struct sa1100fb_mach_info h3600_info __devinitdata = {
- 	.pixclock	= 174757, 	.bpp		= 16,
- 	.xres		= 320,		.yres		= 240,
-@@ -264,13 +271,8 @@ static struct sa1100fb_mach_info h3600_info __devinitdata = {
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ #include <mach/assabet.h>
+@@ -1388,7 +1390,9 @@ static struct sa1100fb_info * __devinit sa1100fb_init_fbinfo(struct device *dev)
+ 	fbi->rgb[RGB_8]		= &rgb_8;
+ 	fbi->rgb[RGB_16]	= &def_rgb_16;
  
- 	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
- 	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
--};
+-	inf = sa1100fb_get_machine_info(fbi);
++	inf = dev->platform_data;
++	if (!inf)
++		inf = sa1100fb_get_machine_info(fbi);
  
--static const struct sa1100fb_rgb h3600_rgb_16 = {
--	.red	= { .offset = 12, .length = 4, },
--	.green	= { .offset = 7,  .length = 4, },
--	.blue	= { .offset = 1,  .length = 4, },
--	.transp	= { .offset = 0,  .length = 0, },
-+	.rgb[RGB_16] = &h3600_rgb_16,
- };
- #endif
- 
-@@ -413,7 +415,6 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
- #ifdef CONFIG_SA1100_H3600
- 	if (machine_is_h3600()) {
- 		inf = &h3600_info;
--		fbi->rgb[RGB_16] = &h3600_rgb_16;
- 	}
- #endif
- #ifdef CONFIG_SA1100_COLLIE
-@@ -1352,6 +1353,7 @@ static struct sa1100fb_info * __devinit sa1100fb_init_fbinfo(struct device *dev)
- {
- 	struct sa1100fb_mach_info *inf;
- 	struct sa1100fb_info *fbi;
-+	unsigned i;
- 
- 	fbi = kmalloc(sizeof(struct sa1100fb_info) + sizeof(u32) * 16,
- 		      GFP_KERNEL);
-@@ -1424,6 +1426,11 @@ static struct sa1100fb_info * __devinit sa1100fb_init_fbinfo(struct device *dev)
- 	fbi->fb.fix.smem_len		= fbi->max_xres * fbi->max_yres *
- 					  fbi->max_bpp / 8;
- 
-+	/* Copy the RGB bitfield overrides */
-+	for (i = 0; i < NR_RGB; i++)
-+		if (inf->rgb[i])
-+			fbi->rgb[i] = inf->rgb[i];
-+
- 	init_waitqueue_head(&fbi->ctrlr_wait);
- 	INIT_WORK(&fbi->task, sa1100fb_task);
- 	mutex_init(&fbi->ctrlr_lock);
+ 	/*
+ 	 * People just don't seem to get this.  We don't support
 diff --git a/drivers/video/sa1100fb.h b/drivers/video/sa1100fb.h
-index b1d5b08..77239b7 100644
+index 77239b7..9ff9ba9 100644
 --- a/drivers/video/sa1100fb.h
 +++ b/drivers/video/sa1100fb.h
-@@ -10,10 +10,12 @@
+@@ -10,48 +10,6 @@
   * for more details.
   */
  
--/*
-- * These are the bitfields for each
-- * display depth that we support.
-- */
+-#define RGB_4	0
+-#define RGB_8	1
+-#define RGB_16	2
+-#define NR_RGB	3
+-
+-/* These are the bitfields for each display depth that we support. */
+-struct sa1100fb_rgb {
+-	struct fb_bitfield	red;
+-	struct fb_bitfield	green;
+-	struct fb_bitfield	blue;
+-	struct fb_bitfield	transp;
+-};
+-
+-/* This structure describes the machine which we are running on. */
+-struct sa1100fb_mach_info {
+-	u_long		pixclock;
+-
+-	u_short		xres;
+-	u_short		yres;
+-
+-	u_char		bpp;
+-	u_char		hsync_len;
+-	u_char		left_margin;
+-	u_char		right_margin;
+-
+-	u_char		vsync_len;
+-	u_char		upper_margin;
+-	u_char		lower_margin;
+-	u_char		sync;
+-
+-	u_int		cmap_greyscale:1,
+-			cmap_inverse:1,
+-			cmap_static:1,
+-			unused:29;
+-
+-	u_int		lccr0;
+-	u_int		lccr3;
+-
+-	/* Overrides for the default RGB maps */
+-	const struct sa1100fb_rgb *rgb[NR_RGB];
+-};
+-
+ /* Shadows for LCD controller registers */
+ struct sa1100fb_lcd_reg {
+ 	unsigned long lccr0;
+diff --git a/include/video/sa1100fb.h b/include/video/sa1100fb.h
+new file mode 100644
+index 0000000..e73c813
+--- /dev/null
++++ b/include/video/sa1100fb.h
+@@ -0,0 +1,59 @@
++/*
++ * StrongARM 1100 LCD Controller Frame Buffer Device
++ *
++ * Copyright (C) 1999 Eric A. Thomas
++ *  Based on acornfb.c Copyright (C) Russell King.
++ *  
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file COPYING in the main directory of this archive
++ * for more details.
++ */
++#ifndef _VIDEO_SA1100FB_H
++#define _VIDEO_SA1100FB_H
++
++#include <linux/fb.h>
++#include <linux/types.h>
++
 +#define RGB_4	0
 +#define RGB_8	1
 +#define RGB_16	2
 +#define NR_RGB	3
 +
 +/* These are the bitfields for each display depth that we support. */
- struct sa1100fb_rgb {
- 	struct fb_bitfield	red;
- 	struct fb_bitfield	green;
-@@ -21,9 +23,7 @@ struct sa1100fb_rgb {
- 	struct fb_bitfield	transp;
- };
- 
--/*
-- * This structure describes the machine which we are running on.
-- */
++struct sa1100fb_rgb {
++	struct fb_bitfield	red;
++	struct fb_bitfield	green;
++	struct fb_bitfield	blue;
++	struct fb_bitfield	transp;
++};
++
 +/* This structure describes the machine which we are running on. */
- struct sa1100fb_mach_info {
- 	u_long		pixclock;
- 
-@@ -47,6 +47,9 @@ struct sa1100fb_mach_info {
- 
- 	u_int		lccr0;
- 	u_int		lccr3;
++struct sa1100fb_mach_info {
++	u_long		pixclock;
++
++	u_short		xres;
++	u_short		yres;
++
++	u_char		bpp;
++	u_char		hsync_len;
++	u_char		left_margin;
++	u_char		right_margin;
++
++	u_char		vsync_len;
++	u_char		upper_margin;
++	u_char		lower_margin;
++	u_char		sync;
++
++	u_int		cmap_greyscale:1,
++			cmap_inverse:1,
++			cmap_static:1,
++			unused:29;
++
++	u_int		lccr0;
++	u_int		lccr3;
 +
 +	/* Overrides for the default RGB maps */
 +	const struct sa1100fb_rgb *rgb[NR_RGB];
- };
- 
- /* Shadows for LCD controller registers */
-@@ -57,11 +60,6 @@ struct sa1100fb_lcd_reg {
- 	unsigned long lccr3;
- };
- 
--#define RGB_4	(0)
--#define RGB_8	(1)
--#define RGB_16	(2)
--#define NR_RGB	3
--
- struct sa1100fb_info {
- 	struct fb_info		fb;
- 	struct device		*dev;
++};
++
++#endif
 -- 
 1.7.4.4
