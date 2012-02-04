@@ -1,100 +1,61 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Sat, 4 Feb 2012 14:06:15 -0800
-Subject: [RFC PATCH v4 1/4] cpuidle: Add time keeping and irq enabling
-In-Reply-To: <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
-References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
- <1328065215-28108-2-git-send-email-rob.lee@linaro.org>
- <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
-Message-ID: <CAJOA=zOhKtt5GohHfYp6=xVTODR2a_RGkDNTwozbusrBSsqE+w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 4 Feb 2012 22:17:48 +0000
+Subject: [PATCH v3 00/25] irq_domain generalization and refinement
+In-Reply-To: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
+References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <20120204221748.GN14129@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 4, 2012 at 11:02 AM, Colin Cross <ccross@google.com> wrote:
-> On Tue, Jan 31, 2012 at 7:00 PM, Robert Lee <rob.lee@linaro.org> wrote:
->> Make necessary changes to add implement time keepign and irq enabling
-> keeping
->> in the core cpuidle code. ?This will allow the remove of these
->> functionalities from the platform cpuidle implementations.
->>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->> ---
->> ?drivers/cpuidle/cpuidle.c | ? 75 +++++++++++++++++++++++++++++++++++---------
->> ?include/linux/cpuidle.h ? | ? 26 ++++++++++-----
->> ?2 files changed, 76 insertions(+), 25 deletions(-)
->>
->> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
->> index 59f4261..8ea0fc3 100644
->> --- a/drivers/cpuidle/cpuidle.c
->> +++ b/drivers/cpuidle/cpuidle.c
->> @@ -57,14 +57,18 @@ static int __cpuidle_register_device(struct cpuidle_device *dev);
->> ?* cpuidle_idle_call - the main idle loop
->> ?*
->> ?* NOTE: no locks or semaphores should be used here
->> + * NOTE: Should only be called from a local irq disabled context
->> ?* return non-zero on failure
->> + *
->> ?*/
->> ?int cpuidle_idle_call(void)
->> ?{
->> ? ? ? ?struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
->> ? ? ? ?struct cpuidle_driver *drv = cpuidle_get_driver();
->> ? ? ? ?struct cpuidle_state *target_state;
->> - ? ? ? int next_state, entered_state;
->> + ? ? ? int idx, ret = 0;
->> + ? ? ? ktime_t t1, t2;
->> + ? ? ? s64 diff;
->>
->> ? ? ? ?if (off)
->> ? ? ? ? ? ? ? ?return -ENODEV;
->> @@ -86,37 +90,76 @@ int cpuidle_idle_call(void)
->> ?#endif
->>
->> ? ? ? ?/* ask the governor for the next state */
->> - ? ? ? next_state = cpuidle_curr_governor->select(drv, dev);
->> + ? ? ? idx = cpuidle_curr_governor->select(drv, dev);
->> +
->> + ? ? ? target_state = &drv->states[idx];
->> +
->> + ? ? ? /*
->> + ? ? ? ?* Check with the device to see if it can enter this state or if another
->> + ? ? ? ?* state should be used.
->> + ? ? ? ?*/
->> + ? ? ? if (target_state->pre_enter) {
->> + ? ? ? ? ? ? ? idx = target_state->
->> + ? ? ? ? ? ? ? ? ? ? ? pre_enter(dev, drv, idx);
-> Unnecessary line wrap and braces.
->
-> What's the point of the pre_enter call? ?This seems very similar to
-> the prepare call that was removed in 3.2. ?Drivers can already demote
+On Fri, Jan 27, 2012 at 02:35:54PM -0700, Grant Likely wrote:
+> Hey everyone,
+> 
+> This patch series is ready for much wider consumption now.  I'd like
+> to get it into linux-next ASAP because there will be ARM board support
+> depending on it.  I'll wait a few days before I ask Stephen to pull
+> this in.
 
-Hi Colin,
+Grant,
 
-I asked Rob to re-introduce the .prepare callback (not .pre_enter).
+Can you answer me this: does this irqdomain support require DT?
 
-The short version of why I requested this is so that I can experiment
-with modifying wake-up latency and theshold values dynamically based
-on PM QoS constraints.  For an OMAP-specific example, I'd like to see
-our C-states no longer model both MPU and CORE power domains, and
-instead only model the MPU.  Then when entering idle the PM QoS
-constraints against the CORE power domain's wake-up latency can be
-considered in the .prepare callback which will affect the C-state
-parameters as well as program the CORE low power target state.
+The question comes up because OMAP has converted some of their support
+to require irq domain support for their PMICs, and it seems irq domain
+support requires DT.  This seems to have made the whole of OMAP
+essentially become a DT-only platform.
 
-.pre_enter isn't really right for the above case so I'm happy for it
-to be dropped, but I'll probably re-introduce something like .prepare
-in the future...
+Removing the dependency on IRQ_DOMAIN brings up these build errors
+in the twl-core code (that being the PMIC for OMAP CPUs):
 
-Regards,
-Mike
+drivers/mfd/twl-core.c: In function 'twl_probe':
+drivers/mfd/twl-core.c:1229: error: invalid use of undefined type 'struct irq_domain'
+drivers/mfd/twl-core.c:1230: error: invalid use of undefined type 'struct irq_domain'
+drivers/mfd/twl-core.c:1235: error: implicit declaration of function 'irq_domain_add'
 
-> the target state in their enter call. ?The only thing you do between
-> pre_enter and enter is trace and account for the time. ?Is there some
-> long call you don't want included in the idle time? ?Some
-> documentation would help, and you need to very clearly define the
-> semantics of when post_enter gets called when pre_enter or enter
-> return errors.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+That's a bit of a problem, because afaik there aren't the DT descriptions
+for the boards I have yet, so it's causing me to see regressions when
+building and booting kernels with CONFIG_OF=n.
+
+The more core-code we end up with which requires DT, the worse this
+problem is going to become - and obviously saying "everyone must now
+convert to DT" is, even today, a mammoth task.
+
+Now, here's the thing: I believe that IRQ domains - at least as far as
+the hwirq stuff - should be available irrespective of whether we have
+the rest of the IRQ domain support code in place, so that IRQ support
+code doesn't have to keep playing games to decode from the global
+space to the per-controller number space.
+
+I believe that would certainly help the current OMAP problems, where
+the current lack of CONFIG_IRQ_DOMAIN basically makes the kernel oops
+on boot.
+
+How we fix this regression for 3.4 I've no idea at present, I'm trying
+to work out what the real dependencies are for OMAP on this stuff.
+
+Finally, do we need asm/irq.h in our asm/prom.h ?  That's causing
+fragility between DT and non-DT builds, because people are finding
+that their DT builds work without their mach/irqs.h includes but
+fail when built with non-DT.  The only thing which DT might need -
+at the most - is NR_IRQS, but I'd hope with things like irq domains
+it doesn't actually require it.
