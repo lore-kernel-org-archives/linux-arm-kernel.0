@@ -1,30 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 4 Feb 2012 11:31:11 -0800
-Subject: [PATCH] ARM: bcmring: remove unused DMA map code
-In-Reply-To: <4F26E9A5.5010301@broadcom.com>
-References: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D3D12CE3@SJEXCHCCR02.corp.ad.broadcom.com>
- <CAOesGMhhh2bsC+sAZyyBOZw8Lgk1sR7e=ZB+RcnNJG-qDqiwtg@mail.gmail.com>
- <4F26E9A5.5010301@broadcom.com>
-Message-ID: <CAOesGMjxBg_ArFwtd5YfMZ=KiEkZ4TRCZnaJVtuVwJfbJdr4vg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 4 Feb 2012 12:37:06 -0700 (MST)
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <20120204175528.GL1275@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+ <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
+ <alpine.DEB.2.00.1202040928320.9453@utopia.booyaka.com>
+ <20120204165736.GI1275@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202041029520.9453@utopia.booyaka.com>
+ <20120204175528.GL1275@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1202041224170.9453@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 11:04 AM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
->> What is this patch based on? It doesn't apply on top of 3.3-rc1, nor
->> v3.2, 3.1, 3.0 or current linux-next.
->>
-> It is against v3.3-rc1. I attached the patch file now in case the email
-> system (outlook) messed up the format like line ending.
+On Sat, 4 Feb 2012, Russell King - ARM Linux wrote:
 
-Ok, that looks better.
+> On Sat, Feb 04, 2012 at 10:32:16AM -0700, Paul Walmsley wrote:
+> > On Sat, 4 Feb 2012, Russell King - ARM Linux wrote:
+> > 
+> > > [detailed discussion of framing errors]
+> > 
+> > Thanks for the detailed description.  If the driver is in fact discarding 
+> > characters with framing errors -- which I have not personally verified -- 
+> > then taking further action there is pointless.
+> 
+> Paul, I know you don't particularly like me getting involved with OMAP
+> issues, but tough.  You don't seem to understand some of these issues so
+> you're going to get more explanation.
 
->> Also, that SHA doesn't exist in the mainline tree, nor in linux-next.
->
-> Updated in attached patch file
+Hehe.  Oh, hurt me again with more explanation, please ;-)  I can't take 
+it ;-)  I happen to enjoy many of your technical explanations.  Doesn't 
+necessarily mean that we're always in agreement, though.
 
-Thanks!
+As for the part about not wanting you involved with OMAP, that's an 
+interesting perspective, considering I mentioned to you at ELC-E last year 
+my appreciation of your technical review on the lists.  And you'll 
+probably note, if you care to review the lists, that many of my E-mail 
+responses express gratitude for your comments... including the one you 
+quoted.
 
-Applied to arm-soc fixes branch for -rc.
+Of course the snarky, personal bits can be unnecessarily irritating, but 
+anyone who's in this line of work just has to deal with them, it seems.
+
+So if you want to believe otherwise, there's nothing I can do to control 
+that.  But you should represent this as your personal perspective, and 
+not as someone else's, e.g., mine.
 
 
--Olof
+- Paul
