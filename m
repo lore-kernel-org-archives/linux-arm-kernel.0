@@ -1,46 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 4 Feb 2012 10:59:22 -0800
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120204174715.GK1275@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
- <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
- <20120204163931.GH1275@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1202040943450.9453@utopia.booyaka.com>
- <20120204170114.GJ1275@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1202041005270.9453@utopia.booyaka.com>
- <20120204174715.GK1275@n2100.arm.linux.org.uk>
-Message-ID: <20120204185922.GK20333@atomide.com>
+From: ccross@google.com (Colin Cross)
+Date: Sat, 4 Feb 2012 11:02:47 -0800
+Subject: [RFC PATCH v4 1/4] cpuidle: Add time keeping and irq enabling
+In-Reply-To: <1328065215-28108-2-git-send-email-rob.lee@linaro.org>
+References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+ <1328065215-28108-2-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120204 09:16]:
-> On Sat, Feb 04, 2012 at 10:22:27AM -0700, Paul Walmsley wrote:
-> > No, that is not an example of a protocol with a retry.  That is an example 
-> > of a protocol that has no provision for reliable data delivery.  Sending a 
-> > new data string one second later is not a retry.
-> > 
-> > In such situations, the system integrator would just use the UART in the 
-> > default (lossless) mode.  And if they don't, they'll have to deal with the 
-> > consequences that they chose.  Those of us who ship battery-powered Linux 
-> > devices are indeed capable of making this choice.
-> 
-> Okay, lets see.  You're making a battery powered Linux device.  It has
-> a standard RS232 serial port available, and you allow users to load
-> 'apps' onto it.
-> 
-> Do you run the serial ports in lossless mode?
+On Tue, Jan 31, 2012 at 7:00 PM, Robert Lee <rob.lee@linaro.org> wrote:
+> Make necessary changes to add implement time keepign and irq enabling
+keeping
+> in the core cpuidle code. ?This will allow the remove of these
+> functionalities from the platform cpuidle implementations.
+>
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+> ?drivers/cpuidle/cpuidle.c | ? 75 +++++++++++++++++++++++++++++++++++---------
+> ?include/linux/cpuidle.h ? | ? 26 ++++++++++-----
+> ?2 files changed, 76 insertions(+), 25 deletions(-)
+>
+> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+> index 59f4261..8ea0fc3 100644
+> --- a/drivers/cpuidle/cpuidle.c
+> +++ b/drivers/cpuidle/cpuidle.c
+> @@ -57,14 +57,18 @@ static int __cpuidle_register_device(struct cpuidle_device *dev);
+> ?* cpuidle_idle_call - the main idle loop
+> ?*
+> ?* NOTE: no locks or semaphores should be used here
+> + * NOTE: Should only be called from a local irq disabled context
+> ?* return non-zero on failure
+> + *
+> ?*/
+> ?int cpuidle_idle_call(void)
+> ?{
+> ? ? ? ?struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
+> ? ? ? ?struct cpuidle_driver *drv = cpuidle_get_driver();
+> ? ? ? ?struct cpuidle_state *target_state;
+> - ? ? ? int next_state, entered_state;
+> + ? ? ? int idx, ret = 0;
+> + ? ? ? ktime_t t1, t2;
+> + ? ? ? s64 diff;
+>
+> ? ? ? ?if (off)
+> ? ? ? ? ? ? ? ?return -ENODEV;
+> @@ -86,37 +90,76 @@ int cpuidle_idle_call(void)
+> ?#endif
+>
+> ? ? ? ?/* ask the governor for the next state */
+> - ? ? ? next_state = cpuidle_curr_governor->select(drv, dev);
+> + ? ? ? idx = cpuidle_curr_governor->select(drv, dev);
+> +
+> + ? ? ? target_state = &drv->states[idx];
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Check with the device to see if it can enter this state or if another
+> + ? ? ? ?* state should be used.
+> + ? ? ? ?*/
+> + ? ? ? if (target_state->pre_enter) {
+> + ? ? ? ? ? ? ? idx = target_state->
+> + ? ? ? ? ? ? ? ? ? ? ? pre_enter(dev, drv, idx);
+Unnecessary line wrap and braces.
 
-The default should always be the lossless mode. If the clocks for the
-serial port are cut off based on a timer, the timer should be port
-specific, and default to 0.
-
-Then if some app using the port wants to intentionall enable automatic
-disabling of the clocks, it can still do it.
-
-Regards,
-
-Tony
+What's the point of the pre_enter call?  This seems very similar to
+the prepare call that was removed in 3.2.  Drivers can already demote
+the target state in their enter call.  The only thing you do between
+pre_enter and enter is trace and account for the time.  Is there some
+long call you don't want included in the idle time?  Some
+documentation would help, and you need to very clearly define the
+semantics of when post_enter gets called when pre_enter or enter
+return errors.
