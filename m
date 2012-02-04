@@ -1,44 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 4 Feb 2012 09:15:15 -0800
-Subject: Pinmux bindings proposal V2
-In-Reply-To: <CAA+hA=ThTuGnedNk_KnYLpquZ7EG+b6yU+GSoiS8qiWUB=_0fw@mail.gmail.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
- <20120201143530.GA2203@S2101-09.ap.freescale.net>
- <74CDBE0F657A3D45AFBB94109FB122FF178E124AC5@HQMAIL01.nvidia.com>
- <CAA+hA=RpkP-FFAr8wqVPjSKEMvO_sRHmOK_9nUYfuW=ps0O_=Q@mail.gmail.com>
- <20120203173205.GB1426@atomide.com>
- <CAA+hA=QFB7x0yv65LMuLx1exmiUAuB98D+9Fyyk9oeVu+7F2QQ@mail.gmail.com>
- <20120203210545.GE1426@atomide.com>
- <CAA+hA=ThTuGnedNk_KnYLpquZ7EG+b6yU+GSoiS8qiWUB=_0fw@mail.gmail.com>
-Message-ID: <20120204171515.GJ20333@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 4 Feb 2012 10:22:27 -0700 (MST)
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <20120204170114.GJ1275@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+ <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
+ <20120204163931.GH1275@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202040943450.9453@utopia.booyaka.com>
+ <20120204170114.GJ1275@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1202041005270.9453@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dong Aisheng <dongas86@gmail.com> [120204 08:24]:
-> On Sat, Feb 4, 2012 at 5:05 AM, Tony Lindgren <tony@atomide.com> wrote:
-> ....
-> >> I'm think the new way which i sent in this thread after the mail you replied.
-> >> You can refer to them to see if it's reasonable for you too.
-> >
-> > Hmm, sorry now I'm confused. Got a link for that mail as so
-> > many have been posted?
-> >
-> Pls see:
-> https://lkml.org/lkml/2012/2/3/276
+On Sat, 4 Feb 2012, Russell King - ARM Linux wrote:
+
+> On Sat, Feb 04, 2012 at 09:49:57AM -0700, Paul Walmsley wrote:
+> > There is indeed an argument here.  The decision of how to act in this 
+> > situation needs to be up to the user of the serial port.
+> > 
+> > The default behavior needs to be what you state: to not lose characters.  
+> > And indeed that is what it is in v3.3: the UART will not enter idle when 
+> > the PM runtime autosuspend timeout is -1.  
+> > 
+> > But in cases where there is a protocol that can handle retries, the system 
+> > integrator may well prefer the large power savings available by letting 
+> > the chip enter device idle, and take the added delay in the retransmission 
+> > process.
 > 
-> For a simple example, you can refer to.
-> https://lkml.org/lkml/2012/2/2/405
+> Rubbish.  Let's say I hook an OMAP platform up to a GPS, and the system
+> integrator has decided to set the idle timeout on all UARTs to .5 sec.
+> The GPS transmits data every second.  Yes, it effectively retries each
+> second, but there's no way to receive its complete transmission _ever_.
 
-Thanks for clarifying. Yes I'm using something that's a subset
-of that already, except I'm creating the functions and groups
-automatically.
+No, that is not an example of a protocol with a retry.  That is an example 
+of a protocol that has no provision for reliable data delivery.  Sending a 
+new data string one second later is not a retry.
 
-> Shawn and me will attend Linaro connect meeting on Feb 6th.
-> If you also attend, we may discuss it together with Linus and Stephen.
+In such situations, the system integrator would just use the UART in the 
+default (lossless) mode.  And if they don't, they'll have to deal with the 
+consequences that they chose.  Those of us who ship battery-powered Linux 
+devices are indeed capable of making this choice.
 
-Yes let's talk more there, I won't be there until on Tuesday
-the 7th though.
+One could argue that the PM runtime autosuspend timeout is not the 
+appropriate place to change this setting, and that it should be somewhere 
+else.  That's fine.  But that's a separate issue from removing the 
+functionality completely.
 
-Regards,
 
-Tony
+- Paul
