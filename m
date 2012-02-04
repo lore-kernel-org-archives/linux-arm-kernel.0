@@ -1,8 +1,8 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 3 Feb 2012 20:56:07 -0700 (MST)
+From: neilb@suse.de (NeilBrown)
+Date: Sat, 4 Feb 2012 15:17:38 +1100
 Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
  in non-DMA" added to tty tree
-In-Reply-To: <20120204144353.0803fe23@notabene.brown>
+In-Reply-To: <alpine.DEB.2.00.1202032050560.9453@utopia.booyaka.com>
 References: <13274430881471@kroah.org>
  <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
  <20120126042155.GA3185@suse.de>
@@ -21,24 +21,48 @@ References: <13274430881471@kroah.org>
  <20120204140923.063706c8@notabene.brown>
  <alpine.DEB.2.00.1202032014170.9453@utopia.booyaka.com>
  <20120204144353.0803fe23@notabene.brown>
-Message-ID: <alpine.DEB.2.00.1202032050560.9453@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202032050560.9453@utopia.booyaka.com>
+Message-ID: <20120204151738.0cbafa47@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 Feb 2012, NeilBrown wrote:
+On Fri, 3 Feb 2012 20:56:07 -0700 (MST) Paul Walmsley <paul@pwsan.com> wrote:
 
-> I have to set autosuspend_delay_ms for omap_uart.3 as well before the
-> behaviour is significant.
-> But then I see no output corruption.  Lots of input corruption of course but
-> the output looks fine.
+> On Sat, 4 Feb 2012, NeilBrown wrote:
+> 
+> > I have to set autosuspend_delay_ms for omap_uart.3 as well before the
+> > behaviour is significant.
+> > But then I see no output corruption.  Lots of input corruption of course but
+> > the output looks fine.
+> 
+> OK.  Is the input corruption at the beginning of the pasted buffer, or the 
+> middle?  And this is with CPUIdle enabled?
+> 
+> With CPUIdle disabled here, what I thought was output corruption occurs in 
+> the middle of the pasted buffer occasionally.  But it might be input 
+> corruption, if the CPU manages to empty the RX FIFO while the TX FIFO is 
+> empty.
+> 
+> 
+> - Paul
 
-OK.  Is the input corruption at the beginning of the pasted buffer, or the 
-middle?  And this is with CPUIdle enabled?
+Yes, cpu-idle is enabled.
 
-With CPUIdle disabled here, what I thought was output corruption occurs in 
-the middle of the pasted buffer occasionally.  But it might be input 
-corruption, if the CPU manages to empty the RX FIFO while the TX FIFO is 
-empty.
+I think corruption is mostly early, though it isn't very consistent.
+
+e.g.
+
+# C!jHhzys/Y?omap/omap_uart.2/power/autosuspend_delay_ms
+-bash: !jHhzys/Y?omap/omap_uart.2/power/autosuspend_delay_ms: event not found
+# echo 0 > /sys/devices/platFK/////mpWWt.]au%e_mHHHhQ 5
+-bash: /sys/devices/platFK/////mpWWt.]au%e_mHHHhQ: No such file or directory
 
 
-- Paul
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120204/40bbe317/attachment-0001.sig>
