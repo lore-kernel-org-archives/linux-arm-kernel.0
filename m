@@ -1,26 +1,48 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Sat, 4 Feb 2012 01:24:19 +0000
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <201202032221.11686.marek.vasut@gmail.com>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <201202032221.11686.marek.vasut@gmail.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498030350@039-SN2MPN1-021.039d.mgd.msft.net>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Sat, 4 Feb 2012 01:46:52 +0000
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <alpine.DEB.2.00.1202031731500.27947@utopia.booyaka.com>
+References: <13274430881471@kroah.org>
+ <alpine.DEB.2.00.1201251156361.5324@utopia.booyaka.com>
+ <20120126042155.GA3185@suse.de>
+ <alpine.DEB.2.00.1201252124470.11174@utopia.booyaka.com>
+ <20120126191604.GA15516@suse.de>
+ <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <20120203231113.25ae2d3a@notabene.brown>
+ <EF62F09C0797D947AD4180A1043C0DF73492FFC3@DLEE10.ent.ti.com>
+ <alpine.DEB.2.00.1202031731500.27947@utopia.booyaka.com>
+Message-ID: <EF62F09C0797D947AD4180A1043C0DF73493107B@DLEE10.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> Hi,
-> 
-> any updates on the MXS USB Host front?
-> 
-> M
 
-According to maintainer's suggestion, it needs to refine
-i.mx usb framework first, then mainline i.mx usb remaining
-drivers.
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Friday, February 03, 2012 7:00 PM
 
-http://www.spinics.net/lists/linux-usb/msg55061.html
+> > One irritation was some internal interrupt sources were not linked to
+> > low power wakeup events. If you were in interrupt mode and got
+> > characters below watermark you could sleep before interrupt status
+> > showed up (as you had to wait several frame times before functional
+> > interrupt asserted) but there was no wake at anticipated frame timeout
+> > because lack of linking of internal event to wake event.
+> 
+> Indeed, it seems that we are just now working around these wakeup-related
+> bugs.  Kind of surprising that no errata showed up for them.
 
-BR,
-Peter
+There have been errata over time in this area. Several I hit were updated at 3630 time. UART did get IER2 but I don't recall all details for UART.  Probably that is not being used.
+
+> What's particularly remarkable is that it looks like the UARTs will
+> idle-ack while their transmit FIFOs have data in them (!)
+
+Generally a module can ACK its ICLK if it is not used internally. The FCLK can push data out with out ICLK and is controlled separately always (omap4 changed encoding, to optional clock). This allows interconnect to idle during tx to save power. The trick is to ensure all module wakeup plumbing is enabled so a functional tx irq will flow.  Audits last showed several drivers missing steps (omap specific). Some drivers seemed to rely on static dependencies or coincident neighbor activity to allow their functional interrupt to flow... to many interdependent custom details... and yes some errata.
+
+Anyway, even with all SOC specific wake bits you may lose the character with latency of restart. Point I was raising was external chip hook can not be neglected as its part of equation.
+
+Regards,
+Richard W.
