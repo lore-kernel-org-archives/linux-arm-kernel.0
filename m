@@ -1,58 +1,117 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 4 Feb 2012 12:59:04 +0000
-Subject: [BUG] Multiple definition of pcibios_max_latency
-Message-ID: <20120204125904.GU889@n2100.arm.linux.org.uk>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Sat, 04 Feb 2012 14:11:13 +0100
+Subject: [PATCH 1/2] ARM: EXYNOS: Add files about definition of C2C
+In-Reply-To: <000501cce314$cf9fcff0$6edf6fd0$%lee@samsung.com>
+References: <000501cce314$cf9fcff0$6edf6fd0$%lee@samsung.com>
+Message-ID: <4F2D2E71.1030105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While building my test PXA configuration, I came across:
+Hi,
 
-drivers/built-in.o:(.data+0x230): multiple definition of `pcibios_max_latency'
-arch/arm/common/built-in.o:(.data+0x40c): first defined here
-make[1]: *** [vmlinux.o] Error 1
+On 02/04/2012 09:13 AM, Kisang Lee wrote:
+> Cc: Arnd Bergmann<arnd<at>  arndb.de>
+> Cc: Greg Kroah-Hartman<greg<at>  kroah.com>
+> 
+> Following files are added for C2C driver
+> c2c.h : Definition of C2C platform data and mode
+> regs-c2c.h : Definition of C2C registers
+>
+> Signed-off-by: Kisang Lee<kisang80.lee@samsung.com>
+> ---
+>   arch/arm/mach-exynos/include/mach/c2c.h      |   65 +++++++++++++++++++++++
+>   arch/arm/mach-exynos/include/mach/regs-c2c.h |   71 ++++++++++++++++++++++++++
+>   2 files changed, 136 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/mach-exynos/include/mach/c2c.h
+>   create mode 100644 arch/arm/mach-exynos/include/mach/regs-c2c.h
+> 
+...
+> diff --git a/arch/arm/mach-exynos/include/mach/regs-c2c.h b/arch/arm/mach-exynos/include/mach/regs-c2c.h
+> new file mode 100644
+> index 0000000..0c3d005
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/include/mach/regs-c2c.h
+> @@ -0,0 +1,71 @@
+> +/* linux/arch/arm/mach-exynos/include/mach/regs-c2c.h
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
 
-This was introduced by:
+2012 ?
 
-commit 96c5590058d7fded14f43af2ab521436cecf3125
-Author: Myron Stowe <mstowe@redhat.com>
-Date:   Fri Oct 28 15:48:38 2011 -0600
+> + * http://www.samsung.com/
+> + *
+> + * Register definition file for Samsung C2C
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#ifndef __ASM_ARM_REGS_S5P_C2C_H
+> +#define __ASM_ARM_REGS_S5P_C2C_H
+> +
+> +/***************************************************************/
+> +/* C2C Registers part				*/
+> +/***************************************************************/
+> +#define EXYNOS_C2C_REVISION		0x0
+> +#define EXYNOS_C2C_SYSCONFIG		0x4
+> +#define EXYNOS_C2C_SYSSTATUS		0x8
+> +#define EXYNOS_C2C_PORTCONFIG		0xc
+> +#define EXYNOS_C2C_MIRRORMODE		0x10
+> +#define EXYNOS_C2C_IRQ_RAW_STAT0	0x14
+> +#define EXYNOS_C2C_IRQ_RAW_STAT1	0x18
+> +#define EXYNOS_C2C_IRQ_EN_STAT0	0x1c
+> +#define EXYNOS_C2C_IRQ_EN_STAT1	0x20
+> +#define EXYNOS_C2C_IRQ_EN_SET0		0x24
+> +#define EXYNOS_C2C_IRQ_EN_SET1		0x28
+> +#define EXYNOS_C2C_IRQ_EN_CLEAR0	0x2c
+> +#define EXYNOS_C2C_IRQ_EN_CLEAR1	0x30
+> +#define EXYNOS_C2C_IRQ_EOI		0x34
+> +
+> +#define EXYNOS_C2C_FCLK_FREQ		0x40
+> +#define EXYNOS_C2C_RX_MAX_FREQ		0x44
+> +#define EXYNOS_C2C_TX_MAX_FREQ		0x48
+> +#define EXYNOS_C2C_RX_MAX_FREQ_ACK	0x4c
+> +#define EXYNOS_C2C_WAKE_REQ		0x50
+> +#define EXYNOS_C2C_WAKE_ACK		0x54
+> +#define EXYNOS_C2C_STANDBY		0x60
+> +#define EXYNOS_C2C_STANDBY_IN		0x64
+> +#define EXYNOS_C2C_WAIT		0x68
+> +#define EXYNOS_C2C_GENI_CONTROL	0x70
+> +#define EXYNOS_C2C_GENI_MASK		0x74
+> +#define EXYNOS_C2C_GENO_STATUS		0x80
+> +
+> +#define EXYNOS_C2C_GENO_INT		0x84
+> +#define EXYNOS_C2C_GENO_LEVEL		0x88
+> +
+> +/***************************************************************/
+> +/* C2C Bit definition part					*/
+> +/***************************************************************/
+> +/* SYSREG Bit definition */
+> +#define C2C_SYSREG_CG		(31) /* C2C Clock Gating [31] */
+> +#define C2C_SYSREG_MO		(30) /* Master On [30] */
+> +#define C2C_SYSREG_FCLK		(20) /* Default Functional Clock Freq [29:20] */
+> +#define C2C_SYSREG_TXW		(18) /* Default Tx Width [19:18] */
+> +#define C2C_SYSREG_RXW		(16) /* Default Rx Width [17:16] */
+> +#define C2C_SYSREG_RST		(15) /* Reset [15] */
+> +#define C2C_SYSREG_MD		(14) /* Master On [14] */
+> +#define C2C_SYSREG_RTRST	(13) /* Reset retention registers [13] */
+> +#define C2C_SYSREG_BASE_ADDR	(3)  /* DRAM Base Address [12:3] */
+> +#define C2C_SYSREG_DRAM_SIZE	(0)  /* DRAM Size [2:0] */
+> +
+> +#define C2C_GENIO_LATENCY_INT	(26)
+> +#define C2C_GENIO_OPP_INT	(27)
+> +#define C2C_GENIO_OPP_MODE0	(28)
+> +#define C2C_GENIO_OPP_MODE1	(29)
+> +#define C2C_GENIO_LATENCY0	(30)
+> +#define C2C_GENIO_LATENCY1	(31)
 
-    PCI: Pull PCI 'latency timer' setup up into the core
+Could we have the parentheses around numbers removed ? They don't seem
+to be useful for anything.
 
-    The 'latency timer' of PCI devices, both Type 0 and Type 1,
-    is setup in architecture-specific code [see: 'pcibios_set_master()'].
-    There are two approaches being taken by all the architectures - check
-    if the 'latency timer' is currently set between 16 and 255 and if not
-    bring it within bounds, or, do nothing (and then there is the
-    gratuitously different PA-RISC implementation).
+> +#endif /* __ASM_ARM_REGS_S5P_C2C_H */
 
-    There is nothing architecture-specific about PCI's 'latency timer' so
-    this patch pulls its setup functionality up into the PCI core by
-    creating a generic 'pcibios_set_master()' function using the '__weak'
-    attribute which can be used by all architectures as a default which,
-    if necessary, can then be over-ridden by architecture-specific code.
+--
 
-    No functional change.
-
-    Signed-off-by: Myron Stowe <myron.stowe@redhat.com>
-    Signed-off-by: Jesse Barnes <jbarnes@virtuousgeek.org>
-
-which moved the handling of pcibios_set_master() into core code for
-everyone but ARM:
-
- arch/blackfin/include/asm/pci.h         |    4 ----
- arch/frv/mb93090-mb00/pci-frv.c         |    6 ------
- arch/frv/mb93090-mb00/pci-frv.h         |    2 --
- arch/h8300/include/asm/pci.h            |    5 -----
- arch/mips/pci/pci.c                     |    6 ------
- arch/mn10300/unit-asb2305/pci-asb2305.c |    6 ------
- arch/mn10300/unit-asb2305/pci-asb2305.h |    2 --
- arch/sh/drivers/pci/pci.c               |    6 ------
- arch/x86/include/asm/pci_x86.h          |    2 --
- arch/x86/pci/i386.c                     |    6 ------
- drivers/pci/pci.c                       |   29 +++++++++++++++++++++++++++++
- include/linux/pci.h                     |    3 +++
- 12 files changed, 32 insertions(+), 45 deletions(-)
-
-I think the right solution is to delete the (now duplicate) definition 
-of pcibios_max_latency in arch/arm/common/it8152.c.  Please comment.
+Thanks,
+Sylwester
