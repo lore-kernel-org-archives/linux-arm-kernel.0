@@ -1,46 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 4 Feb 2012 11:30:32 -0800
-Subject: [PATCH] arm: fix build failure in mach-bcmring/arch.c
-In-Reply-To: <4F1E00BB.9070705@broadcom.com>
-References: <1327263990-8769-1-git-send-email-paul.gortmaker@windriver.com>
- <4F1E00BB.9070705@broadcom.com>
-Message-ID: <CAOesGMj9nRAXLwn+B7W_A4eOwwZJBHLiyHUKhC+T1ty4To5D7w@mail.gmail.com>
+Date: Sat, 4 Feb 2012 11:31:11 -0800
+Subject: [PATCH] ARM: bcmring: remove unused DMA map code
+In-Reply-To: <4F26E9A5.5010301@broadcom.com>
+References: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D3D12CE3@SJEXCHCCR02.corp.ad.broadcom.com>
+ <CAOesGMhhh2bsC+sAZyyBOZw8Lgk1sR7e=ZB+RcnNJG-qDqiwtg@mail.gmail.com>
+ <4F26E9A5.5010301@broadcom.com>
+Message-ID: <CAOesGMjxBg_ArFwtd5YfMZ=KiEkZ4TRCZnaJVtuVwJfbJdr4vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2012 at 4:52 PM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
-> On 1/22/2012 12:26 PM, Paul Gortmaker wrote:
+On Mon, Jan 30, 2012 at 11:04 AM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
+>> What is this patch based on? It doesn't apply on top of 3.3-rc1, nor
+>> v3.2, 3.1, 3.0 or current linux-next.
 >>
->> Upstream commit d1fce9c115eeb93e01c01732dfe9a86cf76009cf
->>
->> ? ? "ARM: restart: bcmring: use new restart hook"
->>
->> breaks building of this platform, since what used to be the
->> last field of the MACHINE_START/END block didn't have a
->> trailing comma. ?Once another field was added below, we get:
->>
->> arch/arm/mach-bcmring/arch.c:198: error: request for member 'restart' in
->> something not a structure or union
->>
->> Signed-off-by: Paul Gortmaker<paul.gortmaker@windriver.com>
->>
->> diff --git a/arch/arm/mach-bcmring/arch.c b/arch/arm/mach-bcmring/arch.c
->> index 9e5e755..45c97b1 100644
->> --- a/arch/arm/mach-bcmring/arch.c
->> +++ b/arch/arm/mach-bcmring/arch.c
->> @@ -194,6 +194,6 @@ MACHINE_START(BCMRING, "BCMRING")
->> ? ? ? ?.init_early = bcmring_init_early,
->> ? ? ? ?.init_irq = bcmring_init_irq,
->> ? ? ? ?.timer =&bcmring_timer,
->> - ? ? ? .init_machine = bcmring_init_machine
->> + ? ? ? .init_machine = bcmring_init_machine,
->> ? ? ? ?.restart = bcmring_restart,
->> ?MACHINE_END
->
->
-> Acked-by: Jiandong Zheng <jdzheng@broadcom.com>
+> It is against v3.3-rc1. I attached the patch file now in case the email
+> system (outlook) messed up the format like line ending.
 
-Thanks, applied to arm-soc fixes for -rc.
+Ok, that looks better.
+
+>> Also, that SHA doesn't exist in the mainline tree, nor in linux-next.
+>
+> Updated in attached patch file
+
+Thanks!
+
+Applied to arm-soc fixes branch for -rc.
 
 
 -Olof
