@@ -1,158 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat,  4 Feb 2012 17:50:02 +0100
-Subject: [PATCH] arm:orion: Fix USB phy for orion5x.
-Message-ID: <1328374202-31413-1-git-send-email-andrew@lunn.ch>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sun, 5 Feb 2012 00:55:18 +0800
+Subject: Pinmux bindings proposal V2
+In-Reply-To: <20120203210545.GE1426@atomide.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF1780DAB4CE@HQMAIL01.nvidia.com>
+ <20120201143530.GA2203@S2101-09.ap.freescale.net>
+ <74CDBE0F657A3D45AFBB94109FB122FF178E124AC5@HQMAIL01.nvidia.com>
+ <CAA+hA=RpkP-FFAr8wqVPjSKEMvO_sRHmOK_9nUYfuW=ps0O_=Q@mail.gmail.com>
+ <20120203173205.GB1426@atomide.com>
+ <CAA+hA=QFB7x0yv65LMuLx1exmiUAuB98D+9Fyyk9oeVu+7F2QQ@mail.gmail.com>
+ <20120203210545.GE1426@atomide.com>
+Message-ID: <CAA+hA=ThTuGnedNk_KnYLpquZ7EG+b6yU+GSoiS8qiWUB=_0fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch "ARM: orion: Consolidate USB platform setup code.", commit
-4fcd3f374a928081d391cd9a570afe3b2c692fdc broke USB on TS-7800 and
-other orion5x boards, because the wrong type of PHY was being passed
-to the EHCI driver in the platform data. Orion5x needs EHCI_PHY_ORION
-and all the others want EHCI_PHY_NA.
+On Sat, Feb 4, 2012 at 5:05 AM, Tony Lindgren <tony@atomide.com> wrote:
+....
+>> I'm think the new way which i sent in this thread after the mail you replied.
+>> You can refer to them to see if it's reasonable for you too.
+>
+> Hmm, sorry now I'm confused. Got a link for that mail as so
+> many have been posted?
+>
+Pls see:
+https://lkml.org/lkml/2012/2/3/276
 
-Allow the mach- code to tell the generic plat-orion code which USB PHY
-enum to place into the platform data.
+For a simple example, you can refer to.
+https://lkml.org/lkml/2012/2/2/405
 
-Reported-by: Ambroz Bizjak <ambrop7@gmail.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Ambroz Bizjak <ambrop7@gmail.com>
----
- arch/arm/mach-dove/common.c               |    3 ++-
- arch/arm/mach-kirkwood/common.c           |    3 ++-
- arch/arm/mach-mv78xx0/common.c            |    3 ++-
- arch/arm/mach-orion5x/common.c            |    4 +++-
- arch/arm/plat-orion/common.c              |    9 ++++-----
- arch/arm/plat-orion/include/plat/common.h |    3 ++-
- 6 files changed, 15 insertions(+), 10 deletions(-)
+Shawn and me will attend Linaro connect meeting on Feb 6th.
+If you also attend, we may discuss it together with Linus and Stephen.
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index a9e0dae..1620b15 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -29,6 +29,7 @@
- #include <asm/mach/arch.h>
- #include <linux/irq.h>
- #include <plat/time.h>
-+#include <plat/ehci-orion.h>
- #include <plat/common.h>
- #include "common.h"
- 
-@@ -72,7 +73,7 @@ void __init dove_map_io(void)
- void __init dove_ehci0_init(void)
- {
- 	orion_ehci_init(&dove_mbus_dram_info,
--			DOVE_USB0_PHYS_BASE, IRQ_DOVE_USB0);
-+			DOVE_USB0_PHYS_BASE, IRQ_DOVE_USB0, EHCI_PHY_NA);
- }
- 
- /*****************************************************************************
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index f3248cf..c5dbbb3 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -28,6 +28,7 @@
- #include <plat/cache-feroceon-l2.h>
- #include <plat/mvsdio.h>
- #include <plat/orion_nand.h>
-+#include <plat/ehci-orion.h>
- #include <plat/common.h>
- #include <plat/time.h>
- #include "common.h"
-@@ -74,7 +75,7 @@ void __init kirkwood_ehci_init(void)
- {
- 	kirkwood_clk_ctrl |= CGC_USB0;
- 	orion_ehci_init(&kirkwood_mbus_dram_info,
--			USB_PHYS_BASE, IRQ_KIRKWOOD_USB);
-+			USB_PHYS_BASE, IRQ_KIRKWOOD_USB, EHCI_PHY_NA);
- }
- 
- 
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index 23d3980..d90e244 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -20,6 +20,7 @@
- #include <mach/mv78xx0.h>
- #include <mach/bridge-regs.h>
- #include <plat/cache-feroceon-l2.h>
-+#include <plat/ehci-orion.h>
- #include <plat/orion_nand.h>
- #include <plat/time.h>
- #include <plat/common.h>
-@@ -170,7 +171,7 @@ void __init mv78xx0_map_io(void)
- void __init mv78xx0_ehci0_init(void)
- {
- 	orion_ehci_init(&mv78xx0_mbus_dram_info,
--			USB0_PHYS_BASE, IRQ_MV78XX0_USB_0);
-+			USB0_PHYS_BASE, IRQ_MV78XX0_USB_0, EHCI_PHY_NA);
- }
- 
- 
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 22ace0b..53b68b8 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -29,6 +29,7 @@
- #include <mach/hardware.h>
- #include <mach/orion5x.h>
- #include <plat/orion_nand.h>
-+#include <plat/ehci-orion.h>
- #include <plat/time.h>
- #include <plat/common.h>
- #include "common.h"
-@@ -72,7 +73,8 @@ void __init orion5x_map_io(void)
- void __init orion5x_ehci0_init(void)
- {
- 	orion_ehci_init(&orion5x_mbus_dram_info,
--			ORION5X_USB0_PHYS_BASE, IRQ_ORION5X_USB0_CTRL);
-+			ORION5X_USB0_PHYS_BASE, IRQ_ORION5X_USB0_CTRL,
-+			EHCI_PHY_ORION);
- }
- 
- 
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 9e5451b..11dce87 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -806,10 +806,7 @@ void __init orion_xor1_init(unsigned long mapbase_low,
- /*****************************************************************************
-  * EHCI
-  ****************************************************************************/
--static struct orion_ehci_data orion_ehci_data = {
--	.phy_version	= EHCI_PHY_NA,
--};
--
-+static struct orion_ehci_data orion_ehci_data;
- static u64 ehci_dmamask = DMA_BIT_MASK(32);
- 
- 
-@@ -830,9 +827,11 @@ static struct platform_device orion_ehci = {
- 
- void __init orion_ehci_init(struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
--			    unsigned long irq)
-+			    unsigned long irq,
-+			    enum orion_ehci_phy_ver phy_version)
- {
- 	orion_ehci_data.dram = mbus_dram_info;
-+	orion_ehci_data.phy_version = phy_version;
- 	fill_resources(&orion_ehci, orion_ehci_resources, mapbase, SZ_4K - 1,
- 		       irq);
- 
-diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
-index a63c357..a2c0e31 100644
---- a/arch/arm/plat-orion/include/plat/common.h
-+++ b/arch/arm/plat-orion/include/plat/common.h
-@@ -95,7 +95,8 @@ void __init orion_xor1_init(unsigned long mapbase_low,
- 
- void __init orion_ehci_init(struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
--			    unsigned long irq);
-+			    unsigned long irq,
-+			    enum orion_ehci_phy_ver phy_version);
- 
- void __init orion_ehci_1_init(struct mbus_dram_target_info *mbus_dram_info,
- 			      unsigned long mapbase,
--- 
-1.7.2.5
+Regards
+Dong Aisheng
