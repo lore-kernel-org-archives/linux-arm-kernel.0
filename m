@@ -1,196 +1,228 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  5 Feb 2012 19:22:53 +0100
-Subject: [FOR 3.3 PATCH 1/2] ARM: at91: add accessor to manage smc
-Message-ID: <1328466174-27946-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Sun,  5 Feb 2012 19:29:35 +0100
+Subject: [PATCH 1/2] genalloc: add support of named pool
+Message-ID: <1328466576-29384-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/include/mach/at91sam9_smc.h |   29 +++++++++
- arch/arm/mach-at91/sam9_smc.c                  |   76 ++++++++++++++++++++++--
- arch/arm/mach-at91/sam9_smc.h                  |   23 -------
- 3 files changed, 100 insertions(+), 28 deletions(-)
+so we can get the pool in the driver by name instead of passing it via
+parameter
 
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9_smc.h b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
-index eb18a70..a768b21 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9_smc.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
-@@ -18,6 +18,35 @@
- 
- #include <mach/cpu.h>
- 
-+#ifndef __ASSEMBLY__
-+struct sam9_smc_config {
-+	/* Setup register */
-+	u8 ncs_read_setup;
-+	u8 nrd_setup;
-+	u8 ncs_write_setup;
-+	u8 nwe_setup;
-+
-+	/* Pulse register */
-+	u8 ncs_read_pulse;
-+	u8 nrd_pulse;
-+	u8 ncs_write_pulse;
-+	u8 nwe_pulse;
-+
-+	/* Cycle register */
-+	u16 read_cycle;
-+	u16 write_cycle;
-+
-+	/* Mode register */
-+	u32 mode;
-+	u8 tdf_cycles:4;
-+};
-+
-+extern void sam9_smc_configure(int id, int cs, struct sam9_smc_config* config);
-+extern void sam9_smc_read(int id, int cs, struct sam9_smc_config* config);
-+extern void sam9_smc_read_mode(int id, int cs, struct sam9_smc_config* config);
-+extern void sam9_smc_write_mode(int id, int cs, struct sam9_smc_config* config);
-+#endif
-+
- #define AT91_SMC_SETUP		0x00				/* Setup Register for CS n */
- #define		AT91_SMC_NWESETUP	(0x3f << 0)			/* NWE Setup Length */
- #define			AT91_SMC_NWESETUP_(x)	((x) << 0)
-diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
-index 8294783..bf0cfef 100644
---- a/arch/arm/mach-at91/sam9_smc.c
-+++ b/arch/arm/mach-at91/sam9_smc.c
-@@ -2,6 +2,7 @@
-  * linux/arch/arm/mach-at91/sam9_smc.c
-  *
-  * Copyright (C) 2008 Andrew Victor
-+ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -22,7 +23,22 @@
- 
- static void __iomem *smc_base_addr[2];
- 
--static void __init sam9_smc_cs_configure(void __iomem *base, struct sam9_smc_config* config)
-+static void sam9_smc_cs_write_mode(void __iomem *base,
-+					struct sam9_smc_config* config)
-+{
-+	__raw_writel(config->mode
-+		   | AT91_SMC_TDF_(config->tdf_cycles),
-+		   base + AT91_SMC_MODE);
-+}
-+
-+void sam9_smc_write_mode(int id, int cs,
-+					struct sam9_smc_config* config)
-+{
-+	sam9_smc_cs_write_mode(AT91_SMC_CS(id, cs), config);
-+}
-+
-+static void sam9_smc_cs_configure(void __iomem *base,
-+					struct sam9_smc_config* config)
- {
- 
- 	/* Setup register */
-@@ -45,16 +61,66 @@ static void __init sam9_smc_cs_configure(void __iomem *base, struct sam9_smc_con
- 		   base + AT91_SMC_CYCLE);
- 
- 	/* Mode register */
--	__raw_writel(config->mode
--		   | AT91_SMC_TDF_(config->tdf_cycles),
--		   base + AT91_SMC_MODE);
-+	sam9_smc_cs_write_mode(base, config);
- }
- 
--void __init sam9_smc_configure(int id, int cs, struct sam9_smc_config* config)
-+void sam9_smc_configure(int id, int cs,
-+					struct sam9_smc_config* config)
- {
- 	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
- }
- 
-+static void sam9_smc_cs_read_mode(void __iomem *base,
-+					struct sam9_smc_config* config)
-+{
-+	u32 val = __raw_readl(base + AT91_SMC_MODE);
-+
-+	config->mode = (val & ~AT91_SMC_NWECYCLE);
-+	config->tdf_cycles = (val & AT91_SMC_NWECYCLE) >> 16 ;
-+}
-+
-+void sam9_smc_read_mode(int id, int cs,
-+					struct sam9_smc_config* config)
-+{
-+	sam9_smc_cs_read_mode(AT91_SMC_CS(id, cs), config);
-+}
-+
-+static void sam9_smc_cs_read(void __iomem *base,
-+					struct sam9_smc_config* config)
-+{
-+	u32 val;
-+
-+	/* Setup register */
-+	val = __raw_readl(base + AT91_SMC_SETUP);
-+
-+	config->nwe_setup = val & AT91_SMC_NWESETUP;
-+	config->ncs_write_setup = (val & AT91_SMC_NCS_WRSETUP) >> 8;
-+	config->nrd_setup = (val & AT91_SMC_NRDSETUP) >> 16;
-+	config->ncs_read_setup = (val & AT91_SMC_NCS_RDSETUP) >> 24;
-+
-+	/* Pulse register */
-+	val = __raw_readl(base + AT91_SMC_PULSE);
-+
-+	config->nwe_setup = val & AT91_SMC_NWEPULSE;
-+	config->ncs_write_pulse = (val & AT91_SMC_NCS_WRPULSE) >> 8;
-+	config->nrd_pulse = (val & AT91_SMC_NRDPULSE) >> 16;
-+	config->ncs_read_pulse = (val & AT91_SMC_NCS_RDPULSE) >> 24;
-+
-+	/* Cycle register */
-+	val = __raw_readl(base + AT91_SMC_CYCLE);
-+
-+	config->write_cycle = val & AT91_SMC_NWECYCLE;
-+	config->read_cycle = (val & AT91_SMC_NRDCYCLE) >> 16;
-+
-+	/* Mode register */
-+	sam9_smc_cs_read_mode(base, config);
-+}
-+
-+void sam9_smc_read(int id, int cs, struct sam9_smc_config* config)
-+{
-+	sam9_smc_cs_read(AT91_SMC_CS(id, cs), config);
-+}
-+
- void __init at91sam9_ioremap_smc(int id, u32 addr)
- {
- 	if (id > 1) {
-diff --git a/arch/arm/mach-at91/sam9_smc.h b/arch/arm/mach-at91/sam9_smc.h
-index 039c5ce..3e52dcd4 100644
---- a/arch/arm/mach-at91/sam9_smc.h
-+++ b/arch/arm/mach-at91/sam9_smc.h
-@@ -8,27 +8,4 @@
-  * published by the Free Software Foundation.
+this will be use on AT91 to get access from different drivers to the sram or
+gpbr as example
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+---
+Hi,
+
+	if you don't mind I'll apply this via at91 tree as it's needed to
+	finish a cleanup on at91 to allow multiple soc in the same kernel
+
+Best Regards,
+J.
+ include/linux/genalloc.h |   50 +++++++++++++++++++++++++++++++++++-
+ lib/genalloc.c           |   64 +++++++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 107 insertions(+), 7 deletions(-)
+
+diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
+index 5e98eeb..8b54532 100644
+--- a/include/linux/genalloc.h
++++ b/include/linux/genalloc.h
+@@ -33,9 +33,12 @@
+  *  General purpose special memory pool descriptor.
   */
+ struct gen_pool {
++	char *name;			/* pool name */
+ 	spinlock_t lock;
+ 	struct list_head chunks;	/* list of chunks in this pool */
+ 	int min_alloc_order;		/* minimum allocation order */
++
++	struct list_head list;		/* list of pool */
+ };
  
--struct sam9_smc_config {
--	/* Setup register */
--	u8 ncs_read_setup;
--	u8 nrd_setup;
--	u8 ncs_write_setup;
--	u8 nwe_setup;
--
--	/* Pulse register */
--	u8 ncs_read_pulse;
--	u8 nrd_pulse;
--	u8 ncs_write_pulse;
--	u8 nwe_pulse;
--
--	/* Cycle register */
--	u16 read_cycle;
--	u16 write_cycle;
--
--	/* Mode register */
--	u32 mode;
--	u8 tdf_cycles:4;
--};
--
--extern void __init sam9_smc_configure(int id, int cs, struct sam9_smc_config* config);
- extern void __init at91sam9_ioremap_smc(int id, u32 addr);
+ /*
+@@ -50,7 +53,21 @@ struct gen_pool_chunk {
+ 	unsigned long bits[0];		/* bitmap for allocating memory chunk */
+ };
+ 
+-extern struct gen_pool *gen_pool_create(int, int);
++extern struct gen_pool *gen_pool_create_byname(const char*, int, int);
++
++/**
++ * gen_pool_create - create a new special memory pool
++ * @min_alloc_order: log base 2 of number of bytes each bitmap bit represents
++ * @nid: node id of the node the pool structure should be allocated on, or -1
++ *
++ * Create a new special memory pool that can be used to manage special purpose
++ * memory not managed by the regular kmalloc/kfree interface.
++ */
++static inline struct gen_pool *gen_pool_create(int min_alloc_order, int nid)
++{
++	return gen_pool_create_byname(NULL, min_alloc_order, nid);
++}
++extern struct gen_pool *gen_pool_byname(const char *name);
+ extern phys_addr_t gen_pool_virt_to_phys(struct gen_pool *pool, unsigned long);
+ extern int gen_pool_add_virt(struct gen_pool *, unsigned long, phys_addr_t,
+ 			     size_t, int);
+@@ -78,4 +95,35 @@ extern void gen_pool_for_each_chunk(struct gen_pool *,
+ 	void (*)(struct gen_pool *, struct gen_pool_chunk *, void *), void *);
+ extern size_t gen_pool_avail(struct gen_pool *);
+ extern size_t gen_pool_size(struct gen_pool *);
++
++/**
++ * gen_pool_alloc_byname - allocate special memory from the pool
++ * @name: name of the pool to allocate from
++ * @size: number of bytes to allocate from the pool
++ *
++ * Allocate the requested number of bytes from the specified pool.
++ * Uses a first-fit algorithm. Can not be used in NMI handler on
++ * architectures without NMI-safe cmpxchg implementation.
++ */
++static inline unsigned long gen_pool_alloc_byname(const char* name, size_t size)
++{
++	return gen_pool_alloc(gen_pool_byname(name), size);
++}
++
++/**
++ * gen_pool_free_byname - free allocated special memory back to the pool
++ * @name: name of the pool to allocate from
++ * @addr: starting address of memory to free back to pool
++ * @size: size in bytes of memory to free
++ *
++ * Free previously allocated special memory back to the specified
++ * pool.  Can not be used in NMI handler on architectures without
++ * NMI-safe cmpxchg implementation.
++ */
++static inline void gen_pool_free_byname(const char* name,
++					unsigned long addr, size_t size)
++{
++	gen_pool_free(gen_pool_byname(name), addr, size);
++}
++
+ #endif /* __GENALLOC_H__ */
+diff --git a/lib/genalloc.c b/lib/genalloc.c
+index f352cc4..f1772b0 100644
+--- a/lib/genalloc.c
++++ b/lib/genalloc.c
+@@ -35,6 +35,9 @@
+ #include <linux/interrupt.h>
+ #include <linux/genalloc.h>
+ 
++static LIST_HEAD(pools);
++static DEFINE_SPINLOCK(pools_lock);
++
+ static int set_bits_ll(unsigned long *addr, unsigned long mask_to_set)
+ {
+ 	unsigned long val, nval;
+@@ -136,26 +139,63 @@ static int bitmap_clear_ll(unsigned long *map, int start, int nr)
+ }
+ 
+ /**
+- * gen_pool_create - create a new special memory pool
++ * gen_pool_byname - get pool by name
++ * @name: pool name
++ */
++struct gen_pool *gen_pool_byname(const char *name)
++{
++	struct gen_pool *pool;
++
++	if (!name)
++		return NULL;
++
++	spin_lock(&pools_lock);
++	list_for_each_entry(pool, &pools, list) {
++		if (pool->name && strcmp(pool->name, name) == 0)
++			goto end;
++	}
++	pool = NULL;
++end:
++	spin_unlock(&pools_lock);
++	return pool;
++}
++EXPORT_SYMBOL(gen_pool_byname);
++
++/**
++ * gen_pool_create_byname - create a new special memory pool
++ * @name: pool name if NULL you will not be able to get it via gen_pool_byname
+  * @min_alloc_order: log base 2 of number of bytes each bitmap bit represents
+  * @nid: node id of the node the pool structure should be allocated on, or -1
+  *
+  * Create a new special memory pool that can be used to manage special purpose
+  * memory not managed by the regular kmalloc/kfree interface.
+  */
+-struct gen_pool *gen_pool_create(int min_alloc_order, int nid)
++struct gen_pool *gen_pool_create_byname(const char *name,
++					int min_alloc_order, int nid)
+ {
+-	struct gen_pool *pool;
++	struct gen_pool *pool = NULL;
++
++	if (gen_pool_byname(name))
++		goto end;
+ 
++	spin_lock(&pools_lock);
+ 	pool = kmalloc_node(sizeof(struct gen_pool), GFP_KERNEL, nid);
+ 	if (pool != NULL) {
+ 		spin_lock_init(&pool->lock);
+ 		INIT_LIST_HEAD(&pool->chunks);
+ 		pool->min_alloc_order = min_alloc_order;
++		pool->name = kstrdup(name, GFP_KERNEL);
++		if (!pool->name) {
++			kfree(pool);
++			goto end;
++		}
++		list_add_tail(&pool->list, &pools);
+ 	}
++end:
++	spin_unlock(&pools_lock);
+ 	return pool;
+ }
+-EXPORT_SYMBOL(gen_pool_create);
++EXPORT_SYMBOL(gen_pool_create_byname);
+ 
+ /**
+  * gen_pool_add_virt - add a new chunk of special memory to the pool
+@@ -244,6 +284,8 @@ void gen_pool_destroy(struct gen_pool *pool)
+ 
+ 		kfree(chunk);
+ 	}
++	list_del(&pool->list);
++	kfree(pool->name);
+ 	kfree(pool);
+ 	return;
+ }
+@@ -262,9 +304,14 @@ unsigned long gen_pool_alloc(struct gen_pool *pool, size_t size)
+ {
+ 	struct gen_pool_chunk *chunk;
+ 	unsigned long addr = 0;
+-	int order = pool->min_alloc_order;
++	int order;
+ 	int nbits, start_bit = 0, end_bit, remain;
+ 
++	if (!pool)
++		return addr;
++
++	order = pool->min_alloc_order;
++
+ #ifndef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	BUG_ON(in_nmi());
+ #endif
+@@ -315,9 +362,14 @@ EXPORT_SYMBOL(gen_pool_alloc);
+ void gen_pool_free(struct gen_pool *pool, unsigned long addr, size_t size)
+ {
+ 	struct gen_pool_chunk *chunk;
+-	int order = pool->min_alloc_order;
++	int order;
+ 	int start_bit, nbits, remain;
+ 
++	if (!pool)
++		return;
++
++	order = pool->min_alloc_order;
++
+ #ifndef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	BUG_ON(in_nmi());
+ #endif
 -- 
 1.7.7
