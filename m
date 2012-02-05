@@ -1,65 +1,69 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Sat, 4 Feb 2012 17:48:28 -0800
-Subject: [RFC PATCH v4 1/4] cpuidle: Add time keeping and irq enabling
-In-Reply-To: <CAMbhsRR2Zsv7d+_iganMhz5WxDiUYd-zOCoVehz4yjzyH2q+wA@mail.gmail.com>
-References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
- <1328065215-28108-2-git-send-email-rob.lee@linaro.org>
- <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
- <CAJOA=zOhKtt5GohHfYp6=xVTODR2a_RGkDNTwozbusrBSsqE+w@mail.gmail.com>
- <CAMbhsRR2Zsv7d+_iganMhz5WxDiUYd-zOCoVehz4yjzyH2q+wA@mail.gmail.com>
-Message-ID: <CAJOA=zMp-bydL8tJuY_xUOFFNk3EBrvUDOoW+gcYB_-WLRu6sQ@mail.gmail.com>
+From: dhillf@gmail.com (Hillf Danton)
+Date: Sun, 5 Feb 2012 12:25:40 +0800
+Subject: [PATCH 12/15] drivers: add Contiguous Memory Allocator
+In-Reply-To: <1328271538-14502-13-git-send-email-m.szyprowski@samsung.com>
+References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
+ <1328271538-14502-13-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAJd=RBBPOwftZJUfe3xc6y24=T8un5hPk0wEOT_5v6WMCbDSag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 4, 2012 at 5:36 PM, Colin Cross <ccross@google.com> wrote:
-> On Sat, Feb 4, 2012 at 2:06 PM, Turquette, Mike <mturquette@ti.com> wrote:
->> On Sat, Feb 4, 2012 at 11:02 AM, Colin Cross <ccross@google.com> wrote:
->>> What's the point of the pre_enter call? ?This seems very similar to
->>> the prepare call that was removed in 3.2. ?Drivers can already demote
->>
->> Hi Colin,
->>
->> I asked Rob to re-introduce the .prepare callback (not .pre_enter).
->>
->> The short version of why I requested this is so that I can experiment
->> with modifying wake-up latency and theshold values dynamically based
->> on PM QoS constraints. ?For an OMAP-specific example, I'd like to see
->> our C-states no longer model both MPU and CORE power domains, and
->> instead only model the MPU. ?Then when entering idle the PM QoS
->> constraints against the CORE power domain's wake-up latency can be
->> considered in the .prepare callback which will affect the C-state
->> parameters as well as program the CORE low power target state.
+On Fri, Feb 3, 2012 at 8:18 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> The Contiguous Memory Allocator is a set of helper functions for DMA
+> mapping framework that improves allocations of contiguous memory chunks.
 >
-> prepare makes sense to adjust latencies, as long as it is not used for
-> state demotion as well.
+> CMA grabs memory on system boot, marks it with CMA_MIGRATE_TYPE and
+> gives back to the system. Kernel is allowed to allocate movable pages
+> within CMA's managed memory so that it can be used for example for page
+> cache when DMA mapping do not use it. On dma_alloc_from_contiguous()
+> request such pages are migrated out of CMA area to free required
+> contiguous block and fulfill the request. This allows to allocate large
+> contiguous chunks of memory at any time assuming that there is enough
+> free memory available in the system.
+>
+> This code is heavily based on earlier works by Michal Nazarewicz.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> CC: Michal Nazarewicz <mina86@mina86.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Tested-by: Rob Clark <rob.clark@linaro.org>
+> Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> ---
 
-Latency adjustment is the plan.  State demotion is not.
+[...]
 
-Rob,
+> +/*
+> + * Contiguous Memory Allocator
+> + *
+> + * ? The Contiguous Memory Allocator (CMA) makes it possible to
+> + * ? allocate big contiguous chunks of memory after the system has
+> + * ? booted.
+> + *
+> + * Why is it needed?
+> + *
+> + * ? Various devices on embedded systems have no scatter-getter and/or
+> + * ? IO map support and require contiguous blocks of memory to
+> + * ? operate. ?They include devices such as cameras, hardware video
+> + * ? coders, etc.
+> + *
+> + * ? Such devices often require big memory buffers (a full HD frame
+> + * ? is, for instance, more then 2 mega pixels large, i.e. more than 6
+> + * ? MB of memory), which makes mechanisms such as kmalloc() or
+> + * ? alloc_page() ineffective.
+> + *
+> + * ? At the same time, a solution where a big memory region is
+> + * ? reserved for a device is suboptimal since often more memory is
+> + * ? reserved then strictly required and, moreover, the memory is
+> + * ? inaccessible to page system even if device drivers don't use it.
+> + *
+> + * ? CMA tries to solve this issue by operating on memory regions
+> + * ? where only movable pages can be allocated from. ?This way, kernel
+> + * ? can use the memory for pagecache and when device driver requests
+> + * ? it, allocated pages can be migrated.
+> + *
 
-If you cook up another version of this series feel free to drop
-.pre_enter.  It would be nice if you re-introduced .prepare as per our
-original discussion but if that's a roadblock then you can forget that
-point too and I'll take a crack at it later.
-
-Regards,
-Mike
-
->> .pre_enter isn't really right for the above case so I'm happy for it
->> to be dropped, but I'll probably re-introduce something like .prepare
->> in the future...
->>
->> Regards,
->> Mike
->>
->>> the target state in their enter call. ?The only thing you do between
->>> pre_enter and enter is trace and account for the time. ?Is there some
->>> long call you don't want included in the idle time? ?Some
->>> documentation would help, and you need to very clearly define the
->>> semantics of when post_enter gets called when pre_enter or enter
->>> return errors.
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Without boot mem reservation, what is the successful rate of CMA to
+serve requests of 1MiB, 2MiB, 4MiB and 8MiB chunks?
