@@ -1,56 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Feb 2012 16:13:48 +0000
-Subject: [PATCH v3 00/25] irq_domain generalization and refinement
-In-Reply-To: <20120205013853.GQ20333@atomide.com>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <20120204221748.GN14129@n2100.arm.linux.org.uk>
- <20120204223125.GO14129@n2100.arm.linux.org.uk>
- <20120205013853.GQ20333@atomide.com>
-Message-ID: <20120205161348.GZ889@n2100.arm.linux.org.uk>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Mon, 6 Feb 2012 00:22:13 +0800
+Subject: [PATCH resent v2 1/2] ioport : add DEFINE_RES_DMA_SIZE_NAMED macro
+In-Reply-To: <20120205123415.GY889@n2100.arm.linux.org.uk>
+References: <1326959620-25920-1-git-send-email-b32955@freescale.com>
+ <1326959620-25920-2-git-send-email-b32955@freescale.com>
+ <CAMiH66FoX0m_NPntMRyt6zJoYgxuYnzv6neDggmKxW8nfzKJiA@mail.gmail.com>
+ <20120205123415.GY889@n2100.arm.linux.org.uk>
+Message-ID: <CAMiH66F+Nz0b=S-=_97MuBgmPz8svG6-9QVZmtTCjg12H6jUng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 04, 2012 at 05:38:53PM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120204 14:00]:
-> > 
-> > Actually, it turns out to be not that hard, because twl doesn't actually
-> > make use of the IRQ domain stuff:
-> > 
-> > commit aeb5032b3f8b9ab69daa545777433fa94b3494c4
-> > Author:     Benoit Cousson <b-cousson@ti.com>
-> > AuthorDate: Mon Aug 29 16:20:23 2011 +0200
-> > Commit:     Samuel Ortiz <sameo@linux.intel.com>
-> > CommitDate: Mon Jan 9 00:37:40 2012 +0100
-> > 
-> >     mfd: twl-core: Add initial DT support for twl4030/twl6030
-> > 
-> >     [grant.likely at secretlab.ca: Fix IRQ_DOMAIN dependency in kconfig]
-> > 
-> > Adding any dependency - especially one which wouldn't be enabled - for
-> > a new feature which wasn't required before is going to break existing
-> > users, so this shouldn't have been done in the first place.
-> > 
-> > A better fix to preserve existing users would've been as below - yes
-> > it means more ifdefs, but if irq domain is to remain a DT only thing
-> > then we're going to end up with _lots_ of this stuff.
-> > 
-> > I'd much prefer to see irq domain become more widely available so it
-> > doesn't require these ifdefs everywhere.
-> 
-> Your patch below looks like a correct fix to me to the problem
-> you and Grazvydas are seeing:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+On Sun, Feb 5, 2012 at 8:34 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Feb 05, 2012 at 07:53:31PM +0800, Huang Shijie wrote:
+>> Does any one have any comments about this patch?
+>
+> Yes. ?Having a flat numberspace for DMAs invites the same problems that
+> we have with the flat IRQ numberspace when it comes to having multiple
+> DMA controllers.
+>
+> With DMA engine drivers, channels are allocated using a match function
+> and unspecified match data. ?While a linear numberspace can be used,
+> that sets itself up for clashing between different DMA controllers
+> especially if the numberspace overlaps.
+>
+> What's missing from this patch set is an illustration of how this will
+> be used.
+>
+> Another issue here is that having the peripheral drivers know about the
+> exact match function and what data the DMA engines require ties the
+> periperal drivers to their respective DMA engine. ?One of the points of
+> DMA engine is to separate that knowledge, so that the same peripheral IP
+> can be re-used with different DMA engines.
+>
+> To encode knowledge of the DMA engine into the peripheral driver basically
+> destroys the purpose of having a DMA engine API.
+>
+> So, I believe that _if_ we are going down the path of using the DMA engine
+> API for our SoCs, we really don't want to invent a linear DMA numberspace
+> by putting DMA numbers into resources.
 
-It's not quite correct, because OMAP4 has issues in this area as well
-(which does select IRQ_DOMAIN but can be without OF.)  The result is
-an oops from irq_domain_add() because domain->ops is NULL.
+ok. thanks.
 
-The right solution is three fold:
 
-1. Wrap the bits of code in CONFIG_IRQ_DOMAIN
-2. Get rid of the #ifdef CONFIG_OF there, so the 'ops' member can be
-   initialized.
-3. Fix the OMAP vp code not to oops when voltdm->pmic is NULL
-
-which I have in my combined patch for fixing OMAP so far.
+Huang Shijie
