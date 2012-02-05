@@ -1,93 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 4 Feb 2012 17:38:53 -0800
-Subject: [PATCH v3 00/25] irq_domain generalization and refinement
-In-Reply-To: <20120204223125.GO14129@n2100.arm.linux.org.uk>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <20120204221748.GN14129@n2100.arm.linux.org.uk>
- <20120204223125.GO14129@n2100.arm.linux.org.uk>
-Message-ID: <20120205013853.GQ20333@atomide.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Sat, 4 Feb 2012 17:48:28 -0800
+Subject: [RFC PATCH v4 1/4] cpuidle: Add time keeping and irq enabling
+In-Reply-To: <CAMbhsRR2Zsv7d+_iganMhz5WxDiUYd-zOCoVehz4yjzyH2q+wA@mail.gmail.com>
+References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+ <1328065215-28108-2-git-send-email-rob.lee@linaro.org>
+ <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
+ <CAJOA=zOhKtt5GohHfYp6=xVTODR2a_RGkDNTwozbusrBSsqE+w@mail.gmail.com>
+ <CAMbhsRR2Zsv7d+_iganMhz5WxDiUYd-zOCoVehz4yjzyH2q+wA@mail.gmail.com>
+Message-ID: <CAJOA=zMp-bydL8tJuY_xUOFFNk3EBrvUDOoW+gcYB_-WLRu6sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120204 14:00]:
-> 
-> Actually, it turns out to be not that hard, because twl doesn't actually
-> make use of the IRQ domain stuff:
-> 
-> commit aeb5032b3f8b9ab69daa545777433fa94b3494c4
-> Author:     Benoit Cousson <b-cousson@ti.com>
-> AuthorDate: Mon Aug 29 16:20:23 2011 +0200
-> Commit:     Samuel Ortiz <sameo@linux.intel.com>
-> CommitDate: Mon Jan 9 00:37:40 2012 +0100
-> 
->     mfd: twl-core: Add initial DT support for twl4030/twl6030
-> 
->     [grant.likely at secretlab.ca: Fix IRQ_DOMAIN dependency in kconfig]
-> 
-> Adding any dependency - especially one which wouldn't be enabled - for
-> a new feature which wasn't required before is going to break existing
-> users, so this shouldn't have been done in the first place.
-> 
-> A better fix to preserve existing users would've been as below - yes
-> it means more ifdefs, but if irq domain is to remain a DT only thing
-> then we're going to end up with _lots_ of this stuff.
-> 
-> I'd much prefer to see irq domain become more widely available so it
-> doesn't require these ifdefs everywhere.
+On Sat, Feb 4, 2012 at 5:36 PM, Colin Cross <ccross@google.com> wrote:
+> On Sat, Feb 4, 2012 at 2:06 PM, Turquette, Mike <mturquette@ti.com> wrote:
+>> On Sat, Feb 4, 2012 at 11:02 AM, Colin Cross <ccross@google.com> wrote:
+>>> What's the point of the pre_enter call? ?This seems very similar to
+>>> the prepare call that was removed in 3.2. ?Drivers can already demote
+>>
+>> Hi Colin,
+>>
+>> I asked Rob to re-introduce the .prepare callback (not .pre_enter).
+>>
+>> The short version of why I requested this is so that I can experiment
+>> with modifying wake-up latency and theshold values dynamically based
+>> on PM QoS constraints. ?For an OMAP-specific example, I'd like to see
+>> our C-states no longer model both MPU and CORE power domains, and
+>> instead only model the MPU. ?Then when entering idle the PM QoS
+>> constraints against the CORE power domain's wake-up latency can be
+>> considered in the .prepare callback which will affect the C-state
+>> parameters as well as program the CORE low power target state.
+>
+> prepare makes sense to adjust latencies, as long as it is not used for
+> state demotion as well.
 
-Your patch below looks like a correct fix to me to the problem
-you and Grazvydas are seeing:
+Latency adjustment is the plan.  State demotion is not.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
->  drivers/mfd/Kconfig    |    2 +-
->  drivers/mfd/twl-core.c |    4 ++++
->  2 files changed, 5 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 28a301b..bd60ce0 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -200,7 +200,7 @@ config MENELAUS
->  
->  config TWL4030_CORE
->  	bool "Texas Instruments TWL4030/TWL5030/TWL6030/TPS659x0 Support"
-> -	depends on I2C=y && GENERIC_HARDIRQS && IRQ_DOMAIN
-> +	depends on I2C=y && GENERIC_HARDIRQS
->  	help
->  	  Say yes here if you have TWL4030 / TWL6030 family chip on your board.
->  	  This core driver provides register access and IRQ handling
-> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-> index e04e04d..5913aaa 100644
-> --- a/drivers/mfd/twl-core.c
-> +++ b/drivers/mfd/twl-core.c
-> @@ -263,7 +263,9 @@ struct twl_client {
->  
->  static struct twl_client twl_modules[TWL_NUM_SLAVES];
->  
-> +#ifdef CONFIG_IRQ_DOMAIN
->  static struct irq_domain domain;
-> +#endif
->  
->  /* mapping the module id to slave id and base address */
->  struct twl_mapping {
-> @@ -1226,6 +1228,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  	pdata->irq_base = status;
->  	pdata->irq_end = pdata->irq_base + nr_irqs;
->  
-> +#ifdef CONFIG_IRQ_DOMAIN
->  	domain.irq_base = pdata->irq_base;
->  	domain.nr_irq = nr_irqs;
->  #ifdef CONFIG_OF_IRQ
-> @@ -1233,6 +1236,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  	domain.ops = &irq_domain_simple_ops;
->  #endif
->  	irq_domain_add(&domain);
-> +#endif
->  
->  	if (i2c_check_functionality(client->adapter, I2C_FUNC_I2C) == 0) {
->  		dev_dbg(&client->dev, "can't talk I2C?\n");
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+Rob,
+
+If you cook up another version of this series feel free to drop
+.pre_enter.  It would be nice if you re-introduced .prepare as per our
+original discussion but if that's a roadblock then you can forget that
+point too and I'll take a crack at it later.
+
+Regards,
+Mike
+
+>> .pre_enter isn't really right for the above case so I'm happy for it
+>> to be dropped, but I'll probably re-introduce something like .prepare
+>> in the future...
+>>
+>> Regards,
+>> Mike
+>>
+>>> the target state in their enter call. ?The only thing you do between
+>>> pre_enter and enter is trace and account for the time. ?Is there some
+>>> long call you don't want included in the idle time? ?Some
+>>> documentation would help, and you need to very clearly define the
+>>> semantics of when post_enter gets called when pre_enter or enter
+>>> return errors.
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
