@@ -1,46 +1,79 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Mon, 6 Feb 2012 00:22:13 +0800
-Subject: [PATCH resent v2 1/2] ioport : add DEFINE_RES_DMA_SIZE_NAMED macro
-In-Reply-To: <20120205123415.GY889@n2100.arm.linux.org.uk>
-References: <1326959620-25920-1-git-send-email-b32955@freescale.com>
- <1326959620-25920-2-git-send-email-b32955@freescale.com>
- <CAMiH66FoX0m_NPntMRyt6zJoYgxuYnzv6neDggmKxW8nfzKJiA@mail.gmail.com>
- <20120205123415.GY889@n2100.arm.linux.org.uk>
-Message-ID: <CAMiH66F+Nz0b=S-=_97MuBgmPz8svG6-9QVZmtTCjg12H6jUng@mail.gmail.com>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Sun, 5 Feb 2012 17:57:40 +0000
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <20120205160329.GO1275@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+ <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
+ <20120204163931.GH1275@n2100.arm.linux.org.uk>
+ <EF62F09C0797D947AD4180A1043C0DF734934E36@DLEE10.ent.ti.com>
+ <20120205160329.GO1275@n2100.arm.linux.org.uk>
+Message-ID: <EF62F09C0797D947AD4180A1043C0DF734934E9D@DLEE10.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 5, 2012 at 8:34 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Feb 05, 2012 at 07:53:31PM +0800, Huang Shijie wrote:
->> Does any one have any comments about this patch?
->
-> Yes. ?Having a flat numberspace for DMAs invites the same problems that
-> we have with the flat IRQ numberspace when it comes to having multiple
-> DMA controllers.
->
-> With DMA engine drivers, channels are allocated using a match function
-> and unspecified match data. ?While a linear numberspace can be used,
-> that sets itself up for clashing between different DMA controllers
-> especially if the numberspace overlaps.
->
-> What's missing from this patch set is an illustration of how this will
-> be used.
->
-> Another issue here is that having the peripheral drivers know about the
-> exact match function and what data the DMA engines require ties the
-> periperal drivers to their respective DMA engine. ?One of the points of
-> DMA engine is to separate that knowledge, so that the same peripheral IP
-> can be re-used with different DMA engines.
->
-> To encode knowledge of the DMA engine into the peripheral driver basically
-> destroys the purpose of having a DMA engine API.
->
-> So, I believe that _if_ we are going down the path of using the DMA engine
-> API for our SoCs, we really don't want to invent a linear DMA numberspace
-> by putting DMA numbers into resources.
 
-ok. thanks.
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Sunday, February 05, 2012 10:03 AM
+> To: Woodruff, Richard
 
+> On Sun, Feb 05, 2012 at 03:37:21PM +0000, Woodruff, Richard wrote:
+> > [x] What is acceptable depends is not black and white.  Is there some
+> > QOS mapping which can be set per channel which allows runtime PM to
+> > pick a best chose (which may allow for loss and frame issues)?.
+> 
+> What you're asking is whether there's anything in the kernel which can
+> predict when the next character is to arrive.
 
-Huang Shijie
+No, this was not the comment's intent.
+
+> But, the fact of the matter is that deriving the UART clocks from a PLL
+> which takes a finite time to lock, and the PLL is shut down during runtime
+> PM _is_ _going_ _to_ _cause_ _problems_.  There is absolutely no getting
+> away from that.
+
+Yes this is one of the issues to be worked around.
+
+> Let's take your modem example.  Modems today would typically be used with
+> some IP based protocol, probably PPP based.  Incoming traffic on IP is
+> entirely unpredictable.  You wouldn't know when the next character would
+> be received.
+> 
+> One solution to this is to transmit an 0xff character before your real
+> data to ensure that your end is awake and properly synchronized...
+
+This approach as you say has issues.  This is solved in different ways for modems.
+
+<sleep>My observation is modem software which many talk over ppp over ip over serial of some sort (might be uart, might be usb), will send a command to the modem to go into a low power mode. Now you can cut clocks with out hurting modem and getting SOC power.
+
+<wake>When some event happens at modem or processor (timer near beacon or other) the modem or apps processor can signal the other with some wake event (maybe over gpio) which then puts system in a state where it can receive data in trusted manner.
+
+The modem channel driver try's to inform kernel about entering/exiting modes to set expectation.
+
+> So, go ahead with having PM drop random characters if you want, but don't
+> expect anyone in their right mind to accept broken workarounds to the
+> kernel serial driver to try to drop maybe 16 characters or more at a time
+> on the floor when a framing error occurs just because the PM is broken.
+
+No character was dropped in modem example.  On the UART-to-Debug console it may be ok to drop a character.  Ether needs a coordination hook.
+
+Each stack needs some way to adjust expectations.  Finding a way to isolate to a sub-layer of stack and not break everything is always the quest.
+
+> And let's not forget the problem that current kernels have on OMAP34xx
+> platforms.  Literally minutes to get a dmesg out over a 115200 baud serial
+> port, 16 characters at a time.  I guess you're going to try to justify
+> that as 'acceptable behaviour' from the system.  Yes, of course it is.
+> If you're dealing with a 1960s computer which processes that slowly.
+> 
+> And I thought we were in 2012.
+
+This looks like a different issue.  Years back with custom kernels with lots of hacks hack this was not the case.  These days the job is harder to make it work more generally.  Evolving for PM tradeoffs is painful in HW and SW.
+
+Regards,
+Richard W.
