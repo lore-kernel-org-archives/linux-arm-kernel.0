@@ -1,69 +1,77 @@
-From: dhillf@gmail.com (Hillf Danton)
-Date: Sun, 5 Feb 2012 12:25:40 +0800
-Subject: [PATCH 12/15] drivers: add Contiguous Memory Allocator
-In-Reply-To: <1328271538-14502-13-git-send-email-m.szyprowski@samsung.com>
-References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
- <1328271538-14502-13-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAJd=RBBPOwftZJUfe3xc6y24=T8un5hPk0wEOT_5v6WMCbDSag@mail.gmail.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Sun, 05 Feb 2012 12:50:15 +0800
+Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
+In-Reply-To: <20120203133240.GB12915@S2101-09.ap.freescale.net>
+References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
+ <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
+ <20120202085521.GB9773@S2101-09.ap.freescale.net>
+ <20120202091132.GD9773@S2101-09.ap.freescale.net>
+ <20120202092427.GB32403@b20223-02.ap.freescale.net>
+ <20120202130901.GE9773@S2101-09.ap.freescale.net>
+ <20120202135805.GB3015@richard-laptop>
+ <20120203021554.GE32403@b20223-02.ap.freescale.net>
+ <20120203133240.GB12915@S2101-09.ap.freescale.net>
+Message-ID: <a9d9bad3-edd0-4a5f-9bb3-15787430d858@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2012 at 8:18 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> The Contiguous Memory Allocator is a set of helper functions for DMA
-> mapping framework that improves allocations of contiguous memory chunks.
->
-> CMA grabs memory on system boot, marks it with CMA_MIGRATE_TYPE and
-> gives back to the system. Kernel is allowed to allocate movable pages
-> within CMA's managed memory so that it can be used for example for page
-> cache when DMA mapping do not use it. On dma_alloc_from_contiguous()
-> request such pages are migrated out of CMA area to free required
-> contiguous block and fulfill the request. This allows to allocate large
-> contiguous chunks of memory at any time assuming that there is enough
-> free memory available in the system.
->
-> This code is heavily based on earlier works by Michal Nazarewicz.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> CC: Michal Nazarewicz <mina86@mina86.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Tested-by: Rob Clark <rob.clark@linaro.org>
-> Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> ---
 
-[...]
 
-> +/*
-> + * Contiguous Memory Allocator
-> + *
-> + * ? The Contiguous Memory Allocator (CMA) makes it possible to
-> + * ? allocate big contiguous chunks of memory after the system has
-> + * ? booted.
-> + *
-> + * Why is it needed?
-> + *
-> + * ? Various devices on embedded systems have no scatter-getter and/or
-> + * ? IO map support and require contiguous blocks of memory to
-> + * ? operate. ?They include devices such as cameras, hardware video
-> + * ? coders, etc.
-> + *
-> + * ? Such devices often require big memory buffers (a full HD frame
-> + * ? is, for instance, more then 2 mega pixels large, i.e. more than 6
-> + * ? MB of memory), which makes mechanisms such as kmalloc() or
-> + * ? alloc_page() ineffective.
-> + *
-> + * ? At the same time, a solution where a big memory region is
-> + * ? reserved for a device is suboptimal since often more memory is
-> + * ? reserved then strictly required and, moreover, the memory is
-> + * ? inaccessible to page system even if device drivers don't use it.
-> + *
-> + * ? CMA tries to solve this issue by operating on memory regions
-> + * ? where only movable pages can be allocated from. ?This way, kernel
-> + * ? can use the memory for pagecache and when device driver requests
-> + * ? it, allocated pages can be migrated.
-> + *
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Without boot mem reservation, what is the successful rate of CMA to
-serve requests of 1MiB, 2MiB, 4MiB and 8MiB chunks?
+>On Fri, Feb 03, 2012 at 10:15:54AM +0800, Richard Zhao wrote:
+>> adding Eric B?nard.
+>> 
+>> On Thu, Feb 02, 2012 at 09:58:07PM +0800, Richard Zhao wrote:
+>> > On Thu, Feb 02, 2012 at 09:09:03PM +0800, Shawn Guo wrote:
+>> > > On Thu, Feb 02, 2012 at 05:24:28PM +0800, Richard Zhao wrote:
+>> > > > On Thu, Feb 02, 2012 at 05:11:34PM +0800, Shawn Guo wrote:
+>> > > > > On Thu, Feb 02, 2012 at 04:55:23PM +0800, Shawn Guo wrote:
+>> > > > > > On Thu, Feb 02, 2012 at 10:12:05AM +0800, Richard Zhao
+>wrote:
+>> > > > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+>> > > > > > > ---
+>> > > > > > >  arch/arm/mach-imx/mach-mx31ads.c      |   10 ++++++++++
+>> > > > > > >  arch/arm/plat-mxc/include/mach/mx31.h |    1 +
+>> > > > > > >  2 files changed, 11 insertions(+), 0 deletions(-)
+>> > > > > > > 
+>> > > > > > Hmm, let's see who are actually using
+>mxc_audmux_v2_configure_port().
+>> > > > > > 
+>> > > > > > $ git grep -n mxc_audmux_v2_configure_port arch/arm/
+>> > > > > > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:246:    
+>mxc_audmux_v2_configure_port(0,
+>> > > > > > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:254:    
+>mxc_audmux_v2_configure_port(4,
+>> > > > > > arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:257:    
+>mxc_audmux_v2_configure_port(0,
+>> > > > > > arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c:265:    
+>mxc_audmux_v2_configure_port(3,
+>> > > > > > arch/arm/mach-imx/mach-pcm043.c:365:   
+>mxc_audmux_v2_configure_port(3,
+>> > > > > > arch/arm/mach-imx/mach-pcm043.c:371:   
+>mxc_audmux_v2_configure_port(0,
+>> It's machine specific code, though audmux driver is common. Might be
+>ok?
+>
+>With audmux driver moved out, it's not ok to me to have board file
+>call this function.
+>
+>> The asoc machine file for the above 3 boards is not platform driver,
+>and
+>> don't get any plat info.
+>
+>It can be nicely solved if we do these initial setup in audmux driver
+>probe function with the configuration data retrieved from audmux
+>platform data or device tree.
+no, it is asoc machine driver to have machine specific code. 
+the machine driver do not correspond to any hw device, which cause hard to bind dt or create platform device.
+>
+>-- 
+>Regards,
+>Shawn
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
