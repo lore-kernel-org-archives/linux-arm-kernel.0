@@ -1,79 +1,112 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Sun, 5 Feb 2012 17:57:40 +0000
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120205160329.GO1275@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
- <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
- <20120204163931.GH1275@n2100.arm.linux.org.uk>
- <EF62F09C0797D947AD4180A1043C0DF734934E36@DLEE10.ent.ti.com>
- <20120205160329.GO1275@n2100.arm.linux.org.uk>
-Message-ID: <EF62F09C0797D947AD4180A1043C0DF734934E9D@DLEE10.ent.ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun,  5 Feb 2012 19:22:54 +0100
+Subject: [FOR 3.3 PATCH 2/2] pata/at91: use newly introduce smc accessor
+In-Reply-To: <1328466174-27946-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1328466174-27946-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1328466174-27946-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+this will allow to use the pata_at91 on a single zImage
 
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Sunday, February 05, 2012 10:03 AM
-> To: Woodruff, Richard
+and fix the pata since the cleanup of SMC in commit faee0cc33c3df3
 
-> On Sun, Feb 05, 2012 at 03:37:21PM +0000, Woodruff, Richard wrote:
-> > [x] What is acceptable depends is not black and white.  Is there some
-> > QOS mapping which can be set per channel which allows runtime PM to
-> > pick a best chose (which may allow for loss and frame issues)?.
-> 
-> What you're asking is whether there's anything in the kernel which can
-> predict when the next character is to arrive.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: linux-ide at vger.kernel.org
+---
+Hi,
 
-No, this was not the comment's intent.
+	it's depends on other patch for AT91 can we apply via at91
 
-> But, the fact of the matter is that deriving the UART clocks from a PLL
-> which takes a finite time to lock, and the PLL is shut down during runtime
-> PM _is_ _going_ _to_ _cause_ _problems_.  There is absolutely no getting
-> away from that.
+Best Regards,
+J.
+ drivers/ata/pata_at91.c |   46 ++++++++++++++++++++--------------------------
+ 1 files changed, 20 insertions(+), 26 deletions(-)
 
-Yes this is one of the issues to be worked around.
-
-> Let's take your modem example.  Modems today would typically be used with
-> some IP based protocol, probably PPP based.  Incoming traffic on IP is
-> entirely unpredictable.  You wouldn't know when the next character would
-> be received.
-> 
-> One solution to this is to transmit an 0xff character before your real
-> data to ensure that your end is awake and properly synchronized...
-
-This approach as you say has issues.  This is solved in different ways for modems.
-
-<sleep>My observation is modem software which many talk over ppp over ip over serial of some sort (might be uart, might be usb), will send a command to the modem to go into a low power mode. Now you can cut clocks with out hurting modem and getting SOC power.
-
-<wake>When some event happens at modem or processor (timer near beacon or other) the modem or apps processor can signal the other with some wake event (maybe over gpio) which then puts system in a state where it can receive data in trusted manner.
-
-The modem channel driver try's to inform kernel about entering/exiting modes to set expectation.
-
-> So, go ahead with having PM drop random characters if you want, but don't
-> expect anyone in their right mind to accept broken workarounds to the
-> kernel serial driver to try to drop maybe 16 characters or more at a time
-> on the floor when a framing error occurs just because the PM is broken.
-
-No character was dropped in modem example.  On the UART-to-Debug console it may be ok to drop a character.  Ether needs a coordination hook.
-
-Each stack needs some way to adjust expectations.  Finding a way to isolate to a sub-layer of stack and not break everything is always the quest.
-
-> And let's not forget the problem that current kernels have on OMAP34xx
-> platforms.  Literally minutes to get a dmesg out over a 115200 baud serial
-> port, 16 characters at a time.  I guess you're going to try to justify
-> that as 'acceptable behaviour' from the system.  Yes, of course it is.
-> If you're dealing with a 1960s computer which processes that slowly.
-> 
-> And I thought we were in 2012.
-
-This looks like a different issue.  Years back with custom kernels with lots of hacks hack this was not the case.  These days the job is harder to make it work more generally.  Evolving for PM tradeoffs is painful in HW and SW.
-
-Regards,
-Richard W.
+diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+index a7d91a7..53d3770 100644
+--- a/drivers/ata/pata_at91.c
++++ b/drivers/ata/pata_at91.c
+@@ -207,11 +207,11 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+ {
+ 	int ret = 0;
+ 	int use_iordy;
++	struct sam9_smc_config smc;
+ 	unsigned int t6z;         /* data tristate time in ns */
+ 	unsigned int cycle;       /* SMC Cycle width in MCK ticks */
+ 	unsigned int setup;       /* SMC Setup width in MCK ticks */
+ 	unsigned int pulse;       /* CFIOR and CFIOW pulse width in MCK ticks */
+-	unsigned int cs_setup = 0;/* CS4 or CS5 setup width in MCK ticks */
+ 	unsigned int cs_pulse;    /* CS4 or CS5 pulse width in MCK ticks*/
+ 	unsigned int tdf_cycles;  /* SMC TDF MCK ticks */
+ 	unsigned long mck_hz;     /* MCK frequency in Hz */
+@@ -244,26 +244,20 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+ 	}
+ 
+ 	dev_dbg(dev, "Use IORDY=%u, TDF Cycles=%u\n", use_iordy, tdf_cycles);
+-	info->mode |= AT91_SMC_TDF_(tdf_cycles);
+ 
+-	/* write SMC Setup Register */
+-	at91_sys_write(AT91_SMC_SETUP(info->cs),
+-			AT91_SMC_NWESETUP_(setup) |
+-			AT91_SMC_NRDSETUP_(setup) |
+-			AT91_SMC_NCS_WRSETUP_(cs_setup) |
+-			AT91_SMC_NCS_RDSETUP_(cs_setup));
+-	/* write SMC Pulse Register */
+-	at91_sys_write(AT91_SMC_PULSE(info->cs),
+-			AT91_SMC_NWEPULSE_(pulse) |
+-			AT91_SMC_NRDPULSE_(pulse) |
+-			AT91_SMC_NCS_WRPULSE_(cs_pulse) |
+-			AT91_SMC_NCS_RDPULSE_(cs_pulse));
+-	/* write SMC Cycle Register */
+-	at91_sys_write(AT91_SMC_CYCLE(info->cs),
+-			AT91_SMC_NWECYCLE_(cycle) |
+-			AT91_SMC_NRDCYCLE_(cycle));
+-	/* write SMC Mode Register*/
+-	at91_sys_write(AT91_SMC_MODE(info->cs), info->mode);
++	/* SMC Setup Register */
++	smc.nwe_setup = smc.nrd_setup = setup;
++	smc.ncs_write_setup = smc.ncs_read_setup = 0;
++	/* SMC Pulse Register */
++	smc.nwe_pulse = smc.nrd_pulse = pulse;
++	smc.ncs_write_pulse = smc.ncs_read_pulse = cs_pulse;
++	/* SMC Cycle Register */
++	smc.write_cycle = smc.read_cycle = cycle;
++	/* SMC Mode Register*/
++	smc.tdf_cycles = tdf_cycles;
++	smc.mode = info->mode;
++
++	sam9_smc_configure(0, info->cs, &smc);
+ }
+ 
+ static void pata_at91_set_piomode(struct ata_port *ap, struct ata_device *adev)
+@@ -288,20 +282,20 @@ static unsigned int pata_at91_data_xfer_noirq(struct ata_device *dev,
+ 	struct at91_ide_info *info = dev->link->ap->host->private_data;
+ 	unsigned int consumed;
+ 	unsigned long flags;
+-	unsigned int mode;
++	struct sam9_smc_config smc;
+ 
+ 	local_irq_save(flags);
+-	mode = at91_sys_read(AT91_SMC_MODE(info->cs));
++	sam9_smc_read_mode(0, info->cs, &smc);
+ 
+ 	/* set 16bit mode before writing data */
+-	at91_sys_write(AT91_SMC_MODE(info->cs),
+-			(mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16);
++	smc.mode = (smc.mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16;
++	sam9_smc_write_mode(0, info->cs, &smc);
+ 
+ 	consumed = ata_sff_data_xfer(dev, buf, buflen, rw);
+ 
+ 	/* restore 8bit mode after data is written */
+-	at91_sys_write(AT91_SMC_MODE(info->cs),
+-			(mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8);
++	smc.mode = (smc.mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8;
++	sam9_smc_write_mode(0, info->cs, &smc);
+ 
+ 	local_irq_restore(flags);
+ 	return consumed;
+-- 
+1.7.7
