@@ -1,28 +1,31 @@
 From: mina86@mina86.com (Michal Nazarewicz)
-Date: Sun, 05 Feb 2012 15:33:08 +0100
-Subject: [PATCH 12/15] drivers: add Contiguous Memory Allocator
-In-Reply-To: <CAJd=RBBPOwftZJUfe3xc6y24=T8un5hPk0wEOT_5v6WMCbDSag@mail.gmail.com>
+Date: Sun, 05 Feb 2012 15:34:15 +0100
+Subject: [PATCH 05/15] mm: compaction: export some of the functions
+In-Reply-To: <CAJd=RBBsTxV4bM_QEbKaU=uKkFTNgPEK4yTiLjbE0TaEp4KA7w@mail.gmail.com>
 References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
- <1328271538-14502-13-git-send-email-m.szyprowski@samsung.com>
- <CAJd=RBBPOwftZJUfe3xc6y24=T8un5hPk0wEOT_5v6WMCbDSag@mail.gmail.com>
-Message-ID: <op.v87mpive3l0zgt@mpn-glaptop>
+ <1328271538-14502-6-git-send-email-m.szyprowski@samsung.com>
+ <CAJd=RBBsTxV4bM_QEbKaU=uKkFTNgPEK4yTiLjbE0TaEp4KA7w@mail.gmail.com>
+Message-ID: <op.v87mrdg83l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 05 Feb 2012 05:25:40 +0100, Hillf Danton <dhillf@gmail.com> wrote:
-> Without boot mem reservation, what is the successful rate of CMA to
-> serve requests of 1MiB, 2MiB, 4MiB and 8MiB chunks?
+> On Fri, Feb 3, 2012 at 8:18 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>> From: Michal Nazarewicz <mina86@mina86.com>
+>>
+>> This commit exports some of the functions from compaction.c file
+>> outside of it adding their declaration into internal.h header
+>> file so that other mm related code can use them.
+>>
+>> This forced compaction.c to always be compiled (as opposed to being
+>> compiled only if CONFIG_COMPACTION is defined) but as to avoid
+>> introducing code that user did not ask for, part of the compaction.c
+>> is now wrapped in on #ifdef.
 
-CMA will work as long as you manage to get some pageblocks marked as
-MIGRATE_CMA and move all non-movable pages away.  You might try and get it
-done after system has booted but we have not tried nor tested it.
-Reservation at boot time lets us make sure that the portion of memory we
-are grabbing has no unmovable pages.
+On Sun, 05 Feb 2012 08:40:08 +0100, Hillf Danton <dhillf@gmail.com> wrote:
+> What if both compaction and CMA are not enabled?
 
-You might still and use alloc_contig_pages() on its own (even without
-MIGRATE_CMA) but that would require additional code which would look for
-a region of memory that could be used (ie. that does not have unmovable
-pages in it).  That in fact was what Kamezawa's code was doing.
+What about it?  If both are enabled, both will be compiled and usable.
 
 -- 
 Best regards,                                         _     _
