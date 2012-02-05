@@ -1,31 +1,37 @@
 From: mina86@mina86.com (Michal Nazarewicz)
-Date: Sun, 05 Feb 2012 15:34:15 +0100
-Subject: [PATCH 05/15] mm: compaction: export some of the functions
-In-Reply-To: <CAJd=RBBsTxV4bM_QEbKaU=uKkFTNgPEK4yTiLjbE0TaEp4KA7w@mail.gmail.com>
+Date: Sun, 05 Feb 2012 15:37:07 +0100
+Subject: [PATCH 08/15] mm: mmzone: MIGRATE_CMA migration type added
+In-Reply-To: <CAJd=RBD765rmiCDiCz87Vf8vf8Wp-AiW=gZ3Nw5LjTPw70ZO7g@mail.gmail.com>
 References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
- <1328271538-14502-6-git-send-email-m.szyprowski@samsung.com>
- <CAJd=RBBsTxV4bM_QEbKaU=uKkFTNgPEK4yTiLjbE0TaEp4KA7w@mail.gmail.com>
-Message-ID: <op.v87mrdg83l0zgt@mpn-glaptop>
+ <1328271538-14502-9-git-send-email-m.szyprowski@samsung.com>
+ <CAJd=RBByc_wLEJTK66J4eY03CWnCoCRiwAeEYjXCZ5xEZhp3ag@mail.gmail.com>
+ <op.v830ygma3l0zgt@mpn-glaptop>
+ <CAJd=RBD765rmiCDiCz87Vf8vf8Wp-AiW=gZ3Nw5LjTPw70ZO7g@mail.gmail.com>
+Message-ID: <op.v87mv5ca3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Feb 3, 2012 at 8:18 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> From: Michal Nazarewicz <mina86@mina86.com>
->>
->> This commit exports some of the functions from compaction.c file
->> outside of it adding their declaration into internal.h header
->> file so that other mm related code can use them.
->>
->> This forced compaction.c to always be compiled (as opposed to being
->> compiled only if CONFIG_COMPACTION is defined) but as to avoid
->> introducing code that user did not ask for, part of the compaction.c
->> is now wrapped in on #ifdef.
+>>>> +static inline bool migrate_async_suitable(int migratetype)
 
-On Sun, 05 Feb 2012 08:40:08 +0100, Hillf Danton <dhillf@gmail.com> wrote:
-> What if both compaction and CMA are not enabled?
+>> On Fri, 03 Feb 2012 15:19:54 +0100, Hillf Danton <dhillf@gmail.com> wrote:
+>>> Just nitpick, since the helper is not directly related to what async
+>>> means, how about migrate_suitable(int migrate_type) ?
 
-What about it?  If both are enabled, both will be compiled and usable.
+> 2012/2/3 Michal Nazarewicz <mina86@mina86.com>:
+>> I feel current name is better suited since it says that it's OK to scan this
+>> block if it's an asynchronous compaction run.
+
+On Sat, 04 Feb 2012 10:09:02 +0100, Hillf Danton <dhillf@gmail.com> wrote:
+> The input is the migrate type of page considered, and the async is only one
+> of the modes that compaction should be carried out. Plus the helper is
+> also used in other cases where async is entirely not concerned.
+>
+> That said, the naming is not clear, if not misleading.
+
+In the first version the function was called is_migrate_cma_or_movable() which
+described what the function checked.  Mel did not like it though, hence the
+change to migrate_async_suitable().  Honestly, I'm not sure what would be the
+best name for function.
 
 -- 
 Best regards,                                         _     _
