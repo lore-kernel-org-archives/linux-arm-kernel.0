@@ -1,59 +1,101 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 06 Feb 2012 11:42:27 +0100
-Subject: [BUG] genirq: Race condition in ONESHOT IRQ handler disabling
- IRQ forever
-In-Reply-To: <20271.35831.227679.177366@ipc1.ka-ro>
-References: <20271.35831.227679.177366@ipc1.ka-ro>
-Message-ID: <4F2FAE93.5020205@metafoo.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 06 Feb 2012 17:08:14 +0530
+Subject: [PATCH v3] dmaengine: Add support for MEMCPY for imx-dma.
+In-Reply-To: <1328006840-7345-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1328006840-7345-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1328528294.26182.80.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2012 09:14 AM, =?utf-8?Q?Lothar_Wa=C3=9Fmann?= wrote:
-> Hi,
+On Tue, 2012-01-31 at 11:47 +0100, Javier Martin wrote:
+> MEMCPY transfers allow DMA copies from memory to
+> memory. This patch has been tested with dmatest
+> device driver.
 > 
-> I already sent this to <linux-kernel@vger.kernel.org> on Feb. 1, 2012
-> but did not get any response there. So resending to a wider audience
-> with improved subject line:
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> ---
+>  drivers/dma/imx-dma.c |   36 +++++++++++++++++++++++++++++++++++-
+>  1 files changed, 35 insertions(+), 1 deletions(-)
 > 
-> there is a race condition in the threaded IRQ handler code for oneshot
-> interrupts that may lead to disabling an IRQ indefinitely. IRQs are
-> masked before calling the hard-irq handler and are unmasked only after
-> the soft-irq handler has been run. Thus if the hard-irq handler
-> returns IRQ_HANDLED instead of IRQ_WAKE_THREAD, meaning the soft-irq
-> will not be called, the interrupt will remain masked forever.
-> 
-> This can happen due to a short pulse on the interrupt line, that
-> triggers the interrupt logic, but goes undetected by the hard-irq
-> handler. The problem can be reproduced with the TSC2007 touch
-> controller driver that uses ONESHOT interrupts.
-> 
-> The problem arises also with interrupt controllers that latch a level
-> triggered IRQ until it is acknowledged (like the i.MX28 does).
-> In this case the IRQ status bit will remain asserted after the
-> soft-irq finishes and retrigger the interrupt while the interrupt line
-> is already deasserted.
-> 
-> The following patch would solve the problem, but I'm not sure whether
-> it's the Right Thing(TM) to do. Especially wrt. shared interrupts.
-> 
-> diff --git a/kernel/irq/handle.c b/kernel/irq/handle.c
-> index 470d08c..93beadb 100644
-> --- a/kernel/irq/handle.c
-> +++ b/kernel/irq/handle.c
-> @@ -146,6 +146,11 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
->  			/* Fall through to add to randomness */
->  		case IRQ_HANDLED:
->  			random |= action->flags;
-> +			/* unmask the IRQ that has been left masked
-> +			 * due to race condition
-> +			 */
-> +			if (res == IRQ_HANDLED && (action->flags & IRQF_ONESHOT))
-> +				unmask_irq(desc);
->  			break;
+> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+> index 3296a73..9aa6e85 100644
+> --- a/drivers/dma/imx-dma.c
+> +++ b/drivers/dma/imx-dma.c
+> @@ -196,7 +196,8 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
+>  	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+>  	struct imx_dma_data *data = chan->private;
 >  
->  		default:
+> -	imxdmac->dma_request = data->dma_request;
+> +	if (data != NULL)
+> +		imxdmac->dma_request = data->dma_request;
+if you support memcopy then why should it _always_ require private
+pointer?
+>  
+>  	dma_async_tx_descriptor_init(&imxdmac->desc, chan);
+>  	imxdmac->desc.tx_submit = imxdma_tx_submit;
+> @@ -328,6 +329,36 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+>  	return &imxdmac->desc;
+>  }
+>  
+> +static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+> +	struct dma_chan *chan, dma_addr_t dest,
+> +	dma_addr_t src, size_t len, unsigned long flags)
+> +{
+> +	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+> +	struct imxdma_engine *imxdma = imxdmac->imxdma;
+> +	int ret;
+> +
+> +	dev_dbg(imxdma->dev, "%s channel: %d src=0x%x dst=0x%x len=%d\n",
+> +			__func__, imxdmac->channel, src, dest, len);
+> +
+> +	if (imxdmac->status == DMA_IN_PROGRESS)
+> +		return NULL;
+thats not right, you should be able to prepare descriptors even if dmac
+is busy. Prepare != start
+> +	imxdmac->status = DMA_IN_PROGRESS;
+> +
+> +	ret = imx_dma_config_channel(imxdmac->imxdma_channel,
+> +			       IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
+> +			       IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
+> +			       0, 0);
+> +	if (ret)
+> +		return NULL;
+> +
+> +	ret = imx_dma_setup_single(imxdmac->imxdma_channel, src, len,
+> +				   dest, DMA_MODE_WRITE);
+> +	if (ret)
+> +		return NULL;
+> +
+> +	return &imxdmac->desc;
+> +}
+> +
+>  static void imxdma_issue_pending(struct dma_chan *chan)
+>  {
+>  	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+> @@ -349,6 +380,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+>  
+>  	dma_cap_set(DMA_SLAVE, imxdma->dma_device.cap_mask);
+>  	dma_cap_set(DMA_CYCLIC, imxdma->dma_device.cap_mask);
+> +	dma_cap_set(DMA_MEMCPY, imxdma->dma_device.cap_mask);
+>  
+>  	/* Initialize channel parameters */
+>  	for (i = 0; i < MAX_DMA_CHANNELS; i++) {
+> @@ -382,11 +414,13 @@ static int __init imxdma_probe(struct platform_device *pdev)
+>  	imxdma->dma_device.device_tx_status = imxdma_tx_status;
+>  	imxdma->dma_device.device_prep_slave_sg = imxdma_prep_slave_sg;
+>  	imxdma->dma_device.device_prep_dma_cyclic = imxdma_prep_dma_cyclic;
+> +	imxdma->dma_device.device_prep_dma_memcpy = imxdma_prep_dma_memcpy;
+>  	imxdma->dma_device.device_control = imxdma_control;
+>  	imxdma->dma_device.device_issue_pending = imxdma_issue_pending;
+>  
+>  	platform_set_drvdata(pdev, imxdma);
+>  
+> +	imxdma->dma_device.copy_align = 2; /* 2^2 = 4 bytes alignment */
+what is this magic number?
+>  	imxdma->dma_device.dev->dma_parms = &imxdma->dma_parms;
+>  	dma_set_max_seg_size(imxdma->dma_device.dev, 0xffffff);
+>  
 
-I think a better fix is to check the return value of handle_irq_event in
-handle_level_irq and if the IRQ_WAKE_THREADED bit is not set unmask the irq.
 
-The same should probably also be done for handle_fasteoi_irq.
+-- 
+~Vinod
