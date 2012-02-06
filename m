@@ -1,56 +1,133 @@
-From: bill4carson@gmail.com (carson bill)
-Date: Mon, 6 Feb 2012 22:40:30 +0800
-Subject: [PATCH 4/7] Store huge page linux pte in mm_struct
-In-Reply-To: <20120206102957.GB26538@arm.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-5-git-send-email-bill4carson@gmail.com>
- <20120131100154.GC889@n2100.arm.linux.org.uk>
- <4F28D18D.1040402@gmail.com> <4F2F352B.9080408@gmail.com>
- <20120206102957.GB26538@arm.com>
-Message-ID: <CAOMgcG+Jb8MEFiTGj7AcpzLRxGJ=yYBq8_5iurqs9mc05MxSeA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon,  6 Feb 2012 15:53:20 +0100
+Subject: [PATCH 1/1] ARM: at91/dt: add Calao DAB-MMX daugther board support
+ for USB-A9G20
+Message-ID: <1328540001-24337-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/2/6, Catalin Marinas <catalin.marinas@arm.com>:
-> bill4carson wrote:
->> Normal page based pte has hardware version and linux version, these
->> two kinds of ptes occupy half of 4K page, and each of two pmd level
->> entry pointer to this half 4K page.
->>
->> For huge page, mappings only exist in pmd level from hardware
->> perspective, however mm subsystem also needs to know the linux version
->> *pte* of this huge page based mapping, problems is where to store
->> these huge page linux pte?
->>
->> A:
->> Store huge page linux pte in mm_struct
->>
->> B:
->> Store huge page linux pte in mm_context_t suggested by Catalin.
->> This is almost like option A, while it's nice to modify arm code only
->> and take small effort to make it happen.
->>
->> C:
->> Modify pgd_alloc to allocate 2048 pgd_t entries plus two void pointers
->> Use these two additional pointers to store huge page linux pte.
->> It's feasible, but I don't know whether this is a good idea.
->
-> I wouldn't add this to pgd_alloc since not all tasks need huge pages.
-> First option is also not feasible as we shouldn't touch generic code.
-> This leaves us with B, unless better options are suggested.
->
+http://www.calao-systems.com/articles.php?lng=en&pg=6099
 
-So far B sounds better, I will make that happens in V2.
-I don't know whether other guru have any opinion on this patch,
-Advice/suggestion/criticism are all truly welcome!
+this daughter board add the following device:
+ - Micro-SD socket
+ - TTL 3V3 - (Tx/Rx/RTS/CTS)
+ - I2C port
+ - 0.96" Serial OLED Display Module (over UART)
+ - MP3 decoder with Micro & Speakers
+ - 4x PB, 4x Leds (Blue), 3x Leds (Green, Orange, Red)
 
+for now we add only the 2 UARTs, 4 Buttons, 7 leds and i2c via DT
 
-> I had a patch couple of years ago
-> (http://article.gmane.org/gmane.linux.ports.arm.kernel/55045) to use the
-> AF (Access Flag) bit and free up some bits in the page table, allowing
-> us to drop the Linux PTE. But we end up in a bigger configuration mess
-> as we already have to choose between classic MMU and LPAE. The
-> performance advantage wasn't that big either.
-> --
-> Catalin
->
+used_led1 will not be re-add via DT as it's used by the motherboard too
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi |   97 ++++++++++++++++++++++++++++++
+ 1 files changed, 97 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi
+
+diff --git a/arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi b/arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi
+new file mode 100644
+index 0000000..60c2a58
+--- /dev/null
++++ b/arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi
+@@ -0,0 +1,97 @@
++/*
++ * calao-dab-mmx.dtsi - Device Tree Include file for Calao DAB-MMX Daughter Board
++ *
++ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
++
++/ {
++	ahb {
++		apb {
++			usart1: serial at fffb4000 {
++				status = "okay";
++			};
++
++			usart3: serial at fffd0000 {
++				status = "okay";
++			};
++
++			i2c-gpio at 0 {
++				status = "okay";
++			};
++
++			leds at 1 {
++				compatible = "gpio-leds";
++
++				user_led1 {
++					label = "user_led1";
++					gpios = <&pioB 20 1>;
++				};
++
++/*
++ * led already used by mother board but active as high
++ *				user_led2 {
++ *					label = "user_led2";
++ *					gpios = <&pioB 21 1>;
++ *				};
++ */
++				user_led3 {
++					label = "user_led3";
++					gpios = <&pioB 22 1>;
++				};
++
++				user_led4 {
++					label = "user_led4";
++					gpios = <&pioB 23 1>;
++				};
++
++				red {
++					label = "red";
++					gpios = <&pioB 24 1>;
++				};
++
++				orange {
++					label = "orange";
++					gpios = <&pioB 30 1>;
++				};
++
++				green {
++					label = "green";
++					gpios = <&pioB 31 1>;
++				};
++			};
++
++			gpio_keys at 1 {
++				compatible = "gpio-keys";
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				user_pb1 {
++					label = "user_pb1";
++					gpios = <&pioB 25 1>;
++					linux,code = <0x100>;
++				};
++
++				user_pb2 {
++					label = "user_pb2";
++					gpios = <&pioB 13 1>;
++					linux,code = <0x101>;
++				};
++
++				user_pb3 {
++					label = "user_pb3";
++					gpios = <&pioA 26 1>;
++					linux,code = <0x102>;
++				};
++
++				user_pb4 {
++					label = "user_pb4";
++					gpios = <&pioC 9 1>;
++					linux,code = <0x103>;
++				};
++			};
++
++		};
++	};
++};
+-- 
+1.7.7
